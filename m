@@ -1,123 +1,108 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Mon, 31 Aug 2015 14:40:10 -0700
-Subject: [PATCH v2 0/5] Fix broken DMAFLUSHP on Rockchips platform
-In-Reply-To: <1440722176-31588-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1440722176-31588-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <CAPz6YkXmGkQsB4WbQ5VbBAPRCTQFYCUR=Nf6G+syhbXSPA2DeQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 31 Aug 2015 16:49:10 -0500
+Subject: [PATCH v3 2/5] ARM: NSP: add minimal Northstar Plus device tree
+In-Reply-To: <20150831194404.GA28848@broadcom.com>
+References: <1440805644-18241-1-git-send-email-jonmason@broadcom.com>
+ <55E0FAC4.2040108@broadcom.com> <20150831022417.GA27066@broadcom.com>
+ <55E3FFB5.6090703@broadcom.com> <20150831194404.GA28848@broadcom.com>
+Message-ID: <CAL_JsqL1=WoaidMgLN4exvhF7bYr4FNGmtMgYO8e-c=NxP3JbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 27, 2015 at 5:36 PM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
->
-> The purpose of the DMAFLUSHP instruction:
-> - Tell the peripheral to clear its status and control registers.
-> - Send a message to the peripheral to resend its level status.
->
-> There are 3 timings described in PL330 Technical Reference Manual:
-> - Timing 1: Burst request, can work well without DMAFLUSHP.
-> - Timing 2: Single and burst request, DMAC will ignore the single
->             transfer request. This timing happens if there are single
->             and burst request.
-> - Timing 3: Single transfers for a burst request, DMAC should signals
->             datype to request the peripheral to flush the contents of
->             any control registers. This timing happens if there is
->             not enough MFIFO to places the burst data.
->
-> A peripheral may signal a DMA request during the execution of
-> DMAFLUSHP instruction, that cause DMA request being ignored by DMAC.
->
-> But DMAC and all peripherals on RK3X SoCs DO NOT support DMAFLUSHP.
-> It can't send a message to the peripheral to resend DMA request,
-> and the peripheral can't acknowledge a flush request from DMAC.
-> So all DMA requests should NOT be ignored by DMAC, and DMAC will not
-> notify the peripheral to flush.
->
-> To fix this problem, we need:
-> - Do NOT execute DMAFLUSHP instruction.
-> - Timing 2 and timing 3 should not happen.
->
-> Because on RK3X SoCs, there are 6 or below  channels and 32 MFIFO depth
-> for DMAC_BUS, and 8 channels and 64 MFIFO depth for DMAC_PERI, it is
-> impossible to hit the timing 3 if burst length is equal or less than 4.
+On Mon, Aug 31, 2015 at 2:44 PM, Jon Mason <jonmason@broadcom.com> wrote:
+> On Mon, Aug 31, 2015 at 12:18:13AM -0700, Ray Jui wrote:
+>>
+>>
+>> On 8/30/2015 7:24 PM, Jon Mason wrote:
+>> > On Fri, Aug 28, 2015 at 05:20:20PM -0700, Ray Jui wrote:
+>> >>
+>> >>
+>> >> On 8/28/2015 4:47 PM, Jon Mason wrote:
+>> >>> Add a very minimalistic set of Northstar Plus Device Tree files which
+>> >>> describes the SoC and the BCM958625 implementation.  The perpherials
+>> >>> described are:
+>> >>>
+>> >>> ARM Cortex A9 CPU
+>> >>> 2 8250 UARTs
+>> >>> ARM GIC
+>> >>> PL310 L2 Cache
+>> >>> ARM A9 Global timer
 
-Fixing this issue also requires changes to drivers, so it would be
-nice if you put those changes into the same patchset.
-Otherwise someone may apply this series and expect things to work but
-they will still be broken. Specifically the peripherals should be
-setting their burst sizes for their DMA requests low enough to avoid
-needing the working DMAFLUSHP instruction.
+[...]
 
-Also, I remember we ran into an issue when we tried using burst length
-of 4 with the i2s device on RK3288 because we could get requests that
-either weren't aligned or a multiple of 4 sizes and some transfers
-would just fail, so we ended up using a burst size of 1.  I recommend
-if we aren't sure about size or alignment for a particular peripheral,
-a burst size of 1 is safest.  For something like a block device, I
-think we can use the larger size bursts.  That's another reason to
-include the driver fixes in the series, just so we get it right,
-thanks.
+>> >>> + apb {
+>> >>> +         compatible = "arm,amba-bus", "simple-bus";
+>> >>
+>> >> Should "arm,amba-bus" has a separate bus node with AMBA compatible
+>> >> devices declared in there (e.g, pl330, spi-pl022, and etc.) in the
+>> >> future after they are brought up? To my best knowledge, "ns16550a" UART
+>> >> is NOT an AMBA compatible device.
 
+IIRC, "arm,amba-bus" is not documented nor used. It isn't really
+needed as there is no s/w visible feature to an AMBA bus. There are
+also multiple flavors of AMBA buses, so it is pretty meaningless.
+
+>> > APB is an AMBA bus, so this part is accurate.  The block diagram of
+>> > the SoC has the UARTs (and other perpherials) hanging off of the APB
+>> > bus.  So, this organization follows the block diagram.
+>>
+>> Okay so the "apb" node can be used for amba compatible devices
+>> (arm,amba-bus) and/or simple platform devices (simple-bus). I guess
+>> that's fine and I now see that there are some other dtsi also doing it
+>> this way.
+
+I think what is meant here by "amba compatible devices" is really ARM
+Primecell peripherals which are the ARM IP with standard ID registers.
+These are designated by "arm,primecell" compatible strings for the
+device not the bus compatible string.
+
+>>
+>> > While the
+>> > UART drivers are not AMBA aware, there appears to be no issues with
+>> > this layout (as the HW/drivers come up without issue). Unless there
+>> > is an unforeseen issue with having non-AMBA aware devices on the DT
+>> > AMBA bus, I would think it best to organize it to match the block
+>> > disgram.
+>> >
+>>
+>> UART runs fine because you also have "simple-bus" listed as the
+>> compatible string so uart is populated as standard platform device.
+>>
+>> >>> +         interrupt-parent = <&gic>;
+>> >>> +         ranges = <0x00000000 0x18000000 0x00001000>;
+>> >>
+>> >> Does the 'apb' bus mean to cover all peripherals connected through APB?
+>> >> If so, the size is only 0x1000 and that seems to be too small...
+>> >
+>> > This is all that is currently needed.  I was planning on expanding it
+>> > as I added more devices.
+>>
+>> Sure.
+>>
+>> I haven't checked the datahsheet but based on the layout (which seems
+>> quite similar to Cygnus), I assume the range for these devices should be
+>> 0x18000000 - 0x18ffffff? Just want to make sure there are no other
+>> devices come before 0x18000000 so you don't need to change all these reg
+>> offsets in the future.
 >
-> Since the request type signal by the peripheral can only be set by
-> software. We can set Rockchip Soc's GRF_PERIDMAC_CON0[2:1] to select single
-> or burst request, if it is set b01,  all of the peripharals will signal a brust
-> request. So the timing 2 will not happen, too.
+> Based on the devices listed in the block diagram (and not including
+> those on the AXI bus):
+> i2c 0x18038000
+> spi 0x18027200
+> gpio 0x18000060
+> pwm 0x18031000
+> wdt 0x18039000
 >
-> So DMAC on RK3X can support single or burst transfer, but can't support
-> mixed transfer.
+> and a few others.
 >
-> Because burst transfer is more efficient than single transfer, this is
-> confirmed by our ASIC team, who strongly suggest to use burst transfer.
-> And this is confirmed by Addy's test on RK3288-Pink2 board, the speed of
-> spi flash burst transfer will increase about two times than single transfer.
-> Also, I have tested dw_mmc with pl330 on RK3188 platform to double confirm
-> the result. That means burst transfer is reansonable.
->
-> So we need a quirk not to execute DMAFLUSHP instruction and to use burst
-> transfer.
->
-> Note:
-> - The Rockchip Soc default value of GRF_PERIDMAC_CON0[2:1] is b01. To
->   support brust transfer, these bits should not be changed in bootloader.
->
->
-> Changes in v2:
-> - amend the author
-> - reorder the patches suggested by Doug
-> - add Reviewed-by: Doug Anderson <dianders@chromium.org> for
->   rk3288.dtsi patch and arm-pl330.txt patch
-> - amend Olof's mail address
->
-> Changes in v1:
-> - rename broken-no-flushp to "arm,pl330-broken-no-flushp" suggested
->   by Krzysztof.
-> - add From original author.
-> - remove Sunny's tag
->
-> Addy Ke (2):
->   DMA: pl330: add quirk for broken no flushp
->   ARM: dts: Add arm,pl330-broken-no-flushp quirk for rk3288 platform
->
-> Boojin Kim (1):
->   DMA: pl330: support burst mode for dev-to-mem and mem-to-dev transmit
->
-> Shawn Lin (2):
->   Documentation: arm-pl330: add description of
->     arm,pl330-broken-no-flushp
->   ARM: dts: Add arm,pl330-broken-no-flushp quirk for rk3xxx platform
->
->  .../devicetree/bindings/dma/arm-pl330.txt          |   1 +
->  arch/arm/boot/dts/rk3288.dtsi                      |   3 +
->  arch/arm/boot/dts/rk3xxx.dtsi                      |   3 +
->  drivers/dma/pl330.c                                | 101 +++++++++++++++------
->  4 files changed, 79 insertions(+), 29 deletions(-)
->
-> --
-> 2.3.7
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Looking at the sources, all the ARM IP is 0x19000000 and the rest is
+> 0x18000000.  The only part that is a little harry is the clocks, which
+> have BCM and ARM (which causes the addresses to be both 0x19000000 and
+> 0x18000000).  But, we can handle that when we upstream that part (which
+> should be very soon).
+
+If you can tell that 0x19000000 is a separate bus at some level, then
+it makes sense to separate it. You can't always tell without detailed
+internal bus diagrams.
+
+Rob
