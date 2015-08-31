@@ -1,34 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 31 Aug 2015 07:11:34 -0700
-Subject: [PATCH] gpio: omap: Fix gpiochip_add() handling for deferred probe
-In-Reply-To: <55E4186E.7090605@ti.com>
-References: <1440787489-15992-1-git-send-email-tony@atomide.com>
- <55E4186E.7090605@ti.com>
-Message-ID: <20150831141134.GA4215@atomide.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 31 Aug 2015 16:13:18 +0200 (CEST)
+Subject: [PATCH v3 RESEND 0/5] Remaining part of kill off set_irq_flags
+ usage
+In-Reply-To: <1440889285-5637-1-git-send-email-robh@kernel.org>
+References: <1440889285-5637-1-git-send-email-robh@kernel.org>
+Message-ID: <alpine.DEB.2.11.1508311612320.15006@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [150831 02:07]:
-> Hi Tony,
+On Sat, 29 Aug 2015, Rob Herring wrote:
+> Thomas,
 > 
-> On 08/28/2015 09:44 PM, Tony Lindgren wrote:
-> >Currently we gpio-omap breaks if gpiochip_add() returns -EPROBE_DEFER:
-> >
-> >[    0.570000] gpiochip_add: GPIOs 0..31 (gpio) failed to register
-> >[    0.570000] omap_gpio 48310000.gpio: Could not register gpio chip -517
-> >...
-> >[    3.670000] omap_gpio 48310000.gpio: Unbalanced pm_runtime_enable!
-> 
-> I have no objection to the patch itself.
-> 
-> But I curious, How have you got this error output? Was it simulated?
+> As requested, here are the remaining patches for killing off 
+> set_irq_flags which have not been picked up. The rest of the 
+> series has been picked up and are in -next. 
 
-I ran into it when trying to get rid of all the custom initcalls
-for various drivers. And especially if adding dts mappings for
-gpio-ranges to try to find some solution for the 1.158 issue that
-keeps me from having a mainline GPIO PM regresion test with
-pinging wl12xx during off idle :)
+I pick it up, stick it into tip irq/urgent let it brew for a couple of
+days in next and send it to Linus after that.
 
-Regards,
+Thanks,
 
-Tony
+	tglx
