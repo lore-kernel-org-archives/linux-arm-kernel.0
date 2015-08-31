@@ -1,77 +1,102 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 31 Aug 2015 13:22:02 +0200
-Subject: [PATCH v8 29/55] [media] replace all occurrences of
- MEDIA_ENT_T_DEVNODE_V4L
-In-Reply-To: <553c4e697dee72bbdf3d73a4d428118e10e18720.1440902901.git.mchehab@osg.samsung.com>
-References: <cover.1440902901.git.mchehab@osg.samsung.com>
- <553c4e697dee72bbdf3d73a4d428118e10e18720.1440902901.git.mchehab@osg.samsung.com>
-Message-ID: <55E438DA.7050701@xs4all.nl>
+From: antonios.motakis@huawei.com (Antonios Motakis)
+Date: Mon, 31 Aug 2015 13:43:56 +0200
+Subject: [PATCH v3 04/10] VFIO: platform: add vfio_platform_set_automasked
+In-Reply-To: <1439919864.4023.626.camel@redhat.com>
+References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
+ <1439212864-12954-5-git-send-email-eric.auger@linaro.org>
+ <1439405794.4023.528.camel@redhat.com> <55D1FFE8.9050104@linaro.org>
+ <1439919864.4023.626.camel@redhat.com>
+Message-ID: <55E43DFC.8050608@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/2015 05:06 AM, Mauro Carvalho Chehab wrote:
-> Now that interfaces and entities are distinct, it makes no sense
-> of keeping something named as MEDIA_ENT_T_DEVNODE.
-> 
-> This change was done with this script:
-> 
-> 	for i in $(git grep -l MEDIA_ENT_T|grep -v uapi/linux/media.h); do sed s,MEDIA_ENT_T_DEVNODE_V4L,MEDIA_ENT_T_V4L2_VIDEO, <$i >a && mv a $i; done
-> 
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+
+On 18-Aug-15 19:44, Alex Williamson wrote:
+> On Mon, 2015-08-17 at 17:38 +0200, Eric Auger wrote:
+>> On 08/12/2015 08:56 PM, Alex Williamson wrote:
+>>> On Mon, 2015-08-10 at 15:20 +0200, Eric Auger wrote:
+>>>> This function makes possible to change the automasked mode.
+>>>>
+>>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>>>
+>>>> ---
+>>>>
+>>>> v1 -> v2:
+>>>> - set forwarded flag
+>>>> ---
+>>>>  drivers/vfio/platform/vfio_platform_irq.c | 19 +++++++++++++++++++
+>>>>  1 file changed, 19 insertions(+)
+>>>>
+>>>> diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+>>>> index b31b1f0..a285384 100644
+>>>> --- a/drivers/vfio/platform/vfio_platform_irq.c
+>>>> +++ b/drivers/vfio/platform/vfio_platform_irq.c
+>>>> @@ -186,6 +186,25 @@ static irqreturn_t vfio_handler(int irq, void *dev_id)
+>>>>  	return ret;
+>>>>  }
+>>>>  
+>>>> +static int vfio_platform_set_automasked(struct vfio_platform_irq *irq,
+>>>> +					   bool automasked)
+>>>> +{
+>>>> +	unsigned long flags;
+>>>> +
+>>>> +	spin_lock_irqsave(&irq->lock, flags);
+>>>> +	if (automasked) {
+>>>> +		irq->forwarded = true;
+>>>> +		irq->flags |= VFIO_IRQ_INFO_AUTOMASKED;
+>>>> +		irq->handler = vfio_automasked_irq_handler;
+>>>> +	} else {
+>>>> +		irq->forwarded = false;
+>>>> +		irq->flags &= ~VFIO_IRQ_INFO_AUTOMASKED;
+>>>> +		irq->handler = vfio_irq_handler;
+>>>> +	}
+>>>> +	spin_unlock_irqrestore(&irq->lock, flags);
+>>>> +	return 0;
+>>>
+>>> In vfio-speak, automasked means level and we're not magically changing
+>>> the IRQ from level to edge, we're simply able to handle level
+>>> differently based on a hardware optimization.  Should the user visible
+>>> flags therefore change based on this?  Aren't we really setting the
+>>> forwarded state rather than the automasked state?
+>>
+>> Well actually this was following the discussion we had a long time ago
+>> about that topic:
+>>
+>> http://lkml.iu.edu/hypermail/linux/kernel/1409.1/03659.html
+>>
+>> I did not really know how to conclude ...
+>>
+>> If it is preferred I can hide this to the userspace, no problem.
+> 
+> I think that was based on the user being involved in enabling forwarding
+> though, now that it's hidden and automatic, it doesn't make much sense
+> to me to toggle any of the interrupt info details based on the state of
+> the forward.  The user always needs to handle the interrupt as level
+> since the bypass can be torn down at any point in time.  We're taking
+> advantage of the in-kernel path to make further optimizations, which
+> seems like they should be transparent to the user.  Thanks,
+
+I wonder if it makes sense to rename VFIO_IRQ_INFO_AUTOMASKED to
+VFIO_IRQ_INFO_LEVEL_TRIGGERED, and reintroduce VFIO_IRQ_INFO_AUTOMASKED as
+an alias, so compatibility with user space can be maintained? This way
+this semantic misunderstanding could be left behind.
+
+Cheers,
+Antonios
 
 > 
-> diff --git a/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml b/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
-> index 5872f8bbf774..910243d4edb8 100644
-> --- a/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
-> +++ b/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
-> @@ -183,7 +183,7 @@
->  	    <entry>Unknown device node</entry>
->  	  </row>
->  	  <row>
-> -	    <entry><constant>MEDIA_ENT_T_DEVNODE_V4L</constant></entry>
-> +	    <entry><constant>MEDIA_ENT_T_V4L2_VIDEO</constant></entry>
->  	    <entry>V4L video, radio or vbi device node</entry>
->  	  </row>
->  	  <row>
-> diff --git a/drivers/media/platform/xilinx/xilinx-dma.c b/drivers/media/platform/xilinx/xilinx-dma.c
-> index 92e8116dc28f..88cd789cdaf7 100644
-> --- a/drivers/media/platform/xilinx/xilinx-dma.c
-> +++ b/drivers/media/platform/xilinx/xilinx-dma.c
-> @@ -193,7 +193,7 @@ static int xvip_pipeline_validate(struct xvip_pipeline *pipe,
->  	while ((entity = media_entity_graph_walk_next(&graph))) {
->  		struct xvip_dma *dma;
->  
-> -		if (entity->type != MEDIA_ENT_T_DEVNODE_V4L)
-> +		if (entity->type != MEDIA_ENT_T_V4L2_VIDEO)
->  			continue;
->  
->  		dma = to_xvip_dma(media_entity_to_video_device(entity));
-> diff --git a/drivers/media/v4l2-core/v4l2-dev.c b/drivers/media/v4l2-core/v4l2-dev.c
-> index 71a1b93b0790..44b330589787 100644
-> --- a/drivers/media/v4l2-core/v4l2-dev.c
-> +++ b/drivers/media/v4l2-core/v4l2-dev.c
-> @@ -912,7 +912,7 @@ int __video_register_device(struct video_device *vdev, int type, int nr,
->  	/* Part 5: Register the entity. */
->  	if (vdev->v4l2_dev->mdev &&
->  	    vdev->vfl_type != VFL_TYPE_SUBDEV) {
-> -		vdev->entity.type = MEDIA_ENT_T_DEVNODE_V4L;
-> +		vdev->entity.type = MEDIA_ENT_T_V4L2_VIDEO;
->  		vdev->entity.name = vdev->name;
->  		vdev->entity.info.dev.major = VIDEO_MAJOR;
->  		vdev->entity.info.dev.minor = vdev->minor;
-> diff --git a/drivers/media/v4l2-core/v4l2-subdev.c b/drivers/media/v4l2-core/v4l2-subdev.c
-> index 83615b8fb46a..e6e1115d8215 100644
-> --- a/drivers/media/v4l2-core/v4l2-subdev.c
-> +++ b/drivers/media/v4l2-core/v4l2-subdev.c
-> @@ -535,7 +535,7 @@ v4l2_subdev_link_validate_get_format(struct media_pad *pad,
->  		return v4l2_subdev_call(sd, pad, get_fmt, NULL, fmt);
->  	}
->  
-> -	WARN(pad->entity->type != MEDIA_ENT_T_DEVNODE_V4L,
-> +	WARN(pad->entity->type != MEDIA_ENT_T_V4L2_VIDEO,
->  	     "Driver bug! Wrong media entity type 0x%08x, entity %s\n",
->  	     pad->entity->type, pad->entity->name);
->  
+> Alex
 > 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> 
+
+-- 
+Antonios Motakis
+Virtualization Engineer
+Huawei Technologies Duesseldorf GmbH
+European Research Center
+Riesstrasse 25, 80992 M?nchen
