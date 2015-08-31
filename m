@@ -1,32 +1,42 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 31 Aug 2015 16:31:05 +0200
-Subject: [PATCH 1/3] ARM: mvebu: add DT support for Seagate NAS 2 and 4-Bay
-In-Reply-To: <20150831131610.GG14459@lunn.ch>
-References: <1440866805-31731-1-git-send-email-simon.guinot@sequanux.org>
- <1440866805-31731-2-git-send-email-simon.guinot@sequanux.org>
- <20150831124314.GE14459@lunn.ch>
- <20150831131306.GO30993@kw.sim.vm.gnt>
- <20150831131610.GG14459@lunn.ch>
-Message-ID: <20150831143105.GQ30993@kw.sim.vm.gnt>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 31 Aug 2015 17:37:22 +0300
+Subject: [PATCH] gpio: omap: Fix gpiochip_add() handling for deferred probe
+In-Reply-To: <20150831141134.GA4215@atomide.com>
+References: <1440787489-15992-1-git-send-email-tony@atomide.com>
+ <55E4186E.7090605@ti.com> <20150831141134.GA4215@atomide.com>
+Message-ID: <55E466A2.9080900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 31, 2015 at 03:16:10PM +0200, Andrew Lunn wrote:
-> > It may sound crazy but I have nothing more than the hardware and product
-> > names which are respectively "n090201" and "Seagate NAS 2-Bay" for this
-> > board.
+On 08/31/2015 05:11 PM, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [150831 02:07]:
+>> Hi Tony,
+>>
+>> On 08/28/2015 09:44 PM, Tony Lindgren wrote:
+>>> Currently we gpio-omap breaks if gpiochip_add() returns -EPROBE_DEFER:
+>>>
+>>> [    0.570000] gpiochip_add: GPIOs 0..31 (gpio) failed to register
+>>> [    0.570000] omap_gpio 48310000.gpio: Could not register gpio chip -517
+>>> ...
+>>> [    3.670000] omap_gpio 48310000.gpio: Unbalanced pm_runtime_enable!
+>>
+>> I have no objection to the patch itself.
+>>
+>> But I curious, How have you got this error output? Was it simulated?
 > 
-> Does it have a plate on the back with identification information? Is
-> this n090201 on the ID plate?
+> I ran into it when trying to get rid of all the custom initcalls
+> for various drivers. And especially if adding dts mappings for
+> gpio-ranges to try to find some solution for the 1.158 issue that
+> keeps me from having a mainline GPIO PM regresion test with
+> pinging wl12xx during off idle :)
+> 
 
-No it is not. Else it would have been too easy :) Please, see my answer
-to Jason who is more or less asking for the same thing.
+Ah. So, -EPROBE_DEFER was returned by of_gpiochip_add_pin_range(),
+I was not able to find a place where gpiochip_add() can return -EPROBE_DEFER ;)
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150831/eb3b84ca/attachment.sig>
+Thanks for clarification.
+
+
+-- 
+regards,
+-grygorii
