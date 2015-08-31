@@ -1,96 +1,62 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 31 Aug 2015 08:54:34 -0600
-Subject: [PATCH v3 04/10] VFIO: platform: add vfio_platform_set_automasked
-In-Reply-To: <55E43DFC.8050608@huawei.com>
-References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
- <1439212864-12954-5-git-send-email-eric.auger@linaro.org>
- <1439405794.4023.528.camel@redhat.com> <55D1FFE8.9050104@linaro.org>
- <1439919864.4023.626.camel@redhat.com> <55E43DFC.8050608@huawei.com>
-Message-ID: <1441032874.20355.126.camel@redhat.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 31 Aug 2015 16:20:08 +0100
+Subject: [PATCH v4] iio: adc: vf610: Add IIO buffer support for Vybrid ADC
+In-Reply-To: <BN3PR0301MB121977040608F337E69ADADEF5660@BN3PR0301MB1219.namprd03.prod.outlook.com>
+References: <d556443a26070be505f9a5f5f0999253b73d9b71.1439283162.git.maitysanchayan@gmail.com>
+ <9be567ec7d6f6370dd42a41438d64cf7aaa47635.1439826018.git.maitysanchayan@gmail.com>
+ <BN3PR0301MB121977040608F337E69ADADEF5660@BN3PR0301MB1219.namprd03.prod.outlook.com>
+Message-ID: <55E470A8.4000200@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-08-31 at 13:43 +0200, Antonios Motakis wrote:
+On 20/08/15 07:50, Duan Andy wrote:
+> From: Sanchayan Maity <maitysanchayan@gmail.com> Sent: Monday, August 17, 2015 11:52 PM
+>> To: jic23 at kernel.org; linux-iio at vger.kernel.org
+>> Cc: stefan at agner.ch; Duan Fugang-B38611; pmeerw at pmeerw.net; linux-
+>> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Sanchayan
+>> Maity
+>> Subject: [PATCH v4] iio: adc: vf610: Add IIO buffer support for Vybrid
+>> ADC
+>>
+>> This patch adds support for IIO buffer to the Vybrid ADC driver.
+>> IIO triggered buffer infrastructure along with iio sysfs trigger is used
+>> to leverage continuous sampling support provided by the ADC block.
+>>
+>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>> ---
+>>
+>> Changes since v3:
+>> Fix iio_buffer_setup_ops for postenable and predisable functions to match
+>> pairwise. Before this the predisable work was being done in postdisable.
+>>
+>> Changes since v2:
+>> 1. Fix the wrong buffer size for statically allocated buffer 2. Drop the
+>> use of .address field from the iio_chan_spec 3. Use iio_buffer_enabled
+>> call inside the lock 4. Drop wrapper function around iio_trigered_*
+>> function calls 5. Drop Kconfig select of sysfs trigger 6. Drop Kconfig
+>> select IIO_TRIGGER as it is already selected by IIO_TRIGGERED_BUFFER
+>>
+>> Changes since v1:
+>> 1. Use a fixed size buffer instead of kmalloc allocated during update
+>> scan mode 2. Remove a write to read only register ADC_HS (COCO bit)
+>>
+>>  drivers/iio/adc/Kconfig     |   2 +
+>>  drivers/iio/adc/vf610_adc.c | 105
+>> +++++++++++++++++++++++++++++++++++++++++---
+>>  2 files changed, 100 insertions(+), 7 deletions(-)
+>>
 > 
-> On 18-Aug-15 19:44, Alex Williamson wrote:
-> > On Mon, 2015-08-17 at 17:38 +0200, Eric Auger wrote:
-> >> On 08/12/2015 08:56 PM, Alex Williamson wrote:
-> >>> On Mon, 2015-08-10 at 15:20 +0200, Eric Auger wrote:
-> >>>> This function makes possible to change the automasked mode.
-> >>>>
-> >>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> >>>>
-> >>>> ---
-> >>>>
-> >>>> v1 -> v2:
-> >>>> - set forwarded flag
-> >>>> ---
-> >>>>  drivers/vfio/platform/vfio_platform_irq.c | 19 +++++++++++++++++++
-> >>>>  1 file changed, 19 insertions(+)
-> >>>>
-> >>>> diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
-> >>>> index b31b1f0..a285384 100644
-> >>>> --- a/drivers/vfio/platform/vfio_platform_irq.c
-> >>>> +++ b/drivers/vfio/platform/vfio_platform_irq.c
-> >>>> @@ -186,6 +186,25 @@ static irqreturn_t vfio_handler(int irq, void *dev_id)
-> >>>>  	return ret;
-> >>>>  }
-> >>>>  
-> >>>> +static int vfio_platform_set_automasked(struct vfio_platform_irq *irq,
-> >>>> +					   bool automasked)
-> >>>> +{
-> >>>> +	unsigned long flags;
-> >>>> +
-> >>>> +	spin_lock_irqsave(&irq->lock, flags);
-> >>>> +	if (automasked) {
-> >>>> +		irq->forwarded = true;
-> >>>> +		irq->flags |= VFIO_IRQ_INFO_AUTOMASKED;
-> >>>> +		irq->handler = vfio_automasked_irq_handler;
-> >>>> +	} else {
-> >>>> +		irq->forwarded = false;
-> >>>> +		irq->flags &= ~VFIO_IRQ_INFO_AUTOMASKED;
-> >>>> +		irq->handler = vfio_irq_handler;
-> >>>> +	}
-> >>>> +	spin_unlock_irqrestore(&irq->lock, flags);
-> >>>> +	return 0;
-> >>>
-> >>> In vfio-speak, automasked means level and we're not magically changing
-> >>> the IRQ from level to edge, we're simply able to handle level
-> >>> differently based on a hardware optimization.  Should the user visible
-> >>> flags therefore change based on this?  Aren't we really setting the
-> >>> forwarded state rather than the automasked state?
-> >>
-> >> Well actually this was following the discussion we had a long time ago
-> >> about that topic:
-> >>
-> >> http://lkml.iu.edu/hypermail/linux/kernel/1409.1/03659.html
-> >>
-> >> I did not really know how to conclude ...
-> >>
-> >> If it is preferred I can hide this to the userspace, no problem.
-> > 
-> > I think that was based on the user being involved in enabling forwarding
-> > though, now that it's hidden and automatic, it doesn't make much sense
-> > to me to toggle any of the interrupt info details based on the state of
-> > the forward.  The user always needs to handle the interrupt as level
-> > since the bypass can be torn down at any point in time.  We're taking
-> > advantage of the in-kernel path to make further optimizations, which
-> > seems like they should be transparent to the user.  Thanks,
+> The version is fine for me. Thanks for your effort.
 > 
-> I wonder if it makes sense to rename VFIO_IRQ_INFO_AUTOMASKED to
-> VFIO_IRQ_INFO_LEVEL_TRIGGERED, and reintroduce VFIO_IRQ_INFO_AUTOMASKED as
-> an alias, so compatibility with user space can be maintained? This way
-> this semantic misunderstanding could be left behind.
+> Acked-by: Fugang Duan <B38611@freescale.com>
+Applied to the togreg branch of iio.git - will be initially pushed out
+as testing for the autobuilders to play with it.
 
-Is there really a misunderstanding here?  I think the change is that the
-user was previously involved and updating the flag reinforced that.  Now
-the user is not involved and the flag changing is just unexpected noise.
-"automasked" is intentionally not "level" because being level triggered
-may not be the only reason we'd need to mask an interrupt upon receiving
-it.  We could actually have automasked edge triggered interrupts if we
-wanted.  We don't do that, so we can equate automasked to level
-currently, but technically automasked simply indicates that an unmask is
-required to get the next interrupt.  In this case the VM is able to
-effectively do the unmask itself.  Thanks,
+Thanks,
 
-Alex
+Jonathan
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
