@@ -1,158 +1,135 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Mon, 31 Aug 2015 10:53:04 +0800
-Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <CAFpQJXWO0xT0kxWf09L_XcAOXm1Lov8i2U2BQzk-x0TStj7vBg@mail.gmail.com>
-References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
- <20150828123228.GE31748@leverpostej>
- <CAL_JsqLOpUTVeKbkJ6uPi0EYistd=BowAHdtSmaUYYDhU6c9Sg@mail.gmail.com>
- <55E17F58.5020101@huawei.com>
- <CAFpQJXWO0xT0kxWf09L_XcAOXm1Lov8i2U2BQzk-x0TStj7vBg@mail.gmail.com>
-Message-ID: <55E3C190.30407@huawei.com>
+From: punnaia@xilinx.com (punnaiah choudary kalluri)
+Date: Mon, 31 Aug 2015 09:07:00 +0530
+Subject: [PATCH v4 1/2] Documentation: dt: Add Xilinx zynqmp dma device
+ tree binding documentation
+In-Reply-To: <CAGnW=BbS0V-avm+oV-V5J0995YUXwP9v0uZFwc4i9587u1SDTg@mail.gmail.com>
+References: <1438831173-8761-1-git-send-email-punnaia@xilinx.com>
+ <CAL_Jsq+261JzSorbgEyQ4BFCHbsFsBaJQnpWJX-G=SX3yhqZJw@mail.gmail.com>
+ <CAGnW=BbS0V-avm+oV-V5J0995YUXwP9v0uZFwc4i9587u1SDTg@mail.gmail.com>
+Message-ID: <CAGnW=Ba4PjsEXaxeSPNRgLCNBX02BwnxAfxrRQEwighpC9NOjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2015/8/29 22:56, Ganapatrao Kulkarni wrote:
-> Hi Thunder,
-> 
-> On Sat, Aug 29, 2015 at 3:16 PM, Leizhen (ThunderTown)
-> <thunder.leizhen@huawei.com> wrote:
->>
->>
->> On 2015/8/28 22:02, Rob Herring wrote:
->>> +benh
+On Tue, Aug 25, 2015 at 12:16 PM, punnaiah choudary kalluri
+<punnaia@xilinx.com> wrote:
+> Hi Rob,
+>
+> On Tue, Aug 25, 2015 at 12:23 AM, Rob Herring <robherring2@gmail.com> wrote:
+>> On Wed, Aug 5, 2015 at 10:19 PM, Punnaiah Choudary Kalluri
+>> <punnaiah.choudary.kalluri@xilinx.com> wrote:
+>>> Device-tree binding documentation for Xilinx zynqmp dma engine used in
+>>> Zynq UltraScale+ MPSoC.
 >>>
->>> On Fri, Aug 28, 2015 at 7:32 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>> Hi,
->>>>
->>>> On Fri, Aug 14, 2015 at 05:39:32PM +0100, Ganapatrao Kulkarni wrote:
->>>>> DT bindings for numa map for memory, cores and IOs using
->>>>> arm,associativity device node property.
->>>>
->>>> Given this is just a copy of ibm,associativity, I'm not sure I see much
->>>> point in renaming the properties.
+>>> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+>>> ---
+>>> Changes in v4:
+>>> - None
+>>> Changes in v3:
+>>> - None
+>>> Changes in v2:
+>>> - None
+>>> ---
+>>>  .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  |   61 ++++++++++++++++++++
+>>>  1 files changed, 61 insertions(+), 0 deletions(-)
+>>>  create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
 >>>
->>> So just keep the ibm? I'm okay with that. That would help move to
->>> common code. Alternatively, we could drop the vendor prefix and have
->>> common code just check for both.
+>>> diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+>>> new file mode 100644
+>>> index 0000000..e4f92b9
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+>>> @@ -0,0 +1,61 @@
+>>> +Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
+>>> +memory to device and device to memory transfers. It also has flow
+>>> +control and rate control support for slave/peripheral dma access.
+>>> +
+>>> +Required properties:
+>>> +- compatible: Should be "xlnx,zynqmp-dma-1.0"
+>>> +- #dma-cells: Should be <1>, a single cell holding a line request number
+>>> +- reg: Memory map for module access
+>>> +- interrupt-parent: Interrupt controller the interrupt is routed through
+>>> +- interrupts: Should contain DMA channel interrupt
+>>> +- xlnx,bus-width: AXI buswidth in bits. Should contain 128 or 64
+>>> +
+>>> +Optional properties:
+>>> +- xlnx,include-sg: Indicates the controller to operate in simple or scatter
+>>> +                  gather dma mode
+>>> +- xlnx,ratectrl: Scheduling interval in terms of clock cycles for
+>>> +                source AXI transaction
+>>> +- xlnx,overfetch: Tells whether the channel is allowed to over fetch the data
+>>> +- xlnx,src-issue: Number of AXI outstanding transactions on source side
+>>> +- xlnx,desc-axi-cohrnt: Tells whether the AXI transactions generated for the
+>>> +                       descriptor read are marked Non-coherent
+>>> +- xlnx,src-axi-cohrnt: Tells whether the AXI transactions generated for the
+>>> +                       source descriptor payload are marked Non-coherent
+>>> +- xlnx,dst-axi-cohrnt: Tells whether the AXI transactions generated for the
+>>> +                       dst descriptor payload are marked Non-coherent
+>>
+>> Do you really need 3? dma-coherent property doesn't work for you?
+>>
+>> Not that it should dictate the binding, but the kernel doesn't support
+>> a device needing both coherent and non-coherent DMA ops.
+>
+> I will get back to you shortly on this
+
+Yes. dma-coherent property works. I will modify the bindings.
+
+Thanks,
+Punnaiah
+>
+>>
+>>> +- xlnx,desc-axi-qos: AXI QOS bits to be used for descriptor fetch
+>>> +- xlnx,src-axi-qos: AXI QOS bits to be used for data read
+>>> +- xlnx,dst-axi-qos: AXI QOS bits to be used for data write
+>>> +- xlnx,desc-axi-cache: AXI cache bits to be used for descriptor fetch.
+>>> +- xlnx,desc-axi-cache: AXI cache bits to be used for data read
+>>> +- xlnx,desc-axi-cache: AXI cache bits to be used for data write
+>>
+>> These signals are generally part of the coherent or not setting. This
+>> allows for potentially invalid combinations.
+>>
+>> Plus you have a copy/paste error.
+>
+> I will fix this.
+>
+> Thanks,
+> Punnaiah
+>>
+>>> +- xlnx,src-burst-len: AXI length for data read. Support only power of 2 values
+>>> +                     i.e 1,2,4,8 and 16
+>>> +- xlnx,dst-burst-len: AXI length for data write. Support only power of 2 values
+>>> +                     i.e 1,2,4,8 and 16
+>>> +
+>>> +Example:
+>>> +++++++++
+>>> +fpd_dma_chan1: dma at FD500000 {
+>>> +       compatible = "xlnx,zynqmp-dma-1.0";
+>>> +       reg = <0x0 0xFD500000 0x1000>;
+>>> +       #dma_cells = <1>;
+>>> +       interrupt-parent = <&gic>;
+>>> +       interrupts = <0 117 4>;
+>>> +       xlnx,bus-width = <128>;
+>>> +       xlnx,include-sg;
+>>> +       xlnx,overfetch;
+>>> +       xlnx,ratectrl = <0>;
+>>> +       xlnx,src-issue = <16>;
+>>> +       xlnx,desc-axi-cohrnt;
+>>> +       xlnx,src-axi-cohrnt;
+>>> +       xlnx,dst-axi-cohrnt;
+>>> +       xlnx,desc-axi-qos = <0>;
+>>> +       xlnx,desc-axi-cache = <0>;
+>>> +       xlnx,src-axi-qos = <0>;
+>>> +       xlnx,src-axi-cache = <2>;
+>>> +       xlnx,dst-axi-qos = <0>;
+>>> +       xlnx,dst-axi-cache = <2>;
+>>> +       xlnx,src-burst-len = <4>;
+>>> +       xlnx,dst-burst-len = <4>;
+>>> +};
+>>> --
+>>> 1.7.4
 >>>
->>
->> Hi all,
->>
->> Why not copy the method of ACPI numa? There only three elements should be configured:
->> 1) a cpu belong to which node
->> 2) a memory block belong to which node
->> 3) the distance of each two nodes
->>
->> The devicetree nodes of numa can be like below:
->> / {
->>         ...
->>
->>         numa-nodes-info {
->>                 node-name: node-description {
->>                         mem-ranges = <...>;
->>                         cpus-list = <...>;
->>                 };
->>
->>                 nodes-distance {
->>                         distance-list = <...>;
->>                 };
->>         };
->>
->>         ...
->> };
->>
-> some what similar to what your are proposing is already implemented in
-> my v2 patchset.
-> https://lwn.net/Articles/623920/
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305164.html
-
-Sorry, I have not read your old version patchsets before.
-
-The basic ideas are consistent, but details are different. I think your v2 patchset may meet some problem:
-
--------------------------
-+- cpu-map:	This property defines the association of range of processors
-+		(range of cpu ids) and the proximity domain to which
-+		the processor belongs.
-
-+		cpu-map = <0 7 0>,
-+			  <8 15 1>;
--------------------------
-
-1.
-I am not sure the cpu ids is logical cpu-ids in Linux or the sequence number of the CPU dt-nodes in dts.
-The former case: logical cpu-id is allocated by Linux, we can not ensure that cpu0 is the first CPU dt-node.
-The latter case: depend on Linux strictly parse CPU dt-nodes follow the sequence in dts.
-
-2. You should put most codes into /drivers/of/, because it can be shared with other ARCHs which base upon devicetree.
-
-Here is my detailed example:
-Examples:
-/ {
-	#address-cells = <2>;
-	#size-cells = <2>;
-
-	memory at 0 {
-		device_type = "memory";
-		reg = <0x0 0x00000000 0x0 0x40000000>,
-		      <0x1 0x00000000 0x1 0x00000000>,
-		      <0x2 0x00000000 0x0 0x40000000>,
-		      <0x2 0x80000000 0x0 0x40000000>;
-	};
-
-	CPU0: cpu at 10000 {
-		device_type = "cpu";
-		reg = <0x10000>;
-		...
-	};
-
-	numa-nodes-info {
-		node0: cluster0 {
-			mem-ranges = <0x0 0x00000000 0x1 0x00000000>;
-			cpus-list = <&CPU0 &CPU1>;
-		};
-
-		node1: cluster1 {
-			mem-ranges = <0x1 0x00000000 0x1 0x00000000>;
-			cpus-list = <&CPU2>;
-		};
-
-		node2: cluster2 {
-			mem-ranges = <0x2 0x00000000 0x1 0x00000000>;
-			cpus-list = <&CPU3 &CPU4 &CPU5>;
-		};
-
-		nodes-distance {
-			distance-list = <&node0 &node1 15>, <&node1 &node2 18>;
-		};
-	};
-
-> we have went to associativity property based implementation to keep it
-> more generic.
-> i do have both acpi(using linaro/hanjun's patches) and associativity
-> based implementations on our internal tree
-> and tested on thunderx platform.
-> i do see issue in creating numa mapping using ACPI for IOs(for
-> example, i am not able to create numa mapping for ITS which is on each
-> node, using ACPI tables),  since ACPI spec (tables SRAT and SLIT)
-> talks only about processor and memory.
-> however associativity is generic and you can apply on any dt node.
->> Sorry, I don't think xxx,associativity is a good method, it's hard to config, and it
->> seems hardware-dependent. Especially, when we want to support memory hot-add, it's too hard.
->> Because xxx,associativity have no obvious information about it. Like powerpc, it use another
->> property: "/ibm,dynamic-reconfiguration-memory".
->>
->> I spend almost a whole month to implement of_numa(configured by dt-nodes), base upon my opinion
->> mentioned above. If somebody are interested in it, I can send my patchset to show it.
->>
->> Regards,
->> Thunder.
->>
-> thanks
-> ganapat
-> 
-> .
-> 
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
