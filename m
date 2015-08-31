@@ -1,25 +1,97 @@
-From: linux@rasmusvillemoes.dk (Rasmus Villemoes)
-Date: Sun, 30 Aug 2015 23:47:20 +0200
-Subject: [PATCH] lib: Make _find_next_bit helper function inline
-In-Reply-To: <55E1CC83.1010007@gmail.com> (Yury's message of "Sat, 29 Aug 2015
- 18:15:15 +0300")
-References: <1438110564-19932-1-git-send-email-cburden@codeaurora.org>
- <55B7F2C6.9010000@gmail.com>
- <20150728144537.67d46b5714c99d25f0bb33fb@linux-foundation.org>
- <1438176656.18723.8.camel@ceres> <55B93A47.90107@codeaurora.org>
- <CALW4P+LU2iLkT7d=BiaC_=oSJ6K_g152VsVSjfcQGUKx_5q4tQ@mail.gmail.com>
- <55E1CC83.1010007@gmail.com>
-Message-ID: <87si701maf.fsf@rasmusvillemoes.dk>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Mon, 31 Aug 2015 09:46:48 +0800
+Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <1440844631.2912.248.camel@kernel.crashing.org>
+References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
+ <20150828123228.GE31748@leverpostej>
+ <CAL_JsqLOpUTVeKbkJ6uPi0EYistd=BowAHdtSmaUYYDhU6c9Sg@mail.gmail.com>
+ <55E17F58.5020101@huawei.com> <1440844631.2912.248.camel@kernel.crashing.org>
+Message-ID: <55E3B208.3020404@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've lost track of what's up and down in this, but now that I look at
-this again let me throw in my two observations of stupid gcc behaviour:
-For the current code, both debian's gcc (4.7) and 5.1 partially inlines
-_find_next_bit, namely the "if (!nbits || start >= nbits)" test. I know it
-does it to avoid a function call, but in this case the early return
-condition is unlikely, so there's not much to gain. Moreover, it fails
-to optimize the test to simply "if (start >= nbits)" - everything being
-unsigned, these are obviously equivalent.
 
-Rasmus
+
+On 2015/8/29 18:37, Benjamin Herrenschmidt wrote:
+> On Sat, 2015-08-29 at 17:46 +0800, Leizhen (ThunderTown) wrote:
+>> Why not copy the method of ACPI numa? There only three elements
+>> should be configured:
+>> 1) a cpu belong to which node
+>> 2) a memory block belong to which node
+>> 3) the distance of each two nodes
+
+Sorry, I forgot to write something:
+4) a device(maybe a bus device) belongs to which node
+
+For example:
+device-name {
+        ...
+        numa-node = <&node0>;
+};
+
+To simplify the discussion, I will not mention device again. Treat both
+cpus and devices as masters, memorys as slaves.
+
+A bus is not a master, we allow binding numa node to a bus, because we may
+want all devices on the bus to inherit its numa node-id without obvious configured one by one.
+
+> 
+> This means your are bolting into the DT representation the concept of
+> "Node" which isn't necessarily very meaningful.
+> 
+> Your system is really a hierarchy of objects. You can have cores on a
+> chip, already possibly sharing some level of cache or not, you can have
+> chips on a module, modules linked at various distances, etc...
+> 
+> What is "a node" ?
+> 
+> For example, I have a P8 chip with 2 chips on a module (fast X-bus) and
+> 2 modules (slightly slower A-bus). All 4 chips have 2 memory
+> controllers each.
+> 
+> Is a "node" a chip or a module ?
+
+A numa node is a abstract concept, it needn't related to a real hardware level.
+A numa node normally contains both cpus and mems, but may only contains cpus or mems,
+or maybe nothing(quite rare). We put cpus or mems into a node, because we want to use
+node-distance to implement the nearest memory access, the nearest process schedule.
+
+In your example:
+On fast X-bus, have a module contains 2 chips.
+On slightly slower A-bus, have 2 modules(treat them as 2 chips).
+Each chip contains 2 memory controllers.
+
+Suppose each chip access its local bus memory faster than another.
+
+Case1:
+Each chip access its 2 local memory controllers faster than others. Then we can define numa nodes:
+node-xbus-0: a chip and 2 local memory.
+node-xbus-1: a chip and 2 local memory.
+node-abus-0: a chip(module) and 2 local memory.
+node-abus-1: a chip(module) and 2 local memory.
+
+Case2:
+Each chip access any memory controllers on its local bus are the same. Then we can define numa nodes:
+node-xbus: 2 chips and 4 local memory.
+node-abus: 2 chips(modules) and 4 local memory.
+
+
+> 
+> The Linux concept of node is too restrictive. The associativity
+> properties avoid this by allowing you to define as many "levels" of
+> associativity as you wish. Also since it's right justified, a given
+> component doesn't need to have all levels (a MC can stop at chip while
+> cores can go down one more level for example).
+> 
+> The reference points property gives a hint as "interesting" levels can
+> typically be used as a hint for chosing what Linux will use as a "node"
+> at least until Linux gets smarter. It can also be used to calculate
+> distances.
+> 
+> Cheers,
+> Ben.
+> 
+> 
+> .
+> 
