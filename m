@@ -1,97 +1,262 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Mon, 31 Aug 2015 09:46:48 +0800
-Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
-In-Reply-To: <1440844631.2912.248.camel@kernel.crashing.org>
-References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
- <20150828123228.GE31748@leverpostej>
- <CAL_JsqLOpUTVeKbkJ6uPi0EYistd=BowAHdtSmaUYYDhU6c9Sg@mail.gmail.com>
- <55E17F58.5020101@huawei.com> <1440844631.2912.248.camel@kernel.crashing.org>
-Message-ID: <55E3B208.3020404@huawei.com>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Sun, 30 Aug 2015 22:24:17 -0400
+Subject: [PATCH v3 2/5] ARM: NSP: add minimal Northstar Plus device tree
+In-Reply-To: <55E0FAC4.2040108@broadcom.com>
+References: <1440805644-18241-1-git-send-email-jonmason@broadcom.com>
+ <55E0FAC4.2040108@broadcom.com>
+Message-ID: <20150831022417.GA27066@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2015/8/29 18:37, Benjamin Herrenschmidt wrote:
-> On Sat, 2015-08-29 at 17:46 +0800, Leizhen (ThunderTown) wrote:
->> Why not copy the method of ACPI numa? There only three elements
->> should be configured:
->> 1) a cpu belong to which node
->> 2) a memory block belong to which node
->> 3) the distance of each two nodes
-
-Sorry, I forgot to write something:
-4) a device(maybe a bus device) belongs to which node
-
-For example:
-device-name {
-        ...
-        numa-node = <&node0>;
-};
-
-To simplify the discussion, I will not mention device again. Treat both
-cpus and devices as masters, memorys as slaves.
-
-A bus is not a master, we allow binding numa node to a bus, because we may
-want all devices on the bus to inherit its numa node-id without obvious configured one by one.
-
-> 
-> This means your are bolting into the DT representation the concept of
-> "Node" which isn't necessarily very meaningful.
-> 
-> Your system is really a hierarchy of objects. You can have cores on a
-> chip, already possibly sharing some level of cache or not, you can have
-> chips on a module, modules linked at various distances, etc...
-> 
-> What is "a node" ?
-> 
-> For example, I have a P8 chip with 2 chips on a module (fast X-bus) and
-> 2 modules (slightly slower A-bus). All 4 chips have 2 memory
-> controllers each.
-> 
-> Is a "node" a chip or a module ?
-
-A numa node is a abstract concept, it needn't related to a real hardware level.
-A numa node normally contains both cpus and mems, but may only contains cpus or mems,
-or maybe nothing(quite rare). We put cpus or mems into a node, because we want to use
-node-distance to implement the nearest memory access, the nearest process schedule.
-
-In your example:
-On fast X-bus, have a module contains 2 chips.
-On slightly slower A-bus, have 2 modules(treat them as 2 chips).
-Each chip contains 2 memory controllers.
-
-Suppose each chip access its local bus memory faster than another.
-
-Case1:
-Each chip access its 2 local memory controllers faster than others. Then we can define numa nodes:
-node-xbus-0: a chip and 2 local memory.
-node-xbus-1: a chip and 2 local memory.
-node-abus-0: a chip(module) and 2 local memory.
-node-abus-1: a chip(module) and 2 local memory.
-
-Case2:
-Each chip access any memory controllers on its local bus are the same. Then we can define numa nodes:
-node-xbus: 2 chips and 4 local memory.
-node-abus: 2 chips(modules) and 4 local memory.
-
-
-> 
-> The Linux concept of node is too restrictive. The associativity
-> properties avoid this by allowing you to define as many "levels" of
-> associativity as you wish. Also since it's right justified, a given
-> component doesn't need to have all levels (a MC can stop at chip while
-> cores can go down one more level for example).
-> 
-> The reference points property gives a hint as "interesting" levels can
-> typically be used as a hint for chosing what Linux will use as a "node"
-> at least until Linux gets smarter. It can also be used to calculate
-> distances.
-> 
-> Cheers,
-> Ben.
+On Fri, Aug 28, 2015 at 05:20:20PM -0700, Ray Jui wrote:
 > 
 > 
-> .
+> On 8/28/2015 4:47 PM, Jon Mason wrote:
+> > Add a very minimalistic set of Northstar Plus Device Tree files which
+> > describes the SoC and the BCM958625 implementation.  The perpherials
+> > described are:
+> > 
+> > ARM Cortex A9 CPU
+> > 2 8250 UARTs
+> > ARM GIC
+> > PL310 L2 Cache
+> > ARM A9 Global timer
+> > 
+> > Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+> > Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> > ---
+> >  arch/arm/boot/dts/Makefile       |   2 +
+> >  arch/arm/boot/dts/bcm-nsp.dtsi   | 120 +++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/bcm958625k.dts |  57 +++++++++++++++++++
+> >  3 files changed, 179 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/bcm-nsp.dtsi
+> >  create mode 100644 arch/arm/boot/dts/bcm958625k.dts
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 246473a..adb5732 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -82,6 +82,8 @@ dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
+> >  dtb-$(CONFIG_ARCH_BCM_MOBILE) += \
+> >  	bcm28155-ap.dtb \
+> >  	bcm21664-garnet.dtb
+> > +dtb-$(CONFIG_ARCH_BCM_NSP) += \
+> > +	bcm958625k.dtb
+> >  dtb-$(CONFIG_ARCH_BERLIN) += \
+> >  	berlin2-sony-nsz-gs7.dtb \
+> >  	berlin2cd-google-chromecast.dtb \
+> > diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+> > new file mode 100644
+> > index 0000000..f5f494f
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+> > @@ -0,0 +1,120 @@
+> > +/*
+> > + *  BSD LICENSE
+> > + *
+> > + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+> > + *
+> > + *  Redistribution and use in source and binary forms, with or without
+> > + *  modification, are permitted provided that the following conditions
+> > + *  are met:
+> > + *
+> > + *    * Redistributions of source code must retain the above copyright
+> > + *      notice, this list of conditions and the following disclaimer.
+> > + *    * Redistributions in binary form must reproduce the above copyright
+> > + *      notice, this list of conditions and the following disclaimer in
+> > + *      the documentation and/or other materials provided with the
+> > + *      distribution.
+> > + *    * Neither the name of Broadcom Corporation nor the names of its
+> > + *      contributors may be used to endorse or promote products derived
+> > + *      from this software without specific prior written permission.
+> > + *
+> > + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> > + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> > + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> > + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> > + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> > + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> > + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> > + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> > + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> > + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> > + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> > + */
+> > +
+> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > +#include <dt-bindings/interrupt-controller/irq.h>
+> > +
+> > +#include "skeleton.dtsi"
+> > +
+> > +/ {
+> > +	compatible = "brcm,nsp";
+> > +	model = "Broadcom Northstar Plus SoC";
+> > +	interrupt-parent = <&gic>;
+> > +
+> > +	mpcore {
+> > +		compatible = "simple-bus";
+> > +		ranges = <0x00000000 0x19020000 0x00003000>;
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +
+> > +		cpus {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			cpu at 0 {
+> > +				device_type = "cpu";
+> > +				compatible = "arm,cortex-a9";
+> > +				next-level-cache = <&L2>;
+> > +				reg = <0x0>;
+> > +			};
+> > +		};
+> > +
+> > +		L2: l2-cache {
+> > +			compatible = "arm,pl310-cache";
+> > +			reg = <0x2000 0x1000>;
+> > +			cache-unified;
+> > +			cache-level = <2>;
+> > +		};
+> > +
+> > +		gic: interrupt-controller at 19021000 {
+> > +			compatible = "arm,cortex-a9-gic";
+> > +			#interrupt-cells = <3>;
+> > +			#address-cells = <0>;
+> > +			interrupt-controller;
+> > +			reg = <0x1000 0x1000>,
+> > +			      <0x0100 0x100>;
+> > +		};
+> > +
+> > +		timer at 19020200 {
+> > +			compatible = "arm,cortex-a9-global-timer";
+> > +			reg = <0x0200 0x100>;
+> > +			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+> > +			clocks = <&periph_clk>;
+> > +		};
+> > +	};
+> > +
+> > +	clocks {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		ranges;
+> > +
+> > +		periph_clk: periph_clk {
+> > +			compatible = "fixed-clock";
+> > +			#clock-cells = <0>;
+> > +			clock-frequency = <500000000>;
+> > +		};
+> > +	};
+> > +
+> > +	apb {
+> > +		compatible = "arm,amba-bus", "simple-bus";
 > 
+> Should "arm,amba-bus" has a separate bus node with AMBA compatible
+> devices declared in there (e.g, pl330, spi-pl022, and etc.) in the
+> future after they are brought up? To my best knowledge, "ns16550a" UART
+> is NOT an AMBA compatible device.
+
+APB is an AMBA bus, so this part is accurate.  The block diagram of
+the SoC has the UARTs (and other perpherials) hanging off of the APB
+bus.  So, this organization follows the block diagram.  While the
+UART drivers are not AMBA aware, there appears to be no issues with
+this layout (as the HW/drivers come up without issue).  Unless there
+is an unforeseen issue with having non-AMBA aware devices on the DT
+AMBA bus, I would think it best to organize it to match the block
+disgram.
+
+> > +		interrupt-parent = <&gic>;
+> > +		ranges = <0x00000000 0x18000000 0x00001000>;
+> 
+> Does the 'apb' bus mean to cover all peripherals connected through APB?
+> If so, the size is only 0x1000 and that seems to be too small...
+
+This is all that is currently needed.  I was planning on expanding it
+as I added more devices.
+
+Thanks,
+Jon
+
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +
+> > +		uart0: serial at 18000300 {
+> > +			compatible = "ns16550a";
+> > +			reg = <0x0300 0x100>;
+> > +			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+> > +			clock-frequency = <62499840>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> > +		uart1: serial at 18000400 {
+> > +			compatible = "ns16550a";
+> > +			reg = <0x0400 0x100>;
+> > +			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+> > +			clock-frequency = <62499840>;
+> > +			status = "disabled";
+> > +		};
+> > +	};
+> > +};
+> > diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
+> > new file mode 100644
+> > index 0000000..16303db
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/bcm958625k.dts
+> > @@ -0,0 +1,57 @@
+> > +/*
+> > + *  BSD LICENSE
+> > + *
+> > + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+> > + *
+> > + *  Redistribution and use in source and binary forms, with or without
+> > + *  modification, are permitted provided that the following conditions
+> > + *  are met:
+> > + *
+> > + *    * Redistributions of source code must retain the above copyright
+> > + *      notice, this list of conditions and the following disclaimer.
+> > + *    * Redistributions in binary form must reproduce the above copyright
+> > + *      notice, this list of conditions and the following disclaimer in
+> > + *      the documentation and/or other materials provided with the
+> > + *      distribution.
+> > + *    * Neither the name of Broadcom Corporation nor the names of its
+> > + *      contributors may be used to endorse or promote products derived
+> > + *      from this software without specific prior written permission.
+> > + *
+> > + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> > + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> > + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> > + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> > + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> > + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> > + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> > + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> > + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> > + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> > + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +
+> > +#include "bcm-nsp.dtsi"
+> > +
+> > +/ {
+> > +	model = "NorthStar Plus SVK (BCM958625K)";
+> > +	compatible = "brcm,bcm58625", "brcm,nsp";
+> > +
+> > +	aliases {
+> > +		serial0 = &uart0;
+> > +		serial1 = &uart1;
+> > +	};
+> > +
+> > +	chosen {
+> > +		stdout-path = "serial0:115200n8";
+> > +	};
+> > +};
+> > +
+> > +&uart0 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&uart1 {
+> > +	status = "okay";
+> > +};
+> > 
