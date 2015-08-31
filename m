@@ -1,96 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 31 Aug 2015 14:43:14 +0200
-Subject: [PATCH 1/3] ARM: mvebu: add DT support for Seagate NAS 2 and 4-Bay
-In-Reply-To: <1440866805-31731-2-git-send-email-simon.guinot@sequanux.org>
-References: <1440866805-31731-1-git-send-email-simon.guinot@sequanux.org>
- <1440866805-31731-2-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20150831124314.GE14459@lunn.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 31 Aug 2015 07:52:07 -0500
+Subject: [RESEND PATCH v3 3/5] sh: kill off set_irq_flags usage
+In-Reply-To: <20150831050104.GA26119@verge.net.au>
+References: <1440889285-5637-1-git-send-email-robh@kernel.org>
+ <1440889285-5637-4-git-send-email-robh@kernel.org>
+ <20150831050104.GA26119@verge.net.au>
+Message-ID: <CAL_JsqJuPtkvFMFvcSwaFssXoLYrHs9bM3EedXSzj21YAPmwDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 29, 2015 at 06:46:43PM +0200, Simon Guinot wrote:
-> From: Vincent Donnefort <vdonnefort@gmail.com>
-> 
-> This patch adds DT support for the Seagate NAS 2 and 4-Bay (n090201 and
-> n090401).
-> 
-> Chipset list (common):
-> - SoC Marvell Armada 370 88F6707, CPU @1.2GHz
-> - SDRAM memory: 512MB DDR3 600MHz (16-bits bandwidth)
-> - NAND flash 256MB, 8-bits (Micron MT29F2G08AAB or Hinyx H27U2G8F2CTR-BC)
-> - 2 SATA II ports (SoC)
-> - 1 Ethernet Gigabit ports (PHY Marvell 88E1518)
-> - 2 USB3 host ports (PCIe controller ASM1042)
-> - GPIO fan (4 speeds)
-> - External I2C RTC (MCP7940NT)
-> - 3 push buttons (power, backup and reset)
-> - 2 SATA LEDs (bi-color, blue and red)
-> - 1 power LED (bi-color, blue and red)
-> 
-> Only on 4-Bay models:
-> - 2 extra SATA III ports (PCIe AHCI controller Marvell 88SE9170)
-> - 1 extra Ethernet Gigabit ports (PHY Marvell 88E1518)
-> - I2C GPIO expander (PCA9554A)
-> - 2 extra SATA LEDs (bi-color, blue and red)
-> 
-> Note that support for the white SATA LEDs associated with HDDs 0 and 1
-> is missing. A dedicated LED driver is needed.
-> 
-> Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile                |   2 +
->  arch/arm/boot/dts/armada-370-n090201.dts  |  28 ++++
->  arch/arm/boot/dts/armada-370-n090401.dts  | 124 ++++++++++++++++
->  arch/arm/boot/dts/armada-370-n090x01.dtsi | 232 ++++++++++++++++++++++++++++++
->  4 files changed, 386 insertions(+)
->  create mode 100644 arch/arm/boot/dts/armada-370-n090201.dts
->  create mode 100644 arch/arm/boot/dts/armada-370-n090401.dts
->  create mode 100644 arch/arm/boot/dts/armada-370-n090x01.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 233159d2eaab..0a46613e90d2 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -699,6 +699,8 @@ dtb-$(CONFIG_MACH_ARMADA_370) += \
->  	armada-370-db.dtb \
->  	armada-370-dlink-dns327l.dtb \
->  	armada-370-mirabox.dtb \
-> +	armada-370-n090201.dtb \
-> +	armada-370-n090401.dtb \
->  	armada-370-netgear-rn102.dtb \
->  	armada-370-netgear-rn104.dtb \
->  	armada-370-rd.dtb \
-> diff --git a/arch/arm/boot/dts/armada-370-n090201.dts b/arch/arm/boot/dts/armada-370-n090201.dts
-> new file mode 100644
-> index 000000000000..b92b1ee067d6
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-370-n090201.dts
-> @@ -0,0 +1,28 @@
-> +/*
-> + * Device Tree file for Seagate NAS 2-Bay (n090201)
-> + *
-> + * Copyright (C) 2015 Seagate
-> + *
-> + * Author: Vincent Donnefort <vdonnefort@gmail.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "armada-370-n090x01.dtsi"
-> +
-> +/ {
-> +	model = "Seagate NAS 2-Bay";
+On Mon, Aug 31, 2015 at 12:01 AM, Simon Horman <horms@verge.net.au> wrote:
+> Hi Rob,
+>
+> On Sat, Aug 29, 2015 at 06:01:23PM -0500, Rob Herring wrote:
+>> set_irq_flags is ARM specific with custom flags which have genirq
+>> equivalents. Convert drivers to use the genirq interfaces directly, so we
+>> can kill off set_irq_flags. The translation of flags is as follows:
+>>
+>> IRQF_VALID -> !IRQ_NOREQUEST
+>> IRQF_PROBE -> !IRQ_NOPROBE
+>> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+>>
+>> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+>> and setting IRQ_NOREQUEST already, so there is no need to do this in
+>> .map() functions and we can simply remove the set_irq_flags calls. Some
+>> users also modify IRQ_NOPROBE and this has been maintained although it
+>> is not clear that is really needed. There appears to be a great deal of
+>> blind copy and paste of this code.
+>>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Acked-by: Simon Horman <horms@verge.net.au>
+>> Cc: Magnus Damm <magnus.damm@gmail.com>
+>> Cc: linux-sh at vger.kernel.org
+>
+> I have queued this up. Please let me know if that was not your intent.
+>
+> The patch is queued up in the sh-drivers-for-v4.3 branch of my renesas tree.
+> At this point I plan to send a pull-request once dt changes that other
+> patches in that branch depend on hit Linus's tree via the ARM SoC tree.
+> I anticipate that being during the rc1 or rc2 timeframe.
 
-On a similar line to Jason's comment. I'm sure Seagate has/is going to
-have more than this 2-bay NAS. Can we have a more descriptive model
-string here?
+This needs to go in before -rc1 so the final 2 patches removing
+set_irq_flags can go in at the end of the merge window. Given your
+timeline, I think you can just leave this one for Thomas to apply with
+those 2.
 
-I could imagine an installer which looks through the list of available
-DT blobs and creates a list showing the model and compatible string,
-and asks the user, which should it use.
-
-    Andrew
+Rob
