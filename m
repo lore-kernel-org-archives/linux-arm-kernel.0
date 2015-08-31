@@ -1,54 +1,57 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Mon, 31 Aug 2015 10:44:40 +0200
-Subject: [PATCH 3/7] dmaengine: st_fdma: Add STMicroelectronics FDMA
- engine driver support
-In-Reply-To: <1441008481.8272.10.camel@tiscali.nl>
-References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
- <1436371888-27863-4-git-send-email-peter.griffin@linaro.org>
- <1436429872.20619.77.camel@tiscali.nl> <55E40715.1040204@st.com>
- <1441008481.8272.10.camel@tiscali.nl>
-Message-ID: <55E413F8.6070307@st.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 31 Aug 2015 10:46:59 +0200
+Subject: [PATCH 9/9] arm/arm64: KVM: arch timer: Reset CNTV_CTL to 0
+In-Reply-To: <1440942866-23802-10-git-send-email-christoffer.dall@linaro.org>
+References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
+ <1440942866-23802-10-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <CAKv+Gu-4KKUUt7J==CPK6J79mWXLeMJFsG_fj85tYB2orzfrZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 30 August 2015 at 15:54, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> Provide a better quality of implementation and be architecture compliant
+> on ARMv7 for the architected timer by resetting the CNTV_CTL to 0 on
+> reset of the timer, and call kvm_timer_update_state(vcpu) at the same
+> time, ensuring the timer output is not asserted after, for example, a
+> PSCI system reset.
+>
+> This change alone fixes the UEFI reset issue reported by Laszlo back in
+> February.
+>
 
+Do you have a link to that report? I can't quite remember the details ...
 
-On 08/31/2015 10:08 AM, Paul Bolle wrote:
-> Hi Maxime,
+> Cc: Laszlo Ersek <lersek@redhat.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Drew Jones <drjones@redhat.com>
+> Cc: Wei Huang <wei@redhat.com>
+> Cc: Peter Maydell <peter.maydell@linaro.org>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/arm/arch_timer.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 >
-> On ma, 2015-08-31 at 09:49 +0200, Maxime Coquelin wrote:
->> On 07/09/2015 10:17 AM, Paul Bolle wrote:
->>>>> +static int __exit st_fdma_remove(struct platform_device *pdev)
->>>>> +{
->>>>> +	struct st_fdma_dev *fdev = platform_get_drvdata(pdev);
->>>>> +
->>>>> +	wait_for_completion(&fdev->fw_ack);
->>>>> +
->>>>> +	st_fdma_clk_disable(fdev);
->>>>> +
->>>>> +	return 0;
->>>>> +}
->>> Since this driver is built-in only this means st_fdma_remove() can
->>> never be used, right?
->> It's not because a driver is built-in only that it does not need a
->> remove callback.
->> An instance can be probed/removed any time via driver's bind/unbind
->> SysFS entries.
->> Am I missing something?
-> (This discussion is moot because Peter already stated that a new version
-> will be modular.)
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 747302f..8a0fdfc 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -255,6 +255,15 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>         timer->irq.irq = irq->irq;
 >
-> It follows from the __exit tag that st_fdma_remove() should never be
-> part of the kernel image (in this version of the patch), doesn't it?
-Yes, you are right.
-The remove callback is relevant, but without the __exit tag.
+>         /*
+> +        * The bits in CNTV_CTL are architecturally reset to UNKNOWN for ARMv8
+> +        * and to 0 for ARMv7.  We provide an implementation that always
+> +        * resets the timer to be disabled and unmasked and is compliant with
+> +        * the ARMv7 architecture.
+> +        */
+> +       timer->cntv_ctl = 0;
+> +       kvm_timer_update_state(vcpu);
+> +
+> +       /*
+>          * Tell the VGIC that the virtual interrupt is tied to a
+>          * physical interrupt. We do that once per VCPU.
+>          */
+> --
+> 2.1.2.330.g565301e.dirty
 >
-> (I don't know what happens in this situation if an unbind sysfs entry is
-> used to remove a driver. I've never tried that.)
->
->
-Not checked whether the function is omitted when built-in, but in any 
-case, I thnk remove callbacks should not be tagged with __exit.
-
-Regards,
-Maxime
