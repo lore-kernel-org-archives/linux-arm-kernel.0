@@ -1,62 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Aug 2015 13:20:31 +0100
-Subject: [PATCH] arm64: fix a migrating irq bug when hotplug cpu
-In-Reply-To: <55E3020C.8020303@linaro.org>
-References: <55E1AD09.7020701@huawei.com> <55E1CBE9.6080705@linux.intel.com>
- <66e158e6da958d355d54543ef69e5e94@www.loen.fr>
- <55E3020C.8020303@linaro.org>
-Message-ID: <20150831132031.2a017df1@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 31 Aug 2015 12:39:44 +0000
+Subject: [PATCH 0/3] Add support for the Armada-370-based Seagate NAS
+In-Reply-To: <1440866805-31731-1-git-send-email-simon.guinot@sequanux.org>
+References: <1440866805-31731-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20150831123944.GK3684@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 30 Aug 2015 21:15:56 +0800
-Hanjun Guo <hanjun.guo@linaro.org> wrote:
-
-> On 08/30/2015 02:12 AM, Marc Zyngier wrote:
-> > On 2015-08-29 16:12, Jiang Liu wrote:
-> >> On 2015/8/29 21:00, Yang Yingliang wrote:
-> >>> From: Yang Yingliang <yangyingliang@huawei.com>
-> >>>
-> >>> When cpu is disabled, all irqs will be migratged to another cpu.
-> >>> In some cases, a new affinity is different, it needed to be coppied
-> >>> to irq's affinity. But if the type of irq is LPI, it's affinity will
-> >>> not be coppied because of irq_set_affinity's return value.
-> >>> So copy the affinity, when the return value is IRQ_SET_MASK_OK_DONE.
-> >> Hi Yingliang,
-> >>     If irq_set_affinity callback returns IRQ_SET_MASK_OK_DONE,
-> >> it means that irq_set_affinity has copied the new CPU mask to irq
-> >> affinity mask. It would be better to change irq_set_affinity for LPI
-> >> to follow this rule.
-> >
-> > The main issue here seems to be that we do not call irq_set_affinity, but
-> > that we directly call into the top-level irqchip method, which relies on
-> > the core code to do the copy (see irq_do_set_affinity). Too bad.
-> >
-> > It feels like the arm/arm64 code would probably be better consolidated into
-> > kernel/irq/migration.c, which already deals with some of this for x86
-> > and ia64. It would save us the duplication and will make sure we don't
-> > miss things next time we add a new return code, as irq_do_set_affinity
-> > would handle this properly.
-> >
-> > Thoughts?
+On Sat, Aug 29, 2015 at 06:46:42PM +0200, Simon Guinot wrote:
+> Hi,
 > 
-> I agree. In arch/arm64/kernel/irq.c the irq migrate code is the same
-> as ARM32, and it's duplicate. But this is a bugfix, can we fix it in
-> a simple way, and refactor the code later?
+> This patch series adds support for the Seagate machines based on the
+> Armada-370 Marvell SoC. This includes the Personal Cloud 1 and 2-Bay
+> and the Seagate NAS 2 and 4-Bay.
+> 
+> Thanks,
+> 
+> Simon
+> 
+> Simon Guinot (2):
+>   ARM: mvebu: add DT support for Seagate Personal Cloud
+>   ARM: mvebu: enable options for Seagate NAS in mvebu_v7_defconfig
+> 
+> Vincent Donnefort (1):
+>   ARM: mvebu: add DT support for Seagate NAS 2 and 4-Bay
+> 
+>  arch/arm/boot/dts/Makefile                |   4 +
+>  arch/arm/boot/dts/armada-370-n090103.dts  |  28 ++++
+>  arch/arm/boot/dts/armada-370-n090201.dts  |  28 ++++
+>  arch/arm/boot/dts/armada-370-n090203.dts  |  42 ++++++
+>  arch/arm/boot/dts/armada-370-n090401.dts  | 124 ++++++++++++++++
+>  arch/arm/boot/dts/armada-370-n090x01.dtsi | 232 ++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/armada-370-n090x03.dtsi | 174 ++++++++++++++++++++++
+>  arch/arm/configs/mvebu_v7_defconfig       |   9 +-
+>  8 files changed, 640 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/armada-370-n090103.dts
+>  create mode 100644 arch/arm/boot/dts/armada-370-n090201.dts
+>  create mode 100644 arch/arm/boot/dts/armada-370-n090203.dts
+>  create mode 100644 arch/arm/boot/dts/armada-370-n090401.dts
+>  create mode 100644 arch/arm/boot/dts/armada-370-n090x01.dtsi
+>  create mode 100644 arch/arm/boot/dts/armada-370-n090x03.dtsi
 
-I'm not buying this.
+Could you please name these something more informative?  e.g.
+armada-370-seagate-personal-cloud-{1,2}.dts, etc?
 
-I really can't see how adding more duplication can be beneficial. It is
-not so much that there is duplication between arm and arm64 that
-bothers me (as if that was the only thing...). The real issue is that
-there is duplication between the arch code and the core code.
+thx,
 
-Migrating interrupts is a core code matter, and that's were it should
-be handled IMHO. Plus, we're in the merge window, and there is plenty
-of time to get this fixed the proper way.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Jason.
