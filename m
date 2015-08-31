@@ -1,108 +1,287 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 31 Aug 2015 16:49:10 -0500
-Subject: [PATCH v3 2/5] ARM: NSP: add minimal Northstar Plus device tree
-In-Reply-To: <20150831194404.GA28848@broadcom.com>
-References: <1440805644-18241-1-git-send-email-jonmason@broadcom.com>
- <55E0FAC4.2040108@broadcom.com> <20150831022417.GA27066@broadcom.com>
- <55E3FFB5.6090703@broadcom.com> <20150831194404.GA28848@broadcom.com>
-Message-ID: <CAL_JsqL1=WoaidMgLN4exvhF7bYr4FNGmtMgYO8e-c=NxP3JbQ@mail.gmail.com>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Mon, 31 Aug 2015 14:53:18 -0700
+Subject: [PATCH v2 2/5] DMA: pl330: add quirk for broken no flushp
+In-Reply-To: <1440722280-31678-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1440722176-31588-1-git-send-email-shawn.lin@rock-chips.com>
+ <1440722280-31678-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <CAPz6YkWeBsp2_9VD+0RpcGFC7FvdcY1kyYONBMV0yunR3orKyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 31, 2015 at 2:44 PM, Jon Mason <jonmason@broadcom.com> wrote:
-> On Mon, Aug 31, 2015 at 12:18:13AM -0700, Ray Jui wrote:
->>
->>
->> On 8/30/2015 7:24 PM, Jon Mason wrote:
->> > On Fri, Aug 28, 2015 at 05:20:20PM -0700, Ray Jui wrote:
->> >>
->> >>
->> >> On 8/28/2015 4:47 PM, Jon Mason wrote:
->> >>> Add a very minimalistic set of Northstar Plus Device Tree files which
->> >>> describes the SoC and the BCM958625 implementation.  The perpherials
->> >>> described are:
->> >>>
->> >>> ARM Cortex A9 CPU
->> >>> 2 8250 UARTs
->> >>> ARM GIC
->> >>> PL310 L2 Cache
->> >>> ARM A9 Global timer
-
-[...]
-
->> >>> + apb {
->> >>> +         compatible = "arm,amba-bus", "simple-bus";
->> >>
->> >> Should "arm,amba-bus" has a separate bus node with AMBA compatible
->> >> devices declared in there (e.g, pl330, spi-pl022, and etc.) in the
->> >> future after they are brought up? To my best knowledge, "ns16550a" UART
->> >> is NOT an AMBA compatible device.
-
-IIRC, "arm,amba-bus" is not documented nor used. It isn't really
-needed as there is no s/w visible feature to an AMBA bus. There are
-also multiple flavors of AMBA buses, so it is pretty meaningless.
-
->> > APB is an AMBA bus, so this part is accurate.  The block diagram of
->> > the SoC has the UARTs (and other perpherials) hanging off of the APB
->> > bus.  So, this organization follows the block diagram.
->>
->> Okay so the "apb" node can be used for amba compatible devices
->> (arm,amba-bus) and/or simple platform devices (simple-bus). I guess
->> that's fine and I now see that there are some other dtsi also doing it
->> this way.
-
-I think what is meant here by "amba compatible devices" is really ARM
-Primecell peripherals which are the ARM IP with standard ID registers.
-These are designated by "arm,primecell" compatible strings for the
-device not the bus compatible string.
-
->>
->> > While the
->> > UART drivers are not AMBA aware, there appears to be no issues with
->> > this layout (as the HW/drivers come up without issue). Unless there
->> > is an unforeseen issue with having non-AMBA aware devices on the DT
->> > AMBA bus, I would think it best to organize it to match the block
->> > disgram.
->> >
->>
->> UART runs fine because you also have "simple-bus" listed as the
->> compatible string so uart is populated as standard platform device.
->>
->> >>> +         interrupt-parent = <&gic>;
->> >>> +         ranges = <0x00000000 0x18000000 0x00001000>;
->> >>
->> >> Does the 'apb' bus mean to cover all peripherals connected through APB?
->> >> If so, the size is only 0x1000 and that seems to be too small...
->> >
->> > This is all that is currently needed.  I was planning on expanding it
->> > as I added more devices.
->>
->> Sure.
->>
->> I haven't checked the datahsheet but based on the layout (which seems
->> quite similar to Cygnus), I assume the range for these devices should be
->> 0x18000000 - 0x18ffffff? Just want to make sure there are no other
->> devices come before 0x18000000 so you don't need to change all these reg
->> offsets in the future.
+On Thu, Aug 27, 2015 at 5:38 PM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
+> From: Addy Ke <addy.ke@rock-chips.com>
 >
-> Based on the devices listed in the block diagram (and not including
-> those on the AXI bus):
-> i2c 0x18038000
-> spi 0x18027200
-> gpio 0x18000060
-> pwm 0x18031000
-> wdt 0x18039000
+> This patch add "arm,pl330-broken-no-flushp" quirk to avoid execute
+> DMAFLUSHP if Soc doesn't support it.
 >
-> and a few others.
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> cc: Doug Anderson <dianders@chromium.org>
+> cc: Heiko Stuebner <heiko@sntech.de>
+> cc: Olof Johansson <olof@lixom.net>
 >
-> Looking at the sources, all the ARM IP is 0x19000000 and the rest is
-> 0x18000000.  The only part that is a little harry is the clocks, which
-> have BCM and ARM (which causes the addresses to be both 0x19000000 and
-> 0x18000000).  But, we can handle that when we upstream that part (which
-> should be very soon).
+> ---
+>
+> Changes in v2:
+> - amend the author
+> - amend Olof's mail address
+>
+> Changes in v1:
+> - rename broken-no-flushp to "arm,pl330-broken-no-flushp" suggested
+>   by Krzysztof.
+> - remove Sunny's tag
+>
+>  drivers/dma/pl330.c | 87 ++++++++++++++++++++++++++++++++++++++---------------
+>  1 file changed, 62 insertions(+), 25 deletions(-)
+>
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 0d544d2..3b9b426 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -34,6 +34,8 @@
+>  #define PL330_MAX_IRQS         32
+>  #define PL330_MAX_PERI         32
+>
+> +#define PL330_QUIRK_BROKEN_NO_FLUSHP BIT(0)
+> +
+>  enum pl330_cachectrl {
+>         CCTRL0,         /* Noncacheable and nonbufferable */
+>         CCTRL1,         /* Bufferable only */
+> @@ -488,6 +490,17 @@ struct pl330_dmac {
+>         /* Peripheral channels connected to this DMAC */
+>         unsigned int num_peripherals;
+>         struct dma_pl330_chan *peripherals; /* keep at end */
+> +       int quirks;
+> +};
+> +
+> +static struct pl330_of_quirks {
+> +       char *quirk;
+> +       int id;
+> +} of_quirks[] = {
+> +       {
+> +               .quirk = "arm,pl330-broken-no-flushp",
+> +               .id = PL330_QUIRK_BROKEN_NO_FLUSHP,
+> +       }
+>  };
+>
+>  struct dma_pl330_desc {
+> @@ -1137,53 +1150,68 @@ static inline int _ldst_memtomem(unsigned dry_run, u8 buf[],
+>         return off;
+>  }
+>
+> -static inline int _ldst_devtomem(unsigned dry_run, u8 buf[],
+> -               const struct _xfer_spec *pxs, int cyc)
+> +static inline int _ldst_devtomem(struct pl330_dmac *pl330, unsigned dry_run,
+> +                                u8 buf[], const struct _xfer_spec *pxs,
+> +                                int cyc)
+>  {
+>         int off = 0;
+>         enum pl330_cond cond;
+>
+> -       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
+> +       if (pl330->quirks & PL330_QUIRK_BROKEN_NO_FLUSHP)
+> +               cond = BURST;
+> +       else
+> +               cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
+>
+>         while (cyc--) {
+>                 off += _emit_WFP(dry_run, &buf[off], cond, pxs->desc->peri);
+>                 off += _emit_LDP(dry_run, &buf[off], cond, pxs->desc->peri);
+>                 off += _emit_ST(dry_run, &buf[off], ALWAYS);
+> -               off += _emit_FLUSHP(dry_run, &buf[off], pxs->desc->peri);
+> +
+> +               if (!(pl330->quirks & PL330_QUIRK_BROKEN_NO_FLUSHP))
+> +                       off += _emit_FLUSHP(dry_run, &buf[off],
+> +                                           pxs->desc->peri);
+>         }
+>
+>         return off;
+>  }
+>
+> -static inline int _ldst_memtodev(unsigned dry_run, u8 buf[],
+> -               const struct _xfer_spec *pxs, int cyc)
+> +static inline int _ldst_memtodev(struct pl330_dmac *pl330,
+> +                                unsigned dry_run, u8 buf[],
+> +                                const struct _xfer_spec *pxs, int cyc)
+>  {
+>         int off = 0;
+>         enum pl330_cond cond;
+>
+> -       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
+> +       if (pl330->quirks & PL330_QUIRK_BROKEN_NO_FLUSHP)
+> +               cond = BURST;
+> +       else
+> +               cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
+> +
+>
+>         while (cyc--) {
+>                 off += _emit_WFP(dry_run, &buf[off], cond, pxs->desc->peri);
+>                 off += _emit_LD(dry_run, &buf[off], ALWAYS);
+>                 off += _emit_STP(dry_run, &buf[off], cond, pxs->desc->peri);
+> -               off += _emit_FLUSHP(dry_run, &buf[off], pxs->desc->peri);
+> +
+> +               if (!(pl330->quirks & PL330_QUIRK_BROKEN_NO_FLUSHP))
+> +                       off += _emit_FLUSHP(dry_run, &buf[off],
+> +                                           pxs->desc->peri);
+>         }
+>
+>         return off;
+>  }
+>
+> -static int _bursts(unsigned dry_run, u8 buf[],
+> +static int _bursts(struct pl330_dmac *pl330, unsigned dry_run, u8 buf[],
+>                 const struct _xfer_spec *pxs, int cyc)
+>  {
+>         int off = 0;
+>
+>         switch (pxs->desc->rqtype) {
+>         case DMA_MEM_TO_DEV:
+> -               off += _ldst_memtodev(dry_run, &buf[off], pxs, cyc);
+> +               off += _ldst_memtodev(pl330, dry_run, &buf[off], pxs, cyc);
+>                 break;
+>         case DMA_DEV_TO_MEM:
+> -               off += _ldst_devtomem(dry_run, &buf[off], pxs, cyc);
+> +               off += _ldst_devtomem(pl330, dry_run, &buf[off], pxs, cyc);
+>                 break;
+>         case DMA_MEM_TO_MEM:
+>                 off += _ldst_memtomem(dry_run, &buf[off], pxs, cyc);
+> @@ -1197,7 +1225,7 @@ static int _bursts(unsigned dry_run, u8 buf[],
+>  }
+>
+>  /* Returns bytes consumed and updates bursts */
+> -static inline int _loop(unsigned dry_run, u8 buf[],
+> +static inline int _loop(struct pl330_dmac *pl330, unsigned dry_run, u8 buf[],
+>                 unsigned long *bursts, const struct _xfer_spec *pxs)
+>  {
+>         int cyc, cycmax, szlp, szlpend, szbrst, off;
+> @@ -1220,7 +1248,7 @@ static inline int _loop(unsigned dry_run, u8 buf[],
+>         }
+>
+>         szlp = _emit_LP(1, buf, 0, 0);
+> -       szbrst = _bursts(1, buf, pxs, 1);
+> +       szbrst = _bursts(pl330, 1, buf, pxs, 1);
+>
+>         lpend.cond = ALWAYS;
+>         lpend.forever = false;
+> @@ -1252,7 +1280,7 @@ static inline int _loop(unsigned dry_run, u8 buf[],
+>         off += _emit_LP(dry_run, &buf[off], 1, lcnt1);
+>         ljmp1 = off;
+>
+> -       off += _bursts(dry_run, &buf[off], pxs, cyc);
+> +       off += _bursts(pl330, dry_run, &buf[off], pxs, cyc);
+>
+>         lpend.cond = ALWAYS;
+>         lpend.forever = false;
+> @@ -1275,8 +1303,9 @@ static inline int _loop(unsigned dry_run, u8 buf[],
+>         return off;
+>  }
+>
+> -static inline int _setup_loops(unsigned dry_run, u8 buf[],
+> -               const struct _xfer_spec *pxs)
+> +static inline int _setup_loops(struct pl330_dmac *pl330,
+> +                              unsigned dry_run, u8 buf[],
+> +                              const struct _xfer_spec *pxs)
+>  {
+>         struct pl330_xfer *x = &pxs->desc->px;
+>         u32 ccr = pxs->ccr;
+> @@ -1285,15 +1314,16 @@ static inline int _setup_loops(unsigned dry_run, u8 buf[],
+>
+>         while (bursts) {
+>                 c = bursts;
+> -               off += _loop(dry_run, &buf[off], &c, pxs);
+> +               off += _loop(pl330, dry_run, &buf[off], &c, pxs);
+>                 bursts -= c;
+>         }
+>
+>         return off;
+>  }
+>
+> -static inline int _setup_xfer(unsigned dry_run, u8 buf[],
+> -               const struct _xfer_spec *pxs)
+> +static inline int _setup_xfer(struct pl330_dmac *pl330,
+> +                             unsigned dry_run, u8 buf[],
+> +                             const struct _xfer_spec *pxs)
+>  {
+>         struct pl330_xfer *x = &pxs->desc->px;
+>         int off = 0;
+> @@ -1304,7 +1334,7 @@ static inline int _setup_xfer(unsigned dry_run, u8 buf[],
+>         off += _emit_MOV(dry_run, &buf[off], DAR, x->dst_addr);
+>
+>         /* Setup Loop(s) */
+> -       off += _setup_loops(dry_run, &buf[off], pxs);
+> +       off += _setup_loops(pl330, dry_run, &buf[off], pxs);
+>
+>         return off;
+>  }
+> @@ -1313,8 +1343,9 @@ static inline int _setup_xfer(unsigned dry_run, u8 buf[],
+>   * A req is a sequence of one or more xfer units.
+>   * Returns the number of bytes taken to setup the MC for the req.
+>   */
+> -static int _setup_req(unsigned dry_run, struct pl330_thread *thrd,
+> -               unsigned index, struct _xfer_spec *pxs)
+> +static int _setup_req(struct pl330_dmac *pl330, unsigned dry_run,
+> +                     struct pl330_thread *thrd, unsigned index,
+> +                     struct _xfer_spec *pxs)
+>  {
+>         struct _pl330_req *req = &thrd->req[index];
+>         struct pl330_xfer *x;
+> @@ -1331,7 +1362,7 @@ static int _setup_req(unsigned dry_run, struct pl330_thread *thrd,
+>         if (x->bytes % (BRST_SIZE(pxs->ccr) * BRST_LEN(pxs->ccr)))
+>                 return -EINVAL;
+>
+> -       off += _setup_xfer(dry_run, &buf[off], pxs);
+> +       off += _setup_xfer(pl330, dry_run, &buf[off], pxs);
+>
+>         /* DMASEV peripheral/event */
+>         off += _emit_SEV(dry_run, &buf[off], thrd->ev);
+> @@ -1425,7 +1456,7 @@ static int pl330_submit_req(struct pl330_thread *thrd,
+>         xs.desc = desc;
+>
+>         /* First dry run to check if req is acceptable */
+> -       ret = _setup_req(1, thrd, idx, &xs);
+> +       ret = _setup_req(pl330, 1, thrd, idx, &xs);
+>         if (ret < 0)
+>                 goto xfer_exit;
+>
+> @@ -1439,7 +1470,7 @@ static int pl330_submit_req(struct pl330_thread *thrd,
+>         /* Hook the request */
+>         thrd->lstenq = idx;
+>         thrd->req[idx].desc = desc;
+> -       _setup_req(0, thrd, idx, &xs);
+> +       _setup_req(pl330, 0, thrd, idx, &xs);
+>
+>         ret = 0;
+>
+> @@ -2784,6 +2815,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>         struct resource *res;
+>         int i, ret, irq;
+>         int num_chan;
+> +       struct device_node *np = adev->dev.of_node;
+>
+>         pdat = dev_get_platdata(&adev->dev);
+>
+> @@ -2803,6 +2835,11 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>
+>         pl330->mcbufsz = pdat ? pdat->mcbuf_sz : 0;
+>
+> +       /* get quirk */
+> +       for (i = 0; i < ARRAY_SIZE(of_quirks); i++)
+> +               if (of_property_read_bool(np, of_quirks[i].quirk))
+> +                       pl330->quirks |= of_quirks[i].id;
+> +
+>         res = &adev->res;
+>         pl330->base = devm_ioremap_resource(&adev->dev, res);
+>         if (IS_ERR(pl330->base))
+> --
+> 2.3.7
+>
 
-If you can tell that 0x19000000 is a separate bus at some level, then
-it makes sense to separate it. You can't always tell without detailed
-internal bus diagrams.
+Reviewed-by: Sonny Rao <sonnyrao@chromium.org>
 
-Rob
+
+>
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
