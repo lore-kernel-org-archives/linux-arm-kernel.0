@@ -1,39 +1,82 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 31 Aug 2015 14:01:04 +0900
-Subject: [RESEND PATCH v3 3/5] sh: kill off set_irq_flags usage
-In-Reply-To: <1440889285-5637-4-git-send-email-robh@kernel.org>
-References: <1440889285-5637-1-git-send-email-robh@kernel.org>
- <1440889285-5637-4-git-send-email-robh@kernel.org>
-Message-ID: <20150831050104.GA26119@verge.net.au>
+From: jianwei.wang.chn@gmail.com (Jianwei Wang)
+Date: Mon, 31 Aug 2015 13:14:33 +0800
+Subject: [PATCH] drm/fsl-dcu: Cleanup vblank interrupt mask and status setting
+ code
+Message-ID: <1440998073-31851-1-git-send-email-jianwei.wang.chn@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Switch update interrupt mask bit with regmap_update_bits, and clear
+interrupt status by writing 1 to relevant bit before setting mask in
+fsl_dcu_drm_irq_init function.
 
-On Sat, Aug 29, 2015 at 06:01:23PM -0500, Rob Herring wrote:
-> set_irq_flags is ARM specific with custom flags which have genirq
-> equivalents. Convert drivers to use the genirq interfaces directly, so we
-> can kill off set_irq_flags. The translation of flags is as follows:
-> 
-> IRQF_VALID -> !IRQ_NOREQUEST
-> IRQF_PROBE -> !IRQ_NOPROBE
-> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
-> 
-> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
-> and setting IRQ_NOREQUEST already, so there is no need to do this in
-> .map() functions and we can simply remove the set_irq_flags calls. Some
-> users also modify IRQ_NOPROBE and this has been maintained although it
-> is not clear that is really needed. There appears to be a great deal of
-> blind copy and paste of this code.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Acked-by: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: linux-sh at vger.kernel.org
+Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
+---
+ drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c | 26 +++++++-------------------
+ 1 file changed, 7 insertions(+), 19 deletions(-)
 
-I have queued this up. Please let me know if that was not your intent.
-
-The patch is queued up in the sh-drivers-for-v4.3 branch of my renesas tree.
-At this point I plan to send a pull-request once dt changes that other
-patches in that branch depend on hit Linus's tree via the ARM SoC tree.
-I anticipate that being during the rc1 or rc2 timeframe.
+diff --git a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
+index 9a8e2da..bf36971 100644
+--- a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
++++ b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
+@@ -38,21 +38,17 @@ static const struct regmap_config fsl_dcu_regmap_config = {
+ static int fsl_dcu_drm_irq_init(struct drm_device *dev)
+ {
+ 	struct fsl_dcu_drm_device *fsl_dev = dev->dev_private;
+-	unsigned int value;
+ 	int ret;
+ 
+ 	ret = drm_irq_install(dev, fsl_dev->irq);
+ 	if (ret < 0)
+ 		dev_err(dev->dev, "failed to install IRQ handler\n");
+ 
+-	ret = regmap_write(fsl_dev->regmap, DCU_INT_STATUS, 0);
++	ret = regmap_write(fsl_dev->regmap, DCU_INT_STATUS, 0xffffffff);
+ 	if (ret)
+ 		dev_err(dev->dev, "set DCU_INT_STATUS failed\n");
+-	ret = regmap_read(fsl_dev->regmap, DCU_INT_MASK, &value);
+-	if (ret)
+-		dev_err(dev->dev, "read DCU_INT_MASK failed\n");
+-	value &= DCU_INT_MASK_VBLANK;
+-	ret = regmap_write(fsl_dev->regmap, DCU_INT_MASK, value);
++	ret = regmap_update_bits(fsl_dev->regmap, DCU_INT_MASK,
++				 DCU_INT_MASK_VBLANK, ~DCU_INT_MASK_VBLANK);
+ 	if (ret)
+ 		dev_err(dev->dev, "set DCU_INT_MASK failed\n");
+ 	ret = regmap_write(fsl_dev->regmap, DCU_UPDATE_MODE,
+@@ -143,14 +139,10 @@ static irqreturn_t fsl_dcu_drm_irq(int irq, void *arg)
+ static int fsl_dcu_drm_enable_vblank(struct drm_device *dev, int crtc)
+ {
+ 	struct fsl_dcu_drm_device *fsl_dev = dev->dev_private;
+-	unsigned int value;
+ 	int ret;
+ 
+-	ret = regmap_read(fsl_dev->regmap, DCU_INT_MASK, &value);
+-	if (ret)
+-		dev_err(dev->dev, "read DCU_INT_MASK failed\n");
+-	value &= ~DCU_INT_MASK_VBLANK;
+-	ret = regmap_write(fsl_dev->regmap, DCU_INT_MASK, value);
++	ret = regmap_update_bits(fsl_dev->regmap, DCU_INT_MASK,
++				 DCU_INT_MASK_VBLANK, ~DCU_INT_MASK_VBLANK);
+ 	if (ret)
+ 		dev_err(dev->dev, "set DCU_INT_MASK failed\n");
+ 	return 0;
+@@ -159,14 +151,10 @@ static int fsl_dcu_drm_enable_vblank(struct drm_device *dev, int crtc)
+ static void fsl_dcu_drm_disable_vblank(struct drm_device *dev, int crtc)
+ {
+ 	struct fsl_dcu_drm_device *fsl_dev = dev->dev_private;
+-	unsigned int value;
+ 	int ret;
+ 
+-	ret = regmap_read(fsl_dev->regmap, DCU_INT_MASK, &value);
+-	if (ret)
+-		dev_err(dev->dev, "read DCU_INT_MASK failed\n");
+-	value |= DCU_INT_MASK_VBLANK;
+-	ret = regmap_write(fsl_dev->regmap, DCU_INT_MASK, value);
++	ret = regmap_update_bits(fsl_dev->regmap, DCU_INT_MASK,
++				 DCU_INT_MASK_VBLANK, DCU_INT_MASK_VBLANK);
+ 	if (ret)
+ 		dev_err(dev->dev, "set DCU_INT_MASK failed\n");
+ }
+-- 
+2.1.0.27.g96db324
