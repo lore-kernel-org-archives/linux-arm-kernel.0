@@ -1,33 +1,58 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 31 Aug 2015 22:15:23 +0200
-Subject: [PATCH] rtc: Fix module autoload for OF platform drivers
-In-Reply-To: <1440676322-19870-1-git-send-email-javier@osg.samsung.com>
-References: <1440676322-19870-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <20150831201523.GB3409@piout.net>
+From: lho@apm.com (Loc Ho)
+Date: Mon, 31 Aug 2015 14:26:11 -0700
+Subject: [PATCH v4 0/4] edac: Add L3/SoC support to the APM X-Gene SoC
+ EDAC driver
+In-Reply-To: <1439534769-22811-1-git-send-email-lho@apm.com>
+References: <1439534769-22811-1-git-send-email-lho@apm.com>
+Message-ID: <CAPw-ZTm_n6o2jXc5LuSZLrdZy3ZCmJmrRAP6S+7S-EO2ZAGANg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/08/2015 at 13:52:02 +0200, Javier Martinez Canillas wrote :
-> These platform drivers have a OF device ID table but the OF module
-> alias information is not created so module autoloading won't work.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> ---
-> 
->  drivers/rtc/rtc-armada38x.c | 1 +
->  drivers/rtc/rtc-coh901331.c | 1 +
->  drivers/rtc/rtc-da9063.c    | 1 +
->  drivers/rtc/rtc-moxart.c    | 1 +
->  drivers/rtc/rtc-mpc5121.c   | 1 +
->  drivers/rtc/rtc-mt6397.c    | 1 +
->  drivers/rtc/rtc-mv.c        | 1 +
->  drivers/rtc/rtc-vt8500.c    | 1 +
->  8 files changed, 8 insertions(+)
-> 
-Applied, thanks.
+Hi Borislav,
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Are you okay with this version to pull in for 4.3 release?
+
+-Loc
+
+On Thu, Aug 13, 2015 at 11:46 PM, Loc Ho <lho@apm.com> wrote:
+> v4:
+> * Remove function for EDAC debugfs node and replace with export variable
+> * Switch the driver to use the exported edac_debugfs variable
+> * Revert the if statement logic for function as necessary
+> * Remove un-necessary code in debugfs creation functions
+>
+> v3:
+> * Add an function to retrieve the EDAC debugfs node
+> * Move all debugfs node under EDAC code debugfs node
+> * Update L3 to check for v1 errata
+> * Rename error label for L3/SoC add routines
+> * Re-structure SoC EDAC functions for code readability
+> * Inline the function xgene_edac_soc_mem_data
+> * Remove un-necessary { }
+>
+> v2:
+> * Update binding documentation accordingly
+> * Change all single bit defines to BIT(x)
+> * Add support for L3 version 1 and 2 HW's
+> * Change to use debug file system for error injection
+> * In L3/SoC instance add function, allocate EDAC context after all
+>   initalization successed
+> * Support raw or detail info for SoC EDAC error reporting
+>
+> v1:
+> * Add L3/SoC support to the APM X-Gene SoC EDAC driver
+> ---
+> Loc Ho (4):
+>   edac: Export edac_debugfs
+>   Documentation: Update the APM X-Gene SoC EDAC DTS binding for L3/SoC
+>     subnodes
+>   edac: Add L3/SoC EDAC support to the APM X-Gene SoC EDAC driver
+>   arm64: Add L3/SoC DT subnodes to the APM X-Gene SoC EDAC node
+>
+>  .../devicetree/bindings/edac/apm-xgene-edac.txt    |   23 +
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi             |   10 +
+>  drivers/edac/edac_core.h                           |    1 +
+>  drivers/edac/edac_mc_sysfs.c                       |    5 +-
+>  drivers/edac/xgene_edac.c                          | 1169 ++++++++++++++++----
+>  5 files changed, 1012 insertions(+), 196 deletions(-)
+>
