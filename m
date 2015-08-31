@@ -1,70 +1,74 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 31 Aug 2015 20:24:00 +0200
-Subject: [PATCH 2/8] clk: rockchip: Make calculations use rounding
+Date: Mon, 31 Aug 2015 20:24:02 +0200
+Subject: [PATCH 4/8] mmc: dw_mmc: Use mmc_regulator_set_vqmmc in
+ start_signal_voltage_switch
 In-Reply-To: <1441045446-30858-1-git-send-email-heiko@sntech.de>
 References: <1441045446-30858-1-git-send-email-heiko@sntech.de>
-Message-ID: <1441045446-30858-3-git-send-email-heiko@sntech.de>
+Message-ID: <1441045446-30858-5-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Douglas Anderson <dianders@chromium.org>
 
-Let's use DIV_ROUND_CLOSEST for rounding, not just truncating
-division.  This lets us get closer to the right rate.
+We've introduced a new helper in the MMC core:
+mmc_regulator_set_vqmmc().  Let's use this in dw_mmc.  Using this new
+helper has some advantages:
 
-Before this:
-  set_phase(86) delay_nums=26 reg[0xf000420c]=0x468 actual_degrees=83
-  set_phase(89) delay_nums=27 reg[0xf000420c]=0x46c actual_degrees=86
+1. We get the mmc_regulator_set_vqmmc() behavior of trying to match
+   VQMMC and VMMC when the signal voltage is 3.3V.  This ensures max
+   compatibility.
 
-After this:
-  set_phase(86) delay_nums=27 reg[0xf000420c]=0x46c actual_degrees=86
-  set_phase(89) delay_nums=28 reg[0xf000420c]=0x470 actual_degrees=90
+2. We get rid of a few more warnings when probing unsupported
+   voltages.
+
+3. We get rid of some non-dw_mmc specific code in dw_mmc.
 
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/clk/rockchip/clk-mmc-phase.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ drivers/mmc/host/dw_mmc.c | 17 ++++++-----------
+ 1 file changed, 6 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk-mmc-phase.c b/drivers/clk/rockchip/clk-mmc-phase.c
-index a797d86..bc24e5a 100644
---- a/drivers/clk/rockchip/clk-mmc-phase.c
-+++ b/drivers/clk/rockchip/clk-mmc-phase.c
-@@ -69,7 +69,7 @@ static int rockchip_mmc_get_phase(struct clk_hw *hw)
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index fcbf552..b1b7e7f 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -1279,7 +1279,6 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	const struct dw_mci_drv_data *drv_data = host->drv_data;
+ 	u32 uhs;
+ 	u32 v18 = SDMMC_UHS_18V << slot->id;
+-	int min_uv, max_uv;
+ 	int ret;
  
- 		delay_num = (raw_value & ROCKCHIP_MMC_DELAYNUM_MASK);
- 		delay_num >>= ROCKCHIP_MMC_DELAYNUM_OFFSET;
--		degrees += delay_num * factor / 10000;
-+		degrees += DIV_ROUND_CLOSEST(delay_num * factor, 10000);
- 	}
- 
- 	return degrees % 360;
-@@ -82,7 +82,7 @@ static int rockchip_mmc_set_phase(struct clk_hw *hw, int degrees)
- 	u8 nineties, remainder;
- 	u8 delay_num;
- 	u32 raw_value;
--	u64 delay;
-+	u32 delay;
- 
- 	nineties = degrees / 90;
- 	remainder = (degrees % 90);
-@@ -110,12 +110,13 @@ static int rockchip_mmc_set_phase(struct clk_hw *hw, int degrees)
- 	 * Convert to delay; do a little extra work to make sure we
- 	 * don't overflow 32-bit / 64-bit numbers.
+ 	if (drv_data && drv_data->switch_voltage)
+@@ -1291,22 +1290,18 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	 * does no harm but you need to set the regulator directly.  Try both.
  	 */
--	delay = PSECS_PER_SEC;
-+	delay = 10000000; /* PSECS_PER_SEC / 10000 / 10 */
- 	delay *= remainder;
--	do_div(delay, 10000);
--	do_div(delay, (rate / 1000) * 36 * ROCKCHIP_MMC_DELAY_ELEMENT_PSEC);
-+	delay = DIV_ROUND_CLOSEST(delay,
-+			(rate / 1000) * 36 *
-+				(ROCKCHIP_MMC_DELAY_ELEMENT_PSEC / 10));
+ 	uhs = mci_readl(host, UHS_REG);
+-	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
+-		min_uv = 2700000;
+-		max_uv = 3600000;
++	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330)
+ 		uhs &= ~v18;
+-	} else {
+-		min_uv = 1700000;
+-		max_uv = 1950000;
++	else
+ 		uhs |= v18;
+-	}
++
+ 	if (!IS_ERR(mmc->supply.vqmmc)) {
+-		ret = regulator_set_voltage(mmc->supply.vqmmc, min_uv, max_uv);
++		ret = mmc_regulator_set_vqmmc(mmc, ios);
  
--	delay_num = (u8) min(delay, 255ULL);
-+	delay_num = (u8) min_t(u32, delay, 255);
- 
- 	raw_value = delay_num ? ROCKCHIP_MMC_DELAY_SEL : 0;
- 	raw_value |= delay_num << ROCKCHIP_MMC_DELAYNUM_OFFSET;
+ 		if (ret) {
+ 			dev_dbg(&mmc->class_dev,
+-					 "Regulator set error %d: %d - %d\n",
+-					 ret, min_uv, max_uv);
++					 "Regulator set error %d - %s V\n",
++					 ret, uhs & v18 ? "1.8" : "3.3");
+ 			return ret;
+ 		}
+ 	}
 -- 
 2.1.4
