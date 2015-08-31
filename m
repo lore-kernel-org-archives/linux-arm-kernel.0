@@ -1,135 +1,125 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 31 Aug 2015 15:51:06 +0000 (UTC)
-Subject: [PATCH v2 2/5] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
-In-Reply-To: <55A7CE59.6010600@ti.com>
-References: <1433332284-10766-1-git-send-email-vigneshr@ti.com>
- <1433332284-10766-3-git-send-email-vigneshr@ti.com>
- <alpine.DEB.2.02.1507152029460.32764@utopia.booyaka.com>
- <55A7CE59.6010600@ti.com>
-Message-ID: <alpine.DEB.2.02.1508121700500.7154@utopia.booyaka.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 31 Aug 2015 17:52:42 +0200
+Subject: [PATCH] usb: musb: dsps: handle the
+ otg_state_a_wait_vrise_timeout case
+In-Reply-To: <55D719B1.8010700@free-electrons.com> (Gregory CLEMENT's message
+ of "Fri, 21 Aug 2015 14:29:37 +0200")
+References: <1440087153-31084-1-git-send-email-gregory.clement@free-electrons.com>
+ <55D719B1.8010700@free-electrons.com>
+Message-ID: <87twrfsbed.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Felipe,
+ 
+ On ven., ao?t 21 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+>> According to the OTG specification after a timeout of
+>> OTG_TIME_A_WAIT_VRISE (the maximum value is 100ms) the driver must
+>> move from the state a_wait_vrise to the state a_wait_bcon. However,
+>> the dsps version of musb does not handle this case.
+>> 
+>> Without it, the driver could remain stuck in the a_wait_vrise. It can
+>> be reproduce with the following steps:
+>> 
+>> 1) Boot a board with no USB adapter inserted
+>> 2) Insert an empty OTG adapter
+>> 3) Wait 2 seconds then remove the OTG adapter
+>> 4) The unit is now stuck in host mode, the VBUS switch is latched on
+>> and the ID pin is no longer polled.
+>> 
+>> The only way to exit this state was to insert a OTG adapter with an
+>> USB device connected. Until this, the usb device mode was not
+>> available.
+>> 
+>> It was tested on a AM35x based board.
+>> 
+>> CC: <stable@vger.kernel.org>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  drivers/usb/musb/musb_dsps.c | 14 +++++++++++++-
+>>  1 file changed, 13 insertions(+), 1 deletion(-)
+>> 
+>> diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+>> index 65d931a..2d22683 100644
+>> --- a/drivers/usb/musb/musb_dsps.c
+>> +++ b/drivers/usb/musb/musb_dsps.c
+>> @@ -145,6 +145,7 @@ struct dsps_glue {
+>>  	struct timer_list timer;	/* otg_workaround timer */
+>>  	unsigned long last_timer;    /* last timer data for each instance */
+>>  	bool sw_babble_enabled;
+>> +	int otg_state_a_wait_vrise_timeout;
+>>  
+>>  	struct dsps_context context;
+>>  	struct debugfs_regset32 regset;
+>> @@ -268,9 +269,18 @@ static void otg_timer(unsigned long _musb)
+>>  
+>>  	spin_lock_irqsave(&musb->lock, flags);
+>>  	switch (musb->xceiv->otg->state) {
+>> +	case OTG_STATE_A_WAIT_VRISE:
+>> +		if ((glue->otg_state_a_wait_vrise_timeout)) {
+>> +				musb->xceiv->otg->state = OTG_STATE_A_WAIT_BCON;
+>> +				musb->is_active = 0;
+>> +			}
+>> +		mod_timer(&glue->timer, jiffies +
+>> +			  msecs_to_jiffies(OTG_TIME_A_WAIT_VRISE));
+>
+> After more test on more USB drive, it seems that for some of them
+> OTG_TIME_A_WAIT_VRISE is too short. 200ms seems better. It is
+> disturbing because according to the OTG specification the maximum
+> is 100ms, however I am not so surprised that USB device maker don't
+> follow it.
 
-On Thu, 16 Jul 2015, R, Vignesh wrote:
+So after many tests on different devices, 200ms is enough for most of
+them, but for one, 2000ms (2s) was needed!
 
-> On 07/16/2015 03:24 AM, Paul Walmsley wrote:
-> > 
-> > On Wed, 3 Jun 2015, Vignesh R wrote:
-> > 
-> >> Add hwmod entries for the PWMSS on DRA7.
-> >>
-> >> Set l4_root_clk_div as the main_clk of PWMSS. It is fixed-factored clock
-> >> equal to L4PER2_L3_GICLK/2(l3_iclk_div/2).
-> >> As per AM57x TRM SPRUHZ6[1], October 2014, Section 29.1.3 Table 29-4,
-> >> clock source to PWMSS is L4PER2_L3_GICLK. But it is actually
-> >> L4PER2_L3_GICLK/2. The TRM does not show the division by 2.
-> > 
-> > Is the divide-by-two coming from PWMSS_EPWM.EPWM_TBCTL[HSPCLKDIV]?  Or is 
-> > HSPCLKDIV a separate divider after the divide-by-2 you mention above?
-> 
-> No, it not related to HSPCLKDIV. The TRM wrongly states L4PER2_L3_GICLK
-> as clock input for PWMSS. But actually  L4PER2_L4_GICLK(=L3_GICLK/2) is
-> the clock input for PWMSS. This will be updated in TRM soon.
+I see several option:
+- adding a sysfs entry to setup the time
+- adding a debugs entry entry
+- adding configuration option in menuconfig
+- using 2000ms and hopping it was enough for everyone
 
-OK
+My preference would go to the first option, what is your opinion?
 
-> >> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> >> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> >> @@ -362,6 +362,149 @@ static struct omap_hwmod dra7xx_dcan2_hwmod = {
-> >>  	},
-> >>  };
-> >>  
-> >> +/* pwmss  */
-> >> +static struct omap_hwmod_class_sysconfig dra7xx_epwmss_sysc = {
-> >> +	.rev_offs	= 0x0,
-> >> +	.sysc_offs	= 0x4,
-> >> +	.sysc_flags	= SYSC_HAS_SIDLEMODE | SYSC_HAS_RESET_STATUS,
-> > 
-> > This doesn't match SPRUHZ6 Table 29-13 "PWMSS_SYSCONFIG".  There's no 
-> > RESETSTATUS bit.  There is a SOFTRESET bit. 
-> > 
-> > Could you please confirm whether this is intentional?
-> 
-> sorry my bad... I will change this in v3.
+Thanks,
 
-OK
+Gregory
 
-> >> +/* ecap0 */
-> >> +struct omap_hwmod dra7xx_ecap0_hwmod = {
-> >> +	.name		= "ecap0",
-> >> +	.class		= &dra7xx_ecap_hwmod_class,
-> >> +	.clkdm_name	= "l4per2_clkdm",
-> >> +	.main_clk	= "l4_root_clk_div",
-> > 
-> > Looking at SPRUHZ6 Section 29.1.4.2 "PWMSS Modules Local Clock Gating", 
-> > there appears to be a local "mini-PRCM" for the PWMSS which implements 
-> > clock gating and reports back on the status of what I'd guess is the local 
-> > clock gating FSM.
-> > 
-> > So from that point of view, you should probably create a clock driver that 
-> > manages both the clock gate request bit and the FSM status bit.  It should 
-> > be something that can be reused for the other PWMSS IP blocks.  Then 
-> > you'd create per-IP block clock nodes and set the main_clk to point to 
-> > that node.
-> 
-> Since, this register is within the config space of PWMSS, the individual
-> gating and reporting for the modules within PWMSS
-> (PWMSS_CLKCONFIG) is currently being taken care by pwm-tipwmss.c(almost
-> the sole function this driver is doing). It has been the same since
-> am335x. Adding new clock nodes will result in driver changes and also
-> changes to am335x, am437x (and other platforms) hwmod files. It also
-> involves adding new nodes to clocks.dtsi and it will be difficult to
-> maintain backward compatibility for older platforms. Is it not better to
-> keep this as is, in order to maintain consistency (with am335x, am437x
-> etc) and also that these clock bits are within IP's config space?
+>
+>
+>> +		break;
+>>  	case OTG_STATE_A_WAIT_BCON:
+>>  		dsps_writeb(musb->mregs, MUSB_DEVCTL, 0);
+>>  		skip_session = 1;
+>> +		glue->otg_state_a_wait_vrise_timeout = 0;
+>>  		/* fall */
+>>  
+>>  	case OTG_STATE_A_IDLE:
+>> @@ -359,7 +369,9 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
+>>  			MUSB_HST_MODE(musb);
+>>  			musb->xceiv->otg->default_a = 1;
+>>  			musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
+>> -			del_timer(&glue->timer);
+>> +			glue->otg_state_a_wait_vrise_timeout = 1;
+>> +			mod_timer(&glue->timer, jiffies +
+>> +				  msecs_to_jiffies(OTG_TIME_A_WAIT_VRISE));
+>>  		} else {
+>>  			musb->is_active = 0;
+>>  			MUSB_DEV_MODE(musb);
+>> 
+>
+>
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-It's certainly possible that we as maintainers didn't look closely enough 
-at the AM33xx data for the PWMSS when we merged it.  But if that's 
-incorrect too, then now is the time to fix this.  Otherwise it will never 
-get fixed, since each new group of people patching this code will keep 
-punting it off to the indeterminate future.
-
-In terms of hwmod data: based on the register maps in sections 29.4.3, 
-29.3.3, and 29.2.3 of SPRUHZ6, none of these subdevices are hwmod devices.  
-They don't support the Highlander OCP registers, they have no individual 
-PRCM registers or register bitfields, and all of the idle and status 
-reporting is to the PWMSS top-level IP block itself.  So it looks to me 
-like the eCAP, eQEP, and ePWM modules should be registered via DT, rather 
-than via hwmod.  It looks like you can get away with using the 
-"simple-bus" abstraction, but you might ultimately have to define 
-something custom here.  However, the PWMSS top level subsystem, described 
-in section 29.1, does have the OCP registers, sideband signals, etc., and 
-thus should remain a hwmod-registered device (via DT).
-
-In terms of the clock data: based on section 29.1.4, section 29.1.5.2, 
-figure 29-3, and table 29-4, there are several clock gating control bits.  
-These should be modeled as clock nodes in the Linux common clock 
-framework.  Furthermore these registers are located inside the PWMSS 
-subsystem itself, and are only accessible when the PWMSS IP block is 
-functional in a PM runtime point of view: i.e., when the block is mapped 
-into memory space, clocked and out of reset, etc.  So the clock types for 
-the PWMSS_CFG IP block should most likely be implemented in the PWMSS 
-driver.  I think you'll still be able to define the clock node data itself 
-in DT, but this will probably need a closer look.  Ideally, since the 
-clock node register address data is the same for all three subsystem 
-instances, one would be able to simply include a DT include file three 
-times; but the DT binding data format may ultimately make this 
-impractical.
-
-In terms of the transition from the old approach to this approach, it ooks 
-to me like the first thing to do would be to convert
-drivers/pwm/pwm-tipwmss.c to define some clk_ops and register some clock
-nodes with the CCF.  You've got the meat of the clock gating control code
-there already.  Then the next thing to do would be to to get rid of
-pwmss_submodule_state_change() and use
-clk_{prepare,enable,disable,unprepare}*() in the drivers/pwm/pwm-ti*.c
-subdrivers instead.  All of that looks like it should be possible to  
-implement in a backwards-compatible way.  Then you'd convert the eCAP, 
-eQEP, and ePWM code to probe as platform_devices, driven from a simple-bus 
-or pwmss-bus or whatever in the DT data.  Naturally, the AM33xx/43xx data 
-should be fixed also.  
-
-
-- Paul
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
