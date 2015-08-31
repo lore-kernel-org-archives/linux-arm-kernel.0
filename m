@@ -1,193 +1,45 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 31 Aug 2015 22:40:19 +0800
-Subject: [PATCH 2/2] arm64: dts: add dts files for Hisilicon Hip05-D02
- Development Board
-In-Reply-To: <55E45A46.7040805@huawei.com>
-References: <1440838361-1468-1-git-send-email-dingtianhong@huawei.com>
- <1440838361-1468-3-git-send-email-dingtianhong@huawei.com>
- <20150831131244.GB6194@leoy-linaro> <55E45A46.7040805@huawei.com>
-Message-ID: <20150831144019.GA22491@leoy-linaro>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Mon, 31 Aug 2015 16:42:13 +0200
+Subject: [PATCH v2] clk: rockchip: Add pclk_peri to critical clocks on
+ RK3066/RK3188
+In-Reply-To: <1440322357-2621-1-git-send-email-romain.perier@gmail.com>
+References: <1440322357-2621-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <CABgxDo+otZrYoqTNK-ea=L6Dsd5p_b_MFCi4H4XJZZ25PV_qnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 31, 2015 at 09:44:38PM +0800, Ding Tianhong wrote:
-> On 2015/8/31 21:12, Leo Yan wrote:
-> > On Sat, Aug 29, 2015 at 04:52:41PM +0800, Ding Tianhong wrote:
-> >> Add initial dtsi file to support Hisilicon Hip05-D02 Board with
-> >> support of CPUs in four clusters and each cluster has quard Cortex-A57.
-> >>
-> >> Also add dts file to support Hip05-D02 development board.
-> >>
-> >> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> >> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> >> ---
-> >>  arch/arm64/boot/dts/hisilicon/Makefile      |   2 +-
-> >>  arch/arm64/boot/dts/hisilicon/hip05-d02.dts |  36 ++++
-> >>  arch/arm64/boot/dts/hisilicon/hip05.dtsi    | 271 ++++++++++++++++++++++++++++
-> >>  3 files changed, 308 insertions(+), 1 deletion(-)
-> >>  create mode 100644 arch/arm64/boot/dts/hisilicon/hip05-d02.dts
-> >>  create mode 100644 arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> >>
-> >> diff --git a/arch/arm64/boot/dts/hisilicon/Makefile b/arch/arm64/boot/dts/hisilicon/Makefile
-> >> index fa81a6e..cd158b8 100644
-> >> --- a/arch/arm64/boot/dts/hisilicon/Makefile
-> >> +++ b/arch/arm64/boot/dts/hisilicon/Makefile
-> >> @@ -1,4 +1,4 @@
-> >> -dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb
-> >> +dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb hip05-d02.dtb
-> >>  
-> >>  always		:= $(dtb-y)
-> >>  subdir-y	:= $(dts-dirs)
-> >> diff --git a/arch/arm64/boot/dts/hisilicon/hip05-d02.dts b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
-> >> new file mode 100644
-> >> index 0000000..ae34e25
-> >> --- /dev/null
-> >> +++ b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
-> >> @@ -0,0 +1,36 @@
-> >> +/**
-> >> + * dts file for Hisilicon D02 Development Board
-> >> + *
-> >> + * Copyright (C) 2014,2015 Hisilicon Ltd.
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * publishhed by the Free Software Foundation.
-> >> + *
-> >> + */
-> >> +
-> >> +/dts-v1/;
-> >> +
-> >> +#include "hip05.dtsi"
-> >> +
-> >> +/ {
-> >> +	model = "Hisilicon Hip05 D02 Development Board";
-> >> +	compatible = "hisilicon,hip05-d02";
-> >> +
-> >> +	memory at 00000000 {
-> >> +		device_type = "memory";
-> >> +		reg = <0x0 0x00000000 0x0 0x80000000>;
-> >> +	};
-> >> +
-> >> +	aliases {
-> >> +		serial0 = &uart0;
-> >> +	};
-> >> +
-> >> +	chosen {
-> >> +		stdout-path = "serial0:115200n8";
-> >> +	};
-> >> +};
-> >> +
-> >> +&uart0 {
-> >> +	status = "ok";
-> >> +};
-> >> diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> >> new file mode 100644
-> >> index 0000000..da12d94
-> >> --- /dev/null
-> >> +++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> >> @@ -0,0 +1,271 @@
-> >> +/**
-> >> + * dts file for Hisilicon D02 Development Board
-> >> + *
-> >> + * Copyright (C) 2014,2015 Hisilicon Ltd.
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * publishhed by the Free Software Foundation.
-> >> + *
-> >> + */
-> >> +
-> >> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> >> +
-> >> +/ {
-> >> +	compatible = "hisilicon,hip05-d02";
-> >> +	interrupt-parent = <&gic>;
-> >> +	#address-cells = <2>;
-> >> +	#size-cells = <2>;
-> >> +
-> >> +	psci {
-> >> +		compatible = "arm,psci-0.2";
-> >> +		method = "smc";
-> >> +	};
-> >> +
-> >> +	cpus {
-> >> +		#address-cells = <1>;
-> >> +		#size-cells = <0>;
-> >> +
-> >> +		cpu-map {
-> >> +			cluster0 {
-> >> +				core0 {
-> >> +					cpu = <&cpu0>;
-> >> +				};
-> >> +				core1 {
-> >> +					cpu = <&cpu1>;
-> >> +				};
-> >> +				core2 {
-> >> +					cpu = <&cpu2>;
-> >> +				};
-> >> +				core3 {
-> >> +					cpu = <&cpu3>;
-> >> +				};
-> >> +			};
-> >> +			cluster1 {
-> >> +				core0 {
-> >> +					cpu = <&cpu4>;
-> >> +				};
-> >> +				core1 {
-> >> +					cpu = <&cpu5>;
-> >> +				};
-> >> +				core2 {
-> >> +					cpu = <&cpu6>;
-> >> +				};
-> >> +				core3 {
-> >> +					cpu = <&cpu7>;
-> >> +				};
-> >> +			};
-> >> +			cluster2 {
-> >> +				core0 {
-> >> +					cpu = <&cpu8>;
-> >> +				};
-> >> +				core1 {
-> >> +					cpu = <&cpu9>;
-> >> +				};
-> >> +				core2 {
-> >> +					cpu = <&cpu10>;
-> >> +				};
-> >> +				core3 {
-> >> +					cpu = <&cpu11>;
-> >> +				};
-> >> +			};
-> >> +			cluster3 {
-> >> +				core0 {
-> >> +					cpu = <&cpu12>;
-> >> +				};
-> >> +				core1 {
-> >> +					cpu = <&cpu13>;
-> >> +				};
-> >> +				core2 {
-> >> +					cpu = <&cpu14>;
-> >> +				};
-> >> +				core3 {
-> >> +					cpu = <&cpu15>;
-> >> +				};
-> >> +			};
-> >> +		};
-> >> +
-> >> +		cpu0: cpu at 20000 {
-> >> +			device_type = "cpu";
-> >> +			compatible = "arm,armv8";
-> > 
-> > Change to "arm,cortex-a57","arm,armv8"?
-> > 
-> 
-> Ok?but I think should be "hisilicon,hip05","arm,armv8".
+ping
 
-If the CPU is a starndard ARM core (such like CA53, CA57, etc), you
-need directly use the CPU type which has been defined in:
-Documentation/devicetree/bindings/arm/cpus.txt. So here hip05 is the
-naming code for SoC? or for the CPU customized by Hisilicon?
-
-[...]
-
-Thanks,
-Leo Yan
+2015-08-23 11:32 GMT+02:00 Romain Perier <romain.perier@gmail.com>:
+> Now that the rockchip clock subsystem does clock gating with GPIO banks,
+> these are no longer enabled once during probe and no longer stay enabled
+> for eternity. When all these clocks are disabled, the parent clock pclk_peri
+> might be disabled too, as no other child claims it. So, we need to add pclk_peri
+> to the critical clocks.
+>
+> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+> Tested-by: Michael Niewoehner <linux@mniewoehner.de>
+> ---
+>
+> changes in v2:
+> - Improved commit messages
+> - Added "Tested-by" from Michael Niewoehner, as he tested v1 and no code changed
+>
+>  drivers/clk/rockchip/clk-rk3188.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+> index bf20214..839a22a 100644
+> --- a/drivers/clk/rockchip/clk-rk3188.c
+> +++ b/drivers/clk/rockchip/clk-rk3188.c
+> @@ -717,6 +717,7 @@ static const char *const rk3188_critical_clocks[] __initconst = {
+>         "aclk_peri",
+>         "hclk_peri",
+>         "pclk_cpu",
+> +       "pclk_peri",
+>  };
+>
+>  static void __init rk3188_common_clk_init(struct device_node *np)
+> --
+> 2.1.4
+>
