@@ -1,60 +1,21 @@
-From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Mon, 31 Aug 2015 21:18:58 +0800
-Subject: [PATCH 3/3] spi: Mediatek: Document devicetree bindings update for
- spi bus
-In-Reply-To: <1441027138-16458-1-git-send-email-leilk.liu@mediatek.com>
-References: <1441027138-16458-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1441027138-16458-4-git-send-email-leilk.liu@mediatek.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 31 Aug 2015 15:16:10 +0200
+Subject: [PATCH 1/3] ARM: mvebu: add DT support for Seagate NAS 2 and 4-Bay
+In-Reply-To: <20150831131306.GO30993@kw.sim.vm.gnt>
+References: <1440866805-31731-1-git-send-email-simon.guinot@sequanux.org>
+ <1440866805-31731-2-git-send-email-simon.guinot@sequanux.org>
+ <20150831124314.GE14459@lunn.ch>
+ <20150831131306.GO30993@kw.sim.vm.gnt>
+Message-ID: <20150831131610.GG14459@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates spi bindings, fixs clock usage description.
+> It may sound crazy but I have nothing more than the hardware and product
+> names which are respectively "n090201" and "Seagate NAS 2-Bay" for this
+> board.
 
-Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
----
- Documentation/devicetree/bindings/spi/spi-mt65xx.txt | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+Does it have a plate on the back with identification information? Is
+this n090201 on the ID plate?
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-index dcefc43..6160ffb 100644
---- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-@@ -15,17 +15,18 @@ Required properties:
- - interrupts: Should contain spi interrupt
- 
- - clocks: phandles to input clocks.
--  The first should be <&topckgen CLK_TOP_SPI_SEL>.
--  The second should be one of the following.
-+  The first should be one of the following. It's PLL.
-    -  <&clk26m>: specify parent clock 26MHZ.
-    -  <&topckgen CLK_TOP_SYSPLL3_D2>: specify parent clock 109MHZ.
- 				      It's the default one.
-    -  <&topckgen CLK_TOP_SYSPLL4_D2>: specify parent clock 78MHZ.
-    -  <&topckgen CLK_TOP_UNIVPLL2_D4>: specify parent clock 104MHZ.
-    -  <&topckgen CLK_TOP_UNIVPLL1_D8>: specify parent clock 78MHZ.
-+  The second should be <&topckgen CLK_TOP_SPI_SEL>. It's clock mux.
-+  The third is <&pericfg CLK_PERI_SPI0>. It's clock gate.
- 
--- clock-names: shall be "spi-clk" for the controller clock, and
--  "parent-clk" for the parent clock.
-+- clock-names: shall be "parent-clk" for the parent clock, "sel-clk" for the
-+  muxes clock, and "spi-clk" for the clock gate.
- 
- Optional properties:
- - mediatek,pad-select: specify which pins group(ck/mi/mo/cs) spi
-@@ -44,8 +45,11 @@ spi: spi at 1100a000 {
- 	#size-cells = <0>;
- 	reg = <0 0x1100a000 0 0x1000>;
- 	interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
--	clocks = <&topckgen CLK_TOP_SPI_SEL>, <&topckgen CLK_TOP_SYSPLL3_D2>;
--	clock-names = "spi-clk", "parent-clk";
-+	clocks = <&topckgen CLK_TOP_SYSPLL3_D2>,
-+		 <&topckgen CLK_TOP_SPI_SEL>,
-+		 <&pericfg CLK_PERI_SPI0>;
-+	clock-names = "parent-clk", "sel-clk", "spi-clk";
-+
- 	mediatek,pad-select = <0>;
- 	status = "disabled";
- };
--- 
-1.8.1.1.dirty
+     Thanks
+	Andrew
