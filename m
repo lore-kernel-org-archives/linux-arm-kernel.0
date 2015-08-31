@@ -1,95 +1,158 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 31 Aug 2015 10:40:38 +0800
-Subject: [PATCH v3 0/14] Add Analogix Core Display Port Driver
-In-Reply-To: <CABgxDoKcsRye43pqzZC=4A=D1+iDj5Bmy9XZjx+K8ekca0=FwQ@mail.gmail.com>
-References: <1439995728-18046-1-git-send-email-ykk@rock-chips.com>	<105A0032-83A0-4B75-AE94-258F12451670@gmail.com>	<55D6F6F8.70504@rock-chips.com>	<8384E112-E1F4-4CD3-85BF-A2A25989783F@gmail.com>	<20150821131631.GC22118@ulmo.nvidia.com>
- <CABgxDoKcsRye43pqzZC=4A=D1+iDj5Bmy9XZjx+K8ekca0=FwQ@mail.gmail.com>
-Message-ID: <55E3BEA6.50407@rock-chips.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Mon, 31 Aug 2015 10:53:04 +0800
+Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <CAFpQJXWO0xT0kxWf09L_XcAOXm1Lov8i2U2BQzk-x0TStj7vBg@mail.gmail.com>
+References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
+ <20150828123228.GE31748@leverpostej>
+ <CAL_JsqLOpUTVeKbkJ6uPi0EYistd=BowAHdtSmaUYYDhU6c9Sg@mail.gmail.com>
+ <55E17F58.5020101@huawei.com>
+ <CAFpQJXWO0xT0kxWf09L_XcAOXm1Lov8i2U2BQzk-x0TStj7vBg@mail.gmail.com>
+Message-ID: <55E3C190.30407@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
 
-? 08/30/2015 08:16 PM, Romain Perier ??:
-> Hi,
->
-> Could you rebase your serie onto linux-next or 4.2-rc8 ? it does not
-> apply here...
 
-Thanks for try to applied, and feel sorry for that failed.
-
-This v3 series was rebased on github.com/torvalds/linux.git, so I should
-rebase on kernel/next/linux-next.git when I'm preparing v4 series.
-
-Thanks,
-- Yakir
-
-> Regards,
-> Romain
->
-> 2015-08-21 15:16 GMT+02:00 Thierry Reding <treding@nvidia.com>:
->> On Fri, Aug 21, 2015 at 08:24:16PM +0900, Jingoo Han wrote:
->>> On 2015. 8. 21., at PM 7:01, Yakir Yang <ykk@rock-chips.com> wrote:
->>>> Hi Jingoo,
->>>>
->>>>> ? 2015/8/21 16:20, Jingoo Han ??:
->>>>>> On 2015. 8. 19., at PM 11:48, Yakir Yang <ykk@rock-chips.com> wrote:
->>>>> .....
->>>>>
->>>>>> .../bindings/video/analogix_dp-rockchip.txt        |   83 ++
->>>>>> .../devicetree/bindings/video/exynos_dp.txt        |   51 +-
->>>>>> arch/arm/boot/dts/exynos5250-arndale.dts           |   10 +-
->>>>>> arch/arm/boot/dts/exynos5250-smdk5250.dts          |   10 +-
->>>>>> arch/arm/boot/dts/exynos5250-snow.dts              |   12 +-
->>>>>> arch/arm/boot/dts/exynos5250-spring.dts            |   12 +-
->>>>>> arch/arm/boot/dts/exynos5420-peach-pit.dts         |   12 +-
->>>>>> arch/arm/boot/dts/exynos5420-smdk5420.dts          |   10 +-
->>>>>> arch/arm/boot/dts/exynos5800-peach-pi.dts          |   12 +-
->>>>>> drivers/gpu/drm/bridge/Kconfig                     |    5 +
->>>>>> drivers/gpu/drm/bridge/Makefile                    |    1 +
->>>>>> drivers/gpu/drm/bridge/analogix_dp_core.c          | 1382 +++++++++++++++++++
->>>>>> drivers/gpu/drm/bridge/analogix_dp_core.h          |  286 ++++
->>>>>> drivers/gpu/drm/bridge/analogix_dp_reg.c           | 1294 ++++++++++++++++++
->>>>>> .../exynos_dp_reg.h => bridge/analogix_dp_reg.h}   |  270 ++--
->>>>>> drivers/gpu/drm/exynos/Kconfig                     |    5 +-
->>>>>> drivers/gpu/drm/exynos/Makefile                    |    2 +-
->>>>>> drivers/gpu/drm/exynos/analogix_dp-exynos.c        |  347 +++++
->>>>> Would you change this file name to "exynos_dp.c"?
->>>> Sorry, I don't think so  ;(
->>>>
->>>> I think IP_name+Soc_name would be better in this re-use case.
->>> So? Is there the naming rule such as "IP_name+SoC_name"?
->>>
->>>> Beside I see
->>>> there are lots of driver named with this format in kernel, such as dw_hdmi & dw_mmc
->>> Please look at other dw cases.
->>> For example, look at dw_pcie.
->>>
->>> drivers/pci/host/
->>> pcie-designware.c
->>> pci-spear13xx.c
->>> pci-exynos.c
->>>
->>> In this case, pci-spear13xx.c and pci-exynos.c do not use "IP_name+SoC_name", even though these are dw IPs.
->>>
->>> Also, naming consistency is more important.
->>> Now, Exynos DRM files are using "exynos_drm_" prefix.
->>>
->>> drivers/gpu/drm/exynos/
->>> exynos_drm_buf.c
->>> exynos_drm_core.c
->>> ....
->>>
->>> However, "analogix_dp-exynos.c" looks very inconsistent.
->>>
->>> If there is no strict naming rule, please use "exynos_dp.c"
->>> or "exynos_drm_dp.c".
->> Exynos DRM maintainers get to pick their filenames, so Yakir, please
->> rename as Jingoo suggested.
+On 2015/8/29 22:56, Ganapatrao Kulkarni wrote:
+> Hi Thunder,
+> 
+> On Sat, Aug 29, 2015 at 3:16 PM, Leizhen (ThunderTown)
+> <thunder.leizhen@huawei.com> wrote:
 >>
->> Even if you didn't the first thing that would go into the Exynos DRM
->> driver tree after this is merged is a rename patch anyway.
 >>
->> Thierry
->
->
+>> On 2015/8/28 22:02, Rob Herring wrote:
+>>> +benh
+>>>
+>>> On Fri, Aug 28, 2015 at 7:32 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>> Hi,
+>>>>
+>>>> On Fri, Aug 14, 2015 at 05:39:32PM +0100, Ganapatrao Kulkarni wrote:
+>>>>> DT bindings for numa map for memory, cores and IOs using
+>>>>> arm,associativity device node property.
+>>>>
+>>>> Given this is just a copy of ibm,associativity, I'm not sure I see much
+>>>> point in renaming the properties.
+>>>
+>>> So just keep the ibm? I'm okay with that. That would help move to
+>>> common code. Alternatively, we could drop the vendor prefix and have
+>>> common code just check for both.
+>>>
+>>
+>> Hi all,
+>>
+>> Why not copy the method of ACPI numa? There only three elements should be configured:
+>> 1) a cpu belong to which node
+>> 2) a memory block belong to which node
+>> 3) the distance of each two nodes
+>>
+>> The devicetree nodes of numa can be like below:
+>> / {
+>>         ...
+>>
+>>         numa-nodes-info {
+>>                 node-name: node-description {
+>>                         mem-ranges = <...>;
+>>                         cpus-list = <...>;
+>>                 };
+>>
+>>                 nodes-distance {
+>>                         distance-list = <...>;
+>>                 };
+>>         };
+>>
+>>         ...
+>> };
+>>
+> some what similar to what your are proposing is already implemented in
+> my v2 patchset.
+> https://lwn.net/Articles/623920/
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305164.html
+
+Sorry, I have not read your old version patchsets before.
+
+The basic ideas are consistent, but details are different. I think your v2 patchset may meet some problem:
+
+-------------------------
++- cpu-map:	This property defines the association of range of processors
++		(range of cpu ids) and the proximity domain to which
++		the processor belongs.
+
++		cpu-map = <0 7 0>,
++			  <8 15 1>;
+-------------------------
+
+1.
+I am not sure the cpu ids is logical cpu-ids in Linux or the sequence number of the CPU dt-nodes in dts.
+The former case: logical cpu-id is allocated by Linux, we can not ensure that cpu0 is the first CPU dt-node.
+The latter case: depend on Linux strictly parse CPU dt-nodes follow the sequence in dts.
+
+2. You should put most codes into /drivers/of/, because it can be shared with other ARCHs which base upon devicetree.
+
+Here is my detailed example:
+Examples:
+/ {
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	memory at 0 {
+		device_type = "memory";
+		reg = <0x0 0x00000000 0x0 0x40000000>,
+		      <0x1 0x00000000 0x1 0x00000000>,
+		      <0x2 0x00000000 0x0 0x40000000>,
+		      <0x2 0x80000000 0x0 0x40000000>;
+	};
+
+	CPU0: cpu at 10000 {
+		device_type = "cpu";
+		reg = <0x10000>;
+		...
+	};
+
+	numa-nodes-info {
+		node0: cluster0 {
+			mem-ranges = <0x0 0x00000000 0x1 0x00000000>;
+			cpus-list = <&CPU0 &CPU1>;
+		};
+
+		node1: cluster1 {
+			mem-ranges = <0x1 0x00000000 0x1 0x00000000>;
+			cpus-list = <&CPU2>;
+		};
+
+		node2: cluster2 {
+			mem-ranges = <0x2 0x00000000 0x1 0x00000000>;
+			cpus-list = <&CPU3 &CPU4 &CPU5>;
+		};
+
+		nodes-distance {
+			distance-list = <&node0 &node1 15>, <&node1 &node2 18>;
+		};
+	};
+
+> we have went to associativity property based implementation to keep it
+> more generic.
+> i do have both acpi(using linaro/hanjun's patches) and associativity
+> based implementations on our internal tree
+> and tested on thunderx platform.
+> i do see issue in creating numa mapping using ACPI for IOs(for
+> example, i am not able to create numa mapping for ITS which is on each
+> node, using ACPI tables),  since ACPI spec (tables SRAT and SLIT)
+> talks only about processor and memory.
+> however associativity is generic and you can apply on any dt node.
+>> Sorry, I don't think xxx,associativity is a good method, it's hard to config, and it
+>> seems hardware-dependent. Especially, when we want to support memory hot-add, it's too hard.
+>> Because xxx,associativity have no obvious information about it. Like powerpc, it use another
+>> property: "/ibm,dynamic-reconfiguration-memory".
+>>
+>> I spend almost a whole month to implement of_numa(configured by dt-nodes), base upon my opinion
+>> mentioned above. If somebody are interested in it, I can send my patchset to show it.
+>>
+>> Regards,
+>> Thunder.
+>>
+> thanks
+> ganapat
+> 
+> .
+> 
