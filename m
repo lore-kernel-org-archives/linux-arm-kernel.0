@@ -1,62 +1,109 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 31 Aug 2015 16:20:08 +0100
-Subject: [PATCH v4] iio: adc: vf610: Add IIO buffer support for Vybrid ADC
-In-Reply-To: <BN3PR0301MB121977040608F337E69ADADEF5660@BN3PR0301MB1219.namprd03.prod.outlook.com>
-References: <d556443a26070be505f9a5f5f0999253b73d9b71.1439283162.git.maitysanchayan@gmail.com>
- <9be567ec7d6f6370dd42a41438d64cf7aaa47635.1439826018.git.maitysanchayan@gmail.com>
- <BN3PR0301MB121977040608F337E69ADADEF5660@BN3PR0301MB1219.namprd03.prod.outlook.com>
-Message-ID: <55E470A8.4000200@kernel.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 31 Aug 2015 10:25:22 -0500
+Subject: [PATCH v3 4/6] [media] c8sectpfe: Update binding to reset-gpios
+In-Reply-To: <1440784362-31217-5-git-send-email-peter.griffin@linaro.org>
+References: <1440784362-31217-1-git-send-email-peter.griffin@linaro.org>
+ <1440784362-31217-5-git-send-email-peter.griffin@linaro.org>
+Message-ID: <CAL_JsqLYes5L2Bg0R45ui24yYWgHzFSLgBPajieSLgLz09=1aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/08/15 07:50, Duan Andy wrote:
-> From: Sanchayan Maity <maitysanchayan@gmail.com> Sent: Monday, August 17, 2015 11:52 PM
->> To: jic23 at kernel.org; linux-iio at vger.kernel.org
->> Cc: stefan at agner.ch; Duan Fugang-B38611; pmeerw at pmeerw.net; linux-
->> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Sanchayan
->> Maity
->> Subject: [PATCH v4] iio: adc: vf610: Add IIO buffer support for Vybrid
->> ADC
->>
->> This patch adds support for IIO buffer to the Vybrid ADC driver.
->> IIO triggered buffer infrastructure along with iio sysfs trigger is used
->> to leverage continuous sampling support provided by the ADC block.
->>
->> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
->> ---
->>
->> Changes since v3:
->> Fix iio_buffer_setup_ops for postenable and predisable functions to match
->> pairwise. Before this the predisable work was being done in postdisable.
->>
->> Changes since v2:
->> 1. Fix the wrong buffer size for statically allocated buffer 2. Drop the
->> use of .address field from the iio_chan_spec 3. Use iio_buffer_enabled
->> call inside the lock 4. Drop wrapper function around iio_trigered_*
->> function calls 5. Drop Kconfig select of sysfs trigger 6. Drop Kconfig
->> select IIO_TRIGGER as it is already selected by IIO_TRIGGERED_BUFFER
->>
->> Changes since v1:
->> 1. Use a fixed size buffer instead of kmalloc allocated during update
->> scan mode 2. Remove a write to read only register ADC_HS (COCO bit)
->>
->>  drivers/iio/adc/Kconfig     |   2 +
->>  drivers/iio/adc/vf610_adc.c | 105
->> +++++++++++++++++++++++++++++++++++++++++---
->>  2 files changed, 100 insertions(+), 7 deletions(-)
->>
-> 
-> The version is fine for me. Thanks for your effort.
-> 
-> Acked-by: Fugang Duan <B38611@freescale.com>
-Applied to the togreg branch of iio.git - will be initially pushed out
-as testing for the autobuilders to play with it.
+On Fri, Aug 28, 2015 at 12:52 PM, Peter Griffin
+<peter.griffin@linaro.org> wrote:
+> gpio.txt documents that GPIO properties should be named
+> "[<name>-]gpios", with <name> being the purpose of this
+> GPIO for the device.
+>
+> This change has been done as one atomic commit.
 
-Thanks,
+dtb and kernel updates are not necessarily atomic, so you are breaking
+compatibility with older dtbs. You should certainly highlight that in
+the commit message. I only point this out. I'll leave it to platform
+maintainers whether or not this breakage is acceptable.
 
-Jonathan
+Rob
+
+>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt | 6 +++---
+>  arch/arm/boot/dts/stihxxx-b2120.dtsi                          | 4 ++--
+>  drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c         | 2 +-
+>  3 files changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+> index d4def76..e70d840 100644
+> --- a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+> +++ b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+> @@ -35,7 +35,7 @@ Required properties (tsin (child) node):
+>
+>  - tsin-num     : tsin id of the InputBlock (must be between 0 to 6)
+>  - i2c-bus      : phandle to the I2C bus DT node which the demodulators & tuners on this tsin channel are connected.
+> -- rst-gpio     : reset gpio for this tsin channel.
+> +- reset-gpios  : reset gpio for this tsin channel.
+>
+>  Optional properties (tsin (child) node):
+>
+> @@ -75,7 +75,7 @@ Example:
+>                         tsin-num                = <0>;
+>                         serial-not-parallel;
+>                         i2c-bus                 = <&ssc2>;
+> -                       rst-gpio                = <&pio15 4 0>;
+> +                       reset-gpios             = <&pio15 4 GPIO_ACTIVE_HIGH>;
+>                         dvb-card                = <STV0367_TDA18212_NIMA_1>;
+>                 };
+>
+> @@ -83,7 +83,7 @@ Example:
+>                         tsin-num                = <3>;
+>                         serial-not-parallel;
+>                         i2c-bus                 = <&ssc3>;
+> -                       rst-gpio                = <&pio15 7 0>;
+> +                       reset-gpios             = <&pio15 7 GPIO_ACTIVE_HIGH>;
+>                         dvb-card                = <STV0367_TDA18212_NIMB_1>;
+>                 };
+>         };
+> diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> index f9fca10..0b7592e 100644
+> --- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> +++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> @@ -6,8 +6,8 @@
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>   */
+> -
+>  #include <dt-bindings/clock/stih407-clks.h>
+> +#include <dt-bindings/gpio/gpio.h>
+>  #include <dt-bindings/media/c8sectpfe.h>
+>  / {
+>         soc {
+> @@ -116,7 +116,7 @@
+>                                 tsin-num        = <0>;
+>                                 serial-not-parallel;
+>                                 i2c-bus         = <&ssc2>;
+> -                               rst-gpio        = <&pio15 4 GPIO_ACTIVE_HIGH>;
+> +                               reset-gpios     = <&pio15 4 GPIO_ACTIVE_HIGH>;
+>                                 dvb-card        = <STV0367_TDA18212_NIMA_1>;
+>                         };
+>                 };
+> diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+> index 3a91093..c691e13 100644
+> --- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+> +++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+> @@ -822,7 +822,7 @@ static int c8sectpfe_probe(struct platform_device *pdev)
+>                 }
+>                 of_node_put(i2c_bus);
+>
+> -               tsin->rst_gpio = of_get_named_gpio(child, "rst-gpio", 0);
+> +               tsin->rst_gpio = of_get_named_gpio(child, "reset-gpios", 0);
+>
+>                 ret = gpio_is_valid(tsin->rst_gpio);
+>                 if (!ret) {
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
