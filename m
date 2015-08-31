@@ -1,192 +1,227 @@
-From: jogo@openwrt.org (Jonas Gorski)
-Date: Mon, 31 Aug 2015 21:22:12 +0200
-Subject: [PATCH linux-next v5 1/5] mtd: spi-nor: notify (Q)SPI controller
- about protocol change
-In-Reply-To: <55DEDDBD.8060408@atmel.com>
-References: <cover.1440580764.git.cyrille.pitchen@atmel.com>
- <464fce12d75a5ba2105456cfd0a385b2d40305ba.1440580764.git.cyrille.pitchen@atmel.com>
- <CAOiHx=n+byfsbJNhnboqDEwhruOT8uKDJ+CcES7QBqPDLVAMsw@mail.gmail.com>
- <55DEDDBD.8060408@atmel.com>
-Message-ID: <CAOiHx=m0FhuH5BR-EYp4yQyB83yGRzdCFAPVfqB0b0+BvRE-6Q@mail.gmail.com>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Mon, 31 Aug 2015 15:44:04 -0400
+Subject: [PATCH v3 2/5] ARM: NSP: add minimal Northstar Plus device tree
+In-Reply-To: <55E3FFB5.6090703@broadcom.com>
+References: <1440805644-18241-1-git-send-email-jonmason@broadcom.com>
+ <55E0FAC4.2040108@broadcom.com>
+ <20150831022417.GA27066@broadcom.com>
+ <55E3FFB5.6090703@broadcom.com>
+Message-ID: <20150831194404.GA28848@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Aug 31, 2015 at 12:18:13AM -0700, Ray Jui wrote:
+> 
+> 
+> On 8/30/2015 7:24 PM, Jon Mason wrote:
+> > On Fri, Aug 28, 2015 at 05:20:20PM -0700, Ray Jui wrote:
+> >>
+> >>
+> >> On 8/28/2015 4:47 PM, Jon Mason wrote:
+> >>> Add a very minimalistic set of Northstar Plus Device Tree files which
+> >>> describes the SoC and the BCM958625 implementation.  The perpherials
+> >>> described are:
+> >>>
+> >>> ARM Cortex A9 CPU
+> >>> 2 8250 UARTs
+> >>> ARM GIC
+> >>> PL310 L2 Cache
+> >>> ARM A9 Global timer
+> >>>
+> >>> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+> >>> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> >>> ---
+> >>>  arch/arm/boot/dts/Makefile       |   2 +
+> >>>  arch/arm/boot/dts/bcm-nsp.dtsi   | 120 +++++++++++++++++++++++++++++++++++++++
+> >>>  arch/arm/boot/dts/bcm958625k.dts |  57 +++++++++++++++++++
+> >>>  3 files changed, 179 insertions(+)
+> >>>  create mode 100644 arch/arm/boot/dts/bcm-nsp.dtsi
+> >>>  create mode 100644 arch/arm/boot/dts/bcm958625k.dts
+> >>>
+> >>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >>> index 246473a..adb5732 100644
+> >>> --- a/arch/arm/boot/dts/Makefile
+> >>> +++ b/arch/arm/boot/dts/Makefile
+> >>> @@ -82,6 +82,8 @@ dtb-$(CONFIG_ARCH_BCM_CYGNUS) += \
+> >>>  dtb-$(CONFIG_ARCH_BCM_MOBILE) += \
+> >>>  	bcm28155-ap.dtb \
+> >>>  	bcm21664-garnet.dtb
+> >>> +dtb-$(CONFIG_ARCH_BCM_NSP) += \
+> >>> +	bcm958625k.dtb
+> >>>  dtb-$(CONFIG_ARCH_BERLIN) += \
+> >>>  	berlin2-sony-nsz-gs7.dtb \
+> >>>  	berlin2cd-google-chromecast.dtb \
+> >>> diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+> >>> new file mode 100644
+> >>> index 0000000..f5f494f
+> >>> --- /dev/null
+> >>> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+> >>> @@ -0,0 +1,120 @@
+> >>> +/*
+> >>> + *  BSD LICENSE
+> >>> + *
+> >>> + *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
+> >>> + *
+> >>> + *  Redistribution and use in source and binary forms, with or without
+> >>> + *  modification, are permitted provided that the following conditions
+> >>> + *  are met:
+> >>> + *
+> >>> + *    * Redistributions of source code must retain the above copyright
+> >>> + *      notice, this list of conditions and the following disclaimer.
+> >>> + *    * Redistributions in binary form must reproduce the above copyright
+> >>> + *      notice, this list of conditions and the following disclaimer in
+> >>> + *      the documentation and/or other materials provided with the
+> >>> + *      distribution.
+> >>> + *    * Neither the name of Broadcom Corporation nor the names of its
+> >>> + *      contributors may be used to endorse or promote products derived
+> >>> + *      from this software without specific prior written permission.
+> >>> + *
+> >>> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> >>> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> >>> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> >>> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> >>> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> >>> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> >>> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> >>> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> >>> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> >>> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> >>> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> >>> + */
+> >>> +
+> >>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> >>> +#include <dt-bindings/interrupt-controller/irq.h>
+> >>> +
+> >>> +#include "skeleton.dtsi"
+> >>> +
+> >>> +/ {
+> >>> +	compatible = "brcm,nsp";
+> >>> +	model = "Broadcom Northstar Plus SoC";
+> >>> +	interrupt-parent = <&gic>;
+> >>> +
+> >>> +	mpcore {
+> >>> +		compatible = "simple-bus";
+> >>> +		ranges = <0x00000000 0x19020000 0x00003000>;
+> >>> +		#address-cells = <1>;
+> >>> +		#size-cells = <1>;
+> >>> +
+> >>> +		cpus {
+> >>> +			#address-cells = <1>;
+> >>> +			#size-cells = <0>;
+> >>> +
+> >>> +			cpu at 0 {
+> >>> +				device_type = "cpu";
+> >>> +				compatible = "arm,cortex-a9";
+> >>> +				next-level-cache = <&L2>;
+> >>> +				reg = <0x0>;
+> >>> +			};
+> >>> +		};
+> >>> +
+> >>> +		L2: l2-cache {
+> >>> +			compatible = "arm,pl310-cache";
+> >>> +			reg = <0x2000 0x1000>;
+> >>> +			cache-unified;
+> >>> +			cache-level = <2>;
+> >>> +		};
+> >>> +
+> >>> +		gic: interrupt-controller at 19021000 {
+> >>> +			compatible = "arm,cortex-a9-gic";
+> >>> +			#interrupt-cells = <3>;
+> >>> +			#address-cells = <0>;
+> >>> +			interrupt-controller;
+> >>> +			reg = <0x1000 0x1000>,
+> >>> +			      <0x0100 0x100>;
+> >>> +		};
+> >>> +
+> >>> +		timer at 19020200 {
+> >>> +			compatible = "arm,cortex-a9-global-timer";
+> >>> +			reg = <0x0200 0x100>;
+> >>> +			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+> >>> +			clocks = <&periph_clk>;
+> >>> +		};
+> >>> +	};
+> >>> +
+> >>> +	clocks {
+> >>> +		#address-cells = <1>;
+> >>> +		#size-cells = <1>;
+> >>> +		ranges;
+> >>> +
+> >>> +		periph_clk: periph_clk {
+> >>> +			compatible = "fixed-clock";
+> >>> +			#clock-cells = <0>;
+> >>> +			clock-frequency = <500000000>;
+> >>> +		};
+> >>> +	};
+> >>> +
+> >>> +	apb {
+> >>> +		compatible = "arm,amba-bus", "simple-bus";
+> >>
+> >> Should "arm,amba-bus" has a separate bus node with AMBA compatible
+> >> devices declared in there (e.g, pl330, spi-pl022, and etc.) in the
+> >> future after they are brought up? To my best knowledge, "ns16550a" UART
+> >> is NOT an AMBA compatible device.
+> > 
+> > APB is an AMBA bus, so this part is accurate.  The block diagram of
+> > the SoC has the UARTs (and other perpherials) hanging off of the APB
+> > bus.  So, this organization follows the block diagram.
+> 
+> Okay so the "apb" node can be used for amba compatible devices
+> (arm,amba-bus) and/or simple platform devices (simple-bus). I guess
+> that's fine and I now see that there are some other dtsi also doing it
+> this way.
+> 
+> > While the
+> > UART drivers are not AMBA aware, there appears to be no issues with
+> > this layout (as the HW/drivers come up without issue). Unless there
+> > is an unforeseen issue with having non-AMBA aware devices on the DT
+> > AMBA bus, I would think it best to organize it to match the block
+> > disgram.
+> > 
+> 
+> UART runs fine because you also have "simple-bus" listed as the
+> compatible string so uart is populated as standard platform device.
+> 
+> >>> +		interrupt-parent = <&gic>;
+> >>> +		ranges = <0x00000000 0x18000000 0x00001000>;
+> >>
+> >> Does the 'apb' bus mean to cover all peripherals connected through APB?
+> >> If so, the size is only 0x1000 and that seems to be too small...
+> > 
+> > This is all that is currently needed.  I was planning on expanding it
+> > as I added more devices.
+> 
+> Sure.
+> 
+> I haven't checked the datahsheet but based on the layout (which seems
+> quite similar to Cygnus), I assume the range for these devices should be
+> 0x18000000 - 0x18ffffff? Just want to make sure there are no other
+> devices come before 0x18000000 so you don't need to change all these reg
+> offsets in the future.
 
-On Thu, Aug 27, 2015 at 11:51 AM, Cyrille Pitchen
-<cyrille.pitchen@atmel.com> wrote:
-> Hi Jonas,
->
-> Le 26/08/2015 16:02, Jonas Gorski a ?crit :
->> On Wed, Aug 26, 2015 at 2:30 PM, Cyrille Pitchen
->> <cyrille.pitchen@atmel.com> wrote:
->>> Once the Quad SPI mode has been enabled on a Micron flash memory, this
->>> device expects ALL the following commands to use the SPI 4-4-4 protocol.
->>> The (Q)SPI controller needs to be notified about the protocol change so it
->>> can adapt and keep on dialoging with the Micron memory.
->>
->> Doesn't that mean you need to disable quad mode on removal? Else the
->> following will break/fail:
->>
->> insmod atmel-quadspi.ko ~> spi-nor attaches -> sees micron -> enables quad mode
->> rmmod atmel-quadspi.ko ~> spi-nor detaches
->> insmod atmel-quadspi.ko ~> spi-nor attaches -> fails to read the id
->> because flash is still in quad mode.
->>
->
-> Indeed you're right such an issue does exist. So as you said one solution
-> could be create a new function to "clean" what have been done by spi_nor_scan()
-> then call it from remove() function of each driver calling spi_nor_scan() from
-> its probe().
-> However we could also enhance the probing of the memory. It is true that Micron
-> spi nor memories only accept SPI 4-4-4 commands once switched in quad mode but
-> actually they also provide a new command for this purpose:
-> "Multiple I/O Read ID" (0xAF).
-> Hence we could first try to probe using the regular Read ID (0x9F) command then
-> change the protocol, for instance to SPI 4-4-4, and try the 0xAF command.
-> I don't think all combinations for command/protocol need to be tested: for
-> Micron memories, their datasheets claim the 0x9F command is only supported in
-> "extended spi mode" so for the SPI 1-1-1 protocol whereas the 0xAF command
-> only works in dual or quad modes.
-> On the other hand Spansion memories still reply to the regular 0x9F command in
-> SPI 1-1-1 protocol even after their quad mode had been enabled.
-> For other manufacturers, well... I don't know!
+Based on the devices listed in the block diagram (and not including
+those on the AXI bus):
+i2c 0x18038000
+spi 0x18027200
+gpio 0x18000060
+pwm 0x18031000
+wdt 0x18039000
 
-At least from the two spansion datasheets I looked at, there is no 2_
-or 4_ mode for spansion flashes, and the quad mode only enables the
-1_x_4 commands, where as on micron the 1_x_4 commands are always
-available, and you only need to switch to DIO or QIO if you want to
-use 2_2_2 or 4_4_4.
+and a few others.  
 
-The question is how to detect if the READID command failed. Hopefully
-it will result in an invalid command, and we get 0xff... (or 0x00...)
-for the the id. And from there on we can first test 4_4_4 MIORDID (so
-it won't a a full command on a DIO-enabled flash), and if that fails,
-2_2_2. We need to tell the spi-nor controller to send these
-accordingly though. I wonder if it might not be better to pass the
-c_a_d as an additional parameter to the read_reg/write_reg etc call
-backs, because they might change depending on the command used. E.g.
-when using SPI_NOR_QUAD, we might want to make use of the quad page
-program command (which is 1_1_4), but there is no 1_1_2 version, so we
-cannot rely on a global "protocol" member for that, unless we want to
-do a set_protocol before every command.
+Looking at the sources, all the ARM IP is 0x19000000 and the rest is
+0x18000000.  The only part that is a little harry is the clocks, which
+have BCM and ARM (which causes the addresses to be both 0x19000000 and
+0x18000000).  But, we can handle that when we upstream that part (which
+should be very soon).
 
->
-> Some of the advantages of the probe solution as compared to the remove one are:
-> - we don't need to patch all drivers using spi_nor_scan() to call a new
->   function from their remove().
-> - it doesn't rely on the assumption that the spi-nor memory starts in
->   SPI 1-1-1 protocol. As a matter of fact the remove() won't be called for
->   built-in modules or in many (all ?) cases of reset. Moreover some bootloaders
->   may have already enabled the quad mode before starting the Linux kernel. This
->   is what the sama5d2 romcode does when it is configured to boot from a QSPI
->   memory.
->
-> Anyway you're right and the issue need to be addressed but maybe in another
-> dedicated patch ?
+Thanks,
+Jon
 
-Yes, probably as a prerequisite to the quad mode on micron flashes. I
-think we should also add a separate flag for the DIO/QIO modes for
-micron flashes, as these are something separate from just the DOR/QOR
-commands usually implied by SPI_NOR_DUAL/QUAD (well they are the same,
-but work differently)
-
->>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->>> Acked-by: Marek Vasut <marex@denx.de>
->>> Acked-by: Bean Huo <beanhuo@micron.com>
->>> ---
->>>  drivers/mtd/spi-nor/spi-nor.c | 21 +++++++++++++++++++++
->>>  include/linux/mtd/spi-nor.h   | 13 +++++++++++++
->>>  2 files changed, 34 insertions(+)
->>>
->>> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
->>> index c27d427fead4..c8810313a752 100644
->>> --- a/drivers/mtd/spi-nor/spi-nor.c
->>> +++ b/drivers/mtd/spi-nor/spi-nor.c
->>> @@ -165,6 +165,22 @@ static inline int write_disable(struct spi_nor *nor)
->>>         return nor->write_reg(nor, SPINOR_OP_WRDI, NULL, 0, 0);
->>>  }
->>>
->>> +/*
->>> + * Let the spi-nor framework notify lower layers, especially the driver of the
->>> + * (Q)SPI controller, about the new protocol to be used. Indeed, once the
->>> + * spi-nor framework has sent manufacturer specific commands to a memory to
->>> + * enable its Quad SPI mode, it should immediately after tell the QSPI
->>> + * controller to use the very same Quad SPI protocol as expected by the memory.
->>> + */
->>> +static inline int spi_nor_set_protocol(struct spi_nor *nor,
->>> +                                      enum spi_protocol proto)
->>> +{
->>> +       if (nor->set_protocol)
->>> +               return nor->set_protocol(nor, proto);
->>> +
->>> +       return 0;
->>
->> Shouldn't the default assumption be that it won't support it? Also it
->> might make sense to first check if it's supported before enabling it
->> in the chip, so that we don't enable something just to then find out
->> we can't back out of it.
->>
->> I also wonder if we need an extra flag for that as at least SPI has
->> RX_{DUAL,QUAD} and TX_{DUAL,QUAD} separated, so in theory there could
->> be a controller that supports quad read, but not quad write, so we
->> shouldn't be using the quad mode in that case. m25p80 currently sets
->> SPI_NOR_{DUAL,QUAD} only based on SPI_RX_{DUAL,QUAD}, so that would
->> then fail.
->>
->> At least the n25q32 seems to support the "boring" 1_1_2 and 1_1_4
->> commands, so these should work in case the spi controller does not
->> support quad tx, but quad rx.
->>
->> So maybe an additional flag for the "full" dual/quad modes would be in order.
->>
->
-> My first thought was to return -ENOSYS when the set_protocol() callback is not
-> implemented but logically none of the already existing drivers implements it.
-> So I made this new callback optional. This way, micron_quad_enable() works the
-> exact same way as before for all the existing drivers so no regression or side-
-> effect should be introduced by this patch.
-
-If they don't implement the callback, then they won't know that they
-are supposed to use a different protocol, so change will definitely
-have broken them. Therefore an error return value and or a dev_warn
-would be IMHO better.
-
-> So more accurate checks should be done before calling set_quad_mode(). Maybe
-> the range of values for the mode parameter of spi_nor_scan() is too small.
-> SPI_NOR_QUAD doesn't allow to make the difference between SPI protocols 1-1-4,
-> 1-4-4 or 4-4-4. Knowing the exact set of protocols supported by both the
-> controller and the memory could help making the right decision and choosing the
-> best suited Fast Read command.
-> The RX_{DUAL_QUAD} and TX_{DUAL,QUAD} flags from the spi->mode in the m25p80
-> driver provide more information than the limited "mode" argument of
-> spi_nor_scan().
-
-so from the controller side we need to know whether it can do
-RX_{DUAL,QUAD} and TX_{DUAL,QUAD}; but for the flash supported
-commands we have a bit more variety (the x_y_z you mentioned).
-
-Funny enough, once we are on QIO on spansion, there is no difference
-anymore between FAST (0x0b), QOR (0x6b) and QIOR (0xeb), they all work
-in the 4_4_4 mode.
-
->> Last but not least, the protocol probably should be stored somewhere
->> in the nor struct, so that users don't have to store it themselves (I
->> assume they will need to check it for each command again to know if
->> the cmd/address should be send in serial or quad mode).
->>
->>
-> I agree with you, this could be an improvement for some spi controller drivers :)
->
->> Jonas
->>
->
-> thanks for your review!
->
-> Best regards,
->
-> Cyrille
-
-
-Regards
-Jonas
+> > 
+> > Thanks,
+> > Jon
+> > 
+> 
+> Thanks,
+> 
+> Ray
