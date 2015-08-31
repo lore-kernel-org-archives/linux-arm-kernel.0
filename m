@@ -1,25 +1,14 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 31 Aug 2015 14:42:53 +0900
-Subject: [PATCH] arm64: dts: Add BUS1 instance pinctrl support
-In-Reply-To: <1440761134-27639-1-git-send-email-alim.akhtar@samsung.com>
-References: <1440761134-27639-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <55E3E95D.50003@samsung.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Mon, 31 Aug 2015 12:31:25 +0530
+Subject: [PATCH net-next v2 0/8] net: thunderx: New features and fixes
+In-Reply-To: <20150830.215426.1263274449496319755.davem@davemloft.net>
+References: <1440926958-1874-1-git-send-email-aleksey.makarov@auriga.com>
+ <20150830.215426.1263274449496319755.davem@davemloft.net>
+Message-ID: <CA+sq2Cd6N+oP5hL6qjsJVf=o=NBRnY_eMPcryLVAY3sof-MU7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.08.2015 20:25, Alim Akhtar wrote:
-> This adds BUS1 instance pinctrl for exynos7 soc.
-> 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
->  arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi |  111 +++++++++++++++++++++++
->  arch/arm64/boot/dts/exynos/exynos7.dtsi         |    7 ++
->  2 files changed, 118 insertions(+)
-
-The "etc1" GPIO in my datasheet is not fully documented but the rest
-looks good:
-
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+>>
+>> Series applied, thanks.
+>> --
+Thanks a lot.
