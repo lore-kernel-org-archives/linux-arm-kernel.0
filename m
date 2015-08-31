@@ -1,63 +1,60 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 31 Aug 2015 20:24:03 +0200
-Subject: [PATCH 5/8] mmc: dw_mmc: dt-binding: Add tuning related things
-In-Reply-To: <1441045446-30858-1-git-send-email-heiko@sntech.de>
-References: <1441045446-30858-1-git-send-email-heiko@sntech.de>
-Message-ID: <1441045446-30858-6-git-send-email-heiko@sntech.de>
+Date: Mon, 31 Aug 2015 20:23:58 +0200
+Subject: [PATCH 0/8] mmc: dw_mmc: allow tuning using the clk-phase api
+Message-ID: <1441045446-30858-1-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandru M Stan <amstan@chromium.org>
+This series resurrects and adapts some individual patches whose sum
+enable the dw_mmc hosts on Rockchip socs to tune clock phases using
+the generic phase api (rk3288 and following have this capability).
 
-Add ciu_drv, ciu_sample clocks and default-sample-phase. This will later
-be used by tuning code.
+The changes to the original mmc-phase clocks are expanded by further
+findings resulting from devices being used in the field.
 
-We do not touch ciu_drive (and by extension define default-drive-phase).
-Drive phase is mostly used to define minimum hold times, while one could
-write some code to determine what phase meets the minimum hold time
-(ex 10 degrees) this will not work with the current clock phase framework
-(which floors angles, so we'll get 0 deg, and there's no way to know what
-resolution the floors happen at). We assume that the default drive angles
-set by the hardware are good enough.
+Similarly the regulator handling changes do use the brand new
+regulator_set_voltage_triplet call to allow specifying lower and upper
+limits. One possible point of discussion are the two voltage ranges
+that are tried for the 3.3V signal level. Trying to stay near vmmc
+at first and only then opening the range to the full 2.7-3.6V.
 
-Signed-off-by: Alexandru M Stan <amstan@chromium.org>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+This mainly circumvents a shortcoming of the regulator voltage
+setting, in that even with regulator_set_voltage_triplet the regulator
+framework will take the lowest possible voltage when the possible
+voltages are below the target voltage. While it may be ideal to solve
+this on the regulator side, I'm not seeing this appearing in the short
+term, mainly because all regulator parts (including regulator drivers)
+are keyed to selecting the lowest voltage from the range, while on the
+mmc side we know which voltages may work and trying this in two steps
+does not create to much overhead, as unsupported voltages are already
+filtered out by the regulator_is_voltage_selected calls.
 
-diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-index 346c609..5edadc2 100644
---- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-+++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-@@ -42,11 +42,13 @@ Optional properties:
- * clocks: from common clock binding: handle to biu and ciu clocks for the
-   bus interface unit clock and the card interface unit clock.
- 
--* clock-names: from common clock binding: Shall be "biu" and "ciu".
--  If the biu clock is missing we'll simply skip enabling it.  If the
--  ciu clock is missing we'll just assume that the clock is running at
-+* clock-names: from common clock binding: Shall be "biu", "ciu", "ciu_drv" and
-+  "ciu_sample".  If the biu clock is missing we'll simply skip enabling it.
-+  If the ciu clock is missing we'll just assume that the clock is running at
-   clock-frequency.  It is an error to omit both the ciu clock and the
--  clock-frequency.
-+  clock-frequency.  "ciu_drv" and "ciu_sample" are used to control the clock
-+  phases, "ciu_sample" is required for tuning high speed modes (if no other
-+  custom tuning method is defined).
- 
- * clock-frequency: should be the frequency (in Hz) of the ciu clock.  If this
-   is specified and the ciu clock is specified then we'll try to set the ciu
-@@ -75,6 +77,10 @@ Optional properties:
- * vmmc-supply: The phandle to the regulator to use for vmmc.  If this is
-   specified we'll defer probe until we can find this regulator.
- 
-+* default-sample-phase: The default phase to set ciu_sample at probing, low
-+  speeds or in case where all phases work at tuning time. If not specified
-+  0 deg will be used.
-+
- Aliases:
- 
- - All the MSHC controller nodes should be represented in the aliases node using
+
+Alexandru M Stan (3):
+  mmc: dw_mmc: dt-binding: Add tuning related things
+  mmc: dw_mmc: Generic MMC tuning with the clock phase framework
+  ARM: dts: rockchip: Add drive/sample clocks for rk3288 dw_mmc devices
+
+Douglas Anderson (4):
+  clk: rockchip: Allow more precision for some mmc clock phases
+  clk: rockchip: Make calculations use rounding
+  mmc: core: Add mmc_regulator_set_vqmmc()
+  mmc: dw_mmc: Use mmc_regulator_set_vqmmc in
+    start_signal_voltage_switch
+
+Heiko Stuebner (1):
+  ARM: dts: rockchip: add tuning related settings to veyron devices
+
+ .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   |  14 +-
+ arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi         |   7 +-
+ arch/arm/boot/dts/rk3288-veyron.dtsi               |   6 +
+ arch/arm/boot/dts/rk3288.dtsi                      |  20 +--
+ drivers/clk/rockchip/clk-mmc-phase.c               |  54 ++++---
+ drivers/mmc/core/core.c                            |  68 +++++++++
+ drivers/mmc/host/dw_mmc.c                          | 159 +++++++++++++++++++--
+ include/linux/mmc/dw_mmc.h                         |   3 +
+ include/linux/mmc/host.h                           |   7 +
+ 9 files changed, 295 insertions(+), 43 deletions(-)
+
 -- 
 2.1.4
