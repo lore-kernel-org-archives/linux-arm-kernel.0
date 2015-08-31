@@ -1,58 +1,47 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 31 Aug 2015 12:03:42 +0300
-Subject: [PATCH] gpio: omap: Fix gpiochip_add() handling for deferred probe
-In-Reply-To: <1440787489-15992-1-git-send-email-tony@atomide.com>
-References: <1440787489-15992-1-git-send-email-tony@atomide.com>
-Message-ID: <55E4186E.7090605@ti.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 31 Aug 2015 11:22:43 +0200
+Subject: [PATCH v3 2/2] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
+ support
+In-Reply-To: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
+References: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <1441012963.3234.28.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Vladimir,
 
-On 08/28/2015 09:44 PM, Tony Lindgren wrote:
-> Currently we gpio-omap breaks if gpiochip_add() returns -EPROBE_DEFER:
->
-> [    0.570000] gpiochip_add: GPIOs 0..31 (gpio) failed to register
-> [    0.570000] omap_gpio 48310000.gpio: Could not register gpio chip -517
-> ...
-> [    3.670000] omap_gpio 48310000.gpio: Unbalanced pm_runtime_enable!
+Am Montag, den 31.08.2015, 00:34 +0300 schrieb Vladimir Zapolskiy:
+> The change adds support of internal HDMI I2C master controller, this
+> subdevice is used by default, if "ddc-i2c-bus" DT property is omitted.
 
-I have no objection to the patch itself.
+I think this should be mentioned in
+Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
 
-But I curious, How have you got this error output? Was it simulated?
-
->
-> Let's fix the issue by adding the missing pm_runtime_put() on error.
->
-> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> The main purpose of this functionality is to support reading EDID from
+> an HDMI monitor on boards, which don't have an I2C bus connected to
+> DDC pins.
+> 
+> The current implementation does not support "I2C Master Interface
+> Extended Read Mode" to read data addressed by non-zero segment
+> pointer, this means that if EDID has more than 1 extension blocks,
+> EDID reading operation won't succeed, in my practice all tested HDMI
+> monitors have at maximum one extension block.
+> 
+> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
 > ---
->   drivers/gpio/gpio-omap.c | 5 ++++-
->   1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index b0c57d5..f09bf0b 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1232,8 +1232,11 @@ static int omap_gpio_probe(struct platform_device *pdev)
->   	omap_gpio_mod_init(bank);
->
->   	ret = omap_gpio_chip_init(bank, irqc);
-> -	if (ret)
-> +	if (ret) {
-> +		pm_runtime_put_sync(bank->dev);
-> +		pm_runtime_disable(bank->dev);
->   		return ret;
-> +	}
->
->   	omap_gpio_show_rev(bank);
->
->
+> The change is based on today's v4.2, please let me know, if it should be rebased.
+> 
+> The change has compilation dependency on I2CM_ADDRESS register name fix,
+> see http://lists.freedesktop.org/archives/dri-devel/2015-May/082980.html
+> 
+> From http://lists.freedesktop.org/archives/dri-devel/2015-May/082981.html
+> v1 of the change was
+> 
+>   Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+> 
+> but I hesitate to add the tag here due to multiple updates in v2.
 
+Tested again, v2 still works fine on Nitrogen6X with HDMI monitor.
 
--- 
-regards,
--grygorii
+regards
+Philipp
