@@ -1,287 +1,128 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Mon, 31 Aug 2015 14:53:18 -0700
-Subject: [PATCH v2 2/5] DMA: pl330: add quirk for broken no flushp
-In-Reply-To: <1440722280-31678-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1440722176-31588-1-git-send-email-shawn.lin@rock-chips.com>
- <1440722280-31678-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <CAPz6YkWeBsp2_9VD+0RpcGFC7FvdcY1kyYONBMV0yunR3orKyQ@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 31 Aug 2015 15:11:26 -0700
+Subject: [PATCH] ARM: EXYNOS: reset KFC cores when cpu is up
+In-Reply-To: <1441031111-6549-1-git-send-email-parkch98@gmail.com> (Chanho
+ Park's message of "Mon, 31 Aug 2015 23:25:11 +0900")
+References: <1441031111-6549-1-git-send-email-parkch98@gmail.com>
+Message-ID: <7hmvx785wx.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 27, 2015 at 5:38 PM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
-> From: Addy Ke <addy.ke@rock-chips.com>
+Chanho Park <parkch98@gmail.com> writes:
+
+> The cpu booting of exynos5422 has been still broken since we discussed
+> it in last year[1]. This patch is inspired from odroid xu3
+> code(Actually, it was from samsung exynos vendor kernel)[2]. This weird
+> reset code was founded exynos5420 octa cores series SoCs and only
+> required for the first boot core is the little core(kingfisher core).
+> Some of the exynos5420 boards and all of the exynos5422 boards will be
+> required this code.
+> There is two ways to check the little core is the first cpu. One is
+> checking GPG2CON[1] gpio value and the other is checking the cluster
+> number of the first cpu. I selected the latter because it's more easier
+> than the former.
 >
-> This patch add "arm,pl330-broken-no-flushp" quirk to avoid execute
-> DMAFLUSHP if Soc doesn't support it.
+> Changes since RFC[3]:
+> - drop checking soc_is_exynos5800 to extend this codes to
+> exynos5420/5422 boards.
+> - kfc cores will be reset only if the cpu0 is kfc core.
+> - Rebase top of the kukjin's for-next branch
 >
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> cc: Doug Anderson <dianders@chromium.org>
-> cc: Heiko Stuebner <heiko@sntech.de>
-> cc: Olof Johansson <olof@lixom.net>
+> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350632.html
+> [2]:https://patchwork.kernel.org/patch/6782891/
+> [3]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/356610.html
 >
+> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+> Cc: Chanwoo Choi <cw00.choi@samsung.com>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Heesub Shin <heesub.shin@samsung.com>
+> Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
+> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+> Cc: Przemyslaw Marczak <p.marczak@samsung.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Chanho Park <parkch98@gmail.com>
+
 > ---
+>  arch/arm/mach-exynos/mcpm-exynos.c | 18 +++++++++++++++++-
+>  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
+>  2 files changed, 23 insertions(+), 1 deletion(-)
 >
-> Changes in v2:
-> - amend the author
-> - amend Olof's mail address
->
-> Changes in v1:
-> - rename broken-no-flushp to "arm,pl330-broken-no-flushp" suggested
->   by Krzysztof.
-> - remove Sunny's tag
->
->  drivers/dma/pl330.c | 87 ++++++++++++++++++++++++++++++++++++++---------------
->  1 file changed, 62 insertions(+), 25 deletions(-)
->
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 0d544d2..3b9b426 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -34,6 +34,8 @@
->  #define PL330_MAX_IRQS         32
->  #define PL330_MAX_PERI         32
->
-> +#define PL330_QUIRK_BROKEN_NO_FLUSHP BIT(0)
+> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+> index 9bdf547..5b69ed2 100644
+> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+> @@ -20,6 +20,7 @@
+>  #include <asm/cputype.h>
+>  #include <asm/cp15.h>
+>  #include <asm/mcpm.h>
+> +#include <asm/smp_plat.h>
+>  
+>  #include "regs-pmu.h"
+>  #include "common.h"
+> @@ -70,7 +71,22 @@ static int exynos_cpu_powerup(unsigned int cpu, unsigned int cluster)
+>  		cluster >= EXYNOS5420_NR_CLUSTERS)
+>  		return -EINVAL;
+>  
+> -	exynos_cpu_power_up(cpunr);
+> +	if (!exynos_cpu_power_state(cpunr)) {
+> +		exynos_cpu_power_up(cpunr);
 > +
->  enum pl330_cachectrl {
->         CCTRL0,         /* Noncacheable and nonbufferable */
->         CCTRL1,         /* Bufferable only */
-> @@ -488,6 +490,17 @@ struct pl330_dmac {
->         /* Peripheral channels connected to this DMAC */
->         unsigned int num_peripherals;
->         struct dma_pl330_chan *peripherals; /* keep at end */
-> +       int quirks;
-> +};
-> +
-> +static struct pl330_of_quirks {
-> +       char *quirk;
-> +       int id;
-> +} of_quirks[] = {
-> +       {
-> +               .quirk = "arm,pl330-broken-no-flushp",
-> +               .id = PL330_QUIRK_BROKEN_NO_FLUSHP,
-> +       }
->  };
->
->  struct dma_pl330_desc {
-> @@ -1137,53 +1150,68 @@ static inline int _ldst_memtomem(unsigned dry_run, u8 buf[],
->         return off;
->  }
->
-> -static inline int _ldst_devtomem(unsigned dry_run, u8 buf[],
-> -               const struct _xfer_spec *pxs, int cyc)
-> +static inline int _ldst_devtomem(struct pl330_dmac *pl330, unsigned dry_run,
-> +                                u8 buf[], const struct _xfer_spec *pxs,
-> +                                int cyc)
->  {
->         int off = 0;
->         enum pl330_cond cond;
->
-> -       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
-> +       if (pl330->quirks & PL330_QUIRK_BROKEN_NO_FLUSHP)
-> +               cond = BURST;
-> +       else
-> +               cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
->
->         while (cyc--) {
->                 off += _emit_WFP(dry_run, &buf[off], cond, pxs->desc->peri);
->                 off += _emit_LDP(dry_run, &buf[off], cond, pxs->desc->peri);
->                 off += _emit_ST(dry_run, &buf[off], ALWAYS);
-> -               off += _emit_FLUSHP(dry_run, &buf[off], pxs->desc->peri);
-> +
-> +               if (!(pl330->quirks & PL330_QUIRK_BROKEN_NO_FLUSHP))
-> +                       off += _emit_FLUSHP(dry_run, &buf[off],
-> +                                           pxs->desc->peri);
->         }
->
->         return off;
->  }
->
-> -static inline int _ldst_memtodev(unsigned dry_run, u8 buf[],
-> -               const struct _xfer_spec *pxs, int cyc)
-> +static inline int _ldst_memtodev(struct pl330_dmac *pl330,
-> +                                unsigned dry_run, u8 buf[],
-> +                                const struct _xfer_spec *pxs, int cyc)
->  {
->         int off = 0;
->         enum pl330_cond cond;
->
-> -       cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
-> +       if (pl330->quirks & PL330_QUIRK_BROKEN_NO_FLUSHP)
-> +               cond = BURST;
-> +       else
-> +               cond = (pxs->desc->rqcfg.brst_len == 1) ? SINGLE : BURST;
-> +
->
->         while (cyc--) {
->                 off += _emit_WFP(dry_run, &buf[off], cond, pxs->desc->peri);
->                 off += _emit_LD(dry_run, &buf[off], ALWAYS);
->                 off += _emit_STP(dry_run, &buf[off], cond, pxs->desc->peri);
-> -               off += _emit_FLUSHP(dry_run, &buf[off], pxs->desc->peri);
-> +
-> +               if (!(pl330->quirks & PL330_QUIRK_BROKEN_NO_FLUSHP))
-> +                       off += _emit_FLUSHP(dry_run, &buf[off],
-> +                                           pxs->desc->peri);
->         }
->
->         return off;
->  }
->
-> -static int _bursts(unsigned dry_run, u8 buf[],
-> +static int _bursts(struct pl330_dmac *pl330, unsigned dry_run, u8 buf[],
->                 const struct _xfer_spec *pxs, int cyc)
->  {
->         int off = 0;
->
->         switch (pxs->desc->rqtype) {
->         case DMA_MEM_TO_DEV:
-> -               off += _ldst_memtodev(dry_run, &buf[off], pxs, cyc);
-> +               off += _ldst_memtodev(pl330, dry_run, &buf[off], pxs, cyc);
->                 break;
->         case DMA_DEV_TO_MEM:
-> -               off += _ldst_devtomem(dry_run, &buf[off], pxs, cyc);
-> +               off += _ldst_devtomem(pl330, dry_run, &buf[off], pxs, cyc);
->                 break;
->         case DMA_MEM_TO_MEM:
->                 off += _ldst_memtomem(dry_run, &buf[off], pxs, cyc);
-> @@ -1197,7 +1225,7 @@ static int _bursts(unsigned dry_run, u8 buf[],
->  }
->
->  /* Returns bytes consumed and updates bursts */
-> -static inline int _loop(unsigned dry_run, u8 buf[],
-> +static inline int _loop(struct pl330_dmac *pl330, unsigned dry_run, u8 buf[],
->                 unsigned long *bursts, const struct _xfer_spec *pxs)
->  {
->         int cyc, cycmax, szlp, szlpend, szbrst, off;
-> @@ -1220,7 +1248,7 @@ static inline int _loop(unsigned dry_run, u8 buf[],
->         }
->
->         szlp = _emit_LP(1, buf, 0, 0);
-> -       szbrst = _bursts(1, buf, pxs, 1);
-> +       szbrst = _bursts(pl330, 1, buf, pxs, 1);
->
->         lpend.cond = ALWAYS;
->         lpend.forever = false;
-> @@ -1252,7 +1280,7 @@ static inline int _loop(unsigned dry_run, u8 buf[],
->         off += _emit_LP(dry_run, &buf[off], 1, lcnt1);
->         ljmp1 = off;
->
-> -       off += _bursts(dry_run, &buf[off], pxs, cyc);
-> +       off += _bursts(pl330, dry_run, &buf[off], pxs, cyc);
->
->         lpend.cond = ALWAYS;
->         lpend.forever = false;
-> @@ -1275,8 +1303,9 @@ static inline int _loop(unsigned dry_run, u8 buf[],
->         return off;
->  }
->
-> -static inline int _setup_loops(unsigned dry_run, u8 buf[],
-> -               const struct _xfer_spec *pxs)
-> +static inline int _setup_loops(struct pl330_dmac *pl330,
-> +                              unsigned dry_run, u8 buf[],
-> +                              const struct _xfer_spec *pxs)
->  {
->         struct pl330_xfer *x = &pxs->desc->px;
->         u32 ccr = pxs->ccr;
-> @@ -1285,15 +1314,16 @@ static inline int _setup_loops(unsigned dry_run, u8 buf[],
->
->         while (bursts) {
->                 c = bursts;
-> -               off += _loop(dry_run, &buf[off], &c, pxs);
-> +               off += _loop(pl330, dry_run, &buf[off], &c, pxs);
->                 bursts -= c;
->         }
->
->         return off;
->  }
->
-> -static inline int _setup_xfer(unsigned dry_run, u8 buf[],
-> -               const struct _xfer_spec *pxs)
-> +static inline int _setup_xfer(struct pl330_dmac *pl330,
-> +                             unsigned dry_run, u8 buf[],
-> +                             const struct _xfer_spec *pxs)
->  {
->         struct pl330_xfer *x = &pxs->desc->px;
->         int off = 0;
-> @@ -1304,7 +1334,7 @@ static inline int _setup_xfer(unsigned dry_run, u8 buf[],
->         off += _emit_MOV(dry_run, &buf[off], DAR, x->dst_addr);
->
->         /* Setup Loop(s) */
-> -       off += _setup_loops(dry_run, &buf[off], pxs);
-> +       off += _setup_loops(pl330, dry_run, &buf[off], pxs);
->
->         return off;
->  }
-> @@ -1313,8 +1343,9 @@ static inline int _setup_xfer(unsigned dry_run, u8 buf[],
->   * A req is a sequence of one or more xfer units.
->   * Returns the number of bytes taken to setup the MC for the req.
->   */
-> -static int _setup_req(unsigned dry_run, struct pl330_thread *thrd,
-> -               unsigned index, struct _xfer_spec *pxs)
-> +static int _setup_req(struct pl330_dmac *pl330, unsigned dry_run,
-> +                     struct pl330_thread *thrd, unsigned index,
-> +                     struct _xfer_spec *pxs)
->  {
->         struct _pl330_req *req = &thrd->req[index];
->         struct pl330_xfer *x;
-> @@ -1331,7 +1362,7 @@ static int _setup_req(unsigned dry_run, struct pl330_thread *thrd,
->         if (x->bytes % (BRST_SIZE(pxs->ccr) * BRST_LEN(pxs->ccr)))
->                 return -EINVAL;
->
-> -       off += _setup_xfer(dry_run, &buf[off], pxs);
-> +       off += _setup_xfer(pl330, dry_run, &buf[off], pxs);
->
->         /* DMASEV peripheral/event */
->         off += _emit_SEV(dry_run, &buf[off], thrd->ev);
-> @@ -1425,7 +1456,7 @@ static int pl330_submit_req(struct pl330_thread *thrd,
->         xs.desc = desc;
->
->         /* First dry run to check if req is acceptable */
-> -       ret = _setup_req(1, thrd, idx, &xs);
-> +       ret = _setup_req(pl330, 1, thrd, idx, &xs);
->         if (ret < 0)
->                 goto xfer_exit;
->
-> @@ -1439,7 +1470,7 @@ static int pl330_submit_req(struct pl330_thread *thrd,
->         /* Hook the request */
->         thrd->lstenq = idx;
->         thrd->req[idx].desc = desc;
-> -       _setup_req(0, thrd, idx, &xs);
-> +       _setup_req(pl330, 0, thrd, idx, &xs);
->
->         ret = 0;
->
-> @@ -2784,6 +2815,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->         struct resource *res;
->         int i, ret, irq;
->         int num_chan;
-> +       struct device_node *np = adev->dev.of_node;
->
->         pdat = dev_get_platdata(&adev->dev);
->
-> @@ -2803,6 +2835,11 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->
->         pl330->mcbufsz = pdat ? pdat->mcbuf_sz : 0;
->
-> +       /* get quirk */
-> +       for (i = 0; i < ARRAY_SIZE(of_quirks); i++)
-> +               if (of_property_read_bool(np, of_quirks[i].quirk))
-> +                       pl330->quirks |= of_quirks[i].id;
-> +
->         res = &adev->res;
->         pl330->base = devm_ioremap_resource(&adev->dev, res);
->         if (IS_ERR(pl330->base))
-> --
-> 2.3.7
->
+> +		/* This assumes the cluster number of the eagle is 0 and the
+> +		 * kfc is 1. When the system was booted from the kfc core,
+> +		 * they should be reset */
 
-Reviewed-by: Sonny Rao <sonnyrao@chromium.org>
+minor: fix multi-line comment style (search for 'multi-line' in
+Documentation/CodingStyle)
 
+Also minor, but personally, I prefer seeing A15/A7 instead of eagle/KFC
+as those names are fading from my memory and I can't seem to remember
+which one is which. :/
 
->
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+> +		if (cluster &&
+> +		    cluster == MPIDR_AFFINITY_LEVEL(cpu_logical_map(0), 1)) {
+> +			while (!pmu_raw_readl(S5P_PMU_SPARE2))
+> +				udelay(10);
+> +
+> +			pmu_raw_writel(EXYNOS5420_KFC_CORE_RESET(cpu),
+> +					EXYNOS_SWRESET);
+> +		}
+> +	}
+> +
+>  	return 0;
+>  }
+
+I tested this on top of mainline (v4.2) using exynos_defconfig (with
+BL_SWITCHER disabled) and I now see all 8 CPUs booting.  Nice!
+
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+Also, please note that this does not fix another fundamental problem
+with this board in that the firmware puts CCI into secure mode, so
+linux/MCPM cannot manage it, causing hangs whenever CPUidle is enabled
+(because b.L cpuidle driver tries to use MCPM, which needs to manage
+CCI.)
+
+In order for this to not hang when using CPUidle, the following patch is
+also needed.
+
+Kevin
+
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+index 78e6a502f320..7891bd05bf8e 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+@@ -49,3 +49,11 @@
+                shunt-resistor = <10000>;
+        };
+ };
++
++/*
++ * Secure firmware prevents CCI access/usage from linux, so must be
+disabled
++ * to prevent usage by MCPM.
++ */
++&cci {
++       status = "disabled";
++};
