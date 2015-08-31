@@ -1,38 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 31 Aug 2015 11:02:53 +0200
-Subject: [PATCH 9/9] arm/arm64: KVM: arch timer: Reset CNTV_CTL to 0
-In-Reply-To: <20150831085752.GH24113@cbox>
-References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
- <1440942866-23802-10-git-send-email-christoffer.dall@linaro.org>
- <CAKv+Gu-4KKUUt7J==CPK6J79mWXLeMJFsG_fj85tYB2orzfrZg@mail.gmail.com>
- <20150831085752.GH24113@cbox>
-Message-ID: <CAKv+Gu_f97gu+TftpdJDef4X89sjYB2udUybpmm=M113_TTiPw@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 31 Aug 2015 12:03:42 +0300
+Subject: [PATCH] gpio: omap: Fix gpiochip_add() handling for deferred probe
+In-Reply-To: <1440787489-15992-1-git-send-email-tony@atomide.com>
+References: <1440787489-15992-1-git-send-email-tony@atomide.com>
+Message-ID: <55E4186E.7090605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 August 2015 at 10:57, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Mon, Aug 31, 2015 at 10:46:59AM +0200, Ard Biesheuvel wrote:
->> On 30 August 2015 at 15:54, Christoffer Dall
->> <christoffer.dall@linaro.org> wrote:
->> > Provide a better quality of implementation and be architecture compliant
->> > on ARMv7 for the architected timer by resetting the CNTV_CTL to 0 on
->> > reset of the timer, and call kvm_timer_update_state(vcpu) at the same
->> > time, ensuring the timer output is not asserted after, for example, a
->> > PSCI system reset.
->> >
->> > This change alone fixes the UEFI reset issue reported by Laszlo back in
->> > February.
->> >
->>
->> Do you have a link to that report? I can't quite remember the details ...
->>
-> There was no public mailing list cc'ed on the report, and the bugzilla
-> bug was created in a non-public Red Hat instance.
+Hi Tony,
+
+On 08/28/2015 09:44 PM, Tony Lindgren wrote:
+> Currently we gpio-omap breaks if gpiochip_add() returns -EPROBE_DEFER:
 >
-> But you were cc'ed on the original mail from Laszlo.  Look for an e-mail
-> from February 5th with the subject "virtual timer interrupt stuck across
-> guest firmware reboot on KVM".
+> [    0.570000] gpiochip_add: GPIOs 0..31 (gpio) failed to register
+> [    0.570000] omap_gpio 48310000.gpio: Could not register gpio chip -517
+> ...
+> [    3.670000] omap_gpio 48310000.gpio: Unbalanced pm_runtime_enable!
+
+I have no objection to the patch itself.
+
+But I curious, How have you got this error output? Was it simulated?
+
+>
+> Let's fix the issue by adding the missing pm_runtime_put() on error.
+>
+> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>   drivers/gpio/gpio-omap.c | 5 ++++-
+>   1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index b0c57d5..f09bf0b 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1232,8 +1232,11 @@ static int omap_gpio_probe(struct platform_device *pdev)
+>   	omap_gpio_mod_init(bank);
+>
+>   	ret = omap_gpio_chip_init(bank, irqc);
+> -	if (ret)
+> +	if (ret) {
+> +		pm_runtime_put_sync(bank->dev);
+> +		pm_runtime_disable(bank->dev);
+>   		return ret;
+> +	}
+>
+>   	omap_gpio_show_rev(bank);
+>
 >
 
-Found it, thanks.
+
+-- 
+regards,
+-grygorii
