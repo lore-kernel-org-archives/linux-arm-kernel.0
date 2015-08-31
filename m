@@ -1,45 +1,25 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Mon, 31 Aug 2015 16:42:13 +0200
-Subject: [PATCH v2] clk: rockchip: Add pclk_peri to critical clocks on
- RK3066/RK3188
-In-Reply-To: <1440322357-2621-1-git-send-email-romain.perier@gmail.com>
-References: <1440322357-2621-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <CABgxDo+otZrYoqTNK-ea=L6Dsd5p_b_MFCi4H4XJZZ25PV_qnA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 31 Aug 2015 16:36:17 +0200
+Subject: [PATCH 2/3] ARM: mvebu: add DT support for Seagate Personal Cloud
+In-Reply-To: <20150831142857.GP30993@kw.sim.vm.gnt>
+References: <1440866805-31731-1-git-send-email-simon.guinot@sequanux.org>
+ <1440866805-31731-3-git-send-email-simon.guinot@sequanux.org>
+ <20150831125926.GL3684@io.lakedaemon.net>
+ <20150831142857.GP30993@kw.sim.vm.gnt>
+Message-ID: <20150831143617.GC20180@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping
+> But the hardware name is used by the stock U-Boot image to build an
+> environment variable: target.dtb. This variable holds the name of
+> the DTB file to load (armada-370-n090103.dtb for example) from hard
+> disk during the boot process. I was hoping I could keep Linux
+> mainline naming compatible with the stock U-Boot.
 
-2015-08-23 11:32 GMT+02:00 Romain Perier <romain.perier@gmail.com>:
-> Now that the rockchip clock subsystem does clock gating with GPIO banks,
-> these are no longer enabled once during probe and no longer stay enabled
-> for eternity. When all these clocks are disabled, the parent clock pclk_peri
-> might be disabled too, as no other child claims it. So, we need to add pclk_peri
-> to the critical clocks.
->
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> Tested-by: Michael Niewoehner <linux@mniewoehner.de>
-> ---
->
-> changes in v2:
-> - Improved commit messages
-> - Added "Tested-by" from Michael Niewoehner, as he tested v1 and no code changed
->
->  drivers/clk/rockchip/clk-rk3188.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-> index bf20214..839a22a 100644
-> --- a/drivers/clk/rockchip/clk-rk3188.c
-> +++ b/drivers/clk/rockchip/clk-rk3188.c
-> @@ -717,6 +717,7 @@ static const char *const rk3188_critical_clocks[] __initconst = {
->         "aclk_peri",
->         "hclk_peri",
->         "pclk_cpu",
-> +       "pclk_peri",
->  };
->
->  static void __init rk3188_common_clk_init(struct device_node *np)
-> --
-> 2.1.4
->
+Hi Simon
+
+Could you make the suggestion towards the product managers that future
+new products include seagate in the filename? That will greatly
+increase the chance of keeping naming compatibility.
+
+	 Andrew
