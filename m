@@ -1,136 +1,70 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 31 Aug 2015 17:33:14 +0100
-Subject: [PATCH] ARM64: PCI: do not enable resources on PROBE_ONLY systems
-In-Reply-To: <20150831132803.GB647@google.com>
-References: <1438262039-32085-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20150828211444.GA27890@google.com>
- <20150829124457.GA18125@red-moon> <20150831132803.GB647@google.com>
-Message-ID: <20150831163314.GA19309@red-moon>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 31 Aug 2015 18:36:27 +0200
+Subject: [PATCH 0/8] i.MX early debug UART clock fixes
+In-Reply-To: <1440693561-28095-1-git-send-email-l.stach@pengutronix.de>
+References: <1440693561-28095-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1441038987.3652.44.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 31, 2015 at 02:28:03PM +0100, Bjorn Helgaas wrote:
-> On Sat, Aug 29, 2015 at 01:44:57PM +0100, Lorenzo Pieralisi wrote:
-> > On Fri, Aug 28, 2015 at 10:14:44PM +0100, Bjorn Helgaas wrote:
-> > > On Thu, Jul 30, 2015 at 02:13:59PM +0100, Lorenzo Pieralisi wrote:
-> > > > On ARM64 PROBE_ONLY PCI systems resources are not currently claimed,
-> > > > therefore they can't be enabled since they do not have a valid
-> > > > parent pointer; this in turn prevents enabling PCI devices on
-> > > > ARM64 PROBE_ONLY systems, causing PCI devices initialization to
-> > > > fail.
-> > > 
-> > > Where does arm64 claim PCI BAR resources for the non-PROBE_ONLY case?
-> > 
-> > arm64 (and arm) does not claim resources in arch code, they are always
-> > assigned in the respective host controllers (or the pcibios on arm),
-> > except for the PCI generic host when in PROBE_ONLY mode, where resources
-> > are neither claimed nor assigned (the reason for this patch to exist).
-> > ...
-> > 
-> > > I know it must be there somewhere, but I don't see it.
-> > 
-> > It is not there, it is done in the host controllers by assigning the
-> > resources (which also "claim" them by assigning the parent pointer).
+Am Donnerstag, den 27.08.2015, 18:39 +0200 schrieb Lucas Stach:
+> This series fixes a long standing interaction issue between the
+> kernels early debug facilities and the i.MX clock drivers.
 > 
-> The host controller drivers should claim the apertures forwarded to
-> the PCI bus.  For pci-host-generic, this happens when
-> gen_pci_parse_request_of_pci_ranges() calls devm_request_resource().
-
-Yes, the generic host claims the apertures at DT probing time.
-
-> But that doesn't do anything for the BARs of the PCI devices
-> themselves, of course.
+> Both earlyprintk and earlycon rely on the bootloader setup clocks
+> for the UARTs to be retained during kernel init. As those clocks are
+> only enabled in hardware, but not referenced in software they (or even
+> their parent clocks) may get disabled as a result of other clocks being
+> en-/disabled during boot.
 > 
-> If this patch fixes a problem that will occur in the future, when we
-> add arm/arm64 code to claim BARs, let's make this patch part of that
-> series.  If it fixes a problem in the current tree, I'll merge it now,
-> but so far I haven't been able to make the connection between this
-> patch and a problem in the current code.
-
-It fixes a problem in the current tree (I mean when the PCI pull is
-merged - it contains code that enables PCI host generic on arm64),
-since without it PROBE_ONLY systems (ie PCI host generic on kvmtool) would
-try to enable resources and fail, since the resources were not claimed.
-
-It works the same way as arm, I will rework both arches when I am done
-refactoring the resource claiming implementation.
-
-Will picked it up already I do not know what's the best way to
-merge it I guess it can go via the arm64 tree if you do not have any
-objections.
-
-Thank you !
-Lorenzo
-
-> > > > To solve this issue, resources must be claimed when devices are
-> > > > added on PROBE_ONLY systems, which ensures that the resource hierarchy
-> > > > is validated and the resource tree is sane, but this requires changes
-> > > > in the ARM64 resource management that can affect adversely existing
-> > > > PCI set-ups (claiming resources on !PROBE_ONLY systems might break
-> > > > existing ARM64 PCI platform implementations).
-> > > > 
-> > > > As a temporary solution in preparation for a proper resources claiming
-> > > > implementation in ARM64 core, to enable PCI PROBE_ONLY systems on ARM64,
-> > > > this patch adds a pcibios_enable_device() arch implementation that
-> > > > simply prevents enabling resources on PROBE_ONLY systems (mirroring ARM
-> > > > behaviour).
-> > > > 
-> > > > This is always a safe thing to do because on PROBE_ONLY systems the
-> > > > configuration space set-up can be considered immutable, and it is in
-> > > > preparation of proper resource claiming that would finally validate
-> > > > the PCI resources tree in the ARM64 arch implementation on PROBE_ONLY
-> > > > systems.
-> > > > 
-> > > > For !PROBE_ONLY systems resources enablement in pcibios_enable_device()
-> > > > on ARM64 is implemented as in current PCI core, leaving the behaviour
-> > > > unchanged.
-> > > > 
-> > > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > > Cc: Will Deacon <will.deacon@arm.com>
-> > > > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > > ---
-> > > > Bjorn, all,
-> > > > 
-> > > > as I mention in the commit log, this patch is a temporary solution
-> > > > in preparation for proper resources claiming in ARM64, so that
-> > > > we can safely enable the PCI generic host controller on ARM64 systems.
-> > > > 
-> > > > It mirrors ARM implementation and I will work on changing both
-> > > > ARM and ARM64 to convert them to proper resources claiming in
-> > > > the respective implementations.
-> > > > 
-> > > > Lorenzo
-> > > > 
-> > > >  arch/arm64/kernel/pci.c | 13 +++++++++++++
-> > > >  1 file changed, 13 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> > > > index 4095379..b3d098b 100644
-> > > > --- a/arch/arm64/kernel/pci.c
-> > > > +++ b/arch/arm64/kernel/pci.c
-> > > > @@ -38,6 +38,19 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-> > > >  	return res->start;
-> > > >  }
-> > > >  
-> > > > +/**
-> > > > + * pcibios_enable_device - Enable I/O and memory.
-> > > > + * @dev: PCI device to be enabled
-> > > > + * @mask: bitmask of BARs to enable
-> > > > + */
-> > > > +int pcibios_enable_device(struct pci_dev *dev, int mask)
-> > > > +{
-> > > > +	if (pci_has_flag(PCI_PROBE_ONLY))
-> > > > +		return 0;
-> > > > +
-> > > > +	return pci_enable_resources(dev, mask);
-> > > > +}
-> > > > +
-> > > >  /*
-> > > >   * Try to assign the IRQ number from DT when adding a new device
-> > > >   */
-> > > > -- 
-> > > > 2.2.1
-> > > > 
-> > > 
+> This results in missing messages from the early debug console until the
+> regular system console takes over, or even worse system hangs in response
+> to unclocked register accesses. This renders those debugging facilities a
+> lot less useful.
 > 
+> The fix implemented here is to check if any of this early debugging is
+> enabled and keep the UART clocks referenced and enabled in that case.
+> The clocks will then only be disabled at the end of kernel init, at which
+> point the real console should have taken over and the early outputs being
+> disabled.
+> 
+> I've runtime tested this on i.MX6Q and i.MX53, other platforms are only
+> compile tested. This is mostly a mechanical change, but still I would
+> appreciate some testing.
+> 
+And Philipp noted that passing in a list of clocks from the clock
+providers look a lot better than the current direct clock enable calling
+and the needed callback.
+
+I'm self-nacking this series, so I can spin a V2 with changes as above.
+
+> Regards,
+> Lucas
+> 
+> Lucas Stach (8):
+>   clk: imx: add common logic to detect early UART usage
+>   clk: imx25: retain early UART clocks during kernel init
+>   clk: imx27: retain early UART clocks during kernel init
+>   clk: imx31: retain early UART clocks during kernel init
+>   clk: imx35: retain early UART clocks during kernel init
+>   clk: imx5: retain early UART clocks during kernel init
+>   clk: imx6: retain early UART clocks during kernel init
+>   clk: imx7d: retain early UART clocks during kernel init
+> 
+>  drivers/clk/imx/clk-imx25.c       | 20 ++++++++++++++++++++
+>  drivers/clk/imx/clk-imx27.c       | 22 ++++++++++++++++++++++
+>  drivers/clk/imx/clk-imx31.c       | 20 ++++++++++++++++++++
+>  drivers/clk/imx/clk-imx35.c       | 16 ++++++++++++++++
+>  drivers/clk/imx/clk-imx51-imx53.c | 28 ++++++++++++++++++++++++++++
+>  drivers/clk/imx/clk-imx6q.c       | 12 ++++++++++++
+>  drivers/clk/imx/clk-imx6sl.c      | 12 ++++++++++++
+>  drivers/clk/imx/clk-imx6sx.c      | 12 ++++++++++++
+>  drivers/clk/imx/clk-imx7d.c       | 22 ++++++++++++++++++++++
+>  drivers/clk/imx/clk.c             | 33 +++++++++++++++++++++++++++++++++
+>  drivers/clk/imx/clk.h             |  2 ++
+>  11 files changed, 199 insertions(+)
+> 
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
