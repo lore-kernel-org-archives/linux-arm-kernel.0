@@ -1,125 +1,136 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 31 Aug 2015 17:52:42 +0200
-Subject: [PATCH] usb: musb: dsps: handle the
- otg_state_a_wait_vrise_timeout case
-In-Reply-To: <55D719B1.8010700@free-electrons.com> (Gregory CLEMENT's message
- of "Fri, 21 Aug 2015 14:29:37 +0200")
-References: <1440087153-31084-1-git-send-email-gregory.clement@free-electrons.com>
- <55D719B1.8010700@free-electrons.com>
-Message-ID: <87twrfsbed.fsf@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 31 Aug 2015 17:33:14 +0100
+Subject: [PATCH] ARM64: PCI: do not enable resources on PROBE_ONLY systems
+In-Reply-To: <20150831132803.GB647@google.com>
+References: <1438262039-32085-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20150828211444.GA27890@google.com>
+ <20150829124457.GA18125@red-moon> <20150831132803.GB647@google.com>
+Message-ID: <20150831163314.GA19309@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
- 
- On ven., ao?t 21 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
->> According to the OTG specification after a timeout of
->> OTG_TIME_A_WAIT_VRISE (the maximum value is 100ms) the driver must
->> move from the state a_wait_vrise to the state a_wait_bcon. However,
->> the dsps version of musb does not handle this case.
->> 
->> Without it, the driver could remain stuck in the a_wait_vrise. It can
->> be reproduce with the following steps:
->> 
->> 1) Boot a board with no USB adapter inserted
->> 2) Insert an empty OTG adapter
->> 3) Wait 2 seconds then remove the OTG adapter
->> 4) The unit is now stuck in host mode, the VBUS switch is latched on
->> and the ID pin is no longer polled.
->> 
->> The only way to exit this state was to insert a OTG adapter with an
->> USB device connected. Until this, the usb device mode was not
->> available.
->> 
->> It was tested on a AM35x based board.
->> 
->> CC: <stable@vger.kernel.org>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  drivers/usb/musb/musb_dsps.c | 14 +++++++++++++-
->>  1 file changed, 13 insertions(+), 1 deletion(-)
->> 
->> diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
->> index 65d931a..2d22683 100644
->> --- a/drivers/usb/musb/musb_dsps.c
->> +++ b/drivers/usb/musb/musb_dsps.c
->> @@ -145,6 +145,7 @@ struct dsps_glue {
->>  	struct timer_list timer;	/* otg_workaround timer */
->>  	unsigned long last_timer;    /* last timer data for each instance */
->>  	bool sw_babble_enabled;
->> +	int otg_state_a_wait_vrise_timeout;
->>  
->>  	struct dsps_context context;
->>  	struct debugfs_regset32 regset;
->> @@ -268,9 +269,18 @@ static void otg_timer(unsigned long _musb)
->>  
->>  	spin_lock_irqsave(&musb->lock, flags);
->>  	switch (musb->xceiv->otg->state) {
->> +	case OTG_STATE_A_WAIT_VRISE:
->> +		if ((glue->otg_state_a_wait_vrise_timeout)) {
->> +				musb->xceiv->otg->state = OTG_STATE_A_WAIT_BCON;
->> +				musb->is_active = 0;
->> +			}
->> +		mod_timer(&glue->timer, jiffies +
->> +			  msecs_to_jiffies(OTG_TIME_A_WAIT_VRISE));
->
-> After more test on more USB drive, it seems that for some of them
-> OTG_TIME_A_WAIT_VRISE is too short. 200ms seems better. It is
-> disturbing because according to the OTG specification the maximum
-> is 100ms, however I am not so surprised that USB device maker don't
-> follow it.
+On Mon, Aug 31, 2015 at 02:28:03PM +0100, Bjorn Helgaas wrote:
+> On Sat, Aug 29, 2015 at 01:44:57PM +0100, Lorenzo Pieralisi wrote:
+> > On Fri, Aug 28, 2015 at 10:14:44PM +0100, Bjorn Helgaas wrote:
+> > > On Thu, Jul 30, 2015 at 02:13:59PM +0100, Lorenzo Pieralisi wrote:
+> > > > On ARM64 PROBE_ONLY PCI systems resources are not currently claimed,
+> > > > therefore they can't be enabled since they do not have a valid
+> > > > parent pointer; this in turn prevents enabling PCI devices on
+> > > > ARM64 PROBE_ONLY systems, causing PCI devices initialization to
+> > > > fail.
+> > > 
+> > > Where does arm64 claim PCI BAR resources for the non-PROBE_ONLY case?
+> > 
+> > arm64 (and arm) does not claim resources in arch code, they are always
+> > assigned in the respective host controllers (or the pcibios on arm),
+> > except for the PCI generic host when in PROBE_ONLY mode, where resources
+> > are neither claimed nor assigned (the reason for this patch to exist).
+> > ...
+> > 
+> > > I know it must be there somewhere, but I don't see it.
+> > 
+> > It is not there, it is done in the host controllers by assigning the
+> > resources (which also "claim" them by assigning the parent pointer).
+> 
+> The host controller drivers should claim the apertures forwarded to
+> the PCI bus.  For pci-host-generic, this happens when
+> gen_pci_parse_request_of_pci_ranges() calls devm_request_resource().
 
-So after many tests on different devices, 200ms is enough for most of
-them, but for one, 2000ms (2s) was needed!
+Yes, the generic host claims the apertures at DT probing time.
 
-I see several option:
-- adding a sysfs entry to setup the time
-- adding a debugs entry entry
-- adding configuration option in menuconfig
-- using 2000ms and hopping it was enough for everyone
+> But that doesn't do anything for the BARs of the PCI devices
+> themselves, of course.
+> 
+> If this patch fixes a problem that will occur in the future, when we
+> add arm/arm64 code to claim BARs, let's make this patch part of that
+> series.  If it fixes a problem in the current tree, I'll merge it now,
+> but so far I haven't been able to make the connection between this
+> patch and a problem in the current code.
 
-My preference would go to the first option, what is your opinion?
+It fixes a problem in the current tree (I mean when the PCI pull is
+merged - it contains code that enables PCI host generic on arm64),
+since without it PROBE_ONLY systems (ie PCI host generic on kvmtool) would
+try to enable resources and fail, since the resources were not claimed.
 
-Thanks,
+It works the same way as arm, I will rework both arches when I am done
+refactoring the resource claiming implementation.
 
-Gregory
+Will picked it up already I do not know what's the best way to
+merge it I guess it can go via the arm64 tree if you do not have any
+objections.
 
->
->
->> +		break;
->>  	case OTG_STATE_A_WAIT_BCON:
->>  		dsps_writeb(musb->mregs, MUSB_DEVCTL, 0);
->>  		skip_session = 1;
->> +		glue->otg_state_a_wait_vrise_timeout = 0;
->>  		/* fall */
->>  
->>  	case OTG_STATE_A_IDLE:
->> @@ -359,7 +369,9 @@ static irqreturn_t dsps_interrupt(int irq, void *hci)
->>  			MUSB_HST_MODE(musb);
->>  			musb->xceiv->otg->default_a = 1;
->>  			musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
->> -			del_timer(&glue->timer);
->> +			glue->otg_state_a_wait_vrise_timeout = 1;
->> +			mod_timer(&glue->timer, jiffies +
->> +				  msecs_to_jiffies(OTG_TIME_A_WAIT_VRISE));
->>  		} else {
->>  			musb->is_active = 0;
->>  			MUSB_DEV_MODE(musb);
->> 
->
->
-> -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thank you !
+Lorenzo
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> > > > To solve this issue, resources must be claimed when devices are
+> > > > added on PROBE_ONLY systems, which ensures that the resource hierarchy
+> > > > is validated and the resource tree is sane, but this requires changes
+> > > > in the ARM64 resource management that can affect adversely existing
+> > > > PCI set-ups (claiming resources on !PROBE_ONLY systems might break
+> > > > existing ARM64 PCI platform implementations).
+> > > > 
+> > > > As a temporary solution in preparation for a proper resources claiming
+> > > > implementation in ARM64 core, to enable PCI PROBE_ONLY systems on ARM64,
+> > > > this patch adds a pcibios_enable_device() arch implementation that
+> > > > simply prevents enabling resources on PROBE_ONLY systems (mirroring ARM
+> > > > behaviour).
+> > > > 
+> > > > This is always a safe thing to do because on PROBE_ONLY systems the
+> > > > configuration space set-up can be considered immutable, and it is in
+> > > > preparation of proper resource claiming that would finally validate
+> > > > the PCI resources tree in the ARM64 arch implementation on PROBE_ONLY
+> > > > systems.
+> > > > 
+> > > > For !PROBE_ONLY systems resources enablement in pcibios_enable_device()
+> > > > on ARM64 is implemented as in current PCI core, leaving the behaviour
+> > > > unchanged.
+> > > > 
+> > > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > > Cc: Will Deacon <will.deacon@arm.com>
+> > > > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > > ---
+> > > > Bjorn, all,
+> > > > 
+> > > > as I mention in the commit log, this patch is a temporary solution
+> > > > in preparation for proper resources claiming in ARM64, so that
+> > > > we can safely enable the PCI generic host controller on ARM64 systems.
+> > > > 
+> > > > It mirrors ARM implementation and I will work on changing both
+> > > > ARM and ARM64 to convert them to proper resources claiming in
+> > > > the respective implementations.
+> > > > 
+> > > > Lorenzo
+> > > > 
+> > > >  arch/arm64/kernel/pci.c | 13 +++++++++++++
+> > > >  1 file changed, 13 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> > > > index 4095379..b3d098b 100644
+> > > > --- a/arch/arm64/kernel/pci.c
+> > > > +++ b/arch/arm64/kernel/pci.c
+> > > > @@ -38,6 +38,19 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+> > > >  	return res->start;
+> > > >  }
+> > > >  
+> > > > +/**
+> > > > + * pcibios_enable_device - Enable I/O and memory.
+> > > > + * @dev: PCI device to be enabled
+> > > > + * @mask: bitmask of BARs to enable
+> > > > + */
+> > > > +int pcibios_enable_device(struct pci_dev *dev, int mask)
+> > > > +{
+> > > > +	if (pci_has_flag(PCI_PROBE_ONLY))
+> > > > +		return 0;
+> > > > +
+> > > > +	return pci_enable_resources(dev, mask);
+> > > > +}
+> > > > +
+> > > >  /*
+> > > >   * Try to assign the IRQ number from DT when adding a new device
+> > > >   */
+> > > > -- 
+> > > > 2.2.1
+> > > > 
+> > > 
+> 
