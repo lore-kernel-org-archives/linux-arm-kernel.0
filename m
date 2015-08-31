@@ -1,49 +1,96 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 31 Aug 2015 12:39:44 +0000
-Subject: [PATCH 0/3] Add support for the Armada-370-based Seagate NAS
-In-Reply-To: <1440866805-31731-1-git-send-email-simon.guinot@sequanux.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 31 Aug 2015 14:43:14 +0200
+Subject: [PATCH 1/3] ARM: mvebu: add DT support for Seagate NAS 2 and 4-Bay
+In-Reply-To: <1440866805-31731-2-git-send-email-simon.guinot@sequanux.org>
 References: <1440866805-31731-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20150831123944.GK3684@io.lakedaemon.net>
+ <1440866805-31731-2-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20150831124314.GE14459@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 29, 2015 at 06:46:42PM +0200, Simon Guinot wrote:
-> Hi,
+On Sat, Aug 29, 2015 at 06:46:43PM +0200, Simon Guinot wrote:
+> From: Vincent Donnefort <vdonnefort@gmail.com>
 > 
-> This patch series adds support for the Seagate machines based on the
-> Armada-370 Marvell SoC. This includes the Personal Cloud 1 and 2-Bay
-> and the Seagate NAS 2 and 4-Bay.
+> This patch adds DT support for the Seagate NAS 2 and 4-Bay (n090201 and
+> n090401).
 > 
-> Thanks,
+> Chipset list (common):
+> - SoC Marvell Armada 370 88F6707, CPU @1.2GHz
+> - SDRAM memory: 512MB DDR3 600MHz (16-bits bandwidth)
+> - NAND flash 256MB, 8-bits (Micron MT29F2G08AAB or Hinyx H27U2G8F2CTR-BC)
+> - 2 SATA II ports (SoC)
+> - 1 Ethernet Gigabit ports (PHY Marvell 88E1518)
+> - 2 USB3 host ports (PCIe controller ASM1042)
+> - GPIO fan (4 speeds)
+> - External I2C RTC (MCP7940NT)
+> - 3 push buttons (power, backup and reset)
+> - 2 SATA LEDs (bi-color, blue and red)
+> - 1 power LED (bi-color, blue and red)
 > 
-> Simon
+> Only on 4-Bay models:
+> - 2 extra SATA III ports (PCIe AHCI controller Marvell 88SE9170)
+> - 1 extra Ethernet Gigabit ports (PHY Marvell 88E1518)
+> - I2C GPIO expander (PCA9554A)
+> - 2 extra SATA LEDs (bi-color, blue and red)
 > 
-> Simon Guinot (2):
->   ARM: mvebu: add DT support for Seagate Personal Cloud
->   ARM: mvebu: enable options for Seagate NAS in mvebu_v7_defconfig
+> Note that support for the white SATA LEDs associated with HDDs 0 and 1
+> is missing. A dedicated LED driver is needed.
 > 
-> Vincent Donnefort (1):
->   ARM: mvebu: add DT support for Seagate NAS 2 and 4-Bay
-> 
->  arch/arm/boot/dts/Makefile                |   4 +
->  arch/arm/boot/dts/armada-370-n090103.dts  |  28 ++++
+> Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
+> ---
+>  arch/arm/boot/dts/Makefile                |   2 +
 >  arch/arm/boot/dts/armada-370-n090201.dts  |  28 ++++
->  arch/arm/boot/dts/armada-370-n090203.dts  |  42 ++++++
 >  arch/arm/boot/dts/armada-370-n090401.dts  | 124 ++++++++++++++++
 >  arch/arm/boot/dts/armada-370-n090x01.dtsi | 232 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/armada-370-n090x03.dtsi | 174 ++++++++++++++++++++++
->  arch/arm/configs/mvebu_v7_defconfig       |   9 +-
->  8 files changed, 640 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/armada-370-n090103.dts
+>  4 files changed, 386 insertions(+)
 >  create mode 100644 arch/arm/boot/dts/armada-370-n090201.dts
->  create mode 100644 arch/arm/boot/dts/armada-370-n090203.dts
 >  create mode 100644 arch/arm/boot/dts/armada-370-n090401.dts
 >  create mode 100644 arch/arm/boot/dts/armada-370-n090x01.dtsi
->  create mode 100644 arch/arm/boot/dts/armada-370-n090x03.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 233159d2eaab..0a46613e90d2 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -699,6 +699,8 @@ dtb-$(CONFIG_MACH_ARMADA_370) += \
+>  	armada-370-db.dtb \
+>  	armada-370-dlink-dns327l.dtb \
+>  	armada-370-mirabox.dtb \
+> +	armada-370-n090201.dtb \
+> +	armada-370-n090401.dtb \
+>  	armada-370-netgear-rn102.dtb \
+>  	armada-370-netgear-rn104.dtb \
+>  	armada-370-rd.dtb \
+> diff --git a/arch/arm/boot/dts/armada-370-n090201.dts b/arch/arm/boot/dts/armada-370-n090201.dts
+> new file mode 100644
+> index 000000000000..b92b1ee067d6
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-370-n090201.dts
+> @@ -0,0 +1,28 @@
+> +/*
+> + * Device Tree file for Seagate NAS 2-Bay (n090201)
+> + *
+> + * Copyright (C) 2015 Seagate
+> + *
+> + * Author: Vincent Donnefort <vdonnefort@gmail.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "armada-370-n090x01.dtsi"
+> +
+> +/ {
+> +	model = "Seagate NAS 2-Bay";
 
-Could you please name these something more informative?  e.g.
-armada-370-seagate-personal-cloud-{1,2}.dts, etc?
+On a similar line to Jason's comment. I'm sure Seagate has/is going to
+have more than this 2-bay NAS. Can we have a more descriptive model
+string here?
 
-thx,
+I could imagine an installer which looks through the list of available
+DT blobs and creates a list showing the model and compatible string,
+and asks the user, which should it use.
 
-Jason.
+    Andrew
