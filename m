@@ -1,20 +1,39 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 30 Aug 2015 21:54:26 -0700 (PDT)
-Subject: [PATCH net-next v2 0/8] net: thunderx: New features and fixes
-In-Reply-To: <1440926958-1874-1-git-send-email-aleksey.makarov@auriga.com>
-References: <1440926958-1874-1-git-send-email-aleksey.makarov@auriga.com>
-Message-ID: <20150830.215426.1263274449496319755.davem@davemloft.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 31 Aug 2015 14:01:04 +0900
+Subject: [RESEND PATCH v3 3/5] sh: kill off set_irq_flags usage
+In-Reply-To: <1440889285-5637-4-git-send-email-robh@kernel.org>
+References: <1440889285-5637-1-git-send-email-robh@kernel.org>
+ <1440889285-5637-4-git-send-email-robh@kernel.org>
+Message-ID: <20150831050104.GA26119@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aleksey Makarov <aleksey.makarov@auriga.com>
-Date: Sun, 30 Aug 2015 12:29:08 +0300
+Hi Rob,
 
-> v2:
->   - The unused affinity_mask field of the structure cmp_queue 
->   has been deleted. (thanks to David Miller)
->   - The unneeded initializers have been dropped. (thanks to Alexey Klimov)
->   - The commit message "net: thunderx: Rework interrupt handling"
->   has been fixed. (thanks to Alexey Klimov)
+On Sat, Aug 29, 2015 at 06:01:23PM -0500, Rob Herring wrote:
+> set_irq_flags is ARM specific with custom flags which have genirq
+> equivalents. Convert drivers to use the genirq interfaces directly, so we
+> can kill off set_irq_flags. The translation of flags is as follows:
+> 
+> IRQF_VALID -> !IRQ_NOREQUEST
+> IRQF_PROBE -> !IRQ_NOPROBE
+> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+> 
+> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+> and setting IRQ_NOREQUEST already, so there is no need to do this in
+> .map() functions and we can simply remove the set_irq_flags calls. Some
+> users also modify IRQ_NOPROBE and this has been maintained although it
+> is not clear that is really needed. There appears to be a great deal of
+> blind copy and paste of this code.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Acked-by: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: linux-sh at vger.kernel.org
 
-Series applied, thanks.
+I have queued this up. Please let me know if that was not your intent.
+
+The patch is queued up in the sh-drivers-for-v4.3 branch of my renesas tree.
+At this point I plan to send a pull-request once dt changes that other
+patches in that branch depend on hit Linus's tree via the ARM SoC tree.
+I anticipate that being during the rc1 or rc2 timeframe.
