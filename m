@@ -1,121 +1,67 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 31 Aug 2015 12:59:26 +0000
-Subject: [PATCH 2/3] ARM: mvebu: add DT support for Seagate Personal Cloud
-In-Reply-To: <1440866805-31731-3-git-send-email-simon.guinot@sequanux.org>
+Date: Mon, 31 Aug 2015 13:03:38 +0000
+Subject: [PATCH 0/3] Add support for the Armada-370-based Seagate NAS
+In-Reply-To: <20150831130236.GN30993@kw.sim.vm.gnt>
 References: <1440866805-31731-1-git-send-email-simon.guinot@sequanux.org>
- <1440866805-31731-3-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20150831125926.GL3684@io.lakedaemon.net>
+ <20150831123944.GK3684@io.lakedaemon.net>
+ <20150831130236.GN30993@kw.sim.vm.gnt>
+Message-ID: <20150831130337.GM3684@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 29, 2015 at 06:46:44PM +0200, Simon Guinot wrote:
-> This patch adds DT support for the Seagate Personal Cloud 1 and 2-Bay
-> (n090103 and n090203).
+On Mon, Aug 31, 2015 at 03:02:36PM +0200, Simon Guinot wrote:
+> On Mon, Aug 31, 2015 at 12:39:44PM +0000, Jason Cooper wrote:
+> > On Sat, Aug 29, 2015 at 06:46:42PM +0200, Simon Guinot wrote:
+> > > Hi,
+> > > 
+> > > This patch series adds support for the Seagate machines based on the
+> > > Armada-370 Marvell SoC. This includes the Personal Cloud 1 and 2-Bay
+> > > and the Seagate NAS 2 and 4-Bay.
+> > > 
+> > > Thanks,
+> > > 
+> > > Simon
+> > > 
+> > > Simon Guinot (2):
+> > >   ARM: mvebu: add DT support for Seagate Personal Cloud
+> > >   ARM: mvebu: enable options for Seagate NAS in mvebu_v7_defconfig
+> > > 
+> > > Vincent Donnefort (1):
+> > >   ARM: mvebu: add DT support for Seagate NAS 2 and 4-Bay
+> > > 
+> > >  arch/arm/boot/dts/Makefile                |   4 +
+> > >  arch/arm/boot/dts/armada-370-n090103.dts  |  28 ++++
+> > >  arch/arm/boot/dts/armada-370-n090201.dts  |  28 ++++
+> > >  arch/arm/boot/dts/armada-370-n090203.dts  |  42 ++++++
+> > >  arch/arm/boot/dts/armada-370-n090401.dts  | 124 ++++++++++++++++
+> > >  arch/arm/boot/dts/armada-370-n090x01.dtsi | 232 ++++++++++++++++++++++++++++++
+> > >  arch/arm/boot/dts/armada-370-n090x03.dtsi | 174 ++++++++++++++++++++++
+> > >  arch/arm/configs/mvebu_v7_defconfig       |   9 +-
+> > >  8 files changed, 640 insertions(+), 1 deletion(-)
+> > >  create mode 100644 arch/arm/boot/dts/armada-370-n090103.dts
+> > >  create mode 100644 arch/arm/boot/dts/armada-370-n090201.dts
+> > >  create mode 100644 arch/arm/boot/dts/armada-370-n090203.dts
+> > >  create mode 100644 arch/arm/boot/dts/armada-370-n090401.dts
+> > >  create mode 100644 arch/arm/boot/dts/armada-370-n090x01.dtsi
+> > >  create mode 100644 arch/arm/boot/dts/armada-370-n090x03.dtsi
 > 
-> Chipset list:
-> - SoC Marvell Armada 370 88F6707, CPU @1GHz
-> - SDRAM memory: 512MB DDR3 667MHz (16-bits bandwidth)
-> - SPI flash 1MB (Macronix MX25L8006E)
-> - 1 or 2 SATA internal ports
-> - 1 Ethernet Gigabit port (PHY Marvell 88E1518)
-> - 1 USB3 host port (PCIe controller ASM1042)
-> - 1 USB2 host port (SoC)
-> - 2 push buttons (power and reset)
-> - 1 SATA LED (bi-color, white and red)
-
-Do you have long term URLs for these products?  It would be nice to add
-those.  The best I could find is:
-
-  http://www.seagate.com/www-content/product-content/personal-cloud/en-us/doc/personal-cloud-ds1838-1-1501us.pdf
-
-But none of the model numbers match what you've used in this patch
-series.  I imagine this will make it harder for newcomers to find the
-relevant code.
-
-> Note that support for the white SATA LED is missing. A dedicated LED
-> driver is needed.
+> Hi Jason,
 > 
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> ---
->  arch/arm/boot/dts/Makefile                |   2 +
->  arch/arm/boot/dts/armada-370-n090103.dts  |  28 +++++
->  arch/arm/boot/dts/armada-370-n090203.dts  |  42 ++++++++
->  arch/arm/boot/dts/armada-370-n090x03.dtsi | 174 ++++++++++++++++++++++++++++++
->  4 files changed, 246 insertions(+)
->  create mode 100644 arch/arm/boot/dts/armada-370-n090103.dts
->  create mode 100644 arch/arm/boot/dts/armada-370-n090203.dts
->  create mode 100644 arch/arm/boot/dts/armada-370-n090x03.dtsi
+> > 
+> > Could you please name these something more informative?  e.g.
+> > armada-370-seagate-personal-cloud-{1,2}.dts, etc?
 > 
+> Sure I can. But note that n090103 is an hardware name while Seagate
+> Personal Cloud is a product name. The former is unique while the latter
+> is not. For example, it is possible that we will see in a near future an
+> hardware update for the Personal Cloud.
 
-...
+Understood, but I'd also like to make it a bit easier for hackers not
+intimately familiar with the tree/products to find the file they are
+interested in.
 
-> diff --git a/arch/arm/boot/dts/armada-370-n090103.dts b/arch/arm/boot/dts/armada-370-n090103.dts
-> new file mode 100644
-> index 000000000000..c94bed449050
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-370-n090103.dts
-> @@ -0,0 +1,28 @@
-> +/*
-> + * Device Tree file for Seagate Personal Cloud NAS (n090103).
-> + *
-> + * Copyright (C) 2015 Seagate
-> + *
-> + * Author: Simon Guinot <simon.guinot@sequanux.org>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-
-Based on previous discussions, I'm pretty sure I know what the answer
-is, but I have to at least ask in case it was accidental.  All other
-armada-* files are dual licensed, GPLv2/X11.  Was it intentional to
-license these as GPLv2 only?
-
-> +
-> +/dts-v1/;
-> +#include "armada-370-n090x03.dtsi"
-> +
-> +/ {
-> +	model = "Seagate Personal Cloud";
-> +	compatible = "seagate,n090103", "marvell,armada370", "marvell,armada-370-xp";
-
-In line with my previous comment, can we add a compatible string here?
-
-	compatible = "seagate,n090103", "seagate,personalcloud", "marvell,armada370", "marvell,armada-370-xp";
-
-> diff --git a/arch/arm/boot/dts/armada-370-n090203.dts b/arch/arm/boot/dts/armada-370-n090203.dts
-> new file mode 100644
-> index 000000000000..3bc62b9f0b0c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-370-n090203.dts
-> @@ -0,0 +1,42 @@
-> +/*
-> + * Device Tree file for Seagate Personnal Cloud 2-Bay NAS (n090203).
-> + *
-> + * Copyright (C) 2015 Seagate
-> + *
-> + * Author: Simon Guinot <simon.guinot@sequanux.org>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +#include "armada-370-n090x03.dtsi"
-> +
-> +/ {
-> +	model = "Seagate Personnal Cloud 2-Bay";
-> +	compatible = "seagate,n090203", "marvell,armada370", "marvell,armada-370-xp";
-
-And then here:
-
-	compatible = "seagate,n090103", "seagate,personalcloud2", "marvell,armada370", "marvell,armada-370-xp";
-
-or similar.
-
-The same comments apply to the NAS versions as well.
+I've no problem with 'armada-370-seagate-personalcloud-n090103.dts'
+either.
 
 thx,
 
