@@ -1,31 +1,34 @@
-From: vichy.kuo@gmail.com (vichy)
-Date: Mon, 31 Aug 2015 22:03:33 +0800
-Subject: about system time incorrect after changing cpu frequency
-Message-ID: <CAOVJa8GTDj3UJpgUd4nH1wknUKa6fgac=1SsqC8g=UCG0MGuDw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 31 Aug 2015 07:11:34 -0700
+Subject: [PATCH] gpio: omap: Fix gpiochip_add() handling for deferred probe
+In-Reply-To: <55E4186E.7090605@ti.com>
+References: <1440787489-15992-1-git-send-email-tony@atomide.com>
+ <55E4186E.7090605@ti.com>
+Message-ID: <20150831141134.GA4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi all:
-My platform is like below:
-1. single core Cortex A9
-2. use global timer for system timer
+* Grygorii Strashko <grygorii.strashko@ti.com> [150831 02:07]:
+> Hi Tony,
+> 
+> On 08/28/2015 09:44 PM, Tony Lindgren wrote:
+> >Currently we gpio-omap breaks if gpiochip_add() returns -EPROBE_DEFER:
+> >
+> >[    0.570000] gpiochip_add: GPIOs 0..31 (gpio) failed to register
+> >[    0.570000] omap_gpio 48310000.gpio: Could not register gpio chip -517
+> >...
+> >[    3.670000] omap_gpio 48310000.gpio: Unbalanced pm_runtime_enable!
+> 
+> I have no objection to the patch itself.
+> 
+> But I curious, How have you got this error output? Was it simulated?
 
-after I porting cpu frequency driver based on snow ball, the cpu
-frequency did change as I expected.
-But the system time is incorrect( since pherial clk is got from cpu frequency)
+I ran into it when trying to get rid of all the custom initcalls
+for various drivers. And especially if adding dts mappings for
+gpio-ranges to try to find some solution for the 1.158 issue that
+keeps me from having a mainline GPIO PM regresion test with
+pinging wl12xx during off idle :)
 
-for example:
-a) cpu 1G (pherial clk = 250M) --> sleep 1 sec (OK)
-b) cpu 500M  (pherial clk = 125M) --> sleep 1 sec (will be measured as 2 sec)
+Regards,
 
-I try to call below 2 functions to change the frequency of clocksource
-and clockevent, but the above b) sleep time is still incorrect when
-cpu runs in 500Mhz.
-    clockevents_update_freq(this_cpu_ptr(gt_evt), gt_clk_rate);
-    __clocksource_updatefreq_hz(&gt_clocksource, gt_clk_rate);
-
-in Arm cortex A9 single core system with Global timer as system timer,
-is there any kernel api to change system timer period when cpu/pherial
-frequency change?
-
-appreciate your kind help in advance,
+Tony
