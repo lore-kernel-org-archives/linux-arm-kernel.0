@@ -1,374 +1,133 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 31 Aug 2015 21:12:44 +0800
-Subject: [PATCH 2/2] arm64: dts: add dts files for Hisilicon Hip05-D02
- Development Board
-In-Reply-To: <1440838361-1468-3-git-send-email-dingtianhong@huawei.com>
-References: <1440838361-1468-1-git-send-email-dingtianhong@huawei.com>
- <1440838361-1468-3-git-send-email-dingtianhong@huawei.com>
-Message-ID: <20150831131244.GB6194@leoy-linaro>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 31 Aug 2015 15:11:19 +0200
+Subject: Trying to get a Pogoplug v4 board description added
+In-Reply-To: <CAAKvOSg7h=YOVWQ1gKLv-WGw6BGF_rBfp+Zb=za7FkKE2Zwbhg@mail.gmail.com>
+References: <CAAKvOShfrRn-E9o2Gjek5xb8xfGucUmO_FRu7c3T7S2V=co-2g@mail.gmail.com>
+ <20150829153646.GB31545@lunn.ch>
+ <CAAKvOSg7h=YOVWQ1gKLv-WGw6BGF_rBfp+Zb=za7FkKE2Zwbhg@mail.gmail.com>
+Message-ID: <20150831131119.GF14459@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 29, 2015 at 04:52:41PM +0800, Ding Tianhong wrote:
-> Add initial dtsi file to support Hisilicon Hip05-D02 Board with
-> support of CPUs in four clusters and each cluster has quard Cortex-A57.
-> 
-> Also add dts file to support Hip05-D02 development board.
-> 
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
->  arch/arm64/boot/dts/hisilicon/Makefile      |   2 +-
->  arch/arm64/boot/dts/hisilicon/hip05-d02.dts |  36 ++++
->  arch/arm64/boot/dts/hisilicon/hip05.dtsi    | 271 ++++++++++++++++++++++++++++
->  3 files changed, 308 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/boot/dts/hisilicon/hip05-d02.dts
->  create mode 100644 arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/Makefile b/arch/arm64/boot/dts/hisilicon/Makefile
-> index fa81a6e..cd158b8 100644
-> --- a/arch/arm64/boot/dts/hisilicon/Makefile
-> +++ b/arch/arm64/boot/dts/hisilicon/Makefile
-> @@ -1,4 +1,4 @@
-> -dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb
-> +dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb hip05-d02.dtb
->  
->  always		:= $(dtb-y)
->  subdir-y	:= $(dts-dirs)
-> diff --git a/arch/arm64/boot/dts/hisilicon/hip05-d02.dts b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
-> new file mode 100644
-> index 0000000..ae34e25
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
-> @@ -0,0 +1,36 @@
-> +/**
-> + * dts file for Hisilicon D02 Development Board
-> + *
-> + * Copyright (C) 2014,2015 Hisilicon Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * publishhed by the Free Software Foundation.
-> + *
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "hip05.dtsi"
-> +
-> +/ {
-> +	model = "Hisilicon Hip05 D02 Development Board";
-> +	compatible = "hisilicon,hip05-d02";
-> +
-> +	memory at 00000000 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x00000000 0x0 0x80000000>;
-> +	};
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +};
-> +
-> +&uart0 {
-> +	status = "ok";
-> +};
-> diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> new file mode 100644
-> index 0000000..da12d94
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> @@ -0,0 +1,271 @@
-> +/**
-> + * dts file for Hisilicon D02 Development Board
-> + *
-> + * Copyright (C) 2014,2015 Hisilicon Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * publishhed by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +	compatible = "hisilicon,hip05-d02";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	psci {
-> +		compatible = "arm,psci-0.2";
-> +		method = "smc";
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu-map {
-> +			cluster0 {
-> +				core0 {
-> +					cpu = <&cpu0>;
-> +				};
-> +				core1 {
-> +					cpu = <&cpu1>;
-> +				};
-> +				core2 {
-> +					cpu = <&cpu2>;
-> +				};
-> +				core3 {
-> +					cpu = <&cpu3>;
-> +				};
-> +			};
-> +			cluster1 {
-> +				core0 {
-> +					cpu = <&cpu4>;
-> +				};
-> +				core1 {
-> +					cpu = <&cpu5>;
-> +				};
-> +				core2 {
-> +					cpu = <&cpu6>;
-> +				};
-> +				core3 {
-> +					cpu = <&cpu7>;
-> +				};
-> +			};
-> +			cluster2 {
-> +				core0 {
-> +					cpu = <&cpu8>;
-> +				};
-> +				core1 {
-> +					cpu = <&cpu9>;
-> +				};
-> +				core2 {
-> +					cpu = <&cpu10>;
-> +				};
-> +				core3 {
-> +					cpu = <&cpu11>;
-> +				};
-> +			};
-> +			cluster3 {
-> +				core0 {
-> +					cpu = <&cpu12>;
-> +				};
-> +				core1 {
-> +					cpu = <&cpu13>;
-> +				};
-> +				core2 {
-> +					cpu = <&cpu14>;
-> +				};
-> +				core3 {
-> +					cpu = <&cpu15>;
-> +				};
-> +			};
-> +		};
-> +
-> +		cpu0: cpu at 20000 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
+Hi Andrew
 
-Change to "arm,cortex-a57","arm,armv8"?
+Once you have the copyright and licence sort out, we should have a
+header here with this information.
 
-> +			reg = <0x20000>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu1: cpu at 20001 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20001>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu2: cpu at 20002 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20002>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu3: cpu at 20003 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20003>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu4: cpu at 20100 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20100>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu5: cpu at 20101 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20101>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu6: cpu at 20102 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20102>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu7: cpu at 20103 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20103>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu8: cpu at 20200 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20200>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu9: cpu at 20201 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20201>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu10: cpu at 20202 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20202>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu11: cpu at 20203 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20203>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu12: cpu at 20300 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20300>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu13: cpu at 20301 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20301>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu14: cpu at 20302 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20302>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu15: cpu at 20303 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x20303>;
-> +			enable-method = "psci";
-> +		};
-> +	};
-> +
-> +	gic: interrupt-controller at 8d000000 {
-> +		compatible = "arm,gic-v3";
-> +                #interrupt-cells = <3>;
-> +                #address-cells = <2>;
-> +                #size-cells = <2>;
-> +                ranges;
-> +                interrupt-controller;
-> +                #redistributor-regions = <1>;
-> +                redistributor-stride = <0x0 0x30000>;
-> +		reg = <0x0 0x8d000000 0 0x10000>,	/* GICD */
-> +		      <0x0 0x8d100000 0 0x300000>,	/* GICR */
-> +		      <0x0 0xfe000000 0 0x10000>,	/* GICC */
-> +		      <0x0 0xfe010000 0 0x10000>,       /* GICH */
-> +		      <0x0 0xfe020000 0 0x10000>;       /* GICV */
-> +		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
-> +
-> +		its_totems: interrupt-controller at 8c000000 {
-> +			compatible = "arm,gic-v3-its";
-> +			msi-controller;
-> +			reg = <0x0 0x8c000000 0x0 0x1000000>;
-> +		};
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
+> >> kirkwood-pogoplug_v4.dts
+> >> /dts-v1/;
+> >>
+> >> #include "kirkwood.dtsi"
+> >> #include "kirkwood-6192.dtsi"
+> >>
+> >> / {
+> >>         model = "Pogoplug v4";
+> >>         compatible = "cloudengines,pogoplug-v4",
+> >> "cloudengines,pogoplug-mobile", "marvell,kirkwood-88f6192",
+> >> "marvell,kirkwood";
+> >>
+> >>         memory {
+> >>                 device_type = "memory";
+> >>                 reg = <0x00000000 0x8000000>;
+> >>         };
+> >>
+> >>         chosen {
+> >>                 bootargs = "console=ttyS0,115200";
+> >>                 stdout-path = &uart0;
 
-Here have a question:
-In devcie tree binding file: Documentation/devicetree/bindings/arm/gic.txt,
-it only considers for maximum 8 cpus. So will we need change the
-binding file and also use GIC_CPU_MASK_SIMPLE(16) for 16 cores?
+You can combine this into one line:
 
-> +	};
-> +
-> +	pmu {
-> +		compatible = "arm,armv8-pmuv3";
-> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		refclk200mhz: refclk200mhz {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <200000000>;
-> +		};
-> +
-> +		uart0: uart at 80300000 {
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x0 0x80300000 0x0 0x10000>;
-> +			interrupts = <GIC_SPI 317 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&refclk200mhz>;
-> +			clock-names = "apb_pclk";
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			status = "disabled";
-> +		};
-> +
-> +		uart1: uart at 80310000 {
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x0 0x80310000 0x0 0x10000>;
-> +			interrupts = <GIC_SPI 318 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&refclk200mhz>;
-> +			clock-names = "apb_pclk";
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			status = "disabled";
-> +		};
-> +	};
-> +};
-> -- 
-> 1.9.0
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+    		     stdout-path = "uart0:115200n8"
+
+I don't think any Kirkwood boards do this yet, but it should work.
+
+> >>         };
+> >>
+> >>         mbus {
+> >>                 pcie-controller {
+> >>                         status = "okay";
+> >>
+> >>                         pcie at 1,0 {
+> >>                                 status = "okay";
+> >>                         };
+
+Optional, but it is nice to comment on what is connected to the PCIe
+bus. I think it is the USB 3 controller? Adding the make model makes
+it easier for people to get the driver build into the kernel or as a
+module.
+
+> >>                 };
+> >>         };
+> >>
+> >>         ocp at f1000000 {
+> >>                 pinctrl: pin-controller at 10000 {
+> >>                         pmx_led_green: pmx-led-green {
+> >>                                 marvell,pins = "mpp22";
+> >>                                 marvell,function = "gpio";
+> >>                         };
+> >>                         pmx_led_red: pmx-led-red {
+> >>                                 marvell,pins = "mpp24";
+> >>                                 marvell,function = "gpio";
+> >>                         };
+> >>                         pmx_button_eject: pmx-button-eject {
+> >>                                 marvell,pins = "mpp29";
+> >>                                 marvell,function = "gpio";
+> >>                         };
+> >>                 };
+> >>
+> >>                 serial at 12000 {
+> >>                         status = "okay";
+> >>                 };
+> >>
+> >>                 sata at 80000 {
+> >>                         status = "okay";
+> >>                         nr-ports = <1>;
+> >>                         phys = <&sata_phy0>;
+> >>                         phy-names = "port0";
+
+You should not need these last two lines. They are provided by the
+.dtsi file.
+
+> >>                 };
+> >>
+> >>                 mvsdio at 90000 {
+> >>                         pinctrl-0 = <&pmx_sdio>;
+> >>                         pinctrl-names = "default";
+> >>                         status = "okay";
+> >>                         cd-gpios = <&gpio0 27 GPIO_ACTIVE_HIGH>;
+
+You should have a pinmux definition for this. See for example
+kirkwood-sheevaplug-esata.dts and kirkwood-sheevaplug-common.dtsi
+
+> >>                         /* No WP GPIO */
+> >>                 };
+> >>         };
+> >>
+> >>         gpio-leds {
+> >>                 compatible = "gpio-leds";
+> >>                 pinctrl-0 = <&pmx_led_red &pmx_led_green>;
+> >>                 pinctrl-names = "default";
+> >>
+> >>                 health {
+> >>                         label = "status:green:health";
+> >>                         gpios = <&gpio0 22 GPIO_ACTIVE_LOW>;
+> >>                         default-state = "keep";
+> >>                 };
+> >>                 fault {
+> >>                         label = "status:red:fault";
+> >>                         gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
+> >>                 };
+
+A common problem here, the labels don't fit what is documented.
+Documentation/leds/leds.txt says:
+
+"devicename:colour:function"
+
+so you should change status to pogoplugv4
+
+> >>         };
+> >>
+
+Please also add this file to the Makefile, keeping things in order.
+
+       Andrew
