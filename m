@@ -1,73 +1,38 @@
-From: jianwei.wang.chn@gmail.com (Jianwei Wang)
-Date: Mon, 31 Aug 2015 16:53:35 +0800
-Subject: [PATCH] drm/fsl-dcu: Add multi layers support
-Message-ID: <1441011215-3769-1-git-send-email-jianwei.wang.chn@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 31 Aug 2015 11:02:53 +0200
+Subject: [PATCH 9/9] arm/arm64: KVM: arch timer: Reset CNTV_CTL to 0
+In-Reply-To: <20150831085752.GH24113@cbox>
+References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
+ <1440942866-23802-10-git-send-email-christoffer.dall@linaro.org>
+ <CAKv+Gu-4KKUUt7J==CPK6J79mWXLeMJFsG_fj85tYB2orzfrZg@mail.gmail.com>
+ <20150831085752.GH24113@cbox>
+Message-ID: <CAKv+Gu_f97gu+TftpdJDef4X89sjYB2udUybpmm=M113_TTiPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For DCU support atmost 16 layers(on ls1021a) or 64 layers(on vf610),
-add (total_layer - 1) overlay planes.
+On 31 August 2015 at 10:57, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Mon, Aug 31, 2015 at 10:46:59AM +0200, Ard Biesheuvel wrote:
+>> On 30 August 2015 at 15:54, Christoffer Dall
+>> <christoffer.dall@linaro.org> wrote:
+>> > Provide a better quality of implementation and be architecture compliant
+>> > on ARMv7 for the architected timer by resetting the CNTV_CTL to 0 on
+>> > reset of the timer, and call kvm_timer_update_state(vcpu) at the same
+>> > time, ensuring the timer output is not asserted after, for example, a
+>> > PSCI system reset.
+>> >
+>> > This change alone fixes the UEFI reset issue reported by Laszlo back in
+>> > February.
+>> >
+>>
+>> Do you have a link to that report? I can't quite remember the details ...
+>>
+> There was no public mailing list cc'ed on the report, and the bugzilla
+> bug was created in a non-public Red Hat instance.
+>
+> But you were cc'ed on the original mail from Laszlo.  Look for an e-mail
+> from February 5th with the subject "virtual timer interrupt stuck across
+> guest firmware reboot on KVM".
+>
 
-Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
----
- drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c | 27 ++++++++++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c
-index 8787920..1195568 100644
---- a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c
-+++ b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c
-@@ -236,7 +236,10 @@ static const u32 fsl_dcu_drm_plane_formats[] = {
- 
- struct drm_plane *fsl_dcu_drm_primary_create_plane(struct drm_device *dev)
- {
-+	struct fsl_dcu_drm_device *fsl_dev = dev->dev_private;
- 	struct drm_plane *primary;
-+	struct drm_plane *overlay;
-+	unsigned int total_layer, formats_size, i;
- 	int ret;
- 
- 	primary = kzalloc(sizeof(*primary), GFP_KERNEL);
-@@ -245,11 +248,12 @@ struct drm_plane *fsl_dcu_drm_primary_create_plane(struct drm_device *dev)
- 		return NULL;
- 	}
- 
-+	formats_size = ARRAY_SIZE(fsl_dcu_drm_plane_formats);
- 	/* possible_crtc's will be filled in later by crtc_init */
- 	ret = drm_universal_plane_init(dev, primary, 0,
- 				       &fsl_dcu_drm_plane_funcs,
- 				       fsl_dcu_drm_plane_formats,
--				       ARRAY_SIZE(fsl_dcu_drm_plane_formats),
-+				       formats_size,
- 				       DRM_PLANE_TYPE_PRIMARY);
- 	if (ret) {
- 		kfree(primary);
-@@ -257,5 +261,26 @@ struct drm_plane *fsl_dcu_drm_primary_create_plane(struct drm_device *dev)
- 	}
- 	drm_plane_helper_add(primary, &fsl_dcu_drm_plane_helper_funcs);
- 
-+	total_layer = fsl_dev->soc->total_layer;
-+	for (i = 0; i < total_layer - 1; i++) {
-+		overlay = kzalloc(sizeof(*overlay), GFP_KERNEL);
-+		if (!overlay) {
-+			DRM_DEBUG_KMS("Failed to allocate overlay plane\n");
-+			goto out;
-+		}
-+
-+		ret = drm_universal_plane_init(dev, overlay, 1,
-+					       &fsl_dcu_drm_plane_funcs,
-+					       fsl_dcu_drm_plane_formats,
-+					       formats_size,
-+					       DRM_PLANE_TYPE_OVERLAY);
-+		if (ret) {
-+			kfree(overlay);
-+			goto out;
-+		}
-+		drm_plane_helper_add(overlay, &fsl_dcu_drm_plane_helper_funcs);
-+	}
-+
-+out:
- 	return primary;
- }
--- 
-2.1.0.27.g96db324
+Found it, thanks.
