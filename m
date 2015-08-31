@@ -1,106 +1,77 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Mon, 31 Aug 2015 13:01:33 +0200
-Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
- ECAM) and ACPI code out of arch/x86/ directory
-In-Reply-To: <20150608151443.GA16151@red-moon>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-6-git-send-email-hanjun.guo@linaro.org>
- <20150526170817.GU1565@arm.com> <55657B02.5090805@linaro.org>
- <20150602133215.GC23650@red-moon> <55701A31.808@linaro.org>
- <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
- <557504A2.3060203@linaro.org> <20150608151443.GA16151@red-moon>
-Message-ID: <55E4340D.6050004@linaro.org>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 31 Aug 2015 13:22:02 +0200
+Subject: [PATCH v8 29/55] [media] replace all occurrences of
+ MEDIA_ENT_T_DEVNODE_V4L
+In-Reply-To: <553c4e697dee72bbdf3d73a4d428118e10e18720.1440902901.git.mchehab@osg.samsung.com>
+References: <cover.1440902901.git.mchehab@osg.samsung.com>
+ <553c4e697dee72bbdf3d73a4d428118e10e18720.1440902901.git.mchehab@osg.samsung.com>
+Message-ID: <55E438DA.7050701@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.06.2015 17:14, Lorenzo Pieralisi wrote:
-> On Mon, Jun 08, 2015 at 03:57:38AM +0100, Hanjun Guo wrote:
->
-> [...]
->
->>>>>>>> Why can't we make use of the ECAM implementation used by
->>>>>>>> pci-host-generic
->>>>>>>> and drivers/pci/access.c?
->>>>>>>
->>>>>>> We had that question when I had posted MMCFG patch set separately,
->>>>>>> please see:
->>>>>>> https://lkml.org/lkml/2015/3/11/492
->>>>>>
->>>>>> Yes, but the real question is, why do we need to have PCI config space
->>>>>> up and running before a bus struct is even created ? I think the
->>>>>> reason is
->>>>>> the PCI configuration address space format (ACPI 6.0, Table 5-27, page
->>>>>> 108):
->>>>>>
->>>>>> "PCI Configuration space addresses must be confined to devices on
->>>>>> PCI Segment Group 0, bus 0. This restriction exists to accommodate
->>>>>> access to fixed hardware prior to PCI bus enumeration".
->>>>>>
->>>>>> On HW reduced platforms I do not even think this is required at all,
->>>>>> we have to look into this to avoid code duplication that might well
->>>>>> turn out useless.
->>>>>
->>>>> This is only for the fixed hardware, which will be not available for
->>>>> ARM64 (reduced hardware mode), but in Generic Hardware Programming
->>>>> Model, we using OEM-provided ACPI Machine Language (AML) code to access
->>>>> generic hardware registers, this will be available for reduced hardware
->>>>> too.
->>>>>
->>>>> So in ACPI spec, it says: (ACPI 6.0 page 66, last paragraph)
->>>>>
->>>>> ACPI defines eight address spaces that may be accessed by generic
->>>>> hardware implementations. These include:
->>>>> * System I/O space
->>>>> * System memory space
->>>>> * PCI configuration space
->>>>> * Embedded controller space
->>>>> * System Management Bus (SMBus) space
->>>>> * CMOS
->>>>> * PCI BAR Target
->>>>> * IPMI space
->>>>>
->>>>> So if any device using the PCI address space for control, such
->>>>> as a system reset control device, its address space can be reside
->>>>> in PCI configuration space (who can prevent a OEM do that crazy
->>>>> thing? :) ), and it should be accessible before the PCI bus is
->>>>> created.
->>>>
->>>> Us, by changing attitude and questioning features whose usefulness
->>>> is questionable. I will look into this and raise the point, I am not
->>>> thrilled by the idea of adding another set of PCI accessor functions
->>>> and drivers because we have to access a register through PCI before
->>>> enumerating the bus (and on arm64 this is totally useless since
->>>> we are not meant to support fixed HW anyway). Maybe we can make acpica
->>>> code use a "special" stub (ACPI specific, PCI configuration space address
->>>> space has restrictions anyway), I have to review this set in its
->>>> entirety to see how to do that (and I would kindly ask you to do
->>>> it too, before saying it is not possible to implement it).
->>>
->>> I'm willing to do that, actually, if we don't need a mechanism to
->>> access PCI config space before the bus is created, the code can be
->>> simplified a lot.
->>
->> After more investigation on the spec and the ACPI core code, I'm
->> still not convinced that accessing to PCI config space before PCI
->> bus creating is impossible, also there is no enough ARM64 hardware
->> to prove that too. But I think we can go in this way, reuse the
->> ECAM implementation by pci-host-generic for now, and implement the PCI
->> accessor functions before enumerating PCI bus when needed in the
->> future, does it make sense?
->
-> You mean we rewrite the patch to make sure we can use the PCI host generic
-> driver with MCFG and we leave the acpica PCI config call empty stubs on
-> arm64 (as they are now) ?
->
+On 08/30/2015 05:06 AM, Mauro Carvalho Chehab wrote:
+> Now that interfaces and entities are distinct, it makes no sense
+> of keeping something named as MEDIA_ENT_T_DEVNODE.
+> 
+> This change was done with this script:
+> 
+> 	for i in $(git grep -l MEDIA_ENT_T|grep -v uapi/linux/media.h); do sed s,MEDIA_ENT_T_DEVNODE_V4L,MEDIA_ENT_T_V4L2_VIDEO, <$i >a && mv a $i; done
+> 
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-Hi Bjorn, Rafael,
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
 
-Lorenzo pointed out very important problem we are having with PCI config 
-space access for ARM64. Please refer to the above discussion and add 
-your 2 cents. Can we forget about accessing PCI config space (for 
-Hardware Reduced profile) before PCI bus creation? If not, do you see a 
-way to use drivers/pci/access.c accessors here, like acpica change? Any 
-opinion is very appreciated.
-
-Regards,
-Tomasz
+> 
+> diff --git a/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml b/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
+> index 5872f8bbf774..910243d4edb8 100644
+> --- a/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
+> +++ b/Documentation/DocBook/media/v4l/media-ioc-enum-entities.xml
+> @@ -183,7 +183,7 @@
+>  	    <entry>Unknown device node</entry>
+>  	  </row>
+>  	  <row>
+> -	    <entry><constant>MEDIA_ENT_T_DEVNODE_V4L</constant></entry>
+> +	    <entry><constant>MEDIA_ENT_T_V4L2_VIDEO</constant></entry>
+>  	    <entry>V4L video, radio or vbi device node</entry>
+>  	  </row>
+>  	  <row>
+> diff --git a/drivers/media/platform/xilinx/xilinx-dma.c b/drivers/media/platform/xilinx/xilinx-dma.c
+> index 92e8116dc28f..88cd789cdaf7 100644
+> --- a/drivers/media/platform/xilinx/xilinx-dma.c
+> +++ b/drivers/media/platform/xilinx/xilinx-dma.c
+> @@ -193,7 +193,7 @@ static int xvip_pipeline_validate(struct xvip_pipeline *pipe,
+>  	while ((entity = media_entity_graph_walk_next(&graph))) {
+>  		struct xvip_dma *dma;
+>  
+> -		if (entity->type != MEDIA_ENT_T_DEVNODE_V4L)
+> +		if (entity->type != MEDIA_ENT_T_V4L2_VIDEO)
+>  			continue;
+>  
+>  		dma = to_xvip_dma(media_entity_to_video_device(entity));
+> diff --git a/drivers/media/v4l2-core/v4l2-dev.c b/drivers/media/v4l2-core/v4l2-dev.c
+> index 71a1b93b0790..44b330589787 100644
+> --- a/drivers/media/v4l2-core/v4l2-dev.c
+> +++ b/drivers/media/v4l2-core/v4l2-dev.c
+> @@ -912,7 +912,7 @@ int __video_register_device(struct video_device *vdev, int type, int nr,
+>  	/* Part 5: Register the entity. */
+>  	if (vdev->v4l2_dev->mdev &&
+>  	    vdev->vfl_type != VFL_TYPE_SUBDEV) {
+> -		vdev->entity.type = MEDIA_ENT_T_DEVNODE_V4L;
+> +		vdev->entity.type = MEDIA_ENT_T_V4L2_VIDEO;
+>  		vdev->entity.name = vdev->name;
+>  		vdev->entity.info.dev.major = VIDEO_MAJOR;
+>  		vdev->entity.info.dev.minor = vdev->minor;
+> diff --git a/drivers/media/v4l2-core/v4l2-subdev.c b/drivers/media/v4l2-core/v4l2-subdev.c
+> index 83615b8fb46a..e6e1115d8215 100644
+> --- a/drivers/media/v4l2-core/v4l2-subdev.c
+> +++ b/drivers/media/v4l2-core/v4l2-subdev.c
+> @@ -535,7 +535,7 @@ v4l2_subdev_link_validate_get_format(struct media_pad *pad,
+>  		return v4l2_subdev_call(sd, pad, get_fmt, NULL, fmt);
+>  	}
+>  
+> -	WARN(pad->entity->type != MEDIA_ENT_T_DEVNODE_V4L,
+> +	WARN(pad->entity->type != MEDIA_ENT_T_V4L2_VIDEO,
+>  	     "Driver bug! Wrong media entity type 0x%08x, entity %s\n",
+>  	     pad->entity->type, pad->entity->name);
+>  
+> 
