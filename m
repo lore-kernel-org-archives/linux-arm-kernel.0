@@ -1,52 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 31 Aug 2015 09:34:06 +0200
-Subject: [PATCH 3/3] ARM64: dts: mt8173: Add thermal/auxadc device nodes
-In-Reply-To: <1441006446-4558-1-git-send-email-s.hauer@pengutronix.de>
-References: <1441006446-4558-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1441006446-4558-4-git-send-email-s.hauer@pengutronix.de>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Mon, 31 Aug 2015 09:49:41 +0200
+Subject: [PATCH 3/7] dmaengine: st_fdma: Add STMicroelectronics FDMA
+ engine driver support
+In-Reply-To: <1436429872.20619.77.camel@tiscali.nl>
+References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
+ <1436371888-27863-4-git-send-email-peter.griffin@linaro.org>
+ <1436429872.20619.77.camel@tiscali.nl>
+Message-ID: <55E40715.1040204@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Hi Paul,
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 27237a1..ddacb86 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -151,6 +151,11 @@
- 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 		};
- 
-+		auxadc: auxadc at 11001000 {
-+			compatible = "mediatek,mt8173-auxadc";
-+			reg = <0 0x11001000 0 0x1000>;
-+		};
-+
- 		uart0: serial at 11002000 {
- 			compatible = "mediatek,mt8173-uart",
- 				     "mediatek,mt6577-uart";
-@@ -186,6 +191,18 @@
- 			clocks = <&uart_clk>;
- 			status = "disabled";
- 		};
-+
-+		thermal: thermal at 1100b000 {
-+			#thermal-sensor-cells = <1>;
-+			compatible = "mediatek,mt8173-thermal";
-+			reg = <0 0x1100b000 0 0x1000>;
-+			interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
-+			clock-names = "therm", "auxadc";
-+			resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
-+			mediatek,auxadc = <&auxadc>;
-+			mediatek,apmixedsys = <&apmixedsys>;
-+		};
- 	};
- };
- 
--- 
-2.5.0
+On 07/09/2015 10:17 AM, Paul Bolle wrote:
+>> >+static int __exit st_fdma_remove(struct platform_device *pdev)
+>> >+{
+>> >+	struct st_fdma_dev *fdev = platform_get_drvdata(pdev);
+>> >+
+>> >+	wait_for_completion(&fdev->fw_ack);
+>> >+
+>> >+	st_fdma_clk_disable(fdev);
+>> >+
+>> >+	return 0;
+>> >+}
+> Since this driver is built-in only this means st_fdma_remove() can never
+> be used, right?
+>
+
+It's not because a driver is built-in only that it does not need a 
+remove callback.
+An instance can be probed/removed any time via driver's bind/unbind 
+SysFS entries.
+Am I missing something?
+
+Kind regards,
+Maxime
