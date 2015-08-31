@@ -1,43 +1,30 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 31 Aug 2015 21:09:08 +0530
-Subject: [PATCH 1/2] usb: dwc3: support for pinctrl state change during system
- sleep
-In-Reply-To: <cover.1441029572.git.nsekhar@ti.com>
-References: <cover.1441029572.git.nsekhar@ti.com>
-Message-ID: <9dd70870cfee40154a37186d4cf3ae0e9a452cbd.1441029572.git.nsekhar@ti.com>
+Date: Mon, 31 Aug 2015 21:09:07 +0530
+Subject: [PATCH 0/2] AM437x: USB DWC3: save power during system sleep
+Message-ID: <cover.1441029572.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for USB DRVVBUS pinctrl state change during
-suspend/resume. This helps is conserving power during
-system sleep.
+Hi,
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- drivers/usb/dwc3/core.c | 4 ++++
- 1 file changed, 4 insertions(+)
+This series add support to DWC3 core to conserve
+power during system sleep by setting the USB
+DRVVBUS line to a lower power consuming state.
 
-diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-index ff5773c66b84..a5ffa66e39fb 100644
---- a/drivers/usb/dwc3/core.c
-+++ b/drivers/usb/dwc3/core.c
-@@ -1093,6 +1093,8 @@ static int dwc3_suspend(struct device *dev)
- 	phy_exit(dwc->usb2_generic_phy);
- 	phy_exit(dwc->usb3_generic_phy);
- 
-+	pinctrl_pm_select_sleep_state(dev);
-+
- 	return 0;
- }
- 
-@@ -1102,6 +1104,8 @@ static int dwc3_resume(struct device *dev)
- 	unsigned long	flags;
- 	int		ret;
- 
-+	pinctrl_pm_select_default_state(dev);
-+
- 	usb_phy_init(dwc->usb3_phy);
- 	usb_phy_init(dwc->usb2_phy);
- 	ret = phy_init(dwc->usb2_generic_phy);
+Tested to make sure USB host and device works on
+AM437x with v4.2. Tested for power savings on v4.1
+kernel where there is an implementation of suspend-
+to-RAM for AM437x available.
+
+Dave Gerlach (1):
+  ARM: dts: am437x-gp-evm: Add pinctrl states for usb
+
+Sekhar Nori (1):
+  usb: dwc3: support for pinctrl state change during system sleep
+
+ arch/arm/boot/dts/am437x-gp-evm.dts | 30 ++++++++++++++++++++++++++++++
+ drivers/usb/dwc3/core.c             |  4 ++++
+ 2 files changed, 34 insertions(+)
+
 -- 
 2.4.4.408.g16da57c
