@@ -1,80 +1,41 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Tue, 1 Sep 2015 19:46:05 +0800
-Subject: [PATCH v6 2/5] dt-bindings: Add a binding for Mediatek xHCI
- host controller
-In-Reply-To: <55D877DD.3010400@cogentembedded.com>
-References: <1440207911-17666-1-git-send-email-chunfeng.yun@mediatek.com>
- <1440207911-17666-3-git-send-email-chunfeng.yun@mediatek.com>
- <55D877DD.3010400@cogentembedded.com>
-Message-ID: <1441107965.26285.6.camel@mhfsdcap03>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 1 Sep 2015 06:49:45 -0500
+Subject: [PATCH v2 2/4] remoteproc: dt: Provide bindings for ST's Remote
+ Processor Controller driver
+In-Reply-To: <20150901104145.GS4796@x1>
+References: <1440757911-9120-1-git-send-email-lee.jones@linaro.org>
+ <1440757911-9120-3-git-send-email-lee.jones@linaro.org>
+ <CAL_JsqLuF2iAJhzjDh5CL-RgYk+H+N+D05wsWqUT01zvq9SOxA@mail.gmail.com>
+ <20150901104145.GS4796@x1>
+Message-ID: <CAL_JsqKJjs4-tewODq2R-vUT=Nr494emLvDA_GEC5xt=HJ3WoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi, 
-On Sat, 2015-08-22 at 16:23 +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 8/22/2015 4:45 AM, Chunfeng Yun wrote:
-> 
-> > add a DT binding documentation of xHCI host controller for the
-> > MT8173 SoC from Mediatek.
-> 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >   .../devicetree/bindings/usb/mt8173-xhci.txt        | 52 ++++++++++++++++++++++
-> >   1 file changed, 52 insertions(+)
-> >   create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> > new file mode 100644
-> > index 0000000..8e6e463
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> > @@ -0,0 +1,52 @@
-> > +mt65XX xHCI
-> 
->     The file is called mt8173-xhci.txt. Are you sure MT65xx should be here?
-> 
-I will revise it later.
+On Tue, Sep 1, 2015 at 5:41 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Mon, 31 Aug 2015, Rob Herring wrote:
+>
+>> On Fri, Aug 28, 2015 at 5:31 AM, Lee Jones <lee.jones@linaro.org> wrote:
+>> > Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> > ---
+>> >  .../devicetree/bindings/remoteproc/st-rproc.txt    | 35 ++++++++++++++++++++++
+>> >  1 file changed, 35 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/remoteproc/st-rproc.txt b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+>> > new file mode 100644
+>> > index 0000000..fbd7d78
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+>> > @@ -0,0 +1,35 @@
+>> > +STMicroelectronics Remote Processor
+>>
+>> "remote processor" is what STM datasheets call them? This seems like
+>> Linux naming is leaking in here.
+>
+> That's what this directory is called and the other binding within it.
 
-> > +
-> > +The device node for Mediatek SOC usb3.0 host controller
-> > +
-> > +Required properties:
-> > + - compatible : should contain "mediatek,mt8173-xhci"
-> > + - reg : specifies physical base address and size of the registers,
-> > +	the first one for MAC, the second for IPPC
-> > + - interrupts : interrupt used by the controller
-> > + - power-domains : a phandle to USB power domain node to control usb's
-> 
->     USB's -- be consistent, please.
-> 
-> > +	mtcmos
-> > + - vusb33-supply : regulator of usb avdd3.3v
-> > +
-> > + - clocks : a list of phandle + clock-specifier pairs, one for each
-> > +	entry in clock-names
-> > + - clock-names : must contain
-> > +	"sys_ck": for clock of xHCI MAC
-> > +	"wakeup_deb_p0": for usb wakeup debounce clock of port0
-> > +	"wakeup_deb_p0": for usb wakeup debounce clock of port1
-> 
->     USB.
-> 
-> > +
-> > + - phys : a list of phandle + phy specifier pairs
-> > + - usb3-lpm-capable : supports USB3 LPM
-> > + - mediatek,syscon-wakeup : phandle to syscon used to access usb wakeup
-> > +	control register
-> > + - mediatek,wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup
-> > +	mode; others means don't enable wakeup source of usb
-> 
->     "Others mean" and "USB".
-> 
-I will replace all 'usb' by "USB"
+That doesn't make it right or answer my question. Certainly our
+directory structure too closely mirrors the kernel.
 
-Thanks a lot, and sorry for later reply.
-> [...]
-> 
-> MBR, Sergei
-> 
+Rob
