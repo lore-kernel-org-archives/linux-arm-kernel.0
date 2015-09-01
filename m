@@ -1,183 +1,180 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Tue, 1 Sep 2015 20:17:14 +0530
-Subject: [PATCH] ARM: EXYNOS: reset KFC cores when cpu is up
-In-Reply-To: <55E4EFA3.1050007@samsung.com>
-References: <1441031111-6549-1-git-send-email-parkch98@gmail.com>
- <7hmvx785wx.fsf@deeprootsystems.com>
- <55E4D93E.4090307@osg.samsung.com> <55E4EFA3.1050007@samsung.com>
-Message-ID: <CAM4voamGcz_g+ONa-YaYMs0ZGgcPiXGGOeCV47U5nw_uu48+Jg@mail.gmail.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Tue, 1 Sep 2015 16:46:43 +0200
+Subject: [PATCH linux-next v9 3/3] mfd: atmel-flexcom: add a driver for Atmel
+ Flexible Serial Communication Unit
+In-Reply-To: <cover.1441118159.git.cyrille.pitchen@atmel.com>
+References: <cover.1441118159.git.cyrille.pitchen@atmel.com>
+Message-ID: <868664fac88a20ea02a7c5cd500259d2fa27d1ed.1441118159.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This driver supports the new Atmel Flexcom. The Flexcom is a wrapper which
+integrates one SPI controller, one I2C controller and one USART. Only one
+function can be enabled at a time. This driver selects the function once
+for all, when the Flexcom is probed, according to the value of the new
+"atmel,flexcom-mode" device tree property.
 
-On Tue, Sep 1, 2015 at 5:51 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On 01.09.2015 07:46, Javier Martinez Canillas wrote:
->>
->> [adding Krzysztof Kozlowski to cc list]
->>
->> Hello Kevin,
->>
->> On 09/01/2015 12:11 AM, Kevin Hilman wrote:
->>> Chanho Park <parkch98@gmail.com> writes:
->>>
->>>> The cpu booting of exynos5422 has been still broken since we discussed
->>>> it in last year[1]. This patch is inspired from odroid xu3
->>>> code(Actually, it was from samsung exynos vendor kernel)[2]. This weird
->>>> reset code was founded exynos5420 octa cores series SoCs and only
->>>> required for the first boot core is the little core(kingfisher core).
->>>> Some of the exynos5420 boards and all of the exynos5422 boards will be
->>>> required this code.
->>>> There is two ways to check the little core is the first cpu. One is
->>>> checking GPG2CON[1] gpio value and the other is checking the cluster
->>>> number of the first cpu. I selected the latter because it's more easier
->>>> than the former.
->>>>
->>>> Changes since RFC[3]:
->>>> - drop checking soc_is_exynos5800 to extend this codes to
->>>> exynos5420/5422 boards.
->>>> - kfc cores will be reset only if the cpu0 is kfc core.
->>>> - Rebase top of the kukjin's for-next branch
->>>>
->>>> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350632.html
->>>> [2]:https://patchwork.kernel.org/patch/6782891/
->>>> [3]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/356610.html
->>>>
->>>> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
->>>> Cc: Chanwoo Choi <cw00.choi@samsung.com>
->>>> Cc: Kevin Hilman <khilman@kernel.org>
->>>> Cc: Heesub Shin <heesub.shin@samsung.com>
->>>> Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
->>>> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
->>>> Cc: Przemyslaw Marczak <p.marczak@samsung.com>
->>>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>> Signed-off-by: Chanho Park <parkch98@gmail.com>
->>>
->>>> ---
->>>>  arch/arm/mach-exynos/mcpm-exynos.c | 18 +++++++++++++++++-
->>>>  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
->>>>  2 files changed, 23 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
->>>> index 9bdf547..5b69ed2 100644
->>>> --- a/arch/arm/mach-exynos/mcpm-exynos.c
->>>> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
->>>> @@ -20,6 +20,7 @@
->>>>  #include <asm/cputype.h>
->>>>  #include <asm/cp15.h>
->>>>  #include <asm/mcpm.h>
->>>> +#include <asm/smp_plat.h>
->>>>
->>>>  #include "regs-pmu.h"
->>>>  #include "common.h"
->>>> @@ -70,7 +71,22 @@ static int exynos_cpu_powerup(unsigned int cpu, unsigned int cluster)
->>>>             cluster >= EXYNOS5420_NR_CLUSTERS)
->>>>             return -EINVAL;
->>>>
->>>> -   exynos_cpu_power_up(cpunr);
->>>> +   if (!exynos_cpu_power_state(cpunr)) {
->>>> +           exynos_cpu_power_up(cpunr);
->>>> +
->>>> +           /* This assumes the cluster number of the eagle is 0 and the
->>>> +            * kfc is 1. When the system was booted from the kfc core,
->>>> +            * they should be reset */
->>>
->>> minor: fix multi-line comment style (search for 'multi-line' in
->>> Documentation/CodingStyle)
->>>
->>> Also minor, but personally, I prefer seeing A15/A7 instead of eagle/KFC
->>> as those names are fading from my memory and I can't seem to remember
->>> which one is which. :/
->>>
->>>> +           if (cluster &&
->>>> +               cluster == MPIDR_AFFINITY_LEVEL(cpu_logical_map(0), 1)) {
->>>> +                   while (!pmu_raw_readl(S5P_PMU_SPARE2))
->>>> +                           udelay(10);
->>>> +
->>>> +                   pmu_raw_writel(EXYNOS5420_KFC_CORE_RESET(cpu),
->>>> +                                   EXYNOS_SWRESET);
->>>> +           }
->>>> +   }
->>>> +
->>>>     return 0;
->>>>  }
->>>
->>> I tested this on top of mainline (v4.2) using exynos_defconfig (with
->>> BL_SWITCHER disabled) and I now see all 8 CPUs booting.  Nice!
->>>
->>> Tested-by: Kevin Hilman <khilman@linaro.org>
->>>
->>> Also, please note that this does not fix another fundamental problem
->>> with this board in that the firmware puts CCI into secure mode, so
->>> linux/MCPM cannot manage it, causing hangs whenever CPUidle is enabled
->>> (because b.L cpuidle driver tries to use MCPM, which needs to manage
->>> CCI.)
->>>
->>> In order for this to not hang when using CPUidle, the following patch is
->>> also needed.
->>>
->>> Kevin
->>>
->>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->>> b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->>> index 78e6a502f320..7891bd05bf8e 100644
->>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->>> @@ -49,3 +49,11 @@
->>>                 shunt-resistor = <10000>;
->>>         };
->>>  };
->>> +
->>> +/*
->>> + * Secure firmware prevents CCI access/usage from linux, so must be
->>> disabled
->>> + * to prevent usage by MCPM.
->>> + */
->>> +&cci {
->>> +       status = "disabled";
->>> +};
->>>
->>>
->>
->> I posted a similar patch that instead disabling CCI for the XU3 board,
->> it disables in exynos5422-odroidxu3-common.dtsi since all Exynos5422
->> Odroid boards have the same broken firmware and so the same issue:
->>
->> https://lkml.org/lkml/2015/8/29/59
->>
->> Krzysztof tested it on an Odroid XU3 Lite and reported that disabling
->> CCI caused some CPUs to fail to boot even with $subject applied:
->>
->> https://lkml.org/lkml/2015/8/29/65
->
-> Indeed. On Odroid XU3 Chanho's patch gives me 8 CPUs up. Disabling CCI
-> causes fails on CPU{5,6,7} (Cortex-A15).
+This driver has chosen to present the Flexcom to the system as a MFD so
+the implementation is seamless for the existing Atmel SPI, I2C and USART
+drivers.
 
-Chanho's patch is for the exynos mcpm back-end. However, when we
-disable CCI the mcpm code is bypassed and we default to the code in
-exynos' platsmp.c/firmware.c. If the A7s were failing to boot-up then
-the reason could have been that Chanho's workaround was not being
-executed after applying the CCI disablement patch.
-According to the comments the A15s are not booting and so the
-exynos_boot_secondary function needs to be checked further.
+Also the Flexcom embeds FIFOs: the latest patches of the SPI, I2C and
+USART drivers take advantage of this new feature.
 
-Regards,
-Abhilash
->
-> Best regards,
-> Krzysztof
->
->>
->> Did you succeed booting all CPUs with CONFIG_ARM_BIG_LITTLE_CPUIDLE
->> enabled and CCI disabled in the the Odroid XU3 DTS?
->>
->> Best regards,
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/mfd/Kconfig         |  11 +++++
+ drivers/mfd/Makefile        |   1 +
+ drivers/mfd/atmel-flexcom.c | 104 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 116 insertions(+)
+ create mode 100644 drivers/mfd/atmel-flexcom.c
+
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 99d63675f073..87e84e7c71da 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -60,6 +60,17 @@ config MFD_AAT2870_CORE
+ 	  additional drivers must be enabled in order to use the
+ 	  functionality of the device.
+ 
++config MFD_ATMEL_FLEXCOM
++	tristate "Atmel Flexcom (Flexible Serial Communication Unit)"
++	select MFD_CORE
++	depends on OF
++	help
++	  Select this to get support for Atmel Flexcom. This is a wrapper
++	  which embeds a SPI controller, a I2C controller and a USART. Only
++	  one function can be used at a time. The choice is done at boot time
++	  by the probe function of this MFD driver according to a device tree
++	  property.
++
+ config MFD_ATMEL_HLCDC
+ 	tristate "Atmel HLCDC (High-end LCD Controller)"
+ 	select MFD_CORE
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index a59e3fcc8626..f2383e0d1760 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -164,6 +164,7 @@ obj-$(CONFIG_MFD_SPMI_PMIC)	+= qcom-spmi-pmic.o
+ obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+ obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
+ obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
++obj-$(CONFIG_MFD_ATMEL_FLEXCOM)	+= atmel-flexcom.o
+ obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
+ obj-$(CONFIG_MFD_INTEL_LPSS)	+= intel-lpss.o
+ obj-$(CONFIG_MFD_INTEL_LPSS_PCI)	+= intel-lpss-pci.o
+diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
+new file mode 100644
+index 000000000000..e8e67be6b493
+--- /dev/null
++++ b/drivers/mfd/atmel-flexcom.c
+@@ -0,0 +1,104 @@
++/*
++ * Driver for Atmel Flexcom
++ *
++ * Copyright (C) 2015 Atmel Corporation
++ *
++ * Author: Cyrille Pitchen <cyrille.pitchen@atmel.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/module.h>
++#include <linux/types.h>
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <dt-bindings/mfd/atmel-flexcom.h>
++
++/* I/O register offsets */
++#define FLEX_MR		0x0	/* Mode Register */
++#define FLEX_VERSION	0xfc	/* Version Register */
++
++/* Mode Register bit fields */
++#define FLEX_MR_OPMODE_OFFSET	(0)  /* Operating Mode */
++#define FLEX_MR_OPMODE_MASK	(0x3 << FLEX_MR_OPMODE_OFFSET)
++#define FLEX_MR_OPMODE(opmode)	(((opmode) << FLEX_MR_OPMODE_OFFSET) &	\
++				 FLEX_MR_OPMODE_MASK)
++
++
++static int atmel_flexcom_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct clk *clk;
++	struct resource *res;
++	void __iomem *base;
++	u32 opmode;
++	int err;
++
++	err = of_property_read_u32(np, "atmel,flexcom-mode", &opmode);
++	if (err)
++		return err;
++
++	if (opmode < ATMEL_FLEXCOM_MODE_USART ||
++	    opmode > ATMEL_FLEXCOM_MODE_TWI)
++		return -EINVAL;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++
++	clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	err = clk_prepare_enable(clk);
++	if (err)
++		return err;
++
++	/*
++	 * Set the Operating Mode in the Mode Register: only the selected device
++	 * is clocked. Hence, registers of the other serial devices remain
++	 * inaccessible and are read as zero. Also the external I/O lines of the
++	 * Flexcom are muxed to reach the selected device.
++	 */
++	writel(FLEX_MR_OPMODE(opmode), base + FLEX_MR);
++
++	clk_disable_unprepare(clk);
++
++	return of_platform_populate(np, NULL, NULL, &pdev->dev);
++}
++
++static const struct of_device_id atmel_flexcom_of_match[] = {
++	{ .compatible = "atmel,sama5d2-flexcom" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, atmel_flexcom_of_match);
++
++static struct platform_driver atmel_flexcom_driver = {
++	.probe	= atmel_flexcom_probe,
++	.driver	= {
++		.name		= "atmel_flexcom",
++		.of_match_table	= atmel_flexcom_of_match,
++	},
++};
++
++module_platform_driver(atmel_flexcom_driver);
++
++MODULE_AUTHOR("Cyrille Pitchen <cyrille.pitchen@atmel.com>");
++MODULE_DESCRIPTION("Atmel Flexcom MFD driver");
++MODULE_LICENSE("GPL v2");
+-- 
+1.8.2.2
