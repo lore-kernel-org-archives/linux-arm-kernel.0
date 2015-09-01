@@ -1,74 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  1 Sep 2015 10:08:53 +0100
-Subject: [PATCH] irqchip/gic: Fix EOImode setting for non-DT/ACPI systems
-Message-ID: <1441098533-31523-1-git-send-email-marc.zyngier@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 1 Sep 2015 10:09:16 +0100
+Subject: [PATCH v3 4/6] [media] c8sectpfe: Update binding to reset-gpios
+In-Reply-To: <CABxcv=nM7MBK2EcD1-YK5y0J1hBtxV+6Wu812C23pNkAzigu7g@mail.gmail.com>
+References: <1440784362-31217-1-git-send-email-peter.griffin@linaro.org>
+ <1440784362-31217-5-git-send-email-peter.griffin@linaro.org>
+ <CABxcv=nM7MBK2EcD1-YK5y0J1hBtxV+6Wu812C23pNkAzigu7g@mail.gmail.com>
+Message-ID: <20150901090916.GM4796@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Non-DT/ACPI systems call directly into the GIC driver at init time.
-Turns out 0b996fd35957 ("irqchip/GIC: Convert to EOImode == 1")
-breaks old non firmware-driven platforms, as the driver only
-works out the capability of the platform on the DT/ACPI paths.
+On Tue, 01 Sep 2015, Javier Martinez Canillas wrote:
+> On Fri, Aug 28, 2015 at 7:52 PM, Peter Griffin <peter.griffin@linaro.org> wrote:
+> > gpio.txt documents that GPIO properties should be named
+> > "[<name>-]gpios", with <name> being the purpose of this
+> > GPIO for the device.
+> >
+> > This change has been done as one atomic commit.
+> >
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > Acked-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt | 6 +++---
+> >  arch/arm/boot/dts/stihxxx-b2120.dtsi                          | 4 ++--
+> >  drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c         | 2 +-
+> >  3 files changed, 6 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+> > index d4def76..e70d840 100644
+> > --- a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+> > +++ b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+> > @@ -35,7 +35,7 @@ Required properties (tsin (child) node):
+> >
+> >  - tsin-num     : tsin id of the InputBlock (must be between 0 to 6)
+> >  - i2c-bus      : phandle to the I2C bus DT node which the demodulators & tuners on this tsin channel are connected.
+> > -- rst-gpio     : reset gpio for this tsin channel.
+> > +- reset-gpios  : reset gpio for this tsin channel.
+> 
+> The documentation is a bit outdated, the GPIO subsystem supports both
+> -gpio and -gpios, see commit:
+> 
+> dd34c37aa3e8 ("gpio: of: Allow -gpio suffix for property names")
+> 
+> So it makes sense to me to use -gpio instead of -gpios in this case
+> since is a single GPIO. Also rst is already a descriptive name since
+> that's how many datasheets name a reset pin. I'm not saying I'm
+> against this patch, just pointing out since the commit message is a
+> bit misleading.
 
-Fix this thinko by forcing EOImode==0 on non-DT platforms,
-which are not capable of supporting a hypervisor anyway.
+As I suggested this patch, I feel I must comment.
 
-Tested-by: Guenter Roeck <linux@roeck-us.net>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic.c | 19 ++++++++++++++++---
- 1 file changed, 16 insertions(+), 3 deletions(-)
+My order of preference would be:
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 72bf81b..e6b7ed5 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -993,7 +993,7 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
- 	.xlate = gic_irq_domain_xlate,
- };
- 
--void __init gic_init_bases(unsigned int gic_nr, int irq_start,
-+static void __init __gic_init_bases(unsigned int gic_nr, int irq_start,
- 			   void __iomem *dist_base, void __iomem *cpu_base,
- 			   u32 percpu_offset, struct device_node *node)
- {
-@@ -1103,6 +1103,19 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 	gic_pm_init(gic);
- }
- 
-+void __init gic_init_bases(unsigned int gic_nr, int irq_start,
-+			   void __iomem *dist_base, void __iomem *cpu_base,
-+			   u32 percpu_offset, struct device_node *node)
-+{
-+	/*
-+	 * Non-DT/ACPI systems won't run a hypervisor, so let's not
-+	 * bother with these...
-+	 */
-+	static_key_slow_dec(&supports_deactivate);
-+	__gic_init_bases(gic_nr, irq_start, dist_base, cpu_base,
-+			 percpu_offset, node);
-+}
-+
- #ifdef CONFIG_OF
- static int gic_cnt __initdata;
- 
-@@ -1137,7 +1150,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
- 	if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
- 		percpu_offset = 0;
- 
--	gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, node);
-+	__gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset, node);
- 	if (!gic_cnt)
- 		gic_init_physaddr(node);
- 
-@@ -1265,7 +1278,7 @@ gic_v2_acpi_init(struct acpi_table_header *table)
- 	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
- 	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
- 	 */
--	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
-+	__gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
- 	irq_set_default_host(gic_data[0].domain);
- 
- 	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+ reset-gpio
+ reset-gpios
+ rst-gpio
+ rst-gpios
+
+This current patch is No2, so it's okay to stay IMHO.
+
 -- 
-2.1.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
