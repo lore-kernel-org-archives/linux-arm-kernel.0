@@ -1,21 +1,40 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Tue, 01 Sep 2015 10:04:33 +0800
-Subject: ARM: pxa: build error in arch/arm/plat-pxa/ssp.c
-Message-ID: <1441073073.12012.3.camel@ingics.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 1 Sep 2015 09:27:13 +0530
+Subject: about system time incorrect after changing cpu frequency
+In-Reply-To: <CAOVJa8GTDj3UJpgUd4nH1wknUKa6fgac=1SsqC8g=UCG0MGuDw@mail.gmail.com>
+References: <CAOVJa8GTDj3UJpgUd4nH1wknUKa6fgac=1SsqC8g=UCG0MGuDw@mail.gmail.com>
+Message-ID: <CAOh2x=ky8_uwqvdH-krKxgMSby5jgovJp7odK6x=MpqNL+YoGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  CC [M]  arch/arm/plat-pxa/ssp.o
-arch/arm/plat-pxa/ssp.c:110:52: error: 'LPSS_SSP' undeclared here (not in a function)
-scripts/Makefile.build:264: recipe for target 'arch/arm/plat-pxa/ssp.o' failed
-make[1]: *** [arch/arm/plat-pxa/ssp.o] Error 1
-Makefile:965: recipe for target 'arch/arm/plat-pxa' failed
-make: *** [arch/arm/plat-pxa] Error 2
+On Mon, Aug 31, 2015 at 7:33 PM, vichy <vichy.kuo@gmail.com> wrote:
+> hi all:
+> My platform is like below:
+> 1. single core Cortex A9
+> 2. use global timer for system timer
+>
+> after I porting cpu frequency driver based on snow ball, the cpu
+> frequency did change as I expected.
+> But the system time is incorrect( since pherial clk is got from cpu frequency)
+>
+> for example:
+> a) cpu 1G (pherial clk = 250M) --> sleep 1 sec (OK)
+> b) cpu 500M  (pherial clk = 125M) --> sleep 1 sec (will be measured as 2 sec)
+>
+> I try to call below 2 functions to change the frequency of clocksource
+> and clockevent, but the above b) sleep time is still incorrect when
+> cpu runs in 500Mhz.
+>     clockevents_update_freq(this_cpu_ptr(gt_evt), gt_clk_rate);
+>     __clocksource_updatefreq_hz(&gt_clocksource, gt_clk_rate);
+>
+> in Arm cortex A9 single core system with Global timer as system timer,
+> is there any kernel api to change system timer period when cpu/pherial
+> frequency change?
+>
+> appreciate your kind help in advance,
 
+The list cpufreq at vger.kernel.org is the wrong list for posting cpufreq queries
+as we have moved to Linux PM list <linux-pm@vger.kernel.org> list now.
 
-The build error is introduced by:
-commit 03fbf488cece461468d3abb795f5e5f055e00040
-Author: Jarkko Nikula <jarkko.nikula@linux.intel.com>
-Date:   Thu Jun 4 16:55:10 2015 +0300
-
-    spi: pxa2xx: Differentiate Intel LPSS types
+Try unsetting CPUFREQ_CONST_LOOPS flag in your driver, if you have it
+set.
