@@ -1,83 +1,85 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 1 Sep 2015 17:41:12 +0300
-Subject: [PATCH 2/2] arm64: don't load 32-bit binaries if platform has no
- aarch32_el0
-In-Reply-To: <1441118472-3513-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1441118472-3513-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1441118472-3513-3-git-send-email-ynorov@caviumnetworks.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Tue, 1 Sep 2015 16:46:40 +0200
+Subject: [PATCH linux-next v9 0/3] mfd: flexcom: add a driver for Flexcom
+Message-ID: <cover.1441118159.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kernel option COMPAT defines the ability of executing aarch32 binaries.
-Some platforms does not support aarch32 mode, and so cannot execute that
-binaries. But we cannot just disable COMPAT for them because the same
-kernel binary may be used by multiple platforms.
+ChangeLog
 
-In this patch, system_supports_aarch32_el0() is introduced to detect
-aarch32 support at run-time.
+v9:
+- go back to v5 (use the new "atmel,flexcom-mode" DT property).
+- fix the name of the spi node in the DT example: from spi at f8034400 to
+  spi at 400
+- align the fields of the struct platform_driver atmel_flexcom_driver as
+  suggested by Lee Jones.
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- arch/arm64/include/asm/cpufeature.h | 1 +
- arch/arm64/include/asm/elf.h        | 6 ++++--
- arch/arm64/kernel/cpuinfo.c         | 9 +++++++++
- 3 files changed, 14 insertions(+), 2 deletions(-)
+v8:
+- fix the name of the spi node in the DT example: from spi at f8034400 to
+  spi at 2,0
+- use the return code of op_property_read_u32_index() instead of -EINVAL
+  to report error.
+- add Acked-by from Nicolas Ferre
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 20cdc26..d24ea15 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -81,6 +81,7 @@ void check_local_cpu_errata(void);
- void check_local_cpu_features(void);
- bool cpu_supports_mixed_endian_el0(void);
- bool system_supports_mixed_endian_el0(void);
-+bool system_supports_aarch32_el0(void);
- 
- #endif /* __ASSEMBLY__ */
- 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index faad6df..461897b 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -21,6 +21,7 @@
- /*
-  * ELF register definitions..
-  */
-+#include <asm/cpufeature.h>
- #include <asm/ptrace.h>
- #include <asm/user.h>
- 
-@@ -173,8 +174,9 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
- 
- /* AArch32 EABI. */
- #define EF_ARM_EABI_MASK		0xff000000
--#define compat_elf_check_arch(x)	(((x)->e_machine == EM_ARM) && \
--					 ((x)->e_flags & EF_ARM_EABI_MASK))
-+#define compat_elf_check_arch(x)	(system_supports_aarch32_el0()	\
-+					&& ((x)->e_machine == EM_ARM)	\
-+					&& ((x)->e_flags & EF_ARM_EABI_MASK))
- 
- #define compat_start_thread		compat_start_thread
- #define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 75d5a86..95d953f 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -79,6 +79,15 @@ bool system_supports_mixed_endian_el0(void)
- 	return mixed_endian_el0;
- }
- 
-+#define AARCH64		1
-+#define AARCH32_64	2
-+bool system_supports_aarch32_el0(void)
-+{
-+	struct cpuinfo_arm64 *info = this_cpu_ptr(&cpu_data);
-+	u64 arm64_el0 = info->reg_id_aa64pfr0 & 0xf;
-+	return arm64_el0 == AARCH32_64;
-+}
-+
- static void update_mixed_endian_el0_support(struct cpuinfo_arm64 *info)
- {
- 	mixed_endian_el0 &= id_aa64mmfr0_mixed_endian_el0(info->reg_id_aa64mmfr0);
+v7:
+- read the operating mode from the very first u32 of the reg property from
+  the first available child node (should be unique).
+- update the DT bindings documentation accordingly.
+
+v6:
+- select the operating mode according to the "compatible" DT property of
+  the first available child node (should be unique).
+- remove the "atmel,flexcom-mode" DT property so the need of a header file
+  defining macros for the possible values of this deprecated property.
+
+v5:
+- create a header file containing macros used by DT bindings
+- use numeric constants instead of strings to select the Flexcom mode
+- change the license to "GPL v2"
+- update the DT binding documentation to make it more readable and add
+  references to USART, SPI and I2C DT binding documentations. remove the
+  useless label in the Example section.
+- change the register prefix from FX_ to FLEX_ to match the Flexcom
+  programmer datasheet.
+- rename some variables to make them more understandable.
+
+v4:
+- check clk_prepare_enable() return code in atmel_flexcom_probe()
+- add a commit message to the DT binding patch
+
+v3:
+- remove MODULE_ALIAS()
+- add Acked-by from Boris Brezillon and Alexandre Belloni
+
+v2:
+- enhance the documentation of DT bindings and change the way the "ranges"
+  property is used.
+- replace __raw_readl() and __raw_writel() by readl() and writel().
+- change the module license to "GPL" for v2 or later
+- print the selected flexcom mode after the hardware version
+
+v1:
+This series of patches a support to the Atmel Flexcom, a wrapper which
+integrates an USART, a SPI controller and a TWI controller. Only one
+peripheral can be used at a time. The active function is selected though
+the Flexcom Mode Register.
+
+Cyrille Pitchen (3):
+  mfd: atmel-flexcom: create include file with macros used by DT
+    bindings
+  mfd: devicetree: add bindings for Atmel Flexcom
+  mfd: atmel-flexcom: add a driver for Atmel Flexible Serial
+    Communication Unit
+
+ .../devicetree/bindings/mfd/atmel-flexcom.txt      |  67 +++++++++++++
+ drivers/mfd/Kconfig                                |  11 +++
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/atmel-flexcom.c                        | 104 +++++++++++++++++++++
+ include/dt-bindings/mfd/atmel-flexcom.h            |  16 ++++
+ 5 files changed, 199 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+ create mode 100644 drivers/mfd/atmel-flexcom.c
+ create mode 100644 include/dt-bindings/mfd/atmel-flexcom.h
+
 -- 
-2.1.4
+1.8.2.2
