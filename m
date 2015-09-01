@@ -1,37 +1,79 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 1 Sep 2015 08:58:11 +0100
-Subject: [PATCH v3 4/6] [media] c8sectpfe: Update binding to reset-gpios
-In-Reply-To: <CAL_JsqLYes5L2Bg0R45ui24yYWgHzFSLgBPajieSLgLz09=1aw@mail.gmail.com>
+Date: Tue, 1 Sep 2015 08:59:19 +0100
+Subject: [PATCH v3 2/6] ARM: DT: STi: STiH407: Add c8sectpfe LinuxDVB DT
+ node.
+In-Reply-To: <1440784362-31217-3-git-send-email-peter.griffin@linaro.org>
 References: <1440784362-31217-1-git-send-email-peter.griffin@linaro.org>
- <1440784362-31217-5-git-send-email-peter.griffin@linaro.org>
- <CAL_JsqLYes5L2Bg0R45ui24yYWgHzFSLgBPajieSLgLz09=1aw@mail.gmail.com>
-Message-ID: <20150901075811.GK4796@x1>
+ <1440784362-31217-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20150901075919.GL4796@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 31 Aug 2015, Rob Herring wrote:
+On Fri, 28 Aug 2015, Peter Griffin wrote:
 
-> On Fri, Aug 28, 2015 at 12:52 PM, Peter Griffin
-> <peter.griffin@linaro.org> wrote:
-> > gpio.txt documents that GPIO properties should be named
-> > "[<name>-]gpios", with <name> being the purpose of this
-> > GPIO for the device.
-> >
-> > This change has been done as one atomic commit.
+> This patch adds in the required DT node for the c8sectpfe
+> Linux DVB demux driver which allows the tsin channels
+> to be used on an upstream kernel.
 > 
-> dtb and kernel updates are not necessarily atomic, so you are breaking
-> compatibility with older dtbs. You should certainly highlight that in
-> the commit message.
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  arch/arm/boot/dts/stihxxx-b2120.dtsi | 35 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
 
-Good idea.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-> I only point this out. I'll leave it to platform
-> maintainers whether or not this breakage is acceptable.
-
-This driver is new.  The 'original' bindings are in next.  So this
-binding is not even close to being ABI.
-
-[...]
+> diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> index 62994ae..f9fca10 100644
+> --- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> +++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> @@ -6,6 +6,9 @@
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>   */
+> +
+> +#include <dt-bindings/clock/stih407-clks.h>
+> +#include <dt-bindings/media/c8sectpfe.h>
+>  / {
+>  	soc {
+>  		sbc_serial0: serial at 9530000 {
+> @@ -85,5 +88,37 @@
+>  			status = "okay";
+>  		};
+>  
+> +		demux at 08a20000 {
+> +			compatible	= "st,stih407-c8sectpfe";
+> +			status		= "okay";
+> +			reg		= <0x08a20000 0x10000>,
+> +					  <0x08a00000 0x4000>;
+> +			reg-names	= "c8sectpfe", "c8sectpfe-ram";
+> +			interrupts	= <GIC_SPI 34 IRQ_TYPE_NONE>,
+> +					  <GIC_SPI 35 IRQ_TYPE_NONE>;
+> +			interrupt-names	= "c8sectpfe-error-irq",
+> +					  "c8sectpfe-idle-irq";
+> +			pinctrl-0	= <&pinctrl_tsin0_serial>;
+> +			pinctrl-1	= <&pinctrl_tsin0_parallel>;
+> +			pinctrl-2	= <&pinctrl_tsin3_serial>;
+> +			pinctrl-3	= <&pinctrl_tsin4_serial_alt3>;
+> +			pinctrl-4	= <&pinctrl_tsin5_serial_alt1>;
+> +			pinctrl-names	= "tsin0-serial",
+> +					  "tsin0-parallel",
+> +					  "tsin3-serial",
+> +					  "tsin4-serial",
+> +					  "tsin5-serial";
+> +			clocks		= <&clk_s_c0_flexgen CLK_PROC_STFE>;
+> +			clock-names	= "c8sectpfe";
+> +
+> +			/* tsin0 is TSA on NIMA */
+> +			tsin0: port at 0 {
+> +				tsin-num	= <0>;
+> +				serial-not-parallel;
+> +				i2c-bus		= <&ssc2>;
+> +				rst-gpio	= <&pio15 4 GPIO_ACTIVE_HIGH>;
+> +				dvb-card	= <STV0367_TDA18212_NIMA_1>;
+> +			};
+> +		};
+>  	};
+>  };
 
 -- 
 Lee Jones
