@@ -1,149 +1,176 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 01 Sep 2015 09:58:45 -0700
-Subject: Porting MIPS IRQ handler to ARM
-In-Reply-To: <55E5CED8.7000408@free.fr>
-References: <55E5CED8.7000408@free.fr>
-Message-ID: <55E5D945.3040504@gmail.com>
+From: Andrew.Pinski@caviumnetworks.com (Pinski, Andrew)
+Date: Tue, 1 Sep 2015 17:06:32 +0000
+Subject: [PATCHv2] ARM64: Add AT_ARM64_MIDR to the aux vector
+In-Reply-To: <A9115CAF-0C57-4810-97F6-6245E7D0CE48@gmail.com>
+References: <1440873982-44062-1-git-send-email-apinski@cavium.com>
+ <20150901163304.GC16430@leverpostej>,
+ <A9115CAF-0C57-4810-97F6-6245E7D0CE48@gmail.com>
+Message-ID: <4C8DD5E0-E1EA-40C6-B947-72189241023C@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/15 09:14, Mason wrote:
-> Hello,
-> 
-> I'm trying to port to my ARM platform: IRQ handling code written for MIPS.
-> 
-> https://github.com/mansr/linux-tangox/blob/master/drivers/irqchip/irq-tangox.c
-
-On MIPS, you usually have a built-in interrupt controller in the CPU off
-which you can have as many interrupt controllers which are SoC-specific.
-This means that you typically register a cascading handler for one of
-the MIPS HW interrupts (typically 2 and 3).
-
-Calling clear_c0_status() and write_c0_status() in tangox_irq_handler()
-sounds like a layering violation here, this should be taken care of by
-the interrupt code once proper parenting between the MIPS IRQ controller
-and your tangox controller is established.
-
-You could take a look at drivers/irqchip/irq-bcm7038-l1.c and
-arch/mips/bmips/irq.c for an example of an interrupt controller that
-works on both ARM and MIPS.
-
-> 
-> static void tangox_irq_handler(unsigned int irq, struct irq_desc *desc)
-> {
-> 	struct irq_domain *dom = irq_desc_get_handler_data(desc);
-> 	struct tangox_irq_chip *chip = dom->host_data;
-> 	unsigned int status, status_hi;
-> 	unsigned int sr = 0;
-> 
-> 	status = intc_readl(chip, chip->ctl + IRQ_STATUS);
-> 	status_hi = intc_readl(chip, chip->ctl + IRQ_CTL_HI + IRQ_STATUS);
-> 
-> 	if (!(status | status_hi)) {
-> 		spurious_interrupt();
-> 		return;
-> 	}
-> 
-> 	if (chip->mask)
-> 		sr = clear_c0_status(chip->mask);
-> 
-> 	tangox_dispatch_irqs(dom, status, 0);
-> 	tangox_dispatch_irqs(dom, status_hi, 32);
-> 
-> 	if (chip->mask)
-> 		write_c0_status(sr);
-> }
-> 
->   CC      drivers/irqchip/irq-tangox.o
-> drivers/irqchip/irq-tangox.c: In function 'tangox_irq_handler':
-> drivers/irqchip/irq-tangox.c:85:3: error: implicit declaration of function 'spurious_interrupt' [-Werror=implicit-function-declaration]
->    spurious_interrupt();
->    ^
-> drivers/irqchip/irq-tangox.c:90:3: error: implicit declaration of function 'clear_c0_status' [-Werror=implicit-function-declaration]
->    sr = clear_c0_status(chip->mask);
->    ^
-> drivers/irqchip/irq-tangox.c:96:3: error: implicit declaration of function 'write_c0_status' [-Werror=implicit-function-declaration]
->    write_c0_status(sr);
->    ^
-> drivers/irqchip/irq-tangox.c: In function 'tangox_irq_init':
-> drivers/irqchip/irq-tangox.c:205:41: error: 'STATUSB_IP2' undeclared (first use in this function)
->   chip->mask = ((1 << (irq - 2)) - 1) << STATUSB_IP2;
->                                          ^
-> drivers/irqchip/irq-tangox.c:205:41: note: each undeclared identifier is reported only once for each function it appears in
-> 
-> 
-> In arch/mips/kernel/irq.c
-> 
-> atomic_t irq_err_count;
-> 
-> int arch_show_interrupts(struct seq_file *p, int prec)
-> {
-> 	seq_printf(p, "%*s: %10u\n", prec, "ERR", atomic_read(&irq_err_count));
-> 	return 0;
-> }
-> 
-> asmlinkage void spurious_interrupt(void)
-> {
-> 	atomic_inc(&irq_err_count);
-> }
-> 
-> 
-> In arch/arm/kernel/irq.c
-> 
-> unsigned long irq_err_count;
-> 
-> int arch_show_interrupts(struct seq_file *p, int prec)
-> {
-> #ifdef CONFIG_FIQ
-> 	show_fiq_list(p, prec);
-> #endif
-> #ifdef CONFIG_SMP
-> 	show_ipi_list(p, prec);
-> #endif
-> 	seq_printf(p, "%*s: %10lu\n", prec, "Err", irq_err_count);
-> 	return 0;
-> }
-> 
-> static inline void ack_bad_irq(int irq)
-> {
-> 	extern unsigned long irq_err_count;
-> 	irq_err_count++;
-> 	pr_crit("unexpected IRQ trap at vector %02x\n", irq);
-> }
-> 
-> 
-> Replacing spurious_interrupt() with ack_bad_irq() doesn't feel correct.
-> (Writing to the console from an IRQ handler can't be good?)
-> 
-> It's the same interrupt controller hardware on the MIPS and ARM platforms.
-> Are there platform-agnostic / generic alternatives?
-> 
-> 
-> In arch/mips/include/asm/mipsregs.h
-> 
-> /*
->  * Manipulate bits in a c0 register.
->  */
-> #define __BUILD_SET_C0(name)
-> set_c0_##name
-> clear_c0_##name
-> change_c0_##name
-> __BUILD_SET_C0(status)
-> 
-> #define read_c0_status()	__read_32bit_c0_register($12, 0)
-> #define write_c0_status(val)	__write_32bit_c0_register($12, 0, val)
-> 
-> Obviously very platform-specific...
-> Guess I'll have to take a look at the MIPS programmer's guide.
-> 
-> Regards.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
 
 
--- 
-Florian
+
+
+> On Sep 2, 2015, at 12:51 AM, "pinskia at gmail.com" <pinskia@gmail.com> wrote:
+> 
+> 
+> 
+> 
+> 
+>> On Sep 2, 2015, at 12:33 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> 
+>> Hi,
+>> 
+>>> On Sat, Aug 29, 2015 at 07:46:22PM +0100, Andrew Pinski wrote:
+>>> It is useful to pass down MIDR register down to userland if all of
+>>> the online cores are all the same type.  This adds AT_ARM64_MIDR
+>>> aux vector type and passes down the midr system register.
+>>> 
+>>> This is alternative to MIDR_EL1 part of
+>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/358995.html.
+>>> It allows for faster access to midr_el1 than going through a trap and
+>>> does not exist if the set of cores are not the same.
+>> 
+>> I'm not sure I follow the rationale. If speed is important the
+>> application can cache the value the first time it reads it with a trap.
+> 
+> It is also about compatibility also. Exposing the register is not backwards compatible but using the aux vector is. 
+
+That would also break big.little too. So either break it with hot plug or break it in userland, your choice. 
+
+
+> 
+>> 
+>> This also means that the behaviour is different across homogeneous and
+>> heterogeneous systems.
+
+That should be ok because it is still backwards compatible with what was done before.  My goal here is just to allow quick easy access to midr in the case of a homogeneous system which I care about, thunderx and to allow glibc to select a memcpy/memset that is better for thunderx. 
+
+Thanks,
+Andrew
+
+>> 
+>>> Changes from v1:
+>>> Forgot to include the auxvec.h part.
+>>> 
+>>> Signed-off-by: Andrew Pinski <apinski@cavium.com>
+>>> ---
+>>> arch/arm64/include/asm/cpu.h         |    1 +
+>>> arch/arm64/include/asm/elf.h         |    6 ++++++
+>>> arch/arm64/include/uapi/asm/auxvec.h |    3 +++
+>>> arch/arm64/kernel/cpuinfo.c          |   22 ++++++++++++++++++++++
+>>> 4 files changed, 32 insertions(+)
+>>> 
+>>> diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
+>>> index 8e797b2..fab0aa1 100644
+>>> --- a/arch/arm64/include/asm/cpu.h
+>>> +++ b/arch/arm64/include/asm/cpu.h
+>>> @@ -62,5 +62,6 @@ DECLARE_PER_CPU(struct cpuinfo_arm64, cpu_data);
+>>> 
+>>> void cpuinfo_store_cpu(void);
+>>> void __init cpuinfo_store_boot_cpu(void);
+>>> +u32 get_arm64_midr(void);
+>>> 
+>>> #endif /* __ASM_CPU_H */
+>>> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+>>> index faad6df..d3549de 100644
+>>> --- a/arch/arm64/include/asm/elf.h
+>>> +++ b/arch/arm64/include/asm/elf.h
+>>> @@ -17,6 +17,7 @@
+>>> #define __ASM_ELF_H
+>>> 
+>>> #include <asm/hwcap.h>
+>>> +#include <asm/cpu.h>
+>>> 
+>>> /*
+>>> * ELF register definitions..
+>>> @@ -138,8 +139,13 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+>>> 
+>>> #define ARCH_DLINFO                            \
+>>> do {                                    \
+>>> +    u32 midr;                            \
+>>> +                                    \
+>>>   NEW_AUX_ENT(AT_SYSINFO_EHDR,                    \
+>>>           (elf_addr_t)current->mm->context.vdso);        \
+>>> +    midr = get_arm64_midr();                    \
+>>> +    if (midr != 0)                            \
+>>> +        NEW_AUX_ENT(AT_ARM64_MIDR, (elf_addr_t)midr);        \
+>>> } while (0)
+>>> 
+>>> #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
+>>> diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
+>>> index 22d6d88..dc55c56 100644
+>>> --- a/arch/arm64/include/uapi/asm/auxvec.h
+>>> +++ b/arch/arm64/include/uapi/asm/auxvec.h
+>>> @@ -19,4 +19,7 @@
+>>> /* vDSO location */
+>>> #define AT_SYSINFO_EHDR    33
+>>> 
+>>> +/* Machine IDenfier Register (MDIR). */
+>>> +#define AT_ARM64_MIDR 38
+>>> +
+>>> #endif
+>>> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+>>> index 75d5a86..b14c87d 100644
+>>> --- a/arch/arm64/kernel/cpuinfo.c
+>>> +++ b/arch/arm64/kernel/cpuinfo.c
+>>> @@ -254,3 +254,25 @@ void __init cpuinfo_store_boot_cpu(void)
+>>> 
+>>>   boot_cpu_data = *info;
+>>> }
+>>> +
+>>> +u32 get_arm64_midr(void)
+>>> +{
+>>> +    int i;
+>>> +    u32 midr = 0;
+>>> +
+>>> +    for_each_online_cpu(i) {
+>>> +        struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
+>>> +        u32 oldmidr = midr;
+>>> +
+>>> +        midr = cpuinfo->reg_midr;
+>>> +        /*
+>>> +         * If there are cpus which have a different
+>>> +         * midr just return 0.
+>>> +         */
+>>> +        if (oldmidr && oldmidr != midr)
+>>> +            return 0;
+>>> +    }
+>>> +
+>>> +    return midr;
+>>> +}
+>> 
+>> If I have a big.LITTLE system where all the big CPUs are currently
+>> offline, this will leave the MIDR the little CPUs in the auxvec.
+>> However, at any point after this has run, I could hotplug the big CPUs
+>> on and the little CPUs off, leaving this reporting a MIDR that
+>> represents none of the online CPUs.
+>> 
+>> Given big.LITTLE and the potential for physical/dynamic hotplug (where
+>> we won't know all the MIDRs in advance), I don't think that we can
+>> generally expose a common MIDR in this fashion, and I don't think that
+>> we should give the impression that we can.
+> 
+> This is standard issue with hot plug and big.little. Really big.little is a design flaw but I am not going into that here. 
+> 
+> 
+>> 
+>> I think that the only things we can do are expose the MIDR for CPU the
+>> code is currently executing on (as Suzuki's patches do), and/or expose
+>> all the MIDRs for currently online CPUs (as Steve's [1] patch does).
+>> Anything else leaves us trying to provide semantics that we cannot
+>> guarantee.
+> 
+> Except they are not backwards compatible which means nobody in their right mind would use the register to get the midr that way. I am sorry but having a newer version of glibc working on a year old kernel is not going to fly. 
+> 
+> Thanks,
+> Andrew
+> 
+> 
+>> 
+>> Thanks,
+>> Mark.
+>> 
+>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/359127.html
