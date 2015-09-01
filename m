@@ -1,33 +1,28 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 01 Sep 2015 11:07:44 -0700
-Subject: Porting MIPS IRQ handler to ARM
-In-Reply-To: <55E5E70D.4060006@free.fr>
-References: <55E5CED8.7000408@free.fr> <yw1xtwreysnr.fsf@unicorn.mansr.com>
- <55E5E70D.4060006@free.fr>
-Message-ID: <55E5E970.90801@gmail.com>
+From: fransklaver@gmail.com (Frans Klaver)
+Date: Tue, 1 Sep 2015 20:21:24 +0200
+Subject: [PATCH] arm: omap2: vc: fix 'or' always true warning
+In-Reply-To: <20150901154609.GK4215@atomide.com>
+References: <DUB128-W519E183FDD98EF80BD4CB79C6E0@phx.gbl>
+ <1440756632-14043-1-git-send-email-frans.klaver@xsens.com>
+ <20150901154609.GK4215@atomide.com>
+Message-ID: <CAH6sp9NLgiFGU8yDsxjYgu6ZUeyTvduwueF60VEgMeMi5dmEDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/15 10:57, Mason wrote:
-> M?ns Rullg?rd wrote:
-> 
->> Mason wrote:
+On Tue, Sep 1, 2015 at 5:46 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Frans Klaver <frans.klaver@xsens.com> [150828 03:14]:
+>> From: Frans Klaver <fransklaver@gmail.com>
 >>
->>> I'm trying to port to my ARM platform: IRQ handling code written for MIPS.
->>> https://github.com/mansr/linux-tangox/blob/master/drivers/irqchip/irq-tangox.c
+>> Fix the warning:
+>> arch/arm/mach-omap2/vc.c:302:47: warning: logical ?or? of collectively exhaustive tests is always true [-Wlogical-op]
 >>
->> Go get the latest version of that file.  It should work on ARM now.
-> 
-> It would probably have taken me days to figure out I could just delete
-> the arch-dependent code. Linux internals are so hard to grok... <sigh>
-> 
-> Would you like me to ask if they can send you a dev board? :-)
-> 
-> By the way, it seems the generic UART driver does not use interrupts,
-> which would explain why the console works despite my busted device tree.
-> Does that mean that the driver polls? (I'll take a closer look tomorrow.)
+>> As we're toggling both CLKREQ and OFFMODE, we should also be checking
+>> OFFMODE.
+>>
+>> Signed-off-by: Frans Klaver <fransklaver@gmail.com>
+>
+> Thanks apppying into omap-for-v4.3/fixes.
 
-Kernel console is buffer and polled, user-space (tty) console uses
-interrupts.
--- 
-Florian
+Thanks!
+
+Frans
