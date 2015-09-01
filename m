@@ -1,56 +1,33 @@
 From: lftan@altera.com (Ley Foon Tan)
-Date: Tue, 1 Sep 2015 18:30:02 +0800
-Subject: [PATCH v6 0/6] Altera PCIe host controller driver with MSI support
-Message-ID: <1441103408-8433-1-git-send-email-lftan@altera.com>
+Date: Tue, 1 Sep 2015 18:30:03 +0800
+Subject: [PATCH v6 1/6] arm: add msi.h to Kbuild
+In-Reply-To: <1441103408-8433-1-git-send-email-lftan@altera.com>
+References: <1441103408-8433-1-git-send-email-lftan@altera.com>
+Message-ID: <1441103408-8433-2-git-send-email-lftan@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the 6th version of patch set to add support for Altera PCIe host
-controller with MSI feature on Altera FPGA device families. This patchset
-mainly resolve comments from Marc Zyngier in v5 and minor fixes.
+Include asm-generic/msi.h to support CONFIG_GENERIC_MSI_IRQ_DOMAIN.
+This to fix compilation error:
+"include/linux/msi.h:123:21: fatal error: asm/msi.h:
+No such file or directory"
 
-It is based on patch series from Marc Zyngier "Per-device MSI domain &
-platform MSI" [1] to get rid of struct msi_controller.
+Signed-off-by: Ley Foon Tan <lftan@altera.com>
+---
+ arch/arm/include/asm/Kbuild | 1 +
+ 1 file changed, 1 insertion(+)
 
-v5->v6 changes:
-- altera-msi: remove irq_enable and irq_disable
-- pcie-altera: change to PCI_VENDOR_ID_ALTERA for fixup
-- pcie-altera: change to use switch case method
-- update interrupt handling
-- include: pci: add Altera PCI vendor ID
-
-[1]: https://lkml.org/lkml/2015/7/23/172
-
-History:
--------
-[v1]: https://lkml.org/lkml/2015/7/28/395
-[v2]: https://lkml.org/lkml/2015/7/31/267
-[v3]: http://www.kernelhub.org/?msg=811940&p=2
-[v4]: https://lkml.org/lkml/2015/8/17/141
-[v5]: https://lkml.org/lkml/2015/8/25/238
-
-Ley Foon Tan (6):
-  arm: add msi.h to Kbuild
-  pci: add Altera PCI vendor ID
-  pci:host: Add Altera PCIe host controller driver
-  pci: altera: Add Altera PCIe MSI driver
-  Documentation: dt-bindings: pci: altera pcie device tree binding
-  MAINTAINERS: Add Altera PCIe and MSI drivers maintainer
-
- .../devicetree/bindings/pci/altera-pcie-msi.txt    |  28 +
- .../devicetree/bindings/pci/altera-pcie.txt        |  49 ++
- MAINTAINERS                                        |  16 +
- arch/arm/include/asm/Kbuild                        |   1 +
- drivers/pci/host/Kconfig                           |  16 +
- drivers/pci/host/Makefile                          |   2 +
- drivers/pci/host/pcie-altera-msi.c                 | 311 +++++++++++
- drivers/pci/host/pcie-altera.c                     | 593 +++++++++++++++++++++
- include/linux/pci_ids.h                            |   2 +
- 9 files changed, 1018 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
- create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
- create mode 100644 drivers/pci/host/pcie-altera-msi.c
- create mode 100644 drivers/pci/host/pcie-altera.c
-
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index 30b3bc1..362b053 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -15,6 +15,7 @@ generic-y += local64.h
+ generic-y += mcs_spinlock.h
+ generic-y += mm-arch-hooks.h
+ generic-y += msgbuf.h
++generic-y += msi.h
+ generic-y += param.h
+ generic-y += parport.h
+ generic-y += poll.h
 -- 
 1.8.2.1
