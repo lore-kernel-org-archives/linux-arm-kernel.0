@@ -1,83 +1,111 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 1 Sep 2015 14:30:30 +0200
-Subject: [PATCH v3 4/6] [media] c8sectpfe: Update binding to reset-gpios
-In-Reply-To: <CAL_JsqLccRKCnASOK-tAUn=ifZpQ3hCEJ1eg1hmrei=3vEpzFA@mail.gmail.com>
-References: <1440784362-31217-1-git-send-email-peter.griffin@linaro.org>
- <1440784362-31217-5-git-send-email-peter.griffin@linaro.org>
- <CABxcv=nM7MBK2EcD1-YK5y0J1hBtxV+6Wu812C23pNkAzigu7g@mail.gmail.com>
- <CAL_JsqLccRKCnASOK-tAUn=ifZpQ3hCEJ1eg1hmrei=3vEpzFA@mail.gmail.com>
-Message-ID: <CABxcv==BDJw60Nb2pPSJkM0Ea7PKuMkDeKT1Awu+=WBTXrcAgw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 1 Sep 2015 14:40:02 +0200
+Subject: [PATCH 1/9] PM / Domains: Allocate memory outside domain locks
+In-Reply-To: <1438731339-58317-2-git-send-email-lina.iyer@linaro.org>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFp_YvJCXkujk7AzJtq-Pdj8-SaAXie5KqS_KkVQArx9Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding GPIO maintainers to cc list]
-
-Hello Rob,
-
-On Tue, Sep 1, 2015 at 1:54 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On Tue, Sep 1, 2015 at 3:32 AM, Javier Martinez Canillas
-> <javier@dowhile0.org> wrote:
->> Hello Peter,
->>
->> On Fri, Aug 28, 2015 at 7:52 PM, Peter Griffin <peter.griffin@linaro.org> wrote:
->>> gpio.txt documents that GPIO properties should be named
->>> "[<name>-]gpios", with <name> being the purpose of this
->>> GPIO for the device.
->>>
->>> This change has been done as one atomic commit.
->>>
->>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->>> Acked-by: Lee Jones <lee.jones@linaro.org>
->>> ---
->>>  Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt | 6 +++---
->>>  arch/arm/boot/dts/stihxxx-b2120.dtsi                          | 4 ++--
->>>  drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c         | 2 +-
->>>  3 files changed, 6 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
->>> index d4def76..e70d840 100644
->>> --- a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
->>> +++ b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
->>> @@ -35,7 +35,7 @@ Required properties (tsin (child) node):
->>>
->>>  - tsin-num     : tsin id of the InputBlock (must be between 0 to 6)
->>>  - i2c-bus      : phandle to the I2C bus DT node which the demodulators & tuners on this tsin channel are connected.
->>> -- rst-gpio     : reset gpio for this tsin channel.
->>> +- reset-gpios  : reset gpio for this tsin channel.
->>
->> The documentation is a bit outdated, the GPIO subsystem supports both
->> -gpio and -gpios, see commit:
->>
->> dd34c37aa3e8 ("gpio: of: Allow -gpio suffix for property names")
+On 5 August 2015 at 01:35, Lina Iyer <lina.iyer@linaro.org> wrote:
+> In preparation for supporting IRQ-safe domains, allocate domain data
+> outside the domain locks. These functions are not called in an atomic
+> context, so we can always allocate memory using GFP_KERNEL. By
+> allocating memory before the locks, we can safely lock the domain using
+> spinlocks instead of mutexes.
 >
-> Yes, because we have lots of them.
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+> Cc: Krzysztof Koz?owski <k.kozlowski@samsung.com>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+> ---
+>  drivers/base/power/domain.c | 30 +++++++++++++++---------------
+>  1 file changed, 15 insertions(+), 15 deletions(-)
 >
-
-Yes, I know that was the motivation for that change.
-
->> So it makes sense to me to use -gpio instead of -gpios in this case
->> since is a single GPIO. Also rst is already a descriptive name since
->> that's how many datasheets name a reset pin. I'm not saying I'm
->> against this patch, just pointing out since the commit message is a
->> bit misleading.
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 7666a1c..5fd1306 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1382,13 +1382,17 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+>  int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>                            struct generic_pm_domain *subdomain)
+>  {
+> -       struct gpd_link *link;
+> +       struct gpd_link *link, *itr;
+>         int ret = 0;
 >
-> I believe that this has been discussed at length and it was decided
-> that new bindings should use "-gpios" even for 1. Just like "clocks"
-> is always plural.
+>         if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(subdomain)
+>             || genpd == subdomain)
+>                 return -EINVAL;
 >
-
-The documentation doesn't reflect that decision though. If new
-bindings are supposed to be using -gpios rather than -gpio even when a
-single GPIO is used, then
-Documentation/devicetree/bindings/gpio/gpio.txt and
-Documentation/gpio/board.txt should say that <function>-gpio is also
-supported for backward compatibility but that is deprecated and should
-not be used.
-
-Otherwise when looking the code it seems that is just that the
-documentation is outdated and that both -gpio or -gpios can be used.
-
-> Rob
-
-Best regards,
-Javier
+> +       link = kzalloc(sizeof(*link), GFP_KERNEL);
+> +       if (!link)
+> +               return -ENOMEM;
+> +
+>         mutex_lock(&genpd->lock);
+>         mutex_lock_nested(&subdomain->lock, SINGLE_DEPTH_NESTING);
+>
+> @@ -1398,18 +1402,13 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>                 goto out;
+>         }
+>
+> -       list_for_each_entry(link, &genpd->master_links, master_node) {
+> -               if (link->slave == subdomain && link->master == genpd) {
+> +       list_for_each_entry(itr, &genpd->master_links, master_node) {
+> +               if (itr->slave == subdomain && itr->master == genpd) {
+>                         ret = -EINVAL;
+>                         goto out;
+>                 }
+>         }
+>
+> -       link = kzalloc(sizeof(*link), GFP_KERNEL);
+> -       if (!link) {
+> -               ret = -ENOMEM;
+> -               goto out;
+> -       }
+>         link->master = genpd;
+>         list_add_tail(&link->master_node, &genpd->master_links);
+>         link->slave = subdomain;
+> @@ -1420,7 +1419,8 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>   out:
+>         mutex_unlock(&subdomain->lock);
+>         mutex_unlock(&genpd->lock);
+> -
+> +       if (ret)
+> +               kfree(link);
+>         return ret;
+>  }
+>
+> @@ -1511,17 +1511,17 @@ int pm_genpd_attach_cpuidle(struct generic_pm_domain *genpd, int state)
+>         if (IS_ERR_OR_NULL(genpd) || state < 0)
+>                 return -EINVAL;
+>
+> +       cpuidle_data = kzalloc(sizeof(*cpuidle_data), GFP_KERNEL);
+> +       if (!cpuidle_data)
+> +               return -ENOMEM;
+> +
+>         mutex_lock(&genpd->lock);
+>
+>         if (genpd->cpuidle_data) {
+>                 ret = -EEXIST;
+> -               goto out;
+> -       }
+> -       cpuidle_data = kzalloc(sizeof(*cpuidle_data), GFP_KERNEL);
+> -       if (!cpuidle_data) {
+> -               ret = -ENOMEM;
+> -               goto out;
+> +               goto err_drv;
+>         }
+> +
+>         cpuidle_drv = cpuidle_driver_ref();
+>         if (!cpuidle_drv) {
+>                 ret = -ENODEV;
+> --
+> 2.1.4
+>
