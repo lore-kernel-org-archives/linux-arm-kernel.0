@@ -1,102 +1,96 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 01 Sep 2015 18:41:29 +0100
-Subject: [PATCH 2/2] arm64: don't load 32-bit binaries if platform has
- no aarch32_el0
+From: ynorov@caviumnetworks.com (Yury)
+Date: Tue, 1 Sep 2015 20:44:31 +0300
+Subject: [PATCH 2/2] arm64: don't load 32-bit binaries if platform has no
+ aarch32_el0
 In-Reply-To: <20150901160426.GB16430@leverpostej>
 References: <1441118472-3513-1-git-send-email-ynorov@caviumnetworks.com>
  <1441118472-3513-3-git-send-email-ynorov@caviumnetworks.com>
  <20150901160426.GB16430@leverpostej>
-Message-ID: <55E5E349.4080802@arm.com>
+Message-ID: <20150901174431.GA5684@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/15 17:04, Mark Rutland wrote:
+On Tue, Sep 01, 2015 at 05:04:26PM +0100, Mark Rutland wrote:
 > On Tue, Sep 01, 2015 at 03:41:12PM +0100, Yury Norov wrote:
->> Kernel option COMPAT defines the ability of executing aarch32 binaries.
->> Some platforms does not support aarch32 mode, and so cannot execute that
->> binaries. But we cannot just disable COMPAT for them because the same
->> kernel binary may be used by multiple platforms.
->>
->> In this patch, system_supports_aarch32_el0() is introduced to detect
->> aarch32 support at run-time.
->>
->> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
->> ---
->>   arch/arm64/include/asm/cpufeature.h | 1 +
->>   arch/arm64/include/asm/elf.h        | 6 ++++--
->>   arch/arm64/kernel/cpuinfo.c         | 9 +++++++++
->>   3 files changed, 14 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->> index 20cdc26..d24ea15 100644
->> --- a/arch/arm64/include/asm/cpufeature.h
->> +++ b/arch/arm64/include/asm/cpufeature.h
->> @@ -81,6 +81,7 @@ void check_local_cpu_errata(void);
->>   void check_local_cpu_features(void);
->>   bool cpu_supports_mixed_endian_el0(void);
->>   bool system_supports_mixed_endian_el0(void);
->> +bool system_supports_aarch32_el0(void);
->>
->>   #endif /* __ASSEMBLY__ */
->>
->> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
->> index faad6df..461897b 100644
->> --- a/arch/arm64/include/asm/elf.h
->> +++ b/arch/arm64/include/asm/elf.h
->> @@ -21,6 +21,7 @@
->>   /*
->>    * ELF register definitions..
->>    */
->> +#include <asm/cpufeature.h>
->>   #include <asm/ptrace.h>
->>   #include <asm/user.h>
->>
->> @@ -173,8 +174,9 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
->>
->>   /* AArch32 EABI. */
->>   #define EF_ARM_EABI_MASK		0xff000000
->> -#define compat_elf_check_arch(x)	(((x)->e_machine == EM_ARM) && \
->> -					 ((x)->e_flags & EF_ARM_EABI_MASK))
->> +#define compat_elf_check_arch(x)	(system_supports_aarch32_el0()	\
->> +					&& ((x)->e_machine == EM_ARM)	\
->> +					&& ((x)->e_flags & EF_ARM_EABI_MASK))
->>
->>   #define compat_start_thread		compat_start_thread
->>   #define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
->> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
->> index 75d5a86..95d953f 100644
->> --- a/arch/arm64/kernel/cpuinfo.c
->> +++ b/arch/arm64/kernel/cpuinfo.c
->> @@ -79,6 +79,15 @@ bool system_supports_mixed_endian_el0(void)
->>   	return mixed_endian_el0;
->>   }
->>
->> +#define AARCH64		1
->> +#define AARCH32_64	2
->
+> > Kernel option COMPAT defines the ability of executing aarch32 binaries.
+> > Some platforms does not support aarch32 mode, and so cannot execute that
+> > binaries. But we cannot just disable COMPAT for them because the same
+> > kernel binary may be used by multiple platforms.
+> > 
+> > In this patch, system_supports_aarch32_el0() is introduced to detect
+> > aarch32 support at run-time.
+> > 
+> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> > ---
+> >  arch/arm64/include/asm/cpufeature.h | 1 +
+> >  arch/arm64/include/asm/elf.h        | 6 ++++--
+> >  arch/arm64/kernel/cpuinfo.c         | 9 +++++++++
+> >  3 files changed, 14 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> > index 20cdc26..d24ea15 100644
+> > --- a/arch/arm64/include/asm/cpufeature.h
+> > +++ b/arch/arm64/include/asm/cpufeature.h
+> > @@ -81,6 +81,7 @@ void check_local_cpu_errata(void);
+> >  void check_local_cpu_features(void);
+> >  bool cpu_supports_mixed_endian_el0(void);
+> >  bool system_supports_mixed_endian_el0(void);
+> > +bool system_supports_aarch32_el0(void);
+> >  
+> >  #endif /* __ASSEMBLY__ */
+> >  
+> > diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> > index faad6df..461897b 100644
+> > --- a/arch/arm64/include/asm/elf.h
+> > +++ b/arch/arm64/include/asm/elf.h
+> > @@ -21,6 +21,7 @@
+> >  /*
+> >   * ELF register definitions..
+> >   */
+> > +#include <asm/cpufeature.h>
+> >  #include <asm/ptrace.h>
+> >  #include <asm/user.h>
+> >  
+> > @@ -173,8 +174,9 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
+> >  
+> >  /* AArch32 EABI. */
+> >  #define EF_ARM_EABI_MASK		0xff000000
+> > -#define compat_elf_check_arch(x)	(((x)->e_machine == EM_ARM) && \
+> > -					 ((x)->e_flags & EF_ARM_EABI_MASK))
+> > +#define compat_elf_check_arch(x)	(system_supports_aarch32_el0()	\
+> > +					&& ((x)->e_machine == EM_ARM)	\
+> > +					&& ((x)->e_flags & EF_ARM_EABI_MASK))
+> >  
+> >  #define compat_start_thread		compat_start_thread
+> >  #define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
+> > diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> > index 75d5a86..95d953f 100644
+> > --- a/arch/arm64/kernel/cpuinfo.c
+> > +++ b/arch/arm64/kernel/cpuinfo.c
+> > @@ -79,6 +79,15 @@ bool system_supports_mixed_endian_el0(void)
+> >  	return mixed_endian_el0;
+> >  }
+> >  
+> > +#define AARCH64		1
+> > +#define AARCH32_64	2
+> 
 > These should be better namespaced. Perhaps ID_AA64PFR0_EL1_EL0_64 and
 > ID_AA64PFR0_EL1_EL0_6432 ?
->
->> +bool system_supports_aarch32_el0(void)
->> +{
->> +	struct cpuinfo_arm64 *info = this_cpu_ptr(&cpu_data);
->> +	u64 arm64_el0 = info->reg_id_aa64pfr0 & 0xf;
->> +	return arm64_el0 == AARCH32_64;
->> +}
->
+> 
+> > +bool system_supports_aarch32_el0(void)
+> > +{
+> > +	struct cpuinfo_arm64 *info = this_cpu_ptr(&cpu_data);
+> > +	u64 arm64_el0 = info->reg_id_aa64pfr0 & 0xf;
+> > +	return arm64_el0 == AARCH32_64;
+> > +}
+> 
 > We should handle this the same way as we do for endianness support and
 > check that all CPUs support AArch32, and set a global flag, rather than
 > assuming that all CPUs are symmetric. Likewise for any other feature we
 > have to dynamically detect.
+> 
 
-Correct. With my series, which I will post after the merge window, we should be able to
-define this as a CPU capability and check that bit instead, which would give us a system
-wide value.
+OK. Will do in V2
 
-Suzuki
-
-
->
 > Thanks,
 > Mark.
->
