@@ -1,36 +1,43 @@
 From: aalonso@freescale.com (Adrian Alonso)
-Date: Tue, 1 Sep 2015 17:49:08 -0500
-Subject: [PATCH v2 3/8] ARM: dts: imx: imx7d add iomuxc lpsr device node
+Date: Tue, 1 Sep 2015 17:49:09 -0500
+Subject: [PATCH v2 4/8] ARM: dts: imx: imx7d-sbd add iomuxc-lpsr hoggrp-2 pads
 In-Reply-To: <1441147753-13239-1-git-send-email-aalonso@freescale.com>
 References: <1441147753-13239-1-git-send-email-aalonso@freescale.com>
-Message-ID: <1441147753-13239-3-git-send-email-aalonso@freescale.com>
+Message-ID: <1441147753-13239-4-git-send-email-aalonso@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree node to support iomuxc-lpsr controller
+Add imx7d-sdb iomuxc-lpsr hoggrp-2 default pads settings
 
 Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 ---
 Changes for V2: Resend
 
- arch/arm/boot/dts/imx7d.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/imx7d-sdb.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index b738ce0..00f70db 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -446,6 +446,11 @@
- 				status = "disabled";
- 			};
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index fdd1d7c..63af4ea 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -406,3 +406,18 @@
  
-+			iomuxc_lpsr: iomuxc-lpsr at 302c0000 {
-+				compatible = "fsl,imx7d-iomuxc-lpsr";
-+				reg = <0x302c0000 0x10000>;
-+			};
+ 	};
+ };
 +
- 			gpt1: gpt at 302d0000 {
- 				compatible = "fsl,imx7d-gpt", "fsl,imx6sx-gpt";
- 				reg = <0x302d0000 0x10000>;
++&iomuxc_lpsr {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog_2>;
++
++	imx7d-sdb {
++		pinctrl_hog_2: hoggrp-2 {
++			fsl,pins = <
++				MX7D_PAD_GPIO1_IO05__GPIO1_IO5    0x14
++				MX7D_PAD_GPIO1_IO07__GPIO1_IO7    0x59
++				MX7D_PAD_GPIO1_IO00__WDOD1_WDOG_B 0x74
++			>;
++		};
++	};
++};
 -- 
 2.1.4
