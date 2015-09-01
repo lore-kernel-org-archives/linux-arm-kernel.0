@@ -1,33 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 1 Sep 2015 11:04:54 -0700
-Subject: [PATCH 3/3] soc: qcom: smd: Handle big endian CPUs
-In-Reply-To: <20150901050644.GD13472@usrtlx11787.corpusers.net>
-References: <1441071594-15941-1-git-send-email-sboyd@codeaurora.org>
- <1441071594-15941-4-git-send-email-sboyd@codeaurora.org>
- <20150901050644.GD13472@usrtlx11787.corpusers.net>
-Message-ID: <20150901180453.GC19120@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 01 Sep 2015 11:07:44 -0700
+Subject: Porting MIPS IRQ handler to ARM
+In-Reply-To: <55E5E70D.4060006@free.fr>
+References: <55E5CED8.7000408@free.fr> <yw1xtwreysnr.fsf@unicorn.mansr.com>
+ <55E5E70D.4060006@free.fr>
+Message-ID: <55E5E970.90801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31, Bjorn Andersson wrote:
-> On Mon 31 Aug 18:39 PDT 2015, Stephen Boyd wrote:
+On 01/09/15 10:57, Mason wrote:
+> M?ns Rullg?rd wrote:
 > 
-> > The smd structures are always in little endian, but the smd
-> > driver is not capable of being used on big endian CPUs. Annotate
-> > the little endian data members and update the code to do the
-> > proper byte swapping.
-> > 
+>> Mason wrote:
+>>
+>>> I'm trying to port to my ARM platform: IRQ handling code written for MIPS.
+>>> https://github.com/mansr/linux-tangox/blob/master/drivers/irqchip/irq-tangox.c
+>>
+>> Go get the latest version of that file.  It should work on ARM now.
 > 
-> I think this looks good, but I think it would be better to reference
-> the 8-bit entries of the info struct as "flags" rather than INFO8s.
+> It would probably have taken me days to figure out I could just delete
+> the arch-dependent code. Linux internals are so hard to grok... <sigh>
 > 
-> Could you please change the name of the macros to
-> {G,S}ET_{R,T}X_CHANNEL_FLAG() to make the code slightly easier to
+> Would you like me to ask if they can send you a dev board? :-)
+> 
+> By the way, it seems the generic UART driver does not use interrupts,
+> which would explain why the console works despite my busted device tree.
+> Does that mean that the driver polls? (I'll take a closer look tomorrow.)
 
-Sure. I also found another missing __le32 marking on the "hdr"
-stack structure. I'll test out some smd sending before resending
-the patches.
-
+Kernel console is buffer and polled, user-space (tty) console uses
+interrupts.
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Florian
