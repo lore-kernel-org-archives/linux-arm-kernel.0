@@ -1,41 +1,123 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 1 Sep 2015 06:49:45 -0500
-Subject: [PATCH v2 2/4] remoteproc: dt: Provide bindings for ST's Remote
- Processor Controller driver
-In-Reply-To: <20150901104145.GS4796@x1>
-References: <1440757911-9120-1-git-send-email-lee.jones@linaro.org>
- <1440757911-9120-3-git-send-email-lee.jones@linaro.org>
- <CAL_JsqLuF2iAJhzjDh5CL-RgYk+H+N+D05wsWqUT01zvq9SOxA@mail.gmail.com>
- <20150901104145.GS4796@x1>
-Message-ID: <CAL_JsqKJjs4-tewODq2R-vUT=Nr494emLvDA_GEC5xt=HJ3WoQ@mail.gmail.com>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Tue, 01 Sep 2015 14:54:17 +0300
+Subject: [PATCH v7 1/2] usb: make xhci platform driver use 64 bit or 32
+ bit DMA
+In-Reply-To: <CADaLNDnPaeHcMjywsuQ4oiUpWsNpStshdKVtW=tuUorrcQkZ=g@mail.gmail.com>
+References: <1522889.9kdnRk8vHo@wuerfel>
+ <69e6f5bf693d02fba001d02047453bed0519499d.1440098398.git.dhdang@apm.com>
+ <CADaLNDnPaeHcMjywsuQ4oiUpWsNpStshdKVtW=tuUorrcQkZ=g@mail.gmail.com>
+Message-ID: <55E591E9.60008@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 1, 2015 at 5:41 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Mon, 31 Aug 2015, Rob Herring wrote:
->
->> On Fri, Aug 28, 2015 at 5:31 AM, Lee Jones <lee.jones@linaro.org> wrote:
->> > Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> > ---
->> >  .../devicetree/bindings/remoteproc/st-rproc.txt    | 35 ++++++++++++++++++++++
->> >  1 file changed, 35 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/remoteproc/st-rproc.txt b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
->> > new file mode 100644
->> > index 0000000..fbd7d78
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
->> > @@ -0,0 +1,35 @@
->> > +STMicroelectronics Remote Processor
+On 31.08.2015 21:58, Duc Dang wrote:
+> On Thu, Aug 20, 2015 at 12:38 PM, Duc Dang <dhdang@apm.com> wrote:
+>> The xhci platform driver needs to work on systems that
+>> either only support 64-bit DMA or only support 32-bit DMA.
+>> Attempt to set a coherent dma mask for 64-bit DMA, and
+>> attempt again with 32-bit DMA if that fails.
 >>
->> "remote processor" is what STM datasheets call them? This seems like
->> Linux naming is leaking in here.
+>> [dhdang: regenerate the patch over 4.2-rc5 and address new comments]
+>> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+>> Tested-by: Mark Salter <msalter@redhat.com>
+>> Signed-off-by: Duc Dang <dhdang@apm.com>
+>>
+>> ---
+>> Changes from v6:
+>>          -Add WARN_ON if dma_mask is NULL
+>>          -Use dma_coerce_mask_and_coherent to assign
+>>          dma_mask and coherent_dma_mask
+>>
+>> Changes from v5:
+>>          -Change comment
+>>          -Assign dma_mask to coherent_dma_mask if dma_mask is NULL
+>>          to make sure dma_set_mask_and_coherent does not fail prematurely.
+>>
+>> Changes from v4:
+>>          -None
+>>
+>> Changes from v3:
+>>          -Re-generate the patch over 4.2-rc5
+>>          -No code change.
+>>
+>> Changes from v2:
+>>          -None
+>>
+>> Changes from v1:
+>>          -Consolidated to use dma_set_mask_and_coherent
+>>          -Got rid of the check against sizeof(dma_addr_t)
+>>
+>>   drivers/usb/host/xhci-plat.c | 21 +++++++++++++--------
+>>   1 file changed, 13 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+>> index 890ad9d..e4c7f9d 100644
+>> --- a/drivers/usb/host/xhci-plat.c
+>> +++ b/drivers/usb/host/xhci-plat.c
+>> @@ -93,14 +93,19 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>>          if (irq < 0)
+>>                  return -ENODEV;
+>>
+>> -       /* Initialize dma_mask and coherent_dma_mask to 32-bits */
+>> -       ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+>> -       if (ret)
+>> -               return ret;
+>> -       if (!pdev->dev.dma_mask)
+>> -               pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+>> -       else
+>> -               dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
+>> +       /* Throw a waring if broken platform code didn't initialize dma_mask */
+>> +       WARN_ON(!pdev->dev.dma_mask);
+>> +       /*
+>> +        * Try setting dma_mask and coherent_dma_mask to 64 bits,
+>> +        * then try 32 bits
+>> +        */
+>> +       ret = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+>> +       if (ret) {
+>> +               ret = dma_coerce_mask_and_coherent(&pdev->dev,
+>> +                                                  DMA_BIT_MASK(32));
+>> +               if (ret)
+>> +                       return ret;
+>> +       }
+>>
+>>          hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
+>>          if (!hcd)
+>> --
+>> 1.9.1
+>>
 >
-> That's what this directory is called and the other binding within it.
+> Hi Greg, Arnd, Russell,
+>
+> Do you have any more comment about this patch set?
+>
 
-That doesn't make it right or answer my question. Certainly our
-directory structure too closely mirrors the kernel.
+I'm not sure I fully understand why we need to try the 64 bit DMA mask in platform probe.
 
-Rob
+As I understood it we just want to have some DMA mask set before calling usb_create_hcd()
+to make sure USB core gets the "uses_dma" flag set and dma_set_mask() won't fail because of
+missing dev->dma_mask.
+
+The correct DMA mask is set later in xhci_gen_setup()
+
+We also need to make sure the controller supports 64bit addressing capability before setting a 64 bit DMA mask.
+(bit 0 in HCCPARAMS)
+
+So for platform devices it goes look go this:
+
+xhci_plat_probe()
+   usb_create_hcd()
+     usb_create_shared_hcd()
+       hcd->self.uses_dma = (dev->dma_mask != NULL);
+   usb_add_hcd()
+     hcd->driver->reset()  (.reset = xhci_plat_setup)
+       xhci_plat_setup()
+         xhci_gen_setup()
+           if (HCC_64BIT_ADDR(xhci->hcc_params) && !dma_set_mask(dev, DMA_BIT_MASK(64))) {
+             xhci_dbg(xhci, "Enabling 64-bit DMA addresses.\n");
+             dma_set_coherent_mask(dev, DMA_BIT_MASK(64));
+           }
+
+or do we end up with dev->dma_mask = NULL on 64-bit DMA only after trying to set it to 32 in xhci_plat_probe(),
+and thus also failing the dma_set_mask() in xhci_gen_setup()?
+
+-Mathias
