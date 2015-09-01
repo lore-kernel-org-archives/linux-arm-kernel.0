@@ -1,125 +1,196 @@
-From: vichy.kuo@gmail.com (vichy)
-Date: Tue, 1 Sep 2015 13:36:54 +0800
-Subject: about system time incorrect after changing cpu frequency
-In-Reply-To: <CAOh2x=ky8_uwqvdH-krKxgMSby5jgovJp7odK6x=MpqNL+YoGg@mail.gmail.com>
-References: <CAOVJa8GTDj3UJpgUd4nH1wknUKa6fgac=1SsqC8g=UCG0MGuDw@mail.gmail.com>
- <CAOh2x=ky8_uwqvdH-krKxgMSby5jgovJp7odK6x=MpqNL+YoGg@mail.gmail.com>
-Message-ID: <CAOVJa8HNQ-s=yDfADCcoL+r22ALpHFtTjWZ=oxTkBUriYbCk+Q@mail.gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue,  1 Sep 2015 13:46:11 +0800
+Subject: [PATCH v4 0/16] Add Analogix Core Display Port Driver
+Message-ID: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Viresh:
+Hi all,
 
+   The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
+share the same IP, so a lot of parts can be re-used. I split the common
+code into bridge directory, then rk3288 and exynos only need to keep
+some platform code. Cause I can't find the exact IP name of exynos dp
+controller, so I decide to name dp core driver with "analogix" which I
+find in rk3288 eDP TRM ;)
 
-2015-09-01 11:57 GMT+08:00 Viresh Kumar <viresh.kumar@linaro.org>:
-> On Mon, Aug 31, 2015 at 7:33 PM, vichy <vichy.kuo@gmail.com> wrote:
->> hi all:
->> My platform is like below:
->> 1. single core Cortex A9
->> 2. use global timer for system timer
->>
->> after I porting cpu frequency driver based on snow ball, the cpu
->> frequency did change as I expected.
->> But the system time is incorrect( since pherial clk is got from cpu frequency)
->>
->> for example:
->> a) cpu 1G (pherial clk = 250M) --> sleep 1 sec (OK)
->> b) cpu 500M  (pherial clk = 125M) --> sleep 1 sec (will be measured as 2 sec)
->>
->> I try to call below 2 functions to change the frequency of clocksource
->> and clockevent, but the above b) sleep time is still incorrect when
->> cpu runs in 500Mhz.
->>     clockevents_update_freq(this_cpu_ptr(gt_evt), gt_clk_rate);
->>     __clocksource_updatefreq_hz(&gt_clocksource, gt_clk_rate);
->>
->> in Arm cortex A9 single core system with Global timer as system timer,
->> is there any kernel api to change system timer period when cpu/pherial
->> frequency change?
->>
->> appreciate your kind help in advance,
->
-> The list cpufreq at vger.kernel.org is the wrong list for posting cpufreq queries
-> as we have moved to Linux PM list <linux-pm@vger.kernel.org> list now.
->
-> Try unsetting CPUFREQ_CONST_LOOPS flag in your driver, if you have it
-> set.
+Beyond that, there are three light registers setting differents bewteen
+exynos and rk3288.
+1. RK3288 have five special pll resigters which not indicata in exynos
+   dp controller.
+2. The address of DP_PHY_PD(dp phy power manager register) are different
+   between rk3288 and exynos.
+3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
+   register).
 
-I DIDN'T set the CPUFREQ_CONST_LOOPS when I register my cpufreq driver
-I pasted my cpufreq driver declariation as below:
+I have verified this series on two kinds of rockchip platform board, one
+is rk3288 sdk board which connect with a 2K display port monitor, the other
+is google jerry chromebook which connect with a eDP screen "cnm,n116bgeea2",
+both of them works rightlly.
 
-static struct cpufreq_driver plat_cpufreq_driver = {
-    .flags  = CPUFREQ_STICKY,
-    .verify = plat_cpufreq_verify_speed,
-    .target = plat_cpufreq_target,
-    .get    = plat_cpufreq_getspeed,
-    .init   = plat_cpufreq_init,
-    .name   = "plat-cpufreq",
-    .attr   = plat_cpufreq_attr,
-};
+I haven't verified the dp function on samsung platform, cause I haven't got
+exynos boards. I can only ensure that there are no build error on samsung
+platform, wish some samsung guys help to test. ;)
 
+Besides, The v4 version have been rebased on linux-next master branch
+(git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git), tag name is
+next-20150828 (latest is next-2015-0831). So I think if someone try to apply
+this series, there would be no conflict  ;)
 
-I have traced the kernel code
-if I guess correctly, the sleep accurate is based on jiffies and
-tick_handle_periodic will periodically update the next event interval
+Thanks,
+- Yakir
 
-void tick_handle_periodic
--->
-  for (;;) {
-          if (!clockevents_program_event(dev, next, false))
-              return;
-          /*
-           * Have to be careful here. If we're in oneshot mode,
-           * before we call tick_periodic() in a loop, we need
-           * to be sure we're using a real hardware clocksource.
-           * Otherwise we could get trapped in an infinite
-           * loop, as the tick_periodic() increments jiffies,
-           * when then will increment time, posibly causing
-           * the loop to trigger again and again.
-           */
-          if (timekeeping_valid_for_hres())
-              tick_periodic(cpu);
-          next = ktime_add(next, tick_period);
-      }
+Changes in v4:
+- Take Romain suggest, rebase on linux-next branch.
+- Take Rob suggest, update "analogix,hpd-gpios" to "hpd-gpios" DT propery.
+- Take Jingoo suggest, rename "analogix_dp-exynos.c" file name to "exynos_dp.c"
+- Take Archit suggest, create a separate folder for analogix code in bridge/
+- Take Jingoo Han suggest, update commit message more readable.
+- Adjust the order from 05 to 04
+- Take Krzysztof suggest, provide backword compatibility with samsung.
+- Take Thierry suggest, add "color-depth" and "color-space" dynamic parsed.
+- Take Krzysztof suggest, split all DTS changes, and provide backward compatibility.
+  Mark old properties as deprecated but still support them.
+- Take Rob suggest, update "analogix,hpd-gpio" to "hpd-gpios" prop name.
+- Take Thierry suggest, deprecated some properties which could parsed from Edid/Mode/DPCD.
+    "analogix,color-space" & "analogix,color-depth"   &
+    "analogix,link-rate"   & "analogix,lane-count"    &
+    "analogix,ycbcr-coeff" & "analogix,dynamic-range" &
+    "vsync-active-high"    & "hsync-active-high"      & "interlaces"
+- Take Krzysztof suggest, separate all DTS changes to a separate patch.
+- Remove some deprecated DT properties in rockchip dp document.
+- Take Kishon suggest, add commit message, and remove the redundant
+  rockchip_dp_phy_init() function, move those code to probe() method.
+  And remove driver .owner number.
+- Take Thierry suggest, seprate the link-rate and lane-count limit
+  out with the device_type flag.
+- Take Jingoo suggest, add commit messages.
+- Call drm_panel_prepare() in .get_modes function, ensure panel should
+  power on before driver try to read edid message.
 
-and in clockevents_program_event, we will use mult, shift to calculate
-the cycles need for global timer triggering next interrupt event.
+Changes in v3:
+- Take Thierry Reding suggest, move exynos's video_timing code
+  to analogix_dp-exynos platform driver, add get_modes method
+  to struct analogix_dp_plat_data.
+- Take Heiko suggest, rename some "samsung*" dts propery to "analogix*".
+- Take Thierry Reding suggest, link_rate and lane_count shouldn't config to
+  the DT property value directly, but we can take those as hardware limite.
+  For example, RK3288 only support 4 physical lanes of 2.7/1.62 Gbps/lane,
+  so DT property would like "link-rate = 0x0a" "lane-count = 4".
+- Take Thierry Reding suggest, dynamic parse video timing info from
+  struct drm_display_mode and struct drm_display_info.
+- Take Heiko suggest, add devicetree binding documents.
+- Take Thierry Reding suggest, remove sync pol & colorimetry properies
+  from the new analogix dp driver devicetree binding.
+- Update the exist exynos dtsi file with the latest DP DT properies.
+- Take Thierry Reding and Heiko suggest, leave "sclk_edp_24m" to rockchip
+  dp phy driver which name to "24m", and leave "sclk_edp" to analogix dp
+  core driver which name to "dp", and leave "pclk_edp" to rockchip dp platform
+  driver which name to "pclk".
+- Take Heiko suggest, add devicetree binding document.
+- Take Heiko suggest, remove "rockchip,panel" DT property, take use of remote
+  point to get panel node.
+- Add the new function point analogix_dp_platdata.get_modes init.
+- Take Heiko suggest, add rockchip dp phy driver,
+  collect the phy clocks and power control.
+- Add "analogix,need-force-hpd" to indicate whether driver need foce
+  hpd when hpd detect failed.
+- move dp hpd detect to connector detect function.
+- Add edid modes parse support
 
-    clc = ((unsigned long long) delta * dev->mult) >> dev->shift;
-    rc = dev->set_next_event((unsigned long) clc, dev);
+Changes in v2:
+- Take Joe Preches advise, improved commit message more readable, and
+  avoid using some uncommon style like bellow:
+  -  retval = exynos_dp_read_bytes_from_i2c(...
+				...)
+  +  retval =
+  +  exynos_dp_read_bytes_from_i2c(......);
+- Take Jingoo Han suggest, just remove my name from author list.
+- Take Jingoo Han suggest, remove new copyright
+- Fix compiled failed dut to analogix_dp_device misspell
+- Take Heiko suggest, get panel node with remote-endpoint method,
+  and create devicetree binding for driver.
+- Remove the clock enable/disbale with "sclk_edp" & "sclk_edp_24m",
+  leave those clock to rockchip dp phy driver.
+- Add GNU license v2 declared and samsung copyright
+- Fix compile failed dut to phy_pd_addr variable misspell error
 
-belwo is my tick device information in /proc/timer_list
-and multi did change to 1/2 when I change cpu freq from 1G to 500Mhz.
-when cpu run 1GHz
+Mark Yao (1):
+  drm: rockchip: add bpc and color mode setting
 
-except multi and shift, is there any place I need to take care for
-system timer accurate?
-appreciate your kind help,
+Yakir Yang (15):
+  drm: exynos/dp: fix code style
+  drm: exynos/dp: convert to drm bridge mode
+  drm: bridge: analogix/dp: split exynos dp driver to bridge dir
+  drm: bridge: analogix/dp: remove duplicate configuration of link rate
+    and link count
+  drm: bridge: analogix/dp: dynamic parse sync_pol & interlace &
+    colorimetry
+  Documentation: drm/bridge: add document for analogix_dp
+  ARM: dts: exynos/dp: remove some properties that deprecated by
+    analogix_dp driver
+  drm: rockchip/dp: add rockchip platform dp driver
+  phy: Add driver for rockchip Display Port PHY
+  drm: bridge: analogix/dp: add platform device type support
+  drm: bridge: analogix/dp: add some rk3288 special registers setting
+  drm: bridge: analogix/dp: add max link rate and lane count limit for
+    RK3288
+  drm: bridge: analogix/dp: try force hpd after plug in lookup failed
+  drm: bridge: analogix/dp: move hpd detect to connector detect function
+  drm: bridge: analogix/dp: add edid modes parse in get_modes method
 
-Tick Device: mode:     1
-Per CPU device: 0
-Clock Event Device: arm_global_timer
- max_delta_ns:   17043521021
- min_delta_ns:   1000
- mult:           541165879
- shift:          31
- mode:           3
- next_event:     2176344000000 nsecs
- set_next_event: gt_clockevent_set_next_event
- set_mode:       gt_clockevent_set_mode
- event_handler:  hrtimer_interrupt
- retries:        0
+ .../devicetree/bindings/drm/bridge/analogix_dp.txt |   52 +
+ .../devicetree/bindings/phy/rockchip-dp-phy.txt    |   26 +
+ .../bindings/video/analogix_dp-rockchip.txt        |   75 +
+ .../devicetree/bindings/video/exynos_dp.txt        |   64 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts           |    2 -
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    2 -
+ arch/arm/boot/dts/exynos5250-snow.dts              |    4 +-
+ arch/arm/boot/dts/exynos5250-spring.dts            |    4 +-
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         |    4 +-
+ arch/arm/boot/dts/exynos5420-smdk5420.dts          |    2 -
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          |    4 +-
+ drivers/gpu/drm/bridge/Kconfig                     |    2 +
+ drivers/gpu/drm/bridge/Makefile                    |    1 +
+ drivers/gpu/drm/bridge/analogix/Kconfig            |    4 +
+ drivers/gpu/drm/bridge/analogix/Makefile           |    1 +
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 1409 +++++++++++++++++++
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  286 ++++
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  | 1294 ++++++++++++++++++
+ .../analogix/analogix_dp_reg.h}                    |  270 ++--
+ drivers/gpu/drm/exynos/Kconfig                     |    3 +-
+ drivers/gpu/drm/exynos/Makefile                    |    2 +-
+ drivers/gpu/drm/exynos/exynos_dp.c                 |  355 +++++
+ drivers/gpu/drm/exynos/exynos_dp_core.c            | 1427 --------------------
+ drivers/gpu/drm/exynos/exynos_dp_core.h            |  281 ----
+ drivers/gpu/drm/exynos/exynos_dp_reg.c             | 1263 -----------------
+ drivers/gpu/drm/rockchip/Kconfig                   |    9 +
+ drivers/gpu/drm/rockchip/Makefile                  |    1 +
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  416 ++++++
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        |    2 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h        |    2 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |   33 +-
+ drivers/phy/Kconfig                                |    7 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-rockchip-dp.c                      |  166 +++
+ include/drm/bridge/analogix_dp.h                   |   40 +
+ 35 files changed, 4347 insertions(+), 3167 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+ create mode 100644 Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
+ create mode 100644 drivers/gpu/drm/bridge/analogix/Kconfig
+ create mode 100644 drivers/gpu/drm/bridge/analogix/Makefile
+ create mode 100644 drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+ create mode 100644 drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+ create mode 100644 drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+ rename drivers/gpu/drm/{exynos/exynos_dp_reg.h => bridge/analogix/analogix_dp_reg.h} (62%)
+ create mode 100644 drivers/gpu/drm/exynos/exynos_dp.c
+ delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.c
+ delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_core.h
+ delete mode 100644 drivers/gpu/drm/exynos/exynos_dp_reg.c
+ create mode 100644 drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+ create mode 100644 drivers/phy/phy-rockchip-dp.c
+ create mode 100644 include/drm/bridge/analogix_dp.h
 
-when cpu run in 500Mhz
-Tick Device: mode:     1
-Per CPU device: 0
-Clock Event Device: arm_global_timer
- max_delta_ns:   34087041979
- min_delta_ns:   1000
- mult:           270582940
- shift:          31
- mode:           3
- next_event:     2230100000000 nsecs
- set_next_event: gt_clockevent_set_next_event
- set_mode:       gt_clockevent_set_mode
- event_handler:  hrtimer_interrupt
- retries:        0
+-- 
+2.1.2
