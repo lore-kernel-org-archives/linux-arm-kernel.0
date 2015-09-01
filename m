@@ -1,82 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 1 Sep 2015 08:59:19 +0100
-Subject: [PATCH v3 2/6] ARM: DT: STi: STiH407: Add c8sectpfe LinuxDVB DT
- node.
-In-Reply-To: <1440784362-31217-3-git-send-email-peter.griffin@linaro.org>
-References: <1440784362-31217-1-git-send-email-peter.griffin@linaro.org>
- <1440784362-31217-3-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20150901075919.GL4796@x1>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 1 Sep 2015 09:17:00 +0100
+Subject: [STLinux Kernel] [PATCH v2 3/4] remoteproc: Supply controller
+ driver for ST's Remote Processors
+In-Reply-To: <20150901075538.GJ4796@x1>
+References: <1440757911-9120-1-git-send-email-lee.jones@linaro.org>
+ <1440757911-9120-4-git-send-email-lee.jones@linaro.org>
+ <55E08B34.9080102@mentor.com> <20150901075538.GJ4796@x1>
+Message-ID: <20150901081700.GA30542@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Aug 2015, Peter Griffin wrote:
+Hi,
 
-> This patch adds in the required DT node for the c8sectpfe
-> Linux DVB demux driver which allows the tsin channels
-> to be used on an upstream kernel.
+On Tue, 01 Sep 2015, Lee Jones wrote:
+
+> On Fri, 28 Aug 2015, Nathan Lynch wrote:
 > 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  arch/arm/boot/dts/stihxxx-b2120.dtsi | 35 +++++++++++++++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
+> > On 08/28/2015 05:31 AM, Lee Jones wrote:
+> > > diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> > > index 28c711f..72e97d7 100644
+> > > --- a/drivers/remoteproc/Kconfig
+> > > +++ b/drivers/remoteproc/Kconfig
+> > > @@ -77,4 +77,13 @@ config DA8XX_REMOTEPROC
+> > >  	  It's safe to say n here if you're not interested in multimedia
+> > >  	  offloading.
+> > >  
+> > > +config ST_REMOTEPROC
+> > > +	tristate "ST remoteproc support"
+> > > +	depends on ARCH_STI
+> > > +	select REMOTEPROC
+> > > +	help
+> > > +	  Say y here to support ST's adjunct processors via the remote
+> > > +	  processor framework.
+> > > +	  This can be either built-in or a loadable module.
+> > > +
+> > 
+> > The code uses reset_control_* APIs, so this should depend on
+> > RESET_CONTROLLER, no?
+> 
+> There's no need to explicitly depend on RESET_CONTROLLER.
+> 
+> With !RESET_CONTROLLER the user is WARN()ed about using the reset_*
+> API.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+ARCH_STI selects RESET_CONTROLLER, so it will always be enabled.
 
-> diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-> index 62994ae..f9fca10 100644
-> --- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-> +++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-> @@ -6,6 +6,9 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
->   */
-> +
-> +#include <dt-bindings/clock/stih407-clks.h>
-> +#include <dt-bindings/media/c8sectpfe.h>
->  / {
->  	soc {
->  		sbc_serial0: serial at 9530000 {
-> @@ -85,5 +88,37 @@
->  			status = "okay";
->  		};
->  
-> +		demux at 08a20000 {
-> +			compatible	= "st,stih407-c8sectpfe";
-> +			status		= "okay";
-> +			reg		= <0x08a20000 0x10000>,
-> +					  <0x08a00000 0x4000>;
-> +			reg-names	= "c8sectpfe", "c8sectpfe-ram";
-> +			interrupts	= <GIC_SPI 34 IRQ_TYPE_NONE>,
-> +					  <GIC_SPI 35 IRQ_TYPE_NONE>;
-> +			interrupt-names	= "c8sectpfe-error-irq",
-> +					  "c8sectpfe-idle-irq";
-> +			pinctrl-0	= <&pinctrl_tsin0_serial>;
-> +			pinctrl-1	= <&pinctrl_tsin0_parallel>;
-> +			pinctrl-2	= <&pinctrl_tsin3_serial>;
-> +			pinctrl-3	= <&pinctrl_tsin4_serial_alt3>;
-> +			pinctrl-4	= <&pinctrl_tsin5_serial_alt1>;
-> +			pinctrl-names	= "tsin0-serial",
-> +					  "tsin0-parallel",
-> +					  "tsin3-serial",
-> +					  "tsin4-serial",
-> +					  "tsin5-serial";
-> +			clocks		= <&clk_s_c0_flexgen CLK_PROC_STFE>;
-> +			clock-names	= "c8sectpfe";
-> +
-> +			/* tsin0 is TSA on NIMA */
-> +			tsin0: port at 0 {
-> +				tsin-num	= <0>;
-> +				serial-not-parallel;
-> +				i2c-bus		= <&ssc2>;
-> +				rst-gpio	= <&pio15 4 GPIO_ACTIVE_HIGH>;
-> +				dvb-card	= <STV0367_TDA18212_NIMA_1>;
-> +			};
-> +		};
->  	};
->  };
+regards,
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Peter.
