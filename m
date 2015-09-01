@@ -1,33 +1,56 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 1 Sep 2015 11:12:30 +0100
-Subject: [PATCH v3 4/6] [media] c8sectpfe: Update binding to reset-gpios
-In-Reply-To: <CAL_JsqLYes5L2Bg0R45ui24yYWgHzFSLgBPajieSLgLz09=1aw@mail.gmail.com>
-References: <1440784362-31217-1-git-send-email-peter.griffin@linaro.org>
- <1440784362-31217-5-git-send-email-peter.griffin@linaro.org>
- <CAL_JsqLYes5L2Bg0R45ui24yYWgHzFSLgBPajieSLgLz09=1aw@mail.gmail.com>
-Message-ID: <20150901101230.GB2316@griffinp-ThinkPad-X1-Carbon-2nd>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Tue, 1 Sep 2015 18:30:02 +0800
+Subject: [PATCH v6 0/6] Altera PCIe host controller driver with MSI support
+Message-ID: <1441103408-8433-1-git-send-email-lftan@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+This is the 6th version of patch set to add support for Altera PCIe host
+controller with MSI feature on Altera FPGA device families. This patchset
+mainly resolve comments from Marc Zyngier in v5 and minor fixes.
 
-On Mon, 31 Aug 2015, Rob Herring wrote:
+It is based on patch series from Marc Zyngier "Per-device MSI domain &
+platform MSI" [1] to get rid of struct msi_controller.
 
-> On Fri, Aug 28, 2015 at 12:52 PM, Peter Griffin
-> <peter.griffin@linaro.org> wrote:
-> > gpio.txt documents that GPIO properties should be named
-> > "[<name>-]gpios", with <name> being the purpose of this
-> > GPIO for the device.
-> >
-> > This change has been done as one atomic commit.
-> 
-> dtb and kernel updates are not necessarily atomic, so you are breaking
-> compatibility with older dtbs. You should certainly highlight that in
-> the commit message. I only point this out. I'll leave it to platform
-> maintainers whether or not this breakage is acceptable.
+v5->v6 changes:
+- altera-msi: remove irq_enable and irq_disable
+- pcie-altera: change to PCI_VENDOR_ID_ALTERA for fixup
+- pcie-altera: change to use switch case method
+- update interrupt handling
+- include: pci: add Altera PCI vendor ID
 
-Ok I will highlight that in the commit message of the next version.
+[1]: https://lkml.org/lkml/2015/7/23/172
 
-regards,
+History:
+-------
+[v1]: https://lkml.org/lkml/2015/7/28/395
+[v2]: https://lkml.org/lkml/2015/7/31/267
+[v3]: http://www.kernelhub.org/?msg=811940&p=2
+[v4]: https://lkml.org/lkml/2015/8/17/141
+[v5]: https://lkml.org/lkml/2015/8/25/238
 
-Peter.
+Ley Foon Tan (6):
+  arm: add msi.h to Kbuild
+  pci: add Altera PCI vendor ID
+  pci:host: Add Altera PCIe host controller driver
+  pci: altera: Add Altera PCIe MSI driver
+  Documentation: dt-bindings: pci: altera pcie device tree binding
+  MAINTAINERS: Add Altera PCIe and MSI drivers maintainer
+
+ .../devicetree/bindings/pci/altera-pcie-msi.txt    |  28 +
+ .../devicetree/bindings/pci/altera-pcie.txt        |  49 ++
+ MAINTAINERS                                        |  16 +
+ arch/arm/include/asm/Kbuild                        |   1 +
+ drivers/pci/host/Kconfig                           |  16 +
+ drivers/pci/host/Makefile                          |   2 +
+ drivers/pci/host/pcie-altera-msi.c                 | 311 +++++++++++
+ drivers/pci/host/pcie-altera.c                     | 593 +++++++++++++++++++++
+ include/linux/pci_ids.h                            |   2 +
+ 9 files changed, 1018 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
+ create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-altera-msi.c
+ create mode 100644 drivers/pci/host/pcie-altera.c
+
+-- 
+1.8.2.1
