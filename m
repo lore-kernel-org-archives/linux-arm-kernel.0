@@ -1,249 +1,228 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 31 Aug 2015 17:07:07 -0700
-Subject: [GIT PULL 4/7] ARM: SoC driver updates for v4.3
+Date: Mon, 31 Aug 2015 17:07:10 -0700
+Subject: [GIT PULL 7/7] ARM: SoC 64-bit changes for v4.3
 In-Reply-To: <1441066030-23225-1-git-send-email-olof@lixom.net>
 References: <1441066030-23225-1-git-send-email-olof@lixom.net>
-Message-ID: <1441066030-23225-5-git-send-email-olof@lixom.net>
+Message-ID: <1441066030-23225-8-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some releases this branch is nearly empty, others we have more stuff. It
-tends to gather drivers that need SoC modification or dependencies such
-that they have to (also) go in through our tree.
+Here's our branch of ARM64 contents for this merge window.
 
-For this release, we have merged in part of the reset controller tree
-(with handshake that the parts we have merged in will remain stable),
-as well as dependencies on a few clock branches.
+Most of this is DT contents for new SoCs (or those who have seen new
+device support added). Maybe we should stop separating out the arm64
+contents here to avoid the kind of internal conflicts as we got this
+time around, where 32- and 64-bit contents conflicted.
 
-In general, new items here are:
+Anyhow, on the actual contents:
 
-- Qualcomm driver for SMM/SMD, which is how they communicate with the
-coprocessors on (some) of their platforms
-- Memory controller work for ARM's PL172 memory controller
-- Reset drivers for various platforms
-- PMU power domain support for Marvell platforms
-- Tegra support for T132/T210 SoCs: PMC, fuse, memory controller per-SoC support
+New SoCs:
+
+- Broadcom North Star 2 (ns2)
+- Marvell Berlin4CT
+- Mediatek MT6795
+- Rockchip RK3368
+
+In addition, there are enhancements for the following platforms:
+
+- Mediatek MT8173: cpuidle-dt updates, misc other additions
+- ZyncMP: A bunch of devices added to the existing DTSI
+- Qualcomm MSM8916 and APQ8016 updates for USB, etc.
+
++ A handful of other updates for various platforms
+
+
+Conflicts:
+
+Documentation/devicetree/bindings/serial/mtk-uart.txt:
+
+Add/add conflict with 32-bit DT additions of MT6795 and 64-bit addition
+of MT8173.
+Keep both sides, which means rewrapping the last line. Entries are
+sorted in decreasing order, which is a bit unusual.
 
 ----------------------------------------------------------------
 
-The following changes since commit 995140c8ab9423d63f23f106815550801c93e599:
+The following changes since commit c055798226422b953ee59e68ba33f4a9bfc894bb:
 
-  Merge branch 'next/soc' into HEAD
+  Merge branch 'next/defconfig' into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-drivers
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-arm64
 
-for you to fetch changes up to 21815b9a24c6e6d3488703609561bd2892d3d9f3:
+for you to fetch changes up to 341a670abd1c086d44e09901f0ebee3dd86a60ba:
 
-  Merge tag 'tegra-for-4.3-memory' of git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux into next/drivers
+  ARM64: dts: vexpress: Use assigned-clock-parents for sp810
 
 ----------------------------------------------------------------
 
-Alban Bedel (3):
-      devicetree: Add bindings for the ATH79 reset controller
-      reset: Add a driver for the reset controller on the AR71XX/AR9XXX
-      MIPS: ath79: Add the reset controller to the AR9132 dtsi
+Chunyan Zhang (1):
+      arm64: dts: sprd: adding ETM entries to Spreadtrum SC9836
 
-Bjorn Andersson (5):
-      soc: qcom: Add Shared Memory Manager driver
-      soc: qcom: Add device tree binding for Shared Memory Device
-      soc: qcom: Add Shared Memory Driver
-      soc: qcom: Driver for the Qualcomm RPM over SMD
-      devicetree: soc: Add Qualcomm SMD based RPM DT binding
+Eddie Huang (4):
+      arm64: dts: mt8173: Add watchdog device node
+      arm64: dts: mt8173: Add I2C device node
+      arm64: dts: mt8173-evb: Add PMIC support
+      arm64: dts: mediatek: Add MT8173 MMC dts
 
-Dinh Nguyen (1):
-      reset: socfpga: Update reset-socfpga to read the altr,modrst-offset property
+Heiko Stuebner (11):
+      clk: rockchip: rk3288: add CLK_SET_RATE_PARENT to sclk_mac
+      clk: rockchip: fix faulty vip parent name on rk3288
+      clk: rockchip: protect register macros against multipart values
+      clk: rockchip: add COMPOSITE_NOGATE_DIVTBL variant
+      clk: rockchip: add support for phase inverters
+      clk: rockchip: fix issues in the mmc-phase clock
+      clk: rockchip: define the inverters of rk3066/rk3188 and rk3288
+      dt-bindings: add documentation of rk3668 clock controller
+      clk: rockchip: add dt-binding header for rk3368
+      clk: rockchip: add missing include guards
+      clk: rockchip: add rk3368 clock controller
 
-Fabian Frederick (1):
-      reset: sti: constify of_device_id array
+Heiko St?bner (3):
+      arm64: add Rockchip architecture entry
+      arm64: defconfig: enable ARCH_ROCKCHIP
+      arm64: dts: add Rockchip rk3368 core dtsi and board dts for the r88 board
 
-Geert Uytterhoeven (5):
-      clk: shmobile: Add CPG/MSTP Clock Domain support
-      clk: shmobile: r8a7778: Add CPG/MSTP Clock Domain support
-      clk: shmobile: r8a7779: Add CPG/MSTP Clock Domain support
-      clk: shmobile: rcar-gen2: Add CPG/MSTP Clock Domain support
-      clk: shmobile: rz: Add CPG/MSTP Clock Domain support
+Henry Chen (1):
+      dts: mt8173-evb: Add da9211 to i2c1
 
-Joachim Eastwood (5):
-      memory: add ARM PL172 MultiPort Memory Controller driver
-      doc: dt: add documentation for pl172 memory bindings
-      memory: pl172: fix modular build
-      reset: add driver for lpc18xx rgu
-      doc: dt: add documentation for lpc1850-rgu reset driver
+Howard Chen (1):
+      ARM: dts: mt8173: support arm64 cpuidle-dt
 
-Lina Iyer (1):
-      drivers: qcom: Select QCOM_SCM unconditionally for QCOM_PM
+Ivan T. Ivanov (6):
+      arm64: dts: qcom: Extend msm8916 pinctrl device coverage
+      arm64: dts: qcom: Add msm8916 BLSP device nodes
+      arm64: dts: qcom: Add msm8916 USB configuration nodes
+      arm64: dts: qcom: apq8016-sbc: Don't hog client driver pins
+      arm64: dts: qcom: Fix apq8016-sbc board USB related pin definitions
+      arm64: dts: qcom: Add apq8016-sbc board LED's related device nodes
 
-Masahiro Yamada (1):
-      soc: tegra: Remove redundant $(CONFIG_ARCH_TEGRA) in Makefile
+Jisheng Zhang (3):
+      arm64: dts: Add dts files for Marvell Berlin4CT SoC
+      arm64: Enable Marvell Berlin SoC family in Kconfig
+      arm64: Enable Marvell Berlin SoC family in defconfig
 
-Moritz Fischer (2):
-      docs: dts: Added documentation for Xilinx Zynq Reset Controller bindings.
-      reset: reset-zynq: Adding support for Xilinx Zynq reset controller.
+Koro Chen (1):
+      arm64: dts: mt8173: Add afe device node
 
-Olof Johansson (7):
-      Merge tag 'mvebu-soc-4.3-2' of git://git.infradead.org/linux-mvebu into next/drivers
-      Merge tag 'qcom-soc-for-4.3' of git://codeaurora.org/quic/kernel/agross-msm into next/drivers
-      Merge tag 'renesas-clk-for-v4.3' of git://git.kernel.org/.../horms/renesas into next/drivers
-      Merge tag 'reset-for-4.3' of git://git.pengutronix.de/git/pza/linux into next/drivers
-      Merge tag 'tegra-for-4.3-soc' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'tegra-for-4.3-cpufreq' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'tegra-for-4.3-memory' of git://git.kernel.org/.../tegra/linux into next/drivers
+Mars Cheng (2):
+      Document: DT: Add bindings for mediatek MT6795 SoC Platform
+      arm64: dts: mediatek: add mt6795 support
 
-Paul Walmsley (1):
-      memory: tegra: Add support for a variable-size client ID bitfield
+Michal Simek (10):
+      ARM64: zynqmp: Use zynqmp specific compatible string for gpio
+      ARM64: zynqmp: Add CANs node for platform
+      ARM64: zynqmp: Add SMMU support
+      ARM64: zynqmp: Add DWC3 usb support
+      ARM64: zynqmp: Enable watchdog on ep108
+      ARM64: zynqmp: Enable sdhci on ep108
+      ARM64: zynqmp: Add eeprom memories on i2c bus
+      ARM64: zynqmp: Enable spi flashes on ep108
+      ARM64: zynqmp: Move uart and ttcs to the right location
+      ARM64: zynqmp: Move SPI nodes to the right location
 
-Philipp Zabel (3):
-      MAINTAINERS: add include/dt-bindings/reset path to reset controller entry
-      ARM: STi: DT: Move reset controller constants into common location
-      Merge branch 'reset/ath79' into reset/next
+Olof Johansson (8):
+      arm64: Split out platform options to separate Kconfig
+      Merge branch 'depends/clk-rk3368' into next/arm64
+      arm64: fix Kconfig include path
+      Merge tag 'v4.2-next-arm64' of https://github.com/mbgg/linux-mediatek into next/arm64
+      Merge tag 'qcom-arm64-for-4.3' of git://codeaurora.org/quic/kernel/agross-msm into next/arm64
+      Merge tag 'zynqmp-dt-for-4.3' of https://github.com/Xilinx/linux-xlnx into next/arm64
+      Merge tag 'v4.2-next-arm64-2' of https://github.com/mbgg/linux-mediatek into next/arm64
+      Merge tag 'berlin64-for-v4.3-1' of git://git.infradead.org/users/hesselba/linux-berlin into next/arm64
 
-Russell King (1):
-      ARM: dove: create a proper PMU driver for power domains, PMU IRQs and resets
+Ray Jui (5):
+      PCI: iproc: enable arm64 support for iProc PCIe
+      PCI: iproc: Fix ARM64 dependency in Kconfig
+      arm64: Add Broadcom iProc family support
+      arm64: dts: Add Broadcom North Star 2 support
+      PCI: iproc: Fix BCMA dependency in Kconfig
 
-Thierry Reding (17):
-      soc/tegra: Add Tegra132 support
-      soc/tegra: Add Tegra210 support
-      memory: tegra: Expose supported rates via debugfs
-      soc/tegra: pmc: Avoid usage of uninitialized variable
-      soc/tegra: pmc: Restrict legacy code to 32-bit ARM
-      soc/tegra: pmc: Add Tegra210 support
-      soc/tegra: fuse: Restrict legacy code to 32-bit ARM
-      soc/tegra: fuse: Unify Tegra20 and Tegra30 drivers
-      soc/tegra: fuse: Add Tegra210 support
-      soc/tegra: fuse: Rename core_* to soc_*
-      soc/tegra: fuse: Add spare bit offset for Tegra114
-      soc/tegra: fuse: Add spare bit offset for Tegra124
-      soc/tegra: fuse: Add spare bit offset for Tegra210
-      memory: tegra: Add Tegra210 support
-      soc/tegra: pmc: Remove unnecessary return statement
-      soc/tegra: pmc: Use existing pclk reference
-      ARM: tegra: Disable cpuidle if PSCI is available
+Sascha Hauer (4):
+      arm64: dts: mt8173: Add clock controller device nodes
+      arm64: dts: mt8173: Use real clock for UARTs
+      arm64: dts: mt8173: Add PMIC wrapper device node
+      ARM64: MediaTek MT8173: Add SCPSYS device node
 
-Tomeu Vizoso (1):
-      ARM: tegra: cpuidle: implement cpuidle_state.enter_freeze()
+Scott Shu (1):
+      ARM64: dts: mt6795: enable basic SMP bringup for MT6795
 
-Tuomas Tynkkynen (3):
-      cpufreq: tegra124: Add device tree bindings
-      cpufreq: tegra: Rename tegra-cpufreq to tegra20-cpufreq
-      cpufreq: Add cpufreq driver for Tegra124
+Srinivas Kandagatla (1):
+      arm64: dts: qcom: Add msm8916 sdhci configuration nodes
+
+Stephen Boyd (1):
+      ARM64: dts: vexpress: Use assigned-clock-parents for sp810
+
+Suneel Garapati (1):
+      devicetree: xilinx: zynqmp: add sata node
 
 
- .../clock/renesas,r8a7778-cpg-clocks.txt        |   29 +-
- .../clock/renesas,r8a7779-cpg-clocks.txt        |   30 +-
- .../clock/renesas,rcar-gen2-cpg-clocks.txt      |   26 +-
- .../bindings/clock/renesas,rz-cpg-clocks.txt    |   29 +-
- .../bindings/cpufreq/tegra124-cpufreq.txt       |   44 +
- .../bindings/memory-controllers/arm,pl172.txt   |  125 ++
- .../devicetree/bindings/reset/ath79-reset.txt   |   20 +
- .../bindings/reset/nxp,lpc1850-rgu.txt          |   84 ++
- .../bindings/reset/st,sti-picophyreset.txt      |    2 +-
- .../bindings/reset/st,sti-powerdown.txt         |    4 +-
- .../bindings/reset/st,sti-softreset.txt         |    4 +-
- .../devicetree/bindings/reset/zynq-reset.txt    |   68 +
- .../devicetree/bindings/soc/qcom,smd-rpm.txt    |  117 ++
- .../devicetree/bindings/soc/qcom/qcom,smd.txt   |   79 ++
- MAINTAINERS                                     |    1 +
- arch/arm/boot/dts/stih407-family.dtsi           |    2 +-
- arch/arm/boot/dts/stih415.dtsi                  |    2 +-
- arch/arm/boot/dts/stih416.dtsi                  |    2 +-
- arch/arm/mach-mvebu/Kconfig                     |    1 +
- arch/arm/mach-mvebu/dove.c                      |    2 +
- arch/arm/mach-shmobile/Kconfig                  |    2 +
- arch/arm/mach-tegra/cpuidle-tegra114.c          |   19 +-
- arch/arm/mach-tegra/iomap.h                     |    3 -
- arch/mips/Kconfig                               |    1 +
- arch/mips/boot/dts/qca/ar9132.dtsi              |    8 +
- drivers/clk/shmobile/clk-mstp.c                 |   87 ++
- drivers/clk/shmobile/clk-r8a7778.c              |    2 +
- drivers/clk/shmobile/clk-r8a7779.c              |    2 +
- drivers/clk/shmobile/clk-rcar-gen2.c            |    2 +
- drivers/clk/shmobile/clk-rz.c                   |    3 +
- drivers/cpufreq/Kconfig.arm                     |   13 +-
- drivers/cpufreq/Makefile                        |    3 +-
- drivers/cpufreq/tegra124-cpufreq.c              |  214 +++
- .../{tegra-cpufreq.c => tegra20-cpufreq.c}      |    0
- drivers/iommu/Kconfig                           |    2 +-
- drivers/memory/Kconfig                          |    8 +
- drivers/memory/Makefile                         |    1 +
- drivers/memory/pl172.c                          |  301 ++++
- drivers/memory/tegra/Makefile                   |    1 +
- drivers/memory/tegra/mc.c                       |    8 +-
- drivers/memory/tegra/mc.h                       |    4 +
- drivers/memory/tegra/tegra114.c                 |    1 +
- drivers/memory/tegra/tegra124-emc.c             |   42 +-
- drivers/memory/tegra/tegra124.c                 |    2 +
- drivers/memory/tegra/tegra210.c                 | 1080 ++++++++++++++
- drivers/memory/tegra/tegra30.c                  |    1 +
- drivers/reset/Makefile                          |    3 +
- drivers/reset/reset-ath79.c                     |  128 ++
- drivers/reset/reset-lpc18xx.c                   |  258 ++++
- drivers/reset/reset-socfpga.c                   |   19 +-
- drivers/reset/reset-zynq.c                      |  155 ++
- drivers/reset/sti/reset-stih407.c               |    4 +-
- drivers/reset/sti/reset-stih415.c               |    4 +-
- drivers/reset/sti/reset-stih416.c               |    4 +-
- drivers/soc/Makefile                            |    1 +
- drivers/soc/dove/Makefile                       |    1 +
- drivers/soc/dove/pmu.c                          |  412 ++++++
- drivers/soc/qcom/Kconfig                        |   31 +
- drivers/soc/qcom/Makefile                       |    3 +
- drivers/soc/qcom/smd-rpm.c                      |  244 ++++
- drivers/soc/qcom/smd.c                          | 1319 ++++++++++++++++++
- drivers/soc/qcom/smem.c                         |  775 ++++++++++
- drivers/soc/tegra/Makefile                      |    6 +-
- drivers/soc/tegra/common.c                      |    2 +
- drivers/soc/tegra/fuse/Makefile                 |    2 +
- drivers/soc/tegra/fuse/fuse-tegra.c             |  257 +++-
- drivers/soc/tegra/fuse/fuse-tegra20.c           |  175 +--
- drivers/soc/tegra/fuse/fuse-tegra30.c           |  232 ++-
- drivers/soc/tegra/fuse/fuse.h                   |   95 +-
- drivers/soc/tegra/fuse/speedo-tegra114.c        |   22 +-
- drivers/soc/tegra/fuse/speedo-tegra124.c        |   26 +-
- drivers/soc/tegra/fuse/speedo-tegra20.c         |   28 +-
- drivers/soc/tegra/fuse/speedo-tegra210.c        |  184 +++
- drivers/soc/tegra/fuse/speedo-tegra30.c         |   48 +-
- drivers/soc/tegra/fuse/tegra-apbmisc.c          |   76 +-
- drivers/soc/tegra/pmc.c                         |  125 +-
- include/dt-bindings/memory/tegra210-mc.h        |   36 +
- .../stih407-resets.h                            |    0
- .../stih415-resets.h                            |    0
- .../stih416-resets.h                            |    0
- include/linux/clk/shmobile.h                    |   12 +
- include/linux/soc/dove/pmu.h                    |    6 +
- include/linux/soc/qcom/smd-rpm.h                |   35 +
- include/linux/soc/qcom/smd.h                    |   46 +
- include/linux/soc/qcom/smem.h                   |   11 +
- include/soc/tegra/fuse.h                        |    6 +-
- include/soc/tegra/mc.h                          |    2 +
- include/soc/tegra/pmc.h                         |    5 +
- 88 files changed, 6781 insertions(+), 498 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/cpufreq/tegra124-cpufreq.txt
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/arm,pl172.txt
- create mode 100644 Documentation/devicetree/bindings/reset/ath79-reset.txt
- create mode 100644 Documentation/devicetree/bindings/reset/nxp,lpc1850-rgu.txt
- create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset.txt
- create mode 100644 Documentation/devicetree/bindings/soc/qcom,smd-rpm.txt
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
- create mode 100644 drivers/cpufreq/tegra124-cpufreq.c
- rename drivers/cpufreq/{tegra-cpufreq.c => tegra20-cpufreq.c} (100%)
- create mode 100644 drivers/memory/pl172.c
- create mode 100644 drivers/memory/tegra/tegra210.c
- create mode 100644 drivers/reset/reset-ath79.c
- create mode 100644 drivers/reset/reset-lpc18xx.c
- create mode 100644 drivers/reset/reset-zynq.c
- create mode 100644 drivers/soc/dove/Makefile
- create mode 100644 drivers/soc/dove/pmu.c
- create mode 100644 drivers/soc/qcom/smd-rpm.c
- create mode 100644 drivers/soc/qcom/smd.c
- create mode 100644 drivers/soc/qcom/smem.c
- create mode 100644 drivers/soc/tegra/fuse/speedo-tegra210.c
- create mode 100644 include/dt-bindings/memory/tegra210-mc.h
- rename include/dt-bindings/{reset-controller => reset}/stih407-resets.h (100%)
- rename include/dt-bindings/{reset-controller => reset}/stih415-resets.h (100%)
- rename include/dt-bindings/{reset-controller => reset}/stih416-resets.h (100%)
- create mode 100644 include/linux/soc/dove/pmu.h
- create mode 100644 include/linux/soc/qcom/smd-rpm.h
- create mode 100644 include/linux/soc/qcom/smd.h
- create mode 100644 include/linux/soc/qcom/smem.h
+ .../devicetree/bindings/arm/bcm/ns2.txt         |   9 +
+ .../devicetree/bindings/arm/mediatek.txt        |   9 +-
+ .../bindings/arm/mediatek/mediatek,sysirq.txt   |   3 +-
+ .../bindings/clock/rockchip,rk3368-cru.txt      |  61 ++
+ .../devicetree/bindings/serial/mtk-uart.txt     |   5 +-
+ arch/arm64/Kconfig                              | 105 +--
+ arch/arm64/Kconfig.platforms                    | 125 +++
+ arch/arm64/boot/dts/Makefile                    |   3 +
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi   |   2 +
+ .../arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi |   2 +
+ arch/arm64/boot/dts/broadcom/Makefile           |   5 +
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts        |  59 ++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi           | 118 +++
+ arch/arm64/boot/dts/marvell/Makefile            |   5 +
+ arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts   |  66 ++
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi      | 164 ++++
+ arch/arm64/boot/dts/mediatek/Makefile           |   1 +
+ arch/arm64/boot/dts/mediatek/mt6795-evb.dts     |  41 +
+ arch/arm64/boot/dts/mediatek/mt6795.dtsi        | 175 ++++
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts     | 353 ++++++++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi        | 327 ++++++-
+ .../boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi    |  34 +-
+ .../boot/dts/qcom/apq8016-sbc-soc-pins.dtsi     |  14 +-
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi       |  51 ++
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi      | 430 +++++++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi           | 227 ++++-
+ arch/arm64/boot/dts/rockchip/Makefile           |   5 +
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts     | 354 ++++++++
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi        | 900 +++++++++++++++++++
+ arch/arm64/boot/dts/sprd/sc9836.dtsi            |  99 +-
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts     |  89 ++
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi          | 233 +++--
+ arch/arm64/configs/defconfig                    |   4 +
+ drivers/clk/rockchip/Makefile                   |   2 +
+ drivers/clk/rockchip/clk-inverter.c             | 116 +++
+ drivers/clk/rockchip/clk-mmc-phase.c            |   6 +-
+ drivers/clk/rockchip/clk-rk3188.c               |   9 +-
+ drivers/clk/rockchip/clk-rk3288.c               |  13 +-
+ drivers/clk/rockchip/clk-rk3368.c               | 881 ++++++++++++++++++
+ drivers/clk/rockchip/clk.c                      |   7 +
+ drivers/clk/rockchip/clk.h                      |  72 +-
+ drivers/pci/host/Kconfig                        |   4 +-
+ drivers/pci/host/pcie-iproc.c                   |  27 +-
+ drivers/pci/host/pcie-iproc.h                   |   4 +-
+ include/dt-bindings/clock/rk3066a-cru.h         |   5 +
+ include/dt-bindings/clock/rk3188-cru-common.h   |   5 +
+ include/dt-bindings/clock/rk3188-cru.h          |   5 +
+ include/dt-bindings/clock/rk3288-cru.h          |   5 +
+ include/dt-bindings/clock/rk3368-cru.h          | 384 ++++++++
+ 49 files changed, 5341 insertions(+), 282 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/ns2.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3368-cru.txt
+ create mode 100644 arch/arm64/Kconfig.platforms
+ create mode 100644 arch/arm64/boot/dts/broadcom/Makefile
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2-svk.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/Makefile
+ create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
+ create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt6795-evb.dts
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt6795.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
+ create mode 100644 arch/arm64/boot/dts/rockchip/Makefile
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-r88.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3368.dtsi
+ create mode 100644 drivers/clk/rockchip/clk-inverter.c
+ create mode 100644 drivers/clk/rockchip/clk-rk3368.c
+ create mode 100644 include/dt-bindings/clock/rk3368-cru.h
