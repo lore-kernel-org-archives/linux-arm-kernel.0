@@ -1,213 +1,97 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue,  1 Sep 2015 14:09:17 +0800
-Subject: [PATCH v4 12/16] drm: bridge: analogix/dp: add some rk3288 special
- registers setting
+Date: Tue,  1 Sep 2015 14:11:30 +0800
+Subject: [PATCH v4 13/16] drm: bridge: analogix/dp: add max link rate and lane
+ count limit for RK3288
 In-Reply-To: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
 References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1441087757-25642-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1441087890-25722-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RK3288 need some special registers setting, we can separate
-them out by the dev_type of plat_data.
+There are some IP limit on rk3288 that only support 4 physical lanes
+of 2.7/1.6 Gbps/lane, so seprate them out by device_type flag.
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
-Changes in v4: None
+Changes in v4:
+- Take Thierry suggest, seprate the link-rate and lane-count limit
+  out with the device_type flag.
+
 Changes in v3: None
-Changes in v2:
-- Fix compile failed dut to phy_pd_addr variable misspell error
+Changes in v2: None
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 76 ++++++++++++++---------
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h | 12 ++++
- 2 files changed, 60 insertions(+), 28 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 35 ++++++++++++++--------
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  4 +--
+ 2 files changed, 24 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index 6a643be..15346fe 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -15,6 +15,8 @@
- #include <linux/delay.h>
- #include <linux/gpio.h>
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index f0db92e..f7227ec 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -897,8 +897,8 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 		return;
+ 	}
  
-+#include <drm/bridge/analogix_dp.h>
-+
- #include "analogix_dp_core.h"
- #include "analogix_dp_reg.h"
- 
-@@ -72,6 +74,14 @@ void analogix_dp_init_analog_param(struct analogix_dp_device *dp)
- 	reg = SEL_24M | TX_DVDD_BIT_1_0625V;
- 	writel(reg, dp->reg_base + ANALOGIX_DP_ANALOG_CTL_2);
- 
-+	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP)) {
-+		writel(REF_CLK_24M, dp->reg_base + ANALOGIX_DP_PLL_REG_1);
-+		writel(0x95, dp->reg_base + ANALOGIX_DP_PLL_REG_2);
-+		writel(0x40, dp->reg_base + ANALOGIX_DP_PLL_REG_3);
-+		writel(0x58, dp->reg_base + ANALOGIX_DP_PLL_REG_4);
-+		writel(0x22, dp->reg_base + ANALOGIX_DP_PLL_REG_5);
-+	}
-+
- 	reg = DRIVE_DVDD_BIT_1_0625V | VCO_BIT_600_MICRO;
- 	writel(reg, dp->reg_base + ANALOGIX_DP_ANALOG_CTL_3);
- 
-@@ -206,81 +216,85 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
- 				       bool enable)
+-	ret = analogix_dp_set_link_train(dp, dp->video_info.lane_count,
+-					 dp->video_info.link_rate);
++	ret = analogix_dp_set_link_train(dp, dp->video_info.max_lane_count,
++					 dp->video_info.max_link_rate);
+ 	if (ret) {
+ 		dev_err(dp->dev, "unable to do link train\n");
+ 		return;
+@@ -1201,18 +1201,27 @@ static int analogix_dp_create_bridge(struct drm_device *drm_dev,
+ static int analogix_dp_dt_parse_pdata(struct analogix_dp_device *dp)
  {
- 	u32 reg;
-+	u32 phy_pd_addr = ANALOGIX_DP_PHY_PD;
-+
-+	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP))
-+		phy_pd_addr = ANALOGIX_DP_PD;
+ 	struct device_node *dp_node = dp->dev->of_node;
+-	struct video_info *video_config = &dp->video_info;
+-
+-	if (of_property_read_u32(dp_node, "samsung,link-rate",
+-				 &video_info->link_rate)) {
+-		dev_err(dev, "failed to get link-rate\n");
+-		return -EINVAL;
+-	}
++	struct video_info *video_info = &dp->video_info;
  
- 	switch (block) {
- 	case AUX_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= AUX_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~AUX_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case CH0_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= CH0_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~CH0_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case CH1_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= CH1_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~CH1_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case CH2_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= CH2_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~CH2_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case CH3_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= CH3_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~CH3_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case ANALOG_TOTAL:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= DP_PHY_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~DP_PHY_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case POWER_ALL:
- 		if (enable) {
- 			reg = DP_PHY_PD | AUX_PD | CH3_PD | CH2_PD |
- 				CH1_PD | CH0_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			writel(0x00, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(0x00, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	default:
-@@ -399,8 +413,14 @@ void analogix_dp_init_aux(struct analogix_dp_device *dp)
- 	analogix_dp_reset_aux(dp);
+-	if (of_property_read_u32(dp_node, "samsung,lane-count",
+-				 &video_info->lane_count)) {
+-		dev_err(dev, "failed to get lane-count\n");
+-		return -EINVAL;
++	switch (dp->plat_data && dp->plat_data->dev_type) {
++	case RK3288_DP:
++		/*
++		 * Like Rk3288 DisplayPort TRM indicate that "Main link
++		 * containing 4 physical lanes of 2.7/1.62 Gbps/lane".
++		 */
++		video_info->max_link_rate = 0x0A;
++		video_info->max_lane_count = 0x04;
++		break;
++	case EXYNOS_DP:
++		/*
++		 * NOTE: those property parseing code is used for
++		 * providing backward compatibility for samsung platform.
++		 */
++		of_property_read_u32(dp_node, "samsung,link-rate",
++				     &video_info->max_link_rate);
++		of_property_read_u32(dp_node, "samsung,lane-count",
++				     &video_info->max_lane_count);
++		break;
+ 	}
  
- 	/* Disable AUX transaction H/W retry */
--	reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) | AUX_HW_RETRY_COUNT_SEL(0) |
--	      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
-+	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP))
-+		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(0) |
-+		      AUX_HW_RETRY_COUNT_SEL(3) |
-+		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
-+	else
-+		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) |
-+		      AUX_HW_RETRY_COUNT_SEL(0) |
-+		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
- 	writel(reg, dp->reg_base + ANALOGIX_DP_AUX_HW_RETRY_CTL);
+ 	return 0;
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+index 6e3d5bc..d8945e2 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+@@ -129,8 +129,8 @@ struct video_info {
+ 	enum color_coefficient ycbcr_coeff;
+ 	enum color_depth color_depth;
  
- 	/* Receive AUX Channel DEFER commands equal to DEFFER_COUNT*64 */
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-index 2d878fd..21330aa 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-@@ -22,6 +22,14 @@
- #define ANALOGIX_DP_VIDEO_CTL_8			0x3C
- #define ANALOGIX_DP_VIDEO_CTL_10			0x44
+-	enum link_rate_type link_rate;
+-	enum link_lane_count_type lane_count;
++	enum link_rate_type max_link_rate;
++	enum link_lane_count_type max_lane_count;
+ };
  
-+#define ANALOGIX_DP_PLL_REG_1			0xfc
-+#define ANALOGIX_DP_PLL_REG_2			0x9e4
-+#define ANALOGIX_DP_PLL_REG_3			0x9e8
-+#define ANALOGIX_DP_PLL_REG_4			0x9ec
-+#define ANALOGIX_DP_PLL_REG_5			0xa00
-+
-+#define ANALOGIX_DP_PD                          0x12c
-+
- #define ANALOGIX_DP_LANE_MAP			0x35C
- 
- #define ANALOGIX_DP_ANALOG_CTL_1			0x370
-@@ -154,6 +162,10 @@
- #define VSYNC_POLARITY_CFG			(0x1 << 1)
- #define HSYNC_POLARITY_CFG			(0x1 << 0)
- 
-+/* ANALOGIX_DP_PLL_REG_1 */
-+#define REF_CLK_24M				(0x1 << 1)
-+#define REF_CLK_27M				(0x0 << 1)
-+
- /* ANALOGIX_DP_LANE_MAP */
- #define LANE3_MAP_LOGIC_LANE_0			(0x0 << 6)
- #define LANE3_MAP_LOGIC_LANE_1			(0x1 << 6)
+ struct link_train {
 -- 
 2.1.2
