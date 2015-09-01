@@ -1,138 +1,115 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed,  2 Sep 2015 01:02:18 +0530
-Subject: [RFC 3/3] mmc: sdhci-pxav3: Add ->voltage_switch callback support
-In-Reply-To: <1441135938-8056-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1441135938-8056-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1441135938-8056-4-git-send-email-vaibhav.hiremath@linaro.org>
+From: w-kwok2@ti.com (WingMan Kwok)
+Date: Tue, 1 Sep 2015 16:28:44 -0400
+Subject: [PATCH] ARM: dts: keystone: use one to one address translations under
+ netcp
+Message-ID: <1441139324-29296-1-git-send-email-w-kwok2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case PXA1928 family of devices, there is device/controller specific
-configuration to control voltage/power on the IO pins.
+Network subsystem NetCP in Keystone-2 devices includes some HW blocks
+that are memory mapped to ranges outside that of the NetCP itself.
+Thus address space of a child node of the NetCP node needs to be
+mapped 1:1 onto the parent address space.  Hence empty ranges
+should be used under the NetCP node.
 
-This patch implements and enables the sdhci_ops->voltage_switch()
-callback api.
-Note that IO pad register addresses are fetched as a memory resource.
-
-For example, in case of PXA1928 and family of devices, the DT property
-would look something like,
-
-sdh1: sdh at d4280000 {
-	compatible = "mrvl,pxav3-mmc";
-	reg-names = "sdhci", "io-pwr", "io-pwr-lock-unlock";
-	reg = <0xd4280000 0x120>,
-		<0xd401e81c 4>,
-		<0xd4015068 8>;
-	...
-};
-
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
 ---
- drivers/mmc/host/sdhci-pxav3.c | 59 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+ arch/arm/boot/dts/k2e-netcp.dtsi  |    8 +++-----
+ arch/arm/boot/dts/k2hk-netcp.dtsi |   14 ++++++--------
+ arch/arm/boot/dts/k2l-netcp.dtsi  |    8 +++-----
+ 3 files changed, 12 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-index 5d26fe0..cebb2f9 100644
---- a/drivers/mmc/host/sdhci-pxav3.c
-+++ b/drivers/mmc/host/sdhci-pxav3.c
-@@ -63,11 +63,18 @@
- #define IO_PWR_AKEY_ASSAR		0xeb10
- #define IO_PWR_MMC1_PAD_1V8		BIT(2)
+diff --git a/arch/arm/boot/dts/k2e-netcp.dtsi b/arch/arm/boot/dts/k2e-netcp.dtsi
+index b13b3c9..e103ed9 100644
+--- a/arch/arm/boot/dts/k2e-netcp.dtsi
++++ b/arch/arm/boot/dts/k2e-netcp.dtsi
+@@ -111,9 +111,7 @@ netcp: netcp at 24000000 {
+ 	compatible = "ti,netcp-1.0";
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
+-
+-	/* NetCP address range */
+-	ranges = <0 0x24000000 0x1000000>;
++	ranges;
  
-+/* IO Power control */
-+#define IO_PWR_AKEY_ASFAR		0xbaba
-+#define IO_PWR_AKEY_ASSAR		0xeb10
-+#define IO_PWR_MMC1_PAD_1V8		BIT(2)
-+
- struct sdhci_pxa {
- 	struct clk *clk_core;
- 	struct clk *clk_io;
- 	u8	power_mode;
- 	void __iomem *sdio3_conf_reg;
-+	void __iomem *io_pwr_reg;
-+	void __iomem *io_pwr_lock_reg;
- };
+ 	clocks = <&papllclk>, <&clkcpgmac>, <&chipclk12>;
+ 	dma-coherent;
+@@ -127,10 +125,10 @@ netcp: netcp at 24000000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
+-		gbe at 200000 { /* ETHSS */
++		gbe at 24200000 { /* ETHSS */
+ 			label = "netcp-gbe";
+ 			compatible = "ti,netcp-gbe-9";
+-			reg = <0x200000 0x900>, <0x220000 0x20000>;
++			reg = <0x24200000 0x900>, <0x24220000 0x20000>;
+ 			/* enable-ale; */
+ 			tx-queue = <896>;
+ 			tx-channel = "nettx";
+diff --git a/arch/arm/boot/dts/k2hk-netcp.dtsi b/arch/arm/boot/dts/k2hk-netcp.dtsi
+index 77a32c3..3b885f5 100644
+--- a/arch/arm/boot/dts/k2hk-netcp.dtsi
++++ b/arch/arm/boot/dts/k2hk-netcp.dtsi
+@@ -127,9 +127,7 @@ netcp: netcp at 2000000 {
+ 	compatible = "ti,netcp-1.0";
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
+-
+-	/* NetCP address range */
+-	ranges  = <0 0x2000000 0x100000>;
++	ranges;
  
- /*
-@@ -307,6 +314,38 @@ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
- 		__func__, uhs, ctrl_2);
- }
+ 	clocks = <&papllclk>, <&clkcpgmac>, <&chipclk12>;
+ 	dma-coherent;
+@@ -140,15 +138,15 @@ netcp: netcp at 2000000 {
+ 	ti,navigator-dma-names = "netrx0", "netrx1", "nettx";
  
-+static void pxav3_voltage_switch(struct sdhci_host *host,
-+						u8 signal_voltage)
-+{
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_pxa *pxa = pltfm_host->priv;
-+	unsigned int val;
-+
-+	if (!pxa->io_pwr_reg || !pxa->io_pwr_lock_reg)
-+		return;
-+
-+	/* Lock register is 64 bit: First & Second access register */
-+	writel(IO_PWR_AKEY_ASFAR, pxa->io_pwr_lock_reg);
-+	writel(IO_PWR_AKEY_ASSAR, pxa->io_pwr_lock_reg + 4);
-+	val = readl(pxa->io_pwr_reg);
-+
-+	switch (signal_voltage) {
-+	case MMC_SIGNAL_VOLTAGE_180:
-+	case MMC_SIGNAL_VOLTAGE_120:
-+		val |= IO_PWR_MMC1_PAD_1V8;
-+		break;
-+	case MMC_SIGNAL_VOLTAGE_330:
-+	default:
-+		val &= ~IO_PWR_MMC1_PAD_1V8;
-+		break;
-+	}
-+
-+	writel(IO_PWR_AKEY_ASFAR, pxa->io_pwr_lock_reg);
-+	writel(IO_PWR_AKEY_ASSAR, pxa->io_pwr_lock_reg + 4);
-+
-+	writel(val, pxa->io_pwr_reg);
-+}
-+
- static const struct sdhci_ops pxav3_sdhci_ops = {
- 	.set_clock			= sdhci_set_clock,
- 	.platform_send_init_74_clocks	= pxav3_gen_init_74_clocks,
-@@ -314,6 +353,7 @@ static const struct sdhci_ops pxav3_sdhci_ops = {
- 	.set_bus_width			= sdhci_set_bus_width,
- 	.reset				= pxav3_reset,
- 	.set_uhs_signaling		= pxav3_set_uhs_signaling,
-+	.voltage_switch			= pxav3_voltage_switch,
- };
+ 	netcp-devices {
+-		ranges;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		gbe at 90000 { /* ETHSS */
+-			#address-cells = <1>;
+-			#size-cells = <1>;
++		ranges;
++		gbe at 2090000 { /* ETHSS */
+ 			label = "netcp-gbe";
+ 			compatible = "ti,netcp-gbe";
+-			reg = <0x90000 0x300>, <0x90400 0x400>, <0x90800 0x700>;
++			reg = <0x02090000 0x300>,
++			      <0x02090400 0x400>,
++			      <0x02090800 0x700>;
+ 			/* enable-ale; */
+ 			tx-queue = <648>;
+ 			tx-channel = "nettx";
+diff --git a/arch/arm/boot/dts/k2l-netcp.dtsi b/arch/arm/boot/dts/k2l-netcp.dtsi
+index 6b95284..97ae805 100644
+--- a/arch/arm/boot/dts/k2l-netcp.dtsi
++++ b/arch/arm/boot/dts/k2l-netcp.dtsi
+@@ -110,9 +110,7 @@ netcp: netcp at 26000000 {
+ 	compatible = "ti,netcp-1.0";
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
+-
+-	/* NetCP address range */
+-	ranges = <0 0x26000000 0x1000000>;
++	ranges;
  
- static struct sdhci_pltfm_data sdhci_pxav3_pdata = {
-@@ -368,6 +408,7 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
- 	struct sdhci_host *host = NULL;
- 	struct sdhci_pxa *pxa = NULL;
- 	const struct of_device_id *match;
-+	struct resource *res;
- 	int ret;
- 
- 	pxa = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_pxa), GFP_KERNEL);
-@@ -408,6 +449,24 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
- 			goto err_mbus_win;
- 	}
- 
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "io-pwr-conf");
-+	if (res) {
-+		pxa->io_pwr_reg = devm_ioremap_resource(&pdev->dev, res);
-+		if (IS_ERR(pxa->io_pwr_reg)) {
-+			ret = PTR_ERR(pxa->io_pwr_reg);
-+			goto err_mbus_win;
-+		}
-+	}
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "io-pwr-lock-unlock");
-+	if (res) {
-+		pxa->io_pwr_lock_reg = devm_ioremap_resource(&pdev->dev, res);
-+		if (IS_ERR(pxa->io_pwr_lock_reg)) {
-+			ret = PTR_ERR(pxa->io_pwr_lock_reg);
-+			goto err_mbus_win;
-+		}
-+	}
-+
- 	match = of_match_device(of_match_ptr(sdhci_pxav3_of_match), &pdev->dev);
- 	if (match) {
- 		ret = mmc_of_parse(host->mmc);
+ 	clocks = <&papllclk>, <&clkcpgmac>, <&chipclk12>;
+ 	dma-coherent;
+@@ -126,10 +124,10 @@ netcp: netcp at 26000000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
+-		gbe at 200000 { /* ETHSS */
++		gbe at 26200000 { /* ETHSS */
+ 			label = "netcp-gbe";
+ 			compatible = "ti,netcp-gbe-5";
+-			reg = <0x200000 0x900>, <0x220000 0x20000>;
++			reg = <0x26200000 0x900>, <0x26220000 0x20000>;
+ 			/* enable-ale; */
+ 			tx-queue = <896>;
+ 			tx-channel = "nettx";
 -- 
-1.9.1
+1.7.9.5
