@@ -1,83 +1,64 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 1 Sep 2015 13:09:48 +0100
-Subject: [PATCH v3 4/6] [media] c8sectpfe: Update binding to reset-gpios
-In-Reply-To: <20150901103458.GA9149@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1440784362-31217-1-git-send-email-peter.griffin@linaro.org>
- <1440784362-31217-5-git-send-email-peter.griffin@linaro.org>
- <CABxcv=nM7MBK2EcD1-YK5y0J1hBtxV+6Wu812C23pNkAzigu7g@mail.gmail.com>
- <20150901090916.GM4796@x1>
- <CABxcv==iC+mkVGKi_9LSidPjFa2WTooARMCOcWW1Nyr80UYJgw@mail.gmail.com>
- <20150901103458.GA9149@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20150901120948.GT4796@x1>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 1 Sep 2015 14:18:52 +0200
+Subject: [PATCH] ARM: dts: Add exynos5422-odroidxu4 board
+In-Reply-To: <55E5936B.3050003@samsung.com>
+References: <1440993365-26896-1-git-send-email-k.kozlowski@samsung.com>
+ <55E56646.2070106@osg.samsung.com> <55E5936B.3050003@samsung.com>
+Message-ID: <55E597AC.7070208@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 01 Sep 2015, Peter Griffin wrote:
-> On Tue, 01 Sep 2015, Javier Martinez Canillas wrote:
-> > On Tue, Sep 1, 2015 at 11:09 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > > On Tue, 01 Sep 2015, Javier Martinez Canillas wrote:
-> > >> On Fri, Aug 28, 2015 at 7:52 PM, Peter Griffin <peter.griffin@linaro.org> wrote:
-> > >> > gpio.txt documents that GPIO properties should be named
-> > >> > "[<name>-]gpios", with <name> being the purpose of this
-> > >> > GPIO for the device.
-> > >> >
-> > >> > This change has been done as one atomic commit.
-> > >> >
-> > >> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > >> > Acked-by: Lee Jones <lee.jones@linaro.org>
-> > >> > ---
-> > >> >  Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt | 6 +++---
-> > >> >  arch/arm/boot/dts/stihxxx-b2120.dtsi                          | 4 ++--
-> > >> >  drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c         | 2 +-
-> > >> >  3 files changed, 6 insertions(+), 6 deletions(-)
-> > >> >
-> > >> > diff --git a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
-> > >> > index d4def76..e70d840 100644
-> > >> > --- a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
-> > >> > +++ b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
-> > >> > @@ -35,7 +35,7 @@ Required properties (tsin (child) node):
-> > >> >
-> > >> >  - tsin-num     : tsin id of the InputBlock (must be between 0 to 6)
-> > >> >  - i2c-bus      : phandle to the I2C bus DT node which the demodulators & tuners on this tsin channel are connected.
-> > >> > -- rst-gpio     : reset gpio for this tsin channel.
-> > >> > +- reset-gpios  : reset gpio for this tsin channel.
-> > >>
-> > >> The documentation is a bit outdated, the GPIO subsystem supports both
-> > >> -gpio and -gpios, see commit:
-> > >>
-> > >> dd34c37aa3e8 ("gpio: of: Allow -gpio suffix for property names")
-> > >>
-> > >> So it makes sense to me to use -gpio instead of -gpios in this case
-> > >> since is a single GPIO. Also rst is already a descriptive name since
-> > >> that's how many datasheets name a reset pin. I'm not saying I'm
-> > >> against this patch, just pointing out since the commit message is a
-> > >> bit misleading.
+Hello Krzysztof,
+
+On 09/01/2015 02:00 PM, Krzysztof Kozlowski wrote:
+> W dniu 01.09.2015 o 17:48, Javier Martinez Canillas pisze:
+
+[snip]
+
+>>>  
+>>>  &hsi2c_5 {
+>>>  	status = "okay";
+>>
+>> since I believe for the Odroid XU4 we would like this to be disabled.
+>> The only I2C device in this I2C bus is the max98090 codec which is
+>> not present in the XU4.
 > 
-> Ok thanks for pointing that out. It's nice to know the original binding was
-> actually OK.
-
-By luck, rather than judgement. ;)
-
-> > > As I suggested this patch, I feel I must comment.
-> > >
-> > > My order of preference would be:
-> > >
-> > >  reset-gpio
-> > >  reset-gpios
-> > >  rst-gpio
-> > >  rst-gpios
-> > >
-> > > This current patch is No2, so it's okay to stay IMHO.
-> > >
-> > 
-> > If the property is being changed anyways, why not going with No1 then?
+> hsi2c_5 and i2s_0 are not used by board directly but are connected to
+> external connector:
+> http://www.hardkernel.com/main/products/prdt_info.php?g_code=G143452239825&tab_idx=2
 > 
-> I've changed to No1 in v4.
+> This is the 12pin GPIO/I2C/I2S connector in bottom-right corner of board
+> view.
+>
 
-Nice!  Thanks for fixing up.
+Thanks for the info, I missed that.
+ 
+> This is why I left this and is2_0 enabled on Odroid XU4 - I assumed
+> someone may connect something to it. However I have doubts if it is
 
+Yes, now it makes sense.
+
+> usable in such state: without respective addresses and interrupts. In
+> the same time OF_OVERLAY should customize it properly.
+>
+> What do you think?
+>
+
+As you said, these are not usable in the current form since if someone
+wants to use it, has to add a dev node for the I2C device, possibly a
+clock-frequency to change the default operating frequency, etc.
+
+So has to either create a new DTS based on exynos5422-odroidxu4.dts or
+as you said use OF overlays. IMHO these should be left disabled and be
+enabled by users when adding the needed stuff.
+ 
+> Thanks for review,
+> Best regards,
+> Krzysztof
+> 
+
+Best regards,
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
