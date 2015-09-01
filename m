@@ -1,43 +1,48 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Tue, 01 Sep 2015 14:19:20 -0700
-Subject: [PATCH] ARM: dts: keystone: use one to one address translations
- under netcp
-In-Reply-To: <1441139324-29296-1-git-send-email-w-kwok2@ti.com>
-References: <1441139324-29296-1-git-send-email-w-kwok2@ti.com>
-Message-ID: <55E61658.9010207@oracle.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 01 Sep 2015 23:47:35 +0200
+Subject: [PATCH v4 0/16] Add Analogix Core Display Port Driver
+In-Reply-To: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
+References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <3233920.KG0buE86B2@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/1/15 1:28 PM, WingMan Kwok wrote:
-> Network subsystem NetCP in Keystone-2 devices includes some HW blocks
-> that are memory mapped to ranges outside that of the NetCP itself.
-> Thus address space of a child node of the NetCP node needs to be
-> mapped 1:1 onto the parent address space.  Hence empty ranges
-> should be used under the NetCP node.
->
-> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> ---
->   arch/arm/boot/dts/k2e-netcp.dtsi  |    8 +++-----
->   arch/arm/boot/dts/k2hk-netcp.dtsi |   14 ++++++--------
->   arch/arm/boot/dts/k2l-netcp.dtsi  |    8 +++-----
->   3 files changed, 12 insertions(+), 18 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/k2e-netcp.dtsi b/arch/arm/boot/dts/k2e-netcp.dtsi
-> index b13b3c9..e103ed9 100644
-> --- a/arch/arm/boot/dts/k2e-netcp.dtsi
-> +++ b/arch/arm/boot/dts/k2e-netcp.dtsi
-> @@ -111,9 +111,7 @@ netcp: netcp at 24000000 {
->   	compatible = "ti,netcp-1.0";
->   	#address-cells = <1>;
->   	#size-cells = <1>;
-> -
-> -	/* NetCP address range */
-> -	ranges = <0 0x24000000 0x1000000>;
-> +	ranges;
->
-What blocks are we talking here. We need to increase the
-range if the current range isn't covering entire NETCP
-address space. Removing range isn't a solution.
+Hi Yakir,
 
-Regards,
-Santosh
+Am Dienstag, 1. September 2015, 13:46:11 schrieb Yakir Yang:
+>    The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
+> share the same IP, so a lot of parts can be re-used. I split the common
+> code into bridge directory, then rk3288 and exynos only need to keep
+> some platform code. Cause I can't find the exact IP name of exynos dp
+> controller, so I decide to name dp core driver with "analogix" which I
+> find in rk3288 eDP TRM ;)
+> 
+> Beyond that, there are three light registers setting differents bewteen
+> exynos and rk3288.
+> 1. RK3288 have five special pll resigters which not indicata in exynos
+>    dp controller.
+> 2. The address of DP_PHY_PD(dp phy power manager register) are different
+>    between rk3288 and exynos.
+> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
+>    register).
+> 
+> I have verified this series on two kinds of rockchip platform board, one
+> is rk3288 sdk board which connect with a 2K display port monitor, the other
+> is google jerry chromebook which connect with a eDP screen "cnm,n116bgeea2",
+> both of them works rightlly.
+
+it looks like during the rebase something did go wrong and I found some issues 
+I mentioned in the replies to individual patches.
+
+I did prepare a branch based on mainline [0] with both the old and the new edp 
+driver - rk3288_veyron_defconfig build both drivers into the image.
+
+While the old driver still works, I wasn't able to make the new one work yet 
+... the drm core does find the connector, but not that anything is connected 
+to it. I'll try to dig deeper tomorrow, but maybe you'll see anything 
+interesting before then.
+
+
+Heiko
+
+[0] https://github.com/mmind/linux-rockchip/tree/tmp/edp-with-veyron
