@@ -1,203 +1,74 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 01 Sep 2015 23:00:57 +0200
-Subject: [PATCH v4 09/16] drm: rockchip: add bpc and color mode setting
-In-Reply-To: <1441087308-25455-1-git-send-email-ykk@rock-chips.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <1441087308-25455-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <120097760.HO2inCimVA@phil>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 1 Sep 2015 14:19:38 -0700
+Subject: [PATCH 15/16] mtd: mtdcore: fix initcall level
+In-Reply-To: <1440592108-3740-16-git-send-email-holler@ahsoftware.de>
+References: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
+ <1440592108-3740-16-git-send-email-holler@ahsoftware.de>
+Message-ID: <20150901211938.GJ81844@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yakir,
+Hi Alexander,
 
-Am Dienstag, 1. September 2015, 14:01:48 schrieb Yakir Yang:
-> From: Mark Yao <yzq@rock-chips.com>
+No judgment here for the rest of this series, but for this patch:
+
+On Wed, Aug 26, 2015 at 02:28:27PM +0200, Alexander Holler wrote:
+> The mtd-core has to be initialized before other dependent mtd-drivers,
+> otherwise a crash might occur.
 > 
-> Add bpc and color mode setting in rockchip_drm_vop driver, so
-> connector could try to use the edid drm_display_info to config
-> vop output mode.
+> Currently mtd_init() is called in the initcall-level device, which is the
+> same level where most mtd-drivers will end up. By luck this seemed to have
+> been called most of the time before other mtd-drivers without having been
+> explicitly enforced.
+
+I can't really speak for the original authors, but it does not appear to
+be entirely "by luck." Link order was one of the de facto ways to get
+this ordering (though it's not really a great one), and mtdcore was
+always linked first within the drivers/mtd/ directory structure.
+
+But that's just background, I think this is worth fixing anyway. It
+could, for instance, become a problem if drivers are located outside
+drivers/mtd/; I see random board files in arch/ that register with MTD,
+and I'm actually not sure how they have never tripped on this.
+
+> But if mtd_init() is not called before a dependent
+> driver, a null-pointer exception might occur (e.g. because the mtd device
+> class isn't registered).
 > 
-> Signed-off-by: Mark Yao <yzq@rock-chips.com>
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> To fix this, mtd-init() is moved to the initcall-level fs (right before
+> the standard initcall level device).
+
+Is there a good reason we shouldn't just make this a subsys_initcall()?
+That would match the naming better, and it mirrors what, e.g.,
+block/genhd uses. It would also allow flexibility if there are other
+current/future use cases that might need to sit between the subsystem
+and the drivers.
+
+> Signed-off-by: Alexander Holler <holler@ahsoftware.de>
 > ---
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
+>  drivers/mtd/mtdcore.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
->  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 46
-> +++++++++++++++++++------ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c     |
->  2 +-
->  drivers/gpu/drm/rockchip/rockchip_drm_drv.h     |  2 +-
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c     | 33 ++++++++++++++++--
->  4 files changed, 68 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c index cebff9e..efea045
-> 100644
-> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> @@ -11,11 +11,6 @@
->   * Free Software Foundation; either version 2 of the License, or (at your
->   * option) any later version.
->   */
-> -#include <drm/drmP.h>
-> -#include <drm/drm_crtc_helper.h>
-> -#include <drm/drm_panel.h>
-> -#include <drm/drm_of.h>
-> -#include <drm/drm_dp_helper.h>
-> 
->  #include <linux/component.h>
->  #include <linux/mfd/syscon.h>
-> @@ -27,6 +22,13 @@
->  #include <video/of_videomode.h>
->  #include <video/videomode.h>
-> 
-> +#include <drm/drmP.h>
-> +#include <drm/drm_crtc.h>
-> +#include <drm/drm_crtc_helper.h>
-> +#include <drm/drm_panel.h>
-> +#include <drm/drm_of.h>
-> +#include <drm/drm_dp_helper.h>
-> +
->  #include <drm/bridge/analogix_dp.h>
-> 
->  #include "rockchip_drm_drv.h"
-> @@ -125,20 +127,44 @@ static void rockchip_dp_drm_encoder_mode_set(struct
-> drm_encoder *encoder, /* do nothing */
+> diff --git a/drivers/mtd/mtdcore.c b/drivers/mtd/mtdcore.c
+> index 8bbbb75..fa8e6452 100644
+> --- a/drivers/mtd/mtdcore.c
+> +++ b/drivers/mtd/mtdcore.c
+> @@ -1303,7 +1303,7 @@ static void __exit cleanup_mtd(void)
+>  	bdi_destroy(&mtd_bdi);
 >  }
+>  
+> -module_init(init_mtd);
+> +fs_initcall_sync(init_mtd);
+
+Why the *_sync() version? init_mtd() is very simple and doesn't have any
+multithreading issues to handle.
+
+>  module_exit(cleanup_mtd);
+>  
+>  MODULE_LICENSE("GPL");
+> -- 
+> 2.1.0
 > 
-> +static drm_connector *rockchip_dp_get_connector(struct rockchip_dp_device
 
-missing a "struct" -> static struct drm_connector
-
-
-> *dp) +{
-> +	struct drm_connector *connector;
-> +	struct drm_device *drm_dev = dp->drm_dev;
-> +
-> +	drm_for_each_connector(connector, drm_dev) {
-> +		if (connector->encoder != &dp->encoder)
-> +			return connector;
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
->  static void rockchip_dp_drm_encoder_prepare(struct drm_encoder *encoder)
->  {
->  	struct rockchip_dp_device *dp = encoder_to_dp(encoder);
-> +	struct drm_connector *connector;
-> +	int ret = 0;
->  	u32 val;
-> -	int ret;
-> 
-> -	ret = rockchip_drm_crtc_mode_config(encoder->crtc,
-> -					    DRM_MODE_CONNECTOR_eDP,
-> -					    ROCKCHIP_OUT_MODE_AAAA);
-> -	if (ret < 0) {
-> +	connector = rockchip_dp_get_connector(dp);
-> +	if (!connector) {
-> +		DRM_ERROR("Failed to get connector by encoder[%p]\n", encoder);
-> +		return;
-> +	}
-> +
-> +	if (connector->display_info.color_formats | DRM_COLOR_FORMAT_RGB444)
-> +		ret = rockchip_drm_crtc_mode_config(
-> +			encoder->crtc, DRM_MODE_CONNECTOR_eDP,
-> +			connector->display_info.bpc, DRM_COLOR_FORMAT_RGB444);
-> +	if (!ret) {
->  		dev_err(dp->dev, "Could not set crtc mode config: %d.\n", ret);
->  		return;
->  	}
-> 
-> +	connector->display_info.bpc = ret;
-> +	connector->display_info.color_formats = DRM_COLOR_FORMAT_RGB444;
-> +
->  	ret = rockchip_drm_encoder_get_mux_id(dp->dev->of_node, encoder);
->  	if (ret < 0)
->  		return;
-> diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c index 80d6fc8..428a3c1 100644
-> --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> @@ -215,7 +215,7 @@ static void dw_hdmi_rockchip_encoder_commit(struct
-> drm_encoder *encoder) static void dw_hdmi_rockchip_encoder_prepare(struct
-> drm_encoder *encoder) {
->  	rockchip_drm_crtc_mode_config(encoder->crtc, DRM_MODE_CONNECTOR_HDMIA,
-> -				      ROCKCHIP_OUT_MODE_AAAA);
-> +				      10, DRM_COLOR_FORMAT_RGB444);
->  }
-> 
->  static struct drm_encoder_helper_funcs
-> dw_hdmi_rockchip_encoder_helper_funcs = { diff --git
-> a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h index dc4e5f0..ef1d7fb 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> @@ -59,7 +59,7 @@ void rockchip_unregister_crtc_funcs(struct drm_device
-> *dev, int pipe); int rockchip_drm_encoder_get_mux_id(struct device_node
-> *node,
->  				    struct drm_encoder *encoder);
->  int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc, int
-> connector_type, -				  int out_mode);
-> +				  int bpc, int color);
->  int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
->  				   struct device *dev);
->  void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c index 34b78e7..5d7f9b6 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -811,14 +811,41 @@ static const struct drm_plane_funcs vop_plane_funcs =
-> {
-> 
->  int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc,
->  				  int connector_type,
-> -				  int out_mode)
-> +				  int bpc, int color)
->  {
->  	struct vop *vop = to_vop(crtc);
-> -
->  	vop->connector_type = connector_type;
->  	vop->connector_out_mode = out_mode;
-
-this line should probably go away, as the source var "out_mode" does not exist 
-in the function params any more, making the compilation break, and is set 
-below anyway.
-
-
-Heiko
-
-> 
-> -	return 0;
-> +	/*
-> +	 * RK3288 vop only support RGB Color output.
-> +	 */
-> +	if (color != DRM_COLOR_FORMAT_RGB444) {
-> +		DRM_ERROR("Only support output RGB444, not support%d\n",
-> +			  color);
-> +		return -EINVAL;
-> +	}
-> +
-> +	/*
-> +	 * Fixme: I don't know how to describe the ROCKCHIP_OUT_MODE_P565's
-> +	 * bpc, 5 or 6?
-> +	 *
-> +	 */
-> +	if (bpc >= 10) {
-> +		bpc = 10;
-> +		vop->connector_out_mode = ROCKCHIP_OUT_MODE_AAAA;
-> +	} else if (bpc >= 8) {
-> +		bpc = 8;
-> +		vop->connector_out_mode = ROCKCHIP_OUT_MODE_P888;
-> +	} else if (bpc >= 6) {
-> +		bpc = 6;
-> +		vop->connector_out_mode = ROCKCHIP_OUT_MODE_P888;
-> +	} else {
-> +		DRM_ERROR("unsupport bpc %d\n", bpc);
-> +		return -EINVAL;
-> +	}
-> +
-> +	return bpc;
->  }
->  EXPORT_SYMBOL_GPL(rockchip_drm_crtc_mode_config);
+Regards,
+Brian
