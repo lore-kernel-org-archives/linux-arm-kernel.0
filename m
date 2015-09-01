@@ -1,34 +1,32 @@
-From: kuleshovmail@gmail.com (Alexander Kuleshov)
-Date: Tue,  1 Sep 2015 20:29:48 +0600
-Subject: [PATCH 5/5 v2] arm/mmu: Use memblock_first_region_size() helper
-In-Reply-To: <1441117527-30466-1-git-send-email-kuleshovmail@gmail.com>
-References: <1441117527-30466-1-git-send-email-kuleshovmail@gmail.com>
-Message-ID: <1441117788-30822-1-git-send-email-kuleshovmail@gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 1 Sep 2015 17:41:10 +0300
+Subject: [PATCH 0/2] arm64: introduce run-time detection of aarch32 support
+Message-ID: <1441118472-3513-1-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 0a11142e commit (mm/memblock: Introduce memblock_first_region_size()
-helper) introduced memblock_first_region_size() helper for the getting
-size of the first memblock region. Let's use it instead of directly access
-to structure.
+This is needed to avoid loading aarch32 binaries if COMPAT is enabled, but
+aarch32 is not supported by specific platform.
 
-Signed-off-by: Alexander Kuleshov <kuleshovmail@gmail.com>
----
- arch/arm/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+First patch fixes hidden header dependencies in arch/arm64/include/asm/cpufeature.h.
+It's not related to the issue, but helps to avoid build failure that happens
+if one applies second patch only.
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 870838a..fc60882 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1176,7 +1176,7 @@ static inline void prepare_page_table(void)
- 	/*
- 	 * Find the end of the first block of lowmem.
- 	 */
--	end = memblock.memory.regions[0].base + memblock.memory.regions[0].size;
-+	end = memblock.memory.regions[0].base + memblock_first_region_size();
- 	if (end >= arm_lowmem_limit)
- 		end = arm_lowmem_limit;
- 
+Second patch adds run-time detection of aarch32 support, and rejects kernel to
+load such binaries, if not supported.
+
+Tested on ThunderX.
+
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+
+Yury Norov (2):
+  arm64: cpufeature.h: resolve hidden header dependencies
+  arm64: don't load 32-bit binaries if platform has no aarch32_el0
+
+ arch/arm64/include/asm/cpufeature.h | 6 ++++++
+ arch/arm64/include/asm/elf.h        | 6 ++++--
+ arch/arm64/kernel/cpuinfo.c         | 9 +++++++++
+ 3 files changed, 19 insertions(+), 2 deletions(-)
+
 -- 
-2.5.0
+2.1.4
