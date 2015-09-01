@@ -1,50 +1,201 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 1 Sep 2015 10:09:58 +0900
-Subject: [RESEND PATCH v3 3/5] sh: kill off set_irq_flags usage
-In-Reply-To: <CAL_JsqJuPtkvFMFvcSwaFssXoLYrHs9bM3EedXSzj21YAPmwDQ@mail.gmail.com>
-References: <1440889285-5637-1-git-send-email-robh@kernel.org>
- <1440889285-5637-4-git-send-email-robh@kernel.org>
- <20150831050104.GA26119@verge.net.au>
- <CAL_JsqJuPtkvFMFvcSwaFssXoLYrHs9bM3EedXSzj21YAPmwDQ@mail.gmail.com>
-Message-ID: <20150901010958.GA29746@verge.net.au>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Tue, 1 Sep 2015 09:14:12 +0800
+Subject: [PATCH 2/2] arm64: dts: add dts files for Hisilicon Hip05-D02
+ Development Board
+In-Reply-To: <20150831144019.GA22491@leoy-linaro>
+References: <1440838361-1468-1-git-send-email-dingtianhong@huawei.com>
+ <1440838361-1468-3-git-send-email-dingtianhong@huawei.com>
+ <20150831131244.GB6194@leoy-linaro> <55E45A46.7040805@huawei.com>
+ <20150831144019.GA22491@leoy-linaro>
+Message-ID: <55E4FBE4.3010808@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 31, 2015 at 07:52:07AM -0500, Rob Herring wrote:
-> On Mon, Aug 31, 2015 at 12:01 AM, Simon Horman <horms@verge.net.au> wrote:
-> > Hi Rob,
-> >
-> > On Sat, Aug 29, 2015 at 06:01:23PM -0500, Rob Herring wrote:
-> >> set_irq_flags is ARM specific with custom flags which have genirq
-> >> equivalents. Convert drivers to use the genirq interfaces directly, so we
-> >> can kill off set_irq_flags. The translation of flags is as follows:
-> >>
-> >> IRQF_VALID -> !IRQ_NOREQUEST
-> >> IRQF_PROBE -> !IRQ_NOPROBE
-> >> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
-> >>
-> >> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
-> >> and setting IRQ_NOREQUEST already, so there is no need to do this in
-> >> .map() functions and we can simply remove the set_irq_flags calls. Some
-> >> users also modify IRQ_NOPROBE and this has been maintained although it
-> >> is not clear that is really needed. There appears to be a great deal of
-> >> blind copy and paste of this code.
-> >>
-> >> Signed-off-by: Rob Herring <robh@kernel.org>
-> >> Acked-by: Simon Horman <horms@verge.net.au>
-> >> Cc: Magnus Damm <magnus.damm@gmail.com>
-> >> Cc: linux-sh at vger.kernel.org
-> >
-> > I have queued this up. Please let me know if that was not your intent.
-> >
-> > The patch is queued up in the sh-drivers-for-v4.3 branch of my renesas tree.
-> > At this point I plan to send a pull-request once dt changes that other
-> > patches in that branch depend on hit Linus's tree via the ARM SoC tree.
-> > I anticipate that being during the rc1 or rc2 timeframe.
+On 2015/8/31 22:40, Leo Yan wrote:
+> On Mon, Aug 31, 2015 at 09:44:38PM +0800, Ding Tianhong wrote:
+>> On 2015/8/31 21:12, Leo Yan wrote:
+>>> On Sat, Aug 29, 2015 at 04:52:41PM +0800, Ding Tianhong wrote:
+>>>> Add initial dtsi file to support Hisilicon Hip05-D02 Board with
+>>>> support of CPUs in four clusters and each cluster has quard Cortex-A57.
+>>>>
+>>>> Also add dts file to support Hip05-D02 development board.
+>>>>
+>>>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>>>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>>>> ---
+>>>>  arch/arm64/boot/dts/hisilicon/Makefile      |   2 +-
+>>>>  arch/arm64/boot/dts/hisilicon/hip05-d02.dts |  36 ++++
+>>>>  arch/arm64/boot/dts/hisilicon/hip05.dtsi    | 271 ++++++++++++++++++++++++++++
+>>>>  3 files changed, 308 insertions(+), 1 deletion(-)
+>>>>  create mode 100644 arch/arm64/boot/dts/hisilicon/hip05-d02.dts
+>>>>  create mode 100644 arch/arm64/boot/dts/hisilicon/hip05.dtsi
+>>>>
+>>>> diff --git a/arch/arm64/boot/dts/hisilicon/Makefile b/arch/arm64/boot/dts/hisilicon/Makefile
+>>>> index fa81a6e..cd158b8 100644
+>>>> --- a/arch/arm64/boot/dts/hisilicon/Makefile
+>>>> +++ b/arch/arm64/boot/dts/hisilicon/Makefile
+>>>> @@ -1,4 +1,4 @@
+>>>> -dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb
+>>>> +dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb hip05-d02.dtb
+>>>>  
+>>>>  always		:= $(dtb-y)
+>>>>  subdir-y	:= $(dts-dirs)
+>>>> diff --git a/arch/arm64/boot/dts/hisilicon/hip05-d02.dts b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
+>>>> new file mode 100644
+>>>> index 0000000..ae34e25
+>>>> --- /dev/null
+>>>> +++ b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
+>>>> @@ -0,0 +1,36 @@
+>>>> +/**
+>>>> + * dts file for Hisilicon D02 Development Board
+>>>> + *
+>>>> + * Copyright (C) 2014,2015 Hisilicon Ltd.
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or modify
+>>>> + * it under the terms of the GNU General Public License version 2 as
+>>>> + * publishhed by the Free Software Foundation.
+>>>> + *
+>>>> + */
+>>>> +
+>>>> +/dts-v1/;
+>>>> +
+>>>> +#include "hip05.dtsi"
+>>>> +
+>>>> +/ {
+>>>> +	model = "Hisilicon Hip05 D02 Development Board";
+>>>> +	compatible = "hisilicon,hip05-d02";
+>>>> +
+>>>> +	memory at 00000000 {
+>>>> +		device_type = "memory";
+>>>> +		reg = <0x0 0x00000000 0x0 0x80000000>;
+>>>> +	};
+>>>> +
+>>>> +	aliases {
+>>>> +		serial0 = &uart0;
+>>>> +	};
+>>>> +
+>>>> +	chosen {
+>>>> +		stdout-path = "serial0:115200n8";
+>>>> +	};
+>>>> +};
+>>>> +
+>>>> +&uart0 {
+>>>> +	status = "ok";
+>>>> +};
+>>>> diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+>>>> new file mode 100644
+>>>> index 0000000..da12d94
+>>>> --- /dev/null
+>>>> +++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+>>>> @@ -0,0 +1,271 @@
+>>>> +/**
+>>>> + * dts file for Hisilicon D02 Development Board
+>>>> + *
+>>>> + * Copyright (C) 2014,2015 Hisilicon Ltd.
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or modify
+>>>> + * it under the terms of the GNU General Public License version 2 as
+>>>> + * publishhed by the Free Software Foundation.
+>>>> + *
+>>>> + */
+>>>> +
+>>>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>>>> +
+>>>> +/ {
+>>>> +	compatible = "hisilicon,hip05-d02";
+>>>> +	interrupt-parent = <&gic>;
+>>>> +	#address-cells = <2>;
+>>>> +	#size-cells = <2>;
+>>>> +
+>>>> +	psci {
+>>>> +		compatible = "arm,psci-0.2";
+>>>> +		method = "smc";
+>>>> +	};
+>>>> +
+>>>> +	cpus {
+>>>> +		#address-cells = <1>;
+>>>> +		#size-cells = <0>;
+>>>> +
+>>>> +		cpu-map {
+>>>> +			cluster0 {
+>>>> +				core0 {
+>>>> +					cpu = <&cpu0>;
+>>>> +				};
+>>>> +				core1 {
+>>>> +					cpu = <&cpu1>;
+>>>> +				};
+>>>> +				core2 {
+>>>> +					cpu = <&cpu2>;
+>>>> +				};
+>>>> +				core3 {
+>>>> +					cpu = <&cpu3>;
+>>>> +				};
+>>>> +			};
+>>>> +			cluster1 {
+>>>> +				core0 {
+>>>> +					cpu = <&cpu4>;
+>>>> +				};
+>>>> +				core1 {
+>>>> +					cpu = <&cpu5>;
+>>>> +				};
+>>>> +				core2 {
+>>>> +					cpu = <&cpu6>;
+>>>> +				};
+>>>> +				core3 {
+>>>> +					cpu = <&cpu7>;
+>>>> +				};
+>>>> +			};
+>>>> +			cluster2 {
+>>>> +				core0 {
+>>>> +					cpu = <&cpu8>;
+>>>> +				};
+>>>> +				core1 {
+>>>> +					cpu = <&cpu9>;
+>>>> +				};
+>>>> +				core2 {
+>>>> +					cpu = <&cpu10>;
+>>>> +				};
+>>>> +				core3 {
+>>>> +					cpu = <&cpu11>;
+>>>> +				};
+>>>> +			};
+>>>> +			cluster3 {
+>>>> +				core0 {
+>>>> +					cpu = <&cpu12>;
+>>>> +				};
+>>>> +				core1 {
+>>>> +					cpu = <&cpu13>;
+>>>> +				};
+>>>> +				core2 {
+>>>> +					cpu = <&cpu14>;
+>>>> +				};
+>>>> +				core3 {
+>>>> +					cpu = <&cpu15>;
+>>>> +				};
+>>>> +			};
+>>>> +		};
+>>>> +
+>>>> +		cpu0: cpu at 20000 {
+>>>> +			device_type = "cpu";
+>>>> +			compatible = "arm,armv8";
+>>>
+>>> Change to "arm,cortex-a57","arm,armv8"?
+>>>
+>>
+>> Ok?but I think should be "hisilicon,hip05","arm,armv8".
 > 
-> This needs to go in before -rc1 so the final 2 patches removing
-> set_irq_flags can go in at the end of the merge window. Given your
-> timeline, I think you can just leave this one for Thomas to apply with
-> those 2.
+> If the CPU is a starndard ARM core (such like CA53, CA57, etc), you
+> need directly use the CPU type which has been defined in:
+> Documentation/devicetree/bindings/arm/cpus.txt. So here hip05 is the
+> naming code for SoC? or for the CPU customized by Hisilicon?
+> 
+> [...]
 
-Sure, will do.
+Hip05 is the name for SoC.
+
+> 
+> Thanks,
+> Leo Yan
+> 
+> .
+> 
