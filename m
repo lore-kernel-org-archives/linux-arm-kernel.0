@@ -1,36 +1,76 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 1 Sep 2015 13:12:05 +0530
-Subject: about system time incorrect after changing cpu frequency
-In-Reply-To: <CAOVJa8Hh0i05M7f39Pd9bXQmJA9n8tKTwNQoSmwAdUSSGtP_3w@mail.gmail.com>
-References: <CAOVJa8GTDj3UJpgUd4nH1wknUKa6fgac=1SsqC8g=UCG0MGuDw@mail.gmail.com>
- <CAOh2x=ky8_uwqvdH-krKxgMSby5jgovJp7odK6x=MpqNL+YoGg@mail.gmail.com>
- <CAOVJa8HNQ-s=yDfADCcoL+r22ALpHFtTjWZ=oxTkBUriYbCk+Q@mail.gmail.com>
- <20150901060236.GB1456@linux>
- <CAOVJa8Hh0i05M7f39Pd9bXQmJA9n8tKTwNQoSmwAdUSSGtP_3w@mail.gmail.com>
-Message-ID: <20150901074205.GC1456@linux>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 1 Sep 2015 08:48:07 +0100
+Subject: [PATCH v2 4/4] remoteproc: debugfs: Add ability to boot remote
+ processor using debugfs
+In-Reply-To: <55E07CE2.2050704@mentor.com>
+References: <1440757911-9120-1-git-send-email-lee.jones@linaro.org>
+ <1440757911-9120-5-git-send-email-lee.jones@linaro.org>
+ <55E07CE2.2050704@mentor.com>
+Message-ID: <20150901074807.GI4796@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01-09-15, 15:21, vichy wrote:
-> and I add  PLAT_gt_change_freq in arm_global_timer.c like below:
->  PLAT_gt_change_freq calling() {
->     gt_clk_rate = get_periph_clk();
->     clockevents_update_freq(this_cpu_ptr(gt_evt), gt_clk_rate);
+On Fri, 28 Aug 2015, Nathan Lynch wrote:
 
-In earlier versions of kernel, this had a problem that it works only
-for ONESHOT mode and simply returns in PERIODIC mode. I do see that
-your's mode is ONESHOT only, and so it should have worked.
+> On 08/28/2015 05:31 AM, Lee Jones wrote:
+> > +static ssize_t rproc_state_write(struct file *filp, const char __user *userbuf,
+> > +				 size_t count, loff_t *ppos)
+> > +{
+> > +	struct rproc *rproc = filp->private_data;
+> > +	char buf[2];
+> > +	int ret;
+> > +
+> > +	ret = copy_from_user(buf, userbuf, 1);
+> > +	if (ret)
+> > +		return -EFAULT;
+> > +
+> > +	switch (buf[0]) {
+> > +	case '0':
+> > +		rproc_shutdown(rproc);
+> > +		break;
+> > +	case '1':
+> > +		ret = rproc_boot(rproc);
+> > +		if (ret)
+> > +			dev_warn(&rproc->dev, "Boot failed: %d\n", ret);
+> > +		break;
+> > +	default:
+> > +		dev_err(&rproc->dev, "Unrecognised option: %x\n", buf[1]);
+> > +		return -EINVAL;
+> 
+> This prints uninitialized kernel stack contents instead of what was
+> copied from user space.
 
-Anyway, few prints into that routine to see where we are reaching
-might help.
+Yes, you're right.  I will conduct a better test of the failure path
+here. 
 
->     __clocksource_updatefreq_hz(&gt_clocksource, gt_clk_rate);
+> Is the dev_err statement really necessary anyway?
 
-AFAIR, there is a difference between how different mdelay/udelay are
-implemented. One of them is using the loops_per_jiffie variable to
-calculate the time, other uses clkevt device. I am not 100% sure about
-the theory, but that's what I remember. So, have a look from that
-perspective as well..
+Yes.  As I described in my other mail, this interface is for Kernel
+Engineers, who read the kernel log.
+
+> > +	}
+> > +
+> > +	return count;
+> > +}
+> 
+> If rproc_boot fails, that should be reflected in the syscall result.
+> 
+> This interface is essentially exposing the remoteproc->power refcount to
+> user space; is that okay?  Seems like it makes it easy to underflow
+> remoteproc->power through successive shutdown calls.
+
+If the subsystem is suseptable to underruns someone should think about
+adding protection against imbalances in the 'core'.
+
+> The other debugfs interface in remoteproc that has a write method
+> (recovery) accepts more expressive string commands as opposed to 0/1.
+> It would be more consistent for this interface to take commands such as
+> "boot" and "shutdown" IMO.
+
+Agreed.
 
 -- 
-viresh
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
