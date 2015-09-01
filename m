@@ -1,50 +1,56 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue,  1 Sep 2015 11:48:13 +0100
-Subject: [PATCH v4 5/6] [media] c8sectpfe: Update DT binding doc with some
- minor fixes
+Date: Tue,  1 Sep 2015 11:48:14 +0100
+Subject: [PATCH v4 6/6] [media] c8sectpfe: Simplify for loop in
+ load_slim_core_fw
 In-Reply-To: <1441104494-10468-1-git-send-email-peter.griffin@linaro.org>
 References: <1441104494-10468-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1441104494-10468-6-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1441104494-10468-7-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- .../devicetree/bindings/media/stih407-c8sectpfe.txt        | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
-index 84ae9d1..4cb539d 100644
---- a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
-+++ b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
-@@ -55,20 +55,20 @@ Example:
- 		status = "okay";
- 		reg = <0x08a20000 0x10000>, <0x08a00000 0x4000>;
- 		reg-names = "stfe", "stfe-ram";
--		interrupts = <0 34 0>, <0 35 0>;
-+		interrupts = <GIC_SPI 34 IRQ_TYPE_NONE>, <GIC_SPI 35 IRQ_TYPE_NONE>;
- 		interrupt-names = "stfe-error-irq", "stfe-idle-irq";
--
--		pinctrl-names	= "tsin0-serial", "tsin0-parallel", "tsin3-serial",
--				"tsin4-serial", "tsin5-serial";
--
- 		pinctrl-0	= <&pinctrl_tsin0_serial>;
- 		pinctrl-1	= <&pinctrl_tsin0_parallel>;
- 		pinctrl-2	= <&pinctrl_tsin3_serial>;
- 		pinctrl-3	= <&pinctrl_tsin4_serial_alt3>;
- 		pinctrl-4	= <&pinctrl_tsin5_serial_alt1>;
--
-+		pinctrl-names	= "tsin0-serial",
-+				  "tsin0-parallel",
-+				  "tsin3-serial",
-+				  "tsin4-serial",
-+				  "tsin5-serial";
- 		clocks = <&clk_s_c0_flexgen CLK_PROC_STFE>;
--		clock-names = "stfe";
-+		clock-names = "c8sectpfe";
+diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+index e19c6b4..782174a 100644
+--- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
++++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+@@ -1096,7 +1096,7 @@ static int load_slim_core_fw(const struct firmware *fw, void *context)
+ 	Elf32_Ehdr *ehdr;
+ 	Elf32_Phdr *phdr;
+ 	u8 __iomem *dst;
+-	int err, i;
++	int err = 0, i;
  
- 		/* tsin0 is TSA on NIMA */
- 		tsin0: port at 0 {
+ 	if (!fw || !context)
+ 		return -EINVAL;
+@@ -1105,7 +1105,7 @@ static int load_slim_core_fw(const struct firmware *fw, void *context)
+ 	phdr = (Elf32_Phdr *)(fw->data + ehdr->e_phoff);
+ 
+ 	/* go through the available ELF segments */
+-	for (i = 0; i < ehdr->e_phnum && !err; i++, phdr++) {
++	for (i = 0; i < ehdr->e_phnum; i++, phdr++) {
+ 
+ 		/* Only consider LOAD segments */
+ 		if (phdr->p_type != PT_LOAD)
+@@ -1118,7 +1118,7 @@ static int load_slim_core_fw(const struct firmware *fw, void *context)
+ 			dev_err(fei->dev,
+ 				"Segment %d is outside of firmware file\n", i);
+ 			err = -EINVAL;
+-			break;
++			goto err;
+ 		}
+ 
+ 		/*
+@@ -1146,6 +1146,7 @@ static int load_slim_core_fw(const struct firmware *fw, void *context)
+ 		}
+ 	}
+ 
++err:
+ 	release_firmware(fw);
+ 	return err;
+ }
 -- 
 1.9.1
