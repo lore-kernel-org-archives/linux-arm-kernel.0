@@ -1,15 +1,16 @@
 From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue,  1 Sep 2015 17:57:19 +0800
-Subject: [PATCH v3 3/9] Documentation: spi-rockchip: add description of
- rockchip, spi-broken-burst-len
+Date: Tue,  1 Sep 2015 17:57:29 +0800
+Subject: [PATCH v3 4/9] Documentation: rockchip-i2s: add description of
+ rockchip, i2s-broken-burst-len
 In-Reply-To: <1441101381-1329-1-git-send-email-shawn.lin@rock-chips.com>
 References: <1441101381-1329-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <1441101439-1465-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <1441101449-1506-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 cc: Addy Ke <addy.ke@rock-chips.com>
+cc: Jianqun Xu <xjq@rock-chips.com>
 cc: Heiko Stuebner <heiko@sntech.de>
 cc: Doug Anderson <dianders@chromium.org>
 cc: Olof Johansson <olof@lixom.net>
@@ -20,22 +21,23 @@ Changes in v3: None
 Changes in v2: None
 Changes in v1: None
 
- Documentation/devicetree/bindings/spi/spi-rockchip.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-index 0c491bd..2256610 100644
---- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-@@ -27,7 +27,8 @@ Optional Properties:
- - rx-sample-delay-ns: nanoseconds to delay after the SCLK edge before sampling
- 		Rx data (may need to be fine tuned for high capacitance lines).
- 		No delay (0) by default.
--
-+- rockchip,spi-broken-burst-len: quirk for broken burst len on Rockchip platform.
-+			Add this property will force driver to set burst ONE.
+diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+index 9b82c20..9987787 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+@@ -22,6 +22,10 @@ Required properties:
+    - "i2s_hclk": clock for I2S BUS
+    - "i2s_clk" : clock for I2S controller
  
- Example:
++Optional Properties:
++- rockchip,i2s-broken-burst-len: quirk for broken burst len on Rockchip platform.
++				 Add this property will force driver to set burst ONE.
++
+ Example for rk3288 I2S controller:
  
+ i2s at ff890000 {
 -- 
 2.3.7
