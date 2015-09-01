@@ -1,199 +1,86 @@
-From: rklein@nvidia.com (Rhyland Klein)
-Date: Tue, 1 Sep 2015 18:33:49 -0400
-Subject: driver core: correct device's shutdown order
-In-Reply-To: <1438018981-13893-1-git-send-email-grygorii.strashko@ti.com>
-References: <1438018981-13893-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <55E627CD.8050906@nvidia.com>
+From: aalonso@freescale.com (Adrian Alonso)
+Date: Tue, 1 Sep 2015 17:49:06 -0500
+Subject: [PATCH v2 1/8] pinctrl: freescale: imx: fix system crash if enable
+ two pinctl instances
+Message-ID: <1441147753-13239-1-git-send-email-aalonso@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/27/2015 1:43 PM, Strashko, Grygorii wrote:
-> Now device's shutdown sequence is performed in reverse order of their
-> registration in devices_kset list and this sequence corresponds to the
-> reverse device's creation order. So, devices_kset data tracks
-> "parent<-child" device's dependencies only.
-> 
-> Unfortunately, that's not enough and causes problems in case of
-> implementing board's specific shutdown procedures. For example [1]:
-> "DRA7XX_evm uses PCF8575 and one of the PCF output lines feeds to
-> MMC/SD and this line should be driven high in order for the MMC/SD to
-> be detected. This line is modelled as regulator and the hsmmc driver
-> takes care of enabling and disabling it. In the case of 'reboot',
-> during shutdown path as part of it's cleanup process the hsmmc driver
-> disables this regulator. This makes MMC boot not functional."
-> 
-> To handle this issue the .shutdown() callback could be implemented
-> for PCF8575 device where corresponding GPIO pins will be configured to
-> states, required for correct warm/cold reset. This can be achieved
-> only when all .shutdown() callbacks have been called already for all
-> PCF8575's consumers. But devices_kset is not filled correctly now:
-> 
-> devices_kset: Device61 4e000000.dmm
-> devices_kset: Device62 48070000.i2c
-> devices_kset: Device63 48072000.i2c
-> devices_kset: Device64 48060000.i2c
-> devices_kset: Device65 4809c000.mmc
-> ...
-> devices_kset: Device102 fixedregulator-sd
-> ...
-> devices_kset: Device181 0-0020 // PCF8575
-> devices_kset: Device182 gpiochip496
-> devices_kset: Device183 0-0021 // PCF8575
-> devices_kset: Device184 gpiochip480
-> 
-> As can be seen from above .shutdown() callback for PCF8575 will be called
-> before its consumers, which, in turn means, that any changes of PCF8575
-> GPIO's pins will be or unsafe or overwritten later by GPIO's consumers.
-> The problem can be solved if devices_kset list will be filled not only
-> according device creation order, but also according device's probing
-> order to track "supplier<-consumer" dependencies also.
-> 
-> Hence, as a fix, lets add devices_kset_move_last(),
-> devices_kset_move_before(), devices_kset_move_after() and call them
-> from device_move() and also add call of devices_kset_move_last() in
-> really_probe(). After this change all entries in devices_kset will
-> be sorted according to device's creation ("parent<-child") and
-> probing ("supplier<-consumer") order.
-> 
-> devices_kset after:
-> devices_kset: Device121 48070000.i2c
-> devices_kset: Device122 i2c-0
-> ...
-> devices_kset: Device147 regulator.24
-> devices_kset: Device148 0-0020
-> devices_kset: Device149 gpiochip496
-> devices_kset: Device150 0-0021
-> devices_kset: Device151 gpiochip480
-> devices_kset: Device152 0-0019
-> ...
-> devices_kset: Device372 fixedregulator-sd
-> devices_kset: Device373 regulator.29
-> devices_kset: Device374 4809c000.mmc
-> devices_kset: Device375 mmc0
-> 
-> [1] http://www.spinics.net/lists/linux-mmc/msg29825.html
-> 
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> 
-> ---
-> drivers/base/base.h |  1 +
->  drivers/base/core.c | 49 +++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/base/dd.c   |  8 ++++++++
->  3 files changed, 58 insertions(+)
-> 
-> diff --git a/drivers/base/base.h b/drivers/base/base.h
-> index fd3347d..8c5eb73 100644
-> --- a/drivers/base/base.h
-> +++ b/drivers/base/base.h
-> @@ -134,6 +134,7 @@ extern int devres_release_all(struct device *dev);
->  
->  /* /sys/devices directory */
->  extern struct kset *devices_kset;
-> +extern void devices_kset_move_last(struct device *dev);
->  
->  #if defined(CONFIG_MODULES) && defined(CONFIG_SYSFS)
->  extern void module_add_driver(struct module *mod, struct device_driver *drv);
-> diff --git a/drivers/base/core.c b/drivers/base/core.c
-> index dafae6d..fc5a558 100644
-> --- a/drivers/base/core.c
-> +++ b/drivers/base/core.c
-> @@ -534,6 +534,52 @@ static DEVICE_ATTR_RO(dev);
->  struct kset *devices_kset;
->  
->  /**
-> + * devices_kset_move_before - Move device in the devices_kset's list.
-> + * @deva: Device to move.
-> + * @devb: Device @deva should come before.
-> + */
-> +static void devices_kset_move_before(struct device *deva, struct device *devb)
-> +{
-> +	if (!devices_kset)
-> +		return;
-> +	pr_debug("devices_kset: Moving %s before %s\n",
-> +		 dev_name(deva), dev_name(devb));
-> +	spin_lock(&devices_kset->list_lock);
-> +	list_move_tail(&deva->kobj.entry, &devb->kobj.entry);
-> +	spin_unlock(&devices_kset->list_lock);
-> +}
-> +
-> +/**
-> + * devices_kset_move_after - Move device in the devices_kset's list.
-> + * @deva: Device to move
-> + * @devb: Device @deva should come after.
-> + */
-> +static void devices_kset_move_after(struct device *deva, struct device *devb)
-> +{
-> +	if (!devices_kset)
-> +		return;
-> +	pr_debug("devices_kset: Moving %s after %s\n",
-> +		 dev_name(deva), dev_name(devb));
-> +	spin_lock(&devices_kset->list_lock);
-> +	list_move(&deva->kobj.entry, &devb->kobj.entry);
-> +	spin_unlock(&devices_kset->list_lock);
-> +}
-> +
-> +/**
-> + * devices_kset_move_last - move the device to the end of devices_kset's list.
-> + * @dev: device to move
-> + */
-> +void devices_kset_move_last(struct device *dev)
-> +{
-> +	if (!devices_kset)
-> +		return;
-> +	pr_debug("devices_kset: Moving %s to end of list\n", dev_name(dev));
-> +	spin_lock(&devices_kset->list_lock);
-> +	list_move_tail(&dev->kobj.entry, &devices_kset->list);
-> +	spin_unlock(&devices_kset->list_lock);
-> +}
-> +
-> +/**
->   * device_create_file - create sysfs attribute file for device.
->   * @dev: device.
->   * @attr: device attribute descriptor.
-> @@ -1923,12 +1969,15 @@ int device_move(struct device *dev, struct device *new_parent,
->  		break;
->  	case DPM_ORDER_DEV_AFTER_PARENT:
->  		device_pm_move_after(dev, new_parent);
-> +		devices_kset_move_after(dev, new_parent);
->  		break;
->  	case DPM_ORDER_PARENT_BEFORE_DEV:
->  		device_pm_move_before(new_parent, dev);
-> +		devices_kset_move_before(new_parent, dev);
->  		break;
->  	case DPM_ORDER_DEV_LAST:
->  		device_pm_move_last(dev);
-> +		devices_kset_move_last(dev);
->  		break;
->  	}
->  
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index a638bbb..cc2b1d4 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -304,6 +304,14 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->  			goto probe_failed;
->  	}
->  
-> +	/*
-> +	 * Ensure devices are listed in devices_kset in correct order
-> +	 * It's important to move Dev to the end of devices_kset before
-> +	 * calling .probe, because it could be recursive and parent Dev
-> +	 * should always go first
-> +	 */
-> +	devices_kset_move_last(dev);
-> +
->  	if (dev->bus->probe) {
->  		ret = dev->bus->probe(dev);
->  		if (ret)
-> 
+From: Robin Gong <b38343@freescale.com>
 
-I loaded this change up with an Arm64 booting kernel and verified that
-some previously device drivers which were previously incorrectly ordered
-are now properly ordered.
+Fix system chrash caused by groups whose number is smaller than the number
+of groups of the last pinctl instance which is not initialized.
 
-Reviewed-by: Rhyland Klein <rklein@nvidia.com>
-Tested-by: Rhyland Klein <rklein@nvidia.com>
+iMX7D supports two iomux controllers (iomuxc-lpsr and iomuxc) on probing
+the second instance (iomuxc) the chrash below occurs.
 
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.2.0-next-20150901-00006-gebfa43c (aalonso at bluefly)
+[    0.000000] CPU: ARMv7 Processor [410fc075] revision 5 (ARMv7)
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasin instruction cache
+[    0.000000] Machine model: Freescale i.MX7 SabreSD Board
+[    0.661012] [<802a6cb0>] (strcmp) from [<802cc80c>] (imx_dt_node_to_map+0x58/0x208)
+[    0.668879] [<802cc80c>] (imx_dt_node_to_map) from [<802cbe24>] (pinctrl_dt_to_map+0x174/0x2b0)
+[    0.677654] [<802cbe24>] (pinctrl_dt_to_map) from [<802c8f18>] (pinctrl_get+0x100/0x424)
+[    0.685878] [<802c8f18>] (pinctrl_get) from [<802c9510>] (pinctrl_register+0x26c/0x480)
+[    0.694104] [<802c9510>] (pinctrl_register) from [<802ccf3c>] (imx_pinctrl_probe+0x580/0x6e8)
+[    0.702706] [<802ccf3c>] (imx_pinctrl_probe) from [<80351b58>] (platform_drv_probe+0x44/0xa4)
+[    0.711455] [<80351b58>] (platform_drv_probe) from [<803503ec>] (driver_probe_device+0x174/0x2b4)
+[    0.720405] [<803503ec>] (driver_probe_device) from [<803505fc>] (__driver_attach+0x8c/0x90)
+[    0.728982] [<803505fc>] (__driver_attach) from [<8034e930>] (bus_for_each_dev+0x6c/0xa0)
+[    0.737381] [<8034e930>] (bus_for_each_dev) from [<8034fb88>] (bus_add_driver+0x148/0x1f0)
+[    0.745804] [<8034fb88>] (bus_add_driver) from [<80350c00>] (driver_register+0x78/0xf8)
+[    0.753880] [<80350c00>] (driver_register) from [<800097d0>] (do_one_initcall+0x8c/0x1d4)
+[    0.762282] [<800097d0>] (do_one_initcall) from [<80987dac>] (kernel_init_freeable+0x144/0x1e4)
+[    0.771061] [<80987dac>] (kernel_init_freeable) from [<806d9c7c>] (kernel_init+0x8/0xe8)
+[    0.779285] [<806d9c7c>] (kernel_init) from [<8000f628>] (ret_from_fork+0x14/0x2c)
+[    0.786981] Code: e3520000 e5e32001 1afffffb e12fff1e (e4d03001)
+
+Signed-off-by: Robin Gong <b38343@freescale.com>
+Signed-off-by: Adrian Alonso <aalonso@freescale.com>
+---
+Chages for V2:
+- Reorder patch series
+- Add platform boot up information on kernel error
+- Move gpr_index to imx_pinctrl_soc_info
+
+ drivers/pinctrl/freescale/pinctrl-imx.c | 3 +--
+ drivers/pinctrl/freescale/pinctrl-imx.h | 1 +
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+index d7b98ba..95db9e8 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+@@ -580,7 +580,6 @@ static int imx_pinctrl_parse_functions(struct device_node *np,
+ 	struct device_node *child;
+ 	struct imx_pmx_func *func;
+ 	struct imx_pin_group *grp;
+-	static u32 grp_index;
+ 	u32 i = 0;
+ 
+ 	dev_dbg(info->dev, "parse function(%d): %s\n", index, np->name);
+@@ -599,7 +598,7 @@ static int imx_pinctrl_parse_functions(struct device_node *np,
+ 
+ 	for_each_child_of_node(np, child) {
+ 		func->groups[i] = child->name;
+-		grp = &info->groups[grp_index++];
++		grp = &info->groups[info->grp_index++];
+ 		imx_pinctrl_parse_groups(child, grp, info, i++);
+ 	}
+ 
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h b/drivers/pinctrl/freescale/pinctrl-imx.h
+index 49e55d3..26f8f1c 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.h
++++ b/drivers/pinctrl/freescale/pinctrl-imx.h
+@@ -81,6 +81,7 @@ struct imx_pinctrl_soc_info {
+ 	struct imx_pmx_func *functions;
+ 	unsigned int nfunctions;
+ 	unsigned int flags;
++	u32 grp_index;
+ };
+ 
+ #define SHARE_MUX_CONF_REG	0x1
 -- 
-nvpublic
+2.1.4
