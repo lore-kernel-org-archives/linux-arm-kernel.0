@@ -1,11 +1,11 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 1 Sep 2015 15:35:38 +0300
+Date: Tue, 1 Sep 2015 15:35:52 +0300
 Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
 In-Reply-To: <OFCA2F1DCE.C787A961-ONC1257EAE.001D79BC-C1257EAE.00203AFF@br-automation.com>
 References: <1432156863-19695-1-git-send-email-tony@atomide.com>
  <1432156863-19695-3-git-send-email-tony@atomide.com>
  <OFCA2F1DCE.C787A961-ONC1257EAE.001D79BC-C1257EAE.00203AFF@br-automation.com>
-Message-ID: <55E59B9A.1010007@ti.com>
+Message-ID: <55E59BA8.1020602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
