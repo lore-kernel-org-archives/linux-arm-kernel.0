@@ -1,460 +1,115 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 1 Sep 2015 21:00:43 +0900
-Subject: [PATCH] ARM: dts: Add exynos5422-odroidxu4 board
-In-Reply-To: <55E56646.2070106@osg.samsung.com>
-References: <1440993365-26896-1-git-send-email-k.kozlowski@samsung.com>
- <55E56646.2070106@osg.samsung.com>
-Message-ID: <55E5936B.3050003@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Sep 2015 13:07:02 +0100
+Subject: [PATCH v7 1/2] usb: make xhci platform driver use 64 bit or 32
+ bit DMA
+In-Reply-To: <55E591E9.60008@linux.intel.com>
+References: <1522889.9kdnRk8vHo@wuerfel>
+ <69e6f5bf693d02fba001d02047453bed0519499d.1440098398.git.dhdang@apm.com>
+ <CADaLNDnPaeHcMjywsuQ4oiUpWsNpStshdKVtW=tuUorrcQkZ=g@mail.gmail.com>
+ <55E591E9.60008@linux.intel.com>
+Message-ID: <20150901120702.GK21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 01.09.2015 o 17:48, Javier Martinez Canillas pisze:
-> Hello Krzysztof,
-> 
-> The patch looks good to me, I just have one small comment.
-> 
-> On 08/31/2015 05:56 AM, Krzysztof Kozlowski wrote:
->> Add Hardkernel Odroid XU4 board Device Tree sources. The board differs
->> from Odroid XU3 and XU3-Lite by:
->> 1. No green and red leds (except standard red power led).
->> 2. No audio codec.
->> 3. Two USB3 ports in host mode (no micro USB3 connector for OTG).
->> 4. Realtek RTL8153-CG gigabit network adapter (instead of SMSC9514).
->> 5. Additional connector with IO ports (I2S_0, I2C_5).
->> 6. No DisplayPort.
->> 7. No TI INA231 power measurement sensors.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->>  arch/arm/boot/dts/Makefile                         |  1 +
->>  arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi  | 56 ++++++++++++++
->>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 90 +---------------------
->>  arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    | 52 +++++++++++++
->>  arch/arm/boot/dts/exynos5422-odroidxu3.dts         | 52 +++++++++++++
->>  arch/arm/boot/dts/exynos5422-odroidxu4.dts         | 48 ++++++++++++
->>  6 files changed, 210 insertions(+), 89 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi
->>  create mode 100644 arch/arm/boot/dts/exynos5422-odroidxu4.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 233159d2eaab..3d27fe34647f 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -123,6 +123,7 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
->>  	exynos5420-smdk5420.dtb \
->>  	exynos5422-odroidxu3.dtb \
->>  	exynos5422-odroidxu3-lite.dtb \
->> +	exynos5422-odroidxu4.dtb \
->>  	exynos5440-sd5v1.dtb \
->>  	exynos5440-ssdk5440.dtb \
->>  	exynos5800-peach-pi.dtb
->> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi
->> new file mode 100644
->> index 000000000000..eee16a820484
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi
->> @@ -0,0 +1,56 @@
->> +/*
->> + * Hardkernel Odroid XU3 Audio Codec device tree source
->> + *
->> + * Copyright (c) 2015 Krzysztof Kozlowski
->> + * Copyright (c) 2014 Collabora Ltd.
->> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
->> + *		http://www.samsung.com
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +/ {
->> +	sound: sound {
->> +		compatible = "simple-audio-card";
->> +
->> +		simple-audio-card,name = "Odroid-XU3";
->> +		simple-audio-card,widgets =
->> +			"Headphone", "Headphone Jack",
->> +			"Speakers", "Speakers";
->> +		simple-audio-card,routing =
->> +			"Headphone Jack", "HPL",
->> +			"Headphone Jack", "HPR",
->> +			"Headphone Jack", "MICBIAS",
->> +			"IN1", "Headphone Jack",
->> +			"Speakers", "SPKL",
->> +			"Speakers", "SPKR";
->> +
->> +		simple-audio-card,format = "i2s";
->> +		simple-audio-card,bitclock-master = <&link0_codec>;
->> +		simple-audio-card,frame-master = <&link0_codec>;
->> +
->> +		simple-audio-card,cpu {
->> +			sound-dai = <&i2s0 0>;
->> +			system-clock-frequency = <19200000>;
->> +		};
->> +
->> +		link0_codec: simple-audio-card,codec {
->> +			sound-dai = <&max98090>;
->> +			clocks = <&i2s0 CLK_I2S_CDCLK>;
->> +		};
->> +	};
->> +};
->> +
->> +&hsi2c_5 {
->> +	max98090: max98090 at 10 {
->> +		compatible = "maxim,max98090";
->> +		reg = <0x10>;
->> +		interrupt-parent = <&gpx3>;
->> +		interrupts = <2 0>;
->> +		clocks = <&i2s0 CLK_I2S_CDCLK>;
->> +		clock-names = "mclk";
->> +		#sound-dai-cells = <0>;
->> +	};
-> 
-> Shouldn't this node also include the status = "okay" ?
+On Tue, Sep 01, 2015 at 02:54:17PM +0300, Mathias Nyman wrote:
+> On 31.08.2015 21:58, Duc Dang wrote:
+> >On Thu, Aug 20, 2015 at 12:38 PM, Duc Dang <dhdang@apm.com> wrote:
+> >>The xhci platform driver needs to work on systems that
+> >>either only support 64-bit DMA or only support 32-bit DMA.
+> >>Attempt to set a coherent dma mask for 64-bit DMA, and
+> >>attempt again with 32-bit DMA if that fails.
+> >>
+> >>[dhdang: regenerate the patch over 4.2-rc5 and address new comments]
+> >>Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+> >>Tested-by: Mark Salter <msalter@redhat.com>
+> >>Signed-off-by: Duc Dang <dhdang@apm.com>
+> >>
+> >>---
+> >>Changes from v6:
+> >>         -Add WARN_ON if dma_mask is NULL
+> >>         -Use dma_coerce_mask_and_coherent to assign
+> >>         dma_mask and coherent_dma_mask
+> >>
+> >>Changes from v5:
+> >>         -Change comment
+> >>         -Assign dma_mask to coherent_dma_mask if dma_mask is NULL
+> >>         to make sure dma_set_mask_and_coherent does not fail prematurely.
+> >>
+> >>Changes from v4:
+> >>         -None
+> >>
+> >>Changes from v3:
+> >>         -Re-generate the patch over 4.2-rc5
+> >>         -No code change.
+> >>
+> >>Changes from v2:
+> >>         -None
+> >>
+> >>Changes from v1:
+> >>         -Consolidated to use dma_set_mask_and_coherent
+> >>         -Got rid of the check against sizeof(dma_addr_t)
+> >>
+> >>  drivers/usb/host/xhci-plat.c | 21 +++++++++++++--------
+> >>  1 file changed, 13 insertions(+), 8 deletions(-)
+> >>
+> >>diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> >>index 890ad9d..e4c7f9d 100644
+> >>--- a/drivers/usb/host/xhci-plat.c
+> >>+++ b/drivers/usb/host/xhci-plat.c
+> >>@@ -93,14 +93,19 @@ static int xhci_plat_probe(struct platform_device *pdev)
+> >>         if (irq < 0)
+> >>                 return -ENODEV;
+> >>
+> >>-       /* Initialize dma_mask and coherent_dma_mask to 32-bits */
+> >>-       ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+> >>-       if (ret)
+> >>-               return ret;
+> >>-       if (!pdev->dev.dma_mask)
+> >>-               pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+> >>-       else
+> >>-               dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
+> >>+       /* Throw a waring if broken platform code didn't initialize dma_mask */
+> >>+       WARN_ON(!pdev->dev.dma_mask);
+> >>+       /*
+> >>+        * Try setting dma_mask and coherent_dma_mask to 64 bits,
+> >>+        * then try 32 bits
+> >>+        */
+> >>+       ret = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+> >>+       if (ret) {
+> >>+               ret = dma_coerce_mask_and_coherent(&pdev->dev,
+> >>+                                                  DMA_BIT_MASK(32));
+> >>+               if (ret)
+> >>+                       return ret;
+> >>+       }
 
-Let me answer to this in next comment.
+This isn't very good.  If dev.dma_mask is already set,
+dma_coerce_mask_and_coherent() will always overwrite it.  There's also
+no need to call it twice.  This, imho, is much better:
 
-> 
->> +};
->> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->> index dd8bc86d9de4..52c34d8e791f 100644
->> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
->> @@ -46,70 +46,6 @@
->>  		reset-gpios = <&gpd1 0 1>;
->>  	};
->>  
->> -	pwmleds {
->> -		compatible = "pwm-leds";
->> -
->> -		greenled {
->> -			label = "green:mmc0";
->> -			pwms = <&pwm 1 2000000 0>;
->> -			pwm-names = "pwm1";
->> -			/*
->> -			 * Green LED is much brighter than the others
->> -			 * so limit its max brightness
->> -			 */
->> -			max_brightness = <127>;
->> -			linux,default-trigger = "mmc0";
->> -		};
->> -
->> -		blueled {
->> -			label = "blue:heartbeat";
->> -			pwms = <&pwm 2 2000000 0>;
->> -			pwm-names = "pwm2";
->> -			max_brightness = <255>;
->> -			linux,default-trigger = "heartbeat";
->> -		};
->> -	};
->> -
->> -	gpioleds {
->> -		compatible = "gpio-leds";
->> -		redled {
->> -			label = "red:microSD";
->> -			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
->> -			default-state = "off";
->> -			linux,default-trigger = "mmc1";
->> -		};
->> -	};
->> -
->> -	sound: sound {
->> -		compatible = "simple-audio-card";
->> -
->> -		simple-audio-card,name = "Odroid-XU3";
->> -		simple-audio-card,widgets =
->> -			"Headphone", "Headphone Jack",
->> -			"Speakers", "Speakers";
->> -		simple-audio-card,routing =
->> -			"Headphone Jack", "HPL",
->> -			"Headphone Jack", "HPR",
->> -			"Headphone Jack", "MICBIAS",
->> -			"IN1", "Headphone Jack",
->> -			"Speakers", "SPKL",
->> -			"Speakers", "SPKR";
->> -
->> -		simple-audio-card,format = "i2s";
->> -		simple-audio-card,bitclock-master = <&link0_codec>;
->> -		simple-audio-card,frame-master = <&link0_codec>;
->> -
->> -		simple-audio-card,cpu {
->> -			sound-dai = <&i2s0 0>;
->> -			system-clock-frequency = <19200000>;
->> -		};
->> -
->> -		link0_codec: simple-audio-card,codec {
->> -			sound-dai = <&max98090>;
->> -			clocks = <&i2s0 CLK_I2S_CDCLK>;
->> -		};
->> -	};
->> -
->>  	fan0: pwm-fan {
->>  		compatible = "pwm-fan";
->>  		pwms = <&pwm 0 20972 0>;
->> @@ -378,15 +314,6 @@
->>  
->>  &hsi2c_5 {
->>  	status = "okay";
-> 
-> since I believe for the Odroid XU4 we would like this to be disabled.
-> The only I2C device in this I2C bus is the max98090 codec which is
-> not present in the XU4.
+	/* Try to set a 64-bit DMA mask first */
+	if (WARN_ON(!pdev->dev.dma_mask)) {
+		/* Eek, platform didn't initialise the streaming DMA mask */
+		ret = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+	} else {
+		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+	}
 
-hsi2c_5 and i2s_0 are not used by board directly but are connected to
-external connector:
-http://www.hardkernel.com/main/products/prdt_info.php?g_code=G143452239825&tab_idx=2
+	/* If that failed, fall back to a 32-bit DMA mask */
+	if (ret) {
+		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+		if (ret)
+			return ret;
+	}
 
-This is the 12pin GPIO/I2C/I2S connector in bottom-right corner of board
-view.
+since it preserves the dev.dma_mask pointer if it was properly setup
 
-This is why I left this and is2_0 enabled on Odroid XU4 - I assumed
-someone may connect something to it. However I have doubts if it is
-usable in such state: without respective addresses and interrupts. In
-the same time OF_OVERLAY should customize it properly.
+Really, drivers shouldn't be messing around with that pointer - especially
+if it's already been correctly setup.  A platform may require separate
+streaming and coherent masks, and we should respect that.
 
-What do you think?
+(The whole dma_mask being a pointer thing is a left-over from the PCI
+layer which has never been cleaned up through fear of breaking something.)
 
-Thanks for review,
-Best regards,
-Krzysztof
-
-> 
->> -	max98090: max98090 at 10 {
->> -		compatible = "maxim,max98090";
->> -		reg = <0x10>;
->> -		interrupt-parent = <&gpx3>;
->> -		interrupts = <2 0>;
->> -		clocks = <&i2s0 CLK_I2S_CDCLK>;
->> -		clock-names = "mclk";
->> -		#sound-dai-cells = <0>;
->> -	};
->>  };
->>  
->>  &i2c_2 {
->> @@ -464,19 +391,6 @@
->>  	};
->>  };
->>  
->> -&pwm {
->> -	/*
->> -	 * PWM 0 -- fan
->> -	 * PWM 1 -- Green LED
->> -	 * PWM 2 -- Blue LED
->> -	 * PWM 3 -- on MIPI connector for backlight
->> -	 */
->> -	pinctrl-0 = <&pwm0_out &pwm1_out &pwm2_out &pwm3_out>;
->> -	pinctrl-names = "default";
->> -	samsung,pwm-outputs = <0>;
->> -	status = "okay";
->> -};
->> -
->>  &tmu_cpu0 {
->>  	vtmu-supply = <&ldo7_reg>;
->>  	status = "okay";
->> @@ -512,9 +426,7 @@
->>  	dr_mode = "host";
->>  };
->>  
->> -&usbdrd_dwc3_1 {
->> -	dr_mode = "otg";
->> -};
->> +/* usbdrd_dwc3_1 mode customized in each board */
->>  
->>  &usbdrd3_0 {
->>  	vdd33-supply = <&ldo9_reg>;
->> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
->> index c06882bbb822..379cd61178ee 100644
->> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
->> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
->> @@ -13,8 +13,60 @@
->>  
->>  /dts-v1/;
->>  #include "exynos5422-odroidxu3-common.dtsi"
->> +#include "exynos5422-odroidxu3-audio.dtsi"
->>  
->>  / {
->>  	model = "Hardkernel Odroid XU3 Lite";
->>  	compatible = "hardkernel,odroid-xu3-lite", "samsung,exynos5800", "samsung,exynos5";
->> +
->> +	pwmleds {
->> +		compatible = "pwm-leds";
->> +
->> +		greenled {
->> +			label = "green:mmc0";
->> +			pwms = <&pwm 1 2000000 0>;
->> +			pwm-names = "pwm1";
->> +			/*
->> +			 * Green LED is much brighter than the others
->> +			 * so limit its max brightness
->> +			 */
->> +			max_brightness = <127>;
->> +			linux,default-trigger = "mmc0";
->> +		};
->> +
->> +		blueled {
->> +			label = "blue:heartbeat";
->> +			pwms = <&pwm 2 2000000 0>;
->> +			pwm-names = "pwm2";
->> +			max_brightness = <255>;
->> +			linux,default-trigger = "heartbeat";
->> +		};
->> +	};
->> +
->> +	gpioleds {
->> +		compatible = "gpio-leds";
->> +		redled {
->> +			label = "red:microSD";
->> +			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
->> +			default-state = "off";
->> +			linux,default-trigger = "mmc1";
->> +		};
->> +	};
->> +};
->> +
->> +&pwm {
->> +	/*
->> +	 * PWM 0 -- fan
->> +	 * PWM 1 -- Green LED
->> +	 * PWM 2 -- Blue LED
->> +	 * PWM 3 -- on MIPI connector for backlight
->> +	 */
->> +	pinctrl-0 = <&pwm0_out &pwm1_out &pwm2_out &pwm3_out>;
->> +	pinctrl-names = "default";
->> +	samsung,pwm-outputs = <0>;
->> +	status = "okay";
->> +};
->> +
->> +&usbdrd_dwc3_1 {
->> +	dr_mode = "otg";
->>  };
->> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->> index 78e6a502f320..c7509690131d 100644
->> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->> @@ -12,10 +12,45 @@
->>  
->>  /dts-v1/;
->>  #include "exynos5422-odroidxu3-common.dtsi"
->> +#include "exynos5422-odroidxu3-audio.dtsi"
->>  
->>  / {
->>  	model = "Hardkernel Odroid XU3";
->>  	compatible = "hardkernel,odroid-xu3", "samsung,exynos5800", "samsung,exynos5";
->> +
->> +	pwmleds {
->> +		compatible = "pwm-leds";
->> +
->> +		greenled {
->> +			label = "green:mmc0";
->> +			pwms = <&pwm 1 2000000 0>;
->> +			pwm-names = "pwm1";
->> +			/*
->> +			 * Green LED is much brighter than the others
->> +			 * so limit its max brightness
->> +			 */
->> +			max_brightness = <127>;
->> +			linux,default-trigger = "mmc0";
->> +		};
->> +
->> +		blueled {
->> +			label = "blue:heartbeat";
->> +			pwms = <&pwm 2 2000000 0>;
->> +			pwm-names = "pwm2";
->> +			max_brightness = <255>;
->> +			linux,default-trigger = "heartbeat";
->> +		};
->> +	};
->> +
->> +	gpioleds {
->> +		compatible = "gpio-leds";
->> +		redled {
->> +			label = "red:microSD";
->> +			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
->> +			default-state = "off";
->> +			linux,default-trigger = "mmc1";
->> +		};
->> +	};
->>  };
->>  
->>  &i2c_0 {
->> @@ -49,3 +84,20 @@
->>  		shunt-resistor = <10000>;
->>  	};
->>  };
->> +
->> +&pwm {
->> +	/*
->> +	 * PWM 0 -- fan
->> +	 * PWM 1 -- Green LED
->> +	 * PWM 2 -- Blue LED
->> +	 * PWM 3 -- on MIPI connector for backlight
->> +	 */
->> +	pinctrl-0 = <&pwm0_out &pwm1_out &pwm2_out &pwm3_out>;
->> +	pinctrl-names = "default";
->> +	samsung,pwm-outputs = <0>;
->> +	status = "okay";
->> +};
->> +
->> +&usbdrd_dwc3_1 {
->> +	dr_mode = "otg";
->> +};
->> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu4.dts b/arch/arm/boot/dts/exynos5422-odroidxu4.dts
->> new file mode 100644
->> index 000000000000..087c485b6084
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/exynos5422-odroidxu4.dts
->> @@ -0,0 +1,48 @@
->> +/*
->> + * Hardkernel Odroid XU4 board device tree source
->> + *
->> + * Copyright (c) 2015 Krzysztof Kozlowski
->> + * Copyright (c) 2014 Collabora Ltd.
->> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
->> + *		http://www.samsung.com
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +/dts-v1/;
->> +#include "exynos5422-odroidxu3-common.dtsi"
->> +
->> +/ {
->> +	model = "Hardkernel Odroid XU4";
->> +	compatible = "hardkernel,odroid-xu4", "samsung,exynos5800", \
->> +		     "samsung,exynos5";
->> +
->> +	pwmleds {
->> +		compatible = "pwm-leds";
->> +
->> +		blueled {
->> +			label = "blue:heartbeat";
->> +			pwms = <&pwm 2 2000000 0>;
->> +			pwm-names = "pwm2";
->> +			max_brightness = <255>;
->> +			linux,default-trigger = "heartbeat";
->> +		};
->> +	};
->> +};
->> +
->> +&pwm {
->> +	/*
->> +	 * PWM 0 -- fan
->> +	 * PWM 2 -- Blue LED
->> +	 */
->> +	pinctrl-0 = <&pwm0_out &pwm2_out>;
->> +	pinctrl-names = "default";
->> +	samsung,pwm-outputs = <0>;
->> +	status = "okay";
->> +};
->> +
->> +&usbdrd_dwc3_1 {
->> +	dr_mode = "host";
->> +};
->>
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> Best regards,
-> 
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
