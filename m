@@ -1,23 +1,28 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Tue, 01 Sep 2015 18:07:52 +0100
-Subject: Porting MIPS IRQ handler to ARM
-In-Reply-To: <55E5CED8.7000408@free.fr> (Mason's message of "Tue, 01 Sep 2015
- 18:14:16 +0200")
-References: <55E5CED8.7000408@free.fr>
-Message-ID: <yw1xtwreysnr.fsf@unicorn.mansr.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Tue, 1 Sep 2015 18:10:29 +0100
+Subject: [PATCH v3 19/20] xen/privcmd: Add support for Linux 64KB page
+ granularity
+In-Reply-To: <alpine.DEB.2.02.1508101230260.11337@kaball.uk.xensource.com>
+References: <1438966019-19322-1-git-send-email-julien.grall@citrix.com>
+ <1438966019-19322-20-git-send-email-julien.grall@citrix.com>
+ <alpine.DEB.2.02.1508101230260.11337@kaball.uk.xensource.com>
+Message-ID: <55E5DC05.2080701@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Hi Stefano,
 
-> Hello,
->
-> I'm trying to port to my ARM platform: IRQ handling code written for MIPS.
->
-> https://github.com/mansr/linux-tangox/blob/master/drivers/irqchip/irq-tangox.c
+On 10/08/15 13:03, Stefano Stabellini wrote:
+>> +			xen_pfn = xen_page_to_pfn(page);
+>> +		}
+>> +		fn(pfn_to_gfn(xen_pfn++), data);
+> 
+> What is the purpose of incrementing xen_pfn here?
 
-Go get the latest version of that file.  It should work on ARM now.
+Because the Linux page is split into multiple xen_pfn, so we want to get
+the next xen_pfn for the next iteration.
+
+Regards,
 
 -- 
-M?ns Rullg?rd
-mans at mansr.com
+Julien Grall
