@@ -1,51 +1,62 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 1 Sep 2015 10:32:39 +0200
-Subject: [PATCH v3 4/6] [media] c8sectpfe: Update binding to reset-gpios
-In-Reply-To: <1440784362-31217-5-git-send-email-peter.griffin@linaro.org>
-References: <1440784362-31217-1-git-send-email-peter.griffin@linaro.org>
- <1440784362-31217-5-git-send-email-peter.griffin@linaro.org>
-Message-ID: <CABxcv=nM7MBK2EcD1-YK5y0J1hBtxV+6Wu812C23pNkAzigu7g@mail.gmail.com>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Tue, 1 Sep 2015 09:44:23 +0100
+Subject: [PATCH v5] dtb: Create a common home for cross-architecture
+ dtsi files.
+In-Reply-To: <CAOesGMhj50wg5WyByC7kHp3joo-ahfYWWDLLudp=kyKMpxauhg@mail.gmail.com>
+References: <1438618000-1091-1-git-send-email-ian.campbell@citrix.com>
+ <1439287646.9747.212.camel@citrix.com>
+ <CAL_JsqKv2aOEM-U7JNZnaHomA6HFBSFhSLZ-zhp7c20s6gQBaQ@mail.gmail.com>
+ <CAOesGMj46mvbdya1OQnZzL8VrxVwxAV3KoZZRtk3c0CTVx7d5w@mail.gmail.com>
+ <CAL_Jsq+tUmRfvKE6vf+za6TsG_fhMWn5M2DDDLcCfkDt=KJGVg@mail.gmail.com>
+ <CAOesGMigmaEviCDBAncomkq+uowr18B5FTOmOyBHsNz4p6F6Dw@mail.gmail.com>
+ <CAL_JsqKu6B1Q1q38GFSkdAT+Gxg3=87uk8ZOGPH96Eni0cer_g@mail.gmail.com>
+ <CAOesGMhj50wg5WyByC7kHp3joo-ahfYWWDLLudp=kyKMpxauhg@mail.gmail.com>
+Message-ID: <1441097063.27618.3.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Peter,
+On Mon, 2015-08-24 at 15:22 -0700, Olof Johansson wrote:
+> Hi,
+> 
+> On Mon, Aug 24, 2015 at 1:58 PM, Rob Herring <robherring2@gmail.com> 
+> wrote:
+> > On Sun, Aug 23, 2015 at 6:52 PM, Olof Johansson <olof@lixom.net> wrote:
+> > > On Sun, Aug 23, 2015 at 4:42 PM, Rob Herring <robherring2@gmail.com> 
+> > > wrote:
+> > > > On Sun, Aug 23, 2015 at 6:13 PM, Olof Johansson <olof@lixom.net> 
+> > > > wrote:
+> > > > > 
+> > > Right now it's not possible to do even per-arch "all-dtbs" since only
+> > > the currently configured platforms will get their dtbs compiled.
+> > 
+> > I know. It's been on my todo list for a while. Having that per arch at
+> > least would be an improvement. Having it arch independent would mean I
+> > don't even need a cross-compiler (probably).
+> 
+> Yeah, seems like something that should work quite well in the scope of
+> Ian's tree if nothing else.
 
-On Fri, Aug 28, 2015 at 7:52 PM, Peter Griffin <peter.griffin@linaro.org> wrote:
-> gpio.txt documents that GPIO properties should be named
-> "[<name>-]gpios", with <name> being the purpose of this
-> GPIO for the device.
->
-> This change has been done as one atomic commit.
->
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt | 6 +++---
->  arch/arm/boot/dts/stihxxx-b2120.dtsi                          | 4 ++--
->  drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c         | 2 +-
->  3 files changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
-> index d4def76..e70d840 100644
-> --- a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
-> +++ b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
-> @@ -35,7 +35,7 @@ Required properties (tsin (child) node):
->
->  - tsin-num     : tsin id of the InputBlock (must be between 0 to 6)
->  - i2c-bus      : phandle to the I2C bus DT node which the demodulators & tuners on this tsin channel are connected.
-> -- rst-gpio     : reset gpio for this tsin channel.
-> +- reset-gpios  : reset gpio for this tsin channel.
+In the split tree "make all -k" will already build every dtb (and always
+has done), in fact this is how I discovered the breakage which I'm trying
+to address with this patch since the daily cronjob which does the
+conversion runs this.
 
-The documentation is a bit outdated, the GPIO subsystem supports both
--gpio and -gpios, see commit:
+> Something like lib/ seems more appropriate. Or drivers/..., but I
+> suspect that could cause further confusion on the expected separation
+> of binding/hardware description and the consuming drivers.
 
-dd34c37aa3e8 ("gpio: of: Allow -gpio suffix for property names")
+I'm quite happy to rework the patch with whatever path is settled upon.
 
-So it makes sense to me to use -gpio instead of -gpios in this case
-since is a single GPIO. Also rst is already a descriptive name since
-that's how many datasheets name a reset pin. I'm not saying I'm
-against this patch, just pointing out since the commit message is a
-bit misleading.
+Or if someone has an alternative suggestion for how to fix the build in the
+split devicetree git tree I'm happy to give that a go too.
 
-Best regards,
-Javier
+> > > > We could also see sharing between PPC and ARM on FSL networking 
+> > > > parts,
+> > > > but I've not heard if they actually have that problem.
+> > > 
+> > > Yeah, there could potentially be some sharing between MIPS and
+> > > ARM{,64} too, but I don't know if we'll actually see it done.
+> > 
+> > Yep, hard to say.
+> > 
+> > Rob
