@@ -1,31 +1,38 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Tue, 01 Sep 2015 09:52:21 +0800
-Subject: [PATCH] ARM: pxa: balloon3: Fix build error
-Message-ID: <1441072341.12012.0.camel@ingics.com>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Tue, 1 Sep 2015 10:00:04 +0800
+Subject: [PATCH] arm64: add kc_offset_to_vaddr and kc_vaddr_to_offset macro
+In-Reply-To: <1440915599-18485-1-git-send-email-yalin.wang2010@gmail.com>
+References: <1440915599-18485-1-git-send-email-yalin.wang2010@gmail.com>
+Message-ID: <385BEB9B-288F-4898-8728-CC4948DF0907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-irq_data_get_chip() function does not exist, call irq_desc_get_chip()
-instead.
-
-Fixes: 9ec97561aa6d ("ARM/pxa: Prepare balloon3_irq_handler for irq argument removal")
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
- arch/arm/mach-pxa/balloon3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
-index 70366b3..c1cda98 100644
---- a/arch/arm/mach-pxa/balloon3.c
-+++ b/arch/arm/mach-pxa/balloon3.c
-@@ -502,7 +502,7 @@ static void balloon3_irq_handler(unsigned int __irq, struct irq_desc *desc)
- 					balloon3_irq_enabled;
- 	do {
- 		struct irq_data *d = irq_desc_get_irq_data(desc);
--		struct irq_chip *chip = irq_data_get_chip(d);
-+		struct irq_chip *chip = irq_desc_get_chip(desc);
- 		unsigned int irq;
- 
- 		/* clear useless edge notification */
--- 
-2.1.0
+Ping ?
+> On Aug 30, 2015, at 14:19, yalin wang <yalin.wang2010@gmail.com> wrote:
+> 
+> This patch add kc_offset_to_vaddr() and kc_vaddr_to_offset(),
+> the default version doesn't work on arm64, because arm64 kernel address
+> is below the PAGE_OFFSET, like module address and vmemmap address are
+> all below PAGE_OFFSET address.
+> 
+> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+> ---
+> arch/arm64/include/asm/pgtable.h | 2 ++
+> 1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index d374191..ef1ed5c 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -660,6 +660,8 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
+> 
+> #define update_mmu_cache_pmd(vma, address, pmd) do { } while (0)
+> 
+> +#define	kc_vaddr_to_offset(v) ((v) & ((1UL << VA_BITS) - 1))
+> +#define	kc_offset_to_vaddr(o) ((o) | ~((1UL << VA_BITS) - 1))
+> #endif /* !__ASSEMBLY__ */
+> 
+> #endif /* __ASM_PGTABLE_H */
+> -- 
+> 1.9.1
+> 
