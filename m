@@ -1,40 +1,100 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 1 Aug 2015 15:43:40 +0900
-Subject: [PATCH v3] dtb: Create a common home for cross-architecture dtsi
- files.
-In-Reply-To: <CAK7LNATj96OKFDTgyPC8Uu0qt=4NQ7ZVeLKEEP3K7-smFP2SCw@mail.gmail.com>
-References: <1438353109-373-1-git-send-email-ian.campbell@citrix.com>
- <CAK7LNATj96OKFDTgyPC8Uu0qt=4NQ7ZVeLKEEP3K7-smFP2SCw@mail.gmail.com>
-Message-ID: <CAK7LNARqFCF3hcR4VNp5hhfyNNMxcx4majzRTx8=HPMYgpVcTg@mail.gmail.com>
+From: vichy.kuo@gmail.com (vichy)
+Date: Tue, 1 Sep 2015 15:21:40 +0800
+Subject: about system time incorrect after changing cpu frequency
+In-Reply-To: <20150901060236.GB1456@linux>
+References: <CAOVJa8GTDj3UJpgUd4nH1wknUKa6fgac=1SsqC8g=UCG0MGuDw@mail.gmail.com>
+ <CAOh2x=ky8_uwqvdH-krKxgMSby5jgovJp7odK6x=MpqNL+YoGg@mail.gmail.com>
+ <CAOVJa8HNQ-s=yDfADCcoL+r22ALpHFtTjWZ=oxTkBUriYbCk+Q@mail.gmail.com>
+ <20150901060236.GB1456@linux>
+Message-ID: <CAOVJa8Hh0i05M7f39Pd9bXQmJA9n8tKTwNQoSmwAdUSSGtP_3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-08-01 15:21 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> 2015-07-31 23:31 GMT+09:00 Ian Campbell <ian.campbell@citrix.com>:
->> Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
->> LogicTile Express 20MG" added a new dts file to arch/arm64 which
->> included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
->> .dtsi supplied by arch/arm.
->>
->> Unfortunately this causes some issues for the split device tree
->> repository[0], since things get moved around there. In that context
->> the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
->> while the include is at src/arm/vexpress-v2m-rs1.dtsi.
+hi Viresh:
+
+2015-09-01 14:02 GMT+08:00 Viresh Kumar <viresh.kumar@linaro.org>:
+> On 01-09-15, 13:36, vichy wrote:
+>> >> I try to call below 2 functions to change the frequency of clocksource
+>> >> and clockevent, but the above b) sleep time is still incorrect when
+>> >> cpu runs in 500Mhz.
+>> >>     clockevents_update_freq(this_cpu_ptr(gt_evt), gt_clk_rate);
+>> >>     __clocksource_updatefreq_hz(&gt_clocksource, gt_clk_rate);
 >
-> Typo?
+> How and when were you calling them? What kernel version is it ?
+Belwo is what I did in my cpufreq driver and my kernel version is 3.0.33.
+plat_cpufreq_target()
+{
+........
+    cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+    PLAT_Mpll(freqs.new / 1000);
+    PLAT_gt_change_freq();
+    /* post change notification */
+    cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+....
+}
+
+and I add  PLAT_gt_change_freq in arm_global_timer.c like below:
+ PLAT_gt_change_freq calling() {
+    gt_clk_rate = get_periph_clk();
+    clockevents_update_freq(this_cpu_ptr(gt_evt), gt_clk_rate);
+    __clocksource_updatefreq_hz(&gt_clocksource, gt_clk_rate);
+}
+
+
+I also do another experiment that DIDN'T change any REAL HW setting
+but change mult/shift to the half value like below:
+(But I measure out the "sleep 1" --> still 1secs, even I modify mult/shift)
+(in my opinion, the "seep 1" I measured should be 500ms, since HW NO
+change but mult/shift change)
+plat_cpufreq_target()
+{
+........
+    cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+   //    PLAT_Mpll(freqs.new / 1000); //NO HW FREQ change
+     PLAT_gt_change_freq();
+    /* post change notification */
+    cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+....
+}
+
+PLAT_gt_change_freq in arm_global_timer.c like below:
+ PLAT_gt_change_freq calling() {
+    gt_clk_rate = get_periph_clk()/2; //purposely chage 1/2
+    clockevents_update_freq(this_cpu_ptr(gt_evt), gt_clk_rate);
+    __clocksource_updatefreq_hz(&gt_clocksource, gt_clk_rate);
+}
+
 >
-> src/arm64  ->  arch/arm64
-> src/arm    ->  arch/arm
+>> Clock Event Device: arm_global_timer
 >
+> This driver doesn't have support to update clkevt device's freq. You
+> may need to modify that based on how arch/arm/kernel/smp_twd.c is
+> updated. look for: clockevents_update_freq().
+I have check the latest kernel about arch/arm/kernel/smp_twd.c
+it almost do the same thing like I did, except it use cpufreq notifier
+for calling clockevents_update_freq like below:
+(the final target of them is the same --> clling
+clockevents_update_freq to change mult/shift.
 
+static void twd_update_frequency(void *data)
+{
+    twd_timer_rate = clk_get_rate(twd_clk);
 
-I retract this comment with my apology.
-(I was seeing the kernel tree, not devicetree-rebasing)
+    clockevents_update_freq(raw_cpu_ptr(twd_evt), twd_timer_rate);
+}
 
-Sorry.
+I know so far arm global timer seems not support cpu frequcy chage flow.
+But like my experiment above to fake change gt_clk_rate, the sleep
+should be 1/2 of the original.
 
+if smp_twd call twd_update_frequency to change multi/shift can work,
+why purposely adding  clockevents_update_freq in global timer not
+working?
 
+or there is something else except Mult/shift need to be modify when
+gt_clk_rate changed?
 
--- 
-Best Regards
-Masahiro Yamada
+appreciate your help in advance,
+>
+> --
+> viresh
