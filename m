@@ -1,97 +1,183 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Tue, 1 Sep 2015 16:46:42 +0200
-Subject: [PATCH linux-next v9 2/3] mfd: devicetree: add bindings for Atmel
- Flexcom
-In-Reply-To: <cover.1441118159.git.cyrille.pitchen@atmel.com>
-References: <cover.1441118159.git.cyrille.pitchen@atmel.com>
-Message-ID: <90fa2e0ded92567a29c996658153d833aaa5e411.1441118159.git.cyrille.pitchen@atmel.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Tue, 1 Sep 2015 20:17:14 +0530
+Subject: [PATCH] ARM: EXYNOS: reset KFC cores when cpu is up
+In-Reply-To: <55E4EFA3.1050007@samsung.com>
+References: <1441031111-6549-1-git-send-email-parkch98@gmail.com>
+ <7hmvx785wx.fsf@deeprootsystems.com>
+ <55E4D93E.4090307@osg.samsung.com> <55E4EFA3.1050007@samsung.com>
+Message-ID: <CAM4voamGcz_g+ONa-YaYMs0ZGgcPiXGGOeCV47U5nw_uu48+Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch documents the DT bindings for the Atmel Flexcom which will be
-introduced by sama5d2x SoCs. These bindings will be used by the actual
-Flexcom driver to be sent in another patch.
+Hi,
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- .../devicetree/bindings/mfd/atmel-flexcom.txt      | 67 ++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+On Tue, Sep 1, 2015 at 5:51 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> On 01.09.2015 07:46, Javier Martinez Canillas wrote:
+>>
+>> [adding Krzysztof Kozlowski to cc list]
+>>
+>> Hello Kevin,
+>>
+>> On 09/01/2015 12:11 AM, Kevin Hilman wrote:
+>>> Chanho Park <parkch98@gmail.com> writes:
+>>>
+>>>> The cpu booting of exynos5422 has been still broken since we discussed
+>>>> it in last year[1]. This patch is inspired from odroid xu3
+>>>> code(Actually, it was from samsung exynos vendor kernel)[2]. This weird
+>>>> reset code was founded exynos5420 octa cores series SoCs and only
+>>>> required for the first boot core is the little core(kingfisher core).
+>>>> Some of the exynos5420 boards and all of the exynos5422 boards will be
+>>>> required this code.
+>>>> There is two ways to check the little core is the first cpu. One is
+>>>> checking GPG2CON[1] gpio value and the other is checking the cluster
+>>>> number of the first cpu. I selected the latter because it's more easier
+>>>> than the former.
+>>>>
+>>>> Changes since RFC[3]:
+>>>> - drop checking soc_is_exynos5800 to extend this codes to
+>>>> exynos5420/5422 boards.
+>>>> - kfc cores will be reset only if the cpu0 is kfc core.
+>>>> - Rebase top of the kukjin's for-next branch
+>>>>
+>>>> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350632.html
+>>>> [2]:https://patchwork.kernel.org/patch/6782891/
+>>>> [3]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/356610.html
+>>>>
+>>>> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+>>>> Cc: Chanwoo Choi <cw00.choi@samsung.com>
+>>>> Cc: Kevin Hilman <khilman@kernel.org>
+>>>> Cc: Heesub Shin <heesub.shin@samsung.com>
+>>>> Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
+>>>> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+>>>> Cc: Przemyslaw Marczak <p.marczak@samsung.com>
+>>>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>> Signed-off-by: Chanho Park <parkch98@gmail.com>
+>>>
+>>>> ---
+>>>>  arch/arm/mach-exynos/mcpm-exynos.c | 18 +++++++++++++++++-
+>>>>  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
+>>>>  2 files changed, 23 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+>>>> index 9bdf547..5b69ed2 100644
+>>>> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+>>>> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+>>>> @@ -20,6 +20,7 @@
+>>>>  #include <asm/cputype.h>
+>>>>  #include <asm/cp15.h>
+>>>>  #include <asm/mcpm.h>
+>>>> +#include <asm/smp_plat.h>
+>>>>
+>>>>  #include "regs-pmu.h"
+>>>>  #include "common.h"
+>>>> @@ -70,7 +71,22 @@ static int exynos_cpu_powerup(unsigned int cpu, unsigned int cluster)
+>>>>             cluster >= EXYNOS5420_NR_CLUSTERS)
+>>>>             return -EINVAL;
+>>>>
+>>>> -   exynos_cpu_power_up(cpunr);
+>>>> +   if (!exynos_cpu_power_state(cpunr)) {
+>>>> +           exynos_cpu_power_up(cpunr);
+>>>> +
+>>>> +           /* This assumes the cluster number of the eagle is 0 and the
+>>>> +            * kfc is 1. When the system was booted from the kfc core,
+>>>> +            * they should be reset */
+>>>
+>>> minor: fix multi-line comment style (search for 'multi-line' in
+>>> Documentation/CodingStyle)
+>>>
+>>> Also minor, but personally, I prefer seeing A15/A7 instead of eagle/KFC
+>>> as those names are fading from my memory and I can't seem to remember
+>>> which one is which. :/
+>>>
+>>>> +           if (cluster &&
+>>>> +               cluster == MPIDR_AFFINITY_LEVEL(cpu_logical_map(0), 1)) {
+>>>> +                   while (!pmu_raw_readl(S5P_PMU_SPARE2))
+>>>> +                           udelay(10);
+>>>> +
+>>>> +                   pmu_raw_writel(EXYNOS5420_KFC_CORE_RESET(cpu),
+>>>> +                                   EXYNOS_SWRESET);
+>>>> +           }
+>>>> +   }
+>>>> +
+>>>>     return 0;
+>>>>  }
+>>>
+>>> I tested this on top of mainline (v4.2) using exynos_defconfig (with
+>>> BL_SWITCHER disabled) and I now see all 8 CPUs booting.  Nice!
+>>>
+>>> Tested-by: Kevin Hilman <khilman@linaro.org>
+>>>
+>>> Also, please note that this does not fix another fundamental problem
+>>> with this board in that the firmware puts CCI into secure mode, so
+>>> linux/MCPM cannot manage it, causing hangs whenever CPUidle is enabled
+>>> (because b.L cpuidle driver tries to use MCPM, which needs to manage
+>>> CCI.)
+>>>
+>>> In order for this to not hang when using CPUidle, the following patch is
+>>> also needed.
+>>>
+>>> Kevin
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+>>> b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+>>> index 78e6a502f320..7891bd05bf8e 100644
+>>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+>>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+>>> @@ -49,3 +49,11 @@
+>>>                 shunt-resistor = <10000>;
+>>>         };
+>>>  };
+>>> +
+>>> +/*
+>>> + * Secure firmware prevents CCI access/usage from linux, so must be
+>>> disabled
+>>> + * to prevent usage by MCPM.
+>>> + */
+>>> +&cci {
+>>> +       status = "disabled";
+>>> +};
+>>>
+>>>
+>>
+>> I posted a similar patch that instead disabling CCI for the XU3 board,
+>> it disables in exynos5422-odroidxu3-common.dtsi since all Exynos5422
+>> Odroid boards have the same broken firmware and so the same issue:
+>>
+>> https://lkml.org/lkml/2015/8/29/59
+>>
+>> Krzysztof tested it on an Odroid XU3 Lite and reported that disabling
+>> CCI caused some CPUs to fail to boot even with $subject applied:
+>>
+>> https://lkml.org/lkml/2015/8/29/65
+>
+> Indeed. On Odroid XU3 Chanho's patch gives me 8 CPUs up. Disabling CCI
+> causes fails on CPU{5,6,7} (Cortex-A15).
 
-diff --git a/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
-new file mode 100644
-index 000000000000..fc3511e41542
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
-@@ -0,0 +1,67 @@
-+* Device tree bindings for Atmel Flexcom (Flexible Serial Communication Unit)
-+
-+The Atmel Flexcom is just a wrapper which embeds a SPI controller, an I2C
-+controller and an USART. Only one function can be used at a time and is chosen
-+at boot time according to the device tree.
-+
-+Required properties:
-+- compatible:		Should be "atmel,sama5d2-flexcom"
-+- reg:			Should be the offset/length value for Flexcom dedicated
-+			I/O registers (without USART, TWI or SPI registers).
-+- clocks:		Should be the Flexcom peripheral clock from PMC.
-+- #address-cells:	Should be <1>
-+- #size-cells:		Should be <1>
-+- ranges:		Should be one range for the full I/O register region
-+			(including USART, TWI and SPI registers).
-+- atmel,flexcom-mode:	Should be one of the 3 following macros as defined in
-+			include/dt-bindings/mfd/atmel-flexcom.h:
-+			- ATMEL_FLEXCOM_MODE_USART for USART
-+			- ATMEL_FLEXCOM_MODE_SPI for SPI
-+			- ATMEL_FLEXCOM_MODE_TWI for I2C
-+
-+Required child:
-+a single child device of type matching the "atmel,flexcom-mode" property.
-+
-+The reg property of this child should be:
-+- <0x200 0x200> for USART
-+- <0x400 0x200> for SPI
-+- <0x600 0x200> for I2C
-+
-+The phandle provided by the clocks property of the child is the same as one for
-+the Flexcom parent.
-+
-+Other properties remain unchanged. See documentation of the respective device:
-+- ../serial/atmel-usart.txt
-+- ../spi/spi_atmel.txt
-+- ../i2c/i2c-at91.txt
-+
-+Example:
-+
-+flexcom at f8034000 {
-+	compatible = "atmel,sama5d2-flexcom";
-+	reg = <0xf8034000 0x200>;
-+	clocks = <&flx0_clk>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges = <0x0 0xf8034000 0x800>;
-+	atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_SPI>;
-+
-+	spi at 400 {
-+		compatible = "atmel,at91rm9200-spi";
-+		reg = <0x400 0x200>;
-+		interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_flx0_default>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&flx0_clk>;
-+		clock-names = "spi_clk";
-+		atmel,fifo-size = <32>;
-+
-+		mtd_dataflash at 0 {
-+			compatible = "atmel,at25f512b";
-+			reg = <0>;
-+			spi-max-frequency = <20000000>;
-+		};
-+	};
-+};
--- 
-1.8.2.2
+Chanho's patch is for the exynos mcpm back-end. However, when we
+disable CCI the mcpm code is bypassed and we default to the code in
+exynos' platsmp.c/firmware.c. If the A7s were failing to boot-up then
+the reason could have been that Chanho's workaround was not being
+executed after applying the CCI disablement patch.
+According to the comments the A15s are not booting and so the
+exynos_boot_secondary function needs to be checked further.
+
+Regards,
+Abhilash
+>
+> Best regards,
+> Krzysztof
+>
+>>
+>> Did you succeed booting all CPUs with CONFIG_ARM_BIG_LITTLE_CPUIDLE
+>> enabled and CCI disabled in the the Odroid XU3 DTS?
+>>
+>> Best regards,
+>>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
