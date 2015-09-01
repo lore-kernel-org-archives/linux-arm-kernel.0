@@ -1,49 +1,57 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Tue, 1 Sep 2015 10:02:11 -0300
-Subject: [PATCH v2 0/2] Add support for NXP LPC18xx PWM/SCT
-In-Reply-To: <CAAEAJfCyZUNadthZ_3-scqv0f8Rjf4dd=fg8Rhqt0xfdoDF9XQ@mail.gmail.com>
-References: <1438828307-14641-1-git-send-email-ariel@vanguardiasur.com.ar>
- <CAAEAJfCyZUNadthZ_3-scqv0f8Rjf4dd=fg8Rhqt0xfdoDF9XQ@mail.gmail.com>
-Message-ID: <55E5A1D3.4050507@vanguardiasur.com.ar>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 1 Sep 2015 15:28:27 +0200
+Subject: [PATCH 2/9] PM / Domains: Remove dev->driver check for runtime PM
+In-Reply-To: <1438731339-58317-3-git-send-email-lina.iyer@linaro.org>
+References: <1438731339-58317-1-git-send-email-lina.iyer@linaro.org>
+ <1438731339-58317-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFoJvdw8t15FFxWuh07E9aM=xB6rexwGvtR=KYf7jfOVsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 5 August 2015 at 01:35, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Remove check for driver of a device, for runtime PM. Device may be
+> suspended without an explicit driver. This check seems to be vestigial
+> and incorrect in the current context.
+>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 
-El 20/08/15 a las 16:51, Ezequiel Garcia escribi?:
-> Thierry,
-> 
-> On 5 August 2015 at 23:31, Ariel D'Alessandro
-> <ariel@vanguardiasur.com.ar> wrote:
->> This patch series adds support for NXP LPC18xx PWM/SCT.
->>
->> NXP LPC SoCs family, which includes LPC18xx/LPC43xx, provides a State
->> Configurable Timer (SCT) which can be configured as a Pulse Width Modulator.
->> Other SoCs in that family may share the same hardware.
->>
->> Patchset is based on tag next-20150723 of the linux-next repository.
->> It has been successfully tested on a Hitex LPC4350 Evaluation Board.
->>
->> Changes since v1:
->> * Added "sct" in DT compatible string and driver's name.
->> * Allowed period changes when there's only one channel requested.
->>
->> Ariel D'Alessandro (2):
->>   pwm: NXP LPC18xx PWM/SCT driver
->>   DT: pwm: Add NXP LPC18xx PWM/SCT binding documentation
->>
->>  .../devicetree/bindings/pwm/lpc1850-sct-pwm.txt    |  20 +
->>  drivers/pwm/Kconfig                                |  12 +
->>  drivers/pwm/Makefile                               |   1 +
->>  drivers/pwm/pwm-lpc18xx-sct.c                      | 465 +++++++++++++++++++++
->>  4 files changed, 498 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pwm/lpc1850-sct-pwm.txt
->>  create mode 100644 drivers/pwm/pwm-lpc18xx-sct.c
->>
->> --
->> 1.9.1
->>
-> 
-> Any news about this driver?
-> 
+I think this makes perfect sense!
 
-Ping on this.
+Moreover in *theory*, I have considered both cases for how a device
+currently gets attached/detached to its genpd and I can't find any
+issues with $subject patch. With *both* cases I mean attaching the
+device using *pm_genpd_[name]add_device() API or via the ->probe()
+sequence using the dev_pm_domain_attach() API.
+
+Now, of course that statement also relies on that drivers behaves
+properly from a runtime PM point of view, for example make sure to do
+pm_runtime_disable() at ->remove().
+
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+Kind regards
+Uffe
+
+> ---
+>  drivers/base/power/domain.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 5fd1306..ef8d19f 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -394,8 +394,7 @@ static int pm_genpd_poweroff(struct generic_pm_domain *genpd)
+>                 if (stat > PM_QOS_FLAGS_NONE)
+>                         return -EBUSY;
+>
+> -               if (pdd->dev->driver && (!pm_runtime_suspended(pdd->dev)
+> -                   || pdd->dev->power.irq_safe))
+> +               if (!pm_runtime_suspended(pdd->dev) || pdd->dev->power.irq_safe)
+>                         not_suspended++;
+>         }
+>
+> --
+> 2.1.4
+>
