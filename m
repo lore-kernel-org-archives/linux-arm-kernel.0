@@ -1,35 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 1 Sep 2015 08:47:46 -0700
-Subject: [PATCH] ARM: DRA752: Add ID detect for ES2.0
-In-Reply-To: <1439476340-20141-1-git-send-email-nm@ti.com>
-References: <1439476340-20141-1-git-send-email-nm@ti.com>
-Message-ID: <20150901154746.GL4215@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 1 Sep 2015 17:02:58 +0100
+Subject: [PATCH 1/2] arm64: cpufeature.h: resolve hidden header
+ dependencies
+In-Reply-To: <1441118472-3513-2-git-send-email-ynorov@caviumnetworks.com>
+References: <1441118472-3513-1-git-send-email-ynorov@caviumnetworks.com>
+ <1441118472-3513-2-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20150901160258.GA16430@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [150813 07:35]:
-> From: Vishal Mahaveer <vishalm@ti.com>
+On Tue, Sep 01, 2015 at 03:41:11PM +0100, Yury Norov wrote:
+> Functions implemented in cpufeature.h depend on some headers, but
+> cpufeature.h does not include them. This may cause build failure if
+> cpufeature.h user does not include that headers by itself. (Like it
+> happens in next patch of this series.)
 > 
-> ES2.0 is a minor variant of ES1.1. ES2.0 is an incremental revision
-> with various fixes including the following:
-> 	- reset logic fixes
-> 	- few assymetric aging logic fixes
-> 	- MMC clock rate fixes
-> 	- Ethernet speed fixes
-> 	- edma fixes for mcasp
-> 
-> NOTE: even though we use a compatible of dra742 and dra752, the usage in
-> the Linux kernel is more or less interchangable - we use dra752 more
-> often in the linux kernel compared to dra742 and 4.2-rc6
-> 
-> Signed-off-by: Vishal Mahaveer <vishalm@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 > ---
-> based on linux-next next-20150812, applies to v4.2-rc6 as well.
-> Definetly not a 4.2 material, for 4.3, this probably missed the first merge
-> window for 4.3, will be great if it could be considered for the second merge
-> window.
+>  arch/arm64/include/asm/cpufeature.h | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index c104421..20cdc26 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -30,6 +30,11 @@
+>  
+>  #ifndef __ASSEMBLY__
+>  
+> +#include <linux/bitmap.h>
 
-I'll apply this into omap-for-v4.3/fixes thanks,
+We're also missing <linux/compiler.h> for the __attribute_const__ on
+cpuid_feature_extract_field.
 
-Tony
+> +#include <linux/log2.h>
+
+The cpu_feature macro using ilog2 is prior to the __ASSEMBLY__ guard.
+Given it cannot be used by assembly, I think it should also be pulled
+under the guard, or removed as it doesn't appear to be used anyway
+(which would remove the need for this include).
+
+Otherwise this looks good to me.
+
+Thanks,
+Mark.
+
+> +#include <linux/printk.h>
+> +#include <linux/types.h>
+> +
+>  struct arm64_cpu_capabilities {
+>  	const char *desc;
+>  	u16 capability;
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
