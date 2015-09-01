@@ -1,103 +1,83 @@
 From: aalonso@freescale.com (Adrian Alonso)
-Date: Tue, 1 Sep 2015 17:49:11 -0500
-Subject: [PATCH v2 6/8] pinctrl: freescale: imx: add shared input select reg
- support
+Date: Tue, 1 Sep 2015 17:49:12 -0500
+Subject: [PATCH v2 7/8] pinctrl: freescale: imx7d: support iomux lpsr
+ controller
 In-Reply-To: <1441147753-13239-1-git-send-email-aalonso@freescale.com>
 References: <1441147753-13239-1-git-send-email-aalonso@freescale.com>
-Message-ID: <1441147753-13239-6-git-send-email-aalonso@freescale.com>
+Message-ID: <1441147753-13239-7-git-send-email-aalonso@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Add shared input select register support
-- imx7d has two iomux controllers iomuxc and iomuxc-lpsr
-  which share select_input register for daisy chain settings
+iMX7D has two iomuxc controllers, iomuxc controller similar as
+previous iMX SoC generation and iomuxc-lpsr which provides low
+power state rentetion capabilities on gpios that are part of
+iomuxc-lpsr
+
+- Add iomuxc-lpsr gpio group id's
+- Use flag ZERO_OFFSET_VALID and SHARE_INPUT_SELECT_REG to
+  properly set pads from iomuxc-lpsr domain
 
 Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 ---
-Changes for V2: Resend
+Changes for V2: Add imx7d_lpsr_pads enums
 
- drivers/pinctrl/freescale/pinctrl-imx.c | 28 +++++++++++++++++++++++++++-
- drivers/pinctrl/freescale/pinctrl-imx.h |  1 +
- 2 files changed, 28 insertions(+), 1 deletion(-)
+ drivers/pinctrl/freescale/pinctrl-imx7d.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
-index 9f019be..597319d 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-@@ -18,6 +18,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/of_address.h>
- #include <linux/pinctrl/machine.h>
- #include <linux/pinctrl/pinconf.h>
- #include <linux/pinctrl/pinctrl.h>
-@@ -39,6 +40,7 @@ struct imx_pinctrl {
- 	struct device *dev;
- 	struct pinctrl_dev *pctl;
- 	void __iomem *base;
-+	void __iomem *input_sel_base;
- 	const struct imx_pinctrl_soc_info *info;
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx7d.c b/drivers/pinctrl/freescale/pinctrl-imx7d.c
+index 1fa7530..b4d77e4 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx7d.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx7d.c
+@@ -174,6 +174,17 @@ enum imx7d_pads {
+ 	MX7D_PAD_ENET1_COL = 154,
  };
  
-@@ -254,7 +256,12 @@ static int imx_pmx_set(struct pinctrl_dev *pctldev, unsigned selector,
- 			 * Regular select input register can never be at offset
- 			 * 0, and we only print register value for regular case.
- 			 */
--			writel(pin->input_val, ipctl->base + pin->input_reg);
-+			if (info->flags & SHARE_INPUT_SELECT_REG)
-+				writel(pin->input_val, ipctl->input_sel_base +
-+						pin->input_reg);
-+			else
-+				writel(pin->input_val, ipctl->base +
-+						pin->input_reg);
- 			dev_dbg(ipctl->dev,
- 				"==>select_input: offset 0x%x val 0x%x\n",
- 				pin->input_reg, pin->input_val);
-@@ -690,6 +697,8 @@ static int imx_pinctrl_probe_dt(struct platform_device *pdev,
- int imx_pinctrl_probe(struct platform_device *pdev,
- 		      struct imx_pinctrl_soc_info *info)
- {
-+	struct device_node *dev_np = pdev->dev.of_node;
-+	struct device_node *np;
- 	struct imx_pinctrl *ipctl;
- 	struct resource *res;
- 	int ret;
-@@ -715,6 +724,23 @@ int imx_pinctrl_probe(struct platform_device *pdev,
- 	if (IS_ERR(ipctl->base))
- 		return PTR_ERR(ipctl->base);
- 
-+	if (info->flags & SHARE_INPUT_SELECT_REG) {
-+		np = of_get_child_by_name(dev_np->parent, "iomuxc");
-+		if (np) {
-+			ipctl->input_sel_base = of_iomap(np, 0);
-+			if (IS_ERR(ipctl->input_sel_base)) {
-+				of_node_put(np);
-+				dev_err(&pdev->dev,
-+				       "iomuxc base address not found\n");
-+				return PTR_ERR(ipctl->input_sel_base);
-+			}
-+		} else {
-+			dev_err(&pdev->dev, "iomuxc device node not foud\n");
-+			return -EINVAL;
-+		}
-+		of_node_put(np);
-+	}
++enum imx7d_lpsr_pads {
++	MX7D_PAD_GPIO1_IO00 = 0,
++	MX7D_PAD_GPIO1_IO01 = 1,
++	MX7D_PAD_GPIO1_IO02 = 2,
++	MX7D_PAD_GPIO1_IO03 = 3,
++	MX7D_PAD_GPIO1_IO04 = 4,
++	MX7D_PAD_GPIO1_IO05 = 5,
++	MX7D_PAD_GPIO1_IO06 = 6,
++	MX7D_PAD_GPIO1_IO07 = 7,
++};
 +
- 	imx_pinctrl_desc.name = dev_name(&pdev->dev);
- 	imx_pinctrl_desc.pins = info->pins;
- 	imx_pinctrl_desc.npins = info->npins;
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h b/drivers/pinctrl/freescale/pinctrl-imx.h
-index 67c07c2..d11a827 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx.h
-+++ b/drivers/pinctrl/freescale/pinctrl-imx.h
-@@ -86,6 +86,7 @@ struct imx_pinctrl_soc_info {
+ /* Pad names for the pinmux subsystem */
+ static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
+ 	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE0),
+@@ -333,13 +344,32 @@ static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
+ 	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_COL),
+ };
  
- #define SHARE_MUX_CONF_REG	0x1
- #define ZERO_OFFSET_VALID	0x2
-+#define SHARE_INPUT_SELECT_REG	0x4
++/* Pad names for the pinmux subsystem */
++static const struct pinctrl_pin_desc imx7d_lpsr_pinctrl_pads[] = {
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO00),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO01),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO02),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO03),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO04),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO05),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO06),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO07),
++};
++
+ static struct imx_pinctrl_soc_info imx7d_pinctrl_info = {
+ 	.pins = imx7d_pinctrl_pads,
+ 	.npins = ARRAY_SIZE(imx7d_pinctrl_pads),
+ };
  
- #define NO_MUX		0x0
- #define NO_PAD		0x0
++static struct imx_pinctrl_soc_info imx7d_lpsr_pinctrl_info = {
++	.pins = imx7d_lpsr_pinctrl_pads,
++	.npins = ARRAY_SIZE(imx7d_lpsr_pinctrl_pads),
++	.flags = SHARE_INPUT_SELECT_REG | ZERO_OFFSET_VALID,
++};
++
+ static struct of_device_id imx7d_pinctrl_of_match[] = {
+ 	{ .compatible = "fsl,imx7d-iomuxc", .data = &imx7d_pinctrl_info, },
++	{ .compatible = "fsl,imx7d-iomuxc-lpsr", .data = &imx7d_lpsr_pinctrl_info },
+ 	{ /* sentinel */ }
+ };
+ 
 -- 
 2.1.4
