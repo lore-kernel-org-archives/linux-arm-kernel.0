@@ -1,37 +1,29 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 2 Sep 2015 12:00:52 +0200
-Subject: [PATCH 02/14] arm64: Handle section maps for swapper/idmap
-In-Reply-To: <55E6C4A2.7080307@arm.com>
-References: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
- <1439465645-22584-3-git-send-email-suzuki.poulose@arm.com>
- <CAKv+Gu-0ut3o3iy322tbyqLAmR_gfzoE5272O3U3qSd5Zoh0Hw@mail.gmail.com>
- <55E6C4A2.7080307@arm.com>
-Message-ID: <CAKv+Gu_VUSxTNb1muM8qykWjHQjcuys+_1Dfa37xRjGE5G+QGA@mail.gmail.com>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Wed, 2 Sep 2015 10:39:24 +0100
+Subject: [PATCH V3] Watchdog: Fix parent of watchdog_devices
+In-Reply-To: <db7db9102158b87a4a7169e84e2272b3ba03f9f7.1439954581.git.panand@redhat.com>
+References: <db7db9102158b87a4a7169e84e2272b3ba03f9f7.1439954581.git.panand@redhat.com>
+Message-ID: <20150902093924.GA12688@ck-lbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 September 2015 at 11:42, Suzuki K. Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 02/09/15 10:38, Ard Biesheuvel wrote:
->>
->> On 13 August 2015 at 13:33, Suzuki K. Poulose <suzuki.poulose@arm.com>
->> wrote:
->>>
->>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->>>
->>> We use section maps with 4K page size to create the
->>> swapper/idmaps. So far we have used !64K or 4K checks
->>> to handle the case where we use the section maps. This
->>> patch adds a symbol to make it clear those cases.
->>>
->>
->> That sentence does not make sense.
->
->
-> I agree. How about :
->
-> "This patch adds a new symbol, 'ARM64_SWAPPER_USES_SECTION_MAPS', to
-> handle cases where we use section maps, instead of using the page size
-> symbols."
->
+On Wed, Aug 19, 2015 at 08:58:24AM +0530, Pratyush Anand wrote:
+> /sys/class/watchdog/watchdogn/device/modalias can help to identify the
+> driver/module for a given watchdog node. However, many wdt devices does not set
+> its parent and so, we do not see an entry for device in sysfs for such devices.
+> 
+> This patch fixes parent of watchdog_device so that
+> /sys/class/watchdog/watchdogn/device is populated.
+> 
+> Exceptions: booke, diag288, mpc8xxx, octeon, softdog and w83627hf -- They do not
+> have any parent. Not sure, how we can we identify driver for these devices.
+> 
+> Signed-off-by: Pratyush Anand <panand@redhat.com>
+> ---
 
-Yep, much better
+For the Wolfson parts:
+
+Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+
+Thanks,
+Charles
