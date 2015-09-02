@@ -1,71 +1,62 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 2 Sep 2015 20:56:09 +0200
-Subject: [LINUX RFC v2 0/4] spi: add dual parallel mode support in Zynq
- MPSoC GQSPI controller
-In-Reply-To: <7CFCFE83B8145347A1D424EC939F1C3C014AFF00@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
- <201508260856.22258.marex@denx.de>
- <7CFCFE83B8145347A1D424EC939F1C3C014AFF00@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <201509022056.09635.marex@denx.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 2 Sep 2015 21:29:32 +0200
+Subject: [PATCH v3 05/10] VFIO: platform: add vfio_platform_is_active
+In-Reply-To: <1439212864-12954-6-git-send-email-eric.auger@linaro.org>
+References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
+ <1439212864-12954-6-git-send-email-eric.auger@linaro.org>
+Message-ID: <20150902192932.GT10991@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 02, 2015 at 07:12:14 PM, Ranjit Abhimanyu Waghmode 
-wrote:
-> Hi Marek,
+On Mon, Aug 10, 2015 at 03:20:59PM +0200, Eric Auger wrote:
+> This function returns whether the IRQ is active at irqchip level or
+> VFIO masked. If either is true, it is considered the IRQ is active.
+> Currently there is no way to differentiate userspace masked IRQ from
+> automasked IRQ. There might be false detection of activity. However
+> it is currently acceptable to have false detection.
 > 
-> > -----Original Message-----
-> > From: Marek Vasut [mailto:marex at denx.de]
-> > Sent: Wednesday, August 26, 2015 12:26 PM
-> > To: Ranjit Abhimanyu Waghmode
-> > Cc: dwmw2 at infradead.org; computersforpeace at gmail.com;
-> > broonie at kernel.org; Michal Simek; Soren Brinkmann; zajec5 at gmail.com;
-> > ben at decadent.org.uk; b32955 at freescale.com; knut.wohlrab at de.bosch.com;
-> > juhosg at openwrt.org; beanhuo at micron.com; linux-mtd at lists.infradead.org;
-> > linux-kernel at vger.kernel.org; linux-spi at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; Harini Katakam; Punnaiah Choudary Kalluri
-> > Subject: Re: [LINUX RFC v2 0/4] spi: add dual parallel mode support in
-> > Zynq MPSoC GQSPI controller
-> > 
-> > On Wednesday, August 26, 2015 at 08:26:03 AM, Ranjit Waghmode wrote:
-> > > This series adds dual parallel mode support for Zynq Ultrascale+ MPSoC
-> > > GQSPI controller driver.
-> > > 
-> > > What is dual parallel mode?
-> > > ---------------------------
-> > > ZynqMP GQSPI controller supports Dual Parallel mode with following
-> > > functionalities: 1) Supporting two SPI flash memories operating in
-> > > parallel. 8 I/O lines. 2) Chip selects and clock are shared to both
-> > > the flash devices
-> > > 3) This mode is targeted for faster read/write speed and also doubles
-> > > the size 4) Commands/data can be transmitted/received from both the
-> > > devices(mirror), or only upper or only lower flash memory devices.
-> > > 
-> > > 5) Data arrangement:
-> > >    With stripe enabled,
-> > >    Even bytes i.e. 0, 2, 4,... are transmitted on Lower Data Bus
-> > >    Odd bytes i.e. 1, 3, 5,.. are transmitted on Upper Data Bus.
-> > 
-> > This might be a dumb question, but why don't you just treat this as an
-> > SPI NOR flash with 8-bit bus ?
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
 > 
-> In case of dual parallel configuration of this controller there are
-> different modes like single, dual and quad mode. Whatever you are
-> suggesting would fit only in the case of Quad mode operation as both buses
-> would have 4 lines each. In case of single mode of parallel configuration,
-> there would be two buses; but the line on each bus would one. So
-> altogether there will be two lines. And in case of dual mode of parallel
-> configuration each bus will be having two lines. So altogether 4 lines
-> will be there. So keeping 8 lines would not support above two modes of
-> parallel configuration correctly.
+> ---
+> ---
+>  drivers/vfio/platform/vfio_platform_irq.c | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
 > 
-> Logically it is a single flash with 8 IO lines but physically it's a two
-> flash devices and each has 4 IO lines. So, in this case, read and write
-> addresses should be always even and minimum data that can be accessed is 2
-> bytes.
+> diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+> index a285384..efaee58 100644
+> --- a/drivers/vfio/platform/vfio_platform_irq.c
+> +++ b/drivers/vfio/platform/vfio_platform_irq.c
+> @@ -205,6 +205,23 @@ static int vfio_platform_set_automasked(struct vfio_platform_irq *irq,
+>  	return 0;
+>  }
+>  
+> +static int vfio_platform_is_active(struct vfio_platform_irq *irq)
+> +{
+> +	unsigned long flags;
+> +	bool active, masked, outstanding;
+> +	int ret;
+> +
+> +	spin_lock_irqsave(&irq->lock, flags);
+> +
+> +	ret = irq_get_irqchip_state(irq->hwirq, IRQCHIP_STATE_ACTIVE, &active);
+> +	BUG_ON(ret);
+> +	masked = irq->masked;
+> +	outstanding = active || masked;
 
-Oh, I see what the issue is now. It has to do with configuring the flash
-into correct bus-width mode, right ?
+outstanding?
 
-Best regards,
-Marek Vasut
+why not just return active || masked ?
+
+-Christoffer
+
+> +
+> +	spin_unlock_irqrestore(&irq->lock, flags);
+> +	return outstanding;
+> +}
+> +
+>  static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
+>  {
+>  }
+> -- 
+> 1.9.1
+> 
