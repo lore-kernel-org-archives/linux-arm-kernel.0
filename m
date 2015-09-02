@@ -1,114 +1,245 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 2 Sep 2015 10:00:02 +0100
-Subject: [PATCH v2 01/15] KVM: arm/arm64: VGIC: don't track used LRs in
- the distributor
-In-Reply-To: <55E41383.2000109@linaro.org>
-References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
- <1436538111-4294-2-git-send-email-andre.przywara@arm.com>
- <55CB0B80.5040508@linaro.org> <55DB474F.7010202@arm.com>
- <55E41383.2000109@linaro.org>
-Message-ID: <55E6BA92.9020906@arm.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed,  2 Sep 2015 16:59:36 +0800
+Subject: [PATCH v17 0/4] ARM: rk3288: Add PM Domain support
+Message-ID: <1441184380-13827-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/08/15 09:42, Eric Auger wrote:
-> On 08/24/2015 06:33 PM, Andre Przywara wrote:
+Thank you all for providing inputs and comments on previous versions of
+this patchset.
+Especially thanks to the (Kevin, Heiko, Dmitry, Doug, ULF, Michael....).
 
-Salut Eric,
+Add power domain drivers based on generic power domain for
+Rockchip platform, and support RK3288 SoCs.
 
-...
+Verified on url =
+    https://chromium.googlesource.com/chromiumos/third_party/kernel/+/v3.14
+    localhost / # cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+    domain                      status         slaves
+    /device                      runtime        status
+    ----------------------------------------------------------------------
+    pd_video                        off
+    /devices/ff9a0800.iommu                     suspended
+    /devices/ff9a0000.video-codec               suspended
+    pd_vio                          on
+    /devices/ff930300.iommu                     suspended
+    /devices/ff940300.iommu                     suspended
+    /devices/ff930000.vop                       suspended
+    /devices/ff940000.vop                       suspended
+    /devices/ff980000.hdmi                      unsupported
+    /devices/rockchip-edp                       unsupported
+    pd_hevc                         off
+    pd_gpu                          off
+    /devices/ffa30000.gpu                       suspended
 
->>>> @@ -1126,9 +1124,9 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
->>>>   */
->>>>  bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
->>>>  {
->>>> -   struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->>>>     struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->>>> -   struct vgic_lr vlr;
->>>> +   u64 elrsr = vgic_get_elrsr(vcpu);
->>>> +   unsigned long *elrsr_ptr = u64_to_bitmask(&elrsr);
->>>>     int lr;
->>>>
->>>>     /* Sanitize the input... */
->>>> @@ -1138,42 +1136,20 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
->>>>
->>>>     kvm_debug("Queue IRQ%d\n", irq);
->>>>
->>>> -   lr = vgic_cpu->vgic_irq_lr_map[irq];
->>>> -
->>>> -   /* Do we have an active interrupt for the same CPUID? */
->>>> -   if (lr != LR_EMPTY) {
->>>> -           vlr = vgic_get_lr(vcpu, lr);
->>>> -           if (vlr.source == sgi_source_id) {
->>>> -                   kvm_debug("LR%d piggyback for IRQ%d\n", lr, vlr.irq);
->>>> -                   BUG_ON(!test_bit(lr, vgic_cpu->lr_used));
->>>> -                   vgic_queue_irq_to_lr(vcpu, irq, lr, vlr);
->>>> -                   return true;
->>>> -           }
->>>> -   }
->>>> +   lr = find_first_bit(elrsr_ptr, vgic->nr_lr);
->>>>
->>>> -   /* Try to use another LR for this interrupt */
->>>> -   lr = find_first_zero_bit((unsigned long *)vgic_cpu->lr_used,
->>>> -                          vgic->nr_lr);
->>>>     if (lr >= vgic->nr_lr)
->>>>             return false;
->>>>
->>>>     kvm_debug("LR%d allocated for IRQ%d %x\n", lr, irq, sgi_source_id);
->>>> -   vgic_cpu->vgic_irq_lr_map[irq] = lr;
->>>> -   set_bit(lr, vgic_cpu->lr_used);
->>>>
->>>> -   vlr.irq = irq;
->>>> -   vlr.source = sgi_source_id;
->>>> -   vlr.state = 0;
->>>> -   vgic_queue_irq_to_lr(vcpu, irq, lr, vlr);
->>>> +   vgic_queue_irq_to_lr(vcpu, irq, lr, sgi_source_id);
->>>>
->>>>     return true;
->>>>  }
->>>>
->>>>  static bool vgic_queue_hwirq(struct kvm_vcpu *vcpu, int irq)
->>>>  {
->>>> -   if (!vgic_can_sample_irq(vcpu, irq))
->>>> -           return true; /* level interrupt, already queued */
->>>> -
->>> I think that change needs to be introduced in a separate patch as the
->>> other one mentioned above and justified since it affects the state machine.
->>
->> But this change is dependent on this patch: it will not work without
->> this patch and this patch will not work without that change.
->> So the idea is that on returning from the guest we now harvest all
->> _used_ LRs by copying their state back into the distributor. The
->> previous behaviour was to just check _unused_ LRs for completed IRQs.
->> So now all IRQs need to be re-inserted into the LRs before the next
->> guest run, that's why we have to remove the test which skipped this for
->> IRQs where the code knew that they were still in the LRs.
->> Does that make sense?
-> In level sensitive case, what if the IRQ'LR state was active. LR was
-> kept intact. IRQ is queued. With previous code we wouldn't inject a new
-> IRQ. Here aren't we going to inject it?
+    The following is the easy example.
 
-Effectively we only inject _pending_ IRQs: I was going forth and back
-through the current code and couldn't find a place where we actually
-make use of any active-only interrupt - the only exception being
-migration, where we explicitly iterate through all LRs again and pick up
-active-only IRQs as well. We never set the active state except there.
+    vopb: vop at ff930000 {
+        compatible = "rockchip,rk3288-vop";
+        ...
+        iommus = <&vopb_mmu>;
+        power-domains = <&power RK3288_PD_VIO>;
+        status = "disabled";
+        ...
+    };
 
-So I decided to keep only-active IRQs in the LRs and do not propagate
-them back into the emulated distributor state. One reason is that we
-don't use it, which makes the code look silly and secondly we avoid the
-issue you described above.
+    vopb_mmu: iommu at ff930300 {
+        compatible = "rockchip,iommu";
+        ...
+        interrupt-names = "vopb_mmu";
+        power-domains = <&power RK3288_PD_VIO>;
+        #iommu-cells = <0>;
+        status = "disabled";
+        ...
+    };
 
-> In the sync when you move the IRQ from the LR reg to the state variable,
-> shouldn't you reset the queued state for level sensitive case? In such a
-> case I think you could keep that check.
+    vopl: vop at ff940000 {
+        compatible = "rockchip,rk3288-vop";
+        reg = <0xff940000 0x19c>;
+        ...
+        iommus = <&vopl_mmu>;
+        power-domains = <&power RK3288_PD_VIO>;
+        status = "disabled";
+        ...
+    };
 
-We keep them as "queued" in our emulation until they become inactive and
-we clear the queued bit in the EOI handler.
+    vopl_mmu: iommu at ff940300 {
+        compatible = "rockchip,iommu";
+        ...
+        interrupt-names = "vopl_mmu";
+        power-domains = <&power RK3288_PD_VIO>;
+        #iommu-cells = <0>;
+        status = "disabled";
+    };
 
-Admittedly this whole approach is not obvious and it's perfectly
-possible that I missed something. So please can you check and confirm my
-assumptions above?
+    Others, we can verify this driver for the EDP.
+    We can apply the following these patchs.
 
-Merci,
-Andr?
+    6967631 New          [v2,1/8] drm: exynos/dp: fix code style
+    6967741 New          [v2,2/8] drm: exynos/dp: convert to drm bridge mode
+    6967801 New          [v2,3/8] drm: bridge: analogix_dp: split exynos dp driver to bridge dir
+    6967791 New          [v2,4/8] drm: rockchip/dp: add rockchip platform dp driver
+    6968031 New          [v2,5/8] drm: bridge/analogix_dp: add platform device type support
+    6968141 New          [v2,6/8] drm: bridge: analogix_dp: add some rk3288 special registers setting
+    6967941 New          [v2,7/8] drm: bridge: analogix_dp: try force hpd after plug in lookup failed
+    6967971 New          [v2,8/8] drm: bridge/analogix_dp: expand the delay time for hpd detect
+
+    There is a recent addition from Linus Walleij,
+    called simple-mfd [a] that is supposed to get added real early for kernel 4.2
+
+    [a]:
+    https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-integrator.git/commit/?id=fcf294c020ff7ee4e3b1e96159e4dc7a17ad5
+
+    Here is my branch, Tested by chromeos-3.14 and next-kernel.
+
+    f54144e ARM: dts: add the support power-domain node on RK3288 SoCs
+    acf07d3 soc: rockchip: power-domain: Add power domain driver
+    8cc2139 ARM: power-domain: rockchip: add all the domain type on RK3288 SoCs
+    7114c12 dt-bindings: add document of Rockchip power domains
+    ae98207 Merge tag 'pm+acpi-4.3-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm
+    f1a3c0b Merge tag 'devicetree-for-4.3' of git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux
+    089b669 Merge branch 'for-next' of git://git.kernel.org/pub/scm/linux/kernel/git/jikos/trivial
+    45c680b Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/jikos/livepatching
+    851328f Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/jikos/hid
+    ......
+
+
+Changes in v17:
+- add the decription in detail for RK3288 SoCs.
+- delete the ugly chart in the commit.
+- (re)defining config for ROCKCHIP.
+- remove clocks of the HDMI ctrl.
+- update the description.
+- add Reviewed-by: Michale.
+
+Changes in v16:
+- remove the pmu node.
+- Add more domain decription.
+- the driver type from tristate to bool.
+- Letter misspelled.
+- As Ulf suggestion, remove #include <linux/clk-provider.h>,
+  use "%pC" as the formatting string for the dev_dbg().
+- As the Ulf suggestion, set the genpd->flags to assign the
+  ->stop|start() callbacks.
+- Manually copy the problem in patch v15.
+- rebase the description.
+
+Changes in v15:
+- change the comment.
+- As the kevin suggestion, put the power-domain driver into driver/soc/vendor.
+- As Heiko suggestion, Patch 1: binding doc, 2: binding-header, 3: driver,
+  4: dts-changes.
+- return -ENXIO --> return -ENODEV.
+- As Tomasz remarked previously the dts should represent the hardware
+  and the power-domains are part of the pmu.
+
+Changes in v14:
+- does not need to set an owner,remove the "THIS_MODULE".
+- Remove essential clocks from rk3288 PD_VIO domain, Some clocks are
+  essential for the system health and should not be turned down.
+  However there is no owner for them so if they listed as belonging to power
+  domain we'll try toggling them up and down during power domain transition.
+  As a result we either fail to suspend or resume the system.
+
+Changes in v13:
+- Remove essential clocks from rk3288 PD_VIO domain Some clocks are essential
+  for the system health and should not be turned down. However there is no owner
+  for them so if they listed as belonging to power domain we'll try toggling them
+  up and down during power domain.
+- Device drivers expect their devices to be powered on before their
+  probing code is invoked. To achieve that we should start with
+  power domains powered on (we may turn them off later once all devices enable
+  runtime powermanagment and go idle).
+- This change switches Rockchip power domain driver to use updated
+  device_attach and device_detach API.
+- set the gpu/core power domain power delay time.
+- fix enumerating PM clocks for devices.
+- fix use after free We can't use clk after we did clk_put(clk).
+
+Changes in v12:
+- fix the title doamin->domain.
+- updated device_attach and device_detach API,otherwise it will
+  compile fail on next kernel.
+
+Changes in v11:
+- fix pm_genpd_init(&pd->genpd, NULL, false).
+
+Changes in v10:
+- this switches over domain infos to use masks instead of recomputing
+  them each time and also gets rid of custom domain translator and
+  uses standard onecell on.
+- fix missing the #include <dt-bindings/power-domain/rk3288.h>.
+- remove the notes.
+
+Changes in v9:
+- add document decription.
+- fix v8 changes as follows:
+- This reconciles the v2 and v7 code so that we power domain have lists of clocks
+  they trigger on and off during power transitions and independently from power
+  domains clocks. We attach clocks to devices comprising power domain and prepare
+  them so they are turn on and off by runtime PM.
+- add rockchip_pm_add_one_domain() to control domains.
+- add pd_start/pd_stop interface to control clocks.
+- add decription for power-doamin node.
+
+Changes in v8:
+- document go back to v2.
+- This reconciles the v2 and v7 code so that we power domain have
+  lists of clocks they toggle on and off during power transitions
+  and independently from power domains clocks we attach clocks to
+  devices comprising power domain and prepare them so they are
+  turn on and off by runtime PM.
+- DTS go back to v2.
+
+Changes in v7:
+ - Delete unused variables
+
+Changes in v6:
+- delete pmu_lock.
+- modify dev_lock using mutex.
+- pm_clk_resume(pd->dev) change to pm_clk_resume(ed->dev).
+- pm_clk_suspend(pd->dev) change to pm_clk_suspend(ed->dev).
+- add devm_kfree(pd->dev, de) in rockchip_pm_domain_detach_dev.
+
+Changes in v5:
+- delete idle_lock.
+- add timeout in rockchip_pmu_set_idle_request().
+
+Changes in v4:
+- use list storage dev.
+
+Changes in v3:
+- DT structure has changed.
+- change use pm_clk_resume() and pm_clk_suspend().
+- Decomposition power-controller, changed to multiple controller
+  (gpu-power-controller, hevc-power-controller).
+
+Changes in v2:
+- move clocks to "optional".
+- remove the "pd->pd.of_node = np".
+- make pd_vio clocks all one entry per line and alphabetize.
+- power: power-controller move back to pinctrl: pinctrl.
+
+Caesar Wang (4):
+  dt-bindings: add document of Rockchip power domains
+  ARM: power-domain: rockchip: add all the domain type on RK3288 SoCs
+  soc: rockchip: power-domain: Add power domain driver
+  ARM: dts: add the support power-domain node on RK3288 SoCs
+
+ .../bindings/soc/rockchip/power_domain.txt         | 114 +++++
+ arch/arm/boot/dts/rk3288.dtsi                      |  58 ++-
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/rockchip/Kconfig                       |  14 +
+ drivers/soc/rockchip/Makefile                      |   4 +
+ drivers/soc/rockchip/pm_domains.c                  | 485 +++++++++++++++++++++
+ include/dt-bindings/power-domain/rk3288.h          |  31 ++
+ 8 files changed, 707 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+ create mode 100644 drivers/soc/rockchip/Kconfig
+ create mode 100644 drivers/soc/rockchip/Makefile
+ create mode 100644 drivers/soc/rockchip/pm_domains.c
+ create mode 100644 include/dt-bindings/power-domain/rk3288.h
+
+-- 
+1.9.1
