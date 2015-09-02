@@ -1,27 +1,36 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 02 Sep 2015 13:44:47 -0700
-Subject: [PATCH v4 2/5] ARM: NSP: add minimal Northstar Plus device tree
-In-Reply-To: <1441064933-6723-1-git-send-email-jonmason@broadcom.com>
-References: <1441064933-6723-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <55E75FBF.9060309@gmail.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Wed, 2 Sep 2015 16:17:24 -0500
+Subject: [PATCH] ARM: disable GCC SRA optimization
+In-Reply-To: <CAKv+Gu_eOQ=ZACn1jzQU-z2ZMqX3PdUx9j05fXuGjniccS2x8Q@mail.gmail.com>
+References: <1441211290-11449-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_eOQ=ZACn1jzQU-z2ZMqX3PdUx9j05fXuGjniccS2x8Q@mail.gmail.com>
+Message-ID: <55E76764.2020200@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/08/15 16:48, Jon Mason wrote:
-> Add a very minimalistic set of Northstar Plus Device Tree files which
-> describes the SoC and the BCM958625 implementation.  The perpherials
-> described are:
+On 09/02/2015 11:45 AM, Ard Biesheuvel wrote:
+> On 2 September 2015 at 18:28, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> This is a known but as yet unresolved issue.
+>> (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65932). In this particular
+>> case, it is causing the second while loop to be executed erroneously a
+>> single time, causing the additional space characters to be printed.
+>>
+>> So disable the optimization by passing -fno-ipa-sra.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>
+>> Needs to go to stable perhaps?
+>> The emitted asm is at the end of this patch.
+>>
 > 
-> ARM Cortex A9 CPU
-> 2 8250 UARTs
-> ARM GIC
-> PL310 L2 Cache
-> ARM A9 Global timer
-> 
-> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> Another report of the same issue:
+> https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66271
 
-Applied this version to devicetree/next with Ray's tag, and consequently
-dropped the previous version. Thanks!
--- 
-Florian
+Comments in both bugs indicate that this happens only when building with
+-Os and not -O2.  Have you (or anyone else) been able to get bad code
+with -O2?
+
+I don't think the answer should affect the patch itself, but it might be
+kind to note in the commit message whether -Os definitely makes the
+difference here, if this information is known.
