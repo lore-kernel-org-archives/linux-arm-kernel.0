@@ -1,94 +1,114 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 02 Sep 2015 09:41:27 +0200
-Subject: [PATCH 5/8] mmc: dw_mmc: dt-binding: Add tuning related things
-In-Reply-To: <55E682C0.6050204@samsung.com>
-References: <1441045446-30858-1-git-send-email-heiko@sntech.de>
- <1441045446-30858-6-git-send-email-heiko@sntech.de>
- <55E682C0.6050204@samsung.com>
-Message-ID: <2716742.hZCgYT9c9i@phil>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 2 Sep 2015 09:44:54 +0200
+Subject: [PATCHv2] ARM: EXYNOS: reset Little cores when cpu is up
+In-Reply-To: <55E64559.7000105@samsung.com>
+References: <1441117023-25478-1-git-send-email-parkch98@gmail.com>
+ <55E63F8F.4020300@samsung.com> <55E64386.3000903@osg.samsung.com>
+ <55E64559.7000105@samsung.com>
+Message-ID: <55E6A8F6.5020301@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon,
+Hello Krzysztof,
 
-Am Mittwoch, 2. September 2015, 14:01:52 schrieb Jaehoon Chung:
-> Hi, Heiko.
+On 09/02/2015 02:39 AM, Krzysztof Kozlowski wrote:
+> On 02.09.2015 09:32, Javier Martinez Canillas wrote:
+>> Hello Krzysztof,
+>>
+>> On 09/02/2015 02:15 AM, Krzysztof Kozlowski wrote:
+>>> On 01.09.2015 23:17, Chanho Park wrote:
+>>>> The cpu booting of exynos5422 has been still broken since we discussed
+>>>> it in last year[1]. This patch is inspired from Odroid XU3
+>>>> code (Actually, it was from samsung exynos vendor kernel)[2]. This weird
+>>>> reset code was founded exynos5420 octa cores series SoCs and only
+>>>> required for the first boot core is the Little core (Cortex A7).
+>>>> Some of the exynos5420 boards and all of the exynos5422 boards will require
+>>>> this code.
+>>>>
+>>>> There is two ways to check the little core is the first cpu. One is
+>>>> checking GPG2CON[1] GPIO value and the other is checking the cluster
+>>>> number of the first cpu. I selected the latter because it's more easier
+>>>> than the former.
+>>>>
+>>>> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350632.html
+>>>> [2]:https://patchwork.kernel.org/patch/6782891/
+>>>>
+>>>> Cc: Kevin Hilman <khilman@kernel.org>
+>>>> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+>>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>> Tested-by: Kevin Hilman <khilman@linaro.org>
+>>>> Signed-off-by: Chanho Park <parkch98@gmail.com>
+>>>> ---
+>>>> Changes from v1:
+>>>>  .kfc to Little (Cortex A7) and eagle to big (Cortex A15)
+>>>>  .append comments about waiting SPARE2 register
+>>>>
+>>>> Changes since RFC:
+>>>>  .drop checking soc_is_exynos5800 to extend this codes to
+>>>> exynos5420/5422 boards.
+>>>>  .kfc cores will be reset only if the cpu0 is kfc core.
+>>>>  .Rebase top of the kukjin's for-next branch
+>>>>
+>>>>  arch/arm/mach-exynos/mcpm-exynos.c | 25 ++++++++++++++++++++++++-
+>>>>  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
+>>>>  2 files changed, 30 insertions(+), 1 deletion(-)
+>>>
+>>> Thanks for updating the patch. Remaining minor nit about comment style
+>>> (/* on first line) can be fixed while applying.
+>>>
+>>> The patch works good, after disabling bL switcher I have 8 cores running:
+>>>
+>>> Tested on Odroid XU4:
+>>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>
+>>> It's 4.3 merge window so the patch will go probably to v4.4.
+>>>
+>>
+>> Isn't this material for the v4.3 -rc cycle since it's fixing a bug
+>> (CPUs not booting)? So I don't think that's necessary to wait for v4.4.
 > 
-> On 09/01/2015 03:24 AM, Heiko Stuebner wrote:
-> > From: Alexandru M Stan <amstan@chromium.org>
-> > 
-> > Add ciu_drv, ciu_sample clocks and default-sample-phase. This will later
-> > be used by tuning code.
+> It is a bug fix but:
+> 1. Not a fix for regression introduced in current merge window,
+
+I thought the -rc cycle was for stabilization and fix not only regressions
+introduced during the merge window but also long standing issues.
+
+> 2. There may be more subtle issues like the one mentioned below, not
+> found yet (probably no one tested it with all possible configurations),
+>
+
+Right, this is indeed a better reason to wait for v4.4.
+ 
+> so I don't think rushing with the patch to mainline is good idea.
+>
+
+Yes, agreed.
+ 
+> However your comment reminds me about stable. This actually looks like a
+> candidate for stable.
 > 
-> As i know, ciu_drv and ciu_sample clocks are generated with "ciu" clock.
-> But in these patch-set, ciu_drv and ciu_sample are controlled by clock
-> framework. It's a little strange.
-> Are there ciu_drv and ciu_sample clock on Rockchip?
+>>
+>> But I was expecting another re-spin as from Abhilash's latest comments [0],
+>> it seems the same workaround is needed in arch/arm/mach-exynos/platsmp.c
+>> to avoid the CPU's not booting issue when CCI is disabled in DT and the
+>> MCPM backend is bypassed.
+>>
+>> Although I guess that could be also made as a follow up patch.
+> 
+> Chanho patch fixes only MCPM path. Regular path (platsmp, firmware) is
+> not affected so I would expect a following patch.
+>
 
-Yes on Rockchip SoCs the drv and sample clock registers are residing inside 
-the clock controller and not in the dw_mmc block.
+Ok, hopefully the non MCPM path can also be fixed before v4.4.
+ 
+> Best regards,
+> Krzysztof
+> 
+>>
 
-See drivers/clk/rockchip/clk-mmcphase.c and clk-rk3288.c around line 490 .
-
-
-Heiko
-
-> > We do not touch ciu_drive (and by extension define default-drive-phase).
-> > Drive phase is mostly used to define minimum hold times, while one could
-> > write some code to determine what phase meets the minimum hold time
-> > (ex 10 degrees) this will not work with the current clock phase framework
-> > (which floors angles, so we'll get 0 deg, and there's no way to know what
-> > resolution the floors happen at). We assume that the default drive angles
-> > set by the hardware are good enough.
-> > 
-> > Signed-off-by: Alexandru M Stan <amstan@chromium.org>
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > 
-> >  Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt | 14
-> >  ++++++++++---- 1 file changed, 10 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-> > b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt index
-> > 346c609..5edadc2 100644
-> > --- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-> > +++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-> > 
-> > @@ -42,11 +42,13 @@ Optional properties:
-> >  * clocks: from common clock binding: handle to biu and ciu clocks for the
-> >  
-> >    bus interface unit clock and the card interface unit clock.
-> > 
-> > -* clock-names: from common clock binding: Shall be "biu" and "ciu".
-> > -  If the biu clock is missing we'll simply skip enabling it.  If the
-> > -  ciu clock is missing we'll just assume that the clock is running at
-> > +* clock-names: from common clock binding: Shall be "biu", "ciu",
-> > "ciu_drv" and +  "ciu_sample".  If the biu clock is missing we'll simply
-> > skip enabling it. +  If the ciu clock is missing we'll just assume that
-> > the clock is running at> 
-> >    clock-frequency.  It is an error to omit both the ciu clock and the
-> > 
-> > -  clock-frequency.
-> > +  clock-frequency.  "ciu_drv" and "ciu_sample" are used to control the
-> > clock +  phases, "ciu_sample" is required for tuning high speed modes (if
-> > no other +  custom tuning method is defined).
-> > 
-> >  * clock-frequency: should be the frequency (in Hz) of the ciu clock.  If
-> >  this>  
-> >    is specified and the ciu clock is specified then we'll try to set the
-> >    ciu
-> > 
-> > @@ -75,6 +77,10 @@ Optional properties:
-> >  * vmmc-supply: The phandle to the regulator to use for vmmc.  If this is
-> >  
-> >    specified we'll defer probe until we can find this regulator.
-> > 
-> > +* default-sample-phase: The default phase to set ciu_sample at probing,
-> > low +  speeds or in case where all phases work at tuning time. If not
-> > specified +  0 deg will be used.
-> > +
-> > 
-> >  Aliases:
-> >  
-> >  - All the MSHC controller nodes should be represented in the aliases node
-> >  using
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
