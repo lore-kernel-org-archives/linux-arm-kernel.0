@@ -1,206 +1,78 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 2 Sep 2015 19:42:08 +0800
-Subject: [PATCH] ARM/ARM64: KVM: remove 'config KVM_ARM_MAX_VCPUS'
-In-Reply-To: <20150902102555.GH10991@cbox>
-References: <1441175481-18348-1-git-send-email-ming.lei@canonical.com>
- <20150902102555.GH10991@cbox>
-Message-ID: <CACVXFVOfaqRtobQ6us8VdsU+DOgPzxKCbTGqmG7nyds9kqMn_g@mail.gmail.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Wed, 2 Sep 2015 17:13:57 +0530
+Subject: [RFC 2/3] mmc: sdhci: add host_ops->voltage_switch callback for
+ all other voltages
+In-Reply-To: <20150902162627.682cdedf@xhacker>
+References: <1441135938-8056-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1441135938-8056-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150902150442.118d3305@xhacker> <55E6B129.1030002@linaro.org>
+ <20150902162627.682cdedf@xhacker>
+Message-ID: <55E6E0FD.7000806@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 2, 2015 at 6:25 PM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Wed, Sep 02, 2015 at 02:31:21PM +0800, Ming Lei wrote:
->> This patch removes config option of KVM_ARM_MAX_VCPUS,
->> and like other ARCHs, just choose the maximum allowed
->> value from hardware, and follows the reasons:
->>
->> 1) from distribution view, the option has to be
->> defined as the max allowed value because it need to
->> meet all kinds of virtulization applications and
->> need to support most of SoCs;
->>
->> 2) using a bigger value doesn't introduce extra memory
->> consumption, and the help text in Kconfig isn't accurate
->> because kvm_vpu structure isn't allocated until request
->> of creating VCPU is sent from QEMU;
->
-> This used to be true because of the vgic bitmaps, but that is now
-> dynamically allocated, so I believe you're correct in saying that the
-> text is no longer accurate.
->
->>
->> 3) the main effect is that the field of vcpus[] in 'struct kvm'
->> becomes a bit bigger(sizeof(void *) per vcpu) and need more cache
->> lines to hold the structure, but 'struct kvm' is one generic struct,
->> and it has worked well on other ARCHs already in this way. Also,
->> the world switch frequecy is often low, for example, it is ~2000
->> when running kernel building load in VM from APM xgene KVM host,
->> so the effect is very small, and the difference can't be observed
->> in my test at all.
->
-> While I'm not prinicipally opposed to removing this option, I have to
-> point out that this analysis is far far over-simplified.  You have
-> chosen a workload which excercised only CPU and memory virtualization,
-> mostly solved by the hardware virtualization support, and therefore you
-> don't see many exits.
->
-> Try running an I/O bound workload, or something which involves a lot of
-> virtual IPIs, and you'll see a higher number of exits.
 
-Yeah, the frequency of exits becomes higher(6600/sec) when I run a
-totally I/O benchmark(fio: 4 jobs, bs 4k, libaio over virtio-blk) in a
-quad-core VM, but it is still not high enough to cause any difference
-on the test result.
 
+On Wednesday 02 September 2015 01:56 PM, Jisheng Zhang wrote:
+> On Wed, 2 Sep 2015 13:49:53 +0530
+> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
 >
-> However, I still doubt that the effects will be noticable in the grand
-> scheme of things.
 >>
->> Cc: Dann Frazier <dann.frazier@canonical.com>
->> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: kvmarm at lists.cs.columbia.edu
->> Cc: kvm at vger.kernel.org
->> Signed-off-by: Ming Lei <ming.lei@canonical.com>
->> ---
->>  arch/arm/include/asm/kvm_host.h   |  8 ++------
->>  arch/arm/kvm/Kconfig              | 11 -----------
->>  arch/arm64/include/asm/kvm_host.h |  8 ++------
->>  arch/arm64/kvm/Kconfig            | 11 -----------
->>  include/kvm/arm_vgic.h            |  6 +-----
->>  virt/kvm/arm/vgic-v3.c            |  2 +-
->>  6 files changed, 6 insertions(+), 40 deletions(-)
 >>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index dcba0fa..c8c226a 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -29,12 +29,6 @@
+>> On Wednesday 02 September 2015 12:34 PM, Jisheng Zhang wrote:
+>>> On Wed, 2 Sep 2015 01:02:17 +0530
+>>> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
+>>>
+>>>> Currently, the sdhci_do_start_signal_voltage_switch() function invokes
+>>>> controller specific voltage switch configuration only for 1.8v usecase;
+>>>> but it is required for others as well.
+>>>>
+>>>> For example, in case of PXA1928 SDH controller, we need to set different
+>>>> configuration for 3.3, 1.8 and 1.2 volt support (I/O domain power
+>>>> control register).
+>>>>
+>>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>>>> ---
+>>>> Note:
+>>>> Currently ->voltage_switch() callback is only supported
+>>>> in f_sdh30 driver. And I am not sure on the dependency of execution
+>>>> sequence for that device. I could have moved ->voltage_switch() call
+>>>> at one common place (above/below), but was not quite sure about it.
+>>>> So, replicated/duplicated the call for other voltages.
+>>>>
+>>>>    drivers/mmc/host/sdhci.c | 8 ++++++++
+>>>>    1 file changed, 8 insertions(+)
+>>>>
+>>>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+>>>> index 3dd295f..b59b76d 100644
+>>>> --- a/drivers/mmc/host/sdhci.c
+>>>> +++ b/drivers/mmc/host/sdhci.c
+>>>> @@ -1753,6 +1753,10 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
+>>>>    		/* Wait for 5ms */
+>>>>    		usleep_range(5000, 5500);
+>>>>
+>>>> +		/* Some controller need to do more when switching */
+>>>> +		if (host->ops->voltage_switch)
+>>>> +			host->ops->voltage_switch(host, MMC_SIGNAL_VOLTAGE_330);
+>>>
+>>> Could this be implemented by regulator API? From patch set 3/3, the pxa1928
+>>> voltage_switch hook is to operate the IO pad registers, this seems not belong
+>>> to the SDHC IP core.
+>>>
 >>
->>  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
->>
->> -#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
->> -#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
->> -#else
->> -#define KVM_MAX_VCPUS 0
->> -#endif
->> -
->>  #define KVM_USER_MEM_SLOTS 32
->>  #define KVM_PRIVATE_MEM_SLOTS 4
->>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
->> @@ -44,6 +38,8 @@
->>
->>  #include <kvm/arm_vgic.h>
->>
->> +#define KVM_MAX_VCPUS VGIC_V2_MAX_CPUS
->> +
->>  u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
->>  int __attribute_const__ kvm_target_cpu(void);
->>  int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
->> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
->> index bfb915d..210ecca 100644
->> --- a/arch/arm/kvm/Kconfig
->> +++ b/arch/arm/kvm/Kconfig
->> @@ -45,15 +45,4 @@ config KVM_ARM_HOST
->>       ---help---
->>         Provides host support for ARM processors.
->>
->> -config KVM_ARM_MAX_VCPUS
->> -     int "Number maximum supported virtual CPUs per VM"
->> -     depends on KVM_ARM_HOST
->> -     default 4
->> -     help
->> -       Static number of max supported virtual CPUs per VM.
->> -
->> -       If you choose a high number, the vcpu structures will be quite
->> -       large, so only choose a reasonable number that you expect to
->> -       actually use.
->> -
->>  endif # VIRTUALIZATION
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 415938d..3fb58ea 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -30,12 +30,6 @@
->>
->>  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
->>
->> -#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
->> -#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
->> -#else
->> -#define KVM_MAX_VCPUS 0
->> -#endif
->> -
->>  #define KVM_USER_MEM_SLOTS 32
->>  #define KVM_PRIVATE_MEM_SLOTS 4
->>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
->> @@ -43,6 +37,8 @@
->>  #include <kvm/arm_vgic.h>
->>  #include <kvm/arm_arch_timer.h>
->>
->> +#define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
->> +
->>  #define KVM_VCPU_MAX_FEATURES 3
->>
->>  int __attribute_const__ kvm_target_cpu(void);
->> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
->> index bfffe8f..5c7e920 100644
->> --- a/arch/arm64/kvm/Kconfig
->> +++ b/arch/arm64/kvm/Kconfig
->> @@ -41,15 +41,4 @@ config KVM_ARM_HOST
->>       ---help---
->>         Provides host support for ARM processors.
->>
->> -config KVM_ARM_MAX_VCPUS
->> -     int "Number maximum supported virtual CPUs per VM"
->> -     depends on KVM_ARM_HOST
->> -     default 4
->> -     help
->> -       Static number of max supported virtual CPUs per VM.
->> -
->> -       If you choose a high number, the vcpu structures will be quite
->> -       large, so only choose a reasonable number that you expect to
->> -       actually use.
->> -
->>  endif # VIRTUALIZATION
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index d901f1a..4e14dac 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -35,11 +35,7 @@
->>  #define VGIC_V3_MAX_LRS              16
->>  #define VGIC_MAX_IRQS                1024
->>  #define VGIC_V2_MAX_CPUS     8
->> -
->> -/* Sanity checks... */
->> -#if (KVM_MAX_VCPUS > 255)
->> -#error Too many KVM VCPUs, the VGIC only supports up to 255 VCPUs for now
->> -#endif
->> +#define VGIC_V3_MAX_CPUS     255
->>
->>  #if (VGIC_NR_IRQS_LEGACY & 31)
->>  #error "VGIC_NR_IRQS must be a multiple of 32"
->> diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
->> index afbf925..7dd5d62 100644
->> --- a/virt/kvm/arm/vgic-v3.c
->> +++ b/virt/kvm/arm/vgic-v3.c
->> @@ -288,7 +288,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
->>
->>       vgic->vctrl_base = NULL;
->>       vgic->type = VGIC_V3;
->> -     vgic->max_gic_vcpus = KVM_MAX_VCPUS;
->> +     vgic->max_gic_vcpus = VGIC_V3_MAX_CPUS;
->>
->>       kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
->>                vcpu_res.start, vgic->maint_irq);
->> --
->> 1.9.1
+>> Not quite sure whether regulator would be right fit for this.
 >
->
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>  From the patche[3/3], this can be achieved by abstracting the IO PAD as regulators
+> then, we may not need to touch the core sdhci.c. But I'm not sure whether this
+> is the good solution or not.
 
-Thanks for your review.
+Exactly...
+
+> sdhci Maintainers and experts may have better
+> suggestions.
+>
+
+Thats is the reason I stamped it as a RFC :)
 
 Thanks,
-Ming
+Vaibhav
