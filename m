@@ -1,35 +1,55 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 2 Sep 2015 10:01:42 +0200
-Subject: [PATCH v2 2/2] ARM: dts: Add exynos5422-odroidxu4 board
-In-Reply-To: <1441157405-22123-2-git-send-email-k.kozlowski@samsung.com>
-References: <1441157405-22123-1-git-send-email-k.kozlowski@samsung.com>
- <1441157405-22123-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <55E6ACE6.3030709@osg.samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 2 Sep 2015 13:36:39 +0530
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <20150826120628.GZ19409@x1>
+References: <20150811080023.GB5509@linux> <20150811093039.GA18282@x1>
+ <20150811100941.GG5509@linux> <20150811115425.GE18282@x1>
+ <20150811120124.GH5509@linux> <20150811132756.GG18282@x1>
+ <20150811142812.GJ5509@linux> <20150811151736.GO18282@x1>
+ <20150812110841.GC20238@linux> <20150826120628.GZ19409@x1>
+Message-ID: <20150902080639.GA26744@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 09/02/2015 03:30 AM, Krzysztof Kozlowski wrote:
-> Add Hardkernel Odroid XU4 board Device Tree sources. The board differs
-> from Odroid XU3 and XU3-Lite by:
-> 1. No green and red leds (except standard red power led).
-> 2. No audio codec.
-> 3. Two USB3 ports in host mode (no micro USB3 connector for OTG).
-> 4. Realtek RTL8153-CG gigabit network adapter (instead of SMSC9514).
-> 5. Additional connector with IO ports (I2S_0, I2C_5).
-> 6. No DisplayPort (like XU3-Lite).
-> 7. No TI INA231 power measurement sensors (like XU3-Lite).
+On 26-08-15, 13:06, Lee Jones wrote:
+> On Wed, 12 Aug 2015, Viresh Kumar wrote:
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > On 11-08-15, 16:17, Lee Jones wrote:
+> > > This would work if we only had a single variable to contend with, but
+> > > what I showed you in my previous example is that we have 3 variables
+> > > to consider; cut (version), pcode and substrate.
+> > > 
+> > > Using the two (simple) examples I provided, how would your suggestion
+> > > look in our case?
+> > 
+> > So the solution I gave is for picking the microvolt based on pcode.
+> > The other two (cut, substrate) aren't about picking microvolt, but if
+> > the OPP is available or not. Right?
 > 
+> 'pcode', 'cut' and 'substrate' all determine whether a given set of
+> OPPs an be used on the running platform.  I do not believe that you
+> can differentiate between them. 
+> 
+> > If these terms are generic enough, then we can add something similar
+> > to what you have added..
+> 
+> If it makes it easier, you can treat them as version numbers 2.2.1
+> <pcode.cut.substrate>, but I don't see how this can help.  Obviously
+> this becomes more difficult when you add wild cards to the OPPs, where
+> a particular OPP would be suitable for all cuts for example.
+> 
+> If you still think you can come up with a generic method to lay out
+> CPUFreq OPP nodes that will satisfy all vendors and not be a mass of
+> 10's of separate nodes, then great.  Again, I'm struggling to see how
+> that might be possible.
+> 
+> What I believe we shouldn't do, is have this blocked forever for the
+> sake of adding a couple of vendor properties however.
 
-Looks good to me.
+I agree and can understand the pain you are feeling..
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+@Rob/Stephen: Please close this thread soon and let Lee get his work
+done :)
 
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+viresh
