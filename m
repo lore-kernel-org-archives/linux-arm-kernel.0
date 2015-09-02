@@ -1,75 +1,61 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 2 Sep 2015 20:46:52 +0530
-Subject: [PATCH 2/2] mmc: sdhci-pxav3: Print ret value on error from
- sdhci_add_host() fn
-In-Reply-To: <1441206476.12163.44.camel@perches.com>
-References: <1441135454-6902-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1441135454-6902-3-git-send-email-vaibhav.hiremath@linaro.org>
- <1441139838.12163.5.camel@perches.com> <55E6F497.8080300@linaro.org>
- <1441206476.12163.44.camel@perches.com>
-Message-ID: <55E712E4.7080608@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 02 Sep 2015 17:25:32 +0200
+Subject: [PATCH] ARM: dts: imx6sl: Complete the dcp node
+In-Reply-To: <1441206417-27805-1-git-send-email-festevam@gmail.com>
+References: <1441206417-27805-1-git-send-email-festevam@gmail.com>
+Message-ID: <1441207532.3137.22.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Mittwoch, den 02.09.2015, 12:06 -0300 schrieb Fabio Estevam:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> The DCP block present on MX6SL is compatible with the one on MX28,
+> so add the compatible string and also complete the interrupt entries.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6sl.dtsi | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index 320a27f..b105735 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -670,8 +670,12 @@
+>  			};
+>  
+>  			dcp: dcp at 020fc000 {
+> +				compatible = "fsl,imx28-dcp";
 
+Can we please start to make it good habit to always introduce a new
+compatible to the DTs, even if the blocks are the same in theory?
 
-On Wednesday 02 September 2015 08:37 PM, Joe Perches wrote:
-> On Wed, 2015-09-02 at 18:37 +0530, Vaibhav Hiremath wrote:
->> On Wednesday 02 September 2015 02:07 AM, Joe Perches wrote:
->>> On Wed, 2015-09-02 at 00:54 +0530, Vaibhav Hiremath wrote:
->>>> Return value would give clear information about the actual root-cause
->>>> of the failure.
->>>> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
->>>> @@ -455,7 +455,7 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
->>>>
->>>>    	ret = sdhci_add_host(host);
->>>>    	if (ret) {
->>>> -		dev_err(&pdev->dev, "failed to add host\n");
->>>> +		dev_err(&pdev->dev, "failed to add host ret - %d\n", ret);
->>>>    		goto err_add_host;
->>>>    	}
->>>
->>> If this is really desirable, there are many other callers of
->>> sdhci_add_host with error messages just like this one.
->>>
->> How about this? If you are ok, I can change it and submit the patch
->> again.
->> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> []
->> @@ -3176,8 +3176,11 @@ int sdhci_add_host(struct sdhci_host *host)
->>                   mmc->caps |= MMC_CAP_NEEDS_POLL;
->>
->>           /* If there are external regulators, get them */
->> -       if (mmc_regulator_get_supply(mmc) == -EPROBE_DEFER)
->> +       if (mmc_regulator_get_supply(mmc) == -EPROBE_DEFER) {
->> +               pr_err("%s: regulator supply unavailable, deferring
->> probe. \n",
->> +                               mmc_hostname(mmc));
->>                   return -EPROBE_DEFER;
->> +       }
->
-> (your email client has inappropriate line wrapping)
->
-> The KERN_<LEVEL> here probably isn't right.
->
-> Deferring isn't an error, at best it's a notification
+We already had situations where the SoC IP integration exposed bugs,
+which need driver workarounds and the only way to detect such situations
+is to check the machine compatible in the driver, which is really ugly.
 
-I would consider it as an ERROR if it gets deferred
-continuously/multiple times due to same reason.
+So can we please make this:
+	compatible = "fsl,imx6sl-dcp", "fsl,imx28-dcp";
 
-> and perhaps should be at pr_notice/KERN_NOTICE
->
+This way we can bind any required driver changes to the new compatible
+if necessary, without the need to change the DT again. Keep in mind that
+we try to push DTs as ABI that doesn't need to be updated in steplock
+with the kernel.
 
-Yeah, KERN_NOTICE looks right here.
+Regards,
+Lucas
 
-> I don't know how often or how many times this deferral
-> can occur.  Do you?
->
+>  				reg = <0x020fc000 0x4000>;
+> -				interrupts = <0 99 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupts = <0 99 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <0 100 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <0 101 IRQ_TYPE_LEVEL_HIGH>;
+> +				status = "okay";
+>  			};
+>  		};
+>  
 
--EDEFER_PROBE usually means that driver has some dependency,
-for which it has to wait.
-In my case, during every boot, I pxav3_sdhci_probe gets deferred once
-due to regulator unavailability.
-
-Thanks,
-Vaibhav
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
