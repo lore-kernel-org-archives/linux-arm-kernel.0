@@ -1,299 +1,294 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 2 Sep 2015 15:09:49 +0200
-Subject: [PATCH v4 04/15] KVM: arm: common infrastructure for handling
- AArch32 CP14/CP15
-In-Reply-To: <1439213167-8988-5-git-send-email-zhichao.huang@linaro.org>
-References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
- <1439213167-8988-5-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <20150902130949.GK10991@cbox>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 2 Sep 2015 08:27:22 -0500
+Subject: [PATCH v4 10/16] phy: Add driver for rockchip Display Port PHY
+In-Reply-To: <1441087455-25533-1-git-send-email-ykk@rock-chips.com>
+References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
+ <1441087455-25533-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <CAL_JsqJG3wGO3PC2raWvc588rrwF-zHD9+3WwBJxEwntm19k7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 09:25:56PM +0800, Zhichao Huang wrote:
-> As we're about to trap a bunch of CP14 registers, let's rework
-> the CP15 handling so it can be generalized and work with multiple
-> tables.
-> 
-> We stop trapping access here, because we haven't finished our trap
-> handlers. We will enable trapping agian until everything is OK.
-> 
-> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+On Tue, Sep 1, 2015 at 1:04 AM, Yakir Yang <ykk@rock-chips.com> wrote:
+> This phy driver would control the Rockchip DisplayPort module
+> phy clock and phy power, it is relate to analogix_dp-rockchip
+> dp driver. If you want DP works rightly on rockchip platform,
+> then you should select both of them.
+>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 > ---
->  arch/arm/kvm/coproc.c          | 168 ++++++++++++++++++++++++++---------------
->  arch/arm/kvm/interrupts_head.S |   2 +-
->  2 files changed, 110 insertions(+), 60 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> index 4db571d..d23395b 100644
-> --- a/arch/arm/kvm/coproc.c
-> +++ b/arch/arm/kvm/coproc.c
-> @@ -375,6 +375,9 @@ static const struct coproc_reg cp15_regs[] = {
->  	{ CRn(15), CRm( 0), Op1( 4), Op2( 0), is32, access_cbar},
->  };
->  
-> +static const struct coproc_reg cp14_regs[] = {
+> Changes in v4:
+> - Take Kishon suggest, add commit message, and remove the redundant
+>   rockchip_dp_phy_init() function, move those code to probe() method.
+>   And remove driver .owner number.
+>
+> Changes in v3:
+> - Take Heiko suggest, add rockchip dp phy driver,
+>   collect the phy clocks and power control.
+>
+> Changes in v2: None
+>
+>  .../devicetree/bindings/phy/rockchip-dp-phy.txt    |  26 ++++
+
+It is preferred that you split binding doc's from driver changes.
+
+>  drivers/phy/Kconfig                                |   7 +
+>  drivers/phy/Makefile                               |   1 +
+>  drivers/phy/phy-rockchip-dp.c                      | 166 +++++++++++++++++++++
+>  4 files changed, 200 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+>  create mode 100644 drivers/phy/phy-rockchip-dp.c
+>
+> diff --git a/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+> new file mode 100644
+> index 0000000..5de1088
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+> @@ -0,0 +1,26 @@
+> +Rockchip Soc Seroes Display Port PHY
+> +------------------------------------
+> +
+> +Required properties:
+> +- compatible : should be one of the following supported values:
+> +        - "rockchip.rk3288-dp-phy"
+> +
+> +- reg : a list of registers used by phy driver
+
+Please state the size of the list and order of what each entry if more than one.
+
+> +- clocks: from common clock binding: handle to dp clock.
+> +       of memory mapped region.
+> +- clock-names: from common clock binding:
+> +       Required elements: "sclk_dp" "sclk_dp_24m"
+> +
+> +- rockchip,grf: this soc should set GRF regs, so need get grf here.
+
+I have no idea what GRF means.
+
+> +- #phy-cells : from the generic PHY bindings, must be 0;
+> +
+> +Example:
+> +
+> +edp_phy: phy at ff770274 {
+> +       compatilble = "rockchip,rk3288-dp-phy";
+> +       reg = <0xff770274 4>;
+> +       rockchip,grf = <&grf>;
+> +       clocks = <&cru SCLK_EDP_24M>;
+> +       clock-names = "24m";
+> +       #phy-cells = <0>;
+> +}
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 47da573..8f2bc4f 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -310,6 +310,13 @@ config PHY_ROCKCHIP_USB
+>         help
+>           Enable this to support the Rockchip USB 2.0 PHY.
+>
+> +config PHY_ROCKCHIP_DP
+> +       tristate "Rockchip Display Port PHY Driver"
+> +       depends on ARCH_ROCKCHIP && OF
+> +       select GENERIC_PHY
+> +       help
+> +         Enable this to support the Rockchip Display Port PHY.
+> +
+>  config PHY_ST_SPEAR1310_MIPHY
+>         tristate "ST SPEAR1310-MIPHY driver"
+>         select GENERIC_PHY
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index a5b18c1..e281f35 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -34,6 +34,7 @@ phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)    += phy-s5pv210-usb2.o
+>  obj-$(CONFIG_PHY_EXYNOS5_USBDRD)       += phy-exynos5-usbdrd.o
+>  obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)    += phy-qcom-apq8064-sata.o
+>  obj-$(CONFIG_PHY_ROCKCHIP_USB) += phy-rockchip-usb.o
+> +obj-$(CONFIG_PHY_ROCKCHIP_DP)          += phy-rockchip-dp.o
+>  obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)    += phy-qcom-ipq806x-sata.o
+>  obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)   += phy-spear1310-miphy.o
+>  obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)   += phy-spear1340-miphy.o
+> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
+> new file mode 100644
+> index 0000000..e9a726e
+> --- /dev/null
+> +++ b/drivers/phy/phy-rockchip-dp.c
+> @@ -0,0 +1,166 @@
+> +/*
+> + * Rockchip DP PHY driver
+> + *
+> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
+> + * Author: Yakir Yang <ykk@@rock-chips.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/clk.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define GRF_SOC_CON12                   0x0274
+> +#define GRF_EDP_REF_CLK_SEL_INTER       BIT(4)
+> +
+> +#define DP_PHY_SIDDQ_WRITE_EN           BIT(21)
+> +#define DP_PHY_SIDDQ_ON                 0
+> +#define DP_PHY_SIDDQ_OFF                BIT(5)
+> +
+> +struct rockchip_dp_phy {
+> +       struct device  *dev;
+> +       struct regmap  *grf;
+> +       void __iomem   *regs;
+> +       struct clk     *phy_24m;
 > +};
 > +
->  /* Target specific emulation tables */
->  static struct kvm_coproc_target_table *target_tables[KVM_ARM_NUM_TARGETS];
->  
-> @@ -424,43 +427,75 @@ static const struct coproc_reg *find_reg(const struct coproc_params *params,
->  	return NULL;
->  }
->  
-> -static int emulate_cp15(struct kvm_vcpu *vcpu,
-> -			const struct coproc_params *params)
-> +/*
-> + * emulate_cp --  tries to match a cp14/cp15 access in a handling table,
-> + *                and call the corresponding trap handler.
-> + *
-> + * @params: pointer to the descriptor of the access
-> + * @table: array of trap descriptors
-> + * @num: size of the trap descriptor array
-> + *
-> + * Return 0 if the access has been handled, and -1 if not.
-> + */
-> +static int emulate_cp(struct kvm_vcpu *vcpu,
-> +			const struct coproc_params *params,
-> +			const struct coproc_reg *table,
-> +			size_t num)
->  {
-> -	size_t num;
-> -	const struct coproc_reg *table, *r;
-> -
-> -	trace_kvm_emulate_cp15_imp(params->Op1, params->Rt1, params->CRn,
-> -				   params->CRm, params->Op2, params->is_write);
-> +	const struct coproc_reg *r;
->  
-> -	table = get_target_table(vcpu->arch.target, &num);
-> +	if (!table)
-> +		return -1;	/* Not handled */
->  
-> -	/* Search target-specific then generic table. */
->  	r = find_reg(params, table, num);
-> -	if (!r)
-> -		r = find_reg(params, cp15_regs, ARRAY_SIZE(cp15_regs));
->  
-> -	if (likely(r)) {
-> +	if (r) {
->  		/* If we don't have an accessor, we should never get here! */
->  		BUG_ON(!r->access);
->  
->  		if (likely(r->access(vcpu, params, r))) {
->  			/* Skip instruction, since it was emulated */
->  			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-> -			return 1;
->  		}
-> -		/* If access function fails, it should complain. */
-> -	} else {
-> -		kvm_err("Unsupported guest CP15 access at: %08lx\n",
-> -			*vcpu_pc(vcpu));
-> -		print_cp_instr(params);
+> +static int rockchip_dp_phy_clk_enable(struct rockchip_dp_phy *dp)
+> +{
+> +       int ret = 0;
 > +
-> +		/* Handled */
-> +		return 0;
->  	}
+> +       ret = clk_set_rate(dp->phy_24m, 24000000);
+
+Do you need to do this every time? This can go in probe.
+
+> +       if (ret < 0) {
+> +               dev_err(dp->dev, "cannot set clock phy_24m %d\n", ret);
+> +               return ret;
+> +       }
 > +
-> +	/* Not handled */
-> +	return -1;
+> +       ret = clk_prepare_enable(dp->phy_24m);
+> +       if (ret < 0) {
+> +               dev_err(dp->dev, "cannot enable clock phy_24m %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       return 0;
 > +}
 > +
-> +static void unhandled_cp_access(struct kvm_vcpu *vcpu,
-> +				const struct coproc_params *params)
+> +static int rockchip_dp_phy_clk_disable(struct rockchip_dp_phy *dp)
 > +{
-> +	u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
-> +	int cp;
+> +       clk_disable_unprepare(dp->phy_24m);
 > +
-> +	switch (hsr_ec) {
-> +	case HSR_EC_CP15_32:
-> +	case HSR_EC_CP15_64:
-> +		cp = 15;
-> +		break;
-> +	case HSR_EC_CP14_MR:
-> +	case HSR_EC_CP14_64:
-> +		cp = 14;
-> +		break;
-> +	default:
-> +		WARN_ON((cp = -1));
-> +	}
-> +
-> +	kvm_err("Unsupported guest CP%d access at: %08lx\n",
-> +		cp, *vcpu_pc(vcpu));
-> +	print_cp_instr(params);
->  	kvm_inject_undefined(vcpu);
-> -	return 1;
->  }
->  
-> -static int kvm_handle_cp_64(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> -			    bool cp15)
-> +int kvm_handle_cp_64(struct kvm_vcpu *vcpu,
-> +			const struct coproc_reg *global,
-> +			size_t nr_global,
-> +			const struct coproc_reg *target_specific,
-> +			size_t nr_specific)
->  {
->  	struct coproc_params params;
->  
-> @@ -474,37 +509,15 @@ static int kvm_handle_cp_64(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  	params.Rt2 = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
->  	params.CRm = 0;
->  
-> -	if (cp15)
-> -		return emulate_cp15(vcpu, &params);
-> +	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
-> +		return 1;
-> +	if (!emulate_cp(vcpu, &params, global, nr_global))
-> +		return 1;
->  
-> -	/* raz_wi cp14 */
-> -	(void)trap_raz_wi(vcpu, &params, NULL);
-> -
-> -	/* handled */
-> -	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-> +	unhandled_cp_access(vcpu, &params);
->  	return 1;
->  }
->  
-> -/**
-> - * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
-> - * @vcpu: The VCPU pointer
-> - * @run:  The kvm_run struct
-> - */
-> -int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> -{
-> -	return kvm_handle_cp_64(vcpu, run, 1);
-> -}
-> -
-> -/**
-> - * kvm_handle_cp14_64 -- handles a mrrc/mcrr trap on a guest CP14 access
-> - * @vcpu: The VCPU pointer
-> - * @run:  The kvm_run struct
-> - */
-> -int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> -{
-> -	return kvm_handle_cp_64(vcpu, run, 0);
-> -}
-> -
->  static void reset_coproc_regs(struct kvm_vcpu *vcpu,
->  			      const struct coproc_reg *table, size_t num)
->  {
-> @@ -515,8 +528,11 @@ static void reset_coproc_regs(struct kvm_vcpu *vcpu,
->  			table[i].reset(vcpu, &table[i]);
->  }
->  
-> -static int kvm_handle_cp_32(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> -			      bool cp15)
-> +int kvm_handle_cp_32(struct kvm_vcpu *vcpu,
-> +			const struct coproc_reg *global,
-> +			size_t nr_global,
-> +			const struct coproc_reg *target_specific,
-> +			size_t nr_specific)
->  {
->  	struct coproc_params params;
->  
-> @@ -530,25 +546,57 @@ static int kvm_handle_cp_32(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  	params.Op2 = (kvm_vcpu_get_hsr(vcpu) >> 17) & 0x7;
->  	params.Rt2 = 0;
->  
-> -	if (cp15)
-> -		return emulate_cp15(vcpu, &params);
-> -
-> -	/* raz_wi cp14 */
-> -	(void)trap_raz_wi(vcpu, &params, NULL);
-> +	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
-> +		return 1;
-> +	if (!emulate_cp(vcpu, &params, global, nr_global))
-> +		return 1;
->  
-> -	/* handled */
-> -	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-> +	unhandled_cp_access(vcpu, &params);
->  	return 1;
->  }
->  
->  /**
-> + * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
-> + * @vcpu: The VCPU pointer
-> + * @run:  The kvm_run struct
-> + */
-> +int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> +{
-> +	const struct coproc_reg *target_specific;
-> +	size_t num;
-> +
-> +	target_specific = get_target_table(vcpu->arch.target, &num);
-> +	return kvm_handle_cp_64(vcpu,
-> +				cp15_regs, ARRAY_SIZE(cp15_regs),
-> +				target_specific, num);
+> +       return 0;
 > +}
 > +
-> +/**
->   * kvm_handle_cp15_32 -- handles a mrc/mcr trap on a guest CP15 access
->   * @vcpu: The VCPU pointer
->   * @run:  The kvm_run struct
->   */
->  int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
-> -	return kvm_handle_cp_32(vcpu, run, 1);
-> +	const struct coproc_reg *target_specific;
-> +	size_t num;
+> +static int rockchip_set_phy_state(struct phy *phy, bool enable)
+> +{
+> +       struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
 > +
-> +	target_specific = get_target_table(vcpu->arch.target, &num);
-> +	return kvm_handle_cp_32(vcpu,
-> +				cp15_regs, ARRAY_SIZE(cp15_regs),
-> +				target_specific, num);
+> +       if (enable) {
+> +               rockchip_dp_phy_clk_enable(dp);
+> +               writel(DP_PHY_SIDDQ_WRITE_EN | DP_PHY_SIDDQ_ON, dp->regs);
+> +       } else {
+> +               rockchip_dp_phy_clk_disable(dp);
+> +               writel(DP_PHY_SIDDQ_WRITE_EN | DP_PHY_SIDDQ_OFF, dp->regs);
+> +       }
+> +
+> +       return 0;
+> +}
+
+I would just inline all 3 of these functions. The wrappers don't
+doesn't do anything, but add 2 levels of function calls.
+
+> +
+> +static int rockchip_dp_phy_power_on(struct phy *phy)
+> +{
+> +       return rockchip_set_phy_state(phy, true);
 > +}
 > +
-> +/**
-> + * kvm_handle_cp14_64 -- handles a mrrc/mcrr trap on a guest CP14 access
-> + * @vcpu: The VCPU pointer
-> + * @run:  The kvm_run struct
-> + */
-> +int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +static int rockchip_dp_phy_power_off(struct phy *phy)
 > +{
-> +	return kvm_handle_cp_64(vcpu,
-> +				cp14_regs, ARRAY_SIZE(cp14_regs),
-> +				NULL, 0);
->  }
->  
->  /**
-> @@ -558,7 +606,9 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
->   */
->  int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  {
-> -	return kvm_handle_cp_32(vcpu, run, 0);
-> +	return kvm_handle_cp_32(vcpu,
-> +				cp14_regs, ARRAY_SIZE(cp14_regs),
-> +				NULL, 0);
->  }
->  
->  /******************************************************************************
-> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-> index 7c4075c..7ac5e51 100644
-> --- a/arch/arm/kvm/interrupts_head.S
-> +++ b/arch/arm/kvm/interrupts_head.S
-> @@ -633,7 +633,7 @@ ARM_BE8(rev	r6, r6  )
->   * (hardware reset value is 0) */
->  .macro set_hdcr operation
->  	mrc	p15, 4, r2, c1, c1, 1
-> -	ldr	r3, =(HDCR_TPM|HDCR_TPMCR|HDCR_TDRA|HDCR_TDOSA|HDCR_TDA)
-> +	ldr	r3, =(HDCR_TPM|HDCR_TPMCR)
+> +       return rockchip_set_phy_state(phy, false);
+> +}
+> +
+> +static struct phy_ops rockchip_dp_phy_ops = {
+> +       .power_on       = rockchip_dp_phy_power_on,
+> +       .power_off      = rockchip_dp_phy_power_off,
+> +       .owner          = THIS_MODULE,
+> +};
+> +
+> +static int rockchip_dp_phy_probe(struct platform_device *pdev)
+> +{
+> +       struct device *dev = &pdev->dev;
+> +       struct device_node *np = dev->of_node;
+> +       struct phy_provider *phy_provider;
+> +       struct rockchip_dp_phy *dp;
+> +       struct resource *res;
+> +       struct phy *phy;
+> +       int ret;
+> +
+> +       dp = devm_kzalloc(dev, sizeof(*dp), GFP_KERNEL);
+> +       if (IS_ERR(dp))
+> +               return -ENOMEM;
+> +
+> +       dp->dev = dev;
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       dp->regs = devm_ioremap_resource(dev, res);
+> +       if (IS_ERR(dp->regs))
+> +               return PTR_ERR(dp->regs);
+> +
+> +       dp->phy_24m = devm_clk_get(dev, "24m");
+> +       if (IS_ERR(dp->phy_24m)) {
+> +               dev_err(dev, "cannot get clock 24m\n");
+> +               return PTR_ERR(dp->phy_24m);
+> +       }
 
-I know I said ok to this, but I don't like the ordering of this with
-these patches.
+The binding says there are 2 clocks.
 
-I think we should only stop trapping debug accesses when we have proper
-world-switching in place.
-
-You should be able to put all the infrastructure needed in place first,
-and then hook things up in the end.
-
-Thanks,
--Christoffer
-
->  	.if \operation == vmentry
->  	orr	r2, r2, r3		@ Trap some perfmon accesses
->  	.else
-> -- 
-> 1.7.12.4
-> 
+> +
+> +       dp->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
+> +       if (IS_ERR(dp->grf)) {
+> +               dev_err(dev, "rk3288-dp needs rockchip,grf property\n");
+> +               return PTR_ERR(dp->grf);
+> +       }
+> +
+> +       ret = regmap_write(dp->grf, GRF_SOC_CON12,
+> +                          GRF_EDP_REF_CLK_SEL_INTER |
+> +                          (GRF_EDP_REF_CLK_SEL_INTER << 16));
+> +       if (ret != 0) {
+> +               dev_err(dp->dev, "Could not config GRF edp ref clk: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       phy = devm_phy_create(dev, NULL, &rockchip_dp_phy_ops, NULL);
+> +       if (IS_ERR(phy)) {
+> +               dev_err(dev, "failed to create phy\n");
+> +               return PTR_ERR(phy);
+> +       }
+> +       phy_set_drvdata(phy, dp);
+> +
+> +       phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+> +
+> +       return PTR_ERR_OR_ZERO(phy_provider);
+> +}
+> +
+> +static const struct of_device_id rockchip_dp_phy_dt_ids[] = {
+> +       { .compatible = "rockchip,rk3288-dp-phy" },
+> +       {}
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, rockchip_dp_phy_dt_ids);
+> +
+> +static struct platform_driver rockchip_dp_phy_driver = {
+> +       .probe          = rockchip_dp_phy_probe,
+> +       .driver         = {
+> +               .name   = "rockchip-dp-phy",
+> +               .of_match_table = rockchip_dp_phy_dt_ids,
+> +       },
+> +};
+> +
+> +module_platform_driver(rockchip_dp_phy_driver);
+> +
+> +MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
+> +MODULE_DESCRIPTION("Rockchip DP PHY driver");
+> +MODULE_LICENSE("GPL v2");
+> --
+> 2.1.2
+>
+>
