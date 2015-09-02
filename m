@@ -1,100 +1,64 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 2 Sep 2015 14:42:04 -0400
-Subject: [PATCH] ARM: dts: keystone: use one to one address translations
- under netcp
-In-Reply-To: <55E73F25.2050608@oracle.com>
-References: <1441139324-29296-1-git-send-email-w-kwok2@ti.com>
- <55E61658.9010207@oracle.com>
- <230CBA6E4B6B6B418E8730AC28E6FC7E04221776@DFLE11.ent.ti.com>
- <55E71AB3.7070406@oracle.com> <55E7255A.8060402@ti.com>
- <55E730D4.6040102@oracle.com> <55E738AE.9000207@ti.com>
- <55E73F25.2050608@oracle.com>
-Message-ID: <55E742FC.3020109@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 2 Sep 2015 13:58:36 -0500
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <20150902080639.GA26744@linux>
+References: <20150811080023.GB5509@linux> <20150811093039.GA18282@x1>
+ <20150811100941.GG5509@linux> <20150811115425.GE18282@x1>
+ <20150811120124.GH5509@linux>
+ <20150811132756.GG18282@x1> <20150811142812.GJ5509@linux>
+ <20150811151736.GO18282@x1>
+ <20150812110841.GC20238@linux> <20150826120628.GZ19409@x1>
+ <20150902080639.GA26744@linux>
+Message-ID: <CAL_JsqKMGp+3Z+oO6E0YYzjTCb=-R_QM=YF=B33NWayWmV057A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2015 02:25 PM, santosh shilimkar wrote:
-> 9/2/2015 10:58 AM, Murali Karicheri wrote:
->> On 09/02/2015 01:24 PM, santosh shilimkar wrote:
->>> On 9/2/2015 9:35 AM, Murali Karicheri wrote:
->>>> Santosh,
->>>>
+On Wed, Sep 2, 2015 at 3:06 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 26-08-15, 13:06, Lee Jones wrote:
+>> On Wed, 12 Aug 2015, Viresh Kumar wrote:
 >>
->> ---Cut-------------------
+>> > On 11-08-15, 16:17, Lee Jones wrote:
+>> > > This would work if we only had a single variable to contend with, but
+>> > > what I showed you in my previous example is that we have 3 variables
+>> > > to consider; cut (version), pcode and substrate.
+>> > >
+>> > > Using the two (simple) examples I provided, how would your suggestion
+>> > > look in our case?
+>> >
+>> > So the solution I gave is for picking the microvolt based on pcode.
+>> > The other two (cut, substrate) aren't about picking microvolt, but if
+>> > the OPP is available or not. Right?
 >>
->>>>> I suspected the same. I know back then we started with SERDES code
->>>>> with NETCP but as you already know, its a separate block which
->>>>> is needed for NIC card to work. Its more of phy and hence its
->>>>> having different address space is not surprising.
->>>>
->>>> Using Phy interface is not acceptable to the subsystem maintainer based
->>>> on the communication I had on this. Also the Phy here is tighly coupled
->>>> with the hardware block it is working with. So this model is not right
->>>> for SerDes driver as it require additional enhancements as described
->>>> below if needs to be used.
->>>>
->>> Thanks for update on that.
->>>
->>>> The serdes initialization procedure requires checking the status in the
->>>> hardware block (PCIe, 1G or 10G) and then taking corrective action.
->>>> This
->>>> means a Phy driver would require mapping of related hw address space
->>>> (PCIe, 1G and 10G) as well which is already mapped by the hardware
->>>> driver(PCIe, 1G and 10G). One solution is to treat this as a libray
->>>> function that can be called from the respective hardware device driver.
->>>>   A device node of h/w device (PCIe or 1G) in such as looks like
->>>>
->>> Or SerDes driver can embed the status reg address space.
->>> This is read only access so should be fine.
->>>
->>>> pcie {
->>>>
->>>>      serdes at someaddress {
->>>>          reg = <address of serdes>;
->>>>      }
->>>> }
->>>>
->>>> hw driver will call ks2_serdes_init(node, hw_base_address) to
->>>> initialize
->>>> the serdes. Other APIs can be added to enable/disable lane or shutdown
->>>> etc. The libary will be added to drivers/soc/ti/ and used by various
->>>> device drivers to initialize and use the phy. As the serdes is slightly
->>>> integrated with the hardware block, IMO, this is a better approach than
->>>> using the phy model. The API definitions will be added to
->>>> include/linux/soc/ti/ folder.
->>>>
->>> Serdes Driver with its status register address space might solve this
->>> sharing problem. Library might work but we should try to have driver
->>> considering there is a physical device. I don't have strong opinion
->>> on drivers vs library.
->>>
+>> 'pcode', 'cut' and 'substrate' all determine whether a given set of
+>> OPPs an be used on the running platform.  I do not believe that you
+>> can differentiate between them.
 >>
->> In addition to checking status in the SerDes, it needs to also check the
->> status of the associated hardware block (PCIe, 1G, 10G etc). So this
->> means, same needs to be mapped twice, first by the above hardware device
->> drivers and then by the serdes driver which causes problem. My point is
->> since they both are tightly coupled, a libary is a better option. That
->> way the mapped address can be passed to the serdes API to perform the
->> required task, instead of using Phy API which doesn't allow us to do the
->> same. If SerDes h/w can be brought up independently, the Phy model fits
->> well.
+>> > If these terms are generic enough, then we can add something similar
+>> > to what you have added..
 >>
-> As I said, I don't have strong preference and fine with library approach.
-> I suggest you do a RFC to take this further. Include Arnd on CC for
-> that.
+>> If it makes it easier, you can treat them as version numbers 2.2.1
+>> <pcode.cut.substrate>, but I don't see how this can help.  Obviously
+>> this becomes more difficult when you add wild cards to the OPPs, where
+>> a particular OPP would be suitable for all cuts for example.
+>>
+>> If you still think you can come up with a generic method to lay out
+>> CPUFreq OPP nodes that will satisfy all vendors and not be a mass of
+>> 10's of separate nodes, then great.  Again, I'm struggling to see how
+>> that might be possible.
+>>
+>> What I believe we shouldn't do, is have this blocked forever for the
+>> sake of adding a couple of vendor properties however.
+>
+> I agree and can understand the pain you are feeling..
+>
+> @Rob/Stephen: Please close this thread soon and let Lee get his work
+> done :)
 
-Sure!
+What do you expect here? It is your job to close it. Ultimately, this
+will be your problem to deal with. If you have 10 different vendors
+doing selection of OPPs in 10 different ways you will not be able to
+change that easily later. Maybe if you can't come up with something
+common, then this should just not go into DT. You can always look at
+how to do this in a common way and move from the kernel to DT later.
 
-Murali
->
-> Regards,
-> Santosh
->
->
->
->
-
-
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+Rob
