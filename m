@@ -1,62 +1,46 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 2 Sep 2015 11:48:41 +0200
-Subject: [PATCH 12/14] arm64: Check for selected granule support
-In-Reply-To: <20150813172946.GD4602@e104818-lin.cambridge.arm.com>
+Date: Wed, 2 Sep 2015 11:55:10 +0200
+Subject: [PATCH 00/14] arm64: 16K translation granule support
+In-Reply-To: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
 References: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
- <1439465645-22584-13-git-send-email-suzuki.poulose@arm.com>
- <CAPvkgC3=S1BxdzZM4uUOmyXLjii48SMpCof6i6HdNeTG_fydfg@mail.gmail.com>
- <55CCAD73.7080702@arm.com>
- <20150813172946.GD4602@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu8vfsL+SFqgsXESfYC5a90-rnHbLqVFuOkvDXTt2b1E3Q@mail.gmail.com>
+Message-ID: <CAKv+Gu-fbC9hFj4cvGWd4sEvxPaR-nfgWS7C+e+jdRTGKOtp4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 August 2015 at 19:29, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Aug 13, 2015 at 03:45:07PM +0100, Suzuki K. Poulose wrote:
->> On 13/08/15 13:28, Steve Capper wrote:
->> >On 13 August 2015 at 12:34, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
->> >>  __enable_mmu:
->> >>+       mrs     x1, ID_AA64MMFR0_EL1
->> >>+       ubfx    x2, x1, #ID_AA64MMFR0_TGran_SHIFT, 4
->> >>+       cmp     x2, #ID_AA64MMFR0_TGran_ENABLED
->> >>+       b.ne    __no_granule_support
->> >>         ldr     x5, =vectors
->> >>         msr     vbar_el1, x5
->> >>         msr     ttbr0_el1, x25                  // load TTBR0
->> >>@@ -626,3 +643,8 @@ __enable_mmu:
->> >>         isb
->> >>         br      x27
->> >>  ENDPROC(__enable_mmu)
->> >>+
->> >>+__no_granule_support:
->> >>+       wfe
->> >>+       b __no_granule_support
->> >>+ENDPROC(__no_granule_support)
->> >>--
->> >>1.7.9.5
->> >>
->> >
->> >Is is possible to tell the user that the kernel has failed to boot due
->> >to the kernel granule being unsupported?
->>
->> We don't have anything up at this time. The "looping address" is actually a clue
->> to the (expert) user. Not sure we can do something, until we get something like DEBUG_LL(?)
+On 13 August 2015 at 13:33, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 >
-> No.
+> This series enables the 16K page size support on Linux for arm64.
+> This series adds support for 48bit VA(4 level), 47bit VA(3 level) and
+> 36bit VA(2 level) with 16K. 16K was a late addition to the architecture
+> and is not implemented by all CPUs. Added a check to ensure the
+> selected granule size is supported by the CPU, failing which the CPU
+> won't proceed with booting.
 >
->> Or we should let it continue and end in a panic(?). The current situation can boot a
->> multi-cluster system with boot cluster having the Tgran support(which doesn't make a
->> strong use case though). I will try out some options and get back to you.
+> KVM bits have been tested on a fast model with GICv3 using Andre's kvmtool
+> with gicv3 support[1].
 >
-> If the boot CPU does not support 16KB pages, in general there isn't much
-> we can do since the console printing is done after we enabled the MMU.
-> Even mapping the UART address requires fixmap support and the PAGE_SIZE
-> is hard-coded in the kernel image. The DT is also mapped at run-time.
+> Patches 1-7 cleans up the kernel page size handling code.
+> Patches 8-11 Fixes some issues with the KVM bits, mainly the fake PGD
+>              handling code.
+> Patch 12    Adds a check to ensure the CPU supports the selected granule size.
+> Patch 13-14 Adds the 16k page size support bits.
 >
-> While in theory it's possible to fall back to a 4KB page size just
-> enough to load the DT and figure out the early console, I suggest we
-> just live with the "looping address" clue.
+> This series applies on top of for-next/core branch of the aarch64 tree and is
+> also available here:
+>
+>         git://linux-arm.org/linux-skp.git  16k/v1
 >
 
-Couldn't we allocate some flag bits in the Image header to communicate
-the page size to the bootloader?
+
+Hi Suzuki,
+
+I have given this a spin on the FVP Base model to check UEFI booting,
+and everything seems to work fine. (I tested 2-level and 3-level)
+I didn't test the KVM changes, so for all patches except those:
+
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Regards,
+Ard.
