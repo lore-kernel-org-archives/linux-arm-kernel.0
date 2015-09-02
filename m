@@ -1,46 +1,37 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 2 Sep 2015 11:55:10 +0200
-Subject: [PATCH 00/14] arm64: 16K translation granule support
-In-Reply-To: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
+Date: Wed, 2 Sep 2015 12:00:52 +0200
+Subject: [PATCH 02/14] arm64: Handle section maps for swapper/idmap
+In-Reply-To: <55E6C4A2.7080307@arm.com>
 References: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <CAKv+Gu-fbC9hFj4cvGWd4sEvxPaR-nfgWS7C+e+jdRTGKOtp4A@mail.gmail.com>
+ <1439465645-22584-3-git-send-email-suzuki.poulose@arm.com>
+ <CAKv+Gu-0ut3o3iy322tbyqLAmR_gfzoE5272O3U3qSd5Zoh0Hw@mail.gmail.com>
+ <55E6C4A2.7080307@arm.com>
+Message-ID: <CAKv+Gu_VUSxTNb1muM8qykWjHQjcuys+_1Dfa37xRjGE5G+QGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 August 2015 at 13:33, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+On 2 September 2015 at 11:42, Suzuki K. Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 02/09/15 10:38, Ard Biesheuvel wrote:
+>>
+>> On 13 August 2015 at 13:33, Suzuki K. Poulose <suzuki.poulose@arm.com>
+>> wrote:
+>>>
+>>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>>>
+>>> We use section maps with 4K page size to create the
+>>> swapper/idmaps. So far we have used !64K or 4K checks
+>>> to handle the case where we use the section maps. This
+>>> patch adds a symbol to make it clear those cases.
+>>>
+>>
+>> That sentence does not make sense.
 >
-> This series enables the 16K page size support on Linux for arm64.
-> This series adds support for 48bit VA(4 level), 47bit VA(3 level) and
-> 36bit VA(2 level) with 16K. 16K was a late addition to the architecture
-> and is not implemented by all CPUs. Added a check to ensure the
-> selected granule size is supported by the CPU, failing which the CPU
-> won't proceed with booting.
 >
-> KVM bits have been tested on a fast model with GICv3 using Andre's kvmtool
-> with gicv3 support[1].
+> I agree. How about :
 >
-> Patches 1-7 cleans up the kernel page size handling code.
-> Patches 8-11 Fixes some issues with the KVM bits, mainly the fake PGD
->              handling code.
-> Patch 12    Adds a check to ensure the CPU supports the selected granule size.
-> Patch 13-14 Adds the 16k page size support bits.
->
-> This series applies on top of for-next/core branch of the aarch64 tree and is
-> also available here:
->
->         git://linux-arm.org/linux-skp.git  16k/v1
+> "This patch adds a new symbol, 'ARM64_SWAPPER_USES_SECTION_MAPS', to
+> handle cases where we use section maps, instead of using the page size
+> symbols."
 >
 
-
-Hi Suzuki,
-
-I have given this a spin on the FVP Base model to check UEFI booting,
-and everything seems to work fine. (I tested 2-level and 3-level)
-I didn't test the KVM changes, so for all patches except those:
-
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Regards,
-Ard.
+Yep, much better
