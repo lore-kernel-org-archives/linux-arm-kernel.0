@@ -1,34 +1,42 @@
-From: sr@denx.de (Stefan Roese)
-Date: Wed,  2 Sep 2015 12:41:57 +0200
-Subject: [PATCH] clk: spear600: Fix adc clock device name
-Message-ID: <1441190517-20235-1-git-send-email-sr@denx.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 2 Sep 2015 16:17:27 +0530
+Subject: [PATCH 0/6] Fix pbias regulator enable 
+Message-ID: <1441190853-7133-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device name for the adc clock is incorrect. This results in the
-IIO ADC driver to fail while probing for the clock. This patch
-fixes the name and the ADC driver is now started correctly.
+vsel_reg and enable_reg of the pbias regulator descriptor should actually
+have the offset from syscon.
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Vipul Kumar Samar <vipulkumar.samar@st.com>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Mike Turquette <mturquette@linaro.org>
----
- drivers/clk/spear/spear6xx_clock.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+However after
+"ARM: dts: <platform>: add minimal l4 bus layout with control module
+support"
+vsel_reg and enable_reg started to have the absolute address because
+of address translation that happens due to pbias node made as the
+child node of syscon. This breaks the pbias regulator enable.
 
-diff --git a/drivers/clk/spear/spear6xx_clock.c b/drivers/clk/spear/spear6xx_clock.c
-index 4f649c9..3e43244 100644
---- a/drivers/clk/spear/spear6xx_clock.c
-+++ b/drivers/clk/spear/spear6xx_clock.c
-@@ -316,7 +316,7 @@ void __init spear6xx_clk_init(void __iomem *misc_base)
- 	/* clock derived from apb clk */
- 	clk = clk_register_gate(NULL, "adc_clk", "apb_clk", 0, PERIP1_CLK_ENB,
- 			ADC_CLK_ENB, 0, &_lock);
--	clk_register_clkdev(clk, NULL, "adc");
-+	clk_register_clkdev(clk, NULL, "d8200000.adc");
- 
- 	clk = clk_register_fixed_factor(NULL, "gpio0_clk", "apb_clk", 0, 1, 1);
- 	clk_register_clkdev(clk, NULL, "f0100000.gpio");
+This series adds the 'offset' to be populated in vsel_reg and enable_reg
+in the pbias driver itself.
+
+Tested these patches against mmc -next in omap4 panda, omap3 beagle xm,
+dra72 and omap5 uevm
+
+Kishon Vijay Abraham I (6):
+  regulator: pbias: program pbias register offset in pbias driver
+  ARM: dts: dra7: use "ti,pbias-dra7" compatible string for pbias
+  ARM: dts: omap243x: use "ti,pbias-omap2" compatible string for pbias
+  ARM: dts: omap3: use "ti,pbias-omap3" compatible string for pbias
+  ARM: dts: OMAP4: use "ti,pbias-omap4" compatible string for pbias
+  ARM: dts: OMAP5: use "ti,pbias-omap5" compatible string for pbias
+
+ .../bindings/regulator/pbias-regulator.txt         |    7 ++-
+ arch/arm/boot/dts/dra7.dtsi                        |    2 +-
+ arch/arm/boot/dts/omap2430.dtsi                    |    2 +-
+ arch/arm/boot/dts/omap3.dtsi                       |    2 +-
+ arch/arm/boot/dts/omap4.dtsi                       |    2 +-
+ arch/arm/boot/dts/omap5.dtsi                       |    2 +-
+ drivers/regulator/pbias-regulator.c                |   52 +++++++++++++++++---
+ 7 files changed, 57 insertions(+), 12 deletions(-)
+
 -- 
-2.5.1
+1.7.9.5
