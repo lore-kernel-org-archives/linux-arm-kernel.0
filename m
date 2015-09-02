@@ -1,36 +1,48 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Wed,  2 Sep 2015 14:25:48 -0700
-Subject: [PATCH] ARM: dts: Add ddc i2c reference to veyron
-Message-ID: <1441229148-12095-1-git-send-email-dianders@chromium.org>
+Date: Wed,  2 Sep 2015 14:54:22 -0700
+Subject: [PATCH] ARM: dts: Add the hdmi-ddc pinctrl settings for rk3288
+Message-ID: <1441230862-17376-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ddc-i2c-bus property was missing from the veyron dtsi file since
-downstream the ddc-i2c-bus was still being specified in rk3288.dtsi and
-nobody noticed when the veyron dtsi was sent upstream.  Add it.
+The pins for i2c5 can either be configured as "I2C5" which means that
+they're controlled by the normal RK3288 I2C controller or as "EDP / HDMI
+I2C".  It's unclear why EDP is referenced here since apparently setting
+the mux to this position enables I2C communication using the dw_hdmi
+block with a patch like <https://patchwork.kernel.org/patch/7098101/>.
+
+There appear to be some reasons why using the builtin I2C controller in
+dw_hdmi is better than using the normal RK3288 I2C controller, so boards
+based on rk3288 might eventually want to use this pinmux if it's known
+to work.
+
+Once driver support in dw_hdmi lands, boards would use this by selecting
+this pinctrl for the HDMI block and then _not_ specifying a ddc-i2c-bus
+and _not_ setting the status to "okay" for i2c5 (which uses the same
+pins).
 
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
-Note: I noticed that this was wrong but I don't currently have
-graphics up and running on upstream on veyron.  Posting this anyway
-since it's pretty clear that it's needed.  If someone else wants to
-try it out that'd be nice, otherwise I'll put it on my list to figure
-out how to get myself setup for graphics upstream.  ;)
+ arch/arm/boot/dts/rk3288.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
- arch/arm/boot/dts/rk3288-veyron.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
-index 2fa7a0d..275c78c 100644
---- a/arch/arm/boot/dts/rk3288-veyron.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
-@@ -158,6 +158,7 @@
- };
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 906e938..055b488 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -923,6 +923,13 @@
+ 			#interrupt-cells = <2>;
+ 		};
  
- &hdmi {
-+	ddc-i2c-bus = <&i2c5>;
- 	status = "okay";
- };
- 
++		hdmi {
++			hdmi_ddc: hdmi-ddc {
++				rockchip,pins = <7 19 RK_FUNC_2 &pcfg_pull_none>,
++						<7 20 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
+ 		pcfg_pull_up: pcfg-pull-up {
+ 			bias-pull-up;
+ 		};
 -- 
 2.5.0.457.gab17608
