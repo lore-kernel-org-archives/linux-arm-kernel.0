@@ -1,54 +1,134 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 2 Sep 2015 23:12:29 +0900
-Subject: [PATCHv2 2/2] ARM: exynos_defconfig: Enable CONFIG_LEDS_PWM for
- Odroid-XU3
-In-Reply-To: <1433696621-4763-2-git-send-email-linux.amoon@gmail.com>
-References: <1433696621-4763-1-git-send-email-linux.amoon@gmail.com>
- <1433696621-4763-2-git-send-email-linux.amoon@gmail.com>
-Message-ID: <55E703CD.3060207@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 2 Sep 2015 16:15:52 +0200
+Subject: [PATCH v2 2/2] arm64: don't load 32-bit binaries if platform has
+ no aarch32_el0
+In-Reply-To: <1441202438-27005-3-git-send-email-ynorov@caviumnetworks.com>
+References: <1441202438-27005-1-git-send-email-ynorov@caviumnetworks.com>
+ <1441202438-27005-3-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <CAKv+Gu-vVJjvp8q93=9Dea0WrsoRLTEeW4fuKLGKOCY7fbO4+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 08.06.2015 o 02:03, Anand Moon pisze:
-> Enable CONFIG_LEDS_PWM amd CONFIG_LEDS_TRIGGER_HEARTBEAT for
-> Odroid-XU3 board.
-> 
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-
-Dear Anand,
-
-There was some confusion for this patch (mixed v3 and v2) so overall it
-slipped through fingers.
-
-Can you please:
-1. Rebase and resend.
-2. Enable them as built-ins, not modules. For exynos_defconfig
-everything is built-in which makes easier to test on various boards.
-3. Enable LEDS_GPIO. I don't know why it disappeared...
-
-Best regards,
-Krzysztof
-
-
+On 2 September 2015 at 16:00, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> Kernel option COMPAT defines the ability of executing aarch32 binaries.
+> Some platforms does not support aarch32 mode, and so cannot execute that
+> binaries. But we cannot just disable COMPAT for them because the same
+> kernel binary may be used by multiple platforms.
+>
+> In this patch, system_supports_aarch32_el0() is introduced to detect
+> aarch32 support at run-time.
+>
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 > ---
->  arch/arm/configs/exynos_defconfig | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 1b7253b..2bbdf80 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -165,6 +165,12 @@ CONFIG_MMC_SDHCI_S3C_DMA=y
->  CONFIG_MMC_DW=y
->  CONFIG_MMC_DW_IDMAC=y
->  CONFIG_MMC_DW_EXYNOS=y
-> +CONFIG_NEW_LEDS=y
-> +CONFIG_LEDS_CLASS=m
-> +CONFIG_LEDS_PWM=m
-> +CONFIG_LEDS_TRIGGERS=y
-> +CONFIG_LEDS_TRIGGER_TIMER=m
-> +CONFIG_LEDS_TRIGGER_HEARTBEAT=m
->  CONFIG_RTC_CLASS=y
->  CONFIG_RTC_DRV_MAX77686=y
->  CONFIG_RTC_DRV_MAX77802=y
-> 
+>  arch/arm64/include/asm/cpufeature.h |  1 +
+>  arch/arm64/include/asm/cputype.h    |  8 ++++++++
+>  arch/arm64/include/asm/elf.h        |  6 ++++--
+>  arch/arm64/kernel/cpuinfo.c         | 12 ++++++++++++
+>  4 files changed, 25 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index f0e4017..35f2654 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -83,6 +83,7 @@ void check_local_cpu_errata(void);
+>  void check_local_cpu_features(void);
+>  bool cpu_supports_mixed_endian_el0(void);
+>  bool system_supports_mixed_endian_el0(void);
+> +bool system_supports_aarch32_el0(void);
+>
+>  #endif /* __ASSEMBLY__ */
+>
+> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+> index a84ec60..a24e42c 100644
+> --- a/arch/arm64/include/asm/cputype.h
+> +++ b/arch/arm64/include/asm/cputype.h
+> @@ -81,6 +81,9 @@
+>  #define ID_AA64MMFR0_BIGEND(mmfr0)     \
+>         (((mmfr0) & ID_AA64MMFR0_BIGEND_MASK) >> ID_AA64MMFR0_BIGEND_SHIFT)
+>
+> +#define ID_AA64PFR0_EL0_64     1
+> +#define ID_AA64PFR0_EL0_6432   2
+> +
+>  #define SCTLR_EL1_CP15BEN      (0x1 << 5)
+>  #define SCTLR_EL1_SED          (0x1 << 8)
+>
+> @@ -116,6 +119,11 @@ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
+>         return read_cpuid(CTR_EL0);
+>  }
+>
+> +static inline bool id_aa64pfr0_aarch32_el0(u64 pfr0)
+> +{
+> +       return pfr0 == ID_AA64PFR0_EL0_6432;
+> +}
+> +
+
+Shouldn't you be masking some bits in pfr0 before doing the comparison?
+ID_AA64PFR0_EL1.EL0 occupies bits [3:0] only.
+
+>  static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
+>  {
+>         return (ID_AA64MMFR0_BIGEND(mmfr0) == 0x1) ||
+> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> index faad6df..461897b 100644
+> --- a/arch/arm64/include/asm/elf.h
+> +++ b/arch/arm64/include/asm/elf.h
+> @@ -21,6 +21,7 @@
+>  /*
+>   * ELF register definitions..
+>   */
+> +#include <asm/cpufeature.h>
+>  #include <asm/ptrace.h>
+>  #include <asm/user.h>
+>
+> @@ -173,8 +174,9 @@ typedef compat_elf_greg_t           compat_elf_gregset_t[COMPAT_ELF_NGREG];
+>
+>  /* AArch32 EABI. */
+>  #define EF_ARM_EABI_MASK               0xff000000
+> -#define compat_elf_check_arch(x)       (((x)->e_machine == EM_ARM) && \
+> -                                        ((x)->e_flags & EF_ARM_EABI_MASK))
+> +#define compat_elf_check_arch(x)       (system_supports_aarch32_el0()  \
+> +                                       && ((x)->e_machine == EM_ARM)   \
+> +                                       && ((x)->e_flags & EF_ARM_EABI_MASK))
+>
+>  #define compat_start_thread            compat_start_thread
+>  #define COMPAT_SET_PERSONALITY(ex)     set_thread_flag(TIF_32BIT);
+> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> index 75d5a86..4a6ae31 100644
+> --- a/arch/arm64/kernel/cpuinfo.c
+> +++ b/arch/arm64/kernel/cpuinfo.c
+> @@ -36,6 +36,7 @@
+>  DEFINE_PER_CPU(struct cpuinfo_arm64, cpu_data);
+>  static struct cpuinfo_arm64 boot_cpu_data;
+>  static bool mixed_endian_el0 = true;
+> +static bool aarch32_el0 = true;
+>
+>  static char *icache_policy_str[] = {
+>         [ICACHE_POLICY_RESERVED] = "RESERVED/UNKNOWN",
+> @@ -79,13 +80,24 @@ bool system_supports_mixed_endian_el0(void)
+>         return mixed_endian_el0;
+>  }
+>
+> +bool system_supports_aarch32_el0(void)
+> +{
+> +       return aarch32_el0;
+> +}
+> +
+>  static void update_mixed_endian_el0_support(struct cpuinfo_arm64 *info)
+>  {
+>         mixed_endian_el0 &= id_aa64mmfr0_mixed_endian_el0(info->reg_id_aa64mmfr0);
+>  }
+>
+> +static void update_aarch32_el0_support(struct cpuinfo_arm64 *info)
+> +{
+> +       aarch32_el0 &= id_aa64pfr0_aarch32_el0(info->reg_id_aa64pfr0);
+> +}
+> +
+>  static void update_cpu_features(struct cpuinfo_arm64 *info)
+>  {
+> +       update_aarch32_el0_support(info);
+>         update_mixed_endian_el0_support(info);
+>  }
+>
+> --
+> 2.1.4
+>
