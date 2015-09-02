@@ -1,48 +1,59 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 2 Sep 2015 16:43:38 -0700
-Subject: [PATCH v3 2/2] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
- support
-In-Reply-To: <20150902225008.GQ21084@n2100.arm.linux.org.uk>
-References: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <CAD=FV=WvUp7xhsmXJgVzm1Awqej12hNF_QPJhrQq7z=Fa4Nnuw@mail.gmail.com>
- <20150902225008.GQ21084@n2100.arm.linux.org.uk>
-Message-ID: <CAD=FV=VuyQXNGt7dgF-YF7D7MDu31B-QuBdGpeC_+0b1F2=dKg@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 03 Sep 2015 08:48:16 +0900
+Subject: [PATCHv4] ARM: exynos_defconfig: Enable CONFIG_LEDS_PWM for
+ Odroid-XU3/XU4
+In-Reply-To: <1441212107-3993-1-git-send-email-linux.amoon@gmail.com>
+References: <1441212107-3993-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <55E78AC0.10006@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On 03.09.2015 01:41, Anand Moon wrote:
+> Enable CONFIG_LEDS_PWM amd CONFIG_LEDS_TRIGGER_HEARTBEAT for
+> Odroid-XU3/XU4 board.
+> 
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> 
+> ---
+> Changes from last version.
+>   Make all modules build-in.
+>   Enabled LEDS_GPIO
+> ---
+>  arch/arm/configs/exynos_defconfig | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 2263cd9..c285975 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -168,6 +168,16 @@ CONFIG_MMC_SDHCI_S3C_DMA=y
+>  CONFIG_MMC_DW=y
+>  CONFIG_MMC_DW_IDMAC=y
+>  CONFIG_MMC_DW_EXYNOS=y
+> +CONFIG_NEW_LEDS=y
+> +CONFIG_LEDS_CLASS=y
+> +CONFIG_LEDS_CLASS_FLASH=y
+> +CONFIG_LEDS_GPIO=y
+> +CONFIG_LEDS_PWM=y
+> +CONFIG_LEDS_TRIGGERS=y
+> +CONFIG_LEDS_TRIGGER_TIMER=y
+> +CONFIG_LEDS_TRIGGER_ONESHOT=y
+> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+> +CONFIG_LEDS_TRIGGER_GPIO=y
 
-On Wed, Sep 2, 2015 at 3:50 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Never copy the of_node from one device to another.  That allows the
-> bus matching to unintentionally match the of_node against the wrong
-> driver.
+This is getting boring. I asked about enabling LEDS_GPIO, which you
+confirmed in changelog. Good!
+So what are LEDS_CLASS_FLASH, TRIGGER_ONESHOT and TRIGGER_GPIO doing
+here? They are not mentioned in commit message, changelog and previous
+discussions.
 
-Can you be more specific about what problems you'd expect.  It seems
-like a terribly common practice to do this, but maybe I'm
-misunderstanding:
+Beside that commit message seems to be far away from the contents now...
 
-On today's next, I do a simple:
-  git grep 'dev.of_node = '
+Best regards,
+Krzysztof
 
-...and I find lots of hits:
 
-drivers/i2c/busses/i2c-at91.c:  dev->adapter.dev.of_node = pdev->dev.of_node;
-drivers/i2c/busses/i2c-axxia.c: idev->adapter.dev.of_node = pdev->dev.of_node;
-drivers/i2c/busses/i2c-bcm-iproc.c:     adap->dev.of_node = pdev->dev.of_node;
-drivers/i2c/busses/i2c-bcm-kona.c:      adap->dev.of_node = pdev->dev.of_node;
-drivers/i2c/busses/i2c-bcm2835.c:       adap->dev.of_node = pdev->dev.of_node;
-drivers/i2c/busses/i2c-brcmstb.c:       adap->dev.of_node = pdev->dev.of_node;
-...
-
-So unless I'm mistaken, the code I'm suggesting is a common practice.
-Perhaps there is a latent bug that's waiting to bite us.  If so then
-that bug should be reported and fixed.  ...but without seeing some
-concrete problem (or some reason that the code I'm suggesting is
-different than everyone else's code) it seems best to take it and to
-later fix it (along with all the other code) if/when we find some
-problem.
-
-Objections?
-
--Doug
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_MAX77686=y
+>  CONFIG_RTC_DRV_MAX77802=y
+> 
