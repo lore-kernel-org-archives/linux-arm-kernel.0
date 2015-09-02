@@ -1,58 +1,45 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 02 Sep 2015 08:07:56 -0700
-Subject: [PATCH 2/2] mmc: sdhci-pxav3: Print ret value on error from
- sdhci_add_host() fn
-In-Reply-To: <55E6F497.8080300@linaro.org>
-References: <1441135454-6902-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1441135454-6902-3-git-send-email-vaibhav.hiremath@linaro.org>
- <1441139838.12163.5.camel@perches.com> <55E6F497.8080300@linaro.org>
-Message-ID: <1441206476.12163.44.camel@perches.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 2 Sep 2015 16:14:50 +0100
+Subject: [PATCH 6/7] MAINTAINERS: Add FDMA driver files to STi section.
+In-Reply-To: <20150826073351.GU19409@x1>
+References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
+ <1436371888-27863-7-git-send-email-peter.griffin@linaro.org>
+ <20150826073351.GU19409@x1>
+Message-ID: <20150902151450.GB15477@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-09-02 at 18:37 +0530, Vaibhav Hiremath wrote:
-> On Wednesday 02 September 2015 02:07 AM, Joe Perches wrote:
-> > On Wed, 2015-09-02 at 00:54 +0530, Vaibhav Hiremath wrote:
-> >> Return value would give clear information about the actual root-cause
-> >> of the failure.
-> >> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-> >> @@ -455,7 +455,7 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
-> >>
-> >>   	ret = sdhci_add_host(host);
-> >>   	if (ret) {
-> >> -		dev_err(&pdev->dev, "failed to add host\n");
-> >> +		dev_err(&pdev->dev, "failed to add host ret - %d\n", ret);
-> >>   		goto err_add_host;
-> >>   	}
-> >
-> > If this is really desirable, there are many other callers of
-> > sdhci_add_host with error messages just like this one.
-> >
-> How about this? If you are ok, I can change it and submit the patch
-> again.
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-[]
-> @@ -3176,8 +3176,11 @@ int sdhci_add_host(struct sdhci_host *host)
->                  mmc->caps |= MMC_CAP_NEEDS_POLL;
+Hi Lee,
+
+On Wed, 26 Aug 2015, Lee Jones wrote:
+
+> On Wed, 08 Jul 2015, Peter Griffin wrote:
 > 
->          /* If there are external regulators, get them */
-> -       if (mmc_regulator_get_supply(mmc) == -EPROBE_DEFER)
-> +       if (mmc_regulator_get_supply(mmc) == -EPROBE_DEFER) {
-> +               pr_err("%s: regulator supply unavailable, deferring 
-> probe. \n",
-> +                               mmc_hostname(mmc));
->                  return -EPROBE_DEFER;
-> +       }
+> > This patch adds the FDMA driver files to the STi
+> > section of the maintainers file.
+> > 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > ---
+> >  MAINTAINERS | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index 8133cef..8cb1ad9 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -1503,6 +1503,8 @@ S:	Maintained
+> >  F:	arch/arm/mach-sti/
+> >  F:	arch/arm/boot/dts/sti*
+> >  F:	drivers/clocksource/arm_global_timer.c
+> > +F:	drivers/dma/st_fdma.*
+> > +F:	drivers/dma/st_fdma_xbar.c
+> 
+> How about you replace both lines with:
+> 
+> F:	drivers/dma/st_fdma*
 
-(your email client has inappropriate line wrapping)
+Ok, will fix in next version.
 
-The KERN_<LEVEL> here probably isn't right.
+regards,
 
-Deferring isn't an error, at best it's a notification
-and perhaps should be at pr_notice/KERN_NOTICE
-
-I don't know how often or how many times this deferral
-can occur.  Do you?
-
-If it's moderately common, that message should likely
-be ratelimited if it exists at all.
+Peter.
