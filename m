@@ -1,40 +1,83 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 2 Sep 2015 15:07:49 -0700
-Subject: [PATCH v3 2/2] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
- support
-In-Reply-To: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <CAD=FV=WvUp7xhsmXJgVzm1Awqej12hNF_QPJhrQq7z=Fa4Nnuw@mail.gmail.com>
+From: amstan@chromium.org (Alexandru M Stan)
+Date: Wed,  2 Sep 2015 15:20:06 -0700
+Subject: [PATCH] ARM: dts: rk3288: pull up cts lines
+Message-ID: <1441232406-32628-1-git-send-email-amstan@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The flow control lines from a user accessible UART are optional,
+the user might not have anything connected to those pins.
+In order to prevent random interrupts happening and noise affecting
+that pin it should be pulled up.
 
-On Sun, Aug 30, 2015 at 2:34 PM, Vladimir Zapolskiy
-<vladimir_zapolskiy@mentor.com> wrote:
-> +static struct i2c_adapter *dw_hdmi_i2c_adapter(struct dw_hdmi *hdmi)
-> +{
-> +       struct i2c_adapter *adap;
-> +       struct dw_hdmi_i2c *i2c;
-> +       int ret;
-> +
-> +       i2c = devm_kzalloc(hdmi->dev, sizeof(*i2c), GFP_KERNEL);
-> +       if (!i2c)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       mutex_init(&i2c->lock);
-> +       init_completion(&i2c->cmp);
-> +
-> +       adap = &i2c->adap;
-> +       adap->class = I2C_CLASS_DDC;
-> +       adap->owner = THIS_MODULE;
-> +       adap->dev.parent = hdmi->dev;
+Note that the default state for those pins on the rk3288 is pulled up,
+so this patch merely restores them.
 
-I think you may want to add "adap->dev.of_node = hdmi->dev->of_node;"
-here.  That will allow device trees to specify the i2c bus by using an
-alias.
+Suggested-by: Neil Hendin <nhendin@chromium.org>
+Signed-off-by: Alexandru M Stan <amstan@chromium.org>
+---
+ arch/arm/boot/dts/rk3288.dtsi | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-See <https://chromium-review.googlesource.com/#/c/297040/> where I've
-added this line and
-<https://chromium-review.googlesource.com/#/c/297041/> where I've used
-it.
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 906e938..a059367 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -1211,11 +1211,11 @@
+ 			};
+ 
+ 			uart0_cts: uart0-cts {
+-				rockchip,pins = <4 18 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <4 18 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 
+ 			uart0_rts: uart0-rts {
+-				rockchip,pins = <4 19 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <4 19 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+@@ -1226,11 +1226,11 @@
+ 			};
+ 
+ 			uart1_cts: uart1-cts {
+-				rockchip,pins = <5 10 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <5 10 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 
+ 			uart1_rts: uart1-rts {
+-				rockchip,pins = <5 11 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <5 11 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+@@ -1249,11 +1249,11 @@
+ 			};
+ 
+ 			uart3_cts: uart3-cts {
+-				rockchip,pins = <7 9 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <7 9 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 
+ 			uart3_rts: uart3-rts {
+-				rockchip,pins = <7 10 RK_FUNC_1 &pcfg_pull_none>;
++				rockchip,pins = <7 10 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+@@ -1264,11 +1264,11 @@
+ 			};
+ 
+ 			uart4_cts: uart4-cts {
+-				rockchip,pins = <5 14 3 &pcfg_pull_none>;
++				rockchip,pins = <5 14 3 &pcfg_pull_up>;
+ 			};
+ 
+ 			uart4_rts: uart4-rts {
+-				rockchip,pins = <5 15 3 &pcfg_pull_none>;
++				rockchip,pins = <5 15 3 &pcfg_pull_up>;
+ 			};
+ 		};
+ 
+-- 
+2.5.0.457.gab17608
