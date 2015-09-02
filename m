@@ -1,400 +1,75 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 2 Sep 2015 12:28:01 +0800
-Subject: [PATCH 2/2] arm64: dts: add dts files for Hisilicon Hip05-D02
- Development Board
-In-Reply-To: <55E45A46.7040805@huawei.com>
-References: <1440838361-1468-1-git-send-email-dingtianhong@huawei.com>	<1440838361-1468-3-git-send-email-dingtianhong@huawei.com>	<20150831131244.GB6194@leoy-linaro>
- <55E45A46.7040805@huawei.com>
-Message-ID: <55E67AD1.2010405@huawei.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Wed, 02 Sep 2015 14:01:52 +0900
+Subject: [PATCH 5/8] mmc: dw_mmc: dt-binding: Add tuning related things
+In-Reply-To: <1441045446-30858-6-git-send-email-heiko@sntech.de>
+References: <1441045446-30858-1-git-send-email-heiko@sntech.de>
+ <1441045446-30858-6-git-send-email-heiko@sntech.de>
+Message-ID: <55E682C0.6050204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi?Marc?
+Hi, Heiko.
 
-Can you check this, I am not sure whether the GIC_CPU_MASK_SIMPLE(xx) is used for gic-v3, maybe we should remove it, thanks.
+On 09/01/2015 03:24 AM, Heiko Stuebner wrote:
+> From: Alexandru M Stan <amstan@chromium.org>
+> 
+> Add ciu_drv, ciu_sample clocks and default-sample-phase. This will later
+> be used by tuning code.
 
-Ding
+As i know, ciu_drv and ciu_sample clocks are generated with "ciu" clock.
+But in these patch-set, ciu_drv and ciu_sample are controlled by clock framework.
+It's a little strange.
+Are there ciu_drv and ciu_sample clock on Rockchip?
 
-On 2015/8/31 21:44, Ding Tianhong wrote:
-> On 2015/8/31 21:12, Leo Yan wrote:
->> On Sat, Aug 29, 2015 at 04:52:41PM +0800, Ding Tianhong wrote:
->>> Add initial dtsi file to support Hisilicon Hip05-D02 Board with
->>> support of CPUs in four clusters and each cluster has quard Cortex-A57.
->>>
->>> Also add dts file to support Hip05-D02 development board.
->>>
->>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->>> ---
->>>  arch/arm64/boot/dts/hisilicon/Makefile      |   2 +-
->>>  arch/arm64/boot/dts/hisilicon/hip05-d02.dts |  36 ++++
->>>  arch/arm64/boot/dts/hisilicon/hip05.dtsi    | 271 ++++++++++++++++++++++++++++
->>>  3 files changed, 308 insertions(+), 1 deletion(-)
->>>  create mode 100644 arch/arm64/boot/dts/hisilicon/hip05-d02.dts
->>>  create mode 100644 arch/arm64/boot/dts/hisilicon/hip05.dtsi
->>>
->>> diff --git a/arch/arm64/boot/dts/hisilicon/Makefile b/arch/arm64/boot/dts/hisilicon/Makefile
->>> index fa81a6e..cd158b8 100644
->>> --- a/arch/arm64/boot/dts/hisilicon/Makefile
->>> +++ b/arch/arm64/boot/dts/hisilicon/Makefile
->>> @@ -1,4 +1,4 @@
->>> -dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb
->>> +dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb hip05-d02.dtb
->>>  
->>>  always		:= $(dtb-y)
->>>  subdir-y	:= $(dts-dirs)
->>> diff --git a/arch/arm64/boot/dts/hisilicon/hip05-d02.dts b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
->>> new file mode 100644
->>> index 0000000..ae34e25
->>> --- /dev/null
->>> +++ b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
->>> @@ -0,0 +1,36 @@
->>> +/**
->>> + * dts file for Hisilicon D02 Development Board
->>> + *
->>> + * Copyright (C) 2014,2015 Hisilicon Ltd.
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * publishhed by the Free Software Foundation.
->>> + *
->>> + */
->>> +
->>> +/dts-v1/;
->>> +
->>> +#include "hip05.dtsi"
->>> +
->>> +/ {
->>> +	model = "Hisilicon Hip05 D02 Development Board";
->>> +	compatible = "hisilicon,hip05-d02";
->>> +
->>> +	memory at 00000000 {
->>> +		device_type = "memory";
->>> +		reg = <0x0 0x00000000 0x0 0x80000000>;
->>> +	};
->>> +
->>> +	aliases {
->>> +		serial0 = &uart0;
->>> +	};
->>> +
->>> +	chosen {
->>> +		stdout-path = "serial0:115200n8";
->>> +	};
->>> +};
->>> +
->>> +&uart0 {
->>> +	status = "ok";
->>> +};
->>> diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
->>> new file mode 100644
->>> index 0000000..da12d94
->>> --- /dev/null
->>> +++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
->>> @@ -0,0 +1,271 @@
->>> +/**
->>> + * dts file for Hisilicon D02 Development Board
->>> + *
->>> + * Copyright (C) 2014,2015 Hisilicon Ltd.
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * publishhed by the Free Software Foundation.
->>> + *
->>> + */
->>> +
->>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->>> +
->>> +/ {
->>> +	compatible = "hisilicon,hip05-d02";
->>> +	interrupt-parent = <&gic>;
->>> +	#address-cells = <2>;
->>> +	#size-cells = <2>;
->>> +
->>> +	psci {
->>> +		compatible = "arm,psci-0.2";
->>> +		method = "smc";
->>> +	};
->>> +
->>> +	cpus {
->>> +		#address-cells = <1>;
->>> +		#size-cells = <0>;
->>> +
->>> +		cpu-map {
->>> +			cluster0 {
->>> +				core0 {
->>> +					cpu = <&cpu0>;
->>> +				};
->>> +				core1 {
->>> +					cpu = <&cpu1>;
->>> +				};
->>> +				core2 {
->>> +					cpu = <&cpu2>;
->>> +				};
->>> +				core3 {
->>> +					cpu = <&cpu3>;
->>> +				};
->>> +			};
->>> +			cluster1 {
->>> +				core0 {
->>> +					cpu = <&cpu4>;
->>> +				};
->>> +				core1 {
->>> +					cpu = <&cpu5>;
->>> +				};
->>> +				core2 {
->>> +					cpu = <&cpu6>;
->>> +				};
->>> +				core3 {
->>> +					cpu = <&cpu7>;
->>> +				};
->>> +			};
->>> +			cluster2 {
->>> +				core0 {
->>> +					cpu = <&cpu8>;
->>> +				};
->>> +				core1 {
->>> +					cpu = <&cpu9>;
->>> +				};
->>> +				core2 {
->>> +					cpu = <&cpu10>;
->>> +				};
->>> +				core3 {
->>> +					cpu = <&cpu11>;
->>> +				};
->>> +			};
->>> +			cluster3 {
->>> +				core0 {
->>> +					cpu = <&cpu12>;
->>> +				};
->>> +				core1 {
->>> +					cpu = <&cpu13>;
->>> +				};
->>> +				core2 {
->>> +					cpu = <&cpu14>;
->>> +				};
->>> +				core3 {
->>> +					cpu = <&cpu15>;
->>> +				};
->>> +			};
->>> +		};
->>> +
->>> +		cpu0: cpu at 20000 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>
->> Change to "arm,cortex-a57","arm,armv8"?
->>
+Best Regards,
+Jaehoon Chung
+
 > 
-> Ok?but I think should be "hisilicon,hip05","arm,armv8".
+> We do not touch ciu_drive (and by extension define default-drive-phase).
+> Drive phase is mostly used to define minimum hold times, while one could
+> write some code to determine what phase meets the minimum hold time
+> (ex 10 degrees) this will not work with the current clock phase framework
+> (which floors angles, so we'll get 0 deg, and there's no way to know what
+> resolution the floors happen at). We assume that the default drive angles
+> set by the hardware are good enough.
 > 
->>> +			reg = <0x20000>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu1: cpu at 20001 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20001>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu2: cpu at 20002 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20002>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu3: cpu at 20003 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20003>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu4: cpu at 20100 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20100>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu5: cpu at 20101 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20101>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu6: cpu at 20102 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20102>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu7: cpu at 20103 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20103>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu8: cpu at 20200 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20200>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu9: cpu at 20201 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20201>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu10: cpu at 20202 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20202>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu11: cpu at 20203 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20203>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu12: cpu at 20300 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20300>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu13: cpu at 20301 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20301>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu14: cpu at 20302 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20302>;
->>> +			enable-method = "psci";
->>> +		};
->>> +
->>> +		cpu15: cpu at 20303 {
->>> +			device_type = "cpu";
->>> +			compatible = "arm,armv8";
->>> +			reg = <0x20303>;
->>> +			enable-method = "psci";
->>> +		};
->>> +	};
->>> +
->>> +	gic: interrupt-controller at 8d000000 {
->>> +		compatible = "arm,gic-v3";
->>> +                #interrupt-cells = <3>;
->>> +                #address-cells = <2>;
->>> +                #size-cells = <2>;
->>> +                ranges;
->>> +                interrupt-controller;
->>> +                #redistributor-regions = <1>;
->>> +                redistributor-stride = <0x0 0x30000>;
->>> +		reg = <0x0 0x8d000000 0 0x10000>,	/* GICD */
->>> +		      <0x0 0x8d100000 0 0x300000>,	/* GICR */
->>> +		      <0x0 0xfe000000 0 0x10000>,	/* GICC */
->>> +		      <0x0 0xfe010000 0 0x10000>,       /* GICH */
->>> +		      <0x0 0xfe020000 0 0x10000>;       /* GICV */
->>> +		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
->>> +
->>> +		its_totems: interrupt-controller at 8c000000 {
->>> +			compatible = "arm,gic-v3-its";
->>> +			msi-controller;
->>> +			reg = <0x0 0x8c000000 0x0 0x1000000>;
->>> +		};
->>> +	};
->>> +
->>> +	timer {
->>> +		compatible = "arm,armv8-timer";
->>> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
->>> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
->>> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
->>> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
->>
->> Here have a question:
->> In devcie tree binding file: Documentation/devicetree/bindings/arm/gic.txt,
->> it only considers for maximum 8 cpus. So will we need change the
->> binding file and also use GIC_CPU_MASK_SIMPLE(16) for 16 cores?
->>
+> Signed-off-by: Alexandru M Stan <amstan@chromium.org>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt | 14 ++++++++++----
+>  1 file changed, 10 insertions(+), 4 deletions(-)
 > 
-> Looks like should updtate gic.txt and use the GIC_CPU_MASK_SIMPLE(16) for 16 cores.
-> 
-> Ding
-> 
->>> +	};
->>> +
->>> +	pmu {
->>> +		compatible = "arm,armv8-pmuv3";
->>> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_HIGH>;
->>> +	};
->>> +
->>> +	soc {
->>> +		compatible = "simple-bus";
->>> +		#address-cells = <2>;
->>> +		#size-cells = <2>;
->>> +		ranges;
->>> +
->>> +		refclk200mhz: refclk200mhz {
->>> +			compatible = "fixed-clock";
->>> +			#clock-cells = <0>;
->>> +			clock-frequency = <200000000>;
->>> +		};
->>> +
->>> +		uart0: uart at 80300000 {
->>> +			compatible = "snps,dw-apb-uart";
->>> +			reg = <0x0 0x80300000 0x0 0x10000>;
->>> +			interrupts = <GIC_SPI 317 IRQ_TYPE_LEVEL_HIGH>;
->>> +			clocks = <&refclk200mhz>;
->>> +			clock-names = "apb_pclk";
->>> +			reg-shift = <2>;
->>> +			reg-io-width = <4>;
->>> +			status = "disabled";
->>> +		};
->>> +
->>> +		uart1: uart at 80310000 {
->>> +			compatible = "snps,dw-apb-uart";
->>> +			reg = <0x0 0x80310000 0x0 0x10000>;
->>> +			interrupts = <GIC_SPI 318 IRQ_TYPE_LEVEL_HIGH>;
->>> +			clocks = <&refclk200mhz>;
->>> +			clock-names = "apb_pclk";
->>> +			reg-shift = <2>;
->>> +			reg-io-width = <4>;
->>> +			status = "disabled";
->>> +		};
->>> +	};
->>> +};
->>> -- 
->>> 1.9.0
->>>
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->> .
->>
-> 
-> 
-> _______________________________________________
-> linuxarm mailing list
-> linuxarm at huawei.com
-> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+> diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+> index 346c609..5edadc2 100644
+> --- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+> @@ -42,11 +42,13 @@ Optional properties:
+>  * clocks: from common clock binding: handle to biu and ciu clocks for the
+>    bus interface unit clock and the card interface unit clock.
+>  
+> -* clock-names: from common clock binding: Shall be "biu" and "ciu".
+> -  If the biu clock is missing we'll simply skip enabling it.  If the
+> -  ciu clock is missing we'll just assume that the clock is running at
+> +* clock-names: from common clock binding: Shall be "biu", "ciu", "ciu_drv" and
+> +  "ciu_sample".  If the biu clock is missing we'll simply skip enabling it.
+> +  If the ciu clock is missing we'll just assume that the clock is running at
+>    clock-frequency.  It is an error to omit both the ciu clock and the
+> -  clock-frequency.
+> +  clock-frequency.  "ciu_drv" and "ciu_sample" are used to control the clock
+> +  phases, "ciu_sample" is required for tuning high speed modes (if no other
+> +  custom tuning method is defined).
+>  
+>  * clock-frequency: should be the frequency (in Hz) of the ciu clock.  If this
+>    is specified and the ciu clock is specified then we'll try to set the ciu
+> @@ -75,6 +77,10 @@ Optional properties:
+>  * vmmc-supply: The phandle to the regulator to use for vmmc.  If this is
+>    specified we'll defer probe until we can find this regulator.
+>  
+> +* default-sample-phase: The default phase to set ciu_sample at probing, low
+> +  speeds or in case where all phases work at tuning time. If not specified
+> +  0 deg will be used.
+> +
+>  Aliases:
+>  
+>  - All the MSHC controller nodes should be represented in the aliases node using
 > 
