@@ -1,20 +1,48 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Wed, 2 Sep 2015 18:49:08 -0400
-Subject: [PATCH 0/8] i.MX early debug UART clock fixes
-In-Reply-To: <1441038987.3652.44.camel@pengutronix.de>
-References: <1440693561-28095-1-git-send-email-l.stach@pengutronix.de>
- <1441038987.3652.44.camel@pengutronix.de>
-Message-ID: <55E77CE4.7040303@hurleysoftware.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Sep 2015 23:50:09 +0100
+Subject: [PATCH v3 2/2] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
+ support
+In-Reply-To: <CAD=FV=WvUp7xhsmXJgVzm1Awqej12hNF_QPJhrQq7z=Fa4Nnuw@mail.gmail.com>
+References: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <CAD=FV=WvUp7xhsmXJgVzm1Awqej12hNF_QPJhrQq7z=Fa4Nnuw@mail.gmail.com>
+Message-ID: <20150902225008.GQ21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/2015 12:36 PM, Lucas Stach wrote:
-> I'm self-nacking this series, so I can spin a V2 with changes as above.
+On Wed, Sep 02, 2015 at 03:07:49PM -0700, Doug Anderson wrote:
+> Hi,
+> 
+> On Sun, Aug 30, 2015 at 2:34 PM, Vladimir Zapolskiy
+> <vladimir_zapolskiy@mentor.com> wrote:
+> > +static struct i2c_adapter *dw_hdmi_i2c_adapter(struct dw_hdmi *hdmi)
+> > +{
+> > +       struct i2c_adapter *adap;
+> > +       struct dw_hdmi_i2c *i2c;
+> > +       int ret;
+> > +
+> > +       i2c = devm_kzalloc(hdmi->dev, sizeof(*i2c), GFP_KERNEL);
+> > +       if (!i2c)
+> > +               return ERR_PTR(-ENOMEM);
+> > +
+> > +       mutex_init(&i2c->lock);
+> > +       init_completion(&i2c->cmp);
+> > +
+> > +       adap = &i2c->adap;
+> > +       adap->class = I2C_CLASS_DDC;
+> > +       adap->owner = THIS_MODULE;
+> > +       adap->dev.parent = hdmi->dev;
+> 
+> I think you may want to add "adap->dev.of_node = hdmi->dev->of_node;"
+> here.  That will allow device trees to specify the i2c bus by using an
+> alias.
 
-Hi Lucas,
+Never copy the of_node from one device to another.  That allows the
+bus matching to unintentionally match the of_node against the wrong
+driver.
 
-Would you please copy the linux-serial list as well so that other ASoC
-UART driver authors can reference how to fix similar issues in their drivers?
+Also, is it appropriate to hook non-DDC devices to a DDC bus?  I suspect
+that's asking for trouble.
 
-Regards,
-Peter Hurley
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
