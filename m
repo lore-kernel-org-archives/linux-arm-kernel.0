@@ -1,44 +1,52 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 2 Sep 2015 18:49:58 +0300
-Subject: [PATCH v3 0/2] arm64: introduce run-time detection of aarch32 support
-Message-ID: <1441209000-26746-1-git-send-email-ynorov@caviumnetworks.com>
+Date: Wed, 2 Sep 2015 18:49:59 +0300
+Subject: [PATCH v3 1/2] arm64: cpufeature.h: resolve hidden header dependencies
+In-Reply-To: <1441209000-26746-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1441209000-26746-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1441209000-26746-2-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed to avoid loading aarch32 binaries if COMPAT is enabled, but
-aarch32 is not supported by specific platform.
+Functions implemented in cpufeature.h depend on some headers, but
+cpufeature.h does not include them. This may cause build failure if
+cpufeature.h user does not include that headers by itself. (Like it
+happens in next patch of this series.)
 
-First patch fixes hidden header dependencies in arch/arm64/include/asm/cpufeature.h.
-It's not related to the issue, but helps to avoid build failure that happens
-if one applies second patch only.
-
-Second patch adds run-time detection of aarch32 support, and rejects kernel to
-load such binaries, if not supported.
-
-Tested on ThunderX.
-
-V3:
- - first patch message extended with explanation for cpu_feature macro move;
- - in second patch, restored pfr0 masking in id_aa64pfr0_aarch32_el0().
-
-V2:
- - add missing <linux/compiler.h> for the __attribute_const__ on
-   cpuid_feature_extract_field;
- - move cpu_feature macro under the __ASSEMBLY__ guard.
- - check that all CPUs support AArch32, not the current only,
-   the same way as for endianness support.
+cpu_feature macro is moved under "#ifndef __ASSEMBLY__" guard as
+it depends on <linux/log2.h>, and can be used in C files only.
 
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/include/asm/cpufeature.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-Yury Norov (2):
-  arm64: cpufeature.h: resolve hidden header dependencies
-  arm64: don't load 32-bit binaries if platform has no aarch32_el0
-
- arch/arm64/include/asm/cpufeature.h | 10 +++++++++-
- arch/arm64/include/asm/cputype.h    |  8 ++++++++
- arch/arm64/include/asm/elf.h        |  6 ++++--
- arch/arm64/kernel/cpuinfo.c         | 12 ++++++++++++
- 4 files changed, 33 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index c104421..f0e4017 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -19,7 +19,6 @@
+  */
+ 
+ #define MAX_CPU_FEATURES	(8 * sizeof(elf_hwcap))
+-#define cpu_feature(x)		ilog2(HWCAP_ ## x)
+ 
+ #define ARM64_WORKAROUND_CLEAN_CACHE		0
+ #define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	1
+@@ -30,6 +29,14 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
++#include <linux/bitmap.h>
++#include <linux/compiler.h>
++#include <linux/log2.h>
++#include <linux/printk.h>
++#include <linux/types.h>
++
++#define cpu_feature(x)		ilog2(HWCAP_ ## x)
++
+ struct arm64_cpu_capabilities {
+ 	const char *desc;
+ 	u16 capability;
 -- 
 2.1.4
