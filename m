@@ -1,41 +1,59 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 2 Sep 2015 09:52:35 +0800
-Subject: [PATCH v3 4/5] clk: Hi6220: add stub clock driver
-In-Reply-To: <CAMAWPa8dNOipiFFv96J5XvP1Qs7ysHBD6_-RpMGqCEdPAKxHAA@mail.gmail.com>
-References: <1438564418-15948-1-git-send-email-leo.yan@linaro.org>
- <1438564418-15948-5-git-send-email-leo.yan@linaro.org>
- <CAMAWPa8dNOipiFFv96J5XvP1Qs7ysHBD6_-RpMGqCEdPAKxHAA@mail.gmail.com>
-Message-ID: <20150902015235.GA7763@leoy-linaro>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 2 Sep 2015 11:29:36 +0900
+Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
+In-Reply-To: <55D7A3A1.9020009@cogentembedded.com>
+References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+ <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
+ <20150812012652.GH15957@verge.net.au>
+ <55D790A5.1050008@cogentembedded.com>
+ <55D7A3A1.9020009@cogentembedded.com>
+Message-ID: <20150902022936.GA18115@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-On Tue, Sep 01, 2015 at 05:28:03PM -0700, Kevin Hilman wrote:
-> On Sun, Aug 2, 2015 at 6:13 PM, Leo Yan <leo.yan@linaro.org> wrote:
-> > On Hi6220, there have some clocks which can use mailbox channel to send
-> > messages to power controller to change frequency; this includes CPU, GPU
-> > and DDR clocks.
-> >
-> > For dynamic frequency scaling, firstly need write the frequency value to
-> > SRAM region, and then send message to mailbox to trigger power controller
-> > to handle this requirement. This driver will use syscon APIs to pass SRAM
-> > memory region and use common mailbox APIs for channels accessing.
-> >
-> > This init driver will support cpu frequency change firstly.
-> >
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+On Sat, Aug 22, 2015 at 01:18:09AM +0300, Sergei Shtylyov wrote:
+> On 08/21/2015 11:57 PM, Sergei Shtylyov wrote:
 > 
-> The kernelci.org build/boot bot detected boot failures in
-> linux-next[1], and the failure was bisected down to this patch (landed
-> in linux-next as commit c1628a2c416da947f5afac615d53189250fa49cb.
+> >>>Define the SILK board dependent part of the SDHI1 (connected to micro-SD slot)
+> >>>device nodes along with the necessary voltage regulators.
+> >>>
+> >>>Based on the original patch by Vladimir Barinov
+> >>><vladimir.barinov@cogentembedded.com>.
+> >>>
+> >>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>>
+> >>>---
+> >>>This patch is against 'renesas-devel-20150810-v4.2-rc6' tag of Simon Horman's
+> >>>'renesas.git' repo plus the R8A7794/SILK QSPI patches just re-posted. It needs
+> >>>the R8A7794 GPIO patches in order to compile.
+> >>>
+> >>>Changes in version 2:
+> >>>- removed not working SDHI0 stuff, renamed the patch;
+> >>>- replaced SDHI1's "wp-gpios" property with "disable-wp".
+> >>
+> >>I am wondering if you could explain the motivation for the "disable-wp"
+> >>update
+> >
+> >    Please see the comment in mmc_sd_get_ro().
+> >
+> >>and weather it is appropriate for other r8a779* dts files.
+> >
+> >    In case of micro-SD slots, yes.
 > 
-> I verifed that reverting this commit on top of next-20150901 gets the
-> hikey booting again.
+>    The MMC binding document says it should only be specified if the
+> controller has WP detection logic. We, so far, seem to have been replying on
+> the GPIOs despite this logic is present (according to the R-Car gen2 SDHI
+> manuals I have). The driver will first call mmc_gpio_get_ro() and when that
+> fails due to "wp-gpios" not being specified, it proceeds to reading the
+> register but that is forbidden by TMIO_MMC_WRPROTECT_DISABLE flag set for
+> the R-Car gen1/2 chips, so 0 is always returned from tmio_mmc_get_ro().
+> There seems to be no point in going that far (and doing the runtime PM
+> dances) --
+> and MMC_CAP2_NO_WRITE_PROTECT (set when "disable-wp" is specified) prohibits
+> doing that...
 
-Thanks for reporting. This issue has been confirmed at my side, it's
-caused by the patch have added dependency with MAILBOX, will fix this
-issue and send patch.
+That sounds reasonable to me.
+Some more questions from my side:
 
-Thanks,
-Leo Yan
+* What is the status of this patch
+* Can you prepare patches for r8a779* dts files for micro-SD slots?
