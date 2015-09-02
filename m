@@ -1,99 +1,191 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 1 Sep 2015 18:16:16 -0700
-Subject: [PATCH v2] mtd: nand: sunxi: rely on nand_dt_init initialization
-In-Reply-To: <1440411031-8910-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1440411031-8910-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150902011616.GP81844@google.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 02 Sep 2015 10:30:04 +0900
+Subject: [PATCH v2 1/2] ARM: dts: Split audio configuration to separate
+ exynos5422-odroidxu3-audio
+Message-ID: <1441157405-22123-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 12:10:31PM +0200, Boris Brezillon wrote:
-> nand_dt_init(), called from nand_scan_ident(), is already parsing the
-> generic MTD/NAND DT properties, and initializing the nand_chip struct
-> accordingly.
-> Rely on this initialization instead of manually parsing those properties.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
-> Changes since v1:
-> - drop unused strength and blk_size variables
+The Odroid XU4 board does not have audio codec so before adding DTS for
+new board split the audio codec to separate DTSI file. Include the audio codec
+DTSI in Odroid XU3 and XU3-Lite boards.
 
-Good catch, I was about to comment on v1 :)
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-> ---
->  drivers/mtd/nand/sunxi_nand.c | 20 +++++---------------
->  1 file changed, 5 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-> index 96dda70..92a2c58 100644
-> --- a/drivers/mtd/nand/sunxi_nand.c
-> +++ b/drivers/mtd/nand/sunxi_nand.c
-> @@ -1164,16 +1164,9 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
->  			       struct device_node *np)
->  {
->  	struct nand_chip *nand = mtd->priv;
-> -	int strength;
-> -	int blk_size;
->  	int ret;
->  
-> -	blk_size = of_get_nand_ecc_step_size(np);
-> -	strength = of_get_nand_ecc_strength(np);
-> -	if (blk_size > 0 && strength > 0) {
-> -		ecc->size = blk_size;
-> -		ecc->strength = strength;
-> -	} else {
-> +	if (!ecc->size) {
->  		ecc->size = nand->ecc_step_ds;
->  		ecc->strength = nand->ecc_strength_ds;
->  	}
-> @@ -1183,10 +1176,6 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
->  
->  	ecc->mode = NAND_ECC_HW;
->  
-> -	ret = of_get_nand_ecc_mode(np);
-> -	if (ret >= 0)
-> -		ecc->mode = ret;
-> -
+---
 
-I think you've missed something here. You're now *only* allowing HW ECC!
-You now want to make this a default case.
+Changes since v1:
+1. New patch (refactor).
+---
+ arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi  | 61 ++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 47 -----------------
+ arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |  1 +
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts         |  1 +
+ 4 files changed, 63 insertions(+), 47 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi
 
-There's also a subtle change here that affects more than just here: you
-don't have a good way to tell the difference between "no ECC mode
-provide" and NAND_ECC_NONE. Perhaps we can modify the nand_ecc_modes_t
-enum to include a "uninitialized" value? I'm not sure if that'd work
-best as 0, -1, or something else, in case there are people making
-assumptions elsewhere...
-
->  	switch (ecc->mode) {
->  	case NAND_ECC_SOFT_BCH:
->  		break;
-> @@ -1312,15 +1301,13 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
->  	/* Default tR value specified in the ONFI spec (chapter 4.15.1) */
->  	nand->chip_delay = 200;
->  	nand->controller = &nfc->controller;
-> +	nand->dn = np;
->  	nand->select_chip = sunxi_nfc_select_chip;
->  	nand->cmd_ctrl = sunxi_nfc_cmd_ctrl;
->  	nand->read_buf = sunxi_nfc_read_buf;
->  	nand->write_buf = sunxi_nfc_write_buf;
->  	nand->read_byte = sunxi_nfc_read_byte;
->  
-> -	if (of_get_nand_on_flash_bbt(np))
-> -		nand->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
-> -
->  	mtd = &chip->mtd;
->  	mtd->dev.parent = dev;
->  	mtd->priv = nand;
-> @@ -1330,6 +1317,9 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
->  	if (ret)
->  		return ret;
->  
-> +	if (nand->bbt_options & NAND_BBT_USE_FLASH)
-> +		nand->bbt_options |= NAND_BBT_NO_OOB;
-> +
->  	ret = sunxi_nand_chip_init_timings(chip, np);
->  	if (ret) {
->  		dev_err(dev, "could not configure chip timings: %d\n", ret);
-
-Brian
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi
+new file mode 100644
+index 000000000000..9493923ec652
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi
+@@ -0,0 +1,61 @@
++/*
++ * Hardkernel Odroid XU3 Audio Codec device tree source
++ *
++ * Copyright (c) 2015 Krzysztof Kozlowski
++ * Copyright (c) 2014 Collabora Ltd.
++ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/ {
++	sound: sound {
++		compatible = "simple-audio-card";
++
++		simple-audio-card,name = "Odroid-XU3";
++		simple-audio-card,widgets =
++			"Headphone", "Headphone Jack",
++			"Speakers", "Speakers";
++		simple-audio-card,routing =
++			"Headphone Jack", "HPL",
++			"Headphone Jack", "HPR",
++			"Headphone Jack", "MICBIAS",
++			"IN1", "Headphone Jack",
++			"Speakers", "SPKL",
++			"Speakers", "SPKR";
++
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&link0_codec>;
++		simple-audio-card,frame-master = <&link0_codec>;
++
++		simple-audio-card,cpu {
++			sound-dai = <&i2s0 0>;
++			system-clock-frequency = <19200000>;
++		};
++
++		link0_codec: simple-audio-card,codec {
++			sound-dai = <&max98090>;
++			clocks = <&i2s0 CLK_I2S_CDCLK>;
++		};
++	};
++};
++
++&hsi2c_5 {
++	status = "okay";
++	max98090: max98090 at 10 {
++		compatible = "maxim,max98090";
++		reg = <0x10>;
++		interrupt-parent = <&gpx3>;
++		interrupts = <2 0>;
++		clocks = <&i2s0 CLK_I2S_CDCLK>;
++		clock-names = "mclk";
++		#sound-dai-cells = <0>;
++	};
++};
++
++&i2s0 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+index dd8bc86d9de4..987c15d8ebe5 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+@@ -80,36 +80,6 @@
+ 		};
+ 	};
+ 
+-	sound: sound {
+-		compatible = "simple-audio-card";
+-
+-		simple-audio-card,name = "Odroid-XU3";
+-		simple-audio-card,widgets =
+-			"Headphone", "Headphone Jack",
+-			"Speakers", "Speakers";
+-		simple-audio-card,routing =
+-			"Headphone Jack", "HPL",
+-			"Headphone Jack", "HPR",
+-			"Headphone Jack", "MICBIAS",
+-			"IN1", "Headphone Jack",
+-			"Speakers", "SPKL",
+-			"Speakers", "SPKR";
+-
+-		simple-audio-card,format = "i2s";
+-		simple-audio-card,bitclock-master = <&link0_codec>;
+-		simple-audio-card,frame-master = <&link0_codec>;
+-
+-		simple-audio-card,cpu {
+-			sound-dai = <&i2s0 0>;
+-			system-clock-frequency = <19200000>;
+-		};
+-
+-		link0_codec: simple-audio-card,codec {
+-			sound-dai = <&max98090>;
+-			clocks = <&i2s0 CLK_I2S_CDCLK>;
+-		};
+-	};
+-
+ 	fan0: pwm-fan {
+ 		compatible = "pwm-fan";
+ 		pwms = <&pwm 0 20972 0>;
+@@ -376,19 +346,6 @@
+ 	};
+ };
+ 
+-&hsi2c_5 {
+-	status = "okay";
+-	max98090: max98090 at 10 {
+-		compatible = "maxim,max98090";
+-		reg = <0x10>;
+-		interrupt-parent = <&gpx3>;
+-		interrupts = <2 0>;
+-		clocks = <&i2s0 CLK_I2S_CDCLK>;
+-		clock-names = "mclk";
+-		#sound-dai-cells = <0>;
+-	};
+-};
+-
+ &i2c_2 {
+ 	samsung,i2c-sda-delay = <100>;
+ 	samsung,i2c-max-bus-freq = <66000>;
+@@ -400,10 +357,6 @@
+ 	};
+ };
+ 
+-&i2s0 {
+-	status = "okay";
+-};
+-
+ &mfc {
+ 	samsung,mfc-r = <0x43000000 0x800000>;
+ 	samsung,mfc-l = <0x51000000 0x800000>;
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
+index c06882bbb822..9c0cea99c996 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
+@@ -13,6 +13,7 @@
+ 
+ /dts-v1/;
+ #include "exynos5422-odroidxu3-common.dtsi"
++#include "exynos5422-odroidxu3-audio.dtsi"
+ 
+ / {
+ 	model = "Hardkernel Odroid XU3 Lite";
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+index 78e6a502f320..d8647a469a86 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+@@ -12,6 +12,7 @@
+ 
+ /dts-v1/;
+ #include "exynos5422-odroidxu3-common.dtsi"
++#include "exynos5422-odroidxu3-audio.dtsi"
+ 
+ / {
+ 	model = "Hardkernel Odroid XU3";
+-- 
+1.9.1
