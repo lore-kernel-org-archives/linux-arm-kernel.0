@@ -1,81 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 2 Sep 2015 08:30:16 -0700
-Subject: [PATCH 1/6] regulator: pbias: program pbias register offset in
- pbias driver
-In-Reply-To: <1441190853-7133-2-git-send-email-kishon@ti.com>
-References: <1441190853-7133-1-git-send-email-kishon@ti.com>
- <1441190853-7133-2-git-send-email-kishon@ti.com>
-Message-ID: <20150902153015.GR4215@atomide.com>
+From: w-kwok2@ti.com (Kwok, WingMan)
+Date: Wed, 2 Sep 2015 15:31:18 +0000
+Subject: [PATCH] ARM: dts: keystone: use one to one address translations
+ under netcp
+In-Reply-To: <55E61658.9010207@oracle.com>
+References: <1441139324-29296-1-git-send-email-w-kwok2@ti.com>
+ <55E61658.9010207@oracle.com>
+Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E04221776@DFLE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [150902 03:51]:
-> --- a/drivers/regulator/pbias-regulator.c
-> +++ b/drivers/regulator/pbias-regulator.c
 
-How about add a comment here:
 
-/* Offset from SCM general area (and syscon) base */
-  
-> +static const struct pbias_of_data pbias_of_data_omap2 = {
-> +	.offset = 0x230,
-> +};
-> +
-> +static const struct pbias_of_data pbias_of_data_omap3 = {
-> +	.offset = 0x2b0,
-> +};
-> +
-> +static const struct pbias_of_data pbias_of_data_omap4 = {
-> +	.offset = 0x60,
-> +};
-> +
-> +static const struct pbias_of_data pbias_of_data_omap5 = {
-> +	.offset = 0x60,
-> +};
-> +
-> +static const struct pbias_of_data pbias_of_data_dra7 = {
-> +	.offset = 0xe00,
-> +};
-> +
->  static const struct of_device_id pbias_of_match[] = {
->  	{ .compatible = "ti,pbias-omap", },
-> +	{ .compatible = "ti,pbias-omap2", .data = &pbias_of_data_omap2, },
-> +	{ .compatible = "ti,pbias-omap3", .data = &pbias_of_data_omap3, },
-> +	{ .compatible = "ti,pbias-omap4", .data = &pbias_of_data_omap4, },
-> +	{ .compatible = "ti,pbias-omap5", .data = &pbias_of_data_omap5, },
-> +	{ .compatible = "ti,pbias-dra7", .data = &pbias_of_data_dra7, },
->  	{},
->  };
-...
+> -----Original Message-----
+> From: santosh.shilimkar at oracle.com [mailto:santosh.shilimkar at oracle.com]
+> Sent: Tuesday, September 01, 2015 5:19 PM
+> To: Kwok, WingMan; robh+dt at kernel.org; pawel.moll at arm.com;
+> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org;
+> linux at arm.linux.org.uk; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; ssantosh at kernel.org
+> Cc: Karicheri, Muralidharan
+> Subject: Re: [PATCH] ARM: dts: keystone: use one to one address translations
+> under netcp
+> 
+> On 9/1/15 1:28 PM, WingMan Kwok wrote:
+> > Network subsystem NetCP in Keystone-2 devices includes some HW blocks
+> > that are memory mapped to ranges outside that of the NetCP itself.
+> > Thus address space of a child node of the NetCP node needs to be
+> > mapped 1:1 onto the parent address space.  Hence empty ranges
+> > should be used under the NetCP node.
+> >
+> > Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+> > ---
+> >   arch/arm/boot/dts/k2e-netcp.dtsi  |    8 +++-----
+> >   arch/arm/boot/dts/k2hk-netcp.dtsi |   14 ++++++--------
+> >   arch/arm/boot/dts/k2l-netcp.dtsi  |    8 +++-----
+> >   3 files changed, 12 insertions(+), 18 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/k2e-netcp.dtsi b/arch/arm/boot/dts/k2e-
+> netcp.dtsi
+> > index b13b3c9..e103ed9 100644
+> > --- a/arch/arm/boot/dts/k2e-netcp.dtsi
+> > +++ b/arch/arm/boot/dts/k2e-netcp.dtsi
+> > @@ -111,9 +111,7 @@ netcp: netcp at 24000000 {
+> >   	compatible = "ti,netcp-1.0";
+> >   	#address-cells = <1>;
+> >   	#size-cells = <1>;
+> > -
+> > -	/* NetCP address range */
+> > -	ranges = <0 0x24000000 0x1000000>;
+> > +	ranges;
+> >
+> What blocks are we talking here. We need to increase the
+> range if the current range isn't covering entire NETCP
+> address space. Removing range isn't a solution.
+> 
 
-> @@ -129,6 +161,18 @@ static int pbias_regulator_probe(struct platform_device *pdev)
->  	if (IS_ERR(syscon))
->  		return PTR_ERR(syscon);
->  
-> +	match = of_match_device(of_match_ptr(pbias_of_match), &pdev->dev);
-> +	if (match && match->data) {
-> +		data = match->data;
-> +		offset = data->offset;
-> +	} else {
-> +		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +		if (!res)
-> +			return -EINVAL;
-> +
-> +		offset = res->start;
-> +	}
-> +
->  	cfg.regmap = syscon;
->  	cfg.dev = &pdev->dev;
->  
+The Serdes.  It is a HW block inside the NetCP but its address
+space starts from 0x0232a000.  We can change the base in the
+ranges property to include the serdes.  But then offsets of
+other HW blocks that are within the NetCP address range will be
+relative to this new base and are not as documented in the HW
+user guides.
 
-Maybe add a warning here for parsing the legacy broken IORESOURCE_MEM
-that's known to be broken from DT point of view?
-
-Other than that, looks OK to me and should allow also changing to
-use a generic solution, Mark may have some other comments.
-
-Anyways, something like this is needed for v4.3-rc cycle, probably
-best that Mark queues all these after review. So feel free to add
-for the whole series:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
+Regards
+WingMan
