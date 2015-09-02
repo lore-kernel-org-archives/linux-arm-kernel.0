@@ -1,91 +1,68 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 2 Sep 2015 16:54:22 +0200
-Subject: [PATCH v4 09/15] KVM: arm: redefine kvm_cpu_context_t to save
- the host cp14 states
-In-Reply-To: <1439213167-8988-10-git-send-email-zhichao.huang@linaro.org>
-References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
- <1439213167-8988-10-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <20150902145422.GM10991@cbox>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 2 Sep 2015 16:03:01 +0100
+Subject: [PATCH v3 4/6] [media] c8sectpfe: Update binding to reset-gpios
+In-Reply-To: <CAL_JsqLccRKCnASOK-tAUn=ifZpQ3hCEJ1eg1hmrei=3vEpzFA@mail.gmail.com>
+References: <1440784362-31217-1-git-send-email-peter.griffin@linaro.org>
+ <1440784362-31217-5-git-send-email-peter.griffin@linaro.org>
+ <CABxcv=nM7MBK2EcD1-YK5y0J1hBtxV+6Wu812C23pNkAzigu7g@mail.gmail.com>
+ <CAL_JsqLccRKCnASOK-tAUn=ifZpQ3hCEJ1eg1hmrei=3vEpzFA@mail.gmail.com>
+Message-ID: <20150902150301.GA15477@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 09:26:01PM +0800, Zhichao Huang wrote:
-> Redefine kvm_cpu_context_t as a new struct that include the cp14 states,
-> which we used to save the host cp14 states.
+Hi Rob,
+
+On Tue, 01 Sep 2015, Rob Herring wrote:
+
+> On Tue, Sep 1, 2015 at 3:32 AM, Javier Martinez Canillas
+> <javier@dowhile0.org> wrote:
+> > Hello Peter,
+> >
+> > On Fri, Aug 28, 2015 at 7:52 PM, Peter Griffin <peter.griffin@linaro.org> wrote:
+> >> gpio.txt documents that GPIO properties should be named
+> >> "[<name>-]gpios", with <name> being the purpose of this
+> >> GPIO for the device.
+> >>
+> >> This change has been done as one atomic commit.
+> >>
+> >> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> >> Acked-by: Lee Jones <lee.jones@linaro.org>
+> >> ---
+> >>  Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt | 6 +++---
+> >>  arch/arm/boot/dts/stihxxx-b2120.dtsi                          | 4 ++--
+> >>  drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c         | 2 +-
+> >>  3 files changed, 6 insertions(+), 6 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+> >> index d4def76..e70d840 100644
+> >> --- a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+> >> +++ b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+> >> @@ -35,7 +35,7 @@ Required properties (tsin (child) node):
+> >>
+> >>  - tsin-num     : tsin id of the InputBlock (must be between 0 to 6)
+> >>  - i2c-bus      : phandle to the I2C bus DT node which the demodulators & tuners on this tsin channel are connected.
+> >> -- rst-gpio     : reset gpio for this tsin channel.
+> >> +- reset-gpios  : reset gpio for this tsin channel.
+> >
+> > The documentation is a bit outdated, the GPIO subsystem supports both
+> > -gpio and -gpios, see commit:
+> >
+> > dd34c37aa3e8 ("gpio: of: Allow -gpio suffix for property names")
 > 
-> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
-> ---
->  arch/arm/include/asm/kvm_host.h | 6 +++++-
->  arch/arm/kernel/asm-offsets.c   | 4 +++-
->  arch/arm/kvm/interrupts.S       | 6 ++++--
->  3 files changed, 12 insertions(+), 4 deletions(-)
+> Yes, because we have lots of them.
 > 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 63ac005..fc461ac 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -91,7 +91,11 @@ struct kvm_vcpu_fault_info {
->  	u32 hyp_pc;		/* PC when exception was taken from Hyp mode */
->  };
->  
-> -typedef struct vfp_hard_struct kvm_cpu_context_t;
-> +struct kvm_cpu_context {
-> +	struct vfp_hard_struct vfp;
-> +	u32 cp14[NR_CP14_REGS];
-> +};
-> +typedef struct kvm_cpu_context kvm_cpu_context_t;
->  
->  struct kvm_vcpu_arch {
->  	struct kvm_regs regs;
-> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-> index 9158de0..cee4254 100644
-> --- a/arch/arm/kernel/asm-offsets.c
-> +++ b/arch/arm/kernel/asm-offsets.c
-> @@ -175,7 +175,9 @@ int main(void)
->    DEFINE(VCPU_CP14,		offsetof(struct kvm_vcpu, arch.cp14));
->    DEFINE(VCPU_CP15,		offsetof(struct kvm_vcpu, arch.cp15));
->    DEFINE(VCPU_VFP_GUEST,	offsetof(struct kvm_vcpu, arch.vfp_guest));
-> -  DEFINE(VCPU_VFP_HOST,		offsetof(struct kvm_vcpu, arch.host_cpu_context));
-> +  DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-> +  DEFINE(VCPU_VFP_HOST,		offsetof(struct kvm_cpu_context, vfp));
-> +  DEFINE(VCPU_CP14_HOST,	offsetof(struct kvm_cpu_context, cp14));
-
-it's a bit weird to call these last two VCPU_ something when they're not
-offsets of the vcpu struct...
-
->    DEFINE(VCPU_REGS,		offsetof(struct kvm_vcpu, arch.regs));
->    DEFINE(VCPU_USR_REGS,		offsetof(struct kvm_vcpu, arch.regs.usr_regs));
->    DEFINE(VCPU_SVC_REGS,		offsetof(struct kvm_vcpu, arch.regs.svc_regs));
-> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> index 48333ff..d4ff22e 100644
-> --- a/arch/arm/kvm/interrupts.S
-> +++ b/arch/arm/kvm/interrupts.S
-> @@ -176,8 +176,9 @@ __kvm_vcpu_return:
->  	@ Switch VFP/NEON hardware state to the host's
->  	add	r7, vcpu, #VCPU_VFP_GUEST
->  	store_vfp_state r7
-> -	add	r7, vcpu, #VCPU_VFP_HOST
-> +	add	r7, vcpu, #VCPU_HOST_CONTEXT
->  	ldr	r7, [r7]
-> +	add	r7, r7, #VCPU_VFP_HOST
->  	restore_vfp_state r7
->  
->  after_vfp_restore:
-> @@ -484,8 +485,9 @@ switch_to_guest_vfp:
->  	set_hcptr vmtrap, (HCPTR_TCP(10) | HCPTR_TCP(11))
->  
->  	@ Switch VFP/NEON hardware state to the guest's
-> -	add	r7, r0, #VCPU_VFP_HOST
-> +	add	r7, r0, #VCPU_HOST_CONTEXT
->  	ldr	r7, [r7]
-> +	add	r7, r7, #VCPU_VFP_HOST
->  	store_vfp_state r7
->  	add	r7, r0, #VCPU_VFP_GUEST
->  	restore_vfp_state r7
-> -- 
-> 1.7.12.4
+> > So it makes sense to me to use -gpio instead of -gpios in this case
+> > since is a single GPIO. Also rst is already a descriptive name since
+> > that's how many datasheets name a reset pin. I'm not saying I'm
+> > against this patch, just pointing out since the commit message is a
+> > bit misleading.
 > 
+> I believe that this has been discussed at length and it was decided
+> that new bindings should use "-gpios" even for 1. Just like "clocks"
+> is always plural.
 
-Otherwise this look ok.
+Doh! Ok I will change back again to 'reset-gpios'.
 
--Christoffer
+regards,
+
+Peter.
