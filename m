@@ -1,44 +1,55 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Wed,  2 Sep 2015 16:41:47 +0000
-Subject: [PATCHv4] ARM: exynos_defconfig: Enable CONFIG_LEDS_PWM for
- Odroid-XU3/XU4
-Message-ID: <1441212107-3993-1-git-send-email-linux.amoon@gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 02 Sep 2015 18:42:01 +0200
+Subject: [PATCH] cpufreq-dt: add suspend frequency support
+Message-ID: <1441212121-21021-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable CONFIG_LEDS_PWM amd CONFIG_LEDS_TRIGGER_HEARTBEAT for
-Odroid-XU3/XU4 board.
+Add suspend frequency support and set it to the boot frequency,
+this matches what the old exynos-cpufreq driver has been doing.
 
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+This patch fixes suspend/resume support on Exynos4412 based
+Trats2 board and reboot hang on Exynos4412 based Odroid U3
+board.
 
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
-Changes from last version.
-  Make all modules build-in.
-  Enabled LEDS_GPIO
----
- arch/arm/configs/exynos_defconfig | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+This patch supersedes "[PATCH] ARM: dts: exynos4412-odroid-*: add
+workaround for CPUfreq/reboot issue" one from yesterday.
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 2263cd9..c285975 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -168,6 +168,16 @@ CONFIG_MMC_SDHCI_S3C_DMA=y
- CONFIG_MMC_DW=y
- CONFIG_MMC_DW_IDMAC=y
- CONFIG_MMC_DW_EXYNOS=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_CLASS_FLASH=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_PWM=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_ONESHOT=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_GPIO=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_MAX77686=y
- CONFIG_RTC_DRV_MAX77802=y
+ drivers/cpufreq/cpufreq-dt.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+index c3583cd..c9138c7 100644
+--- a/drivers/cpufreq/cpufreq-dt.c
++++ b/drivers/cpufreq/cpufreq-dt.c
+@@ -329,6 +329,10 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 	policy->driver_data = priv;
+ 
+ 	policy->clk = cpu_clk;
++
++	/* capture boot frequency */
++	policy->suspend_freq = clk_get_rate(cpu_clk) / 1000;;
++
+ 	ret = cpufreq_table_validate_and_show(policy, freq_table);
+ 	if (ret) {
+ 		dev_err(cpu_dev, "%s: invalid frequency table: %d\n", __func__,
+@@ -419,6 +423,9 @@ static struct cpufreq_driver dt_cpufreq_driver = {
+ 	.ready = cpufreq_ready,
+ 	.name = "cpufreq-dt",
+ 	.attr = cpufreq_dt_attr,
++#ifdef CONFIG_PM
++	.suspend = cpufreq_generic_suspend,
++#endif
+ };
+ 
+ static int dt_cpufreq_probe(struct platform_device *pdev)
 -- 
-2.1.4
+1.9.1
