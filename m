@@ -1,309 +1,41 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 02 Sep 2015 10:30:05 +0900
-Subject: [PATCH v2 2/2] ARM: dts: Add exynos5422-odroidxu4 board
-In-Reply-To: <1441157405-22123-1-git-send-email-k.kozlowski@samsung.com>
-References: <1441157405-22123-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1441157405-22123-2-git-send-email-k.kozlowski@samsung.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 2 Sep 2015 09:52:35 +0800
+Subject: [PATCH v3 4/5] clk: Hi6220: add stub clock driver
+In-Reply-To: <CAMAWPa8dNOipiFFv96J5XvP1Qs7ysHBD6_-RpMGqCEdPAKxHAA@mail.gmail.com>
+References: <1438564418-15948-1-git-send-email-leo.yan@linaro.org>
+ <1438564418-15948-5-git-send-email-leo.yan@linaro.org>
+ <CAMAWPa8dNOipiFFv96J5XvP1Qs7ysHBD6_-RpMGqCEdPAKxHAA@mail.gmail.com>
+Message-ID: <20150902015235.GA7763@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Hardkernel Odroid XU4 board Device Tree sources. The board differs
-from Odroid XU3 and XU3-Lite by:
-1. No green and red leds (except standard red power led).
-2. No audio codec.
-3. Two USB3 ports in host mode (no micro USB3 connector for OTG).
-4. Realtek RTL8153-CG gigabit network adapter (instead of SMSC9514).
-5. Additional connector with IO ports (I2S_0, I2C_5).
-6. No DisplayPort (like XU3-Lite).
-7. No TI INA231 power measurement sensors (like XU3-Lite).
+Hi Kevin,
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On Tue, Sep 01, 2015 at 05:28:03PM -0700, Kevin Hilman wrote:
+> On Sun, Aug 2, 2015 at 6:13 PM, Leo Yan <leo.yan@linaro.org> wrote:
+> > On Hi6220, there have some clocks which can use mailbox channel to send
+> > messages to power controller to change frequency; this includes CPU, GPU
+> > and DDR clocks.
+> >
+> > For dynamic frequency scaling, firstly need write the frequency value to
+> > SRAM region, and then send message to mailbox to trigger power controller
+> > to handle this requirement. This driver will use syscon APIs to pass SRAM
+> > memory region and use common mailbox APIs for channels accessing.
+> >
+> > This init driver will support cpu frequency change firstly.
+> >
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> 
+> The kernelci.org build/boot bot detected boot failures in
+> linux-next[1], and the failure was bisected down to this patch (landed
+> in linux-next as commit c1628a2c416da947f5afac615d53189250fa49cb.
+> 
+> I verifed that reverting this commit on top of next-20150901 gets the
+> hikey booting again.
 
----
+Thanks for reporting. This issue has been confirmed at my side, it's
+caused by the patch have added dependency with MAILBOX, will fix this
+issue and send patch.
 
-Changes since v1:
-1. hsi2c_5 and is20 are disabled on Odroid XU4 (after moving these nodes
-   to the audio DTSI).
-2. Update Samsung's copyright date for XU4 DTS.
-
-I did not add Javier's reviewed-by tag because of splitting audio codec
-to separate patch (1/2).
----
- arch/arm/boot/dts/Makefile                         |  1 +
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 51 +---------------------
- arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    | 51 ++++++++++++++++++++++
- arch/arm/boot/dts/exynos5422-odroidxu3.dts         | 51 ++++++++++++++++++++++
- arch/arm/boot/dts/exynos5422-odroidxu4.dts         | 48 ++++++++++++++++++++
- 5 files changed, 152 insertions(+), 50 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos5422-odroidxu4.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 233159d2eaab..3d27fe34647f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -123,6 +123,7 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
- 	exynos5420-smdk5420.dtb \
- 	exynos5422-odroidxu3.dtb \
- 	exynos5422-odroidxu3-lite.dtb \
-+	exynos5422-odroidxu4.dtb \
- 	exynos5440-sd5v1.dtb \
- 	exynos5440-ssdk5440.dtb \
- 	exynos5800-peach-pi.dtb
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index 987c15d8ebe5..a83d569baea8 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -46,40 +46,6 @@
- 		reset-gpios = <&gpd1 0 1>;
- 	};
- 
--	pwmleds {
--		compatible = "pwm-leds";
--
--		greenled {
--			label = "green:mmc0";
--			pwms = <&pwm 1 2000000 0>;
--			pwm-names = "pwm1";
--			/*
--			 * Green LED is much brighter than the others
--			 * so limit its max brightness
--			 */
--			max_brightness = <127>;
--			linux,default-trigger = "mmc0";
--		};
--
--		blueled {
--			label = "blue:heartbeat";
--			pwms = <&pwm 2 2000000 0>;
--			pwm-names = "pwm2";
--			max_brightness = <255>;
--			linux,default-trigger = "heartbeat";
--		};
--	};
--
--	gpioleds {
--		compatible = "gpio-leds";
--		redled {
--			label = "red:microSD";
--			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
--			default-state = "off";
--			linux,default-trigger = "mmc1";
--		};
--	};
--
- 	fan0: pwm-fan {
- 		compatible = "pwm-fan";
- 		pwms = <&pwm 0 20972 0>;
-@@ -417,19 +383,6 @@
- 	};
- };
- 
--&pwm {
--	/*
--	 * PWM 0 -- fan
--	 * PWM 1 -- Green LED
--	 * PWM 2 -- Blue LED
--	 * PWM 3 -- on MIPI connector for backlight
--	 */
--	pinctrl-0 = <&pwm0_out &pwm1_out &pwm2_out &pwm3_out>;
--	pinctrl-names = "default";
--	samsung,pwm-outputs = <0>;
--	status = "okay";
--};
--
- &tmu_cpu0 {
- 	vtmu-supply = <&ldo7_reg>;
- 	status = "okay";
-@@ -465,9 +418,7 @@
- 	dr_mode = "host";
- };
- 
--&usbdrd_dwc3_1 {
--	dr_mode = "otg";
--};
-+/* usbdrd_dwc3_1 mode customized in each board */
- 
- &usbdrd3_0 {
- 	vdd33-supply = <&ldo9_reg>;
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-index 9c0cea99c996..379cd61178ee 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-@@ -18,4 +18,55 @@
- / {
- 	model = "Hardkernel Odroid XU3 Lite";
- 	compatible = "hardkernel,odroid-xu3-lite", "samsung,exynos5800", "samsung,exynos5";
-+
-+	pwmleds {
-+		compatible = "pwm-leds";
-+
-+		greenled {
-+			label = "green:mmc0";
-+			pwms = <&pwm 1 2000000 0>;
-+			pwm-names = "pwm1";
-+			/*
-+			 * Green LED is much brighter than the others
-+			 * so limit its max brightness
-+			 */
-+			max_brightness = <127>;
-+			linux,default-trigger = "mmc0";
-+		};
-+
-+		blueled {
-+			label = "blue:heartbeat";
-+			pwms = <&pwm 2 2000000 0>;
-+			pwm-names = "pwm2";
-+			max_brightness = <255>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	gpioleds {
-+		compatible = "gpio-leds";
-+		redled {
-+			label = "red:microSD";
-+			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "mmc1";
-+		};
-+	};
-+};
-+
-+&pwm {
-+	/*
-+	 * PWM 0 -- fan
-+	 * PWM 1 -- Green LED
-+	 * PWM 2 -- Blue LED
-+	 * PWM 3 -- on MIPI connector for backlight
-+	 */
-+	pinctrl-0 = <&pwm0_out &pwm1_out &pwm2_out &pwm3_out>;
-+	pinctrl-names = "default";
-+	samsung,pwm-outputs = <0>;
-+	status = "okay";
-+};
-+
-+&usbdrd_dwc3_1 {
-+	dr_mode = "otg";
- };
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-index d8647a469a86..c7509690131d 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-@@ -17,6 +17,40 @@
- / {
- 	model = "Hardkernel Odroid XU3";
- 	compatible = "hardkernel,odroid-xu3", "samsung,exynos5800", "samsung,exynos5";
-+
-+	pwmleds {
-+		compatible = "pwm-leds";
-+
-+		greenled {
-+			label = "green:mmc0";
-+			pwms = <&pwm 1 2000000 0>;
-+			pwm-names = "pwm1";
-+			/*
-+			 * Green LED is much brighter than the others
-+			 * so limit its max brightness
-+			 */
-+			max_brightness = <127>;
-+			linux,default-trigger = "mmc0";
-+		};
-+
-+		blueled {
-+			label = "blue:heartbeat";
-+			pwms = <&pwm 2 2000000 0>;
-+			pwm-names = "pwm2";
-+			max_brightness = <255>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	gpioleds {
-+		compatible = "gpio-leds";
-+		redled {
-+			label = "red:microSD";
-+			gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "mmc1";
-+		};
-+	};
- };
- 
- &i2c_0 {
-@@ -50,3 +84,20 @@
- 		shunt-resistor = <10000>;
- 	};
- };
-+
-+&pwm {
-+	/*
-+	 * PWM 0 -- fan
-+	 * PWM 1 -- Green LED
-+	 * PWM 2 -- Blue LED
-+	 * PWM 3 -- on MIPI connector for backlight
-+	 */
-+	pinctrl-0 = <&pwm0_out &pwm1_out &pwm2_out &pwm3_out>;
-+	pinctrl-names = "default";
-+	samsung,pwm-outputs = <0>;
-+	status = "okay";
-+};
-+
-+&usbdrd_dwc3_1 {
-+	dr_mode = "otg";
-+};
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu4.dts b/arch/arm/boot/dts/exynos5422-odroidxu4.dts
-new file mode 100644
-index 000000000000..dae0ddc25bdc
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu4.dts
-@@ -0,0 +1,48 @@
-+/*
-+ * Hardkernel Odroid XU4 board device tree source
-+ *
-+ * Copyright (c) 2015 Krzysztof Kozlowski
-+ * Copyright (c) 2014 Collabora Ltd.
-+ * Copyright (c) 2013-2015 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+#include "exynos5422-odroidxu3-common.dtsi"
-+
-+/ {
-+	model = "Hardkernel Odroid XU4";
-+	compatible = "hardkernel,odroid-xu4", "samsung,exynos5800", \
-+		     "samsung,exynos5";
-+
-+	pwmleds {
-+		compatible = "pwm-leds";
-+
-+		blueled {
-+			label = "blue:heartbeat";
-+			pwms = <&pwm 2 2000000 0>;
-+			pwm-names = "pwm2";
-+			max_brightness = <255>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+&pwm {
-+	/*
-+	 * PWM 0 -- fan
-+	 * PWM 2 -- Blue LED
-+	 */
-+	pinctrl-0 = <&pwm0_out &pwm2_out>;
-+	pinctrl-names = "default";
-+	samsung,pwm-outputs = <0>;
-+	status = "okay";
-+};
-+
-+&usbdrd_dwc3_1 {
-+	dr_mode = "host";
-+};
--- 
-1.9.1
+Thanks,
+Leo Yan
