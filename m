@@ -1,334 +1,193 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 2 Sep 2015 13:38:04 +0200
-Subject: [PATCH v4 01/15] KVM: arm: plug guest debug exploit
-In-Reply-To: <1439213167-8988-2-git-send-email-zhichao.huang@linaro.org>
-References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
- <1439213167-8988-2-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <20150902113804.GJ10991@cbox>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 2 Sep 2015 13:38:31 +0200
+Subject: [PATCH 3/8] mmc: core: Add mmc_regulator_set_vqmmc()
+In-Reply-To: <1441045446-30858-4-git-send-email-heiko@sntech.de>
+References: <1441045446-30858-1-git-send-email-heiko@sntech.de>
+ <1441045446-30858-4-git-send-email-heiko@sntech.de>
+Message-ID: <CAPDyKFqJp3VuOeTh4Abkn2X6gQxNHDXwJj8N51OxxSo+Agespw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 09:25:53PM +0800, Zhichao Huang wrote:
-> Hardware debugging in guests is not intercepted currently, it means
-> that a malicious guest can bring down the entire machine by writing
-> to the debug registers.
-> 
-> This patch enable trapping of all debug registers, preventing the guests
-> to access the debug registers.
-> 
-> This patch also disable the debug mode(DBGDSCR) in the guest world all
-> the time, preventing the guests to mess with the host state.
-
-Remind me how this works:  How does disabling debug mode prevent the
-guest from messing with the host state?  I would think that disabling
-debug mode makes sure that exceptions from breakpoints or watchpoints
-programmed by the host are ignored?
-
-> 
-> However, it is a precursor for later patches which will need to do
-> more to world switch debug states while necessary.
-> 
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+On 31 August 2015 at 20:24, Heiko Stuebner <heiko@sntech.de> wrote:
+> From: Douglas Anderson <dianders@chromium.org>
+>
+> This adds logic to the MMC core to set VQMMC.  This is expected to be
+> called by MMC drivers like dw_mmc as part of (or instead of) their
+> start_signal_voltage_switch() callback.
+>
+> A few notes:
+>
+> * When setting the signal voltage to 3.3V we do our best to make VQMMC
+>   and VMMC match.  It's been reported that this makes some old cards
+>   happy since they were tested back in the day before UHS when VQMMC
+>   and VMMC were provided by the same regulator.  A nice side effect of
+>   this is that we don't end up on the hairy edge of VQMMC (2.7V),
+>   which some EEs claim is a little too close to the minimum for
+>   comfort.
+>   If this is not supported by the supplying regulator we try to find
+>   a suitable voltage within the whole 2.7V-3.6V area of the spec.
+>
+> * When setting the signal voltage to 1.8V or 1.2V we aim for that
+>   specific voltage instead of picking the lowest one in the range.
+>
+> * We very purposely don't print errors in mmc_regulator_set_vqmmc().
+>   There are cases where the MMC core will try several different
+>   voltages and we don't want to pollute the logs.
+>
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->  arch/arm/include/asm/kvm_coproc.h |  3 +-
->  arch/arm/kvm/coproc.c             | 82 +++++++++++++++++++++++++++++----------
->  arch/arm/kvm/handle_exit.c        |  4 +-
->  arch/arm/kvm/interrupts.S         | 12 +++---
->  arch/arm/kvm/interrupts_head.S    | 21 ++++++++--
->  5 files changed, 89 insertions(+), 33 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_coproc.h b/arch/arm/include/asm/kvm_coproc.h
-> index 4917c2f..e74ab0f 100644
-> --- a/arch/arm/include/asm/kvm_coproc.h
-> +++ b/arch/arm/include/asm/kvm_coproc.h
-> @@ -31,7 +31,8 @@ void kvm_register_target_coproc_table(struct kvm_coproc_target_table *table);
->  int kvm_handle_cp10_id(struct kvm_vcpu *vcpu, struct kvm_run *run);
->  int kvm_handle_cp_0_13_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
->  int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run);
-> -int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
-> +int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
-> +int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
->  int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
->  int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
->  
-> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> index f3d88dc..a885cfe 100644
-> --- a/arch/arm/kvm/coproc.c
-> +++ b/arch/arm/kvm/coproc.c
-> @@ -91,12 +91,6 @@ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	return 1;
+>  drivers/mmc/core/core.c  | 68 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mmc/host.h |  7 +++++
+>  2 files changed, 75 insertions(+)
+>
+> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+> index 0520064..9dc0b65 100644
+> --- a/drivers/mmc/core/core.c
+> +++ b/drivers/mmc/core/core.c
+> @@ -1437,6 +1437,74 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
 >  }
->  
-> -int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> -{
-> -	kvm_inject_undefined(vcpu);
-> -	return 1;
-> -}
-> -
->  static void reset_mpidr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
+>  EXPORT_SYMBOL_GPL(mmc_regulator_set_ocr);
+>
+> +static int mmc_regulator_set_voltage_if_supported(struct regulator *regulator,
+> +                                                 int min_uV, int target_uV,
+> +                                                 int max_uV)
+> +{
+> +       /*
+> +        * Check if supported first to avoid errors since we may try several
+> +        * signal levels during power up and don't want to show errors.
+> +        */
+> +       if (!regulator_is_supported_voltage(regulator, min_uV, max_uV))
+> +               return -EINVAL;
+> +
+> +       return regulator_set_voltage_triplet(regulator, min_uV, target_uV,
+> +                                            max_uV);
+> +}
+> +
+> +/**
+> + * mmc_regulator_set_vqmmc - Set VQMMC as per the ios
+> + *
+> + * For 3.3V signaling, we try to match VQMMC to VMMC as closely as possible.
+
+Looking at the code, I don't think this statement is entirely true.
+Isn't it so that we will be trying with a maximum tolerance of 0.3 V
+towards the VMMC voltage level (then fall-back to the complete range)?
+Perhaps you can find a better way to describe that in the change log.
+
+Just to be clear, I believe this approach make sense but I appreciate
+some more details about the policy, both in the code and in the change
+log.
+
+> + * That will match the behavior of old boards where VQMMC and VMMC were supplied
+> + * by the same supply.  The Bus Operating conditions for 3.3V signaling in the
+> + * SD card spec also define VQMMC in terms of VMMC.
+> + * If this is not possible we'll try the full 2.7-3.6V of the spec.
+> + *
+> + * For 1.2V and 1.8V signaling we'll try to get as close as possible to the
+> + * requested voltage.  This is definitely a good idea for UHS where there's a
+> + * separate regulator on the card that's trying to make 1.8V and it's best if
+> + * we match.
+> + *
+> + * This function is expected to be used by a controller's
+> + * start_signal_voltage_switch() function.
+> + */
+> +int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios)
+> +{
+> +       int volt, min_uV, max_uV;
+> +
+> +       /* If no vqmmc supply then we can't change the voltage */
+> +       if (IS_ERR(mmc->supply.vqmmc))
+> +               return -EINVAL;
+
+In general vqmmc is considered as an optional regulator and that's
+also how host drivers treat it. So perhaps it would make sense to
+return 0 here instead of an error code or what do you think?
+
+> +
+> +       switch (ios->signal_voltage) {
+> +       case MMC_SIGNAL_VOLTAGE_120:
+> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
+> +                                               1100000, 1200000, 1300000);
+> +       case MMC_SIGNAL_VOLTAGE_180:
+> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
+> +                                               1700000, 1800000, 1950000);
+> +       case MMC_SIGNAL_VOLTAGE_330:
+> +               volt = regulator_get_voltage(mmc->supply.vmmc);
+
+Before invoking regulator_get_voltage(), we need to check for an
+existing regulator handle for vmmc.
+
+Moreover, as the regulator handle to vmmc is optional, perhaps we
+should fall-back to use the ios->vdd bit to find the current voltage
+level?
+
+> +               if (volt < 0)
+> +                       return volt;
+> +
+> +               min_uV = max(volt - 300000, 2700000);
+> +               max_uV = min(volt + 300000, 3600000);
+
+These calculations deserves a comment.
+
+> +
+> +               /* try to stay close to vmmc at first */
+> +               if (!mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
+> +                                               min_uV, volt, max_uV))
+> +                       return 0;
+> +
+> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
+> +                                               2700000, volt, 3600000);
+> +       default:
+> +               return -EINVAL;
+> +       }
+> +}
+> +EXPORT_SYMBOL_GPL(mmc_regulator_set_vqmmc);
+> +
+>  #endif /* CONFIG_REGULATOR */
+>
+>  int mmc_regulator_get_supply(struct mmc_host *mmc)
+> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+> index 83b81fd..a2a78eb 100644
+> --- a/include/linux/mmc/host.h
+> +++ b/include/linux/mmc/host.h
+> @@ -423,6 +423,7 @@ int mmc_regulator_get_ocrmask(struct regulator *supply);
+>  int mmc_regulator_set_ocr(struct mmc_host *mmc,
+>                         struct regulator *supply,
+>                         unsigned short vdd_bit);
+> +int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios);
+>  #else
+>  static inline int mmc_regulator_get_ocrmask(struct regulator *supply)
 >  {
->  	/*
-> @@ -465,12 +459,8 @@ static int emulate_cp15(struct kvm_vcpu *vcpu,
->  	return 1;
->  }
->  
-> -/**
-> - * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
-> - * @vcpu: The VCPU pointer
-> - * @run:  The kvm_run struct
-> - */
-> -int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> +static int kvm_handle_cp_64(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +			    bool cp15)
-
-perhaps have cp as an int argument instead and do a switch below?
-
+> @@ -435,6 +436,12 @@ static inline int mmc_regulator_set_ocr(struct mmc_host *mmc,
 >  {
->  	struct coproc_params params;
->  
-> @@ -484,7 +474,35 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	params.Rt2 = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
->  	params.CRm = 0;
->  
-> -	return emulate_cp15(vcpu, &params);
-> +	if (cp15)
-> +		return emulate_cp15(vcpu, &params);
-> +
-> +	/* raz_wi cp14 */
-> +	(void)pm_fake(vcpu, &params, NULL);
-
-I don't think you need the (void) ?
-
-> +
-> +	/* handled */
-> +	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-> +	return 1;
-
-perhaps this would be easier to read by adding an emulate_cp14 function
-which basically looks like this:
-
-static int emulate_cp14(struct kvm_vcpu *vcpu,
-			const struct coproc_params *params)
-{
-	pm_fake(vcpu, &params, NULL);
-
-	/* handled */
-	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-	return 1;
-}
-	
-
-> +}
-> +
-> +/**
-> + * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
-> + * @vcpu: The VCPU pointer
-> + * @run:  The kvm_run struct
-> + */
-> +int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> +{
-> +	return kvm_handle_cp_64(vcpu, run, 1);
-> +}
-> +
-> +/**
-> + * kvm_handle_cp14_64 -- handles a mrrc/mcrr trap on a guest CP14 access
-> + * @vcpu: The VCPU pointer
-> + * @run:  The kvm_run struct
-> + */
-> +int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> +{
-> +	return kvm_handle_cp_64(vcpu, run, 0);
+>         return 0;
 >  }
->  
->  static void reset_coproc_regs(struct kvm_vcpu *vcpu,
-> @@ -497,12 +515,8 @@ static void reset_coproc_regs(struct kvm_vcpu *vcpu,
->  			table[i].reset(vcpu, &table[i]);
->  }
->  
-> -/**
-> - * kvm_handle_cp15_32 -- handles a mrc/mcr trap on a guest CP15 access
-> - * @vcpu: The VCPU pointer
-> - * @run:  The kvm_run struct
-> - */
-> -int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> +static int kvm_handle_cp_32(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +			      bool cp15)
->  {
->  	struct coproc_params params;
->  
-> @@ -516,7 +530,35 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	params.Op2 = (kvm_vcpu_get_hsr(vcpu) >> 17) & 0x7;
->  	params.Rt2 = 0;
->  
-> -	return emulate_cp15(vcpu, &params);
-> +	if (cp15)
-> +		return emulate_cp15(vcpu, &params);
 > +
-> +	/* raz_wi cp14 */
-> +	(void)pm_fake(vcpu, &params, NULL);
-> +
-> +	/* handled */
-> +	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-> +	return 1;
+> +static inline int mmc_regulator_set_vqmmc(struct mmc_host *mmc,
+> +                                         struct mmc_ios *ios)
+> +{
+> +       return -EINVAL;
 
-same comment as above
+According to my upper comment about vqmmc being optional, perhaps this
+shouldn't be treated as an error!?
 
 > +}
-> +
-> +/**
-> + * kvm_handle_cp15_32 -- handles a mrc/mcr trap on a guest CP15 access
-> + * @vcpu: The VCPU pointer
-> + * @run:  The kvm_run struct
-> + */
-> +int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> +{
-> +	return kvm_handle_cp_32(vcpu, run, 1);
-> +}
-> +
-> +/**
-> + * kvm_handle_cp14_32 -- handles a mrc/mcr trap on a guest CP14 access
-> + * @vcpu: The VCPU pointer
-> + * @run:  The kvm_run struct
-> + */
-> +int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> +{
-> +	return kvm_handle_cp_32(vcpu, run, 0);
->  }
->  
->  /******************************************************************************
-> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-> index 95f12b2..357ad1b 100644
-> --- a/arch/arm/kvm/handle_exit.c
-> +++ b/arch/arm/kvm/handle_exit.c
-> @@ -104,9 +104,9 @@ static exit_handle_fn arm_exit_handlers[] = {
->  	[HSR_EC_WFI]		= kvm_handle_wfx,
->  	[HSR_EC_CP15_32]	= kvm_handle_cp15_32,
->  	[HSR_EC_CP15_64]	= kvm_handle_cp15_64,
-> -	[HSR_EC_CP14_MR]	= kvm_handle_cp14_access,
-> +	[HSR_EC_CP14_MR]	= kvm_handle_cp14_32,
->  	[HSR_EC_CP14_LS]	= kvm_handle_cp14_load_store,
-> -	[HSR_EC_CP14_64]	= kvm_handle_cp14_access,
-> +	[HSR_EC_CP14_64]	= kvm_handle_cp14_64,
->  	[HSR_EC_CP_0_13]	= kvm_handle_cp_0_13_access,
->  	[HSR_EC_CP10_ID]	= kvm_handle_cp10_id,
->  	[HSR_EC_SVC_HYP]	= handle_svc_hyp,
-> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> index 568494d..48333ff 100644
-> --- a/arch/arm/kvm/interrupts.S
-> +++ b/arch/arm/kvm/interrupts.S
-> @@ -112,9 +112,9 @@ ENTRY(__kvm_vcpu_run)
->  	restore_vgic_state
->  	restore_timer_state
->  
-> -	@ Store hardware CP15 state and load guest state
-> -	read_cp15_state store_to_vcpu = 0
-> -	write_cp15_state read_from_vcpu = 1
-> +	@ Store hardware CP14/CP15 state and load guest state
-> +	read_coproc_state store_to_vcpu = 0
-> +	write_coproc_state read_from_vcpu = 1
->  
->  	@ If the host kernel has not been configured with VFPv3 support,
->  	@ then it is safer if we deny guests from using it as well.
-> @@ -199,9 +199,9 @@ after_vfp_restore:
->  	mrc	p15, 0, r2, c0, c0, 5
->  	mcr	p15, 4, r2, c0, c0, 5
->  
-> -	@ Store guest CP15 state and restore host state
-> -	read_cp15_state store_to_vcpu = 1
-> -	write_cp15_state read_from_vcpu = 0
-> +	@ Store guest CP14/CP15 state and restore host state
-> +	read_coproc_state store_to_vcpu = 1
-> +	write_coproc_state read_from_vcpu = 0
->  
->  	save_timer_state
->  	save_vgic_state
-> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-> index 702740d..7c4075c 100644
-> --- a/arch/arm/kvm/interrupts_head.S
-> +++ b/arch/arm/kvm/interrupts_head.S
-> @@ -239,7 +239,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	save_guest_regs_mode irq, #VCPU_IRQ_REGS
->  .endm
->  
-> -/* Reads cp15 registers from hardware and stores them in memory
-> +/* Reads cp14/cp15 registers from hardware and stores them in memory
->   * @store_to_vcpu: If 0, registers are written in-order to the stack,
->   * 		   otherwise to the VCPU struct pointed to by vcpup
->   *
-> @@ -247,7 +247,12 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->   *
->   * Clobbers r2 - r12
->   */
-> -.macro read_cp15_state store_to_vcpu
-> +.macro read_coproc_state store_to_vcpu
-> +	.if \store_to_vcpu == 0
-> +	mrc	p14, 0, r2, c0, c1, 0	@ DBGDSCR
-> +	push	{r2}
-> +	.endif
-> +
->  	mrc	p15, 0, r2, c1, c0, 0	@ SCTLR
->  	mrc	p15, 0, r3, c1, c0, 2	@ CPACR
->  	mrc	p15, 0, r4, c2, c0, 2	@ TTBCR
-> @@ -325,7 +330,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->   *
->   * Assumes vcpu pointer in vcpu reg
->   */
-> -.macro write_cp15_state read_from_vcpu
-> +.macro write_coproc_state read_from_vcpu
->  	.if \read_from_vcpu == 0
->  	pop	{r2,r4-r7}
->  	.else
-> @@ -394,6 +399,14 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	mcr	p15, 0, r10, c10, c2, 0	@ PRRR
->  	mcr	p15, 0, r11, c10, c2, 1	@ NMRR
->  	mcr	p15, 2, r12, c0, c0, 0	@ CSSELR
-> +
-> +	.if \read_from_vcpu == 0
-> +	pop	{r2}
-> +	.else
-> +	mov	r2, #0
+>  #endif
+>
+>  int mmc_regulator_get_supply(struct mmc_host *mmc);
+> --
+> 2.1.4
+>
 
-I really think that we should read the register, clear the bits you care
-about (MDBGen and HDBGen) and then write back the register.
+Finally, I wonder if you have considered to handle the
+regulator_enable|disable() calls from within this new API? Currently
+host driver deals with that themselves, but it would be nice to get
+some consolidation around that. Similar to what we already have for
+the vmmc regulator through the mmc_regulator_set_ocr() API.
 
-So, if I recall correctly, this is to avoid having to set HDCR_TDE
-below?
+If you considered this, I am fine with adding that kind of
+functionality as a separate patch on top of this one, it gets easier
+to discuss/review.
 
-Given Will's concerns about touching this register, I'm thinking if we
-shouldn't start with the HDCR_TDE enabled (and a handler in KVM) and
-then see if we want to add this optimization later?
-
-At the very least, you should do as Will pointed out and predicate
-writes to this register based on whether the reset code in
-hw_breakpoint.c successfully reset the debug regs.  I think checking the
-debug_err_mask variable from the C code and pass this on to the Hyp code
-would be the right way to go.
-
-But as I said, I think we should just trap debug exceptions to begin
-with (to plug the hole) and then add the more intelligent stuff later.
-
-> +	.endif
-> +
-> +	mcr	p14, 0, r2, c0, c2, 2	@ DBGDSCR
->  .endm
->  
->  /*
-> @@ -620,7 +633,7 @@ ARM_BE8(rev	r6, r6  )
->   * (hardware reset value is 0) */
->  .macro set_hdcr operation
->  	mrc	p15, 4, r2, c1, c1, 1
-> -	ldr	r3, =(HDCR_TPM|HDCR_TPMCR)
-> +	ldr	r3, =(HDCR_TPM|HDCR_TPMCR|HDCR_TDRA|HDCR_TDOSA|HDCR_TDA)
-
-
-
->  	.if \operation == vmentry
->  	orr	r2, r2, r3		@ Trap some perfmon accesses
->  	.else
-> -- 
-> 1.7.12.4
-> 
-
-Thanks,
--Christoffer
+Kind regards
+Uffe
