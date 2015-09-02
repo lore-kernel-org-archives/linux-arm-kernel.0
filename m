@@ -1,59 +1,70 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 2 Sep 2015 11:29:36 +0900
-Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
-In-Reply-To: <55D7A3A1.9020009@cogentembedded.com>
-References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
- <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
- <20150812012652.GH15957@verge.net.au>
- <55D790A5.1050008@cogentembedded.com>
- <55D7A3A1.9020009@cogentembedded.com>
-Message-ID: <20150902022936.GA18115@verge.net.au>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Wed, 02 Sep 2015 08:07:42 +0530
+Subject: [PATCH 5/9] clk: qcom: gcc-msm8960: add child devices support.
+In-Reply-To: <55CD5BD2.3070907@codeaurora.org>
+References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
+ <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
+ <20150811224902.GO2839@codeaurora.org> <55CB0B26.2020105@linaro.org>
+ <55CC1CFE.7000005@codeaurora.org> <20150814004206.GU26614@codeaurora.org>
+ <55CD5BD2.3070907@codeaurora.org>
+Message-ID: <55E660F6.3020007@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 22, 2015 at 01:18:09AM +0300, Sergei Shtylyov wrote:
-> On 08/21/2015 11:57 PM, Sergei Shtylyov wrote:
-> 
-> >>>Define the SILK board dependent part of the SDHI1 (connected to micro-SD slot)
-> >>>device nodes along with the necessary voltage regulators.
-> >>>
-> >>>Based on the original patch by Vladimir Barinov
-> >>><vladimir.barinov@cogentembedded.com>.
-> >>>
-> >>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >>>
-> >>>---
-> >>>This patch is against 'renesas-devel-20150810-v4.2-rc6' tag of Simon Horman's
-> >>>'renesas.git' repo plus the R8A7794/SILK QSPI patches just re-posted. It needs
-> >>>the R8A7794 GPIO patches in order to compile.
-> >>>
-> >>>Changes in version 2:
-> >>>- removed not working SDHI0 stuff, renamed the patch;
-> >>>- replaced SDHI1's "wp-gpios" property with "disable-wp".
-> >>
-> >>I am wondering if you could explain the motivation for the "disable-wp"
-> >>update
-> >
-> >    Please see the comment in mmc_sd_get_ro().
-> >
-> >>and weather it is appropriate for other r8a779* dts files.
-> >
-> >    In case of micro-SD slots, yes.
-> 
->    The MMC binding document says it should only be specified if the
-> controller has WP detection logic. We, so far, seem to have been replying on
-> the GPIOs despite this logic is present (according to the R-Car gen2 SDHI
-> manuals I have). The driver will first call mmc_gpio_get_ro() and when that
-> fails due to "wp-gpios" not being specified, it proceeds to reading the
-> register but that is forbidden by TMIO_MMC_WRPROTECT_DISABLE flag set for
-> the R-Car gen1/2 chips, so 0 is always returned from tmio_mmc_get_ro().
-> There seems to be no point in going that far (and doing the runtime PM
-> dances) --
-> and MMC_CAP2_NO_WRITE_PROTECT (set when "disable-wp" is specified) prohibits
-> doing that...
+Stephen,
 
-That sounds reasonable to me.
-Some more questions from my side:
+>>>>> Also, I don't like having a subnode in DT. Why can't we use the
+>>>>> same node as the GCC node and create a virtual child device here
+>>>>> for tsens? We can assign the same of_node that this platform
+>>>>> device has so that DT keeps working correctly.
+>>>
+>>> So the current driver looks up data based on compatible strings.
+>>
+>> The tsens device is always the same piece of hardware. The only
+>
+> Well, not always. The one in 8960 does need additional initializations,
+> requires you to save/restore context as it can be powered off
+> not being in an always powered on domain etc.
+>
+>> thing that's changing is the qfprom data and the number of
+>> sensors. So we should be looking at the qfprom compatible string
+>
+> How? Tsens uses nvmem framework apis to read the qfprom atleast
+> in this series.
+>
+>> to figure out how to interpret the qfprom data which would
+>> include the number of sensors and how the data is encoded.
+>>
+>>> So you suggesting to create a virtual child device for gcc and
+>>> associate the gcc DT node to it? (And have the tsens compatible
+>>> mentioned as part of the gcc DT node?)
+>>
+>> No. The driver should work just fine without having to
+>> interrogate the device's compatible string. If we still need the
+>> compatible check for some reason, then we can always match based
+>> on qcom,gcc-msm8960, qcom,gcc-apq8064, etc. But I don't see why
+>
+> Thats not quite possible I guess. 2 drivers (gcc and tsens) matching
+> the same compatibles? Will it not just depend on which ends up being
+> the first match?
 
-* What is the status of this patch
-* Can you prepare patches for r8a779* dts files for micro-SD slots?
+Any thoughts on how to move forward with this?
+
+I tried what you were suggesting, and here's what I had to do to get
+things working
+
+* Created a gcc node in DT with gcc and tsens compatibles, with gcc and
+tsens properties
+* gcc driver probes the device/node first given gcc is registered with
+a core_initcall()
+* creates a virtual child device attaching the same of_node (having
+both gcc and tsens compatibles)
+* gcc ends up probing the virtual device/node _again_ (due to the gcc
+compatible match), fails
+* At a later point, tsens driver gets registered (using module_initcall)
+ends up probing the virtual child node and succeeds
+
+Is this what you had in mind, or am I at the wrong end of the stick?
+
+regards,
+Rajendra
