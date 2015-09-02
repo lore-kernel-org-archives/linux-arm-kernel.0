@@ -1,66 +1,86 @@
-From: w-kwok2@ti.com (Kwok, WingMan)
-Date: Wed, 2 Sep 2015 15:31:18 +0000
-Subject: [PATCH] ARM: dts: keystone: use one to one address translations
- under netcp
-In-Reply-To: <55E61658.9010207@oracle.com>
-References: <1441139324-29296-1-git-send-email-w-kwok2@ti.com>
- <55E61658.9010207@oracle.com>
-Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E04221776@DFLE11.ent.ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 2 Sep 2015 17:40:16 +0200
+Subject: [PATCH v4 11/15] KVM: arm: add a function to keep track of host
+ use of the debug registers
+In-Reply-To: <1439213167-8988-12-git-send-email-zhichao.huang@linaro.org>
+References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
+ <1439213167-8988-12-git-send-email-zhichao.huang@linaro.org>
+Message-ID: <20150902154016.GN10991@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: santosh.shilimkar at oracle.com [mailto:santosh.shilimkar at oracle.com]
-> Sent: Tuesday, September 01, 2015 5:19 PM
-> To: Kwok, WingMan; robh+dt at kernel.org; pawel.moll at arm.com;
-> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org;
-> linux at arm.linux.org.uk; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; ssantosh at kernel.org
-> Cc: Karicheri, Muralidharan
-> Subject: Re: [PATCH] ARM: dts: keystone: use one to one address translations
-> under netcp
+On Mon, Aug 10, 2015 at 09:26:03PM +0800, Zhichao Huang wrote:
+> As we're about to implement a lazy world switch for debug registers,
+> we add a function reading the break/watch control variables directly to
+> indicate whether the host has enabled any break/watch points or not.
 > 
-> On 9/1/15 1:28 PM, WingMan Kwok wrote:
-> > Network subsystem NetCP in Keystone-2 devices includes some HW blocks
-> > that are memory mapped to ranges outside that of the NetCP itself.
-> > Thus address space of a child node of the NetCP node needs to be
-> > mapped 1:1 onto the parent address space.  Hence empty ranges
-> > should be used under the NetCP node.
-> >
-> > Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> > ---
-> >   arch/arm/boot/dts/k2e-netcp.dtsi  |    8 +++-----
-> >   arch/arm/boot/dts/k2hk-netcp.dtsi |   14 ++++++--------
-> >   arch/arm/boot/dts/k2l-netcp.dtsi  |    8 +++-----
-> >   3 files changed, 12 insertions(+), 18 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/k2e-netcp.dtsi b/arch/arm/boot/dts/k2e-
-> netcp.dtsi
-> > index b13b3c9..e103ed9 100644
-> > --- a/arch/arm/boot/dts/k2e-netcp.dtsi
-> > +++ b/arch/arm/boot/dts/k2e-netcp.dtsi
-> > @@ -111,9 +111,7 @@ netcp: netcp at 24000000 {
-> >   	compatible = "ti,netcp-1.0";
-> >   	#address-cells = <1>;
-> >   	#size-cells = <1>;
-> > -
-> > -	/* NetCP address range */
-> > -	ranges = <0 0x24000000 0x1000000>;
-> > +	ranges;
-> >
-> What blocks are we talking here. We need to increase the
-> range if the current range isn't covering entire NETCP
-> address space. Removing range isn't a solution.
+> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+> ---
+>  arch/arm/include/asm/hw_breakpoint.h |  5 +++++
+>  arch/arm/kernel/hw_breakpoint.c      | 21 +++++++++++++++++++++
+>  2 files changed, 26 insertions(+)
 > 
+> diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
+> index f2f4c61..6f375c5 100644
+> --- a/arch/arm/include/asm/hw_breakpoint.h
+> +++ b/arch/arm/include/asm/hw_breakpoint.h
+> @@ -66,9 +66,14 @@ int arch_install_hw_breakpoint(struct perf_event *bp);
+>  void arch_uninstall_hw_breakpoint(struct perf_event *bp);
+>  void hw_breakpoint_pmu_read(struct perf_event *bp);
+>  int hw_breakpoint_slots(int type);
+> +bool hw_breakpoint_enabled(void);
+>  
+>  #else
+>  static inline void clear_ptrace_hw_breakpoint(struct task_struct *tsk) {}
+> +static inline bool hw_breakpoint_enabled(void)
+> +{
+> +	return false;
+> +}
+>  
+>  #endif	/* CONFIG_HAVE_HW_BREAKPOINT */
+>  #endif  /* __ASSEMBLY */
+> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+> index dc7d0a9..f56788f 100644
+> --- a/arch/arm/kernel/hw_breakpoint.c
+> +++ b/arch/arm/kernel/hw_breakpoint.c
+> @@ -227,6 +227,27 @@ static int get_num_brps(void)
+>  	return core_has_mismatch_brps() ? brps - 1 : brps;
+>  }
+>  
+> +/* Indicate whether the host has enabled any break/watch points or not. */
+> +bool hw_breakpoint_enabled(void)
+> +{
+> +	struct perf_event **slots;
+> +	int i;
 
-The Serdes.  It is a HW block inside the NetCP but its address
-space starts from 0x0232a000.  We can change the base in the
-ranges property to include the serdes.  But then offsets of
-other HW blocks that are within the NetCP address range will be
-relative to this new base and are not as documented in the HW
-user guides.
+since this is exported, shouldn't you have BUG_ON(preemptible()) here
+isnce you're using this_cpu_ptr()?
 
-Regards
-WingMan
+At least the comment to the function should describe the context in
+which this can be used.
+
+It also looks like these arrays are protected with rcu locks, so don't
+you need to do rcu_read_lock() before looking at these?
+
+> +
+> +	slots = this_cpu_ptr(bp_on_reg);
+> +	for (i = 0; i < core_num_brps; i++) {
+> +		if (slots[i])
+> +			return true;
+> +	}
+> +
+> +	slots = this_cpu_ptr(wp_on_reg);
+> +	for (i = 0; i < core_num_wrps; i++) {
+> +		if (slots[i])
+> +			return true;
+> +	}
+> +
+> +	return false;
+> +}
+> +
+>  /*
+>   * In order to access the breakpoint/watchpoint control registers,
+>   * we must be running in debug monitor mode. Unfortunately, we can
+> -- 
+> 1.7.12.4
+> 
