@@ -1,80 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 2 Sep 2015 14:57:53 +0100
-Subject: [PATCH 2/2] arm64/apm: add dts for Gigabyte MP30-AR0 board
-In-Reply-To: <20150902075936.GR17056@jannau.net>
-References: <1440948270-1991-1-git-send-email-j@jannau.net>
- <1440948270-1991-3-git-send-email-j@jannau.net>
- <20150901105510.GB15900@leverpostej>
- <20150902075936.GR17056@jannau.net>
-Message-ID: <20150902135753.GA15051@leverpostej>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 2 Sep 2015 17:00:36 +0300
+Subject: [PATCH v2 0/2] arm64: introduce run-time detection of aarch32 support
+Message-ID: <1441202438-27005-1-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > +};
-> > > diff --git a/arch/arm64/boot/dts/apm/mp30ar0.dts b/arch/arm64/boot/dts/apm/mp30ar0.dts
-> > > new file mode 100644
-> > > index 0000000..f7a9dae5
-> > > --- /dev/null
-> > > +++ b/arch/arm64/boot/dts/apm/mp30ar0.dts
-> 
-> [...]
-> 
-> > > +	memory {
-> > > +		#address-cells = <0x2>;
-> > > +		#size-cells = <0x2>;
-> > 
-> > I don't see why these properties should be here.
-> 
-> removed
-> 
-> > > +		device_type = "memory";
-> > > +		reg = <0x0 0x0 0x0 0x2000000>;
-> > 
-> > Is this overriden by the bootloader? It seems a tad small...
-> 
-> yes, it is overriden by the bootloader. It requires a memory node in the 
-> dts but will overwrite the contents. I'll set size to zero and add a 
-> comment that it is updated by the bootloader. I could set start to 0x40 
-> 0x00 or leave it at zero.
+This is needed to avoid loading aarch32 binaries if COMPAT is enabled, but
+aarch32 is not supported by specific platform.
 
-I think all zeroes is preferable. The comment is definitely worthwhile.
+First patch fixes hidden header dependencies in arch/arm64/include/asm/cpufeature.h.
+It's not related to the issue, but helps to avoid build failure that happens
+if one applies second patch only.
 
-> > > +	};
-> > > +
-> > > +	poweroff_mbox: poweroff_mbox at 10548000 {
-> > > +		compatible = "syscon";
-> > > +		reg = <0x0 0x10548000 0x0 0x100>;
-> > > +	};
-> > > +
-> > > +	poweroff at 10548010 {
-> > > +		compatible = "syscon-poweroff";
-> > > +		regmap = <&poweroff_mbox>;
-> > > +		offset = <0x10>;
-> > > +		mask = <0x1>;
-> > > +	};
-> > > +
-> > > +	chosen {
-> > > +		linux,stdout-path = "/soc/serial at 1c020000";
-> > 
-> > Please use stdout-path rather than linux,stdout-path.
-> > 
-> > No rate configuration?
-> > 
-> > This would look nicer with an alias.
-> 
-> I can change that but the bootloader will add a 'linux,stdout-path' and 
-> the stdout-path will override it. OTOH the bootloader seems to always 
-> add this exact string so it will be fine to "override" it from the dts.
-> The alternative would to remove it.
+Second patch adds run-time detection of aarch32 support, and rejects kernel to
+load such binaries, if not supported.
 
-I guess it doesn't fill in the rate, which is somewhat unfortunate.
+Tested on ThunderX.
 
-Does it override an existing linux,stdout-path? If not, we could add the
-rate.
+V2:
+ - add missing <linux/compiler.h> for the __attribute_const__ on
+   cpuid_feature_extract_field;
+ - move cpu_feature macro under the __ASSEMBLY__ guard.
+ - check that all CPUs support AArch32, not the current only,
+   the same way as for endianness support.
 
-I think we should have a comment about the bootlaoder filling in
-linux,stdout-path, but other than that I'm not really sure what the best
-option is.
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 
-Thanks,
-Mark.
+Yury Norov (2):
+  arm64: cpufeature.h: resolve hidden header dependencies
+  arm64: don't load 32-bit binaries if platform has no aarch32_el0
+
+ arch/arm64/include/asm/cpufeature.h | 10 +++++++++-
+ arch/arm64/include/asm/cputype.h    |  8 ++++++++
+ arch/arm64/include/asm/elf.h        |  6 ++++--
+ arch/arm64/kernel/cpuinfo.c         | 12 ++++++++++++
+ 4 files changed, 33 insertions(+), 3 deletions(-)
+
+-- 
+2.1.4
