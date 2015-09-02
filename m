@@ -1,62 +1,44 @@
-From: ranjit.waghmode@xilinx.com (Ranjit Abhimanyu Waghmode)
-Date: Wed, 2 Sep 2015 17:12:14 +0000
-Subject: [LINUX RFC v2 0/4] spi: add dual parallel mode support in Zynq
- MPSoC GQSPI controller
-In-Reply-To: <201508260856.22258.marex@denx.de>
-References: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
- <201508260856.22258.marex@denx.de>
-Message-ID: <7CFCFE83B8145347A1D424EC939F1C3C014AFF00@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Wed, 02 Sep 2015 18:17:36 +0100
+Subject: Porting MIPS IRQ handler to ARM
+In-Reply-To: <55E722F2.50905@free.fr> (Mason's message of "Wed, 02 Sep 2015
+ 18:25:22 +0200")
+References: <55E5CED8.7000408@free.fr> <55E5D945.3040504@gmail.com>
+ <55E722F2.50905@free.fr>
+Message-ID: <yw1xy4goyc3z.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Mason <slash.tmp@free.fr> writes:
 
-> -----Original Message-----
-> From: Marek Vasut [mailto:marex at denx.de]
-> Sent: Wednesday, August 26, 2015 12:26 PM
-> To: Ranjit Abhimanyu Waghmode
-> Cc: dwmw2 at infradead.org; computersforpeace at gmail.com;
-> broonie at kernel.org; Michal Simek; Soren Brinkmann; zajec5 at gmail.com;
-> ben at decadent.org.uk; b32955 at freescale.com; knut.wohlrab at de.bosch.com;
-> juhosg at openwrt.org; beanhuo at micron.com; linux-mtd at lists.infradead.org;
-> linux-kernel at vger.kernel.org; linux-spi at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Harini Katakam; Punnaiah Choudary Kalluri
-> Subject: Re: [LINUX RFC v2 0/4] spi: add dual parallel mode support in Zynq
-> MPSoC GQSPI controller
-> 
-> On Wednesday, August 26, 2015 at 08:26:03 AM, Ranjit Waghmode wrote:
-> > This series adds dual parallel mode support for Zynq Ultrascale+ MPSoC
-> > GQSPI controller driver.
-> >
-> > What is dual parallel mode?
-> > ---------------------------
-> > ZynqMP GQSPI controller supports Dual Parallel mode with following
-> > functionalities: 1) Supporting two SPI flash memories operating in
-> > parallel. 8 I/O lines. 2) Chip selects and clock are shared to both
-> > the flash devices
-> > 3) This mode is targeted for faster read/write speed and also doubles
-> > the size 4) Commands/data can be transmitted/received from both the
-> > devices(mirror), or only upper or only lower flash memory devices.
-> > 5) Data arrangement:
-> >    With stripe enabled,
-> >    Even bytes i.e. 0, 2, 4,... are transmitted on Lower Data Bus
-> >    Odd bytes i.e. 1, 3, 5,.. are transmitted on Upper Data Bus.
-> 
-> This might be a dumb question, but why don't you just treat this as an SPI NOR
-> flash with 8-bit bus ?
+> On 01/09/2015 18:58, Florian Fainelli wrote:
+>
+>> On 01/09/15 09:14, Mason wrote:
+>>
+>>> I'm trying to port to my ARM platform: IRQ handling code written for MIPS.
+>>> https://github.com/mansr/linux-tangox/blob/master/drivers/irqchip/irq-tangox.c
+>> 
+>> Calling clear_c0_status() and write_c0_status() in tangox_irq_handler()
+>> sounds like a layering violation here, this should be taken care of by
+>> the interrupt code once proper parenting between the MIPS IRQ controller
+>> and your tangox controller is established.
+>
+> Following Mans' suggestion, I deleted the arch-specific code, and
+> the driver now compiles and links.
+>
+> Unfortunately, I still can't get it to work, and I've been banging
+> my head against the wall over this device tree monstrosity.
+>
+> tangox_irq_init() fails in irq_of_parse_and_map()
+>
+> I see that
+> irqchip_init is called
+> gic_of_init is called
+> but of_irq_parse_one(dev, index, &oirq) fails... :-(
 
-In case of dual parallel configuration of this controller there are different modes like single, dual and quad mode.
-Whatever you are suggesting would fit only in the case of Quad mode operation as both buses would have 4 lines each.
-In case of single mode of parallel configuration, there would be two buses; but the line on each bus would one. So altogether there will be two lines.
-And in case of dual mode of parallel configuration each bus will be having two lines. So altogether 4 lines will be there.
-So keeping 8 lines would not support above two modes of parallel configuration correctly.
+Use the latest DT from my tree.  It looks like you're missing some
+changes.
 
-Logically it is a single flash with 8 IO lines but physically it's a two flash devices and each has 4 IO lines. 
-So, in this case, read and write addresses should be always even and minimum data that can be accessed is 2 bytes.
-
-Regards,
-Ranjit
-
-> 
-> Best regards,
-> Marek Vasut
+-- 
+M?ns Rullg?rd
+mans at mansr.com
