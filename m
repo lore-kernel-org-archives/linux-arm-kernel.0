@@ -1,123 +1,34 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 02 Sep 2015 09:15:11 +0900
-Subject: [PATCHv2] ARM: EXYNOS: reset Little cores when cpu is up
-In-Reply-To: <1441117023-25478-1-git-send-email-parkch98@gmail.com>
-References: <1441117023-25478-1-git-send-email-parkch98@gmail.com>
-Message-ID: <55E63F8F.4020300@samsung.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 1 Sep 2015 17:28:03 -0700
+Subject: [PATCH v3 4/5] clk: Hi6220: add stub clock driver
+In-Reply-To: <1438564418-15948-5-git-send-email-leo.yan@linaro.org>
+References: <1438564418-15948-1-git-send-email-leo.yan@linaro.org>
+ <1438564418-15948-5-git-send-email-leo.yan@linaro.org>
+Message-ID: <CAMAWPa8dNOipiFFv96J5XvP1Qs7ysHBD6_-RpMGqCEdPAKxHAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.09.2015 23:17, Chanho Park wrote:
-> The cpu booting of exynos5422 has been still broken since we discussed
-> it in last year[1]. This patch is inspired from Odroid XU3
-> code (Actually, it was from samsung exynos vendor kernel)[2]. This weird
-> reset code was founded exynos5420 octa cores series SoCs and only
-> required for the first boot core is the Little core (Cortex A7).
-> Some of the exynos5420 boards and all of the exynos5422 boards will require
-> this code.
-> 
-> There is two ways to check the little core is the first cpu. One is
-> checking GPG2CON[1] GPIO value and the other is checking the cluster
-> number of the first cpu. I selected the latter because it's more easier
-> than the former.
-> 
-> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350632.html
-> [2]:https://patchwork.kernel.org/patch/6782891/
-> 
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Chanho Park <parkch98@gmail.com>
-> ---
-> Changes from v1:
->  .kfc to Little (Cortex A7) and eagle to big (Cortex A15)
->  .append comments about waiting SPARE2 register
-> 
-> Changes since RFC:
->  .drop checking soc_is_exynos5800 to extend this codes to
-> exynos5420/5422 boards.
->  .kfc cores will be reset only if the cpu0 is kfc core.
->  .Rebase top of the kukjin's for-next branch
-> 
->  arch/arm/mach-exynos/mcpm-exynos.c | 25 ++++++++++++++++++++++++-
->  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
->  2 files changed, 30 insertions(+), 1 deletion(-)
+On Sun, Aug 2, 2015 at 6:13 PM, Leo Yan <leo.yan@linaro.org> wrote:
+> On Hi6220, there have some clocks which can use mailbox channel to send
+> messages to power controller to change frequency; this includes CPU, GPU
+> and DDR clocks.
+>
+> For dynamic frequency scaling, firstly need write the frequency value to
+> SRAM region, and then send message to mailbox to trigger power controller
+> to handle this requirement. This driver will use syscon APIs to pass SRAM
+> memory region and use common mailbox APIs for channels accessing.
+>
+> This init driver will support cpu frequency change firstly.
+>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 
-Thanks for updating the patch. Remaining minor nit about comment style
-(/* on first line) can be fixed while applying.
+The kernelci.org build/boot bot detected boot failures in
+linux-next[1], and the failure was bisected down to this patch (landed
+in linux-next as commit c1628a2c416da947f5afac615d53189250fa49cb.
 
-The patch works good, after disabling bL switcher I have 8 cores running:
+I verifed that reverting this commit on top of next-20150901 gets the
+hikey booting again.
 
-Tested on Odroid XU4:
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Kevin
 
-It's 4.3 merge window so the patch will go probably to v4.4.
-
-Best regards,
-Krzysztof
-
-
-> 
-> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> index 9bdf547..8926621 100644
-> --- a/arch/arm/mach-exynos/mcpm-exynos.c
-> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> @@ -20,6 +20,7 @@
->  #include <asm/cputype.h>
->  #include <asm/cp15.h>
->  #include <asm/mcpm.h>
-> +#include <asm/smp_plat.h>
->  
->  #include "regs-pmu.h"
->  #include "common.h"
-> @@ -70,7 +71,29 @@ static int exynos_cpu_powerup(unsigned int cpu, unsigned int cluster)
->  		cluster >= EXYNOS5420_NR_CLUSTERS)
->  		return -EINVAL;
->  
-> -	exynos_cpu_power_up(cpunr);
-> +	if (!exynos_cpu_power_state(cpunr)) {
-> +		exynos_cpu_power_up(cpunr);
-> +
-> +		/* This assumes the cluster number of the big cores(Cortex A15)
-> +		 * is 0 and the Little cores(Cortex A7) is 1.
-> +		 * When the system was booted from the Little core,
-> +		 * they should be reset during power up cpu.
-> +		 */
-> +		if (cluster &&
-> +		    cluster == MPIDR_AFFINITY_LEVEL(cpu_logical_map(0), 1)) {
-> +			/* Before we reset the Little cores, we should wait
-> +			 * the SPARE2 register is set to 1 because the init
-> +			 * codes of the iROM will set the register after
-> +			 * initialization.
-> +			 */
-> +			while (!pmu_raw_readl(S5P_PMU_SPARE2))
-> +				udelay(10);
-> +
-> +			pmu_raw_writel(EXYNOS5420_KFC_CORE_RESET(cpu),
-> +					EXYNOS_SWRESET);
-> +		}
-> +	}
-> +
->  	return 0;
->  }
->  
-> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-> index b761433..fba9068 100644
-> --- a/arch/arm/mach-exynos/regs-pmu.h
-> +++ b/arch/arm/mach-exynos/regs-pmu.h
-> @@ -513,6 +513,12 @@ static inline unsigned int exynos_pmu_cpunr(unsigned int mpidr)
->  #define SPREAD_ENABLE						0xF
->  #define SPREAD_USE_STANDWFI					0xF
->  
-> +#define EXYNOS5420_KFC_CORE_RESET0				BIT(8)
-> +#define EXYNOS5420_KFC_ETM_RESET0				BIT(20)
-> +
-> +#define EXYNOS5420_KFC_CORE_RESET(_nr)				\
-> +	((EXYNOS5420_KFC_CORE_RESET0 | EXYNOS5420_KFC_ETM_RESET0) << (_nr))
-> +
->  #define EXYNOS5420_BB_CON1					0x0784
->  #define EXYNOS5420_BB_SEL_EN					BIT(31)
->  #define EXYNOS5420_BB_PMOS_EN					BIT(7)
-> 
+[1] http://kernelci.org/boot/hi6220-hikey/
