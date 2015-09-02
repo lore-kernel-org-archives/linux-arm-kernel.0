@@ -1,272 +1,193 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 2 Sep 2015 16:53:27 +0200
-Subject: [PATCH v4 10/15] KVM: arm: implement world switch for debug
- registers
-In-Reply-To: <1439213167-8988-11-git-send-email-zhichao.huang@linaro.org>
-References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
- <1439213167-8988-11-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <20150902145327.GL10991@cbox>
+From: andrew.pinski@caviumnetworks.com (Andrew Pinski)
+Date: Wed, 2 Sep 2015 22:52:05 +0800
+Subject: [PATCHv2] ARM64: Add AT_ARM64_MIDR to the aux vector
+In-Reply-To: <20150902165752.782e75be@i7>
+References: <1440873982-44062-1-git-send-email-apinski@cavium.com>
+ <20150901163304.GC16430@leverpostej>
+ <A9115CAF-0C57-4810-97F6-6245E7D0CE48@gmail.com>
+ <4C8DD5E0-E1EA-40C6-B947-72189241023C@caviumnetworks.com>
+ <20150901173043.GE16430@leverpostej>
+ <9AA83792-C973-4642-88BA-3C59F23EB048@gmail.com>
+ <20150901221254.5e08ab6e@i7>
+ <8C837F8F-050A-45DD-882B-02E107EFD663@caviumnetworks.com>
+ <20150902165752.782e75be@i7>
+Message-ID: <CA+=Sn1=27ibpBokqJj3vLZ7NsnovKRdq7mR22ReeJJya4ona-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 09:26:02PM +0800, Zhichao Huang wrote:
-> Implement switching of the debug registers. While the number
-> of registers is massive, CPUs usually don't implement them all
-> (A15 has 6 breakpoints and 4 watchpoints, which gives us a total
-> of 22 registers "only").
-> 
-> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
-> ---
->  arch/arm/kvm/interrupts_head.S | 170 ++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 159 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-> index 7ac5e51..b9e7410 100644
-> --- a/arch/arm/kvm/interrupts_head.S
-> +++ b/arch/arm/kvm/interrupts_head.S
-> @@ -5,6 +5,7 @@
->  #define VCPU_USR_SP		(VCPU_USR_REG(13))
->  #define VCPU_USR_LR		(VCPU_USR_REG(14))
->  #define CP15_OFFSET(_cp15_reg_idx) (VCPU_CP15 + (_cp15_reg_idx * 4))
-> +#define CP14_OFFSET(_cp14_reg_idx) ((_cp14_reg_idx) * 4)
->  
->  /*
->   * Many of these macros need to access the VCPU structure, which is always
-> @@ -239,6 +240,136 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	save_guest_regs_mode irq, #VCPU_IRQ_REGS
->  .endm
->  
-> +/* Assume r10/r11/r12 are in use, clobbers r2-r3 */
-> +.macro cp14_read_and_str base Op2 cp14_reg0 skip_num
-> +	adr	r3, 1f
-> +	add	r3, r3, \skip_num, lsl #3
+On Wed, Sep 2, 2015 at 9:57 PM, Siarhei Siamashka
+<siarhei.siamashka@gmail.com> wrote:
+> On Wed, 2 Sep 2015 00:28:28 +0000
+> "Pinski, Andrew" <Andrew.Pinski@caviumnetworks.com> wrote:
+>
+>> > On Sep 2, 2015, at 3:13 AM, Siarhei Siamashka <siarhei.siamashka@gmail.com> wrote:
+>> >
+>> > On Wed, 2 Sep 2015 01:58:56 +0800
+>> > pinskia at gmail.com wrote:
+>> >
+>> >>> On Sep 2, 2015, at 1:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> >>>
+>> >>> [...]
+>> >>>
+>> >>>>>>> On Sat, Aug 29, 2015 at 07:46:22PM +0100, Andrew Pinski wrote:
+>> >>>>>>> It is useful to pass down MIDR register down to userland if all of
+>> >>>>>>> the online cores are all the same type.  This adds AT_ARM64_MIDR
+>> >>>>>>> aux vector type and passes down the midr system register.
+>> >>>>>>>
+>> >>>>>>> This is alternative to MIDR_EL1 part of
+>> >>>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/358995.html.
+>> >>>>>>> It allows for faster access to midr_el1 than going through a trap and
+>> >>>>>>> does not exist if the set of cores are not the same.
+>> >>>>>>
+>> >>>>>> I'm not sure I follow the rationale. If speed is important the
+>> >>>>>> application can cache the value the first time it reads it with a trap.
+>> >>>>>
+>> >>>>> It is also about compatibility also. Exposing the register is not backwards compatible but using the aux vector is.
+>> >>>>
+>> >>>> That would also break big.little too. So either break it with hot plug or break it in userland, your choice.
+>> >>>
+>> >>> The value wouldn't be representative of the system as a whole; that is
+>> >>> true. However, we never guaranteed that it was, while the aux vector
+>> >>> code implied that we did.
+>> >>
+>> >> Yes but I guess you talk about caching the value in userspace but doing
+>> >> it via the aux vector is the same as your suggestion. Just one
+>> >> difference is you don't get the aux vector entry if there is a CPU
+>> >> that is online which is different. No difference from your suggestion
+>> >> of caching it. Without considering hot pug for a second (that is a
+>> >> huge different issue all together), if userland wants to know if all
+>> >> up CPUs have the same midr, they would either read /sys entries (lots
+>> >> of syscalls) or bind to each CPU and do the trap. That means at least
+>> >> three or two syscalls/traps for each CPU. My way is none and gets a
+>> >> value of midr if they are all the Same for free.
+>> >
+>> > Andrew, how do you propose to get the value of MIDR? Open the
+>> > "/proc/self/auxv", read it, do a linear search in the buffer to find
+>> > the required entry and then read the value? Or use the glibc specific
+>> > getauxval() function (https://lwn.net/Articles/519085) ?
+>>
+>> This is inside glibc I am talking about so getauxval.
+>
+> OK. Point taken.
+>
+>> > Regarding the caching implementation, one can open and parse the
+>> > "/proc/cpuinfo" file (with older kernels) or read the new sysfs
+>> > entries to get the MIDR value for each core. Then create a lookup
+>> > table. As an additional bonus, this lookup table can contain not
+>> > just the MIDR values, but any arbitrary data in any format (for
+>> > example, a function pointer to the memcpy function or anything else).
+>>
+>> You don't want to do that early on in ld.so each time a program
+>> starts up. Too much overhead.
+>
+> Right.
+>
+>> > After the lookup table is available, one can use the getcpu() syscall
+>> > for getting the CPU number and do the table lookup. And for getting
+>> > reasonable performance, implement the vdso variant of the getcpu()
+>> > syscall.
+>> >
+>> > All of this internal ugliness would be best abstracted inside
+>> > of the GCC __builtin_cpu_init(), __builtin_cpu_is() and
+>> > __builtin_cpu_supports() builtins:
+>> >    http://gcc.gnu.org/gcc-4.8/changes.html
+>>
+>> Yes but this is about glibc support and not other userland
+>> support. Having glibc depend on that is even worse.
+>
+> Well, basically you are saying that you only care about your
+> individual use case (glibc only, 64-bit only, no support for
+> big.LITTLE) and just don't give rats about anything else. This
+> is not necessarily wrong, but we are not getting the problem
+> solved on a wider scale with such approach.
+>
+> Regarding the reliance on the getauxval() function. Appears that
+> at least it seems to be also supported in recent versions of Android
+> and in musl too. So it already has a wide support in the Linux
+> different flavours and just needs a configure check in regular
+> applications/libraries. This is not perfect, but not bad either
+> and will only get better in the future.
+>
+> Regarding the performance. Avoiding to open and read any files
+> surely helps to make the setup cost lower. In this sense, the
+>     http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/359127.html
+> patch is not very good because we would have to deal with multiple
+> files, increasing the overhead even more.
+>
+> Regarding the big.LITTLE hardware. We can't just ignore it and
+> pretend that it does not exist. This would be rather short-sighted.
+> Just like not thinking about allowing userspace access to the MIDR
+> register was a short-sighted decision in the past for ARMv8 and
+> earlier architectures.
+>
+> So let's review everything. You are suggesting that we should try
+> to read AT_ARM64_MIDR via getauxval (btw, why ARM64 in the name?) and
+> if it is found, then all the CPU cores are identical and we have the
+> MIDR value. If it is not found, then we should check AT_HWCAP for the
+> HWCAP_CPUID bit and read the MIDR register directly (which will be
+> trapped, but emulated in the kernel).
+>
+> The HWCAP_CPUID approach and emulation looks interesting, because it
+> might probably motivate ARM to actually implement direct userspace
+> access to the MIDR register in the future revisions of hardware :-)
+>
+> Now I wonder about the performance difference between the kernel
+> emulated MIDR read and the performance of doing a table lookup, using
+> sched_getcpu() result as an index. And I have done some preliminary
+> tests. On my Cortex-A7 processor, running "sched_getcpu()" in a loop
+> takes ~200 cycles per iteration. Running "getauxval(AT_PLATFORM)" in
+> the same loop takes ~100 cycles per iteration. The emulated SWP and
+> unaligned LDM instructions take around ~500 and ~400 cycles. But the
+> emulation of the MIDR register read should be much more lightweight
+> than SWP/LDM, so it might be more competitive with sched_getcpu()
+> and I will benchmark this later.
+>
+> I wonder if we still can try to make "sched_getcpu()" use vDSO
+> instead of the syscall to make it faster? Now that there exists a
+> vDSO implementation for gettimeofday(), everything should be easy if
+> we can find an unused userspace readable coprocessor register.
+> In the past, Catalin Marinas mentioned that "We have a user read-only
+> thread register unused on arm64":
+>     http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/220664.html
+> And if I understand it correctly, also one of the "scratch registers"
+> should exist in 32-bit ARM, which "isn't present in ARMv8/AArch64":
+>     http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/221056.html
+> What kind of registers are these exactly?
+>
+> In principle, the aux vector can be extended to also contain a pointer
+> to an array of MIDR values for all the CPU cores if reducing the setup
+> overhead is critical.
 
-can this code be compiled in Thumb-2 ?  If so, are all the instructions
-below 32-bit wide?
+That is not a bad idea.  Put this array in the data section of the
+VDSO too.  It should be small enough though on systems with 96 or more
+cores (dual socket ThunderX has 96 cores total), it is slightly
+getting big.
+The struct would be something like:
+struct
+{
+  int32 numcores;
+  int32 midr[];
+};
 
-> +	bx	r3
-> +1:
-> +	mrc	p14, 0, r2, c0, c15, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+15)]
-> +	mrc	p14, 0, r2, c0, c14, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+14)]
-> +	mrc	p14, 0, r2, c0, c13, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+13)]
-> +	mrc	p14, 0, r2, c0, c12, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+12)]
-> +	mrc	p14, 0, r2, c0, c11, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+11)]
-> +	mrc	p14, 0, r2, c0, c10, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+10)]
-> +	mrc	p14, 0, r2, c0, c9, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+9)]
-> +	mrc	p14, 0, r2, c0, c8, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+8)]
-> +	mrc	p14, 0, r2, c0, c7, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+7)]
-> +	mrc	p14, 0, r2, c0, c6, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+6)]
-> +	mrc	p14, 0, r2, c0, c5, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+5)]
-> +	mrc	p14, 0, r2, c0, c4, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+4)]
-> +	mrc	p14, 0, r2, c0, c3, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+3)]
-> +	mrc	p14, 0, r2, c0, c2, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+2)]
-> +	mrc	p14, 0, r2, c0, c1, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0+1)]
-> +	mrc	p14, 0, r2, c0, c0, \Op2
-> +	str     r2, [\base, #CP14_OFFSET(\cp14_reg0)]
-> +.endm
-> +
-> +/* Assume r11/r12 are in use, clobbers r2-r3 */
-> +.macro cp14_ldr_and_write base Op2 cp14_reg0 skip_num
-> +	adr	r3, 1f
-> +	add	r3, r3, \skip_num, lsl #3
+Which you place right after the current data.  This would allow for
+shared read only data between the processes and not needed to waste
+other space.
+I will try to  program this up in a few days and that will solve my
+issue really.  I can cache in userspace if they are the same.  Also it
+avoids a trap which can be more expensive than a cache misses.
 
-see above
+Thanks,
+Andrew Pinski
 
-> +	bx	r3
-> +1:
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+15)]
-> +	mcr	p14, 0, r2, c0, c15, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+14)]
-> +	mcr	p14, 0, r2, c0, c14, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+13)]
-> +	mcr	p14, 0, r2, c0, c13, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+12)]
-> +	mcr	p14, 0, r2, c0, c12, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+11)]
-> +	mcr	p14, 0, r2, c0, c11, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+10)]
-> +	mcr	p14, 0, r2, c0, c10, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+9)]
-> +	mcr	p14, 0, r2, c0, c9, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+8)]
-> +	mcr	p14, 0, r2, c0, c8, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+7)]
-> +	mcr	p14, 0, r2, c0, c7, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+6)]
-> +	mcr	p14, 0, r2, c0, c6, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+5)]
-> +	mcr	p14, 0, r2, c0, c5, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+4)]
-> +	mcr	p14, 0, r2, c0, c4, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+3)]
-> +	mcr	p14, 0, r2, c0, c3, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+2)]
-> +	mcr	p14, 0, r2, c0, c2, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0+1)]
-> +	mcr	p14, 0, r2, c0, c1, \Op2
-> +	ldr     r2, [\base, #CP14_OFFSET(\cp14_reg0)]
-> +	mcr	p14, 0, r2, c0, c0, \Op2
-> +.endm
-> +
-> +/* Get extract number of BRPs and WRPs. Saved in r11/r12 */
-> +.macro read_hw_dbg_num
-> +	mrc	p14, 0, r2, c0, c0, 0
-
-can you add @ DBGDIDR here, so we know which register we are looking at?
-
-> +	ubfx	r11, r2, #24, #4
-> +	add	r11, r11, #1		@ Extract BRPs
-> +	ubfx	r12, r2, #28, #4
-> +	add	r12, r12, #1		@ Extract WRPs
-> +	mov	r2, #16
-> +	sub	r11, r2, r11		@ How many BPs to skip
-> +	sub	r12, r2, r12		@ How many WPs to skip
-> +.endm
-> +
-> +/* Reads cp14 registers from hardware.
-> + * Writes cp14 registers in-order to the CP14 struct pointed to by r10
-> + *
-> + * Assumes vcpu pointer in vcpu reg
-> + *
-> + * Clobbers r2-r12
-> + */
-> +.macro save_debug_state
-> +	read_hw_dbg_num
-> +	cp14_read_and_str r10, 4, cp14_DBGBVR0, r11
-> +	cp14_read_and_str r10, 5, cp14_DBGBCR0, r11
-> +	cp14_read_and_str r10, 6, cp14_DBGWVR0, r12
-> +	cp14_read_and_str r10, 7, cp14_DBGWCR0, r12
-> +
-> +	/* DBGDSCR reg */
-> +	mrc	p14, 0, r2, c0, c1, 0
-> +	str	r2, [r10, #CP14_OFFSET(cp14_DBGDSCRext)]
-
-so again we're touching the scary register on every world-switch.  Since
-it sounds like we have experience telling us that this can cause
-troubles, I'm wondering if we can get around it by:
-
-Only ever allow the guest to use debugging registers if we managed to
-enter_monitor_mode on the host, and in that case only allow guest
-debugging with the configuration of DBGDSCR that the host has.
-
-If the host never managed to enable debugging, the guest probably won't
-succeed either, and we should just trap all guest accesses to the debug
-registers.
-
-Does this work?
-
-> +.endm
-> +
-> +/* Reads cp14 registers in-order from the CP14 struct pointed to by r10
-> + * Writes cp14 registers to hardware.
-> + *
-> + * Assumes vcpu pointer in vcpu reg
-> + *
-> + * Clobbers r2-r12
-> + */
-> +.macro restore_debug_state
-> +	read_hw_dbg_num
-> +	cp14_ldr_and_write r10, 4, cp14_DBGBVR0, r11
-> +	cp14_ldr_and_write r10, 5, cp14_DBGBCR0, r11
-> +	cp14_ldr_and_write r10, 6, cp14_DBGWVR0, r12
-> +	cp14_ldr_and_write r10, 7, cp14_DBGWCR0, r12
-> +
-> +	/* DBGDSCR reg */
-> +	ldr	r2, [r10, #CP14_OFFSET(cp14_DBGDSCRext)]
-> +	mcr	p14, 0, r2, c0, c2, 2
-
-same as above
-
-> +.endm
-> +
->  /* Reads cp14/cp15 registers from hardware and stores them in memory
->   * @store_to_vcpu: If 0, registers are written in-order to the stack,
->   * 		   otherwise to the VCPU struct pointed to by vcpup
-> @@ -248,11 +379,17 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->   * Clobbers r2 - r12
->   */
->  .macro read_coproc_state store_to_vcpu
-> -	.if \store_to_vcpu == 0
-> -	mrc	p14, 0, r2, c0, c1, 0	@ DBGDSCR
-> -	push	{r2}
-> +	.if \store_to_vcpu == 1
-> +	add	r10, vcpu, #VCPU_CP14
-> +	.else
-> +	add	r10, vcpu, #VCPU_HOST_CONTEXT
-> +	ldr	r10, [r10]
-> +	add	r10, r10, #VCPU_CP14_HOST
->  	.endif
->  
-> +	/* Assumes r10 pointer in cp14 regs  */
-> +	bl __save_debug_state
-> +
->  	mrc	p15, 0, r2, c1, c0, 0	@ SCTLR
->  	mrc	p15, 0, r3, c1, c0, 2	@ CPACR
->  	mrc	p15, 0, r4, c2, c0, 2	@ TTBCR
-> @@ -331,6 +468,17 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->   * Assumes vcpu pointer in vcpu reg
->   */
->  .macro write_coproc_state read_from_vcpu
-> +	.if \read_from_vcpu == 1
-> +	add	r10, vcpu, #VCPU_CP14
-> +	.else
-> +	add	r10, vcpu, #VCPU_HOST_CONTEXT
-> +	ldr	r10, [r10]
-> +	add	r10, r10, #VCPU_CP14_HOST
-> +	.endif
-> +
-> +	/* Assumes r10 pointer in cp14 regs  */
-> +	bl __restore_debug_state
-> +
->  	.if \read_from_vcpu == 0
->  	pop	{r2,r4-r7}
->  	.else
-> @@ -399,14 +547,6 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	mcr	p15, 0, r10, c10, c2, 0	@ PRRR
->  	mcr	p15, 0, r11, c10, c2, 1	@ NMRR
->  	mcr	p15, 2, r12, c0, c0, 0	@ CSSELR
-> -
-> -	.if \read_from_vcpu == 0
-> -	pop	{r2}
-> -	.else
-> -	mov	r2, #0
-> -	.endif
-> -
-> -	mcr	p14, 0, r2, c0, c2, 2	@ DBGDSCR
->  .endm
->  
->  /*
-> @@ -657,3 +797,11 @@ ARM_BE8(rev	r6, r6  )
->  .macro load_vcpu
->  	mrc	p15, 4, vcpu, c13, c0, 2	@ HTPIDR
->  .endm
-> +
-> +__save_debug_state:
-> +	save_debug_state
-> +	bx	lr
-> +
-> +__restore_debug_state:
-> +	restore_debug_state
-> +	bx	lr
-> -- 
-> 1.7.12.4
-> 
-
-The rest of the register mangling looks ok this time though.
-
--Christoffer
+>
+> The GCC __builtin_cpu_is() and __builtin_cpu_supports() builtins are
+> unrelated to the kernel and not really needed for glibc, but it's
+> important to ensure that they can be implemented efficiently on ARM.
+> It would be great if we could delegate all this ugly and hairy
+> runtime CPU features detection task to GCC. Instead of implementing
+> it in every application and library, which makes use of assembly
+> optimizations.
+>
+> --
+> Best regards,
+> Siarhei Siamashka
