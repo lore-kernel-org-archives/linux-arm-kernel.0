@@ -1,193 +1,91 @@
-From: andrew.pinski@caviumnetworks.com (Andrew Pinski)
-Date: Wed, 2 Sep 2015 22:52:05 +0800
-Subject: [PATCHv2] ARM64: Add AT_ARM64_MIDR to the aux vector
-In-Reply-To: <20150902165752.782e75be@i7>
-References: <1440873982-44062-1-git-send-email-apinski@cavium.com>
- <20150901163304.GC16430@leverpostej>
- <A9115CAF-0C57-4810-97F6-6245E7D0CE48@gmail.com>
- <4C8DD5E0-E1EA-40C6-B947-72189241023C@caviumnetworks.com>
- <20150901173043.GE16430@leverpostej>
- <9AA83792-C973-4642-88BA-3C59F23EB048@gmail.com>
- <20150901221254.5e08ab6e@i7>
- <8C837F8F-050A-45DD-882B-02E107EFD663@caviumnetworks.com>
- <20150902165752.782e75be@i7>
-Message-ID: <CA+=Sn1=27ibpBokqJj3vLZ7NsnovKRdq7mR22ReeJJya4ona-A@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 2 Sep 2015 16:54:22 +0200
+Subject: [PATCH v4 09/15] KVM: arm: redefine kvm_cpu_context_t to save
+ the host cp14 states
+In-Reply-To: <1439213167-8988-10-git-send-email-zhichao.huang@linaro.org>
+References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
+ <1439213167-8988-10-git-send-email-zhichao.huang@linaro.org>
+Message-ID: <20150902145422.GM10991@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 2, 2015 at 9:57 PM, Siarhei Siamashka
-<siarhei.siamashka@gmail.com> wrote:
-> On Wed, 2 Sep 2015 00:28:28 +0000
-> "Pinski, Andrew" <Andrew.Pinski@caviumnetworks.com> wrote:
->
->> > On Sep 2, 2015, at 3:13 AM, Siarhei Siamashka <siarhei.siamashka@gmail.com> wrote:
->> >
->> > On Wed, 2 Sep 2015 01:58:56 +0800
->> > pinskia at gmail.com wrote:
->> >
->> >>> On Sep 2, 2015, at 1:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> >>>
->> >>> [...]
->> >>>
->> >>>>>>> On Sat, Aug 29, 2015 at 07:46:22PM +0100, Andrew Pinski wrote:
->> >>>>>>> It is useful to pass down MIDR register down to userland if all of
->> >>>>>>> the online cores are all the same type.  This adds AT_ARM64_MIDR
->> >>>>>>> aux vector type and passes down the midr system register.
->> >>>>>>>
->> >>>>>>> This is alternative to MIDR_EL1 part of
->> >>>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/358995.html.
->> >>>>>>> It allows for faster access to midr_el1 than going through a trap and
->> >>>>>>> does not exist if the set of cores are not the same.
->> >>>>>>
->> >>>>>> I'm not sure I follow the rationale. If speed is important the
->> >>>>>> application can cache the value the first time it reads it with a trap.
->> >>>>>
->> >>>>> It is also about compatibility also. Exposing the register is not backwards compatible but using the aux vector is.
->> >>>>
->> >>>> That would also break big.little too. So either break it with hot plug or break it in userland, your choice.
->> >>>
->> >>> The value wouldn't be representative of the system as a whole; that is
->> >>> true. However, we never guaranteed that it was, while the aux vector
->> >>> code implied that we did.
->> >>
->> >> Yes but I guess you talk about caching the value in userspace but doing
->> >> it via the aux vector is the same as your suggestion. Just one
->> >> difference is you don't get the aux vector entry if there is a CPU
->> >> that is online which is different. No difference from your suggestion
->> >> of caching it. Without considering hot pug for a second (that is a
->> >> huge different issue all together), if userland wants to know if all
->> >> up CPUs have the same midr, they would either read /sys entries (lots
->> >> of syscalls) or bind to each CPU and do the trap. That means at least
->> >> three or two syscalls/traps for each CPU. My way is none and gets a
->> >> value of midr if they are all the Same for free.
->> >
->> > Andrew, how do you propose to get the value of MIDR? Open the
->> > "/proc/self/auxv", read it, do a linear search in the buffer to find
->> > the required entry and then read the value? Or use the glibc specific
->> > getauxval() function (https://lwn.net/Articles/519085) ?
->>
->> This is inside glibc I am talking about so getauxval.
->
-> OK. Point taken.
->
->> > Regarding the caching implementation, one can open and parse the
->> > "/proc/cpuinfo" file (with older kernels) or read the new sysfs
->> > entries to get the MIDR value for each core. Then create a lookup
->> > table. As an additional bonus, this lookup table can contain not
->> > just the MIDR values, but any arbitrary data in any format (for
->> > example, a function pointer to the memcpy function or anything else).
->>
->> You don't want to do that early on in ld.so each time a program
->> starts up. Too much overhead.
->
-> Right.
->
->> > After the lookup table is available, one can use the getcpu() syscall
->> > for getting the CPU number and do the table lookup. And for getting
->> > reasonable performance, implement the vdso variant of the getcpu()
->> > syscall.
->> >
->> > All of this internal ugliness would be best abstracted inside
->> > of the GCC __builtin_cpu_init(), __builtin_cpu_is() and
->> > __builtin_cpu_supports() builtins:
->> >    http://gcc.gnu.org/gcc-4.8/changes.html
->>
->> Yes but this is about glibc support and not other userland
->> support. Having glibc depend on that is even worse.
->
-> Well, basically you are saying that you only care about your
-> individual use case (glibc only, 64-bit only, no support for
-> big.LITTLE) and just don't give rats about anything else. This
-> is not necessarily wrong, but we are not getting the problem
-> solved on a wider scale with such approach.
->
-> Regarding the reliance on the getauxval() function. Appears that
-> at least it seems to be also supported in recent versions of Android
-> and in musl too. So it already has a wide support in the Linux
-> different flavours and just needs a configure check in regular
-> applications/libraries. This is not perfect, but not bad either
-> and will only get better in the future.
->
-> Regarding the performance. Avoiding to open and read any files
-> surely helps to make the setup cost lower. In this sense, the
->     http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/359127.html
-> patch is not very good because we would have to deal with multiple
-> files, increasing the overhead even more.
->
-> Regarding the big.LITTLE hardware. We can't just ignore it and
-> pretend that it does not exist. This would be rather short-sighted.
-> Just like not thinking about allowing userspace access to the MIDR
-> register was a short-sighted decision in the past for ARMv8 and
-> earlier architectures.
->
-> So let's review everything. You are suggesting that we should try
-> to read AT_ARM64_MIDR via getauxval (btw, why ARM64 in the name?) and
-> if it is found, then all the CPU cores are identical and we have the
-> MIDR value. If it is not found, then we should check AT_HWCAP for the
-> HWCAP_CPUID bit and read the MIDR register directly (which will be
-> trapped, but emulated in the kernel).
->
-> The HWCAP_CPUID approach and emulation looks interesting, because it
-> might probably motivate ARM to actually implement direct userspace
-> access to the MIDR register in the future revisions of hardware :-)
->
-> Now I wonder about the performance difference between the kernel
-> emulated MIDR read and the performance of doing a table lookup, using
-> sched_getcpu() result as an index. And I have done some preliminary
-> tests. On my Cortex-A7 processor, running "sched_getcpu()" in a loop
-> takes ~200 cycles per iteration. Running "getauxval(AT_PLATFORM)" in
-> the same loop takes ~100 cycles per iteration. The emulated SWP and
-> unaligned LDM instructions take around ~500 and ~400 cycles. But the
-> emulation of the MIDR register read should be much more lightweight
-> than SWP/LDM, so it might be more competitive with sched_getcpu()
-> and I will benchmark this later.
->
-> I wonder if we still can try to make "sched_getcpu()" use vDSO
-> instead of the syscall to make it faster? Now that there exists a
-> vDSO implementation for gettimeofday(), everything should be easy if
-> we can find an unused userspace readable coprocessor register.
-> In the past, Catalin Marinas mentioned that "We have a user read-only
-> thread register unused on arm64":
->     http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/220664.html
-> And if I understand it correctly, also one of the "scratch registers"
-> should exist in 32-bit ARM, which "isn't present in ARMv8/AArch64":
->     http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/221056.html
-> What kind of registers are these exactly?
->
-> In principle, the aux vector can be extended to also contain a pointer
-> to an array of MIDR values for all the CPU cores if reducing the setup
-> overhead is critical.
+On Mon, Aug 10, 2015 at 09:26:01PM +0800, Zhichao Huang wrote:
+> Redefine kvm_cpu_context_t as a new struct that include the cp14 states,
+> which we used to save the host cp14 states.
+> 
+> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_host.h | 6 +++++-
+>  arch/arm/kernel/asm-offsets.c   | 4 +++-
+>  arch/arm/kvm/interrupts.S       | 6 ++++--
+>  3 files changed, 12 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 63ac005..fc461ac 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -91,7 +91,11 @@ struct kvm_vcpu_fault_info {
+>  	u32 hyp_pc;		/* PC when exception was taken from Hyp mode */
+>  };
+>  
+> -typedef struct vfp_hard_struct kvm_cpu_context_t;
+> +struct kvm_cpu_context {
+> +	struct vfp_hard_struct vfp;
+> +	u32 cp14[NR_CP14_REGS];
+> +};
+> +typedef struct kvm_cpu_context kvm_cpu_context_t;
+>  
+>  struct kvm_vcpu_arch {
+>  	struct kvm_regs regs;
+> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+> index 9158de0..cee4254 100644
+> --- a/arch/arm/kernel/asm-offsets.c
+> +++ b/arch/arm/kernel/asm-offsets.c
+> @@ -175,7 +175,9 @@ int main(void)
+>    DEFINE(VCPU_CP14,		offsetof(struct kvm_vcpu, arch.cp14));
+>    DEFINE(VCPU_CP15,		offsetof(struct kvm_vcpu, arch.cp15));
+>    DEFINE(VCPU_VFP_GUEST,	offsetof(struct kvm_vcpu, arch.vfp_guest));
+> -  DEFINE(VCPU_VFP_HOST,		offsetof(struct kvm_vcpu, arch.host_cpu_context));
+> +  DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+> +  DEFINE(VCPU_VFP_HOST,		offsetof(struct kvm_cpu_context, vfp));
+> +  DEFINE(VCPU_CP14_HOST,	offsetof(struct kvm_cpu_context, cp14));
 
-That is not a bad idea.  Put this array in the data section of the
-VDSO too.  It should be small enough though on systems with 96 or more
-cores (dual socket ThunderX has 96 cores total), it is slightly
-getting big.
-The struct would be something like:
-struct
-{
-  int32 numcores;
-  int32 midr[];
-};
+it's a bit weird to call these last two VCPU_ something when they're not
+offsets of the vcpu struct...
 
-Which you place right after the current data.  This would allow for
-shared read only data between the processes and not needed to waste
-other space.
-I will try to  program this up in a few days and that will solve my
-issue really.  I can cache in userspace if they are the same.  Also it
-avoids a trap which can be more expensive than a cache misses.
+>    DEFINE(VCPU_REGS,		offsetof(struct kvm_vcpu, arch.regs));
+>    DEFINE(VCPU_USR_REGS,		offsetof(struct kvm_vcpu, arch.regs.usr_regs));
+>    DEFINE(VCPU_SVC_REGS,		offsetof(struct kvm_vcpu, arch.regs.svc_regs));
+> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> index 48333ff..d4ff22e 100644
+> --- a/arch/arm/kvm/interrupts.S
+> +++ b/arch/arm/kvm/interrupts.S
+> @@ -176,8 +176,9 @@ __kvm_vcpu_return:
+>  	@ Switch VFP/NEON hardware state to the host's
+>  	add	r7, vcpu, #VCPU_VFP_GUEST
+>  	store_vfp_state r7
+> -	add	r7, vcpu, #VCPU_VFP_HOST
+> +	add	r7, vcpu, #VCPU_HOST_CONTEXT
+>  	ldr	r7, [r7]
+> +	add	r7, r7, #VCPU_VFP_HOST
+>  	restore_vfp_state r7
+>  
+>  after_vfp_restore:
+> @@ -484,8 +485,9 @@ switch_to_guest_vfp:
+>  	set_hcptr vmtrap, (HCPTR_TCP(10) | HCPTR_TCP(11))
+>  
+>  	@ Switch VFP/NEON hardware state to the guest's
+> -	add	r7, r0, #VCPU_VFP_HOST
+> +	add	r7, r0, #VCPU_HOST_CONTEXT
+>  	ldr	r7, [r7]
+> +	add	r7, r7, #VCPU_VFP_HOST
+>  	store_vfp_state r7
+>  	add	r7, r0, #VCPU_VFP_GUEST
+>  	restore_vfp_state r7
+> -- 
+> 1.7.12.4
+> 
 
-Thanks,
-Andrew Pinski
+Otherwise this look ok.
 
->
-> The GCC __builtin_cpu_is() and __builtin_cpu_supports() builtins are
-> unrelated to the kernel and not really needed for glibc, but it's
-> important to ensure that they can be implemented efficiently on ARM.
-> It would be great if we could delegate all this ugly and hairy
-> runtime CPU features detection task to GCC. Instead of implementing
-> it in every application and library, which makes use of assembly
-> optimizations.
->
-> --
-> Best regards,
-> Siarhei Siamashka
+-Christoffer
