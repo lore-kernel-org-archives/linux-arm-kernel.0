@@ -1,119 +1,79 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 2 Sep 2015 17:44:53 +0200
-Subject: [PATCH v4 12/15] KVM: arm: keep track of host use of the debug
- registers
-In-Reply-To: <1439213167-8988-13-git-send-email-zhichao.huang@linaro.org>
-References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
- <1439213167-8988-13-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <20150902154453.GO10991@cbox>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Wed, 2 Sep 2015 08:50:11 -0700
+Subject: [PATCH] ARM: dts: keystone: use one to one address translations
+ under netcp
+In-Reply-To: <230CBA6E4B6B6B418E8730AC28E6FC7E04221776@DFLE11.ent.ti.com>
+References: <1441139324-29296-1-git-send-email-w-kwok2@ti.com>
+ <55E61658.9010207@oracle.com>
+ <230CBA6E4B6B6B418E8730AC28E6FC7E04221776@DFLE11.ent.ti.com>
+Message-ID: <55E71AB3.7070406@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 09:26:04PM +0800, Zhichao Huang wrote:
-> Every guest entry, we need to keep track of host use of the debug
-> registers.
-> 
-> We only call the function upon guest entry, after preempt_disable()
-> and local_irq_disable(), so there is no race for it.
+On 9/2/2015 8:31 AM, Kwok, WingMan wrote:
+>
+>
+>> -----Original Message-----
+>> From: santosh.shilimkar at oracle.com [mailto:santosh.shilimkar at oracle.com]
+>> Sent: Tuesday, September 01, 2015 5:19 PM
+>> To: Kwok, WingMan; robh+dt at kernel.org; pawel.moll at arm.com;
+>> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org;
+>> linux at arm.linux.org.uk; devicetree at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; ssantosh at kernel.org
+>> Cc: Karicheri, Muralidharan
+>> Subject: Re: [PATCH] ARM: dts: keystone: use one to one address translations
+>> under netcp
+>>
+>> On 9/1/15 1:28 PM, WingMan Kwok wrote:
+>>> Network subsystem NetCP in Keystone-2 devices includes some HW blocks
+>>> that are memory mapped to ranges outside that of the NetCP itself.
+>>> Thus address space of a child node of the NetCP node needs to be
+>>> mapped 1:1 onto the parent address space.  Hence empty ranges
+>>> should be used under the NetCP node.
+>>>
+>>> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+>>> ---
+>>>    arch/arm/boot/dts/k2e-netcp.dtsi  |    8 +++-----
+>>>    arch/arm/boot/dts/k2hk-netcp.dtsi |   14 ++++++--------
+>>>    arch/arm/boot/dts/k2l-netcp.dtsi  |    8 +++-----
+>>>    3 files changed, 12 insertions(+), 18 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/k2e-netcp.dtsi b/arch/arm/boot/dts/k2e-
+>> netcp.dtsi
+>>> index b13b3c9..e103ed9 100644
+>>> --- a/arch/arm/boot/dts/k2e-netcp.dtsi
+>>> +++ b/arch/arm/boot/dts/k2e-netcp.dtsi
+>>> @@ -111,9 +111,7 @@ netcp: netcp at 24000000 {
+>>>    	compatible = "ti,netcp-1.0";
+>>>    	#address-cells = <1>;
+>>>    	#size-cells = <1>;
+>>> -
+>>> -	/* NetCP address range */
+>>> -	ranges = <0 0x24000000 0x1000000>;
+>>> +	ranges;
+>>>
+>> What blocks are we talking here. We need to increase the
+>> range if the current range isn't covering entire NETCP
+>> address space. Removing range isn't a solution.
+>>
+>
+> The Serdes.  It is a HW block inside the NetCP but its address
+> space starts from 0x0232a000.  We can change the base in the
+> ranges property to include the serdes.  But then offsets of
+> other HW blocks that are within the NetCP address range will be
+> relative to this new base and are not as documented in the HW
+> user guides.
+>
+I suspected the same. I know back then we started with SERDES code
+with NETCP but as you already know, its a separate block which
+is needed for NIC card to work. Its more of phy and hence its
+having different address space is not surprising.
 
-what about on SMP?  It may be true because you're only accessing per cpu
-data structures which are never accessed by any other CPUs than
-yourself, but then this commit message should explain this :)
+IIRC, there was a plan to consolidate the serdes code together
+since the PCIE also needs it. Irrespective of that, I suggest
+you model the serdes address space in another node and fetch
+it from there if that works for you. Please also add DTS
+documentation if you are going ahead with that approach.
 
-> 
-> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
-> ---
->  arch/arm/include/asm/kvm_asm.h    | 3 +++
->  arch/arm/include/asm/kvm_host.h   | 4 ++++
->  arch/arm/kernel/asm-offsets.c     | 1 +
->  arch/arm/kvm/arm.c                | 2 ++
->  arch/arm/kvm/coproc.c             | 8 ++++++++
->  arch/arm64/include/asm/kvm_host.h | 1 +
->  6 files changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> index 7443a3a..5b1c3eb 100644
-> --- a/arch/arm/include/asm/kvm_asm.h
-> +++ b/arch/arm/include/asm/kvm_asm.h
-> @@ -64,6 +64,9 @@
->  #define cp14_DBGDSCRext	65	/* Debug Status and Control external */
->  #define NR_CP14_REGS	66	/* Number of regs (incl. invalid) */
->  
-> +#define KVM_ARM_DEBUG_HOST_INUSE_SHIFT	0
-> +#define KVM_ARM_DEBUG_HOST_INUSE	(1 << KVM_ARM_DEBUG_HOST_INUSE_SHIFT)
-> +
->  #define ARM_EXCEPTION_RESET	  0
->  #define ARM_EXCEPTION_UNDEFINED   1
->  #define ARM_EXCEPTION_SOFTWARE    2
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index fc461ac..7338f34 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -131,6 +131,9 @@ struct kvm_vcpu_arch {
->  	/* System control coprocessor (cp14) */
->  	u32 cp14[NR_CP14_REGS];
->  
-> +	/* Debug State */
-> +	u32 debug_flags;
-> +
->  	/*
->  	 * Anything that is not used directly from assembly code goes
->  	 * here.
-> @@ -237,5 +240,6 @@ static inline void kvm_arch_hardware_unsetup(void) {}
->  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
->  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
-> +void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
->  
->  #endif /* __ARM_KVM_HOST_H__ */
-> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-> index cee4254..7750597 100644
-> --- a/arch/arm/kernel/asm-offsets.c
-> +++ b/arch/arm/kernel/asm-offsets.c
-> @@ -178,6 +178,7 @@ int main(void)
->    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
->    DEFINE(VCPU_VFP_HOST,		offsetof(struct kvm_cpu_context, vfp));
->    DEFINE(VCPU_CP14_HOST,	offsetof(struct kvm_cpu_context, cp14));
-> +  DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
->    DEFINE(VCPU_REGS,		offsetof(struct kvm_vcpu, arch.regs));
->    DEFINE(VCPU_USR_REGS,		offsetof(struct kvm_vcpu, arch.regs.usr_regs));
->    DEFINE(VCPU_SVC_REGS,		offsetof(struct kvm_vcpu, arch.regs.svc_regs));
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index bc738d2..0129346 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -550,6 +550,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  			continue;
->  		}
->  
-> +		kvm_arm_setup_debug(vcpu);
-> +
-
-you need to rebase this series on kvmarm/next or mainline once the
-KVM/ARM pull request with the v8 debug stuff is merged.
-
->  		/**************************************************************
->  		 * Enter the guest
->  		 */
-> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> index d15b250..b37afd6 100644
-> --- a/arch/arm/kvm/coproc.c
-> +++ b/arch/arm/kvm/coproc.c
-> @@ -1516,3 +1516,11 @@ void kvm_reset_coprocs(struct kvm_vcpu *vcpu)
->  		if (vcpu->arch.cp15[num] == 0x42424242)
->  			panic("Didn't reset vcpu->arch.cp15[%zi]", num);
->  }
-> +
-> +void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
-> +{
-> +	if (hw_breakpoint_enabled())
-> +		vcpu->arch.debug_flags |= KVM_ARM_DEBUG_HOST_INUSE;
-> +	else
-> +		vcpu->arch.debug_flags &= ~KVM_ARM_DEBUG_HOST_INUSE;
-> +}
-
-This otherwise looks reasonable enough.
-
-
-Thanks,
--Christoffer
+Regards,
+Santosh
