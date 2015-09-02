@@ -1,75 +1,49 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed, 2 Sep 2015 07:34:42 +0200
-Subject: [PATCH 15/16] mtd: mtdcore: fix initcall level
-In-Reply-To: <20150901211938.GJ81844@google.com>
-References: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
- <1440592108-3740-16-git-send-email-holler@ahsoftware.de>
- <20150901211938.GJ81844@google.com>
-Message-ID: <55E68A72.30909@ahsoftware.de>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed, 2 Sep 2015 14:02:44 +0800
+Subject: [PATCH v4] pinctrl: mediatek: Implement wake handler and suspend
+ resume
+In-Reply-To: <55DB4609.5040904@arm.com>
+References: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>
+ <55DB4609.5040904@arm.com>
+Message-ID: <CAGS+omBnoitju07KQ1Y7JHTbce6+DO4WqWHTaKz5D+T157zEJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 01.09.2015 um 23:19 schrieb Brian Norris:
-> Hi Alexander,
+Hi maoguang,
+
+On Tue, Aug 25, 2015 at 12:27 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 >
-> No judgment here for the rest of this series, but for this patch:
 >
-> On Wed, Aug 26, 2015 at 02:28:27PM +0200, Alexander Holler wrote:
->> The mtd-core has to be initialized before other dependent mtd-drivers,
->> otherwise a crash might occur.
+> On 14/08/15 09:38, maoguang.meng at mediatek.com wrote:
 >>
->> Currently mtd_init() is called in the initcall-level device, which is the
->> same level where most mtd-drivers will end up. By luck this seemed to have
->> been called most of the time before other mtd-drivers without having been
->> explicitly enforced.
->
-> I can't really speak for the original authors, but it does not appear to
-> be entirely "by luck." Link order was one of the de facto ways to get
-> this ordering (though it's not really a great one), and mtdcore was
-> always linked first within the drivers/mtd/ directory structure.
->
-> But that's just background, I think this is worth fixing anyway. It
-> could, for instance, become a problem if drivers are located outside
-> drivers/mtd/; I see random board files in arch/ that register with MTD,
-> and I'm actually not sure how they have never tripped on this.
-
-I've already found at least a half a dozen other drivers with the same 
-problem through my shuffling of the drivers which all end up in the 
-standard initcall level device. I'm aware that this is based on the link 
-order, which itself is based on linker behaviour (and maybe other things 
-like make or other build tools). I'm just calling it luck, because this 
-is nowhere explicitly stated, at least I've never seen such a statement, 
-neither in any source, nor somewhere in Documentation. So I've choosen 
-the term "by luck" in order to provoke a bit (or to stimulate a 
-discussion about that widespread problem).
-
->
->> But if mtd_init() is not called before a dependent
->> driver, a null-pointer exception might occur (e.g. because the mtd device
->> class isn't registered).
+>> From: Maoguang Meng <maoguang.meng@mediatek.com>
 >>
->> To fix this, mtd-init() is moved to the initcall-level fs (right before
->> the standard initcall level device).
+>> This patch implement irq_set_wake to get who is wakeup source and
+>> setup on suspend resume.
+>>
+>> Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
+>>
+[snip]
+
+Can you please respond to Sudeep's questions:
+
+> Does this pinmux controller:
 >
-> Is there a good reason we shouldn't just make this a subsys_initcall()?
-> That would match the naming better, and it mirrors what, e.g.,
-> block/genhd uses. It would also allow flexibility if there are other
-> current/future use cases that might need to sit between the subsystem
-> and the drivers.
+> 1. Support wake-up configuration ? If not, you need to use
+>    IRQCHIP_SKIP_SET_WAKE. I don't see any value in writing the
+>    mask_{set,clear} if the same registers are used for {en,dis}able
+>
+> 2. Is in always on domain ? If not, you need save/restore only to
+>    resume back the functionality. Generally we can set
+>    IRQCHIP_MASK_ON_SUSPEND to ensure non-wake-up interrupts are
+>    disabled during suspend and re-enabled in resume path. You just
+>    save/restore raw values without tracking the wake-up source.
+>
+> Also I see that no care is taken to set the port irq as wake enable
+> source. It may work with current mainline, but won't with -next. Please
+> ensure the port irq to the parent interrupt controller remains
+> enabled(i.e set as wake).
 
-No real reason here. The names for the initcall levels seem to be 
-outdated since a long time anyway, and I think just speaking about the 
-numbers 1-7 (or 0-14) would be better anyways. The only reason why I've 
-used the fs (sync) level is because I was too lazy to check out if 
-mtdcore might depend on something else in any other level. Therefor I've 
-used the one most close to were it was before.
-
-Also I've an idea about how to fix that in general for all drivers (by 
-using the same algorithm I've now introduced just for DT-based drivers 
-with a device description). Wouldn't be that hard to use that for all 
-drivers, but as I've written in a follow up to the introductory mail, 
-one step after another.
-
-Regards,
-
-Alexander Holler
+>
+> Regards,
+> Sudeep
