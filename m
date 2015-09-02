@@ -1,36 +1,36 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Wed, 2 Sep 2015 16:17:24 -0500
-Subject: [PATCH] ARM: disable GCC SRA optimization
-In-Reply-To: <CAKv+Gu_eOQ=ZACn1jzQU-z2ZMqX3PdUx9j05fXuGjniccS2x8Q@mail.gmail.com>
-References: <1441211290-11449-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_eOQ=ZACn1jzQU-z2ZMqX3PdUx9j05fXuGjniccS2x8Q@mail.gmail.com>
-Message-ID: <55E76764.2020200@mentor.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Wed,  2 Sep 2015 14:25:48 -0700
+Subject: [PATCH] ARM: dts: Add ddc i2c reference to veyron
+Message-ID: <1441229148-12095-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2015 11:45 AM, Ard Biesheuvel wrote:
-> On 2 September 2015 at 18:28, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> This is a known but as yet unresolved issue.
->> (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65932). In this particular
->> case, it is causing the second while loop to be executed erroneously a
->> single time, causing the additional space characters to be printed.
->>
->> So disable the optimization by passing -fno-ipa-sra.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>
->> Needs to go to stable perhaps?
->> The emitted asm is at the end of this patch.
->>
-> 
-> Another report of the same issue:
-> https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66271
+The ddc-i2c-bus property was missing from the veyron dtsi file since
+downstream the ddc-i2c-bus was still being specified in rk3288.dtsi and
+nobody noticed when the veyron dtsi was sent upstream.  Add it.
 
-Comments in both bugs indicate that this happens only when building with
--Os and not -O2.  Have you (or anyone else) been able to get bad code
-with -O2?
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+Note: I noticed that this was wrong but I don't currently have
+graphics up and running on upstream on veyron.  Posting this anyway
+since it's pretty clear that it's needed.  If someone else wants to
+try it out that'd be nice, otherwise I'll put it on my list to figure
+out how to get myself setup for graphics upstream.  ;)
 
-I don't think the answer should affect the patch itself, but it might be
-kind to note in the commit message whether -Os definitely makes the
-difference here, if this information is known.
+ arch/arm/boot/dts/rk3288-veyron.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
+index 2fa7a0d..275c78c 100644
+--- a/arch/arm/boot/dts/rk3288-veyron.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
+@@ -158,6 +158,7 @@
+ };
+ 
+ &hdmi {
++	ddc-i2c-bus = <&i2c5>;
+ 	status = "okay";
+ };
+ 
+-- 
+2.5.0.457.gab17608
