@@ -1,42 +1,83 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  2 Sep 2015 15:16:22 -0300
-Subject: [PATCH 3/3] ARM: dts: imx7d-sdb: Add USB support
-In-Reply-To: <1441217782-6304-1-git-send-email-festevam@gmail.com>
-References: <1441217782-6304-1-git-send-email-festevam@gmail.com>
-Message-ID: <1441217782-6304-3-git-send-email-festevam@gmail.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Wed, 2 Sep 2015 11:25:41 -0700
+Subject: [PATCH] ARM: dts: keystone: use one to one address translations
+ under netcp
+In-Reply-To: <55E738AE.9000207@ti.com>
+References: <1441139324-29296-1-git-send-email-w-kwok2@ti.com>
+ <55E61658.9010207@oracle.com>
+ <230CBA6E4B6B6B418E8730AC28E6FC7E04221776@DFLE11.ent.ti.com>
+ <55E71AB3.7070406@oracle.com> <55E7255A.8060402@ti.com>
+ <55E730D4.6040102@oracle.com> <55E738AE.9000207@ti.com>
+Message-ID: <55E73F25.2050608@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+9/2/2015 10:58 AM, Murali Karicheri wrote:
+> On 09/02/2015 01:24 PM, santosh shilimkar wrote:
+>> On 9/2/2015 9:35 AM, Murali Karicheri wrote:
+>>> Santosh,
+>>>
+>
+> ---Cut-------------------
+>
+>>>> I suspected the same. I know back then we started with SERDES code
+>>>> with NETCP but as you already know, its a separate block which
+>>>> is needed for NIC card to work. Its more of phy and hence its
+>>>> having different address space is not surprising.
+>>>
+>>> Using Phy interface is not acceptable to the subsystem maintainer based
+>>> on the communication I had on this. Also the Phy here is tighly coupled
+>>> with the hardware block it is working with. So this model is not right
+>>> for SerDes driver as it require additional enhancements as described
+>>> below if needs to be used.
+>>>
+>> Thanks for update on that.
+>>
+>>> The serdes initialization procedure requires checking the status in the
+>>> hardware block (PCIe, 1G or 10G) and then taking corrective action. This
+>>> means a Phy driver would require mapping of related hw address space
+>>> (PCIe, 1G and 10G) as well which is already mapped by the hardware
+>>> driver(PCIe, 1G and 10G). One solution is to treat this as a libray
+>>> function that can be called from the respective hardware device driver.
+>>>   A device node of h/w device (PCIe or 1G) in such as looks like
+>>>
+>> Or SerDes driver can embed the status reg address space.
+>> This is read only access so should be fine.
+>>
+>>> pcie {
+>>>
+>>>      serdes at someaddress {
+>>>          reg = <address of serdes>;
+>>>      }
+>>> }
+>>>
+>>> hw driver will call ks2_serdes_init(node, hw_base_address) to initialize
+>>> the serdes. Other APIs can be added to enable/disable lane or shutdown
+>>> etc. The libary will be added to drivers/soc/ti/ and used by various
+>>> device drivers to initialize and use the phy. As the serdes is slightly
+>>> integrated with the hardware block, IMO, this is a better approach than
+>>> using the phy model. The API definitions will be added to
+>>> include/linux/soc/ti/ folder.
+>>>
+>> Serdes Driver with its status register address space might solve this
+>> sharing problem. Library might work but we should try to have driver
+>> considering there is a physical device. I don't have strong opinion
+>> on drivers vs library.
+>>
+>
+> In addition to checking status in the SerDes, it needs to also check the
+> status of the associated hardware block (PCIe, 1G, 10G etc). So this
+> means, same needs to be mapped twice, first by the above hardware device
+> drivers and then by the serdes driver which causes problem. My point is
+> since they both are tightly coupled, a libary is a better option. That
+> way the mapped address can be passed to the serdes API to perform the
+> required task, instead of using Phy API which doesn't allow us to do the
+> same. If SerDes h/w can be brought up independently, the Phy model fits
+> well.
+>
+As I said, I don't have strong preference and fine with library approach.
+I suggest you do a RFC to take this further. Include Arnd on CC for
+that.
 
-Add support for USBOTG1 and USBOTG2.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx7d-sdb.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index fdd1d7c..3c6cf52 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -231,6 +231,17 @@
- 	status = "okay";
- };
- 
-+&usbotg1 {
-+	vbus-supply = <&reg_usb_otg1_vbus>;
-+	status = "okay";
-+};
-+
-+&usbotg2 {
-+	vbus-supply = <&reg_usb_otg2_vbus>;
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
- &usdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc1>;
--- 
-1.9.1
+Regards,
+Santosh
