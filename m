@@ -1,46 +1,51 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 2 Sep 2015 16:33:53 +0530
-Subject: [PATCH] clk: spear600: Fix adc clock device name
-In-Reply-To: <20150902110213.GD26744@linux>
-References: <1441190517-20235-1-git-send-email-sr@denx.de>
- <20150902110213.GD26744@linux>
-Message-ID: <20150902110353.GE26744@linux>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 2 Sep 2015 12:10:52 +0100
+Subject: [PATCH 2/3] [v4] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
+In-Reply-To: <20150824235144.GH14330@codeaurora.org>
+References: <1438992995-22610-1-git-send-email-timur@codeaurora.org>
+ <1438992995-22610-2-git-send-email-timur@codeaurora.org>
+ <20150810094008.GD1604@arm.com> <55D2749A.401@codeaurora.org>
+ <20150818082141.GA6281@e103592.cambridge.arm.com>
+ <55D3825D.6020105@codeaurora.org>
+ <20150819101426.GB6281@e103592.cambridge.arm.com>
+ <55D4ABF4.5020600@codeaurora.org>
+ <20150819163736.GC6281@e103592.cambridge.arm.com>
+ <20150824235144.GH14330@codeaurora.org>
+Message-ID: <20150902111052.GG6281@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02-09-15, 16:32, Viresh Kumar wrote:
-> On 02-09-15, 12:41, Stefan Roese wrote:
-> > The device name for the adc clock is incorrect. This results in the
-> > IIO ADC driver to fail while probing for the clock. This patch
-> > fixes the name and the ADC driver is now started correctly.
+On Mon, Aug 24, 2015 at 04:51:44PM -0700, sboyd at codeaurora.org wrote:
+> On 08/19, Dave Martin wrote:
+> > On Wed, Aug 19, 2015 at 11:16:52AM -0500, Timur Tabi wrote:
+> > > On 08/19/2015 05:14 AM, Dave Martin wrote:
+> > > >>>So does that mean that ldrb will zero-extend the byte to all 64 bits of x3?
+> > > >Yes.  No extra operation is required.
+> > > 
+> > > So my patch is actually correct as-is?
 > > 
-> > Signed-off-by: Stefan Roese <sr@denx.de>
-> > Cc: Vipul Kumar Samar <vipulkumar.samar@st.com>
-> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > ---
-> >  drivers/clk/spear/spear6xx_clock.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > +static inline void __dcc_putchar(char c)
+> > +{
+> > +	asm volatile("msr dbgdtrtx_el0, %0"
+> > +			: /* No output register */
+> > +			: "r" (c));
 > > 
-> > diff --git a/drivers/clk/spear/spear6xx_clock.c b/drivers/clk/spear/spear6xx_clock.c
-> > index 4f649c9..3e43244 100644
-> > --- a/drivers/clk/spear/spear6xx_clock.c
-> > +++ b/drivers/clk/spear/spear6xx_clock.c
-> > @@ -316,7 +316,7 @@ void __init spear6xx_clk_init(void __iomem *misc_base)
-> >  	/* clock derived from apb clk */
-> >  	clk = clk_register_gate(NULL, "adc_clk", "apb_clk", 0, PERIP1_CLK_ENB,
-> >  			ADC_CLK_ENB, 0, &_lock);
-> > -	clk_register_clkdev(clk, NULL, "adc");
-> > +	clk_register_clkdev(clk, NULL, "d8200000.adc");
-> >  
-> >  	clk = clk_register_fixed_factor(NULL, "gpio0_clk", "apb_clk", 0, 1, 1);
-> >  	clk_register_clkdev(clk, NULL, "f0100000.gpio");
+> > For safety, you still need to make sure that c is appropriately masked
+> > before passing it to the asm.  Something like this should definitely be
+> > safe:
+> > 
+> > 			: "r" ((unsigned long)(unsigned char)c)
+> > 
+> > GCC can then emit uxtb or not, depending on whether it's needed in each
+> > context where the asm is inlined.
 > 
-> Sigh. Its fixed for all other boards, but this.
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Does this mean we ought to do the same thing in the arm header
+> file too?
 
-Sending to Mike's updated email id.
+Probably.
 
--- 
-viresh
+Even though current CPUs don't place special meaning on the upper bits,
+it's possible that future CPUs will.
+
+Cheers
+---Dave
