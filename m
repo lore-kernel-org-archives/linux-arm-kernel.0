@@ -1,62 +1,29 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 2 Sep 2015 09:20:58 -0700
-Subject: [PATCH 3/8] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <CAPDyKFqJp3VuOeTh4Abkn2X6gQxNHDXwJj8N51OxxSo+Agespw@mail.gmail.com>
-References: <1441045446-30858-1-git-send-email-heiko@sntech.de>
- <1441045446-30858-4-git-send-email-heiko@sntech.de>
- <CAPDyKFqJp3VuOeTh4Abkn2X6gQxNHDXwJj8N51OxxSo+Agespw@mail.gmail.com>
-Message-ID: <CAD=FV=Wy7foROYkmR+cX+NS5-=BaB36WsW1sc1XjmmdUnPCxsA@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  2 Sep 2015 18:24:21 +0200
+Subject: [PATCH] MAINTAINERS: explicitly add Atmel SAMA5
+Message-ID: <1441211061-11872-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf,
+Atmel SAMA5 SoCs are also supported through mach-at91.
 
-On Wed, Sep 2, 2015 at 4:38 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> +/**
->> + * mmc_regulator_set_vqmmc - Set VQMMC as per the ios
->> + *
->> + * For 3.3V signaling, we try to match VQMMC to VMMC as closely as possible.
->
-> Looking at the code, I don't think this statement is entirely true.
-> Isn't it so that we will be trying with a maximum tolerance of 0.3 V
-> towards the VMMC voltage level (then fall-back to the complete range)?
-> Perhaps you can find a better way to describe that in the change log.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ MAINTAINERS | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-If regulator_set_voltage_triplet() is ever implemented more correctly
-then the description here is correct.  ...the problem is that
-regulator_set_voltage_triplet() is still using the same shortcut that
-regulator_set_voltage_tol() was using.
-
-
->> +int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios)
->> +{
->> +       int volt, min_uV, max_uV;
->> +
->> +       /* If no vqmmc supply then we can't change the voltage */
->> +       if (IS_ERR(mmc->supply.vqmmc))
->> +               return -EINVAL;
->
-> In general vqmmc is considered as an optional regulator and that's
-> also how host drivers treat it. So perhaps it would make sense to
-> return 0 here instead of an error code or what do you think?
-
-The idea is that since this is intended to be called by
-start_signal_voltage_switch() and having no vqmmc should be considered
-an error for start_signal_voltage_switch() then it should be an error
-here.  What do you think?
-
-
->> +
->> +               /* try to stay close to vmmc at first */
->> +               if (!mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
->> +                                               min_uV, volt, max_uV))
->> +                       return 0;
->> +
->> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
->> +                                               2700000, volt, 3600000);
-
-The whole fact that there are two calls here is really just because of
-the limitations of the current implementation of
-regulator_set_voltage_triplet().  If that implementation is ever fixed
-then we'd just need a single call.  Probably worth a comment saying
-that?
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b60e2b2369d2..e8a40437727c 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -891,7 +891,7 @@ M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
+ S:	Maintained
+ F:	arch/arm/mach-alpine/
+ 
+-ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
++ARM/ATMEL AT91RM9200, AT91SAM9 AND SAMA5 SOC SUPPORT
+ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
+ M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+-- 
+2.1.4
