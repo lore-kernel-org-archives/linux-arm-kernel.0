@@ -1,55 +1,61 @@
-From: alexandru.porosanu@freescale.com (Porosanu Alexandru)
-Date: Wed, 2 Sep 2015 06:25:20 +0000
-Subject: [RFC][PATCH 2/2] crypto: caam - handle core endianness != caam
- endianness
-In-Reply-To: <1441068591.4966.47.camel@freescale.com>
-References: <1440762306-7764-1-git-send-email-horia.geanta@freescale.com>
- <1440762608-7866-1-git-send-email-horia.geanta@freescale.com>
- <1441068591.4966.47.camel@freescale.com>
-Message-ID: <BY1PR03MB1404538A6C4D0A85F7DD2E7080690@BY1PR03MB1404.namprd03.prod.outlook.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed,  2 Sep 2015 08:23:29 +0200
+Subject: [PATCH] ARM: fix alignement of __bug_table section entries
+Message-ID: <1441175009-26730-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Scott,
+On old ARM chips, unaligned accesses to memory are not trapped and
+fixed.  On module load, symbols are relocated, and the relocation of
+__bug_table symbols is done on a u32 basis. Yet the section is not
+aligned to a multiple of 4 address, but to a multiple of 2.
 
-> -----Original Message-----
-> From: Wood Scott-B07421
-> Sent: 1 septembrie 2015 03:50
-> To: Geanta Neag Horia Ioan-B05471
-> Cc: Herbert Xu; Catalin Marinas; Will Deacon; linux-crypto at vger.kernel.org;
-> David S. Miller; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; Milhoan Victoria-B42089; Cornelius Steven-
-> STEVENEC; Estevam Fabio-R49496; Porosanu Alexandru-B06830
-> Subject: Re: [RFC][PATCH 2/2] crypto: caam - handle core endianness !=
-> caam endianness
-> 
-> On Fri, 2015-08-28 at 14:50 +0300, Horia Geant? wrote:
-> >
-> > -#ifdef __BIG_ENDIAN
-> > -#define wr_reg32(reg, data) out_be32(reg, data)
-> > -#define rd_reg32(reg) in_be32(reg)
-> > +#ifdef CONFIG_CRYPTO_DEV_FSL_CAAM_LE
-> > +#define caam16_to_cpu(value) le16_to_cpu(value)
-> > +#define cpu_to_caam16(value) cpu_to_le16(value)
-> > +#define caam32_to_cpu(value) le32_to_cpu(value)
-> > +#define cpu_to_caam32(value) cpu_to_le32(value)
-> > +#define caam64_to_cpu(value) le64_to_cpu(value)
-> > +#define cpu_to_caam64(value) cpu_to_le64(value)
-> 
-> What if we want to build a kernel that supports a chip with an LE CAAM and
-> another chip with a BE CAAM (e.g. ls1043a plus ls2080a)?  This information
-> needs to come at runtime.
-[AP] We're currently targeting local SEC (where local means SEC is on the SoC). Having this information at run-time will add some penalty as opposed to having these accessory as macros.
-For "remote" SEC (e.g. PCI-E connected devices like C29x, LS2, etc.), taking into account that the PCI-E bus is little endian, it should be the PCI-E driver's job to translate host's endianness to EP's endianness (and vice-versa). This is something that needs to be discussed, especially since such a driver isn't currently available in the community.
+This triggers an Oops on pxa architecture, where address 0xbf0021ea
+is the first relocation in the __bug_table section :
+  apply_relocate(): pxa3xx_nand: section 13 reloc 0 sym ''
+  Unable to handle kernel paging request at virtual address bf0021ea
+  pgd = e1cd0000
+  [bf0021ea] *pgd=c1cce851, *pte=c1cde04f, *ppte=c1cde01f
+  Internal error: Oops: 23 [#1] ARM
+  Modules linked in:
+  CPU: 0 PID: 606 Comm: insmod Not tainted 4.2.0-rc8-next-20150828-cm-x300+ #887
+  Hardware name: CM-X300 module
+  task: e1c68700 ti: e1c3e000 task.ti: e1c3e000
+  PC is at apply_relocate+0x2f4/0x3d4
+  LR is at 0xbf0021ea
+  pc : [<c000e7c8>]    lr : [<bf0021ea>]    psr: 80000013
+  sp : e1c3fe30  ip : 60000013  fp : e49e8c60
+  r10: e49e8fa8  r9 : 00000000  r8 : e49e7c58
+  r7 : e49e8c38  r6 : e49e8a58  r5 : e49e8920  r4 : e49e8918
+  r3 : bf0021ea  r2 : bf007034  r1 : 00000000  r0 : bf000000
+  Flags: Nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+  Control: 0000397f  Table: c1cd0018  DAC: 00000051
+  Process insmod (pid: 606, stack limit = 0xe1c3e198)
+  [<c000e7c8>] (apply_relocate) from [<c005ce5c>] (load_module+0x1248/0x1f5c)
+  [<c005ce5c>] (load_module) from [<c005dc54>] (SyS_init_module+0xe4/0x170)
+  [<c005dc54>] (SyS_init_module) from [<c000a420>] (ret_fast_syscall+0x0/0x38)
 
-> 
-> > +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-> > +#ifdef CONFIG_SOC_IMX7D
-> 
-> Likewise, why is there an ifdef for a particular SoC type?
-> 
-> -Scott
+Fix this by ensuring entries in __bug_table are all aligned to at least
+of multiple of 4. This transforms a module section  __bug_table as :
+-   [12] __bug_table       PROGBITS        00000000 002232 000018 00   A  0   0  1
++   [12] __bug_table       PROGBITS        00000000 002232 000018 00   A  0   0  4
 
-Thanks,
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/include/asm/bug.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Alex P.
+diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+index b274bde24905..e7335a92144e 100644
+--- a/arch/arm/include/asm/bug.h
++++ b/arch/arm/include/asm/bug.h
+@@ -40,6 +40,7 @@ do {								\
+ 		"2:\t.asciz " #__file "\n" 			\
+ 		".popsection\n" 				\
+ 		".pushsection __bug_table,\"a\"\n"		\
++		".align 2\n"					\
+ 		"3:\t.word 1b, 2b\n"				\
+ 		"\t.hword " #__line ", 0\n"			\
+ 		".popsection");					\
+-- 
+2.1.4
