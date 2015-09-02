@@ -1,41 +1,27 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  2 Sep 2015 12:55:21 -0300
-Subject: [PATCH v2] ARM: dts: imx6sl: Complete the dcp node
-Message-ID: <1441209321-28331-1-git-send-email-festevam@gmail.com>
+Date: Wed, 2 Sep 2015 12:57:00 -0300
+Subject: [PATCH] ARM: dts: imx6sl: Complete the dcp node
+In-Reply-To: <1441207532.3137.22.camel@pengutronix.de>
+References: <1441206417-27805-1-git-send-email-festevam@gmail.com>
+ <1441207532.3137.22.camel@pengutronix.de>
+Message-ID: <CAOMZO5CbO+mX8=Qv=5OWdA3hLaVLSo6NQ87rf+zmJQ+r9eX1Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Sep 2, 2015 at 12:25 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
 
-The DCP block present on MX6SL is compatible with the one on MX28,
-so add the compatible string and also complete the interrupt entries.
+> Can we please start to make it good habit to always introduce a new
+> compatible to the DTs, even if the blocks are the same in theory?
+>
+> We already had situations where the SoC IP integration exposed bugs,
+> which need driver workarounds and the only way to detect such situations
+> is to check the machine compatible in the driver, which is really ugly.
+>
+> So can we please make this:
+>         compatible = "fsl,imx6sl-dcp", "fsl,imx28-dcp";
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Use compatible = "fsl,imx6sl-dcp", "fsl,imx28-dcp"; as suggested by
-Lucas Stach
+Thanks for the suggestion. Did this in v2.
 
- arch/arm/boot/dts/imx6sl.dtsi | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Regards,
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 320a27f..b105735 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -670,8 +670,12 @@
- 			};
- 
- 			dcp: dcp at 020fc000 {
-+				compatible = "fsl,imx6sl-dcp", "fsl,imx28-dcp";
- 				reg = <0x020fc000 0x4000>;
--				interrupts = <0 99 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupts = <0 99 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 100 IRQ_TYPE_LEVEL_HIGH>,
-+					     <0 101 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "okay";
- 			};
- 		};
- 
--- 
-1.9.1
+Fabio Estevam
