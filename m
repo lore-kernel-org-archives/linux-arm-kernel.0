@@ -1,62 +1,99 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 2 Sep 2015 10:47:03 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-In-Reply-To: <20150812094834.0b0b2af1@canb.auug.org.au>
-References: <20150812094834.0b0b2af1@canb.auug.org.au>
-Message-ID: <20150902104703.71cbd2ec@canb.auug.org.au>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 1 Sep 2015 18:16:16 -0700
+Subject: [PATCH v2] mtd: nand: sunxi: rely on nand_dt_init initialization
+In-Reply-To: <1440411031-8910-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1440411031-8910-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150902011616.GP81844@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Wed, 12 Aug 2015 09:48:34 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->
-> Today's linux-next merge of the arm-soc tree got a conflict in:
+On Mon, Aug 24, 2015 at 12:10:31PM +0200, Boris Brezillon wrote:
+> nand_dt_init(), called from nand_scan_ident(), is already parsing the
+> generic MTD/NAND DT properties, and initializing the nand_chip struct
+> accordingly.
+> Rely on this initialization instead of manually parsing those properties.
 > 
->   arch/arm/kernel/psci.c
-> 
-> between commit:
-> 
->   be120397e770 ("ARM: migrate to common PSCI client code")
-> 
-> from the arm tree and commit:
-> 
->   19c233b79d1a ("ARM: appropriate __init annotation for const data")
-> 
-> from the arm-soc tree.
-> 
-> I fixed it up (the former removed the file, so I did that, then added
-> the following patch) and can carry the fix as necessary (no action
-> is required).
-
-These fixups are now being applied to the merge of the arm tree as the
-arm-soc commit above has been merged into Linus' tree.
-
-> From: Stephen Rothwell <sfr@canb.auug.org.au>
-> Date: Wed, 12 Aug 2015 09:39:15 +1000
-> Subject: [PATCH] ARM: fix for PSCI code movement
-> 
-> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
->  drivers/firmware/psci.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index a6956007dd38..42700f09a8c5 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -337,7 +337,7 @@ out_put_node:
->  	return err;
->  }
->  
-> -static const struct of_device_id psci_of_match[] __initconst = {
-> +static const struct of_device_id const psci_of_match[] __initconst = {
->  	{ .compatible = "arm,psci",	.data = psci_0_1_init},
->  	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
->  	{},
-> -- 
-> 2.5.0
+> Changes since v1:
+> - drop unused strength and blk_size variables
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Good catch, I was about to comment on v1 :)
+
+> ---
+>  drivers/mtd/nand/sunxi_nand.c | 20 +++++---------------
+>  1 file changed, 5 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+> index 96dda70..92a2c58 100644
+> --- a/drivers/mtd/nand/sunxi_nand.c
+> +++ b/drivers/mtd/nand/sunxi_nand.c
+> @@ -1164,16 +1164,9 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
+>  			       struct device_node *np)
+>  {
+>  	struct nand_chip *nand = mtd->priv;
+> -	int strength;
+> -	int blk_size;
+>  	int ret;
+>  
+> -	blk_size = of_get_nand_ecc_step_size(np);
+> -	strength = of_get_nand_ecc_strength(np);
+> -	if (blk_size > 0 && strength > 0) {
+> -		ecc->size = blk_size;
+> -		ecc->strength = strength;
+> -	} else {
+> +	if (!ecc->size) {
+>  		ecc->size = nand->ecc_step_ds;
+>  		ecc->strength = nand->ecc_strength_ds;
+>  	}
+> @@ -1183,10 +1176,6 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
+>  
+>  	ecc->mode = NAND_ECC_HW;
+>  
+> -	ret = of_get_nand_ecc_mode(np);
+> -	if (ret >= 0)
+> -		ecc->mode = ret;
+> -
+
+I think you've missed something here. You're now *only* allowing HW ECC!
+You now want to make this a default case.
+
+There's also a subtle change here that affects more than just here: you
+don't have a good way to tell the difference between "no ECC mode
+provide" and NAND_ECC_NONE. Perhaps we can modify the nand_ecc_modes_t
+enum to include a "uninitialized" value? I'm not sure if that'd work
+best as 0, -1, or something else, in case there are people making
+assumptions elsewhere...
+
+>  	switch (ecc->mode) {
+>  	case NAND_ECC_SOFT_BCH:
+>  		break;
+> @@ -1312,15 +1301,13 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+>  	/* Default tR value specified in the ONFI spec (chapter 4.15.1) */
+>  	nand->chip_delay = 200;
+>  	nand->controller = &nfc->controller;
+> +	nand->dn = np;
+>  	nand->select_chip = sunxi_nfc_select_chip;
+>  	nand->cmd_ctrl = sunxi_nfc_cmd_ctrl;
+>  	nand->read_buf = sunxi_nfc_read_buf;
+>  	nand->write_buf = sunxi_nfc_write_buf;
+>  	nand->read_byte = sunxi_nfc_read_byte;
+>  
+> -	if (of_get_nand_on_flash_bbt(np))
+> -		nand->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
+> -
+>  	mtd = &chip->mtd;
+>  	mtd->dev.parent = dev;
+>  	mtd->priv = nand;
+> @@ -1330,6 +1317,9 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+>  	if (ret)
+>  		return ret;
+>  
+> +	if (nand->bbt_options & NAND_BBT_USE_FLASH)
+> +		nand->bbt_options |= NAND_BBT_NO_OOB;
+> +
+>  	ret = sunxi_nand_chip_init_timings(chip, np);
+>  	if (ret) {
+>  		dev_err(dev, "could not configure chip timings: %d\n", ret);
+
+Brian
