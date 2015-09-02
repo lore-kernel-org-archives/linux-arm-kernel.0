@@ -1,140 +1,168 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  2 Sep 2015 15:46:50 -0700
-Subject: [PATCH v2 7/8] soc: qcom: smd_rpm: Handle big endian CPUs
+Date: Wed,  2 Sep 2015 15:46:46 -0700
+Subject: [PATCH v2 3/8] soc: qcom: smd: Represent channel layout in structures
 In-Reply-To: <1441234011-4259-1-git-send-email-sboyd@codeaurora.org>
 References: <1441234011-4259-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1441234011-4259-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1441234011-4259-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The smd rpm structures are always in little endian, but this
-driver is not capable of being used on big endian CPUs. Annotate
-the little endian data members and update the code to do the
-proper byte swapping.
+The rx and tx channel info are laid out in memory next to each
+other, and there are two types of channel info structures, byte
+based and word based. We have 4 pointers to these info
+structures, when we really only need two to point to the
+different types of structures. Encapsulate the byte based and
+word based tx/rx structures in a "channel pair" structure that
+describes the layout of memory and reduces the number of pointers
+in the smd channel structure by two.
 
-Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
 
 Changes from v1:
- * New patch
+ * Renamed structures smd_channel_info{_word}_pair
 
- drivers/soc/qcom/smd-rpm.c | 50 ++++++++++++++++++++++++----------------------
- 1 file changed, 26 insertions(+), 24 deletions(-)
+ drivers/soc/qcom/smd.c | 61 +++++++++++++++++++++++++++-----------------------
+ 1 file changed, 33 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/soc/qcom/smd-rpm.c b/drivers/soc/qcom/smd-rpm.c
-index e86c206b9e97..a79a804e338d 100644
---- a/drivers/soc/qcom/smd-rpm.c
-+++ b/drivers/soc/qcom/smd-rpm.c
-@@ -45,8 +45,8 @@ struct qcom_smd_rpm {
-  * @length:		length of the payload
+diff --git a/drivers/soc/qcom/smd.c b/drivers/soc/qcom/smd.c
+index aa65c07f281e..15edef1dc58a 100644
+--- a/drivers/soc/qcom/smd.c
++++ b/drivers/soc/qcom/smd.c
+@@ -65,7 +65,9 @@
   */
- struct qcom_rpm_header {
--	u32 service_type;
--	u32 length;
-+	__le32 service_type;
-+	__le32 length;
+ 
+ struct smd_channel_info;
++struct smd_channel_info_pair;
+ struct smd_channel_info_word;
++struct smd_channel_info_word_pair;
+ 
+ #define SMD_ALLOC_TBL_COUNT	2
+ #define SMD_ALLOC_TBL_SIZE	64
+@@ -151,10 +153,8 @@ enum smd_channel_state {
+  * @name:		name of the channel
+  * @state:		local state of the channel
+  * @remote_state:	remote state of the channel
+- * @tx_info:		byte aligned outgoing channel info
+- * @rx_info:		byte aligned incoming channel info
+- * @tx_info_word:	word aligned outgoing channel info
+- * @rx_info_word:	word aligned incoming channel info
++ * @info:		byte aligned outgoing/incoming channel info
++ * @info_word:		word aligned outgoing/incoming channel info
+  * @tx_lock:		lock to make writes to the channel mutually exclusive
+  * @fblockread_event:	wakeup event tied to tx fBLOCKREADINTR
+  * @tx_fifo:		pointer to the outgoing ring buffer
+@@ -175,11 +175,8 @@ struct qcom_smd_channel {
+ 	enum smd_channel_state state;
+ 	enum smd_channel_state remote_state;
+ 
+-	struct smd_channel_info *tx_info;
+-	struct smd_channel_info *rx_info;
+-
+-	struct smd_channel_info_word *tx_info_word;
+-	struct smd_channel_info_word *rx_info_word;
++	struct smd_channel_info_pair *info;
++	struct smd_channel_info_word_pair *info_word;
+ 
+ 	struct mutex tx_lock;
+ 	wait_queue_head_t fblockread_event;
+@@ -228,6 +225,11 @@ struct smd_channel_info {
+ 	u32 head;
  };
+ 
++struct smd_channel_info_pair {
++	struct smd_channel_info tx;
++	struct smd_channel_info rx;
++};
++
+ /*
+  * Format of the smd_info smem items, for word aligned channels.
+  */
+@@ -245,25 +247,30 @@ struct smd_channel_info_word {
+ 	u32 head;
+ };
+ 
++struct smd_channel_info_word_pair {
++	struct smd_channel_info_word tx;
++	struct smd_channel_info_word rx;
++};
++
+ #define GET_RX_CHANNEL_INFO(channel, param) \
+-	(channel->rx_info_word ? \
+-		channel->rx_info_word->param : \
+-		channel->rx_info->param)
++	(channel->info_word ? \
++		channel->info_word->rx.param : \
++		channel->info->rx.param)
+ 
+ #define SET_RX_CHANNEL_INFO(channel, param, value) \
+-	(channel->rx_info_word ? \
+-		(channel->rx_info_word->param = value) : \
+-		(channel->rx_info->param = value))
++	(channel->info_word ? \
++		(channel->info_word->rx.param = value) : \
++		(channel->info->rx.param = value))
+ 
+ #define GET_TX_CHANNEL_INFO(channel, param) \
+-	(channel->tx_info_word ? \
+-		channel->tx_info_word->param : \
+-		channel->tx_info->param)
++	(channel->info_word ? \
++		channel->info_word->tx.param : \
++		channel->info->tx.param)
+ 
+ #define SET_TX_CHANNEL_INFO(channel, param, value) \
+-	(channel->tx_info_word ? \
+-		(channel->tx_info_word->param = value) : \
+-		(channel->tx_info->param = value))
++	(channel->info_word ? \
++		(channel->info_word->tx.param = value) : \
++		(channel->info->tx.param = value))
  
  /**
-@@ -58,11 +58,11 @@ struct qcom_rpm_header {
-  * @data_len:	length of the payload following this header
-  */
- struct qcom_rpm_request {
--	u32 msg_id;
--	u32 flags;
--	u32 type;
--	u32 id;
--	u32 data_len;
-+	__le32 msg_id;
-+	__le32 flags;
-+	__le32 type;
-+	__le32 id;
-+	__le32 data_len;
- };
+  * struct qcom_smd_alloc_entry - channel allocation entry
+@@ -412,7 +419,7 @@ static size_t qcom_smd_channel_peek(struct qcom_smd_channel *channel,
+ 	unsigned tail;
+ 	size_t len;
  
- /**
-@@ -75,10 +75,10 @@ struct qcom_rpm_request {
-  * Multiple of these messages can be stacked in an rpm message.
-  */
- struct qcom_rpm_message {
--	u32 msg_type;
--	u32 length;
-+	__le32 msg_type;
-+	__le32 length;
- 	union {
--		u32 msg_id;
-+		__le32 msg_id;
- 		u8 message[0];
- 	};
- };
-@@ -122,14 +122,14 @@ int qcom_rpm_smd_write(struct qcom_smd_rpm *rpm,
+-	word_aligned = channel->rx_info_word != NULL;
++	word_aligned = channel->info_word;
+ 	tail = GET_RX_CHANNEL_INFO(channel, tail);
  
- 	mutex_lock(&rpm->lock);
+ 	len = min_t(size_t, count, channel->fifo_size - tail);
+@@ -627,7 +634,7 @@ static int qcom_smd_write_fifo(struct qcom_smd_channel *channel,
+ 	unsigned head;
+ 	size_t len;
  
--	pkt->hdr.service_type = RPM_SERVICE_TYPE_REQUEST;
--	pkt->hdr.length = sizeof(struct qcom_rpm_request) + count;
-+	pkt->hdr.service_type = cpu_to_le32(RPM_SERVICE_TYPE_REQUEST);
-+	pkt->hdr.length = cpu_to_le32(sizeof(struct qcom_rpm_request) + count);
+-	word_aligned = channel->tx_info_word != NULL;
++	word_aligned = channel->info_word;
+ 	head = GET_TX_CHANNEL_INFO(channel, head);
  
--	pkt->req.msg_id = msg_id++;
--	pkt->req.flags = BIT(state);
--	pkt->req.type = type;
--	pkt->req.id = id;
--	pkt->req.data_len = count;
-+	pkt->req.msg_id = cpu_to_le32(msg_id++);
-+	pkt->req.flags = cpu_to_le32(BIT(state));
-+	pkt->req.type = cpu_to_le32(type);
-+	pkt->req.id = cpu_to_le32(id);
-+	pkt->req.data_len = cpu_to_le32(count);
- 	memcpy(pkt->payload, buf, count);
+ 	len = min_t(size_t, count, channel->fifo_size - head);
+@@ -670,7 +677,7 @@ int qcom_smd_send(struct qcom_smd_channel *channel, const void *data, int len)
+ 	int ret;
  
- 	ret = qcom_smd_send(rpm->rpm_channel, pkt, sizeof(*pkt));
-@@ -154,27 +154,29 @@ static int qcom_smd_rpm_callback(struct qcom_smd_device *qsdev,
- 				 size_t count)
- {
- 	const struct qcom_rpm_header *hdr = data;
-+	size_t hdr_length = le32_to_cpu(hdr->length);
- 	const struct qcom_rpm_message *msg;
- 	struct qcom_smd_rpm *rpm = dev_get_drvdata(&qsdev->dev);
- 	const u8 *buf = data + sizeof(struct qcom_rpm_header);
--	const u8 *end = buf + hdr->length;
-+	const u8 *end = buf + hdr_length;
- 	char msgbuf[32];
- 	int status = 0;
--	u32 len;
-+	u32 len, msg_length;
+ 	/* Word aligned channels only accept word size aligned data */
+-	if (channel->rx_info_word != NULL && len % 4)
++	if (channel->info_word && len % 4)
+ 		return -EINVAL;
  
--	if (hdr->service_type != RPM_SERVICE_TYPE_REQUEST ||
--	    hdr->length < sizeof(struct qcom_rpm_message)) {
-+	if (le32_to_cpu(hdr->service_type) != RPM_SERVICE_TYPE_REQUEST ||
-+	    hdr_length < sizeof(struct qcom_rpm_message)) {
- 		dev_err(&qsdev->dev, "invalid request\n");
- 		return 0;
- 	}
- 
- 	while (buf < end) {
- 		msg = (struct qcom_rpm_message *)buf;
--		switch (msg->msg_type) {
-+		msg_length = le32_to_cpu(msg->length);
-+		switch (le32_to_cpu(msg->msg_type)) {
- 		case RPM_MSG_TYPE_MSG_ID:
- 			break;
- 		case RPM_MSG_TYPE_ERR:
--			len = min_t(u32, ALIGN(msg->length, 4), sizeof(msgbuf));
-+			len = min_t(u32, ALIGN(msg_length, 4), sizeof(msgbuf));
- 			memcpy_fromio(msgbuf, msg->message, len);
- 			msgbuf[len - 1] = 0;
- 
-@@ -185,7 +187,7 @@ static int qcom_smd_rpm_callback(struct qcom_smd_device *qsdev,
- 			break;
- 		}
- 
--		buf = PTR_ALIGN(buf + 2 * sizeof(u32) + msg->length, 4);
-+		buf = PTR_ALIGN(buf + 2 * sizeof(u32) + msg_length, 4);
- 	}
- 
- 	rpm->ack_status = status;
+ 	ret = mutex_lock_interruptible(&channel->tx_lock);
+@@ -989,11 +996,9 @@ static struct qcom_smd_channel *qcom_smd_create_channel(struct qcom_smd_edge *ed
+ 	 * use.
+ 	 */
+ 	if (info_size == 2 * sizeof(struct smd_channel_info_word)) {
+-		channel->tx_info_word = info;
+-		channel->rx_info_word = info + sizeof(struct smd_channel_info_word);
++		channel->info_word = info;
+ 	} else if (info_size == 2 * sizeof(struct smd_channel_info)) {
+-		channel->tx_info = info;
+-		channel->rx_info = info + sizeof(struct smd_channel_info);
++		channel->info = info;
+ 	} else {
+ 		dev_err(smd->dev,
+ 			"channel info of size %zu not supported\n", info_size);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
