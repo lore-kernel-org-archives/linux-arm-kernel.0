@@ -1,122 +1,160 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 02 Sep 2015 16:59:19 +0900
-Subject: [PATCHv2] ARM: EXYNOS: reset Little cores when cpu is up
-In-Reply-To: <55E6A8F6.5020301@osg.samsung.com>
-References: <1441117023-25478-1-git-send-email-parkch98@gmail.com>
- <55E63F8F.4020300@samsung.com> <55E64386.3000903@osg.samsung.com>
- <55E64559.7000105@samsung.com> <55E6A8F6.5020301@osg.samsung.com>
-Message-ID: <55E6AC57.4020208@samsung.com>
+From: j@jannau.net (Janne Grunau)
+Date: Wed, 2 Sep 2015 09:59:36 +0200
+Subject: [PATCH 2/2] arm64/apm: add dts for Gigabyte MP30-AR0 board
+In-Reply-To: <20150901105510.GB15900@leverpostej>
+References: <1440948270-1991-1-git-send-email-j@jannau.net>
+ <1440948270-1991-3-git-send-email-j@jannau.net>
+ <20150901105510.GB15900@leverpostej>
+Message-ID: <20150902075936.GR17056@jannau.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.09.2015 16:44, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
+On 2015-09-01 11:55:11 +0100, Mark Rutland wrote:
+> On Sun, Aug 30, 2015 at 04:24:30PM +0100, Janne Grunau wrote:
+> > Creates apm-storm-883408.dtsi which should be shareable with the HP
+> > Moonshot m400 cartridge.
+> > 
+> > Signed-off-by: Janne Grunau <j@jannau.net>
+> > ---
+> >  arch/arm64/boot/dts/apm/Makefile              |  1 +
+> >  arch/arm64/boot/dts/apm/apm-storm-883408.dtsi | 98 +++++++++++++++++++++++++++
+> >  arch/arm64/boot/dts/apm/mp30ar0.dts           | 85 +++++++++++++++++++++++
+> >  3 files changed, 184 insertions(+)
+> >  create mode 100644 arch/arm64/boot/dts/apm/apm-storm-883408.dtsi
+> >  create mode 100644 arch/arm64/boot/dts/apm/mp30ar0.dts
+> > 
+> > diff --git a/arch/arm64/boot/dts/apm/Makefile b/arch/arm64/boot/dts/apm/Makefile
+> > index a2afabb..b0ec2b6 100644
+> > --- a/arch/arm64/boot/dts/apm/Makefile
+> > +++ b/arch/arm64/boot/dts/apm/Makefile
+> > @@ -1,4 +1,5 @@
+> >  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+> > +dtb-$(CONFIG_ARCH_XGENE) += mp30ar0.dtb
+> >  
+> >  always		:= $(dtb-y)
+> >  subdir-y	:= $(dts-dirs)
+> > diff --git a/arch/arm64/boot/dts/apm/apm-storm-883408.dtsi b/arch/arm64/boot/dts/apm/apm-storm-883408.dtsi
+> > new file mode 100644
+> > index 0000000..83116df
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/apm/apm-storm-883408.dtsi
+> > @@ -0,0 +1,98 @@
+> > +/*
+> > + * dts file for AppliedMicro (APM) X-Gene Storm SOC APM883408
+> > + *
+> > + * Copyright (C) 2013, Applied Micro Circuits Corporation
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation; either version 2 of
+> > + * the License, or (at your option) any later version.
+> > + */
+> > +
+> > +/ {
+> > +	compatible = "apm,xgene-storm";
+> > +	interrupt-parent = <&gic>;
+> > +	#address-cells = <2>;
+> > +	#size-cells = <2>;
+> > +
+> > +	cpus {
+> > +		#address-cells = <2>;
+> > +		#size-cells = <0>;
+> > +
+> > +		cpu at 000 {
+> > +			device_type = "cpu";
+> > +			compatible = "apm,potenza", "arm,armv8";
+> > +			reg = <0x0 0x000>;
+> > +			enable-method = "spin-table";
+> > +			cpu-release-addr = <0x40 0x0000fff8>;
+> > +		};
 > 
-> On 09/02/2015 02:39 AM, Krzysztof Kozlowski wrote:
->> On 02.09.2015 09:32, Javier Martinez Canillas wrote:
->>> Hello Krzysztof,
->>>
->>> On 09/02/2015 02:15 AM, Krzysztof Kozlowski wrote:
->>>> On 01.09.2015 23:17, Chanho Park wrote:
->>>>> The cpu booting of exynos5422 has been still broken since we discussed
->>>>> it in last year[1]. This patch is inspired from Odroid XU3
->>>>> code (Actually, it was from samsung exynos vendor kernel)[2]. This weird
->>>>> reset code was founded exynos5420 octa cores series SoCs and only
->>>>> required for the first boot core is the Little core (Cortex A7).
->>>>> Some of the exynos5420 boards and all of the exynos5422 boards will require
->>>>> this code.
->>>>>
->>>>> There is two ways to check the little core is the first cpu. One is
->>>>> checking GPG2CON[1] GPIO value and the other is checking the cluster
->>>>> number of the first cpu. I selected the latter because it's more easier
->>>>> than the former.
->>>>>
->>>>> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350632.html
->>>>> [2]:https://patchwork.kernel.org/patch/6782891/
->>>>>
->>>>> Cc: Kevin Hilman <khilman@kernel.org>
->>>>> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
->>>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>>> Tested-by: Kevin Hilman <khilman@linaro.org>
->>>>> Signed-off-by: Chanho Park <parkch98@gmail.com>
->>>>> ---
->>>>> Changes from v1:
->>>>>  .kfc to Little (Cortex A7) and eagle to big (Cortex A15)
->>>>>  .append comments about waiting SPARE2 register
->>>>>
->>>>> Changes since RFC:
->>>>>  .drop checking soc_is_exynos5800 to extend this codes to
->>>>> exynos5420/5422 boards.
->>>>>  .kfc cores will be reset only if the cpu0 is kfc core.
->>>>>  .Rebase top of the kukjin's for-next branch
->>>>>
->>>>>  arch/arm/mach-exynos/mcpm-exynos.c | 25 ++++++++++++++++++++++++-
->>>>>  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
->>>>>  2 files changed, 30 insertions(+), 1 deletion(-)
->>>>
->>>> Thanks for updating the patch. Remaining minor nit about comment style
->>>> (/* on first line) can be fixed while applying.
->>>>
->>>> The patch works good, after disabling bL switcher I have 8 cores running:
->>>>
->>>> Tested on Odroid XU4:
->>>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>>
->>>> It's 4.3 merge window so the patch will go probably to v4.4.
->>>>
->>>
->>> Isn't this material for the v4.3 -rc cycle since it's fixing a bug
->>> (CPUs not booting)? So I don't think that's necessary to wait for v4.4.
->>
->> It is a bug fix but:
->> 1. Not a fix for regression introduced in current merge window,
+> This release address doesn't fall in the region described by the memory
+> node, and I don't see any /memreserve/. That worries me.
 > 
-> I thought the -rc cycle was for stabilization and fix not only regressions
-> introduced during the merge window but also long standing issues.
+> Does the bootlaoder override the memory node?
 
-It's all subtle. Sometimes it also depends on the mood of maintainer...
-A lot of fixes for different issues are merged in -rc and in the same
-time they are rejected because they are too late and they don't fix
-regression from merge window. Anyway I used the argument #1 in
-combination with #2.
+The bootloader overrides the memory node and memory starts at 0x40 0x0
 
-Best regards,
-Krzysztof
+> Does it add the requisite memreserve?
+> 
+> Does it override the cpu-release-addr?
 
+neither of that
+
+> > +	timer {
+> > +		compatible = "arm,armv8-timer";
+> > +		interrupts = <1 0 0xff04>,	/* Secure Phys IRQ */
+> > +			     <1 13 0xff04>,	/* Non-secure Phys IRQ */
+> > +			     <1 14 0xff04>,	/* Virt IRQ */
+> > +			     <1 15 0xff04>;	/* Hyp IRQ */
+> > +		clock-frequency = <50000000>;
+> > +	};
 > 
->> 2. There may be more subtle issues like the one mentioned below, not
->> found yet (probably no one tested it with all possible configurations),
->>
+> Surely the firmware is configuring CNTFRQ, and it's not necessary to
+> have a clock-frequency property?
+
+it does, clock-frequency removed
+
+> > +};
+> > diff --git a/arch/arm64/boot/dts/apm/mp30ar0.dts b/arch/arm64/boot/dts/apm/mp30ar0.dts
+> > new file mode 100644
+> > index 0000000..f7a9dae5
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/apm/mp30ar0.dts
+
+[...]
+
+> > +	memory {
+> > +		#address-cells = <0x2>;
+> > +		#size-cells = <0x2>;
 > 
-> Right, this is indeed a better reason to wait for v4.4.
->  
->> so I don't think rushing with the patch to mainline is good idea.
->>
+> I don't see why these properties should be here.
+
+removed
+
+> > +		device_type = "memory";
+> > +		reg = <0x0 0x0 0x0 0x2000000>;
 > 
-> Yes, agreed.
->  
->> However your comment reminds me about stable. This actually looks like a
->> candidate for stable.
->>
->>>
->>> But I was expecting another re-spin as from Abhilash's latest comments [0],
->>> it seems the same workaround is needed in arch/arm/mach-exynos/platsmp.c
->>> to avoid the CPU's not booting issue when CCI is disabled in DT and the
->>> MCPM backend is bypassed.
->>>
->>> Although I guess that could be also made as a follow up patch.
->>
->> Chanho patch fixes only MCPM path. Regular path (platsmp, firmware) is
->> not affected so I would expect a following patch.
->>
+> Is this overriden by the bootloader? It seems a tad small...
+
+yes, it is overriden by the bootloader. It requires a memory node in the 
+dts but will overwrite the contents. I'll set size to zero and add a 
+comment that it is updated by the bootloader. I could set start to 0x40 
+0x00 or leave it at zero.
+
+> > +	};
+> > +
+> > +	poweroff_mbox: poweroff_mbox at 10548000 {
+> > +		compatible = "syscon";
+> > +		reg = <0x0 0x10548000 0x0 0x100>;
+> > +	};
+> > +
+> > +	poweroff at 10548010 {
+> > +		compatible = "syscon-poweroff";
+> > +		regmap = <&poweroff_mbox>;
+> > +		offset = <0x10>;
+> > +		mask = <0x1>;
+> > +	};
+> > +
+> > +	chosen {
+> > +		linux,stdout-path = "/soc/serial at 1c020000";
 > 
-> Ok, hopefully the non MCPM path can also be fixed before v4.4.
->  
->> Best regards,
->> Krzysztof
->>
->>>
+> Please use stdout-path rather than linux,stdout-path.
 > 
-> Best regards,
+> No rate configuration?
 > 
+> This would look nicer with an alias.
+
+I can change that but the bootloader will add a 'linux,stdout-path' and 
+the stdout-path will override it. OTOH the bootloader seems to always 
+add this exact string so it will be fine to "override" it from the dts.
+The alternative would to remove it.
+
+Thanks,
+
+Janne
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
