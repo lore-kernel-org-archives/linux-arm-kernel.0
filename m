@@ -1,86 +1,65 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 2 Sep 2015 17:40:16 +0200
-Subject: [PATCH v4 11/15] KVM: arm: add a function to keep track of host
- use of the debug registers
-In-Reply-To: <1439213167-8988-12-git-send-email-zhichao.huang@linaro.org>
-References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
- <1439213167-8988-12-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <20150902154016.GN10991@cbox>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  2 Sep 2015 16:38:03 +0100
+Subject: [PATCH v3 0/6] remoteproc: Add driver for STMicroelectronics platforms
+Message-ID: <1441208289-17330-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 10, 2015 at 09:26:03PM +0800, Zhichao Huang wrote:
-> As we're about to implement a lazy world switch for debug registers,
-> we add a function reading the break/watch control variables directly to
-> indicate whether the host has enabled any break/watch points or not.
-> 
-> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
-> ---
->  arch/arm/include/asm/hw_breakpoint.h |  5 +++++
->  arch/arm/kernel/hw_breakpoint.c      | 21 +++++++++++++++++++++
->  2 files changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
-> index f2f4c61..6f375c5 100644
-> --- a/arch/arm/include/asm/hw_breakpoint.h
-> +++ b/arch/arm/include/asm/hw_breakpoint.h
-> @@ -66,9 +66,14 @@ int arch_install_hw_breakpoint(struct perf_event *bp);
->  void arch_uninstall_hw_breakpoint(struct perf_event *bp);
->  void hw_breakpoint_pmu_read(struct perf_event *bp);
->  int hw_breakpoint_slots(int type);
-> +bool hw_breakpoint_enabled(void);
->  
->  #else
->  static inline void clear_ptrace_hw_breakpoint(struct task_struct *tsk) {}
-> +static inline bool hw_breakpoint_enabled(void)
-> +{
-> +	return false;
-> +}
->  
->  #endif	/* CONFIG_HAVE_HW_BREAKPOINT */
->  #endif  /* __ASSEMBLY */
-> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-> index dc7d0a9..f56788f 100644
-> --- a/arch/arm/kernel/hw_breakpoint.c
-> +++ b/arch/arm/kernel/hw_breakpoint.c
-> @@ -227,6 +227,27 @@ static int get_num_brps(void)
->  	return core_has_mismatch_brps() ? brps - 1 : brps;
->  }
->  
-> +/* Indicate whether the host has enabled any break/watch points or not. */
-> +bool hw_breakpoint_enabled(void)
-> +{
-> +	struct perf_event **slots;
-> +	int i;
+ST's platforms often have multiple co-processors (usually ST40s or ST231s)
+on-board.  This provides the Linux-side infrastructure to flash and boot
+them successfully.
+  
+This set has been tested on an STiH410-B2120.
+  
+v2 => v3:
+ - Generify syscon property (st,syscfg-boot => st,syscfg-boot)
+ - Rename IP in DT bindings doc (Remote Processor => Co-Processor)
+ - Remove superfluous 'clock-names' property
+ - Remove superfluous 'reg-names' property
+ - Populate MAINTAINERS
+ - Clean-up DTS formatting
+ - Use strings in debugfs to control procs ('1|0' => 'start|stop')
+ - Align copyright statement with MODULE() macros
+ - Rename driver data structure ('st_rproc' => 'ddata')
+ - Addition of a full error path in .start()
 
-since this is exported, shouldn't you have BUG_ON(preemptible()) here
-isnce you're using this_cpu_ptr()?
+v1 => v2:
+ - Remove Linux implementation specific comment from binding document
+ - Force debugfs '0' to shutdown co-processor - rather than !1
+ - Supply more detailed commit message
+ - Propagate errors back from .stop()
+ - Review GPL wording
+ - Supply original author's SoBs
+  
+Lee Jones (4):
+  ARM: STiH407: Add nodes for RemoteProc
+  remoteproc: dt: Provide bindings for ST's Remote Processor Controller
+    driver
+  remoteproc: Supply controller driver for ST's Remote Processors
+  remoteproc: debugfs: Add ability to boot remote processor using
+    debugfs
 
-At least the comment to the function should describe the context in
-which this can be used.
+Lee Jones (6):
+  ARM: STi: Add DT defines for co-processor reset lines
+  remoteproc: dt: Provide bindings for ST's Remote Processor Controller
+    driver
+  remoteproc: Supply controller driver for ST's Remote Processors
+  remoteproc: debugfs: Add ability to boot remote processor using
+    debugfs
+  ARM: STiH407: Add nodes for RemoteProc
+  MAINTAINERS: Add ST's Remote Processor Driver to ARM/STI ARCHITECTURE
 
-It also looks like these arrays are protected with rcu locks, so don't
-you need to do rcu_read_lock() before looking at these?
+ .../devicetree/bindings/remoteproc/st-rproc.txt    |  35 +++
+ MAINTAINERS                                        |   1 +
+ arch/arm/boot/dts/stih407-family.dtsi              |  40 +++
+ drivers/remoteproc/Kconfig                         |   9 +
+ drivers/remoteproc/Makefile                        |   1 +
+ drivers/remoteproc/remoteproc_debugfs.c            |  34 +++
+ drivers/remoteproc/st_remoteproc.c                 | 307 +++++++++++++++++++++
+ .../dt-bindings/reset-controller/stih407-resets.h  |   4 +
+ 8 files changed, 431 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+ create mode 100644 drivers/remoteproc/st_remoteproc.c
 
-> +
-> +	slots = this_cpu_ptr(bp_on_reg);
-> +	for (i = 0; i < core_num_brps; i++) {
-> +		if (slots[i])
-> +			return true;
-> +	}
-> +
-> +	slots = this_cpu_ptr(wp_on_reg);
-> +	for (i = 0; i < core_num_wrps; i++) {
-> +		if (slots[i])
-> +			return true;
-> +	}
-> +
-> +	return false;
-> +}
-> +
->  /*
->   * In order to access the breakpoint/watchpoint control registers,
->   * we must be running in debug monitor mode. Unfortunately, we can
-> -- 
-> 1.7.12.4
-> 
+-- 
+1.9.1
