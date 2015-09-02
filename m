@@ -1,107 +1,43 @@
-From: Andrew.Pinski@caviumnetworks.com (Pinski, Andrew)
-Date: Wed, 2 Sep 2015 17:21:24 +0000
-Subject: [PATCHv2] ARM64: Add AT_ARM64_MIDR to the aux vector
-In-Reply-To: <20150902171157.GC25614@e104818-lin.cambridge.arm.com>
-References: <1440873982-44062-1-git-send-email-apinski@cavium.com>
- <20150901163304.GC16430@leverpostej>
- <A9115CAF-0C57-4810-97F6-6245E7D0CE48@gmail.com>
- <4C8DD5E0-E1EA-40C6-B947-72189241023C@caviumnetworks.com>
- <20150901173043.GE16430@leverpostej>
- <9AA83792-C973-4642-88BA-3C59F23EB048@gmail.com> <20150901221254.5e08ab6e@i7>
- <8C837F8F-050A-45DD-882B-02E107EFD663@caviumnetworks.com>
- <20150902165752.782e75be@i7>
- <CA+=Sn1=27ibpBokqJj3vLZ7NsnovKRdq7mR22ReeJJya4ona-A@mail.gmail.com>,
- <20150902171157.GC25614@e104818-lin.cambridge.arm.com>
-Message-ID: <BE017903-1EEB-48E9-88C0-A1412534CB4D@caviumnetworks.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 2 Sep 2015 19:23:03 +0200
+Subject: [RESEND PATCH 0/3 v6] Add Mediatek MT8173 cpufreq driver
+In-Reply-To: <CAGS+omAtiALWTjVJS4wNatXVLqZRSOk3m29QQvW=fQWs7Hs5ng@mail.gmail.com>
+References: <1439803465-19683-1-git-send-email-pi-cheng.chen@linaro.org>
+ <20150826021659.GD8784@linux>
+ <CALx668V2herrp6XOtCDR7nNvFhd7DLLMjXmr86cjfCOQ_cgmrw@mail.gmail.com>
+ <22538895.vrRgZUmQTV@vostro.rjw.lan>
+ <CAGS+omAtiALWTjVJS4wNatXVLqZRSOk3m29QQvW=fQWs7Hs5ng@mail.gmail.com>
+Message-ID: <55E73077.8060106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
+On 02/09/15 08:45, Daniel Kurtz wrote:
+> Matthias,
+>
+> On Fri, Aug 28, 2015 at 10:06 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> On Wednesday, August 26, 2015 02:53:39 PM Pi-Cheng Chen wrote:
+>>> On Wed, Aug 26, 2015 at 10:16 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>>>> On 26-08-15, 09:25, Pi-Cheng Chen wrote:
+>>>>> The [3/3] is based on Mediatek SoC maintainer tree[1] and the patch which
+>>>>> introduce a new clock type[2] consumed by MT8173 cpufreq driver. So it will
+>>>>> cause some conflicts if it goes through your tree. I am not sure how this
+>>>>> should be handled, but should it be merged through Mediatek SoC maintainer
+>>>>> tree?
+>>>>
+>>>> Just get that applied to MTK tree, it doesn't have any dependency on
+>>>> rest of the patches for build/boot. The only thing is that cpufreq
+>>>> wouldn't work and it will work as soon as Rafael's and MTK's trees are
+>>>> merged by Linus.
+>>>
+>>> Thanks for your explanation.
+>>>
+>>> @Rafael, Would you please apply [1,2] to your tree?
+>>
+>> Applied, thanks!
+>
+> Can you please apply [3] from this set to your dts tree?
+>
 
-
-> On Sep 3, 2015, at 1:12 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> 
->> On Wed, Sep 02, 2015 at 10:52:05PM +0800, Andrew Pinski wrote:
->> On Wed, Sep 2, 2015 at 9:57 PM, Siarhei Siamashka <siarhei.siamashka@gmail.com> wrote:
-> [...]
->>>>> On Wed, 2 Sep 2015 01:58:56 +0800 pinskia at gmail.com wrote:
->>>>>> Yes but I guess you talk about caching the value in userspace but doing
->>>>>> it via the aux vector is the same as your suggestion. Just one
->>>>>> difference is you don't get the aux vector entry if there is a CPU
->>>>>> that is online which is different. No difference from your suggestion
->>>>>> of caching it. Without considering hot pug for a second (that is a
->>>>>> huge different issue all together), if userland wants to know if all
->>>>>> up CPUs have the same midr, they would either read /sys entries (lots
->>>>>> of syscalls) or bind to each CPU and do the trap. That means at least
->>>>>> three or two syscalls/traps for each CPU. My way is none and gets a
->>>>>> value of midr if they are all the Same for free.
-> 
-> Whether we like it or not, big.LITTLE systems are present in the ARM
-> ecosystem. You are looking to add a specific AT_ to solve a particular
-> problem on fully symmetric systems, ignoring the rest. I want this fixed
-> for all systems rather than trying to invent something else for
-> big.LITTLE which won't help user space at all.
-> 
-> If you want to avoid parsing all /sys entries, I would rather have a
-> HWCAP_ASYMMETRIC bit for big.LITTLE systems and let user space decide
-> whether to read all entries or not.
-> 
->>> I wonder if we still can try to make "sched_getcpu()" use vDSO
->>> instead of the syscall to make it faster? Now that there exists a
->>> vDSO implementation for gettimeofday(), everything should be easy if
->>> we can find an unused userspace readable coprocessor register.
->>> In the past, Catalin Marinas mentioned that "We have a user read-only
->>> thread register unused on arm64":
->>>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/220664.html
-> 
-> We have a patch under development internally, it will appear on the list
-> at some point.
-> 
->>> And if I understand it correctly, also one of the "scratch registers"
->>> should exist in 32-bit ARM, which "isn't present in ARMv8/AArch64":
->>>    http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/221056.html
->>> What kind of registers are these exactly?
->>> 
->>> In principle, the aux vector can be extended to also contain a pointer
->>> to an array of MIDR values for all the CPU cores if reducing the setup
->>> overhead is critical.
->> 
->> That is not a bad idea.  Put this array in the data section of the
->> VDSO too.  It should be small enough though on systems with 96 or more
->> cores (dual socket ThunderX has 96 cores total), it is slightly
->> getting big.
->> The struct would be something like:
->> struct
->> {
->>  int32 numcores;
->>  int32 midr[];
->> };
-> 
-> First of all, I'm against hard-coding (VDSO) data as ABI. So far we used
-> VDSO to override some weak glibc functions but the VDSO-specific data is
-> parsed by the VDSO function implementation and not directly by glibc (or
-> user space). I prefer helper functions that read the VDSO-internal data
-> structures.
-
-You don't like the idea of a fixed structure ABI that resides inside vdso data? Having a fixed struct ABI should be ok.  The location inside the data part was going to be passed via an aux vector entry.  Userland does even need to know it is really located in the vdso at all. It just happens to reside in there. The data structure would be well defined for the aux vector. 
-
-> 
-> Secondly, you seem to be only interested in MIDR_EL1 but we also have
-> REVIDR_EL1 and AIDR_EL1 which may be relevant. Once we realise that more
-> information is needed, it's not always clear where the boundaries are
-> so I would rather have this exposed via /sys and/or MRS emulation (there
-> are patches for both).
-> 
-> Anyway, you need to involve the toolchain people in such discussions,
-> they may have different needs (like ifunc).
-
-I am a toolchain person first and needed this in the first place for memset and memcpy on thunderx. I had asked our kernel engineers here first before even going forward with my original approach. I touch the kernel only because I need to really. I even had asked on #linaro-kernel and #linaro-toolchain around two-three months ago about this approach and I only had time to post it this week. 
-
-Thanks,
-Andrew
-
-
-> 
-> -- 
-> Catalin
+I will as soon as v4.3-rc1 shows up.
