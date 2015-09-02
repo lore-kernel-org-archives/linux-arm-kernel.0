@@ -1,83 +1,61 @@
-From: amstan@chromium.org (Alexandru M Stan)
-Date: Wed,  2 Sep 2015 15:20:06 -0700
-Subject: [PATCH] ARM: dts: rk3288: pull up cts lines
-Message-ID: <1441232406-32628-1-git-send-email-amstan@chromium.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 2 Sep 2015 17:23:25 -0500
+Subject: [PATCH v2 1/4] of/pci: Add of_pci_check_probe_only to parse
+ "linux,pci-probe-only"
+In-Reply-To: <CAL_JsqL7VPB6nc-zRYm_73ZSgYVq_+a6sW_XZZ_LRaUXf4jTng@mail.gmail.com>
+References: <1439569159-10051-1-git-send-email-marc.zyngier@arm.com>
+ <1439569159-10051-2-git-send-email-marc.zyngier@arm.com>
+ <CAL_JsqL7VPB6nc-zRYm_73ZSgYVq_+a6sW_XZZ_LRaUXf4jTng@mail.gmail.com>
+Message-ID: <20150902222325.GD829@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flow control lines from a user accessible UART are optional,
-the user might not have anything connected to those pins.
-In order to prevent random interrupts happening and noise affecting
-that pin it should be pulled up.
+On Fri, Aug 14, 2015 at 04:08:10PM -0500, Rob Herring wrote:
+> On Fri, Aug 14, 2015 at 11:19 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > Both pci-host-generic and Pseries parse the "linux,pci-probe-only"
+> > to engage the PCI_PROBE_ONLY mode, and both have a subtle bug that
+> > can be triggered if the property has no parameter.
+> 
+> Humm, I bet we could break a lot of machines if we fixed the core code
+> to properly make pp->value NULL when there is no value.
+> 
+> > Provide a generic implementation that can be used by both.
+> >
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  drivers/of/of_pci.c    | 30 ++++++++++++++++++++++++++++++
+> >  include/linux/of_pci.h |  3 +++
+> >  2 files changed, 33 insertions(+)
+> >
+> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> > index 5751dc5..a4e29ff 100644
+> > --- a/drivers/of/of_pci.c
+> > +++ b/drivers/of/of_pci.c
+> > @@ -118,6 +118,36 @@ int of_get_pci_domain_nr(struct device_node *node)
+> >  EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
+> >
+> >  /**
+> > + * of_pci_check_probe_only - Setup probe only mode if linux,pci-probe-only
+> > + *                           is present and valid
+> > + *
+> > + * @node: device tree node that may contain the property (usually "chosen")
+> > + *
+> > + */
+> > +void of_pci_check_probe_only(struct device_node *node)
+> > +{
+> > +       const int *prop;
+> > +       int len;
+> > +
+> > +       if (!node)
+> > +               return;
+> > +
+> > +       prop = of_get_property(node, "linux,pci-probe-only", &len);
+> 
+> It is preferred to use of_property_read_u32 to avoid just these types
+> of problems.
 
-Note that the default state for those pins on the rk3288 is pulled up,
-so this patch merely restores them.
+I don't know enough OF to really understand this, but I infer that
+this is a suggestion for improving the patch.  Should I be waiting for
+a v3 series?
 
-Suggested-by: Neil Hendin <nhendin@chromium.org>
-Signed-off-by: Alexandru M Stan <amstan@chromium.org>
----
- arch/arm/boot/dts/rk3288.dtsi | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 906e938..a059367 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -1211,11 +1211,11 @@
- 			};
- 
- 			uart0_cts: uart0-cts {
--				rockchip,pins = <4 18 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <4 18 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 
- 			uart0_rts: uart0-rts {
--				rockchip,pins = <4 19 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <4 19 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 		};
- 
-@@ -1226,11 +1226,11 @@
- 			};
- 
- 			uart1_cts: uart1-cts {
--				rockchip,pins = <5 10 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <5 10 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 
- 			uart1_rts: uart1-rts {
--				rockchip,pins = <5 11 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <5 11 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 		};
- 
-@@ -1249,11 +1249,11 @@
- 			};
- 
- 			uart3_cts: uart3-cts {
--				rockchip,pins = <7 9 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <7 9 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 
- 			uart3_rts: uart3-rts {
--				rockchip,pins = <7 10 RK_FUNC_1 &pcfg_pull_none>;
-+				rockchip,pins = <7 10 RK_FUNC_1 &pcfg_pull_up>;
- 			};
- 		};
- 
-@@ -1264,11 +1264,11 @@
- 			};
- 
- 			uart4_cts: uart4-cts {
--				rockchip,pins = <5 14 3 &pcfg_pull_none>;
-+				rockchip,pins = <5 14 3 &pcfg_pull_up>;
- 			};
- 
- 			uart4_rts: uart4-rts {
--				rockchip,pins = <5 15 3 &pcfg_pull_none>;
-+				rockchip,pins = <5 15 3 &pcfg_pull_up>;
- 			};
- 		};
- 
--- 
-2.5.0.457.gab17608
+Bjorn
