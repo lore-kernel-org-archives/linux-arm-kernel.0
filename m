@@ -1,33 +1,42 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 2 Sep 2015 16:17:33 +0530
-Subject: [PATCH 6/6] ARM: dts: OMAP5: use "ti,
- pbias-omap5" compatible string for pbias
-In-Reply-To: <1441190853-7133-1-git-send-email-kishon@ti.com>
-References: <1441190853-7133-1-git-send-email-kishon@ti.com>
-Message-ID: <1441190853-7133-7-git-send-email-kishon@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 2 Sep 2015 16:32:13 +0530
+Subject: [PATCH] clk: spear600: Fix adc clock device name
+In-Reply-To: <1441190517-20235-1-git-send-email-sr@denx.de>
+References: <1441190517-20235-1-git-send-email-sr@denx.de>
+Message-ID: <20150902110213.GD26744@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use "ti,pbias-omap5" compatible string which is specifically added
-for OMAP5.
+On 02-09-15, 12:41, Stefan Roese wrote:
+> The device name for the adc clock is incorrect. This results in the
+> IIO ADC driver to fail while probing for the clock. This patch
+> fixes the name and the ADC driver is now started correctly.
+> 
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Vipul Kumar Samar <vipulkumar.samar@st.com>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> ---
+>  drivers/clk/spear/spear6xx_clock.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/spear/spear6xx_clock.c b/drivers/clk/spear/spear6xx_clock.c
+> index 4f649c9..3e43244 100644
+> --- a/drivers/clk/spear/spear6xx_clock.c
+> +++ b/drivers/clk/spear/spear6xx_clock.c
+> @@ -316,7 +316,7 @@ void __init spear6xx_clk_init(void __iomem *misc_base)
+>  	/* clock derived from apb clk */
+>  	clk = clk_register_gate(NULL, "adc_clk", "apb_clk", 0, PERIP1_CLK_ENB,
+>  			ADC_CLK_ENB, 0, &_lock);
+> -	clk_register_clkdev(clk, NULL, "adc");
+> +	clk_register_clkdev(clk, NULL, "d8200000.adc");
+>  
+>  	clk = clk_register_fixed_factor(NULL, "gpio0_clk", "apb_clk", 0, 1, 1);
+>  	clk_register_clkdev(clk, NULL, "f0100000.gpio");
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/omap5.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Sigh. Its fixed for all other boards, but this.
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index b1a1263..76ef595 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -187,7 +187,7 @@
- 					#size-cells = <1>;
- 
- 					pbias_regulator: pbias_regulator {
--						compatible = "ti,pbias-omap";
-+						compatible = "ti,pbias-omap5", "ti,pbias-omap";
- 						reg = <0x60 0x4>;
- 						syscon = <&omap5_padconf_global>;
- 						pbias_mmc_reg: pbias_mmc_omap5 {
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
 -- 
-1.7.9.5
+viresh
