@@ -1,75 +1,75 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 02 Sep 2015 14:01:52 +0900
-Subject: [PATCH 5/8] mmc: dw_mmc: dt-binding: Add tuning related things
-In-Reply-To: <1441045446-30858-6-git-send-email-heiko@sntech.de>
-References: <1441045446-30858-1-git-send-email-heiko@sntech.de>
- <1441045446-30858-6-git-send-email-heiko@sntech.de>
-Message-ID: <55E682C0.6050204@samsung.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 2 Sep 2015 07:34:42 +0200
+Subject: [PATCH 15/16] mtd: mtdcore: fix initcall level
+In-Reply-To: <20150901211938.GJ81844@google.com>
+References: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
+ <1440592108-3740-16-git-send-email-holler@ahsoftware.de>
+ <20150901211938.GJ81844@google.com>
+Message-ID: <55E68A72.30909@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Heiko.
+Am 01.09.2015 um 23:19 schrieb Brian Norris:
+> Hi Alexander,
+>
+> No judgment here for the rest of this series, but for this patch:
+>
+> On Wed, Aug 26, 2015 at 02:28:27PM +0200, Alexander Holler wrote:
+>> The mtd-core has to be initialized before other dependent mtd-drivers,
+>> otherwise a crash might occur.
+>>
+>> Currently mtd_init() is called in the initcall-level device, which is the
+>> same level where most mtd-drivers will end up. By luck this seemed to have
+>> been called most of the time before other mtd-drivers without having been
+>> explicitly enforced.
+>
+> I can't really speak for the original authors, but it does not appear to
+> be entirely "by luck." Link order was one of the de facto ways to get
+> this ordering (though it's not really a great one), and mtdcore was
+> always linked first within the drivers/mtd/ directory structure.
+>
+> But that's just background, I think this is worth fixing anyway. It
+> could, for instance, become a problem if drivers are located outside
+> drivers/mtd/; I see random board files in arch/ that register with MTD,
+> and I'm actually not sure how they have never tripped on this.
 
-On 09/01/2015 03:24 AM, Heiko Stuebner wrote:
-> From: Alexandru M Stan <amstan@chromium.org>
-> 
-> Add ciu_drv, ciu_sample clocks and default-sample-phase. This will later
-> be used by tuning code.
+I've already found at least a half a dozen other drivers with the same 
+problem through my shuffling of the drivers which all end up in the 
+standard initcall level device. I'm aware that this is based on the link 
+order, which itself is based on linker behaviour (and maybe other things 
+like make or other build tools). I'm just calling it luck, because this 
+is nowhere explicitly stated, at least I've never seen such a statement, 
+neither in any source, nor somewhere in Documentation. So I've choosen 
+the term "by luck" in order to provoke a bit (or to stimulate a 
+discussion about that widespread problem).
 
-As i know, ciu_drv and ciu_sample clocks are generated with "ciu" clock.
-But in these patch-set, ciu_drv and ciu_sample are controlled by clock framework.
-It's a little strange.
-Are there ciu_drv and ciu_sample clock on Rockchip?
+>
+>> But if mtd_init() is not called before a dependent
+>> driver, a null-pointer exception might occur (e.g. because the mtd device
+>> class isn't registered).
+>>
+>> To fix this, mtd-init() is moved to the initcall-level fs (right before
+>> the standard initcall level device).
+>
+> Is there a good reason we shouldn't just make this a subsys_initcall()?
+> That would match the naming better, and it mirrors what, e.g.,
+> block/genhd uses. It would also allow flexibility if there are other
+> current/future use cases that might need to sit between the subsystem
+> and the drivers.
 
-Best Regards,
-Jaehoon Chung
+No real reason here. The names for the initcall levels seem to be 
+outdated since a long time anyway, and I think just speaking about the 
+numbers 1-7 (or 0-14) would be better anyways. The only reason why I've 
+used the fs (sync) level is because I was too lazy to check out if 
+mtdcore might depend on something else in any other level. Therefor I've 
+used the one most close to were it was before.
 
-> 
-> We do not touch ciu_drive (and by extension define default-drive-phase).
-> Drive phase is mostly used to define minimum hold times, while one could
-> write some code to determine what phase meets the minimum hold time
-> (ex 10 degrees) this will not work with the current clock phase framework
-> (which floors angles, so we'll get 0 deg, and there's no way to know what
-> resolution the floors happen at). We assume that the default drive angles
-> set by the hardware are good enough.
-> 
-> Signed-off-by: Alexandru M Stan <amstan@chromium.org>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt | 14 ++++++++++----
->  1 file changed, 10 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-> index 346c609..5edadc2 100644
-> --- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-> @@ -42,11 +42,13 @@ Optional properties:
->  * clocks: from common clock binding: handle to biu and ciu clocks for the
->    bus interface unit clock and the card interface unit clock.
->  
-> -* clock-names: from common clock binding: Shall be "biu" and "ciu".
-> -  If the biu clock is missing we'll simply skip enabling it.  If the
-> -  ciu clock is missing we'll just assume that the clock is running at
-> +* clock-names: from common clock binding: Shall be "biu", "ciu", "ciu_drv" and
-> +  "ciu_sample".  If the biu clock is missing we'll simply skip enabling it.
-> +  If the ciu clock is missing we'll just assume that the clock is running at
->    clock-frequency.  It is an error to omit both the ciu clock and the
-> -  clock-frequency.
-> +  clock-frequency.  "ciu_drv" and "ciu_sample" are used to control the clock
-> +  phases, "ciu_sample" is required for tuning high speed modes (if no other
-> +  custom tuning method is defined).
->  
->  * clock-frequency: should be the frequency (in Hz) of the ciu clock.  If this
->    is specified and the ciu clock is specified then we'll try to set the ciu
-> @@ -75,6 +77,10 @@ Optional properties:
->  * vmmc-supply: The phandle to the regulator to use for vmmc.  If this is
->    specified we'll defer probe until we can find this regulator.
->  
-> +* default-sample-phase: The default phase to set ciu_sample at probing, low
-> +  speeds or in case where all phases work at tuning time. If not specified
-> +  0 deg will be used.
-> +
->  Aliases:
->  
->  - All the MSHC controller nodes should be represented in the aliases node using
-> 
+Also I've an idea about how to fix that in general for all drivers (by 
+using the same algorithm I've now introduced just for DT-based drivers 
+with a device description). Wouldn't be that hard to use that for all 
+drivers, but as I've written in a follow up to the introductory mail, 
+one step after another.
+
+Regards,
+
+Alexander Holler
