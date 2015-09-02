@@ -1,51 +1,44 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 2 Sep 2015 12:10:52 +0100
-Subject: [PATCH 2/3] [v4] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
-In-Reply-To: <20150824235144.GH14330@codeaurora.org>
-References: <1438992995-22610-1-git-send-email-timur@codeaurora.org>
- <1438992995-22610-2-git-send-email-timur@codeaurora.org>
- <20150810094008.GD1604@arm.com> <55D2749A.401@codeaurora.org>
- <20150818082141.GA6281@e103592.cambridge.arm.com>
- <55D3825D.6020105@codeaurora.org>
- <20150819101426.GB6281@e103592.cambridge.arm.com>
- <55D4ABF4.5020600@codeaurora.org>
- <20150819163736.GC6281@e103592.cambridge.arm.com>
- <20150824235144.GH14330@codeaurora.org>
-Message-ID: <20150902111052.GG6281@e103592.cambridge.arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 2 Sep 2015 14:25:45 +0300
+Subject: [PATCH] video: fbdev: atmel_lcdfb: remove useless include
+In-Reply-To: <1439217114-12317-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1439217114-12317-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <55E6DCB9.2080204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 24, 2015 at 04:51:44PM -0700, sboyd at codeaurora.org wrote:
-> On 08/19, Dave Martin wrote:
-> > On Wed, Aug 19, 2015 at 11:16:52AM -0500, Timur Tabi wrote:
-> > > On 08/19/2015 05:14 AM, Dave Martin wrote:
-> > > >>>So does that mean that ldrb will zero-extend the byte to all 64 bits of x3?
-> > > >Yes.  No extra operation is required.
-> > > 
-> > > So my patch is actually correct as-is?
-> > 
-> > +static inline void __dcc_putchar(char c)
-> > +{
-> > +	asm volatile("msr dbgdtrtx_el0, %0"
-> > +			: /* No output register */
-> > +			: "r" (c));
-> > 
-> > For safety, you still need to make sure that c is appropriately masked
-> > before passing it to the asm.  Something like this should definitely be
-> > safe:
-> > 
-> > 			: "r" ((unsigned long)(unsigned char)c)
-> > 
-> > GCC can then emit uxtb or not, depending on whether it's needed in each
-> > context where the asm is inlined.
+
+
+On 10/08/15 17:31, Alexandre Belloni wrote:
+> Definitions from linux/platform_data/atmel.h are not used, remove the
+> include.
 > 
-> Does this mean we ought to do the same thing in the arm header
-> file too?
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/video/fbdev/atmel_lcdfb.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/video/fbdev/atmel_lcdfb.c b/drivers/video/fbdev/atmel_lcdfb.c
+> index abadc490fa1f..a5006788647c 100644
+> --- a/drivers/video/fbdev/atmel_lcdfb.c
+> +++ b/drivers/video/fbdev/atmel_lcdfb.c
+> @@ -19,7 +19,6 @@
+>  #include <linux/backlight.h>
+>  #include <linux/gfp.h>
+>  #include <linux/module.h>
+> -#include <linux/platform_data/atmel.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+>  #include <linux/of_gpio.h>
 
-Probably.
+Thanks, queued for 4.3.
 
-Even though current CPUs don't place special meaning on the upper bits,
-it's possible that future CPUs will.
+ Tomi
 
-Cheers
----Dave
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150902/1f3486fe/attachment.sig>
