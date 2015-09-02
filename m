@@ -1,43 +1,134 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 2 Sep 2015 19:23:03 +0200
-Subject: [RESEND PATCH 0/3 v6] Add Mediatek MT8173 cpufreq driver
-In-Reply-To: <CAGS+omAtiALWTjVJS4wNatXVLqZRSOk3m29QQvW=fQWs7Hs5ng@mail.gmail.com>
-References: <1439803465-19683-1-git-send-email-pi-cheng.chen@linaro.org>
- <20150826021659.GD8784@linux>
- <CALx668V2herrp6XOtCDR7nNvFhd7DLLMjXmr86cjfCOQ_cgmrw@mail.gmail.com>
- <22538895.vrRgZUmQTV@vostro.rjw.lan>
- <CAGS+omAtiALWTjVJS4wNatXVLqZRSOk3m29QQvW=fQWs7Hs5ng@mail.gmail.com>
-Message-ID: <55E73077.8060106@gmail.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Wed, 2 Sep 2015 10:24:36 -0700
+Subject: [PATCH] ARM: dts: keystone: use one to one address translations
+ under netcp
+In-Reply-To: <55E7255A.8060402@ti.com>
+References: <1441139324-29296-1-git-send-email-w-kwok2@ti.com>
+ <55E61658.9010207@oracle.com>
+ <230CBA6E4B6B6B418E8730AC28E6FC7E04221776@DFLE11.ent.ti.com>
+ <55E71AB3.7070406@oracle.com> <55E7255A.8060402@ti.com>
+Message-ID: <55E730D4.6040102@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/09/15 08:45, Daniel Kurtz wrote:
-> Matthias,
+On 9/2/2015 9:35 AM, Murali Karicheri wrote:
+> Santosh,
 >
-> On Fri, Aug 28, 2015 at 10:06 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->> On Wednesday, August 26, 2015 02:53:39 PM Pi-Cheng Chen wrote:
->>> On Wed, Aug 26, 2015 at 10:16 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->>>> On 26-08-15, 09:25, Pi-Cheng Chen wrote:
->>>>> The [3/3] is based on Mediatek SoC maintainer tree[1] and the patch which
->>>>> introduce a new clock type[2] consumed by MT8173 cpufreq driver. So it will
->>>>> cause some conflicts if it goes through your tree. I am not sure how this
->>>>> should be handled, but should it be merged through Mediatek SoC maintainer
->>>>> tree?
+> On 09/02/2015 11:50 AM, santosh shilimkar wrote:
+>> On 9/2/2015 8:31 AM, Kwok, WingMan wrote:
+>>>
+>>>
+>>>> -----Original Message-----
+>>>> From: santosh.shilimkar at oracle.com
+>>>> [mailto:santosh.shilimkar at oracle.com]
+>>>> Sent: Tuesday, September 01, 2015 5:19 PM
+>>>> To: Kwok, WingMan; robh+dt at kernel.org; pawel.moll at arm.com;
+>>>> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk;
+>>>> galak at codeaurora.org;
+>>>> linux at arm.linux.org.uk; devicetree at vger.kernel.org; linux-arm-
+>>>> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+>>>> ssantosh at kernel.org
+>>>> Cc: Karicheri, Muralidharan
+>>>> Subject: Re: [PATCH] ARM: dts: keystone: use one to one address
+>>>> translations
+>>>> under netcp
 >>>>
->>>> Just get that applied to MTK tree, it doesn't have any dependency on
->>>> rest of the patches for build/boot. The only thing is that cpufreq
->>>> wouldn't work and it will work as soon as Rafael's and MTK's trees are
->>>> merged by Linus.
+>>>> On 9/1/15 1:28 PM, WingMan Kwok wrote:
+>>>>> Network subsystem NetCP in Keystone-2 devices includes some HW blocks
+>>>>> that are memory mapped to ranges outside that of the NetCP itself.
+>>>>> Thus address space of a child node of the NetCP node needs to be
+>>>>> mapped 1:1 onto the parent address space.  Hence empty ranges
+>>>>> should be used under the NetCP node.
+>>>>>
+>>>>> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+>>>>> ---
+>>>>>    arch/arm/boot/dts/k2e-netcp.dtsi  |    8 +++-----
+>>>>>    arch/arm/boot/dts/k2hk-netcp.dtsi |   14 ++++++--------
+>>>>>    arch/arm/boot/dts/k2l-netcp.dtsi  |    8 +++-----
+>>>>>    3 files changed, 12 insertions(+), 18 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/k2e-netcp.dtsi b/arch/arm/boot/dts/k2e-
+>>>> netcp.dtsi
+>>>>> index b13b3c9..e103ed9 100644
+>>>>> --- a/arch/arm/boot/dts/k2e-netcp.dtsi
+>>>>> +++ b/arch/arm/boot/dts/k2e-netcp.dtsi
+>>>>> @@ -111,9 +111,7 @@ netcp: netcp at 24000000 {
+>>>>>        compatible = "ti,netcp-1.0";
+>>>>>        #address-cells = <1>;
+>>>>>        #size-cells = <1>;
+>>>>> -
+>>>>> -    /* NetCP address range */
+>>>>> -    ranges = <0 0x24000000 0x1000000>;
+>>>>> +    ranges;
+>>>>>
+>>>> What blocks are we talking here. We need to increase the
+>>>> range if the current range isn't covering entire NETCP
+>>>> address space. Removing range isn't a solution.
+>>>>
 >>>
->>> Thanks for your explanation.
+>>> The Serdes.  It is a HW block inside the NetCP but its address
+>>> space starts from 0x0232a000.  We can change the base in the
+>>> ranges property to include the serdes.  But then offsets of
+>>> other HW blocks that are within the NetCP address range will be
+>>> relative to this new base and are not as documented in the HW
+>>> user guides.
 >>>
->>> @Rafael, Would you please apply [1,2] to your tree?
->>
->> Applied, thanks!
+>> I suspected the same. I know back then we started with SERDES code
+>> with NETCP but as you already know, its a separate block which
+>> is needed for NIC card to work. Its more of phy and hence its
+>> having different address space is not surprising.
 >
-> Can you please apply [3] from this set to your dts tree?
+> Using Phy interface is not acceptable to the subsystem maintainer based
+> on the communication I had on this. Also the Phy here is tighly coupled
+> with the hardware block it is working with. So this model is not right
+> for SerDes driver as it require additional enhancements as described
+> below if needs to be used.
 >
+Thanks for update on that.
 
-I will as soon as v4.3-rc1 shows up.
+> The serdes initialization procedure requires checking the status in the
+> hardware block (PCIe, 1G or 10G) and then taking corrective action. This
+> means a Phy driver would require mapping of related hw address space
+> (PCIe, 1G and 10G) as well which is already mapped by the hardware
+> driver(PCIe, 1G and 10G). One solution is to treat this as a libray
+> function that can be called from the respective hardware device driver.
+>   A device node of h/w device (PCIe or 1G) in such as looks like
+>
+Or SerDes driver can embed the status reg address space.
+This is read only access so should be fine.
+
+> pcie {
+>
+>      serdes at someaddress {
+>          reg = <address of serdes>;
+>      }
+> }
+>
+> hw driver will call ks2_serdes_init(node, hw_base_address) to initialize
+> the serdes. Other APIs can be added to enable/disable lane or shutdown
+> etc. The libary will be added to drivers/soc/ti/ and used by various
+> device drivers to initialize and use the phy. As the serdes is slightly
+> integrated with the hardware block, IMO, this is a better approach than
+> using the phy model. The API definitions will be added to
+> include/linux/soc/ti/ folder.
+>
+Serdes Driver with its status register address space might solve this
+sharing problem. Library might work but we should try to have driver
+considering there is a physical device. I don't have strong opinion
+on drivers vs library.
+
+
+> The SerDes will use the firmware interface to download and configure the
+> hardware block to use with PCIe/1G/10G/SRIO. I queried the linux forum
+> on this and the response was that firmware interface can be used for
+> this. The patch will be using the firmware interface instead of
+> embedding magic values in the serdes driver.
+>
+Firmware interface usage seems to be correct way.
+Thanks for giving the details. It helped me to get better picture.
+
+Regards,
+Santosh
+
+Regards,
+Santosh
