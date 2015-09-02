@@ -1,30 +1,48 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 2 Sep 2015 16:35:28 -0700
-Subject: [PATCH v2 2/2] ARM: dts: rockchip: Remove specific cts pullup
- from veyron
-In-Reply-To: <1441236479-4941-3-git-send-email-amstan@chromium.org>
-References: <1441236479-4941-1-git-send-email-amstan@chromium.org>
- <1441236479-4941-3-git-send-email-amstan@chromium.org>
-Message-ID: <CAD=FV=UQz3ip3q4Kt8_HJrG800a9gzJDiaqoi6=JPBxO=6A80A@mail.gmail.com>
+Date: Wed, 2 Sep 2015 16:43:38 -0700
+Subject: [PATCH v3 2/2] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
+ support
+In-Reply-To: <20150902225008.GQ21084@n2100.arm.linux.org.uk>
+References: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <CAD=FV=WvUp7xhsmXJgVzm1Awqej12hNF_QPJhrQq7z=Fa4Nnuw@mail.gmail.com>
+ <20150902225008.GQ21084@n2100.arm.linux.org.uk>
+Message-ID: <CAD=FV=VuyQXNGt7dgF-YF7D7MDu31B-QuBdGpeC_+0b1F2=dKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alex,
+Russell,
 
-On Wed, Sep 2, 2015 at 4:27 PM, Alexandru M Stan <amstan@chromium.org> wrote:
-> With the previous patch ("rk3288: pull up cts lines") this is redundant,
-> I sent that patch for the same reason this existed here, so the lines don't
-> wiggle randomly when disconnected.
->
-> Signed-off-by: Alexandru M Stan <amstan@chromium.org>
-> ---
-> Changes in v2:
-> - Restrict changes only to cts pin, leave rts alone
-> - CC people with the firefly board
-> - New patch removing redundant pullup code from veyron
-> - cover letter
->
->  arch/arm/boot/dts/rk3288-veyron.dtsi | 12 ------------
->  1 file changed, 12 deletions(-)
+On Wed, Sep 2, 2015 at 3:50 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Never copy the of_node from one device to another.  That allows the
+> bus matching to unintentionally match the of_node against the wrong
+> driver.
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Can you be more specific about what problems you'd expect.  It seems
+like a terribly common practice to do this, but maybe I'm
+misunderstanding:
+
+On today's next, I do a simple:
+  git grep 'dev.of_node = '
+
+...and I find lots of hits:
+
+drivers/i2c/busses/i2c-at91.c:  dev->adapter.dev.of_node = pdev->dev.of_node;
+drivers/i2c/busses/i2c-axxia.c: idev->adapter.dev.of_node = pdev->dev.of_node;
+drivers/i2c/busses/i2c-bcm-iproc.c:     adap->dev.of_node = pdev->dev.of_node;
+drivers/i2c/busses/i2c-bcm-kona.c:      adap->dev.of_node = pdev->dev.of_node;
+drivers/i2c/busses/i2c-bcm2835.c:       adap->dev.of_node = pdev->dev.of_node;
+drivers/i2c/busses/i2c-brcmstb.c:       adap->dev.of_node = pdev->dev.of_node;
+...
+
+So unless I'm mistaken, the code I'm suggesting is a common practice.
+Perhaps there is a latent bug that's waiting to bite us.  If so then
+that bug should be reported and fixed.  ...but without seeing some
+concrete problem (or some reason that the code I'm suggesting is
+different than everyone else's code) it seems best to take it and to
+later fix it (along with all the other code) if/when we find some
+problem.
+
+Objections?
+
+-Doug
