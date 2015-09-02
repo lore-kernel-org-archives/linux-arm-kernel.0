@@ -1,86 +1,123 @@
-From: aalonso@freescale.com (Adrian Alonso)
-Date: Tue, 1 Sep 2015 17:49:13 -0500
-Subject: [PATCH v2 8/8] pinctrl: freescale: imx: imx7d iomuxc-lpsr devicetree
- bindings
-In-Reply-To: <1441147753-13239-1-git-send-email-aalonso@freescale.com>
-References: <1441147753-13239-1-git-send-email-aalonso@freescale.com>
-Message-ID: <1441147753-13239-8-git-send-email-aalonso@freescale.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 02 Sep 2015 09:15:11 +0900
+Subject: [PATCHv2] ARM: EXYNOS: reset Little cores when cpu is up
+In-Reply-To: <1441117023-25478-1-git-send-email-parkch98@gmail.com>
+References: <1441117023-25478-1-git-send-email-parkch98@gmail.com>
+Message-ID: <55E63F8F.4020300@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add iomuxc-lpsr devicetree bindings documentation
-Provide documentation context as well an example on
-pheriperals that could use pad from either iomuxc controller
-supported by iMX7D SoC
+On 01.09.2015 23:17, Chanho Park wrote:
+> The cpu booting of exynos5422 has been still broken since we discussed
+> it in last year[1]. This patch is inspired from Odroid XU3
+> code (Actually, it was from samsung exynos vendor kernel)[2]. This weird
+> reset code was founded exynos5420 octa cores series SoCs and only
+> required for the first boot core is the Little core (Cortex A7).
+> Some of the exynos5420 boards and all of the exynos5422 boards will require
+> this code.
+> 
+> There is two ways to check the little core is the first cpu. One is
+> checking GPG2CON[1] GPIO value and the other is checking the cluster
+> number of the first cpu. I selected the latter because it's more easier
+> than the former.
+> 
+> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350632.html
+> [2]:https://patchwork.kernel.org/patch/6782891/
+> 
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Chanho Park <parkch98@gmail.com>
+> ---
+> Changes from v1:
+>  .kfc to Little (Cortex A7) and eagle to big (Cortex A15)
+>  .append comments about waiting SPARE2 register
+> 
+> Changes since RFC:
+>  .drop checking soc_is_exynos5800 to extend this codes to
+> exynos5420/5422 boards.
+>  .kfc cores will be reset only if the cpu0 is kfc core.
+>  .Rebase top of the kukjin's for-next branch
+> 
+>  arch/arm/mach-exynos/mcpm-exynos.c | 25 ++++++++++++++++++++++++-
+>  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
+>  2 files changed, 30 insertions(+), 1 deletion(-)
 
-Signed-off-by: Adrian Alonso <aalonso@freescale.com>
----
-Changes for V2: New patch on imx7d iomuxc-lpsr patch series
+Thanks for updating the patch. Remaining minor nit about comment style
+(/* on first line) can be fixed while applying.
 
- .../bindings/pinctrl/fsl,imx7d-pinctrl.txt         | 43 ++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+The patch works good, after disabling bL switcher I have 8 cores running:
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
-index 8bbf25d..c7310fc 100644
---- a/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
-@@ -1,10 +1,19 @@
- * Freescale i.MX7 Dual IOMUX Controller
- 
-+iMX7D supports two iomuxc controllers, fsl,imx7d-iomuxc controller is similar
-+as previous iMX SoC generation and fsl,imx7d-iomuxc-lpsr which provides low
-+power state rentetion capabilities on gpios that are part of iomuxc-lpsr
-+(GPIO1_IO7..GPIO1_IO0).
-+
-+Pheriparials using pads from iomuxc-lpsr support low state retention power
-+state, under LPSR mode GPIO's state of pads are retain.
-+
- Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
- and usage.
- 
- Required properties:
- - compatible: "fsl,imx7d-iomuxc"
-+- compatible: "fsl-imx7d-iomuxc-lpsr"
- - fsl,pins: each entry consists of 6 integers and represents the mux and config
-   setting for one pin.  The first 5 integers <mux_reg conf_reg input_reg mux_val
-   input_val> are specified using a PIN_FUNC_ID macro, which can be found in
-@@ -25,3 +34,37 @@ PAD_CTL_DSE_X1                  (0 << 0)
- PAD_CTL_DSE_X2                  (1 << 0)
- PAD_CTL_DSE_X3                  (2 << 0)
- PAD_CTL_DSE_X4                  (3 << 0)
-+
-+Examples:
-+While iomuxc-lpsr is intended to be used by dedicated peripherals to take
-+advantages of LPSR power mode, is also possible that an IP to use pads from
-+any of the iomux controllers. For example the I2C1 IP can use SCL pad from
-+iomuxc-lpsr controller and SDA pad from iomuxc controller as:
-+
-+i2c1: i2c@30a20000 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1_1 &pinctrl_i2c1_2>;
-+	status = "okay";
-+};
-+
-+iomuxc-lpsr at 302c0000 {
-+	compatible = "fsl,imx7d-iomuxc-lpsr";
-+	reg = <0x302c0000 0x10000>;
-+
-+	pinctrl_i2c1_1: i2c1grp-1 {
-+		fsl,pins = <
-+			MX7D_PAD_GPIO1_IO04__I2C1_SCL 0x4000007f
-+		>;
-+	};
-+};
-+
-+iomuxc at 30330000 {
-+	compatible = "fsl,imx7d-iomuxc";
-+	reg = <0x30330000 0x10000>;
-+
-+	pinctrl_i2c1_2: i2c1grp-2 {
-+		fsl,pins = <
-+			MX7D_PAD_I2C1_SCL__I2C1_SCL 0x4000007f
-+		>;
-+	};
-+};
--- 
-2.1.4
+Tested on Odroid XU4:
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+It's 4.3 merge window so the patch will go probably to v4.4.
+
+Best regards,
+Krzysztof
+
+
+> 
+> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+> index 9bdf547..8926621 100644
+> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+> @@ -20,6 +20,7 @@
+>  #include <asm/cputype.h>
+>  #include <asm/cp15.h>
+>  #include <asm/mcpm.h>
+> +#include <asm/smp_plat.h>
+>  
+>  #include "regs-pmu.h"
+>  #include "common.h"
+> @@ -70,7 +71,29 @@ static int exynos_cpu_powerup(unsigned int cpu, unsigned int cluster)
+>  		cluster >= EXYNOS5420_NR_CLUSTERS)
+>  		return -EINVAL;
+>  
+> -	exynos_cpu_power_up(cpunr);
+> +	if (!exynos_cpu_power_state(cpunr)) {
+> +		exynos_cpu_power_up(cpunr);
+> +
+> +		/* This assumes the cluster number of the big cores(Cortex A15)
+> +		 * is 0 and the Little cores(Cortex A7) is 1.
+> +		 * When the system was booted from the Little core,
+> +		 * they should be reset during power up cpu.
+> +		 */
+> +		if (cluster &&
+> +		    cluster == MPIDR_AFFINITY_LEVEL(cpu_logical_map(0), 1)) {
+> +			/* Before we reset the Little cores, we should wait
+> +			 * the SPARE2 register is set to 1 because the init
+> +			 * codes of the iROM will set the register after
+> +			 * initialization.
+> +			 */
+> +			while (!pmu_raw_readl(S5P_PMU_SPARE2))
+> +				udelay(10);
+> +
+> +			pmu_raw_writel(EXYNOS5420_KFC_CORE_RESET(cpu),
+> +					EXYNOS_SWRESET);
+> +		}
+> +	}
+> +
+>  	return 0;
+>  }
+>  
+> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+> index b761433..fba9068 100644
+> --- a/arch/arm/mach-exynos/regs-pmu.h
+> +++ b/arch/arm/mach-exynos/regs-pmu.h
+> @@ -513,6 +513,12 @@ static inline unsigned int exynos_pmu_cpunr(unsigned int mpidr)
+>  #define SPREAD_ENABLE						0xF
+>  #define SPREAD_USE_STANDWFI					0xF
+>  
+> +#define EXYNOS5420_KFC_CORE_RESET0				BIT(8)
+> +#define EXYNOS5420_KFC_ETM_RESET0				BIT(20)
+> +
+> +#define EXYNOS5420_KFC_CORE_RESET(_nr)				\
+> +	((EXYNOS5420_KFC_CORE_RESET0 | EXYNOS5420_KFC_ETM_RESET0) << (_nr))
+> +
+>  #define EXYNOS5420_BB_CON1					0x0784
+>  #define EXYNOS5420_BB_SEL_EN					BIT(31)
+>  #define EXYNOS5420_BB_PMOS_EN					BIT(7)
+> 
