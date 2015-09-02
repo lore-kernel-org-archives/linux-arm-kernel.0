@@ -1,61 +1,86 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed,  2 Sep 2015 08:23:29 +0200
-Subject: [PATCH] ARM: fix alignement of __bug_table section entries
-Message-ID: <1441175009-26730-1-git-send-email-robert.jarzmik@free.fr>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Wed, 2 Sep 2015 11:59:14 +0530
+Subject: [PATCH 1/2] mmc: sdhci-pxav3: Fix tabbing issue
+In-Reply-To: <1441139486.12163.3.camel@perches.com>
+References: <1441135454-6902-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1441135454-6902-2-git-send-email-vaibhav.hiremath@linaro.org>
+ <1441139486.12163.3.camel@perches.com>
+Message-ID: <55E6973A.20305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On old ARM chips, unaligned accesses to memory are not trapped and
-fixed.  On module load, symbols are relocated, and the relocation of
-__bug_table symbols is done on a u32 basis. Yet the section is not
-aligned to a multiple of 4 address, but to a multiple of 2.
 
-This triggers an Oops on pxa architecture, where address 0xbf0021ea
-is the first relocation in the __bug_table section :
-  apply_relocate(): pxa3xx_nand: section 13 reloc 0 sym ''
-  Unable to handle kernel paging request at virtual address bf0021ea
-  pgd = e1cd0000
-  [bf0021ea] *pgd=c1cce851, *pte=c1cde04f, *ppte=c1cde01f
-  Internal error: Oops: 23 [#1] ARM
-  Modules linked in:
-  CPU: 0 PID: 606 Comm: insmod Not tainted 4.2.0-rc8-next-20150828-cm-x300+ #887
-  Hardware name: CM-X300 module
-  task: e1c68700 ti: e1c3e000 task.ti: e1c3e000
-  PC is at apply_relocate+0x2f4/0x3d4
-  LR is at 0xbf0021ea
-  pc : [<c000e7c8>]    lr : [<bf0021ea>]    psr: 80000013
-  sp : e1c3fe30  ip : 60000013  fp : e49e8c60
-  r10: e49e8fa8  r9 : 00000000  r8 : e49e7c58
-  r7 : e49e8c38  r6 : e49e8a58  r5 : e49e8920  r4 : e49e8918
-  r3 : bf0021ea  r2 : bf007034  r1 : 00000000  r0 : bf000000
-  Flags: Nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-  Control: 0000397f  Table: c1cd0018  DAC: 00000051
-  Process insmod (pid: 606, stack limit = 0xe1c3e198)
-  [<c000e7c8>] (apply_relocate) from [<c005ce5c>] (load_module+0x1248/0x1f5c)
-  [<c005ce5c>] (load_module) from [<c005dc54>] (SyS_init_module+0xe4/0x170)
-  [<c005dc54>] (SyS_init_module) from [<c000a420>] (ret_fast_syscall+0x0/0x38)
 
-Fix this by ensuring entries in __bug_table are all aligned to at least
-of multiple of 4. This transforms a module section  __bug_table as :
--   [12] __bug_table       PROGBITS        00000000 002232 000018 00   A  0   0  1
-+   [12] __bug_table       PROGBITS        00000000 002232 000018 00   A  0   0  4
+On Wednesday 02 September 2015 02:01 AM, Joe Perches wrote:
+> On Wed, 2015-09-02 at 00:54 +0530, Vaibhav Hiremath wrote:
+>> There were some coding style issues where spaces have been used instead
+>> of tabs, for example, in macro definitions, alignment of function
+>> declarations/definitions, etc...
+>>
+>> This patch fixes all such occurrences in the code.
+>> And also use BIT for bit definitions.
+>
+> Please send 2 patches instead.
+>
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/include/asm/bug.h | 1 +
- 1 file changed, 1 insertion(+)
+Really?
 
-diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-index b274bde24905..e7335a92144e 100644
---- a/arch/arm/include/asm/bug.h
-+++ b/arch/arm/include/asm/bug.h
-@@ -40,6 +40,7 @@ do {								\
- 		"2:\t.asciz " #__file "\n" 			\
- 		".popsection\n" 				\
- 		".pushsection __bug_table,\"a\"\n"		\
-+		".align 2\n"					\
- 		"3:\t.word 1b, 2b\n"				\
- 		"\t.hword " #__line ", 0\n"			\
- 		".popsection");					\
--- 
-2.1.4
+I had two separate patches earlier, but after looking at the changes
+squahsed them. Anyway, I do not have any strong opinion on this, so
+will separate it in next version.
+
+
+>> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+> []
+>> @@ -128,7 +133,7 @@ static int mv_conf_mbus_windows(struct platform_device *pdev,
+>>   }
+>>
+>>   static int armada_38x_quirks(struct platform_device *pdev,
+>> -			     struct sdhci_host *host)
+>> +			struct sdhci_host *host)
+>
+> This is not an improvement.
+>
+> The old code is aligned to the open parenthesis
+> and is fine.
+>
+
+Ok,
+Same here, I always use tabs. No strong opinion, so will remove it.
+
+>> @@ -284,10 +288,10 @@ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+>>   	 * FE-2946959
+>>   	 */
+>>   	if (pxa->sdio3_conf_reg) {
+>> -		u8 reg_val  = readb(pxa->sdio3_conf_reg);
+>> +		u8 reg_val = readb(pxa->sdio3_conf_reg);
+>>
+>>   		if (uhs == MMC_TIMING_UHS_SDR50 ||
+>> -		    uhs == MMC_TIMING_UHS_DDR50) {
+>> +				uhs == MMC_TIMING_UHS_DDR50) {
+>
+> Also not an improvement.
+>
+>> @@ -304,20 +308,20 @@ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+>>   }
+>>
+>>   static const struct sdhci_ops pxav3_sdhci_ops = {
+>> -	.set_clock = sdhci_set_clock,
+>> -	.platform_send_init_74_clocks = pxav3_gen_init_74_clocks,
+>> -	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+>> -	.set_bus_width = sdhci_set_bus_width,
+>> -	.reset = pxav3_reset,
+>> -	.set_uhs_signaling = pxav3_set_uhs_signaling,
+>> +	.set_clock			= sdhci_set_clock,
+>> +	.platform_send_init_74_clocks	= pxav3_gen_init_74_clocks,
+>> +	.get_max_clock			= sdhci_pltfm_clk_get_max_clock,
+>> +	.set_bus_width			= sdhci_set_bus_width,
+>> +	.reset				= pxav3_reset,
+>> +	.set_uhs_signaling		= pxav3_set_uhs_signaling,
+>
+> <shrug>  If you want.
+
+Please clarify.
+
+Thanks,
+Vaibhav
