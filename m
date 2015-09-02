@@ -1,29 +1,78 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 2 Sep 2015 09:52:41 +0200
-Subject: [PATCH v2 1/2] ARM: dts: Split audio configuration to separate
- exynos5422-odroidxu3-audio
-In-Reply-To: <1441157405-22123-1-git-send-email-k.kozlowski@samsung.com>
-References: <1441157405-22123-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <55E6AAC9.2010804@osg.samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed,  2 Sep 2015 09:57:01 +0200
+Subject: [PATCH v2] nand: sunxi: fix write to USER_DATA reg
+Message-ID: <1441180621-29708-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+The USER_DATA register cannot be accessed using byte accessors on A13
+SoCs, thus triggering a bug when using memcpy_toio on this register.
+Declare an NFC_USER_DATA() macro to convert the OOB buffer content into
+a suitable u32 value which can then be programmed with writel().
 
-On 09/02/2015 03:30 AM, Krzysztof Kozlowski wrote:
-> The Odroid XU4 board does not have audio codec so before adding DTS for
-> new board split the audio codec to separate DTSI file. Include the audio codec
-> DTSI in Odroid XU3 and XU3-Lite boards.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
+Also drop the oob_required contidion, since ->oob_pio already contains
+FFs when oob_required is false.
 
-Looks good to me.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
+Changes since v1:
+- drop the !oob_required conditional path
+- replace endianness conversions by a macro relying on byte shifting
+  operations
+---
+ drivers/mtd/nand/sunxi_nand.c | 25 ++++++++-----------------
+ 1 file changed, 8 insertions(+), 17 deletions(-)
 
-Best regards,
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index 6f93b29..0c29f6c 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -138,6 +138,10 @@
+ #define NFC_ECC_MODE		GENMASK(15, 12)
+ #define NFC_RANDOM_SEED		GENMASK(30, 16)
+ 
++/* NFC_USER_DATA helper macro */
++#define NFC_USER_DATA(buf)	((buf)[0] | ((buf)[1] << 8) | \
++				 ((buf)[2] << 16) | ((buf)[3] << 24))
++
+ #define NFC_DEFAULT_TIMEOUT_MS	1000
+ 
+ #define NFC_SRAM_SIZE		1024
+@@ -632,15 +636,9 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
+ 		offset = layout->eccpos[i * ecc->bytes] - 4 + mtd->writesize;
+ 
+ 		/* Fill OOB data in */
+-		if (oob_required) {
+-			tmp = 0xffffffff;
+-			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, &tmp,
+-				    4);
+-		} else {
+-			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE,
+-				    chip->oob_poi + offset - mtd->writesize,
+-				    4);
+-		}
++		writel(NFC_USER_DATA(chip->oob_poi +
++				     layout->oobfree[i].offset),
++		       nfc->regs + NFC_REG_USER_DATA_BASE);
+ 
+ 		chip->cmdfunc(mtd, NAND_CMD_RNDIN, offset, -1);
+ 
+@@ -770,14 +768,7 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
+ 		offset += ecc->size;
+ 
+ 		/* Fill OOB data in */
+-		if (oob_required) {
+-			tmp = 0xffffffff;
+-			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, &tmp,
+-				    4);
+-		} else {
+-			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, oob,
+-				    4);
+-		}
++		writel(NFC_USER_DATA(oob), nfc->regs + NFC_REG_USER_DATA_BASE);
+ 
+ 		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ACCESS_DIR |
+ 		      (1 << 30);
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+1.9.1
