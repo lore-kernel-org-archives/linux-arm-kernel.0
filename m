@@ -1,61 +1,81 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 02 Sep 2015 17:25:32 +0200
-Subject: [PATCH] ARM: dts: imx6sl: Complete the dcp node
-In-Reply-To: <1441206417-27805-1-git-send-email-festevam@gmail.com>
-References: <1441206417-27805-1-git-send-email-festevam@gmail.com>
-Message-ID: <1441207532.3137.22.camel@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 2 Sep 2015 08:30:16 -0700
+Subject: [PATCH 1/6] regulator: pbias: program pbias register offset in
+ pbias driver
+In-Reply-To: <1441190853-7133-2-git-send-email-kishon@ti.com>
+References: <1441190853-7133-1-git-send-email-kishon@ti.com>
+ <1441190853-7133-2-git-send-email-kishon@ti.com>
+Message-ID: <20150902153015.GR4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 02.09.2015, 12:06 -0300 schrieb Fabio Estevam:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> The DCP block present on MX6SL is compatible with the one on MX28,
-> so add the compatible string and also complete the interrupt entries.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6sl.dtsi | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index 320a27f..b105735 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -670,8 +670,12 @@
->  			};
+* Kishon Vijay Abraham I <kishon@ti.com> [150902 03:51]:
+> --- a/drivers/regulator/pbias-regulator.c
+> +++ b/drivers/regulator/pbias-regulator.c
+
+How about add a comment here:
+
+/* Offset from SCM general area (and syscon) base */
+  
+> +static const struct pbias_of_data pbias_of_data_omap2 = {
+> +	.offset = 0x230,
+> +};
+> +
+> +static const struct pbias_of_data pbias_of_data_omap3 = {
+> +	.offset = 0x2b0,
+> +};
+> +
+> +static const struct pbias_of_data pbias_of_data_omap4 = {
+> +	.offset = 0x60,
+> +};
+> +
+> +static const struct pbias_of_data pbias_of_data_omap5 = {
+> +	.offset = 0x60,
+> +};
+> +
+> +static const struct pbias_of_data pbias_of_data_dra7 = {
+> +	.offset = 0xe00,
+> +};
+> +
+>  static const struct of_device_id pbias_of_match[] = {
+>  	{ .compatible = "ti,pbias-omap", },
+> +	{ .compatible = "ti,pbias-omap2", .data = &pbias_of_data_omap2, },
+> +	{ .compatible = "ti,pbias-omap3", .data = &pbias_of_data_omap3, },
+> +	{ .compatible = "ti,pbias-omap4", .data = &pbias_of_data_omap4, },
+> +	{ .compatible = "ti,pbias-omap5", .data = &pbias_of_data_omap5, },
+> +	{ .compatible = "ti,pbias-dra7", .data = &pbias_of_data_dra7, },
+>  	{},
+>  };
+...
+
+> @@ -129,6 +161,18 @@ static int pbias_regulator_probe(struct platform_device *pdev)
+>  	if (IS_ERR(syscon))
+>  		return PTR_ERR(syscon);
 >  
->  			dcp: dcp at 020fc000 {
-> +				compatible = "fsl,imx28-dcp";
-
-Can we please start to make it good habit to always introduce a new
-compatible to the DTs, even if the blocks are the same in theory?
-
-We already had situations where the SoC IP integration exposed bugs,
-which need driver workarounds and the only way to detect such situations
-is to check the machine compatible in the driver, which is really ugly.
-
-So can we please make this:
-	compatible = "fsl,imx6sl-dcp", "fsl,imx28-dcp";
-
-This way we can bind any required driver changes to the new compatible
-if necessary, without the need to change the DT again. Keep in mind that
-we try to push DTs as ABI that doesn't need to be updated in steplock
-with the kernel.
-
-Regards,
-Lucas
-
->  				reg = <0x020fc000 0x4000>;
-> -				interrupts = <0 99 IRQ_TYPE_LEVEL_HIGH>;
-> +				interrupts = <0 99 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <0 100 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <0 101 IRQ_TYPE_LEVEL_HIGH>;
-> +				status = "okay";
->  			};
->  		};
+> +	match = of_match_device(of_match_ptr(pbias_of_match), &pdev->dev);
+> +	if (match && match->data) {
+> +		data = match->data;
+> +		offset = data->offset;
+> +	} else {
+> +		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +		if (!res)
+> +			return -EINVAL;
+> +
+> +		offset = res->start;
+> +	}
+> +
+>  	cfg.regmap = syscon;
+>  	cfg.dev = &pdev->dev;
 >  
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Maybe add a warning here for parsing the legacy broken IORESOURCE_MEM
+that's known to be broken from DT point of view?
+
+Other than that, looks OK to me and should allow also changing to
+use a generic solution, Mark may have some other comments.
+
+Anyways, something like this is needed for v4.3-rc cycle, probably
+best that Mark queues all these after review. So feel free to add
+for the whole series:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
