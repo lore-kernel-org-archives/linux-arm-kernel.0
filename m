@@ -1,81 +1,100 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  2 Sep 2015 15:16:20 -0300
-Subject: [PATCH 1/3] ARM: dts: imx7d: Add PWM support
-Message-ID: <1441217782-6304-1-git-send-email-festevam@gmail.com>
+Date: Wed,  2 Sep 2015 15:16:21 -0300
+Subject: [PATCH 2/3] ARM: dts: imx7d: Add USB support
+In-Reply-To: <1441217782-6304-1-git-send-email-festevam@gmail.com>
+References: <1441217782-6304-1-git-send-email-festevam@gmail.com>
+Message-ID: <1441217782-6304-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Add the PWM1-4 nodes.
-
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx7d.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ arch/arm/boot/dts/imx7d.dtsi | 71 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index b738ce0..15c2193 100644
+index 15c2193..90eb9f4 100644
 --- a/arch/arm/boot/dts/imx7d.dtsi
 +++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -570,6 +570,58 @@
+@@ -746,6 +746,77 @@
+ 				status = "disabled";
  			};
- 		};
  
-+		aips2: aips-bus at 30400000 {
-+			compatible = "fsl,aips-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x30400000 0x400000>;
-+			ranges;
-+
-+			pwm1: pwm at 30660000 {
-+				compatible = "fsl,imx7d-pwm", "fsl,imx27-pwm";
-+				reg = <0x30660000 0x10000>;
-+				interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_PWM1_ROOT_CLK>,
-+					 <&clks IMX7D_PWM1_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				#pwm-cells = <2>;
++			usbotg1: usb at 30b10000 {
++				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
++				reg = <0x30b10000 0x200>;
++				interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_USB_CTRL_CLK>;
++				fsl,usbphy = <&usbphy_nop1>;
++				fsl,usbmisc = <&usbmisc1 0>;
++				phy-clkgate-delay-us = <400>;
 +				status = "disabled";
 +			};
 +
-+			pwm2: pwm at 30670000 {
-+				compatible = "fsl,imx7d-pwm", "fsl,imx27-pwm";
-+				reg = <0x30670000 0x10000>;
-+				interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_PWM2_ROOT_CLK>,
-+					 <&clks IMX7D_PWM2_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				#pwm-cells = <2>;
++			usbotg2: usb at 30b20000 {
++				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
++				reg = <0x30b20000 0x200>;
++				interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_USB_CTRL_CLK>;
++				fsl,usbphy = <&usbphy_nop2>;
++				fsl,usbmisc = <&usbmisc2 0>;
++				phy-clkgate-delay-us = <400>;
 +				status = "disabled";
 +			};
 +
-+			pwm3: pwm at 30680000 {
-+				compatible = "fsl,imx7d-pwm", "fsl,imx27-pwm";
-+				reg = <0x30680000 0x10000>;
-+				interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_PWM3_ROOT_CLK>,
-+					 <&clks IMX7D_PWM3_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				#pwm-cells = <2>;
++			usbh: usb at 30b30000 {
++				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
++				reg = <0x30b30000 0x200>;
++				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_USB_CTRL_CLK>;
++				fsl,usbphy = <&usbphy_nop3>;
++				fsl,usbmisc = <&usbmisc3 0>;
++				phy_type = "hsic";
++				dr_mode = "host";
++				phy-clkgate-delay-us = <400>;
 +				status = "disabled";
 +			};
 +
-+			pwm4: pwm at 30690000 {
-+				compatible = "fsl,imx7d-pwm", "fsl,imx27-pwm";
-+				reg = <0x30690000 0x10000>;
-+				interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_PWM4_ROOT_CLK>,
-+					 <&clks IMX7D_PWM4_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				#pwm-cells = <2>;
-+				status = "disabled";
++			usbmisc1: usbmisc at 30b10200 {
++				#index-cells = <1>;
++				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
++				reg = <0x30b10200 0x200>;
 +			};
-+		};
 +
- 		aips3: aips-bus at 30800000 {
- 			compatible = "fsl,aips-bus", "simple-bus";
- 			#address-cells = <1>;
++			usbmisc2: usbmisc at 30b20200 {
++				#index-cells = <1>;
++				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
++				reg = <0x30b20200 0x200>;
++			};
++
++			usbmisc3: usbmisc at 30b30200 {
++				#index-cells = <1>;
++				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
++				reg = <0x30b30200 0x200>;
++			};
++
++			usbphy_nop1: usbphy_nop1 {
++				compatible = "usb-nop-xceiv";
++				clocks = <&clks IMX7D_USB_PHY1_CLK>;
++				clock-names = "main_clk";
++			};
++
++			usbphy_nop2: usbphy_nop2 {
++				compatible = "usb-nop-xceiv";
++				clocks = <&clks IMX7D_USB_PHY2_CLK>;
++				clock-names = "main_clk";
++			};
++
++			usbphy_nop3: usbphy_nop3 {
++				compatible = "usb-nop-xceiv";
++				clocks = <&clks IMX7D_USB_HSIC_ROOT_CLK>;
++				clock-names = "main_clk";
++			};
++
+ 			usdhc1: usdhc at 30b40000 {
+ 				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
+ 				reg = <0x30b40000 0x10000>;
 -- 
 1.9.1
