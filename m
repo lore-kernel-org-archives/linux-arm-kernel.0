@@ -1,34 +1,24 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 2 Sep 2015 11:03:33 -0700
-Subject: [PATCH v2] cpufreq-dt: add suspend frequency support
-In-Reply-To: <1441212476-21316-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1441212476-21316-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <55E739F5.8060000@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 2 Sep 2015 19:06:54 +0100
+Subject: [PATCH 1/6] regulator: pbias: program pbias register offset in
+ pbias driver
+In-Reply-To: <1441190853-7133-2-git-send-email-kishon@ti.com>
+References: <1441190853-7133-1-git-send-email-kishon@ti.com>
+ <1441190853-7133-2-git-send-email-kishon@ti.com>
+Message-ID: <20150902180654.GD5313@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2015 09:47 AM, Bartlomiej Zolnierkiewicz wrote:
-> Add suspend frequency support and set it to the boot frequency,
-> this matches what the old exynos-cpufreq driver has been doing.
->
-> This patch fixes suspend/resume support on Exynos4412 based
-> Trats2 board and reboot hang on Exynos4412 based Odroid U3
-> board.
->
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
-> This patch supersedes "[PATCH] ARM: dts: exynos4412-odroid-*: add
-> workaround for CPUfreq/reboot issue" one from yesterday.
+On Wed, Sep 02, 2015 at 04:17:28PM +0530, Kishon Vijay Abraham I wrote:
+> Add separate compatible strings for every platform and populate the
+> pbias register offset in the driver data.
+> This helps avoid depending on the dt for pbias register offset.
 
-What do we do about cpufreq-dt users that don't want to change frequency
-during suspend?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Can you respin with Tony's comment please and I'll apply?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150902/4b5d276d/attachment.sig>
