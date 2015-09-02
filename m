@@ -1,91 +1,114 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  2 Sep 2015 10:30:25 +0200
-Subject: [PATCH v3] mtd: nand: sunxi: rely on nand_dt_init initialization
-Message-ID: <1441182625-525-1-git-send-email-boris.brezillon@free-electrons.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 2 Sep 2015 10:00:02 +0100
+Subject: [PATCH v2 01/15] KVM: arm/arm64: VGIC: don't track used LRs in
+ the distributor
+In-Reply-To: <55E41383.2000109@linaro.org>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-2-git-send-email-andre.przywara@arm.com>
+ <55CB0B80.5040508@linaro.org> <55DB474F.7010202@arm.com>
+ <55E41383.2000109@linaro.org>
+Message-ID: <55E6BA92.9020906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nand_dt_init(), called from nand_scan_ident(), is already parsing the
-generic MTD/NAND DT properties, and initializing the nand_chip struct
-accordingly.
-Rely on this initialization instead of manually parsing those properties.
+On 31/08/15 09:42, Eric Auger wrote:
+> On 08/24/2015 06:33 PM, Andre Przywara wrote:
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
-Changes since v2:
-- fix a bug forcing ecc.mode to HW_ECC
-Changes since v1:
-- drop unused strength and blk_size variables
----
- drivers/mtd/nand/sunxi_nand.c | 27 ++++++++++-----------------
- 1 file changed, 10 insertions(+), 17 deletions(-)
+Salut Eric,
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index 0c29f6c..d644548 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -1076,16 +1076,9 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
- 			       struct device_node *np)
- {
- 	struct nand_chip *nand = mtd->priv;
--	int strength;
--	int blk_size;
- 	int ret;
- 
--	blk_size = of_get_nand_ecc_step_size(np);
--	strength = of_get_nand_ecc_strength(np);
--	if (blk_size > 0 && strength > 0) {
--		ecc->size = blk_size;
--		ecc->strength = strength;
--	} else {
-+	if (!ecc->size) {
- 		ecc->size = nand->ecc_step_ds;
- 		ecc->strength = nand->ecc_strength_ds;
- 	}
-@@ -1093,12 +1086,6 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
- 	if (!ecc->size || !ecc->strength)
- 		return -EINVAL;
- 
--	ecc->mode = NAND_ECC_HW;
--
--	ret = of_get_nand_ecc_mode(np);
--	if (ret >= 0)
--		ecc->mode = ret;
--
- 	switch (ecc->mode) {
- 	case NAND_ECC_SOFT_BCH:
- 		break;
-@@ -1224,15 +1211,18 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 	/* Default tR value specified in the ONFI spec (chapter 4.15.1) */
- 	nand->chip_delay = 200;
- 	nand->controller = &nfc->controller;
-+	/*
-+	 * Set the ECC mode to the default value in case nothing is specified
-+	 * in the DT.
-+	 */
-+	nand->ecc.mode = NAND_ECC_HW;
-+	nand->dn = np;
- 	nand->select_chip = sunxi_nfc_select_chip;
- 	nand->cmd_ctrl = sunxi_nfc_cmd_ctrl;
- 	nand->read_buf = sunxi_nfc_read_buf;
- 	nand->write_buf = sunxi_nfc_write_buf;
- 	nand->read_byte = sunxi_nfc_read_byte;
- 
--	if (of_get_nand_on_flash_bbt(np))
--		nand->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
--
- 	mtd = &chip->mtd;
- 	mtd->dev.parent = dev;
- 	mtd->priv = nand;
-@@ -1242,6 +1232,9 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 	if (ret)
- 		return ret;
- 
-+	if (nand->bbt_options & NAND_BBT_USE_FLASH)
-+		nand->bbt_options |= NAND_BBT_NO_OOB;
-+
- 	ret = sunxi_nand_chip_init_timings(chip, np);
- 	if (ret) {
- 		dev_err(dev, "could not configure chip timings: %d\n", ret);
--- 
-1.9.1
+...
+
+>>>> @@ -1126,9 +1124,9 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
+>>>>   */
+>>>>  bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+>>>>  {
+>>>> -   struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>>>>     struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>>>> -   struct vgic_lr vlr;
+>>>> +   u64 elrsr = vgic_get_elrsr(vcpu);
+>>>> +   unsigned long *elrsr_ptr = u64_to_bitmask(&elrsr);
+>>>>     int lr;
+>>>>
+>>>>     /* Sanitize the input... */
+>>>> @@ -1138,42 +1136,20 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+>>>>
+>>>>     kvm_debug("Queue IRQ%d\n", irq);
+>>>>
+>>>> -   lr = vgic_cpu->vgic_irq_lr_map[irq];
+>>>> -
+>>>> -   /* Do we have an active interrupt for the same CPUID? */
+>>>> -   if (lr != LR_EMPTY) {
+>>>> -           vlr = vgic_get_lr(vcpu, lr);
+>>>> -           if (vlr.source == sgi_source_id) {
+>>>> -                   kvm_debug("LR%d piggyback for IRQ%d\n", lr, vlr.irq);
+>>>> -                   BUG_ON(!test_bit(lr, vgic_cpu->lr_used));
+>>>> -                   vgic_queue_irq_to_lr(vcpu, irq, lr, vlr);
+>>>> -                   return true;
+>>>> -           }
+>>>> -   }
+>>>> +   lr = find_first_bit(elrsr_ptr, vgic->nr_lr);
+>>>>
+>>>> -   /* Try to use another LR for this interrupt */
+>>>> -   lr = find_first_zero_bit((unsigned long *)vgic_cpu->lr_used,
+>>>> -                          vgic->nr_lr);
+>>>>     if (lr >= vgic->nr_lr)
+>>>>             return false;
+>>>>
+>>>>     kvm_debug("LR%d allocated for IRQ%d %x\n", lr, irq, sgi_source_id);
+>>>> -   vgic_cpu->vgic_irq_lr_map[irq] = lr;
+>>>> -   set_bit(lr, vgic_cpu->lr_used);
+>>>>
+>>>> -   vlr.irq = irq;
+>>>> -   vlr.source = sgi_source_id;
+>>>> -   vlr.state = 0;
+>>>> -   vgic_queue_irq_to_lr(vcpu, irq, lr, vlr);
+>>>> +   vgic_queue_irq_to_lr(vcpu, irq, lr, sgi_source_id);
+>>>>
+>>>>     return true;
+>>>>  }
+>>>>
+>>>>  static bool vgic_queue_hwirq(struct kvm_vcpu *vcpu, int irq)
+>>>>  {
+>>>> -   if (!vgic_can_sample_irq(vcpu, irq))
+>>>> -           return true; /* level interrupt, already queued */
+>>>> -
+>>> I think that change needs to be introduced in a separate patch as the
+>>> other one mentioned above and justified since it affects the state machine.
+>>
+>> But this change is dependent on this patch: it will not work without
+>> this patch and this patch will not work without that change.
+>> So the idea is that on returning from the guest we now harvest all
+>> _used_ LRs by copying their state back into the distributor. The
+>> previous behaviour was to just check _unused_ LRs for completed IRQs.
+>> So now all IRQs need to be re-inserted into the LRs before the next
+>> guest run, that's why we have to remove the test which skipped this for
+>> IRQs where the code knew that they were still in the LRs.
+>> Does that make sense?
+> In level sensitive case, what if the IRQ'LR state was active. LR was
+> kept intact. IRQ is queued. With previous code we wouldn't inject a new
+> IRQ. Here aren't we going to inject it?
+
+Effectively we only inject _pending_ IRQs: I was going forth and back
+through the current code and couldn't find a place where we actually
+make use of any active-only interrupt - the only exception being
+migration, where we explicitly iterate through all LRs again and pick up
+active-only IRQs as well. We never set the active state except there.
+
+So I decided to keep only-active IRQs in the LRs and do not propagate
+them back into the emulated distributor state. One reason is that we
+don't use it, which makes the code look silly and secondly we avoid the
+issue you described above.
+
+> In the sync when you move the IRQ from the LR reg to the state variable,
+> shouldn't you reset the queued state for level sensitive case? In such a
+> case I think you could keep that check.
+
+We keep them as "queued" in our emulation until they become inactive and
+we clear the queued bit in the EOI handler.
+
+Admittedly this whole approach is not obvious and it's perfectly
+possible that I missed something. So please can you check and confirm my
+assumptions above?
+
+Merci,
+Andr?
