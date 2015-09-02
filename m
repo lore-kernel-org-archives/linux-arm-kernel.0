@@ -1,139 +1,100 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 2 Sep 2015 17:38:01 +0300
-Subject: [PATCH v2 2/2] arm64: don't load 32-bit binaries if platform has
- no aarch32_el0
-In-Reply-To: <CAKv+Gu-vVJjvp8q93=9Dea0WrsoRLTEeW4fuKLGKOCY7fbO4+g@mail.gmail.com>
-References: <1441202438-27005-1-git-send-email-ynorov@caviumnetworks.com>
- <1441202438-27005-3-git-send-email-ynorov@caviumnetworks.com>
- <CAKv+Gu-vVJjvp8q93=9Dea0WrsoRLTEeW4fuKLGKOCY7fbO4+g@mail.gmail.com>
-Message-ID: <20150902143801.GA27761@yury-N73SV>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 2 Sep 2015 17:43:34 +0300
+Subject: Antwort: Re: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option
+ for debug
+In-Reply-To: <OFFEAB70E0.C9C6AAC7-ONC1257EB3.0049139E-C1257EB3.004A5089@br-automation.com>
+References: <1432156863-19695-1-git-send-email-tony@atomide.com>
+ <1432156863-19695-3-git-send-email-tony@atomide.com>
+ <OFCA2F1DCE.C787A961-ONC1257EAE.001D79BC-C1257EAE.00203AFF@br-automation.com>
+ <55E59B9A.1010007@ti.com>
+ <OFFEAB70E0.C9C6AAC7-ONC1257EB3.0049139E-C1257EB3.004A5089@br-automation.com>
+Message-ID: <55E70B16.8050301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2015 at 04:15:52PM +0200, Ard Biesheuvel wrote:
-> On 2 September 2015 at 16:00, Yury Norov <ynorov@caviumnetworks.com> wrote:
-> > Kernel option COMPAT defines the ability of executing aarch32 binaries.
-> > Some platforms does not support aarch32 mode, and so cannot execute that
-> > binaries. But we cannot just disable COMPAT for them because the same
-> > kernel binary may be used by multiple platforms.
-> >
-> > In this patch, system_supports_aarch32_el0() is introduced to detect
-> > aarch32 support at run-time.
-> >
-> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> > ---
-> >  arch/arm64/include/asm/cpufeature.h |  1 +
-> >  arch/arm64/include/asm/cputype.h    |  8 ++++++++
-> >  arch/arm64/include/asm/elf.h        |  6 ++++--
-> >  arch/arm64/kernel/cpuinfo.c         | 12 ++++++++++++
-> >  4 files changed, 25 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> > index f0e4017..35f2654 100644
-> > --- a/arch/arm64/include/asm/cpufeature.h
-> > +++ b/arch/arm64/include/asm/cpufeature.h
-> > @@ -83,6 +83,7 @@ void check_local_cpu_errata(void);
-> >  void check_local_cpu_features(void);
-> >  bool cpu_supports_mixed_endian_el0(void);
-> >  bool system_supports_mixed_endian_el0(void);
-> > +bool system_supports_aarch32_el0(void);
-> >
-> >  #endif /* __ASSEMBLY__ */
-> >
-> > diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-> > index a84ec60..a24e42c 100644
-> > --- a/arch/arm64/include/asm/cputype.h
-> > +++ b/arch/arm64/include/asm/cputype.h
-> > @@ -81,6 +81,9 @@
-> >  #define ID_AA64MMFR0_BIGEND(mmfr0)     \
-> >         (((mmfr0) & ID_AA64MMFR0_BIGEND_MASK) >> ID_AA64MMFR0_BIGEND_SHIFT)
-> >
-> > +#define ID_AA64PFR0_EL0_64     1
-> > +#define ID_AA64PFR0_EL0_6432   2
-> > +
-> >  #define SCTLR_EL1_CP15BEN      (0x1 << 5)
-> >  #define SCTLR_EL1_SED          (0x1 << 8)
-> >
-> > @@ -116,6 +119,11 @@ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
-> >         return read_cpuid(CTR_EL0);
-> >  }
-> >
-> > +static inline bool id_aa64pfr0_aarch32_el0(u64 pfr0)
-> > +{
-> > +       return pfr0 == ID_AA64PFR0_EL0_6432;
-> > +}
-> > +
+On 01/09/15 16:31, Hannes Schmelzer wrote:
+>> Hi Hannes,
+> Hi Roger,
 > 
-> Shouldn't you be masking some bits in pfr0 before doing the comparison?
-> ID_AA64PFR0_EL1.EL0 occupies bits [3:0] only.
+>>
+>> On 27/08/15 08:52, Hannes Schmelzer wrote:
+>>> Hi Tony,
+>>>
+>>> Did anyone test this changeset on some AM335x board?
+>>>
+>>> Today I ran into trouble with that because:
+>>>
+>>> The GPMC controller gets reseted on kernel boot due to the 
+> missing/removed 
+>> HWMOD_INIT_NO_RESET flag.
+>>>
+>>> Primary this should not be a big problem, but on my board (maybe on 
+> all 
+>> AM335x) the GPMC doesn't behave as described in TRM.
+>>> Especially the GPMC_CONFIG register is not reset to 0h after reset, 
+> instead 
+>> it holds the value 0xa00 which is very strange because bit 10-31 are 
+> reserved.
+>>>
+>>> Further this 0xa00 means that Bit9 (WAIT1PINPOLARITY) is set, exactly 
+> this 
+>> causes my system to stall on first access the connected NAND flash 
+> because it 
+>> never becomes ready due to the wrong wait pin polarity. Maybe others 
+> dont't 
+>> run into trouble because they may use WAIT0PIN, which one has it's old 
+> polarity.
+>>
+>> So nand ready/busy pin is connected to waitpin1 through an inverter on 
+> your board?
+>>
+>> On am335x-evm we use waitpin0. Nand ready/busy is directly connected to 
+> waitpin0.
 > 
+> No there is no inverter between flash and AM335x, the READY_nBUSY line is 
+> directly connected to waitpin1.
+> But your sentence brings some good idea to me, i will try to solder some 
+> inverter into the READY_nBUSY line on my board and see if the problem 
+> appears again.
 
-Yes, it was in v1 but I lost in v2.
+Please don't do that. We want to maintain the NAND ready/busy# logic as it is.
 
-> >  static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
-> >  {
-> >         return (ID_AA64MMFR0_BIGEND(mmfr0) == 0x1) ||
-> > diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> > index faad6df..461897b 100644
-> > --- a/arch/arm64/include/asm/elf.h
-> > +++ b/arch/arm64/include/asm/elf.h
-> > @@ -21,6 +21,7 @@
-> >  /*
-> >   * ELF register definitions..
-> >   */
-> > +#include <asm/cpufeature.h>
-> >  #include <asm/ptrace.h>
-> >  #include <asm/user.h>
-> >
-> > @@ -173,8 +174,9 @@ typedef compat_elf_greg_t           compat_elf_gregset_t[COMPAT_ELF_NGREG];
-> >
-> >  /* AArch32 EABI. */
-> >  #define EF_ARM_EABI_MASK               0xff000000
-> > -#define compat_elf_check_arch(x)       (((x)->e_machine == EM_ARM) && \
-> > -                                        ((x)->e_flags & EF_ARM_EABI_MASK))
-> > +#define compat_elf_check_arch(x)       (system_supports_aarch32_el0()  \
-> > +                                       && ((x)->e_machine == EM_ARM)   \
-> > +                                       && ((x)->e_flags & EF_ARM_EABI_MASK))
-> >
-> >  #define compat_start_thread            compat_start_thread
-> >  #define COMPAT_SET_PERSONALITY(ex)     set_thread_flag(TIF_32BIT);
-> > diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> > index 75d5a86..4a6ae31 100644
-> > --- a/arch/arm64/kernel/cpuinfo.c
-> > +++ b/arch/arm64/kernel/cpuinfo.c
-> > @@ -36,6 +36,7 @@
-> >  DEFINE_PER_CPU(struct cpuinfo_arm64, cpu_data);
-> >  static struct cpuinfo_arm64 boot_cpu_data;
-> >  static bool mixed_endian_el0 = true;
-> > +static bool aarch32_el0 = true;
-> >
-> >  static char *icache_policy_str[] = {
-> >         [ICACHE_POLICY_RESERVED] = "RESERVED/UNKNOWN",
-> > @@ -79,13 +80,24 @@ bool system_supports_mixed_endian_el0(void)
-> >         return mixed_endian_el0;
-> >  }
-> >
-> > +bool system_supports_aarch32_el0(void)
-> > +{
-> > +       return aarch32_el0;
-> > +}
-> > +
-> >  static void update_mixed_endian_el0_support(struct cpuinfo_arm64 *info)
-> >  {
-> >         mixed_endian_el0 &= id_aa64mmfr0_mixed_endian_el0(info->reg_id_aa64mmfr0);
-> >  }
-> >
-> > +static void update_aarch32_el0_support(struct cpuinfo_arm64 *info)
-> > +{
-> > +       aarch32_el0 &= id_aa64pfr0_aarch32_el0(info->reg_id_aa64pfr0);
-> > +}
-> > +
-> >  static void update_cpu_features(struct cpuinfo_arm64 *info)
-> >  {
-> > +       update_aarch32_el0_support(info);
-> >         update_mixed_endian_el0_support(info);
-> >  }
-> >
-> > --
-> > 2.1.4
-> >
+> If i'm right in my theory that the value 0xa00 in GPMC_CONFIG register is 
+> the problem, the inverter would solve it.
+
+You really need to disable read/write monitoring in gpmc-settings.
+
+> 
+> You're right am335x-evm uses waitpin0, which one is not affected from this 
+> "bug".
+
+Why is it not affected by this bug? The polarities are same for am335x-evm and
+your board. Only the wait pin is different.
+
+> I have to use waitpin1, because i also have a 2nd ethernet interface 
+> connected, and there is waitpin0 uses for collission detect signal from 
+> the phy (other pinmux).
+> 
+>> For NAND operation read/write wait monitoring must be disabled.
+>> The nand driver uses the WAIT pin purely for Read/Busy signalling.
+>> Unfortunately the existing driver cannot handle anything other than 
+> waitpin 0 
+>> for nand for DT boot.
+> for sure ? have a look to omap-gpmc.c at line #90.
+> Here i can see that either can be used.
+
+Which tree are you referring to?
+
+> 
+>>
+>> I've tried to address this issue here
+>> http://thread.gmane.org/gmane.linux.drivers.devicetree/131076
+> This is useful if the READY_nBUSY line cannot be connected to the GPMC 
+> itself, instead it maybe connected to some other gpio.
+> But it doesn't solve the problem.
+
+It does. We are adding gpiolib and interrupt controller support for all
+the wait pins.
+
+cheers,
+-roger
