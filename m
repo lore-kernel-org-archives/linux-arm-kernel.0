@@ -1,60 +1,67 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  2 Sep 2015 16:38:05 +0100
-Subject: [PATCH v3 2/6] remoteproc: dt: Provide bindings for ST's Remote
- Processor Controller driver
+Date: Wed,  2 Sep 2015 16:38:08 +0100
+Subject: [PATCH v3 5/6] ARM: STiH407: Add nodes for RemoteProc
 In-Reply-To: <1441208289-17330-1-git-send-email-lee.jones@linaro.org>
 References: <1441208289-17330-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1441208289-17330-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1441208289-17330-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- .../devicetree/bindings/remoteproc/st-rproc.txt    | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+ arch/arm/boot/dts/stih407-family.dtsi | 40 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/remoteproc/st-rproc.txt b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
-new file mode 100644
-index 0000000..c3848f6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
-@@ -0,0 +1,35 @@
-+STMicroelectronics Co-Processor Bindings
-+----------------------------------------
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 33daa49..1c31918 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -608,5 +608,45 @@
+ 			status		= "okay";
+ 			tx-only;
+ 		};
 +
-+This binding provides support for adjunct processors found on ST SoCs.
++		st231_gp0: st231-gp0 at 40000000 {
++			compatible	= "st,st231-rproc";
++			reg		= <0x40000000 0x01000000>;
++			resets		= <&softreset STIH407_ST231_GP0_SOFTRESET>;
++			reset-names	= "sw_reset";
++			clocks		= <&clk_s_c0_flexgen CLK_ST231_GP_0>;
++			clock-frequency	= <600000000>;
++			st,syscfg	= <&syscfg_core 0x22c>;
++		};
 +
-+Co-processors can be controlled from the bootloader or the primary OS. If
-+the bootloader starts a co-processor, the primary OS must detect its state
-+and act accordingly.
++		st231_gp1: st231-gp1 at 41000000 {
++			compatible	= "st,st231-rproc";
++			reg		= <0x41000000 0x01000000>;
++			resets		= <&softreset STIH407_ST231_GP1_SOFTRESET>;
++			reset-names	= "sw_reset";
++			clocks		= <&clk_s_c0_flexgen CLK_ST231_GP_1>;
++			clock-frequency = <600000000>;
++			st,syscfg	= <&syscfg_core 0x220>;
++		};
 +
-+Required properties:
-+- compatible		Should be one of:
-+				"st,st231-rproc"
-+				"st,st40-rproc"
-+- reg			Size and length of reserved co-processor memory
-+- resets		Reset lines (See: ../reset/reset.txt)
-+- reset-names		Must be "sw_reset" and "pwr_reset"
-+- clocks		Clock for co-processor (See: ../clock/clock-bindings.txt)
-+- clock-frequency	Clock frequency to set co-processor at if the bootloader
-+			hasn't already done so
-+- st,syscfg		System configuration register which holds the boot vector
-+			for the co-processor
-+				1st cell: Phandle to syscon block
-+				2nd cell: Boot vector register offset
++		st231_audio: st231-audio at 42000000 {
++			compatible	= "st,st231-rproc";
++			reg		= <0x42000000 0x01000000>;
++			resets		= <&softreset STIH407_ST231_AUD_SOFTRESET>;
++			reset-names	= "sw_reset";
++			clocks		= <&clk_s_c0_flexgen CLK_ST231_AUD_0>;
++			clock-frequency	= <600000000>;
++			st,syscfg	= <&syscfg_core 0x228>;
++		};
 +
-+Example:
-+
-+	st231-audio at bae00000 {
-+		compatible	= "st,st231-rproc";
-+		reg		= <0xbae00000 0x01000000>;
-+		resets		= <&softreset STIH407_ST231_AUD_SOFTRESET>;
-+		reset-names	= "sw_reset";
-+		clocks		= <&clk_s_c0_flexgen CLK_ST231_AUD_0>;
-+		clock-frequency	= <600000000>;
-+		st,syscfg	= <&syscfg_core 0x228>;
-+	};
++		st231_dmu: st231-dmu at 43000000 {
++			compatible	= "st,st231-rproc";
++			reg		= <0x43000000 0x01000000>;
++			resets		= <&softreset STIH407_ST231_DMU_SOFTRESET>;
++			reset-names	= "sw_reset";
++			clocks		= <&clk_s_c0_flexgen CLK_ST231_DMU>;
++			clock-frequency	= <600000000>;
++			st,syscfg	= <&syscfg_core 0x224>;
++		};
+ 	};
+ };
 -- 
 1.9.1
