@@ -1,431 +1,74 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 2 Sep 2015 16:20:36 +0800
-Subject: [PATCH 2/2] arm64: dts: add dts files for Hisilicon Hip05-D02
- Development Board
-In-Reply-To: <55E6AC08.4000302@arm.com>
-References: <1440838361-1468-1-git-send-email-dingtianhong@huawei.com>	<1440838361-1468-3-git-send-email-dingtianhong@huawei.com>	<20150831131244.GB6194@leoy-linaro>
- <55E45A46.7040805@huawei.com> <55E67AD1.2010405@huawei.com>
- <55E6AC08.4000302@arm.com>
-Message-ID: <55E6B154.1000704@huawei.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Wed, 2 Sep 2015 13:49:53 +0530
+Subject: [RFC 2/3] mmc: sdhci: add host_ops->voltage_switch callback for
+ all other voltages
+In-Reply-To: <20150902150442.118d3305@xhacker>
+References: <1441135938-8056-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1441135938-8056-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150902150442.118d3305@xhacker>
+Message-ID: <55E6B129.1030002@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/9/2 15:58, Marc Zyngier wrote:
-> [Don't top-post, this is very annoying]
-> 
-> On 02/09/15 05:28, Ding Tianhong wrote:
->> Hi?Marc?
->>
->> Can you check this, I am not sure whether the GIC_CPU_MASK_SIMPLE(xx)
->> is used for gic-v3, maybe we should remove it, thanks.
-> 
-> The binding documentation
-> (Documentation/devicetree/bindings/arm/gic-v3.txt) is very clear:
-> 
->   The 3rd cell is the flags, encoded as follows:
->         bits[3:0] trigger type and level flags.
->                 1 = edge triggered
->                 4 = level triggered
-> 
-> There is no mask whatsoever, because that would restrict the interrupt
-> to only 32 CPUs at most.
-> 
-> So please remove this, this is just wrong.
-> 
-> Thanks,
-> 
-> 	M.
-> 
-Ok, thanks.
 
-Ding
 
->> Ding
+On Wednesday 02 September 2015 12:34 PM, Jisheng Zhang wrote:
+> On Wed, 2 Sep 2015 01:02:17 +0530
+> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
+>
+>> Currently, the sdhci_do_start_signal_voltage_switch() function invokes
+>> controller specific voltage switch configuration only for 1.8v usecase;
+>> but it is required for others as well.
 >>
->> On 2015/8/31 21:44, Ding Tianhong wrote:
->>> On 2015/8/31 21:12, Leo Yan wrote:
->>>> On Sat, Aug 29, 2015 at 04:52:41PM +0800, Ding Tianhong wrote:
->>>>> Add initial dtsi file to support Hisilicon Hip05-D02 Board with
->>>>> support of CPUs in four clusters and each cluster has quard Cortex-A57.
->>>>>
->>>>> Also add dts file to support Hip05-D02 development board.
->>>>>
->>>>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->>>>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->>>>> ---
->>>>>  arch/arm64/boot/dts/hisilicon/Makefile      |   2 +-
->>>>>  arch/arm64/boot/dts/hisilicon/hip05-d02.dts |  36 ++++
->>>>>  arch/arm64/boot/dts/hisilicon/hip05.dtsi    | 271 ++++++++++++++++++++++++++++
->>>>>  3 files changed, 308 insertions(+), 1 deletion(-)
->>>>>  create mode 100644 arch/arm64/boot/dts/hisilicon/hip05-d02.dts
->>>>>  create mode 100644 arch/arm64/boot/dts/hisilicon/hip05.dtsi
->>>>>
->>>>> diff --git a/arch/arm64/boot/dts/hisilicon/Makefile b/arch/arm64/boot/dts/hisilicon/Makefile
->>>>> index fa81a6e..cd158b8 100644
->>>>> --- a/arch/arm64/boot/dts/hisilicon/Makefile
->>>>> +++ b/arch/arm64/boot/dts/hisilicon/Makefile
->>>>> @@ -1,4 +1,4 @@
->>>>> -dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb
->>>>> +dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb hip05-d02.dtb
->>>>>  
->>>>>  always		:= $(dtb-y)
->>>>>  subdir-y	:= $(dts-dirs)
->>>>> diff --git a/arch/arm64/boot/dts/hisilicon/hip05-d02.dts b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
->>>>> new file mode 100644
->>>>> index 0000000..ae34e25
->>>>> --- /dev/null
->>>>> +++ b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
->>>>> @@ -0,0 +1,36 @@
->>>>> +/**
->>>>> + * dts file for Hisilicon D02 Development Board
->>>>> + *
->>>>> + * Copyright (C) 2014,2015 Hisilicon Ltd.
->>>>> + *
->>>>> + * This program is free software; you can redistribute it and/or modify
->>>>> + * it under the terms of the GNU General Public License version 2 as
->>>>> + * publishhed by the Free Software Foundation.
->>>>> + *
->>>>> + */
->>>>> +
->>>>> +/dts-v1/;
->>>>> +
->>>>> +#include "hip05.dtsi"
->>>>> +
->>>>> +/ {
->>>>> +	model = "Hisilicon Hip05 D02 Development Board";
->>>>> +	compatible = "hisilicon,hip05-d02";
->>>>> +
->>>>> +	memory at 00000000 {
->>>>> +		device_type = "memory";
->>>>> +		reg = <0x0 0x00000000 0x0 0x80000000>;
->>>>> +	};
->>>>> +
->>>>> +	aliases {
->>>>> +		serial0 = &uart0;
->>>>> +	};
->>>>> +
->>>>> +	chosen {
->>>>> +		stdout-path = "serial0:115200n8";
->>>>> +	};
->>>>> +};
->>>>> +
->>>>> +&uart0 {
->>>>> +	status = "ok";
->>>>> +};
->>>>> diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
->>>>> new file mode 100644
->>>>> index 0000000..da12d94
->>>>> --- /dev/null
->>>>> +++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
->>>>> @@ -0,0 +1,271 @@
->>>>> +/**
->>>>> + * dts file for Hisilicon D02 Development Board
->>>>> + *
->>>>> + * Copyright (C) 2014,2015 Hisilicon Ltd.
->>>>> + *
->>>>> + * This program is free software; you can redistribute it and/or modify
->>>>> + * it under the terms of the GNU General Public License version 2 as
->>>>> + * publishhed by the Free Software Foundation.
->>>>> + *
->>>>> + */
->>>>> +
->>>>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->>>>> +
->>>>> +/ {
->>>>> +	compatible = "hisilicon,hip05-d02";
->>>>> +	interrupt-parent = <&gic>;
->>>>> +	#address-cells = <2>;
->>>>> +	#size-cells = <2>;
->>>>> +
->>>>> +	psci {
->>>>> +		compatible = "arm,psci-0.2";
->>>>> +		method = "smc";
->>>>> +	};
->>>>> +
->>>>> +	cpus {
->>>>> +		#address-cells = <1>;
->>>>> +		#size-cells = <0>;
->>>>> +
->>>>> +		cpu-map {
->>>>> +			cluster0 {
->>>>> +				core0 {
->>>>> +					cpu = <&cpu0>;
->>>>> +				};
->>>>> +				core1 {
->>>>> +					cpu = <&cpu1>;
->>>>> +				};
->>>>> +				core2 {
->>>>> +					cpu = <&cpu2>;
->>>>> +				};
->>>>> +				core3 {
->>>>> +					cpu = <&cpu3>;
->>>>> +				};
->>>>> +			};
->>>>> +			cluster1 {
->>>>> +				core0 {
->>>>> +					cpu = <&cpu4>;
->>>>> +				};
->>>>> +				core1 {
->>>>> +					cpu = <&cpu5>;
->>>>> +				};
->>>>> +				core2 {
->>>>> +					cpu = <&cpu6>;
->>>>> +				};
->>>>> +				core3 {
->>>>> +					cpu = <&cpu7>;
->>>>> +				};
->>>>> +			};
->>>>> +			cluster2 {
->>>>> +				core0 {
->>>>> +					cpu = <&cpu8>;
->>>>> +				};
->>>>> +				core1 {
->>>>> +					cpu = <&cpu9>;
->>>>> +				};
->>>>> +				core2 {
->>>>> +					cpu = <&cpu10>;
->>>>> +				};
->>>>> +				core3 {
->>>>> +					cpu = <&cpu11>;
->>>>> +				};
->>>>> +			};
->>>>> +			cluster3 {
->>>>> +				core0 {
->>>>> +					cpu = <&cpu12>;
->>>>> +				};
->>>>> +				core1 {
->>>>> +					cpu = <&cpu13>;
->>>>> +				};
->>>>> +				core2 {
->>>>> +					cpu = <&cpu14>;
->>>>> +				};
->>>>> +				core3 {
->>>>> +					cpu = <&cpu15>;
->>>>> +				};
->>>>> +			};
->>>>> +		};
->>>>> +
->>>>> +		cpu0: cpu at 20000 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>
->>>> Change to "arm,cortex-a57","arm,armv8"?
->>>>
->>>
->>> Ok?but I think should be "hisilicon,hip05","arm,armv8".
->>>
->>>>> +			reg = <0x20000>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu1: cpu at 20001 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20001>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu2: cpu at 20002 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20002>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu3: cpu at 20003 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20003>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu4: cpu at 20100 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20100>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu5: cpu at 20101 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20101>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu6: cpu at 20102 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20102>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu7: cpu at 20103 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20103>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu8: cpu at 20200 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20200>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu9: cpu at 20201 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20201>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu10: cpu at 20202 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20202>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu11: cpu at 20203 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20203>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu12: cpu at 20300 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20300>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu13: cpu at 20301 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20301>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu14: cpu at 20302 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20302>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +
->>>>> +		cpu15: cpu at 20303 {
->>>>> +			device_type = "cpu";
->>>>> +			compatible = "arm,armv8";
->>>>> +			reg = <0x20303>;
->>>>> +			enable-method = "psci";
->>>>> +		};
->>>>> +	};
->>>>> +
->>>>> +	gic: interrupt-controller at 8d000000 {
->>>>> +		compatible = "arm,gic-v3";
->>>>> +                #interrupt-cells = <3>;
->>>>> +                #address-cells = <2>;
->>>>> +                #size-cells = <2>;
->>>>> +                ranges;
->>>>> +                interrupt-controller;
->>>>> +                #redistributor-regions = <1>;
->>>>> +                redistributor-stride = <0x0 0x30000>;
->>>>> +		reg = <0x0 0x8d000000 0 0x10000>,	/* GICD */
->>>>> +		      <0x0 0x8d100000 0 0x300000>,	/* GICR */
->>>>> +		      <0x0 0xfe000000 0 0x10000>,	/* GICC */
->>>>> +		      <0x0 0xfe010000 0 0x10000>,       /* GICH */
->>>>> +		      <0x0 0xfe020000 0 0x10000>;       /* GICV */
->>>>> +		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
->>>>> +
->>>>> +		its_totems: interrupt-controller at 8c000000 {
->>>>> +			compatible = "arm,gic-v3-its";
->>>>> +			msi-controller;
->>>>> +			reg = <0x0 0x8c000000 0x0 0x1000000>;
->>>>> +		};
->>>>> +	};
->>>>> +
->>>>> +	timer {
->>>>> +		compatible = "arm,armv8-timer";
->>>>> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
->>>>> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
->>>>> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
->>>>> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
->>>>
->>>> Here have a question:
->>>> In devcie tree binding file: Documentation/devicetree/bindings/arm/gic.txt,
->>>> it only considers for maximum 8 cpus. So will we need change the
->>>> binding file and also use GIC_CPU_MASK_SIMPLE(16) for 16 cores?
->>>>
->>>
->>> Looks like should updtate gic.txt and use the GIC_CPU_MASK_SIMPLE(16) for 16 cores.
->>>
->>> Ding
->>>
->>>>> +	};
->>>>> +
->>>>> +	pmu {
->>>>> +		compatible = "arm,armv8-pmuv3";
->>>>> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_HIGH>;
->>>>> +	};
->>>>> +
->>>>> +	soc {
->>>>> +		compatible = "simple-bus";
->>>>> +		#address-cells = <2>;
->>>>> +		#size-cells = <2>;
->>>>> +		ranges;
->>>>> +
->>>>> +		refclk200mhz: refclk200mhz {
->>>>> +			compatible = "fixed-clock";
->>>>> +			#clock-cells = <0>;
->>>>> +			clock-frequency = <200000000>;
->>>>> +		};
->>>>> +
->>>>> +		uart0: uart at 80300000 {
->>>>> +			compatible = "snps,dw-apb-uart";
->>>>> +			reg = <0x0 0x80300000 0x0 0x10000>;
->>>>> +			interrupts = <GIC_SPI 317 IRQ_TYPE_LEVEL_HIGH>;
->>>>> +			clocks = <&refclk200mhz>;
->>>>> +			clock-names = "apb_pclk";
->>>>> +			reg-shift = <2>;
->>>>> +			reg-io-width = <4>;
->>>>> +			status = "disabled";
->>>>> +		};
->>>>> +
->>>>> +		uart1: uart at 80310000 {
->>>>> +			compatible = "snps,dw-apb-uart";
->>>>> +			reg = <0x0 0x80310000 0x0 0x10000>;
->>>>> +			interrupts = <GIC_SPI 318 IRQ_TYPE_LEVEL_HIGH>;
->>>>> +			clocks = <&refclk200mhz>;
->>>>> +			clock-names = "apb_pclk";
->>>>> +			reg-shift = <2>;
->>>>> +			reg-io-width = <4>;
->>>>> +			status = "disabled";
->>>>> +		};
->>>>> +	};
->>>>> +};
->>>>> -- 
->>>>> 1.9.0
->>>>>
->>>>>
->>>>>
->>>>> _______________________________________________
->>>>> linux-arm-kernel mailing list
->>>>> linux-arm-kernel at lists.infradead.org
->>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>>
->>>> .
->>>>
->>>
->>>
->>> _______________________________________________
->>> linuxarm mailing list
->>> linuxarm at huawei.com
->>> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
->>>
+>> For example, in case of PXA1928 SDH controller, we need to set different
+>> configuration for 3.3, 1.8 and 1.2 volt support (I/O domain power
+>> control register).
 >>
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>> ---
+>> Note:
+>> Currently ->voltage_switch() callback is only supported
+>> in f_sdh30 driver. And I am not sure on the dependency of execution
+>> sequence for that device. I could have moved ->voltage_switch() call
+>> at one common place (above/below), but was not quite sure about it.
+>> So, replicated/duplicated the call for other voltages.
 >>
-> 
-> 
+>>   drivers/mmc/host/sdhci.c | 8 ++++++++
+>>   1 file changed, 8 insertions(+)
+>>
+>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+>> index 3dd295f..b59b76d 100644
+>> --- a/drivers/mmc/host/sdhci.c
+>> +++ b/drivers/mmc/host/sdhci.c
+>> @@ -1753,6 +1753,10 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
+>>   		/* Wait for 5ms */
+>>   		usleep_range(5000, 5500);
+>>
+>> +		/* Some controller need to do more when switching */
+>> +		if (host->ops->voltage_switch)
+>> +			host->ops->voltage_switch(host, MMC_SIGNAL_VOLTAGE_330);
+>
+> Could this be implemented by regulator API? From patch set 3/3, the pxa1928
+> voltage_switch hook is to operate the IO pad registers, this seems not belong
+> to the SDHC IP core.
+>
+
+Not quite sure whether regulator would be right fit for this.
+
+Initially I was thinking of making use of pinconf framework, using
+PIN_CONFIG_POWER_SOURCE, but that too I am not sure is the right way of
+doing it.
+
+Probably, question for pinctrl maintainer. Looping Linus Walleji.
+
+Also note that, this configuration is not applicable to all pins/pads,
+only handpicked pads have this configuration (voltage selection on
+pads).
+And this configuration is not part of the same register map.
+
+It is part of separate register map (AIB_EXT_REG_BASE), called IO
+domain power control register.
+And that
+
+Thanks,
+Vaibhav
