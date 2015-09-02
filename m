@@ -1,61 +1,61 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 2 Sep 2015 17:23:25 -0500
-Subject: [PATCH v2 1/4] of/pci: Add of_pci_check_probe_only to parse
- "linux,pci-probe-only"
-In-Reply-To: <CAL_JsqL7VPB6nc-zRYm_73ZSgYVq_+a6sW_XZZ_LRaUXf4jTng@mail.gmail.com>
-References: <1439569159-10051-1-git-send-email-marc.zyngier@arm.com>
- <1439569159-10051-2-git-send-email-marc.zyngier@arm.com>
- <CAL_JsqL7VPB6nc-zRYm_73ZSgYVq_+a6sW_XZZ_LRaUXf4jTng@mail.gmail.com>
-Message-ID: <20150902222325.GD829@google.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Wed, 2 Sep 2015 17:33:32 -0500
+Subject: [RFC][PATCH 2/2] crypto: caam - handle core endianness != caam
+ endianness
+In-Reply-To: <BY1PR03MB1404538A6C4D0A85F7DD2E7080690@BY1PR03MB1404.namprd03.prod.outlook.com>
+References: <1440762306-7764-1-git-send-email-horia.geanta@freescale.com>
+ <1440762608-7866-1-git-send-email-horia.geanta@freescale.com>
+ <1441068591.4966.47.camel@freescale.com>
+ <BY1PR03MB1404538A6C4D0A85F7DD2E7080690@BY1PR03MB1404.namprd03.prod.outlook.com>
+Message-ID: <1441233212.4966.174.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 04:08:10PM -0500, Rob Herring wrote:
-> On Fri, Aug 14, 2015 at 11:19 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > Both pci-host-generic and Pseries parse the "linux,pci-probe-only"
-> > to engage the PCI_PROBE_ONLY mode, and both have a subtle bug that
-> > can be triggered if the property has no parameter.
+On Wed, 2015-09-02 at 01:25 -0500, Porosanu Alexandru-B06830 wrote:
+> Hi Scott,
 > 
-> Humm, I bet we could break a lot of machines if we fixed the core code
-> to properly make pp->value NULL when there is no value.
-> 
-> > Provide a generic implementation that can be used by both.
-> >
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  drivers/of/of_pci.c    | 30 ++++++++++++++++++++++++++++++
-> >  include/linux/of_pci.h |  3 +++
-> >  2 files changed, 33 insertions(+)
-> >
-> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> > index 5751dc5..a4e29ff 100644
-> > --- a/drivers/of/of_pci.c
-> > +++ b/drivers/of/of_pci.c
-> > @@ -118,6 +118,36 @@ int of_get_pci_domain_nr(struct device_node *node)
-> >  EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
-> >
-> >  /**
-> > + * of_pci_check_probe_only - Setup probe only mode if linux,pci-probe-only
-> > + *                           is present and valid
-> > + *
-> > + * @node: device tree node that may contain the property (usually "chosen")
-> > + *
-> > + */
-> > +void of_pci_check_probe_only(struct device_node *node)
-> > +{
-> > +       const int *prop;
-> > +       int len;
-> > +
-> > +       if (!node)
-> > +               return;
-> > +
-> > +       prop = of_get_property(node, "linux,pci-probe-only", &len);
-> 
-> It is preferred to use of_property_read_u32 to avoid just these types
-> of problems.
+> > -----Original Message-----
+> > From: Wood Scott-B07421
+> > Sent: 1 septembrie 2015 03:50
+> > To: Geanta Neag Horia Ioan-B05471
+> > Cc: Herbert Xu; Catalin Marinas; Will Deacon; linux-crypto at vger.kernel.org;
+> > 
+> > David S. Miller; linux-arm-kernel at lists.infradead.org; linux-
+> > kernel at vger.kernel.org; Milhoan Victoria-B42089; Cornelius Steven-
+> > STEVENEC; Estevam Fabio-R49496; Porosanu Alexandru-B06830
+> > Subject: Re: [RFC][PATCH 2/2] crypto: caam - handle core endianness !=
+> > caam endianness
+> > 
+> > On Fri, 2015-08-28 at 14:50 +0300, Horia Geant? wrote:
+> > > 
+> > > -#ifdef __BIG_ENDIAN
+> > > -#define wr_reg32(reg, data) out_be32(reg, data)
+> > > -#define rd_reg32(reg) in_be32(reg)
+> > > +#ifdef CONFIG_CRYPTO_DEV_FSL_CAAM_LE
+> > > +#define caam16_to_cpu(value) le16_to_cpu(value)
+> > > +#define cpu_to_caam16(value) cpu_to_le16(value)
+> > > +#define caam32_to_cpu(value) le32_to_cpu(value)
+> > > +#define cpu_to_caam32(value) cpu_to_le32(value)
+> > > +#define caam64_to_cpu(value) le64_to_cpu(value)
+> > > +#define cpu_to_caam64(value) cpu_to_le64(value)
+> > 
+> > What if we want to build a kernel that supports a chip with an LE CAAM and
+> > another chip with a BE CAAM (e.g. ls1043a plus ls2080a)?  This information
+> > needs to come at runtime.
+> [AP] We're currently targeting local SEC (where local means SEC is on the 
+> SoC). Having this information at run-time will add some penalty as opposed 
+> to having these accessory as macros.
 
-I don't know enough OF to really understand this, but I infer that
-this is a suggestion for improving the patch.  Should I be waiting for
-a v3 series?
+It is important to be able to have one kernel that works on multiple SoCs.  
+You could perhaps have a config option that optimizes one way or another 
+(with a check that refuses to probe on the wrong-endian hardware) but please 
+have a runtime check for the default configuration.  Otherwise the most 
+likely result is that default configs won't enable CAAM support at all.
 
-Bjorn
+How severe is the performance penalty?  Perhaps the decision can be made at a 
+higher level for performance-critical parts of the driver (e.g. replace the 
+entire calling function rather than each I/O access)?  Have the hardware 
+designers been made aware of the performance consequence of their 
+inconsistency?
+
+-Scott
