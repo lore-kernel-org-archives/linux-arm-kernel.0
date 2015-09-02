@@ -1,31 +1,70 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  2 Sep 2015 16:38:04 +0100
-Subject: [PATCH v3 1/6] ARM: STi: Add DT defines for co-processor reset lines
+Date: Wed,  2 Sep 2015 16:38:07 +0100
+Subject: [PATCH v3 4/6] remoteproc: debugfs: Add ability to boot remote
+ processor using debugfs
 In-Reply-To: <1441208289-17330-1-git-send-email-lee.jones@linaro.org>
 References: <1441208289-17330-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1441208289-17330-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1441208289-17330-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This functionality is especially useful during the testing phase.  When
+used in conjunction with Mailbox's Test Framework we can trivially conduct
+end-to-end testing i.e. boot co-processor, send and receive messages to
+the co-processor, then shut it down again (repeat as required).
+
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- include/dt-bindings/reset-controller/stih407-resets.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/remoteproc/remoteproc_debugfs.c | 34 +++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/include/dt-bindings/reset-controller/stih407-resets.h b/include/dt-bindings/reset-controller/stih407-resets.h
-index 02d4328..4ab3a1c 100644
---- a/include/dt-bindings/reset-controller/stih407-resets.h
-+++ b/include/dt-bindings/reset-controller/stih407-resets.h
-@@ -52,6 +52,10 @@
- #define STIH407_KEYSCAN_SOFTRESET	26
- #define STIH407_USB2_PORT0_SOFTRESET	27
- #define STIH407_USB2_PORT1_SOFTRESET	28
-+#define STIH407_ST231_AUD_SOFTRESET	29
-+#define STIH407_ST231_DMU_SOFTRESET	30
-+#define STIH407_ST231_GP0_SOFTRESET	31
-+#define STIH407_ST231_GP1_SOFTRESET	32
+diff --git a/drivers/remoteproc/remoteproc_debugfs.c b/drivers/remoteproc/remoteproc_debugfs.c
+index 9d30809..8113c18 100644
+--- a/drivers/remoteproc/remoteproc_debugfs.c
++++ b/drivers/remoteproc/remoteproc_debugfs.c
+@@ -88,8 +88,42 @@ static ssize_t rproc_state_read(struct file *filp, char __user *userbuf,
+ 	return simple_read_from_buffer(userbuf, count, ppos, buf, i);
+ }
  
- /* Picophy reset defines */
- #define STIH407_PICOPHY0_RESET		0
++static ssize_t rproc_state_write(struct file *filp, const char __user *userbuf,
++				 size_t count, loff_t *ppos)
++{
++	struct rproc *rproc = filp->private_data;
++	char buf[10];
++	int ret;
++
++	if (count > sizeof(buf))
++		return count;
++
++	ret = copy_from_user(buf, userbuf, count);
++	if (ret)
++		return -EFAULT;
++
++	if (buf[count - 1] == '\n')
++		buf[count - 1] = '\0';
++
++	if (!strncmp(buf, "start", count)) {
++		ret = rproc_boot(rproc);
++		if (ret) {
++			dev_err(&rproc->dev, "Boot failed: %d\n", ret);
++			return ret;
++		}
++	} else if (!strncmp(buf, "stop", count)) {
++		rproc_shutdown(rproc);
++	} else {
++		dev_err(&rproc->dev, "Unrecognised option: %s\n", buf);
++		return -EINVAL;
++	}
++
++	return count;
++}
++
+ static const struct file_operations rproc_state_ops = {
+ 	.read = rproc_state_read,
++	.write = rproc_state_write,
+ 	.open = simple_open,
+ 	.llseek	= generic_file_llseek,
+ };
 -- 
 1.9.1
