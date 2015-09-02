@@ -1,83 +1,91 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 2 Sep 2015 16:26:27 +0800
-Subject: [RFC 2/3] mmc: sdhci: add host_ops->voltage_switch callback for
- all other voltages
-In-Reply-To: <55E6B129.1030002@linaro.org>
-References: <1441135938-8056-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1441135938-8056-3-git-send-email-vaibhav.hiremath@linaro.org>
- <20150902150442.118d3305@xhacker>	<55E6B129.1030002@linaro.org>
-Message-ID: <20150902162627.682cdedf@xhacker>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed,  2 Sep 2015 10:30:25 +0200
+Subject: [PATCH v3] mtd: nand: sunxi: rely on nand_dt_init initialization
+Message-ID: <1441182625-525-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Sep 2015 13:49:53 +0530
-Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
+nand_dt_init(), called from nand_scan_ident(), is already parsing the
+generic MTD/NAND DT properties, and initializing the nand_chip struct
+accordingly.
+Rely on this initialization instead of manually parsing those properties.
 
-> 
-> 
-> On Wednesday 02 September 2015 12:34 PM, Jisheng Zhang wrote:
-> > On Wed, 2 Sep 2015 01:02:17 +0530
-> > Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
-> >
-> >> Currently, the sdhci_do_start_signal_voltage_switch() function invokes
-> >> controller specific voltage switch configuration only for 1.8v usecase;
-> >> but it is required for others as well.
-> >>
-> >> For example, in case of PXA1928 SDH controller, we need to set different
-> >> configuration for 3.3, 1.8 and 1.2 volt support (I/O domain power
-> >> control register).
-> >>
-> >> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> >> ---
-> >> Note:
-> >> Currently ->voltage_switch() callback is only supported
-> >> in f_sdh30 driver. And I am not sure on the dependency of execution
-> >> sequence for that device. I could have moved ->voltage_switch() call
-> >> at one common place (above/below), but was not quite sure about it.
-> >> So, replicated/duplicated the call for other voltages.
-> >>
-> >>   drivers/mmc/host/sdhci.c | 8 ++++++++
-> >>   1 file changed, 8 insertions(+)
-> >>
-> >> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> >> index 3dd295f..b59b76d 100644
-> >> --- a/drivers/mmc/host/sdhci.c
-> >> +++ b/drivers/mmc/host/sdhci.c
-> >> @@ -1753,6 +1753,10 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
-> >>   		/* Wait for 5ms */
-> >>   		usleep_range(5000, 5500);
-> >>
-> >> +		/* Some controller need to do more when switching */
-> >> +		if (host->ops->voltage_switch)
-> >> +			host->ops->voltage_switch(host, MMC_SIGNAL_VOLTAGE_330);
-> >
-> > Could this be implemented by regulator API? From patch set 3/3, the pxa1928
-> > voltage_switch hook is to operate the IO pad registers, this seems not belong
-> > to the SDHC IP core.
-> >
-> 
-> Not quite sure whether regulator would be right fit for this.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+Changes since v2:
+- fix a bug forcing ecc.mode to HW_ECC
+Changes since v1:
+- drop unused strength and blk_size variables
+---
+ drivers/mtd/nand/sunxi_nand.c | 27 ++++++++++-----------------
+ 1 file changed, 10 insertions(+), 17 deletions(-)
 
->From the patche[3/3], this can be achieved by abstracting the IO PAD as regulators
-then, we may not need to touch the core sdhci.c. But I'm not sure whether this
-is the good solution or not. sdhci Maintainers and experts may have better
-suggestions.
-
-> 
-> Initially I was thinking of making use of pinconf framework, using
-> PIN_CONFIG_POWER_SOURCE, but that too I am not sure is the right way of
-> doing it.
-> 
-> Probably, question for pinctrl maintainer. Looping Linus Walleji.
-> 
-> Also note that, this configuration is not applicable to all pins/pads,
-> only handpicked pads have this configuration (voltage selection on
-> pads).
-> And this configuration is not part of the same register map.
-> 
-> It is part of separate register map (AIB_EXT_REG_BASE), called IO
-> domain power control register.
-> And that
-> 
-> Thanks,
-> Vaibhav
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index 0c29f6c..d644548 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -1076,16 +1076,9 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
+ 			       struct device_node *np)
+ {
+ 	struct nand_chip *nand = mtd->priv;
+-	int strength;
+-	int blk_size;
+ 	int ret;
+ 
+-	blk_size = of_get_nand_ecc_step_size(np);
+-	strength = of_get_nand_ecc_strength(np);
+-	if (blk_size > 0 && strength > 0) {
+-		ecc->size = blk_size;
+-		ecc->strength = strength;
+-	} else {
++	if (!ecc->size) {
+ 		ecc->size = nand->ecc_step_ds;
+ 		ecc->strength = nand->ecc_strength_ds;
+ 	}
+@@ -1093,12 +1086,6 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
+ 	if (!ecc->size || !ecc->strength)
+ 		return -EINVAL;
+ 
+-	ecc->mode = NAND_ECC_HW;
+-
+-	ret = of_get_nand_ecc_mode(np);
+-	if (ret >= 0)
+-		ecc->mode = ret;
+-
+ 	switch (ecc->mode) {
+ 	case NAND_ECC_SOFT_BCH:
+ 		break;
+@@ -1224,15 +1211,18 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+ 	/* Default tR value specified in the ONFI spec (chapter 4.15.1) */
+ 	nand->chip_delay = 200;
+ 	nand->controller = &nfc->controller;
++	/*
++	 * Set the ECC mode to the default value in case nothing is specified
++	 * in the DT.
++	 */
++	nand->ecc.mode = NAND_ECC_HW;
++	nand->dn = np;
+ 	nand->select_chip = sunxi_nfc_select_chip;
+ 	nand->cmd_ctrl = sunxi_nfc_cmd_ctrl;
+ 	nand->read_buf = sunxi_nfc_read_buf;
+ 	nand->write_buf = sunxi_nfc_write_buf;
+ 	nand->read_byte = sunxi_nfc_read_byte;
+ 
+-	if (of_get_nand_on_flash_bbt(np))
+-		nand->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
+-
+ 	mtd = &chip->mtd;
+ 	mtd->dev.parent = dev;
+ 	mtd->priv = nand;
+@@ -1242,6 +1232,9 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+ 	if (ret)
+ 		return ret;
+ 
++	if (nand->bbt_options & NAND_BBT_USE_FLASH)
++		nand->bbt_options |= NAND_BBT_NO_OOB;
++
+ 	ret = sunxi_nand_chip_init_timings(chip, np);
+ 	if (ret) {
+ 		dev_err(dev, "could not configure chip timings: %d\n", ret);
+-- 
+1.9.1
