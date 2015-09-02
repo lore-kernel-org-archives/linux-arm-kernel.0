@@ -1,78 +1,53 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 2 Sep 2015 17:13:57 +0530
-Subject: [RFC 2/3] mmc: sdhci: add host_ops->voltage_switch callback for
- all other voltages
-In-Reply-To: <20150902162627.682cdedf@xhacker>
-References: <1441135938-8056-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1441135938-8056-3-git-send-email-vaibhav.hiremath@linaro.org>
- <20150902150442.118d3305@xhacker> <55E6B129.1030002@linaro.org>
- <20150902162627.682cdedf@xhacker>
-Message-ID: <55E6E0FD.7000806@linaro.org>
+Date: Wed, 2 Sep 2015 17:55:09 +0530
+Subject: [PATCH 1/2] mmc: sdhci-pxav3: Fix tabbing issue
+In-Reply-To: <1441139486.12163.3.camel@perches.com>
+References: <1441135454-6902-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1441135454-6902-2-git-send-email-vaibhav.hiremath@linaro.org>
+ <1441139486.12163.3.camel@perches.com>
+Message-ID: <55E6EAA5.4030808@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Wednesday 02 September 2015 01:56 PM, Jisheng Zhang wrote:
-> On Wed, 2 Sep 2015 13:49:53 +0530
-> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
+On Wednesday 02 September 2015 02:01 AM, Joe Perches wrote:
+> On Wed, 2015-09-02 at 00:54 +0530, Vaibhav Hiremath wrote:
+>> There were some coding style issues where spaces have been used instead
+>> of tabs, for example, in macro definitions, alignment of function
+>> declarations/definitions, etc...
+>>
+>> This patch fixes all such occurrences in the code.
+>> And also use BIT for bit definitions.
 >
->>
->>
->> On Wednesday 02 September 2015 12:34 PM, Jisheng Zhang wrote:
->>> On Wed, 2 Sep 2015 01:02:17 +0530
->>> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
->>>
->>>> Currently, the sdhci_do_start_signal_voltage_switch() function invokes
->>>> controller specific voltage switch configuration only for 1.8v usecase;
->>>> but it is required for others as well.
->>>>
->>>> For example, in case of PXA1928 SDH controller, we need to set different
->>>> configuration for 3.3, 1.8 and 1.2 volt support (I/O domain power
->>>> control register).
->>>>
->>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->>>> ---
->>>> Note:
->>>> Currently ->voltage_switch() callback is only supported
->>>> in f_sdh30 driver. And I am not sure on the dependency of execution
->>>> sequence for that device. I could have moved ->voltage_switch() call
->>>> at one common place (above/below), but was not quite sure about it.
->>>> So, replicated/duplicated the call for other voltages.
->>>>
->>>>    drivers/mmc/host/sdhci.c | 8 ++++++++
->>>>    1 file changed, 8 insertions(+)
->>>>
->>>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
->>>> index 3dd295f..b59b76d 100644
->>>> --- a/drivers/mmc/host/sdhci.c
->>>> +++ b/drivers/mmc/host/sdhci.c
->>>> @@ -1753,6 +1753,10 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
->>>>    		/* Wait for 5ms */
->>>>    		usleep_range(5000, 5500);
->>>>
->>>> +		/* Some controller need to do more when switching */
->>>> +		if (host->ops->voltage_switch)
->>>> +			host->ops->voltage_switch(host, MMC_SIGNAL_VOLTAGE_330);
->>>
->>> Could this be implemented by regulator API? From patch set 3/3, the pxa1928
->>> voltage_switch hook is to operate the IO pad registers, this seems not belong
->>> to the SDHC IP core.
->>>
->>
->> Not quite sure whether regulator would be right fit for this.
+> Please send 2 patches instead.
 >
->  From the patche[3/3], this can be achieved by abstracting the IO PAD as regulators
-> then, we may not need to touch the core sdhci.c. But I'm not sure whether this
-> is the good solution or not.
-
-Exactly...
-
-> sdhci Maintainers and experts may have better
-> suggestions.
+>> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+> []
+>> @@ -128,7 +133,7 @@ static int mv_conf_mbus_windows(struct platform_device *pdev,
+>>   }
+>>
+>>   static int armada_38x_quirks(struct platform_device *pdev,
+>> -			     struct sdhci_host *host)
+>> +			struct sdhci_host *host)
+>
+> This is not an improvement.
 >
 
-Thats is the reason I stamped it as a RFC :)
+Missed to highlight one more point here,
+
+The kernel CodingStyle talks about indentation, pasting it below -
+
+-------
+Outside of comments, documentation and except in Kconfig, spaces are
+never used for indentation.
+-------
+
+But I see spaces are being used at lot of places :)
+
+Till now all the patches or drivers which I submitted, I never used
+spaces. :)
+Anyway, just wanted to highlight CodingStyle document here.
 
 Thanks,
 Vaibhav
