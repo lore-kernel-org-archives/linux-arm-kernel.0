@@ -1,96 +1,95 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Thu, 3 Sep 2015 16:08:28 -0700
-Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
- v4.3-rc1
-In-Reply-To: <20150819103305.GF26627@ulmo>
-References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
- <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
- <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
- <20150819091358.GA26627@ulmo>
- <1439977724.4135.90.camel@collabora.co.uk>
- <20150819103305.GF26627@ulmo>
-Message-ID: <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 4 Sep 2015 07:49:08 +0800
+Subject: [PATCH v2] clk: rockchip: reset init state before mmc card
+ initialization
+In-Reply-To: <4930263.TgyPa9P2vP@phil>
+References: <1440462876-5457-1-git-send-email-shawn.lin@rock-chips.com>
+ <4930263.TgyPa9P2vP@phil>
+Message-ID: <55E8DC74.3090200@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
-
-On 19 August 2015 at 03:33, Thierry Reding <thierry.reding@gmail.com> wrote:
-> On Wed, Aug 19, 2015 at 11:48:44AM +0200, Sjoerd Simons wrote:
->> On Wed, 2015-08-19 at 11:14 +0200, Thierry Reding wrote:
->> > On Tue, Aug 18, 2015 at 03:30:41PM -0700, Tyler Baker wrote:
->> > > Hi Theirry,
->> > >
->> > >
->> > > This isn't where the story ends unfortunately. The collabora lab
->> > > also
->> > > has a jetson-tk1, booted in the same manner, which boots next
->> > > -20150818
->> > > fine[4]. The only differences I can spot in the two boot logs is
->> > > that
->> > > the collabora board is using an older version of u-boot, where as
->> > > my
->> > > board is using a newer version. U-Boot 2015.01-00231-gab77f24-dirty
->> > > (Good) vs U-Boot 2015.07-00130-gb217c89 (Bad).
+? 2015/9/4 3:07, Heiko Stuebner ??:
+> Am Dienstag, 25. August 2015, 08:34:36 schrieb Shawn Lin:
+>> mmc host controller's IO input/output timing is unpredictable if
+>> bootloader execute tuning for HS200 mode. It might make kernel failed
+>> to initialize mmc card in identification mode. The root cause is
+>> tuning phase and degree setting for HS200 mode in bootloader aren't
+>> applicable to that of identification mode in kernel stage. Anyway, we
+>> can't force all bootloaders to reset tuning phase and degree setting
+>> before into kernel. Simply reset it in rockchip_clk_register_mmc.
 >>
->> Our 2015.01-00231-gab77f24-dirty is 2015.01-00231-gab77f24 + changes
->> which got merged as 053b86e6d8e50359412e626c33bae3f7bafd74dd in
->> upstream u-boot.
+>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+>
+> I'm not 100% sure why you need the new function instead of having that
+> directly in rockchip_clk_register_mmc, but I guess that is a matter of taste
+
+Thanks, Heiko.
+:) That's indeed my taste but might not be appropriate sometimes. Also 
+add it directly into rockchip_clk_register_mmc looks fine to me.
+
+I'm prone to do it as your advice since it can reduce a function call.
+
+> and I don't have a hard opinion on that, so
+>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+>
 >>
->> Fwiw:
->> $ git show 2015.01-00231-gab77f24
->> commit ab77f24119e80257de4ab017b877f92f96980562
->> Merge: d928664 fa58b10
->> Author: Tom Rini <trini@ti.com>
->> Date:   Thu Jan 15 14:05:31 2015 -0500
+>> ---
 >>
->>     Merge branch 'master' of git://git.denx.de/u-boot-ti
+>> Changes in v2:
+>> - rename to rockchip_clk_mmc_reset
+>> - simplifying the code
 >>
->> Which is definately a commit you should hae in your upstream u-boot
->> tree.
->
-> Yeah, I suck. I was running:
->
->         $ git show gab77f24
->
-> I didn't know git could parse the full output from git describe.
->
->> > I don't have either of those commits in any of the U-Boot trees I
->> > have.
->> > Perhaps whatever tree this comes from has local patches that cause
->> > the
->> > breakage? The version that I use a recent upstream U-Boot with some
->> > local patches, none of which should impact Jetson TK1 in any way.
->> > Just
->> > to make sure I tried running latest origin/master, which identifies
->> > thusly:
->> >
->> >     U-Boot 2015.10-rc2-00040-g0f9258228e2b
->> >
->> > And that boots next-20150818 fine.
+>>   drivers/clk/rockchip/clk-mmc-phase.c | 16 ++++++++++++++++
+>>   1 file changed, 16 insertions(+)
 >>
->> Probably worth for tyler to test that u-boot commit on his jetson to
->> see if that solves the issue he's having...
+>> diff --git a/drivers/clk/rockchip/clk-mmc-phase.c
+>> b/drivers/clk/rockchip/clk-mmc-phase.c index e9f8df32..1d3e8fe6 100644
+>> --- a/drivers/clk/rockchip/clk-mmc-phase.c
+>> +++ b/drivers/clk/rockchip/clk-mmc-phase.c
+>> @@ -38,6 +38,8 @@ static unsigned long rockchip_mmc_recalc(struct clk_hw
+>> *hw, #define ROCKCHIP_MMC_DEGREE_MASK 0x3
+>>   #define ROCKCHIP_MMC_DELAYNUM_OFFSET 2
+>>   #define ROCKCHIP_MMC_DELAYNUM_MASK (0xff << ROCKCHIP_MMC_DELAYNUM_OFFSET)
+>> +#define ROCKCHIP_MMC_INIT_STATE_RESET 0x1
+>> +#define ROCKCHIP_MMC_INIT_STATE_SHIFT 1
+>>
+>>   #define PSECS_PER_SEC 1000000000000LL
+>>
+>> @@ -119,6 +121,14 @@ static const struct clk_ops rockchip_mmc_clk_ops = {
+>>   	.set_phase	= rockchip_mmc_set_phase,
+>>   };
+>>
+>> +static void rockchip_clk_mmc_reset(struct rockchip_mmc_clock *mmc_clock)
+>> +{
+>> +	if (mmc_clock->shift == ROCKCHIP_MMC_INIT_STATE_SHIFT)
+>> +		writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_RESET,
+>> +				     ROCKCHIP_MMC_INIT_STATE_RESET,
+>> +				     mmc_clock->shift), mmc_clock->reg);
+>> +}
+>> +
+>>   struct clk *rockchip_clk_register_mmc(const char *name,
+>>   				const char *const *parent_names, u8 num_parents,
+>>   				void __iomem *reg, int shift)
+>> @@ -139,6 +149,12 @@ struct clk *rockchip_clk_register_mmc(const char *name,
+>> mmc_clock->reg = reg;
+>>   	mmc_clock->shift = shift;
+>>
+>> +	/*
+>> +	* Assert init_state to soft reset the CLKGEN
+>> +	* for mmc tuning phase and degree
+>> +	*/
+>> +	rockchip_clk_mmc_reset(mmc_clock);
+>> +
+>>   	if (name)
+>>   		init.name = name;
 >
-> I've tried reconstructing the version that Tyler is running by checking
-> out 2015.01-00231-gab77f24 and applying 053b86e6d8e5 ("pci: tegra: Fix
-> port information parsing") on top, but that also leaves me with a
-> bootable system, so no way of reproducing. I agree that upgrading to a
-> more recent U-Boot version sounds like the best way forward because it
-> has already proven to work on at least two setups.
+>
+>
+>
 
-Sorry for the delay. I've upgraded u-boot to U-Boot
-2015.10-rc2-00439-g03d8714 using the tegra u-boot flashing scripts.
-FWIW, I did have to revert 620776d734e4 ("tftp: adjust settings to be
-suitable for 100Mbit ethernet") to get TFTP working again.
 
-Anyways, it hangs at the exact same spot[1] with the newer version of
-u-boot. If remove the modules from the initrd or just disable
-CONFIG_SND_HDA_TEGRA it boots fine. This weekend I'll try to debug
-this module manually and see if I draw any conclusions.
-
-Cheers,
-
-Tyler
-
-[1] http://lava.kernelci.org/scheduler/job/180894/log_file
+-- 
+Best Regards
+Shawn Lin
