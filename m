@@ -1,67 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 03 Sep 2015 09:18:45 +0100
-Subject: [PATCH v2 1/4] of/pci: Add of_pci_check_probe_only to parse
- "linux, pci-probe-only"
-In-Reply-To: <20150902222325.GD829@google.com>
-References: <1439569159-10051-1-git-send-email-marc.zyngier@arm.com>
- <1439569159-10051-2-git-send-email-marc.zyngier@arm.com>
- <CAL_JsqL7VPB6nc-zRYm_73ZSgYVq_+a6sW_XZZ_LRaUXf4jTng@mail.gmail.com>
- <20150902222325.GD829@google.com>
-Message-ID: <55E80265.3050701@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Sep 2015 09:22:10 +0100
+Subject: [PATCH] ARM: dts: Add ddc i2c reference to veyron
+In-Reply-To: <CAL_JsqLLPCy6OpsP4NNjUA6+UxeTC-zGjGPPU+MLhUqFXSSGJQ@mail.gmail.com>
+References: <1441229148-12095-1-git-send-email-dianders@chromium.org>
+ <CAL_JsqLLPCy6OpsP4NNjUA6+UxeTC-zGjGPPU+MLhUqFXSSGJQ@mail.gmail.com>
+Message-ID: <20150903082210.GU21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/15 23:23, Bjorn Helgaas wrote:
-> On Fri, Aug 14, 2015 at 04:08:10PM -0500, Rob Herring wrote:
->> On Fri, Aug 14, 2015 at 11:19 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> Both pci-host-generic and Pseries parse the "linux,pci-probe-only"
->>> to engage the PCI_PROBE_ONLY mode, and both have a subtle bug that
->>> can be triggered if the property has no parameter.
->>
->> Humm, I bet we could break a lot of machines if we fixed the core code
->> to properly make pp->value NULL when there is no value.
->>
->>> Provide a generic implementation that can be used by both.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  drivers/of/of_pci.c    | 30 ++++++++++++++++++++++++++++++
->>>  include/linux/of_pci.h |  3 +++
->>>  2 files changed, 33 insertions(+)
->>>
->>> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
->>> index 5751dc5..a4e29ff 100644
->>> --- a/drivers/of/of_pci.c
->>> +++ b/drivers/of/of_pci.c
->>> @@ -118,6 +118,36 @@ int of_get_pci_domain_nr(struct device_node *node)
->>>  EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
->>>
->>>  /**
->>> + * of_pci_check_probe_only - Setup probe only mode if linux,pci-probe-only
->>> + *                           is present and valid
->>> + *
->>> + * @node: device tree node that may contain the property (usually "chosen")
->>> + *
->>> + */
->>> +void of_pci_check_probe_only(struct device_node *node)
->>> +{
->>> +       const int *prop;
->>> +       int len;
->>> +
->>> +       if (!node)
->>> +               return;
->>> +
->>> +       prop = of_get_property(node, "linux,pci-probe-only", &len);
->>
->> It is preferred to use of_property_read_u32 to avoid just these types
->> of problems.
+On Wed, Sep 02, 2015 at 07:13:24PM -0500, Rob Herring wrote:
+> On Wed, Sep 2, 2015 at 4:25 PM, Douglas Anderson <dianders@chromium.org> wrote:
+> > The ddc-i2c-bus property was missing from the veyron dtsi file since
+> > downstream the ddc-i2c-bus was still being specified in rk3288.dtsi and
+> > nobody noticed when the veyron dtsi was sent upstream.  Add it.
+> >
+> > Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> > ---
+> > Note: I noticed that this was wrong but I don't currently have
+> > graphics up and running on upstream on veyron.  Posting this anyway
+> > since it's pretty clear that it's needed.  If someone else wants to
+> > try it out that'd be nice, otherwise I'll put it on my list to figure
+> > out how to get myself setup for graphics upstream.  ;)
 > 
-> I don't know enough OF to really understand this, but I infer that
-> this is a suggestion for improving the patch.  Should I be waiting for
-> a v3 series?
+> Based on your other patch, this is temporary, right?
+> 
+> I've been looking at DRM a lot lately. I think specifying the i2c bus
+> in the hdmi chip or IP block node is wrong. If the I2C host is
+> separate from the HDMI block, then it's only connection is to the HDMI
+> connector. So the I2C host to the connector relationship is what the
+> DT should describe. HPD gpio is similar. Now if the HDMI bridge
+> controls DDC and HPD directly, then we don't need to describe those
+> connections.
 
-Yes, I'll post an update very shortly. Thanks for reminding me!
+Except... we don't generally model connectors under DRM as a general
+rule.  (The fbdev video connector stuff happened without very much
+publicity afaics.)
 
-	M.
+It's not always appropriate to split it out from the bridge in any
+case.  Consider something like a TDA998x where the TDA998x itself
+takes care of reading the DDC bus, and doesn't provide an I2C-like
+interface.  If you try and split that into "bridge" or "encoder" and
+"connector" you end up having to invent a new kind of I2C thing which
+isn't an I2C adapter, or somehow squeezing an I2C adapter which isn't
+into the I2C layer.
+
+The TDA998x provides an interface to read a block of EDID at a time.
+It always does the page register access.  You don't get to read it
+byte wise.  It doesn't fit into I2C as an adapter at all.
+
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
