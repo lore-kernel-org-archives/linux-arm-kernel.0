@@ -1,31 +1,79 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 3 Sep 2015 13:54:29 +0100
-Subject: [PATCH v3 8/9] spi: rockchip: modify DMA max burst to 1
-In-Reply-To: <1441101524-1700-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1441101381-1329-1-git-send-email-shawn.lin@rock-chips.com>
- <1441101524-1700-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <20150903125429.GA12027@sirena.org.uk>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 03 Sep 2015 16:20:18 +0300
+Subject: PING-2: [PATCH v2 TRIVIAL] Enable GICv2m on ARM virt machine
+Message-ID: <018d01d0e64b$47cce390$d766aab0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 01, 2015 at 05:58:44PM +0800, Shawn Lin wrote:
+ Knock-knock!
 
-> Generic dma controller on Rockchips' platform cannot support
-> DMAFLUSHP instruction which make dma to flush the req of non-aligned
-> or non-multiple of what we need. That will cause an unrecoverable
-> dma bus error. The saftest way is to set dma max burst to 1.
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
 
-If this is a quirk of the DMA controller why is it being fixed with a
-property specific to the SPI controller?  Can't the DMA controller just
-override the burst size?
 
-> +#define ROCKCHIP_SPI_BORKEN_BURST_LEN (1<<0) /* broken burst len*/
-
-This is misspelt.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150903/c314d56f/attachment.sig>
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Pavel
+> Fedin
+> Sent: Friday, August 07, 2015 1:51 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: 'Marc Zyngier'; trivial at kernel.org; 'Russell King'
+> Subject: [PATCH v2 TRIVIAL] Enable GICv2m on ARM virt machine
+> 
+> qemu implementation of "virt" includes GICv2m. This commit allows to use
+> it also on ARM32 architecture.
+> 
+> msi.h is added because it is required by linux/msi.h
+> if CONFIG_GENERIC_MSI_IRQ_DOMAIN is defined. It gets enabled by the
+> following KConfig dependency chain:
+> ARM_GIC_V2M => PCI_MSI_IRQ_DOMAIN => GENERIC_MSI_IRQ_DOMAIN
+> 
+> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+> ---
+> v1 => v2:
+> Added verbose explanation in commit message
+> ---
+>  arch/arm/Kconfig            | 1 +
+>  arch/arm/include/asm/Kbuild | 1 +
+>  2 files changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 45df48b..1091025 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -815,6 +815,7 @@ config ARCH_VIRT
+>  	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
+>  	select ARM_AMBA
+>  	select ARM_GIC
+> +	select ARM_GIC_V2M if PCI_MSI
+>  	select ARM_PSCI
+>  	select HAVE_ARM_ARCH_TIMER
+> 
+> diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+> index 3c4596d..01806f5 100644
+> --- a/arch/arm/include/asm/Kbuild
+> +++ b/arch/arm/include/asm/Kbuild
+> @@ -14,6 +14,7 @@ generic-y += local.h
+>  generic-y += local64.h
+>  generic-y += mcs_spinlock.h
+>  generic-y += msgbuf.h
+> +generic-y += msi.h
+>  generic-y += param.h
+>  generic-y += parport.h
+>  generic-y += poll.h
+> --
+> 1.9.5.msysgit.0
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
