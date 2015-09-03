@@ -1,46 +1,70 @@
-From: suravee.suthikulpanit@amd.com (Suthikulpanit, Suravee)
-Date: Thu, 3 Sep 2015 21:19:40 +0700
-Subject: [PATCH v3 4/4] arm64: dts: Drop linux,pci-probe-only from the
- Seattle DTS
-In-Reply-To: <1441282576-7304-5-git-send-email-marc.zyngier@arm.com>
-References: <1441282576-7304-1-git-send-email-marc.zyngier@arm.com>
- <1441282576-7304-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <55E856FC.4040006@amd.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 3 Sep 2015 16:20:25 +0200
+Subject: [PATCH] ARM: disable GCC SRA optimization
+In-Reply-To: <1441211290-11449-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1441211290-11449-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu9zVCnnKOv=vROT3TBJkwJo4BW8UD-fhg_+Bfp7GyXCZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc
-
-On 9/3/2015 7:16 PM, Marc Zyngier wrote:
-> The linux,pci-probe-only property mandates an argument to indicate
-> whether or not to engage the "probe-only" mode, but the Seattle
-> DTS just provides a naked property, which is illegal.
+On 2 September 2015 at 18:28, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> While working on the 32-bit ARM port of UEFI, I noticed a strange
+> corruption in the kernel log. The following snprintf() statement
+> (in drivers/firmware/efi/efi.c:efi_md_typeattr_format())
 >
-> Also, it turns out that the board is perfectly happy without
-> probe-only, so let's drop this altogether.
+>         snprintf(pos, size, "|%3s|%2s|%2s|%2s|%3s|%2s|%2s|%2s|%2s]",
 >
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> was producing the following output in the log:
+>
+>         |    |   |   |   |    |WB|WT|WC|UC]
+>         |    |   |   |   |    |WB|WT|WC|UC]
+>         |    |   |   |   |    |WB|WT|WC|UC]
+>         |RUN|   |   |   |    |WB|WT|WC|UC]*
+>         |RUN|   |   |   |    |WB|WT|WC|UC]*
+>         |    |   |   |   |    |WB|WT|WC|UC]
+>         |RUN|   |   |   |    |WB|WT|WC|UC]*
+>         |    |   |   |   |    |WB|WT|WC|UC]
+>         |RUN|   |   |   |    |   |   |   |UC]
+>         |RUN|   |   |   |    |   |   |   |UC]
+>
+> As it turns out, this is caused by incorrect code being emitted for
+> the string() function in lib/vsprintf.c. The following code
+>
+>         if (!(spec.flags & LEFT)) {
+>                 while (len < spec.field_width--) {
+>                         if (buf < end)
+>                                 *buf = ' ';
+>                         ++buf;
+>                 }
+>         }
+>         for (i = 0; i < len; ++i) {
+>                 if (buf < end)
+>                         *buf = *s;
+>                 ++buf; ++s;
+>         }
+>         while (len < spec.field_width--) {
+>                 if (buf < end)
+>                         *buf = ' ';
+>                 ++buf;
+>         }
+>
+> when called with len == 0, triggers an issue in the GCC SRA optimization
+> pass (Scalar Replacement of Aggregates), which handles promotion of signed
+> struct members incorrectly. This is a known but as yet unresolved issue.
+> (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65932). In this particular
+> case, it is causing the second while loop to be executed erroneously a
+> single time, causing the additional space characters to be printed.
+>
+> So disable the optimization by passing -fno-ipa-sra.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->   arch/arm64/boot/dts/amd/amd-overdrive.dts | 1 -
->   1 file changed, 1 deletion(-)
 >
-> diff --git a/arch/arm64/boot/dts/amd/amd-overdrive.dts b/arch/arm64/boot/dts/amd/amd-overdrive.dts
-> index 564a3f7..128fa94 100644
-> --- a/arch/arm64/boot/dts/amd/amd-overdrive.dts
-> +++ b/arch/arm64/boot/dts/amd/amd-overdrive.dts
-> @@ -14,7 +14,6 @@
->
->   	chosen {
->   		stdout-path = &serial0;
-> -		linux,pci-probe-only;
->   	};
->   };
->
+> Needs to go to stable perhaps?
+> The emitted asm is at the end of this patch.
 >
 
-Thanks, I was planning to do this as well. The embedded DT in the UEFI 
-FW will soon remove this property.
+Submitted to the patch tracker as 8429/1 (with cc: stable)
 
-Acked-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-
-Suravee
+-- 
+Ard.
