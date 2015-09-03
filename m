@@ -1,87 +1,111 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 3 Sep 2015 16:26:38 +0100
-Subject: [STLinux Kernel] [PATCH v3 5/6] ARM: STiH407: Add nodes for
- RemoteProc
-In-Reply-To: <1441208289-17330-6-git-send-email-lee.jones@linaro.org>
-References: <1441208289-17330-1-git-send-email-lee.jones@linaro.org>
- <1441208289-17330-6-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150903152638.GD7093@griffinp-ThinkPad-X1-Carbon-2nd>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 03 Sep 2015 16:33:43 +0100
+Subject: [PATCH 7/9] arm/arm64: KVM: vgic: Move active state handling
+ to flush_hwstate
+In-Reply-To: <1440942866-23802-8-git-send-email-christoffer.dall@linaro.org>
+References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
+ <1440942866-23802-8-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <55E86857.5020609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Wed, 02 Sep 2015, Lee Jones wrote:
-
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/boot/dts/stih407-family.dtsi | 40 +++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
+On 30/08/15 14:54, Christoffer Dall wrote:
+> We currently set the physical active state only when we *inject* a new
+> pending virtual interrupt, but this is actually not correct, because we
+> could have been preempted and run something else on the system that
+> resets the active state to clear.  This causes us to run the VM with the
+> timer set to fire, but without setting the physical active state.
 > 
-> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> index 33daa49..1c31918 100644
-> --- a/arch/arm/boot/dts/stih407-family.dtsi
-> +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> @@ -608,5 +608,45 @@
->  			status		= "okay";
->  			tx-only;
->  		};
+> The solution is to always check the LR configurations, and we if have a
+> mapped interrupt in th LR in either the pending or active state
+
+s/th/the/
+
+> (virtual), then set the physical active state.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/arm/vgic.c | 42 ++++++++++++++++++++++++++----------------
+>  1 file changed, 26 insertions(+), 16 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 8299c24..9ed8d53 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1144,26 +1144,11 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
+>  		struct irq_phys_map *map;
+>  		map = vgic_irq_map_search(vcpu, irq);
+>  
+> -		/*
+> -		 * If we have a mapping, and the virtual interrupt is
+> -		 * being injected, then we must set the state to
+> -		 * active in the physical world. Otherwise the
+> -		 * physical interrupt will fire and the guest will
+> -		 * exit before processing the virtual interrupt.
+> -		 */
+>  		if (map) {
+> -			int ret;
+> -
+> -			BUG_ON(!map->active);
+>  			vlr.hwirq = map->phys_irq;
+>  			vlr.state |= LR_HW;
+>  			vlr.state &= ~LR_EOI_INT;
+>  
+> -			ret = irq_set_irqchip_state(map->irq,
+> -						    IRQCHIP_STATE_ACTIVE,
+> -						    true);
+> -			WARN_ON(ret);
+> -
+>  			/*
+>  			 * Make sure we're not going to sample this
+>  			 * again, as a HW-backed interrupt cannot be
+> @@ -1255,7 +1240,7 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+>  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>  	unsigned long *pa_percpu, *pa_shared;
+> -	int i, vcpu_id;
+> +	int i, vcpu_id, lr, ret;
+>  	int overflow = 0;
+>  	int nr_shared = vgic_nr_shared_irqs(dist);
+>  
+> @@ -1310,6 +1295,31 @@ epilog:
+>  		 */
+>  		clear_bit(vcpu_id, dist->irq_pending_on_cpu);
+>  	}
 > +
-> +		st231_gp0: st231-gp0 at 40000000 {
-> +			compatible	= "st,st231-rproc";
-> +			reg		= <0x40000000 0x01000000>;
-> +			resets		= <&softreset STIH407_ST231_GP0_SOFTRESET>;
-> +			reset-names	= "sw_reset";
-> +			clocks		= <&clk_s_c0_flexgen CLK_ST231_GP_0>;
-> +			clock-frequency	= <600000000>;
-> +			st,syscfg	= <&syscfg_core 0x22c>;
-> +		};
+> +	for (lr = 0; lr < vgic->nr_lr; lr++) {
+> +		struct vgic_lr vlr;
 > +
-> +		st231_gp1: st231-gp1 at 41000000 {
-> +			compatible	= "st,st231-rproc";
-> +			reg		= <0x41000000 0x01000000>;
-> +			resets		= <&softreset STIH407_ST231_GP1_SOFTRESET>;
-> +			reset-names	= "sw_reset";
-> +			clocks		= <&clk_s_c0_flexgen CLK_ST231_GP_1>;
-> +			clock-frequency = <600000000>;
-> +			st,syscfg	= <&syscfg_core 0x220>;
-> +		};
+> +		if (!test_bit(lr, vgic_cpu->lr_used))
+> +			continue;
 > +
-> +		st231_audio: st231-audio at 42000000 {
-> +			compatible	= "st,st231-rproc";
-> +			reg		= <0x42000000 0x01000000>;
-> +			resets		= <&softreset STIH407_ST231_AUD_SOFTRESET>;
-> +			reset-names	= "sw_reset";
-> +			clocks		= <&clk_s_c0_flexgen CLK_ST231_AUD_0>;
-> +			clock-frequency	= <600000000>;
-> +			st,syscfg	= <&syscfg_core 0x228>;
-> +		};
+> +		vlr = vgic_get_lr(vcpu, lr);
 > +
-> +		st231_dmu: st231-dmu at 43000000 {
-> +			compatible	= "st,st231-rproc";
-> +			reg		= <0x43000000 0x01000000>;
-> +			resets		= <&softreset STIH407_ST231_DMU_SOFTRESET>;
-> +			reset-names	= "sw_reset";
-> +			clocks		= <&clk_s_c0_flexgen CLK_ST231_DMU>;
+> +		/*
+> +		 * If we have a mapping, and the virtual interrupt is
+> +		 * presented to the guest (as pending or active), then we must
+> +		 * set the state to active in the physical world. See
+> +		 * Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt.
+> +		 */
+> +		if (vlr.state & LR_HW) {
+> +			struct irq_phys_map *map;
+> +			map = vgic_irq_map_search(vcpu, vlr.irq);
+> +
+> +			ret = irq_set_irqchip_state(map->irq,
+> +						    IRQCHIP_STATE_ACTIVE,
+> +						    true);
+> +			WARN_ON(ret);
+> +		}
+> +	}
+>  }
+>  
+>  static int process_level_irq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
+> 
 
-Thinking more about this more, I believe you will actually need to support enabling
-and setting the frequency on a list of clocks.
+/me bangs his head on the wall...
 
-The reason being that for the video ST231 for example you also need to enable
-CLK_VID_DMU. This clock clocks the DeltaMU hw used by the video ST231 for
-video decoding. I suspect if the video firmware is loading and working correctly
-with this patchset, then it is most likely because the clock is being enabled
-by the bootloader and not being disabled by CCF due to our platform booting
-with clk_ignore_unused.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-When yours (or Mikes) critical clock patches get merged, and we stop booting with
-"clk_ignore_unused" you will find it no longer works.
-
-I'm not aware of other hw which is used by the audio of gp ST231, but as the driver
-also covers ST40 and potentially other co-processors in the future, having a list
-of clocks seems nicely extendable to cover other permutations.
-
-regards,
-
-Peter.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
