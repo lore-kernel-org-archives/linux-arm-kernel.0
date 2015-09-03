@@ -1,113 +1,36 @@
-From: t.remmet@phytec.de (Teresa Remmet)
-Date: Thu, 3 Sep 2015 14:00:07 +0200
-Subject: [PATCH 2/2] ARM: dts: am335x-wega: Clean up regulators
-In-Reply-To: <1441281607-35457-1-git-send-email-t.remmet@phytec.de>
-References: <1441281607-35457-1-git-send-email-t.remmet@phytec.de>
-Message-ID: <1441281607-35457-2-git-send-email-t.remmet@phytec.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 3 Sep 2015 13:12:32 +0100
+Subject: [LINUX RFC v2 1/4] spi: add support of two chip selects & data
+ stripe
+In-Reply-To: <1440570367-22569-2-git-send-email-ranjit.waghmode@xilinx.com>
+References: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
+ <1440570367-22569-2-git-send-email-ranjit.waghmode@xilinx.com>
+Message-ID: <20150903121232.GW12027@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleaned up the regulators on the wega board. Created a simple bus,
-renamed the regulators according to the schematics and added missing
-regulator on wega.
+On Wed, Aug 26, 2015 at 11:56:04AM +0530, Ranjit Waghmode wrote:
 
-Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
----
- arch/arm/boot/dts/am335x-phycore-som.dtsi | 36 ++++++++++++++++---------------
- arch/arm/boot/dts/am335x-wega.dtsi        | 13 ++++++++++-
- 2 files changed, 31 insertions(+), 18 deletions(-)
+> To support dual parallel mode operation of ZynqMP GQSPI controller
+> following API's are added inside the core:
 
-diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-index 5dd084f..2f43e45 100644
---- a/arch/arm/boot/dts/am335x-phycore-som.dtsi
-+++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-@@ -29,8 +29,17 @@
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
- 	};
- 
--	vbat: fixedregulator at 0 {
--		compatible = "regulator-fixed";
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		vcc5v: fixedregulator at 0 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "vcc5v";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
- 	};
- };
- 
-@@ -233,14 +242,14 @@
- #include "tps65910.dtsi"
- 
- &tps {
--	vcc1-supply = <&vbat>;
--	vcc2-supply = <&vbat>;
--	vcc3-supply = <&vbat>;
--	vcc4-supply = <&vbat>;
--	vcc5-supply = <&vbat>;
--	vcc6-supply = <&vbat>;
--	vcc7-supply = <&vbat>;
--	vccio-supply = <&vbat>;
-+	vcc1-supply = <&vcc5v>;
-+	vcc2-supply = <&vcc5v>;
-+	vcc3-supply = <&vcc5v>;
-+	vcc4-supply = <&vcc5v>;
-+	vcc5-supply = <&vcc5v>;
-+	vcc6-supply = <&vcc5v>;
-+	vcc7-supply = <&vcc5v>;
-+	vccio-supply = <&vcc5v>;
- 
- 	regulators {
- 		vrtc_reg: regulator at 0 {
-@@ -311,13 +320,6 @@
- 	};
- };
- 
--&vbat {
--	regulator-name = "vbat";
--	regulator-min-microvolt = <5000000>;
--	regulator-max-microvolt = <5000000>;
--	regulator-boot-on;
--};
--
- /* SPI Busses */
- &am33xx_pinmux {
- 	spi0_pins: pinmux_spi0 {
-diff --git a/arch/arm/boot/dts/am335x-wega.dtsi b/arch/arm/boot/dts/am335x-wega.dtsi
-index 5e541bd..2cecb39 100644
---- a/arch/arm/boot/dts/am335x-wega.dtsi
-+++ b/arch/arm/boot/dts/am335x-wega.dtsi
-@@ -11,6 +11,17 @@
- 	model = "Phytec AM335x phyBOARD-WEGA";
- 	compatible = "phytec,am335x-wega", "phytec,am335x-phycore-som", "ti,am33xx";
- 
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		vcc3v3: fixedregulator at 1 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "vcc3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-boot-on;
-+		};
-+	};
- };
- 
- /* CAN Busses */
-@@ -80,7 +91,7 @@
- };
- 
- &mmc1 {
--	vmmc-supply = <&vmmc_reg>;
-+	vmmc-supply = <&vcc3v3>;
- 	bus-width = <4>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc1_pins>;
--- 
-1.9.1
+As covered in SubmittingPatches please try to make each patch a single
+change rather than having multiple separate changes in one commit.
+
+> +	/* Controller may support more than one chip.
+> +	 * This flag will enable that feature.
+> +	 */
+> +#define SPI_MASTER_BOTH_CS		BIT(8)		/* enable both chips */
+
+This isn't saying that the controller supports more than one chip, it's
+saying that the controller supports asserting more than one chip select
+at once which isn't the same thing.  I'm also not entirely sure that
+this makes sense as a separate feature to the data striping one - I'm
+struggling to think of a way to use this sensibly separately to that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150903/3c3c8b6c/attachment-0001.sig>
