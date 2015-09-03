@@ -1,40 +1,100 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 03 Sep 2015 15:52:48 +0200
-Subject: [PATCH v4 10/16] phy: Add driver for rockchip Display Port PHY
-In-Reply-To: <55E7BD8C.5070803@rock-chips.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <CAL_JsqJG3wGO3PC2raWvc588rrwF-zHD9+3WwBJxEwntm19k7Q@mail.gmail.com>
- <55E7BD8C.5070803@rock-chips.com>
-Message-ID: <3242714.Wxby7z5YyH@phil>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 3 Sep 2015 09:01:43 -0500
+Subject: [PATCH v3 1/4] of/pci: Add of_pci_check_probe_only to parse
+ "linux, pci-probe-only"
+In-Reply-To: <1441282576-7304-2-git-send-email-marc.zyngier@arm.com>
+References: <1441282576-7304-1-git-send-email-marc.zyngier@arm.com>
+ <1441282576-7304-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAL_JsqJo2vH-i229fqa6T2VBdo65tAjo5q3oNijsLvde+M5+HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 3. September 2015, 11:25:00 schrieb Yakir Yang:
-> ? 09/02/2015 09:27 PM, Rob Herring ??:
-> > On Tue, Sep 1, 2015 at 1:04 AM, Yakir Yang <ykk@rock-chips.com> wrote:
-> >> +- clocks: from common clock binding: handle to dp clock.
-> >> +       of memory mapped region.
-> >> +- clock-names: from common clock binding:
-> >> +       Required elements: "sclk_dp" "sclk_dp_24m"
-> >> +
-> >> +- rockchip,grf: this soc should set GRF regs, so need get grf here.
-> > 
-> > I have no idea what GRF means.
-> 
-> GRF is an module of our IC chip, the full name is General Register Files.
-> I would rather to pick some words from our TRM.
-> 
-> The general register file will be used to do static set by software, which
-> is composed of many registers for system control.
+On Thu, Sep 3, 2015 at 7:16 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Both pci-host-generic and Pseries parse the "linux,pci-probe-only"
+> property to engage the PCI_PROBE_ONLY mode, and both have a subtle
+> bug that can be triggered if the property has no parameter.
+>
+> Provide a generic, safe implementation that can be used by both.
 
-The general register files are present on all Rockchip SoCs I've seen so far 
-and really are just an aggregation of registers for settings and status 
-indications, ranging from memory stuff, dma-controller settings, usb-phy and 
-settings for a lot of other phys, etc.
+Sorry, but a couple of other minor things I noticed.
 
-The most prevalent description in dt-bindings is currently:
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/of/of_pci.c    | 31 +++++++++++++++++++++++++++++++
+>  include/linux/of_pci.h |  3 +++
+>  2 files changed, 34 insertions(+)
+>
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index 5751dc5..7876343 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -118,6 +118,37 @@ int of_get_pci_domain_nr(struct device_node *node)
+>  EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
+>
+>  /**
+> + * of_pci_check_probe_only - Setup probe only mode if linux,pci-probe-only
+> + *                           is present and valid
+> + *
+> + * @node: device tree node that may contain the property (usually "chosen")
+> + *
+> + */
+> +void of_pci_check_probe_only(struct device_node *node)
 
-- rockchip,grf: phandle to the syscon managing the "general register files"
+This property is only valid in /chosen, so there's no point passing
+of_chosen in and you can constrain it to only look in /chosen.
 
+> +{
+> +       u32 val;
+> +       int ret;
+> +
+> +       if (!node)
+> +               return;
 
-Heiko
+I believe of_property_read_u32 will check this.
+
+> +
+> +       ret = of_property_read_u32(node, "linux,pci-probe-only", &val);
+> +       if (ret) {
+> +               if (ret == -ENODATA || ret == -EOVERFLOW)
+> +                       pr_warn("linux,pci-probe-only without valid value, ignoring\n");
+> +               return;
+> +       }
+> +
+> +       if (val)
+> +               pci_add_flags(PCI_PROBE_ONLY);
+> +       else
+> +               pci_clear_flags(PCI_PROBE_ONLY);
+> +
+> +       pr_info("PCI: PROBE_ONLY %sabled\n", val ? "en" : "dis");
+> +}
+> +EXPORT_SYMBOL_GPL(of_pci_check_probe_only);
+> +
+> +/**
+>   * of_pci_dma_configure - Setup DMA configuration
+>   * @dev: ptr to pci_dev struct of the PCI device
+>   *
+> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+> index 29fd3fe..4c0a617 100644
+> --- a/include/linux/of_pci.h
+> +++ b/include/linux/of_pci.h
+> @@ -17,6 +17,7 @@ int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
+>  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+>  int of_get_pci_domain_nr(struct device_node *node);
+>  void of_pci_dma_configure(struct pci_dev *pci_dev);
+> +void of_pci_check_probe_only(struct device_node *node);
+>  #else
+>  static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
+>  {
+> @@ -53,6 +54,8 @@ of_get_pci_domain_nr(struct device_node *node)
+>  }
+>
+>  static inline void of_pci_dma_configure(struct pci_dev *pci_dev) { }
+> +
+> +static inline void of_pci_check_probe_only(struct device_node *node) { }
+>  #endif
+>
+>  #if defined(CONFIG_OF_ADDRESS)
+> --
+> 2.1.4
+>
