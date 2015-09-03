@@ -1,18 +1,30 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Thu, 3 Sep 2015 10:03:27 -0700
-Subject: [PATCH v2 8/8] regulator: qcom_smd: Handle big endian CPUs
-In-Reply-To: <1441234011-4259-9-git-send-email-sboyd@codeaurora.org>
-References: <1441234011-4259-1-git-send-email-sboyd@codeaurora.org>
- <1441234011-4259-9-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150903170327.GU13472@usrtlx11787.corpusers.net>
+From: kwizart@gmail.com (Nicolas Chauvet)
+Date: Thu,  3 Sep 2015 19:05:35 +0200
+Subject: [PATCH] ARM: OMAP2+: Fixup model name for HP t410 dts
+Message-ID: <1441299935-22694-1-git-send-email-kwizart@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 02 Sep 15:46 PDT 2015, Stephen Boyd wrote:
+This fix the model name for the device.
+Whole string taken from the HP support center web page
 
-> The smd rpm structures are always in little endian, but this
-> driver is not capable of being used on big endian CPUs. Annotate
-> the little endian data members and update the code to do the
-> proper byte swapping.
-> 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Signed-off-by: Nicolas Chauvet <kwizart@gmail.com>
+---
+ arch/arm/boot/dts/dm8148-t410.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/dm8148-t410.dts b/arch/arm/boot/dts/dm8148-t410.dts
+index 8c4bbc7..19e0b9a 100644
+--- a/arch/arm/boot/dts/dm8148-t410.dts
++++ b/arch/arm/boot/dts/dm8148-t410.dts
+@@ -8,7 +8,7 @@
+ #include "dm814x.dtsi"
+ 
+ / {
+-	model = "DM8148 EVM";
++	model = "HP t410 Smart Zero Client";
+ 	compatible = "hp,t410", "ti,dm8148";
+ 
+ 	memory {
+-- 
+2.4.3
