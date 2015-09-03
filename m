@@ -1,111 +1,91 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 03 Sep 2015 19:16:28 +0100
-Subject: earlycon issues in -next with amba-pl011 updates
-In-Reply-To: <55E88B79.5090804@hurleysoftware.com>
-References: <20150810232312.GB10728@bivouac.eciton.net>
- <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
- <55E81F93.1020104@arm.com> <20150903155255.GA28336@kroah.com>
- <55E87095.4030600@arm.com> <55E8880E.5080707@hurleysoftware.com>
- <20150903175327.GA29340@kroah.com> <55E88B79.5090804@hurleysoftware.com>
-Message-ID: <55E88E7C.9040609@arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu,  3 Sep 2015 18:59:52 +0100
+Subject: [PATCH v5 4/6] [media] c8sectpfe: Update binding to reset-gpios
+In-Reply-To: <1441303194-28211-1-git-send-email-peter.griffin@linaro.org>
+References: <1441303194-28211-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1441303194-28211-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/15 19:03, Peter Hurley wrote:
-> On 09/03/2015 01:53 PM, Greg Kroah-Hartman wrote:
->> On Thu, Sep 03, 2015 at 01:49:02PM -0400, Peter Hurley wrote:
->>> On 09/03/2015 12:08 PM, Marc Zyngier wrote:
->>>> On 03/09/15 16:52, Greg Kroah-Hartman wrote:
->>>>> On Thu, Sep 03, 2015 at 11:23:15AM +0100, Marc Zyngier wrote:
->>>>>> On 11/08/15 02:48, Jun Nie wrote:
->>>>>>> 2015-08-11 7:23 GMT+08:00 Leif Lindholm <leif.lindholm@linaro.org>:
->>>>>>>> Hi all,
->>>>>>>>
->>>>>>>> The kernelci.org bot picked up a complete boot failure (no output past
->>>>>>>> UEFI stub) with next-20150806 and Tyler bisected it down to somewhere
->>>>>>>> in
->>>>>>>> 8cd90e5 uart: pl011: Add support to ZTE ZX296702 uart
->>>>>>>> 09dcc7d uart: pl011: Improve LCRH register access decision
->>>>>>>> 2c096a9 uart: pl011: Introduce register look up table
->>>>>>>> 7b753f3 uart: pl011: Introduce register accessor
->>>>>>>>
->>>>>>>> The issue only appears with earlycon on command line, for pl011
->>>>>>>> consoles.
->>>>>>>>
->>>>>>>> Some investigation shows that the cause lies with
->>>>>>>> commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
->>>>>>>> and
->>>>>>>> commit 2c096a9eedc6 ("uart: pl011: Introduce register look up table")
->>>>>>>>
->>>>>>>> Specifically, the changes to pl011_putc() are incorrect:
->>>>>>>> The new pl011_ accessors take a (struct uart_amba_port *) input, but
->>>>>>>> pl011_putc() directly uses the incoming (struct uart_port *) for this.
->>>>>>>>
->>>>>>>> Apart from ending up with an unintended/incorrect UART base address,
->>>>>>>> the introduction of the lookup table for register offsets also means
->>>>>>>> the accessors try to dereference (struct uart_amba_port *)->reg_lut.
->>>>>>>>
->>>>>>>> The below is a hack that shows/resolves the issue, but some
->>>>>>>> refactoring of the original patches might be in order.
->>>>>>>>
->>>>>>>> /
->>>>>>>>     Leif
->>>>>>>
->>>>>>> Leif,
->>>>>>>
->>>>>>> Sorry for the inconvenience. I do not have idea of early console till
->>>>>>> now and I always have debug console for early panic debug. Learned
->>>>>>> more from this issue.
->>>>>>>
->>>>>>> Suppose Peter's patch will resolve your issue.
->>>>>>
->>>>>> [+ Greg KH]
->>>>>>
->>>>>> So -next has now been broken for a while on a number of ARM platforms
->>>>>> because of this (they simply cannot boot), and no progress has been made
->>>>>> towards resolving this problem.
->>>>>>
->>>>>> Can we please drop this series (at least commits 7b753f3 and following)
->>>>>> from -next until is has been reworked and reviewed?
->>>>>
->>>>> I don't have any patches in my -next tree, everything is in Linus's tree
->>>>> now.  So if I've missed something, or need to revert something, please
->>>>> let me know specifcally what to do.
->>>>
->>>> Gahhh... Given that there is no obvious fix
->>>
->>> Fix has been on list since Aug 10.
->>>
->>> http://www.spinics.net/lists/linux-serial/msg18576.html
->>
->> Now if only someone would have at least compile tested it :)
-> 
-> On 08/11/2015 06:07 AM, Leif Lindholm wrote:
->> It works, but builds with:
->> drivers/tty/serial/amba-pl011.c:329:13: warning: ?pl011_writeb?
->> defined but not used [-Wunused-function]
->>  static void pl011_writeb(struct uart_amba_port *uap, u8 val, int
->>  index)
->>              ^
->> I was dithering about whether having _relaxed accessors in post boot
->> code and plain ones in earlycon was an issue, but I guess it doesn't
->> matter much.
-> 
-> Russell wanted me to do a bunch of improvements, but I wrote that
-> should wait until 4.3-rc cycle.
+reset-gpios is more clear than rst-gpio.
 
-It is well known that we merge "improvements" outside of the merge
-window. And what about starting with a series that is actually bisectable?
+This change has been done as one atomic commit but it
+does breaks compatability with older dtbs.
 
-It is quite apparent that this code hasn't been tested enough, hasn't
-been reviewed enough, and breaks a wide range of platforms (almost
-anything that sits on and under my desk, TBH).
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+---
+ Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt | 6 +++---
+ arch/arm/boot/dts/stihxxx-b2120.dtsi                          | 4 ++--
+ drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c         | 2 +-
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
-That's really for Greg to decide, but I'm not overly confident with the
-state of this series as it stands.
-
-Thanks,
-
-	M.
+diff --git a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+index d4def76..e70d840 100644
+--- a/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
++++ b/Documentation/devicetree/bindings/media/stih407-c8sectpfe.txt
+@@ -35,7 +35,7 @@ Required properties (tsin (child) node):
+ 
+ - tsin-num	: tsin id of the InputBlock (must be between 0 to 6)
+ - i2c-bus	: phandle to the I2C bus DT node which the demodulators & tuners on this tsin channel are connected.
+-- rst-gpio	: reset gpio for this tsin channel.
++- reset-gpios	: reset gpio for this tsin channel.
+ 
+ Optional properties (tsin (child) node):
+ 
+@@ -75,7 +75,7 @@ Example:
+ 			tsin-num		= <0>;
+ 			serial-not-parallel;
+ 			i2c-bus			= <&ssc2>;
+-			rst-gpio		= <&pio15 4 0>;
++			reset-gpios		= <&pio15 4 GPIO_ACTIVE_HIGH>;
+ 			dvb-card		= <STV0367_TDA18212_NIMA_1>;
+ 		};
+ 
+@@ -83,7 +83,7 @@ Example:
+ 			tsin-num		= <3>;
+ 			serial-not-parallel;
+ 			i2c-bus			= <&ssc3>;
+-			rst-gpio		= <&pio15 7 0>;
++			reset-gpios		= <&pio15 7 GPIO_ACTIVE_HIGH>;
+ 			dvb-card		= <STV0367_TDA18212_NIMB_1>;
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+index f9fca10..0b7592e 100644
+--- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
++++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+@@ -6,8 +6,8 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-
+ #include <dt-bindings/clock/stih407-clks.h>
++#include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/media/c8sectpfe.h>
+ / {
+ 	soc {
+@@ -116,7 +116,7 @@
+ 				tsin-num	= <0>;
+ 				serial-not-parallel;
+ 				i2c-bus		= <&ssc2>;
+-				rst-gpio	= <&pio15 4 GPIO_ACTIVE_HIGH>;
++				reset-gpios	= <&pio15 4 GPIO_ACTIVE_HIGH>;
+ 				dvb-card	= <STV0367_TDA18212_NIMA_1>;
+ 			};
+ 		};
+diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+index 3a91093..c691e13 100644
+--- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
++++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+@@ -822,7 +822,7 @@ static int c8sectpfe_probe(struct platform_device *pdev)
+ 		}
+ 		of_node_put(i2c_bus);
+ 
+-		tsin->rst_gpio = of_get_named_gpio(child, "rst-gpio", 0);
++		tsin->rst_gpio = of_get_named_gpio(child, "reset-gpios", 0);
+ 
+ 		ret = gpio_is_valid(tsin->rst_gpio);
+ 		if (!ret) {
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
