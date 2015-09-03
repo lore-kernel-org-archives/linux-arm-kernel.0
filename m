@@ -1,75 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 3 Sep 2015 09:39:50 +0200
-Subject: [PATCH v2 0/6] regulator: Fix pbias regulator enable
-In-Reply-To: <1441263042-12942-1-git-send-email-kishon@ti.com>
-References: <1441263042-12942-1-git-send-email-kishon@ti.com>
-Message-ID: <CAPDyKFrVR+vvmxm43hGimjqo4pcFa1pfDuNNENXU-tk_qXo2=w@mail.gmail.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 3 Sep 2015 09:40:21 +0200
+Subject: Cortex A9 MP: ARM errata 754323 implementation?
+Message-ID: <55E7F965.8080802@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Olof
+Hi,
 
-On 3 September 2015 at 08:50, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> vsel_reg and enable_reg of the pbias regulator descriptor should actually
-> have the offset from syscon.
->
-> However after
-> "ARM: dts: <platform>: add minimal l4 bus layout with control module
-> support"
-> vsel_reg and enable_reg started to have the absolute address because
-> of address translation that happens due to pbias node made as the
-> child node of syscon. This breaks the pbias regulator enable.
->
-> This series adds the 'offset' to be populated in vsel_reg and enable_reg
-> in the pbias driver itself.
->
-> Changes from v1:
-> *) Fixed Tony's review comments on adding a 'comment' for adding offset in
->    the driver and adding a warning for using platform_get_resource.
-> *) Added Tony's Acked-by.
->
-> Tested these patches against mmc -next in omap4 panda, omap3 beagle xm,
-> dra72 and omap5 uevm
->
-> Kishon Vijay Abraham I (6):
->   regulator: pbias: program pbias register offset in pbias driver
->   ARM: dts: dra7: use "ti,pbias-dra7" compatible string for pbias
->   ARM: dts: omap243x: use "ti,pbias-omap2" compatible string for pbias
->   ARM: dts: omap3: use "ti,pbias-omap3" compatible string for pbias
->   ARM: dts: omap4: use "ti,pbias-omap4" compatible string for pbias
->   ARM: dts: omap5: use "ti,pbias-omap5" compatible string for pbias
->
->  .../bindings/regulator/pbias-regulator.txt         |    7 ++-
->  arch/arm/boot/dts/dra7.dtsi                        |    2 +-
->  arch/arm/boot/dts/omap2430.dtsi                    |    2 +-
->  arch/arm/boot/dts/omap3.dtsi                       |    2 +-
->  arch/arm/boot/dts/omap4.dtsi                       |    2 +-
->  arch/arm/boot/dts/omap5.dtsi                       |    2 +-
->  drivers/regulator/pbias-regulator.c                |   56 +++++++++++++++++---
->  7 files changed, 61 insertions(+), 12 deletions(-)
->
-> --
-> 1.7.9.5
->
+looking through the ARM Cortex A9 errata list [1] I wonder why we don't 
+have a workaround for
 
-I have recently queued another patchset [1] for the mmc omap driver
-for 4.3 through my mmc tree for which Olof Johansson reported a
-regression [2] for Panda ES with multi_v7_defconfig.
+(754323) Repeated Store in the same cache line might delay the 
+visibility of the Store
 
-Kishon, could you please clarify if $subject patchset solves that
-regression reported by Olof? Or perhaps Olof can run a test?
+in the kernel? Or have I missed it?
 
-Finally, perhaps it's better if we queue this through my mmc tree
-since we would then be able to avoid the regression - if I put
-$subject patchset before [1], right? Then I need an ack from Mark for
-the regulator patch.
-Please tell me if you guys prefer another way.
+We do have the workaround for the related erratum #754327 implemented 
+[2], but that is supposed only for cores prior to r2p0.
 
-Kind regards
-Uffe
+While #754323 seems to affect all newer cores, too?
 
-[1]
-http://permalink.gmane.org/gmane.linux.kernel/2027789
+Any idea?
 
-[2]
-http://www.spinics.net/lists/linux-mmc/msg33146.html
+Best regards
+
+Dirk
+
+[1] ARM Cortex-A9 processors
+r4 releases
+Software Developers Errata Notice
+ARM UAN 0009D (ID032315)
+
+[2] 
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/Kconfig#n1196
