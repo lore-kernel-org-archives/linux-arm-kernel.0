@@ -1,104 +1,107 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu,  3 Sep 2015 13:58:27 -0600
-Subject: [PATCH v2 0/7] PM / Domains: Generic PM domains for CPUs/Clusters
-Message-ID: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
+Date: Thu,  3 Sep 2015 13:58:28 -0600
+Subject: [PATCH v2 1/7] PM / Domains: Allocate memory outside domain locks
+In-Reply-To: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
+References: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1441310314-8857-2-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1 [3]:
-- Remove compatible for CPU PM domains, platform explicity calls an API to
-  create and register a CPU PD.
-- Remove init section initialization of platform callbacks.
-- Review comments addressed in domain.c
-- Move cpu-pd.c and cpu-pd.h out of ARM. However, changes to hotplug and
-  cpuidle has only be made for ARM at this time.
-- Define CPU devices as IRQ safe at init
-- Prevent lockdep RCU false warnings
-- Added Reviewed, Ack tags
+In preparation for supporting IRQ-safe domains, allocate domain data
+outside the domain locks. These functions are not called in an atomic
+context, so we can always allocate memory using GFP_KERNEL. By
+allocating memory before the locks, we can safely lock the domain using
+spinlocks instead of mutexes.
 
-Changes since RFC v2 [2]:
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+Cc: Krzysztof Koz?owski <k.kozlowski@samsung.com>
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+---
+ drivers/base/power/domain.c | 30 +++++++++++++++---------------
+ 1 file changed, 15 insertions(+), 15 deletions(-)
 
-- Fix memory not released on error in pm_genpd_add_subdomain()
-- Reworded commit texts and documentation
-- Add Documentation for CPU PM domain and device tree
-- Clean up CPU PD initialization code
-- Add runtime PM support for CPU idle and hotplug instead of notifications
-- Allow platform drivers to register for CPU PD callbacks
-- Send CPU_PM notifications for cluster from the common code.
-- Not including platform code as part of this series. Will submit separately.
-- Rebased on top of linux-next
-- Minor fix to comment in CPU_PM
-
-Changes since RFC v1 [1]:
-
-- Address review comments on v1.
-- Incorporate Kevin's arch/arm/domain.c changes
-- Drop drivers/base/power/cpu_domain.c
-- Rebase on top of linux-next (to date)
-- Reference implementation added.
-
-This patchset fashions CPU clusters as generic PM domains. CPUs in most new
-SOCs are grouped together as clusters, along with some supporting hardware,
-GIC, L2 caches etc. When the CPUs in the cluster are powered off, these
-hardware may also be powered off.
-
-Generic PM domain  framework provides the necessary backend to build a cluster
-hierarchy through devices, domains and nested domains. When devices and
-sub-domains of a genpd are suspended, the genpd may also be suspended and
-resumed before the first of the devices resumes. This works well for devices
-and domains that operate in process context.
-
-CPU idle operates with IRQs disabled. IRQs are disabled early in the CPU idle
-operation and therefore any activity related to CPU's idle cannot sleep. The
-cluster hardware has to support atomic operations if they are to be powered
-on/off, along with the CPU. The limitation in using genpd framework for cluster
-idle, is that genpd inherently uses mutexes for locking PM domains during
-runtime suspend and resume and therefore may sleep during these operations. If
-this limitation were to be removed, CPU clusters can be represented as devices
-attached to a PM domain and when the CPUs are in runtime idle, the PM domain
-can also be suspended.
-
-The approach here is simple, allow genpd domains to specify the type of locking
-the domain would use. A genpd that can suspend and resume in an IRQ safe
-context, would initialize a spinlock as the genpd lock instead of a mutex.
-Therefore, IRQ safe devices may initiate a genpd suspend when the last active
-device goes idle. In a CPU domain, the last CPU powering down, may now program
-the domain hardware to suspend, when the CPU enters idle. Thus when all the
-CPUs are in idle, the domain and therefore the caches, VFP, GIC, Coresight,
-power controller and other peripheral hardware may also be in a low power
-state. This can save a considerable amount of runtime power.
-
-Thanks,
-Lina
-
-[1]. http://www.spinics.net/lists/arm-kernel/msg423430.html
-[2]. http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/352787.html
-[3]. https://lwn.net/Articles/653579/
-
-Lina Iyer (7):
-  PM / Domains: Allocate memory outside domain locks
-  PM / Domains: Support IRQ safe PM domains
-  drivers: cpu: Define CPU devices as IRQ safe
-  PM / Domains: Introduce PM domains for CPUs/clusters
-  ARM: cpuidle: Add runtime PM support for CPU idle
-  ARM64: smp: Add runtime PM support for CPU hotplug
-  ARM: smp: Add runtime PM support for CPU hotplug
-
- Documentation/arm/cpu-domains.txt |  56 +++++++++
- Documentation/power/devices.txt   |  11 +-
- arch/arm/kernel/smp.c             |  18 ++-
- arch/arm64/kernel/smp.c           |  16 +++
- drivers/base/cpu.c                |   6 +-
- drivers/base/power/Makefile       |   2 +-
- drivers/base/power/cpu-pd.c       | 206 ++++++++++++++++++++++++++++++++
- drivers/base/power/domain.c       | 242 +++++++++++++++++++++++++++++---------
- drivers/cpuidle/cpuidle-arm.c     |  11 ++
- include/linux/cpu-pd.h            |  35 ++++++
- include/linux/pm_domain.h         |  11 +-
- 11 files changed, 550 insertions(+), 64 deletions(-)
- create mode 100644 Documentation/arm/cpu-domains.txt
- create mode 100644 drivers/base/power/cpu-pd.c
- create mode 100644 include/linux/cpu-pd.h
-
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index e45a0ef..ef8d19f 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1381,13 +1381,17 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+ 			   struct generic_pm_domain *subdomain)
+ {
+-	struct gpd_link *link;
++	struct gpd_link *link, *itr;
+ 	int ret = 0;
+ 
+ 	if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(subdomain)
+ 	    || genpd == subdomain)
+ 		return -EINVAL;
+ 
++	link = kzalloc(sizeof(*link), GFP_KERNEL);
++	if (!link)
++		return -ENOMEM;
++
+ 	mutex_lock(&genpd->lock);
+ 	mutex_lock_nested(&subdomain->lock, SINGLE_DEPTH_NESTING);
+ 
+@@ -1397,18 +1401,13 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+ 		goto out;
+ 	}
+ 
+-	list_for_each_entry(link, &genpd->master_links, master_node) {
+-		if (link->slave == subdomain && link->master == genpd) {
++	list_for_each_entry(itr, &genpd->master_links, master_node) {
++		if (itr->slave == subdomain && itr->master == genpd) {
+ 			ret = -EINVAL;
+ 			goto out;
+ 		}
+ 	}
+ 
+-	link = kzalloc(sizeof(*link), GFP_KERNEL);
+-	if (!link) {
+-		ret = -ENOMEM;
+-		goto out;
+-	}
+ 	link->master = genpd;
+ 	list_add_tail(&link->master_node, &genpd->master_links);
+ 	link->slave = subdomain;
+@@ -1419,7 +1418,8 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+  out:
+ 	mutex_unlock(&subdomain->lock);
+ 	mutex_unlock(&genpd->lock);
+-
++	if (ret)
++		kfree(link);
+ 	return ret;
+ }
+ 
+@@ -1510,17 +1510,17 @@ int pm_genpd_attach_cpuidle(struct generic_pm_domain *genpd, int state)
+ 	if (IS_ERR_OR_NULL(genpd) || state < 0)
+ 		return -EINVAL;
+ 
++	cpuidle_data = kzalloc(sizeof(*cpuidle_data), GFP_KERNEL);
++	if (!cpuidle_data)
++		return -ENOMEM;
++
+ 	mutex_lock(&genpd->lock);
+ 
+ 	if (genpd->cpuidle_data) {
+ 		ret = -EEXIST;
+-		goto out;
+-	}
+-	cpuidle_data = kzalloc(sizeof(*cpuidle_data), GFP_KERNEL);
+-	if (!cpuidle_data) {
+-		ret = -ENOMEM;
+-		goto out;
++		goto err_drv;
+ 	}
++
+ 	cpuidle_drv = cpuidle_driver_ref();
+ 	if (!cpuidle_drv) {
+ 		ret = -ENODEV;
 -- 
 2.1.4
