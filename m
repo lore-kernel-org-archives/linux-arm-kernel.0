@@ -1,95 +1,60 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 4 Sep 2015 07:49:08 +0800
-Subject: [PATCH v2] clk: rockchip: reset init state before mmc card
- initialization
-In-Reply-To: <4930263.TgyPa9P2vP@phil>
-References: <1440462876-5457-1-git-send-email-shawn.lin@rock-chips.com>
- <4930263.TgyPa9P2vP@phil>
-Message-ID: <55E8DC74.3090200@rock-chips.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 04 Sep 2015 08:55:09 +0900
+Subject: [PATCHv7] ARM: exynos_defconfig: Enable LEDS for Odroid-XU3/XU4
+In-Reply-To: <1441303910-3266-1-git-send-email-linux.amoon@gmail.com>
+References: <1441303910-3266-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <55E8DDDD.80106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2015/9/4 3:07, Heiko Stuebner ??:
-> Am Dienstag, 25. August 2015, 08:34:36 schrieb Shawn Lin:
->> mmc host controller's IO input/output timing is unpredictable if
->> bootloader execute tuning for HS200 mode. It might make kernel failed
->> to initialize mmc card in identification mode. The root cause is
->> tuning phase and degree setting for HS200 mode in bootloader aren't
->> applicable to that of identification mode in kernel stage. Anyway, we
->> can't force all bootloaders to reset tuning phase and degree setting
->> before into kernel. Simply reset it in rockchip_clk_register_mmc.
->>
->> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
->
-> I'm not 100% sure why you need the new function instead of having that
-> directly in rockchip_clk_register_mmc, but I guess that is a matter of taste
+On 04.09.2015 03:11, Anand Moon wrote:
+> Earlier design of the LED for Odroid XU3 was using gpio-leds
+> Now It was change to using both pwm-leds and gpio-leds.
 
-Thanks, Heiko.
-:) That's indeed my taste but might not be appropriate sometimes. Also 
-add it directly into rockchip_clk_register_mmc looks fine to me.
+It is still not a reason for this change. gpio-leds were not enabled
+before. This could be a valid reason of adding LEDS_PWM to existing
+config LEDS_GPIO. But LEDS_GPIO were not enabled... so why the change on
+the board from gpio->(gpio+pwm) means that we have to enable LEDS_GPIO?
 
-I'm prone to do it as your advice since it can reduce a function call.
+Actually I gave up on this and I wanted to change the commit message on
+myself when applying. But discussion was brought up again so... clearly
+we have different understanding of the meaning of "WHY". :)
 
-> and I don't have a hard opinion on that, so
->
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
->
->>
->> ---
->>
->> Changes in v2:
->> - rename to rockchip_clk_mmc_reset
->> - simplifying the code
->>
->>   drivers/clk/rockchip/clk-mmc-phase.c | 16 ++++++++++++++++
->>   1 file changed, 16 insertions(+)
->>
->> diff --git a/drivers/clk/rockchip/clk-mmc-phase.c
->> b/drivers/clk/rockchip/clk-mmc-phase.c index e9f8df32..1d3e8fe6 100644
->> --- a/drivers/clk/rockchip/clk-mmc-phase.c
->> +++ b/drivers/clk/rockchip/clk-mmc-phase.c
->> @@ -38,6 +38,8 @@ static unsigned long rockchip_mmc_recalc(struct clk_hw
->> *hw, #define ROCKCHIP_MMC_DEGREE_MASK 0x3
->>   #define ROCKCHIP_MMC_DELAYNUM_OFFSET 2
->>   #define ROCKCHIP_MMC_DELAYNUM_MASK (0xff << ROCKCHIP_MMC_DELAYNUM_OFFSET)
->> +#define ROCKCHIP_MMC_INIT_STATE_RESET 0x1
->> +#define ROCKCHIP_MMC_INIT_STATE_SHIFT 1
->>
->>   #define PSECS_PER_SEC 1000000000000LL
->>
->> @@ -119,6 +121,14 @@ static const struct clk_ops rockchip_mmc_clk_ops = {
->>   	.set_phase	= rockchip_mmc_set_phase,
->>   };
->>
->> +static void rockchip_clk_mmc_reset(struct rockchip_mmc_clock *mmc_clock)
->> +{
->> +	if (mmc_clock->shift == ROCKCHIP_MMC_INIT_STATE_SHIFT)
->> +		writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_RESET,
->> +				     ROCKCHIP_MMC_INIT_STATE_RESET,
->> +				     mmc_clock->shift), mmc_clock->reg);
->> +}
->> +
->>   struct clk *rockchip_clk_register_mmc(const char *name,
->>   				const char *const *parent_names, u8 num_parents,
->>   				void __iomem *reg, int shift)
->> @@ -139,6 +149,12 @@ struct clk *rockchip_clk_register_mmc(const char *name,
->> mmc_clock->reg = reg;
->>   	mmc_clock->shift = shift;
->>
->> +	/*
->> +	* Assert init_state to soft reset the CLKGEN
->> +	* for mmc tuning phase and degree
->> +	*/
->> +	rockchip_clk_mmc_reset(mmc_clock);
->> +
->>   	if (name)
->>   		init.name = name;
->
->
->
->
+Best regards,
+Krzysztof
 
-
--- 
-Best Regards
-Shawn Lin
+> 
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> Changes from last version
+> dropped following option.
+>   CONFIG_LEDS_CLASS_FLASH
+>   CONFIG_TRIGGER_ONESHOT
+>   CONFIG_LEDS_TRIGGER_TIMER
+>   CONFIG_TRIGGER_GPIO
+> fixed the From address
+> fixed the commit message.
+> ---
+>  arch/arm/configs/exynos_defconfig | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 9504e77..bd6b7f7 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -163,6 +163,12 @@ CONFIG_MMC_SDHCI_S3C_DMA=y
+>  CONFIG_MMC_DW=y
+>  CONFIG_MMC_DW_IDMAC=y
+>  CONFIG_MMC_DW_EXYNOS=y
+> +CONFIG_NEW_LEDS=y
+> +CONFIG_LEDS_CLASS=y
+> +CONFIG_LEDS_GPIO=y
+> +CONFIG_LEDS_PWM=y
+> +CONFIG_LEDS_TRIGGERS=y
+> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_MAX77686=y
+>  CONFIG_RTC_DRV_MAX77802=y
+> 
