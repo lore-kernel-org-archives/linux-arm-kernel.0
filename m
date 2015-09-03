@@ -1,35 +1,31 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 3 Sep 2015 09:40:21 +0200
-Subject: Cortex A9 MP: ARM errata 754323 implementation?
-Message-ID: <55E7F965.8080802@de.bosch.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Sep 2015 09:00:28 +0100
+Subject: [PATCH] ARM: fix bug which VMALLOC_START is lowwer than 0xf0000000
+In-Reply-To: <1441247087-10342-1-git-send-email-ytk.lee@samsung.com>
+References: <1441247087-10342-1-git-send-email-ytk.lee@samsung.com>
+Message-ID: <20150903080028.GS21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Sep 03, 2015 at 11:24:47AM +0900, Yongtaek Lee wrote:
+> default value of vmalloc_min was set 0xf0000000 for ARM by commit
+> 0536bdf3. But actually vmalloc_min is 0xef800000 not 0xf0000000.
+> 
+> VMALLOC_END - (240 << 20) - VMALLOC_OFFSET)
+> 0xff000000 - 0x0f000000 - 0x00800000 = 0xef800000
+> 
+> In case of 768MB ram without CONFIG_HIGHMEM=y, last 8MB could not be
+> allocated. Kernel log also print out warning message as below.
+> "Truncating RAM at 80000000-afffffff to -af7fffff (vmalloc region overlap)."
+> 
+> Although it could be solved by state "vmalloc=size" in cmdline but i think
+> it would be better to change default value to 232 from 240.
+> 
+> Signed-off-by: Yongtaek Lee <ytk.lee@samsung.com>
 
-looking through the ARM Cortex A9 errata list [1] I wonder why we don't 
-have a workaround for
+I fail to see what the problem is here.  You're adjusting the size of the
+vmalloc space to accomodate the size of RAM you have.  That's not a bug.
 
-(754323) Repeated Store in the same cache line might delay the 
-visibility of the Store
-
-in the kernel? Or have I missed it?
-
-We do have the workaround for the related erratum #754327 implemented 
-[2], but that is supposed only for cores prior to r2p0.
-
-While #754323 seems to affect all newer cores, too?
-
-Any idea?
-
-Best regards
-
-Dirk
-
-[1] ARM Cortex-A9 processors
-r4 releases
-Software Developers Errata Notice
-ARM UAN 0009D (ID032315)
-
-[2] 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/Kconfig#n1196
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
