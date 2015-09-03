@@ -1,29 +1,51 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 3 Sep 2015 16:55:59 -0500
-Subject: [PATCH v4 14/16] drm: bridge: analogix/dp: try force hpd after
- plug in lookup failed
-In-Reply-To: <20150903084735.GB3784@ulmo.nvidia.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <1441088079-25809-1-git-send-email-ykk@rock-chips.com>
- <CAL_JsqJDALnjVaVoEqGGsSLeE31m3MKOfbSoZ3M+g+zPZR2MFg@mail.gmail.com>
- <20150903084735.GB3784@ulmo.nvidia.com>
-Message-ID: <CAL_Jsq+F=eE6vU3f-bHrrSCD9GCoh80Nf-5=Qm73QgGDW1Np=w@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 3 Sep 2015 23:57:29 +0200
+Subject: [PATCH] ARM: dts: Fix Makefile target for
+ sun4i-a10-itead-iteaduino-plus
+In-Reply-To: <20150902201812.GC464@hansolo.redhat.com>
+References: <20150902201812.GC464@hansolo.redhat.com>
+Message-ID: <20150903215729.GH31584@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 3, 2015 at 3:47 AM, Thierry Reding <treding@nvidia.com> wrote:
-> On Wed, Sep 02, 2015 at 03:17:57PM -0500, Rob Herring wrote:
-> [...]
->> Are there any eDP panels which don't have EDID and need panel details in DT?
->
-> Most panels need information other than EDID. They typically have some
-> requirements regarding the power up sequence that aren't to be found
-> anywhere in EDID or detectable by some other mechanism. A decision was
-> therefore made a long time ago to require panels to be listed in DT with
-> a specific compatible string. That way all of these details can be
-> stashed away in drivers that know how to deal with these kinds of
-> details.
+Hi Josh
 
-I guess I was being hopeful that eDP was improving that situation.
+On Wed, Sep 02, 2015 at 04:18:12PM -0400, Josh Boyer wrote:
+> linux-kernel at vger.kernel.org
+> Bcc: 
+> Subject: [PATCH] ARM: dts: Fix Makefile target for sun4i-a10-itead-iteaduino-plus
+> Reply-To: 
 
-Rob
+Hmmm, something went wrong with your mail header.
+
+> ommit 79ae3e66f8d (ARM: dts: sun4i: Add Iteaduino Plus A10) added a new
+
+Missing opening "C"
+
+> make target for the sun4i-a10-itead-iteaduino-plus dts file, but mistakenly
+> used .dts instead of the correct .dtb suffix.  This resulted in a build error
+> like:
+> 
+> 	scripts/Makefile.dtbinst:42: target 'sun4i-a10-itead-iteaduino-plus.dts' doesn't match the target pattern
+> 
+> when doing a make dtbs_install.
+> 
+> Fix it to use the proper file name.
+> 
+> Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
+
+Apart from that, it looks fine, thanks!
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150903/77d76f57/attachment-0001.sig>
