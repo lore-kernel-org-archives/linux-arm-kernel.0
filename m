@@ -1,71 +1,43 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 02 Sep 2015 22:57:58 -0700
-Subject: [PATCH v4 01/16] drm: exynos/dp: fix code style
-In-Reply-To: <55E7DBA7.90504@rock-chips.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <1441086399-24889-1-git-send-email-ykk@rock-chips.com>
- <55E79297.3050203@samsung.com> <55E7D4E4.6070808@rock-chips.com>
- <55E7D5EB.1060505@samsung.com> <55E7DBA7.90504@rock-chips.com>
-Message-ID: <1441259878.12163.75.camel@perches.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 3 Sep 2015 08:45:32 +0200
+Subject: [PATCH] ARM: disable GCC SRA optimization
+In-Reply-To: <55E76764.2020200@mentor.com>
+References: <1441211290-11449-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_eOQ=ZACn1jzQU-z2ZMqX3PdUx9j05fXuGjniccS2x8Q@mail.gmail.com>
+ <55E76764.2020200@mentor.com>
+Message-ID: <CAKv+Gu86YFhyQ1RE-ZvKgUhx9q5fM+_8f7sBu9x-cc-ODahPqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-09-03 at 13:33 +0800, Yakir Yang wrote:
-[]
-> >>>> diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c
-[]
-> >>>> @@ -155,24 +156,22 @@ static int exynos_dp_read_edid(struct
-> >>>> exynos_dp_device *dp)
-> >>>>            }
-> >>>>              exynos_dp_read_byte_from_dpcd(dp, DP_TEST_REQUEST,
-> >>>> -                    &test_vector);
-> >>>> +                          &test_vector);
-> >>>>            if (test_vector & DP_TEST_LINK_EDID_READ) {
-> >>>> -            exynos_dp_write_byte_to_dpcd(dp,
-> >>>> -                DP_TEST_EDID_CHECKSUM,
-> >>>> +            exynos_dp_write_byte_to_dpcd(
-> >>>> +                dp, DP_TEST_EDID_CHECKSUM,
-> >>>>                    edid[EDID_BLOCK_LENGTH + EDID_CHECKSUM]);
-> >>>> -            exynos_dp_write_byte_to_dpcd(dp,
-> >>>> -                DP_TEST_RESPONSE,
-> >>>> +            exynos_dp_write_byte_to_dpcd(
-> >>>> +                dp, DP_TEST_RESPONSE,
-> >>>>                    DP_TEST_EDID_CHECKSUM_WRITE);
-> >>> To me, missing argument after opening parenthesis, looks worse. I would
-> >>> prefer:
-> >>>
-> >>>              exynos_dp_write_byte_to_dpcd(dp,
-> >>>
-> >>> Why you moved the 'dp' argument to new line?
-> >> Hmm... Just like style tool indicate, no more warning after
-> >> that change.
-> >>
-> >> For now, I would like to follow the original style, just improved
-> >> some obvious style problem.  :-)
-> > What was the checkpatch warning that said 'dp' has to move to new line?
-> > I tried this and I don't see it.
-> 
-> checkpatch haven't remind me that put dp to new line would fix
-> this warning, this just come from my experiments. And I works,
-> no more warnings from checkpatch, so I toke this style.
+On 2 September 2015 at 23:17, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
+> On 09/02/2015 11:45 AM, Ard Biesheuvel wrote:
+>> On 2 September 2015 at 18:28, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>> This is a known but as yet unresolved issue.
+>>> (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65932). In this particular
+>>> case, it is causing the second while loop to be executed erroneously a
+>>> single time, causing the additional space characters to be printed.
+>>>
+>>> So disable the optimization by passing -fno-ipa-sra.
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+>>>
+>>> Needs to go to stable perhaps?
+>>> The emitted asm is at the end of this patch.
+>>>
+>>
+>> Another report of the same issue:
+>> https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66271
+>
+> Comments in both bugs indicate that this happens only when building with
+> -Os and not -O2.  Have you (or anyone else) been able to get bad code
+> with -O2?
+>
 
-Checkpatch isn't a great arbiter of style.
-It's just a brainless tool.
+For me, it occurred with -O2, I did not test -Os in fact. I did
+confirm that the problem goes away with -O1
 
-Always use your instead of anything brainless.
-
-If it were code I was writing, I'd ignore 80 columns warnings
-where appropriate.
-
-These are long function names and long macro defines, so it's
-inappropriate to use 80 columns as a guiding style.
-
-I'd write:
-
-		exynos_dp_read_byte_from_dpcd(dp, DP_TEST_REQUEST, &test_vector);
-		if (test_vector & DP_TEST_LINK_EDID_READ) {
-			exynos_dp_write_byte_to_dpcd(dp, DP_TEST_EDID_CHECKSUM,
-						     edid[EDID_BLOCK_LENGTH + EDID_CHECKSUM]);
-			exynos_dp_write_byte_to_dpcd(dp, DP_TEST_RESPONSE,
-						     DP_TEST_EDID_CHECKSUM_WRITE);
-		}
+> I don't think the answer should affect the patch itself, but it might be
+> kind to note in the commit message whether -Os definitely makes the
+> difference here, if this information is known.
+>
