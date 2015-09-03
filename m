@@ -1,29 +1,62 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Thu, 03 Sep 2015 13:09:40 -0500
-Subject: [PATCH v5 05/11] drivers: PL011: refactor pl011_probe()
-In-Reply-To: <55E87B3E.8070106@arm.com>
-References: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
- <1432225584-4655-6-git-send-email-andre.przywara@arm.com>
- <CAOZdJXVgRQZhEfYY9YdpiQ=n1D56yYL84s42V4hd2=YX2k48ZA@mail.gmail.com>
- <55E87B3E.8070106@arm.com>
-Message-ID: <55E88CE4.7080401@tabi.org>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu,  3 Sep 2015 18:59:48 +0100
+Subject: [PATCH v5 0/6]  [media] c8sectpfe: Various fixups
+Message-ID: <1441303194-28211-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2015 11:54 AM, Andre Przywara wrote:
+Hi Mauro,
 
-> I don't get where pl011_early_write() would need any kind of PL011 struct.
-> It only references structures defined in the serial core, so it's
-> completely dumb MMIO writes and reads, using only the base address
-> provided on the command line.
-> Are you by any chance mixing up early console and the normal console? To
-> me it looks like early console just uses the three tiny functions
-> defined just before the declaration and it does not touch vendor at all,
-> isn't it?
->
-> As for the broken part, any chance you were testing -next, which has
-> some patches that broke early console, as we learned today?[1]
+This series includes a couple of fixes for the c8sectpfe Linux dvb driver.
 
-I have to apologize -- I forgot that I applied an internal patch that 
-modified this code, and the bug is in that patch, not yours.  Your code 
-is fine as is.
+The only difference versus v5 is on RobH advice we are back to "reset-gpios"
+for the binding.
+
+One was caused by omitting a patch from the original c8sectpfe series which
+defined the ssc2 and ssc3 dt nodes, which was then used by the later DT patch.
+This patch is included, along with the original patch which you reverted.
+
+Also Valentin Rothberg spotted LIBELF32 Kconfig symbol I was selecting in the
+Kconfig, this isn't required upstream and is left over legacy so I've removed
+it.
+
+Also included are some fixups spotted by Lee Jones.
+
+Changes since v4:
+ - Change back (again) to "reset-gpios"
+
+Changes since v3:
+ - Collect up more acks
+ - Change binding to "reset-gpio"
+ - highlight dtb incompatability in commit message
+
+Changes since v2:
+ - Add some "\n" and other formatting fixes
+ - 'Suggested by' should be in chronological order
+ - Simplify load_slim_core_fw loop
+
+Changes since v1:
+ - Various formating patches to DT node
+ - Update to reset-gpios
+ - Use GPIO_ACTIVE_HIGH, GIC_SPI and IRQ_TYPE_NONE defines
+
+kind regards,
+
+Peter.
+
+Peter Griffin (6):
+  ARM: DT: STi: stihxxx-b2120: Add pulse-width properties to ssc2 & ssc3
+  ARM: DT: STi: STiH407: Add c8sectpfe LinuxDVB DT node.
+  [media] c8sectpfe: Remove select on undefined LIBELF_32
+  [media] c8sectpfe: Update binding to reset-gpios
+  [media] c8sectpfe: Update DT binding doc with some minor fixes
+  [media] c8sectpfe: Simplify for loop in load_slim_core_fw
+
+ .../bindings/media/stih407-c8sectpfe.txt           | 20 +++++-----
+ arch/arm/boot/dts/stihxxx-b2120.dtsi               | 45 +++++++++++++++++++++-
+ drivers/media/platform/sti/c8sectpfe/Kconfig       |  1 -
+ .../media/platform/sti/c8sectpfe/c8sectpfe-core.c  |  9 +++--
+ 4 files changed, 58 insertions(+), 17 deletions(-)
+
+-- 
+1.9.1
