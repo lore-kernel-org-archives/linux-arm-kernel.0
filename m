@@ -1,10 +1,10 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Thu, 3 Sep 2015 10:03:09 -0700
-Subject: [PATCH v2 7/8] soc: qcom: smd_rpm: Handle big endian CPUs
-In-Reply-To: <1441234011-4259-8-git-send-email-sboyd@codeaurora.org>
+Date: Thu, 3 Sep 2015 10:03:27 -0700
+Subject: [PATCH v2 8/8] regulator: qcom_smd: Handle big endian CPUs
+In-Reply-To: <1441234011-4259-9-git-send-email-sboyd@codeaurora.org>
 References: <1441234011-4259-1-git-send-email-sboyd@codeaurora.org>
- <1441234011-4259-8-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150903170309.GT13472@usrtlx11787.corpusers.net>
+ <1441234011-4259-9-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150903170327.GU13472@usrtlx11787.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
