@@ -1,32 +1,96 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 3 Sep 2015 15:56:17 -0700
-Subject: [PATCH] ARM: dts: Add ddc i2c reference to veyron
-In-Reply-To: <CAD=FV=WkFPitTsagQa+94DAWujzYECVqk7fO+OUdrfFq3bWTuQ@mail.gmail.com>
-References: <1441229148-12095-1-git-send-email-dianders@chromium.org>
- <CAD=FV=WkFPitTsagQa+94DAWujzYECVqk7fO+OUdrfFq3bWTuQ@mail.gmail.com>
-Message-ID: <20150903225617.GA75694@google.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Thu, 3 Sep 2015 16:08:28 -0700
+Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
+ v4.3-rc1
+In-Reply-To: <20150819103305.GF26627@ulmo>
+References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
+ <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
+ <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
+ <20150819091358.GA26627@ulmo>
+ <1439977724.4135.90.camel@collabora.co.uk>
+ <20150819103305.GF26627@ulmo>
+Message-ID: <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 03, 2015 at 02:00:26PM -0700, Doug Anderson wrote:
-> On Wed, Sep 2, 2015 at 2:25 PM, Douglas Anderson <dianders@chromium.org> wrote:
-> > The ddc-i2c-bus property was missing from the veyron dtsi file since
-> > downstream the ddc-i2c-bus was still being specified in rk3288.dtsi and
-> > nobody noticed when the veyron dtsi was sent upstream.  Add it.
-> >
-> > Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> > ---
-> > Note: I noticed that this was wrong but I don't currently have
-> > graphics up and running on upstream on veyron.  Posting this anyway
-> > since it's pretty clear that it's needed.  If someone else wants to
-> > try it out that'd be nice, otherwise I'll put it on my list to figure
-> > out how to get myself setup for graphics upstream.  ;)
-> 
-> OK, I've used Heiko's "somewhat stable" branch to test this against
-> something very close to mainline.
-> 
-> Without my patch I can't read the HDMI EDID.  With my patch I can.  :)
+Hi Thierry,
 
-Same for veyron-jaq:
+On 19 August 2015 at 03:33, Thierry Reding <thierry.reding@gmail.com> wrote:
+> On Wed, Aug 19, 2015 at 11:48:44AM +0200, Sjoerd Simons wrote:
+>> On Wed, 2015-08-19 at 11:14 +0200, Thierry Reding wrote:
+>> > On Tue, Aug 18, 2015 at 03:30:41PM -0700, Tyler Baker wrote:
+>> > > Hi Theirry,
+>> > >
+>> > >
+>> > > This isn't where the story ends unfortunately. The collabora lab
+>> > > also
+>> > > has a jetson-tk1, booted in the same manner, which boots next
+>> > > -20150818
+>> > > fine[4]. The only differences I can spot in the two boot logs is
+>> > > that
+>> > > the collabora board is using an older version of u-boot, where as
+>> > > my
+>> > > board is using a newer version. U-Boot 2015.01-00231-gab77f24-dirty
+>> > > (Good) vs U-Boot 2015.07-00130-gb217c89 (Bad).
+>>
+>> Our 2015.01-00231-gab77f24-dirty is 2015.01-00231-gab77f24 + changes
+>> which got merged as 053b86e6d8e50359412e626c33bae3f7bafd74dd in
+>> upstream u-boot.
+>>
+>> Fwiw:
+>> $ git show 2015.01-00231-gab77f24
+>> commit ab77f24119e80257de4ab017b877f92f96980562
+>> Merge: d928664 fa58b10
+>> Author: Tom Rini <trini@ti.com>
+>> Date:   Thu Jan 15 14:05:31 2015 -0500
+>>
+>>     Merge branch 'master' of git://git.denx.de/u-boot-ti
+>>
+>> Which is definately a commit you should hae in your upstream u-boot
+>> tree.
+>
+> Yeah, I suck. I was running:
+>
+>         $ git show gab77f24
+>
+> I didn't know git could parse the full output from git describe.
+>
+>> > I don't have either of those commits in any of the U-Boot trees I
+>> > have.
+>> > Perhaps whatever tree this comes from has local patches that cause
+>> > the
+>> > breakage? The version that I use a recent upstream U-Boot with some
+>> > local patches, none of which should impact Jetson TK1 in any way.
+>> > Just
+>> > to make sure I tried running latest origin/master, which identifies
+>> > thusly:
+>> >
+>> >     U-Boot 2015.10-rc2-00040-g0f9258228e2b
+>> >
+>> > And that boots next-20150818 fine.
+>>
+>> Probably worth for tyler to test that u-boot commit on his jetson to
+>> see if that solves the issue he's having...
+>
+> I've tried reconstructing the version that Tyler is running by checking
+> out 2015.01-00231-gab77f24 and applying 053b86e6d8e5 ("pci: tegra: Fix
+> port information parsing") on top, but that also leaves me with a
+> bootable system, so no way of reproducing. I agree that upgrading to a
+> more recent U-Boot version sounds like the best way forward because it
+> has already proven to work on at least two setups.
 
-Tested-by: Brian Norris <briannorris@chromium.org>
+Sorry for the delay. I've upgraded u-boot to U-Boot
+2015.10-rc2-00439-g03d8714 using the tegra u-boot flashing scripts.
+FWIW, I did have to revert 620776d734e4 ("tftp: adjust settings to be
+suitable for 100Mbit ethernet") to get TFTP working again.
+
+Anyways, it hangs at the exact same spot[1] with the newer version of
+u-boot. If remove the modules from the initrd or just disable
+CONFIG_SND_HDA_TEGRA it boots fine. This weekend I'll try to debug
+this module manually and see if I draw any conclusions.
+
+Cheers,
+
+Tyler
+
+[1] http://lava.kernelci.org/scheduler/job/180894/log_file
