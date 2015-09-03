@@ -1,31 +1,46 @@
-From: Poonam.Aggrwal@freescale.com (Aggrwal Poonam)
-Date: Thu, 3 Sep 2015 04:50:56 +0000
-Subject: arm_coherent_dma_alloc
-Message-ID: <DM2PR0301MB070161BE05943337F62EA5218C680@DM2PR0301MB0701.namprd03.prod.outlook.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 03 Sep 2015 14:02:48 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Make S3C2410_WATCHDOG as loadable
+ module
+In-Reply-To: <1441253429-3264-1-git-send-email-linux.amoon@gmail.com>
+References: <1441253429-3264-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <55E7D478.2020200@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+On 03.09.2015 13:10, Anand Moon wrote:
+> S3C2410_WATCHDOG watchdog drivers should not be loaded automatically,
+> but only if a watchdog daemon is installed.
 
+First of all: why?
 
-I am looking at the ?file: "arch/arm/mm/dma-mapping.c"
+Secondly: even as a module driver could be loaded automatically to match
+enabled device (it has MODULE_DEVICE_TABLE). In the same time loading it
+does not hurt - watchdog should be inactive:
 
-static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
-??????? dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
-{
-? ??????pgprot_t prot = __get_dma_pgprot(attrs, pgprot_kernel);
-??????? void *memory;
+s3c2410-wdt 10060000.watchdog: watchdog inactive, reset disabled, irq
+disabled
 
-??????? if (dma_alloc_from_coherent(dev, size, handle, &memory))
-??????????????? return memory;
+Best regards,
+Krzysztof
 
-??????? return __dma_alloc(dev, size, handle, gfp, prot, true,
-?????????? ????????????????__builtin_return_address(0));
-}
-
-I want to understand the attributes of ?memory allocated using __dma_alloc, in terms of cacheable.
-
-This specific question is for CortexA7 MP core.
-
-Regards
-Poonam
+> 
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> ---
+>  arch/arm/configs/exynos_defconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index aaf7aa4..b5d382e 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -101,7 +101,7 @@ CONFIG_CPU_THERMAL=y
+>  CONFIG_THERMAL_EMULATION=y
+>  CONFIG_EXYNOS_THERMAL=y
+>  CONFIG_WATCHDOG=y
+> -CONFIG_S3C2410_WATCHDOG=y
+> +CONFIG_S3C2410_WATCHDOG=m
+>  CONFIG_MFD_CROS_EC=y
+>  CONFIG_MFD_CROS_EC_I2C=y
+>  CONFIG_MFD_CROS_EC_SPI=y
+> 
