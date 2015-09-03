@@ -1,96 +1,75 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  3 Sep 2015 09:06:48 +0200
-Subject: [PATCH v3] mtd: nand: sunxi: fix OOB handling in ->write_xxx()
- functions
-Message-ID: <1441264008-24569-1-git-send-email-boris.brezillon@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 3 Sep 2015 09:39:50 +0200
+Subject: [PATCH v2 0/6] regulator: Fix pbias regulator enable
+In-Reply-To: <1441263042-12942-1-git-send-email-kishon@ti.com>
+References: <1441263042-12942-1-git-send-email-kishon@ti.com>
+Message-ID: <CAPDyKFrVR+vvmxm43hGimjqo4pcFa1pfDuNNENXU-tk_qXo2=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USER_DATA register cannot be accessed using byte accessors on A13
-SoCs, thus triggering a bug when using memcpy_toio on this register.
-Declare two helper macros to convert an OOB buffer into a suitable
-USER_DATA value and vice-versa.
++Olof
 
-This patch also fixes an error in the oob_required logic (some OOB data
-are not written even if the user required it) by removing the
-oob_required condition, which is perfectly valid since the core already
-fill ->oob_poi with FFs when oob_required is false.
+On 3 September 2015 at 08:50, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> vsel_reg and enable_reg of the pbias regulator descriptor should actually
+> have the offset from syscon.
+>
+> However after
+> "ARM: dts: <platform>: add minimal l4 bus layout with control module
+> support"
+> vsel_reg and enable_reg started to have the absolute address because
+> of address translation that happens due to pbias node made as the
+> child node of syscon. This breaks the pbias regulator enable.
+>
+> This series adds the 'offset' to be populated in vsel_reg and enable_reg
+> in the pbias driver itself.
+>
+> Changes from v1:
+> *) Fixed Tony's review comments on adding a 'comment' for adding offset in
+>    the driver and adding a warning for using platform_get_resource.
+> *) Added Tony's Acked-by.
+>
+> Tested these patches against mmc -next in omap4 panda, omap3 beagle xm,
+> dra72 and omap5 uevm
+>
+> Kishon Vijay Abraham I (6):
+>   regulator: pbias: program pbias register offset in pbias driver
+>   ARM: dts: dra7: use "ti,pbias-dra7" compatible string for pbias
+>   ARM: dts: omap243x: use "ti,pbias-omap2" compatible string for pbias
+>   ARM: dts: omap3: use "ti,pbias-omap3" compatible string for pbias
+>   ARM: dts: omap4: use "ti,pbias-omap4" compatible string for pbias
+>   ARM: dts: omap5: use "ti,pbias-omap5" compatible string for pbias
+>
+>  .../bindings/regulator/pbias-regulator.txt         |    7 ++-
+>  arch/arm/boot/dts/dra7.dtsi                        |    2 +-
+>  arch/arm/boot/dts/omap2430.dtsi                    |    2 +-
+>  arch/arm/boot/dts/omap3.dtsi                       |    2 +-
+>  arch/arm/boot/dts/omap4.dtsi                       |    2 +-
+>  arch/arm/boot/dts/omap5.dtsi                       |    2 +-
+>  drivers/regulator/pbias-regulator.c                |   56 +++++++++++++++++---
+>  7 files changed, 61 insertions(+), 12 deletions(-)
+>
+> --
+> 1.7.9.5
+>
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Cc: <stable@vger.kernel.org> # 3.19+
-Fixes: 1fef62c1423b ("mtd: nand: add sunxi NAND flash controller support")
+I have recently queued another patchset [1] for the mmc omap driver
+for 4.3 through my mmc tree for which Olof Johansson reported a
+regression [2] for Panda ES with multi_v7_defconfig.
 
----
-Changes since v2:
-- add the NFC_USER_DATA_TO_BUF() macro and rename NFC_USER_DATA() into
-  NFC_BUF_TO_USER_DATA()
-- rework the commit message
+Kishon, could you please clarify if $subject patchset solves that
+regression reported by Olof? Or perhaps Olof can run a test?
 
-Changes since v1:
-- drop the !oob_required conditional path
-- replace endianness conversions by a macro relying on byte shifting
-  operations
----
- drivers/mtd/nand/sunxi_nand.c | 33 ++++++++++++++++-----------------
- 1 file changed, 16 insertions(+), 17 deletions(-)
+Finally, perhaps it's better if we queue this through my mmc tree
+since we would then be able to avoid the regression - if I put
+$subject patchset before [1], right? Then I need an ack from Mark for
+the regulator patch.
+Please tell me if you guys prefer another way.
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index f97a58d..f9b5a4c 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -147,6 +147,17 @@
- #define NFC_ECC_MODE		GENMASK(15, 12)
- #define NFC_RANDOM_SEED		GENMASK(30, 16)
- 
-+/* NFC_USER_DATA helper macros */
-+#define NFC_BUF_TO_USER_DATA(buf)	((buf)[0] | ((buf)[1] << 8) | \
-+					((buf)[2] << 16) | ((buf)[3] << 24))
-+#define NFC_USER_DATA_TO_BUF(buf, val)	\
-+	{				\
-+		(buf)[0] = val;		\
-+		(buf)[1] = val >> 8;	\
-+		(buf)[2] = val >> 16;	\
-+		(buf)[3] = val >> 24;	\
-+	}
-+
- #define NFC_DEFAULT_TIMEOUT_MS	1000
- 
- #define NFC_SRAM_SIZE		1024
-@@ -646,15 +657,9 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
- 		offset = layout->eccpos[i * ecc->bytes] - 4 + mtd->writesize;
- 
- 		/* Fill OOB data in */
--		if (oob_required) {
--			tmp = 0xffffffff;
--			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, &tmp,
--				    4);
--		} else {
--			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE,
--				    chip->oob_poi + offset - mtd->writesize,
--				    4);
--		}
-+		writel(NFC_BUF_TO_USER_DATA(chip->oob_poi +
-+					    layout->oobfree[i].offset),
-+		       nfc->regs + NFC_REG_USER_DATA_BASE);
- 
- 		chip->cmdfunc(mtd, NAND_CMD_RNDIN, offset, -1);
- 
-@@ -784,14 +789,8 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
- 		offset += ecc->size;
- 
- 		/* Fill OOB data in */
--		if (oob_required) {
--			tmp = 0xffffffff;
--			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, &tmp,
--				    4);
--		} else {
--			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, oob,
--				    4);
--		}
-+		writel(NFC_BUF_TO_USER_DATA(oob),
-+		       nfc->regs + NFC_REG_USER_DATA_BASE);
- 
- 		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ACCESS_DIR |
- 		      (1 << 30);
--- 
-1.9.1
+Kind regards
+Uffe
+
+[1]
+http://permalink.gmane.org/gmane.linux.kernel/2027789
+
+[2]
+http://www.spinics.net/lists/linux-mmc/msg33146.html
