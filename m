@@ -1,113 +1,31 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 3 Sep 2015 14:53:56 +0200
-Subject: [PATCH v2 5/7] staging: board: Add support for devices with
- complex dependencies
-In-Reply-To: <1434530336-15073-6-git-send-email-geert+renesas@glider.be>
-References: <1434530336-15073-1-git-send-email-geert+renesas@glider.be>
- <1434530336-15073-6-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAPDyKFqouMeTKuXyyohH-VDmWXH+TiLNDT-7MKFa_-TqeF2WSw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 3 Sep 2015 13:54:29 +0100
+Subject: [PATCH v3 8/9] spi: rockchip: modify DMA max burst to 1
+In-Reply-To: <1441101524-1700-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1441101381-1329-1-git-send-email-shawn.lin@rock-chips.com>
+ <1441101524-1700-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <20150903125429.GA12027@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 June 2015 at 10:38, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
-> Add support for easy registering of one ore more platform devices that
-> may:
->   - need clocks that are described in DT,
->   - be part of a PM Domain.
->
-> All these dependencies are optional.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v2:
->   - Drop support for pinctrl, use standard pinctrl in DT instead,
->   - Drop support for configured GPIOs, use "gpio-hog" in DT instead,
->   - Use clk_add_alias() instead of open coding,
->   - Update for changed function names,
->   - Drop RFC status.
-> ---
->  drivers/staging/board/board.c | 56 +++++++++++++++++++++++++++++++++++++++++++
->  drivers/staging/board/board.h | 20 ++++++++++++++++
->  2 files changed, 76 insertions(+)
->
-> diff --git a/drivers/staging/board/board.c b/drivers/staging/board/board.c
-> index 8712f566b31196e0..29d456e29f38feac 100644
-> --- a/drivers/staging/board/board.c
-> +++ b/drivers/staging/board/board.c
-> @@ -9,6 +9,7 @@
->
->  #define pr_fmt(fmt)    "board_staging: "  fmt
->
-> +#include <linux/clkdev.h>
->  #include <linux/init.h>
->  #include <linux/irq.h>
->  #include <linux/device.h>
-> @@ -16,6 +17,8 @@
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pm_domain.h>
->
->  #include "board.h"
->
-> @@ -118,3 +121,56 @@ void __init board_staging_gic_fixup_resources(struct resource *res,
->         for (i = 0; i < nres; i++)
->                 gic_fixup_resource(&res[i]);
->  }
-> +
-> +int __init board_staging_register_clock(const struct board_staging_clk *bsc)
-> +{
-> +       int error;
-> +
-> +       pr_debug("Aliasing clock %s for con_id %s dev_id %s\n", bsc->clk,
-> +                bsc->con_id, bsc->dev_id);
-> +       error = clk_add_alias(bsc->con_id, bsc->dev_id, bsc->clk, NULL);
-> +       if (error)
-> +               pr_err("Failed to alias clock %s (%d)\n", bsc->clk, error);
-> +
-> +       return error;
-> +}
-> +
-> +int __init board_staging_register_device(const struct board_staging_dev *dev)
-> +{
-> +       struct platform_device *pdev = dev->pdev;
-> +       unsigned int i;
-> +       int error;
-> +
-> +       pr_debug("Trying to register device %s\n", pdev->name);
-> +       if (board_staging_dt_node_available(pdev->resource,
-> +                                           pdev->num_resources)) {
-> +               pr_warn("Skipping %s, already in DT\n", pdev->name);
-> +               return -EEXIST;
-> +       }
-> +
-> +       board_staging_gic_fixup_resources(pdev->resource, pdev->num_resources);
-> +
-> +       for (i = 0; i < dev->nclocks; i++)
-> +               board_staging_register_clock(&dev->clocks[i]);
-> +
-> +       error = platform_device_register(pdev);
-> +       if (error) {
-> +               pr_err("Failed to register device %s (%d)\n", pdev->name,
-> +                      error);
-> +               return error;
-> +       }
-> +
-> +       if (dev->domain)
-> +               __pm_genpd_name_add_device(dev->domain, &pdev->dev, NULL);
+On Tue, Sep 01, 2015 at 05:58:44PM +0800, Shawn Lin wrote:
 
-Urgh, this managed to slip through my filters.
+> Generic dma controller on Rockchips' platform cannot support
+> DMAFLUSHP instruction which make dma to flush the req of non-aligned
+> or non-multiple of what we need. That will cause an unrecoverable
+> dma bus error. The saftest way is to set dma max burst to 1.
 
-It seems like we almost managed to remove all users of the
-"..._name_add..." APIs for genpd. If hasn't been for $subject patch.
-:-)
+If this is a quirk of the DMA controller why is it being fixed with a
+property specific to the SPI controller?  Can't the DMA controller just
+override the burst size?
 
-Now, I realize this is already too late here, but let's try to fix
-this before it turns into a bigger issue.
+> +#define ROCKCHIP_SPI_BORKEN_BURST_LEN (1<<0) /* broken burst len*/
 
-Geert, do you think it's possible to convert into using the non-named
-bases APIs?
-
-Kind regards
-Uffe
+This is misspelt.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150903/c314d56f/attachment.sig>
