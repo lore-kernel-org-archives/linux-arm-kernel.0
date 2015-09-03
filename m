@@ -1,86 +1,87 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 03 Sep 2015 17:08:53 +0100
-Subject: earlycon issues in -next with amba-pl011 updates
-In-Reply-To: <20150903155255.GA28336@kroah.com>
-References: <20150810232312.GB10728@bivouac.eciton.net>
- <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
- <55E81F93.1020104@arm.com> <20150903155255.GA28336@kroah.com>
-Message-ID: <55E87095.4030600@arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 03 Sep 2015 18:13:58 +0200
+Subject: [PATCH] ARM: dts: Add ddc i2c reference to veyron
+In-Reply-To: <CAD=FV=XdP9T29drocB_WkNKrDif9Qwrdjt2C4=AwQk9rey3yLg@mail.gmail.com>
+References: <1441229148-12095-1-git-send-email-dianders@chromium.org>
+ <CAL_JsqLLPCy6OpsP4NNjUA6+UxeTC-zGjGPPU+MLhUqFXSSGJQ@mail.gmail.com>
+ <20150903082210.GU21084@n2100.arm.linux.org.uk>
+ <CAL_JsqL838-somj-o2QtxRA9bXon5dHijx22v0mVowqyhKgoUQ@mail.gmail.com>
+ <20150903151854.GA21084@n2100.arm.linux.org.uk>
+ <CAL_JsqLKbW2ur1US1DCAcJeDYzq8f1L3vO9C8TitAqGt9tAusQ@mail.gmail.com>
+ <CAD=FV=XdP9T29drocB_WkNKrDif9Qwrdjt2C4=AwQk9rey3yLg@mail.gmail.com>
+Message-ID: <1441296838.3102.12.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/15 16:52, Greg Kroah-Hartman wrote:
-> On Thu, Sep 03, 2015 at 11:23:15AM +0100, Marc Zyngier wrote:
->> On 11/08/15 02:48, Jun Nie wrote:
->>> 2015-08-11 7:23 GMT+08:00 Leif Lindholm <leif.lindholm@linaro.org>:
->>>> Hi all,
->>>>
->>>> The kernelci.org bot picked up a complete boot failure (no output past
->>>> UEFI stub) with next-20150806 and Tyler bisected it down to somewhere
->>>> in
->>>> 8cd90e5 uart: pl011: Add support to ZTE ZX296702 uart
->>>> 09dcc7d uart: pl011: Improve LCRH register access decision
->>>> 2c096a9 uart: pl011: Introduce register look up table
->>>> 7b753f3 uart: pl011: Introduce register accessor
->>>>
->>>> The issue only appears with earlycon on command line, for pl011
->>>> consoles.
->>>>
->>>> Some investigation shows that the cause lies with
->>>> commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
->>>> and
->>>> commit 2c096a9eedc6 ("uart: pl011: Introduce register look up table")
->>>>
->>>> Specifically, the changes to pl011_putc() are incorrect:
->>>> The new pl011_ accessors take a (struct uart_amba_port *) input, but
->>>> pl011_putc() directly uses the incoming (struct uart_port *) for this.
->>>>
->>>> Apart from ending up with an unintended/incorrect UART base address,
->>>> the introduction of the lookup table for register offsets also means
->>>> the accessors try to dereference (struct uart_amba_port *)->reg_lut.
->>>>
->>>> The below is a hack that shows/resolves the issue, but some
->>>> refactoring of the original patches might be in order.
->>>>
->>>> /
->>>>     Leif
->>>
->>> Leif,
->>>
->>> Sorry for the inconvenience. I do not have idea of early console till
->>> now and I always have debug console for early panic debug. Learned
->>> more from this issue.
->>>
->>> Suppose Peter's patch will resolve your issue.
->>
->> [+ Greg KH]
->>
->> So -next has now been broken for a while on a number of ARM platforms
->> because of this (they simply cannot boot), and no progress has been made
->> towards resolving this problem.
->>
->> Can we please drop this series (at least commits 7b753f3 and following)
->> from -next until is has been reworked and reviewed?
+Am Donnerstag, den 03.09.2015, 09:04 -0700 schrieb Doug Anderson:
+> Hi,
 > 
-> I don't have any patches in my -next tree, everything is in Linus's tree
-> now.  So if I've missed something, or need to revert something, please
-> let me know specifcally what to do.
+> On Thu, Sep 3, 2015 at 8:46 AM, Rob Herring <robherring2@gmail.com> wrote:
+> > On Thu, Sep 3, 2015 at 10:18 AM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> >> On Thu, Sep 03, 2015 at 09:46:38AM -0500, Rob Herring wrote:
+> >>> Yes, that is fairly common (ADV75xx is same), and we would not
+> >>> describe an I2C bus in DT in that case. Same with HPD directly handled
+> >>> vs. a GPIO line. That is no different than what Doug has said:
+> >>> ddc-i2c-bus is present if using the SOC's I2C host and absent if using
+> >>> the HDMI block's DDC functionality. I'm only questioning the location
+> >>> of the property.
+> >>
+> >> No, I don't think that's what Doug wants.  Doug wants the bridge's
+> >> internal I2C host to be exposed, so he can number it through a DT
+> >> alias.
+> >
+> > See his earlier reply and other patch[1] which states once the dw_hdmi
+> > built-in I2C controller support is added in mainline, then this
+> > property is not needed. For now, the SOC's general purpose I2C
+> > controller is used.
+> >
+> > Rob
+> >
+> > [1] https://lkml.org/lkml/2015/9/2/571
+> 
+> Hmmm, I think we're getting all mixed up here.  To summarize:
+> 
+> 1. On rk3288 you can mux the same pins on the SoC to _either_ be
+> controlled by a generic rk3288 i2c controller (i2c5) or controlled by
+> the dw_hdmi's i2c block.
+> 
+> 2. At the moment, there's no code in mainline to handle the dw_hdmi's i2c block.
+> 
+> 3. Right now there _is_ code in mainline to handle specifying
+> "ddc-i2c-bus" and have it point to the generic rk3288 i2c controller.
+> 
+> 4. So in mainline if you want to read an EDID, you've got to configure
+> the pinmux as "i2c5" and add a "ddc-i2c-bus" reference to the HDMI
+> section of the device tree.  That's what most rk3288 boards do and (as
+> far as I understand) matches existing bindings.  The only reason
+> veyron didn't have this reference was due to a small oversight when
+> sending the DTS file upstream.
+> 
+> 5. There are apparently benefits to using the builtin i2c controller
+> in dw_hdmi.  There's an outstanding patch add code to support the
+> dw_hdmi's i2c block.
+> 
+> 6. Once you start using the dw_hdmi's i2c block with the currently
+> posted patch against mainline (to do this you not only need the patch
+> but you need to remove the ddc-i2c-bus property, set the pinmux, and
+> disable i2c5) then you'll see a bonafide i2c bus exposed to Linux.  In
+> my case this stole i2c0 away from the builtin SoC I2C bus and caused
+> the SoC I2C bus to fail to probe.  Doh.
+> 
+This shouldn't happen. I don't know if the patches landed yet, but I
+know Wolfram (i2c maintainer) had patches to reserve the range of bus
+numbers that are fixed by alias nodes and don't hand out those numbers
+to adapters with a dynamic bus number allocation.
 
-Gahhh... Given that there is no obvious fix, that the discussion has
-stalled and that the author of the series is apparently away, the
-following patches should be reverted:
+> 7. I was trying to solve #6 by adding an "of_node" to the i2c bus
+> which allowed me to give it a (non-conflicting) bus ID.
+> 
+This should not be needed.
 
-8cd90e50d140 uart: pl011: Add support to ZTE ZX296702 uart
-09dcc7dfc05b uart: pl011: Improve LCRH register access decision
-2c096a9eedc6 uart: pl011: Introduce register look up table
-7b753f318d14 uart: pl011: Introduce register accessor
-534e14e2293d uart: pl011: Rename regs with enumeration
+Regards,
+Lucas
 
-(7b753f318d14 being the one breaking everything, but it makes more sense
-to revert the whole series until it is properly fixed and reviewed).
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
