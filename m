@@ -1,56 +1,67 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 3 Sep 2015 10:26:49 +0200
-Subject: Cortex A9 MP: ARM errata 754323 implementation?
-In-Reply-To: <20150903080502.GT21084@n2100.arm.linux.org.uk>
-References: <55E7F965.8080802@de.bosch.com>
- <20150903080502.GT21084@n2100.arm.linux.org.uk>
-Message-ID: <55E80449.9040308@de.bosch.com>
+From: ytk.lee@samsung.com (Yongtaek Lee)
+Date: Thu, 03 Sep 2015 17:28:07 +0900
+Subject: [PATCH] ARM: fix bug which VMALLOC_START is lowwer than
+ 0xf0000000
+In-Reply-To: <20150903080028.GS21084@n2100.arm.linux.org.uk>
+References: <20150903080028.GS21084@n2100.arm.linux.org.uk>
+Message-ID: <1441268887-11618-1-git-send-email-ytk.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.09.2015 10:05, Russell King - ARM Linux wrote:
-> On Thu, Sep 03, 2015 at 09:40:21AM +0200, Dirk Behme wrote:
->> looking through the ARM Cortex A9 errata list [1] I wonder why we don't have
->> a workaround for
->>
->> (754323) Repeated Store in the same cache line might delay the visibility of
->> the Store
->>
->> in the kernel? Or have I missed it?
+
+> On Thu, Sep 03, 2015 at 11:24:47AM +0900, Yongtaek Lee wrote:
+> > default value of vmalloc_min was set 0xf0000000 for ARM by commit
+> > 0536bdf3. But actually vmalloc_min is 0xef800000 not 0xf0000000.
+> > 
+> > VMALLOC_END - (240 << 20) - VMALLOC_OFFSET)
+> > 0xff000000 - 0x0f000000 - 0x00800000 = 0xef800000
+> > 
+> > In case of 768MB ram without CONFIG_HIGHMEM=y, last 8MB could not be
+> > allocated. Kernel log also print out warning message as below.
+> > "Truncating RAM at 80000000-afffffff to -af7fffff (vmalloc region overlap)."
+> > 
+> > Although it could be solved by state "vmalloc=size" in cmdline but i think
+> > it would be better to change default value to 232 from 240.
+> > 
+> > Signed-off-by: Yongtaek Lee <ytk.lee@samsung.com>
 >
-> The policy for errata is not to implement them unless there's a requirement
-> to do so - and then the errata should be implemented in board firmware in
-> preference to the kernel where possible.
->
-> Are you seeing a problem directly attributable to this errata?
+> I fail to see what the problem is here.  You're adjusting the size of the
+> vmalloc space to accomodate the size of RAM you have.  That's not a bug.
 
+I will explain more about problem. 
+It could happened with 768MB RAM device and CONFIG_HIGHMEN is not set.
+"vmalloc=size" also not stated so that default value of vmalloc_min will be 
+used to calculate lowmem end address. 
 
-I got a report from some internal testing that an issue they see goes 
-away if they enable 754327. I rejected this because i.MX6 is > r2p0 and 
-therefore can't be affected by this errata. Looking through the list of 
-erratas I then found the related 754323 which seems to apply to i.MX6, 
-but is not implemented.
+before applying patch.
+[    0.000000]  [0:        swapper:    0] [c0] Truncating RAM at 80000000-afffffff to -af7fffff (vmalloc region overlap).
 
+[    0.000000]  [0:        swapper:    0] [c0] Memory: 106MB 652MB = 758MB total
+[    0.000000]  [0:        swapper:    0] [c0] Memory: 669892k/669892k available, 108348k reserved, 0K highmem
+[    0.000000]  [0:        swapper:    0] [c0] Virtual kernel memory layout:
+[    0.000000]  [0:        swapper:    0]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]  [0:        swapper:    0]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+[    0.000000]  [0:        swapper:    0]     vmalloc : 0xf0000000 - 0xff000000   ( 240 MB)
+[    0.000000]  [0:        swapper:    0]     lowmem  : 0xc0000000 - 0xef800000   ( 760 MB)
+[    0.000000]  [0:        swapper:    0]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+[    0.000000]  [0:        swapper:    0]       .text : 0xc0008000 - 0xc09bbee0   (9936 kB)
+[    0.000000]  [0:        swapper:    0]       .init : 0xc09bc000 - 0xc0a2b740   ( 446 kB)
+[    0.000000]  [0:        swapper:    0]       .data : 0xc0a2c000 - 0xc0ac4088   ( 609 kB)
+[    0.000000]  [0:        swapper:    0]        .bss : 0xc0ac4088 - 0xc0d3e7b4   (2538 kB)
 
-The issue we are talking about is
+after applying patch. 
+[    0.000000]  [0:        swapper:    0] [c0] Memory: 106MB 660MB = 766MB total
+[    0.000000]  [0:        swapper:    0] [c0] Memory: 678004k/678004k available, 108428k reserved, 0K highmem
+[    0.000000]  [0:        swapper:    0] [c0] Virtual kernel memory layout:
+[    0.000000]  [0:        swapper:    0]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]  [0:        swapper:    0]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+[    0.000000]  [0:        swapper:    0]     vmalloc : 0xf0800000 - 0xff000000   ( 232 MB)
+[    0.000000]  [0:        swapper:    0]     lowmem  : 0xc0000000 - 0xf0000000   ( 768 MB)
+[    0.000000]  [0:        swapper:    0]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+[    0.000000]  [0:        swapper:    0]       .text : 0xc0008000 - 0xc09bbee0   (9936 kB)
+[    0.000000]  [0:        swapper:    0]       .init : 0xc09bc000 - 0xc0a2b740   ( 446 kB)
+[    0.000000]  [0:        swapper:    0]       .data : 0xc0a2c000 - 0xc0ac4088   ( 609 kB)
+[    0.000000]  [0:        swapper:    0]        .bss : 0xc0ac4088 - 0xc0d3e7b4   (2538 kB)
 
-Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
-PC is at kfree+0x10c/0x238
-LR is at release_firmware+0x5c/0x70
-
-which is said to be triggered by this code
-
-void kfree(const void *x)
-...
-page = virt_to_head_page(x);
-if (unlikely(!PageSlab(page))) {
-BUG_ON(!PageCompound(page));
-...
-
-on a custom 3.14.x kernel. I haven't looked into this myself, but at 
-least two people think that the kmalloc/kfree is correct with the 
-request_firmware()/release_firmware() usage in the driver.
-
-Best regards
-
-Dirk
+As i know "vmalloc=size" is not mandatory so that i think default value of
+vmalloc_min is wrong. 
