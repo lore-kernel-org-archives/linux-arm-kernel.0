@@ -1,29 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Sep 2015 11:13:28 +0100
-Subject: [PATCH v5 1/4] arm64, numa: adding numa support for arm64
- platforms.
-In-Reply-To: <CAFpQJXXiU3LcUWvjP8r4pHUysYe7X4DJBvjhXzf+p4qaJdBVWA@mail.gmail.com>
-References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1439570374-4079-2-git-send-email-gkulkarni@caviumnetworks.com>
- <CAFpQJXXiU3LcUWvjP8r4pHUysYe7X4DJBvjhXzf+p4qaJdBVWA@mail.gmail.com>
-Message-ID: <20150903101328.GB877@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 03 Sep 2015 11:23:15 +0100
+Subject: earlycon issues in -next with amba-pl011 updates
+In-Reply-To: <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
+References: <20150810232312.GB10728@bivouac.eciton.net>
+ <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
+Message-ID: <55E81F93.1020104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 03, 2015 at 10:52:02AM +0100, Ganapatrao Kulkarni wrote:
-> On Fri, Aug 14, 2015 at 10:09 PM, Ganapatrao Kulkarni
-> <gkulkarni@caviumnetworks.com> wrote:
-> > Adding numa support for arm64 based platforms.
-> > This patch adds by default the dummy numa node and
-> > maps all memory and cpus to node 0.
-> > using this patch, numa can be simulated on single node arm64 platforms.
-> >
-> > Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+On 11/08/15 02:48, Jun Nie wrote:
+> 2015-08-11 7:23 GMT+08:00 Leif Lindholm <leif.lindholm@linaro.org>:
+>> Hi all,
+>>
+>> The kernelci.org bot picked up a complete boot failure (no output past
+>> UEFI stub) with next-20150806 and Tyler bisected it down to somewhere
+>> in
+>> 8cd90e5 uart: pl011: Add support to ZTE ZX296702 uart
+>> 09dcc7d uart: pl011: Improve LCRH register access decision
+>> 2c096a9 uart: pl011: Introduce register look up table
+>> 7b753f3 uart: pl011: Introduce register accessor
+>>
+>> The issue only appears with earlycon on command line, for pl011
+>> consoles.
+>>
+>> Some investigation shows that the cause lies with
+>> commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
+>> and
+>> commit 2c096a9eedc6 ("uart: pl011: Introduce register look up table")
+>>
+>> Specifically, the changes to pl011_putc() are incorrect:
+>> The new pl011_ accessors take a (struct uart_amba_port *) input, but
+>> pl011_putc() directly uses the incoming (struct uart_port *) for this.
+>>
+>> Apart from ending up with an unintended/incorrect UART base address,
+>> the introduction of the lookup table for register offsets also means
+>> the accessors try to dereference (struct uart_amba_port *)->reg_lut.
+>>
+>> The below is a hack that shows/resolves the issue, but some
+>> refactoring of the original patches might be in order.
+>>
+>> /
+>>     Leif
+> 
+> Leif,
+> 
+> Sorry for the inconvenience. I do not have idea of early console till
+> now and I always have debug console for early panic debug. Learned
+> more from this issue.
+> 
+> Suppose Peter's patch will resolve your issue.
 
-[trimmed ~850 lines of context]
+[+ Greg KH]
 
-> can you please review this patch.
+So -next has now been broken for a while on a number of ARM platforms
+because of this (they simply cannot boot), and no progress has been made
+towards resolving this problem.
 
-It's the middle of the merge window, please be patient.
+Can we please drop this series (at least commits 7b753f3 and following)
+from -next until is has been reworked and reviewed?
 
-Will
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
