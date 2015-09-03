@@ -1,30 +1,89 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Sep 2015 10:10:44 +0100
-Subject: [PATCH] ARM: fix bug which VMALLOC_START is lowwer than
- 0xf0000000
-In-Reply-To: <1441269809-11688-1-git-send-email-ytk.lee@samsung.com>
-References: <1441269272.3102.3.camel@pengutronix.de>
- <1441269809-11688-1-git-send-email-ytk.lee@samsung.com>
-Message-ID: <20150903091044.GW21084@n2100.arm.linux.org.uk>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 3 Sep 2015 10:18:54 +0100
+Subject: [PATCH 1/7] dmaengine: st_fdma: Add STMicroelectronics FDMA DT
+ binding documentation
+In-Reply-To: <20150826071236.GS19409@x1>
+References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
+ <1436371888-27863-2-git-send-email-peter.griffin@linaro.org>
+ <20150819150605.GA13546@localhost>
+ <20150825170840.GA1498@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20150826071236.GS19409@x1>
+Message-ID: <20150903091854.GD15477@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 03, 2015 at 05:43:29PM +0900, Yongtaek Lee wrote:
-> > So, if we go and apply your logic to a 1GB system we should resize the
-> > vmalloc area to 0 bytes in order to avoid RAM truncation without
-> > CONFIG_HIGHMEM?
+Hi Lee,
+
+On Wed, 26 Aug 2015, Lee Jones wrote:
+
+> On Tue, 25 Aug 2015, Peter Griffin wrote:
 > 
-> As you already know, CONFIG_HIGHMEM option is necessary if RAM is
-> more than 1GB. So no need to resize vmalloc area to 0. 
+> > Hi Vinod,
+> > 
+> > Thanks for reviewing.
+> > 
+> > On Wed, 19 Aug 2015, Vinod Koul wrote:
+> > 
+> > > On Wed, Jul 08, 2015 at 05:11:22PM +0100, Peter Griffin wrote:
+> > > > This patch adds the DT binding documentation for the FDMA constroller
+> > > > found on STi based chipsets from STMicroelectronics.
+> > > > 
+> > > > Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> > > > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > > > ---
+> > > >  Documentation/devicetree/bindings/dma/st_fdma.txt | 76 +++++++++++++++++++++++
+> > > >  1 file changed, 76 insertions(+)
+> > > >  create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/dma/st_fdma.txt b/Documentation/devicetree/bindings/dma/st_fdma.txt
+> > > > new file mode 100644
+> > > > index 0000000..1ec7470
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/dma/st_fdma.txt
+> > > > @@ -0,0 +1,76 @@
+> > > > +* STMicroelectronics Flexible Direct Memory Access Device Tree bindings
+> > > > +
+> > > > +The FDMA is a general-purpose direct memory access controller capable of
+> > > > +supporting 16 independent DMA channels. It accepts up to 32 DMA requests.
+> > > > +The FDMA is based on a Slim processor which require a firmware.
+> > > > +
+> > > > +* FDMA Controller
+> > > > +
+> > > > +Required properties:
+> > > > +- compatible	: Should be "st,fdma_mpe31"
+> > > > +- reg		: Should contain DMA registers location and length
+> > > > +- interrupts	: Should contain one interrupt shared by all channel
+> > > 
+> > > s/channel/channels
+> > 
+> > Will fix in v2.
+> > 
+> > > 
+> > > > +- dma-channels	: Number of channels supported by the controller
+> > > > +- #dma-cells	: Must be <3>.
+> > > 
+> > > any reason three?
+> > 
+> > Yes, it is documented further down in the file under DMA Client.
+> > 
+> > To make it clearer in V2 I could change to
+> > 
+> > "- #dma-cells	: Must be <3>. See DMA client section below"?
+> 
+> - #dma-cells	: Must be <3>
+> 			1st cell: Phandle to       ... <blah>
+> 			2nd cell: DMA channel      ... <blah>
+> 			3rd cell: Flags describing ... <blah>  
 
-Wrong, there is no such "rule".
+I'd prefer not to document it twice in the same file as it is
+almost 20 lines long. IMHO it makes more sense to document it under
+the dma-client section like it is done presently, because when writing a
+dma-client node you need to know what these things mean.
 
-If we apply that rule, then if you have 1GB of RAM, it will fill from
-0xc0000000 to 0xffffffff inclusive.  There will be _zero_ bytes of
-vmalloc space.  There will be _zero_ bytes of IO mappings.  There won't
-even be a vectors page, so the kernel _will_ crash on the first exception.
-The "rule" you think exists doesn't because it is wrong.
+When writing a controller node all you only need to know is
+"Must be <3>". A more avid reader now has a nice pointer to scroll
+down if they wish to find out more.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+regards,
+
+Peter.
