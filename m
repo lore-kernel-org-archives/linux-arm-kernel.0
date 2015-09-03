@@ -1,24 +1,35 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 03 Sep 2015 16:48:28 +0200
-Subject: [PATCH v3] ARM: dts: rockchip: add veyron-jaq board
-In-Reply-To: <1440457083-77519-1-git-send-email-briannorris@chromium.org>
-References: <1440457083-77519-1-git-send-email-briannorris@chromium.org>
-Message-ID: <2133794.3eoi2O5Mqy@phil>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Thu, 03 Sep 2015 07:48:56 -0700
+Subject: [PATCH] ARM: dts: keystone: use one to one address translations
+ under netcp
+In-Reply-To: <20150903142645.GS4215@atomide.com>
+References: <1441139324-29296-1-git-send-email-w-kwok2@ti.com>
+ <55E61658.9010207@oracle.com>
+ <230CBA6E4B6B6B418E8730AC28E6FC7E04221776@DFLE11.ent.ti.com>
+ <55E71AB3.7070406@oracle.com> <20150903142645.GS4215@atomide.com>
+Message-ID: <55E85DD8.4070102@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+On 9/3/15 7:26 AM, Tony Lindgren wrote:
+> * santosh shilimkar <santosh.shilimkar@oracle.com> [150902 08:55]:
+>>
+>> I suspected the same. I know back then we started with SERDES code
+>> with NETCP but as you already know, its a separate block which
+>> is needed for NIC card to work. Its more of phy and hence its
+>> having different address space is not surprising.
+>
+> The point Santosh is making here though is that any drivers
+> tinkering with registers belonging to a separate hardware block
+> is a recipe for a long term maintenance nightmare with mysterious
+> bugs popping up as things are not clocked or powered properly
+> or become racy with other drivers.
+>
+> Each hardware block needs to have it's own driver and then the
+> drivers can communicate using some Linux generic APIs like clock,
+> regulator, phy, or mailbox frameworks.
+>
+Right !!
 
-Am Montag, 24. August 2015, 15:58:03 schrieb Brian Norris:
-> a.k.a. Haier Chromebook 11, and others
-> 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
-> Cc: Alexandru M Stan <amstan@chromium.org>
-> Cc: Douglas Anderson <dianders@chromium.org>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-I've added this patch to my dts branch for 4.4 .
-This branch will only show up after 4.3-rc1 though
-
-
-Heiko
+Regards,
+Santosh
