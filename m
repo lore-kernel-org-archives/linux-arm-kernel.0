@@ -1,90 +1,46 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Thu, 3 Sep 2015 22:13:06 +0800
-Subject: [PATCH v2] clk: rockchip: reset init state before mmc card
- initialization
-In-Reply-To: <1440462876-5457-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1440462876-5457-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <55E85572.10005@rock-chips.com>
+From: suravee.suthikulpanit@amd.com (Suthikulpanit, Suravee)
+Date: Thu, 3 Sep 2015 21:19:40 +0700
+Subject: [PATCH v3 4/4] arm64: dts: Drop linux,pci-probe-only from the
+ Seattle DTS
+In-Reply-To: <1441282576-7304-5-git-send-email-marc.zyngier@arm.com>
+References: <1441282576-7304-1-git-send-email-marc.zyngier@arm.com>
+ <1441282576-7304-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55E856FC.4040006@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/8/25 8:34, Shawn Lin wrote:
-> mmc host controller's IO input/output timing is unpredictable if
-> bootloader execute tuning for HS200 mode. It might make kernel failed
-> to initialize mmc card in identification mode. The root cause is
-> tuning phase and degree setting for HS200 mode in bootloader aren't
-> applicable to that of identification mode in kernel stage. Anyway, we
-> can't force all bootloaders to reset tuning phase and degree setting
-> before into kernel. Simply reset it in rockchip_clk_register_mmc.
+Hi Marc
+
+On 9/3/2015 7:16 PM, Marc Zyngier wrote:
+> The linux,pci-probe-only property mandates an argument to indicate
+> whether or not to engage the "probe-only" mode, but the Seattle
+> DTS just provides a naked property, which is illegal.
 >
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> Also, it turns out that the board is perfectly happy without
+> probe-only, so let's drop this altogether.
 >
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
+>   arch/arm64/boot/dts/amd/amd-overdrive.dts | 1 -
+>   1 file changed, 1 deletion(-)
 >
-> Changes in v2:
-> - rename to rockchip_clk_mmc_reset
-> - simplifying the code
+> diff --git a/arch/arm64/boot/dts/amd/amd-overdrive.dts b/arch/arm64/boot/dts/amd/amd-overdrive.dts
+> index 564a3f7..128fa94 100644
+> --- a/arch/arm64/boot/dts/amd/amd-overdrive.dts
+> +++ b/arch/arm64/boot/dts/amd/amd-overdrive.dts
+> @@ -14,7 +14,6 @@
 >
-
-Hi Heiko,
-
-How about the next of this patch ? :)
-Feel free to let me know if it still has something more to be done.
-
-BTW, recently, we get another report that while changing data bus width, 
-uboot do bus testing(CMD19 + CMD14) for emmc DDR52 8bit bus mode by 
-tuning the phase and degree to fit the timing fails the kernel to 
-boot-up for the same reason.
-
-
-
->   drivers/clk/rockchip/clk-mmc-phase.c | 16 ++++++++++++++++
->   1 file changed, 16 insertions(+)
->
-> diff --git a/drivers/clk/rockchip/clk-mmc-phase.c b/drivers/clk/rockchip/clk-mmc-phase.c
-> index e9f8df32..1d3e8fe6 100644
-> --- a/drivers/clk/rockchip/clk-mmc-phase.c
-> +++ b/drivers/clk/rockchip/clk-mmc-phase.c
-> @@ -38,6 +38,8 @@ static unsigned long rockchip_mmc_recalc(struct clk_hw *hw,
->   #define ROCKCHIP_MMC_DEGREE_MASK 0x3
->   #define ROCKCHIP_MMC_DELAYNUM_OFFSET 2
->   #define ROCKCHIP_MMC_DELAYNUM_MASK (0xff << ROCKCHIP_MMC_DELAYNUM_OFFSET)
-> +#define ROCKCHIP_MMC_INIT_STATE_RESET 0x1
-> +#define ROCKCHIP_MMC_INIT_STATE_SHIFT 1
->
->   #define PSECS_PER_SEC 1000000000000LL
->
-> @@ -119,6 +121,14 @@ static const struct clk_ops rockchip_mmc_clk_ops = {
->   	.set_phase	= rockchip_mmc_set_phase,
+>   	chosen {
+>   		stdout-path = &serial0;
+> -		linux,pci-probe-only;
+>   	};
 >   };
 >
-> +static void rockchip_clk_mmc_reset(struct rockchip_mmc_clock *mmc_clock)
-> +{
-> +	if (mmc_clock->shift == ROCKCHIP_MMC_INIT_STATE_SHIFT)
-> +		writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_RESET,
-> +				     ROCKCHIP_MMC_INIT_STATE_RESET,
-> +				     mmc_clock->shift), mmc_clock->reg);
-> +}
-> +
->   struct clk *rockchip_clk_register_mmc(const char *name,
->   				const char *const *parent_names, u8 num_parents,
->   				void __iomem *reg, int shift)
-> @@ -139,6 +149,12 @@ struct clk *rockchip_clk_register_mmc(const char *name,
->   	mmc_clock->reg = reg;
->   	mmc_clock->shift = shift;
->
-> +	/*
-> +	* Assert init_state to soft reset the CLKGEN
-> +	* for mmc tuning phase and degree
-> +	*/
-> +	rockchip_clk_mmc_reset(mmc_clock);
-> +
->   	if (name)
->   		init.name = name;
->
 >
 
+Thanks, I was planning to do this as well. The embedded DT in the UEFI 
+FW will soon remove this property.
 
--- 
-Best Regards
-Shawn Lin
+Acked-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+
+Suravee
