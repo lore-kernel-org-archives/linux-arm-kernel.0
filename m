@@ -1,42 +1,37 @@
-From: luis@debethencourt.com (Luis de Bethencourt)
-Date: Thu, 3 Sep 2015 13:00:03 +0200
-Subject: [PATCH 10/12] ASoC: pxa: Fix module autoload for OF platform drivers
-Message-ID: <20150903110003.GA17009@goodgumbo.baconseed.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 3 Sep 2015 16:57:49 +0530
+Subject: [PATCH 0/4] omap: Fix broken address translation for pbias
+Message-ID: <1441279673-28105-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These platform drivers have a OF device ID table but the OF module
-alias information is not created so module autoloading won't work.
+pbias device stopped having memory resource after
+"ARM: dts: <platform>: add minimal l4 bus layout with control module
+support" got merged. This results in platform_get_resource returning
+-EINVAL in pbias driver. This is because address translation fails
+while trying to convert the address to resource which happens
+during the device creation process during boot up.
 
-Signed-off-by: Luis de Bethencourt <luis@debethencourt.com>
----
- sound/soc/pxa/pxa-ssp.c    | 1 +
- sound/soc/pxa/pxa2xx-pcm.c | 1 +
- 2 files changed, 2 insertions(+)
+Even though after [1], reg property in pbias dt node is un-used,
+it might be an issue if we plan to use it at a later point of time.
 
-diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
-index fbe2e93..c254a75 100644
---- a/sound/soc/pxa/pxa-ssp.c
-+++ b/sound/soc/pxa/pxa-ssp.c
-@@ -809,6 +809,7 @@ static const struct of_device_id pxa_ssp_of_ids[] = {
- 	{ .compatible = "mrvl,pxa-ssp-dai" },
- 	{}
- };
-+MODULE_DEVICE_TABLE(of, pxa_ssp_of_ids);
- #endif
- 
- static int asoc_ssp_probe(struct platform_device *pdev)
-diff --git a/sound/soc/pxa/pxa2xx-pcm.c b/sound/soc/pxa/pxa2xx-pcm.c
-index a51c9da..f1aea95 100644
---- a/sound/soc/pxa/pxa2xx-pcm.c
-+++ b/sound/soc/pxa/pxa2xx-pcm.c
-@@ -138,6 +138,7 @@ static const struct of_device_id snd_soc_pxa_audio_match[] = {
- 	{ .compatible   = "mrvl,pxa-pcm-audio" },
- 	{ }
- };
-+MODULE_DEVICE_TABLE(of, snd_soc_pxa_audio_match);
- #endif
- 
- static struct platform_driver pxa_pcm_driver = {
+Patch series is created on top of [1].
+
+[1] -> https://lkml.org/lkml/2015/9/3/51
+
+Verified the address in omap4 panda, omap5 uevm and dra72 boards.
+
+Kishon Vijay Abraham I (4):
+  ARM: dts: omap24xx: fix address translation for pbias
+  ARM: dts: omap4: fix address translation for pbias
+  ARM: dts: omap5: fix address translation for pbias
+  ARM: dts: dra7: fix address translation for pbias
+
+ arch/arm/boot/dts/dra7.dtsi     |    1 +
+ arch/arm/boot/dts/omap2430.dtsi |    1 +
+ arch/arm/boot/dts/omap4.dtsi    |    1 +
+ arch/arm/boot/dts/omap5.dtsi    |    1 +
+ 4 files changed, 4 insertions(+)
+
 -- 
-2.4.6
+1.7.9.5
