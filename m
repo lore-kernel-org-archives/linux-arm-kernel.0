@@ -1,87 +1,55 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  3 Sep 2015 13:16:13 +0100
-Subject: [PATCH v3 1/4] of/pci: Add of_pci_check_probe_only to parse "linux,
- pci-probe-only"
+Date: Thu,  3 Sep 2015 13:16:14 +0100
+Subject: [PATCH v3 2/4] PCI: pci-host-generic: Fix lookup of linux,
+ pci-probe-only property
 In-Reply-To: <1441282576-7304-1-git-send-email-marc.zyngier@arm.com>
 References: <1441282576-7304-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1441282576-7304-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1441282576-7304-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both pci-host-generic and Pseries parse the "linux,pci-probe-only"
-property to engage the PCI_PROBE_ONLY mode, and both have a subtle
-bug that can be triggered if the property has no parameter.
+When pci-host-generic looks for the probe-only property, it seems
+to trust the DT to be correctly written, and assumes that there
+is a parameter to the property.
 
-Provide a generic, safe implementation that can be used by both.
+Unfortunately, this is not always the case, and some firmware expose
+this property naked. The driver ends up making a decision based on
+whatever the property pointer points to, which is likely to be junk.
+
+Switch to the common of_pci.c implementation that doesn't suffer
+from this problem.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/of/of_pci.c    | 31 +++++++++++++++++++++++++++++++
- include/linux/of_pci.h |  3 +++
- 2 files changed, 34 insertions(+)
+ drivers/pci/host/pci-host-generic.c | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 5751dc5..7876343 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -118,6 +118,37 @@ int of_get_pci_domain_nr(struct device_node *node)
- EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
+diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+index 265dd25..545ff4e 100644
+--- a/drivers/pci/host/pci-host-generic.c
++++ b/drivers/pci/host/pci-host-generic.c
+@@ -210,7 +210,6 @@ static int gen_pci_probe(struct platform_device *pdev)
+ 	int err;
+ 	const char *type;
+ 	const struct of_device_id *of_id;
+-	const int *prop;
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *np = dev->of_node;
+ 	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+@@ -225,13 +224,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
  
- /**
-+ * of_pci_check_probe_only - Setup probe only mode if linux,pci-probe-only
-+ *                           is present and valid
-+ *
-+ * @node: device tree node that may contain the property (usually "chosen")
-+ *
-+ */
-+void of_pci_check_probe_only(struct device_node *node)
-+{
-+	u32 val;
-+	int ret;
-+
-+	if (!node)
-+		return;
-+
-+	ret = of_property_read_u32(node, "linux,pci-probe-only", &val);
-+	if (ret) {
-+		if (ret == -ENODATA || ret == -EOVERFLOW)
-+			pr_warn("linux,pci-probe-only without valid value, ignoring\n");
-+		return;
-+	}
-+
-+	if (val)
-+		pci_add_flags(PCI_PROBE_ONLY);
-+	else
-+		pci_clear_flags(PCI_PROBE_ONLY);
-+
-+	pr_info("PCI: PROBE_ONLY %sabled\n", val ? "en" : "dis");
-+}
-+EXPORT_SYMBOL_GPL(of_pci_check_probe_only);
-+
-+/**
-  * of_pci_dma_configure - Setup DMA configuration
-  * @dev: ptr to pci_dev struct of the PCI device
-  *
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 29fd3fe..4c0a617 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -17,6 +17,7 @@ int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
- int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
- int of_get_pci_domain_nr(struct device_node *node);
- void of_pci_dma_configure(struct pci_dev *pci_dev);
-+void of_pci_check_probe_only(struct device_node *node);
- #else
- static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
- {
-@@ -53,6 +54,8 @@ of_get_pci_domain_nr(struct device_node *node)
- }
+-	prop = of_get_property(of_chosen, "linux,pci-probe-only", NULL);
+-	if (prop) {
+-		if (*prop)
+-			pci_add_flags(PCI_PROBE_ONLY);
+-		else
+-			pci_clear_flags(PCI_PROBE_ONLY);
+-	}
++	of_pci_check_probe_only(of_chosen);
  
- static inline void of_pci_dma_configure(struct pci_dev *pci_dev) { }
-+
-+static inline void of_pci_check_probe_only(struct device_node *node) { }
- #endif
- 
- #if defined(CONFIG_OF_ADDRESS)
+ 	of_id = of_match_node(gen_pci_of_match, np);
+ 	pci->cfg.ops = of_id->data;
 -- 
 2.1.4
