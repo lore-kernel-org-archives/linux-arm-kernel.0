@@ -1,48 +1,55 @@
-From: ytk.lee@samsung.com (Yongtaek Lee)
-Date: Thu, 03 Sep 2015 14:11:06 +0900
-Subject: [PATCH] ARM: fix bug which lowmem size is limited to 760MB
-In-Reply-To: <1441247087-10342-1-git-send-email-ytk.lee@samsung.com>
-References: <1441247087-10342-1-git-send-email-ytk.lee@samsung.com>
-Message-ID: <1441257066-10963-1-git-send-email-ytk.lee@samsung.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 03 Sep 2015 14:11:07 +0900
+Subject: [PATCHv5] ARM: exynos_defconfig: Enable LEDS for Odroid-XU3/XU4
+In-Reply-To: <1441252656-3034-1-git-send-email-linux.amoon@gmail.com>
+References: <1441252656-3034-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <55E7D66B.4060401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-default value of VMALLOC_START was set 0xf0000000 for ARM by commit
-0536bdf3. It leads lowmem end address 0xef800000 not 0xf0000000.
+On 03.09.2015 12:57, Anand Moon wrote:
+> From: Anand Moon <moon.linux@yahoo.com>
+> 
+> Enable config option NEW_LEDS, LEDS_CLASS, LEDS_GPIO, LEDS_PWM,
+> LEDS_TRIGGERS, LEDS_TRIGGER_TIMER, LEDS_TRIGGER_HEARTBEAT for
+> Odroid-XU3/XU4 board.
+> 
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> 
+> ---
+> Changes from last version
+> dropped following option.
+>   CONFIG_LEDS_CLASS_FLASH
+>   CONFIG_TRIGGER_ONESHOT
+>   CONFIG_TRIGGER_GPIO
 
-VMALLOC_END - (240 << 20) - VMALLOC_OFFSET)
-0xff000000 - 0x0f000000 - 0x00800000 = 0xef800000
+Thank you. The patch looks good, commit message... almost. Now the
+"From" address does not match "Signed-off-by".
+Please fix and resubmit :) .
 
-In case of 768MB ram without CONFIG_HIGHMEM=y, last 8MB could not be
-allocated. Kernel log also print out warning message as below.
-"Truncating RAM at 80000000-afffffff to -af7fffff (vmalloc region overlap)."
+BR,
+Krzysztof
 
-Although it could be solved by state "vmalloc=size" in cmdline but i think
-it would be better to change default value to 232 from 240.
-
-Signed-off-by: Yongtaek Lee <ytk.lee@samsung.com>
----
- arch/arm/mm/mmu.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 8348ed6..9a1bab4 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1040,12 +1040,12 @@ void __init debug_ll_io_init(void)
- #endif
- 
- static void * __initdata vmalloc_min =
--	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
-+	(void *)(VMALLOC_END - (232 << 20) - VMALLOC_OFFSET);
- 
- /*
-  * vmalloc=size forces the vmalloc area to be exactly 'size'
-  * bytes. This can be used to increase (or decrease) the vmalloc
-- * area - the default is 240m.
-+ * area - the default is 232m.
-  */
- static int __init early_vmalloc(char *arg)
- {
--- 
-1.7.9
+> ---
+>  arch/arm/configs/exynos_defconfig | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 9504e77..aaf7aa4 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -163,6 +163,13 @@ CONFIG_MMC_SDHCI_S3C_DMA=y
+>  CONFIG_MMC_DW=y
+>  CONFIG_MMC_DW_IDMAC=y
+>  CONFIG_MMC_DW_EXYNOS=y
+> +CONFIG_NEW_LEDS=y
+> +CONFIG_LEDS_CLASS=y
+> +CONFIG_LEDS_GPIO=y
+> +CONFIG_LEDS_PWM=y
+> +CONFIG_LEDS_TRIGGERS=y
+> +CONFIG_LEDS_TRIGGER_TIMER=y
+> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_MAX77686=y
+>  CONFIG_RTC_DRV_MAX77802=y
+> 
