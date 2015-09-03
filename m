@@ -1,115 +1,156 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 3 Sep 2015 14:21:32 -0400
-Subject: earlycon issues in -next with amba-pl011 updates
-In-Reply-To: <55E88E7C.9040609@arm.com>
-References: <20150810232312.GB10728@bivouac.eciton.net>
- <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
- <55E81F93.1020104@arm.com> <20150903155255.GA28336@kroah.com>
- <55E87095.4030600@arm.com> <55E8880E.5080707@hurleysoftware.com>
- <20150903175327.GA29340@kroah.com> <55E88B79.5090804@hurleysoftware.com>
- <55E88E7C.9040609@arm.com>
-Message-ID: <55E88FAC.5060703@hurleysoftware.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Fri, 4 Sep 2015 00:05:55 +0530
+Subject: [RFC 3/3] mmc: sdhci-pxav3: Add ->voltage_switch callback support
+In-Reply-To: <55E6FEF5.9080905@rock-chips.com>
+References: <1441135938-8056-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1441135938-8056-4-git-send-email-vaibhav.hiremath@linaro.org>
+ <55E6FEF5.9080905@rock-chips.com>
+Message-ID: <55E8930B.1010309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2015 02:16 PM, Marc Zyngier wrote:
-> On 03/09/15 19:03, Peter Hurley wrote:
->> On 09/03/2015 01:53 PM, Greg Kroah-Hartman wrote:
->>> On Thu, Sep 03, 2015 at 01:49:02PM -0400, Peter Hurley wrote:
->>>> On 09/03/2015 12:08 PM, Marc Zyngier wrote:
->>>>> On 03/09/15 16:52, Greg Kroah-Hartman wrote:
->>>>>> On Thu, Sep 03, 2015 at 11:23:15AM +0100, Marc Zyngier wrote:
->>>>>>> On 11/08/15 02:48, Jun Nie wrote:
->>>>>>>> 2015-08-11 7:23 GMT+08:00 Leif Lindholm <leif.lindholm@linaro.org>:
->>>>>>>>> Hi all,
->>>>>>>>>
->>>>>>>>> The kernelci.org bot picked up a complete boot failure (no output past
->>>>>>>>> UEFI stub) with next-20150806 and Tyler bisected it down to somewhere
->>>>>>>>> in
->>>>>>>>> 8cd90e5 uart: pl011: Add support to ZTE ZX296702 uart
->>>>>>>>> 09dcc7d uart: pl011: Improve LCRH register access decision
->>>>>>>>> 2c096a9 uart: pl011: Introduce register look up table
->>>>>>>>> 7b753f3 uart: pl011: Introduce register accessor
->>>>>>>>>
->>>>>>>>> The issue only appears with earlycon on command line, for pl011
->>>>>>>>> consoles.
->>>>>>>>>
->>>>>>>>> Some investigation shows that the cause lies with
->>>>>>>>> commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
->>>>>>>>> and
->>>>>>>>> commit 2c096a9eedc6 ("uart: pl011: Introduce register look up table")
->>>>>>>>>
->>>>>>>>> Specifically, the changes to pl011_putc() are incorrect:
->>>>>>>>> The new pl011_ accessors take a (struct uart_amba_port *) input, but
->>>>>>>>> pl011_putc() directly uses the incoming (struct uart_port *) for this.
->>>>>>>>>
->>>>>>>>> Apart from ending up with an unintended/incorrect UART base address,
->>>>>>>>> the introduction of the lookup table for register offsets also means
->>>>>>>>> the accessors try to dereference (struct uart_amba_port *)->reg_lut.
->>>>>>>>>
->>>>>>>>> The below is a hack that shows/resolves the issue, but some
->>>>>>>>> refactoring of the original patches might be in order.
->>>>>>>>>
->>>>>>>>> /
->>>>>>>>>     Leif
->>>>>>>>
->>>>>>>> Leif,
->>>>>>>>
->>>>>>>> Sorry for the inconvenience. I do not have idea of early console till
->>>>>>>> now and I always have debug console for early panic debug. Learned
->>>>>>>> more from this issue.
->>>>>>>>
->>>>>>>> Suppose Peter's patch will resolve your issue.
->>>>>>>
->>>>>>> [+ Greg KH]
->>>>>>>
->>>>>>> So -next has now been broken for a while on a number of ARM platforms
->>>>>>> because of this (they simply cannot boot), and no progress has been made
->>>>>>> towards resolving this problem.
->>>>>>>
->>>>>>> Can we please drop this series (at least commits 7b753f3 and following)
->>>>>>> from -next until is has been reworked and reviewed?
->>>>>>
->>>>>> I don't have any patches in my -next tree, everything is in Linus's tree
->>>>>> now.  So if I've missed something, or need to revert something, please
->>>>>> let me know specifcally what to do.
->>>>>
->>>>> Gahhh... Given that there is no obvious fix
->>>>
->>>> Fix has been on list since Aug 10.
->>>>
->>>> http://www.spinics.net/lists/linux-serial/msg18576.html
->>>
->>> Now if only someone would have at least compile tested it :)
+
+
+On Wednesday 02 September 2015 07:21 PM, Shawn Lin wrote:
+> On 2015/9/2 3:32, Vaibhav Hiremath wrote:
+>> In case PXA1928 family of devices, there is device/controller specific
+>> configuration to control voltage/power on the IO pins.
 >>
->> On 08/11/2015 06:07 AM, Leif Lindholm wrote:
->>> It works, but builds with:
->>> drivers/tty/serial/amba-pl011.c:329:13: warning: ?pl011_writeb?
->>> defined but not used [-Wunused-function]
->>>  static void pl011_writeb(struct uart_amba_port *uap, u8 val, int
->>>  index)
->>>              ^
->>> I was dithering about whether having _relaxed accessors in post boot
->>> code and plain ones in earlycon was an issue, but I guess it doesn't
->>> matter much.
+>> This patch implements and enables the sdhci_ops->voltage_switch()
+>> callback api.
+>> Note that IO pad register addresses are fetched as a memory resource.
 >>
->> Russell wanted me to do a bunch of improvements, but I wrote that
->> should wait until 4.3-rc cycle.
-> 
-> It is well known that we merge "improvements" outside of the merge
-> window. And what about starting with a series that is actually bisectable?
-> 
-> It is quite apparent that this code hasn't been tested enough, hasn't
-> been reviewed enough, and breaks a wide range of platforms (almost
-> anything that sits on and under my desk, TBH).
-> 
-> That's really for Greg to decide, but I'm not overly confident with the
-> state of this series as it stands.
+>> For example, in case of PXA1928 and family of devices, the DT property
+>> would look something like,
+>>
+>> sdh1: sdh at d4280000 {
+>>     compatible = "mrvl,pxav3-mmc";
+>>     reg-names = "sdhci", "io-pwr", "io-pwr-lock-unlock";
+>>     reg = <0xd4280000 0x120>,
+>>         <0xd401e81c 4>,
+>>         <0xd4015068 8>;
+>>     ...
+>> };
+>>
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>> ---
+>>   drivers/mmc/host/sdhci-pxav3.c | 59
+>> ++++++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 59 insertions(+)
+>>
+>> diff --git a/drivers/mmc/host/sdhci-pxav3.c
+>> b/drivers/mmc/host/sdhci-pxav3.c
+>> index 5d26fe0..cebb2f9 100644
+>> --- a/drivers/mmc/host/sdhci-pxav3.c
+>> +++ b/drivers/mmc/host/sdhci-pxav3.c
+>> @@ -63,11 +63,18 @@
+>>   #define IO_PWR_AKEY_ASSAR        0xeb10
+>>   #define IO_PWR_MMC1_PAD_1V8        BIT(2)
+>>
+>> +/* IO Power control */
+>> +#define IO_PWR_AKEY_ASFAR        0xbaba
+>> +#define IO_PWR_AKEY_ASSAR        0xeb10
+>> +#define IO_PWR_MMC1_PAD_1V8        BIT(2)
+>> +
+>>   struct sdhci_pxa {
+>>       struct clk *clk_core;
+>>       struct clk *clk_io;
+>>       u8    power_mode;
+>>       void __iomem *sdio3_conf_reg;
+>> +    void __iomem *io_pwr_reg;
+>> +    void __iomem *io_pwr_lock_reg;
+>>   };
+>>
+>>   /*
+>> @@ -307,6 +314,38 @@ static void pxav3_set_uhs_signaling(struct
+>> sdhci_host *host, unsigned int uhs)
+>>           __func__, uhs, ctrl_2);
+>>   }
+>>
+>> +static void pxav3_voltage_switch(struct sdhci_host *host,
+>> +                        u8 signal_voltage)
+>> +{
+>> +    struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> +    struct sdhci_pxa *pxa = pltfm_host->priv;
+>> +    unsigned int val;
+>> +
+>> +    if (!pxa->io_pwr_reg || !pxa->io_pwr_lock_reg)
+>> +        return;
+>> +
+>> +    /* Lock register is 64 bit: First & Second access register */
+>> +    writel(IO_PWR_AKEY_ASFAR, pxa->io_pwr_lock_reg);
+>> +    writel(IO_PWR_AKEY_ASSAR, pxa->io_pwr_lock_reg + 4);
+>> +    val = readl(pxa->io_pwr_reg);
+>> +
+>> +    switch (signal_voltage) {
+>> +    case MMC_SIGNAL_VOLTAGE_180:
+>> +    case MMC_SIGNAL_VOLTAGE_120:
+>> +        val |= IO_PWR_MMC1_PAD_1V8;
+>> +        break;
+>> +    case MMC_SIGNAL_VOLTAGE_330:
+>> +    default:
+>> +        val &= ~IO_PWR_MMC1_PAD_1V8;
+>> +        break;
+>> +    }
+>> +
+>> +    writel(IO_PWR_AKEY_ASFAR, pxa->io_pwr_lock_reg);
+>> +    writel(IO_PWR_AKEY_ASSAR, pxa->io_pwr_lock_reg + 4);
+>> +
+>> +    writel(val, pxa->io_pwr_reg);
+>> +}
+>> +
+>>   static const struct sdhci_ops pxav3_sdhci_ops = {
+>>       .set_clock            = sdhci_set_clock,
+>>       .platform_send_init_74_clocks    = pxav3_gen_init_74_clocks,
+>> @@ -314,6 +353,7 @@ static const struct sdhci_ops pxav3_sdhci_ops = {
+>>       .set_bus_width            = sdhci_set_bus_width,
+>>       .reset                = pxav3_reset,
+>>       .set_uhs_signaling        = pxav3_set_uhs_signaling,
+>> +    .voltage_switch            = pxav3_voltage_switch,
+>>   };
+>>
+>>   static struct sdhci_pltfm_data sdhci_pxav3_pdata = {
+>> @@ -368,6 +408,7 @@ static int sdhci_pxav3_probe(struct
+>> platform_device *pdev)
+>>       struct sdhci_host *host = NULL;
+>>       struct sdhci_pxa *pxa = NULL;
+>>       const struct of_device_id *match;
+>> +    struct resource *res;
+>>       int ret;
+>>
+>>       pxa = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_pxa),
+>> GFP_KERNEL);
+>> @@ -408,6 +449,24 @@ static int sdhci_pxav3_probe(struct
+>> platform_device *pdev)
+>>               goto err_mbus_win;
+>>       }
+>>
+>> +    res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+>> "io-pwr-conf");
+>> +    if (res) {
+>> +        pxa->io_pwr_reg = devm_ioremap_resource(&pdev->dev, res);
+>> +        if (IS_ERR(pxa->io_pwr_reg)) {
+>> +            ret = PTR_ERR(pxa->io_pwr_reg);
+>> +            goto err_mbus_win;
+>> +        }
+>> +    }
+>
+> Hi Vaibhav,
+>
+> Why not get it from syscon and use regmap API to deal with it.
+> IMO, that's okay, you can find examples from
+> drivers/mmc/host/dw_mmc-k3.c: dw_mci_hi6220_switch_voltage
+>
+>
 
-If you feel the code is not reliable enough/tested/not bisectable/whatever,
-I have no objection to reverting and starting again.
+After looking more into this, things are not looking good to me -
 
-But if the issue is only wrt earlycon, then my patch ought to address that.
+PXA1928 (thats what I have details for) has different needs here,
 
-Regards,
-Peter Hurley
+The lock/unlock register located in apbc_clocks register space, and sysconf
+will not be right place for it.
+
+I think the approach which I took in this series looks better to me :)
+
+Thanks,
+Vaibhav
