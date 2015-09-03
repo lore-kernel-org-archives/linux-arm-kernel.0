@@ -1,37 +1,38 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 3 Sep 2015 16:57:49 +0530
-Subject: [PATCH 0/4] omap: Fix broken address translation for pbias
-Message-ID: <1441279673-28105-1-git-send-email-kishon@ti.com>
+Date: Thu, 3 Sep 2015 16:57:51 +0530
+Subject: [PATCH 2/4] ARM: dts: omap4: fix address translation for pbias
+In-Reply-To: <1441279673-28105-1-git-send-email-kishon@ti.com>
+References: <1441279673-28105-1-git-send-email-kishon@ti.com>
+Message-ID: <1441279673-28105-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pbias device stopped having memory resource after
-"ARM: dts: <platform>: add minimal l4 bus layout with control module
-support" got merged. This results in platform_get_resource returning
--EINVAL in pbias driver. This is because address translation fails
-while trying to convert the address to resource which happens
-during the device creation process during boot up.
+commit <7415b0b4c645> ("ARM: dts: omap4: add minimal l4 bus layout
+with control module support") moved pbias_regulator dt node
+from being a child node of ocp to be the child node of
+omap4_padconf_global. Since omap4_padconf_global doesn't have the
+'ranges' property, address translation fails while trying to convert
+the address to resource. Fix it here.
 
-Even though after [1], reg property in pbias dt node is un-used,
-it might be an issue if we plan to use it at a later point of time.
+Fixes: 7415b0b4c645 ("ARM: dts: omap4: add minimal l4 bus layout
+with control module support")
 
-Patch series is created on top of [1].
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/omap4.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-[1] -> https://lkml.org/lkml/2015/9/3/51
-
-Verified the address in omap4 panda, omap5 uevm and dra72 boards.
-
-Kishon Vijay Abraham I (4):
-  ARM: dts: omap24xx: fix address translation for pbias
-  ARM: dts: omap4: fix address translation for pbias
-  ARM: dts: omap5: fix address translation for pbias
-  ARM: dts: dra7: fix address translation for pbias
-
- arch/arm/boot/dts/dra7.dtsi     |    1 +
- arch/arm/boot/dts/omap2430.dtsi |    1 +
- arch/arm/boot/dts/omap4.dtsi    |    1 +
- arch/arm/boot/dts/omap5.dtsi    |    1 +
- 4 files changed, 4 insertions(+)
-
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 5aad7f3..5a206c1 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -196,6 +196,7 @@
+ 					reg = <0x5a0 0x170>;
+ 					#address-cells = <1>;
+ 					#size-cells = <1>;
++					ranges = <0 0x5a0 0x170>;
+ 
+ 					pbias_regulator: pbias_regulator {
+ 						compatible = "ti,pbias-omap4", "ti,pbias-omap";
 -- 
 1.7.9.5
