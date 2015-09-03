@@ -1,29 +1,29 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 3 Sep 2015 15:25:11 +0530
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable PBIAS regulator
-Message-ID: <1441274111-18049-1-git-send-email-kishon@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Sep 2015 11:13:28 +0100
+Subject: [PATCH v5 1/4] arm64, numa: adding numa support for arm64
+ platforms.
+In-Reply-To: <CAFpQJXXiU3LcUWvjP8r4pHUysYe7X4DJBvjhXzf+p4qaJdBVWA@mail.gmail.com>
+References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1439570374-4079-2-git-send-email-gkulkarni@caviumnetworks.com>
+ <CAFpQJXXiU3LcUWvjP8r4pHUysYe7X4DJBvjhXzf+p4qaJdBVWA@mail.gmail.com>
+Message-ID: <20150903101328.GB877@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PBIAS regulator is required for MMC module in OMAP2, OMAP3, OMAP4,
-OMAP5 and DRA7 SoCs. Enable it here.
+On Thu, Sep 03, 2015 at 10:52:02AM +0100, Ganapatrao Kulkarni wrote:
+> On Fri, Aug 14, 2015 at 10:09 PM, Ganapatrao Kulkarni
+> <gkulkarni@caviumnetworks.com> wrote:
+> > Adding numa support for arm64 based platforms.
+> > This patch adds by default the dummy numa node and
+> > maps all memory and cpus to node 0.
+> > using this patch, numa can be simulated on single node arm64 platforms.
+> >
+> > Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/configs/multi_v7_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+[trimmed ~850 lines of context]
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 5fd8df6..f497c96 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -403,6 +403,7 @@ CONFIG_REGULATOR_MAX8973=y
- CONFIG_REGULATOR_MAX77686=y
- CONFIG_REGULATOR_MAX77693=m
- CONFIG_REGULATOR_PALMAS=y
-+CONFIG_REGULATOR_PBIAS=y
- CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
- CONFIG_REGULATOR_TPS51632=y
--- 
-1.7.9.5
+> can you please review this patch.
+
+It's the middle of the merge window, please be patient.
+
+Will
