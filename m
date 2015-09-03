@@ -1,44 +1,28 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 3 Sep 2015 18:45:02 +0100
-Subject: [PATCH v3 8/9] spi: rockchip: modify DMA max burst to 1
-In-Reply-To: <55E84E17.2090409@rock-chips.com>
-References: <1441101381-1329-1-git-send-email-shawn.lin@rock-chips.com>
- <1441101524-1700-1-git-send-email-shawn.lin@rock-chips.com>
- <20150903125429.GA12027@sirena.org.uk>
- <55E84E17.2090409@rock-chips.com>
-Message-ID: <20150903174502.GI5313@sirena.org.uk>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 03 Sep 2015 21:03:15 +0200
+Subject: [PATCH v2 0/2] ARM: dts: rockchip: pull up cts lines
+In-Reply-To: <1441236479-4941-1-git-send-email-amstan@chromium.org>
+References: <1441236479-4941-1-git-send-email-amstan@chromium.org>
+Message-ID: <2685164.GZh6IdR1jF@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 03, 2015 at 09:41:43PM +0800, Shawn Lin wrote:
-> On 2015/9/3 20:54, Mark Brown wrote:
+Hi Alex,
 
-> >If this is a quirk of the DMA controller why is it being fixed with a
-> >property specific to the SPI controller?  Can't the DMA controller just
-> >override the burst size?
+Am Mittwoch, 2. September 2015, 16:27:57 schrieb Alexandru M Stan:
+> The flow control lines from a user accessible UART are optional,
+> the user might not have anything connected to those pins.
+> In order to prevent random interrupts happening and noise affecting
+> the cts pin should be pulled up.
+> 
+> The only boards affected (that care about uart*_cts ) are the veyron
+> chromeos devices and the firefly. Veyron already has something like that,
+> which I now have to remove in the second patch. Firefly uses uart0_cts
+> for the wifi chip communications, same thing as veyron, so it should be
+> fine having it.
 
-> Cool...that's a good question. Actually DMA controller can't do that since
-> block peripheral controller(e.g sd/emmc, they always access data by
-> block-512Bytes.) can't meet the case. So It's hard for dma controller know
-> who is the caller, and what should be done.
+applied both to my dts branch for 4.4 with Doug's Review-tag
+(Currently only on github and becomes really public after 4.3-rc1)
 
-You could take a guess based on request size, but that's going to be a
-bit error prone I imagine.
 
-> The only thing dma controller can do is avoid to execute DMAFLUSHP on its
-> own. But how about peripheral controller trigger non-multiple access? So
-> that's what I mentioned on covery letter that we should do "broken things"
-> for both dma controller and some peripherals.
-
-The other thing it could do is provide the information out via some
-internal Linux API which the drivers could query instead of directly
-having a DT property in each client driver.  That way at least the DT
-only needs the quirk in one place even if the clients need to handle it
-individually.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150903/e05a3a9d/attachment.sig>
+Heiko
