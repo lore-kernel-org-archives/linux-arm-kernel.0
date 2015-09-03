@@ -1,77 +1,63 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 03 Sep 2015 21:07:34 +0200
-Subject: [PATCH v2] clk: rockchip: reset init state before mmc card
- initialization
-In-Reply-To: <1440462876-5457-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1440462876-5457-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <4930263.TgyPa9P2vP@phil>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 3 Sep 2015 15:18:16 -0400
+Subject: [PATCH] ARM: dts: keystone: use one to one address translations
+ under netcp
+In-Reply-To: <20150903142645.GS4215@atomide.com>
+References: <1441139324-29296-1-git-send-email-w-kwok2@ti.com>
+ <55E61658.9010207@oracle.com>
+ <230CBA6E4B6B6B418E8730AC28E6FC7E04221776@DFLE11.ent.ti.com>
+ <55E71AB3.7070406@oracle.com> <20150903142645.GS4215@atomide.com>
+Message-ID: <55E89CF8.4050700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 25. August 2015, 08:34:36 schrieb Shawn Lin:
-> mmc host controller's IO input/output timing is unpredictable if
-> bootloader execute tuning for HS200 mode. It might make kernel failed
-> to initialize mmc card in identification mode. The root cause is
-> tuning phase and degree setting for HS200 mode in bootloader aren't
-> applicable to that of identification mode in kernel stage. Anyway, we
-> can't force all bootloaders to reset tuning phase and degree setting
-> before into kernel. Simply reset it in rockchip_clk_register_mmc.
-> 
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+Tony,
+On 09/03/2015 10:26 AM, Tony Lindgren wrote:
+> * santosh shilimkar <santosh.shilimkar@oracle.com> [150902 08:55]:
+>>
+>> I suspected the same. I know back then we started with SERDES code
+>> with NETCP but as you already know, its a separate block which
+>> is needed for NIC card to work. Its more of phy and hence its
+>> having different address space is not surprising.
+>
+> The point Santosh is making here though is that any drivers
+> tinkering with registers belonging to a separate hardware block
+> is a recipe for a long term maintenance nightmare with mysterious
 
-I'm not 100% sure why you need the new function instead of having that 
-directly in rockchip_clk_register_mmc, but I guess that is a matter of taste 
-and I don't have a hard opinion on that, so
+That is what we want to avoid as well. If I interpret your statement 
+correctly, you don't want SerDes driver update the register of say 
+SGMII, right? But we will have to based on the hardware design. So it 
+can't be a standalone device driver IMO and it has to be part of the 
+respective peripheral device driver.
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> bugs popping up as things are not clocked or powered properly
+> or become racy with other drivers.
+>
+> Each hardware block needs to have it's own driver and then the
+> drivers can communicate using some Linux generic APIs like clock,
+> regulator, phy, or mailbox frameworks.
 
-> 
-> ---
-> 
-> Changes in v2:
-> - rename to rockchip_clk_mmc_reset
-> - simplifying the code
-> 
->  drivers/clk/rockchip/clk-mmc-phase.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/clk/rockchip/clk-mmc-phase.c
-> b/drivers/clk/rockchip/clk-mmc-phase.c index e9f8df32..1d3e8fe6 100644
-> --- a/drivers/clk/rockchip/clk-mmc-phase.c
-> +++ b/drivers/clk/rockchip/clk-mmc-phase.c
-> @@ -38,6 +38,8 @@ static unsigned long rockchip_mmc_recalc(struct clk_hw
-> *hw, #define ROCKCHIP_MMC_DEGREE_MASK 0x3
->  #define ROCKCHIP_MMC_DELAYNUM_OFFSET 2
->  #define ROCKCHIP_MMC_DELAYNUM_MASK (0xff << ROCKCHIP_MMC_DELAYNUM_OFFSET)
-> +#define ROCKCHIP_MMC_INIT_STATE_RESET 0x1
-> +#define ROCKCHIP_MMC_INIT_STATE_SHIFT 1
-> 
->  #define PSECS_PER_SEC 1000000000000LL
-> 
-> @@ -119,6 +121,14 @@ static const struct clk_ops rockchip_mmc_clk_ops = {
->  	.set_phase	= rockchip_mmc_set_phase,
->  };
-> 
-> +static void rockchip_clk_mmc_reset(struct rockchip_mmc_clock *mmc_clock)
-> +{
-> +	if (mmc_clock->shift == ROCKCHIP_MMC_INIT_STATE_SHIFT)
-> +		writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_RESET,
-> +				     ROCKCHIP_MMC_INIT_STATE_RESET,
-> +				     mmc_clock->shift), mmc_clock->reg);
-> +}
-> +
->  struct clk *rockchip_clk_register_mmc(const char *name,
->  				const char *const *parent_names, u8 num_parents,
->  				void __iomem *reg, int shift)
-> @@ -139,6 +149,12 @@ struct clk *rockchip_clk_register_mmc(const char *name,
-> mmc_clock->reg = reg;
->  	mmc_clock->shift = shift;
-> 
-> +	/*
-> +	* Assert init_state to soft reset the CLKGEN
-> +	* for mmc tuning phase and degree
-> +	*/
-> +	rockchip_clk_mmc_reset(mmc_clock);
-> +
->  	if (name)
->  		init.name = name;
+That depends on what your definition of a hardware block is. Inside 
+NetCP, there are many hardware blocks that work together to provide the 
+NIC functionality, and SerDes is one of them. Where ever possible, we 
+have separate drivers :- knav qmss, knav pkt dma, ethss, mdio etc. Ethss 
+driver manages Eth subsystem that includes SGMII and SerDes. 
+Unfortunately SerDes is tightly integrated with ethss and taking it out 
+as a separate driver (Say Phy) is not a good idea. We will posting an 
+RFC for this soon and probably we can discuss it more then.
+
+Probably we will fold this into the RFC series to give this a better 
+context.
+
+Murali
+
+>
+> Regards,
+>
+> Tony
+>
+
+
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
