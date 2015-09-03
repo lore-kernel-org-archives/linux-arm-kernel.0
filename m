@@ -1,44 +1,27 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Thu, 3 Sep 2015 12:18:40 -0300
-Subject: [PATCH v2 0/4] mtd: pxa3xx_nand: rework the timing setup
-In-Reply-To: <55A912F0.7080605@vanguardiasur.com.ar>
-References: <1436281707-20106-1-git-send-email-antoine.tenart@free-electrons.com>
- <20150717134159.GC10608@kwain>
- <55A912F0.7080605@vanguardiasur.com.ar>
-Message-ID: <CAAEAJfD=uoPksfU=vqwa00RjM_0JN=QH-UoEqPJBFyVNP7H4ew@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Sep 2015 16:18:54 +0100
+Subject: [PATCH] ARM: dts: Add ddc i2c reference to veyron
+In-Reply-To: <CAL_JsqL838-somj-o2QtxRA9bXon5dHijx22v0mVowqyhKgoUQ@mail.gmail.com>
+References: <1441229148-12095-1-git-send-email-dianders@chromium.org>
+ <CAL_JsqLLPCy6OpsP4NNjUA6+UxeTC-zGjGPPU+MLhUqFXSSGJQ@mail.gmail.com>
+ <20150903082210.GU21084@n2100.arm.linux.org.uk>
+ <CAL_JsqL838-somj-o2QtxRA9bXon5dHijx22v0mVowqyhKgoUQ@mail.gmail.com>
+Message-ID: <20150903151854.GA21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 July 2015 at 11:36, Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> wrote:
-> Hi Antoine,
->
-> On 07/17/2015 10:41 AM, Antoine Tenart wrote:
->>
->> Hi guys,
->>
->> On Tue, Jul 07, 2015 at 05:08:23PM +0200, Antoine Tenart wrote:
->>>
->>>
->>> This series was part of a bigger one[1], which was split into smaller
->>> ones as asked by Ezequiel[2]. When we take this into account, this is
->>> v7. In addition, there was absolutely no comment for more than 1 month
->>> (since June 2nd). Given this, I really expect the series to be merge
->>> soon as other series are based on this.
->>
->>
->> Any news on this series?
->>
+On Thu, Sep 03, 2015 at 09:46:38AM -0500, Rob Herring wrote:
+> Yes, that is fairly common (ADV75xx is same), and we would not
+> describe an I2C bus in DT in that case. Same with HPD directly handled
+> vs. a GPIO line. That is no different than what Doug has said:
+> ddc-i2c-bus is present if using the SOC's I2C host and absent if using
+> the HDMI block's DDC functionality. I'm only questioning the location
+> of the property.
 
-Antoine,
+No, I don't think that's what Doug wants.  Doug wants the bridge's
+internal I2C host to be exposed, so he can number it through a DT
+alias.
 
-Do you think you can respin this patchset and send a new one so we
-can move forward? There might be still some issues with it (16-bit support),
-but I think it'll be better to discuss them on a fresh patchset.
-
-Don't forget to Cc Robert, since he's able to provide valuable input
-and testing on PXA boards.
-
-Thanks a lot,
 -- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
