@@ -1,95 +1,85 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 3 Sep 2015 14:51:27 +0530
-Subject: [PATCH v2 0/6] regulator: Fix pbias regulator enable
-In-Reply-To: <CAPDyKFrVR+vvmxm43hGimjqo4pcFa1pfDuNNENXU-tk_qXo2=w@mail.gmail.com>
-References: <1441263042-12942-1-git-send-email-kishon@ti.com>
- <CAPDyKFrVR+vvmxm43hGimjqo4pcFa1pfDuNNENXU-tk_qXo2=w@mail.gmail.com>
-Message-ID: <55E81117.2040900@ti.com>
+From: treding@nvidia.com (Thierry Reding)
+Date: Thu, 3 Sep 2015 11:39:12 +0200
+Subject: [PATCH v3 2/2] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
+ support
+In-Reply-To: <20150903091900.GX21084@n2100.arm.linux.org.uk>
+References: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <CAD=FV=WvUp7xhsmXJgVzm1Awqej12hNF_QPJhrQq7z=Fa4Nnuw@mail.gmail.com>
+ <20150902225008.GQ21084@n2100.arm.linux.org.uk>
+ <CAD=FV=VuyQXNGt7dgF-YF7D7MDu31B-QuBdGpeC_+0b1F2=dKg@mail.gmail.com>
+ <20150903091900.GX21084@n2100.arm.linux.org.uk>
+Message-ID: <20150903093910.GA4151@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Sep 03, 2015 at 10:19:00AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Sep 02, 2015 at 04:43:38PM -0700, Doug Anderson wrote:
+> > Russell,
+> > 
+> > On Wed, Sep 2, 2015 at 3:50 PM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > Never copy the of_node from one device to another.  That allows the
+> > > bus matching to unintentionally match the of_node against the wrong
+> > > driver.
+> > 
+> > Can you be more specific about what problems you'd expect.  It seems
+> > like a terribly common practice to do this, but maybe I'm
+> > misunderstanding:
+> 
+> The problem with copying an of_node from one struct device to another
+> struct device is of_match_device().
+> 
+> Devices in a DT setup are bound to drivers using dev->of_node - when a
+> new device or driver is registered onto a bus, the new object is matched
+> against all un-bound objects (devices or drivers as appropriate)
+> comparing the compatible string gained from dev->of_node against the
+> list of of_device_id strings provided by the driver.
+> 
+> When a match is found, the two are attempted to be bound together.
+> 
+> Consider what happens when you have a platform device with an of_node,
+> and you bind that to a driver matched via the compatible string.  The
+> driver creates a new platform device, and copies the of_node to this
+> new device so the new device can have access to the properties of the
+> of_node.
+> 
+> What happens next?  Does the new device bind to the same driver (and
+> thus we enter an infinite loop) or does it bind to some other driver
+> as the author originally hoped?  Depends whether the other driver is
+> earlier in the list of drivers or later, whether it's in the kernel
+> or not.
+> 
+> It's less of a problem when you copy the of_node between two different
+> buses, because they won't match the same driver, but this is a dangerous
+> act - if stuff copies it in one direction, what's to stop someone copying
+> it back to a new device on the original bus.  As soon as that happens,
+> things can go awol.
+> 
+> It would be a good idea if either:
+> 1) this never happened
+> or
+> 2) we had a flag which said "ignore the of_node for driver matching"
+> 
+> And yes, we do have drivers which do exactly what I said above.  They
+> work through luck rather than design.
 
-On Thursday 03 September 2015 01:09 PM, Ulf Hansson wrote:
-> +Olof
-> 
-> On 3 September 2015 at 08:50, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> vsel_reg and enable_reg of the pbias regulator descriptor should actually
->> have the offset from syscon.
->>
->> However after
->> "ARM: dts: <platform>: add minimal l4 bus layout with control module
->> support"
->> vsel_reg and enable_reg started to have the absolute address because
->> of address translation that happens due to pbias node made as the
->> child node of syscon. This breaks the pbias regulator enable.
->>
->> This series adds the 'offset' to be populated in vsel_reg and enable_reg
->> in the pbias driver itself.
->>
->> Changes from v1:
->> *) Fixed Tony's review comments on adding a 'comment' for adding offset in
->>    the driver and adding a warning for using platform_get_resource.
->> *) Added Tony's Acked-by.
->>
->> Tested these patches against mmc -next in omap4 panda, omap3 beagle xm,
->> dra72 and omap5 uevm
->>
->> Kishon Vijay Abraham I (6):
->>   regulator: pbias: program pbias register offset in pbias driver
->>   ARM: dts: dra7: use "ti,pbias-dra7" compatible string for pbias
->>   ARM: dts: omap243x: use "ti,pbias-omap2" compatible string for pbias
->>   ARM: dts: omap3: use "ti,pbias-omap3" compatible string for pbias
->>   ARM: dts: omap4: use "ti,pbias-omap4" compatible string for pbias
->>   ARM: dts: omap5: use "ti,pbias-omap5" compatible string for pbias
->>
->>  .../bindings/regulator/pbias-regulator.txt         |    7 ++-
->>  arch/arm/boot/dts/dra7.dtsi                        |    2 +-
->>  arch/arm/boot/dts/omap2430.dtsi                    |    2 +-
->>  arch/arm/boot/dts/omap3.dtsi                       |    2 +-
->>  arch/arm/boot/dts/omap4.dtsi                       |    2 +-
->>  arch/arm/boot/dts/omap5.dtsi                       |    2 +-
->>  drivers/regulator/pbias-regulator.c                |   56 +++++++++++++++++---
->>  7 files changed, 61 insertions(+), 12 deletions(-)
->>
->> --
->> 1.7.9.5
->>
-> 
-> I have recently queued another patchset [1] for the mmc omap driver
-> for 4.3 through my mmc tree for which Olof Johansson reported a
-> regression [2] for Panda ES with multi_v7_defconfig.
+Perhaps the I2C core needs to be taught to look at the adapter's
+->dev.parent->of_node in of_find_i2c_adapter_by_node(). As I understand
+it the purpose for registering a separate struct device for each I2C
+controller is so that there's an I2C parent for all slaves. At the same
+time every controller sets up ->dev.parent, and that parent's OF node is
+what we really want when we look up an I2C adapter by OF node. In other
+words, the OF node by which I2C adapters are referenced is always that
+of its parent device, as far as I can tell.
 
-I generally perform my tests with omap2plus_defconfig and without this
-series MMC doesn't work with omap2plus_defconfig.
-> 
-> Kishon, could you please clarify if $subject patchset solves that
-> regression reported by Olof? Or perhaps Olof can run a test?
+Wolfram, do you know of any cases where adapter->dev.of_node would not
+be the same as adapter->dev.parent->of_node?
 
-Just checked multi_v7_defconfig and this series is definitely required
-to get MMC working. But we also have to enable 'CONFIG_REGULATOR_PBIAS'
-which is not enabled by default in multi_v7_defconfig.
-
-So we should have a patch to enable 'CONFIG_REGULATOR_PBIAS' in
-multi_v7_defconfig to completely solve the problem reported by Olof.
-I'll prepare a patch for multi_v7_defconfig and post it asap.
-
-Thanks
-Kishon
-
-> 
-> Finally, perhaps it's better if we queue this through my mmc tree
-> since we would then be able to avoid the regression - if I put
-> $subject patchset before [1], right? Then I need an ack from Mark for
-> the regulator patch.
-> Please tell me if you guys prefer another way.
-> 
-> Kind regards
-> Uffe
-> 
-> [1]
-> http://permalink.gmane.org/gmane.linux.kernel/2027789
-> 
-> [2]
-> http://www.spinics.net/lists/linux-mmc/msg33146.html
-> 
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150903/80388b69/attachment.sig>
