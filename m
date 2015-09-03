@@ -1,39 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Sep 2015 08:10:06 -0700
-Subject: [PATCH 0/4] omap: Fix broken address translation for pbias
-In-Reply-To: <1441279673-28105-1-git-send-email-kishon@ti.com>
-References: <1441279673-28105-1-git-send-email-kishon@ti.com>
-Message-ID: <20150903151005.GU4215@atomide.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Thu, 3 Sep 2015 12:18:40 -0300
+Subject: [PATCH v2 0/4] mtd: pxa3xx_nand: rework the timing setup
+In-Reply-To: <55A912F0.7080605@vanguardiasur.com.ar>
+References: <1436281707-20106-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20150717134159.GC10608@kwain>
+ <55A912F0.7080605@vanguardiasur.com.ar>
+Message-ID: <CAAEAJfD=uoPksfU=vqwa00RjM_0JN=QH-UoEqPJBFyVNP7H4ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [150903 04:31]:
-> pbias device stopped having memory resource after
-> "ARM: dts: <platform>: add minimal l4 bus layout with control module
-> support" got merged. This results in platform_get_resource returning
-> -EINVAL in pbias driver. This is because address translation fails
-> while trying to convert the address to resource which happens
-> during the device creation process during boot up.
-> 
-> Even though after [1], reg property in pbias dt node is un-used,
-> it might be an issue if we plan to use it at a later point of time.
-> 
-> Patch series is created on top of [1].
-> 
-> [1] -> https://lkml.org/lkml/2015/9/3/51
-> 
-> Verified the address in omap4 panda, omap5 uevm and dra72 boards.
+On 17 July 2015 at 11:36, Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> wrote:
+> Hi Antoine,
+>
+> On 07/17/2015 10:41 AM, Antoine Tenart wrote:
+>>
+>> Hi guys,
+>>
+>> On Tue, Jul 07, 2015 at 05:08:23PM +0200, Antoine Tenart wrote:
+>>>
+>>>
+>>> This series was part of a bigger one[1], which was split into smaller
+>>> ones as asked by Ezequiel[2]. When we take this into account, this is
+>>> v7. In addition, there was absolutely no comment for more than 1 month
+>>> (since June 2nd). Given this, I really expect the series to be merge
+>>> soon as other series are based on this.
+>>
+>>
+>> Any news on this series?
+>>
 
-Your other series is obviously needed for v4.3.. But seems these
-are also needed for stable? If so, which versions, v4.2+?
+Antoine,
 
-Can you please just do a single patch with multiple Fixes tags
-as they fix regression for multiple commits? Doing tons of one
-liner patches for the same thing just creates commit log noise..
+Do you think you can respin this patchset and send a new one so we
+can move forward? There might be still some issues with it (16-bit support),
+but I think it'll be better to discuss them on a fresh patchset.
 
-Remember to not Cc stable when posting, I'll add that tag when
-committing if needed.
+Don't forget to Cc Robert, since he's able to provide valuable input
+and testing on PXA boards.
 
-Regards,
-
-Tony
+Thanks a lot,
+-- 
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
