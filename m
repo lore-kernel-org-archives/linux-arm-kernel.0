@@ -1,111 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 03 Sep 2015 16:33:43 +0100
-Subject: [PATCH 7/9] arm/arm64: KVM: vgic: Move active state handling
- to flush_hwstate
-In-Reply-To: <1440942866-23802-8-git-send-email-christoffer.dall@linaro.org>
-References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
- <1440942866-23802-8-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <55E86857.5020609@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 3 Sep 2015 17:42:17 +0200
+Subject: [PATCH linux-next v9 1/3] mfd: atmel-flexcom: create include file
+ with macros used by DT bindings
+In-Reply-To: <69844d8092ccbcaef6a3a24d39127ca432462d69.1441118159.git.cyrille.pitchen@atmel.com>
+References: <cover.1441118159.git.cyrille.pitchen@atmel.com>
+ <69844d8092ccbcaef6a3a24d39127ca432462d69.1441118159.git.cyrille.pitchen@atmel.com>
+Message-ID: <55E86A59.7060107@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/15 14:54, Christoffer Dall wrote:
-> We currently set the physical active state only when we *inject* a new
-> pending virtual interrupt, but this is actually not correct, because we
-> could have been preempted and run something else on the system that
-> resets the active state to clear.  This causes us to run the VM with the
-> timer set to fire, but without setting the physical active state.
+Le 01/09/2015 16:46, Cyrille Pitchen a ?crit :
+> This patch defines some macros to be used as value for the
+> "atmel,flexcom-mode" DT property. This value is then written into
+> the Operating Mode (OPMODE) bit field of the Flexcom Mode Register.
 > 
-> The solution is to always check the LR configurations, and we if have a
-> mapped interrupt in th LR in either the pending or active state
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-s/th/the/
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> (virtual), then set the physical active state.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
->  virt/kvm/arm/vgic.c | 42 ++++++++++++++++++++++++++----------------
->  1 file changed, 26 insertions(+), 16 deletions(-)
+>  include/dt-bindings/mfd/atmel-flexcom.h | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>  create mode 100644 include/dt-bindings/mfd/atmel-flexcom.h
 > 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 8299c24..9ed8d53 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1144,26 +1144,11 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
->  		struct irq_phys_map *map;
->  		map = vgic_irq_map_search(vcpu, irq);
->  
-> -		/*
-> -		 * If we have a mapping, and the virtual interrupt is
-> -		 * being injected, then we must set the state to
-> -		 * active in the physical world. Otherwise the
-> -		 * physical interrupt will fire and the guest will
-> -		 * exit before processing the virtual interrupt.
-> -		 */
->  		if (map) {
-> -			int ret;
-> -
-> -			BUG_ON(!map->active);
->  			vlr.hwirq = map->phys_irq;
->  			vlr.state |= LR_HW;
->  			vlr.state &= ~LR_EOI_INT;
->  
-> -			ret = irq_set_irqchip_state(map->irq,
-> -						    IRQCHIP_STATE_ACTIVE,
-> -						    true);
-> -			WARN_ON(ret);
-> -
->  			/*
->  			 * Make sure we're not going to sample this
->  			 * again, as a HW-backed interrupt cannot be
-> @@ -1255,7 +1240,7 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
->  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->  	unsigned long *pa_percpu, *pa_shared;
-> -	int i, vcpu_id;
-> +	int i, vcpu_id, lr, ret;
->  	int overflow = 0;
->  	int nr_shared = vgic_nr_shared_irqs(dist);
->  
-> @@ -1310,6 +1295,31 @@ epilog:
->  		 */
->  		clear_bit(vcpu_id, dist->irq_pending_on_cpu);
->  	}
+> diff --git a/include/dt-bindings/mfd/atmel-flexcom.h b/include/dt-bindings/mfd/atmel-flexcom.h
+> new file mode 100644
+> index 000000000000..6728f2851b4d
+> --- /dev/null
+> +++ b/include/dt-bindings/mfd/atmel-flexcom.h
+> @@ -0,0 +1,16 @@
+> +/*
+> + * This header provides macros for Atmel Flexcom DT bindings.
+> + *
+> + * Copyright (C) 2015 Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> + *
+> + * GPLv2 only
+> + */
 > +
-> +	for (lr = 0; lr < vgic->nr_lr; lr++) {
-> +		struct vgic_lr vlr;
+> +#ifndef __DT_BINDINGS_ATMEL_FLEXCOM_H__
+> +#define __DT_BINDINGS_ATMEL_FLEXCOM_H__
 > +
-> +		if (!test_bit(lr, vgic_cpu->lr_used))
-> +			continue;
+> +#define ATMEL_FLEXCOM_MODE_USART	1
+> +#define ATMEL_FLEXCOM_MODE_SPI		2
+> +#define ATMEL_FLEXCOM_MODE_TWI		3
 > +
-> +		vlr = vgic_get_lr(vcpu, lr);
-> +
-> +		/*
-> +		 * If we have a mapping, and the virtual interrupt is
-> +		 * presented to the guest (as pending or active), then we must
-> +		 * set the state to active in the physical world. See
-> +		 * Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt.
-> +		 */
-> +		if (vlr.state & LR_HW) {
-> +			struct irq_phys_map *map;
-> +			map = vgic_irq_map_search(vcpu, vlr.irq);
-> +
-> +			ret = irq_set_irqchip_state(map->irq,
-> +						    IRQCHIP_STATE_ACTIVE,
-> +						    true);
-> +			WARN_ON(ret);
-> +		}
-> +	}
->  }
->  
->  static int process_level_irq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
+> +#endif /* __DT_BINDINGS_ATMEL_FLEXCOM_H__ */
 > 
 
-/me bangs his head on the wall...
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Nicolas Ferre
