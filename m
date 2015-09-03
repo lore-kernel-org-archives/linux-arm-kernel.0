@@ -1,29 +1,42 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 3 Sep 2015 17:34:15 -0500
-Subject: [PATCH 1/2] ARM: OMAP2+: Remove legacy OMAP3 ISP instantiation
-In-Reply-To: <20150716125800.GN17550@atomide.com>
-References: <1437051319-9904-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <1437051319-9904-2-git-send-email-laurent.pinchart@ideasonboard.com>
- <20150716125800.GN17550@atomide.com>
-Message-ID: <55E8CAE7.3010301@ti.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri,  4 Sep 2015 00:50:56 +0200
+Subject: [PATCH] spi: mediatek: fix wrong error return value on probe
+Message-ID: <1441320656-8666-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+Commit adcbcfea15d62 ("spi: mediatek: fix spi clock usage error")
+added a new sel_clk but introduced bugs in the error paths since
+the wrong struct clk pointers are passed to PTR_ERR().
 
-On 07/16/2015 07:58 AM, Tony Lindgren wrote:
-> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [150716 05:57]:
->> The OMAP3 ISP is now fully supported in DT, remove its instantiation
->> from C code.
-> 
-> Please feel to queue this along with the second patch in this series,
-> this should not cause any merge conflicts:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+Fixes: adcbcfea15d62 ("spi: mediatek: fix spi clock usage error")
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Just wondering if you have already queued this, I see the v4l changes in
-linux-next, but not this patch. Also, can you confirm if this series is
-making it into 4.3?
+---
 
-regards
-Suman
+ drivers/spi/spi-mt65xx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+index 6fbb5e5132b0..e9839a4e0175 100644
+--- a/drivers/spi/spi-mt65xx.c
++++ b/drivers/spi/spi-mt65xx.c
+@@ -585,14 +585,14 @@ static int mtk_spi_probe(struct platform_device *pdev)
+ 
+ 	mdata->sel_clk = devm_clk_get(&pdev->dev, "sel-clk");
+ 	if (IS_ERR(mdata->sel_clk)) {
+-		ret = PTR_ERR(mdata->spi_clk);
++		ret = PTR_ERR(mdata->sel_clk);
+ 		dev_err(&pdev->dev, "failed to get sel-clk: %d\n", ret);
+ 		goto err_put_master;
+ 	}
+ 
+ 	mdata->spi_clk = devm_clk_get(&pdev->dev, "spi-clk");
+ 	if (IS_ERR(mdata->spi_clk)) {
+-		ret = PTR_ERR(mdata->parent_clk);
++		ret = PTR_ERR(mdata->spi_clk);
+ 		dev_err(&pdev->dev, "failed to get spi-clk: %d\n", ret);
+ 		goto err_put_master;
+ 	}
+-- 
+2.4.3
