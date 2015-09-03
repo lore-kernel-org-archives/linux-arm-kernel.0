@@ -1,67 +1,110 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 03 Sep 2015 11:23:15 +0100
-Subject: earlycon issues in -next with amba-pl011 updates
-In-Reply-To: <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
-References: <20150810232312.GB10728@bivouac.eciton.net>
- <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
-Message-ID: <55E81F93.1020104@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 3 Sep 2015 12:29:46 +0200
+Subject: [PATCHv6] ARM: exynos_defconfig: Enable LEDS for Odroid-XU3/XU4
+In-Reply-To: <CANAwSgT0u9iC9MSsbGz5L6n7XgB-fLLYhrN7sUPrn9GyN-2bGA@mail.gmail.com>
+References: <1441258696-3699-1-git-send-email-linux.amoon@gmail.com>
+ <55E810E3.6080709@osg.samsung.com>
+ <CANAwSgT0u9iC9MSsbGz5L6n7XgB-fLLYhrN7sUPrn9GyN-2bGA@mail.gmail.com>
+Message-ID: <55E8211A.1000806@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/15 02:48, Jun Nie wrote:
-> 2015-08-11 7:23 GMT+08:00 Leif Lindholm <leif.lindholm@linaro.org>:
->> Hi all,
->>
->> The kernelci.org bot picked up a complete boot failure (no output past
->> UEFI stub) with next-20150806 and Tyler bisected it down to somewhere
->> in
->> 8cd90e5 uart: pl011: Add support to ZTE ZX296702 uart
->> 09dcc7d uart: pl011: Improve LCRH register access decision
->> 2c096a9 uart: pl011: Introduce register look up table
->> 7b753f3 uart: pl011: Introduce register accessor
->>
->> The issue only appears with earlycon on command line, for pl011
->> consoles.
->>
->> Some investigation shows that the cause lies with
->> commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
->> and
->> commit 2c096a9eedc6 ("uart: pl011: Introduce register look up table")
->>
->> Specifically, the changes to pl011_putc() are incorrect:
->> The new pl011_ accessors take a (struct uart_amba_port *) input, but
->> pl011_putc() directly uses the incoming (struct uart_port *) for this.
->>
->> Apart from ending up with an unintended/incorrect UART base address,
->> the introduction of the lookup table for register offsets also means
->> the accessors try to dereference (struct uart_amba_port *)->reg_lut.
->>
->> The below is a hack that shows/resolves the issue, but some
->> refactoring of the original patches might be in order.
->>
->> /
->>     Leif
+Hello Anand,
+
+On 09/03/2015 11:47 AM, Anand Moon wrote:
+> Hi Javier,
 > 
-> Leif,
+> On 3 September 2015 at 14:50, Javier Martinez Canillas
+> <javier@osg.samsung.com> wrote:
+>> Hello Anand,
+>>
+>> On 09/03/2015 07:38 AM, Anand Moon wrote:
+>>> Enable config option NEW_LEDS, LEDS_CLASS, LEDS_GPIO, LEDS_PWM,
+>>> LEDS_TRIGGERS, LEDS_TRIGGER_TIMER, LEDS_TRIGGER_HEARTBEAT for
+>>> Odroid-XU3/XU4 board.
+>>>
+>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>>
+>>> ---
+>>
+>> I think Krzysztof already mentioned but a commit message shouln't
+>> describe what the change is (one can look to the patch for that)
+>> but why the change is needed.
+>>
+>> So I would had expect something along these lines:
+>>
+>> Many Exynos boards (i.e: the Exynos5422 Odroid XU3/XU4) have GPIO
+>> and PWM based LEDs, so enable the needed Kconfig options to have
+>> support for these. Also, some boards use the heartbeat LED trigger
+>> so enable support for this as well.
+>>
+>>> Changes from last version
+>>> dropped following option.
+>>>   CONFIG_LEDS_CLASS_FLASH
+>>>   CONFIG_TRIGGER_ONESHOT
+>>>   CONFIG_TRIGGER_GPIO
+>>> fixed the From address
+>>> ---
+>>>  arch/arm/configs/exynos_defconfig | 7 +++++++
+>>>  1 file changed, 7 insertions(+)
+>>>
+>>> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+>>> index 9504e77..aaf7aa4 100644
+>>> --- a/arch/arm/configs/exynos_defconfig
+>>> +++ b/arch/arm/configs/exynos_defconfig
+>>> @@ -163,6 +163,13 @@ CONFIG_MMC_SDHCI_S3C_DMA=y
+>>>  CONFIG_MMC_DW=y
+>>>  CONFIG_MMC_DW_IDMAC=y
+>>>  CONFIG_MMC_DW_EXYNOS=y
+>>> +CONFIG_NEW_LEDS=y
+>>> +CONFIG_LEDS_CLASS=y
+>>> +CONFIG_LEDS_GPIO=y
+>>> +CONFIG_LEDS_PWM=y
+>>> +CONFIG_LEDS_TRIGGERS=y
+>>> +CONFIG_LEDS_TRIGGER_TIMER=y
+>>
 > 
-> Sorry for the inconvenience. I do not have idea of early console till
-> now and I always have debug console for early panic debug. Learned
-> more from this issue.
+>> I don't see an Exynos board using the timer trigger. Do you need it for
+>> some user-space application that uses the sysfs interface? I'm OK with
+>> enabling it but again this should be mentioned in the commit message.
+>>
+
+You haven't answered this question.
+
+>>> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+>>>  CONFIG_RTC_CLASS=y
+>>>  CONFIG_RTC_DRV_MAX77686=y
+>>>  CONFIG_RTC_DRV_MAX77802=y
+>>>
+>>
 > 
-> Suppose Peter's patch will resolve your issue.
+> Earlier design of the LED for Odroid XU3 was using gpio-leds
+> Now It was change to using both pwm-leds and gpio-leds.
+>
 
-[+ Greg KH]
+I know that Odroid XU3 have both LEDs connected to GPIO and
+PWM lines but that should be mentioned in the commit message.
+ 
+> Earlier I kept them as loadable module and now build-in.
+>
 
-So -next has now been broken for a while on a number of ARM platforms
-because of this (they simply cannot boot), and no progress has been made
-towards resolving this problem.
+Yes, because exynos_defconfig as everything as built-in to
+make it easier for developers to test by only copying the
+kernel image and not the modules.
+ 
+> Should I resend this again. Or some body will update the commit message.
+>
 
-Can we please drop this series (at least commits 7b753f3 and following)
-from -next until is has been reworked and reviewed?
+If a patch has a typo, an extra blank line or something
+very easy to fix then it may be possible that the maintainer
+will do the fix when applying but changing the commit message
+I think is too much so in this case is better to resend IMHO.
+ 
+> -Anand Moon
+> 
 
-
-Thanks,
-
-	M.
+Best regards,
 -- 
-Jazz is not dead. It just smells funny...
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
