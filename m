@@ -1,28 +1,77 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 03 Sep 2015 21:03:15 +0200
-Subject: [PATCH v2 0/2] ARM: dts: rockchip: pull up cts lines
-In-Reply-To: <1441236479-4941-1-git-send-email-amstan@chromium.org>
-References: <1441236479-4941-1-git-send-email-amstan@chromium.org>
-Message-ID: <2685164.GZh6IdR1jF@phil>
+Date: Thu, 03 Sep 2015 21:07:34 +0200
+Subject: [PATCH v2] clk: rockchip: reset init state before mmc card
+ initialization
+In-Reply-To: <1440462876-5457-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1440462876-5457-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <4930263.TgyPa9P2vP@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-
-Am Mittwoch, 2. September 2015, 16:27:57 schrieb Alexandru M Stan:
-> The flow control lines from a user accessible UART are optional,
-> the user might not have anything connected to those pins.
-> In order to prevent random interrupts happening and noise affecting
-> the cts pin should be pulled up.
+Am Dienstag, 25. August 2015, 08:34:36 schrieb Shawn Lin:
+> mmc host controller's IO input/output timing is unpredictable if
+> bootloader execute tuning for HS200 mode. It might make kernel failed
+> to initialize mmc card in identification mode. The root cause is
+> tuning phase and degree setting for HS200 mode in bootloader aren't
+> applicable to that of identification mode in kernel stage. Anyway, we
+> can't force all bootloaders to reset tuning phase and degree setting
+> before into kernel. Simply reset it in rockchip_clk_register_mmc.
 > 
-> The only boards affected (that care about uart*_cts ) are the veyron
-> chromeos devices and the firefly. Veyron already has something like that,
-> which I now have to remove in the second patch. Firefly uses uart0_cts
-> for the wifi chip communications, same thing as veyron, so it should be
-> fine having it.
+> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-applied both to my dts branch for 4.4 with Doug's Review-tag
-(Currently only on github and becomes really public after 4.3-rc1)
+I'm not 100% sure why you need the new function instead of having that 
+directly in rockchip_clk_register_mmc, but I guess that is a matter of taste 
+and I don't have a hard opinion on that, so
 
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-Heiko
+> 
+> ---
+> 
+> Changes in v2:
+> - rename to rockchip_clk_mmc_reset
+> - simplifying the code
+> 
+>  drivers/clk/rockchip/clk-mmc-phase.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/drivers/clk/rockchip/clk-mmc-phase.c
+> b/drivers/clk/rockchip/clk-mmc-phase.c index e9f8df32..1d3e8fe6 100644
+> --- a/drivers/clk/rockchip/clk-mmc-phase.c
+> +++ b/drivers/clk/rockchip/clk-mmc-phase.c
+> @@ -38,6 +38,8 @@ static unsigned long rockchip_mmc_recalc(struct clk_hw
+> *hw, #define ROCKCHIP_MMC_DEGREE_MASK 0x3
+>  #define ROCKCHIP_MMC_DELAYNUM_OFFSET 2
+>  #define ROCKCHIP_MMC_DELAYNUM_MASK (0xff << ROCKCHIP_MMC_DELAYNUM_OFFSET)
+> +#define ROCKCHIP_MMC_INIT_STATE_RESET 0x1
+> +#define ROCKCHIP_MMC_INIT_STATE_SHIFT 1
+> 
+>  #define PSECS_PER_SEC 1000000000000LL
+> 
+> @@ -119,6 +121,14 @@ static const struct clk_ops rockchip_mmc_clk_ops = {
+>  	.set_phase	= rockchip_mmc_set_phase,
+>  };
+> 
+> +static void rockchip_clk_mmc_reset(struct rockchip_mmc_clock *mmc_clock)
+> +{
+> +	if (mmc_clock->shift == ROCKCHIP_MMC_INIT_STATE_SHIFT)
+> +		writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_RESET,
+> +				     ROCKCHIP_MMC_INIT_STATE_RESET,
+> +				     mmc_clock->shift), mmc_clock->reg);
+> +}
+> +
+>  struct clk *rockchip_clk_register_mmc(const char *name,
+>  				const char *const *parent_names, u8 num_parents,
+>  				void __iomem *reg, int shift)
+> @@ -139,6 +149,12 @@ struct clk *rockchip_clk_register_mmc(const char *name,
+> mmc_clock->reg = reg;
+>  	mmc_clock->shift = shift;
+> 
+> +	/*
+> +	* Assert init_state to soft reset the CLKGEN
+> +	* for mmc tuning phase and degree
+> +	*/
+> +	rockchip_clk_mmc_reset(mmc_clock);
+> +
+>  	if (name)
+>  		init.name = name;
