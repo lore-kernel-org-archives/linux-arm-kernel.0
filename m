@@ -1,69 +1,95 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 3 Sep 2015 23:31:01 +0200 (CEST)
-Subject: [PATCHv2] drivers: i2c: exynos5: irq spinlock rt-safe
-In-Reply-To: <1441314363-9836-1-git-send-email-anders.roxell@linaro.org>
-References: <1440489125-20082-1-git-send-email-anders.roxell@linaro.org>
- <1441314363-9836-1-git-send-email-anders.roxell@linaro.org>
-Message-ID: <alpine.DEB.2.11.1509032319570.15006@nanos>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 3 Sep 2015 14:33:22 -0700
+Subject: [PATCH] firmware: qcom: scm: Convert to platform driver
+In-Reply-To: <1437431152-6730-1-git-send-email-agross@codeaurora.org>
+References: <1437431152-6730-1-git-send-email-agross@codeaurora.org>
+Message-ID: <20150903213322.GI15099@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Sep 2015, Anders Roxell wrote:
-
-> The current spin_lock_irqsave() protects the enabling of the device
-> interrupt.  In order to prevent recursion in the case of sleeping
-> spinlocks (e.g. with RT patch, stacktrace below), convert the spin lock
-> to a raw spin lock. No change for !RT kernels.
+On 07/20, Andy Gross wrote:
+> This patch creates a platform driver for the SCM so that we can adequately
+> manage resources.  This removes clients having to carry the necessary
+> clocks to use the SCM resources.
 > 
-> [   10.992238] kernel BUG at ../kernel/locking/rtmutex.c:998!
-> [   10.992243] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
-> [   10.992250] Modules linked in:
-> [   10.992258] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.1.5-rt5
-> [   10.992263] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-> [   10.992268] task: ed880000 ti: ed888000 task.ti: ed888000
-> [   10.992281] PC is at rt_spin_lock_slowlock+0xa4/0x2ec
-> [   10.992288] LR is at rt_spin_lock_slowlock+0x54/0x2ec
-> [   10.992296] pc : [<c099e1bc>]    lr : [<c099e16c>]    psr: 60000193
-> [   10.992296] sp : ed889a28  ip : ed880001  fp : 00000089
-> [   10.992300] r10: ed889a28  r9 : c0f55654  r8 : 00000060
-> [   10.992305] r7 : ed880000  r6 : 00000000  r5 : 00000001  r4 : ed9f7288
-> [   10.992310] r3 : ed880000  r2 : 00000000  r1 : ed880000  r0 : 00000000
-> [   10.992316] Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM
-> Segment kernel
-> ...
-> ...
-> [   10.992662] [<c099e1bc>] (rt_spin_lock_slowlock) from [<c07bc794>]
-> (exynos5_i2c_irq+0x20/0x2b0)
-> [   10.992678] [<c07bc794>] (exynos5_i2c_irq) from [<c028c8b4>]
-> (handle_irq_event_percpu+0x68/0x158)
-> [   10.992690] [<c028c8b4>] (handle_irq_event_percpu) from [<c028ca0c>]
-> (handle_irq_event+0x68/0xa8)
-> [   10.992702] [<c028ca0c>] (handle_irq_event) from [<c028f9c4>]
-> (handle_fasteoi_irq+0x11c/0x1d4)
-> [   10.992713] [<c028f9c4>] (handle_fasteoi_irq) from [<c028c17c>]
-> (generic_handle_irq+0x20/0x30)
-> [   10.992724] [<c028c17c>] (generic_handle_irq) from [<c028c290>]
-> (__handle_domain_irq+0x6c/0xe4)
-> [   10.992734] [<c028c290>] (__handle_domain_irq) from [<c020a71c>]
-> (gic_handle_irq+0x2c/0x68)
-> [   10.992744] [<c020a71c>] (gic_handle_irq) from [<c0214140>]
-> (__irq_svc+0x40/0x88)
-> [   10.992749] Exception stack(0xed889b28 to 0xed889b70)
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
 
-What you completely fail to explain how this can happen at all.
+It would be nice if we could use this platform device for doing
+the DMAish memory allocations that we do in this driver too. I
+guess one complication there is that we would need to allocate
+memory with the DMA APIs before CPUs are brought up
+(early_initcall level).
 
-On RT the interrupt of that device is force threaded, but the handler
-is called in hard interrupt context, which is wrong to begin with.
+> diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+> index 45c008d..5dd0514 100644
+> --- a/drivers/firmware/qcom_scm.c
+> +++ b/drivers/firmware/qcom_scm.c
+> @@ -15,14 +15,57 @@
+>   * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+>   * 02110-1301, USA.
+>   */
+> -
+> +#include <linux/platform_device.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
 
-While the interrupt request in this driver is bogus:
+This include is here twice.
 
-        ret = devm_request_irq(&pdev->dev, i2c->irq, exynos5_i2c_irq,
-                                IRQF_NO_SUSPEND | IRQF_ONESHOT,
-                                dev_name(&pdev->dev), i2c);
+>  #include <linux/cpumask.h>
+>  #include <linux/export.h>
+>  #include <linux/types.h>
+>  #include <linux/qcom_scm.h>
+> +#include <linux/of.h>
+> +#include <linux/clk.h>
+>  
+[...]
+> +
+> +/**
+> + * qcom_scm_is_available() - Checks if SCM is available
+> + */
+> +bool qcom_scm_is_available(void)
+> +{
+> +	return !!__scm;
+> +}
+> +EXPORT_SYMBOL(qcom_scm_is_available);
+> +
+> +static int qcom_scm_remove(struct platform_device *pdev)
+> +{
+> +	__scm = NULL;
+> +
+> +	return 0;
+> +}
 
-because it sets the ONESHOT flag for no reason, it does not set the
-NOTRHEAD flag which would prevent force threading.
+Maybe we just shouldn't allow this? The firmware isn't going
+anywhere at runtime, and this driver is currently marked as
+bool in the Kconfig.
 
-Hmm?
+> +
+> +static const struct of_device_id qcom_scm_dt_match[] = {
+> +	{ .compatible = "qcom,scm",},
+> +	{},
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, qcom_scm_dt_match);
+> +
+> +static struct platform_driver qcom_scm_driver = {
+> +	.driver = {
+> +		.name	= "scm",
 
-	tglx
+Maybe 'qcom_scm' ?
+
+> +		.of_match_table = qcom_scm_dt_match,
+> +	},
+> +	.probe = qcom_scm_probe,
+> +	.remove = qcom_scm_remove,
+> +};
+> +
+> +module_platform_driver(qcom_scm_driver);
+
+Isn't there some sort of builtin_platform_driver() macro for
+builtin modules?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
