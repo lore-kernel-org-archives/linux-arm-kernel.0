@@ -1,33 +1,55 @@
-From: nikhil.badola@freescale.com (Nikhil Badola)
-Date: Thu, 3 Sep 2015 11:35:25 +0530
-Subject: [PATCH 3/3][v3] arm: dts: ls1021a: Add quirk for Erratum A009116
-Message-ID: <1441260325-27340-1-git-send-email-nikhil.badola@freescale.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 03 Sep 2015 14:42:33 +0900
+Subject: [PATCHv6] ARM: exynos_defconfig: Enable LEDS for Odroid-XU3/XU4
+In-Reply-To: <1441258696-3699-1-git-send-email-linux.amoon@gmail.com>
+References: <1441258696-3699-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <55E7DDC9.7090603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "snps,quirk-frame-length-adjustment" property to
-USB3 node for erratum A009116. This property provides
-value of GFLADJ_30MHZ for post silicon frame length
-adjustment.
+On 03.09.2015 14:38, Anand Moon wrote:
+> Enable config option NEW_LEDS, LEDS_CLASS, LEDS_GPIO, LEDS_PWM,
+> LEDS_TRIGGERS, LEDS_TRIGGER_TIMER, LEDS_TRIGGER_HEARTBEAT for
+> Odroid-XU3/XU4 board.
+> 
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> 
+> ---
+> Changes from last version
+> dropped following option.
+>   CONFIG_LEDS_CLASS_FLASH
+>   CONFIG_TRIGGER_ONESHOT
+>   CONFIG_TRIGGER_GPIO
+> fixed the From address
+> ---
+>  arch/arm/configs/exynos_defconfig | 7 +++++++
+>  1 file changed, 7 insertions(+)
 
-Signed-off-by: Nikhil Badola <nikhil.badola@freescale.com>
----
-Changes for v3 : None
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
- arch/arm/boot/dts/ls1021a.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+BTW, Javier's email is different. All you previous mails bounced. I
+cc-ed here the proper one.
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index c70bb27..50ac0d4 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -404,6 +404,7 @@
- 			reg = <0x0 0x3100000 0x0 0x10000>;
- 			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
- 			dr_mode = "host";
-+			snps,quirk-frame-length-adjustment = <0x20>;
- 		};
- 	};
- };
--- 
-2.1.0
+Best regards,
+Krzysztof
+
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 9504e77..aaf7aa4 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -163,6 +163,13 @@ CONFIG_MMC_SDHCI_S3C_DMA=y
+>  CONFIG_MMC_DW=y
+>  CONFIG_MMC_DW_IDMAC=y
+>  CONFIG_MMC_DW_EXYNOS=y
+> +CONFIG_NEW_LEDS=y
+> +CONFIG_LEDS_CLASS=y
+> +CONFIG_LEDS_GPIO=y
+> +CONFIG_LEDS_PWM=y
+> +CONFIG_LEDS_TRIGGERS=y
+> +CONFIG_LEDS_TRIGGER_TIMER=y
+> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_MAX77686=y
+>  CONFIG_RTC_DRV_MAX77802=y
+> 
