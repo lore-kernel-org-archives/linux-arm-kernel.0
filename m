@@ -1,38 +1,35 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 03 Sep 2015 16:49:03 +0100
-Subject: [PATCH v2 3/6] ARM: dts: apq8064-ifc6410: add notify led support.
-In-Reply-To: <55DCDFC1.4010803@codeaurora.org>
-References: <1439903069-19752-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1439903409-20233-1-git-send-email-srinivas.kandagatla@linaro.org>
- <55DCDFC1.4010803@codeaurora.org>
-Message-ID: <55E86BEF.3010403@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 3 Sep 2015 21:20:29 +0530
+Subject: [PATCH] cpufreq: Add ARM_MT8173_CPUFREQ dependencyon THERMAL
+In-Reply-To: <1441293658-18199-1-git-send-email-linux@roeck-us.net>
+References: <1441293658-18199-1-git-send-email-linux@roeck-us.net>
+Message-ID: <20150903155029.GB5332@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03-09-15, 08:20, Guenter Roeck wrote:
+> If ARM_MT8173_CPUFREQ is configured, and THERMAL is configured as module,
+> the following build error is seen for arm:allmodconfig and
+> arm64:allmodconfig.
+> 
+> drivers/built-in.o: In function `mtk_cpufreq_ready':
+> :(.text+0x32a20c): undefined reference to `of_cpufreq_cooling_register'
+> drivers/built-in.o: In function `mtk_cpufreq_exit':
+> :(.text+0x32a420): undefined reference to `cpufreq_cooling_unregister'
+> 
+> The fix is similar to CPUFREQ_DT, but more restrictive since
+> ARM_MT8173_CPUFREQ can not be built as module.
+> 
+> Fixes: 1453863fb02a ("cpufreq: mediatek: Add MT8173 cpufreq driver")
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+> It might also make sense to declare ARM_MT8173_CPUFREQ as tristate
+> and relax the conditions, but I don't know if that is feasible.
+> 
+>  drivers/cpufreq/Kconfig.arm | 1 +
+>  1 file changed, 1 insertion(+)
 
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-On 25/08/15 22:36, Stephen Boyd wrote:
-> On 08/18/2015 06:10 AM, Srinivas Kandagatla wrote:
->> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> index b1f9ddb..08daafe 100644
->> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> @@ -221,6 +221,18 @@
->>               status = "okay";
->>           };
->> +        leds {
->> +            compatible = "gpio-leds";
->> +            pinctrl-names = "default";
->> +            pinctrl-0 = <&notify_led>;
->> +
->> +            led at 1 {
->> +                label = "apq8064:green:user1";
->> +                gpios = <&pm8921_gpio 18 GPIO_ACTIVE_HIGH>;
->> +                default-state = "on";
->> +            };
->> +        };
->
-> Wrong place. Should be in root, not soc node.
-yep, Will move it to the root.
->
+-- 
+viresh
