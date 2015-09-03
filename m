@@ -1,64 +1,45 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu, 03 Sep 2015 11:55:14 +0800
-Subject: [PATCH v4 03/16] drm: bridge: analogix/dp: split exynos dp driver
- to bridge dir
-In-Reply-To: <CACvgo53pZUtSLRGVMYPs1s4QPBrAr3j=xoZ1t23tPv202bzfyg@mail.gmail.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>	<1441086598-24995-1-git-send-email-ykk@rock-chips.com>
- <CACvgo53pZUtSLRGVMYPs1s4QPBrAr3j=xoZ1t23tPv202bzfyg@mail.gmail.com>
-Message-ID: <55E7C4A2.6000504@rock-chips.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Thu,  3 Sep 2015 03:57:36 +0000
+Subject: [PATCHv5] ARM: exynos_defconfig: Enable LEDS for Odroid-XU3/XU4
+Message-ID: <1441252656-3034-1-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emil,
+From: Anand Moon <moon.linux@yahoo.com>
 
-? 09/02/2015 10:50 PM, Emil Velikov ??:
-> [Dropping the CC list]
+Enable config option NEW_LEDS, LEDS_CLASS, LEDS_GPIO, LEDS_PWM,
+LEDS_TRIGGERS, LEDS_TRIGGER_TIMER, LEDS_TRIGGER_HEARTBEAT for
+Odroid-XU3/XU4 board.
 
-Hmm...Don't understand what this means. If you can explain, that
-would be better, so I would not miss your suggest.  :-)
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 
-> Hi Yakir Yang,
->
-> On 1 September 2015 at 06:49, Yakir Yang <ykk@rock-chips.com> wrote:
->> Split the dp core driver from exynos directory to bridge
->> directory, and rename the core driver to analogix_dp_*,
->> leave the platform code to analogix_dp-exynos.
->>
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> ---
->> Changes in v4:
->> - Take Rob suggest, update "analogix,hpd-gpios" to "hpd-gpios" DT propery.
->> - Take Jingoo suggest, rename "analogix_dp-exynos.c" file name to "exynos_dp.c"
->> - Take Archit suggest, create a separate folder for analogix code in bridge/
->>
-> "Take X suggest", is grammatically incorrect. You should use
-> "suggestion(s)" or alternatively use the following approach.
->
-> - Create a separate folder for analogix code in bridge/ (Archit)
+---
+Changes from last version
+dropped following option.
+  CONFIG_LEDS_CLASS_FLASH
+  CONFIG_TRIGGER_ONESHOT
+  CONFIG_TRIGGER_GPIO
+---
+ arch/arm/configs/exynos_defconfig | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Thanks for your correct. I prefer to take the last one  ;)
-
-> Cheers,
-> Emil
->
-> P.S. Why do you resend the whole series (some 10+ patches) when only a
-> few patches have been changed ? Are all the patches changed whist
-> missing that information (vX: rebase on top of A)
-
-Yes, those 10+ patches do base on the previous changes, specially when I
-rebase my series on the latest linux-next branch.
-
-Besides, I don't know that how to send parts of this series, and keep the
-unrelated patches no send. For example if the [v4 03/16] ~ [v4 10/16]
-need  update to v5, and [v4 11/16] ~ [v4 16/16] keep in v4.
-So should I only send the [v5 03/16]  ~ [v5 10/16], no need to send and
-update [v4 11/16] ~ [v4 16/16] to v5 ?
-
-If so I think it would be difficult for guys to comment, cause they 
-can't see
-the whole series in one reply list .   ;)
-
-Thanks,
-- Yakir
->
->
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 9504e77..aaf7aa4 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -163,6 +163,13 @@ CONFIG_MMC_SDHCI_S3C_DMA=y
+ CONFIG_MMC_DW=y
+ CONFIG_MMC_DW_IDMAC=y
+ CONFIG_MMC_DW_EXYNOS=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_PWM=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_TIMER=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_MAX77686=y
+ CONFIG_RTC_DRV_MAX77802=y
+-- 
+2.1.4
