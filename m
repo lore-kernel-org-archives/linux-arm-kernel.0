@@ -1,67 +1,29 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed,  2 Sep 2015 18:06:36 -0700
-Subject: [PATCH v12 4/5] ARM: dts: vf610twr: add NAND flash controller
- peripherial
+Date: Wed,  2 Sep 2015 18:06:37 -0700
+Subject: [PATCH v12 5/5] ARM: dts: vf-colibri: enable NAND flash controller
 In-Reply-To: <1441242397-870-1-git-send-email-stefan@agner.ch>
 References: <1441242397-870-1-git-send-email-stefan@agner.ch>
-Message-ID: <1441242397-870-5-git-send-email-stefan@agner.ch>
+Message-ID: <1441242397-870-6-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the NAND flash controller (NFC) peripherial. The driver
-supports the SLC NAND chips found on Freescale's Vybrid Tower System
-Module. The Micron NAND chip on the module needs 4-bit ECC per 512
-byte page. Use 24-bit ECC per 2k page, which is supported by the
-driver.
+Enable NAND access by adding pinmux and NAND flash controller node
+to device tree. The NAND chips currently used on the Colibri VF61
+requires 8-bit ECC per 512 byte page, hence specify 32-bit ECC
+strength per 2k page size.
 
-Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
 Reviewed-by: Brian Norris <computersforpeace@gmail.com>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/vf610-twr.dts | 47 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/vfxxx.dtsi    | 10 +++++++++
- 2 files changed, 57 insertions(+)
+ arch/arm/boot/dts/vf-colibri.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index 375ab23..64d1696 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -237,6 +237,33 @@
- 			>;
- 		};
- 
-+		pinctrl_nfc: nfcgrp {
-+			fsl,pins = <
-+			VF610_PAD_PTD31__NF_IO15	0x28df
-+			VF610_PAD_PTD30__NF_IO14	0x28df
-+			VF610_PAD_PTD29__NF_IO13	0x28df
-+			VF610_PAD_PTD28__NF_IO12	0x28df
-+			VF610_PAD_PTD27__NF_IO11	0x28df
-+			VF610_PAD_PTD26__NF_IO10	0x28df
-+			VF610_PAD_PTD25__NF_IO9		0x28df
-+			VF610_PAD_PTD24__NF_IO8		0x28df
-+			VF610_PAD_PTD23__NF_IO7		0x28df
-+			VF610_PAD_PTD22__NF_IO6		0x28df
-+			VF610_PAD_PTD21__NF_IO5		0x28df
-+			VF610_PAD_PTD20__NF_IO4		0x28df
-+			VF610_PAD_PTD19__NF_IO3		0x28df
-+			VF610_PAD_PTD18__NF_IO2		0x28df
-+			VF610_PAD_PTD17__NF_IO1		0x28df
-+			VF610_PAD_PTD16__NF_IO0		0x28df
-+			VF610_PAD_PTB24__NF_WE_B	0x28c2
-+			VF610_PAD_PTB25__NF_CE0_B	0x28c2
-+			VF610_PAD_PTB27__NF_RE_B	0x28c2
-+			VF610_PAD_PTC26__NF_RB_B	0x283d
-+			VF610_PAD_PTC27__NF_ALE		0x28c2
-+			VF610_PAD_PTC28__NF_CLE		0x28c2
-+			>;
-+		};
-+
- 		pinctrl_pwm0: pwm0grp {
- 			fsl,pins = <
- 				VF610_PAD_PTB0__FTM0_CH0		0x1582
-@@ -274,6 +301,26 @@
- 	};
+diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
+index 68ca125..e5949b9 100644
+--- a/arch/arm/boot/dts/vf-colibri.dtsi
++++ b/arch/arm/boot/dts/vf-colibri.dtsi
+@@ -52,6 +52,26 @@
+ 	pinctrl-0 = <&pinctrl_i2c0>;
  };
  
 +&nfc {
@@ -76,9 +38,9 @@ index 375ab23..64d1696 100644
 +		reg = <0>;
 +		#address-cells = <1>;
 +		#size-cells = <1>;
-+		nand-bus-width = <16>;
++		nand-bus-width = <8>;
 +		nand-ecc-mode = "hw";
-+		nand-ecc-strength = <24>;
++		nand-ecc-strength = <32>;
 +		nand-ecc-step-size = <2048>;
 +		nand-on-flash-bbt;
 +	};
@@ -87,26 +49,31 @@ index 375ab23..64d1696 100644
  &pwm0 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&pinctrl_pwm0>;
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index 4aa3351..17066a2 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -520,6 +520,16 @@
- 				status = "disabled";
- 			};
- 
-+			nfc: nand at 400e0000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,vf610-nfc";
-+				reg = <0x400e0000 0x4000>;
-+				interrupts = <83 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks VF610_CLK_NFC>;
-+				clock-names = "nfc";
-+				status = "disabled";
-+			};
+@@ -156,6 +176,25 @@
+ 			>;
  		};
- 	};
- };
+ 
++		pinctrl_nfc: nfcgrp {
++			fsl,pins = <
++				VF610_PAD_PTD23__NF_IO7		0x28df
++				VF610_PAD_PTD22__NF_IO6		0x28df
++				VF610_PAD_PTD21__NF_IO5		0x28df
++				VF610_PAD_PTD20__NF_IO4		0x28df
++				VF610_PAD_PTD19__NF_IO3		0x28df
++				VF610_PAD_PTD18__NF_IO2		0x28df
++				VF610_PAD_PTD17__NF_IO1		0x28df
++				VF610_PAD_PTD16__NF_IO0		0x28df
++				VF610_PAD_PTB24__NF_WE_B	0x28c2
++				VF610_PAD_PTB25__NF_CE0_B	0x28c2
++				VF610_PAD_PTB27__NF_RE_B	0x28c2
++				VF610_PAD_PTC26__NF_RB_B	0x283d
++				VF610_PAD_PTC27__NF_ALE		0x28c2
++				VF610_PAD_PTC28__NF_CLE		0x28c2
++			>;
++		};
++
+ 		pinctrl_pwm0: pwm0grp {
+ 			fsl,pins = <
+ 				VF610_PAD_PTB0__FTM0_CH0		0x1182
 -- 
 2.5.1
