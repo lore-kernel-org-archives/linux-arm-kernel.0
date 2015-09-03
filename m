@@ -1,75 +1,95 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 3 Sep 2015 11:20:35 +0200
-Subject: [PATCHv6] ARM: exynos_defconfig: Enable LEDS for Odroid-XU3/XU4
-In-Reply-To: <1441258696-3699-1-git-send-email-linux.amoon@gmail.com>
-References: <1441258696-3699-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <55E810E3.6080709@osg.samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 3 Sep 2015 14:51:27 +0530
+Subject: [PATCH v2 0/6] regulator: Fix pbias regulator enable
+In-Reply-To: <CAPDyKFrVR+vvmxm43hGimjqo4pcFa1pfDuNNENXU-tk_qXo2=w@mail.gmail.com>
+References: <1441263042-12942-1-git-send-email-kishon@ti.com>
+ <CAPDyKFrVR+vvmxm43hGimjqo4pcFa1pfDuNNENXU-tk_qXo2=w@mail.gmail.com>
+Message-ID: <55E81117.2040900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Anand,
+Hi,
 
-On 09/03/2015 07:38 AM, Anand Moon wrote:
-> Enable config option NEW_LEDS, LEDS_CLASS, LEDS_GPIO, LEDS_PWM,
-> LEDS_TRIGGERS, LEDS_TRIGGER_TIMER, LEDS_TRIGGER_HEARTBEAT for
-> Odroid-XU3/XU4 board.
+On Thursday 03 September 2015 01:09 PM, Ulf Hansson wrote:
+> +Olof
 > 
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> On 3 September 2015 at 08:50, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> vsel_reg and enable_reg of the pbias regulator descriptor should actually
+>> have the offset from syscon.
+>>
+>> However after
+>> "ARM: dts: <platform>: add minimal l4 bus layout with control module
+>> support"
+>> vsel_reg and enable_reg started to have the absolute address because
+>> of address translation that happens due to pbias node made as the
+>> child node of syscon. This breaks the pbias regulator enable.
+>>
+>> This series adds the 'offset' to be populated in vsel_reg and enable_reg
+>> in the pbias driver itself.
+>>
+>> Changes from v1:
+>> *) Fixed Tony's review comments on adding a 'comment' for adding offset in
+>>    the driver and adding a warning for using platform_get_resource.
+>> *) Added Tony's Acked-by.
+>>
+>> Tested these patches against mmc -next in omap4 panda, omap3 beagle xm,
+>> dra72 and omap5 uevm
+>>
+>> Kishon Vijay Abraham I (6):
+>>   regulator: pbias: program pbias register offset in pbias driver
+>>   ARM: dts: dra7: use "ti,pbias-dra7" compatible string for pbias
+>>   ARM: dts: omap243x: use "ti,pbias-omap2" compatible string for pbias
+>>   ARM: dts: omap3: use "ti,pbias-omap3" compatible string for pbias
+>>   ARM: dts: omap4: use "ti,pbias-omap4" compatible string for pbias
+>>   ARM: dts: omap5: use "ti,pbias-omap5" compatible string for pbias
+>>
+>>  .../bindings/regulator/pbias-regulator.txt         |    7 ++-
+>>  arch/arm/boot/dts/dra7.dtsi                        |    2 +-
+>>  arch/arm/boot/dts/omap2430.dtsi                    |    2 +-
+>>  arch/arm/boot/dts/omap3.dtsi                       |    2 +-
+>>  arch/arm/boot/dts/omap4.dtsi                       |    2 +-
+>>  arch/arm/boot/dts/omap5.dtsi                       |    2 +-
+>>  drivers/regulator/pbias-regulator.c                |   56 +++++++++++++++++---
+>>  7 files changed, 61 insertions(+), 12 deletions(-)
+>>
+>> --
+>> 1.7.9.5
+>>
 > 
-> ---
+> I have recently queued another patchset [1] for the mmc omap driver
+> for 4.3 through my mmc tree for which Olof Johansson reported a
+> regression [2] for Panda ES with multi_v7_defconfig.
 
-I think Krzysztof already mentioned but a commit message shouln't
-describe what the change is (one can look to the patch for that)
-but why the change is needed.
-
-So I would had expect something along these lines:
-
-Many Exynos boards (i.e: the Exynos5422 Odroid XU3/XU4) have GPIO
-and PWM based LEDs, so enable the needed Kconfig options to have
-support for these. Also, some boards use the heartbeat LED trigger
-so enable support for this as well.
-
-> Changes from last version
-> dropped following option.
->   CONFIG_LEDS_CLASS_FLASH
->   CONFIG_TRIGGER_ONESHOT
->   CONFIG_TRIGGER_GPIO
-> fixed the From address
-> ---
->  arch/arm/configs/exynos_defconfig | 7 +++++++
->  1 file changed, 7 insertions(+)
+I generally perform my tests with omap2plus_defconfig and without this
+series MMC doesn't work with omap2plus_defconfig.
 > 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 9504e77..aaf7aa4 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -163,6 +163,13 @@ CONFIG_MMC_SDHCI_S3C_DMA=y
->  CONFIG_MMC_DW=y
->  CONFIG_MMC_DW_IDMAC=y
->  CONFIG_MMC_DW_EXYNOS=y
-> +CONFIG_NEW_LEDS=y
-> +CONFIG_LEDS_CLASS=y
-> +CONFIG_LEDS_GPIO=y
-> +CONFIG_LEDS_PWM=y
-> +CONFIG_LEDS_TRIGGERS=y
-> +CONFIG_LEDS_TRIGGER_TIMER=y
+> Kishon, could you please clarify if $subject patchset solves that
+> regression reported by Olof? Or perhaps Olof can run a test?
 
-I don't see an Exynos board using the timer trigger. Do you need it for
-some user-space application that uses the sysfs interface? I'm OK with
-enabling it but again this should be mentioned in the commit message.
+Just checked multi_v7_defconfig and this series is definitely required
+to get MMC working. But we also have to enable 'CONFIG_REGULATOR_PBIAS'
+which is not enabled by default in multi_v7_defconfig.
 
-> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
->  CONFIG_RTC_CLASS=y
->  CONFIG_RTC_DRV_MAX77686=y
->  CONFIG_RTC_DRV_MAX77802=y
+So we should have a patch to enable 'CONFIG_REGULATOR_PBIAS' in
+multi_v7_defconfig to completely solve the problem reported by Olof.
+I'll prepare a patch for multi_v7_defconfig and post it asap.
+
+Thanks
+Kishon
+
 > 
-
-The change looks good to me though so with a better commit message:
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+> Finally, perhaps it's better if we queue this through my mmc tree
+> since we would then be able to avoid the regression - if I put
+> $subject patchset before [1], right? Then I need an ack from Mark for
+> the regulator patch.
+> Please tell me if you guys prefer another way.
+> 
+> Kind regards
+> Uffe
+> 
+> [1]
+> http://permalink.gmane.org/gmane.linux.kernel/2027789
+> 
+> [2]
+> http://www.spinics.net/lists/linux-mmc/msg33146.html
+> 
