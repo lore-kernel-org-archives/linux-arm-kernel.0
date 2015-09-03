@@ -1,75 +1,67 @@
 From: kuleshovmail@gmail.com (Alexander Kuleshov)
-Date: Fri,  4 Sep 2015 00:11:51 +0600
-Subject: [PATCH 1/3] arm64/cpufeature.h: Add macros for a cpu features testing
-Message-ID: <1441303911-9421-1-git-send-email-kuleshovmail@gmail.com>
+Date: Fri,  4 Sep 2015 00:12:52 +0600
+Subject: [PATCH 2/3] arm64/setup: Use ID_AA64ISAR0_EL1_.* macros
+In-Reply-To: <1441303911-9421-1-git-send-email-kuleshovmail@gmail.com>
+References: <1441303911-9421-1-git-send-email-kuleshovmail@gmail.com>
+Message-ID: <1441303972-9480-1-git-send-email-kuleshovmail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides a couple of macros for the testing of processor
-features (crypto and FP/SIMD) like support of SHA1, AES instructions,
-support for FPU and etc. There is already a couple of places in the
-arch/arm64/kernel where these processor features are tested and these
-macros are facilitate this.
+The 26d75e67c commit (arm64/cpufeature.h: Add macros for a cpu features
+testing) provides set of macros for the testing processor's crypto features.
+Let's use these macros instead of direct calculation.
 
 Signed-off-by: Alexander Kuleshov <kuleshovmail@gmail.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 44 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+ arch/arm64/kernel/setup.c | 29 +++++++++--------------------
+ 1 file changed, 9 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index c104421..2919455 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -28,7 +28,50 @@
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 926ae8d..a3faf4f 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -250,33 +250,22 @@ static void __init setup_processor(void)
  
- #define ARM64_NCAPS				4
+ 	/*
+ 	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
+-	 * The blocks we test below represent incremental functionality
+-	 * for non-negative values. Negative values are reserved.
+ 	 */
+ 	features = read_cpuid(ID_AA64ISAR0_EL1);
+-	block = (features >> 4) & 0xf;
+-	if (!(block & 0x8)) {
+-		switch (block) {
+-		default:
+-		case 2:
+-			elf_hwcap |= HWCAP_PMULL;
+-		case 1:
+-			elf_hwcap |= HWCAP_AES;
+-		case 0:
+-			break;
+-		}
+-	}
  
-+/*
-+ * ID_AA64ISAR0_EL1 AES, bits [7:4]
-+ */
-+#define ID_AA64ISAR0_EL1_AES_MASK	4
-+#define ID_AA64ISAR0_EL1_AES(feature)	\
-+	(((feature >> ID_AA64ISAR0_EL1_AES_MASK) & 0xf) & 1UL)
-+#define ID_AA64ISAR0_EL1_PMULL(feature)	\
-+	(((feature >> ID_AA64ISAR0_EL1_AES_MASK) & 0xf) & 2UL)
+-	block = (features >> 8) & 0xf;
+-	if (block && !(block & 0x8))
++	if (ID_AA64ISAR0_EL1_AES(features))
++		elf_hwcap |= HWCAP_AES;
 +
-+/*
-+ * ID_AA64ISAR0_EL1 SHA1, bits [11:8]
-+ */
-+#define ID_AA64ISAR0_EL1_SHA1_MASK	8
-+#define ID_AA64ISAR0_EL1_SHA1(feature)	\
-+	(((feature >> ID_AA64ISAR0_EL1_SHA1_MASK) & 0xf) & 1UL)
++	if (ID_AA64ISAR0_EL1_PMULL(features))
++		elf_hwcap |= HWCAP_PMULL;
 +
-+/*
-+ * ID_AA64ISAR0_EL1 SHA2, bits [15:12]
-+ */
-+#define ID_AA64ISAR0_EL1_SHA2_MASK	12
-+#define ID_AA64ISAR0_EL1_SHA2(feature)	\
-+	(((feature >> ID_AA64ISAR0_EL1_SHA2_MASK) & 0xf) & 1UL)
-+
-+/*
-+ * ID_AA64ISAR0_EL1 CRC32, bits [19:16]
-+ */
-+#define ID_AA64ISAR0_EL1_CRC32_MASK	16
-+#define ID_AA64ISAR0_EL1_CRC32(feature)	\
-+	(((feature >> ID_AA64ISAR0_EL1_CRC32_MASK) & 0xf) & 1UL)
-+
-+/*
-+ * ID_AA64PFR0_EL1 FP, bits [19:16]
-+ */
-+#define ID_AA64PFR0_EL1_FP_MASK		16
-+#define ID_AA64PFR0_EL1_FP(ptr)		\
-+	(ptr & (0xf << ID_AA64PFR0_EL1_FP_MASK))
-+
-+/*
-+ * ID_AA64PFR0_EL1 AdvSIMD, bits [23:20]
-+ */
-+#define ID_AA64PFR0_EL1_ADV_SIMD_MASK	20
-+#define ID_AA64PFR0_EL1_ADV_SIMD(ptr)	\
-+	(ptr & (0xf << ID_AA64PFR0_EL1_ADV_SIMD_MASK))
-+
- #ifndef __ASSEMBLY__
++	if (ID_AA64ISAR0_EL1_SHA1(features))
+ 		elf_hwcap |= HWCAP_SHA1;
  
- struct arm64_cpu_capabilities {
+-	block = (features >> 12) & 0xf;
+-	if (block && !(block & 0x8))
++	if (ID_AA64ISAR0_EL1_SHA2(features))
+ 		elf_hwcap |= HWCAP_SHA2;
+ 
+-	block = (features >> 16) & 0xf;
+-	if (block && !(block & 0x8))
++	if (ID_AA64ISAR0_EL1_CRC32(features))
+ 		elf_hwcap |= HWCAP_CRC32;
+ 
+ #ifdef CONFIG_COMPAT
 -- 
 2.5.0
