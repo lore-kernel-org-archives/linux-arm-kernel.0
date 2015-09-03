@@ -1,50 +1,94 @@
-From: kuleshovmail@gmail.com (Alexander Kuleshov)
-Date: Fri,  4 Sep 2015 00:12:59 +0600
-Subject: [PATCH 3/3] arm64/fpsimd: Use ID_AA64PFR0_EL1_.* macros
-In-Reply-To: <1441303911-9421-1-git-send-email-kuleshovmail@gmail.com>
-References: <1441303911-9421-1-git-send-email-kuleshovmail@gmail.com>
-Message-ID: <1441303979-9535-1-git-send-email-kuleshovmail@gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Thu, 3 Sep 2015 14:15:24 -0400
+Subject: earlycon issues in -next with amba-pl011 updates
+In-Reply-To: <55E88ABE.2090402@arm.com>
+References: <20150810232312.GB10728@bivouac.eciton.net>
+ <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
+ <55E81F93.1020104@arm.com> <20150903155255.GA28336@kroah.com>
+ <55E87095.4030600@arm.com> <55E8880E.5080707@hurleysoftware.com>
+ <55E88ABE.2090402@arm.com>
+Message-ID: <55E88E3C.2010403@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 26d75e67c commit (arm64/cpufeature.h: Add macros for a cpu features
-testing) provides set of macros for the testing processor's FP and advanced
-SIMD features.
+On 09/03/2015 02:00 PM, Marc Zyngier wrote:
+> On 03/09/15 18:49, Peter Hurley wrote:
+>> On 09/03/2015 12:08 PM, Marc Zyngier wrote:
+>>> On 03/09/15 16:52, Greg Kroah-Hartman wrote:
+>>>> On Thu, Sep 03, 2015 at 11:23:15AM +0100, Marc Zyngier wrote:
+>>>>> On 11/08/15 02:48, Jun Nie wrote:
+>>>>>> 2015-08-11 7:23 GMT+08:00 Leif Lindholm <leif.lindholm@linaro.org>:
+>>>>>>> Hi all,
+>>>>>>>
+>>>>>>> The kernelci.org bot picked up a complete boot failure (no output past
+>>>>>>> UEFI stub) with next-20150806 and Tyler bisected it down to somewhere
+>>>>>>> in
+>>>>>>> 8cd90e5 uart: pl011: Add support to ZTE ZX296702 uart
+>>>>>>> 09dcc7d uart: pl011: Improve LCRH register access decision
+>>>>>>> 2c096a9 uart: pl011: Introduce register look up table
+>>>>>>> 7b753f3 uart: pl011: Introduce register accessor
+>>>>>>>
+>>>>>>> The issue only appears with earlycon on command line, for pl011
+>>>>>>> consoles.
+>>>>>>>
+>>>>>>> Some investigation shows that the cause lies with
+>>>>>>> commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
+>>>>>>> and
+>>>>>>> commit 2c096a9eedc6 ("uart: pl011: Introduce register look up table")
+>>>>>>>
+>>>>>>> Specifically, the changes to pl011_putc() are incorrect:
+>>>>>>> The new pl011_ accessors take a (struct uart_amba_port *) input, but
+>>>>>>> pl011_putc() directly uses the incoming (struct uart_port *) for this.
+>>>>>>>
+>>>>>>> Apart from ending up with an unintended/incorrect UART base address,
+>>>>>>> the introduction of the lookup table for register offsets also means
+>>>>>>> the accessors try to dereference (struct uart_amba_port *)->reg_lut.
+>>>>>>>
+>>>>>>> The below is a hack that shows/resolves the issue, but some
+>>>>>>> refactoring of the original patches might be in order.
+>>>>>>>
+>>>>>>> /
+>>>>>>>     Leif
+>>>>>>
+>>>>>> Leif,
+>>>>>>
+>>>>>> Sorry for the inconvenience. I do not have idea of early console till
+>>>>>> now and I always have debug console for early panic debug. Learned
+>>>>>> more from this issue.
+>>>>>>
+>>>>>> Suppose Peter's patch will resolve your issue.
+>>>>>
+>>>>> [+ Greg KH]
+>>>>>
+>>>>> So -next has now been broken for a while on a number of ARM platforms
+>>>>> because of this (they simply cannot boot), and no progress has been made
+>>>>> towards resolving this problem.
+>>>>>
+>>>>> Can we please drop this series (at least commits 7b753f3 and following)
+>>>>> from -next until is has been reworked and reviewed?
+>>>>
+>>>> I don't have any patches in my -next tree, everything is in Linus's tree
+>>>> now.  So if I've missed something, or need to revert something, please
+>>>> let me know specifcally what to do.
+>>>
+>>> Gahhh... Given that there is no obvious fix
+>>
+>> Fix has been on list since Aug 10.
+>>
+>> http://www.spinics.net/lists/linux-serial/msg18576.html
+> 
+> ... with both Leif and Russell outlining issues with this patch:
+> 
+> http://www.spinics.net/lists/linux-serial/msg18594.html
+> http://www.spinics.net/lists/linux-serial/msg18599.html
 
-Let's use these macros instead of direct calculation.
+Russell's suggestions were noted in my reply
 
-Signed-off-by: Alexander Kuleshov <kuleshovmail@gmail.com>
----
- arch/arm64/kernel/fpsimd.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+http://www.spinics.net/lists/linux-serial/msg18650.html
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 44d6f75..12943a5 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -27,6 +27,7 @@
- 
- #include <asm/fpsimd.h>
- #include <asm/cputype.h>
-+#include <asm/cpufeature.h>
- 
- #define FPEXC_IOF	(1 << 0)
- #define FPEXC_DZF	(1 << 1)
-@@ -333,13 +334,13 @@ static int __init fpsimd_init(void)
- {
- 	u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
- 
--	if (pfr & (0xf << 16)) {
-+	if (ID_AA64PFR0_EL1_FP(pfr)) {
- 		pr_notice("Floating-point is not implemented\n");
- 		return 0;
- 	}
- 	elf_hwcap |= HWCAP_FP;
- 
--	if (pfr & (0xf << 20))
-+	if (ID_AA64PFR0_EL1_ADV_SIMD(pfr))
- 		pr_notice("Advanced SIMD is not implemented\n");
- 	else
- 		elf_hwcap |= HWCAP_ASIMD;
--- 
-2.5.0
+> so maybe coming up with an updated series would have been a good move.
+
+Feel free to work from where I left off.
+
+Regards,
+Peter Hurley
