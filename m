@@ -1,71 +1,66 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu,  3 Sep 2015 13:58:32 -0600
-Subject: [PATCH v2 5/7] ARM: cpuidle: Add runtime PM support for CPU idle
+Date: Thu,  3 Sep 2015 13:58:33 -0600
+Subject: [PATCH v2 6/7] ARM64: smp: Add runtime PM support for CPU hotplug
 In-Reply-To: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
 References: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1441310314-8857-6-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1441310314-8857-7-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Notify runtime PM when the CPU is going to be powered off in the idle
-state. This allows for runtime PM suspend/resume of the CPU as well as
-its  PM domain.
+Enable runtime PM for CPU devices. Do a runtime get of the CPU device
+when the CPU is hotplugged in and runtime put of the CPU device when the
+CPU is hotplugged off. When all the CPUs in a domain are hotplugged off,
+the domain may also be powered off and cluster_pm_enter/exit()
+notifications are be sent out.
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- drivers/cpuidle/cpuidle-arm.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm64/kernel/smp.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index 545069d..7c791f9 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -11,13 +11,16 @@
- 
- #define pr_fmt(fmt) "CPUidle arm: " fmt
- 
-+#include <linux/cpu.h>
- #include <linux/cpuidle.h>
- #include <linux/cpumask.h>
- #include <linux/cpu_pm.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/pm_runtime.h>
- #include <linux/slab.h>
-+#include <linux/rcupdate.h>
- 
- #include <asm/cpuidle.h>
- 
-@@ -37,6 +40,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
- 				struct cpuidle_driver *drv, int idx)
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index dbdaacd..4076962 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -135,6 +135,7 @@ asmlinkage void secondary_start_kernel(void)
  {
- 	int ret;
-+	struct device *cpu_dev = get_cpu_device(dev->cpu);
+ 	struct mm_struct *mm = &init_mm;
+ 	unsigned int cpu = smp_processor_id();
++	struct device *cpu_dev;
  
- 	if (!idx) {
- 		cpu_do_idle();
-@@ -46,12 +50,19 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
- 	ret = cpu_pm_enter();
- 	if (!ret) {
- 		/*
-+		 * Notify runtime PM as well of this cpu powering down
-+		 * TODO: Merge CPU_PM and runtime PM.
-+		 */
-+		RCU_NONIDLE(pm_runtime_put_sync(cpu_dev));
+ 	/*
+ 	 * All kernel threads share the same mm context; grab a
+@@ -185,6 +186,11 @@ asmlinkage void secondary_start_kernel(void)
+ 	local_irq_enable();
+ 	local_async_enable();
+ 
++	/* We are running, enable runtime PM for the CPU. */
++	cpu_dev = get_cpu_device(cpu);
++	if (cpu_dev)
++		pm_runtime_get_sync(cpu_dev);
 +
-+		/*
- 		 * Pass idle state index to cpu_suspend which in turn will
- 		 * call the CPU ops suspend protocol with idle index as a
- 		 * parameter.
- 		 */
- 		arm_cpuidle_suspend(idx);
+ 	/*
+ 	 * OK, it's off to the idle thread for us
+ 	 */
+@@ -292,6 +298,16 @@ void __cpu_die(unsigned int cpu)
+ void cpu_die(void)
+ {
+ 	unsigned int cpu = smp_processor_id();
++	struct device *cpu_dev;
++
++	/*
++	 * We dont need the CPU device anymore.
++	 * Lets do this before IRQs are disabled to allow
++	 * runtime PM to suspend the domain as well.
++	 */
++	cpu_dev = get_cpu_device(cpu);
++	if (cpu_dev)
++		pm_runtime_put_sync(cpu_dev);
  
-+		RCU_NONIDLE(pm_runtime_get_sync(cpu_dev));
- 		cpu_pm_exit();
- 	}
+ 	idle_task_exit();
  
 -- 
 2.1.4
