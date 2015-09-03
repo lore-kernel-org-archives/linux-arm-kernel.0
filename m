@@ -1,79 +1,92 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 03 Sep 2015 16:20:18 +0300
-Subject: PING-2: [PATCH v2 TRIVIAL] Enable GICv2m on ARM virt machine
-Message-ID: <018d01d0e64b$47cce390$d766aab0$@samsung.com>
+From: ranjit.waghmode@xilinx.com (Ranjit Abhimanyu Waghmode)
+Date: Thu, 3 Sep 2015 13:25:00 +0000
+Subject: [LINUX RFC v2 0/4] spi: add dual parallel mode support in Zynq
+ MPSoC GQSPI controller
+In-Reply-To: <201509022056.09635.marex@denx.de>
+References: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
+ <201508260856.22258.marex@denx.de>
+ <7CFCFE83B8145347A1D424EC939F1C3C014AFF00@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <201509022056.09635.marex@denx.de>
+Message-ID: <7CFCFE83B8145347A1D424EC939F1C3C014B08B2@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Knock-knock!
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
-
+Hi,
 
 > -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Pavel
-> Fedin
-> Sent: Friday, August 07, 2015 1:51 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: 'Marc Zyngier'; trivial at kernel.org; 'Russell King'
-> Subject: [PATCH v2 TRIVIAL] Enable GICv2m on ARM virt machine
+> From: Marek Vasut [mailto:marex at denx.de]
+> Sent: Thursday, September 03, 2015 12:26 AM
+> To: Ranjit Abhimanyu Waghmode
+> Cc: dwmw2 at infradead.org; computersforpeace at gmail.com;
+> broonie at kernel.org; Michal Simek; Soren Brinkmann; zajec5 at gmail.com;
+> ben at decadent.org.uk; b32955 at freescale.com; knut.wohlrab at de.bosch.com;
+> juhosg at openwrt.org; beanhuo at micron.com; linux-mtd at lists.infradead.org;
+> linux-kernel at vger.kernel.org; linux-spi at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Harini Katakam; Punnaiah Choudary Kalluri
+> Subject: Re: [LINUX RFC v2 0/4] spi: add dual parallel mode support in Zynq
+> MPSoC GQSPI controller
 > 
-> qemu implementation of "virt" includes GICv2m. This commit allows to use
-> it also on ARM32 architecture.
+> On Wednesday, September 02, 2015 at 07:12:14 PM, Ranjit Abhimanyu
+> Waghmode
+> wrote:
+> > Hi Marek,
+> >
+> > > -----Original Message-----
+> > > From: Marek Vasut [mailto:marex at denx.de]
+> > > Sent: Wednesday, August 26, 2015 12:26 PM
+> > > To: Ranjit Abhimanyu Waghmode
+> > > Cc: dwmw2 at infradead.org; computersforpeace at gmail.com;
+> > > broonie at kernel.org; Michal Simek; Soren Brinkmann; zajec5 at gmail.com;
+> > > ben at decadent.org.uk; b32955 at freescale.com;
+> > > knut.wohlrab at de.bosch.com; juhosg at openwrt.org;
+> beanhuo at micron.com;
+> > > linux-mtd at lists.infradead.org; linux-kernel at vger.kernel.org;
+> > > linux-spi at vger.kernel.org; linux-arm- kernel at lists.infradead.org;
+> > > Harini Katakam; Punnaiah Choudary Kalluri
+> > > Subject: Re: [LINUX RFC v2 0/4] spi: add dual parallel mode support
+> > > in Zynq MPSoC GQSPI controller
+> > >
+> > > On Wednesday, August 26, 2015 at 08:26:03 AM, Ranjit Waghmode wrote:
+> > > > This series adds dual parallel mode support for Zynq Ultrascale+
+> > > > MPSoC GQSPI controller driver.
+> > > >
+> > > > What is dual parallel mode?
+> > > > ---------------------------
+> > > > ZynqMP GQSPI controller supports Dual Parallel mode with following
+> > > > functionalities: 1) Supporting two SPI flash memories operating in
+> > > > parallel. 8 I/O lines. 2) Chip selects and clock are shared to
+> > > > both the flash devices
+> > > > 3) This mode is targeted for faster read/write speed and also
+> > > > doubles the size 4) Commands/data can be transmitted/received from
+> > > > both the devices(mirror), or only upper or only lower flash memory
+> devices.
+> > > >
+> > > > 5) Data arrangement:
+> > > >    With stripe enabled,
+> > > >    Even bytes i.e. 0, 2, 4,... are transmitted on Lower Data Bus
+> > > >    Odd bytes i.e. 1, 3, 5,.. are transmitted on Upper Data Bus.
+> > >
+> > > This might be a dumb question, but why don't you just treat this as
+> > > an SPI NOR flash with 8-bit bus ?
+> >
+> > In case of dual parallel configuration of this controller there are
+> > different modes like single, dual and quad mode. Whatever you are
+> > suggesting would fit only in the case of Quad mode operation as both
+> > buses would have 4 lines each. In case of single mode of parallel
+> > configuration, there would be two buses; but the line on each bus
+> > would one. So altogether there will be two lines. And in case of dual
+> > mode of parallel configuration each bus will be having two lines. So
+> > altogether 4 lines will be there. So keeping 8 lines would not support
+> > above two modes of parallel configuration correctly.
+> >
+> > Logically it is a single flash with 8 IO lines but physically it's a
+> > two flash devices and each has 4 IO lines. So, in this case, read and
+> > write addresses should be always even and minimum data that can be
+> > accessed is 2 bytes.
 > 
-> msi.h is added because it is required by linux/msi.h
-> if CONFIG_GENERIC_MSI_IRQ_DOMAIN is defined. It gets enabled by the
-> following KConfig dependency chain:
-> ARM_GIC_V2M => PCI_MSI_IRQ_DOMAIN => GENERIC_MSI_IRQ_DOMAIN
+> Oh, I see what the issue is now. It has to do with configuring the flash into
+> correct bus-width mode, right ?
+Yes.
 > 
-> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
-> ---
-> v1 => v2:
-> Added verbose explanation in commit message
-> ---
->  arch/arm/Kconfig            | 1 +
->  arch/arm/include/asm/Kbuild | 1 +
->  2 files changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 45df48b..1091025 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -815,6 +815,7 @@ config ARCH_VIRT
->  	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
->  	select ARM_AMBA
->  	select ARM_GIC
-> +	select ARM_GIC_V2M if PCI_MSI
->  	select ARM_PSCI
->  	select HAVE_ARM_ARCH_TIMER
-> 
-> diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-> index 3c4596d..01806f5 100644
-> --- a/arch/arm/include/asm/Kbuild
-> +++ b/arch/arm/include/asm/Kbuild
-> @@ -14,6 +14,7 @@ generic-y += local.h
->  generic-y += local64.h
->  generic-y += mcs_spinlock.h
->  generic-y += msgbuf.h
-> +generic-y += msi.h
->  generic-y += param.h
->  generic-y += parport.h
->  generic-y += poll.h
-> --
-> 1.9.5.msysgit.0
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Best regards,
+> Marek Vasut
