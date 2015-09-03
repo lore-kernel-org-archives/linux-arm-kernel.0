@@ -1,89 +1,66 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 3 Sep 2015 10:18:54 +0100
-Subject: [PATCH 1/7] dmaengine: st_fdma: Add STMicroelectronics FDMA DT
- binding documentation
-In-Reply-To: <20150826071236.GS19409@x1>
-References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
- <1436371888-27863-2-git-send-email-peter.griffin@linaro.org>
- <20150819150605.GA13546@localhost>
- <20150825170840.GA1498@griffinp-ThinkPad-X1-Carbon-2nd>
- <20150826071236.GS19409@x1>
-Message-ID: <20150903091854.GD15477@griffinp-ThinkPad-X1-Carbon-2nd>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Sep 2015 10:19:00 +0100
+Subject: [PATCH v3 2/2] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
+ support
+In-Reply-To: <CAD=FV=VuyQXNGt7dgF-YF7D7MDu31B-QuBdGpeC_+0b1F2=dKg@mail.gmail.com>
+References: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <CAD=FV=WvUp7xhsmXJgVzm1Awqej12hNF_QPJhrQq7z=Fa4Nnuw@mail.gmail.com>
+ <20150902225008.GQ21084@n2100.arm.linux.org.uk>
+ <CAD=FV=VuyQXNGt7dgF-YF7D7MDu31B-QuBdGpeC_+0b1F2=dKg@mail.gmail.com>
+Message-ID: <20150903091900.GX21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Wed, 26 Aug 2015, Lee Jones wrote:
-
-> On Tue, 25 Aug 2015, Peter Griffin wrote:
+On Wed, Sep 02, 2015 at 04:43:38PM -0700, Doug Anderson wrote:
+> Russell,
 > 
-> > Hi Vinod,
-> > 
-> > Thanks for reviewing.
-> > 
-> > On Wed, 19 Aug 2015, Vinod Koul wrote:
-> > 
-> > > On Wed, Jul 08, 2015 at 05:11:22PM +0100, Peter Griffin wrote:
-> > > > This patch adds the DT binding documentation for the FDMA constroller
-> > > > found on STi based chipsets from STMicroelectronics.
-> > > > 
-> > > > Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> > > > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > > > ---
-> > > >  Documentation/devicetree/bindings/dma/st_fdma.txt | 76 +++++++++++++++++++++++
-> > > >  1 file changed, 76 insertions(+)
-> > > >  create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/dma/st_fdma.txt b/Documentation/devicetree/bindings/dma/st_fdma.txt
-> > > > new file mode 100644
-> > > > index 0000000..1ec7470
-> > > > --- /dev/null
-> > > > +++ b/Documentation/devicetree/bindings/dma/st_fdma.txt
-> > > > @@ -0,0 +1,76 @@
-> > > > +* STMicroelectronics Flexible Direct Memory Access Device Tree bindings
-> > > > +
-> > > > +The FDMA is a general-purpose direct memory access controller capable of
-> > > > +supporting 16 independent DMA channels. It accepts up to 32 DMA requests.
-> > > > +The FDMA is based on a Slim processor which require a firmware.
-> > > > +
-> > > > +* FDMA Controller
-> > > > +
-> > > > +Required properties:
-> > > > +- compatible	: Should be "st,fdma_mpe31"
-> > > > +- reg		: Should contain DMA registers location and length
-> > > > +- interrupts	: Should contain one interrupt shared by all channel
-> > > 
-> > > s/channel/channels
-> > 
-> > Will fix in v2.
-> > 
-> > > 
-> > > > +- dma-channels	: Number of channels supported by the controller
-> > > > +- #dma-cells	: Must be <3>.
-> > > 
-> > > any reason three?
-> > 
-> > Yes, it is documented further down in the file under DMA Client.
-> > 
-> > To make it clearer in V2 I could change to
-> > 
-> > "- #dma-cells	: Must be <3>. See DMA client section below"?
+> On Wed, Sep 2, 2015 at 3:50 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > Never copy the of_node from one device to another.  That allows the
+> > bus matching to unintentionally match the of_node against the wrong
+> > driver.
 > 
-> - #dma-cells	: Must be <3>
-> 			1st cell: Phandle to       ... <blah>
-> 			2nd cell: DMA channel      ... <blah>
-> 			3rd cell: Flags describing ... <blah>  
+> Can you be more specific about what problems you'd expect.  It seems
+> like a terribly common practice to do this, but maybe I'm
+> misunderstanding:
 
-I'd prefer not to document it twice in the same file as it is
-almost 20 lines long. IMHO it makes more sense to document it under
-the dma-client section like it is done presently, because when writing a
-dma-client node you need to know what these things mean.
+The problem with copying an of_node from one struct device to another
+struct device is of_match_device().
 
-When writing a controller node all you only need to know is
-"Must be <3>". A more avid reader now has a nice pointer to scroll
-down if they wish to find out more.
+Devices in a DT setup are bound to drivers using dev->of_node - when a
+new device or driver is registered onto a bus, the new object is matched
+against all un-bound objects (devices or drivers as appropriate)
+comparing the compatible string gained from dev->of_node against the
+list of of_device_id strings provided by the driver.
 
-regards,
+When a match is found, the two are attempted to be bound together.
 
-Peter.
+Consider what happens when you have a platform device with an of_node,
+and you bind that to a driver matched via the compatible string.  The
+driver creates a new platform device, and copies the of_node to this
+new device so the new device can have access to the properties of the
+of_node.
+
+What happens next?  Does the new device bind to the same driver (and
+thus we enter an infinite loop) or does it bind to some other driver
+as the author originally hoped?  Depends whether the other driver is
+earlier in the list of drivers or later, whether it's in the kernel
+or not.
+
+It's less of a problem when you copy the of_node between two different
+buses, because they won't match the same driver, but this is a dangerous
+act - if stuff copies it in one direction, what's to stop someone copying
+it back to a new device on the original bus.  As soon as that happens,
+things can go awol.
+
+It would be a good idea if either:
+1) this never happened
+or
+2) we had a flag which said "ignore the of_node for driver matching"
+
+And yes, we do have drivers which do exactly what I said above.  They
+work through luck rather than design.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
