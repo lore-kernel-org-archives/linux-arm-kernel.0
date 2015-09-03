@@ -1,28 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 03 Sep 2015 16:03:58 +0100
-Subject: [PATCH 4/9] arm/arm64: Implement GICD_ICFGR as RO for PPIs
-In-Reply-To: <1440942866-23802-5-git-send-email-christoffer.dall@linaro.org>
-References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
- <1440942866-23802-5-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <55E8615E.30300@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 Sep 2015 08:04:53 -0700
+Subject: [PATCH v2 0/6] regulator: Fix pbias regulator enable
+In-Reply-To: <55E81117.2040900@ti.com>
+References: <1441263042-12942-1-git-send-email-kishon@ti.com>
+ <CAPDyKFrVR+vvmxm43hGimjqo4pcFa1pfDuNNENXU-tk_qXo2=w@mail.gmail.com>
+ <55E81117.2040900@ti.com>
+Message-ID: <20150903150452.GT4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/15 14:54, Christoffer Dall wrote:
-> The GICD_ICFGR allows the bits for the SGIs and PPIs to be read only.
-> We currently simulate this behavior by writing a hardcoded value to the
-> register for the SGIs and PPIs on every write of these bits to the
-> register (ignoring what the guest actually wrote), and by writing the
-> same value as the reset value to the register.
-> 
-> This is a bit counter-intuitive, as the register is RO for these bits,
-> and we can just implement it that way, allowing us to control the value
-> of the bits purely in the reset code.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+* Kishon Vijay Abraham I <kishon@ti.com> [150903 02:25]:
+> On Thursday 03 September 2015 01:09 PM, Ulf Hansson wrote:
+> > 
+> > Finally, perhaps it's better if we queue this through my mmc tree
+> > since we would then be able to avoid the regression - if I put
+> > $subject patchset before [1], right? Then I need an ack from Mark for
+> > the regulator patch.
+> > Please tell me if you guys prefer another way.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+That works for me too. Or Mark can set up an immutable signed
+branch that you can merge in, up to you guys.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+It's still going to break git bisect for booting but
+removes the regression when mergeing to mainline.
+
+I'd squash all the one liner dts changes into a single
+patch though when applying to cut down on the commit
+noise.
+
+Regards,
+
+Tony
