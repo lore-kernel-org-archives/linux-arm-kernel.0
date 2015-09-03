@@ -1,53 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Sep 2015 09:22:10 +0100
-Subject: [PATCH] ARM: dts: Add ddc i2c reference to veyron
-In-Reply-To: <CAL_JsqLLPCy6OpsP4NNjUA6+UxeTC-zGjGPPU+MLhUqFXSSGJQ@mail.gmail.com>
-References: <1441229148-12095-1-git-send-email-dianders@chromium.org>
- <CAL_JsqLLPCy6OpsP4NNjUA6+UxeTC-zGjGPPU+MLhUqFXSSGJQ@mail.gmail.com>
-Message-ID: <20150903082210.GU21084@n2100.arm.linux.org.uk>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 3 Sep 2015 10:26:49 +0200
+Subject: Cortex A9 MP: ARM errata 754323 implementation?
+In-Reply-To: <20150903080502.GT21084@n2100.arm.linux.org.uk>
+References: <55E7F965.8080802@de.bosch.com>
+ <20150903080502.GT21084@n2100.arm.linux.org.uk>
+Message-ID: <55E80449.9040308@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2015 at 07:13:24PM -0500, Rob Herring wrote:
-> On Wed, Sep 2, 2015 at 4:25 PM, Douglas Anderson <dianders@chromium.org> wrote:
-> > The ddc-i2c-bus property was missing from the veyron dtsi file since
-> > downstream the ddc-i2c-bus was still being specified in rk3288.dtsi and
-> > nobody noticed when the veyron dtsi was sent upstream.  Add it.
-> >
-> > Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> > ---
-> > Note: I noticed that this was wrong but I don't currently have
-> > graphics up and running on upstream on veyron.  Posting this anyway
-> > since it's pretty clear that it's needed.  If someone else wants to
-> > try it out that'd be nice, otherwise I'll put it on my list to figure
-> > out how to get myself setup for graphics upstream.  ;)
-> 
-> Based on your other patch, this is temporary, right?
-> 
-> I've been looking at DRM a lot lately. I think specifying the i2c bus
-> in the hdmi chip or IP block node is wrong. If the I2C host is
-> separate from the HDMI block, then it's only connection is to the HDMI
-> connector. So the I2C host to the connector relationship is what the
-> DT should describe. HPD gpio is similar. Now if the HDMI bridge
-> controls DDC and HPD directly, then we don't need to describe those
-> connections.
+On 03.09.2015 10:05, Russell King - ARM Linux wrote:
+> On Thu, Sep 03, 2015 at 09:40:21AM +0200, Dirk Behme wrote:
+>> looking through the ARM Cortex A9 errata list [1] I wonder why we don't have
+>> a workaround for
+>>
+>> (754323) Repeated Store in the same cache line might delay the visibility of
+>> the Store
+>>
+>> in the kernel? Or have I missed it?
+>
+> The policy for errata is not to implement them unless there's a requirement
+> to do so - and then the errata should be implemented in board firmware in
+> preference to the kernel where possible.
+>
+> Are you seeing a problem directly attributable to this errata?
 
-Except... we don't generally model connectors under DRM as a general
-rule.  (The fbdev video connector stuff happened without very much
-publicity afaics.)
 
-It's not always appropriate to split it out from the bridge in any
-case.  Consider something like a TDA998x where the TDA998x itself
-takes care of reading the DDC bus, and doesn't provide an I2C-like
-interface.  If you try and split that into "bridge" or "encoder" and
-"connector" you end up having to invent a new kind of I2C thing which
-isn't an I2C adapter, or somehow squeezing an I2C adapter which isn't
-into the I2C layer.
+I got a report from some internal testing that an issue they see goes 
+away if they enable 754327. I rejected this because i.MX6 is > r2p0 and 
+therefore can't be affected by this errata. Looking through the list of 
+erratas I then found the related 754323 which seems to apply to i.MX6, 
+but is not implemented.
 
-The TDA998x provides an interface to read a block of EDID at a time.
-It always does the page register access.  You don't get to read it
-byte wise.  It doesn't fit into I2C as an adapter at all.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+The issue we are talking about is
+
+Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
+PC is at kfree+0x10c/0x238
+LR is at release_firmware+0x5c/0x70
+
+which is said to be triggered by this code
+
+void kfree(const void *x)
+...
+page = virt_to_head_page(x);
+if (unlikely(!PageSlab(page))) {
+BUG_ON(!PageCompound(page));
+...
+
+on a custom 3.14.x kernel. I haven't looked into this myself, but at 
+least two people think that the kmalloc/kfree is correct with the 
+request_firmware()/release_firmware() usage in the driver.
+
+Best regards
+
+Dirk
