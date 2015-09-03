@@ -1,27 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Sep 2015 16:18:54 +0100
-Subject: [PATCH] ARM: dts: Add ddc i2c reference to veyron
-In-Reply-To: <CAL_JsqL838-somj-o2QtxRA9bXon5dHijx22v0mVowqyhKgoUQ@mail.gmail.com>
-References: <1441229148-12095-1-git-send-email-dianders@chromium.org>
- <CAL_JsqLLPCy6OpsP4NNjUA6+UxeTC-zGjGPPU+MLhUqFXSSGJQ@mail.gmail.com>
- <20150903082210.GU21084@n2100.arm.linux.org.uk>
- <CAL_JsqL838-somj-o2QtxRA9bXon5dHijx22v0mVowqyhKgoUQ@mail.gmail.com>
-Message-ID: <20150903151854.GA21084@n2100.arm.linux.org.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu,  3 Sep 2015 08:20:58 -0700
+Subject: [PATCH] cpufreq: Add ARM_MT8173_CPUFREQ dependencyon THERMAL
+Message-ID: <1441293658-18199-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 03, 2015 at 09:46:38AM -0500, Rob Herring wrote:
-> Yes, that is fairly common (ADV75xx is same), and we would not
-> describe an I2C bus in DT in that case. Same with HPD directly handled
-> vs. a GPIO line. That is no different than what Doug has said:
-> ddc-i2c-bus is present if using the SOC's I2C host and absent if using
-> the HDMI block's DDC functionality. I'm only questioning the location
-> of the property.
+If ARM_MT8173_CPUFREQ is configured, and THERMAL is configured as module,
+the following build error is seen for arm:allmodconfig and
+arm64:allmodconfig.
 
-No, I don't think that's what Doug wants.  Doug wants the bridge's
-internal I2C host to be exposed, so he can number it through a DT
-alias.
+drivers/built-in.o: In function `mtk_cpufreq_ready':
+:(.text+0x32a20c): undefined reference to `of_cpufreq_cooling_register'
+drivers/built-in.o: In function `mtk_cpufreq_exit':
+:(.text+0x32a420): undefined reference to `cpufreq_cooling_unregister'
 
+The fix is similar to CPUFREQ_DT, but more restrictive since
+ARM_MT8173_CPUFREQ can not be built as module.
+
+Fixes: 1453863fb02a ("cpufreq: mediatek: Add MT8173 cpufreq driver")
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+It might also make sense to declare ARM_MT8173_CPUFREQ as tristate
+and relax the conditions, but I don't know if that is feasible.
+
+ drivers/cpufreq/Kconfig.arm | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 77aa34eae92c..c4c6200be435 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -133,6 +133,7 @@ config ARM_KIRKWOOD_CPUFREQ
+ config ARM_MT8173_CPUFREQ
+ 	bool "Mediatek MT8173 CPUFreq support"
+ 	depends on ARCH_MEDIATEK && REGULATOR
++	depends on !CPU_THERMAL || THERMAL=y
+ 	select PM_OPP
+ 	help
+ 	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
