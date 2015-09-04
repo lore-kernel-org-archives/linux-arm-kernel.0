@@ -1,51 +1,48 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 4 Sep 2015 22:52:40 +0300
-Subject: [RFC PATCH] arm64: cpuinfo: reduce cache contention on
- update_{feature}_support
-In-Reply-To: <55E9C999.1090503@arm.com>
-References: <1441382651-12058-1-git-send-email-ynorov@caviumnetworks.com>
- <55E9C999.1090503@arm.com>
-Message-ID: <20150904195240.GA14679@yury-N73SV>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 4 Sep 2015 13:00:11 -0700
+Subject: [PATCH 8/9] drm: bridge/dw_hdmi: replace CTS calculation for the
+ ACR
+In-Reply-To: <E1ZO6hm-0003Ni-E0@rmk-PC.arm.linux.org.uk>
+References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
+ <E1ZO6hm-0003Ni-E0@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAD=FV=X6Qhuw6DF7HFqQ-uMMC1TRRNYoPZs=aUhqs9q--gEO3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 04, 2015 at 05:40:57PM +0100, Suzuki K. Poulose wrote:
-> On 04/09/15 17:04, Yury Norov wrote:
-> >This patch is on top of https://lkml.org/lkml/2015/9/2/413
-> >
-> >In master, there's only a single function -
-> >	update_mixed_endian_el0_support
-> >And similar function is on review mentioned above.
-> >
-> >The algorithm for them is like this:
-> >  - there's system-wide boolean marker for the feature that is
-> >    initially enabled;
-> >  - there's also updater for the feature that may disable it
-> >    system-widely if feature is not supported on current CPU.
-> >  - updater is called for each CPU on bootup.
-> >
-> >The problem is the way updater does its work. On each CPU, it
-> >unconditionally updates system-wide marker. For multi-core
-> >system it makes CPU issue invalidate message for a cache
-> >line containing marker. This invalidate increases cache
-> >contention for nothing, because there's a single marker reset
-> >that is really needed, and the others are useless.
-> >
-> >If the number of system-wide markers of this sort will grow,
-> >it may become a trouble on large-scale SOCs. The fix is trivial,
-> >though: do system-wide marker update conditionally, and preserve
-> >corresponding cache line in shared state for all update() calls,
-> >except, probably, one.
-> 
-> As I have mentioned already, this patch (and the per feature functions)
-> won't be needed once we merge my series (which is waiting for the merge
-> window to see the public lights)
-> 
+Russell,
 
-OK. Than waiting for your patchset.
+On Sat, Aug 8, 2015 at 9:10 AM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> Given the TDMS clock, audio sample rate, and the N parameter, we can
+> calculate the CTS value for the audio clock regenerator (ACR) using the
+> following calculation given in the HDMI specification:
+>
+>         CTS = ftdms * N / (128 * fs)
+>
+> The specification says that the CTS value is an average value, which is
+> true if the source hardware measures it.  Where source hardware needs it
+> to be programmed, it is particularly difficult to alternate it between
+> two values correctly to ensure that we achieve a correct "average"
+> fractional value at the sink.
+>
+> Also, there's the problem that our "ftdms" is not a fully accurate
+> value; it is rounded to a kHz value.  This introduces an unnecessary
+> (and harmless) fractional value into the above equation for combinations
+> like 148.5MHz/1.001 for 44100Hz - we still calculate the correct CTS
+> value.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/gpu/drm/bridge/dw_hdmi.c | 92 +++++++---------------------------------
+>  1 file changed, 16 insertions(+), 76 deletions(-)
 
-BR,
-Yury
+If you take my feedback about your "drm: bridge/dw_hdmi: adjust pixel
+clock values in N calculation" patch [1], all this math just works out
+to "cts = pixel_clk / 1000".  ...but doing the math does future proof
+us a bit, so it seems like a good idea.
 
-> Cheers
-> Suzuki
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Tested-by: Douglas Anderson <dianders@chromium.org>
+
+
+[1] https://patchwork.kernel.org/patch/6975221/
