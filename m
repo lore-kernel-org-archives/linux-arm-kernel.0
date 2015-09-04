@@ -1,74 +1,49 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Fri, 04 Sep 2015 15:31:07 +0300
-Subject: [PATCH v3 TRIVIAL] ARM: Enable GICv2m on 32-bit virt machine
-Message-ID: <1441369867-2372-1-git-send-email-p.fedin@samsung.com>
+From: martin@sperl.org (Martin Sperl)
+Date: Fri, 4 Sep 2015 14:35:52 +0200
+Subject: [LINUX RFC v2 1/4] spi: add support of two chip selects & data
+ stripe
+In-Reply-To: <20150903121232.GW12027@sirena.org.uk>
+References: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
+ <1440570367-22569-2-git-send-email-ranjit.waghmode@xilinx.com>
+ <20150903121232.GW12027@sirena.org.uk>
+Message-ID: <E4C1DE94-773C-498F-9CD5-639FBEEE3139@sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-qemu implementation of "virt" includes GICv2m. This commit allows to use
-it also on ARM32 architecture.
 
-msi.h is added because it is required by linux/msi.h
-if CONFIG_GENERIC_MSI_IRQ_DOMAIN is defined. It gets enabled by the
-following KConfig dependency chain:
-ARM_GIC_V2M => PCI_MSI_IRQ_DOMAIN => GENERIC_MSI_IRQ_DOMAIN
+> On 03.09.2015, at 14:12, Mark Brown <broonie@kernel.org> wrote:
+> 
+> On Wed, Aug 26, 2015 at 11:56:04AM +0530, Ranjit Waghmode wrote:
+> 
+>> To support dual parallel mode operation of ZynqMP GQSPI controller
+>> following API's are added inside the core:
+> 
+> As covered in SubmittingPatches please try to make each patch a single
+> change rather than having multiple separate changes in one commit.
+> 
+>> +	/* Controller may support more than one chip.
+>> +	 * This flag will enable that feature.
+>> +	 */
+>> +#define SPI_MASTER_BOTH_CS		BIT(8)		/* enable both chips */
+> 
+> This isn't saying that the controller supports more than one chip, it's
+> saying that the controller supports asserting more than one chip select
+> at once which isn't the same thing.  I'm also not entirely sure that
+> this makes sense as a separate feature to the data striping one - I'm
+> struggling to think of a way to use this sensibly separately to that.
 
-drivers/irqchip/irq-gic-v2m.c: In function ?gicv2m_compose_msi_msg?:
-drivers/irqchip/irq-gic-v2m.c:100:2: warning: right shift count >= width
-of type [enabled by default]
-  msg->address_hi = (u32) (addr >> 32);
-  ^
+Well - there is one use-case that I can think of:
+fbtft has the requirement for some devices to control a GPIO to
+differentiate between command and data getting transferred
+- sort of 9 bit.
 
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
----
-v2 => v3:
-Fixed build warning in irq-gic-v2m.c
+Right now it is done outside of spi in the fbtft driver itself wrapping
+spi_sync().
 
-v1 => v2:
-Added verbose explanation in commit message
----
- arch/arm/Kconfig              | 1 +
- arch/arm/include/asm/Kbuild   | 1 +
- drivers/irqchip/irq-gic-v2m.c | 2 ++
- 3 files changed, 4 insertions(+)
+Similarly a ?hold? line on an eeprom or similar could get (de)asserted
+without requiring holding a spi-bus-lock.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 45df48b..1091025 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -815,6 +815,7 @@ config ARCH_VIRT
- 	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
- 	select ARM_AMBA
- 	select ARM_GIC
-+	select ARM_GIC_V2M if PCI_MSI
- 	select ARM_PSCI
- 	select HAVE_ARM_ARCH_TIMER
- 
-diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-index 3c4596d..01806f5 100644
---- a/arch/arm/include/asm/Kbuild
-+++ b/arch/arm/include/asm/Kbuild
-@@ -14,6 +14,7 @@ generic-y += local.h
- generic-y += local64.h
- generic-y += mcs_spinlock.h
- generic-y += msgbuf.h
-+generic-y += msi.h
- generic-y += param.h
- generic-y += parport.h
- generic-y += poll.h
-diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-index fdf7065..f76fc9a 100644
---- a/drivers/irqchip/irq-gic-v2m.c
-+++ b/drivers/irqchip/irq-gic-v2m.c
-@@ -97,7 +97,9 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
- 	struct v2m_data *v2m = irq_data_get_irq_chip_data(data);
- 	phys_addr_t addr = v2m->res.start + V2M_MSI_SETSPI_NS;
- 
-+#ifdef CONFIG_ARM64
- 	msg->address_hi = (u32) (addr >> 32);
-+#endif
- 	msg->address_lo = (u32) (addr);
- 	msg->data = data->hwirq;
- }
--- 
-2.4.4
+But then the current patch would not allow this kind of ?generic?
+use-case.
+
+Martin
