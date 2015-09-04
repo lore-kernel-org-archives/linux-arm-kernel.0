@@ -1,52 +1,22 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Fri, 4 Sep 2015 14:00:02 +0530
-Subject: [PATCH 5/5] ARM: dts: AM4372: add entry for qspi mmap region
-In-Reply-To: <1441355402-6837-1-git-send-email-vigneshr@ti.com>
-References: <1441355402-6837-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1441355402-6837-6-git-send-email-vigneshr@ti.com>
+From: dawei.chien@mediatek.com (Dawei Chien)
+Date: Fri, 4 Sep 2015 17:01:47 +0800
+Subject: thermal: mediatek: Add cpu power cooling model
+Message-ID: <1441357309-61669-1-git-send-email-dawei.chien@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add qspi memory mapped region entries for AM43xx based SoCs. Also,
-update the binding documents for the controller to document this change.
+Use Intelligent Power Allocation (IPA) technical to add
+static/dynamic power model for binding CPU thermal zone.
+The power allocator governor allocates power budget to control
+CPU temperature.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- Documentation/devicetree/bindings/spi/ti_qspi.txt | 5 +++--
- arch/arm/boot/dts/am4372.dtsi                     | 4 +++-
- 2 files changed, 6 insertions(+), 3 deletions(-)
+Dawei.Chien (2):
+  thermal: mediatek: Add cpu power cooling model.
+  arm64: dts: mt8173: Add thermal zone node for mt8173.
 
-diff --git a/Documentation/devicetree/bindings/spi/ti_qspi.txt b/Documentation/devicetree/bindings/spi/ti_qspi.txt
-index f05dd631bef1..05488970060b 100644
---- a/Documentation/devicetree/bindings/spi/ti_qspi.txt
-+++ b/Documentation/devicetree/bindings/spi/ti_qspi.txt
-@@ -17,9 +17,10 @@ Recommended properties:
- 
- Example:
- 
-+For am4372:
- qspi: qspi at 4b300000 {
--	compatible = "ti,dra7xxx-qspi";
--	reg = <0x47900000 0x100>, <0x30000000 0x3ffffff>;
-+	compatible = "ti,am4372-qspi";
-+	reg = <0x47900000 0x100>, <0x30000000 0x4000000>;
- 	reg-names = "qspi_base", "qspi_mmap";
- 	#address-cells = <1>;
- 	#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index ade28c790f4b..52cf4846b8e1 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -902,7 +902,9 @@
- 
- 		qspi: qspi at 47900000 {
- 			compatible = "ti,am4372-qspi";
--			reg = <0x47900000 0x100>;
-+			reg = <0x47900000 0x100>,
-+			      <0x30000000 0x4000000>;
-+			reg-names = "qspi_base", "qspi_mmap";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "qspi";
--- 
-2.5.1
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   44 ++++++++++++++
+ drivers/cpufreq/mt8173-cpufreq.c         |   97 ++++++++++++++++++++++++++----
+ 2 files changed, 130 insertions(+), 11 deletions(-)
+
+--
+1.7.9.5
