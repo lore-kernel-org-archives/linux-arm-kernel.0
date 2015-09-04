@@ -1,43 +1,83 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Fri,  4 Sep 2015 14:23:07 +0000
-Subject: [RFC PATCH 3/3] arm64: Reduce kernel stack size when using IRQ stack
-In-Reply-To: <1441376587-12979-1-git-send-email-jungseoklee85@gmail.com>
-References: <1441376587-12979-1-git-send-email-jungseoklee85@gmail.com>
-Message-ID: <1441376587-12979-4-git-send-email-jungseoklee85@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 4 Sep 2015 15:23:26 +0100
+Subject: Cortex A9 MP: ARM errata 754323 implementation?
+In-Reply-To: <55E9A412.8030806@gmail.com>
+References: <55E7F965.8080802@de.bosch.com>
+ <20150903080502.GT21084@n2100.arm.linux.org.uk>
+ <55E80449.9040308@de.bosch.com>
+ <20150903172947.GG5019@e104818-lin.cambridge.arm.com>
+ <55E9A412.8030806@gmail.com>
+Message-ID: <20150904142325.GG17253@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is a principal objective of IRQ stack feature to reduce kernel
-stack size. Therefore, the size is set to 8KB when a separate IRQ
-stack is active.
+On Fri, Sep 04, 2015 at 04:00:50PM +0200, Dirk Behme wrote:
+> On 03.09.2015 19:29, Catalin Marinas wrote:
+> >On Thu, Sep 03, 2015 at 10:26:49AM +0200, Dirk Behme wrote:
+> >>On 03.09.2015 10:05, Russell King - ARM Linux wrote:
+> >>>On Thu, Sep 03, 2015 at 09:40:21AM +0200, Dirk Behme wrote:
+> >>>>looking through the ARM Cortex A9 errata list [1] I wonder why we don't have
+> >>>>a workaround for
+> >>>>
+> >>>>(754323) Repeated Store in the same cache line might delay the visibility of
+> >>>>the Store
+> >>>>
+> >>>>in the kernel? Or have I missed it?
+> >>>
+> >>>The policy for errata is not to implement them unless there's a requirement
+> >>>to do so - and then the errata should be implemented in board firmware in
+> >>>preference to the kernel where possible.
+> >>>
+> >>>Are you seeing a problem directly attributable to this errata?
+> >>
+> >>I got a report from some internal testing that an issue they see goes away
+> >>if they enable 754327. I rejected this because i.MX6 is > r2p0 and therefore
+> >>can't be affected by this errata. Looking through the list of erratas I then
+> >>found the related 754323 which seems to apply to i.MX6, but is not
+> >>implemented.
+> >
+> >These errata are usually harmless, in most cases it prevents the system
+> >from making progress (like flag update not visible while being polled by
+> >another CPU), hence the workaround makes cpu_relax() a barrier since
+> >most polling loops should use it.
+> >
+> >>The issue we are talking about is
+> >>
+> >>Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
+> >>PC is at kfree+0x10c/0x238
+> >>LR is at release_firmware+0x5c/0x70
+> >>
+> >>which is said to be triggered by this code
+> >>
+> >>void kfree(const void *x)
+> >>...
+> >>page = virt_to_head_page(x);
+> >>if (unlikely(!PageSlab(page))) {
+> >>BUG_ON(!PageCompound(page));
+> >>...
+> >>
+> >>on a custom 3.14.x kernel. I haven't looked into this myself, but at least
+> >>two people think that the kmalloc/kfree is correct with the
+> >>request_firmware()/release_firmware() usage in the driver.
+> >
+> >I don't see how the erratum above would trigger a BUG. It's possible
+> >that there are some memory ordering issues (and A9 has some read after
+> >read bugs) that are hidden when enabling the barrier in cpu_relax().
+> 
+> Do you have anything specific in mind we could try? Besides enabling 754327?
 
-Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
----
- arch/arm64/include/asm/thread_info.h | 8 ++++++++
- 1 file changed, 8 insertions(+)
+You may hit erratum 761319. There is a more detailed explanation here:
 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 5345a67..e79210d 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -24,10 +24,18 @@
- #include <linux/compiler.h>
- 
- #ifndef CONFIG_ARM64_64K_PAGES
-+#ifdef CONFIG_IRQ_STACK
-+#define THREAD_SIZE_ORDER	1
-+#else
- #define THREAD_SIZE_ORDER	2
- #endif
-+#endif
- 
-+#ifdef CONFIG_IRQ_STACK
-+#define THREAD_SIZE		8192
-+#else
- #define THREAD_SIZE		16384
-+#endif
- #define THREAD_START_SP		(THREAD_SIZE - 16)
- 
- #ifndef __ASSEMBLY__
+http://infocenter.arm.com/help/topic/com.arm.doc.uan0004a/UAN0004A_a9_read_read.pdf
+
+But there isn't much we can do in the kernel, other than recompiling it
+with a gcc that can work around the erratum. Searching for this erratum
+number and gcc seems to show some patches adding
+-mfix-cortex-a9-volatile-hazards but I can't tell when/whether they've
+been merged in gcc.
+
+For this specific case, you could place a DMB (smp_mb) before BUG_ON to
+see if this hunk is causing the problem.
+
 -- 
-1.9.1
+Catalin
