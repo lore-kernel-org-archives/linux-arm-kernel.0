@@ -1,85 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 04 Sep 2015 13:51:34 +0100
-Subject: [PATCH v3 TRIVIAL] ARM: Enable GICv2m on 32-bit virt machine
-In-Reply-To: <1441369867-2372-1-git-send-email-p.fedin@samsung.com>
-References: <1441369867-2372-1-git-send-email-p.fedin@samsung.com>
-Message-ID: <55E993D6.9050107@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 4 Sep 2015 14:26:05 +0100
+Subject: arm_coherent_dma_alloc
+In-Reply-To: <DM2PR0301MB070161BE05943337F62EA5218C680@DM2PR0301MB0701.namprd03.prod.outlook.com>
+References: <DM2PR0301MB070161BE05943337F62EA5218C680@DM2PR0301MB0701.namprd03.prod.outlook.com>
+Message-ID: <20150904132604.GD17253@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/15 13:31, Pavel Fedin wrote:
-> qemu implementation of "virt" includes GICv2m. This commit allows to use
-> it also on ARM32 architecture.
+On Thu, Sep 03, 2015 at 04:50:56AM +0000, Aggrwal Poonam wrote:
+> I am looking at the ?file: "arch/arm/mm/dma-mapping.c"
 > 
-> msi.h is added because it is required by linux/msi.h
-> if CONFIG_GENERIC_MSI_IRQ_DOMAIN is defined. It gets enabled by the
-> following KConfig dependency chain:
-> ARM_GIC_V2M => PCI_MSI_IRQ_DOMAIN => GENERIC_MSI_IRQ_DOMAIN
+> static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+> ??????? dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
+> {
+> ? ??????pgprot_t prot = __get_dma_pgprot(attrs, pgprot_kernel);
+> ??????? void *memory;
 > 
-> drivers/irqchip/irq-gic-v2m.c: In function ?gicv2m_compose_msi_msg?:
-> drivers/irqchip/irq-gic-v2m.c:100:2: warning: right shift count >= width
-> of type [enabled by default]
->   msg->address_hi = (u32) (addr >> 32);
->   ^
+> ??????? if (dma_alloc_from_coherent(dev, size, handle, &memory))
+> ??????????????? return memory;
 > 
-> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
-> ---
-> v2 => v3:
-> Fixed build warning in irq-gic-v2m.c
+> ??????? return __dma_alloc(dev, size, handle, gfp, prot, true,
+> ?????????? ????????????????__builtin_return_address(0));
+> }
 > 
-> v1 => v2:
-> Added verbose explanation in commit message
-> ---
->  arch/arm/Kconfig              | 1 +
->  arch/arm/include/asm/Kbuild   | 1 +
->  drivers/irqchip/irq-gic-v2m.c | 2 ++
->  3 files changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 45df48b..1091025 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -815,6 +815,7 @@ config ARCH_VIRT
->  	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
->  	select ARM_AMBA
->  	select ARM_GIC
-> +	select ARM_GIC_V2M if PCI_MSI
->  	select ARM_PSCI
->  	select HAVE_ARM_ARCH_TIMER
->  
-> diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-> index 3c4596d..01806f5 100644
-> --- a/arch/arm/include/asm/Kbuild
-> +++ b/arch/arm/include/asm/Kbuild
-> @@ -14,6 +14,7 @@ generic-y += local.h
->  generic-y += local64.h
->  generic-y += mcs_spinlock.h
->  generic-y += msgbuf.h
-> +generic-y += msi.h
->  generic-y += param.h
->  generic-y += parport.h
->  generic-y += poll.h
-> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-> index fdf7065..f76fc9a 100644
-> --- a/drivers/irqchip/irq-gic-v2m.c
-> +++ b/drivers/irqchip/irq-gic-v2m.c
-> @@ -97,7 +97,9 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
->  	struct v2m_data *v2m = irq_data_get_irq_chip_data(data);
->  	phys_addr_t addr = v2m->res.start + V2M_MSI_SETSPI_NS;
->  
-> +#ifdef CONFIG_ARM64
->  	msg->address_hi = (u32) (addr >> 32);
-> +#endif
->  	msg->address_lo = (u32) (addr);
->  	msg->data = data->hwirq;
->  }
-> 
+> I want to understand the attributes of ?memory allocated using
+> __dma_alloc, in terms of cacheable.
 
-Please use the upper_32_bits/lower_32_bits macros that will avoid this
-ugly #ifdef. This should be a separate patch.
+If is_coherent == true (for __dma_alloc), the attributes are Normal
+Cacheable (the case above).
 
-Thanks,
+If __dma_alloc() is called with is_coherent == false, the attributes are
+given by __get_dma_pgprot() and they would be Normal Non-cacheable.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
