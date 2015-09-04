@@ -1,52 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 04 Sep 2015 18:14:08 +0100
-Subject: [PATCH v4 TRIVIAL 2/2] ARM: Fix GICv2m build warning on 32 bits
-In-Reply-To: <1935621cb5eb23d740e8e49c1ab15dddcc14511c.1441373056.git.p.fedin@samsung.com>
-References: <cover.1441373056.git.p.fedin@samsung.com>
- <1935621cb5eb23d740e8e49c1ab15dddcc14511c.1441373056.git.p.fedin@samsung.com>
-Message-ID: <55E9D160.3090709@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 04 Sep 2015 19:46:04 +0200
+Subject: Porting MIPS IRQ handler to ARM
+In-Reply-To: <yw1x8u8mxht2.fsf@unicorn.mansr.com>
+References: <55E5CED8.7000408@free.fr>
+ <55E5D945.3040504@gmail.com>	<55E722F2.50905@free.fr>
+ <yw1xy4goyc3z.fsf@unicorn.mansr.com>	<55E73971.8030406@free.fr>
+ <55E9C33A.2080801@free.fr> <yw1x8u8mxht2.fsf@unicorn.mansr.com>
+Message-ID: <55E9D8DC.6090201@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/15 14:29, Pavel Fedin wrote:
-> After GICv2m was enabled for 32-bit ARM kernel, a warning popped up:
-> 
-> drivers/irqchip/irq-gic-v2m.c: In function ?gicv2m_compose_msi_msg?:
-> drivers/irqchip/irq-gic-v2m.c:100:2: warning: right shift count >= width
-> of type [enabled by default]
->   msg->address_hi = (u32) (addr >> 32);
->   ^
-> 
-> This patch fixes it by using proper macros for splitting up the value.
-> 
-> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
-> ---
->  drivers/irqchip/irq-gic-v2m.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-> index fdf7065..9055b02 100644
-> --- a/drivers/irqchip/irq-gic-v2m.c
-> +++ b/drivers/irqchip/irq-gic-v2m.c
-> @@ -97,8 +97,8 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
->  	struct v2m_data *v2m = irq_data_get_irq_chip_data(data);
->  	phys_addr_t addr = v2m->res.start + V2M_MSI_SETSPI_NS;
->  
-> -	msg->address_hi = (u32) (addr >> 32);
-> -	msg->address_lo = (u32) (addr);
-> +	msg->address_hi = upper_32_bits(addr);
-> +	msg->address_lo = lower_32_bits(addr);
->  	msg->data = data->hwirq;
->  }
->  
-> 
+On 04/09/2015 18:36, M?ns Rullg?rd wrote:
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Mason wrote:
+> 
+>> There's just too much DT syntax that flies light-years over my head.
+>> #address-cells, #size-cells, #interrupt-cells, ranges, aliases, etc.
+>> Basically, all I understand is /dts-v1/;
+>> (Anyone have links to good tutorials?)
+>>
+>> I've attached the current version I'm playing with (I tried to make it
+>> as small as possible). If some charitable soul spots an obvious problem...
+>> (Commented blocks have been tested uncommented, of course.)
+> 
+> What happens when you try to boot with this device tree?
 
-I'll add that to my queue of GIC fixes.
+It panics in tangox_irq_init IIRC.
 
-Thanks,
+> Are you sure these addresses are correct?  Those are the values from
+> tango3.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+AFAIU, that HW block hasn't changed in a long time, but I'll
+double-check to be sure.
+
+>> 			interrupt-parent = <&gic>;
+>> 			interrupt-controller;
+>> 			#address-cells = <1>;
+>> 			#size-cells = <1>;
+>>
+>> 			irqintc: irq at 000 {
+>> 				reg = <0x000 0x100>;
+>> 				interrupt-controller;
+>> 				#interrupt-cells = <2>;
+>> 				interrupts = <2>;
+> 
+> This "interrupts" specification is wrong for a source wired into the
+> GIC.  For the correct format, see the binding spec in
+> Documentation/devicetree/bindings/arm/gic.txt:
+
+Doooh! I'd read that document (about 12 times) but for some
+reason, it never occurred to me that I had to follow the
+syntax for the intc (although that seems obvious now that
+you mention it).
+
+I suspect you've nailed my problem. Wish I could test right
+away, but it'll have to wait after the weekend.
+
+Thanks (again).
+
+Regards.
