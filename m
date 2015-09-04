@@ -1,29 +1,37 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 4 Sep 2015 15:35:47 -0500
-Subject: [PATCH v2 0/8] SMEM/SMD/SMD_RPM big endian support + tidying
-In-Reply-To: <1441234011-4259-1-git-send-email-sboyd@codeaurora.org>
-References: <1441234011-4259-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150904203547.GB31824@qualcomm.com>
+From: joel@porquet.org (Joel Porquet)
+Date: Fri, 04 Sep 2015 16:54:21 -0400
+Subject: [PATCH] arm:irqchip: IRQCHIP_DECLARE macro is now accessible
+In-Reply-To: <20150713152035.GD26642@tiger>
+References: <1436299411-12329-1-git-send-email-joel@porquet.org>
+ <20150713152035.GD26642@tiger>
+Message-ID: <7212409.q6uiaM0l3x@joel-zenbook>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2015 at 03:46:43PM -0700, Stephen Boyd wrote:
-> This supersedes the 3 "series" of patches to move smem to big endian,
-> smd to big endian, and make qcom_smem_get() return a pointer.
+On Monday, July 13, 2015 11:20:35 PM Shawn Guo wrote:
+> On Tue, Jul 07, 2015 at 04:02:53PM -0400, Joel Porquet wrote:
+> > The IRQCHIP_DECLARE macro migrated to 'include/linux/irqchip.h', making it
+> > globally accessible.
+> > 
+> > See commit 91e20b5040c67c51aad88cf87db4305c5bd7f79d
+> > ("irqchip: Move IRQCHIP_DECLARE macro to include/linux/irqchip.h").
+> > 
+> > This patch adds inclusions of 'include/linux/irqchip.h' and replaces uses
+> > of macro OF_DECLARE_2 with IRQCHIP_DECLARE.
+> > 
+> > Signed-off-by: Joel Porquet <joel@porquet.org>
+> > ---
 > 
-> I've moved the qcom_smem_get() returning a pointer part to the beginning
-> of the series so it can be applied earlier if desired. I imagine the
-> first 7 patches can go through arm-soc, and the last patch Mark can pick
-> up anytime. All patches tested on apq8074 dragonboard.
+> ...
 > 
-> I've already written the patches to add __ioread32_copy(), but I'm
-> holding them until -rc1 drops because I'd rather not involve even
-> more people in this series just yet.
+> >  arch/arm/mach-imx/gpc.c              | 7 ++-----
 > 
+> Acked-by: Shawn Guo <shawnguo@kernel.org>
+> 
+> How will this patch be sent to upstream?
 
-All of these look fine to me.
+If it's more convenient for the different maintainers affected by this patch, 
+I can probably resubmit it into a series of patches that modify each file 
+separately... Let me know quickly so we don't miss the merge window!
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Jo?l
