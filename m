@@ -1,54 +1,58 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 4 Sep 2015 13:00:38 +0300
-Subject: [PATCH] gpio: omap: Fix GPIO numbering for deferred probe
-In-Reply-To: <1441301487-6238-1-git-send-email-tony@atomide.com>
-References: <1441301487-6238-1-git-send-email-tony@atomide.com>
-Message-ID: <55E96BC6.1040003@ti.com>
+From: treding@nvidia.com (Thierry Reding)
+Date: Fri, 4 Sep 2015 12:01:48 +0200
+Subject: [PATCH v4 14/16] drm: bridge: analogix/dp: try force hpd after
+ plug in lookup failed
+In-Reply-To: <CAL_Jsq+F=eE6vU3f-bHrrSCD9GCoh80Nf-5=Qm73QgGDW1Np=w@mail.gmail.com>
+References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
+ <1441088079-25809-1-git-send-email-ykk@rock-chips.com>
+ <CAL_JsqJDALnjVaVoEqGGsSLeE31m3MKOfbSoZ3M+g+zPZR2MFg@mail.gmail.com>
+ <20150903084735.GB3784@ulmo.nvidia.com>
+ <CAL_Jsq+F=eE6vU3f-bHrrSCD9GCoh80Nf-5=Qm73QgGDW1Np=w@mail.gmail.com>
+Message-ID: <20150904100147.GE22056@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2015 08:31 PM, Tony Lindgren wrote:
-> If gpio-omap probe fails with -EPROBE_DEFER, the GPIO numbering
-> keeps increasing. Only increase the gpio count if gpiochip_add()
-> was successful as otherwise the numbers will increase for each
-> probe attempt.
->
-> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->   drivers/gpio/gpio-omap.c | 4 +++-
->   1 file changed, 3 insertions(+), 1 deletion(-)
->
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1095,7 +1095,6 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
->   	} else {
->   		bank->chip.label = "gpio";
->   		bank->chip.base = gpio;
-> -		gpio += bank->width;
->   	}
->   	bank->chip.ngpio = bank->width;
->
-> @@ -1105,6 +1104,9 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
->   		return ret;
->   	}
->
-> +	if (!bank->is_mpuio)
-> +		gpio += bank->width;
-> +
->   #ifdef CONFIG_ARCH_OMAP1
->   	/*
->   	 * REVISIT: Once we have OMAP1 supporting SPARSE_IRQ, we can drop
->
+On Thu, Sep 03, 2015 at 04:55:59PM -0500, Rob Herring wrote:
+> On Thu, Sep 3, 2015 at 3:47 AM, Thierry Reding <treding@nvidia.com> wrote:
+> > On Wed, Sep 02, 2015 at 03:17:57PM -0500, Rob Herring wrote:
+> > [...]
+> >> Are there any eDP panels which don't have EDID and need panel details in DT?
+> >
+> > Most panels need information other than EDID. They typically have some
+> > requirements regarding the power up sequence that aren't to be found
+> > anywhere in EDID or detectable by some other mechanism. A decision was
+> > therefore made a long time ago to require panels to be listed in DT with
+> > a specific compatible string. That way all of these details can be
+> > stashed away in drivers that know how to deal with these kinds of
+> > details.
+> 
+> I guess I was being hopeful that eDP was improving that situation.
 
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Unfortunately not. eDP helps with a number of things (DPCD and link
+training take care of a lot of the issues), but it doesn't provide a
+solution for everything.
 
-With hope that only GPIO0 will be deferred, otherwise
-there will be total mess in gpios enumeration ;)
+To my knowledge in most cases the power up sequence isn't strictly
+necessary to get the panel to operate. But there have been instances
+where this is absolutely required if you want to avoid visual artifacts
+as you set a mode. A lot of panels that I've come across require
+receiving a couple of frames before they guarantee that something will
+actually be displayed on the screen. So if your code is too quickly
+enabling backlight, and your backlight doesn't happen to have just the
+right amount of ramp-up time you might end up seeing garbage on the
+screen for a couple of frames.
 
--- 
-regards,
--grygorii
+It would be great if somebody came up with, say, an EDID extension to
+describe these requirements, but I'm not sure if even that would give
+us panels that could be driven with a generic driver. Often the power
+supplies or reset/enable signals are very different across panels. So
+describing it all generically would become messy rather quickly.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150904/46733cc4/attachment.sig>
