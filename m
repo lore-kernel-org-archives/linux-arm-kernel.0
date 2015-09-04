@@ -1,39 +1,161 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Sat, 5 Sep 2015 00:46:37 +0300
-Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
-In-Reply-To: <Pine.LNX.4.44L0.1509041443360.29995-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1509041443360.29995-100000@iolanthe.rowland.org>
-Message-ID: <55EA113D.9000806@ti.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 4 Sep 2015 17:46:39 -0400
+Subject: [PATCH v1 2/2] ARM: dts: keystone: enable accumulator channels
+In-Reply-To: <1441403199-10936-1-git-send-email-m-karicheri2@ti.com>
+References: <1441403199-10936-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1441403199-10936-2-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2015 09:45 PM, Alan Stern wrote:
-> On Fri, 4 Sep 2015, Grygorii Strashko wrote:
-> 
->> There is one "small" problem with such approach :(
->>
->> - It's incompatible with -RT kernel, because PM runtime can't be used
->> in atomic context on -RT.
-> 
-> Can you explain this more fully?  Why can't runtime PM be used in
-> atomic context in the -rt kernels?
->  
+Add low priority accumulator channel that can monitor multiple QMSS
+queues. User for example could use the accumular queue for Netcp
+Rx completion. While at it, also add an extra line end of each top
+level node in DTS to make it more readable.
 
-See:
- http://lwn.net/Articles/146861/
- https://rt.wiki.kernel.org/index.php/Frequently_Asked_Questions#How_does_the_CONFIG_PREEMPT_RT_patch_work.3F
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ v1  - No change from initial version
+ arch/arm/boot/dts/k2e-netcp.dtsi  | 24 ++++++++++++++++++++++++
+ arch/arm/boot/dts/k2hk-netcp.dtsi | 25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/k2l-netcp.dtsi  | 24 ++++++++++++++++++++++++
+ 3 files changed, 73 insertions(+)
 
-spinlock_t
-    Critical sections are preemptible. The _irq operations (e.g., spin_lock_irqsave())
- do -not- disable hardware interrupts. Priority inheritance is used to prevent priority
- inversion. An underlying rt_mutex is used to implement spinlock_t in PREEMPT_RT. 
-
-As result, have to do things like:
-https://lkml.org/lkml/2015/8/18/161
-https://lkml.org/lkml/2015/8/18/162
-
-Sorry for brief reply - Friday/Sat night :)
-
+diff --git a/arch/arm/boot/dts/k2e-netcp.dtsi b/arch/arm/boot/dts/k2e-netcp.dtsi
+index b13b3c9..1818929 100644
+--- a/arch/arm/boot/dts/k2e-netcp.dtsi
++++ b/arch/arm/boot/dts/k2e-netcp.dtsi
+@@ -72,7 +72,17 @@ qmss: qmss at 2a40000 {
+ 				qalloc-by-id;
+ 			};
+ 		};
++		accumulator {
++			acc-low-0 {
++				qrange = <480 32>;
++				accumulator = <0 47 16 2 50>;
++				interrupts = <0 226 0xf01>;
++				multi-queue;
++				qalloc-by-id;
++			};
++		};
+ 	};
++
+ 	descriptor-regions {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -83,6 +93,20 @@ qmss: qmss at 2a40000 {
+ 			link-index = <0x4000>;
+ 		};
+ 	};
++
++	pdsps {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		pdsp0 at 0x2a10000 {
++			firmware = "ks2_qmss_pdsp_acc48_k2_le_1_0_0_9.bin";
++			reg = <0x2a10000 0x1000    /*iram */
++			       0x2a0f000 0x100     /*reg*/
++			       0x2a0c000 0x3c8	   /*intd */
++			       0x2a20000 0x4000>;  /*cmd*/
++			id = <0>;
++		};
++	};
+ }; /* qmss */
+ 
+ knav_dmas: knav_dmas at 0 {
+diff --git a/arch/arm/boot/dts/k2hk-netcp.dtsi b/arch/arm/boot/dts/k2hk-netcp.dtsi
+index 77a32c3..b9941b4 100644
+--- a/arch/arm/boot/dts/k2hk-netcp.dtsi
++++ b/arch/arm/boot/dts/k2hk-netcp.dtsi
+@@ -47,6 +47,7 @@ qmss: qmss at 2a40000 {
+ 				    "region", "push", "pop";
+ 		};
+ 	};
++
+ 	queue-pools {
+ 		qpend {
+ 			qpend-0 {
+@@ -88,7 +89,17 @@ qmss: qmss at 2a40000 {
+ 				qalloc-by-id;
+ 			};
+ 		};
++		accumulator {
++			acc-low-0 {
++				qrange = <480 32>;
++				accumulator = <0 47 16 2 50>;
++				interrupts = <0 226 0xf01>;
++				multi-queue;
++				qalloc-by-id;
++			};
++		};
+ 	};
++
+ 	descriptor-regions {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -99,6 +110,20 @@ qmss: qmss at 2a40000 {
+ 			link-index = <0x4000>;
+ 		};
+ 	};
++
++	pdsps {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		pdsp0 at 0x2a10000 {
++			firmware = "ks2_qmss_pdsp_acc48_k2_le_1_0_0_9.bin";
++			reg = <0x2a10000 0x1000    /*iram */
++			       0x2a0f000 0x100     /*reg*/
++			       0x2a0c000 0x3c8	   /*intd */
++			       0x2a20000 0x4000>;  /*cmd*/
++			id = <0>;
++		};
++	};
+ }; /* qmss */
+ 
+ knav_dmas: knav_dmas at 0 {
+diff --git a/arch/arm/boot/dts/k2l-netcp.dtsi b/arch/arm/boot/dts/k2l-netcp.dtsi
+index 6b95284..8d7ddb3 100644
+--- a/arch/arm/boot/dts/k2l-netcp.dtsi
++++ b/arch/arm/boot/dts/k2l-netcp.dtsi
+@@ -72,7 +72,16 @@ qmss: qmss at 2a40000 {
+ 				qalloc-by-id;
+ 			};
+ 		};
++		accumulator {
++			acc-low-0 {
++				qrange = <480 32>;
++				accumulator = <0 47 16 2 50>;
++				interrupts = <0 226 0xf01>;
++				multi-queue;
++			};
++		};
+ 	};
++
+ 	descriptor-regions {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -83,6 +92,21 @@ qmss: qmss at 2a40000 {
+ 			link-index = <0x4000>;
+ 		};
+ 	};
++
++	pdsps {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		pdsp0 at 0x2a10000 {
++			firmware = "ks2_qmss_pdsp_acc48_k2_le_1_0_0_9.bin";
++			reg = <0x2a10000 0x1000    /*iram */
++			       0x2a0f000 0x100     /*reg*/
++			       0x2a0c000 0x3c8	   /*intd */
++			       0x2a20000 0x4000>;  /*cmd*/
++			id = <0>;
++		};
++	};
++
+ }; /* qmss */
+ 
+ knav_dmas: knav_dmas at 0 {
 -- 
-regards,
--grygorii
+1.9.1
