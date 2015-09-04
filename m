@@ -1,85 +1,35 @@
-From: dawei.chien@mediatek.com (Dawei Chien)
-Date: Fri, 4 Sep 2015 17:01:49 +0800
-Subject: [PATCH 2/2] arm64: dts: mt8173: Add thermal zone node for mt8173.
-In-Reply-To: <1441357309-61669-1-git-send-email-dawei.chien@mediatek.com>
-References: <1441357309-61669-1-git-send-email-dawei.chien@mediatek.com>
-Message-ID: <1441357309-61669-3-git-send-email-dawei.chien@mediatek.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Sep 2015 10:17:35 +0100
+Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
+In-Reply-To: <1441310314-8857-8-git-send-email-lina.iyer@linaro.org>
+References: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
+ <1441310314-8857-8-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20150904091735.GC21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add thermal zone node to mt8173.dtsi.
+On Thu, Sep 03, 2015 at 01:58:34PM -0600, Lina Iyer wrote:
+> @@ -401,6 +412,11 @@ asmlinkage void secondary_start_kernel(void)
+>  	local_irq_enable();
+>  	local_fiq_enable();
+>  
+> +	/* We are running, enable runtime PM for the CPU. */
+> +	cpu_dev = get_cpu_device(cpu);
+> +	if (cpu_dev)
+> +		pm_runtime_get_sync(cpu_dev);
+> +
 
-Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
----
-This patch is base on following patches
-https://patchwork.kernel.org/patch/6969581/
-https://patchwork.kernel.org/patch/6969571/
-https://patchwork.kernel.org/patch/6969381/
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |   44 ++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+Please no.  This is fragile.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 208051a..6493bfd 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -17,6 +17,7 @@
- #include <dt-bindings/power/mt8173-power.h>
- #include <dt-bindings/reset-controller/mt8173-resets.h>
- #include "mt8173-pinfunc.h"
-+#include <dt-bindings/thermal/thermal.h>
- 
- / {
- 	compatible = "mediatek,mt8173";
-@@ -116,6 +117,49 @@
- 		clock-output-names = "clk32k";
- 	};
- 
-+	thermal-zones {
-+		cpu_thermal: cpu_thermal {
-+			polling-delay-passive = <1000>; /* milliseconds */
-+			polling-delay = <1000>; /* milliseconds */
-+
-+			thermal-sensors = <&thermal MT8173_THERMAL_ZONE_CA57>;
-+			sustainable-power = <1500>;
-+
-+			trips {
-+				threshold: trip-point at 0 {
-+					temperature = <68000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				target: trip-point at 1 {
-+					temperature = <85000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_crit: cpu_crit at 0 {
-+					temperature = <115000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				map at 0 {
-+					trip = <&target>;
-+					cooling-device = <&cpu0 0 0>;
-+					contribution = <1024>;
-+				};
-+				map at 1 {
-+					trip = <&target>;
-+					cooling-device = <&cpu2 0 0>;
-+					contribution = <2048>;
-+				};
-+			};
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupt-parent = <&gic>;
+pm_runtime_get_sync() can sleep, and this path is used when the system
+is fully up and running.  Locks may be held, which cause this to sleep.
+However, we're calling it from a context where we can't sleep - which
+is the general rule for any part of system initialisation where we
+have not entered the idle thread yet (the idle thread is what we run
+when sleeping.)
+
+NAK on this.
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
