@@ -1,39 +1,32 @@
 From: jwboyer@fedoraproject.org (Josh Boyer)
-Date: Fri, 4 Sep 2015 08:49:34 -0400
-Subject: [PATCH RESEND] ARM: dts: Fix Makefile target for
+Date: Fri, 4 Sep 2015 08:50:40 -0400
+Subject: [PATCH] ARM: dts: Fix Makefile target for
  sun4i-a10-itead-iteaduino-plus
-Message-ID: <20150904124934.GD464@hansolo.redhat.com>
+In-Reply-To: <20150903215729.GH31584@lukather>
+References: <20150902201812.GC464@hansolo.redhat.com>
+ <20150903215729.GH31584@lukather>
+Message-ID: <CA+5PVA5L1Q3h4N-0q8EnQFSi9YE0N0j8m0q5-PquJAzGVyuGOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 79ae3e66f8d (ARM: dts: sun4i: Add Iteaduino Plus A10) added a new
-make target for the sun4i-a10-itead-iteaduino-plus dts file, but mistakenly
-used .dts instead of the correct .dtb suffix.  This resulted in a build error
-like:
+On Thu, Sep 3, 2015 at 5:57 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Josh
+>
+> On Wed, Sep 02, 2015 at 04:18:12PM -0400, Josh Boyer wrote:
+>> linux-kernel at vger.kernel.org
+>> Bcc:
+>> Subject: [PATCH] ARM: dts: Fix Makefile target for sun4i-a10-itead-iteaduino-plus
+>> Reply-To:
+>
+> Hmmm, something went wrong with your mail header.
 
-        scripts/Makefile.dtbinst:42: target 'sun4i-a10-itead-iteaduino-plus.dts' doesn't match the target pattern
+Well, that's embarrassing.  I've resent it.
 
-when doing a make dtbs_install.
+>> ommit 79ae3e66f8d (ARM: dts: sun4i: Add Iteaduino Plus A10) added a new
+>
+> Missing opening "C"
 
-Fix it to use the proper file name.
+Fixed in the resend.  Thanks for looking it over.
 
-Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
----
- arch/arm/boot/dts/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 233159d2eaab..bb8fa023d574 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -578,7 +578,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
- 	sun4i-a10-hackberry.dtb \
- 	sun4i-a10-hyundai-a7hd.dtb \
- 	sun4i-a10-inet97fv2.dtb \
--	sun4i-a10-itead-iteaduino-plus.dts \
-+	sun4i-a10-itead-iteaduino-plus.dtb \
- 	sun4i-a10-jesurun-q5.dtb \
- 	sun4i-a10-marsboard.dtb \
- 	sun4i-a10-mini-xplus.dtb \
--- 
-2.4.3
+josh
