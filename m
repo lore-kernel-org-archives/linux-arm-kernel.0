@@ -1,50 +1,50 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 4 Sep 2015 16:33:26 +0530
-Subject: [PATCH 0/4] omap: Fix broken address translation for pbias
-In-Reply-To: <20150903151005.GU4215@atomide.com>
-References: <1441279673-28105-1-git-send-email-kishon@ti.com>
- <20150903151005.GU4215@atomide.com>
-Message-ID: <55E97A7E.8010308@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 4 Sep 2015 12:06:52 +0100
+Subject: earlycon issues in -next with amba-pl011 updates
+In-Reply-To: <55E87095.4030600@arm.com>
+References: <20150810232312.GB10728@bivouac.eciton.net>
+ <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
+ <55E81F93.1020104@arm.com> <20150903155255.GA28336@kroah.com>
+ <55E87095.4030600@arm.com>
+Message-ID: <20150904110651.GE4818@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Thursday 03 September 2015 08:40 PM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [150903 04:31]:
->> pbias device stopped having memory resource after
->> "ARM: dts: <platform>: add minimal l4 bus layout with control module
->> support" got merged. This results in platform_get_resource returning
->> -EINVAL in pbias driver. This is because address translation fails
->> while trying to convert the address to resource which happens
->> during the device creation process during boot up.
->>
->> Even though after [1], reg property in pbias dt node is un-used,
->> it might be an issue if we plan to use it at a later point of time.
->>
->> Patch series is created on top of [1].
->>
->> [1] -> https://lkml.org/lkml/2015/9/3/51
->>
->> Verified the address in omap4 panda, omap5 uevm and dra72 boards.
+On Thu, Sep 03, 2015 at 05:08:53PM +0100, Marc Zyngier wrote:
+> On 03/09/15 16:52, Greg Kroah-Hartman wrote:
+> > On Thu, Sep 03, 2015 at 11:23:15AM +0100, Marc Zyngier wrote:
+> >> So -next has now been broken for a while on a number of ARM platforms
+> >> because of this (they simply cannot boot), and no progress has been made
+> >> towards resolving this problem.
+> >>
+> >> Can we please drop this series (at least commits 7b753f3 and following)
+> >> from -next until is has been reworked and reviewed?
+> > 
+> > I don't have any patches in my -next tree, everything is in Linus's tree
+> > now.  So if I've missed something, or need to revert something, please
+> > let me know specifcally what to do.
 > 
-> Your other series is obviously needed for v4.3.. But seems these
-> are also needed for stable? If so, which versions, v4.2+?
-
-Both the series are needed from v4.1+. However since the 'reg' property
-is not going to be used, I'm not sure if this series has to be marked
-for stable.
+> Gahhh... Given that there is no obvious fix, that the discussion has
+> stalled and that the author of the series is apparently away, the
+> following patches should be reverted:
 > 
-> Can you please just do a single patch with multiple Fixes tags
-> as they fix regression for multiple commits? Doing tons of one
-> liner patches for the same thing just creates commit log noise..
-
-Sure.
+> 8cd90e50d140 uart: pl011: Add support to ZTE ZX296702 uart
+> 09dcc7dfc05b uart: pl011: Improve LCRH register access decision
+> 2c096a9eedc6 uart: pl011: Introduce register look up table
+> 7b753f318d14 uart: pl011: Introduce register accessor
+> 534e14e2293d uart: pl011: Rename regs with enumeration
 > 
-> Remember to not Cc stable when posting, I'll add that tag when
-> committing if needed.
+> (7b753f318d14 being the one breaking everything, but it makes more sense
+> to revert the whole series until it is properly fixed and reviewed).
 
-Sure.
+For the reverts (git revert 534e14e2293d~1..8cd90e50d140):
 
-Thanks
-Kishon
+  Acked-by: Will Deacon <will.deacon@arm.com>
+  Tested-by: Will Deacon <will.deacon@arm.com>
+
+We can discuss what could've and should've happened 'til we're blue in
+the face but, in the meantime, I'd like my serial console back.
+
+Greg -- any chance you could send these for -rc1, please?
+
+Will
