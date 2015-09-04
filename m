@@ -1,59 +1,75 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri, 4 Sep 2015 11:50:23 +0530
-Subject: [PATCHv7] ARM: exynos_defconfig: Enable LEDS for Odroid-XU3/XU4
-In-Reply-To: <55E8E534.1040204@osg.samsung.com>
-References: <1441303910-3266-1-git-send-email-linux.amoon@gmail.com>
- <55E8DDDD.80106@samsung.com> <55E8E534.1040204@osg.samsung.com>
-Message-ID: <CANAwSgQOijKEyhvM=DU4nRdGK6v5cxJUZ54pnnG2YqjeT9pBxA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 04 Sep 2015 15:42:50 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Make S3C2410_WATCHDOG as loadable
+ module
+In-Reply-To: <CANAwSgQwC3-Z364ZcGRbKCzQbNi_RYB_3cDRT0ZsxhhprW9mxQ@mail.gmail.com>
+References: <1441253429-3264-1-git-send-email-linux.amoon@gmail.com>
+ <55E7D478.2020200@samsung.com>
+ <CANAwSgQwC3-Z364ZcGRbKCzQbNi_RYB_3cDRT0ZsxhhprW9mxQ@mail.gmail.com>
+Message-ID: <55E93D6A.8030301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
-
-On 4 September 2015 at 05:56, Javier Martinez Canillas
-<javier@osg.samsung.com> wrote:
-> Hello Krzysztof,
->
-> On 09/04/2015 01:55 AM, Krzysztof Kozlowski wrote:
->> On 04.09.2015 03:11, Anand Moon wrote:
->>> Earlier design of the LED for Odroid XU3 was using gpio-leds
->>> Now It was change to using both pwm-leds and gpio-leds.
+On 03.09.2015 14:20, Anand Moon wrote:
+> Hi Krzysztof
+> 
+> On 3 September 2015 at 10:32, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+>> On 03.09.2015 13:10, Anand Moon wrote:
+>>> S3C2410_WATCHDOG watchdog drivers should not be loaded automatically,
+>>> but only if a watchdog daemon is installed.
 >>
->> It is still not a reason for this change. gpio-leds were not enabled
->> before. This could be a valid reason of adding LEDS_PWM to existing
->> config LEDS_GPIO. But LEDS_GPIO were not enabled... so why the change on
->> the board from gpio->(gpio+pwm) means that we have to enable LEDS_GPIO?
+>> First of all: why?
 >>
->
-> Agreed, also the commit message doesn't explain why the heartbeat
-> LED trigger is enabled as I mentioned in the previous version.
->
->> Actually I gave up on this and I wanted to change the commit message on
->> myself when applying. But discussion was brought up again so... clearly
->> we have different understanding of the meaning of "WHY". :)
+>> Secondly: even as a module driver could be loaded automatically to match
+>> enabled device (it has MODULE_DEVICE_TABLE). In the same time loading it
+>> does not hurt - watchdog should be inactive:
+>>
+>> s3c2410-wdt 10060000.watchdog: watchdog inactive, reset disabled, irq
+>> disabled
 >>
 >> Best regards,
 >> Krzysztof
 >>
+>>>
+>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>> ---
+>>>  arch/arm/configs/exynos_defconfig | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+>>> index aaf7aa4..b5d382e 100644
+>>> --- a/arch/arm/configs/exynos_defconfig
+>>> +++ b/arch/arm/configs/exynos_defconfig
+>>> @@ -101,7 +101,7 @@ CONFIG_CPU_THERMAL=y
+>>>  CONFIG_THERMAL_EMULATION=y
+>>>  CONFIG_EXYNOS_THERMAL=y
+>>>  CONFIG_WATCHDOG=y
+>>> -CONFIG_S3C2410_WATCHDOG=y
+>>> +CONFIG_S3C2410_WATCHDOG=m
+>>>  CONFIG_MFD_CROS_EC=y
+>>>  CONFIG_MFD_CROS_EC_I2C=y
+>>>  CONFIG_MFD_CROS_EC_SPI=y
+>>>
+> 
+> All the watchdog drivers are blacklisted not to be loaded by the ubuntu.
+> Their are some configurable parameters which get configured while
+> loading of the module using watchdog daemon.
+> Watchdog service will reconfigure watchdog driver while loading.
 
-Just of the records. I you agree with following commit message I will
-resend the patch.
-------------------------------------------------------
-Exynos boards support GPIO and PWM based LEDs
+Thank you for clarification. First of all such information (that Ubuntu
+requires it) should be put in commit message.
 
-Odroid boards support led activity to indicate the various status
-Red led - power: hooked up to 5V power
-Blue led - alive Solid light : u-boot is running
-               flashing : Kernel is running (heart beat)
--------------------------------------------------------
-If you want to add some thing more please suggest me.
+This looks like a requirement specific for Ubuntu. For example on Arch
+these modules are not blacklisted. I don't know how this is handled on
+Debian or Fedora.
 
-Earlier I was just frustrated.
+Other defconfigs (including multi_v7) make these modules built-in.
 
--Anand Moon
+Summarizing I am not convinced that the change is necessary. Having
+everything built-in makes testing exynos defconfig easier because some
+you just upload zImage and DTB to the testing board. With modules you
+have to prepare the initramfs/initrd (e.g. for network boot).
 
-> Best regards,
-> --
-> Javier Martinez Canillas
-> Open Source Group
-> Samsung Research America
+Best regards,
+Krzysztof
