@@ -1,19 +1,39 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 4 Sep 2015 14:45:29 -0400 (EDT)
-Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
-In-Reply-To: <55E9DB76.3080904@ti.com>
-Message-ID: <Pine.LNX.4.44L0.1509041443360.29995-100000@iolanthe.rowland.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 4 Sep 2015 12:01:40 -0700
+Subject: [PATCH] cpufreq: Add ARM_MT8173_CPUFREQ dependencyon THERMAL
+In-Reply-To: <20150903155029.GB5332@linux>
+References: <1441293658-18199-1-git-send-email-linux@roeck-us.net>
+ <20150903155029.GB5332@linux>
+Message-ID: <CAOesGMgcSjNdRCe6i994F=unLLXG3-JJeiV-mLBnOHfbUd0DDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Sep 2015, Grygorii Strashko wrote:
+On Thu, Sep 3, 2015 at 8:50 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 03-09-15, 08:20, Guenter Roeck wrote:
+>> If ARM_MT8173_CPUFREQ is configured, and THERMAL is configured as module,
+>> the following build error is seen for arm:allmodconfig and
+>> arm64:allmodconfig.
+>>
+>> drivers/built-in.o: In function `mtk_cpufreq_ready':
+>> :(.text+0x32a20c): undefined reference to `of_cpufreq_cooling_register'
+>> drivers/built-in.o: In function `mtk_cpufreq_exit':
+>> :(.text+0x32a420): undefined reference to `cpufreq_cooling_unregister'
+>>
+>> The fix is similar to CPUFREQ_DT, but more restrictive since
+>> ARM_MT8173_CPUFREQ can not be built as module.
+>>
+>> Fixes: 1453863fb02a ("cpufreq: mediatek: Add MT8173 cpufreq driver")
+>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+>> ---
+>> It might also make sense to declare ARM_MT8173_CPUFREQ as tristate
+>> and relax the conditions, but I don't know if that is feasible.
+>>
+>>  drivers/cpufreq/Kconfig.arm | 1 +
+>>  1 file changed, 1 insertion(+)
+>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-> There is one "small" problem with such approach :(
-> 
-> - It's incompatible with -RT kernel, because PM runtime can't be used
-> in atomic context on -RT.
+Who's applying and sending this up to avoid extended period of build breakage?
 
-Can you explain this more fully?  Why can't runtime PM be used in 
-atomic context in the -rt kernels?
 
-Alan Stern
+-Olof
