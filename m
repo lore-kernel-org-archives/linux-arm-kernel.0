@@ -1,38 +1,50 @@
 From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
-Date: Fri, 4 Sep 2015 20:16:42 +0000
-Subject: [PATCH v2 03/10] Documentation/dts: Add bindings for QIXIS FPGA
- controller found on FSL boards
-In-Reply-To: <CADRPPNR11BD4WfXTWoQ28rZCd_BJuhdWu49E6jjpO29CH2s5Ow@mail.gmail.com>
+Date: Fri, 4 Sep 2015 20:20:03 +0000
+Subject: [PATCH v2 04/10] doc/bindings: Update PCIe devicetree binding
+ documentation for LS2080A
+In-Reply-To: <CADRPPNRGpzWawsqLHCiv530HbtPf+9RaPzOtvy88ftwv2ffqLQ@mail.gmail.com>
 References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
- <1441349872-4560-4-git-send-email-bhupesh.sharma@freescale.com>
- <CADRPPNR11BD4WfXTWoQ28rZCd_BJuhdWu49E6jjpO29CH2s5Ow@mail.gmail.com>
-Message-ID: <BY1PR0301MB1303E56B5462BCD0C77C7E4D82570@BY1PR0301MB1303.namprd03.prod.outlook.com>
+ <1441349872-4560-5-git-send-email-bhupesh.sharma@freescale.com>
+ <CADRPPNRGpzWawsqLHCiv530HbtPf+9RaPzOtvy88ftwv2ffqLQ@mail.gmail.com>
+Message-ID: <BY1PR0301MB13037F8BC0A8E1E4258F58DE82570@BY1PR0301MB1303.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: pku.leo at gmail.com [mailto:pku.leo at gmail.com]
-> Sent: Friday, September 04, 2015 10:27 PM
+> From: Leo Li [mailto:pku.leo at gmail.com]
+> Sent: Friday, September 04, 2015 11:27 PM
 > On Fri, Sep 4, 2015 at 1:57 AM, Bhupesh Sharma
 > <bhupesh.sharma@freescale.com> wrote:
-> > This patch adds bindings for QIXIS FPGA controller found on FSL boards.
-> 
-> A general comment: when you are updating the device tree bindings.
-> You should cc the devicetree at vger.kernel.org mailing list.
-> 
+> > Add the documentation for compatible string "fsl,ls2080a-pcie"
+> > for Freescale's LS2080A platform.
 > >
-> > Some Freescale boards like LS2080AQDS/LS2080ARDB have an on-board
-> > FPGA/CPLD connected to the IFC controller. The bindings specified in
-> > this patch cater to those on-board FPGA/CPLD controllers.
+> > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> > Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> > ---
+> >  .../devicetree/bindings/pci/layerscape-pci.txt     |    3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > index 6286f04..e72e68f 100644
+> > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis
+> > Designware PCIe IP  and thus inherits all the common properties defined
+> in designware-pcie.txt.
+> >
+> >  Required properties:
+> > -- compatible: should contain the platform identifier such as
+> "fsl,ls1021a-pcie"
+> > +- compatible: should contain the platform identifier such as
+> > +"fsl,ls1021a-pcie",
+> > +  "fsl,ls2080a-pcie".
 > 
-> We already have the binding defined in
-> Documentation/devicetree/bindings/powerpc/fsl/board.txt.  We probably
-> should just move it to a more generic location.
+> Make it generic like "fsl,<chip>-pcie"
 
-Consolidation of powerpc and ARM bindings is something that needs to be
-targeted by a separate patch-series, perhaps in future.
+Minghuan, if you don't have an objection, I would like to address Leo's suggestion
+in v3 of this series as I think it is a valid one.
 
-There are a number of duplications that can be looked into, but I don't
-think this patchset should depend on that.
+Please share your views. 
 
 Regards,
 Bhupesh
