@@ -1,63 +1,33 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 4 Sep 2015 16:47:19 +0200
-Subject: [PATCH 2/2] arm/arm64: KVM: arch timer: Reset CNTV_CTL to 0
-In-Reply-To: <1441376679-8341-3-git-send-email-christoffer.dall@linaro.org>
-References: <1441376679-8341-1-git-send-email-christoffer.dall@linaro.org>
- <1441376679-8341-3-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20150904144719.GJ5171@cbox>
+Date: Fri, 4 Sep 2015 16:50:23 +0200
+Subject: [PATCH 1/9] KVM: Add kvm_arch_vcpu_{un}blocking callbacks
+In-Reply-To: <55E9A190.10602@linaro.org>
+References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
+ <1440942866-23802-2-git-send-email-christoffer.dall@linaro.org>
+ <55E9A190.10602@linaro.org>
+Message-ID: <20150904145023.GK5171@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 04, 2015 at 04:24:39PM +0200, Christoffer Dall wrote:
-> Provide a better quality of implementation and be architecture compliant
-> on ARMv7 for the architected timer by resetting the CNTV_CTL to 0 on
-> reset of the timer, and call kvm_timer_update_state(vcpu) at the same
-> time, ensuring the timer output is not asserted after, for example, a
-> PSCI system reset.
+On Fri, Sep 04, 2015 at 03:50:08PM +0200, Eric Auger wrote:
+> Hi Christoffer,
+> On 08/30/2015 03:54 PM, Christoffer Dall wrote:
+> > Some times it is useful for architecture implementations of KVM to know
+> > when the VCPU thread is about to block or when it comes back from
+> > blocking (arm/arm64 needs to know this to properly implement timers, for
+> > example).
+> what about vcpu_sleep()? Is that callback specific to kvm_vcpu_block
+> function entry/exit points or is it more generic? The question also
+> applies to future halt/resume functions
+> 
+For ARM, This should be called when we're about to block in a situation
+where timer interrupts could affect our sleep state, which would not be
+the case for vcpu_sleep, which unconditionally puts the vcpu to sleep
+based on other conditions.
 
-forgot to remove the bit about kvm_timer_update_state(vcpu) which is no
-longer valid when these patches are merged before the rework series.
-
-Marc, if you're otherwise happy with this patch, can you fix this up at
-commit time?
+I believe that any case where you care about incoming interrupts are
+covered by the semantics of kvm_vcpu_block, and therefore these hooks
+should only be called by kvm_vcpu_block.
 
 Thanks,
 -Christoffer
-
-> 
-> This change alone fixes the UEFI reset issue reported by Laszlo back in
-> February.
-> 
-> Cc: Laszlo Ersek <lersek@redhat.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Drew Jones <drjones@redhat.com>
-> Cc: Wei Huang <wei@redhat.com>
-> Cc: Peter Maydell <peter.maydell@linaro.org>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/arch_timer.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 76e38d2..48c6e1a 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -200,6 +200,14 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->  	timer->irq = irq;
->  
->  	/*
-> +	 * The bits in CNTV_CTL are architecturally reset to UNKNOWN for ARMv8
-> +	 * and to 0 for ARMv7.  We provide an implementation that always
-> +	 * resets the timer to be disabled and unmasked and is compliant with
-> +	 * the ARMv7 architecture.
-> +	 */
-> +	timer->cntv_ctl = 0;
-> +
-> +	/*
->  	 * Tell the VGIC that the virtual interrupt is tied to a
->  	 * physical interrupt. We do that once per VCPU.
->  	 */
-> -- 
-> 2.1.2.330.g565301e.dirty
-> 
