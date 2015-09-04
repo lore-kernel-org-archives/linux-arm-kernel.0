@@ -1,37 +1,69 @@
-From: joel@porquet.org (Joel Porquet)
-Date: Fri, 04 Sep 2015 16:54:21 -0400
-Subject: [PATCH] arm:irqchip: IRQCHIP_DECLARE macro is now accessible
-In-Reply-To: <20150713152035.GD26642@tiger>
-References: <1436299411-12329-1-git-send-email-joel@porquet.org>
- <20150713152035.GD26642@tiger>
-Message-ID: <7212409.q6uiaM0l3x@joel-zenbook>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 4 Sep 2015 17:00:05 -0400
+Subject: [PATCH 1/2] soc: ti: display firmware file name as part of boot log
+Message-ID: <1441400405-13229-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 13, 2015 11:20:35 PM Shawn Guo wrote:
-> On Tue, Jul 07, 2015 at 04:02:53PM -0400, Joel Porquet wrote:
-> > The IRQCHIP_DECLARE macro migrated to 'include/linux/irqchip.h', making it
-> > globally accessible.
-> > 
-> > See commit 91e20b5040c67c51aad88cf87db4305c5bd7f79d
-> > ("irqchip: Move IRQCHIP_DECLARE macro to include/linux/irqchip.h").
-> > 
-> > This patch adds inclusions of 'include/linux/irqchip.h' and replaces uses
-> > of macro OF_DECLARE_2 with IRQCHIP_DECLARE.
-> > 
-> > Signed-off-by: Joel Porquet <joel@porquet.org>
-> > ---
-> 
-> ...
-> 
-> >  arch/arm/mach-imx/gpc.c              | 7 ++-----
-> 
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
-> 
-> How will this patch be sent to upstream?
+To help the user, print the PDSP file name as part of
+knav_queue_load_pdsp(). This will be useful for users to know what
+version of the firmware is loaded to PDSP. Also update the
+document for the location of the QMSS accumulator PDSP firmware.
 
-If it's more convenient for the different maintainers affected by this patch, 
-I can probably resubmit it into a series of patches that modify each file 
-separately... Let me know quickly so we don't miss the merge window!
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ .../bindings/soc/ti/keystone-navigator-qmss.txt      | 20 +++++++++++++++++++-
+ drivers/soc/ti/knav_qmss_queue.c                     |  3 +++
+ 2 files changed, 22 insertions(+), 1 deletion(-)
 
-Jo?l
+diff --git a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+index d8e8cdb..a91ee0b 100644
+--- a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
++++ b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+@@ -221,7 +221,7 @@ qmss: qmss at 2a40000 {
+ 		#size-cells = <1>;
+ 		ranges;
+ 		pdsp0 at 0x2a10000 {
+-			firmware = "keystone/qmss_pdsp_acc48_k2_le_1_0_0_8.fw";
++			firmware = "k2_qmss_pdsp_acc48_k2_le_1_0_0_9.bin";
+ 			reg = <0x2a10000 0x1000>,
+ 			      <0x2a0f000 0x100>,
+ 			      <0x2a0c000 0x3c8>,
+@@ -230,3 +230,21 @@ qmss: qmss at 2a40000 {
+ 		};
+ 	};
+ }; /* qmss */
++
++Accumulator QMSS Channel using PDSP firmware
++============================================
++The QMSS PDSP firmware support accumulator channel that can monitor a single
++queue or multiple contiguous queues. drivers/soc/ti/knav_qmss_acc.c is the
++driver that interface with the accumulator PDSP. This configures
++accumulator channels defined in DTS (example above) to monitor 1 or 32 queues
++per channel. More description on the firmware is available in CPPI/QMSS Low
++Level Driver document (docs/CPPI_QMSS_LLD_SDS.pdf) at
++	git://git.ti.com/keystone-rtos/qmss-lld.git
++
++k2_qmss_pdsp_acc48_k2_le_1_0_0_9.fw firmware supports upto 48 accumulator
++channels. This firmware is available under firmware folder of the above repo
++under the name acc48_le.bin. To use copy the firmware image to lib/firmware
++folder of the initramfs or ubifs file system as
++k2_qmss_pdsp_acc48_k2_le_1_0_0_9.fw and boot up the kernel. User would see
++"firmware file ks2_qmss_pdsp_acc48_k2_le_1_0_0_9.bin downloaded for PDSP" in
++the boot up log if loading of firmware to PDSP is successful.
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index 6d8646d..f26ce99 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -1526,6 +1526,9 @@ static int knav_queue_load_pdsp(struct knav_device *kdev,
+ 			pdsp->firmware, pdsp->name);
+ 		return ret;
+ 	}
++	dev_info(kdev->dev, "firmware file %s downloaded for PDSP\n",
++		 pdsp->firmware);
++
+ 	writel_relaxed(pdsp->id + 1, pdsp->command + 0x18);
+ 	/* download the firmware */
+ 	fwdata = (u32 *)fw->data;
+-- 
+1.9.1
