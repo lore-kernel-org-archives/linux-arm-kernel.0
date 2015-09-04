@@ -1,62 +1,27 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri, 4 Sep 2015 14:15:36 +0200
-Subject: [PATCH] ARM: ux500: fix typo in regulator names
-In-Reply-To: <CAPDyKFqRz1QyfWXzcDde0J9Fc7gTZWQOFGNzU=2cg1JnMyrL+g@mail.gmail.com>
-References: <1438777340-27511-1-git-send-email-tomeu.vizoso@collabora.com>
- <CAPDyKFqRz1QyfWXzcDde0J9Fc7gTZWQOFGNzU=2cg1JnMyrL+g@mail.gmail.com>
-Message-ID: <CAAObsKBK-EFCxufr3C=bLRd6G=U9OUwigXYZ=roD8YG=jK7Aug@mail.gmail.com>
+From: kuleshovmail@gmail.com (Alexander Kuleshov)
+Date: Fri, 4 Sep 2015 18:19:22 +0600
+Subject: [PATCH 1/3] arm64/cpufeature.h: Add macros for a cpu features
+ testing
+In-Reply-To: <55E987CA.4090302@arm.com>
+References: <1441303911-9421-1-git-send-email-kuleshovmail@gmail.com>
+ <55E987CA.4090302@arm.com>
+Message-ID: <CANCZXo4rtkVr-m3p1kyavS6Ruu7Gbwp-qqR9BhEtiZ39+NahvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 September 2015 at 13:48, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 5 August 2015 at 14:22, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
->> Apparently an extra _reg suffix was appended to the end of the names of
->> regulators ab8500_ext2_reg and ab8500_ext3_reg.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+2015-09-04 18:00 GMT+06:00 Suzuki K. Poulose <Suzuki.Poulose@arm.com>:
+> There is generic CPUID feature helper queued for 4.3, which can extract
+> the feature bits
 >
-> You should probably include Linus Walleij as he is the maintainer of ux500.
-
-Thanks, maybe the file should be added to MAINTAINERS?
-
-Regards,
-
-Tomeu
-
-> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+>  cpuid_feature_extract_field(feature, shift)
 >
->> ---
->>  arch/arm/boot/dts/ste-snowball.dts | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
->> index 32a5ccb14e7e..07c0e346942c 100644
->> --- a/arch/arm/boot/dts/ste-snowball.dts
->> +++ b/arch/arm/boot/dts/ste-snowball.dts
->> @@ -360,11 +360,11 @@
->>                                                 regulator-name = "ab8500-ext-supply1";
->>                                         };
->>
->> -                                       ab8500_ext2_reg_reg: ab8500_ext2 {
->> +                                       ab8500_ext2_reg: ab8500_ext2 {
->>                                                 regulator-name = "ab8500-ext-supply2";
->>                                         };
->>
->> -                                       ab8500_ext3_reg_reg: ab8500_ext3 {
->> +                                       ab8500_ext3_reg: ab8500_ext3 {
->>                                                 regulator-name = "ab8500-ext-supply3";
->>                                         };
->>                                 };
->> --
->> 2.4.3
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> You might want to use it instead. Btw, I have a patch series(waiting for
+> the merge window, before I post), which changes the way we initialise the
+> HWCAP bits.
+
+Hello,
+
+Thanks for feedback first of all. So, I'll wait while your changes will be
+in the mainline kernel and will reconsider the changes.
+
+Thank you.
