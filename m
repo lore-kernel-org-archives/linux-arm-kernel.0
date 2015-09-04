@@ -1,75 +1,41 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 04 Sep 2015 15:42:50 +0900
-Subject: [PATCH] ARM: exynos_defconfig: Make S3C2410_WATCHDOG as loadable
- module
-In-Reply-To: <CANAwSgQwC3-Z364ZcGRbKCzQbNi_RYB_3cDRT0ZsxhhprW9mxQ@mail.gmail.com>
-References: <1441253429-3264-1-git-send-email-linux.amoon@gmail.com>
- <55E7D478.2020200@samsung.com>
- <CANAwSgQwC3-Z364ZcGRbKCzQbNi_RYB_3cDRT0ZsxhhprW9mxQ@mail.gmail.com>
-Message-ID: <55E93D6A.8030301@samsung.com>
+From: oliver+list@schinagl.nl (Olliver Schinagl)
+Date: Fri, 04 Sep 2015 08:43:24 +0200
+Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in host-only
+ mode
+In-Reply-To: <55C47041.3000603@schinagl.nl>
+References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
+ <55C31963.2010701@schinagl.nl> <55C3709C.4080609@redhat.com>
+ <55C47041.3000603@schinagl.nl>
+Message-ID: <55E93D8C.9020804@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.09.2015 14:20, Anand Moon wrote:
-> Hi Krzysztof
-> 
-> On 3 September 2015 at 10:32, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
->> On 03.09.2015 13:10, Anand Moon wrote:
->>> S3C2410_WATCHDOG watchdog drivers should not be loaded automatically,
->>> but only if a watchdog daemon is installed.
->>
->> First of all: why?
->>
->> Secondly: even as a module driver could be loaded automatically to match
->> enabled device (it has MODULE_DEVICE_TABLE). In the same time loading it
->> does not hurt - watchdog should be inactive:
->>
->> s3c2410-wdt 10060000.watchdog: watchdog inactive, reset disabled, irq
->> disabled
->>
->> Best regards,
->> Krzysztof
->>
->>>
->>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->>> ---
->>>  arch/arm/configs/exynos_defconfig | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
->>> index aaf7aa4..b5d382e 100644
->>> --- a/arch/arm/configs/exynos_defconfig
->>> +++ b/arch/arm/configs/exynos_defconfig
->>> @@ -101,7 +101,7 @@ CONFIG_CPU_THERMAL=y
->>>  CONFIG_THERMAL_EMULATION=y
->>>  CONFIG_EXYNOS_THERMAL=y
->>>  CONFIG_WATCHDOG=y
->>> -CONFIG_S3C2410_WATCHDOG=y
->>> +CONFIG_S3C2410_WATCHDOG=m
->>>  CONFIG_MFD_CROS_EC=y
->>>  CONFIG_MFD_CROS_EC_I2C=y
->>>  CONFIG_MFD_CROS_EC_SPI=y
->>>
-> 
-> All the watchdog drivers are blacklisted not to be loaded by the ubuntu.
-> Their are some configurable parameters which get configured while
-> loading of the module using watchdog daemon.
-> Watchdog service will reconfigure watchdog driver while loading.
+Hey Hans,
 
-Thank you for clarification. First of all such information (that Ubuntu
-requires it) should be put in commit message.
+On 07-08-15 10:45, Olliver Schinagl wrote:
+> <snip>
+>> If you change the dr_mode to host then you _must_ also remove any 
+>> id_det and vbus_det
+>> gpio settings from the usb_phy node in the dts, as the sun4i phy code 
+>> detects
+>> host vs otg mode by checking for the presence of these.
+> Yes, this fixes it and makes it work. Thanks.
+>
+I've been going back to this and am wondering if this is something I can 
+look into to fix properly? E.g. if the dts sets dr_mode = host, can we 
+simply ignore the pins and treat them as unset?
 
-This looks like a requirement specific for Ubuntu. For example on Arch
-these modules are not blacklisted. I don't know how this is handled on
-Debian or Fedora.
+Reason why I'm asking, the board we are using, the Lime2 has all the 
+stuff required for regular otg mode. The cables however that we connect 
+to the miniusb however do not force host only mode via the id pin, which 
+would have been the preferred way. We use a 'shield' for our lime with 
+various connections and thus have a dts for this shield, which includes 
+the lime2 dts. In the lime2 dts you want the otg pins enabled and set in 
+the generic usbphy section.
 
-Other defconfigs (including multi_v7) make these modules built-in.
+In my overlay, I ideally don't want to unset the pins, but do want to 
+set dr_mode (as i can't force it from userspace can I?). The logical 
+thing in my mind, would be to then just ignore those pins even when set, 
+right?
 
-Summarizing I am not convinced that the change is necessary. Having
-everything built-in makes testing exynos defconfig easier because some
-you just upload zImage and DTB to the testing board. With modules you
-have to prepare the initramfs/initrd (e.g. for network boot).
-
-Best regards,
-Krzysztof
+Olliver
