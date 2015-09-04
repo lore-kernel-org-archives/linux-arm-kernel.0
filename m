@@ -1,43 +1,63 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 4 Sep 2015 12:06:22 -0700
-Subject: [GIT PULL] Mailbox changes for v4.3
-Message-ID: <CABb+yY2b0heDoqGoBCbaE4zdWCTwTNM-A3r7LriKo5g2C+OKVA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 4 Sep 2015 13:52:59 -0500
+Subject: [PATCH v4 0/4] PCI: arm64/powerpc: Fix parsing of linux,
+ pci-probe-only
+In-Reply-To: <1441385411-7624-1-git-send-email-marc.zyngier@arm.com>
+References: <1441385411-7624-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAL_JsqJeZ3HJLvoyyz-WiPZOAXsmP9Q4yhrNeYjvDf8k+p0_9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Sep 4, 2015 at 11:50 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> The pci-host-generic driver parses the linux,pci-probe-only property,
+> and assumes that it will have a boolean parameter.
+>
+> Turns out that the Seattle DTS file has a naked "linux,pci-probe-only"
+> property, which leads to the driver dereferencing some unsuspecting
+> memory location. Nothing really bad happens (we end up reading some
+> other bit of DT, fortunately), but that not a reason to keep it this
+> way. Turns out that the Pseries code (where this code was lifted from)
+> may suffer from the same issue.
+>
+> The first patch introduces a common (and fixed) version of that check
+> that can be used by drivers and architectures that require it. The two
+> following patches change the pci-host-generic driver and the powerpc
+> code to use it.
+>
+> Finally, the bad property is removed from the Seatle DTS, because it
+> is simply not necessary (it actually prevents me from using SR-IOV,
+> which otherwise runs fine without the probe-only thing).
+>
+> This has been tested on the offending Seattle board.
+>
+> * From v3:
+>   - Restrict the property lookup to /chosen (Rob)
+>   - Acked-by on patch #4 from Suravee
+>   - I swear this is the last time I rework these patches! ;-)
+>
+> * From v2:
+>   - Use of_property_read_u32 to safely read the property (Rob)
+>   - Add a log message to indicate when we enable probe-only
+>     (probably quite useful for debugging)
+>
+> * From v1:
+>   - Consolidate the parsing in of_pci.c (Bjorn)
+>
+> Marc Zyngier (4):
+>   of/pci: Add of_pci_check_probe_only to parse "linux,pci-probe-only"
+>   PCI: pci-host-generic: Fix lookup of linux,pci-probe-only property
+>   powerpc: PCI: Fix lookup of linux,pci-probe-only property
+>   arm64: dts: Drop linux,pci-probe-only from the Seattle DTS
+>
+>  arch/arm64/boot/dts/amd/amd-overdrive.dts |  1 -
+>  arch/powerpc/platforms/pseries/setup.c    | 14 ++------------
+>  drivers/of/of_pci.c                       | 28 ++++++++++++++++++++++++++++
+>  drivers/pci/host/pci-host-generic.c       |  9 +--------
+>  include/linux/of_pci.h                    |  3 +++
+>  5 files changed, 34 insertions(+), 21 deletions(-)
 
-The following changes since commit 4e6b6ee253ce58aa156d7f1448d1038679b26783:
+For the series:
 
-  Merge tag 'md/4.2-rc5-fixes' of git://neil.brown.name/md (2015-08-05
-11:02:42 +0200)
+Reviewed-by: Rob Herring <robh@kernel.org>
 
-are available in the git repository at:
-
-
-  http://git.linaro.org/landing-teams/working/fujitsu/integration.git
-mailbox-for-next
-
-for you to fetch changes up to 86e488adaab77a733b01e759bf7bfda054479660:
-
-  mailbox: arm_mhu: reduce txpoll_period from 10ms to 1 ms (2015-08-10
-14:29:44 +0530)
-
-----------------------------------------------------------------
-
-Mainly we move from jiffy based timer to HRTIMER for finer control over
-polling. Then a controller reduces its polling period from 10 to 1ms.
-
-----------------------------------------------------------------
-Krzysztof Kozlowski (1):
-      mailbox: Drop owner assignment from platform_driver
-
-Sudeep Holla (2):
-      mailbox: switch to hrtimer for tx_complete polling
-      mailbox: arm_mhu: reduce txpoll_period from 10ms to 1 ms
-
- drivers/mailbox/arm_mhu.c          |  2 +-
- drivers/mailbox/bcm2835-mailbox.c  |  1 -
- drivers/mailbox/mailbox.c          | 27 +++++++++++++++------------
- include/linux/mailbox_controller.h |  7 ++++---
- 4 files changed, 20 insertions(+), 17 deletions(-)
+Rob
