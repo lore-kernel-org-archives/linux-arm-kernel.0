@@ -1,29 +1,62 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 4 Sep 2015 17:43:15 +0530
-Subject: [RESEND PATCH] ARM: multi_v7_defconfig: Enable PBIAS regulator
-Message-ID: <1441368795-21420-1-git-send-email-kishon@ti.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Fri, 4 Sep 2015 14:15:36 +0200
+Subject: [PATCH] ARM: ux500: fix typo in regulator names
+In-Reply-To: <CAPDyKFqRz1QyfWXzcDde0J9Fc7gTZWQOFGNzU=2cg1JnMyrL+g@mail.gmail.com>
+References: <1438777340-27511-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CAPDyKFqRz1QyfWXzcDde0J9Fc7gTZWQOFGNzU=2cg1JnMyrL+g@mail.gmail.com>
+Message-ID: <CAAObsKBK-EFCxufr3C=bLRd6G=U9OUwigXYZ=roD8YG=jK7Aug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PBIAS regulator is required for MMC module in OMAP2, OMAP3, OMAP4,
-OMAP5 and DRA7 SoCs. Enable it here.
+On 4 September 2015 at 13:48, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 5 August 2015 at 14:22, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+>> Apparently an extra _reg suffix was appended to the end of the names of
+>> regulators ab8500_ext2_reg and ab8500_ext3_reg.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>
+> You should probably include Linus Walleij as he is the maintainer of ux500.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/configs/multi_v7_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+Thanks, maybe the file should be added to MAINTAINERS?
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 5fd8df6..f497c96 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -403,6 +403,7 @@ CONFIG_REGULATOR_MAX8973=y
- CONFIG_REGULATOR_MAX77686=y
- CONFIG_REGULATOR_MAX77693=m
- CONFIG_REGULATOR_PALMAS=y
-+CONFIG_REGULATOR_PBIAS=y
- CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
- CONFIG_REGULATOR_TPS51632=y
--- 
-1.7.9.5
+Regards,
+
+Tomeu
+
+> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+>
+>> ---
+>>  arch/arm/boot/dts/ste-snowball.dts | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+>> index 32a5ccb14e7e..07c0e346942c 100644
+>> --- a/arch/arm/boot/dts/ste-snowball.dts
+>> +++ b/arch/arm/boot/dts/ste-snowball.dts
+>> @@ -360,11 +360,11 @@
+>>                                                 regulator-name = "ab8500-ext-supply1";
+>>                                         };
+>>
+>> -                                       ab8500_ext2_reg_reg: ab8500_ext2 {
+>> +                                       ab8500_ext2_reg: ab8500_ext2 {
+>>                                                 regulator-name = "ab8500-ext-supply2";
+>>                                         };
+>>
+>> -                                       ab8500_ext3_reg_reg: ab8500_ext3 {
+>> +                                       ab8500_ext3_reg: ab8500_ext3 {
+>>                                                 regulator-name = "ab8500-ext-supply3";
+>>                                         };
+>>                                 };
+>> --
+>> 2.4.3
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
