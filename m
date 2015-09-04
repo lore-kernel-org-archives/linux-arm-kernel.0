@@ -1,37 +1,38 @@
-From: martin@sperl.org (Martin Sperl)
-Date: Fri, 4 Sep 2015 17:48:59 +0200
-Subject: [LINUX RFC v2 1/4] spi: add support of two chip selects & data
- stripe
-In-Reply-To: <20150904153718.GO5313@sirena.org.uk>
-References: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
- <1440570367-22569-2-git-send-email-ranjit.waghmode@xilinx.com>
- <20150903121232.GW12027@sirena.org.uk>
- <E4C1DE94-773C-498F-9CD5-639FBEEE3139@sperl.org>
- <20150904153718.GO5313@sirena.org.uk>
-Message-ID: <D536C243-E8B3-492A-87C8-DE1CFF0DD278@sperl.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 4 Sep 2015 17:53:14 +0200
+Subject: [PATCH 0/2] arm/arm64: KVM: Fix arthictected timer issues
+In-Reply-To: <55E9BA38.7030305@arm.com>
+References: <1441376679-8341-1-git-send-email-christoffer.dall@linaro.org>
+ <55E9BA38.7030305@arm.com>
+Message-ID: <20150904155314.GA20138@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Sep 04, 2015 at 04:35:20PM +0100, Marc Zyngier wrote:
+> Hi Christoffer,
+> 
+> On 04/09/15 15:24, Christoffer Dall wrote:
+> > These two patches fix two separate issues with the architected timer and
+> > the corresponding interrupt injection to VMs on KVM/ARM.
+> > 
+> > The first patch fixes an issue introduced with the active timer state
+> > switching series recently merged for v4.3, which could cause a guest to
+> > loop without progress if another VCPU is run on the same physical CPU
+> > and preempts the original VCPU while the guest is running the ISR for
+> > the timer interrupt.
+> > 
+> > The second patch resets the architected timer's control register to zero
+> > on system reset, ensuring that interrupts are not injected when a system
+> > resets.  This fixes a long-standing issue with UEFI, where soft reset
+> > initiated from within UEFI prevented the system from booting again.
+> 
+> Thanks for respinning these patches. I've queued them in our -next
+> queue. I'll send this to Paolo some time next week, once they get some
+> hammering.
+> 
+Awesome, fyi I left these patches running in a loop with reboots and
+running hackbench on 2 simultaneous VMs with 4 vcpus each on X-gene for
+100 iterations, and left the guest and host run cyclictest for ~20
+minutes without issues.
 
-> On 04.09.2015, at 17:37, Mark Brown <broonie@kernel.org> wrote:
-> 
-> On Fri, Sep 04, 2015 at 02:35:52PM +0200, Martin Sperl wrote:
->>> On 03.09.2015, at 14:12, Mark Brown <broonie@kernel.org> wrote:
-> 
->>> This isn't saying that the controller supports more than one chip, it's
->>> saying that the controller supports asserting more than one chip select
->>> at once which isn't the same thing.  I'm also not entirely sure that
->>> this makes sense as a separate feature to the data striping one - I'm
->>> struggling to think of a way to use this sensibly separately to that.
-> 
->> Well - there is one use-case that I can think of:
->> fbtft has the requirement for some devices to control a GPIO to
->> differentiate between command and data getting transferred
->> - sort of 9 bit.
-> 
-> That's another thing again, isn't it?  It's one device switching between
-> two different control interfaces at runtime rather than two devices
-> controlled in lockstep.
-
-I agree, but there may be a solution that can handle both, so I wanted
-to mention it.
+-Christoffer
