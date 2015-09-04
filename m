@@ -1,45 +1,74 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  4 Sep 2015 18:06:51 +0100
-Subject: [PATCH 4/5] clocksource/acpi: Add probing infrastructure for
- ACPI-based clocksources
+Date: Fri,  4 Sep 2015 18:06:52 +0100
+Subject: [PATCH 5/5] clocksource/arm_arch_timer: Convert to ACPI probing
 In-Reply-To: <1441386412-8139-1-git-send-email-marc.zyngier@arm.com>
 References: <1441386412-8139-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1441386412-8139-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1441386412-8139-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT enjoys a rather nice probing infrastructure for clocksources,
-while ACPI is so far stuck into a very distant past.
+It is now absolutely trivial to convert the arch timer driver to
+use ACPI probing, just like its DT counterpart.
 
-This patch introduces a declarative API, allowing clocksources
-to be self-contained and be called when parsing the GTDT table.
+Let's enjoy another crapectomy.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/clksrc-of.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/kernel/time.c             |  6 ------
+ drivers/clocksource/arm_arch_timer.c | 10 +---------
+ include/linux/clocksource.h          |  6 ------
+ 3 files changed, 1 insertion(+), 21 deletions(-)
 
-diff --git a/drivers/clocksource/clksrc-of.c b/drivers/clocksource/clksrc-of.c
-index 0093a8e..b351b1e 100644
---- a/drivers/clocksource/clksrc-of.c
-+++ b/drivers/clocksource/clksrc-of.c
-@@ -14,6 +14,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+index 42f9195..4e56739 100644
+--- a/arch/arm64/kernel/time.c
++++ b/arch/arm64/kernel/time.c
+@@ -73,12 +73,6 @@ void __init time_init(void)
  
-+#include <linux/acpi.h>
- #include <linux/init.h>
- #include <linux/of.h>
- #include <linux/clocksource.h>
-@@ -38,6 +39,9 @@ void __init clocksource_of_init(void)
- 		init_func(np);
- 		clocksources++;
- 	}
-+
-+	clocksources += acpi_probe_device_table(ACPI_SIG_GTDT);
-+
- 	if (!clocksources)
- 		pr_crit("%s: no matching clocksources found\n", __func__);
+ 	tick_setup_hrtimer_broadcast();
+ 
+-	/*
+-	 * Since ACPI or FDT will only one be available in the system,
+-	 * we can use acpi_generic_timer_init() here safely
+-	 */
+-	acpi_generic_timer_init();
+-
+ 	arch_timer_rate = arch_timer_get_rate();
+ 	if (!arch_timer_rate)
+ 		panic("Unable to initialise architected timer.\n");
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 0aa135d..ba4e6f2 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -872,13 +872,5 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ 	arch_timer_init();
+ 	return 0;
  }
+-
+-/* Initialize all the generic timers presented in GTDT */
+-void __init acpi_generic_timer_init(void)
+-{
+-	if (acpi_disabled)
+-		return;
+-
+-	acpi_table_parse(ACPI_SIG_GTDT, arch_timer_acpi_init);
+-}
++DEVICE_ACPI_DECLARE(arch_timer, ACPI_SIG_GTDT, arch_timer_acpi_init);
+ #endif
+diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
+index 278dd27..a25fc6e 100644
+--- a/include/linux/clocksource.h
++++ b/include/linux/clocksource.h
+@@ -252,10 +252,4 @@ extern void clocksource_of_init(void);
+ static inline void clocksource_of_init(void) {}
+ #endif
+ 
+-#ifdef CONFIG_ACPI
+-void acpi_generic_timer_init(void);
+-#else
+-static inline void acpi_generic_timer_init(void) { }
+-#endif
+-
+ #endif /* _LINUX_CLOCKSOURCE_H */
 -- 
 2.1.4
