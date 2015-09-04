@@ -1,146 +1,54 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 4 Sep 2015 15:50:08 +0200
-Subject: [PATCH 1/9] KVM: Add kvm_arch_vcpu_{un}blocking callbacks
-In-Reply-To: <1440942866-23802-2-git-send-email-christoffer.dall@linaro.org>
-References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
- <1440942866-23802-2-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <55E9A190.10602@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 4 Sep 2015 14:58:17 +0100
+Subject: [PATCH 12/14] arm64: Check for selected granule support
+In-Reply-To: <CAKv+Gu-eWRcFQkn_99WF_3H=u8qAAVis60SuegdxyeYK3v5QdQ@mail.gmail.com>
+References: <1439465645-22584-1-git-send-email-suzuki.poulose@arm.com>
+ <1439465645-22584-13-git-send-email-suzuki.poulose@arm.com>
+ <CAPvkgC3=S1BxdzZM4uUOmyXLjii48SMpCof6i6HdNeTG_fydfg@mail.gmail.com>
+ <55CCAD73.7080702@arm.com>
+ <20150813172946.GD4602@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8vfsL+SFqgsXESfYC5a90-rnHbLqVFuOkvDXTt2b1E3Q@mail.gmail.com>
+ <CAKv+Gu-eWRcFQkn_99WF_3H=u8qAAVis60SuegdxyeYK3v5QdQ@mail.gmail.com>
+Message-ID: <20150904135817.GE17253@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-On 08/30/2015 03:54 PM, Christoffer Dall wrote:
-> Some times it is useful for architecture implementations of KVM to know
-> when the VCPU thread is about to block or when it comes back from
-> blocking (arm/arm64 needs to know this to properly implement timers, for
-> example).
-what about vcpu_sleep()? Is that callback specific to kvm_vcpu_block
-function entry/exit points or is it more generic? The question also
-applies to future halt/resume functions
-
-Thanks
-
-Eric
+On Wed, Sep 02, 2015 at 12:19:07PM +0200, Ard Biesheuvel wrote:
+> On 2 September 2015 at 11:48, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > Couldn't we allocate some flag bits in the Image header to communicate
+> > the page size to the bootloader?
 > 
-> Therefore provide a generic architecture callback function in line with
-> what we do elsewhere for KVM generic-arch interactions.
+> Something like this perhaps?
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm/include/asm/kvm_host.h     | 3 +++
->  arch/arm64/include/asm/kvm_host.h   | 3 +++
->  arch/mips/include/asm/kvm_host.h    | 2 ++
->  arch/powerpc/include/asm/kvm_host.h | 2 ++
->  arch/s390/include/asm/kvm_host.h    | 2 ++
->  arch/x86/include/asm/kvm_host.h     | 3 +++
->  include/linux/kvm_host.h            | 2 ++
->  virt/kvm/kvm_main.c                 | 3 +++
->  8 files changed, 20 insertions(+)
+> ------------8<---------------
+> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+> index 7d9d3c2286b2..13a8aaa9a6e9 100644
+> --- a/Documentation/arm64/booting.txt
+> +++ b/Documentation/arm64/booting.txt
+> @@ -104,7 +104,8 @@ Header notes:
+>  - The flags field (introduced in v3.17) is a little-endian 64-bit field
+>    composed as follows:
+>    Bit 0:       Kernel endianness.  1 if BE, 0 if LE.
+> -  Bits 1-63:   Reserved.
+> +  Bits 1-2:    Kernel page size.   0=unspecified, 1=4K, 2=16K, 3=64K
+> +  Bits 3-63:   Reserved.
 > 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index dcba0fa..86fcf6e 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -236,4 +236,7 @@ static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
->  static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
->  static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
->  
-> +static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu) {}
-> +static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu) {}
-> +
->  #endif /* __ARM_KVM_HOST_H__ */
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 415938d..dd143f5 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -257,4 +257,7 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
->  void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
->  void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
->  
-> +static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu) {}
-> +static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu) {}
-> +
->  #endif /* __ARM64_KVM_HOST_H__ */
-> diff --git a/arch/mips/include/asm/kvm_host.h b/arch/mips/include/asm/kvm_host.h
-> index e8c8d9d..58f0f4d 100644
-> --- a/arch/mips/include/asm/kvm_host.h
-> +++ b/arch/mips/include/asm/kvm_host.h
-> @@ -845,5 +845,7 @@ static inline void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
->  		struct kvm_memory_slot *slot) {}
->  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
->  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
-> +static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu) {}
-> +static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu) {}
->  
->  #endif /* __MIPS_KVM_HOST_H__ */
-> diff --git a/arch/powerpc/include/asm/kvm_host.h b/arch/powerpc/include/asm/kvm_host.h
-> index d91f65b..179f9a7 100644
-> --- a/arch/powerpc/include/asm/kvm_host.h
-> +++ b/arch/powerpc/include/asm/kvm_host.h
-> @@ -702,5 +702,7 @@ static inline void kvm_arch_memslots_updated(struct kvm *kvm, struct kvm_memslot
->  static inline void kvm_arch_flush_shadow_all(struct kvm *kvm) {}
->  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
->  static inline void kvm_arch_exit(void) {}
-> +static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu) {}
-> +static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu) {}
->  
->  #endif /* __POWERPC_KVM_HOST_H__ */
-> diff --git a/arch/s390/include/asm/kvm_host.h b/arch/s390/include/asm/kvm_host.h
-> index 3024acb..04a97df 100644
-> --- a/arch/s390/include/asm/kvm_host.h
-> +++ b/arch/s390/include/asm/kvm_host.h
-> @@ -640,5 +640,7 @@ static inline void kvm_arch_memslots_updated(struct kvm *kvm, struct kvm_memslot
->  static inline void kvm_arch_flush_shadow_all(struct kvm *kvm) {}
->  static inline void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
->  		struct kvm_memory_slot *slot) {}
-> +static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu) {}
-> +static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu) {}
->  
+>  - When image_size is zero, a bootloader should attempt to keep as much
+>    memory as possible free for use by the kernel immediately after the
+> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+> index 8fae0756e175..5def289bda84 100644
+> --- a/arch/arm64/kernel/image.h
+> +++ b/arch/arm64/kernel/image.h
+> @@ -47,7 +47,9 @@
+>  #define __HEAD_FLAG_BE 0
 >  #endif
-> diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
-> index 2a7f5d7..26c4086 100644
-> --- a/arch/x86/include/asm/kvm_host.h
-> +++ b/arch/x86/include/asm/kvm_host.h
-> @@ -1202,4 +1202,7 @@ int __x86_set_memory_region(struct kvm *kvm,
->  int x86_set_memory_region(struct kvm *kvm,
->  			  const struct kvm_userspace_memory_region *mem);
->  
-> +static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu) {}
-> +static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu) {}
-> +
->  #endif /* _ASM_X86_KVM_HOST_H */
-> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-> index 9564fd7..87d7be6 100644
-> --- a/include/linux/kvm_host.h
-> +++ b/include/linux/kvm_host.h
-> @@ -619,6 +619,8 @@ int kvm_vcpu_write_guest(struct kvm_vcpu *vcpu, gpa_t gpa, const void *data,
->  void kvm_vcpu_mark_page_dirty(struct kvm_vcpu *vcpu, gfn_t gfn);
->  
->  void kvm_vcpu_block(struct kvm_vcpu *vcpu);
-> +void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu);
-> +void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu);
->  void kvm_vcpu_kick(struct kvm_vcpu *vcpu);
->  int kvm_vcpu_yield_to(struct kvm_vcpu *target);
->  void kvm_vcpu_on_spin(struct kvm_vcpu *vcpu);
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index 8b8a444..04b59dd 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -1946,6 +1946,8 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
->  		} while (single_task_running() && ktime_before(cur, stop));
->  	}
->  
-> +	kvm_arch_vcpu_blocking(vcpu);
-> +
->  	for (;;) {
->  		prepare_to_wait(&vcpu->wq, &wait, TASK_INTERRUPTIBLE);
->  
-> @@ -1959,6 +1961,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
->  	finish_wait(&vcpu->wq, &wait);
->  	cur = ktime_get();
->  
-> +	kvm_arch_vcpu_unblocking(vcpu);
->  out:
->  	trace_kvm_vcpu_wakeup(ktime_to_ns(cur) - ktime_to_ns(start), waited);
->  }
 > 
+> -#define __HEAD_FLAGS   (__HEAD_FLAG_BE << 0)
+> +#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
+> +
+> +#define __HEAD_FLAGS   (__HEAD_FLAG_BE << 0) | (__HEAD_FLAG_PAGE_SIZE << 1)
+
+I'm fine with this.
+
+-- 
+Catalin
