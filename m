@@ -1,43 +1,43 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 04 Sep 2015 17:37:57 +0100
-Subject: Porting MIPS IRQ handler to ARM
-In-Reply-To: <55E9C33A.2080801@free.fr> (Mason's message of "Fri, 04 Sep 2015
- 18:13:46 +0200")
-References: <55E5CED8.7000408@free.fr> <55E5D945.3040504@gmail.com>
- <55E722F2.50905@free.fr> <yw1xy4goyc3z.fsf@unicorn.mansr.com>
- <55E73971.8030406@free.fr> <55E9C33A.2080801@free.fr>
-Message-ID: <yw1x4mjaxhqy.fsf@unicorn.mansr.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Fri, 04 Sep 2015 17:40:57 +0100
+Subject: [RFC PATCH] arm64: cpuinfo: reduce cache contention on
+ update_{feature}_support
+In-Reply-To: <1441382651-12058-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1441382651-12058-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <55E9C999.1090503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
-
-> On 02/09/2015 20:01, Mason wrote:
+On 04/09/15 17:04, Yury Norov wrote:
+> This patch is on top of https://lkml.org/lkml/2015/9/2/413
 >
->> On 02/09/2015 19:17, M?ns Rullg?rd wrote:
->> 
->>> Use the latest DT from my tree.  It looks like you're missing some
->>> changes.
->> 
->> Indeed, my repo is not up-to-date. (I was vaguely worried that you'd
->> have made further changes that I'd have to revert when back-porting
->> to 3.14)
->> 
->> I'll try upgrading and report back.
->> 
->> By the way, did you write the DT from scratch?
->> 
->> Are there people walking this earth that can write device tree like C?
+> In master, there's only a single function -
+> 	update_mixed_endian_el0_support
+> And similar function is on review mentioned above.
 >
-> No cigar :-(
+> The algorithm for them is like this:
+>   - there's system-wide boolean marker for the feature that is
+>     initially enabled;
+>   - there's also updater for the feature that may disable it
+>     system-widely if feature is not supported on current CPU.
+>   - updater is called for each CPU on bootup.
 >
-> There's just too much DT syntax that flies light-years over my head.
-> #address-cells, #size-cells, #interrupt-cells, ranges, aliases, etc.
-> Basically, all I understand is /dts-v1/;
-> (Anyone have links to good tutorials?)
+> The problem is the way updater does its work. On each CPU, it
+> unconditionally updates system-wide marker. For multi-core
+> system it makes CPU issue invalidate message for a cache
+> line containing marker. This invalidate increases cache
+> contention for nothing, because there's a single marker reset
+> that is really needed, and the others are useless.
+>
+> If the number of system-wide markers of this sort will grow,
+> it may become a trouble on large-scale SOCs. The fix is trivial,
+> though: do system-wide marker update conditionally, and preserve
+> corresponding cache line in shared state for all update() calls,
+> except, probably, one.
 
-Here's something: http://devicetree.org/Device_Tree_Usage
+As I have mentioned already, this patch (and the per feature functions)
+won't be needed once we merge my series (which is waiting for the merge
+window to see the public lights)
 
--- 
-M?ns Rullg?rd
-mans at mansr.com
+Cheers
+Suzuki
