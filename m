@@ -1,67 +1,49 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 3 Sep 2015 21:24:00 -0400 (EDT)
-Subject: [PATCH] ARM: fix bug which lowmem size is limited to 760MB
-In-Reply-To: <1441276233-14566-1-git-send-email-ytk.lee@samsung.com>
-References: <20150903091044.GW21084@n2100.arm.linux.org.uk>
- <1441276233-14566-1-git-send-email-ytk.lee@samsung.com>
-Message-ID: <alpine.LFD.2.20.1509032106420.22877@knanqh.ubzr>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Fri, 4 Sep 2015 08:19:07 +0530
+Subject: [PATCHv7] ARM: exynos_defconfig: Enable LEDS for Odroid-XU3/XU4
+In-Reply-To: <55E8E534.1040204@osg.samsung.com>
+References: <1441303910-3266-1-git-send-email-linux.amoon@gmail.com>
+ <55E8DDDD.80106@samsung.com> <55E8E534.1040204@osg.samsung.com>
+Message-ID: <CANAwSgTKQ6WSRkL=f9FXUk1RmUNOEzmaQo8MbgMeEUS9vUsfPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Sep 2015, Yongtaek Lee wrote:
+Hi All,
 
-> So i summarize my opinion again. 
-> 
-> Current status.
-> 
-> 768MB, no CONFIG_HIGHMEM and no vmalloc=size
-> lowmem : 0MB ~ 760MB
-> vmalloc : 768MB ~ VMALLOC_END
->   => waste 8MB because 760MB ~ 768MB is hole
-> 
-> 1GB, no CONFIG_HIGHMEM and no vmalloc=size
-> lowmem : 0MB ~ 760MB
-> vmalloc : 768MB ~ VMALLOC_END
->  => waste 264MB, so we need to enable CONFIG_HIGHMEM to use full memory. 
-> highmem : 264MB if enable CONFIG_HIGHMEM 
-> 
-> after applying patch. 
-> 
-> 768MB, no CONFIG_HIGHMEM and no vmalloc=size
-> lowmem : 0MB ~ 768MB
-> vmalloc : 776MB ~ VMALLOC_END
->  => use 768MB fully
-> 
-> 1GB, no CONFIG_HIGHMEM and no vmalloc=size
-> lowmem : 0MB ~ 768MB
-> vmalloc : 776MB ~ VMALLOC_END
->  => waste 256MB, so we need to enable CONFIG_HIGHMEM to use full memory. 
-> highmem : 256MB if enable CONFIG_HIGHMEM
->  => it will not fill from 0xc0000000 to 0xffffffff
-> 
-> My opinion is not that vmalloc area size should be changed for all cases(512M, 768M, 1GB, 2GB, etc.). 
-> If we change default value from 240MB to 232MB, it could covor all cases without 
-> any other changes so that i have suggested this patch. 
-> 
-> 
-> As we already talked there are 3 cases with 768MB
-> 1. live with the truncation => waste 8MB so that it will not be acceptable. 
-> 2. enable CONFIG_HIGHMEM => mm point of view it could make overhead because there is only 8MB(very small) in highmem. 
-> 3. set vmalloc size manually => I already mentioned it could fix issue but 
-> if default value is suitable then it is needless.  
+On 4 September 2015 at 05:56, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> Hello Krzysztof,
+>
+> On 09/04/2015 01:55 AM, Krzysztof Kozlowski wrote:
+>> On 04.09.2015 03:11, Anand Moon wrote:
+>>> Earlier design of the LED for Odroid XU3 was using gpio-leds
+>>> Now It was change to using both pwm-leds and gpio-leds.
+>>
+>> It is still not a reason for this change. gpio-leds were not enabled
+>> before. This could be a valid reason of adding LEDS_PWM to existing
+>> config LEDS_GPIO. But LEDS_GPIO were not enabled... so why the change on
+>> the board from gpio->(gpio+pwm) means that we have to enable LEDS_GPIO?
+>>
+>
+> Agreed, also the commit message doesn't explain why the heartbeat
+> LED trigger is enabled as I mentioned in the previous version.
+>
+>> Actually I gave up on this and I wanted to change the commit message on
+>> myself when applying. But discussion was brought up again so... clearly
+>> we have different understanding of the meaning of "WHY". :)
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>
+I give up. I will not resend any patch.
+I don't own this changes.
 
-This is indeed unfortunate that the current value does not fit well with 
-a 768MB configuration.  However this default value has been in place for 
-many years now without problems on existing targets.  There is always a 
-slight possibility that some targets might have issues with a reduced 
-vmalloc size if we were to change it now.
+sorry for the noise.
 
-If 768MB targets were common place then it could be worth changing the 
-default vmalloc size to accommodate this memory size and testing all the 
-other targets to make sure no regressions are introduced.  But given it 
-is easy to change the default via the kernel cmdline, and that you lose 
-only 8 MB otherwise, I don't think it is worth the trouble and/or the 
-risk.
-
-
-Nicolas
+-Anand Moon
+> Best regards,
+> --
+> Javier Martinez Canillas
+> Open Source Group
+> Samsung Research America
