@@ -1,43 +1,36 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 4 Sep 2015 08:58:31 -0700
-Subject: [PATCH v2] mtd: nand: sunxi: rely on nand_dt_init initialization
-In-Reply-To: <20150902102108.72219170@bbrezillon>
-References: <1440411031-8910-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150902011616.GP81844@google.com>
- <20150902102108.72219170@bbrezillon>
-Message-ID: <20150904155831.GD81844@google.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 04 Sep 2015 16:59:39 +0100
+Subject: [PATCH 6/9] arm/arm64: KVM: Add mapped interrupts documentation
+In-Reply-To: <20150904155733.GN5171@cbox>
+References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
+ <1440942866-23802-7-git-send-email-christoffer.dall@linaro.org>
+ <55E865D8.9080406@arm.com> <20150904155733.GN5171@cbox>
+Message-ID: <55E9BFEB.6000801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2015 at 10:21:08AM +0200, Boris Brezillon wrote:
-> On Tue, 1 Sep 2015 18:16:16 -0700
-> Brian Norris <computersforpeace@gmail.com> wrote:
-> > There's also a subtle change here that affects more than just here: you
-> > don't have a good way to tell the difference between "no ECC mode
-> > provide" and NAND_ECC_NONE. Perhaps we can modify the nand_ecc_modes_t
-> > enum to include a "uninitialized" value? I'm not sure if that'd work
-> > best as 0, -1, or something else, in case there are people making
-> > assumptions elsewhere...
+On 04/09/15 16:57, Christoffer Dall wrote:
+> On Thu, Sep 03, 2015 at 04:23:04PM +0100, Marc Zyngier wrote:
+>> On 30/08/15 14:54, Christoffer Dall wrote:
+>>> +
+>>> +
+>>> +Life Cycle for Forwarded Physical Interrupts
+>>> +--------------------------------------------
+>>> +
+>>> +By forwarded physical interrupts we mean interrupts presented to a guest
+>>> +representing a real HW event originally signaled to the host as a
+>>
+>> s/signaled/signalled/
+>>
+> Actaully this was my first version as well, but aspell told me it was
+> spelled signaled.
 > 
-> It really depends on what we want to do. I see at least two solutions
-> for this problem:
-> 1/ keep the nand_dt_init() implementation as is and ask
->    nand_scan_ident() callers to pre-set their default value in ecc.mode.
->    This should work since ecc.mode is only overridden if ecc_mode is >= 0.
-> 2/ modify the nand_dt_init function to assign the ecc_mode even if it
->    is negative, or create a new value in the enum (NAND_ECC_UNSPECIFIED
->    = -1) and assign it to ecc.mode when ecc_mode is negative.
+> Turns out it's mostly acceptable to use both spellings:
 > 
-> 1# does not require any change, but if we choose this solution, we
-> should make it clear that NAND controller drivers should set their
-> default value before calling nand_scan_ident().
+> http://www.merriam-webster.com/dictionary/signaled
 
-I'm OK with your choice of #1. Your v3 patch looks fine.
+I stand corrected! :-)
 
-> And if go for 2#, that's not like we'll have to patch a lot of
-> drivers (AFAICT, the only user in 4.2 is the brcmnand driver) ;-).
-
-:) Well, I thought there were others in the pipeline. I've at least
-reviewed another addition somewhat recently, but it wasn't quite ready.
-
-Brian
+	M.
+-- 
+Jazz is not dead. It just smells funny...
