@@ -1,36 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 04 Sep 2015 16:59:39 +0100
-Subject: [PATCH 6/9] arm/arm64: KVM: Add mapped interrupts documentation
-In-Reply-To: <20150904155733.GN5171@cbox>
-References: <1440942866-23802-1-git-send-email-christoffer.dall@linaro.org>
- <1440942866-23802-7-git-send-email-christoffer.dall@linaro.org>
- <55E865D8.9080406@arm.com> <20150904155733.GN5171@cbox>
-Message-ID: <55E9BFEB.6000801@arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri,  4 Sep 2015 18:00:14 +0200
+Subject: [PATCH v2 3/8] clk: imx27: retain early UART clocks during kernel init
+In-Reply-To: <1441382419-4343-1-git-send-email-l.stach@pengutronix.de>
+References: <1441382419-4343-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1441382419-4343-4-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/15 16:57, Christoffer Dall wrote:
-> On Thu, Sep 03, 2015 at 04:23:04PM +0100, Marc Zyngier wrote:
->> On 30/08/15 14:54, Christoffer Dall wrote:
->>> +
->>> +
->>> +Life Cycle for Forwarded Physical Interrupts
->>> +--------------------------------------------
->>> +
->>> +By forwarded physical interrupts we mean interrupts presented to a guest
->>> +representing a real HW event originally signaled to the host as a
->>
->> s/signaled/signalled/
->>
-> Actaully this was my first version as well, but aspell told me it was
-> spelled signaled.
-> 
-> Turns out it's mostly acceptable to use both spellings:
-> 
-> http://www.merriam-webster.com/dictionary/signaled
+Make sure to keep UART clocks enabled during kernel init if
+earlyprintk or earlycon are active.
 
-I stand corrected! :-)
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ drivers/clk/imx/clk-imx27.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-	M.
+diff --git a/drivers/clk/imx/clk-imx27.c b/drivers/clk/imx/clk-imx27.c
+index d9d50d54ef2a..720adc5d7c24 100644
+--- a/drivers/clk/imx/clk-imx27.c
++++ b/drivers/clk/imx/clk-imx27.c
+@@ -47,6 +47,15 @@ static const char *ssi_sel_clks[] = { "spll_gate", "mpll", };
+ static struct clk *clk[IMX27_CLK_MAX];
+ static struct clk_onecell_data clk_data;
+ 
++static struct clk **uart_clks[] __initdata = { &clk[IMX27_CLK_PER1_GATE],
++					       &clk[IMX27_CLK_UART1_IPG_GATE],
++					       &clk[IMX27_CLK_UART2_IPG_GATE],
++					       &clk[IMX27_CLK_UART3_IPG_GATE],
++					       &clk[IMX27_CLK_UART4_IPG_GATE],
++					       &clk[IMX27_CLK_UART5_IPG_GATE],
++					       &clk[IMX27_CLK_UART6_IPG_GATE],
++					       NULL };
++
+ static void __init _mx27_clocks_init(unsigned long fref)
+ {
+ 	BUG_ON(!ccm);
+@@ -163,6 +172,8 @@ static void __init _mx27_clocks_init(unsigned long fref)
+ 
+ 	clk_prepare_enable(clk[IMX27_CLK_EMI_AHB_GATE]);
+ 
++	imx_register_uart_clocks(uart_clks);
++
+ 	imx_print_silicon_rev("i.MX27", mx27_revision());
+ }
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.5.0
