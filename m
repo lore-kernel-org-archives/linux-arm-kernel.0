@@ -1,90 +1,60 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 4 Sep 2015 17:30:25 +0530
-Subject: [PATCH v3 2/2] ARM: dts: <omap2/3/4/5/dra7>: use "ti,
- pbias-<platform>" compatible string for pbias
-In-Reply-To: <1441368025-21182-1-git-send-email-kishon@ti.com>
-References: <1441368025-21182-1-git-send-email-kishon@ti.com>
-Message-ID: <1441368025-21182-3-git-send-email-kishon@ti.com>
+From: ranjit.waghmode@xilinx.com (Ranjit Abhimanyu Waghmode)
+Date: Fri, 4 Sep 2015 12:02:21 +0000
+Subject: [LINUX RFC v2 1/4] spi: add support of two chip selects & data
+ stripe
+In-Reply-To: <20150903121232.GW12027@sirena.org.uk>
+References: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
+ <1440570367-22569-2-git-send-email-ranjit.waghmode@xilinx.com>
+ <20150903121232.GW12027@sirena.org.uk>
+Message-ID: <7CFCFE83B8145347A1D424EC939F1C3C014B0D67@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use platform specific compatible strings instead of the common
-"ti,pbias-omap" compatible string.
+Hi Mark,
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/dra7.dtsi     |    2 +-
- arch/arm/boot/dts/omap2430.dtsi |    2 +-
- arch/arm/boot/dts/omap3.dtsi    |    2 +-
- arch/arm/boot/dts/omap4.dtsi    |    2 +-
- arch/arm/boot/dts/omap5.dtsi    |    2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at kernel.org]
+> Sent: Thursday, September 03, 2015 5:43 PM
+> To: Ranjit Abhimanyu Waghmode
+> Cc: dwmw2 at infradead.org; computersforpeace at gmail.com; Michal Simek;
+> Soren Brinkmann; zajec5 at gmail.com; ben at decadent.org.uk; marex at denx.de;
+> b32955 at freescale.com; knut.wohlrab at de.bosch.com; juhosg at openwrt.org;
+> beanhuo at micron.com; linux-mtd at lists.infradead.org; linux-
+> kernel at vger.kernel.org; linux-spi at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Harini Katakam; Punnaiah Choudary Kalluri
+> Subject: Re: [LINUX RFC v2 1/4] spi: add support of two chip selects & data
+> stripe
+> 
+> On Wed, Aug 26, 2015 at 11:56:04AM +0530, Ranjit Waghmode wrote:
+> 
+> > To support dual parallel mode operation of ZynqMP GQSPI controller
+> > following API's are added inside the core:
+> 
+> As covered in SubmittingPatches please try to make each patch a single change
+> rather than having multiple separate changes in one commit.
+I will split the patch.
+> 
+> > +	/* Controller may support more than one chip.
+> > +	 * This flag will enable that feature.
+> > +	 */
+> > +#define SPI_MASTER_BOTH_CS		BIT(8)		/* enable both
+> chips */
+> 
+> This isn't saying that the controller supports more than one chip, it's saying that
+> the controller supports asserting more than one chip select at once which isn't
+> the same thing.  I'm also not entirely sure that this makes sense as a separate
+> feature to the data striping one - I'm struggling to think of a way to use this
+> sensibly separately to that.
+If the SPI controller is having more than one chip select and the data lines are distributed equally.
+And also there is requirement to activate all the chip selects in one go.
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 1e29ccf..d6bc6db 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -122,7 +122,7 @@
- 					#size-cells = <1>;
- 
- 					pbias_regulator: pbias_regulator {
--						compatible = "ti,pbias-omap";
-+						compatible = "ti,pbias-dra7", "ti,pbias-omap";
- 						reg = <0xe00 0x4>;
- 						syscon = <&scm_conf>;
- 						pbias_mmc_reg: pbias_mmc_omap5 {
-diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-index 2390f38..3961a6f 100644
---- a/arch/arm/boot/dts/omap2430.dtsi
-+++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -63,7 +63,7 @@
- 					};
- 
- 					pbias_regulator: pbias_regulator {
--						compatible = "ti,pbias-omap";
-+						compatible = "ti,pbias-omap2", "ti,pbias-omap";
- 						reg = <0x230 0x4>;
- 						syscon = <&scm_conf>;
- 						pbias_mmc_reg: pbias_mmc_omap2430 {
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 69a40cf..9af9ae1 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -203,7 +203,7 @@
- 		};
- 
- 		pbias_regulator: pbias_regulator {
--			compatible = "ti,pbias-omap";
-+			compatible = "ti,pbias-omap3", "ti,pbias-omap";
- 			reg = <0x2b0 0x4>;
- 			syscon = <&scm_conf>;
- 			pbias_mmc_reg: pbias_mmc_omap2430 {
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index abc4473..5aad7f3 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -198,7 +198,7 @@
- 					#size-cells = <1>;
- 
- 					pbias_regulator: pbias_regulator {
--						compatible = "ti,pbias-omap";
-+						compatible = "ti,pbias-omap4", "ti,pbias-omap";
- 						reg = <0x60 0x4>;
- 						syscon = <&omap4_padconf_global>;
- 						pbias_mmc_reg: pbias_mmc_omap4 {
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index b1a1263..76ef595 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -187,7 +187,7 @@
- 					#size-cells = <1>;
- 
- 					pbias_regulator: pbias_regulator {
--						compatible = "ti,pbias-omap";
-+						compatible = "ti,pbias-omap5", "ti,pbias-omap";
- 						reg = <0x60 0x4>;
- 						syscon = <&omap5_padconf_global>;
- 						pbias_mmc_reg: pbias_mmc_omap5 {
--- 
-1.7.9.5
+Now we can consider following use cases:
+
+Suppose we need to send the same data to multiple slaves of same kind:
+Here the application need not to do individual slave access for writing, instead it can send data to all the devices in one go.
+
+Let's take another case where application is trying to send data in such a way that first nibble of the byte will got to the one slave and the second nibble of the byte will go to the other slave:
+Here data in slave devices can be organized by taking advantage of above topology along with the support in hardware.
+
+Regards,
+Ranjit
