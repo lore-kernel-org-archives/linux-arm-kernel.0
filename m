@@ -1,45 +1,74 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Sat, 5 Sep 2015 00:27:42 +0200
-Subject: [PATCH] cpufreq: Add ARM_MT8173_CPUFREQ dependencyon THERMAL
-In-Reply-To: <CAOesGMgcSjNdRCe6i994F=unLLXG3-JJeiV-mLBnOHfbUd0DDw@mail.gmail.com>
-References: <1441293658-18199-1-git-send-email-linux@roeck-us.net>
- <20150903155029.GB5332@linux>
- <CAOesGMgcSjNdRCe6i994F=unLLXG3-JJeiV-mLBnOHfbUd0DDw@mail.gmail.com>
-Message-ID: <CAJZ5v0hzcbprjy_NHihbe-rbP7OxR1pmcU_Xxx_rTM2SQ5yL5A@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 5 Sep 2015 02:47:25 +0300
+Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
+In-Reply-To: <20150902022936.GA18115@verge.net.au>
+References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+ <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
+ <20150812012652.GH15957@verge.net.au> <55D790A5.1050008@cogentembedded.com>
+ <55D7A3A1.9020009@cogentembedded.com> <20150902022936.GA18115@verge.net.au>
+Message-ID: <55EA2D8D.90004@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-On Fri, Sep 4, 2015 at 9:01 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, Sep 3, 2015 at 8:50 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->> On 03-09-15, 08:20, Guenter Roeck wrote:
->>> If ARM_MT8173_CPUFREQ is configured, and THERMAL is configured as module,
->>> the following build error is seen for arm:allmodconfig and
->>> arm64:allmodconfig.
+On 09/02/2015 05:29 AM, Simon Horman wrote:
+
+>>>>> Define the SILK board dependent part of the SDHI1 (connected to micro-SD slot)
+>>>>> device nodes along with the necessary voltage regulators.
+>>>>>
+>>>>> Based on the original patch by Vladimir Barinov
+>>>>> <vladimir.barinov@cogentembedded.com>.
+>>>>>
+>>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>>>
+>>>>> ---
+>>>>> This patch is against 'renesas-devel-20150810-v4.2-rc6' tag of Simon Horman's
+>>>>> 'renesas.git' repo plus the R8A7794/SILK QSPI patches just re-posted. It needs
+>>>>> the R8A7794 GPIO patches in order to compile.
+>>>>>
+>>>>> Changes in version 2:
+>>>>> - removed not working SDHI0 stuff, renamed the patch;
+>>>>> - replaced SDHI1's "wp-gpios" property with "disable-wp".
+>>>>
+>>>> I am wondering if you could explain the motivation for the "disable-wp"
+>>>> update
 >>>
->>> drivers/built-in.o: In function `mtk_cpufreq_ready':
->>> :(.text+0x32a20c): undefined reference to `of_cpufreq_cooling_register'
->>> drivers/built-in.o: In function `mtk_cpufreq_exit':
->>> :(.text+0x32a420): undefined reference to `cpufreq_cooling_unregister'
+>>>     Please see the comment in mmc_sd_get_ro().
 >>>
->>> The fix is similar to CPUFREQ_DT, but more restrictive since
->>> ARM_MT8173_CPUFREQ can not be built as module.
+>>>> and weather it is appropriate for other r8a779* dts files.
 >>>
->>> Fixes: 1453863fb02a ("cpufreq: mediatek: Add MT8173 cpufreq driver")
->>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
->>> ---
->>> It might also make sense to declare ARM_MT8173_CPUFREQ as tristate
->>> and relax the conditions, but I don't know if that is feasible.
->>>
->>>  drivers/cpufreq/Kconfig.arm | 1 +
->>>  1 file changed, 1 insertion(+)
+>>>     In case of micro-SD slots, yes.
 >>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>     The MMC binding document says it should only be specified if the
+>> controller has WP detection logic. We, so far, seem to have been replying on
+>> the GPIOs despite this logic is present (according to the R-Car gen2 SDHI
+>> manuals I have). The driver will first call mmc_gpio_get_ro() and when that
+>> fails due to "wp-gpios" not being specified, it proceeds to reading the
+>> register but that is forbidden by TMIO_MMC_WRPROTECT_DISABLE flag set for
+>> the R-Car gen1/2 chips, so 0 is always returned from tmio_mmc_get_ro().
+>> There seems to be no point in going that far (and doing the runtime PM
+>> dances) --
+
+    Alternatively, the driver could be fixed to check the flag before the RPM 
+call unlike what it does now.
+
+>> and MMC_CAP2_NO_WRITE_PROTECT (set when "disable-wp" is specified) prohibits
+>> doing that...
 >
-> Who's applying and sending this up to avoid extended period of build breakage?
+> That sounds reasonable to me.
 
-I'll queue up this particular one.
+    I'm still wondering why TMIO_MMC_WRPROTECT_DISABLE is set for the R-Car 
+SoCs. Morimoto-san, any comments? Your change logs are too terse. :-)
 
-Thanks,
-Rafael
+> Some more questions from my side:
+
+> * What is the status of this patch
+
+    Tested, working.
+
+> * Can you prepare patches for r8a779* dts files for micro-SD slots?
+
+    Ugh, I probably can but won't promise anything.
+
+MBR, Sergei
