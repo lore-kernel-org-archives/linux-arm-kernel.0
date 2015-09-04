@@ -1,29 +1,37 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 4 Sep 2015 10:50:19 -0700
-Subject: [PATCH 5/9] drm: bridge/dw_hdmi: avoid being recursive in N
- calculation
-In-Reply-To: <E1ZO6hX-0003NK-0H@rmk-PC.arm.linux.org.uk>
-References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
- <E1ZO6hX-0003NK-0H@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAD=FV=WJAm=EpugwnnBjPKJV1OOybyE6hkdhU2RrN0AR2qae6w@mail.gmail.com>
+From: pku.leo@gmail.com (Leo Li)
+Date: Fri, 4 Sep 2015 12:56:39 -0500
+Subject: [PATCH v2 04/10] doc/bindings: Update PCIe devicetree binding
+ documentation for LS2080A
+In-Reply-To: <1441349872-4560-5-git-send-email-bhupesh.sharma@freescale.com>
+References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1441349872-4560-5-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <CADRPPNRGpzWawsqLHCiv530HbtPf+9RaPzOtvy88ftwv2ffqLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-On Sat, Aug 8, 2015 at 9:10 AM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> There's no need to be recursive when computing the N value for the ACR
-> packet - we can instead calculate the multiplier prior to our switch()
-> based lookup, and multiply the N value appropriately afterwards.
+On Fri, Sep 4, 2015 at 1:57 AM, Bhupesh Sharma
+<bhupesh.sharma@freescale.com> wrote:
+> Add the documentation for compatible string "fsl,ls2080a-pcie"
+> for Freescale's LS2080A platform.
 >
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
 > ---
->  drivers/gpu/drm/bridge/dw_hdmi.c | 25 +++++++++----------------
->  1 file changed, 9 insertions(+), 16 deletions(-)
+>  .../devicetree/bindings/pci/layerscape-pci.txt     |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> index 6286f04..e72e68f 100644
+> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
+>  and thus inherits all the common properties defined in designware-pcie.txt.
+>
+>  Required properties:
+> -- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie"
+> +- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie",
+> +  "fsl,ls2080a-pcie".
 
-For what it's worth, I backported this change into my local 3.14-based
-tree and it worked for me.  It also looks good to me.
+Make it generic like "fsl,<chip>-pcie"
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
-Tested-by: Douglas Anderson <dianders@chromium.org>
+- Leo
