@@ -1,49 +1,132 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Fri, 4 Sep 2015 12:05:12 +0800
-Subject: [PATCH] soc: mediatek: Move the initial setting of pmic wrap
- interrupt before requesting irq.
-Message-ID: <1441339512-15510-1-git-send-email-henryc.chen@mediatek.com>
+From: klimov.linux@gmail.com (Alexey Klimov)
+Date: Fri, 4 Sep 2015 07:10:10 +0300
+Subject: [PATCH v12 1/5] mtd: nand: vf610_nfc: Freescale NFC for VF610,
+ MPC5125 and others
+In-Reply-To: <1441242397-870-2-git-send-email-stefan@agner.ch>
+References: <1441242397-870-1-git-send-email-stefan@agner.ch>
+ <1441242397-870-2-git-send-email-stefan@agner.ch>
+Message-ID: <CALW4P+LDwFnCjOorh7iCr8TrUnync7a_zkdZ4Hp_91=60AtUQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seperate the initialization of pmic wrap interrupt from pmic wrap init to make sure setting is correct before requesting irq.
+Hi Stefan,
 
-Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
----
- drivers/soc/mediatek/mtk-pmic-wrap.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+just few very small comments.
 
-diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index f432291..c91d629 100644
---- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-+++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -725,10 +725,6 @@ static int pwrap_init(struct pmic_wrapper *wrp)
- 	pwrap_writel(wrp, 0x1, PWRAP_WACS2_EN);
- 	pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
- 	pwrap_writel(wrp, 0xff, PWRAP_STAUPD_GRPEN);
--	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
--	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
--	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
--	pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
- 
- 	if (pwrap_is_mt8135(wrp)) {
- 		/* enable pwrap events and pwrap bridge in AP side */
-@@ -896,6 +892,16 @@ static int pwrap_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	/*
-+	 * watch dog@pwrap,
-+	 * The bootloader may not initial the wdt/interrupt setting of pwrap,
-+	 * set it before reguesting the irq.
-+	 */
-+	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
-+	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
-+	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
-+	pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
-+
- 	irq = platform_get_irq(pdev, 0);
- 	ret = devm_request_irq(wrp->dev, irq, pwrap_interrupt, IRQF_TRIGGER_HIGH,
- 			"mt-pmic-pwrap", wrp);
--- 
-1.8.1.1.dirty
+On Thu, Sep 3, 2015 at 4:06 AM, Stefan Agner <stefan@agner.ch> wrote:
+
+[..]
+
+> --- /dev/null
+> +++ b/drivers/mtd/nand/vf610_nfc.c
+
+[..]
+
+> +static inline u32 vf610_nfc_read(struct vf610_nfc *nfc, uint reg)
+> +{
+> +       return readl(nfc->regs + reg);
+> +}
+> +
+> +static inline void vf610_nfc_write(struct vf610_nfc *nfc, uint reg, u32 val)
+> +{
+> +       writel(val, nfc->regs + reg);
+> +}
+> +
+> +static inline void vf610_nfc_set(struct vf610_nfc *nfc, uint reg, u32 bits)
+> +{
+> +       vf610_nfc_write(nfc, reg, vf610_nfc_read(nfc, reg) | bits);
+> +}
+> +
+> +static inline void vf610_nfc_clear(struct vf610_nfc *nfc, uint reg, u32 bits)
+> +{
+> +       vf610_nfc_write(nfc, reg, vf610_nfc_read(nfc, reg) & ~bits);
+> +}
+> +
+> +static inline void vf610_nfc_set_field(struct vf610_nfc *nfc, u32 reg,
+> +                                      u32 mask, u32 shift, u32 val)
+> +{
+> +       vf610_nfc_write(nfc, reg,
+> +                       (vf610_nfc_read(nfc, reg) & (~mask)) | val << shift);
+> +}
+> +
+> +static inline void vf610_nfc_memcpy(void *dst, const void __iomem *src,
+> +                                   size_t n)
+> +{
+> +       /*
+> +        * Use this accessor for the internal SRAM buffers. On the ARM
+> +        * Freescale Vybrid SoC it's known that the driver can treat
+> +        * the SRAM buffer as if it's memory. Other platform might need
+> +        * to treat the buffers differently.
+> +        *
+> +        * For the time being, use memcpy
+> +        */
+> +       memcpy(dst, src, n);
+> +}
+> +
+> +/* Clear flags for upcoming command */
+> +static inline void vf610_nfc_clear_status(struct vf610_nfc *nfc)
+> +{
+> +       u32 tmp = vf610_nfc_read(nfc, NFC_IRQ_STATUS);
+> +
+> +       tmp |= CMD_DONE_CLEAR_BIT | IDLE_CLEAR_BIT;
+> +       vf610_nfc_write(nfc, NFC_IRQ_STATUS, tmp);
+> +}
+
+There is general intention on maillists that I see sometimes is to
+make people get rid of
+'inline' for static functions in *.c files and let compiler decide how
+to optimize that.
+
+
+> +static int vf610_nfc_probe(struct platform_device *pdev)
+> +{
+> +       struct vf610_nfc *nfc;
+> +       struct resource *res;
+> +       struct mtd_info *mtd;
+> +       struct nand_chip *chip;
+> +       struct device_node *child;
+> +       const struct of_device_id *of_id;
+> +       int err = 0;
+
+According to usage you don't need to initialize err to zero here.
+
+> +       int irq;
+> +
+> +       nfc = devm_kzalloc(&pdev->dev, sizeof(*nfc), GFP_KERNEL);
+> +       if (!nfc)
+> +               return -ENOMEM;
+> +
+> +       nfc->dev = &pdev->dev;
+> +       mtd = &nfc->mtd;
+> +       chip = &nfc->chip;
+> +
+> +       mtd->priv = chip;
+> +       mtd->owner = THIS_MODULE;
+> +       mtd->dev.parent = nfc->dev;
+> +       mtd->name = DRV_NAME;
+> +
+> +       irq = platform_get_irq(pdev, 0);
+> +       if (irq <= 0)
+> +               return -EINVAL;
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       nfc->regs = devm_ioremap_resource(nfc->dev, res);
+> +       if (IS_ERR(nfc->regs))
+> +               return PTR_ERR(nfc->regs);
+> +
+> +       nfc->clk = devm_clk_get(&pdev->dev, NULL);
+> +       if (IS_ERR(nfc->clk))
+> +               return PTR_ERR(nfc->clk);
+> +
+> +       err = clk_prepare_enable(nfc->clk);
+> +       if (err) {
+> +               dev_err(nfc->dev, "Unable to enable clock!\n");
+> +               return err;
+> +       }
+
+After fixing that feel free to use:
+
+Reviewed-by: Alexey Klimov <klimov.linux@gmail.com>
+
+Thanks,
+Alexey Klimov
