@@ -1,191 +1,598 @@
 From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Fri, 4 Sep 2015 12:27:48 +0530
-Subject: [PATCH v2 06/10] clk: qoriq: Add ls2080a support.
-In-Reply-To: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1441349872-4560-7-git-send-email-bhupesh.sharma@freescale.com>
+Date: Fri, 4 Sep 2015 12:35:19 +0530
+Subject: [PATCH v2 07/10] dts/ls2085a: Update DTSI to add support of various
+ peripherals
+Message-ID: <1441350322-4671-1-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Scott Wood <scottwood@freescale.com>
+This patch updates the LS2085a DTSI (DTS Include) file to add
+support for various peripherals supported by FSL LS2085a SoC, for e.g.:
+	- USB 3.0 Host
+	- PMU
+	- CCN-504
+	- Watchdog
+	- SATA
+	- SPI
+	- PCIe
+	- etc.
 
-LS2080A is the first implementation of the chassis 3 clockgen, which
-has a different register layout than previous chips.  It is also little
-endian, unlike previous chips.
-
+Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+Signed-off-by: Jaiprakash Singh <b44839@freescale.com>
+Signed-off-by: Alison Wang <alison.wang@freescale.com>
+Signed-off-by: Liu Gang <Gang.Liu@freescale.com>
+Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
+Signed-off-by: Nikhil Badola <nikhil.badola@freescale.com>
+Signed-off-by: Yangbo Lu <yangbo.lu@freescale.com>
 Signed-off-by: Scott Wood <scottwood@freescale.com>
 ---
- drivers/clk/Kconfig     |    2 +-
- drivers/clk/clk-qoriq.c |   78 +++++++++++++++++++++++++++++++++++++++++------
- 2 files changed, 70 insertions(+), 10 deletions(-)
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |  469 +++++++++++++++++++++++-
+ 1 file changed, 459 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 42f7120..9f1970c 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -121,7 +121,7 @@ config COMMON_CLK_AXI_CLKGEN
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 333d942..5fee0a7 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -20,11 +20,6 @@
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- *     You should have received a copy of the GNU General Public
+- *     License along with this library; if not, write to the Free
+- *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+- *     MA 02110-1301 USA
+- *
+  * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+@@ -71,48 +66,56 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x0>;
++			clocks = <&clockgen 1 0>;
+ 		};
  
- config CLK_QORIQ
- 	bool "Clock driver for Freescale QorIQ platforms"
--	depends on (PPC_E500MC || ARM) && OF
-+	depends on (PPC_E500MC || ARM || ARM64) && OF
- 	---help---
- 	  This adds the clock driver support for Freescale QorIQ platforms
- 	  using common clock framework.
-diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
-index d9e4402..bae82ac 100644
---- a/drivers/clk/clk-qoriq.c
-+++ b/drivers/clk/clk-qoriq.c
-@@ -68,7 +68,10 @@ struct clockgen;
-  * If not set, cmux freq must be >= platform pll/2
-  */
- #define CG_CMUX_GE_PLAT		1
+ 		cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x1>;
++			clocks = <&clockgen 1 0>;
+ 		};
+ 
+ 		cpu at 100 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x100>;
++			clocks = <&clockgen 1 1>;
+ 		};
+ 
+ 		cpu at 101 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x101>;
++			clocks = <&clockgen 1 1>;
+ 		};
+ 
+ 		cpu at 200 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x200>;
++			clocks = <&clockgen 1 2>;
+ 		};
+ 
+ 		cpu at 201 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x201>;
++			clocks = <&clockgen 1 2>;
+ 		};
+ 
+ 		cpu at 300 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x300>;
++			clocks = <&clockgen 1 3>;
+ 		};
+ 
+ 		cpu at 301 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0 0x301>;
++			clocks = <&clockgen 1 3>;
+ 		};
+ 	};
+ 
+@@ -122,13 +125,44 @@
+ 		      /* DRAM space - 1, size : 2 GB DRAM */
+ 	};
+ 
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <1 7 0x8>; /* PMU PPI, Level low type */
++	};
 +
- #define CG_PLL_8BIT		2	/* PLLCnGSR[CFG] is 8 bits, not 6 */
-+#define CG_VER3			4	/* version 3 cg: reg layout different */
-+#define CG_LITTLE_ENDIAN	8
- 
- struct clockgen_chipinfo {
- 	const char *compat, *guts_compat;
-@@ -94,6 +97,26 @@ struct clockgen {
- 
- static struct clockgen clockgen;
- 
-+static void cg_out(struct clockgen *cg, u32 val, u32 __iomem *reg)
-+{
-+	if (cg->info.flags & CG_LITTLE_ENDIAN)
-+		iowrite32(val, reg);
-+	else
-+		iowrite32be(val, reg);
-+}
+ 	gic: interrupt-controller at 6000000 {
+ 		compatible = "arm,gic-v3";
+ 		reg = <0x0 0x06000000 0 0x10000>, /* GIC Dist */
+-		      <0x0 0x06100000 0 0x100000>; /* GICR (RD_base + SGI_base) */
++		      <0x0 0x06100000 0 0x100000>, /* GICR (RD_base + SGI_base) */
++		      <0x0 0x0c0c0000 0 0x2000>, /* GICC */
++		      <0x0 0x0c0d0000 0 0x1000>, /* GICH */
++		      <0x0 0x0c0e0000 0 0x20000>; /* GICV */
+ 		#interrupt-cells = <3>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
+ 		interrupt-controller;
+ 		interrupts = <1 9 0x4>;
 +
-+static u32 cg_in(struct clockgen *cg, u32 __iomem *reg)
-+{
-+	u32 val;
++		its: gic-its at 6020000 {
++			compatible = "arm,gic-v3-its";
++			msi-controller;
++			reg = <0x0 0x6020000 0 0x20000>;
++		};
++	};
 +
-+	if (cg->info.flags & CG_LITTLE_ENDIAN)
-+		val = ioread32(reg);
-+	else
-+		val = ioread32be(reg);
++	clockgen: clocking at 1300000 {
++		compatible = "fsl,ls2080a-clockgen";
++		reg = <0 0x1300000 0 0xa0000>;
++		#clock-cells = <2>;
++		clocks = <&sysclk>;
 +
-+	return val;
-+}
++		sysclk: sysclk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <100000000>;
++			clock-output-names = "sysclk";
++		};
+ 	};
+ 
+ 	timer {
+@@ -139,25 +173,440 @@
+ 			     <1 10 0x8>; /* Hypervisor PPI, active-low */
+ 	};
+ 
++	amba {
++		compatible = "arm,amba-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
 +
- static const struct clockgen_muxinfo p2041_cmux_grp1 = {
- 	{
- 		[0] = { CLKSEL_VALID, CGA_PLL1, PLL_DIV1 },
-@@ -429,6 +452,17 @@ static const struct clockgen_chipinfo chipinfo[] = {
- 		.pll_mask = 0x03,
- 	},
- 	{
-+		.compat = "fsl,ls2080a-clockgen",
-+		.cmux_groups = {
-+			&clockgen2_cmux_cga12, &clockgen2_cmux_cgb
-+		},
-+		.cmux_to_group = {
-+			0, 0, 1, 1, -1
-+		},
-+		.pll_mask = 0x37,
-+		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
-+	},
-+	{
- 		.compat = "fsl,p2041-clockgen",
- 		.guts_compat = "fsl,qoriq-device-config-1.0",
- 		.init_periph = p2041_init_periph,
-@@ -575,7 +609,7 @@ static int mux_set_parent(struct clk_hw *hw, u8 idx)
- 		return -EINVAL;
++		cluster1_core0_watchdog: wdt at c000000 {
++			compatible = "arm,primecell";
++			reg = <0x0 0xc000000 0x0 0x1000>;
++			interrupts = <1 12 0x8>; /* PPI, Level low type */
++			clocks = <&clockgen 4 3>;
++			clock-names = "apb_pclk";
++		};
++
++		cluster1_core1_watchdog: wdt at c010000 {
++			compatible = "arm,primecell";
++			reg = <0x0 0xc010000 0x0 0x1000>;
++			interrupts = <1 12 0x8>; /* PPI, Level low type */
++			clocks = <&clockgen 4 3>;
++			clock-names = "apb_pclk";
++		};
++
++		cluster2_core0_watchdog: wdt at c100000 {
++			compatible = "arm,primecell";
++			reg = <0x0 0xc100000 0x0 0x1000>;
++			interrupts = <1 12 0x8>; /* PPI, Level low type */
++			clocks = <&clockgen 4 3>;
++			clock-names = "apb_pclk";
++		};
++
++		cluster2_core1_watchdog: wdt at c110000 {
++			compatible = "arm,primecell";
++			reg = <0x0 0xc110000 0x0 0x1000>;
++			interrupts = <1 12 0x8>; /* PPI, Level low type */
++			clocks = <&clockgen 4 3>;
++			clock-names = "apb_pclk";
++		};
++
++		cluster3_core0_watchdog: wdt at c200000 {
++			compatible = "arm,primecell";
++			reg = <0x0 0xc200000 0x0 0x1000>;
++			interrupts = <1 12 0x8>; /* PPI, Level low type */
++			clocks = <&clockgen 4 3>;
++			clock-names = "apb_pclk";
++		};
++
++		cluster3_core1_watchdog: wdt at c210000 {
++			compatible = "arm,primecell";
++			reg = <0x0 0xc210000 0x0 0x1000>;
++			interrupts = <1 12 0x8>; /* PPI, Level low type */
++			clocks = <&clockgen 4 3>;
++			clock-names = "apb_pclk";
++		};
++
++		cluster4_core0_watchdog: wdt at c300000 {
++			compatible = "arm,primecell";
++			reg = <0x0 0xc300000 0x0 0x1000>;
++			interrupts = <1 12 0x8>; /* PPI, Level low type */
++			clocks = <&clockgen 4 3>;
++			clock-names = "apb_pclk";
++		};
++
++		cluster4_core1_watchdog: wdt at c310000 {
++			compatible = "arm,primecell";
++			reg = <0x0 0xc310000 0x0 0x1000>;
++			interrupts = <1 12 0x8>; /* PPI, Level low type */
++			clocks = <&clockgen 4 3>;
++			clock-names = "apb_pclk";
++		};
++	};
++
+ 	serial0: serial at 21c0500 {
+ 		device_type = "serial";
+ 		compatible = "fsl,ns16550", "ns16550a";
+ 		reg = <0x0 0x21c0500 0x0 0x100>;
+-		clock-frequency = <0>;	/* Updated by bootloader */
+-		interrupts = <0 32 0x1>; /* edge triggered */
++		clocks = <&clockgen 4 3>;
++		interrupts = <0 32 0x4>; /* Level high type */
+ 	};
  
- 	clksel = hwc->parent_to_clksel[idx];
--	iowrite32be((clksel << CLKSEL_SHIFT) & CLKSEL_MASK, hwc->reg);
-+	cg_out(hwc->cg, (clksel << CLKSEL_SHIFT) & CLKSEL_MASK, hwc->reg);
+ 	serial1: serial at 21c0600 {
+ 		device_type = "serial";
+ 		compatible = "fsl,ns16550", "ns16550a";
+ 		reg = <0x0 0x21c0600 0x0 0x100>;
+-		clock-frequency = <0>; 	/* Updated by bootloader */
+-		interrupts = <0 32 0x1>; /* edge triggered */
++		clocks = <&clockgen 4 3>;
++		interrupts = <0 32 0x4>; /* Level high type */
+ 	};
  
- 	return 0;
- }
-@@ -586,7 +620,7 @@ static u8 mux_get_parent(struct clk_hw *hw)
- 	u32 clksel;
- 	s8 ret;
- 
--	clksel = (ioread32be(hwc->reg) & CLKSEL_MASK) >> CLKSEL_SHIFT;
-+	clksel = (cg_in(hwc->cg, hwc->reg) & CLKSEL_MASK) >> CLKSEL_SHIFT;
- 
- 	ret = hwc->clksel_to_parent[clksel];
- 	if (ret < 0) {
-@@ -694,6 +728,7 @@ static struct clk * __init create_one_cmux(struct clockgen *cg, int idx)
- 	if (!hwc)
- 		return NULL;
- 
-+	hwc->cg = cg;
- 	hwc->reg = cg->regs + 0x20 * idx;
- 	hwc->info = cg->info.cmux_groups[cg->info.cmux_to_group[idx]];
- 
-@@ -704,7 +739,7 @@ static struct clk * __init create_one_cmux(struct clockgen *cg, int idx)
- 	 * default clksel) may be inappropriately excluded on certain
- 	 * chips.
- 	 */
--	clksel = (ioread32be(hwc->reg) & CLKSEL_MASK) >> CLKSEL_SHIFT;
-+	clksel = (cg_in(cg, hwc->reg) & CLKSEL_MASK) >> CLKSEL_SHIFT;
- 	div = get_pll_div(cg, hwc, clksel);
- 	if (!div)
- 		return NULL;
-@@ -873,13 +908,36 @@ static void __init create_one_pll(struct clockgen *cg, int idx)
- 	if (!(cg->info.pll_mask & (1 << idx)))
- 		return;
- 
--	if (idx == PLATFORM_PLL)
--		reg = cg->regs + 0xc00;
--	else
--		reg = cg->regs + 0x800 + 0x20 * (idx - 1);
-+	if (cg->info.flags & CG_VER3) {
-+		switch (idx) {
-+		case PLATFORM_PLL:
-+			reg = cg->regs + 0x60080;
-+			break;
-+		case CGA_PLL1:
-+			reg = cg->regs + 0x80;
-+			break;
-+		case CGA_PLL2:
-+			reg = cg->regs + 0xa0;
-+			break;
-+		case CGB_PLL1:
-+			reg = cg->regs + 0x10080;
-+			break;
-+		case CGB_PLL2:
-+			reg = cg->regs + 0x100a0;
-+			break;
-+		default:
-+			WARN_ONCE(1, "index %d\n", idx);
-+			return;
-+		}
-+	} else {
-+		if (idx == PLATFORM_PLL)
-+			reg = cg->regs + 0xc00;
-+		else
-+			reg = cg->regs + 0x800 + 0x20 * (idx - 1);
-+	}
- 
- 	/* Get the multiple of PLL */
--	mult = ioread32be(reg);
-+	mult = cg_in(cg, reg);
- 
- 	/* Check if this PLL is disabled */
- 	if (mult & PLL_KILL) {
-@@ -887,7 +945,8 @@ static void __init create_one_pll(struct clockgen *cg, int idx)
- 		return;
- 	}
- 
--	if ((cg->info.flags & CG_PLL_8BIT) && idx != PLATFORM_PLL)
-+	if ((cg->info.flags & CG_VER3) ||
-+	    ((cg->info.flags & CG_PLL_8BIT) && idx != PLATFORM_PLL))
- 		mult = (mult & GENMASK(8, 1)) >> 1;
- 	else
- 		mult = (mult & GENMASK(6, 1)) >> 1;
-@@ -1168,6 +1227,7 @@ err:
- CLK_OF_DECLARE(qoriq_clockgen_1, "fsl,qoriq-clockgen-1.0", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_2, "fsl,qoriq-clockgen-2.0", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls1021a, "fsl,ls1021a-clockgen", clockgen_init);
-+CLK_OF_DECLARE(qoriq_clockgen_ls2080a, "fsl,ls2080a-clockgen", clockgen_init);
- 
- /* Legacy nodes */
- CLK_OF_DECLARE(qoriq_sysclk_1, "fsl,qoriq-sysclk-1.0", sysclk_init);
+ 	fsl_mc: fsl-mc at 80c000000 {
+ 		compatible = "fsl,qoriq-mc";
++		#stream-id-cells = <2>;
+ 		reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
+ 		      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
++		lpi-parent = <&its>;
++	};
++
++	smmu: iommu at 5000000 {
++		compatible = "arm,mmu-500";
++		reg = <0 0x5000000 0 0x800000>;
++		#global-interrupts = <12>;
++		interrupts = <0 13 4>, /* global secure fault */
++			     <0 14 4>, /* combined secure interrupt */
++			     <0 15 4>, /* global non-secure fault */
++			     <0 16 4>, /* combined non-secure interrupt */
++			/* performance counter interrupts 0-7 */
++			     <0 211 4>,
++			     <0 212 4>,
++			     <0 213 4>,
++			     <0 214 4>,
++			     <0 215 4>,
++			     <0 216 4>,
++			     <0 217 4>,
++			     <0 218 4>,
++			/* per context interrupt, 64 interrupts */
++			     <0 146 4>,
++			     <0 147 4>,
++			     <0 148 4>,
++			     <0 149 4>,
++			     <0 150 4>,
++			     <0 151 4>,
++			     <0 152 4>,
++			     <0 153 4>,
++			     <0 154 4>,
++			     <0 155 4>,
++			     <0 156 4>,
++			     <0 157 4>,
++			     <0 158 4>,
++			     <0 159 4>,
++			     <0 160 4>,
++			     <0 161 4>,
++			     <0 162 4>,
++			     <0 163 4>,
++			     <0 164 4>,
++			     <0 165 4>,
++			     <0 166 4>,
++			     <0 167 4>,
++			     <0 168 4>,
++			     <0 169 4>,
++			     <0 170 4>,
++			     <0 171 4>,
++			     <0 172 4>,
++			     <0 173 4>,
++			     <0 174 4>,
++			     <0 175 4>,
++			     <0 176 4>,
++			     <0 177 4>,
++			     <0 178 4>,
++			     <0 179 4>,
++			     <0 180 4>,
++			     <0 181 4>,
++			     <0 182 4>,
++			     <0 183 4>,
++			     <0 184 4>,
++			     <0 185 4>,
++			     <0 186 4>,
++			     <0 187 4>,
++			     <0 188 4>,
++			     <0 189 4>,
++			     <0 190 4>,
++			     <0 191 4>,
++			     <0 192 4>,
++			     <0 193 4>,
++			     <0 194 4>,
++			     <0 195 4>,
++			     <0 196 4>,
++			     <0 197 4>,
++			     <0 198 4>,
++			     <0 199 4>,
++			     <0 200 4>,
++			     <0 201 4>,
++			     <0 202 4>,
++			     <0 203 4>,
++			     <0 204 4>,
++			     <0 205 4>,
++			     <0 206 4>,
++			     <0 207 4>,
++			     <0 208 4>,
++			     <0 209 4>;
++		mmu-masters = <&fsl_mc 0x300 0>;
++	};
++
++	dspi: dspi at 2100000 {
++		compatible = "fsl,vf610-dspi";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x0 0x2100000 0x0 0x10000>;
++		interrupts = <0 26 0x4>; /* Level high type */
++		tcfq-mode;
++		clocks = <&clockgen 4 3>;
++		clock-names = "dspi";
++		spi-num-chipselects = <5>;
++		bus-num = <0>;
++		spi-cpol;
++		spi-cpha;
++	};
++
++	esdhc: esdhc at 2140000 {
++		compatible = "fsl,ls2080a-esdhc", "fsl,esdhc";
++		reg = <0x0 0x2140000 0x0 0x10000>;
++		interrupts = <0 28 0x4>; /* Level high type */
++		clock-frequency = <0>;	/* Updated by bootloader */
++		voltage-ranges = <1800 1800 3300 3300>;
++		sdhci,auto-cmd12;
++		little-endian;
++		bus-width = <4>;
++	};
++
++	gpio0: gpio at 2300000 {
++		compatible = "fsl,ls2080a-gpio";
++		reg = <0x0 0x2300000 0x0 0x10000>;
++		interrupts = <0 36 0x4>; /* Level high type */
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++	};
++
++	gpio1: gpio at 2310000 {
++		compatible = "fsl,ls2080a-gpio";
++		reg = <0x0 0x2310000 0x0 0x10000>;
++		interrupts = <0 36 0x4>; /* Level high type */
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++	};
++
++	gpio2: gpio at 2320000 {
++		compatible = "fsl,ls2080a-gpio";
++		reg = <0x0 0x2320000 0x0 0x10000>;
++		interrupts = <0 37 0x4>; /* Level high type */
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++	};
++
++	gpio3: gpio at 2330000 {
++		compatible = "fsl,ls2080a-gpio";
++		reg = <0x0 0x2330000 0x0 0x10000>;
++		interrupts = <0 37 0x4>; /* Level high type */
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++	};
++
++	i2c0: i2c at 2000000 {
++		compatible = "fsl,vf610-i2c";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x0 0x2000000 0x0 0x10000>;
++		interrupts = <0 34 0x4>; /* Level high type */
++		clock-names = "i2c";
++		clocks = <&clockgen 4 3>;
++	};
++
++	i2c1: i2c at 2010000 {
++		compatible = "fsl,vf610-i2c";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x0 0x2010000 0x0 0x10000>;
++		interrupts = <0 34 0x4>; /* Level high type */
++		clock-names = "i2c";
++		clocks = <&clockgen 4 3>;
++	};
++
++	i2c2: i2c at 2020000 {
++		compatible = "fsl,vf610-i2c";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x0 0x2020000 0x0 0x10000>;
++		interrupts = <0 35 0x4>; /* Level high type */
++		clock-names = "i2c";
++		clocks = <&clockgen 4 3>;
++	};
++
++	i2c3: i2c at 2030000 {
++		compatible = "fsl,vf610-i2c";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x0 0x2030000 0x0 0x10000>;
++		interrupts = <0 35 0x4>; /* Level high type */
++		clock-names = "i2c";
++		clocks = <&clockgen 4 3>;
++	};
++
++	ifc: ifc at 2240000 {
++		compatible = "fsl,ifc", "simple-bus";
++		reg = <0x0 0x2240000 0x0 0x20000>;
++		interrupts = <0 21 0x4>; /* Level high type */
++		little-endian;
++		#address-cells = <2>;
++		#size-cells = <1>;
++
++		ranges = <0 0 0x5 0x80000000 0x08000000
++			  2 0 0x5 0x30000000 0x00010000
++			  3 0 0x5 0x20000000 0x00010000>;
++	};
++
++	qspi: quadspi at 20c0000 {
++		compatible = "fsl,vf610-qspi";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x0 0x20c0000 0x0 0x10000>,
++		      <0x0 0x20000000 0x0 0x10000000>;
++		reg-names = "QuadSPI", "QuadSPI-memory";
++		interrupts = <0 25 0x4>; /* Level high type */
++		clocks = <&clockgen 4 3>, <&clockgen 4 3>;
++		clock-names = "qspi_en", "qspi";
++	};
++
++	pcie at 3400000 {
++		compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
++		reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
++		       0x10 0x00000000 0x0 0x00001000>; /* configuration space */
++		reg-names = "regs", "config";
++		interrupts = <0 108 0x4>; /* Level high type */
++		interrupt-names = "intr";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		num-lanes = <4>;
++		bus-range = <0x0 0xff>;
++		ranges = <0x81000000 0x0 0x00000000 0x10 0x00010000 0x0 0x00010000   /* downstream I/O */
++			  0x82000000 0x0 0x40000000 0x10 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++		msi-parent = <&its>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 7>;
++		interrupt-map = <0000 0 0 1 &gic 0 0 0 109 4>,
++				<0000 0 0 2 &gic 0 0 0 110 4>,
++				<0000 0 0 3 &gic 0 0 0 111 4>,
++				<0000 0 0 4 &gic 0 0 0 112 4>;
++	};
++
++	pcie at 3500000 {
++		compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
++		reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
++		       0x12 0x00000000 0x0 0x00001000>; /* configuration space */
++		reg-names = "regs", "config";
++		interrupts = <0 113 0x4>; /* Level high type */
++		interrupt-names = "intr";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		num-lanes = <4>;
++		bus-range = <0x0 0xff>;
++		ranges = <0x81000000 0x0 0x00000000 0x12 0x00010000 0x0 0x00010000   /* downstream I/O */
++			  0x82000000 0x0 0x40000000 0x12 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++		msi-parent = <&its>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 7>;
++		interrupt-map = <0000 0 0 1 &gic 0 0 0 114 4>,
++				<0000 0 0 2 &gic 0 0 0 115 4>,
++				<0000 0 0 3 &gic 0 0 0 116 4>,
++				<0000 0 0 4 &gic 0 0 0 117 4>;
++	};
++
++	pcie at 3600000 {
++		compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
++		reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
++		       0x14 0x00000000 0x0 0x00001000>; /* configuration space */
++		reg-names = "regs", "config";
++		interrupts = <0 118 0x4>; /* Level high type */
++		interrupt-names = "intr";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		num-lanes = <8>;
++		bus-range = <0x0 0xff>;
++		ranges = <0x81000000 0x0 0x00000000 0x14 0x00010000 0x0 0x00010000   /* downstream I/O */
++			  0x82000000 0x0 0x40000000 0x14 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++		msi-parent = <&its>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 7>;
++		interrupt-map = <0000 0 0 1 &gic 0 0 0 119 4>,
++				<0000 0 0 2 &gic 0 0 0 120 4>,
++				<0000 0 0 3 &gic 0 0 0 121 4>,
++				<0000 0 0 4 &gic 0 0 0 122 4>;
++	};
++
++	pcie at 3700000 {
++		compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
++		reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
++		       0x16 0x00000000 0x0 0x00001000>; /* configuration space */
++		reg-names = "regs", "config";
++		interrupts = <0 123 0x4>; /* Level high type */
++		interrupt-names = "intr";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		num-lanes = <4>;
++		bus-range = <0x0 0xff>;
++		ranges = <0x81000000 0x0 0x00000000 0x16 0x00010000 0x0 0x00010000   /* downstream I/O */
++			  0x82000000 0x0 0x40000000 0x16 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++		msi-parent = <&its>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 7>;
++		interrupt-map = <0000 0 0 1 &gic 0 0 0 124 4>,
++				<0000 0 0 2 &gic 0 0 0 125 4>,
++				<0000 0 0 3 &gic 0 0 0 126 4>,
++				<0000 0 0 4 &gic 0 0 0 127 4>;
++	};
++
++	sata0: sata at 3200000 {
++		compatible = "fsl,ls2080a-ahci", "fsl,ls1021a-ahci";
++		reg = <0x0 0x3200000 0x0 0x10000>;
++		interrupts = <0 133 0x4>; /* Level high type */
++		clocks = <&clockgen 4 3>;
++	};
++
++	sata1: sata at 3210000 {
++		compatible = "fsl,ls2080a-ahci", "fsl,ls1021a-ahci";
++		reg = <0x0 0x3210000 0x0 0x10000>;
++		interrupts = <0 136 0x4>; /* Level high type */
++		clocks = <&clockgen 4 3>;
++	};
++
++	usb0: usb3 at 3100000 {
++		compatible = "snps,dwc3";
++		reg = <0x0 0x3100000 0x0 0x10000>;
++		interrupts = <0 80 0x4>; /* Level high type */
++		dr_mode = "host";
++	};
++
++	usb1: usb3 at 3110000 {
++		compatible = "snps,dwc3";
++		reg = <0x0 0x3110000 0x0 0x10000>;
++		interrupts = <0 81 0x4>; /* Level high type */
++		dr_mode = "host";
++	};
++
++	ccn at 4000000 {
++		compatible = "arm,ccn-504";
++		reg = <0x0 0x04000000 0x0 0x01000000>;
++		interrupts = <0 12 4>;
+ 	};
+ };
 -- 
 1.7.9.5
