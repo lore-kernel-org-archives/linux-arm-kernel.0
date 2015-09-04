@@ -1,43 +1,84 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 04 Sep 2015 17:40:57 +0100
-Subject: [RFC PATCH] arm64: cpuinfo: reduce cache contention on
- update_{feature}_support
-In-Reply-To: <1441382651-12058-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1441382651-12058-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <55E9C999.1090503@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  4 Sep 2015 17:50:08 +0100
+Subject: [PATCH v4 1/4] of/pci: Add of_pci_check_probe_only to parse "linux,
+ pci-probe-only"
+In-Reply-To: <1441385411-7624-1-git-send-email-marc.zyngier@arm.com>
+References: <1441385411-7624-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1441385411-7624-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/15 17:04, Yury Norov wrote:
-> This patch is on top of https://lkml.org/lkml/2015/9/2/413
->
-> In master, there's only a single function -
-> 	update_mixed_endian_el0_support
-> And similar function is on review mentioned above.
->
-> The algorithm for them is like this:
->   - there's system-wide boolean marker for the feature that is
->     initially enabled;
->   - there's also updater for the feature that may disable it
->     system-widely if feature is not supported on current CPU.
->   - updater is called for each CPU on bootup.
->
-> The problem is the way updater does its work. On each CPU, it
-> unconditionally updates system-wide marker. For multi-core
-> system it makes CPU issue invalidate message for a cache
-> line containing marker. This invalidate increases cache
-> contention for nothing, because there's a single marker reset
-> that is really needed, and the others are useless.
->
-> If the number of system-wide markers of this sort will grow,
-> it may become a trouble on large-scale SOCs. The fix is trivial,
-> though: do system-wide marker update conditionally, and preserve
-> corresponding cache line in shared state for all update() calls,
-> except, probably, one.
+Both pci-host-generic and Pseries parse the "linux,pci-probe-only"
+property to engage the PCI_PROBE_ONLY mode, and both have a subtle
+bug that can be triggered if the property has no parameter.
 
-As I have mentioned already, this patch (and the per feature functions)
-won't be needed once we merge my series (which is waiting for the merge
-window to see the public lights)
+Provide a generic, safe implementation that can be used by both.
 
-Cheers
-Suzuki
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/of/of_pci.c    | 28 ++++++++++++++++++++++++++++
+ include/linux/of_pci.h |  3 +++
+ 2 files changed, 31 insertions(+)
+
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 5751dc5..5dd4966 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -118,6 +118,34 @@ int of_get_pci_domain_nr(struct device_node *node)
+ EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
+ 
+ /**
++ * of_pci_check_probe_only - Setup probe only mode if linux,pci-probe-only
++ *                           is present and valid
++ *
++ * @node: device tree node that may contain the property (usually "chosen")
++ *
++ */
++void of_pci_check_probe_only(void)
++{
++	u32 val;
++	int ret;
++
++	ret = of_property_read_u32(of_chosen, "linux,pci-probe-only", &val);
++	if (ret) {
++		if (ret == -ENODATA || ret == -EOVERFLOW)
++			pr_warn("linux,pci-probe-only without valid value, ignoring\n");
++		return;
++	}
++
++	if (val)
++		pci_add_flags(PCI_PROBE_ONLY);
++	else
++		pci_clear_flags(PCI_PROBE_ONLY);
++
++	pr_info("PCI: PROBE_ONLY %sabled\n", val ? "en" : "dis");
++}
++EXPORT_SYMBOL_GPL(of_pci_check_probe_only);
++
++/**
+  * of_pci_dma_configure - Setup DMA configuration
+  * @dev: ptr to pci_dev struct of the PCI device
+  *
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index 29fd3fe..38c0533 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -17,6 +17,7 @@ int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
+ int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+ int of_get_pci_domain_nr(struct device_node *node);
+ void of_pci_dma_configure(struct pci_dev *pci_dev);
++void of_pci_check_probe_only(void);
+ #else
+ static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
+ {
+@@ -53,6 +54,8 @@ of_get_pci_domain_nr(struct device_node *node)
+ }
+ 
+ static inline void of_pci_dma_configure(struct pci_dev *pci_dev) { }
++
++static inline void of_pci_check_probe_only(void) { }
+ #endif
+ 
+ #if defined(CONFIG_OF_ADDRESS)
+-- 
+2.1.4
