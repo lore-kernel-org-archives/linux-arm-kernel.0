@@ -1,24 +1,42 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 4 Sep 2015 09:24:02 -0700
-Subject: [PATCH v2] clk: rockchip: Add pclk_peri to critical clocks on
- RK3066/RK3188
-In-Reply-To: <CABgxDoLgqfzO-Sb_rKHe=-GuMaKWMihHhktx6sDSM6M=Q+Koaw@mail.gmail.com>
-References: <1440322357-2621-1-git-send-email-romain.perier@gmail.com>
- <CABgxDo+otZrYoqTNK-ea=L6Dsd5p_b_MFCi4H4XJZZ25PV_qnA@mail.gmail.com>
- <CABgxDoLgqfzO-Sb_rKHe=-GuMaKWMihHhktx6sDSM6M=Q+Koaw@mail.gmail.com>
-Message-ID: <20150904162402.GN15099@codeaurora.org>
+From: leoli@freescale.com (Li Yang)
+Date: Fri, 4 Sep 2015 11:31:19 -0500
+Subject: [PATCH v2 01/10] arm64: Use generic Layerscape SoC family naming
+ & rename LS2085A to LS2080A
+In-Reply-To: <1441349872-4560-2-git-send-email-bhupesh.sharma@freescale.com>
+References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1441349872-4560-2-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <CADRPPNQbTPrJ47SKsA=EaPi7xo8+0hQqEpt3wDPKMbL1vTOr9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04, Romain Perier wrote:
-> Hi all,
-> 
-> just a reminder, I sent this patch two weeks ago, rk3xxx-based
-> platforms still need it, it fixes a freeze during boot.
+On Fri, Sep 4, 2015 at 1:57 AM, Bhupesh Sharma
+<bhupesh.sharma@freescale.com> wrote:
+> Freescale will be a churning out a host of ARMv8 based SoCs which
+> will be based on a similar overall SoC architecture. So, this patch
+> converts the existing infrastructure in the arm64/dts, arm64/Kconfig
+> and arm64/configs to use the generic convention ARCH_LAYERSCAPE
+> in place of the more specific FSL_LS2085A, to save code duplication
+> later-on.
+>
+> Also Freescale is renaming LS2085A to LS2080A.
+>
+> This patch addresses the above two points.
+>
+> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> ---
+{snip}
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> @@ -1,7 +1,7 @@
+>  /*
+> - * Device Tree Include file for Freescale Layerscape-2085A family SoC.
+> + * Device Tree Include file for Freescale Layerscape-2080A family SoC.
+>   *
+> - * Copyright (C) 2014, Freescale Semiconductor
+> + * Copyright (C) 2014-15, Freescale Semiconductor
 
-Sorry I thought that Linus W was going to pick this up? If not,
-we can take it through clk tree as a fix for -rc1.
+Normally we spell out the whole 2015.  The preferred copyright template is:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Copyright 2014-2015 Freescale Semiconductor, Inc.
+
+- Leo
