@@ -1,83 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Sep 2015 15:23:26 +0100
-Subject: Cortex A9 MP: ARM errata 754323 implementation?
-In-Reply-To: <55E9A412.8030806@gmail.com>
-References: <55E7F965.8080802@de.bosch.com>
- <20150903080502.GT21084@n2100.arm.linux.org.uk>
- <55E80449.9040308@de.bosch.com>
- <20150903172947.GG5019@e104818-lin.cambridge.arm.com>
- <55E9A412.8030806@gmail.com>
-Message-ID: <20150904142325.GG17253@e104818-lin.cambridge.arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 4 Sep 2015 16:47:19 +0200
+Subject: [PATCH 2/2] arm/arm64: KVM: arch timer: Reset CNTV_CTL to 0
+In-Reply-To: <1441376679-8341-3-git-send-email-christoffer.dall@linaro.org>
+References: <1441376679-8341-1-git-send-email-christoffer.dall@linaro.org>
+ <1441376679-8341-3-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <20150904144719.GJ5171@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 04, 2015 at 04:00:50PM +0200, Dirk Behme wrote:
-> On 03.09.2015 19:29, Catalin Marinas wrote:
-> >On Thu, Sep 03, 2015 at 10:26:49AM +0200, Dirk Behme wrote:
-> >>On 03.09.2015 10:05, Russell King - ARM Linux wrote:
-> >>>On Thu, Sep 03, 2015 at 09:40:21AM +0200, Dirk Behme wrote:
-> >>>>looking through the ARM Cortex A9 errata list [1] I wonder why we don't have
-> >>>>a workaround for
-> >>>>
-> >>>>(754323) Repeated Store in the same cache line might delay the visibility of
-> >>>>the Store
-> >>>>
-> >>>>in the kernel? Or have I missed it?
-> >>>
-> >>>The policy for errata is not to implement them unless there's a requirement
-> >>>to do so - and then the errata should be implemented in board firmware in
-> >>>preference to the kernel where possible.
-> >>>
-> >>>Are you seeing a problem directly attributable to this errata?
-> >>
-> >>I got a report from some internal testing that an issue they see goes away
-> >>if they enable 754327. I rejected this because i.MX6 is > r2p0 and therefore
-> >>can't be affected by this errata. Looking through the list of erratas I then
-> >>found the related 754323 which seems to apply to i.MX6, but is not
-> >>implemented.
-> >
-> >These errata are usually harmless, in most cases it prevents the system
-> >from making progress (like flag update not visible while being polled by
-> >another CPU), hence the workaround makes cpu_relax() a barrier since
-> >most polling loops should use it.
-> >
-> >>The issue we are talking about is
-> >>
-> >>Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
-> >>PC is at kfree+0x10c/0x238
-> >>LR is at release_firmware+0x5c/0x70
-> >>
-> >>which is said to be triggered by this code
-> >>
-> >>void kfree(const void *x)
-> >>...
-> >>page = virt_to_head_page(x);
-> >>if (unlikely(!PageSlab(page))) {
-> >>BUG_ON(!PageCompound(page));
-> >>...
-> >>
-> >>on a custom 3.14.x kernel. I haven't looked into this myself, but at least
-> >>two people think that the kmalloc/kfree is correct with the
-> >>request_firmware()/release_firmware() usage in the driver.
-> >
-> >I don't see how the erratum above would trigger a BUG. It's possible
-> >that there are some memory ordering issues (and A9 has some read after
-> >read bugs) that are hidden when enabling the barrier in cpu_relax().
+On Fri, Sep 04, 2015 at 04:24:39PM +0200, Christoffer Dall wrote:
+> Provide a better quality of implementation and be architecture compliant
+> on ARMv7 for the architected timer by resetting the CNTV_CTL to 0 on
+> reset of the timer, and call kvm_timer_update_state(vcpu) at the same
+> time, ensuring the timer output is not asserted after, for example, a
+> PSCI system reset.
+
+forgot to remove the bit about kvm_timer_update_state(vcpu) which is no
+longer valid when these patches are merged before the rework series.
+
+Marc, if you're otherwise happy with this patch, can you fix this up at
+commit time?
+
+Thanks,
+-Christoffer
+
 > 
-> Do you have anything specific in mind we could try? Besides enabling 754327?
-
-You may hit erratum 761319. There is a more detailed explanation here:
-
-http://infocenter.arm.com/help/topic/com.arm.doc.uan0004a/UAN0004A_a9_read_read.pdf
-
-But there isn't much we can do in the kernel, other than recompiling it
-with a gcc that can work around the erratum. Searching for this erratum
-number and gcc seems to show some patches adding
--mfix-cortex-a9-volatile-hazards but I can't tell when/whether they've
-been merged in gcc.
-
-For this specific case, you could place a DMB (smp_mb) before BUG_ON to
-see if this hunk is causing the problem.
-
--- 
-Catalin
+> This change alone fixes the UEFI reset issue reported by Laszlo back in
+> February.
+> 
+> Cc: Laszlo Ersek <lersek@redhat.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Drew Jones <drjones@redhat.com>
+> Cc: Wei Huang <wei@redhat.com>
+> Cc: Peter Maydell <peter.maydell@linaro.org>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/arm/arch_timer.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 76e38d2..48c6e1a 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -200,6 +200,14 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>  	timer->irq = irq;
+>  
+>  	/*
+> +	 * The bits in CNTV_CTL are architecturally reset to UNKNOWN for ARMv8
+> +	 * and to 0 for ARMv7.  We provide an implementation that always
+> +	 * resets the timer to be disabled and unmasked and is compliant with
+> +	 * the ARMv7 architecture.
+> +	 */
+> +	timer->cntv_ctl = 0;
+> +
+> +	/*
+>  	 * Tell the VGIC that the virtual interrupt is tied to a
+>  	 * physical interrupt. We do that once per VCPU.
+>  	 */
+> -- 
+> 2.1.2.330.g565301e.dirty
+> 
