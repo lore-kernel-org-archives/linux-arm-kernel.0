@@ -1,47 +1,30 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 04 Sep 2015 09:36:36 +0200
-Subject: [PATCH V2] clockevents/drivers/mtk: Fix spurious interrupt leading
- to crash
-In-Reply-To: <1441350953.12270.6.camel@mtksdaap41>
-References: <1440426924.17418.11.camel@mtksdaap41>		
- <1440453450-21203-1-git-send-email-daniel.lezcano@linaro.org>	
- <1440508871.29634.1.camel@mtksdaap41> <55DDCC4B.7010203@linaro.org>
- <1441350953.12270.6.camel@mtksdaap41>
-Message-ID: <55E94A04.90006@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 4 Sep 2015 09:39:30 +0200
+Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
+In-Reply-To: <1441310314-8857-8-git-send-email-lina.iyer@linaro.org>
+References: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
+ <1441310314-8857-8-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAMuHMdUROhCFOLWqABY3G_VaOavz5crDsM4z6KkGcBOEQtXj_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2015 09:15 AM, Yingjoe Chen wrote:
-> On Wed, 2015-08-26 at 16:25 +0200, Daniel Lezcano wrote:
->> On 08/25/2015 03:21 PM, Yingjoe Chen wrote:
->>> Tested-by: Yingjoe Chen<yingjoe.chen@mediatek.com>
->>
->> Applied to my tree for 4.4.
->>
->>     -- Daniel
->>
->
-> Hi Daniel,
->
-> I can't find this patch in
-> https://git.linaro.org/people/daniel.lezcano/linux.git
-> Is this tree public now? Where can I see it?
->
-> Also, will you take patch[1] "clocksource: mediatek: Use GPT as sched
-> clock source" in your tree?
+On Thu, Sep 3, 2015 at 9:58 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Enable runtime PM for CPU devices. Do a runtime get of the CPU device
+> when the CPU is hotplugged in and a runtime put of the CPU device when
 
-Yep. I did not push my branch. Done.
+s/in/on/
 
-Note it will be also available for linux-next.
+> the CPU is hotplugged off. When all the CPUs in a domain are hotplugged
+> off, the domain may also be powered off and cluster_pm_enter/exit()
+> notifications are be sent out.
 
-Thanks for the head up.
+Gr{oetje,eeting}s,
 
-   -- Daniel
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
