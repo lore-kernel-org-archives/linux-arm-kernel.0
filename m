@@ -1,49 +1,52 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 4 Sep 2015 13:48:30 +0200
-Subject: [PATCH] ARM: ux500: fix typo in regulator names
-In-Reply-To: <1438777340-27511-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1438777340-27511-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <CAPDyKFqRz1QyfWXzcDde0J9Fc7gTZWQOFGNzU=2cg1JnMyrL+g@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Fri, 04 Sep 2015 13:00:10 +0100
+Subject: [PATCH 1/3] arm64/cpufeature.h: Add macros for a cpu features
+ testing
+In-Reply-To: <1441303911-9421-1-git-send-email-kuleshovmail@gmail.com>
+References: <1441303911-9421-1-git-send-email-kuleshovmail@gmail.com>
+Message-ID: <55E987CA.4090302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 August 2015 at 14:22, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
-> Apparently an extra _reg suffix was appended to the end of the names of
-> regulators ab8500_ext2_reg and ab8500_ext3_reg.
+On 03/09/15 19:11, Alexander Kuleshov wrote:
+> This patch provides a couple of macros for the testing of processor
+> features (crypto and FP/SIMD) like support of SHA1, AES instructions,
+> support for FPU and etc. There is already a couple of places in the
+> arch/arm64/kernel where these processor features are tested and these
+> macros are facilitate this.
 >
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-
-You should probably include Linus Walleij as he is the maintainer of ux500.
-
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-
+> Signed-off-by: Alexander Kuleshov <kuleshovmail@gmail.com>
 > ---
->  arch/arm/boot/dts/ste-snowball.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>   arch/arm64/include/asm/cpufeature.h | 44 +++++++++++++++++++++++++++++++++++++
+>   1 file changed, 44 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-> index 32a5ccb14e7e..07c0e346942c 100644
-> --- a/arch/arm/boot/dts/ste-snowball.dts
-> +++ b/arch/arm/boot/dts/ste-snowball.dts
-> @@ -360,11 +360,11 @@
->                                                 regulator-name = "ab8500-ext-supply1";
->                                         };
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index c104421..2919455 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -28,7 +28,50 @@
 >
-> -                                       ab8500_ext2_reg_reg: ab8500_ext2 {
-> +                                       ab8500_ext2_reg: ab8500_ext2 {
->                                                 regulator-name = "ab8500-ext-supply2";
->                                         };
+>   #define ARM64_NCAPS				4
 >
-> -                                       ab8500_ext3_reg_reg: ab8500_ext3 {
-> +                                       ab8500_ext3_reg: ab8500_ext3 {
->                                                 regulator-name = "ab8500-ext-supply3";
->                                         };
->                                 };
-> --
-> 2.4.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> +/*
+> + * ID_AA64ISAR0_EL1 AES, bits [7:4]
+> + */
+> +#define ID_AA64ISAR0_EL1_AES_MASK	4
+> +#define ID_AA64ISAR0_EL1_AES(feature)	\
+> +	(((feature >> ID_AA64ISAR0_EL1_AES_MASK) & 0xf) & 1UL)
+> +#define ID_AA64ISAR0_EL1_PMULL(feature)	\
+> +	(((feature >> ID_AA64ISAR0_EL1_AES_MASK) & 0xf) & 2UL)
+> +
+
+
+There is generic CPUID feature helper queued for 4.3, which can extract
+the feature bits
+
+  cpuid_feature_extract_field(feature, shift)
+
+You might want to use it instead. Btw, I have a patch series(waiting for
+the merge window, before I post), which changes the way we initialise the
+HWCAP bits.
+
+Thanks
+Suzuki
