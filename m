@@ -1,61 +1,45 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 04 Sep 2015 19:46:04 +0200
-Subject: Porting MIPS IRQ handler to ARM
-In-Reply-To: <yw1x8u8mxht2.fsf@unicorn.mansr.com>
-References: <55E5CED8.7000408@free.fr>
- <55E5D945.3040504@gmail.com>	<55E722F2.50905@free.fr>
- <yw1xy4goyc3z.fsf@unicorn.mansr.com>	<55E73971.8030406@free.fr>
- <55E9C33A.2080801@free.fr> <yw1x8u8mxht2.fsf@unicorn.mansr.com>
-Message-ID: <55E9D8DC.6090201@free.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Sep 2015 18:46:59 +0100
+Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
+In-Reply-To: <20150904170211.GF876@linaro.org>
+References: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
+ <1441310314-8857-8-git-send-email-lina.iyer@linaro.org>
+ <20150904091735.GC21084@n2100.arm.linux.org.uk>
+ <20150904092716.GD21084@n2100.arm.linux.org.uk>
+ <20150904151202.GA876@linaro.org>
+ <20150904162325.GG21084@n2100.arm.linux.org.uk>
+ <20150904170211.GF876@linaro.org>
+Message-ID: <20150904174659.GH21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2015 18:36, M?ns Rullg?rd wrote:
-
-> Mason wrote:
+On Fri, Sep 04, 2015 at 11:02:11AM -0600, Lina Iyer wrote:
+> On Fri, Sep 04 2015 at 10:23 -0600, Russell King - ARM Linux wrote:
+> >You're taking the behaviour of the hardware you have in front of you
+> >and claiming that it's true everywhere, and shoving that into generic
+> >code.
+> >
+> >I know, for example on OMAP, you have to power up the CPU first before
+> >you can "wake" it.
+> >
+> >I wouldn't be surprised if other SoCs are like that: where they require
+> >the CPU core to be powered and held in reset, before releasing the reset
+> >to then allow them to start executing the secondary core bringup.
+> >
+> It would still require that the CPU's domain be powered on in the hw,
+> before the CPU can run Linux.
 > 
->> There's just too much DT syntax that flies light-years over my head.
->> #address-cells, #size-cells, #interrupt-cells, ranges, aliases, etc.
->> Basically, all I understand is /dts-v1/;
->> (Anyone have links to good tutorials?)
->>
->> I've attached the current version I'm playing with (I tried to make it
->> as small as possible). If some charitable soul spots an obvious problem...
->> (Commented blocks have been tested uncommented, of course.)
-> 
-> What happens when you try to boot with this device tree?
+> >Relying on hardware to do this sounds really fragile and bad design to
+> >me.
+> >
+> >If you want to persue your current design, don't make it generic code,
+> >because it's got no right to be generic with assumptions like that.
+> >
+> Hmm, okay. I can look at alternatives like  hotplug notifiers.
 
-It panics in tangox_irq_init IIRC.
+How about putting the pm resume in path of the _requesting_ CPU?
+IOW, in __cpu_up().
 
-> Are you sure these addresses are correct?  Those are the values from
-> tango3.
-
-AFAIU, that HW block hasn't changed in a long time, but I'll
-double-check to be sure.
-
->> 			interrupt-parent = <&gic>;
->> 			interrupt-controller;
->> 			#address-cells = <1>;
->> 			#size-cells = <1>;
->>
->> 			irqintc: irq at 000 {
->> 				reg = <0x000 0x100>;
->> 				interrupt-controller;
->> 				#interrupt-cells = <2>;
->> 				interrupts = <2>;
-> 
-> This "interrupts" specification is wrong for a source wired into the
-> GIC.  For the correct format, see the binding spec in
-> Documentation/devicetree/bindings/arm/gic.txt:
-
-Doooh! I'd read that document (about 12 times) but for some
-reason, it never occurred to me that I had to follow the
-syntax for the intc (although that seems obvious now that
-you mention it).
-
-I suspect you've nailed my problem. Wish I could test right
-away, but it'll have to wait after the weekend.
-
-Thanks (again).
-
-Regards.
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
