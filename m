@@ -1,89 +1,63 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri,  4 Sep 2015 18:00:12 +0200
-Subject: [PATCH v2 1/8] clk: imx: add common logic to detect early UART usage
-In-Reply-To: <1441382419-4343-1-git-send-email-l.stach@pengutronix.de>
-References: <1441382419-4343-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1441382419-4343-2-git-send-email-l.stach@pengutronix.de>
+Date: Fri,  4 Sep 2015 18:00:11 +0200
+Subject: [PATCH v2 0/8] i.MX early debug UART clock fixes
+Message-ID: <1441382419-4343-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both earlycon and eralyprintk depend on the bootloader setup UART
-clocks being retained. This patch adds the common logic to detect such
-situations and make the information available to the clock drivers, as
-well as adding the facilities to disable those clocks at the end of
-the kernel init.
+This series fixes a long standing interaction issue between the
+kernels early debug facilities and the i.MX clock drivers.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- drivers/clk/imx/clk.c | 46 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/imx/clk.h |  1 +
- 2 files changed, 47 insertions(+)
+Both earlyprintk and earlycon rely on the bootloader setup clocks
+for the UARTs to be retained during kernel init. As those clocks are
+only enabled in hardware, but not referenced in software they (or even
+their parent clocks) may get disabled as a result of other clocks being
+en-/disabled during boot.
 
-diff --git a/drivers/clk/imx/clk.c b/drivers/clk/imx/clk.c
-index df12b5307175..3357e29e43ab 100644
---- a/drivers/clk/imx/clk.c
-+++ b/drivers/clk/imx/clk.c
-@@ -73,3 +73,49 @@ void imx_cscmr1_fixup(u32 *val)
- 	*val ^= CSCMR1_FIXUP;
- 	return;
- }
-+
-+static int __initdata imx_keep_uart_clocks;
-+static struct clk __initdata ***imx_uart_clocks;
-+
-+static int __init imx_keep_uart_clocks_param(char *str)
-+{
-+	imx_keep_uart_clocks = 1;
-+
-+	return 0;
-+}
-+__setup_param("earlycon", imx_keep_uart_earlycon,
-+	      imx_keep_uart_clocks_param, 0);
-+__setup_param("earlyprintk", imx_keep_uart_earlyprintk,
-+	      imx_keep_uart_clocks_param, 0);
-+
-+void __init imx_register_uart_clocks(struct clk **clks[])
-+{
-+	if (imx_keep_uart_clocks) {
-+		int i;
-+
-+		imx_uart_clocks = clks;
-+		for (i = 0;; i++) {
-+			if (imx_uart_clocks[i])
-+				clk_prepare_enable(*imx_uart_clocks[i]);
-+			else
-+				break;
-+		}
-+	}
-+}
-+
-+static int __init imx_clk_disable_uart(void)
-+{
-+	if (imx_keep_uart_clocks) {
-+		int i;
-+
-+		for (i = 0;; i++) {
-+			if (imx_uart_clocks[i])
-+				clk_disable_unprepare(*imx_uart_clocks[i]);
-+			else
-+				break;
-+		}
-+	}
-+
-+	return 0;
-+}
-+late_initcall_sync(imx_clk_disable_uart);
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index 1049b0c7d818..c4e2e282e892 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -7,6 +7,7 @@
- extern spinlock_t imx_ccm_lock;
- 
- void imx_check_clocks(struct clk *clks[], unsigned int count);
-+void imx_register_uart_clocks(struct clk **clks[]);
- 
- extern void imx_cscmr1_fixup(u32 *val);
- 
+This results in missing messages from the early debug console until the
+regular system console takes over, or even worse system hangs in response
+to unclocked register accesses. This renders those debugging facilities a
+lot less useful.
+
+The fix implemented here is to check if any of this early debugging is
+enabled and keep the UART clocks referenced and enabled in that case.
+The clocks will then only be disabled at the end of kernel init, at which
+point the real console should have taken over and the early outputs being
+disabled.
+
+I've runtime tested this on i.MX6Q and i.MX53, other platforms are only
+compile tested. This is mostly a mechanical change, but still I would
+appreciate some testing.
+
+Changes since v1:
+- reworked logic to require significantly less code in the individual
+  clock drivers
+
+Regards,
+Lucas
+
+Lucas Stach (8):
+  clk: imx: add common logic to detect early UART usage
+  clk: imx25: retain early UART clocks during kernel init
+  clk: imx27: retain early UART clocks during kernel init
+  clk: imx31: retain early UART clocks during kernel init
+  clk: imx35: retain early UART clocks during kernel init
+  clk: imx5: retain early UART clocks during kernel init
+  clk: imx6: retain early UART clocks during kernel init
+  clk: imx7d: retain early UART clocks during kernel init
+
+ drivers/clk/imx/clk-imx25.c       | 10 +++++++++
+ drivers/clk/imx/clk-imx27.c       | 11 ++++++++++
+ drivers/clk/imx/clk-imx31.c       | 10 +++++++++
+ drivers/clk/imx/clk-imx35.c       |  8 +++++++
+ drivers/clk/imx/clk-imx51-imx53.c | 14 ++++++++++++
+ drivers/clk/imx/clk-imx6q.c       |  6 +++++
+ drivers/clk/imx/clk-imx6sl.c      |  6 +++++
+ drivers/clk/imx/clk-imx6sx.c      |  6 +++++
+ drivers/clk/imx/clk-imx7d.c       | 11 ++++++++++
+ drivers/clk/imx/clk.c             | 46 +++++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk.h             |  1 +
+ 11 files changed, 129 insertions(+)
+
 -- 
 2.5.0
