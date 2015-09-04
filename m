@@ -1,33 +1,39 @@
-From: nikhil.badola@freescale.com (Nikhil Badola)
-Date: Fri, 4 Sep 2015 10:16:56 +0530
-Subject: [PATCH 3/3][v4] arm: dts: ls1021a: Add quirk for Erratum A009116
-Message-ID: <1441342016-17428-1-git-send-email-nikhil.badola@freescale.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Fri, 4 Sep 2015 07:46:24 +0200
+Subject: [PATCH v3 01/18] platform: delay OF device-driver matches until
+ late_initcall
+In-Reply-To: <20150810102515.GA1965@sirena.org.uk>
+References: <1438870315-18689-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1438870315-18689-2-git-send-email-tomeu.vizoso@collabora.com>
+ <CAL_Jsq+GLMZe-f6qEi=7i1YrrWc6k99RpGkOyCd5KkYDiyt0QA@mail.gmail.com>
+ <CAAObsKBapFqzr+4YEXJfcJWMd+tkaBqYbGiFTntHStAP=+P-_Q@mail.gmail.com>
+ <55C4E597.1010701@ti.com>
+ <CAAObsKDJsuhuQfLbxq27Mtm1T_Auz7Gohp8PDyK7rNNDyaGhcg@mail.gmail.com>
+ <20150810102515.GA1965@sirena.org.uk>
+Message-ID: <CAAObsKB0XiqquxFxAnH5LzenrcY8SbH69qPW25m6R9B09DQT5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "snps,quirk-frame-length-adjustment" property to
-USB3 node for erratum A009116. This property provides
-value of GFLADJ_30MHZ for post silicon frame length
-adjustment.
+On 10 August 2015 at 12:25, Mark Brown <broonie@kernel.org> wrote:
+> On Sun, Aug 09, 2015 at 03:03:14PM +0200, Tomeu Vizoso wrote:
+>
+>> There was some recent thread about how the disabling of unused clocks
+>> and regulators isn't really safe because after late_initcall_sync more
+>> drivers can be registered from modules. Furthermore, there's async
+>> device probes.
+>
+> What recent thread and why would that be unsafe?
 
-Signed-off-by: Nikhil Badola <nikhil.badola@freescale.com>
----
-Changes for v4: None
+Sorry, I should have said instead that it's already unpredictable and
+that from what I have seen during testing these series doesn't make it
+any worst.
 
- arch/arm/boot/dts/ls1021a.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+Regards,
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index c70bb27..50ac0d4 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -404,6 +404,7 @@
- 			reg = <0x0 0x3100000 0x0 0x10000>;
- 			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
- 			dr_mode = "host";
-+			snps,quirk-frame-length-adjustment = <0x20>;
- 		};
- 	};
- };
--- 
-2.1.0
+Tomeu
+
+> Any driver using a
+> clock or regulator ought to be making sure that the clock or regulator
+> is enabled before it tries to use it.  The worst that should happen is
+> that something gets the power bounced during boot which isn't the end of
+> the world.
