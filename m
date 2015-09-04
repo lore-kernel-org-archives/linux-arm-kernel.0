@@ -1,73 +1,128 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri, 4 Sep 2015 12:24:18 +0530
-Subject: [PATCHv7] ARM: exynos_defconfig: Enable LEDS for Odroid-XU3/XU4
-In-Reply-To: <55E93ECE.60006@samsung.com>
-References: <1441303910-3266-1-git-send-email-linux.amoon@gmail.com>
- <55E8DDDD.80106@samsung.com> <55E8E534.1040204@osg.samsung.com>
- <CANAwSgQOijKEyhvM=DU4nRdGK6v5cxJUZ54pnnG2YqjeT9pBxA@mail.gmail.com>
- <55E93ECE.60006@samsung.com>
-Message-ID: <CANAwSgSEKu2DG5v7DULJFP0QHiSQmf0ru+kHwSsVXDFFOA42gA@mail.gmail.com>
+From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
+Date: Fri, 4 Sep 2015 12:27:42 +0530
+Subject: [PATCH v2 00/10] ARM64: Update support for FSL's LS2085A SoC
+Message-ID: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+This is the v2 of the patchset which updates the support for FSL's LS2085A SoC
+which is now being renamed to LS2080A (and is based on ARMv8 architecture).
 
-On 4 September 2015 at 12:18, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On 04.09.2015 15:20, Anand Moon wrote:
->> Hi All,
->>
->> On 4 September 2015 at 05:56, Javier Martinez Canillas
->> <javier@osg.samsung.com> wrote:
->>> Hello Krzysztof,
->>>
->>> On 09/04/2015 01:55 AM, Krzysztof Kozlowski wrote:
->>>> On 04.09.2015 03:11, Anand Moon wrote:
->>>>> Earlier design of the LED for Odroid XU3 was using gpio-leds
->>>>> Now It was change to using both pwm-leds and gpio-leds.
->>>>
->>>> It is still not a reason for this change. gpio-leds were not enabled
->>>> before. This could be a valid reason of adding LEDS_PWM to existing
->>>> config LEDS_GPIO. But LEDS_GPIO were not enabled... so why the change on
->>>> the board from gpio->(gpio+pwm) means that we have to enable LEDS_GPIO?
->>>>
->>>
->>> Agreed, also the commit message doesn't explain why the heartbeat
->>> LED trigger is enabled as I mentioned in the previous version.
->>>
->>>> Actually I gave up on this and I wanted to change the commit message on
->>>> myself when applying. But discussion was brought up again so... clearly
->>>> we have different understanding of the meaning of "WHY". :)
->>>>
->>>> Best regards,
->>>> Krzysztof
->>>>
->>
->> Just of the records. I you agree with following commit message I will
->> resend the patch.
->> ------------------------------------------------------
->> Exynos boards support GPIO and PWM based LEDs
->>
->> Odroid boards support led activity to indicate the various status
->> Red led - power: hooked up to 5V power
->> Blue led - alive Solid light : u-boot is running
->>                flashing : Kernel is running (heart beat)
->> -------------------------------------------------------
->> If you want to add some thing more please suggest me.
->>
->> Earlier I was just frustrated.
->
-> That commit message looks better. Anyway I applied the patch with
-> changed message. You can find it here:
-> https://github.com/krzk/linux/commit/8b14e57ae423b676873e542944ed8714be211ded
->
-> although it is not pushed to the for-next branch because we are at merge
-> window.
->
-> Best regards,
-> Krzysztof
->
+Here is a description of what this patchset tries to achieve:
 
-Thanks you very much.
+  - Patch 1:
+    Freescale will be a churning out a host of ARMv8 based SoCs which
+    will be based on a similar overall SoC architecture. So, this patch
+    converts the existing infrastructure to use the generic convention
+    ARCH_LAYERSCAPE. Also since Freescale is renaming LS2085A to LS2080A
+    this patch fixes the same as well.
 
--Anand Moon
+    Further details of the LS2080a based platforms can be seen here:
+    http://www.freescale.com/products/arm-processors/qoriq-arm-processors/qoriq-ls2080a-40a-multicore-communications-processors:LS2080A?fsrch=1&sr=1&pageNum=1
+
+  - Patch 2:
+    Adds DTS binding documentation for Freescale's LS2080A QDS and RDB boards
+
+  - Patch 3:
+    This patch adds bindings for QIXIS FPGA controller found on FSL boards.
+
+  - Patch 4:
+    Updates PCIe devicetree binding documentation for LS2080A.
+
+  - Patch 5:
+    Updates clk-qoriq bindings for FSL's chassis-3.0 SoCs
+  
+  - Patch 6:
+    Addresses changes required in clk-qoriq driver to handle
+    little-endian clockgen SoCs like LS2080A.
+
+  - Patch 7:
+    Updates the support of various peripherals (PMU, Watchdog, SMMU,
+    SATA, PCI, SPI, etc.) present on FSL LS2080a SoC in the SoC DTSI.
+
+  - Patch 8:
+    Updates the DTS LS2085a simulator platform to reflect the new
+    peripherals added in the DTSI.
+
+  - Patch 9:
+    Adds new DTS files for LS2085a based QDS and RDB boards.
+  
+  - Patch 10:
+    Adds build support for LS2085a QDS and RDB board DTS files.
+
+Rebasing details:
+-----------------
+- Rebased against arm-soc git tree, branch: next/dt
+
+- Rebased against Scott's latest v2 of QorIQ clk fixes, which can be
+  viewed here:
+  https://patchwork.kernel.org/patch/7020471/
+  https://patchwork.kernel.org/patch/7020541/
+  https://patchwork.kernel.org/patch/7020491/
+  https://patchwork.kernel.org/patch/7020481/
+  https://patchwork.kernel.org/patch/7020501/
+
+Changes since v1:
+----------------
+(v1 can be viewed here: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/334990.html)
+
+- Addressed Mark's comments regarding the FTM alarm timer node.
+	Removed the node for now as the FTM binding change related discussion is
+	underway with the maintainers.
+- Added support for Layerscape family of SoCs and changed name of
+  LS2085a chip to LS2080a chip.
+- Updated QorIQ clk driver to support LS2080a like SoCs.
+- Added support for SATA nodes in the DTSI.
+- Added binding document for on-board QIXIS FPGA controllers.
+
+Note:
+-----
+I get a checkpatch warning for the amba-bus compatible string being missing from
+Documentation/devicetree/bindings/ . I am not aware if some patch is already
+being worked on, to solve the same:
+	compatible = "arm,amba-bus";
+
+If not, I can try to send a patch, with the re-spin of this patchset.
+
+Bhupesh Sharma (9):
+  arm64: Use generic Layerscape SoC family naming & rename LS2085A to
+    LS2080A
+  Documentation: DT: Add entry for FSL LS2080A QDS and RDB boards
+  Documentation/dts: Add bindings for QIXIS FPGA controller found on
+    FSL boards
+  doc/bindings: Update PCIe devicetree binding documentation for
+    LS2080A
+  doc/bindings: Update clk-qoriq bindings for FSL's chassis-3.0 SoCs
+  dts/ls2085a: Update DTSI to add support of various peripherals
+  dts/ls2085a: Update Simulator DTS to add support of various
+    peripherals
+  dts/ls2080a: Add DTS support for LS2080a QDS & RDB boards
+  dts/Makefile: Add build support for LS2080a QDS & RDB board DTS
+
+Scott Wood (1):
+  clk: qoriq: Add ls2080a support.
+
+ .../devicetree/bindings/arm/fsl,board.txt          |   31 +
+ Documentation/devicetree/bindings/arm/fsl.txt      |   16 +-
+ .../devicetree/bindings/clock/qoriq-clock.txt      |   16 +-
+ .../devicetree/bindings/pci/layerscape-pci.txt     |    3 +-
+ arch/arm64/Kconfig                                 |    6 +-
+ arch/arm64/boot/dts/freescale/Makefile             |    2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts  |  198 +++++++
+ .../{fsl-ls2085a-simu.dts => fsl-ls2080a-rdb.dts}  |  126 +++-
+ .../{fsl-ls2085a-simu.dts => fsl-ls2080a-simu.dts} |   64 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |  612 ++++++++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi     |  163 ------
+ arch/arm64/configs/defconfig                       |    2 +-
+ drivers/clk/Kconfig                                |    2 +-
+ drivers/clk/clk-qoriq.c                            |   78 ++-
+ 14 files changed, 1107 insertions(+), 212 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/fsl,board.txt
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
+ copy arch/arm64/boot/dts/freescale/{fsl-ls2085a-simu.dts => fsl-ls2080a-rdb.dts} (52%)
+ rename arch/arm64/boot/dts/freescale/{fsl-ls2085a-simu.dts => fsl-ls2080a-simu.dts} (76%)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+ delete mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+
+-- 
+1.7.9.5
