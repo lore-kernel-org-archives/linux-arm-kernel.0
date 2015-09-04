@@ -1,26 +1,60 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Sep 2015 16:27:48 +0100
-Subject: [PATCH] arm64: ioremap: change ioremap prototype and add
- ioremap_cache macro
-In-Reply-To: <1440663660-24244-1-git-send-email-yalin.wang2010@gmail.com>
-References: <1440663660-24244-1-git-send-email-yalin.wang2010@gmail.com>
-Message-ID: <20150904152748.GB23159@e104818-lin.cambridge.arm.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Fri,  4 Sep 2015 21:02:16 +0530
+Subject: [PATCH 0/5] mmc: sdhci-pxav3: Enable support for PXA1928 SDCHI
+ controller
+Message-ID: <1441380741-13115-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 27, 2015 at 04:21:00PM +0800, yalin wang wrote:
-> This patch change ioremap_*() first parameter type to resource_size_t to
-> be the same as other platforms, and add ioremap_cache macro,
-> because some code will test if this macro is defined or not, and
-> will generate a generric version if not defined, for example,
-> memremap.c do like this.
+PXA1928 SDHCI controller has few differences, for example,
 
-It seems that asm-generic/io.h uses phys_addr_t (which makes more sense
-to me, though they are practically the same).
+                           PXAxxx                    PXA1928
+                           ======                    =======
+   SDCLK_DELAY field       0x10A                     0x114
+   SDCLK_DELAY mask        0x1F                      0x3FF
+   SDCLK_DELAY shift        9                          8
+   SDCLK_SEL shift          8                          2 (SEL1)
 
-> +#define ioremap_cache			ioremap_cache
+So this patch series introduces new compatible device_id
+(marvell,pxav3-1928-sdhci), and makes use of .data for handling
+such differences.
 
-This makes sense.
+The series also adds support like,
+
+ - independent ->set_clock() api, as we need to enable internal clock gate
+    and TX clock
+ - pinctrl configuration based on bus speed.
+ - introduce new quirk SDHCI_QUIRK2_MUST_SET_SDHCI_BUS_POWER
+   SD_BUS_POWER & SD_BUS_VLT bit-fields are used internally to gate the
+   clocks, so it is important to configure them as part of ->set_power()
+   More detailed description is written into commit log.
+ - Enable SDHCI_QUIRK_BROKEN_TIMEOUT_VAL for PXA1928 device_id
+
+
+Testing:
+I have done basic testing on both eMMC and SD card on PXA1928 based
+platform.
+
+Note: I tried to made sure that I do not break any other platform, which
+used sdhci, except HS200 configuration. 
+Unfortunately I do not have access to any other datasheets, where I can
+cross check the details on HS200 bit-fields. Probably someone who has
+access can confirm [PATCH 4/5], whether it impacts other platforms.
+
+Kevin Liu (1):
+  mmc: sdhci-pxav3: Fix HS200 mode support
+
+Vaibhav Hiremath (4):
+  mmc: sdhci-pxav3: Enable pxa1928 device support
+  mmc: sdhci-pxav3: Add platform specific set_clock ops
+  mmc: sdhci-pxav3: Add pinctl setting according to bus clock
+  mmc: sdhci: add new quirk for setting BUS_POWER & BUS_VLT fields
+
+ drivers/mmc/host/sdhci-pltfm.c |   3 +
+ drivers/mmc/host/sdhci-pxav3.c | 168 ++++++++++++++++++++++++++++++++++++++---
+ drivers/mmc/host/sdhci.c       |   3 +-
+ drivers/mmc/host/sdhci.h       |   2 +
+ 4 files changed, 163 insertions(+), 13 deletions(-)
 
 -- 
-Catalin
+1.9.1
