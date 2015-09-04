@@ -1,57 +1,55 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  4 Sep 2015 17:50:07 +0100
-Subject: [PATCH v4 0/4] PCI: arm64/powerpc: Fix parsing of linux,
- pci-probe-only
-Message-ID: <1441385411-7624-1-git-send-email-marc.zyngier@arm.com>
+Date: Fri,  4 Sep 2015 17:50:09 +0100
+Subject: [PATCH v4 2/4] PCI: pci-host-generic: Fix lookup of linux,
+ pci-probe-only property
+In-Reply-To: <1441385411-7624-1-git-send-email-marc.zyngier@arm.com>
+References: <1441385411-7624-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1441385411-7624-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pci-host-generic driver parses the linux,pci-probe-only property,
-and assumes that it will have a boolean parameter.
+When pci-host-generic looks for the probe-only property, it seems
+to trust the DT to be correctly written, and assumes that there
+is a parameter to the property.
 
-Turns out that the Seattle DTS file has a naked "linux,pci-probe-only"
-property, which leads to the driver dereferencing some unsuspecting
-memory location. Nothing really bad happens (we end up reading some
-other bit of DT, fortunately), but that not a reason to keep it this
-way. Turns out that the Pseries code (where this code was lifted from)
-may suffer from the same issue.
+Unfortunately, this is not always the case, and some firmware expose
+this property naked. The driver ends up making a decision based on
+whatever the property pointer points to, which is likely to be junk.
 
-The first patch introduces a common (and fixed) version of that check
-that can be used by drivers and architectures that require it. The two
-following patches change the pci-host-generic driver and the powerpc
-code to use it.
+Switch to the common of_pci.c implementation that doesn't suffer
+from this problem.
 
-Finally, the bad property is removed from the Seatle DTS, because it
-is simply not necessary (it actually prevents me from using SR-IOV,
-which otherwise runs fine without the probe-only thing).
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/pci/host/pci-host-generic.c | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
-This has been tested on the offending Seattle board.
-
-* From v3:
-  - Restrict the property lookup to /chosen (Rob)
-  - Acked-by on patch #4 from Suravee
-  - I swear this is the last time I rework these patches! ;-)
-
-* From v2:
-  - Use of_property_read_u32 to safely read the property (Rob)
-  - Add a log message to indicate when we enable probe-only
-    (probably quite useful for debugging)
-
-* From v1:
-  - Consolidate the parsing in of_pci.c (Bjorn)
-
-Marc Zyngier (4):
-  of/pci: Add of_pci_check_probe_only to parse "linux,pci-probe-only"
-  PCI: pci-host-generic: Fix lookup of linux,pci-probe-only property
-  powerpc: PCI: Fix lookup of linux,pci-probe-only property
-  arm64: dts: Drop linux,pci-probe-only from the Seattle DTS
-
- arch/arm64/boot/dts/amd/amd-overdrive.dts |  1 -
- arch/powerpc/platforms/pseries/setup.c    | 14 ++------------
- drivers/of/of_pci.c                       | 28 ++++++++++++++++++++++++++++
- drivers/pci/host/pci-host-generic.c       |  9 +--------
- include/linux/of_pci.h                    |  3 +++
- 5 files changed, 34 insertions(+), 21 deletions(-)
-
+diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+index 265dd25..224303d 100644
+--- a/drivers/pci/host/pci-host-generic.c
++++ b/drivers/pci/host/pci-host-generic.c
+@@ -210,7 +210,6 @@ static int gen_pci_probe(struct platform_device *pdev)
+ 	int err;
+ 	const char *type;
+ 	const struct of_device_id *of_id;
+-	const int *prop;
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *np = dev->of_node;
+ 	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+@@ -225,13 +224,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	prop = of_get_property(of_chosen, "linux,pci-probe-only", NULL);
+-	if (prop) {
+-		if (*prop)
+-			pci_add_flags(PCI_PROBE_ONLY);
+-		else
+-			pci_clear_flags(PCI_PROBE_ONLY);
+-	}
++	of_pci_check_probe_only();
+ 
+ 	of_id = of_match_node(gen_pci_of_match, np);
+ 	pci->cfg.ops = of_id->data;
 -- 
 2.1.4
