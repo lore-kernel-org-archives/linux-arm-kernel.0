@@ -1,61 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Sep 2015 12:13:18 +0100
-Subject: earlycon issues in -next with amba-pl011 updates
-In-Reply-To: <20150904110651.GE4818@arm.com>
-References: <20150810232312.GB10728@bivouac.eciton.net>
- <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
- <55E81F93.1020104@arm.com> <20150903155255.GA28336@kroah.com>
- <55E87095.4030600@arm.com> <20150904110651.GE4818@arm.com>
-Message-ID: <20150904111318.GF21084@n2100.arm.linux.org.uk>
+From: jteki@openedev.com (Jagan Teki)
+Date: Fri, 4 Sep 2015 16:55:33 +0530
+Subject: [PATCH 1/5] spi: introduce mmap read support for spi flash devices
+In-Reply-To: <1441355402-6837-2-git-send-email-vigneshr@ti.com>
+References: <1441355402-6837-1-git-send-email-vigneshr@ti.com>
+ <1441355402-6837-2-git-send-email-vigneshr@ti.com>
+Message-ID: <CAD6G_RT8Q+Uyp1ZjzHf54Tno1wHm0SmLKEwRAe2gkdp772FD9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 04, 2015 at 12:06:52PM +0100, Will Deacon wrote:
-> On Thu, Sep 03, 2015 at 05:08:53PM +0100, Marc Zyngier wrote:
-> > On 03/09/15 16:52, Greg Kroah-Hartman wrote:
-> > > On Thu, Sep 03, 2015 at 11:23:15AM +0100, Marc Zyngier wrote:
-> > >> So -next has now been broken for a while on a number of ARM platforms
-> > >> because of this (they simply cannot boot), and no progress has been made
-> > >> towards resolving this problem.
-> > >>
-> > >> Can we please drop this series (at least commits 7b753f3 and following)
-> > >> from -next until is has been reworked and reviewed?
-> > > 
-> > > I don't have any patches in my -next tree, everything is in Linus's tree
-> > > now.  So if I've missed something, or need to revert something, please
-> > > let me know specifcally what to do.
-> > 
-> > Gahhh... Given that there is no obvious fix, that the discussion has
-> > stalled and that the author of the series is apparently away, the
-> > following patches should be reverted:
-> > 
-> > 8cd90e50d140 uart: pl011: Add support to ZTE ZX296702 uart
-> > 09dcc7dfc05b uart: pl011: Improve LCRH register access decision
-> > 2c096a9eedc6 uart: pl011: Introduce register look up table
-> > 7b753f318d14 uart: pl011: Introduce register accessor
-> > 534e14e2293d uart: pl011: Rename regs with enumeration
-> > 
-> > (7b753f318d14 being the one breaking everything, but it makes more sense
-> > to revert the whole series until it is properly fixed and reviewed).
-> 
-> For the reverts (git revert 534e14e2293d~1..8cd90e50d140):
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
->   Tested-by: Will Deacon <will.deacon@arm.com>
-> 
-> We can discuss what could've and should've happened 'til we're blue in
-> the face but, in the meantime, I'd like my serial console back.
-> 
-> Greg -- any chance you could send these for -rc1, please?
+On 4 September 2015 at 13:59, Vignesh R <vigneshr@ti.com> wrote:
+> In addition to providing direct access to SPI bus, some spi controller
+> hardwares (like ti-qspi) provide special memory mapped port
+> to accesses SPI flash devices in order to increase read performance.
+> This means the controller can automatically send the SPI signals
+> required to read data from the SPI flash device.
+> For this, spi controller needs to know flash specific information like
+> read command to use, dummy bytes and address width. Once these settings
+> are populated in hardware registers, any read accesses to flash's memory
+> map region(SoC specific) through memcpy or mem-to-mem DMA copy will be
+> handled by controller hardware. The hardware will automatically generate
+> spi signals required to read data from flash and present it to CPU or
+> DMA engine.
+>
+> Introduce spi_mtd_mmap_read() method to support memory mapped read
+> over SPI flash devices. SPI master drivers can implement this method to
+> support memory mapped read interfaces. m25p80 flash driver and other
+> flash drivers can call this to request memory mapped read. The interface
+> should only be used mtd flashes and cannot be used with other spi devices.
+>
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  include/linux/spi/spi.h | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>
+> diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+> index d673072346f2..b74a3f169fc2 100644
+> --- a/include/linux/spi/spi.h
+> +++ b/include/linux/spi/spi.h
+> @@ -293,6 +293,23 @@ static inline void spi_unregister_driver(struct spi_driver *sdrv)
+>   * @handle_err: the subsystem calls the driver to handle an error that occurs
+>   *             in the generic implementation of transfer_one_message().
+>   * @unprepare_message: undo any work done by prepare_message().
+> + * @spi_mtd_mmap_read: some spi-controller hardwares provide memory
+> + *                     mapped interface to communicate with mtd flashes.
+> + *                     For this, spi  controller needs to know flash
+> + *                     memory settings like read command to use, dummy
+> + *                     bytes and address width. Once these settings are
+> + *                     populated in hardware registers, any read
+> + *                     accesses to flash's memory map region(as defined
+> + *                     by SoC) through memcpy or mem-to-mem DMA copy
+> + *                     will be handled by controller hardware. The
+> + *                     hardware will automatically generate spi signals
+> + *                     required to read data from flash and present it
+> + *                     to CPU or DMA. SPI master drivers can use this
+> + *                     callback to implement memory mapped read
+> + *                     interface. Flash driver (like m25p80) requests
+> + *                     memory mapped read via this method. The interface
+> + *                     should  only be used mtd flashes and cannot be
+> + *                     used with other spi devices.
+>   * @cs_gpios: Array of GPIOs to use as chip select lines; one per CS
+>   *     number. Any individual value may be -ENOENT for CS lines that
+>   *     are not GPIOs (driven by the SPI controller itself).
+> @@ -438,6 +455,10 @@ struct spi_master {
+>                                struct spi_message *message);
+>         int (*unprepare_message)(struct spi_master *master,
+>                                  struct spi_message *message);
+> +       int (*spi_mtd_mmap_read)(struct  spi_device *spi,
+> +                                loff_t from, size_t len, size_t *retlen,
+> +                                u_char *buf, u8 read_opcode,
+> +                                u8 addr_width, u8 dummy_bytes);
 
-Given the number of reviews the patches went through, I eventually came
-to the conclusion that it would be far better if I were to write the
-set of patches for the driver - but I haven't had a slot to do that.
-I basically stopped reviewing them because I decided it wasn't worth
-spending the time anymore on the series.  That wasn't an implicit
-"I'm happy with the patch set" but more a "I've given up with this
-patch set, it's still not up to scratch."
+This looks un-manageable to know spi core or master knows what are the
+command or opcode used by spi-nor flash and also I think mmap support
+seems to be flash related or any justification this is spi bus
+master/controller feature?
 
+thanks!
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jagan | openedev.
