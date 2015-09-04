@@ -1,35 +1,72 @@
 From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Fri, 4 Sep 2015 12:27:46 +0530
-Subject: [PATCH v2 04/10] doc/bindings: Update PCIe devicetree binding
- documentation for LS2080A
+Date: Fri, 4 Sep 2015 12:27:47 +0530
+Subject: [PATCH v2 05/10] doc/bindings: Update clk-qoriq bindings for FSL's
+ chassis-3.0 SoCs
 In-Reply-To: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
 References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1441349872-4560-5-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <1441349872-4560-6-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the documentation for compatible string "fsl,ls2080a-pcie"
-for Freescale's LS2080A platform.
+This patch updates the 'clk-qoriq' device-tree bindings for
+chassis-3.0 compliant SoCs from FSL, for e.g. LS2080A
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
 Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
 ---
- .../devicetree/bindings/pci/layerscape-pci.txt     |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/clock/qoriq-clock.txt      |   16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-index 6286f04..e72e68f 100644
---- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-@@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
- and thus inherits all the common properties defined in designware-pcie.txt.
+diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+index 16a3ec4..f0a4b1c 100644
+--- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
++++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+@@ -14,6 +14,7 @@ Chassis Version		Example Chips
+ ---------------		-------------
+ 1.0			p4080, p5020, p5040
+ 2.0			t4240, b4860
++3.0			ls2080a
  
- Required properties:
--- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie"
-+- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie",
-+  "fsl,ls2080a-pcie".
- - reg: base addresses and lengths of the PCIe controller
- - interrupts: A list of interrupt outputs of the controller. Must contain an
-   entry for each entry in the interrupt-names property.
+ 1. Clock Block Binding
+ 
+@@ -32,9 +33,11 @@ Required properties:
+ 	* "fsl,b4420-clockgen"
+ 	* "fsl,b4860-clockgen"
+ 	* "fsl,ls1021a-clockgen"
+-	Chassis-version clock strings include:
++	* "fsl,ls2080a-clockgen"
++	Chassis clock strings include:
+ 	* "fsl,qoriq-clockgen-1.0": for chassis 1.0 clocks
+ 	* "fsl,qoriq-clockgen-2.0": for chassis 2.0 clocks
++	* "fsl,qoriq-clockgen-3.0": for chassis 3.0 clocks
+ - reg: Describes the address of the device's resources within the
+ 	address space defined by its parent bus, and resource zero
+ 	represents the clock register set
+@@ -96,18 +99,23 @@ Required properties:
+ - compatible : Should include one of the following:
+ 	* "fsl,qoriq-core-pll-1.0" for core PLL clocks (v1.0)
+ 	* "fsl,qoriq-core-pll-2.0" for core PLL clocks (v2.0)
++	* "fsl,qoriq-core-pll-3.0" for core PLL clocks (v3.0)
+ 	* "fsl,qoriq-core-mux-1.0" for core mux clocks (v1.0)
+ 	* "fsl,qoriq-core-mux-2.0" for core mux clocks (v2.0)
++	* "fsl,qoriq-core-mux-3.0" for core mux clocks (v3.0)
+ 	* "fsl,qoriq-sysclk-1.0": for input system clock (v1.0).
+ 		It takes parent's clock-frequency as its clock.
+ 	* "fsl,qoriq-sysclk-2.0": for input system clock (v2.0).
+ 		It takes parent's clock-frequency as its clock.
++	* "fsl,qoriq-sysclk-3.0": for input system clock (v3.0).
++		It takes parent's clock-frequency as its clock.
+ 	* "fsl,qoriq-platform-pll-1.0" for the platform PLL clock (v1.0)
+ 	* "fsl,qoriq-platform-pll-2.0" for the platform PLL clock (v2.0)
++	* "fsl,qoriq-platform-pll-3.0" for the platform PLL clock (v3.0)
+ - #clock-cells: From common clock binding. The number of cells in a
+-	clock-specifier. Should be <0> for "fsl,qoriq-sysclk-[1,2].0"
+-	clocks, or <1> for "fsl,qoriq-core-pll-[1,2].0" clocks.
+-	For "fsl,qoriq-core-pll-[1,2].0" clocks, the single
++	clock-specifier. Should be <0> for "fsl,qoriq-sysclk-[1,2,3].0"
++	clocks, or <1> for "fsl,qoriq-core-pll-[1,2,3].0" clocks.
++	For "fsl,qoriq-core-pll-[1,2,3].0" clocks, the single
+ 	clock-specifier cell may take the following values:
+ 	* 0 - equal to the PLL frequency
+ 	* 1 - equal to the PLL frequency divided by 2
 -- 
 1.7.9.5
