@@ -1,150 +1,90 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 4 Sep 2015 17:30:24 +0530
-Subject: [PATCH v3 1/2] regulator: pbias: program pbias register offset in
- pbias driver
+Date: Fri, 4 Sep 2015 17:30:25 +0530
+Subject: [PATCH v3 2/2] ARM: dts: <omap2/3/4/5/dra7>: use "ti,
+ pbias-<platform>" compatible string for pbias
 In-Reply-To: <1441368025-21182-1-git-send-email-kishon@ti.com>
 References: <1441368025-21182-1-git-send-email-kishon@ti.com>
-Message-ID: <1441368025-21182-2-git-send-email-kishon@ti.com>
+Message-ID: <1441368025-21182-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add separate compatible strings for every platform and populate the
-pbias register offset in the driver data.
-This helps avoid depending on the dt for pbias register offset.
+Use platform specific compatible strings instead of the common
+"ti,pbias-omap" compatible string.
 
-Also update the dt binding documentation with the new compatible
-strings.
-
-Suggested-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- .../bindings/regulator/pbias-regulator.txt         |    7 ++-
- drivers/regulator/pbias-regulator.c                |   56 +++++++++++++++++---
- 2 files changed, 56 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/dra7.dtsi     |    2 +-
+ arch/arm/boot/dts/omap2430.dtsi |    2 +-
+ arch/arm/boot/dts/omap3.dtsi    |    2 +-
+ arch/arm/boot/dts/omap4.dtsi    |    2 +-
+ arch/arm/boot/dts/omap5.dtsi    |    2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/regulator/pbias-regulator.txt b/Documentation/devicetree/bindings/regulator/pbias-regulator.txt
-index 32aa26f..acbcb45 100644
---- a/Documentation/devicetree/bindings/regulator/pbias-regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/pbias-regulator.txt
-@@ -2,7 +2,12 @@ PBIAS internal regulator for SD card dual voltage i/o pads on OMAP SoCs.
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 1e29ccf..d6bc6db 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -122,7 +122,7 @@
+ 					#size-cells = <1>;
  
- Required properties:
- - compatible:
--  - "ti,pbias-omap" for OMAP2, OMAP3, OMAP4, OMAP5, DRA7.
-+  - should be "ti,pbias-dra7" for DRA7
-+  - should be "ti,pbias-omap2" for OMAP2
-+  - should be "ti,pbias-omap3" for OMAP3
-+  - should be "ti,pbias-omap4" for OMAP4
-+  - should be "ti,pbias-omap5" for OMAP5
-+  - "ti,pbias-omap" is deprecated
- - reg: pbias register offset from syscon base and size of pbias register.
- - syscon : phandle of the system control module
- - regulator-name : should be
-diff --git a/drivers/regulator/pbias-regulator.c b/drivers/regulator/pbias-regulator.c
-index bd2b75c..c21cedb 100644
---- a/drivers/regulator/pbias-regulator.c
-+++ b/drivers/regulator/pbias-regulator.c
-@@ -44,6 +44,10 @@ struct pbias_regulator_data {
- 	int voltage;
- };
+ 					pbias_regulator: pbias_regulator {
+-						compatible = "ti,pbias-omap";
++						compatible = "ti,pbias-dra7", "ti,pbias-omap";
+ 						reg = <0xe00 0x4>;
+ 						syscon = <&scm_conf>;
+ 						pbias_mmc_reg: pbias_mmc_omap5 {
+diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
+index 2390f38..3961a6f 100644
+--- a/arch/arm/boot/dts/omap2430.dtsi
++++ b/arch/arm/boot/dts/omap2430.dtsi
+@@ -63,7 +63,7 @@
+ 					};
  
-+struct pbias_of_data {
-+	unsigned int offset;
-+};
-+
- static const unsigned int pbias_volt_table[] = {
- 	1800000,
- 	3000000
-@@ -98,8 +102,35 @@ static struct of_regulator_match pbias_matches[] = {
- };
- #define PBIAS_NUM_REGS	ARRAY_SIZE(pbias_matches)
+ 					pbias_regulator: pbias_regulator {
+-						compatible = "ti,pbias-omap";
++						compatible = "ti,pbias-omap2", "ti,pbias-omap";
+ 						reg = <0x230 0x4>;
+ 						syscon = <&scm_conf>;
+ 						pbias_mmc_reg: pbias_mmc_omap2430 {
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 69a40cf..9af9ae1 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -203,7 +203,7 @@
+ 		};
  
-+/* Offset from SCM general area (and syscon) base */
-+
-+static const struct pbias_of_data pbias_of_data_omap2 = {
-+	.offset = 0x230,
-+};
-+
-+static const struct pbias_of_data pbias_of_data_omap3 = {
-+	.offset = 0x2b0,
-+};
-+
-+static const struct pbias_of_data pbias_of_data_omap4 = {
-+	.offset = 0x60,
-+};
-+
-+static const struct pbias_of_data pbias_of_data_omap5 = {
-+	.offset = 0x60,
-+};
-+
-+static const struct pbias_of_data pbias_of_data_dra7 = {
-+	.offset = 0xe00,
-+};
-+
- static const struct of_device_id pbias_of_match[] = {
- 	{ .compatible = "ti,pbias-omap", },
-+	{ .compatible = "ti,pbias-omap2", .data = &pbias_of_data_omap2, },
-+	{ .compatible = "ti,pbias-omap3", .data = &pbias_of_data_omap3, },
-+	{ .compatible = "ti,pbias-omap4", .data = &pbias_of_data_omap4, },
-+	{ .compatible = "ti,pbias-omap5", .data = &pbias_of_data_omap5, },
-+	{ .compatible = "ti,pbias-dra7", .data = &pbias_of_data_dra7, },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, pbias_of_match);
-@@ -114,6 +145,9 @@ static int pbias_regulator_probe(struct platform_device *pdev)
- 	const struct pbias_reg_info *info;
- 	int ret = 0;
- 	int count, idx, data_idx = 0;
-+	const struct of_device_id *match;
-+	const struct pbias_of_data *data;
-+	unsigned int offset;
+ 		pbias_regulator: pbias_regulator {
+-			compatible = "ti,pbias-omap";
++			compatible = "ti,pbias-omap3", "ti,pbias-omap";
+ 			reg = <0x2b0 0x4>;
+ 			syscon = <&scm_conf>;
+ 			pbias_mmc_reg: pbias_mmc_omap2430 {
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index abc4473..5aad7f3 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -198,7 +198,7 @@
+ 					#size-cells = <1>;
  
- 	count = of_regulator_match(&pdev->dev, np, pbias_matches,
- 						PBIAS_NUM_REGS);
-@@ -129,6 +163,20 @@ static int pbias_regulator_probe(struct platform_device *pdev)
- 	if (IS_ERR(syscon))
- 		return PTR_ERR(syscon);
+ 					pbias_regulator: pbias_regulator {
+-						compatible = "ti,pbias-omap";
++						compatible = "ti,pbias-omap4", "ti,pbias-omap";
+ 						reg = <0x60 0x4>;
+ 						syscon = <&omap4_padconf_global>;
+ 						pbias_mmc_reg: pbias_mmc_omap4 {
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index b1a1263..76ef595 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -187,7 +187,7 @@
+ 					#size-cells = <1>;
  
-+	match = of_match_device(of_match_ptr(pbias_of_match), &pdev->dev);
-+	if (match && match->data) {
-+		data = match->data;
-+		offset = data->offset;
-+	} else {
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+		if (!res)
-+			return -EINVAL;
-+
-+		offset = res->start;
-+		dev_WARN(&pdev->dev,
-+			 "using legacy dt data for pbias offset\n");
-+	}
-+
- 	cfg.regmap = syscon;
- 	cfg.dev = &pdev->dev;
- 
-@@ -141,10 +189,6 @@ static int pbias_regulator_probe(struct platform_device *pdev)
- 		if (!info)
- 			return -ENODEV;
- 
--		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--		if (!res)
--			return -EINVAL;
--
- 		drvdata[data_idx].syscon = syscon;
- 		drvdata[data_idx].info = info;
- 		drvdata[data_idx].desc.name = info->name;
-@@ -154,9 +198,9 @@ static int pbias_regulator_probe(struct platform_device *pdev)
- 		drvdata[data_idx].desc.volt_table = pbias_volt_table;
- 		drvdata[data_idx].desc.n_voltages = 2;
- 		drvdata[data_idx].desc.enable_time = info->enable_time;
--		drvdata[data_idx].desc.vsel_reg = res->start;
-+		drvdata[data_idx].desc.vsel_reg = offset;
- 		drvdata[data_idx].desc.vsel_mask = info->vmode;
--		drvdata[data_idx].desc.enable_reg = res->start;
-+		drvdata[data_idx].desc.enable_reg = offset;
- 		drvdata[data_idx].desc.enable_mask = info->enable_mask;
- 		drvdata[data_idx].desc.enable_val = info->enable;
- 
+ 					pbias_regulator: pbias_regulator {
+-						compatible = "ti,pbias-omap";
++						compatible = "ti,pbias-omap5", "ti,pbias-omap";
+ 						reg = <0x60 0x4>;
+ 						syscon = <&omap5_padconf_global>;
+ 						pbias_mmc_reg: pbias_mmc_omap5 {
 -- 
 1.7.9.5
