@@ -1,30 +1,34 @@
-From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Fri, 4 Sep 2015 12:35:22 +0530
-Subject: [PATCH v2 10/10] dts/Makefile: Add build support for LS2080a QDS &
- RDB board DTS
-In-Reply-To: <1441350322-4671-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1441350322-4671-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1441350322-4671-4-git-send-email-bhupesh.sharma@freescale.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 4 Sep 2015 15:15:53 +0800
+Subject: [PATCH V2] clockevents/drivers/mtk: Fix spurious interrupt
+ leading to crash
+In-Reply-To: <55DDCC4B.7010203@linaro.org>
+References: <1440426924.17418.11.camel@mtksdaap41>
+ <1440453450-21203-1-git-send-email-daniel.lezcano@linaro.org>
+ <1440508871.29634.1.camel@mtksdaap41> <55DDCC4B.7010203@linaro.org>
+Message-ID: <1441350953.12270.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds build support for LS2080a QDS & RDB board DTS files
-in the arm64 DTS Makefile.
+On Wed, 2015-08-26 at 16:25 +0200, Daniel Lezcano wrote:
+> On 08/25/2015 03:21 PM, Yingjoe Chen wrote:
+> > Tested-by: Yingjoe Chen<yingjoe.chen@mediatek.com>
+> 
+> Applied to my tree for 4.4.
+> 
+>    -- Daniel
+> 
 
-Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
----
- arch/arm64/boot/dts/freescale/Makefile |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Hi Daniel,
 
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 932001a..57b41c7 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -1,4 +1,4 @@
--dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb fsl-ls2080a-rdb.dtb fsl-ls2080a-simu.dtb
-  
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
--- 
-1.7.9.5
+I can't find this patch in
+https://git.linaro.org/people/daniel.lezcano/linux.git
+Is this tree public now? Where can I see it?
+
+Also, will you take patch[1] "clocksource: mediatek: Use GPT as sched
+clock source" in your tree?
+
+Joe.C
+
+[1]:
+http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001547.html
