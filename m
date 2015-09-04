@@ -1,34 +1,41 @@
 From: p.fedin@samsung.com (Pavel Fedin)
-Date: Fri, 04 Sep 2015 16:29:50 +0300
-Subject: [PATCH v4 TRIVIAL 0/2] ARM: Enable GICv2m on 32-bit virt machine
-Message-ID: <cover.1441373056.git.p.fedin@samsung.com>
+Date: Fri, 04 Sep 2015 16:29:52 +0300
+Subject: [PATCH v4 TRIVIAL 2/2] ARM: Fix GICv2m build warning on 32 bits
+In-Reply-To: <cover.1441373056.git.p.fedin@samsung.com>
+References: <cover.1441373056.git.p.fedin@samsung.com>
+Message-ID: <1935621cb5eb23d740e8e49c1ab15dddcc14511c.1441373056.git.p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-qemu implementation of "virt" includes GICv2m. This series allows to use
-it also on ARM32 architecture.
+After GICv2m was enabled for 32-bit ARM kernel, a warning popped up:
 
-v3 => v4:
-- Split into two patches as requested by Marc Zyngier
-- Use specialized word extraction macros instead of #ifdef
+drivers/irqchip/irq-gic-v2m.c: In function ?gicv2m_compose_msi_msg?:
+drivers/irqchip/irq-gic-v2m.c:100:2: warning: right shift count >= width
+of type [enabled by default]
+  msg->address_hi = (u32) (addr >> 32);
+  ^
 
-v1 => v2:
-Added verbose explanation in commit message
+This patch fixes it by using proper macros for splitting up the value.
 
-v2 => v3:
-Fixed build warning in irq-gic-v2m.c
-
-v1 => v2:
-Added verbose explanation in commit message
-
-Pavel Fedin (2):
-  ARM: Enable GICv2m on 32-bit virt machine
-  ARM: Fix GICv2m build warning on 32 bits
-
- arch/arm/Kconfig              | 1 +
- arch/arm/include/asm/Kbuild   | 1 +
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+---
  drivers/irqchip/irq-gic-v2m.c | 4 ++--
- 3 files changed, 4 insertions(+), 2 deletions(-)
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+index fdf7065..9055b02 100644
+--- a/drivers/irqchip/irq-gic-v2m.c
++++ b/drivers/irqchip/irq-gic-v2m.c
+@@ -97,8 +97,8 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+ 	struct v2m_data *v2m = irq_data_get_irq_chip_data(data);
+ 	phys_addr_t addr = v2m->res.start + V2M_MSI_SETSPI_NS;
+ 
+-	msg->address_hi = (u32) (addr >> 32);
+-	msg->address_lo = (u32) (addr);
++	msg->address_hi = upper_32_bits(addr);
++	msg->address_lo = lower_32_bits(addr);
+ 	msg->data = data->hwirq;
+ }
+ 
 -- 
 2.4.4
