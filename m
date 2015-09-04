@@ -1,60 +1,58 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 4 Sep 2015 20:57:10 +0300
-Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
-In-Reply-To: <20150904151202.GA876@linaro.org>
-References: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
- <1441310314-8857-8-git-send-email-lina.iyer@linaro.org>
- <20150904091735.GC21084@n2100.arm.linux.org.uk>
- <20150904092716.GD21084@n2100.arm.linux.org.uk>
- <20150904151202.GA876@linaro.org>
-Message-ID: <55E9DB76.3080904@ti.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 4 Sep 2015 11:21:45 -0700
+Subject: [PATCH 6/9] drm: bridge/dw_hdmi: adjust pixel clock values in N
+ calculation
+In-Reply-To: <E1ZO6hc-0003NW-55@rmk-PC.arm.linux.org.uk>
+References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
+ <E1ZO6hc-0003NW-55@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAD=FV=WXjcp-wyH_SKexHJDo8R9Xug4yMAOHFPWPYBgiTyM=PQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lina,
+Russell,
 
-On 09/04/2015 06:12 PM, Lina Iyer wrote:
-> On Fri, Sep 04 2015 at 03:27 -0600, Russell King - ARM Linux wrote:
->> On Fri, Sep 04, 2015 at 10:17:35AM +0100, Russell King - ARM Linux wrote:
->>> On Thu, Sep 03, 2015 at 01:58:34PM -0600, Lina Iyer wrote:
->>> > @@ -401,6 +412,11 @@ asmlinkage void secondary_start_kernel(void)
->>> >      local_irq_enable();
->>> >      local_fiq_enable();
->>> >
->>> > +    /* We are running, enable runtime PM for the CPU. */
->>> > +    cpu_dev = get_cpu_device(cpu);
->>> > +    if (cpu_dev)
->>> > +        pm_runtime_get_sync(cpu_dev);
->>> > +
->>>
->>> Please no.  This is fragile.
->>>
->>> pm_runtime_get_sync() can sleep, and this path is used when the system
->>> is fully up and running.  Locks may be held, which cause this to sleep.
->>> However, we're calling it from a context where we can't sleep - which
->>> is the general rule for any part of system initialisation where we
->>> have not entered the idle thread yet (the idle thread is what we run
->>> when sleeping.)
->>>
-> More explanation below.
-> 
-> Another patch (3/7) in this series defines CPU devices as IRQ safe and
-> therefore the dev->power.lock would be spinlock'd before calling the
-> rest of the PM runtime code and the domain. The CPU PM domain would also
-> be an IRQ safe domain (patch 2/7 makes the genpd framework usable in IRQ
-> safe context).
+On Sat, Aug 8, 2015 at 9:10 AM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> Adjust the pixel clock values in the N calculation to match the more
+> accurate clock values we're given by the DRM subsystem, which are the
+> kHz pixel rate, with any fractional kHz rounded down in the case of
+> the non-240, non-480 line modes, or rounded up for the others.  So,
+>
+>          25.20 / 1.001 =>  25175
+>          27.00 * 1.001 =>  27027
+>          74.25 / 1.001 =>  74176
+>         148.50 / 1.001 => 148352
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/gpu/drm/bridge/dw_hdmi.c | 20 ++++++++++----------
+>  1 file changed, 10 insertions(+), 10 deletions(-)
 
-There is one "small" problem with such approach :(
+For what it's worth, I backported this change into my local 3.14-based
+tree and it doesn't cause any problems, though it looks like the code
+isn't being run in my case...
 
-- It's incompatible with -RT kernel, because PM runtime can't be used
-in atomic context on -RT. As result, CPU's hotplug will be broken
-(CPUIdle will be broken also, but CPU hotplug is more important at least for me:).
+I can confirm that the rates you list match the rates I actually see
+requested by DRM, but in my current tree I've actually got something
+that allows a little bit of "slop" in HDMI rates because my system
+can't actually always make exactly the modes requested, but it appears
+that getting "close enough" works, especially if your clock jitter is
+low enough (because the sink needs to have a little bit of wiggle room
+for jitter anyway).  For instance, when 25.175 is requested we
+actually end up making 25.170732.
 
-Also, as for me, PM runtime + genpd is a little bit heavy-weight things
-to be used for CPUIdle and It could affect on states with small wake-up latencies.
+In my tree this adjustment happens in mode_fixup by changing the
+adj_mode.  In one particular case, some debug prints show:
+  640x480, mode=25200000, adj=25171000, actual=25170732
+  freq=48000, pixel_clk=25171000, n=6144
 
-[...]
+I'm not enough of an HDMI expert to say whether it's better to be
+using n=6144 or n=6864 in this case, but audio does play with either
+on the TV I tested.
 
--- 
-regards,
--grygorii
+In any case, I'd say that your change at least makes things better
+than they were, so I'd be in favor of taking it.  If someone later
+decides that we should add a little margin to these numbers, then a
+patch to add that could go atop yours.
+
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
