@@ -1,120 +1,55 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 04 Sep 2015 18:13:46 +0200
-Subject: Porting MIPS IRQ handler to ARM
-In-Reply-To: <55E73971.8030406@free.fr>
-References: <55E5CED8.7000408@free.fr>
- <55E5D945.3040504@gmail.com>	<55E722F2.50905@free.fr>
- <yw1xy4goyc3z.fsf@unicorn.mansr.com> <55E73971.8030406@free.fr>
-Message-ID: <55E9C33A.2080801@free.fr>
+From: greg@kroah.com (Greg Kroah-Hartman)
+Date: Fri, 4 Sep 2015 09:15:10 -0700
+Subject: earlycon issues in -next with amba-pl011 updates
+In-Reply-To: <20150904110651.GE4818@arm.com>
+References: <20150810232312.GB10728@bivouac.eciton.net>
+ <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
+ <55E81F93.1020104@arm.com> <20150903155255.GA28336@kroah.com>
+ <55E87095.4030600@arm.com> <20150904110651.GE4818@arm.com>
+Message-ID: <20150904161510.GA15055@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2015 20:01, Mason wrote:
-
-> On 02/09/2015 19:17, M?ns Rullg?rd wrote:
+On Fri, Sep 04, 2015 at 12:06:52PM +0100, Will Deacon wrote:
+> On Thu, Sep 03, 2015 at 05:08:53PM +0100, Marc Zyngier wrote:
+> > On 03/09/15 16:52, Greg Kroah-Hartman wrote:
+> > > On Thu, Sep 03, 2015 at 11:23:15AM +0100, Marc Zyngier wrote:
+> > >> So -next has now been broken for a while on a number of ARM platforms
+> > >> because of this (they simply cannot boot), and no progress has been made
+> > >> towards resolving this problem.
+> > >>
+> > >> Can we please drop this series (at least commits 7b753f3 and following)
+> > >> from -next until is has been reworked and reviewed?
+> > > 
+> > > I don't have any patches in my -next tree, everything is in Linus's tree
+> > > now.  So if I've missed something, or need to revert something, please
+> > > let me know specifcally what to do.
+> > 
+> > Gahhh... Given that there is no obvious fix, that the discussion has
+> > stalled and that the author of the series is apparently away, the
+> > following patches should be reverted:
+> > 
+> > 8cd90e50d140 uart: pl011: Add support to ZTE ZX296702 uart
+> > 09dcc7dfc05b uart: pl011: Improve LCRH register access decision
+> > 2c096a9eedc6 uart: pl011: Introduce register look up table
+> > 7b753f318d14 uart: pl011: Introduce register accessor
+> > 534e14e2293d uart: pl011: Rename regs with enumeration
+> > 
+> > (7b753f318d14 being the one breaking everything, but it makes more sense
+> > to revert the whole series until it is properly fixed and reviewed).
 > 
->> Use the latest DT from my tree.  It looks like you're missing some
->> changes.
+> For the reverts (git revert 534e14e2293d~1..8cd90e50d140):
 > 
-> Indeed, my repo is not up-to-date. (I was vaguely worried that you'd
-> have made further changes that I'd have to revert when back-porting
-> to 3.14)
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+>   Tested-by: Will Deacon <will.deacon@arm.com>
 > 
-> I'll try upgrading and report back.
+> We can discuss what could've and should've happened 'til we're blue in
+> the face but, in the meantime, I'd like my serial console back.
 > 
-> By the way, did you write the DT from scratch?
-> 
-> Are there people walking this earth that can write device tree like C?
+> Greg -- any chance you could send these for -rc1, please?
 
-No cigar :-(
+Ok, now reverted, I'll send the pull request later today.
 
-There's just too much DT syntax that flies light-years over my head.
-#address-cells, #size-cells, #interrupt-cells, ranges, aliases, etc.
-Basically, all I understand is /dts-v1/;
-(Anyone have links to good tutorials?)
+thanks,
 
-I've attached the current version I'm playing with (I tried to make it
-as small as possible). If some charitable soul spots an obvious problem...
-(Commented blocks have been tested uncommented, of course.)
-
-Regards
-
--------------- next part --------------
-/dts-v1/;
-
-/ {
-	compatible = "sigma,tango4-soc";
-
-	#address-cells = <1>;
-	#size-cells = <1>;
-
-	gic: interrupt-controller at 20001000 {
-		compatible = "arm,cortex-a9-gic";
-		interrupt-controller;
-		#interrupt-cells = <3>;
-		reg = <0x20001000 0x1000>,
-		      <0x20000100 0x0100>;
-	};
-
-	soc {
-		compatible = "simple-bus";
-/*		interrupt-parent = <&irqintc>;	*/
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges;
-
-		uart0: uart at 10700 {
-			compatible = "ns16550a";
-			reg = <0x10700 0x100>;
-			clock-frequency = <7372800>;
-			reg-shift = <2>;
-			no-loopback-test;
-		};
-	};
-
-	cpublock: cpublock {
-		compatible = "simple-bus";
-		reg = <0x60000 0x10000>;
-		ranges = <0x0 0x60000 0x10000>;
-/*		interrupt-parent = <&irqintc>;	*/
-		#address-cells = <1>;
-		#size-cells = <1>;
-
-		intc: intc at e000 {
-			compatible = "sigma,tango-intc";
-			reg = <0xe000 0x1000>;
-			ranges = <0x0 0xe000 0x1000>;
-			interrupt-parent = <&gic>;
-			interrupt-controller;
-			#address-cells = <1>;
-			#size-cells = <1>;
-
-			irqintc: irq at 000 {
-				reg = <0x000 0x100>;
-				interrupt-controller;
-				#interrupt-cells = <2>;
-				interrupts = <2>;
-				label = "IRQ";
-			};
-
-/*
-			fiqintc: fiq at 100 {
-				reg = <0x100 0x100>;
-				interrupt-controller;
-				#interrupt-cells = <2>;
-				interrupts = <3>;
-				label = "FIQ";
-			};
-
-			iiqintc: iiq at 300 {
-				reg = <0x300 0x100>;
-				interrupt-controller;
-				#interrupt-cells = <2>;
-				interrupts = <4>;
-				label = "IIQ";
-			};
-*/
-		};
-	};
-
-};
+greg k-h
