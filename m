@@ -1,43 +1,40 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 04 Sep 2015 21:14:03 +0200
-Subject: [PATCH] ARM: pxa: ssp: Fix build error by removing originally
- incorrect DT binding
-In-Reply-To: <1441208649-6192-1-git-send-email-jarkko.nikula@bitmer.com>
- (Jarkko Nikula's message of "Wed, 2 Sep 2015 18:44:09 +0300")
-References: <1441208649-6192-1-git-send-email-jarkko.nikula@bitmer.com>
-Message-ID: <87pp1yxais.fsf@belgarion.home>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 4 Sep 2015 14:19:53 -0500
+Subject: [PATCH v4 1/4] of/pci: Add of_pci_check_probe_only to parse
+ "linux, pci-probe-only"
+In-Reply-To: <1441385411-7624-2-git-send-email-marc.zyngier@arm.com>
+References: <1441385411-7624-1-git-send-email-marc.zyngier@arm.com>
+ <1441385411-7624-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAL_JsqKjXqgCvzUcTZkCfgpvub6uh_XzLTfyHpgSZzh4dJaOEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jarkko Nikula <jarkko.nikula@bitmer.com> writes:
-
-> From: Jarkko Nikula <jarkko.nikula@linux.intel.com>
+On Fri, Sep 4, 2015 at 11:50 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Both pci-host-generic and Pseries parse the "linux,pci-probe-only"
+> property to engage the PCI_PROBE_ONLY mode, and both have a subtle
+> bug that can be triggered if the property has no parameter.
 >
-> Commit 03fbf488cece ("spi: pxa2xx: Differentiate Intel LPSS types") caused
-> build error here because it removed the type LPSS_SSP and I didn't notice
-> the type was used here too.
+> Provide a generic, safe implementation that can be used by both.
 >
-> I believe commit a6e56c28a178 ("ARM: pxa: ssp: add DT bindings") added it
-> accidentally by copying all enum pxa_ssp_type types from
-> include/linux/pxa2xx_ssp.h even LPSS_SSP was for Intel LPSS SPI devices.
->
-> Fix the build error by removing this incorrect binding.
->
-> Signed-off-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
-> Reported-by: Axel Lin <axel.lin@ingics.com>
-> Cc: stable at vger.kernel.org # 4.2
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
-> Sorry if you got this twice today. I had email problems today and this patch
-> didn't go through to at least some of recipients. Resending from other my
-> another address.
+>  drivers/of/of_pci.c    | 28 ++++++++++++++++++++++++++++
+>  include/linux/of_pci.h |  3 +++
+>  2 files changed, 31 insertions(+)
+>
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index 5751dc5..5dd4966 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -118,6 +118,34 @@ int of_get_pci_domain_nr(struct device_node *node)
+>  EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
+>
+>  /**
+> + * of_pci_check_probe_only - Setup probe only mode if linux,pci-probe-only
+> + *                           is present and valid
+> + *
+> + * @node: device tree node that may contain the property (usually "chosen")
 
-I'll take it through pxa tree, and I'll add this :
-Fixes: 03fbf488cece ("spi: pxa2xx: Differentiate Intel LPSS types")
+This line should be removed. Perhaps Bjorn will fix it up.
 
-Up to my understanding this is the tag stable tree will use to know which kernel
-version this patch should be applied to.
-
-Cheers.
-
---
-Robert
+Rob
