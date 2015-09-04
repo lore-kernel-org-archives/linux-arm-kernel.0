@@ -1,197 +1,89 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 4 Sep 2015 17:03:02 +0200 (CEST)
-Subject: [PATCH v2 5/7] staging: board: Add support for devices with
- complex dependencies
-In-Reply-To: <CAPDyKFriANthZbDcAQT8WXM2Z857p9+-UZB+woss04ZwM-97ZA@mail.gmail.com>
-References: <1434530336-15073-1-git-send-email-geert+renesas@glider.be>
- <1434530336-15073-6-git-send-email-geert+renesas@glider.be>
- <CAPDyKFqouMeTKuXyyohH-VDmWXH+TiLNDT-7MKFa_-TqeF2WSw@mail.gmail.com>
- <CAMuHMdUiH+WZnPtnM-HNs-SpZ8ZxULiKeAiTC1ONTJoP3YMXKg@mail.gmail.com>
- <CAPDyKFriANthZbDcAQT8WXM2Z857p9+-UZB+woss04ZwM-97ZA@mail.gmail.com>
-Message-ID: <alpine.DEB.2.10.1509041616140.8359@ayla.of.borg>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 4 Sep 2015 09:12:02 -0600
+Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
+In-Reply-To: <20150904092716.GD21084@n2100.arm.linux.org.uk>
+References: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
+ <1441310314-8857-8-git-send-email-lina.iyer@linaro.org>
+ <20150904091735.GC21084@n2100.arm.linux.org.uk>
+ <20150904092716.GD21084@n2100.arm.linux.org.uk>
+Message-ID: <20150904151202.GA876@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Ulf,
+On Fri, Sep 04 2015 at 03:27 -0600, Russell King - ARM Linux wrote:
+>On Fri, Sep 04, 2015 at 10:17:35AM +0100, Russell King - ARM Linux wrote:
+>> On Thu, Sep 03, 2015 at 01:58:34PM -0600, Lina Iyer wrote:
+>> > @@ -401,6 +412,11 @@ asmlinkage void secondary_start_kernel(void)
+>> >  	local_irq_enable();
+>> >  	local_fiq_enable();
+>> >
+>> > +	/* We are running, enable runtime PM for the CPU. */
+>> > +	cpu_dev = get_cpu_device(cpu);
+>> > +	if (cpu_dev)
+>> > +		pm_runtime_get_sync(cpu_dev);
+>> > +
+>>
+>> Please no.  This is fragile.
+>>
+>> pm_runtime_get_sync() can sleep, and this path is used when the system
+>> is fully up and running.  Locks may be held, which cause this to sleep.
+>> However, we're calling it from a context where we can't sleep - which
+>> is the general rule for any part of system initialisation where we
+>> have not entered the idle thread yet (the idle thread is what we run
+>> when sleeping.)
+>>
+More explanation below.
 
-On Fri, 4 Sep 2015, Ulf Hansson wrote:
-> On 3 September 2015 at 15:35, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> > On Thu, Sep 3, 2015 at 2:53 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> >> On 17 June 2015 at 10:38, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
-> >>> Add support for easy registering of one ore more platform devices that
-> >>> may:
-> >>>   - need clocks that are described in DT,
-> >>>   - be part of a PM Domain.
-> >
-> >>> diff --git a/drivers/staging/board/board.c b/drivers/staging/board/board.c
-> >>> index 8712f566b31196e0..29d456e29f38feac 100644
-> >>> --- a/drivers/staging/board/board.c
-> >>> +++ b/drivers/staging/board/board.c
-> >
-> >>> +int __init board_staging_register_device(const struct board_staging_dev *dev)
-> >>> +{
-> >>> +       struct platform_device *pdev = dev->pdev;
-> >>> +       unsigned int i;
-> >>> +       int error;
-> >>> +
-> >>> +       pr_debug("Trying to register device %s\n", pdev->name);
-> >>> +       if (board_staging_dt_node_available(pdev->resource,
-> >>> +                                           pdev->num_resources)) {
-> >>> +               pr_warn("Skipping %s, already in DT\n", pdev->name);
-> >>> +               return -EEXIST;
-> >>> +       }
-> >>> +
-> >>> +       board_staging_gic_fixup_resources(pdev->resource, pdev->num_resources);
-> >>> +
-> >>> +       for (i = 0; i < dev->nclocks; i++)
-> >>> +               board_staging_register_clock(&dev->clocks[i]);
-> >>> +
-> >>> +       error = platform_device_register(pdev);
-> >>> +       if (error) {
-> >>> +               pr_err("Failed to register device %s (%d)\n", pdev->name,
-> >>> +                      error);
-> >>> +               return error;
-> >>> +       }
-> >>> +
-> >>> +       if (dev->domain)
-> >>> +               __pm_genpd_name_add_device(dev->domain, &pdev->dev, NULL);
-> >>
-> >> Urgh, this managed to slip through my filters.
-> >>
-> >> It seems like we almost managed to remove all users of the
-> >> "..._name_add..." APIs for genpd. If hasn't been for $subject patch.
-> >> :-)
-> >>
-> >> Now, I realize this is already too late here, but let's try to fix
-> >> this before it turns into a bigger issue.
-> >>
-> >> Geert, do you think it's possible to convert into using the non-named
-> >> bases APIs?
-> >
-> > That will be difficult. This code is meant to use drivers that are not yet
-> > DT-aware on DT-based systems. Hence it uses platform devices with named PM
-> > domains, while the PM domains are described in DT.
-> > I don't think there's another way to look up a PM domain by name, is there?
-> 
-> As a matter of fact there are, especially for those genpds that has
-> been created through DT as in this case. The API to use is
-> of_genpd_get_from_provider() to find the struct generic_pm_domain.
+Another patch (3/7) in this series defines CPU devices as IRQ safe and
+therefore the dev->power.lock would be spinlock'd before calling the
+rest of the PM runtime code and the domain. The CPU PM domain would also
+be an IRQ safe domain (patch 2/7 makes the genpd framework usable in IRQ
+safe context).
 
-Thanks!
+>> NAK on this.
+>
+>There's another issue here.  This is obviously wrong.  If the CPU is
+>inside the PM domain, then don't you need the PM domain powered up for
+>the CPU to start executing instructions?
+>
+This would not be the case for CPU PM domains. The CPU PM domains AFAIK,
+are triggered by the same wake up interrupt that brings the CPU out of
+its power downs state. The domain hardware has to be awake before the
+CPU executes its first instruction. Thefore the hw power up is a logical
+OR of the wakeup signals to any of the cores.
 
-> Yes, I do realize that you need to manage the parsing of the domain
-> name to make sure it's the one you want, but I would rather keep that
-> "hack" in this driver than in the generic API.
+Similarly, the domain hardware would be the last to power down after all
+the CPUs.  Generally tied to the execution of WFI command by the ARM CPU
+core. The domain power down signal is a logical AND of all the WFI
+signals of all the cores in the domain.
 
-OK. It turned out not to be that complex, cfr. the patch below.
-For now this supports PM domains with "#power-domain-cells = <0>" only,
-but of course it can be extended if the need arises.
+>If the CPU can run instructions with the PM domain that it's allegedly
+>inside powered down, then the CPU is _not_ part of the PM domain, and
+>this whole thing is total crap.
+>
+CPU PM domains have to be synchronized in hardware and all these can
+only happen when the SoC provides a domain that can power on before any
+of the CPU powers up and power down only after the all CPUs have powered
+down.
 
-I've also tried:
+What s/w generally can do in the CPU domain power on/off callbacks from
+genpd is to configure which state the domain should be in, when all the
+CPUs have powered down. Many SoCs, have PM domains that could be in
+retention in anticipation of an early wakeup or could be completely
+cache flushed and powered down, when suspending or sleeping for a longer
+duration. The power off callbacks for the PM domain does the
+configuration and it doesnt take effect until all the CPUs power down.
 
-    np = of_find_compatible_node(NULL, NULL, "renesas,sysc-rmobile");
-    np = of_find_node_by_name(np, "a4lc");
+While powering on the domain in the genpd power on callback, all we do
+is to ensure that the domain is reconfigured to remain active (ignore
+all WFI instruction from the CPU, which are not tied to CPU power down.
+Dont want the domain powering off when all CPUs in the domain are just
+clock gated.) until the domain is configured to its idle state by the
+last CPU in Linux.
 
-(the second step is needed because of the domain hierarchy in DT), but that
-would require adding the compatible string to struct board_staging_dev,
-and doesn't work if you have multiple identical power providers.
+>Sorry, I'm really not impressed by the "design" here, it seems to be
+>totally screwed.
+>
 
-I hope you like it?
-
->From 5fb11904845eb929a5b3382a9d5153c151cde1cf Mon Sep 17 00:00:00 2001
-From: Geert Uytterhoeven <geert+renesas@glider.be>
-Date: Fri, 4 Sep 2015 16:52:33 +0200
-Subject: [PATCH/RFC] staging: board: Migrate away from
- __pm_genpd_name_add_device()
-
-The named genpd APIs are deprecated. Hence convert the board staging
-code from using genpd names to DT node paths.
-
-For now this supports PM domains with "#power-domain-cells = <0>" only.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- drivers/staging/board/armadillo800eva.c |  2 +-
- drivers/staging/board/board.c           | 36 ++++++++++++++++++++++++++++++++-
- 2 files changed, 36 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/staging/board/armadillo800eva.c b/drivers/staging/board/armadillo800eva.c
-index 0165591a52443c46..912c96b0536def7c 100644
---- a/drivers/staging/board/armadillo800eva.c
-+++ b/drivers/staging/board/armadillo800eva.c
-@@ -91,7 +91,7 @@ static const struct board_staging_dev armadillo800eva_devices[] __initconst = {
- 		.pdev		= &lcdc0_device,
- 		.clocks		= lcdc0_clocks,
- 		.nclocks	= ARRAY_SIZE(lcdc0_clocks),
--		.domain		= "a4lc",
-+		.domain		= "/system-controller at e6180000/pm-domains/c5/a4lc at 1"
- 	},
- };
- 
-diff --git a/drivers/staging/board/board.c b/drivers/staging/board/board.c
-index 29d456e29f38feac..3eb5eb8f069c236d 100644
---- a/drivers/staging/board/board.c
-+++ b/drivers/staging/board/board.c
-@@ -135,6 +135,40 @@ int __init board_staging_register_clock(const struct board_staging_clk *bsc)
- 	return error;
- }
- 
-+#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
-+static int board_staging_add_dev_domain(struct platform_device *pdev,
-+					const char *domain)
-+{
-+	struct of_phandle_args pd_args;
-+	struct generic_pm_domain *pd;
-+	struct device_node *np;
-+
-+	np = of_find_node_by_path(domain);
-+	if (!np) {
-+		pr_err("Cannot find domain node %s\n", domain);
-+		return -ENOENT;
-+	}
-+
-+	pd_args.np = np;
-+	pd_args.args_count = 0;
-+	pd = of_genpd_get_from_provider(&pd_args);
-+	if (IS_ERR(pd)) {
-+		pr_err("Cannot find genpd %s (%ld)\n", domain, PTR_ERR(pd));
-+		return PTR_ERR(pd);
-+
-+	}
-+	pr_debug("Found genpd %s for device %s\n", pd->name, pdev->name);
-+
-+	return pm_genpd_add_device(pd, &pdev->dev);
-+}
-+#else
-+static inline int board_staging_add_dev_domain(struct platform_device *pdev,
-+					       const char *domain)
-+{
-+	return 0;
-+}
-+#endif
-+
- int __init board_staging_register_device(const struct board_staging_dev *dev)
- {
- 	struct platform_device *pdev = dev->pdev;
-@@ -161,7 +195,7 @@ int __init board_staging_register_device(const struct board_staging_dev *dev)
- 	}
- 
- 	if (dev->domain)
--		__pm_genpd_name_add_device(dev->domain, &pdev->dev, NULL);
-+		board_staging_add_dev_domain(pdev, dev->domain);
- 
- 	return error;
- }
--- 
-1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+Thanks,
+Lina
