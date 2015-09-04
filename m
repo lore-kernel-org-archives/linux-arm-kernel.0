@@ -1,48 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Sep 2015 10:27:16 +0100
-Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
-In-Reply-To: <20150904091735.GC21084@n2100.arm.linux.org.uk>
-References: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
- <1441310314-8857-8-git-send-email-lina.iyer@linaro.org>
- <20150904091735.GC21084@n2100.arm.linux.org.uk>
-Message-ID: <20150904092716.GD21084@n2100.arm.linux.org.uk>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Fri,  4 Sep 2015 09:41:44 +0000
+Subject: [PATCH v5 0/6] bcm2835: auxiliar device support for spi
+Message-ID: <1441359711-2800-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 04, 2015 at 10:17:35AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Sep 03, 2015 at 01:58:34PM -0600, Lina Iyer wrote:
-> > @@ -401,6 +412,11 @@ asmlinkage void secondary_start_kernel(void)
-> >  	local_irq_enable();
-> >  	local_fiq_enable();
-> >  
-> > +	/* We are running, enable runtime PM for the CPU. */
-> > +	cpu_dev = get_cpu_device(cpu);
-> > +	if (cpu_dev)
-> > +		pm_runtime_get_sync(cpu_dev);
-> > +
-> 
-> Please no.  This is fragile.
-> 
-> pm_runtime_get_sync() can sleep, and this path is used when the system
-> is fully up and running.  Locks may be held, which cause this to sleep.
-> However, we're calling it from a context where we can't sleep - which
-> is the general rule for any part of system initialisation where we
-> have not entered the idle thread yet (the idle thread is what we run
-> when sleeping.)
-> 
-> NAK on this.
+From: Martin Sperl <kernel@martin.sperl.org>
 
-There's another issue here.  This is obviously wrong.  If the CPU is
-inside the PM domain, then don't you need the PM domain powered up for
-the CPU to start executing instructions?
+The BCM2835 contains 3 auxiliar devices:
+* spi1
+* spi2
+* uart1
 
-If the CPU can run instructions with the PM domain that it's allegedly
-inside powered down, then the CPU is _not_ part of the PM domain, and
-this whole thing is total crap.
+All of those 3 devices are enabled/disabled via a shared register,
+which is set by default to be disabled.
 
-Sorry, I'm really not impressed by the "design" here, it seems to be
-totally screwed.
+Access to this register needs to get serialized.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+So after several iterations of discussions with the following ideas:
+* syscon - device tree should describe HW not drivers to use -
+           'compatiblity = "brcm,bcm2835-aux-enable", "syscon";'
+           is not acceptable
+* regulator - it is not necessarily a regulator or a power gate
+              that is implemented in HW, so it is not valid to use
+              this framework
+
+The recommendation was made to create a new minimal API in soc
+just for access to this shared enable/disable register.
+
+This patch-series implements:
+* the bcm2835-auxiliar device enable/disable api in soc.
+* the bcm2835-auxiliar spi device driver
+
+The uart1 device driver (ns16550 based) is not implemented so far
+but would be using the same API.
+
+Both spi and uart drivers can run with shared interrupts,
+so there is no need for an interrupt-controller to get implemented.
+
+Martin Sperl (6):
+  soc: bcm2835: auxiliar devices enable infrastructure
+  ARM: bcm2835: add DT for the bcm2835 auxiliar devices
+  dt/bindings: bcm2835: add binding documentation for bcm2835-aux
+  spi: bcm2835: new driver implementing auxiliar spi1/spi2 on the
+    bcm2835 soc
+  ARM: bcm2835: enable building of spi-bcm2835aux driver in default
+    config
+  dt/bindings: bcm2835: Add binding documentation for auxiliar spi
+    devices
+
+ .../bindings/soc/bcm/brcm,bcm2835-aux.txt          |   27 +
+ .../bindings/spi/brcm,bcm2835-aux-spi.txt          |   47 ++
+ arch/arm/boot/dts/bcm2835.dtsi                     |   37 ++
+ arch/arm/configs/bcm2835_defconfig                 |    1 +
+ drivers/soc/Kconfig                                |    1 +
+ drivers/soc/Makefile                               |    1 +
+ drivers/soc/bcm/Kconfig                            |   11 +
+ drivers/soc/bcm/Makefile                           |    1 +
+ drivers/soc/bcm/bcm2835-aux.c                      |  154 ++++++
+ drivers/spi/Kconfig                                |   12 +
+ drivers/spi/Makefile                               |    1 +
+ drivers/spi/spi-bcm2835aux.c                       |  514 ++++++++++++++++++++
+ include/linux/soc/bcm/bcm2835-aux.h                |   23 +
+ 13 files changed, 830 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-aux.txt
+ create mode 100644 Documentation/devicetree/bindings/spi/brcm,bcm2835-aux-spi.txt
+ create mode 100644 drivers/soc/bcm/Kconfig
+ create mode 100644 drivers/soc/bcm/Makefile
+ create mode 100644 drivers/soc/bcm/bcm2835-aux.c
+ create mode 100644 drivers/spi/spi-bcm2835aux.c
+ create mode 100644 include/linux/soc/bcm/bcm2835-aux.h
+
+--
+1.7.10.4
