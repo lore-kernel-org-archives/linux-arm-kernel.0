@@ -1,60 +1,50 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 04 Sep 2015 08:55:09 +0900
-Subject: [PATCHv7] ARM: exynos_defconfig: Enable LEDS for Odroid-XU3/XU4
-In-Reply-To: <1441303910-3266-1-git-send-email-linux.amoon@gmail.com>
-References: <1441303910-3266-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <55E8DDDD.80106@samsung.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 4 Sep 2015 08:03:26 +0800
+Subject: [PATCH v3 8/9] spi: rockchip: modify DMA max burst to 1
+In-Reply-To: <20150903174502.GI5313@sirena.org.uk>
+References: <1441101381-1329-1-git-send-email-shawn.lin@rock-chips.com>
+ <1441101524-1700-1-git-send-email-shawn.lin@rock-chips.com>
+ <20150903125429.GA12027@sirena.org.uk> <55E84E17.2090409@rock-chips.com>
+ <20150903174502.GI5313@sirena.org.uk>
+Message-ID: <55E8DFCE.5040504@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.09.2015 03:11, Anand Moon wrote:
-> Earlier design of the LED for Odroid XU3 was using gpio-leds
-> Now It was change to using both pwm-leds and gpio-leds.
+On 2015/9/4 1:45, Mark Brown wrote:
+> On Thu, Sep 03, 2015 at 09:41:43PM +0800, Shawn Lin wrote:
+>> On 2015/9/3 20:54, Mark Brown wrote:
+>
+>>> If this is a quirk of the DMA controller why is it being fixed with a
+>>> property specific to the SPI controller?  Can't the DMA controller just
+>>> override the burst size?
+>
+>> Cool...that's a good question. Actually DMA controller can't do that since
+>> block peripheral controller(e.g sd/emmc, they always access data by
+>> block-512Bytes.) can't meet the case. So It's hard for dma controller know
+>> who is the caller, and what should be done.
+>
+> You could take a guess based on request size, but that's going to be a
+> bit error prone I imagine.
+>
 
-It is still not a reason for this change. gpio-leds were not enabled
-before. This could be a valid reason of adding LEDS_PWM to existing
-config LEDS_GPIO. But LEDS_GPIO were not enabled... so why the change on
-the board from gpio->(gpio+pwm) means that we have to enable LEDS_GPIO?
+yes, not always cover all cases.
 
-Actually I gave up on this and I wanted to change the commit message on
-myself when applying. But discussion was brought up again so... clearly
-we have different understanding of the meaning of "WHY". :)
+>> The only thing dma controller can do is avoid to execute DMAFLUSHP on its
+>> own. But how about peripheral controller trigger non-multiple access? So
+>> that's what I mentioned on covery letter that we should do "broken things"
+>> for both dma controller and some peripherals.
+>
+> The other thing it could do is provide the information out via some
+> internal Linux API which the drivers could query instead of directly
+> having a DT property in each client driver.  That way at least the DT
+> only needs the quirk in one place even if the clients need to handle it
+> individually.
 
-Best regards,
-Krzysztof
+Good idea. Thanks, Mark.
 
-> 
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> ---
-> Changes from last version
-> dropped following option.
->   CONFIG_LEDS_CLASS_FLASH
->   CONFIG_TRIGGER_ONESHOT
->   CONFIG_LEDS_TRIGGER_TIMER
->   CONFIG_TRIGGER_GPIO
-> fixed the From address
-> fixed the commit message.
-> ---
->  arch/arm/configs/exynos_defconfig | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 9504e77..bd6b7f7 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -163,6 +163,12 @@ CONFIG_MMC_SDHCI_S3C_DMA=y
->  CONFIG_MMC_DW=y
->  CONFIG_MMC_DW_IDMAC=y
->  CONFIG_MMC_DW_EXYNOS=y
-> +CONFIG_NEW_LEDS=y
-> +CONFIG_LEDS_CLASS=y
-> +CONFIG_LEDS_GPIO=y
-> +CONFIG_LEDS_PWM=y
-> +CONFIG_LEDS_TRIGGERS=y
-> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
->  CONFIG_RTC_CLASS=y
->  CONFIG_RTC_DRV_MAX77686=y
->  CONFIG_RTC_DRV_MAX77802=y
-> 
+>
+
+
+-- 
+Best Regards
+Shawn Lin
