@@ -1,25 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 4 Sep 2015 16:17:32 +0100
-Subject: [PATCH v3 1/2] regulator: pbias: program pbias register offset
- in pbias driver
-In-Reply-To: <1441368025-21182-2-git-send-email-kishon@ti.com>
-References: <1441368025-21182-1-git-send-email-kishon@ti.com>
- <1441368025-21182-2-git-send-email-kishon@ti.com>
-Message-ID: <20150904151732.GN5313@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 4 Sep 2015 16:27:48 +0100
+Subject: [PATCH] arm64: ioremap: change ioremap prototype and add
+ ioremap_cache macro
+In-Reply-To: <1440663660-24244-1-git-send-email-yalin.wang2010@gmail.com>
+References: <1440663660-24244-1-git-send-email-yalin.wang2010@gmail.com>
+Message-ID: <20150904152748.GB23159@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 04, 2015 at 05:30:24PM +0530, Kishon Vijay Abraham I wrote:
-> Add separate compatible strings for every platform and populate the
-> pbias register offset in the driver data.
-> This helps avoid depending on the dt for pbias register offset.
+On Thu, Aug 27, 2015 at 04:21:00PM +0800, yalin wang wrote:
+> This patch change ioremap_*() first parameter type to resource_size_t to
+> be the same as other platforms, and add ioremap_cache macro,
+> because some code will test if this macro is defined or not, and
+> will generate a generric version if not defined, for example,
+> memremap.c do like this.
 
-If there are any changes from the already applied patch for this please
-send an incremental patch.  Please don't resend already applied patches.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150904/e4f42a86/attachment-0001.sig>
+It seems that asm-generic/io.h uses phys_addr_t (which makes more sense
+to me, though they are practically the same).
+
+> +#define ioremap_cache			ioremap_cache
+
+This makes sense.
+
+-- 
+Catalin
