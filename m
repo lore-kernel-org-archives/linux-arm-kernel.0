@@ -1,98 +1,59 @@
-From: lee@kernel.org (Lee Jones)
-Date: Fri, 4 Sep 2015 20:23:20 +0100
-Subject: [GIT PULL] RPi DT changes due for v4.3
-In-Reply-To: <87613q57k1.fsf@eliezer.anholt.net>
-References: <20150811160642.GQ18282@x1> <20150813103056.GY30160@localhost>
- <878u9dhggh.fsf@eliezer.anholt.net> <20150827111046.GB4796@x1>
- <87613q57k1.fsf@eliezer.anholt.net>
-Message-ID: <20150904192320.GD4796@x1>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri,  4 Sep 2015 21:40:42 +0200
+Subject: [PATCH v2 0/8] Rework architected timer and forwarded IRQs handling
+Message-ID: <1441395650-19663-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 04 Sep 2015, Eric Anholt wrote:
+The architected timer integration with the VGIC had some shortcomings in
+that certain guest operations weren't fully supported.
 
-> Lee Jones <lee@kernel.org> writes:
-> 
-> > On Fri, 14 Aug 2015, Eric Anholt wrote:
-> >> Olof Johansson <olof@lixom.net> writes:
-> >> > On Tue, Aug 11, 2015 at 05:06:42PM +0100, Lee Jones wrote:
-> >> >> ARM SoC Chaps,
-> >> >> 
-> >> >> Please find a couple of simple RPi changes pertaining to Firmware.
-> >> >> 
-> >> >> The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
-> >> >> 
-> >> >>   Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
-> >> >> 
-> >> >> are available in the git repository at:
-> >> >> 
-> >> >>   git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git tags/rpi-dt-for-armsoc-4.3
-> >> >> 
-> >> >> for you to fetch changes up to fd26f8830979de48eb3f1c253eb9d2ee2e468eb6:
-> >> >> 
-> >> >>   dt/bindings: Add binding for the Raspberry Pi firmware driver (2015-08-11 16:56:41 +0100)
-> >> >
-> >> > I've merged this but I'm a little confused about bcm2835 maintainership:
-> >> > I got a MAINTAINERS update from Florian earlier grouped in a set of
-> >> > other bcm changes (adding Eric), and now this directly from you.
-> >> >
-> >> > In general the bcm platforms are quite diverse and we've asked Florian
-> >> > to be the funnel for all of the new ones, but I don't think we talked
-> >> > much about 2835 at that time. Should we expect to see merges directly
-> >> > from you and the other maintainers there or will it go through Florian?
-> >> 
-> >> I'd been talking with Arnd and Florian about the delays in RPi patch
-> >> acceptance (Stephen and Lee have limited time to dedicate to 2835), and
-> >> Florian suggested me becoming a maintainer and routing patches through
-> >> him.  He's been great to work with and has had useful feedback on my
-> >> patches.
-> >> 
-> >> I was kind of surprised to see Lee send this pull request -- these
-> >> patches had been sitting un-merged for 2 months and pings on irc didn't
-> >> get replies, so I thought I was stepping in where the others definitely
-> >> didn't have time.  It was also odd to see just these two patches, but
-> >> not the actual driver.
-> >> 
-> >> I'm willing to do the merging process for 2835, and if I'm doing so, I
-> >> like the idea of feeding it through a more experienced maintainer who's
-> >> ready to look at my pull requests whenever, without bothering the main
-> >> arm-soc folks.  My goal here, besides my actual job of getting open
-> >> source graphics working for Broadcom, is to hopefully push the rpi
-> >> foundation toward getting their code merged, so that this hardware fully
-> >> works on stock upstream.
-> >
-> > Apologies for the confusion caused by this pull-request.  After
-> > speaking with Florian last cycle the plan was to send the request to
-> > him prior to him sending to ARM-SoC; however, I didn't realise how
-> > early in the cycle he was going to send that request and I missed the
-> > boat.  So rather than miss the cycle, I decided just to send directly
-> > to ARM-SoC instead.
-> >
-> > I do resent the IRQ comment though, as I'm always on IRC during
-> > working hours and (unless something has gone wrong) I have a proxy
-> > which collects missed messages and replays them back to me, so in
-> > theory I shouldn't miss a message.  All messages you've sent to me
-> > I've replied to.
-> >
-> > The Firmware patches wouldn't have ever been part of this set without
-> > explicit request/permission from the Maintainer.  So that's why the
-> > driver patches weren't part of this set.
-> 
-> For what it's worth, the recent IRC message I was referring to was:
+This series tries to address these problems in providing level-triggered
+semantics for the arch timer and VGIC integration and seeks to clarify
+the behavior when setting/clearing the active state on the physical
+distributor.
 
-It's in the back-trace buffer provided by ZNC.  No idea why the
-notification didn't work.  Fail!
+It also fixes a few other bugs in the VGIC code and finally adds support
+for edge-triggered forwarded interrupts.
 
-I guess some IRC messages just fall through the cracks.  I do
-endeavour to answer all of the pings I'm sent. Sometimes it might just
-be worth a re-poke or an email in case something like this happens again.
+The edge-triggered forwarded interrupts code is untested but probably
+better to clearly do something wrong and raise a warning.
 
-> Jun 30 14:02:09 <anholt> lag: the rpi tree doesn't have the rpi firmware
-> patches you said you applied -- are they somewhere else?
-> 
-> and Stephen Warren had back on June 5th replied to your question about
-> who the maintainer was with the analysis (same as I'd done by reading
-> MAINTAINERS and the logs).
+Changes since v1:
+ - Sent out bug fixes for active state and UEFI reset as separate
+   patches.
+ - Fixed various spelling nits
+ - Rewrote proposed documentation file trying to address Eric's and
+   Marc's comments
+ - Rewrote kvm_timer_update_irq and kvm_timer_update_state according to
+   Marc's suggestion (thanks!)
+ - Added additional patch to support edge-triggered forwarded
+   interrupts.
 
-Ah, so the Firmware SS doesn't have a Maintainer.  Fair point.
-Apologies for not collecting them in that case.
+Christoffer Dall (8):
+  KVM: Add kvm_arch_vcpu_{un}blocking callbacks
+  arm/arm64: KVM: arch_timer: Only schedule soft timer on vcpu_block
+  arm/arm64: KVM: vgic: Factor out level irq processing on guest exit
+  arm/arm64: KVM: Implement GICD_ICFGR as RO for PPIs
+  arm/arm64: KVM: Use appropriate define in VGIC reset code
+  arm/arm64: KVM: Add forwarded physical interrupts documentation
+  arm/arm64: KVM: Rework the arch timer to use level-triggered semantics
+  arm/arm64: KVM: Support edge-triggered forwarded interrupts
+
+ Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt | 181 +++++++++++++++++++++
+ arch/arm/kvm/arm.c                                 |  21 ++-
+ arch/mips/include/asm/kvm_host.h                   |   2 +
+ arch/powerpc/include/asm/kvm_host.h                |   2 +
+ arch/s390/include/asm/kvm_host.h                   |   2 +
+ arch/x86/include/asm/kvm_host.h                    |   3 +
+ include/kvm/arm_arch_timer.h                       |   4 +-
+ include/kvm/arm_vgic.h                             |   3 -
+ include/linux/kvm_host.h                           |   2 +
+ virt/kvm/arm/arch_timer.c                          | 150 +++++++++++------
+ virt/kvm/arm/vgic.c                                | 163 +++++++++----------
+ virt/kvm/kvm_main.c                                |   3 +
+ 12 files changed, 398 insertions(+), 138 deletions(-)
+ create mode 100644 Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+
+-- 
+2.1.2.330.g565301e.dirty
