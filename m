@@ -1,46 +1,35 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sat, 5 Sep 2015 11:39:20 -0400 (EDT)
-Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
-In-Reply-To: <55EA113D.9000806@ti.com>
-Message-ID: <Pine.LNX.4.44L0.1509051133100.30865-100000@netrider.rowland.org>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Sat, 5 Sep 2015 18:12:08 +0200
+Subject: [PATCH v2] clk: rockchip: Add pclk_peri to critical clocks on
+ RK3066/RK3188
+In-Reply-To: <20150904162402.GN15099@codeaurora.org>
+References: <1440322357-2621-1-git-send-email-romain.perier@gmail.com>
+ <CABgxDo+otZrYoqTNK-ea=L6Dsd5p_b_MFCi4H4XJZZ25PV_qnA@mail.gmail.com>
+ <CABgxDoLgqfzO-Sb_rKHe=-GuMaKWMihHhktx6sDSM6M=Q+Koaw@mail.gmail.com>
+ <20150904162402.GN15099@codeaurora.org>
+Message-ID: <CABgxDo+0qN5GJdCNpQi4g_CdW67PvxsogMseRoAa5cuAbWk1wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 5 Sep 2015, Grygorii Strashko wrote:
+Np,
 
-> On 09/04/2015 09:45 PM, Alan Stern wrote:
-> > On Fri, 4 Sep 2015, Grygorii Strashko wrote:
-> > 
-> >> There is one "small" problem with such approach :(
-> >>
-> >> - It's incompatible with -RT kernel, because PM runtime can't be used
-> >> in atomic context on -RT.
-> > 
-> > Can you explain this more fully?  Why can't runtime PM be used in
-> > atomic context in the -rt kernels?
-> >  
-> 
-> See:
->  http://lwn.net/Articles/146861/
->  https://rt.wiki.kernel.org/index.php/Frequently_Asked_Questions#How_does_the_CONFIG_PREEMPT_RT_patch_work.3F
-> 
-> spinlock_t
->     Critical sections are preemptible. The _irq operations (e.g., spin_lock_irqsave())
->  do -not- disable hardware interrupts. Priority inheritance is used to prevent priority
->  inversion. An underlying rt_mutex is used to implement spinlock_t in PREEMPT_RT. 
-> 
-> As result, have to do things like:
-> https://lkml.org/lkml/2015/8/18/161
-> https://lkml.org/lkml/2015/8/18/162
-> 
-> Sorry for brief reply - Friday/Sat night :)
+Yes it would be nice to take it for -rc1, because I think that 4.3
+won't boot without this fix
 
-I see.  Although we normally think of interrupt contexts as being
-atomic, in an -rt kernel this isn't true any more because things like
-spin_lock_irq don't actually disable interrupts.
 
-Therefore it would be correct to say that in -rt kernels, runtime PM
-can be used in interrupt context (if the device is marked as irq-safe),
-but not in atomic context.  Right?
+Regards,
+Romain
 
-Alan Stern
+2015-09-04 18:24 GMT+02:00 Stephen Boyd <sboyd@codeaurora.org>:
+> On 09/04, Romain Perier wrote:
+>> Hi all,
+>>
+>> just a reminder, I sent this patch two weeks ago, rk3xxx-based
+>> platforms still need it, it fixes a freeze during boot.
+>
+> Sorry I thought that Linus W was going to pick this up? If not,
+> we can take it through clk tree as a fix for -rc1.
+>
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
