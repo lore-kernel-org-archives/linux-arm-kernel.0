@@ -1,170 +1,356 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 4 Sep 2015 19:03:11 -0700
-Subject: [PATCH 6/9] drm: bridge/dw_hdmi: adjust pixel clock values in N
- calculation
-In-Reply-To: <20150905002733.GJ21084@n2100.arm.linux.org.uk>
-References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
- <E1ZO6hc-0003NW-55@rmk-PC.arm.linux.org.uk>
- <CAD=FV=WXjcp-wyH_SKexHJDo8R9Xug4yMAOHFPWPYBgiTyM=PQ@mail.gmail.com>
- <CAD=FV=WnVLiCNYgZ8idpknD==Rw7UaLCY1gky4G0TvwUR-VATw@mail.gmail.com>
- <20150904212401.GI21084@n2100.arm.linux.org.uk>
- <CAD=FV=U7h6b1eR+cva6VywcLP8RL2p5sAMSWc_vzUCg6WfWCYQ@mail.gmail.com>
- <20150905002733.GJ21084@n2100.arm.linux.org.uk>
-Message-ID: <CAD=FV=WR4iJ57FLh1d46-s9Gu-4wW6NdoROx-kNbbA0zFpUo0w@mail.gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Sat, 5 Sep 2015 10:58:59 +0800
+Subject: [PATCH 2/2] arm64: dts: add dts files for Hisilicon Hip05-D02
+ Development Board
+In-Reply-To: <1441421939-6236-1-git-send-email-dingtianhong@huawei.com>
+References: <1441421939-6236-1-git-send-email-dingtianhong@huawei.com>
+Message-ID: <1441421939-6236-3-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Add initial dtsi file to support Hisilicon Hip05-D02 Board with
+support of CPUs in four clusters and each cluster has quard Cortex-A57.
 
-On Fri, Sep 4, 2015 at 5:27 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Sep 04, 2015 at 04:50:03PM -0700, Doug Anderson wrote:
->> Russell,
->>
->> On Fri, Sep 4, 2015 at 2:24 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> >> In your case you're probably making the value that Linux
->> >> asked you to make, AKA 25.175000 MHz.
->> >
->> > ... which is the spec value.
->>
->> This is where we're not on the same page.  Where in the spec does it
->> say 25.17500 MHz?  I see in the spec:
->>  25.2 / 1.001
->
-> Section 4 of CEA-861-B, which defines the video clock rates and their
-> accuracy of 0.5%.
+Also add dts file to support Hip05-D02 development board.
 
-Then perhaps you shouldn't be using a switch statement.  You won't
-catch all values that are within .05% of (25.2 / 1.001).
+Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ arch/arm64/boot/dts/hisilicon/Makefile      |   2 +-
+ arch/arm64/boot/dts/hisilicon/hip05-d02.dts |  36 ++++
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi    | 271 ++++++++++++++++++++++++++++
+ 3 files changed, 308 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hip05-d02.dts
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hip05.dtsi
 
-
->> ...and this is a crucial difference here.  Please double-check my math, but:
->>
->> (25175000 * 4576) / (128 * 32000.)
->> => 28125.1953125
->>
->> (25174825 * 4576) / (128 * 32000.)
->> => 28125.0
->>
->> This calculation is what led to my belief that the goal here is to
->> make an integral CTS.  If you have 25.175 MHZ clock and N of 4576 you
->> _will not_ have an integral CTS.  If you instead have 25.174825 MHz
->> clock and N of 4576 you _will_ have an integral CTS.
->
-> Right, but 25.175 is close enough to 25.174825.  Do this calculation:
->
-> 25175000 * 4576 / 28125 / 128
->
-> That'll give you the resulting audio sample rate, which is 32000.222Hz.
-> That's an error of... 0.00069%, which is probably around the typical
-> error of your average crystal oscillator.  Really not worth bothering
-> with.
-
-OK, so do this calculation:
-
-25175000 * 4096 / 25175 / 128
-
-You get 32000.000000000000000000
-
-I'm not saying there's anything terribly wrong with 32000.222 Hz and
-I'm sure it will work just dandy for you.  I'm saying that you're
-adding complexity _and_ ending up with a slightly worse rate.
-
-AKA: just replace your entire "compute_n" function with:
-
-return (128 * freq) / 1000;
-
-...and it's 100% simpler _and_ gets you a (marginally) better rate
-(assuming you really have 22.175000).  If it was just about a
-32000.222 vs 32000 I'd not be saying anything right now.  It's about
-adding complexity.
-
-
->> Said another way:
->>
->> 1. The reason 25174825 Hz has a different N is to make an integral CTS.
->>
->> 2. If you are indeed making 25175000 then there is no need for a
->> different N to make an integral CTS
->>
->> 3. If you use 4576 for N but you're making 25175000 Hz, you end up in
->> a _worse_ position than if you use the standard 4096 for N.
->
-> Total rubbish.  Sorry, but it is.
->
-> Follow the code.  Pixel clock is 25175000.  For 32kHz, N will be 4576.
-> 25175000 * 4576 = 1.152008e11.  Divide that by the audio clock rate
-> (128 * 32000) gives 28125.19531.  Since we're using integer division,
-> that gets rounded down to 28125.
->
-> DRM uses a clock rate of "25175" to represent 25.2/1.001 modes.  So,
-> if your hardware sets a video clock rate of 25.2MHz/1.001, then you
-> end up with a sample rate of exactly 32kHz.  If you set exactly
-> 25.175MHz, you end up with an approximate 32kHz sample rate - one
-> which is 0.00069% in error, which is (excluse the language) fuck all
-> different from exactly 32kHz.
-
-Agree that the difference is negligible.
-
-I will say that IMHO the kind folks who wrote the HDMI spec were still
-trying their best to make that error 0.00%.  That's entirely the
-reason that they have that table and they don't just use "(128 * freq)
-/ 1000" for everything.
-
-AKA, I can imagine something like:
-
-Person 1: Is there any reason to pick a N value that's exactly (128 *
-freq) / 1000?
-
-Person 2: Not really
-
-Person 1: Hrm, but I notice that I can get a tiny bit more accurate
-audio clock when I have a pixel clock of (25.2 / 1.001) if I use a N
-that's not (128 * freq) / 1000.  Is that OK?
-
-Person 2: Yeah, go ahead.  Add it to the spec.
-
-Person 1: OK.  I've got some nifty tables I can add.  Cool!  Now we
-get exactly the right audio clock.
-
-Person 2: Nice job!
-
-...but I have no idea if that's really true.
-
-
-> Are you _really_ going to continue arguing over a 0.00069% error?
-> If you are, I'm not going to listen anymore - it's soo damned small
-> that it's not worth bothering with.  At all.
-
-Well, I think I've adequately expressed my opinion.  If you want to
-land your patch, I certainly won't yell.  I think it adds extra
-complexity and produces a (marginally) inferior audio rate, but that's
-up to the folks who maintain the code to deal with.
-
-
->> As a side note: I realized one part of the HDMI spec that isn't trying
->> to make an integral value but still uses a different value for N: 297
->> MHz.  From the DesignWare spec I have it appears that 594 MHz is
->> similar.  For those cases it looks like we have:
->
-> 297MHz _does_ work.
->
-> 297000000 * 3072 / 222750 = 128 * 32000 exactly.
-
-I guess I didn't express myself clearly enough.  I'm saying that:
-
-* The only reason I can discern for using non "(128 * freq) / 1000" N
-values for rates < 297 Mhz is to try to make an integral CTS.
-
-* For rates >= 297 MHz you could make CTS integral and still keep
-"(128 * freq) / 1000", but the spec still says to use something
-different.  I don't know why.  My formula accurately makes values in
-the spec for 297 MHz.
-
-
-Anyway, I'm about done commenting on this thread.  Feel free to land
-this if folks are happy with it, but I'd prefer not to have my
-Reviewed-by on it given all that I've discovered.
-
--Doug
+diff --git a/arch/arm64/boot/dts/hisilicon/Makefile b/arch/arm64/boot/dts/hisilicon/Makefile
+index fa81a6e..cd158b8 100644
+--- a/arch/arm64/boot/dts/hisilicon/Makefile
++++ b/arch/arm64/boot/dts/hisilicon/Makefile
+@@ -1,4 +1,4 @@
+-dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb
++dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb hip05-d02.dtb
+ 
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/hisilicon/hip05-d02.dts b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
+new file mode 100644
+index 0000000..ae34e25
+--- /dev/null
++++ b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
+@@ -0,0 +1,36 @@
++/**
++ * dts file for Hisilicon D02 Development Board
++ *
++ * Copyright (C) 2014,2015 Hisilicon Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * publishhed by the Free Software Foundation.
++ *
++ */
++
++/dts-v1/;
++
++#include "hip05.dtsi"
++
++/ {
++	model = "Hisilicon Hip05 D02 Development Board";
++	compatible = "hisilicon,hip05-d02";
++
++	memory at 00000000 {
++		device_type = "memory";
++		reg = <0x0 0x00000000 0x0 0x80000000>;
++	};
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&uart0 {
++	status = "ok";
++};
+diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+new file mode 100644
+index 0000000..92d00f4
+--- /dev/null
++++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+@@ -0,0 +1,271 @@
++/**
++ * dts file for Hisilicon D02 Development Board
++ *
++ * Copyright (C) 2014,2015 Hisilicon Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * publishhed by the Free Software Foundation.
++ *
++ */
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	compatible = "hisilicon,hip05-d02";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu-map {
++			cluster0 {
++				core0 {
++					cpu = <&cpu0>;
++				};
++				core1 {
++					cpu = <&cpu1>;
++				};
++				core2 {
++					cpu = <&cpu2>;
++				};
++				core3 {
++					cpu = <&cpu3>;
++				};
++			};
++			cluster1 {
++				core0 {
++					cpu = <&cpu4>;
++				};
++				core1 {
++					cpu = <&cpu5>;
++				};
++				core2 {
++					cpu = <&cpu6>;
++				};
++				core3 {
++					cpu = <&cpu7>;
++				};
++			};
++			cluster2 {
++				core0 {
++					cpu = <&cpu8>;
++				};
++				core1 {
++					cpu = <&cpu9>;
++				};
++				core2 {
++					cpu = <&cpu10>;
++				};
++				core3 {
++					cpu = <&cpu11>;
++				};
++			};
++			cluster3 {
++				core0 {
++					cpu = <&cpu12>;
++				};
++				core1 {
++					cpu = <&cpu13>;
++				};
++				core2 {
++					cpu = <&cpu14>;
++				};
++				core3 {
++					cpu = <&cpu15>;
++				};
++			};
++		};
++
++		cpu0: cpu at 20000 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20000>;
++			enable-method = "psci";
++		};
++
++		cpu1: cpu at 20001 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20001>;
++			enable-method = "psci";
++		};
++
++		cpu2: cpu at 20002 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20002>;
++			enable-method = "psci";
++		};
++
++		cpu3: cpu at 20003 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20003>;
++			enable-method = "psci";
++		};
++
++		cpu4: cpu at 20100 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20100>;
++			enable-method = "psci";
++		};
++
++		cpu5: cpu at 20101 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20101>;
++			enable-method = "psci";
++		};
++
++		cpu6: cpu at 20102 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20102>;
++			enable-method = "psci";
++		};
++
++		cpu7: cpu at 20103 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20103>;
++			enable-method = "psci";
++		};
++
++		cpu8: cpu at 20200 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20200>;
++			enable-method = "psci";
++		};
++
++		cpu9: cpu at 20201 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20201>;
++			enable-method = "psci";
++		};
++
++		cpu10: cpu at 20202 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20202>;
++			enable-method = "psci";
++		};
++
++		cpu11: cpu at 20203 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20203>;
++			enable-method = "psci";
++		};
++
++		cpu12: cpu at 20300 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20300>;
++			enable-method = "psci";
++		};
++
++		cpu13: cpu at 20301 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20301>;
++			enable-method = "psci";
++		};
++
++		cpu14: cpu at 20302 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20302>;
++			enable-method = "psci";
++		};
++
++		cpu15: cpu at 20303 {
++			device_type = "cpu";
++			compatible = "hisilicon,hip05", "arm,armv8";
++			reg = <0x20303>;
++			enable-method = "psci";
++		};
++	};
++
++	gic: interrupt-controller at 8d000000 {
++		compatible = "arm,gic-v3";
++                #interrupt-cells = <3>;
++                #address-cells = <2>;
++                #size-cells = <2>;
++                ranges;
++                interrupt-controller;
++                #redistributor-regions = <1>;
++                redistributor-stride = <0x0 0x30000>;
++		reg = <0x0 0x8d000000 0 0x10000>,	/* GICD */
++		      <0x0 0x8d100000 0 0x300000>,	/* GICR */
++		      <0x0 0xfe000000 0 0x10000>,	/* GICC */
++		      <0x0 0xfe010000 0 0x10000>,       /* GICH */
++		      <0x0 0xfe020000 0 0x10000>;       /* GICV */
++		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
++
++		its_totems: interrupt-controller at 8c000000 {
++			compatible = "arm,gic-v3-its";
++			msi-controller;
++			reg = <0x0 0x8c000000 0x0 0x1000000>;
++		};
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		refclk200mhz: refclk200mhz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <200000000>;
++		};
++
++		uart0: uart at 80300000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x0 0x80300000 0x0 0x10000>;
++			interrupts = <GIC_SPI 317 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&refclk200mhz>;
++			clock-names = "apb_pclk";
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			status = "disabled";
++		};
++
++		uart1: uart at 80310000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x0 0x80310000 0x0 0x10000>;
++			interrupts = <GIC_SPI 318 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&refclk200mhz>;
++			clock-names = "apb_pclk";
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			status = "disabled";
++		};
++	};
++};
+-- 
+1.9.0
