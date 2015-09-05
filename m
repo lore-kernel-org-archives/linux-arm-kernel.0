@@ -1,53 +1,32 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  5 Sep 2015 16:55:53 +0200
-Subject: [PATCH 3/3] ARM: dts: sun5i: Add dts file for q8 formfactor a13 based
- tablets
+Date: Sat,  5 Sep 2015 16:55:52 +0200
+Subject: [PATCH 2/3] ARM: dts: sun5i: Add sun5i-q8-common.dtsi
 In-Reply-To: <1441464953-26351-1-git-send-email-hdegoede@redhat.com>
 References: <1441464953-26351-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1441464953-26351-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1441464953-26351-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commits adds a generic dts file for q8 formfactor a13 based tablets.
+This is the sun5i / a13 version of sun8i-q8-common.dtsi for use in dts
+files for a13 q8 based tablets. Compared to sun8i this uses uart1 for the
+serial console, and PG0 for card-detect for mmc0.
 
-The tablets ship in many variants, with the difference mainly being the
-touchscreen controller / accelerometer / wifi chip used.
-
-The wifi is USB based, and thus not listed in devicetree.
-
-The touchscreen controller / accelerometer may turn out to be a problem
-once we add support for those. We can either do something with devicetree
-overlays, or add sun5i-a13-<touchscreen>-<accelerometer>.dts files. The
-latter is what the android mod community is doing with firmware images.
-
-This dts was tested with an a13 q8 tablet with a pcb labelled: "94V-0",
-silead gsl1680 touchscreen controller and a mc32x0 accelerometer.
+This also adds pmic and otg support, which both use the same config on
+all known q8 a13 devices. This is not present in sun5i-q8-common.dtsi
+because pmic / otg support for sun8i has not yet been merged.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/Makefile                |  1 +
- arch/arm/boot/dts/sun5i-a13-q8-tablet.dts | 60 +++++++++++++++++++++++++++++++
- 2 files changed, 61 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
+ arch/arm/boot/dts/sun5i-q8-common.dtsi | 170 +++++++++++++++++++++++++++++++++
+ 1 file changed, 170 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun5i-q8-common.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index c08883c..6d43044 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -573,6 +573,7 @@ dtb-$(CONFIG_MACH_SUN5I) += \
- 	sun5i-a13-inet-98v-rev2.dtb \
- 	sun5i-a13-olinuxino.dtb \
- 	sun5i-a13-olinuxino-micro.dtb \
-+	sun5i-a13-q8-tablet.dtb \
- 	sun5i-a13-utoo-p66.dtb \
- 	sun5i-r8-chip.dtb
- dtb-$(CONFIG_MACH_SUN6I) += \
-diff --git a/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts b/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
+diff --git a/arch/arm/boot/dts/sun5i-q8-common.dtsi b/arch/arm/boot/dts/sun5i-q8-common.dtsi
 new file mode 100644
-index 0000000..72e93ac
+index 0000000..0641d68
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
-@@ -0,0 +1,60 @@
++++ b/arch/arm/boot/dts/sun5i-q8-common.dtsi
+@@ -0,0 +1,170 @@
 +/*
 + * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
 + *
@@ -89,24 +68,134 @@ index 0000000..72e93ac
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
-+
-+/dts-v1/;
-+#include "sun5i-a13.dtsi"
-+#include "sun5i-q8-common.dtsi"
++#include "sunxi-q8-common.dtsi"
 +
 +/ {
-+	model = "Q8 A13 Tablet";
-+	compatible = "allwinner,q8-a13", "allwinner,sun5i-a13";
++	aliases {
++		serial0 = &uart1;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
 +};
 +
-+&reg_ldo3 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi";
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&i2c0 {
++	axp209: pmic at 34 {
++		reg = <0x34>;
++		interrupts = <0>;
++	};
++};
++
++&i2c1 {
++	pcf8563: rtc at 51 {
++		compatible = "nxp,pcf8563";
++		reg = <0x51>;
++	};
++};
++
++#include "axp209.dtsi"
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_q8>;
++	vmmc-supply = <&reg_vcc3v0>;
++	bus-width = <4>;
++	cd-gpios = <&pio 6 0 GPIO_ACTIVE_HIGH>; /* PG0 */
++	cd-inverted;
++	status = "okay";
++};
++
++&otg_sram {
++	status = "okay";
++};
++
++&pio {
++	mmc0_cd_pin_q8: mmc0_cd_pin at 0 {
++		allwinner,pins = "PG0";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++		allwinner,pins = "PG1";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
++	};
++
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PG2";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	usb0_vbus_pin_a: usb0_vbus_pin at 0 {
++		allwinner,pins = "PG12";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-pll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
++&reg_usb0_vbus {
++	gpio = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins_b>;
++	status = "okay";
++};
++
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
 +};
 +
 +&usbphy {
-+	usb1_vbus-supply = <&reg_ldo3>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
++	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
++	usb0_vbus_det-gpio = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
++	usb0_vbus-supply = <&reg_usb0_vbus>;
++	status = "okay";
 +};
 -- 
 2.4.3
