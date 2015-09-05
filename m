@@ -1,98 +1,114 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Sep 2015 15:25:19 +0100
-Subject: [PATCH] ARM: fix alignement of __bug_table section entries
-In-Reply-To: <878u8lx9hl.fsf@belgarion.home>
-References: <1441175009-26730-1-git-send-email-robert.jarzmik@free.fr>
- <20150902103955.GF6281@e103592.cambridge.arm.com>
- <878u8lx9hl.fsf@belgarion.home>
-Message-ID: <20150905142519.GN21084@n2100.arm.linux.org.uk>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Sat, 5 Sep 2015 22:42:03 +0800
+Subject: earlycon issues in -next with amba-pl011 updates
+In-Reply-To: <55E87095.4030600@arm.com>
+References: <20150810232312.GB10728@bivouac.eciton.net>
+ <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
+ <55E81F93.1020104@arm.com> <20150903155255.GA28336@kroah.com>
+ <55E87095.4030600@arm.com>
+Message-ID: <CABymUCP4s+ePs-sphJkQ4b61EcNT51FQat2ADWoy1Tgww35GMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 05, 2015 at 03:48:38PM +0200, Robert Jarzmik wrote:
-> Dave Martin <Dave.Martin@arm.com> writes:
-> 
-> > On Wed, Sep 02, 2015 at 08:23:29AM +0200, Robert Jarzmik wrote:
-> >> On old ARM chips, unaligned accesses to memory are not trapped and
-> >> fixed.  On module load, symbols are relocated, and the relocation of
-> >> __bug_table symbols is done on a u32 basis. Yet the section is not
-> >> aligned to a multiple of 4 address, but to a multiple of 2.
-> 
-> Hi Russell,
-> 
-> I dug deeper, and got another stack, unrelated to modules insertion but related
-> to alignement fault (see [1] for reference). As before, this didn't happen on
-> v4.1, but happens on linux-next.
-> I'm wondering if alignement fixup does work in my case and if I understand it.
-> 
-> This time I took my JTAG to have a look at the flow, in arch/arm/mm/alignment.c,
-> where I added the small chunk in [2], which gave in my case :
->     RJK: fault=4 instr=0x00000000 instrptr=0xc02b37c8 thumb_mode=0 tinstr=0x0000
+2015-09-04 0:08 GMT+08:00 Marc Zyngier <marc.zyngier@arm.com>:
+> On 03/09/15 16:52, Greg Kroah-Hartman wrote:
+>> On Thu, Sep 03, 2015 at 11:23:15AM +0100, Marc Zyngier wrote:
+>>> On 11/08/15 02:48, Jun Nie wrote:
+>>>> 2015-08-11 7:23 GMT+08:00 Leif Lindholm <leif.lindholm@linaro.org>:
+>>>>> Hi all,
+>>>>>
+>>>>> The kernelci.org bot picked up a complete boot failure (no output past
+>>>>> UEFI stub) with next-20150806 and Tyler bisected it down to somewhere
+>>>>> in
+>>>>> 8cd90e5 uart: pl011: Add support to ZTE ZX296702 uart
+>>>>> 09dcc7d uart: pl011: Improve LCRH register access decision
+>>>>> 2c096a9 uart: pl011: Introduce register look up table
+>>>>> 7b753f3 uart: pl011: Introduce register accessor
+>>>>>
+>>>>> The issue only appears with earlycon on command line, for pl011
+>>>>> consoles.
+>>>>>
+>>>>> Some investigation shows that the cause lies with
+>>>>> commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
+>>>>> and
+>>>>> commit 2c096a9eedc6 ("uart: pl011: Introduce register look up table")
+>>>>>
+>>>>> Specifically, the changes to pl011_putc() are incorrect:
+>>>>> The new pl011_ accessors take a (struct uart_amba_port *) input, but
+>>>>> pl011_putc() directly uses the incoming (struct uart_port *) for this.
+>>>>>
+>>>>> Apart from ending up with an unintended/incorrect UART base address,
+>>>>> the introduction of the lookup table for register offsets also means
+>>>>> the accessors try to dereference (struct uart_amba_port *)->reg_lut.
+>>>>>
+>>>>> The below is a hack that shows/resolves the issue, but some
+>>>>> refactoring of the original patches might be in order.
+>>>>>
+>>>>> /
+>>>>>     Leif
+>>>>
+>>>> Leif,
+>>>>
+>>>> Sorry for the inconvenience. I do not have idea of early console till
+>>>> now and I always have debug console for early panic debug. Learned
+>>>> more from this issue.
+>>>>
+>>>> Suppose Peter's patch will resolve your issue.
+>>>
+>>> [+ Greg KH]
+>>>
+>>> So -next has now been broken for a while on a number of ARM platforms
+>>> because of this (they simply cannot boot), and no progress has been made
+>>> towards resolving this problem.
+>>>
+>>> Can we please drop this series (at least commits 7b753f3 and following)
+>>> from -next until is has been reworked and reviewed?
+>>
+>> I don't have any patches in my -next tree, everything is in Linus's tree
+>> now.  So if I've missed something, or need to revert something, please
+>> let me know specifcally what to do.
+>
+> Gahhh... Given that there is no obvious fix, that the discussion has
+> stalled and that the author of the series is apparently away, the
+> following patches should be reverted:
 
-Right, so as fault is nonzero, this means that we were unable to read the
-instruction.  That seems mad though - the instruction pointer is certainly
-valid, and as we're using probe_kernel_address(), that switches to the
-kernel "segment" before trying to read kernel addresses.  That should
-mean that __copy_from_user_inatomic() is able to read the instruction.
+Marc,
 
-I think this is the root cause of the issue.
+There had a patch from Peter that revert early console part, which I
+thought will be merged to mainline. It's my fault for not fix the bug
+on time. Also sorry for late response to you as I took three days
+leave.
 
-> The instruction (as seen with vmlinux disassembly or JTAG memory dump) is  :
->     0xc02b37c8 <+372>:	b2 50 c6 10	strhne	r5, [r6], #2
-> 
-> I must admit I fail to see how the following "fixup:" label can be reached with
-> a "missed" copy_from_user() (fault == 4).
+Could you help test attached patch? Thank you in advance!
 
-We can't fix up the fault if we failed to read the instruction causing the
-fault - because we've no idea what register(s) will need updating.
 
-> [1] New stack
-> =============
->   #0: pxa2xx-ac97 (Wolfson WM9713,WM9714)
-> RJK: fault=4 instr=0x00000000 instrptr=0xc02b37c8 thumb_mode=0 tinstr=0x0000
-> &Unable to handle kernel paging request at virtual address c3057661
-> &pgd = c0004000
-> "[c3057661] *pgd=a300040e(bad)
-> Internal error: Oops: 803 [#1] PREEMPT ARM
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper Not tainted 4.2.0-rc8-next-20150828+ #900
-> Hardware name: MIO A701
-> task: c3858bc0 ti: c385c000 task.ti: c385c000
-> PC is at doc_read_data_area+0x174/0x370
-> LR is at doc_read_page_getbytes+0x58/0x78
-> pc : [<c02b37c8>]    lr : [<c02b3a1c>]    psr: a8000013
-> sp : c385d8e0  ip : c07142b8  fp : c385d91c
-> r10: c3aac540  r9 : c070ffc0  r8 : c385c000
-> @QGi
-> r7 : 00000002  r6 : c3057661  r5 : 0000c1e5  r4 : 0000000b
-> r3 : 0000000a  r2 : 0000000b  r1 : c3057661  r0 : 00000000
-> Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+Greg,
 
-It seems you have SW_DOMAIN_PAN enabled.
+Would you please hold the merging of revert patches for one or two
+days so that the fix can be verified? Thank you!
 
-> Control: 0000397f  Table: a0004000  DAC: 00000053
+Jun
 
-And the DACR for the parent context shows that user no-access, kernel
-manager-access (iow, in the doc_read_data_area() function).  I have to
-wonder why that would be the case - I can't find anything that would
-set the kernel to manager-access.  There's no get_ds() or KERNEL_DS
-reference in fs/ubifs or drivers/mtd.
 
-> [3] Abort stack
-> ===============
-> #0  panic (fmt=0xc385d6c4 <incomplete sequence \344>) at kernel/panic.c:72
-> #1  0xc000e788 in oops_end (regs=<optimized out>, signr=<optimized out>, flags=<optimized out>) at arch/arm/kernel/traps.c:311
-> #2  die (str=0x68000013 "", regs=<optimized out>, err=-1014638958) at arch/arm/kernel/traps.c:333
-> #3  0xc00137c0 in __do_kernel_fault (mm=0xc06e8c04 <init_mm>, addr=3271915105, fsr=2051, regs=0xc385d890) at arch/arm/mm/fault.c:150
-> #4  0xc0013b10 in do_bad_area (addr=<optimized out>, fsr=<optimized out>, regs=<optimized out>) at arch/arm/mm/fault.c:198
-> #5  0xc00166c8 in do_alignment (addr=3271915105, fsr=2051, regs=0xc385d890) at arch/arm/mm/alignment.c:900
-> #6  0xc0009264 in do_DataAbort (addr=3271915105, fsr=2051, regs=0xc385d890) at arch/arm/mm/fault.c:550
-> #7  0xc000f024 in __dabt_svc () at arch/arm/kernel/entry-armv.S:204
-
-I'm afraid this isn't useful, and I think (as seems to be typical with gdb)
-some of those values are completely wrong.  There's no way "str" would
-be 0x68000013 in frame 2 for example.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>
+> 8cd90e50d140 uart: pl011: Add support to ZTE ZX296702 uart
+> 09dcc7dfc05b uart: pl011: Improve LCRH register access decision
+> 2c096a9eedc6 uart: pl011: Introduce register look up table
+> 7b753f318d14 uart: pl011: Introduce register accessor
+> 534e14e2293d uart: pl011: Rename regs with enumeration
+>
+> (7b753f318d14 being the one breaking everything, but it makes more sense
+> to revert the whole series until it is properly fixed and reviewed).
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-serial-pl011-Fix-earlycon-register-LUT-breakage.patch
+Type: text/x-patch
+Size: 1981 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150905/0697756a/attachment.bin>
