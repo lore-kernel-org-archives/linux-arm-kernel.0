@@ -1,57 +1,68 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Sat, 5 Sep 2015 12:44:51 -0700
-Subject: [PATCH 6/9] drm: bridge/dw_hdmi: adjust pixel clock values in N
- calculation
-In-Reply-To: <20150905140136.GM21084@n2100.arm.linux.org.uk>
-References: <20150808160936.GN7557@n2100.arm.linux.org.uk>
- <E1ZO6hc-0003NW-55@rmk-PC.arm.linux.org.uk>
- <CAD=FV=WXjcp-wyH_SKexHJDo8R9Xug4yMAOHFPWPYBgiTyM=PQ@mail.gmail.com>
- <CAD=FV=WnVLiCNYgZ8idpknD==Rw7UaLCY1gky4G0TvwUR-VATw@mail.gmail.com>
- <20150904212401.GI21084@n2100.arm.linux.org.uk>
- <CAD=FV=U7h6b1eR+cva6VywcLP8RL2p5sAMSWc_vzUCg6WfWCYQ@mail.gmail.com>
- <20150905002733.GJ21084@n2100.arm.linux.org.uk>
- <CAD=FV=WR4iJ57FLh1d46-s9Gu-4wW6NdoROx-kNbbA0zFpUo0w@mail.gmail.com>
- <20150905083107.GK21084@n2100.arm.linux.org.uk>
- <CAD=FV=XzPRHE6n-svm=0_9jXUORY5NPzfmgS0Ncp7PXXbqivOw@mail.gmail.com>
- <20150905140136.GM21084@n2100.arm.linux.org.uk>
-Message-ID: <CAD=FV=WsKgQRrKNmN+sFwQBCC2XiJLOg-yzg5w6w8n6qk8MjRQ@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Sat, 05 Sep 2015 16:00:37 -0400
+Subject: _DSD standardization note (WAS: Re: [PATCH 2/2] net, thunder, bgx:
+ Add support for ACPI binding.)
+In-Reply-To: <CAJZ5v0iNqRsrpwzWY5o97R1S+Dr-CzRPg3Cymt1q4v5gvABCQA@mail.gmail.com>
+References: <1438907590-29649-1-git-send-email-ddaney.cavm@gmail.com>	<1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>	<20150807140106.GE7646@leverpostej>	<55C4ECC6.7050908@caviumnetworks.com>	<20150807175127.GB12013@leverpostej>	<CAJZ5v0gc=bo3ayO7aWq19Hh_205YC52wqXGbbM5vxR1atXm+oA@mail.gmail.com>	<55C5494D.5010903@caviumnetworks.com>
+ <CAJZ5v0iNqRsrpwzWY5o97R1S+Dr-CzRPg3Cymt1q4v5gvABCQA@mail.gmail.com>
+Message-ID: <55EB49E5.5040206@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Following up on this thread after finally seeing it...figured I would
+send something just for the archive mainly (we discussed this in person
+recently at a few different events and I think are aligned already).
 
-On Sat, Sep 5, 2015 at 7:01 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->> If you know the answer, just tell me.  If you're talking about 74.25
->> vs. 32 kHz it is further evidence of what I'm saying.  Note that
->> picking only one of the two listed CTS values again puts you in a
->> worse position for regenerating the proper audio clock then just using
->> the default N=4096.
->
-> No it doesn't.
->
-> 74.25MHz/1.001 * 4096 / (128 * 32000) = 74175 (rounded down)
->
-> Now do the calcuation.
->
-> (74.25MHz/1.001) / 74175 * 4096 = 4096045.511 => 32000.35556Hz
->         => error of 0.001111%
->
-> Now for the calcuation using the proscribed figures.
->
-> (74.25MHz/1.001) / 210937 * 11648 = 4096009.709 => 32000.07585Hz
->         => error of 0.000237%
->
+On 08/07/2015 08:28 PM, Rafael J. Wysocki wrote:
+> Hi David,
+> 
+> On Sat, Aug 8, 2015 at 2:11 AM, David Daney <ddaney@caviumnetworks.com> wrote:
+>> On 08/07/2015 05:05 PM, Rafael J. Wysocki wrote:
+> 
+> [cut]
+> 
+>>>
+>>> It is actually useful to people as far as I can say.
+>>>
+>>> Also, if somebody is going to use properties with ACPI, why whould
+>>> they use a different set of properties with DT?
 
-Why would you round down???  Round to the closest.
+Generally speaking, if there's a net new thing to handle, there is of
+course no particular problem with using DT as an inspiration, but we
+need to be conscious of the fact that Linux isn't the only Operating
+System that may need to support these bindings, so the correct thing (as
+stated by many of you, and below, and in person also recently - so we
+are aligned) is to get this (the MAC address binding for _DSD in ACPI)
+standardized properly through UEFI where everyone who has a vest OS
+interest beyond Linux can also have their own involvement as well. As
+discussed, that doesn't make it part of ACPI6.0, just a binding.
 
-(74250000 / 1.001 * 4096)  / (128 * 32000.)
-=> 74175.82417582418
-=> 74176
+FWIW I made a decision on the Red Hat end that in our guidelines to
+partners for ARM RHEL(SA - Server for ARM) builds we would not generally
+endorse any use of _DSD, with the exception of the MAC address binding
+being discussed here. In that case, I realized I had not been fully
+prescriptive enough with the vendors building early hw in that I should
+have realized this would happen and have required that they do this the
+right way. MAC IP should be more sophisticated such that it can handle
+being reset even after the firmware has loaded its MAC address(es).
+Platform flash storage separate from UEFI variable storage (which is
+being abused to contain too much now that DXE drivers then load into the
+ACPI tables prior to exiting Boot Services, etc.) should contain the
+actual MAC address(es), as it is done on other arches, and it should not
+be necessary to communicate this via ACPI tables to begin with (that's a
+cost saving embedded concept that should not happen on server systems in
+the general case). I have already had several unannounced future designs
+adjusted in light of this _DSD usage.
 
-(74250000 / 1.001) / 74176 * 4096 / 128
-=> 31999.924148327947
+In the case of providing MAC address information (only) by _DSD, I
+connected the initial ARMv8 SoC silicon vendors who needed to use such a
+hack to ensure they were using the same properties, and will followup
+off list to ensure Cavium are looped into that. But, we do need to get
+the _DSD property for MAC address provision standardized through UEFI
+properly as an official binding rather than just a link on the website,
+and then we need to be extremely careful not to grow any further
+dependence upon _DSD elsewhere. Generally, if you're using that approach
+on a server system (other than for this MAC case), your firmware or
+design (or both) need to be modified to not use _DSD.
 
-That's actually the same error as yours: 0.000237%
-
-You're right.  Yours isn't worse, but it's also not any better.
+Jon.
