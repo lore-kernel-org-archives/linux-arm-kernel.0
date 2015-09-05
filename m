@@ -1,68 +1,93 @@
 From: jcm@redhat.com (Jon Masters)
-Date: Sat, 05 Sep 2015 16:00:37 -0400
-Subject: _DSD standardization note (WAS: Re: [PATCH 2/2] net, thunder, bgx:
- Add support for ACPI binding.)
-In-Reply-To: <CAJZ5v0iNqRsrpwzWY5o97R1S+Dr-CzRPg3Cymt1q4v5gvABCQA@mail.gmail.com>
-References: <1438907590-29649-1-git-send-email-ddaney.cavm@gmail.com>	<1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>	<20150807140106.GE7646@leverpostej>	<55C4ECC6.7050908@caviumnetworks.com>	<20150807175127.GB12013@leverpostej>	<CAJZ5v0gc=bo3ayO7aWq19Hh_205YC52wqXGbbM5vxR1atXm+oA@mail.gmail.com>	<55C5494D.5010903@caviumnetworks.com>
- <CAJZ5v0iNqRsrpwzWY5o97R1S+Dr-CzRPg3Cymt1q4v5gvABCQA@mail.gmail.com>
-Message-ID: <55EB49E5.5040206@redhat.com>
+Date: Sat, 05 Sep 2015 16:13:12 -0400
+Subject: X-Gene: Unhandled fault: synchronous external abort in
+ pci_generic_config_read32
+In-Reply-To: <CAErSpo59jH3qeqThG-OO_dqB0fU5gmgC89Xued5QKrbB0dt2yg@mail.gmail.com>
+References: <20150724224258.GA23990@google.com>
+ <CADaLNDmYZ=8XQt82W_H74QaOiX3UwkVxkE1_EWRgzhkG1boebw@mail.gmail.com>
+ <CAErSpo549xfAnx62quCqGHh3DNay5Lfb6EhEG+4EXooEuueQFQ@mail.gmail.com>
+ <CADaLNDn95H=g73DKWRsrB4SuWcf+-8mkepbwb_DC-sFsVkrk6g@mail.gmail.com>
+ <20150728212944.GA12958@google.com>
+ <CADaLNDkOLiyPmVC3VwpnbrfAKFmNwSVJKdChjQFdQqs7XP-Ddg@mail.gmail.com>
+ <20150729012255.GA18606@google.com> <20150729155509.GA31170@google.com>
+ <CADaLNDk=+J_yOer1ferSCNb_xAC42ULtP2FyCLmYMwa+Gj=vfA@mail.gmail.com>
+ <CAErSpo4VFh7rv81sCAG-eCXVyZh4ub8Trh-ntZhyfy7BzqTr5g@mail.gmail.com>
+ <CADaLNDkUQHzGACfFmYDeJWnaNrKmJUDx4Rby60OWr4FzOjx3rA@mail.gmail.com>
+ <CAErSpo7aDYKwy4MC6ZPf7hNd4MPE-LARiOVKutFfDFFkHY7qjQ@mail.gmail.com>
+ <CADaLNDmnnZOoB1fxO=rQQa-eqT=B9G24rUrN_GzwAkFoC3Acbw@mail.gmail.com>
+ <CAErSpo59jH3qeqThG-OO_dqB0fU5gmgC89Xued5QKrbB0dt2yg@mail.gmail.com>
+Message-ID: <55EB4CD8.8080405@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following up on this thread after finally seeing it...figured I would
-send something just for the archive mainly (we discussed this in person
-recently at a few different events and I think are aligned already).
-
-On 08/07/2015 08:28 PM, Rafael J. Wysocki wrote:
-> Hi David,
-> 
-> On Sat, Aug 8, 2015 at 2:11 AM, David Daney <ddaney@caviumnetworks.com> wrote:
->> On 08/07/2015 05:05 PM, Rafael J. Wysocki wrote:
-> 
-> [cut]
-> 
+On 08/11/2015 03:28 PM, Bjorn Helgaas wrote:
+> On Mon, Aug 10, 2015 at 2:07 PM, Duc Dang <dhdang@apm.com> wrote:
+>> On Mon, Aug 10, 2015 at 10:42 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>>> On Mon, Aug 10, 2015 at 12:16 PM, Duc Dang <dhdang@apm.com> wrote:
+>>>> On Monday, August 10, 2015, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>>>>>
+>>>>> On Fri, Jul 31, 2015 at 12:00 PM, Duc Dang <dhdang@apm.com> wrote:
+>>>>>> On Wed, Jul 29, 2015 at 8:55 AM, Bjorn Helgaas <bhelgaas@google.com>
+>>>>>> wrote:
+>>>>>>> On Tue, Jul 28, 2015 at 08:22:55PM -0500, Bjorn Helgaas wrote:
+>>>>>>>> On Tue, Jul 28, 2015 at 02:50:39PM -0700, Duc Dang wrote:
+>>>>>>>
+>>>>>>>>> Do you have another PCIe card to try on the same reboot test on this
+>>>>>>>>> board?
+>>>>>>>>
+>>>>>>>> I've seen this on at least two Mellanox cards.  I'm running similar
+>>>>>>>> tests
+>>>>>>>> on a different type of card now.
+>>>>>>>
+>>>>>>> FWIW, reboot tests on two machines with Mellanox cards failed, while
+>>>>>>> the
+>>>>>>> same test on a machine with a different proprietary card succeeded.
+>>>>>>
+>>>>>> Thanks, Bjorn.
+>>>>>>
+>>>>>> I don't have the same Mellanox card as yours, but I will also run
+>>>>>> similar reboot test to see if I hit the same issue with my card.
+>>>>>
+>>>>> Any more hints on this?  Nothing has changed on my end, so of course
+>>>>> I'm still seeing this, always on machines with Mellanox, and never on
+>>>>> other machines.  Could this be a hardware issue like a signal
+>>>>> integrity or margin issue?  I don't know where to go from here because
+>>>>> I'm not a hardware person, and I don't know anything to do in
+>>>>> software.
+>>>>
+>>>>
+>>>> Hi Bjorn,
+>>>>
+>>>> I tried to run similar reboot tests on 2 different Mellanox cards (Connect-X
+>>>> family, one card has 2 10G interfaces, the other one has 1 port that
+>>>> supports InfiniBand) with U-Boot 1.15.12 and linux 4.2-rc5 and I did not see
+>>>> the crash that you encounterred.
+>>>>
+>>>> Did you check if your Mellanox cards have latest firmware? I did see some
+>>>> link issues on my Mellanox cards with its old firmware before.
 >>>
->>> It is actually useful to people as far as I can say.
->>>
->>> Also, if somebody is going to use properties with ACPI, why whould
->>> they use a different set of properties with DT?
+>>> Good idea; I'll check that, too.  Also, I just learned that these
+>>> cards on installed with an extender card because of some space issues,
+>>> so we're going to test again without the extender.
+>>
+>> Hi Bjorn,
+>>
+>> Are other cards that passed your test installed directly to the
+>> on-board PCIe slot?
+>> If yes, then this is a good data point and it will be useful to test
+>> the case where
+>> your Mellanox cards are directly installed into the on-board PCIe slot.
+> 
+> The cards that passed the test were installed directly, with  no
+> extender.  We removed the extender from one of the machines with the
+> Mellanox card and have not seen this issue since then.  I think it's
+> very likely that the problem is related to using the extender.
 
-Generally speaking, if there's a net new thing to handle, there is of
-course no particular problem with using DT as an inspiration, but we
-need to be conscious of the fact that Linux isn't the only Operating
-System that may need to support these bindings, so the correct thing (as
-stated by many of you, and below, and in person also recently - so we
-are aligned) is to get this (the MAC address binding for _DSD in ACPI)
-standardized properly through UEFI where everyone who has a vest OS
-interest beyond Linux can also have their own involvement as well. As
-discussed, that doesn't make it part of ACPI6.0, just a binding.
-
-FWIW I made a decision on the Red Hat end that in our guidelines to
-partners for ARM RHEL(SA - Server for ARM) builds we would not generally
-endorse any use of _DSD, with the exception of the MAC address binding
-being discussed here. In that case, I realized I had not been fully
-prescriptive enough with the vendors building early hw in that I should
-have realized this would happen and have required that they do this the
-right way. MAC IP should be more sophisticated such that it can handle
-being reset even after the firmware has loaded its MAC address(es).
-Platform flash storage separate from UEFI variable storage (which is
-being abused to contain too much now that DXE drivers then load into the
-ACPI tables prior to exiting Boot Services, etc.) should contain the
-actual MAC address(es), as it is done on other arches, and it should not
-be necessary to communicate this via ACPI tables to begin with (that's a
-cost saving embedded concept that should not happen on server systems in
-the general case). I have already had several unannounced future designs
-adjusted in light of this _DSD usage.
-
-In the case of providing MAC address information (only) by _DSD, I
-connected the initial ARMv8 SoC silicon vendors who needed to use such a
-hack to ensure they were using the same properties, and will followup
-off list to ensure Cavium are looped into that. But, we do need to get
-the _DSD property for MAC address provision standardized through UEFI
-properly as an official binding rather than just a link on the website,
-and then we need to be extremely careful not to grow any further
-dependence upon _DSD elsewhere. Generally, if you're using that approach
-on a server system (other than for this MAC case), your firmware or
-design (or both) need to be modified to not use _DSD.
+If you're trying to use Mellanox cards in (for example) an APM Mustang
+like system with a PCIe extender card (for example a 90 degree angle
+adjustment for a low profile server case), you might want to ping me
+offline. I have procured a number of these over the past couple of years
+for my home lab and have found one that works (almost) reliably on that
+particular hardware platform and does 10G in my home lab.
 
 Jon.
