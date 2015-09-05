@@ -1,103 +1,63 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Sat, 05 Sep 2015 16:22:02 -0400
-Subject: X-Gene: Unhandled fault: synchronous external abort in
- pci_generic_config_read32
-In-Reply-To: <55EB4CD8.8080405@redhat.com>
-References: <20150724224258.GA23990@google.com>
- <CADaLNDmYZ=8XQt82W_H74QaOiX3UwkVxkE1_EWRgzhkG1boebw@mail.gmail.com>
- <CAErSpo549xfAnx62quCqGHh3DNay5Lfb6EhEG+4EXooEuueQFQ@mail.gmail.com>
- <CADaLNDn95H=g73DKWRsrB4SuWcf+-8mkepbwb_DC-sFsVkrk6g@mail.gmail.com>
- <20150728212944.GA12958@google.com>
- <CADaLNDkOLiyPmVC3VwpnbrfAKFmNwSVJKdChjQFdQqs7XP-Ddg@mail.gmail.com>
- <20150729012255.GA18606@google.com> <20150729155509.GA31170@google.com>
- <CADaLNDk=+J_yOer1ferSCNb_xAC42ULtP2FyCLmYMwa+Gj=vfA@mail.gmail.com>
- <CAErSpo4VFh7rv81sCAG-eCXVyZh4ub8Trh-ntZhyfy7BzqTr5g@mail.gmail.com>
- <CADaLNDkUQHzGACfFmYDeJWnaNrKmJUDx4Rby60OWr4FzOjx3rA@mail.gmail.com>
- <CAErSpo7aDYKwy4MC6ZPf7hNd4MPE-LARiOVKutFfDFFkHY7qjQ@mail.gmail.com>
- <CADaLNDmnnZOoB1fxO=rQQa-eqT=B9G24rUrN_GzwAkFoC3Acbw@mail.gmail.com>
- <CAErSpo59jH3qeqThG-OO_dqB0fU5gmgC89Xued5QKrbB0dt2yg@mail.gmail.com>
- <55EB4CD8.8080405@redhat.com>
-Message-ID: <55EB4EEA.2070409@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 5 Sep 2015 21:38:18 +0100
+Subject: [PATCH] ARM: fix alignement of __bug_table section entries
+In-Reply-To: <87y4gkx04m.fsf@belgarion.home>
+References: <1441175009-26730-1-git-send-email-robert.jarzmik@free.fr>
+ <20150902103955.GF6281@e103592.cambridge.arm.com>
+ <878u8lx9hl.fsf@belgarion.home>
+ <20150905142519.GN21084@n2100.arm.linux.org.uk>
+ <87y4gkx04m.fsf@belgarion.home>
+Message-ID: <20150905203818.GO21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2015 04:13 PM, Jon Masters wrote:
-> On 08/11/2015 03:28 PM, Bjorn Helgaas wrote:
->> On Mon, Aug 10, 2015 at 2:07 PM, Duc Dang <dhdang@apm.com> wrote:
->>> On Mon, Aug 10, 2015 at 10:42 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
->>>> On Mon, Aug 10, 2015 at 12:16 PM, Duc Dang <dhdang@apm.com> wrote:
->>>>> On Monday, August 10, 2015, Bjorn Helgaas <bhelgaas@google.com> wrote:
->>>>>>
->>>>>> On Fri, Jul 31, 2015 at 12:00 PM, Duc Dang <dhdang@apm.com> wrote:
->>>>>>> On Wed, Jul 29, 2015 at 8:55 AM, Bjorn Helgaas <bhelgaas@google.com>
->>>>>>> wrote:
->>>>>>>> On Tue, Jul 28, 2015 at 08:22:55PM -0500, Bjorn Helgaas wrote:
->>>>>>>>> On Tue, Jul 28, 2015 at 02:50:39PM -0700, Duc Dang wrote:
->>>>>>>>
->>>>>>>>>> Do you have another PCIe card to try on the same reboot test on this
->>>>>>>>>> board?
->>>>>>>>>
->>>>>>>>> I've seen this on at least two Mellanox cards.  I'm running similar
->>>>>>>>> tests
->>>>>>>>> on a different type of card now.
->>>>>>>>
->>>>>>>> FWIW, reboot tests on two machines with Mellanox cards failed, while
->>>>>>>> the
->>>>>>>> same test on a machine with a different proprietary card succeeded.
->>>>>>>
->>>>>>> Thanks, Bjorn.
->>>>>>>
->>>>>>> I don't have the same Mellanox card as yours, but I will also run
->>>>>>> similar reboot test to see if I hit the same issue with my card.
->>>>>>
->>>>>> Any more hints on this?  Nothing has changed on my end, so of course
->>>>>> I'm still seeing this, always on machines with Mellanox, and never on
->>>>>> other machines.  Could this be a hardware issue like a signal
->>>>>> integrity or margin issue?  I don't know where to go from here because
->>>>>> I'm not a hardware person, and I don't know anything to do in
->>>>>> software.
->>>>>
->>>>>
->>>>> Hi Bjorn,
->>>>>
->>>>> I tried to run similar reboot tests on 2 different Mellanox cards (Connect-X
->>>>> family, one card has 2 10G interfaces, the other one has 1 port that
->>>>> supports InfiniBand) with U-Boot 1.15.12 and linux 4.2-rc5 and I did not see
->>>>> the crash that you encounterred.
->>>>>
->>>>> Did you check if your Mellanox cards have latest firmware? I did see some
->>>>> link issues on my Mellanox cards with its old firmware before.
->>>>
->>>> Good idea; I'll check that, too.  Also, I just learned that these
->>>> cards on installed with an extender card because of some space issues,
->>>> so we're going to test again without the extender.
->>>
->>> Hi Bjorn,
->>>
->>> Are other cards that passed your test installed directly to the
->>> on-board PCIe slot?
->>> If yes, then this is a good data point and it will be useful to test
->>> the case where
->>> your Mellanox cards are directly installed into the on-board PCIe slot.
->>
->> The cards that passed the test were installed directly, with  no
->> extender.  We removed the extender from one of the machines with the
->> Mellanox card and have not seen this issue since then.  I think it's
->> very likely that the problem is related to using the extender.
+On Sat, Sep 05, 2015 at 07:10:49PM +0200, Robert Jarzmik wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 > 
-> If you're trying to use Mellanox cards in (for example) an APM Mustang
-> like system with a PCIe extender card (for example a 90 degree angle
-> adjustment for a low profile server case), you might want to ping me
-> offline. I have procured a number of these over the past couple of years
-> for my home lab and have found one that works (almost) reliably on that
-> particular hardware platform and does 10G in my home lab.
+> > On Sat, Sep 05, 2015 at 03:48:38PM +0200, Robert Jarzmik wrote:
+> >> This time I took my JTAG to have a look at the flow, in arch/arm/mm/alignment.c,
+> >> where I added the small chunk in [2], which gave in my case :
+> >>     RJK: fault=4 instr=0x00000000 instrptr=0xc02b37c8 thumb_mode=0 tinstr=0x0000
+> >
+> > Right, so as fault is nonzero, this means that we were unable to read the
+> > instruction.  That seems mad though - the instruction pointer is certainly
+> > valid, and as we're using probe_kernel_address(), that switches to the
+> > kernel "segment" before trying to read kernel addresses.  That should
+> > mean that __copy_from_user_inatomic() is able to read the instruction.
+> >
+> > I think this is the root cause of the issue.
+> 
+> And there is more madness to come : I tried to "reread" the instruction [1] a
+> second time if the first result was 4 :
+> RJK: fault=4 instr=0x00000000(@c385d72c) instrptr=0xc02b39e8 thumb_mode=0 tinstr=0x0000
+> RJK: reread instruction: [0xc02b39e8] = 0x10c650b2: 0
+> 
+> Guess what, the second probe_kernel_address() with the same parameters returns
+> 0, and everything works. It's insane.
+> 
+> >> Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+> > It seems you have SW_DOMAIN_PAN enabled.
+> That's the default arch/arm/Kconfig implies.
+> And ... this is what also _is_ the cause of this behavior : removing
+> SW_DOMAIN_PAN makes all my pxa boards work again !!!
+> 
+> Moreover, this is consistent with the fact that this commit is in linux-next but
+> not in v4.1 :
+>     a5e090acbf54 ("ARM: software-based priviledged-no-access support")
+> 
+> So the issue is around this SW_DOMAIN_PAN, at least on PXA.
 
-Traveling for the holiday, but I guess it doesn't need to be a secret. I
-think I have found some success with this one (but I have ordered many
-different ones over the past year so will confirm next week):
+Is it only PXA which seems to be affected?
 
-http://www.amazon.com/gp/product/B00H8VVD00?psc=1&redirect=true&ref_=oh_aui_search_detailpage
+If so, you may need to add:
 
-Specifically, the fixed angle adapter brackets generally DO NOT work.
+	mrc p15, 0, \rd, c2, c0, 0
+	mov \rd, \rd
+	sub pc, pc, #4
 
-Jon.
+to the places we update the domain access register to ensure that the
+Xscale pipeline stalls to allow the CP15 DACR update to hit.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
