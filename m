@@ -1,62 +1,91 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 6 Sep 2015 16:15:26 +0800
-Subject: [PATCH v9 1/4] clk: clk-vf610: Add clock for Vybrid OCOTP
- controller
-In-Reply-To: <e38870196e689bd4edcaf43f36df899d63a6851c.1439384645.git.maitysanchayan@gmail.com>
-References: <cover.1439384645.git.maitysanchayan@gmail.com>
- <e38870196e689bd4edcaf43f36df899d63a6851c.1439384645.git.maitysanchayan@gmail.com>
-Message-ID: <20150906081526.GL30746@tiger>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Sun, 06 Sep 2015 16:20:39 +0800
+Subject: [PATCH v4 14/16] drm: bridge: analogix/dp: try force hpd after
+ plug in lookup failed
+In-Reply-To: <CAL_JsqKoyZOAA7yzSATA-Ys8N1q9Edi-3ctPU09UVeV=7sTWTg@mail.gmail.com>
+References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
+ <1441088079-25809-1-git-send-email-ykk@rock-chips.com>
+ <CAL_JsqJDALnjVaVoEqGGsSLeE31m3MKOfbSoZ3M+g+zPZR2MFg@mail.gmail.com>
+ <55E7CC43.7040608@rock-chips.com>
+ <CAL_JsqKoyZOAA7yzSATA-Ys8N1q9Edi-3ctPU09UVeV=7sTWTg@mail.gmail.com>
+Message-ID: <55EBF757.20108@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 12, 2015 at 06:49:18PM +0530, Sanchayan Maity wrote:
-> Add clock support for Vybrid On-Chip One Time Programmable
-> (OCOTP) controller.
-> 
-> While the OCOTP block does not require explicit clock gating,
-> for programming the OCOTP timing register the clock rate of
-> ipg clock is required for timing calculations related to fuse
-> and shadow register read sequence. We explicitly specify the
-> ipg clock for OCOTP as a result.
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->  drivers/clk/imx/clk-vf610.c             | 1 +
->  include/dt-bindings/clock/vf610-clock.h | 3 ++-
->  2 files changed, 3 insertions(+), 1 deletion(-)
+Hi Rob,
 
-Please copy linux-clk list and clock maintainers on i.MX clock patches
-as well.  If you run ./scripts/get_maintainer.pl on the patch, you will
-get them.
+? 09/05/2015 05:46 AM, Rob Herring ??:
+> On Wed, Sep 2, 2015 at 11:27 PM, Yakir Yang <ykk@rock-chips.com> wrote:
+>> Hi Rob,
+>>
+>> ? 09/03/2015 04:17 AM, Rob Herring ??:
+>>> On Tue, Sep 1, 2015 at 1:14 AM, Yakir Yang <ykk@rock-chips.com> wrote:
+>>>> Some edp screen do not have hpd signal, so we can't just return
+>>>> failed when hpd plug in detect failed.
+>>> This is a property of the panel (or connector perhaps), so this
+>>> property should be located there. At least, it is a common issue and
+>>> not specific to this chip. We could have an HDMI connector and failed
+>>> to hook up HPD for example. A connector node is also where hpd-gpios
+>>> should be located instead (and are already defined by
+>>> ../bindings/video/hdmi-connector.txt). Perhaps we need a eDP connector
+>>> binding, too.
+>>
+>> Yep, I agree with your front point, it is a property of panel, not specific
+>> to eDP controller, so this code should handle in connector logic.
+>>
+>> But another question, if we just leave this property to connector,
+>> then we would need to parse this property in analogix_dp-rockchip.c,
+>> and then make an hook in analogix_dp_core.c driver. This is not nice,
+>> and if there are some coming platform which alse want to use analogix_dp
+>> code and meet this "no-hpd" situation,  then they would need duplicate
+>> to parse this property and fill the hook in analogix_dp_core.c driver.
+>> So it's little bit conflict  :-)
+> Ideally, you would be able to just retrieve this quirk from the
+> connector or panel. Getting this property from your node vs. the port
+> you are attached to should not be much harder. Either the connector
+> struct can have this info or there can be a DT function that can walk
+> the graph and get it. Just don't open code the graph traversal in your
+> driver.
+>
+>> Beside I can not understand your example very well. Do you mean
+>> that there are some HDMI monitor which also do not have HPD
+>> signal (just like some eDP panel do not have hpd too), and then
+>> the "hpd-gpios" ? Hmm... I don't know how the "hpd-gpios" want
+>> to help in this case, would you mind show some sample code  :-D
+> I don't know that there is h/w, but it is always possible HPD is not
+> hooked up or hooked up incorrectly some how.
+>
+> If there is no HPD support, then hpd-gpios is not going to help you.
+>
+> I think there are 3 cases to handle:
+> - HPD handled by bridge chip - The bridge driver knows it has this
+> capability. No DT properties are needed and no HPD properties on the
+> connector node imply the bridge chip should handle HPD functions.
+> - HPD handled by GPIO line (or some other block) - Indicated by
+> hpd-gpios present
+> - No or broken HPD - Indicated by "hpd-force" property.
 
-Shawn
+Oh, I think the first/second case isn't suitable in this case, my panel
+"cnm,n116bgeea2" haven't included HPD signal.
 
-> 
-> diff --git a/drivers/clk/imx/clk-vf610.c b/drivers/clk/imx/clk-vf610.c
-> index bff45ea..d1b1c95 100644
-> --- a/drivers/clk/imx/clk-vf610.c
-> +++ b/drivers/clk/imx/clk-vf610.c
-> @@ -387,6 +387,7 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
->  
->  	clk[VF610_CLK_SNVS] = imx_clk_gate2("snvs-rtc", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(7));
->  	clk[VF610_CLK_DAP] = imx_clk_gate("dap", "platform_bus", CCM_CCSR, 24);
-> +	clk[VF610_CLK_OCOTP] = imx_clk_gate("ocotp", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(5));
->  
->  	imx_check_clocks(clk, ARRAY_SIZE(clk));
->  
-> diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
-> index d197634..56c16aa 100644
-> --- a/include/dt-bindings/clock/vf610-clock.h
-> +++ b/include/dt-bindings/clock/vf610-clock.h
-> @@ -194,6 +194,7 @@
->  #define VF610_PLL7_BYPASS		181
->  #define VF610_CLK_SNVS			182
->  #define VF610_CLK_DAP			183
-> -#define VF610_CLK_END			184
-> +#define VF610_CLK_OCOTP         184
-> +#define VF610_CLK_END			185
->  
->  #endif /* __DT_BINDINGS_CLOCK_VF610_H */
-> -- 
-> 2.5.0
-> 
+>
+>>> Are there any eDP panels which don't have EDID and need panel details in
+>>> DT?
+>>
+>> Oh, I think you want to collect some info that belong to panel
+>> property but no indicate in panel EDID message, so those can
+>> be collect in eDP connector binding, is it right ?
+> Yes, and as Thierry pointed out we may need to know the exact panel even.
+
+Yeah, just like I reply to Thierry, this is a panel quirk. And he 
+suggest we should
+handle this in panel driver, but I have no idea how to handle this in 
+common panel
+driver.   :)
+
+- Yakir
+
+> Rob
+>
+>
+>
