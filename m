@@ -1,110 +1,26 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 6 Sep 2015 20:22:58 +0800
-Subject: [PATCH 2/3] ARM: dts: imx7d: Add USB support
-In-Reply-To: <1441217782-6304-2-git-send-email-festevam@gmail.com>
-References: <1441217782-6304-1-git-send-email-festevam@gmail.com>
- <1441217782-6304-2-git-send-email-festevam@gmail.com>
-Message-ID: <20150906122258.GS30746@tiger>
+Date: Sun, 6 Sep 2015 20:26:06 +0800
+Subject: [PATCH V3 2/6] PM / OPP: Rename opp init/free table routines
+In-Reply-To: <6bdbc2c69b18528648d5a752da0d6176825bd870.1441354424.git.viresh.kumar@linaro.org>
+References: <cover.1441354424.git.viresh.kumar@linaro.org>
+ <6bdbc2c69b18528648d5a752da0d6176825bd870.1441354424.git.viresh.kumar@linaro.org>
+Message-ID: <20150906122606.GT30746@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2015 at 03:16:21PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Sep 04, 2015 at 01:47:23PM +0530, Viresh Kumar wrote:
+> free-table routines are opposite of init-table ones, and must be named
+> to make that clear. Opposite of 'init' is 'exit', but those doesn't suit
+> really well.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Replace 'init' with 'add' and 'free' with 'remove'.
+> 
+> Reported-by: Pavel Machek <pavel@ucw.cz>
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  arch/arm/boot/dts/imx7d.dtsi | 71 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 71 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> index 15c2193..90eb9f4 100644
-> --- a/arch/arm/boot/dts/imx7d.dtsi
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -746,6 +746,77 @@
->  				status = "disabled";
->  			};
->  
-> +			usbotg1: usb at 30b10000 {
-> +				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
-> +				reg = <0x30b10000 0x200>;
-> +				interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_USB_CTRL_CLK>;
-> +				fsl,usbphy = <&usbphy_nop1>;
-> +				fsl,usbmisc = <&usbmisc1 0>;
-> +				phy-clkgate-delay-us = <400>;
-> +				status = "disabled";
-> +			};
-> +
-> +			usbotg2: usb at 30b20000 {
-> +				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
-> +				reg = <0x30b20000 0x200>;
-> +				interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_USB_CTRL_CLK>;
-> +				fsl,usbphy = <&usbphy_nop2>;
-> +				fsl,usbmisc = <&usbmisc2 0>;
-> +				phy-clkgate-delay-us = <400>;
-> +				status = "disabled";
-> +			};
-> +
-> +			usbh: usb at 30b30000 {
-> +				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
-> +				reg = <0x30b30000 0x200>;
-> +				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_USB_CTRL_CLK>;
-> +				fsl,usbphy = <&usbphy_nop3>;
-> +				fsl,usbmisc = <&usbmisc3 0>;
-> +				phy_type = "hsic";
-> +				dr_mode = "host";
-> +				phy-clkgate-delay-us = <400>;
-> +				status = "disabled";
-> +			};
-> +
-> +			usbmisc1: usbmisc at 30b10200 {
-> +				#index-cells = <1>;
-> +				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
-> +				reg = <0x30b10200 0x200>;
-> +			};
-> +
-> +			usbmisc2: usbmisc at 30b20200 {
-> +				#index-cells = <1>;
-> +				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
-> +				reg = <0x30b20200 0x200>;
-> +			};
-> +
-> +			usbmisc3: usbmisc at 30b30200 {
-> +				#index-cells = <1>;
-> +				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
-> +				reg = <0x30b30200 0x200>;
-> +			};
-> +
-> +			usbphy_nop1: usbphy_nop1 {
+>  arch/arm/mach-imx/mach-imx6q.c       |  2 +-
+...
+>  drivers/cpufreq/imx6q-cpufreq.c      |  6 +++---
 
-Hyphen rather than underscore should be used in node name.
-
-When you resend, please copy kernel at pengutronix.de and Peter Chen.
-
-Shawn
-
-> +				compatible = "usb-nop-xceiv";
-> +				clocks = <&clks IMX7D_USB_PHY1_CLK>;
-> +				clock-names = "main_clk";
-> +			};
-> +
-> +			usbphy_nop2: usbphy_nop2 {
-> +				compatible = "usb-nop-xceiv";
-> +				clocks = <&clks IMX7D_USB_PHY2_CLK>;
-> +				clock-names = "main_clk";
-> +			};
-> +
-> +			usbphy_nop3: usbphy_nop3 {
-> +				compatible = "usb-nop-xceiv";
-> +				clocks = <&clks IMX7D_USB_HSIC_ROOT_CLK>;
-> +				clock-names = "main_clk";
-> +			};
-> +
->  			usdhc1: usdhc at 30b40000 {
->  				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
->  				reg = <0x30b40000 0x10000>;
-> -- 
-> 1.9.1
-> 
+Acked-by: Shawn Guo <shawnguo@kernel.org>
