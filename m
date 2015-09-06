@@ -1,42 +1,112 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Sun, 6 Sep 2015 12:05:01 +0800
-Subject: [PATCH] arm64: add kc_offset_to_vaddr and kc_vaddr_to_offset macro
-In-Reply-To: <20150902102454.GG25720@arm.com>
-References: <1440915599-18485-1-git-send-email-yalin.wang2010@gmail.com>
- <20150902102454.GG25720@arm.com>
-Message-ID: <2771ED00-BE84-4734-BE90-C0A600964F1E@gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Sun, 06 Sep 2015 12:07:22 +0800
+Subject: [PATCH v4 11/16] drm: bridge: analogix/dp: add platform device
+ type support
+In-Reply-To: <55E8E77C.4020305@samsung.com>
+References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
+ <1441087620-25586-1-git-send-email-ykk@rock-chips.com>
+ <55E8E77C.4020305@samsung.com>
+Message-ID: <55EBBBFA.3020801@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ok
+Hi Krzysztof,
 
-i will send a V2 patch for this change.
-> On Sep 2, 2015, at 18:24, Will Deacon <will.deacon@arm.com> wrote:
-> 
-> On Sun, Aug 30, 2015 at 07:19:59AM +0100, yalin wang wrote:
->> This patch add kc_offset_to_vaddr() and kc_vaddr_to_offset(),
->> the default version doesn't work on arm64, because arm64 kernel address
->> is below the PAGE_OFFSET, like module address and vmemmap address are
->> all below PAGE_OFFSET address.
->> 
->> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+? 09/04/2015 08:36 AM, Krzysztof Kozlowski ??:
+> On 01.09.2015 15:07, Yakir Yang wrote:
+>
+> Empty commit message. Please explain here why you want to add platform
+> device type support.
+>
+> Actually the title is confusing. You are not adding support for platform
+> device types but rather adding a field containing type of device.
+>
+>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 >> ---
->> arch/arm64/include/asm/pgtable.h | 2 ++
->> 1 file changed, 2 insertions(+)
->> 
->> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->> index d374191..ef1ed5c 100644
->> --- a/arch/arm64/include/asm/pgtable.h
->> +++ b/arch/arm64/include/asm/pgtable.h
->> @@ -660,6 +660,8 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
->> 
->> #define update_mmu_cache_pmd(vma, address, pmd) do { } while (0)
->> 
->> +#define	kc_vaddr_to_offset(v) ((v) & ((1UL << VA_BITS) - 1))
->> +#define	kc_offset_to_vaddr(o) ((o) | ~((1UL << VA_BITS) - 1))
-> 
-> I think it would be cleaner to define something like VIRTUAL_BASE, and
-> then define the vmalloc area in terms of that as well as these kcore
-> macros.
-> 
-> Will
+>> Changes in v4: None
+>> Changes in v3: None
+>> Changes in v2:
+>> - Add GNU license v2 declared and samsung copyright
+>>
+>>   drivers/gpu/drm/exynos/exynos_dp.c              |  1 +
+>>   drivers/gpu/drm/rockchip/analogix_dp-rockchip.c |  1 +
+>>   include/drm/bridge/analogix_dp.h                | 16 ++++++++++++++++
+>>   3 files changed, 18 insertions(+)
+>>
+>> diff --git a/drivers/gpu/drm/exynos/exynos_dp.c b/drivers/gpu/drm/exynos/exynos_dp.c
+>> index 6060d2c..40ef727 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_dp.c
+>> +++ b/drivers/gpu/drm/exynos/exynos_dp.c
+>> @@ -224,6 +224,7 @@ static int exynos_dp_bind(struct device *dev, struct device *master, void *data)
+>>   	dp->dev = dev;
+>>   	dp->drm_dev = drm_dev;
+>>   
+>> +	dp->plat_data.dev_type = EXYNOS_DP;
+>>   	dp->plat_data.power_on = exynos_dp_poweron;
+>>   	dp->plat_data.power_off = exynos_dp_poweroff;
+>>   	dp->plat_data.get_modes = exynos_dp_get_modes;
+>> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+>> index efea045..4934271 100644
+>> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+>> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+>> @@ -293,6 +293,7 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
+>>   		return ret;
+>>   	}
+>>   
+>> +	dp->plat_data.dev_type = RK3288_DP;
+>>   	dp->plat_data.attach = NULL;
+>>   	dp->plat_data.get_modes = NULL;
+>>   	dp->plat_data.power_on = rockchip_dp_poweron;
+>> diff --git a/include/drm/bridge/analogix_dp.h b/include/drm/bridge/analogix_dp.h
+>> index 8b4ffad..7209a64 100644
+>> --- a/include/drm/bridge/analogix_dp.h
+>> +++ b/include/drm/bridge/analogix_dp.h
+>> @@ -1,9 +1,25 @@
+>> +/*
+>> + * Analogix Core DP (Display Port) interface driver.
+>> + *
+>> + * Copyright (C) 2012 Samsung Electronics Co., Ltd.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms of the GNU General Public License as published by the
+>> + * Free Software Foundation; either version 2 of the License, or (at your
+>> + * option) any later version.
+>> + */
+> Two questions:
+> 1. Why this change is here? I would rather expect it at patch 3/16 when
+> you created this file... That is the usual time for adding copyrights.
+
+Yep, I should move this to 03/16.
+
+> 2. Does this file contains previous Samsung work?
+
+Hmm... I think this haven't contains the previous Samsung works,
+but I have the cover the head message from analogix_dp_core driver
+(include the copyright, but without ant author).
+
+Thanks
+- Yakir
+
+> Best regards,
+> Krzysztof
+>
+>>   #ifndef _ANALOGIX_DP_H_
+>>   #define _ANALOGIX_DP_H_
+>>   
+>>   #include <drm/drm_crtc.h>
+>>   
+>> +enum analogix_dp_devtype {
+>> +	EXYNOS_DP,
+>> +	RK3288_DP,
+>> +};
+>> +
+>>   struct analogix_dp_plat_data {
+>> +	enum analogix_dp_devtype dev_type;
+>>   	struct drm_panel *panel;
+>>   
+>>   	int (*power_on)(struct analogix_dp_plat_data *);
+>>
+>
+>
+>
