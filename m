@@ -1,94 +1,64 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Sun, 6 Sep 2015 16:07:26 +0800
-Subject: [RFC PATCH v1 0/4] arm/arm64: fix a migrating irq bug when
- hotplug cpu
-In-Reply-To: <1441513421-8092-1-git-send-email-yangyingliang@huawei.com>
-References: <1441513421-8092-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <55EBF43E.8070501@linux.intel.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 6 Sep 2015 16:13:35 +0800
+Subject: [PATCH v9 4/4] nvmem: Add DT binding documentation for Vybrid
+ OCOTP driver
+In-Reply-To: <24fcfdc695907103e8f4602b7dc6b8fa38e85ec1.1439384645.git.maitysanchayan@gmail.com>
+References: <cover.1439384645.git.maitysanchayan@gmail.com>
+ <24fcfdc695907103e8f4602b7dc6b8fa38e85ec1.1439384645.git.maitysanchayan@gmail.com>
+Message-ID: <20150906081334.GK30746@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/9/6 12:23, Yang Yingliang wrote:
-> Hi All,
+On Wed, Aug 12, 2015 at 06:49:21PM +0530, Sanchayan Maity wrote:
+> Add the devicetree bindings for the Freescale Vybrid On-Chip
+> OTP driver.
 > 
-> There is a bug:
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  .../devicetree/bindings/nvmem/vf610-ocotp.txt       | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
 > 
-> When cpu is disabled, all irqs will be migratged to another cpu.
-> In some cases, a new affinity is different, it needed to be coppied
-> to irq's affinity. But if the type of irq is LPI, it's affinity will
-> not be coppied because of irq_set_affinity's return value.
-> 
-> 
-> 
-> As Marc and Will suggested, I refactor the arm/arm64 migrating interrupts
-> code and fix the migrating irq bug while cpu is offline.
-> 
-> I'm trying let the core code do the migrating interrupts matter. kernel/irq/migration.c
-> depends on CONFIG_GENERIC_PENDING_IRQ, so I make it selected by CONFIG_SMP and
-> CONFIG_HOTPLUG_CPU and rename it to CONFIG_GENERIC_IRQ_MIGRATION for more general.
-> When CONFIG_GENERIC_IRQ_MIGRATION is enabled, an interrupt whose state_use_accessors
-> is not set with IRQD_MOVE_PCNTXT won't be migrated immediately in irq_set_affinity_locked().
-> So introduce irq_settings_set_move_pcntxt() helper to set the state in gic_irq_domain_map().
-> 
-> With the above preparation, move the migrating interrupts code into kernel/irq/migration.c
-> and fix the bug by using irq_do_set_affinity().
-Hi Yingliang,
-	As we are going to move migrate_irqs() to generic kernel
-code, and powerpc, metag, xtensa, sh, ia64 mn10300 also defines
- migrate_irqs() too. It would be great if we could consolidate
-all these.
-	And as we are going to refine these code, there's another
-issue need attention. On x86, we need to allocate a CPU vector
-if an irq is directed to a CPU. So there's possibility that
-we run out of CPU vectors after CPU hot-removal. So we have a
-mechanism to detect whether we will run out of CPU vector
-after removing a CPU, and reject CPU hot-removal if that will
-happen.
-	So the key point is, if we a need to allocate some sort
-of resource on the target CPUs for an irq, we need two steps
-when removing a CPU
-1) check whether resources are available after removing the CPU,
-   and reject CPU removal request if we ran out of resource
-2) fix irqs after hot-removing the CPU.
-Thanks!
-Gerry
+> diff --git a/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt b/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
+> new file mode 100644
+> index 0000000..b29f65f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
+> @@ -0,0 +1,21 @@
+> +On-Chip OTP Memory for Freescale Vybrid
+> +
+> +Required Properties:
+> +  compatible:
+> +  - "fsl,vf610-ocotp" for VF5xx/VF6xx
+> +  #address-cells : Should be 1
+> +  #size-cells : Should be 1
+> +  reg : Address and length of OTP controller and fuse map registers
+> +  clocks : ipg clock we associate with the OCOTP peripheral
+> +  clock-names : Must contain "ocotp" as matching entry
 
-> 
-> Cc: Jiang Liu <jiang.liu@linux.intel.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> 
-> Yang Yingliang (4):
->   genirq: Introduce irq_settings_set_move_pcntxt() helper
->   irqchip: GICv3: set non-percpu irqs status with _IRQ_MOVE_PCNTXT
->   genirq: rename config GENERIC_PENDING_IRQ to GENERIC_IRQ_MIGRATION
->   arm/arm64: fix a migrating irq bug when hotplug cpu
-> 
->  arch/arc/Kconfig               |  2 +-
->  arch/arm/Kconfig               |  1 +
->  arch/arm/include/asm/irq.h     |  1 -
->  arch/arm/kernel/irq.c          | 62 ------------------------------------------
->  arch/arm64/Kconfig             |  1 +
->  arch/arm64/include/asm/irq.h   |  1 -
->  arch/arm64/kernel/irq.c        | 62 ------------------------------------------
->  arch/hexagon/Kconfig           |  2 +-
->  arch/ia64/Kconfig              |  2 +-
->  arch/tile/Kconfig              |  2 +-
->  arch/x86/Kconfig               |  2 +-
->  arch/x86/kernel/apic/io_apic.c |  2 +-
->  drivers/irqchip/irq-gic-v3.c   |  2 ++
->  include/linux/irq.h            |  5 +++-
->  include/linux/irqdesc.h        |  2 +-
->  kernel/irq/Kconfig             |  4 +--
->  kernel/irq/Makefile            |  2 +-
->  kernel/irq/irqdesc.c           | 18 ++++++++++--
->  kernel/irq/manage.c            |  2 +-
->  kernel/irq/migration.c         | 62 ++++++++++++++++++++++++++++++++++++++++++
->  kernel/irq/proc.c              |  2 +-
->  kernel/irq/settings.h          |  5 ++++
->  22 files changed, 102 insertions(+), 142 deletions(-)
+I'm not sure "ocotp" is a good name for describing a clock from OCOTP
+internal point of view.  "ipg" might be better.  But I would suggest you
+drop clock-names property completely, if "ipg" is the only clock you
+need to describe here.  The clock-names is necessary only when there are
+multiple clocks to distinguish.
+
+With clock-names dropped, the driver works by passing NULL as the second
+parameter to devm_clk_get() call.
+
+Shawn
+
+> +
+> +Example for Vybrid VF5xx/VF6xx:
+> +
+> +	ocotp: ocotp at 400a5000 {
+> +		compatible = "fsl,vf610-ocotp";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x400a5000 0xCF0>;
+> +		clocks = <&clks VF610_CLK_OCOTP>;
+> +		clock-names = "ocotp";
+> +	};
+> -- 
+> 2.5.0
 > 
