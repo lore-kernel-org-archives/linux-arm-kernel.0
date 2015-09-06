@@ -1,68 +1,39 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 6 Sep 2015 22:23:15 +0800
-Subject: [PATCH v2 2/8] clk: imx25: retain early UART clocks during
- kernel init
-In-Reply-To: <1441382419-4343-3-git-send-email-l.stach@pengutronix.de>
-References: <1441382419-4343-1-git-send-email-l.stach@pengutronix.de>
- <1441382419-4343-3-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20150906142315.GA30746@tiger>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 6 Sep 2015 13:20:46 +0200
+Subject: [PATCH RESEND] ARM: dts: Fix Makefile target for
+ sun4i-a10-itead-iteaduino-plus
+In-Reply-To: <20150904124934.GD464@hansolo.redhat.com>
+References: <20150904124934.GD464@hansolo.redhat.com>
+Message-ID: <20150906112046.GK31584@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 04, 2015 at 06:00:13PM +0200, Lucas Stach wrote:
-> Make sure to keep UART clocks enabled during kernel init if
-> earlyprintk or earlycon are active.
+On Fri, Sep 04, 2015 at 08:49:34AM -0400, Josh Boyer wrote:
+> Commit 79ae3e66f8d (ARM: dts: sun4i: Add Iteaduino Plus A10) added a new
+> make target for the sun4i-a10-itead-iteaduino-plus dts file, but mistakenly
+> used .dts instead of the correct .dtb suffix.  This resulted in a build error
+> like:
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  drivers/clk/imx/clk-imx25.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+>         scripts/Makefile.dtbinst:42: target 'sun4i-a10-itead-iteaduino-plus.dts' doesn't match the target pattern
 > 
-> diff --git a/drivers/clk/imx/clk-imx25.c b/drivers/clk/imx/clk-imx25.c
-> index ec1a4c1dacf1..e55acea762fb 100644
-> --- a/drivers/clk/imx/clk-imx25.c
-> +++ b/drivers/clk/imx/clk-imx25.c
-> @@ -86,6 +86,14 @@ enum mx25_clks {
->  
->  static struct clk *clk[clk_max];
->  
-> +static struct clk **uart_clks[] __initdata = { &clk[uart_ipg_per],
-> +					       &clk[uart1_ipg],
-> +					       &clk[uart2_ipg],
-> +					       &clk[uart3_ipg],
-> +					       &clk[uart4_ipg],
-> +					       &clk[uart5_ipg],
-> +					       NULL };
-> +
-
-I prefer to code it like:
-
-static struct clk **uart_clks[] __initdata = {
-	&clk[uart_ipg_per],
-	&clk[uart1_ipg],
-	&clk[uart2_ipg],
-	&clk[uart3_ipg],
-	&clk[uart4_ipg],
-	&clk[uart5_ipg],
-	NULL
-};
-
-Other than that, I'm fine with the series.
-
-Shawn
-
->  static int __init __mx25_clocks_init(unsigned long osc_rate,
->  				     void __iomem *ccm_base)
->  {
-> @@ -233,6 +241,8 @@ static int __init __mx25_clocks_init(unsigned long osc_rate,
->  	 */
->  	clk_set_parent(clk[cko_sel], clk[ipg]);
->  
-> +	imx_register_uart_clocks(uart_clks);
-> +
->  	return 0;
->  }
->  
-> -- 
-> 2.5.0
+> when doing a make dtbs_install.
 > 
+> Fix it to use the proper file name.
+> 
+> Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
+
+Queued, thanks!
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150906/1c971668/attachment.sig>
