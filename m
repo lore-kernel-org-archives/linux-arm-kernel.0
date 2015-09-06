@@ -1,15 +1,14 @@
 From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Sun,  6 Sep 2015 09:12:44 +0800
-Subject: [PATCH v4 06/10] dmaengine: add API for getting dma controller's quirk
+Date: Sun,  6 Sep 2015 09:12:55 +0800
+Subject: [PATCH v4 07/10] DMA: pl330: implement dmaengine_get_quirks hook
 In-Reply-To: <1441501881-13700-1-git-send-email-shawn.lin@rock-chips.com>
 References: <1441501881-13700-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <1441501964-13952-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <1441501975-13993-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dmaengine_get_quirks API for peripheral devices to query
-quirks if they need it to make special workaround due to broken
-dma controller design.
+By adding this function, slave device can query quirks
+from pl330 if they need special settings for dmaengine.
 
 Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 ---
@@ -19,35 +18,35 @@ Changes in v3: None
 Changes in v2: None
 Changes in v1: None
 
- include/linux/dmaengine.h | 9 +++++++++
+ drivers/dma/pl330.c | 9 +++++++++
  1 file changed, 9 insertions(+)
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index e2f5eb4..5174ca4 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -704,6 +704,7 @@ struct dma_device {
- 
- 	int (*device_config)(struct dma_chan *chan,
- 			     struct dma_slave_config *config);
-+	int (*device_get_quirks)(struct dma_chan *chan);
- 	int (*device_pause)(struct dma_chan *chan);
- 	int (*device_resume)(struct dma_chan *chan);
- 	int (*device_terminate_all)(struct dma_chan *chan);
-@@ -723,6 +724,14 @@ static inline int dmaengine_slave_config(struct dma_chan *chan,
- 	return -ENOSYS;
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 3b9b426..bf01d24 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2156,6 +2156,14 @@ static int pl330_config(struct dma_chan *chan,
+ 	return 0;
  }
  
-+static inline int dmaengine_get_quirks(struct dma_chan *chan)
++static int pl330_quirks(struct dma_chan *chan)
 +{
-+	if (chan->device->device_get_quirks)
-+		return chan->device->device_get_quirks(chan);
++	struct dma_pl330_chan *pch = to_pchan(chan);
++	struct pl330_dmac *pl330 = pch->dmac;
 +
-+	return -ENOSYS;
++	return pl330->quirks;
 +}
 +
- static inline bool is_slave_direction(enum dma_transfer_direction direction)
+ static int pl330_terminate_all(struct dma_chan *chan)
  {
- 	return (direction == DMA_MEM_TO_DEV) || (direction == DMA_DEV_TO_MEM);
+ 	struct dma_pl330_chan *pch = to_pchan(chan);
+@@ -2928,6 +2936,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 	pd->device_tx_status = pl330_tx_status;
+ 	pd->device_prep_slave_sg = pl330_prep_slave_sg;
+ 	pd->device_config = pl330_config;
++	pd->device_get_quirks = pl330_quirks;
+ 	pd->device_pause = pl330_pause;
+ 	pd->device_terminate_all = pl330_terminate_all;
+ 	pd->device_issue_pending = pl330_issue_pending;
 -- 
 2.3.7
