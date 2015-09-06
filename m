@@ -1,51 +1,53 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 6 Sep 2015 20:08:30 +0800
-Subject: [PATCH v2] ARM: dts: imx6sl: Complete the dcp node
-In-Reply-To: <1441209321-28331-1-git-send-email-festevam@gmail.com>
-References: <1441209321-28331-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150906120830.GQ30746@tiger>
+From: ijc@debian.org (Ian Campbell)
+Date: Sun, 06 Sep 2015 13:11:44 +0100
+Subject: I/O issues with writing to mtdblock devices on kirkwood
+In-Reply-To: <20150905210846.GF6040@lunn.ch>
+References: <1440159857.19360.50.camel@debian.org>
+ <20150905210846.GF6040@lunn.ch>
+Message-ID: <1441541504.23553.46.camel@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2015 at 12:55:21PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Sat, 2015-09-05 at 23:08 +0200, Andrew Lunn wrote:
+> On Fri, Aug 21, 2015 at 01:24:17PM +0100, Ian Campbell wrote:
+> > Hi kirkwood-upstream,
+> > 
+> > We (Debian) have had a couple of reports of I/O errors running 
+> Debian
+> > on kirkwood, specifically it seems to relate to later kernels (e.g.
+> > 4.0+) and I _suspect_ (without proof) that it may be due to the 
+> switch
+> > from board files to the DTS based kernel, or some change implied by
+> > this (e.g. different SATA driver now or timeouts have changed
+> > perhaps?).
 > 
-> The DCP block present on MX6SL is compatible with the one on MX28,
-> so add the compatible string and also complete the interrupt entries.
+> Hi Ian
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Use compatible = "fsl,imx6sl-dcp", "fsl,imx28-dcp"; as suggested by
-> Lucas Stach
-> 
->  arch/arm/boot/dts/imx6sl.dtsi | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index 320a27f..b105735 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -670,8 +670,12 @@
->  			};
->  
->  			dcp: dcp at 020fc000 {
-> +				compatible = "fsl,imx6sl-dcp", "fsl,imx28-dcp";
->  				reg = <0x020fc000 0x4000>;
-> -				interrupts = <0 99 IRQ_TYPE_LEVEL_HIGH>;
-> +				interrupts = <0 99 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <0 100 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <0 101 IRQ_TYPE_LEVEL_HIGH>;
-> +				status = "okay";
+> I've not reproduced this exactly, but something similar.
 
-For devices we want to enable by default, omitting 'status' property
-will just do the job.  Drop the line and applied the patch.
+It sounds likely to be the same underlying issue.
 
-Shawn
+> I do a find / and in parallel a cat /dev/mtdblock3 > /dev/null
 
->  			};
->  		};
->  
-> -- 
-> 1.9.1
+FYI it was reported this morning[0] that using flashcp doesn't exhibit
+this behaviour. Since AIUI flashcp goes directly at the /dev/mtdN
+device, rather than via mtdblockN, this seems to point towards
+something in the mtdblock layer perhaps?
+
+> While the cat is active, the find grinds to a halt. I don't get any
+> SATA timeouts, but that could be because /dev/mtdblock3 is small
+> enough that the timers don't expire.
+
+Agreed.
+
+Thanks,
+Ian.
+
+[0] http://article.gmane.org/gmane.linux.debian.ports.arm/15767
+
+> So i will now try to track down if there is a lock getting contended,
+> or at least why only the cat process makes progress.
+> 
+>    Andrew
+> 
 > 
