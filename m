@@ -1,48 +1,42 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 06 Sep 2015 00:12:59 +0200
-Subject: [PATCH] ARM: fix alignement of __bug_table section entries
-In-Reply-To: <20150905203818.GO21084@n2100.arm.linux.org.uk> (Russell King's
- message of "Sat, 5 Sep 2015 21:38:18 +0100")
-References: <1441175009-26730-1-git-send-email-robert.jarzmik@free.fr>
- <20150902103955.GF6281@e103592.cambridge.arm.com>
- <878u8lx9hl.fsf@belgarion.home>
- <20150905142519.GN21084@n2100.arm.linux.org.uk>
- <87y4gkx04m.fsf@belgarion.home>
- <20150905203818.GO21084@n2100.arm.linux.org.uk>
-Message-ID: <87pp1wwm50.fsf@belgarion.home>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 6 Sep 2015 08:45:31 +0800
+Subject: [PATCH] arm:irqchip: IRQCHIP_DECLARE macro is now accessible
+In-Reply-To: <7212409.q6uiaM0l3x@joel-zenbook>
+References: <1436299411-12329-1-git-send-email-joel@porquet.org>
+ <20150713152035.GD26642@tiger> <7212409.q6uiaM0l3x@joel-zenbook>
+Message-ID: <20150906004531.GA30746@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+On Fri, Sep 04, 2015 at 04:54:21PM -0400, Joel Porquet wrote:
+> On Monday, July 13, 2015 11:20:35 PM Shawn Guo wrote:
+> > On Tue, Jul 07, 2015 at 04:02:53PM -0400, Joel Porquet wrote:
+> > > The IRQCHIP_DECLARE macro migrated to 'include/linux/irqchip.h', making it
+> > > globally accessible.
+> > > 
+> > > See commit 91e20b5040c67c51aad88cf87db4305c5bd7f79d
+> > > ("irqchip: Move IRQCHIP_DECLARE macro to include/linux/irqchip.h").
+> > > 
+> > > This patch adds inclusions of 'include/linux/irqchip.h' and replaces uses
+> > > of macro OF_DECLARE_2 with IRQCHIP_DECLARE.
+> > > 
+> > > Signed-off-by: Joel Porquet <joel@porquet.org>
+> > > ---
+> > 
+> > ...
+> > 
+> > >  arch/arm/mach-imx/gpc.c              | 7 ++-----
+> > 
+> > Acked-by: Shawn Guo <shawnguo@kernel.org>
+> > 
+> > How will this patch be sent to upstream?
+> 
+> If it's more convenient for the different maintainers affected by this patch, 
+> I can probably resubmit it into a series of patches that modify each file 
+> separately... Let me know quickly so we don't miss the merge window!
 
->> Moreover, this is consistent with the fact that this commit is in linux-next but
->> not in v4.1 :
->>     a5e090acbf54 ("ARM: software-based priviledged-no-access support")
->> 
->> So the issue is around this SW_DOMAIN_PAN, at least on PXA.
->
-> Is it only PXA which seems to be affected?
-Sorry I don't know, I only own pxa platforms.
+We had sent out the materials for this merge window.  So if you have a
+path to upstream, you'd better send this patch through that.  You've
+already got the ACKs from maintainers of affected platform.
 
-> If so, you may need to add:
->
-> 	mrc p15, 0, \rd, c2, c0, 0
-> 	mov \rd, \rd
-> 	sub pc, pc, #4
->
-> to the places we update the domain access register to ensure that the
-> Xscale pipeline stalls to allow the CP15 DACR update to hit.
-Okay, I'll try that.
-
-By the way, the ARMv5 manual states in chapter "B4.5.1 MMU Fault" that for a
-DACR update, a "PrefetchFlush" operation has to be done (chapter B2.6.3
-PrefetchFlush CP15 register 7), quoting :
-    Changes to the Domain Access Control register are synchronized by performing
-    a PrefetchFlush operation (or as result of an exception or exception
-    return). See Changes to CP15 registers and the memory order model on page
-    B2-24 for details.
-
-Cheers.
-
--- 
-Robert
+Shawn
