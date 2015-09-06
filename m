@@ -1,72 +1,44 @@
-From: Minghuan.Lian@freescale.com (Lian M.H.)
-Date: Sun, 6 Sep 2015 02:25:46 +0000
-Subject: [PATCH v2 04/10] doc/bindings: Update PCIe devicetree binding
- documentation for LS2080A
-In-Reply-To: <BY1PR0301MB13037F8BC0A8E1E4258F58DE82570@BY1PR0301MB1303.namprd03.prod.outlook.com>
-References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
- <1441349872-4560-5-git-send-email-bhupesh.sharma@freescale.com>
- <CADRPPNRGpzWawsqLHCiv530HbtPf+9RaPzOtvy88ftwv2ffqLQ@mail.gmail.com>
- <BY1PR0301MB13037F8BC0A8E1E4258F58DE82570@BY1PR0301MB1303.namprd03.prod.outlook.com>
-Message-ID: <DM2PR0301MB0640B355ADF0CF1AD514B2A1E2550@DM2PR0301MB0640.namprd03.prod.outlook.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Sun, 6 Sep 2015 10:40:02 +0800
+Subject: [PATCH 0/2] arm64: Support Hisilicon Hip05-D02 board
+In-Reply-To: <20150905101854.4f5011bb@arm.com>
+References: <1441421939-6236-1-git-send-email-dingtianhong@huawei.com>
+ <20150905101854.4f5011bb@arm.com>
+Message-ID: <55EBA782.7080403@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bhupesh
+On 2015/9/5 17:18, Marc Zyngier wrote:
+> On Sat, 5 Sep 2015 10:58:57 +0800
+> Ding Tianhong <dingtianhong@huawei.com> wrote:
+> 
+>> Hip05-D02 Development Board is based on Cortex-A57, this patchset
+>> contains initial support for Hip05-D02 Soc and Board. Initial support
+>> is minimal and includes just the arch configuration, device tree
+>> configuration.
+>>
+>> PSCI is enabled in device tree and there is no problem to boot all the
+>> 16 cores, and the CPU hotplug is also working now, you can download and
+>> compile the latest firmware based on the following link to run this
+>> patch set.
+>>
+>> https://github.com/hisilicon/estuary/blob/master/README
+>>
+>> v1->v2:
+>> - 1. Change the compatible name for per CPU.
+>>   2. Remove the GIC_CPU_MASK_SIMPLE(xx) which is not used for gicv3
+>>      from hip05.dtsi.
+> 
+> Please always indicate the version number in the email subject ("PATCH
+> v2" is the usual scheme). It makes it otherwise difficult to keep track
+> of what version I am looking at.
+> 
+> Thanks,
+> 
+Miss it, fix it in next version, thanks.
 
-I agree with Leo whose suggestion is a better.
+Ding
 
-Thanks,
-Minghuan 
 
-> -----Original Message-----
-> From: Sharma Bhupesh-B45370
-> Sent: Saturday, September 05, 2015 4:20 AM
-> To: Leo Li <pku.leo@gmail.com>; Lian Minghuan-B31939
-> <Minghuan.Lian@freescale.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>; Mark Rutland
-> <mark.rutland@arm.com>; linux-arm-kernel at lists.infradead.org;
-> marc.zyngier at arm.com; linux-clk at vger.kernel.org;
-> Catalin.Marinas at arm.com; will.deacon at arm.com; olof at lixom.net; Bhupesh
-> SHARMA <bhupesh.linux@gmail.com>; devicetree at vger.kernel.org
-> Subject: RE: [PATCH v2 04/10] doc/bindings: Update PCIe devicetree binding
-> documentation for LS2080A
+> 	M.
 > 
-> > From: Leo Li [mailto:pku.leo at gmail.com]
-> > Sent: Friday, September 04, 2015 11:27 PM On Fri, Sep 4, 2015 at 1:57
-> > AM, Bhupesh Sharma <bhupesh.sharma@freescale.com> wrote:
-> > > Add the documentation for compatible string "fsl,ls2080a-pcie"
-> > > for Freescale's LS2080A platform.
-> > >
-> > > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> > > Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> > > ---
-> > >  .../devicetree/bindings/pci/layerscape-pci.txt     |    3 ++-
-> > >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > >
-> > > diff --git
-> > > a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > > b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > > index 6286f04..e72e68f 100644
-> > > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > > @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis
-> > > Designware PCIe IP  and thus inherits all the common properties
-> > > defined
-> > in designware-pcie.txt.
-> > >
-> > >  Required properties:
-> > > -- compatible: should contain the platform identifier such as
-> > "fsl,ls1021a-pcie"
-> > > +- compatible: should contain the platform identifier such as
-> > > +"fsl,ls1021a-pcie",
-> > > +  "fsl,ls2080a-pcie".
-> >
-> > Make it generic like "fsl,<chip>-pcie"
-> 
-> Minghuan, if you don't have an objection, I would like to address Leo's
-> suggestion in v3 of this series as I think it is a valid one.
-> 
-> Please share your views.
-> 
-> Regards,
-> Bhupesh
