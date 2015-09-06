@@ -1,77 +1,45 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Sun, 06 Sep 2015 11:04:58 +0800
-Subject: [PATCH v17 3/4] soc: rockchip: power-domain: Add power domain
- driver
-In-Reply-To: <7hbndkptfm.fsf@linaro.org>
-References: <1441184380-13827-1-git-send-email-wxt@rock-chips.com>
- <1441184380-13827-4-git-send-email-wxt@rock-chips.com>
- <7hbndkptfm.fsf@linaro.org>
-Message-ID: <55EBAD5A.9060107@rock-chips.com>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Sun,  6 Sep 2015 12:04:10 +0800
+Subject: [PATCH V2] arm64: add kc_offset_to_vaddr and kc_vaddr_to_offset macro
+Message-ID: <1441512250-9667-1-git-send-email-yalin.wang2010@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+This patch add kc_offset_to_vaddr() and kc_vaddr_to_offset(),
+the default version doesn't work on arm64, because arm64 kernel address
+is below the PAGE_OFFSET, like module address and vmemmap address are
+all below PAGE_OFFSET address.
 
-Thanks for having a look into it.
-
-
-? 2015?09?03? 02:28, Kevin Hilman ??:
-> Caesar Wang <wxt@rock-chips.com> writes:
->
->> This driver is found on RK3288 SoCs.
->>
->> In order to meet high performance and low power requirements, a power
->> management unit is designed or saving power when RK3288 in low power
->> mode.
->> The RK3288 PMU is dedicated for managing the power of the whole chip.
->>
->> PMU can work in the Low Power Mode by setting bit[0] of PMU_PWRMODE_CON
->> register. After setting the register, PMU would enter the Low Power mode.
->> In the low power mode, pmu will auto power on/off the specified power
->> domain, send idle req to specified power domain, shut down/up pll and
->> so on. All of above are configurable by setting corresponding registers.
->>
->> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> [...]
->
->> +static void rockchip_pm_remove_one_domain(struct rockchip_pm_domain *pd)
->> +{
->> +	int i;
->> +
->> +	for (i = 0; i < pd->num_clks; i++) {
->> +		clk_unprepare(pd->clks[i]);
->> +		clk_put(pd->clks[i]);
->> +	}
->
-> You don't set pd->num_clks = 0 here, which means other places that
-> iterate over the clocks might race with this and try to use clocks that
-> have been unprepared/put.
-
-Agree, we should set the "pd->num_cloks=0' in here.
-> This might be over-paranoid, but in particular, this could race with
-> rockchip_pd_power().
->
-> Also not setting the pd->num_clks to zero would be a problem for a
-> power-controller that is configured as a module which could be unloaded
-> and reloaded (I know that doesn't really work now, but it will
-> eventually, I hope.)
-
-Yep.
->
-> Maybe use the mutex here?  It should at least protect the zeroing of
-> pm->num_clks.
-
-Sound resonable.
-Done.
-
+Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
 ---
-Thanks,
-Caesar
->
-> Kevin
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+ arch/arm64/include/asm/memory.h  | 1 +
+ arch/arm64/include/asm/pgtable.h | 2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index f800d45..2d09fe8 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -55,6 +55,7 @@
+ #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+ #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
+ #define TASK_SIZE_64		(UL(1) << VA_BITS)
++#define __VIRTUAL_MASK		((1UL << VA_BITS) - 1)
+ 
+ #ifdef CONFIG_COMPAT
+ #define TASK_SIZE_32		UL(0x100000000)
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index d374191..9da6681 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -660,6 +660,8 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
+ 
+ #define update_mmu_cache_pmd(vma, address, pmd) do { } while (0)
+ 
++#define	kc_vaddr_to_offset(v) ((v) & __VIRTUAL_MASK)
++#define	kc_offset_to_vaddr(o) ((o) | ~__VIRTUAL_MASK)
+ #endif /* !__ASSEMBLY__ */
+ 
+ #endif /* __ASM_PGTABLE_H */
+-- 
+1.9.1
