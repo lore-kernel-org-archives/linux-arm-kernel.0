@@ -1,91 +1,115 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Sun, 06 Sep 2015 16:20:39 +0800
-Subject: [PATCH v4 14/16] drm: bridge: analogix/dp: try force hpd after
- plug in lookup failed
-In-Reply-To: <CAL_JsqKoyZOAA7yzSATA-Ys8N1q9Edi-3ctPU09UVeV=7sTWTg@mail.gmail.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <1441088079-25809-1-git-send-email-ykk@rock-chips.com>
- <CAL_JsqJDALnjVaVoEqGGsSLeE31m3MKOfbSoZ3M+g+zPZR2MFg@mail.gmail.com>
- <55E7CC43.7040608@rock-chips.com>
- <CAL_JsqKoyZOAA7yzSATA-Ys8N1q9Edi-3ctPU09UVeV=7sTWTg@mail.gmail.com>
-Message-ID: <55EBF757.20108@rock-chips.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 6 Sep 2015 16:49:45 +0800
+Subject: [PATCH 1/1] ARM: imx35: Do not call mxc_timer_init twice when
+ booting with DT
+In-Reply-To: <1439277502-16917-1-git-send-email-alexander.stein@systec-electronic.com>
+References: <1439277502-16917-1-git-send-email-alexander.stein@systec-electronic.com>
+Message-ID: <20150906084945.GM30746@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Tue, Aug 11, 2015 at 09:18:22AM +0200, Alexander Stein wrote:
+> mxc_timer_init must not be called from within mx35_clocks_init_dt. It will
+> eventually be called by imx31_timer_init_dt
+> (drivers/clocksources/timer-imx-gpt.c).
 
-? 09/05/2015 05:46 AM, Rob Herring ??:
-> On Wed, Sep 2, 2015 at 11:27 PM, Yakir Yang <ykk@rock-chips.com> wrote:
->> Hi Rob,
->>
->> ? 09/03/2015 04:17 AM, Rob Herring ??:
->>> On Tue, Sep 1, 2015 at 1:14 AM, Yakir Yang <ykk@rock-chips.com> wrote:
->>>> Some edp screen do not have hpd signal, so we can't just return
->>>> failed when hpd plug in detect failed.
->>> This is a property of the panel (or connector perhaps), so this
->>> property should be located there. At least, it is a common issue and
->>> not specific to this chip. We could have an HDMI connector and failed
->>> to hook up HPD for example. A connector node is also where hpd-gpios
->>> should be located instead (and are already defined by
->>> ../bindings/video/hdmi-connector.txt). Perhaps we need a eDP connector
->>> binding, too.
->>
->> Yep, I agree with your front point, it is a property of panel, not specific
->> to eDP controller, so this code should handle in connector logic.
->>
->> But another question, if we just leave this property to connector,
->> then we would need to parse this property in analogix_dp-rockchip.c,
->> and then make an hook in analogix_dp_core.c driver. This is not nice,
->> and if there are some coming platform which alse want to use analogix_dp
->> code and meet this "no-hpd" situation,  then they would need duplicate
->> to parse this property and fill the hook in analogix_dp_core.c driver.
->> So it's little bit conflict  :-)
-> Ideally, you would be able to just retrieve this quirk from the
-> connector or panel. Getting this property from your node vs. the port
-> you are attached to should not be much harder. Either the connector
-> struct can have this info or there can be a DT function that can walk
-> the graph and get it. Just don't open code the graph traversal in your
-> driver.
->
->> Beside I can not understand your example very well. Do you mean
->> that there are some HDMI monitor which also do not have HPD
->> signal (just like some eDP panel do not have hpd too), and then
->> the "hpd-gpios" ? Hmm... I don't know how the "hpd-gpios" want
->> to help in this case, would you mind show some sample code  :-D
-> I don't know that there is h/w, but it is always possible HPD is not
-> hooked up or hooked up incorrectly some how.
->
-> If there is no HPD support, then hpd-gpios is not going to help you.
->
-> I think there are 3 cases to handle:
-> - HPD handled by bridge chip - The bridge driver knows it has this
-> capability. No DT properties are needed and no HPD properties on the
-> connector node imply the bridge chip should handle HPD functions.
-> - HPD handled by GPIO line (or some other block) - Indicated by
-> hpd-gpios present
-> - No or broken HPD - Indicated by "hpd-force" property.
+s/clocksources/clocksource
 
-Oh, I think the first/second case isn't suitable in this case, my panel
-"cnm,n116bgeea2" haven't included HPD signal.
+> This arranges the initialization code similar to clk-imx27.c
+> 
+> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+> ---
+>  drivers/clk/imx/clk-imx35.c | 49 +++++++++++++++++++++++++--------------------
 
->
->>> Are there any eDP panels which don't have EDID and need panel details in
->>> DT?
->>
->> Oh, I think you want to collect some info that belong to panel
->> property but no indicate in panel EDID message, so those can
->> be collect in eDP connector binding, is it right ?
-> Yes, and as Thierry pointed out we may need to know the exact panel even.
+Also, while you are there, can you please fix clk-imx31.c as well?
 
-Yeah, just like I reply to Thierry, this is a panel quirk. And he 
-suggest we should
-handle this in panel driver, but I have no idea how to handle this in 
-common panel
-driver.   :)
+Shawn
 
-- Yakir
-
-> Rob
->
->
->
+>  1 file changed, 27 insertions(+), 22 deletions(-)
+> 
+> diff --git a/drivers/clk/imx/clk-imx35.c b/drivers/clk/imx/clk-imx35.c
+> index 69138ba..3e7c805 100644
+> --- a/drivers/clk/imx/clk-imx35.c
+> +++ b/drivers/clk/imx/clk-imx35.c
+> @@ -84,7 +84,7 @@ enum mx35_clks {
+>  
+>  static struct clk *clk[clk_max];
+>  
+> -int __init mx35_clocks_init(void)
+> +static void __init _mx35_clocks_init(void)
+>  {
+>  	void __iomem *base;
+>  	u32 pdr0, consumer_sel, hsp_sel;
+> @@ -219,6 +219,30 @@ int __init mx35_clocks_init(void)
+>  
+>  	imx_check_clocks(clk, ARRAY_SIZE(clk));
+>  
+> +	clk_prepare_enable(clk[spba_gate]);
+> +	clk_prepare_enable(clk[gpio1_gate]);
+> +	clk_prepare_enable(clk[gpio2_gate]);
+> +	clk_prepare_enable(clk[gpio3_gate]);
+> +	clk_prepare_enable(clk[iim_gate]);
+> +	clk_prepare_enable(clk[emi_gate]);
+> +	clk_prepare_enable(clk[max_gate]);
+> +	clk_prepare_enable(clk[iomuxc_gate]);
+> +
+> +	/*
+> +	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
+> +	 * before conversion to common clk also enabled UART1 (which isn't
+> +	 * handled here and not needed for mmc) and IIM (which is enabled
+> +	 * unconditionally above).
+> +	 */
+> +	clk_prepare_enable(clk[scc_gate]);
+> +
+> +	imx_print_silicon_rev("i.MX35", mx35_revision());
+> +}
+> +
+> +int __init mx35_clocks_init(void)
+> +{
+> +	_mx35_clocks_init();
+> +
+>  	clk_register_clkdev(clk[pata_gate], NULL, "pata_imx");
+>  	clk_register_clkdev(clk[can1_gate], NULL, "flexcan.0");
+>  	clk_register_clkdev(clk[can2_gate], NULL, "flexcan.1");
+> @@ -275,25 +299,6 @@ int __init mx35_clocks_init(void)
+>  	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
+>  	clk_register_clkdev(clk[admux_gate], "audmux", NULL);
+>  
+> -	clk_prepare_enable(clk[spba_gate]);
+> -	clk_prepare_enable(clk[gpio1_gate]);
+> -	clk_prepare_enable(clk[gpio2_gate]);
+> -	clk_prepare_enable(clk[gpio3_gate]);
+> -	clk_prepare_enable(clk[iim_gate]);
+> -	clk_prepare_enable(clk[emi_gate]);
+> -	clk_prepare_enable(clk[max_gate]);
+> -	clk_prepare_enable(clk[iomuxc_gate]);
+> -
+> -	/*
+> -	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
+> -	 * before conversion to common clk also enabled UART1 (which isn't
+> -	 * handled here and not needed for mmc) and IIM (which is enabled
+> -	 * unconditionally above).
+> -	 */
+> -	clk_prepare_enable(clk[scc_gate]);
+> -
+> -	imx_print_silicon_rev("i.MX35", mx35_revision());
+> -
+>  	mxc_timer_init(MX35_GPT1_BASE_ADDR, MX35_INT_GPT, GPT_TYPE_IMX31);
+>  
+>  	return 0;
+> @@ -301,10 +306,10 @@ int __init mx35_clocks_init(void)
+>  
+>  static void __init mx35_clocks_init_dt(struct device_node *ccm_node)
+>  {
+> +	_mx35_clocks_init();
+> +
+>  	clk_data.clks = clk;
+>  	clk_data.clk_num = ARRAY_SIZE(clk);
+>  	of_clk_add_provider(ccm_node, of_clk_src_onecell_get, &clk_data);
+> -
+> -	mx35_clocks_init();
+>  }
+>  CLK_OF_DECLARE(imx35, "fsl,imx35-ccm", mx35_clocks_init_dt);
+> -- 
+> 2.4.6
+> 
