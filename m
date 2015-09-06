@@ -1,23 +1,43 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 7 Sep 2015 00:08:26 +0200 (CEST)
-Subject: [RFC PATCH v1 1/4] genirq: Introduce
- irq_settings_set_move_pcntxt() helper
-In-Reply-To: <1441513421-8092-2-git-send-email-yangyingliang@huawei.com>
-References: <1441513421-8092-1-git-send-email-yangyingliang@huawei.com>
- <1441513421-8092-2-git-send-email-yangyingliang@huawei.com>
-Message-ID: <alpine.DEB.2.11.1509070007310.15006@nanos>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 6 Sep 2015 16:41:10 -0700
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable PBIAS regulator
+In-Reply-To: <1441274111-18049-1-git-send-email-kishon@ti.com>
+References: <1441274111-18049-1-git-send-email-kishon@ti.com>
+Message-ID: <20150906234110.GA2228@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 6 Sep 2015, Yang Yingliang wrote:
+On Thu, Sep 03, 2015 at 03:25:11PM +0530, Kishon Vijay Abraham I wrote:
+> PBIAS regulator is required for MMC module in OMAP2, OMAP3, OMAP4,
+> OMAP5 and DRA7 SoCs. Enable it here.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-> It's expected to use the helper when interrupt can be moved
-> in process.
+Tested-by: Guenter Roeck <linux@roeck-us.net>
 
-What's wrong with using the existing helper?
-
-       irq_set_status_flags(irq, IRQ_MOVE_PCNTXT);
-
-Thanks,
-
-	tglx
+> ---
+>  arch/arm/configs/multi_v7_defconfig |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 5fd8df6..f497c96 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -403,6 +403,7 @@ CONFIG_REGULATOR_MAX8973=y
+>  CONFIG_REGULATOR_MAX77686=y
+>  CONFIG_REGULATOR_MAX77693=m
+>  CONFIG_REGULATOR_PALMAS=y
+> +CONFIG_REGULATOR_PBIAS=y
+>  CONFIG_REGULATOR_S2MPS11=y
+>  CONFIG_REGULATOR_S5M8767=y
+>  CONFIG_REGULATOR_TPS51632=y
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> 
