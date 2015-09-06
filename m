@@ -1,21 +1,31 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 6 Sep 2015 19:36:16 +0800
-Subject: [PATCH] ARM: dts: imx: add "jedec,spi-nor" flash compatible
- binding
-In-Reply-To: <1439707157-15091-1-git-send-email-zajec5@gmail.com>
-References: <1439707157-15091-1-git-send-email-zajec5@gmail.com>
-Message-ID: <20150906113615.GO30746@tiger>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun,  6 Sep 2015 13:40:54 +0200
+Subject: [PATCH 3/3] dmaengine: pxa_dma: declare transfer are reusable
+In-Reply-To: <1441539654-19055-1-git-send-email-robert.jarzmik@free.fr>
+References: <1441539654-19055-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1441539654-19055-3-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 16, 2015 at 08:39:17AM +0200, Rafa? Mi?ecki wrote:
-> Starting with commit 8947e396a829 ("Documentation: dt: mtd: replace
-> "nor-jedec" binding with "jedec, spi-nor"") we have "jedec,spi-nor"
-> binding indicating support for JEDEC identification.
-> 
-> Use it for all flashes that are supposed to support READ ID op according
-> to the datasheets.
-> 
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+As this driver provides a mechanism to reuse transfers, declare it in
+its probe function.
 
-Applied, thanks.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ drivers/dma/pxa_dma.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index ddcbbf5cd9e9..bb85cd7b5b70 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -1396,6 +1396,7 @@ static int pxad_probe(struct platform_device *op)
+ 	pdev->slave.dst_addr_widths = widths;
+ 	pdev->slave.directions = BIT(DMA_MEM_TO_DEV) | BIT(DMA_DEV_TO_MEM);
+ 	pdev->slave.residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
++	pdev->slave.descriptor_reuse = true;
+ 
+ 	pdev->slave.dev = &op->dev;
+ 	ret = pxad_init_dmadev(op, pdev, dma_channels);
+-- 
+2.1.4
