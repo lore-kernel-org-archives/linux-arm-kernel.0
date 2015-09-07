@@ -1,349 +1,582 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 7 Sep 2015 16:33:56 +0100
-Subject: [PATCH v4 18/20] net/xen-netback: Make it running on 64KB page
+Date: Mon, 7 Sep 2015 16:33:53 +0100
+Subject: [PATCH v4 15/20] block/xen-blkfront: Make it running on 64KB page
  granularity
 In-Reply-To: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
 References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1441640038-23615-19-git-send-email-julien.grall@citrix.com>
+Message-ID: <1441640038-23615-16-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PV network protocol is using 4KB page granularity. The goal of this
-patch is to allow a Linux using 64KB page granularity working as a
-network backend on a non-modified Xen.
+The PV block protocol is using 4KB page granularity. The goal of this
+patch is to allow a Linux using 64KB page granularity using block
+device on a non-modified Xen.
 
-It's only necessary to adapt the ring size and break skb data in small
-chunk of 4KB. The rest of the code is relying on the grant table code.
+The block API is using segment which should at least be the size of a
+Linux page. Therefore, the driver will have to break the page in chunk
+of 4K before giving the page to the backend.
+
+When breaking a 64KB segment in 4KB chunks, it is possible that some
+chunks are empty. As the PV protocol always require to have data in the
+chunk, we have to count the number of Xen page which will be in use and
+avoid sending empty chunks.
+
+Note that, a pre-defined number of grants are reserved before preparing
+the request. This pre-defined number is based on the number and the
+maximum size of the segments. If each segment contains a very small
+amount of data, the driver may reserve too many grants (16 grants is
+reserved per segment with 64KB page granularity).
+
+Furthermore, in the case of persistent grants we allocate one Linux page
+per grant although only the first 4KB of the page will be effectively
+in use. This could be improved by sharing the page with multiple grants.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
+Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
 
 ---
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Wei Liu <wei.liu2@citrix.com>
-Cc: netdev at vger.kernel.org
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
 
-Improvement such as support of 64KB grant is not taken into
-consideration in this patch because we have the requirement to run a
-Linux using 64KB pages on a non-modified Xen.
-
-Note that I haven't add a comment why the offset is 0 after the first
-iteration. See [1] for more details.
-
-[1] https://lkml.org/lkml/2015/8/10/456
+Improvement such as support 64KB grant is not taken into consideration in
+this patch because we have the requirement to run a Linux using 64KB page
+on a non-modified Xen.
 
     Changes in v4:
-        - Add a comment to explain how we compute MAX_XEN_SKB_FRAGS
+        - Rebase after d50babbe300eedf33ea5b00a12c5df3a05bd96c7 "
+        xen-blkfront: introduce blkfront_gather_backend_features()"
+        - Fix typoes
+        - Add Roger's acked-by
 
     Changes in v3:
-        - Fix errors reported by checkpatch.pl
+        - Use DIV_ROUND_UP in INDIRECT_GREFS
+        - Split lines over 80 characters whenever it's possible
         - s/mfn/gfn/ based on the new naming
-        - gnttab_foreach_grant has been renamed to gnttab_forach_grant_in_range
-        - The grant callback doesn't allow anymore to use less data. An
-        helpers has been added in netback to handle this.
+        - The grant callback doesn't allow anymore to change the len
+        (wasn't used here).
+        - gnttab_foreach_grant has been renamed to gnttab_foreach_grant_in_range
+        - Use gnttab_count_grant to get the number of grants in a sg
+        - Do some renaming to use the correct variable every time
 
     Changes in v2:
-        - Correctly set MAX_GRANT_COPY_OPS and XEN_NETBK_RX_SLOTS_MAX
-        - Don't use XEN_PAGE_SIZE in handle_frag_list as we coalesce
-        fragment into a new skb
-        - Use gnntab_foreach_grant to split a Linux page into grant
+        - Use gnttab_foreach_grant to split a Linux page into grant
 ---
- drivers/net/xen-netback/common.h  |  18 +++--
- drivers/net/xen-netback/netback.c | 153 ++++++++++++++++++++++++--------------
- 2 files changed, 110 insertions(+), 61 deletions(-)
+ drivers/block/xen-blkfront.c | 324 ++++++++++++++++++++++++++++---------------
+ 1 file changed, 213 insertions(+), 111 deletions(-)
 
-diff --git a/drivers/net/xen-netback/common.h b/drivers/net/xen-netback/common.h
-index 8a495b3..24cb365 100644
---- a/drivers/net/xen-netback/common.h
-+++ b/drivers/net/xen-netback/common.h
-@@ -44,6 +44,7 @@
- #include <xen/interface/grant_table.h>
- #include <xen/grant_table.h>
- #include <xen/xenbus.h>
-+#include <xen/page.h>
- #include <linux/debugfs.h>
- 
- typedef unsigned int pending_ring_idx_t;
-@@ -64,8 +65,8 @@ struct pending_tx_info {
- 	struct ubuf_info callback_struct;
+diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
+index 4232cbd..f2cdc73 100644
+--- a/drivers/block/xen-blkfront.c
++++ b/drivers/block/xen-blkfront.c
+@@ -78,6 +78,7 @@ struct blk_shadow {
+ 	struct grant **grants_used;
+ 	struct grant **indirect_grants;
+ 	struct scatterlist *sg;
++	unsigned int num_sg;
  };
  
--#define XEN_NETIF_TX_RING_SIZE __CONST_RING_SIZE(xen_netif_tx, PAGE_SIZE)
--#define XEN_NETIF_RX_RING_SIZE __CONST_RING_SIZE(xen_netif_rx, PAGE_SIZE)
-+#define XEN_NETIF_TX_RING_SIZE __CONST_RING_SIZE(xen_netif_tx, XEN_PAGE_SIZE)
-+#define XEN_NETIF_RX_RING_SIZE __CONST_RING_SIZE(xen_netif_rx, XEN_PAGE_SIZE)
+ struct split_bio {
+@@ -107,8 +108,12 @@ static unsigned int xen_blkif_max_ring_order;
+ module_param_named(max_ring_page_order, xen_blkif_max_ring_order, int, S_IRUGO);
+ MODULE_PARM_DESC(max_ring_page_order, "Maximum order of pages to be used for the shared ring");
  
- struct xenvif_rx_meta {
- 	int id;
-@@ -80,16 +81,21 @@ struct xenvif_rx_meta {
- /* Discriminate from any valid pending_idx value. */
- #define INVALID_PENDING_IDX 0xFFFF
- 
--#define MAX_BUFFER_OFFSET PAGE_SIZE
-+#define MAX_BUFFER_OFFSET XEN_PAGE_SIZE
- 
- #define MAX_PENDING_REQS XEN_NETIF_TX_RING_SIZE
- 
-+/* The maximum number of frags is derived from the size of a grant (same
-+ * as a Xen page size for now).
-+ */
-+#define MAX_XEN_SKB_FRAGS (65536 / XEN_PAGE_SIZE + 1)
+-#define BLK_RING_SIZE(info) __CONST_RING_SIZE(blkif, PAGE_SIZE * (info)->nr_ring_pages)
+-#define BLK_MAX_RING_SIZE __CONST_RING_SIZE(blkif, PAGE_SIZE * XENBUS_MAX_RING_PAGES)
++#define BLK_RING_SIZE(info)	\
++	__CONST_RING_SIZE(blkif, XEN_PAGE_SIZE * (info)->nr_ring_pages)
 +
- /* It's possible for an skb to have a maximal number of frags
-  * but still be less than MAX_BUFFER_OFFSET in size. Thus the
-- * worst-case number of copy operations is MAX_SKB_FRAGS per
-+ * worst-case number of copy operations is MAX_XEN_SKB_FRAGS per
-  * ring slot.
-  */
--#define MAX_GRANT_COPY_OPS (MAX_SKB_FRAGS * XEN_NETIF_RX_RING_SIZE)
-+#define MAX_GRANT_COPY_OPS (MAX_XEN_SKB_FRAGS * XEN_NETIF_RX_RING_SIZE)
++#define BLK_MAX_RING_SIZE	\
++	__CONST_RING_SIZE(blkif, XEN_PAGE_SIZE * XENBUS_MAX_RING_PAGES)
++
+ /*
+  * ring-ref%i i=(-1UL) would take 11 characters + 'ring-ref' is 8, so 19
+  * characters are enough. Define to 20 to keep consist with backend.
+@@ -147,6 +152,7 @@ struct blkfront_info
+ 	unsigned int discard_granularity;
+ 	unsigned int discard_alignment;
+ 	unsigned int feature_persistent:1;
++	/* Number of 4KB segments handled */
+ 	unsigned int max_indirect_segments;
+ 	int is_ready;
+ 	struct blk_mq_tag_set tag_set;
+@@ -175,10 +181,23 @@ static DEFINE_SPINLOCK(minor_lock);
  
- #define NETBACK_INVALID_HANDLE -1
+ #define DEV_NAME	"xvd"	/* name in /dev */
  
-@@ -203,7 +209,7 @@ struct xenvif_queue { /* Per-queue data for xenvif */
- /* Maximum number of Rx slots a to-guest packet may use, including the
-  * slot needed for GSO meta-data.
-  */
--#define XEN_NETBK_RX_SLOTS_MAX (MAX_SKB_FRAGS + 1)
-+#define XEN_NETBK_RX_SLOTS_MAX ((MAX_XEN_SKB_FRAGS + 1))
+-#define SEGS_PER_INDIRECT_FRAME \
+-	(PAGE_SIZE/sizeof(struct blkif_request_segment))
+-#define INDIRECT_GREFS(_segs) \
+-	((_segs + SEGS_PER_INDIRECT_FRAME - 1)/SEGS_PER_INDIRECT_FRAME)
++/*
++ * Grants are always the same size as a Xen page (i.e 4KB).
++ * A physical segment is always the same size as a Linux page.
++ * Number of grants per physical segment
++ */
++#define GRANTS_PER_PSEG	(PAGE_SIZE / XEN_PAGE_SIZE)
++
++#define GRANTS_PER_INDIRECT_FRAME \
++	(XEN_PAGE_SIZE / sizeof(struct blkif_request_segment))
++
++#define PSEGS_PER_INDIRECT_FRAME	\
++	(GRANTS_INDIRECT_FRAME / GRANTS_PSEGS)
++
++#define INDIRECT_GREFS(_grants)		\
++	DIV_ROUND_UP(_grants, GRANTS_PER_INDIRECT_FRAME)
++
++#define GREFS(_psegs)	((_psegs) * GRANTS_PER_PSEG)
  
- enum state_bit_shift {
- 	/* This bit marks that the vif is connected */
-diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
-index d4c1bc7..b1649aa 100644
---- a/drivers/net/xen-netback/netback.c
-+++ b/drivers/net/xen-netback/netback.c
-@@ -263,6 +263,80 @@ static struct xenvif_rx_meta *get_next_rx_buffer(struct xenvif_queue *queue,
- 	return meta;
+ static int blkfront_setup_indirect(struct blkfront_info *info);
+ static int blkfront_gather_backend_features(struct blkfront_info *info);
+@@ -466,14 +485,100 @@ static int blkif_queue_discard_req(struct request *req)
+ 	return 0;
  }
  
-+struct gop_frag_copy {
-+	struct xenvif_queue *queue;
-+	struct netrx_pending_operations *npo;
-+	struct xenvif_rx_meta *meta;
-+	int head;
-+	int gso_type;
-+
-+	struct page *page;
++struct setup_rw_req {
++	unsigned int grant_idx;
++	struct blkif_request_segment *segments;
++	struct blkfront_info *info;
++	struct blkif_request *ring_req;
++	grant_ref_t gref_head;
++	unsigned int id;
++	/* Only used when persistent grant is used and it's a read request */
++	bool need_copy;
++	unsigned int bvec_off;
++	char *bvec_data;
 +};
 +
-+static void xenvif_setup_copy_gop(unsigned long gfn,
-+				  unsigned int offset,
-+				  unsigned int *len,
-+				  struct gop_frag_copy *info)
++static void blkif_setup_rw_req_grant(unsigned long gfn, unsigned int offset,
++				     unsigned int len, void *data)
 +{
-+	struct gnttab_copy *copy_gop;
-+	struct xen_page_foreign *foreign;
++	struct setup_rw_req *setup = data;
++	int n, ref;
++	struct grant *gnt_list_entry;
++	unsigned int fsect, lsect;
 +	/* Convenient aliases */
-+	struct xenvif_queue *queue = info->queue;
-+	struct netrx_pending_operations *npo = info->npo;
-+	struct page *page = info->page;
++	unsigned int grant_idx = setup->grant_idx;
++	struct blkif_request *ring_req = setup->ring_req;
++	struct blkfront_info *info = setup->info;
++	struct blk_shadow *shadow = &info->shadow[setup->id];
 +
-+	BUG_ON(npo->copy_off > MAX_BUFFER_OFFSET);
++	if ((ring_req->operation == BLKIF_OP_INDIRECT) &&
++	    (grant_idx % GRANTS_PER_INDIRECT_FRAME == 0)) {
++		if (setup->segments)
++			kunmap_atomic(setup->segments);
 +
-+	if (npo->copy_off == MAX_BUFFER_OFFSET)
-+		info->meta = get_next_rx_buffer(queue, npo);
++		n = grant_idx / GRANTS_PER_INDIRECT_FRAME;
++		gnt_list_entry = get_indirect_grant(&setup->gref_head, info);
++		shadow->indirect_grants[n] = gnt_list_entry;
++		setup->segments = kmap_atomic(gnt_list_entry->page);
++		ring_req->u.indirect.indirect_grefs[n] = gnt_list_entry->gref;
++	}
 +
-+	if (npo->copy_off + *len > MAX_BUFFER_OFFSET)
-+		*len = MAX_BUFFER_OFFSET - npo->copy_off;
++	gnt_list_entry = get_grant(&setup->gref_head, gfn, info);
++	ref = gnt_list_entry->gref;
++	shadow->grants_used[grant_idx] = gnt_list_entry;
 +
-+	copy_gop = npo->copy + npo->copy_prod++;
-+	copy_gop->flags = GNTCOPY_dest_gref;
-+	copy_gop->len = *len;
++	if (setup->need_copy) {
++		void *shared_data;
 +
-+	foreign = xen_page_foreign(page);
-+	if (foreign) {
-+		copy_gop->source.domid = foreign->domid;
-+		copy_gop->source.u.ref = foreign->gref;
-+		copy_gop->flags |= GNTCOPY_source_gref;
++		shared_data = kmap_atomic(gnt_list_entry->page);
++		/*
++		 * this does not wipe data stored outside the
++		 * range sg->offset..sg->offset+sg->length.
++		 * Therefore, blkback *could* see data from
++		 * previous requests. This is OK as long as
++		 * persistent grants are shared with just one
++		 * domain. It may need refactoring if this
++		 * changes
++		 */
++		memcpy(shared_data + offset,
++		       setup->bvec_data + setup->bvec_off,
++		       len);
++
++		kunmap_atomic(shared_data);
++		setup->bvec_off += len;
++	}
++
++	fsect = offset >> 9;
++	lsect = fsect + (len >> 9) - 1;
++	if (ring_req->operation != BLKIF_OP_INDIRECT) {
++		ring_req->u.rw.seg[grant_idx] =
++			(struct blkif_request_segment) {
++				.gref       = ref,
++				.first_sect = fsect,
++				.last_sect  = lsect };
 +	} else {
-+		copy_gop->source.domid = DOMID_SELF;
-+		copy_gop->source.u.gmfn = gfn;
++		setup->segments[grant_idx % GRANTS_PER_INDIRECT_FRAME] =
++			(struct blkif_request_segment) {
++				.gref       = ref,
++				.first_sect = fsect,
++				.last_sect  = lsect };
 +	}
-+	copy_gop->source.offset = offset;
 +
-+	copy_gop->dest.domid = queue->vif->domid;
-+	copy_gop->dest.offset = npo->copy_off;
-+	copy_gop->dest.u.ref = npo->copy_gref;
-+
-+	npo->copy_off += *len;
-+	info->meta->size += *len;
-+
-+	/* Leave a gap for the GSO descriptor. */
-+	if (info->head && ((1 << info->gso_type) & queue->vif->gso_mask))
-+		queue->rx.req_cons++;
-+
-+	info->head = 0; /* There must be something in this buffer now */
++	(setup->grant_idx)++;
 +}
 +
-+static void xenvif_gop_frag_copy_grant(unsigned long gfn,
-+				       unsigned offset,
-+				       unsigned int len,
-+				       void *data)
-+{
-+	unsigned int bytes;
-+
-+	while (len) {
-+		bytes = len;
-+		xenvif_setup_copy_gop(gfn, offset, &bytes, data);
-+		offset += bytes;
-+		len -= bytes;
-+	}
-+}
-+
- /*
-  * Set up the grant operations for this fragment. If it's a flipping
-  * interface, we also set up the unmap request from here.
-@@ -272,83 +346,52 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
- 				 struct page *page, unsigned long size,
- 				 unsigned long offset, int *head)
+ static int blkif_queue_rw_req(struct request *req)
  {
--	struct gnttab_copy *copy_gop;
--	struct xenvif_rx_meta *meta;
-+	struct gop_frag_copy info = {
-+		.queue = queue,
-+		.npo = npo,
-+		.head = *head,
-+		.gso_type = XEN_NETIF_GSO_TYPE_NONE,
+ 	struct blkfront_info *info = req->rq_disk->private_data;
+ 	struct blkif_request *ring_req;
+ 	unsigned long id;
+-	unsigned int fsect, lsect;
+-	int i, ref, n;
+-	struct blkif_request_segment *segments = NULL;
++	int i;
++	struct setup_rw_req setup = {
++		.grant_idx = 0,
++		.segments = NULL,
++		.info = info,
++		.need_copy = rq_data_dir(req) && info->feature_persistent,
 +	};
- 	unsigned long bytes;
--	int gso_type = XEN_NETIF_GSO_TYPE_NONE;
  
- 	if (skb_is_gso(skb)) {
- 		if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV4)
--			gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
-+			info.gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
- 		else if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6)
--			gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
-+			info.gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
- 	}
+ 	/*
+ 	 * Used to store if we are able to queue the request by just using
+@@ -481,25 +586,23 @@ static int blkif_queue_rw_req(struct request *req)
+ 	 * as there are not sufficiently many free.
+ 	 */
+ 	bool new_persistent_gnts;
+-	grant_ref_t gref_head;
+-	struct grant *gnt_list_entry = NULL;
+ 	struct scatterlist *sg;
+-	int nseg, max_grefs;
++	int num_sg, max_grefs, num_grant;
  
- 	/* Data must not cross a page boundary. */
- 	BUG_ON(size + offset > PAGE_SIZE<<compound_order(page));
+-	max_grefs = req->nr_phys_segments;
++	max_grefs = req->nr_phys_segments * GRANTS_PER_PSEG;
+ 	if (max_grefs > BLKIF_MAX_SEGMENTS_PER_REQUEST)
+ 		/*
+ 		 * If we are using indirect segments we need to account
+ 		 * for the indirect grefs used in the request.
+ 		 */
+-		max_grefs += INDIRECT_GREFS(req->nr_phys_segments);
++		max_grefs += INDIRECT_GREFS(max_grefs);
  
--	meta = npo->meta + npo->meta_prod - 1;
-+	info.meta = npo->meta + npo->meta_prod - 1;
+ 	/* Check if we have enough grants to allocate a requests */
+ 	if (info->persistent_gnts_c < max_grefs) {
+ 		new_persistent_gnts = 1;
+ 		if (gnttab_alloc_grant_references(
+ 		    max_grefs - info->persistent_gnts_c,
+-		    &gref_head) < 0) {
++		    &setup.gref_head) < 0) {
+ 			gnttab_request_free_callback(
+ 				&info->callback,
+ 				blkif_restart_queue_callback,
+@@ -516,12 +619,19 @@ static int blkif_queue_rw_req(struct request *req)
+ 	info->shadow[id].request = req;
  
- 	/* Skip unused frames from start of page */
- 	page += offset >> PAGE_SHIFT;
- 	offset &= ~PAGE_MASK;
- 
- 	while (size > 0) {
--		struct xen_page_foreign *foreign;
--
- 		BUG_ON(offset >= PAGE_SIZE);
--		BUG_ON(npo->copy_off > MAX_BUFFER_OFFSET);
--
--		if (npo->copy_off == MAX_BUFFER_OFFSET)
--			meta = get_next_rx_buffer(queue, npo);
- 
- 		bytes = PAGE_SIZE - offset;
- 		if (bytes > size)
- 			bytes = size;
- 
--		if (npo->copy_off + bytes > MAX_BUFFER_OFFSET)
--			bytes = MAX_BUFFER_OFFSET - npo->copy_off;
--
--		copy_gop = npo->copy + npo->copy_prod++;
--		copy_gop->flags = GNTCOPY_dest_gref;
--		copy_gop->len = bytes;
--
--		foreign = xen_page_foreign(page);
--		if (foreign) {
--			copy_gop->source.domid = foreign->domid;
--			copy_gop->source.u.ref = foreign->gref;
--			copy_gop->flags |= GNTCOPY_source_gref;
--		} else {
--			copy_gop->source.domid = DOMID_SELF;
--			copy_gop->source.u.gmfn =
--				virt_to_gfn(page_address(page));
--		}
--		copy_gop->source.offset = offset;
--
--		copy_gop->dest.domid = queue->vif->domid;
--		copy_gop->dest.offset = npo->copy_off;
--		copy_gop->dest.u.ref = npo->copy_gref;
--
--		npo->copy_off += bytes;
--		meta->size += bytes;
--
--		offset += bytes;
-+		info.page = page;
-+		gnttab_foreach_grant_in_range(page, offset, bytes,
-+					      xenvif_gop_frag_copy_grant,
-+					      &info);
- 		size -= bytes;
-+		offset = 0;
- 
--		/* Next frame */
--		if (offset == PAGE_SIZE && size) {
-+		/* Next page */
-+		if (size) {
- 			BUG_ON(!PageCompound(page));
- 			page++;
--			offset = 0;
- 		}
--
--		/* Leave a gap for the GSO descriptor. */
--		if (*head && ((1 << gso_type) & queue->vif->gso_mask))
--			queue->rx.req_cons++;
--
--		*head = 0; /* There must be something in this buffer now. */
--
- 	}
+ 	BUG_ON(info->max_indirect_segments == 0 &&
+-	       req->nr_phys_segments > BLKIF_MAX_SEGMENTS_PER_REQUEST);
++	       GREFS(req->nr_phys_segments) > BLKIF_MAX_SEGMENTS_PER_REQUEST);
+ 	BUG_ON(info->max_indirect_segments &&
+-	       req->nr_phys_segments > info->max_indirect_segments);
+-	nseg = blk_rq_map_sg(req->q, req, info->shadow[id].sg);
++	       GREFS(req->nr_phys_segments) > info->max_indirect_segments);
 +
-+	*head = info.head;
- }
- 
- /*
-@@ -747,7 +790,7 @@ static int xenvif_count_requests(struct xenvif_queue *queue,
- 		first->size -= txp->size;
- 		slots++;
- 
--		if (unlikely((txp->offset + txp->size) > PAGE_SIZE)) {
-+		if (unlikely((txp->offset + txp->size) > XEN_PAGE_SIZE)) {
- 			netdev_err(queue->vif->dev, "Cross page boundary, txp->offset: %u, size: %u\n",
- 				 txp->offset, txp->size);
- 			xenvif_fatal_tx_err(queue->vif);
-@@ -1229,11 +1272,11 @@ static void xenvif_tx_build_gops(struct xenvif_queue *queue,
++	num_sg = blk_rq_map_sg(req->q, req, info->shadow[id].sg);
++	num_grant = 0;
++	/* Calculate the number of grant used */
++	for_each_sg(info->shadow[id].sg, sg, num_sg, i)
++	       num_grant += gnttab_count_grant(sg->offset, sg->length);
++
+ 	ring_req->u.rw.id = id;
+-	if (nseg > BLKIF_MAX_SEGMENTS_PER_REQUEST) {
++	info->shadow[id].num_sg = num_sg;
++	if (num_grant > BLKIF_MAX_SEGMENTS_PER_REQUEST) {
+ 		/*
+ 		 * The indirect operation can only be a BLKIF_OP_READ or
+ 		 * BLKIF_OP_WRITE
+@@ -532,7 +642,7 @@ static int blkif_queue_rw_req(struct request *req)
+ 			BLKIF_OP_WRITE : BLKIF_OP_READ;
+ 		ring_req->u.indirect.sector_number = (blkif_sector_t)blk_rq_pos(req);
+ 		ring_req->u.indirect.handle = info->handle;
+-		ring_req->u.indirect.nr_segments = nseg;
++		ring_req->u.indirect.nr_segments = num_grant;
+ 	} else {
+ 		ring_req->u.rw.sector_number = (blkif_sector_t)blk_rq_pos(req);
+ 		ring_req->u.rw.handle = info->handle;
+@@ -560,73 +670,30 @@ static int blkif_queue_rw_req(struct request *req)
+ 				ring_req->operation = 0;
+ 			}
  		}
+-		ring_req->u.rw.nr_segments = nseg;
+-	}
+-	for_each_sg(info->shadow[id].sg, sg, nseg, i) {
+-		fsect = sg->offset >> 9;
+-		lsect = fsect + (sg->length >> 9) - 1;
+-
+-		if ((ring_req->operation == BLKIF_OP_INDIRECT) &&
+-		    (i % SEGS_PER_INDIRECT_FRAME == 0)) {
+-			if (segments)
+-				kunmap_atomic(segments);
+-
+-			n = i / SEGS_PER_INDIRECT_FRAME;
+-			gnt_list_entry = get_indirect_grant(&gref_head, info);
+-			info->shadow[id].indirect_grants[n] = gnt_list_entry;
+-			segments = kmap_atomic(gnt_list_entry->page);
+-			ring_req->u.indirect.indirect_grefs[n] = gnt_list_entry->gref;
+-		}
+-
+-		gnt_list_entry = get_grant(&gref_head,
+-					   xen_page_to_gfn(sg_page(sg)),
+-					   info);
+-		ref = gnt_list_entry->gref;
+-
+-		info->shadow[id].grants_used[i] = gnt_list_entry;
+-
+-		if (rq_data_dir(req) && info->feature_persistent) {
+-			char *bvec_data;
+-			void *shared_data;
++		ring_req->u.rw.nr_segments = num_grant;
++	}
  
- 		/* No crossing a page as the payload mustn't fragment. */
--		if (unlikely((txreq.offset + txreq.size) > PAGE_SIZE)) {
-+		if (unlikely((txreq.offset + txreq.size) > XEN_PAGE_SIZE)) {
- 			netdev_err(queue->vif->dev,
- 				   "txreq.offset: %u, size: %u, end: %lu\n",
- 				   txreq.offset, txreq.size,
--				   (unsigned long)(txreq.offset&~PAGE_MASK) + txreq.size);
-+				   (unsigned long)(txreq.offset&~XEN_PAGE_MASK) + txreq.size);
- 			xenvif_fatal_tx_err(queue->vif);
- 			break;
- 		}
-@@ -1299,7 +1342,7 @@ static void xenvif_tx_build_gops(struct xenvif_queue *queue,
- 			virt_to_gfn(skb->data);
- 		queue->tx_copy_ops[*copy_ops].dest.domid = DOMID_SELF;
- 		queue->tx_copy_ops[*copy_ops].dest.offset =
--			offset_in_page(skb->data);
-+			offset_in_page(skb->data) & ~XEN_PAGE_MASK;
+-			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
++	setup.ring_req = ring_req;
++	setup.id = id;
++	for_each_sg(info->shadow[id].sg, sg, num_sg, i) {
++		BUG_ON(sg->offset + sg->length > PAGE_SIZE);
  
- 		queue->tx_copy_ops[*copy_ops].len = data_len;
- 		queue->tx_copy_ops[*copy_ops].flags = GNTCOPY_source_gref;
-@@ -1784,7 +1827,7 @@ int xenvif_map_frontend_rings(struct xenvif_queue *queue,
- 		goto err;
+-			shared_data = kmap_atomic(gnt_list_entry->page);
+-			bvec_data = kmap_atomic(sg_page(sg));
++		if (setup.need_copy) {
++			setup.bvec_off = sg->offset;
++			setup.bvec_data = kmap_atomic(sg_page(sg));
++		}
  
- 	txs = (struct xen_netif_tx_sring *)addr;
--	BACK_RING_INIT(&queue->tx, txs, PAGE_SIZE);
-+	BACK_RING_INIT(&queue->tx, txs, XEN_PAGE_SIZE);
+-			/*
+-			 * this does not wipe data stored outside the
+-			 * range sg->offset..sg->offset+sg->length.
+-			 * Therefore, blkback *could* see data from
+-			 * previous requests. This is OK as long as
+-			 * persistent grants are shared with just one
+-			 * domain. It may need refactoring if this
+-			 * changes
+-			 */
+-			memcpy(shared_data + sg->offset,
+-			       bvec_data   + sg->offset,
+-			       sg->length);
++		gnttab_foreach_grant_in_range(sg_page(sg),
++					      sg->offset,
++					      sg->length,
++					      blkif_setup_rw_req_grant,
++					      &setup);
  
- 	err = xenbus_map_ring_valloc(xenvif_to_xenbus_device(queue->vif),
- 				     &rx_ring_ref, 1, &addr);
-@@ -1792,7 +1835,7 @@ int xenvif_map_frontend_rings(struct xenvif_queue *queue,
- 		goto err;
+-			kunmap_atomic(bvec_data);
+-			kunmap_atomic(shared_data);
+-		}
+-		if (ring_req->operation != BLKIF_OP_INDIRECT) {
+-			ring_req->u.rw.seg[i] =
+-					(struct blkif_request_segment) {
+-						.gref       = ref,
+-						.first_sect = fsect,
+-						.last_sect  = lsect };
+-		} else {
+-			n = i % SEGS_PER_INDIRECT_FRAME;
+-			segments[n] =
+-				(struct blkif_request_segment) {
+-						.gref       = ref,
+-						.first_sect = fsect,
+-						.last_sect  = lsect };
+-		}
++		if (setup.need_copy)
++			kunmap_atomic(setup.bvec_data);
+ 	}
+-	if (segments)
+-		kunmap_atomic(segments);
++	if (setup.segments)
++		kunmap_atomic(setup.segments);
  
- 	rxs = (struct xen_netif_rx_sring *)addr;
--	BACK_RING_INIT(&queue->rx, rxs, PAGE_SIZE);
-+	BACK_RING_INIT(&queue->rx, rxs, XEN_PAGE_SIZE);
+ 	info->ring.req_prod_pvt++;
+ 
+@@ -634,7 +701,7 @@ static int blkif_queue_rw_req(struct request *req)
+ 	info->shadow[id].req = *ring_req;
+ 
+ 	if (new_persistent_gnts)
+-		gnttab_free_grant_references(gref_head);
++		gnttab_free_grant_references(setup.gref_head);
  
  	return 0;
+ }
+@@ -751,14 +818,14 @@ static int xlvbd_init_blk_queue(struct gendisk *gd, u16 sector_size,
+ 	/* Hard sector size and max sectors impersonate the equiv. hardware. */
+ 	blk_queue_logical_block_size(rq, sector_size);
+ 	blk_queue_physical_block_size(rq, physical_sector_size);
+-	blk_queue_max_hw_sectors(rq, (segments * PAGE_SIZE) / 512);
++	blk_queue_max_hw_sectors(rq, (segments * XEN_PAGE_SIZE) / 512);
+ 
+ 	/* Each segment in a request is up to an aligned page in size. */
+ 	blk_queue_segment_boundary(rq, PAGE_SIZE - 1);
+ 	blk_queue_max_segment_size(rq, PAGE_SIZE);
+ 
+ 	/* Ensure a merged request will fit in a single I/O ring slot. */
+-	blk_queue_max_segments(rq, segments);
++	blk_queue_max_segments(rq, segments / GRANTS_PER_PSEG);
+ 
+ 	/* Make sure buffer addresses are sector-aligned. */
+ 	blk_queue_dma_alignment(rq, 511);
+@@ -1117,32 +1184,65 @@ free_shadow:
+ 
+ }
+ 
++struct copy_from_grant {
++	const struct blk_shadow *s;
++	unsigned int grant_idx;
++	unsigned int bvec_offset;
++	char *bvec_data;
++};
++
++static void blkif_copy_from_grant(unsigned long gfn, unsigned int offset,
++				  unsigned int len, void *data)
++{
++	struct copy_from_grant *info = data;
++	char *shared_data;
++	/* Convenient aliases */
++	const struct blk_shadow *s = info->s;
++
++	shared_data = kmap_atomic(s->grants_used[info->grant_idx]->page);
++
++	memcpy(info->bvec_data + info->bvec_offset,
++	       shared_data + offset, len);
++
++	info->bvec_offset += len;
++	info->grant_idx++;
++
++	kunmap_atomic(shared_data);
++}
++
+ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
+ 			     struct blkif_response *bret)
+ {
+ 	int i = 0;
+ 	struct scatterlist *sg;
+-	char *bvec_data;
+-	void *shared_data;
+-	int nseg;
++	int num_sg, num_grant;
++	struct copy_from_grant data = {
++		.s = s,
++		.grant_idx = 0,
++	};
+ 
+-	nseg = s->req.operation == BLKIF_OP_INDIRECT ?
++	num_grant = s->req.operation == BLKIF_OP_INDIRECT ?
+ 		s->req.u.indirect.nr_segments : s->req.u.rw.nr_segments;
++	num_sg = s->num_sg;
+ 
+ 	if (bret->operation == BLKIF_OP_READ && info->feature_persistent) {
+-		for_each_sg(s->sg, sg, nseg, i) {
++		for_each_sg(s->sg, sg, num_sg, i) {
+ 			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
+-			shared_data = kmap_atomic(s->grants_used[i]->page);
+-			bvec_data = kmap_atomic(sg_page(sg));
+-			memcpy(bvec_data   + sg->offset,
+-			       shared_data + sg->offset,
+-			       sg->length);
+-			kunmap_atomic(bvec_data);
+-			kunmap_atomic(shared_data);
++
++			data.bvec_offset = sg->offset;
++			data.bvec_data = kmap_atomic(sg_page(sg));
++
++			gnttab_foreach_grant_in_range(sg_page(sg),
++						      sg->offset,
++						      sg->length,
++						      blkif_copy_from_grant,
++						      &data);
++
++			kunmap_atomic(data.bvec_data);
+ 		}
+ 	}
+ 	/* Add the persistent grant into the list of free grants */
+-	for (i = 0; i < nseg; i++) {
++	for (i = 0; i < num_grant; i++) {
+ 		if (gnttab_query_foreign_access(s->grants_used[i]->gref)) {
+ 			/*
+ 			 * If the grant is still mapped by the backend (the
+@@ -1168,7 +1268,7 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
+ 		}
+ 	}
+ 	if (s->req.operation == BLKIF_OP_INDIRECT) {
+-		for (i = 0; i < INDIRECT_GREFS(nseg); i++) {
++		for (i = 0; i < INDIRECT_GREFS(num_grant); i++) {
+ 			if (gnttab_query_foreign_access(s->indirect_grants[i]->gref)) {
+ 				if (!info->feature_persistent)
+ 					pr_alert_ratelimited("backed has not unmapped grant: %u\n",
+@@ -1312,7 +1412,7 @@ static int setup_blkring(struct xenbus_device *dev,
+ {
+ 	struct blkif_sring *sring;
+ 	int err, i;
+-	unsigned long ring_size = info->nr_ring_pages * PAGE_SIZE;
++	unsigned long ring_size = info->nr_ring_pages * XEN_PAGE_SIZE;
+ 	grant_ref_t gref[XENBUS_MAX_RING_PAGES];
+ 
+ 	for (i = 0; i < info->nr_ring_pages; i++)
+@@ -1643,8 +1743,8 @@ static int blkif_recover(struct blkfront_info *info)
+ 			atomic_set(&split_bio->pending, pending);
+ 			split_bio->bio = bio;
+ 			for (i = 0; i < pending; i++) {
+-				offset = (i * segs * PAGE_SIZE) >> 9;
+-				size = min((unsigned int)(segs * PAGE_SIZE) >> 9,
++				offset = (i * segs * XEN_PAGE_SIZE) >> 9;
++				size = min((unsigned int)(segs * XEN_PAGE_SIZE) >> 9,
+ 					   (unsigned int)bio_sectors(bio) - offset);
+ 				cloned_bio = bio_clone(bio, GFP_NOIO);
+ 				BUG_ON(cloned_bio == NULL);
+@@ -1755,15 +1855,17 @@ static void blkfront_setup_discard(struct blkfront_info *info)
+ 
+ static int blkfront_setup_indirect(struct blkfront_info *info)
+ {
+-	unsigned int segs;
++	unsigned int psegs, grants;
+ 	int err, i;
+ 
+ 	if (info->max_indirect_segments == 0)
+-		segs = BLKIF_MAX_SEGMENTS_PER_REQUEST;
++		grants = BLKIF_MAX_SEGMENTS_PER_REQUEST;
+ 	else
+-		segs = info->max_indirect_segments;
++		grants = info->max_indirect_segments;
++	psegs = grants / GRANTS_PER_PSEG;
+ 
+-	err = fill_grant_buffer(info, (segs + INDIRECT_GREFS(segs)) * BLK_RING_SIZE(info));
++	err = fill_grant_buffer(info,
++				(grants + INDIRECT_GREFS(grants)) * BLK_RING_SIZE(info));
+ 	if (err)
+ 		goto out_of_memory;
+ 
+@@ -1773,7 +1875,7 @@ static int blkfront_setup_indirect(struct blkfront_info *info)
+ 		 * grants, we need to allocate a set of pages that can be
+ 		 * used for mapping indirect grefs
+ 		 */
+-		int num = INDIRECT_GREFS(segs) * BLK_RING_SIZE(info);
++		int num = INDIRECT_GREFS(grants) * BLK_RING_SIZE(info);
+ 
+ 		BUG_ON(!list_empty(&info->indirect_pages));
+ 		for (i = 0; i < num; i++) {
+@@ -1786,20 +1888,20 @@ static int blkfront_setup_indirect(struct blkfront_info *info)
+ 
+ 	for (i = 0; i < BLK_RING_SIZE(info); i++) {
+ 		info->shadow[i].grants_used = kzalloc(
+-			sizeof(info->shadow[i].grants_used[0]) * segs,
++			sizeof(info->shadow[i].grants_used[0]) * grants,
+ 			GFP_NOIO);
+-		info->shadow[i].sg = kzalloc(sizeof(info->shadow[i].sg[0]) * segs, GFP_NOIO);
++		info->shadow[i].sg = kzalloc(sizeof(info->shadow[i].sg[0]) * psegs, GFP_NOIO);
+ 		if (info->max_indirect_segments)
+ 			info->shadow[i].indirect_grants = kzalloc(
+ 				sizeof(info->shadow[i].indirect_grants[0]) *
+-				INDIRECT_GREFS(segs),
++				INDIRECT_GREFS(grants),
+ 				GFP_NOIO);
+ 		if ((info->shadow[i].grants_used == NULL) ||
+ 			(info->shadow[i].sg == NULL) ||
+ 		     (info->max_indirect_segments &&
+ 		     (info->shadow[i].indirect_grants == NULL)))
+ 			goto out_of_memory;
+-		sg_init_table(info->shadow[i].sg, segs);
++		sg_init_table(info->shadow[i].sg, psegs);
+ 	}
+ 
  
 -- 
 2.1.4
