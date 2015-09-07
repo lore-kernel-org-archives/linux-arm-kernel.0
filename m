@@ -1,63 +1,60 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Mon, 07 Sep 2015 12:14:22 +0300
-Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun4i: Add dts file for the
- pov protab2-ips9 tablet
-In-Reply-To: <55ED4F8F.6080502@redhat.com>
-References: <1441441319-10658-1-git-send-email-hdegoede@redhat.com>
- <20150906163023.GR31584@lukather> <55ED3739.609@redhat.com>
- <1441612142.14422.34.camel@plaes.org> <55ED4F8F.6080502@redhat.com>
-Message-ID: <1441617262.21530.4.camel@plaes.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 7 Sep 2015 10:15:37 +0100
+Subject: [PATCH v4 2/4] PCI: pci-host-generic: Fix lookup of
+ linux,pci-probe-only property
+In-Reply-To: <1441385411-7624-3-git-send-email-marc.zyngier@arm.com>
+References: <1441385411-7624-1-git-send-email-marc.zyngier@arm.com>
+ <1441385411-7624-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150907091537.GA14244@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-09-07 at 10:49 +0200, Hans de Goede wrote:
-> Hi,
+On Fri, Sep 04, 2015 at 05:50:09PM +0100, Marc Zyngier wrote:
+> When pci-host-generic looks for the probe-only property, it seems
+> to trust the DT to be correctly written, and assumes that there
+> is a parameter to the property.
 > 
-> On 07-09-15 09:49, Priit Laes wrote:
-> > On Mon, 2015-09-07 at 09:05 +0200, Hans de Goede wrote:
-> > > Hi,
-> > > 
-> > > On 06-09-15 18:30, Maxime Ripard wrote:
-> > > > On Sat, Sep 05, 2015 at 10:21:59AM +0200, Hans de Goede wrote:
-> > > > > The Point of View protab2-ips9 is a tablet with a 9" ips
-> > > > > 1024x768
-> > > > > lcd screen,
-> > > > > microsd slot, headphones, mini hdmi, mini usb b and power
-> > > > > barrel
-> > > > > connectors.
-> > > > > 
-> > > > > It uses a rtl8188cus usb wifi chip and a RDA 5875Y bluetooth
-> > > > > chip
-> > > > > attached
-> > > > > to uart2. It has a bma250 accelerometer attached to i2c1 addr
-> > > > > 0x18.
-> > > > > 
-> > 
-> > [...]
-> > > > 
-> > > > What is connected on i2c1 ? Just the camera sensor? or it has
-> > > > some
-> > > > other devices there?
-> > > 
-> > > The bma250 accelerometer sits there, and the kernel already has a
-> > > driver
-> > > for it. That driver needs to have devicetree binding support
-> > > added,
-> > > and
-> > > then we should be able to use the accelerometer.
-> > 
-> > bma250 already has devicetree support. It is used in Gemei G9
-> > tablet
-> > (sun4i-gemei-g9.dts).
+> Unfortunately, this is not always the case, and some firmware expose
+> this property naked. The driver ends up making a decision based on
+> whatever the property pointer points to, which is likely to be junk.
 > 
-> Yes I've seen that, but does it actually work? I've not tried but I
-> do not see any compatible string in the actual bma250 code in the
-> kernel,
-> so I believe that this part of the sun4i-gemei-g9.dts file does not
-> work ?
+> Switch to the common of_pci.c implementation that doesn't suffer
+> from this problem.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/pci/host/pci-host-generic.c | 9 +--------
+>  1 file changed, 1 insertion(+), 8 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 265dd25..224303d 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -210,7 +210,6 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  	int err;
+>  	const char *type;
+>  	const struct of_device_id *of_id;
+> -	const int *prop;
+>  	struct device *dev = &pdev->dev;
+>  	struct device_node *np = dev->of_node;
+>  	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> @@ -225,13 +224,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> -	prop = of_get_property(of_chosen, "linux,pci-probe-only", NULL);
+> -	if (prop) {
+> -		if (*prop)
+> -			pci_add_flags(PCI_PROBE_ONLY);
+> -		else
+> -			pci_clear_flags(PCI_PROBE_ONLY);
+> -	}
+> +	of_pci_check_probe_only();
 
-It worked (even without IRQs) when I submitted the patch. Driver itself
-is under iio/accel/bma180.c
+Looks good to me:
 
-P?ikest,
-Priit
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thanks, Marc.
+
+Will
