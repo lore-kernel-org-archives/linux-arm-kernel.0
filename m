@@ -1,66 +1,101 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Mon, 7 Sep 2015 10:54:52 +0800
-Subject: [RFC PATCH v1 0/4] arm/arm64: fix a migrating irq bug when
- hotplug cpu
-In-Reply-To: <55EBF43E.8070501@linux.intel.com>
-References: <1441513421-8092-1-git-send-email-yangyingliang@huawei.com>
- <55EBF43E.8070501@linux.intel.com>
-Message-ID: <55ECFC7C.8060505@huawei.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Mon, 7 Sep 2015 12:00:25 +0800
+Subject: [PATCH 2/2] arm64: dts: mt8173: Add thermal zone node for mt8173.
+In-Reply-To: <1441357309-61669-3-git-send-email-dawei.chien@mediatek.com>
+References: <1441357309-61669-1-git-send-email-dawei.chien@mediatek.com>
+ <1441357309-61669-3-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <CAGS+omAxWDj+fHsJQhJ-KhFdWPZ-ymcVr63v5Q7ho2bAL_7PBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Dawei,
 
-
-On 2015/9/6 16:07, Jiang Liu wrote:
-> On 2015/9/6 12:23, Yang Yingliang wrote:
->> Hi All,
->>
->> There is a bug:
->>
->> When cpu is disabled, all irqs will be migratged to another cpu.
->> In some cases, a new affinity is different, it needed to be coppied
->> to irq's affinity. But if the type of irq is LPI, it's affinity will
->> not be coppied because of irq_set_affinity's return value.
->>
->>
->>
->> As Marc and Will suggested, I refactor the arm/arm64 migrating interrupts
->> code and fix the migrating irq bug while cpu is offline.
->>
->> I'm trying let the core code do the migrating interrupts matter. kernel/irq/migration.c
->> depends on CONFIG_GENERIC_PENDING_IRQ, so I make it selected by CONFIG_SMP and
->> CONFIG_HOTPLUG_CPU and rename it to CONFIG_GENERIC_IRQ_MIGRATION for more general.
->> When CONFIG_GENERIC_IRQ_MIGRATION is enabled, an interrupt whose state_use_accessors
->> is not set with IRQD_MOVE_PCNTXT won't be migrated immediately in irq_set_affinity_locked().
->> So introduce irq_settings_set_move_pcntxt() helper to set the state in gic_irq_domain_map().
->>
->> With the above preparation, move the migrating interrupts code into kernel/irq/migration.c
->> and fix the bug by using irq_do_set_affinity().
-> Hi Yingliang,
-> 	As we are going to move migrate_irqs() to generic kernel
-> code, and powerpc, metag, xtensa, sh, ia64 mn10300 also defines
->   migrate_irqs() too. It would be great if we could consolidate
-> all these.
-> 	And as we are going to refine these code, there's another
-> issue need attention. On x86, we need to allocate a CPU vector
-> if an irq is directed to a CPU. So there's possibility that
-> we run out of CPU vectors after CPU hot-removal. So we have a
-> mechanism to detect whether we will run out of CPU vector
-> after removing a CPU, and reject CPU hot-removal if that will
-> happen.
-> 	So the key point is, if we a need to allocate some sort
-> of resource on the target CPUs for an irq, we need two steps
-> when removing a CPU
-> 1) check whether resources are available after removing the CPU,
->     and reject CPU removal request if we ran out of resource
-> 2) fix irqs after hot-removing the CPU.
-> Thanks!
-> Gerry
+On Fri, Sep 4, 2015 at 5:01 PM, Dawei Chien <dawei.chien@mediatek.com> wrote:
+> Add thermal zone node to mt8173.dtsi.
 >
+> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+> ---
+> This patch is base on following patches
+> https://patchwork.kernel.org/patch/6969581/
+> https://patchwork.kernel.org/patch/6969571/
+> https://patchwork.kernel.org/patch/6969381/
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   44 ++++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 208051a..6493bfd 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -17,6 +17,7 @@
+>  #include <dt-bindings/power/mt8173-power.h>
+>  #include <dt-bindings/reset-controller/mt8173-resets.h>
+>  #include "mt8173-pinfunc.h"
+> +#include <dt-bindings/thermal/thermal.h>
 
-On arm, as I know, it doesn't need extra resource for an irq.
-I am not sure other platform need this way besides x86.
+This include is not necessary, however...
 
-I think we could consolidate all migrate_irqs() later. I am not
-sure if it's good to do so big changing and modify other arch code in
-a patchset that supposed to fix a bug of arm.
+>
+>  / {
+>         compatible = "mediatek,mt8173";
+> @@ -116,6 +117,49 @@
+>                 clock-output-names = "clk32k";
+>         };
+>
+> +       thermal-zones {
+> +               cpu_thermal: cpu_thermal {
+> +                       polling-delay-passive = <1000>; /* milliseconds */
+> +                       polling-delay = <1000>; /* milliseconds */
+> +
+> +                       thermal-sensors = <&thermal MT8173_THERMAL_ZONE_CA57>;
+
+this fails to compile, because MT8173_THERMAL_ZONE_CA57 is defined in:
+
+include/dt-bindings/thermal/mt8173.h
+
+-Dan
+
+
+> +                       sustainable-power = <1500>;
+> +
+> +                       trips {
+> +                               threshold: trip-point at 0 {
+> +                                       temperature = <68000>;
+> +                                       hysteresis = <2000>;
+> +                                       type = "passive";
+> +                               };
+> +
+> +                               target: trip-point at 1 {
+> +                                       temperature = <85000>;
+> +                                       hysteresis = <2000>;
+> +                                       type = "passive";
+> +                               };
+> +
+> +                               cpu_crit: cpu_crit at 0 {
+> +                                       temperature = <115000>;
+> +                                       hysteresis = <2000>;
+> +                                       type = "critical";
+> +                               };
+> +                       };
+> +
+> +                       cooling-maps {
+> +                               map at 0 {
+> +                                       trip = <&target>;
+> +                                       cooling-device = <&cpu0 0 0>;
+> +                                       contribution = <1024>;
+> +                               };
+> +                               map at 1 {
+> +                                       trip = <&target>;
+> +                                       cooling-device = <&cpu2 0 0>;
+> +                                       contribution = <2048>;
+> +                               };
+> +                       };
+> +               };
+> +       };
+> +
+>         timer {
+>                 compatible = "arm,armv8-timer";
+>                 interrupt-parent = <&gic>;
+> --
+> 1.7.9.5
+>
