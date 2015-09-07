@@ -1,62 +1,83 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 7 Sep 2015 19:05:16 +0100
-Subject: [PATCH 2/3] Docs: dt: Add PCI MSI map bindings
-In-Reply-To: <55EA1C3F.1030300@caviumnetworks.com>
-References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
- <1437670365-20704-3-git-send-email-mark.rutland@arm.com>
- <55B5E8C1.4030707@arm.com> <55EA1C3F.1030300@caviumnetworks.com>
-Message-ID: <20150907180516.GC18079@leverpostej>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 7 Sep 2015 20:52:04 +0200
+Subject: [PATCH v3 1/8] clk: imx: add common logic to detect early UART
+ usage
+In-Reply-To: <1441638573-6701-2-git-send-email-l.stach@pengutronix.de>
+References: <1441638573-6701-1-git-send-email-l.stach@pengutronix.de>
+ <1441638573-6701-2-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20150907185204.GB14598@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 04, 2015 at 11:33:35PM +0100, David Daney wrote:
-> Hi Mark,
+Hello Lucas,
 
-Hi David,
-
-> I now have a prototype implementation for irq-gic-v3-its.c that is using 
-> this binding on Cavium's ThunderX platform.
+On Mon, Sep 07, 2015 at 05:09:26PM +0200, Lucas Stach wrote:
+> Both earlycon and earlyprintk depend on the bootloader setup UART
+> clocks being retained. This patch adds the common logic to detect such
+> situations and make the information available to the clock drivers, as
+> well as adding the facilities to disable those clocks at the end of
+> the kernel init.
 > 
-> Q: Have you guys had any more thoughts on this that might require 
-> changing the binding?
-
-Having discussed this with Stuart and others at Linux Plumbers, I think
-that the binding is sufficient, and unlikely to change greatly unless
-there is a strong objection (Stuart, please correct me if I am wrong).
-
-Per Marc's comments there are probably some edge cases and/or wording
-details to sort out, but I think the common/simple case is sorted. I'll
-send a v2 once those have been settled.
-
-> If not, I will be sending out my patches for your consideration.
-
-Please do!
-
-> Thanks,
-> David Daney
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  drivers/clk/imx/clk.c | 38 ++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/imx/clk.h |  1 +
+>  2 files changed, 39 insertions(+)
 > 
-> On 07/27/2015 01:16 AM, Marc Zyngier wrote:
-> > On 23/07/15 17:52, Mark Rutland wrote:
-> >> Currently msi-parent is used by a few bindings to describe the
-> >> relationship between a PCI root complex and a single MSI controller, but
-> >> this property does not have a generic binding document.
-> >>
-> >> Additionally, msi-parent is insufficient to describe more complex
-> >> relationships between MSI controllers and devices under a root complex,
-> >> where devices may be able to target multiple MSI controllers, or where
-> >> MSI controllers use (non-probeable) sideband information to distinguish
-> >> devices.
-> >>
-> >> This patch adds a generic binding for mapping PCI devices to MSI
-> >> controllers. This document covers msi-parent, and a new msi-map property
-> >> (specific to PCI*) which may be used to map devices (identified by their
-> >> Requester ID) to sideband data for each MSI controller that they may
-> >> target.
-> >>
-> >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> 
-> Acked-by: David Daney <david.daney@cavium.com>
+> diff --git a/drivers/clk/imx/clk.c b/drivers/clk/imx/clk.c
+> index df12b5307175..45a073dab435 100644
+> --- a/drivers/clk/imx/clk.c
+> +++ b/drivers/clk/imx/clk.c
+> @@ -73,3 +73,41 @@ void imx_cscmr1_fixup(u32 *val)
+>  	*val ^= CSCMR1_FIXUP;
+>  	return;
+>  }
+> +
+> +static int imx_keep_uart_clocks __initdata;
+> +static struct clk ** const *imx_uart_clocks __initdata;
+> +
+> +static int __init imx_keep_uart_clocks_param(char *str)
+> +{
+> +	imx_keep_uart_clocks = 1;
+> +
+> +	return 0;
+> +}
+> +__setup_param("earlycon", imx_keep_uart_earlycon,
+> +	      imx_keep_uart_clocks_param, 0);
+> +__setup_param("earlyprintk", imx_keep_uart_earlyprintk,
+> +	      imx_keep_uart_clocks_param, 0);
+> +
+> +void __init imx_register_uart_clocks(struct clk ** const clks[])
+> +{
+> +	if (imx_keep_uart_clocks) {
+> +		int i;
+> +
+> +		imx_uart_clocks = clks;
+> +		for (i = 0; imx_uart_clocks[i]; i++)
+> +			clk_prepare_enable(*imx_uart_clocks[i]);
+> +	}
+> +}
+> +
+> +static int __init imx_clk_disable_uart(void)
+> +{
+> +	if (imx_keep_uart_clocks) {
+> +		int i;
+> +
+> +		for (i = 0; imx_uart_clocks[i]; i++)
+> +			clk_disable_unprepare(*imx_uart_clocks[i]);
+> +	}
+> +
+> +	return 0;
+> +}
+> +late_initcall_sync(imx_clk_disable_uart);
 
-Thanks!
+I bet you didn't test if this works when earlyprintk (or earlycon) is
+provided on the command line but imx_register_uart_clocks isn't called
+(e.g. because this is a Samsung CPU running a multiarch kernel).
 
-Mark.
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
