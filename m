@@ -1,32 +1,44 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon,  7 Sep 2015 17:01:08 +0530
-Subject: [PATCH-v2 0/3] mmc: sdhci-pxav3: Fix tabbing issue
-Message-ID: <1441625471-16315-1-git-send-email-vaibhav.hiremath@linaro.org>
+Date: Mon,  7 Sep 2015 17:01:10 +0530
+Subject: [PATCH-v2 2/3] mmc: sdhci-pxav3: Use BIT macro for bit field
+ definitions
+In-Reply-To: <1441625471-16315-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1441625471-16315-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1441625471-16315-3-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trivial patch-series, which fixes the tabbing issue in the driver,
-uses the BIT macro for bit fields and prints notice on -EPROBE_DEFER
-in sdhci_add_host() function on regulator unavailability.
+Instead of using shift operation use BIT macro for bit field
+definitions.
 
-V1 => V2
-========
- - Fixed all comments from Joe, mostly alignment changes
- - Separated BIT macro usage patch into new one.
- - changed error to kernel notice for EPROBE_DEFER in sdhci_add_host()
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+---
+ drivers/mmc/host/sdhci-pxav3.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Note: This patch-series should get merged before another series -
-
-[PATCH-v2 0/7] mmc: sdhci-pxav3: Enable support for PXA1928 SDCHI controller
-
-Vaibhav Hiremath (3):
-  mmc: sdhci-pxav3: Fix tabbing issue
-  mmc: sdhci-pxav3: Use BIT macro for bit field definitions
-  mmc: sdhci: print notice on -EPROBE_DEFER in sdhci_add_host() fn
-
- drivers/mmc/host/sdhci-pxav3.c | 46 +++++++++++++++++++++---------------------
- drivers/mmc/host/sdhci.c       |  5 ++++-
- 2 files changed, 27 insertions(+), 24 deletions(-)
-
+diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+index 7a07177..a8a8c94 100644
+--- a/drivers/mmc/host/sdhci-pxav3.c
++++ b/drivers/mmc/host/sdhci-pxav3.c
+@@ -47,7 +47,7 @@
+ #define  SDCLK_DELAY_MASK		0x1f
+ 
+ #define SD_CFG_FIFO_PARAM		0x100
+-#define  SDCFG_GEN_PAD_CLK_ON		(1<<6)
++#define  SDCFG_GEN_PAD_CLK_ON		BIT(6)
+ #define  SDCFG_GEN_PAD_CLK_CNT_MASK	0xFF
+ #define  SDCFG_GEN_PAD_CLK_CNT_SHIFT	24
+ 
+@@ -55,8 +55,8 @@
+ #define SD_CE_ATA_1			0x10C
+ 
+ #define SD_CE_ATA_2			0x10E
+-#define  SDCE_MISC_INT			(1<<2)
+-#define  SDCE_MISC_INT_EN		(1<<1)
++#define  SDCE_MISC_INT			BIT(2)
++#define  SDCE_MISC_INT_EN		BIT(1)
+ 
+ struct sdhci_pxa {
+ 	struct clk *clk_core;
 -- 
 1.9.1
