@@ -1,35 +1,35 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 07 Sep 2015 23:29:36 +0200
-Subject: [PATCH 1/5] acpi: Add basic device probing infrastructure
-In-Reply-To: <1441386412-8139-2-git-send-email-marc.zyngier@arm.com>
-References: <1441386412-8139-1-git-send-email-marc.zyngier@arm.com>
- <1441386412-8139-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <2194763.hsLfaM94lK@vostro.rjw.lan>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon,  7 Sep 2015 23:45:23 +0200
+Subject: [PATCH] ARM: exynos_defconfig: Enable USB Video Class support
+Message-ID: <1441662323-15468-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 04, 2015 06:06:48 PM Marc Zyngier wrote:
-> IRQ controllers and timers are the two types of device the kernel
-> requires before being able to use the device driver model.
-> 
-> ACPI so far lacks a proper probing infrastructure similar to the one
-> we have with DT, where we're able to declare IRQ chips and
-> clocksources inside the driver code, and let the core code pick it up
-> and call us back on a match. This leads to all kind of really ugly
-> hacks all over the arm64 code and even in the ACPI layer.
-> 
-> In order to allow some basic probing based on the ACPI tables,
-> introduce "struct acpi_probe_entry" which contains just enough
-> data and callbacks to match a table, an optional subtable, and
-> call a probe function. A driver can, at build time, register itself
-> and expect being called if the right entry exists in the ACPI
-> table.
-> 
-> A acpi_probe_device_init() is provided, taking an ACPI table
-> identifier, and iterating over the registered entries.
+The Exynos5420 Peach Pit and Exynos5800 Peach Pi boards have a built-in
+Silicon Motion USB UVC WebCam. Enable support for the USB Video Class
+driver and its needed media Kconfig symbols so the camera is supported.
 
-What about things that are provided by the ACPI namespace (eg. via _MAT) rather
-than in static tables?
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Thanks,
-Rafael
+---
+
+ arch/arm/configs/exynos_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 1ff2bfa2e183..62f677f76a0b 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -126,6 +126,10 @@ CONFIG_REGULATOR_S2MPA01=y
+ CONFIG_REGULATOR_S2MPS11=y
+ CONFIG_REGULATOR_S5M8767=y
+ CONFIG_REGULATOR_TPS65090=y
++CONFIG_MEDIA_SUPPORT=y
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_MEDIA_USB_SUPPORT=y
++CONFIG_USB_VIDEO_CLASS=y
+ CONFIG_DRM=y
+ CONFIG_DRM_NXP_PTN3460=y
+ CONFIG_DRM_PARADE_PS8622=y
+-- 
+2.4.3
