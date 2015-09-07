@@ -1,41 +1,40 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 7 Sep 2015 13:06:10 +0200
-Subject: [PATCH 1/4] ARM: multi_v7_defconfig: Enable common Rockchip
- devices/busses
-In-Reply-To: <55ED6D35.6060704@rock-chips.com>
-References: <1441570566-14001-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1441570566-14001-2-git-send-email-sjoerd.simons@collabora.co.uk>
- <55ED585B.9030009@osg.samsung.com> <1441621467.8778.26.camel@collabora.co.uk>
- <55ED6D35.6060704@rock-chips.com>
-Message-ID: <55ED6FA2.4090903@osg.samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 7 Sep 2015 12:13:52 +0100
+Subject: [PATCH V4 2/2] arm64: Change memcpy in kernel to use the copy
+ template file
+In-Reply-To: <1440194501-4953-1-git-send-email-fkan@apm.com>
+References: <1440194458-4837-1-git-send-email-fkan@apm.com>
+ <1440194501-4953-1-git-send-email-fkan@apm.com>
+Message-ID: <20150907111351.GB10645@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andy,
+On Fri, Aug 21, 2015 at 03:01:41PM -0700, Feng Kan wrote:
+> This converts the memcpy.S to use the copy template file. The copy
+> template file was based originally on the memcpy.S. Minor changes
+> was made to it to accommodate the copy to/from/in user files.
 
-On 09/07/2015 12:55 PM, Andy Yan wrote:
-> Hi
->     There are also many other devices like display and mmc and even
-> the cpu(if the cpu want run a high frequency when boot up)need to
-> get power supply from PMIC, so it is better to load PMIC as early as
-> possible.Built-in is a better choice.
->
+I think it will be easier to follow if you make this patch the first,
+just a simple move of code without any functional change.
 
-Please don't top post, it makes following the conversation much harder.
+> 
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+>  arch/arm64/lib/memcpy.S | 179 +++++++-----------------------------------------
+>  1 file changed, 26 insertions(+), 153 deletions(-)
+> 
+> diff --git a/arch/arm64/lib/memcpy.S b/arch/arm64/lib/memcpy.S
+> index 8a9a96d..761acd7 100644
+> --- a/arch/arm64/lib/memcpy.S
+> +++ b/arch/arm64/lib/memcpy.S
+[...]
+> +        .macro strh1 label, ptr, regB, val
+> +        strh \ptr, [\regB], \val
+> +        .endm
 
-Yes, I know that many devices needs the regulators provided by the PMIC
-but that it's also true for all the regulators in all the PMICs for all
-the boards supported by multi_v7_defconfig.
+There is a problem with the tab/space conversion, either in your editor
+or the email server. The above indentation should use tabs (and the
+subsequent ones).
 
-So to keep the kernel binary on a reasonable size, the current multi_v7
-policy is to enable as much as possible as a module so just saying that
-many other devices are using regulators from this PMIC is not enough.
-
-Saying that it will allow mounting a NFS rootfs without an initramfs as
-Sjoerd said is a much better justification IMHO.
-
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Catalin
