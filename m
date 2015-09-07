@@ -1,58 +1,42 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Mon, 07 Sep 2015 09:10:32 +0200
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Enable DW USB2 support and
- rockchip phy
-In-Reply-To: <55ECD40F.8020001@samsung.com>
-References: <1441570566-14001-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1441570566-14001-5-git-send-email-sjoerd.simons@collabora.co.uk>
- <55ECD40F.8020001@samsung.com>
-Message-ID: <1441609832.8778.4.camel@collabora.co.uk>
+From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
+Date: Mon,  7 Sep 2015 10:23:01 +0300
+Subject: [PATCH v2] ARM: pxa: ssp: Fix build error by removing originally
+ incorrect DT binding
+Message-ID: <1441610581-11434-1-git-send-email-jarkko.nikula@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Krzysztof,
+Commit 03fbf488cece ("spi: pxa2xx: Differentiate Intel LPSS types") caused
+build error here because it removed the type LPSS_SSP and I didn't notice
+the type was used here too.
 
-On Mon, 2015-09-07 at 09:02 +0900, Krzysztof Kozlowski wrote:
-> On 07.09.2015 05:16, Sjoerd Simons wrote:
-> > The DesignWare HS OTG USB 2.0 is used in various SoC families among
-> > wich
-> > the various rockchip SoCs, enable the driver and the PHY glue for
-> > rockchip
-> +Cc Marek and Kukjin,
-> 
-> This would conflict with Marek's:
-> [PATCH v2] ARM: multi_v7_defconfig: Enable DWC2 USB driver and USB
-> ethernet gadget
-> http://www.spinics.net/lists/linux-samsung-soc/msg46743.html
-> 
-> Probably your series and Marek's change should go together to the
-> same
-> tree. How about rebasing your work on top of it?
+I believe commit a6e56c28a178 ("ARM: pxa: ssp: add DT bindings") added it
+accidentally by copying all enum pxa_ssp_type types from
+include/linux/pxa2xx_ssp.h even LPSS_SSP was for Intel LPSS SPI devices.
 
-Thanks for the pointer! I'm entirely happy to rebase on Mareks patch or
-this one dropped for now until Mareks patch lands. 
+Fix the build error by removing this incorrect binding.
 
-These patches were based on current linux-next, so i guess Mareks pathc
-didn't land just yet? Tbh, i don't really know what tries multi_v7
-tends to go through (especially for non-platform specific changes)
+Fixes: 03fbf488cece ("spi: pxa2xx: Differentiate Intel LPSS types")
+Signed-off-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
+Reported-by: Axel Lin <axel.lin@ingics.com>
+Cc: <stable@vger.kernel.org> # 4.2
+---
+v2: Added Fixes tag suggested by Robert Jarzmik
+---
+ arch/arm/plat-pxa/ssp.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-> Best regards,
-> Krzysztof
-> 
-> >  CONFIG_AB8500_USB=y
-> >  CONFIG_KEYSTONE_USB_PHY=y
-> >  CONFIG_OMAP_USB3=y
-> > @@ -658,6 +659,7 @@ CONFIG_PHY_HIX5HD2_SATA=y
-> >  CONFIG_PWM_STI=m
-> >  CONFIG_OMAP_USB2=y
-> >  CONFIG_TI_PIPE3=y
-> > +CONFIG_PHY_ROCKCHIP_USB=y
-> >  CONFIG_PHY_MIPHY28LP=y
-> >  CONFIG_PHY_MIPHY365X=y
-> >  CONFIG_PHY_RCAR_GEN2=m
-> > 
-> 
-
+diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
+index ad9529cc4203..daa1a65f2eb7 100644
+--- a/arch/arm/plat-pxa/ssp.c
++++ b/arch/arm/plat-pxa/ssp.c
+@@ -107,7 +107,6 @@ static const struct of_device_id pxa_ssp_of_ids[] = {
+ 	{ .compatible = "mvrl,pxa168-ssp",	.data = (void *) PXA168_SSP },
+ 	{ .compatible = "mrvl,pxa910-ssp",	.data = (void *) PXA910_SSP },
+ 	{ .compatible = "mrvl,ce4100-ssp",	.data = (void *) CE4100_SSP },
+-	{ .compatible = "mrvl,lpss-ssp",	.data = (void *) LPSS_SSP },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, pxa_ssp_of_ids);
 -- 
-Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Collabora Ltd.
+2.5.1
