@@ -1,50 +1,37 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 8 Sep 2015 01:34:40 +0900
-Subject: [PATCH] arm64: kernel: Use a separate stack for irq interrupts.
-In-Reply-To: <55EDB5FB.8060800@arm.com>
-References: <55EDA040.90208@arm.com>
- <1441636584-23174-1-git-send-email-james.morse@arm.com>
- <400272B6-0733-456F-95C9-9C72C597CEB5@gmail.com> <55EDB5FB.8060800@arm.com>
-Message-ID: <81D7F9F1-1552-4709-BA74-1BF15163C4A0@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Sep 2015 17:35:40 +0100
+Subject: [PATCH v4 0/5] irqchip, gicv3: Updates and Cavium ThunderX errata
+ workarounds
+In-Reply-To: <1439576885-15621-1-git-send-email-rric@kernel.org>
+References: <1439576885-15621-1-git-send-email-rric@kernel.org>
+Message-ID: <55EDBCDC.5090901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sep 8, 2015, at 1:06 AM, James Morse wrote:
-> On 07/09/15 16:48, Jungseok Lee wrote:
->> On Sep 7, 2015, at 11:36 PM, James Morse wrote:
->> 
->> Hi James,
->> 
->>> Having to handle interrupts on top of an existing kernel stack means the
->>> kernel stack must be large enough to accomodate both the maximum kernel
->>> usage, and the maximum irq handler usage. Switching to a different stack
->>> when processing irqs allows us to make the stack size smaller.
->>> 
->>> Maximum kernel stack usage (running ltp and generating usb+ethernet
->>> interrupts) was 7256 bytes. With this patch, the same workload gives
->>> a maximum stack usage of 5816 bytes.
->> 
->> I'd like to know how to measure the max stack depth.
->> AFAIK, a stack tracer on ftrace does not work well. Did you dump a stack
->> region and find or track down an untouched region? 
+Hi Robert,
+
+On 14/08/15 19:28, Robert Richter wrote:
+> From: Robert Richter <rrichter@cavium.com>
 > 
-> I enabled the 'Trace max stack' option under menuconfig 'Kernel Hacking' ->
-> 'Tracers', then looked in debugfs:/tracing/stack_max_size.
+> This patch series adds gicv3 updates and workarounds for HW errata in
+> Cavium's ThunderX GICV3.
 > 
-> What problems did you encounter?
-> (I may be missing something?)
+> The first one is an unchanged resubmission of a patch from a gicv3
+> series I sent a while ago.
+> 
+> The next patches implement the workarounds for ThunderX's gicv3. Patch
+> #2 implements the cpu workaround for gicv3 on ThunderX. Patch #3 is a
+> prerequisit for patch #5. Patch #4 adds generic code to parse the hw
+> revision provided by an IIDR. This patch is used for the implementa-
+> tion of the actual gicv3-its workaround in #5.
+> 
+> All current review comments addressed so far with v4.
 
-When I enabled the feature, all entries had *0* size except the last entry.
-It can be reproduced easily as looking in debugs:/tracing/stack_trace.
+There has been a small number of comments on this series. Would you mind
+respining it so that it could make it a a 4.3-rc?
 
-You can track down my report and Akashi's changes with the following links:
-- http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354126.html
-- https://lkml.org/lkml/2015/7/13/29
+Thanks,
 
-Although it is impossible to measure an exact depth at this moment, the feature
-could be utilized to check improvement.
-
-Cc'ing Akashi for additional comments if needed.
-
-Best Regards
-Jungseok Lee
+	M.
+-- 
+Jazz is not dead. It just smells funny...
