@@ -1,125 +1,58 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 07 Sep 2015 08:55:55 +0900
-Subject: [PATCH v4 11/16] drm: bridge: analogix/dp: add platform device
- type support
-In-Reply-To: <55EBBBFA.3020801@rock-chips.com>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <1441087620-25586-1-git-send-email-ykk@rock-chips.com>
- <55E8E77C.4020305@samsung.com> <55EBBBFA.3020801@rock-chips.com>
-Message-ID: <55ECD28B.40703@samsung.com>
+Date: Mon, 07 Sep 2015 09:02:23 +0900
+Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Enable DW USB2 support and
+ rockchip phy
+In-Reply-To: <1441570566-14001-5-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1441570566-14001-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1441570566-14001-5-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <55ECD40F.8020001@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.09.2015 13:07, Yakir Yang wrote:
-> Hi Krzysztof,
+On 07.09.2015 05:16, Sjoerd Simons wrote:
+> The DesignWare HS OTG USB 2.0 is used in various SoC families among wich
+> the various rockchip SoCs, enable the driver and the PHY glue for
+> rockchip
 > 
-> ? 09/04/2015 08:36 AM, Krzysztof Kozlowski ??:
->> On 01.09.2015 15:07, Yakir Yang wrote:
->>
->> Empty commit message. Please explain here why you want to add platform
->> device type support.
->>
->> Actually the title is confusing. You are not adding support for platform
->> device types but rather adding a field containing type of device.
->>
->>
->>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->>> ---
->>> Changes in v4: None
->>> Changes in v3: None
->>> Changes in v2:
->>> - Add GNU license v2 declared and samsung copyright
->>>
->>>   drivers/gpu/drm/exynos/exynos_dp.c              |  1 +
->>>   drivers/gpu/drm/rockchip/analogix_dp-rockchip.c |  1 +
->>>   include/drm/bridge/analogix_dp.h                | 16 ++++++++++++++++
->>>   3 files changed, 18 insertions(+)
->>>
->>> diff --git a/drivers/gpu/drm/exynos/exynos_dp.c
->>> b/drivers/gpu/drm/exynos/exynos_dp.c
->>> index 6060d2c..40ef727 100644
->>> --- a/drivers/gpu/drm/exynos/exynos_dp.c
->>> +++ b/drivers/gpu/drm/exynos/exynos_dp.c
->>> @@ -224,6 +224,7 @@ static int exynos_dp_bind(struct device *dev,
->>> struct device *master, void *data)
->>>       dp->dev = dev;
->>>       dp->drm_dev = drm_dev;
->>>   +    dp->plat_data.dev_type = EXYNOS_DP;
->>>       dp->plat_data.power_on = exynos_dp_poweron;
->>>       dp->plat_data.power_off = exynos_dp_poweroff;
->>>       dp->plat_data.get_modes = exynos_dp_get_modes;
->>> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
->>> b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
->>> index efea045..4934271 100644
->>> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
->>> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
->>> @@ -293,6 +293,7 @@ static int rockchip_dp_bind(struct device *dev,
->>> struct device *master,
->>>           return ret;
->>>       }
->>>   +    dp->plat_data.dev_type = RK3288_DP;
->>>       dp->plat_data.attach = NULL;
->>>       dp->plat_data.get_modes = NULL;
->>>       dp->plat_data.power_on = rockchip_dp_poweron;
->>> diff --git a/include/drm/bridge/analogix_dp.h
->>> b/include/drm/bridge/analogix_dp.h
->>> index 8b4ffad..7209a64 100644
->>> --- a/include/drm/bridge/analogix_dp.h
->>> +++ b/include/drm/bridge/analogix_dp.h
->>> @@ -1,9 +1,25 @@
->>> +/*
->>> + * Analogix Core DP (Display Port) interface driver.
->>> + *
->>> + * Copyright (C) 2012 Samsung Electronics Co., Ltd.
->>> + *
->>> + * This program is free software; you can redistribute it and/or
->>> modify it
->>> + * under the terms of the GNU General Public License as published by
->>> the
->>> + * Free Software Foundation; either version 2 of the License, or (at
->>> your
->>> + * option) any later version.
->>> + */
->> Two questions:
->> 1. Why this change is here? I would rather expect it at patch 3/16 when
->> you created this file... That is the usual time for adding copyrights.
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 > 
-> Yep, I should move this to 03/16.
+> ---
 > 
->> 2. Does this file contains previous Samsung work?
+>  arch/arm/configs/multi_v7_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Hmm... I think this haven't contains the previous Samsung works,
-> but I have the cover the head message from analogix_dp_core driver
-> (include the copyright, but without ant author).
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index fb673e2..49c733a 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -514,6 +514,7 @@ CONFIG_USB_STORAGE=y
+>  CONFIG_USB_DWC3=y
+>  CONFIG_USB_CHIPIDEA=y
+>  CONFIG_USB_CHIPIDEA_HOST=y
+> +CONFIG_USB_DWC2=y
 
-If it does not contain Samsung's work then don't mention its copyrights.
++Cc Marek and Kukjin,
+
+This would conflict with Marek's:
+[PATCH v2] ARM: multi_v7_defconfig: Enable DWC2 USB driver and USB
+ethernet gadget
+http://www.spinics.net/lists/linux-samsung-soc/msg46743.html
+
+Probably your series and Marek's change should go together to the same
+tree. How about rebasing your work on top of it?
 
 Best regards,
 Krzysztof
 
-> 
-> Thanks
-> - Yakir
-> 
->> Best regards,
->> Krzysztof
->>
->>>   #ifndef _ANALOGIX_DP_H_
->>>   #define _ANALOGIX_DP_H_
->>>     #include <drm/drm_crtc.h>
->>>   +enum analogix_dp_devtype {
->>> +    EXYNOS_DP,
->>> +    RK3288_DP,
->>> +};
->>> +
->>>   struct analogix_dp_plat_data {
->>> +    enum analogix_dp_devtype dev_type;
->>>       struct drm_panel *panel;
->>>         int (*power_on)(struct analogix_dp_plat_data *);
->>>
->>
->>
->>
-> 
-> 
+>  CONFIG_AB8500_USB=y
+>  CONFIG_KEYSTONE_USB_PHY=y
+>  CONFIG_OMAP_USB3=y
+> @@ -658,6 +659,7 @@ CONFIG_PHY_HIX5HD2_SATA=y
+>  CONFIG_PWM_STI=m
+>  CONFIG_OMAP_USB2=y
+>  CONFIG_TI_PIPE3=y
+> +CONFIG_PHY_ROCKCHIP_USB=y
+>  CONFIG_PHY_MIPHY28LP=y
+>  CONFIG_PHY_MIPHY365X=y
+>  CONFIG_PHY_RCAR_GEN2=m
 > 
