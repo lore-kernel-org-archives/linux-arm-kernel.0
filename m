@@ -1,62 +1,78 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Mon, 7 Sep 2015 06:14:52 +0200
-Subject: [PATCH v2 00/21] ARM: pxa: magician: Rework HTC Magician support
-In-Reply-To: <87fv2txjle.fsf@belgarion.home>
-References: <55D2583B.8040602@tul.cz> <87fv2txjle.fsf@belgarion.home>
-Message-ID: <55ED0F3C.9040805@tul.cz>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 7 Sep 2015 09:44:22 +0530
+Subject: [PATCH 01/11] ARM64 / PCI: introduce struct pci_controller for
+ ACPI
+In-Reply-To: <55657EA3.5000601@linaro.org>
+References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+ <1432644564-24746-2-git-send-email-hanjun.guo@linaro.org>
+ <20150526165844.GD2175@e106497-lin.cambridge.arm.com>
+ <5564AB68.6080502@linux.intel.com> <55657EA3.5000601@linaro.org>
+Message-ID: <CAFpQJXUU4mVbJSyfQJJm_VjR_uAm-xKHP7syYaM_xuC+CG7q5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 5.9.2015 v 12:10 Robert Jarzmik napsal(a):
-> Petr Cvek <petr.cvek@tul.cz> writes:
-> 
->> This patchset will clean, fix and finally add multiple PXA devices
->> to HTC Magician machine. Also it adds leds-pasic3 driver to LED subsystem.
->> This driver require changes into htc-pasic3 structures, which are used
->> exclusively by magician.c code.
+Hi Hanjun,
+
+On Wed, May 27, 2015 at 1:51 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> Hi Liviu,
+>
+> On 2015?05?27? 01:20, Jiang Liu wrote:
 >>
->> Petr Cvek (21):
->>   ARM: pxa: magician: Fix Kconfig for magician to always include
->>     htc-egpio
->>   ARM: pxa: magician: Fix indentation and whitespaces
->>   ARM: pxa: magician: Fix comments, debug functions and print strings
->>   ARM: pxa: magician: Add, fix and init (new) GPIOs
->>   ARM: pxa: magician: Add support for ADS7846 touchscreen
->>   ARM: pxa: magician: Add normal and power I2C definition
->>   ARM: pxa: magician: Fix IrDA pdata and redundant GPIO request
->>   ARM: pxa: magician: Add StrataFlash Vpp GPIO and alternative driver
->>   ARM: pxa: magician: Add OV9640 camera support
->>   ARM: pxa: magician: Add UDA1380 sound support
->>   ARM: pxa: magician: Add MAX1586 Vcore regulator support
->>   ARM: pxa: magician: Add PXA27x UDC support
->>   ARM: pxa: magician: Fix charging source and add NiCd backup charging
->>   ARM: pxa: magician: Fix PXA USB OHCI port enable flags
->>   ARM: pxa: magician: Fix PWM backlight regulator
->>   ARM: pxa: magician: Add support for alternative LCD backlight
->>   ARM: pxa: magician: Remove (temporarily) pasic3 LED support
->>   mfd: htc-pasic3: Prepare driver for leds-pasic3
->>   leds: leds-pasic3: Add support for PASIC3 LED controller
->>   ARM: pxa: magician: Re-add pdata for new leds-pasic3 driver
->>   ARM: pxa: magician: Move platform_add_devices() to the end of
->>     magician_init()
-> 
-> Hi Petr,
-> 
-> If you want several of these patches targeted at v4.3, I need to know which ones
-> (in arch/arm/mach-pxa) are pure fixes without which magician is broken.
-> 
-> And a confirmation from Philip on this list would make my life easier.
-> 
+>> On 2015/5/27 0:58, Liviu Dudau wrote:
+>>>
+>>> On Tue, May 26, 2015 at 01:49:14PM +0100, Hanjun Guo wrote:
+>>>>
+>>>> ARM64 ACPI based PCI host bridge init needs a arch dependent
+>>>> struct pci_controller to accommodate common PCI host bridge
+>>>> code which is introduced later, or it will lead to compile
+>>>> errors on ARM64.
+>>>
+>>>
+>>> Hi Hanjun,
+>>>
+>>> Two questions: why don't you introduce this patch next to the
+>>> one that is going to make use of it (or even merge it there)?
+>
+>
+> this is because of this patch is needed by Jiang Liu's patch set
+> to fix the compile error on ARM64, I'd rather do that, but It's
+> better to let Jiang Liu's patch goes in, and then this one, that's
+> why I prepared a single patch for the struct. (I mentioned it
+> in the cover letter)
+>
+>>> Second, why is the whole struct pci_controller not surrounded
+>>> by #ifdef CONFIG_ACPI as you are implying that this is needed
+>>> only for ACPI?
+>
+>
+> I hope it can be reused, since the NUMA node and segment (domain)
+> is both needed for DT and ACPI, if it's not the case foe now, I
+> can surrounded them all by #ifdef CONFIG_ACPI.
+we can make use of this structure to hold pci to numa node
+mapping(pcibus_to_node).
+can you please pull node member out of  CONFIG_ACPI ifdef.
+or you can put only acpi_device under ifdef.
+>
+>>>
+>>> Btw, looking through the whole series I'm not (yet) convinced
+>>> that this is needed at all.
+>>
+>> Hi Liviu,
+>>         This structure is required by the requested patch set
+>> at http://patchwork.ozlabs.org/patch/472249/, which consolidates
+>> the common code to support PCI host bridge into ACPI core.
+>
+>
+> Jiang, thanks for the explanation :)
+>
+> Thanks
+> Hanjun
 
-Sorry for delay, I was offline for few days and I have got frozen on creating rootfs suitable for NOR flash.
-
-I will send next patchset soon (this week I hope). 
-
-If it misses this devel window, it is OK to me (I'm no hurry :-D).
-
-Best regards,
-Petr
-
-
-> Cheers.
-> 
+thanks
+Ganapat
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
