@@ -1,58 +1,71 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 8 Sep 2015 00:51:04 +0900
-Subject: [RFC PATCH 1/3] arm64: entry: Remove unnecessary calculation for
- S_SP in EL1h
-In-Reply-To: <20150907145646.GB13786@leverpostej>
-References: <1441376587-12979-1-git-send-email-jungseoklee85@gmail.com>
- <1441376587-12979-2-git-send-email-jungseoklee85@gmail.com>
- <20150907145646.GB13786@leverpostej>
-Message-ID: <9A8464CF-B1F4-4CB1-A04C-37EE8F10EE29@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Sep 2015 16:54:29 +0100
+Subject: [PATCH 1/2] arm/arm64: KVM: vgic: Move active state handling
+ to flush_hwstate
+In-Reply-To: <55EDA2B4.5000903@linaro.org>
+References: <1441376679-8341-1-git-send-email-christoffer.dall@linaro.org>
+ <1441376679-8341-2-git-send-email-christoffer.dall@linaro.org>
+ <55EDA2B4.5000903@linaro.org>
+Message-ID: <55EDB335.9080009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sep 7, 2015, at 11:56 PM, Mark Rutland wrote:
-
-Hi Mark,
-
-> On Fri, Sep 04, 2015 at 03:23:05PM +0100, Jungseok Lee wrote:
->> Under EL1h, S_SP data is not seen in kernel_exit. Thus, x21 calculation
->> is not needed in kernel_entry. Currently, S_SP information is vaild only
->> when sp_el0 is used.
-> 
-> I don't think this is true. The generic BUG implementation will grab the
-> saved SP from the pt_regs, and with this change we'll report whatever
-> happened to be in x21 instead.
-> 
->> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
+On 07/09/15 15:44, Eric Auger wrote:
+> Hi,
+> On 09/04/2015 04:24 PM, Christoffer Dall wrote:
+>> We currently set the physical active state only when we *inject* a new
+>> pending virtual interrupt, but this is actually not correct, because we
+>> could have been preempted and run something else on the system that
+>> resets the active state to clear.  This causes us to run the VM with the
+>> timer set to fire, but without setting the physical active state.
+>>
+>> The solution is to always check the LR configurations, and we if have a
+>> mapped interrupt in the LR in either the pending or active state
+>> (virtual), then set the physical active state.
+>>
+>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 >> ---
->> arch/arm64/kernel/entry.S | 2 --
->> 1 file changed, 2 deletions(-)
->> 
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index e163518..d23ca0d 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -91,8 +91,6 @@
->> 	get_thread_info tsk			// Ensure MDSCR_EL1.SS is clear,
->> 	ldr	x19, [tsk, #TI_FLAGS]		// since we can unmask debug
->> 	disable_step_tsk x19, x20		// exceptions when scheduling.
->> -	.else
->> -	add	x21, sp, #S_FRAME_SIZE
->> 	.endif
->> 	mrs	x22, elr_el1
->> 	mrs	x23, spsr_el1
-> 
-> Immediately after this we do:
-> 
-> 	stp     lr, x21, [sp, #S_LR]
-> 
-> To store the LR and SP to the pt_regs which bug_handler would use.
-> 
-> Am I missing smoething?
+>>  virt/kvm/arm/vgic.c | 42 ++++++++++++++++++++++++++----------------
+>>  1 file changed, 26 insertions(+), 16 deletions(-)
+>>
+[...]
+>> +
+>> +	for (lr = 0; lr < vgic->nr_lr; lr++) {
+>> +		struct vgic_lr vlr;
+>> +
+>> +		if (!test_bit(lr, vgic_cpu->lr_used))
+>> +			continue;
+>> +
+>> +		vlr = vgic_get_lr(vcpu, lr);
+>> +
+>> +		/*
+>> +		 * If we have a mapping, and the virtual interrupt is
+>> +		 * presented to the guest (as pending or active), then we must
+>> +		 * set the state to active in the physical world. See
+>> +		 * Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt.
+> if upstreamed in 4.3 whereas the other series is not there,
+> vgic-mapped-irqs.txt won't be available.
 
-No, You're right. As James mentioned, x21 is used in do_sp_pc_abort.
+Good point, I'll update the queued patch.
 
-Thanks for the comment.
+>> +		 */
+>> +		if (vlr.state & LR_HW) {
+>> +			struct irq_phys_map *map;
+>> +			map = vgic_irq_map_search(vcpu, vlr.irq);
+>> +
+>> +			ret = irq_set_irqchip_state(map->irq,
+>> +						    IRQCHIP_STATE_ACTIVE,
+>> +						    true);
+> I understand the need for manually setting the phys dist state in case
+> of timer however for non shared IRQs, GIC does the job directly. But I
+> guess it does not harm.
 
-Best Regards
-Jungseok Lee
+For non-shared interrupts, I'd expect an additional test on map->shared
+to avoid hitting the distributor once more.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
