@@ -1,71 +1,119 @@
 From: b38611@freescale.com (Fugang Duan)
-Date: Mon, 7 Sep 2015 10:54:59 +0800
-Subject: [PATCH v3 1/4] ARM: imx7d: add imx7d iomux-gpr field define
+Date: Mon, 7 Sep 2015 10:55:02 +0800
+Subject: [PATCH v3 4/4] ARM: dts: imx7d-sdb: add fec1 and fec2 support
 In-Reply-To: <1441594502-19236-1-git-send-email-b38611@freescale.com>
 References: <1441594502-19236-1-git-send-email-b38611@freescale.com>
-Message-ID: <1441594502-19236-2-git-send-email-b38611@freescale.com>
+Message-ID: <1441594502-19236-5-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx7d iomux-gpr field define.
+Enable fec1 and fec2 for i.MX7d-sdb board.
 
 Signed-off-by: Fugang Duan <B38611@freescale.com>
 ---
- include/linux/mfd/syscon/imx7-iomuxc-gpr.h | 47 ++++++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
+ arch/arm/boot/dts/imx7d-sdb.dts | 76 ++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 75 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/mfd/syscon/imx7-iomuxc-gpr.h b/include/linux/mfd/syscon/imx7-iomuxc-gpr.h
-new file mode 100644
-index 0000000..4585d61
---- /dev/null
-+++ b/include/linux/mfd/syscon/imx7-iomuxc-gpr.h
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright (C) 2015 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 4d1a4b9..7d3e980 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -101,6 +101,45 @@
+ 	arm-supply = <&sw1a_reg>;
+ };
+ 
++&fec1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet1>;
++	assigned-clocks = <&clks IMX7D_ENET1_TIME_ROOT_SRC>,
++			  <&clks IMX7D_ENET1_TIME_ROOT_CLK>;
++	assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>;
++	assigned-clock-rates = <0>, <100000000>;
++	phy-mode = "rgmii";
++	phy-handle = <&ethphy0>;
++	fsl,magic-packet;
++	status = "okay";
 +
-+#ifndef __LINUX_IMX7_IOMUXC_GPR_H
-+#define __LINUX_IMX7_IOMUXC_GPR_H
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+#define IOMUXC_GPR0	0x00
-+#define IOMUXC_GPR1	0x04
-+#define IOMUXC_GPR2	0x08
-+#define IOMUXC_GPR3	0x0c
-+#define IOMUXC_GPR4	0x10
-+#define IOMUXC_GPR5	0x14
-+#define IOMUXC_GPR6	0x18
-+#define IOMUXC_GPR7	0x1c
-+#define IOMUXC_GPR8	0x20
-+#define IOMUXC_GPR9	0x24
-+#define IOMUXC_GPR10	0x28
-+#define IOMUXC_GPR11	0x2c
-+#define IOMUXC_GPR12	0x30
-+#define IOMUXC_GPR13	0x34
-+#define IOMUXC_GPR14	0x38
-+#define IOMUXC_GPR15	0x3c
-+#define IOMUXC_GPR16	0x40
-+#define IOMUXC_GPR17	0x44
-+#define IOMUXC_GPR18	0x48
-+#define IOMUXC_GPR19	0x4c
-+#define IOMUXC_GPR20	0x50
-+#define IOMUXC_GPR21	0x54
-+#define IOMUXC_GPR22	0x58
++		ethphy0: ethernet-phy at 0 {
++			reg = <0>;
++		};
 +
-+/* For imx7d iomux gpr register field define */
-+#define IMX7D_GPR1_IRQ_MASK			(0x1 << 12)
-+#define IMX7D_GPR1_ENET1_TX_CLK_SEL_MASK	(0x1 << 13)
-+#define IMX7D_GPR1_ENET2_TX_CLK_SEL_MASK	(0x1 << 14)
-+#define IMX7D_GPR1_ENET_TX_CLK_SEL_MASK		(0x3 << 13)
-+#define IMX7D_GPR1_ENET1_CLK_DIR_MASK		(0x1 << 17)
-+#define IMX7D_GPR1_ENET2_CLK_DIR_MASK		(0x1 << 18)
-+#define IMX7D_GPR1_ENET_CLK_DIR_MASK		(0x3 << 17)
++		ethphy1: ethernet-phy at 1 {
++			reg = <1>;
++		};
++	};
++};
 +
-+#define IMX7D_GPR5_CSI_MUX_CONTROL_MIPI		(0x1 << 4)
++&fec2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet2>;
++	assigned-clocks = <&clks IMX7D_ENET2_TIME_ROOT_SRC>,
++			  <&clks IMX7D_ENET2_TIME_ROOT_CLK>;
++	assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>;
++	assigned-clock-rates = <0>, <100000000>;
++	phy-mode = "rgmii";
++	phy-handle = <&ethphy1>;
++	fsl,magic-packet;
++	status = "okay";
++};
 +
-+#endif /* __LINUX_IMX7_IOMUXC_GPR_H */
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c1>;
+@@ -246,6 +285,42 @@
+ 	pinctrl-0 = <&pinctrl_hog>;
+ 
+ 	imx7d-sdb {
++		pinctrl_enet1: enet1grp {
++			fsl,pins = <
++				MX7D_PAD_GPIO1_IO10__ENET1_MDIO			0x3
++				MX7D_PAD_GPIO1_IO11__ENET1_MDC			0x3
++				MX7D_PAD_ENET1_RGMII_TXC__ENET1_RGMII_TXC	0x1
++				MX7D_PAD_ENET1_RGMII_TD0__ENET1_RGMII_TD0	0x1
++				MX7D_PAD_ENET1_RGMII_TD1__ENET1_RGMII_TD1	0x1
++				MX7D_PAD_ENET1_RGMII_TD2__ENET1_RGMII_TD2	0x1
++				MX7D_PAD_ENET1_RGMII_TD3__ENET1_RGMII_TD3	0x1
++				MX7D_PAD_ENET1_RGMII_TX_CTL__ENET1_RGMII_TX_CTL	0x1
++				MX7D_PAD_ENET1_RGMII_RXC__ENET1_RGMII_RXC	0x1
++				MX7D_PAD_ENET1_RGMII_RD0__ENET1_RGMII_RD0	0x1
++				MX7D_PAD_ENET1_RGMII_RD1__ENET1_RGMII_RD1	0x1
++				MX7D_PAD_ENET1_RGMII_RD2__ENET1_RGMII_RD2	0x1
++				MX7D_PAD_ENET1_RGMII_RD3__ENET1_RGMII_RD3	0x1
++				MX7D_PAD_ENET1_RGMII_RX_CTL__ENET1_RGMII_RX_CTL	0x1
++			>;
++		};
++
++		pinctrl_enet2: enet2grp {
++			fsl,pins = <
++				MX7D_PAD_EPDC_GDSP__ENET2_RGMII_TXC		0x1
++				MX7D_PAD_EPDC_SDCE2__ENET2_RGMII_TD0		0x1
++				MX7D_PAD_EPDC_SDCE3__ENET2_RGMII_TD1		0x1
++				MX7D_PAD_EPDC_GDCLK__ENET2_RGMII_TD2		0x1
++				MX7D_PAD_EPDC_GDOE__ENET2_RGMII_TD3		0x1
++				MX7D_PAD_EPDC_GDRL__ENET2_RGMII_TX_CTL		0x1
++				MX7D_PAD_EPDC_SDCE1__ENET2_RGMII_RXC		0x1
++				MX7D_PAD_EPDC_SDCLK__ENET2_RGMII_RD0		0x1
++				MX7D_PAD_EPDC_SDLE__ENET2_RGMII_RD1		0x1
++				MX7D_PAD_EPDC_SDOE__ENET2_RGMII_RD2		0x1
++				MX7D_PAD_EPDC_SDSHR__ENET2_RGMII_RD3		0x1
++				MX7D_PAD_EPDC_SDCE0__ENET2_RGMII_RX_CTL		0x1
++			>;
++		};
++
+ 		pinctrl_hog: hoggrp {
+ 			fsl,pins = <
+ 				MX7D_PAD_UART3_CTS_B__GPIO4_IO7		0x14
+@@ -281,7 +356,6 @@
+ 			>;
+ 		};
+ 
+-
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX	0x79
 -- 
 1.9.1
