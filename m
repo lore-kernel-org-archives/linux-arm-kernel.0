@@ -1,37 +1,64 @@
-From: tanxiaojun@huawei.com (Tan Xiaojun)
-Date: Mon, 7 Sep 2015 12:21:12 +0800
-Subject: [PATCH] CMA: fix CONFIG_CMA_SIZE_MBYTES overflow in 64bit
-Message-ID: <1441599672-1360-1-git-send-email-tanxiaojun@huawei.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 7 Sep 2015 07:39:20 +0200
+Subject: [PATCH] soc: mediatek: Move the initial setting of pmic wrap
+ interrupt before requesting irq.
+In-Reply-To: <1441339512-15510-1-git-send-email-henryc.chen@mediatek.com>
+References: <1441339512-15510-1-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <20150907053920.GW18700@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In 64bit system, if you set CONFIG_CMA_SIZE_MBYTES>=2048, it will
-overflow and size_bytes will be a big wrong number.
+On Fri, Sep 04, 2015 at 12:05:12PM +0800, Henry Chen wrote:
+> Seperate the initialization of pmic wrap interrupt from pmic wrap init to make sure setting is correct before requesting irq.
 
-Set CONFIG_CMA_SIZE_MBYTES=2048 and you will get an info below
-during system boot:
+It seems the problem this patch solves is the missing watchdog
+initialization when the pwrap is already initialized but the watchdog is
+not, so how about a commit log like:
 
-*********
-cma: Failed to reserve 17592186042368 MiB
-*********
+"The watchdog may not be initialized by the bootloader, even if the rest
+of the pwrap is. Move the watchdog initialization out of pwrap_init()
+to make sure the watchdog is always initialized and not only when the
+pwrap is uninitialized."
 
-Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
----
- drivers/base/dma-contiguous.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Also please add linebreaks to the commit log.
 
-diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-index 950fff9..426ba27 100644
---- a/drivers/base/dma-contiguous.c
-+++ b/drivers/base/dma-contiguous.c
-@@ -46,7 +46,7 @@ struct cma *dma_contiguous_default_area;
-  * Users, who want to set the size of global CMA area for their system
-  * should use cma= kernel parameter.
-  */
--static const phys_addr_t size_bytes = CMA_SIZE_MBYTES * SZ_1M;
-+static const phys_addr_t size_bytes = (phys_addr_t)CMA_SIZE_MBYTES * SZ_1M;
- static phys_addr_t size_cmdline = -1;
- static phys_addr_t base_cmdline;
- static phys_addr_t limit_cmdline;
+> 
+> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+> ---
+>  drivers/soc/mediatek/mtk-pmic-wrap.c | 14 ++++++++++----
+>  1 file changed, 10 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index f432291..c91d629 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -725,10 +725,6 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+>  	pwrap_writel(wrp, 0x1, PWRAP_WACS2_EN);
+>  	pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
+>  	pwrap_writel(wrp, 0xff, PWRAP_STAUPD_GRPEN);
+> -	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
+> -	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
+> -	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
+> -	pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
+>  
+>  	if (pwrap_is_mt8135(wrp)) {
+>  		/* enable pwrap events and pwrap bridge in AP side */
+> @@ -896,6 +892,16 @@ static int pwrap_probe(struct platform_device *pdev)
+>  		return -ENODEV;
+>  	}
+>  
+> +	/*
+> +	 * watch dog at pwrap,
+> +	 * The bootloader may not initial the wdt/interrupt setting of pwrap,
+> +	 * set it before reguesting the irq.
+> +	 */
+
+/* initialize watchdog, may not be done by the bootloader */
+
+Sascha
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
