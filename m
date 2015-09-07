@@ -1,63 +1,61 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 07 Sep 2015 18:41:50 +0100
-Subject: [PATCH v4 2/5] irqchip, gicv3: Workaround for Cavium ThunderX
- erratum 23154
-In-Reply-To: <20150907171501.GD10645@e104818-lin.cambridge.arm.com>
-References: <1439576885-15621-1-git-send-email-rric@kernel.org>
- <1439576885-15621-3-git-send-email-rric@kernel.org>
- <55EDC12E.8000408@arm.com>
- <20150907171501.GD10645@e104818-lin.cambridge.arm.com>
-Message-ID: <55EDCC5E.9080203@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Sep 2015 18:50:10 +0100
+Subject: [PATCH v2 6/8] arm/arm64: KVM: Add forwarded physical interrupts
+ documentation
+In-Reply-To: <55EDBF36.4040307@linaro.org>
+References: <1441395650-19663-1-git-send-email-christoffer.dall@linaro.org>
+ <1441395650-19663-7-git-send-email-christoffer.dall@linaro.org>
+ <55EDBF36.4040307@linaro.org>
+Message-ID: <55EDCE52.1040006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/15 18:15, Catalin Marinas wrote:
-> On Mon, Sep 07, 2015 at 05:54:06PM +0100, Suzuki K. Poulose wrote:
->> On 14/08/15 19:28, Robert Richter wrote:
->>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->>> index c52f7ba205b4..4211c39b8744 100644
->>> --- a/drivers/irqchip/irq-gic-v3.c
->>> +++ b/drivers/irqchip/irq-gic-v3.c
->>> @@ -107,7 +107,7 @@ static void gic_redist_wait_for_rwp(void)
+On 07/09/15 17:45, Eric Auger wrote:
+> Hi Christoffer,
+> On 09/04/2015 09:40 PM, Christoffer Dall wrote:
+>> Forwarded physical interrupts on arm/arm64 is a tricky concept and the
+>> way we deal with them is not apparently easy to understand by reading
+>> various specs.
 >>
->> ...
+>> Therefore, add a proper documentation file explaining the flow and
+>> rationale of the behavior of the vgic.
 >>
->>> +}
->>> +
->>>   static void __maybe_unused gic_write_pmr(u64 val)
->>>   {
->>>   	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
->>> @@ -766,6 +798,12 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
->>>   	.free = gic_irq_domain_free,
->>>   };
->>>
->>> +static void gicv3_enable_quirks(void)
->>> +{
->>> +	if (cpus_have_cap(ARM64_WORKAROUND_CAVIUM_23154))
->>> +		static_key_slow_inc(&is_cavium_thunderx);
+>> Some of this text was contributed by Marc Zyngier and edited by me.
+>> Omissions and errors are all mine.
 >>
->> May be you could use the enable() method added to struct arm64_cpu_capability
->> here to perform the above operation, added by James :
+>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> ---
+>>  Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt | 181 +++++++++++++++++++++
+>>  1 file changed, 181 insertions(+)
+>>  create mode 100644 Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
 >>
->> commit 1c0763037f1e1caef739e36e09c6d41ed7b61b2d
->> Author: James Morse <james.morse@arm.com>
->> Date:   Tue Jul 21 13:23:28 2015 +0100
->>
->>      arm64: kernel: Add cpufeature 'enable' callback
->
-> I thought about this as well when looking at the patch but decided it's
-> better as it is. The "enable" method is meant to enable per-CPU features
-> (or workarounds) but here it is about GICv3, so we don't want to enable
-> for every CPU.
+>> diff --git a/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+>> new file mode 100644
+>> index 0000000..24b6f28
+>> --- /dev/null
+>> +++ b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+>> @@ -0,0 +1,181 @@
+>> +KVM/ARM VGIC Forwarded Physical Interrupts
+>> +==========================================
 
-Right. I have been playing with a series where the checks are delayed until
-all CPUs are brought up. But yes, I understand this usecase is slightly different
-and may not match what I was thinking about.
+[...]
 
-May be, gic can have its own private list of _cpu_capability which it can run
-over check_cpu_capabilities(), which it can run over and that will fall back to
-what we have at the moment. So, may be what we have here is as good as we can
-get.
+>> +1.  KVM runs the VCPU
+>> +2.  The guest programs the time to fire in T+100
+>> +4.  At T+100 the timer fires and a physical IRQ causes the VM to exit
+>> +5.  With interrupts disabled on the CPU, KVM looks at the timer state
+>> +    and injects a forwarded physical interrupt because it concludes the
+>> +    timer has expired.
+> I don't get how we can trap without the virtual timer PPI handler being
+> entered on host side. Please can you elaborate on this?
 
-Cheers
-Suzuki
+On VM exit, we disable the virtual timer (see the code in
+hyp.S::save_timer_state where we clear the enable bit). We still perform
+the exit, but the cause for exit is now gone, and the handler will never
+fire.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
