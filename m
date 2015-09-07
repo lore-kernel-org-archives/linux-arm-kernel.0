@@ -1,43 +1,24 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Mon, 07 Sep 2015 10:49:02 +0300
-Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun4i: Add dts file for the
- pov protab2-ips9 tablet
-In-Reply-To: <55ED3739.609@redhat.com>
-References: <1441441319-10658-1-git-send-email-hdegoede@redhat.com>
- <20150906163023.GR31584@lukather> <55ED3739.609@redhat.com>
-Message-ID: <1441612142.14422.34.camel@plaes.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 7 Sep 2015 10:05:54 +0200
+Subject: [PATCH 1/3] gpio: Use __gpiod_request directly
+In-Reply-To: <1439979512-3894-2-git-send-email-mpa@pengutronix.de>
+References: <1439979512-3894-1-git-send-email-mpa@pengutronix.de>
+ <1439979512-3894-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <20150907080554.GP9999@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-09-07 at 09:05 +0200, Hans de Goede wrote:
-> Hi,
+On Wed, Aug 19, 2015 at 12:18:30PM +0200, Markus Pargmann wrote:
+> From: Markus Pargmann <mpa@devmp.org>
 > 
-> On 06-09-15 18:30, Maxime Ripard wrote:
-> > On Sat, Sep 05, 2015 at 10:21:59AM +0200, Hans de Goede wrote:
-> > > The Point of View protab2-ips9 is a tablet with a 9" ips 1024x768
-> > > lcd screen,
-> > > microsd slot, headphones, mini hdmi, mini usb b and power barrel
-> > > connectors.
-> > > 
-> > > It uses a rtl8188cus usb wifi chip and a RDA 5875Y bluetooth chip
-> > > attached
-> > > to uart2. It has a bma250 accelerometer attached to i2c1 addr
-> > > 0x18.
-> > > 
-
-[...]
-> > 
-> > What is connected on i2c1 ? Just the camera sensor? or it has some
-> > other devices there?
+> There is no reason to find out chip and hwnum to use to request a gpio
+> and get another gpio descriptor. We already have the descriptor we want
+> to use so we can directly use it.
 > 
-> The bma250 accelerometer sits there, and the kernel already has a
-> driver
-> for it. That driver needs to have devicetree binding support added,
-> and
-> then we should be able to use the accelerometer.
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-bma250 already has devicetree support. It is used in Gemei G9 tablet
-(sun4i-gemei-g9.dts).
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-P?ikest,
-Priit :)
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
