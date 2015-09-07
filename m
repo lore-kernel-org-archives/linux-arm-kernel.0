@@ -1,52 +1,63 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 7 Sep 2015 11:34:36 -0400 (EDT)
-Subject: [PATCH] ARM: fix bug which lowmem size is limited to 760MB
-In-Reply-To: <1713935.2YV1sNJUyb@wuerfel>
-References: <20150903091044.GW21084@n2100.arm.linux.org.uk>
- <1441276233-14566-1-git-send-email-ytk.lee@samsung.com>
- <alpine.LFD.2.20.1509032106420.22877@knanqh.ubzr>
- <1713935.2YV1sNJUyb@wuerfel>
-Message-ID: <alpine.LFD.2.20.1509071128151.22877@knanqh.ubzr>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 7 Sep 2015 16:33:39 +0100
+Subject: [PATCH v4 01/20] net/xen-netback: xenvif_gop_frag_copy: move GSO
+ check out of the loop
+In-Reply-To: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <1441640038-23615-2-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Sep 2015, Arnd Bergmann wrote:
+The skb doesn't change within the function. Therefore it's only
+necessary to check if we need GSO once at the beginning.
 
-> Given how much more common 1GB hardware configurations are compared to 768MB
-> configuration, we could however think about adding a VMSPLIT_3G_OPT option
-> that x86 has (also VMSPLIT_2_75G on ARCH_TILE), to allow using the entire
-> 1GB of lowmem without going all the way to VMSPLIT_2G. That option would
-> also let us use the entire 768MB on the machines that 	Yongtaek Lee is
-> interested in.
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
+Acked-by: Wei Liu <wei.liu2@citrix.com>
 
-That's easy enough:
+---
+Cc: Ian Campbell <ian.campbell@citrix.com>
+Cc: netdev at vger.kernel.org
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0d1b717e1e..a63970f211 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1470,6 +1470,8 @@ choice
+    Changes in v4:
+        - Add Wei's acked
+
+    Changes in v2:
+        - Patch added
+---
+ drivers/net/xen-netback/netback.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
+index 7c64c74..d4c1bc7 100644
+--- a/drivers/net/xen-netback/netback.c
++++ b/drivers/net/xen-netback/netback.c
+@@ -277,6 +277,13 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
+ 	unsigned long bytes;
+ 	int gso_type = XEN_NETIF_GSO_TYPE_NONE;
  
- 	config VMSPLIT_3G
- 		bool "3G/1G user/kernel split"
-+	config VMSPLIT_3G_OPT
-+		bool "3G/1G user/kernel split (for full 1G low memory)"
- 	config VMSPLIT_2G
- 		bool "2G/2G user/kernel split"
- 	config VMSPLIT_1G
-@@ -1481,6 +1483,7 @@ config PAGE_OFFSET
- 	default PHYS_OFFSET if !MMU
- 	default 0x40000000 if VMSPLIT_1G
- 	default 0x80000000 if VMSPLIT_2G
-+	default 0xAF000000 if VMSPLIT_3G_OPT
- 	default 0xC0000000
++	if (skb_is_gso(skb)) {
++		if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV4)
++			gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
++		else if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6)
++			gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
++	}
++
+ 	/* Data must not cross a page boundary. */
+ 	BUG_ON(size + offset > PAGE_SIZE<<compound_order(page));
  
- config NR_CPUS
-
-
-That shifts the risk to user space though.  But if there is a regression 
-there, it will manifest itself on all systems and not only with some 
-particular hardware.
-
-
-Nicolas
+@@ -336,13 +343,6 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
+ 		}
+ 
+ 		/* Leave a gap for the GSO descriptor. */
+-		if (skb_is_gso(skb)) {
+-			if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV4)
+-				gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
+-			else if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6)
+-				gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
+-		}
+-
+ 		if (*head && ((1 << gso_type) & queue->vif->gso_mask))
+ 			queue->rx.req_cons++;
+ 
+-- 
+2.1.4
