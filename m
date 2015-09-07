@@ -1,13 +1,14 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 07 Sep 2015 23:26:34 +0200
-Subject: [PATCH 0/5] ACPI probing infrastructure
-In-Reply-To: <1441386412-8139-1-git-send-email-marc.zyngier@arm.com>
+Date: Mon, 07 Sep 2015 23:29:36 +0200
+Subject: [PATCH 1/5] acpi: Add basic device probing infrastructure
+In-Reply-To: <1441386412-8139-2-git-send-email-marc.zyngier@arm.com>
 References: <1441386412-8139-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <3667410.80mLyhGuXy@vostro.rjw.lan>
+ <1441386412-8139-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <2194763.hsLfaM94lK@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 04, 2015 06:06:47 PM Marc Zyngier wrote:
+On Friday, September 04, 2015 06:06:48 PM Marc Zyngier wrote:
 > IRQ controllers and timers are the two types of device the kernel
 > requires before being able to use the device driver model.
 > 
@@ -17,13 +18,18 @@ On Friday, September 04, 2015 06:06:47 PM Marc Zyngier wrote:
 > and call us back on a match. This leads to all kind of really ugly
 > hacks all over the arm64 code and even in the ACPI layer.
 > 
-> It turns out that providing such a probing infrastructure is rather
-> easy, and provides a much deserved cleanup in both the arch code, the
-> GIC driver, and the architected timer driver.
+> In order to allow some basic probing based on the ACPI tables,
+> introduce "struct acpi_probe_entry" which contains just enough
+> data and callbacks to match a table, an optional subtable, and
+> call a probe function. A driver can, at build time, register itself
+> and expect being called if the right entry exists in the ACPI
+> table.
+> 
+> A acpi_probe_device_init() is provided, taking an ACPI table
+> identifier, and iterating over the registered entries.
 
-Since I'm not familiar with the DT probing infrastructure mentioned above,
-can you please explain to me (possibly at a high level), how it is supposed
-to work in the ACPI case?
+What about things that are provided by the ACPI namespace (eg. via _MAT) rather
+than in static tables?
 
 Thanks,
 Rafael
