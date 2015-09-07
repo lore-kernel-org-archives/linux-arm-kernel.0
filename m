@@ -1,42 +1,56 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 8 Sep 2015 00:42:47 +0900
-Subject: [RFC PATCH 0/3] Implement IRQ stack on ARM64
-In-Reply-To: <55EDA040.90208@arm.com>
-References: <1441376587-12979-1-git-send-email-jungseoklee85@gmail.com>
- <55EDA040.90208@arm.com>
-Message-ID: <AFDD2C50-682E-4A66-89FB-BD32108D9298@gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 07 Sep 2015 17:41:37 +0200
+Subject: [PATCH v4 0/4] cpufreq-dt: add suspend frequency support
+Message-ID: <1441640501-13613-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sep 7, 2015, at 11:33 PM, James Morse wrote:
-> On 04/09/15 15:23, Jungseok Lee wrote:
->> ARM64 kernel allocates 16KB kernel stack when creating a process. In case
->> of low memory platforms with tough workloads on userland, this order-2
->> allocation request reaches to memory pressure and performance degradation
->> simultaenously since VM page allocator falls into slowpath frequently,
->> which triggers page reclaim and compaction.
->> 
->> I believe that one of the best solutions is to reduce kernel stack size.
->> According to the following data from stack tracer with some fixes, [1],
->> a separate IRQ stack would greatly help to decrease a kernel stack depth.
->> 
-> 
-> Hi Jungseok Lee,
+Hi,
 
-Hi James Morse,
+This patch series adds suspend frequency support (using opp-v2
+bindings and suspend-opp functionality) to cpufreq-dt driver and
+then adds suspend opp for Exynos4412 based boards.
 
-> I was working on a similar patch for irq stack, (patch as a follow up email).
-> 
-> I suggest we work together on a single implementation. I think the only
-> major difference is that you're using sp_el0 as a temporary register to
-> store a copy of the stack-pointer to find struct thread_info, whereas I was
-> copying it between stacks (ends up as 2x ldp/stps), which keeps the change
-> restricted to irq_stack setup code.
-> 
-> We should get some feedback as to which approach is preferred.
+This patch series fixes suspend/resume support on Exynos4412
+based Trats2 board and reboot hang on Exynos4412 based Odroid
+U3 board.
 
-Great idea!
-I'd really like to figure out the most ideal implementation of this feature.
+Changes since v3:
+- fixed dev_pm_opp_get_suspend_opp() locking
+- shortened variable name in dev_pm_opp_get_suspend_opp()
+- adjusted cpufreq_generic_suspend() to work with cpufreq-dt
+- removed no longer needed cpufreq_dt_suspend()
+- added Acked-by tag from Viresh to patch #4
 
-Best Regards
-Jungseok Lee
+Changes since v2:
+- rewrote to use suspend-opp functionality
+
+Changes since v1:
+- removed superfluous ";"
+
+Depends on:
+- next-20150902 branch of linux-next kernel tree
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+
+Bartlomiej Zolnierkiewicz (4):
+  PM / OPP: add dev_pm_opp_get_suspend_opp() helper
+  cpufreq: allow cpufreq_generic_suspend() to work without suspend
+    frequency
+  cpufreq-dt: add suspend frequency support
+  ARM: dts: add suspend opp to exynos4412
+
+ arch/arm/boot/dts/exynos4412.dtsi |  1 +
+ drivers/base/power/opp.c          | 30 ++++++++++++++++++++++++++++++
+ drivers/cpufreq/cpufreq-dt.c      | 11 +++++++++++
+ drivers/cpufreq/cpufreq.c         |  4 ++--
+ include/linux/pm_opp.h            |  6 ++++++
+ 5 files changed, 50 insertions(+), 2 deletions(-)
+
+-- 
+1.9.1
