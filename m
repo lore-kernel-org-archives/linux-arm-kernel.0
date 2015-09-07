@@ -1,49 +1,49 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon,  7 Sep 2015 17:09:33 +0200
-Subject: [PATCH v3 8/8] clk: imx7d: retain early UART clocks during kernel init
-In-Reply-To: <1441638573-6701-1-git-send-email-l.stach@pengutronix.de>
-References: <1441638573-6701-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1441638573-6701-9-git-send-email-l.stach@pengutronix.de>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 7 Sep 2015 23:11:06 +0800
+Subject: [PATCH v8 2/2] ARM: imx: support suspend states on imx7D
+In-Reply-To: <1438378439-11569-3-git-send-email-shenwei.wang@freescale.com>
+References: <1438378439-11569-1-git-send-email-shenwei.wang@freescale.com>
+ <1438378439-11569-3-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <20150907151106.GA30723@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure to keep UART clocks enabled during kernel init if
-earlyprintk or earlycon are active.
+On Fri, Jul 31, 2015 at 04:33:59PM -0500, Shenwei Wang wrote:
+> IMX7D contains a new version of GPC IP block (GPCv2). It has two
+> major functions: power management and wakeup source management.
+> 
+> GPCv2 provides low power mode control for Cortex-A7 and Cortex-M4
+> domains. And it can support WAIT, STOP, and DSM(Deep Sleep Mode) modes.
+> After configuring the GPCv2 module, the platform can enter into a
+> selected mode either automatically triggered by ARM WFI instruction or
+> manually by software. The system will exit the low power states
+> by the predefined wakeup sources which are managed by the gpcv2
+> irqchip driver.
+> 
+> This patch adds a new suspend driver to manage the power states on IMX7D.
+> It currently supports "SUSPEND_STANDBY" and "SUSPEND_MEM" states.
+> 
+> Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+> Signed-off-by: Anson Huang <b20788@freescale.com>
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- drivers/clk/imx/clk-imx7d.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Please stop sending patches to my Linaro mailbox, and use
+shawnguo at kernel.org instead.  You should already get that if you ever
+run ./scripts/get_maintainer.pl on the patch.  Also please always copy
+kernel at pengutronix.de for i.MX platform patches like this.
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index 71f3a94b472c..f86b68049872 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -363,6 +363,17 @@ static const char *pll_video_bypass_sel[] = { "pll_video_main", "pll_video_main_
- 
- static struct clk_onecell_data clk_data;
- 
-+static struct clk ** const uart_clks[] __initconst = {
-+	&clks[IMX7D_UART1_ROOT_CLK],
-+	&clks[IMX7D_UART2_ROOT_CLK],
-+	&clks[IMX7D_UART3_ROOT_CLK],
-+	&clks[IMX7D_UART4_ROOT_CLK],
-+	&clks[IMX7D_UART5_ROOT_CLK],
-+	&clks[IMX7D_UART6_ROOT_CLK],
-+	&clks[IMX7D_UART7_ROOT_CLK],
-+	NULL
-+};
-+
- static void __init imx7d_clocks_init(struct device_node *ccm_node)
- {
- 	struct device_node *np;
-@@ -856,5 +867,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	/* set uart module clock's parent clock source that must be great then 80MHz */
- 	clk_set_parent(clks[IMX7D_UART1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
- 
-+	imx_register_uart_clocks(uart_clks);
-+
- }
- CLK_OF_DECLARE(imx7d, "fsl,imx7d-ccm", imx7d_clocks_init);
--- 
-2.5.0
+> ---
+>  arch/arm/mach-imx/Kconfig        |   1 +
+>  arch/arm/mach-imx/Makefile       |   2 +
+>  arch/arm/mach-imx/common.h       |   4 +
+>  arch/arm/mach-imx/pm-imx7.c      | 917 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-imx/suspend-imx7.S | 529 ++++++++++++++++++++++
+>  5 files changed, 1453 insertions(+)
+
+1453 lines addition to kernel only for i.MX7D suspend support.  Yes,
+this is the way we support suspend on i.MX6, but that's enough, and
+we have to stop this somewhere.  I would ask you to take Sudeep's
+comment and adopt PSCI for i.MX7D power management.
+
+Shawn
+
+[1] https://lkml.org/lkml/2015/8/26/554
