@@ -1,57 +1,84 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 7 Sep 2015 11:33:31 +0200
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Enable DW USB2 support and
- rockchip phy
-In-Reply-To: <1441570566-14001-5-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1441570566-14001-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1441570566-14001-5-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <55ED59EB.4010000@osg.samsung.com>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Mon, 7 Sep 2015 09:45:43 +0000
+Subject: [PATCH] ARM: ls1021a: add platform notifier for dma-coherent
+ requirement
+In-Reply-To: <20150906072245.GG30746@tiger>
+References: <1438941719-38350-1-git-send-email-b18965@freescale.com>
+ <20150906072245.GG30746@tiger>
+Message-ID: <BN3PR0301MB08672B490F8A00EAAEFBB637FE540@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sjoerd,
+Hi, Shawn,
 
-On 09/06/2015 10:16 PM, Sjoerd Simons wrote:
-> The DesignWare HS OTG USB 2.0 is used in various SoC families among wich
-> the various rockchip SoCs, enable the driver and the PHY glue for
-> rockchip
+> On Fri, Aug 07, 2015 at 06:01:59PM +0800, Alison Wang wrote:
+> > This patch adds platform notifier for dma-coherent requirement.
+> > Structure arm_coherent_dma_ops is used instead of arm_dma_ops.
+> >
+> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> > ---
+> >  arch/arm/mach-imx/mach-ls1021a.c | 30 ++++++++++++++++++++++++++++++
+> >  1 file changed, 30 insertions(+)
+> >
+> > diff --git a/arch/arm/mach-imx/mach-ls1021a.c
+> > b/arch/arm/mach-imx/mach-ls1021a.c
+> > index b89c858..6bfc71b 100644
+> > --- a/arch/arm/mach-imx/mach-ls1021a.c
+> > +++ b/arch/arm/mach-imx/mach-ls1021a.c
+> > @@ -7,10 +7,39 @@
+> >   * (at your option) any later version.
+> >   */
+> >
+> > +#include <linux/dma-mapping.h>
+> > +#include <linux/of_platform.h>
+> >  #include <asm/mach/arch.h>
+> >
+> >  #include "common.h"
+> >
+> > +static int ls1021a_platform_notifier(struct notifier_block *nb,
+> > +				  unsigned long event, void *__dev) {
+> > +	struct device *dev = __dev;
+> > +
+> > +	if (event != BUS_NOTIFY_ADD_DEVICE)
+> > +		return NOTIFY_DONE;
+> > +
+> > +	if (of_device_is_compatible(dev->of_node, "fsl,etsec2"))
+> > +		set_dma_ops(dev, &arm_coherent_dma_ops);
 > 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> Why cannot you simply add property dma-coherent for etsec2 node in
+> device tree?  In that case, of_dma_configure() will just do the job
+> from of_platform_device_create_pdata().
+[Alison Wang] Yes, you are right. I will change in v2. Thanks.
 > 
-> ---
+> Shawn
 > 
->  arch/arm/configs/multi_v7_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index fb673e2..49c733a 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -514,6 +514,7 @@ CONFIG_USB_STORAGE=y
->  CONFIG_USB_DWC3=y
->  CONFIG_USB_CHIPIDEA=y
->  CONFIG_USB_CHIPIDEA_HOST=y
-> +CONFIG_USB_DWC2=y
->  CONFIG_AB8500_USB=y
->  CONFIG_KEYSTONE_USB_PHY=y
->  CONFIG_OMAP_USB3=y
-> @@ -658,6 +659,7 @@ CONFIG_PHY_HIX5HD2_SATA=y
->  CONFIG_PWM_STI=m
->  CONFIG_OMAP_USB2=y
->  CONFIG_TI_PIPE3=y
-> +CONFIG_PHY_ROCKCHIP_USB=y
->  CONFIG_PHY_MIPHY28LP=y
->  CONFIG_PHY_MIPHY365X=y
->  CONFIG_PHY_RCAR_GEN2=m
->
-
-After dropping the DWC2 and keeping only the PHY as suggested
-by Heiko and Krzysztof:
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+> > +	else if (of_property_read_bool(dev->of_node, "dma-coherent"))
+> > +		set_dma_ops(dev, &arm_coherent_dma_ops);
+> > +
+> > +	return NOTIFY_OK;
+> > +}
+> > +
+> > +static struct notifier_block ls1021a_platform_nb = {
+> > +	.notifier_call = ls1021a_platform_notifier, };
+> > +
+> > +static void __init ls1021a_init_machine(void) {
+> > +	bus_register_notifier(&platform_bus_type, &ls1021a_platform_nb);
+> > +
+> > +	of_platform_populate(NULL, of_default_bus_match_table, NULL,
+> NULL);
+> > +}
+> > +
+> >  static const char * const ls1021a_dt_compat[] __initconst = {
+> >  	"fsl,ls1021a",
+> >  	NULL,
+> > @@ -18,5 +47,6 @@ static const char * const ls1021a_dt_compat[]
+> > __initconst = {
+> >
+> >  DT_MACHINE_START(LS1021A, "Freescale LS1021A")
+> >  	.smp		= smp_ops(ls1021a_smp_ops),
+> > +	.init_machine   = ls1021a_init_machine,
+> >  	.dt_compat	= ls1021a_dt_compat,
+> >  MACHINE_END
+> > --
+> > 2.1.0.27.g96db324
+> >
