@@ -1,174 +1,108 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon,  7 Sep 2015 14:23:27 +0200
-Subject: [PATCH v4 02/22] ARM: amba: Move reading of periphid to pre_probe()
+Date: Mon,  7 Sep 2015 14:23:26 +0200
+Subject: [PATCH v4 01/22] driver core: Add pre_probe callback to bus_type
 In-Reply-To: <1441628627-5143-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1441628627-5143-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1441628627-5143-3-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1441628627-5143-2-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reading the periphid when the Primecell device is registered means that
-the apb pclk must be available by then or the device won't be registered
-at all.
+Some buses (eg. AMBA) need access to some HW resources (it may need a
+clock to be enabled so a device ID can be read) before a device can be
+matched to a driver.
 
-By moving this code to pre_probe (to be called by the device-driver core
-before the device is matched to a driver) we remove any order
-requirements.
+The pre_probe callback allows the device-driver core to request the bus
+to perform this initialization and can defer the probe if any of the
+resources needed are missing.
+
+This gives us more flexibility when setting the order in which devices
+are probed because the resources needed to get the matching information
+don't need to be available by the time that the bus devices are
+registered.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
 
-Changes in v4:
-- Added bus.pre_probe callback so the probes of Primecell devices can be
-  deferred if their device IDs cannot be yet read because of the clock
-  driver not having probed when they are registered. Maybe this goes
-  overboard and the matching information should be in the DT if there is
-  one.
-
+Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- drivers/amba/bus.c | 78 ++++++++++++++++++++++++++----------------------------
- 1 file changed, 38 insertions(+), 40 deletions(-)
+ drivers/base/dd.c      | 24 ++++++++++++++++++++++++
+ include/linux/device.h |  4 ++++
+ 2 files changed, 28 insertions(+)
 
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index f0099360039e..1cbe43b4acd3 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -24,6 +24,8 @@
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index be0eb4639128..faf60bfc46b3 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -544,6 +544,17 @@ static int __device_attach(struct device *dev, bool allow_async)
+ 	int ret = 0;
  
- #define to_amba_driver(d)	container_of(d, struct amba_driver, drv)
- 
-+static int amba_pre_probe(struct device *dev);
+ 	device_lock(dev);
 +
- static const struct amba_id *
- amba_lookup(const struct amba_id *table, struct amba_device *dev)
++	if (dev->bus && dev->bus->pre_probe) {
++		ret = dev->bus->pre_probe(dev);
++		if (ret) {
++			if (ret == -EPROBE_DEFER)
++				driver_deferred_probe_add(dev);
++			ret = 0;
++			goto out_unlock;
++		}
++	}
++
+ 	if (dev->driver) {
+ 		if (klist_node_attached(&dev->p->knode_driver)) {
+ 			ret = 1;
+@@ -619,6 +630,7 @@ void device_initial_probe(struct device *dev)
+ static int __driver_attach(struct device *dev, void *data)
  {
-@@ -193,6 +195,7 @@ struct bus_type amba_bustype = {
- 	.name		= "amba",
- 	.dev_attrs	= amba_dev_attrs,
- 	.match		= amba_match,
-+	.pre_probe	= amba_pre_probe,
- 	.uevent		= amba_uevent,
- 	.pm		= &amba_pm,
- };
-@@ -336,44 +339,26 @@ static void amba_device_release(struct device *dev)
- 	kfree(d);
- }
- 
--/**
-- *	amba_device_add - add a previously allocated AMBA device structure
-- *	@dev: AMBA device allocated by amba_device_alloc
-- *	@parent: resource parent for this devices resources
-- *
-- *	Claim the resource, and read the device cell ID if not already
-- *	initialized.  Register the AMBA device with the Linux device
-- *	manager.
-- */
--int amba_device_add(struct amba_device *dev, struct resource *parent)
-+static int amba_pre_probe(struct device *dev)
- {
-+	struct amba_device *d = to_amba_device(dev);
- 	u32 size;
- 	void __iomem *tmp;
- 	int i, ret;
- 
--	WARN_ON(dev->irq[0] == (unsigned int)-1);
--	WARN_ON(dev->irq[1] == (unsigned int)-1);
--
--	ret = request_resource(parent, &dev->res);
--	if (ret)
--		goto err_out;
--
--	/* Hard-coded primecell ID instead of plug-n-play */
--	if (dev->periphid != 0)
--		goto skip_probe;
-+	if (d->periphid != 0)
-+		return 0;
+ 	struct device_driver *drv = data;
++	int ret;
  
  	/*
- 	 * Dynamically calculate the size of the resource
- 	 * and use this for iomap
- 	 */
--	size = resource_size(&dev->res);
--	tmp = ioremap(dev->res.start, size);
--	if (!tmp) {
--		ret = -ENOMEM;
--		goto err_release;
--	}
-+	size = resource_size(&d->res);
-+	tmp = ioremap(d->res.start, size);
-+	if (!tmp)
-+		return -ENOMEM;
- 
--	ret = amba_get_enable_pclk(dev);
-+	ret = amba_get_enable_pclk(d);
- 	if (ret == 0) {
- 		u32 pid, cid;
- 
-@@ -388,37 +373,50 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
- 			cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
- 				(i * 8);
- 
--		amba_put_disable_pclk(dev);
-+		amba_put_disable_pclk(d);
- 
- 		if (cid == AMBA_CID || cid == CORESIGHT_CID)
--			dev->periphid = pid;
-+			d->periphid = pid;
- 
--		if (!dev->periphid)
-+		if (!d->periphid)
- 			ret = -ENODEV;
- 	}
- 
- 	iounmap(tmp);
- 
-+	return ret;
-+}
+ 	 * Lock device and try to bind to it. We drop the error
+@@ -636,8 +648,20 @@ static int __driver_attach(struct device *dev, void *data)
+ 	if (dev->parent)	/* Needed for USB */
+ 		device_lock(dev->parent);
+ 	device_lock(dev);
 +
-+/**
-+ *	amba_device_add - add a previously allocated AMBA device structure
-+ *	@dev: AMBA device allocated by amba_device_alloc
-+ *	@parent: resource parent for this devices resources
-+ *
-+ *	Claim the resource, and register the AMBA device with the Linux device
-+ *	manager.
-+ */
-+int amba_device_add(struct amba_device *dev, struct resource *parent)
-+{
-+	int ret;
++	if (dev->bus && dev->bus->pre_probe) {
++		ret = dev->bus->pre_probe(dev);
++		if (ret) {
++			if (ret == -EPROBE_DEFER)
++				driver_deferred_probe_add(dev);
++			goto out;
++		}
++	}
 +
-+	WARN_ON(dev->irq[0] == (unsigned int)-1);
-+	WARN_ON(dev->irq[1] == (unsigned int)-1);
+ 	if (!dev->driver)
+ 		driver_probe_device(drv, dev);
 +
-+	ret = request_resource(parent, &dev->res);
- 	if (ret)
--		goto err_release;
-+		return ret;
++out:
+ 	device_unlock(dev);
+ 	if (dev->parent)
+ 		device_unlock(dev->parent);
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 5d7bc6349930..d8be07bc9c3f 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -74,6 +74,9 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
+  *		given device can be handled by the given driver.
+  * @uevent:	Called when a device is added, removed, or a few other things
+  *		that generate uevents to add the environment variables.
++ * @pre_probe:	Called when a new device or driver is added to this bus, to
++ *		perform any initializations that are needed so the device can
++ *		be matched to a driver.
+  * @probe:	Called when a new device or driver add to this bus, and callback
+  *		the specific driver's probe to initial the matched device.
+  * @remove:	Called when a device removed from this bus.
+@@ -113,6 +116,7 @@ struct bus_type {
  
-- skip_probe:
- 	ret = device_add(&dev->dev);
- 	if (ret)
--		goto err_release;
-+		return ret;
- 
- 	if (dev->irq[0])
- 		ret = device_create_file(&dev->dev, &dev_attr_irq0);
- 	if (ret == 0 && dev->irq[1])
- 		ret = device_create_file(&dev->dev, &dev_attr_irq1);
--	if (ret == 0)
--		return ret;
--
--	device_unregister(&dev->dev);
-+	if (ret)
-+		device_unregister(&dev->dev);
- 
-- err_release:
--	release_resource(&dev->res);
-- err_out:
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(amba_device_add);
+ 	int (*match)(struct device *dev, struct device_driver *drv);
+ 	int (*uevent)(struct device *dev, struct kobj_uevent_env *env);
++	int (*pre_probe)(struct device *dev);
+ 	int (*probe)(struct device *dev);
+ 	int (*remove)(struct device *dev);
+ 	void (*shutdown)(struct device *dev);
 -- 
 2.4.3
