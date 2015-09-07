@@ -1,52 +1,95 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Mon, 7 Sep 2015 18:48:44 +0200
-Subject: [PATCH v2] irqchip, gicv3-its, numa: Workaround for Cavium
- ThunderX erratum 23144
-In-Reply-To: <55EDBEF9.4050007@arm.com>
-References: <1440497885-24584-1-git-send-email-gkulkarni@caviumnetworks.com>
- <55EDBEF9.4050007@arm.com>
-Message-ID: <20150907164844.GU1820@rric.localdomain>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 07 Sep 2015 17:54:06 +0100
+Subject: [PATCH v4 2/5] irqchip, gicv3: Workaround for Cavium ThunderX
+ erratum 23154
+In-Reply-To: <1439576885-15621-3-git-send-email-rric@kernel.org>
+References: <1439576885-15621-1-git-send-email-rric@kernel.org>
+ <1439576885-15621-3-git-send-email-rric@kernel.org>
+Message-ID: <55EDC12E.8000408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.09.15 17:44:41, Marc Zyngier wrote:
-> On 25/08/15 11:18, Ganapatrao Kulkarni wrote:
-> > The patch below adds a workaround for gicv3 in a numa environment. It
-> > is on top of Robert's recent gicv3 errata patch submission v4 and my
-> > arm64 numa patches v5.
-> > 
-> > This implements a workaround for gicv3-its erratum 23144 on Cavium's
-> > ThunderX dual-socket platforms, where LPI cannot be routed to a
-> > redistributors present on a foreign node.
-> > 
-> > v2:
-> > updatated as per Marc Zyngier's review comments.
-> > 
-> > Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> > Signed-off-by: Robert Richter <rrichter@cavium.com>
-> > ---
-> >  drivers/irqchip/irq-gic-v3-its.c | 53 +++++++++++++++++++++++++++++++++-------
-> >  1 file changed, 44 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> > index 614a367..d3fe0a4 100644
-> > --- a/drivers/irqchip/irq-gic-v3-its.c
-> > +++ b/drivers/irqchip/irq-gic-v3-its.c
-> > @@ -40,7 +40,8 @@
-> >  #include "irqchip.h"
-> >  
-> >  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING          (1ULL << 0)
-> > -#define ITS_FLAGS_CAVIUM_THUNDERX              (1ULL << 1)
-> > +#define ITS_WORKAROUND_CAVIUM_22375            (1ULL << 1)
-> > +#define ITS_WORKAROUND_CAVIUM_23144            (1ULL << 2)
-> 
-> Please move this to Robert's series, as it doesn't make much sense to
-> add a quirk flag just to modify it in the next patch. This will help
-> declutter this patch.
+On 14/08/15 19:28, Robert Richter wrote:
+> From: Robert Richter <rrichter@cavium.com>
+>
+> This patch implements Cavium ThunderX erratum 23154.
+>
+> The gicv3 of ThunderX requires a modified version for reading the IAR
+> status to ensure data synchronization. Since this is in the fast-path
+> and called with each interrupt, runtime patching is used using jump
+> label patching for smallest overhead (no-op). This is the same
+> technique as used for tracepoints.
+>
+> v4:
+>   * simplify code to only use cpus_have_cap() in gicv3_enable_quirks()
+>
+> v3:
+>   * fix erratum to be dependend from midr
+>   * use arm64 errata framework
+>
+> v2:
+>   * implement code in a single asm() to keep instruction sequence
+>   * added comment to the code that explains the erratum
+>   * apply workaround also if running as guest, thus check MIDR
+>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>   arch/arm64/Kconfig                  | 11 ++++++++++
+>   arch/arm64/include/asm/cpufeature.h |  3 ++-
+>   arch/arm64/include/asm/cputype.h    | 18 +++++++++-------
+>   arch/arm64/kernel/cpu_errata.c      |  9 ++++++++
+>   drivers/irqchip/irq-gic-v3.c        | 42 ++++++++++++++++++++++++++++++++++++-
+>   5 files changed, 74 insertions(+), 9 deletions(-)
+>
 
-I will merge the bits in and rebase and rework this one on top (we
-will post this separately due to dependencies to other patch sets).
+...
 
-Thanks,
+>   };
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index c52f7ba205b4..4211c39b8744 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -107,7 +107,7 @@ static void gic_redist_wait_for_rwp(void)
 
--Robert
+...
+
+> +}
+> +
+>   static void __maybe_unused gic_write_pmr(u64 val)
+>   {
+>   	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
+> @@ -766,6 +798,12 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
+>   	.free = gic_irq_domain_free,
+>   };
+>
+> +static void gicv3_enable_quirks(void)
+> +{
+> +	if (cpus_have_cap(ARM64_WORKAROUND_CAVIUM_23154))
+> +		static_key_slow_inc(&is_cavium_thunderx);
+
+May be you could use the enable() method added to struct arm64_cpu_capability
+here to perform the above operation, added by James :
+
+commit 1c0763037f1e1caef739e36e09c6d41ed7b61b2d
+Author: James Morse <james.morse@arm.com>
+Date:   Tue Jul 21 13:23:28 2015 +0100
+
+     arm64: kernel: Add cpufeature 'enable' callback
+
+
+> +}
+> +
+>   static int __init gic_of_init(struct device_node *node, struct device_node *parent)
+>   {
+>   	void __iomem *dist_base;
+> @@ -825,6 +863,8 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+>   	gic_data.nr_redist_regions = nr_redist_regions;
+>   	gic_data.redist_stride = redist_stride;
+>
+> +	gicv3_enable_quirks();
+> +
+
+than adding a hook here ?
+
+Cheers
+Suzuki
