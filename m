@@ -1,45 +1,65 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 7 Sep 2015 12:38:08 +0200
-Subject: [PATCH 1/4] ARM: multi_v7_defconfig: Enable common Rockchip
- devices/busses
-In-Reply-To: <1441621467.8778.26.camel@collabora.co.uk>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 7 Sep 2015 18:49:02 +0800
+Subject: [PATCH 2/4] ARM: multi_v7_defconfig: Enable ACT8865 PMIC driver
+In-Reply-To: <3043964.0UPNRg7XJB@diego>
 References: <1441570566-14001-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1441570566-14001-2-git-send-email-sjoerd.simons@collabora.co.uk>
- <55ED585B.9030009@osg.samsung.com> <1441621467.8778.26.camel@collabora.co.uk>
-Message-ID: <55ED6910.8010202@osg.samsung.com>
+ <1441570566-14001-3-git-send-email-sjoerd.simons@collabora.co.uk>
+ <3043964.0UPNRg7XJB@diego>
+Message-ID: <55ED6B9E.1030705@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sjoerd,
+PMIC RK808 used on many rk3288 boards ,such as Popmetal.
+It is a MFD with function regulator and RTC. So if you plan to enable
+RK808, please also enable CONFIG_RTC_DRV_RK808.
 
-On 09/07/2015 12:24 PM, Sjoerd Simons wrote:
-> On Mon, 2015-09-07 at 11:26 +0200, Javier Martinez Canillas wrote:
->> Hello Sjoerd,
->>
->> On 09/06/2015 10:16 PM, Sjoerd Simons wrote:
->>> Enable Rockchip I2C, SPI, PWM, thermal drivers.
->>>
->>> Builtin are:
->>>  * I2C as it often controls the pmic.
->>
->> Having I2C as a module will cause more probe deferrals due missing
->> regulators and slow down the boot but it should not cause issues.
->> Or am I missing something?
->>
->> In fact, I think even the PMIC could be built as a module.
-> 
-> It could in principle. However as a lot of other drivers do need the
-> regulators provided by the pmic, they'll be deferred until that driver
-> is loaded. So e.g. with the i2c/pmic drivers as a module you cannot
-> boot to an NFS rootfs without using an initramfs. 
+thanks.
+
+On 2015?09?07? 17:33, Heiko St?bner wrote:
+> Hi,
 >
-
-Right, not needing an initramfs is certainly a good reason. If you could
-add something like that in the commit message of patches 1/4 and 2/4 that
-would be great.
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+> I guess one could rename that to something like
+> "ARM: multi_v7_defconfig: Enable regulators used on most rockchip boards"
+>
+> and as well add
+>
+> CONFIG_REGULATOR_FAN53555=y
+> CONFIG_MFD_RK808=y
+> CONFIG_REGULATOR_RK808=y
+>
+> fan5355 is the driver providing support for the syr82x used on all rk3288
+> boards with an act8846.
+>
+>
+>
+> Am Sonntag, 6. September 2015, 22:16:04 schrieb Sjoerd Simons:
+>> Active Semi act8846 is used as the PMIC on various Rockchip boards,
+>> enable the ACT8865 driver to support this.
+>>
+>> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+>
+>> ---
+>>
+>>   arch/arm/configs/multi_v7_defconfig | 1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/configs/multi_v7_defconfig
+>> b/arch/arm/configs/multi_v7_defconfig index 25a1d574..7058fef 100644
+>> --- a/arch/arm/configs/multi_v7_defconfig
+>> +++ b/arch/arm/configs/multi_v7_defconfig
+>> @@ -401,6 +401,7 @@ CONFIG_MFD_TPS65090=y
+>>   CONFIG_MFD_TPS6586X=y
+>>   CONFIG_MFD_TPS65910=y
+>>   CONFIG_REGULATOR_AB8500=y
+>> +CONFIG_REGULATOR_ACT8865=y
+>>   CONFIG_REGULATOR_AS3711=y
+>>   CONFIG_REGULATOR_AS3722=y
+>>   CONFIG_REGULATOR_AXP20X=y
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>
+>
+>
