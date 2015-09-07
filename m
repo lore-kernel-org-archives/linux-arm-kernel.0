@@ -1,371 +1,178 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 7 Sep 2015 16:33:44 +0100
-Subject: [PATCH v4 06/20] block/xen-blkfront: Split blkif_queue_request in 2
+Date: Mon, 7 Sep 2015 16:33:42 +0100
+Subject: [PATCH v4 04/20] xen/grant: Introduce helpers to split a page into
+ grant
 In-Reply-To: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
 References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1441640038-23615-7-git-send-email-julien.grall@citrix.com>
+Message-ID: <1441640038-23615-5-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, blkif_queue_request has 2 distinct execution path:
-    - Send a discard request
-    - Send a read/write request
+Currently, a grant is always based on the Xen page granularity (i.e
+4KB). When Linux is using a different page granularity, a single page
+will be split between multiple grants.
 
-The function is also allocating grants to use for generating the
-request. Although, this is only used for read/write request.
+The new helpers will be in charge of splitting the Linux page into grants
+and call a function given by the caller on each grant.
 
-Rather than having a function with 2 distinct execution path, separate
-the function in 2. This will also remove one level of tabulation.
+Also provide an helper to count the number of grants within a given
+contiguous region.
+
+Note that the x86/include/asm/xen/page.h is now including
+xen/interface/grant_table.h rather than xen/grant_table.h. It's
+necessary because xen/grant_table.h depends on asm/xen/page.h and will
+break the compilation. Furthermore, only definition in
+interface/grant_table.h is required.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Reviewed-by: Roger Pau Monn? <roger.pau@citrix.com>
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
 ---
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: x86 at kernel.org
 
-    Roger, if you really want if can drop the else clause in
-    blkif_queue_request, IHMO it's more clear here. Although I've kept
-    your Reviewed-by. Let me know if it's not fine.
+    Changes in v4:
+        - Typoes
+        - Rename gnttab_one_grant into gnttab_for_one_grant
+        - Add Stefano and David's reviewed-by
+        - s/xen_page_to_pfn/page_to_xen_pfn/ based on the new naming
 
     Changes in v3:
-        - Fix errors reported by checkpatch.pl
-        - Add Roger's Reviewed-by
+        - Fix error reported by checkpatch.pl
+        - Typoes
+        - s/pfn/xen_pfn/ in gnttab_foreach_grant
+        - Drop the possibility to use less data. The complexity is moved
+        in netback which is the only user
+        - Rename gnttab_foreach_grant into gnttab_foreach_grant_in_range
+        - s/offset/start/ in gnttab_count_grant and update the
+        description of the parameter
+        - s/mfn/gfn base on the new terminologies
+        - Add EXPORT_SYMBOL_GPL for gnttab_foreach_grant_in_range
+        - Use xen_offset_in_page and XEN_PFN_DOWN whenever it's possible
+        - Fix compilation on x86.
 
     Changes in v2:
         - Patch added
 ---
- drivers/block/xen-blkfront.c | 277 ++++++++++++++++++++++++-------------------
- 1 file changed, 153 insertions(+), 124 deletions(-)
+ arch/x86/include/asm/xen/page.h |  2 +-
+ drivers/xen/grant-table.c       | 26 +++++++++++++++++++++++++
+ include/xen/grant_table.h       | 42 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 69 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
-index 432e105..b11f084 100644
---- a/drivers/block/xen-blkfront.c
-+++ b/drivers/block/xen-blkfront.c
-@@ -395,13 +395,35 @@ static int blkif_ioctl(struct block_device *bdev, fmode_t mode,
- 	return 0;
+diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
+index 0b762f6..501479e 100644
+--- a/arch/x86/include/asm/xen/page.h
++++ b/arch/x86/include/asm/xen/page.h
+@@ -12,7 +12,7 @@
+ #include <asm/pgtable.h>
+ 
+ #include <xen/interface/xen.h>
+-#include <xen/grant_table.h>
++#include <xen/interface/grant_table.h>
+ #include <xen/features.h>
+ 
+ /* Xen machine address */
+diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+index 62f591f..7b4e1cf 100644
+--- a/drivers/xen/grant-table.c
++++ b/drivers/xen/grant-table.c
+@@ -776,6 +776,32 @@ void gnttab_batch_copy(struct gnttab_copy *batch, unsigned count)
  }
+ EXPORT_SYMBOL_GPL(gnttab_batch_copy);
  
--/*
-- * Generate a Xen blkfront IO request from a blk layer request.  Reads
-- * and writes are handled as expected.
-- *
-- * @req: a request struct
-- */
--static int blkif_queue_request(struct request *req)
-+static int blkif_queue_discard_req(struct request *req)
++void gnttab_foreach_grant_in_range(struct page *page,
++				   unsigned int offset,
++				   unsigned int len,
++				   xen_grant_fn_t fn,
++				   void *data)
 +{
-+	struct blkfront_info *info = req->rq_disk->private_data;
-+	struct blkif_request *ring_req;
-+	unsigned long id;
++	unsigned int goffset;
++	unsigned int glen;
++	unsigned long xen_pfn;
 +
-+	/* Fill out a communications ring structure. */
-+	ring_req = RING_GET_REQUEST(&info->ring, info->ring.req_prod_pvt);
-+	id = get_id_from_freelist(info);
-+	info->shadow[id].request = req;
++	len = min_t(unsigned int, PAGE_SIZE - offset, len);
++	goffset = xen_offset_in_page(offset);
 +
-+	ring_req->operation = BLKIF_OP_DISCARD;
-+	ring_req->u.discard.nr_sectors = blk_rq_sectors(req);
-+	ring_req->u.discard.id = id;
-+	ring_req->u.discard.sector_number = (blkif_sector_t)blk_rq_pos(req);
-+	if ((req->cmd_flags & REQ_SECURE) && info->feature_secdiscard)
-+		ring_req->u.discard.flag = BLKIF_DISCARD_SECURE;
-+	else
-+		ring_req->u.discard.flag = 0;
++	xen_pfn = page_to_xen_pfn(page) + XEN_PFN_DOWN(offset);
 +
-+	info->ring.req_prod_pvt++;
++	while (len) {
++		glen = min_t(unsigned int, XEN_PAGE_SIZE - goffset, len);
++		fn(pfn_to_gfn(xen_pfn), goffset, glen, data);
 +
-+	/* Keep a private copy so we can reissue requests when recovering. */
-+	info->shadow[id].req = *ring_req;
-+
-+	return 0;
-+}
-+
-+static int blkif_queue_rw_req(struct request *req)
- {
- 	struct blkfront_info *info = req->rq_disk->private_data;
- 	struct blkif_request *ring_req;
-@@ -421,9 +443,6 @@ static int blkif_queue_request(struct request *req)
- 	struct scatterlist *sg;
- 	int nseg, max_grefs;
- 
--	if (unlikely(info->connected != BLKIF_STATE_CONNECTED))
--		return 1;
--
- 	max_grefs = req->nr_phys_segments;
- 	if (max_grefs > BLKIF_MAX_SEGMENTS_PER_REQUEST)
- 		/*
-@@ -453,139 +472,131 @@ static int blkif_queue_request(struct request *req)
- 	id = get_id_from_freelist(info);
- 	info->shadow[id].request = req;
- 
--	if (unlikely(req->cmd_flags & (REQ_DISCARD | REQ_SECURE))) {
--		ring_req->operation = BLKIF_OP_DISCARD;
--		ring_req->u.discard.nr_sectors = blk_rq_sectors(req);
--		ring_req->u.discard.id = id;
--		ring_req->u.discard.sector_number = (blkif_sector_t)blk_rq_pos(req);
--		if ((req->cmd_flags & REQ_SECURE) && info->feature_secdiscard)
--			ring_req->u.discard.flag = BLKIF_DISCARD_SECURE;
--		else
--			ring_req->u.discard.flag = 0;
-+	BUG_ON(info->max_indirect_segments == 0 &&
-+	       req->nr_phys_segments > BLKIF_MAX_SEGMENTS_PER_REQUEST);
-+	BUG_ON(info->max_indirect_segments &&
-+	       req->nr_phys_segments > info->max_indirect_segments);
-+	nseg = blk_rq_map_sg(req->q, req, info->shadow[id].sg);
-+	ring_req->u.rw.id = id;
-+	if (nseg > BLKIF_MAX_SEGMENTS_PER_REQUEST) {
-+		/*
-+		 * The indirect operation can only be a BLKIF_OP_READ or
-+		 * BLKIF_OP_WRITE
-+		 */
-+		BUG_ON(req->cmd_flags & (REQ_FLUSH | REQ_FUA));
-+		ring_req->operation = BLKIF_OP_INDIRECT;
-+		ring_req->u.indirect.indirect_op = rq_data_dir(req) ?
-+			BLKIF_OP_WRITE : BLKIF_OP_READ;
-+		ring_req->u.indirect.sector_number = (blkif_sector_t)blk_rq_pos(req);
-+		ring_req->u.indirect.handle = info->handle;
-+		ring_req->u.indirect.nr_segments = nseg;
- 	} else {
--		BUG_ON(info->max_indirect_segments == 0 &&
--		       req->nr_phys_segments > BLKIF_MAX_SEGMENTS_PER_REQUEST);
--		BUG_ON(info->max_indirect_segments &&
--		       req->nr_phys_segments > info->max_indirect_segments);
--		nseg = blk_rq_map_sg(req->q, req, info->shadow[id].sg);
--		ring_req->u.rw.id = id;
--		if (nseg > BLKIF_MAX_SEGMENTS_PER_REQUEST) {
-+		ring_req->u.rw.sector_number = (blkif_sector_t)blk_rq_pos(req);
-+		ring_req->u.rw.handle = info->handle;
-+		ring_req->operation = rq_data_dir(req) ?
-+			BLKIF_OP_WRITE : BLKIF_OP_READ;
-+		if (req->cmd_flags & (REQ_FLUSH | REQ_FUA)) {
- 			/*
--			 * The indirect operation can only be a BLKIF_OP_READ or
--			 * BLKIF_OP_WRITE
-+			 * Ideally we can do an unordered flush-to-disk.
-+			 * In case the backend onlysupports barriers, use that.
-+			 * A barrier request a superset of FUA, so we can
-+			 * implement it the same way.  (It's also a FLUSH+FUA,
-+			 * since it is guaranteed ordered WRT previous writes.)
- 			 */
--			BUG_ON(req->cmd_flags & (REQ_FLUSH | REQ_FUA));
--			ring_req->operation = BLKIF_OP_INDIRECT;
--			ring_req->u.indirect.indirect_op = rq_data_dir(req) ?
--				BLKIF_OP_WRITE : BLKIF_OP_READ;
--			ring_req->u.indirect.sector_number = (blkif_sector_t)blk_rq_pos(req);
--			ring_req->u.indirect.handle = info->handle;
--			ring_req->u.indirect.nr_segments = nseg;
--		} else {
--			ring_req->u.rw.sector_number = (blkif_sector_t)blk_rq_pos(req);
--			ring_req->u.rw.handle = info->handle;
--			ring_req->operation = rq_data_dir(req) ?
--				BLKIF_OP_WRITE : BLKIF_OP_READ;
--			if (req->cmd_flags & (REQ_FLUSH | REQ_FUA)) {
--				/*
--				 * Ideally we can do an unordered flush-to-disk. In case the
--				 * backend onlysupports barriers, use that. A barrier request
--				 * a superset of FUA, so we can implement it the same
--				 * way.  (It's also a FLUSH+FUA, since it is
--				 * guaranteed ordered WRT previous writes.)
--				 */
--				switch (info->feature_flush &
--					((REQ_FLUSH|REQ_FUA))) {
--				case REQ_FLUSH|REQ_FUA:
--					ring_req->operation =
--						BLKIF_OP_WRITE_BARRIER;
--					break;
--				case REQ_FLUSH:
--					ring_req->operation =
--						BLKIF_OP_FLUSH_DISKCACHE;
--					break;
--				default:
--					ring_req->operation = 0;
--				}
-+			switch (info->feature_flush &
-+				((REQ_FLUSH|REQ_FUA))) {
-+			case REQ_FLUSH|REQ_FUA:
-+				ring_req->operation =
-+					BLKIF_OP_WRITE_BARRIER;
-+				break;
-+			case REQ_FLUSH:
-+				ring_req->operation =
-+					BLKIF_OP_FLUSH_DISKCACHE;
-+				break;
-+			default:
-+				ring_req->operation = 0;
- 			}
--			ring_req->u.rw.nr_segments = nseg;
- 		}
--		for_each_sg(info->shadow[id].sg, sg, nseg, i) {
--			fsect = sg->offset >> 9;
--			lsect = fsect + (sg->length >> 9) - 1;
-+		ring_req->u.rw.nr_segments = nseg;
++		goffset = 0;
++		xen_pfn++;
++		len -= glen;
 +	}
-+	for_each_sg(info->shadow[id].sg, sg, nseg, i) {
-+		fsect = sg->offset >> 9;
-+		lsect = fsect + (sg->length >> 9) - 1;
- 
--			if ((ring_req->operation == BLKIF_OP_INDIRECT) &&
--			    (i % SEGS_PER_INDIRECT_FRAME == 0)) {
--				unsigned long uninitialized_var(pfn);
-+		if ((ring_req->operation == BLKIF_OP_INDIRECT) &&
-+		    (i % SEGS_PER_INDIRECT_FRAME == 0)) {
-+			unsigned long uninitialized_var(pfn);
- 
--				if (segments)
--					kunmap_atomic(segments);
-+			if (segments)
-+				kunmap_atomic(segments);
- 
--				n = i / SEGS_PER_INDIRECT_FRAME;
--				if (!info->feature_persistent) {
--					struct page *indirect_page;
--
--					/* Fetch a pre-allocated page to use for indirect grefs */
--					BUG_ON(list_empty(&info->indirect_pages));
--					indirect_page = list_first_entry(&info->indirect_pages,
--					                                 struct page, lru);
--					list_del(&indirect_page->lru);
--					pfn = page_to_pfn(indirect_page);
--				}
--				gnt_list_entry = get_grant(&gref_head, pfn, info);
--				info->shadow[id].indirect_grants[n] = gnt_list_entry;
--				segments = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
--				ring_req->u.indirect.indirect_grefs[n] = gnt_list_entry->gref;
-+			n = i / SEGS_PER_INDIRECT_FRAME;
-+			if (!info->feature_persistent) {
-+				struct page *indirect_page;
++}
++EXPORT_SYMBOL_GPL(gnttab_foreach_grant_in_range);
 +
-+				/*
-+				 * Fetch a pre-allocated page to use for
-+				 * indirect grefs
-+				 */
-+				BUG_ON(list_empty(&info->indirect_pages));
-+				indirect_page = list_first_entry(&info->indirect_pages,
-+								 struct page, lru);
-+				list_del(&indirect_page->lru);
-+				pfn = page_to_pfn(indirect_page);
- 			}
-+			gnt_list_entry = get_grant(&gref_head, pfn, info);
-+			info->shadow[id].indirect_grants[n] = gnt_list_entry;
-+			segments = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
-+			ring_req->u.indirect.indirect_grefs[n] = gnt_list_entry->gref;
-+		}
+ int gnttab_map_refs(struct gnttab_map_grant_ref *map_ops,
+ 		    struct gnttab_map_grant_ref *kmap_ops,
+ 		    struct page **pages, unsigned int count)
+diff --git a/include/xen/grant_table.h b/include/xen/grant_table.h
+index 4478f4b..05b5b08 100644
+--- a/include/xen/grant_table.h
++++ b/include/xen/grant_table.h
+@@ -45,8 +45,10 @@
+ #include <asm/xen/hypervisor.h>
  
--			gnt_list_entry = get_grant(&gref_head, page_to_pfn(sg_page(sg)), info);
--			ref = gnt_list_entry->gref;
-+		gnt_list_entry = get_grant(&gref_head, page_to_pfn(sg_page(sg)), info);
-+		ref = gnt_list_entry->gref;
+ #include <xen/features.h>
++#include <xen/page.h>
+ #include <linux/mm_types.h>
+ #include <linux/page-flags.h>
++#include <linux/kernel.h>
  
--			info->shadow[id].grants_used[i] = gnt_list_entry;
-+		info->shadow[id].grants_used[i] = gnt_list_entry;
+ #define GNTTAB_RESERVED_XENSTORE 1
  
--			if (rq_data_dir(req) && info->feature_persistent) {
--				char *bvec_data;
--				void *shared_data;
-+		if (rq_data_dir(req) && info->feature_persistent) {
-+			char *bvec_data;
-+			void *shared_data;
- 
--				BUG_ON(sg->offset + sg->length > PAGE_SIZE);
-+			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
- 
--				shared_data = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
--				bvec_data = kmap_atomic(sg_page(sg));
-+			shared_data = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
-+			bvec_data = kmap_atomic(sg_page(sg));
- 
--				/*
--				 * this does not wipe data stored outside the
--				 * range sg->offset..sg->offset+sg->length.
--				 * Therefore, blkback *could* see data from
--				 * previous requests. This is OK as long as
--				 * persistent grants are shared with just one
--				 * domain. It may need refactoring if this
--				 * changes
--				 */
--				memcpy(shared_data + sg->offset,
--				       bvec_data   + sg->offset,
--				       sg->length);
-+			/*
-+			 * this does not wipe data stored outside the
-+			 * range sg->offset..sg->offset+sg->length.
-+			 * Therefore, blkback *could* see data from
-+			 * previous requests. This is OK as long as
-+			 * persistent grants are shared with just one
-+			 * domain. It may need refactoring if this
-+			 * changes
-+			 */
-+			memcpy(shared_data + sg->offset,
-+			       bvec_data   + sg->offset,
-+			       sg->length);
- 
--				kunmap_atomic(bvec_data);
--				kunmap_atomic(shared_data);
--			}
--			if (ring_req->operation != BLKIF_OP_INDIRECT) {
--				ring_req->u.rw.seg[i] =
--						(struct blkif_request_segment) {
--							.gref       = ref,
--							.first_sect = fsect,
--							.last_sect  = lsect };
--			} else {
--				n = i % SEGS_PER_INDIRECT_FRAME;
--				segments[n] =
-+			kunmap_atomic(bvec_data);
-+			kunmap_atomic(shared_data);
-+		}
-+		if (ring_req->operation != BLKIF_OP_INDIRECT) {
-+			ring_req->u.rw.seg[i] =
- 					(struct blkif_request_segment) {
--							.gref       = ref,
--							.first_sect = fsect,
--							.last_sect  = lsect };
--			}
-+						.gref       = ref,
-+						.first_sect = fsect,
-+						.last_sect  = lsect };
-+		} else {
-+			n = i % SEGS_PER_INDIRECT_FRAME;
-+			segments[n] =
-+				(struct blkif_request_segment) {
-+						.gref       = ref,
-+						.first_sect = fsect,
-+						.last_sect  = lsect };
- 		}
--		if (segments)
--			kunmap_atomic(segments);
- 	}
-+	if (segments)
-+		kunmap_atomic(segments);
- 
- 	info->ring.req_prod_pvt++;
- 
-@@ -598,6 +609,24 @@ static int blkif_queue_request(struct request *req)
- 	return 0;
+@@ -224,4 +226,44 @@ static inline struct xen_page_foreign *xen_page_foreign(struct page *page)
+ #endif
  }
  
-+/*
-+ * Generate a Xen blkfront IO request from a blk layer request.  Reads
-+ * and writes are handled as expected.
++/* Split Linux page in chunk of the size of the grant and call fn
 + *
-+ * @req: a request struct
++ * Parameters of fn:
++ *	gfn: guest frame number
++ *	offset: offset in the grant
++ *	len: length of the data in the grant.
++ *	data: internal information
 + */
-+static int blkif_queue_request(struct request *req)
++typedef void (*xen_grant_fn_t)(unsigned long gfn, unsigned int offset,
++			       unsigned int len, void *data);
++
++void gnttab_foreach_grant_in_range(struct page *page,
++				   unsigned int offset,
++				   unsigned int len,
++				   xen_grant_fn_t fn,
++				   void *data);
++
++/* Helper to get to call fn only on the first "grant chunk" */
++static inline void gnttab_for_one_grant(struct page *page, unsigned int offset,
++					unsigned len, xen_grant_fn_t fn,
++					void *data)
 +{
-+	struct blkfront_info *info = req->rq_disk->private_data;
++	/* The first request is limited to the size of one grant */
++	len = min_t(unsigned int, XEN_PAGE_SIZE - (offset & ~XEN_PAGE_MASK),
++		    len);
 +
-+	if (unlikely(info->connected != BLKIF_STATE_CONNECTED))
-+		return 1;
-+
-+	if (unlikely(req->cmd_flags & (REQ_DISCARD | REQ_SECURE)))
-+		return blkif_queue_discard_req(req);
-+	else
-+		return blkif_queue_rw_req(req);
++	gnttab_foreach_grant_in_range(page, offset, len, fn, data);
 +}
- 
- static inline void flush_requests(struct blkfront_info *info)
- {
++
++/* Get the number of grant in a specified region
++ *
++ * start: Offset from the beginning of the first page
++ * len: total length of data (can cross multiple page)
++ */
++static inline unsigned int gnttab_count_grant(unsigned int start,
++					      unsigned int len)
++{
++	return XEN_PFN_UP(xen_offset_in_page(start) + len);
++}
++
+ #endif /* __ASM_GNTTAB_H__ */
 -- 
 2.1.4
