@@ -1,151 +1,308 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 7 Sep 2015 16:33:54 +0100
-Subject: [PATCH v4 16/20] block/xen-blkback: Make it running on 64KB page
+Date: Mon, 7 Sep 2015 16:33:55 +0100
+Subject: [PATCH v4 17/20] net/xen-netfront: Make it running on 64KB page
  granularity
 In-Reply-To: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
 References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1441640038-23615-17-git-send-email-julien.grall@citrix.com>
+Message-ID: <1441640038-23615-18-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PV block protocol is using 4KB page granularity. The goal of this
-patch is to allow a Linux using 64KB page granularity behaving as a
-block backend on a non-modified Xen.
+The PV network protocol is using 4KB page granularity. The goal of this
+patch is to allow a Linux using 64KB page granularity using network
+device on a non-modified Xen.
 
-It's only necessary to adapt the ring size and the number of request per
-indirect frames. The rest of the code is relying on the grant table
-code.
+It's only necessary to adapt the ring size and break skb data in small
+chunk of 4KB. The rest of the code is relying on the grant table code.
 
-Note that the grant table code is allocating a Linux page per grant
-which will result to waste 6OKB for every grant when Linux is using 64KB
-page granularity. This could be improved by sharing the page between
-multiple grants.
+Note that we allocate a Linux page for each rx skb but only the first
+4KB is used. We may improve the memory usage by extending the size of
+the rx skb.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Acked-by: "Roger Pau Monn?" <roger.pau@citrix.com>
----
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 
+---
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
+Cc: netdev at vger.kernel.org
 
 Improvement such as support of 64KB grant is not taken into
-consideration in this patch because we have the requirement to run a
-Linux using 64KB pages on a non-modified Xen.
+consideration in this patch because we have the requirement to run a Linux
+using 64KB pages on a non-modified Xen.
 
-This has been tested only with a loop device. I plan to test passing
-hard drive partition but I didn't yet convert the swiotlb code.
+Tested with workload such as ping, ssh, wget, git... I would happy if
+someone give details how to test all the path.
 
     Changes in v4:
-        - Add Roger's acked-by
+        - s/gnttab_one_grant/gnttab_for_one_grant/ based on the new naming
+        - Add David's reviewed-by
 
     Changes in v3:
-        - Use DIV_ROUND_UP in INDIRECT_PAGES to avoid a line over 80
-        characters
----
- drivers/block/xen-blkback/blkback.c |  5 +++--
- drivers/block/xen-blkback/common.h  | 17 +++++++++++++----
- drivers/block/xen-blkback/xenbus.c  |  9 ++++++---
- 3 files changed, 22 insertions(+), 9 deletions(-)
+        - Fix errors reported by checkpatch.pl
+        - s/mfn/gfn/ base on the new naming
+        - xennet_tx_setup_grant was calling itself resulting an
+        guest stall when using iperf.
+        - The grant callback doesn't allow anymore to change the len
+        (wasn't used here)
+        - gnttab_foreach_grant has been renamed to gnttab_foreach_grant_in_range
+        - gnttab_page_grant_foreign_ref has been renamed to
+        gnttab_foreach_grant_foreign_ref_one
 
-diff --git a/drivers/block/xen-blkback/blkback.c b/drivers/block/xen-blkback/blkback.c
-index 954c002..802319a 100644
---- a/drivers/block/xen-blkback/blkback.c
-+++ b/drivers/block/xen-blkback/blkback.c
-@@ -961,7 +961,7 @@ static int xen_blkbk_parse_indirect(struct blkif_request *req,
- 		seg[n].nsec = segments[i].last_sect -
- 			segments[i].first_sect + 1;
- 		seg[n].offset = (segments[i].first_sect << 9);
--		if ((segments[i].last_sect >= (PAGE_SIZE >> 9)) ||
-+		if ((segments[i].last_sect >= (XEN_PAGE_SIZE >> 9)) ||
- 		    (segments[i].last_sect < segments[i].first_sect)) {
- 			rc = -EINVAL;
- 			goto unmap;
-@@ -1210,6 +1210,7 @@ static int dispatch_rw_block_io(struct xen_blkif *blkif,
+    Changes in v2:
+        - Use gnttab_foreach_grant to split a Linux page in grant
+        - Fix count slots
+---
+ drivers/net/xen-netfront.c | 122 ++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 86 insertions(+), 36 deletions(-)
+
+diff --git a/drivers/net/xen-netfront.c b/drivers/net/xen-netfront.c
+index 47f791e..17b1013 100644
+--- a/drivers/net/xen-netfront.c
++++ b/drivers/net/xen-netfront.c
+@@ -74,8 +74,8 @@ struct netfront_cb {
  
- 	req_operation = req->operation == BLKIF_OP_INDIRECT ?
- 			req->u.indirect.indirect_op : req->operation;
-+
- 	if ((req->operation == BLKIF_OP_INDIRECT) &&
- 	    (req_operation != BLKIF_OP_READ) &&
- 	    (req_operation != BLKIF_OP_WRITE)) {
-@@ -1268,7 +1269,7 @@ static int dispatch_rw_block_io(struct xen_blkif *blkif,
- 			seg[i].nsec = req->u.rw.seg[i].last_sect -
- 				req->u.rw.seg[i].first_sect + 1;
- 			seg[i].offset = (req->u.rw.seg[i].first_sect << 9);
--			if ((req->u.rw.seg[i].last_sect >= (PAGE_SIZE >> 9)) ||
-+			if ((req->u.rw.seg[i].last_sect >= (XEN_PAGE_SIZE >> 9)) ||
- 			    (req->u.rw.seg[i].last_sect <
- 			     req->u.rw.seg[i].first_sect))
- 				goto fail_response;
-diff --git a/drivers/block/xen-blkback/common.h b/drivers/block/xen-blkback/common.h
-index 45a044a..68e87a0 100644
---- a/drivers/block/xen-blkback/common.h
-+++ b/drivers/block/xen-blkback/common.h
-@@ -39,6 +39,7 @@
- #include <asm/pgalloc.h>
- #include <asm/hypervisor.h>
- #include <xen/grant_table.h>
-+#include <xen/page.h>
- #include <xen/xenbus.h>
- #include <xen/interface/io/ring.h>
- #include <xen/interface/io/blkif.h>
-@@ -51,12 +52,20 @@ extern unsigned int xen_blkif_max_ring_order;
-  */
- #define MAX_INDIRECT_SEGMENTS 256
+ #define GRANT_INVALID_REF	0
  
--#define SEGS_PER_INDIRECT_FRAME \
--	(PAGE_SIZE/sizeof(struct blkif_request_segment))
-+/*
-+ * Xen use 4K pages. The guest may use different page size (4K or 64K)
-+ * Number of Xen pages per segment
-+ */
-+#define XEN_PAGES_PER_SEGMENT   (PAGE_SIZE / XEN_PAGE_SIZE)
-+
-+#define XEN_PAGES_PER_INDIRECT_FRAME \
-+	(XEN_PAGE_SIZE/sizeof(struct blkif_request_segment))
-+#define SEGS_PER_INDIRECT_FRAME	\
-+	(XEN_PAGES_PER_INDIRECT_FRAME / XEN_PAGES_PER_SEGMENT)
-+
- #define MAX_INDIRECT_PAGES \
- 	((MAX_INDIRECT_SEGMENTS + SEGS_PER_INDIRECT_FRAME - 1)/SEGS_PER_INDIRECT_FRAME)
--#define INDIRECT_PAGES(_segs) \
--	((_segs + SEGS_PER_INDIRECT_FRAME - 1)/SEGS_PER_INDIRECT_FRAME)
-+#define INDIRECT_PAGES(_segs) DIV_ROUND_UP(_segs, XEN_PAGES_PER_INDIRECT_FRAME)
+-#define NET_TX_RING_SIZE __CONST_RING_SIZE(xen_netif_tx, PAGE_SIZE)
+-#define NET_RX_RING_SIZE __CONST_RING_SIZE(xen_netif_rx, PAGE_SIZE)
++#define NET_TX_RING_SIZE __CONST_RING_SIZE(xen_netif_tx, XEN_PAGE_SIZE)
++#define NET_RX_RING_SIZE __CONST_RING_SIZE(xen_netif_rx, XEN_PAGE_SIZE)
  
- /* Not a real protocol.  Used to generate ring structs which contain
-  * the elements common to all protocols only.  This way we get a
-diff --git a/drivers/block/xen-blkback/xenbus.c b/drivers/block/xen-blkback/xenbus.c
-index deb3f00..edd27e4 100644
---- a/drivers/block/xen-blkback/xenbus.c
-+++ b/drivers/block/xen-blkback/xenbus.c
-@@ -176,21 +176,24 @@ static int xen_blkif_map(struct xen_blkif *blkif, grant_ref_t *gref,
- 	{
- 		struct blkif_sring *sring;
- 		sring = (struct blkif_sring *)blkif->blk_ring;
--		BACK_RING_INIT(&blkif->blk_rings.native, sring, PAGE_SIZE * nr_grefs);
-+		BACK_RING_INIT(&blkif->blk_rings.native, sring,
-+			       XEN_PAGE_SIZE * nr_grefs);
- 		break;
+ /* Minimum number of Rx slots (includes slot for GSO metadata). */
+ #define NET_RX_SLOTS_MIN (XEN_NETIF_NR_SLOTS_MIN + 1)
+@@ -291,7 +291,7 @@ static void xennet_alloc_rx_buffers(struct netfront_queue *queue)
+ 		struct sk_buff *skb;
+ 		unsigned short id;
+ 		grant_ref_t ref;
+-		unsigned long gfn;
++		struct page *page;
+ 		struct xen_netif_rx_request *req;
+ 
+ 		skb = xennet_alloc_one_rx_buffer(queue);
+@@ -307,14 +307,13 @@ static void xennet_alloc_rx_buffers(struct netfront_queue *queue)
+ 		BUG_ON((signed short)ref < 0);
+ 		queue->grant_rx_ref[id] = ref;
+ 
+-		gfn = xen_page_to_gfn(skb_frag_page(&skb_shinfo(skb)->frags[0]));
++		page = skb_frag_page(&skb_shinfo(skb)->frags[0]);
+ 
+ 		req = RING_GET_REQUEST(&queue->rx, req_prod);
+-		gnttab_grant_foreign_access_ref(ref,
+-						queue->info->xbdev->otherend_id,
+-						gfn,
+-						0);
+-
++		gnttab_page_grant_foreign_access_ref_one(ref,
++							 queue->info->xbdev->otherend_id,
++							 page,
++							 0);
+ 		req->id = id;
+ 		req->gref = ref;
  	}
- 	case BLKIF_PROTOCOL_X86_32:
- 	{
- 		struct blkif_x86_32_sring *sring_x86_32;
- 		sring_x86_32 = (struct blkif_x86_32_sring *)blkif->blk_ring;
--		BACK_RING_INIT(&blkif->blk_rings.x86_32, sring_x86_32, PAGE_SIZE * nr_grefs);
-+		BACK_RING_INIT(&blkif->blk_rings.x86_32, sring_x86_32,
-+			       XEN_PAGE_SIZE * nr_grefs);
- 		break;
+@@ -415,25 +414,33 @@ static void xennet_tx_buf_gc(struct netfront_queue *queue)
+ 	xennet_maybe_wake_tx(queue);
+ }
+ 
+-static struct xen_netif_tx_request *xennet_make_one_txreq(
+-	struct netfront_queue *queue, struct sk_buff *skb,
+-	struct page *page, unsigned int offset, unsigned int len)
++struct xennet_gnttab_make_txreq {
++	struct netfront_queue *queue;
++	struct sk_buff *skb;
++	struct page *page;
++	struct xen_netif_tx_request *tx; /* Last request */
++	unsigned int size;
++};
++
++static void xennet_tx_setup_grant(unsigned long gfn, unsigned int offset,
++				  unsigned int len, void *data)
+ {
++	struct xennet_gnttab_make_txreq *info = data;
+ 	unsigned int id;
+ 	struct xen_netif_tx_request *tx;
+ 	grant_ref_t ref;
+-
+-	len = min_t(unsigned int, PAGE_SIZE - offset, len);
++	/* convenient aliases */
++	struct page *page = info->page;
++	struct netfront_queue *queue = info->queue;
++	struct sk_buff *skb = info->skb;
+ 
+ 	id = get_id_from_freelist(&queue->tx_skb_freelist, queue->tx_skbs);
+ 	tx = RING_GET_REQUEST(&queue->tx, queue->tx.req_prod_pvt++);
+ 	ref = gnttab_claim_grant_reference(&queue->gref_tx_head);
+ 	BUG_ON((signed short)ref < 0);
+ 
+-	gnttab_grant_foreign_access_ref(ref,
+-					queue->info->xbdev->otherend_id,
+-					xen_page_to_gfn(page),
+-					GNTMAP_readonly);
++	gnttab_grant_foreign_access_ref(ref, queue->info->xbdev->otherend_id,
++					gfn, GNTMAP_readonly);
+ 
+ 	queue->tx_skbs[id].skb = skb;
+ 	queue->grant_tx_page[id] = page;
+@@ -445,7 +452,34 @@ static struct xen_netif_tx_request *xennet_make_one_txreq(
+ 	tx->size = len;
+ 	tx->flags = 0;
+ 
+-	return tx;
++	info->tx = tx;
++	info->size += tx->size;
++}
++
++static struct xen_netif_tx_request *xennet_make_first_txreq(
++	struct netfront_queue *queue, struct sk_buff *skb,
++	struct page *page, unsigned int offset, unsigned int len)
++{
++	struct xennet_gnttab_make_txreq info = {
++		.queue = queue,
++		.skb = skb,
++		.page = page,
++		.size = 0,
++	};
++
++	gnttab_for_one_grant(page, offset, len, xennet_tx_setup_grant, &info);
++
++	return info.tx;
++}
++
++static void xennet_make_one_txreq(unsigned long gfn, unsigned int offset,
++				  unsigned int len, void *data)
++{
++	struct xennet_gnttab_make_txreq *info = data;
++
++	info->tx->flags |= XEN_NETTXF_more_data;
++	skb_get(info->skb);
++	xennet_tx_setup_grant(gfn, offset, len, data);
+ }
+ 
+ static struct xen_netif_tx_request *xennet_make_txreqs(
+@@ -453,20 +487,30 @@ static struct xen_netif_tx_request *xennet_make_txreqs(
+ 	struct sk_buff *skb, struct page *page,
+ 	unsigned int offset, unsigned int len)
+ {
++	struct xennet_gnttab_make_txreq info = {
++		.queue = queue,
++		.skb = skb,
++		.tx = tx,
++	};
++
+ 	/* Skip unused frames from start of page */
+ 	page += offset >> PAGE_SHIFT;
+ 	offset &= ~PAGE_MASK;
+ 
+ 	while (len) {
+-		tx->flags |= XEN_NETTXF_more_data;
+-		tx = xennet_make_one_txreq(queue, skb_get(skb),
+-					   page, offset, len);
++		info.page = page;
++		info.size = 0;
++
++		gnttab_foreach_grant_in_range(page, offset, len,
++					      xennet_make_one_txreq,
++					      &info);
++
+ 		page++;
+ 		offset = 0;
+-		len -= tx->size;
++		len -= info.size;
  	}
- 	case BLKIF_PROTOCOL_X86_64:
- 	{
- 		struct blkif_x86_64_sring *sring_x86_64;
- 		sring_x86_64 = (struct blkif_x86_64_sring *)blkif->blk_ring;
--		BACK_RING_INIT(&blkif->blk_rings.x86_64, sring_x86_64, PAGE_SIZE * nr_grefs);
-+		BACK_RING_INIT(&blkif->blk_rings.x86_64, sring_x86_64,
-+			       XEN_PAGE_SIZE * nr_grefs);
- 		break;
+ 
+-	return tx;
++	return info.tx;
+ }
+ 
+ /*
+@@ -476,9 +520,10 @@ static struct xen_netif_tx_request *xennet_make_txreqs(
+ static int xennet_count_skb_slots(struct sk_buff *skb)
+ {
+ 	int i, frags = skb_shinfo(skb)->nr_frags;
+-	int pages;
++	int slots;
+ 
+-	pages = PFN_UP(offset_in_page(skb->data) + skb_headlen(skb));
++	slots = gnttab_count_grant(offset_in_page(skb->data),
++				   skb_headlen(skb));
+ 
+ 	for (i = 0; i < frags; i++) {
+ 		skb_frag_t *frag = skb_shinfo(skb)->frags + i;
+@@ -488,10 +533,10 @@ static int xennet_count_skb_slots(struct sk_buff *skb)
+ 		/* Skip unused frames from start of page */
+ 		offset &= ~PAGE_MASK;
+ 
+-		pages += PFN_UP(offset + size);
++		slots += gnttab_count_grant(offset, size);
  	}
- 	default:
+ 
+-	return pages;
++	return slots;
+ }
+ 
+ static u16 xennet_select_queue(struct net_device *dev, struct sk_buff *skb,
+@@ -512,6 +557,8 @@ static u16 xennet_select_queue(struct net_device *dev, struct sk_buff *skb,
+ 	return queue_idx;
+ }
+ 
++#define MAX_XEN_SKB_FRAGS (65536 / XEN_PAGE_SIZE + 1)
++
+ static int xennet_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ {
+ 	struct netfront_info *np = netdev_priv(dev);
+@@ -546,7 +593,7 @@ static int xennet_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 	}
+ 
+ 	slots = xennet_count_skb_slots(skb);
+-	if (unlikely(slots > MAX_SKB_FRAGS + 1)) {
++	if (unlikely(slots > MAX_XEN_SKB_FRAGS + 1)) {
+ 		net_dbg_ratelimited("xennet: skb rides the rocket: %d slots, %d bytes\n",
+ 				    slots, skb->len);
+ 		if (skb_linearize(skb))
+@@ -567,10 +614,13 @@ static int xennet_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 	}
+ 
+ 	/* First request for the linear area. */
+-	first_tx = tx = xennet_make_one_txreq(queue, skb,
+-					      page, offset, len);
+-	page++;
+-	offset = 0;
++	first_tx = tx = xennet_make_first_txreq(queue, skb,
++						page, offset, len);
++	offset += tx->size;
++	if (offset == PAGE_SIZE) {
++		page++;
++		offset = 0;
++	}
+ 	len -= tx->size;
+ 
+ 	if (skb->ip_summed == CHECKSUM_PARTIAL)
+@@ -732,7 +782,7 @@ static int xennet_get_responses(struct netfront_queue *queue,
+ 
+ 	for (;;) {
+ 		if (unlikely(rx->status < 0 ||
+-			     rx->offset + rx->status > PAGE_SIZE)) {
++			     rx->offset + rx->status > XEN_PAGE_SIZE)) {
+ 			if (net_ratelimit())
+ 				dev_warn(dev, "rx->offset: %u, size: %d\n",
+ 					 rx->offset, rx->status);
+@@ -1495,7 +1545,7 @@ static int setup_netfront(struct xenbus_device *dev,
+ 		goto fail;
+ 	}
+ 	SHARED_RING_INIT(txs);
+-	FRONT_RING_INIT(&queue->tx, txs, PAGE_SIZE);
++	FRONT_RING_INIT(&queue->tx, txs, XEN_PAGE_SIZE);
+ 
+ 	err = xenbus_grant_ring(dev, txs, 1, &gref);
+ 	if (err < 0)
+@@ -1509,7 +1559,7 @@ static int setup_netfront(struct xenbus_device *dev,
+ 		goto alloc_rx_ring_fail;
+ 	}
+ 	SHARED_RING_INIT(rxs);
+-	FRONT_RING_INIT(&queue->rx, rxs, PAGE_SIZE);
++	FRONT_RING_INIT(&queue->rx, rxs, XEN_PAGE_SIZE);
+ 
+ 	err = xenbus_grant_ring(dev, rxs, 1, &gref);
+ 	if (err < 0)
 -- 
 2.1.4
