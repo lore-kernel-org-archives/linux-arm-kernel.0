@@ -1,61 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 07 Sep 2015 18:50:10 +0100
-Subject: [PATCH v2 6/8] arm/arm64: KVM: Add forwarded physical interrupts
- documentation
-In-Reply-To: <55EDBF36.4040307@linaro.org>
-References: <1441395650-19663-1-git-send-email-christoffer.dall@linaro.org>
- <1441395650-19663-7-git-send-email-christoffer.dall@linaro.org>
- <55EDBF36.4040307@linaro.org>
-Message-ID: <55EDCE52.1040006@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 7 Sep 2015 18:56:43 +0100
+Subject: [PATCH 2/3] Docs: dt: Add PCI MSI map bindings
+In-Reply-To: <55B5E8C1.4030707@arm.com>
+References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
+ <1437670365-20704-3-git-send-email-mark.rutland@arm.com>
+ <55B5E8C1.4030707@arm.com>
+Message-ID: <20150907175643.GB18079@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/15 17:45, Eric Auger wrote:
-> Hi Christoffer,
-> On 09/04/2015 09:40 PM, Christoffer Dall wrote:
->> Forwarded physical interrupts on arm/arm64 is a tricky concept and the
->> way we deal with them is not apparently easy to understand by reading
->> various specs.
->>
->> Therefore, add a proper documentation file explaining the flow and
->> rationale of the behavior of the vgic.
->>
->> Some of this text was contributed by Marc Zyngier and edited by me.
->> Omissions and errors are all mine.
->>
->> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->> ---
->>  Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt | 181 +++++++++++++++++++++
->>  1 file changed, 181 insertions(+)
->>  create mode 100644 Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
->>
->> diff --git a/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
->> new file mode 100644
->> index 0000000..24b6f28
->> --- /dev/null
->> +++ b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
->> @@ -0,0 +1,181 @@
->> +KVM/ARM VGIC Forwarded Physical Interrupts
->> +==========================================
+> > +PCI root complex
+> > +================
+> > +
+> > +Optional properties
+> > +-------------------
+> > +
+> > +- msi-map: Maps a Requester ID to an MSI controller and associated
+> > +  msi-specifier data. The property is an arbitrary number of tuples of
+> > +  (rid-base,msi-controller,msi-base,length), where:
+> > +
+> > +  * rid-base is a single cell describing the first RID matched by the entry.
+> > +
+> > +  * msi-controller is a single phandle to an MSI controller
+> > +
+> > +  * msi-base is an msi-specifier describing the msi-specifier produced for the
+> > +    first RID matched by the entry.
+> > +
+> > +  * length is a single cell describing how many consecutive RIDs are matched
+> > +    following the rid-base.
+> > +
+> > +  Any RID r in the interval [rid-base, rid-base + length) is associated with
+> > +  the listed msi-controller, with the msi-specifier (r - rid-base + msi-base).
+> > +
+> > +- msi-map-mask: A mask to be applied to each Requester ID prior to being mapped
+> > +  to an msi-specifier per the msi-map property.
+> > +
+> > +- msi-parent: Describes the MSI parent of the root complex itself. Where
+> > +  the root complex and MSI controller do not pass sideband data with MSI
+> > +  writes, this property may be used to describe the MSI controller(s)
+> > +  used by PCI devices under the root complex, if defined as such in the
+> > +  binding for the root complex.
+> 
+> Right, this is where I'd expect some details about #msi-cells. Is it
+> meant to be ignored? The lack of symmetry between the PCI and non-PCI
+> use cases feels a bit inelegant (not to mention that it precludes having
+> an unified parser for both cases).
 
-[...]
+I would expect that the msi-parent's #msi-cells could be non-zero.
 
->> +1.  KVM runs the VCPU
->> +2.  The guest programs the time to fire in T+100
->> +4.  At T+100 the timer fires and a physical IRQ causes the VM to exit
->> +5.  With interrupts disabled on the CPU, KVM looks at the timer state
->> +    and injects a forwarded physical interrupt because it concludes the
->> +    timer has expired.
-> I don't get how we can trap without the virtual timer PPI handler being
-> entered on host side. Please can you elaborate on this?
+As I see it, there are three possible interpretations (and the choice
+between these would be specific to a PCI root complex):
 
-On VM exit, we disable the virtual timer (see the code in
-hyp.S::save_timer_state where we clear the enable bit). We still perform
-the exit, but the cause for exit is now gone, and the handler will never
-fire.
+(1) Devices under the root complex generate MSIs via the MSI parent,
+    using common sideband data described in the msi cells (and therefore
+    cannot be distingushed from each other).
+
+(2) The root complex itself generates MSIs via the MSI parent, with any
+    sideband data described in the msi cells.
+
+(3) Both the root complex and devices underneath it generate MSIs via
+    the MSI parent, using common sideband data described in the msi
+    cells (and therefore cannot be distinguished from each other).
+
+Of these, (1) is the common case today, though (2) would be more in
+keeping with how this style of property usually works.
+
+I'm not sure how to capture that.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
