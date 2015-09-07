@@ -1,13 +1,13 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon,  7 Sep 2015 14:23:41 +0200
-Subject: [PATCH v4 16/22] pinctrl: Probe pinctrl devices on demand
+Date: Mon,  7 Sep 2015 14:23:42 +0200
+Subject: [PATCH v4 17/22] phy: core: Probe phy providers on demand
 In-Reply-To: <1441628627-5143-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1441628627-5143-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1441628627-5143-17-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1441628627-5143-18-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When looking up a pin controller through its OF node, probe it if it
+When looking up a phy provider through its OF node, probe it if it
 hasn't already.
 
 The goal is to reduce deferred probes to a minimum, as it makes it very
@@ -21,29 +21,29 @@ Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- drivers/pinctrl/devicetree.c | 3 +++
+ drivers/phy/phy-core.c | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
-index fe04e748dfe4..f5340b8e1dbe 100644
---- a/drivers/pinctrl/devicetree.c
-+++ b/drivers/pinctrl/devicetree.c
+diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+index fc48fac003a6..94e90031d7f3 100644
+--- a/drivers/phy/phy-core.c
++++ b/drivers/phy/phy-core.c
 @@ -18,6 +18,7 @@
- 
  #include <linux/device.h>
+ #include <linux/slab.h>
  #include <linux/of.h>
 +#include <linux/of_device.h>
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/slab.h>
+ #include <linux/phy/phy.h>
+ #include <linux/idr.h>
+ #include <linux/pm_runtime.h>
+@@ -363,6 +364,8 @@ static struct phy *_of_phy_get(struct device_node *np, int index)
+ 	if (ret)
+ 		return ERR_PTR(-ENODEV);
  
-@@ -110,6 +111,8 @@ static int dt_to_map_one_config(struct pinctrl *p, const char *statename,
- 	struct pinctrl_map *map;
- 	unsigned num_maps;
- 
-+	of_device_probe(np_config);
++	of_device_probe(args.np);
 +
- 	/* Find the pin controller containing np_config */
- 	np_pctldev = of_node_get(np_config);
- 	for (;;) {
+ 	mutex_lock(&phy_provider_mutex);
+ 	phy_provider = of_phy_provider_lookup(args.np);
+ 	if (IS_ERR(phy_provider) || !try_module_get(phy_provider->owner)) {
 -- 
 2.4.3
