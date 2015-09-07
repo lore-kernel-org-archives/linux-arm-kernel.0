@@ -1,34 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 7 Sep 2015 11:10:05 +0200
-Subject: [PATCH v2 2/8] clk: imx25: retain early UART clocks during
- kernel init
-In-Reply-To: <20150906142315.GA30746@tiger>
-References: <1441382419-4343-1-git-send-email-l.stach@pengutronix.de>
- <1441382419-4343-3-git-send-email-l.stach@pengutronix.de>
- <20150906142315.GA30746@tiger>
-Message-ID: <20150907091005.GV9999@pengutronix.de>
+From: plaes@plaes.org (Priit Laes)
+Date: Mon, 07 Sep 2015 12:14:22 +0300
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun4i: Add dts file for the
+ pov protab2-ips9 tablet
+In-Reply-To: <55ED4F8F.6080502@redhat.com>
+References: <1441441319-10658-1-git-send-email-hdegoede@redhat.com>
+ <20150906163023.GR31584@lukather> <55ED3739.609@redhat.com>
+ <1441612142.14422.34.camel@plaes.org> <55ED4F8F.6080502@redhat.com>
+Message-ID: <1441617262.21530.4.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 06, 2015 at 10:23:15PM +0800, Shawn Guo wrote:
+On Mon, 2015-09-07 at 10:49 +0200, Hans de Goede wrote:
+> Hi,
 > 
-> I prefer to code it like:
+> On 07-09-15 09:49, Priit Laes wrote:
+> > On Mon, 2015-09-07 at 09:05 +0200, Hans de Goede wrote:
+> > > Hi,
+> > > 
+> > > On 06-09-15 18:30, Maxime Ripard wrote:
+> > > > On Sat, Sep 05, 2015 at 10:21:59AM +0200, Hans de Goede wrote:
+> > > > > The Point of View protab2-ips9 is a tablet with a 9" ips
+> > > > > 1024x768
+> > > > > lcd screen,
+> > > > > microsd slot, headphones, mini hdmi, mini usb b and power
+> > > > > barrel
+> > > > > connectors.
+> > > > > 
+> > > > > It uses a rtl8188cus usb wifi chip and a RDA 5875Y bluetooth
+> > > > > chip
+> > > > > attached
+> > > > > to uart2. It has a bma250 accelerometer attached to i2c1 addr
+> > > > > 0x18.
+> > > > > 
+> > 
+> > [...]
+> > > > 
+> > > > What is connected on i2c1 ? Just the camera sensor? or it has
+> > > > some
+> > > > other devices there?
+> > > 
+> > > The bma250 accelerometer sits there, and the kernel already has a
+> > > driver
+> > > for it. That driver needs to have devicetree binding support
+> > > added,
+> > > and
+> > > then we should be able to use the accelerometer.
+> > 
+> > bma250 already has devicetree support. It is used in Gemei G9
+> > tablet
+> > (sun4i-gemei-g9.dts).
 > 
-> static struct clk **uart_clks[] __initdata = {
-> 	&clk[uart_ipg_per],
-> 	&clk[uart1_ipg],
-> 	&clk[uart2_ipg],
-> 	&clk[uart3_ipg],
-> 	&clk[uart4_ipg],
-> 	&clk[uart5_ipg],
-> 	NULL
-> };
+> Yes I've seen that, but does it actually work? I've not tried but I
+> do not see any compatible string in the actual bma250 code in the
+> kernel,
+> so I believe that this part of the sun4i-gemei-g9.dts file does not
+> work ?
 
-And maybe also use mx25_ as prefix to make the name unique.
+It worked (even without IRQs) when I submitted the patch. Driver itself
+is under iio/accel/bma180.c
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+P?ikest,
+Priit
