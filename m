@@ -1,37 +1,52 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Mon, 07 Sep 2015 10:49:00 +0200
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Enable DW USB2 support and
- rockchip phy
-In-Reply-To: <55ED433A.5000907@samsung.com>
-References: <1441570566-14001-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1441609832.8778.4.camel@collabora.co.uk> <55ED3BC5.8050603@samsung.com>
- <1447076.WCyUA0P2ql@diego> <55ED433A.5000907@samsung.com>
-Message-ID: <1441615740.8778.15.camel@collabora.co.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 7 Sep 2015 10:49:19 +0200
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun4i: Add dts file for the
+ pov protab2-ips9 tablet
+In-Reply-To: <1441612142.14422.34.camel@plaes.org>
+References: <1441441319-10658-1-git-send-email-hdegoede@redhat.com>
+ <20150906163023.GR31584@lukather> <55ED3739.609@redhat.com>
+ <1441612142.14422.34.camel@plaes.org>
+Message-ID: <55ED4F8F.6080502@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-09-07 at 16:56 +0900, Krzysztof Kozlowski wrote:
-> On 07.09.2015 16:53, Heiko St?bner wrote:
-> > Am Montag, 7. September 2015, 16:24:53 schrieb Krzysztof Kozlowski:
-> > I guess the easiest option would be to just drop the dwc2 from
-> > here, only 
-> > keeping the phy enablement and let everything (Marek's and Sjoerd's
-> > patch) 
-> > come together in the armsoc defconfig branch? As the rest of both
-> > patches don't 
-> > seem to touch common areas, they should be easily mergable from
-> > different trees 
-> > as well.
-> 
-> Yes, I agree. The config PHY_ROCKCHIP_USB does not depend on it
-> directly
-> so this should work fine.
+Hi,
 
-Sounds good, I'll wait a bit longer for more feedback and then send a
-V2 with patch 4 adjusted to just enable the rockchip PHY.
+On 07-09-15 09:49, Priit Laes wrote:
+> On Mon, 2015-09-07 at 09:05 +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 06-09-15 18:30, Maxime Ripard wrote:
+>>> On Sat, Sep 05, 2015 at 10:21:59AM +0200, Hans de Goede wrote:
+>>>> The Point of View protab2-ips9 is a tablet with a 9" ips 1024x768
+>>>> lcd screen,
+>>>> microsd slot, headphones, mini hdmi, mini usb b and power barrel
+>>>> connectors.
+>>>>
+>>>> It uses a rtl8188cus usb wifi chip and a RDA 5875Y bluetooth chip
+>>>> attached
+>>>> to uart2. It has a bma250 accelerometer attached to i2c1 addr
+>>>> 0x18.
+>>>>
+>
+> [...]
+>>>
+>>> What is connected on i2c1 ? Just the camera sensor? or it has some
+>>> other devices there?
+>>
+>> The bma250 accelerometer sits there, and the kernel already has a
+>> driver
+>> for it. That driver needs to have devicetree binding support added,
+>> and
+>> then we should be able to use the accelerometer.
+>
+> bma250 already has devicetree support. It is used in Gemei G9 tablet
+> (sun4i-gemei-g9.dts).
 
-Thanks for the feedback!
+Yes I've seen that, but does it actually work? I've not tried but I
+do not see any compatible string in the actual bma250 code in the kernel,
+so I believe that this part of the sun4i-gemei-g9.dts file does not work ?
 
--- 
-Sjoerd Simons
-Collabora Ltd.
+Regards,
+
+Hans
