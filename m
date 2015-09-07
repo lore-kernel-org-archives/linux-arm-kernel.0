@@ -1,60 +1,146 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon,  7 Sep 2015 18:24:18 +0200
-Subject: [PATCH] ARM: dts: omap3-igep: Move eth IRQ pinmux to IGEPv2 common
- dtsi
-Message-ID: <1441643058-8641-1-git-send-email-javier@osg.samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Sep 2015 17:26:00 +0100
+Subject: [PATCH v4 4/5] irqchip, gicv3-its: Add HW revision detection
+ and configuration
+In-Reply-To: <1439576885-15621-5-git-send-email-rric@kernel.org>
+References: <1439576885-15621-1-git-send-email-rric@kernel.org>
+ <1439576885-15621-5-git-send-email-rric@kernel.org>
+Message-ID: <55EDBA98.3020903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only the IGEPv2 boards have a LAN9221i chip connected to the GPMC
-so the pinmux configuration for the GPIO connected to the IRQ line
-of the LAN chip should not be defined in the IGEP common dtsi but
-in the one common to the IGEPv2 boards.
+Hi Robert,
 
-While there, use the OMAP3_CORE1_IOPAD() macro for the padconf reg.
+On 14/08/15 19:28, Robert Richter wrote:
+> From: Robert Richter <rrichter@cavium.com>
+> 
+> Some GIC revisions require an individual configuration to esp. add
+> workarounds for HW bugs. This patch implements generic code to parse
+> the hw revision provided by an IIDR register value and runs specific
+> code if hw matches. There are functions that read the IIDR registers
+> for GICV3 and ITS (GICD_IIDR/GITS_IIDR) and then go through a list of
+> init functions to be called for specific versions.
+> 
+> A MIDR register value may also be used, this is especially useful for
+> hw detection from a guest.
 
-Suggested-by: Ladislav Michl <ladis@linux-mips.org>
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+I don't think this sentence is relevant anymore.
 
----
+> 
+> The patch is needed to implement workarounds for HW errata in Cavium's
+> ThunderX GICV3.
+> 
+> v4:
+>  * only enable hw detection for its in its_enable_quirks()
+>  * removed gicv3_check_capabilities()
+> 
+> v3:
+>  * use arm64 errata framework for midr check
+> 
+> v2:
+>  * adding MIDR check
+> 
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  drivers/irqchip/irq-gic-common.c | 11 +++++++++++
+>  drivers/irqchip/irq-gic-common.h |  9 +++++++++
+>  drivers/irqchip/irq-gic-v3-its.c | 15 +++++++++++++++
+>  3 files changed, 35 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+> index 9448e391cb71..ee789b07f2d1 100644
+> --- a/drivers/irqchip/irq-gic-common.c
+> +++ b/drivers/irqchip/irq-gic-common.c
+> @@ -21,6 +21,17 @@
+>  
+>  #include "irq-gic-common.h"
+>  
+> +void gic_check_capabilities(u32 iidr, const struct gic_capabilities *cap,
+> +			void *data)
 
- arch/arm/boot/dts/omap3-igep.dtsi            | 6 ------
- arch/arm/boot/dts/omap3-igep0020-common.dtsi | 6 ++++++
- 2 files changed, 6 insertions(+), 6 deletions(-)
+Let's call a duck a duck, and replace all occurrences of
+capabilit{y,ies} with "quirk".
 
-diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
-index d5e5cd449b16..2230e1c03320 100644
---- a/arch/arm/boot/dts/omap3-igep.dtsi
-+++ b/arch/arm/boot/dts/omap3-igep.dtsi
-@@ -78,12 +78,6 @@
- 		>;
- 	};
- 
--	smsc9221_pins: pinmux_smsc9221_pins {
--		pinctrl-single,pins = <
--			0x1a2 (PIN_INPUT | MUX_MODE4)		/* mcspi1_cs2.gpio_176 */
--		>;
--	};
--
- 	i2c1_pins: pinmux_i2c1_pins {
- 		pinctrl-single,pins = <
- 			0x18a (PIN_INPUT | MUX_MODE0)   /* i2c1_scl.i2c1_scl */
-diff --git a/arch/arm/boot/dts/omap3-igep0020-common.dtsi b/arch/arm/boot/dts/omap3-igep0020-common.dtsi
-index e458c2185e3c..5ad688c57a00 100644
---- a/arch/arm/boot/dts/omap3-igep0020-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-igep0020-common.dtsi
-@@ -156,6 +156,12 @@
- 			OMAP3_CORE1_IOPAD(0x217a, PIN_INPUT | MUX_MODE0)	/* uart2_rx.uart2_rx */
- 		>;
- 	};
-+
-+	smsc9221_pins: pinmux_smsc9221_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x21d2, PIN_INPUT | MUX_MODE4)	/* mcspi1_cs2.gpio_176 */
-+		>;
-+	};
- };
- 
- &omap3_pmx_core2 {
+> +{
+> +	for (; cap->desc; cap++) {
+> +		if (cap->iidr != (cap->mask & iidr))
+> +			continue;
+> +		cap->init(data);
+> +		pr_info("%s\n", cap->desc);
+> +	}
+> +}
+> +
+>  int gic_configure_irq(unsigned int irq, unsigned int type,
+>  		       void __iomem *base, void (*sync_access)(void))
+>  {
+> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
+> index 35a9884778bd..ca12635bbe3c 100644
+> --- a/drivers/irqchip/irq-gic-common.h
+> +++ b/drivers/irqchip/irq-gic-common.h
+> @@ -20,10 +20,19 @@
+>  #include <linux/of.h>
+>  #include <linux/irqdomain.h>
+>  
+> +struct gic_capabilities {
+> +	const char *desc;
+> +	void (*init)(void *data);
+> +	u32 iidr;
+> +	u32 mask;
+> +};
+> +
+>  int gic_configure_irq(unsigned int irq, unsigned int type,
+>                         void __iomem *base, void (*sync_access)(void));
+>  void gic_dist_config(void __iomem *base, int gic_irqs,
+>  		     void (*sync_access)(void));
+>  void gic_cpu_config(void __iomem *base, void (*sync_access)(void));
+> +void gic_check_capabilities(u32 iidr, const struct gic_capabilities *cap,
+> +			void *data);
+>  
+>  #endif /* _IRQ_GIC_COMMON_H */
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 06131db7a198..697421e834ee 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -36,6 +36,7 @@
+>  #include <asm/cputype.h>
+>  #include <asm/exception.h>
+>  
+> +#include "irq-gic-common.h"
+>  #include "irqchip.h"
+>  
+>  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1 << 0)
+> @@ -1390,6 +1391,18 @@ static int its_force_quiescent(void __iomem *base)
+>  	}
+>  }
+>  
+> +static const struct gic_capabilities its_errata[] = {
+> +	{
+> +	}
+> +};
+> +
+> +static void its_enable_quirks(struct its_node *its)
+> +{
+> +	u32 iidr = readl_relaxed(its->base + GITS_IIDR);
+> +
+> +	gic_check_capabilities(iidr, its_errata, its);
+> +}
+> +
+>  static int its_probe(struct device_node *node, struct irq_domain *parent)
+>  {
+>  	struct resource res;
+> @@ -1448,6 +1461,8 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+>  	}
+>  	its->cmd_write = its->cmd_base;
+>  
+> +	its_enable_quirks(its);
+> +
+>  	err = its_alloc_tables(its);
+>  	if (err)
+>  		goto out_free_cmd;
+> 
+
+Otherwise looks good to me.
+
+	M.
 -- 
-2.4.3
+Jazz is not dead. It just smells funny...
