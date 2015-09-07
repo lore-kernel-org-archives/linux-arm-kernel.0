@@ -1,134 +1,79 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Mon, 7 Sep 2015 08:17:20 +0000
-Subject: [PATCH v8 0/6] PCI: hisi: Add PCIe host support for HiSilicon
- SoC Hip05
-In-Reply-To: <1440496734-18417-1-git-send-email-wangzhou1@hisilicon.com>
-References: <1440496734-18417-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1620A175@lhreml503-mbs>
+From: treding@nvidia.com (Thierry Reding)
+Date: Mon, 7 Sep 2015 10:20:18 +0200
+Subject: [PATCH v4 14/16] drm: bridge: analogix/dp: try force hpd after
+ plug in lookup failed
+In-Reply-To: <55EBBA0C.1030100@rock-chips.com>
+References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
+ <1441088079-25809-1-git-send-email-ykk@rock-chips.com>
+ <CAL_JsqJDALnjVaVoEqGGsSLeE31m3MKOfbSoZ3M+g+zPZR2MFg@mail.gmail.com>
+ <55E7CC43.7040608@rock-chips.com>
+ <20150903090421.GC3784@ulmo.nvidia.com>
+ <55EBBA0C.1030100@rock-chips.com>
+Message-ID: <20150907082017.GB19961@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn and all
-
-Do you have any comment on this patchset? I think we should be close to a final one...
-
-Thanks and Regards
-
-Gab
-
-> -----Original Message-----
-> From: Wangzhou (B)
-> Sent: 25 August 2015 10:59
-> To: Bjorn Helgaas; jingoohan1 at gmail.com; pratyush.anand at gmail.com; Arnd
-> Bergmann; linux at arm.linux.org.uk; thomas.petazzoni at free-electrons.com;
-> Gabriele Paoloni; lorenzo.pieralisi at arm.com; james.morse at arm.com;
-> Liviu.Dudau at arm.com; jason at lakedaemon.net; robh at kernel.org
-> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; zhangjukuo; qiuzhenfa; liudongdong (C); qiujiang;
-> xuwei (O); Liguozhu (Kenneth); Wangzhou (B)
-> Subject: [PATCH v8 0/6] PCI: hisi: Add PCIe host support for HiSilicon SoC
-> Hip05
+On Sun, Sep 06, 2015 at 11:59:08AM +0800, Yakir Yang wrote:
+> Hi Thierry,
 > 
-> This patchset adds PCIe host support for HiSilicon SoC Hip05. The PCIe hosts
-> use PCIe IP core from Synopsys, So this driver is base on designware PCIe
+> ? 09/03/2015 05:04 PM, Thierry Reding ??:
+> >On Thu, Sep 03, 2015 at 12:27:47PM +0800, Yakir Yang wrote:
+> >>Hi Rob,
+> >>
+> >>? 09/03/2015 04:17 AM, Rob Herring ??:
+> >>>On Tue, Sep 1, 2015 at 1:14 AM, Yakir Yang <ykk@rock-chips.com> wrote:
+> >>>>Some edp screen do not have hpd signal, so we can't just return
+> >>>>failed when hpd plug in detect failed.
+> >>>This is a property of the panel (or connector perhaps), so this
+> >>>property should be located there. At least, it is a common issue and
+> >>>not specific to this chip. We could have an HDMI connector and failed
+> >>>to hook up HPD for example. A connector node is also where hpd-gpios
+> >>>should be located instead (and are already defined by
+> >>>../bindings/video/hdmi-connector.txt). Perhaps we need a eDP connector
+> >>>binding, too.
+> >>Yep, I agree with your front point, it is a property of panel, not specific
+> >>to eDP controller, so this code should handle in connector logic.
+> > From your description it sounds more like this is in fact a property of
+> >the panel. Or maybe I should say "quirk". If the panel doesn't generate
+> >the HPD signal, then that should be a property of the panel, not the
+> >connector. The eDP specification mandates that connectors have a HPD
+> >signal, though it allows the "HPD conductor in the connector cable" to
+> >be omitted if not used by the source. I'd consider the cable to belong
+> >to the panel rather than the connector, so absence of HPD, either
+> >because the cable doesn't have the conductor or because the panel does
+> >not generate the signal, should be a quirk of the panel.
+> >
+> >That said you could have a panel that supports HPD connected via a cable
+> >that doesn't transmit it, so this would be a per-board variant and hence
+> >should be a device tree property rather than hard-coded in some panel
+> >driver.
+> >
+> >Conversely, if the panel isn't capable of generating an HPD signal, then
+> >I don't think it would be appropriate to make it a DT property. It would
+> >be better to hard-code it in the driver, lest someone forget to set the
+> >property in DT and get stuck with a device that isn't operational.
+> 
+> Oh, you're right, if it's a cable quirk, then DT property would be okay, if
+> it
+> is a problem of panel, then maybe hard-code in driver would be better.
+> 
+> After look up for the document of panel "innolux,n116bge", I haven't see
+> any description of hot plug signal, and even not found in PIN ASSIGNMENT.
+> So I believe it's a panel problem, that's to say it should handle in panel
 > driver.
-> 
-> Hip05 is an ARMv8 architecture SoC. It should be able to use ARM64 PCIe API in
-> designeware PCIe driver. So this patch also adds ARM64 support for designware
-> pcie.
-> 
-> This patchset is based on v4.2-rc1.
-> 
-> Change from v7:
-> - Remove pp->root_bus_nr = 0 in dra7xx, exynos, imx6, keystone, layerscape,
->   spear13xx. Pass pp->busn->start to pci_create_root_bus as root bus number.
-> - Remove bus-range parsing in pcie-hisi.c.
-> 
-> Change from v6:
-> - Add Pratyush's Acked-by for 1/6 and 2/6.
-> - Add James' Tested-by for 3/6.
-> 
-> Change from v5:
-> - Merge 1/6 in this series, discussion about this can be found in [1]
-> 
-> Change from v4:
-> - Change the author of 1/5 to Gabriele.
-> - Modify problems in 3/5 pointed by Bjorn.
-> - Modify spelling problems in 4/5.
-> 
-> Change from v3:
-> - Change 1/5 to what Gabriele suggested.
-> - Use win->__res.start to get *_mod_base in 2/5, this fix a bug in v3 series.
-> 
-> Change from v2:
-> - Move struct pci_dev *dev and struct pci_sys_data *sys in
->   pcibios_align_resource in 1/5.
-> - Add Gabriele's codes in 2/5 which delete unnecessary information parse and
->   use of_pci_get_host_bridge_resources for both ARM32 and ARM64.
-> - Add maintainer patch 5/5.
-> 
-> Change from RFC v1:
-> - Add 1/4 patch by Arnd which removes align_resource callback in ARM
->   pcibios_align_resource.
-> - Change head file in pcie-designware from asm/hardirq.h to linux/hardirq.h.
-> - Set pp->root_bus_nr = 0 in dra7xx, exynos, imx6, keystone, layerscape,
->   spear13xx.
-> - Remove unnecessary parentheses of some macros in pcie-hisi.
-> - Use macro to replace some magic values.
-> - Merge two loops together and add some comments about it in context_config
->   function in pcie-hisi.
-> - Modify some value of items in pcie node example in binding document.
-> 
-> Change from RFC:
-> - delete dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
->   merge related operations into dw_pcie_host_init.
-> 
-> Link of v7:
-> - http://www.spinics.net/lists/devicetree/msg90690.html
-> Link of v6:
-> - http://www.spinics.net/lists/linux-pci/msg43669.html
-> Link of v5:
-> - http://www.spinics.net/lists/devicetree/msg87959.html
-> Link of v4:
-> - http://www.spinics.net/lists/arm-kernel/msg433050.html
-> Link of v3:
-> - http://www.spinics.net/lists/linux-pci/msg42539.html
-> Link of v2:
-> - http://www.spinics.net/lists/linux-pci/msg41844.html
-> Link of RFC v1:
-> - http://www.spinics.net/lists/linux-pci/msg41305.html
-> Link of RFC:
-> - http://www.spinics.net/lists/linux-pci/msg40434.html
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
-> July/359741.html
-> 
-> 
-> Zhou Wang (4):
->   PCI: designware: Add ARM64 support
->   PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05
->   Documentation: DT: Add HiSilicon PCIe host binding
->   MAINTAINERS: Add pcie-hisi maintainer
-> 
-> gabriele paoloni (2):
->   PCI: designware: move calculation of bus addresses to DRA7xx
->   ARM/PCI: remove align_resource in pci_sys_data
-> 
->  .../devicetree/bindings/pci/hisilicon-pcie.txt     |  46 ++++
->  MAINTAINERS                                        |   7 +
->  arch/arm/include/asm/mach/pci.h                    |   5 -
->  arch/arm/kernel/bios32.c                           |  12 +-
->  drivers/pci/host/Kconfig                           |   8 +
->  drivers/pci/host/Makefile                          |   1 +
->  drivers/pci/host/pci-dra7xx.c                      |  13 ++
->  drivers/pci/host/pci-keystone-dw.c                 |   2 +-
->  drivers/pci/host/pcie-designware.c                 | 237 +++++++-------------
->  drivers/pci/host/pcie-designware.h                 |  14 +-
->  drivers/pci/host/pcie-hisi.c                       | 247
-> +++++++++++++++++++++
->  11 files changed, 413 insertions(+), 179 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
->  create mode 100644 drivers/pci/host/pcie-hisi.c
-> 
-> --
-> 1.9.1
+
+The datasheet that I have for that panel lists HPD as pin 17. Also I
+used to have a setup with that panel and I distinctly remember hotplug
+working just fine. Perhaps this is an issue with a specific variant of
+the panel? Or perhaps this is indeed a problem with the cable that's
+connecting the panel to the board. It could be one of those cases where
+they left out the HPD conductor to save money.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150907/b3e2ffa1/attachment.sig>
