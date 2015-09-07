@@ -1,54 +1,117 @@
-From: majun258@huawei.com (majun (F))
-Date: Mon, 7 Sep 2015 09:17:01 +0800
-Subject: [PATCH v4 1/2] Add the driver of mbigen interrupt controller
-In-Reply-To: <CALW4P+KQEJsKCbnXeyup2Z2vNGY9jXKZKafQ+hSvc5_U5O+vtQ@mail.gmail.com>
-References: <CALW4P+JABDw=dOtpC1MgEjXt7hN4Pm1f4NPDna9XYoE+yc=Grg@mail.gmail.com>
- <55E50344.9090104@huawei.com>
- <CALW4P+KQEJsKCbnXeyup2Z2vNGY9jXKZKafQ+hSvc5_U5O+vtQ@mail.gmail.com>
-Message-ID: <55ECE58D.6050602@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 7 Sep 2015 09:28:31 +0800
+Subject: [PATCH v2 5/8] pinctrl: freescale: imx: add ZERO_OFFSET_VALID flag
+In-Reply-To: <1441147753-13239-5-git-send-email-aalonso@freescale.com>
+References: <1441147753-13239-1-git-send-email-aalonso@freescale.com>
+ <1441147753-13239-5-git-send-email-aalonso@freescale.com>
+Message-ID: <20150907012831.GE30746@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexey:
-
-? 2015/9/4 8:56, Alexey Klimov ??:
-> Hi Ma Jun,
+On Tue, Sep 01, 2015 at 05:49:10PM -0500, Adrian Alonso wrote:
+> - Add ZERO_OFFSET_VALID flag, on imx7d mux_conf reg
+>   offset is zero for iomuxc-lspr controller
+> - Do default initialization on parse group function.
 > 
-> On Tue, Sep 1, 2015 at 4:45 AM, majun (F) <majun258@huawei.com> wrote:
->> Hi Alexey:
->>
-[...]
->>>> +       mgn_chip->base = base;
->>>> +       mgn_chip->node = node;
->>>> +
->>>> +       domain = irq_domain_add_tree(node, &mbigen_domain_ops, mgn_chip);
->>>> +       mgn_chip->domain = domain;
->>>> +
->>>> +       raw_spin_lock_init(&mgn_chip->lock);
->>>> +       INIT_LIST_HEAD(&mgn_chip->entry);
->>>> +       INIT_LIST_HEAD(&mgn_chip->mbigen_device_list);
->>>> +
->>>> +       for_each_child_of_node(node, child) {
->>>> +               mbigen_device_init(mgn_chip, child);
->>>
->>> You don't check error from mbigen_device_init()
->> I don't think we need to check errors here.
->> mbigen_device_init() handle all errors.
-> 
-> For my eyes, mbigen_device_init() is static and used only once here.
-> Here you don't check return value from it. If this is correct you can
-> convert mbigen_device_init() to return void unless you have future
-> plans to modify it.
-> 
-> Or you have option to check return value here and add error path.
+> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 
-Ok, This will be changed in next version.
+I do not follow why this patch is needed at all.  All the register
+validity check are done against -1, and zero offset is already supported
+by the driver in the current form.  Or am I missing anything?
 
+Shawn
+
+> ---
+> Changes for V2: Resend
 > 
-> Please add me to cc to next version of patch set which I guess will be v5.
+>  drivers/pinctrl/freescale/pinctrl-imx.c | 23 +++++++++++++----------
+>  drivers/pinctrl/freescale/pinctrl-imx.h |  1 +
+>  2 files changed, 14 insertions(+), 10 deletions(-)
 > 
-
-Got it. I will add you to cc list in next version.
-Thanks for you review !
-
-Ma Jun
+> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+> index 95db9e8..9f019be 100644
+> --- a/drivers/pinctrl/freescale/pinctrl-imx.c
+> +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+> @@ -437,7 +437,7 @@ static void imx_pinconf_dbg_show(struct pinctrl_dev *pctldev,
+>  	const struct imx_pin_reg *pin_reg = &info->pin_regs[pin_id];
+>  	unsigned long config;
+>  
+> -	if (!pin_reg || pin_reg->conf_reg == -1) {
+> +	if (pin_reg->conf_reg == -1) {
+>  		seq_printf(s, "N/A");
+>  		return;
+>  	}
+> @@ -536,21 +536,29 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
+>  		return -ENOMEM;
+>  
+>  	for (i = 0; i < grp->npins; i++) {
+> -		u32 mux_reg = be32_to_cpu(*list++);
+> +		u32 mux_reg;
+>  		u32 conf_reg;
+>  		unsigned int pin_id;
+>  		struct imx_pin_reg *pin_reg;
+>  		struct imx_pin *pin = &grp->pins[i];
+>  
+> +		mux_reg = be32_to_cpu(*list++);
+> +		if (!(info->flags & ZERO_OFFSET_VALID) && !mux_reg)
+> +			mux_reg = -1;
+> +
+>  		if (info->flags & SHARE_MUX_CONF_REG) {
+>  			conf_reg = mux_reg;
+>  		} else {
+>  			conf_reg = be32_to_cpu(*list++);
+> -			if (!conf_reg)
+> +			if (!(info->flags & ZERO_OFFSET_VALID) && !conf_reg)
+>  				conf_reg = -1;
+>  		}
+>  
+> -		pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
+> +		if (info->flags & ZERO_OFFSET_VALID)
+> +			pin_id = mux_reg / 4;
+> +		else
+> +			pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
+> +
+>  		pin_reg = &info->pin_regs[pin_id];
+>  		pin->pin = pin_id;
+>  		grp->pin_ids[i] = pin_id;
+> @@ -684,7 +692,7 @@ int imx_pinctrl_probe(struct platform_device *pdev,
+>  {
+>  	struct imx_pinctrl *ipctl;
+>  	struct resource *res;
+> -	int ret, i;
+> +	int ret;
+>  
+>  	if (!info || !info->pins || !info->npins) {
+>  		dev_err(&pdev->dev, "wrong pinctrl info\n");
+> @@ -702,11 +710,6 @@ int imx_pinctrl_probe(struct platform_device *pdev,
+>  	if (!info->pin_regs)
+>  		return -ENOMEM;
+>  
+> -	for (i = 0; i < info->npins; i++) {
+> -		info->pin_regs[i].mux_reg = -1;
+> -		info->pin_regs[i].conf_reg = -1;
+> -	}
+> -
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	ipctl->base = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(ipctl->base))
+> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h b/drivers/pinctrl/freescale/pinctrl-imx.h
+> index 26f8f1c..67c07c2 100644
+> --- a/drivers/pinctrl/freescale/pinctrl-imx.h
+> +++ b/drivers/pinctrl/freescale/pinctrl-imx.h
+> @@ -85,6 +85,7 @@ struct imx_pinctrl_soc_info {
+>  };
+>  
+>  #define SHARE_MUX_CONF_REG	0x1
+> +#define ZERO_OFFSET_VALID	0x2
+>  
+>  #define NO_MUX		0x0
+>  #define NO_PAD		0x0
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
