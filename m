@@ -1,78 +1,43 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 07 Sep 2015 16:56:42 +0900
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Enable DW USB2 support and
- rockchip phy
-In-Reply-To: <1447076.WCyUA0P2ql@diego>
-References: <1441570566-14001-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1441609832.8778.4.camel@collabora.co.uk> <55ED3BC5.8050603@samsung.com>
- <1447076.WCyUA0P2ql@diego>
-Message-ID: <55ED433A.5000907@samsung.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Mon, 07 Sep 2015 10:49:02 +0300
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun4i: Add dts file for the
+ pov protab2-ips9 tablet
+In-Reply-To: <55ED3739.609@redhat.com>
+References: <1441441319-10658-1-git-send-email-hdegoede@redhat.com>
+ <20150906163023.GR31584@lukather> <55ED3739.609@redhat.com>
+Message-ID: <1441612142.14422.34.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.09.2015 16:53, Heiko St?bner wrote:
-> Am Montag, 7. September 2015, 16:24:53 schrieb Krzysztof Kozlowski:
->> On 07.09.2015 16:10, Sjoerd Simons wrote:
->>> Hey Krzysztof,
->>>
->>> On Mon, 2015-09-07 at 09:02 +0900, Krzysztof Kozlowski wrote:
->>>> On 07.09.2015 05:16, Sjoerd Simons wrote:
->>>>> The DesignWare HS OTG USB 2.0 is used in various SoC families among
->>>>> wich
->>>>> the various rockchip SoCs, enable the driver and the PHY glue for
->>>>> rockchip
->>>>
->>>> +Cc Marek and Kukjin,
->>>>
->>>> This would conflict with Marek's:
->>>> [PATCH v2] ARM: multi_v7_defconfig: Enable DWC2 USB driver and USB
->>>> ethernet gadget
->>>> http://www.spinics.net/lists/linux-samsung-soc/msg46743.html
->>>>
->>>> Probably your series and Marek's change should go together to the
->>>> same
->>>> tree. How about rebasing your work on top of it?
->>>
->>> Thanks for the pointer! I'm entirely happy to rebase on Mareks patch or
->>> this one dropped for now until Mareks patch lands.
->>>
->>> These patches were based on current linux-next, so i guess Mareks pathc
->>> didn't land just yet? Tbh, i don't really know what tries multi_v7
->>> tends to go through (especially for non-platform specific changes)
->>
->> It was too late for Marek's patch to go for v4.3 merge window, so I
->> applied it but not pushed to my for-next branch. AFAIU, Stephen does not
->> want v4.4 material during merge window because of mangling with statistics.
->>
->>
->> If you want to rebase (or cherry-pick), you can find Marek's patch here:
->> branch: defconfig-for-next
->> repo: git://github.com/krzk/linux.git
->>
->> However this *branch will be rebased on v4.3-rc1* (because this is
->> material for v4.4). After v4.3-rc1 I can prepare a tag for other
->> interested parties.
->>
->>
->> As for multi_v7_defconfig policy, I got impression from the
->> Arnd/Olof/Kevin comments on LKML, that platform specific changes should
->> go through platform tree. However this is multi-platform change so maybe
->> we can push both patches through arm-soc.
->>
->>
->> Arnd, Olof, Kevin (BTW, you missed to CC him),
->>
->> How do you wish to handle this case (USB_DWC2 and two patches: Marek's
->> and Sjoerd's)?
+On Mon, 2015-09-07 at 09:05 +0200, Hans de Goede wrote:
+> Hi,
 > 
-> I guess the easiest option would be to just drop the dwc2 from here, only 
-> keeping the phy enablement and let everything (Marek's and Sjoerd's patch) 
-> come together in the armsoc defconfig branch? As the rest of both patches don't 
-> seem to touch common areas, they should be easily mergable from different trees 
-> as well.
+> On 06-09-15 18:30, Maxime Ripard wrote:
+> > On Sat, Sep 05, 2015 at 10:21:59AM +0200, Hans de Goede wrote:
+> > > The Point of View protab2-ips9 is a tablet with a 9" ips 1024x768
+> > > lcd screen,
+> > > microsd slot, headphones, mini hdmi, mini usb b and power barrel
+> > > connectors.
+> > > 
+> > > It uses a rtl8188cus usb wifi chip and a RDA 5875Y bluetooth chip
+> > > attached
+> > > to uart2. It has a bma250 accelerometer attached to i2c1 addr
+> > > 0x18.
+> > > 
 
-Yes, I agree. The config PHY_ROCKCHIP_USB does not depend on it directly
-so this should work fine.
+[...]
+> > 
+> > What is connected on i2c1 ? Just the camera sensor? or it has some
+> > other devices there?
+> 
+> The bma250 accelerometer sits there, and the kernel already has a
+> driver
+> for it. That driver needs to have devicetree binding support added,
+> and
+> then we should be able to use the accelerometer.
 
-Best regards,
-Krzysztof
+bma250 already has devicetree support. It is used in Gemei G9 tablet
+(sun4i-gemei-g9.dts).
+
+P?ikest,
+Priit :)
