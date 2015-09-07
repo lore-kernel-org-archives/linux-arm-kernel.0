@@ -1,78 +1,43 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 7 Sep 2015 16:37:44 +0300
-Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
-In-Reply-To: <2657565.lxWtPmdjyp@vostro.rjw.lan>
-References: <Pine.LNX.4.44L0.1509051133100.30865-100000@netrider.rowland.org>
- <2657565.lxWtPmdjyp@vostro.rjw.lan>
-Message-ID: <55ED9328.2010501@ti.com>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Mon, 7 Sep 2015 23:03:35 +0900
+Subject: [PATCH V2] arm64: add kc_offset_to_vaddr and kc_vaddr_to_offset
+ macro
+In-Reply-To: <1441512250-9667-1-git-send-email-yalin.wang2010@gmail.com>
+References: <1441512250-9667-1-git-send-email-yalin.wang2010@gmail.com>
+Message-ID: <6F07C7AF-779B-439D-B820-E11816664406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2015 04:04 PM, Rafael J. Wysocki wrote:
-> On Saturday, September 05, 2015 11:39:20 AM Alan Stern wrote:
->> On Sat, 5 Sep 2015, Grygorii Strashko wrote:
->>
->>> On 09/04/2015 09:45 PM, Alan Stern wrote:
->>>> On Fri, 4 Sep 2015, Grygorii Strashko wrote:
->>>>
->>>>> There is one "small" problem with such approach :(
->>>>>
->>>>> - It's incompatible with -RT kernel, because PM runtime can't be used
->>>>> in atomic context on -RT.
->>>>
->>>> Can you explain this more fully?  Why can't runtime PM be used in
->>>> atomic context in the -rt kernels?
->>>>   
->>>
->>> See:
->>>   http://lwn.net/Articles/146861/
->>>   https://rt.wiki.kernel.org/index.php/Frequently_Asked_Questions#How_does_the_CONFIG_PREEMPT_RT_patch_work.3F
->>>
->>> spinlock_t
->>>      Critical sections are preemptible. The _irq operations (e.g., spin_lock_irqsave())
->>>   do -not- disable hardware interrupts. Priority inheritance is used to prevent priority
->>>   inversion. An underlying rt_mutex is used to implement spinlock_t in PREEMPT_RT.
->>>
->>> As result, have to do things like:
->>> https://lkml.org/lkml/2015/8/18/161
->>> https://lkml.org/lkml/2015/8/18/162
->>>
->>> Sorry for brief reply - Friday/Sat night :)
->>
->> I see.  Although we normally think of interrupt contexts as being
->> atomic, in an -rt kernel this isn't true any more because things like
->> spin_lock_irq don't actually disable interrupts.
->>
->> Therefore it would be correct to say that in -rt kernels, runtime PM
->> can be used in interrupt context (if the device is marked as irq-safe),
->> but not in atomic context.  Right?
+On Sep 6, 2015, at 1:04 PM, yalin wang wrote:
+
+Hello Yalin,
+
+> This patch add kc_offset_to_vaddr() and kc_vaddr_to_offset(),
+> the default version doesn't work on arm64, because arm64 kernel address
+> is below the PAGE_OFFSET, like module address and vmemmap address are
+> all below PAGE_OFFSET address.
 > 
-> Right.
+> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+> ---
+> arch/arm64/include/asm/memory.h  | 1 +
+> arch/arm64/include/asm/pgtable.h | 2 ++
+> 2 files changed, 3 insertions(+)
 > 
-> Whatever is suitable for interrupt context in the mainline, will be suitable
-> for that in -rt kernels too. 
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index f800d45..2d09fe8 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -55,6 +55,7 @@
+> #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+> #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
+> #define TASK_SIZE_64		(UL(1) << VA_BITS)
+> +#define __VIRTUAL_MASK		((1UL << VA_BITS) - 1)
 
-Not exactly true :(, since spinlock is converted to [rt_] mutex.
-Usually, this difference can't be seen because on -RT kernel all or
-mostly all HW IRQ handlers will be forced to be threaded.
-For the cases, where such automatic conversion is not working,
-(like chained irq handlers or HW-handler+Threaded handler) the code
-has to be carefully patched to work properly as for non-RT as for -RT.
+According to Catalin's comment, [1], it might need to be rewritten using VA_START
+in the KASan patches, [2], after this merge window.
 
-Also, this triggers some -RT incompatibility issues, like with PM runtime or
-CLK framework (http://www.spinics.net/lists/linux-rt-users/msg13653.html).
+[1] https://lkml.org/lkml/2015/9/4/529
+[2] git://github.com/aryabinin/linux.git kasan/arm64v5
 
-> However, what is suitable for the idle loop
-> in the mainline, may not be suitable for that in -rt kernels.
-> 
-> That's why raw_spin_lock/unlock() need to be used within the idle loop.
-
-Indeed. CPU hotplug/CPUIdle is guarded by local_irq_disable()/local_irq_enable().
-(example of CPU hotplug RT-issue http://www.spinics.net/lists/arm-kernel/msg438963.html).
-
-I don't want to be the final authority here as my experience with -RT is short.
-But, I want to point out on potential issues based on what I've already discovered
-and tried to fix.
-
-Thanks & regards,
--grygorii
+Best Regards
+Jungseok Lee
