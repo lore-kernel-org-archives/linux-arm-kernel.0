@@ -1,68 +1,81 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Mon, 7 Sep 2015 11:01:53 +0200
-Subject: [PATCH v4 14/16] drm: bridge: analogix/dp: try force hpd after
- plug in lookup failed
-In-Reply-To: <20150904102003.GE21084@n2100.arm.linux.org.uk>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <1441088079-25809-1-git-send-email-ykk@rock-chips.com>
- <CAL_JsqJDALnjVaVoEqGGsSLeE31m3MKOfbSoZ3M+g+zPZR2MFg@mail.gmail.com>
- <55E7CC43.7040608@rock-chips.com>
- <20150903090421.GC3784@ulmo.nvidia.com>
- <20150904102003.GE21084@n2100.arm.linux.org.uk>
-Message-ID: <20150907090151.GD19961@ulmo.nvidia.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 7 Sep 2015 11:06:03 +0200
+Subject: [PATCH v2 1/8] clk: imx: add common logic to detect early UART
+ usage
+In-Reply-To: <1441382419-4343-2-git-send-email-l.stach@pengutronix.de>
+References: <1441382419-4343-1-git-send-email-l.stach@pengutronix.de>
+ <1441382419-4343-2-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20150907090603.GU9999@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 04, 2015 at 11:20:03AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Sep 03, 2015 at 11:04:40AM +0200, Thierry Reding wrote:
-> > Conversely, if the panel isn't capable of generating an HPD signal, then
-> > I don't think it would be appropriate to make it a DT property. It would
-> > be better to hard-code it in the driver, lest someone forget to set the
-> > property in DT and get stuck with a device that isn't operational.
+Hello Lucas,
+
+On Fri, Sep 04, 2015 at 06:00:12PM +0200, Lucas Stach wrote:
+> Both earlycon and eralyprintk depend on the bootloader setup UART
+> clocks being retained. This patch adds the common logic to detect such
+> situations and make the information available to the clock drivers, as
+> well as adding the facilities to disable those clocks at the end of
+> the kernel init.
 > 
-> There is another way to deal with this: DRM supports the idea of connector
-> forcing - where you can force the connector to think that it's connected
-> or disconnected.
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  drivers/clk/imx/clk.c | 46 ++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/imx/clk.h |  1 +
+>  2 files changed, 47 insertions(+)
+> 
+> diff --git a/drivers/clk/imx/clk.c b/drivers/clk/imx/clk.c
+> index df12b5307175..3357e29e43ab 100644
+> --- a/drivers/clk/imx/clk.c
+> +++ b/drivers/clk/imx/clk.c
+> @@ -73,3 +73,49 @@ void imx_cscmr1_fixup(u32 *val)
+>  	*val ^= CSCMR1_FIXUP;
+>  	return;
+>  }
+> +
+> +static int __initdata imx_keep_uart_clocks;
+> +static struct clk __initdata ***imx_uart_clocks;
+> +
+> +static int __init imx_keep_uart_clocks_param(char *str)
+> +{
+> +	imx_keep_uart_clocks = 1;
+> +
+> +	return 0;
+> +}
+> +__setup_param("earlycon", imx_keep_uart_earlycon,
+> +	      imx_keep_uart_clocks_param, 0);
+> +__setup_param("earlyprintk", imx_keep_uart_earlyprintk,
+> +	      imx_keep_uart_clocks_param, 0);
+> +
+> +void __init imx_register_uart_clocks(struct clk **clks[])
 
-Yes, this could work well for RGB/LVDS or DSI connectors perhaps. For
-eDP there is added complexity because the HPD interrupt function is also
-used to signal loss of link integrity. That is, after receiving an HPD
-interrupt you are supposed to retrain the link (or at least check the
-link status to see if the interrupt cause is loss of integrity). While
-the eDP specification makes HPD optional, it also says that if HPD isn't
-available, then the source must use polling to monitor link integrity
-instead.
+const struct clk **clks[]?
 
-DRM does provide a mechanism for that as well. You can set the
-connector's ->polled field to DRM_CONNECTOR_POLL_CONNECT |
-DRM_CONNECTOR_POLL_DISCONNECT and have the core actively poll for the
-connector status (i.e. call ->detect() every 100 ms).
+I wonder why you need an array of pointers to pointers of clocks. Isn't
+one indirection less possible and more easy?
 
-I think use of polling would be more appropriate in case of eDP.
+> +{
+> +	if (imx_keep_uart_clocks) {
+> +		int i;
+> +
+> +		imx_uart_clocks = clks;
+> +		for (i = 0;; i++) {
+> +			if (imx_uart_clocks[i])
+> +				clk_prepare_enable(*imx_uart_clocks[i]);
+> +			else
+> +				break;
+> +		}
 
-> One of the problems is that not many ARM DRM drivers implement it - maybe
-> it should be a requirement for code to be accepted? :)
+I would have written this as:
 
-I suspect that many drivers may roll their own. In fact I'm guilty of
-that myself. On Tegra we have a default implementation for outputs which
-will default to the state of an HPD GPIO where available and fall back
-to "always connected" for outputs that have a panel connected. Outputs
-that have a separate mechanism to signal hotplug detection (such as DP)
-simply use a custom ->detect() implementation.
+	for (i = 0; imx_uart_clocks[i]; ++i)
+		clk_prepare_enable(*imx_uart_clocks[i]);
 
-The overhead of rolling one's own is almost zero and connector forcing
-has the disadvantage of being available via sysfs and debugfs, so the
-default set by drivers could be overwritten by users at runtime with no
-easy way back.
+but I guess that's a matter of taste.
 
-Given the above I'm not sure enforcing connector forcing would be
-beneficial.
+Best regards
+Uwe
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150907/30abe69e/attachment-0001.sig>
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
