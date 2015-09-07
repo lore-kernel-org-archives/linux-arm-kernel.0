@@ -1,75 +1,91 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 7 Sep 2015 15:40:36 -0400 (EDT)
-Subject: [PATCH] ARM: fix bug which lowmem size is limited to 760MB
-In-Reply-To: <1713935.2YV1sNJUyb@wuerfel>
-References: <20150903091044.GW21084@n2100.arm.linux.org.uk>
- <1441276233-14566-1-git-send-email-ytk.lee@samsung.com>
- <alpine.LFD.2.20.1509032106420.22877@knanqh.ubzr>
- <1713935.2YV1sNJUyb@wuerfel>
-Message-ID: <alpine.LFD.2.20.1509071152510.22877@knanqh.ubzr>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 07 Sep 2015 22:42:20 +0200
+Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
+In-Reply-To: <55ED9328.2010501@ti.com>
+References: <Pine.LNX.4.44L0.1509051133100.30865-100000@netrider.rowland.org>
+ <2657565.lxWtPmdjyp@vostro.rjw.lan> <55ED9328.2010501@ti.com>
+Message-ID: <2355864.I8qZFusWfm@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Sep 2015, Arnd Bergmann wrote:
-
-> On Thursday 03 September 2015 21:24:00 Nicolas Pitre wrote:
-> > If 768MB targets were common place then it could be worth changing the 
-> > default vmalloc size to accommodate this memory size and testing all the 
-> > other targets to make sure no regressions are introduced.  But given it 
-> > is easy to change the default via the kernel cmdline, and that you lose 
-> > only 8 MB otherwise, I don't think it is worth the trouble and/or the 
-> > risk.
+On Monday, September 07, 2015 04:37:44 PM Grygorii Strashko wrote:
+> On 09/07/2015 04:04 PM, Rafael J. Wysocki wrote:
+> > On Saturday, September 05, 2015 11:39:20 AM Alan Stern wrote:
+> >> On Sat, 5 Sep 2015, Grygorii Strashko wrote:
+> >>
+> >>> On 09/04/2015 09:45 PM, Alan Stern wrote:
+> >>>> On Fri, 4 Sep 2015, Grygorii Strashko wrote:
+> >>>>
+> >>>>> There is one "small" problem with such approach :(
+> >>>>>
+> >>>>> - It's incompatible with -RT kernel, because PM runtime can't be used
+> >>>>> in atomic context on -RT.
+> >>>>
+> >>>> Can you explain this more fully?  Why can't runtime PM be used in
+> >>>> atomic context in the -rt kernels?
+> >>>>   
+> >>>
+> >>> See:
+> >>>   http://lwn.net/Articles/146861/
+> >>>   https://rt.wiki.kernel.org/index.php/Frequently_Asked_Questions#How_does_the_CONFIG_PREEMPT_RT_patch_work.3F
+> >>>
+> >>> spinlock_t
+> >>>      Critical sections are preemptible. The _irq operations (e.g., spin_lock_irqsave())
+> >>>   do -not- disable hardware interrupts. Priority inheritance is used to prevent priority
+> >>>   inversion. An underlying rt_mutex is used to implement spinlock_t in PREEMPT_RT.
+> >>>
+> >>> As result, have to do things like:
+> >>> https://lkml.org/lkml/2015/8/18/161
+> >>> https://lkml.org/lkml/2015/8/18/162
+> >>>
+> >>> Sorry for brief reply - Friday/Sat night :)
+> >>
+> >> I see.  Although we normally think of interrupt contexts as being
+> >> atomic, in an -rt kernel this isn't true any more because things like
+> >> spin_lock_irq don't actually disable interrupts.
+> >>
+> >> Therefore it would be correct to say that in -rt kernels, runtime PM
+> >> can be used in interrupt context (if the device is marked as irq-safe),
+> >> but not in atomic context.  Right?
+> > 
+> > Right.
+> > 
+> > Whatever is suitable for interrupt context in the mainline, will be suitable
+> > for that in -rt kernels too. 
 > 
-> Agreed.
+> Not exactly true :(, since spinlock is converted to [rt_] mutex.
+> Usually, this difference can't be seen because on -RT kernel all or
+> mostly all HW IRQ handlers will be forced to be threaded.
 
-Well... I think there is a better solution.
+Exactly.  And that's what I'm talking about.
 
-Instead of shrinking the vmalloc size, we should instead move 
-VMALLOC_END and keep the vmalloc size unchanged.  That also makes for 
-nicer address alignment in a subsequent CONFIG_VMSPLIT_3G_OPT patch.
+> For the cases, where such automatic conversion is not working,
+> (like chained irq handlers or HW-handler+Threaded handler) the code
+> has to be carefully patched to work properly as for non-RT as for -RT.
 
------ >8
-ARM: move VMALLOC_END up from 0xff000000 to 0xff800000
+Right.
 
-There is a 12MB unused region in our memory map between the vmalloc and
-fixmap areas. This became unused with commit e9da6e9905e6, confirmed with
-commit 64d3b6a3f480.
+> Also, this triggers some -RT incompatibility issues, like with PM runtime or
 
-We also have a 8MB guard area before the vmalloc area.  With the default
-240MB vmalloc area size, that puts the end of low memory at 0xef800000
-which is unfortunate for 768MB machines where 8MB of RAM is lost to
-himem.
+That I'm not sure about.  Why would runtime PM cause problems with -RT (apart
+from attempts to use it from the idle loop, but that's not happening in the
+mainline anyway)?
 
-Let's move VMALLOC_END to 0xff800000 so the guard area won't chop the
-top of the 768MB lomem area while keeping the default vmalloc area size
-unchanged and also preserving a gap between the vmalloc and fixmap
-areas.
+> CLK framework (http://www.spinics.net/lists/linux-rt-users/msg13653.html).
+>
+> > However, what is suitable for the idle loop
+> > in the mainline, may not be suitable for that in -rt kernels.
+> > 
+> > That's why raw_spin_lock/unlock() need to be used within the idle loop.
+> 
+> Indeed. CPU hotplug/CPUIdle is guarded by local_irq_disable()/local_irq_enable().
+> (example of CPU hotplug RT-issue http://www.spinics.net/lists/arm-kernel/msg438963.html).
+> 
+> I don't want to be the final authority here as my experience with -RT is short.
+> But, I want to point out on potential issues based on what I've already discovered
+> and tried to fix.
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
+OK
 
-diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
-index 4178ebda6e..546a39048e 100644
---- a/Documentation/arm/memory.txt
-+++ b/Documentation/arm/memory.txt
-@@ -54,7 +54,7 @@ VMALLOC_START	VMALLOC_END-1	vmalloc() / ioremap() space.
- 				located here through iotable_init().
- 				VMALLOC_START is based upon the value
- 				of the high_memory variable, and VMALLOC_END
--				is equal to 0xff000000.
-+				is equal to 0xff800000.
- 
- PAGE_OFFSET	high_memory-1	Kernel direct-mapped RAM region.
- 				This maps the platforms RAM, and typically
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index f40354198b..348caabb76 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -43,7 +43,7 @@
-  */
- #define VMALLOC_OFFSET		(8*1024*1024)
- #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
--#define VMALLOC_END		0xff000000UL
-+#define VMALLOC_END		0xff800000UL
- 
- #define LIBRARY_TEXT_START	0x0c000000
- 
+Thanks,
+Rafael
