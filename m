@@ -1,71 +1,62 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 7 Sep 2015 18:56:43 +0100
+Date: Mon, 7 Sep 2015 19:05:16 +0100
 Subject: [PATCH 2/3] Docs: dt: Add PCI MSI map bindings
-In-Reply-To: <55B5E8C1.4030707@arm.com>
+In-Reply-To: <55EA1C3F.1030300@caviumnetworks.com>
 References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
  <1437670365-20704-3-git-send-email-mark.rutland@arm.com>
- <55B5E8C1.4030707@arm.com>
-Message-ID: <20150907175643.GB18079@leverpostej>
+ <55B5E8C1.4030707@arm.com> <55EA1C3F.1030300@caviumnetworks.com>
+Message-ID: <20150907180516.GC18079@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +PCI root complex
-> > +================
-> > +
-> > +Optional properties
-> > +-------------------
-> > +
-> > +- msi-map: Maps a Requester ID to an MSI controller and associated
-> > +  msi-specifier data. The property is an arbitrary number of tuples of
-> > +  (rid-base,msi-controller,msi-base,length), where:
-> > +
-> > +  * rid-base is a single cell describing the first RID matched by the entry.
-> > +
-> > +  * msi-controller is a single phandle to an MSI controller
-> > +
-> > +  * msi-base is an msi-specifier describing the msi-specifier produced for the
-> > +    first RID matched by the entry.
-> > +
-> > +  * length is a single cell describing how many consecutive RIDs are matched
-> > +    following the rid-base.
-> > +
-> > +  Any RID r in the interval [rid-base, rid-base + length) is associated with
-> > +  the listed msi-controller, with the msi-specifier (r - rid-base + msi-base).
-> > +
-> > +- msi-map-mask: A mask to be applied to each Requester ID prior to being mapped
-> > +  to an msi-specifier per the msi-map property.
-> > +
-> > +- msi-parent: Describes the MSI parent of the root complex itself. Where
-> > +  the root complex and MSI controller do not pass sideband data with MSI
-> > +  writes, this property may be used to describe the MSI controller(s)
-> > +  used by PCI devices under the root complex, if defined as such in the
-> > +  binding for the root complex.
+On Fri, Sep 04, 2015 at 11:33:35PM +0100, David Daney wrote:
+> Hi Mark,
+
+Hi David,
+
+> I now have a prototype implementation for irq-gic-v3-its.c that is using 
+> this binding on Cavium's ThunderX platform.
 > 
-> Right, this is where I'd expect some details about #msi-cells. Is it
-> meant to be ignored? The lack of symmetry between the PCI and non-PCI
-> use cases feels a bit inelegant (not to mention that it precludes having
-> an unified parser for both cases).
+> Q: Have you guys had any more thoughts on this that might require 
+> changing the binding?
 
-I would expect that the msi-parent's #msi-cells could be non-zero.
+Having discussed this with Stuart and others at Linux Plumbers, I think
+that the binding is sufficient, and unlikely to change greatly unless
+there is a strong objection (Stuart, please correct me if I am wrong).
 
-As I see it, there are three possible interpretations (and the choice
-between these would be specific to a PCI root complex):
+Per Marc's comments there are probably some edge cases and/or wording
+details to sort out, but I think the common/simple case is sorted. I'll
+send a v2 once those have been settled.
 
-(1) Devices under the root complex generate MSIs via the MSI parent,
-    using common sideband data described in the msi cells (and therefore
-    cannot be distingushed from each other).
+> If not, I will be sending out my patches for your consideration.
 
-(2) The root complex itself generates MSIs via the MSI parent, with any
-    sideband data described in the msi cells.
+Please do!
 
-(3) Both the root complex and devices underneath it generate MSIs via
-    the MSI parent, using common sideband data described in the msi
-    cells (and therefore cannot be distinguished from each other).
+> Thanks,
+> David Daney
+> 
+> On 07/27/2015 01:16 AM, Marc Zyngier wrote:
+> > On 23/07/15 17:52, Mark Rutland wrote:
+> >> Currently msi-parent is used by a few bindings to describe the
+> >> relationship between a PCI root complex and a single MSI controller, but
+> >> this property does not have a generic binding document.
+> >>
+> >> Additionally, msi-parent is insufficient to describe more complex
+> >> relationships between MSI controllers and devices under a root complex,
+> >> where devices may be able to target multiple MSI controllers, or where
+> >> MSI controllers use (non-probeable) sideband information to distinguish
+> >> devices.
+> >>
+> >> This patch adds a generic binding for mapping PCI devices to MSI
+> >> controllers. This document covers msi-parent, and a new msi-map property
+> >> (specific to PCI*) which may be used to map devices (identified by their
+> >> Requester ID) to sideband data for each MSI controller that they may
+> >> target.
+> >>
+> >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> Acked-by: David Daney <david.daney@cavium.com>
 
-Of these, (1) is the common case today, though (2) would be more in
-keeping with how this style of property usually works.
+Thanks!
 
-I'm not sure how to capture that.
-
-Thanks,
 Mark.
