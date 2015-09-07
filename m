@@ -1,110 +1,86 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 07 Sep 2015 17:32:25 +0100
-Subject: [PATCH v4 5/5] irqchip, gicv3-its: Workaround for Cavium ThunderX
- errata 22375, 24313
-In-Reply-To: <1439576885-15621-6-git-send-email-rric@kernel.org>
-References: <1439576885-15621-1-git-send-email-rric@kernel.org>
- <1439576885-15621-6-git-send-email-rric@kernel.org>
-Message-ID: <55EDBC19.2010301@arm.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Tue, 8 Sep 2015 00:33:28 +0800
+Subject: [RFC PATCH v1 2/4] irqchip: GICv3: set non-percpu irqs status
+ with _IRQ_MOVE_PCNTXT
+In-Reply-To: <55EDA5A5.9070805@arm.com>
+References: <1441513421-8092-1-git-send-email-yangyingliang@huawei.com>
+ <1441513421-8092-3-git-send-email-yangyingliang@huawei.com>
+ <55EBD59B.4030405@linux.intel.com> <55ED83D2.90809@arm.com>
+ <alpine.DEB.2.11.1509071502080.15006@nanos> <55EDA5A5.9070805@arm.com>
+Message-ID: <55EDBC58.7030609@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/15 19:28, Robert Richter wrote:
-> From: Robert Richter <rrichter@cavium.com>
+On 2015/9/7 22:56, Marc Zyngier wrote:
+> Hi Thomas,
 > 
-> This implements two gicv3-its errata workarounds for ThunderX. Both
-> with small impact affecting only ITS table allocation.
+> On 07/09/15 14:24, Thomas Gleixner wrote:
+>> On Mon, 7 Sep 2015, Marc Zyngier wrote:
+>>> On 06/09/15 06:56, Jiang Liu wrote:
+>>>> On 2015/9/6 12:23, Yang Yingliang wrote:
+>>>>> Use irq_settings_set_move_pcntxt() helper irqs status with
+>>>>> _IRQ_MOVE_PCNTXT. So that it can do set affinity when calling
+>>>>> irq_set_affinity_locked().
+>>>> Hi Yingliang,
+>>>> 	We could only set _IRQ_MOVE_PCNTCT flag to enable migrating
+>>>> IRQ in process context if your hardware platform supports atomically
+>>>> change IRQ configuration. Not sure whether that's true for GICv3.
+>>>> If GICv3 doesn't support atomically change irq configuration, this
+>>>> change may cause trouble.
+>>>
+>>> I think it boils down to what exactly "process context" means here. If
+>>> this means "we do not need to mask the interrupt" while moving it, then
+>>> it should be fine (the GIC architecture guarantees that a pending
+>>> interrupt will be migrated).
+>>>
+>>> Is there any other requirement for this flag?
+>>
+>> The history of this flag is as follows:
+>>
+>> On x86 interrupts can only be safely migrated while the interrupt is
+>> handled.
 > 
->  erratum 22375: only alloc 8MB table size
->  erratum 24313: ignore memory access type
+> Woa! That's creative! :-) I suppose this doesn't work very well with CPU
+> hotplug though...
+X86 has special handling of this case when hot-removing a CPU.
+Basically, it does:
+1) mask an irq
+2) migrate irq to other cpus with set_affinity
+3) redirect(retrigger) irq to other CPUs if it's pending on the CPU to
+be removed.
+Thanks!
+Gerry
+
 > 
-> The fixes are in ITS initialization and basically ignore memory access
-> type and table size provided by the TYPER and BASER registers.
+>> With the introduction of IRQ remapping this requirement
+>> changed. Remapped interrupts can be migrated in any context.
+>>
+>> If you look at irq_set_affinity_locked()
+>>
+>>    if (irq_can_move_pcntxt(data) {
+>>       irq_do_set_affinity(data,...)
+>>         chip->irq_set_affinity(data,...);
+>>    } else {
+>>       irqd_set_move_pending(data);
+>>    }
+>>
+>> So if IRQ_MOVE_PCNTXT is not set, we handle the migration of the
+>> interrupt from next the interrupt. If it's set set_affinity() is
+>> called right away.
 > 
-> v3:
->  * fix erratum to be dependend from iidr
+> OK, that is now starting to make more sense.
 > 
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 35 +++++++++++++++++++++++++++++++----
->  1 file changed, 31 insertions(+), 4 deletions(-)
+>> All architectures which do not select GENERIC_PENDING_IRQ are using
+>> the direct method.
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 697421e834ee..30459df2ee2c 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -39,7 +39,8 @@
->  #include "irq-gic-common.h"
->  #include "irqchip.h"
->  
-> -#define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1 << 0)
-> +#define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
-> +#define ITS_FLAGS_CAVIUM_THUNDERX		(1ULL << 1)
-
-I think you might need something slightly more explicit, as I'd expect
-some ulterior revision of ThunderX to be eventually fixed...
-ITS_FLAGS_THUNDERX_BOGUS_TYPER? Or something based on the errata numbers?
-
->  
->  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
->  
-> @@ -803,9 +804,22 @@ static int its_alloc_tables(struct its_node *its)
->  	int i;
->  	int psz = SZ_64K;
->  	u64 shr = GITS_BASER_InnerShareable;
-> -	u64 cache = GITS_BASER_WaWb;
-> -	u64 typer = readq_relaxed(its->base + GITS_TYPER);
-> -	u32 ids = GITS_TYPER_DEVBITS(typer);
-> +	u64 cache;
-> +	u64 typer;
-> +	u32 ids;
-> +
-> +	if (its->flags & ITS_FLAGS_CAVIUM_THUNDERX) {
-> +		/*
-> +		 * erratum 22375: only alloc 8MB table size
-> +		 * erratum 24313: ignore memory access type
-> +		 */
-> +		cache	= 0;
-> +		ids	= 0x13;			/* 20 bits, 8MB */
-> +	} else {
-
-You can move the typer definition here, as it is only used here.
-
-> +		cache	= GITS_BASER_WaWb;
-> +		typer	= readq_relaxed(its->base + GITS_TYPER);
-> +		ids	= GITS_TYPER_DEVBITS(typer);
-> +	}
->  
->  	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
->  		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
-> @@ -1391,8 +1405,21 @@ static int its_force_quiescent(void __iomem *base)
->  	}
->  }
->  
-> +static void its_enable_cavium_thunderx(void *data)
-> +{
-> +	struct its_node *its = data;
-> +
-> +	its->flags |= ITS_FLAGS_CAVIUM_THUNDERX;
-> +}
-> +
->  static const struct gic_capabilities its_errata[] = {
->  	{
-> +		.desc	= "ITS: Cavium errata 22375, 24313",
-> +		.iidr	= 0xa100034c,	/* ThunderX pass 1.x */
-> +		.mask	= 0xffff0fff,
-> +		.init	= its_enable_cavium_thunderx,
-> +	},
-> +	{
->  	}
->  };
->  
+> Right. On ARM, only the direct method makes sense so far (we have no
+> constraint such as the one you describe above).
 > 
-
-Otherwise looks OK to me.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> So I wonder why we bother introducing the IRQ_MOVE_PCNTXT flag on ARM at
+> all. Is that just because migration.c is only compiled when
+> GENERIC_PENDING_IRQ is set?
+> 
+> Thanks,
+> 
+> 	M.
+> 
