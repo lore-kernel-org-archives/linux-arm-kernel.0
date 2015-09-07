@@ -1,25 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Sep 2015 10:47:39 +0100
-Subject: [PATCH 0/3] gpiolib: Initializing GPIOs using DT property
- gpio-initval
-In-Reply-To: <1439979512-3894-1-git-send-email-mpa@pengutronix.de>
-References: <1439979512-3894-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150907094739.GR21084@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon,  7 Sep 2015 10:49:03 +0100
+Subject: [PATCH] Docs: dt: add #msi-cells to GICv3 ITS binding
+Message-ID: <1441619343-12087-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 19, 2015 at 12:18:29PM +0200, Markus Pargmann wrote:
-> This series adds a gpio-initval property to the devicetree. It provides a way
-> to initialize GPIOs to a defined value.
+The GICv3 ITS uses sideband master identification data (known as a
+DeviceID) to identify which master wrote to a doorbell, and this data is
+used to determine how to react in response to the write.
 
-This is actually a good thing to have.  I know at least one SoC contains
-a paragraph in its hardware spec:
+Commit 1e6db000482fa65a ("irqchip/gicv3-its: Add platform MSI support")
+added support per this binding, but failed to update the documentation.
+This patch fixes the documentation.
 
-General Purpose Pins (GPP)
-Each individual pin can be defined as an input, output, or level interrupt
-input. These pins can be used for indications retrieving or for peripherals
-control. When not in use, program interface to GPIOs and set GPIOs as output.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/gic-v3.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
+index ddfade4..7803e77 100644
+--- a/Documentation/devicetree/bindings/arm/gic-v3.txt
++++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
+@@ -57,6 +57,8 @@ used to route Message Signalled Interrupts (MSI) to the CPUs.
+ These nodes must have the following properties:
+ - compatible : Should at least contain  "arm,gic-v3-its".
+ - msi-controller : Boolean property. Identifies the node as an MSI controller
++- #msi-cells: Must be <1>. The single msi-cell is the DeviceID of the device
++  which will generate the MSI.
+ - reg: Specifies the base physical address and size of the ITS
+   registers.
+ 
+@@ -83,6 +85,7 @@ Examples:
+ 		gic-its at 2c200000 {
+ 			compatible = "arm,gic-v3-its";
+ 			msi-controller;
++			#msi-cells = <1>;
+ 			reg = <0x0 0x2c200000 0 0x200000>;
+ 		};
+ 	};
+@@ -107,12 +110,14 @@ Examples:
+ 		gic-its at 2c200000 {
+ 			compatible = "arm,gic-v3-its";
+ 			msi-controller;
++			#msi-cells = <1>;
+ 			reg = <0x0 0x2c200000 0 0x200000>;
+ 		};
+ 
+ 		gic-its at 2c400000 {
+ 			compatible = "arm,gic-v3-its";
+ 			msi-controller;
++			#msi-cells = <1>;
+ 			reg = <0x0 0x2c400000 0 0x200000>;
+ 		};
+ 	};
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
