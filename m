@@ -1,72 +1,125 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Mon, 7 Sep 2015 10:03:49 +0800
-Subject: [RFC PATCH v1 2/4] irqchip: GICv3: set non-percpu irqs status
- with _IRQ_MOVE_PCNTXT
-In-Reply-To: <55EBD59B.4030405@linux.intel.com>
-References: <1441513421-8092-1-git-send-email-yangyingliang@huawei.com>
- <1441513421-8092-3-git-send-email-yangyingliang@huawei.com>
- <55EBD59B.4030405@linux.intel.com>
-Message-ID: <55ECF085.7020708@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 7 Sep 2015 10:12:57 +0800
+Subject: [PATCH v2 6/8] pinctrl: freescale: imx: add shared input select
+ reg support
+In-Reply-To: <1441147753-13239-6-git-send-email-aalonso@freescale.com>
+References: <1441147753-13239-1-git-send-email-aalonso@freescale.com>
+ <1441147753-13239-6-git-send-email-aalonso@freescale.com>
+Message-ID: <20150907021257.GF30746@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 01, 2015 at 05:49:11PM -0500, Adrian Alonso wrote:
+> - Add shared input select register support
+> - imx7d has two iomux controllers iomuxc and iomuxc-lpsr
+>   which share select_input register for daisy chain settings
+> 
+> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
+> ---
+> Changes for V2: Resend
+> 
+>  drivers/pinctrl/freescale/pinctrl-imx.c | 28 +++++++++++++++++++++++++++-
+>  drivers/pinctrl/freescale/pinctrl-imx.h |  1 +
+>  2 files changed, 28 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+> index 9f019be..597319d 100644
+> --- a/drivers/pinctrl/freescale/pinctrl-imx.c
+> +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> +#include <linux/of_address.h>
+>  #include <linux/pinctrl/machine.h>
+>  #include <linux/pinctrl/pinconf.h>
+>  #include <linux/pinctrl/pinctrl.h>
+> @@ -39,6 +40,7 @@ struct imx_pinctrl {
+>  	struct device *dev;
+>  	struct pinctrl_dev *pctl;
+>  	void __iomem *base;
+> +	void __iomem *input_sel_base;
+>  	const struct imx_pinctrl_soc_info *info;
+>  };
+>  
+> @@ -254,7 +256,12 @@ static int imx_pmx_set(struct pinctrl_dev *pctldev, unsigned selector,
+>  			 * Regular select input register can never be at offset
+>  			 * 0, and we only print register value for regular case.
+>  			 */
+> -			writel(pin->input_val, ipctl->base + pin->input_reg);
+> +			if (info->flags & SHARE_INPUT_SELECT_REG)
 
+This can be replaced by a NULL checking on input_sel_base.
 
-On 2015/9/6 13:56, Jiang Liu wrote:
-> On 2015/9/6 12:23, Yang Yingliang wrote:
->> Use irq_settings_set_move_pcntxt() helper irqs status with
->> _IRQ_MOVE_PCNTXT. So that it can do set affinity when calling
->> irq_set_affinity_locked().
-> Hi Yingliang,
-> 	We could only set _IRQ_MOVE_PCNTCT flag to enable migrating
-> IRQ in process context if your hardware platform supports atomically
-> change IRQ configuration. Not sure whether that's true for GICv3.
-> If GICv3 doesn't support atomically change irq configuration, this
-> change may cause trouble.
-> Thanks!
-> Gerry
+> +				writel(pin->input_val, ipctl->input_sel_base +
+> +						pin->input_reg);
+> +			else
+> +				writel(pin->input_val, ipctl->base +
+> +						pin->input_reg);
+>  			dev_dbg(ipctl->dev,
+>  				"==>select_input: offset 0x%x val 0x%x\n",
+>  				pin->input_reg, pin->input_val);
+> @@ -690,6 +697,8 @@ static int imx_pinctrl_probe_dt(struct platform_device *pdev,
+>  int imx_pinctrl_probe(struct platform_device *pdev,
+>  		      struct imx_pinctrl_soc_info *info)
+>  {
+> +	struct device_node *dev_np = pdev->dev.of_node;
+> +	struct device_node *np;
+>  	struct imx_pinctrl *ipctl;
+>  	struct resource *res;
+>  	int ret;
+> @@ -715,6 +724,23 @@ int imx_pinctrl_probe(struct platform_device *pdev,
+>  	if (IS_ERR(ipctl->base))
+>  		return PTR_ERR(ipctl->base);
+>  
+> +	if (info->flags & SHARE_INPUT_SELECT_REG) {
+> +		np = of_get_child_by_name(dev_np->parent, "iomuxc");
 
-I am not certain sure if GICv3 supports it. But current code consider it 
-as true default without CONFIG_GENERIC_PENDING_IRQ enable on arm.
-Does Marc have any opinion ?
+This doesn't scale well.  First of all, we do not generally recommend
+searching node by name, because most of time node name is not enforced
+to be stable, and some nodes are named quite arbitrarily.  Secondly, we
+do not know if the hardware people will move select_input registers to
+somewhere else than IOMUXC in the future.
 
-Thanks
-Yang
->
->>
->> Cc: Jiang Liu <jiang.liu@linux.intel.com>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
->> Cc: Hanjun Guo <hanjun.guo@linaro.org>
->> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
->> ---
->>   drivers/irqchip/irq-gic-v3.c | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index e406bc5..9108387 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -688,6 +688,7 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->>   		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
->>   				    handle_fasteoi_irq, NULL, NULL);
->>   		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
->> +		irq_set_move_pcntxt(irq);
->>   	}
->>   	/* LPIs */
->>   	if (hw >= 8192 && hw < GIC_ID_NR) {
->> @@ -696,6 +697,7 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->>   		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
->>   				    handle_fasteoi_irq, NULL, NULL);
->>   		set_irq_flags(irq, IRQF_VALID);
->> +		irq_set_move_pcntxt(irq);
->>   	}
->>
->>   	return 0;
->>
->
-> .
->
+Hence, I suggest you have a device tree phandle pointing the device
+where select_input registers are located.  In that case, flag
+SHARE_INPUT_SELECT_REG can even be saved completely.
+
+> +		if (np) {
+> +			ipctl->input_sel_base = of_iomap(np, 0);
+> +			if (IS_ERR(ipctl->input_sel_base)) {
+> +				of_node_put(np);
+> +				dev_err(&pdev->dev,
+> +				       "iomuxc base address not found\n");
+> +				return PTR_ERR(ipctl->input_sel_base);
+> +			}
+> +		} else {
+> +			dev_err(&pdev->dev, "iomuxc device node not foud\n");
+
+s/foud/found
+
+Shawn
+
+> +			return -EINVAL;
+> +		}
+> +		of_node_put(np);
+> +	}
+> +
+>  	imx_pinctrl_desc.name = dev_name(&pdev->dev);
+>  	imx_pinctrl_desc.pins = info->pins;
+>  	imx_pinctrl_desc.npins = info->npins;
+> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h b/drivers/pinctrl/freescale/pinctrl-imx.h
+> index 67c07c2..d11a827 100644
+> --- a/drivers/pinctrl/freescale/pinctrl-imx.h
+> +++ b/drivers/pinctrl/freescale/pinctrl-imx.h
+> @@ -86,6 +86,7 @@ struct imx_pinctrl_soc_info {
+>  
+>  #define SHARE_MUX_CONF_REG	0x1
+>  #define ZERO_OFFSET_VALID	0x2
+> +#define SHARE_INPUT_SELECT_REG	0x4
+>  
+>  #define NO_MUX		0x0
+>  #define NO_PAD		0x0
+> -- 
+> 2.1.4
+> 
