@@ -1,73 +1,35 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon,  7 Sep 2015 16:48:39 +0530
-Subject: [PATCH-v2 5/7] mmc: sdhci-pxav3: Fix HS200 mode support
+Date: Mon,  7 Sep 2015 16:48:41 +0530
+Subject: [PATCH-v2 7/7] mmc: sdhci: enable SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON
+ for pxa1928
 In-Reply-To: <1441624721-15612-1-git-send-email-vaibhav.hiremath@linaro.org>
 References: <1441624721-15612-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1441624721-15612-6-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1441624721-15612-8-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Liu <kliu5@marvell.com>
+Card power is dependent on bus power, without that card
+wouldn't respond (No CARD_INT). So this patch enables the
+quirk SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON.
 
-IN case of MMC HS200 mode, current code does not enable
-SD_CE_ATA_2.MMC_HS200 & SD_CE_ATA_2.MMC_CARD bit configurations.
-
-So this patch updates the above bit fields correctly.
-
-Signed-off-by: Tim Wang <wangtt@marvell.com>
-Signed-off-by: Kevin Liu <kliu5@marvell.com>
 Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 ---
-Note: Unfortunately I do not have access to any other datasheets
-which uses sdhci-pxav3 driver, so quite not sure whether this would
-break any existing platform, probably NOT, as I do not see any
-references for this change.
-If anyone can confirm that would be really great.
+ drivers/mmc/host/sdhci-pltfm.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
- drivers/mmc/host/sdhci-pxav3.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-index d933f75..6978810 100644
---- a/drivers/mmc/host/sdhci-pxav3.c
-+++ b/drivers/mmc/host/sdhci-pxav3.c
-@@ -57,6 +57,8 @@
- #define SD_CE_ATA_1			0x10C
+diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+index 5788a8c..057190c 100644
+--- a/drivers/mmc/host/sdhci-pltfm.c
++++ b/drivers/mmc/host/sdhci-pltfm.c
+@@ -102,7 +102,8 @@ void sdhci_get_of_property(struct platform_device *pdev)
+ 		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
  
- #define SD_CE_ATA_2			0x10E
-+#define  SD_CE_ATA2_HS200_EN		BIT(10)
-+#define  SD_CE_ATA2_MMC_MODE		BIT(12)
- #define  SDCE_MISC_INT			BIT(2)
- #define  SDCE_MISC_INT_EN		BIT(1)
+ 	if (of_device_is_compatible(np, "marvell,pxav3-1928-sdhci"))
+-		host->quirks2 |= SDHCI_QUIRK2_MUST_SET_SDHCI_BUS_POWER;
++		host->quirks2 |= SDHCI_QUIRK2_MUST_SET_SDHCI_BUS_POWER |
++				SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON;
  
-@@ -330,6 +332,17 @@ static int pxav3_select_pinstate(struct sdhci_host *host, unsigned int uhs)
- 	return pinctrl_select_state(pxa->pinctrl, pinctrl);
- }
- 
-+static int pxav3_select_hs200(struct sdhci_host *host)
-+{
-+	u16 reg = 0;
-+
-+	reg = sdhci_readw(host, SD_CE_ATA_2);
-+	reg |= SD_CE_ATA2_HS200_EN | SD_CE_ATA2_MMC_MODE;
-+	sdhci_writew(host, reg, SD_CE_ATA_2);
-+
-+	return 0;
-+}
-+
- static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-@@ -361,6 +374,10 @@ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
- 	case MMC_TIMING_UHS_DDR50:
- 		ctrl_2 |= SDHCI_CTRL_UHS_DDR50 | SDHCI_CTRL_VDD_180;
- 		break;
-+	case MMC_TIMING_MMC_HS200:
-+		ctrl_2 |= SDHCI_CTRL_UHS_SDR104 | SDHCI_CTRL_VDD_180;
-+		pxav3_select_hs200(host);
-+		break;
- 	}
- 
- 	/*
+ 	clk = of_get_property(np, "clock-frequency", &size);
+ 	if (clk && size == sizeof(*clk) && *clk)
 -- 
 1.9.1
