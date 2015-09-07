@@ -1,110 +1,134 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Mon, 7 Sep 2015 10:11:53 +0200
-Subject: [PATCH v4 03/16] drm: bridge: analogix/dp: split exynos dp
- driver to bridge dir
-In-Reply-To: <3704589.SqgGPobGdG@phil>
-References: <1441086371-24838-1-git-send-email-ykk@rock-chips.com>
- <2618155.E00Pak1qvi@phil>
- <CAL_JsqLvOOF0Wk=E1kz0rWXg0+6ay0=4OTbCpjdGCfL7_qFN8Q@mail.gmail.com>
- <3704589.SqgGPobGdG@phil>
-Message-ID: <20150907081152.GA19961@ulmo.nvidia.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 7 Sep 2015 08:17:20 +0000
+Subject: [PATCH v8 0/6] PCI: hisi: Add PCIe host support for HiSilicon
+ SoC Hip05
+In-Reply-To: <1440496734-18417-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1440496734-18417-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1620A175@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 04, 2015 at 11:29:30PM +0200, Heiko Stuebner wrote:
-> Am Freitag, 4. September 2015, 16:06:02 schrieb Rob Herring:
-> > On Tue, Sep 1, 2015 at 3:46 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> > > Am Dienstag, 1. September 2015, 13:49:58 schrieb Yakir Yang:
-> > >> Split the dp core driver from exynos directory to bridge
-> > >> directory, and rename the core driver to analogix_dp_*,
-> > >> leave the platform code to analogix_dp-exynos.
-> > >> 
-> > >> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> > > 
-> > > [...]
-> > > 
-> > >> diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c
-> > >> b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c similarity index 50%
-> > >> rename from drivers/gpu/drm/exynos/exynos_dp_core.c
-> > >> rename to drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-> > >> index bed0252..7d62f22 100644
-> > >> --- a/drivers/gpu/drm/exynos/exynos_dp_core.c
-> > >> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-> > > 
-> > > [...]
-> > > 
-> > >>       connector->polled = DRM_CONNECTOR_POLL_HPD;
-> > >>       
-> > >>       ret = drm_connector_init(dp->drm_dev, connector,
-> > >> 
-> > >> -                              &exynos_dp_connector_funcs,
-> > >> +                              &analogix_dp_connector_funcs,
-> > >> 
-> > >>                                DRM_MODE_CONNECTOR_eDP);
-> > >>       
-> > >>       if (ret) {
-> > >>       
-> > >>               DRM_ERROR("Failed to initialize connector with drm\n");
-> > >>               return ret;
-> > >>       
-> > >>       }
-> > >> 
-> > >> -     drm_connector_helper_add(connector,
-> > >> &exynos_dp_connector_helper_funcs); +    
-> > >> drm_connector_helper_add(connector,
-> > >> +                              &analogix_dp_connector_helper_funcs);
-> > >> 
-> > >>       drm_connector_register(connector);
-> > > 
-> > > this should only run on exynos, as we're doing all our connector
-> > > registration in the core driver after all components are bound, so I
-> > > guess something like> 
-> > > the following is needed:
-> > >        if (dp->plat_data && dp->plat_data->dev_type == EXYNOS_DP)
-> > >        
-> > >                drm_connector_register(connector);
-> > 
-> > Yuck!
-> > 
-> > Surely there is a better way. From what I've seen of DRM, I have no
-> > doubt this is needed, but really a better solution is needed. Surely
-> > there can be a more generic way for the driver to determine if it
-> > should handle the connector or not. This seems like a common problem
-> > including one I have seen. What I'm working on has onchip DSI encoder
-> > -> ADV7533 -> HDMI. The DSI encoder can also have a direct attached
-> > panel. So I have to check for a bridge in the encoder driver and only
-> > register the connector for the panel if a bridge is not attached.
-> 
-> I'm also only a part-time drm meddler, so things may be inaccurate.
-> 
-> This conditional is not meant to prevent the registration of the dp connector, 
-> only delay it for non-exynos drms. The connector registration does publish it 
-> to userspace, so like i.MX we're doing that for all connectors at the same 
-> time after all components are bound - to also make x11 happy. Exynos on the 
-> other hand seems to register its connectors individually and I'm not sure if 
-> they would be willing to change that.
-> 
-> see d3007dabeff4 ("drm/rockchip: register all connectors after bind") or 
-> simply rockchip_drm_drv.c line 178.
-> 
-> and e355e7dd607b ("imx-drm: delay publishing sysfs connector entries")
+Hi Bjorn and all
 
-There really shouldn't be a reason for both drivers to behave
-differently in this case. Gustavo has done a lot of work on cleaning up
-the Exynos driver lately, so perhaps you should sync up with him to see
-if this is something that he can integrate with his changes.
+Do you have any comment on this patchset? I think we should be close to a final one...
 
-If you can't reach an agreement and Exynos must keep the exact behaviour
-as it has now, then perhaps a better option would be to have the
-Analogix core driver not register the connector but rather leave that up
-to users of the helpers. Then you don't have to clutter the core driver
-with this type of platform-specific data.
+Thanks and Regards
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150907/096f8638/attachment.sig>
+Gab
+
+> -----Original Message-----
+> From: Wangzhou (B)
+> Sent: 25 August 2015 10:59
+> To: Bjorn Helgaas; jingoohan1 at gmail.com; pratyush.anand at gmail.com; Arnd
+> Bergmann; linux at arm.linux.org.uk; thomas.petazzoni at free-electrons.com;
+> Gabriele Paoloni; lorenzo.pieralisi at arm.com; james.morse at arm.com;
+> Liviu.Dudau at arm.com; jason at lakedaemon.net; robh at kernel.org
+> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; zhangjukuo; qiuzhenfa; liudongdong (C); qiujiang;
+> xuwei (O); Liguozhu (Kenneth); Wangzhou (B)
+> Subject: [PATCH v8 0/6] PCI: hisi: Add PCIe host support for HiSilicon SoC
+> Hip05
+> 
+> This patchset adds PCIe host support for HiSilicon SoC Hip05. The PCIe hosts
+> use PCIe IP core from Synopsys, So this driver is base on designware PCIe
+> driver.
+> 
+> Hip05 is an ARMv8 architecture SoC. It should be able to use ARM64 PCIe API in
+> designeware PCIe driver. So this patch also adds ARM64 support for designware
+> pcie.
+> 
+> This patchset is based on v4.2-rc1.
+> 
+> Change from v7:
+> - Remove pp->root_bus_nr = 0 in dra7xx, exynos, imx6, keystone, layerscape,
+>   spear13xx. Pass pp->busn->start to pci_create_root_bus as root bus number.
+> - Remove bus-range parsing in pcie-hisi.c.
+> 
+> Change from v6:
+> - Add Pratyush's Acked-by for 1/6 and 2/6.
+> - Add James' Tested-by for 3/6.
+> 
+> Change from v5:
+> - Merge 1/6 in this series, discussion about this can be found in [1]
+> 
+> Change from v4:
+> - Change the author of 1/5 to Gabriele.
+> - Modify problems in 3/5 pointed by Bjorn.
+> - Modify spelling problems in 4/5.
+> 
+> Change from v3:
+> - Change 1/5 to what Gabriele suggested.
+> - Use win->__res.start to get *_mod_base in 2/5, this fix a bug in v3 series.
+> 
+> Change from v2:
+> - Move struct pci_dev *dev and struct pci_sys_data *sys in
+>   pcibios_align_resource in 1/5.
+> - Add Gabriele's codes in 2/5 which delete unnecessary information parse and
+>   use of_pci_get_host_bridge_resources for both ARM32 and ARM64.
+> - Add maintainer patch 5/5.
+> 
+> Change from RFC v1:
+> - Add 1/4 patch by Arnd which removes align_resource callback in ARM
+>   pcibios_align_resource.
+> - Change head file in pcie-designware from asm/hardirq.h to linux/hardirq.h.
+> - Set pp->root_bus_nr = 0 in dra7xx, exynos, imx6, keystone, layerscape,
+>   spear13xx.
+> - Remove unnecessary parentheses of some macros in pcie-hisi.
+> - Use macro to replace some magic values.
+> - Merge two loops together and add some comments about it in context_config
+>   function in pcie-hisi.
+> - Modify some value of items in pcie node example in binding document.
+> 
+> Change from RFC:
+> - delete dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
+>   merge related operations into dw_pcie_host_init.
+> 
+> Link of v7:
+> - http://www.spinics.net/lists/devicetree/msg90690.html
+> Link of v6:
+> - http://www.spinics.net/lists/linux-pci/msg43669.html
+> Link of v5:
+> - http://www.spinics.net/lists/devicetree/msg87959.html
+> Link of v4:
+> - http://www.spinics.net/lists/arm-kernel/msg433050.html
+> Link of v3:
+> - http://www.spinics.net/lists/linux-pci/msg42539.html
+> Link of v2:
+> - http://www.spinics.net/lists/linux-pci/msg41844.html
+> Link of RFC v1:
+> - http://www.spinics.net/lists/linux-pci/msg41305.html
+> Link of RFC:
+> - http://www.spinics.net/lists/linux-pci/msg40434.html
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
+> July/359741.html
+> 
+> 
+> Zhou Wang (4):
+>   PCI: designware: Add ARM64 support
+>   PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05
+>   Documentation: DT: Add HiSilicon PCIe host binding
+>   MAINTAINERS: Add pcie-hisi maintainer
+> 
+> gabriele paoloni (2):
+>   PCI: designware: move calculation of bus addresses to DRA7xx
+>   ARM/PCI: remove align_resource in pci_sys_data
+> 
+>  .../devicetree/bindings/pci/hisilicon-pcie.txt     |  46 ++++
+>  MAINTAINERS                                        |   7 +
+>  arch/arm/include/asm/mach/pci.h                    |   5 -
+>  arch/arm/kernel/bios32.c                           |  12 +-
+>  drivers/pci/host/Kconfig                           |   8 +
+>  drivers/pci/host/Makefile                          |   1 +
+>  drivers/pci/host/pci-dra7xx.c                      |  13 ++
+>  drivers/pci/host/pci-keystone-dw.c                 |   2 +-
+>  drivers/pci/host/pcie-designware.c                 | 237 +++++++-------------
+>  drivers/pci/host/pcie-designware.h                 |  14 +-
+>  drivers/pci/host/pcie-hisi.c                       | 247
+> +++++++++++++++++++++
+>  11 files changed, 413 insertions(+), 179 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+>  create mode 100644 drivers/pci/host/pcie-hisi.c
+> 
+> --
+> 1.9.1
