@@ -1,207 +1,175 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 7 Sep 2015 17:39:09 +0100
-Subject: [PATCH v4 12/20] xen/balloon: Don't rely on the page granularity
- is the same for Xen and Linux
-In-Reply-To: <1441640038-23615-13-git-send-email-julien.grall@citrix.com>
-References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
- <1441640038-23615-13-git-send-email-julien.grall@citrix.com>
-Message-ID: <alpine.DEB.2.02.1509071732500.2672@kaball.uk.xensource.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Sep 2015 17:44:41 +0100
+Subject: [PATCH v2] irqchip, gicv3-its,
+ numa: Workaround for Cavium ThunderX erratum 23144
+In-Reply-To: <1440497885-24584-1-git-send-email-gkulkarni@caviumnetworks.com>
+References: <1440497885-24584-1-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <55EDBEF9.4050007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Sep 2015, Julien Grall wrote:
-> For ARM64 guests, Linux is able to support either 64K or 4K page
-> granularity. Although, the hypercall interface is always based on 4K
-> page granularity.
+On 25/08/15 11:18, Ganapatrao Kulkarni wrote:
+> The patch below adds a workaround for gicv3 in a numa environment. It
+> is on top of Robert's recent gicv3 errata patch submission v4 and my
+> arm64 numa patches v5.
 > 
-> With 64K page granularity, a single page will be spread over multiple
-> Xen frame.
+> This implements a workaround for gicv3-its erratum 23144 on Cavium's
+> ThunderX dual-socket platforms, where LPI cannot be routed to a
+> redistributors present on a foreign node.
 > 
-> To avoid splitting the page into 4K frame, take advantage of the
-> extent_order field to directly allocate/free chunk of the Linux page
-> size.
+> v2:
+> updatated as per Marc Zyngier's review comments.
 > 
-> Note that PVMMU is only used for PV guest (which is x86) and the page
-> granularity is always 4KB. Some BUILD_BUG_ON has been added to ensure
-> that because the code has not been modified.
-> 
-> Signed-off-by: Julien Grall <julien.grall@citrix.com>
-
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-
+> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
 > ---
-> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> Cc: David Vrabel <david.vrabel@citrix.com>
-> Cc: Wei Liu <wei.liu2@citrix.com>
+>  drivers/irqchip/irq-gic-v3-its.c | 53 +++++++++++++++++++++++++++++++++-------
+>  1 file changed, 44 insertions(+), 9 deletions(-)
 > 
-> Note that two BUILD_BUG_ON(XEN_PAGE_SIZE != PAGE_SIZE) in code built
-> for the PV MMU code is kept in order to have at least one even if we
-> ever decide to drop of code section.
-> 
->     Changes in v4:
->         - s/xen_page_to_pfn/page_to_xen_pfn/ based on the new naming
->         - Use the field lru in the page to get a list of pages when
->         decreasing the memory reservation. It avoids to use a static
->         array to store the pages (see v3).
->         - Update comment for EXTENT_ORDER.
-> 
->     Changes in v3:
->         - Fix errors reported by checkpatch.pl
->         - s/mfn/gfn/ based on the new naming
->         - Rather than splitting the page into 4KB chunk, use the
->         extent_order field to allocate directly a Linux page size. This
->         is avoid lots of code for no benefits.
-> 
->     Changes in v2:
->         - Use xen_apply_to_page to split a page in 4K chunk
->         - It's not necessary to have a smaller frame list. Re-use
->         PAGE_SIZE
->         - Convert reserve_additional_memory to use XEN_... macro
-> ---
->  drivers/xen/balloon.c | 59 ++++++++++++++++++++++++++++++++++++++-------------
->  1 file changed, 44 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/xen/balloon.c b/drivers/xen/balloon.c
-> index c79329f..3babf13 100644
-> --- a/drivers/xen/balloon.c
-> +++ b/drivers/xen/balloon.c
-> @@ -70,6 +70,11 @@
->  #include <xen/features.h>
->  #include <xen/page.h>
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 614a367..d3fe0a4 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -40,7 +40,8 @@
+>  #include "irqchip.h"
 >  
-> +/* Use one extent per PAGE_SIZE to avoid to break down the page into
-> + * multiple frame.
-> + */
-> +#define EXTENT_ORDER (fls(XEN_PFN_PER_PAGE) - 1)
-> +
->  /*
->   * balloon_process() state:
->   *
-> @@ -230,6 +235,11 @@ static enum bp_state reserve_additional_memory(long credit)
->  	nid = memory_add_physaddr_to_nid(hotplug_start_paddr);
+>  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING          (1ULL << 0)
+> -#define ITS_FLAGS_CAVIUM_THUNDERX              (1ULL << 1)
+> +#define ITS_WORKAROUND_CAVIUM_22375            (1ULL << 1)
+> +#define ITS_WORKAROUND_CAVIUM_23144            (1ULL << 2)
+
+Please move this to Robert's series, as it doesn't make much sense to
+add a quirk flag just to modify it in the next patch. This will help
+declutter this patch.
+
 >  
->  #ifdef CONFIG_XEN_HAVE_PVMMU
-> +	/* We don't support PV MMU when Linux and Xen is using
-> +	 * different page granularity.
-> +	 */
-> +	BUILD_BUG_ON(XEN_PAGE_SIZE != PAGE_SIZE);
-> +
->          /*
->           * add_memory() will build page tables for the new memory so
->           * the p2m must contain invalid entries so the correct
-> @@ -326,11 +336,11 @@ static enum bp_state reserve_additional_memory(long credit)
->  static enum bp_state increase_reservation(unsigned long nr_pages)
+>  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
+>  
+> @@ -73,6 +74,7 @@ struct its_node {
+>  	struct list_head	its_device_list;
+>  	u64			flags;
+>  	u32			ite_size;
+> +	int			numa_node;
+>  };
+>  
+>  #define ITS_ITT_ALIGN		SZ_256
+> @@ -607,11 +609,20 @@ static void its_eoi_irq(struct irq_data *d)
+>  static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>  			    bool force)
 >  {
->  	int rc;
-> -	unsigned long  pfn, i;
-> +	unsigned long i;
->  	struct page   *page;
->  	struct xen_memory_reservation reservation = {
->  		.address_bits = 0,
-> -		.extent_order = 0,
-> +		.extent_order = EXTENT_ORDER,
->  		.domid        = DOMID_SELF
->  	};
+> -	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
+> +	unsigned int cpu;
+> +	const struct cpumask *cpu_mask = cpu_online_mask;
+>  	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+>  	struct its_collection *target_col;
+>  	u32 id = its_get_event_id(d);
 >  
-> @@ -352,7 +362,11 @@ static enum bp_state increase_reservation(unsigned long nr_pages)
->  			nr_pages = i;
->  			break;
->  		}
-> -		frame_list[i] = page_to_pfn(page);
+> +	/* lpi cannot be routed to a redistributor that is on a foreign node */
+> +	if (its_dev->its->flags & ITS_WORKAROUND_CAVIUM_23144) {
+> +		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
+> +		if (!cpumask_intersects(mask_val, cpu_mask))
+> +			return -EINVAL;
+> +	}
 > +
-> +		/* XENMEM_populate_physmap requires a PFN based on Xen
-> +		 * granularity.
-> +		 */
-> +		frame_list[i] = page_to_xen_pfn(page);
->  		page = balloon_next_page(page);
->  	}
+> +	cpu = cpumask_any_and(mask_val, cpu_mask);
+>  	if (cpu >= nr_cpu_ids)
+>  		return -EINVAL;
 >  
-> @@ -366,10 +380,15 @@ static enum bp_state increase_reservation(unsigned long nr_pages)
->  		page = balloon_retrieve(false);
->  		BUG_ON(page == NULL);
->  
-> -		pfn = page_to_pfn(page);
-> -
->  #ifdef CONFIG_XEN_HAVE_PVMMU
-> +		/* We don't support PV MMU when Linux and Xen is using
-> +		 * different page granularity.
-> +		 */
-> +		BUILD_BUG_ON(XEN_PAGE_SIZE != PAGE_SIZE);
-> +
->  		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-> +			unsigned long pfn = page_to_pfn(page);
-> +
->  			set_phys_to_machine(pfn, frame_list[i]);
->  
->  			/* Link back into the page tables if not highmem. */
-> @@ -396,14 +415,15 @@ static enum bp_state increase_reservation(unsigned long nr_pages)
->  static enum bp_state decrease_reservation(unsigned long nr_pages, gfp_t gfp)
+> @@ -1338,9 +1349,14 @@ static void its_irq_domain_activate(struct irq_domain *domain,
 >  {
->  	enum bp_state state = BP_DONE;
-> -	unsigned long  pfn, i;
-> -	struct page   *page;
-> +	unsigned long i;
-> +	struct page *page, *tmp;
->  	int ret;
->  	struct xen_memory_reservation reservation = {
->  		.address_bits = 0,
-> -		.extent_order = 0,
-> +		.extent_order = EXTENT_ORDER,
->  		.domid        = DOMID_SELF
->  	};
-> +	LIST_HEAD(pages);
+>  	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+>  	u32 event = its_get_event_id(d);
+> +	const struct cpumask *cpu_mask = cpu_online_mask;
+> +
+> +	/* get the cpu_mask of local node */
+> +	if (IS_ENABLED(CONFIG_NUMA))
+> +		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
 >  
->  #ifdef CONFIG_XEN_BALLOON_MEMORY_HOTPLUG
->  	if (balloon_stats.hotplug_pages) {
-> @@ -425,8 +445,7 @@ static enum bp_state decrease_reservation(unsigned long nr_pages, gfp_t gfp)
->  			break;
->  		}
->  		scrub_page(page);
-> -
-> -		frame_list[i] = page_to_pfn(page);
-> +		list_add(&page->lru, &pages);
+>  	/* Bind the LPI to the first possible CPU */
+> -	its_dev->event_map.col_map[event] = cpumask_first(cpu_online_mask);
+> +	its_dev->event_map.col_map[event] = cpumask_first(cpu_mask);
+>  
+>  	/* Map the GIC IRQ and event to the device */
+>  	its_send_mapvi(its_dev, d->hwirq, event);
+> @@ -1423,11 +1439,19 @@ static int its_force_quiescent(void __iomem *base)
+>  	}
+>  }
+>  
+> -static void its_enable_cavium_thunderx(void *data)
+> +static void its_enable_cavium_thunderx_22375(void *data)
+>  {
+>         struct its_node *its = data;
+>  
+> -       its->flags |= ITS_FLAGS_CAVIUM_THUNDERX;
+> +	its->flags |= ITS_WORKAROUND_CAVIUM_22375;
+> +}
+> +
+> +static void its_enable_cavium_thunderx_23144(void *data)
+> +{
+> +	struct its_node *its = data;
+> +
+> +	if (num_possible_nodes() > 1)
+> +		its->flags |= ITS_WORKAROUND_CAVIUM_23144;
+>  }
+>  
+>  static const struct gic_capabilities its_errata[] = {
+> @@ -1435,10 +1459,16 @@ static const struct gic_capabilities its_errata[] = {
+>                 .desc   = "ITS: Cavium errata 22375, 24313",
+>                 .iidr   = 0xa100034c,   /* ThunderX pass 1.x */
+>                 .mask   = 0xffff0fff,
+> -               .init   = its_enable_cavium_thunderx,
+> -       },
+> -       {
+> -       }
+> +		.init	= its_enable_cavium_thunderx_22375,
+> +	},
+> +	{
+> +		.desc	= "ITS: Cavium errata 23144",
+> +		.iidr	= 0xa100034c,	/* ThunderX pass 1.x */
+> +		.mask	= 0xffff0fff,
+> +		.init	= its_enable_cavium_thunderx_23144,
+> +	},
+> +	{
+> +	}
+>  };
+>  
+>  static void its_enable_quirks(struct its_node *its)
+> @@ -1456,6 +1486,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+>  	u32 val;
+>  	u64 baser, tmp;
+>  	int err;
+> +	int numa_node;
+>  
+>  	err = of_address_to_resource(node, 0, &res);
+>  	if (err) {
+> @@ -1463,6 +1494,9 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+>  		return -ENXIO;
 >  	}
 >  
->  	/*
-> @@ -438,14 +457,23 @@ static enum bp_state decrease_reservation(unsigned long nr_pages, gfp_t gfp)
->  	 */
->  	kmap_flush_unused();
->  
-> -	/* Update direct mapping, invalidate P2M, and add to balloon. */
-> -	for (i = 0; i < nr_pages; i++) {
-> -		pfn = frame_list[i];
-> -		frame_list[i] = pfn_to_gfn(pfn);
-> -		page = pfn_to_page(pfn);
-> +	/*
-> +	 * Setup the frame, update direct mapping, invalidate P2M,
-> +	 * and add to balloon.
-> +	 */
-> +	list_for_each_entry_safe(page, tmp, &pages, lru) {
-> +		/* XENMEM_decrease_reservation requires a GFN */
-> +		frame_list[i] = xen_page_to_gfn(page);
->  
->  #ifdef CONFIG_XEN_HAVE_PVMMU
-> +		/* We don't support PV MMU when Linux and Xen is using
-> +		 * different page granularity.
-> +		 */
-> +		BUILD_BUG_ON(XEN_PAGE_SIZE != PAGE_SIZE);
+> +	/* get numa affinity of its node*/
+> +	numa_node = of_node_to_nid(node);
 > +
->  		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-> +			unsigned long pfn = page_to_pfn(page);
-> +
->  			if (!PageHighMem(page)) {
->  				ret = HYPERVISOR_update_va_mapping(
->  						(unsigned long)__va(pfn << PAGE_SHIFT),
-> @@ -455,6 +483,7 @@ static enum bp_state decrease_reservation(unsigned long nr_pages, gfp_t gfp)
->  			__set_phys_to_machine(pfn, INVALID_P2M_ENTRY);
->  		}
->  #endif
-> +		list_del(&page->lru);
+>  	its_base = ioremap(res.start, resource_size(&res));
+>  	if (!its_base) {
+>  		pr_warn("%s: unable to map registers\n", node->full_name);
+> @@ -1498,6 +1532,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+>  	its->phys_base = res.start;
+>  	its->msi_chip.of_node = node;
+>  	its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
+> +	its->numa_node = numa_node;
 >  
->  		balloon_append(page);
->  	}
-> -- 
-> 2.1.4
+>  	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
+>  	if (!its->cmd_base) {
 > 
+
+The patch (minus the above comment about splitting it) looks sane, but
+obviously depends on the whole of_node_to_nid() discussion to happen,
+and I haven't followed that.
+
+Please CC me for further discussions on this matter.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
