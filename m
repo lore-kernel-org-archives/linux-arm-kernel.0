@@ -1,48 +1,26 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 7 Sep 2015 11:29:03 +0530
-Subject: [PATCH v3 3/3] ARM: dts: add suspend opp to exynos4412
-In-Reply-To: <1441303892-32004-4-git-send-email-b.zolnierkie@samsung.com>
-References: <1441303892-32004-1-git-send-email-b.zolnierkie@samsung.com>
- <1441303892-32004-4-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <20150907055903.GD26760@linux>
+Date: Mon, 7 Sep 2015 11:39:31 +0530
+Subject: thermal: mediatek: Add cpu power cooling model
+In-Reply-To: <1441357309-61669-1-git-send-email-dawei.chien@mediatek.com>
+References: <1441357309-61669-1-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <20150907060931.GF26760@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03-09-15, 20:11, Bartlomiej Zolnierkiewicz wrote:
-> Mark 800MHz OPP as a suspend opp for Exynos4412 based
-> boards so effectively cpufreq-dt driver behavior w.r.t.
-> suspend frequency matches what the old exynos-cpufreq
-> driver has been doing.
-> 
-> This patch fixes suspend/resume support on Exynos4412 based
-> Trats2 board and reboot hang on Exynos4412 based Odroid U3
-> board.
-> 
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4412.dtsi | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-> index ca0e3c1..294cfe4 100644
-> --- a/arch/arm/boot/dts/exynos4412.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412.dtsi
-> @@ -98,6 +98,7 @@
->  			opp-hz = /bits/ 64 <800000000>;
->  			opp-microvolt = <1000000>;
->  			clock-latency-ns = <200000>;
-> +			opp-suspend;
->  		};
->  		opp07 {
->  			opp-hz = /bits/ 64 <900000000>;
+On 04-09-15, 17:01, Dawei Chien wrote:
+> Use Intelligent Power Allocation (IPA) technical to add
+> static/dynamic power model for binding CPU thermal zone.
+> The power allocator governor allocates power budget to control
+> CPU temperature.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Sorry but this isn't enough really.. I don't have time to go through
+the code and understand the purpose of the series.
+
+Please explain here in detail:
+- Why this is needed.
+- What/How you are doing it.
+
+(Don't resend, just reply to this email :) )
 
 -- 
 viresh
