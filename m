@@ -1,76 +1,79 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 7 Sep 2015 16:33:51 +0100
-Subject: [PATCH v4 13/20] xen/events: fifo: Make it running on 64KB granularity
+Date: Mon, 7 Sep 2015 16:33:48 +0100
+Subject: [PATCH v4 10/20] xen/xenbus: Use Xen page definition
 In-Reply-To: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
 References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1441640038-23615-14-git-send-email-julien.grall@citrix.com>
+Message-ID: <1441640038-23615-11-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only use the first 4KB of the page to store the events channel info. It
-means that we will waste 60KB every time we allocate page for:
-     * control block: a page is allocating per CPU
-     * event array: a page is allocating everytime we need to expand it
-
-I think we can reduce the memory waste for the 2 areas by:
-
-    * control block: sharing between multiple vCPUs. Although it will
-    require some bookkeeping in order to not free the page when the CPU
-    goes offline and the other CPUs sharing the page still there
-
-    * event array: always extend the array event by 64K (i.e 16 4K
-    chunk). That would require more care when we fail to expand the
-    event channel.
+All the ring (xenstore, and PV rings) are always based on the page
+granularity of Xen.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
 Reviewed-by: David Vrabel <david.vrabel@citrix.com>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@citrix.com>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
 ---
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 
-    Note I haven't updated the suggestion to reduce the memory waste
-    after David's email [1]. I can do it if necessary.
-
     Changes in v3:
+        - Fix errors reported by checkpatch.pl
+        - s/MFN/GFN base on the new naming
         - Add David and Stefano's reviewed-by
 
-    [1] http://lists.xen.org/archives/html/xen-devel/2015-07/msg04596.html
+    Changes in v2:
+        - Also update the ring mapping function
 ---
- drivers/xen/events/events_base.c | 2 +-
- drivers/xen/events/events_fifo.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/xen/xenbus/xenbus_client.c | 6 +++---
+ drivers/xen/xenbus/xenbus_probe.c  | 3 ++-
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
-index c49bb7a..00dd923 100644
---- a/drivers/xen/events/events_base.c
-+++ b/drivers/xen/events/events_base.c
-@@ -40,11 +40,11 @@
- #include <asm/idle.h>
- #include <asm/io_apic.h>
- #include <asm/xen/pci.h>
--#include <xen/page.h>
- #endif
- #include <asm/sync_bitops.h>
- #include <asm/xen/hypercall.h>
- #include <asm/xen/hypervisor.h>
-+#include <xen/page.h>
+diff --git a/drivers/xen/xenbus/xenbus_client.c b/drivers/xen/xenbus/xenbus_client.c
+index 2ba09c1..359e654 100644
+--- a/drivers/xen/xenbus/xenbus_client.c
++++ b/drivers/xen/xenbus/xenbus_client.c
+@@ -388,7 +388,7 @@ int xenbus_grant_ring(struct xenbus_device *dev, void *vaddr,
+ 		}
+ 		grefs[i] = err;
  
- #include <xen/xen.h>
- #include <xen/hvm.h>
-diff --git a/drivers/xen/events/events_fifo.c b/drivers/xen/events/events_fifo.c
-index 1d4baf5..e3e9e3d 100644
---- a/drivers/xen/events/events_fifo.c
-+++ b/drivers/xen/events/events_fifo.c
-@@ -54,7 +54,7 @@
+-		vaddr = vaddr + PAGE_SIZE;
++		vaddr = vaddr + XEN_PAGE_SIZE;
+ 	}
  
- #include "events_internal.h"
+ 	return 0;
+@@ -555,7 +555,7 @@ static int xenbus_map_ring_valloc_pv(struct xenbus_device *dev,
+ 	if (!node)
+ 		return -ENOMEM;
  
--#define EVENT_WORDS_PER_PAGE (PAGE_SIZE / sizeof(event_word_t))
-+#define EVENT_WORDS_PER_PAGE (XEN_PAGE_SIZE / sizeof(event_word_t))
- #define MAX_EVENT_ARRAY_PAGES (EVTCHN_FIFO_NR_CHANNELS / EVENT_WORDS_PER_PAGE)
+-	area = alloc_vm_area(PAGE_SIZE * nr_grefs, ptes);
++	area = alloc_vm_area(XEN_PAGE_SIZE * nr_grefs, ptes);
+ 	if (!area) {
+ 		kfree(node);
+ 		return -ENOMEM;
+@@ -750,7 +750,7 @@ static int xenbus_unmap_ring_vfree_pv(struct xenbus_device *dev, void *vaddr)
+ 		unsigned long addr;
  
- struct evtchn_fifo_queue {
+ 		memset(&unmap[i], 0, sizeof(unmap[i]));
+-		addr = (unsigned long)vaddr + (PAGE_SIZE * i);
++		addr = (unsigned long)vaddr + (XEN_PAGE_SIZE * i);
+ 		unmap[i].host_addr = arbitrary_virt_to_machine(
+ 			lookup_address(addr, &level)).maddr;
+ 		unmap[i].dev_bus_addr = 0;
+diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
+index 3cbe055..33a31cf 100644
+--- a/drivers/xen/xenbus/xenbus_probe.c
++++ b/drivers/xen/xenbus/xenbus_probe.c
+@@ -802,7 +802,8 @@ static int __init xenbus_init(void)
+ 			goto out_error;
+ 		xen_store_gfn = (unsigned long)v;
+ 		xen_store_interface =
+-			xen_remap(xen_store_gfn << PAGE_SHIFT, PAGE_SIZE);
++			xen_remap(xen_store_gfn << XEN_PAGE_SHIFT,
++				  XEN_PAGE_SIZE);
+ 		break;
+ 	default:
+ 		pr_warn("Xenstore state unknown\n");
 -- 
 2.1.4
