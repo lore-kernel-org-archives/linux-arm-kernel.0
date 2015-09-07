@@ -1,37 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 07 Sep 2015 17:35:40 +0100
-Subject: [PATCH v4 0/5] irqchip, gicv3: Updates and Cavium ThunderX errata
- workarounds
-In-Reply-To: <1439576885-15621-1-git-send-email-rric@kernel.org>
-References: <1439576885-15621-1-git-send-email-rric@kernel.org>
-Message-ID: <55EDBCDC.5090901@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 7 Sep 2015 18:38:59 +0200
+Subject: [PATCH] ARM: at91/dt: fixes dbgu pinctrl, set pullup on rx,
+ clear pullup on tx
+In-Reply-To: <1441639328-2615-1-git-send-email-sylvain.rochet@finsecur.com>
+References: <1441639328-2615-1-git-send-email-sylvain.rochet@finsecur.com>
+Message-ID: <20150907163859.GB3237@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Hi,
 
-On 14/08/15 19:28, Robert Richter wrote:
-> From: Robert Richter <rrichter@cavium.com>
+On 07/09/2015 at 17:22:08 +0200, Sylvain Rochet wrote :
+> Remove pullup on dbgu DTXD signal, it is a push-pull output thus the
+> pullup only increase power consumption while transmitting with no value
+> added.
 > 
-> This patch series adds gicv3 updates and workarounds for HW errata in
-> Cavium's ThunderX GICV3.
+> Add pullup on dbgu DRXD signal, it prevents the DRXD signal to be left
+> floating and so consuming a useless extra amount of power if nothing is
+> externally connected to dbgu.
 > 
-> The first one is an unchanged resubmission of a patch from a gicv3
-> series I sent a while ago.
+> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> ---
+>  arch/arm/boot/dts/at91rm9200.dtsi  | 4 ++--
+>  arch/arm/boot/dts/at91sam9260.dtsi | 4 ++--
+>  arch/arm/boot/dts/at91sam9261.dtsi | 4 ++--
+>  arch/arm/boot/dts/at91sam9263.dtsi | 4 ++--
+>  arch/arm/boot/dts/at91sam9g45.dtsi | 2 +-
+>  arch/arm/boot/dts/at91sam9n12.dtsi | 4 ++--
+>  arch/arm/boot/dts/at91sam9rl.dtsi  | 4 ++--
+>  arch/arm/boot/dts/at91sam9x5.dtsi  | 4 ++--
+>  arch/arm/boot/dts/sama5d3.dtsi     | 4 ++--
+>  arch/arm/boot/dts/sama5d4.dtsi     | 4 ++--
+>  10 files changed, 19 insertions(+), 19 deletions(-)
 > 
-> The next patches implement the workarounds for ThunderX's gicv3. Patch
-> #2 implements the cpu workaround for gicv3 on ThunderX. Patch #3 is a
-> prerequisit for patch #5. Patch #4 adds generic code to parse the hw
-> revision provided by an IIDR. This patch is used for the implementa-
-> tion of the actual gicv3-its workaround in #5.
-> 
-> All current review comments addressed so far with v4.
+> diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+> index 60edd8b..12815f6d 100644
+> --- a/arch/arm/boot/dts/at91rm9200.dtsi
+> +++ b/arch/arm/boot/dts/at91rm9200.dtsi
+> @@ -481,8 +481,8 @@
+>  				dbgu {
+>  					pinctrl_dbgu: dbgu-0 {
+>  						atmel,pins =
+> -							<AT91_PIOA 30 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PA30 periph A */
+> -							 AT91_PIOA 31 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;	/* PA31 periph with pullup */
+> +							<AT91_PIOA 30 AT91_PERIPH_A AT91_PINCTRL_PULL_UP	/* PA30 periph A with pullup */
+> +							 AT91_PIOA 31 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PA31 periph */
 
-There has been a small number of comments on this series. Would you mind
-respining it so that it could make it a a 4.3-rc?
+I would prefer dropping those useless (and sometimes wrong) comments
+when reworking the pinctrl. This is also valid for 2/2
 
-Thanks,
+Else, the change makes sense.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
