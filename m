@@ -1,48 +1,57 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 7 Sep 2015 15:12:10 +0200
-Subject: [PATCH 0/5] New Atmel PIO4 pinctrl/gpio driver
-In-Reply-To: <1439281685-3020-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1439281685-3020-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20150907131210.GC32379@odux.rfo.atmel.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 7 Sep 2015 15:24:01 +0200 (CEST)
+Subject: [RFC PATCH v1 2/4] irqchip: GICv3: set non-percpu irqs status
+ with _IRQ_MOVE_PCNTXT
+In-Reply-To: <55ED83D2.90809@arm.com>
+References: <1441513421-8092-1-git-send-email-yangyingliang@huawei.com>
+ <1441513421-8092-3-git-send-email-yangyingliang@huawei.com>
+ <55EBD59B.4030405@linux.intel.com> <55ED83D2.90809@arm.com>
+Message-ID: <alpine.DEB.2.11.1509071502080.15006@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Mon, 7 Sep 2015, Marc Zyngier wrote:
+> On 06/09/15 06:56, Jiang Liu wrote:
+> > On 2015/9/6 12:23, Yang Yingliang wrote:
+> >> Use irq_settings_set_move_pcntxt() helper irqs status with
+> >> _IRQ_MOVE_PCNTXT. So that it can do set affinity when calling
+> >> irq_set_affinity_locked().
+> > Hi Yingliang,
+> > 	We could only set _IRQ_MOVE_PCNTCT flag to enable migrating
+> > IRQ in process context if your hardware platform supports atomically
+> > change IRQ configuration. Not sure whether that's true for GICv3.
+> > If GICv3 doesn't support atomically change irq configuration, this
+> > change may cause trouble.
+> 
+> I think it boils down to what exactly "process context" means here. If
+> this means "we do not need to mask the interrupt" while moving it, then
+> it should be fine (the GIC architecture guarantees that a pending
+> interrupt will be migrated).
+> 
+> Is there any other requirement for this flag?
 
-Any comments about this version? Maybe you missed it since you answered
-me on the RFC version. Of course I'll do the changes you requested for
-the next version (remove gpio_request_*() stuff and add macros for gpio
-muxing case).
+The history of this flag is as follows:
 
-Thanks
+On x86 interrupts can only be safely migrated while the interrupt is
+handled. With the introduction of IRQ remapping this requirement
+changed. Remapped interrupts can be migrated in any context.
 
-Ludovic
+If you look at irq_set_affinity_locked()
 
-On Tue, Aug 11, 2015 at 10:28:00AM +0200, Ludovic Desroches wrote:
-> Hi,
-> 
-> The Atmel PIO4 controller has been introduced with SAMA5D2 chip family. This
-> drivers manages both pinmux/pinconf and gpio stuff. It is inspired by Mediatek
-> pinctrl driver.
-> 
-> Ludovic Desroches (5):
->   pinctrl: introduce driver for Atmel PIO4 controller
->   pinctrl: dt-binding: Add DT binding documentation for Atmel PIO4
->   MAINTAINERS: Add an entry for pinctrl-at91-pio4
->   ARM: at91/dt: sama5d2: add pio controller node
->   ARM: at91/defconfig: sama5: add PIO4 controller support
-> 
->  .../bindings/pinctrl/atmel,at91-pio4-pinctrl.txt   |   90 ++
->  MAINTAINERS                                        |    7 +
->  arch/arm/boot/dts/sama5d2.dtsi                     |   14 +
->  arch/arm/mach-at91/Kconfig                         |    1 +
->  drivers/pinctrl/Kconfig                            |   13 +
->  drivers/pinctrl/Makefile                           |    1 +
->  drivers/pinctrl/pinctrl-at91-pio4.c                | 1063 ++++++++++++++++++++
->  7 files changed, 1189 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/atmel,at91-pio4-pinctrl.txt
->  create mode 100644 drivers/pinctrl/pinctrl-at91-pio4.c
-> 
-> -- 
-> 2.5.0
-> 
+   if (irq_can_move_pcntxt(data) {
+      irq_do_set_affinity(data,...)
+        chip->irq_set_affinity(data,...);
+   } else {
+      irqd_set_move_pending(data);
+   }
+
+So if IRQ_MOVE_PCNTXT is not set, we handle the migration of the
+interrupt from next the interrupt. If it's set set_affinity() is
+called right away.
+
+All architectures which do not select GENERIC_PENDING_IRQ are using
+the direct method.
+
+Thanks,
+
+	tglx
