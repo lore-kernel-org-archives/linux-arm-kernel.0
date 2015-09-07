@@ -1,34 +1,74 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 7 Sep 2015 11:26:51 +0200
-Subject: [PATCH 1/4] ARM: multi_v7_defconfig: Enable common Rockchip
- devices/busses
-In-Reply-To: <1441570566-14001-2-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1441570566-14001-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1441570566-14001-2-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <55ED585B.9030009@osg.samsung.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 7 Sep 2015 11:30:03 +0200
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun4i: Add dts file for the
+ pov protab2-ips9 tablet
+In-Reply-To: <1441617262.21530.4.camel@plaes.org>
+References: <1441441319-10658-1-git-send-email-hdegoede@redhat.com>
+ <20150906163023.GR31584@lukather> <55ED3739.609@redhat.com>
+ <1441612142.14422.34.camel@plaes.org> <55ED4F8F.6080502@redhat.com>
+ <1441617262.21530.4.camel@plaes.org>
+Message-ID: <55ED591B.7050705@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sjoerd,
+Hi,
 
-On 09/06/2015 10:16 PM, Sjoerd Simons wrote:
-> Enable Rockchip I2C, SPI, PWM, thermal drivers.
-> 
-> Builtin are:
->  * I2C as it often controls the pmic.
+On 07-09-15 11:14, Priit Laes wrote:
+> On Mon, 2015-09-07 at 10:49 +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 07-09-15 09:49, Priit Laes wrote:
+>>> On Mon, 2015-09-07 at 09:05 +0200, Hans de Goede wrote:
+>>>> Hi,
+>>>>
+>>>> On 06-09-15 18:30, Maxime Ripard wrote:
+>>>>> On Sat, Sep 05, 2015 at 10:21:59AM +0200, Hans de Goede wrote:
+>>>>>> The Point of View protab2-ips9 is a tablet with a 9" ips
+>>>>>> 1024x768
+>>>>>> lcd screen,
+>>>>>> microsd slot, headphones, mini hdmi, mini usb b and power
+>>>>>> barrel
+>>>>>> connectors.
+>>>>>>
+>>>>>> It uses a rtl8188cus usb wifi chip and a RDA 5875Y bluetooth
+>>>>>> chip
+>>>>>> attached
+>>>>>> to uart2. It has a bma250 accelerometer attached to i2c1 addr
+>>>>>> 0x18.
+>>>>>>
+>>>
+>>> [...]
+>>>>>
+>>>>> What is connected on i2c1 ? Just the camera sensor? or it has
+>>>>> some
+>>>>> other devices there?
+>>>>
+>>>> The bma250 accelerometer sits there, and the kernel already has a
+>>>> driver
+>>>> for it. That driver needs to have devicetree binding support
+>>>> added,
+>>>> and
+>>>> then we should be able to use the accelerometer.
+>>>
+>>> bma250 already has devicetree support. It is used in Gemei G9
+>>> tablet
+>>> (sun4i-gemei-g9.dts).
+>>
+>> Yes I've seen that, but does it actually work? I've not tried but I
+>> do not see any compatible string in the actual bma250 code in the
+>> kernel,
+>> so I believe that this part of the sun4i-gemei-g9.dts file does not
+>> work ?
+>
+> It worked (even without IRQs) when I submitted the patch. Driver itself
+> is under iio/accel/bma180.c
 
-Having I2C as a module will cause more probe deferrals due missing
-regulators and slow down the boot but it should not cause issues.
-Or am I missing something?
+That is really weird, because:
 
-In fact, I think even the PMIC could be built as a module.
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/iio/accel/bma180.c
 
-But I don't have a strong opinion on this so patch looks good:
+Does not have an of_match_table ... ??
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Regards,
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Hans
