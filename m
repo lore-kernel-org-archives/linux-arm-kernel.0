@@ -1,49 +1,35 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 7 Sep 2015 15:56:47 +0100
-Subject: [RFC PATCH 1/3] arm64: entry: Remove unnecessary calculation for
- S_SP in EL1h
-In-Reply-To: <1441376587-12979-2-git-send-email-jungseoklee85@gmail.com>
-References: <1441376587-12979-1-git-send-email-jungseoklee85@gmail.com>
- <1441376587-12979-2-git-send-email-jungseoklee85@gmail.com>
-Message-ID: <20150907145646.GB13786@leverpostej>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 7 Sep 2015 16:58:46 +0200 (CEST)
+Subject: [RFC PATCH v1 2/4] irqchip: GICv3: set non-percpu irqs status
+ with _IRQ_MOVE_PCNTXT
+In-Reply-To: <55EDA5A5.9070805@arm.com>
+References: <1441513421-8092-1-git-send-email-yangyingliang@huawei.com>
+ <1441513421-8092-3-git-send-email-yangyingliang@huawei.com>
+ <55EBD59B.4030405@linux.intel.com> <55ED83D2.90809@arm.com>
+ <alpine.DEB.2.11.1509071502080.15006@nanos>
+ <55EDA5A5.9070805@arm.com>
+Message-ID: <alpine.DEB.2.11.1509071657320.15006@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 04, 2015 at 03:23:05PM +0100, Jungseok Lee wrote:
-> Under EL1h, S_SP data is not seen in kernel_exit. Thus, x21 calculation
-> is not needed in kernel_entry. Currently, S_SP information is vaild only
-> when sp_el0 is used.
-
-I don't think this is true. The generic BUG implementation will grab the
-saved SP from the pt_regs, and with this change we'll report whatever
-happened to be in x21 instead.
-
-> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
-> ---
->  arch/arm64/kernel/entry.S | 2 --
->  1 file changed, 2 deletions(-)
+On Mon, 7 Sep 2015, Marc Zyngier wrote:
+> On 07/09/15 14:24, Thomas Gleixner wrote:
+> > The history of this flag is as follows:
+> > 
+> > On x86 interrupts can only be safely migrated while the interrupt is
+> > handled.
 > 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index e163518..d23ca0d 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -91,8 +91,6 @@
->  	get_thread_info tsk			// Ensure MDSCR_EL1.SS is clear,
->  	ldr	x19, [tsk, #TI_FLAGS]		// since we can unmask debug
->  	disable_step_tsk x19, x20		// exceptions when scheduling.
-> -	.else
-> -	add	x21, sp, #S_FRAME_SIZE
->  	.endif
->  	mrs	x22, elr_el1
->  	mrs	x23, spsr_el1
+> Woa! That's creative! :-) I suppose this doesn't work very well with CPU
+> hotplug though...
 
-Immediately after this we do:
+Go figure ....
+ 
+> So I wonder why we bother introducing the IRQ_MOVE_PCNTXT flag on ARM at
+> all. Is that just because migration.c is only compiled when
+> GENERIC_PENDING_IRQ is set?
 
-	stp     lr, x21, [sp, #S_LR]
-
-To store the LR and SP to the pt_regs which bug_handler would use.
-
-Am I missing smoething?
+Looks like. We can distangle that, if this code needs to be reusable.
 
 Thanks,
-Mark.
+
+	tglx
