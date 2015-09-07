@@ -1,19 +1,22 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 7 Sep 2015 11:28:23 +0530
-Subject: [PATCH v3 2/3] cpufreq-dt: add suspend frequency support
-In-Reply-To: <1441303892-32004-3-git-send-email-b.zolnierkie@samsung.com>
+Date: Mon, 7 Sep 2015 11:29:03 +0530
+Subject: [PATCH v3 3/3] ARM: dts: add suspend opp to exynos4412
+In-Reply-To: <1441303892-32004-4-git-send-email-b.zolnierkie@samsung.com>
 References: <1441303892-32004-1-git-send-email-b.zolnierkie@samsung.com>
- <1441303892-32004-3-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <20150907055823.GC26760@linux>
+ <1441303892-32004-4-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20150907055903.GD26760@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 03-09-15, 20:11, Bartlomiej Zolnierkiewicz wrote:
-> Add suspend frequency support and if needed set it to
-> the frequency obtained from the suspend opp (can be defined
-> using opp-v2 bindings and is optional).  Also implement
-> custom suspend method (needed to not error out on platforms
-> which don't require suspend frequency).
+> Mark 800MHz OPP as a suspend opp for Exynos4412 based
+> boards so effectively cpufreq-dt driver behavior w.r.t.
+> suspend frequency matches what the old exynos-cpufreq
+> driver has been doing.
+> 
+> This patch fixes suspend/resume support on Exynos4412 based
+> Trats2 board and reboot hang on Exynos4412 based Odroid U3
+> board.
 > 
 > Cc: Viresh Kumar <viresh.kumar@linaro.org>
 > Cc: Thomas Abraham <thomas.ab@samsung.com>
@@ -23,38 +26,23 @@ On 03-09-15, 20:11, Bartlomiej Zolnierkiewicz wrote:
 > Cc: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
 > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 > ---
->  drivers/cpufreq/cpufreq-dt.c | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
+>  arch/arm/boot/dts/exynos4412.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
-> +#ifdef CONFIG_PM
-> +static int cpufreq_dt_suspend(struct cpufreq_policy *policy)
-> +{
-> +	int ret;
-> +
-> +	if (!policy->suspend_freq) {
-> +		pr_debug("%s: suspend_freq not defined\n", __func__);
-> +		return 0;
-> +	}
-> +
-> +	pr_debug("%s: Setting suspend-freq: %u\n", __func__,
-> +			policy->suspend_freq);
-> +
-> +	ret = __cpufreq_driver_target(policy, policy->suspend_freq,
-> +			CPUFREQ_RELATION_H);
-> +	if (ret)
-> +		pr_err("%s: unable to set suspend-freq: %u. err: %d\n",
-> +				__func__, policy->suspend_freq, ret);
-> +
-> +	return ret;
-> +}
-> +#else
-> +#define cpufreq_dt_suspend NULL
-> +#endif
+> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+> index ca0e3c1..294cfe4 100644
+> --- a/arch/arm/boot/dts/exynos4412.dtsi
+> +++ b/arch/arm/boot/dts/exynos4412.dtsi
+> @@ -98,6 +98,7 @@
+>  			opp-hz = /bits/ 64 <800000000>;
+>  			opp-microvolt = <1000000>;
+>  			clock-latency-ns = <200000>;
+> +			opp-suspend;
+>  		};
+>  		opp07 {
+>  			opp-hz = /bits/ 64 <900000000>;
 
-No, there is no point replicating the exactly same routine again.
-Rather modify cpufreq_generic_suspend() to not print error and instead
-do pr_debug(), on !policy->suspend_freq.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 -- 
 viresh
