@@ -1,288 +1,339 @@
-From: fugang.duan@freescale.com (Duan Andy)
-Date: Mon, 7 Sep 2015 02:23:35 +0000
-Subject: [PATCH v2 3/5] ARM: dts: imx: pinfunc: add GPIO1 pin define for
- i.MX7d
-In-Reply-To: <20150906130840.GX30746@tiger>
-References: <1440386992-6775-1-git-send-email-b38611@freescale.com>
- <1440386992-6775-4-git-send-email-b38611@freescale.com>
- <20150906130840.GX30746@tiger>
-Message-ID: <BN3PR0301MB12196D3E5A3A00D7C6B98FF7F5540@BN3PR0301MB1219.namprd03.prod.outlook.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Mon, 7 Sep 2015 10:33:38 +0800
+Subject: [RFC PATCH v1 4/4] arm/arm64: fix a migrating irq bug when
+ hotplug cpu
+In-Reply-To: <55EBD55C.2040100@linux.intel.com>
+References: <1441513421-8092-1-git-send-email-yangyingliang@huawei.com>
+ <1441513421-8092-5-git-send-email-yangyingliang@huawei.com>
+ <55EBD55C.2040100@linux.intel.com>
+Message-ID: <55ECF782.3040209@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawnguo@kernel.org> Sent: Sunday, September 06, 2015 9:09 PM
-> To: Duan Fugang-B38611
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 3/5] ARM: dts: imx: pinfunc: add GPIO1 pin define
-> for i.MX7d
-> 
-> On Mon, Aug 24, 2015 at 11:29:50AM +0800, Fugang Duan wrote:
-> > Add GPIO1 pin define for i.MX7d.
-> >
-> > Signed-off-by: Fugang Duan <B38611@freescale.com>
-> > ---
-Will drop the patch in next version. Pls apply Adrian pinfunc patch firstly.
 
-> >  arch/arm/boot/dts/imx7d-pinfunc.h | 115
-> > ++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 115 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/imx7d-pinfunc.h
-> > b/arch/arm/boot/dts/imx7d-pinfunc.h
-> > index a8d8149..8b3cf2bc 100644
-> > --- a/arch/arm/boot/dts/imx7d-pinfunc.h
-> > +++ b/arch/arm/boot/dts/imx7d-pinfunc.h
-> > @@ -15,6 +15,121 @@
-> >   * <mux_reg conf_reg input_reg mux_mode input_val>
-> >   */
-> >
-> > +#define MX7D_PAD_GPIO1_IO00__GPIO1_IO0				  0x0000
-> 0x0030 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO00__PWM4_OUT				  0x0000
-> 0x0030 0x0000 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO00__WDOD1_WDOG_ANY			  0x0000
-> 0x0030 0x0000 0x2 0x0
-> > +#define MX7D_PAD_GPIO1_IO00__WDOD1_WDOG_B			  0x0000
-> 0x0030 0x0000 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO00__WDOD1_WDOG__RST_B_DEB		  0x0000
-> 0x0030 0x0000 0x4 0x0
-> > +#define MX7D_PAD_GPIO1_IO01__GPIO1_IO1				  0x0004
-> 0x0034 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO01__PWM1_OUT				  0x0004
-> 0x0034 0x0000 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO01__CCM_ENET_REF_CLK3
-> 0x0004 0x0034 0x0000 0x2 0x0
-> > +#define MX7D_PAD_GPIO1_IO01__SAI1_MCLK				  0x0004
-> 0x0034 0x0000 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO01__OBSERVE0_OUT			  0x0004
-> 0x0034 0x0000 0x6 0x0
-> > +#define MX7D_PAD_GPIO1_IO02__GPIO1_IO2				  0x0008
-> 0x0038 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO02__PWM2_OUT				  0x0008
-> 0x0038 0x0000 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO02__CCM_ENET_REF_CLK1
-> 0x0008 0x0038 0x0564 0x2 0x3
-> > +#define MX7D_PAD_GPIO1_IO02__SAI2_MCLK				  0x0008
-> 0x0038 0x0000 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO02__CCM_CLKO1				  0x0008
-> 0x0038 0x0000 0x5 0x0
-> > +#define MX7D_PAD_GPIO1_IO02__OBSERVE1_OUT			  0x0008
-> 0x0038 0x0000 0x6 0x0
-> > +#define MX7D_PAD_GPIO1_IO02__USB_OTG1_ID			  0x0008
-> 0x0038 0x0734 0x7 0x3
-> > +#define MX7D_PAD_GPIO1_IO03__GPIO1_IO3				  0x000C
-> 0x003C 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO03__PWM3_OUT				  0x000C
-> 0x003C 0x0000 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO03__CCM_ENET_REF_CLK2
-> 0x000C 0x003C 0x0570 0x2 0x3
-> > +#define MX7D_PAD_GPIO1_IO03__SAI3_MCLK				  0x000C
-> 0x003C 0x0000 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO03__CCM_CLKO2				  0x000C
-> 0x003C 0x0000 0x5 0x0
-> > +#define MX7D_PAD_GPIO1_IO03__OBSERVE2_OUT			  0x000C
-> 0x003C 0x0000 0x6 0x0
-> > +#define MX7D_PAD_GPIO1_IO03__USB_OTG2_ID			  0x000C
-> 0x003C 0x0730 0x7 0x3
-> > +#define MX7D_PAD_GPIO1_IO04__GPIO1_IO4				  0x0010
-> 0x0040 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO04__USB_OTG1_OC			  0x0010
-> 0x0040 0x072C 0x1 0x1
-> > +#define MX7D_PAD_GPIO1_IO04__FLEXTIMER1_CH4			  0x0010
-> 0x0040 0x0594 0x2 0x1
-> > +#define MX7D_PAD_GPIO1_IO04__UART5_CTS_B			  0x0010
-> 0x0040 0x0710 0x3 0x4
-> > +#define MX7D_PAD_GPIO1_IO04__I2C1_SCL				  0x0010
-> 0x0040 0x05D4 0x4 0x2
-> > +#define MX7D_PAD_GPIO1_IO04__OBSERVE3_OUT			  0x0010
-> 0x0040 0x0000 0x6 0x0
-> > +#define MX7D_PAD_GPIO1_IO05__GPIO1_IO5				  0x0014
-> 0x0044 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO05__USB_OTG1_PWR			  0x0014
-> 0x0044 0x0000 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO05__FLEXTIMER1_CH5			  0x0014
-> 0x0044 0x0598 0x2 0x1
-> > +#define MX7D_PAD_GPIO1_IO05__UART5_RTS_B			  0x0014
-> 0x0044 0x0710 0x3 0x5
-> > +#define MX7D_PAD_GPIO1_IO05__I2C1_SDA				  0x0014
-> 0x0044 0x05D8 0x4 0x2
-> > +#define MX7D_PAD_GPIO1_IO05__OBSERVE4_OUT			  0x0014
-> 0x0044 0x0000 0x6 0x0
-> > +#define MX7D_PAD_GPIO1_IO06__GPIO1_IO6				  0x0018
-> 0x0048 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO06__USB_OTG2_OC			  0x0018
-> 0x0048 0x0728 0x1 0x1
-> > +#define MX7D_PAD_GPIO1_IO06__FLEXTIMER1_CH6			  0x0018
-> 0x0048 0x059C 0x2 0x1
-> > +#define MX7D_PAD_GPIO1_IO06__UART5_RX_DATA			  0x0018
-> 0x0048 0x0714 0x3 0x4
-> > +#define MX7D_PAD_GPIO1_IO06__I2C2_SCL				  0x0018
-> 0x0048 0x05DC 0x4 0x2
-> > +#define MX7D_PAD_GPIO1_IO06__CCM_WAIT				  0x0018
-> 0x0048 0x0000 0x5 0x0
-> > +#define MX7D_PAD_GPIO1_IO06__KPP_ROW4				  0x0018
-> 0x0048 0x0624 0x6 0x1
-> > +#define MX7D_PAD_GPIO1_IO07__GPIO1_IO7				  0x001C
-> 0x004C 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO07__USB_OTG2_PWR			  0x001C
-> 0x004C 0x0000 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO07__FLEXTIMER1_CH7			  0x001C
-> 0x004C 0x05A0 0x2 0x1
-> > +#define MX7D_PAD_GPIO1_IO07__UART5_TX_DATA			  0x001C
-> 0x004C 0x0714 0x3 0x5
-> > +#define MX7D_PAD_GPIO1_IO07__I2C2_SDA				  0x001C
-> 0x004C 0x05E0 0x4 0x2
-> > +#define MX7D_PAD_GPIO1_IO07__CCM_STOP				  0x001C
-> 0x004C 0x0000 0x5 0x0
-> > +#define MX7D_PAD_GPIO1_IO07__KPP_COL4				  0x001C
-> 0x004C 0x0604 0x6 0x1
-> 
-> All above lines use tab + spaces for indentation, which is different from
-> the indentation already used in this file.
-> 
-> Shawn
-> 
-> > +#define MX7D_PAD_GPIO1_IO08__GPIO1_IO8
-> 0x0014 0x026C 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO08__SD1_VSELECT
-> 0x0014 0x026C 0x0000 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO08__WDOG1_WDOG_B
-> 0x0014 0x026C 0x0000 0x2 0x0
-> > +#define MX7D_PAD_GPIO1_IO08__UART3_DCE_RX
-> 0x0014 0x026C 0x0704 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO08__UART3_DTE_TX
-> 0x0014 0x026C 0x0000 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO08__I2C3_SCL
-> 0x0014 0x026C 0x05E4 0x4 0x0
-> > +#define MX7D_PAD_GPIO1_IO08__KPP_COL5
-> 0x0014 0x026C 0x0608 0x6 0x0
-> > +#define MX7D_PAD_GPIO1_IO08__PWM1_OUT
-> 0x0014 0x026C 0x0000 0x7 0x0
-> > +#define MX7D_PAD_GPIO1_IO09__GPIO1_IO9
-> 0x0018 0x0270 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO09__SD1_LCTL
-> 0x0018 0x0270 0x0000 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO09__CCM_ENET_REF_CLK3
-> 0x0018 0x0270 0x0000 0x2 0x0
-> > +#define MX7D_PAD_GPIO1_IO09__UART3_DCE_TX
-> 0x0018 0x0270 0x0000 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO09__UART3_DTE_RX
-> 0x0018 0x0270 0x0704 0x3 0x1
-> > +#define MX7D_PAD_GPIO1_IO09__I2C3_SDA
-> 0x0018 0x0270 0x05E8 0x4 0x0
-> > +#define MX7D_PAD_GPIO1_IO09__CCM_PMIC_READY
-> 0x0018 0x0270 0x04F4 0x5 0x0
-> > +#define MX7D_PAD_GPIO1_IO09__KPP_ROW5
-> 0x0018 0x0270 0x0628 0x6 0x0
-> > +#define MX7D_PAD_GPIO1_IO09__PWM2_OUT
-> 0x0018 0x0270 0x0000 0x7 0x0
-> > +#define MX7D_PAD_GPIO1_IO10__GPIO1_IO10
-> 0x001C 0x0274 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO10__SD2_LCTL
-> 0x001C 0x0274 0x0000 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO10__ENET1_MDIO
-> 0x001C 0x0274 0x0568 0x2 0x0
-> > +#define MX7D_PAD_GPIO1_IO10__UART3_DCE_RTS
-> 0x001C 0x0274 0x0700 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO10__UART3_DTE_CTS
-> 0x001C 0x0274 0x0000 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO10__I2C4_SCL
-> 0x001C 0x0274 0x05EC 0x4 0x0
-> > +#define MX7D_PAD_GPIO1_IO10__FLEXTIMER1_PHA
-> 0x001C 0x0274 0x05A4 0x5 0x0
-> > +#define MX7D_PAD_GPIO1_IO10__KPP_COL6
-> 0x001C 0x0274 0x060C 0x6 0x0
-> > +#define MX7D_PAD_GPIO1_IO10__PWM3_OUT
-> 0x001C 0x0274 0x0000 0x7 0x0
-> > +#define MX7D_PAD_GPIO1_IO11__GPIO1_IO11
-> 0x0020 0x0278 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO11__SD3_LCTL
-> 0x0020 0x0278 0x0000 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO11__ENET1_MDC
-> 0x0020 0x0278 0x0000 0x2 0x0
-> > +#define MX7D_PAD_GPIO1_IO11__UART3_DCE_CTS
-> 0x0020 0x0278 0x0000 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO11__UART3_DTE_RTS
-> 0x0020 0x0278 0x0700 0x3 0x1
-> > +#define MX7D_PAD_GPIO1_IO11__I2C4_SDA
-> 0x0020 0x0278 0x05F0 0x4 0x0
-> > +#define MX7D_PAD_GPIO1_IO11__FLEXTIMER1_PHB
-> 0x0020 0x0278 0x05A8 0x5 0x0
-> > +#define MX7D_PAD_GPIO1_IO11__KPP_ROW6
-> 0x0020 0x0278 0x062C 0x6 0x0
-> > +#define MX7D_PAD_GPIO1_IO11__PWM4_OUT
-> 0x0020 0x0278 0x0000 0x7 0x0
-> > +#define MX7D_PAD_GPIO1_IO12__GPIO1_IO12
-> 0x0024 0x027C 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO12__SD2_VSELECT
-> 0x0024 0x027C 0x0000 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO12__CCM_ENET_REF_CLK1
-> 0x0024 0x027C 0x0564 0x2 0x0
-> > +#define MX7D_PAD_GPIO1_IO12__FLEXCAN1_RX
-> 0x0024 0x027C 0x04DC 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO12__CM4_NMI
-> 0x0024 0x027C 0x0000 0x4 0x0
-> > +#define MX7D_PAD_GPIO1_IO12__CCM_EXT_CLK1
-> 0x0024 0x027C 0x04E4 0x5 0x0
-> > +#define MX7D_PAD_GPIO1_IO12__SNVS_VIO_5
-> 0x0024 0x027C 0x0000 0x6 0x0
-> > +#define MX7D_PAD_GPIO1_IO12__USB_OTG1_ID
-> 0x0024 0x027C 0x0734 0x7 0x0
-> > +#define MX7D_PAD_GPIO1_IO13__GPIO1_IO13
-> 0x0028 0x0280 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO13__SD3_VSELECT
-> 0x0028 0x0280 0x0000 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO13__CCM_ENET_REF_CLK2
-> 0x0028 0x0280 0x0570 0x2 0x0
-> > +#define MX7D_PAD_GPIO1_IO13__FLEXCAN1_TX
-> 0x0028 0x0280 0x0000 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO13__CCM_PMIC_READY
-> 0x0028 0x0280 0x04F4 0x4 0x1
-> > +#define MX7D_PAD_GPIO1_IO13__CCM_EXT_CLK2
-> 0x0028 0x0280 0x04E8 0x5 0x0
-> > +#define MX7D_PAD_GPIO1_IO13__SNVS_VIO_5_CTL
-> 0x0028 0x0280 0x0000 0x6 0x0
-> > +#define MX7D_PAD_GPIO1_IO13__USB_OTG2_ID
-> 0x0028 0x0280 0x0730 0x7 0x0
-> > +#define MX7D_PAD_GPIO1_IO14__GPIO1_IO14
-> 0x002C 0x0284 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO14__SD3_CD_B
-> 0x002C 0x0284 0x0738 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO14__ENET2_MDIO
-> 0x002C 0x0284 0x0574 0x2 0x0
-> > +#define MX7D_PAD_GPIO1_IO14__FLEXCAN2_RX
-> 0x002C 0x0284 0x04E0 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO14__WDOG3_WDOG_B
-> 0x002C 0x0284 0x0000 0x4 0x0
-> > +#define MX7D_PAD_GPIO1_IO14__CCM_EXT_CLK3
-> 0x002C 0x0284 0x04EC 0x5 0x0
-> > +#define MX7D_PAD_GPIO1_IO14__SDMA_EXT_EVENT0
-> 0x002C 0x0284 0x06D8 0x6 0x0
-> > +#define MX7D_PAD_GPIO1_IO15__GPIO1_IO15
-> 0x0030 0x0288 0x0000 0x0 0x0
-> > +#define MX7D_PAD_GPIO1_IO15__SD3_WP
-> 0x0030 0x0288 0x073C 0x1 0x0
-> > +#define MX7D_PAD_GPIO1_IO15__ENET2_MDC
-> 0x0030 0x0288 0x0000 0x2 0x0
-> > +#define MX7D_PAD_GPIO1_IO15__FLEXCAN2_TX
-> 0x0030 0x0288 0x0000 0x3 0x0
-> > +#define MX7D_PAD_GPIO1_IO15__WDOG4_WDOG_B
-> 0x0030 0x0288 0x0000 0x4 0x0
-> > +#define MX7D_PAD_GPIO1_IO15__CCM_EXT_CLK4
-> 0x0030 0x0288 0x04F0 0x5 0x0
-> > +#define MX7D_PAD_GPIO1_IO15__SDMA_EXT_EVENT1
-> 0x0030 0x0288 0x06DC 0x6 0x0
-> >  #define MX7D_PAD_EPDC_DATA00__EPDC_DATA0
-> 0x0034 0x02A4 0x0000 0x0 0x0
-> >  #define MX7D_PAD_EPDC_DATA00__SIM1_PORT2_TRXD
-> 0x0034 0x02A4 0x0000 0x1 0x0
-> >  #define MX7D_PAD_EPDC_DATA00__QSPI_A_DATA0
-> 0x0034 0x02A4 0x0000 0x2 0x0
-> > --
-> > 1.9.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On 2015/9/6 13:55, Jiang Liu wrote:
+>
+>
+> On 2015/9/6 12:23, Yang Yingliang wrote:
+>> When cpu is disabled, all irqs will be migratged to another cpu.
+>> In some cases, a new affinity is different, it needed to be coppied
+>> to irq's affinity. But if the type of irq is LPI, it's affinity will
+>> not be coppied because of irq_set_affinity's return value. Fix it by
+>> using irq_do_set_affinity.
+>>
+>> And migrating interrupts is a core code matter, so move the code to
+>> kernel/irq/migration.c and select CONFIG_GENERIC_IRQ_MIGRATION when
+>> CONFIG_HOTPLUG_CPU and CONFIG_SMP is enabled.
+>>
+>> Cc: Jiang Liu <jiang.liu@linux.intel.com>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+>> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+>> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+>> ---
+>>   arch/arm/Kconfig             |  1 +
+>>   arch/arm/include/asm/irq.h   |  1 -
+>>   arch/arm/kernel/irq.c        | 62 --------------------------------------------
+>>   arch/arm64/Kconfig           |  1 +
+>>   arch/arm64/include/asm/irq.h |  1 -
+>>   arch/arm64/kernel/irq.c      | 62 --------------------------------------------
+>>   kernel/irq/migration.c       | 62 ++++++++++++++++++++++++++++++++++++++++++++
+>>   7 files changed, 64 insertions(+), 126 deletions(-)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 41cbb4a..ebc8a33 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -22,6 +22,7 @@ config ARM
+>>   	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+>>   	select GENERIC_IDLE_POLL_SETUP
+>>   	select GENERIC_IRQ_PROBE
+>> +	select GENERIC_IRQ_MIGRATION if SMP && HOTPLUG_CPU
+>>   	select GENERIC_IRQ_SHOW
+>>   	select GENERIC_IRQ_SHOW_LEVEL
+>>   	select GENERIC_PCI_IOMAP
+>> diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+>> index 53c15de..d17fc900 100644
+>> --- a/arch/arm/include/asm/irq.h
+>> +++ b/arch/arm/include/asm/irq.h
+>> @@ -24,7 +24,6 @@
+>>   #ifndef __ASSEMBLY__
+>>   struct irqaction;
+>>   struct pt_regs;
+>> -extern void migrate_irqs(void);
+>>
+>>   extern void asm_do_IRQ(unsigned int, struct pt_regs *);
+>>   void handle_IRQ(unsigned int, struct pt_regs *);
+>> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+>> index baf8ede..2efdb40 100644
+>> --- a/arch/arm/kernel/irq.c
+>> +++ b/arch/arm/kernel/irq.c
+>> @@ -31,7 +31,6 @@
+>>   #include <linux/smp.h>
+>>   #include <linux/init.h>
+>>   #include <linux/seq_file.h>
+>> -#include <linux/ratelimit.h>
+>>   #include <linux/errno.h>
+>>   #include <linux/list.h>
+>>   #include <linux/kallsyms.h>
+>> @@ -135,64 +134,3 @@ int __init arch_probe_nr_irqs(void)
+>>   	return nr_irqs;
+>>   }
+>>   #endif
+>> -
+>> -#ifdef CONFIG_HOTPLUG_CPU
+>> -static bool migrate_one_irq(struct irq_desc *desc)
+>> -{
+>> -	struct irq_data *d = irq_desc_get_irq_data(desc);
+>> -	const struct cpumask *affinity = irq_data_get_affinity_mask(d);
+>> -	struct irq_chip *c;
+>> -	bool ret = false;
+>> -
+>> -	/*
+>> -	 * If this is a per-CPU interrupt, or the affinity does not
+>> -	 * include this CPU, then we have nothing to do.
+>> -	 */
+>> -	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
+>> -		return false;
+>> -
+>> -	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
+>> -		affinity = cpu_online_mask;
+>> -		ret = true;
+>> -	}
+>> -
+>> -	c = irq_data_get_irq_chip(d);
+>> -	if (!c->irq_set_affinity)
+>> -		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+>> -	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
+>> -		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
+>> -
+>> -	return ret;
+>> -}
+>> -
+>> -/*
+>> - * The current CPU has been marked offline.  Migrate IRQs off this CPU.
+>> - * If the affinity settings do not allow other CPUs, force them onto any
+>> - * available CPU.
+>> - *
+>> - * Note: we must iterate over all IRQs, whether they have an attached
+>> - * action structure or not, as we need to get chained interrupts too.
+>> - */
+>> -void migrate_irqs(void)
+>> -{
+>> -	unsigned int i;
+>> -	struct irq_desc *desc;
+>> -	unsigned long flags;
+>> -
+>> -	local_irq_save(flags);
+>> -
+>> -	for_each_irq_desc(i, desc) {
+>> -		bool affinity_broken;
+>> -
+>> -		raw_spin_lock(&desc->lock);
+>> -		affinity_broken = migrate_one_irq(desc);
+>> -		raw_spin_unlock(&desc->lock);
+>> -
+>> -		if (affinity_broken)
+>> -			pr_warn_ratelimited("IRQ%u no longer affine to CPU%u\n",
+>> -				i, smp_processor_id());
+>> -	}
+>> -
+>> -	local_irq_restore(flags);
+>> -}
+>> -#endif /* CONFIG_HOTPLUG_CPU */
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index b7b9cea..6ffe411 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -32,6 +32,7 @@ config ARM64
+>>   	select GENERIC_CPU_AUTOPROBE
+>>   	select GENERIC_EARLY_IOREMAP
+>>   	select GENERIC_IRQ_PROBE
+>> +	select GENERIC_IRQ_MIGRATION if SMP && HOTPLUG_CPU
+>>   	select GENERIC_IRQ_SHOW
+>>   	select GENERIC_IRQ_SHOW_LEVEL
+>>   	select GENERIC_PCI_IOMAP
+>> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
+>> index bbb251b..0916929 100644
+>> --- a/arch/arm64/include/asm/irq.h
+>> +++ b/arch/arm64/include/asm/irq.h
+>> @@ -7,7 +7,6 @@
+>>
+>>   struct pt_regs;
+>>
+>> -extern void migrate_irqs(void);
+>>   extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+>>
+>>   static inline void acpi_irq_init(void)
+>> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+>> index 463fa2e..04ac1f6 100644
+>> --- a/arch/arm64/kernel/irq.c
+>> +++ b/arch/arm64/kernel/irq.c
+>> @@ -27,7 +27,6 @@
+>>   #include <linux/init.h>
+>>   #include <linux/irqchip.h>
+>>   #include <linux/seq_file.h>
+>> -#include <linux/ratelimit.h>
+>>
+>>   unsigned long irq_err_count;
+>>
+>> @@ -56,64 +55,3 @@ void __init init_IRQ(void)
+>>   	if (!handle_arch_irq)
+>>   		panic("No interrupt controller found.");
+>>   }
+>> -
+>> -#ifdef CONFIG_HOTPLUG_CPU
+>> -static bool migrate_one_irq(struct irq_desc *desc)
+>> -{
+>> -	struct irq_data *d = irq_desc_get_irq_data(desc);
+>> -	const struct cpumask *affinity = irq_data_get_affinity_mask(d);
+>> -	struct irq_chip *c;
+>> -	bool ret = false;
+>> -
+>> -	/*
+>> -	 * If this is a per-CPU interrupt, or the affinity does not
+>> -	 * include this CPU, then we have nothing to do.
+>> -	 */
+>> -	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
+>> -		return false;
+>> -
+>> -	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
+>> -		affinity = cpu_online_mask;
+>> -		ret = true;
+>> -	}
+>> -
+>> -	c = irq_data_get_irq_chip(d);
+>> -	if (!c->irq_set_affinity)
+>> -		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+>> -	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
+>> -		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
+>> -
+>> -	return ret;
+>> -}
+>> -
+>> -/*
+>> - * The current CPU has been marked offline.  Migrate IRQs off this CPU.
+>> - * If the affinity settings do not allow other CPUs, force them onto any
+>> - * available CPU.
+>> - *
+>> - * Note: we must iterate over all IRQs, whether they have an attached
+>> - * action structure or not, as we need to get chained interrupts too.
+>> - */
+>> -void migrate_irqs(void)
+>> -{
+>> -	unsigned int i;
+>> -	struct irq_desc *desc;
+>> -	unsigned long flags;
+>> -
+>> -	local_irq_save(flags);
+>> -
+>> -	for_each_irq_desc(i, desc) {
+>> -		bool affinity_broken;
+>> -
+>> -		raw_spin_lock(&desc->lock);
+>> -		affinity_broken = migrate_one_irq(desc);
+>> -		raw_spin_unlock(&desc->lock);
+>> -
+>> -		if (affinity_broken)
+>> -			pr_warn_ratelimited("IRQ%u no longer affine to CPU%u\n",
+>> -					    i, smp_processor_id());
+>> -	}
+>> -
+>> -	local_irq_restore(flags);
+>> -}
+>> -#endif /* CONFIG_HOTPLUG_CPU */
+>> diff --git a/kernel/irq/migration.c b/kernel/irq/migration.c
+>> index 37ddb7b..5801c79 100644
+>> --- a/kernel/irq/migration.c
+>> +++ b/kernel/irq/migration.c
+>> @@ -1,6 +1,7 @@
+>>
+>>   #include <linux/irq.h>
+>>   #include <linux/interrupt.h>
+>> +#include <linux/ratelimit.h>
+>>
+>>   #include "internals.h"
+>>
+>> @@ -77,3 +78,64 @@ void irq_move_irq(struct irq_data *idata)
+>>   	if (!masked)
+>>   		idata->chip->irq_unmask(idata);
+>>   }
+>> +
+>> +#ifdef CONFIG_HOTPLUG_CPU
+>> +static bool migrate_one_irq(struct irq_desc *desc)
+>> +{
+>> +	struct irq_data *d = irq_desc_get_irq_data(desc);
+>> +	const struct cpumask *affinity = d->affinity;
+>> +	struct irq_chip *c;
+>> +	bool ret = false;
+>> +
+>> +	/*
+>> +	 * If this is a per-CPU interrupt, or the affinity does not
+>> +	 * include this CPU, then we have nothing to do.
+>> +	 */
+>> +	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
+>> +		return false;
+>> +
+>> +	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
+>> +		affinity = cpu_online_mask;
+>> +		ret = true;
+>> +	}
+>> +
+>> +	c = irq_data_get_irq_chip(d);
+>> +	if (!c->irq_set_affinity)
+>> +		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+> How about pr_warn here? It may cause serious drawback if this happens.
+I think so, I will change it next version.
+>
+>> +	else
+>> +		irq_do_set_affinity(d, affinity, false);
+> Should we check return value here?
+>
+The return value is not used, so we don't check it.
+Maybe I could add some warning by checking it.
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +/*
+>> + * The current CPU has been marked offline.  Migrate IRQs off this CPU.
+>> + * If the affinity settings do not allow other CPUs, force them onto any
+>> + * available CPU.
+>> + *
+>> + * Note: we must iterate over all IRQs, whether they have an attached
+>> + * action structure or not, as we need to get chained interrupts too.
+>> + */
+>> +void migrate_irqs(void)
+>> +{
+>> +	unsigned int i;
+>> +	struct irq_desc *desc;
+>> +	unsigned long flags;
+>> +
+>> +	local_irq_save(flags);
+>> +
+>> +	for_each_irq_desc(i, desc) {
+> Should we use for_each_active_irq() here to iterate over active
+> irqs only?
+>
+It looks good. I will use it next version.
+>> +		bool affinity_broken;
+>> +
+>> +		raw_spin_lock(&desc->lock);
+>> +		affinity_broken = migrate_one_irq(desc);
+>> +		raw_spin_unlock(&desc->lock);
+>> +
+>> +		if (affinity_broken)
+>> +			pr_warn_ratelimited("IRQ%u no longer affine to CPU%u\n",
+>> +					    i, smp_processor_id());
+>> +	}
+>> +
+>> +	local_irq_restore(flags);
+>> +}
+>> +#endif /* CONFIG_HOTPLUG_CPU */
+>>
+>
+> .
+>
