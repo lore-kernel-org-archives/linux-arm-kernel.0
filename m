@@ -1,64 +1,125 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Mon, 7 Sep 2015 19:32:18 +0200
-Subject: [PATCH v4 2/5] irqchip, gicv3: Workaround for Cavium ThunderX
- erratum 23154
-In-Reply-To: <55EDC4DC.4040405@arm.com>
-References: <1439576885-15621-1-git-send-email-rric@kernel.org>
- <1439576885-15621-3-git-send-email-rric@kernel.org>
- <55EDC12E.8000408@arm.com> <55EDC4DC.4040405@arm.com>
-Message-ID: <20150907173218.GV1820@rric.localdomain>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Sep 2015 18:35:52 +0100
+Subject: [PATCH 1/5] acpi: Add basic device probing infrastructure
+In-Reply-To: <20150907160045.GC29293@red-moon>
+References: <1441386412-8139-1-git-send-email-marc.zyngier@arm.com>
+ <1441386412-8139-2-git-send-email-marc.zyngier@arm.com>
+ <20150907160045.GC29293@red-moon>
+Message-ID: <55EDCAF8.6080605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.09.15 18:09:48, Marc Zyngier wrote:
-> On 07/09/15 17:54, Suzuki K. Poulose wrote:
-> > On 14/08/15 19:28, Robert Richter wrote:
-> >> From: Robert Richter <rrichter@cavium.com>
-
-> >> +static void gicv3_enable_quirks(void)
-> >> +{
-> >> +	if (cpus_have_cap(ARM64_WORKAROUND_CAVIUM_23154))
-> >> +		static_key_slow_inc(&is_cavium_thunderx);
-> > 
-> > May be you could use the enable() method added to struct arm64_cpu_capability
-> > here to perform the above operation, added by James :
-> > 
-> > commit 1c0763037f1e1caef739e36e09c6d41ed7b61b2d
-> > Author: James Morse <james.morse@arm.com>
-> > Date:   Tue Jul 21 13:23:28 2015 +0100
-> > 
-> >      arm64: kernel: Add cpufeature 'enable' callback
-> > 
-> > 
-> >> +}
-> >> +
-> >>   static int __init gic_of_init(struct device_node *node, struct device_node *parent)
-> >>   {
-> >>   	void __iomem *dist_base;
-> >> @@ -825,6 +863,8 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
-> >>   	gic_data.nr_redist_regions = nr_redist_regions;
-> >>   	gic_data.redist_stride = redist_stride;
-> >>
-> >> +	gicv3_enable_quirks();
-> >> +
-> > 
-> > than adding a hook here ?
+On 07/09/15 17:00, Lorenzo Pieralisi wrote:
+> [+M.Salter]
 > 
-> It feels like a good idea, except that it creates a weird dependency
-> between the core arch code and the GIC driver. Can you think of an
-> elegant way to deal with this?
+> On Fri, Sep 04, 2015 at 06:06:48PM +0100, Marc Zyngier wrote:
+>> IRQ controllers and timers are the two types of device the kernel
+>> requires before being able to use the device driver model.
+>>
+>> ACPI so far lacks a proper probing infrastructure similar to the one
+>> we have with DT, where we're able to declare IRQ chips and
+>> clocksources inside the driver code, and let the core code pick it up
+>> and call us back on a match. This leads to all kind of really ugly
+>> hacks all over the arm64 code and even in the ACPI layer.
+>>
+>> In order to allow some basic probing based on the ACPI tables,
+>> introduce "struct acpi_probe_entry" which contains just enough
+>> data and callbacks to match a table, an optional subtable, and
+>> call a probe function. A driver can, at build time, register itself
+>> and expect being called if the right entry exists in the ACPI
+>> table.
+>>
+>> A acpi_probe_device_init() is provided, taking an ACPI table
+>> identifier, and iterating over the registered entries.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/acpi/scan.c               | 41 ++++++++++++++++++++++++++++
+>>  include/asm-generic/vmlinux.lds.h | 11 ++++++++
+>>  include/linux/acpi.h              | 56 +++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 108 insertions(+)
+>>
+>> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+>> index ec25635..9e920ec 100644
+>> --- a/drivers/acpi/scan.c
+>> +++ b/drivers/acpi/scan.c
+>> @@ -2793,3 +2793,44 @@ int __init acpi_scan_init(void)
+>>  	mutex_unlock(&acpi_scan_lock);
+>>  	return result;
+>>  }
+>> +
+>> +static const struct acpi_probe_entry device_acpi_probe_end
+>> +		__used __section(__device_acpi_probe_table_end);
+>> +extern struct acpi_probe_entry __device_acpi_probe_table[];
+>> +static struct acpi_probe_entry *ape;
+>> +static int acpi_probe_count;
+>> +static DEFINE_SPINLOCK(acpi_probe_lock);
+>> +
+>> +static int __init acpi_match_madt(struct acpi_subtable_header *header,
+>> +				  const unsigned long end)
+>> +{
+>> +	if (!ape->validate_subtbl || ape->validate_subtbl(header, ape))
+>> +		if (!ape->probe_subtbl(header, end))
+>> +			acpi_probe_count++;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +int __init acpi_probe_device_table(const char *id)
+>> +{
+>> +	int count = 0;
+>> +
+>> +	if (acpi_disabled)
+>> +		return 0;
+>> +
+>> +	spin_lock(&acpi_probe_lock);
+>> +	for (ape = __device_acpi_probe_table; ape->probe_table; ape++) {
+>> +		if (!ACPI_COMPARE_NAME(id, ape->id))
+>> +			continue;
+>> +		if (ACPI_COMPARE_NAME(ACPI_SIG_MADT, ape->id)) {
+>> +			acpi_probe_count = 0;
+>> +			acpi_table_parse_madt(ape->type, acpi_match_madt, 0);
+>> +			count += acpi_probe_count;
+>> +		} else {
+>> +			count = acpi_table_parse(ape->id, ape->probe_table);
+>> +		}
+>> +	}
+>> +	spin_unlock(&acpi_probe_lock);
+>> +
+>> +	return count;
+>> +}
+> 
+> We should add a mechanism to prevent re-parsing the same entries
+> multiple times (in case this function is called with the same
+> signature multiple times). We could create a separate table of device
+> entries, per-subsystem, that we want to parse (irqchip specific table,
+> timers, etc.) instead of adding all the devices to the same table (ie
+> linker section), you can do this already with the current patchset by
+> just choosing different table names as DT does.
 
-The only chance I see is to move it all to the driver and adding
-enable() calls to the caps in gicv3_errata:
+Yeah, my initial approach was to have multiple tables, but I ended up
+deciding against it because nothing required it so far, and I wanted to
+avoid the over-engineered syndrome.
 
-static void gicv3_enable_quirks(void)
-{
-        check_cpu_capabilities(gicv3_errata, "enabling workaround for");
-}
+Also, it could be useful to flag entries that have been successfully
+probed to ensure we don't try them again. Though having separate tables
+would probably greatly reduce the usefulness of this.
 
-Here the code is kept in the driver and called during driver init.
+> We may also want to extend this set so that it can be used to parse the
+> same table, same subtype multiple times at different stages in the boot
+> path (but let's first see if it is a) really needed b) feasible).
+> 
+> Basically it is to avoid parsing the MADT multiple times:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/340267.html
+> 
+> Those can be extensions to the current patchset (because basically
+> they are not real issues at present), it is just a heads-up.
 
-But current solution looks more elegant and simpler to me. So I would
-not change it.
+I'll see if I can whip that up by the end of the week - the PMU stuff is
+definitely interesting.
 
--Robert
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
