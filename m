@@ -1,119 +1,66 @@
-From: b38611@freescale.com (Fugang Duan)
-Date: Mon, 7 Sep 2015 10:55:02 +0800
-Subject: [PATCH v3 4/4] ARM: dts: imx7d-sdb: add fec1 and fec2 support
-In-Reply-To: <1441594502-19236-1-git-send-email-b38611@freescale.com>
-References: <1441594502-19236-1-git-send-email-b38611@freescale.com>
-Message-ID: <1441594502-19236-5-git-send-email-b38611@freescale.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Mon, 7 Sep 2015 10:54:52 +0800
+Subject: [RFC PATCH v1 0/4] arm/arm64: fix a migrating irq bug when
+ hotplug cpu
+In-Reply-To: <55EBF43E.8070501@linux.intel.com>
+References: <1441513421-8092-1-git-send-email-yangyingliang@huawei.com>
+ <55EBF43E.8070501@linux.intel.com>
+Message-ID: <55ECFC7C.8060505@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable fec1 and fec2 for i.MX7d-sdb board.
 
-Signed-off-by: Fugang Duan <B38611@freescale.com>
----
- arch/arm/boot/dts/imx7d-sdb.dts | 76 ++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 75 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index 4d1a4b9..7d3e980 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -101,6 +101,45 @@
- 	arm-supply = <&sw1a_reg>;
- };
- 
-+&fec1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet1>;
-+	assigned-clocks = <&clks IMX7D_ENET1_TIME_ROOT_SRC>,
-+			  <&clks IMX7D_ENET1_TIME_ROOT_CLK>;
-+	assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>;
-+	assigned-clock-rates = <0>, <100000000>;
-+	phy-mode = "rgmii";
-+	phy-handle = <&ethphy0>;
-+	fsl,magic-packet;
-+	status = "okay";
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy0: ethernet-phy at 0 {
-+			reg = <0>;
-+		};
-+
-+		ethphy1: ethernet-phy at 1 {
-+			reg = <1>;
-+		};
-+	};
-+};
-+
-+&fec2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet2>;
-+	assigned-clocks = <&clks IMX7D_ENET2_TIME_ROOT_SRC>,
-+			  <&clks IMX7D_ENET2_TIME_ROOT_CLK>;
-+	assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>;
-+	assigned-clock-rates = <0>, <100000000>;
-+	phy-mode = "rgmii";
-+	phy-handle = <&ethphy1>;
-+	fsl,magic-packet;
-+	status = "okay";
-+};
-+
- &i2c1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_i2c1>;
-@@ -246,6 +285,42 @@
- 	pinctrl-0 = <&pinctrl_hog>;
- 
- 	imx7d-sdb {
-+		pinctrl_enet1: enet1grp {
-+			fsl,pins = <
-+				MX7D_PAD_GPIO1_IO10__ENET1_MDIO			0x3
-+				MX7D_PAD_GPIO1_IO11__ENET1_MDC			0x3
-+				MX7D_PAD_ENET1_RGMII_TXC__ENET1_RGMII_TXC	0x1
-+				MX7D_PAD_ENET1_RGMII_TD0__ENET1_RGMII_TD0	0x1
-+				MX7D_PAD_ENET1_RGMII_TD1__ENET1_RGMII_TD1	0x1
-+				MX7D_PAD_ENET1_RGMII_TD2__ENET1_RGMII_TD2	0x1
-+				MX7D_PAD_ENET1_RGMII_TD3__ENET1_RGMII_TD3	0x1
-+				MX7D_PAD_ENET1_RGMII_TX_CTL__ENET1_RGMII_TX_CTL	0x1
-+				MX7D_PAD_ENET1_RGMII_RXC__ENET1_RGMII_RXC	0x1
-+				MX7D_PAD_ENET1_RGMII_RD0__ENET1_RGMII_RD0	0x1
-+				MX7D_PAD_ENET1_RGMII_RD1__ENET1_RGMII_RD1	0x1
-+				MX7D_PAD_ENET1_RGMII_RD2__ENET1_RGMII_RD2	0x1
-+				MX7D_PAD_ENET1_RGMII_RD3__ENET1_RGMII_RD3	0x1
-+				MX7D_PAD_ENET1_RGMII_RX_CTL__ENET1_RGMII_RX_CTL	0x1
-+			>;
-+		};
-+
-+		pinctrl_enet2: enet2grp {
-+			fsl,pins = <
-+				MX7D_PAD_EPDC_GDSP__ENET2_RGMII_TXC		0x1
-+				MX7D_PAD_EPDC_SDCE2__ENET2_RGMII_TD0		0x1
-+				MX7D_PAD_EPDC_SDCE3__ENET2_RGMII_TD1		0x1
-+				MX7D_PAD_EPDC_GDCLK__ENET2_RGMII_TD2		0x1
-+				MX7D_PAD_EPDC_GDOE__ENET2_RGMII_TD3		0x1
-+				MX7D_PAD_EPDC_GDRL__ENET2_RGMII_TX_CTL		0x1
-+				MX7D_PAD_EPDC_SDCE1__ENET2_RGMII_RXC		0x1
-+				MX7D_PAD_EPDC_SDCLK__ENET2_RGMII_RD0		0x1
-+				MX7D_PAD_EPDC_SDLE__ENET2_RGMII_RD1		0x1
-+				MX7D_PAD_EPDC_SDOE__ENET2_RGMII_RD2		0x1
-+				MX7D_PAD_EPDC_SDSHR__ENET2_RGMII_RD3		0x1
-+				MX7D_PAD_EPDC_SDCE0__ENET2_RGMII_RX_CTL		0x1
-+			>;
-+		};
-+
- 		pinctrl_hog: hoggrp {
- 			fsl,pins = <
- 				MX7D_PAD_UART3_CTS_B__GPIO4_IO7		0x14
-@@ -281,7 +356,6 @@
- 			>;
- 		};
- 
--
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX	0x79
--- 
-1.9.1
+On 2015/9/6 16:07, Jiang Liu wrote:
+> On 2015/9/6 12:23, Yang Yingliang wrote:
+>> Hi All,
+>>
+>> There is a bug:
+>>
+>> When cpu is disabled, all irqs will be migratged to another cpu.
+>> In some cases, a new affinity is different, it needed to be coppied
+>> to irq's affinity. But if the type of irq is LPI, it's affinity will
+>> not be coppied because of irq_set_affinity's return value.
+>>
+>>
+>>
+>> As Marc and Will suggested, I refactor the arm/arm64 migrating interrupts
+>> code and fix the migrating irq bug while cpu is offline.
+>>
+>> I'm trying let the core code do the migrating interrupts matter. kernel/irq/migration.c
+>> depends on CONFIG_GENERIC_PENDING_IRQ, so I make it selected by CONFIG_SMP and
+>> CONFIG_HOTPLUG_CPU and rename it to CONFIG_GENERIC_IRQ_MIGRATION for more general.
+>> When CONFIG_GENERIC_IRQ_MIGRATION is enabled, an interrupt whose state_use_accessors
+>> is not set with IRQD_MOVE_PCNTXT won't be migrated immediately in irq_set_affinity_locked().
+>> So introduce irq_settings_set_move_pcntxt() helper to set the state in gic_irq_domain_map().
+>>
+>> With the above preparation, move the migrating interrupts code into kernel/irq/migration.c
+>> and fix the bug by using irq_do_set_affinity().
+> Hi Yingliang,
+> 	As we are going to move migrate_irqs() to generic kernel
+> code, and powerpc, metag, xtensa, sh, ia64 mn10300 also defines
+>   migrate_irqs() too. It would be great if we could consolidate
+> all these.
+> 	And as we are going to refine these code, there's another
+> issue need attention. On x86, we need to allocate a CPU vector
+> if an irq is directed to a CPU. So there's possibility that
+> we run out of CPU vectors after CPU hot-removal. So we have a
+> mechanism to detect whether we will run out of CPU vector
+> after removing a CPU, and reject CPU hot-removal if that will
+> happen.
+> 	So the key point is, if we a need to allocate some sort
+> of resource on the target CPUs for an irq, we need two steps
+> when removing a CPU
+> 1) check whether resources are available after removing the CPU,
+>     and reject CPU removal request if we ran out of resource
+> 2) fix irqs after hot-removing the CPU.
+> Thanks!
+> Gerry
+>
+
+On arm, as I know, it doesn't need extra resource for an irq.
+I am not sure other platform need this way besides x86.
+
+I think we could consolidate all migrate_irqs() later. I am not
+sure if it's good to do so big changing and modify other arch code in
+a patchset that supposed to fix a bug of arm.
