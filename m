@@ -1,56 +1,90 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 07 Sep 2015 17:41:37 +0200
-Subject: [PATCH v4 0/4] cpufreq-dt: add suspend frequency support
-Message-ID: <1441640501-13613-1-git-send-email-b.zolnierkie@samsung.com>
+Date: Mon, 07 Sep 2015 17:41:38 +0200
+Subject: [PATCH v4 1/4] PM / OPP: add dev_pm_opp_get_suspend_opp() helper
+In-Reply-To: <1441640501-13613-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1441640501-13613-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1441640501-13613-2-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add dev_pm_opp_get_suspend_opp() helper to obtain suspend opp.
 
-This patch series adds suspend frequency support (using opp-v2
-bindings and suspend-opp functionality) to cpufreq-dt driver and
-then adds suspend opp for Exynos4412 based boards.
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ drivers/base/power/opp.c | 30 ++++++++++++++++++++++++++++++
+ include/linux/pm_opp.h   |  6 ++++++
+ 2 files changed, 36 insertions(+)
 
-This patch series fixes suspend/resume support on Exynos4412
-based Trats2 board and reboot hang on Exynos4412 based Odroid
-U3 board.
-
-Changes since v3:
-- fixed dev_pm_opp_get_suspend_opp() locking
-- shortened variable name in dev_pm_opp_get_suspend_opp()
-- adjusted cpufreq_generic_suspend() to work with cpufreq-dt
-- removed no longer needed cpufreq_dt_suspend()
-- added Acked-by tag from Viresh to patch #4
-
-Changes since v2:
-- rewrote to use suspend-opp functionality
-
-Changes since v1:
-- removed superfluous ";"
-
-Depends on:
-- next-20150902 branch of linux-next kernel tree
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-
-Bartlomiej Zolnierkiewicz (4):
-  PM / OPP: add dev_pm_opp_get_suspend_opp() helper
-  cpufreq: allow cpufreq_generic_suspend() to work without suspend
-    frequency
-  cpufreq-dt: add suspend frequency support
-  ARM: dts: add suspend opp to exynos4412
-
- arch/arm/boot/dts/exynos4412.dtsi |  1 +
- drivers/base/power/opp.c          | 30 ++++++++++++++++++++++++++++++
- drivers/cpufreq/cpufreq-dt.c      | 11 +++++++++++
- drivers/cpufreq/cpufreq.c         |  4 ++--
- include/linux/pm_opp.h            |  6 ++++++
- 5 files changed, 50 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+index eb25449..3d948ea 100644
+--- a/drivers/base/power/opp.c
++++ b/drivers/base/power/opp.c
+@@ -341,6 +341,36 @@ unsigned long dev_pm_opp_get_max_clock_latency(struct device *dev)
+ EXPORT_SYMBOL_GPL(dev_pm_opp_get_max_clock_latency);
+ 
+ /**
++ * dev_pm_opp_get_suspend_opp() - Get suspend opp
++ * @dev:	device for which we do this operation
++ *
++ * Return: This function returns pointer to the suspend opp if it is
++ * defined, otherwise it returns NULL.
++ *
++ * Locking: This function must be called under rcu_read_lock(). opp is a rcu
++ * protected pointer. The reason for the same is that the opp pointer which is
++ * returned will remain valid for use with opp_get_{voltage, freq} only while
++ * under the locked area. The pointer returned must be used prior to unlocking
++ * with rcu_read_unlock() to maintain the integrity of the pointer.
++ */
++struct dev_pm_opp *dev_pm_opp_get_suspend_opp(struct device *dev)
++{
++	struct device_opp *dev_opp;
++	struct dev_pm_opp *opp;
++
++	opp_rcu_lockdep_assert();
++
++	dev_opp = _find_device_opp(dev);
++	if (IS_ERR(dev_opp))
++		opp = NULL;
++	else
++		opp = dev_opp->suspend_opp;
++
++	return opp;
++}
++EXPORT_SYMBOL_GPL(dev_pm_opp_get_suspend_opp);
++
++/**
+  * dev_pm_opp_get_opp_count() - Get number of opps available in the opp list
+  * @dev:	device for which we do this operation
+  *
+diff --git a/include/linux/pm_opp.h b/include/linux/pm_opp.h
+index cab7ba5..e817722 100644
+--- a/include/linux/pm_opp.h
++++ b/include/linux/pm_opp.h
+@@ -34,6 +34,7 @@ bool dev_pm_opp_is_turbo(struct dev_pm_opp *opp);
+ 
+ int dev_pm_opp_get_opp_count(struct device *dev);
+ unsigned long dev_pm_opp_get_max_clock_latency(struct device *dev);
++struct dev_pm_opp *dev_pm_opp_get_suspend_opp(struct device *dev);
+ 
+ struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
+ 					      unsigned long freq,
+@@ -80,6 +81,11 @@ static inline unsigned long dev_pm_opp_get_max_clock_latency(struct device *dev)
+ 	return 0;
+ }
+ 
++static inline struct dev_pm_opp *dev_pm_opp_get_suspend_opp(struct device *dev)
++{
++	return NULL;
++}
++
+ static inline struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
+ 					unsigned long freq, bool available)
+ {
 -- 
 1.9.1
