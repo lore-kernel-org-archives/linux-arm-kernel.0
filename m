@@ -1,175 +1,236 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 07 Sep 2015 17:44:41 +0100
-Subject: [PATCH v2] irqchip, gicv3-its,
- numa: Workaround for Cavium ThunderX erratum 23144
-In-Reply-To: <1440497885-24584-1-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1440497885-24584-1-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <55EDBEF9.4050007@arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 7 Sep 2015 18:45:42 +0200
+Subject: [PATCH v2 6/8] arm/arm64: KVM: Add forwarded physical interrupts
+ documentation
+In-Reply-To: <1441395650-19663-7-git-send-email-christoffer.dall@linaro.org>
+References: <1441395650-19663-1-git-send-email-christoffer.dall@linaro.org>
+ <1441395650-19663-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <55EDBF36.4040307@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/08/15 11:18, Ganapatrao Kulkarni wrote:
-> The patch below adds a workaround for gicv3 in a numa environment. It
-> is on top of Robert's recent gicv3 errata patch submission v4 and my
-> arm64 numa patches v5.
+Hi Christoffer,
+On 09/04/2015 09:40 PM, Christoffer Dall wrote:
+> Forwarded physical interrupts on arm/arm64 is a tricky concept and the
+> way we deal with them is not apparently easy to understand by reading
+> various specs.
 > 
-> This implements a workaround for gicv3-its erratum 23144 on Cavium's
-> ThunderX dual-socket platforms, where LPI cannot be routed to a
-> redistributors present on a foreign node.
+> Therefore, add a proper documentation file explaining the flow and
+> rationale of the behavior of the vgic.
 > 
-> v2:
-> updatated as per Marc Zyngier's review comments.
+> Some of this text was contributed by Marc Zyngier and edited by me.
+> Omissions and errors are all mine.
 > 
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
->  drivers/irqchip/irq-gic-v3-its.c | 53 +++++++++++++++++++++++++++++++++-------
->  1 file changed, 44 insertions(+), 9 deletions(-)
+>  Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt | 181 +++++++++++++++++++++
+>  1 file changed, 181 insertions(+)
+>  create mode 100644 Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 614a367..d3fe0a4 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -40,7 +40,8 @@
->  #include "irqchip.h"
->  
->  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING          (1ULL << 0)
-> -#define ITS_FLAGS_CAVIUM_THUNDERX              (1ULL << 1)
-> +#define ITS_WORKAROUND_CAVIUM_22375            (1ULL << 1)
-> +#define ITS_WORKAROUND_CAVIUM_23144            (1ULL << 2)
+> diff --git a/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+> new file mode 100644
+> index 0000000..24b6f28
+> --- /dev/null
+> +++ b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+> @@ -0,0 +1,181 @@
+> +KVM/ARM VGIC Forwarded Physical Interrupts
+> +==========================================
+> +
+> +The KVM/ARM code implements software support for the ARM Generic
+> +Interrupt Controller's (GIC's) hardware support for virtualization by
+> +allowing software to inject virtual interrupts to a VM, which the guest
+> +OS sees as regular interrupts.  The code is famously known as the VGIC.
+> +
+> +Some of these virtual interrupts, however, correspond to physical
+> +interrupts from real physical devices.  One example could be the
+> +architected timer, which itself supports virtualization, and therefore
+> +lets a guest OS program the hardware device directly to raise an
+> +interrupt at some point in time.  When such an interrupt is raised, the
+> +host OS initially handles the interrupt and must somehow signal this
+> +event as a virtual interrupt to the guest.  Another example could be a
+> +passthrough device, where the physical interrupts are initially handled
+> +by the host, but the device driver for the device lives in the guest OS
+> +and KVM must therefore somehow inject a virtual interrupt on behalf of
+> +the physical one to the guest OS.
+> +
+> +These virtual interrupts corresponding to a physical interrupt on the
+> +host are called forwarded physical interrupts, but are also sometimes
+> +referred to as 'virtualized physical interrupts' and 'mapped interrupts'.
+> +
+> +Forwarded physical interrupts are handled slightly differently compared
+> +to virtual interrupts generated purely by a software emulated device.
+> +
+> +
+> +The HW bit
+> +----------
+> +Virtual interrupts are signalled to the guest by programming the List
+> +Registers (LRs) on the GIC before running a VCPU.  The LR is programmed
+> +with the virtual IRQ number and the state of the interrupt (Pending,
+> +Active, or Pending+Active).  When the guest ACKs and EOIs a virtual
+> +interrupt, the LR state moves from Pending to Active, and finally to
+> +inactive.
+> +
+> +The LRs include an extra bit, called the HW bit.  When this bit is set,
+> +KVM must also program an additional field in the LR, the physical IRQ
+> +number, to link the virtual with the physical IRQ.
+> +
+> +When the HW bit is set, KVM must EITHER set the Pending OR the Active
+> +bit, never both at the same time.
+> +
+> +Setting the HW bit causes the hardware to deactivate the physical
+> +interrupt on the physical distributor when the guest deactivates the
+> +corresponding virtual interrupt.
+> +
+> +
+> +Forwarded Physical Interrupts Life Cycle
+> +----------------------------------------
+> +
+> +The state of forwarded physical interrupts is managed in the following way:
+> +
+> +  - The physical interrupt is acked by the host, and becomes active on
+> +    the physical distributor (*).
+> +  - KVM sets the LR.Pending bit, because this is the only way the GICV
+> +    interface is going to present it to the guest.
+> +  - LR.Pending will stay set as long as the guest has not acked the interrupt.
+> +  - LR.Pending transitions to LR.Active on the guest read of the IAR, as
+> +    expected.
+> +  - On guest EOI, the *physical distributor* active bit gets cleared,
+> +    but the LR.Active is left untouched (set).
+> +  - KVM clears the LR when on VM exits when the physical distributor
+s/when//?
+> +    active state has been cleared.
+> +
+> +(*): The host handling is slightly more complicated.  For some devices
+> +(shared), KVM directly sets the active state on the physical distributor
+> +before entering the guest, and for some devices (non-shared) the host
+> +configures the GIC such that it does not deactivate the interrupt on
+> +host EOIs, but only performs a priority drop allowing the GIC to receive
+> +other interrupts and leaves the interrupt in the active state on the
+> +physical distributor.
+EOIMode == 1 is set globally and impacts all forwarded SPI/PPIs, shared
+or not shared I think. reading the above lines I have the impression
+this is a per-device programming.
 
-Please move this to Robert's series, as it doesn't make much sense to
-add a quirk flag just to modify it in the next patch. This will help
-declutter this patch.
+My understanding is for the timer it is needed to manually set the
+physical distributor state because 1) the HW (GIC) does not do it and 2)
+we need to context switch depending on the vCPU. For non shared device
+the GIC sets the physical distributor state and the state is fully
+maintained by HW until the guest deactivation.
 
->  
->  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
->  
-> @@ -73,6 +74,7 @@ struct its_node {
->  	struct list_head	its_device_list;
->  	u64			flags;
->  	u32			ite_size;
-> +	int			numa_node;
->  };
->  
->  #define ITS_ITT_ALIGN		SZ_256
-> @@ -607,11 +609,20 @@ static void its_eoi_irq(struct irq_data *d)
->  static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->  			    bool force)
->  {
-> -	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
-> +	unsigned int cpu;
-> +	const struct cpumask *cpu_mask = cpu_online_mask;
->  	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
->  	struct its_collection *target_col;
->  	u32 id = its_get_event_id(d);
->  
-> +	/* lpi cannot be routed to a redistributor that is on a foreign node */
-> +	if (its_dev->its->flags & ITS_WORKAROUND_CAVIUM_23144) {
-> +		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
-> +		if (!cpumask_intersects(mask_val, cpu_mask))
-> +			return -EINVAL;
-> +	}
 > +
-> +	cpu = cpumask_any_and(mask_val, cpu_mask);
->  	if (cpu >= nr_cpu_ids)
->  		return -EINVAL;
->  
-> @@ -1338,9 +1349,14 @@ static void its_irq_domain_activate(struct irq_domain *domain,
->  {
->  	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
->  	u32 event = its_get_event_id(d);
-> +	const struct cpumask *cpu_mask = cpu_online_mask;
 > +
-> +	/* get the cpu_mask of local node */
-> +	if (IS_ENABLED(CONFIG_NUMA))
-> +		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
->  
->  	/* Bind the LPI to the first possible CPU */
-> -	its_dev->event_map.col_map[event] = cpumask_first(cpu_online_mask);
-> +	its_dev->event_map.col_map[event] = cpumask_first(cpu_mask);
->  
->  	/* Map the GIC IRQ and event to the device */
->  	its_send_mapvi(its_dev, d->hwirq, event);
-> @@ -1423,11 +1439,19 @@ static int its_force_quiescent(void __iomem *base)
->  	}
->  }
->  
-> -static void its_enable_cavium_thunderx(void *data)
-> +static void its_enable_cavium_thunderx_22375(void *data)
->  {
->         struct its_node *its = data;
->  
-> -       its->flags |= ITS_FLAGS_CAVIUM_THUNDERX;
-> +	its->flags |= ITS_WORKAROUND_CAVIUM_22375;
-> +}
+> +Forwarded Edge and Level Triggered PPIs and SPIs
+> +------------------------------------------------
+> +Forwarded physical interrupts injected should always be active on the
+> +physical distributor when injected to a guest.
 > +
-> +static void its_enable_cavium_thunderx_23144(void *data)
-> +{
-> +	struct its_node *its = data;
+> +Level-triggered interrupts will keep the interrupt line to the GIC
+> +asserted, typically until the guest programs the device to deassert the
+> +line.  This means that the interrupt will remain pending on the physical
+> +distributor until the guest has reprogrammed the device.  Since we
+> +always run the VM with interrupts enabled on the CPU, a pending
+> +interrupt will exit the guest as soon as we switch into the guest,
+> +preventing the guest from ever making progress as the process repeats
+> +over and over.  Therefore, the active state on the physical distributor
+> +must be set when entering the guest, preventing the GIC from forwarding
+> +the pending interrupt to the CPU.  As soon as the guest deactivates
+> +(EOIs) the interrupt, the physical line is sampled by the hardware again
+I think you can remove "(EOI)". This depends on EOI mode setting on
+guest side. it can be 2-in-1 EOI or EOI+DIR.
+> +and the host takes a new interrupt if and only if the physical line is
+> +still asserted.
 > +
-> +	if (num_possible_nodes() > 1)
-> +		its->flags |= ITS_WORKAROUND_CAVIUM_23144;
->  }
->  
->  static const struct gic_capabilities its_errata[] = {
-> @@ -1435,10 +1459,16 @@ static const struct gic_capabilities its_errata[] = {
->                 .desc   = "ITS: Cavium errata 22375, 24313",
->                 .iidr   = 0xa100034c,   /* ThunderX pass 1.x */
->                 .mask   = 0xffff0fff,
-> -               .init   = its_enable_cavium_thunderx,
-> -       },
-> -       {
-> -       }
-> +		.init	= its_enable_cavium_thunderx_22375,
-> +	},
-> +	{
-> +		.desc	= "ITS: Cavium errata 23144",
-> +		.iidr	= 0xa100034c,	/* ThunderX pass 1.x */
-> +		.mask	= 0xffff0fff,
-> +		.init	= its_enable_cavium_thunderx_23144,
-> +	},
-> +	{
-> +	}
->  };
->  
->  static void its_enable_quirks(struct its_node *its)
-> @@ -1456,6 +1486,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
->  	u32 val;
->  	u64 baser, tmp;
->  	int err;
-> +	int numa_node;
->  
->  	err = of_address_to_resource(node, 0, &res);
->  	if (err) {
-> @@ -1463,6 +1494,9 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
->  		return -ENXIO;
->  	}
->  
-> +	/* get numa affinity of its node*/
-> +	numa_node = of_node_to_nid(node);
+> +Edge-triggered interrupts do not exhibit the same problem with
+> +preventing guest execution that level-triggered interrupts do.  One
+> +option is to not use HW bit at all, and inject edge-triggered interrupts
+> +from a physical device as pure virtual interrupts.  But that would
+> +potentially slow down handling of the interrupt in the guest, because a
+> +physical interrupt occurring in the middle of the guest ISR would
+> +preempt the guest for the host to handle the interrupt.  Additionally,
+> +if you configure the system to handle interrupts on a separate physical
+> +core from that running your VCPU, you still have to interrupt the VCPU
+> +to queue the pending state onto the LR, even though the guest won't use
+> +this information until the guest ISR completes.  Therefore, the HW
+> +bit should always be set for forwarded edge-triggered interrupts.  With
+> +the HW bit set, the virtual interrupt is injected and additional
+> +physical interrupts occurring before the guest deactivates the interrupt
+> +simply mark the state on the physical distributor as Pending+Active.  As
+> +soon as the guest deactivates the interrupt, the host takes another
+> +interrupt if and only if there was a physical interrupt between
+> +injecting the forwarded interrupt to the guest
+missing and?
+ the guest deactivating
+> +the interrupt.
 > +
->  	its_base = ioremap(res.start, resource_size(&res));
->  	if (!its_base) {
->  		pr_warn("%s: unable to map registers\n", node->full_name);
-> @@ -1498,6 +1532,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
->  	its->phys_base = res.start;
->  	its->msi_chip.of_node = node;
->  	its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
-> +	its->numa_node = numa_node;
->  
->  	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
->  	if (!its->cmd_base) {
+> +Consequently, whenever we schedule a VCPU with one or more LRs with the
+> +HW bit set, the interrupt must also be active on the physical
+> +distributor.
+> +
+> +
+> +Forwarded LPIs
+> +--------------
+> +LPIs, introduced in GICv3, are always edge-triggered and do not have an
+> +active state.  They become pending when a device signal them, and as
+> +soon as they are acked by the CPU, they are inactive again.
+> +
+> +It therefore doesn't make sense, and is not supported, to set the HW bit
+> +for physical LPIs that are forwarded to a VM as virtual interrupts,
+> +typically virtual SPIs.
+> +
+> +For LPIs, there is no other choice than to preempt the VCPU thread if
+> +necessary, and queue the pending state onto the LR.
+> +
+> +
+> +Putting It Together: The Architected Timer
+> +------------------------------------------
+> +The architected timer is a device that signals interrupts with level
+> +triggered semantics.  The timer hardware is directly accessed by VCPUs
+> +which program the timer to fire at some point in time.  Each VCPU on a
+> +system programs the timer to fire at different times, and therefore the
+> +hardware is multiplexed between multiple VCPUs.  This is implemented by
+> +context-switching the timer state along with each VCPU thread.
+> +
+> +However, this means that a scenario like the following is entirely
+> +possible, and in fact, typical:
+> +
+> +1.  KVM runs the VCPU
+> +2.  The guest programs the time to fire in T+100
+> +3.  The guest is idle and calls WFI (wait-for-interrupts)
+> +4.  The hardware traps to the host
+> +5.  KVM stores the timer state to memory and disables the hardware timer
+> +6.  KVM schedules a soft timer to fire in T+(100 - time since step 2)
+> +7.  KVM puts the VCPU thread to sleep (on a waitqueue)
+> +8.  The soft timer fires, waking up the VCPU thread
+> +9.  KVM reprograms the timer hardware with the VCPU's values
+> +10. KVM marks the timer interrupt as active on the physical distributor
+> +11. KVM injects a forwarded physical interrupt to the guest
+> +12. KVM runs the VCPU
+> +
+> +Notice that KVM injects a forwarded physical interrupt in step 11 without
+> +the corresponding interrupt having actually fired on the host.  That is
+> +exactly why we mark the timer interrupt as active in step 10, because
+> +the active state on the physical distributor is part of the state
+> +belonging to the timer hardware, which is context-switched along with
+> +the VCPU thread.
+> +
+> +If the guest does not idle because it is busy, flow looks like this
+> +instead:
+> +
+> +1.  KVM runs the VCPU
+> +2.  The guest programs the time to fire in T+100
+> +4.  At T+100 the timer fires and a physical IRQ causes the VM to exit
+> +5.  With interrupts disabled on the CPU, KVM looks at the timer state
+> +    and injects a forwarded physical interrupt because it concludes the
+> +    timer has expired.
+I don't get how we can trap without the virtual timer PPI handler being
+entered on host side. Please can you elaborate on this?
+
+Eric
+> +6.  KVM marks the timer interrupt as active on the physical distributor
+> +7.  KVM runs the VCPU
+> +
+> +Notice that again the forwarded physical interrupt is injected to the
+> +guest without having actually been handled on the host.  In this case it
+> +is because the physical interrupt is forwarded to the guest before KVM
+> +enables physical interrupts on the CPU after exiting the guest.
 > 
-
-The patch (minus the above comment about splitting it) looks sane, but
-obviously depends on the whole of_node_to_nid() discussion to happen,
-and I haven't followed that.
-
-Please CC me for further discussions on this matter.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
