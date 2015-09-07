@@ -1,32 +1,103 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 07 Sep 2015 13:32:10 +0200
-Subject: [PATCH v2 04/10] doc/bindings: Update PCIe devicetree binding
- documentation for LS2080A
-In-Reply-To: <1441349872-4560-5-git-send-email-bhupesh.sharma@freescale.com>
-References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
- <1441349872-4560-5-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <80094129.LHZFOe1ZPU@wuerfel>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Mon,  7 Sep 2015 17:01:09 +0530
+Subject: [PATCH-v2 1/3] mmc: sdhci-pxav3: Fix tabbing issue
+In-Reply-To: <1441625471-16315-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1441625471-16315-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1441625471-16315-2-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 September 2015 12:27:46 Bhupesh Sharma wrote:
-> @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
->  and thus inherits all the common properties defined in designware-pcie.txt.
->  
->  Required properties:
-> -- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie"
-> +- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie",
-> +  "fsl,ls2080a-pcie".
->  - reg: base addresses and lengths of the PCIe controller
->  - interrupts: A list of interrupt outputs of the controller. Must contain an
->    entry for each entry in the interrupt-names property.
-> 
+There were some coding style issues where spaces have been used instead
+of tabs, for example, in macro definitions, alignment of function
+declarations/definitions, etc...
 
-Are the two PCIe hosts mutually compatible? If they are, you should mandate
-one of the strings as the base model for identification, with the additional
-model being optional for identification of the specific SoC.
+This patch fixes all such occurrences in the code.
 
-It would also be good to add a string with the specific version number of the
-designware PCIe block that is being used there.
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+---
+ drivers/mmc/host/sdhci-pxav3.c | 46 +++++++++++++++++++++---------------------
+ 1 file changed, 23 insertions(+), 23 deletions(-)
 
-	Arnd
+diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+index 946d37f..7a07177 100644
+--- a/drivers/mmc/host/sdhci-pxav3.c
++++ b/drivers/mmc/host/sdhci-pxav3.c
+@@ -39,24 +39,24 @@
+ #include "sdhci.h"
+ #include "sdhci-pltfm.h"
+ 
+-#define PXAV3_RPM_DELAY_MS     50
++#define PXAV3_RPM_DELAY_MS		50
+ 
+-#define SD_CLOCK_BURST_SIZE_SETUP		0x10A
+-#define SDCLK_SEL	0x100
+-#define SDCLK_DELAY_SHIFT	9
+-#define SDCLK_DELAY_MASK	0x1f
++#define SD_CLOCK_BURST_SIZE_SETUP	0x10A
++#define SDCLK_SEL			0x100
++#define  SDCLK_DELAY_SHIFT		9
++#define  SDCLK_DELAY_MASK		0x1f
+ 
+-#define SD_CFG_FIFO_PARAM       0x100
+-#define SDCFG_GEN_PAD_CLK_ON	(1<<6)
+-#define SDCFG_GEN_PAD_CLK_CNT_MASK	0xFF
+-#define SDCFG_GEN_PAD_CLK_CNT_SHIFT	24
++#define SD_CFG_FIFO_PARAM		0x100
++#define  SDCFG_GEN_PAD_CLK_ON		(1<<6)
++#define  SDCFG_GEN_PAD_CLK_CNT_MASK	0xFF
++#define  SDCFG_GEN_PAD_CLK_CNT_SHIFT	24
+ 
+-#define SD_SPI_MODE          0x108
+-#define SD_CE_ATA_1          0x10C
++#define SD_SPI_MODE			0x108
++#define SD_CE_ATA_1			0x10C
+ 
+-#define SD_CE_ATA_2          0x10E
+-#define SDCE_MISC_INT		(1<<2)
+-#define SDCE_MISC_INT_EN	(1<<1)
++#define SD_CE_ATA_2			0x10E
++#define  SDCE_MISC_INT			(1<<2)
++#define  SDCE_MISC_INT_EN		(1<<1)
+ 
+ struct sdhci_pxa {
+ 	struct clk *clk_core;
+@@ -284,7 +284,7 @@ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+ 	 * FE-2946959
+ 	 */
+ 	if (pxa->sdio3_conf_reg) {
+-		u8 reg_val  = readb(pxa->sdio3_conf_reg);
++		u8 reg_val = readb(pxa->sdio3_conf_reg);
+ 
+ 		if (uhs == MMC_TIMING_UHS_SDR50 ||
+ 		    uhs == MMC_TIMING_UHS_DDR50) {
+@@ -304,20 +304,20 @@ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+ }
+ 
+ static const struct sdhci_ops pxav3_sdhci_ops = {
+-	.set_clock = sdhci_set_clock,
+-	.platform_send_init_74_clocks = pxav3_gen_init_74_clocks,
+-	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+-	.set_bus_width = sdhci_set_bus_width,
+-	.reset = pxav3_reset,
+-	.set_uhs_signaling = pxav3_set_uhs_signaling,
++	.set_clock			= sdhci_set_clock,
++	.platform_send_init_74_clocks	= pxav3_gen_init_74_clocks,
++	.get_max_clock			= sdhci_pltfm_clk_get_max_clock,
++	.set_bus_width			= sdhci_set_bus_width,
++	.reset				= pxav3_reset,
++	.set_uhs_signaling		= pxav3_set_uhs_signaling,
+ };
+ 
+ static struct sdhci_pltfm_data sdhci_pxav3_pdata = {
+-	.quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
++	.quirks	= SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
+ 		| SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC
+ 		| SDHCI_QUIRK_32BIT_ADMA_SIZE
+ 		| SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+-	.ops = &pxav3_sdhci_ops,
++	.ops	= &pxav3_sdhci_ops,
+ };
+ 
+ #ifdef CONFIG_OF
+-- 
+1.9.1
