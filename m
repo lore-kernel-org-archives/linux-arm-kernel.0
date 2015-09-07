@@ -1,67 +1,37 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 7 Sep 2015 09:45:42 +0100
-Subject: [PATCH 01/11] ARM64 / PCI: introduce struct pci_controller for
- ACPI
-In-Reply-To: <CAFpQJXUU4mVbJSyfQJJm_VjR_uAm-xKHP7syYaM_xuC+CG7q5w@mail.gmail.com>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-2-git-send-email-hanjun.guo@linaro.org>
- <20150526165844.GD2175@e106497-lin.cambridge.arm.com>
- <5564AB68.6080502@linux.intel.com> <55657EA3.5000601@linaro.org>
- <CAFpQJXUU4mVbJSyfQJJm_VjR_uAm-xKHP7syYaM_xuC+CG7q5w@mail.gmail.com>
-Message-ID: <20150907084542.GA29293@red-moon>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon, 07 Sep 2015 10:49:00 +0200
+Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Enable DW USB2 support and
+ rockchip phy
+In-Reply-To: <55ED433A.5000907@samsung.com>
+References: <1441570566-14001-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1441609832.8778.4.camel@collabora.co.uk> <55ED3BC5.8050603@samsung.com>
+ <1447076.WCyUA0P2ql@diego> <55ED433A.5000907@samsung.com>
+Message-ID: <1441615740.8778.15.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 07, 2015 at 05:14:22AM +0100, Ganapatrao Kulkarni wrote:
-> Hi Hanjun,
+On Mon, 2015-09-07 at 16:56 +0900, Krzysztof Kozlowski wrote:
+> On 07.09.2015 16:53, Heiko St?bner wrote:
+> > Am Montag, 7. September 2015, 16:24:53 schrieb Krzysztof Kozlowski:
+> > I guess the easiest option would be to just drop the dwc2 from
+> > here, only 
+> > keeping the phy enablement and let everything (Marek's and Sjoerd's
+> > patch) 
+> > come together in the armsoc defconfig branch? As the rest of both
+> > patches don't 
+> > seem to touch common areas, they should be easily mergable from
+> > different trees 
+> > as well.
 > 
-> On Wed, May 27, 2015 at 1:51 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > Hi Liviu,
-> >
-> > On 2015???05???27??? 01:20, Jiang Liu wrote:
-> >>
-> >> On 2015/5/27 0:58, Liviu Dudau wrote:
-> >>>
-> >>> On Tue, May 26, 2015 at 01:49:14PM +0100, Hanjun Guo wrote:
-> >>>>
-> >>>> ARM64 ACPI based PCI host bridge init needs a arch dependent
-> >>>> struct pci_controller to accommodate common PCI host bridge
-> >>>> code which is introduced later, or it will lead to compile
-> >>>> errors on ARM64.
-> >>>
-> >>>
-> >>> Hi Hanjun,
-> >>>
-> >>> Two questions: why don't you introduce this patch next to the
-> >>> one that is going to make use of it (or even merge it there)?
-> >
-> >
-> > this is because of this patch is needed by Jiang Liu's patch set
-> > to fix the compile error on ARM64, I'd rather do that, but It's
-> > better to let Jiang Liu's patch goes in, and then this one, that's
-> > why I prepared a single patch for the struct. (I mentioned it
-> > in the cover letter)
-> >
-> >>> Second, why is the whole struct pci_controller not surrounded
-> >>> by #ifdef CONFIG_ACPI as you are implying that this is needed
-> >>> only for ACPI?
-> >
-> >
-> > I hope it can be reused, since the NUMA node and segment (domain)
-> > is both needed for DT and ACPI, if it's not the case foe now, I
-> > can surrounded them all by #ifdef CONFIG_ACPI.
-> we can make use of this structure to hold pci to numa node
-> mapping(pcibus_to_node).
-> can you please pull node member out of  CONFIG_ACPI ifdef.
-> or you can put only acpi_device under ifdef.
+> Yes, I agree. The config PHY_ROCKCHIP_USB does not depend on it
+> directly
+> so this should work fine.
 
-That struct disappeared in the latest series:
+Sounds good, I'll wait a bit longer for more feedback and then send a
+V2 with patch 4 adjusted to just enable the rockchip PHY.
 
-https://lkml.org/lkml/2015/6/8/443
+Thanks for the feedback!
 
-we have to have a common way to handle the NUMA info in DT and ACPI
-so we should still find a solution that can be shared between the two,
-it is yet another thing to take into account for PCI ACPI on arm64.
-
-Thanks,
-Lorenzo
+-- 
+Sjoerd Simons
+Collabora Ltd.
