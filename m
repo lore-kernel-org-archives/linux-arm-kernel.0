@@ -1,92 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Sep 2015 12:25:55 +0100
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <m3bnde5whx.fsf@t19.piap.pl>
-References: <m3bnde5whx.fsf@t19.piap.pl>
-Message-ID: <20150907112555.GS21084@n2100.arm.linux.org.uk>
+From: treding@nvidia.com (Thierry Reding)
+Date: Mon, 7 Sep 2015 13:27:38 +0200
+Subject: [PATCH 1/4] ARM: multi_v7_defconfig: Enable common Rockchip
+ devices/busses
+In-Reply-To: <55ED6910.8010202@osg.samsung.com>
+References: <1441570566-14001-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1441570566-14001-2-git-send-email-sjoerd.simons@collabora.co.uk>
+ <55ED585B.9030009@osg.samsung.com>
+ <1441621467.8778.26.camel@collabora.co.uk>
+ <55ED6910.8010202@osg.samsung.com>
+Message-ID: <20150907112736.GA15787@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 07, 2015 at 12:55:54PM +0200, Krzysztof Ha?asa wrote:
-> Hi,
+On Mon, Sep 07, 2015 at 12:38:08PM +0200, Javier Martinez Canillas wrote:
+> Hello Sjoerd,
 > 
-> I'd like to ask if the HDMI output on I.MX6-based boards is possible.
-> I'm unable to get it to work. What I'm trying to do is getting
-> a) DRM HDMI output, b) X.org output using etnaviv, libdrm-armada and
-> xf86-video-armada, c) GLX and Xvideo. Basically, latest versions.
+> On 09/07/2015 12:24 PM, Sjoerd Simons wrote:
+> > On Mon, 2015-09-07 at 11:26 +0200, Javier Martinez Canillas wrote:
+> >> Hello Sjoerd,
+> >>
+> >> On 09/06/2015 10:16 PM, Sjoerd Simons wrote:
+> >>> Enable Rockchip I2C, SPI, PWM, thermal drivers.
+> >>>
+> >>> Builtin are:
+> >>>  * I2C as it often controls the pmic.
+> >>
+> >> Having I2C as a module will cause more probe deferrals due missing
+> >> regulators and slow down the boot but it should not cause issues.
+> >> Or am I missing something?
+> >>
+> >> In fact, I think even the PMIC could be built as a module.
+> > 
+> > It could in principle. However as a lot of other drivers do need the
+> > regulators provided by the pmic, they'll be deferred until that driver
+> > is loaded. So e.g. with the i2c/pmic drivers as a module you cannot
+> > boot to an NFS rootfs without using an initramfs. 
+> >
 > 
-> I'm working with Gateworks Ventana GW54xx boards and with Sabre-lite,
-> using newly built imx6q-gw54xx.dtb and imx6q-sabrelite.dtb. In both
-> cases, required kernel modules are inserted and (somehow) initialized,
-> but the HDMI device isn't created.
-> 
-> The first problem seems to be this:
-> - dw_hdmi_imx_probe() is called (and does component_add()), but
-> - dw_hdmi_imx_bind() is never called.
-> 
-> Now if I enable LVDS (CONFIG_DRM_IMX_LDB - I don't have any LVDS
-> hardware connected), the HDMI device is created (as well as LVDS).
+> Right, not needing an initramfs is certainly a good reason. If you could
+> add something like that in the commit message of patches 1/4 and 2/4 that
+> would be great.
 
-Are you telling the kernel in your device tree file that LDB is required?
-DRM doesn't support hot-plugging outputs, all specified output modules
-must be present before DRM can bring up the display subsystem.
+I don't know. multi_v7_defconfig is primarily useful as a means to
+quickly get a configuration that has most drivers enabled that most ARM
+SoCs need. As such it's more of a convenience for build testing rather
+than using it for booting a device.
 
-> This used to detect the monitor as "unknown" but now it's "connected"
-> most of the time - not sure what have changed. EDID is empty and I get
-> the following entries in /sys/devices/soc0/display-subsystem/drm/card0:
+I don't think the focus should be on optimizing for boot speed. Rather
+if you do want to optimize for a device going through the trouble of
+setting up an initial ramdisk isn't all that complicated. Even more so
+because if you build drivers into the kernel and those drivers happen
+to require firmware then people will be required to setup initial
+ramdisks anyway.
 
-"used to" - when was this?  I don't think dw_hdmi has ever reported
-a connected status of "unknown", always explicitly stating connected
-or disconnected.
+Building too many drivers into the kernel has in the past often lead to
+problems where all of a sudden the kernel became too big to fit into any
+reasonably sized region of memory and cause all sorts of weird failures
+in boot farms. Building everything as modules has the advantage that the
+size of the zImage itself doesn't vary much, hence has less of a chance
+to break boot farms.
 
-> dev                                            226:0
-> card0-HDMI-A-1/edid                            (empty)
-> card0-HDMI-A-1/dpms                            On
-> card0-HDMI-A-1/modes
-> card0-HDMI-A-1/power/control                   auto
-> card0-HDMI-A-1/power/runtime_active_time       0
-> card0-HDMI-A-1/power/autosuspend_delay_ms      (Input/output error)
-> card0-HDMI-A-1/power/runtime_status            unsupported
-> card0-HDMI-A-1/power/runtime_suspended_time    0
-> card0-HDMI-A-1/enabled                         enabled
-> card0-HDMI-A-1/status                          used to be "unknown", now: "connected"
-> card0-HDMI-A-1/uevent                          power/control auto
+There are quite a few drivers in multi_v7_defconfig that I suspect could
+be built as loadable modules to decrease the size of the images that are
+currently generated.
 
-Looks fine apart from the lack of EDID.  Are you sure you have the
-pinctrl setup correct for this?  (We don't use the DDC I2C built
-into the HDMI interface.)
+I understand that not everybody likes the additional ramdisk but, in my
+opinion, that's what SoC-specific default configurations are good for.
+We can use those to provide a base for developers where the focus is
+ease of testability.
 
-> Now, somehow the X.org server sets the resolution to 1024x768, though
-> nothing is displayed on the monitor (it's in stand-by). Files in
-> /sys/.../card0-HDMI-A/ now have the actual EDID, mode list etc.
-
-By default, 1024x768 is selected when there's nothing else available.
-The DPMS "on" and enabled above tends to suggest you should be seeing
-output though.
-
-It's possible that having both LVDS and HDMI enabled causes a pixel
-clocking conflict if both are routed to the same CRTC and PLL.  (The
-clocking side of it is something I really hate, and the decision was
-taken to control this statically.)
-
-> This also causes:
-> imx-ipuv3 2400000.ipu: DC stop timeout after 50 ms
-> imx-ipuv3 2400000.ipu: Timeout waiting for DMFC FIFOs to clear
-
-I don't have an answer for that... that's deep internal IPU stuff.
-
-> What am I doing wrong?
-> - kernel command line? video=mxcfb0:dev=hdmi,1920x1080M at 60,if=RGB24
-> - wrong SDMA firmware? MD5 is:
->   5d4584134cc4cba62e1be2f382cd6f3a  /lib/firmware/imx/sdma/sdma-imx6q.bin
-> - wrong X.org stuff?
-
-Probably none of the above.
-
-I should point out that virtually every -rc kernel gets tested here on
-iMX6 with HDMI output - onto my Panasonic TV, and I've seen no evidence
-of any regressions.  For me, it Just Works(tm).
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150907/0a3e067b/attachment.sig>
