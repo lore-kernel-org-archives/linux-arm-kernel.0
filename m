@@ -1,207 +1,90 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue,  8 Sep 2015 14:18:23 +0800
-Subject: [PATCH v18 4/4] ARM: dts: add the support power-domain node on RK3288
- SoCs
-In-Reply-To: <1441693103-26712-1-git-send-email-wxt@rock-chips.com>
-References: <1441693103-26712-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1441693103-26712-5-git-send-email-wxt@rock-chips.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 08 Sep 2015 15:44:28 +0900
+Subject: [PATCH] arm64: kernel: Use a separate stack for irq interrupts.
+In-Reply-To: <55EE3DCB.40401@linaro.org>
+References: <55EDA040.90208@arm.com>
+ <1441636584-23174-1-git-send-email-james.morse@arm.com>
+ <400272B6-0733-456F-95C9-9C72C597CEB5@gmail.com> <55EDB5FB.8060800@arm.com>
+ <81D7F9F1-1552-4709-BA74-1BF15163C4A0@gmail.com> <55EE3DCB.40401@linaro.org>
+Message-ID: <55EE83CC.5060206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can add more domains node in the future.
-This patch add the needed clocks into power-controller.
-As the discuess about all the device clocks being listed in
-the power-domains itself.
+On 09/08/2015 10:45 AM, AKASHI Takahiro wrote:
+> Jungseok,
+>
+> On 09/08/2015 01:34 AM, Jungseok Lee wrote:
+>> On Sep 8, 2015, at 1:06 AM, James Morse wrote:
+>>> On 07/09/15 16:48, Jungseok Lee wrote:
+>>>> On Sep 7, 2015, at 11:36 PM, James Morse wrote:
+>>>>
+>>>> Hi James,
+>>>>
+>>>>> Having to handle interrupts on top of an existing kernel stack means the
+>>>>> kernel stack must be large enough to accomodate both the maximum kernel
+>>>>> usage, and the maximum irq handler usage. Switching to a different stack
+>>>>> when processing irqs allows us to make the stack size smaller.
+>>>>>
+>>>>> Maximum kernel stack usage (running ltp and generating usb+ethernet
+>>>>> interrupts) was 7256 bytes. With this patch, the same workload gives
+>>>>> a maximum stack usage of 5816 bytes.
+>>>>
+>>>> I'd like to know how to measure the max stack depth.
+>>>> AFAIK, a stack tracer on ftrace does not work well. Did you dump a stack
+>>>> region and find or track down an untouched region?
+>>>
+>>> I enabled the 'Trace max stack' option under menuconfig 'Kernel Hacking' ->
+>>> 'Tracers', then looked in debugfs:/tracing/stack_max_size.
+>>>
+>>> What problems did you encounter?
+>>> (I may be missing something?)
+>>
+>> When I enabled the feature, all entries had *0* size except the last entry.
+>> It can be reproduced easily as looking in debugs:/tracing/stack_trace.
+>
+> I'm afraid that you have not applied one of patches in my RFC:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355919.html
+>
+> I have not looked into James' patch in details, but hope that it will help
+> fix one of issues that are annoying me: Stack tracer (actually save_stack_trace())
+> will miss a function (and its parent function in some case) that is being executed
+> when an interrupt is taken.
 
-There are several reasons as follows:
+Well, it didn't fix the issue:
+# cat /sys/kernel/debug/tracing/stack_trace
+         Depth    Size   Location    (54 entries)
+         -----    ----   --------
+   0)     5096      16   irq_copy_thread_info+0x18/0x70
+   1)     5080     336   el1_irq+0x78/0x11c
 
-Firstly, the clocks need be turned off to save power when
-the system enter the suspend state. So we need to enumerate
-the clocks in the dts. In order to power domain can turn on and off.
+                                  <<<= _raw_spin_unlock_irqrestore
 
-Secondly, the reset-circuit should reset be synchronous on RK3288,
-then sync revoked. So we need to enable clocks of all devices.
-In other words, we have to enable the clocks before you operate them
-if all the device clocks are included in someone domians.
+   2)     4744      48   __skb_recv_datagram+0x148/0x49c
+   3)     4696     208   skb_recv_datagram+0x50/0x60
+   4)     4488      64   xs_udp_data_ready+0x48/0x170
+   5)     4424      96   sock_queue_rcv_skb+0x1fc/0x270
+  ...
+  53)      344     344   el0_svc_naked+0x20/0x28
 
-Thirdly, as the chip designs for PM hardhare. we need turn on the noc
-clocks, if we are operating the "pd_vio" domain to enter the idle status.
-The device's clock be included in domains that needed turn on if do that.
+__skb_recv_datagram+0x148 is "bl _raw_spin_unlock_irqrestore."
 
-The clocks in the dts are needed to enable before you want to happy work.
-At the moment, This patch is very good work for PM hardware.
+And the frames, #0 and #1, appear here because this patch replaces stack pointers
+*after* kernel_entry.
 
-Also, we can add these clocks in the future if we have some hidden clocks.
+-Takahiro AKASHI
 
-Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Reviewed-by: Michael Turquette <mturquette@baylibre.com>
-
----
-
-Changes in v18:
-- Change the index order in the dts on PATCH [4/4] .
-- Add some notes for domains in the dts on PATCH [4/4].
-
-Changes in v17:
-- remove clocks of the HDMI ctrl.
-- update the description.
-- add Reviewed-by: Michale.
-
-Changes in v16:
-- Manually copy the problem in patch v15.
-- rebase the description.
-
-Changes in v15:
-- As Tomasz remarked previously the dts should represent the hardware
-  and the power-domains are part of the pmu.
-
-Changes in v14:
-- Remove essential clocks from rk3288 PD_VIO domain, Some clocks are
-  essential for the system health and should not be turned down.
-  However there is no owner for them so if they listed as belonging to power
-  domain we'll try toggling them up and down during power domain transition.
-  As a result we either fail to suspend or resume the system.
-
-Changes in v13: None
-Changes in v12: None
-Changes in v11: None
-Changes in v10:
-- fix missing the #include <dt-bindings/power-domain/rk3288.h>.
-- remove the notes.
-
-Changes in v9:
-- add decription for power-doamin node.
-
-Changes in v8:
-- DTS go back to v2.
-
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-- Decomposition power-controller, changed to multiple controller
-  (gpu-power-controller, hevc-power-controller).
-
-Changes in v2:
-- make pd_vio clocks all one entry per line and alphabetize.
-- power: power-controller move back to pinctrl: pinctrl.
-
- arch/arm/boot/dts/rk3288.dtsi | 93 ++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 92 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 906e938..d7fa534 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -44,6 +44,7 @@
- #include <dt-bindings/pinctrl/rockchip.h>
- #include <dt-bindings/clock/rk3288-cru.h>
- #include <dt-bindings/thermal/thermal.h>
-+#include <dt-bindings/power-domain/rk3288.h>
- #include "skeleton.dtsi"
- 
- / {
-@@ -613,8 +614,98 @@
- 	};
- 
- 	pmu: power-management at ff730000 {
--		compatible = "rockchip,rk3288-pmu", "syscon";
-+		compatible = "rockchip,rk3288-pmu", "syscon", "simple-mfd";
- 		reg = <0xff730000 0x100>;
-+
-+		power: power-controller {
-+			compatible = "rockchip,rk3288-power-controller";
-+			#power-domain-cells = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/*
-+			 * Note: Although SCLK_* are the working clocks
-+			 * of device without including on the NOC, needed for
-+			 * synchronous reset.
-+			 *
-+			 * The clocks on the which NOC:
-+			 * ACLK_IEP/ACLK_VIP/ACLK_VOP0 are on ACLK_VIO0_NIU.
-+			 * ACLK_ISP/ACLK_VOP1 are on ACLK_VIO1_NIU.
-+			 * ACLK_RGA is on ACLK_RGA_NIU.
-+			 * The others (HCLK_*,PLCK_*) are on HCLK_VIO_NIU.
-+			 *
-+			 * Which clock are device clocks:
-+			 *	clocks		devices
-+			 *	*_IEP		IEP:Image Enhancement Processor
-+			 *	*_ISP		ISP:Image Signal Processing
-+			 *	*_VIP		VIP:Video Input Processor
-+			 *	*_VOP*		VOP:Visual Output Processor
-+			 *	*_RGA		RGA
-+			 *	*_EDP*		EDP
-+			 *	*_LVDS_*	LVDS
-+			 *	*_HDMI		HDMI
-+			 *	*_MIPI_*	MIPI
-+			 */
-+			pd_vio {
-+				reg = <RK3288_PD_VIO>;
-+				clocks = <&cru ACLK_IEP>,
-+					 <&cru ACLK_ISP>,
-+					 <&cru ACLK_RGA>,
-+					 <&cru ACLK_VIP>,
-+					 <&cru ACLK_VOP0>,
-+					 <&cru ACLK_VOP1>,
-+					 <&cru DCLK_VOP0>,
-+					 <&cru DCLK_VOP1>,
-+					 <&cru HCLK_IEP>,
-+					 <&cru HCLK_ISP>,
-+					 <&cru HCLK_RGA>,
-+					 <&cru HCLK_VIP>,
-+					 <&cru HCLK_VOP0>,
-+					 <&cru HCLK_VOP1>,
-+					 <&cru PCLK_EDP_CTRL>,
-+					 <&cru PCLK_HDMI_CTRL>,
-+					 <&cru PCLK_LVDS_PHY>,
-+					 <&cru PCLK_MIPI_CSI>,
-+					 <&cru PCLK_MIPI_DSI0>,
-+					 <&cru PCLK_MIPI_DSI1>,
-+					 <&cru SCLK_EDP_24M>,
-+					 <&cru SCLK_EDP>,
-+					 <&cru SCLK_ISP_JPE>,
-+					 <&cru SCLK_ISP>,
-+					 <&cru SCLK_RGA>;
-+			};
-+
-+			/*
-+			 * Note: The following 3 are HEVC(H.265) clocks,
-+			 * and on the ACLK_HEVC_NIU (NOC).
-+			 */
-+			pd_hevc {
-+				reg = <RK3288_PD_HEVC>;
-+				clocks = <&cru ACLK_HEVC>,
-+					 <&cru SCLK_HEVC_CABAC>,
-+					 <&cru SCLK_HEVC_CORE>;
-+			};
-+
-+			/*
-+			 * Note: ACLK_VCODEC/HCLK_VCODEC are VCODEC
-+			 * (video endecoder & decoder) clocks that on the
-+			 * ACLK_VCODEC_NIU and HCLK_VCODEC_NIU (NOC).
-+			 */
-+			pd_video {
-+				reg = <RK3288_PD_VIDEO>;
-+				clocks = <&cru ACLK_VCODEC>,
-+					 <&cru HCLK_VCODEC>;
-+			};
-+
-+			/*
-+			 * Note: ACLK_GPU is the GPU clock,
-+			 * and on the ACLK_GPU_NIU (NOC).
-+			 */
-+			pd_gpu {
-+				reg = <RK3288_PD_GPU>;
-+				clocks = <&cru ACLK_GPU>;
-+			};
-+		};
- 	};
- 
- 	sgrf: syscon at ff740000 {
--- 
-1.9.1
+>
+> -Takahiro AKASHI
+>
+>> You can track down my report and Akashi's changes with the following links:
+>> - http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354126.html
+>> - https://lkml.org/lkml/2015/7/13/29
+>>
+>> Although it is impossible to measure an exact depth at this moment, the feature
+>> could be utilized to check improvement.
+>>
+>> Cc'ing Akashi for additional comments if needed.
+>>
+>> Best Regards
+>> Jungseok Lee
+>>
