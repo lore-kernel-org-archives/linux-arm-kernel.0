@@ -1,69 +1,75 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Tue, 08 Sep 2015 09:59:11 +0200
-Subject: [PATCH v2] ARM: tegra: paz00: use con_id's to refer GPIO's
- ingpiod_lookup table
-In-Reply-To: <55ED5721.80508@gmail.com>
-References: <1435673759-11996-1-git-send-email-digetx@gmail.com>
- <55ED5721.80508@gmail.com>
-Message-ID: <3738507.JjVW9EvTJ3@fb07-iapwap2>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Sep 2015 09:03:17 +0100
+Subject: [PATCH] ARM: fix bug which lowmem size is limited to 760MB
+In-Reply-To: <alpine.LFD.2.20.1509072139050.22877@knanqh.ubzr>
+References: <20150903091044.GW21084@n2100.arm.linux.org.uk>
+ <1441276233-14566-1-git-send-email-ytk.lee@samsung.com>
+ <alpine.LFD.2.20.1509032106420.22877@knanqh.ubzr>
+ <1713935.2YV1sNJUyb@wuerfel>
+ <alpine.LFD.2.20.1509071152510.22877@knanqh.ubzr>
+ <20150908001042.GT21084@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.20.1509072139050.22877@knanqh.ubzr>
+Message-ID: <20150908080316.GU21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 7. September 2015, 12:21:37 schrieb Dmitry Osipenko:
-> 30.06.2015 17:15, Dmitry Osipenko ?????:
-> > Commit 72daceb9a10a ("net: rfkill: gpio: Add default GPIO driver mappings
-> > for ACPI") removed possibility to request GPIO by table index for non-ACPI
-> > platforms without changing it users. As result "shutdown" GPIO request
-> > will fail if request for "reset" GPIO succeeded or "reset" will be
-> > requested instead of "shutdown" if "reset" wasn't defined. Fix it by
-> > making gpiod_lookup_table use con_id's instead of indexes.
-> > 
-> > Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
-> > Fixes: 72daceb (net: rfkill: gpio: Add default GPIO driver mappings for
-> > ACPI) Cc: <stable@vger.kernel.org> # v3.19+
-> > Acked-by: Alexandre Courbot <acourbot@nvidia.com>
-> > ---
-> > 
-> > v2: s/GPIO_LOOKUP_IDX/GPIO_LOOKUP/, otherwise "shutdown" GPIO won't be
-> > requested> 
-> >   arch/arm/mach-tegra/board-paz00.c | 4 ++--
-> >   1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-tegra/board-paz00.c
-> > b/arch/arm/mach-tegra/board-paz00.c index fbe74c6..49d1110 100644
-> > --- a/arch/arm/mach-tegra/board-paz00.c
-> > +++ b/arch/arm/mach-tegra/board-paz00.c
-> > @@ -39,8 +39,8 @@ static struct platform_device wifi_rfkill_device = {
-> > 
-> >   static struct gpiod_lookup_table wifi_gpio_lookup = {
-> >   
-> >   	.dev_id = "rfkill_gpio",
-> >   	.table = {
-> > 
-> > -		GPIO_LOOKUP_IDX("tegra-gpio", 25, NULL, 0, 0),
-> > -		GPIO_LOOKUP_IDX("tegra-gpio", 85, NULL, 1, 0),
-> > +		GPIO_LOOKUP("tegra-gpio", 25, "reset", 0),
-> > +		GPIO_LOOKUP("tegra-gpio", 85, "shutdown", 0),
-> > 
-> >   		{ },
-> >   	
-> >   	},
-> >   
-> >   };
+On Mon, Sep 07, 2015 at 10:01:41PM -0400, Nicolas Pitre wrote:
+> On Tue, 8 Sep 2015, Russell King - ARM Linux wrote:
 > 
-> Ping
+> > On Mon, Sep 07, 2015 at 03:40:36PM -0400, Nicolas Pitre wrote:
+> > > On Mon, 7 Sep 2015, Arnd Bergmann wrote:
+> > > 
+> > > > On Thursday 03 September 2015 21:24:00 Nicolas Pitre wrote:
+> > > > > If 768MB targets were common place then it could be worth changing the 
+> > > > > default vmalloc size to accommodate this memory size and testing all the 
+> > > > > other targets to make sure no regressions are introduced.  But given it 
+> > > > > is easy to change the default via the kernel cmdline, and that you lose 
+> > > > > only 8 MB otherwise, I don't think it is worth the trouble and/or the 
+> > > > > risk.
+> > > > 
+> > > > Agreed.
+> > > 
+> > > Well... I think there is a better solution.
+> > 
+> > Doesn't this clash with things like:
+> > 
+> > #define UNCACHEABLE_ADDR        0xff000000      /* IRQ_STAT */
+> > 
+> > ?
+> 
+> It looks like the move might actually "fix" it.  That UNCACHEABLE_ADDR 
+> is mapped with:
+> 
+> static struct map_desc ebsa110_io_desc[] __initdata = {
+>         /*
+>          * sparse external-decode ISAIO space
+>          */
+>         {       /* IRQ_STAT/IRQ_MCLR */
+>                 .virtual        = (unsigned long)IRQ_STAT,
+>                 .pfn            = __phys_to_pfn(TRICK4_PHYS),
+>                 .length         = TRICK4_SIZE,
+>                 .type           = MT_DEVICE
+>         },
+> [...]
+> };
+> 
+> This is passed to iotable_init(), then to create_mapping(). There you 
+> have:
+> 
+>         if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
+>             md->virtual >= PAGE_OFFSET &&
+>             (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
+>                 pr_warn("BUG: mapping for 0x%08llx at 0x%08lx out of vmalloc space\n",
+>                         (long long)__pfn_to_phys((u64)md->pfn), md->virtual);
+>         }
+> 
+> So you must have hit the above warning somehow. Incidentally, this 
+> IRQ_STAT entry is the only one that happened to be outside the vmalloc 
+> area. By moving VMALLOC_END from 0xff000000 to 0xff800000 the warning 
+> will be gone.
 
-also 
+No, there are other legacy platforms which have mappings above that.
 
-Tested-by: Marc Dietrich <marvin24@gmx.de>
-
-I thing this should go through the tegra-soc tree. Thierry? Stephen?
-
-Marc
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150908/bb751e14/attachment.sig>
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
