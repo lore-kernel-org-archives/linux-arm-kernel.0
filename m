@@ -1,201 +1,51 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Tue,  8 Sep 2015 16:35:30 -0500
-Subject: [PATCH 10/11] regulator: qcom-smd: Add support for PMA8084
-In-Reply-To: <1441748131-26490-1-git-send-email-agross@codeaurora.org>
-References: <1441748131-26490-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1441748131-26490-12-git-send-email-agross@codeaurora.org>
+Date: Tue,  8 Sep 2015 16:40:39 -0500
+Subject: [PATCH] ARM: qcom_defconfig: Enable SMD-RPM regulators
+Message-ID: <1441748439-26639-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support and documentation for the PMA8084 regulators
-found on APQ8084 platforms.
+This patch enables all of the options required to support SMD RPM based
+regulators.
 
 Signed-off-by: Andy Gross <agross@codeaurora.org>
 ---
- .../bindings/soc/qcom/qcom,smd-rpm-regulator.txt   |   35 ++++++++
- drivers/regulator/qcom_smd-regulator.c             |   95 ++++++++++++++++++++
- 2 files changed, 130 insertions(+)
+ arch/arm/configs/qcom_defconfig |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
-index 5c867e9..a5f650f 100644
---- a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
-+++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
-@@ -19,6 +19,7 @@ Regulator nodes are identified by their compatible:
- 		    "qcom,rpm-pm8841-regulators"
- 		    "qcom,rpm-pm8941-regulators"
- 		    "qcom,rpm-pm8916-regulators"
-+		    "qcom,rpm-pma8084-regulators"
- 
- - vdd_s1-supply:
- - vdd_s2-supply:
-@@ -64,6 +65,35 @@ Regulator nodes are identified by their compatible:
- 	Definition: reference to regulator supplying the input pin, as
- 		    described in the data sheet
- 
-+- vdd_s1:
-+- vdd_s2:
-+- vdd_s3:
-+- vdd_s4:
-+- vdd_s5:
-+- vdd_s6:
-+- vdd_s7:
-+- vdd_s8:
-+- vdd_s9:
-+- vdd_s10:
-+- vdd_s11:
-+- vdd_s12:
-+- vdd_l1_l11:
-+- vdd_l2_l3_l4_l27:
-+- vdd_l5_l7:
-+- vdd_l6_l12_l14_l15_l26:
-+- vdd_l8:
-+- vdd_l9_l10_l13_l20_l23_l24:
-+- vdd_l16_l25:
-+- vdd_l17:
-+- vdd_l18:
-+- vdd_l19:
-+- vdd_l21:
-+- vdd_l22:
-+	Usage: optional (pma8084 only)
-+	Value type: <phandle>
-+	Definition: reference to regulator supplying the input pin, as
-+		    described in the data sheet
-+
- The regulator node houses sub-nodes for each regulator within the device. Each
- sub-node is identified using the node's name, with valid values listed for each
- of the pmics below.
-@@ -80,6 +110,11 @@ pm8916:
- 	s1, s2, s3, s4, l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13,
- 	l14, l15, l16, l17, l18
- 
-+pma8084:
-+	s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, l1, l2, l3, l4, l5,
-+	l6, l7, l8, l9, l10, l11, l12, l13, l14, l15, l16, l17, l18, l19, l20,
-+	l21, l22, l23, l24, l25, l26, l27, lvs1, lvs2, lvs3, lvs4, 5vs1
-+
- The content of each sub-node is defined by the standard binding for regulators -
- see regulator.txt.
- 
-diff --git a/drivers/regulator/qcom_smd-regulator.c b/drivers/regulator/qcom_smd-regulator.c
-index e92735f..f09d5b8 100644
---- a/drivers/regulator/qcom_smd-regulator.c
-+++ b/drivers/regulator/qcom_smd-regulator.c
-@@ -153,6 +153,49 @@ static const struct regulator_ops rpm_switch_ops = {
- 	.is_enabled = rpm_reg_is_enabled,
- };
- 
-+static const struct regulator_desc pma8084_hfsmps = {
-+	.linear_ranges = (struct regulator_linear_range[]) {
-+		REGULATOR_LINEAR_RANGE(375000,  0,  95, 12500),
-+		REGULATOR_LINEAR_RANGE(1550000, 96, 158, 25000),
-+	},
-+	.n_linear_ranges = 2,
-+	.n_voltages = 159,
-+	.ops = &rpm_smps_ldo_ops,
-+};
-+
-+static const struct regulator_desc pma8084_ftsmps = {
-+	.linear_ranges = (struct regulator_linear_range[]) {
-+		REGULATOR_LINEAR_RANGE(350000,  0, 184, 5000),
-+		REGULATOR_LINEAR_RANGE(700000, 185, 339, 10000),
-+	},
-+	.n_linear_ranges = 2,
-+	.n_voltages = 340,
-+	.ops = &rpm_smps_ldo_ops,
-+};
-+
-+static const struct regulator_desc pma8084_pldo = {
-+	.linear_ranges = (struct regulator_linear_range[]) {
-+		REGULATOR_LINEAR_RANGE(750000,  0,  30, 25000),
-+		REGULATOR_LINEAR_RANGE(1500000, 31, 99, 50000),
-+	},
-+	.n_linear_ranges = 2,
-+	.n_voltages = 100,
-+	.ops = &rpm_smps_ldo_ops,
-+};
-+
-+static const struct regulator_desc pma8084_nldo = {
-+	.linear_ranges = (struct regulator_linear_range[]) {
-+		REGULATOR_LINEAR_RANGE(750000, 0, 63, 12500),
-+	},
-+	.n_linear_ranges = 1,
-+	.n_voltages = 64,
-+	.ops = &rpm_smps_ldo_ops,
-+};
-+
-+static const struct regulator_desc pma8084_switch = {
-+	.ops = &rpm_switch_ops,
-+};
-+
- static const struct regulator_desc pm8x41_hfsmps = {
- 	.linear_ranges = (struct regulator_linear_range[]) {
- 		REGULATOR_LINEAR_RANGE( 375000,  0,  95, 12500),
-@@ -309,6 +352,57 @@ static const struct rpm_regulator_data rpm_pm8941_regulators[] = {
- 	{}
- };
- 
-+static const struct rpm_regulator_data rpm_pma8084_regulators[] = {
-+	{ "s1", QCOM_SMD_RPM_SMPA, 1, &pma8084_ftsmps, "vdd_s1" },
-+	{ "s2", QCOM_SMD_RPM_SMPA, 2, &pma8084_ftsmps, "vdd_s2" },
-+	{ "s3", QCOM_SMD_RPM_SMPA, 3, &pma8084_hfsmps, "vdd_s3" },
-+	{ "s4", QCOM_SMD_RPM_SMPA, 4, &pma8084_hfsmps, "vdd_s4" },
-+	{ "s5", QCOM_SMD_RPM_SMPA, 5, &pma8084_hfsmps, "vdd_s5" },
-+	{ "s6", QCOM_SMD_RPM_SMPA, 6, &pma8084_ftsmps, "vdd_s6" },
-+	{ "s7", QCOM_SMD_RPM_SMPA, 7, &pma8084_ftsmps, "vdd_s7" },
-+	{ "s8", QCOM_SMD_RPM_SMPA, 8, &pma8084_ftsmps, "vdd_s8" },
-+	{ "s9", QCOM_SMD_RPM_SMPA, 9, &pma8084_ftsmps, "vdd_s9" },
-+	{ "s10", QCOM_SMD_RPM_SMPA, 10, &pma8084_ftsmps, "vdd_s10" },
-+	{ "s11", QCOM_SMD_RPM_SMPA, 11, &pma8084_ftsmps, "vdd_s11" },
-+	{ "s12", QCOM_SMD_RPM_SMPA, 12, &pma8084_ftsmps, "vdd_s12" },
-+
-+	{ "l1", QCOM_SMD_RPM_LDOA, 1, &pma8084_nldo, "vdd_l1_l11" },
-+	{ "l2", QCOM_SMD_RPM_LDOA, 2, &pma8084_nldo, "vdd_l2_l3_l4_l27" },
-+	{ "l3", QCOM_SMD_RPM_LDOA, 3, &pma8084_nldo, "vdd_l2_l3_l4_l27" },
-+	{ "l4", QCOM_SMD_RPM_LDOA, 4, &pma8084_nldo, "vdd_l2_l3_l4_l27" },
-+	{ "l5", QCOM_SMD_RPM_LDOA, 5, &pma8084_pldo, "vdd_l5_l7" },
-+	{ "l6", QCOM_SMD_RPM_LDOA, 6, &pma8084_pldo, "vdd_l6_l12_l14_l15_l26" },
-+	{ "l7", QCOM_SMD_RPM_LDOA, 7, &pma8084_pldo, "vdd_l5_l7" },
-+	{ "l8", QCOM_SMD_RPM_LDOA, 8, &pma8084_pldo, "vdd_l8" },
-+	{ "l9", QCOM_SMD_RPM_LDOA, 9, &pma8084_pldo, "vdd_l9_l10_l13_l20_l23_l24" },
-+	{ "l10", QCOM_SMD_RPM_LDOA, 10, &pma8084_pldo, "vdd_l9_l10_l13_l20_l23_l24" },
-+	{ "l11", QCOM_SMD_RPM_LDOA, 11, &pma8084_nldo, "vdd_l1_l11" },
-+	{ "l12", QCOM_SMD_RPM_LDOA, 12, &pma8084_pldo, "vdd_l6_l12_l14_l15_l26" },
-+	{ "l13", QCOM_SMD_RPM_LDOA, 13, &pma8084_pldo, "vdd_l9_l10_l13_l20_l23_l24" },
-+	{ "l14", QCOM_SMD_RPM_LDOA, 14, &pma8084_pldo, "vdd_l6_l12_l14_l15_l26" },
-+	{ "l15", QCOM_SMD_RPM_LDOA, 15, &pma8084_pldo, "vdd_l6_l12_l14_l15_l26" },
-+	{ "l16", QCOM_SMD_RPM_LDOA, 16, &pma8084_pldo, "vdd_l16_l25" },
-+	{ "l17", QCOM_SMD_RPM_LDOA, 17, &pma8084_pldo, "vdd_l17" },
-+	{ "l18", QCOM_SMD_RPM_LDOA, 18, &pma8084_pldo, "vdd_l18" },
-+	{ "l19", QCOM_SMD_RPM_LDOA, 19, &pma8084_pldo, "vdd_l19" },
-+	{ "l20", QCOM_SMD_RPM_LDOA, 20, &pma8084_pldo, "vdd_l9_l10_l13_l20_l23_l24" },
-+	{ "l21", QCOM_SMD_RPM_LDOA, 21, &pma8084_pldo, "vdd_l21" },
-+	{ "l22", QCOM_SMD_RPM_LDOA, 22, &pma8084_pldo, "vdd_l22" },
-+	{ "l23", QCOM_SMD_RPM_LDOA, 23, &pma8084_pldo, "vdd_l9_l10_l13_l20_l23_l24" },
-+	{ "l24", QCOM_SMD_RPM_LDOA, 24, &pma8084_pldo, "vdd_l9_l10_l13_l20_l23_l24" },
-+	{ "l25", QCOM_SMD_RPM_LDOA, 25, &pma8084_pldo, "vdd_l16_l25" },
-+	{ "l26", QCOM_SMD_RPM_LDOA, 26, &pma8084_pldo, "vdd_l6_l12_l14_l15_l26" },
-+	{ "l27", QCOM_SMD_RPM_LDOA, 27, &pma8084_nldo, "vdd_l2_l3_l4_l27" },
-+
-+	{ "lvs1", QCOM_SMD_RPM_VSA, 1, &pma8084_switch },
-+	{ "lvs2", QCOM_SMD_RPM_VSA, 2, &pma8084_switch },
-+	{ "lvs3", QCOM_SMD_RPM_VSA, 3, &pma8084_switch },
-+	{ "lvs4", QCOM_SMD_RPM_VSA, 4, &pma8084_switch },
-+	{ "5vs1", QCOM_SMD_RPM_VSA, 5, &pma8084_switch },
-+
-+	{}
-+};
-+
- static const struct rpm_regulator_data rpm_pm8916_regulators[] = {
- 	{ "s1", QCOM_SMD_RPM_SMPA, 1, &pm8916_buck_lvo_smps, "vdd_s1" },
- 	{ "s2", QCOM_SMD_RPM_SMPA, 2, &pm8916_buck_lvo_smps, "vdd_s2" },
-@@ -339,6 +433,7 @@ static const struct of_device_id rpm_of_match[] = {
- 	{ .compatible = "qcom,rpm-pm8841-regulators", .data = &rpm_pm8841_regulators },
- 	{ .compatible = "qcom,rpm-pm8941-regulators", .data = &rpm_pm8941_regulators },
- 	{ .compatible = "qcom,rpm-pm8916-regulators", .data = &rpm_pm8916_regulators },
-+	{ .compatible = "qcom,rpm-pma8084-regulators", .data = &rpm_pma8084_regulators },
- 	{}
- };
- MODULE_DEVICE_TABLE(of, rpm_of_match);
+diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+index ff7985b..ee54a70 100644
+--- a/arch/arm/configs/qcom_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -109,6 +109,7 @@ CONFIG_MFD_QCOM_RPM=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_QCOM_RPM=y
++CONFIG_REGULATOR_QCOM_SMD_RPM=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_FB=y
+ CONFIG_SOUND=y
+@@ -145,16 +146,17 @@ CONFIG_MSM_GCC_8660=y
+ CONFIG_MSM_LCC_8960=y
+ CONFIG_MSM_MMCC_8960=y
+ CONFIG_MSM_MMCC_8974=y
+-CONFIG_MSM_IOMMU=y
++CONFIG_HWSPINLOCK_QCOM=y
+ CONFIG_QCOM_GSBI=y
+ CONFIG_QCOM_PM=y
++CONFIG_QCOM_SMD=y
++CONFIG_QCOM_SMD_RPM=y
++CONFIG_QCOM_SMEM=y
+ CONFIG_PHY_QCOM_APQ8064_SATA=y
+ CONFIG_PHY_QCOM_IPQ806X_SATA=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT3_FS=y
+-# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
+-CONFIG_EXT4_FS=y
+ CONFIG_FUSE_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
