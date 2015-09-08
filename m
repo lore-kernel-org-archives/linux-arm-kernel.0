@@ -1,28 +1,95 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 8 Sep 2015 10:40:53 +0530
-Subject: [PATCH v4 0/4] cpufreq-dt: add suspend frequency support
-In-Reply-To: <55EE6892.3010304@samsung.com>
-References: <1441640501-13613-1-git-send-email-b.zolnierkie@samsung.com>
- <20150908024659.GF26760@linux> <55EE5C79.2030604@samsung.com>
- <20150908042017.GJ26760@linux> <55EE6892.3010304@samsung.com>
-Message-ID: <20150908051053.GA18554@linux>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 8 Sep 2015 14:17:59 +0800
+Subject: [PATCH v7 1/5] dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
+In-Reply-To: <1441693083-8440-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1441693083-8440-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1441693083-8440-2-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08-09-15, 13:48, Krzysztof Kozlowski wrote:
-> Somehow my mind stuck on solving Exynos4x12 cpufreq issues.
-> 
-> Right, it should go through Rafael's, probably except DTS patch (4/4)
-> because it depends on previous DTS changes. These changes are still in
-> arm-soc, not in Linus' tree [0].
+add a DT binding documentation of usb3.0 phy for MT65xx
+SoCs from Mediatek.
 
-That's bad :(
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ .../devicetree/bindings/phy/phy-mt65xx-usb.txt     | 69 ++++++++++++++++++++++
+ 1 file changed, 69 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
 
-Anyway, 4/4 is kind of independent to this series, in the sense that
-it wouldn't harm even if it gets applied separately.
-
-So, go ahead and apply 4/4 to Samsung's tree and rest of this can be
-picked by Rafael.
-
+diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+new file mode 100644
+index 0000000..5812d20
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+@@ -0,0 +1,69 @@
++mt65xx USB3.0 PHY binding
++--------------------------
++
++This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
++
++Required properties (controller (parent) node):
++ - compatible	: should be "mediatek,mt8173-u3phy"
++ - reg		: offset and length of register for phy, exclude port's
++		  register.
++ - clocks	: a list of phandle + clock-specifier pairs, one for each
++		  entry in clock-names
++ - clock-names	: must contain
++		  "u3phya_ref": for reference clock of usb3.0 analog phy.
++
++Required nodes	: a sub-node is required for each port the controller
++		  provides. Address range information including the usual
++		  'reg' property is used inside these nodes to describe
++		  the controller's topology. These nodes are translated
++		  by the driver's .xlate() function.
++
++Required properties (port (child) node):
++- reg		: address and length of the register set for the port.
++- #phy-cells	: should be 1 (See second example)
++		  cell after port phandle is phy type from:
++			- PHY_TYPE_USB2
++			- PHY_TYPE_USB3
++
++Example:
++
++u3phy: usb-phy at 11290000 {
++	compatible = "mediatek,mt8173-u3phy";
++	reg = <0 0x11290000 0 0x800>;
++	clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
++	clock-names = "u3phya_ref";
++	#address-cells = <2>;
++	#size-cells = <2>;
++	ranges;
++	status = "okay";
++
++	phy_port0: port at 11290800 {
++		reg = <0 0x11290800 0 0x800>;
++		#phy-cells = <1>;
++		status = "okay";
++	};
++
++	phy_port1: port at 11291000 {
++		reg = <0 0x11291000 0 0x800>;
++		#phy-cells = <1>;
++		status = "okay";
++	};
++};
++
++Specifying phy control of devices
++---------------------------------
++
++Device nodes should specify the configuration required in their "phys"
++property, containing a phandle to the phy port node and a device type;
++phy-names for each port are optional.
++
++Example:
++
++#include <dt-bindings/phy/phy.h>
++
++usb30: usb at 11270000 {
++	...
++	phys = <&phy_port0 PHY_TYPE_USB3>;
++	phy-names = "usb3-0";
++	...
++};
 -- 
-viresh
+1.8.1.1.dirty
