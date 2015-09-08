@@ -1,83 +1,51 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 8 Sep 2015 12:30:52 -0700
-Subject: [PATCH 1/3] sysfs: Fix is_visible() support for binary attributes
-In-Reply-To: <20150908191002.GB10156@kroah.com>
-References: <1441714066-5599-1-git-send-email-emilio.lopez@collabora.co.uk>
- <1441714066-5599-2-git-send-email-emilio.lopez@collabora.co.uk>
- <20150908153013.GA6758@roeck-us.net>
- <20150908191002.GB10156@kroah.com>
-Message-ID: <20150908193052.GA11106@roeck-us.net>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Tue, 8 Sep 2015 21:36:01 +0200
+Subject: [PATCH 15/16] mtd: mtdcore: fix initcall level
+In-Reply-To: <55E91746.4060502@ahsoftware.de>
+References: <1440592108-3740-1-git-send-email-holler@ahsoftware.de>
+ <1440592108-3740-16-git-send-email-holler@ahsoftware.de>
+ <20150901211938.GJ81844@google.com> <55E68A72.30909@ahsoftware.de>
+ <55E91746.4060502@ahsoftware.de>
+Message-ID: <55EF38A1.2040201@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2015 at 12:10:02PM -0700, Greg KH wrote:
-> On Tue, Sep 08, 2015 at 08:30:13AM -0700, Guenter Roeck wrote:
-> > Emilio,
-> > 
-> > On Tue, Sep 08, 2015 at 09:07:44AM -0300, Emilio L?pez wrote:
-> > > According to the sysfs header file:
-> > > 
-> > >     "The returned value will replace static permissions defined in
-> > >      struct attribute or struct bin_attribute."
-> > > 
-> > > but this isn't the case, as is_visible is only called on
-> > > struct attribute only. This patch adds the code paths required
-> > > to support is_visible() on binary attributes.
-> > > 
-> > > Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
-> > > ---
-> > >  fs/sysfs/group.c | 22 ++++++++++++++++++----
-> > >  1 file changed, 18 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/fs/sysfs/group.c b/fs/sysfs/group.c
-> > > index 39a0199..eb6996a 100644
-> > > --- a/fs/sysfs/group.c
-> > > +++ b/fs/sysfs/group.c
-> > > @@ -37,10 +37,10 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
-> > >  {
-> > >  	struct attribute *const *attr;
-> > >  	struct bin_attribute *const *bin_attr;
-> > > -	int error = 0, i;
-> > > +	int error = 0, i = 0;
-> > >  
-> > >  	if (grp->attrs) {
-> > > -		for (i = 0, attr = grp->attrs; *attr && !error; i++, attr++) {
-> > > +		for (attr = grp->attrs; *attr && !error; i++, attr++) {
-> > >  			umode_t mode = (*attr)->mode;
-> > >  
-> > >  			/*
-> > > @@ -73,13 +73,27 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
-> > >  	}
-> > >  
-> > >  	if (grp->bin_attrs) {
-> > > -		for (bin_attr = grp->bin_attrs; *bin_attr; bin_attr++) {
-> > > +		for (bin_attr = grp->bin_attrs; *bin_attr; i++, bin_attr++) {
-> > > +			umode_t mode = (*bin_attr)->attr.mode;
-> > > +
-> > >  			if (update)
-> > >  				kernfs_remove_by_name(parent,
-> > >  						(*bin_attr)->attr.name);
-> > > +			if (grp->is_visible) {
-> > > +				mode = grp->is_visible(kobj,
-> > > +						       &(*bin_attr)->attr, i);
-> > 
-> > With this, if 'n' is the number of non-binary attributes,
-> > 
-> > for i < n:
-> > 	The index passed to is_visible points to a non-binary attribute.
-> > for i >= n:
-> > 	The index passed to is_visible points to the (index - n)th binary
-> > 	attribute.
-> > 
-> > Unless I am missing something, this is not explained anywhere, but it is
-> > not entirely trivial to understand. I think it should be documented.
-> 
-> I agree, make i the number of the bin attribute and that should solve
-> this issue.
-> 
-No, that would conflict with the "normal" use of is_visible for non-binary
-attributes, and make the index all but useless, since the is_visible function
-would have to search through all the attributes anyway to figure out which one
-is being checked.
+Am 04.09.2015 um 06:00 schrieb Alexander Holler:
+> Am 02.09.2015 um 07:34 schrieb Alexander Holler:
+>> Am 01.09.2015 um 23:19 schrieb Brian Norris:
+>>> Hi Alexander,
+>>>
+>>> No judgment here for the rest of this series, but for this patch:
+>>>
+>>> On Wed, Aug 26, 2015 at 02:28:27PM +0200, Alexander Holler wrote:
+>>>> The mtd-core has to be initialized before other dependent mtd-drivers,
+>>>> otherwise a crash might occur.
+>>>>
+>>>> Currently mtd_init() is called in the initcall-level device, which is
+>>>> the
+>>>> same level where most mtd-drivers will end up. By luck this seemed to
+>>>> have
+>>>> been called most of the time before other mtd-drivers without having
+>>>> been
+>>>> explicitly enforced.
+>>>
+>>> I can't really speak for the original authors, but it does not appear to
+>>> be entirely "by luck." Link order was one of the de facto ways to get
+>>> this ordering (though it's not really a great one), and mtdcore was
+>>> always linked first within the drivers/mtd/ directory structure.
+>>>
+>>> But that's just background, I think this is worth fixing anyway. It
+>>> could, for instance, become a problem if drivers are located outside
+>>> drivers/mtd/; I see random board files in arch/ that register with MTD,
+>>> and I'm actually not sure how they have never tripped on this.
 
-Guenter
+As I've just had a look at my patches in order to clean up the patch for 
+parallel initialization (to post it here too):
+
+drivers/mtd/ofparts.c has the same problem. In order to let the 
+NAND-driver see the partitions defined in the DT I had to move this into 
+another initcall level (fs sync) too.
+
+Regards,
+
+Alexander Holler
