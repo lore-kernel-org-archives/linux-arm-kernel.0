@@ -1,65 +1,47 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Tue, 8 Sep 2015 17:00:05 -0600
-Subject: [PATCH v2 1/5] ACPI: add in a bad_madt_entry() function to
- eventually replace the macro
-In-Reply-To: <55EDADF5.5060008@arm.com>
-References: <1440022048-6285-1-git-send-email-al.stone@linaro.org>
- <1440022048-6285-2-git-send-email-al.stone@linaro.org>
- <55EDADF5.5060008@arm.com>
-Message-ID: <55EF6875.9000404@redhat.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 08 Sep 2015 16:13:41 -0700
+Subject: [PATCH] ARM: dt: bcm2835: set mmc clock to the correct value of
+ 250MHz
+In-Reply-To: <1441362818-4323-1-git-send-email-kernel@martin.sperl.org>
+References: <1441362818-4323-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87k2s0wllm.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2015 09:32 AM, Sudeep Holla wrote:
-> Hi Al,
-> 
-> On 19/08/15 23:07, Al Stone wrote:
-> 
-> I finally got a chance to try this series on Juno. Well it exposed a firmware
-> bug in MADT table :)
+kernel at martin.sperl.org writes:
 
-What?  The code did what it was supposed to do :-)?  Very cool.  Good to know.
+> From: Martin Sperl <kernel@martin.sperl.org>
+>
+> This patch sets the clock speed to 250MHz to make the SD card
+> work at the correct clock speed without overclocking by 2.5.
+>
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> ---
+>  arch/arm/boot/dts/bcm2835.dtsi |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> Analysis with a logic-analyzer found that the current setting
+> of the mmc clock at 100MHz is wrong and results in overclocking
+> the SD-card and eMMC on the Compute Module.
+>
+> Exact measurements show that when 25Mhz are selected by the sdhci
+> driver effectively 62.5MHz are used (so 2.5 times faster), which is
+> what is expected when the clock is configured to a fixed 100MHz
+> instead of the 250MHz that the clock is actually running at.
 
-I talked to Graeme a bit, too, and he had some good suggestions for clean up.
-I'll post a v3 tomorrow.
+Looks like this became the default in the firmware in November 2013 (you
+can, of course, still do lots of configuration that would change it
+higher or lower).
 
-> [..]
-> 
->>                  acpi_tbl_entry_handler handler,
->> @@ -245,6 +484,8 @@ acpi_parse_entries(char *id, unsigned long table_size,
->>                 table_end) {
->>                  if (entry->type == entry_id
->>                      && (!max_entries || count < max_entries)) {
->> +                       if (bad_madt_entry(table_header, entry))
->> +                               return -EINVAL;
-> 
-> Not sure if we can have the above check here unconditionally.
-> Currently I can see there are 2 other users of acpi_parse_entries i.e.
-> PCC and NUMA. So may be it can be made conditional or return success for
-> non-MADT tables from bad_madt_entry ?
+I don't know what the downside would be of running MMC with too large of
+a divisor for devices running pre-November firmware.  I suspect we
+should just wait until the new clock driver lands, to avoid any
+backwards-compatibility issues.  Sorry for the trouble :(
 
-I'll double check these uses.  I thought I had before, and based on what I
-saw the check would be reasonable.  It never hurts to check again, though.
-
-> Other than that, you can add for ARM64 specific parts:
-> Reviewed-and-tested-by: Sudeep Holla <sudeep.holla@arm.com>
-
-Thanks!
-
-> Regards,
-> Sudeep
-> -- 
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150908/1295eb54/attachment.sig>
