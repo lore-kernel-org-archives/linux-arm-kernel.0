@@ -1,42 +1,45 @@
-From: songjun.wu@atmel.com (Wu, Songjun)
-Date: Tue, 8 Sep 2015 17:36:13 +0800
-Subject: [PATCH 2/2] ASoC: atmel-classd: DT binding for Class D audio
- amplifier driver
-In-Reply-To: <20150907162548.GW5313@sirena.org.uk>
-References: <1441086101-15303-1-git-send-email-songjun.wu@atmel.com>
- <1441086101-15303-3-git-send-email-songjun.wu@atmel.com>
- <20150903114316.GV12027@sirena.org.uk> <55EC0AFE.3080809@atmel.com>
- <20150907162548.GW5313@sirena.org.uk>
-Message-ID: <55EEAC0D.7010003@atmel.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 8 Sep 2015 15:06:14 +0530
+Subject: [PATCH] ARM: omap2plus_defconfig: make PCF857x built-in
+In-Reply-To: <1438782229-25118-1-git-send-email-kishon@ti.com>
+References: <1438782229-25118-1-git-send-email-kishon@ti.com>
+Message-ID: <55EEAC0E.3070404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
+On Wednesday 05 August 2015 07:13 PM, Kishon Vijay Abraham I wrote:
+> One of the lines from PCF857x is connected to the vdd line of MMC1
+> in DRA74x and DRA72x EVMs and is modelled as a regulator. If PCF857x
+> is not made as built-in, the regulator_get in omap_hsmmc fails making
+> it difficult to use MMC1 as rootfs.
+> 
+> Make PCF857x built-in.
 
-On 9/8/2015 00:25, Mark Brown wrote:
-> On Sun, Sep 06, 2015 at 05:44:30PM +0800, Wu, Songjun wrote:
->> On 9/3/2015 19:43, Mark Brown wrote:
->
->>> Why is this a separate DT node?  It seems that this IP is entirely self
->>> contained so I'm not clear why we need a separate node for the card, the
->>> card is usually a separate node because it ties together multiple
->>> different devices in the system but that's not the case here.
->
->> The classD can finish the audio function without other devices.
->> But I want to reuse the code in ASoC, leave many things(like creating PCM,
->> DMA operations) to ASoC, then the driver can only focus on how to configure
->> classD.
->> The classD IP is divided to tree parts logically, platform, CPU dai,
->> and codec, and these parts are registered to ASoC.
->
->> This separate DT node is needed in ASoC, ties these tree parts in ClassD.
->
-> Sure, there's no problem at all having that structure in software but it
-> should be possible to do this without having to represent this structure
-> in DT.  It should be possible to register the card at the same time as
-> the rest of the components rather than needing the separate device in
-> the DT.
->
-Do you mean using a single entry in the DT for the whole classD system 
-and instantiate ASoC components from it.
-For now, there are two entry, they could be combined to one entry.
+Can this be picked for 4.3?
+
+Thanks
+Kishon
+
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+>  arch/arm/configs/omap2plus_defconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index ac521e7..7cedfe9 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -236,7 +236,7 @@ CONFIG_SSI_PROTOCOL=m
+>  CONFIG_PINCTRL_SINGLE=y
+>  CONFIG_DEBUG_GPIO=y
+>  CONFIG_GPIO_SYSFS=y
+> -CONFIG_GPIO_PCF857X=m
+> +CONFIG_GPIO_PCF857X=y
+>  CONFIG_GPIO_TWL4030=y
+>  CONFIG_GPIO_PALMAS=y
+>  CONFIG_W1=m
+> 
