@@ -1,41 +1,33 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 08 Sep 2015 21:19:45 +0800
-Subject: [PATCH 0/5] ACPI probing infrastructure
-In-Reply-To: <1441386412-8139-1-git-send-email-marc.zyngier@arm.com>
-References: <1441386412-8139-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <55EEE071.7040506@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 8 Sep 2015 15:21:05 +0200
+Subject: [PATCH] arm: Handle starting up in secure mode
+In-Reply-To: <20150826103940.GD6281@e103592.cambridge.arm.com>
+References: <1440424572-27116-1-git-send-email-cov@codeaurora.org>
+ <20150826103940.GD6281@e103592.cambridge.arm.com>
+Message-ID: <CACRpkda1mD1SO25NL=K-SqOUAtXGj=X+v6oaOSbSVJEdfAXZ0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Wed, Aug 26, 2015 at 12:39 PM, Dave Martin <Dave.Martin@arm.com> wrote:
 
-Sorry for the late response for quite a while...
+> Shouldn't the bootloader or firmware be doing this stuff, and if not,
+> why not?
 
-On 09/05/2015 01:06 AM, Marc Zyngier wrote:
-> IRQ controllers and timers are the two types of device the kernel
-> requires before being able to use the device driver model.
->
-> ACPI so far lacks a proper probing infrastructure similar to the one
-> we have with DT, where we're able to declare IRQ chips and
-> clocksources inside the driver code, and let the core code pick it up
-> and call us back on a match. This leads to all kind of really ugly
-> hacks all over the arm64 code and even in the ACPI layer.
->
-> It turns out that providing such a probing infrastructure is rather
-> easy, and provides a much deserved cleanup in both the arch code, the
-> GIC driver, and the architected timer driver.
->
-> I'm sure there is some more code to be deleted, and one can only
-> wonder why this wasn't done before the arm64 code was initially merged
-> (the diffstat says it all...).
->
-> Patches are against v4.2, and a branch is available at
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git acpi/device-probing
+Firmware yes, bootloader no, or maybe.
 
-Great thanks to cleanup these stuff, I will test
-this patch set and review it, will get back to you
-if I get anything.
+Bootloaders IMO loads in images, checksum, even public key check or
+whatever, then sets up the basics and boot them.
 
-Thanks
-Hanjun
+Some hacks in U-Boot install PSCI handlers. It is neat, but a hack:
+a piece of code is compiled to a special offset and copied there
+by U-Boot to install the PSCI handlers. I would be fine if that software
+was not compiled as part of U-Boot, but another binary loaded by it.
+
+This would be another such "neat hack" also leaving a minimal
+monitor behind IIUC.
+
+I see the simplicity it brings to compile a load of stuff into U-Boot,
+but eahhhhhhh...
+
+Yours,
+Linus Walleij
