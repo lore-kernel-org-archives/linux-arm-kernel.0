@@ -1,61 +1,88 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 8 Sep 2015 15:45:04 -0700
-Subject: [PATCH 10/11] regulator: qcom-smd: Add support for PMA8084
-In-Reply-To: <1441748131-26490-12-git-send-email-agross@codeaurora.org>
-References: <1441748131-26490-1-git-send-email-agross@codeaurora.org>
- <1441748131-26490-12-git-send-email-agross@codeaurora.org>
-Message-ID: <20150908224504.GA13472@usrtlx11787.corpusers.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 09 Sep 2015 00:46:07 +0200
+Subject: set rockchip-specific uboot bootmode flags on reboot (was: [PATCH]
+ ARM: rockchip: add reboot notifier)
+In-Reply-To: <1441716187-29446-1-git-send-email-andy.yan@rock-chips.com>
+References: <1441716187-29446-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <9364768.6AeuYh3EEP@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 08 Sep 14:35 PDT 2015, Andy Gross wrote:
+Hi Andy,
 
-> This patch adds support and documentation for the PMA8084 regulators
-> found on APQ8084 platforms.
+Am Dienstag, 8. September 2015, 20:43:07 schrieb Andy Yan:
+> rockchip platform have a protocol to pass the the kernel
+> reboot mode to bootloader by some special registers when
+> system reboot.By this way the bootloader can take different
+> action according to the different kernel reboot mode, for
+> example, command "reboot loader" will reboot the board to
+> rockusb mode, this is a very convenient way to get the board
+> to download mode.
 > 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> ---
->  .../bindings/soc/qcom/qcom,smd-rpm-regulator.txt   |   35 ++++++++
->  drivers/regulator/qcom_smd-regulator.c             |   95 ++++++++++++++++++++
->  2 files changed, 130 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
-[..]
-> +- vdd_s1:
-> +- vdd_s2:
-> +- vdd_s3:
-> +- vdd_s4:
-> +- vdd_s5:
-> +- vdd_s6:
-> +- vdd_s7:
-> +- vdd_s8:
-> +- vdd_s9:
-> +- vdd_s10:
-> +- vdd_s11:
-> +- vdd_s12:
-> +- vdd_l1_l11:
-> +- vdd_l2_l3_l4_l27:
-> +- vdd_l5_l7:
-> +- vdd_l6_l12_l14_l15_l26:
-> +- vdd_l8:
-> +- vdd_l9_l10_l13_l20_l23_l24:
-> +- vdd_l16_l25:
-> +- vdd_l17:
-> +- vdd_l18:
-> +- vdd_l19:
-> +- vdd_l21:
-> +- vdd_l22:
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
--supply
+[...]
 
-> +	Usage: optional (pma8084 only)
-> +	Value type: <phandle>
-> +	Definition: reference to regulator supplying the input pin, as
-> +		    described in the data sheet
+> @@ -0,0 +1,22 @@
+> +#ifndef __MACH_ROCKCHIP_LOADER_H
+> +#define __MACH_ROCKCHIP_LOADER_H
 > +
+> +/*high 24 bits is tag, low 8 bits is type*/
+> +#define SYS_LOADER_REBOOT_FLAG   0x5242C300
+> +
+> +enum {
+> +	BOOT_NORMAL = 0, /* normal boot */
+> +	BOOT_LOADER,     /* enter loader rockusb mode */
+> +	BOOT_MASKROM,    /* enter maskrom rockusb mode (not support now) */
+> +	BOOT_RECOVER,    /* enter recover */
+> +	BOOT_NORECOVER,  /* do not enter recover */
+> +	BOOT_SECONDOS,   /* boot second OS (not support now)*/
+> +	BOOT_WIPEDATA,   /* enter recover and wipe data. */
+> +	BOOT_WIPEALL,    /* enter recover and wipe all data. */
+> +	BOOT_CHECKIMG,   /* check firmware img with backup part*/
+> +	BOOT_FASTBOOT,   /* enter fast boot mode */
+> +	BOOT_SECUREBOOT_DISABLE,
+> +	BOOT_CHARGING,   /* enter charge mode */
+> +	BOOT_MAX         /* MAX VALID BOOT TYPE.*/
+> +};
+> +#endif
 
-Otherwise it looks good.
+These flags rely on code in the bootloader to actually handle the target 
+action. Nowadays this is uboot, but still a rockchip-specific fork. And we're 
+actively moving away from that, with the recent rk3288 addition to mainline 
+uboot. 
+
+So unless you convince uboot people that the _underlying special 
+functionality_ behind these flags should be part of uboot, I don't think this 
+is going to fly.
 
 
-Regards,
-Bjorn
+In a way this is similar to gpu kernel code talking to proprietary userspace 
+libs - these are also not eligible for the kernel. (meaning stuff like the 
+mali kernel driver not being allowed). 
+
+[...]
+
+> +static int rockchip_reboot_notify(struct notifier_block *this,
+> +				  unsigned long mode, void *cmd)
+> +{
+> +	u32 flag;
+> +
+> +	rockchip_get_reboot_flag(cmd, &flag);
+> +	regmap_write(regmap, flag_reg, flag);
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +static struct notifier_block rockchip_reboot_handler = {
+> +	.notifier_call = rockchip_reboot_notify,
+> +	.priority = 150,
+> +};
+
+the restart handlers are meant to really only restart the system, not to 
+execute some actions before the restart happens.
+
+See https://lkml.org/lkml/2015/6/3/707 for a similar case.
+
+
+Heiko
