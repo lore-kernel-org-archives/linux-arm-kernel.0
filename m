@@ -1,46 +1,34 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 8 Sep 2015 12:21:15 -0700
-Subject: [PATCH 5/9] clk: qcom: gcc-msm8960: add child devices support.
-In-Reply-To: <55ED311E.1070404@codeaurora.org>
-References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
- <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
- <20150811224902.GO2839@codeaurora.org>
- <55CB0B26.2020105@linaro.org> <55CC1CFE.7000005@codeaurora.org>
- <20150814004206.GU26614@codeaurora.org>
- <55CD5BD2.3070907@codeaurora.org> <55E660F6.3020007@codeaurora.org>
- <20150903172743.GE15099@codeaurora.org>
- <55ED311E.1070404@codeaurora.org>
-Message-ID: <20150908192115.GP15099@codeaurora.org>
+Date: Tue, 8 Sep 2015 12:22:57 -0700
+Subject: [PATCH 1/4] clk: bcm2835: Move under bcm/ with other Broadcom
+ SoC clk drivers.
+In-Reply-To: <20150907064838.GE4796@x1>
+References: <1441562263-19888-1-git-send-email-eric@anholt.net>
+ <1441562263-19888-2-git-send-email-eric@anholt.net>
+ <20150907064838.GE4796@x1>
+Message-ID: <20150908192257.GQ15099@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07, Rajendra Nayak wrote:
-> >
-> >Yeah this might happen though because we've assigned the of_node
-> >pointer to the tsens device before we register it on the platform
-> >bus. The other way to pass that data down from gcc to tsens would
-> >be to not have an of_node assigned to the tsens device, and check
-> >for that case in the tsens driver. If there isn't an of_node,
-> >then we look at the parent device's of_node to figure out which
-> >gcc it is (if this even matters) and parse DT properties.
+On 09/07, Lee Jones wrote:
+> On Sun, 06 Sep 2015, Eric Anholt wrote:
 > 
-> Parsing DT properties from parent (in the tsens driver) is fine, but
-> the nvmem apis still expect an of_node for the tsens device and hence
-> fail.
-
-So pass the parent device to the nvmem APIs? Or adjust the nvmem
-APIs to look for a parent of_node if there isn't an of_node for
-the device being passed? Or make the nvmem APIs work without
-using DT, and copy over the nvmem information from the gcc node
-to the virtual tsens child device?
-
+> > clk-bcm2835.c predates the drivers under bcm/, but all the new BCM
+> > drivers are going in there so let's follow them.
+> > 
+> > Signed-off-by: Eric Anholt <eric@anholt.net>
+> > ---
+> >  drivers/clk/Makefile          |  1 -
+> >  drivers/clk/bcm/Makefile      |  1 +
+> >  drivers/clk/bcm/clk-bcm2835.c | 60 +++++++++++++++++++++++++++++++++++++++++++
+> >  drivers/clk/clk-bcm2835.c     | 60 -------------------------------------------
 > 
-> Associating the of_node of the parent to the tsens device while being
-> probed ends up with the same issues of gcc ending up probing the device
-> and failing because tsens defers probe a couple times before a
-> successful probe.
+> You need to resubmit this with `git format-patch -M`.
 
-Yeah sounds like we shouldn't do it that way.
+You don't have to. It would have been nice if it was formatted
+with -M so that review is easier, but we can always apply the
+patch and then check the result to make sure things look the
+same.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
