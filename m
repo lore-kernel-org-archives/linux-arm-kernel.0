@@ -1,178 +1,61 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 8 Sep 2015 16:07:27 +0100
-Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
- ECAM) and ACPI code out of arch/x86/ directory
-In-Reply-To: <55ED6010.3020406@linaro.org>
-References: <20150526170817.GU1565@arm.com> <55657B02.5090805@linaro.org>
- <20150602133215.GC23650@red-moon> <55701A31.808@linaro.org>
- <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
- <557504A2.3060203@linaro.org> <20150608151443.GA16151@red-moon>
- <55E4340D.6050004@linaro.org> <55ED6010.3020406@linaro.org>
-Message-ID: <20150908150727.GF29293@red-moon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Sep 2015 08:13:52 -0700
+Subject: [PATCH] ARM: dts: keystone: use one to one address translations
+ under netcp
+In-Reply-To: <55E89CF8.4050700@ti.com>
+References: <1441139324-29296-1-git-send-email-w-kwok2@ti.com>
+ <55E61658.9010207@oracle.com>
+ <230CBA6E4B6B6B418E8730AC28E6FC7E04221776@DFLE11.ent.ti.com>
+ <55E71AB3.7070406@oracle.com> <20150903142645.GS4215@atomide.com>
+ <55E89CF8.4050700@ti.com>
+Message-ID: <20150908151351.GE4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
-
-On Mon, Sep 07, 2015 at 10:59:44AM +0100, Tomasz Nowicki wrote:
-> On 31.08.2015 13:01, Tomasz Nowicki wrote:
-> > On 08.06.2015 17:14, Lorenzo Pieralisi wrote:
-> >> On Mon, Jun 08, 2015 at 03:57:38AM +0100, Hanjun Guo wrote:
+* Murali Karicheri <m-karicheri2@ti.com> [150903 12:21]:
+> Tony,
+> On 09/03/2015 10:26 AM, Tony Lindgren wrote:
+> >* santosh shilimkar <santosh.shilimkar@oracle.com> [150902 08:55]:
 > >>
-> >> [...]
-> >>
-> >>>>>>>>> Why can't we make use of the ECAM implementation used by
-> >>>>>>>>> pci-host-generic
-> >>>>>>>>> and drivers/pci/access.c?
-> >>>>>>>>
-> >>>>>>>> We had that question when I had posted MMCFG patch set separately,
-> >>>>>>>> please see:
-> >>>>>>>> https://lkml.org/lkml/2015/3/11/492
-> >>>>>>>
-> >>>>>>> Yes, but the real question is, why do we need to have PCI config
-> >>>>>>> space
-> >>>>>>> up and running before a bus struct is even created ? I think the
-> >>>>>>> reason is
-> >>>>>>> the PCI configuration address space format (ACPI 6.0, Table 5-27,
-> >>>>>>> page
-> >>>>>>> 108):
-> >>>>>>>
-> >>>>>>> "PCI Configuration space addresses must be confined to devices on
-> >>>>>>> PCI Segment Group 0, bus 0. This restriction exists to accommodate
-> >>>>>>> access to fixed hardware prior to PCI bus enumeration".
-> >>>>>>>
-> >>>>>>> On HW reduced platforms I do not even think this is required at all,
-> >>>>>>> we have to look into this to avoid code duplication that might well
-> >>>>>>> turn out useless.
-> >>>>>>
-> >>>>>> This is only for the fixed hardware, which will be not available for
-> >>>>>> ARM64 (reduced hardware mode), but in Generic Hardware Programming
-> >>>>>> Model, we using OEM-provided ACPI Machine Language (AML) code to
-> >>>>>> access
-> >>>>>> generic hardware registers, this will be available for reduced
-> >>>>>> hardware
-> >>>>>> too.
-> >>>>>>
-> >>>>>> So in ACPI spec, it says: (ACPI 6.0 page 66, last paragraph)
-> >>>>>>
-> >>>>>> ACPI defines eight address spaces that may be accessed by generic
-> >>>>>> hardware implementations. These include:
-> >>>>>> * System I/O space
-> >>>>>> * System memory space
-> >>>>>> * PCI configuration space
-> >>>>>> * Embedded controller space
-> >>>>>> * System Management Bus (SMBus) space
-> >>>>>> * CMOS
-> >>>>>> * PCI BAR Target
-> >>>>>> * IPMI space
-> >>>>>>
-> >>>>>> So if any device using the PCI address space for control, such
-> >>>>>> as a system reset control device, its address space can be reside
-> >>>>>> in PCI configuration space (who can prevent a OEM do that crazy
-> >>>>>> thing? :) ), and it should be accessible before the PCI bus is
-> >>>>>> created.
-> >>>>>
-> >>>>> Us, by changing attitude and questioning features whose usefulness
-> >>>>> is questionable. I will look into this and raise the point, I am not
-> >>>>> thrilled by the idea of adding another set of PCI accessor functions
-> >>>>> and drivers because we have to access a register through PCI before
-> >>>>> enumerating the bus (and on arm64 this is totally useless since
-> >>>>> we are not meant to support fixed HW anyway). Maybe we can make acpica
-> >>>>> code use a "special" stub (ACPI specific, PCI configuration space
-> >>>>> address
-> >>>>> space has restrictions anyway), I have to review this set in its
-> >>>>> entirety to see how to do that (and I would kindly ask you to do
-> >>>>> it too, before saying it is not possible to implement it).
-> >>>>
-> >>>> I'm willing to do that, actually, if we don't need a mechanism to
-> >>>> access PCI config space before the bus is created, the code can be
-> >>>> simplified a lot.
-> >>>
-> >>> After more investigation on the spec and the ACPI core code, I'm
-> >>> still not convinced that accessing to PCI config space before PCI
-> >>> bus creating is impossible, also there is no enough ARM64 hardware
-> >>> to prove that too. But I think we can go in this way, reuse the
-> >>> ECAM implementation by pci-host-generic for now, and implement the PCI
-> >>> accessor functions before enumerating PCI bus when needed in the
-> >>> future, does it make sense?
-> >>
-> >> You mean we rewrite the patch to make sure we can use the PCI host
-> >> generic
-> >> driver with MCFG and we leave the acpica PCI config call empty stubs on
-> >> arm64 (as they are now) ?
-> >>
+> >>I suspected the same. I know back then we started with SERDES code
+> >>with NETCP but as you already know, its a separate block which
+> >>is needed for NIC card to work. Its more of phy and hence its
+> >>having different address space is not surprising.
 > >
-> > Hi Bjorn, Rafael,
-> >
-> > Lorenzo pointed out very important problem we are having with PCI config
-> > space access for ARM64. Please refer to the above discussion and add
-> > your 2 cents. Can we forget about accessing PCI config space (for
-> > Hardware Reduced profile) before PCI bus creation? If not, do you see a
-> > way to use drivers/pci/access.c accessors here, like acpica change? Any
-> > opinion is very appreciated.
-> >
+> >The point Santosh is making here though is that any drivers
+> >tinkering with registers belonging to a separate hardware block
+> >is a recipe for a long term maintenance nightmare with mysterious
 > 
-> Kindly remainder.
+> That is what we want to avoid as well. If I interpret your statement
+> correctly, you don't want SerDes driver update the register of say SGMII,
+> right? But we will have to based on the hardware design. So it can't be a
+> standalone device driver IMO and it has to be part of the respective
+> peripheral device driver.
 
-I think (but I am happy to be corrected) that the map_bus() hook
-(ie that's why struct pci_bus is required in eg pci_generic_config_write)
-is there to ensure that when the generic accessors are called
-a) we have a valid bus b) the host controllers implementing it
-has been initialized.
+If it's a separate target on the interconnect it should be a separate
+driver. Depending on the SoC version these targets can move around
+as we've seen.
 
-I had another look and I noticed you are trying to solve multiple
-things at once:
+> >bugs popping up as things are not clocked or powered properly
+> >or become racy with other drivers.
+> >
+> >Each hardware block needs to have it's own driver and then the
+> >drivers can communicate using some Linux generic APIs like clock,
+> >regulator, phy, or mailbox frameworks.
+> 
+> That depends on what your definition of a hardware block is. Inside NetCP,
+> there are many hardware blocks that work together to provide the NIC
+> functionality, and SerDes is one of them. Where ever possible, we have
+> separate drivers :- knav qmss, knav pkt dma, ethss, mdio etc. Ethss driver
+> manages Eth subsystem that includes SGMII and SerDes. Unfortunately SerDes
+> is tightly integrated with ethss and taking it out as a separate driver (Say
+> Phy) is not a good idea. We will posting an RFC for this soon and probably
+> we can discuss it more then.
 
-1) ACPICA seems to need PCI config space on bus 0 to be working
-   before PCI enumerates (ie before we have a root bus), we need to
-   countercheck on that, but you can't use the generic PCI accessors
-   for that reasons (ie root bus might not be available, you do not
-   have a pci_bus struct)
-2) the raw_pci_read/write require _generic_ mmio back-ends, since AMD
-   can't cope with standard x86 read/write{b,w,l}
+A separate target on the interconnect is the best criteria to use
+here. This is because two targets may or may not share some resources
+and can get rearranged depending on the SoC.
 
-Overall, it seems to me that we can avoid code duplication by
-shuffling your code a bit.
+Regards,
 
-You could modify the generic accessors in drivers/pci/access.c to
-use your mmio back-end instead of using plain read/write{b,w,l}
-functions (we should check if RobH is ok with that there can be
-reasons that prevent this from happening). This would solve the
-AMD mmio issue.
-
-By factoring out the code that actually carries out the reads
-and writes in the accessors basically you decouple the functions
-requiring the struct pci_bus from the ones that does not require it
-(ie raw_pci_{read/write}.
-
-The generic MMIO layer belongs in the drivers/pci/access.c file, it has
-nothing to do with ECAM.
-
-The mmcfg interface should probably live in pci-acpi.c, I do not think
-you need an extra file in there but that's a detail.
-
-Basically the generic accessors would become something like eg:
-
-int pci_generic_config_write(struct pci_bus *bus, unsigned int devfn,
-			     int where, int size, u32 val)
-{
-	void __iomem *addr;
-
-	addr = bus->ops->map_bus(bus, devfn, where);
-	if (!addr)
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	pci_mmio_write(size, addr + where, value);
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-With that in place using raw_pci_write/read or the generic accessors
-becomes almost identical, with code requiring the pci_bus to be
-created using the generic accessors and ACPICA using the raw version.
-
-I might be missing something, so apologies if that's the case.
-
-Comments welcome.
-
-Lorenzo
+Tony
