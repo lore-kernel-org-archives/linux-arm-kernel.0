@@ -1,80 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 08 Sep 2015 10:45:58 +0100
-Subject: [PATCH 0/5] ACPI probing infrastructure
-In-Reply-To: <3667410.80mLyhGuXy@vostro.rjw.lan>
-References: <1441386412-8139-1-git-send-email-marc.zyngier@arm.com>
- <3667410.80mLyhGuXy@vostro.rjw.lan>
-Message-ID: <55EEAE56.9070804@arm.com>
+From: bayi.cheng@mediatek.com (Bayi Cheng)
+Date: Tue, 8 Sep 2015 17:49:53 +0800
+Subject: [PATCH 0/3] Mediatek SPI-NOR flash driver 
+Message-ID: <1441705796-11365-1-git-send-email-bayi.cheng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/15 22:26, Rafael J. Wysocki wrote:
-> On Friday, September 04, 2015 06:06:47 PM Marc Zyngier wrote:
->> IRQ controllers and timers are the two types of device the kernel
->> requires before being able to use the device driver model.
->>
->> ACPI so far lacks a proper probing infrastructure similar to the one
->> we have with DT, where we're able to declare IRQ chips and
->> clocksources inside the driver code, and let the core code pick it up
->> and call us back on a match. This leads to all kind of really ugly
->> hacks all over the arm64 code and even in the ACPI layer.
->>
->> It turns out that providing such a probing infrastructure is rather
->> easy, and provides a much deserved cleanup in both the arch code, the
->> GIC driver, and the architected timer driver.
-> 
-> Since I'm not familiar with the DT probing infrastructure mentioned above,
-> can you please explain to me (possibly at a high level), how it is supposed
-> to work in the ACPI case?
+The patch supports MediaTek's NOR flash controller.
+The NOR flash controller is specifically for spi nor flash,
+and it is more stable and faster than SPI bus, the MTK
+NOR controller not only support single mode but also support
+dual mode and quad mode.
 
-So let's start with DT. Each interrupt controller driver has at least
-one entry like this:
+This series is based on v4.2-rc1 and l2-mtd.git
+(git://git.infradead.org/l2-mtd.git)
 
-IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
+Bayi Cheng (3):
+  doc: dt: add documentation for Mediatek spi-nor controller
+  mtd: mtk-nor: mtk serial flash controller driver
+  arm64: dts: mt8173: Add nor flash node
 
-which says: if you find a node having "arm,gic-400" as a compatible
-string in the device tree, then call gic_of_init with this node as a
-parameter. The probing itself is done by the OF layer when the
-architecture code calls of_irq_init() (usually via irqchip_init).
+ Documentation/devicetree/bindings/mtd/mtk_nor.txt |  25 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi          |  10 +
+ drivers/mtd/spi-nor/Kconfig                       |   7 +
+ drivers/mtd/spi-nor/Makefile                      |   1 +
+ drivers/mtd/spi-nor/mtk_nor.c                     | 533 ++++++++++++++++++++++
+ 5 files changed, 576 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/mtk_nor.txt
+ create mode 100644 drivers/mtd/spi-nor/mtk_nor.c
 
-This has a number of benefits:
-
-- The irqchip code is self-contained. No architecture specific entry
-point, no exposed symbols. Just a standard interface.
-
-- The low-level architecture code doesn't have to know about which
-interrupt controller is present. It just calls into the firmware
-interface (of_irq_init) which is going to sort things out.
-
-Similar infrastructure is provided for the timers/clock sources. Note
-that this is not a replacement for the device model, but acts as a
-probing infrastructure for things that are required too early for the
-device infrastructure to be available.
-
-What I'm aiming for is to introduce the same level of abstraction for
-ACPI, or at least for the few bits that are required before a full blown
-ACPI/device model can be used. For this, I introduce something  vaguely
-similar:
-
-IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
-		     gic_validate_dist, ACPI_MADT_GIC_VERSION_V2,
-		     gic_v2_acpi_init);
-
-which says: if you find a ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR entry in
-MADT (implied by the macro), and that entry is of type
-ACPI_MADT_GIC_VERSION_V2 (as checked by gic_validate_dist), then call
-gic_v2_acpi_init with the entry as a parameter. A bit more convoluted,
-but still without any special entry point.
-
-The various interrupt controller drivers can then implement the above,
-and the arch code can use a firmware-specific call to get the probing
-done, still being oblivious of what interrupt controller is being used.
-It also makes the adaptation of a DT driver to ACPI easier.
-
-Does this help?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+--
+1.8.1.1.dirty
