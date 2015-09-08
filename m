@@ -1,42 +1,73 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Sep 2015 07:38:11 -0700
-Subject: mysterious crashes on OMAP5 uevm
-In-Reply-To: <CANOLnOO3NdK1r1jZQtS=TcHEE7SQwhGHh0YsqqoCJpFW3NO05Q@mail.gmail.com>
-References: <CANOLnOO3NdK1r1jZQtS=TcHEE7SQwhGHh0YsqqoCJpFW3NO05Q@mail.gmail.com>
-Message-ID: <20150908143810.GD4215@atomide.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 8 Sep 2015 16:38:50 +0200
+Subject: [PATCH 0/5] ACPI probing infrastructure
+In-Reply-To: <55ED3599.5090508@semihalf.com>
+References: <1441386412-8139-1-git-send-email-marc.zyngier@arm.com>
+ <55ED3599.5090508@semihalf.com>
+Message-ID: <55EEF2FA.3050009@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grazvydas Ignotas <notasas@gmail.com> [150908 05:50]:
-> Hi,
-> 
-> this is a longstanding problem I'm seeing since the very beginning,
-> which was around 3.12 or so (when I've first got the hardware) and it
-> seems 4.2 is affected by it still. Basically what happens is Xorg
-> randomly segfaults at some "impossible" location. I don't have the
-> details at the moment (could get them is needed), but from what I
-> examined with gdb some time ago the situation did not make any sense.
-> 
-> There are 2 workarounds that I know which make the problem go away
-> (one is enough):
-> - recompile Xorg with -marm (I'm using Debian armhf so it's thumb2 by default)
-> - disable ARCH_MULTI_V6 in the kernel config
-> 
-> Because of the above workarounds I have forgotten about it several
-> times, but it regularly comes back and bites again. It would look like
-> some missing erratum workaround, but I have all of them enabled in the
-> kernel.
-> 
-> Does anyone know about this? Perhaps some missing erratum workaround
-> in the bootloader? u-boot isn't too old here (2015.07).
+On 07.09.2015 08:58, Tomasz Nowicki wrote:
+> Hi Marc,
+>
+> On 04.09.2015 19:06, Marc Zyngier wrote:
+>> IRQ controllers and timers are the two types of device the kernel
+>> requires before being able to use the device driver model.
+>>
+>> ACPI so far lacks a proper probing infrastructure similar to the one
+>> we have with DT, where we're able to declare IRQ chips and
+>> clocksources inside the driver code, and let the core code pick it up
+>> and call us back on a match. This leads to all kind of really ugly
+>> hacks all over the arm64 code and even in the ACPI layer.
+>>
+>> It turns out that providing such a probing infrastructure is rather
+>> easy, and provides a much deserved cleanup in both the arch code, the
+>> GIC driver, and the architected timer driver.
+>>
+>> I'm sure there is some more code to be deleted, and one can only
+>> wonder why this wasn't done before the arm64 code was initially merged
+>> (the diffstat says it all...).
+>>
+>> Patches are against v4.2, and a branch is available at
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+>> acpi/device-probing
+>>
+>> Marc Zyngier (5):
+>>    acpi: Add basic device probing infrastructure
+>>    irqchip/acpi: Add probing infrastructure for ACPI-based irqchips
+>>    irqchip/gic: Convert the GIC driver to ACPI probing
+>>    clocksource/acpi: Add probing infrastructure for ACPI-based
+>>      clocksources
+>>    clocksource/arm_arch_timer: Convert to ACPI probing
+>>
+>>   arch/arm64/include/asm/acpi.h        |  1 -
+>>   arch/arm64/include/asm/irq.h         | 13 -------
+>>   arch/arm64/kernel/acpi.c             | 25 -------------
+>>   arch/arm64/kernel/time.c             |  6 ----
+>>   drivers/acpi/scan.c                  | 41 +++++++++++++++++++++
+>>   drivers/clocksource/arm_arch_timer.c | 10 +-----
+>>   drivers/clocksource/clksrc-of.c      |  4 +++
+>>   drivers/irqchip/irq-gic.c            | 69
+>> ++++++++++++++++++------------------
+>>   drivers/irqchip/irqchip.c            |  5 ++-
+>>   include/asm-generic/vmlinux.lds.h    | 11 ++++++
+>>   include/linux/acpi.h                 | 56 +++++++++++++++++++++++++++++
+>>   include/linux/acpi_irq.h             | 10 ------
+>>   include/linux/clocksource.h          |  6 ----
+>>   include/linux/irqchip.h              | 16 +++++++++
+>>   include/linux/irqchip/arm-gic-acpi.h | 31 ----------------
+>>   15 files changed, 166 insertions(+), 138 deletions(-)
+>>   delete mode 100644 include/linux/acpi_irq.h
+>>   delete mode 100644 include/linux/irqchip/arm-gic-acpi.h
+>>
+>
+> Thanks for cleaning this up!
+>
+> For the whole series:
+> Acked-by: Tomasz Nowicki <tn@semihalf.com>
 
-Seems like some incorrect handling with CONFIG_CPU_V6 compiled in.. 
-Maybe try to narrow it down by commenting out some CONFIG_CPU_V6 and
-__LINUX_ARM_ARCH__ = 6 ifdefs in the git grep CONFIG_CPU_V6
-places ignoring uncompress and davinci code.
+s/Acked-by/Reviewed-by
 
-Do you have some easy way to reproduce this issue?
-
-Regards,
-
-Tony
+Tomasz
