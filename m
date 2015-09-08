@@ -1,49 +1,33 @@
-From: wei.liu2@citrix.com (Wei Liu)
-Date: Tue, 8 Sep 2015 12:09:33 +0100
-Subject: [Xen-devel] [PATCH v4 18/20] net/xen-netback: Make it running on
- 64KB page granularity
-In-Reply-To: <55EEC173.6020606@citrix.com>
-References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
- <1441640038-23615-19-git-send-email-julien.grall@citrix.com>
- <20150907165727.GT6436@zion.uk.xensource.com> <55EEC173.6020606@citrix.com>
-Message-ID: <20150908110933.GB12714@zion.uk.xensource.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 08 Sep 2015 14:24:49 +0300
+Subject: [PATCH] dmaengine: omap-dma: Add support for memcpy
+In-Reply-To: <1429688069-31765-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1429688069-31765-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <3187470.tKXzQaPa1m@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2015 at 12:07:31PM +0100, Julien Grall wrote:
-> Hi Wei,
-> 
-> On 07/09/15 17:57, Wei Liu wrote:
-> > You might need to rebase you patch. A patch to netback went it recently.
-> 
-> Do you mean 210c34dcd8d912dcc740f1f17625a7293af5cb56 "xen-netback: add
-> support for multicast control"?
-> 
+Hi Peter,
 
-Yes, that one.
+Thank you for the patch.
 
-> If so I didn't see any specific issue while rebasing on the latest
-> linus' master.
-> 
+While trying to port the omap_vout driver to the DMA engine API I noticed that 
+the driver makes use of double-indexed transfers, which are not supported by 
+the omap-dma driver. I haven't checked in details what would be required, but 
+the interleaved API might be a good candidate for this. Do you have any plan 
+to add support for double-indexed transfers to the omap-dma driver ?
 
-Good.
+On Wednesday 22 April 2015 10:34:29 Peter Ujfalusi wrote:
+> The sDMA controller is capable of performing memory copy operation. It need
+> to be configured to software triggered mode and without HW synchronization.
+> The sDMA can copy data which is aligned to 8, 16 or 32 bits.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  drivers/dma/omap-dma.c | 51 +++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 49 insertions(+), 2 deletions(-)
 
-> > On Mon, Sep 07, 2015 at 04:33:56PM +0100, Julien Grall wrote:
-> >> The PV network protocol is using 4KB page granularity. The goal of this
-> >> patch is to allow a Linux using 64KB page granularity working as a
-> >> network backend on a non-modified Xen.
-> >>
-> >> It's only necessary to adapt the ring size and break skb data in small
-> >> chunk of 4KB. The rest of the code is relying on the grant table code.
-> >>
-> >> Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> >>
-> > 
-> > Reviewed-by: Wei Liu <wei.liu2@citrix.com>
-> 
-> Thank you!
-> 
-> Regards,
-> 
-> -- 
-> Julien Grall
+-- 
+Regards,
+
+Laurent Pinchart
