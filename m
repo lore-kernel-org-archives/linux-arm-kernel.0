@@ -1,53 +1,65 @@
-From: danindrey@mail.ru (Andrey Danin)
-Date: Tue, 8 Sep 2015 15:31:39 +0300
-Subject: [PATCH v3 1/4] i2c: tegra: implement slave mode
-In-Reply-To: <20150908114621.GB15793@katana>
-References: <1437424546-30405-1-git-send-email-danindrey@mail.ru>
- <1437424546-30405-2-git-send-email-danindrey@mail.ru>
- <20150724092720.GA1597@katana> <55B210F4.6030700@mail.ru>
- <20150724105251.GA22787@katana> <55D5C4AA.2000307@mail.ru>
- <20150908114621.GB15793@katana>
-Message-ID: <55EED52B.8080701@mail.ru>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue,  8 Sep 2015 13:43:32 +0100
+Subject: [RFC 0/5] console/acpi: add DBG2 and SPCR console configuration
+Message-ID: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram, thanks!
+Support for configuring bootconsole and console via the ACPI tables
+DBG2 (Debug Port Table 2) [1] and SPCR (Serial Port Console Redirection
+Table) [2], defined by Microsoft, has been discussed on and off over the
+years.
 
-On 08.09.2015 14:46, Wolfram Sang wrote:
->
->> Sorry for the long delay. I tried to analyze the issue. Attached patch works
->> on AC100 (Misha Komarovsky helped me with testing).
->>
->> Wolfram could you please try the patch with your environment?
->
-> No change, sadly. I don't get slave interrupts.
+[1] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639131(v=vs.85).aspx
+[2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
 
-Slave ISR is called only if slave device is registered on a bus. Do you 
-get master interrupts ?
+Licensing concerns have prevented this happening in the past, but as of
+10 August 2015, these tables have both been released also under OWF 1.0
+(http://www.openwebfoundation.org/legal/the-owf-1-0-agreements/owfa-1-0)
+which is think is noncontroversially GPL-compatible?
 
->> Init function is called multuple times. If I2C controller works
->> in slave mode, then driver must keep slave registers otherwise
->> slave configuration will be reseted.
->
-> This patch does not tackle the main issue, though. There should not be a
-> "slave mode" for the controller.
+This set is a first attempt at implementing this.
 
-Looks like my commit message is not clear enough :(
- >> If I2C controller works in slave mode, then ...
-I mean something like this:
-"If slave functionality is enabled, then ..."
+Submitting as an RFC since the SPCR handling currently depends on the
+console driver being initialized after subsystem initcalls. Workaround
+to enable testing surrounding infrastructure in 5/5, _really_ not
+intended to be merged.
+(Suggestions for acceptable ways of working around this appreciated.)
 
-> It can be a master and slave
-> simultaneously and should do the right thing depending on what's
-> happening on the bus. The Tegra2 manual I have says "The Master can
-> address the internal slave (for basic testing) or an external 7-bit or
-> 10-bit addressed Slave device." So even a loopback should be possible
-> (if we trust the manual ;)).
+For testing the DBG2 stuff with pl011, you would need:
+- A patch to unbreak pl011 earlycon, like
+  http://permalink.gmane.org/gmane.linux.ports.arm.kernel/433219
+- A QEMU that generates DBG2 tables, like current HEAD with the
+  addition of
+  http://lists.nongnu.org/archive/html/qemu-devel/2015-09/msg01719.html
 
-Slave logic is not enabled by default (we don't set up proper 
-configuration and slave address). We can enable it by default but it is 
-useless without driver that will handle requests.
+SPCR support is included in QEMU's ARM mach-virt since 2.4 release.
 
-We used i2cdetect on the I2C bus where master NVEC controller is 
-connected. i2cdetect found devices on the bus. Also keyboard and mouse 
-was running fine after that (slave logic was not disabled).
+DBG2 support has an Intel copyright notice added to it since my starting
+point was Lv Zheng's 2012 DBGP/DBG2 set (although not much of the
+original remains - this is quite a cut-down version).
+
+Leif Lindholm (4):
+  arm64: move acpi/dt decision earlier in boot process
+  of/serial: move earlycon early_param handling to serial
+  acpi/serial: add DBG2 earlycon support
+  HACK: serial: move pl011 initcall to device_initcall
+
+Torez Smith (1):
+  tty/console: use SPCR table to define console
+
+ arch/arm64/kernel/acpi.c         |  55 +++++----
+ drivers/acpi/Makefile            |   1 +
+ drivers/acpi/console.c           | 260 +++++++++++++++++++++++++++++++++++++++
+ drivers/of/fdt.c                 |  13 +-
+ drivers/tty/serial/amba-pl011.c  |   2 +-
+ drivers/tty/serial/earlycon.c    |  18 ++-
+ drivers/tty/serial/serial_core.c |  14 ++-
+ include/linux/acpi.h             |  13 ++
+ include/linux/of_fdt.h           |   1 +
+ include/linux/serial_core.h      |   9 +-
+ 10 files changed, 337 insertions(+), 49 deletions(-)
+ create mode 100644 drivers/acpi/console.c
+
+-- 
+2.1.4
