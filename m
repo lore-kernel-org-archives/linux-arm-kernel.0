@@ -1,47 +1,62 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed, 09 Sep 2015 10:45:59 +0530
-Subject: [PATCH 5/9] clk: qcom: gcc-msm8960: add child devices support.
-In-Reply-To: <55EFA876.30708@codeaurora.org>
-References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
- <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
- <20150811224902.GO2839@codeaurora.org> <55CB0B26.2020105@linaro.org>
- <55CC1CFE.7000005@codeaurora.org> <20150814004206.GU26614@codeaurora.org>
- <55CD5BD2.3070907@codeaurora.org> <55E660F6.3020007@codeaurora.org>
- <20150903172743.GE15099@codeaurora.org> <55ED311E.1070404@codeaurora.org>
- <20150908192115.GP15099@codeaurora.org> <55EFA876.30708@codeaurora.org>
-Message-ID: <55EFC08F.8060105@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 8 Sep 2015 18:29:20 -0500
+Subject: [PATCH linux-next v5 4/5] Documentation: atmel-quadspi: add
+ binding file for Atmel QSPI driver
+In-Reply-To: <793cb906c79eed821cf9b47e79dc1b54a7a5dbd0.1440580764.git.cyrille.pitchen@atmel.com>
+References: <cover.1440580764.git.cyrille.pitchen@atmel.com>
+ <793cb906c79eed821cf9b47e79dc1b54a7a5dbd0.1440580764.git.cyrille.pitchen@atmel.com>
+Message-ID: <55EF6F50.5020006@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/26/2015 07:30 AM, Cyrille Pitchen wrote:
+> This patch documents the DT bindings for the driver of the Atmel QSPI
+> controller embedded inside sama5d2x SoCs.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Marek Vasut <marex@denx.de>
 
-On 09/09/2015 09:03 AM, Rajendra Nayak wrote:
->
-> On 09/09/2015 12:51 AM, Stephen Boyd wrote:
->> On 09/07, Rajendra Nayak wrote:
->>>>
->>>> Yeah this might happen though because we've assigned the of_node
->>>> pointer to the tsens device before we register it on the platform
->>>> bus. The other way to pass that data down from gcc to tsens would
->>>> be to not have an of_node assigned to the tsens device, and check
->>>> for that case in the tsens driver. If there isn't an of_node,
->>>> then we look at the parent device's of_node to figure out which
->>>> gcc it is (if this even matters) and parse DT properties.
->>>
->>> Parsing DT properties from parent (in the tsens driver) is fine, but
->>> the nvmem apis still expect an of_node for the tsens device and hence
->>> fail.
->>
->> So pass the parent device to the nvmem APIs? Or adjust the nvmem
->> APIs to look for a parent of_node if there isn't an of_node for
->> the device being passed? Or make the nvmem APIs work without
->> using DT, and copy over the nvmem information from the gcc node
->> to the virtual tsens child device?
->
-> Srini, you being the nvmem maintainer, any thoughts?
+Acked-by: Rob Herring <robh@kernel.org>
 
-passing the parent device to nvmem APIs seems the cleanest to me,
-without having to change much with the nvmem APIs itself.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> ---
+>  .../devicetree/bindings/mtd/atmel-quadspi.txt      | 29 ++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+> new file mode 100644
+> index 000000000000..0b8d545bb198
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+> @@ -0,0 +1,29 @@
+> +* Atmel Quad Serial Peripheral Interface (QSPI)
+> +
+> +Required properties:
+> +- compatible:     should be "atmel,sama5d2-qspi"
+> +- reg:            the first contains the register location and length,
+> +                  the second contains the memory mapping address and length
+> +- interrupts:     should contain the interrupt for the device
+> +- clocks:         the phandle of the clock needed by the QSPI controller
+> +- #address-cells: should be <1>
+> +- #size-cells:    should be <0>
+> +
+> +Example:
+> +
+> +spi at f0020000 {
+> +	compatible = "atmel,sama5d2-qspi";
+> +	reg = <0xf0020000 0x100>,
+> +	      <0xd0000000 0x8000000>;
+> +	interrupts = <52 IRQ_TYPE_LEVEL_HIGH 7>;
+> +	clocks = <&spi0_clk>;
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_spi0_default>;
+> +	status = "okay";
+> +
+> +	m25p80 at 0 {
+> +		...
+> +	};
+> +};
+> 
