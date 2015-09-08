@@ -1,9 +1,9 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Tue,  8 Sep 2015 16:35:26 -0500
-Subject: [PATCH 06/11] regulators: qcom-smd: Add PM8916 support
+Date: Tue,  8 Sep 2015 16:35:25 -0500
+Subject: [PATCH 06/11] regulator: qcom-smd: Add PM8916 support
 In-Reply-To: <1441748131-26490-1-git-send-email-agross@codeaurora.org>
 References: <1441748131-26490-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1441748131-26490-8-git-send-email-agross@codeaurora.org>
+Message-ID: <1441748131-26490-7-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
