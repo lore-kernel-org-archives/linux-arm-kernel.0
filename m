@@ -1,30 +1,28 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 08 Sep 2015 13:48:18 +0900
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 8 Sep 2015 10:40:53 +0530
 Subject: [PATCH v4 0/4] cpufreq-dt: add suspend frequency support
-In-Reply-To: <20150908042017.GJ26760@linux>
+In-Reply-To: <55EE6892.3010304@samsung.com>
 References: <1441640501-13613-1-git-send-email-b.zolnierkie@samsung.com>
  <20150908024659.GF26760@linux> <55EE5C79.2030604@samsung.com>
- <20150908042017.GJ26760@linux>
-Message-ID: <55EE6892.3010304@samsung.com>
+ <20150908042017.GJ26760@linux> <55EE6892.3010304@samsung.com>
+Message-ID: <20150908051053.GA18554@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.09.2015 13:20, Viresh Kumar wrote:
-> On 08-09-15, 12:56, Krzysztof Kozlowski wrote:
->> There were no comments from your side for this patchset nor for previous
->> Marek's fix. After mentioned change and Bart's re-spin, do you plan to
->> grab this patchset and send it for current v4.3 cycle?
+On 08-09-15, 13:48, Krzysztof Kozlowski wrote:
+> Somehow my mind stuck on solving Exynos4x12 cpufreq issues.
 > 
-> Why do you think it should go via Kukjin's tree and not Rafael's?
+> Right, it should go through Rafael's, probably except DTS patch (4/4)
+> because it depends on previous DTS changes. These changes are still in
+> arm-soc, not in Linus' tree [0].
 
-Somehow my mind stuck on solving Exynos4x12 cpufreq issues.
+That's bad :(
 
-Right, it should go through Rafael's, probably except DTS patch (4/4)
-because it depends on previous DTS changes. These changes are still in
-arm-soc, not in Linus' tree [0].
+Anyway, 4/4 is kind of independent to this series, in the sense that
+it wouldn't harm even if it gets applied separately.
 
-Best regards,
-Krzysztof
+So, go ahead and apply 4/4 to Samsung's tree and rest of this can be
+picked by Rafael.
 
-[0]
-https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=next/late&id=f44997412e5b39b6a1231f16555120c5b2aae0ed
+-- 
+viresh
