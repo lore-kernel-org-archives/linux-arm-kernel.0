@@ -1,48 +1,33 @@
-From: zhenzhang.zhang@huawei.com (Zhang Zhen)
-Date: Tue, 8 Sep 2015 10:45:38 +0800
-Subject: [PATCH] ARM:mm: define arch-specific IOREMAP_MAX_ORDER only in !SMP
- && !LPAE case
-In-Reply-To: <1441680050-50490-1-git-send-email-zhenzhang.zhang@huawei.com>
-References: <1441680050-50490-1-git-send-email-zhenzhang.zhang@huawei.com>
-Message-ID: <55EE4BD2.3080800@huawei.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 8 Sep 2015 08:16:59 +0530
+Subject: [PATCH v4 0/4] cpufreq-dt: add suspend frequency support
+In-Reply-To: <1441640501-13613-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1441640501-13613-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20150908024659.GF26760@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arch-specific IOREMAP_MAX_ORDER is introduced in
-commit: ff0daca([ARM] Add section support to ioremap) and
-commit: a069c89 ([ARM] 3705/1: add supersection support to ioremap()).
-But supersections and sections mappings are only used in !SMP && !LPAE case.
-Otherwise, mapping is created using the usual 4K pages.
+On 07-09-15, 17:41, Bartlomiej Zolnierkiewicz wrote:
+> Hi,
+> 
+> This patch series adds suspend frequency support (using opp-v2
+> bindings and suspend-opp functionality) to cpufreq-dt driver and
+> then adds suspend opp for Exynos4412 based boards.
+> 
+> This patch series fixes suspend/resume support on Exynos4412
+> based Trats2 board and reboot hang on Exynos4412 based Odroid
+> U3 board.
+> 
+> Changes since v3:
+> - fixed dev_pm_opp_get_suspend_opp() locking
+> - shortened variable name in dev_pm_opp_get_suspend_opp()
+> - adjusted cpufreq_generic_suspend() to work with cpufreq-dt
+> - removed no longer needed cpufreq_dt_suspend()
+> - added Acked-by tag from Viresh to patch #4
 
-In most cases without !SMP && !LPAE, the big alignment cause high fragmentation
-issue in vmalloc area.
-Here we use arch-specific IOREMAP_MAX_ORDER only in !SMP && !LPAE case,
-otherwise use generic IOREMAP_MAX_ORDER in include/linux/vmalloc.h.
+Just a minor comment on 3/4 and after fixing that:
 
-Signed-off-by: Zhang Zhen <zhenzhang.zhang@huawei.com>
----
- arch/arm/include/asm/memory.h | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index b7f6fb4..3209012 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -76,10 +76,12 @@
-  */
- #define XIP_VIRT_ADDR(physaddr)  (MODULES_VADDR + ((physaddr) & 0x000fffff))
-
-+#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
- /*
-  * Allow 16MB-aligned ioremap pages
-  */
- #define IOREMAP_MAX_ORDER	24
-+#endif
-
- #else /* CONFIG_MMU */
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 -- 
-1.9.1
-
-
-.
+viresh
