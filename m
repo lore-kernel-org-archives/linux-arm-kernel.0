@@ -1,31 +1,39 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 8 Sep 2015 08:41:10 -0300
-Subject: [PATCH 4/4] ARM: dts: imx: add Boundary Devices Nitrogen6_Lite
- board
-In-Reply-To: <CAAMH-ysfTs9W+dWdS7DR9=KKPxij1DEHEevMn3+TMp8gqvoELQ@mail.gmail.com>
-References: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
- <1441645069-27263-5-git-send-email-gary.bisson@boundarydevices.com>
- <CAOMZO5Bb5TwtV4=C4jtU9KpuwtYSdYcSCgQVMMOY0FMf7hZx8w@mail.gmail.com>
- <CAAMH-ysfTs9W+dWdS7DR9=KKPxij1DEHEevMn3+TMp8gqvoELQ@mail.gmail.com>
-Message-ID: <CAOMZO5BG1hcCWzTVvO6aZMVY484NGzezpfVQCK9kGcgamMA5wQ@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 8 Sep 2015 13:46:21 +0200
+Subject: [PATCH v3 1/4] i2c: tegra: implement slave mode
+In-Reply-To: <55D5C4AA.2000307@mail.ru>
+References: <1437424546-30405-1-git-send-email-danindrey@mail.ru>
+ <1437424546-30405-2-git-send-email-danindrey@mail.ru>
+ <20150724092720.GA1597@katana> <55B210F4.6030700@mail.ru>
+ <20150724105251.GA22787@katana> <55D5C4AA.2000307@mail.ru>
+Message-ID: <20150908114621.GB15793@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gary,
 
-On Tue, Sep 8, 2015 at 7:18 AM, Gary Bisson
-<gary.bisson@boundarydevices.com> wrote:
-> Hi Fabio,
+> Sorry for the long delay. I tried to analyze the issue. Attached patch works
+> on AC100 (Misha Komarovsky helped me with testing).
+> 
+> Wolfram could you please try the patch with your environment?
 
-> Ok will do in v2. Should I relicense Nitrogen6x and SabreLite as well?
+No change, sadly. I don't get slave interrupts.
 
-That would be nice.
+> Init function is called multuple times. If I2C controller works
+> in slave mode, then driver must keep slave registers otherwise
+> slave configuration will be reseted.
 
-> Yes, I actually just copied what was done for the Nitrogen6x, should I
-> update the latter as well?
+This patch does not tackle the main issue, though. There should not be a
+"slave mode" for the controller. It can be a master and slave
+simultaneously and should do the right thing depending on what's
+happening on the bus. The Tegra2 manual I have says "The Master can
+address the internal slave (for basic testing) or an external 7-bit or
+10-bit addressed Slave device." So even a loopback should be possible
+(if we trust the manual ;)).
 
-Yes, please.
-
-Regards,
-
-Fabio Estevam
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150908/a63da796/attachment.sig>
