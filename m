@@ -1,269 +1,77 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue,  8 Sep 2015 13:43:36 +0100
-Subject: [RFC 4/5] tty/console: use SPCR table to define console
-In-Reply-To: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
-References: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1441716217-23786-5-git-send-email-leif.lindholm@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 08 Sep 2015 14:43:53 +0200
+Subject: I.MX6 HDMI support in v4.2
+In-Reply-To: <20150908112909.GX21084@n2100.arm.linux.org.uk>
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m337yp5gvv.fsf@t19.piap.pl> <1441709778.13536.8.camel@pengutronix.de>
+ <20150908110135.GW21084@n2100.arm.linux.org.uk>
+ <1441710467.13536.13.camel@pengutronix.de>
+ <20150908112909.GX21084@n2100.arm.linux.org.uk>
+Message-ID: <1441716233.13536.21.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Torez Smith <torez@redhat.com>
+Am Dienstag, den 08.09.2015, 12:29 +0100 schrieb Russell King - ARM
+Linux:
+> On Tue, Sep 08, 2015 at 01:07:47PM +0200, Lucas Stach wrote:
+> > Am Dienstag, den 08.09.2015, 12:01 +0100 schrieb Russell King - ARM
+> > Linux:
+> > > On Tue, Sep 08, 2015 at 12:56:18PM +0200, Lucas Stach wrote:
+> > > > This is expected, it's the overlay adapter which doesn't really work
+> > > > with imx-drm yet.
+> > > 
+> > > No, it's imx-drm which isn't working.  As I explained in my previous
+> > > email, overlay planes are expected to do scaling.  imx-drm errors out
+> > > attempts for that.  This is a kernel bug, not an Xorg driver bug.
+> > > 
+> > I would argue that this is a bug of the interface between kernel and
+> > userspace.
+> 
+> Yes, only in so far as knowing beforehand whether scaling is possible.
+> The only time that you get to know is when the call to display the plane
+> fails.  That's a really poor interface.
+> 
+> > Scaling isn't something that can be expected to be usable on every
+> > hardware (and in fact the IPU isn't able to do arbitrary scaling with
+> > its 1024 in/out pixel constraints), but there is no clear way to
+> > communicate this to userspace other than flat out rejecting the plane
+> > update. Atomic may provide some better ways, but we are not there yet
+> > for imx-drm.
+> 
+> I think that depends on your point of view - I suspect x86 people would
+> be surprised by that comment. :)
+> 
+I think some of the recent Intel chips had the same problem, in that
+they lost the ability to scale planes and ended up not exposing them due
+to the poor interface.
 
-If console= is not added to the kernel command line, the console
-is not registered until much further into the booting process. This patch
-adds support to parse the SPCR ACPI table to pull console support out,
-then use the appropriate drivers to set up console support earlier in the
-boot process.
+> There was talk a while back when the overlay plane support went in that
+> it was possible to do >1024 pixels, but it was complex, but the impression
+> I was left with was one day it would work - and I'm still waiting. 
 
-Signed-off-by: Jon Masters <jcm@redhat.com>
-[rebased and cleaned up]
-Signed-off-by: Torez Smith <torez@redhat.com>
-[reworked to use _CRS, moved to drivers/acpi]
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
----
- drivers/acpi/console.c           | 157 +++++++++++++++++++++++++++++++++++++++
- drivers/tty/serial/serial_core.c |  14 +++-
- include/linux/acpi.h             |  11 ++-
- 3 files changed, 179 insertions(+), 3 deletions(-)
+Don't wait for that. We can't do >1024 without doing a copy in memory,
+which would be a big stretch of the plane definition and benefit.
 
-diff --git a/drivers/acpi/console.c b/drivers/acpi/console.c
-index a985890..02883a1 100644
---- a/drivers/acpi/console.c
-+++ b/drivers/acpi/console.c
-@@ -1,5 +1,6 @@
- /*
-  * Copyright (c) 2012, Intel Corporation
-+ * Copyright (c) 2015, Red Hat, Inc.
-  * Copyright (c) 2015, Linaro Ltd.
-  *
-  * This program is free software; you can redistribute it and/or modify
-@@ -12,11 +13,17 @@
- #define pr_fmt(fmt) "ACPI: " KBUILD_MODNAME ": " fmt
- 
- #include <linux/acpi.h>
-+#include <linux/console.h>
- #include <linux/kernel.h>
- #include <linux/serial_core.h>
-+#include <linux/tty.h>
- 
- #define NUM_ELEMS(x) (sizeof(x) / sizeof(*x))
- 
-+static u64 acpi_serial_addr;
-+static struct acpi_device *acpi_serial_device;
-+static char *acpi_serial_options;
-+
- #ifdef CONFIG_SERIAL_EARLYCON
- static int use_earlycon __initdata;
- static int __init setup_acpi_earlycon(char *buf)
-@@ -101,3 +108,153 @@ int __init acpi_early_console_probe(void)
- 	return 0;
- }
- #endif /* CONFIG_SERIAL_EARLYCON */
-+
-+/*
-+ * Parse the SPCR table. If we are not working with version 2 or
-+ * higher, bail.
-+ * Otherwise, pull out the baud rate and address to the console device.
-+ */
-+static int __init acpi_parse_spcr(struct acpi_table_header *table)
-+{
-+	struct acpi_table_spcr *spcr = (struct acpi_table_spcr *)table;
-+
-+	if (table->revision < 2)
-+		return -EOPNOTSUPP;
-+
-+	/* Handle possible alignment issues */
-+	memcpy(&acpi_serial_addr,
-+	       &spcr->serial_port.address, sizeof(acpi_serial_addr));
-+
-+	/*
-+	 * The baud rate the BIOS used for redirection. Valid values are....
-+	 *	3 = 9600
-+	 *	4 = 19200
-+	 *	6 = 57600
-+	 *	7 = 115200
-+	 *	0-2, 5, 8 - 255 = reserved
-+	*/
-+	switch (spcr->baud_rate) {
-+	case 3:
-+		acpi_serial_options = "9600";
-+		break;
-+	case 4:
-+		acpi_serial_options = "19200";
-+		break;
-+	case 6:
-+		acpi_serial_options = "57600";
-+		break;
-+	case 7:
-+		acpi_serial_options = "115200";
-+		break;
-+	default:
-+		acpi_serial_options = "";
-+		break;
-+	}
-+
-+	pr_info("SPCR serial device: 0x%llx (options: %s)\n",
-+	       acpi_serial_addr, acpi_serial_options);
-+
-+	return 0;
-+}
-+
-+/*
-+ * Parse an ACPI "Device" to determine if it represents the
-+ * data found in the SPCR table. If the associated Device has
-+ * and Address entry, and, that Address matches the one found
-+ * in our SPCR table, it's the entry we are interested in.
-+ *
-+ */
-+static acpi_status acpi_spcr_device_scan(acpi_handle handle,
-+					 u32 level, void *context, void **retv)
-+{
-+	unsigned long long addr = 0;
-+	struct acpi_buffer name_buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-+	acpi_status status = AE_OK;
-+	struct acpi_device *adev;
-+	struct list_head resource_list;
-+	struct resource_entry *rentry;
-+
-+	status = acpi_get_name(handle, ACPI_FULL_PATHNAME, &name_buffer);
-+	if (ACPI_FAILURE(status))
-+		return status;
-+
-+	adev = acpi_bus_get_acpi_device(handle);
-+	if (!adev) {
-+		pr_err("Err locating SPCR device from ACPI handle\n");
-+		return AE_OK; /* skip this one */
-+	}
-+
-+	/*
-+	 * Read device address from _CRS.
-+	 */
-+	INIT_LIST_HEAD(&resource_list);
-+	if (acpi_dev_get_resources(adev, &resource_list, NULL, NULL) <= 0)
-+		return AE_OK;
-+
-+	list_for_each_entry(rentry, &resource_list, node) {
-+		if (resource_type(rentry->res) == IORESOURCE_MEM)
-+			addr = rentry->res->start;
-+	}
-+	acpi_dev_free_resource_list(&resource_list);
-+
-+	if (addr == acpi_serial_addr) {
-+		acpi_serial_device = adev;
-+
-+		pr_info("SPCR serial console: %s (0x%llx)\n",
-+		       (char *)(name_buffer.pointer), addr);
-+
-+		return AE_OK; /* harmless to continue */
-+	}
-+
-+	/* continue */
-+	return AE_OK; /* continue */
-+}
-+
-+static int __init acpi_setup_spcr(void)
-+{
-+	if (0 != acpi_table_parse(ACPI_SIG_SPCR, acpi_parse_spcr)) {
-+		pr_warn("SPCR table not found - auto console disabled\n");
-+		return -ENODEV;
-+	}
-+
-+	acpi_walk_namespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
-+			    ACPI_UINT32_MAX, acpi_spcr_device_scan,
-+			    NULL, NULL, NULL);
-+
-+	return 0;
-+}
-+
-+static int __init acpi_spcr_setup(void)
-+{
-+	/*
-+	 * If ACPI is enabled, scan the tables for
-+	 * automatic console configuration
-+	 */
-+	if (!acpi_disabled)
-+		acpi_setup_spcr();
-+
-+	return 0;
-+}
-+subsys_initcall_sync(acpi_spcr_setup);
-+
-+/**
-+ * acpi_console_check() - Check for and configure console from ACPI information
-+ * @adev - Pointer to device
-+ * @name - Name to use for preferred console without index. ex. "ttyS"
-+ * @index - Index to use for preferred console.
-+ *
-+ * Check if the given device matches the information provided in the SPCR table
-+ * If it does then register it as the preferred console and return TRUE.
-+ * Otherwise return FALSE.
-+ */
-+bool acpi_console_check(struct acpi_device *adev, char *name, int index)
-+{
-+	if (acpi_disabled || !adev || adev != acpi_serial_device
-+	    || console_set_on_cmdline)
-+		return false;
-+
-+	pr_info("adding preferred console [%s]\n", name);
-+
-+	return !add_preferred_console(name, index,
-+				      kstrdup(acpi_serial_options, GFP_KERNEL));
-+}
-diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
-index 603d2cc..4b20bc6 100644
---- a/drivers/tty/serial/serial_core.c
-+++ b/drivers/tty/serial/serial_core.c
-@@ -34,6 +34,7 @@
- #include <linux/serial_core.h>
- #include <linux/delay.h>
- #include <linux/mutex.h>
-+#include <linux/acpi.h>
- 
- #include <asm/irq.h>
- #include <asm/uaccess.h>
-@@ -2696,9 +2697,18 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
- 		spin_lock_init(&uport->lock);
- 		lockdep_set_class(&uport->lock, &port_lock_key);
- 	}
--	if (uport->cons && uport->dev)
--		of_console_check(uport->dev->of_node, uport->cons->name, uport->line);
- 
-+	/*
-+	 * Support both open FW and ACPI access to console definitions.
-+	 * Both of_console_check() and acpi_console_check() will call
-+	 * add_preferred_console() if a console definition is found.
-+	 */
-+	if (uport->cons && uport->dev) {
-+		if (!acpi_console_check(ACPI_COMPANION(uport->dev),
-+					uport->cons->name, uport->line))
-+			of_console_check(uport->dev->of_node,
-+					 uport->cons->name, uport->line);
-+	}
- 	uart_configure_port(drv, state, uport);
- 
- 	num_groups = 2;
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 88cb9c1..f1b9a64 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -811,8 +811,17 @@ static inline struct acpi_device *acpi_get_next_child(struct device *dev,
- 
- #endif
- 
--#if defined(CONFIG_ACPI) && defined(CONFIG_SERIAL_EARLYCON)
-+#if defined(CONFIG_ACPI)
-+# if defined(CONFIG_SERIAL_EARLYCON)
- int __init acpi_early_console_probe(void);
-+# endif
-+bool acpi_console_check(struct acpi_device *adev, char *name, int index);
-+#else
-+static inline bool acpi_console_check(struct acpi_device *adev, char *name,
-+				      int index)
-+{
-+	return FALSE;
-+}
- #endif
- 
- #endif	/*_LINUX_ACPI_H*/
+In addition the IPU scaler has pitch and alignment constraints that make
+the needed tiling extremely complex to get right. We fiddled with this
+extensively to get it to the point that it is usable as a V4L2 mem2mem
+device. Moving this to the display path is not going to happen, ever.
+
+As all relevant resolutions already require a copy you are much better
+of doing it with the GPU and get all the testing effort focused on that
+path.
+
+> I
+> suspect that the iMX6 is going to be obsolete before we have a decent
+> working video playback story on this hardware.
+> 
+MX6Plus is just around the corner and will probably keep us busy for a
+while. ;)
+
+Regards,
+Lucas
+
 -- 
-2.1.4
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
