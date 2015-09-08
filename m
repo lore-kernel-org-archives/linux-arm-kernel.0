@@ -1,319 +1,83 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Tue,  8 Sep 2015 16:35:20 -0500
-Subject: [PATCH 01/11] soc: qcom: documentation: Update SMD/RPM Docs
+Date: Tue,  8 Sep 2015 16:35:29 -0500
+Subject: [PATCH 09/11] arm: dts: Add support for PMA8084 on APQ8084
 In-Reply-To: <1441748131-26490-1-git-send-email-agross@codeaurora.org>
 References: <1441748131-26490-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1441748131-26490-2-git-send-email-agross@codeaurora.org>
+Message-ID: <1441748131-26490-11-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves the qcom,smd-rpm.txt to the correct location and splits
-out the smd and rpm documentation.  In addition, a smd-rpm-regulator
-document is added.
+This patch adds support for the PMA8084 regulators found on APQ8084
+platforms.
 
 Signed-off-by: Andy Gross <agross@codeaurora.org>
 ---
- .../devicetree/bindings/soc/qcom,smd-rpm.txt       |  117 --------------------
- .../bindings/soc/qcom/qcom,smd-rpm-regulator.txt   |  103 +++++++++++++++++
- .../devicetree/bindings/soc/qcom/qcom,smd-rpm.txt  |   55 +++++++++
- 3 files changed, 158 insertions(+), 117 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/soc/qcom,smd-rpm.txt
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
+ arch/arm/boot/dts/qcom-apq8084.dtsi |   52 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/soc/qcom,smd-rpm.txt b/Documentation/devicetree/bindings/soc/qcom,smd-rpm.txt
-deleted file mode 100644
-index e27f5c4..0000000
---- a/Documentation/devicetree/bindings/soc/qcom,smd-rpm.txt
-+++ /dev/null
-@@ -1,117 +0,0 @@
--Qualcomm Resource Power Manager (RPM) over SMD
--
--This driver is used to interface with the Resource Power Manager (RPM) found in
--various Qualcomm platforms. The RPM allows each component in the system to vote
--for state of the system resources, such as clocks, regulators and bus
--frequencies.
--
--- compatible:
--	Usage: required
--	Value type: <string>
--	Definition: must be one of:
--		    "qcom,rpm-msm8974"
--
--- qcom,smd-channels:
--	Usage: required
--	Value type: <stringlist>
--	Definition: Shared Memory channel used for communication with the RPM
--
--= SUBDEVICES
--
--The RPM exposes resources to its subnodes. The below bindings specify the set
--of valid subnodes that can operate on these resources.
--
--== Regulators
--
--Regulator nodes are identified by their compatible:
--
--- compatible:
--	Usage: required
--	Value type: <string>
--	Definition: must be one of:
--		    "qcom,rpm-pm8841-regulators"
--		    "qcom,rpm-pm8941-regulators"
--
--- vdd_s1-supply:
--- vdd_s2-supply:
--- vdd_s3-supply:
--- vdd_s4-supply:
--- vdd_s5-supply:
--- vdd_s6-supply:
--- vdd_s7-supply:
--- vdd_s8-supply:
--	Usage: optional (pm8841 only)
--	Value type: <phandle>
--	Definition: reference to regulator supplying the input pin, as
--		    described in the data sheet
--
--- vdd_s1-supply:
--- vdd_s2-supply:
--- vdd_s3-supply:
--- vdd_l1_l3-supply:
--- vdd_l2_lvs1_2_3-supply:
--- vdd_l4_l11-supply:
--- vdd_l5_l7-supply:
--- vdd_l6_l12_l14_l15-supply:
--- vdd_l8_l16_l18_l19-supply:
--- vdd_l9_l10_l17_l22-supply:
--- vdd_l13_l20_l23_l24-supply:
--- vdd_l21-supply:
--- vin_5vs-supply:
--	Usage: optional (pm8941 only)
--	Value type: <phandle>
--	Definition: reference to regulator supplying the input pin, as
--		    described in the data sheet
--
--The regulator node houses sub-nodes for each regulator within the device. Each
--sub-node is identified using the node's name, with valid values listed for each
--of the pmics below.
--
--pm8841:
--	s1, s2, s3, s4, s5, s6, s7, s8
--
--pm8941:
--	s1, s2, s3, s4, l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13,
--	l14, l15, l16, l17, l18, l19, l20, l21, l22, l23, l24, lvs1, lvs2,
--	lvs3, 5vs1, 5vs2
--
--The content of each sub-node is defined by the standard binding for regulators -
--see regulator.txt.
--
--= EXAMPLE
--
--	smd {
--		compatible = "qcom,smd";
--
--		rpm {
--			interrupts = <0 168 1>;
--			qcom,ipc = <&apcs 8 0>;
--			qcom,smd-edge = <15>;
--
--			rpm_requests {
--				compatible = "qcom,rpm-msm8974";
--				qcom,smd-channels = "rpm_requests";
--
--				pm8941-regulators {
--					compatible = "qcom,rpm-pm8941-regulators";
--					vdd_l13_l20_l23_l24-supply = <&pm8941_boost>;
--
--					pm8941_s3: s3 {
--						regulator-min-microvolt = <1800000>;
--						regulator-max-microvolt = <1800000>;
--					};
--
--					pm8941_boost: s4 {
--						regulator-min-microvolt = <5000000>;
--						regulator-max-microvolt = <5000000>;
--					};
--
--					pm8941_l20: l20 {
--						regulator-min-microvolt = <2950000>;
--						regulator-max-microvolt = <2950000>;
--					};
--				};
--			};
--		};
--	};
--
-diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
-new file mode 100644
-index 0000000..7084474
---- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
-@@ -0,0 +1,103 @@
-+QCOM SMD RPM REGULATOR
+diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+index c4303b9..1239202 100644
+--- a/arch/arm/boot/dts/qcom-apq8084.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+@@ -329,6 +329,58 @@
+ 			rpm_requests {
+ 				compatible = "qcom,rpm-apq8084";
+ 				qcom,smd-channels = "rpm_requests";
 +
-+The Qualcomm RPM over SMD regulator is modelled as a subdevice of the RPM.
-+Because SMD is used as the communication transport mechanism, the RPM resides as
-+a subnode of the SMD.  As such, the SMD-RPM regulator requires that the SMD and
-+RPM nodes be present.
++				pma8084-regulators {
++					compatible = "qcom,rpm-pma8084-regulators";
 +
-+Please refer to the qcom,smd.txt for information pertaining to the SMD node.
-+Please refer to the qcom,smd-rpm.txt for information regarding the RPM node.
++					pma8084_s1: s1 {};
++					pma8084_s2: s2 {};
++					pma8084_s3: s3 {};
++					pma8084_s4: s4 {};
++					pma8084_s5: s5 {};
++					pma8084_s6: s6 {};
++					pma8084_s7: s7 {};
++					pma8084_s8: s8 {};
++					pma8084_s9: s9 {};
++					pma8084_s10: s10 {};
++					pma8084_s11: s11 {};
++					pma8084_s12: s12 {};
 +
-+== Regulator
++					pma8084_l1: l1 {};
++					pma8084_l2: l2 {};
++					pma8084_l3: l3 {};
++					pma8084_l4: l4 {};
++					pma8084_l5: l5 {};
++					pma8084_l6: l6 {};
++					pma8084_l7: l7 {};
++					pma8084_l8: l8 {};
++					pma8084_l9: l9 {};
++					pma8084_l10: l10 {};
++					pma8084_l11: l11 {};
++					pma8084_l12: l12 {};
++					pma8084_l13: l13 {};
++					pma8084_l14: l14 {};
++					pma8084_l15: l15 {};
++					pma8084_l16: l16 {};
++					pma8084_l17: l17 {};
++					pma8084_l18: l18 {};
++					pma8084_l19: l19 {};
++					pma8084_l20: l20 {};
++					pma8084_l21: l21 {};
++					pma8084_l22: l22 {};
++					pma8084_l23: l23 {};
++					pma8084_l24: l24 {};
++					pma8084_l25: l25 {};
++					pma8084_l26: l26 {};
++					pma8084_l27: l27 {};
 +
-+Regulator nodes are identified by their compatible:
++					pma8084_lvs1: lvs1 {};
++					pma8084_lvs2: lvs2 {};
++					pma8084_lvs3: lvs3 {};
++					pma8084_lvs4: lvs4 {};
 +
-+- compatible:
-+	Usage: required
-+	Value type: <string>
-+	Definition: must be one of:
-+		    "qcom,rpm-pm8841-regulators"
-+		    "qcom,rpm-pm8941-regulators"
-+
-+- vdd_s1-supply:
-+- vdd_s2-supply:
-+- vdd_s3-supply:
-+- vdd_s4-supply:
-+- vdd_s5-supply:
-+- vdd_s6-supply:
-+- vdd_s7-supply:
-+- vdd_s8-supply:
-+	Usage: optional (pm8841 only)
-+	Value type: <phandle>
-+	Definition: reference to regulator supplying the input pin, as
-+		    described in the data sheet
-+
-+- vdd_s1-supply:
-+- vdd_s2-supply:
-+- vdd_s3-supply:
-+- vdd_l1_l3-supply:
-+- vdd_l2_lvs1_2_3-supply:
-+- vdd_l4_l11-supply:
-+- vdd_l5_l7-supply:
-+- vdd_l6_l12_l14_l15-supply:
-+- vdd_l8_l16_l18_l19-supply:
-+- vdd_l9_l10_l17_l22-supply:
-+- vdd_l13_l20_l23_l24-supply:
-+- vdd_l21-supply:
-+- vin_5vs-supply:
-+	Usage: optional (pm8941 only)
-+	Value type: <phandle>
-+	Definition: reference to regulator supplying the input pin, as
-+		    described in the data sheet
-+
-+The regulator node houses sub-nodes for each regulator within the device. Each
-+sub-node is identified using the node's name, with valid values listed for each
-+of the pmics below.
-+
-+pm8841:
-+	s1, s2, s3, s4, s5, s6, s7, s8
-+
-+pm8941:
-+	s1, s2, s3, s4, l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13,
-+	l14, l15, l16, l17, l18, l19, l20, l21, l22, l23, l24, lvs1, lvs2,
-+	lvs3, 5vs1, 5vs2
-+
-+The content of each sub-node is defined by the standard binding for regulators -
-+see regulator.txt.
-+
-+= EXAMPLE
-+
-+	smd {
-+		compatible = "qcom,smd";
-+
-+		rpm {
-+			interrupts = <0 168 1>;
-+			qcom,ipc = <&apcs 8 0>;
-+			qcom,smd-edge = <15>;
-+
-+			rpm_requests {
-+				compatible = "qcom,rpm-msm8974";
-+				qcom,smd-channels = "rpm_requests";
-+
-+				pm8941-regulators {
-+					compatible = "qcom,rpm-pm8941-regulators";
-+					vdd_l13_l20_l23_l24-supply = <&pm8941_boost>;
-+
-+					pm8941_s3: s3 {
-+						regulator-min-microvolt = <1800000>;
-+						regulator-max-microvolt = <1800000>;
-+					};
-+
-+					pm8941_boost: s4 {
-+						regulator-min-microvolt = <5000000>;
-+						regulator-max-microvolt = <5000000>;
-+					};
-+
-+					pm8941_l20: l20 {
-+						regulator-min-microvolt = <2950000>;
-+						regulator-max-microvolt = <2950000>;
-+					};
++					pma8084_5vs1: 5vs1 {};
 +				};
-+			};
-+		};
-+	};
-diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
-new file mode 100644
-index 0000000..3710dd5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
-@@ -0,0 +1,55 @@
-+Qualcomm Resource Power Manager (RPM) over SMD
-+
-+This driver is used to interface with the Resource Power Manager (RPM) found in
-+various Qualcomm platforms. The RPM allows each component in the system to vote
-+for state of the system resources, such as clocks, regulators and bus
-+frequencies.
-+
-+The SMD information for the RPM edge should be filled out.  See qcom,smd.txt for
-+the required edge properties.  All SMD related properties will reside within the
-+RPM node itself.
-+
-+= SUBDEVICES
-+
-+The RPM exposes resources to its subnodes.  The rpm_requests node must be
-+present and this subnode may contain children that designate regulator
-+resources.
-+
-+- compatible:
-+	Usage: required
-+	Value type: <string>
-+	Definition: must be one of:
-+		    "qcom,rpm-msm8974"
-+
-+- qcom,smd-channels:
-+	Usage: required
-+	Value type: <string>
-+	Definition: must be "rpm_requests"
-+
-+Please refer to qcom,smd-rpm-regulator.txt for information on the regulator
-+subnodes that can exist under the rpm_requests.
-+
-+Example:
-+
-+       apcs: syscon at f9011000 {
-+                compatible = "syscon";
-+                reg = <0xf9011000 0x1000>;
-+        };
-+
-+        smd {
-+                compatible = "qcom,smd";
-+
-+                rpm {
-+                        interrupts = <0 168 1>;
-+                        qcom,ipc = <&apcs 8 0>;
-+                        qcom,smd-edge = <15>;
-+
-+                        rpm_requests {
-+                                compatible = "qcom,rpm-msm8974";
-+                                qcom,smd-channels = "rpm_requests";
-+
-+                                ...
-+                        };
-+                };
-+        };
-+
+ 			};
+ 		};
+ 	};
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
