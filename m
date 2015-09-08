@@ -1,100 +1,137 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 08 Sep 2015 10:28:04 +0100
-Subject: [PATCH v4] pinctrl: mediatek: Implement wake handler and suspend
- resume
-In-Reply-To: <1441535972.22230.5.camel@mhfsdcap03>
-References: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>	
- <55DB4609.5040904@arm.com>	
- <CAGS+omBnoitju07KQ1Y7JHTbce6+DO4WqWHTaKz5D+T157zEJA@mail.gmail.com>
- <1441535972.22230.5.camel@mhfsdcap03>
-Message-ID: <55EEAA24.6080706@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 8 Sep 2015 10:19:44 +0100
+Subject: [PATCH v6 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <CAFiDJ58WCjTNkU5PWtbHxj+-0oWNg1T+psfE-OaJD+4k-DBb-A@mail.gmail.com>
+References: <1441103408-8433-1-git-send-email-lftan@altera.com>
+ <1441103408-8433-4-git-send-email-lftan@altera.com>
+ <20150901163304.GA9769@red-moon>
+ <CAFiDJ58WCjTNkU5PWtbHxj+-0oWNg1T+psfE-OaJD+4k-DBb-A@mail.gmail.com>
+Message-ID: <20150908091944.GE29293@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Sep 04, 2015 at 09:29:14AM +0100, Ley Foon Tan wrote:
+> On Wed, Sep 2, 2015 at 12:33 AM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
 
+[...]
 
-On 06/09/15 11:39, maoguang meng wrote:
-> On Wed, 2015-09-02 at 14:02 +0800, Daniel Kurtz wrote:
->> Hi maoguang,
->>
->> On Tue, Aug 25, 2015 at 12:27 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>
->>>
->>> On 14/08/15 09:38, maoguang.meng at mediatek.com wrote:
->>>>
->>>> From: Maoguang Meng <maoguang.meng@mediatek.com>
->>>>
->>>> This patch implement irq_set_wake to get who is wakeup source and
->>>> setup on suspend resume.
->>>>
->>>> Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
->>>>
->> [snip]
->>
->> Can you please respond to Sudeep's questions:
->>
->>> Does this pinmux controller:
->>>
->>> 1. Support wake-up configuration ? If not, you need to use
->>>     IRQCHIP_SKIP_SET_WAKE. I don't see any value in writing the
->>>     mask_{set,clear} if the same registers are used for {en,dis}able
->
->    YES.
->    we can call enable_irq_wake(irq) to config this irq as a wake-up
-> source.
->
+> > > +static bool altera_pcie_valid_config(struct altera_pcie *pcie,
+> > > +                                    struct pci_bus *bus, int dev)
+> > > +{
+> > > +       /* If there is no link, then there is no device */
+> > > +       if (bus->number != pcie->root_bus_nr) {
+> > > +               if (!altera_pcie_link_is_up(pcie))
+> > > +                       return false;
+> > > +       }
+> >
+> > Can you explain to pls me why you have to check this for every config
+> > transaction ? Isn't it something that can prevent probing the
+> > host controller altogether ?
+> In our PCIe hardware spec, it stated that software should check the
+> link status before issuing a configuration request to downstream
+> ports.
+> BTW, other pci controllers have similar implementation as well, eg: dw
+> pci, mvebu pci.
 
-No that doesn't answer my question. Yes you can always call
-enable_irq_wake(irq) as along as you have irq_set_wake implemented.
-But my question was does this pinmux controller support wake-up
-configuration.
+Understood, thanks.
 
-IMHO, by looking at the implementation I can confirm *NO*, it doesn't.
-So please stop copy-pasting the implementation from other drivers.
-The reason is you operate on the same mask_{set,clear} which you use
-to {en,dis}able the interrupts which means you don't have to do anything
-to configure an interrupt as a wakeup source other than just keeping
-them enabled. Hopefully this clarifies.
+[...]
 
->>>
->>> 2. Is in always on domain ? If not, you need save/restore only to
->>>     resume back the functionality. Generally we can set
->>>     IRQCHIP_MASK_ON_SUSPEND to ensure non-wake-up interrupts are
->>>     disabled during suspend and re-enabled in resume path. You just
->>>     save/restore raw values without tracking the wake-up source.
->
->    YES.
->
+> > > +static int tlp_read_packet(struct altera_pcie *pcie, u32 *value)
+> > > +{
+> > > +       u8 loop;
+> > > +       struct tlp_rp_regpair_t tlp_rp_regdata;
+> > > +
+> > > +       for (loop = 0; loop < TLP_LOOP; loop++) {
+> > > +               tlp_read_rx(pcie, &tlp_rp_regdata);
+> > > +               if (tlp_rp_regdata.ctrl & RP_RXCPL_EOP) {
+> > > +                       if (value)
+> > > +                               *value = tlp_rp_regdata.reg0;
+> > > +                       return PCIBIOS_SUCCESSFUL;
+> > > +               }
+> > > +               udelay(5);
+> >
+> > Could you comment please on the chosen udelay/TLP_LOOP values (ie how
+> > did you come up with them) ?
+> For udelay value, we just want to have small delay between each read.
 
-Again *YES* for what part of my question. If it's always-on, then you
-don't need this suspend/resume callbacks at all, so I assume the answer
-is *NO*.
+I would explain how you chose the value, in particular if it can
+affect next generation hosts sharing the same driver.
 
->>>
->>> Also I see that no care is taken to set the port irq as wake enable
->>> source. It may work with current mainline, but won't with -next. Please
->>> ensure the port irq to the parent interrupt controller remains
->>> enabled(i.e set as wake).
->
-> As you know, we do not care the port irq as wake enbale source,
-> when enter suspend we think no matter what the port irq is
-> enabled/disabled which are not affected as a wake-up source,
-> Because eint has a line to receive SPM.
->
+> For TLP_LOOP value, minimum 2 loops to read tlp headers and 1 loop to
+> read data payload. So, we choose to poll 10 loops for maximum.
 
-I understand that, but for proper wakeup functionality you need to do
-configure the parent if you want to identify and handle that wakeup
-interrupt. If you don't care then it should be fine.
+Add it to a comment.
 
-> For example,after suspend,press power key(use eint5) will generate an
-> electrical signal which is send to spm by eint.
-> and then spm wake cpu.
+[...]
 
-Yes I got that, as I mentioned above, I think you don't need to identify
-and handle the wakeup interrupt. E.g. if it's a keyboard key press, you
-may need to identify the key pressed, so it needs to be handled
-properly. In your case, I assume it's just power button whose main
-function is to wake/boot and that's already achieved when you are woken up.
+> > > +static int altera_pcie_probe(struct platform_device *pdev)
+> > > +{
+> > > +       struct altera_pcie *pcie;
+> > > +       struct pci_bus *bus;
+> > > +       int ret;
+> > > +
+> > > +       pcie = devm_kzalloc(&pdev->dev, sizeof(*pcie), GFP_KERNEL);
+> > > +       if (!pcie)
+> > > +               return -ENOMEM;
+> > > +
+> > > +       pcie->pdev = pdev;
+> > > +
+> > > +       ret = altera_pcie_parse_dt(pcie);
+> > > +       if (ret) {
+> > > +               dev_err(&pdev->dev, "Parsing DT failed\n");
+> > > +               return ret;
+> > > +       }
+> > > +
+> > > +       INIT_LIST_HEAD(&pcie->resources);
+> > > +
+> > > +       ret = altera_pcie_parse_request_of_pci_ranges(pcie);
+> > > +       if (ret) {
+> > > +               dev_err(&pdev->dev, "Failed add resources\n");
+> > > +               return ret;
+> > > +       }
+> > > +
+> > > +       ret = altera_pcie_init_irq_domain(pcie);
+> > > +       if (ret) {
+> > > +               dev_err(&pdev->dev, "Failed creating IRQ Domain\n");
+> > > +               return ret;
+> > > +       }
+> > > +
+> > > +       pcie->root_bus_nr = 0;
+> >
+> > Nit: It is already 0.
+> Okay. Will remove it.
+> >
+> > > +
+> > > +       /* clear all interrupts */
+> > > +       cra_writel(pcie, P2A_INT_STS_ALL, P2A_INT_STATUS);
+> > > +       /* enable all interrupts */
+> > > +       cra_writel(pcie, P2A_INT_ENA_ALL, P2A_INT_ENABLE);
+> > > +
+> > > +       bus = pci_scan_root_bus(&pdev->dev, pcie->root_bus_nr, &altera_pcie_ops,
+> > > +                               pcie, &pcie->resources);
+> > > +       if (!bus)
+> > > +               return -ENOMEM;
+> > > +
+> > > +       pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> > > +       pci_assign_unassigned_bus_resources(bus);
+> >
+> > I think you are missing a call to pcie_bus_configure_settings(),
+> > see drivers/pci/host/pci-host-generic.c
+> Other pci controller drivers like xgene and iproc don't call to this
+> function, but it call in
+> arch/arm/kernel/bios32.c:pci_common_init_dev().
+> Do we really need this?
 
-Regards,
-Sudeep
+It is there to provide a way to configure the system MPS, through
+command line parameters, it is always a good idea to have it and
+it should be part of your driver so that you can tune it in case
+the MPS is misconfigured or you want to apply a specific configuration
+for a given system.
+
+Have a look at pcie_bus_config and how it is used in
+pcie_bus_configure_settings(), that would clarify further.
+
+Thanks,
+Lorenzo
