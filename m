@@ -1,77 +1,69 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Tue, 8 Sep 2015 15:53:28 +0800
-Subject: [PATCH v2] serial: pl011: Fix earlycon register LUT breakage
-In-Reply-To: <CABymUCN4tuNMC1m0AS36OZ9MVOa3HtH3mYC0s04LyUWVPxmZ4A@mail.gmail.com>
-References: <1441468654-6923-1-git-send-email-jun.nie@linaro.org>
- <CABymUCPMSKPwqtivYMJa3n-2GWbjhM6u7KDOwD1ypJRCeLZo7Q@mail.gmail.com>
- <CABymUCN4tuNMC1m0AS36OZ9MVOa3HtH3mYC0s04LyUWVPxmZ4A@mail.gmail.com>
-Message-ID: <CABymUCNmY+txUSaJDXsn4hb5p=frT5uAN-6Y97t+b7g224dkvw@mail.gmail.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Tue, 08 Sep 2015 09:59:11 +0200
+Subject: [PATCH v2] ARM: tegra: paz00: use con_id's to refer GPIO's
+ ingpiod_lookup table
+In-Reply-To: <55ED5721.80508@gmail.com>
+References: <1435673759-11996-1-git-send-email-digetx@gmail.com>
+ <55ED5721.80508@gmail.com>
+Message-ID: <3738507.JjVW9EvTJ3@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-09-08 15:52 GMT+08:00 Jun Nie <jun.nie@linaro.org>:
-> 2015-09-08 10:23 GMT+08:00 Jun Nie <jun.nie@linaro.org>:
->> 2015-09-05 23:57 GMT+08:00 Jun Nie <jun.nie@linaro.org>:
->>> Commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
->>> mistakenly used the register LUT i/o accessors for the pl011
->>> earlycon. Since the port has not been probed at earlycon time,
->>> the struct uart_amba_port (and register LUTs) are uninitialized.
->>>
->>> Use direct register addressing for pl011 earlycon; other h/w supported
->>> by the amba-pl011 driver should declare an alternate earlycon.
->>>
->>> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
->>> Signed-off-by: Jun Nie <jun.nie@linaro.org>
->>> ---
->>>  drivers/tty/serial/amba-pl011.c | 15 +++------------
->>>  1 file changed, 3 insertions(+), 12 deletions(-)
->>>
->>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
->>> index 2af09ab..cce41e0 100644
->>> --- a/drivers/tty/serial/amba-pl011.c
->>> +++ b/drivers/tty/serial/amba-pl011.c
->>> @@ -326,12 +326,6 @@ static void pl011_writew(struct uart_amba_port *uap, int val, int index)
->>>         writew_relaxed(val, uap->port.membase + uap->reg_lut[index]);
->>>  }
->>>
->>> -static void pl011_writeb(struct uart_amba_port *uap, u8 val, int index)
->>> -{
->>> -       WARN_ON(index > REG_NR);
->>> -       writeb_relaxed(val, uap->port.membase + uap->reg_lut[index]);
->>> -}
->>> -
->>>  /*
->>>   * Reads up to 256 characters from the FIFO or until it's empty and
->>>   * inserts them into the TTY layer. Returns the number of characters
->>> @@ -2348,13 +2342,10 @@ static struct console amba_console = {
->>>
->>>  static void pl011_putc(struct uart_port *port, int c)
->>>  {
->>> -       struct uart_amba_port *uap =
->>> -           container_of(port, struct uart_amba_port, port);
->>> -
->>> -       while (pl011_readw(uap, REG_FR) & UART01x_FR_TXFF)
->>> +       while (readw_relaxed(port->membase + UART01x_FR) & UART01x_FR_TXFF)
->>>                 ;
->>> -       pl011_writeb(uap, c, REG_DR);
->>> -       while (pl011_readw(uap, REG_FR) & uap->fr_busy)
->>> +       writeb_relaxed(c, port->membase + UART01x_DR);
->>> +       while (readw_relaxed(port->membase + UART01x_FR) & UART01x_FR_BUSY)
->>>                 ;
->>>  }
->>>
->>> --
->>> 1.9.1
->>>
->>
->> Could anybody help test this earlycon patch on hardware with standard
->> pl011 serial? Your help is appreciated and valuable no matter the
->> previous patch set is carried on or reverted.
->> Thank you very much!
->>
->> Jun
+Am Montag, 7. September 2015, 12:21:37 schrieb Dmitry Osipenko:
+> 30.06.2015 17:15, Dmitry Osipenko ?????:
+> > Commit 72daceb9a10a ("net: rfkill: gpio: Add default GPIO driver mappings
+> > for ACPI") removed possibility to request GPIO by table index for non-ACPI
+> > platforms without changing it users. As result "shutdown" GPIO request
+> > will fail if request for "reset" GPIO succeeded or "reset" will be
+> > requested instead of "shutdown" if "reset" wasn't defined. Fix it by
+> > making gpiod_lookup_table use con_id's instead of indexes.
+> > 
+> > Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+> > Fixes: 72daceb (net: rfkill: gpio: Add default GPIO driver mappings for
+> > ACPI) Cc: <stable@vger.kernel.org> # v3.19+
+> > Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+> > ---
+> > 
+> > v2: s/GPIO_LOOKUP_IDX/GPIO_LOOKUP/, otherwise "shutdown" GPIO won't be
+> > requested> 
+> >   arch/arm/mach-tegra/board-paz00.c | 4 ++--
+> >   1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-tegra/board-paz00.c
+> > b/arch/arm/mach-tegra/board-paz00.c index fbe74c6..49d1110 100644
+> > --- a/arch/arm/mach-tegra/board-paz00.c
+> > +++ b/arch/arm/mach-tegra/board-paz00.c
+> > @@ -39,8 +39,8 @@ static struct platform_device wifi_rfkill_device = {
+> > 
+> >   static struct gpiod_lookup_table wifi_gpio_lookup = {
+> >   
+> >   	.dev_id = "rfkill_gpio",
+> >   	.table = {
+> > 
+> > -		GPIO_LOOKUP_IDX("tegra-gpio", 25, NULL, 0, 0),
+> > -		GPIO_LOOKUP_IDX("tegra-gpio", 85, NULL, 1, 0),
+> > +		GPIO_LOOKUP("tegra-gpio", 25, "reset", 0),
+> > +		GPIO_LOOKUP("tegra-gpio", 85, "shutdown", 0),
+> > 
+> >   		{ },
+> >   	
+> >   	},
+> >   
+> >   };
+> 
+> Ping
 
-cc linux-arm-kernel at lists.infradead.org in case someone may have
-resource to help have a test. Thank you!
+also 
 
-Jun
+Tested-by: Marc Dietrich <marvin24@gmx.de>
+
+I thing this should go through the tegra-soc tree. Thierry? Stephen?
+
+Marc
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150908/bb751e14/attachment.sig>
