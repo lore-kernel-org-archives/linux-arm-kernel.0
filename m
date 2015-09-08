@@ -1,54 +1,57 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 8 Sep 2015 23:59:50 +0900
-Subject: [PATCH] arm64: kernel: Use a separate stack for irq interrupts.
-In-Reply-To: <55EE3DCB.40401@linaro.org>
-References: <55EDA040.90208@arm.com>
- <1441636584-23174-1-git-send-email-james.morse@arm.com>
- <400272B6-0733-456F-95C9-9C72C597CEB5@gmail.com> <55EDB5FB.8060800@arm.com>
- <81D7F9F1-1552-4709-BA74-1BF15163C4A0@gmail.com> <55EE3DCB.40401@linaro.org>
-Message-ID: <E94EE887-6838-4D08-8684-000A33EBAF61@gmail.com>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Tue, 8 Sep 2015 15:01:07 +0000
+Subject: [PATCH v8 2/2] ARM: imx: support suspend states on imx7D
+In-Reply-To: <20150907151106.GA30723@tiger>
+References: <1438378439-11569-1-git-send-email-shenwei.wang@freescale.com>
+ <1438378439-11569-3-git-send-email-shenwei.wang@freescale.com>
+ <20150907151106.GA30723@tiger>
+Message-ID: <CY1PR0301MB084344B059A4178B09E949DF83530@CY1PR0301MB0843.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sep 8, 2015, at 10:45 AM, AKASHI Takahiro wrote:
-> Jungseok,
 
-Hi Akashi,
 
-> On 09/08/2015 01:34 AM, Jungseok Lee wrote:
->> On Sep 8, 2015, at 1:06 AM, James Morse wrote:
->>> On 07/09/15 16:48, Jungseok Lee wrote:
->>>> On Sep 7, 2015, at 11:36 PM, James Morse wrote:
->>>> 
->>>> Hi James,
->>>> 
->>>>> Having to handle interrupts on top of an existing kernel stack means the
->>>>> kernel stack must be large enough to accomodate both the maximum kernel
->>>>> usage, and the maximum irq handler usage. Switching to a different stack
->>>>> when processing irqs allows us to make the stack size smaller.
->>>>> 
->>>>> Maximum kernel stack usage (running ltp and generating usb+ethernet
->>>>> interrupts) was 7256 bytes. With this patch, the same workload gives
->>>>> a maximum stack usage of 5816 bytes.
->>>> 
->>>> I'd like to know how to measure the max stack depth.
->>>> AFAIK, a stack tracer on ftrace does not work well. Did you dump a stack
->>>> region and find or track down an untouched region?
->>> 
->>> I enabled the 'Trace max stack' option under menuconfig 'Kernel Hacking' ->
->>> 'Tracers', then looked in debugfs:/tracing/stack_max_size.
->>> 
->>> What problems did you encounter?
->>> (I may be missing something?)
->> 
->> When I enabled the feature, all entries had *0* size except the last entry.
->> It can be reproduced easily as looking in debugs:/tracing/stack_trace.
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> > This patch adds a new suspend driver to manage the power states on IMX7D.
+> > It currently supports "SUSPEND_STANDBY" and "SUSPEND_MEM" states.
+> >
+> > Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+> > Signed-off-by: Anson Huang <b20788@freescale.com>
 > 
-> I'm afraid that you have not applied one of patches in my RFC:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355919.html
+> Please stop sending patches to my Linaro mailbox, and use
+> shawnguo at kernel.org instead.  You should already get that if you ever
+> run ./scripts/get_maintainer.pl on the patch.  Also please always copy
+> kernel at pengutronix.de for i.MX platform patches like this.
 
-My description is not clear. Whenever I use a stack tracer, I always put your
-RFC and Steve's stack tracer fix on top of my tree.
+Noted.
 
-Best Regards
-Jungseok Lee
+> > ---
+> >  arch/arm/mach-imx/Kconfig        |   1 +
+> >  arch/arm/mach-imx/Makefile       |   2 +
+> >  arch/arm/mach-imx/common.h       |   4 +
+> >  arch/arm/mach-imx/pm-imx7.c      | 917
+> +++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-imx/suspend-imx7.S | 529 ++++++++++++++++++++++
+> >  5 files changed, 1453 insertions(+)
+> 
+> 1453 lines addition to kernel only for i.MX7D suspend support.  Yes, this is the
+> way we support suspend on i.MX6, but that's enough, and we have to stop this
+> somewhere.  I would ask you to take Sudeep's comment and adopt PSCI for
+> i.MX7D power management.
+
+According to PSCI spec, a supervisory software must be implemented under either
+HVC(EL2) or SMC(EL3) privilege level. I agree that, with this idea, we could finally move 
+these 1453 lines of codes from kernel into a platform specific firmware. The problem
+is we don't have the firmware so far, and we haven't even had a plan to enable the
+hypervisor or secure software on this platform. Because low power consumption is
+the key feature of this i.MX7D platform, please continue to consider the current 
+implementation and get this feature supported first. 
+
+Thanks,
+Shenwei
+
+ 
+> Shawn
+> 
+> [1] https://lkml.org/lkml/2015/8/26/554
