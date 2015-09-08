@@ -1,49 +1,59 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 8 Sep 2015 09:45:52 +0200
+Date: Tue, 8 Sep 2015 09:48:48 +0200
 Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun4i: Add dts file for the
  pov protab2-ips9 tablet
-In-Reply-To: <20150907205603.GX31584@lukather>
+In-Reply-To: <20150907205216.GW31584@lukather>
 References: <1441441319-10658-1-git-send-email-hdegoede@redhat.com>
  <20150906163023.GR31584@lukather> <55ED3739.609@redhat.com>
- <20150907205603.GX31584@lukather>
-Message-ID: <55EE9230.70209@redhat.com>
+ <1441612142.14422.34.camel@plaes.org> <55ED4F8F.6080502@redhat.com>
+ <1441617262.21530.4.camel@plaes.org> <55ED591B.7050705@redhat.com>
+ <20150907205216.GW31584@lukather>
+Message-ID: <55EE92E0.1010805@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 07-09-15 22:56, Maxime Ripard wrote:
-> On Mon, Sep 07, 2015 at 09:05:29AM +0200, Hans de Goede wrote:
->>>> +&reg_ldo3 {
->>>> +	/*
->>>> +	 * We need to always power the camera sensor, otherwhise all access
->>>> +	 * to i2c1 is blocked.
->>>> +	 */
->>>> +	regulator-always-on;
->>>> +	regulator-min-microvolt = <2800000>;
->>>> +	regulator-max-microvolt = <2800000>;
->>>> +	regulator-name = "vdd-csi";
->>>> +};
->>>
->>> What is connected on i2c1 ? Just the camera sensor? or it has some
->>> other devices there?
->>
->> The bma250 accelerometer sits there, and the kernel already has a driver
->> for it. That driver needs to have devicetree binding support added, and
->> then we should be able to use the accelerometer.
+On 07-09-15 22:52, Maxime Ripard wrote:
+> Hi,
 >
-> Ok, so if this regulator is disable, you can't access the other
-> devices as well, right?
+> On Mon, Sep 07, 2015 at 11:30:03AM +0200, Hans de Goede wrote:
+>>>>> bma250 already has devicetree support. It is used in Gemei G9
+>>>>> tablet (sun4i-gemei-g9.dts).
+>>>>
+>>>> Yes I've seen that, but does it actually work? I've not tried but
+>>>> I do not see any compatible string in the actual bma250 code in
+>>>> the kernel, so I believe that this part of the sun4i-gemei-g9.dts
+>>>> file does not work ?
+>>>
+>>> It worked (even without IRQs) when I submitted the patch. Driver
+>>> itself is under iio/accel/bma180.c
+>>
+>> That is really weird, because:
+>>
+>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/iio/accel/bma180.c
+>>
+>> Does not have an of_match_table ... ??
+>
+> Not really, when using DT, i2c will set the i2c_client name to the
+> device part of the compatible [1] [2], and then if the of_device_id
+> lookup fails, will fallback to matching the i2c_client name to the
+> i2c_device_id [3]. Which in our case matches.
+>
+> Maxime
+>
+> [1] http://lxr.free-electrons.com/source/drivers/i2c/i2c-core.c#L1281
+> [2] http://lxr.free-electrons.com/source/drivers/i2c/i2c-core.c#L969
+> [3] http://lxr.free-electrons.com/source/drivers/i2c/i2c-core.c#L461
 
-Right, the controller reports the bus as being stuck.
+Hmm, not sure whether that is a useful feature or an ugly hack :)
 
-> Do you know why? Is it the regulator providing
-> the pull-up voltage?
+It is sorta unexpected either way. But I can make good use of this to
+enable the accelerometer and maybe also some touchscreens on a bunch of
+boards I have.
 
-I've tried enabling the pull ups on the SoC i2c pins, so I do not think
-that it is that, it seems that somehow when not powered the camera sensor is
-actively keeping the lines low. Either it has multiple power planes, or
-it is using normally-on fet-s between ground and its i2c lines.
+Still should we rely on this? This means relying on Linux kernel behavior,
+rather then something documented in Documentation/devicetree/bindings/...
 
 Regards,
 
