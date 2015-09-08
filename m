@@ -1,100 +1,180 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Tue, 8 Sep 2015 17:45:25 +0100
-Subject: [RFC 2/5] of/serial: move earlycon early_param handling to serial
-In-Reply-To: <20150908125245.GC20562@leverpostej>
-References: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
- <1441716217-23786-3-git-send-email-leif.lindholm@linaro.org>
- <20150908125245.GC20562@leverpostej>
-Message-ID: <20150908164525.GN10728@bivouac.eciton.net>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 08 Sep 2015 17:47:50 +0100
+Subject: [PATCH] arm64: kernel: Use a separate stack for irq interrupts.
+In-Reply-To: <2409A0E9-376A-4B49-8C5F-73084843096F@gmail.com>
+References: <55EDA040.90208@arm.com>
+ <1441636584-23174-1-git-send-email-james.morse@arm.com>
+ <2409A0E9-376A-4B49-8C5F-73084843096F@gmail.com>
+Message-ID: <55EF1136.6050102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2015 at 01:52:45PM +0100, Mark Rutland wrote:
-> On Tue, Sep 08, 2015 at 01:43:34PM +0100, Leif Lindholm wrote:
-> > We have multiple "earlycon" early_param handlers - merge the DT one into
-> > the main earlycon one. This means the earlycon early_param handler does
-> > not just return success if no options are specified.
-> > 
-> > Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> > ---
-> >  drivers/of/fdt.c              | 11 +----------
-> >  drivers/tty/serial/earlycon.c |  4 +++-
-> >  include/linux/of_fdt.h        |  1 +
-> >  3 files changed, 5 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> > index 6e82bc42..fcfc4c7 100644
-> > --- a/drivers/of/fdt.c
-> > +++ b/drivers/of/fdt.c
-> > @@ -793,7 +793,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
-> >  #ifdef CONFIG_SERIAL_EARLYCON
-> >  extern struct of_device_id __earlycon_of_table[];
-> >  
-> > -static int __init early_init_dt_scan_chosen_serial(void)
-> > +int __init early_init_dt_scan_chosen_serial(void)
-> >  {
-> >  	int offset;
-> >  	const char *p;
-> > @@ -834,15 +834,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
-> >  	}
-> >  	return -ENODEV;
-> >  }
-> > -
-> > -static int __init setup_of_earlycon(char *buf)
-> > -{
-> > -	if (buf)
-> > -		return 0;
-> > -
-> > -	return early_init_dt_scan_chosen_serial();
-> > -}
-> > -early_param("earlycon", setup_of_earlycon);
-> >  #endif
-> >  
-> >  /**
-> > diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-> > index f096360..2bda09a 100644
-> > --- a/drivers/tty/serial/earlycon.c
-> > +++ b/drivers/tty/serial/earlycon.c
-> > @@ -17,6 +17,7 @@
-> >  #include <linux/kernel.h>
-> >  #include <linux/init.h>
-> >  #include <linux/io.h>
-> > +#include <linux/of_fdt.h>
-> >  #include <linux/serial_core.h>
-> >  #include <linux/sizes.h>
-> >  #include <linux/mod_devicetable.h>
-> > @@ -187,7 +188,8 @@ static int __init param_setup_earlycon(char *buf)
-> >  	 * don't generate a warning from parse_early_params() in that case
-> >  	 */
-> >  	if (!buf || !buf[0])
-> > -		return 0;
-> > +		if (IS_ENABLED(CONFIG_OF_FLATTREE))
-> > +			return early_init_dt_scan_chosen_serial();
-> >  
-> >  	err = setup_earlycon(buf);
-> >  	if (err == -ENOENT || err == -EALREADY)
-> > diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-> > index df9ef38..772c47c 100644
-> > --- a/include/linux/of_fdt.h
-> > +++ b/include/linux/of_fdt.h
-> > @@ -63,6 +63,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
-> >  				     int depth, void *data);
-> >  extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
-> >  				     int depth, void *data);
-> > +extern int early_init_dt_scan_chosen_serial(void);
+On 08/09/15 15:54, Jungseok Lee wrote:
+> On Sep 7, 2015, at 11:36 PM, James Morse wrote:
 > 
-> I think you need a static inline stub to prevent link errors in
-> !CONFIG_OF_FLATTREE kernels, as we do for
-> early_init_fdt_scan_reserved_mem and friends.
+> Hi James,
+> 
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index e16351819fed..d42371f3f5a1 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -190,10 +190,37 @@ tsk	.req	x28		// current thread_info
+>>  * Interrupt handling.
+>>  */
+>> 	.macro	irq_handler
+>> -	adrp	x1, handle_arch_irq
+>> -	ldr	x1, [x1, #:lo12:handle_arch_irq]
+>> -	mov	x0, sp
+>> +	mrs	x21, tpidr_el1
+>> +	adr_l	x20, irq_sp
+>> +	add	x20, x20, x21
+>> +
+>> +	ldr	x21, [x20]
+>> +	mov	x20, sp
+>> +
+>> +	mov	x0, x21
+>> +	mov	x1, x20
+>> +	bl	irq_copy_thread_info
+>> +
+>> +	/* test for recursive use of irq_sp */
+>> +	cbz	w0, 1f
+>> +	mrs	x30, elr_el1
+>> +	mov	sp, x21
+>> +
+>> +	/*
+>> +	 * Create a fake stack frame to bump unwind_frame() onto the original
+>> +	 * stack. This relies on x29 not being clobbered by kernel_entry().
+>> +	 */
+>> +	push	x29, x30
+> 
+> It is the most challenging item to handle a frame pointer in this context.
+> 
+> As I mentioned previously, a stack tracer on ftrace is not supported yet.
+> How about decoupling "IRQ Stack feature" from "Stack Tracer Fix"?
 
-Will add, thanks.
+Yes - I discovered today this was more complicated than I thought. I will
+need to do some more reading.
 
+
+>> +
+>> +1:	ldr_l	x1, handle_arch_irq
+>> +	mov     x0, x20
+>> 	blr	x1
+>> +
+>> +	mov	x0, x20
+>> +	mov	x1, x21
+>> +	bl	irq_copy_thread_info
+>> +	mov	sp, x20
+>> +
+>> 	.endm
+>>
+>> 	.text
+>> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+>> index 463fa2e7e34c..10b57a006da8 100644
+>> --- a/arch/arm64/kernel/irq.c
+>> +++ b/arch/arm64/kernel/irq.c
+>> @@ -26,11 +26,14 @@
+>> #include <linux/smp.h>
+>> #include <linux/init.h>
+>> #include <linux/irqchip.h>
+>> +#include <linux/percpu.h>
+>> #include <linux/seq_file.h>
+>> #include <linux/ratelimit.h>
+>>
+>> unsigned long irq_err_count;
+>>
+>> +DEFINE_PER_CPU(unsigned long, irq_sp) = 0;
+>> +
+>> int arch_show_interrupts(struct seq_file *p, int prec)
+>> {
+>> #ifdef CONFIG_SMP
+>> @@ -55,6 +58,10 @@ void __init init_IRQ(void)
+>> 	irqchip_init();
+>> 	if (!handle_arch_irq)
+>> 		panic("No interrupt controller found.");
+>> +
+>> +	/* Allocate an irq stack for the boot cpu */
+>> +	if (alloc_irq_stack(smp_processor_id()))
+>> +		panic("Failed to allocate irq stack for boot cpu.");
+>> }
+>>
+>> #ifdef CONFIG_HOTPLUG_CPU
+>> @@ -117,3 +124,48 @@ void migrate_irqs(void)
+>> 	local_irq_restore(flags);
+>> }
+>> #endif /* CONFIG_HOTPLUG_CPU */
+>> +
+>> +/* Allocate an irq_stack for a cpu that is about to be brought up. */
+>> +int alloc_irq_stack(unsigned int cpu)
+>> +{
+>> +	struct page *irq_stack_page;
+>> +	union thread_union *irq_stack;
+>> +
+>> +	/* reuse stack allocated previously */
+>> +	if (per_cpu(irq_sp, cpu))
+>> +		return 0;
 > 
-> Mark.
+> I'd like to avoid even this simple check since CPU hotplug could be heavily
+> used for power management.
+
+I don't think its a problem:
+__cpu_up() contains a call to wait_for_completion_timeout() (which could
+eventually end up in the scheduler), so I don't think it could ever be on a
+'really hot' path.
+
+For really frequent hotplug-like power management, cpu_suspend() makes use
+of firmware support to power-off cores - from what I can see it doesn't use
+__cpu_up().
+
+
+>> +
+>> +	irq_stack_page = alloc_kmem_pages(THREADINFO_GFP, THREAD_SIZE_ORDER);
+>> +	if (!irq_stack_page) {
+>> +		pr_crit("CPU%u: failed to allocate irq stack for cpu %u\n",
+>> +			smp_processor_id(), cpu);
+>> +		return -ENOMEM;
+>> +	}
+>> +	irq_stack = page_address(irq_stack_page);
+>> +
+>> +	per_cpu(irq_sp, cpu) = (unsigned long)irq_stack->stack
+>> +			       + THREAD_START_SP;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +/*
+>> + * Copy struct thread_info between two stacks, and update current->stack.
+>> + * This is used when moving to the irq exception stack.
+>> + * Changing current->stack is necessary so that non-arch thread_info writers
+>> + * don't use the new thread_info->task->stack to find the old thread_info when
+>> + * setting flags like TIF_NEED_RESCHED...
+>> + */
+>> +asmlinkage int irq_copy_thread_info(unsigned long dst_sp, unsigned long src_sp)
+>> +{
+>> +	struct thread_info *src = get_thread_info(src_sp);
+>> +	struct thread_info *dst = get_thread_info(dst_sp);
+>> +
+>> +	if (dst == src)
+>> +		return 0;
+>> +
+>> +	*dst = *src;
+>> +	current->stack = dst;
+>> +
+>> +	return 1;
+>> +}
 > 
-> >  extern void early_init_fdt_scan_reserved_mem(void);
-> >  extern void early_init_fdt_reserve_self(void);
-> >  extern void early_init_dt_add_memory_arch(u64 base, u64 size);
-> > -- 
-> > 2.1.4
-> > 
+> Although this is 32-byte memcpy, sizeof(struct thread_info), this function is called
+> twice to handle a single interrupt. Isn's it too expensive?
+> 
+> This is a major difference between my approach and this patch. I think we should get
+> some feedbacks on struct thread_info information management for v2 preparation.
+
+Agreed.
+
+The other difference, as Akashi Takahiro pointed out, is the behaviour of
+object_is_on_stack(). What should this return for an object on an irq stack?
+
+
+Thanks,
+
+James
