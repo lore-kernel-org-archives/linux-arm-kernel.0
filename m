@@ -1,79 +1,93 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 8 Sep 2015 14:18:00 +0800
-Subject: [PATCH v7 2/5] dt-bindings: Add a binding for Mediatek xHCI host
- controller
-In-Reply-To: <1441693083-8440-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1441693083-8440-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1441693083-8440-3-git-send-email-chunfeng.yun@mediatek.com>
+Date: Tue, 8 Sep 2015 14:17:58 +0800
+Subject: [PATCH v7 0/5] Mediatek xHCI support
+Message-ID: <1441693083-8440-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add a DT binding documentation of xHCI host controller for the
-MT8173 SoC from Mediatek.
+The patch supports MediaTek's xHCI controller.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- .../devicetree/bindings/usb/mt8173-xhci.txt        | 52 ++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+There are some differences from xHCI spec:
+1. The interval is specified in 250 * 8ns increments for Interrupt Moderation
+Interval(IMODI) of the Interrupter Moderation(IMOD) register, it is 8 times as
+much as that defined in xHCI spec.
+
+2. For the value of TD Size in Normal TRB, MTK's xHCI controller defines a
+number of packets that remain to be transferred for a TD after processing all
+Max packets in all previous TRBs,that means don't include the current TRB's,
+but in xHCI spec it includes the current ones.
+
+3. To minimize the scheduling effort for synchronous endpoints in xHC, the MTK
+architecture defines some extra SW scheduling parameters for HW. According to
+these parameters provided by SW, the xHC can easily decide whether a
+synchronous endpoint should be scheduled in a specific uFrame. The extra SW
+scheduling parameters are put into reserved DWs in Slot and Endpoint Context.
+And a bandwidth scheduler algorithm is added to support such feature.
+
+A usb3.0 phy driver is also added which used by mt65xx SoCs platform, it
+supports two usb2.0 ports and one usb3.0 port.
+
+
+Change in v7:
+1. remove xHCI timing setting which only for FPGA
+2. revise xHCI scheduler algorithms
+3. replace "usb" by "USB" in xHCI binding file
+
+Change in v6:
+1. get register base address of port in probe instead of of_xlate
+2. enable clock in phy_init instead of probe
+
+
+Change in v5:
+1. descripte more exactly for each specifiers in xHCI binding
+2. make use of new multi-phy feature for phy driver
+
+Change in v4:
+1. descripte more exactly for each specifiers in binding file
+2. use BIT() to define a bit mask mcro
+
+Change in v3:
+1. implement generic phy
+2. move opperations for IPPC and wakeup from phy driver to xHCI driver
+3. seperate quirk functions into a single C file to fix up dependence issue
+
+Change in v2:
+1. Rebase to 4.2-rc1
+2. Remove probe phy before add usb_hcd patch from this series due to 4.2-rc1
+   already fix this issue
+3. add xhci mac clocks
+4. add suspend/resume
+5. support remote wakeup
+
+Chunfeng Yun (5):
+  dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
+  dt-bindings: Add a binding for Mediatek xHCI host controller
+  usb: phy: add usb3.0 phy driver for mt65xx SoCs
+  xhci: mediatek: support MTK xHCI host controller
+  arm64: dts: mediatek: add xHCI & usb phy for mt8173
+
+ .../devicetree/bindings/phy/phy-mt65xx-usb.txt     |  69 ++
+ .../devicetree/bindings/usb/mt8173-xhci.txt        |  52 ++
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  16 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  44 ++
+ drivers/phy/Kconfig                                |   9 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-mt65xx-usb3.c                      | 456 ++++++++++++
+ drivers/usb/host/Kconfig                           |   9 +
+ drivers/usb/host/Makefile                          |   4 +
+ drivers/usb/host/xhci-mtk-sch.c                    | 449 ++++++++++++
+ drivers/usb/host/xhci-mtk.c                        | 765 +++++++++++++++++++++
+ drivers/usb/host/xhci-mtk.h                        | 121 ++++
+ drivers/usb/host/xhci-ring.c                       |  35 +-
+ drivers/usb/host/xhci.c                            |  19 +-
+ drivers/usb/host/xhci.h                            |   1 +
+ 15 files changed, 2043 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
  create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+ create mode 100644 drivers/phy/phy-mt65xx-usb3.c
+ create mode 100644 drivers/usb/host/xhci-mtk-sch.c
+ create mode 100644 drivers/usb/host/xhci-mtk.c
+ create mode 100644 drivers/usb/host/xhci-mtk.h
 
-diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-new file mode 100644
-index 0000000..d851bf1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-@@ -0,0 +1,52 @@
-+MT8173 xHCI
-+
-+The device node for Mediatek SOC USB3.0 host controller
-+
-+Required properties:
-+ - compatible : should contain "mediatek,mt8173-xhci"
-+ - reg : specifies physical base address and size of the registers,
-+	the first one for MAC, the second for IPPC
-+ - interrupts : interrupt used by the controller
-+ - power-domains : a phandle to USB power domain node to control USB's
-+	mtcmos
-+ - vusb33-supply : regulator of USB avdd3.3v
-+
-+ - clocks : a list of phandle + clock-specifier pairs, one for each
-+	entry in clock-names
-+ - clock-names : must contain
-+	"sys_ck": for clock of xHCI MAC
-+	"wakeup_deb_p0": for USB wakeup debounce clock of port0
-+	"wakeup_deb_p0": for USB wakeup debounce clock of port1
-+
-+ - phys : a list of phandle + phy specifier pairs
-+ - usb3-lpm-capable : supports USB3.0 LPM
-+ - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
-+	control register
-+ - mediatek,wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup
-+	mode; Others means don't enable wakeup source of USB
-+
-+Optional properties:
-+ - vbus-supply : reference to the VBUS regulator;
-+
-+Example:
-+usb30: usb at 11270000 {
-+	compatible = "mediatek,mt8173-xhci";
-+	reg = <0 0x11270000 0 0x1000>,
-+	      <0 0x11280700 0 0x0100>;
-+	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+	clocks = <&topckgen CLK_TOP_USB30_SEL>,
-+		 <&pericfg CLK_PERI_USB0>,
-+		 <&pericfg CLK_PERI_USB1>;
-+	clock-names = "sys_ck",
-+		      "wakeup_deb_p0",
-+		      "wakeup_deb_p1";
-+	phys = <&phy_port0 PHY_TYPE_USB3>,
-+	       <&phy_port1 PHY_TYPE_USB2>;
-+	vusb33-supply = <&mt6397_vusb_reg>;
-+	vbus-supply = <&usb_p1_vbus>;
-+	usb3-lpm-capable;
-+	mediatek,syscon-wakeup = <&pericfg>;
-+	mediatek,wakeup-src = <1>;
-+	status = "okay";
-+};
--- 
+--
 1.8.1.1.dirty
