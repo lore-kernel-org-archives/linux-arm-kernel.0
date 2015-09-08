@@ -1,66 +1,50 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Tue, 8 Sep 2015 15:53:07 +0000
-Subject: [PATCH 2/3] Docs: dt: Add PCI MSI map bindings
-In-Reply-To: <20150907180516.GC18079@leverpostej>
-References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
- <1437670365-20704-3-git-send-email-mark.rutland@arm.com>
- <55B5E8C1.4030707@arm.com> <55EA1C3F.1030300@caviumnetworks.com>
- <20150907180516.GC18079@leverpostej>
-Message-ID: <CY1PR0301MB07484C8F1DE26A5EAFE9C7FD87530@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Sep 2015 16:55:34 +0100
+Subject: I.MX6 HDMI support in v4.2
+In-Reply-To: <CAOCHtYhtkV-TtaA6hz1OTD5TpGCnionK27D2mp4beU+HGymwdw@mail.gmail.com>
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m337yp5gvv.fsf@t19.piap.pl>
+ <1441709778.13536.8.camel@pengutronix.de>
+ <20150908110135.GW21084@n2100.arm.linux.org.uk>
+ <1441710467.13536.13.camel@pengutronix.de>
+ <20150908112909.GX21084@n2100.arm.linux.org.uk>
+ <1441716233.13536.21.camel@pengutronix.de>
+ <CAOCHtYhtkV-TtaA6hz1OTD5TpGCnionK27D2mp4beU+HGymwdw@mail.gmail.com>
+Message-ID: <20150908155533.GA21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> -----Original Message-----
-> From: Mark Rutland [mailto:mark.rutland at arm.com]
-> Sent: Monday, September 07, 2015 1:05 PM
-> To: David Daney
-> Cc: Marc Zyngier; tirumalesh.chalamarla at caviumnetworks.com; Richter, Robert; Chintakuntla, Radha;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; iommu at lists.linux-foundation.org; linux-arm-
-> kernel at lists.infradead.org; Will Deacon; Robin Murphy; Lorenzo Pieralisi; arnd at arndb.de; treding at nvidia.com;
-> majun258 at huawei.com; thunder.leizhen at huawei.com; laurent.pinchart at ideasonboard.com; Yoder Stuart-B08248
-> Subject: Re: [PATCH 2/3] Docs: dt: Add PCI MSI map bindings
+On Tue, Sep 08, 2015 at 09:17:06AM -0500, Robert Nelson wrote:
+> >> I
+> >> suspect that the iMX6 is going to be obsolete before we have a decent
+> >> working video playback story on this hardware.
+> >>
+> > MX6Plus is just around the corner and will probably keep us busy for a
+> > while. ;)
 > 
-> On Fri, Sep 04, 2015 at 11:33:35PM +0100, David Daney wrote:
-> > Hi Mark,
+> Lucas,
 > 
-> Hi David,
+> In which case, it "might" be a good idea to get the current version of
+> etnaviv in mainline for current imx6's before you guys disappear again
+> for mx6plus development..
 > 
-> > I now have a prototype implementation for irq-gic-v3-its.c that is using
-> > this binding on Cavium's ThunderX platform.
-> >
-> > Q: Have you guys had any more thoughts on this that might require
-> > changing the binding?
+> As you guys are basically repeating what happened with the limadriver:
+> http://limadriver.org/
 > 
-> Having discussed this with Stuart and others at Linux Plumbers, I think
-> that the binding is sufficient, and unlikely to change greatly unless
-> there is a strong objection (Stuart, please correct me if I am wrong).
+> Remember, there is an etnaviv community.
 > 
-> Per Marc's comments there are probably some edge cases and/or wording
-> details to sort out, but I think the common/simple case is sorted. I'll
-> send a v2 once those have been settled.
+> Russell:
+> is there any reason to not just push your version for mainline and let
+> Pengutronix submit patches.
 
-I think the binding as-is, is sufficient for the static description
-of RID to SID.
+The basic problem is getting the kernel<->user API stable before it
+goes into mainline, which is an absolute must.  We can't drop it into
+mainline and then break the user API.
 
-I think the binding can be extended in a backwards compatible way
-to support dynamic RID->SID mappings if we need that in the future.
+We also want to avoid putting it into the staging tree and have it
+sit around there for years.
 
-The case that we (Freescale) are concerned with are where someone
-plugs an SRIOV card into an SoC and enables, say 64 VFs.  It's
-like hot-plugging 64 new PCI devices at once.  If all those devices
-that show up belong to the host they belong to one 'isolation context' and
-could share the same streamID, same SMMU mappings, and the same
-ITT in the GIC ITS.  So a static mapping could work.
-
-But, as soon as I want to assign VF#5 to a virtual machine I need
-a new RID->SID mapping for VF#5.  To require firmware to do that mapping
-ahead of time is a _real_ pain.  I think longer term we need some
-mechanism to allow lazy, dynamic RID->SID mappings by Linux.
-
-We can start with the static approach, but we need to keep in the
-back of our minds that there may be cases in the near future
-where a static mapping is too inflexible.
-
-Thanks,
-Stuart
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
