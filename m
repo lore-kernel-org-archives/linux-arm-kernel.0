@@ -1,86 +1,80 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 8 Sep 2015 10:37:29 +0100
-Subject: [PATCH v4 2/5] irqchip, gicv3: Workaround for Cavium ThunderX
- erratum 23154
-In-Reply-To: <55EEA5CA.5050901@arm.com>
-References: <1439576885-15621-1-git-send-email-rric@kernel.org>
- <1439576885-15621-3-git-send-email-rric@kernel.org>
- <55EDC12E.8000408@arm.com>
- <20150907171501.GD10645@e104818-lin.cambridge.arm.com>
- <55EDCC5E.9080203@arm.com>
- <20150908090023.GB14550@e104818-lin.cambridge.arm.com>
- <55EEA5CA.5050901@arm.com>
-Message-ID: <20150908093729.GE14550@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 08 Sep 2015 10:45:58 +0100
+Subject: [PATCH 0/5] ACPI probing infrastructure
+In-Reply-To: <3667410.80mLyhGuXy@vostro.rjw.lan>
+References: <1441386412-8139-1-git-send-email-marc.zyngier@arm.com>
+ <3667410.80mLyhGuXy@vostro.rjw.lan>
+Message-ID: <55EEAE56.9070804@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2015 at 10:09:30AM +0100, Suzuki K. Poulose wrote:
-> On 08/09/15 10:00, Catalin Marinas wrote:
-> >On Mon, Sep 07, 2015 at 06:41:50PM +0100, Suzuki K. Poulose wrote:
-> >>On 07/09/15 18:15, Catalin Marinas wrote:
-> >>>On Mon, Sep 07, 2015 at 05:54:06PM +0100, Suzuki K. Poulose wrote:
-> >>>>On 14/08/15 19:28, Robert Richter wrote:
-> >>>>>+static void gicv3_enable_quirks(void)
-> >>>>>+{
-> >>>>>+	if (cpus_have_cap(ARM64_WORKAROUND_CAVIUM_23154))
-> >>>>>+		static_key_slow_inc(&is_cavium_thunderx);
-> >>>>
-> >>>>May be you could use the enable() method added to struct arm64_cpu_capability
-> >>>>here to perform the above operation, added by James :
-> >>>>
-> >>>>commit 1c0763037f1e1caef739e36e09c6d41ed7b61b2d
-> >>>>Author: James Morse <james.morse@arm.com>
-> >>>>Date:   Tue Jul 21 13:23:28 2015 +0100
-> >>>>
-> >>>>     arm64: kernel: Add cpufeature 'enable' callback
-> >>>
-> >>>I thought about this as well when looking at the patch but decided it's
-> >>>better as it is. The "enable" method is meant to enable per-CPU features
-> >>>(or workarounds) but here it is about GICv3, so we don't want to enable
-> >>>for every CPU.
-> >>
-> >>Right. I have been playing with a series where the checks are delayed until
-> >>all CPUs are brought up.
-> >
-> >Unrelated to the GIC workaround, delaying the enable feature until the
-> >CPUs are brought up is not always be feasible.
+On 07/09/15 22:26, Rafael J. Wysocki wrote:
+> On Friday, September 04, 2015 06:06:47 PM Marc Zyngier wrote:
+>> IRQ controllers and timers are the two types of device the kernel
+>> requires before being able to use the device driver model.
+>>
+>> ACPI so far lacks a proper probing infrastructure similar to the one
+>> we have with DT, where we're able to declare IRQ chips and
+>> clocksources inside the driver code, and let the core code pick it up
+>> and call us back on a match. This leads to all kind of really ugly
+>> hacks all over the arm64 code and even in the ACPI layer.
+>>
+>> It turns out that providing such a probing infrastructure is rather
+>> easy, and provides a much deserved cleanup in both the arch code, the
+>> GIC driver, and the architected timer driver.
 > 
-> Right. But then, enabling a feature(and applying the alternatives) based on
-> a single CPU may not be safe, always, like PAN. If one of the boot time CPU
-> doesn't have it, then we are in trouble (even though we WARN about it from
-> SANITY check)
+> Since I'm not familiar with the DT probing infrastructure mentioned above,
+> can you please explain to me (possibly at a high level), how it is supposed
+> to work in the ACPI case?
 
-I see your point but there's a trade-off. For some features it's not be
-feasible to postpone until user space (e.g. errata workarounds). But if
-a CPU coming up late doesn't have compatible features, just keep it in a
-loop (or park it back if possible or even refuse to boot any further). I
-don't think we should cater for insane hardware configurations (e.g. mix
-of PAN/no-PAN as we already do the code patching). Do you plan to defer
-code patching as well?
+So let's start with DT. Each interrupt controller driver has at least
+one entry like this:
 
-Note that we may have to use the .enable function for errata workarounds
-as well, not just features like PAN (we currently only do code patching
-but we may have to do other things like issuing SMC calls, you never
-know what's going to hit us).
+IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
 
-> >At some point we may
-> >implement support to defer the CPU on to user space (I already have a
-> >patch that does this when no DT enable-method is specified, but I won't
-> >publish it before Qualcomm fixes its firmware ;)). But we may have other
-> >reasons to start with CPUs hot-unplugged by default and turn them on
-> >later.
-> 
-> We have SANITY check infrastructure that WARNs in such cases, if the features
-> don't match.  But still, wouldn't it be better to enable a feature
-> only if all the boot-time enabled CPUs have it ? (Errata is an exception though,
-> which only depends on whether one of the CPU needs it).
+which says: if you find a node having "arm,gic-400" as a compatible
+string in the device tree, then call gic_of_init with this node as a
+parameter. The probing itself is done by the OF layer when the
+architecture code calls of_irq_init() (usually via irqchip_init).
 
-If we ever need this, I think we should implement a separate late_enable
-function as just deferring all features enabling is not generic enough.
-But in the meantime, I don't think we should worry about this case,
-let's wait and see whether we ever get such configurations (panicking
-the kernel on incompatible features is a good starting point -
-FPSIMD/no-FPSIMD, PAN/no-PAN etc.)
+This has a number of benefits:
 
+- The irqchip code is self-contained. No architecture specific entry
+point, no exposed symbols. Just a standard interface.
+
+- The low-level architecture code doesn't have to know about which
+interrupt controller is present. It just calls into the firmware
+interface (of_irq_init) which is going to sort things out.
+
+Similar infrastructure is provided for the timers/clock sources. Note
+that this is not a replacement for the device model, but acts as a
+probing infrastructure for things that are required too early for the
+device infrastructure to be available.
+
+What I'm aiming for is to introduce the same level of abstraction for
+ACPI, or at least for the few bits that are required before a full blown
+ACPI/device model can be used. For this, I introduce something  vaguely
+similar:
+
+IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
+		     gic_validate_dist, ACPI_MADT_GIC_VERSION_V2,
+		     gic_v2_acpi_init);
+
+which says: if you find a ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR entry in
+MADT (implied by the macro), and that entry is of type
+ACPI_MADT_GIC_VERSION_V2 (as checked by gic_validate_dist), then call
+gic_v2_acpi_init with the entry as a parameter. A bit more convoluted,
+but still without any special entry point.
+
+The various interrupt controller drivers can then implement the above,
+and the arch code can use a firmware-specific call to get the probing
+done, still being oblivious of what interrupt controller is being used.
+It also makes the adaptation of a DT driver to ACPI easier.
+
+Does this help?
+
+Thanks,
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
