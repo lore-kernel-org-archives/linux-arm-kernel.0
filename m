@@ -1,62 +1,53 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 8 Sep 2015 18:29:20 -0500
-Subject: [PATCH linux-next v5 4/5] Documentation: atmel-quadspi: add
- binding file for Atmel QSPI driver
-In-Reply-To: <793cb906c79eed821cf9b47e79dc1b54a7a5dbd0.1440580764.git.cyrille.pitchen@atmel.com>
-References: <cover.1440580764.git.cyrille.pitchen@atmel.com>
- <793cb906c79eed821cf9b47e79dc1b54a7a5dbd0.1440580764.git.cyrille.pitchen@atmel.com>
-Message-ID: <55EF6F50.5020006@kernel.org>
+Date: Tue, 8 Sep 2015 18:33:19 -0500
+Subject: [PATCH linux-next v9 1/3] mfd: atmel-flexcom: create include file
+ with macros used by DT bindings
+In-Reply-To: <69844d8092ccbcaef6a3a24d39127ca432462d69.1441118159.git.cyrille.pitchen@atmel.com>
+References: <cover.1441118159.git.cyrille.pitchen@atmel.com>
+ <69844d8092ccbcaef6a3a24d39127ca432462d69.1441118159.git.cyrille.pitchen@atmel.com>
+Message-ID: <55EF703F.2030806@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/26/2015 07:30 AM, Cyrille Pitchen wrote:
-> This patch documents the DT bindings for the driver of the Atmel QSPI
-> controller embedded inside sama5d2x SoCs.
+On 09/01/2015 09:46 AM, Cyrille Pitchen wrote:
+> This patch defines some macros to be used as value for the
+> "atmel,flexcom-mode" DT property. This value is then written into
+> the Operating Mode (OPMODE) bit field of the Flexcom Mode Register.
 > 
 > Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: Marek Vasut <marex@denx.de>
 
 Acked-by: Rob Herring <robh@kernel.org>
 
+In the future, you can combine headers with the binding doc as they are
+part of the binding.
+
+Rob
+
 > ---
->  .../devicetree/bindings/mtd/atmel-quadspi.txt      | 29 ++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+>  include/dt-bindings/mfd/atmel-flexcom.h | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>  create mode 100644 include/dt-bindings/mfd/atmel-flexcom.h
 > 
-> diff --git a/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+> diff --git a/include/dt-bindings/mfd/atmel-flexcom.h b/include/dt-bindings/mfd/atmel-flexcom.h
 > new file mode 100644
-> index 000000000000..0b8d545bb198
+> index 000000000000..6728f2851b4d
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
-> @@ -0,0 +1,29 @@
-> +* Atmel Quad Serial Peripheral Interface (QSPI)
+> +++ b/include/dt-bindings/mfd/atmel-flexcom.h
+> @@ -0,0 +1,16 @@
+> +/*
+> + * This header provides macros for Atmel Flexcom DT bindings.
+> + *
+> + * Copyright (C) 2015 Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> + *
+> + * GPLv2 only
+> + */
 > +
-> +Required properties:
-> +- compatible:     should be "atmel,sama5d2-qspi"
-> +- reg:            the first contains the register location and length,
-> +                  the second contains the memory mapping address and length
-> +- interrupts:     should contain the interrupt for the device
-> +- clocks:         the phandle of the clock needed by the QSPI controller
-> +- #address-cells: should be <1>
-> +- #size-cells:    should be <0>
+> +#ifndef __DT_BINDINGS_ATMEL_FLEXCOM_H__
+> +#define __DT_BINDINGS_ATMEL_FLEXCOM_H__
 > +
-> +Example:
+> +#define ATMEL_FLEXCOM_MODE_USART	1
+> +#define ATMEL_FLEXCOM_MODE_SPI		2
+> +#define ATMEL_FLEXCOM_MODE_TWI		3
 > +
-> +spi at f0020000 {
-> +	compatible = "atmel,sama5d2-qspi";
-> +	reg = <0xf0020000 0x100>,
-> +	      <0xd0000000 0x8000000>;
-> +	interrupts = <52 IRQ_TYPE_LEVEL_HIGH 7>;
-> +	clocks = <&spi0_clk>;
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_spi0_default>;
-> +	status = "okay";
-> +
-> +	m25p80 at 0 {
-> +		...
-> +	};
-> +};
+> +#endif /* __DT_BINDINGS_ATMEL_FLEXCOM_H__ */
 > 
