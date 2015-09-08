@@ -1,33 +1,74 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue,  8 Sep 2015 22:38:06 +0200
-Subject: [PATCH v2 3/3] ARM: configs: Set FORCE_MAX_ZONEORDER to 9 in
- efm32_defconfig
-In-Reply-To: <1441744686-20521-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1441744686-20521-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1441744686-20521-4-git-send-email-mcoquelin.stm32@gmail.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Tue, 8 Sep 2015 22:41:15 +0200
+Subject: mysterious crashes on OMAP5 uevm
+In-Reply-To: <20150908143810.GD4215@atomide.com>
+References: <CANOLnOO3NdK1r1jZQtS=TcHEE7SQwhGHh0YsqqoCJpFW3NO05Q@mail.gmail.com>
+ <20150908143810.GD4215@atomide.com>
+Message-ID: <CANOLnOODjTaBcL1QzAm7o4YOB=_P-s7JYovu6fhNSqJSV2Bq+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FORCE_MAX_ZONEORDER has now to be configured in defconfig for ARMV7
-platforms.
+On Tue, Sep 8, 2015 at 4:38 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Grazvydas Ignotas <notasas@gmail.com> [150908 05:50]:
+>> Hi,
+>>
+>> this is a longstanding problem I'm seeing since the very beginning,
+>> which was around 3.12 or so (when I've first got the hardware) and it
+>> seems 4.2 is affected by it still. Basically what happens is Xorg
+>> randomly segfaults at some "impossible" location. I don't have the
+>> details at the moment (could get them is needed), but from what I
+>> examined with gdb some time ago the situation did not make any sense.
+>>
+>> There are 2 workarounds that I know which make the problem go away
+>> (one is enough):
+>> - recompile Xorg with -marm (I'm using Debian armhf so it's thumb2 by default)
+>> - disable ARCH_MULTI_V6 in the kernel config
+>>
+>> Because of the above workarounds I have forgotten about it several
+>> times, but it regularly comes back and bites again. It would look like
+>> some missing erratum workaround, but I have all of them enabled in the
+>> kernel.
+>>
+>> Does anyone know about this? Perhaps some missing erratum workaround
+>> in the bootloader? u-boot isn't too old here (2015.07).
+>
+> Seems like some incorrect handling with CONFIG_CPU_V6 compiled in..
+> Maybe try to narrow it down by commenting out some CONFIG_CPU_V6 and
+> __LINUX_ARM_ARCH__ = 6 ifdefs in the git grep CONFIG_CPU_V6
+> places ignoring uncompress and davinci code.
 
-Cc: Uwe Kleine-K?nig <kernel@pengutronix.de>
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
----
- arch/arm/configs/efm32_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ok with that it was quite easy to find. On a kernel with ARCH_MULTI_V6
+disabled, it is enough to just do this:
 
-diff --git a/arch/arm/configs/efm32_defconfig b/arch/arm/configs/efm32_defconfig
-index c0dac0f0f..884f16e 100644
---- a/arch/arm/configs/efm32_defconfig
-+++ b/arch/arm/configs/efm32_defconfig
-@@ -24,6 +24,7 @@ CONFIG_DRAM_SIZE=0x00400000
- CONFIG_FLASH_MEM_BASE=0x8c000000
- CONFIG_FLASH_SIZE=0x01000000
- CONFIG_PREEMPT=y
-+CONFIG_FORCE_MAX_ZONEORDER=9
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_XIP_KERNEL=y
--- 
-1.9.1
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -340,13 +340,13 @@ setup_return(struct pt_regs *regs, struct ksignal *ksig,
+                /*
+                 * The LSB of the handler determines if we're going to
+                 * be using THUMB or ARM mode for this signal handler.
+                 */
+                thumb = handler & 1;
+
+-#if __LINUX_ARM_ARCH__ >= 7
++#if 0 //__LINUX_ARM_ARCH__ >= 7
+                /*
+                 * Clear the If-Then Thumb-2 execution state
+                 * ARM spec requires this to be all 000s in ARM mode
+                 * Snapdragon S4/Krait misbehaves on a Thumb=>ARM
+                 * signal transition without this.
+                 */
+
+... and the problem appears, so I guess this needs some real
+multiplatform handling,.
+
+> Do you have some easy way to reproduce this issue?
+
+Just moving a browser window around with mouse usually triggers it
+within a minute.
+
+>
+> Regards,
+>
+> Tony
+
+Gra?vydas
