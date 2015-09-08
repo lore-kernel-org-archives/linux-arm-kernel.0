@@ -1,102 +1,95 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 8 Sep 2015 14:09:51 +0100
-Subject: [RFC 3/5] acpi/serial: add DBG2 earlycon support
-In-Reply-To: <1441716217-23786-4-git-send-email-leif.lindholm@linaro.org>
-References: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
- <1441716217-23786-4-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <20150908130951.GE20562@leverpostej>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 8 Sep 2015 22:12:42 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Enable USB Video Class support
+In-Reply-To: <55EE9F1A.9030703@osg.samsung.com>
+References: <1441662323-15468-1-git-send-email-javier@osg.samsung.com>
+ <55EE9820.2010202@samsung.com> <55EE9F1A.9030703@osg.samsung.com>
+Message-ID: <55EEDECA.4040407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2015 at 01:43:35PM +0100, Leif Lindholm wrote:
-> The ACPI DBG2 table defines a debug console. Add support for parsing it
-> and using it to select earlycon destination when no arguments provided.
+W dniu 08.09.2015 o 17:40, Javier Martinez Canillas pisze:
+> [adding Bartlomiej to cc]
 > 
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> Hello Krzysztof,
+> 
+> On 09/08/2015 10:11 AM, Krzysztof Kozlowski wrote:
+>> On 08.09.2015 06:45, Javier Martinez Canillas wrote:
+>>> The Exynos5420 Peach Pit and Exynos5800 Peach Pi boards have a built-in
+>>> Silicon Motion USB UVC WebCam. Enable support for the USB Video Class
+>>> driver and its needed media Kconfig symbols so the camera is supported.
+>>>
+>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>>
+>>> ---
+>>>
+>>>  arch/arm/configs/exynos_defconfig | 4 ++++
+>>>  1 file changed, 4 insertions(+)
+>>
+>> The patch itself looks good but now I wonder whether we are not putting
+>> to much stuff built-in. The exynos_defconfig does not replace the
+>> distribution distro. For a fully working board the distro should prepare
+>> it's own config.
+>>
+> 
+> Agreed that exynos_defconfig is not meant to replace a distro config.
+> 
+>> I understand that in this case the USB webcams are parts of device (like
+>> on all laptops)... a little bit similar as camera sensors on mobile
+>> phones. Yet on mobile phone usually the camera itself is part of SoC,
+>> only the sensor is external.
+>>
+>> Actually what we need is a kind of policy for exynos_defconfig - what
+>> should be inside as built-in and what as module?
+>>
+> 
+> I had the same conversation with Bartlomiej before in [0] when I tried to
+> enable the SBS battery driver as module. I save you a click and quote him:
+> 
+> "the current most popular use case for exynos_defconfig
+> (not multi_v7_defconfig) seems to be to build kernel image
+> alone and use it without any modules"
+> 
+> Which seems to be true, so my understanding is that exynos_defconfig is a
+> minimal defconfig for Exynos platforms and for easy of test/use, everything
+> should be built-in while multi_v7_defconfig would be more similar to a conf
+> used by distros where most things would be built as a module when possible.
 
-[...]
+Yeah, but this actually does not entirely cover my doubts. We cannot
+enable everything built-in because boot partitions on some devices have
+limited size. So enabling everything would break that use case (use case
+of easy testing).
 
-> diff --git a/drivers/acpi/console.c b/drivers/acpi/console.c
-> new file mode 100644
-> index 0000000..a985890
-> --- /dev/null
-> +++ b/drivers/acpi/console.c
-> @@ -0,0 +1,103 @@
-> +/*
-> + * Copyright (c) 2012, Intel Corporation
-> + * Copyright (c) 2015, Linaro Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#define DEBUG
+Let me rephrase my question into:
+1. What is worth enabling in exynos_defconfig? USB devices? I would
+argue, except they are needed to boot.
+So maybe enable everything which Exynos boards have hard-wired? That
+would make some sense... but we're making kernel larger.
 
-Why?
+2. Maybe enable only what is a typical use case (including typical
+testing cases)? Then we would have to define what "typical" means. For
+example battery would be typical but camera would not.
 
-> +#define pr_fmt(fmt) "ACPI: " KBUILD_MODNAME ": " fmt
-> +
-> +#include <linux/acpi.h>
-> +#include <linux/kernel.h>
-> +#include <linux/serial_core.h>
-> +
-> +#define NUM_ELEMS(x) (sizeof(x) / sizeof(*x))
+3. Argh, so maybe, if we agree that not everything is worth being
+enabled, that additional stuff could be build as module?
 
-Use ARRAY_SIZE (from kernel.h).
 
-> +
-> +#ifdef CONFIG_SERIAL_EARLYCON
-> +static int use_earlycon __initdata;
-> +static int __init setup_acpi_earlycon(char *buf)
-> +{
-> +	if (!buf)
-> +		use_earlycon = 1;
-> +
-> +	return 0;
-> +}
-> +early_param("earlycon", setup_acpi_earlycon);
+> Other SoC specific deconfig do it differently, OMAP for example does the
+> opposite and tries to build as much stuff as possible as a module.
 
-It seems a shame to add this after folding the OF case into the earlycon
-code. What necessitates this being a separate early_param? Why is it too
-early to parse DBG2?
+I don't argue about switching from "y" to "m". That's not the case.
+Rather I am thinking where/when we should stop enabling stuff?
 
-[...]
+Best regards,
+Krzysztof
 
-> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-> index 2bda09a..c063cbb 100644
-> --- a/drivers/tty/serial/earlycon.c
-> +++ b/drivers/tty/serial/earlycon.c
-> @@ -13,6 +13,7 @@
->  
->  #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
->  
-> +#include <linux/acpi.h>
->  #include <linux/console.h>
->  #include <linux/kernel.h>
->  #include <linux/init.h>
-> @@ -184,12 +185,16 @@ static int __init param_setup_earlycon(char *buf)
->  	int err;
->  
->  	/*
-> -	 * Just 'earlycon' is a valid param for devicetree earlycons;
-> -	 * don't generate a warning from parse_early_params() in that case
-> +	 * Just 'earlycon' is a valid param for devicetree or ACPI earlycons;
-> +	 * ACPI cannot be parsed yet, so return without action if enabled.
-> +	 * Otherwise, attempt initialization using DT.
->  	 */
-> -	if (!buf || !buf[0])
-> -		if (IS_ENABLED(CONFIG_OF_FLATTREE))
-> +	if (!buf || !buf[0]) {
-> +		if (!acpi_disabled)
-> +			return 0;
-> +		else if (IS_ENABLED(CONFIG_OF_FLATTREE))
->  			return early_init_dt_scan_chosen_serial();
-> +	}
-
-It would be much nicer if we could handle the ACPI earlycon parsing in
-the same place. As above, I assume I'm missing something that prevents
-that.
-
-Mark.
+> 
+>> Best regards,
+>> Krzysztof
+>>
+>>
+> 
+> [0]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/278757.html
+> 
+> Best regards,
+> 
