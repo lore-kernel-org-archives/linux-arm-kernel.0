@@ -1,266 +1,77 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 08 Sep 2015 16:51:04 +0900
-Subject: [PATCH] arm64: kernel: Use a separate stack for irq interrupts.
-In-Reply-To: <1441636584-23174-1-git-send-email-james.morse@arm.com>
-References: <55EDA040.90208@arm.com>
- <1441636584-23174-1-git-send-email-james.morse@arm.com>
-Message-ID: <55EE9368.2060708@linaro.org>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Tue, 8 Sep 2015 15:53:28 +0800
+Subject: [PATCH v2] serial: pl011: Fix earlycon register LUT breakage
+In-Reply-To: <CABymUCN4tuNMC1m0AS36OZ9MVOa3HtH3mYC0s04LyUWVPxmZ4A@mail.gmail.com>
+References: <1441468654-6923-1-git-send-email-jun.nie@linaro.org>
+ <CABymUCPMSKPwqtivYMJa3n-2GWbjhM6u7KDOwD1ypJRCeLZo7Q@mail.gmail.com>
+ <CABymUCN4tuNMC1m0AS36OZ9MVOa3HtH3mYC0s04LyUWVPxmZ4A@mail.gmail.com>
+Message-ID: <CABymUCNmY+txUSaJDXsn4hb5p=frT5uAN-6Y97t+b7g224dkvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2015 11:36 PM, James Morse wrote:
-> Having to handle interrupts on top of an existing kernel stack means the
-> kernel stack must be large enough to accomodate both the maximum kernel
-> usage, and the maximum irq handler usage. Switching to a different stack
-> when processing irqs allows us to make the stack size smaller.
->
-> Maximum kernel stack usage (running ltp and generating usb+ethernet
-> interrupts) was 7256 bytes. With this patch, the same workload gives
-> a maximum stack usage of 5816 bytes.
+2015-09-08 15:52 GMT+08:00 Jun Nie <jun.nie@linaro.org>:
+> 2015-09-08 10:23 GMT+08:00 Jun Nie <jun.nie@linaro.org>:
+>> 2015-09-05 23:57 GMT+08:00 Jun Nie <jun.nie@linaro.org>:
+>>> Commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
+>>> mistakenly used the register LUT i/o accessors for the pl011
+>>> earlycon. Since the port has not been probed at earlycon time,
+>>> the struct uart_amba_port (and register LUTs) are uninitialized.
+>>>
+>>> Use direct register addressing for pl011 earlycon; other h/w supported
+>>> by the amba-pl011 driver should declare an alternate earlycon.
+>>>
+>>> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
+>>> Signed-off-by: Jun Nie <jun.nie@linaro.org>
+>>> ---
+>>>  drivers/tty/serial/amba-pl011.c | 15 +++------------
+>>>  1 file changed, 3 insertions(+), 12 deletions(-)
+>>>
+>>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+>>> index 2af09ab..cce41e0 100644
+>>> --- a/drivers/tty/serial/amba-pl011.c
+>>> +++ b/drivers/tty/serial/amba-pl011.c
+>>> @@ -326,12 +326,6 @@ static void pl011_writew(struct uart_amba_port *uap, int val, int index)
+>>>         writew_relaxed(val, uap->port.membase + uap->reg_lut[index]);
+>>>  }
+>>>
+>>> -static void pl011_writeb(struct uart_amba_port *uap, u8 val, int index)
+>>> -{
+>>> -       WARN_ON(index > REG_NR);
+>>> -       writeb_relaxed(val, uap->port.membase + uap->reg_lut[index]);
+>>> -}
+>>> -
+>>>  /*
+>>>   * Reads up to 256 characters from the FIFO or until it's empty and
+>>>   * inserts them into the TTY layer. Returns the number of characters
+>>> @@ -2348,13 +2342,10 @@ static struct console amba_console = {
+>>>
+>>>  static void pl011_putc(struct uart_port *port, int c)
+>>>  {
+>>> -       struct uart_amba_port *uap =
+>>> -           container_of(port, struct uart_amba_port, port);
+>>> -
+>>> -       while (pl011_readw(uap, REG_FR) & UART01x_FR_TXFF)
+>>> +       while (readw_relaxed(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+>>>                 ;
+>>> -       pl011_writeb(uap, c, REG_DR);
+>>> -       while (pl011_readw(uap, REG_FR) & uap->fr_busy)
+>>> +       writeb_relaxed(c, port->membase + UART01x_DR);
+>>> +       while (readw_relaxed(port->membase + UART01x_FR) & UART01x_FR_BUSY)
+>>>                 ;
+>>>  }
+>>>
+>>> --
+>>> 1.9.1
+>>>
+>>
+>> Could anybody help test this earlycon patch on hardware with standard
+>> pl011 serial? Your help is appreciated and valuable no matter the
+>> previous patch set is carried on or reverted.
+>> Thank you very much!
+>>
+>> Jun
 
-With stack tracer on, the kernel with this patch ran into BUG() in check_stack():
-     if (task_stack_end_corrupted(current))
-         BUG();
+cc linux-arm-kernel at lists.infradead.org in case someone may have
+resource to help have a test. Thank you!
 
-This is because a check for an interrupt stack with "object_is_on_stack(stack)"
-has passed, while your irq stack doesn't have a STACK_END_MAGIC.
-
-> +-+
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->   arch/arm64/include/asm/irq.h         | 12 +++++++++
->   arch/arm64/include/asm/thread_info.h |  8 ++++--
->   arch/arm64/kernel/entry.S            | 33 ++++++++++++++++++++---
->   arch/arm64/kernel/irq.c              | 52 ++++++++++++++++++++++++++++++++++++
->   arch/arm64/kernel/smp.c              |  4 +++
->   arch/arm64/kernel/stacktrace.c       |  4 ++-
->   6 files changed, 107 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-> index bbb251b14746..050d4196c736 100644
-> --- a/arch/arm64/include/asm/irq.h
-> +++ b/arch/arm64/include/asm/irq.h
-> @@ -2,14 +2,20 @@
->   #define __ASM_IRQ_H
->
->   #include <linux/irqchip/arm-gic-acpi.h>
-> +#include <linux/percpu.h>
->
->   #include <asm-generic/irq.h>
-> +#include <asm/thread_info.h>
-> +
-> +DECLARE_PER_CPU(unsigned long, irq_sp);
->
->   struct pt_regs;
->
->   extern void migrate_irqs(void);
->   extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
->
-> +extern int alloc_irq_stack(unsigned int cpu);
-> +
->   static inline void acpi_irq_init(void)
->   {
->   	/*
-> @@ -21,4 +27,10 @@ static inline void acpi_irq_init(void)
->   }
->   #define acpi_irq_init acpi_irq_init
->
-> +static inline bool is_irq_stack(unsigned long sp)
-> +{
-> +	struct thread_info *ti = get_thread_info(sp);
-> +	return (get_thread_info(per_cpu(irq_sp, ti->cpu)) == ti);
-> +}
-> +
->   #endif
-> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-> index dcd06d18a42a..b906254fc400 100644
-> --- a/arch/arm64/include/asm/thread_info.h
-> +++ b/arch/arm64/include/asm/thread_info.h
-> @@ -69,12 +69,16 @@ register unsigned long current_stack_pointer asm ("sp");
->   /*
->    * how to get the thread information struct from C
->    */
-> +static inline struct thread_info *get_thread_info(unsigned long sp)
-> +{
-> +	return (struct thread_info *)(sp & ~(THREAD_SIZE - 1));
-> +}
-> +
->   static inline struct thread_info *current_thread_info(void) __attribute_const__;
->
->   static inline struct thread_info *current_thread_info(void)
->   {
-> -	return (struct thread_info *)
-> -		(current_stack_pointer & ~(THREAD_SIZE - 1));
-> +	return get_thread_info(current_stack_pointer);
->   }
->
->   #define thread_saved_pc(tsk)	\
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index e16351819fed..d42371f3f5a1 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -190,10 +190,37 @@ tsk	.req	x28		// current thread_info
->    * Interrupt handling.
->    */
->   	.macro	irq_handler
-> -	adrp	x1, handle_arch_irq
-> -	ldr	x1, [x1, #:lo12:handle_arch_irq]
-> -	mov	x0, sp
-> +	mrs	x21, tpidr_el1
-> +	adr_l	x20, irq_sp
-> +	add	x20, x20, x21
-> +
-> +	ldr	x21, [x20]
-> +	mov	x20, sp
-> +
-> +	mov	x0, x21
-> +	mov	x1, x20
-> +	bl	irq_copy_thread_info
-> +
-> +	/* test for recursive use of irq_sp */
-> +	cbz	w0, 1f
-> +	mrs	x30, elr_el1
-> +	mov	sp, x21
-> +
-> +	/*
-> +	 * Create a fake stack frame to bump unwind_frame() onto the original
-> +	 * stack. This relies on x29 not being clobbered by kernel_entry().
-> +	 */
-> +	push	x29, x30
-
-I don't think that it works. Since unwind_frame() doesn't care about sp, but
-only does fp, a pushed stack frame will never be dereferenced.
-
--Takahiro AKASHI
-
-
-> +
-> +1:	ldr_l	x1, handle_arch_irq
-> +	mov     x0, x20
->   	blr	x1
-> +
-> +	mov	x0, x20
-> +	mov	x1, x21
-> +	bl	irq_copy_thread_info
-> +	mov	sp, x20
-> +
->   	.endm
->
->   	.text
-> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-> index 463fa2e7e34c..10b57a006da8 100644
-> --- a/arch/arm64/kernel/irq.c
-> +++ b/arch/arm64/kernel/irq.c
-> @@ -26,11 +26,14 @@
->   #include <linux/smp.h>
->   #include <linux/init.h>
->   #include <linux/irqchip.h>
-> +#include <linux/percpu.h>
->   #include <linux/seq_file.h>
->   #include <linux/ratelimit.h>
->
->   unsigned long irq_err_count;
->
-> +DEFINE_PER_CPU(unsigned long, irq_sp) = 0;
-> +
->   int arch_show_interrupts(struct seq_file *p, int prec)
->   {
->   #ifdef CONFIG_SMP
-> @@ -55,6 +58,10 @@ void __init init_IRQ(void)
->   	irqchip_init();
->   	if (!handle_arch_irq)
->   		panic("No interrupt controller found.");
-> +
-> +	/* Allocate an irq stack for the boot cpu */
-> +	if (alloc_irq_stack(smp_processor_id()))
-> +		panic("Failed to allocate irq stack for boot cpu.");
->   }
->
->   #ifdef CONFIG_HOTPLUG_CPU
-> @@ -117,3 +124,48 @@ void migrate_irqs(void)
->   	local_irq_restore(flags);
->   }
->   #endif /* CONFIG_HOTPLUG_CPU */
-> +
-> +/* Allocate an irq_stack for a cpu that is about to be brought up. */
-> +int alloc_irq_stack(unsigned int cpu)
-> +{
-> +	struct page *irq_stack_page;
-> +	union thread_union *irq_stack;
-> +
-> +	/* reuse stack allocated previously */
-> +	if (per_cpu(irq_sp, cpu))
-> +		return 0;
-> +
-> +	irq_stack_page = alloc_kmem_pages(THREADINFO_GFP, THREAD_SIZE_ORDER);
-> +	if (!irq_stack_page) {
-> +		pr_crit("CPU%u: failed to allocate irq stack for cpu %u\n",
-> +			smp_processor_id(), cpu);
-> +		return -ENOMEM;
-> +	}
-> +	irq_stack = page_address(irq_stack_page);
-> +
-> +	per_cpu(irq_sp, cpu) = (unsigned long)irq_stack->stack
-> +			       + THREAD_START_SP;
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * Copy struct thread_info between two stacks, and update current->stack.
-> + * This is used when moving to the irq exception stack.
-> + * Changing current->stack is necessary so that non-arch thread_info writers
-> + * don't use the new thread_info->task->stack to find the old thread_info when
-> + * setting flags like TIF_NEED_RESCHED...
-> + */
-> +asmlinkage int irq_copy_thread_info(unsigned long dst_sp, unsigned long src_sp)
-> +{
-> +	struct thread_info *src = get_thread_info(src_sp);
-> +	struct thread_info *dst = get_thread_info(dst_sp);
-> +
-> +	if (dst == src)
-> +		return 0;
-> +
-> +	*dst = *src;
-> +	current->stack = dst;
-> +
-> +	return 1;
-> +}
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 50fb4696654e..5283dc5629e4 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -89,6 +89,10 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
->   {
->   	int ret;
->
-> +	ret = alloc_irq_stack(cpu);
-> +	if (ret)
-> +		return ret;
-> +
->   	/*
->   	 * We need to tell the secondary core where to find its stack and the
->   	 * page tables.
-> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-> index 407991bf79f5..3d6d5b45aa4b 100644
-> --- a/arch/arm64/kernel/stacktrace.c
-> +++ b/arch/arm64/kernel/stacktrace.c
-> @@ -20,6 +20,7 @@
->   #include <linux/sched.h>
->   #include <linux/stacktrace.h>
->
-> +#include <asm/irq.h>
->   #include <asm/stacktrace.h>
->
->   /*
-> @@ -43,7 +44,8 @@ int notrace unwind_frame(struct stackframe *frame)
->   	low  = frame->sp;
->   	high = ALIGN(low, THREAD_SIZE);
->
-> -	if (fp < low || fp > high - 0x18 || fp & 0xf)
-> +	if ((fp < low || fp > high - 0x18 || fp & 0xf) &&
-> +	    !is_irq_stack(frame->sp))
->   		return -EINVAL;
->
->   	frame->sp = fp + 0x10;
->
+Jun
