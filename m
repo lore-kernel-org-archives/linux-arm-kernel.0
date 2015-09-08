@@ -1,54 +1,275 @@
-From: jteki@openedev.com (Jagan Teki)
-Date: Tue, 8 Sep 2015 17:23:32 +0530
-Subject: [PATCH 3/3] arm64: dts: mt8173: Add nor flash node
-In-Reply-To: <1441705796-11365-4-git-send-email-bayi.cheng@mediatek.com>
-References: <1441705796-11365-1-git-send-email-bayi.cheng@mediatek.com>
- <1441705796-11365-4-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <CAD6G_RTR2r8ETMQ14uGosRn-85sssvVsFT4BjK9SkVSfMkG8Dw@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 8 Sep 2015 14:04:15 +0200
+Subject: [PATCH v3 07/10] KVM: arm/arm64: vgic: Allow HW interrupts for
+ non-shared devices
+In-Reply-To: <20150902194246.GV10991@cbox>
+References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
+ <1439212864-12954-8-git-send-email-eric.auger@linaro.org>
+ <20150902194246.GV10991@cbox>
+Message-ID: <55EECEBF.200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2015 at 15:19, Bayi Cheng <bayi.cheng@mediatek.com> wrote:
-> Add Mediatek nor flash node
->
-> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index d18ee42..a14f005 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -365,6 +365,16 @@
->                         status = "disabled";
->                 };
->
-> +               nor_flash: nor at 1100d000 {
+Hi Christoffer,
+On 09/02/2015 09:42 PM, Christoffer Dall wrote:
+> On Mon, Aug 10, 2015 at 03:21:01PM +0200, Eric Auger wrote:
+>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> So far, the only use of the HW interrupt facility was the timer,
+>> implying that the active state is context-switched for each vcpu,
+>> as the device is is shared across all vcpus.
+>>
+>> This does not work for a device that has been assigned to a VM,
+>> as the guest is entierely in control of that device (the HW is
+>> not shared). In that case, it makes sense to bypass the whole
+>> active state switching.
+>>
+>> Also the VGIC state machine is adapted to support those assigned
+>> (non shared) HW IRQs:
+>> - nly can be sampled when it is pending
+>> - when queueing the IRQ (programming the LR), the pending state is
+>>   removed as for edge sensitive IRQs
+>> - queued state is not modelled. Level state is not modelled
+>> - its injection always is valid since steming from the HW.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> - a mix of
+>>   [PATCH v4 11/11] KVM: arm/arm64: vgic: Allow HW interrupts for
+>>                    non-shared devices
+>>   [RFC v2 2/4] KVM: arm: vgic: fix state machine for forwarded IRQ
+>> ---
+>>  include/kvm/arm_vgic.h    |  6 +++--
+>>  virt/kvm/arm/arch_timer.c |  3 ++-
+>>  virt/kvm/arm/vgic.c       | 58 +++++++++++++++++++++++++++++++++++------------
+>>  3 files changed, 49 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index d901f1a..7ef9ce0 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -163,7 +163,8 @@ struct irq_phys_map {
+>>  	u32			virt_irq;
+>>  	u32			phys_irq;
+>>  	u32			irq;
+>> -	bool			active;
+>> +	bool			shared;
+>> +	bool			active; /* Only valid if shared */
+>>  };
+>>  
+>>  struct irq_phys_map_entry {
+>> @@ -356,7 +357,8 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+>>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
+>>  struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+>> -					   int virt_irq, int irq);
+>> +					   int virt_irq, int irq,
+>> +					   bool shared);
+>>  int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
+>>  bool kvm_vgic_get_phys_irq_active(struct irq_phys_map *map);
+>>  void kvm_vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
+>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>> index 76e38d2..db21d8f 100644
+>> --- a/virt/kvm/arm/arch_timer.c
+>> +++ b/virt/kvm/arm/arch_timer.c
+>> @@ -203,7 +203,8 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>>  	 * Tell the VGIC that the virtual interrupt is tied to a
+>>  	 * physical interrupt. We do that once per VCPU.
+>>  	 */
+>> -	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
+>> +	map = kvm_vgic_map_phys_irq(vcpu, irq->irq,
+>> +				    host_vtimer_irq, true);
+>>  	if (WARN_ON(IS_ERR(map)))
+>>  		return PTR_ERR(map);
+>>  
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 9eb489a..fbd5ba5 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -400,7 +400,11 @@ void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
+>>  
+>>  static bool vgic_can_sample_irq(struct kvm_vcpu *vcpu, int irq)
+>>  {
+>> -	return !vgic_irq_is_queued(vcpu, irq);
+>> +	struct irq_phys_map *map = vgic_irq_map_search(vcpu, irq);
+>> +	bool shared_hw = map && !map->shared;
+> 
+> why is shared true when map->shared is false?
+definitively upside down
+> 
+>> +
+>> +	return !vgic_irq_is_queued(vcpu, irq) ||
+>> +			(shared_hw && vgic_dist_irq_is_pending(vcpu, irq));
+> 
+> so for forwarded, non-shared, level-triggered IRQs, we always sample the
+> line if it's pending?  Why?
 
-Based on the comments from 1/3 - this notation needs to be change something like
-qspi0: quadspi at 1100d000
+No we only sampled it if it was pending. The pending state was reset
+when programming the LR.
 
-> +                       compatible = "mediatek,mt8173-nor";
-> +                       reg = <0 0x1100d000 0 0xe0>;
-> +                       clocks = <&pericfg CLK_PERI_SPI>,
-> +                                <&topckgen CLK_TOP_AXI_SEL>,
-> +                                <&topckgen CLK_TOP_UNIVPLL2_D8>,
-> +                                <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
-> +                       clock-names = "spi_clk", "axi_clk", "mux_clk", "sf_clk";
-> +               };
-> +
->                 i2c3: i2c3 at 11010000 {
->                         compatible = "mediatek,mt8173-i2c";
->                         reg = <0 0x11010000 0 0x70>,
-> --
-> 1.8.1.1.dirty
->
+Now that we model the queued state for mapped IRQ I will use that instead
+> 
+>>  }
+>>  
+>>  /**
+>> @@ -1150,19 +1154,26 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
+>>  		 * active in the physical world. Otherwise the
+>>  		 * physical interrupt will fire and the guest will
+>>  		 * exit before processing the virtual interrupt.
+>> +		 *
+>> +		 * This is of course only valid for a shared
+>> +		 * interrupt. A non shared interrupt should already be
+>> +		 * active.
+>>  		 */
+>>  		if (map) {
+>> -			int ret;
+>> -
+>> -			BUG_ON(!map->active);
+>>  			vlr.hwirq = map->phys_irq;
+>>  			vlr.state |= LR_HW;
+>>  			vlr.state &= ~LR_EOI_INT;
+>>  
+>> -			ret = irq_set_irqchip_state(map->irq,
+>> -						    IRQCHIP_STATE_ACTIVE,
+>> -						    true);
+>> -			WARN_ON(ret);
+>> +			if (map->shared) {
+>> +				int ret;
+>> +
+>> +				BUG_ON(!map->active);
+>> +				ret = irq_set_irqchip_state(
+>> +						map->irq,
+>> +						IRQCHIP_STATE_ACTIVE,
+>> +						true);
+>> +				WARN_ON(ret);
+>> +			}
+> 
+> this stuff all needs to be rebased onto my latest timer/active state
+> rework series.
+sure, ongoing ...
 
-thanks!
--- 
-Jagan | openedev.
+Thanks
 
-
-
-Sent with MailTrack
+Eric
+> 
+>>  
+>>  			/*
+>>  			 * Make sure we're not going to sample this
+>> @@ -1229,10 +1240,13 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+>>  
+>>  static bool vgic_queue_hwirq(struct kvm_vcpu *vcpu, int irq)
+>>  {
+>> +	struct irq_phys_map *map = vgic_irq_map_search(vcpu, irq);
+>> +	bool shared_hw = map && !map->shared;
+> 
+> same question as above?
+> 
+>> +
+>>  	if (!vgic_can_sample_irq(vcpu, irq))
+>>  		return true; /* level interrupt, already queued */
+>>  
+>> -	if (vgic_queue_irq(vcpu, 0, irq)) {
+>> +	if (vgic_queue_irq(vcpu, 0, irq) || shared_hw) {
+>>  		if (vgic_irq_is_edge(vcpu, irq)) {
+>>  			vgic_dist_irq_clear_pending(vcpu, irq);
+>>  			vgic_cpu_irq_clear(vcpu, irq);
+>> @@ -1411,7 +1425,12 @@ static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
+>>  		return 0;
+>>  
+>>  	map = vgic_irq_map_search(vcpu, vlr.irq);
+>> -	BUG_ON(!map || !map->active);
+>> +	BUG_ON(!map);
+>> +
+>> +	if (!map->shared)
+>> +		return 0;
+>> +
+>> +	BUG_ON(map->shared && !map->active);
+>>  
+>>  	ret = irq_get_irqchip_state(map->irq,
+>>  				    IRQCHIP_STATE_ACTIVE,
+>> @@ -1563,6 +1582,7 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+>>  	int edge_triggered, level_triggered;
+>>  	int enabled;
+>>  	bool ret = true, can_inject = true;
+>> +	bool shared_hw = map && !map->shared;
+> 
+> same
+> 
+>>  
+>>  	if (irq_num >= min(kvm->arch.vgic.nr_irqs, 1020))
+>>  		return -EINVAL;
+>> @@ -1573,7 +1593,8 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+>>  	edge_triggered = vgic_irq_is_edge(vcpu, irq_num);
+>>  	level_triggered = !edge_triggered;
+>>  
+>> -	if (!vgic_validate_injection(vcpu, irq_num, level)) {
+>> +	if (!vgic_validate_injection(vcpu, irq_num, level) &&
+>> +		!shared_hw) {
+>>  		ret = false;
+>>  		goto out;
+>>  	}
+>> @@ -1742,16 +1763,21 @@ static struct list_head *vgic_get_irq_phys_map_list(struct kvm_vcpu *vcpu,
+>>   * @vcpu: The VCPU pointer
+>>   * @virt_irq: The virtual irq number
+>>   * @irq: The Linux IRQ number
+>> + * @shared: Indicates if the interrupt has to be context-switched or
+>> + *          if it is private to a VM
+>>   *
+>>   * Establish a mapping between a guest visible irq (@virt_irq) and a
+>>   * Linux irq (@irq). On injection, @virt_irq will be associated with
+>>   * the physical interrupt represented by @irq. This mapping can be
+>>   * established multiple times as long as the parameters are the same.
+>> + * If @shared is true, the active state of the interrupt will be
+>> + * context-switched.
+>>   *
+>>   * Returns a valid pointer on success, and an error pointer otherwise
+>>   */
+>>  struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+>> -					   int virt_irq, int irq)
+>> +					   int virt_irq, int irq,
+>> +					   bool shared)
+>>  {
+>>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>>  	struct list_head *root = vgic_get_irq_phys_map_list(vcpu, virt_irq);
+>> @@ -1785,7 +1811,8 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+>>  	if (map) {
+>>  		/* Make sure this mapping matches */
+>>  		if (map->phys_irq != phys_irq	||
+>> -		    map->irq      != irq)
+>> +		    map->irq      != irq	||
+>> +		    map->shared   != shared)
+>>  			map = ERR_PTR(-EINVAL);
+>>  
+>>  		/* Found an existing, valid mapping */
+>> @@ -1796,6 +1823,7 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+>>  	map->virt_irq = virt_irq;
+>>  	map->phys_irq = phys_irq;
+>>  	map->irq      = irq;
+>> +	map->shared   = shared;
+>>  
+>>  	list_add_tail_rcu(&entry->entry, root);
+>>  
+>> @@ -1846,7 +1874,7 @@ static void vgic_free_phys_irq_map_rcu(struct rcu_head *rcu)
+>>   */
+>>  bool kvm_vgic_get_phys_irq_active(struct irq_phys_map *map)
+>>  {
+>> -	BUG_ON(!map);
+>> +	BUG_ON(!map || !map->shared);
+>>  	return map->active;
+>>  }
+>>  
+>> @@ -1858,7 +1886,7 @@ bool kvm_vgic_get_phys_irq_active(struct irq_phys_map *map)
+>>   */
+>>  void kvm_vgic_set_phys_irq_active(struct irq_phys_map *map, bool active)
+>>  {
+>> -	BUG_ON(!map);
+>> +	BUG_ON(!map || !map->shared);
+>>  	map->active = active;
+>>  }
+>>  
+>> -- 
+>> 1.9.1
+>>
