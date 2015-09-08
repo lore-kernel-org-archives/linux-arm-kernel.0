@@ -1,55 +1,92 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 08 Sep 2015 17:11:12 +0900
-Subject: [PATCH] ARM: exynos_defconfig: Enable USB Video Class support
-In-Reply-To: <1441662323-15468-1-git-send-email-javier@osg.samsung.com>
-References: <1441662323-15468-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <55EE9820.2010202@samsung.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 8 Sep 2015 11:21:53 +0300
+Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
+In-Reply-To: <2355864.I8qZFusWfm@vostro.rjw.lan>
+References: <Pine.LNX.4.44L0.1509051133100.30865-100000@netrider.rowland.org>
+ <2657565.lxWtPmdjyp@vostro.rjw.lan> <55ED9328.2010501@ti.com>
+ <2355864.I8qZFusWfm@vostro.rjw.lan>
+Message-ID: <55EE9AA1.8020200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.09.2015 06:45, Javier Martinez Canillas wrote:
-> The Exynos5420 Peach Pit and Exynos5800 Peach Pi boards have a built-in
-> Silicon Motion USB UVC WebCam. Enable support for the USB Video Class
-> driver and its needed media Kconfig symbols so the camera is supported.
+On 09/07/2015 11:42 PM, Rafael J. Wysocki wrote:
+> On Monday, September 07, 2015 04:37:44 PM Grygorii Strashko wrote:
+>> On 09/07/2015 04:04 PM, Rafael J. Wysocki wrote:
+>>> On Saturday, September 05, 2015 11:39:20 AM Alan Stern wrote:
+>>>> On Sat, 5 Sep 2015, Grygorii Strashko wrote:
+>>>>
+>>>>> On 09/04/2015 09:45 PM, Alan Stern wrote:
+>>>>>> On Fri, 4 Sep 2015, Grygorii Strashko wrote:
+>>>>>>
+>>>>>>> There is one "small" problem with such approach :(
+>>>>>>>
+>>>>>>> - It's incompatible with -RT kernel, because PM runtime can't be used
+>>>>>>> in atomic context on -RT.
+>>>>>>
+>>>>>> Can you explain this more fully?  Why can't runtime PM be used in
+>>>>>> atomic context in the -rt kernels?
+>>>>>>    
+>>>>>
+>>>>> See:
+>>>>>    http://lwn.net/Articles/146861/
+>>>>>    https://rt.wiki.kernel.org/index.php/Frequently_Asked_Questions#How_does_the_CONFIG_PREEMPT_RT_patch_work.3F
+>>>>>
+>>>>> spinlock_t
+>>>>>       Critical sections are preemptible. The _irq operations (e.g., spin_lock_irqsave())
+>>>>>    do -not- disable hardware interrupts. Priority inheritance is used to prevent priority
+>>>>>    inversion. An underlying rt_mutex is used to implement spinlock_t in PREEMPT_RT.
+>>>>>
+>>>>> As result, have to do things like:
+>>>>> https://lkml.org/lkml/2015/8/18/161
+>>>>> https://lkml.org/lkml/2015/8/18/162
+>>>>>
+>>>>> Sorry for brief reply - Friday/Sat night :)
+>>>>
+>>>> I see.  Although we normally think of interrupt contexts as being
+>>>> atomic, in an -rt kernel this isn't true any more because things like
+>>>> spin_lock_irq don't actually disable interrupts.
+>>>>
+>>>> Therefore it would be correct to say that in -rt kernels, runtime PM
+>>>> can be used in interrupt context (if the device is marked as irq-safe),
+>>>> but not in atomic context.  Right?
+>>>
+>>> Right.
+>>>
+>>> Whatever is suitable for interrupt context in the mainline, will be suitable
+>>> for that in -rt kernels too.
+>>
+>> Not exactly true :(, since spinlock is converted to [rt_] mutex.
+>> Usually, this difference can't be seen because on -RT kernel all or
+>> mostly all HW IRQ handlers will be forced to be threaded.
 > 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Exactly.  And that's what I'm talking about.
 > 
-> ---
+>> For the cases, where such automatic conversion is not working,
+>> (like chained irq handlers or HW-handler+Threaded handler) the code
+>> has to be carefully patched to work properly as for non-RT as for -RT.
 > 
->  arch/arm/configs/exynos_defconfig | 4 ++++
->  1 file changed, 4 insertions(+)
-
-The patch itself looks good but now I wonder whether we are not putting
-to much stuff built-in. The exynos_defconfig does not replace the
-distribution distro. For a fully working board the distro should prepare
-it's own config.
-
-I understand that in this case the USB webcams are parts of device (like
-on all laptops)... a little bit similar as camera sensors on mobile
-phones. Yet on mobile phone usually the camera itself is part of SoC,
-only the sensor is external.
-
-Actually what we need is a kind of policy for exynos_defconfig - what
-should be inside as built-in and what as module?
-
-Best regards,
-Krzysztof
-
-
+> Right.
 > 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 1ff2bfa2e183..62f677f76a0b 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -126,6 +126,10 @@ CONFIG_REGULATOR_S2MPA01=y
->  CONFIG_REGULATOR_S2MPS11=y
->  CONFIG_REGULATOR_S5M8767=y
->  CONFIG_REGULATOR_TPS65090=y
-> +CONFIG_MEDIA_SUPPORT=y
-> +CONFIG_MEDIA_CAMERA_SUPPORT=y
-> +CONFIG_MEDIA_USB_SUPPORT=y
-> +CONFIG_USB_VIDEO_CLASS=y
->  CONFIG_DRM=y
->  CONFIG_DRM_NXP_PTN3460=y
->  CONFIG_DRM_PARADE_PS8622=y
+>> Also, this triggers some -RT incompatibility issues, like with PM runtime or
 > 
+> That I'm not sure about.  Why would runtime PM cause problems with -RT (apart
+> from attempts to use it from the idle loop, but that's not happening in the
+> mainline anyway)?
+
+
+I have to be more specific - sorry. "irq_safe" mode of PM runtime is incompatible with -RT.
+
+Here is an example:
+- HW IRQ handler in TI OMAP GPIO driver is implemented as chained IRQ handler and
+  contains pm_runtime_get_sync()/pm_runtime_put(). This works properly with vanilla kernel
+  because OMAP GPIO devices marked as irq_safe.
+  Chained IRQ handlers can't be forced threaded and PM runtime APIs trigger
+ "sleeping function called from invalid context" issues there, so corresponding code has to be reworked.
+
+
+...
+
+
+-- 
+regards,
+-grygorii
