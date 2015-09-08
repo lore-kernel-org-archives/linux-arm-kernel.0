@@ -1,51 +1,78 @@
-From: dserrg@gmail.com (Sergey Dyasly)
-Date: Tue, 8 Sep 2015 21:12:14 +0300
-Subject: [PATCH] ARM:mm: define arch-specific IOREMAP_MAX_ORDER only in
- !SMP && !LPAE case
-In-Reply-To: <55EE4BD2.3080800@huawei.com>
-References: <1441680050-50490-1-git-send-email-zhenzhang.zhang@huawei.com>
- <55EE4BD2.3080800@huawei.com>
-Message-ID: <55EF24FE.4060602@gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 8 Sep 2015 12:10:02 -0700
+Subject: [PATCH 1/3] sysfs: Fix is_visible() support for binary attributes
+In-Reply-To: <20150908153013.GA6758@roeck-us.net>
+References: <1441714066-5599-1-git-send-email-emilio.lopez@collabora.co.uk>
+ <1441714066-5599-2-git-send-email-emilio.lopez@collabora.co.uk>
+ <20150908153013.GA6758@roeck-us.net>
+Message-ID: <20150908191002.GB10156@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.09.2015 5:45, Zhang Zhen wrote:
-> The arch-specific IOREMAP_MAX_ORDER is introduced in
-> commit: ff0daca([ARM] Add section support to ioremap) and
-> commit: a069c89 ([ARM] 3705/1: add supersection support to ioremap()).
-> But supersections and sections mappings are only used in !SMP && !LPAE case.
-> Otherwise, mapping is created using the usual 4K pages.
->
-> In most cases without !SMP && !LPAE, the big alignment cause high fragmentation
-> issue in vmalloc area.
-> Here we use arch-specific IOREMAP_MAX_ORDER only in !SMP && !LPAE case,
-> otherwise use generic IOREMAP_MAX_ORDER in include/linux/vmalloc.h.
->
-> Signed-off-by: Zhang Zhen <zhenzhang.zhang@huawei.com>
-> ---
->   arch/arm/include/asm/memory.h | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index b7f6fb4..3209012 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -76,10 +76,12 @@
->    */
->   #define XIP_VIRT_ADDR(physaddr)  (MODULES_VADDR + ((physaddr) & 0x000fffff))
->
-> +#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
->   /*
->    * Allow 16MB-aligned ioremap pages
->    */
->   #define IOREMAP_MAX_ORDER	24
-> +#endif
->
->   #else /* CONFIG_MMU */
->
+On Tue, Sep 08, 2015 at 08:30:13AM -0700, Guenter Roeck wrote:
+> Emilio,
+> 
+> On Tue, Sep 08, 2015 at 09:07:44AM -0300, Emilio L?pez wrote:
+> > According to the sysfs header file:
+> > 
+> >     "The returned value will replace static permissions defined in
+> >      struct attribute or struct bin_attribute."
+> > 
+> > but this isn't the case, as is_visible is only called on
+> > struct attribute only. This patch adds the code paths required
+> > to support is_visible() on binary attributes.
+> > 
+> > Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
+> > ---
+> >  fs/sysfs/group.c | 22 ++++++++++++++++++----
+> >  1 file changed, 18 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/fs/sysfs/group.c b/fs/sysfs/group.c
+> > index 39a0199..eb6996a 100644
+> > --- a/fs/sysfs/group.c
+> > +++ b/fs/sysfs/group.c
+> > @@ -37,10 +37,10 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
+> >  {
+> >  	struct attribute *const *attr;
+> >  	struct bin_attribute *const *bin_attr;
+> > -	int error = 0, i;
+> > +	int error = 0, i = 0;
+> >  
+> >  	if (grp->attrs) {
+> > -		for (i = 0, attr = grp->attrs; *attr && !error; i++, attr++) {
+> > +		for (attr = grp->attrs; *attr && !error; i++, attr++) {
+> >  			umode_t mode = (*attr)->mode;
+> >  
+> >  			/*
+> > @@ -73,13 +73,27 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
+> >  	}
+> >  
+> >  	if (grp->bin_attrs) {
+> > -		for (bin_attr = grp->bin_attrs; *bin_attr; bin_attr++) {
+> > +		for (bin_attr = grp->bin_attrs; *bin_attr; i++, bin_attr++) {
+> > +			umode_t mode = (*bin_attr)->attr.mode;
+> > +
+> >  			if (update)
+> >  				kernfs_remove_by_name(parent,
+> >  						(*bin_attr)->attr.name);
+> > +			if (grp->is_visible) {
+> > +				mode = grp->is_visible(kobj,
+> > +						       &(*bin_attr)->attr, i);
+> 
+> With this, if 'n' is the number of non-binary attributes,
+> 
+> for i < n:
+> 	The index passed to is_visible points to a non-binary attribute.
+> for i >= n:
+> 	The index passed to is_visible points to the (index - n)th binary
+> 	attribute.
+> 
+> Unless I am missing something, this is not explained anywhere, but it is
+> not entirely trivial to understand. I think it should be documented.
 
-Hmm... This looks exactly like my old patch -
-http://thread.gmane.org/gmane.linux.kernel.mm/127620
-(Thanks to Vladimir for pointing that out!)
+I agree, make i the number of the bin attribute and that should solve
+this issue.
 
-Hasn't there been any progress about this issue?
+thanks,
+
+greg k-h
