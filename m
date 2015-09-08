@@ -1,41 +1,61 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Tue, 8 Sep 2015 22:41:37 +0000
-Subject: question about DOMAIN_BUS_ANY
-Message-ID: <CY1PR0301MB07485D964A46A10E1F80154D87530@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 8 Sep 2015 15:45:04 -0700
+Subject: [PATCH 10/11] regulator: qcom-smd: Add support for PMA8084
+In-Reply-To: <1441748131-26490-12-git-send-email-agross@codeaurora.org>
+References: <1441748131-26490-1-git-send-email-agross@codeaurora.org>
+ <1441748131-26490-12-git-send-email-agross@codeaurora.org>
+Message-ID: <20150908224504.GA13472@usrtlx11787.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+On Tue 08 Sep 14:35 PDT 2015, Andy Gross wrote:
 
-Have a question about DOMAIN_BUS_ANY.  Based on your comment in 
-include/linux/irqdomain.h:
+> This patch adds support and documentation for the PMA8084 regulators
+> found on APQ8084 platforms.
+> 
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
+>  .../bindings/soc/qcom/qcom,smd-rpm-regulator.txt   |   35 ++++++++
+>  drivers/regulator/qcom_smd-regulator.c             |   95 ++++++++++++++++++++
+>  2 files changed, 130 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
+[..]
+> +- vdd_s1:
+> +- vdd_s2:
+> +- vdd_s3:
+> +- vdd_s4:
+> +- vdd_s5:
+> +- vdd_s6:
+> +- vdd_s7:
+> +- vdd_s8:
+> +- vdd_s9:
+> +- vdd_s10:
+> +- vdd_s11:
+> +- vdd_s12:
+> +- vdd_l1_l11:
+> +- vdd_l2_l3_l4_l27:
+> +- vdd_l5_l7:
+> +- vdd_l6_l12_l14_l15_l26:
+> +- vdd_l8:
+> +- vdd_l9_l10_l13_l20_l23_l24:
+> +- vdd_l16_l25:
+> +- vdd_l17:
+> +- vdd_l18:
+> +- vdd_l19:
+> +- vdd_l21:
+> +- vdd_l22:
 
-  /*
-   * Should several domains have the same device node, but serve
-   * different purposes (for example one domain is for PCI/MSI, and the
-   * other for wired IRQs), they can be distinguished using a
-   * bus-specific token. Most domains are expected to only carry
-   * DOMAIN_BUS_ANY.
-   */
+-supply
 
-...if there are 2 domains that are based on the same GIC ITS node,
-for example PCI and the new Freescale "fsl-mc" bus, we should
-be extending irq_domain_bus_token with a new token, correct?
+> +	Usage: optional (pma8084 only)
+> +	Value type: <phandle>
+> +	Definition: reference to regulator supplying the input pin, as
+> +		    described in the data sheet
+> +
 
-The reason "most" domains are expected to have BUS_ANY is because
-most domains have 1 associated device node and there is no ambiguity,
-right?
+Otherwise it looks good.
 
-Currently the fsl-mc bus driver is in drivers/staging.  Is that
-an issue with respect to extending the enum?  (not 100% sure
-what the rules are regarding drivers in staging and other
-dependencies like this enum which are outside of staging).
 
-Another related question... we are implementing a fsl-mc
-bus specific support in a irq-gic-v3-its-fsl-mc-msi.c file,
-similar to what you did for PCI and platform buses.  Do you
-want to see that file in drivers/staging for now, or should
-we put it under drivers/irqchip?
-
-Thanks,
-Stuart
+Regards,
+Bjorn
