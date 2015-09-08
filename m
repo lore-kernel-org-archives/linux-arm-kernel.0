@@ -1,29 +1,29 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 9 Sep 2015 00:08:47 +0200
-Subject: [PATCH v3 2/2] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
- support
-In-Reply-To: <20150903093910.GA4151@ulmo.nvidia.com>
-References: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <CAD=FV=WvUp7xhsmXJgVzm1Awqej12hNF_QPJhrQq7z=Fa4Nnuw@mail.gmail.com>
- <20150902225008.GQ21084@n2100.arm.linux.org.uk>
- <CAD=FV=VuyQXNGt7dgF-YF7D7MDu31B-QuBdGpeC_+0b1F2=dKg@mail.gmail.com>
- <20150903091900.GX21084@n2100.arm.linux.org.uk>
- <20150903093910.GA4151@ulmo.nvidia.com>
-Message-ID: <20150908220847.GA1529@katana>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Sep 2015 23:19:13 +0100
+Subject: [PATCH v2 1/3] ARM: Make FORCE_MAX_ZONEORDER configurable if
+ ARM_SINGLE_ARMV7M
+In-Reply-To: <1441744686-20521-2-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1441744686-20521-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1441744686-20521-2-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <20150908221912.GE21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 08, 2015 at 10:38:04PM +0200, Maxime Coquelin wrote:
+> This patch makes FORCE_MAX_ZONEORDER configurable in defconfig for ARMV7-M
+> when built for a single platform.
 
-> Wolfram, do you know of any cases where adapter->dev.of_node would not
-> be the same as adapter->dev.parent->of_node?
+I'd prefer if we didn't do this, because this isn't supposed to be a user
+visible "option".  It's an option that was introduced to avoid having to
+throw masses of #ifdefs into the definition of MAX_ZONEORDER.
 
-i2c-muxes, I'd say. dev.parent is the device of the parent I2C adapter,
-while the devices get populated from the of_node of the muxing device.
+The problem with it is that it's a "well, what do I set this to?" option
+and that leads to "oh, I'll just choose the default because I don't know
+any better".
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150909/8d6285db/attachment.sig>
+Do we know why EFM32 needs a value of 9 here?  It's not documented in
+the original commit, and it really _should_ have been.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
