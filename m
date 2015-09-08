@@ -1,79 +1,31 @@
-From: jteki@openedev.com (Jagan Teki)
-Date: Tue, 8 Sep 2015 17:04:04 +0530
-Subject: [PATCH 1/3] doc: dt: add documentation for Mediatek spi-nor
- controller
-In-Reply-To: <1441705796-11365-2-git-send-email-bayi.cheng@mediatek.com>
-References: <1441705796-11365-1-git-send-email-bayi.cheng@mediatek.com>
- <1441705796-11365-2-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <CAD6G_RR5W8_4d_gcTD=h9EBhwWUzsEmyNK+pYGq82GEHDV4=ig@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 8 Sep 2015 08:41:10 -0300
+Subject: [PATCH 4/4] ARM: dts: imx: add Boundary Devices Nitrogen6_Lite
+ board
+In-Reply-To: <CAAMH-ysfTs9W+dWdS7DR9=KKPxij1DEHEevMn3+TMp8gqvoELQ@mail.gmail.com>
+References: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1441645069-27263-5-git-send-email-gary.bisson@boundarydevices.com>
+ <CAOMZO5Bb5TwtV4=C4jtU9KpuwtYSdYcSCgQVMMOY0FMf7hZx8w@mail.gmail.com>
+ <CAAMH-ysfTs9W+dWdS7DR9=KKPxij1DEHEevMn3+TMp8gqvoELQ@mail.gmail.com>
+Message-ID: <CAOMZO5BG1hcCWzTVvO6aZMVY484NGzezpfVQCK9kGcgamMA5wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2015 at 15:19, Bayi Cheng <bayi.cheng@mediatek.com> wrote:
-> Add device tree binding documentation for serial flash with
-> Mediatek serial flash controller
->
-> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/mtd/mtk_nor.txt | 25 +++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/mtk_nor.txt
->
-> diff --git a/Documentation/devicetree/bindings/mtd/mtk_nor.txt b/Documentation/devicetree/bindings/mtd/mtk_nor.txt
-> new file mode 100644
-> index 0000000..0eca0cd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/mtk_nor.txt
+Hi Gary,
 
-IMHO - looks like the name of the driver file not resembles controller
-driver, usually spi-nor framework has a name include 'nor' and related
-controller drivers uses simple notion with vendor/soc_name-quadspi or
-something similar.
+On Tue, Sep 8, 2015 at 7:18 AM, Gary Bisson
+<gary.bisson@boundarydevices.com> wrote:
+> Hi Fabio,
 
-cadence-quadspi.c
-fsl-quadspi.c
+> Ok will do in v2. Should I relicense Nitrogen6x and SabreLite as well?
 
-Simple suggestion - mtk-quadspi.c (since it supports quad)
+That would be nice.
 
-> @@ -0,0 +1,25 @@
-> +* MTD SPI nor driver for MTK MT81xx (and similar) serial flash controller
-> +
-> +MTK MT81xx serial flash controller is designed for serial Flash device.
-> +It supports one Flash device with signal mode, dual mode and quad mode.
-> +
-> +Required properties:
-> +- compatible: should be "mediatek,mt8173-nor";
-> +- reg: physical base address and length of the controller's register
-> +- clocks: spi nor source clock
-> +- clock-names: "spi_clk", "axi_clk", "mux_clk", "sf_clk"
-> +
-> +See Documentation/devicetree/bindings/clock/clock-bindings.txt
+> Yes, I actually just copied what was done for the Nitrogen6x, should I
+> update the latter as well?
 
-As this related to clock-names, just add this line in-continuous with
-clock-name property description.
+Yes, please.
 
-> +and Documentation/mtd/spi-nor.txt for details.
+Regards,
 
-This explicit mentioning about spi-nor documentation is may not
-required as this .txt will describe how spi-nor works and not related
-to bindings.
-
-> +
-> +Example:
-> +nor_flash: nor at 1100d000 {
-> +       compatible = "mediatek,mt8173-nor";
-> +       reg = <0 0x1100d000 0 0xe0>;
-> +       clocks = <&pericfg CLK_PERI_SPI>,
-> +                <&topckgen CLK_TOP_AXI_SEL>,
-> +                <&topckgen CLK_TOP_UNIVPLL2_D8>,
-> +                <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
-> +       clock-names = "spi_clk", "axi_clk", "mux_clk", "sf_clk";
-> +};
-> +
-> --
-> 1.8.1.1.dirty
->
-
-thanks!
--- 
-Jagan | openedev.
+Fabio Estevam
