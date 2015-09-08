@@ -1,70 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Sep 2015 14:40:27 +0100
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <1441716233.13536.21.camel@pengutronix.de>
-References: <m3bnde5whx.fsf@t19.piap.pl>
- <20150907112555.GS21084@n2100.arm.linux.org.uk>
- <m337yp5gvv.fsf@t19.piap.pl>
- <1441709778.13536.8.camel@pengutronix.de>
- <20150908110135.GW21084@n2100.arm.linux.org.uk>
- <1441710467.13536.13.camel@pengutronix.de>
- <20150908112909.GX21084@n2100.arm.linux.org.uk>
- <1441716233.13536.21.camel@pengutronix.de>
-Message-ID: <20150908134027.GZ21084@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 8 Sep 2015 15:57:39 +0200
+Subject: [PATCH] gpio: omap: Fix gpiochip_add() handling for deferred probe
+In-Reply-To: <1440787489-15992-1-git-send-email-tony@atomide.com>
+References: <1440787489-15992-1-git-send-email-tony@atomide.com>
+Message-ID: <CACRpkdZdTM5Sgtcn8PoP2X-haqzHZTgjEsvPJzZNLP=0A7XYYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2015 at 02:43:53PM +0200, Lucas Stach wrote:
-> Am Dienstag, den 08.09.2015, 12:29 +0100 schrieb Russell King - ARM
-> Linux:
-> > There was talk a while back when the overlay plane support went in that
-> > it was possible to do >1024 pixels, but it was complex, but the impression
-> > I was left with was one day it would work - and I'm still waiting. 
-> 
-> Don't wait for that. We can't do >1024 without doing a copy in memory,
-> which would be a big stretch of the plane definition and benefit.
-> 
-> In addition the IPU scaler has pitch and alignment constraints that make
-> the needed tiling extremely complex to get right. We fiddled with this
-> extensively to get it to the point that it is usable as a V4L2 mem2mem
-> device. Moving this to the display path is not going to happen, ever.
-> 
-> As all relevant resolutions already require a copy you are much better
-> of doing it with the GPU and get all the testing effort focused on that
-> path.
+On Fri, Aug 28, 2015 at 8:44 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-And at that point, you might as well use the filter blit and blit directly
-to the screen.
+> Currently we gpio-omap breaks if gpiochip_add() returns -EPROBE_DEFER:
+>
+> [    0.570000] gpiochip_add: GPIOs 0..31 (gpio) failed to register
+> [    0.570000] omap_gpio 48310000.gpio: Could not register gpio chip -517
+> ...
+> [    3.670000] omap_gpio 48310000.gpio: Unbalanced pm_runtime_enable!
+>
+> Let's fix the issue by adding the missing pm_runtime_put() on error.
+>
+> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  drivers/gpio/gpio-omap.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index b0c57d5..f09bf0b 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1232,8 +1232,11 @@ static int omap_gpio_probe(struct platform_device *pdev)
+>         omap_gpio_mod_init(bank);
+>
+>         ret = omap_gpio_chip_init(bank, irqc);
+> -       if (ret)
+> +       if (ret) {
+> +               pm_runtime_put_sync(bank->dev);
+> +               pm_runtime_disable(bank->dev);
+>                 return ret;
+> +       }
+>
+>         omap_gpio_show_rev(bank);
 
-I've run some performance analysis on this on iMX6 hardware, and the time
-taken for the CPU to copy the Xv data passed to it is about the same time
-that it takes the CPU to flush the caches, then ask the GPU to copy the
-data, and then wait for the GPU to report that the copy has finished.  My
-analysis shows that you actually lose performance by using the GPU to
-merely copy and then pass it to Xv.
+Patch applied for fixes with Santosh's ACK.
 
-Also, you mention that the IPU scaler has pitch and alignment constraints.
-So does the GPU.  The Xv interface can cope with that just fine, because
-the Xv backend gets to define the pitch and buffer size for any given
-format/width/height, and offsets in the buffer for planar image formats.
-
-It isn't able to specify the alignment of the actual buffer though - for
-SHM, that's going to be the size of a struct page due to the way shmem
-works.  For raw XvPutImage, things are harder to cope with, but the GPU
-can cope provided the offset is aligned to a pixel boundary.
-
-> MX6Plus is just around the corner and will probably keep us busy for a
-> while. ;)
-
-You might be excited about that, but for the rest of us, we have to put
-up with the hardware we have, which is basically iMX6.  We need solutions
-now on existing iMX6 hardware, not the next set of likely to be
-problematical hardware.
-
-I know the grass is always greener on the other side - and I expect that
-when MX6+ comes out, you'll then have no time to work on etnaviv DRM,
-and we'll still be stuck without any progress on that.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Yours,
+Linus Walleij
