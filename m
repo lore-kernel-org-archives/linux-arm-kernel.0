@@ -1,57 +1,89 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Tue, 8 Sep 2015 15:01:07 +0000
-Subject: [PATCH v8 2/2] ARM: imx: support suspend states on imx7D
-In-Reply-To: <20150907151106.GA30723@tiger>
-References: <1438378439-11569-1-git-send-email-shenwei.wang@freescale.com>
- <1438378439-11569-3-git-send-email-shenwei.wang@freescale.com>
- <20150907151106.GA30723@tiger>
-Message-ID: <CY1PR0301MB084344B059A4178B09E949DF83530@CY1PR0301MB0843.namprd03.prod.outlook.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 8 Sep 2015 20:37:11 +0530
+Subject: [PATCH-v2 4/7] mmc: sdhci-pxav3: Add pinctl setting according to
+ bus clock
+In-Reply-To: <CACRpkdY59roEBgUd9TR39yNgfhw393+WmHQQAeLkOEZLChOcWQ@mail.gmail.com>
+References: <1441624721-15612-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1441624721-15612-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <CACRpkdY59roEBgUd9TR39yNgfhw393+WmHQQAeLkOEZLChOcWQ@mail.gmail.com>
+Message-ID: <55EEF99F.1020904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> > This patch adds a new suspend driver to manage the power states on IMX7D.
-> > It currently supports "SUSPEND_STANDBY" and "SUSPEND_MEM" states.
-> >
-> > Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
-> > Signed-off-by: Anson Huang <b20788@freescale.com>
-> 
-> Please stop sending patches to my Linaro mailbox, and use
-> shawnguo at kernel.org instead.  You should already get that if you ever
-> run ./scripts/get_maintainer.pl on the patch.  Also please always copy
-> kernel at pengutronix.de for i.MX platform patches like this.
+On Tuesday 08 September 2015 08:12 PM, Linus Walleij wrote:
+> On Mon, Sep 7, 2015 at 1:18 PM, Vaibhav Hiremath
+> <vaibhav.hiremath@linaro.org> wrote:
+>
+>> Different bus clock may need different pin setting.
+>> For example, fast bus clock like 208Mhz need pin drive fast
+>> while slow bus clock prefer pin drive slow to guarantee
+>> signal quality.
+>>
+>> So this patch creates two states,
+>>    - Default (slow/normal) pin state
+>>    - And fast pin state for higher freq bus speed.
+>>
+>> And selection of pin state is done based on timing mode.
+>>
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>> Signed-off-by: Kevin Liu <kliu5@marvell.com>
+> (...)
+>> +       pxa->pinctrl = devm_pinctrl_get(dev);
+>> +       if (!IS_ERR(pxa->pinctrl)) {
+>> +               pxa->pins_default = pinctrl_lookup_state(pxa->pinctrl, "default");
+>> +               if (IS_ERR(pxa->pins_default))
+>> +                       dev_err(dev, "could not get default pinstate\n");
+>> +               pxa->pins_fast = pinctrl_lookup_state(pxa->pinctrl, "fast");
+>> +               if (IS_ERR(pxa->pins_fast))
+>> +                       dev_info(dev, "could not get fast pinstate\n");
+>> +       }
+>
+> This is exactly how I think it should be used from a pin control
+> point of view.
+>
+> If you depended on CONFIG_PM you could use
+> pinctrl_pm_select_default_state() but for this simple scenario
+> this is fine.
+>
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+>  From a pinctrl point of view.
+>
 
-Noted.
 
-> > ---
-> >  arch/arm/mach-imx/Kconfig        |   1 +
-> >  arch/arm/mach-imx/Makefile       |   2 +
-> >  arch/arm/mach-imx/common.h       |   4 +
-> >  arch/arm/mach-imx/pm-imx7.c      | 917
-> +++++++++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-imx/suspend-imx7.S | 529 ++++++++++++++++++++++
-> >  5 files changed, 1453 insertions(+)
-> 
-> 1453 lines addition to kernel only for i.MX7D suspend support.  Yes, this is the
-> way we support suspend on i.MX6, but that's enough, and we have to stop this
-> somewhere.  I would ask you to take Sudeep's comment and adopt PSCI for
-> i.MX7D power management.
+Thanks for your review.
 
-According to PSCI spec, a supervisory software must be implemented under either
-HVC(EL2) or SMC(EL3) privilege level. I agree that, with this idea, we could finally move 
-these 1453 lines of codes from kernel into a platform specific firmware. The problem
-is we don't have the firmware so far, and we haven't even had a plan to enable the
-hypervisor or secure software on this platform. Because low power consumption is
-the key feature of this i.MX7D platform, please continue to consider the current 
-implementation and get this feature supported first. 
+Linus,
+
+I agree this is how it should be used.
+But I still have one small doubt on expectation from
+devm_pinctrl_get() function.
+
+
+If pinctrl properties are not populated in Devicetree node,
+then, shouldn't devm_pinctrl_get() return error ?
+I followed the code flow, and it seems even if pinctrl properties are
+not populated in DT node, the devm_pinctrl_get() returns valid
+pointer to "struct pinctrl", isn't this against the expectation of the
+call?
+
+
+Code flow -
+
+devm_pinctrl_get()
+...
+--> creat_pinctrl()
+--> pinctrl_dt_to_map()
+...
+
+
+
+pinctrl_dt_to_map() iterates for pinctrl-x (x = 0,1,...) and if it
+founds the entry then it parses the node. If it doesn't find any
+pinctrl property then also it returns 0. and subsequently rreturns
+handle to "struct pinctrl" for the device. Why is so?
+
 
 Thanks,
-Shenwei
-
- 
-> Shawn
-> 
-> [1] https://lkml.org/lkml/2015/8/26/554
+Vaibhav
