@@ -1,75 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Sep 2015 09:03:17 +0100
-Subject: [PATCH] ARM: fix bug which lowmem size is limited to 760MB
-In-Reply-To: <alpine.LFD.2.20.1509072139050.22877@knanqh.ubzr>
-References: <20150903091044.GW21084@n2100.arm.linux.org.uk>
- <1441276233-14566-1-git-send-email-ytk.lee@samsung.com>
- <alpine.LFD.2.20.1509032106420.22877@knanqh.ubzr>
- <1713935.2YV1sNJUyb@wuerfel>
- <alpine.LFD.2.20.1509071152510.22877@knanqh.ubzr>
- <20150908001042.GT21084@n2100.arm.linux.org.uk>
- <alpine.LFD.2.20.1509072139050.22877@knanqh.ubzr>
-Message-ID: <20150908080316.GU21084@n2100.arm.linux.org.uk>
+From: pawelo@king.net.pl (Paul Osmialowski)
+Date: Tue, 8 Sep 2015 10:04:19 +0200 (CEST)
+Subject: [PATCH 7/9] arm: twr-k70f120m: IOMUX driver for Kinetis SoC
+In-Reply-To: <CACRpkdYHBt7YJWM3Bg8ENfw7uL4fuENqW+g8YaO+P6UPBCX4HQ@mail.gmail.com>
+References: <1435094387-20146-1-git-send-email-pawelo@king.net.pl>
+ <1435094387-20146-8-git-send-email-pawelo@king.net.pl>
+ <CACRpkdYHBt7YJWM3Bg8ENfw7uL4fuENqW+g8YaO+P6UPBCX4HQ@mail.gmail.com>
+Message-ID: <alpine.LNX.2.00.1509080953390.31192@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 07, 2015 at 10:01:41PM -0400, Nicolas Pitre wrote:
-> On Tue, 8 Sep 2015, Russell King - ARM Linux wrote:
-> 
-> > On Mon, Sep 07, 2015 at 03:40:36PM -0400, Nicolas Pitre wrote:
-> > > On Mon, 7 Sep 2015, Arnd Bergmann wrote:
-> > > 
-> > > > On Thursday 03 September 2015 21:24:00 Nicolas Pitre wrote:
-> > > > > If 768MB targets were common place then it could be worth changing the 
-> > > > > default vmalloc size to accommodate this memory size and testing all the 
-> > > > > other targets to make sure no regressions are introduced.  But given it 
-> > > > > is easy to change the default via the kernel cmdline, and that you lose 
-> > > > > only 8 MB otherwise, I don't think it is worth the trouble and/or the 
-> > > > > risk.
-> > > > 
-> > > > Agreed.
-> > > 
-> > > Well... I think there is a better solution.
-> > 
-> > Doesn't this clash with things like:
-> > 
-> > #define UNCACHEABLE_ADDR        0xff000000      /* IRQ_STAT */
-> > 
-> > ?
-> 
-> It looks like the move might actually "fix" it.  That UNCACHEABLE_ADDR 
-> is mapped with:
-> 
-> static struct map_desc ebsa110_io_desc[] __initdata = {
->         /*
->          * sparse external-decode ISAIO space
->          */
->         {       /* IRQ_STAT/IRQ_MCLR */
->                 .virtual        = (unsigned long)IRQ_STAT,
->                 .pfn            = __phys_to_pfn(TRICK4_PHYS),
->                 .length         = TRICK4_SIZE,
->                 .type           = MT_DEVICE
->         },
-> [...]
-> };
-> 
-> This is passed to iotable_init(), then to create_mapping(). There you 
-> have:
-> 
->         if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
->             md->virtual >= PAGE_OFFSET &&
->             (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
->                 pr_warn("BUG: mapping for 0x%08llx at 0x%08lx out of vmalloc space\n",
->                         (long long)__pfn_to_phys((u64)md->pfn), md->virtual);
->         }
-> 
-> So you must have hit the above warning somehow. Incidentally, this 
-> IRQ_STAT entry is the only one that happened to be outside the vmalloc 
-> area. By moving VMALLOC_END from 0xff000000 to 0xff800000 the warning 
-> will be gone.
+Hi Linus,
 
-No, there are other legacy platforms which have mappings above that.
+On Tue, 14 Jul 2015, Linus Walleij wrote:
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> OK...
+> 
+> I want Shawn and Sascha to look at this as they worked with
+> other Freescale pin controllers. Especially I want to know if this
+> is a sibling to the other Freescale controllers or a separate hardware.
+> 
+> If it is *not* a sibling I will *insist* that it use more generic pin
+> control bindings and move away from the older Freescale-specific
+> stuff.
+
+No one answered me about that. However, I looked at other Freescale 
+pinctrl drivers and realised that no one of them (IMX, IMX1, MXS) is 
+similar to what I need to do for Kinetis, also positions of configuration 
+bits differ significantly.
+
+> 
+> There exist generic pin config bindings, see
+> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+> 
+> I suggest to to function+group paring and then use generic pin config
+> with this driver unless it is a very close sibling to the existing Freescale
+> pin controllers.
+> 
+> Hint: if it is a sibling, it should share code with them.
+> 
+> There are several drivers doing generic pin control/pin config in the kernel
+> tree.
+> 
+
+I tried to analyze few of the drivers (e.g. zynq family) and can't find 
+how can I assing clock gate (clock device) to each port (PORTA, PORTB, 
+PORTC,...) which is required for Kinetis. Is generic pin control capable 
+to express that requirement or is it a time to desing my own pinctrl 
+driver (maybe somewhat improved than the one I presented so far)?
+
+This pinctrl component is somwehat critical part of BSP. Until it is not 
+sorted, I don't see a point in releasing what was developed so far.
+
+Best regards,
+Paul
