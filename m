@@ -1,49 +1,63 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 08 Sep 2015 16:48:06 +0200
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <CAOCHtYhtkV-TtaA6hz1OTD5TpGCnionK27D2mp4beU+HGymwdw@mail.gmail.com>
-References: <m3bnde5whx.fsf@t19.piap.pl>
- <20150907112555.GS21084@n2100.arm.linux.org.uk>
- <m337yp5gvv.fsf@t19.piap.pl> <1441709778.13536.8.camel@pengutronix.de>
- <20150908110135.GW21084@n2100.arm.linux.org.uk>
- <1441710467.13536.13.camel@pengutronix.de>
- <20150908112909.GX21084@n2100.arm.linux.org.uk>
- <1441716233.13536.21.camel@pengutronix.de>
- <CAOCHtYhtkV-TtaA6hz1OTD5TpGCnionK27D2mp4beU+HGymwdw@mail.gmail.com>
-Message-ID: <1441723686.13536.74.camel@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 08 Sep 2015 16:49:20 +0200
+Subject: [PATCH v2 1/9] ARM: dts: imx6dql-nitrogen6x: add touchscreen
+ support
+In-Reply-To: <1441722886-22798-2-git-send-email-gary.bisson@boundarydevices.com>
+References: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1441722886-22798-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1441722886-22798-2-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1441723760.3241.26.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 08.09.2015, 09:17 -0500 schrieb Robert Nelson:
-> >> I
-> >> suspect that the iMX6 is going to be obsolete before we have a decent
-> >> working video playback story on this hardware.
-> >>
-> > MX6Plus is just around the corner and will probably keep us busy for a
-> > while. ;)
+Am Dienstag, den 08.09.2015, 16:34 +0200 schrieb Gary Bisson:
+> This patch adds the different touchscreens that can be connected using
+> the displays available for this board.
+> http://boundarydevices.com/product-category/displays/
 > 
-> Lucas,
+> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 > 
-> In which case, it "might" be a good idea to get the current version of
-> etnaviv in mainline for current imx6's before you guys disappear again
-> for mx6plus development..
-> 
-This wasn't to signal that we are moving away from MX6 just to say that
-there might be a lot more life in MX6 than what the above implies.
+> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> index ad16dce..24b667d 100644
+> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> @@ -284,6 +284,22 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_i2c3>;
+>  	status = "okay";
+> +
+> +	egalax_ts at 04 {
 
-> As you guys are basically repeating what happened with the limadriver:
-> http://limadriver.org/
-> 
-We have no intention to repeat that.
+I'd prefer to use generic names for the nodes, such as "touchscreen at 04",
+and "touchscreen at 38" below.
 
-> Remember, there is an etnaviv community.
-> 
-I would love to get review feedback for what is currently in the open
-from that community.
+> +		compatible = "eeti,egalax_ts";
+> +		reg = <0x04>;
+> +		interrupt-parent = <&gpio1>;
+> +		interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
+> +		wakeup-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+> +	};
+> +
+> +	ft5x06_ts at 38 {
+> +		compatible = "edt,edt-ft5x06";
+> +		reg = <0x38>;
+> +		interrupt-parent = <&gpio1>;
+> +		interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
+> +		wakeup-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
 
-Regards,
-Lucas
+This should be wake-gpios and GPIO_ACTIVE_HIGH according to the other
+users.
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+> +	};
+>  };
+>  
+>  &iomuxc {
+
+With those changes,
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+regards
+Philipp
