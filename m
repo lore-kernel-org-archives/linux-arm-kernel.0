@@ -1,137 +1,181 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 8 Sep 2015 10:19:44 +0100
-Subject: [PATCH v6 3/6] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <CAFiDJ58WCjTNkU5PWtbHxj+-0oWNg1T+psfE-OaJD+4k-DBb-A@mail.gmail.com>
-References: <1441103408-8433-1-git-send-email-lftan@altera.com>
- <1441103408-8433-4-git-send-email-lftan@altera.com>
- <20150901163304.GA9769@red-moon>
- <CAFiDJ58WCjTNkU5PWtbHxj+-0oWNg1T+psfE-OaJD+4k-DBb-A@mail.gmail.com>
-Message-ID: <20150908091944.GE29293@red-moon>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 8 Sep 2015 15:04:41 +0530
+Subject: [PATCH-v2 4/7] mmc: sdhci-pxav3: Add pinctl setting according to
+ bus clock
+In-Reply-To: <20150908145254.6807dffc@xhacker>
+References: <1441624721-15612-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1441624721-15612-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150908145254.6807dffc@xhacker>
+Message-ID: <55EEABB1.8010806@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 04, 2015 at 09:29:14AM +0100, Ley Foon Tan wrote:
-> On Wed, Sep 2, 2015 at 12:33 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
 
-[...]
 
-> > > +static bool altera_pcie_valid_config(struct altera_pcie *pcie,
-> > > +                                    struct pci_bus *bus, int dev)
-> > > +{
-> > > +       /* If there is no link, then there is no device */
-> > > +       if (bus->number != pcie->root_bus_nr) {
-> > > +               if (!altera_pcie_link_is_up(pcie))
-> > > +                       return false;
-> > > +       }
-> >
-> > Can you explain to pls me why you have to check this for every config
-> > transaction ? Isn't it something that can prevent probing the
-> > host controller altogether ?
-> In our PCIe hardware spec, it stated that software should check the
-> link status before issuing a configuration request to downstream
-> ports.
-> BTW, other pci controllers have similar implementation as well, eg: dw
-> pci, mvebu pci.
+On Tuesday 08 September 2015 12:22 PM, Jisheng Zhang wrote:
+> On Mon, 7 Sep 2015 16:48:38 +0530
+> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
+>
+>> Different bus clock may need different pin setting.
+>> For example, fast bus clock like 208Mhz need pin drive fast
+>> while slow bus clock prefer pin drive slow to guarantee
+>> signal quality.
+>>
+>> So this patch creates two states,
+>>    - Default (slow/normal) pin state
+>>    - And fast pin state for higher freq bus speed.
+>>
+>> And selection of pin state is done based on timing mode.
+>>
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>> Signed-off-by: Kevin Liu <kliu5@marvell.com>
+>> ---
+>>   drivers/mmc/host/sdhci-pxav3.c | 45 +++++++++++++++++++++++++++++++++++++++++-
+>>   1 file changed, 44 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+>> index c2b2b78..d933f75 100644
+>> --- a/drivers/mmc/host/sdhci-pxav3.c
+>> +++ b/drivers/mmc/host/sdhci-pxav3.c
+>> @@ -35,6 +35,7 @@
+>>   #include <linux/pm.h>
+>>   #include <linux/pm_runtime.h>
+>>   #include <linux/mbus.h>
+>> +#include <linux/pinctrl/consumer.h>
+>>
+>>   #include "sdhci.h"
+>>   #include "sdhci-pltfm.h"
+>> @@ -92,6 +93,10 @@ struct sdhci_pxa {
+>>   	void __iomem *io_pwr_reg;
+>>   	void __iomem *io_pwr_lock_reg;
+>>   	struct sdhci_pxa_data *data;
+>> +
+>> +	struct pinctrl *pinctrl;
+>> +	struct pinctrl_state *pins_default;
+>> +	struct pinctrl_state *pins_fast;
+>>   };
+>>
+>>   static struct sdhci_pxa_data pxav3_data_v1 = {
+>> @@ -298,6 +303,33 @@ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
+>>   	pxa->power_mode = power_mode;
+>>   }
+>>
+>> +static int pxav3_select_pinstate(struct sdhci_host *host, unsigned int uhs)
+>> +{
+>> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> +	struct sdhci_pxa *pxa = pltfm_host->priv;
+>> +	struct pinctrl_state *pinctrl;
+>> +
+>> +	if (IS_ERR(pxa->pinctrl) ||
+>> +		IS_ERR(pxa->pins_default) ||
+>> +		IS_ERR(pxa->pins_fast))
+>> +		return -EINVAL;
+>> +
+>> +	switch (uhs) {
+>> +	case MMC_TIMING_UHS_SDR50:
+>> +	case MMC_TIMING_UHS_SDR104:
+>> +	case MMC_TIMING_MMC_HS200:
+>> +	case MMC_TIMING_MMC_HS400:
+>> +		pinctrl = pxa->pins_fast;
+>> +		break;
+>> +	default:
+>> +		/* back to default state for other legacy timing */
+>> +		pinctrl = pxa->pins_default;
+>> +		break;
+>> +	}
+>> +
+>> +	return pinctrl_select_state(pxa->pinctrl, pinctrl);
+>> +}
+>> +
+>>   static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+>>   {
+>>   	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>> @@ -353,6 +385,8 @@ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+>>   	dev_dbg(mmc_dev(host->mmc),
+>>   		"%s uhs = %d, ctrl_2 = %04X\n",
+>>   		__func__, uhs, ctrl_2);
+>> +
+>> +	pxav3_select_pinstate(host, uhs);
+>
+> return pxav3_select_pinstate(host, uhs);?
+>
 
-Understood, thanks.
+Its void function, so don't need it.
 
-[...]
+> And could we ignore this call for those SDHCI hosts that don't need it?
+>
 
-> > > +static int tlp_read_packet(struct altera_pcie *pcie, u32 *value)
-> > > +{
-> > > +       u8 loop;
-> > > +       struct tlp_rp_regpair_t tlp_rp_regdata;
-> > > +
-> > > +       for (loop = 0; loop < TLP_LOOP; loop++) {
-> > > +               tlp_read_rx(pcie, &tlp_rp_regdata);
-> > > +               if (tlp_rp_regdata.ctrl & RP_RXCPL_EOP) {
-> > > +                       if (value)
-> > > +                               *value = tlp_rp_regdata.reg0;
-> > > +                       return PCIBIOS_SUCCESSFUL;
-> > > +               }
-> > > +               udelay(5);
-> >
-> > Could you comment please on the chosen udelay/TLP_LOOP values (ie how
-> > did you come up with them) ?
-> For udelay value, we just want to have small delay between each read.
+I do not want to introduce flags here.
+And also, it is already ignored for those who don't need it.
 
-I would explain how you chose the value, in particular if it can
-affect next generation hosts sharing the same driver.
+The first thing in the function pxav3_select_pinstate() is
 
-> For TLP_LOOP value, minimum 2 loops to read tlp headers and 1 loop to
-> read data payload. So, we choose to poll 10 loops for maximum.
 
-Add it to a comment.
+	if (IS_ERR(pxa->pinctrl) ||
+		IS_ERR(pxa->pins_default) ||
+		IS_ERR(pxa->pins_fast))
+		return -EINVAL;
 
-[...]
 
-> > > +static int altera_pcie_probe(struct platform_device *pdev)
-> > > +{
-> > > +       struct altera_pcie *pcie;
-> > > +       struct pci_bus *bus;
-> > > +       int ret;
-> > > +
-> > > +       pcie = devm_kzalloc(&pdev->dev, sizeof(*pcie), GFP_KERNEL);
-> > > +       if (!pcie)
-> > > +               return -ENOMEM;
-> > > +
-> > > +       pcie->pdev = pdev;
-> > > +
-> > > +       ret = altera_pcie_parse_dt(pcie);
-> > > +       if (ret) {
-> > > +               dev_err(&pdev->dev, "Parsing DT failed\n");
-> > > +               return ret;
-> > > +       }
-> > > +
-> > > +       INIT_LIST_HEAD(&pcie->resources);
-> > > +
-> > > +       ret = altera_pcie_parse_request_of_pci_ranges(pcie);
-> > > +       if (ret) {
-> > > +               dev_err(&pdev->dev, "Failed add resources\n");
-> > > +               return ret;
-> > > +       }
-> > > +
-> > > +       ret = altera_pcie_init_irq_domain(pcie);
-> > > +       if (ret) {
-> > > +               dev_err(&pdev->dev, "Failed creating IRQ Domain\n");
-> > > +               return ret;
-> > > +       }
-> > > +
-> > > +       pcie->root_bus_nr = 0;
-> >
-> > Nit: It is already 0.
-> Okay. Will remove it.
-> >
-> > > +
-> > > +       /* clear all interrupts */
-> > > +       cra_writel(pcie, P2A_INT_STS_ALL, P2A_INT_STATUS);
-> > > +       /* enable all interrupts */
-> > > +       cra_writel(pcie, P2A_INT_ENA_ALL, P2A_INT_ENABLE);
-> > > +
-> > > +       bus = pci_scan_root_bus(&pdev->dev, pcie->root_bus_nr, &altera_pcie_ops,
-> > > +                               pcie, &pcie->resources);
-> > > +       if (!bus)
-> > > +               return -ENOMEM;
-> > > +
-> > > +       pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-> > > +       pci_assign_unassigned_bus_resources(bus);
-> >
-> > I think you are missing a call to pcie_bus_configure_settings(),
-> > see drivers/pci/host/pci-host-generic.c
-> Other pci controller drivers like xgene and iproc don't call to this
-> function, but it call in
-> arch/arm/kernel/bios32.c:pci_common_init_dev().
-> Do we really need this?
+So its already handled.
 
-It is there to provide a way to configure the system MPS, through
-command line parameters, it is always a good idea to have it and
-it should be part of your driver so that you can tune it in case
-the MPS is misconfigured or you want to apply a specific configuration
-for a given system.
+>>   }
+>>
+>>   static void pxav3_voltage_switch(struct sdhci_host *host,
+>> @@ -416,7 +450,6 @@ static void pxav3_set_clock(struct sdhci_host *host, unsigned int clock)
+>>   		/* TX internal clock selection */
+>>   		pxav3_set_tx_clock(host);
+>>   	}
+>> -
+>
+> why not fix this in patch 3?
+>
 
-Have a look at pcie_bus_config and how it is used in
-pcie_bus_configure_settings(), that would clarify further.
+Oops. it got missed from my eyes :)
+Will fix in next version.
+
+>>   }
+>>
+>>   static const struct sdhci_ops pxav3_sdhci_ops = {
+>> @@ -586,6 +619,16 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+>>   		}
+>>   	}
+>>
+>> +	pxa->pinctrl = devm_pinctrl_get(dev);
+>
+> could we ignore this for those SDHCI hosts that don't need it?
+>
+
+Again, no need to introduce flags here. This is standard call and
+handled properly. So for the platforms not using this, it really should
+not matter.
+Also, lookup is getting executed only when pinctrl is populated.
+
+So I do not see any need here.
+
+>> +	if (!IS_ERR(pxa->pinctrl)) {
+>> +		pxa->pins_default = pinctrl_lookup_state(pxa->pinctrl, "default");
+>> +		if (IS_ERR(pxa->pins_default))
+>> +			dev_err(dev, "could not get default pinstate\n");
+>
+> Why those SDHCI hosts that don't need pinctl setting should got this error?
+>
+
+It won't.
+
+If Host does not need pinctrl, the execution would never reach this
+point.
+The if condition check would handle it, isn't it?
+
+	pxa->pinctrl = devm_pinctrl_get(dev);
+	if (!IS_ERR(pxa->pinctrl)) {
+
+		...
+
+	}
+
+So I do not see why is it issue here?
+
 
 Thanks,
-Lorenzo
+Vaibhav
