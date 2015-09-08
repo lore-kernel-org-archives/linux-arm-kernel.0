@@ -1,89 +1,178 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 8 Sep 2015 20:37:11 +0530
-Subject: [PATCH-v2 4/7] mmc: sdhci-pxav3: Add pinctl setting according to
- bus clock
-In-Reply-To: <CACRpkdY59roEBgUd9TR39yNgfhw393+WmHQQAeLkOEZLChOcWQ@mail.gmail.com>
-References: <1441624721-15612-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1441624721-15612-5-git-send-email-vaibhav.hiremath@linaro.org>
- <CACRpkdY59roEBgUd9TR39yNgfhw393+WmHQQAeLkOEZLChOcWQ@mail.gmail.com>
-Message-ID: <55EEF99F.1020904@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 8 Sep 2015 16:07:27 +0100
+Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
+ ECAM) and ACPI code out of arch/x86/ directory
+In-Reply-To: <55ED6010.3020406@linaro.org>
+References: <20150526170817.GU1565@arm.com> <55657B02.5090805@linaro.org>
+ <20150602133215.GC23650@red-moon> <55701A31.808@linaro.org>
+ <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
+ <557504A2.3060203@linaro.org> <20150608151443.GA16151@red-moon>
+ <55E4340D.6050004@linaro.org> <55ED6010.3020406@linaro.org>
+Message-ID: <20150908150727.GF29293@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tomasz,
 
+On Mon, Sep 07, 2015 at 10:59:44AM +0100, Tomasz Nowicki wrote:
+> On 31.08.2015 13:01, Tomasz Nowicki wrote:
+> > On 08.06.2015 17:14, Lorenzo Pieralisi wrote:
+> >> On Mon, Jun 08, 2015 at 03:57:38AM +0100, Hanjun Guo wrote:
+> >>
+> >> [...]
+> >>
+> >>>>>>>>> Why can't we make use of the ECAM implementation used by
+> >>>>>>>>> pci-host-generic
+> >>>>>>>>> and drivers/pci/access.c?
+> >>>>>>>>
+> >>>>>>>> We had that question when I had posted MMCFG patch set separately,
+> >>>>>>>> please see:
+> >>>>>>>> https://lkml.org/lkml/2015/3/11/492
+> >>>>>>>
+> >>>>>>> Yes, but the real question is, why do we need to have PCI config
+> >>>>>>> space
+> >>>>>>> up and running before a bus struct is even created ? I think the
+> >>>>>>> reason is
+> >>>>>>> the PCI configuration address space format (ACPI 6.0, Table 5-27,
+> >>>>>>> page
+> >>>>>>> 108):
+> >>>>>>>
+> >>>>>>> "PCI Configuration space addresses must be confined to devices on
+> >>>>>>> PCI Segment Group 0, bus 0. This restriction exists to accommodate
+> >>>>>>> access to fixed hardware prior to PCI bus enumeration".
+> >>>>>>>
+> >>>>>>> On HW reduced platforms I do not even think this is required at all,
+> >>>>>>> we have to look into this to avoid code duplication that might well
+> >>>>>>> turn out useless.
+> >>>>>>
+> >>>>>> This is only for the fixed hardware, which will be not available for
+> >>>>>> ARM64 (reduced hardware mode), but in Generic Hardware Programming
+> >>>>>> Model, we using OEM-provided ACPI Machine Language (AML) code to
+> >>>>>> access
+> >>>>>> generic hardware registers, this will be available for reduced
+> >>>>>> hardware
+> >>>>>> too.
+> >>>>>>
+> >>>>>> So in ACPI spec, it says: (ACPI 6.0 page 66, last paragraph)
+> >>>>>>
+> >>>>>> ACPI defines eight address spaces that may be accessed by generic
+> >>>>>> hardware implementations. These include:
+> >>>>>> * System I/O space
+> >>>>>> * System memory space
+> >>>>>> * PCI configuration space
+> >>>>>> * Embedded controller space
+> >>>>>> * System Management Bus (SMBus) space
+> >>>>>> * CMOS
+> >>>>>> * PCI BAR Target
+> >>>>>> * IPMI space
+> >>>>>>
+> >>>>>> So if any device using the PCI address space for control, such
+> >>>>>> as a system reset control device, its address space can be reside
+> >>>>>> in PCI configuration space (who can prevent a OEM do that crazy
+> >>>>>> thing? :) ), and it should be accessible before the PCI bus is
+> >>>>>> created.
+> >>>>>
+> >>>>> Us, by changing attitude and questioning features whose usefulness
+> >>>>> is questionable. I will look into this and raise the point, I am not
+> >>>>> thrilled by the idea of adding another set of PCI accessor functions
+> >>>>> and drivers because we have to access a register through PCI before
+> >>>>> enumerating the bus (and on arm64 this is totally useless since
+> >>>>> we are not meant to support fixed HW anyway). Maybe we can make acpica
+> >>>>> code use a "special" stub (ACPI specific, PCI configuration space
+> >>>>> address
+> >>>>> space has restrictions anyway), I have to review this set in its
+> >>>>> entirety to see how to do that (and I would kindly ask you to do
+> >>>>> it too, before saying it is not possible to implement it).
+> >>>>
+> >>>> I'm willing to do that, actually, if we don't need a mechanism to
+> >>>> access PCI config space before the bus is created, the code can be
+> >>>> simplified a lot.
+> >>>
+> >>> After more investigation on the spec and the ACPI core code, I'm
+> >>> still not convinced that accessing to PCI config space before PCI
+> >>> bus creating is impossible, also there is no enough ARM64 hardware
+> >>> to prove that too. But I think we can go in this way, reuse the
+> >>> ECAM implementation by pci-host-generic for now, and implement the PCI
+> >>> accessor functions before enumerating PCI bus when needed in the
+> >>> future, does it make sense?
+> >>
+> >> You mean we rewrite the patch to make sure we can use the PCI host
+> >> generic
+> >> driver with MCFG and we leave the acpica PCI config call empty stubs on
+> >> arm64 (as they are now) ?
+> >>
+> >
+> > Hi Bjorn, Rafael,
+> >
+> > Lorenzo pointed out very important problem we are having with PCI config
+> > space access for ARM64. Please refer to the above discussion and add
+> > your 2 cents. Can we forget about accessing PCI config space (for
+> > Hardware Reduced profile) before PCI bus creation? If not, do you see a
+> > way to use drivers/pci/access.c accessors here, like acpica change? Any
+> > opinion is very appreciated.
+> >
+> 
+> Kindly remainder.
 
-On Tuesday 08 September 2015 08:12 PM, Linus Walleij wrote:
-> On Mon, Sep 7, 2015 at 1:18 PM, Vaibhav Hiremath
-> <vaibhav.hiremath@linaro.org> wrote:
->
->> Different bus clock may need different pin setting.
->> For example, fast bus clock like 208Mhz need pin drive fast
->> while slow bus clock prefer pin drive slow to guarantee
->> signal quality.
->>
->> So this patch creates two states,
->>    - Default (slow/normal) pin state
->>    - And fast pin state for higher freq bus speed.
->>
->> And selection of pin state is done based on timing mode.
->>
->> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->> Signed-off-by: Kevin Liu <kliu5@marvell.com>
-> (...)
->> +       pxa->pinctrl = devm_pinctrl_get(dev);
->> +       if (!IS_ERR(pxa->pinctrl)) {
->> +               pxa->pins_default = pinctrl_lookup_state(pxa->pinctrl, "default");
->> +               if (IS_ERR(pxa->pins_default))
->> +                       dev_err(dev, "could not get default pinstate\n");
->> +               pxa->pins_fast = pinctrl_lookup_state(pxa->pinctrl, "fast");
->> +               if (IS_ERR(pxa->pins_fast))
->> +                       dev_info(dev, "could not get fast pinstate\n");
->> +       }
->
-> This is exactly how I think it should be used from a pin control
-> point of view.
->
-> If you depended on CONFIG_PM you could use
-> pinctrl_pm_select_default_state() but for this simple scenario
-> this is fine.
->
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
->  From a pinctrl point of view.
->
+I think (but I am happy to be corrected) that the map_bus() hook
+(ie that's why struct pci_bus is required in eg pci_generic_config_write)
+is there to ensure that when the generic accessors are called
+a) we have a valid bus b) the host controllers implementing it
+has been initialized.
 
+I had another look and I noticed you are trying to solve multiple
+things at once:
 
-Thanks for your review.
+1) ACPICA seems to need PCI config space on bus 0 to be working
+   before PCI enumerates (ie before we have a root bus), we need to
+   countercheck on that, but you can't use the generic PCI accessors
+   for that reasons (ie root bus might not be available, you do not
+   have a pci_bus struct)
+2) the raw_pci_read/write require _generic_ mmio back-ends, since AMD
+   can't cope with standard x86 read/write{b,w,l}
 
-Linus,
+Overall, it seems to me that we can avoid code duplication by
+shuffling your code a bit.
 
-I agree this is how it should be used.
-But I still have one small doubt on expectation from
-devm_pinctrl_get() function.
+You could modify the generic accessors in drivers/pci/access.c to
+use your mmio back-end instead of using plain read/write{b,w,l}
+functions (we should check if RobH is ok with that there can be
+reasons that prevent this from happening). This would solve the
+AMD mmio issue.
 
+By factoring out the code that actually carries out the reads
+and writes in the accessors basically you decouple the functions
+requiring the struct pci_bus from the ones that does not require it
+(ie raw_pci_{read/write}.
 
-If pinctrl properties are not populated in Devicetree node,
-then, shouldn't devm_pinctrl_get() return error ?
-I followed the code flow, and it seems even if pinctrl properties are
-not populated in DT node, the devm_pinctrl_get() returns valid
-pointer to "struct pinctrl", isn't this against the expectation of the
-call?
+The generic MMIO layer belongs in the drivers/pci/access.c file, it has
+nothing to do with ECAM.
 
+The mmcfg interface should probably live in pci-acpi.c, I do not think
+you need an extra file in there but that's a detail.
 
-Code flow -
+Basically the generic accessors would become something like eg:
 
-devm_pinctrl_get()
-...
---> creat_pinctrl()
---> pinctrl_dt_to_map()
-...
+int pci_generic_config_write(struct pci_bus *bus, unsigned int devfn,
+			     int where, int size, u32 val)
+{
+	void __iomem *addr;
 
+	addr = bus->ops->map_bus(bus, devfn, where);
+	if (!addr)
+		return PCIBIOS_DEVICE_NOT_FOUND;
 
+	pci_mmio_write(size, addr + where, value);
 
-pinctrl_dt_to_map() iterates for pinctrl-x (x = 0,1,...) and if it
-founds the entry then it parses the node. If it doesn't find any
-pinctrl property then also it returns 0. and subsequently rreturns
-handle to "struct pinctrl" for the device. Why is so?
+	return PCIBIOS_SUCCESSFUL;
+}
 
+With that in place using raw_pci_write/read or the generic accessors
+becomes almost identical, with code requiring the pci_bus to be
+created using the generic accessors and ACPICA using the raw version.
 
-Thanks,
-Vaibhav
+I might be missing something, so apologies if that's the case.
+
+Comments welcome.
+
+Lorenzo
