@@ -1,56 +1,68 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Tue,  8 Sep 2015 16:35:28 -0500
-Subject: [PATCH 08/11] arm: dts: Add RPM/SMD support on APQ8084
+Date: Tue,  8 Sep 2015 16:35:27 -0500
+Subject: [PATCH 07/11] arm: dts: Add APQ8084 SMEM nodes
 In-Reply-To: <1441748131-26490-1-git-send-email-agross@codeaurora.org>
 References: <1441748131-26490-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1441748131-26490-10-git-send-email-agross@codeaurora.org>
+Message-ID: <1441748131-26490-9-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for RPM and SMD nodes that are present on APQ8084
-platforms.
+This patch adds all the required nodes to support SMEM on APQ8084
 
 Signed-off-by: Andy Gross <agross@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-apq8084.dtsi |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/qcom-apq8084.dtsi |   31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
 diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index a7e34f9..c4303b9 100644
+index 7084010..a7e34f9 100644
 --- a/arch/arm/boot/dts/qcom-apq8084.dtsi
 +++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -114,6 +114,11 @@
- 			      <0xf9002000 0x1000>;
- 		};
+@@ -10,6 +10,17 @@
+ 	compatible = "qcom,apq8084";
+ 	interrupt-parent = <&intc>;
  
-+		apcs: syscon at f9011000 {
-+			compatible = "syscon";
-+			reg = <0xf9011000 0x1000>;
-+		};
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
 +
- 		timer at f9020000 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-@@ -312,4 +317,19 @@
- 			#interrupt-cells = <4>;
- 		};
- 	};
-+
-+	smd {
-+		compatible = "qcom,smd";
-+
-+		rpm {
-+			interrupts = <0 168 1>;
-+			qcom,ipc = <&apcs 8 0>;
-+			qcom,smd-edge = <15>;
-+
-+			rpm_requests {
-+				compatible = "qcom,rpm-apq8084";
-+				qcom,smd-channels = "rpm_requests";
-+			};
++		smem_mem: smem_region at fa00000 {
++			reg = <0xfa00000 0x200000>;
++			no-map;
 +		};
 +	};
- };
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -224,6 +235,26 @@
+ 			reg = <0xfc400000 0x4000>;
+ 		};
+ 
++		tcsr_mutex_regs: syscon at fd484000 {
++			compatible = "syscon";
++			reg = <0xfd484000 0x2000>;
++		};
++
++		tcsr_mutex: hwlock {
++			compatible = "qcom,tcsr-mutex";
++			syscon = <&tcsr_mutex_regs 0 0x80>;
++			#hwlock-cells = <1>;
++		};
++
++		smem {
++			compatible = "qcom,smem";
++			reg = <0xfc428000 0x4000>;
++			reg-names = "aux-mem1";
++
++			memory-region = <&smem_mem>;
++			hwlocks = <&tcsr_mutex 3>;
++		};
++
+ 		tlmm: pinctrl at fd510000 {
+ 			compatible = "qcom,apq8084-pinctrl";
+ 			reg = <0xfd510000 0x4000>;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
