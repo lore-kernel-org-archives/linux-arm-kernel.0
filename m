@@ -1,99 +1,306 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 8 Sep 2015 10:17:04 -0700
-Subject: _DSD standardization note (WAS: Re: [PATCH 2/2] net, thunder,
- bgx: Add support for ACPI binding.)
-In-Reply-To: <55EB49E5.5040206@redhat.com>
-References: <1438907590-29649-1-git-send-email-ddaney.cavm@gmail.com>	<1438907590-29649-3-git-send-email-ddaney.cavm@gmail.com>	<20150807140106.GE7646@leverpostej>	<55C4ECC6.7050908@caviumnetworks.com>	<20150807175127.GB12013@leverpostej>	<CAJZ5v0gc=bo3ayO7aWq19Hh_205YC52wqXGbbM5vxR1atXm+oA@mail.gmail.com>	<55C5494D.5010903@caviumnetworks.com>
- <CAJZ5v0iNqRsrpwzWY5o97R1S+Dr-CzRPg3Cymt1q4v5gvABCQA@mail.gmail.com>
- <55EB49E5.5040206@redhat.com>
-Message-ID: <55EF1810.40300@caviumnetworks.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 08 Sep 2015 13:40:17 -0400
+Subject: [Linaro-acpi] [RFC 3/5] acpi/serial: add DBG2 earlycon support
+In-Reply-To: <20150908171744.GQ10728@bivouac.eciton.net>
+References: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
+ <1441716217-23786-4-git-send-email-leif.lindholm@linaro.org>
+ <1441730339.5459.8.camel@redhat.com>
+ <20150908171744.GQ10728@bivouac.eciton.net>
+Message-ID: <1441734017.5459.15.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2015 01:00 PM, Jon Masters wrote:
-> Following up on this thread after finally seeing it...figured I would
-> send something just for the archive mainly (we discussed this in person
-> recently at a few different events and I think are aligned already).
->
-> On 08/07/2015 08:28 PM, Rafael J. Wysocki wrote:
->> Hi David,
->>
->> On Sat, Aug 8, 2015 at 2:11 AM, David Daney <ddaney@caviumnetworks.com> wrote:
->>> On 08/07/2015 05:05 PM, Rafael J. Wysocki wrote:
->>
->> [cut]
->>
->>>>
->>>> It is actually useful to people as far as I can say.
->>>>
->>>> Also, if somebody is going to use properties with ACPI, why whould
->>>> they use a different set of properties with DT?
->
-> Generally speaking, if there's a net new thing to handle, there is of
-> course no particular problem with using DT as an inspiration, but we
-> need to be conscious of the fact that Linux isn't the only Operating
-> System that may need to support these bindings, so the correct thing (as
-> stated by many of you, and below, and in person also recently - so we
-> are aligned) is to get this (the MAC address binding for _DSD in ACPI)
-> standardized properly through UEFI where everyone who has a vest OS
-> interest beyond Linux can also have their own involvement as well. As
-> discussed, that doesn't make it part of ACPI6.0, just a binding.
->
-> FWIW I made a decision on the Red Hat end that in our guidelines to
-> partners for ARM RHEL(SA - Server for ARM) builds we would not generally
-> endorse any use of _DSD, with the exception of the MAC address binding
-> being discussed here. In that case, I realized I had not been fully
-> prescriptive enough with the vendors building early hw in that I should
-> have realized this would happen and have required that they do this the
-> right way. MAC IP should be more sophisticated such that it can handle
-> being reset even after the firmware has loaded its MAC address(es).
-> Platform flash storage separate from UEFI variable storage (which is
-> being abused to contain too much now that DXE drivers then load into the
-> ACPI tables prior to exiting Boot Services, etc.) should contain the
-> actual MAC address(es), as it is done on other arches, and it should not
-> be necessary to communicate this via ACPI tables to begin with (that's a
-> cost saving embedded concept that should not happen on server systems in
-> the general case). I have already had several unannounced future designs
-> adjusted in light of this _DSD usage.
->
-> In the case of providing MAC address information (only) by _DSD, I
-> connected the initial ARMv8 SoC silicon vendors who needed to use such a
-> hack to ensure they were using the same properties, and will followup
-> off list to ensure Cavium are looped into that. But, we do need to get
-> the _DSD property for MAC address provision standardized through UEFI
-> properly as an official binding rather than just a link on the website,
-> and then we need to be extremely careful not to grow any further
-> dependence upon _DSD elsewhere. Generally, if you're using that approach
-> on a server system (other than for this MAC case), your firmware or
-> design (or both) need to be modified to not use _DSD.
+On Tue, 2015-09-08 at 18:17 +0100, Leif Lindholm wrote:
+> On Tue, Sep 08, 2015 at 12:38:59PM -0400, Mark Salter wrote:
+> > On Tue, 2015-09-08 at 13:43 +0100, Leif Lindholm wrote:
+> > > The ACPI DBG2 table defines a debug console. Add support for parsing it
+> > > and using it to select earlycon destination when no arguments provided.
+> > > 
+> > > Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> > > ---
+> > >  arch/arm64/kernel/acpi.c      |   2 +
+> > >  drivers/acpi/Makefile         |   1 +
+> > >  drivers/acpi/console.c        | 103 ++++++++++++++++++++++++++++++++++++++++++
+> > >  drivers/of/fdt.c              |   2 +-
+> > >  drivers/tty/serial/earlycon.c |  16 ++++---
+> > >  include/linux/acpi.h          |   4 ++
+> > >  include/linux/serial_core.h   |   9 ++--
+> > >  7 files changed, 126 insertions(+), 11 deletions(-)
+> > >  create mode 100644 drivers/acpi/console.c
+> > > 
+> > > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> > > index b9a5623..be7600a 100644
+> > > --- a/arch/arm64/kernel/acpi.c
+> > > +++ b/arch/arm64/kernel/acpi.c
+> > > @@ -207,6 +207,8 @@ void __init acpi_boot_table_init(void)
+> > >  		if (!param_acpi_force)
+> > >  			disable_acpi();
+> > >  	}
+> > > +
+> > > +	acpi_early_console_probe();
+> > >  }
+> > >  
+> > >  void __init acpi_gic_init(void)
+> > > diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> > > index b5e7cd8..a89587d 100644
+> > > --- a/drivers/acpi/Makefile
+> > > +++ b/drivers/acpi/Makefile
+> > > @@ -10,6 +10,7 @@ ccflags-$(CONFIG_ACPI_DEBUG)	+= -DACPI_DEBUG_OUTPUT
+> > >  #
+> > >  obj-y				+= tables.o
+> > >  obj-$(CONFIG_X86)		+= blacklist.o
+> > > +obj-y				+= console.o
+> > 
+> > obj-$(CONFIG_SERIAL_EARLYCON) += console.o
+> > 
+> > to eliminate whole-file #ifdef
+> 
+> Yes, that makes more sense for this patch standalone, but I felt it
+> would be a bit weird to add the conditionality here only to delete it
+> in the subsequent patch. I don't feel strongly about it.
 
-I think we need to be cognizant of the fact that ARMv8 SoCs do contain, 
-and in the future will still contain, many different hardware bus 
-interface devices.  These include I2C, MDIO, GPIO, xMII (x in {,SG,RGM, 
-etc} network MAC interfaces).  In the context of network interfaces 
-these are often used in conjunction with stand-alone PHY devices.
+OIC. I didn't read ahead far enough.
 
-A network driver on such a system must know several things that cannot 
-be probed, and thus must be communicated by the firmware:
+> 
+> > >  
+> > >  #
+> > >  # ACPI Core Subsystem (Interpreter)
+> > > diff --git a/drivers/acpi/console.c b/drivers/acpi/console.c
+> > > new file mode 100644
+> > > index 0000000..a985890
+> > > --- /dev/null
+> > > +++ b/drivers/acpi/console.c
+> > > @@ -0,0 +1,103 @@
+> > > +/*
+> > > + * Copyright (c) 2012, Intel Corporation
+> > > + * Copyright (c) 2015, Linaro Ltd.
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or modify
+> > > + * it under the terms of the GNU General Public License version 2 as
+> > > + * published by the Free Software Foundation.
+> > > + *
+> > > + */
+> > > +
+> > > +#define DEBUG
+> > > +#define pr_fmt(fmt) "ACPI: " KBUILD_MODNAME ": " fmt
+> > > +
+> > > +#include <linux/acpi.h>
+> > > +#include <linux/kernel.h>
+> > > +#include <linux/serial_core.h>
+> > > +
+> > > +#define NUM_ELEMS(x) (sizeof(x) / sizeof(*x))
+> > > +
+> > > +#ifdef CONFIG_SERIAL_EARLYCON
+> > > +static int use_earlycon __initdata;
+> > > +static int __init setup_acpi_earlycon(char *buf)
+> > > +{
+> > > +	if (!buf)
+> > > +		use_earlycon = 1;
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +early_param("earlycon", setup_acpi_earlycon);
+> > > +
+> > > +extern struct earlycon_id __earlycon_table[];
+> > > +
+> > > +static __initdata struct {
+> > > +	int id;
+> > > +	const char *name;
+> > > +} subtypes[] = {
+> > > +	{0, "uart8250"},
+> > > +	{1, "uart8250"},
+> > > +	{2, NULL},
+> > > +	{3, "pl011"},
+> > > +};
+> > 
+> > Instead of having a table here, why not have an ACPI_EARLYCON_DECLARE()
+> > where individual drivers can provide an id similar to OF_EARLYCON_DECLARE()
+> > providing compatible strings?
+> 
+> The IDs are defined by the DBG2 specification, so it felt more
+> natural to encapsulate it here. However, a comment to that effect
+> would be useful. Or would you still prefer
+> ACPI_EARLYCON_DECLARE(0, uart8250)
+> ACPI_EARLYCON_DECLARE(1, uart8250)
+> ...
+> ?
 
-  - PHY type/model-number.
+The idea is that the driver itself is only place that needs to handle
+a new uart type being supported rather than two places.
 
-  - PHY management channel (MDIO/I2C + management bus address)
+>  
+> > > +
+> > > +static int __init acpi_setup_earlycon(unsigned long addr, const char *driver)
+> > > +{
+> > > +	const struct earlycon_id *match;
+> > > +
+> > > +	for (match = __earlycon_table; match->name[0]; match++)
+> > > +		if (strcmp(driver, match->name) == 0)
+> > > +			return setup_earlycon_driver(addr, match->setup);
+> > > +
+> > > +	return -ENODEV;
+> > > +}
+> > > +
+> > > +static int __init acpi_parse_dbg2(struct acpi_table_header *table)
+> > > +{
+> > > +	struct acpi_table_dbg2 *dbg2;
+> > > +	struct acpi_dbg2_device *entry;
+> > > +	void *tbl_end;
+> > > +
+> > > +	dbg2 = (struct acpi_table_dbg2 *)table;
+> > > +	if (!dbg2) {
+> > > +		pr_debug("DBG2 not present.\n");
+> > > +		return -ENODEV;
+> > > +	}
+> > > +
+> > > +	tbl_end = (void *)table + table->length;
+> > > +
+> > > +	entry = (struct acpi_dbg2_device *)((void *)dbg2 + dbg2->info_offset);
+> > > +
+> > > +	while (((void *)entry) + sizeof(struct acpi_dbg2_device) < tbl_end) {
+> > > +		struct acpi_generic_address *addr;
+> > > +
+> > > +		if (entry->revision != 0) {
+> > > +			pr_debug("DBG2 revision %d not supported.\n",
+> > > +				 entry->revision);
+> > > +			return -ENODEV;
+> > > +		}
+> > > +
+> > > +		addr = (void *)entry + entry->base_address_offset;
+> > > +
+> > > +		pr_debug("DBG2 PROBE - console (%04x:%04x).\n",
+> > > +			 entry->port_type, entry->port_subtype);
+> > > +
+> > > +		if (use_earlycon &&
+> > > +		    (entry->port_type == ACPI_DBG2_SERIAL_PORT) &&
+> > > +		    (entry->port_subtype < NUM_ELEMS(subtypes)))
+> > > +			acpi_setup_earlycon(addr->address,
+> > > +					    subtypes[entry->port_subtype].name);
+> > 
+> > Don't we need to handle space_id (and bit width) as well as address?
+> 
+> space_id? bit width?
+> DBG2 is for quite primitive debug ports, already initialised by
+> formware (or other pre-kernel agent).
 
-  - PHY interrupt connection, if any, (Often a GPIO pin).
+How else would it work for x86 where uart may be mmio or ioport?
+Even with firmware initialization, kernel still needs to poke at
+registers.
 
-  - SFP eeprom location (Which I2C bus is it on).
-
-On x86 systems, all those things were placed on a PCI NIC, and the 
-configuration could be identified in a stand alone manner by the NIC 
-driver, so everything was simple.
-
-For SoC based systems, I don't see a better alternative than to expose 
-the topology via firmware tables.  In the case of OF device-tree, this 
-is done in a standard manner with "phy-handle" and "interrupts" 
-properties utilizing phandle links to traverse branches of the device tree.
-
-I am not an ACPI guru, so I don't know for certain the best way to 
-express this in ACPI, but it seems like _DSD may have to be involved.
-
-David Daney
+> 
+> > > +
+> > > +		entry = (struct acpi_dbg2_device *)
+> > > +			((void *)entry + entry->length);
+> > > +	}
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +int __init acpi_early_console_probe(void)
+> > > +{
+> > > +	acpi_table_parse(ACPI_SIG_DBG2, acpi_parse_dbg2);
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +#endif /* CONFIG_SERIAL_EARLYCON */
+> > > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> > > index fcfc4c7..a96209f 100644
+> > > --- a/drivers/of/fdt.c
+> > > +++ b/drivers/of/fdt.c
+> > > @@ -829,7 +829,7 @@ int __init early_init_dt_scan_chosen_serial(void)
+> > >  		if (!addr)
+> > >  			return -ENXIO;
+> > >  
+> > > -		of_setup_earlycon(addr, match->data);
+> > > +		setup_earlycon_driver(addr, match->data);
+> > >  		return 0;
+> > >  	}
+> > >  	return -ENODEV;
+> > > diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+> > > index 2bda09a..c063cbb 100644
+> > > --- a/drivers/tty/serial/earlycon.c
+> > > +++ b/drivers/tty/serial/earlycon.c
+> > > @@ -13,6 +13,7 @@
+> > >  
+> > >  #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
+> > >  
+> > > +#include <linux/acpi.h>
+> > >  #include <linux/console.h>
+> > >  #include <linux/kernel.h>
+> > >  #include <linux/init.h>
+> > > @@ -184,12 +185,16 @@ static int __init param_setup_earlycon(char *buf)
+> > >  	int err;
+> > >  
+> > >  	/*
+> > > -	 * Just 'earlycon' is a valid param for devicetree earlycons;
+> > > -	 * don't generate a warning from parse_early_params() in that case
+> > > +	 * Just 'earlycon' is a valid param for devicetree or ACPI earlycons;
+> > > +	 * ACPI cannot be parsed yet, so return without action if enabled.
+> > > +	 * Otherwise, attempt initialization using DT.
+> > >  	 */
+> > > -	if (!buf || !buf[0])
+> > > -		if (IS_ENABLED(CONFIG_OF_FLATTREE))
+> > > +	if (!buf || !buf[0]) {
+> > > +		if (!acpi_disabled)
+> > 
+> > How do we know for sure that "acpi" has been parsed before "earlycon"?
+> 
+> Because "arch" comes before "drivers" in kernel image link order.
+> *twitch*
+> Yes, not the best argument ever.
+> 
+> > > +			return 0;
+> > > +		else if (IS_ENABLED(CONFIG_OF_FLATTREE))
+> > >  			return early_init_dt_scan_chosen_serial();
+> > > +	}
+> > >  
+> > >  	err = setup_earlycon(buf);
+> > >  	if (err == -ENOENT || err == -EALREADY)
+> > > @@ -198,8 +203,7 @@ static int __init param_setup_earlycon(char *buf)
+> > >  }
+> > >  early_param("earlycon", param_setup_earlycon);
+> > >  
+> > > -int __init of_setup_earlycon(unsigned long addr,
+> > > -			     int (*setup)(struct earlycon_device *, const char *))
+> > > +int __init setup_earlycon_driver(unsigned long addr, earlycon_initfunc_t setup)
+> > >  {
+> > >  	int err;
+> > >  	struct uart_port *port = &early_console_dev.port;
+> > > diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> > > index 7235c48..88cb9c1 100644
+> > > --- a/include/linux/acpi.h
+> > > +++ b/include/linux/acpi.h
+> > > @@ -811,4 +811,8 @@ static inline struct acpi_device *acpi_get_next_child(struct device *dev,
+> > >  
+> > >  #endif
+> > >  
+> > > +#if defined(CONFIG_ACPI) && defined(CONFIG_SERIAL_EARLYCON)
+> > > +int __init acpi_early_console_probe(void);
+> > > +#endif
+> > > +
+> > >  #endif	/*_LINUX_ACPI_H*/
+> > > diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+> > > index 297d4fa..39e99b0 100644
+> > > --- a/include/linux/serial_core.h
+> > > +++ b/include/linux/serial_core.h
+> > > @@ -339,14 +339,15 @@ struct earlycon_device {
+> > >  	unsigned int baud;
+> > >  };
+> > >  
+> > > +typedef int (*earlycon_initfunc_t)(struct earlycon_device *, const char *);
+> > > +
+> > >  struct earlycon_id {
+> > > -	char	name[16];
+> > > -	int	(*setup)(struct earlycon_device *, const char *options);
+> > > +	char			name[16];
+> > > +	earlycon_initfunc_t	setup;
+> > >  } __aligned(32);
+> > >  
+> > >  extern int setup_earlycon(char *buf);
+> > > -extern int of_setup_earlycon(unsigned long addr,
+> > > -			     int (*setup)(struct earlycon_device *, const char *));
+> > > +extern int setup_earlycon_driver(unsigned long addr, earlycon_initfunc_t setup);
+> > >  
+> > >  #define EARLYCON_DECLARE(_name, func)					\
+> > >  	static const struct earlycon_id __earlycon_##_name		\
+> > 
