@@ -1,58 +1,141 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 8 Sep 2015 18:12:12 +0200
-Subject: at91sam9 Main crystal frequency problems
-In-Reply-To: <55ED3D3B.8060700@overkiz.com>
-References: <55ED3D3B.8060700@overkiz.com>
-Message-ID: <20150908181212.0b4336f0@bbrezillon>
+From: aalonso@freescale.com (Alonso Adrian)
+Date: Tue, 8 Sep 2015 16:13:45 +0000
+Subject: [PATCH v2 6/8] pinctrl: freescale: imx: add shared input select
+ reg support
+In-Reply-To: <20150907021257.GF30746@tiger>
+References: <1441147753-13239-1-git-send-email-aalonso@freescale.com>
+ <1441147753-13239-6-git-send-email-aalonso@freescale.com>,
+ <20150907021257.GF30746@tiger>
+Message-ID: <BN3PR03MB1509E06698F166EFE98FE0D2A8530@BN3PR03MB1509.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
+Hi Shawn,
 
-On Mon, 7 Sep 2015 09:31:07 +0200
-Antoine Aubert <a.aubert@overkiz.com> wrote:
+See comments below.
 
-> Hi,
-> 
-> I currently bring up a board based on AT91SAM9G25cu, and I having
-> problems of watchdogs resets.
-> 
-> We use linux-4.04 mainline, and i found some weird warnings on kernel
-> traces, concerning main clk.
-> 
-> [    0.000000] Main crystal frequency not set, using approximate value
-> [    0.000000] master clk is overclocked
-> [    0.000000] sched_clock: 32 bits at 128 Hz, resolution 7812500ns,
-> wraps every 16777216000000000ns
-> [    0.007812] Calibrating delay loop... 198.76 BogoMIPS (lpj=775168)
-> 
-> I set crystal clock in the DT, but it doesn't seems to work.. I feel
-> that the board works out of the specified range.
+Regards
+Adrian
+________________________________________
+From: Shawn Guo <shawnguo@kernel.org>
+Sent: Sunday, September 6, 2015 9:12 PM
+To: Alonso Lazcano Adrian-B38018
+Cc: linux-arm-kernel at lists.infradead.org; shawn.guo at linaro.org; linus.walleij at linaro.org; lznuaa at gmail.com; linux-gpio at vger.kernel.org; devicetree at vger.kernel.org; robh+dt at kernel.org; Huang Yongcai-B20788; Li Frank-B20596; Gong Yibin-B38343; Garg Nitin-B37173
+Subject: Re: [PATCH v2 6/8] pinctrl: freescale: imx: add shared input select reg support
 
-According to your clk_summary dump that's not the case.
+On Tue, Sep 01, 2015 at 05:49:11PM -0500, Adrian Alonso wrote:
+> - Add shared input select register support
+> - imx7d has two iomux controllers iomuxc and iomuxc-lpsr
+>   which share select_input register for daisy chain settings
+>
+> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
+> ---
+> Changes for V2: Resend
+>
+>  drivers/pinctrl/freescale/pinctrl-imx.c | 28 +++++++++++++++++++++++++++-
+>  drivers/pinctrl/freescale/pinctrl-imx.h |  1 +
+>  2 files changed, 28 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+> index 9f019be..597319d 100644
+> --- a/drivers/pinctrl/freescale/pinctrl-imx.c
+> +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> +#include <linux/of_address.h>
+>  #include <linux/pinctrl/machine.h>
+>  #include <linux/pinctrl/pinconf.h>
+>  #include <linux/pinctrl/pinctrl.h>
+> @@ -39,6 +40,7 @@ struct imx_pinctrl {
+>       struct device *dev;
+>       struct pinctrl_dev *pctl;
+>       void __iomem *base;
+> +     void __iomem *input_sel_base;
+>       const struct imx_pinctrl_soc_info *info;
+>  };
+>
+> @@ -254,7 +256,12 @@ static int imx_pmx_set(struct pinctrl_dev *pctldev, unsigned selector,
+>                        * Regular select input register can never be at offset
+>                        * 0, and we only print register value for regular case.
+>                        */
+> -                     writel(pin->input_val, ipctl->base + pin->input_reg);
+> +                     if (info->flags & SHARE_INPUT_SELECT_REG)
 
-> 
-> So here comes my questions:
-> Can there be a relationship with watchdog problems ? (1 per day)
+This can be replaced by a NULL checking on input_sel_base.
+[Adrian] Yes, but I will prefer to keep this flag check instead to keep code consisten on how to handle
+special cases, that way is easier to spot when input select register is shared.
 
-I'd say no, but could you tell me more about your watchdog issues.
+> +                             writel(pin->input_val, ipctl->input_sel_base +
+> +                                             pin->input_reg);
+> +                     else
+> +                             writel(pin->input_val, ipctl->base +
+> +                                             pin->input_reg);
+>                       dev_dbg(ipctl->dev,
+>                               "==>select_input: offset 0x%x val 0x%x\n",
+>                               pin->input_reg, pin->input_val);
+> @@ -690,6 +697,8 @@ static int imx_pinctrl_probe_dt(struct platform_device *pdev,
+>  int imx_pinctrl_probe(struct platform_device *pdev,
+>                     struct imx_pinctrl_soc_info *info)
+>  {
+> +     struct device_node *dev_np = pdev->dev.of_node;
+> +     struct device_node *np;
+>       struct imx_pinctrl *ipctl;
+>       struct resource *res;
+>       int ret;
+> @@ -715,6 +724,23 @@ int imx_pinctrl_probe(struct platform_device *pdev,
+>       if (IS_ERR(ipctl->base))
+>               return PTR_ERR(ipctl->base);
+>
+> +     if (info->flags & SHARE_INPUT_SELECT_REG) {
+> +             np = of_get_child_by_name(dev_np->parent, "iomuxc");
 
-> Why is it that the frequency of Crystal is not found ?
+This doesn't scale well.  First of all, we do not generally recommend
+searching node by name, because most of time node name is not enforced
+to be stable, and some nodes are named quite arbitrarily.  Secondly, we
+do not know if the hardware people will move select_input registers to
+somewhere else than IOMUXC in the future.
 
-That's a good question, and honestly I don't. Everything seems to be
-defined properly in your device tree.
+Hence, I suggest you have a device tree phandle pointing the device
+where select_input registers are located.  In that case, flag
+SHARE_INPUT_SELECT_REG can even be saved completely.
+[Adrian] Agree, let me rework this :)
+> +             if (np) {
+> +                     ipctl->input_sel_base = of_iomap(np, 0);
+> +                     if (IS_ERR(ipctl->input_sel_base)) {
+> +                             of_node_put(np);
+> +                             dev_err(&pdev->dev,
+> +                                    "iomuxc base address not found\n");
+> +                             return PTR_ERR(ipctl->input_sel_base);
+> +                     }
+> +             } else {
+> +                     dev_err(&pdev->dev, "iomuxc device node not foud\n");
 
-Could you add some traces in the fixed-rate clk driver [1] to see if the
-main_xtal is correctly registered and if its registration occurs before
-the main_osc registration?
+s/foud/found
 
-Best Regards,
+Shawn
 
-Boris
-
-[1]https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/drivers/clk/clk-fixed-rate.c?id=refs/tags/v4.0.4#n115
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> +                     return -EINVAL;
+> +             }
+> +             of_node_put(np);
+> +     }
+> +
+>       imx_pinctrl_desc.name = dev_name(&pdev->dev);
+>       imx_pinctrl_desc.pins = info->pins;
+>       imx_pinctrl_desc.npins = info->npins;
+> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h b/drivers/pinctrl/freescale/pinctrl-imx.h
+> index 67c07c2..d11a827 100644
+> --- a/drivers/pinctrl/freescale/pinctrl-imx.h
+> +++ b/drivers/pinctrl/freescale/pinctrl-imx.h
+> @@ -86,6 +86,7 @@ struct imx_pinctrl_soc_info {
+>
+>  #define SHARE_MUX_CONF_REG   0x1
+>  #define ZERO_OFFSET_VALID    0x2
+> +#define SHARE_INPUT_SELECT_REG       0x4
+>
+>  #define NO_MUX               0x0
+>  #define NO_PAD               0x0
+> --
+> 2.1.4
+>
