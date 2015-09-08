@@ -1,52 +1,49 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 8 Sep 2015 10:58:09 -0400 (EDT)
-Subject: [PATCH] ARM: fix bug which lowmem size is limited to 760MB
-In-Reply-To: <20150908080316.GU21084@n2100.arm.linux.org.uk>
-References: <20150903091044.GW21084@n2100.arm.linux.org.uk>
- <1441276233-14566-1-git-send-email-ytk.lee@samsung.com>
- <alpine.LFD.2.20.1509032106420.22877@knanqh.ubzr>
- <1713935.2YV1sNJUyb@wuerfel>
- <alpine.LFD.2.20.1509071152510.22877@knanqh.ubzr>
- <20150908001042.GT21084@n2100.arm.linux.org.uk>
- <alpine.LFD.2.20.1509072139050.22877@knanqh.ubzr>
- <20150908080316.GU21084@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.20.1509081036060.22877@knanqh.ubzr>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Tue, 08 Sep 2015 16:59:13 +0200
+Subject: I.MX6 HDMI support in v4.2
+In-Reply-To: <20150908125756.GY21084@n2100.arm.linux.org.uk> (Russell King's
+ message of "Tue, 8 Sep 2015 13:57:56 +0100")
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m37fo25nrl.fsf@t19.piap.pl>
+ <20150908091625.GV21084@n2100.arm.linux.org.uk>
+ <m3y4gh41k4.fsf@t19.piap.pl>
+ <20150908125756.GY21084@n2100.arm.linux.org.uk>
+Message-ID: <m3lhch3qke.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Sep 2015, Russell King - ARM Linux wrote:
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-> On Mon, Sep 07, 2015 at 10:01:41PM -0400, Nicolas Pitre wrote:
-> 
-[...]
-> > This is passed to iotable_init(), then to create_mapping(). There you 
-> > have:
-> > 
-> >         if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
-> >             md->virtual >= PAGE_OFFSET &&
-> >             (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
-> >                 pr_warn("BUG: mapping for 0x%08llx at 0x%08lx out of vmalloc space\n",
-> >                         (long long)__pfn_to_phys((u64)md->pfn), md->virtual);
-> >         }
-> > 
-> > So you must have hit the above warning somehow. Incidentally, this 
-> > IRQ_STAT entry is the only one that happened to be outside the vmalloc 
-> > area. By moving VMALLOC_END from 0xff000000 to 0xff800000 the warning 
-> > will be gone.
-> 
-> No, there are other legacy platforms which have mappings above that.
+> Note that most (all?) video requires some scaling.  A 720x576 video on
+> square pixels needs to be scaled to 768x576, but at "modern" aspect
+> ratio of 16:9, it needs to be scaled horizontally to 1024x576.
 
-... for that particular map_desc array instance I mean.
+Sure. What I meant was the very application I'm currently working on
+is, at least at the moment, ok with unscaled video (because it's all
+1920x1080p).
 
-WRT other legacy platforms: if the above warning didn't bother anyone 
-for the last 4 years, then it won't be such an issue either if the 
-current proposal doesn't solve them all.  That's not the primary purpose 
-of this change anyway. In those cases, the appropriate fix, like it is 
-today, should consist in some adjustment of those virtual addresses to 
-bring them inside the vmalloc area.
+> They're probably not the tearing - tearing is where you scan out part of
+> the old frame and part of the new frame, which appears as a particularly
+> noticable effect on scenes with a lot of change.
 
-Your original concern was whether extending the vmalloc area upward 
-would clash with something else, and the short answer is no.
+Right, basically a set of two "halves", moving slowly up or down.
+This is BTW what can be observed on unsynchronized displays (e.g. on
+multi-display machine usually only one display can be synchronized with
+a video stream).
 
+> Horizontal lines which are significantly different (eg, short black lines)
+> will be CPU cache corruption - both the main etnaviv DRM and Lucas' "fixed"
+> cache handling suffer from this.  My patch set doesn't.
+>
+>  git://ftp.arm.linux.org.uk/~rmk/linux-arm.git drm-etnaviv-devel
+>
+> contains my code.
 
-Nicolas
+Great, will switch to it tomorrow.
+Thanks again.
+-- 
+Krzysztof Halasa
+
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
