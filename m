@@ -1,70 +1,95 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 8 Sep 2015 14:49:33 +0200
-Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun4i: Add dts file for the
- pov protab2-ips9 tablet
-In-Reply-To: <CAGb2v64BGPP9Fs0gM0ghJZ0tO8QdGZD9GfpquGCGKiZCeTkyww@mail.gmail.com>
-References: <1441441319-10658-1-git-send-email-hdegoede@redhat.com>
- <20150906163023.GR31584@lukather> <55ED3739.609@redhat.com>
- <20150907205603.GX31584@lukather> <55EE9230.70209@redhat.com>
- <CAGb2v64BGPP9Fs0gM0ghJZ0tO8QdGZD9GfpquGCGKiZCeTkyww@mail.gmail.com>
-Message-ID: <55EED95D.20004@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 8 Sep 2015 13:52:45 +0100
+Subject: [RFC 2/5] of/serial: move earlycon early_param handling to serial
+In-Reply-To: <1441716217-23786-3-git-send-email-leif.lindholm@linaro.org>
+References: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
+ <1441716217-23786-3-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <20150908125245.GC20562@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Sep 08, 2015 at 01:43:34PM +0100, Leif Lindholm wrote:
+> We have multiple "earlycon" early_param handlers - merge the DT one into
+> the main earlycon one. This means the earlycon early_param handler does
+> not just return success if no options are specified.
+> 
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> ---
+>  drivers/of/fdt.c              | 11 +----------
+>  drivers/tty/serial/earlycon.c |  4 +++-
+>  include/linux/of_fdt.h        |  1 +
+>  3 files changed, 5 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index 6e82bc42..fcfc4c7 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -793,7 +793,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
+>  #ifdef CONFIG_SERIAL_EARLYCON
+>  extern struct of_device_id __earlycon_of_table[];
+>  
+> -static int __init early_init_dt_scan_chosen_serial(void)
+> +int __init early_init_dt_scan_chosen_serial(void)
+>  {
+>  	int offset;
+>  	const char *p;
+> @@ -834,15 +834,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
+>  	}
+>  	return -ENODEV;
+>  }
+> -
+> -static int __init setup_of_earlycon(char *buf)
+> -{
+> -	if (buf)
+> -		return 0;
+> -
+> -	return early_init_dt_scan_chosen_serial();
+> -}
+> -early_param("earlycon", setup_of_earlycon);
+>  #endif
+>  
+>  /**
+> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+> index f096360..2bda09a 100644
+> --- a/drivers/tty/serial/earlycon.c
+> +++ b/drivers/tty/serial/earlycon.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/io.h>
+> +#include <linux/of_fdt.h>
+>  #include <linux/serial_core.h>
+>  #include <linux/sizes.h>
+>  #include <linux/mod_devicetable.h>
+> @@ -187,7 +188,8 @@ static int __init param_setup_earlycon(char *buf)
+>  	 * don't generate a warning from parse_early_params() in that case
+>  	 */
+>  	if (!buf || !buf[0])
+> -		return 0;
+> +		if (IS_ENABLED(CONFIG_OF_FLATTREE))
+> +			return early_init_dt_scan_chosen_serial();
+>  
+>  	err = setup_earlycon(buf);
+>  	if (err == -ENOENT || err == -EALREADY)
+> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+> index df9ef38..772c47c 100644
+> --- a/include/linux/of_fdt.h
+> +++ b/include/linux/of_fdt.h
+> @@ -63,6 +63,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
+>  				     int depth, void *data);
+>  extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
+>  				     int depth, void *data);
+> +extern int early_init_dt_scan_chosen_serial(void);
 
-On 09/08/2015 10:40 AM, Chen-Yu Tsai wrote:
-> On Tue, Sep 8, 2015 at 3:45 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 07-09-15 22:56, Maxime Ripard wrote:
->>>
->>> On Mon, Sep 07, 2015 at 09:05:29AM +0200, Hans de Goede wrote:
->>>>>>
->>>>>> +&reg_ldo3 {
->>>>>> +       /*
->>>>>> +        * We need to always power the camera sensor, otherwhise all
->>>>>> access
->>>>>> +        * to i2c1 is blocked.
->>>>>> +        */
->>>>>> +       regulator-always-on;
->>>>>> +       regulator-min-microvolt = <2800000>;
->>>>>> +       regulator-max-microvolt = <2800000>;
->>>>>> +       regulator-name = "vdd-csi";
->>>>>> +};
->>>>>
->>>>>
->>>>> What is connected on i2c1 ? Just the camera sensor? or it has some
->>>>> other devices there?
->>>>
->>>>
->>>> The bma250 accelerometer sits there, and the kernel already has a driver
->>>> for it. That driver needs to have devicetree binding support added, and
->>>> then we should be able to use the accelerometer.
->>>
->>>
->>> Ok, so if this regulator is disable, you can't access the other
->>> devices as well, right?
->>
->>
->> Right, the controller reports the bus as being stuck.
->>
->>> Do you know why? Is it the regulator providing
->>> the pull-up voltage?
->>
->>
->> I've tried enabling the pull ups on the SoC i2c pins, so I do not think
->> that it is that, it seems that somehow when not powered the camera sensor is
->> actively keeping the lines low. Either it has multiple power planes, or
->> it is using normally-on fet-s between ground and its i2c lines.
->
-> FYI the reference designs use one regulator to power the pull-ups, VCC-PX
-> (X for X pin group), and VDDIO (IO power)on the camera sensors. AVDD, DVDD
-> (actual power) for the sensors are another (or more) regulators.
+I think you need a static inline stub to prevent link errors in
+!CONFIG_OF_FLATTREE kernels, as we do for
+early_init_fdt_scan_reserved_mem and friends.
 
-But that is a A23 or some such generation thing, right? This is an A10 based
-tablet!
+Mark.
 
-Regards,
-
-Hans
+>  extern void early_init_fdt_scan_reserved_mem(void);
+>  extern void early_init_fdt_reserve_self(void);
+>  extern void early_init_dt_add_memory_arch(u64 base, u64 size);
+> -- 
+> 2.1.4
+> 
