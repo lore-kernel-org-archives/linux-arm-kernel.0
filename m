@@ -1,33 +1,51 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 08 Sep 2015 14:24:49 +0300
-Subject: [PATCH] dmaengine: omap-dma: Add support for memcpy
-In-Reply-To: <1429688069-31765-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1429688069-31765-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <3187470.tKXzQaPa1m@avalon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Sep 2015 12:29:09 +0100
+Subject: I.MX6 HDMI support in v4.2
+In-Reply-To: <1441710467.13536.13.camel@pengutronix.de>
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m337yp5gvv.fsf@t19.piap.pl>
+ <1441709778.13536.8.camel@pengutronix.de>
+ <20150908110135.GW21084@n2100.arm.linux.org.uk>
+ <1441710467.13536.13.camel@pengutronix.de>
+Message-ID: <20150908112909.GX21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Tue, Sep 08, 2015 at 01:07:47PM +0200, Lucas Stach wrote:
+> Am Dienstag, den 08.09.2015, 12:01 +0100 schrieb Russell King - ARM
+> Linux:
+> > On Tue, Sep 08, 2015 at 12:56:18PM +0200, Lucas Stach wrote:
+> > > This is expected, it's the overlay adapter which doesn't really work
+> > > with imx-drm yet.
+> > 
+> > No, it's imx-drm which isn't working.  As I explained in my previous
+> > email, overlay planes are expected to do scaling.  imx-drm errors out
+> > attempts for that.  This is a kernel bug, not an Xorg driver bug.
+> > 
+> I would argue that this is a bug of the interface between kernel and
+> userspace.
 
-Thank you for the patch.
+Yes, only in so far as knowing beforehand whether scaling is possible.
+The only time that you get to know is when the call to display the plane
+fails.  That's a really poor interface.
 
-While trying to port the omap_vout driver to the DMA engine API I noticed that 
-the driver makes use of double-indexed transfers, which are not supported by 
-the omap-dma driver. I haven't checked in details what would be required, but 
-the interleaved API might be a good candidate for this. Do you have any plan 
-to add support for double-indexed transfers to the omap-dma driver ?
+> Scaling isn't something that can be expected to be usable on every
+> hardware (and in fact the IPU isn't able to do arbitrary scaling with
+> its 1024 in/out pixel constraints), but there is no clear way to
+> communicate this to userspace other than flat out rejecting the plane
+> update. Atomic may provide some better ways, but we are not there yet
+> for imx-drm.
 
-On Wednesday 22 April 2015 10:34:29 Peter Ujfalusi wrote:
-> The sDMA controller is capable of performing memory copy operation. It need
-> to be configured to software triggered mode and without HW synchronization.
-> The sDMA can copy data which is aligned to 8, 16 or 32 bits.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  drivers/dma/omap-dma.c | 51 +++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 49 insertions(+), 2 deletions(-)
+I think that depends on your point of view - I suspect x86 people would
+be surprised by that comment. :)
+
+There was talk a while back when the overlay plane support went in that
+it was possible to do >1024 pixels, but it was complex, but the impression
+I was left with was one day it would work - and I'm still waiting.  I
+suspect that the iMX6 is going to be obsolete before we have a decent
+working video playback story on this hardware.
 
 -- 
-Regards,
-
-Laurent Pinchart
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
