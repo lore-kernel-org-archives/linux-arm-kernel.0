@@ -1,78 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Sep 2015 14:07:08 -0700
-Subject: mysterious crashes on OMAP5 uevm
-In-Reply-To: <CANOLnOODjTaBcL1QzAm7o4YOB=_P-s7JYovu6fhNSqJSV2Bq+Q@mail.gmail.com>
-References: <CANOLnOO3NdK1r1jZQtS=TcHEE7SQwhGHh0YsqqoCJpFW3NO05Q@mail.gmail.com>
- <20150908143810.GD4215@atomide.com>
- <CANOLnOODjTaBcL1QzAm7o4YOB=_P-s7JYovu6fhNSqJSV2Bq+Q@mail.gmail.com>
-Message-ID: <20150908210708.GH4215@atomide.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 8 Sep 2015 23:26:51 +0200
+Subject: [PATCH 2/3] ARM: dts: sun5i: Add sun5i-q8-common.dtsi
+In-Reply-To: <20150908143320.GB31584@lukather>
+References: <1441464953-26351-1-git-send-email-hdegoede@redhat.com>
+ <1441464953-26351-2-git-send-email-hdegoede@redhat.com>
+ <20150908143320.GB31584@lukather>
+Message-ID: <55EF529B.80401@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grazvydas Ignotas <notasas@gmail.com> [150908 13:44]:
-> On Tue, Sep 8, 2015 at 4:38 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Grazvydas Ignotas <notasas@gmail.com> [150908 05:50]:
-> >> Hi,
-> >>
-> >> this is a longstanding problem I'm seeing since the very beginning,
-> >> which was around 3.12 or so (when I've first got the hardware) and it
-> >> seems 4.2 is affected by it still. Basically what happens is Xorg
-> >> randomly segfaults at some "impossible" location. I don't have the
-> >> details at the moment (could get them is needed), but from what I
-> >> examined with gdb some time ago the situation did not make any sense.
-> >>
-> >> There are 2 workarounds that I know which make the problem go away
-> >> (one is enough):
-> >> - recompile Xorg with -marm (I'm using Debian armhf so it's thumb2 by default)
-> >> - disable ARCH_MULTI_V6 in the kernel config
-> >>
-> >> Because of the above workarounds I have forgotten about it several
-> >> times, but it regularly comes back and bites again. It would look like
-> >> some missing erratum workaround, but I have all of them enabled in the
-> >> kernel.
-> >>
-> >> Does anyone know about this? Perhaps some missing erratum workaround
-> >> in the bootloader? u-boot isn't too old here (2015.07).
-> >
-> > Seems like some incorrect handling with CONFIG_CPU_V6 compiled in..
-> > Maybe try to narrow it down by commenting out some CONFIG_CPU_V6 and
-> > __LINUX_ARM_ARCH__ = 6 ifdefs in the git grep CONFIG_CPU_V6
-> > places ignoring uncompress and davinci code.
-> 
-> ok with that it was quite easy to find. On a kernel with ARCH_MULTI_V6
-> disabled, it is enough to just do this:
-> 
-> --- a/arch/arm/kernel/signal.c
-> +++ b/arch/arm/kernel/signal.c
-> @@ -340,13 +340,13 @@ setup_return(struct pt_regs *regs, struct ksignal *ksig,
->                 /*
->                  * The LSB of the handler determines if we're going to
->                  * be using THUMB or ARM mode for this signal handler.
->                  */
->                 thumb = handler & 1;
-> 
-> -#if __LINUX_ARM_ARCH__ >= 7
-> +#if 0 //__LINUX_ARM_ARCH__ >= 7
->                 /*
->                  * Clear the If-Then Thumb-2 execution state
->                  * ARM spec requires this to be all 000s in ARM mode
->                  * Snapdragon S4/Krait misbehaves on a Thumb=>ARM
->                  * signal transition without this.
->                  */
-> 
-> ... and the problem appears, so I guess this needs some real
-> multiplatform handling,.
+Hi,
 
-OK nice to hear you found it. Yeah looks like some runtime
-capability check is needed.
- 
-> > Do you have some easy way to reproduce this issue?
-> 
-> Just moving a browser window around with mouse usually triggers it
-> within a minute.
+On 09/08/2015 04:33 PM, Maxime Ripard wrote:
+> On Sat, Sep 05, 2015 at 04:55:52PM +0200, Hans de Goede wrote:
+>> This is the sun5i / a13 version of sun8i-q8-common.dtsi for use in dts
+>> files for a13 q8 based tablets. Compared to sun8i this uses uart1 for the
+>> serial console, and PG0 for card-detect for mmc0.
+>>
+>> This also adds pmic and otg support, which both use the same config on
+>> all known q8 a13 devices. This is not present in sun5i-q8-common.dtsi
+>> because pmic / otg support for sun8i has not yet been merged.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>
+> Are we going to have any user but the one you posted in the patch 3
+> planned?
 
-OK good to know.
+Depends on what I can get my hands on / what is in the post atm.
+
+One difference in fex files of different 18 variants is how the usb wifi is
+powered, either via a gpio or via ldo3. Also there are differences in which
+accelerometer is used, so eventually I expect there to be several users
+of this dtsi.
+
+I've bought several second hand q8 formfactor tablets on the internet lately,
+when they arrive and I get around to work on them a second user may show
+up soon.
 
 Regards,
 
-Tony
+Hans
