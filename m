@@ -1,74 +1,102 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Sep 2015 15:09:54 +0200
-Subject: [PATCH 1/3] ARM: uniphier: add outer cache support
-In-Reply-To: <CAK7LNATWsa8AhyFGzsR0HAODmQD8yBPidTE0Lx2ACh4_PeQW9w@mail.gmail.com>
-References: <1440382692-3855-1-git-send-email-yamada.masahiro@socionext.com>
- <1440382692-3855-2-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdbJppuA6ZyciNAGfSgrf4M2THVHggzuZYSqORjy2JBp_A@mail.gmail.com>
- <CAK7LNATWsa8AhyFGzsR0HAODmQD8yBPidTE0Lx2ACh4_PeQW9w@mail.gmail.com>
-Message-ID: <CACRpkdan0+rywnSR8Rs=aw63QAm3nN99ujqPcZwfpoh4_Dwc-w@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 8 Sep 2015 14:09:51 +0100
+Subject: [RFC 3/5] acpi/serial: add DBG2 earlycon support
+In-Reply-To: <1441716217-23786-4-git-send-email-leif.lindholm@linaro.org>
+References: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
+ <1441716217-23786-4-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <20150908130951.GE20562@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 28, 2015 at 12:24 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> 2015-08-26 22:39 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+On Tue, Sep 08, 2015 at 01:43:35PM +0100, Leif Lindholm wrote:
+> The ACPI DBG2 table defines a debug console. Add support for parsing it
+> and using it to select earlycon destination when no arguments provided.
+> 
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
 
->> cache-unified and cache-level are *not* optional and should be required.
->
-> "cache-unified" is mentioned in "3.7.3 Internal (L1) Cache Properties"
-> (Table 3-8),
-> but it is not in "3.8 Multi-level and Shared Caches" (Table 3-9)
->
-> Are the rules in Table 3-8 also applied for L2?
+[...]
 
-Your guess is as good as mine unless someone involved in
-actually writing that spec says something :/
+> diff --git a/drivers/acpi/console.c b/drivers/acpi/console.c
+> new file mode 100644
+> index 0000000..a985890
+> --- /dev/null
+> +++ b/drivers/acpi/console.c
+> @@ -0,0 +1,103 @@
+> +/*
+> + * Copyright (c) 2012, Intel Corporation
+> + * Copyright (c) 2015, Linaro Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#define DEBUG
 
->> (I'm just assuming this cache is unified, anything else would be baffling.)
->
-> In fact, unified/harvard is configurable thru a register of this cache
-> controller.
+Why?
 
-Jesus Christ.
+> +#define pr_fmt(fmt) "ACPI: " KBUILD_MODNAME ": " fmt
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/kernel.h>
+> +#include <linux/serial_core.h>
+> +
+> +#define NUM_ELEMS(x) (sizeof(x) / sizeof(*x))
 
-> It is usually used as a unified cached, though.
+Use ARRAY_SIZE (from kernel.h).
 
-I would, too.
+> +
+> +#ifdef CONFIG_SERIAL_EARLYCON
+> +static int use_earlycon __initdata;
+> +static int __init setup_acpi_earlycon(char *buf)
+> +{
+> +	if (!buf)
+> +		use_earlycon = 1;
+> +
+> +	return 0;
+> +}
+> +early_param("earlycon", setup_acpi_earlycon);
 
-> So,I am planning to use the same compatible for L2 and L3, like this:
->
->
->        l2-cache at 500c0000 {
->                compatible = "socionext,uniphier-cache";
->                reg = <0x500c0000 0x2000>, <0x503c0100 0x8>,
->                      <0x506c0000 0x400>;
->                cache-unified;
->                cache-level = <2>;
->                next-level-cache = <&L2>;
->                cache-size = <0x200000>;
->                cache-sets = <256>;
->                cache-line-size = <128>;
->             };
->
->        /* Not all of UniPhier SoCs have L3 cache */
->        l3-cache at 500c8000 {
->                compatible = "socionext,uniphier-cache";
->                reg = <0x500c8000 0x2000>, <0x503c8100 0x8>,
->                      <0x506c8000 0x400>;
->                cache-unified;
->                cache-level = <3>;
->                cache-size = <0x400000>;
->                cache-sets = <256>;
->                cache-line-size = <256>;
->        };
+It seems a shame to add this after folding the OF case into the earlycon
+code. What necessitates this being a separate early_param? Why is it too
+early to parse DBG2?
 
-This LooksGoodToMe.
+[...]
 
-> The Table 3-9 in ePAPR v1.1 says
-> the compatible should be "cache", but I do not think it makes sense here.
+> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+> index 2bda09a..c063cbb 100644
+> --- a/drivers/tty/serial/earlycon.c
+> +++ b/drivers/tty/serial/earlycon.c
+> @@ -13,6 +13,7 @@
+>  
+>  #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/console.h>
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+> @@ -184,12 +185,16 @@ static int __init param_setup_earlycon(char *buf)
+>  	int err;
+>  
+>  	/*
+> -	 * Just 'earlycon' is a valid param for devicetree earlycons;
+> -	 * don't generate a warning from parse_early_params() in that case
+> +	 * Just 'earlycon' is a valid param for devicetree or ACPI earlycons;
+> +	 * ACPI cannot be parsed yet, so return without action if enabled.
+> +	 * Otherwise, attempt initialization using DT.
+>  	 */
+> -	if (!buf || !buf[0])
+> -		if (IS_ENABLED(CONFIG_OF_FLATTREE))
+> +	if (!buf || !buf[0]) {
+> +		if (!acpi_disabled)
+> +			return 0;
+> +		else if (IS_ENABLED(CONFIG_OF_FLATTREE))
+>  			return early_init_dt_scan_chosen_serial();
+> +	}
 
-Agree.
+It would be much nicer if we could handle the ACPI earlycon parsing in
+the same place. As above, I assume I'm missing something that prevents
+that.
 
-Yours,
-Linus Walleij
+Mark.
