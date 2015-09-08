@@ -1,55 +1,55 @@
-From: pawelo@king.net.pl (Paul Osmialowski)
-Date: Tue, 8 Sep 2015 10:04:19 +0200 (CEST)
-Subject: [PATCH 7/9] arm: twr-k70f120m: IOMUX driver for Kinetis SoC
-In-Reply-To: <CACRpkdYHBt7YJWM3Bg8ENfw7uL4fuENqW+g8YaO+P6UPBCX4HQ@mail.gmail.com>
-References: <1435094387-20146-1-git-send-email-pawelo@king.net.pl>
- <1435094387-20146-8-git-send-email-pawelo@king.net.pl>
- <CACRpkdYHBt7YJWM3Bg8ENfw7uL4fuENqW+g8YaO+P6UPBCX4HQ@mail.gmail.com>
-Message-ID: <alpine.LNX.2.00.1509080953390.31192@localhost.localdomain>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 08 Sep 2015 17:11:12 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Enable USB Video Class support
+In-Reply-To: <1441662323-15468-1-git-send-email-javier@osg.samsung.com>
+References: <1441662323-15468-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <55EE9820.2010202@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 08.09.2015 06:45, Javier Martinez Canillas wrote:
+> The Exynos5420 Peach Pit and Exynos5800 Peach Pi boards have a built-in
+> Silicon Motion USB UVC WebCam. Enable support for the USB Video Class
+> driver and its needed media Kconfig symbols so the camera is supported.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> 
+>  arch/arm/configs/exynos_defconfig | 4 ++++
+>  1 file changed, 4 insertions(+)
 
-On Tue, 14 Jul 2015, Linus Walleij wrote:
+The patch itself looks good but now I wonder whether we are not putting
+to much stuff built-in. The exynos_defconfig does not replace the
+distribution distro. For a fully working board the distro should prepare
+it's own config.
 
-> OK...
-> 
-> I want Shawn and Sascha to look at this as they worked with
-> other Freescale pin controllers. Especially I want to know if this
-> is a sibling to the other Freescale controllers or a separate hardware.
-> 
-> If it is *not* a sibling I will *insist* that it use more generic pin
-> control bindings and move away from the older Freescale-specific
-> stuff.
+I understand that in this case the USB webcams are parts of device (like
+on all laptops)... a little bit similar as camera sensors on mobile
+phones. Yet on mobile phone usually the camera itself is part of SoC,
+only the sensor is external.
 
-No one answered me about that. However, I looked at other Freescale 
-pinctrl drivers and realised that no one of them (IMX, IMX1, MXS) is 
-similar to what I need to do for Kinetis, also positions of configuration 
-bits differ significantly.
-
-> 
-> There exist generic pin config bindings, see
-> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> 
-> I suggest to to function+group paring and then use generic pin config
-> with this driver unless it is a very close sibling to the existing Freescale
-> pin controllers.
-> 
-> Hint: if it is a sibling, it should share code with them.
-> 
-> There are several drivers doing generic pin control/pin config in the kernel
-> tree.
-> 
-
-I tried to analyze few of the drivers (e.g. zynq family) and can't find 
-how can I assing clock gate (clock device) to each port (PORTA, PORTB, 
-PORTC,...) which is required for Kinetis. Is generic pin control capable 
-to express that requirement or is it a time to desing my own pinctrl 
-driver (maybe somewhat improved than the one I presented so far)?
-
-This pinctrl component is somwehat critical part of BSP. Until it is not 
-sorted, I don't see a point in releasing what was developed so far.
+Actually what we need is a kind of policy for exynos_defconfig - what
+should be inside as built-in and what as module?
 
 Best regards,
-Paul
+Krzysztof
+
+
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 1ff2bfa2e183..62f677f76a0b 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -126,6 +126,10 @@ CONFIG_REGULATOR_S2MPA01=y
+>  CONFIG_REGULATOR_S2MPS11=y
+>  CONFIG_REGULATOR_S5M8767=y
+>  CONFIG_REGULATOR_TPS65090=y
+> +CONFIG_MEDIA_SUPPORT=y
+> +CONFIG_MEDIA_CAMERA_SUPPORT=y
+> +CONFIG_MEDIA_USB_SUPPORT=y
+> +CONFIG_USB_VIDEO_CLASS=y
+>  CONFIG_DRM=y
+>  CONFIG_DRM_NXP_PTN3460=y
+>  CONFIG_DRM_PARADE_PS8622=y
+> 
