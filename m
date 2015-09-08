@@ -1,28 +1,51 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 08 Sep 2015 13:53:27 -0400
-Subject: [Linaro-acpi] [RFC 3/5] acpi/serial: add DBG2 earlycon support
-In-Reply-To: <20150908171744.GQ10728@bivouac.eciton.net>
-References: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
- <1441716217-23786-4-git-send-email-leif.lindholm@linaro.org>
- <1441730339.5459.8.camel@redhat.com>
- <20150908171744.GQ10728@bivouac.eciton.net>
-Message-ID: <1441734807.5459.18.camel@redhat.com>
+From: dserrg@gmail.com (Sergey Dyasly)
+Date: Tue, 8 Sep 2015 21:12:14 +0300
+Subject: [PATCH] ARM:mm: define arch-specific IOREMAP_MAX_ORDER only in
+ !SMP && !LPAE case
+In-Reply-To: <55EE4BD2.3080800@huawei.com>
+References: <1441680050-50490-1-git-send-email-zhenzhang.zhang@huawei.com>
+ <55EE4BD2.3080800@huawei.com>
+Message-ID: <55EF24FE.4060602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-09-08 at 18:17 +0100, Leif Lindholm wrote:
-> > >      */
-> > > -   if (!buf || !buf[0])
-> > > -           if (IS_ENABLED(CONFIG_OF_FLATTREE))
-> > > +   if (!buf || !buf[0]) {
-> > > +           if (!acpi_disabled)
-> > 
-> > How do we know for sure that "acpi" has been parsed before "earlycon"?
-> 
-> Because "arch" comes before "drivers" in kernel image link order.
-> *twitch*
-> Yes, not the best argument ever.
-> 
+On 08.09.2015 5:45, Zhang Zhen wrote:
+> The arch-specific IOREMAP_MAX_ORDER is introduced in
+> commit: ff0daca([ARM] Add section support to ioremap) and
+> commit: a069c89 ([ARM] 3705/1: add supersection support to ioremap()).
+> But supersections and sections mappings are only used in !SMP && !LPAE case.
+> Otherwise, mapping is created using the usual 4K pages.
+>
+> In most cases without !SMP && !LPAE, the big alignment cause high fragmentation
+> issue in vmalloc area.
+> Here we use arch-specific IOREMAP_MAX_ORDER only in !SMP && !LPAE case,
+> otherwise use generic IOREMAP_MAX_ORDER in include/linux/vmalloc.h.
+>
+> Signed-off-by: Zhang Zhen <zhenzhang.zhang@huawei.com>
+> ---
+>   arch/arm/include/asm/memory.h | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index b7f6fb4..3209012 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -76,10 +76,12 @@
+>    */
+>   #define XIP_VIRT_ADDR(physaddr)  (MODULES_VADDR + ((physaddr) & 0x000fffff))
+>
+> +#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
+>   /*
+>    * Allow 16MB-aligned ioremap pages
+>    */
+>   #define IOREMAP_MAX_ORDER	24
+> +#endif
+>
+>   #else /* CONFIG_MMU */
+>
 
-I don't think that matters. Things are parsed in order they are
-found on cmdline (except for early vs late distinction).
+Hmm... This looks exactly like my old patch -
+http://thread.gmane.org/gmane.linux.kernel.mm/127620
+(Thanks to Vladimir for pointing that out!)
+
+Hasn't there been any progress about this issue?
