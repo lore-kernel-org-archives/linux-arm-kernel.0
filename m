@@ -1,66 +1,57 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 08 Sep 2015 10:09:30 +0100
-Subject: [PATCH v4 2/5] irqchip, gicv3: Workaround for Cavium ThunderX
- erratum 23154
-In-Reply-To: <20150908090023.GB14550@e104818-lin.cambridge.arm.com>
-References: <1439576885-15621-1-git-send-email-rric@kernel.org>
- <1439576885-15621-3-git-send-email-rric@kernel.org>
- <55EDC12E.8000408@arm.com>
- <20150907171501.GD10645@e104818-lin.cambridge.arm.com>
- <55EDCC5E.9080203@arm.com>
- <20150908090023.GB14550@e104818-lin.cambridge.arm.com>
-Message-ID: <55EEA5CA.5050901@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 8 Sep 2015 10:16:05 +0100
+Subject: [question] [Cortex-A57] how to discover implementation defined
+ system registers?
+In-Reply-To: <CAP_9M69hqX6umT1L0=sh+os_vkWa6SMoQeXHo7b1Dkox64SdTA@mail.gmail.com>
+References: <CAP_9M69hqX6umT1L0=sh+os_vkWa6SMoQeXHo7b1Dkox64SdTA@mail.gmail.com>
+Message-ID: <20150908091604.GC14550@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/15 10:00, Catalin Marinas wrote:
-> On Mon, Sep 07, 2015 at 06:41:50PM +0100, Suzuki K. Poulose wrote:
->> On 07/09/15 18:15, Catalin Marinas wrote:
->>> On Mon, Sep 07, 2015 at 05:54:06PM +0100, Suzuki K. Poulose wrote:
->>>> On 14/08/15 19:28, Robert Richter wrote:
->>>>> +static void gicv3_enable_quirks(void)
->>>>> +{
->>>>> +	if (cpus_have_cap(ARM64_WORKAROUND_CAVIUM_23154))
->>>>> +		static_key_slow_inc(&is_cavium_thunderx);
->>>>
->>>> May be you could use the enable() method added to struct arm64_cpu_capability
->>>> here to perform the above operation, added by James :
->>>>
->>>> commit 1c0763037f1e1caef739e36e09c6d41ed7b61b2d
->>>> Author: James Morse <james.morse@arm.com>
->>>> Date:   Tue Jul 21 13:23:28 2015 +0100
->>>>
->>>>      arm64: kernel: Add cpufeature 'enable' callback
->>>
->>> I thought about this as well when looking at the patch but decided it's
->>> better as it is. The "enable" method is meant to enable per-CPU features
->>> (or workarounds) but here it is about GICv3, so we don't want to enable
->>> for every CPU.
->>
->> Right. I have been playing with a series where the checks are delayed until
->> all CPUs are brought up.
->
-> Unrelated to the GIC workaround, delaying the enable feature until the
-> CPUs are brought up is not always be feasible.
+On Tue, Sep 08, 2015 at 02:44:28AM +0300, Alexey Klimov wrote:
+> I'm implementing module for Linux kernel that needs access to
+> implementation defined system registers that described in section:
+> "D7.2.78 S3_<op1>_<Cn>_<Cm>_<op2>, IMPLEMENTATION DEFINED registers"
+> in ARMv8 spec.
 
-Right. But then, enabling a feature(and applying the alternatives) based on
-a single CPU may not be safe, always, like PAN. If one of the boot time CPU
-doesn't have it, then we are in trouble (even though we WARN about it from
-SANITY check)
+Why?
 
-> At some point we may
-> implement support to defer the CPU on to user space (I already have a
-> patch that does this when no DT enable-method is specified, but I won't
-> publish it before Qualcomm fixes its firmware ;)). But we may have other
-> reasons to start with CPUs hot-unplugged by default and turn them on
-> later.
+> In specs for Cortex-A57 they are also described as
+> implementation defined. Page 4-86, table 4-15 in Cortex-A57 spec ARM
+> DDI0488G.
+> 
+> Is it correct understanding that because of implementation-defined
+> nature all information about are they implemented or not goes on
+> vendor shoulders and should be exposed to kernel through
+> 1) Device tree or ACPI. And only if kernel finds node or entry in
+> DT/ACPI about this it can trigger code/driver that needs these regs.
+> 
+> or
+> 
+> 2) I'm looking on undef_hook, {un,}register_undef_hook() code in
+> arch/arm64/traps.c. Can kernel "probe" to access to impl defined regs
+> using undefined instr exceptions and undef_hooks to figure out
+> map/impl features list/array/whatever for each cpu during startup (i'm
+> also checking Suzuki patches for exposing cpu features)? Maybe not all
+> impl defined regs can be probed this way and I suspect it might affect
+> KVM or guests in some way.
 
-We have SANITY check infrastructure that WARNs in such cases, if the features
-don't match.  But still, wouldn't it be better to enable a feature
-only if all the boot-time enabled CPUs have it ? (Errata is an exception though,
-which only depends on whether one of the CPU needs it).
+As above, why does the kernel need to access these registers?
 
-Thanks
-Suzuki
+> Registers in question are L2CTLR_EL1, CPUMERRSR_EL1, L2MERRSR_EL1.
 
->
+Usually, non-secure (i.e. Linux) access to such registers is blocked by
+the (secure) firmware (at least writing to them), so they are not of
+much use to Linux.
+
+> Also, does information about CPU part, revision, variant and
+> implementer play some role here? For example, cpu implementations with
+> revision less than 1 never support this regs or only 0x41 as cpu
+> implementer can provide these list of impl defined regs.
+
+Yes, the CPU MIDR is the only reliable indication of which auxiliary
+registers you have but, as I said above, they are meant for firmware to
+access and Linux shouldn't care about them (at least arm64 Linux).
+
+-- 
+Catalin
