@@ -1,88 +1,50 @@
-From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Tue, 8 Sep 2015 16:59:05 +0800
-Subject: [PATCH v7] arm64: dts: Add spi bus dts
-In-Reply-To: <1441028659-19068-1-git-send-email-leilk.liu@mediatek.com>
-References: <1441028659-19068-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <CANMq1KBhg4j15=ik7F2MwgmyAQZgSz3QYWLivOhd8ZFuDfjHGA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 8 Sep 2015 10:00:23 +0100
+Subject: [PATCH v4 2/5] irqchip, gicv3: Workaround for Cavium ThunderX
+ erratum 23154
+In-Reply-To: <55EDCC5E.9080203@arm.com>
+References: <1439576885-15621-1-git-send-email-rric@kernel.org>
+ <1439576885-15621-3-git-send-email-rric@kernel.org>
+ <55EDC12E.8000408@arm.com>
+ <20150907171501.GD10645@e104818-lin.cambridge.arm.com>
+ <55EDCC5E.9080203@arm.com>
+Message-ID: <20150908090023.GB14550@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 31, 2015 at 9:44 PM, Leilk Liu <leilk.liu@mediatek.com> wrote:
-> This patch adds MT8173 spi bus controllers into device tree.
+On Mon, Sep 07, 2015 at 06:41:50PM +0100, Suzuki K. Poulose wrote:
+> On 07/09/15 18:15, Catalin Marinas wrote:
+> >On Mon, Sep 07, 2015 at 05:54:06PM +0100, Suzuki K. Poulose wrote:
+> >>On 14/08/15 19:28, Robert Richter wrote:
+> >>>+static void gicv3_enable_quirks(void)
+> >>>+{
+> >>>+	if (cpus_have_cap(ARM64_WORKAROUND_CAVIUM_23154))
+> >>>+		static_key_slow_inc(&is_cavium_thunderx);
+> >>
+> >>May be you could use the enable() method added to struct arm64_cpu_capability
+> >>here to perform the above operation, added by James :
+> >>
+> >>commit 1c0763037f1e1caef739e36e09c6d41ed7b61b2d
+> >>Author: James Morse <james.morse@arm.com>
+> >>Date:   Tue Jul 21 13:23:28 2015 +0100
+> >>
+> >>     arm64: kernel: Add cpufeature 'enable' callback
+> >
+> >I thought about this as well when looking at the patch but decided it's
+> >better as it is. The "enable" method is meant to enable per-CPU features
+> >(or workarounds) but here it is about GICv3, so we don't want to enable
+> >for every CPU.
+> 
+> Right. I have been playing with a series where the checks are delayed until
+> all CPUs are brought up.
 
-The corresponding SPI driver has already been merged in
-git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git .
+Unrelated to the GIC workaround, delaying the enable feature until the
+CPUs are brought up is not always be feasible. At some point we may
+implement support to defer the CPU on to user space (I already have a
+patch that does this when no DT enable-method is specified, but I won't
+publish it before Qualcomm fixes its firmware ;)). But we may have other
+reasons to start with CPUs hot-unplugged by default and turn them on
+later.
 
-> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
-
-Reviewed-and-Tested-by: Nicolas Boichat <drinkcat@chromium.org>
-
-> ---
-> Change in this patch:
-> 1. fix spi clock flow usage error.
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++++++++++++++
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 13 +++++++++++++
->  2 files changed, 31 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> index 4be66ca..811cb76 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> @@ -387,6 +387,24 @@
->         };
->  };
->
-> +&pio {
-> +       spi_pins_a: spi0 {
-> +               pins_spi {
-> +                       pinmux = <MT8173_PIN_69_SPI_CK__FUNC_SPI_CK_0_>,
-> +                               <MT8173_PIN_70_SPI_MI__FUNC_SPI_MI_0_>,
-> +                               <MT8173_PIN_71_SPI_MO__FUNC_SPI_MO_0_>,
-> +                               <MT8173_PIN_72_SPI_CS__FUNC_SPI_CS_0_>;
-> +               };
-> +       };
-> +};
-> +
-> +&spi {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&spi_pins_a>;
-> +       mediatek,pad-select = <0>;
-> +       status = "okay";
-> +};
-> +
->  &uart0 {
->         status = "okay";
->  };
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index d18ee42..fcb4860 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -365,6 +365,19 @@
->                         status = "disabled";
->                 };
->
-> +               spi: spi at 1100a000 {
-> +                       compatible = "mediatek,mt8173-spi";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       reg = <0 0x1100a000 0 0x1000>;
-> +                       interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&topckgen CLK_TOP_SYSPLL3_D2>,
-> +                                <&topckgen CLK_TOP_SPI_SEL>,
-> +                                <&pericfg CLK_PERI_SPI0>;
-> +                       clock-names = "parent-clk", "sel-clk", "spi-clk";
-> +                       status = "disabled";
-> +               };
-> +
->                 i2c3: i2c3 at 11010000 {
->                         compatible = "mediatek,mt8173-i2c";
->                         reg = <0 0x11010000 0 0x70>,
-> --
-> 1.8.1.1.dirty
->
->
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+-- 
+Catalin
