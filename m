@@ -1,50 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Sep 2015 16:42:38 +0200
-Subject: [PATCH-v2 4/7] mmc: sdhci-pxav3: Add pinctl setting according to
- bus clock
-In-Reply-To: <1441624721-15612-5-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1441624721-15612-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1441624721-15612-5-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <CACRpkdY59roEBgUd9TR39yNgfhw393+WmHQQAeLkOEZLChOcWQ@mail.gmail.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Tue, 08 Sep 2015 16:45:38 +0200
+Subject: I.MX6 HDMI support in v4.2
+In-Reply-To: <CAOCHtYhtkV-TtaA6hz1OTD5TpGCnionK27D2mp4beU+HGymwdw@mail.gmail.com>
+ (Robert Nelson's message of "Tue, 8 Sep 2015 09:17:06 -0500")
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m337yp5gvv.fsf@t19.piap.pl> <1441709778.13536.8.camel@pengutronix.de>
+ <20150908110135.GW21084@n2100.arm.linux.org.uk>
+ <1441710467.13536.13.camel@pengutronix.de>
+ <20150908112909.GX21084@n2100.arm.linux.org.uk>
+ <1441716233.13536.21.camel@pengutronix.de>
+ <CAOCHtYhtkV-TtaA6hz1OTD5TpGCnionK27D2mp4beU+HGymwdw@mail.gmail.com>
+Message-ID: <m3pp1t3r71.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 7, 2015 at 1:18 PM, Vaibhav Hiremath
-<vaibhav.hiremath@linaro.org> wrote:
+Robert Nelson <robertcnelson@gmail.com> writes:
 
-> Different bus clock may need different pin setting.
-> For example, fast bus clock like 208Mhz need pin drive fast
-> while slow bus clock prefer pin drive slow to guarantee
-> signal quality.
->
-> So this patch creates two states,
->   - Default (slow/normal) pin state
->   - And fast pin state for higher freq bus speed.
->
-> And selection of pin state is done based on timing mode.
->
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> Signed-off-by: Kevin Liu <kliu5@marvell.com>
-(...)
-> +       pxa->pinctrl = devm_pinctrl_get(dev);
-> +       if (!IS_ERR(pxa->pinctrl)) {
-> +               pxa->pins_default = pinctrl_lookup_state(pxa->pinctrl, "default");
-> +               if (IS_ERR(pxa->pins_default))
-> +                       dev_err(dev, "could not get default pinstate\n");
-> +               pxa->pins_fast = pinctrl_lookup_state(pxa->pinctrl, "fast");
-> +               if (IS_ERR(pxa->pins_fast))
-> +                       dev_info(dev, "could not get fast pinstate\n");
-> +       }
+> In which case, it "might" be a good idea to get the current version of
+> etnaviv in mainline for current imx6's before you guys disappear again
+> for mx6plus development..
 
-This is exactly how I think it should be used from a pin control
-point of view.
+Definitely. This also includes the userspace parts.
+Bugs can always be squashed, but everything is much easier when the
+whole environment is already set up.
+-- 
+Krzysztof Halasa
 
-If you depended on CONFIG_PM you could use
-pinctrl_pm_select_default_state() but for this simple scenario
-this is fine.
-
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
->From a pinctrl point of view.
-
-Yours,
-Linus Walleij
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
