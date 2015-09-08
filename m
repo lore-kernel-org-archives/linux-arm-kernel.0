@@ -1,42 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 8 Sep 2015 12:31:13 +0100
-Subject: [PATCH V4 2/3] arm64: support initrd outside kernel linear map
-In-Reply-To: <1439830867-14935-3-git-send-email-msalter@redhat.com>
-References: <1439830867-14935-1-git-send-email-msalter@redhat.com>
- <1439830867-14935-3-git-send-email-msalter@redhat.com>
-Message-ID: <20150908113113.GA20562@leverpostej>
+From: jteki@openedev.com (Jagan Teki)
+Date: Tue, 8 Sep 2015 17:04:04 +0530
+Subject: [PATCH 1/3] doc: dt: add documentation for Mediatek spi-nor
+ controller
+In-Reply-To: <1441705796-11365-2-git-send-email-bayi.cheng@mediatek.com>
+References: <1441705796-11365-1-git-send-email-bayi.cheng@mediatek.com>
+ <1441705796-11365-2-git-send-email-bayi.cheng@mediatek.com>
+Message-ID: <CAD6G_RR5W8_4d_gcTD=h9EBhwWUzsEmyNK+pYGq82GEHDV4=ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 8 September 2015 at 15:19, Bayi Cheng <bayi.cheng@mediatek.com> wrote:
+> Add device tree binding documentation for serial flash with
+> Mediatek serial flash controller
+>
+> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+> ---
+>  Documentation/devicetree/bindings/mtd/mtk_nor.txt | 25 +++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/mtk_nor.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mtd/mtk_nor.txt b/Documentation/devicetree/bindings/mtd/mtk_nor.txt
+> new file mode 100644
+> index 0000000..0eca0cd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/mtk_nor.txt
 
-On Mon, Aug 17, 2015 at 06:01:06PM +0100, Mark Salter wrote:
-> The use of mem= could leave part or all of the initrd outside of
-> the kernel linear map. This will lead to an error when unpacking
-> the initrd and a probable failure to boot. This patch catches that
-> situation and relocates the initrd to be fully within the linear
-> map.
+IMHO - looks like the name of the driver file not resembles controller
+driver, usually spi-nor framework has a name include 'nor' and related
+controller drivers uses simple notion with vendor/soc_name-quadspi or
+something similar.
 
-With next-20150908, this patch results in a confusing message at boot when not
-using an initrd:
+cadence-quadspi.c
+fsl-quadspi.c
 
-Moving initrd from [4080000000-407fffffff] to [9fff49000-9fff48fff]
+Simple suggestion - mtk-quadspi.c (since it supports quad)
 
-I think that can be solved by folding in the diff below.
+> @@ -0,0 +1,25 @@
+> +* MTD SPI nor driver for MTK MT81xx (and similar) serial flash controller
+> +
+> +MTK MT81xx serial flash controller is designed for serial Flash device.
+> +It supports one Flash device with signal mode, dual mode and quad mode.
+> +
+> +Required properties:
+> +- compatible: should be "mediatek,mt8173-nor";
+> +- reg: physical base address and length of the controller's register
+> +- clocks: spi nor source clock
+> +- clock-names: "spi_clk", "axi_clk", "mux_clk", "sf_clk"
+> +
+> +See Documentation/devicetree/bindings/clock/clock-bindings.txt
 
-Thanks,
-Mark.
+As this related to clock-names, just add this line in-continuous with
+clock-name property description.
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 6bab21f..2322479 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -364,6 +364,8 @@ static void __init relocate_initrd(void)
-                to_free = ram_end - orig_start;
- 
-        size = orig_end - orig_start;
-+       if (!size)
-+               return;
- 
-        /* initrd needs to be relocated completely inside linear mapping */
-        new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
+> +and Documentation/mtd/spi-nor.txt for details.
+
+This explicit mentioning about spi-nor documentation is may not
+required as this .txt will describe how spi-nor works and not related
+to bindings.
+
+> +
+> +Example:
+> +nor_flash: nor at 1100d000 {
+> +       compatible = "mediatek,mt8173-nor";
+> +       reg = <0 0x1100d000 0 0xe0>;
+> +       clocks = <&pericfg CLK_PERI_SPI>,
+> +                <&topckgen CLK_TOP_AXI_SEL>,
+> +                <&topckgen CLK_TOP_UNIVPLL2_D8>,
+> +                <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
+> +       clock-names = "spi_clk", "axi_clk", "mux_clk", "sf_clk";
+> +};
+> +
+> --
+> 1.8.1.1.dirty
+>
+
+thanks!
+-- 
+Jagan | openedev.
