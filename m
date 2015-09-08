@@ -1,180 +1,183 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 08 Sep 2015 17:47:50 +0100
-Subject: [PATCH] arm64: kernel: Use a separate stack for irq interrupts.
-In-Reply-To: <2409A0E9-376A-4B49-8C5F-73084843096F@gmail.com>
-References: <55EDA040.90208@arm.com>
- <1441636584-23174-1-git-send-email-james.morse@arm.com>
- <2409A0E9-376A-4B49-8C5F-73084843096F@gmail.com>
-Message-ID: <55EF1136.6050102@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 8 Sep 2015 17:50:46 +0100
+Subject: [PATCH v4] pinctrl: mediatek: Implement wake handler and suspend
+ resume
+In-Reply-To: <55EEAA24.6080706@arm.com>
+References: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>
+ <55DB4609.5040904@arm.com>
+ <CAGS+omBnoitju07KQ1Y7JHTbce6+DO4WqWHTaKz5D+T157zEJA@mail.gmail.com>
+ <1441535972.22230.5.camel@mhfsdcap03> <55EEAA24.6080706@arm.com>
+Message-ID: <55EF11E6.7030307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/15 15:54, Jungseok Lee wrote:
-> On Sep 7, 2015, at 11:36 PM, James Morse wrote:
-> 
-> Hi James,
-> 
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index e16351819fed..d42371f3f5a1 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -190,10 +190,37 @@ tsk	.req	x28		// current thread_info
->>  * Interrupt handling.
->>  */
->> 	.macro	irq_handler
->> -	adrp	x1, handle_arch_irq
->> -	ldr	x1, [x1, #:lo12:handle_arch_irq]
->> -	mov	x0, sp
->> +	mrs	x21, tpidr_el1
->> +	adr_l	x20, irq_sp
->> +	add	x20, x20, x21
->> +
->> +	ldr	x21, [x20]
->> +	mov	x20, sp
->> +
->> +	mov	x0, x21
->> +	mov	x1, x20
->> +	bl	irq_copy_thread_info
->> +
->> +	/* test for recursive use of irq_sp */
->> +	cbz	w0, 1f
->> +	mrs	x30, elr_el1
->> +	mov	sp, x21
->> +
->> +	/*
->> +	 * Create a fake stack frame to bump unwind_frame() onto the original
->> +	 * stack. This relies on x29 not being clobbered by kernel_entry().
->> +	 */
->> +	push	x29, x30
-> 
-> It is the most challenging item to handle a frame pointer in this context.
-> 
-> As I mentioned previously, a stack tracer on ftrace is not supported yet.
-> How about decoupling "IRQ Stack feature" from "Stack Tracer Fix"?
-
-Yes - I discovered today this was more complicated than I thought. I will
-need to do some more reading.
 
 
->> +
->> +1:	ldr_l	x1, handle_arch_irq
->> +	mov     x0, x20
->> 	blr	x1
->> +
->> +	mov	x0, x20
->> +	mov	x1, x21
->> +	bl	irq_copy_thread_info
->> +	mov	sp, x20
->> +
->> 	.endm
+On 08/09/15 10:28, Sudeep Holla wrote:
+>
+>
+> On 06/09/15 11:39, maoguang meng wrote:
+>> On Wed, 2015-09-02 at 14:02 +0800, Daniel Kurtz wrote:
+>>> Hi maoguang,
+>>>
+>>> On Tue, Aug 25, 2015 at 12:27 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>>
+>>>>
+>>>> On 14/08/15 09:38, maoguang.meng at mediatek.com wrote:
+>>>>>
+>>>>> From: Maoguang Meng <maoguang.meng@mediatek.com>
+>>>>>
+>>>>> This patch implement irq_set_wake to get who is wakeup source and
+>>>>> setup on suspend resume.
+>>>>>
+>>>>> Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
+>>>>>
+>>> [snip]
+>>>
+>>> Can you please respond to Sudeep's questions:
+>>>
+>>>> Does this pinmux controller:
+>>>>
+>>>> 1. Support wake-up configuration ? If not, you need to use
+>>>>      IRQCHIP_SKIP_SET_WAKE. I don't see any value in writing the
+>>>>      mask_{set,clear} if the same registers are used for {en,dis}able
 >>
->> 	.text
->> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
->> index 463fa2e7e34c..10b57a006da8 100644
->> --- a/arch/arm64/kernel/irq.c
->> +++ b/arch/arm64/kernel/irq.c
->> @@ -26,11 +26,14 @@
->> #include <linux/smp.h>
->> #include <linux/init.h>
->> #include <linux/irqchip.h>
->> +#include <linux/percpu.h>
->> #include <linux/seq_file.h>
->> #include <linux/ratelimit.h>
+>>     YES.
+>>     we can call enable_irq_wake(irq) to config this irq as a wake-up
+>> source.
 >>
->> unsigned long irq_err_count;
+>
+> No that doesn't answer my question. Yes you can always call
+> enable_irq_wake(irq) as along as you have irq_set_wake implemented.
+> But my question was does this pinmux controller support wake-up
+> configuration.
+>
+> IMHO, by looking at the implementation I can confirm *NO*, it doesn't.
+> So please stop copy-pasting the implementation from other drivers.
+> The reason is you operate on the same mask_{set,clear} which you use
+> to {en,dis}able the interrupts which means you don't have to do anything
+> to configure an interrupt as a wakeup source other than just keeping
+> them enabled. Hopefully this clarifies.
+>
+>>>>
+>>>> 2. Is in always on domain ? If not, you need save/restore only to
+>>>>      resume back the functionality. Generally we can set
+>>>>      IRQCHIP_MASK_ON_SUSPEND to ensure non-wake-up interrupts are
+>>>>      disabled during suspend and re-enabled in resume path. You just
+>>>>      save/restore raw values without tracking the wake-up source.
 >>
->> +DEFINE_PER_CPU(unsigned long, irq_sp) = 0;
->> +
->> int arch_show_interrupts(struct seq_file *p, int prec)
->> {
->> #ifdef CONFIG_SMP
->> @@ -55,6 +58,10 @@ void __init init_IRQ(void)
->> 	irqchip_init();
->> 	if (!handle_arch_irq)
->> 		panic("No interrupt controller found.");
->> +
->> +	/* Allocate an irq stack for the boot cpu */
->> +	if (alloc_irq_stack(smp_processor_id()))
->> +		panic("Failed to allocate irq stack for boot cpu.");
->> }
+>>     YES.
 >>
->> #ifdef CONFIG_HOTPLUG_CPU
->> @@ -117,3 +124,48 @@ void migrate_irqs(void)
->> 	local_irq_restore(flags);
->> }
->> #endif /* CONFIG_HOTPLUG_CPU */
->> +
->> +/* Allocate an irq_stack for a cpu that is about to be brought up. */
->> +int alloc_irq_stack(unsigned int cpu)
->> +{
->> +	struct page *irq_stack_page;
->> +	union thread_union *irq_stack;
->> +
->> +	/* reuse stack allocated previously */
->> +	if (per_cpu(irq_sp, cpu))
->> +		return 0;
-> 
-> I'd like to avoid even this simple check since CPU hotplug could be heavily
-> used for power management.
+>
+> Again *YES* for what part of my question. If it's always-on, then you
+> don't need this suspend/resume callbacks at all, so I assume the answer
+> is *NO*.
+>
 
-I don't think its a problem:
-__cpu_up() contains a call to wait_for_completion_timeout() (which could
-eventually end up in the scheduler), so I don't think it could ever be on a
-'really hot' path.
-
-For really frequent hotplug-like power management, cpu_suspend() makes use
-of firmware support to power-off cores - from what I can see it doesn't use
-__cpu_up().
+IIUC this pinmux controller, something like below should work.
 
 
->> +
->> +	irq_stack_page = alloc_kmem_pages(THREADINFO_GFP, THREAD_SIZE_ORDER);
->> +	if (!irq_stack_page) {
->> +		pr_crit("CPU%u: failed to allocate irq stack for cpu %u\n",
->> +			smp_processor_id(), cpu);
->> +		return -ENOMEM;
->> +	}
->> +	irq_stack = page_address(irq_stack_page);
->> +
->> +	per_cpu(irq_sp, cpu) = (unsigned long)irq_stack->stack
->> +			       + THREAD_START_SP;
->> +
->> +	return 0;
->> +}
->> +
->> +/*
->> + * Copy struct thread_info between two stacks, and update current->stack.
->> + * This is used when moving to the irq exception stack.
->> + * Changing current->stack is necessary so that non-arch thread_info writers
->> + * don't use the new thread_info->task->stack to find the old thread_info when
->> + * setting flags like TIF_NEED_RESCHED...
->> + */
->> +asmlinkage int irq_copy_thread_info(unsigned long dst_sp, unsigned long src_sp)
->> +{
->> +	struct thread_info *src = get_thread_info(src_sp);
->> +	struct thread_info *dst = get_thread_info(dst_sp);
->> +
->> +	if (dst == src)
->> +		return 0;
->> +
->> +	*dst = *src;
->> +	current->stack = dst;
->> +
->> +	return 1;
->> +}
-> 
-> Although this is 32-byte memcpy, sizeof(struct thread_info), this function is called
-> twice to handle a single interrupt. Isn's it too expensive?
-> 
-> This is a major difference between my approach and this patch. I think we should get
-> some feedbacks on struct thread_info information management for v2 preparation.
+---->8
 
-Agreed.
+ From 7c26992bce047efb66a6ba8d2ffec2b272499df7 Mon Sep 17 00:00:00 2001
+From: Sudeep Holla <sudeep.holla@arm.com>
+Date: Tue, 8 Sep 2015 17:35:38 +0100
+Subject: [PATCH] pinctrl: mediatek: Enable SKIP_SET_WAKE and MASK_ON_SUSPEND
 
-The other difference, as Akashi Takahiro pointed out, is the behaviour of
-object_is_on_stack(). What should this return for an object on an irq stack?
+The mediatek pinmux controller doesn't provides any facility to configure
+the wakeup sources. So instead of providing redundant irq_set_wake
+functionality, SKIP_SET_WAKE could be set to it. Also there's no need to
+maintain 2 sets of masks.
 
+This patch enables IRQCHIP_SKIP_SET_WAKE and IRQCHIP_MASK_ON_SUSPEND and
+also removes wake_mask.
 
-Thanks,
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Cc: Yingjoe Chen <yingjoe.chen@mediatek.com>
+Cc: Maoguang Meng <maoguang.meng@mediatek.com>
+Cc: Chaotian Jing <chaotian.jing@mediatek.com>
+Cc: linux-gpio at vger.kernel.org
+Cc: linux-mediatek at lists.infradead.org
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 24 
++-----------------------
+  drivers/pinctrl/mediatek/pinctrl-mtk-common.h |  1 -
+  2 files changed, 1 insertion(+), 24 deletions(-)
 
-James
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c 
+b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index 7726c6caaf83..d8e194a5bb31 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -1063,20 +1063,6 @@ static int mtk_eint_set_type(struct irq_data *d,
+  	return 0;
+  }
+
+-static int mtk_eint_irq_set_wake(struct irq_data *d, unsigned int on)
+-{
+-	struct mtk_pinctrl *pctl = irq_data_get_irq_chip_data(d);
+-	int shift = d->hwirq & 0x1f;
+-	int reg = d->hwirq >> 5;
+-
+-	if (on)
+-		pctl->wake_mask[reg] |= BIT(shift);
+-	else
+-		pctl->wake_mask[reg] &= ~BIT(shift);
+-
+-	return 0;
+-}
+-
+  static void mtk_eint_chip_write_mask(const struct mtk_eint_offsets *chip,
+  		void __iomem *eint_reg_base, u32 *buf)
+  {
+@@ -1112,7 +1098,6 @@ static int mtk_eint_suspend(struct device *device)
+
+  	reg = pctl->eint_reg_base;
+  	mtk_eint_chip_read_mask(eint_offsets, reg, pctl->cur_mask);
+-	mtk_eint_chip_write_mask(eint_offsets, reg, pctl->wake_mask);
+
+  	return 0;
+  }
+@@ -1153,9 +1138,9 @@ static struct irq_chip mtk_pinctrl_irq_chip = {
+  	.irq_unmask = mtk_eint_unmask,
+  	.irq_ack = mtk_eint_ack,
+  	.irq_set_type = mtk_eint_set_type,
+-	.irq_set_wake = mtk_eint_irq_set_wake,
+  	.irq_request_resources = mtk_pinctrl_irq_request_resources,
+  	.irq_release_resources = mtk_pinctrl_irq_release_resources,
++	.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND,
+  };
+
+  static unsigned int mtk_eint_init(struct mtk_pinctrl *pctl)
+@@ -1393,13 +1378,6 @@ int mtk_pctrl_init(struct platform_device *pdev,
+  	}
+
+  	ports_buf = pctl->devdata->eint_offsets.ports;
+-	pctl->wake_mask = devm_kcalloc(&pdev->dev, ports_buf,
+-					sizeof(*pctl->wake_mask), GFP_KERNEL);
+-	if (!pctl->wake_mask) {
+-		ret = -ENOMEM;
+-		goto chip_error;
+-	}
+-
+  	pctl->cur_mask = devm_kcalloc(&pdev->dev, ports_buf,
+  					sizeof(*pctl->cur_mask), GFP_KERNEL);
+  	if (!pctl->cur_mask) {
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h 
+b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+index 55a534338931..acd804a945d8 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+@@ -267,7 +267,6 @@ struct mtk_pinctrl {
+  	void __iomem		*eint_reg_base;
+  	struct irq_domain	*domain;
+  	int			*eint_dual_edges;
+-	u32 *wake_mask;
+  	u32 *cur_mask;
+  };
+
+-- 
+1.9.1
