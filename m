@@ -1,33 +1,111 @@
-From: mathias.nyman@intel.com (Mathias Nyman)
-Date: Tue, 08 Sep 2015 13:45:07 +0300
-Subject: [PATCH v7 4/5] xhci: mediatek: support MTK xHCI host controller
-In-Reply-To: <1441693083-8440-5-git-send-email-chunfeng.yun@mediatek.com>
-References: <1441693083-8440-1-git-send-email-chunfeng.yun@mediatek.com>
- <1441693083-8440-5-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <55EEBC33.5030906@intel.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Tue, 08 Sep 2015 12:45:24 +0200
+Subject: I.MX6 HDMI support in v4.2
+In-Reply-To: <20150907112555.GS21084@n2100.arm.linux.org.uk> (Russell King's
+ message of "Mon, 7 Sep 2015 12:25:55 +0100")
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+Message-ID: <m337yp5gvv.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Trying to make some progress... I was missing the etnaviv DRM kernel
+driver. Now I have both IMX and etnaviv drivers, Linux v4.0-stable:
 
-On 08.09.2015 09:18, Chunfeng Yun wrote:
-> There some vendor quirks for MTK xhci host controller:
-> 1. It defines some extra SW scheduling parameters for HW
->    to minimize the scheduling effort for synchronous and
->    interrupt endpoints. The parameters are put into reseved
->    DWs of slot context and endpoint context.
-> 2. Its IMODI unit for Interrupter Moderation register is
->    8 times as much as that defined in xHCI spec.
-> 3. Its TDS in  Normal TRB defines a number of packets that
->    remains to be transferred for a TD after processing all
->    Max packets in all previous TRBs.
->
+git://git.pengutronix.de/git/lst/linux.git (etnaviv DRM driver)
+PLL5 DTS patch (enables HDMI with LVDS driver loaded):
 
-I just rewrote and unified the the xhci TD remainder functions,
-now we got only one xhci_td_remainder() function which should
-be more suitable for quirks.
+--- a/arch/arm/boot/dts/imx6q-gw54xx.dts
++++ b/arch/arm/boot/dts/imx6q-gw54xx.dts
+@@ -21,3 +21,11 @@
+ &sata {
+ 	status = "okay";
+ };
++
++&clks {
++	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
++			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
++	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
++				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
++};
++
 
-You can add the quirk directly to it, no need to duplicate the
-whole function.
+also had to apply:
 
--Mathias
+--- a/drivers/staging/etnaviv/Makefile
++++ b/drivers/staging/etnaviv/Makefile
+@@ -11,7 +11,6 @@ etnaviv-y := \
+ 	etnaviv_gem_submit.o \
+ 	etnaviv_gpu.o \
+ 	etnaviv_iommu.o \
+-	etnaviv_iommu_v2.o \
+ 	etnaviv_mmu.o \
+ 	etnaviv_buffer.o
+ 
+
+X.org etc.:
+	git://github.com/laanwj/etna_viv.git
+        git://ftp.arm.linux.org.uk/~rmk/libdrm-armada.git/
+        git://ftp.arm.linux.org.uk/~rmk/xf86-video-armada.git unstable-devel
+(I can't use master branch of xf86-video-armada.git because it doesn't
+support etnaviv - does it?)
+
+X log (relevant(?) stuff only):
+
+[ 18919.848] (II) armada(0): hardware: imx-drm
+[ 18919.923] (--) armada(0): Vivante GC320 GPU revision 5007 (etnaviv) 2d PE2.0
+[ 18919.925] (II) armada(0): [DRI2] Setup complete
+[ 18919.925] (II) armada(0): [DRI2]   DRI driver: etnadrm
+[ 18919.925] (II) armada(0): direct rendering: DRI2 enabled
+[ 18919.925] (II) armada(0): RandR 1.2 enabled, ignore the following RandR disabled message.
+[ 18919.927] (==) armada(0): DPMS enabled
+[ 18919.927] (==) armada(0): hotplug detection enabled
+[ 18919.928] (II) armada(0): etnaviv: Xv: using YUY2 tiled format intermediate YUV target
+[ 18919.971] (EE) AIGLX error: dlopen of /lib/dri/etnadrm_dri.so failed (I don't have this yet)
+[ 18920.072] (II) armada(0): etnaviv: A8 target not supported
+
+If I try to use pengutronix/etnaviv-4.1-wip branch (etnaviv DRM - for
+v4.2), dmesg contains a lot of:
+ [drm:etnaviv_ioctl_gem_submit [etnaviv]] *ERROR* cmdstream bo has flag ETNA_BO_CMDSTREAM not set
+and it doesn't work. I assume I shouldn't use it yet?
+
+Changing to pengutronix/etnaviv-for-upstream, it works - sort of.
+
+I now have two Xvideo adapters:
+Adaptor: 0
+Name: Marvell Armada Overlay Video
+ Port: 88
+(which unfortunately doesn't work, the window is black, the XV
+attributes are set to minimums and I can't set them).
+
+Is it expected?
+
+Adaptor: 1
+Name: Etnaviv Textured Video
+ Port(s): 89 - 104
+
+  Name: XV_SYNC_TO_VBLANK
+   Flags: XvGettable XvSettable
+   Min value: 0
+   Max value: 1
+   Current value: 1
+  Name: XV_PIPE
+   Flags: XvGettable XvSettable
+   Min value: -1
+   Max value: 3
+   Current value: -1
+  Name: XV_ENCODING
+   Flags: XvGettable XvSettable
+   Min value: 0
+   Max value: 0
+   Current value: 0
+
+This adapter works, though there are some image distortions (horizontal
+lines apparently caused by changes in color between frames).
+
+Any input?
+-- 
+Krzysztof Halasa
+
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
