@@ -1,93 +1,29 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 08 Sep 2015 15:03:52 -0700
-Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
-In-Reply-To: <55EE9AA1.8020200@ti.com> (Grygorii Strashko's message of "Tue, 8
- Sep 2015 11:21:53 +0300")
-References: <Pine.LNX.4.44L0.1509051133100.30865-100000@netrider.rowland.org>
- <2657565.lxWtPmdjyp@vostro.rjw.lan> <55ED9328.2010501@ti.com>
- <2355864.I8qZFusWfm@vostro.rjw.lan> <55EE9AA1.8020200@ti.com>
-Message-ID: <7h613kmuuv.fsf@deeprootsystems.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 9 Sep 2015 00:08:47 +0200
+Subject: [PATCH v3 2/2] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
+ support
+In-Reply-To: <20150903093910.GA4151@ulmo.nvidia.com>
+References: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <CAD=FV=WvUp7xhsmXJgVzm1Awqej12hNF_QPJhrQq7z=Fa4Nnuw@mail.gmail.com>
+ <20150902225008.GQ21084@n2100.arm.linux.org.uk>
+ <CAD=FV=VuyQXNGt7dgF-YF7D7MDu31B-QuBdGpeC_+0b1F2=dKg@mail.gmail.com>
+ <20150903091900.GX21084@n2100.arm.linux.org.uk>
+ <20150903093910.GA4151@ulmo.nvidia.com>
+Message-ID: <20150908220847.GA1529@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grygorii Strashko <grygorii.strashko@ti.com> writes:
 
-> On 09/07/2015 11:42 PM, Rafael J. Wysocki wrote:
->> On Monday, September 07, 2015 04:37:44 PM Grygorii Strashko wrote:
->>> On 09/07/2015 04:04 PM, Rafael J. Wysocki wrote:
->>>> On Saturday, September 05, 2015 11:39:20 AM Alan Stern wrote:
->>>>> On Sat, 5 Sep 2015, Grygorii Strashko wrote:
->>>>>
->>>>>> On 09/04/2015 09:45 PM, Alan Stern wrote:
->>>>>>> On Fri, 4 Sep 2015, Grygorii Strashko wrote:
->>>>>>>
->>>>>>>> There is one "small" problem with such approach :(
->>>>>>>>
->>>>>>>> - It's incompatible with -RT kernel, because PM runtime can't be used
->>>>>>>> in atomic context on -RT.
->>>>>>>
->>>>>>> Can you explain this more fully?  Why can't runtime PM be used in
->>>>>>> atomic context in the -rt kernels?
->>>>>>>    
->>>>>>
->>>>>> See:
->>>>>>    http://lwn.net/Articles/146861/
->>>>>>    https://rt.wiki.kernel.org/index.php/Frequently_Asked_Questions#How_does_the_CONFIG_PREEMPT_RT_patch_work.3F
->>>>>>
->>>>>> spinlock_t
->>>>>>       Critical sections are preemptible. The _irq operations (e.g., spin_lock_irqsave())
->>>>>>    do -not- disable hardware interrupts. Priority inheritance is used to prevent priority
->>>>>>    inversion. An underlying rt_mutex is used to implement spinlock_t in PREEMPT_RT.
->>>>>>
->>>>>> As result, have to do things like:
->>>>>> https://lkml.org/lkml/2015/8/18/161
->>>>>> https://lkml.org/lkml/2015/8/18/162
->>>>>>
->>>>>> Sorry for brief reply - Friday/Sat night :)
->>>>>
->>>>> I see.  Although we normally think of interrupt contexts as being
->>>>> atomic, in an -rt kernel this isn't true any more because things like
->>>>> spin_lock_irq don't actually disable interrupts.
->>>>>
->>>>> Therefore it would be correct to say that in -rt kernels, runtime PM
->>>>> can be used in interrupt context (if the device is marked as irq-safe),
->>>>> but not in atomic context.  Right?
->>>>
->>>> Right.
->>>>
->>>> Whatever is suitable for interrupt context in the mainline, will be suitable
->>>> for that in -rt kernels too.
->>>
->>> Not exactly true :(, since spinlock is converted to [rt_] mutex.
->>> Usually, this difference can't be seen because on -RT kernel all or
->>> mostly all HW IRQ handlers will be forced to be threaded.
->> 
->> Exactly.  And that's what I'm talking about.
->> 
->>> For the cases, where such automatic conversion is not working,
->>> (like chained irq handlers or HW-handler+Threaded handler) the code
->>> has to be carefully patched to work properly as for non-RT as for -RT.
->> 
->> Right.
->> 
->>> Also, this triggers some -RT incompatibility issues, like with PM runtime or
->> 
->> That I'm not sure about.  Why would runtime PM cause problems with -RT (apart
->> from attempts to use it from the idle loop, but that's not happening in the
->> mainline anyway)?
->
->
-> I have to be more specific - sorry. "irq_safe" mode of PM runtime is incompatible with -RT.
->
-> Here is an example:
-> - HW IRQ handler in TI OMAP GPIO driver is implemented as chained IRQ handler and
->   contains pm_runtime_get_sync()/pm_runtime_put(). This works properly with vanilla kernel
->   because OMAP GPIO devices marked as irq_safe.
->   Chained IRQ handlers can't be forced threaded and PM runtime APIs trigger
->  "sleeping function called from invalid context" issues there, so corresponding code has to be reworked.
+> Wolfram, do you know of any cases where adapter->dev.of_node would not
+> be the same as adapter->dev.parent->of_node?
 
-Isn't that why those are being converted to raw_*[1] ?
+i2c-muxes, I'd say. dev.parent is the device of the parent I2C adapter,
+while the devices get populated from the of_node of the muxing device.
 
-Kevin
-
-[1] http://marc.info/?l=linux-omap&m=143749603401221&w=2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150909/8d6285db/attachment.sig>
