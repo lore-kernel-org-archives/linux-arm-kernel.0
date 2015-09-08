@@ -1,66 +1,45 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 08 Sep 2015 10:45:47 +0900
-Subject: [PATCH] arm64: kernel: Use a separate stack for irq interrupts.
-In-Reply-To: <81D7F9F1-1552-4709-BA74-1BF15163C4A0@gmail.com>
-References: <55EDA040.90208@arm.com>
- <1441636584-23174-1-git-send-email-james.morse@arm.com>
- <400272B6-0733-456F-95C9-9C72C597CEB5@gmail.com> <55EDB5FB.8060800@arm.com>
- <81D7F9F1-1552-4709-BA74-1BF15163C4A0@gmail.com>
-Message-ID: <55EE3DCB.40401@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  7 Sep 2015 22:57:12 -0300
+Subject: [PATCH v2 2/2] ARM: dts: imx7d-sdb: Add USB support
+In-Reply-To: <1441677432-3376-1-git-send-email-festevam@gmail.com>
+References: <1441677432-3376-1-git-send-email-festevam@gmail.com>
+Message-ID: <1441677432-3376-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jungseok,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On 09/08/2015 01:34 AM, Jungseok Lee wrote:
-> On Sep 8, 2015, at 1:06 AM, James Morse wrote:
->> On 07/09/15 16:48, Jungseok Lee wrote:
->>> On Sep 7, 2015, at 11:36 PM, James Morse wrote:
->>>
->>> Hi James,
->>>
->>>> Having to handle interrupts on top of an existing kernel stack means the
->>>> kernel stack must be large enough to accomodate both the maximum kernel
->>>> usage, and the maximum irq handler usage. Switching to a different stack
->>>> when processing irqs allows us to make the stack size smaller.
->>>>
->>>> Maximum kernel stack usage (running ltp and generating usb+ethernet
->>>> interrupts) was 7256 bytes. With this patch, the same workload gives
->>>> a maximum stack usage of 5816 bytes.
->>>
->>> I'd like to know how to measure the max stack depth.
->>> AFAIK, a stack tracer on ftrace does not work well. Did you dump a stack
->>> region and find or track down an untouched region?
->>
->> I enabled the 'Trace max stack' option under menuconfig 'Kernel Hacking' ->
->> 'Tracers', then looked in debugfs:/tracing/stack_max_size.
->>
->> What problems did you encounter?
->> (I may be missing something?)
->
-> When I enabled the feature, all entries had *0* size except the last entry.
-> It can be reproduced easily as looking in debugs:/tracing/stack_trace.
+Add support for USBOTG1 and USBOTG2.
 
-I'm afraid that you have not applied one of patches in my RFC:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355919.html
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- None
 
-I have not looked into James' patch in details, but hope that it will help
-fix one of issues that are annoying me: Stack tracer (actually save_stack_trace())
-will miss a function (and its parent function in some case) that is being executed
-when an interrupt is taken.
+ arch/arm/boot/dts/imx7d-sdb.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-
--Takahiro AKASHI
-
-> You can track down my report and Akashi's changes with the following links:
-> - http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354126.html
-> - https://lkml.org/lkml/2015/7/13/29
->
-> Although it is impossible to measure an exact depth at this moment, the feature
-> could be utilized to check improvement.
->
-> Cc'ing Akashi for additional comments if needed.
->
-> Best Regards
-> Jungseok Lee
->
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index fdd1d7c..3c6cf52 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -231,6 +231,17 @@
+ 	status = "okay";
+ };
+ 
++&usbotg1 {
++	vbus-supply = <&reg_usb_otg1_vbus>;
++	status = "okay";
++};
++
++&usbotg2 {
++	vbus-supply = <&reg_usb_otg2_vbus>;
++	dr_mode = "host";
++	status = "okay";
++};
++
+ &usdhc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usdhc1>;
+-- 
+1.9.1
