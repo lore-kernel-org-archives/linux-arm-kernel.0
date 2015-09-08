@@ -1,42 +1,100 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 8 Sep 2015 10:24:47 +0100
-Subject: arm_coherent_dma_alloc
-In-Reply-To: <DM2PR0301MB0701C97092AB154986A70EC18C530@DM2PR0301MB0701.namprd03.prod.outlook.com>
-References: <DM2PR0301MB070161BE05943337F62EA5218C680@DM2PR0301MB0701.namprd03.prod.outlook.com>
- <20150904132604.GD17253@e104818-lin.cambridge.arm.com>
- <DM2PR0301MB0701C97092AB154986A70EC18C530@DM2PR0301MB0701.namprd03.prod.outlook.com>
-Message-ID: <20150908092446.GD14550@e104818-lin.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 08 Sep 2015 10:28:04 +0100
+Subject: [PATCH v4] pinctrl: mediatek: Implement wake handler and suspend
+ resume
+In-Reply-To: <1441535972.22230.5.camel@mhfsdcap03>
+References: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>	
+ <55DB4609.5040904@arm.com>	
+ <CAGS+omBnoitju07KQ1Y7JHTbce6+DO4WqWHTaKz5D+T157zEJA@mail.gmail.com>
+ <1441535972.22230.5.camel@mhfsdcap03>
+Message-ID: <55EEAA24.6080706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2015 at 04:31:46AM +0000, Aggrwal Poonam wrote:
-> > On Thu, Sep 03, 2015 at 04:50:56AM +0000, Aggrwal Poonam wrote:
-> > > I am looking at the ?file: "arch/arm/mm/dma-mapping.c"
-> > >
-> > > static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
-> > > ??????? dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs) {
-> > > ? ??????pgprot_t prot = __get_dma_pgprot(attrs, pgprot_kernel);
-> > > ??????? void *memory;
-> > >
-> > > ??????? if (dma_alloc_from_coherent(dev, size, handle, &memory))
-> > > ??????????????? return memory;
-> > >
-> > > ??????? return __dma_alloc(dev, size, handle, gfp, prot, true,
-> > > ?????????? ????????????????__builtin_return_address(0)); }
-> > >
-> > > I want to understand the attributes of ?memory allocated using
-> > > __dma_alloc, in terms of cacheable.
-> > 
-> > If is_coherent == true (for __dma_alloc), the attributes are Normal
-> > Cacheable (the case above).
-> Thanks !.
-> In this case; what are the values of  TEX[2:0], C, B bits?
 
-Can you not read the code? Or at least run a kernel with some printks in
-the right place?
 
-TEX[0], C, B are 0b111 which means index 7 in the NMRR/PRRR registers
-(or MAIR0/MAIR1 with LPAE).
+On 06/09/15 11:39, maoguang meng wrote:
+> On Wed, 2015-09-02 at 14:02 +0800, Daniel Kurtz wrote:
+>> Hi maoguang,
+>>
+>> On Tue, Aug 25, 2015 at 12:27 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>
+>>>
+>>> On 14/08/15 09:38, maoguang.meng at mediatek.com wrote:
+>>>>
+>>>> From: Maoguang Meng <maoguang.meng@mediatek.com>
+>>>>
+>>>> This patch implement irq_set_wake to get who is wakeup source and
+>>>> setup on suspend resume.
+>>>>
+>>>> Signed-off-by: Maoguang Meng <maoguang.meng@mediatek.com>
+>>>>
+>> [snip]
+>>
+>> Can you please respond to Sudeep's questions:
+>>
+>>> Does this pinmux controller:
+>>>
+>>> 1. Support wake-up configuration ? If not, you need to use
+>>>     IRQCHIP_SKIP_SET_WAKE. I don't see any value in writing the
+>>>     mask_{set,clear} if the same registers are used for {en,dis}able
+>
+>    YES.
+>    we can call enable_irq_wake(irq) to config this irq as a wake-up
+> source.
+>
 
--- 
-Catalin
+No that doesn't answer my question. Yes you can always call
+enable_irq_wake(irq) as along as you have irq_set_wake implemented.
+But my question was does this pinmux controller support wake-up
+configuration.
+
+IMHO, by looking at the implementation I can confirm *NO*, it doesn't.
+So please stop copy-pasting the implementation from other drivers.
+The reason is you operate on the same mask_{set,clear} which you use
+to {en,dis}able the interrupts which means you don't have to do anything
+to configure an interrupt as a wakeup source other than just keeping
+them enabled. Hopefully this clarifies.
+
+>>>
+>>> 2. Is in always on domain ? If not, you need save/restore only to
+>>>     resume back the functionality. Generally we can set
+>>>     IRQCHIP_MASK_ON_SUSPEND to ensure non-wake-up interrupts are
+>>>     disabled during suspend and re-enabled in resume path. You just
+>>>     save/restore raw values without tracking the wake-up source.
+>
+>    YES.
+>
+
+Again *YES* for what part of my question. If it's always-on, then you
+don't need this suspend/resume callbacks at all, so I assume the answer
+is *NO*.
+
+>>>
+>>> Also I see that no care is taken to set the port irq as wake enable
+>>> source. It may work with current mainline, but won't with -next. Please
+>>> ensure the port irq to the parent interrupt controller remains
+>>> enabled(i.e set as wake).
+>
+> As you know, we do not care the port irq as wake enbale source,
+> when enter suspend we think no matter what the port irq is
+> enabled/disabled which are not affected as a wake-up source,
+> Because eint has a line to receive SPM.
+>
+
+I understand that, but for proper wakeup functionality you need to do
+configure the parent if you want to identify and handle that wakeup
+interrupt. If you don't care then it should be fine.
+
+> For example,after suspend,press power key(use eint5) will generate an
+> electrical signal which is send to spm by eint.
+> and then spm wake cpu.
+
+Yes I got that, as I mentioned above, I think you don't need to identify
+and handle the wakeup interrupt. E.g. if it's a keyboard key press, you
+may need to identify the key pressed, so it needs to be handled
+properly. In your case, I assume it's just power button whose main
+function is to wake/boot and that's already achieved when you are woken up.
+
+Regards,
+Sudeep
