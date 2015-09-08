@@ -1,92 +1,80 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 8 Sep 2015 11:21:53 +0300
-Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
-In-Reply-To: <2355864.I8qZFusWfm@vostro.rjw.lan>
-References: <Pine.LNX.4.44L0.1509051133100.30865-100000@netrider.rowland.org>
- <2657565.lxWtPmdjyp@vostro.rjw.lan> <55ED9328.2010501@ti.com>
- <2355864.I8qZFusWfm@vostro.rjw.lan>
-Message-ID: <55EE9AA1.8020200@ti.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Tue, 8 Sep 2015 16:31:47 +0800
+Subject: [PATCH v2] serial: pl011: Fix earlycon register LUT breakage
+In-Reply-To: <CABymUCNmY+txUSaJDXsn4hb5p=frT5uAN-6Y97t+b7g224dkvw@mail.gmail.com>
+References: <1441468654-6923-1-git-send-email-jun.nie@linaro.org>
+ <CABymUCPMSKPwqtivYMJa3n-2GWbjhM6u7KDOwD1ypJRCeLZo7Q@mail.gmail.com>
+ <CABymUCN4tuNMC1m0AS36OZ9MVOa3HtH3mYC0s04LyUWVPxmZ4A@mail.gmail.com>
+ <CABymUCNmY+txUSaJDXsn4hb5p=frT5uAN-6Y97t+b7g224dkvw@mail.gmail.com>
+Message-ID: <20150908083147.GA15215@free64-pc.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2015 11:42 PM, Rafael J. Wysocki wrote:
-> On Monday, September 07, 2015 04:37:44 PM Grygorii Strashko wrote:
->> On 09/07/2015 04:04 PM, Rafael J. Wysocki wrote:
->>> On Saturday, September 05, 2015 11:39:20 AM Alan Stern wrote:
->>>> On Sat, 5 Sep 2015, Grygorii Strashko wrote:
->>>>
->>>>> On 09/04/2015 09:45 PM, Alan Stern wrote:
->>>>>> On Fri, 4 Sep 2015, Grygorii Strashko wrote:
->>>>>>
->>>>>>> There is one "small" problem with such approach :(
->>>>>>>
->>>>>>> - It's incompatible with -RT kernel, because PM runtime can't be used
->>>>>>> in atomic context on -RT.
->>>>>>
->>>>>> Can you explain this more fully?  Why can't runtime PM be used in
->>>>>> atomic context in the -rt kernels?
->>>>>>    
->>>>>
->>>>> See:
->>>>>    http://lwn.net/Articles/146861/
->>>>>    https://rt.wiki.kernel.org/index.php/Frequently_Asked_Questions#How_does_the_CONFIG_PREEMPT_RT_patch_work.3F
->>>>>
->>>>> spinlock_t
->>>>>       Critical sections are preemptible. The _irq operations (e.g., spin_lock_irqsave())
->>>>>    do -not- disable hardware interrupts. Priority inheritance is used to prevent priority
->>>>>    inversion. An underlying rt_mutex is used to implement spinlock_t in PREEMPT_RT.
->>>>>
->>>>> As result, have to do things like:
->>>>> https://lkml.org/lkml/2015/8/18/161
->>>>> https://lkml.org/lkml/2015/8/18/162
->>>>>
->>>>> Sorry for brief reply - Friday/Sat night :)
->>>>
->>>> I see.  Although we normally think of interrupt contexts as being
->>>> atomic, in an -rt kernel this isn't true any more because things like
->>>> spin_lock_irq don't actually disable interrupts.
->>>>
->>>> Therefore it would be correct to say that in -rt kernels, runtime PM
->>>> can be used in interrupt context (if the device is marked as irq-safe),
->>>> but not in atomic context.  Right?
->>>
->>> Right.
->>>
->>> Whatever is suitable for interrupt context in the mainline, will be suitable
->>> for that in -rt kernels too.
->>
->> Not exactly true :(, since spinlock is converted to [rt_] mutex.
->> Usually, this difference can't be seen because on -RT kernel all or
->> mostly all HW IRQ handlers will be forced to be threaded.
+On Tue, Sep 08, 2015 at 03:53:28PM +0800, Jun Nie wrote:
+> 2015-09-08 15:52 GMT+08:00 Jun Nie <jun.nie@linaro.org>:
+> > 2015-09-08 10:23 GMT+08:00 Jun Nie <jun.nie@linaro.org>:
+> >> 2015-09-05 23:57 GMT+08:00 Jun Nie <jun.nie@linaro.org>:
+> >>> Commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
+> >>> mistakenly used the register LUT i/o accessors for the pl011
+> >>> earlycon. Since the port has not been probed at earlycon time,
+> >>> the struct uart_amba_port (and register LUTs) are uninitialized.
+> >>>
+> >>> Use direct register addressing for pl011 earlycon; other h/w supported
+> >>> by the amba-pl011 driver should declare an alternate earlycon.
+> >>>
+> >>> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
+> >>> Signed-off-by: Jun Nie <jun.nie@linaro.org>
+> >>> ---
+> >>>  drivers/tty/serial/amba-pl011.c | 15 +++------------
+> >>>  1 file changed, 3 insertions(+), 12 deletions(-)
+> >>>
+> >>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> >>> index 2af09ab..cce41e0 100644
+> >>> --- a/drivers/tty/serial/amba-pl011.c
+> >>> +++ b/drivers/tty/serial/amba-pl011.c
+> >>> @@ -326,12 +326,6 @@ static void pl011_writew(struct uart_amba_port *uap, int val, int index)
+> >>>         writew_relaxed(val, uap->port.membase + uap->reg_lut[index]);
+> >>>  }
+> >>>
+> >>> -static void pl011_writeb(struct uart_amba_port *uap, u8 val, int index)
+> >>> -{
+> >>> -       WARN_ON(index > REG_NR);
+> >>> -       writeb_relaxed(val, uap->port.membase + uap->reg_lut[index]);
+> >>> -}
+> >>> -
+> >>>  /*
+> >>>   * Reads up to 256 characters from the FIFO or until it's empty and
+> >>>   * inserts them into the TTY layer. Returns the number of characters
+> >>> @@ -2348,13 +2342,10 @@ static struct console amba_console = {
+> >>>
+> >>>  static void pl011_putc(struct uart_port *port, int c)
+> >>>  {
+> >>> -       struct uart_amba_port *uap =
+> >>> -           container_of(port, struct uart_amba_port, port);
+> >>> -
+> >>> -       while (pl011_readw(uap, REG_FR) & UART01x_FR_TXFF)
+> >>> +       while (readw_relaxed(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+> >>>                 ;
+> >>> -       pl011_writeb(uap, c, REG_DR);
+> >>> -       while (pl011_readw(uap, REG_FR) & uap->fr_busy)
+> >>> +       writeb_relaxed(c, port->membase + UART01x_DR);
+> >>> +       while (readw_relaxed(port->membase + UART01x_FR) & UART01x_FR_BUSY)
+> >>>                 ;
+> >>>  }
+> >>>
+> >>> --
+> >>> 1.9.1
+> >>>
+> >>
+> >> Could anybody help test this earlycon patch on hardware with standard
+> >> pl011 serial? Your help is appreciated and valuable no matter the
+> >> previous patch set is carried on or reverted.
+> >> Thank you very much!
+> >>
+> >> Jun
 > 
-> Exactly.  And that's what I'm talking about.
-> 
->> For the cases, where such automatic conversion is not working,
->> (like chained irq handlers or HW-handler+Threaded handler) the code
->> has to be carefully patched to work properly as for non-RT as for -RT.
-> 
-> Right.
-> 
->> Also, this triggers some -RT incompatibility issues, like with PM runtime or
-> 
-> That I'm not sure about.  Why would runtime PM cause problems with -RT (apart
-> from attempts to use it from the idle loop, but that's not happening in the
-> mainline anyway)?
+> cc linux-arm-kernel at lists.infradead.org in case someone may have
+> resource to help have a test. Thank you!
+I tested this patch with the ARM Juno-r1 board, it works.
 
-
-I have to be more specific - sorry. "irq_safe" mode of PM runtime is incompatible with -RT.
-
-Here is an example:
-- HW IRQ handler in TI OMAP GPIO driver is implemented as chained IRQ handler and
-  contains pm_runtime_get_sync()/pm_runtime_put(). This works properly with vanilla kernel
-  because OMAP GPIO devices marked as irq_safe.
-  Chained IRQ handlers can't be forced threaded and PM runtime APIs trigger
- "sleeping function called from invalid context" issues there, so corresponding code has to be reworked.
-
-
-...
-
-
--- 
-regards,
--grygorii
+Tested-by: Huang Shijie <shijie.huang@arm.com>
