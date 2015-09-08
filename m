@@ -1,65 +1,117 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 08 Sep 2015 08:58:03 +0200
-Subject: [PATCH 1/4] ARM: dts: imx6dql-nitrogen6x: add touchscreen support
-In-Reply-To: <1441645069-27263-2-git-send-email-gary.bisson@boundarydevices.com>
-References: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
- <1441645069-27263-2-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <1441695483.3241.5.camel@pengutronix.de>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 8 Sep 2015 13:52:46 +0800
+Subject: [PATCH v2 1/2] ARM: dts: imx7d: Add USB support
+In-Reply-To: <1441677432-3376-1-git-send-email-festevam@gmail.com>
+References: <1441677432-3376-1-git-send-email-festevam@gmail.com>
+Message-ID: <20150908055245.GA7802@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gary,
-
-Am Montag, den 07.09.2015, 18:57 +0200 schrieb Gary Bisson:
-> This patch adds the different touchscreens that can be connected using
-> the displays available for this board.
-> http://boundarydevices.com/product-category/displays/
+On Mon, Sep 07, 2015 at 10:57:11PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+> Add USB OTG and Host support.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+> Changes since v1:
+> - Remove underscore from node name as suggested by Shawn
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> index ad16dce..ec9da5e 100644
-> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> @@ -284,6 +284,22 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_i2c3>;
->  	status = "okay";
+>  arch/arm/boot/dts/imx7d.dtsi | 71 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 71 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+> index 15c2193..90eb9f4 100644
+> --- a/arch/arm/boot/dts/imx7d.dtsi
+> +++ b/arch/arm/boot/dts/imx7d.dtsi
+> @@ -746,6 +746,77 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			usbotg1: usb at 30b10000 {
+> +				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
+> +				reg = <0x30b10000 0x200>;
+> +				interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX7D_USB_CTRL_CLK>;
+> +				fsl,usbphy = <&usbphynop1>;
+> +				fsl,usbmisc = <&usbmisc1 0>;
+> +				phy-clkgate-delay-us = <400>;
+
+You may add above property description at related binding doc
+
+Peter
+
+> +				status = "disabled";
+> +			};
 > +
-> +	egalax_ts at 04 {
-> +		compatible = "eeti,egalax_ts";
-> +		reg = <0x04>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <9 2>;
-
-Please use IRQ_TYPE_EDGE_FALLING here.
-
-> +		wakeup-gpios = <&gpio1 9 0>;
-
-And that would be GPIO_ACTIVE_HIGH. Should this be changed to
-GPIO_ACTIVE_LOW instead? From other device tree files and from what the
-driver does, it looks as if a wakeup is issued by forcing a falling edge
-on the IRQ pin.
-
-> +	};
+> +			usbotg2: usb at 30b20000 {
+> +				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
+> +				reg = <0x30b20000 0x200>;
+> +				interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX7D_USB_CTRL_CLK>;
+> +				fsl,usbphy = <&usbphynop2>;
+> +				fsl,usbmisc = <&usbmisc2 0>;
+> +				phy-clkgate-delay-us = <400>;
+> +				status = "disabled";
+> +			};
 > +
-> +	ft5x06_ts at 38 {
-> +		compatible = "edt,edt-ft5x06";
-> +		reg = <0x38>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <9 2>;
+> +			usbh: usb at 30b30000 {
+> +				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
+> +				reg = <0x30b30000 0x200>;
+> +				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX7D_USB_CTRL_CLK>;
+> +				fsl,usbphy = <&usbphynop3>;
+> +				fsl,usbmisc = <&usbmisc3 0>;
+> +				phy_type = "hsic";
+> +				dr_mode = "host";
+> +				phy-clkgate-delay-us = <400>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usbmisc1: usbmisc at 30b10200 {
+> +				#index-cells = <1>;
+> +				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
+> +				reg = <0x30b10200 0x200>;
+> +			};
+> +
+> +			usbmisc2: usbmisc at 30b20200 {
+> +				#index-cells = <1>;
+> +				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
+> +				reg = <0x30b20200 0x200>;
+> +			};
+> +
+> +			usbmisc3: usbmisc at 30b30200 {
+> +				#index-cells = <1>;
+> +				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
+> +				reg = <0x30b30200 0x200>;
+> +			};
+> +
+> +			usbphynop1: usbphynop1 {
+> +				compatible = "usb-nop-xceiv";
+> +				clocks = <&clks IMX7D_USB_PHY1_CLK>;
+> +				clock-names = "main_clk";
+> +			};
+> +
+> +			usbphynop2: usbphynop2 {
+> +				compatible = "usb-nop-xceiv";
+> +				clocks = <&clks IMX7D_USB_PHY2_CLK>;
+> +				clock-names = "main_clk";
+> +			};
+> +
+> +			usbphynop3: usbphynop3 {
+> +				compatible = "usb-nop-xceiv";
+> +				clocks = <&clks IMX7D_USB_HSIC_ROOT_CLK>;
+> +				clock-names = "main_clk";
+> +			};
+> +
+>  			usdhc1: usdhc at 30b40000 {
+>  				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
+>  				reg = <0x30b40000 0x10000>;
+> -- 
+> 1.9.1
+> 
 
-IRQ_TYPE_EDGE_FALLING
+-- 
 
-> +		wakeup-gpios = <&gpio1 9 0>;
-
-GPIO_ACTIVE_HIGH
-
-> +	};
->  };
-
-best regards
-Philipp
+Best Regards,
+Peter Chen
