@@ -1,77 +1,175 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 08 Sep 2015 14:43:53 +0200
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <20150908112909.GX21084@n2100.arm.linux.org.uk>
-References: <m3bnde5whx.fsf@t19.piap.pl>
- <20150907112555.GS21084@n2100.arm.linux.org.uk>
- <m337yp5gvv.fsf@t19.piap.pl> <1441709778.13536.8.camel@pengutronix.de>
- <20150908110135.GW21084@n2100.arm.linux.org.uk>
- <1441710467.13536.13.camel@pengutronix.de>
- <20150908112909.GX21084@n2100.arm.linux.org.uk>
-Message-ID: <1441716233.13536.21.camel@pengutronix.de>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Tue,  8 Sep 2015 20:43:07 +0800
+Subject: [PATCH] ARM: rockchip: add reboot notifier
+Message-ID: <1441716187-29446-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 08.09.2015, 12:29 +0100 schrieb Russell King - ARM
-Linux:
-> On Tue, Sep 08, 2015 at 01:07:47PM +0200, Lucas Stach wrote:
-> > Am Dienstag, den 08.09.2015, 12:01 +0100 schrieb Russell King - ARM
-> > Linux:
-> > > On Tue, Sep 08, 2015 at 12:56:18PM +0200, Lucas Stach wrote:
-> > > > This is expected, it's the overlay adapter which doesn't really work
-> > > > with imx-drm yet.
-> > > 
-> > > No, it's imx-drm which isn't working.  As I explained in my previous
-> > > email, overlay planes are expected to do scaling.  imx-drm errors out
-> > > attempts for that.  This is a kernel bug, not an Xorg driver bug.
-> > > 
-> > I would argue that this is a bug of the interface between kernel and
-> > userspace.
-> 
-> Yes, only in so far as knowing beforehand whether scaling is possible.
-> The only time that you get to know is when the call to display the plane
-> fails.  That's a really poor interface.
-> 
-> > Scaling isn't something that can be expected to be usable on every
-> > hardware (and in fact the IPU isn't able to do arbitrary scaling with
-> > its 1024 in/out pixel constraints), but there is no clear way to
-> > communicate this to userspace other than flat out rejecting the plane
-> > update. Atomic may provide some better ways, but we are not there yet
-> > for imx-drm.
-> 
-> I think that depends on your point of view - I suspect x86 people would
-> be surprised by that comment. :)
-> 
-I think some of the recent Intel chips had the same problem, in that
-they lost the ability to scale planes and ended up not exposing them due
-to the poor interface.
+rockchip platform have a protocol to pass the the kernel
+reboot mode to bootloader by some special registers when
+system reboot.By this way the bootloader can take different
+action according to the different kernel reboot mode, for
+example, command "reboot loader" will reboot the board to
+rockusb mode, this is a very convenient way to get the board
+to download mode.
 
-> There was talk a while back when the overlay plane support went in that
-> it was possible to do >1024 pixels, but it was complex, but the impression
-> I was left with was one day it would work - and I'm still waiting. 
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+---
 
-Don't wait for that. We can't do >1024 without doing a copy in memory,
-which would be a big stretch of the plane definition and benefit.
+ arch/arm/mach-rockchip/Makefile |   2 +-
+ arch/arm/mach-rockchip/loader.h |  22 +++++++++
+ arch/arm/mach-rockchip/reboot.c | 103 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 126 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-rockchip/loader.h
+ create mode 100644 arch/arm/mach-rockchip/reboot.c
 
-In addition the IPU scaler has pitch and alignment constraints that make
-the needed tiling extremely complex to get right. We fiddled with this
-extensively to get it to the point that it is usable as a V4L2 mem2mem
-device. Moving this to the display path is not going to happen, ever.
-
-As all relevant resolutions already require a copy you are much better
-of doing it with the GPU and get all the testing effort focused on that
-path.
-
-> I
-> suspect that the iMX6 is going to be obsolete before we have a decent
-> working video playback story on this hardware.
-> 
-MX6Plus is just around the corner and will probably keep us busy for a
-while. ;)
-
-Regards,
-Lucas
-
+diff --git a/arch/arm/mach-rockchip/Makefile b/arch/arm/mach-rockchip/Makefile
+index 5c3a9b2..cd291e3 100644
+--- a/arch/arm/mach-rockchip/Makefile
++++ b/arch/arm/mach-rockchip/Makefile
+@@ -1,5 +1,5 @@
+ CFLAGS_platsmp.o := -march=armv7-a
+ 
+-obj-$(CONFIG_ARCH_ROCKCHIP) += rockchip.o
++obj-$(CONFIG_ARCH_ROCKCHIP) += rockchip.o reboot.o
+ obj-$(CONFIG_PM_SLEEP) += pm.o sleep.o
+ obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+diff --git a/arch/arm/mach-rockchip/loader.h b/arch/arm/mach-rockchip/loader.h
+new file mode 100644
+index 0000000..bf51baa
+--- /dev/null
++++ b/arch/arm/mach-rockchip/loader.h
+@@ -0,0 +1,22 @@
++#ifndef __MACH_ROCKCHIP_LOADER_H
++#define __MACH_ROCKCHIP_LOADER_H
++
++/*high 24 bits is tag, low 8 bits is type*/
++#define SYS_LOADER_REBOOT_FLAG   0x5242C300
++
++enum {
++	BOOT_NORMAL = 0, /* normal boot */
++	BOOT_LOADER,     /* enter loader rockusb mode */
++	BOOT_MASKROM,    /* enter maskrom rockusb mode (not support now) */
++	BOOT_RECOVER,    /* enter recover */
++	BOOT_NORECOVER,  /* do not enter recover */
++	BOOT_SECONDOS,   /* boot second OS (not support now)*/
++	BOOT_WIPEDATA,   /* enter recover and wipe data. */
++	BOOT_WIPEALL,    /* enter recover and wipe all data. */
++	BOOT_CHECKIMG,   /* check firmware img with backup part*/
++	BOOT_FASTBOOT,   /* enter fast boot mode */
++	BOOT_SECUREBOOT_DISABLE,
++	BOOT_CHARGING,   /* enter charge mode */
++	BOOT_MAX         /* MAX VALID BOOT TYPE.*/
++};
++#endif
+diff --git a/arch/arm/mach-rockchip/reboot.c b/arch/arm/mach-rockchip/reboot.c
+new file mode 100644
+index 0000000..704bc16
+--- /dev/null
++++ b/arch/arm/mach-rockchip/reboot.c
+@@ -0,0 +1,103 @@
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/reboot.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include "loader.h"
++
++#define RK3188_PMU_SYS_REG0             0x40
++#define RK3288_PMU_SYS_REG0             0x94
++
++struct regmap *regmap;
++int flag_reg;
++
++static int rockchip_get_pmu_regmap(void)
++{
++	struct device_node *node;
++
++	node = of_find_node_by_path("/cpus");
++
++	regmap = syscon_regmap_lookup_by_phandle(node, "rockchip,pmu");
++	of_node_put(node);
++	if (!IS_ERR(regmap))
++		return 0;
++
++	regmap = syscon_regmap_lookup_by_compatible("rockchip,rk3066-pmu");
++	of_node_put(node);
++	if (!IS_ERR(regmap))
++		return 0;
++
++	return -ENODEV;
++}
++
++static int rockchip_get_reboot_flag_regmap(void)
++{
++	int ret = rockchip_get_pmu_regmap();
++
++	if (ret < 0)
++		return ret;
++
++	if (of_machine_is_compatible("rockchip,rk3288")) {
++		flag_reg = RK3288_PMU_SYS_REG0;
++		return 0;
++	} else if (of_machine_is_compatible("rockchip,rk3066a") ||
++		   of_machine_is_compatible("rockchip,rk3066b") ||
++		   of_machine_is_compatible("rockchip,rk3188")) {
++		flag_reg = RK3188_PMU_SYS_REG0;
++		return 0;
++	}
++
++	return -ENODEV;
++}
++
++static void rockchip_get_reboot_flag(const char *cmd, u32 *flag)
++{
++	*flag = SYS_LOADER_REBOOT_FLAG + BOOT_NORMAL;
++
++	if (cmd) {
++		if (!strcmp(cmd, "loader") || !strcmp(cmd, "bootloader"))
++			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_LOADER;
++		else if (!strcmp(cmd, "recovery"))
++			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_RECOVER;
++		else if (!strcmp(cmd, "charge"))
++			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_CHARGING;
++	}
++}
++
++static int rockchip_reboot_notify(struct notifier_block *this,
++				  unsigned long mode, void *cmd)
++{
++	u32 flag;
++
++	rockchip_get_reboot_flag(cmd, &flag);
++	regmap_write(regmap, flag_reg, flag);
++
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block rockchip_reboot_handler = {
++	.notifier_call = rockchip_reboot_notify,
++	.priority = 150,
++};
++
++static int __init rockchip_reboot_init(void)
++{
++	int ret = 0;
++
++	if (!rockchip_get_reboot_flag_regmap()) {
++		ret = register_restart_handler(&rockchip_reboot_handler);
++		if (ret)
++			pr_err("%s: cannot register reboot handler, %d\n",
++			       __func__, ret);
++	}
++
++return ret;
++}
++
++module_init(rockchip_reboot_init);
++MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
++MODULE_DESCRIPTION("Rockchip platform reboot notifier driver");
++MODULE_LICENSE("GPL");
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+1.9.1
