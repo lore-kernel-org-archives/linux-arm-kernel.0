@@ -1,38 +1,33 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue,  8 Sep 2015 22:38:04 +0200
-Subject: [PATCH v2 1/3] ARM: Make FORCE_MAX_ZONEORDER configurable if
- ARM_SINGLE_ARMV7M
+Date: Tue,  8 Sep 2015 22:38:05 +0200
+Subject: [PATCH v2 2/3] ARM: configs: Set FORCE_MAX_ZONE_ORDER to 9 in
+ stm32_defconfig
 In-Reply-To: <1441744686-20521-1-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1441744686-20521-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1441744686-20521-2-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1441744686-20521-3-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes FORCE_MAX_ZONEORDER configurable in defconfig for ARMV7-M
-when built for a single platform.
+STM32 boards having small amount of RAM, we can optimize by reducing
+max order page blocks size.
 
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Suggested-by: Andreas F?rber <afaerber@suse.de>
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- arch/arm/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/configs/stm32_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a750c14..88937b9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1731,10 +1731,10 @@ config ARM_MODULE_PLTS
- source "mm/Kconfig"
- 
- config FORCE_MAX_ZONEORDER
--	int "Maximum zone order" if ARCH_SHMOBILE_LEGACY
-+	int "Maximum zone order" if ARCH_SHMOBILE_LEGACY || ARM_SINGLE_ARMV7M
- 	range 11 64 if ARCH_SHMOBILE_LEGACY
- 	default "12" if SOC_AM33XX
--	default "9" if SA1111 || ARCH_EFM32
-+	default "9" if SA1111
- 	default "11"
- 	help
- 	  The kernel memory allocator divides physically contiguous memory
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 4725fab..9fe3b39 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -25,6 +25,7 @@ CONFIG_DRAM_BASE=0x90000000
+ CONFIG_FLASH_MEM_BASE=0x08000000
+ CONFIG_FLASH_SIZE=0x00200000
+ CONFIG_PREEMPT=y
++CONFIG_FORCE_MAX_ZONEORDER=9
+ # CONFIG_ATAGS is not set
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
 -- 
 1.9.1
