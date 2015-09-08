@@ -1,103 +1,70 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  7 Sep 2015 22:57:11 -0300
-Subject: [PATCH v2 1/2] ARM: dts: imx7d: Add USB support
-Message-ID: <1441677432-3376-1-git-send-email-festevam@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 7 Sep 2015 22:01:41 -0400 (EDT)
+Subject: [PATCH] ARM: fix bug which lowmem size is limited to 760MB
+In-Reply-To: <20150908001042.GT21084@n2100.arm.linux.org.uk>
+References: <20150903091044.GW21084@n2100.arm.linux.org.uk>
+ <1441276233-14566-1-git-send-email-ytk.lee@samsung.com>
+ <alpine.LFD.2.20.1509032106420.22877@knanqh.ubzr>
+ <1713935.2YV1sNJUyb@wuerfel>
+ <alpine.LFD.2.20.1509071152510.22877@knanqh.ubzr>
+ <20150908001042.GT21084@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.20.1509072139050.22877@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Tue, 8 Sep 2015, Russell King - ARM Linux wrote:
 
-Add USB OTG and Host support.
+> On Mon, Sep 07, 2015 at 03:40:36PM -0400, Nicolas Pitre wrote:
+> > On Mon, 7 Sep 2015, Arnd Bergmann wrote:
+> > 
+> > > On Thursday 03 September 2015 21:24:00 Nicolas Pitre wrote:
+> > > > If 768MB targets were common place then it could be worth changing the 
+> > > > default vmalloc size to accommodate this memory size and testing all the 
+> > > > other targets to make sure no regressions are introduced.  But given it 
+> > > > is easy to change the default via the kernel cmdline, and that you lose 
+> > > > only 8 MB otherwise, I don't think it is worth the trouble and/or the 
+> > > > risk.
+> > > 
+> > > Agreed.
+> > 
+> > Well... I think there is a better solution.
+> 
+> Doesn't this clash with things like:
+> 
+> #define UNCACHEABLE_ADDR        0xff000000      /* IRQ_STAT */
+> 
+> ?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Remove underscore from node name as suggested by Shawn
+It looks like the move might actually "fix" it.  That UNCACHEABLE_ADDR 
+is mapped with:
 
- arch/arm/boot/dts/imx7d.dtsi | 71 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
+static struct map_desc ebsa110_io_desc[] __initdata = {
+        /*
+         * sparse external-decode ISAIO space
+         */
+        {       /* IRQ_STAT/IRQ_MCLR */
+                .virtual        = (unsigned long)IRQ_STAT,
+                .pfn            = __phys_to_pfn(TRICK4_PHYS),
+                .length         = TRICK4_SIZE,
+                .type           = MT_DEVICE
+        },
+[...]
+};
 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index 15c2193..90eb9f4 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -746,6 +746,77 @@
- 				status = "disabled";
- 			};
- 
-+			usbotg1: usb at 30b10000 {
-+				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
-+				reg = <0x30b10000 0x200>;
-+				interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_USB_CTRL_CLK>;
-+				fsl,usbphy = <&usbphynop1>;
-+				fsl,usbmisc = <&usbmisc1 0>;
-+				phy-clkgate-delay-us = <400>;
-+				status = "disabled";
-+			};
-+
-+			usbotg2: usb at 30b20000 {
-+				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
-+				reg = <0x30b20000 0x200>;
-+				interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_USB_CTRL_CLK>;
-+				fsl,usbphy = <&usbphynop2>;
-+				fsl,usbmisc = <&usbmisc2 0>;
-+				phy-clkgate-delay-us = <400>;
-+				status = "disabled";
-+			};
-+
-+			usbh: usb at 30b30000 {
-+				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
-+				reg = <0x30b30000 0x200>;
-+				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_USB_CTRL_CLK>;
-+				fsl,usbphy = <&usbphynop3>;
-+				fsl,usbmisc = <&usbmisc3 0>;
-+				phy_type = "hsic";
-+				dr_mode = "host";
-+				phy-clkgate-delay-us = <400>;
-+				status = "disabled";
-+			};
-+
-+			usbmisc1: usbmisc at 30b10200 {
-+				#index-cells = <1>;
-+				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
-+				reg = <0x30b10200 0x200>;
-+			};
-+
-+			usbmisc2: usbmisc at 30b20200 {
-+				#index-cells = <1>;
-+				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
-+				reg = <0x30b20200 0x200>;
-+			};
-+
-+			usbmisc3: usbmisc at 30b30200 {
-+				#index-cells = <1>;
-+				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
-+				reg = <0x30b30200 0x200>;
-+			};
-+
-+			usbphynop1: usbphynop1 {
-+				compatible = "usb-nop-xceiv";
-+				clocks = <&clks IMX7D_USB_PHY1_CLK>;
-+				clock-names = "main_clk";
-+			};
-+
-+			usbphynop2: usbphynop2 {
-+				compatible = "usb-nop-xceiv";
-+				clocks = <&clks IMX7D_USB_PHY2_CLK>;
-+				clock-names = "main_clk";
-+			};
-+
-+			usbphynop3: usbphynop3 {
-+				compatible = "usb-nop-xceiv";
-+				clocks = <&clks IMX7D_USB_HSIC_ROOT_CLK>;
-+				clock-names = "main_clk";
-+			};
-+
- 			usdhc1: usdhc at 30b40000 {
- 				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
- 				reg = <0x30b40000 0x10000>;
--- 
-1.9.1
+This is passed to iotable_init(), then to create_mapping(). There you 
+have:
+
+        if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
+            md->virtual >= PAGE_OFFSET &&
+            (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
+                pr_warn("BUG: mapping for 0x%08llx at 0x%08lx out of vmalloc space\n",
+                        (long long)__pfn_to_phys((u64)md->pfn), md->virtual);
+        }
+
+So you must have hit the above warning somehow. Incidentally, this 
+IRQ_STAT entry is the only one that happened to be outside the vmalloc 
+area. By moving VMALLOC_END from 0xff000000 to 0xff800000 the warning 
+will be gone.
+
+
+Nicolas
