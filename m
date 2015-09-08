@@ -1,75 +1,70 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 08 Sep 2015 21:35:39 +0800
-Subject: [PATCH 01/11] ARM64 / PCI: introduce struct pci_controller for
- ACPI
-In-Reply-To: <20150907084542.GA29293@red-moon>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-2-git-send-email-hanjun.guo@linaro.org>
- <20150526165844.GD2175@e106497-lin.cambridge.arm.com>
- <5564AB68.6080502@linux.intel.com> <55657EA3.5000601@linaro.org>
- <CAFpQJXUU4mVbJSyfQJJm_VjR_uAm-xKHP7syYaM_xuC+CG7q5w@mail.gmail.com>
- <20150907084542.GA29293@red-moon>
-Message-ID: <55EEE42B.8000305@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Sep 2015 14:40:27 +0100
+Subject: I.MX6 HDMI support in v4.2
+In-Reply-To: <1441716233.13536.21.camel@pengutronix.de>
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m337yp5gvv.fsf@t19.piap.pl>
+ <1441709778.13536.8.camel@pengutronix.de>
+ <20150908110135.GW21084@n2100.arm.linux.org.uk>
+ <1441710467.13536.13.camel@pengutronix.de>
+ <20150908112909.GX21084@n2100.arm.linux.org.uk>
+ <1441716233.13536.21.camel@pengutronix.de>
+Message-ID: <20150908134027.GZ21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2015 04:45 PM, Lorenzo Pieralisi wrote:
-> On Mon, Sep 07, 2015 at 05:14:22AM +0100, Ganapatrao Kulkarni wrote:
->> Hi Hanjun,
->>
->> On Wed, May 27, 2015 at 1:51 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->>> Hi Liviu,
->>>
->>> On 2015???05???27??? 01:20, Jiang Liu wrote:
->>>>
->>>> On 2015/5/27 0:58, Liviu Dudau wrote:
->>>>>
->>>>> On Tue, May 26, 2015 at 01:49:14PM +0100, Hanjun Guo wrote:
->>>>>>
->>>>>> ARM64 ACPI based PCI host bridge init needs a arch dependent
->>>>>> struct pci_controller to accommodate common PCI host bridge
->>>>>> code which is introduced later, or it will lead to compile
->>>>>> errors on ARM64.
->>>>>
->>>>>
->>>>> Hi Hanjun,
->>>>>
->>>>> Two questions: why don't you introduce this patch next to the
->>>>> one that is going to make use of it (or even merge it there)?
->>>
->>>
->>> this is because of this patch is needed by Jiang Liu's patch set
->>> to fix the compile error on ARM64, I'd rather do that, but It's
->>> better to let Jiang Liu's patch goes in, and then this one, that's
->>> why I prepared a single patch for the struct. (I mentioned it
->>> in the cover letter)
->>>
->>>>> Second, why is the whole struct pci_controller not surrounded
->>>>> by #ifdef CONFIG_ACPI as you are implying that this is needed
->>>>> only for ACPI?
->>>
->>>
->>> I hope it can be reused, since the NUMA node and segment (domain)
->>> is both needed for DT and ACPI, if it's not the case foe now, I
->>> can surrounded them all by #ifdef CONFIG_ACPI.
->> we can make use of this structure to hold pci to numa node
->> mapping(pcibus_to_node).
->> can you please pull node member out of  CONFIG_ACPI ifdef.
->> or you can put only acpi_device under ifdef.
->
-> That struct disappeared in the latest series:
->
-> https://lkml.org/lkml/2015/6/8/443
+On Tue, Sep 08, 2015 at 02:43:53PM +0200, Lucas Stach wrote:
+> Am Dienstag, den 08.09.2015, 12:29 +0100 schrieb Russell King - ARM
+> Linux:
+> > There was talk a while back when the overlay plane support went in that
+> > it was possible to do >1024 pixels, but it was complex, but the impression
+> > I was left with was one day it would work - and I'm still waiting. 
+> 
+> Don't wait for that. We can't do >1024 without doing a copy in memory,
+> which would be a big stretch of the plane definition and benefit.
+> 
+> In addition the IPU scaler has pitch and alignment constraints that make
+> the needed tiling extremely complex to get right. We fiddled with this
+> extensively to get it to the point that it is usable as a V4L2 mem2mem
+> device. Moving this to the display path is not going to happen, ever.
+> 
+> As all relevant resolutions already require a copy you are much better
+> of doing it with the GPU and get all the testing effort focused on that
+> path.
 
-Yes, I think that is the right direction going.
+And at that point, you might as well use the filter blit and blit directly
+to the screen.
 
->
-> we have to have a common way to handle the NUMA info in DT and ACPI
-> so we should still find a solution that can be shared between the two,
-> it is yet another thing to take into account for PCI ACPI on arm64.
+I've run some performance analysis on this on iMX6 hardware, and the time
+taken for the CPU to copy the Xv data passed to it is about the same time
+that it takes the CPU to flush the caches, then ask the GPU to copy the
+data, and then wait for the GPU to report that the copy has finished.  My
+analysis shows that you actually lose performance by using the GPU to
+merely copy and then pass it to Xv.
 
-Agreed, we can take that into account when finished the basic
-support.
+Also, you mention that the IPU scaler has pitch and alignment constraints.
+So does the GPU.  The Xv interface can cope with that just fine, because
+the Xv backend gets to define the pitch and buffer size for any given
+format/width/height, and offsets in the buffer for planar image formats.
 
-Thanks
-Hanjun
+It isn't able to specify the alignment of the actual buffer though - for
+SHM, that's going to be the size of a struct page due to the way shmem
+works.  For raw XvPutImage, things are harder to cope with, but the GPU
+can cope provided the offset is aligned to a pixel boundary.
+
+> MX6Plus is just around the corner and will probably keep us busy for a
+> while. ;)
+
+You might be excited about that, but for the rest of us, we have to put
+up with the hardware we have, which is basically iMX6.  We need solutions
+now on existing iMX6 hardware, not the next set of likely to be
+problematical hardware.
+
+I know the grass is always greener on the other side - and I expect that
+when MX6+ comes out, you'll then have no time to work on etnaviv DRM,
+and we'll still be stuck without any progress on that.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
