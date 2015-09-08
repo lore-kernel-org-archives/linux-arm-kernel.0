@@ -1,50 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Sep 2015 16:55:34 +0100
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <CAOCHtYhtkV-TtaA6hz1OTD5TpGCnionK27D2mp4beU+HGymwdw@mail.gmail.com>
-References: <m3bnde5whx.fsf@t19.piap.pl>
- <20150907112555.GS21084@n2100.arm.linux.org.uk>
- <m337yp5gvv.fsf@t19.piap.pl>
- <1441709778.13536.8.camel@pengutronix.de>
- <20150908110135.GW21084@n2100.arm.linux.org.uk>
- <1441710467.13536.13.camel@pengutronix.de>
- <20150908112909.GX21084@n2100.arm.linux.org.uk>
- <1441716233.13536.21.camel@pengutronix.de>
- <CAOCHtYhtkV-TtaA6hz1OTD5TpGCnionK27D2mp4beU+HGymwdw@mail.gmail.com>
-Message-ID: <20150908155533.GA21084@n2100.arm.linux.org.uk>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Tue, 8 Sep 2015 18:04:28 +0200
+Subject: [PATCH linux-next v9 0/3] mfd: flexcom: add a driver for Flexcom
+In-Reply-To: <cover.1441118159.git.cyrille.pitchen@atmel.com>
+References: <cover.1441118159.git.cyrille.pitchen@atmel.com>
+Message-ID: <55EF070C.7020600@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2015 at 09:17:06AM -0500, Robert Nelson wrote:
-> >> I
-> >> suspect that the iMX6 is going to be obsolete before we have a decent
-> >> working video playback story on this hardware.
-> >>
-> > MX6Plus is just around the corner and will probably keep us busy for a
-> > while. ;)
-> 
-> Lucas,
-> 
-> In which case, it "might" be a good idea to get the current version of
-> etnaviv in mainline for current imx6's before you guys disappear again
-> for mx6plus development..
-> 
-> As you guys are basically repeating what happened with the limadriver:
-> http://limadriver.org/
-> 
-> Remember, there is an etnaviv community.
-> 
-> Russell:
-> is there any reason to not just push your version for mainline and let
-> Pengutronix submit patches.
+Hi all,
 
-The basic problem is getting the kernel<->user API stable before it
-goes into mainline, which is an absolute must.  We can't drop it into
-mainline and then break the user API.
+Le 01/09/2015 16:46, Cyrille Pitchen a ?crit :
+> ChangeLog
+> 
+> v9:
+> - go back to v5 (use the new "atmel,flexcom-mode" DT property).
+> - fix the name of the spi node in the DT example: from spi at f8034400 to
+>   spi at 400
+> - align the fields of the struct platform_driver atmel_flexcom_driver as
+>   suggested by Lee Jones.
+> 
+[...]
 
-We also want to avoid putting it into the staging tree and have it
-sit around there for years.
+Are there any remaining blocking points for this series ?
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Best Regards,
+
+Cyrille
