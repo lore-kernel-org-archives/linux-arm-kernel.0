@@ -1,78 +1,47 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 8 Sep 2015 12:10:02 -0700
-Subject: [PATCH 1/3] sysfs: Fix is_visible() support for binary attributes
-In-Reply-To: <20150908153013.GA6758@roeck-us.net>
-References: <1441714066-5599-1-git-send-email-emilio.lopez@collabora.co.uk>
- <1441714066-5599-2-git-send-email-emilio.lopez@collabora.co.uk>
- <20150908153013.GA6758@roeck-us.net>
-Message-ID: <20150908191002.GB10156@kroah.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 8 Sep 2015 12:21:15 -0700
+Subject: [PATCH 5/9] clk: qcom: gcc-msm8960: add child devices support.
+In-Reply-To: <55ED311E.1070404@codeaurora.org>
+References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
+ <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
+ <20150811224902.GO2839@codeaurora.org>
+ <55CB0B26.2020105@linaro.org> <55CC1CFE.7000005@codeaurora.org>
+ <20150814004206.GU26614@codeaurora.org>
+ <55CD5BD2.3070907@codeaurora.org> <55E660F6.3020007@codeaurora.org>
+ <20150903172743.GE15099@codeaurora.org>
+ <55ED311E.1070404@codeaurora.org>
+Message-ID: <20150908192115.GP15099@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2015 at 08:30:13AM -0700, Guenter Roeck wrote:
-> Emilio,
+On 09/07, Rajendra Nayak wrote:
+> >
+> >Yeah this might happen though because we've assigned the of_node
+> >pointer to the tsens device before we register it on the platform
+> >bus. The other way to pass that data down from gcc to tsens would
+> >be to not have an of_node assigned to the tsens device, and check
+> >for that case in the tsens driver. If there isn't an of_node,
+> >then we look at the parent device's of_node to figure out which
+> >gcc it is (if this even matters) and parse DT properties.
 > 
-> On Tue, Sep 08, 2015 at 09:07:44AM -0300, Emilio L?pez wrote:
-> > According to the sysfs header file:
-> > 
-> >     "The returned value will replace static permissions defined in
-> >      struct attribute or struct bin_attribute."
-> > 
-> > but this isn't the case, as is_visible is only called on
-> > struct attribute only. This patch adds the code paths required
-> > to support is_visible() on binary attributes.
-> > 
-> > Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
-> > ---
-> >  fs/sysfs/group.c | 22 ++++++++++++++++++----
-> >  1 file changed, 18 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/fs/sysfs/group.c b/fs/sysfs/group.c
-> > index 39a0199..eb6996a 100644
-> > --- a/fs/sysfs/group.c
-> > +++ b/fs/sysfs/group.c
-> > @@ -37,10 +37,10 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
-> >  {
-> >  	struct attribute *const *attr;
-> >  	struct bin_attribute *const *bin_attr;
-> > -	int error = 0, i;
-> > +	int error = 0, i = 0;
-> >  
-> >  	if (grp->attrs) {
-> > -		for (i = 0, attr = grp->attrs; *attr && !error; i++, attr++) {
-> > +		for (attr = grp->attrs; *attr && !error; i++, attr++) {
-> >  			umode_t mode = (*attr)->mode;
-> >  
-> >  			/*
-> > @@ -73,13 +73,27 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
-> >  	}
-> >  
-> >  	if (grp->bin_attrs) {
-> > -		for (bin_attr = grp->bin_attrs; *bin_attr; bin_attr++) {
-> > +		for (bin_attr = grp->bin_attrs; *bin_attr; i++, bin_attr++) {
-> > +			umode_t mode = (*bin_attr)->attr.mode;
-> > +
-> >  			if (update)
-> >  				kernfs_remove_by_name(parent,
-> >  						(*bin_attr)->attr.name);
-> > +			if (grp->is_visible) {
-> > +				mode = grp->is_visible(kobj,
-> > +						       &(*bin_attr)->attr, i);
-> 
-> With this, if 'n' is the number of non-binary attributes,
-> 
-> for i < n:
-> 	The index passed to is_visible points to a non-binary attribute.
-> for i >= n:
-> 	The index passed to is_visible points to the (index - n)th binary
-> 	attribute.
-> 
-> Unless I am missing something, this is not explained anywhere, but it is
-> not entirely trivial to understand. I think it should be documented.
+> Parsing DT properties from parent (in the tsens driver) is fine, but
+> the nvmem apis still expect an of_node for the tsens device and hence
+> fail.
 
-I agree, make i the number of the bin attribute and that should solve
-this issue.
+So pass the parent device to the nvmem APIs? Or adjust the nvmem
+APIs to look for a parent of_node if there isn't an of_node for
+the device being passed? Or make the nvmem APIs work without
+using DT, and copy over the nvmem information from the gcc node
+to the virtual tsens child device?
 
-thanks,
+> 
+> Associating the of_node of the parent to the tsens device while being
+> probed ends up with the same issues of gcc ending up probing the device
+> and failing because tsens defers probe a couple times before a
+> successful probe.
 
-greg k-h
+Yeah sounds like we shouldn't do it that way.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
