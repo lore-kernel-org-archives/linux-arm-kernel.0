@@ -1,77 +1,36 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 8 Sep 2015 08:30:13 -0700
-Subject: [PATCH 1/3] sysfs: Fix is_visible() support for binary attributes
-In-Reply-To: <1441714066-5599-2-git-send-email-emilio.lopez@collabora.co.uk>
-References: <1441714066-5599-1-git-send-email-emilio.lopez@collabora.co.uk>
- <1441714066-5599-2-git-send-email-emilio.lopez@collabora.co.uk>
-Message-ID: <20150908153013.GA6758@roeck-us.net>
+From: dawei.chien@mediatek.com (dawei chien)
+Date: Tue, 8 Sep 2015 23:46:35 +0800
+Subject: thermal: mediatek: Add cpu power cooling model
+In-Reply-To: <20150907060931.GF26760@linux>
+References: <1441357309-61669-1-git-send-email-dawei.chien@mediatek.com>
+ <20150907060931.GF26760@linux>
+Message-ID: <1441727195.20470.40.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Emilio,
+Hi Viresh,
 
-On Tue, Sep 08, 2015 at 09:07:44AM -0300, Emilio L?pez wrote:
-> According to the sysfs header file:
+On Mon, 2015-09-07 at 11:39 +0530, Viresh Kumar wrote:
+> On 04-09-15, 17:01, Dawei Chien wrote:
+> > Use Intelligent Power Allocation (IPA) technical to add
+> > static/dynamic power model for binding CPU thermal zone.
+> > The power allocator governor allocates power budget to control
+> > CPU temperature.
 > 
->     "The returned value will replace static permissions defined in
->      struct attribute or struct bin_attribute."
+> Sorry but this isn't enough really.. I don't have time to go through
+> the code and understand the purpose of the series.
 > 
-> but this isn't the case, as is_visible is only called on
-> struct attribute only. This patch adds the code paths required
-> to support is_visible() on binary attributes.
+> Please explain here in detail:
+> - Why this is needed.
+Power Allocator governor is able to keep SOC temperature within a
+defined temperature range to avoid SOC overheat and keep it's
+performance. mt8173-cpufreq.c need to register its' own power model with
+power allocator thermal governor, so that power allocator governor can
+allocates suitable power budget to control CPU temperature.
+
+> - What/How you are doing it.
+Measure and create dynamic/static power model, and register cooling
+device of_cpufreq_power_cooling_register for MT8173.
 > 
-> Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
-> ---
->  fs/sysfs/group.c | 22 ++++++++++++++++++----
->  1 file changed, 18 insertions(+), 4 deletions(-)
+> (Don't resend, just reply to this email :) )
 > 
-> diff --git a/fs/sysfs/group.c b/fs/sysfs/group.c
-> index 39a0199..eb6996a 100644
-> --- a/fs/sysfs/group.c
-> +++ b/fs/sysfs/group.c
-> @@ -37,10 +37,10 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
->  {
->  	struct attribute *const *attr;
->  	struct bin_attribute *const *bin_attr;
-> -	int error = 0, i;
-> +	int error = 0, i = 0;
->  
->  	if (grp->attrs) {
-> -		for (i = 0, attr = grp->attrs; *attr && !error; i++, attr++) {
-> +		for (attr = grp->attrs; *attr && !error; i++, attr++) {
->  			umode_t mode = (*attr)->mode;
->  
->  			/*
-> @@ -73,13 +73,27 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
->  	}
->  
->  	if (grp->bin_attrs) {
-> -		for (bin_attr = grp->bin_attrs; *bin_attr; bin_attr++) {
-> +		for (bin_attr = grp->bin_attrs; *bin_attr; i++, bin_attr++) {
-> +			umode_t mode = (*bin_attr)->attr.mode;
-> +
->  			if (update)
->  				kernfs_remove_by_name(parent,
->  						(*bin_attr)->attr.name);
-> +			if (grp->is_visible) {
-> +				mode = grp->is_visible(kobj,
-> +						       &(*bin_attr)->attr, i);
-
-With this, if 'n' is the number of non-binary attributes,
-
-for i < n:
-	The index passed to is_visible points to a non-binary attribute.
-for i >= n:
-	The index passed to is_visible points to the (index - n)th binary
-	attribute.
-
-Unless I am missing something, this is not explained anywhere, but it is
-not entirely trivial to understand. I think it should be documented.
-
-Also, it might be a good idea to check through existing code to ensure
-that this change doesn't accidentially cause trouble (existing drivers
-implementing both attribute types may not expect to see an index variable
-pointing to a value larger than the number of elements in the attrs array).
-
-Thanks,
-Guenter
