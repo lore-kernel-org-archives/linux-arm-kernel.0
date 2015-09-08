@@ -1,73 +1,50 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 8 Sep 2015 16:38:50 +0200
-Subject: [PATCH 0/5] ACPI probing infrastructure
-In-Reply-To: <55ED3599.5090508@semihalf.com>
-References: <1441386412-8139-1-git-send-email-marc.zyngier@arm.com>
- <55ED3599.5090508@semihalf.com>
-Message-ID: <55EEF2FA.3050009@semihalf.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 8 Sep 2015 16:42:38 +0200
+Subject: [PATCH-v2 4/7] mmc: sdhci-pxav3: Add pinctl setting according to
+ bus clock
+In-Reply-To: <1441624721-15612-5-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1441624721-15612-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1441624721-15612-5-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <CACRpkdY59roEBgUd9TR39yNgfhw393+WmHQQAeLkOEZLChOcWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.09.2015 08:58, Tomasz Nowicki wrote:
-> Hi Marc,
->
-> On 04.09.2015 19:06, Marc Zyngier wrote:
->> IRQ controllers and timers are the two types of device the kernel
->> requires before being able to use the device driver model.
->>
->> ACPI so far lacks a proper probing infrastructure similar to the one
->> we have with DT, where we're able to declare IRQ chips and
->> clocksources inside the driver code, and let the core code pick it up
->> and call us back on a match. This leads to all kind of really ugly
->> hacks all over the arm64 code and even in the ACPI layer.
->>
->> It turns out that providing such a probing infrastructure is rather
->> easy, and provides a much deserved cleanup in both the arch code, the
->> GIC driver, and the architected timer driver.
->>
->> I'm sure there is some more code to be deleted, and one can only
->> wonder why this wasn't done before the arm64 code was initially merged
->> (the diffstat says it all...).
->>
->> Patches are against v4.2, and a branch is available at
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
->> acpi/device-probing
->>
->> Marc Zyngier (5):
->>    acpi: Add basic device probing infrastructure
->>    irqchip/acpi: Add probing infrastructure for ACPI-based irqchips
->>    irqchip/gic: Convert the GIC driver to ACPI probing
->>    clocksource/acpi: Add probing infrastructure for ACPI-based
->>      clocksources
->>    clocksource/arm_arch_timer: Convert to ACPI probing
->>
->>   arch/arm64/include/asm/acpi.h        |  1 -
->>   arch/arm64/include/asm/irq.h         | 13 -------
->>   arch/arm64/kernel/acpi.c             | 25 -------------
->>   arch/arm64/kernel/time.c             |  6 ----
->>   drivers/acpi/scan.c                  | 41 +++++++++++++++++++++
->>   drivers/clocksource/arm_arch_timer.c | 10 +-----
->>   drivers/clocksource/clksrc-of.c      |  4 +++
->>   drivers/irqchip/irq-gic.c            | 69
->> ++++++++++++++++++------------------
->>   drivers/irqchip/irqchip.c            |  5 ++-
->>   include/asm-generic/vmlinux.lds.h    | 11 ++++++
->>   include/linux/acpi.h                 | 56 +++++++++++++++++++++++++++++
->>   include/linux/acpi_irq.h             | 10 ------
->>   include/linux/clocksource.h          |  6 ----
->>   include/linux/irqchip.h              | 16 +++++++++
->>   include/linux/irqchip/arm-gic-acpi.h | 31 ----------------
->>   15 files changed, 166 insertions(+), 138 deletions(-)
->>   delete mode 100644 include/linux/acpi_irq.h
->>   delete mode 100644 include/linux/irqchip/arm-gic-acpi.h
->>
->
-> Thanks for cleaning this up!
->
-> For the whole series:
-> Acked-by: Tomasz Nowicki <tn@semihalf.com>
+On Mon, Sep 7, 2015 at 1:18 PM, Vaibhav Hiremath
+<vaibhav.hiremath@linaro.org> wrote:
 
-s/Acked-by/Reviewed-by
+> Different bus clock may need different pin setting.
+> For example, fast bus clock like 208Mhz need pin drive fast
+> while slow bus clock prefer pin drive slow to guarantee
+> signal quality.
+>
+> So this patch creates two states,
+>   - Default (slow/normal) pin state
+>   - And fast pin state for higher freq bus speed.
+>
+> And selection of pin state is done based on timing mode.
+>
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> Signed-off-by: Kevin Liu <kliu5@marvell.com>
+(...)
+> +       pxa->pinctrl = devm_pinctrl_get(dev);
+> +       if (!IS_ERR(pxa->pinctrl)) {
+> +               pxa->pins_default = pinctrl_lookup_state(pxa->pinctrl, "default");
+> +               if (IS_ERR(pxa->pins_default))
+> +                       dev_err(dev, "could not get default pinstate\n");
+> +               pxa->pins_fast = pinctrl_lookup_state(pxa->pinctrl, "fast");
+> +               if (IS_ERR(pxa->pins_fast))
+> +                       dev_info(dev, "could not get fast pinstate\n");
+> +       }
 
-Tomasz
+This is exactly how I think it should be used from a pin control
+point of view.
+
+If you depended on CONFIG_PM you could use
+pinctrl_pm_select_default_state() but for this simple scenario
+this is fine.
+
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+>From a pinctrl point of view.
+
+Yours,
+Linus Walleij
