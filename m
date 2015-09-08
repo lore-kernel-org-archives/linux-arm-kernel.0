@@ -1,135 +1,23 @@
-From: emunson@akamai.com (Eric B Munson)
-Date: Tue,  8 Sep 2015 09:58:58 -0400
-Subject: [PATCH v9 2/6] mm: mlock: Add new mlock system call
-In-Reply-To: <1441720742-7803-1-git-send-email-emunson@akamai.com>
-References: <1441720742-7803-1-git-send-email-emunson@akamai.com>
-Message-ID: <1441720742-7803-3-git-send-email-emunson@akamai.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 8 Sep 2015 16:11:42 +0200
+Subject: [PATCH] pinctrl: core: Warn about NULL gpio_chip in
+ pinctrl_ready_for_gpio_range()
+In-Reply-To: <1441301670-6498-1-git-send-email-tony@atomide.com>
+References: <1441301670-6498-1-git-send-email-tony@atomide.com>
+Message-ID: <CACRpkdbQBt_p74ke3TV94gZ5wa=87th+f5jOLNSZFFhFbn3NEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the refactored mlock code, introduce a new system call for mlock.
-The new call will allow the user to specify what lock states are being
-added.  mlock2 is trivial at the moment, but a follow on patch will add
-a new mlock state making it useful.
+On Thu, Sep 3, 2015 at 7:34 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-Signed-off-by: Eric B Munson <emunson@akamai.com>
-Acked-by: Vlastimil Babka <vbabka@suse.cz>
-Acked-by: Michal Hocko <mhocko@suse.com>
-Cc: Michal Hocko <mhocko@suse.cz>
-Cc: Vlastimil Babka <vbabka@suse.cz>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Stephen Rothwell <sfr@canb.auug.org.au>
-Cc: Guenter Roeck <linux@roeck-us.net>
-Cc: linux-alpha at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: adi-buildroot-devel at lists.sourceforge.net
-Cc: linux-cris-kernel at axis.com
-Cc: linux-ia64 at vger.kernel.org
-Cc: linux-m68k at lists.linux-m68k.org
-Cc: linux-am33-list at redhat.com
-Cc: linux-parisc at vger.kernel.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: linux-s390 at vger.kernel.org
-Cc: linux-sh at vger.kernel.org
-Cc: sparclinux at vger.kernel.org
-Cc: linux-xtensa at linux-xtensa.org
-Cc: linux-api at vger.kernel.org
-Cc: linux-arch at vger.kernel.org
-Cc: linux-mm at kvack.org
----
-Changes from V8:
-* Update x86[_64] syscall numbers to follow the new userfaultfd syscalls
+> If the gpio driver is confused about the numbers for gpio-ranges,
+> pinctrl_ready_for_gpio_range() may get called with invalid GPIO
+> causing a NULL pointer exception. Let's instead provide a warning
+> that allows fixing the problem and return with error.
+>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
- arch/x86/entry/syscalls/syscall_32.tbl | 1 +
- arch/x86/entry/syscalls/syscall_64.tbl | 1 +
- include/linux/syscalls.h               | 2 ++
- include/uapi/asm-generic/unistd.h      | 4 +++-
- kernel/sys_ni.c                        | 1 +
- mm/mlock.c                             | 8 ++++++++
- 6 files changed, 16 insertions(+), 1 deletion(-)
+Patch applied for fixes.
 
-diff --git a/arch/x86/entry/syscalls/syscall_32.tbl b/arch/x86/entry/syscalls/syscall_32.tbl
-index 477bfa6..41e72a5 100644
---- a/arch/x86/entry/syscalls/syscall_32.tbl
-+++ b/arch/x86/entry/syscalls/syscall_32.tbl
-@@ -381,3 +381,4 @@
- 372	i386	recvmsg			sys_recvmsg			compat_sys_recvmsg
- 373	i386	shutdown		sys_shutdown
- 374	i386	userfaultfd		sys_userfaultfd
-+375	i386	mlock2			sys_mlock2
-diff --git a/arch/x86/entry/syscalls/syscall_64.tbl b/arch/x86/entry/syscalls/syscall_64.tbl
-index 81c4906..2366900 100644
---- a/arch/x86/entry/syscalls/syscall_64.tbl
-+++ b/arch/x86/entry/syscalls/syscall_64.tbl
-@@ -330,6 +330,7 @@
- 321	common	bpf			sys_bpf
- 322	64	execveat		stub_execveat
- 323	common	userfaultfd		sys_userfaultfd
-+324	common	mlock2			sys_mlock2
- 
- #
- # x32-specific system call numbers start at 512 to avoid cache impact
-diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-index 0800131..890632c 100644
---- a/include/linux/syscalls.h
-+++ b/include/linux/syscalls.h
-@@ -885,4 +885,6 @@ asmlinkage long sys_execveat(int dfd, const char __user *filename,
- 			const char __user *const __user *argv,
- 			const char __user *const __user *envp, int flags);
- 
-+asmlinkage long sys_mlock2(unsigned long start, size_t len, int flags);
-+
- #endif
-diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
-index e016bd9..14a6013 100644
---- a/include/uapi/asm-generic/unistd.h
-+++ b/include/uapi/asm-generic/unistd.h
-@@ -709,9 +709,11 @@ __SYSCALL(__NR_memfd_create, sys_memfd_create)
- __SYSCALL(__NR_bpf, sys_bpf)
- #define __NR_execveat 281
- __SC_COMP(__NR_execveat, sys_execveat, compat_sys_execveat)
-+#define __NR_mlock2 282
-+__SYSCALL(__NR_mlock2, sys_mlock2)
- 
- #undef __NR_syscalls
--#define __NR_syscalls 282
-+#define __NR_syscalls 283
- 
- /*
-  * All syscalls below here should go away really,
-diff --git a/kernel/sys_ni.c b/kernel/sys_ni.c
-index 03c3875..8de5b26 100644
---- a/kernel/sys_ni.c
-+++ b/kernel/sys_ni.c
-@@ -194,6 +194,7 @@ cond_syscall(sys_mlock);
- cond_syscall(sys_munlock);
- cond_syscall(sys_mlockall);
- cond_syscall(sys_munlockall);
-+cond_syscall(sys_mlock2);
- cond_syscall(sys_mincore);
- cond_syscall(sys_madvise);
- cond_syscall(sys_mremap);
-diff --git a/mm/mlock.c b/mm/mlock.c
-index c32ad8f..a23a533 100644
---- a/mm/mlock.c
-+++ b/mm/mlock.c
-@@ -644,6 +644,14 @@ SYSCALL_DEFINE2(mlock, unsigned long, start, size_t, len)
- 	return do_mlock(start, len, VM_LOCKED);
- }
- 
-+SYSCALL_DEFINE3(mlock2, unsigned long, start, size_t, len, int, flags)
-+{
-+	if (flags)
-+		return -EINVAL;
-+
-+	return do_mlock(start, len, VM_LOCKED);
-+}
-+
- SYSCALL_DEFINE2(munlock, unsigned long, start, size_t, len)
- {
- 	int ret;
--- 
-1.9.1
+Yours,
+Linus Walleij
