@@ -1,47 +1,121 @@
-From: leoli@freescale.com (Li Yang)
-Date: Tue, 8 Sep 2015 15:06:16 -0500
-Subject: [PATCH v2 04/10] doc/bindings: Update PCIe devicetree binding
- documentation for LS2080A
-In-Reply-To: <80094129.LHZFOe1ZPU@wuerfel>
-References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
- <1441349872-4560-5-git-send-email-bhupesh.sharma@freescale.com>
- <80094129.LHZFOe1ZPU@wuerfel>
-Message-ID: <CADRPPNR-cSSQC5sLMmoqcxX46J6hdULa_V4v2BK7T8s8pcX0cg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Sep 2015 21:08:09 +0100
+Subject: [PATCH] ARM: fix alignement of __bug_table section entries
+In-Reply-To: <877fo0x2ur.fsf@belgarion.home>
+References: <20150902103955.GF6281@e103592.cambridge.arm.com>
+ <878u8lx9hl.fsf@belgarion.home>
+ <20150905142519.GN21084@n2100.arm.linux.org.uk>
+ <87y4gkx04m.fsf@belgarion.home>
+ <20150905203818.GO21084@n2100.arm.linux.org.uk>
+ <87lhcjwjde.fsf@belgarion.home>
+ <20150906194805.GP21084@n2100.arm.linux.org.uk>
+ <87egibw7yh.fsf@belgarion.home>
+ <20150906235414.GQ21084@n2100.arm.linux.org.uk>
+ <877fo0x2ur.fsf@belgarion.home>
+Message-ID: <20150908200809.GC21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 7, 2015 at 6:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 04 September 2015 12:27:46 Bhupesh Sharma wrote:
->> @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
->>  and thus inherits all the common properties defined in designware-pcie.txt.
->>
->>  Required properties:
->> -- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie"
->> +- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie",
->> +  "fsl,ls2080a-pcie".
->>  - reg: base addresses and lengths of the PCIe controller
->>  - interrupts: A list of interrupt outputs of the controller. Must contain an
->>    entry for each entry in the interrupt-names property.
->>
->
-> Are the two PCIe hosts mutually compatible? If they are, you should mandate
-> one of the strings as the base model for identification, with the additional
-> model being optional for identification of the specific SoC.
+On Tue, Sep 08, 2015 at 07:01:00PM +0200, Robert Jarzmik wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> 
+> >> Gah, silly me. But even with [1], I still get an error [2]. I have a
+> >> confirmation that I have a "Page Permission" fault on the
+> >> probe_kernel_address().
+> >
+> > Hmm, that's not right.  If it's the DACR, then it should be a page domain
+> > fault, not a page permission fault.
+> >
+> >> [2] Oops
+> >> ========
+> >> # insmod /tmp/unalign.ko 
+> >> RJK1: fsr=23 far=e1c23643 dacr=51
+> >> RJK2: fsr=23 far=e1c23643 dacr=51
+> >> RJK3: fsr=2f far=bf00202c dacr=51
+> >> RJK: fault=4 instr=0x00000000 instrptr=bf00202c
+> >
+> > Can you add a show_pte(current->mm, instrptr) to dump those page
+> > table entries please?
+> Most certainly, here we go :
+> 
+> # insmod /tmp/unalign.ko 
+> RJK1: fsr=23 far=e1c1f743 dacr=51
+> RJK2: fsr=23 far=e1c1f743 dacr=51
+> pgd = e1cc4000
+> [bf00202c] *pgd=c1cab851, *pte=c1cb504f, *ppte=c1cb501f
+> RJK3: fsr=2f far=bf00202c dacr=51
+> RJK4: fault=4 instr=0x00000000 instrptr=bf00202c
+> pgd = e1cc4000
+> [bf00202c] *pgd=c1cab851, *pte=c1cb504f, *ppte=c1cb501f
 
-It seems that controllers on these chips are not exactly the same.
-They will get different driver data by matching the compatible
-strings.  Probably we could define a more generic compatible string,
-such as "fsl,layerscape-pcie" or "fsl,ls-pcie".
+Okay, so domain = 2 (which for an Xscale 3 kernel is DOMAIN_KERNEL).
+The page table entry has AP=01, which is user no-access, svc read/write.
 
->
-> It would also be good to add a string with the specific version number of the
-> designware PCIe block that is being used there.
+What should happen is:
 
-The binding has mentioned to reference the designware-pcie.txt.  But
-it might be more clear to mention the designware compatible string
-"snps,dw-pcie" again in the compatible part.  Currently there is no
-version number defined in the designware-pcie binding.  It might be
-hard to get this information for some SoCs.
+#define probe_kernel_address(addr, retval)              \
+        ({                                              \
+                long ret;                               \
+                mm_segment_t old_fs = get_fs();         \
+                                                        \
+                set_fs(KERNEL_DS);                      \
 
-Regards,
-Leo
+This should update the DACR from 0x51 to 0x71 - switching domain 2 to
+manager mode.
+
+                pagefault_disable();                    \
+                ret = __copy_from_user_inatomic(&(retval), \
+			(__force typeof(retval) __user *)(addr), \
+			sizeof(retval)); \
+...
+__copy_from_user_inatomic is an alias for __copy_from_user:
+
+static inline unsigned long __must_check
+__copy_from_user(void *to, const void __user *from, unsigned long n)
+{
+        unsigned int __ua_flags = uaccess_save_and_enable();
+
+and uaccess_save_and_enable() does:
+
+        unsigned int old_domain = get_domain();
+
+        /* Set the current domain access to permit user accesses */
+        set_domain((old_domain & ~domain_mask(DOMAIN_USER)) |
+                   domain_val(DOMAIN_USER, DOMAIN_CLIENT));
+
+So this should then end up changing the DACR from 0x71 to 0x75,
+enabling user access (because this function may access userspace.)
+
+What this means is that (going back to __copy_from_user):
+
+        n = arm_copy_from_user(to, from, n);
+
+At the point we call into this code, the DACR should be 0x75, which
+should allow us to read the instruction at 0xbf00202c.  But this is
+failing with a permission error - which it would do if it thought
+the kernel domain was in manager mode (iow, 0x55).
+
+I think some debugging in the above areas is needed - but I can't
+see anything wrong.  If something were wrong, I'm pretty sure we'd
+have every pre-ARMv6 machine exploding right now because of it -
+and oopses wouldn't work.
+
+You're clearly getting oopses reported correctly, which rather
+proves out this code path.
+
+Now, when you get the fault inside arm_copy_from_user(), you can
+print the DACR value saved at the time the fault was generated by
+printing the word above struct pt_regs on the stack - add to
+arch/arm/mm/fault.c:do_DataAbort():
+
+if (addr == 0xbf00202c) printk("DACR=0x%08x\n", *(u32 *)(regs + 1));
+
+before the "if (!inf->fn(addr, fsr & ~FSR_LNX_PF, regs))" line.
+That'll tell us what the DACR register was when we saved it.
+
+If it isn't 0x75, then the next part of the puzzle is going to be
+working out why it isn't.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
