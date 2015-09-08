@@ -1,127 +1,75 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 8 Sep 2015 15:32:32 +0200
-Subject: [PATCH] ARM: exynos_defconfig: Enable USB Video Class support
-In-Reply-To: <55EEDECA.4040407@samsung.com>
-References: <1441662323-15468-1-git-send-email-javier@osg.samsung.com>
- <55EE9820.2010202@samsung.com> <55EE9F1A.9030703@osg.samsung.com>
- <55EEDECA.4040407@samsung.com>
-Message-ID: <55EEE370.9040705@osg.samsung.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 08 Sep 2015 21:35:39 +0800
+Subject: [PATCH 01/11] ARM64 / PCI: introduce struct pci_controller for
+ ACPI
+In-Reply-To: <20150907084542.GA29293@red-moon>
+References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+ <1432644564-24746-2-git-send-email-hanjun.guo@linaro.org>
+ <20150526165844.GD2175@e106497-lin.cambridge.arm.com>
+ <5564AB68.6080502@linux.intel.com> <55657EA3.5000601@linaro.org>
+ <CAFpQJXUU4mVbJSyfQJJm_VjR_uAm-xKHP7syYaM_xuC+CG7q5w@mail.gmail.com>
+ <20150907084542.GA29293@red-moon>
+Message-ID: <55EEE42B.8000305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 09/08/2015 03:12 PM, Krzysztof Kozlowski wrote:
-> W dniu 08.09.2015 o 17:40, Javier Martinez Canillas pisze:
->> [adding Bartlomiej to cc]
+On 09/07/2015 04:45 PM, Lorenzo Pieralisi wrote:
+> On Mon, Sep 07, 2015 at 05:14:22AM +0100, Ganapatrao Kulkarni wrote:
+>> Hi Hanjun,
 >>
->> Hello Krzysztof,
->>
->> On 09/08/2015 10:11 AM, Krzysztof Kozlowski wrote:
->>> On 08.09.2015 06:45, Javier Martinez Canillas wrote:
->>>> The Exynos5420 Peach Pit and Exynos5800 Peach Pi boards have a built-in
->>>> Silicon Motion USB UVC WebCam. Enable support for the USB Video Class
->>>> driver and its needed media Kconfig symbols so the camera is supported.
+>> On Wed, May 27, 2015 at 1:51 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>>> Hi Liviu,
+>>>
+>>> On 2015???05???27??? 01:20, Jiang Liu wrote:
 >>>>
->>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>>>
->>>> ---
->>>>
->>>>  arch/arm/configs/exynos_defconfig | 4 ++++
->>>>  1 file changed, 4 insertions(+)
+>>>> On 2015/5/27 0:58, Liviu Dudau wrote:
+>>>>>
+>>>>> On Tue, May 26, 2015 at 01:49:14PM +0100, Hanjun Guo wrote:
+>>>>>>
+>>>>>> ARM64 ACPI based PCI host bridge init needs a arch dependent
+>>>>>> struct pci_controller to accommodate common PCI host bridge
+>>>>>> code which is introduced later, or it will lead to compile
+>>>>>> errors on ARM64.
+>>>>>
+>>>>>
+>>>>> Hi Hanjun,
+>>>>>
+>>>>> Two questions: why don't you introduce this patch next to the
+>>>>> one that is going to make use of it (or even merge it there)?
 >>>
->>> The patch itself looks good but now I wonder whether we are not putting
->>> to much stuff built-in. The exynos_defconfig does not replace the
->>> distribution distro. For a fully working board the distro should prepare
->>> it's own config.
 >>>
->>
->> Agreed that exynos_defconfig is not meant to replace a distro config.
->>
->>> I understand that in this case the USB webcams are parts of device (like
->>> on all laptops)... a little bit similar as camera sensors on mobile
->>> phones. Yet on mobile phone usually the camera itself is part of SoC,
->>> only the sensor is external.
+>>> this is because of this patch is needed by Jiang Liu's patch set
+>>> to fix the compile error on ARM64, I'd rather do that, but It's
+>>> better to let Jiang Liu's patch goes in, and then this one, that's
+>>> why I prepared a single patch for the struct. (I mentioned it
+>>> in the cover letter)
 >>>
->>> Actually what we need is a kind of policy for exynos_defconfig - what
->>> should be inside as built-in and what as module?
+>>>>> Second, why is the whole struct pci_controller not surrounded
+>>>>> by #ifdef CONFIG_ACPI as you are implying that this is needed
+>>>>> only for ACPI?
 >>>
->>
->> I had the same conversation with Bartlomiej before in [0] when I tried to
->> enable the SBS battery driver as module. I save you a click and quote him:
->>
->> "the current most popular use case for exynos_defconfig
->> (not multi_v7_defconfig) seems to be to build kernel image
->> alone and use it without any modules"
->>
->> Which seems to be true, so my understanding is that exynos_defconfig is a
->> minimal defconfig for Exynos platforms and for easy of test/use, everything
->> should be built-in while multi_v7_defconfig would be more similar to a conf
->> used by distros where most things would be built as a module when possible.
-> 
-> Yeah, but this actually does not entirely cover my doubts. We cannot
-> enable everything built-in because boot partitions on some devices have
-> limited size. So enabling everything would break that use case (use case
-> of easy testing).
+>>>
+>>> I hope it can be reused, since the NUMA node and segment (domain)
+>>> is both needed for DT and ACPI, if it's not the case foe now, I
+>>> can surrounded them all by #ifdef CONFIG_ACPI.
+>> we can make use of this structure to hold pci to numa node
+>> mapping(pcibus_to_node).
+>> can you please pull node member out of  CONFIG_ACPI ifdef.
+>> or you can put only acpi_device under ifdef.
 >
-
-Agreed.
- 
-> Let me rephrase my question into:
-> 1. What is worth enabling in exynos_defconfig? USB devices? I would
-> argue, except they are needed to boot.
-
-Ok, I understand your concern. The question is where we draw the line.
-
-> So maybe enable everything which Exynos boards have hard-wired? That
-> would make some sense... but we're making kernel larger.
+> That struct disappeared in the latest series:
 >
+> https://lkml.org/lkml/2015/6/8/443
 
-In the case of this WebCam, it's not a typical USB device in the sense
-that is built in the Chromebook and not something that's plugged on an
-external USB port.
- 
-> 2. Maybe enable only what is a typical use case (including typical
-> testing cases)? Then we would have to define what "typical" means. For
-> example battery would be typical but camera would not.
+Yes, I think that is the right direction going.
+
 >
+> we have to have a common way to handle the NUMA info in DT and ACPI
+> so we should still find a solution that can be shared between the two,
+> it is yet another thing to take into account for PCI ACPI on arm64.
 
-There are a lot of board specific drivers that we currently enable as
-built-in like hwmon sensors or iio devices that are likely only present
-on a single board or a family of boards.
+Agreed, we can take that into account when finished the basic
+support.
 
-So then I think all those drivers should be changed as a module as well,
-unless are critical for the board operation (i.e: thermal or fan drivers).
-
-> 3. Argh, so maybe, if we agree that not everything is worth being
-> enabled, that additional stuff could be build as module?
->
-
-Yes, I don't see anything wrong to enable more stuff as a module if
-that will give more build / test coverage.
-
-The goal of kernelci is to add functional tests so besides testing
-if a given kernel booted correctly, it's going to test if for example
-USB enumeration is working and has no regressions. For that use case
-is interesting to have support for the built-in USB devices like this
-camera (either as built-in or as a module).
- 
-> 
->> Other SoC specific deconfig do it differently, OMAP for example does the
->> opposite and tries to build as much stuff as possible as a module.
-> 
-> I don't argue about switching from "y" to "m". That's not the case.
-> Rather I am thinking where/when we should stop enabling stuff?
->
-
-Yes, sorry for misunderstanding what you meant before.
- 
-> Best regards,
-> Krzysztof
-> 
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Thanks
+Hanjun
