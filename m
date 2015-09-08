@@ -1,175 +1,30 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Tue,  8 Sep 2015 20:43:07 +0800
-Subject: [PATCH] ARM: rockchip: add reboot notifier
-Message-ID: <1441716187-29446-1-git-send-email-andy.yan@rock-chips.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Tue, 8 Sep 2015 14:46:48 +0200
+Subject: mysterious crashes on OMAP5 uevm
+Message-ID: <CANOLnOO3NdK1r1jZQtS=TcHEE7SQwhGHh0YsqqoCJpFW3NO05Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rockchip platform have a protocol to pass the the kernel
-reboot mode to bootloader by some special registers when
-system reboot.By this way the bootloader can take different
-action according to the different kernel reboot mode, for
-example, command "reboot loader" will reboot the board to
-rockusb mode, this is a very convenient way to get the board
-to download mode.
+Hi,
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
----
+this is a longstanding problem I'm seeing since the very beginning,
+which was around 3.12 or so (when I've first got the hardware) and it
+seems 4.2 is affected by it still. Basically what happens is Xorg
+randomly segfaults at some "impossible" location. I don't have the
+details at the moment (could get them is needed), but from what I
+examined with gdb some time ago the situation did not make any sense.
 
- arch/arm/mach-rockchip/Makefile |   2 +-
- arch/arm/mach-rockchip/loader.h |  22 +++++++++
- arch/arm/mach-rockchip/reboot.c | 103 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 126 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-rockchip/loader.h
- create mode 100644 arch/arm/mach-rockchip/reboot.c
+There are 2 workarounds that I know which make the problem go away
+(one is enough):
+- recompile Xorg with -marm (I'm using Debian armhf so it's thumb2 by default)
+- disable ARCH_MULTI_V6 in the kernel config
 
-diff --git a/arch/arm/mach-rockchip/Makefile b/arch/arm/mach-rockchip/Makefile
-index 5c3a9b2..cd291e3 100644
---- a/arch/arm/mach-rockchip/Makefile
-+++ b/arch/arm/mach-rockchip/Makefile
-@@ -1,5 +1,5 @@
- CFLAGS_platsmp.o := -march=armv7-a
- 
--obj-$(CONFIG_ARCH_ROCKCHIP) += rockchip.o
-+obj-$(CONFIG_ARCH_ROCKCHIP) += rockchip.o reboot.o
- obj-$(CONFIG_PM_SLEEP) += pm.o sleep.o
- obj-$(CONFIG_SMP) += headsmp.o platsmp.o
-diff --git a/arch/arm/mach-rockchip/loader.h b/arch/arm/mach-rockchip/loader.h
-new file mode 100644
-index 0000000..bf51baa
---- /dev/null
-+++ b/arch/arm/mach-rockchip/loader.h
-@@ -0,0 +1,22 @@
-+#ifndef __MACH_ROCKCHIP_LOADER_H
-+#define __MACH_ROCKCHIP_LOADER_H
-+
-+/*high 24 bits is tag, low 8 bits is type*/
-+#define SYS_LOADER_REBOOT_FLAG   0x5242C300
-+
-+enum {
-+	BOOT_NORMAL = 0, /* normal boot */
-+	BOOT_LOADER,     /* enter loader rockusb mode */
-+	BOOT_MASKROM,    /* enter maskrom rockusb mode (not support now) */
-+	BOOT_RECOVER,    /* enter recover */
-+	BOOT_NORECOVER,  /* do not enter recover */
-+	BOOT_SECONDOS,   /* boot second OS (not support now)*/
-+	BOOT_WIPEDATA,   /* enter recover and wipe data. */
-+	BOOT_WIPEALL,    /* enter recover and wipe all data. */
-+	BOOT_CHECKIMG,   /* check firmware img with backup part*/
-+	BOOT_FASTBOOT,   /* enter fast boot mode */
-+	BOOT_SECUREBOOT_DISABLE,
-+	BOOT_CHARGING,   /* enter charge mode */
-+	BOOT_MAX         /* MAX VALID BOOT TYPE.*/
-+};
-+#endif
-diff --git a/arch/arm/mach-rockchip/reboot.c b/arch/arm/mach-rockchip/reboot.c
-new file mode 100644
-index 0000000..704bc16
---- /dev/null
-+++ b/arch/arm/mach-rockchip/reboot.c
-@@ -0,0 +1,103 @@
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/reboot.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
-+#include "loader.h"
-+
-+#define RK3188_PMU_SYS_REG0             0x40
-+#define RK3288_PMU_SYS_REG0             0x94
-+
-+struct regmap *regmap;
-+int flag_reg;
-+
-+static int rockchip_get_pmu_regmap(void)
-+{
-+	struct device_node *node;
-+
-+	node = of_find_node_by_path("/cpus");
-+
-+	regmap = syscon_regmap_lookup_by_phandle(node, "rockchip,pmu");
-+	of_node_put(node);
-+	if (!IS_ERR(regmap))
-+		return 0;
-+
-+	regmap = syscon_regmap_lookup_by_compatible("rockchip,rk3066-pmu");
-+	of_node_put(node);
-+	if (!IS_ERR(regmap))
-+		return 0;
-+
-+	return -ENODEV;
-+}
-+
-+static int rockchip_get_reboot_flag_regmap(void)
-+{
-+	int ret = rockchip_get_pmu_regmap();
-+
-+	if (ret < 0)
-+		return ret;
-+
-+	if (of_machine_is_compatible("rockchip,rk3288")) {
-+		flag_reg = RK3288_PMU_SYS_REG0;
-+		return 0;
-+	} else if (of_machine_is_compatible("rockchip,rk3066a") ||
-+		   of_machine_is_compatible("rockchip,rk3066b") ||
-+		   of_machine_is_compatible("rockchip,rk3188")) {
-+		flag_reg = RK3188_PMU_SYS_REG0;
-+		return 0;
-+	}
-+
-+	return -ENODEV;
-+}
-+
-+static void rockchip_get_reboot_flag(const char *cmd, u32 *flag)
-+{
-+	*flag = SYS_LOADER_REBOOT_FLAG + BOOT_NORMAL;
-+
-+	if (cmd) {
-+		if (!strcmp(cmd, "loader") || !strcmp(cmd, "bootloader"))
-+			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_LOADER;
-+		else if (!strcmp(cmd, "recovery"))
-+			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_RECOVER;
-+		else if (!strcmp(cmd, "charge"))
-+			*flag = SYS_LOADER_REBOOT_FLAG + BOOT_CHARGING;
-+	}
-+}
-+
-+static int rockchip_reboot_notify(struct notifier_block *this,
-+				  unsigned long mode, void *cmd)
-+{
-+	u32 flag;
-+
-+	rockchip_get_reboot_flag(cmd, &flag);
-+	regmap_write(regmap, flag_reg, flag);
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block rockchip_reboot_handler = {
-+	.notifier_call = rockchip_reboot_notify,
-+	.priority = 150,
-+};
-+
-+static int __init rockchip_reboot_init(void)
-+{
-+	int ret = 0;
-+
-+	if (!rockchip_get_reboot_flag_regmap()) {
-+		ret = register_restart_handler(&rockchip_reboot_handler);
-+		if (ret)
-+			pr_err("%s: cannot register reboot handler, %d\n",
-+			       __func__, ret);
-+	}
-+
-+return ret;
-+}
-+
-+module_init(rockchip_reboot_init);
-+MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
-+MODULE_DESCRIPTION("Rockchip platform reboot notifier driver");
-+MODULE_LICENSE("GPL");
--- 
-1.9.1
+Because of the above workarounds I have forgotten about it several
+times, but it regularly comes back and bites again. It would look like
+some missing erratum workaround, but I have all of them enabled in the
+kernel.
+
+Does anyone know about this? Perhaps some missing erratum workaround
+in the bootloader? u-boot isn't too old here (2015.07).
+
+Gra?vydas
