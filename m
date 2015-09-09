@@ -1,49 +1,46 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed,  9 Sep 2015 10:23:24 +0200
-Subject: [PATCH 3/3] ARM: dts: sun4i: Add dts file for iNet-1 based tablets
+Date: Wed,  9 Sep 2015 10:23:23 +0200
+Subject: [PATCH 2/3] ARM: dts: sun4i: Add dts file inet9f-rev03 based tablets
 In-Reply-To: <1441787004-4660-1-git-send-email-hdegoede@redhat.com>
 References: <1441787004-4660-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1441787004-4660-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1441787004-4660-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The iNet-tek iNet-1 PCB is a PCB found in various generic 10.1" 1024x600
-A10 based tablets such as the Point of View Protab2 XXL and the
-Cherry M1007.
+The inet9f-rev03 pcb is specially designed for gaming tablets, such as
+the qware tb-g100 tablet.
 
-This patch has been tested on both rev2 and rev5 of this board / these
-tablets.
+These 7" tablets feature a dpad, firebuttons and 2 joysticks on the sides
+of the screen.
 
-It comes with a rtl8188cus usb wifi connected to ehci1, focal ft5406ee8
-touchscreen connected to i2c2 addr 0x38, bosch bma 250 accelerometer
-connected to i2c1 addr 0x18 and the usual connectors: headphone,
-mini hdmi, power-barrel, mini-usb and a micro-sd slot.
+Besides this they have the usual connectors: power-barrel, mini usb,
+mini hdmi, headphone and micro-sd slot.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/Makefile            |   1 +
- arch/arm/boot/dts/sun4i-a10-inet1.dts | 226 ++++++++++++++++++++++++++++++++++
- 2 files changed, 227 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun4i-a10-inet1.dts
+ arch/arm/boot/dts/Makefile                   |   1 +
+ arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts | 227 +++++++++++++++++++++++++++
+ 2 files changed, 228 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index c7b96be..746c7ba 100644
+index e12aeae..c7b96be 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -553,6 +553,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
- 	sun4i-a10-gemei-g9.dtb \
+@@ -554,6 +554,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
  	sun4i-a10-hackberry.dtb \
  	sun4i-a10-hyundai-a7hd.dtb \
-+	sun4i-a10-inet1.dtb \
  	sun4i-a10-inet97fv2.dtb \
- 	sun4i-a10-inet9f-rev03.dtb \
++	sun4i-a10-inet9f-rev03.dtb \
  	sun4i-a10-itead-iteaduino-plus.dtb \
-diff --git a/arch/arm/boot/dts/sun4i-a10-inet1.dts b/arch/arm/boot/dts/sun4i-a10-inet1.dts
+ 	sun4i-a10-jesurun-q5.dtb \
+ 	sun4i-a10-marsboard.dtb \
+diff --git a/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts b/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts
 new file mode 100644
-index 0000000..487ce63
+index 0000000..2fffc04
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun4i-a10-inet1.dts
-@@ -0,0 +1,226 @@
++++ b/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts
+@@ -0,0 +1,227 @@
 +/*
 + * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
 + *
@@ -95,8 +92,8 @@ index 0000000..487ce63
 +#include <dt-bindings/pinctrl/sun4i-a10.h>
 +
 +/ {
-+	model = "iNet-1";
-+	compatible = "inet-tek,inet1", "allwinner,sun4i-a10";
++	model = "iNet-9F Rev 03";
++	compatible = "inet-tek,inet9f-rev03", "allwinner,sun4i-a10";
 +
 +	aliases {
 +		serial0 = &uart0;
@@ -109,10 +106,6 @@ index 0000000..487ce63
 +
 +&cpu0 {
 +	cpu-supply = <&reg_dcdc2>;
-+};
-+
-+&ehci0  {
-+	status = "okay";
 +};
 +
 +&ehci1 {
@@ -157,22 +150,36 @@ index 0000000..487ce63
 +	status = "okay";
 +
 +	button at 200 {
-+		label = "Volume Up";
-+		linux,code = <KEY_VOLUMEUP>;
++		label = "Menu";
++		linux,code = <KEY_MENU>;
 +		channel = <0>;
 +		voltage = <200000>;
 +	};
 +
-+	button at 1000 {
++	button at 600 {
++		label = "Volume Up";
++		linux,code = <KEY_VOLUMEUP>;
++		channel = <0>;
++		voltage = <600000>;
++	};
++
++	button at 800 {
 +		label = "Volume Down";
 +		linux,code = <KEY_VOLUMEDOWN>;
++		channel = <0>;
++		voltage = <800000>;
++	};
++
++	button at 1000 {
++		label = "Home";
++		linux,code = <KEY_HOMEPAGE>;
 +		channel = <0>;
 +		voltage = <1000000>;
 +	};
 +
 +	button at 1200 {
-+		label = "Home";
-+		linux,code = <KEY_HOMEPAGE>;
++		label = "Esc";
++		linux,code = <KEY_ESC>;
 +		channel = <0>;
 +		voltage = <1200000>;
 +	};
@@ -185,10 +192,6 @@ index 0000000..487ce63
 +	bus-width = <4>;
 +	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
 +	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci0  {
 +	status = "okay";
 +};
 +
@@ -241,10 +244,6 @@ index 0000000..487ce63
 +	status = "okay";
 +};
 +
-+&reg_usb1_vbus {
-+	status = "okay";
-+};
-+
 +&reg_usb2_vbus {
 +	status = "okay";
 +};
@@ -266,7 +265,6 @@ index 0000000..487ce63
 +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
 +	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
 +	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
 +	usb2_vbus-supply = <&reg_usb2_vbus>;
 +	status = "okay";
 +};
