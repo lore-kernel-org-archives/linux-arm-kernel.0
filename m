@@ -1,42 +1,35 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 9 Sep 2015 16:18:12 -0500
-Subject: [PATCH 2/4] ARM: omap2+: board-generic: Remove stale of_irq macros
+Date: Wed, 9 Sep 2015 16:18:11 -0500
+Subject: [PATCH 1/4] ARM: OMAP4+: PM: erratum is used by OMAP5 and DRA7 as well
 In-Reply-To: <1441833494-32450-1-git-send-email-nm@ti.com>
 References: <1441833494-32450-1-git-send-email-nm@ti.com>
-Message-ID: <1441833494-32450-3-git-send-email-nm@ti.com>
+Message-ID: <1441833494-32450-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When commit c4082d499fa2 ("ARM: omap2+: board-generic: clean up the
-irq data from board file") cleaned up the direct usage of gic_of_init
-and omap_intc_of_init, it failed to clean up the macros properly.
+OMAP5 and DRA7 reuse the same pm44xx_erratum variable so, enable the
+same, else PM features such as Suspend to ram is broken in a SoC only
+build configuration.
 
-Since these macros are no longer used, lets just remove them.
-
-Fixes: c4082d499fa2 ("ARM: omap2+: board-generic: clean up the irq data from board file")
 Reported-by: Carlos Hernandez <ceh@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/board-generic.c |    7 -------
- 1 file changed, 7 deletions(-)
+ arch/arm/mach-omap2/pm.h |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 24c9afc9e8a7..6133eaac685d 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -20,13 +20,6 @@
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 425bfcd67db6..f5bae699baac 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -103,7 +103,8 @@ static inline void enable_omap3630_toggle_l2_on_restore(void) { }
+ #define PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD	(1 << 0)
+ #define PM_OMAP4_CPU_OSWR_DISABLE		(1 << 1)
  
- #include "common.h"
- 
--#if !(defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3))
--#define intc_of_init	NULL
--#endif
--#ifndef CONFIG_ARCH_OMAP4
--#define gic_of_init		NULL
--#endif
--
- static const struct of_device_id omap_dt_match_table[] __initconst = {
- 	{ .compatible = "simple-bus", },
- 	{ .compatible = "ti,omap-infra", },
+-#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP4)
++#if defined(CONFIG_PM) && (defined(CONFIG_ARCH_OMAP4) ||\
++	   defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX))
+ extern u16 pm44xx_errata;
+ #define IS_PM44XX_ERRATUM(id)		(pm44xx_errata & (id))
+ #else
 -- 
 1.7.9.5
