@@ -1,53 +1,60 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 8 Sep 2015 20:58:50 -0700
-Subject: [PATCH 1/3] sysfs: Fix is_visible() support for binary attributes
-In-Reply-To: <55EF86F8.3060406@roeck-us.net>
-References: <1441714066-5599-1-git-send-email-emilio.lopez@collabora.co.uk>
- <1441714066-5599-2-git-send-email-emilio.lopez@collabora.co.uk>
- <20150908153013.GA6758@roeck-us.net>
- <20150908191002.GB10156@kroah.com>
- <20150908193052.GA11106@roeck-us.net>
- <55EF82A4.5000502@collabora.co.uk> <55EF86F8.3060406@roeck-us.net>
-Message-ID: <20150909035850.GA5497@kroah.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 8 Sep 2015 21:03:27 -0700
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable PBIAS regulator
+In-Reply-To: <20150906234110.GA2228@roeck-us.net>
+References: <1441274111-18049-1-git-send-email-kishon@ti.com>
+ <20150906234110.GA2228@roeck-us.net>
+Message-ID: <20150909040327.GA14905@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2015 at 06:10:16PM -0700, Guenter Roeck wrote:
-> Hi Emilio,
+On Sun, Sep 06, 2015 at 04:41:10PM -0700, Guenter Roeck wrote:
+> On Thu, Sep 03, 2015 at 03:25:11PM +0530, Kishon Vijay Abraham I wrote:
+> > PBIAS regulator is required for MMC module in OMAP2, OMAP3, OMAP4,
+> > OMAP5 and DRA7 SoCs. Enable it here.
+> > 
+> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 > 
-> On 09/08/2015 05:51 PM, Emilio L?pez wrote:
-> >Hi Greg & Guenter,
-> >
-> [ ... ]
-> >>>>
-> >>>>Unless I am missing something, this is not explained anywhere, but it is
-> >>>>not entirely trivial to understand. I think it should be documented.
-> >
-> >I agree. I couldn't find any mention of what this int was supposed to be by looking at Documentation/ (is_visible is not even mentioned :/) or include/linux/sysfs.h. Once we settle on something I'll document it before sending a v2.
-> >
-> In the include file ? No strong preference, though.
+> Tested-by: Guenter Roeck <linux@roeck-us.net>
 > 
-> >By the way, I wrote a quick coccinelle script to match is_visible() users which reference the index (included below), and it found references to drivers which do not seem to use any binary attributes, so I believe changing the index meaning shouldn't be an issue.
-> >
-> Good.
-> 
-> >>>I agree, make i the number of the bin attribute and that should solve
-> >>>this issue.
-> >>>
-> >>No, that would conflict with the "normal" use of is_visible for non-binary
-> >>attributes, and make the index all but useless, since the is_visible function
-> >>would have to search through all the attributes anyway to figure out which one
-> >>is being checked.
-> >
-> >Yeah, using the same indexes would be somewhat pointless, although not many seem to be using it anyway (only 14 files matched). Others seem to be comparing the attr* instead. An alternative would be to use negative indexes for binary attributes and positive indexes for normal attributes.
-> >
-> ... and I probably wrote or reviewed a significant percentage of those ;-).
-> 
-> Using negative numbers for binary attributes is an interesting idea.
-> Kind of unusual, though. Greg, any thoughts on that ?
+This problem is now causing various runtime failures in mainline.
+I see the following qemu test failures:
 
-Ick, no, that's a mess, maybe we just could drop the index alltogether?
+arm:beagle:multi_v7_defconfig:omap3-beagle
+arm:beaglexm:multi_v7_defconfig:omap3-beagle-xm
+arm:overo:multi_v7_defconfig:omap3-overo-tobi
 
-thanks,
+I would expect all omap2/3/4/5 runtime tests with multi_v7_defconfig to fail.
 
-greg k-h
+Also, FWIW,
+
+Fixes: 6a9b2ff07d04 ("mmc: host: omap_hsmmc: return on fatal errors from omap_hsmmc_reg_get")
+
+Guenter
+
+> > ---
+> >  arch/arm/configs/multi_v7_defconfig |    1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> > index 5fd8df6..f497c96 100644
+> > --- a/arch/arm/configs/multi_v7_defconfig
+> > +++ b/arch/arm/configs/multi_v7_defconfig
+> > @@ -403,6 +403,7 @@ CONFIG_REGULATOR_MAX8973=y
+> >  CONFIG_REGULATOR_MAX77686=y
+> >  CONFIG_REGULATOR_MAX77693=m
+> >  CONFIG_REGULATOR_PALMAS=y
+> > +CONFIG_REGULATOR_PBIAS=y
+> >  CONFIG_REGULATOR_S2MPS11=y
+> >  CONFIG_REGULATOR_S5M8767=y
+> >  CONFIG_REGULATOR_TPS51632=y
+> > -- 
+> > 1.7.9.5
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> > 
+> > 
