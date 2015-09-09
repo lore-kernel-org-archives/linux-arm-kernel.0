@@ -1,103 +1,42 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Wed, 9 Sep 2015 14:38:02 +0800
-Subject: [Patch v5 1/6] ACPI/PCI: Enhance ACPI core to support sparse IO
- space
-In-Reply-To: <20150729203741.GC9640@google.com>
-References: <1433780448-18636-1-git-send-email-jiang.liu@linux.intel.com>
- <1433780448-18636-2-git-send-email-jiang.liu@linux.intel.com>
- <20150729203741.GC9640@google.com>
-Message-ID: <55EFD3CA.3050301@linux.intel.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed, 9 Sep 2015 08:48:06 +0200
+Subject: [PATCH v2 1/3] ARM: Make FORCE_MAX_ZONEORDER configurable if
+ ARM_SINGLE_ARMV7M
+In-Reply-To: <20150908221912.GE21084@n2100.arm.linux.org.uk>
+References: <1441744686-20521-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1441744686-20521-2-git-send-email-mcoquelin.stm32@gmail.com>
+ <20150908221912.GE21084@n2100.arm.linux.org.uk>
+Message-ID: <CALszF6CqVfTNSiSK39oP=zNU5Ne5V++0mD1n0HGhJ_+GMqeadw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/7/30 4:37, Bjorn Helgaas wrote:
-> On Tue, Jun 09, 2015 at 12:20:43AM +0800, Jiang Liu wrote:
->> Enhance ACPI resource parsing interfaces to support sparse IO space,
->> which will be used to share common code between x86 and IA64 later.
->>
->> Tested-by: Tony Luck <tony.luck@intel.com>
->> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
->> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>  drivers/acpi/resource.c |    9 ++++++---
->>  include/linux/ioport.h  |    1 +
->>  2 files changed, 7 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
->> index 8244f013f210..fdcc73dad2c1 100644
->> --- a/drivers/acpi/resource.c
->> +++ b/drivers/acpi/resource.c
->> @@ -123,7 +123,7 @@ bool acpi_dev_resource_memory(struct acpi_resource *ares, struct resource *res)
->>  EXPORT_SYMBOL_GPL(acpi_dev_resource_memory);
->>  
->>  static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
->> -				      u8 io_decode)
->> +				      u8 io_decode, u8 translation_type)
->>  {
->>  	res->flags = IORESOURCE_IO;
->>  
->> @@ -135,6 +135,8 @@ static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
->>  
->>  	if (io_decode == ACPI_DECODE_16)
->>  		res->flags |= IORESOURCE_IO_16BIT_ADDR;
->> +	if (translation_type == ACPI_SPARSE_TRANSLATION)
->> +		res->flags |= IORESOURCE_IO_SPARSE;
->>  }
->>  
->>  static void acpi_dev_get_ioresource(struct resource *res, u64 start, u64 len,
->> @@ -142,7 +144,7 @@ static void acpi_dev_get_ioresource(struct resource *res, u64 start, u64 len,
->>  {
->>  	res->start = start;
->>  	res->end = start + len - 1;
->> -	acpi_dev_ioresource_flags(res, len, io_decode);
->> +	acpi_dev_ioresource_flags(res, len, io_decode, 0);
->>  }
->>  
->>  /**
->> @@ -227,7 +229,8 @@ static bool acpi_decode_space(struct resource_win *win,
->>  		acpi_dev_memresource_flags(res, len, wp);
->>  		break;
->>  	case ACPI_IO_RANGE:
->> -		acpi_dev_ioresource_flags(res, len, iodec);
->> +		acpi_dev_ioresource_flags(res, len, iodec,
->> +					  addr->info.io.translation_type);
->>  		break;
->>  	case ACPI_BUS_NUMBER_RANGE:
->>  		res->flags = IORESOURCE_BUS;
->> diff --git a/include/linux/ioport.h b/include/linux/ioport.h
->> index 388e3ae94f7a..24bea087e7af 100644
->> --- a/include/linux/ioport.h
->> +++ b/include/linux/ioport.h
->> @@ -94,6 +94,7 @@ struct resource {
->>  /* PnP I/O specific bits (IORESOURCE_BITS) */
->>  #define IORESOURCE_IO_16BIT_ADDR	(1<<0)
->>  #define IORESOURCE_IO_FIXED		(1<<1)
->> +#define IORESOURCE_IO_SPARSE		(1<<2)
-> 
-> I don't really like this bit.  We adding a new generic IORESOURCE_* bit
-> just for a special case, and it's only used in one place, for one arch,
-> during enumeration.
-Hi Bjorn,
-	Instead of defining a formal flag IORESOURCE_IO_SPARSE, we may
-reuse other field in struct resource to pass back the SPARSE flag,
-but that's a little dirty. For example, we may reuse res->name field
-to carry the SPARSE flag for the IA64 special case.
-	Is that OK?
-Thanks!
-Gerry
+2015-09-09 0:19 GMT+02:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Tue, Sep 08, 2015 at 10:38:04PM +0200, Maxime Coquelin wrote:
+>> This patch makes FORCE_MAX_ZONEORDER configurable in defconfig for ARMV7-M
+>> when built for a single platform.
+>
+> I'd prefer if we didn't do this, because this isn't supposed to be a user
+> visible "option".  It's an option that was introduced to avoid having to
+> throw masses of #ifdefs into the definition of MAX_ZONEORDER.
+>
+> The problem with it is that it's a "well, what do I set this to?" option
+> and that leads to "oh, I'll just choose the default because I don't know
+> any better".
+>
+> Do we know why EFM32 needs a value of 9 here?  It's not documented in
+> the original commit, and it really _should_ have been.
+Ok, I get your point.
 
-> 
-> Don't we have a similar problem (struct resource can't express all the
-> information from an ACPI resource) for the _TRA value for bridge windows?
-> If it's a similar issue, we should solve it in a similar way.
-Per my understanding, we just ignore ACPI address space information
-which can't be expressed by struct resource.
-Thanks!
-Gerry
+For STM32, the value 11 is working, but having value of 9 makes sense
+in my opinion for systems with small quantity of memory (8MB in the
+case of STM32F429 Discovery).
+It saves some bytes in the .data section, and it might also save some
+CPU cycles as there are less iterations and less split/coalescing of
+pages...
+Note that for CPU cycles I haven't done any measurements, this is just
+my opinion after code review.
 
-> 
->>  /* PCI ROM control bits (IORESOURCE_BITS) */
->>  #define IORESOURCE_ROM_ENABLE		(1<<0)	/* ROM is enabled, same as PCI_ROM_ADDRESS_ENABLE */
->> -- 
->> 1.7.10.4
->>
+What drawbacks do you see of using a value of 9?
+
+Thanks,
+Maxime
