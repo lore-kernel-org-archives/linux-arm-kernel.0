@@ -1,46 +1,47 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 09 Sep 2015 15:30:25 -0700
-Subject: [GIT PULL] Reset controller fixes for v4.3
-In-Reply-To: <1441209157.3279.49.camel@pengutronix.de> (Philipp Zabel's
- message of "Wed, 02 Sep 2015 17:52:37 +0200")
-References: <1441209157.3279.49.camel@pengutronix.de>
-Message-ID: <7hegi7kyym.fsf@deeprootsystems.com>
+Date: Wed, 09 Sep 2015 15:53:50 -0700
+Subject: [GIT PULL] omap fixes for v4.3 merge window
+In-Reply-To: <20150903004113.GX10928@atomide.com> (Tony Lindgren's message of
+ "Wed, 2 Sep 2015 17:41:14 -0700")
+References: <20150903004113.GX10928@atomide.com>
+Message-ID: <7h8u8fkxvl.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philipp Zabel <p.zabel@pengutronix.de> writes:
+Tony Lindgren <tony@atomide.com> writes:
 
-> Hi arm-soc maintainers,
+> The following changes since commit 2faf962d90ca4c5ee7ba026b7351b1f74500bcdf:
 >
-> This tags fixes a build error in COMPILE_TEST configurations with
-> RESET_CONTROLLER disabled and fixes a missing spinlock initialization.
-> Because of the build issue, it would be great if this could make it into
-> v4.3-rc1.
->
-> regards
-> Philipp
->
-> The following changes since commit 5d44595c2627f7edcd8c24a76b13bd115f9fc2da:
->
->   Merge branch 'reset/ath79' into reset/next (2015-08-16 17:11:20 +0200)
+>   Merge tag 'armsoc-defconfig' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2015-09-01 13:17:43 -0700)
 >
 > are available in the git repository at:
 >
->   git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.3-fixes
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/fixes-merge-window
 >
-> for you to fetch changes up to f319cb8491e1b4cc44e7baeeb3ae7817dedf57fc:
+> for you to fetch changes up to 21b430d23d233c67e6589ea5054d18392e15a28e:
 >
->   reset: ath79: Fix missing spin_lock_init (2015-09-01 14:48:40 +0200)
+>   ARM: omap2plus_defconfig: Enable MUSB DMA support (2015-09-01 13:59:25 -0700)
 >
 > ----------------------------------------------------------------
-> Reset controller fixes for v4.3
+> Few omap bug fixes that have come up recently:
 >
-> - added stubs to avoid build breakage in COMPILE_TEST
->   configurations with RESET_CONTROLLER disabled
-> - fixed missing spinlock initialization in ath79 driver
+> - Fix deferred probe with omap_device idling unused devices
+>
+> - Fix booting if no timer parent can be set
+>
+> - Fix always true warning for vc register check
+>
+> And also two minor changes not strictly fixes:
+>
+> - Add SoC detection for dra752
+>
+> - Enable omap related MUSB DMA engines as we can now
+>   build them all in finally
 >
 > ----------------------------------------------------------------
 
-Thanks, adding this to our next/late branch for v4.3
+Queuing this into fixes branch for v4.3-rc2.
+
+Thanks,
 
 Kevin
