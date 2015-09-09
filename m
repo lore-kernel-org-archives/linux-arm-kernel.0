@@ -1,110 +1,168 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Wed, 9 Sep 2015 14:49:06 +0800
-Subject: [PATCH v6 3/6] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <20150908091944.GE29293@red-moon>
-References: <1441103408-8433-1-git-send-email-lftan@altera.com>
- <1441103408-8433-4-git-send-email-lftan@altera.com>
- <20150901163304.GA9769@red-moon>
- <CAFiDJ58WCjTNkU5PWtbHxj+-0oWNg1T+psfE-OaJD+4k-DBb-A@mail.gmail.com>
- <20150908091944.GE29293@red-moon>
-Message-ID: <CAFiDJ58i0enTGbV=xf8q8rKGg6oREXkvwu0cT4Jfz01ozbKQ7g@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  9 Sep 2015 09:06:54 +0200
+Subject: [PATCH v2] arm64/efi: don't pad between EFI_MEMORY_RUNTIME regions
+In-Reply-To: <1441371986-4554-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1441371986-4554-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1441782414-16284-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 8, 2015 at 5:19 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Fri, Sep 04, 2015 at 09:29:14AM +0100, Ley Foon Tan wrote:
->> On Wed, Sep 2, 2015 at 12:33 AM, Lorenzo Pieralisi
->> <lorenzo.pieralisi@arm.com> wrote:
->
-> [...]
->
->> > > +static bool altera_pcie_valid_config(struct altera_pcie *pcie,
->> > > +                                    struct pci_bus *bus, int dev)
->> > > +{
->> > > +       /* If there is no link, then there is no device */
->> > > +       if (bus->number != pcie->root_bus_nr) {
->> > > +               if (!altera_pcie_link_is_up(pcie))
->> > > +                       return false;
->> > > +       }
->> >
->> > Can you explain to pls me why you have to check this for every config
->> > transaction ? Isn't it something that can prevent probing the
->> > host controller altogether ?
->> In our PCIe hardware spec, it stated that software should check the
->> link status before issuing a configuration request to downstream
->> ports.
->> BTW, other pci controllers have similar implementation as well, eg: dw
->> pci, mvebu pci.
->
-> Understood, thanks.
->
-> [...]
->
->> > > +static int tlp_read_packet(struct altera_pcie *pcie, u32 *value)
->> > > +{
->> > > +       u8 loop;
->> > > +       struct tlp_rp_regpair_t tlp_rp_regdata;
->> > > +
->> > > +       for (loop = 0; loop < TLP_LOOP; loop++) {
->> > > +               tlp_read_rx(pcie, &tlp_rp_regdata);
->> > > +               if (tlp_rp_regdata.ctrl & RP_RXCPL_EOP) {
->> > > +                       if (value)
->> > > +                               *value = tlp_rp_regdata.reg0;
->> > > +                       return PCIBIOS_SUCCESSFUL;
->> > > +               }
->> > > +               udelay(5);
->> >
->> > Could you comment please on the chosen udelay/TLP_LOOP values (ie how
->> > did you come up with them) ?
->> For udelay value, we just want to have small delay between each read.
->
-> I would explain how you chose the value, in particular if it can
-> affect next generation hosts sharing the same driver.
-Actually, we don't have any calculation to choose the value. Just want
-to give small relaxation between each read.
-It is request from Marc in previous review.
->
->> For TLP_LOOP value, minimum 2 loops to read tlp headers and 1 loop to
->> read data payload. So, we choose to poll 10 loops for maximum.
->
-> Add it to a comment.
-Okay.
->
-[...]
->> >
->> > > +
->> > > +       /* clear all interrupts */
->> > > +       cra_writel(pcie, P2A_INT_STS_ALL, P2A_INT_STATUS);
->> > > +       /* enable all interrupts */
->> > > +       cra_writel(pcie, P2A_INT_ENA_ALL, P2A_INT_ENABLE);
->> > > +
->> > > +       bus = pci_scan_root_bus(&pdev->dev, pcie->root_bus_nr, &altera_pcie_ops,
->> > > +                               pcie, &pcie->resources);
->> > > +       if (!bus)
->> > > +               return -ENOMEM;
->> > > +
->> > > +       pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
->> > > +       pci_assign_unassigned_bus_resources(bus);
->> >
->> > I think you are missing a call to pcie_bus_configure_settings(),
->> > see drivers/pci/host/pci-host-generic.c
->> Other pci controller drivers like xgene and iproc don't call to this
->> function, but it call in
->> arch/arm/kernel/bios32.c:pci_common_init_dev().
->> Do we really need this?
->
-> It is there to provide a way to configure the system MPS, through
-> command line parameters, it is always a good idea to have it and
-> it should be part of your driver so that you can tune it in case
-> the MPS is misconfigured or you want to apply a specific configuration
-> for a given system.
->
-> Have a look at pcie_bus_config and how it is used in
-> pcie_bus_configure_settings(), that would clarify further.
-Thanks for explanation. I will add it.
+The new Properties Table feature introduced in UEFIv2.5 may split
+memory regions that cover PE/COFF memory images into separate code
+and data regions. Since these regions only differ in the type (runtime
+code vs runtime data) and the permission bits, but not in the memory
+type attributes (UC/WC/WT/WB), the spec does not require them to be
+aligned to 64 KB.
 
-Thanks.
+As the relative offset of PE/COFF .text and .data segments cannot be
+changed on the fly, this means that we can no longer pad out those
+regions to be mappable using 64 KB pages.
+Unfortunately, there is no annotation in the UEFI memory map that
+identifies data regions that were split off from a code region, so we
+must apply this logic to all adjacent runtime regions whose attributes
+only differ in the permission bits.
 
-Regards
-Ley Foon
+So instead of rounding each memory region to 64 KB alignment at both
+ends, only round down regions that are not directly preceded by another
+runtime region with the same type attributes. Since the UEFI spec does
+not mandate that the memory map be sorted, this means we also need to
+sort it first.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+
+As discussed off list, this is the arm64 side of what we should backport
+to stable to prevent firmware that adheres to the current version of the
+UEFI v2.5 spec with the memprotect feature enabled from blowing up the system
+upon the first OS call into the runtime services.
+
+For arm64, we already map things in order, but since the spec does not mandate
+a sorted memory map, we need to sort it to be sure. This also allows us to
+easily find adjacent regions with < 64 KB granularity, which the current version
+of the spec allows if they only differ in permission bits (which the spec says
+are 'unused' on AArch64, which could be interpreted as 'allowed but ignored').
+
+Changes since v1:
+- Ensure that we don't inadvertently set the XN bit on the preceding region at
+  mapping time if we the OS is running with >4 KB pages.
+  
+ arch/arm64/kernel/efi.c                 |  3 +-
+ drivers/firmware/efi/libstub/arm-stub.c | 62 +++++++++++++++-----
+ 2 files changed, 49 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index e8ca6eaedd02..13671a9cf016 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -258,7 +258,8 @@ static bool __init efi_virtmap_init(void)
+ 		 */
+ 		if (!is_normal_ram(md))
+ 			prot = __pgprot(PROT_DEVICE_nGnRE);
+-		else if (md->type == EFI_RUNTIME_SERVICES_CODE)
++		else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
++			 !PAGE_ALIGNED(md->phys_addr))
+ 			prot = PAGE_KERNEL_EXEC;
+ 		else
+ 			prot = PAGE_KERNEL;
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index e29560e6b40b..cb4e9c4de952 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -13,6 +13,7 @@
+  */
+ 
+ #include <linux/efi.h>
++#include <linux/sort.h>
+ #include <asm/efi.h>
+ 
+ #include "efistub.h"
+@@ -305,6 +306,13 @@ fail:
+  */
+ #define EFI_RT_VIRTUAL_BASE	0x40000000
+ 
++static int cmp_mem_desc(const void *a, const void *b)
++{
++	const efi_memory_desc_t *left = a, *right = b;
++
++	return (left->phys_addr > right->phys_addr) ? 1 : -1;
++}
++
+ /*
+  * efi_get_virtmap() - create a virtual mapping for the EFI memory map
+  *
+@@ -316,34 +324,58 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
+ 		     unsigned long desc_size, efi_memory_desc_t *runtime_map,
+ 		     int *count)
+ {
++	static const u64 mem_type_mask = EFI_MEMORY_WB | EFI_MEMORY_WT |
++					 EFI_MEMORY_WC | EFI_MEMORY_UC |
++					 EFI_MEMORY_RUNTIME;
++
+ 	u64 efi_virt_base = EFI_RT_VIRTUAL_BASE;
+-	efi_memory_desc_t *out = runtime_map;
++	efi_memory_desc_t *in, *prev = NULL, *out = runtime_map;
+ 	int l;
+ 
+-	for (l = 0; l < map_size; l += desc_size) {
+-		efi_memory_desc_t *in = (void *)memory_map + l;
++	/*
++	 * To work around potential issues with the Properties Table feature
++	 * introduced in UEFI 2.5, which may split PE/COFF executable images
++	 * in memory into several RuntimeServicesCode and RuntimeServicesData
++	 * regions, we need to preserve the relative offsets between adjacent
++	 * EFI_MEMORY_RUNTIME regions with the same memory type attributes.
++	 * The easiest way to find adjacent regions is to sort the memory map
++	 * before traversing it.
++	 */
++	sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc, NULL);
++
++	for (l = 0; l < map_size; l += desc_size, prev = in) {
+ 		u64 paddr, size;
+ 
++		in = (void *)memory_map + l;
+ 		if (!(in->attribute & EFI_MEMORY_RUNTIME))
+ 			continue;
+ 
++		paddr = in->phys_addr;
++		size = in->num_pages * EFI_PAGE_SIZE;
++
+ 		/*
+ 		 * Make the mapping compatible with 64k pages: this allows
+ 		 * a 4k page size kernel to kexec a 64k page size kernel and
+ 		 * vice versa.
+ 		 */
+-		paddr = round_down(in->phys_addr, SZ_64K);
+-		size = round_up(in->num_pages * EFI_PAGE_SIZE +
+-				in->phys_addr - paddr, SZ_64K);
+-
+-		/*
+-		 * Avoid wasting memory on PTEs by choosing a virtual base that
+-		 * is compatible with section mappings if this region has the
+-		 * appropriate size and physical alignment. (Sections are 2 MB
+-		 * on 4k granule kernels)
+-		 */
+-		if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
+-			efi_virt_base = round_up(efi_virt_base, SZ_2M);
++		if (!prev ||
++		    ((prev->attribute ^ in->attribute) & mem_type_mask) != 0 ||
++		    paddr != (prev->phys_addr + prev->num_pages * EFI_PAGE_SIZE)) {
++
++			paddr = round_down(in->phys_addr, SZ_64K);
++			size += in->phys_addr - paddr;
++
++			/*
++			 * Avoid wasting memory on PTEs by choosing a virtual
++			 * base that is compatible with section mappings if this
++			 * region has the appropriate size and physical
++			 * alignment. (Sections are 2 MB on 4k granule kernels)
++			 */
++			if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
++				efi_virt_base = round_up(efi_virt_base, SZ_2M);
++			else
++				efi_virt_base = round_up(efi_virt_base, SZ_64K);
++		}
+ 
+ 		in->virt_addr = efi_virt_base + in->phys_addr - paddr;
+ 		efi_virt_base += size;
+-- 
+1.9.1
