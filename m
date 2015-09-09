@@ -1,76 +1,78 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 09 Sep 2015 22:38:50 +0200
-Subject: [PATCH V3 0/4] PCI: ACPI: Setting up DMA coherency for PCI device
- from _CCA attribute
-In-Reply-To: <55F02331.2060001@amd.com>
-References: <1440597279-11802-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <55F02331.2060001@amd.com>
-Message-ID: <8172790.rR5Ld4j83C@vostro.rjw.lan>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Sep 2015 21:24:33 +0100
+Subject: ARM: domains: Possible regression in v7-M
+In-Reply-To: <55F079A5.1010501@vanguardiasur.com.ar>
+References: <55F06797.3060706@gmail.com>
+ <55F06C55.5070205@vanguardiasur.com.ar>
+ <20150909175230.GF21084@n2100.arm.linux.org.uk>
+ <55F079A5.1010501@vanguardiasur.com.ar>
+Message-ID: <20150909202433.GG21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 09, 2015 07:16:49 PM Suthikulpanit, Suravee wrote:
-> Hi All,
+On Wed, Sep 09, 2015 at 03:25:41PM -0300, Ariel D'Alessandro wrote:
+> Russell,
 > 
-> Are there any other concerns about this patch series?
+> El 09/09/15 a las 14:52, Russell King - ARM Linux escribi?:
+> > On Wed, Sep 09, 2015 at 02:28:53PM -0300, Ariel D'Alessandro wrote:
+> >> Doing a bisect I've observed that regression appears to be caused by:
+> >>
+> >> commit 1eef5d2f1b461c120bcd82077edee5ec706ac53b
+> >> Author: Russell King <rmk+kernel@arm.linux.org.uk>
+> >> Date:   Wed Aug 19 21:23:48 2015 +0100
+> >>
+> >>     ARM: domains: switch to keeping domain value in register
+> >>
+> >>
+> >> Stacktrace paste below.
+> >>
+> >> [    0.171071] Unhandled exception: IPSR = 00000006 LR = fffffff1
+> > 
+> > This looks to be ARMv7M, which is nommu...  I guess what's causing this
+> > is this change in arch/arm/kernel/process.c:
+> > 
+> > +       /*
+> > +        * Copy the initial value of the domain access control register
+> > +        * from the current thread: thread->addr_limit will have been
+> > +        * copied from the current thread via setup_thread_stack() in
+> > +        * kernel/fork.c
+> > +        */
+> > +       thread->cpu_domain = get_domain();
+> > +
+> > 
+> > which probably needs to be #ifdef'd out for !MMU.  Can you try adding:
+> > 
+> > #ifndef CONFIG_MMU
+> 
+> I think you meant #ifdef CONFIG_MMU.
+> 
+> > ...
+> > #endif
+> > 
+> > around that please?  Thanks.
+> > 
+> 
+> Yeah, that works!
+> 
+> Added:
+> 
+> #ifdef CONFIG_MMU
+> ...
+> #endif
+> 
+> around that code block and it booted.
 
-I have none, but then it sort of missed the merge window.
+Thanks.  I've settled on using CONFIG_CPU_USE_DOMAINS here, as it only
+makes sense to save this value if that option is set, and it won't be
+set for noMMU platforms.
 
-I can easily queue it up for the next one unless it is super-urgent,
-but in that case I need to know why that's the case.
+Thanks for reporting this and confirming the problem site.  If you're
+okay with it, I'll add:
 
+Reported-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
 
-> On 8/26/2015 8:54 PM, Suravee Suthikulpanit wrote:
-> > This patch adds support to setup DMA coherency for PCI device using
-> > the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
-> > is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
-> > support for ARM64 which is currently in development.
-> >
-> > Also, this should not affect other architectures that does not define
-> > CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
-> >
-> > I have included the following patch from Jeremy before cleaning up
-> > the acpi_check_dma() function (in patch 2).
-> >
-> >      http://www.spinics.net/lists/linux-usb/msg128582.html)
-> >
-> > Changes from V2: (https://lkml.org/lkml/2015/8/25/549)
-> >      * Return -ENOSUPP instead of -1 (per Rafael's suggestion)
-> >      * Add WARN() when fail to setup DMA for PCI device when booting
-> >        ACPI (per Arnd's suggestion)
-> >      * Added Acked-by from Rob.
-> >      * Minor clean up
-> >
-> > Changes from V1: (https://lkml.org/lkml/2015/8/13/182)
-> >      * Include patch 1 from Jeremy to enable support for _CCA=0
-> >      * Clean up acpi_check_dma() per Bjorn suggestions
-> >      * Split the original V1 patch into two patches (patch 3 and 4)
-> >
-> >
-> > Jeremy Linton (1):
-> >    Honor ACPI _CCA attribute setting
-> >
-> > Suravee Suthikulpanit (3):
-> >    ACPI/scan: Clean up acpi_check_dma
-> >    PCI: OF: Move of_pci_dma_configure() to pci_dma_configure()
-> >    PCI: ACPI: Add support for PCI device DMA coherency
-> >
-> >   drivers/acpi/acpi_platform.c |  7 ++++++-
-> >   drivers/acpi/glue.c          |  6 +++---
-> >   drivers/acpi/scan.c          | 39 +++++++++++++++++++++++++++++++++++++++
-> >   drivers/base/property.c      | 10 +++++++---
-> >   drivers/of/of_pci.c          | 20 --------------------
-> >   drivers/pci/probe.c          | 35 +++++++++++++++++++++++++++++++++--
-> >   include/acpi/acpi_bus.h      | 35 ++---------------------------------
-> >   include/linux/acpi.h         |  4 ++--
-> >   include/linux/of_pci.h       |  3 ---
-> >   9 files changed, 92 insertions(+), 67 deletions(-)
-> >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+to the commit to acknowledge your help in finding this.
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
