@@ -1,175 +1,211 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed,  9 Sep 2015 11:11:25 +0200
-Subject: [PATCH 3/4] input: gpio_keys_polled: input_sync once after polling
- all the buttons
+Date: Wed,  9 Sep 2015 11:11:26 +0200
+Subject: [PATCH 4/4] ARM: dts: sun4i: inet9f-rev03: Add support for game
+ buttons / joysticks
 In-Reply-To: <1441789886-5868-1-git-send-email-hdegoede@redhat.com>
 References: <1441789886-5868-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1441789886-5868-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1441789886-5868-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to do a separate input_sync per changed button. Instead
-do the input_sync once after polling all the buttons.
-
-This is a preparation patch for adding support for EV_ABS / EV_REL events.
+The inet9f-rev03 tablet has multiple fire-buttons / direction controls,
+add support for these using the same axis mapping as ps2 compatible game
+controllers with the same stick / button layout use.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/input/keyboard/gpio_keys_polled.c | 88 +++++++++++++++++++++++++++----
- 1 file changed, 79 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts | 165 +++++++++++++++++++++++++++
+ 1 file changed, 165 insertions(+)
 
-diff --git a/drivers/input/keyboard/gpio_keys_polled.c b/drivers/input/keyboard/gpio_keys_polled.c
-index 097d721..0a80e6f 100644
---- a/drivers/input/keyboard/gpio_keys_polled.c
-+++ b/drivers/input/keyboard/gpio_keys_polled.c
-@@ -40,10 +40,36 @@ struct gpio_keys_polled_dev {
- 	struct input_polled_dev *poll_dev;
- 	struct device *dev;
- 	const struct gpio_keys_platform_data *pdata;
-+	unsigned long rel_axis_seen[BITS_TO_LONGS(REL_CNT)];
-+	unsigned long abs_axis_seen[BITS_TO_LONGS(ABS_CNT)];
- 	struct gpio_keys_button_data data[0];
+diff --git a/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts b/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts
+index 932e397..84c63f3 100644
+--- a/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts
++++ b/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts
+@@ -44,6 +44,7 @@
+ #include "sun4i-a10.dtsi"
+ #include "sunxi-common-regulators.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/evdev.h>
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/pinctrl/sun4i-a10.h>
+@@ -59,6 +60,159 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
++
++	gpio_keys {
++		compatible = "gpio-keys-polled";
++		pinctrl-names = "default";
++		pinctrl-0 = <&key_pins_inet9f>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		poll-interval = <20>;
++
++		button at 0 {
++			label = "Left Joystick Left";
++			linux,code = <ABS_X>;
++			linux,input-type = <EV_ABS>;
++			linux,input-value = <0xffffffff>; /* -1 */
++			gpios = <&pio 0 6 GPIO_ACTIVE_LOW>; /* PA6 */
++		};
++
++		button at 1 {
++			label = "Left Joystick Right";
++			linux,code = <ABS_X>;
++			linux,input-type = <EV_ABS>;
++			linux,input-value = <1>;
++			gpios = <&pio 0 5 GPIO_ACTIVE_LOW>; /* PA5 */
++		};
++
++		button at 2 {
++			label = "Left Joystick Up";
++			linux,code = <ABS_Y>;
++			linux,input-type = <EV_ABS>;
++			linux,input-value = <0xffffffff>; /* -1 */
++			gpios = <&pio 0 8 GPIO_ACTIVE_LOW>; /* PA8 */
++		};
++
++		button at 3 {
++			label = "Left Joystick Down";
++			linux,code = <ABS_Y>;
++			linux,input-type = <EV_ABS>;
++			linux,input-value = <1>;
++			gpios = <&pio 0 9 GPIO_ACTIVE_LOW>; /* PA9 */
++		};
++
++		button at 4 {
++			label = "Right Joystick Left";
++			linux,code = <ABS_Z>;
++			linux,input-type = <EV_ABS>;
++			linux,input-value = <0xffffffff>; /* -1 */
++			gpios = <&pio 0 1 GPIO_ACTIVE_LOW>; /* PA1 */
++		};
++
++		button at 5 {
++			label = "Right Joystick Right";
++			linux,code = <ABS_Z>;
++			linux,input-type = <EV_ABS>;
++			linux,input-value = <1>;
++			gpios = <&pio 0 0 GPIO_ACTIVE_LOW>; /* PA0 */
++		};
++
++		button at 6 {
++			label = "Right Joystick Up";
++			linux,code = <ABS_RZ>;
++			linux,input-type = <EV_ABS>;
++			linux,input-value = <0xffffffff>; /* -1 */
++			gpios = <&pio 0 3 GPIO_ACTIVE_LOW>; /* PA3 */
++		};
++
++		button at 7 {
++			label = "Right Joystick Down";
++			linux,code = <ABS_RZ>;
++			linux,input-type = <EV_ABS>;
++			linux,input-value = <1>;
++			gpios = <&pio 0 4 GPIO_ACTIVE_LOW>; /* PA4 */
++		};
++
++		button at 8 {
++			label = "DPad Left";
++			linux,code = <ABS_HAT0X>;
++			linux,input-type = <EV_ABS>;
++			linux,input-value = <0xffffffff>; /* -1 */
++			gpios = <&pio 7 23 GPIO_ACTIVE_LOW>; /* PH23 */
++		};
++
++		button at 9 {
++			label = "DPad Right";
++			linux,code = <ABS_HAT0X>;
++			linux,input-type = <EV_ABS>;
++			linux,input-value = <1>;
++			gpios = <&pio 7 24 GPIO_ACTIVE_LOW>; /* PH24 */
++		};
++
++		button at 10 {
++			label = "DPad Up";
++			linux,code = <ABS_HAT0Y>;
++			linux,input-type = <EV_ABS>;
++			linux,input-value = <0xffffffff>; /* -1 */
++			gpios = <&pio 7 25 GPIO_ACTIVE_LOW>; /* PH25 */
++		};
++
++		button at 11 {
++			label = "DPad Down";
++			linux,code = <ABS_HAT0Y>;
++			linux,input-type = <EV_ABS>;
++			linux,input-value = <1>;
++			gpios = <&pio 7 26 GPIO_ACTIVE_LOW>; /* PH26 */
++		};
++
++		button at 12 {
++			label = "Button X";
++			linux,code = <BTN_X>;
++			gpios = <&pio 0 16 GPIO_ACTIVE_LOW>; /* PA16 */
++		};
++
++		button at 13 {
++			label = "Button Y";
++			linux,code = <BTN_Y>;
++			gpios = <&pio 0 14 GPIO_ACTIVE_LOW>; /* PA14 */
++		};
++
++		button at 14 {
++			label = "Button A";
++			linux,code = <BTN_A>;
++			gpios = <&pio 0 17 GPIO_ACTIVE_LOW>; /* PA17 */
++		};
++
++		button at 15 {
++			label = "Button B";
++			linux,code = <BTN_B>;
++			gpios = <&pio 0 15 GPIO_ACTIVE_LOW>; /* PA15 */
++		};
++
++		button at 16 {
++			label = "Select Button";
++			linux,code = <BTN_SELECT>;
++			gpios = <&pio 0 11 GPIO_ACTIVE_LOW>; /* PA11 */
++		};
++
++		button at 17 {
++			label = "Start Button";
++			linux,code = <BTN_START>;
++			gpios = <&pio 0 12 GPIO_ACTIVE_LOW>; /* PA12 */
++		};
++
++		button at 18 {
++			label = "Top Left Button";
++			linux,code = <BTN_TL>;
++			gpios = <&pio 7 22 GPIO_ACTIVE_LOW>; /* PH22 */
++		};
++
++		button at 19 {
++			label = "Top Right Button";
++			linux,code = <BTN_TR>;
++			gpios = <&pio 0 13 GPIO_ACTIVE_LOW>; /* PA13 */
++		};
++	};
  };
  
--static void gpio_keys_polled_check_state(struct input_dev *input,
-+static void gpio_keys_button_event(struct input_polled_dev *dev,
-+				   struct gpio_keys_button *button,
-+				   int state)
-+{
-+	struct gpio_keys_polled_dev *bdev = dev->private;
-+	struct input_dev *input = dev->input;
-+	unsigned int type = button->type ?: EV_KEY;
+ &cpu0 {
+@@ -167,6 +321,17 @@
+ };
+ 
+ &pio {
++	key_pins_inet9f: key_pins at 0 {
++		allwinner,pins = "PA0", "PA1", "PA3", "PA4",
++				 "PA5", "PA6", "PA8", "PA9",
++				 "PA11", "PA12", "PA13",
++				 "PA14", "PA15", "PA16", "PA17",
++				 "PH22", "PH23", "PH24", "PH25", "PH26";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
 +
-+	if (type == EV_REL) {
-+		if (state) {
-+			input_event(input, type, button->code, button->value);
-+			__set_bit(button->code, bdev->rel_axis_seen);
-+		}
-+	} else if (type == EV_ABS) {
-+		if (state) {
-+			input_event(input, type, button->code, button->value);
-+			__set_bit(button->code, bdev->abs_axis_seen);
-+		}
-+	} else {
-+		input_event(input, type, button->code, state);
-+		input_sync(input);
-+	}
-+}
-+
-+static void gpio_keys_polled_check_state(struct input_polled_dev *dev,
- 					 struct gpio_keys_button *button,
- 					 struct gpio_keys_button_data *bdata)
- {
-@@ -54,11 +80,9 @@ static void gpio_keys_polled_check_state(struct input_dev *input,
- 	else
- 		state = !!gpiod_get_value(button->gpiod);
- 
--	if (state != bdata->last_state) {
--		unsigned int type = button->type ?: EV_KEY;
-+	gpio_keys_button_event(dev, button, state);
- 
--		input_event(input, type, button->code, state);
--		input_sync(input);
-+	if (state != bdata->last_state) {
- 		bdata->count = 0;
- 		bdata->last_state = state;
- 	}
-@@ -71,15 +95,33 @@ static void gpio_keys_polled_poll(struct input_polled_dev *dev)
- 	struct input_dev *input = dev->input;
- 	int i;
- 
-+	memset(bdev->rel_axis_seen, 0, sizeof(bdev->rel_axis_seen));
-+	memset(bdev->abs_axis_seen, 0, sizeof(bdev->abs_axis_seen));
-+
- 	for (i = 0; i < pdata->nbuttons; i++) {
- 		struct gpio_keys_button_data *bdata = &bdev->data[i];
- 
--		if (bdata->count < bdata->threshold)
-+		if (bdata->count < bdata->threshold) {
- 			bdata->count++;
--		else
--			gpio_keys_polled_check_state(input, &pdata->buttons[i],
-+			gpio_keys_button_event(dev, &pdata->buttons[i],
-+					       bdata->last_state);
-+		} else {
-+			gpio_keys_polled_check_state(dev, &pdata->buttons[i],
- 						     bdata);
-+		}
-+	}
-+
-+	for_each_set_bit(i, input->relbit, REL_CNT) {
-+		if (!test_bit(i, bdev->rel_axis_seen))
-+			input_event(input, EV_REL, i, 0);
-+	}
-+
-+	for_each_set_bit(i, input->absbit, ABS_CNT) {
-+		if (!test_bit(i, bdev->abs_axis_seen))
-+			input_event(input, EV_ABS, i, 0);
- 	}
-+
-+	input_sync(input);
- }
- 
- static void gpio_keys_polled_open(struct input_polled_dev *dev)
-@@ -152,6 +194,10 @@ static struct gpio_keys_platform_data *gpio_keys_polled_get_devtree_pdata(struct
- 					     &button->type))
- 			button->type = EV_KEY;
- 
-+		if (fwnode_property_read_u32(child, "linux,input-value",
-+					     (u32 *)&button->value))
-+			button->value = 1;
-+
- 		button->wakeup = fwnode_property_present(child, "gpio-key,wakeup");
- 
- 		if (fwnode_property_read_u32(child, "debounce-interval",
-@@ -165,6 +211,25 @@ static struct gpio_keys_platform_data *gpio_keys_polled_get_devtree_pdata(struct
- 	return pdata;
- }
- 
-+static void gpio_keys_polled_set_abs_params(struct input_dev *input,
-+	const struct gpio_keys_platform_data *pdata, unsigned int code)
-+{
-+	int i, min = 0, max = 0;
-+
-+	for (i = 0; i < pdata->nbuttons; i++) {
-+		struct gpio_keys_button *button = &pdata->buttons[i];
-+
-+		if (button->type != EV_ABS || button->code != code)
-+			continue;
-+
-+		if (button->value < min)
-+			min = button->value;
-+		if (button->value > max)
-+			max = button->value;
-+	}
-+	input_set_abs_params(input, code, min, max, 0, 0);
-+}
-+
- static const struct of_device_id gpio_keys_polled_of_match[] = {
- 	{ .compatible = "gpio-keys-polled", },
- 	{ },
-@@ -271,6 +336,9 @@ static int gpio_keys_polled_probe(struct platform_device *pdev)
- 						pdata->poll_interval);
- 
- 		input_set_capability(input, type, button->code);
-+		if (type == EV_ABS)
-+			gpio_keys_polled_set_abs_params(input, pdata,
-+							button->code);
- 	}
- 
- 	bdev->poll_dev = poll_dev;
-@@ -287,9 +355,11 @@ static int gpio_keys_polled_probe(struct platform_device *pdev)
- 
- 	/* report initial state of the buttons */
- 	for (i = 0; i < pdata->nbuttons; i++)
--		gpio_keys_polled_check_state(input, &pdata->buttons[i],
-+		gpio_keys_polled_check_state(poll_dev, &pdata->buttons[i],
- 					     &bdev->data[i]);
- 
-+	input_sync(input);
-+
- 	return 0;
- }
- 
+ 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+ 		allwinner,pins = "PH4";
+ 		allwinner,function = "gpio_in";
 -- 
 2.4.3
