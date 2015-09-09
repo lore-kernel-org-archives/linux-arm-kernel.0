@@ -1,98 +1,90 @@
-From: greg@kroah.com (Greg Kroah-Hartman)
-Date: Wed, 9 Sep 2015 12:54:02 -0700
-Subject: earlycon issues in -next with amba-pl011 updates
-In-Reply-To: <CABymUCP4s+ePs-sphJkQ4b61EcNT51FQat2ADWoy1Tgww35GMg@mail.gmail.com>
-References: <20150810232312.GB10728@bivouac.eciton.net>
- <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
- <55E81F93.1020104@arm.com> <20150903155255.GA28336@kroah.com>
- <55E87095.4030600@arm.com>
- <CABymUCP4s+ePs-sphJkQ4b61EcNT51FQat2ADWoy1Tgww35GMg@mail.gmail.com>
-Message-ID: <20150909195402.GA7979@kroah.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Wed, 9 Sep 2015 14:56:39 -0500
+Subject: [PATCH 1/2] fsl: Add binding for RCPM
+In-Reply-To: <1441780967-30879-1-git-send-email-dongsheng.wang@freescale.com>
+References: <1441780967-30879-1-git-send-email-dongsheng.wang@freescale.com>
+Message-ID: <1441828599.29081.36.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 05, 2015 at 10:42:03PM +0800, Jun Nie wrote:
-> 2015-09-04 0:08 GMT+08:00 Marc Zyngier <marc.zyngier@arm.com>:
-> > On 03/09/15 16:52, Greg Kroah-Hartman wrote:
-> >> On Thu, Sep 03, 2015 at 11:23:15AM +0100, Marc Zyngier wrote:
-> >>> On 11/08/15 02:48, Jun Nie wrote:
-> >>>> 2015-08-11 7:23 GMT+08:00 Leif Lindholm <leif.lindholm@linaro.org>:
-> >>>>> Hi all,
-> >>>>>
-> >>>>> The kernelci.org bot picked up a complete boot failure (no output past
-> >>>>> UEFI stub) with next-20150806 and Tyler bisected it down to somewhere
-> >>>>> in
-> >>>>> 8cd90e5 uart: pl011: Add support to ZTE ZX296702 uart
-> >>>>> 09dcc7d uart: pl011: Improve LCRH register access decision
-> >>>>> 2c096a9 uart: pl011: Introduce register look up table
-> >>>>> 7b753f3 uart: pl011: Introduce register accessor
-> >>>>>
-> >>>>> The issue only appears with earlycon on command line, for pl011
-> >>>>> consoles.
-> >>>>>
-> >>>>> Some investigation shows that the cause lies with
-> >>>>> commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
-> >>>>> and
-> >>>>> commit 2c096a9eedc6 ("uart: pl011: Introduce register look up table")
-> >>>>>
-> >>>>> Specifically, the changes to pl011_putc() are incorrect:
-> >>>>> The new pl011_ accessors take a (struct uart_amba_port *) input, but
-> >>>>> pl011_putc() directly uses the incoming (struct uart_port *) for this.
-> >>>>>
-> >>>>> Apart from ending up with an unintended/incorrect UART base address,
-> >>>>> the introduction of the lookup table for register offsets also means
-> >>>>> the accessors try to dereference (struct uart_amba_port *)->reg_lut.
-> >>>>>
-> >>>>> The below is a hack that shows/resolves the issue, but some
-> >>>>> refactoring of the original patches might be in order.
-> >>>>>
-> >>>>> /
-> >>>>>     Leif
-> >>>>
-> >>>> Leif,
-> >>>>
-> >>>> Sorry for the inconvenience. I do not have idea of early console till
-> >>>> now and I always have debug console for early panic debug. Learned
-> >>>> more from this issue.
-> >>>>
-> >>>> Suppose Peter's patch will resolve your issue.
-> >>>
-> >>> [+ Greg KH]
-> >>>
-> >>> So -next has now been broken for a while on a number of ARM platforms
-> >>> because of this (they simply cannot boot), and no progress has been made
-> >>> towards resolving this problem.
-> >>>
-> >>> Can we please drop this series (at least commits 7b753f3 and following)
-> >>> from -next until is has been reworked and reviewed?
-> >>
-> >> I don't have any patches in my -next tree, everything is in Linus's tree
-> >> now.  So if I've missed something, or need to revert something, please
-> >> let me know specifcally what to do.
-> >
-> > Gahhh... Given that there is no obvious fix, that the discussion has
-> > stalled and that the author of the series is apparently away, the
-> > following patches should be reverted:
+On Wed, 2015-09-09 at 14:42 +0800, Dongsheng Wang wrote:
+> From: Wang Dongsheng <dongsheng.wang@freescale.com>
 > 
-> Marc,
+> RCPM is the Run Control and Power Management module performs all
+> device-level tasks associated with device run control and power
+> management.
 > 
-> There had a patch from Peter that revert early console part, which I
-> thought will be merged to mainline. It's my fault for not fix the bug
-> on time. Also sorry for late response to you as I took three days
-> leave.
+> Add this for freescale powerpc platform and layerscape platform.
 > 
-> Could you help test attached patch? Thank you in advance!
+> Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
+> Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
+> Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
 > 
-> 
-> Greg,
-> 
-> Would you please hold the merging of revert patches for one or two
-> days so that the fix can be verified? Thank you!
+> diff --git a/Documentation/devicetree/bindings/soc/fsl/rcpm.txt 
+> b/Documentation/devicetree/bindings/soc/fsl/rcpm.txt
+> new file mode 100644
+> index 0000000..284070c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/fsl/rcpm.txt
+> @@ -0,0 +1,64 @@
+> +* Run Control and Power Management
+> +-------------------------------------------
+> +The RCPM performs all device-level tasks associated with device run control
+> +and power management.
+> +
+> +Required properites:
+> +  - reg : Offset and length of the register set of RCPM block.
+> +  - compatible : Sould contain a chip-specific RCPM block compatible string
+> +     and (if applicable) may contain a chassis-version RCPM compatible string.
+> +     Chip-specific strings are of the form "fsl,<chip>-rcpm", such as:
+> +     * "fsl,p2041-rcpm"
+> +     * "fsl,p3041-rcpm"
+> +     * "fsl,p4080-rcpm"
+> +     * "fsl,p5020-rcpm"
+> +     * "fsl,p5040-rcpm"
+> +     * "fsl,t4240-rcpm"
+> +     * "fsl,b4420-rcpm"
+> +     * "fsl,b4860-rcpm"
+> +
+> +     Chassis-version strings are of the form "fsl,qoriq-rcpm-<version>",
+> +     such as:
+> +     * "fsl,qoriq-rcpm-1.0": for chassis 1.0 rcpm
+> +     * "fsl,qoriq-rcpm-2.0": for chassis 2.0 rcpm
+> +     * "fsl,qoriq-rcpm-2.1": for chassis 2.1 rcpm
+> +
+> +All references to "1.0" and "2.0" refer to the QorIQ chassis version to
+> +which the chip complies.
+> +Chassis Version              Example Chips
+> +---------------              -------------------------------
+> +1.0                          p4080, p5020, p5040, p2041, p3041
+> +2.0                          t4240, b4860, b4420
+> +2.1                          t1040, ls1021
+> +
+> +Example:
+> +The RCPM node for T4240:
+> +     rcpm:  global-utilities at e2000{
+> +             compatible = "fsl,t4240-rcpm", "fsl,qoriq-rcpm-2.0";
+> +             reg = <0xe2000 0x1000>;
+> +     };
+> +
+> +The RCPM node for P4080:
+> +     rcpm:  global-utilities at e2000{
+> +             compatible = "fsl,qoriq-rcpm-1.0";
+> +             reg = <0xe2000 0x1000>;
+> +     };
 
-Given that this took way more than a few days, Linus now has the reverts
-in his tree.  Please feel free to resend the series, in a form that does
-not break people's machines, for inclusion in 4.4-rc1.
+I would avoid putting the p4080 example in the binding, as we don't want to 
+make it look like it's OK to leave out the specific chip compatible.
 
-thanks,
+> +* Freescale RCPM Wakeup Source Device Tree Bindings
+> +-------------------------------------------
+> +Required rcpm-wakeup property should be added to a device node if the 
+> device
+> +can be used as a wakeup source.
+> +
+> +  - rcpm-wakeup: should contain a pointer to the rcpm node and the
+> +     corresponding bit of device in the register.
 
-greg k-h
+The corresponding bit in *what* register?
+
+-Scott
