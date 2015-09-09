@@ -1,44 +1,64 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 09 Sep 2015 11:27:24 -0700
-Subject: [PATCH v5 0/6] bcm2835: auxiliar device support for spi
-In-Reply-To: <2757852.TDqE8OEVr2@ws-stein>
-References: <1441359711-2800-1-git-send-email-kernel@martin.sperl.org>
- <87h9n4weg8.fsf@eliezer.anholt.net> <2757852.TDqE8OEVr2@ws-stein>
-Message-ID: <878u8fcusz.fsf@eliezer.anholt.net>
+From: dserrg@gmail.com (Sergey Dyasly)
+Date: Wed, 9 Sep 2015 21:28:14 +0300
+Subject: [PATCH] ARM:mm: define arch-specific IOREMAP_MAX_ORDER only in
+ !SMP && !LPAE case
+In-Reply-To: <alpine.LFD.2.20.1509082309040.22877@knanqh.ubzr>
+References: <1441680050-50490-1-git-send-email-zhenzhang.zhang@huawei.com>
+ <55EE4BD2.3080800@huawei.com> <55EF24FE.4060602@gmail.com>
+ <alpine.LFD.2.20.1509082309040.22877@knanqh.ubzr>
+Message-ID: <55F07A3E.5010400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexander Stein <alexanders83@web.de> writes:
-
-> Hi,
-> On Tuesday 08 September 2015 18:48:07, Eric Anholt wrote:
->> I finally had a chance to sit down and look at what the hardware's doing
->> with the enable bit (also, I've read a whole lot more of the hardware
->> now, so I'm a lot faster at answering questions like this).  The enable
->> bits are a clock gate off of the VPU clock.
+On 09.09.2015 6:10, Nicolas Pitre wrote:
+> On Tue, 8 Sep 2015, Sergey Dyasly wrote:
 >
-> Are any hardware documents about such things available (in public)?
-
-Nope, I just went through the HDL to see how things were routed.
-
->> I knocked together the enable bits as a clock gate driver, since I'd
->> just written very similar code for the audio domain clock driver (and I
->> assume you are grumpy about how much time you've spent on this one
->> stupid register).  It's up at
->> https://github.com/anholt/linux/tree/bcm2835-clock-aux and I can submit
->> it if you like the result.  I've compile tested it only, but I'm hoping
->> you could just drop your aux SPI driver on top of it and have things
->> work.
+>> On 08.09.2015 5:45, Zhang Zhen wrote:
+>>> The arch-specific IOREMAP_MAX_ORDER is introduced in
+>>> commit: ff0daca([ARM] Add section support to ioremap) and
+>>> commit: a069c89 ([ARM] 3705/1: add supersection support to ioremap()).
+>>> But supersections and sections mappings are only used in !SMP && !LPAE case.
+>>> Otherwise, mapping is created using the usual 4K pages.
+>>>
+>>> In most cases without !SMP && !LPAE, the big alignment cause high
+>>> fragmentation
+>>> issue in vmalloc area.
+>>> Here we use arch-specific IOREMAP_MAX_ORDER only in !SMP && !LPAE case,
+>>> otherwise use generic IOREMAP_MAX_ORDER in include/linux/vmalloc.h.
+>>>
+>>> Signed-off-by: Zhang Zhen <zhenzhang.zhang@huawei.com>
+>>> ---
+>>>    arch/arm/include/asm/memory.h | 2 ++
+>>>    1 file changed, 2 insertions(+)
+>>>
+>>> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+>>> index b7f6fb4..3209012 100644
+>>> --- a/arch/arm/include/asm/memory.h
+>>> +++ b/arch/arm/include/asm/memory.h
+>>> @@ -76,10 +76,12 @@
+>>>     */
+>>>    #define XIP_VIRT_ADDR(physaddr)  (MODULES_VADDR + ((physaddr) &
+>>> 0x000fffff))
+>>>
+>>> +#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
+>>>    /*
+>>>     * Allow 16MB-aligned ioremap pages
+>>>     */
+>>>    #define IOREMAP_MAX_ORDER	24
+>>> +#endif
+>>>
+>>>    #else /* CONFIG_MMU */
+>>>
+>> Hmm... This looks exactly like my old patch -
+>> http://thread.gmane.org/gmane.linux.kernel.mm/127620
+>> (Thanks to Vladimir for pointing that out!)
+>>
+>> Hasn't there been any progress about this issue?
+> IMHO the patch makes sense.
 >
-> IMHO line 45 (https://github.com/anholt/linux/commit/facb4ba917a1b9f6c2ee0cea7d529acf55f584dd#diff-1b6f753c132811b3f6d70f5b31866950R45) should be like this
->> onecell->clks = kzalloc(sizeof(*onecell->clks) * BCM2835_AUX_CLOCK_COUNT, GFP_KERNEL);
-> or you will only allocate a single struct clk*.
+> Did you send it to RMK's patch system?
+Ok, submitted it to the patch system. Thanks!
 
-Thanks, that was a bug in my other clock driver, too!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150909/4f6ac866/attachment.sig>
+>
+>
+> Nicolas
