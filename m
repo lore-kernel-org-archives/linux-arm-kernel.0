@@ -1,106 +1,41 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Wed,  9 Sep 2015 11:35:14 +0200
-Subject: [PATCH v2 1/2] ARM: imx35: Do not call mxc_timer_init twice when
- booting with DT
-Message-ID: <1441791315-25390-1-git-send-email-alexander.stein@systec-electronic.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 9 Sep 2015 10:36:59 +0100
+Subject: [RFC 3/5] acpi/serial: add DBG2 earlycon support
+In-Reply-To: <20150908170307.GP10728@bivouac.eciton.net>
+References: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
+ <1441716217-23786-4-git-send-email-leif.lindholm@linaro.org>
+ <20150908130951.GE20562@leverpostej>
+ <20150908170307.GP10728@bivouac.eciton.net>
+Message-ID: <20150909093659.GA15606@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mxc_timer_init must not be called from within mx35_clocks_init_dt. It will
-eventually be called by imx31_timer_init_dt
-(drivers/clocksource/timer-imx-gpt.c).
-This arranges the initialization code similar to clk-imx27.c
+> > > +#ifdef CONFIG_SERIAL_EARLYCON
+> > > +static int use_earlycon __initdata;
+> > > +static int __init setup_acpi_earlycon(char *buf)
+> > > +{
+> > > +	if (!buf)
+> > > +		use_earlycon = 1;
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +early_param("earlycon", setup_acpi_earlycon);
+> > 
+> > It seems a shame to add this after folding the OF case into the earlycon
+> > code. What necessitates this being a separate early_param? Why is it too
+> > early to parse DBG2?
+> 
+> Currently, we don't even know where our ACPI tables are  at this point
+> (efi_init() is called two functions after parse_early_param() in
+> setup_arch). More specifically, because acpi_boot_table_init() is
+> called even later than that.
+> 
+> If we moved both of those earlier, we could drop the extra earlycon
+> param handling for ACPI. That would of course reduce the ability to
+> have dynamically configurable debug messages for both of these.
 
-Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
----
-Change in v2:
-* Fix typo
+Ok. Would you be able to put something in the commit message regarding
+the above, to make it clear why we need this multi-step dance (and why
+it's preferable to the alternative)?
 
- drivers/clk/imx/clk-imx35.c | 49 +++++++++++++++++++++++++--------------------
- 1 file changed, 27 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/clk/imx/clk-imx35.c b/drivers/clk/imx/clk-imx35.c
-index 69138ba..3e7c805 100644
---- a/drivers/clk/imx/clk-imx35.c
-+++ b/drivers/clk/imx/clk-imx35.c
-@@ -84,7 +84,7 @@ enum mx35_clks {
- 
- static struct clk *clk[clk_max];
- 
--int __init mx35_clocks_init(void)
-+static void __init _mx35_clocks_init(void)
- {
- 	void __iomem *base;
- 	u32 pdr0, consumer_sel, hsp_sel;
-@@ -219,6 +219,30 @@ int __init mx35_clocks_init(void)
- 
- 	imx_check_clocks(clk, ARRAY_SIZE(clk));
- 
-+	clk_prepare_enable(clk[spba_gate]);
-+	clk_prepare_enable(clk[gpio1_gate]);
-+	clk_prepare_enable(clk[gpio2_gate]);
-+	clk_prepare_enable(clk[gpio3_gate]);
-+	clk_prepare_enable(clk[iim_gate]);
-+	clk_prepare_enable(clk[emi_gate]);
-+	clk_prepare_enable(clk[max_gate]);
-+	clk_prepare_enable(clk[iomuxc_gate]);
-+
-+	/*
-+	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
-+	 * before conversion to common clk also enabled UART1 (which isn't
-+	 * handled here and not needed for mmc) and IIM (which is enabled
-+	 * unconditionally above).
-+	 */
-+	clk_prepare_enable(clk[scc_gate]);
-+
-+	imx_print_silicon_rev("i.MX35", mx35_revision());
-+}
-+
-+int __init mx35_clocks_init(void)
-+{
-+	_mx35_clocks_init();
-+
- 	clk_register_clkdev(clk[pata_gate], NULL, "pata_imx");
- 	clk_register_clkdev(clk[can1_gate], NULL, "flexcan.0");
- 	clk_register_clkdev(clk[can2_gate], NULL, "flexcan.1");
-@@ -275,25 +299,6 @@ int __init mx35_clocks_init(void)
- 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
- 	clk_register_clkdev(clk[admux_gate], "audmux", NULL);
- 
--	clk_prepare_enable(clk[spba_gate]);
--	clk_prepare_enable(clk[gpio1_gate]);
--	clk_prepare_enable(clk[gpio2_gate]);
--	clk_prepare_enable(clk[gpio3_gate]);
--	clk_prepare_enable(clk[iim_gate]);
--	clk_prepare_enable(clk[emi_gate]);
--	clk_prepare_enable(clk[max_gate]);
--	clk_prepare_enable(clk[iomuxc_gate]);
--
--	/*
--	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
--	 * before conversion to common clk also enabled UART1 (which isn't
--	 * handled here and not needed for mmc) and IIM (which is enabled
--	 * unconditionally above).
--	 */
--	clk_prepare_enable(clk[scc_gate]);
--
--	imx_print_silicon_rev("i.MX35", mx35_revision());
--
- 	mxc_timer_init(MX35_GPT1_BASE_ADDR, MX35_INT_GPT, GPT_TYPE_IMX31);
- 
- 	return 0;
-@@ -301,10 +306,10 @@ int __init mx35_clocks_init(void)
- 
- static void __init mx35_clocks_init_dt(struct device_node *ccm_node)
- {
-+	_mx35_clocks_init();
-+
- 	clk_data.clks = clk;
- 	clk_data.clk_num = ARRAY_SIZE(clk);
- 	of_clk_add_provider(ccm_node, of_clk_src_onecell_get, &clk_data);
--
--	mx35_clocks_init();
- }
- CLK_OF_DECLARE(imx35, "fsl,imx35-ccm", mx35_clocks_init_dt);
--- 
-2.4.6
+Mark.
