@@ -1,81 +1,55 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Wed,  9 Sep 2015 14:30:44 +0200
-Subject: [PATCH v3 0/9] ARM: dts: update Boundary Devices boards support
-In-Reply-To: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
+Date: Wed,  9 Sep 2015 14:30:45 +0200
+Subject: [PATCH v3 1/9] ARM: dts: imx6dql-nitrogen6x: add touchscreen support
+In-Reply-To: <1441801853-10264-1-git-send-email-gary.bisson@boundarydevices.com>
 References: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <1441801853-10264-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1441801853-10264-1-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1441801853-10264-2-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patch adds the different touchscreens that can be connected using
+the displays available for this board.
+http://boundarydevices.com/product-category/displays/
 
-This series is a follow-up to the previous series that added LCD display
-support.
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/364425.html
+Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+---
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-This one aims at adding touchscreen and WiFi support for Nitrogen6x as well as
-adding two boards: Nitrogen6_Max and Nit6xlite.
-
-It also takes care of updating the licenses to be GPLv2/X11.
-
-The series has been tested against linux-next tag next-20150909.
-
-Note that imx_v6_v7_defconfig has been used with the following additions:
-CONFIG_TOUCHSCREEN_EDT_FT5X06=y
-CONFIG_I2C_MUX_GPIO=y
-CONFIG_RTC_DRV_M41T80=y
-
-Modifications:
-v2->v3:
-- Rename nodes to general class of device as suggested by Philipp and Russell.
-- Remove useless wakeup-gpio field for edt,ft5x06 touchscreen
-- Add missing muxing for interrupt GPIO
-- Rebased on next-20150909
-v1->v2:
-- Add Boundary Devices Inc. to vendor prefixes
-- Relicense devices trees to GPLv2/X11 as suggested by Fabio for:
-  - Nitrogen6x
-  - SabreLite
-  - Nit6xLite
-  - Nitrogen6_MAX
-- Change manufacturer to Boundary Devices as suggested by Fabio for:
-  - Nitrogen6x
-  - Nit6xLite
-  - Nitrogen6_MAX
-- Fixed missing macros for gpio/irq values as suggested by Philipp.
-- Rebased on next-20150908
-
-Regards,
-Gary
-
-Gary Bisson (9):
-  ARM: dts: imx6dql-nitrogen6x: add touchscreen support
-  ARM: dts: imx6qdl-nitrogen6x: add wifi wl1271 support
-  ARM: dts: imx6qdl-nitrogen6x: relicense under GPLv2/X11
-  ARM: dts: imx6qdl-sabrelite: relicense under GPLv2/X11
-  of: Add Boundary Devices Inc. vendor prefix
-  ARM: dts: imx6q-nitrogen6x: change manufacturer to Boundary Devices
-  ARM: dts: imx6dl-nitrogen6x: change manufacturer to Boundary Devices
-  ARM: dts: imx: add Boundary Devices Nitrogen6_Max board
-  ARM: dts: imx: add Boundary Devices Nitrogen6_Lite board
-
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/imx6dl-nit6xlite.dts             |  49 ++
- arch/arm/boot/dts/imx6dl-nitrogen6x.dts            |  44 +-
- arch/arm/boot/dts/imx6dl-sabrelite.dts             |  40 +-
- arch/arm/boot/dts/imx6q-nitrogen6_max.dts          |  53 ++
- arch/arm/boot/dts/imx6q-nitrogen6x.dts             |  44 +-
- arch/arm/boot/dts/imx6q-sabrelite.dts              |  40 +-
- ...6qdl-nitrogen6x.dtsi => imx6qdl-nit6xlite.dtsi} | 396 ++++++----
- arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi       | 873 +++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi          | 111 ++-
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi           |  40 +-
- 12 files changed, 1523 insertions(+), 170 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6dl-nit6xlite.dts
- create mode 100644 arch/arm/boot/dts/imx6q-nitrogen6_max.dts
- copy arch/arm/boot/dts/{imx6qdl-nitrogen6x.dtsi => imx6qdl-nit6xlite.dtsi} (50%)
- create mode 100644 arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 340bc8e..5466368 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -247,6 +247,21 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c3>;
+ 	status = "okay";
++
++	touchscreen at 04 {
++		compatible = "eeti,egalax_ts";
++		reg = <0x04>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
++		wakeup-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
++	};
++
++	touchscreen at 38 {
++		compatible = "edt,edt-ft5x06";
++		reg = <0x38>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
++	};
+ };
+ 
+ &iomuxc {
+@@ -258,6 +273,7 @@
+ 			fsl,pins = <
+ 				/* SGTL5000 sys_mclk */
+ 				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x030b0
++				MX6QDL_PAD_GPIO_9__GPIO1_IO09	0x1b0b0
+ 			>;
+ 		};
+ 
 -- 
 2.5.1
