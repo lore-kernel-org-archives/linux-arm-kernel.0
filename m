@@ -1,75 +1,48 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Wed, 9 Sep 2015 12:03:04 +0200
-Subject: [PATCH v2 1/9] ARM: dts: imx6dql-nitrogen6x: add touchscreen
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Wed, 9 Sep 2015 16:34:59 +0530
+Subject: [PATCH-v2 2/7] mmc: sdhci-pxav3: binding: Add pxa1928 compatible
  support
-In-Reply-To: <1441723760.3241.26.camel@pengutronix.de>
-References: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
- <1441722886-22798-1-git-send-email-gary.bisson@boundarydevices.com>
- <1441722886-22798-2-git-send-email-gary.bisson@boundarydevices.com>
- <1441723760.3241.26.camel@pengutronix.de>
-Message-ID: <CAAMH-ytWT12x8-h4zF7WfgxVPnZxq2hxkXC0MeP7ucTO-nYQbw@mail.gmail.com>
+In-Reply-To: <55EF740A.1020204@kernel.org>
+References: <1441624721-15612-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1441624721-15612-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <55EF740A.1020204@kernel.org>
+Message-ID: <55F0125B.6040500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tue, Sep 8, 2015 at 4:49 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Am Dienstag, den 08.09.2015, 16:34 +0200 schrieb Gary Bisson:
->> This patch adds the different touchscreens that can be connected using
->> the displays available for this board.
->> http://boundarydevices.com/product-category/displays/
+
+On Wednesday 09 September 2015 05:19 AM, Rob Herring wrote:
+> On 09/07/2015 06:18 AM, Vaibhav Hiremath wrote:
+>> With support for pxa1928 family of devices , this patch
+>> updates the binding document with compatible property
+>> of "marvell,pxav3-1928-sdhci".
 >>
->> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 >> ---
->>  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
+>>   Documentation/devicetree/bindings/mmc/sdhci-pxa.txt | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
->> index ad16dce..24b667d 100644
->> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
->> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
->> @@ -284,6 +284,22 @@
->>       pinctrl-names = "default";
->>       pinctrl-0 = <&pinctrl_i2c3>;
->>       status = "okay";
->> +
->> +     egalax_ts at 04 {
+>> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
+>> index 3d1b449..29edcf5 100644
+>> --- a/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
+>> +++ b/Documentation/devicetree/bindings/mmc/sdhci-pxa.txt
+>> @@ -5,7 +5,7 @@ and the properties used by the sdhci-pxav2 and sdhci-pxav3 drivers.
+>>
+>>   Required properties:
+>>   - compatible: Should be "mrvl,pxav2-mmc", "mrvl,pxav3-mmc" or
+>> -  "marvell,armada-380-sdhci".
+>> +  "marvell,armada-380-sdhci" or "marvell,pxav3-1928-sdhci".
 >
-> I'd prefer to use generic names for the nodes, such as "touchscreen at 04",
-> and "touchscreen at 38" below.
-
-Ok will do. Plus for the two new boards, I'll try to follow Russell comment.
-
->> +             compatible = "eeti,egalax_ts";
->> +             reg = <0x04>;
->> +             interrupt-parent = <&gpio1>;
->> +             interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
->> +             wakeup-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
->> +     };
->> +
->> +     ft5x06_ts at 38 {
->> +             compatible = "edt,edt-ft5x06";
->> +             reg = <0x38>;
->> +             interrupt-parent = <&gpio1>;
->> +             interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
->> +             wakeup-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+> v3 is implied by pxa1928. So I'd just do "marvell,pxa1928-sdhci" to
+> better match the chip name.
 >
-> This should be wake-gpios and GPIO_ACTIVE_HIGH according to the other
-> users.
 
-Actually I'm going to remove that line. First it should be wake-gpios
-instead of wakeup-gpios. When I realized and changed it the driver
-wouldn't work at all. Indeed looking at the source code and other
-example it looks like it should be a different GPIO than the interrupt
-one.
+Ok, No issues.
 
-For the eGalax, the driver output a 1 and 0 to create the falling edge
-that wakes the controller up and then releases the gpio as an input
-for interrupts. But in the edt driver, the GPIO is kept as an output
-which prevents from receiving any interrupt. Seems that the ft5x06
-controllers on our display doesn't need any wake-up signal.
+I followed the existing "armada-380-sdhci" naming style.
+Will correct it in next version.
 
-I'll submit a v3 very soon.
 
-Regards,
-Gary
+Thanks,
+Vaibhav
