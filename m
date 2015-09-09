@@ -1,191 +1,97 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Wed, 9 Sep 2015 22:22:23 +0900
-Subject: [PATCH] arm64: kernel: Use a separate stack for irq interrupts.
-In-Reply-To: <55EF1136.6050102@arm.com>
-References: <55EDA040.90208@arm.com>
- <1441636584-23174-1-git-send-email-james.morse@arm.com>
- <2409A0E9-376A-4B49-8C5F-73084843096F@gmail.com> <55EF1136.6050102@arm.com>
-Message-ID: <9FF0599A-395F-43EC-A2C2-0206CE0B30C2@gmail.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Wed, 9 Sep 2015 15:24:10 +0200
+Subject: [PATCH linux-next v6 0/8] add driver for Atmel QSPI controller
+Message-ID: <cover.1441803609.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sep 9, 2015, at 1:47 AM, James Morse wrote:
-> On 08/09/15 15:54, Jungseok Lee wrote:
->> On Sep 7, 2015, at 11:36 PM, James Morse wrote:
->> 
->> Hi James,
->> 
->>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->>> index e16351819fed..d42371f3f5a1 100644
->>> --- a/arch/arm64/kernel/entry.S
->>> +++ b/arch/arm64/kernel/entry.S
->>> @@ -190,10 +190,37 @@ tsk	.req	x28		// current thread_info
->>> * Interrupt handling.
->>> */
->>> 	.macro	irq_handler
->>> -	adrp	x1, handle_arch_irq
->>> -	ldr	x1, [x1, #:lo12:handle_arch_irq]
->>> -	mov	x0, sp
->>> +	mrs	x21, tpidr_el1
->>> +	adr_l	x20, irq_sp
->>> +	add	x20, x20, x21
->>> +
->>> +	ldr	x21, [x20]
->>> +	mov	x20, sp
->>> +
->>> +	mov	x0, x21
->>> +	mov	x1, x20
->>> +	bl	irq_copy_thread_info
->>> +
->>> +	/* test for recursive use of irq_sp */
->>> +	cbz	w0, 1f
->>> +	mrs	x30, elr_el1
->>> +	mov	sp, x21
->>> +
->>> +	/*
->>> +	 * Create a fake stack frame to bump unwind_frame() onto the original
->>> +	 * stack. This relies on x29 not being clobbered by kernel_entry().
->>> +	 */
->>> +	push	x29, x30
->> 
->> It is the most challenging item to handle a frame pointer in this context.
->> 
->> As I mentioned previously, a stack tracer on ftrace is not supported yet.
->> How about decoupling "IRQ Stack feature" from "Stack Tracer Fix"?
-> 
-> Yes - I discovered today this was more complicated than I thought. I will
-> need to do some more reading.
-> 
-> 
->>> +
->>> +1:	ldr_l	x1, handle_arch_irq
->>> +	mov     x0, x20
->>> 	blr	x1
->>> +
->>> +	mov	x0, x20
->>> +	mov	x1, x21
->>> +	bl	irq_copy_thread_info
->>> +	mov	sp, x20
->>> +
->>> 	.endm
->>> 
->>> 	.text
->>> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
->>> index 463fa2e7e34c..10b57a006da8 100644
->>> --- a/arch/arm64/kernel/irq.c
->>> +++ b/arch/arm64/kernel/irq.c
->>> @@ -26,11 +26,14 @@
->>> #include <linux/smp.h>
->>> #include <linux/init.h>
->>> #include <linux/irqchip.h>
->>> +#include <linux/percpu.h>
->>> #include <linux/seq_file.h>
->>> #include <linux/ratelimit.h>
->>> 
->>> unsigned long irq_err_count;
->>> 
->>> +DEFINE_PER_CPU(unsigned long, irq_sp) = 0;
->>> +
->>> int arch_show_interrupts(struct seq_file *p, int prec)
->>> {
->>> #ifdef CONFIG_SMP
->>> @@ -55,6 +58,10 @@ void __init init_IRQ(void)
->>> 	irqchip_init();
->>> 	if (!handle_arch_irq)
->>> 		panic("No interrupt controller found.");
->>> +
->>> +	/* Allocate an irq stack for the boot cpu */
->>> +	if (alloc_irq_stack(smp_processor_id()))
->>> +		panic("Failed to allocate irq stack for boot cpu.");
->>> }
->>> 
->>> #ifdef CONFIG_HOTPLUG_CPU
->>> @@ -117,3 +124,48 @@ void migrate_irqs(void)
->>> 	local_irq_restore(flags);
->>> }
->>> #endif /* CONFIG_HOTPLUG_CPU */
->>> +
->>> +/* Allocate an irq_stack for a cpu that is about to be brought up. */
->>> +int alloc_irq_stack(unsigned int cpu)
->>> +{
->>> +	struct page *irq_stack_page;
->>> +	union thread_union *irq_stack;
->>> +
->>> +	/* reuse stack allocated previously */
->>> +	if (per_cpu(irq_sp, cpu))
->>> +		return 0;
->> 
->> I'd like to avoid even this simple check since CPU hotplug could be heavily
->> used for power management.
-> 
-> I don't think its a problem:
-> __cpu_up() contains a call to wait_for_completion_timeout() (which could
-> eventually end up in the scheduler), so I don't think it could ever be on a
-> 'really hot' path.
-> 
-> For really frequent hotplug-like power management, cpu_suspend() makes use
-> of firmware support to power-off cores - from what I can see it doesn't use
-> __cpu_up().
+ChangeLog
 
-In case of some platforms, CPU hotplug is triggered via sysfs for power management
-based on user data. What is advantage of putting stack allocation into this path?
+v6:
+- add new patch which tries to read the JEDEC ID with different SPI protocols
+  and different commands: 0x9f (SPI-1-1-1), 0xaf (SPI-4-4-4) and finally
+  0xaf (SPI-2-2-2).
+- remove the set_protocol() hook from struct spi_nor and add 4 new members
+  instead of type enum spi_protocol:
+  read_proto, write_proto, erase_proto, reg_proto.
+  The relevant protocol value should be checked by the driver specific read(),
+  write(), erase(), read_reg() and write_reg() hook implementations.
+- remove unused hooks: write_xfer() and read_xfer().
+- tune the op code for read, write and erase commands depending on the memory
+  manufacturer.
+- remove some previously added "Acked-by" since the protocol switch strategy
+  has been changed but not discussed yet.
 
-IRQ stack allocation is an critical one-shot operation. So, there would be no issue
-to give this work to a booting core. 
+v5:
+- remove unused inline functions qspi_read[bw]() and qspi_write[bw](),
+  keep only qspi_readl() and qspi_writel().
+- use reinit_completion() instead of init_completion() during run time,
+  call init_completion() once for all in the probe().
+- add a dev_warn() when trying to tune the number of dummy cycles for
+  spi-nor of a not supported manufacturer then fall back to the default
+  framework value.
+- reword some comments.
+- add "Acked-by: Marek Vasut <marex@denx.de>" for patches 1 and 4.
+- add "Acked-by: Bean Huo <beanhuo@micron.com>" for patch 1.
 
->>> +
->>> +	irq_stack_page = alloc_kmem_pages(THREADINFO_GFP, THREAD_SIZE_ORDER);
->>> +	if (!irq_stack_page) {
->>> +		pr_crit("CPU%u: failed to allocate irq stack for cpu %u\n",
->>> +			smp_processor_id(), cpu);
->>> +		return -ENOMEM;
->>> +	}
->>> +	irq_stack = page_address(irq_stack_page);
+v4:
+- add "OF && HAS_DMA" dependency in Kconfig for Atmel Quad SPI driver.
+- return -ENOMEM instead of the return code of dma_mapping_error() as this
+  function returns a boolean on ARM achitecture.
+- add "Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>" for Atmel Quad
+  SPI driver and its DT binding documentation.
 
-I forgot leaving a comment here. How about using __get_free_pages? It returns an
-address instead of page. 
+v3:
+- reword the comment which explains that spi_nor_set_protocol() is used by
+  the spi-nor framework to notify lower layers, especially the (Q)SPI
+  controller about a protocol change.
+- change the definitions of register/bitfield macros in the Atmel QSPI
+  controller driver: get rid of concatenation operator and use BIT and
+  GENMASK macros when possible.
+- use #define[SPACE] instead of #define[TAB]
 
->>> +
->>> +	per_cpu(irq_sp, cpu) = (unsigned long)irq_stack->stack
->>> +			       + THREAD_START_SP;
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +/*
->>> + * Copy struct thread_info between two stacks, and update current->stack.
->>> + * This is used when moving to the irq exception stack.
->>> + * Changing current->stack is necessary so that non-arch thread_info writers
->>> + * don't use the new thread_info->task->stack to find the old thread_info when
->>> + * setting flags like TIF_NEED_RESCHED...
->>> + */
->>> +asmlinkage int irq_copy_thread_info(unsigned long dst_sp, unsigned long src_sp)
->>> +{
->>> +	struct thread_info *src = get_thread_info(src_sp);
->>> +	struct thread_info *dst = get_thread_info(dst_sp);
->>> +
->>> +	if (dst == src)
->>> +		return 0;
->>> +
->>> +	*dst = *src;
->>> +	current->stack = dst;
->>> +
->>> +	return 1;
->>> +}
->> 
->> Although this is 32-byte memcpy, sizeof(struct thread_info), this function is called
->> twice to handle a single interrupt. Isn's it too expensive?
->> 
->> This is a major difference between my approach and this patch. I think we should get
->> some feedbacks on struct thread_info information management for v2 preparation.
-> 
-> Agreed.
-> 
-> The other difference, as Akashi Takahiro pointed out, is the behaviour of
-> object_is_on_stack(). What should this return for an object on an irq stack?
+v2:
+- remove the patches to set the "latency code" of Spansion QSPI memories
+  (support of Spansion memories may be submitted in later series).
+- rename "qspi" node into "spi" in the DT example to fit ePAPR standard.
+- remove the useless "qspi0" label from the DT node example.
+- remove the leading 0 from the size of the second memory region to make
+  it consistent with the size of the first memory region.
+- indent the DT bindings documentation to make it more readable.
+- remove the useless ".bus	= &platform_bus_type," line from the
+  platform driver definition.
 
-0 should be returned in that case to align with x86 behavior according to check_stack()
-context and the commit, 81520a1b0649d0.
+v1:
 
-Best Regards
-Jungseok Lee
+This series of patches add support for the new Atmel QSPI controller
+embedded inside sama5d2x SoCs.
+
+These patches were first developped for linux-3.18-at91 and tested on a
+sama5d27 Xplained ultra board, which embeds a Micron n25q128a13 QSPI NOR
+flash memory. Then the series was adapted for mainline.
+
+Cyrille Pitchen (8):
+  mtd: spi-nor: read JEDEC ID with multiple I/O protocols
+  mtd: spi-nor: remove unused read_xfer/write_xfer hooks
+  mtd: spi-nor: update the SPI protocol when enabling manufacturer Quad
+    mode
+  mtd: spi-nor: use optimized commands for read/write/erase operations
+  Documentation: mtd: add a DT property to set the number of dummy
+    cycles
+  mtd: spi-nor: allow to tune the number of dummy cycles
+  Documentation: atmel-quadspi: add binding file for Atmel QSPI driver
+  mtd: atmel-quadspi: add driver for Atmel QSPI controller
+
+ .../devicetree/bindings/mtd/atmel-quadspi.txt      |  29 +
+ .../devicetree/bindings/mtd/jedec,spi-nor.txt      |   6 +
+ drivers/mtd/spi-nor/Kconfig                        |   7 +
+ drivers/mtd/spi-nor/Makefile                       |   1 +
+ drivers/mtd/spi-nor/atmel-quadspi.c                | 889 +++++++++++++++++++++
+ drivers/mtd/spi-nor/spi-nor.c                      | 356 +++++++--
+ include/linux/mtd/spi-nor.h                        |  63 +-
+ 7 files changed, 1269 insertions(+), 82 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+ create mode 100644 drivers/mtd/spi-nor/atmel-quadspi.c
+
+-- 
+1.8.2.2
