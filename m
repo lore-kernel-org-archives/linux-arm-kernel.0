@@ -1,53 +1,49 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Wed, 9 Sep 2015 13:57:59 -0600
-Subject: [PATCH v2 1/5] ACPI: add in a bad_madt_entry() function to
- eventually replace the macro
-In-Reply-To: <55EDADF5.5060008@arm.com>
-References: <1440022048-6285-1-git-send-email-al.stone@linaro.org>
- <1440022048-6285-2-git-send-email-al.stone@linaro.org>
- <55EDADF5.5060008@arm.com>
-Message-ID: <55F08F47.1070906@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 09 Sep 2015 22:08:17 +0200
+Subject: [PATCH] selftests/seccomp: build on aarch64, document ABI
+In-Reply-To: <20150909193025.GA29244@www.outflux.net>
+References: <20150909193025.GA29244@www.outflux.net>
+Message-ID: <19228212.s6UOoYJca9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2015 09:32 AM, Sudeep Holla wrote:
-> Hi Al,
+On Wednesday 09 September 2015 12:30:27 Kees Cook wrote:
+> The syscall ABI is inconsistent on aarch64 compat, so at least we should
+> document it in the seccomp_bpf tests.
 > 
-> On 19/08/15 23:07, Al Stone wrote:
-> 
-> I finally got a chance to try this series on Juno. Well it exposed a firmware
-> bug in MADT table :)
-> 
-> [..]
-> 
->>                  acpi_tbl_entry_handler handler,
->> @@ -245,6 +484,8 @@ acpi_parse_entries(char *id, unsigned long table_size,
->>                 table_end) {
->>                  if (entry->type == entry_id
->>                      && (!max_entries || count < max_entries)) {
->> +                       if (bad_madt_entry(table_header, entry))
->> +                               return -EINVAL;
-> 
-> Not sure if we can have the above check here unconditionally.
-> Currently I can see there are 2 other users of acpi_parse_entries i.e.
-> PCC and NUMA. So may be it can be made conditional or return success for
-> non-MADT tables from bad_madt_entry ?
+> Signed-off-by: Kees Cook <keescook@chromium.org>
 
-So, I went back and double checked the other users and they're looking at
-the return value for acpi_parse_entries properly; adding in the check above
-unconditionally should not cause any behavior change.  Further, despite the
-name, acpi_parse_entries is only used to examine MADT subtables.  Granted,
-we should probably make the name clearer at some point (too ambiguous as to
-which entries are parsed right now).  Nonetheless, current usage seems to
-be in order.
+Can you explain in what way the ABI is inconsistent here?
 
+> ---
+> Can someone with access to native aarch64 double-check this for me? I
+> think we need to change these tests to pass if it's expected, but the
+> compat behavior seems bad. It means compat code will break under an
+> aarch64 kernel, when dealing with syscalls, like through seccomp.
+> ---
+>  tools/testing/selftests/seccomp/seccomp_bpf.c | 15 +++++++++++++--
+>  1 file changed, 13 insertions(+), 2 deletions(-)
+> 
+> diff --git a/tools/testing/selftests/seccomp/seccomp_bpf.c b/tools/testing/selftests/seccomp/seccomp_bpf.c
+> index 770f47adf295..866ff42e000d 100644
+> --- a/tools/testing/selftests/seccomp/seccomp_bpf.c
+> +++ b/tools/testing/selftests/seccomp/seccomp_bpf.c
+> @@ -33,6 +33,10 @@
+>  #include <unistd.h>
+>  #include <sys/syscall.h>
+>  
+> +#if defined(__aarch64__) && !defined(__NR_poll)
+> +# define __NR_poll 0x49
+> +#endif
 
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+I don't understand this: 0x49 is __NR_ppoll on arm64 and all architectures
+that use asm-generic/unistd.h, not __NR_poll, which is no longer used there.
+
+If this is intentional, it at least needs a comment to explain the
+situation, and be extended to all other architectures that do not have
+a poll() system call.
+
+The arm32 version of sys_poll should be available as 168 in both native
+and compat mode.
+
+	Arnd
