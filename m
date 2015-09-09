@@ -1,49 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Sep 2015 22:08:17 +0200
-Subject: [PATCH] selftests/seccomp: build on aarch64, document ABI
-In-Reply-To: <20150909193025.GA29244@www.outflux.net>
-References: <20150909193025.GA29244@www.outflux.net>
-Message-ID: <19228212.s6UOoYJca9@wuerfel>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 09 Sep 2015 22:38:50 +0200
+Subject: [PATCH V3 0/4] PCI: ACPI: Setting up DMA coherency for PCI device
+ from _CCA attribute
+In-Reply-To: <55F02331.2060001@amd.com>
+References: <1440597279-11802-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <55F02331.2060001@amd.com>
+Message-ID: <8172790.rR5Ld4j83C@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 September 2015 12:30:27 Kees Cook wrote:
-> The syscall ABI is inconsistent on aarch64 compat, so at least we should
-> document it in the seccomp_bpf tests.
+On Wednesday, September 09, 2015 07:16:49 PM Suthikulpanit, Suravee wrote:
+> Hi All,
 > 
-> Signed-off-by: Kees Cook <keescook@chromium.org>
+> Are there any other concerns about this patch series?
 
-Can you explain in what way the ABI is inconsistent here?
+I have none, but then it sort of missed the merge window.
 
-> ---
-> Can someone with access to native aarch64 double-check this for me? I
-> think we need to change these tests to pass if it's expected, but the
-> compat behavior seems bad. It means compat code will break under an
-> aarch64 kernel, when dealing with syscalls, like through seccomp.
-> ---
->  tools/testing/selftests/seccomp/seccomp_bpf.c | 15 +++++++++++++--
->  1 file changed, 13 insertions(+), 2 deletions(-)
-> 
-> diff --git a/tools/testing/selftests/seccomp/seccomp_bpf.c b/tools/testing/selftests/seccomp/seccomp_bpf.c
-> index 770f47adf295..866ff42e000d 100644
-> --- a/tools/testing/selftests/seccomp/seccomp_bpf.c
-> +++ b/tools/testing/selftests/seccomp/seccomp_bpf.c
-> @@ -33,6 +33,10 @@
->  #include <unistd.h>
->  #include <sys/syscall.h>
->  
-> +#if defined(__aarch64__) && !defined(__NR_poll)
-> +# define __NR_poll 0x49
-> +#endif
+I can easily queue it up for the next one unless it is super-urgent,
+but in that case I need to know why that's the case.
 
-I don't understand this: 0x49 is __NR_ppoll on arm64 and all architectures
-that use asm-generic/unistd.h, not __NR_poll, which is no longer used there.
 
-If this is intentional, it at least needs a comment to explain the
-situation, and be extended to all other architectures that do not have
-a poll() system call.
+> On 8/26/2015 8:54 PM, Suravee Suthikulpanit wrote:
+> > This patch adds support to setup DMA coherency for PCI device using
+> > the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
+> > is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
+> > support for ARM64 which is currently in development.
+> >
+> > Also, this should not affect other architectures that does not define
+> > CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
+> >
+> > I have included the following patch from Jeremy before cleaning up
+> > the acpi_check_dma() function (in patch 2).
+> >
+> >      http://www.spinics.net/lists/linux-usb/msg128582.html)
+> >
+> > Changes from V2: (https://lkml.org/lkml/2015/8/25/549)
+> >      * Return -ENOSUPP instead of -1 (per Rafael's suggestion)
+> >      * Add WARN() when fail to setup DMA for PCI device when booting
+> >        ACPI (per Arnd's suggestion)
+> >      * Added Acked-by from Rob.
+> >      * Minor clean up
+> >
+> > Changes from V1: (https://lkml.org/lkml/2015/8/13/182)
+> >      * Include patch 1 from Jeremy to enable support for _CCA=0
+> >      * Clean up acpi_check_dma() per Bjorn suggestions
+> >      * Split the original V1 patch into two patches (patch 3 and 4)
+> >
+> >
+> > Jeremy Linton (1):
+> >    Honor ACPI _CCA attribute setting
+> >
+> > Suravee Suthikulpanit (3):
+> >    ACPI/scan: Clean up acpi_check_dma
+> >    PCI: OF: Move of_pci_dma_configure() to pci_dma_configure()
+> >    PCI: ACPI: Add support for PCI device DMA coherency
+> >
+> >   drivers/acpi/acpi_platform.c |  7 ++++++-
+> >   drivers/acpi/glue.c          |  6 +++---
+> >   drivers/acpi/scan.c          | 39 +++++++++++++++++++++++++++++++++++++++
+> >   drivers/base/property.c      | 10 +++++++---
+> >   drivers/of/of_pci.c          | 20 --------------------
+> >   drivers/pci/probe.c          | 35 +++++++++++++++++++++++++++++++++--
+> >   include/acpi/acpi_bus.h      | 35 ++---------------------------------
+> >   include/linux/acpi.h         |  4 ++--
+> >   include/linux/of_pci.h       |  3 ---
+> >   9 files changed, 92 insertions(+), 67 deletions(-)
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-The arm32 version of sys_poll should be available as 168 in both native
-and compat mode.
-
-	Arnd
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
