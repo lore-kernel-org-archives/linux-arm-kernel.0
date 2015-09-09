@@ -1,97 +1,46 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Wed, 9 Sep 2015 09:08:55 +0800
-Subject: set rockchip-specific uboot bootmode flags on reboot
-In-Reply-To: <9364768.6AeuYh3EEP@diego>
-References: <1441716187-29446-1-git-send-email-andy.yan@rock-chips.com>
- <9364768.6AeuYh3EEP@diego>
-Message-ID: <55EF86A7.10306@rock-chips.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 08 Sep 2015 18:10:16 -0700
+Subject: [PATCH 1/3] sysfs: Fix is_visible() support for binary attributes
+In-Reply-To: <55EF82A4.5000502@collabora.co.uk>
+References: <1441714066-5599-1-git-send-email-emilio.lopez@collabora.co.uk>
+ <1441714066-5599-2-git-send-email-emilio.lopez@collabora.co.uk>
+ <20150908153013.GA6758@roeck-us.net> <20150908191002.GB10156@kroah.com>
+ <20150908193052.GA11106@roeck-us.net> <55EF82A4.5000502@collabora.co.uk>
+Message-ID: <55EF86F8.3060406@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko:
+Hi Emilio,
 
-On 2015???09???09??? 06:46, Heiko St??bner wrote:
-> Hi Andy,
+On 09/08/2015 05:51 PM, Emilio L?pez wrote:
+> Hi Greg & Guenter,
 >
-> Am Dienstag, 8. September 2015, 20:43:07 schrieb Andy Yan:
->> rockchip platform have a protocol to pass the the kernel
->> reboot mode to bootloader by some special registers when
->> system reboot.By this way the bootloader can take different
->> action according to the different kernel reboot mode, for
->> example, command "reboot loader" will reboot the board to
->> rockusb mode, this is a very convenient way to get the board
->> to download mode.
->>
->> Signed-off-by: Andy Yan<andy.yan@rock-chips.com>
-> [...]
+[ ... ]
+>>>>
+>>>> Unless I am missing something, this is not explained anywhere, but it is
+>>>> not entirely trivial to understand. I think it should be documented.
 >
->> @@ -0,0 +1,22 @@
->> +#ifndef __MACH_ROCKCHIP_LOADER_H
->> +#define __MACH_ROCKCHIP_LOADER_H
->> +
->> +/*high 24 bits is tag, low 8 bits is type*/
->> +#define SYS_LOADER_REBOOT_FLAG   0x5242C300
->> +
->> +enum {
->> +	BOOT_NORMAL = 0, /* normal boot */
->> +	BOOT_LOADER,     /* enter loader rockusb mode */
->> +	BOOT_MASKROM,    /* enter maskrom rockusb mode (not support now) */
->> +	BOOT_RECOVER,    /* enter recover */
->> +	BOOT_NORECOVER,  /* do not enter recover */
->> +	BOOT_SECONDOS,   /* boot second OS (not support now)*/
->> +	BOOT_WIPEDATA,   /* enter recover and wipe data. */
->> +	BOOT_WIPEALL,    /* enter recover and wipe all data. */
->> +	BOOT_CHECKIMG,   /* check firmware img with backup part*/
->> +	BOOT_FASTBOOT,   /* enter fast boot mode */
->> +	BOOT_SECUREBOOT_DISABLE,
->> +	BOOT_CHARGING,   /* enter charge mode */
->> +	BOOT_MAX         /* MAX VALID BOOT TYPE.*/
->> +};
->> +#endif
-> These flags rely on code in the bootloader to actually handle the target
-> action. Nowadays this is uboot, but still a rockchip-specific fork. And we're
-> actively moving away from that, with the recent rk3288 addition to mainline
-> uboot.
-? ?  Sorry, I don't know about this action before, but this is really a 
-very convenient way
-? ?  to get machine enter download mode, it seems that many Android devices
-? ?  have this function to support commands like "reboot recovery", 
-"reboot fastboot".
-? ?  Why should we moving away from that?
-> So unless you convince uboot people that the _underlying special
-> functionality_ behind these flags should be part of uboot, I don't think this
-> is going to fly.
+> I agree. I couldn't find any mention of what this int was supposed to be by looking at Documentation/ (is_visible is not even mentioned :/) or include/linux/sysfs.h. Once we settle on something I'll document it before sending a v2.
 >
+In the include file ? No strong preference, though.
+
+> By the way, I wrote a quick coccinelle script to match is_visible() users which reference the index (included below), and it found references to drivers which do not seem to use any binary attributes, so I believe changing the index meaning shouldn't be an issue.
 >
-> In a way this is similar to gpu kernel code talking to proprietary userspace
-> libs - these are also not eligible for the kernel. (meaning stuff like the
-> mali kernel driver not being allowed).
+Good.
+
+>>> I agree, make i the number of the bin attribute and that should solve
+>>> this issue.
+>>>
+>> No, that would conflict with the "normal" use of is_visible for non-binary
+>> attributes, and make the index all but useless, since the is_visible function
+>> would have to search through all the attributes anyway to figure out which one
+>> is being checked.
 >
-> [...]
+> Yeah, using the same indexes would be somewhat pointless, although not many seem to be using it anyway (only 14 files matched). Others seem to be comparing the attr* instead. An alternative would be to use negative indexes for binary attributes and positive indexes for normal attributes.
 >
->> +static int rockchip_reboot_notify(struct notifier_block *this,
->> +				  unsigned long mode, void *cmd)
->> +{
->> +	u32 flag;
->> +
->> +	rockchip_get_reboot_flag(cmd, &flag);
->> +	regmap_write(regmap, flag_reg, flag);
->> +
->> +	return NOTIFY_DONE;
->> +}
->> +
->> +static struct notifier_block rockchip_reboot_handler = {
->> +	.notifier_call = rockchip_reboot_notify,
->> +	.priority = 150,
->> +};
-> the restart handlers are meant to really only restart the system, not to
-> execute some actions before the restart happens.
->
-> Seehttps://lkml.org/lkml/2015/6/3/707  for a similar case.
->
-    So maybe I can use reboot notifier here?
-   Thank you.
-> Heiko
->
->
->
+... and I probably wrote or reviewed a significant percentage of those ;-).
+
+Using negative numbers for binary attributes is an interesting idea.
+Kind of unusual, though. Greg, any thoughts on that ?
+
+Guenter
