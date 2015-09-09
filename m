@@ -1,33 +1,42 @@
-From: songjun.wu@atmel.com (Wu, Songjun)
-Date: Wed, 9 Sep 2015 11:16:19 +0800
-Subject: [PATCH 2/2] ASoC: atmel-classd: DT binding for Class D audio
- amplifier driver
-In-Reply-To: <20150908122340.GC9751@sirena.org.uk>
-References: <1441086101-15303-1-git-send-email-songjun.wu@atmel.com>
- <1441086101-15303-3-git-send-email-songjun.wu@atmel.com>
- <20150903114316.GV12027@sirena.org.uk> <55EC0AFE.3080809@atmel.com>
- <20150907162548.GW5313@sirena.org.uk> <55EEAC0D.7010003@atmel.com>
- <20150908122340.GC9751@sirena.org.uk>
-Message-ID: <55EFA483.8000804@atmel.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Wed, 09 Sep 2015 09:03:10 +0530
+Subject: [PATCH 5/9] clk: qcom: gcc-msm8960: add child devices support.
+In-Reply-To: <20150908192115.GP15099@codeaurora.org>
+References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
+ <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
+ <20150811224902.GO2839@codeaurora.org> <55CB0B26.2020105@linaro.org>
+ <55CC1CFE.7000005@codeaurora.org> <20150814004206.GU26614@codeaurora.org>
+ <55CD5BD2.3070907@codeaurora.org> <55E660F6.3020007@codeaurora.org>
+ <20150903172743.GE15099@codeaurora.org> <55ED311E.1070404@codeaurora.org>
+ <20150908192115.GP15099@codeaurora.org>
+Message-ID: <55EFA876.30708@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+On 09/09/2015 12:51 AM, Stephen Boyd wrote:
+> On 09/07, Rajendra Nayak wrote:
+>>>
+>>> Yeah this might happen though because we've assigned the of_node
+>>> pointer to the tsens device before we register it on the platform
+>>> bus. The other way to pass that data down from gcc to tsens would
+>>> be to not have an of_node assigned to the tsens device, and check
+>>> for that case in the tsens driver. If there isn't an of_node,
+>>> then we look at the parent device's of_node to figure out which
+>>> gcc it is (if this even matters) and parse DT properties.
+>>
+>> Parsing DT properties from parent (in the tsens driver) is fine, but
+>> the nvmem apis still expect an of_node for the tsens device and hence
+>> fail.
+>
+> So pass the parent device to the nvmem APIs? Or adjust the nvmem
+> APIs to look for a parent of_node if there isn't an of_node for
+> the device being passed? Or make the nvmem APIs work without
+> using DT, and copy over the nvmem information from the gcc node
+> to the virtual tsens child device?
 
-On 9/8/2015 20:23, Mark Brown wrote:
-> On Tue, Sep 08, 2015 at 05:36:13PM +0800, Wu, Songjun wrote:
->> On 9/8/2015 00:25, Mark Brown wrote:
->
->>> Sure, there's no problem at all having that structure in software but it
->>> should be possible to do this without having to represent this structure
->>> in DT.  It should be possible to register the card at the same time as
->>> the rest of the components rather than needing the separate device in
->>> the DT.
->
->> Do you mean using a single entry in the DT for the whole classD system and
->> instantiate ASoC components from it.
->> For now, there are two entry, they could be combined to one entry.
->
-> Yes, exactly.
->
-Accept. the two entries will be combined to one entry.
+Srini, you being the nvmem maintainer, any thoughts?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
