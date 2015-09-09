@@ -1,138 +1,97 @@
-From: emilio.lopez@collabora.co.uk (=?UTF-8?Q?Emilio_L=c3=b3pez?=)
-Date: Tue, 8 Sep 2015 21:51:48 -0300
-Subject: [PATCH 1/3] sysfs: Fix is_visible() support for binary attributes
-In-Reply-To: <20150908193052.GA11106@roeck-us.net>
-References: <1441714066-5599-1-git-send-email-emilio.lopez@collabora.co.uk>
- <1441714066-5599-2-git-send-email-emilio.lopez@collabora.co.uk>
- <20150908153013.GA6758@roeck-us.net> <20150908191002.GB10156@kroah.com>
- <20150908193052.GA11106@roeck-us.net>
-Message-ID: <55EF82A4.5000502@collabora.co.uk>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Wed, 9 Sep 2015 09:08:55 +0800
+Subject: set rockchip-specific uboot bootmode flags on reboot
+In-Reply-To: <9364768.6AeuYh3EEP@diego>
+References: <1441716187-29446-1-git-send-email-andy.yan@rock-chips.com>
+ <9364768.6AeuYh3EEP@diego>
+Message-ID: <55EF86A7.10306@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg & Guenter,
+Hi Heiko:
 
-On 08/09/15 16:30, Guenter Roeck wrote:
-> On Tue, Sep 08, 2015 at 12:10:02PM -0700, Greg KH wrote:
->> On Tue, Sep 08, 2015 at 08:30:13AM -0700, Guenter Roeck wrote:
->>> Emilio,
->>>
->>> On Tue, Sep 08, 2015 at 09:07:44AM -0300, Emilio L?pez wrote:
->>>> According to the sysfs header file:
->>>>
->>>>      "The returned value will replace static permissions defined in
->>>>       struct attribute or struct bin_attribute."
->>>>
->>>> but this isn't the case, as is_visible is only called on
->>>> struct attribute only. This patch adds the code paths required
->>>> to support is_visible() on binary attributes.
->>>>
->>>> Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
->>>> ---
->>>>   fs/sysfs/group.c | 22 ++++++++++++++++++----
->>>>   1 file changed, 18 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/fs/sysfs/group.c b/fs/sysfs/group.c
->>>> index 39a0199..eb6996a 100644
->>>> --- a/fs/sysfs/group.c
->>>> +++ b/fs/sysfs/group.c
->>>> @@ -37,10 +37,10 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
->>>>   {
->>>>   	struct attribute *const *attr;
->>>>   	struct bin_attribute *const *bin_attr;
->>>> -	int error = 0, i;
->>>> +	int error = 0, i = 0;
->>>>
->>>>   	if (grp->attrs) {
->>>> -		for (i = 0, attr = grp->attrs; *attr && !error; i++, attr++) {
->>>> +		for (attr = grp->attrs; *attr && !error; i++, attr++) {
->>>>   			umode_t mode = (*attr)->mode;
->>>>
->>>>   			/*
->>>> @@ -73,13 +73,27 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
->>>>   	}
->>>>
->>>>   	if (grp->bin_attrs) {
->>>> -		for (bin_attr = grp->bin_attrs; *bin_attr; bin_attr++) {
->>>> +		for (bin_attr = grp->bin_attrs; *bin_attr; i++, bin_attr++) {
->>>> +			umode_t mode = (*bin_attr)->attr.mode;
->>>> +
->>>>   			if (update)
->>>>   				kernfs_remove_by_name(parent,
->>>>   						(*bin_attr)->attr.name);
->>>> +			if (grp->is_visible) {
->>>> +				mode = grp->is_visible(kobj,
->>>> +						       &(*bin_attr)->attr, i);
->>>
->>> With this, if 'n' is the number of non-binary attributes,
->>>
->>> for i < n:
->>> 	The index passed to is_visible points to a non-binary attribute.
->>> for i >= n:
->>> 	The index passed to is_visible points to the (index - n)th binary
->>> 	attribute.
->>>
->>> Unless I am missing something, this is not explained anywhere, but it is
->>> not entirely trivial to understand. I think it should be documented.
-
-I agree. I couldn't find any mention of what this int was supposed to be 
-by looking at Documentation/ (is_visible is not even mentioned :/) or 
-include/linux/sysfs.h. Once we settle on something I'll document it 
-before sending a v2.
-
-By the way, I wrote a quick coccinelle script to match is_visible() 
-users which reference the index (included below), and it found 
-references to drivers which do not seem to use any binary attributes, so 
-I believe changing the index meaning shouldn't be an issue.
-
->> I agree, make i the number of the bin attribute and that should solve
->> this issue.
+On 2015???09???09??? 06:46, Heiko St??bner wrote:
+> Hi Andy,
+>
+> Am Dienstag, 8. September 2015, 20:43:07 schrieb Andy Yan:
+>> rockchip platform have a protocol to pass the the kernel
+>> reboot mode to bootloader by some special registers when
+>> system reboot.By this way the bootloader can take different
+>> action according to the different kernel reboot mode, for
+>> example, command "reboot loader" will reboot the board to
+>> rockusb mode, this is a very convenient way to get the board
+>> to download mode.
 >>
-> No, that would conflict with the "normal" use of is_visible for non-binary
-> attributes, and make the index all but useless, since the is_visible function
-> would have to search through all the attributes anyway to figure out which one
-> is being checked.
-
-Yeah, using the same indexes would be somewhat pointless, although not 
-many seem to be using it anyway (only 14 files matched). Others seem to 
-be comparing the attr* instead. An alternative would be to use negative 
-indexes for binary attributes and positive indexes for normal attributes.
-
-Cheers,
-Emilio
-
----->8----
-
-
-// Find out is_visible() users which reference the index
-// somehow
-
-virtual report
-
-@ func @
-identifier visiblefun, i, j, n;
-@@
-
-visiblefun(struct kobject *i, struct attribute *j, int n)
-{
-<+...n...+>
-}
-
-@ attrib depends on func @
-identifier aops;
-identifier func.visiblefun;
-position p0;
-@@
-
-struct attribute_group aops at p0 = {
-...,
-.is_visible = visiblefun,
-...,
-};
-
-@script:python b_report depends on report@
-p0 << attrib.p0;
-@@
-
-msg = "Suspicious is_visible(), please check."
-coccilib.report.print_report(p0[0], msg)
+>> Signed-off-by: Andy Yan<andy.yan@rock-chips.com>
+> [...]
+>
+>> @@ -0,0 +1,22 @@
+>> +#ifndef __MACH_ROCKCHIP_LOADER_H
+>> +#define __MACH_ROCKCHIP_LOADER_H
+>> +
+>> +/*high 24 bits is tag, low 8 bits is type*/
+>> +#define SYS_LOADER_REBOOT_FLAG   0x5242C300
+>> +
+>> +enum {
+>> +	BOOT_NORMAL = 0, /* normal boot */
+>> +	BOOT_LOADER,     /* enter loader rockusb mode */
+>> +	BOOT_MASKROM,    /* enter maskrom rockusb mode (not support now) */
+>> +	BOOT_RECOVER,    /* enter recover */
+>> +	BOOT_NORECOVER,  /* do not enter recover */
+>> +	BOOT_SECONDOS,   /* boot second OS (not support now)*/
+>> +	BOOT_WIPEDATA,   /* enter recover and wipe data. */
+>> +	BOOT_WIPEALL,    /* enter recover and wipe all data. */
+>> +	BOOT_CHECKIMG,   /* check firmware img with backup part*/
+>> +	BOOT_FASTBOOT,   /* enter fast boot mode */
+>> +	BOOT_SECUREBOOT_DISABLE,
+>> +	BOOT_CHARGING,   /* enter charge mode */
+>> +	BOOT_MAX         /* MAX VALID BOOT TYPE.*/
+>> +};
+>> +#endif
+> These flags rely on code in the bootloader to actually handle the target
+> action. Nowadays this is uboot, but still a rockchip-specific fork. And we're
+> actively moving away from that, with the recent rk3288 addition to mainline
+> uboot.
+? ?  Sorry, I don't know about this action before, but this is really a 
+very convenient way
+? ?  to get machine enter download mode, it seems that many Android devices
+? ?  have this function to support commands like "reboot recovery", 
+"reboot fastboot".
+? ?  Why should we moving away from that?
+> So unless you convince uboot people that the _underlying special
+> functionality_ behind these flags should be part of uboot, I don't think this
+> is going to fly.
+>
+>
+> In a way this is similar to gpu kernel code talking to proprietary userspace
+> libs - these are also not eligible for the kernel. (meaning stuff like the
+> mali kernel driver not being allowed).
+>
+> [...]
+>
+>> +static int rockchip_reboot_notify(struct notifier_block *this,
+>> +				  unsigned long mode, void *cmd)
+>> +{
+>> +	u32 flag;
+>> +
+>> +	rockchip_get_reboot_flag(cmd, &flag);
+>> +	regmap_write(regmap, flag_reg, flag);
+>> +
+>> +	return NOTIFY_DONE;
+>> +}
+>> +
+>> +static struct notifier_block rockchip_reboot_handler = {
+>> +	.notifier_call = rockchip_reboot_notify,
+>> +	.priority = 150,
+>> +};
+> the restart handlers are meant to really only restart the system, not to
+> execute some actions before the restart happens.
+>
+> Seehttps://lkml.org/lkml/2015/6/3/707  for a similar case.
+>
+    So maybe I can use reboot notifier here?
+   Thank you.
+> Heiko
+>
+>
+>
