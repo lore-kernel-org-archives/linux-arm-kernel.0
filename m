@@ -1,50 +1,75 @@
 From: scottwood@freescale.com (Scott Wood)
-Date: Wed, 9 Sep 2015 11:41:03 -0500
-Subject: [PATCH v2 06/10] clk: qoriq: Add ls2080a support.
-In-Reply-To: <CADRPPNRhBObf4Am-MKFHFk6y+_PmtZGuGrfVaDPtra6h394Fog@mail.gmail.com>
+Date: Wed, 9 Sep 2015 11:46:50 -0500
+Subject: [PATCH v2 05/10] doc/bindings: Update clk-qoriq bindings for
+ FSL's chassis-3.0 SoCs
+In-Reply-To: <1441349872-4560-6-git-send-email-bhupesh.sharma@freescale.com>
 References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
- <1441349872-4560-7-git-send-email-bhupesh.sharma@freescale.com>
- <CADRPPNQsemXa2HgYZAcm+GurhimHbYVM5CL5ReDsyuzfAO=kSQ@mail.gmail.com>
- <BY1PR0301MB1303A3BD91F3E65853CC3F2E82570@BY1PR0301MB1303.namprd03.prod.outlook.com>
- <CADRPPNRhBObf4Am-MKFHFk6y+_PmtZGuGrfVaDPtra6h394Fog@mail.gmail.com>
-Message-ID: <1441816863.29081.11.camel@freescale.com>
+ <1441349872-4560-6-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <1441817210.29081.15.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-09-04 at 16:06 -0500, Li Yang wrote:
-> On Fri, Sep 4, 2015 at 3:09 PM, Sharma Bhupesh
-> <bhupesh.sharma@freescale.com> wrote:
-> > > From:  pku.leo at gmail.com[mailto:pku.leo at gmail.com]
-> > > Sent: Saturday, September 05, 2015 1:32 AM
-> > > On Fri, Sep 4, 2015 at 1:57 AM, Bhupesh Sharma
-> > > <bhupesh.sharma@freescale.com> wrote:
-> > > > From: Scott Wood <scottwood@freescale.com>
-> > > > 
-> > > > LS2080A is the first implementation of the chassis 3 clockgen, which
-> > > > has a different register layout than previous chips.  It is also
-> > > > little endian, unlike previous chips.
-> > > > 
-> > > > Signed-off-by: Scott Wood <scottwood@freescale.com>
-> > > > ---
-> > > 
-> > > You should probably mention here that the patch is depending on another
-> > > pending patch to apply.  And this patch should be going through the same
-> > > sub-system tree as the dependency patch.  Otherwise, there is no way it
-> > > can be applied.
-> > > 
-> > 
-> > Cover-letter already captures this:
-> > http://www.spinics.net/lists/arm-kernel/msg442910.html
-> > 
-> > See the section 'Rebasing details'. linux-clk is already copied.
+On Fri, 2015-09-04 at 12:27 +0530, Bhupesh Sharma wrote:
+> This patch updates the 'clk-qoriq' device-tree bindings for
+> chassis-3.0 compliant SoCs from FSL, for e.g. LS2080A
 > 
-> But not all the patches are depending on the clk patches.  You should
-> probably break up the series to patches that can be applied cleanly
-> and patches that are depending on the clock patches and should go
-> through the clk tree.
+> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> ---
+>  .../devicetree/bindings/clock/qoriq-clock.txt      |   16 ++++++++++++----
+>  1 file changed, 12 insertions(+), 4 deletions(-)
 
-The clock patches have already been acked, so they don't necessarily need to 
-go via the clock tree.  However, there are both ARM and PPC patches that 
-depend on them, so maybe we should create a topic branch?
+Why didn't you CC me on this?
+
+> diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt 
+> b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+> index 16a3ec4..f0a4b1c 100644
+> --- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+> @@ -14,6 +14,7 @@ Chassis Version             Example Chips
+>  ---------------              -------------
+>  1.0                  p4080, p5020, p5040
+>  2.0                  t4240, b4860
+> +3.0                  ls2080a
+>  
+>  1. Clock Block Binding
+>  
+> @@ -32,9 +33,11 @@ Required properties:
+>       * "fsl,b4420-clockgen"
+>       * "fsl,b4860-clockgen"
+>       * "fsl,ls1021a-clockgen"
+> -     Chassis-version clock strings include:
+> +     * "fsl,ls2080a-clockgen"
+
+We don't need to update this for every new chip.  It says "such as".
+
+> +     Chassis clock strings include:
+>       * "fsl,qoriq-clockgen-1.0": for chassis 1.0 clocks
+>       * "fsl,qoriq-clockgen-2.0": for chassis 2.0 clocks
+> +     * "fsl,qoriq-clockgen-3.0": for chassis 3.0 clocks
+
+With the new binding I don't see value in the generic version compatible.
+
+>  - reg: Describes the address of the device's resources within the
+>       address space defined by its parent bus, and resource zero
+>       represents the clock register set
+> @@ -96,18 +99,23 @@ Required properties:
+>  - compatible : Should include one of the following:
+>       * "fsl,qoriq-core-pll-1.0" for core PLL clocks (v1.0)
+>       * "fsl,qoriq-core-pll-2.0" for core PLL clocks (v2.0)
+> +     * "fsl,qoriq-core-pll-3.0" for core PLL clocks (v3.0)
+>       * "fsl,qoriq-core-mux-1.0" for core mux clocks (v1.0)
+>       * "fsl,qoriq-core-mux-2.0" for core mux clocks (v2.0)
+> +     * "fsl,qoriq-core-mux-3.0" for core mux clocks (v3.0)
+>       * "fsl,qoriq-sysclk-1.0": for input system clock (v1.0).
+>               It takes parent's clock-frequency as its clock.
+>       * "fsl,qoriq-sysclk-2.0": for input system clock (v2.0).
+>               It takes parent's clock-frequency as its clock.
+> +     * "fsl,qoriq-sysclk-3.0": for input system clock (v3.0).
+> +             It takes parent's clock-frequency as its clock.
+>       * "fsl,qoriq-platform-pll-1.0" for the platform PLL clock (v1.0)
+>       * "fsl,qoriq-platform-pll-2.0" for the platform PLL clock (v2.0)
+> +     * "fsl,qoriq-platform-pll-3.0" for the platform PLL clock (v3.0)
+
+No new legacy compatibles please.
 
 -Scott
