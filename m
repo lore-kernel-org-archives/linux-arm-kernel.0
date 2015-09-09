@@ -1,103 +1,175 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed,  9 Sep 2015 11:11:24 +0200
-Subject: [PATCH 2/4] devicetree: bindings: Add header file with evdev type and
- abs/rel code defines
+Date: Wed,  9 Sep 2015 11:11:25 +0200
+Subject: [PATCH 3/4] input: gpio_keys_polled: input_sync once after polling
+ all the buttons
 In-Reply-To: <1441789886-5868-1-git-send-email-hdegoede@redhat.com>
 References: <1441789886-5868-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1441789886-5868-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1441789886-5868-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This header provides evdev constants for linux,code, and linux,input-*
-properties.
+There is no need to do a separate input_sync per changed button. Instead
+do the input_sync once after polling all the buttons.
+
+This is a preparation patch for adding support for EV_ABS / EV_REL events.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- include/dt-bindings/input/evdev.h | 76 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
- create mode 100644 include/dt-bindings/input/evdev.h
+ drivers/input/keyboard/gpio_keys_polled.c | 88 +++++++++++++++++++++++++++----
+ 1 file changed, 79 insertions(+), 9 deletions(-)
 
-diff --git a/include/dt-bindings/input/evdev.h b/include/dt-bindings/input/evdev.h
-new file mode 100644
-index 0000000..c1f7e0d
---- /dev/null
-+++ b/include/dt-bindings/input/evdev.h
-@@ -0,0 +1,76 @@
-+/*
-+ * This header provides evdev constants for linux,code, and linux,input-*
-+ * properties.
-+ */
+diff --git a/drivers/input/keyboard/gpio_keys_polled.c b/drivers/input/keyboard/gpio_keys_polled.c
+index 097d721..0a80e6f 100644
+--- a/drivers/input/keyboard/gpio_keys_polled.c
++++ b/drivers/input/keyboard/gpio_keys_polled.c
+@@ -40,10 +40,36 @@ struct gpio_keys_polled_dev {
+ 	struct input_polled_dev *poll_dev;
+ 	struct device *dev;
+ 	const struct gpio_keys_platform_data *pdata;
++	unsigned long rel_axis_seen[BITS_TO_LONGS(REL_CNT)];
++	unsigned long abs_axis_seen[BITS_TO_LONGS(ABS_CNT)];
+ 	struct gpio_keys_button_data data[0];
+ };
+ 
+-static void gpio_keys_polled_check_state(struct input_dev *input,
++static void gpio_keys_button_event(struct input_polled_dev *dev,
++				   struct gpio_keys_button *button,
++				   int state)
++{
++	struct gpio_keys_polled_dev *bdev = dev->private;
++	struct input_dev *input = dev->input;
++	unsigned int type = button->type ?: EV_KEY;
 +
-+#ifndef _DT_BINDINGS_INPUT_LINUX_H
-+#define _DT_BINDINGS_INPUT_LINUX_H
++	if (type == EV_REL) {
++		if (state) {
++			input_event(input, type, button->code, button->value);
++			__set_bit(button->code, bdev->rel_axis_seen);
++		}
++	} else if (type == EV_ABS) {
++		if (state) {
++			input_event(input, type, button->code, button->value);
++			__set_bit(button->code, bdev->abs_axis_seen);
++		}
++	} else {
++		input_event(input, type, button->code, state);
++		input_sync(input);
++	}
++}
 +
-+/*
-+ * Event types
-+ */
++static void gpio_keys_polled_check_state(struct input_polled_dev *dev,
+ 					 struct gpio_keys_button *button,
+ 					 struct gpio_keys_button_data *bdata)
+ {
+@@ -54,11 +80,9 @@ static void gpio_keys_polled_check_state(struct input_dev *input,
+ 	else
+ 		state = !!gpiod_get_value(button->gpiod);
+ 
+-	if (state != bdata->last_state) {
+-		unsigned int type = button->type ?: EV_KEY;
++	gpio_keys_button_event(dev, button, state);
+ 
+-		input_event(input, type, button->code, state);
+-		input_sync(input);
++	if (state != bdata->last_state) {
+ 		bdata->count = 0;
+ 		bdata->last_state = state;
+ 	}
+@@ -71,15 +95,33 @@ static void gpio_keys_polled_poll(struct input_polled_dev *dev)
+ 	struct input_dev *input = dev->input;
+ 	int i;
+ 
++	memset(bdev->rel_axis_seen, 0, sizeof(bdev->rel_axis_seen));
++	memset(bdev->abs_axis_seen, 0, sizeof(bdev->abs_axis_seen));
 +
-+#define EV_SYN			0x00
-+#define EV_KEY			0x01
-+#define EV_REL			0x02
-+#define EV_ABS			0x03
-+#define EV_MSC			0x04
-+#define EV_SW			0x05
-+#define EV_LED			0x11
-+#define EV_SND			0x12
-+#define EV_REP			0x14
-+#define EV_FF			0x15
-+#define EV_PWR			0x16
-+#define EV_FF_STATUS		0x17
-+#define EV_MAX			0x1f
+ 	for (i = 0; i < pdata->nbuttons; i++) {
+ 		struct gpio_keys_button_data *bdata = &bdev->data[i];
+ 
+-		if (bdata->count < bdata->threshold)
++		if (bdata->count < bdata->threshold) {
+ 			bdata->count++;
+-		else
+-			gpio_keys_polled_check_state(input, &pdata->buttons[i],
++			gpio_keys_button_event(dev, &pdata->buttons[i],
++					       bdata->last_state);
++		} else {
++			gpio_keys_polled_check_state(dev, &pdata->buttons[i],
+ 						     bdata);
++		}
++	}
 +
-+/*
-+ * Relative axes
-+ */
++	for_each_set_bit(i, input->relbit, REL_CNT) {
++		if (!test_bit(i, bdev->rel_axis_seen))
++			input_event(input, EV_REL, i, 0);
++	}
 +
-+#define REL_X			0x00
-+#define REL_Y			0x01
-+#define REL_Z			0x02
-+#define REL_RX			0x03
-+#define REL_RY			0x04
-+#define REL_RZ			0x05
-+#define REL_HWHEEL		0x06
-+#define REL_DIAL		0x07
-+#define REL_WHEEL		0x08
-+#define REL_MISC		0x09
-+#define REL_MAX			0x0f
++	for_each_set_bit(i, input->absbit, ABS_CNT) {
++		if (!test_bit(i, bdev->abs_axis_seen))
++			input_event(input, EV_ABS, i, 0);
+ 	}
 +
-+/*
-+ * Absolute axes
-+ */
++	input_sync(input);
+ }
+ 
+ static void gpio_keys_polled_open(struct input_polled_dev *dev)
+@@ -152,6 +194,10 @@ static struct gpio_keys_platform_data *gpio_keys_polled_get_devtree_pdata(struct
+ 					     &button->type))
+ 			button->type = EV_KEY;
+ 
++		if (fwnode_property_read_u32(child, "linux,input-value",
++					     (u32 *)&button->value))
++			button->value = 1;
 +
-+#define ABS_X			0x00
-+#define ABS_Y			0x01
-+#define ABS_Z			0x02
-+#define ABS_RX			0x03
-+#define ABS_RY			0x04
-+#define ABS_RZ			0x05
-+#define ABS_THROTTLE		0x06
-+#define ABS_RUDDER		0x07
-+#define ABS_WHEEL		0x08
-+#define ABS_GAS			0x09
-+#define ABS_BRAKE		0x0a
-+#define ABS_HAT0X		0x10
-+#define ABS_HAT0Y		0x11
-+#define ABS_HAT1X		0x12
-+#define ABS_HAT1Y		0x13
-+#define ABS_HAT2X		0x14
-+#define ABS_HAT2Y		0x15
-+#define ABS_HAT3X		0x16
-+#define ABS_HAT3Y		0x17
-+#define ABS_PRESSURE		0x18
-+#define ABS_DISTANCE		0x19
-+#define ABS_TILT_X		0x1a
-+#define ABS_TILT_Y		0x1b
-+#define ABS_TOOL_WIDTH		0x1c
+ 		button->wakeup = fwnode_property_present(child, "gpio-key,wakeup");
+ 
+ 		if (fwnode_property_read_u32(child, "debounce-interval",
+@@ -165,6 +211,25 @@ static struct gpio_keys_platform_data *gpio_keys_polled_get_devtree_pdata(struct
+ 	return pdata;
+ }
+ 
++static void gpio_keys_polled_set_abs_params(struct input_dev *input,
++	const struct gpio_keys_platform_data *pdata, unsigned int code)
++{
++	int i, min = 0, max = 0;
 +
-+#define ABS_VOLUME		0x20
++	for (i = 0; i < pdata->nbuttons; i++) {
++		struct gpio_keys_button *button = &pdata->buttons[i];
 +
-+#define ABS_MISC		0x28
++		if (button->type != EV_ABS || button->code != code)
++			continue;
 +
-+#endif /* _DT_BINDINGS_INPUT_LINUX_H */
++		if (button->value < min)
++			min = button->value;
++		if (button->value > max)
++			max = button->value;
++	}
++	input_set_abs_params(input, code, min, max, 0, 0);
++}
++
+ static const struct of_device_id gpio_keys_polled_of_match[] = {
+ 	{ .compatible = "gpio-keys-polled", },
+ 	{ },
+@@ -271,6 +336,9 @@ static int gpio_keys_polled_probe(struct platform_device *pdev)
+ 						pdata->poll_interval);
+ 
+ 		input_set_capability(input, type, button->code);
++		if (type == EV_ABS)
++			gpio_keys_polled_set_abs_params(input, pdata,
++							button->code);
+ 	}
+ 
+ 	bdev->poll_dev = poll_dev;
+@@ -287,9 +355,11 @@ static int gpio_keys_polled_probe(struct platform_device *pdev)
+ 
+ 	/* report initial state of the buttons */
+ 	for (i = 0; i < pdata->nbuttons; i++)
+-		gpio_keys_polled_check_state(input, &pdata->buttons[i],
++		gpio_keys_polled_check_state(poll_dev, &pdata->buttons[i],
+ 					     &bdev->data[i]);
+ 
++	input_sync(input);
++
+ 	return 0;
+ }
+ 
 -- 
 2.4.3
