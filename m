@@ -1,55 +1,47 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 08 Sep 2015 21:12:37 -0700
-Subject: [PATCH 1/3] sysfs: Fix is_visible() support for binary attributes
-In-Reply-To: <20150909035850.GA5497@kroah.com>
-References: <1441714066-5599-1-git-send-email-emilio.lopez@collabora.co.uk>
- <1441714066-5599-2-git-send-email-emilio.lopez@collabora.co.uk>
- <20150908153013.GA6758@roeck-us.net> <20150908191002.GB10156@kroah.com>
- <20150908193052.GA11106@roeck-us.net> <55EF82A4.5000502@collabora.co.uk>
- <55EF86F8.3060406@roeck-us.net> <20150909035850.GA5497@kroah.com>
-Message-ID: <55EFB1B5.1060703@roeck-us.net>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Wed, 09 Sep 2015 10:45:59 +0530
+Subject: [PATCH 5/9] clk: qcom: gcc-msm8960: add child devices support.
+In-Reply-To: <55EFA876.30708@codeaurora.org>
+References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
+ <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
+ <20150811224902.GO2839@codeaurora.org> <55CB0B26.2020105@linaro.org>
+ <55CC1CFE.7000005@codeaurora.org> <20150814004206.GU26614@codeaurora.org>
+ <55CD5BD2.3070907@codeaurora.org> <55E660F6.3020007@codeaurora.org>
+ <20150903172743.GE15099@codeaurora.org> <55ED311E.1070404@codeaurora.org>
+ <20150908192115.GP15099@codeaurora.org> <55EFA876.30708@codeaurora.org>
+Message-ID: <55EFC08F.8060105@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2015 08:58 PM, Greg KH wrote:
-> On Tue, Sep 08, 2015 at 06:10:16PM -0700, Guenter Roeck wrote:
->> Hi Emilio,
->>
->> On 09/08/2015 05:51 PM, Emilio L?pez wrote:
->>> Hi Greg & Guenter,
->>>
->> [ ... ]
->>>>>>
->>>>>> Unless I am missing something, this is not explained anywhere, but it is
->>>>>> not entirely trivial to understand. I think it should be documented.
->>>
->>> I agree. I couldn't find any mention of what this int was supposed to be by looking at Documentation/ (is_visible is not even mentioned :/) or include/linux/sysfs.h. Once we settle on something I'll document it before sending a v2.
->>>
->> In the include file ? No strong preference, though.
->>
->>> By the way, I wrote a quick coccinelle script to match is_visible() users which reference the index (included below), and it found references to drivers which do not seem to use any binary attributes, so I believe changing the index meaning shouldn't be an issue.
->>>
->> Good.
->>
->>>>> I agree, make i the number of the bin attribute and that should solve
->>>>> this issue.
->>>>>
->>>> No, that would conflict with the "normal" use of is_visible for non-binary
->>>> attributes, and make the index all but useless, since the is_visible function
->>>> would have to search through all the attributes anyway to figure out which one
->>>> is being checked.
->>>
->>> Yeah, using the same indexes would be somewhat pointless, although not many seem to be using it anyway (only 14 files matched). Others seem to be comparing the attr* instead. An alternative would be to use negative indexes for binary attributes and positive indexes for normal attributes.
->>>
->> ... and I probably wrote or reviewed a significant percentage of those ;-).
->>
->> Using negative numbers for binary attributes is an interesting idea.
->> Kind of unusual, though. Greg, any thoughts on that ?
->
-> Ick, no, that's a mess, maybe we just could drop the index alltogether?
->
 
-No, please don't. Having to manually compare dozens of index pointers would be
-even more of a mess.
+On 09/09/2015 09:03 AM, Rajendra Nayak wrote:
+>
+> On 09/09/2015 12:51 AM, Stephen Boyd wrote:
+>> On 09/07, Rajendra Nayak wrote:
+>>>>
+>>>> Yeah this might happen though because we've assigned the of_node
+>>>> pointer to the tsens device before we register it on the platform
+>>>> bus. The other way to pass that data down from gcc to tsens would
+>>>> be to not have an of_node assigned to the tsens device, and check
+>>>> for that case in the tsens driver. If there isn't an of_node,
+>>>> then we look at the parent device's of_node to figure out which
+>>>> gcc it is (if this even matters) and parse DT properties.
+>>>
+>>> Parsing DT properties from parent (in the tsens driver) is fine, but
+>>> the nvmem apis still expect an of_node for the tsens device and hence
+>>> fail.
+>>
+>> So pass the parent device to the nvmem APIs? Or adjust the nvmem
+>> APIs to look for a parent of_node if there isn't an of_node for
+>> the device being passed? Or make the nvmem APIs work without
+>> using DT, and copy over the nvmem information from the gcc node
+>> to the virtual tsens child device?
+>
+> Srini, you being the nvmem maintainer, any thoughts?
 
-Guenter
+passing the parent device to nvmem APIs seems the cleanest to me,
+without having to change much with the nvmem APIs itself.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
