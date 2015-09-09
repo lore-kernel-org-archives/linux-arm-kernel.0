@@ -1,61 +1,98 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 9 Sep 2015 12:30:27 -0700
-Subject: [PATCH] selftests/seccomp: build on aarch64, document ABI
-Message-ID: <20150909193025.GA29244@www.outflux.net>
+From: greg@kroah.com (Greg Kroah-Hartman)
+Date: Wed, 9 Sep 2015 12:54:02 -0700
+Subject: earlycon issues in -next with amba-pl011 updates
+In-Reply-To: <CABymUCP4s+ePs-sphJkQ4b61EcNT51FQat2ADWoy1Tgww35GMg@mail.gmail.com>
+References: <20150810232312.GB10728@bivouac.eciton.net>
+ <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
+ <55E81F93.1020104@arm.com> <20150903155255.GA28336@kroah.com>
+ <55E87095.4030600@arm.com>
+ <CABymUCP4s+ePs-sphJkQ4b61EcNT51FQat2ADWoy1Tgww35GMg@mail.gmail.com>
+Message-ID: <20150909195402.GA7979@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The syscall ABI is inconsistent on aarch64 compat, so at least we should
-document it in the seccomp_bpf tests.
+On Sat, Sep 05, 2015 at 10:42:03PM +0800, Jun Nie wrote:
+> 2015-09-04 0:08 GMT+08:00 Marc Zyngier <marc.zyngier@arm.com>:
+> > On 03/09/15 16:52, Greg Kroah-Hartman wrote:
+> >> On Thu, Sep 03, 2015 at 11:23:15AM +0100, Marc Zyngier wrote:
+> >>> On 11/08/15 02:48, Jun Nie wrote:
+> >>>> 2015-08-11 7:23 GMT+08:00 Leif Lindholm <leif.lindholm@linaro.org>:
+> >>>>> Hi all,
+> >>>>>
+> >>>>> The kernelci.org bot picked up a complete boot failure (no output past
+> >>>>> UEFI stub) with next-20150806 and Tyler bisected it down to somewhere
+> >>>>> in
+> >>>>> 8cd90e5 uart: pl011: Add support to ZTE ZX296702 uart
+> >>>>> 09dcc7d uart: pl011: Improve LCRH register access decision
+> >>>>> 2c096a9 uart: pl011: Introduce register look up table
+> >>>>> 7b753f3 uart: pl011: Introduce register accessor
+> >>>>>
+> >>>>> The issue only appears with earlycon on command line, for pl011
+> >>>>> consoles.
+> >>>>>
+> >>>>> Some investigation shows that the cause lies with
+> >>>>> commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
+> >>>>> and
+> >>>>> commit 2c096a9eedc6 ("uart: pl011: Introduce register look up table")
+> >>>>>
+> >>>>> Specifically, the changes to pl011_putc() are incorrect:
+> >>>>> The new pl011_ accessors take a (struct uart_amba_port *) input, but
+> >>>>> pl011_putc() directly uses the incoming (struct uart_port *) for this.
+> >>>>>
+> >>>>> Apart from ending up with an unintended/incorrect UART base address,
+> >>>>> the introduction of the lookup table for register offsets also means
+> >>>>> the accessors try to dereference (struct uart_amba_port *)->reg_lut.
+> >>>>>
+> >>>>> The below is a hack that shows/resolves the issue, but some
+> >>>>> refactoring of the original patches might be in order.
+> >>>>>
+> >>>>> /
+> >>>>>     Leif
+> >>>>
+> >>>> Leif,
+> >>>>
+> >>>> Sorry for the inconvenience. I do not have idea of early console till
+> >>>> now and I always have debug console for early panic debug. Learned
+> >>>> more from this issue.
+> >>>>
+> >>>> Suppose Peter's patch will resolve your issue.
+> >>>
+> >>> [+ Greg KH]
+> >>>
+> >>> So -next has now been broken for a while on a number of ARM platforms
+> >>> because of this (they simply cannot boot), and no progress has been made
+> >>> towards resolving this problem.
+> >>>
+> >>> Can we please drop this series (at least commits 7b753f3 and following)
+> >>> from -next until is has been reworked and reviewed?
+> >>
+> >> I don't have any patches in my -next tree, everything is in Linus's tree
+> >> now.  So if I've missed something, or need to revert something, please
+> >> let me know specifcally what to do.
+> >
+> > Gahhh... Given that there is no obvious fix, that the discussion has
+> > stalled and that the author of the series is apparently away, the
+> > following patches should be reverted:
+> 
+> Marc,
+> 
+> There had a patch from Peter that revert early console part, which I
+> thought will be merged to mainline. It's my fault for not fix the bug
+> on time. Also sorry for late response to you as I took three days
+> leave.
+> 
+> Could you help test attached patch? Thank you in advance!
+> 
+> 
+> Greg,
+> 
+> Would you please hold the merging of revert patches for one or two
+> days so that the fix can be verified? Thank you!
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
-Can someone with access to native aarch64 double-check this for me? I
-think we need to change these tests to pass if it's expected, but the
-compat behavior seems bad. It means compat code will break under an
-aarch64 kernel, when dealing with syscalls, like through seccomp.
----
- tools/testing/selftests/seccomp/seccomp_bpf.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+Given that this took way more than a few days, Linus now has the reverts
+in his tree.  Please feel free to resend the series, in a form that does
+not break people's machines, for inclusion in 4.4-rc1.
 
-diff --git a/tools/testing/selftests/seccomp/seccomp_bpf.c b/tools/testing/selftests/seccomp/seccomp_bpf.c
-index 770f47adf295..866ff42e000d 100644
---- a/tools/testing/selftests/seccomp/seccomp_bpf.c
-+++ b/tools/testing/selftests/seccomp/seccomp_bpf.c
-@@ -33,6 +33,10 @@
- #include <unistd.h>
- #include <sys/syscall.h>
- 
-+#if defined(__aarch64__) && !defined(__NR_poll)
-+# define __NR_poll 0x49
-+#endif
-+
- #include "test_harness.h"
- 
- #ifndef PR_SET_PTRACER
-@@ -2124,10 +2128,17 @@ TEST(syscall_restart)
- 	ASSERT_EQ(SIGTRAP, WSTOPSIG(status));
- 	ASSERT_EQ(PTRACE_EVENT_SECCOMP, (status >> 16));
- 	ASSERT_EQ(0, ptrace(PTRACE_GETEVENTMSG, child_pid, NULL, &msg));
--	ASSERT_EQ(0x200, msg);
-+
-+	/*
-+	 * FIXME:
-+	 * - native ARM does not expose true syscall.
-+	 * - compat ARM on ARM64 does expose true syscall.
-+	 * - native ARM64 hides true syscall even from seccomp.
-+	 */
-+	ASSERT_EQ(0x200, msg);	/* This will fail on native arm64. */
- 	ret = get_syscall(_metadata, child_pid);
- #if defined(__arm__)
--	/* FIXME: ARM does not expose true syscall in registers. */
-+	/* This will fail on arm64 in compat mode. */
- 	EXPECT_EQ(__NR_poll, ret);
- #else
- 	EXPECT_EQ(__NR_restart_syscall, ret);
--- 
-1.9.1
+thanks,
 
--- 
-Kees Cook
-Chrome OS Security
+greg k-h
