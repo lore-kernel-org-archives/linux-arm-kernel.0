@@ -1,116 +1,240 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 9 Sep 2015 09:41:07 +0200
-Subject: [PATCH] ARM: exynos_defconfig: Enable USB Video Class support
-In-Reply-To: <55EF77EE.10301@samsung.com>
-References: <1441662323-15468-1-git-send-email-javier@osg.samsung.com>
- <55EE9820.2010202@samsung.com> <55EE9F1A.9030703@osg.samsung.com>
- <55EEDECA.4040407@samsung.com> <55EEE370.9040705@osg.samsung.com>
- <55EF77EE.10301@samsung.com>
-Message-ID: <55EFE293.8050400@osg.samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 9 Sep 2015 08:59:30 +0100
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <20150909062722.GA5266@linux>
+References: <20150811115425.GE18282@x1> <20150811120124.GH5509@linux>
+ <20150811132756.GG18282@x1> <20150811142812.GJ5509@linux>
+ <20150811151736.GO18282@x1> <20150812110841.GC20238@linux>
+ <20150826120628.GZ19409@x1> <20150902080639.GA26744@linux>
+ <CAL_JsqKMGp+3Z+oO6E0YYzjTCb=-R_QM=YF=B33NWayWmV057A@mail.gmail.com>
+ <20150909062722.GA5266@linux>
+Message-ID: <20150909075930.GB3260@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Wed, 09 Sep 2015, Viresh Kumar wrote:
+> On 02-09-15, 13:58, Rob Herring wrote:
+> > What do you expect here? It is your job to close it. Ultimately, this
+> > will be your problem to deal with. If you have 10 different vendors
+> > doing selection of OPPs in 10 different ways you will not be able to
+> > change that easily later. Maybe if you can't come up with something
+> > common, then this should just not go into DT. You can always look at
+> > how to do this in a common way and move from the kernel to DT later.
+> 
+> After getting ranted a bit, here is an real attempt to solve the
+> problem in a generic way. I hope this can take care of the complexity
+> of both Qualcomm and ST Microelectronics SoCs.
+> 
+> @Lee and Stephen: Lemme know if this still wouldn't work :(
 
-On 09/09/2015 02:06 AM, Krzysztof Kozlowski wrote:
-> On 08.09.2015 22:32, Javier Martinez Canillas wrote:
-> 
-> (...)
-> 
->>  
->>> Let me rephrase my question into:
->>> 1. What is worth enabling in exynos_defconfig? USB devices? I would
->>> argue, except they are needed to boot.
->>
->> Ok, I understand your concern. The question is where we draw the line.
->>
->>> So maybe enable everything which Exynos boards have hard-wired? That
->>> would make some sense... but we're making kernel larger.
->>>
->>
->> In the case of this WebCam, it's not a typical USB device in the sense
->> that is built in the Chromebook and not something that's plugged on an
->> external USB port.
-> 
-> Right, that is the difference from regular USB devices.
-> 
->>  
->>> 2. Maybe enable only what is a typical use case (including typical
->>> testing cases)? Then we would have to define what "typical" means. For
->>> example battery would be typical but camera would not.
->>>
->>
->> There are a lot of board specific drivers that we currently enable as
->> built-in like hwmon sensors or iio devices that are likely only present
->> on a single board or a family of boards.
->>
->> So then I think all those drivers should be changed as a module as well,
->> unless are critical for the board operation (i.e: thermal or fan drivers).
-> 
-> Actually I think we should not judge by number of board using given
-> component but its usefulness in general exynos_defconfig case. Even when
-> something is used on just one board but it is important for that board,
-> then it should be built-in.
-> 
-> For example hwmon monitoring stuff to get information about board
-> condition. Other example are leds on Odroid - to get visible condition
-> of the board.
-> 
-> This don't have to be critical, but just important for testing.
-> 
-> Additionally such components can be accessed usually from limited
-> user-space, e.g. system booted to console or SSH.
-> 
-> If using a component requires more complex user-space (e.g. any kind of
-> window system), then probably already modules could be easily used. In
-> such cases I would expect the boot is not from network but from MMC and
-> there is a full-blown distro working.
-> 
+Thanks for doing this Viresh.  I appreciate your efforts.
 
-Ok, fair enough.
- 
->>> 3. Argh, so maybe, if we agree that not everything is worth being
->>> enabled, that additional stuff could be build as module?
->>>
->>
->> Yes, I don't see anything wrong to enable more stuff as a module if
->> that will give more build / test coverage.
->>
->> The goal of kernelci is to add functional tests so besides testing
->> if a given kernel booted correctly, it's going to test if for example
->> USB enumeration is working and has no regressions. For that use case
->> is interesting to have support for the built-in USB devices like this
->> camera (either as built-in or as a module).
+> -------------------------8<-------------------------
+> From: Viresh Kumar <viresh.kumar@linaro.org>
+> Date: Wed, 9 Sep 2015 11:47:37 +0530
+> Subject: [PATCH] PM / OPP: Add "opp-cuts" and "opp-supply-version" bindings
 > 
-> Okay, so we have some agreement that other stuff which is not important
-> but still hard-wired on Exynos boards (built into the board), can be
-> enabled as a module. So now we we have to draw the line which is
-> "important enough" to built-in and which is not so it could be as module.
+> For many platforms it is unknown until runtime, about which OPPs should
+> be used or if used what should be voltage range for the supplies for a
+> particular frequency. And this mostly depends on the version of the
+> device or hardware, for which the OPPs are getting used.
 > 
->>From my point of view media in general (cameras, tuners etc.) should be
-> put in the second category (module), especially that in usual to test
-> them you would have to boot system to a full graphical mode. Can you
-> test them from SSH connection? Maybe you could test DVB tuners by
-> reading status of packets but still output won't be visible.
->
-
-Ok, my take on it was that if is wired into the board, then it should be
-supported out-of-the-box with a zImage build using exynos_defconfig but
-I see your point and looks reasonable to me.
-
-I'll wait a couple of days to see if others have more opinions and respin
-the patch with these options enabled as a module.
-
-Thanks a lot for your feedback!
- 
-> Any comments from other interested parties?
+> This patch adds two new OPP bindings to get this solved.
 > 
-> Best regards,
-> Krzysztof
-> 
+> 1. "opp-cuts": The purpose of this binding is to allow the platform to
+>    identify the valid OPPs based on the different levels of versions
+>    with which the hardware is identified.
 
-Best regards,
+"cuts" is a very specific name for such a generic property.
+
+You are using the format I suggested weeks ago, which I like.
+
+So how about:
+
+opp-hw-version:
+	User defined array containing a hierarchy of version numbers.
+
+E.g: Taking kernel version v2.6.19 for instance:
+	<2, 6, 19>;
+
+E.g: Representing Major 2 Minor 0, Cuts ALL and Substrate 5:
+	<2, 0, 0xffffffff, 5>;
+
+> 2. "opp-supply-name": The purpose of this binding is to allow the
+>    platform to select the voltage range of the power supplies, for a
+>    valid OPP.
+
+Did you mean 'opp-supply-version', like in the example below?
+
+I suggest '-name' would be better than '-version'.
+
+I guess this is a Qcom specific feature.  I'll let Stephen comment.
+
+> Both of these can be used together, as well as independently.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/opp/opp.txt | 90 +++++++++++++++++++++++++++
+>  1 file changed, 90 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/opp/opp.txt b/Documentation/devicetree/bindings/opp/opp.txt
+> index c56a6b1a44ef..def75f7a3614 100644
+> --- a/Documentation/devicetree/bindings/opp/opp.txt
+> +++ b/Documentation/devicetree/bindings/opp/opp.txt
+> @@ -98,6 +98,13 @@ This describes the OPPs belonging to a device. This node can have following
+>    information. But for multiple power-supplies, this must be set to pass
+>    triplet style values.
+>  
+> +- opp-supply-version: One or more strings describing version of the supplies on
+
+What kind of supplies?  Supplies to me means regulator supplies, which
+I fear would be too easily confused with the regulator '*-supply'
+property.
+
+> +  the platform. This is useful for the cases, where the platform wants to select
+> +  the voltage range for supplies at runtime, based on the specific version of
+> +  the hardware. There should be one entry in opp-microvolt array, for each
+> +  string present here. OPPs for the device must be configured, only for a single
+> +  version of the supplies.
+> +
+>  - status: Marks the OPP table enabled/disabled.
+>  
+>  
+> @@ -144,6 +151,16 @@ properties.
+>  - opp-suspend: Marks the OPP to be used during device suspend. Only one OPP in
+>    the table should have this.
+>  
+> +- opp-cuts: Variable length field that contains versions/cuts/substrate of the
+
+I'd remove any mention of cuts and substrate versions here.
+
+> +  hardware for which the OPP is supported. Should contain entry per level of
+> +  version type. For example: a platform with three levels of versions (cuts
+> +  substrate pcode), this field should be like <X Y Z>, where X corresponds to
+> +  different cuts, Y corresponds to different substrates and Z corresponds to
+> +  different pcodes the OPP supports. Each bit of the value corresponds to a
+
+s/bit/cell/
+
+> +  particular version of the level, and so we can have maximum 32 different
+> +  values of any level. A value of 0xFFFFFFFF means that all the versions of the
+> +  level are supported.
+
+See my comments above.
+
+>  - status: Marks the node enabled/disabled.
+>  
+>  Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
+> @@ -491,3 +508,76 @@ Example 5: Multiple OPP tables
+>  		};
+>  	};
+>  };
+> +
+> +Example 6: OPP selection based on hardware version
+> +(example: three levels of versions: cuts, substrate and pcode)
+> +
+> +/ {
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a7";
+> +			...
+> +
+> +			cpu-supply = <&cpu_supply>
+> +			operating-points-v2 = <&cpu0_opp_table_slow>;
+> +		};
+> +	};
+> +
+> +	opp_table {
+> +		compatible = "operating-points-v2";
+> +		status = "okay";
+> +		opp-shared;
+> +
+> +		opp00 {
+> +			/*
+> +			 * Supports all substrate and pcode versions for 0xf
+> +			 * cuts, i.e. only first four cuts.
+> +			 */
+> +			opp-cuts = <0xf 0xffffffff 0xffffffff>
+
+This does not avoid our issue, as it insists we have an OPP node per
+permutation.  That's (pcodes * cuts * substrate) nodes, which if we
+support 16 pcodes, 4 cuts and 5 substrates is </me takes shoes and
+socks off to count> 320 nodes.  This IMHO is too many to write/
+maintain and is the nucleus of our issue.
+
+If we could index into opp-microvolt however (please see below), this
+would reduce down to (cuts * substrates) nodes, which if taking the
+example above would only result in a more manageable 20 nodes.
+
+> +			opp-hz = /bits/ 64 <600000000>;
+> +			...
+
+It's still worth putting the opp-microvolt property in these nodes.
+
+> +		};
+> +
+> +		opp01 {
+> +			/*
+> +			 * Supports all substrate and pcode versions for 0x20
+> +			 * cuts, i.e. only the 6th cut.
+> +			 */
+
+Not sure what you mean by 6th cut?
+
+> +			opp-cuts = <0x20 0xffffffff 0xffffffff>
+> +			opp-hz = /bits/ 64 <800000000>;
+> +			...
+> +		};
+> +	};
+> +};
+> +
+> +Example 7: Multiple voltage-ranges (opp-supply-version) per supply
+> +(example: device with 2 supplies: vcc0 and vcc1, with two possible ranges of
+> +voltages: slow and fast)
+> +
+> +/ {
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a7";
+> +			...
+> +
+> +			vcc0-supply = <&cpu_supply0>;
+> +			vcc1-supply = <&cpu_supply1>;
+> +			operating-points-v2 = <&cpu0_opp_table>;
+> +		};
+> +	};
+> +
+> +	cpu0_opp_table: opp_table0 {
+> +		compatible = "operating-points-v2";
+> +		supply-names = "vcc0", "vcc1";
+> +		opp-supply-version = "slow", "fast";
+
+You've broken your own convention.  In the explanation above you say,
+"There should be one entry in opp-microvolt array, for each string
+present here."  However, you seem to have 4 arrays of values in
+opp-microvolt below.  I guess (supply-names * opp-supply-version)
+gives you the 4 in your example, but the docs bear no mention of
+this.
+
+Then each of those 4 entries are actually arrays?  What are they?  Are
+they user defined?  If so, then that's great.  In our driver we can
+choose to index by 'pcode', then our node count gets reduced
+dramatically and our problems are solved. \o/
+
+> +		opp-shared;
+> +
+> +		opp00 {
+> +			opp-hz = /bits/ 64 <1000000000>;
+> +			opp-microvolt = <900000 915000 925000>, /* Supply vcc0: slow */
+> +					<910000 925000 935000>, /* Supply vcc1: slow */
+> +					<970000 975000 985000>, /* Supply vcc0: fast */
+> +					<960000 965000 975000>; /* Supply vcc1: fast */
+> +		};
+> +	};
+> +};
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
