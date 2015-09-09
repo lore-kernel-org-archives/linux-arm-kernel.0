@@ -1,40 +1,26 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 9 Sep 2015 12:38:13 -0400
-Subject: [PATCH v1 1/2] soc: ti: display firmware file name as part of
- boot log
-In-Reply-To: <55EA673F.8010904@oracle.com>
-References: <1441403199-10936-1-git-send-email-m-karicheri2@ti.com>
- <55EA673F.8010904@oracle.com>
-Message-ID: <55F06075.6050405@ti.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Wed, 9 Sep 2015 11:39:57 -0500
+Subject: [PATCH v2 06/10] clk: qoriq: Add ls2080a support.
+In-Reply-To: <1441349872-4560-7-git-send-email-bhupesh.sharma@freescale.com>
+References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1441349872-4560-7-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <1441816797.29081.9.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2015 11:53 PM, santosh.shilimkar at oracle.com wrote:
-> On 9/4/15 5:46 PM, Murali Karicheri wrote:
->> To help the user, print the PDSP file name as part of
->> knav_queue_load_pdsp(). This will be useful for users to know what
->> version of the firmware is loaded to PDSP. Also update the
->> document for the location of the QMSS accumulator PDSP firmware.
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> ---
->
-> Looks fine. Will pick both the patches.
->
+On Fri, 2015-09-04 at 12:27 +0530, Bhupesh Sharma wrote:
+> From: Scott Wood <scottwood@freescale.com>
+> 
+> LS2080A is the first implementation of the chassis 3 clockgen, which
+> has a different register layout than previous chips.  It is also little
+> endian, unlike previous chips.
+> 
+> Signed-off-by: Scott Wood <scottwood@freescale.com>
+> ---
 
-Thanks Santhosh.
+You should add your own signoff when passing on someone else's patch.
 
-Is there a requirement to add the firmware to linux-firmware.git. Right 
-now I have provided link to ti git repo that has the firmware. I have 
-the patch ready in case this is required. Do you know?
+FWIW, I'm likely to squash this with my previous clk-qoriq patches when I 
+resubmit.
 
-Murali
-> Regards,
-> Santosh
->
->
-
-
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+-Scott
