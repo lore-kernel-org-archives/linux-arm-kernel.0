@@ -1,49 +1,71 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 9 Sep 2015 07:47:34 +0200
-Subject: [PATCH 1/3] doc: dt: add documentation for Mediatek spi-nor
- controller
-In-Reply-To: <1441705796-11365-2-git-send-email-bayi.cheng@mediatek.com>
-References: <1441705796-11365-1-git-send-email-bayi.cheng@mediatek.com>
- <1441705796-11365-2-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <20150909054734.GC18700@pengutronix.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 9 Sep 2015 11:38:53 +0530
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable PBIAS regulator
+In-Reply-To: <20150909040327.GA14905@roeck-us.net>
+References: <1441274111-18049-1-git-send-email-kishon@ti.com>
+ <20150906234110.GA2228@roeck-us.net> <20150909040327.GA14905@roeck-us.net>
+Message-ID: <55EFCCF5.50407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2015 at 05:49:54PM +0800, Bayi Cheng wrote:
-> Add device tree binding documentation for serial flash with
-> Mediatek serial flash controller
+hi,
+
+On Wednesday 09 September 2015 09:33 AM, Guenter Roeck wrote:
+> On Sun, Sep 06, 2015 at 04:41:10PM -0700, Guenter Roeck wrote:
+>> On Thu, Sep 03, 2015 at 03:25:11PM +0530, Kishon Vijay Abraham I wrote:
+>>> PBIAS regulator is required for MMC module in OMAP2, OMAP3, OMAP4,
+>>> OMAP5 and DRA7 SoCs. Enable it here.
+>>>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>
+>> Tested-by: Guenter Roeck <linux@roeck-us.net>
+>>
+> This problem is now causing various runtime failures in mainline.
+> I see the following qemu test failures:
 > 
-> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/mtd/mtk_nor.txt | 25 +++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/mtk_nor.txt
+> arm:beagle:multi_v7_defconfig:omap3-beagle
+> arm:beaglexm:multi_v7_defconfig:omap3-beagle-xm
+> arm:overo:multi_v7_defconfig:omap3-overo-tobi
 > 
-> diff --git a/Documentation/devicetree/bindings/mtd/mtk_nor.txt b/Documentation/devicetree/bindings/mtd/mtk_nor.txt
-> new file mode 100644
-> index 0000000..0eca0cd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/mtk_nor.txt
-> @@ -0,0 +1,25 @@
-> +* MTD SPI nor driver for MTK MT81xx (and similar) serial flash controller
-> +
-> +MTK MT81xx serial flash controller is designed for serial Flash device.
-> +It supports one Flash device with signal mode, dual mode and quad mode.
-> +
-> +Required properties:
-> +- compatible: should be "mediatek,mt8173-nor";
-> +- reg: physical base address and length of the controller's register
-> +- clocks: spi nor source clock
-> +- clock-names: "spi_clk", "axi_clk", "mux_clk", "sf_clk"
+> I would expect all omap2/3/4/5 runtime tests with multi_v7_defconfig to fail.
+> 
+> Also, FWIW,
+> 
+> Fixes: 6a9b2ff07d04 ("mmc: host: omap_hsmmc: return on fatal errors from omap_hsmmc_reg_get")
 
-Drop the _clk suffix. It's the clock-names property which already makes
-it clear that these are clock names.
+I've resend the patch to arm at kernel.org and it bounced back from Nicolas
+Pitre. However others like Arnd, Thomas, Olof would have received and I
+think they'll be applying this soonish.
 
-Sascha
+Thanks
+Kishon
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> Guenter
+> 
+>>> ---
+>>>  arch/arm/configs/multi_v7_defconfig |    1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+>>> index 5fd8df6..f497c96 100644
+>>> --- a/arch/arm/configs/multi_v7_defconfig
+>>> +++ b/arch/arm/configs/multi_v7_defconfig
+>>> @@ -403,6 +403,7 @@ CONFIG_REGULATOR_MAX8973=y
+>>>  CONFIG_REGULATOR_MAX77686=y
+>>>  CONFIG_REGULATOR_MAX77693=m
+>>>  CONFIG_REGULATOR_PALMAS=y
+>>> +CONFIG_REGULATOR_PBIAS=y
+>>>  CONFIG_REGULATOR_S2MPS11=y
+>>>  CONFIG_REGULATOR_S5M8767=y
+>>>  CONFIG_REGULATOR_TPS51632=y
+>>> -- 
+>>> 1.7.9.5
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>> Please read the FAQ at  http://www.tux.org/lkml/
+>>>
+>>>
