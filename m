@@ -1,20 +1,60 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 09 Sep 2015 16:35:16 -0700
-Subject: [RESEND PATCH] ARM: multi_v7_defconfig: Enable PBIAS regulator
-In-Reply-To: <1441368795-21420-1-git-send-email-kishon@ti.com> (Kishon Vijay
- Abraham, I's message of "Fri, 4 Sep 2015 17:43:15 +0530")
-References: <1441368795-21420-1-git-send-email-kishon@ti.com>
-Message-ID: <7h4mj3kvyj.fsf@deeprootsystems.com>
+From: leoli@freescale.com (Li Yang)
+Date: Wed, 9 Sep 2015 18:38:59 -0500
+Subject: [PATCH v2 03/10] Documentation/dts: Add bindings for QIXIS FPGA
+ controller found on FSL boards
+In-Reply-To: <BY1PR0301MB130339BD3B988DC938AA524482560@BY1PR0301MB1303.namprd03.prod.outlook.com>
+References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1441349872-4560-4-git-send-email-bhupesh.sharma@freescale.com>
+ <CADRPPNR11BD4WfXTWoQ28rZCd_BJuhdWu49E6jjpO29CH2s5Ow@mail.gmail.com>
+ <BY1PR0301MB1303E56B5462BCD0C77C7E4D82570@BY1PR0301MB1303.namprd03.prod.outlook.com>
+ <CADRPPNQFxqNqgvrL9eVhaDX-SYRJxmGDd87zu_XHDHY6afiu3g@mail.gmail.com>
+ <BY1PR0301MB130339BD3B988DC938AA524482560@BY1PR0301MB1303.namprd03.prod.outlook.com>
+Message-ID: <CADRPPNTDPBHR8S4mkT0CzO4jF0sncruZkMdir6OhrdkU6Za2OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kishon Vijay Abraham I <kishon@ti.com> writes:
-
-> PBIAS regulator is required for MMC module in OMAP2, OMAP3, OMAP4,
-> OMAP5 and DRA7 SoCs. Enable it here.
+On Sat, Sep 5, 2015 at 3:11 AM, Sharma Bhupesh
+<bhupesh.sharma@freescale.com> wrote:
+>> From: pku.leo at gmail.com [mailto:pku.leo at gmail.com]
+>> Sent: Saturday, September 05, 2015 2:43 AM
+>> On Fri, Sep 4, 2015 at 3:16 PM, Sharma Bhupesh
+>> <bhupesh.sharma@freescale.com> wrote:
+>> >> From: pku.leo at gmail.com [mailto:pku.leo at gmail.com]
+>> >> Sent: Friday, September 04, 2015 10:27 PM On Fri, Sep 4, 2015 at 1:57
+>> >> AM, Bhupesh Sharma <bhupesh.sharma@freescale.com> wrote:
+>> >> > This patch adds bindings for QIXIS FPGA controller found on FSL
+>> boards.
+>> >>
+>> >> A general comment: when you are updating the device tree bindings.
+>> >> You should cc the devicetree at vger.kernel.org mailing list.
+>> >>
+>> >> >
+>> >> > Some Freescale boards like LS2080AQDS/LS2080ARDB have an on-board
+>> >> > FPGA/CPLD connected to the IFC controller. The bindings specified
+>> >> > in this patch cater to those on-board FPGA/CPLD controllers.
+>> >>
+>> >> We already have the binding defined in
+>> >> Documentation/devicetree/bindings/powerpc/fsl/board.txt.  We probably
+>> >> should just move it to a more generic location.
+>> >
+>> > Consolidation of powerpc and ARM bindings is something that needs to
+>> > be targeted by a separate patch-series, perhaps in future.
+>> >
+>> > There are a number of duplications that can be looked into, but I
+>> > don't think this patchset should depend on that.
+>>
+>> There might be some duplication, but we shouldn't be adding more.  :) I
+>> would rather you directly updating that file than creating a new file
+>> even though the original one was in a wrong directory.
+>>
 >
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> IMO a PowerPC binding update makes no sense in a ARM machine patchset sent
+> on a arm specific mailing list.
 
-Thanks, added to our next/late branch.
+So the best approach is to merge the change with the original binding
+and put it into a common place.  Although there were a lot of non-arch
+specific bindings placed into the arch folder, we should stop adding
+more now.
 
-Kevin
+Regards,
+Leo
