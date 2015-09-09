@@ -1,88 +1,104 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 8 Sep 2015 19:06:27 -0500
-Subject: [PATCH 1/3] ARM: uniphier: add outer cache support
-In-Reply-To: <CACRpkdan0+rywnSR8Rs=aw63QAm3nN99ujqPcZwfpoh4_Dwc-w@mail.gmail.com>
-References: <1440382692-3855-1-git-send-email-yamada.masahiro@socionext.com>
- <1440382692-3855-2-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdbJppuA6ZyciNAGfSgrf4M2THVHggzuZYSqORjy2JBp_A@mail.gmail.com>
- <CAK7LNATWsa8AhyFGzsR0HAODmQD8yBPidTE0Lx2ACh4_PeQW9w@mail.gmail.com>
- <CACRpkdan0+rywnSR8Rs=aw63QAm3nN99ujqPcZwfpoh4_Dwc-w@mail.gmail.com>
-Message-ID: <55EF7803.2010004@kernel.org>
+Date: Tue, 8 Sep 2015 19:16:48 -0500
+Subject: [PATCH v7 1/5] dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
+In-Reply-To: <1441693083-8440-2-git-send-email-chunfeng.yun@mediatek.com>
+References: <1441693083-8440-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1441693083-8440-2-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <55EF7A70.1080701@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2015 08:09 AM, Linus Walleij wrote:
-> On Fri, Aug 28, 2015 at 12:24 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> 2015-08-26 22:39 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+On 09/08/2015 01:17 AM, Chunfeng Yun wrote:
+> add a DT binding documentation of usb3.0 phy for MT65xx
+> SoCs from Mediatek.
 > 
->>> cache-unified and cache-level are *not* optional and should be required.
->>
->> "cache-unified" is mentioned in "3.7.3 Internal (L1) Cache Properties"
->> (Table 3-8),
->> but it is not in "3.8 Multi-level and Shared Caches" (Table 3-9)
->>
->> Are the rules in Table 3-8 also applied for L2?
-> 
-> Your guess is as good as mine unless someone involved in
-> actually writing that spec says something :/
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 
-Maybe you'd have to be crazy to have Harvard cache for 2nd+ level. I've
-got no clue. Doesn't hurt to have it.
+One comment, otherwise:
 
-> 
->>> (I'm just assuming this cache is unified, anything else would be baffling.)
->>
->> In fact, unified/harvard is configurable thru a register of this cache
->> controller.
-> 
-> Jesus Christ.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Hardware designers either hate software folks or ensure our job security.
+> ---
+>  .../devicetree/bindings/phy/phy-mt65xx-usb.txt     | 69 ++++++++++++++++++++++
+>  1 file changed, 69 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> new file mode 100644
+> index 0000000..5812d20
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> @@ -0,0 +1,69 @@
+> +mt65xx USB3.0 PHY binding
+> +--------------------------
+> +
+> +This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
+> +
+> +Required properties (controller (parent) node):
+> + - compatible	: should be "mediatek,mt8173-u3phy"
+> + - reg		: offset and length of register for phy, exclude port's
+> +		  register.
+> + - clocks	: a list of phandle + clock-specifier pairs, one for each
+> +		  entry in clock-names
+> + - clock-names	: must contain
+> +		  "u3phya_ref": for reference clock of usb3.0 analog phy.
+> +
+> +Required nodes	: a sub-node is required for each port the controller
+> +		  provides. Address range information including the usual
+> +		  'reg' property is used inside these nodes to describe
+> +		  the controller's topology. These nodes are translated
+> +		  by the driver's .xlate() function.
 
-> 
->> It is usually used as a unified cached, though.
-> 
-> I would, too.
-> 
->> So,I am planning to use the same compatible for L2 and L3, like this:
->>
->>
->>        l2-cache at 500c0000 {
->>                compatible = "socionext,uniphier-cache";
->>                reg = <0x500c0000 0x2000>, <0x503c0100 0x8>,
->>                      <0x506c0000 0x400>;
->>                cache-unified;
->>                cache-level = <2>;
->>                next-level-cache = <&L2>;
+The last sentence is Linux specific. Please remove.
 
-Next level of the L2 is the L2?
-
->>                cache-size = <0x200000>;
->>                cache-sets = <256>;
->>                cache-line-size = <128>;
->>             };
->>
->>        /* Not all of UniPhier SoCs have L3 cache */
->>        l3-cache at 500c8000 {
->>                compatible = "socionext,uniphier-cache";
->>                reg = <0x500c8000 0x2000>, <0x503c8100 0x8>,
->>                      <0x506c8000 0x400>;
->>                cache-unified;
->>                cache-level = <3>;
->>                cache-size = <0x400000>;
->>                cache-sets = <256>;
->>                cache-line-size = <256>;
->>        };
+> +
+> +Required properties (port (child) node):
+> +- reg		: address and length of the register set for the port.
+> +- #phy-cells	: should be 1 (See second example)
+> +		  cell after port phandle is phy type from:
+> +			- PHY_TYPE_USB2
+> +			- PHY_TYPE_USB3
+> +
+> +Example:
+> +
+> +u3phy: usb-phy at 11290000 {
+> +	compatible = "mediatek,mt8173-u3phy";
+> +	reg = <0 0x11290000 0 0x800>;
+> +	clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+> +	clock-names = "u3phya_ref";
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +	ranges;
+> +	status = "okay";
+> +
+> +	phy_port0: port at 11290800 {
+> +		reg = <0 0x11290800 0 0x800>;
+> +		#phy-cells = <1>;
+> +		status = "okay";
+> +	};
+> +
+> +	phy_port1: port at 11291000 {
+> +		reg = <0 0x11291000 0 0x800>;
+> +		#phy-cells = <1>;
+> +		status = "okay";
+> +	};
+> +};
+> +
+> +Specifying phy control of devices
+> +---------------------------------
+> +
+> +Device nodes should specify the configuration required in their "phys"
+> +property, containing a phandle to the phy port node and a device type;
+> +phy-names for each port are optional.
+> +
+> +Example:
+> +
+> +#include <dt-bindings/phy/phy.h>
+> +
+> +usb30: usb at 11270000 {
+> +	...
+> +	phys = <&phy_port0 PHY_TYPE_USB3>;
+> +	phy-names = "usb3-0";
+> +	...
+> +};
 > 
-> This LooksGoodToMe.
-> 
->> The Table 3-9 in ePAPR v1.1 says
->> the compatible should be "cache", but I do not think it makes sense here.
-> 
-> Agree.
-
-It could be useful for finding all cache nodes, but we've generally
-failed to use it, so at this point it doesn't matter.
-
-Rob
