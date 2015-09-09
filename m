@@ -1,211 +1,47 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed,  9 Sep 2015 11:11:26 +0200
-Subject: [PATCH 4/4] ARM: dts: sun4i: inet9f-rev03: Add support for game
- buttons / joysticks
-In-Reply-To: <1441789886-5868-1-git-send-email-hdegoede@redhat.com>
-References: <1441789886-5868-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1441789886-5868-4-git-send-email-hdegoede@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 09 Sep 2015 11:19:07 +0200
+Subject: [GIT PULL] ARM64: APM X-Gene 1 and X-Gene 2 DTS updates for 4.3
+In-Reply-To: <CADaLNDkKt_0O81CnaBf6pEvHQYAkJ177PqyvvEA_MS_FMREE_A@mail.gmail.com>
+References: <CADaLNDkKt_0O81CnaBf6pEvHQYAkJ177PqyvvEA_MS_FMREE_A@mail.gmail.com>
+Message-ID: <1706053.LCOS62kkie@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The inet9f-rev03 tablet has multiple fire-buttons / direction controls,
-add support for these using the same axis mapping as ps2 compatible game
-controllers with the same stick / button layout use.
+On Tuesday 08 September 2015 16:17:38 Duc Dang wrote:
+> On Tue, Sep 1, 2015 at 3:20 PM, Duc Dang <dhdang@apm.com> wrote:
+> > Hi Olof,
+> >
+> > The following changes since commit 74d33293e467df61de1b1d8b2fbe29e550dec33b:
+> >
+> >   Linux 4.2-rc5 (2015-08-02 18:34:55 -0700)
+> >
+> > are available in the git repository at:
+> >
+> >   https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.3-1
+> >
+> > for you to fetch changes up to 28376033baac2f0c2892eafd471b92ab28385d91:
+> >
+> >   arm64: dts: Add poweroff device nodes for APM X-Gene 2 platform
+> > (2015-09-01 13:42:16 -0700)
+> >
+> > ----------------------------------------------------------------
+> > X-Gene 1 and X-Gene 2 platforms DTS changes queued for 4.3
+> >
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts | 165 +++++++++++++++++++++++++++
- 1 file changed, 165 insertions(+)
+> 
+> Please let me know if you have any comment for this pull request.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts b/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts
-index 932e397..84c63f3 100644
---- a/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts
-@@ -44,6 +44,7 @@
- #include "sun4i-a10.dtsi"
- #include "sunxi-common-regulators.dtsi"
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/evdev.h>
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
-@@ -59,6 +60,159 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys-polled";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&key_pins_inet9f>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		poll-interval = <20>;
-+
-+		button at 0 {
-+			label = "Left Joystick Left";
-+			linux,code = <ABS_X>;
-+			linux,input-type = <EV_ABS>;
-+			linux,input-value = <0xffffffff>; /* -1 */
-+			gpios = <&pio 0 6 GPIO_ACTIVE_LOW>; /* PA6 */
-+		};
-+
-+		button at 1 {
-+			label = "Left Joystick Right";
-+			linux,code = <ABS_X>;
-+			linux,input-type = <EV_ABS>;
-+			linux,input-value = <1>;
-+			gpios = <&pio 0 5 GPIO_ACTIVE_LOW>; /* PA5 */
-+		};
-+
-+		button at 2 {
-+			label = "Left Joystick Up";
-+			linux,code = <ABS_Y>;
-+			linux,input-type = <EV_ABS>;
-+			linux,input-value = <0xffffffff>; /* -1 */
-+			gpios = <&pio 0 8 GPIO_ACTIVE_LOW>; /* PA8 */
-+		};
-+
-+		button at 3 {
-+			label = "Left Joystick Down";
-+			linux,code = <ABS_Y>;
-+			linux,input-type = <EV_ABS>;
-+			linux,input-value = <1>;
-+			gpios = <&pio 0 9 GPIO_ACTIVE_LOW>; /* PA9 */
-+		};
-+
-+		button at 4 {
-+			label = "Right Joystick Left";
-+			linux,code = <ABS_Z>;
-+			linux,input-type = <EV_ABS>;
-+			linux,input-value = <0xffffffff>; /* -1 */
-+			gpios = <&pio 0 1 GPIO_ACTIVE_LOW>; /* PA1 */
-+		};
-+
-+		button at 5 {
-+			label = "Right Joystick Right";
-+			linux,code = <ABS_Z>;
-+			linux,input-type = <EV_ABS>;
-+			linux,input-value = <1>;
-+			gpios = <&pio 0 0 GPIO_ACTIVE_LOW>; /* PA0 */
-+		};
-+
-+		button at 6 {
-+			label = "Right Joystick Up";
-+			linux,code = <ABS_RZ>;
-+			linux,input-type = <EV_ABS>;
-+			linux,input-value = <0xffffffff>; /* -1 */
-+			gpios = <&pio 0 3 GPIO_ACTIVE_LOW>; /* PA3 */
-+		};
-+
-+		button at 7 {
-+			label = "Right Joystick Down";
-+			linux,code = <ABS_RZ>;
-+			linux,input-type = <EV_ABS>;
-+			linux,input-value = <1>;
-+			gpios = <&pio 0 4 GPIO_ACTIVE_LOW>; /* PA4 */
-+		};
-+
-+		button at 8 {
-+			label = "DPad Left";
-+			linux,code = <ABS_HAT0X>;
-+			linux,input-type = <EV_ABS>;
-+			linux,input-value = <0xffffffff>; /* -1 */
-+			gpios = <&pio 7 23 GPIO_ACTIVE_LOW>; /* PH23 */
-+		};
-+
-+		button at 9 {
-+			label = "DPad Right";
-+			linux,code = <ABS_HAT0X>;
-+			linux,input-type = <EV_ABS>;
-+			linux,input-value = <1>;
-+			gpios = <&pio 7 24 GPIO_ACTIVE_LOW>; /* PH24 */
-+		};
-+
-+		button at 10 {
-+			label = "DPad Up";
-+			linux,code = <ABS_HAT0Y>;
-+			linux,input-type = <EV_ABS>;
-+			linux,input-value = <0xffffffff>; /* -1 */
-+			gpios = <&pio 7 25 GPIO_ACTIVE_LOW>; /* PH25 */
-+		};
-+
-+		button at 11 {
-+			label = "DPad Down";
-+			linux,code = <ABS_HAT0Y>;
-+			linux,input-type = <EV_ABS>;
-+			linux,input-value = <1>;
-+			gpios = <&pio 7 26 GPIO_ACTIVE_LOW>; /* PH26 */
-+		};
-+
-+		button at 12 {
-+			label = "Button X";
-+			linux,code = <BTN_X>;
-+			gpios = <&pio 0 16 GPIO_ACTIVE_LOW>; /* PA16 */
-+		};
-+
-+		button at 13 {
-+			label = "Button Y";
-+			linux,code = <BTN_Y>;
-+			gpios = <&pio 0 14 GPIO_ACTIVE_LOW>; /* PA14 */
-+		};
-+
-+		button at 14 {
-+			label = "Button A";
-+			linux,code = <BTN_A>;
-+			gpios = <&pio 0 17 GPIO_ACTIVE_LOW>; /* PA17 */
-+		};
-+
-+		button at 15 {
-+			label = "Button B";
-+			linux,code = <BTN_B>;
-+			gpios = <&pio 0 15 GPIO_ACTIVE_LOW>; /* PA15 */
-+		};
-+
-+		button at 16 {
-+			label = "Select Button";
-+			linux,code = <BTN_SELECT>;
-+			gpios = <&pio 0 11 GPIO_ACTIVE_LOW>; /* PA11 */
-+		};
-+
-+		button at 17 {
-+			label = "Start Button";
-+			linux,code = <BTN_START>;
-+			gpios = <&pio 0 12 GPIO_ACTIVE_LOW>; /* PA12 */
-+		};
-+
-+		button at 18 {
-+			label = "Top Left Button";
-+			linux,code = <BTN_TL>;
-+			gpios = <&pio 7 22 GPIO_ACTIVE_LOW>; /* PH22 */
-+		};
-+
-+		button at 19 {
-+			label = "Top Right Button";
-+			linux,code = <BTN_TR>;
-+			gpios = <&pio 0 13 GPIO_ACTIVE_LOW>; /* PA13 */
-+		};
-+	};
- };
- 
- &cpu0 {
-@@ -167,6 +321,17 @@
- };
- 
- &pio {
-+	key_pins_inet9f: key_pins at 0 {
-+		allwinner,pins = "PA0", "PA1", "PA3", "PA4",
-+				 "PA5", "PA6", "PA8", "PA9",
-+				 "PA11", "PA12", "PA13",
-+				 "PA14", "PA15", "PA16", "PA17",
-+				 "PH22", "PH23", "PH24", "PH25", "PH26";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
- 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
- 		allwinner,pins = "PH4";
- 		allwinner,function = "gpio_in";
--- 
-2.4.3
+I don't know what you had previously discussed, but we tend to not take
+pull requests for new code during the merge window or the time immediately
+before it, so this will normally get merged for 4.4 after 4.3-rc1 is out.
+
+Unless Olof has previously agreed to merge the changes as a very late
+fixup, please rebase the branch on 4.3-rc1 and submit it again next
+week.
+
+We've long had discussions about whether to allow DT changes past the
+start of the merge window, in particular for new hardware support, but
+we have yet to come up with an official policy for it (unless there
+is now one that I have missed while I was on parental leave).
+
+	Arnd
