@@ -1,42 +1,114 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed, 09 Sep 2015 09:03:10 +0530
-Subject: [PATCH 5/9] clk: qcom: gcc-msm8960: add child devices support.
-In-Reply-To: <20150908192115.GP15099@codeaurora.org>
-References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
- <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
- <20150811224902.GO2839@codeaurora.org> <55CB0B26.2020105@linaro.org>
- <55CC1CFE.7000005@codeaurora.org> <20150814004206.GU26614@codeaurora.org>
- <55CD5BD2.3070907@codeaurora.org> <55E660F6.3020007@codeaurora.org>
- <20150903172743.GE15099@codeaurora.org> <55ED311E.1070404@codeaurora.org>
- <20150908192115.GP15099@codeaurora.org>
-Message-ID: <55EFA876.30708@codeaurora.org>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 9 Sep 2015 10:26:13 +0800
+Subject: [PATCH v2 1/2] ARM: dts: imx7d: Add USB support
+In-Reply-To: <1441677432-3376-1-git-send-email-festevam@gmail.com>
+References: <1441677432-3376-1-git-send-email-festevam@gmail.com>
+Message-ID: <20150909022612.GH7802@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Sep 07, 2015 at 10:57:11PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Add USB OTG and Host support.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v1:
+> - Remove underscore from node name as suggested by Shawn
+> 
+>  arch/arm/boot/dts/imx7d.dtsi | 71 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 71 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+> index 15c2193..90eb9f4 100644
+> --- a/arch/arm/boot/dts/imx7d.dtsi
+> +++ b/arch/arm/boot/dts/imx7d.dtsi
+> @@ -746,6 +746,77 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			usbotg1: usb at 30b10000 {
+> +				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
+> +				reg = <0x30b10000 0x200>;
+> +				interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX7D_USB_CTRL_CLK>;
+> +				fsl,usbphy = <&usbphynop1>;
+> +				fsl,usbmisc = <&usbmisc1 0>;
+> +				phy-clkgate-delay-us = <400>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usbotg2: usb at 30b20000 {
+> +				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
+> +				reg = <0x30b20000 0x200>;
+> +				interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX7D_USB_CTRL_CLK>;
+> +				fsl,usbphy = <&usbphynop2>;
+> +				fsl,usbmisc = <&usbmisc2 0>;
+> +				phy-clkgate-delay-us = <400>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usbh: usb at 30b30000 {
+> +				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
+> +				reg = <0x30b30000 0x200>;
+> +				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX7D_USB_CTRL_CLK>;
+> +				fsl,usbphy = <&usbphynop3>;
+> +				fsl,usbmisc = <&usbmisc3 0>;
+> +				phy_type = "hsic";
+> +				dr_mode = "host";
+> +				phy-clkgate-delay-us = <400>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usbmisc1: usbmisc at 30b10200 {
+> +				#index-cells = <1>;
+> +				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
+> +				reg = <0x30b10200 0x200>;
+> +			};
+> +
+> +			usbmisc2: usbmisc at 30b20200 {
+> +				#index-cells = <1>;
+> +				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
+> +				reg = <0x30b20200 0x200>;
+> +			};
+> +
+> +			usbmisc3: usbmisc at 30b30200 {
+> +				#index-cells = <1>;
+> +				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
+> +				reg = <0x30b30200 0x200>;
+> +			};
+> +
+> +			usbphynop1: usbphynop1 {
+> +				compatible = "usb-nop-xceiv";
+> +				clocks = <&clks IMX7D_USB_PHY1_CLK>;
+> +				clock-names = "main_clk";
+> +			};
+> +
+> +			usbphynop2: usbphynop2 {
+> +				compatible = "usb-nop-xceiv";
+> +				clocks = <&clks IMX7D_USB_PHY2_CLK>;
+> +				clock-names = "main_clk";
+> +			};
+> +
+> +			usbphynop3: usbphynop3 {
+> +				compatible = "usb-nop-xceiv";
+> +				clocks = <&clks IMX7D_USB_HSIC_ROOT_CLK>;
+> +				clock-names = "main_clk";
+> +			};
+> +
+>  			usdhc1: usdhc at 30b40000 {
+>  				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
+>  				reg = <0x30b40000 0x10000>;
+> -- 
+> 1.9.1
+> 
 
-On 09/09/2015 12:51 AM, Stephen Boyd wrote:
-> On 09/07, Rajendra Nayak wrote:
->>>
->>> Yeah this might happen though because we've assigned the of_node
->>> pointer to the tsens device before we register it on the platform
->>> bus. The other way to pass that data down from gcc to tsens would
->>> be to not have an of_node assigned to the tsens device, and check
->>> for that case in the tsens driver. If there isn't an of_node,
->>> then we look at the parent device's of_node to figure out which
->>> gcc it is (if this even matters) and parse DT properties.
->>
->> Parsing DT properties from parent (in the tsens driver) is fine, but
->> the nvmem apis still expect an of_node for the tsens device and hence
->> fail.
->
-> So pass the parent device to the nvmem APIs? Or adjust the nvmem
-> APIs to look for a parent of_node if there isn't an of_node for
-> the device being passed? Or make the nvmem APIs work without
-> using DT, and copy over the nvmem information from the gcc node
-> to the virtual tsens child device?
-
-Srini, you being the nvmem maintainer, any thoughts?
+Acked-by: Peter Chen <peter.chen@freescale.com>
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+
+Best Regards,
+Peter Chen
