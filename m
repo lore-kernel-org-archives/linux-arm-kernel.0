@@ -1,38 +1,38 @@
 From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Wed,  9 Sep 2015 11:25:12 +0200
-Subject: [PATCH 2/5] dts: sunxi: correct vendor prefix on OLinuXino a10s micro
+Date: Wed,  9 Sep 2015 11:25:15 +0200
+Subject: [PATCH 5/5] dts: sunxi: add eeprom to A20 OLinuXino micro board
 In-Reply-To: <1441790715-11957-1-git-send-email-o.schinagl@ultimaker.com>
 References: <1441790715-11957-1-git-send-email-o.schinagl@ultimaker.com>
-Message-ID: <1441790715-11957-3-git-send-email-o.schinagl@ultimaker.com>
+Message-ID: <1441790715-11957-6-git-send-email-o.schinagl@ultimaker.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Olliver Schinagl <oliver@schinagl.nl>
 
-The OLinuXino A10S micro features an eeprom. According to the eeprom.txt
-binding document, we should use the manufacturer and 'at' is not the
-proper manufacturer id according to the vendor-prefixes.
-
-This patch takes the proper vendor-prefix and uses it for the eeprom
-node.
+The Olimex A20 OLinuXino Micro features an eeprom that is always on the
+board. This patch adds it to the dts.
 
 --Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 ---
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-index a7e19e4..49a1be6 100644
---- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-@@ -104,7 +104,7 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+index 00f8f25..f2816dd 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+@@ -125,6 +125,12 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins_a>;
  	status = "okay";
- 
- 	at24 at 50 {
--		compatible = "at,24c16";
++
++	eeprom: eeprom at 50 {
 +		compatible = "atmel,24c16";
- 		pagesize = <16>;
- 		reg = <0x50>;
- 		read-only;
++		reg = <0x50>;
++		pagesize = <16>;
++	};
+ };
+ 
+ &i2c2 {
 -- 
 2.1.4
