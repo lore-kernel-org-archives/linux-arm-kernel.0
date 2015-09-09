@@ -1,26 +1,47 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 8 Sep 2015 17:44:35 -0700
-Subject: [PATCH] ARM: qcom: add memory node to IPQ806x/AP148
-In-Reply-To: <1439936804-15138-1-git-send-email-mathieu@codeaurora.org>
-References: <1439936804-15138-1-git-send-email-mathieu@codeaurora.org>
-Message-ID: <20150909004435.GT15099@codeaurora.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 09 Sep 2015 03:16:48 +0200
+Subject: [PATCH v5 0/4] cpufreq-dt: add suspend frequency support
+In-Reply-To: <1441730464-7947-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1441730464-7947-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <2547413.Uj7KDUeGpY@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/18, Mathieu Olivari wrote:
-> On recent bootloaders, the bootloader patches the DT blob with memory
-> information. However, with old bootloader, this operation doesn't
-> happen, which leads the board to freeze in the early init code.
+On Tuesday, September 08, 2015 06:41:00 PM Bartlomiej Zolnierkiewicz wrote:
+> Hi,
 > 
-> This patch adds the memory node to the AP148 dts explicitly to cover all
-> boot cases.
+> This patch series adds suspend frequency support (using opp-v2
+> bindings and suspend-opp functionality) to cpufreq-dt driver and
+> then adds suspend opp for Exynos4412 based boards.
 > 
-> Signed-off-by: Mathieu Olivari <mathieu@codeaurora.org>
+> This patch series fixes suspend/resume support on Exynos4412
+> based Trats2 board and reboot hang on Exynos4412 based Odroid
+> U3 board.
+> 
+> Changes since v4:
+> - removed superfluous CONFIG_PM ifdefs
+> - added Acked-by tag from Krzysztof to patch #4
+> - added Acked-by tag from Viresh to patches #1-3
+> 
+> Changes since v3:
+> - fixed dev_pm_opp_get_suspend_opp() locking
+> - shortened variable name in dev_pm_opp_get_suspend_opp()
+> - adjusted cpufreq_generic_suspend() to work with cpufreq-dt
+> - removed no longer needed cpufreq_dt_suspend()
+> - added Acked-by tag from Viresh to patch #4
+> 
+> Changes since v2:
+> - rewrote to use suspend-opp functionality
+> 
+> Changes since v1:
+> - removed superfluous ";"
+> 
+> Depends on:
+> - next-20150902 branch of linux-next kernel tree
 
-Does the old bootloader pass atags? If so we can just enable
-CONFIG_ARM_ATAG_DTB_COMPAT and then we don't need to add anything
-to dts files.
+I've queued up [1-3/4] for the next PM pull request.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+The [4/4] has to go in separately through the platform tree.
+
+Thanks,
+Rafael
