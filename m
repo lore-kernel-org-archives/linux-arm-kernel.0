@@ -1,58 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Sep 2015 23:20:18 +0200
-Subject: [PATCH] selftests/seccomp: build on aarch64, document ABI
-In-Reply-To: <CAGXu5jJw8hAVPKvut51D1jojsCEGEweWNu2TyWrgUfQ9hqsw3Q@mail.gmail.com>
-References: <20150909193025.GA29244@www.outflux.net>
- <19228212.s6UOoYJca9@wuerfel>
- <CAGXu5jJw8hAVPKvut51D1jojsCEGEweWNu2TyWrgUfQ9hqsw3Q@mail.gmail.com>
-Message-ID: <480615028.m9oKCRv0Vd@wuerfel>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 9 Sep 2015 14:41:52 -0700
+Subject: [GIT PULL] ARM64: APM X-Gene 1 and X-Gene 2 DTS updates for 4.3
+In-Reply-To: <1706053.LCOS62kkie@wuerfel>
+References: <CADaLNDkKt_0O81CnaBf6pEvHQYAkJ177PqyvvEA_MS_FMREE_A@mail.gmail.com>
+ <1706053.LCOS62kkie@wuerfel>
+Message-ID: <CAOesGMi4PpeBa7_oT5CkitVx2uc7z7NwX2BWc7VBGgsrvZ82dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 September 2015 13:52:39 Kees Cook wrote:
-> On Wed, Sep 9, 2015 at 1:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 09 September 2015 12:30:27 Kees Cook wrote:
+On Wed, Sep 9, 2015 at 2:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 08 September 2015 16:17:38 Duc Dang wrote:
+>> On Tue, Sep 1, 2015 at 3:20 PM, Duc Dang <dhdang@apm.com> wrote:
+>> > Hi Olof,
+>> >
+>> > The following changes since commit 74d33293e467df61de1b1d8b2fbe29e550dec33b:
+>> >
+>> >   Linux 4.2-rc5 (2015-08-02 18:34:55 -0700)
+>> >
+>> > are available in the git repository at:
+>> >
+>> >   https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.3-1
+>> >
+>> > for you to fetch changes up to 28376033baac2f0c2892eafd471b92ab28385d91:
+>> >
+>> >   arm64: dts: Add poweroff device nodes for APM X-Gene 2 platform
+>> > (2015-09-01 13:42:16 -0700)
+>> >
+>> > ----------------------------------------------------------------
+>> > X-Gene 1 and X-Gene 2 platforms DTS changes queued for 4.3
+>> >
+>
+>>
+>> Please let me know if you have any comment for this pull request.
+>
+> I don't know what you had previously discussed, but we tend to not take
+> pull requests for new code during the merge window or the time immediately
+> before it, so this will normally get merged for 4.4 after 4.3-rc1 is out.
+>
+> Unless Olof has previously agreed to merge the changes as a very late
+> fixup, please rebase the branch on 4.3-rc1 and submit it again next
+> week.
+>
+> We've long had discussions about whether to allow DT changes past the
+> start of the merge window, in particular for new hardware support, but
+> we have yet to come up with an official policy for it (unless there
+> is now one that I have missed while I was on parental leave).
 
-> > If this is intentional, it at least needs a comment to explain the
-> > situation, and be extended to all other architectures that do not have
-> > a poll() system call.
-> >
-> > The arm32 version of sys_poll should be available as 168 in both native
-> > and compat mode.
-> 
-> Does ppoll still get interrupted like poll to require a restart_syscall call?
 
-Yes, the only difference between the two is the optional signal mask
-argument in ppoll.
+Yeah, sorry, this came in too late. I know it took some time to setup
+the tree and get things sorted, and I was hoping to pick it up in the
+late batch but that didn't happen.
 
-> Regardless, the primary problem is this (emphasis added):
-> 
-> >> +        * - native ARM does _not_ expose true syscall.
-> >> +        * - compat ARM on ARM64 _does_ expose true syscall.
-> 
-> When you ptrace or seccomp an arm32 binary under and arm32 kernel,
-> restart_syscall is invisible. When you ptrace or seccomp an arm32
-> binary under and arm64 kernel, suddenly it's visible. This means, for
-> example, seccomp filters will break under an arm64 kernel.
+Please resend when -rc1 is out and we'll queue it for the next merge window.
 
-Ok, I see.
 
-> (And apologies if I'm not remembering pieces of this correctly, I
-> don't have access to arm64 hardware at the moment, which is why I'm
-> reaching out for some help on this... I'm trying to close out this old
-> thread: https://lkml.org/lkml/2015/1/20/778 )
-
-FWIW, it should not be too hard to get an image that runs in
-qemu-system-arm64.
-
-I suppose the same problem exists on all restartable system calls
-(e.g. nanosleep, select, recvmsg, clock_nanosleep, ...)?
-
-I also believe there are various architectures that cannot see the
-original system call number for a restarted syscall, in particular
-when the syscall number argument is in the same register as the
-return code of the syscall and gets overwritten on the way out of 
-the kernel. Is this the problem you are seeing? If so, we should
-find a solution that works on all such architectures.
-
-	Arnd
+-Olof
