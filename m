@@ -1,80 +1,191 @@
-From: emilio.lopez@collabora.co.uk (=?UTF-8?Q?Emilio_L=c3=b3pez?=)
-Date: Wed, 9 Sep 2015 10:14:46 -0300
-Subject: [PATCH 1/3] sysfs: Fix is_visible() support for binary attributes
-In-Reply-To: <55EFB1B5.1060703@roeck-us.net>
-References: <1441714066-5599-1-git-send-email-emilio.lopez@collabora.co.uk>
- <1441714066-5599-2-git-send-email-emilio.lopez@collabora.co.uk>
- <20150908153013.GA6758@roeck-us.net> <20150908191002.GB10156@kroah.com>
- <20150908193052.GA11106@roeck-us.net> <55EF82A4.5000502@collabora.co.uk>
- <55EF86F8.3060406@roeck-us.net> <20150909035850.GA5497@kroah.com>
- <55EFB1B5.1060703@roeck-us.net>
-Message-ID: <55F030C6.80504@collabora.co.uk>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Wed, 9 Sep 2015 22:22:23 +0900
+Subject: [PATCH] arm64: kernel: Use a separate stack for irq interrupts.
+In-Reply-To: <55EF1136.6050102@arm.com>
+References: <55EDA040.90208@arm.com>
+ <1441636584-23174-1-git-send-email-james.morse@arm.com>
+ <2409A0E9-376A-4B49-8C5F-73084843096F@gmail.com> <55EF1136.6050102@arm.com>
+Message-ID: <9FF0599A-395F-43EC-A2C2-0206CE0B30C2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/15 01:12, Guenter Roeck wrote:
-> On 09/08/2015 08:58 PM, Greg KH wrote:
->> On Tue, Sep 08, 2015 at 06:10:16PM -0700, Guenter Roeck wrote:
->>> Hi Emilio,
->>>
->>> On 09/08/2015 05:51 PM, Emilio L?pez wrote:
->>>> Hi Greg & Guenter,
->>>>
->>> [ ... ]
->>>>>>>
->>>>>>> Unless I am missing something, this is not explained anywhere,
->>>>>>> but it is
->>>>>>> not entirely trivial to understand. I think it should be documented.
->>>>
->>>> I agree. I couldn't find any mention of what this int was supposed
->>>> to be by looking at Documentation/ (is_visible is not even mentioned
->>>> :/) or include/linux/sysfs.h. Once we settle on something I'll
->>>> document it before sending a v2.
->>>>
->>> In the include file ? No strong preference, though.
->>>
->>>> By the way, I wrote a quick coccinelle script to match is_visible()
->>>> users which reference the index (included below), and it found
->>>> references to drivers which do not seem to use any binary
->>>> attributes, so I believe changing the index meaning shouldn't be an
->>>> issue.
->>>>
->>> Good.
->>>
->>>>>> I agree, make i the number of the bin attribute and that should solve
->>>>>> this issue.
->>>>>>
->>>>> No, that would conflict with the "normal" use of is_visible for
->>>>> non-binary
->>>>> attributes, and make the index all but useless, since the
->>>>> is_visible function
->>>>> would have to search through all the attributes anyway to figure
->>>>> out which one
->>>>> is being checked.
->>>>
->>>> Yeah, using the same indexes would be somewhat pointless, although
->>>> not many seem to be using it anyway (only 14 files matched). Others
->>>> seem to be comparing the attr* instead. An alternative would be to
->>>> use negative indexes for binary attributes and positive indexes for
->>>> normal attributes.
->>>>
->>> ... and I probably wrote or reviewed a significant percentage of
->>> those ;-).
->>>
->>> Using negative numbers for binary attributes is an interesting idea.
->>> Kind of unusual, though. Greg, any thoughts on that ?
->>
->> Ick, no, that's a mess, maybe we just could drop the index alltogether?
->>
->
-> No, please don't. Having to manually compare dozens of index pointers
-> would be
-> even more of a mess.
+On Sep 9, 2015, at 1:47 AM, James Morse wrote:
+> On 08/09/15 15:54, Jungseok Lee wrote:
+>> On Sep 7, 2015, at 11:36 PM, James Morse wrote:
+>> 
+>> Hi James,
+>> 
+>>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>>> index e16351819fed..d42371f3f5a1 100644
+>>> --- a/arch/arm64/kernel/entry.S
+>>> +++ b/arch/arm64/kernel/entry.S
+>>> @@ -190,10 +190,37 @@ tsk	.req	x28		// current thread_info
+>>> * Interrupt handling.
+>>> */
+>>> 	.macro	irq_handler
+>>> -	adrp	x1, handle_arch_irq
+>>> -	ldr	x1, [x1, #:lo12:handle_arch_irq]
+>>> -	mov	x0, sp
+>>> +	mrs	x21, tpidr_el1
+>>> +	adr_l	x20, irq_sp
+>>> +	add	x20, x20, x21
+>>> +
+>>> +	ldr	x21, [x20]
+>>> +	mov	x20, sp
+>>> +
+>>> +	mov	x0, x21
+>>> +	mov	x1, x20
+>>> +	bl	irq_copy_thread_info
+>>> +
+>>> +	/* test for recursive use of irq_sp */
+>>> +	cbz	w0, 1f
+>>> +	mrs	x30, elr_el1
+>>> +	mov	sp, x21
+>>> +
+>>> +	/*
+>>> +	 * Create a fake stack frame to bump unwind_frame() onto the original
+>>> +	 * stack. This relies on x29 not being clobbered by kernel_entry().
+>>> +	 */
+>>> +	push	x29, x30
+>> 
+>> It is the most challenging item to handle a frame pointer in this context.
+>> 
+>> As I mentioned previously, a stack tracer on ftrace is not supported yet.
+>> How about decoupling "IRQ Stack feature" from "Stack Tracer Fix"?
+> 
+> Yes - I discovered today this was more complicated than I thought. I will
+> need to do some more reading.
+> 
+> 
+>>> +
+>>> +1:	ldr_l	x1, handle_arch_irq
+>>> +	mov     x0, x20
+>>> 	blr	x1
+>>> +
+>>> +	mov	x0, x20
+>>> +	mov	x1, x21
+>>> +	bl	irq_copy_thread_info
+>>> +	mov	sp, x20
+>>> +
+>>> 	.endm
+>>> 
+>>> 	.text
+>>> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+>>> index 463fa2e7e34c..10b57a006da8 100644
+>>> --- a/arch/arm64/kernel/irq.c
+>>> +++ b/arch/arm64/kernel/irq.c
+>>> @@ -26,11 +26,14 @@
+>>> #include <linux/smp.h>
+>>> #include <linux/init.h>
+>>> #include <linux/irqchip.h>
+>>> +#include <linux/percpu.h>
+>>> #include <linux/seq_file.h>
+>>> #include <linux/ratelimit.h>
+>>> 
+>>> unsigned long irq_err_count;
+>>> 
+>>> +DEFINE_PER_CPU(unsigned long, irq_sp) = 0;
+>>> +
+>>> int arch_show_interrupts(struct seq_file *p, int prec)
+>>> {
+>>> #ifdef CONFIG_SMP
+>>> @@ -55,6 +58,10 @@ void __init init_IRQ(void)
+>>> 	irqchip_init();
+>>> 	if (!handle_arch_irq)
+>>> 		panic("No interrupt controller found.");
+>>> +
+>>> +	/* Allocate an irq stack for the boot cpu */
+>>> +	if (alloc_irq_stack(smp_processor_id()))
+>>> +		panic("Failed to allocate irq stack for boot cpu.");
+>>> }
+>>> 
+>>> #ifdef CONFIG_HOTPLUG_CPU
+>>> @@ -117,3 +124,48 @@ void migrate_irqs(void)
+>>> 	local_irq_restore(flags);
+>>> }
+>>> #endif /* CONFIG_HOTPLUG_CPU */
+>>> +
+>>> +/* Allocate an irq_stack for a cpu that is about to be brought up. */
+>>> +int alloc_irq_stack(unsigned int cpu)
+>>> +{
+>>> +	struct page *irq_stack_page;
+>>> +	union thread_union *irq_stack;
+>>> +
+>>> +	/* reuse stack allocated previously */
+>>> +	if (per_cpu(irq_sp, cpu))
+>>> +		return 0;
+>> 
+>> I'd like to avoid even this simple check since CPU hotplug could be heavily
+>> used for power management.
+> 
+> I don't think its a problem:
+> __cpu_up() contains a call to wait_for_completion_timeout() (which could
+> eventually end up in the scheduler), so I don't think it could ever be on a
+> 'really hot' path.
+> 
+> For really frequent hotplug-like power management, cpu_suspend() makes use
+> of firmware support to power-off cores - from what I can see it doesn't use
+> __cpu_up().
 
-So, what about keeping it the way it is in the patch, and documenting it 
-thoroughly? Otherwise, we could introduce another "is_bin_visible" 
-function to do this same thing but just on binary attributes, but I'd 
-rather not add a new function pointer if possible.
+In case of some platforms, CPU hotplug is triggered via sysfs for power management
+based on user data. What is advantage of putting stack allocation into this path?
 
-Cheers,
-Emilio
+IRQ stack allocation is an critical one-shot operation. So, there would be no issue
+to give this work to a booting core. 
+
+>>> +
+>>> +	irq_stack_page = alloc_kmem_pages(THREADINFO_GFP, THREAD_SIZE_ORDER);
+>>> +	if (!irq_stack_page) {
+>>> +		pr_crit("CPU%u: failed to allocate irq stack for cpu %u\n",
+>>> +			smp_processor_id(), cpu);
+>>> +		return -ENOMEM;
+>>> +	}
+>>> +	irq_stack = page_address(irq_stack_page);
+
+I forgot leaving a comment here. How about using __get_free_pages? It returns an
+address instead of page. 
+
+>>> +
+>>> +	per_cpu(irq_sp, cpu) = (unsigned long)irq_stack->stack
+>>> +			       + THREAD_START_SP;
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +/*
+>>> + * Copy struct thread_info between two stacks, and update current->stack.
+>>> + * This is used when moving to the irq exception stack.
+>>> + * Changing current->stack is necessary so that non-arch thread_info writers
+>>> + * don't use the new thread_info->task->stack to find the old thread_info when
+>>> + * setting flags like TIF_NEED_RESCHED...
+>>> + */
+>>> +asmlinkage int irq_copy_thread_info(unsigned long dst_sp, unsigned long src_sp)
+>>> +{
+>>> +	struct thread_info *src = get_thread_info(src_sp);
+>>> +	struct thread_info *dst = get_thread_info(dst_sp);
+>>> +
+>>> +	if (dst == src)
+>>> +		return 0;
+>>> +
+>>> +	*dst = *src;
+>>> +	current->stack = dst;
+>>> +
+>>> +	return 1;
+>>> +}
+>> 
+>> Although this is 32-byte memcpy, sizeof(struct thread_info), this function is called
+>> twice to handle a single interrupt. Isn's it too expensive?
+>> 
+>> This is a major difference between my approach and this patch. I think we should get
+>> some feedbacks on struct thread_info information management for v2 preparation.
+> 
+> Agreed.
+> 
+> The other difference, as Akashi Takahiro pointed out, is the behaviour of
+> object_is_on_stack(). What should this return for an object on an irq stack?
+
+0 should be returned in that case to align with x86 behavior according to check_stack()
+context and the commit, 81520a1b0649d0.
+
+Best Regards
+Jungseok Lee
