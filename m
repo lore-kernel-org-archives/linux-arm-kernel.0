@@ -1,64 +1,88 @@
-From: dserrg@gmail.com (Sergey Dyasly)
-Date: Wed, 9 Sep 2015 21:28:14 +0300
-Subject: [PATCH] ARM:mm: define arch-specific IOREMAP_MAX_ORDER only in
- !SMP && !LPAE case
-In-Reply-To: <alpine.LFD.2.20.1509082309040.22877@knanqh.ubzr>
-References: <1441680050-50490-1-git-send-email-zhenzhang.zhang@huawei.com>
- <55EE4BD2.3080800@huawei.com> <55EF24FE.4060602@gmail.com>
- <alpine.LFD.2.20.1509082309040.22877@knanqh.ubzr>
-Message-ID: <55F07A3E.5010400@gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 9 Sep 2015 06:30:39 -0700
+Subject: [PATCH 1/3] sysfs: Fix is_visible() support for binary attributes
+In-Reply-To: <55F030C6.80504@collabora.co.uk>
+References: <1441714066-5599-1-git-send-email-emilio.lopez@collabora.co.uk>
+ <1441714066-5599-2-git-send-email-emilio.lopez@collabora.co.uk>
+ <20150908153013.GA6758@roeck-us.net>
+ <20150908191002.GB10156@kroah.com>
+ <20150908193052.GA11106@roeck-us.net>
+ <55EF82A4.5000502@collabora.co.uk> <55EF86F8.3060406@roeck-us.net>
+ <20150909035850.GA5497@kroah.com> <55EFB1B5.1060703@roeck-us.net>
+ <55F030C6.80504@collabora.co.uk>
+Message-ID: <20150909133039.GB9167@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.09.2015 6:10, Nicolas Pitre wrote:
-> On Tue, 8 Sep 2015, Sergey Dyasly wrote:
->
->> On 08.09.2015 5:45, Zhang Zhen wrote:
->>> The arch-specific IOREMAP_MAX_ORDER is introduced in
->>> commit: ff0daca([ARM] Add section support to ioremap) and
->>> commit: a069c89 ([ARM] 3705/1: add supersection support to ioremap()).
->>> But supersections and sections mappings are only used in !SMP && !LPAE case.
->>> Otherwise, mapping is created using the usual 4K pages.
->>>
->>> In most cases without !SMP && !LPAE, the big alignment cause high
->>> fragmentation
->>> issue in vmalloc area.
->>> Here we use arch-specific IOREMAP_MAX_ORDER only in !SMP && !LPAE case,
->>> otherwise use generic IOREMAP_MAX_ORDER in include/linux/vmalloc.h.
->>>
->>> Signed-off-by: Zhang Zhen <zhenzhang.zhang@huawei.com>
->>> ---
->>>    arch/arm/include/asm/memory.h | 2 ++
->>>    1 file changed, 2 insertions(+)
->>>
->>> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
->>> index b7f6fb4..3209012 100644
->>> --- a/arch/arm/include/asm/memory.h
->>> +++ b/arch/arm/include/asm/memory.h
->>> @@ -76,10 +76,12 @@
->>>     */
->>>    #define XIP_VIRT_ADDR(physaddr)  (MODULES_VADDR + ((physaddr) &
->>> 0x000fffff))
->>>
->>> +#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
->>>    /*
->>>     * Allow 16MB-aligned ioremap pages
->>>     */
->>>    #define IOREMAP_MAX_ORDER	24
->>> +#endif
->>>
->>>    #else /* CONFIG_MMU */
->>>
->> Hmm... This looks exactly like my old patch -
->> http://thread.gmane.org/gmane.linux.kernel.mm/127620
->> (Thanks to Vladimir for pointing that out!)
->>
->> Hasn't there been any progress about this issue?
-> IMHO the patch makes sense.
->
-> Did you send it to RMK's patch system?
-Ok, submitted it to the patch system. Thanks!
+On Wed, Sep 09, 2015 at 10:14:46AM -0300, Emilio L?pez wrote:
+> On 09/09/15 01:12, Guenter Roeck wrote:
+> >On 09/08/2015 08:58 PM, Greg KH wrote:
+> >>On Tue, Sep 08, 2015 at 06:10:16PM -0700, Guenter Roeck wrote:
+> >>>Hi Emilio,
+> >>>
+> >>>On 09/08/2015 05:51 PM, Emilio L?pez wrote:
+> >>>>Hi Greg & Guenter,
+> >>>>
+> >>>[ ... ]
+> >>>>>>>
+> >>>>>>>Unless I am missing something, this is not explained anywhere,
+> >>>>>>>but it is
+> >>>>>>>not entirely trivial to understand. I think it should be documented.
+> >>>>
+> >>>>I agree. I couldn't find any mention of what this int was supposed
+> >>>>to be by looking at Documentation/ (is_visible is not even mentioned
+> >>>>:/) or include/linux/sysfs.h. Once we settle on something I'll
+> >>>>document it before sending a v2.
+> >>>>
+> >>>In the include file ? No strong preference, though.
+> >>>
+> >>>>By the way, I wrote a quick coccinelle script to match is_visible()
+> >>>>users which reference the index (included below), and it found
+> >>>>references to drivers which do not seem to use any binary
+> >>>>attributes, so I believe changing the index meaning shouldn't be an
+> >>>>issue.
+> >>>>
+> >>>Good.
+> >>>
+> >>>>>>I agree, make i the number of the bin attribute and that should solve
+> >>>>>>this issue.
+> >>>>>>
+> >>>>>No, that would conflict with the "normal" use of is_visible for
+> >>>>>non-binary
+> >>>>>attributes, and make the index all but useless, since the
+> >>>>>is_visible function
+> >>>>>would have to search through all the attributes anyway to figure
+> >>>>>out which one
+> >>>>>is being checked.
+> >>>>
+> >>>>Yeah, using the same indexes would be somewhat pointless, although
+> >>>>not many seem to be using it anyway (only 14 files matched). Others
+> >>>>seem to be comparing the attr* instead. An alternative would be to
+> >>>>use negative indexes for binary attributes and positive indexes for
+> >>>>normal attributes.
+> >>>>
+> >>>... and I probably wrote or reviewed a significant percentage of
+> >>>those ;-).
+> >>>
+> >>>Using negative numbers for binary attributes is an interesting idea.
+> >>>Kind of unusual, though. Greg, any thoughts on that ?
+> >>
+> >>Ick, no, that's a mess, maybe we just could drop the index alltogether?
+> >>
+> >
+> >No, please don't. Having to manually compare dozens of index pointers
+> >would be
+> >even more of a mess.
+> 
+> So, what about keeping it the way it is in the patch, and documenting it
+> thoroughly? Otherwise, we could introduce another "is_bin_visible" function
+> to do this same thing but just on binary attributes, but I'd rather not add
+> a new function pointer if possible.
 
->
->
-> Nicolas
+is_bin_visiable makes sense to me instead of trying to overload the
+index number in some crazy way.  There's no issue with adding another
+function pointer.
+
+thanks,
+
+greg k-h
