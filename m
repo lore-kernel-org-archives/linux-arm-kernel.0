@@ -1,42 +1,91 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Wed, 9 Sep 2015 08:48:06 +0200
-Subject: [PATCH v2 1/3] ARM: Make FORCE_MAX_ZONEORDER configurable if
- ARM_SINGLE_ARMV7M
-In-Reply-To: <20150908221912.GE21084@n2100.arm.linux.org.uk>
-References: <1441744686-20521-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1441744686-20521-2-git-send-email-mcoquelin.stm32@gmail.com>
- <20150908221912.GE21084@n2100.arm.linux.org.uk>
-Message-ID: <CALszF6CqVfTNSiSK39oP=zNU5Ne5V++0mD1n0HGhJ_+GMqeadw@mail.gmail.com>
+From: dongsheng.wang@freescale.com (Dongsheng Wang)
+Date: Wed, 9 Sep 2015 14:42:46 +0800
+Subject: [PATCH 1/2] fsl: Add binding for RCPM
+Message-ID: <1441780967-30879-1-git-send-email-dongsheng.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-09-09 0:19 GMT+02:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, Sep 08, 2015 at 10:38:04PM +0200, Maxime Coquelin wrote:
->> This patch makes FORCE_MAX_ZONEORDER configurable in defconfig for ARMV7-M
->> when built for a single platform.
->
-> I'd prefer if we didn't do this, because this isn't supposed to be a user
-> visible "option".  It's an option that was introduced to avoid having to
-> throw masses of #ifdefs into the definition of MAX_ZONEORDER.
->
-> The problem with it is that it's a "well, what do I set this to?" option
-> and that leads to "oh, I'll just choose the default because I don't know
-> any better".
->
-> Do we know why EFM32 needs a value of 9 here?  It's not documented in
-> the original commit, and it really _should_ have been.
-Ok, I get your point.
+From: Wang Dongsheng <dongsheng.wang@freescale.com>
 
-For STM32, the value 11 is working, but having value of 9 makes sense
-in my opinion for systems with small quantity of memory (8MB in the
-case of STM32F429 Discovery).
-It saves some bytes in the .data section, and it might also save some
-CPU cycles as there are less iterations and less split/coalescing of
-pages...
-Note that for CPU cycles I haven't done any measurements, this is just
-my opinion after code review.
+RCPM is the Run Control and Power Management module performs all
+device-level tasks associated with device run control and power
+management.
 
-What drawbacks do you see of using a value of 9?
+Add this for freescale powerpc platform and layerscape platform.
 
-Thanks,
-Maxime
+Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
+Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
+Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+
+diff --git a/Documentation/devicetree/bindings/soc/fsl/rcpm.txt b/Documentation/devicetree/bindings/soc/fsl/rcpm.txt
+new file mode 100644
+index 0000000..284070c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/fsl/rcpm.txt
+@@ -0,0 +1,64 @@
++* Run Control and Power Management
++-------------------------------------------
++The RCPM performs all device-level tasks associated with device run control
++and power management.
++
++Required properites:
++  - reg : Offset and length of the register set of RCPM block.
++  - compatible : Sould contain a chip-specific RCPM block compatible string
++	and (if applicable) may contain a chassis-version RCPM compatible string.
++	Chip-specific strings are of the form "fsl,<chip>-rcpm", such as:
++	* "fsl,p2041-rcpm"
++	* "fsl,p3041-rcpm"
++	* "fsl,p4080-rcpm"
++	* "fsl,p5020-rcpm"
++	* "fsl,p5040-rcpm"
++	* "fsl,t4240-rcpm"
++	* "fsl,b4420-rcpm"
++	* "fsl,b4860-rcpm"
++
++	Chassis-version strings are of the form "fsl,qoriq-rcpm-<version>",
++	such as:
++	* "fsl,qoriq-rcpm-1.0": for chassis 1.0 rcpm
++	* "fsl,qoriq-rcpm-2.0": for chassis 2.0 rcpm
++	* "fsl,qoriq-rcpm-2.1": for chassis 2.1 rcpm
++
++All references to "1.0" and "2.0" refer to the QorIQ chassis version to
++which the chip complies.
++Chassis Version		Example Chips
++---------------		-------------------------------
++1.0				p4080, p5020, p5040, p2041, p3041
++2.0				t4240, b4860, b4420
++2.1				t1040, ls1021
++
++Example:
++The RCPM node for T4240:
++	rcpm: global-utilities at e2000 {
++		compatible = "fsl,t4240-rcpm", "fsl,qoriq-rcpm-2.0";
++		reg = <0xe2000 0x1000>;
++	};
++
++The RCPM node for P4080:
++	rcpm: global-utilities at e2000 {
++		compatible = "fsl,qoriq-rcpm-1.0";
++		reg = <0xe2000 0x1000>;
++	};
++
++* Freescale RCPM Wakeup Source Device Tree Bindings
++-------------------------------------------
++Required rcpm-wakeup property should be added to a device node if the device
++can be used as a wakeup source.
++
++  - rcpm-wakeup: should contain a pointer to the rcpm node and the
++	corresponding bit of device in the register.
++
++Example:
++	lpuart0: serial at 2950000 {
++		compatible = "fsl,ls1021a-lpuart";
++		reg = <0x0 0x2950000 0x0 0x1000>;
++		interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&sysclk>;
++		clock-names = "ipg";
++		rcpm-wakeup = <&rcpm 0x0 0x40000000>;
++		status = "disabled";
++	};
+-- 
+2.1.0.27.g96db324
