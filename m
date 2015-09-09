@@ -1,34 +1,54 @@
-From: alexanders83@web.de (Alexander Stein)
-Date: Wed, 09 Sep 2015 11:00:43 +0200
-Subject: [PATCH v5 0/6] bcm2835: auxiliar device support for spi
-In-Reply-To: <87h9n4weg8.fsf@eliezer.anholt.net>
-References: <1441359711-2800-1-git-send-email-kernel@martin.sperl.org>
- <87h9n4weg8.fsf@eliezer.anholt.net>
-Message-ID: <2757852.TDqE8OEVr2@ws-stein>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 09 Sep 2015 11:07:14 +0200
+Subject: [PATCH v2 04/10] doc/bindings: Update PCIe devicetree binding
+ documentation for LS2080A
+In-Reply-To: <CADRPPNR-cSSQC5sLMmoqcxX46J6hdULa_V4v2BK7T8s8pcX0cg@mail.gmail.com>
+References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
+ <80094129.LHZFOe1ZPU@wuerfel>
+ <CADRPPNR-cSSQC5sLMmoqcxX46J6hdULa_V4v2BK7T8s8pcX0cg@mail.gmail.com>
+Message-ID: <5383634.Mln7J3sdWP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Tuesday 08 September 2015 18:48:07, Eric Anholt wrote:
-> I finally had a chance to sit down and look at what the hardware's doing
-> with the enable bit (also, I've read a whole lot more of the hardware
-> now, so I'm a lot faster at answering questions like this).  The enable
-> bits are a clock gate off of the VPU clock.
+On Tuesday 08 September 2015 15:06:16 Li Yang wrote:
+> On Mon, Sep 7, 2015 at 6:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 04 September 2015 12:27:46 Bhupesh Sharma wrote:
+> >> @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
+> >>  and thus inherits all the common properties defined in designware-pcie.txt.
+> >>
+> >>  Required properties:
+> >> -- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie"
+> >> +- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie",
+> >> +  "fsl,ls2080a-pcie".
+> >>  - reg: base addresses and lengths of the PCIe controller
+> >>  - interrupts: A list of interrupt outputs of the controller. Must contain an
+> >>    entry for each entry in the interrupt-names property.
+> >>
+> >
+> > Are the two PCIe hosts mutually compatible? If they are, you should mandate
+> > one of the strings as the base model for identification, with the additional
+> > model being optional for identification of the specific SoC.
+> 
+> It seems that controllers on these chips are not exactly the same.
+> They will get different driver data by matching the compatible
+> strings.  Probably we could define a more generic compatible string,
+> such as "fsl,layerscape-pcie" or "fsl,ls-pcie".
+> 
+> >
+> > It would also be good to add a string with the specific version number of the
+> > designware PCIe block that is being used there.
+> 
+> The binding has mentioned to reference the designware-pcie.txt.  But
+> it might be more clear to mention the designware compatible string
+> "snps,dw-pcie" again in the compatible part.  Currently there is no
+> version number defined in the designware-pcie binding.  It might be
+> hard to get this information for some SoCs.
 
-Are any hardware documents about such things available (in public)?
+For most of them, the information is available and then it should be
+added. Obviously if you can't find it out, it's hard to guess and
+you have to leave it out for that particular chip.
 
-> I knocked together the enable bits as a clock gate driver, since I'd
-> just written very similar code for the audio domain clock driver (and I
-> assume you are grumpy about how much time you've spent on this one
-> stupid register).  It's up at
-> https://github.com/anholt/linux/tree/bcm2835-clock-aux and I can submit
-> it if you like the result.  I've compile tested it only, but I'm hoping
-> you could just drop your aux SPI driver on top of it and have things
-> work.
+A lot of devices also have some internal version register that you
+can read out.
 
-IMHO line 45 (https://github.com/anholt/linux/commit/facb4ba917a1b9f6c2ee0cea7d529acf55f584dd#diff-1b6f753c132811b3f6d70f5b31866950R45) should be like this
-> onecell->clks = kzalloc(sizeof(*onecell->clks) * BCM2835_AUX_CLOCK_COUNT, GFP_KERNEL);
-or you will only allocate a single struct clk*.
-
-Best regards,
-Alexander
+	Arnd
