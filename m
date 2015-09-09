@@ -1,47 +1,110 @@
-From: dongsheng.wang@freescale.com (Dongsheng Wang)
-Date: Wed, 9 Sep 2015 14:42:47 +0800
-Subject: [PATCH 2/2] arm/layerscape: add RCPM device tree support for ls1021a.
-In-Reply-To: <1441780967-30879-1-git-send-email-dongsheng.wang@freescale.com>
-References: <1441780967-30879-1-git-send-email-dongsheng.wang@freescale.com>
-Message-ID: <1441780967-30879-2-git-send-email-dongsheng.wang@freescale.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Wed, 9 Sep 2015 14:49:06 +0800
+Subject: [PATCH v6 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <20150908091944.GE29293@red-moon>
+References: <1441103408-8433-1-git-send-email-lftan@altera.com>
+ <1441103408-8433-4-git-send-email-lftan@altera.com>
+ <20150901163304.GA9769@red-moon>
+ <CAFiDJ58WCjTNkU5PWtbHxj+-0oWNg1T+psfE-OaJD+4k-DBb-A@mail.gmail.com>
+ <20150908091944.GE29293@red-moon>
+Message-ID: <CAFiDJ58i0enTGbV=xf8q8rKGg6oREXkvwu0cT4Jfz01ozbKQ7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wang Dongsheng <dongsheng.wang@freescale.com>
+On Tue, Sep 8, 2015 at 5:19 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Fri, Sep 04, 2015 at 09:29:14AM +0100, Ley Foon Tan wrote:
+>> On Wed, Sep 2, 2015 at 12:33 AM, Lorenzo Pieralisi
+>> <lorenzo.pieralisi@arm.com> wrote:
+>
+> [...]
+>
+>> > > +static bool altera_pcie_valid_config(struct altera_pcie *pcie,
+>> > > +                                    struct pci_bus *bus, int dev)
+>> > > +{
+>> > > +       /* If there is no link, then there is no device */
+>> > > +       if (bus->number != pcie->root_bus_nr) {
+>> > > +               if (!altera_pcie_link_is_up(pcie))
+>> > > +                       return false;
+>> > > +       }
+>> >
+>> > Can you explain to pls me why you have to check this for every config
+>> > transaction ? Isn't it something that can prevent probing the
+>> > host controller altogether ?
+>> In our PCIe hardware spec, it stated that software should check the
+>> link status before issuing a configuration request to downstream
+>> ports.
+>> BTW, other pci controllers have similar implementation as well, eg: dw
+>> pci, mvebu pci.
+>
+> Understood, thanks.
+>
+> [...]
+>
+>> > > +static int tlp_read_packet(struct altera_pcie *pcie, u32 *value)
+>> > > +{
+>> > > +       u8 loop;
+>> > > +       struct tlp_rp_regpair_t tlp_rp_regdata;
+>> > > +
+>> > > +       for (loop = 0; loop < TLP_LOOP; loop++) {
+>> > > +               tlp_read_rx(pcie, &tlp_rp_regdata);
+>> > > +               if (tlp_rp_regdata.ctrl & RP_RXCPL_EOP) {
+>> > > +                       if (value)
+>> > > +                               *value = tlp_rp_regdata.reg0;
+>> > > +                       return PCIBIOS_SUCCESSFUL;
+>> > > +               }
+>> > > +               udelay(5);
+>> >
+>> > Could you comment please on the chosen udelay/TLP_LOOP values (ie how
+>> > did you come up with them) ?
+>> For udelay value, we just want to have small delay between each read.
+>
+> I would explain how you chose the value, in particular if it can
+> affect next generation hosts sharing the same driver.
+Actually, we don't have any calculation to choose the value. Just want
+to give small relaxation between each read.
+It is request from Marc in previous review.
+>
+>> For TLP_LOOP value, minimum 2 loops to read tlp headers and 1 loop to
+>> read data payload. So, we choose to poll 10 loops for maximum.
+>
+> Add it to a comment.
+Okay.
+>
+[...]
+>> >
+>> > > +
+>> > > +       /* clear all interrupts */
+>> > > +       cra_writel(pcie, P2A_INT_STS_ALL, P2A_INT_STATUS);
+>> > > +       /* enable all interrupts */
+>> > > +       cra_writel(pcie, P2A_INT_ENA_ALL, P2A_INT_ENABLE);
+>> > > +
+>> > > +       bus = pci_scan_root_bus(&pdev->dev, pcie->root_bus_nr, &altera_pcie_ops,
+>> > > +                               pcie, &pcie->resources);
+>> > > +       if (!bus)
+>> > > +               return -ENOMEM;
+>> > > +
+>> > > +       pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+>> > > +       pci_assign_unassigned_bus_resources(bus);
+>> >
+>> > I think you are missing a call to pcie_bus_configure_settings(),
+>> > see drivers/pci/host/pci-host-generic.c
+>> Other pci controller drivers like xgene and iproc don't call to this
+>> function, but it call in
+>> arch/arm/kernel/bios32.c:pci_common_init_dev().
+>> Do we really need this?
+>
+> It is there to provide a way to configure the system MPS, through
+> command line parameters, it is always a good idea to have it and
+> it should be part of your driver so that you can tune it in case
+> the MPS is misconfigured or you want to apply a specific configuration
+> for a given system.
+>
+> Have a look at pcie_bus_config and how it is used in
+> pcie_bus_configure_settings(), that would clarify further.
+Thanks for explanation. I will add it.
 
-Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+Thanks.
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 973a496..deb1271 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -139,6 +139,7 @@
- 			sdhci,auto-cmd12;
- 			big-endian;
- 			bus-width = <4>;
-+			rcpm-wakeup = <&rcpm 0x00000080 0x0>;
- 			status = "disabled";
- 		};
- 
-@@ -186,6 +187,11 @@
- 			};
- 		};
- 
-+		rcpm: rcpm at 1ee2000 {
-+			compatible = "fsl,ls1021a-rcpm", "fsl,qoriq-rcpm-2.1";
-+			reg = <0x0 0x1ee2000 0x0 0x10000>;
-+		};
-+
- 		dspi0: dspi at 2100000 {
- 			compatible = "fsl,ls1021a-v1.0-dspi";
- 			#address-cells = <1>;
-@@ -287,6 +293,7 @@
- 			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&sysclk>;
- 			clock-names = "ipg";
-+			rcpm-wakeup = <&rcpm 0x0 0x40000000>;
- 			status = "disabled";
- 		};
- 
--- 
-2.1.0.27.g96db324
+Regards
+Ley Foon
