@@ -1,91 +1,179 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Wed, 9 Sep 2015 15:24:12 +0200
-Subject: [PATCH linux-next v6 2/8] mtd: spi-nor: remove unused
- read_xfer/write_xfer hooks
+Date: Wed, 9 Sep 2015 15:24:13 +0200
+Subject: [PATCH linux-next v6 3/8] mtd: spi-nor: update the SPI protocol when
+ enabling manufacturer Quad mode
 In-Reply-To: <cover.1441803609.git.cyrille.pitchen@atmel.com>
 References: <cover.1441803609.git.cyrille.pitchen@atmel.com>
-Message-ID: <fbc96099fe24c14a858d29ab6df62d1f2b9bdfeb.1441803609.git.cyrille.pitchen@atmel.com>
+Message-ID: <a27d3a653f931e268d94c6efcb36ce32d758b602.1441803609.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct spi_nor_xfer_cfg and read_xfer/write_xfer hooks were never used by
-any driver. Do some cleanup by removing them.
+Micron:
+Once their Quad SPI protocol enabled, Micron spi-nor memories expect all
+commands to use the SPI 4-4-4 protocol. Also when the Dual SPI protocol is
+enabled, all commands must use the SPI 2-2-2 protocol.
+
+Macronix:
+When the QPI mode is enabled, all commands must use the SPI 4-4-4 protocol.
+
+Spansion:
+When Quad I/O operations are enabled, the Fast Read Quad Output (0x6b / 0x6c)
+commands use the SPI 1-1-4 protocol, the Page Program Quad Output (0x32 /
+0x34) command use the SPI 1-1-4 protocol whereas other commands use the
+SPI 1-1-1 protocol.
 
 Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 ---
- include/linux/mtd/spi-nor.h | 35 -----------------------------------
- 1 file changed, 35 deletions(-)
+ drivers/mtd/spi-nor/spi-nor.c | 74 ++++++++++++++++++++++++++++++++++++++++---
+ include/linux/mtd/spi-nor.h   |  1 +
+ 2 files changed, 70 insertions(+), 5 deletions(-)
 
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index 80a0db078aaa..4b36aada3f4c 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -891,6 +891,12 @@ static int macronix_quad_enable(struct spi_nor *nor)
+ 	nor->cmd_buf[0] = val | SR_QUAD_EN_MX;
+ 	nor->write_reg(nor, SPINOR_OP_WRSR, nor->cmd_buf, 1, 0);
+ 
++	/* Once QPI mode enabled, all commands use SPI 4-4-4 protocol. */
++	nor->erase_proto = SPI_PROTO_4_4_4;
++	nor->read_proto = SPI_PROTO_4_4_4;
++	nor->write_proto = SPI_PROTO_4_4_4;
++	nor->reg_proto = SPI_PROTO_4_4_4;
++
+ 	if (spi_nor_wait_till_ready(nor))
+ 		return 1;
+ 
+@@ -938,10 +944,16 @@ static int spansion_quad_enable(struct spi_nor *nor)
+ 		return -EINVAL;
+ 	}
+ 
++	/* set read/write protocols */
++	nor->read_proto = SPI_PROTO_1_1_4;
++	nor->write_proto = SPI_PROTO_1_1_4;
++
+ 	return 0;
+ }
+ 
+-static int micron_quad_enable(struct spi_nor *nor)
++static int micron_set_protocol(struct spi_nor *nor,
++			       u8 mask, u8 value,
++			       enum spi_protocol proto)
+ {
+ 	int ret;
+ 	u8 val;
+@@ -954,14 +966,20 @@ static int micron_quad_enable(struct spi_nor *nor)
+ 
+ 	write_enable(nor);
+ 
+-	/* set EVCR, enable quad I/O */
+-	nor->cmd_buf[0] = val & ~EVCR_QUAD_EN_MICRON;
++	/* set EVCR protocol bits */
++	nor->cmd_buf[0] = (val & ~mask) | value;
+ 	ret = nor->write_reg(nor, SPINOR_OP_WD_EVCR, nor->cmd_buf, 1, 0);
+ 	if (ret < 0) {
+ 		dev_err(nor->dev, "error while writing EVCR register\n");
+ 		return ret;
+ 	}
+ 
++	/* switch protocol for ALL commands */
++	nor->erase_proto = proto;
++	nor->read_proto = proto;
++	nor->write_proto = proto;
++	nor->reg_proto = proto;
++
+ 	ret = spi_nor_wait_till_ready(nor);
+ 	if (ret)
+ 		return ret;
+@@ -972,14 +990,23 @@ static int micron_quad_enable(struct spi_nor *nor)
+ 		dev_err(nor->dev, "error %d reading EVCR\n", ret);
+ 		return ret;
+ 	}
+-	if (val & EVCR_QUAD_EN_MICRON) {
+-		dev_err(nor->dev, "Micron EVCR Quad bit not clear\n");
++	if ((val & mask) != value) {
++		dev_err(nor->dev, "Micron EVCR protocol bits not valid\n");
+ 		return -EINVAL;
+ 	}
+ 
+ 	return 0;
+ }
+ 
++static inline int micron_quad_enable(struct spi_nor *nor)
++{
++	/* Clear Quad bit to enable quad mode */
++	return micron_set_protocol(nor,
++				   EVCR_QUAD_EN_MICRON | EVCR_DUAL_EN_MICRON,
++				   EVCR_DUAL_EN_MICRON,
++				   SPI_PROTO_4_4_4);
++}
++
+ static int set_quad_mode(struct spi_nor *nor, const struct flash_info *info)
+ {
+ 	int status;
+@@ -1009,6 +1036,38 @@ static int set_quad_mode(struct spi_nor *nor, const struct flash_info *info)
+ 	}
+ }
+ 
++static inline int micron_dual_enable(struct spi_nor *nor)
++{
++	/* Clear Dual bit but keep Quad bit set to enable dual mode */
++	return micron_set_protocol(nor,
++				   EVCR_QUAD_EN_MICRON | EVCR_DUAL_EN_MICRON,
++				   EVCR_QUAD_EN_MICRON,
++				   SPI_PROTO_2_2_2);
++}
++
++static int set_dual_mode(struct spi_nor *nor, const struct flash_info *info)
++{
++	int status;
++
++	switch (JEDEC_MFR(info)) {
++	case CFI_MFR_ST:
++		status = micron_dual_enable(nor);
++		if (status) {
++			dev_err(nor->dev, "Micron dual-read not enabled\n");
++			return -EINVAL;
++		}
++		return status;
++	case CFI_MFR_MACRONIX:
++	case CFI_MFR_AMD:
++		nor->read_proto = SPI_PROTO_1_1_2;
++		break;
++	default:
++		break;
++	}
++
++	return 0;
++}
++
+ static int spi_nor_check(struct spi_nor *nor)
+ {
+ 	if (!nor->dev || !nor->read || !nor->write ||
+@@ -1160,6 +1219,11 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
+ 		}
+ 		nor->flash_read = SPI_NOR_QUAD;
+ 	} else if (mode == SPI_NOR_DUAL && info->flags & SPI_NOR_DUAL_READ) {
++		ret = set_dual_mode(nor, info);
++		if (ret) {
++			dev_err(dev, "dual mode not supported\n");
++			return ret;
++		}
+ 		nor->flash_read = SPI_NOR_DUAL;
+ 	}
+ 
 diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-index 66a5f144728a..08e405cbb6af 100644
+index 08e405cbb6af..ce81b0e2cb37 100644
 --- a/include/linux/mtd/spi-nor.h
 +++ b/include/linux/mtd/spi-nor.h
-@@ -98,33 +98,6 @@ enum spi_protocol {
- 	SPI_PROTO_4_4_4,	/* Quad Command */
- };
+@@ -74,6 +74,7 @@
  
--/**
-- * struct spi_nor_xfer_cfg - Structure for defining a Serial Flash transfer
-- * @wren:		command for "Write Enable", or 0x00 for not required
-- * @cmd:		command for operation
-- * @cmd_pins:		number of pins to send @cmd (1, 2, 4)
-- * @addr:		address for operation
-- * @addr_pins:		number of pins to send @addr (1, 2, 4)
-- * @addr_width:		number of address bytes
-- *			(3,4, or 0 for address not required)
-- * @mode:		mode data
-- * @mode_pins:		number of pins to send @mode (1, 2, 4)
-- * @mode_cycles:	number of mode cycles (0 for mode not required)
-- * @dummy_cycles:	number of dummy cycles (0 for dummy not required)
-- */
--struct spi_nor_xfer_cfg {
--	u8		wren;
--	u8		cmd;
--	u8		cmd_pins;
--	u32		addr;
--	u8		addr_pins;
--	u8		addr_width;
--	u8		mode;
--	u8		mode_pins;
--	u8		mode_cycles;
--	u8		dummy_cycles;
--};
--
- #define SPI_NOR_MAX_CMD_SIZE	8
- enum spi_nor_ops {
- 	SPI_NOR_OPS_READ = 0,
-@@ -152,7 +125,6 @@ enum spi_nor_option_flags {
-  * @flash_read:		the mode of the read
-  * @sst_write_second:	used by the SST write operation
-  * @flags:		flag options for the current SPI-NOR (SNOR_F_*)
-- * @cfg:		used by the read_xfer/write_xfer
-  * @erase_proto:	the SPI protocol used by erase operations
-  * @read_proto:		the SPI protocol used by read operations
-  * @write_proto:	the SPI protocol used by write operations
-@@ -162,8 +134,6 @@ enum spi_nor_option_flags {
-  *			read/write/erase/lock/unlock operations
-  * @unprepare:		[OPTIONAL] do some post work after the
-  *			read/write/erase/lock/unlock operations
-- * @read_xfer:		[OPTIONAL] the read fundamental primitive
-- * @write_xfer:		[OPTIONAL] the writefundamental primitive
-  * @read_reg:		[DRIVER-SPECIFIC] read out the register
-  * @write_reg:		[DRIVER-SPECIFIC] write data to the register
-  * @read:		[DRIVER-SPECIFIC] read data from the SPI NOR
-@@ -191,15 +161,10 @@ struct spi_nor {
- 	enum read_mode		flash_read;
- 	bool			sst_write_second;
- 	u32			flags;
--	struct spi_nor_xfer_cfg	cfg;
- 	u8			cmd_buf[SPI_NOR_MAX_CMD_SIZE];
+ /* Enhanced Volatile Configuration Register bits */
+ #define EVCR_QUAD_EN_MICRON    0x80    /* Micron Quad I/O */
++#define EVCR_DUAL_EN_MICRON    0x40    /* Micron Dual I/O */
  
- 	int (*prepare)(struct spi_nor *nor, enum spi_nor_ops ops);
- 	void (*unprepare)(struct spi_nor *nor, enum spi_nor_ops ops);
--	int (*read_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
--			 u8 *buf, size_t len);
--	int (*write_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
--			  u8 *buf, size_t len);
- 	int (*read_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len);
- 	int (*write_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len,
- 			int write_enable);
+ /* Flag Status Register bits */
+ #define FSR_READY		0x80
 -- 
 1.8.2.2
