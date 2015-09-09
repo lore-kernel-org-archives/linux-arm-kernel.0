@@ -1,142 +1,59 @@
-From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Wed,  9 Sep 2015 15:26:44 +0200
-Subject: [PATCH v2 1/1] ARM: dts: sun7i: Enable axp209 driver on olinuxino
- lime2
-In-Reply-To: <1441805204-6037-1-git-send-email-o.schinagl@ultimaker.com>
-References: <1441805204-6037-1-git-send-email-o.schinagl@ultimaker.com>
-Message-ID: <1441805204-6037-2-git-send-email-o.schinagl@ultimaker.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Wed, 9 Sep 2015 15:24:17 +0200
+Subject: [PATCH linux-next v6 7/8] Documentation: atmel-quadspi: add binding
+ file for Atmel QSPI driver
+In-Reply-To: <cover.1441803609.git.cyrille.pitchen@atmel.com>
+References: <cover.1441803609.git.cyrille.pitchen@atmel.com>
+Message-ID: <231d12345119617846d105d053788f3d5000545e.1441803609.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Olimex OLinuXino Lime2 uses the same AXP209 as was recently
-introduced this driver for its power regulation.
+This patch documents the DT bindings for the driver of the Atmel QSPI
+controller embedded inside sama5d2x SoCs.
 
-Signed-off-by: Olliver Schinagl <o.schinagl@ultimaker.com>
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Marek Vasut <marex@denx.de>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 87 +++++++++----------------
- 1 file changed, 31 insertions(+), 56 deletions(-)
+ .../devicetree/bindings/mtd/atmel-quadspi.txt      | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-index d5c796c..dd90a1d 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-@@ -71,14 +71,6 @@
- 			default-state = "on";
- 		};
- 	};
--
--	reg_axp_ipsout: axp_ipsout {
--		compatible = "regulator-fixed";
--		regulator-name = "axp-ipsout";
--		regulator-min-microvolt = <5000000>;
--		regulator-max-microvolt = <5000000>;
--		regulator-always-on;
--	};
- };
- 
- &ahci {
-@@ -86,6 +78,10 @@
- 	status = "okay";
- };
- 
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+new file mode 100644
+index 000000000000..0b8d545bb198
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+@@ -0,0 +1,29 @@
++* Atmel Quad Serial Peripheral Interface (QSPI)
++
++Required properties:
++- compatible:     should be "atmel,sama5d2-qspi"
++- reg:            the first contains the register location and length,
++                  the second contains the memory mapping address and length
++- interrupts:     should contain the interrupt for the device
++- clocks:         the phandle of the clock needed by the QSPI controller
++- #address-cells: should be <1>
++- #size-cells:    should be <0>
++
++Example:
++
++spi at f0020000 {
++	compatible = "atmel,sama5d2-qspi";
++	reg = <0xf0020000 0x100>,
++	      <0xd0000000 0x8000000>;
++	interrupts = <52 IRQ_TYPE_LEVEL_HIGH 7>;
++	clocks = <&spi0_clk>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_spi0_default>;
++	status = "okay";
++
++	m25p80 at 0 {
++		...
++	};
 +};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -112,57 +108,9 @@
- 	status = "okay";
- 
- 	axp209: pmic at 34 {
--		compatible = "x-powers,axp209";
- 		reg = <0x34>;
- 		interrupt-parent = <&nmi_intc>;
- 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
--
--		interrupt-controller;
--		#interrupt-cells = <1>;
--
--		acin-supply = <&reg_axp_ipsout>;
--		vin2-supply = <&reg_axp_ipsout>;
--		vin3-supply = <&reg_axp_ipsout>;
--		ldo24in-supply = <&reg_axp_ipsout>;
--		ldo3in-supply = <&reg_axp_ipsout>;
--
--		regulators {
--			vdd_rtc: ldo1 {
--				regulator-min-microvolt = <1300000>;
--				regulator-max-microvolt = <1300000>;
--				regulator-always-on;
--			};
--
--			avcc: ldo2 {
--				regulator-min-microvolt = <1800000>;
--				regulator-max-microvolt = <3300000>;
--				regulator-always-on;
--			};
--
--			vcc_csi0: ldo3 {
--				regulator-min-microvolt = <700000>;
--				regulator-max-microvolt = <3500000>;
--				regulator-always-on;
--			};
--
--			vcc_csi1: ldo4 {
--				regulator-min-microvolt = <1250000>;
--				regulator-max-microvolt = <3300000>;
--				regulator-always-on;
--			};
--
--			vdd_cpu: dcdc2 {
--				regulator-min-microvolt = <700000>;
--				regulator-max-microvolt = <2275000>;
--				regulator-always-on;
--			};
--
--			vdd_int: dcdc3 {
--				regulator-min-microvolt = <700000>;
--				regulator-max-microvolt = <3500000>;
--				regulator-always-on;
--			};
--		};
- 	};
- };
- 
-@@ -243,6 +191,33 @@
- 	status = "okay";
- };
- 
-+#include "axp209.dtsi"
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1450000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
-+
- &reg_usb0_vbus {
- 	pinctrl-0 = <&usb0_vbus_pin_lime2>;
- 	gpio = <&pio 2 17 GPIO_ACTIVE_HIGH>;
 -- 
-2.1.4
+1.8.2.2
