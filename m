@@ -1,91 +1,71 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 9 Sep 2015 09:54:50 -0500
-Subject: [Patch v5 1/6] ACPI/PCI: Enhance ACPI core to support sparse IO
- space
-In-Reply-To: <55EFD3CA.3050301@linux.intel.com>
-References: <1433780448-18636-1-git-send-email-jiang.liu@linux.intel.com>
- <1433780448-18636-2-git-send-email-jiang.liu@linux.intel.com>
- <20150729203741.GC9640@google.com> <55EFD3CA.3050301@linux.intel.com>
-Message-ID: <CAErSpo438W5kRtxb9dG8AyLNVaCSTqF_QQ-rdU6DR26Q1_gRvA@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 9 Sep 2015 17:32:42 +0200
+Subject: Almost certainly confirmed, sun7i-a20 does not support 8 bit mmc.
+In-Reply-To: <20150909143038.GE9885@lukather>
+References: <55F02E4B.70708@schinagl.nl> <20150909143038.GE9885@lukather>
+Message-ID: <55F0511A.8060803@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 9, 2015 at 1:38 AM, Jiang Liu <jiang.liu@linux.intel.com> wrote:
-> On 2015/7/30 4:37, Bjorn Helgaas wrote:
->> On Tue, Jun 09, 2015 at 12:20:43AM +0800, Jiang Liu wrote:
->>> Enhance ACPI resource parsing interfaces to support sparse IO space,
->>> which will be used to share common code between x86 and IA64 later.
->>>
->>> Tested-by: Tony Luck <tony.luck@intel.com>
->>> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
->>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->>> ---
->>>  drivers/acpi/resource.c |    9 ++++++---
->>>  include/linux/ioport.h  |    1 +
->>>  2 files changed, 7 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
->>> index 8244f013f210..fdcc73dad2c1 100644
->>> --- a/drivers/acpi/resource.c
->>> +++ b/drivers/acpi/resource.c
->>> @@ -123,7 +123,7 @@ bool acpi_dev_resource_memory(struct acpi_resource *ares, struct resource *res)
->>>  EXPORT_SYMBOL_GPL(acpi_dev_resource_memory);
->>>
->>>  static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
->>> -                                  u8 io_decode)
->>> +                                  u8 io_decode, u8 translation_type)
->>>  {
->>>      res->flags = IORESOURCE_IO;
->>>
->>> @@ -135,6 +135,8 @@ static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
->>>
->>>      if (io_decode == ACPI_DECODE_16)
->>>              res->flags |= IORESOURCE_IO_16BIT_ADDR;
->>> +    if (translation_type == ACPI_SPARSE_TRANSLATION)
->>> +            res->flags |= IORESOURCE_IO_SPARSE;
->>>  }
->>>
->>>  static void acpi_dev_get_ioresource(struct resource *res, u64 start, u64 len,
->>> @@ -142,7 +144,7 @@ static void acpi_dev_get_ioresource(struct resource *res, u64 start, u64 len,
->>>  {
->>>      res->start = start;
->>>      res->end = start + len - 1;
->>> -    acpi_dev_ioresource_flags(res, len, io_decode);
->>> +    acpi_dev_ioresource_flags(res, len, io_decode, 0);
->>>  }
->>>
->>>  /**
->>> @@ -227,7 +229,8 @@ static bool acpi_decode_space(struct resource_win *win,
->>>              acpi_dev_memresource_flags(res, len, wp);
->>>              break;
->>>      case ACPI_IO_RANGE:
->>> -            acpi_dev_ioresource_flags(res, len, iodec);
->>> +            acpi_dev_ioresource_flags(res, len, iodec,
->>> +                                      addr->info.io.translation_type);
->>>              break;
->>>      case ACPI_BUS_NUMBER_RANGE:
->>>              res->flags = IORESOURCE_BUS;
->>> diff --git a/include/linux/ioport.h b/include/linux/ioport.h
->>> index 388e3ae94f7a..24bea087e7af 100644
->>> --- a/include/linux/ioport.h
->>> +++ b/include/linux/ioport.h
->>> @@ -94,6 +94,7 @@ struct resource {
->>>  /* PnP I/O specific bits (IORESOURCE_BITS) */
->>>  #define IORESOURCE_IO_16BIT_ADDR    (1<<0)
->>>  #define IORESOURCE_IO_FIXED         (1<<1)
->>> +#define IORESOURCE_IO_SPARSE                (1<<2)
+Hi,
+
+On 09-09-15 16:30, Maxime Ripard wrote:
+> On Wed, Sep 09, 2015 at 03:04:11PM +0200, Olliver Schinagl wrote:
+>> Hey all,
 >>
->> I don't really like this bit.  We adding a new generic IORESOURCE_* bit
->> just for a special case, and it's only used in one place, for one arch,
->> during enumeration.
-> Hi Bjorn,
->         Instead of defining a formal flag IORESOURCE_IO_SPARSE, we may
-> reuse other field in struct resource to pass back the SPARSE flag,
-> but that's a little dirty. For example, we may reuse res->name field
-> to carry the SPARSE flag for the IA64 special case.
->         Is that OK?
+>> After experimenting with a Micron eMMC chip, I made some interesting finds I
+>> wanted to share with you all.
+>>
+>> For a while now, some had hopes or guessed that the A20 could have support
+>> for 8 bit wide bused on the SDC2. Reason for thinking this was, because the
+>> sun7i uses the same IP as the sun5i which does support 8 bit wide eMMC. The
+>> usermanual does mention 1/4/8 bit data buses and jedec 4.3 support of the
+>> MMC spec. Unfortunately so far, it appears that the extra data pins have not
+>> been muxed out to the PC pads.
+>>
+>> I used the following code to enable the extra pins on the A20:
+>>                          mmc2_pins_a: mmc2 at 0 {
+>> -                               allwinner,pins = "PC6", "PC7", "PC8",
+>> -                                                "PC9", "PC10", "PC11";
+>> +                               allwinner,pins = "PC6", "PC7",
+>> +                                                "PC8", "PC9", "PC10",
+>> "PC11",
+>> +                                                "PC12", "PC13", "PC14",
+>> "PC15";
+>>
+>> and
+>>          SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 12),
+>>                    SUNXI_FUNCTION(0x0, "gpio_in"),
+>>                    SUNXI_FUNCTION(0x1, "gpio_out"),
+>> -                 SUNXI_FUNCTION(0x2, "nand0")),        /* NDQ4 */
+>> +                 SUNXI_FUNCTION(0x2, "nand0"),         /* NDQ4 */
+>> +                 SUNXI_FUNCTION(0x3, "mmc2")),         /* D4 */
+>>          SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 13),
+>>                    SUNXI_FUNCTION(0x0, "gpio_in"),
+>>                    SUNXI_FUNCTION(0x1, "gpio_out"),
+>> -                 SUNXI_FUNCTION(0x2, "nand0")),        /* NDQ5 */
+>> +                 SUNXI_FUNCTION(0x2, "nand0"),         /* NDQ5 */
+>> +                 SUNXI_FUNCTION(0x3, "mmc2")),         /* D5 */
+>>          SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 14),
+>>                    SUNXI_FUNCTION(0x0, "gpio_in"),
+>>                    SUNXI_FUNCTION(0x1, "gpio_out"),
+>> -                 SUNXI_FUNCTION(0x2, "nand0")),        /* NDQ6 */
+>> +                 SUNXI_FUNCTION(0x2, "nand0"),         /* NDQ6 */
+>> +                 SUNXI_FUNCTION(0x3, "mmc2")),         /* D6 */
+>>          SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 15),
+>>                    SUNXI_FUNCTION(0x0, "gpio_in"),
+>>                    SUNXI_FUNCTION(0x1, "gpio_out"),
+>> -                 SUNXI_FUNCTION(0x2, "nand0")),        /* NDQ7 */
+>> +                 SUNXI_FUNCTION(0x2, "nand0"),         /* NDQ7 */
+>> +                 SUNXI_FUNCTION(0x3, "mmc2")),         /* D7 */
+>
+> Where did you get that info from ? Those pins have never been reported
+> as having the mmc2 function, which would explain why it doesn't work.
 
-No, I think that's even worse.  Adding IORESOURCE_IO_SPARSE looks
-positively glorious now.
+Right, but the A20 has the same mmc controller as the A13, which does
+do 8 bit mmc on PORTC, and the datasheet advertises 8 bit bus width
+support in its feature list. So this was worth a shot.
 
-Bjorn
+Regards,
+
+Hans
