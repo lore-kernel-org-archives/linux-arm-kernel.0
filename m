@@ -1,83 +1,106 @@
 From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Wed,  9 Sep 2015 11:35:15 +0200
-Subject: [PATCH v2 2/2] ARM: imx31: Do not call mxc_timer_init twice when
+Date: Wed,  9 Sep 2015 11:35:14 +0200
+Subject: [PATCH v2 1/2] ARM: imx35: Do not call mxc_timer_init twice when
  booting with DT
-In-Reply-To: <1441791315-25390-1-git-send-email-alexander.stein@systec-electronic.com>
-References: <1441791315-25390-1-git-send-email-alexander.stein@systec-electronic.com>
-Message-ID: <1441791315-25390-2-git-send-email-alexander.stein@systec-electronic.com>
+Message-ID: <1441791315-25390-1-git-send-email-alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mxc_timer_init must not be called from within mx31_clocks_init_dt. It will
+mxc_timer_init must not be called from within mx35_clocks_init_dt. It will
 eventually be called by imx31_timer_init_dt
 (drivers/clocksource/timer-imx-gpt.c).
 This arranges the initialization code similar to clk-imx27.c
 
 Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
 ---
-* Added in v2
-* Compile tested only due to lack of hardware
+Change in v2:
+* Fix typo
 
- drivers/clk/imx/clk-imx31.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+ drivers/clk/imx/clk-imx35.c | 49 +++++++++++++++++++++++++--------------------
+ 1 file changed, 27 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/clk/imx/clk-imx31.c b/drivers/clk/imx/clk-imx31.c
-index fe66c40..9a49653 100644
---- a/drivers/clk/imx/clk-imx31.c
-+++ b/drivers/clk/imx/clk-imx31.c
-@@ -62,7 +62,7 @@ enum mx31_clks {
- static struct clk *clk[clk_max];
- static struct clk_onecell_data clk_data;
+diff --git a/drivers/clk/imx/clk-imx35.c b/drivers/clk/imx/clk-imx35.c
+index 69138ba..3e7c805 100644
+--- a/drivers/clk/imx/clk-imx35.c
++++ b/drivers/clk/imx/clk-imx35.c
+@@ -84,7 +84,7 @@ enum mx35_clks {
  
--int __init mx31_clocks_init(unsigned long fref)
-+static void __init _mx31_clocks_init(unsigned long fref)
+ static struct clk *clk[clk_max];
+ 
+-int __init mx35_clocks_init(void)
++static void __init _mx35_clocks_init(void)
  {
  	void __iomem *base;
- 	struct device_node *np;
-@@ -132,6 +132,12 @@ int __init mx31_clocks_init(unsigned long fref)
+ 	u32 pdr0, consumer_sel, hsp_sel;
+@@ -219,6 +219,30 @@ int __init mx35_clocks_init(void)
  
  	imx_check_clocks(clk, ARRAY_SIZE(clk));
  
-+	clk_set_parent(clk[csi], clk[upll]);
-+	clk_prepare_enable(clk[emi_gate]);
++	clk_prepare_enable(clk[spba_gate]);
++	clk_prepare_enable(clk[gpio1_gate]);
++	clk_prepare_enable(clk[gpio2_gate]);
++	clk_prepare_enable(clk[gpio3_gate]);
 +	clk_prepare_enable(clk[iim_gate]);
-+	mx31_revision();
-+	clk_disable_unprepare(clk[iim_gate]);
++	clk_prepare_enable(clk[emi_gate]);
++	clk_prepare_enable(clk[max_gate]);
++	clk_prepare_enable(clk[iomuxc_gate]);
 +
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx31-ccm");
- 
- 	if (np) {
-@@ -139,6 +145,11 @@ int __init mx31_clocks_init(unsigned long fref)
- 		clk_data.clk_num = ARRAY_SIZE(clk);
- 		of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
- 	}
++	/*
++	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
++	 * before conversion to common clk also enabled UART1 (which isn't
++	 * handled here and not needed for mmc) and IIM (which is enabled
++	 * unconditionally above).
++	 */
++	clk_prepare_enable(clk[scc_gate]);
++
++	imx_print_silicon_rev("i.MX35", mx35_revision());
 +}
 +
-+int __init mx31_clocks_init(void)
++int __init mx35_clocks_init(void)
 +{
-+	_mx31_clocks_init();
++	_mx35_clocks_init();
++
+ 	clk_register_clkdev(clk[pata_gate], NULL, "pata_imx");
+ 	clk_register_clkdev(clk[can1_gate], NULL, "flexcan.0");
+ 	clk_register_clkdev(clk[can2_gate], NULL, "flexcan.1");
+@@ -275,25 +299,6 @@ int __init mx35_clocks_init(void)
+ 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
+ 	clk_register_clkdev(clk[admux_gate], "audmux", NULL);
  
- 	clk_register_clkdev(clk[gpt_gate], "per", "imx-gpt.0");
- 	clk_register_clkdev(clk[ipg], "ipg", "imx-gpt.0");
-@@ -193,12 +204,6 @@ int __init mx31_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[sdma_gate], NULL, "imx31-sdma");
- 	clk_register_clkdev(clk[iim_gate], "iim", NULL);
- 
--	clk_set_parent(clk[csi], clk[upll]);
--	clk_prepare_enable(clk[emi_gate]);
+-	clk_prepare_enable(clk[spba_gate]);
+-	clk_prepare_enable(clk[gpio1_gate]);
+-	clk_prepare_enable(clk[gpio2_gate]);
+-	clk_prepare_enable(clk[gpio3_gate]);
 -	clk_prepare_enable(clk[iim_gate]);
--	mx31_revision();
--	clk_disable_unprepare(clk[iim_gate]);
+-	clk_prepare_enable(clk[emi_gate]);
+-	clk_prepare_enable(clk[max_gate]);
+-	clk_prepare_enable(clk[iomuxc_gate]);
 -
- 	mxc_timer_init(MX31_GPT1_BASE_ADDR, MX31_INT_GPT, GPT_TYPE_IMX31);
+-	/*
+-	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
+-	 * before conversion to common clk also enabled UART1 (which isn't
+-	 * handled here and not needed for mmc) and IIM (which is enabled
+-	 * unconditionally above).
+-	 */
+-	clk_prepare_enable(clk[scc_gate]);
+-
+-	imx_print_silicon_rev("i.MX35", mx35_revision());
+-
+ 	mxc_timer_init(MX35_GPT1_BASE_ADDR, MX35_INT_GPT, GPT_TYPE_IMX31);
  
  	return 0;
-@@ -217,5 +222,5 @@ int __init mx31_clocks_init_dt(void)
- 			break;
- 	}
+@@ -301,10 +306,10 @@ int __init mx35_clocks_init(void)
  
--	return mx31_clocks_init(fref);
-+	return _mx31_clocks_init(fref);
+ static void __init mx35_clocks_init_dt(struct device_node *ccm_node)
+ {
++	_mx35_clocks_init();
++
+ 	clk_data.clks = clk;
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
+ 	of_clk_add_provider(ccm_node, of_clk_src_onecell_get, &clk_data);
+-
+-	mx35_clocks_init();
  }
+ CLK_OF_DECLARE(imx35, "fsl,imx35-ccm", mx35_clocks_init_dt);
 -- 
 2.4.6
