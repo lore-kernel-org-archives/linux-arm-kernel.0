@@ -1,73 +1,74 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 9 Sep 2015 15:59:40 +0200
-Subject: [PATCH linux-next v6 1/8] mtd: spi-nor: read JEDEC ID with
- multiple I/O protocols
-In-Reply-To: <735e22efa25f6529bf8ed4a709c18a719176714b.1441803609.git.cyrille.pitchen@atmel.com>
-References: <cover.1441803609.git.cyrille.pitchen@atmel.com>
- <735e22efa25f6529bf8ed4a709c18a719176714b.1441803609.git.cyrille.pitchen@atmel.com>
-Message-ID: <201509091559.40948.marex@denx.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 9 Sep 2015 16:30:38 +0200
+Subject: Almost certainly confirmed, sun7i-a20 does not support 8 bit mmc.
+In-Reply-To: <55F02E4B.70708@schinagl.nl>
+References: <55F02E4B.70708@schinagl.nl>
+Message-ID: <20150909143038.GE9885@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 09, 2015 at 03:24:11 PM, Cyrille Pitchen wrote:
-> When their quad or dual I/O mode is enabled, Micron and Macronix spi-nor
-> memories don't reply to the regular Read ID (0x9f) command. Instead they
-> reply to a new dedicated command Read ID Multiple I/O (0xaf).
+On Wed, Sep 09, 2015 at 03:04:11PM +0200, Olliver Schinagl wrote:
+> Hey all,
 > 
-> If the Read ID (0x9f) command fails (the read ID is all 1's or all 0's),
-> then the Read ID Multiple I/O (0xaf) is used, first with SPI 4-4-4 protocol
-> (supported by both Micron and Macronix memories), lately with SPI-2-2-2
-> protocol (supported only by Micron memories).
+> After experimenting with a Micron eMMC chip, I made some interesting finds I
+> wanted to share with you all.
 > 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> ---
->  drivers/mtd/spi-nor/spi-nor.c | 28 +++++++++++++++++++++++++++-
->  include/linux/mtd/spi-nor.h   | 23 +++++++++++++++++++++--
->  2 files changed, 48 insertions(+), 3 deletions(-)
+> For a while now, some had hopes or guessed that the A20 could have support
+> for 8 bit wide bused on the SDC2. Reason for thinking this was, because the
+> sun7i uses the same IP as the sun5i which does support 8 bit wide eMMC. The
+> usermanual does mention 1/4/8 bit data buses and jedec 4.3 support of the
+> MMC spec. Unfortunately so far, it appears that the extra data pins have not
+> been muxed out to the PC pads.
 > 
-> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-> index f59aedfe1462..80a0db078aaa 100644
-> --- a/drivers/mtd/spi-nor/spi-nor.c
-> +++ b/drivers/mtd/spi-nor/spi-nor.c
-> @@ -703,8 +703,9 @@ static const struct flash_info spi_nor_ids[] = {
+> I used the following code to enable the extra pins on the A20:
+>                         mmc2_pins_a: mmc2 at 0 {
+> -                               allwinner,pins = "PC6", "PC7", "PC8",
+> -                                                "PC9", "PC10", "PC11";
+> +                               allwinner,pins = "PC6", "PC7",
+> +                                                "PC8", "PC9", "PC10",
+> "PC11",
+> +                                                "PC12", "PC13", "PC14",
+> "PC15";
 > 
->  static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
->  {
-> -	int			tmp;
-> +	int			i, tmp;
->  	u8			id[SPI_NOR_MAX_ID_LEN];
-> +	enum spi_protocol	proto[2] = {SPI_PROTO_4_4_4, SPI_PROTO_2_2_2};
->  	const struct flash_info	*info;
-> 
->  	tmp = nor->read_reg(nor, SPINOR_OP_RDID, id, SPI_NOR_MAX_ID_LEN);
-> @@ -713,6 +714,25 @@ static const struct flash_info *spi_nor_read_id(struct
-> spi_nor *nor) return ERR_PTR(tmp);
->  	}
-> 
-> +	/* Special case for Micron/Macronix qspi nor. */
-> +	for (i = 0; i < ARRAY_SIZE(proto); ++i) {
-> +		if (!((id[0] == 0xff && id[1] == 0xff && id[2] == 0xff) ||
-> +		      (id[0] == 0x00 && id[1] == 0x00 && id[2] == 0x00)))
-> +			break;
-> +
-> +		nor->erase_proto = proto[i];
-> +		nor->read_proto = proto[i];
-> +		nor->write_proto = proto[i];
-> +		nor->reg_proto = proto[i];
-> +		tmp = nor->read_reg(nor, SPINOR_OP_MIO_RDID,
-> +				    id, SPI_NOR_MAX_ID_LEN);
-> +		if (tmp < 0) {
-> +			dev_dbg(nor->dev,
-> +				" error %d reading JEDEC ID (MULTI IO)\n", tmp);
+> and
+>         SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 12),
+>                   SUNXI_FUNCTION(0x0, "gpio_in"),
+>                   SUNXI_FUNCTION(0x1, "gpio_out"),
+> -                 SUNXI_FUNCTION(0x2, "nand0")),        /* NDQ4 */
+> +                 SUNXI_FUNCTION(0x2, "nand0"),         /* NDQ4 */
+> +                 SUNXI_FUNCTION(0x3, "mmc2")),         /* D4 */
+>         SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 13),
+>                   SUNXI_FUNCTION(0x0, "gpio_in"),
+>                   SUNXI_FUNCTION(0x1, "gpio_out"),
+> -                 SUNXI_FUNCTION(0x2, "nand0")),        /* NDQ5 */
+> +                 SUNXI_FUNCTION(0x2, "nand0"),         /* NDQ5 */
+> +                 SUNXI_FUNCTION(0x3, "mmc2")),         /* D5 */
+>         SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 14),
+>                   SUNXI_FUNCTION(0x0, "gpio_in"),
+>                   SUNXI_FUNCTION(0x1, "gpio_out"),
+> -                 SUNXI_FUNCTION(0x2, "nand0")),        /* NDQ6 */
+> +                 SUNXI_FUNCTION(0x2, "nand0"),         /* NDQ6 */
+> +                 SUNXI_FUNCTION(0x3, "mmc2")),         /* D6 */
+>         SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 15),
+>                   SUNXI_FUNCTION(0x0, "gpio_in"),
+>                   SUNXI_FUNCTION(0x1, "gpio_out"),
+> -                 SUNXI_FUNCTION(0x2, "nand0")),        /* NDQ7 */
+> +                 SUNXI_FUNCTION(0x2, "nand0"),         /* NDQ7 */
+> +                 SUNXI_FUNCTION(0x3, "mmc2")),         /* D7 */
 
-Don't you have one space too much in front of the " error" ?
+Where did you get that info from ? Those pins have never been reported
+as having the mmc2 function, which would explain why it doesn't work.
 
-> +			return ERR_PTR(tmp);
-> +		}
-> +	}
-> +
->  	for (tmp = 0; tmp < ARRAY_SIZE(spi_nor_ids) - 1; tmp++) {
->  		info = &spi_nor_ids[tmp];
->  		if (info->id_len) {
+Maxime
 
-[...]
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150909/ba838457/attachment.sig>
