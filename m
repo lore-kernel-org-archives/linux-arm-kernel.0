@@ -1,142 +1,389 @@
 From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed,  9 Sep 2015 20:35:23 +0200
-Subject: [PATCH 0/2] deps: parallel initialization of (device-)drivers
-In-Reply-To: <55E961DA.5040009@ahsoftware.de>
+Date: Wed,  9 Sep 2015 20:35:24 +0200
+Subject: [PATCH 1/2] deps: parallel initialization of (device-)drivers
+In-Reply-To: <1441823725-8869-1-git-send-email-holler@ahsoftware.de>
 References: <55E961DA.5040009@ahsoftware.de>
-Message-ID: <1441823725-8869-1-git-send-email-holler@ahsoftware.de>
+ <1441823725-8869-1-git-send-email-holler@ahsoftware.de>
+Message-ID: <1441823725-8869-2-git-send-email-holler@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This initializes drivers (annotated or in the initcall level device)
+in parallel.
 
-as already mentioned, I've implemented the stuff to initialize drivers
-in parallel. What follows are two patches to be used on top of my
-already posted series (for 4.2) which implements annotated initcalls
-and DT based dependencies.
+Which drivers can be initialized in parallel is calculated by using
+the dependencies. That means, currently, only annotated drivers which
+are are referenced in the used DT will be in order. For all others it
+is assumed that, as long as they belong to the same initcall level
+(device), they can be called in any order.
 
-But be warned: many drivers which are in the same initcall level
-still depend on the link order given by the Makefile and directoy
-(-name) and therefor will fail. That means without moving them to other
-initcall levels or explicit dependencies (which are a TODO) for these
-drivers, the whole stuff currently works only for some configurations
-and you likely will need to add several patches for your board.
+Unfortunately this isn't allways true and several drivers are depending
+on the link-order (based on the Makefile and the directory). This is,
+imho, a bug or at least a very fragile way to do such and should be,
+again imho, fixed. Otherwise problems might arise if e.g. a driver is
+moved from staging to its final position (which changes its place in
+the list of initcalls too).
+But this isn't really the topic of this patch and I'm mentioning this
+here just as a warning or as hint in case someone experiences problems
+when enabling the feature this patch provides.
 
-I've already posted two patches to move two drivers into another
-initcall level. While playing with the stuff, I've found several
-more drivers which are suffering under the same problem and need
-the same modification:
+Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+---
+ drivers/of/Kconfig           |  20 ++++
+ drivers/of/of_dependencies.c | 245 ++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 261 insertions(+), 4 deletions(-)
 
-block/noop-iosched.c
-crypto/hmac.c
-cryoto/sha_generic.c
-drivers/mtd/ofpart.c
-drivers/tty/serial/8250/8250_core.c
-
-To offer an impression how this patch series might work in action,
-below is the relevant part from the kernel log for a configuration
-I'm using successfully on an imx6q.
-
-Maybe someone has interest in that stuff.
-
-Regards,
-
-Alexander Holler
-
------------
-(...)
-[    2.628325] Thread 0 calling (ordered) initcall for driver reg-fixed-voltage (regulator-fixed)
-[    2.629196] Thread 3 calling (ordered) initcall for driver imx6q-pinctrl (fsl,imx6q-iomuxc)
-[    2.629331] Thread 0 calling (ordered) initcall for driver gpio-mxc (fsl,imx1-gpio)
-[    2.630276] imx6q-pinctrl 20e0000.iomuxc: initialized IMX pinctrl driver
-[    2.632543] Thread 0 calling (ordered) initcall for driver anatop_regulator (fsl,anatop-regulator)
-[    2.632556] Thread 1 calling (ordered) initcall for driver imx-sdma (fsl,imx6q-sdma)
-[    2.632563] Thread 2 calling (ordered) initcall for driver mxs-dma (fsl,imx23-dma-apbh)
-[    2.632598] Thread 3 calling (ordered) initcall for driver sram (mmio-sram)
-[    2.634502] mxs-dma 110000.dma-apbh: initialized
-[    2.634848] Thread 3 calling (ordered) initcall for driver mxs_phy (fsl,imx6sx-usbphy)
-[    2.635165] Thread 0 calling (ordered) initcall for driver imx2-wdt (fsl,imx21-wdt)
-[    2.635181] Thread 2 calling (ordered) initcall for driver snvs_rtc (fsl,sec-v4.0-mon-rtc-lp)
-[    2.635493] snvs_rtc 20cc034.snvs-rtc-lp: rtc core: setting system clock to 2015-09-09 16:37:09 UTC (1441816629)
-[    2.635813] snvs_rtc 20cc034.snvs-rtc-lp: rtc core: registered 20cc034.snvs-rtc-lp as rtc0
-[    2.635978] Thread 2 calling (ordered) initcall for driver ahci-imx (fsl,imx53-ahci)
-[    2.636317] imx-sdma 20ec000.sdma: initialized
-[    2.636322] ahci-imx 2200000.sata: fsl,transmit-level-mV not specified, using 00000024
-[    2.636332] ahci-imx 2200000.sata: fsl,transmit-boost-mdB not specified, using 00000480
-[    2.636338] ahci-imx 2200000.sata: fsl,transmit-atten-16ths not specified, using 00002000
-[    2.636347] ahci-imx 2200000.sata: fsl,receive-eq-mdB not specified, using 05000000
-[    2.636690] Thread 1 calling (ordered) initcall for driver wandboard-rfkill (wand,imx6q-wandboard-rfkill)
-[    2.637160] imx-sdma 20ec000.sdma: loaded firmware 1.1
-[    2.637166] imx2-wdt 20bc000.wdog: timeout 60 sec (nowayout=0)
-[    2.637283] wandboard-rfkill rfkill: Wandboard rfkill initialization
-[    2.637402] Thread 0 calling (ordered) initcall for driver leds-gpio (gpio-leds)
-[    2.637422] wandboard-rfkill rfkill: Turning of power
-[    2.639193] ahci-imx 2200000.sata: SSS flag set, parallel bus scan disabled
-[    2.639253] ahci-imx 2200000.sata: AHCI 0001.0300 32 slots 1 ports 3 Gbps 0x1 impl platform mode
-[    2.639299] ahci-imx 2200000.sata: flags: ncq sntf stag pm led clo only pmp pio slum part ccc apst
-[    2.640579] scsi host0: ahci-imx
-[    2.640902] ata1: SATA max UDMA/133 mmio [mem 0x02200000-0x02203fff] port 0x100 irq 67
-[    2.663463] wandboard-rfkill rfkill: initialize wifi chip
-[    2.663642] wandboard-rfkill rfkill: wifi-rfkill registered.
-[    2.663720] wandboard-rfkill rfkill: initialize bluetooth chip
-[    2.663919] wandboard-rfkill rfkill: bluetooth-rfkill registered.
-[    2.664289] Thread 1 calling (ordered) initcall for driver imx-gpc (fsl,imx6q-gpc)
-[    2.664335] Thread 3 calling (ordered) initcall for driver imx-uart (fsl,imx6q-uart)
-[    2.664769] 2020000.serial: ttymxc0 at MMIO 0x2020000 (irq = 23, base_baud = 5000000) is a IMX
-[    2.983471] ata1: SATA link up 1.5 Gbps (SStatus 113 SControl 300)
-[    2.984610] ata1.00: ATA-8: Hitachi HTS542525K9SA00, BBFOC31P, max UDMA/133
-[    2.984620] ata1.00: 488397168 sectors, multi 0: LBA48 NCQ (depth 31/32)
-[    2.985793] ata1.00: configured for UDMA/133
-[    2.985912] Default I/O scheduler not found. Using noop.
-[    2.986213] scsi 0:0:0:0: Direct-Access     ATA      Hitachi HTS54252 C31P PQ: 0 ANSI: 5
-[    2.986776] scsi 0:0:0:0: Failed to register bsg queue, errno=-19
-[    3.734832] console [ttymxc0] enabled
-[    3.739241] 21ec000.serial: ttymxc2 at MMIO 0x21ec000 (irq = 64, base_baud = 5000000) is a IMX
-[    3.748368] Thread 3 calling (ordered) initcall for driver imx-i2c (fsl,imx1-i2c)
-[    3.748396] Thread 2 calling (ordered) initcall for driver imx-mmdc (fsl,imx6q-mmdc)
-[    3.748413] Thread 1 calling (ordered) initcall for driver fec (fsl,imx25-fec)
-[    3.748424] Thread 0 calling (ordered) initcall for driver sdhci-esdhc-imx (fsl,imx25-esdhc)
-[    3.749226] 2188000.ethernet supply phy not found, using dummy regulator
-[    3.763882] pps pps0: new PPS source ptp0
-[    3.776095] libphy: fec_enet_mii_bus: probed
-[    3.776656] fec 2188000.ethernet eth0: registered PHC device 0
-[    3.776854] Thread 1 calling (ordered) initcall for driver imx-weim (fsl,imx1-weim)
-[    3.777206] /soc/aips-bus at 02100000/usdhc at 02190000: voltage-ranges unspecified
-[    3.777216] sdhci-esdhc-imx 2190000.usdhc: could not get ultra high speed state, work on normal mode
-[    3.777239] sdhci-esdhc-imx 2190000.usdhc: Got CD GPIO
-[    3.778409] sdhci-esdhc-imx 2190000.usdhc: No vmmc regulator found
-[    3.778415] sdhci-esdhc-imx 2190000.usdhc: No vqmmc regulator found
-[    3.823587] mmc0: SDHCI controller on 2190000.usdhc [2190000.usdhc] using ADMA
-[    3.823687] imx-weim 21b8000.weim: Driver registered.
-[    3.824015] /soc/aips-bus at 02100000/usdhc at 02194000: voltage-ranges unspecified
-[    3.824024] sdhci-esdhc-imx 2194000.usdhc: could not get ultra high speed state, work on normal mode
-[    3.825203] sdhci-esdhc-imx 2194000.usdhc: No vmmc regulator found
-[    3.825209] sdhci-esdhc-imx 2194000.usdhc: No vqmmc regulator found
-[    3.873515] mmc1: SDHCI controller on 2194000.usdhc [2194000.usdhc] using ADMA
-[    3.873884] /soc/aips-bus at 02100000/usdhc at 02198000: voltage-ranges unspecified
-[    3.873894] sdhci-esdhc-imx 2198000.usdhc: could not get ultra high speed state, work on normal mode
-[    3.873917] sdhci-esdhc-imx 2198000.usdhc: Got CD GPIO
-[    3.875982] sdhci-esdhc-imx 2198000.usdhc: No vmmc regulator found
-[    3.875988] sdhci-esdhc-imx 2198000.usdhc: No vqmmc regulator found
-[    3.896409] mmc1: queuing unknown CIS tuple 0x80 (2 bytes)
-[    3.898115] mmc1: queuing unknown CIS tuple 0x80 (3 bytes)
-[    3.899819] mmc1: queuing unknown CIS tuple 0x80 (3 bytes)
-[    3.902883] mmc1: queuing unknown CIS tuple 0x80 (7 bytes)
-[    3.907303] mmc1: queuing unknown CIS tuple 0x80 (11 bytes)
-[    3.913585] mmc2: SDHCI controller on 2198000.usdhc [2198000.usdhc] using ADMA
-[    3.957288] mmc1: new high speed SDIO card at address 0001
-[    3.965448] i2c i2c-0: IMX I2C adapter registered
-[    3.970194] i2c i2c-0: can't use DMA
-[    3.974279] i2c i2c-1: IMX I2C adapter registered
-[    3.979026] i2c i2c-1: can't use DMA
-[    3.983582] Thread 2 calling (unordered) initcall for driver imx-pwm (fsl,imx1-pwm)
-[    3.983589] Thread 3 calling (unordered) initcall for driver ahci (generic-ahci)
-[    3.983595] Thread 1 calling (unordered) initcall for driver spi_imx (fsl,imx1-cspi)
-[    3.983601] Thread 0 calling (unordered) initcall for driver usb_phy_generic (usb-nop-xceiv)
-[    3.984137] Thread 3 calling (unordered) initcall for driver mxc_rtc ()
-[    3.984142] Thread 1 calling (unordered) initcall for driver ir-kbd-i2c ()
-[    3.984147] Thread 0 calling (unordered) initcall for driver imx-snvs-poweroff (fsl,sec-v4.0-poweroff)
-[    3.984200] Thread 1 calling (unordered) initcall for driver imx6q-cpufreq ()
-[    3.984239] Thread 3 calling (unordered) initcall for driver hdmi-audio-codec (linux,hdmi-audio)
-[    3.984289] Thread 1 calling (unordered) initcall for driver rfkill_gpio ()
-(...)
------------
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index 26c4b1a..7e6e910 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -132,4 +132,24 @@ config OF_DEPENDENCIES_DEBUG_CALLS_OF_ANNOTATED_INITCALLS
+ 	help
+ 	  Used for debugging purposes.
+ 
++config OF_DEPENDENCIES_PARALLEL
++	bool "Initialize annotated initcalls in parallel"
++	depends on OF_DEPENDENCIES
++	help
++	  Calculates which (annotated) initcalls can be called in parallel
++	  and calls them using multiple threads. Be warned, this doesn't
++	  work always as it should because of missing dependencies and
++	  because it assumes that drivers belonging to the same initcall
++	  level can be called in an order different than the order they
++	  are linked.
++
++config OF_DEPENDENCIES_THREADS
++	int "Number of threads to use for parallel initialization"
++	depends on OF_DEPENDENCIES_PARALLEL
++	default 0
++	help
++	  0 means the number of threads used for parallel initialization
++	  of drivers equals the number of online CPUs.
++	  1 means the threaded initialization is disabled.
++
+ endif # OF
+diff --git a/drivers/of/of_dependencies.c b/drivers/of/of_dependencies.c
+index 06435d5..85cef84 100644
+--- a/drivers/of/of_dependencies.c
++++ b/drivers/of/of_dependencies.c
+@@ -11,12 +11,16 @@
+  */
+ 
+ #include <linux/of_dependencies.h>
++#include <linux/kthread.h>
+ 
+ #define MAX_DT_NODES 1000 /* maximum number of vertices */
+ #define MAX_EDGES (MAX_DT_NODES*2) /* maximum number of edges (dependencies) */
+ 
+ struct edgenode {
+ 	uint32_t y; /* phandle */
++#ifdef CONFIG_OF_DEPENDENCIES_PARALLEL
++	uint32_t x;
++#endif
+ 	struct edgenode *next; /* next edge in list */
+ };
+ 
+@@ -120,6 +124,9 @@ static int __init insert_edge(uint32_t x, uint32_t y)
+ 	graph.include_node[x] = 1;
+ 	graph.include_node[y] = 1;
+ 	p->y = y;
++#ifdef CONFIG_OF_DEPENDENCIES_PARALLEL
++	p->x = x;
++#endif
+ 	p->next = graph.edges[x];
+ 	graph.edges[x] = p; /* insert at head of list */
+ 
+@@ -336,6 +343,90 @@ static void __init of_init_remove_duplicates(void)
+ 		}
+ }
+ 
++#ifdef CONFIG_OF_DEPENDENCIES_PARALLEL
++/*
++ * The algorithm I've used below to calculate the max. distance for
++ * nodes to the root node likely isn't the fasted. But based on the
++ * already done implementation of the topological sort, this is an
++ * easy way to achieve this. Instead of first doing an topological
++ * sort and then using the stuff below to calculate the distances,
++ * using an algorithm which does spit out distances directly would
++ * be likely faster.
++ * If you want to spend the time, you could have a look e.g. at the
++ * topic 'layered graph drawing'.
++ */
++/* max. distance from a node to root */
++static unsigned distance[MAX_DT_NODES+1] __initdata;
++static struct device_node *order_by_distance[MAX_DT_NODES+1] __initdata;
++
++static void __init calc_max_distance(uint32_t v)
++{
++	unsigned i;
++	unsigned max_dist = 0;
++
++	for (i = 0; i < graph.nedges; ++i)
++		if (graph.edge_slots[i].x == v)
++			max_dist = max(max_dist,
++				distance[graph.edge_slots[i].y] + 1);
++	distance[v] = max_dist;
++}
++
++static void __init calc_distances(void)
++{
++	unsigned i;
++
++	for (i = 0; i < order.count; ++i)
++		calc_max_distance(order.order[i]->phandle);
++}
++
++static void __init build_order_by_distance(void)
++{
++	unsigned i, j;
++	unsigned max_distance = 0;
++	unsigned new_order_count = 0;
++
++	calc_distances();
++	order_by_distance[new_order_count++] = order.order[0];
++	for (i = 1; i < order.count; ++i) {
++		if (distance[order.order[i]->phandle] == 1)
++			order_by_distance[new_order_count++] = order.order[i];
++		max_distance = max(max_distance,
++				   distance[order.order[i]->phandle]);
++	}
++	for (j = 2; j <= max_distance; ++j)
++		for (i = 1; i < order.count; ++i)
++			if (distance[order.order[i]->phandle] == j)
++				order_by_distance[new_order_count++] =
++							order.order[i];
++	memcpy(order.order, order_by_distance,
++		sizeof(order.order[0]) * order.count);
++}
++
++struct thread_group {
++	unsigned start;
++	unsigned length;
++};
++
++static struct thread_group tgroup[20] __initdata;
++static unsigned count_groups __initdata;
++
++static void __init build_tgroups(void)
++{
++	unsigned i;
++	unsigned dist = 0;
++
++	for (i = 0; i < order.count; ++i) {
++		if (distance[order.order[i]->phandle] != dist) {
++			dist = distance[order.order[i]->phandle];
++			count_groups++;
++			tgroup[count_groups].start = i;
++		}
++		tgroup[count_groups].length++;
++	}
++	count_groups++;
++}
++#endif /* CONFIG_OF_DEPENDENCIES_PARALLEL */
++
+ #ifdef CONFIG_OF_DEPENDENCIES_PRINT_INIT_ORDER
+ static void __init of_init_print_order(void)
+ {
+@@ -345,7 +436,13 @@ static void __init of_init_print_order(void)
+ 
+ 	pr_info("Initialization order:\n");
+ 	for (i = 0; i < order.count; ++i) {
++#ifdef CONFIG_OF_DEPENDENCIES_PARALLEL
++		pr_info("init %u 0x%x (group %u)", i,
++			order.order[i]->phandle,
++			distance[order.order[i]->phandle]);
++#else
+ 		pr_info("init %u 0x%x", i, order.order[i]->phandle);
++#endif
+ 		if (order.order[i]->name)
+ 			pr_cont(" %s", order.order[i]->name);
+ 		if (order.order[i]->full_name)
+@@ -397,7 +494,14 @@ static int __init of_init_build_order(void)
+ 	if (graph.finished)
+ 		return -EINVAL; /* cycle found */
+ 
++#ifdef CONFIG_OF_DEPENDENCIES_PARALLEL
++	build_order_by_distance();
+ 	of_init_remove_duplicates();
++	build_tgroups();
++#else
++	of_init_remove_duplicates();
++#endif
++
+ #ifdef CONFIG_OF_DEPENDENCIES_PRINT_INIT_ORDER
+ 	of_init_print_order();
+ #endif
+@@ -417,7 +521,7 @@ static void __init of_init_free_order(void)
+ 	/* remove_new_phandles(); */
+ }
+ 
+-static void __init init_if_matched(struct device_node *node)
++static void __init init_if_matched(struct device_node *node, unsigned thread_nr)
+ {
+ 	struct _annotated_initcall *ac;
+ 
+@@ -427,7 +531,8 @@ static void __init init_if_matched(struct device_node *node)
+ 			if (of_match_node(ac->driver->of_match_table,
+ 					 node)) {
+ #ifdef CONFIG_OF_DEPENDENCIES_DEBUG_CALLS_OF_ANNOTATED_INITCALLS
+-				pr_info("Calling (ordered) initcall for driver %s (%s)\n",
++				pr_info("Thread %u calling (ordered) initcall for driver %s (%s)\n",
++					thread_nr,
+ 					ac->driver->name,
+ 					ac->driver->of_match_table ?
+ 						ac->driver->of_match_table->compatible : "");
+@@ -438,14 +543,93 @@ static void __init init_if_matched(struct device_node *node)
+ 	}
+ }
+ 
+-void __init of_init_drivers(void)
++#ifdef CONFIG_OF_DEPENDENCIES_PARALLEL
++
++static __initdata DECLARE_COMPLETION(initcall_thread_done);
++static __initdata DECLARE_WAIT_QUEUE_HEAD(group_waitqueue);
++
++static atomic_t shared_counter __initdata;
++static atomic_t count_initcall_threads __initdata;
++static atomic_t ostart __initdata;
++static atomic_t ocount __initdata;
++static unsigned num_threads __initdata;
++
++static atomic_t current_group __initdata;
++
++static int __init initcall_thread_unordered(void *thread_nr)
++{
++	struct _annotated_initcall *ac;
++	int i;
++	int count_initcalls =
++		__annotated_initcall_end - __annotated_initcall_start;
++
++	while ((i = atomic_dec_return(&shared_counter)) >= 0) {
++		ac = &__annotated_initcall_start[count_initcalls - 1 - i];
++		if (ac->initcall) {
++#ifdef CONFIG_OF_DEPENDENCIES_DEBUG_CALLS_OF_ANNOTATED_INITCALLS
++			pr_info("Thread %u calling (unordered) initcall for driver %s (%s)\n",
++				(unsigned)thread_nr, ac->driver->name,
++				ac->driver->of_match_table ?
++					ac->driver->of_match_table->compatible : "");
++#endif
++			do_one_initcall(*ac->initcall);
++		}
++	}
++	if (atomic_dec_and_test(&count_initcall_threads))
++		complete(&initcall_thread_done);
++	do_exit(0);
++	return 0;
++}
++
++static int __init initcall_thread(void *thread_nr)
++{
++	int i;
++	unsigned group;
++	int start, count;
++
++	DEFINE_WAIT(wait);
++
++	while ((group = atomic_read(&current_group)) < count_groups) {
++		start = atomic_read(&ostart);
++		count = atomic_read(&ocount);
++		while ((i = atomic_dec_return(&shared_counter)) >= 0)
++			init_if_matched(order.order[start + count - 1 - i],
++					(unsigned)thread_nr);
++		prepare_to_wait(&group_waitqueue, &wait, TASK_UNINTERRUPTIBLE);
++		if (!atomic_dec_and_test(&count_initcall_threads)) {
++			schedule();
++			finish_wait(&group_waitqueue, &wait);
++			continue;
++		}
++		atomic_inc(&current_group);
++		atomic_set(&count_initcall_threads, num_threads);
++		if (++group >= count_groups) {
++			/* all thread groups processed */
++			atomic_set(&shared_counter,
++				__annotated_initcall_end -
++					__annotated_initcall_start);
++			wake_up_all(&group_waitqueue);
++			finish_wait(&group_waitqueue, &wait);
++			break;
++		}
++		atomic_set(&ostart, tgroup[group].start);
++		atomic_set(&ocount, tgroup[group].length);
++		atomic_set(&shared_counter, tgroup[group].length);
++		wake_up_all(&group_waitqueue);
++		finish_wait(&group_waitqueue, &wait);
++	}
++	return initcall_thread_unordered(thread_nr);
++}
++#endif
++
++static void __init of_init_drivers_non_threaded(void)
+ {
+ 	unsigned i;
+ 	struct _annotated_initcall *ac;
+ 
+ 	if (!of_init_build_order()) {
+ 		for (i = 0; i < order.count; ++i)
+-			init_if_matched(order.order[i]);
++			init_if_matched(order.order[i], 0);
+ 		of_init_free_order();
+ 	}
+ 	ac = __annotated_initcall_start;
+@@ -461,3 +645,56 @@ void __init of_init_drivers(void)
+ 		}
+ 	}
+ }
++
++void __init of_init_drivers(void)
++{
++	unsigned count_annotated;
++
++	count_annotated = __annotated_initcall_end - __annotated_initcall_start;
++	if (!count_annotated)
++		return;
++
++#ifndef CONFIG_OF_DEPENDENCIES_PARALLEL
++	of_init_drivers_non_threaded();
++#else
++	if (CONFIG_OF_DEPENDENCIES_THREADS == 0)
++		num_threads = num_online_cpus();
++	else
++		num_threads = CONFIG_OF_DEPENDENCIES_THREADS;
++	if (num_threads < 2) {
++		of_init_drivers_non_threaded();
++		return;
++	}
++	if (!of_init_build_order()) {
++		if (count_groups > 1) {
++			unsigned i;
++
++			atomic_set(&count_initcall_threads, num_threads);
++			atomic_set(&ostart, tgroup[1].start);
++			atomic_set(&ocount, tgroup[1].length);
++			atomic_set(&shared_counter, tgroup[1].length);
++			atomic_set(&current_group, 1);
++			for (i = 0; i < num_threads; ++i)
++				kthread_run(initcall_thread, (void *)i,
++							"initcalls");
++			wait_for_completion(&initcall_thread_done);
++			reinit_completion(&initcall_thread_done);
++		}
++		of_init_free_order();
++	} else {
++		/*
++		 * Building order failed (dependency circle).
++		 * Try to boot anyway by calling all initcalls unordered.
++		 */
++		unsigned i;
++
++		atomic_set(&shared_counter, count_annotated);
++		num_threads = min(count_annotated, num_threads);
++		atomic_set(&count_initcall_threads, num_threads);
++		for (i = 0; i < num_threads; ++i)
++			kthread_run(initcall_thread_unordered, (void *)i,
++							"initcalls");
++		wait_for_completion(&initcall_thread_done);
++	}
++#endif
++}
+-- 
+2.1.0
