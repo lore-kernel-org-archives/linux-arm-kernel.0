@@ -1,33 +1,69 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Sep 2015 18:50:03 -0500
-Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
-In-Reply-To: <20150909163620.GF3260@x1>
-References: <20150811151736.GO18282@x1> <20150812110841.GC20238@linux>
- <20150826120628.GZ19409@x1> <20150902080639.GA26744@linux>
- <CAL_JsqKMGp+3Z+oO6E0YYzjTCb=-R_QM=YF=B33NWayWmV057A@mail.gmail.com>
- <20150909062722.GA5266@linux> <20150909075930.GB3260@x1>
- <20150909083031.GB5266@linux> <20150909133930.GE3260@x1>
- <20150909160212.GJ5266@linux> <20150909163620.GF3260@x1>
-Message-ID: <55F0C5AB.5060609@kernel.org>
+From: leoli@freescale.com (Li Yang)
+Date: Wed, 9 Sep 2015 18:50:26 -0500
+Subject: [PATCH v2 04/10] doc/bindings: Update PCIe devicetree binding
+ documentation for LS2080A
+In-Reply-To: <5383634.Mln7J3sdWP@wuerfel>
+References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
+ <80094129.LHZFOe1ZPU@wuerfel>
+ <CADRPPNR-cSSQC5sLMmoqcxX46J6hdULa_V4v2BK7T8s8pcX0cg@mail.gmail.com>
+ <5383634.Mln7J3sdWP@wuerfel>
+Message-ID: <CADRPPNRekyv3dSEroh-n2e6p5nV7Q6tAW1VKHWn=Gqnc+MSs+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2015 11:36 AM, Lee Jones wrote:
->>> Or have I got the wrong end of the stick?
->>>
->>> NB: Note the suggested new property names.
+On Wed, Sep 9, 2015 at 4:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 08 September 2015 15:06:16 Li Yang wrote:
+>> On Mon, Sep 7, 2015 at 6:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Friday 04 September 2015 12:27:46 Bhupesh Sharma wrote:
+>> >> @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
+>> >>  and thus inherits all the common properties defined in designware-pcie.txt.
+>> >>
+>> >>  Required properties:
+>> >> -- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie"
+>> >> +- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie",
+>> >> +  "fsl,ls2080a-pcie".
+>> >>  - reg: base addresses and lengths of the PCIe controller
+>> >>  - interrupts: A list of interrupt outputs of the controller. Must contain an
+>> >>    entry for each entry in the interrupt-names property.
+>> >>
+>> >
+>> > Are the two PCIe hosts mutually compatible? If they are, you should mandate
+>> > one of the strings as the base model for identification, with the additional
+>> > model being optional for identification of the specific SoC.
 >>
->> Yeah, all looks fine to me.
-> 
-> I think these names are better:
-> 
->   opp-supply-range-name => opp-microvolt-names
->   opp-cuts              => opp-supported-hw
-> 
-> Apart from that, the binding is starting to come together.
-> 
-> Let's see what Rob and Stephen have to say about it.
+>> It seems that controllers on these chips are not exactly the same.
+>> They will get different driver data by matching the compatible
+>> strings.  Probably we could define a more generic compatible string,
+>> such as "fsl,layerscape-pcie" or "fsl,ls-pcie".
+>>
+>> >
+>> > It would also be good to add a string with the specific version number of the
+>> > designware PCIe block that is being used there.
+>>
+>> The binding has mentioned to reference the designware-pcie.txt.  But
+>> it might be more clear to mention the designware compatible string
+>> "snps,dw-pcie" again in the compatible part.  Currently there is no
+>> version number defined in the designware-pcie binding.  It might be
+>> hard to get this information for some SoCs.
+>
+> For most of them, the information is available and then it should be
+> added. Obviously if you can't find it out, it's hard to guess and
+> you have to leave it out for that particular chip.
 
-Seems reasonable to me.
+Actually I don't know any approach to get the version number of the
+designware block used.  Maybe they are actually using the same version
+of the IP block, and the differences in the driver are actually caused
+by the differences in SoC integration.
 
-Rob
+>
+> A lot of devices also have some internal version register that you
+> can read out.
+
+There doesn't seem to be this kind of register for the PCIe block.
+
+Minghuan,
+
+Please correct me if you know more. :)
+
+Regards,
+Leo
