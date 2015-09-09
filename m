@@ -1,71 +1,202 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 Sep 2015 10:39:46 +0200
-Subject: [PATCH-v2 4/7] mmc: sdhci-pxav3: Add pinctl setting according to
- bus clock
-In-Reply-To: <55EEF99F.1020904@linaro.org>
-References: <1441624721-15612-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1441624721-15612-5-git-send-email-vaibhav.hiremath@linaro.org>
- <CACRpkdY59roEBgUd9TR39yNgfhw393+WmHQQAeLkOEZLChOcWQ@mail.gmail.com>
- <55EEF99F.1020904@linaro.org>
-Message-ID: <CACRpkdaQc8bH923D1bvoj2+2Puq8sSaLLf5Y8cHKbAKziOwJMg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 9 Sep 2015 10:49:48 +0200
+Subject: [PATCH v2 6/8] arm/arm64: KVM: Add forwarded physical interrupts
+ documentation
+In-Reply-To: <55EF1389.10802@arm.com>
+References: <1441395650-19663-1-git-send-email-christoffer.dall@linaro.org>
+ <1441395650-19663-7-git-send-email-christoffer.dall@linaro.org>
+ <55ED7427.1020901@arm.com> <55EE9FA4.3060204@linaro.org>
+ <55EF1389.10802@arm.com>
+Message-ID: <CAMJs5B_Qxkfu=KSA0oUm386_mgZ73_NQEqS6e+gBGxwBMJVezg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 8, 2015 at 5:07 PM, Vaibhav Hiremath
-<vaibhav.hiremath@linaro.org> wrote:
-
-> But I still have one small doubt on expectation from
-> devm_pinctrl_get() function.
+On Tue, Sep 8, 2015 at 6:57 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi Eric,
 >
-> If pinctrl properties are not populated in Devicetree node,
-> then, shouldn't devm_pinctrl_get() return error ?
-> I followed the code flow, and it seems even if pinctrl properties are
-> not populated in DT node, the devm_pinctrl_get() returns valid
-> pointer to "struct pinctrl", isn't this against the expectation of the
-> call?
+> thanks for you answer.
 >
+> On 08/09/15 09:43, Eric Auger wrote:
+>> Hi Andre,
+>> On 09/07/2015 01:25 PM, Andre Przywara wrote:
+>>> Hi,
+>>>
+>>> firstly: this text is really great, thanks for coming up with that.
+>>> See below for some information I got from tracing the host which I
+>>> cannot make sense of....
+>>>
+>>>
+>>> On 04/09/15 20:40, Christoffer Dall wrote:
+>>>> Forwarded physical interrupts on arm/arm64 is a tricky concept and the
+>>>> way we deal with them is not apparently easy to understand by reading
+>>>> various specs.
+>>>>
+>>>> Therefore, add a proper documentation file explaining the flow and
+>>>> rationale of the behavior of the vgic.
+>>>>
+>>>> Some of this text was contributed by Marc Zyngier and edited by me.
+>>>> Omissions and errors are all mine.
+>>>>
+>>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>>> ---
+>>>>  Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt | 181 +++++++++++++++++++++
+>>>>  1 file changed, 181 insertions(+)
+>>>>  create mode 100644 Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+>>>>
+>>>> diff --git a/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+>>>> new file mode 100644
+>>>> index 0000000..24b6f28
+>>>> --- /dev/null
+>>>> +++ b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+>>>> @@ -0,0 +1,181 @@
+>>>> +KVM/ARM VGIC Forwarded Physical Interrupts
+>>>> +==========================================
+>>>> +
+>>>> +The KVM/ARM code implements software support for the ARM Generic
+>>>> +Interrupt Controller's (GIC's) hardware support for virtualization by
+>>>> +allowing software to inject virtual interrupts to a VM, which the guest
+>>>> +OS sees as regular interrupts.  The code is famously known as the VGIC.
+>>>> +
+>>>> +Some of these virtual interrupts, however, correspond to physical
+>>>> +interrupts from real physical devices.  One example could be the
+>>>> +architected timer, which itself supports virtualization, and therefore
+>>>> +lets a guest OS program the hardware device directly to raise an
+>>>> +interrupt at some point in time.  When such an interrupt is raised, the
+>>>> +host OS initially handles the interrupt and must somehow signal this
+>>>> +event as a virtual interrupt to the guest.  Another example could be a
+>>>> +passthrough device, where the physical interrupts are initially handled
+>>>> +by the host, but the device driver for the device lives in the guest OS
+>>>> +and KVM must therefore somehow inject a virtual interrupt on behalf of
+>>>> +the physical one to the guest OS.
+>>>> +
+>>>> +These virtual interrupts corresponding to a physical interrupt on the
+>>>> +host are called forwarded physical interrupts, but are also sometimes
+>>>> +referred to as 'virtualized physical interrupts' and 'mapped interrupts'.
+>>>> +
+>>>> +Forwarded physical interrupts are handled slightly differently compared
+>>>> +to virtual interrupts generated purely by a software emulated device.
+>>>> +
+>>>> +
+>>>> +The HW bit
+>>>> +----------
+>>>> +Virtual interrupts are signalled to the guest by programming the List
+>>>> +Registers (LRs) on the GIC before running a VCPU.  The LR is programmed
+>>>> +with the virtual IRQ number and the state of the interrupt (Pending,
+>>>> +Active, or Pending+Active).  When the guest ACKs and EOIs a virtual
+>>>> +interrupt, the LR state moves from Pending to Active, and finally to
+>>>> +inactive.
+>>>> +
+>>>> +The LRs include an extra bit, called the HW bit.  When this bit is set,
+>>>> +KVM must also program an additional field in the LR, the physical IRQ
+>>>> +number, to link the virtual with the physical IRQ.
+>>>> +
+>>>> +When the HW bit is set, KVM must EITHER set the Pending OR the Active
+>>>> +bit, never both at the same time.
+>>>> +
+>>>> +Setting the HW bit causes the hardware to deactivate the physical
+>>>> +interrupt on the physical distributor when the guest deactivates the
+>>>> +corresponding virtual interrupt.
+>>>> +
+>>>> +
+>>>> +Forwarded Physical Interrupts Life Cycle
+>>>> +----------------------------------------
+>>>> +
+>>>> +The state of forwarded physical interrupts is managed in the following way:
+>>>> +
+>>>> +  - The physical interrupt is acked by the host, and becomes active on
+>>>> +    the physical distributor (*).
+>>>> +  - KVM sets the LR.Pending bit, because this is the only way the GICV
+>>>> +    interface is going to present it to the guest.
+>>>> +  - LR.Pending will stay set as long as the guest has not acked the interrupt.
+>>>> +  - LR.Pending transitions to LR.Active on the guest read of the IAR, as
+>>>> +    expected.
+>>>> +  - On guest EOI, the *physical distributor* active bit gets cleared,
+>>>> +    but the LR.Active is left untouched (set).
+>>>
+>>> I tried hard in the last week, but couldn't confirm this. Tracing shows
+>>> the following pattern over and over (case 1):
+>>> (This is the kvm/kvm.git:queue branch from last week, so including the
+>>> mapped timer IRQ code. Tests were done on Juno and Midway)
+>>>
+>>> ...
+>>> 229.340171: kvm_exit: TRAP: HSR_EC: 0x0001 (WFx), PC: 0xffffffc000098a64
+>>> 229.340324: kvm_exit: IRQ: HSR_EC: 0x0001 (WFx), PC: 0xffffffc0001c63a0
+>>> 229.340428: kvm_exit: TRAP: HSR_EC: 0x0024 (DABT_LOW), PC:
+>>> 0xffffffc0004089d8
+>>> 229.340430: kvm_vgic_sync_hwstate: LR0 vIRQ: 27, HWIRQ: 27, LR.state: 8,
+>>> ELRSR: 1, dist active: 0, log. active: 1
+>>> ....
+>>>
+>>> My hunch is that the following happens (please correct me if needed!):
+>>> First there is an unrelated trap (line 1), then later the guest exits
+>>> due to to an IRQ (line 2, presumably the timer, the WFx is a red herring
+>>> here since ESR_EL2.EC is not valid on IRQ triggered exceptions).
+>>> The host injects the timer IRQ (not shown here) and returns to the
+>>> guest. On the next trap (line 3, due to a stage 2 page fault),
+>>> vgic_sync_hwirq() will be called on the LR (line 4) and shows that the
+>>> GIC actually did deactivate both the LR (state=8, which is inactive,
+>>> just the HW bit is still set) _and_ the state on the physical
+>>> distributor (dist active=0). This trace_printk is just after entering
+>>> the function, so before the code there performs these steps redundantly.
+>>> Also it shows that the ELRSR bit is set to 1 (empty), so from the GIC
+>>> point of view this virtual IRQ cycle is finished.
+>>>
+>>> The other sequence I see is this one (case 2):
+>>>
+>>> ....
+>>> 231.055324: kvm_exit: IRQ: HSR_EC: 0x0001 (WFx), PC: 0xffffffc0000f0e70
+>>> 231.055329: kvm_exit: TRAP: HSR_EC: 0x0024 (DABT_LOW), PC:
+>>> 0xffffffc0004089d8
+>>> 231.055331: kvm_vgic_sync_hwstate: LR0 vIRQ: 27, HWIRQ: 27, LR.state: 9,
+>>> ELRSR: 0, dist active: 1, log. active: 1
+>>> 231.055338: kvm_exit: IRQ: HSR_EC: 0x0024 (DABT_LOW), PC: 0xffffffc0004089dc
+>>> 231.055340: kvm_vgic_sync_hwstate: LR0 vIRQ: 27, HWIRQ: 27, LR.state: 9,
+>>> ELRSR: 0, dist active: 0, log. active: 1
+>>> ...
+>>>
+>>> In line 1 the timer fires, the host injects the timer IRQ into the
+>>> guest, which exits again in line 2 due to a page fault (may have IRQs
+>>> disabled?). The LR dump in line 3 shows that the timer IRQ is still
+>>> pending in the LR (state=9) and active on the physical distributor. Now
+>>> the code in vgic_sync_hwirq() clears the active state in the physical
+>>> distributor (by calling irq_set_irqchip_state()), but leaves the LR
+>>> alone (by returning 0 to the caller).
+>>> On the next exit (line 4, due to some HW IRQ?) the LR is still the same
+>>> (line 5), only that the physical dist state in now inactive (due to us
+>>> clearing that explicitly during the last exit).
+>> Normally the physical dist state was set active on previous flush, right
+>> (done for all mapped IRQs)?
 >
-> Code flow -
+> Where is this done? I see that the physical dist state is altered on the
+> actual IRQ forwarding, but not on later exits/entries? Do you mean
+> kvm_vgic_flush_hwstate() with "flush"?
+
+this is a bug and should be fixed in the 'fixes' patches I sent last
+week.  We should set active state on every entry to the guest for IRQs
+with the HW bit set in either pending or active state.
+
 >
-> devm_pinctrl_get()
-> ...
-> --> creat_pinctrl()
-
-That is the spelling mistake Dennis Ritchie and Ken Thompson
-wish they had avoided in the first syscall interface :D
-
-> --> pinctrl_dt_to_map()
-> ...
+>> So are you sure the IRQ was not actually
+>> completed by the guest? As Christoffer mentions the LR active state can
+>> remain even if the IRQ was completed.
 >
-> pinctrl_dt_to_map() iterates for pinctrl-x (x = 0,1,...) and if it
-> founds the entry then it parses the node. If it doesn't find any
-> pinctrl property then also it returns 0. and subsequently rreturns
-> handle to "struct pinctrl" for the device. Why is so?
+> I was wondering where this behaviour Christoffer mentioned comes from?
 
-So pinctrl_dt_to_map() returns 0 if there are no maps in the
-device tree.
+>From how I understand the architecture and from talking to Marc.
 
-This is correct: there may be systems that have a mixture
-of device tree and platform data, and in that case the code
-needs to continue after calling pinctrl_dt_to_map() because
-else it bails out before coming to the loop in
-create_pinctrl() where we iterate over the static maps.
+> Is this an observation, an implementation bug or is this mentioned in
+> the spec? Needing to spoon-feed the VGIC by doing it's job sounds a bit
+> awkward to me.
 
-So after the loop in create_pinctrl() it should be possible
-to return something like -ENOENT if we didn't find
-anything. The device core pinctrl handling in
-drivers/base/pinctrl.c seems to cope with it.
+What do you mean?  How are we spoon-feeding the VGIC?
 
-It's a semantic change so we would need to test to toss
-it in and see what happens on some different systems
-but in principe I think you're right. What we get if there is
-no state is basically a dummy pinctrl that does nothing.
+> I will try to add more tracing to see what is actually happening, trying
+> to trace a timer IRQ life cycle more accurately to see what's going on here.
+>
 
-Do you wanna make a patch for this?
+By all means, trace through the thing, it would be great to get others
+to look at this, but I recommend applying both the fixes I sent and
+this v2 timer rework series before doing so, because otherwise things
+don't work as I outline in this document.
 
-(Looping in Stephen Warren so he can tell if I miss something
-obviously evident in the design that require stubs to
-be present.)
-
-Yours,
-Linus Walleij
+-Christoffer
