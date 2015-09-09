@@ -1,80 +1,73 @@
 From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
-Date: Wed, 9 Sep 2015 03:55:56 +0000
+Date: Wed, 9 Sep 2015 03:58:02 +0000
 Subject: [PATCH v2 07/10] dts/ls2085a: Update DTSI to add support of
  various peripherals
-In-Reply-To: <CAL_JsqK4NQ9YRQkTM=km6N+3Cb=RAM_=2TFhtkhPWprA7VNKUg@mail.gmail.com>
+In-Reply-To: <55E9787A.7050304@arm.com>
 References: <1441350322-4671-1-git-send-email-bhupesh.sharma@freescale.com>
- <CADRPPNQER9UnKLazm9C6Dd7DAkDxLb4QShK64tmtahZxJJ-t=g@mail.gmail.com>
- <BY1PR0301MB130306991ACB28E4C8109DD582560@BY1PR0301MB1303.namprd03.prod.outlook.com>
- <CAL_Jsq+KJU4RiK2XWcS5BezucCmup2M-pueaaJUq7O=fA3LUxw@mail.gmail.com>
- <BY1PR0301MB13037916637C1B6E24AC259D82550@BY1PR0301MB1303.namprd03.prod.outlook.com>
- <CAL_JsqK4NQ9YRQkTM=km6N+3Cb=RAM_=2TFhtkhPWprA7VNKUg@mail.gmail.com>
-Message-ID: <BY1PR0301MB13039907260EE04523FB278882520@BY1PR0301MB1303.namprd03.prod.outlook.com>
+ <55E9787A.7050304@arm.com>
+Message-ID: <BY1PR0301MB13035D69FFB5617179F54DB582520@BY1PR0301MB1303.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Rob Herring [mailto:robherring2 at gmail.com]
-> Sent: Tuesday, September 08, 2015 2:28 AM
-> On Sun, Sep 6, 2015 at 4:03 PM, Sharma Bhupesh
-> <bhupesh.sharma@freescale.com> wrote:
-> >> From: Rob Herring [mailto:robherring2 at gmail.com]
-> >> Sent: Monday, September 07, 2015 2:27 AM On Sat, Sep 5, 2015 at 3:37
-> >> AM, Sharma Bhupesh <bhupesh.sharma@freescale.com> wrote:
-> >> >> From: pku.leo at gmail.com [mailto:pku.leo at gmail.com]
-> >> >> Sent: Saturday, September 05, 2015 2:33 AM On Fri, Sep 4, 2015 at
-> >> >> 2:05 AM, Bhupesh Sharma <bhupesh.sharma@freescale.com> wrote:
-> >> >> > This patch updates the LS2085a DTSI (DTS Include) file to add
-> >> >> > support for various peripherals supported by FSL LS2085a SoC,
-> >> >> > for
-> >> e.g.:
-> >> >>
-> >> >> The title and description here are still using the old LS2085 name.
-> >> >
-> >> > Ok.
-> >> >
-> >> > [snip] ..
-> >> >
-> >> >> > +       amba {
-> >> >> > +               compatible = "arm,amba-bus";
-> >> >> > +               #address-cells = <2>;
-> >> >> > +               #size-cells = <2>;
-> >> >> > +               ranges;
-> >> >> > +
-> >> >> > +               cluster1_core0_watchdog: wdt at c000000 {
-> >> >> > +                       compatible = "arm,primecell";
-> >> >>
-> >> >> Binding of Primecell requires a specific name for the device
-> >> >> instead of just a "arm,primecell".
-> >> >
-> >> > The sp805 driver doesn't have a compatible string like arm, sp805.
-> >> > You can refer to 'Documentation/devicetree/bindings/wdt' for
-> >> > details -
-> >> there is no entry for sp805 here.
-> >>
-> >> Because no one wrote it yet. Please read
-> >> Documentation/devicetree/bindings/arm/primecell.txt. If sp805 has no
-> >> binding doc, please write one.
-> >>
-> >> > Instead it relies on the 'drivers/amba/bus.c' framework to invoke
-> >> > the probe function of the
-> >> > sp805 wdt driver using the unique PRIMECELL identifiers of the
-> >> > sp805
-> >> wdt IP.
-> >>
-> >> Whether the kernel chooses to bind with the ID registers or
-> >> compatible strings is up to the kernel. That is independent of the
-> bindings.
-> >>
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: Friday, September 04, 2015 4:25 PM
+
+[snip] ..
+
+> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |  469
+> > +++++++++++++++++++++++-
+> >  1 file changed, 459 insertions(+), 10 deletions(-)
 > >
-> > Right. But wouldn't the driver require DTS awareness to handle the
-> compatible string then.
-> > Shouldn't the DTS awareness added both in terms of bindings and driver
-> handling?
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> > b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> > index 333d942..5fee0a7 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
 > 
-> No. The OS is free to do device enumeration however it sees fit and that
-> could change independent of the DT.
+> [...]
+> 
+> >  	gic: interrupt-controller at 6000000 {
+> >  		compatible = "arm,gic-v3";
+> >  		reg = <0x0 0x06000000 0 0x10000>, /* GIC Dist */
+> > -		      <0x0 0x06100000 0 0x100000>; /* GICR (RD_base +
+> SGI_base) */
+> > +		      <0x0 0x06100000 0 0x100000>, /* GICR (RD_base +
+> SGI_base) */
+> > +		      <0x0 0x0c0c0000 0 0x2000>, /* GICC */
+> > +		      <0x0 0x0c0d0000 0 0x1000>, /* GICH */
+> > +		      <0x0 0x0c0e0000 0 0x20000>; /* GICV */
+> >  		#interrupt-cells = <3>;
+> > +		#address-cells = <2>;
+> > +		#size-cells = <2>;
+> > +		ranges;
+> >  		interrupt-controller;
+> >  		interrupts = <1 9 0x4>;
+> > +
+> > +		its: gic-its at 6020000 {
+> > +			compatible = "arm,gic-v3-its";
+> > +			msi-controller;
+> > +			reg = <0x0 0x6020000 0 0x20000>;
+> > +		};
+> > +	};
+> 
+> [...]
+> 
+> >  	fsl_mc: fsl-mc at 80c000000 {
+> >  		compatible = "fsl,qoriq-mc";
+> > +		#stream-id-cells = <2>;
+> >  		reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base
+> */
+> >  		      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
+> > +		lpi-parent = <&its>;
+> 
+> I'm afraid there is no such thing as "lpi_parent" as a property. We have
+> msi_parent, which is (I think) what you want, and is dealt with in the
+> ITS driver. Also, you'll need to describe the DeviceIDs that can be
+> generated by this device so that the ITS can be correctly programmed.
  
-Ok. Will address this in v3 of this patchset then.
+Oops. This should be 'msi_parent' as you point out, Marc.
+
+I will address these comments in v3 of the patchset.
 
 Regards,
 Bhupesh
