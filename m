@@ -1,69 +1,41 @@
-From: HenryC.Chen@mediatek.com (Henry Chen)
-Date: Wed, 9 Sep 2015 22:04:56 +0800
-Subject: [PATCH] soc: mediatek: Move the initial setting of pmic wrap
- interrupt before requesting irq.
-In-Reply-To: <20150907053920.GW18700@pengutronix.de>
-References: <1441339512-15510-1-git-send-email-henryc.chen@mediatek.com>
- <20150907053920.GW18700@pengutronix.de>
-Message-ID: <1441807496.23717.4.camel@mtksdaap41>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 9 Sep 2015 16:05:59 +0200
+Subject: [PATCH 0/5] Add eeprom to the Olimex series of boards
+In-Reply-To: <1441790715-11957-1-git-send-email-o.schinagl@ultimaker.com>
+References: <1441790715-11957-1-git-send-email-o.schinagl@ultimaker.com>
+Message-ID: <20150909140559.GD9885@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Wed, Sep 09, 2015 at 11:25:10AM +0200, Olliver Schinagl wrote:
+> Some of the olimex series of boards feature a permanently connected eeprom on
+> i2c-1. This patch series adds them on all the boards that have them according
+> to the spec-sheets.
+> 
+> I explicitly added my personal --Tested-by to boards I actually tested.
 
-On Mon, 2015-09-07 at 07:39 +0200, Sascha Hauer wrote:
-> On Fri, Sep 04, 2015 at 12:05:12PM +0800, Henry Chen wrote:
-> > Seperate the initialization of pmic wrap interrupt from pmic wrap init to make sure setting is correct before requesting irq.
-> 
-> It seems the problem this patch solves is the missing watchdog
-> initialization when the pwrap is already initialized but the watchdog is
-> not, so how about a commit log like:
-> 
-> "The watchdog may not be initialized by the bootloader, even if the rest
-> of the pwrap is. Move the watchdog initialization out of pwrap_init()
-> to make sure the watchdog is always initialized and not only when the
-> pwrap is uninitialized."
-> 
-> Also please add linebreaks to the commit log.
-> 
+Testing your changes is the strict minimum before testing your
+patches. Just like running checkpatch on them, which you clearly
+failed to do, otherwise you would have seen that this is not the right
+syntax. Drop the tested-by, fix your SoB.
 
-Yes, thanks for explanation, I will add this on commit log make it more
-clearly to understand.
+> There are two boards, that according to the sheets have them as well
+> and physically inspecting the boards shows them clearly, I did not
+> actually test them on those the boards that are missing the
+> --Tested-by.
 
-Henry
+Then don't send those patches.
 
-> > 
-> > Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> > ---
-> >  drivers/soc/mediatek/mtk-pmic-wrap.c | 14 ++++++++++----
-> >  1 file changed, 10 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> > index f432291..c91d629 100644
-> > --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> > +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> > @@ -725,10 +725,6 @@ static int pwrap_init(struct pmic_wrapper *wrp)
-> >  	pwrap_writel(wrp, 0x1, PWRAP_WACS2_EN);
-> >  	pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
-> >  	pwrap_writel(wrp, 0xff, PWRAP_STAUPD_GRPEN);
-> > -	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
-> > -	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
-> > -	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
-> > -	pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
-> >  
-> >  	if (pwrap_is_mt8135(wrp)) {
-> >  		/* enable pwrap events and pwrap bridge in AP side */
-> > @@ -896,6 +892,16 @@ static int pwrap_probe(struct platform_device *pdev)
-> >  		return -ENODEV;
-> >  	}
-> >  
-> > +	/*
-> > +	 * watch dog at pwrap,
-> > +	 * The bootloader may not initial the wdt/interrupt setting of pwrap,
-> > +	 * set it before reguesting the irq.
-> > +	 */
-> 
-> /* initialize watchdog, may not be done by the bootloader */
-> 
-> Sascha
-> 
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150909/b7a04104/attachment.sig>
