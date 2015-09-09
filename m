@@ -1,67 +1,44 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Wed, 9 Sep 2015 15:25:41 -0300
-Subject: ARM: domains: Possible regression in v7-M
-In-Reply-To: <20150909175230.GF21084@n2100.arm.linux.org.uk>
-References: <55F06797.3060706@gmail.com>
- <55F06C55.5070205@vanguardiasur.com.ar>
- <20150909175230.GF21084@n2100.arm.linux.org.uk>
-Message-ID: <55F079A5.1010501@vanguardiasur.com.ar>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 09 Sep 2015 11:27:24 -0700
+Subject: [PATCH v5 0/6] bcm2835: auxiliar device support for spi
+In-Reply-To: <2757852.TDqE8OEVr2@ws-stein>
+References: <1441359711-2800-1-git-send-email-kernel@martin.sperl.org>
+ <87h9n4weg8.fsf@eliezer.anholt.net> <2757852.TDqE8OEVr2@ws-stein>
+Message-ID: <878u8fcusz.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Alexander Stein <alexanders83@web.de> writes:
 
-El 09/09/15 a las 14:52, Russell King - ARM Linux escribi?:
-> On Wed, Sep 09, 2015 at 02:28:53PM -0300, Ariel D'Alessandro wrote:
->> Doing a bisect I've observed that regression appears to be caused by:
->>
->> commit 1eef5d2f1b461c120bcd82077edee5ec706ac53b
->> Author: Russell King <rmk+kernel@arm.linux.org.uk>
->> Date:   Wed Aug 19 21:23:48 2015 +0100
->>
->>     ARM: domains: switch to keeping domain value in register
->>
->>
->> Stacktrace paste below.
->>
->> [    0.171071] Unhandled exception: IPSR = 00000006 LR = fffffff1
-> 
-> This looks to be ARMv7M, which is nommu...  I guess what's causing this
-> is this change in arch/arm/kernel/process.c:
-> 
-> +       /*
-> +        * Copy the initial value of the domain access control register
-> +        * from the current thread: thread->addr_limit will have been
-> +        * copied from the current thread via setup_thread_stack() in
-> +        * kernel/fork.c
-> +        */
-> +       thread->cpu_domain = get_domain();
-> +
-> 
-> which probably needs to be #ifdef'd out for !MMU.  Can you try adding:
-> 
-> #ifndef CONFIG_MMU
+> Hi,
+> On Tuesday 08 September 2015 18:48:07, Eric Anholt wrote:
+>> I finally had a chance to sit down and look at what the hardware's doing
+>> with the enable bit (also, I've read a whole lot more of the hardware
+>> now, so I'm a lot faster at answering questions like this).  The enable
+>> bits are a clock gate off of the VPU clock.
+>
+> Are any hardware documents about such things available (in public)?
 
-I think you meant #ifdef CONFIG_MMU.
+Nope, I just went through the HDL to see how things were routed.
 
-> ...
-> #endif
-> 
-> around that please?  Thanks.
-> 
+>> I knocked together the enable bits as a clock gate driver, since I'd
+>> just written very similar code for the audio domain clock driver (and I
+>> assume you are grumpy about how much time you've spent on this one
+>> stupid register).  It's up at
+>> https://github.com/anholt/linux/tree/bcm2835-clock-aux and I can submit
+>> it if you like the result.  I've compile tested it only, but I'm hoping
+>> you could just drop your aux SPI driver on top of it and have things
+>> work.
+>
+> IMHO line 45 (https://github.com/anholt/linux/commit/facb4ba917a1b9f6c2ee0cea7d529acf55f584dd#diff-1b6f753c132811b3f6d70f5b31866950R45) should be like this
+>> onecell->clks = kzalloc(sizeof(*onecell->clks) * BCM2835_AUX_CLOCK_COUNT, GFP_KERNEL);
+> or you will only allocate a single struct clk*.
 
-Yeah, that works!
-
-Added:
-
-#ifdef CONFIG_MMU
-...
-#endif
-
-around that code block and it booted.
-
-Thanks,
-
--- 
-Ariel D'Alessandro, VanguardiaSur
-www.vanguardiasur.com.ar
+Thanks, that was a bug in my other clock driver, too!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150909/4f6ac866/attachment.sig>
