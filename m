@@ -1,74 +1,80 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 9 Sep 2015 13:52:39 -0700
-Subject: [PATCH] selftests/seccomp: build on aarch64, document ABI
-In-Reply-To: <19228212.s6UOoYJca9@wuerfel>
-References: <20150909193025.GA29244@www.outflux.net>
- <19228212.s6UOoYJca9@wuerfel>
-Message-ID: <CAGXu5jJw8hAVPKvut51D1jojsCEGEweWNu2TyWrgUfQ9hqsw3Q@mail.gmail.com>
+From: al.stone@linaro.org (Al Stone)
+Date: Wed,  9 Sep 2015 15:09:46 -0600
+Subject: [PATCH v3 0/5] ACPI: Provide better MADT subtable sanity checks
+Message-ID: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 9, 2015 at 1:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 09 September 2015 12:30:27 Kees Cook wrote:
->> The syscall ABI is inconsistent on aarch64 compat, so at least we should
->> document it in the seccomp_bpf tests.
->>
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->
-> Can you explain in what way the ABI is inconsistent here?
->
->> ---
->> Can someone with access to native aarch64 double-check this for me? I
->> think we need to change these tests to pass if it's expected, but the
->> compat behavior seems bad. It means compat code will break under an
->> aarch64 kernel, when dealing with syscalls, like through seccomp.
->> ---
->>  tools/testing/selftests/seccomp/seccomp_bpf.c | 15 +++++++++++++--
->>  1 file changed, 13 insertions(+), 2 deletions(-)
->>
->> diff --git a/tools/testing/selftests/seccomp/seccomp_bpf.c b/tools/testing/selftests/seccomp/seccomp_bpf.c
->> index 770f47adf295..866ff42e000d 100644
->> --- a/tools/testing/selftests/seccomp/seccomp_bpf.c
->> +++ b/tools/testing/selftests/seccomp/seccomp_bpf.c
->> @@ -33,6 +33,10 @@
->>  #include <unistd.h>
->>  #include <sys/syscall.h>
->>
->> +#if defined(__aarch64__) && !defined(__NR_poll)
->> +# define __NR_poll 0x49
->> +#endif
->
-> I don't understand this: 0x49 is __NR_ppoll on arm64 and all architectures
-> that use asm-generic/unistd.h, not __NR_poll, which is no longer used there.
+Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
+check on the various subtables that are defined for the MADT.  The check
+compares the size of the subtable data structure as defined by ACPICA to
+the length entry in the subtable.  If they are not the same, the assumption
+is that the subtable is incorrect.
 
-Ah-ha, okay, that explains part of my struggle. :)
+Over time, the ACPI spec has allowed for MADT subtables where this can
+never be true (the local SAPIC subtable, for example).  Or, more recently,
+the spec has accumulated some minor flaws where there are three possible 
+sizes for a subtable, all of which are valid, but only for specific versions
+of the spec (the GICC subtable).  In both cases, BAD_MADT_ENTRY reports these
+subtables as bad when they are not.  In order to retain some sanity check
+on the MADT subtables, we now have to special case these subtables.  Of
+necessity, these special cases have ended up in arch-dependent code (arm64)
+or an arch has simply decided to forgo the check (ia64).
 
-> If this is intentional, it at least needs a comment to explain the
-> situation, and be extended to all other architectures that do not have
-> a poll() system call.
->
-> The arm32 version of sys_poll should be available as 168 in both native
-> and compat mode.
+This patch set replaces the BAD_MADT_ENTRY macro with a function called
+bad_madt_entry().  This function uses a data set of details about the
+subtables to provide more sanity checking than before:
 
-Does ppoll still get interrupted like poll to require a restart_syscall call?
+	-- is the subtable legal for the version given in the FADT?
 
-Regardless, the primary problem is this (emphasis added):
+	-- is the subtable legal for the revision of the MADT in use?
 
->> +        * - native ARM does _not_ expose true syscall.
->> +        * - compat ARM on ARM64 _does_ expose true syscall.
+	-- is the subtable of the proper length (including checking
+	   on the one variable length subtable that is currently ignored),
+	   given the FADT version and the MADT revision?
 
-When you ptrace or seccomp an arm32 binary under and arm32 kernel,
-restart_syscall is invisible. When you ptrace or seccomp an arm32
-binary under and arm64 kernel, suddenly it's visible. This means, for
-example, seccomp filters will break under an arm64 kernel.
+Further, this patch set adds in the call to bad_madt_entry() from the 
+acpi_table_parse_madt() function, allowing it to be used consistently
+by all architectures, for all subtables, and removing the need for each
+of the subtable traversal callback functions to use BAD_MADT_ENTRY.
 
-(And apologies if I'm not remembering pieces of this correctly, I
-don't have access to arm64 hardware at the moment, which is why I'm
-reaching out for some help on this... I'm trying to close out this old
-thread: https://lkml.org/lkml/2015/1/20/778 )
+In theory, as the ACPI specification changes, we would only have to add
+additional information to the data set describing the MADT subtables in
+order to continue providing sanity checks, even when new subtables are
+added.
 
--Kees
+These patches have been tested on an APM Mustang (arm64) and are known to
+work there.  They have also been cross-compiled for x86 and ia64 with no
+known failures.
+
+Changes for v3:
+   -- Reviewed-and-tested-by from Sudeep Holla for arm64 parts
+   -- Clearer language in error messages (Graeme Gregory, Timur Tabi)
+   -- Double checked that inserting call to bad_madt_entry() into the
+      function acpi_parse_entries() does not impact current behavior
+      (Sudeep Holla)
+   
+Changes for v2:
+   -- Acked-by on 2/5 from Marc Zyngier and Catalin Marinas for ARM
+   -- Correct faulty end of loop test found by Timur Tabi
+
+
+Al Stone (5):
+  ACPI: add in a bad_madt_entry() function to eventually replace the
+    macro
+  ACPI / ARM64: remove usage of BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
+  ACPI / IA64: remove usage of BAD_MADT_ENTRY
+  ACPI / X86: remove usage of BAD_MADT_ENTRY
+  ACPI: remove definition of BAD_MADT_ENTRY macro
+
+ arch/arm64/include/asm/acpi.h |   8 --
+ arch/arm64/kernel/smp.c       |   2 -
+ arch/ia64/kernel/acpi.c       |  20 ----
+ arch/x86/kernel/acpi/boot.c   |  27 -----
+ drivers/acpi/tables.c         | 245 +++++++++++++++++++++++++++++++++++++++++-
+ drivers/irqchip/irq-gic.c     |   6 --
+ include/linux/acpi.h          |   4 -
+ 7 files changed, 244 insertions(+), 68 deletions(-)
 
 -- 
-Kees Cook
-Chrome OS Security
+2.4.3
