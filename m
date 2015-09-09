@@ -1,114 +1,49 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 9 Sep 2015 10:26:13 +0800
-Subject: [PATCH v2 1/2] ARM: dts: imx7d: Add USB support
-In-Reply-To: <1441677432-3376-1-git-send-email-festevam@gmail.com>
-References: <1441677432-3376-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150909022612.GH7802@shlinux2>
+From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
+Date: Wed, 9 Sep 2015 03:45:31 +0000
+Subject: [PATCH v2 04/10] doc/bindings: Update PCIe devicetree binding
+ documentation for LS2080A
+In-Reply-To: <CADRPPNR-cSSQC5sLMmoqcxX46J6hdULa_V4v2BK7T8s8pcX0cg@mail.gmail.com>
+References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1441349872-4560-5-git-send-email-bhupesh.sharma@freescale.com>
+ <80094129.LHZFOe1ZPU@wuerfel>
+ <CADRPPNR-cSSQC5sLMmoqcxX46J6hdULa_V4v2BK7T8s8pcX0cg@mail.gmail.com>
+Message-ID: <BY1PR0301MB130337BA5B78D1887FE1880C82520@BY1PR0301MB1303.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 07, 2015 at 10:57:11PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+> From: pku.leo at gmail.com [mailto:pku.leo at gmail.com]
+> Sent: Wednesday, September 09, 2015 1:36 AM
+> On Mon, Sep 7, 2015 at 6:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 04 September 2015 12:27:46 Bhupesh Sharma wrote:
+> >> @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis
+> >> Designware PCIe IP  and thus inherits all the common properties
+> defined in designware-pcie.txt.
+> >>
+> >>  Required properties:
+> >> -- compatible: should contain the platform identifier such as
+> "fsl,ls1021a-pcie"
+> >> +- compatible: should contain the platform identifier such as
+> >> +"fsl,ls1021a-pcie",
+> >> +  "fsl,ls2080a-pcie".
+> >>  - reg: base addresses and lengths of the PCIe controller
+> >>  - interrupts: A list of interrupt outputs of the controller. Must
+> contain an
+> >>    entry for each entry in the interrupt-names property.
+> >>
+> >
+> > Are the two PCIe hosts mutually compatible? If they are, you should
+> > mandate one of the strings as the base model for identification, with
+> > the additional model being optional for identification of the specific
+> SoC.
 > 
-> Add USB OTG and Host support.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Remove underscore from node name as suggested by Shawn
-> 
->  arch/arm/boot/dts/imx7d.dtsi | 71 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 71 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> index 15c2193..90eb9f4 100644
-> --- a/arch/arm/boot/dts/imx7d.dtsi
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -746,6 +746,77 @@
->  				status = "disabled";
->  			};
->  
-> +			usbotg1: usb at 30b10000 {
-> +				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
-> +				reg = <0x30b10000 0x200>;
-> +				interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_USB_CTRL_CLK>;
-> +				fsl,usbphy = <&usbphynop1>;
-> +				fsl,usbmisc = <&usbmisc1 0>;
-> +				phy-clkgate-delay-us = <400>;
-> +				status = "disabled";
-> +			};
-> +
-> +			usbotg2: usb at 30b20000 {
-> +				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
-> +				reg = <0x30b20000 0x200>;
-> +				interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_USB_CTRL_CLK>;
-> +				fsl,usbphy = <&usbphynop2>;
-> +				fsl,usbmisc = <&usbmisc2 0>;
-> +				phy-clkgate-delay-us = <400>;
-> +				status = "disabled";
-> +			};
-> +
-> +			usbh: usb at 30b30000 {
-> +				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
-> +				reg = <0x30b30000 0x200>;
-> +				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_USB_CTRL_CLK>;
-> +				fsl,usbphy = <&usbphynop3>;
-> +				fsl,usbmisc = <&usbmisc3 0>;
-> +				phy_type = "hsic";
-> +				dr_mode = "host";
-> +				phy-clkgate-delay-us = <400>;
-> +				status = "disabled";
-> +			};
-> +
-> +			usbmisc1: usbmisc at 30b10200 {
-> +				#index-cells = <1>;
-> +				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
-> +				reg = <0x30b10200 0x200>;
-> +			};
-> +
-> +			usbmisc2: usbmisc at 30b20200 {
-> +				#index-cells = <1>;
-> +				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
-> +				reg = <0x30b20200 0x200>;
-> +			};
-> +
-> +			usbmisc3: usbmisc at 30b30200 {
-> +				#index-cells = <1>;
-> +				compatible = "fsl,imx7d-usbmisc", "fsl,imx6q-usbmisc";
-> +				reg = <0x30b30200 0x200>;
-> +			};
-> +
-> +			usbphynop1: usbphynop1 {
-> +				compatible = "usb-nop-xceiv";
-> +				clocks = <&clks IMX7D_USB_PHY1_CLK>;
-> +				clock-names = "main_clk";
-> +			};
-> +
-> +			usbphynop2: usbphynop2 {
-> +				compatible = "usb-nop-xceiv";
-> +				clocks = <&clks IMX7D_USB_PHY2_CLK>;
-> +				clock-names = "main_clk";
-> +			};
-> +
-> +			usbphynop3: usbphynop3 {
-> +				compatible = "usb-nop-xceiv";
-> +				clocks = <&clks IMX7D_USB_HSIC_ROOT_CLK>;
-> +				clock-names = "main_clk";
-> +			};
-> +
->  			usdhc1: usdhc at 30b40000 {
->  				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
->  				reg = <0x30b40000 0x10000>;
-> -- 
-> 1.9.1
-> 
+> It seems that controllers on these chips are not exactly the same.
+> They will get different driver data by matching the compatible strings.
+> Probably we could define a more generic compatible string, such as
+> "fsl,layerscape-pcie" or "fsl,ls-pcie".
 
-Acked-by: Peter Chen <peter.chen@freescale.com>
+Yes, Minghaun captured the differences in the two versions in the v1 review
+discussion for the DTS here:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/338343.html
 
--- 
-
-Best Regards,
-Peter Chen
+Regards,
+Bhupesh
