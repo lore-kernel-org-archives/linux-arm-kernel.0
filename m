@@ -1,62 +1,41 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 8 Sep 2015 23:10:30 -0400 (EDT)
-Subject: [PATCH] ARM:mm: define arch-specific IOREMAP_MAX_ORDER only in
- !SMP && !LPAE case
-In-Reply-To: <55EF24FE.4060602@gmail.com>
-References: <1441680050-50490-1-git-send-email-zhenzhang.zhang@huawei.com>
- <55EE4BD2.3080800@huawei.com> <55EF24FE.4060602@gmail.com>
-Message-ID: <alpine.LFD.2.20.1509082309040.22877@knanqh.ubzr>
+From: songjun.wu@atmel.com (Wu, Songjun)
+Date: Wed, 9 Sep 2015 11:16:08 +0800
+Subject: [PATCH 1/2] ASoC: atmel-classd: add the Audio Class D Amplifier
+ code
+In-Reply-To: <20150908122322.GB9751@sirena.org.uk>
+References: <1441086101-15303-1-git-send-email-songjun.wu@atmel.com>
+ <1441086101-15303-2-git-send-email-songjun.wu@atmel.com>
+ <20150903113716.GU12027@sirena.org.uk> <55EC0AF5.8060403@atmel.com>
+ <20150907162350.GV5313@sirena.org.uk> <55EEAC01.3080409@atmel.com>
+ <20150908122322.GB9751@sirena.org.uk>
+Message-ID: <55EFA478.1000109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Sep 2015, Sergey Dyasly wrote:
-
-> On 08.09.2015 5:45, Zhang Zhen wrote:
-> > The arch-specific IOREMAP_MAX_ORDER is introduced in
-> > commit: ff0daca([ARM] Add section support to ioremap) and
-> > commit: a069c89 ([ARM] 3705/1: add supersection support to ioremap()).
-> > But supersections and sections mappings are only used in !SMP && !LPAE case.
-> > Otherwise, mapping is created using the usual 4K pages.
-> > 
-> > In most cases without !SMP && !LPAE, the big alignment cause high
-> > fragmentation
-> > issue in vmalloc area.
-> > Here we use arch-specific IOREMAP_MAX_ORDER only in !SMP && !LPAE case,
-> > otherwise use generic IOREMAP_MAX_ORDER in include/linux/vmalloc.h.
-> > 
-> > Signed-off-by: Zhang Zhen <zhenzhang.zhang@huawei.com>
-> > ---
-> >   arch/arm/include/asm/memory.h | 2 ++
-> >   1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> > index b7f6fb4..3209012 100644
-> > --- a/arch/arm/include/asm/memory.h
-> > +++ b/arch/arm/include/asm/memory.h
-> > @@ -76,10 +76,12 @@
-> >    */
-> >   #define XIP_VIRT_ADDR(physaddr)  (MODULES_VADDR + ((physaddr) &
-> > 0x000fffff))
-> > 
-> > +#if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
-> >   /*
-> >    * Allow 16MB-aligned ioremap pages
-> >    */
-> >   #define IOREMAP_MAX_ORDER	24
-> > +#endif
-> > 
-> >   #else /* CONFIG_MMU */
-> > 
-> 
-> Hmm... This looks exactly like my old patch -
-> http://thread.gmane.org/gmane.linux.kernel.mm/127620
-> (Thanks to Vladimir for pointing that out!)
-> 
-> Hasn't there been any progress about this issue?
-
-IMHO the patch makes sense.
-
-Did you send it to RMK's patch system?
 
 
-Nicolas
+On 9/8/2015 20:23, Mark Brown wrote:
+> On Tue, Sep 08, 2015 at 05:36:01PM +0800, Wu, Songjun wrote:
+>> On 9/8/2015 00:23, Mark Brown wrote:
+>
+>>> OK, so that's not actually what the code was doing - it had separate
+>>> enums for bass, mid and treble.  If you make this a single enum with all
+>>> the above options in it that seems like the best way of handling things.
+>
+>> A single enum seems not very friendly to user, there are tree EQs, bass,
+>> medium and treble.
+>> So I create tree enum controls to control three EQs.
+>> The 'get' function is replaced by 'classd_get_eq_enum', if user operates one
+>> of the tree EQ controls, the other two EQs will show 0 dB.
+>
+> If you want to have three controls you need to write code so that the
+> user can only change one of them from 0dB at once, returning an error
+> otherwise.  That was why it looked like they were three separate
+> controls.
+>
+If user operates two or tree controls at the same time, for my 
+understanding, these operations are serial actually in kernel, not 
+parallel, and the last operation will be effective. I only write the 
+function 'classd_get_eq_enum' to get the enumeration value, if user 
+changes one of controls, the other controls will get 0dB. Is my 
+understanding correct?
