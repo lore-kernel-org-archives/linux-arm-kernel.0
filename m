@@ -1,45 +1,38 @@
 From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Wed,  9 Sep 2015 11:25:11 +0200
-Subject: [PATCH 1/5] dts: sunxi: add eeprom to A10 OLinuXino Lime board
+Date: Wed,  9 Sep 2015 11:25:12 +0200
+Subject: [PATCH 2/5] dts: sunxi: correct vendor prefix on OLinuXino a10s micro
 In-Reply-To: <1441790715-11957-1-git-send-email-o.schinagl@ultimaker.com>
 References: <1441790715-11957-1-git-send-email-o.schinagl@ultimaker.com>
-Message-ID: <1441790715-11957-2-git-send-email-o.schinagl@ultimaker.com>
+Message-ID: <1441790715-11957-3-git-send-email-o.schinagl@ultimaker.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Olliver Schinagl <oliver@schinagl.nl>
 
-The Olimex A10 OLinuXino Lime features an eeprom that is always on the
-board. This patch adds it to the dts.
+The OLinuXino A10S micro features an eeprom. According to the eeprom.txt
+binding document, we should use the manufacturer and 'at' is not the
+proper manufacturer id according to the vendor-prefixes.
 
---Tested-by: Olliver Schinagl <oliver@schinagl.nl>
+This patch takes the proper vendor-prefix and uses it for the eeprom
+node.
+
 --Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 ---
- arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-index b64aa4e..0f3ed86 100644
---- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-@@ -124,6 +124,18 @@
- 	};
- };
- 
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+
-+	eeprom: eeprom at 50 {
-+		compatible = "atmel,24c16";
-+		reg = <0x50>;
-+		pagesize = <16>;
-+	};
-+};
-+
- &mdio {
+diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+index a7e19e4..49a1be6 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+@@ -104,7 +104,7 @@
  	status = "okay";
  
+ 	at24 at 50 {
+-		compatible = "at,24c16";
++		compatible = "atmel,24c16";
+ 		pagesize = <16>;
+ 		reg = <0x50>;
+ 		read-only;
 -- 
 2.1.4
