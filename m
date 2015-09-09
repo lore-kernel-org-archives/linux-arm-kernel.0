@@ -1,87 +1,66 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 8 Sep 2015 19:30:40 -0500
-Subject: [PATCH v7 2/5] dt-bindings: Add a binding for Mediatek xHCI host
- controller
-In-Reply-To: <1441693083-8440-3-git-send-email-chunfeng.yun@mediatek.com>
-References: <1441693083-8440-1-git-send-email-chunfeng.yun@mediatek.com>
- <1441693083-8440-3-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <55EF7DB0.7040607@kernel.org>
+Date: Tue, 8 Sep 2015 20:29:24 -0500
+Subject: [PATCH v4 04/22] of: add function to allow probing a device from
+ a OF node
+In-Reply-To: <1441628627-5143-5-git-send-email-tomeu.vizoso@collabora.com>
+References: <1441628627-5143-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1441628627-5143-5-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <55EF8B74.7090909@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2015 01:18 AM, Chunfeng Yun wrote:
-> add a DT binding documentation of xHCI host controller for the
-> MT8173 SoC from Mediatek.
+On 09/07/2015 07:23 AM, Tomeu Vizoso wrote:
+> Walks the OF tree up and finds the closest ancestor that has a struct
+> device associated with it, probing it if isn't bound to a driver yet.
 > 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  .../devicetree/bindings/usb/mt8173-xhci.txt        | 52 ++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> The above should ensure that the dependency represented by the passed OF
+> node is available, because probing a device should cause its descendants
+> to be probed as well (when they get registered).
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> new file mode 100644
-> index 0000000..d851bf1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> @@ -0,0 +1,52 @@
-> +MT8173 xHCI
-> +
-> +The device node for Mediatek SOC USB3.0 host controller
-> +
-> +Required properties:
-> + - compatible : should contain "mediatek,mt8173-xhci"
-> + - reg : specifies physical base address and size of the registers,
-> +	the first one for MAC, the second for IPPC
-> + - interrupts : interrupt used by the controller
-> + - power-domains : a phandle to USB power domain node to control USB's
-> +	mtcmos
-> + - vusb33-supply : regulator of USB avdd3.3v
-> +
-> + - clocks : a list of phandle + clock-specifier pairs, one for each
-> +	entry in clock-names
-> + - clock-names : must contain
-> +	"sys_ck": for clock of xHCI MAC
-> +	"wakeup_deb_p0": for USB wakeup debounce clock of port0
-> +	"wakeup_deb_p0": for USB wakeup debounce clock of port1
-> +
-> + - phys : a list of phandle + phy specifier pairs
-> + - usb3-lpm-capable : supports USB3.0 LPM
-> + - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
-> +	control register
+> Subsystems can use this when looking up resources for drivers, to reduce
+> the chances of deferred probes because of the probing order of devices.
+> 
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-Wake-up should probably be done in some generic way. That said, I don't
-have a specific suggestion other than make it optional.
+Looks pretty good to me. One comment below.
 
-> + - mediatek,wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup
-> +	mode; Others means don't enable wakeup source of USB
+[...]
 
-This should be optional rather than any other value meaning disabled.
-
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index baf04d7249bd..f089d95ac961 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -269,6 +269,8 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+>  		goto err_free;
+>  	}
+>  
+> +	node->device = &dev->dev;
 > +
-> +Optional properties:
-> + - vbus-supply : reference to the VBUS regulator;
+
+This seems oddly placed. Can you move to patch 3?
+
+>  	return dev;
+>  
+>  err_free:
+> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+> index cc7dd687a89d..da8d489e73ad 100644
+> --- a/include/linux/of_device.h
+> +++ b/include/linux/of_device.h
+> @@ -40,6 +40,7 @@ extern ssize_t of_device_get_modalias(struct device *dev,
+>  
+>  extern void of_device_uevent(struct device *dev, struct kobj_uevent_env *env);
+>  extern int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env);
+> +extern void of_device_probe(struct device_node *np);
+>  
+>  static inline void of_device_node_put(struct device *dev)
+>  {
+> @@ -84,6 +85,8 @@ static inline int of_device_uevent_modalias(struct device *dev,
+>  	return -ENODEV;
+>  }
+>  
+> +static inline void of_device_probe(struct device_node *np) { }
 > +
-> +Example:
-> +usb30: usb at 11270000 {
-> +	compatible = "mediatek,mt8173-xhci";
-> +	reg = <0 0x11270000 0 0x1000>,
-> +	      <0 0x11280700 0 0x0100>;
-> +	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-> +	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-> +	clocks = <&topckgen CLK_TOP_USB30_SEL>,
-> +		 <&pericfg CLK_PERI_USB0>,
-> +		 <&pericfg CLK_PERI_USB1>;
-> +	clock-names = "sys_ck",
-> +		      "wakeup_deb_p0",
-> +		      "wakeup_deb_p1";
-> +	phys = <&phy_port0 PHY_TYPE_USB3>,
-> +	       <&phy_port1 PHY_TYPE_USB2>;
-> +	vusb33-supply = <&mt6397_vusb_reg>;
-> +	vbus-supply = <&usb_p1_vbus>;
-> +	usb3-lpm-capable;
-> +	mediatek,syscon-wakeup = <&pericfg>;
-> +	mediatek,wakeup-src = <1>;
-> +	status = "okay";
-> +};
+>  static inline void of_device_node_put(struct device *dev) { }
+>  
+>  static inline const struct of_device_id *__of_match_device(
 > 
