@@ -1,33 +1,81 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Wed,  9 Sep 2015 14:27:07 +0200
-Subject: [PATCH] crypto: sun4i-ss Fix a possible driver hang with ciphers
-Message-ID: <1441801627-31820-1-git-send-email-clabbe.montjoie@gmail.com>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Wed,  9 Sep 2015 14:30:44 +0200
+Subject: [PATCH v3 0/9] ARM: dts: update Boundary Devices boards support
+In-Reply-To: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
+References: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1441801853-10264-1-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sun4i_ss_opti_poll function cipher data until the output miter have
-a length of 0.
-If the crypto API client, give more SGs than necessary this could result
-in an infinite loop.
-Fix it by checking for remaining bytes, just like sun4i_ss_cipher_poll().
+Hi all,
 
-Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
----
- drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This series is a follow-up to the previous series that added LCD display
+support.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/364425.html
 
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-index e070c31..a19ee12 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
-@@ -104,7 +104,7 @@ static int sun4i_ss_opti_poll(struct ablkcipher_request *areq)
- 			sg_miter_next(&mo);
- 			oo = 0;
- 		}
--	} while (mo.length > 0);
-+	} while (oleft > 0);
- 
- 	if (areq->info) {
- 		for (i = 0; i < 4 && i < ivsize / 4; i++) {
+This one aims at adding touchscreen and WiFi support for Nitrogen6x as well as
+adding two boards: Nitrogen6_Max and Nit6xlite.
+
+It also takes care of updating the licenses to be GPLv2/X11.
+
+The series has been tested against linux-next tag next-20150909.
+
+Note that imx_v6_v7_defconfig has been used with the following additions:
+CONFIG_TOUCHSCREEN_EDT_FT5X06=y
+CONFIG_I2C_MUX_GPIO=y
+CONFIG_RTC_DRV_M41T80=y
+
+Modifications:
+v2->v3:
+- Rename nodes to general class of device as suggested by Philipp and Russell.
+- Remove useless wakeup-gpio field for edt,ft5x06 touchscreen
+- Add missing muxing for interrupt GPIO
+- Rebased on next-20150909
+v1->v2:
+- Add Boundary Devices Inc. to vendor prefixes
+- Relicense devices trees to GPLv2/X11 as suggested by Fabio for:
+  - Nitrogen6x
+  - SabreLite
+  - Nit6xLite
+  - Nitrogen6_MAX
+- Change manufacturer to Boundary Devices as suggested by Fabio for:
+  - Nitrogen6x
+  - Nit6xLite
+  - Nitrogen6_MAX
+- Fixed missing macros for gpio/irq values as suggested by Philipp.
+- Rebased on next-20150908
+
+Regards,
+Gary
+
+Gary Bisson (9):
+  ARM: dts: imx6dql-nitrogen6x: add touchscreen support
+  ARM: dts: imx6qdl-nitrogen6x: add wifi wl1271 support
+  ARM: dts: imx6qdl-nitrogen6x: relicense under GPLv2/X11
+  ARM: dts: imx6qdl-sabrelite: relicense under GPLv2/X11
+  of: Add Boundary Devices Inc. vendor prefix
+  ARM: dts: imx6q-nitrogen6x: change manufacturer to Boundary Devices
+  ARM: dts: imx6dl-nitrogen6x: change manufacturer to Boundary Devices
+  ARM: dts: imx: add Boundary Devices Nitrogen6_Max board
+  ARM: dts: imx: add Boundary Devices Nitrogen6_Lite board
+
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/imx6dl-nit6xlite.dts             |  49 ++
+ arch/arm/boot/dts/imx6dl-nitrogen6x.dts            |  44 +-
+ arch/arm/boot/dts/imx6dl-sabrelite.dts             |  40 +-
+ arch/arm/boot/dts/imx6q-nitrogen6_max.dts          |  53 ++
+ arch/arm/boot/dts/imx6q-nitrogen6x.dts             |  44 +-
+ arch/arm/boot/dts/imx6q-sabrelite.dts              |  40 +-
+ ...6qdl-nitrogen6x.dtsi => imx6qdl-nit6xlite.dtsi} | 396 ++++++----
+ arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi       | 873 +++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi          | 111 ++-
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi           |  40 +-
+ 12 files changed, 1523 insertions(+), 170 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6dl-nit6xlite.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-nitrogen6_max.dts
+ copy arch/arm/boot/dts/{imx6qdl-nitrogen6x.dtsi => imx6qdl-nit6xlite.dtsi} (50%)
+ create mode 100644 arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
+
 -- 
-2.4.6
+2.5.1
