@@ -1,80 +1,70 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 10 Sep 2015 17:05:39 +0200
-Subject: [PATCH 2/3] ARM: dts: sun5i: Add sun5i-q8-common.dtsi
-In-Reply-To: <20150909140156.GC9885@lukather>
-References: <1441464953-26351-1-git-send-email-hdegoede@redhat.com>
- <1441464953-26351-2-git-send-email-hdegoede@redhat.com>
- <20150908143320.GB31584@lukather> <55EF529B.80401@redhat.com>
- <20150909140156.GC9885@lukather>
-Message-ID: <55F19C43.2000601@redhat.com>
+From: JBeulich@suse.com (Jan Beulich)
+Date: Thu, 10 Sep 2015 09:06:32 -0600
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <20150910145331.GJ29293@leverpostej>
+References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
+ <20150910095208.GA29293@leverpostej>
+ <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
+ <20150910112418.GC29293@leverpostej>
+ <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
+ <55F199DD02000078000A1B1E@prv-mh.provo.novell.com>
+ <20150910145331.GJ29293@leverpostej>
+Message-ID: <55F1B89802000078000A1C9B@prv-mh.provo.novell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+>>> On 10.09.15 at 16:53, <mark.rutland@arm.com> wrote:
+> On Thu, Sep 10, 2015 at 01:55:25PM +0100, Jan Beulich wrote:
+>> >>> On 10.09.15 at 13:37, <stefano.stabellini@eu.citrix.com> wrote:
+>> > On Thu, 10 Sep 2015, Mark Rutland wrote:
+>> >> Why can't Xen give a virtual EFI interface to Dom0 / guests? e.g.
+>> >> create pages of RuntimeServicesCode that are trivial assembly shims
+>> >> doing hypercalls, and plumb these into the virtual EFI memory map and
+>> >> tables?
+>> >> 
+>> >> That would keep things sane for any guest, allow for easy addition of
+>> >> EFI features, and you could even enter the usual EFI entry point,
+>> >> simulate ExitBootServices(), SetVirtualAddressMap(), and allow the guest
+>> >> to make things sane for itself...
+>> > 
+>> > That's the way it was done on x86 and now we have common code both in
+>> > Linux (drivers/xen/efi.c) and Xen (xen/common/efi) which implement this
+>> > scheme.  Switching to a different solution for ARM, would mean diverging
+>> > with x86, which is not nice, or reimplementing the x86 solution too,
+>> > which is expensive.
+>> > 
+>> > BTW I think that the idea you proposed was actually considered at the
+>> > time and deemed hard to implement, if I recall correctly.
+>> 
+>> Considering that the EFI support is just for Dom0, and Dom0 (at
+>> the time) had to be PV anyway, it was the more natural solution to
+>> expose the interface via hypercalls, the more that this allows better
+>> control over what is and primarily what is not being exposed to
+>> Dom0. With the wrapper approach we'd be back to the same
+>> problem (discussed elsewhere) of which EFI version to surface: The
+>> host one would impose potentially missing extensions, while the
+>> most recent hypervisor known one might imply hiding valuable
+>> information from Dom0. Plus there are incompatible changes like
+>> the altered meaning of EFI_MEMORY_WP in 2.5.
+> 
+> I'm not sure I follow how hypercalls solve any impedance mismatch here;
+> you're still expecting Dom0 to call up to Xen in order to perform calls,
+> and all I suggested was a different location for those hypercalls.
+> 
+> If Xen is happy to make such calls blindly, why does it matter if the
+> hypercall was in the kernel binary or an external shim?
 
-On 09-09-15 16:01, Maxime Ripard wrote:
-> On Tue, Sep 08, 2015 at 11:26:51PM +0200, Hans de Goede wrote:
->> Hi,
->>
->> On 09/08/2015 04:33 PM, Maxime Ripard wrote:
->>> On Sat, Sep 05, 2015 at 04:55:52PM +0200, Hans de Goede wrote:
->>>> This is the sun5i / a13 version of sun8i-q8-common.dtsi for use in dts
->>>> files for a13 q8 based tablets. Compared to sun8i this uses uart1 for the
->>>> serial console, and PG0 for card-detect for mmc0.
->>>>
->>>> This also adds pmic and otg support, which both use the same config on
->>>> all known q8 a13 devices. This is not present in sun5i-q8-common.dtsi
->>>> because pmic / otg support for sun8i has not yet been merged.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>
->>> Are we going to have any user but the one you posted in the patch 3
->>> planned?
->>
->> Depends on what I can get my hands on / what is in the post atm.
->>
->> One difference in fex files of different 18 variants is how the usb wifi is
->> powered, either via a gpio or via ldo3. Also there are differences in which
->> accelerometer is used, so eventually I expect there to be several users
->> of this dtsi.
->
-> But no difference in the SoC used (A13 vs A10s)?
->
-> I'm not sure having 18 DTs for a single board name is going to be
-> really helpful.
+Because there could be new entries in SystemTable->RuntimeServices
+(expected and blindly but validly called by the kernel). Even worse
+(because likely harder to deal with) would be new fields in other
+structures.
 
-Sorry I meant to write q8 not 18 :)
+> Incompatible changes are a spec problem regardless of how this is
+> handled.
 
->It would be something to be supported by some quirks
-> mechanism, instead of having to require the user to pick the right one.
+Not necessarily - we don't expose the memory map (we'd have to
+if we were to mimic EFI for Dom0), and hence the mentioned issue
+doesn't exist in our model.
 
-Agreed, which is why I added a generic sun5i-a13-q8-tablet.dts, which
-can then later be extended with quirks and such to get all the different
-variants supported. Which I guess means that the contents of
-sun5i-q8-common.dtsi can be folded into sun5i-a13-q8-tablet.dts, otoh
-we may have some special cases which do require a separate dts and
-having sun5i-q8-common.dtsi follows the same scheme as used for the
-a23 / a33 tablets. In the future we should probably also add
-sun8i-a23-q8-tablet.dts and sun8i-a33-q8-tablet.dts files and make
-the existing ones just empty files with a single #include for
-compatibility.
-
-If possible I would like to at least have you queue up the default
-sun5i-a13-q8-tablet.dts so that we've a dts file for a13 based tablets
-which at least gets the basics going.
-
-Either in its current form, or with it and sun5i-q8-common.dtsi
-squashed together. If you want a squashed version let me know and
-I'll do a resend.
-
-Are you coming to ELCE ? I think the both of us should go to:
-
-http://lceeu2015.sched.org/event/999c45c7fe78824a88269f35539c7e5c#.VfGcCLPYqlM
-
-(Device Tree NG BoF) and try to hash out a solution for this there,
-the quirks / variants stuff sounds good, but I wonder how far along
-that is ?
-
-Regards,
-
-Hans
+Jan
