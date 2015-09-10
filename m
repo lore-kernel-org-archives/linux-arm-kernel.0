@@ -1,329 +1,60 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 10 Sep 2015 12:39:18 +0200
-Subject: [PATCH 3/3] power: reset: at91-shdwc: add new shutdown controller
- driver
-In-Reply-To: <bc6fb78ccf190a6e24f69d70036bc3cd3ec42673.1441881064.git.nicolas.ferre@atmel.com>
-References: <bc6fb78ccf190a6e24f69d70036bc3cd3ec42673.1441881064.git.nicolas.ferre@atmel.com>
-Message-ID: <2e870dbb4c7728ad416360ff20b22c1a97ba88d9.1441881064.git.nicolas.ferre@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Sep 2015 11:41:06 +0100
+Subject: [PATCH] arm64: Add support for hardware updates of the access
+ and dirty pte bits
+In-Reply-To: <20150910100753.GE12294@localhost>
+References: <1436545468-1549-1-git-send-email-catalin.marinas@arm.com>
+ <55F06A87.3000204@citrix.com> <20150910100753.GE12294@localhost>
+Message-ID: <20150910104106.GC22439@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sama5d2 SoC has a completely new shutdown controller with new features and
-register layout. It thus makes sense to add a new driver for this new
-peripheral.
+On Thu, Sep 10, 2015 at 11:07:54AM +0100, Catalin Marinas wrote:
+> On Wed, Sep 09, 2015 at 06:21:11PM +0100, Julien Grall wrote:
+> > I've tried to boot the latest linus/master (a794b4f) which include this
+> > patch as DOM0 on xgene. This is failing late in the boot with
+> > a BUG (see trace below).
+> > 
+> > The bisector pointed me to this patch. When I disable
+> > CONFIG_ARM64_HW_AFDBM, I'm able to boot the kernel and use it
+> > without any issue.
+> > 
+> > Although, I'm not sure to understand how this patch could
+> > possibly break the filesystem subsystem.
+> 
+> I don't understand either. It seems that the kernel raises a BUG on
+> !PagePrivate but this patch never touches the page structure, only ptes.
 
-This driver is Device Tree only and handles events from the wake-up pin and
-the RTC.
-As the register layout may change in the future, so some values are encoded
-in a configuration structure.
+Right, but this could be a symptom of some earlier memory corruption thanks
+to junk ptes.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/power/reset/Kconfig      |   8 ++
- drivers/power/reset/Makefile     |   1 +
- drivers/power/reset/at91-shdwc.c | 263 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 272 insertions(+)
- create mode 100644 drivers/power/reset/at91-shdwc.c
+> > > +#ifdef CONFIG_ARM64_HW_AFDBM
+> > > +	/*
+> > > +	 * Hardware update of the Access and Dirty bits.
+> > > +	 */
+> > > +	mrs	x9, ID_AA64MMFR1_EL1
+> > > +	and	x9, x9, #0xf
+> > > +	cbz	x9, 2f
+> > > +	cmp	x9, #2
+> > > +	b.lt	1f
+> > > +	orr	x10, x10, #TCR_HD		// hardware Dirty flag update
+> > > +1:	orr	x10, x10, #TCR_HA		// hardware Access flag update
+> > > +2:
+> > > +#endif	/* CONFIG_ARM64_HW_AFDBM */
+> > >  	msr	tcr_el1, x10
+> > >  	ret					// return to head.S
+> > >  ENDPROC(__cpu_setup)
+> 
+> Just in case some ID registers are wrong, can you do an "#if 0" above
+> instead of CONFIG_ARM64_HW_AFDBM?
 
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index 5a0189bf19bb..7f52bc938795 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -30,6 +30,14 @@ config POWER_RESET_AT91_RESET
- 	  This driver supports restart for Atmel AT91SAM9 and SAMA5
- 	  SoCs
- 
-+config POWER_RESET_AT91_SHDWC
-+	bool "Atmel AT91 shutdown controller driver"
-+	depends on ARCH_AT91
-+	default SOC_SAMA5
-+	help
-+	  This driver supports poweroff for some Atmel SAMA5 SoCs. It is
-+	  present for example on SAMA5D2 SoC.
-+
- config POWER_RESET_AXXIA
- 	bool "LSI Axxia reset driver"
- 	depends on ARCH_AXXIA
-diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index 096fa67047f6..6b9020ed3fb7 100644
---- a/drivers/power/reset/Makefile
-+++ b/drivers/power/reset/Makefile
-@@ -1,6 +1,7 @@
- obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
- obj-$(CONFIG_POWER_RESET_AT91_POWEROFF) += at91-poweroff.o
- obj-$(CONFIG_POWER_RESET_AT91_RESET) += at91-reset.o
-+obj-$(CONFIG_POWER_RESET_AT91_SHDWC) += at91-shdwc.o
- obj-$(CONFIG_POWER_RESET_AXXIA) += axxia-reset.o
- obj-$(CONFIG_POWER_RESET_BRCMSTB) += brcmstb-reboot.o
- obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
-diff --git a/drivers/power/reset/at91-shdwc.c b/drivers/power/reset/at91-shdwc.c
-new file mode 100644
-index 000000000000..bc5cbf2bc95b
---- /dev/null
-+++ b/drivers/power/reset/at91-shdwc.c
-@@ -0,0 +1,263 @@
-+/*
-+ * Atmel Shutdown Controller (SHDWC) driver
-+ *
-+ * Copyright (C) 2015 Atmel Corporation,
-+ *                    Nicolas Ferre <nicolas.ferre@atmel.com>
-+ *
-+ * Evolved from driver at91-poweroff.c.
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * TODO:
-+ * - addition to status of other wake-up inputs [1 - 15]
-+ * - Analog Comparator wake-up alarm
-+ * - Serial RX wake-up alarm
-+ * - low power debouncer
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/printk.h>
-+
-+#define SLOW_CLOCK_FREQ	32768
-+
-+#define AT91_SHDW_CR	0x00		/* Shut Down Control Register */
-+#define AT91_SHDW_SHDW		BIT(0)			/* Shut Down command */
-+#define AT91_SHDW_KEY		(0xa5 << 24)		/* KEY Password */
-+
-+#define AT91_SHDW_MR	0x04		/* Shut Down Mode Register */
-+#define AT91_SHDW_WKUPDBC_SHIFT	24
-+#define AT91_SHDW_WKUPDBC_MASK	GENMASK(31, 16)
-+#define AT91_SHDW_WKUPDBC(x)	(((x) << AT91_SHDW_WKUPDBC_SHIFT) \
-+						& AT91_SHDW_WKUPDBC_MASK)
-+
-+#define AT91_SHDW_SR	0x08		/* Shut Down Status Register */
-+#define AT91_SHDW_WKUPIS_SHIFT	16
-+#define AT91_SHDW_WKUPIS_MASK	GENMASK(31, 16)
-+#define AT91_SHDW_WKUPIS(x)	((1 << (x)) << AT91_SHDW_WKUPIS_SHIFT \
-+						& AT91_SHDW_WKUPIS_MASK)
-+
-+#define AT91_SHDW_WUIR	0x0c		/* Shutdown Wake-up Inputs Register */
-+#define AT91_SHDW_WKUPEN_MASK	GENMASK(15, 0)
-+#define AT91_SHDW_WKUPEN(x)	((1 << (x)) & AT91_SHDW_WKUPEN_MASK)
-+#define AT91_SHDW_WKUPT_SHIFT	16
-+#define AT91_SHDW_WKUPT_MASK	GENMASK(31, 16)
-+#define AT91_SHDW_WKUPT(x)	((1 << (x)) << AT91_SHDW_WKUPT_SHIFT \
-+						& AT91_SHDW_WKUPT_MASK)
-+
-+#define SHDW_WK_PIN(reg, cfg)	((reg) & AT91_SHDW_WKUPIS((cfg)->wkup_pin_input))
-+#define SHDW_RTCWK(reg, cfg)	(((reg) >> ((cfg)->sr_rtcwk_shift)) & 0x1)
-+#define SHDW_RTCWKEN(cfg)	(1 << ((cfg)->mr_rtcwk_shift))
-+
-+#define DBC_PERIOD_US(x)	DIV_ROUND_UP_ULL((1000000 * (x)), \
-+							SLOW_CLOCK_FREQ)
-+
-+struct shdwc_config {
-+	u8 wkup_pin_input;
-+        u8 mr_rtcwk_shift;
-+        u8 sr_rtcwk_shift;
-+};
-+
-+struct shdwc {
-+	struct shdwc_config *cfg;
-+	void __iomem *at91_shdwc_base;
-+};
-+
-+/*
-+ * Hold configuration here, cannot be more than one instance of the driver
-+ * since pm_power_off itself is global.
-+ */
-+static struct shdwc *at91_shdwc;
-+
-+static const unsigned long long sdwc_dbc_period[] = {
-+	0, 3, 32, 512, 4096, 32768,
-+};
-+
-+static void __init at91_wakeup_status(struct platform_device *pdev)
-+{
-+	struct shdwc *shdw = platform_get_drvdata(pdev);
-+	u32 reg;
-+	char *reason = "unknown";
-+
-+	reg = readl(shdw->at91_shdwc_base + AT91_SHDW_SR);
-+
-+	dev_dbg(&pdev->dev, "%s: status = %#x\n", __func__, reg);
-+
-+	/* Simple power-on, just bail out */
-+	if (!reg)
-+		return;
-+
-+	if (SHDW_WK_PIN(reg, shdw->cfg))
-+		reason = "WKUP pin";
-+        else if (SHDW_RTCWK(reg, shdw->cfg))
-+		reason = "RTC";
-+
-+	pr_info("AT91: Wake-Up source: %s\n", reason);
-+}
-+
-+static void at91_poweroff(void)
-+{
-+	BUG_ON(!at91_shdwc);
-+
-+	writel(AT91_SHDW_KEY | AT91_SHDW_SHDW,
-+			at91_shdwc->at91_shdwc_base + AT91_SHDW_CR);
-+}
-+
-+static u32 at91_shdwc_debouncer_value(struct platform_device *pdev,
-+				      u32 in_period_us)
-+{
-+	int i;
-+	int max_idx = ARRAY_SIZE(sdwc_dbc_period) - 1;
-+	unsigned long long period_us;
-+	unsigned long long max_period_us = DBC_PERIOD_US(sdwc_dbc_period[max_idx]);
-+
-+	if (in_period_us > max_period_us) {
-+		dev_warn(&pdev->dev,
-+			 "debouncer period %u too big, reduced to %llu us\n",
-+			 in_period_us, max_period_us);
-+		return max_idx;
-+	}
-+
-+	for (i = max_idx - 1; i > 0; i--) {
-+		period_us = DBC_PERIOD_US(sdwc_dbc_period[i]);
-+		dev_dbg(&pdev->dev, "%s: ref[%d] = %llu\n",
-+						__func__, i, period_us);
-+		if (in_period_us > period_us)
-+			break;
-+	}
-+
-+	return i + 1;
-+}
-+
-+static u32 at91_shdwc_get_wakeup_input(struct platform_device *pdev,
-+				       struct device_node *np)
-+{
-+	struct device_node *cnp;
-+	const char *pm;
-+	u32 wk_input_mask;
-+	u32 wuir = 0;
-+	u32 wk_input;
-+
-+	for_each_child_of_node(np, cnp) {
-+		if (of_property_read_u32(cnp, "reg", &wk_input)) {
-+			dev_warn(&pdev->dev, "reg property is missing for %s\n",
-+				 cnp->full_name);
-+			continue;
-+		}
-+
-+		wk_input_mask = 1 << wk_input;
-+		if (!(wk_input_mask & AT91_SHDW_WKUPEN_MASK)) {
-+			dev_warn(&pdev->dev,
-+				 "wake-up input %d out of bounds ignore\n",
-+				 wk_input);
-+			continue;
-+		}
-+		wuir |= wk_input_mask;
-+
-+		if (!of_property_read_string(cnp, "atmel,wakeup-type", &pm)) {
-+			if (!strcasecmp(pm, "high"))
-+				/*
-+				 * only add a type if "high" is specified. Low
-+				 * is the default.
-+				 */
-+				wuir |= AT91_SHDW_WKUPT(wk_input);
-+		}
-+		dev_dbg(&pdev->dev, "%s: (child %d) wuir = %#x\n",
-+						__func__, wk_input, wuir);
-+	}
-+
-+	return wuir;
-+}
-+
-+static void at91_shdwc_dt_configure(struct platform_device *pdev)
-+{
-+	struct shdwc *shdw = platform_get_drvdata(pdev);
-+	struct device_node *np = pdev->dev.of_node;
-+	u32 mode = 0, tmp, input;
-+
-+	if (!np) {
-+		dev_err(&pdev->dev, "device node not found\n");
-+		return;
-+	}
-+
-+	if (!of_property_read_u32(np, "atmel,shdwc-debouncer", &tmp)) {
-+		mode |= AT91_SHDW_WKUPDBC(at91_shdwc_debouncer_value(pdev, tmp));
-+	}
-+
-+	if (of_property_read_bool(np, "atmel,wakeup-rtc-timer"))
-+			mode |= SHDW_RTCWKEN(shdw->cfg);
-+
-+	dev_dbg(&pdev->dev, "%s: mode = %#x\n", __func__, mode);
-+	writel(mode, shdw->at91_shdwc_base + AT91_SHDW_MR);
-+
-+	input = at91_shdwc_get_wakeup_input(pdev, np);
-+	writel(input, shdw->at91_shdwc_base + AT91_SHDW_WUIR);
-+}
-+
-+static const struct shdwc_config sama5d2_shdwc_config = {
-+	.wkup_pin_input = 0,
-+	.mr_rtcwk_shift = 17,
-+	.sr_rtcwk_shift = 5,
-+};
-+
-+static struct of_device_id at91_shdwc_of_match[] = {
-+	{
-+		.compatible = "atmel,sama5d2-shdwc",
-+                .data = &sama5d2_shdwc_config,
-+	}, {
-+		/*sentinel*/
-+	}
-+};
-+
-+static int at91_shdwc_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	const struct of_device_id *match;
-+
-+	if (!pdev->dev.of_node)
-+		return -ENODEV;
-+
-+	at91_shdwc = devm_kzalloc(&pdev->dev, sizeof(*at91_shdwc), GFP_KERNEL);
-+	if (!at91_shdwc)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, at91_shdwc);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	at91_shdwc->at91_shdwc_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(at91_shdwc->at91_shdwc_base)) {
-+		dev_err(&pdev->dev, "Could not map reset controller address\n");
-+		return PTR_ERR(at91_shdwc->at91_shdwc_base);
-+	}
-+
-+	match = of_match_node(at91_shdwc_of_match, pdev->dev.of_node);
-+	if (match != NULL)
-+		at91_shdwc->cfg = (struct shdwc_config *)(match->data);
-+	else
-+		return -ENODATA;
-+
-+	at91_wakeup_status(pdev);
-+
-+	at91_shdwc_dt_configure(pdev);
-+
-+	pm_power_off = at91_poweroff;
-+
-+	return 0;
-+}
-+
-+static struct platform_driver at91_shdwc_driver = {
-+	.probe = at91_shdwc_probe,
-+	.driver = {
-+		.name = "at91-shdwc",
-+		.of_match_table = at91_shdwc_of_match,
-+	},
-+};
-+module_platform_driver(at91_shdwc_driver);
-+
-+MODULE_AUTHOR("Nicolas Ferre <nicolas.ferre@atmel.com>");
-+MODULE_DESCRIPTION("Atmel shutdown controller driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.1.3
+The other thing to try would be getting rid of the
+__HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG and related definitions in case the
+issue is somehow related to the use of exclusives for the page table
+updates.
+
+Still, it's strange that nobody else has seen any problems with this
+(and we've so far failed to reproduce it locally on any of our boards,
+even mustang).
+
+Will
