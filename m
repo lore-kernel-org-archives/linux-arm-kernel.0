@@ -1,69 +1,101 @@
-From: leoli@freescale.com (Li Yang)
-Date: Wed, 9 Sep 2015 18:50:26 -0500
-Subject: [PATCH v2 04/10] doc/bindings: Update PCIe devicetree binding
- documentation for LS2080A
-In-Reply-To: <5383634.Mln7J3sdWP@wuerfel>
-References: <1441349872-4560-1-git-send-email-bhupesh.sharma@freescale.com>
- <80094129.LHZFOe1ZPU@wuerfel>
- <CADRPPNR-cSSQC5sLMmoqcxX46J6hdULa_V4v2BK7T8s8pcX0cg@mail.gmail.com>
- <5383634.Mln7J3sdWP@wuerfel>
-Message-ID: <CADRPPNRekyv3dSEroh-n2e6p5nV7Q6tAW1VKHWn=Gqnc+MSs+g@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 9 Sep 2015 19:06:19 -0500
+Subject: [PATCH linux-next v9 2/3] mfd: devicetree: add bindings for Atmel
+ Flexcom
+In-Reply-To: <55F0540F.6000102@atmel.com>
+References: <cover.1441118159.git.cyrille.pitchen@atmel.com>
+ <90fa2e0ded92567a29c996658153d833aaa5e411.1441118159.git.cyrille.pitchen@atmel.com>
+ <55EF7209.8060407@kernel.org> <55F0540F.6000102@atmel.com>
+Message-ID: <55F0C97B.80404@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 9, 2015 at 4:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 08 September 2015 15:06:16 Li Yang wrote:
->> On Mon, Sep 7, 2015 at 6:32 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Friday 04 September 2015 12:27:46 Bhupesh Sharma wrote:
->> >> @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
->> >>  and thus inherits all the common properties defined in designware-pcie.txt.
->> >>
->> >>  Required properties:
->> >> -- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie"
->> >> +- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie",
->> >> +  "fsl,ls2080a-pcie".
->> >>  - reg: base addresses and lengths of the PCIe controller
->> >>  - interrupts: A list of interrupt outputs of the controller. Must contain an
->> >>    entry for each entry in the interrupt-names property.
->> >>
->> >
->> > Are the two PCIe hosts mutually compatible? If they are, you should mandate
->> > one of the strings as the base model for identification, with the additional
->> > model being optional for identification of the specific SoC.
+On 09/09/2015 10:45 AM, Cyrille Pitchen wrote:
+> Hi Rob,
+> 
+> Le 09/09/2015 01:40, Rob Herring a ?crit :
+>> On 09/01/2015 09:46 AM, Cyrille Pitchen wrote:
+>>> This patch documents the DT bindings for the Atmel Flexcom which will be
+>>> introduced by sama5d2x SoCs. These bindings will be used by the actual
+>>> Flexcom driver to be sent in another patch.
+>>>
+>>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>>> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>>> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 >>
->> It seems that controllers on these chips are not exactly the same.
->> They will get different driver data by matching the compatible
->> strings.  Probably we could define a more generic compatible string,
->> such as "fsl,layerscape-pcie" or "fsl,ls-pcie".
+>> A few comments, but in general looks fine.
 >>
->> >
->> > It would also be good to add a string with the specific version number of the
->> > designware PCIe block that is being used there.
+>>> ---
+>>>  .../devicetree/bindings/mfd/atmel-flexcom.txt      | 67 ++++++++++++++++++++++
+>>>  1 file changed, 67 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+>>> new file mode 100644
+>>> index 000000000000..fc3511e41542
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+>>> @@ -0,0 +1,67 @@
+>>> +* Device tree bindings for Atmel Flexcom (Flexible Serial Communication Unit)
+>>> +
+>>> +The Atmel Flexcom is just a wrapper which embeds a SPI controller, an I2C
+>>> +controller and an USART. Only one function can be used at a time and is chosen
+>>> +at boot time according to the device tree.
 >>
->> The binding has mentioned to reference the designware-pcie.txt.  But
->> it might be more clear to mention the designware compatible string
->> "snps,dw-pcie" again in the compatible part.  Currently there is no
->> version number defined in the designware-pcie binding.  It might be
->> hard to get this information for some SoCs.
->
-> For most of them, the information is available and then it should be
-> added. Obviously if you can't find it out, it's hard to guess and
-> you have to leave it out for that particular chip.
+>> Doesn't the board design choose (unless pins go to a header)?
+>>
+> 
+> The function may be chosen once for all by the board design but if we take the
+> sama5d2 xplained board as an example, most Flexcoms output their pins to
+> headers.
+> 
+>>> +
+>>> +Required properties:
+>>> +- compatible:		Should be "atmel,sama5d2-flexcom"
+>>> +- reg:			Should be the offset/length value for Flexcom dedicated
+>>> +			I/O registers (without USART, TWI or SPI registers).
+>>> +- clocks:		Should be the Flexcom peripheral clock from PMC.
+>>> +- #address-cells:	Should be <1>
+>>> +- #size-cells:		Should be <1>
+>>> +- ranges:		Should be one range for the full I/O register region
+>>> +			(including USART, TWI and SPI registers).
+>>> +- atmel,flexcom-mode:	Should be one of the 3 following macros as defined in
+>>> +			include/dt-bindings/mfd/atmel-flexcom.h:
+>>> +			- ATMEL_FLEXCOM_MODE_USART for USART
+>>> +			- ATMEL_FLEXCOM_MODE_SPI for SPI
+>>> +			- ATMEL_FLEXCOM_MODE_TWI for I2C
+>>> +
+>>> +Required child:
+>>> +a single child device of type matching the "atmel,flexcom-mode" property.
+>>
+>> Okay, but why not allow all children and use "status"?
+>>
+> 
+> That is exactly what was proposed in v6 of this series: allow more than one
+> child so possibly all children but only one "available" child (status = 
+> "okay").
+> 
+> The Flexocm driver still needs to find out the type of device of this
+> available child to know which function is to be enabled (USART, I2C or SPI).
+> So the "compatible" attribute was parsed using strstr() to search on of the
+> patterns "usart", "spi" or "i2c".
+> 
+> However the use of strstr() was discussed to know whether the driver should
+> looks for a partial or an exact match of the "compatible" string.
+> An exact match would require to keep the Flexcom driver synchonized with the
+> 3 other drivers every time one of them introduces a new compatibility string,
+> which whould have made every driver more difficult to maintain by creating a
+> useless dependency.
+> So this implementation relying on the "compatible" attribute was abandoned.
+> 
+> To sum up, no other reliable (and simple) means to guess/extact the device
+> type from its DT node was found so we got back to the "atmel,flexcom-mode"
+> property.
 
-Actually I don't know any approach to get the version number of the
-designware block used.  Maybe they are actually using the same version
-of the IP block, and the differences in the driver are actually caused
-by the differences in SoC integration.
+I wasn't thinking removing this property. If the mode is configured by
+the bootloader, then you want to make updates to the configuration as
+simple as possible. Updating atmel,flexcom-mode and status for the
+children would be much more simple than creating the whole child node.
+If that's not a valid usecase, then never mind.
 
->
-> A lot of devices also have some internal version register that you
-> can read out.
-
-There doesn't seem to be this kind of register for the PCIe block.
-
-Minghuan,
-
-Please correct me if you know more. :)
-
-Regards,
-Leo
+Rob
