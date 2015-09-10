@@ -1,36 +1,110 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Thu, 10 Sep 2015 13:58:25 +0100
-Subject: [Xen-devel] [PATCH] efi/libstub/fdt: Standardize the names of
- EFI stub parameters
-In-Reply-To: <20150910121514.GE29293@leverpostej>
-References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
- <20150910095208.GA29293@leverpostej>
- <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
- <20150910112418.GC29293@leverpostej>
- <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
- <20150910121514.GE29293@leverpostej>
-Message-ID: <1441889905.24450.382.camel@citrix.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 10 Sep 2015 15:00:35 +0200
+Subject: [PATCH] ARM: dts: sun8i: Add new sun8i-a33-q8-tzx-723q4.dts file
+Message-ID: <1441890035-3687-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-09-10 at 13:15 +0100, Mark Rutland wrote:
+The TZX 723Q4 PCB is a pcb used in some q8 case 7" A33 tablets.
+This PCB has an interesting issue, its micro sdcards slot will not work
+unless the drive-strength on the mmc pins is lowered from 30mA to 10mA.
 
-> > In any case this should be separate from the shim ABI discussion.
-> 
-> I disagree; I think this is very much relevant to the ABI discussion.
-> That's not to say that I insist on a particular approach, but I think
-> that they need to be considered together.
+Therefor this commit introduces a separate dts file for this board.
 
-Taking a step back, the reason for using the EFI stub parameters is only
-(AFAIK) in order to be able to locate the ACPI RDSP (the root table
-pointer), which as it happens is normally passed via one of the EFI
-firmware tables.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/Makefile                   |  1 +
+ arch/arm/boot/dts/sun8i-a33-q8-tzx-723q4.dts | 70 ++++++++++++++++++++++++++++
+ 2 files changed, 71 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-a33-q8-tzx-723q4.dts
 
-If there was a way to achieve that goal (i.e. another way to find the RSDP)
-without opening the can of UEFI worms then we could consider that opiton
-too.
-
-a way != the legacy x86 thing of scanning low memory of the signature, of
-course.
-
-Ian.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 1dbfd1b..1034922 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -613,6 +613,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a33-et-q8-v1.6.dtb \
+ 	sun8i-a33-ga10h-v1.1.dtb \
+ 	sun8i-a33-ippo-q8h-v1.2.dtb \
++	sun8i-a33-q8-tzx-723q4.dtb \
+ 	sun8i-a33-sinlinx-sina33.dtb
+ dtb-$(CONFIG_MACH_SUN9I) += \
+ 	sun9i-a80-optimus.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-a33-q8-tzx-723q4.dts b/arch/arm/boot/dts/sun8i-a33-q8-tzx-723q4.dts
+new file mode 100644
+index 0000000..04f396a
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-a33-q8-tzx-723q4.dts
+@@ -0,0 +1,70 @@
++/*
++ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun8i-a33.dtsi"
++#include "sun8i-q8-common.dtsi"
++
++/ {
++	model = "Q8 TZX 723Q4 Quad Core Tablet";
++	compatible = "tzx,q8-tzx-723q4", "allwinner,sun8i-a33";
++};
++
++/* The TZX 723Q[a]4 PCB mmc only works properly with a lower drive-strenght */
++&mmc0_pins_a {
++	allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++};
++
++/*
++ * FIXME for now we only support host mode and rely on u-boot to have
++ * turned on Vbus which is controlled by the axp223 pmic on the board.
++ *
++ * Once we have axp223 support we should switch to fully supporting otg.
++ */
++&usb_otg {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usbphy {
++	status = "okay";
++};
+-- 
+2.4.3
