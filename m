@@ -1,38 +1,45 @@
-From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Thu, 10 Sep 2015 10:31:21 +0200
-Subject: [PATCH v2 5/5] dts: sunxi: add eeprom to A20 OLinuXino micro board
-In-Reply-To: <1441873881-3665-1-git-send-email-o.schinagl@ultimaker.com>
-References: <1441873881-3665-1-git-send-email-o.schinagl@ultimaker.com>
-Message-ID: <1441873881-3665-6-git-send-email-o.schinagl@ultimaker.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 10 Sep 2015 11:37:30 +0300
+Subject: [PATCH 01/21] ARM: common: edma: Fix channel parameter for irq
+ callbacks
+In-Reply-To: <1441874270-2399-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1441874270-2399-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1441874270-2399-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Olliver Schinagl <oliver@schinagl.nl>
+In case when the interrupt happened for the second eDMA the channel
+number was incorrectly passed to the client driver.
 
-The Olimex A20 OLinuXino Micro features an eeprom that is always on the
-board. This patch adds it to the dts.
-
-Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+CC: <stable@vger.kernel.org>
 ---
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/common/edma.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index 00f8f25..f2816dd 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -125,6 +125,12 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_pins_a>;
- 	status = "okay";
-+
-+	eeprom: eeprom at 50 {
-+		compatible = "atmel,24c16";
-+		reg = <0x50>;
-+		pagesize = <16>;
-+	};
- };
- 
- &i2c2 {
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 873dbfcc7dc9..56fc339571f9 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -406,7 +406,8 @@ static irqreturn_t dma_irq_handler(int irq, void *data)
+ 					BIT(slot));
+ 			if (edma_cc[ctlr]->intr_data[channel].callback)
+ 				edma_cc[ctlr]->intr_data[channel].callback(
+-					channel, EDMA_DMA_COMPLETE,
++					EDMA_CTLR_CHAN(ctlr, channel),
++					EDMA_DMA_COMPLETE,
+ 					edma_cc[ctlr]->intr_data[channel].data);
+ 		}
+ 	} while (sh_ipr);
+@@ -460,7 +461,8 @@ static irqreturn_t dma_ccerr_handler(int irq, void *data)
+ 					if (edma_cc[ctlr]->intr_data[k].
+ 								callback) {
+ 						edma_cc[ctlr]->intr_data[k].
+-						callback(k,
++						callback(
++						EDMA_CTLR_CHAN(ctlr, k),
+ 						EDMA_DMA_CC_ERROR,
+ 						edma_cc[ctlr]->intr_data
+ 						[k].data);
 -- 
-2.1.4
+2.5.1
