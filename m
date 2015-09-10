@@ -1,29 +1,38 @@
-From: suravee.suthikulpanit@amd.com (Suthikulpanit, Suravee)
-Date: Thu, 10 Sep 2015 09:48:25 +0700
-Subject: [PATCH V3 0/4] PCI: ACPI: Setting up DMA coherency for PCI device
- from _CCA attribute
-In-Reply-To: <8172790.rR5Ld4j83C@vostro.rjw.lan>
-References: <1440597279-11802-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <55F02331.2060001@amd.com> <8172790.rR5Ld4j83C@vostro.rjw.lan>
-Message-ID: <55F0EF79.3090202@amd.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Wed,  9 Sep 2015 21:10:59 -0700
+Subject: [PATCH 03/17] thermal: rockchip: allow compile test
+In-Reply-To: <1441858273-4017-1-git-send-email-edubezval@gmail.com>
+References: <1441858273-4017-1-git-send-email-edubezval@gmail.com>
+Message-ID: <1441858273-4017-4-git-send-email-edubezval@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+Adding COMPILE_TEST flag to rockchip driver to facilitate
+maintenance.
 
-On 9/10/2015 3:38 AM, Rafael J. Wysocki wrote:
-> On Wednesday, September 09, 2015 07:16:49 PM Suthikulpanit, Suravee wrote:
->> >Hi All,
->> >
->> >Are there any other concerns about this patch series?
-> I have none, but then it sort of missed the merge window.
->
-> I can easily queue it up for the next one unless it is super-urgent,
-> but in that case I need to know why that's the case.
->
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: linux-pm at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
+---
+ drivers/thermal/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This is not urgent. This mainly needed to enable the ACPI PCI supports 
-for ARM64 which is still work in progress.
-
-Thanks,
-Suravee
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index 0334886..2e0aaee 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -190,7 +190,7 @@ config SPEAR_THERMAL
+ 
+ config ROCKCHIP_THERMAL
+ 	tristate "Rockchip thermal driver"
+-	depends on ARCH_ROCKCHIP
++	depends on ARCH_ROCKCHIP || COMPILE_TEST
+ 	depends on RESET_CONTROLLER
+ 	help
+ 	  Rockchip thermal driver provides support for Temperature sensor
+-- 
+2.5.0
