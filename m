@@ -1,158 +1,58 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 10 Sep 2015 14:58:25 -0700
-Subject: [PATCH v2 4/4] ARM: bcm2835: Switch to using the new clock driver
- support.
-In-Reply-To: <1441922305-2298-1-git-send-email-eric@anholt.net>
-References: <1441922305-2298-1-git-send-email-eric@anholt.net>
-Message-ID: <1441922305-2298-4-git-send-email-eric@anholt.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 10 Sep 2015 15:06:20 -0700
+Subject: [PATCH] spmi: Auto-populate driver.owner in spmi_driver_register()
+Message-ID: <1441922780-14467-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will give us the ability to set the pixel and HDMI state machine
-clocks for the VC4 KMS driver, change the CPU frequency, and
-potentially gate clocks in the future (once we also write a power
-domain driver).  It also gives the uart an explicit clock reference,
-so that we don't need to change the physical addresses of the old
-fixed clk_bcm2835.c clocks for Raspberry Pi 2 port.
+Populate the owner field of the spmi driver when
+spmi_driver_register() is called in a similar fashion to how
+other *_driver_register() functions do it. This saves driver
+writers from having to do this themselves.
 
-Two clocks get their frequencies updated as a result of this.  One is
-uart's apb_pclk, which was previously accidentally grabbing the fixed
-uart0_pclk due to the apb_pclk not having clk_register_clkdev()
-called.  The uart doesn't seem to do anything with apb_pclk other than
-make sure it's on, so that appears safe (also, as far as I can see,
-the apb clock is actually the same as the VPU clock).  The other is
-EMMC, which according to the docs was supposed to be in the 50-100Mhz
-range, but it turns out the firmware needed to change to running it at
-the 250Mhz core clock speed to avoid a bug in clock domain crossing.
-
-Additionally, anything using BCM2835_CLOCK_VPU will now have a correct
-clock rate if the user configures the boot-time core clock speed using
-config.txt.
-
-Signed-off-by: Eric Anholt <eric@anholt.net>
+Cc: Andy Gross <agross@codeaurora.org>
+Cc: Gilad Avidov <gavidov@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/boot/dts/bcm2835.dtsi | 52 +++++++++++++++++++++++-------------------
- 1 file changed, 28 insertions(+), 24 deletions(-)
+ drivers/spmi/spmi.c  | 5 +++--
+ include/linux/spmi.h | 4 +++-
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 301c73f..a6a55b7 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -1,4 +1,5 @@
- #include <dt-bindings/pinctrl/bcm2835.h>
-+#include <dt-bindings/clock/bcm2835.h>
- #include "skeleton.dtsi"
+diff --git a/drivers/spmi/spmi.c b/drivers/spmi/spmi.c
+index 11467e17bdd8..6b3da1bb0d63 100644
+--- a/drivers/spmi/spmi.c
++++ b/drivers/spmi/spmi.c
+@@ -560,12 +560,13 @@ EXPORT_SYMBOL_GPL(spmi_controller_remove);
+  * This API will register the client driver with the SPMI framework.
+  * It is typically called from the driver's module-init function.
+  */
+-int spmi_driver_register(struct spmi_driver *sdrv)
++int __spmi_driver_register(struct spmi_driver *sdrv, struct module *owner)
+ {
+ 	sdrv->driver.bus = &spmi_bus_type;
++	sdrv->driver.owner = owner;
+ 	return driver_register(&sdrv->driver);
+ }
+-EXPORT_SYMBOL_GPL(spmi_driver_register);
++EXPORT_SYMBOL_GPL(__spmi_driver_register);
  
- / {
-@@ -21,6 +22,10 @@
- 			compatible = "brcm,bcm2835-system-timer";
- 			reg = <0x7e003000 0x1000>;
- 			interrupts = <1 0>, <1 1>, <1 2>, <1 3>;
-+			/* This could be a reference to BCM2835_CLOCK_TIMER,
-+			 * but we don't have the driver using the common clock
-+			 * support yet.
-+			 */
- 			clock-frequency = <1000000>;
- 		};
+ static void __exit spmi_exit(void)
+ {
+diff --git a/include/linux/spmi.h b/include/linux/spmi.h
+index f84212cd3b7d..1396a255d2a2 100644
+--- a/include/linux/spmi.h
++++ b/include/linux/spmi.h
+@@ -153,7 +153,9 @@ static inline struct spmi_driver *to_spmi_driver(struct device_driver *d)
+ 	return container_of(d, struct spmi_driver, driver);
+ }
  
-@@ -57,6 +62,17 @@
- 			reg = <0x7e100000 0x28>;
- 		};
+-int spmi_driver_register(struct spmi_driver *sdrv);
++#define spmi_driver_register(sdrv) \
++	__spmi_driver_register(sdrv, THIS_MODULE)
++int __spmi_driver_register(struct spmi_driver *sdrv, struct module *owner);
  
-+		clocks: cprman at 7e101000 {
-+			compatible = "brcm,bcm2835-cprman";
-+			#clock-cells = <1>;
-+			reg = <0x7e101000 0x2000>;
-+
-+			/* CPRMAN derives everything from the platform's
-+			 * oscillator.
-+			 */
-+			clocks = <&clk_osc>;
-+		};
-+
- 		rng at 7e104000 {
- 			compatible = "brcm,bcm2835-rng";
- 			reg = <0x7e104000 0x10>;
-@@ -96,7 +112,9 @@
- 			compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
- 			reg = <0x7e201000 0x1000>;
- 			interrupts = <2 25>;
--			clock-frequency = <3000000>;
-+			clocks = <&clocks BCM2835_CLOCK_UART>,
-+				 <&clocks BCM2835_CLOCK_VPU>;
-+			clock-names = "uartclk", "apb_pclk";
- 			arm,primecell-periphid = <0x00241011>;
- 		};
- 
-@@ -115,7 +133,7 @@
- 			compatible = "brcm,bcm2835-spi";
- 			reg = <0x7e204000 0x1000>;
- 			interrupts = <2 22>;
--			clocks = <&clk_spi>;
-+			clocks = <&clocks BCM2835_CLOCK_VPU>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
-@@ -125,7 +143,7 @@
- 			compatible = "brcm,bcm2835-i2c";
- 			reg = <0x7e205000 0x1000>;
- 			interrupts = <2 21>;
--			clocks = <&clk_i2c>;
-+			clocks = <&clocks BCM2835_CLOCK_VPU>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
-@@ -135,7 +153,7 @@
- 			compatible = "brcm,bcm2835-sdhci";
- 			reg = <0x7e300000 0x100>;
- 			interrupts = <2 30>;
--			clocks = <&clk_mmc>;
-+			clocks = <&clocks BCM2835_CLOCK_EMMC>;
- 			status = "disabled";
- 		};
- 
-@@ -143,7 +161,7 @@
- 			compatible = "brcm,bcm2835-i2c";
- 			reg = <0x7e804000 0x1000>;
- 			interrupts = <2 21>;
--			clocks = <&clk_i2c>;
-+			clocks = <&clocks BCM2835_CLOCK_VPU>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
-@@ -165,28 +183,14 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		clk_mmc: clock at 0 {
--			compatible = "fixed-clock";
--			reg = <0>;
--			#clock-cells = <0>;
--			clock-output-names = "mmc";
--			clock-frequency = <100000000>;
--		};
--
--		clk_i2c: clock at 1 {
-+		/* The oscillator is the root of the clock tree. */
-+		clk_osc: clock at 3 {
- 			compatible = "fixed-clock";
--			reg = <1>;
-+			reg = <3>;
- 			#clock-cells = <0>;
--			clock-output-names = "i2c";
--			clock-frequency = <250000000>;
-+			clock-output-names = "osc";
-+			clock-frequency = <19200000>;
- 		};
- 
--		clk_spi: clock at 2 {
--			compatible = "fixed-clock";
--			reg = <2>;
--			#clock-cells = <0>;
--			clock-output-names = "spi";
--			clock-frequency = <250000000>;
--		};
- 	};
- };
+ /**
+  * spmi_driver_unregister() - unregister an SPMI client driver
 -- 
-2.1.4
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
