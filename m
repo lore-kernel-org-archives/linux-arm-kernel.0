@@ -1,31 +1,38 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Thu, 10 Sep 2015 13:29:41 +0200
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <20150910104930.GI21084@n2100.arm.linux.org.uk> (Russell King's
- message of "Thu, 10 Sep 2015 11:49:30 +0100")
-References: <m3bnde5whx.fsf@t19.piap.pl>
- <20150907112555.GS21084@n2100.arm.linux.org.uk>
- <m37fo25nrl.fsf@t19.piap.pl>
- <20150908091625.GV21084@n2100.arm.linux.org.uk>
- <m3y4gh41k4.fsf@t19.piap.pl>
- <20150908125756.GY21084@n2100.arm.linux.org.uk>
- <m3a8su4llv.fsf@t19.piap.pl>
- <20150910104930.GI21084@n2100.arm.linux.org.uk>
-Message-ID: <m3613i4imy.fsf@t19.piap.pl>
+From: andrew@fubar.geek.nz (Andrew Turner)
+Date: Thu, 10 Sep 2015 12:32:51 +0100
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20150910123251.7e0810d1@bender.Home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+On Thu, 10 Sep 2015 16:41:56 +0800
+Shannon Zhao <zhaoshenglong@huawei.com> wrote:
 
->>From a quick read of the imx-drm ipuv3-plane code, it looks like it
-> doesn't bother with the U/V planes for planar images.  Nothing looks
-> at fb->offsets[1,2] nor fb->pitches[1,2].  However, it claims to
-> support DRM_FORMAT_YUV420 and DRM_FORMAT_YVU420 formats - which is
-> wrong if it doesn't look at these other offsets and pitches.
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> These EFI stub parameters are used to internal communication between
+> EFI stub and Linux kernel and EFI stub creates these parameters. But
+> for Xen on ARM when booting with UEFI, Xen will create a minimal DT
+> providing these parameters for Dom0 and Dom0 is not only Linux
+> kernel, but also other OS (such as FreeBSD) which will be used in the
+> future. So here we plan to standardize the names by dropping the
+> prefix "linux," and make them common to other OS. Also this will not
+> break the compatibility since these parameters are used to internal
+> communication between EFI stub and kernel.
 
-Well... I have to agree.
--- 
-Krzysztof Halasa
+It is unlikely FreeBSD will use this property when booting ad Xen dom0.
+The kernel expects to be passed a data structure to find boot this
+information.
 
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+My preference would be to have the FreeBSD loader load the xen binary,
+the FreeBSD kernel, and set up these data structs before passing
+control to Xen, with the information it needs to boot the kernel. My
+understanding is this is how it is done on x86.
+
+I can see a few issues with this where, for example, the device tree or
+ACPI tables need to be modified, but these should be solvable.
+
+Andrew
