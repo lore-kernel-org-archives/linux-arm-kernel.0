@@ -1,171 +1,118 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Thu, 10 Sep 2015 13:53:01 -0700
-Subject: [PATCH v7 1/2] usb: make xhci platform driver use 64 bit or 32
- bit DMA
-In-Reply-To: <55E591E9.60008@linux.intel.com>
-References: <1522889.9kdnRk8vHo@wuerfel>
- <69e6f5bf693d02fba001d02047453bed0519499d.1440098398.git.dhdang@apm.com>
- <CADaLNDnPaeHcMjywsuQ4oiUpWsNpStshdKVtW=tuUorrcQkZ=g@mail.gmail.com>
- <55E591E9.60008@linux.intel.com>
-Message-ID: <CADaLNDno0cLXH3_4NG75fk6T31Pe5BCrbcUpA0cGriCwSh6OyQ@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 10 Sep 2015 14:29:38 -0700
+Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
+ v4.3-rc1
+In-Reply-To: <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
+References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
+ <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
+ <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
+ <20150819091358.GA26627@ulmo>
+ <1439977724.4135.90.camel@collabora.co.uk>
+ <20150819103305.GF26627@ulmo>
+ <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
+Message-ID: <CAMAWPa_rus4z+Sg3Uff7ndqrpB8dF1c1rQBVQ9r7vXh6PFcVkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 1, 2015 at 4:54 AM, Mathias Nyman
-<mathias.nyman@linux.intel.com> wrote:
-> On 31.08.2015 21:58, Duc Dang wrote:
+On Thu, Sep 3, 2015 at 4:08 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
+> Hi Thierry,
+>
+> On 19 August 2015 at 03:33, Thierry Reding <thierry.reding@gmail.com> wrote:
+>> On Wed, Aug 19, 2015 at 11:48:44AM +0200, Sjoerd Simons wrote:
+>>> On Wed, 2015-08-19 at 11:14 +0200, Thierry Reding wrote:
+>>> > On Tue, Aug 18, 2015 at 03:30:41PM -0700, Tyler Baker wrote:
+>>> > > Hi Theirry,
+>>> > >
+>>> > >
+>>> > > This isn't where the story ends unfortunately. The collabora lab
+>>> > > also
+>>> > > has a jetson-tk1, booted in the same manner, which boots next
+>>> > > -20150818
+>>> > > fine[4]. The only differences I can spot in the two boot logs is
+>>> > > that
+>>> > > the collabora board is using an older version of u-boot, where as
+>>> > > my
+>>> > > board is using a newer version. U-Boot 2015.01-00231-gab77f24-dirty
+>>> > > (Good) vs U-Boot 2015.07-00130-gb217c89 (Bad).
+>>>
+>>> Our 2015.01-00231-gab77f24-dirty is 2015.01-00231-gab77f24 + changes
+>>> which got merged as 053b86e6d8e50359412e626c33bae3f7bafd74dd in
+>>> upstream u-boot.
+>>>
+>>> Fwiw:
+>>> $ git show 2015.01-00231-gab77f24
+>>> commit ab77f24119e80257de4ab017b877f92f96980562
+>>> Merge: d928664 fa58b10
+>>> Author: Tom Rini <trini@ti.com>
+>>> Date:   Thu Jan 15 14:05:31 2015 -0500
+>>>
+>>>     Merge branch 'master' of git://git.denx.de/u-boot-ti
+>>>
+>>> Which is definately a commit you should hae in your upstream u-boot
+>>> tree.
 >>
->> On Thu, Aug 20, 2015 at 12:38 PM, Duc Dang <dhdang@apm.com> wrote:
->>>
->>> The xhci platform driver needs to work on systems that
->>> either only support 64-bit DMA or only support 32-bit DMA.
->>> Attempt to set a coherent dma mask for 64-bit DMA, and
->>> attempt again with 32-bit DMA if that fails.
->>>
->>> [dhdang: regenerate the patch over 4.2-rc5 and address new comments]
->>> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
->>> Tested-by: Mark Salter <msalter@redhat.com>
->>> Signed-off-by: Duc Dang <dhdang@apm.com>
->>>
->>> ---
->>> Changes from v6:
->>>          -Add WARN_ON if dma_mask is NULL
->>>          -Use dma_coerce_mask_and_coherent to assign
->>>          dma_mask and coherent_dma_mask
->>>
->>> Changes from v5:
->>>          -Change comment
->>>          -Assign dma_mask to coherent_dma_mask if dma_mask is NULL
->>>          to make sure dma_set_mask_and_coherent does not fail
->>> prematurely.
->>>
->>> Changes from v4:
->>>          -None
->>>
->>> Changes from v3:
->>>          -Re-generate the patch over 4.2-rc5
->>>          -No code change.
->>>
->>> Changes from v2:
->>>          -None
->>>
->>> Changes from v1:
->>>          -Consolidated to use dma_set_mask_and_coherent
->>>          -Got rid of the check against sizeof(dma_addr_t)
->>>
->>>   drivers/usb/host/xhci-plat.c | 21 +++++++++++++--------
->>>   1 file changed, 13 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
->>> index 890ad9d..e4c7f9d 100644
->>> --- a/drivers/usb/host/xhci-plat.c
->>> +++ b/drivers/usb/host/xhci-plat.c
->>> @@ -93,14 +93,19 @@ static int xhci_plat_probe(struct platform_device
->>> *pdev)
->>>          if (irq < 0)
->>>                  return -ENODEV;
->>>
->>> -       /* Initialize dma_mask and coherent_dma_mask to 32-bits */
->>> -       ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
->>> -       if (ret)
->>> -               return ret;
->>> -       if (!pdev->dev.dma_mask)
->>> -               pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
->>> -       else
->>> -               dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
->>> +       /* Throw a waring if broken platform code didn't initialize
->>> dma_mask */
->>> +       WARN_ON(!pdev->dev.dma_mask);
->>> +       /*
->>> +        * Try setting dma_mask and coherent_dma_mask to 64 bits,
->>> +        * then try 32 bits
->>> +        */
->>> +       ret = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
->>> +       if (ret) {
->>> +               ret = dma_coerce_mask_and_coherent(&pdev->dev,
->>> +                                                  DMA_BIT_MASK(32));
->>> +               if (ret)
->>> +                       return ret;
->>> +       }
->>>
->>>          hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
->>>          if (!hcd)
->>> --
->>> 1.9.1
->>>
+>> Yeah, I suck. I was running:
 >>
->> Hi Greg, Arnd, Russell,
+>>         $ git show gab77f24
 >>
->> Do you have any more comment about this patch set?
+>> I didn't know git could parse the full output from git describe.
 >>
+>>> > I don't have either of those commits in any of the U-Boot trees I
+>>> > have.
+>>> > Perhaps whatever tree this comes from has local patches that cause
+>>> > the
+>>> > breakage? The version that I use a recent upstream U-Boot with some
+>>> > local patches, none of which should impact Jetson TK1 in any way.
+>>> > Just
+>>> > to make sure I tried running latest origin/master, which identifies
+>>> > thusly:
+>>> >
+>>> >     U-Boot 2015.10-rc2-00040-g0f9258228e2b
+>>> >
+>>> > And that boots next-20150818 fine.
+>>>
+>>> Probably worth for tyler to test that u-boot commit on his jetson to
+>>> see if that solves the issue he's having...
+>>
+>> I've tried reconstructing the version that Tyler is running by checking
+>> out 2015.01-00231-gab77f24 and applying 053b86e6d8e5 ("pci: tegra: Fix
+>> port information parsing") on top, but that also leaves me with a
+>> bootable system, so no way of reproducing. I agree that upgrading to a
+>> more recent U-Boot version sounds like the best way forward because it
+>> has already proven to work on at least two setups.
 >
-> I'm not sure I fully understand why we need to try the 64 bit DMA mask in
-> platform probe.
+> Sorry for the delay. I've upgraded u-boot to U-Boot
+> 2015.10-rc2-00439-g03d8714 using the tegra u-boot flashing scripts.
+> FWIW, I did have to revert 620776d734e4 ("tftp: adjust settings to be
+> suitable for 100Mbit ethernet") to get TFTP working again.
 >
-> As I understood it we just want to have some DMA mask set before calling
-> usb_create_hcd()
-> to make sure USB core gets the "uses_dma" flag set and dma_set_mask() won't
-> fail because of
-> missing dev->dma_mask.
->
-> The correct DMA mask is set later in xhci_gen_setup()
->
-> We also need to make sure the controller supports 64bit addressing
-> capability before setting a 64 bit DMA mask.
-> (bit 0 in HCCPARAMS)
->
-> So for platform devices it goes look go this:
->
-> xhci_plat_probe()
->   usb_create_hcd()
->     usb_create_shared_hcd()
->       hcd->self.uses_dma = (dev->dma_mask != NULL);
->   usb_add_hcd()
->     hcd->driver->reset()  (.reset = xhci_plat_setup)
->       xhci_plat_setup()
->         xhci_gen_setup()
->           if (HCC_64BIT_ADDR(xhci->hcc_params) && !dma_set_mask(dev,
-> DMA_BIT_MASK(64))) {
->             xhci_dbg(xhci, "Enabling 64-bit DMA addresses.\n");
->             dma_set_coherent_mask(dev, DMA_BIT_MASK(64));
->           }
->
-> or do we end up with dev->dma_mask = NULL on 64-bit DMA only after trying to
-> set it to 32 in xhci_plat_probe(),
-> and thus also failing the dma_set_mask() in xhci_gen_setup()?
->
+> Anyways, it hangs at the exact same spot[1] with the newer version of
+> u-boot. If remove the modules from the initrd or just disable
+> CONFIG_SND_HDA_TEGRA it boots fine. This weekend I'll try to debug
+> this module manually and see if I draw any conclusions.
 
-Hi Mathias,
+Since there is no movement on this, and jetson hasn't been boot for
+multi_v7_defconfig for a while[1], I think it's time to undo the
+option causing this problem[2] so that v4.3 will actually boot on the
+jetson.
 
-dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32)) in xhci_plat_probe
-fails on our Arm64 X-Gene platform as we do not have DMA memory below 4GB. As a
-consequence, xhci_plat_probe exits very early without creating any hcd.
+Unless I hear a good reason otherwise, I'll be posting a patch to
+disable the HDA related options in multi_v7_defconfig.
 
-The xhci_gen_setup code assumes that the dma_mask and
-coherent_dma_mask were already
-set to DMA_BIT_MASK(32) and only check to switch to DMA_BIT_MASK(64)
-if the controller
-supports 64-bit DMA. So I also see possible regression if a 32-bit
-controller is used on 64-bit
-system with my patch.
+Kevin
 
-I will integrate Russell's suggestion and add changes to address the
-case of 32-bit controller on 64-bit system
-in my next version of this patch set.
-
-> -Mathias
->
->
->
->
->
->
->
->
->
->
-
-
-Regards,
--- 
-Duc Dang.
+[1] http://kernelci.org/boot/tegra124-jetson-tk1/?multi_v7_defconfig
+[2]
+diff --git a/arch/arm/configs/multi_v7_defconfig
+b/arch/arm/configs/multi_v7_defconfig
+index b2facab..a285afe 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -468,7 +468,6 @@ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
+ CONFIG_SOUND=m
+ CONFIG_SND=m
+ CONFIG_SND_DYNAMIC_MINORS=y
+-CONFIG_SND_HDA_TEGRA=m
+ CONFIG_SND_HDA_INPUT_BEEP=y
+ CONFIG_SND_HDA_PATCH_LOADER=y
+ CONFIG_SND_HDA_CODEC_REALTEK=m
