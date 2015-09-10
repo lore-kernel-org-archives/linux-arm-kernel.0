@@ -1,16 +1,36 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Thu, 10 Sep 2015 15:22:27 -0700
-Subject: BCM2835 auxiliary peripheral clocks.
-Message-ID: <1441923750-19404-1-git-send-email-eric@anholt.net>
+Date: Thu, 10 Sep 2015 15:22:30 -0700
+Subject: [PATCH 3/3] ARM: bcm2835: Add the auxiliary clocks to the device tree.
+In-Reply-To: <1441923750-19404-1-git-send-email-eric@anholt.net>
+References: <1441923750-19404-1-git-send-email-eric@anholt.net>
+Message-ID: <1441923750-19404-4-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a followup to the main audio domain clocks series I just
-posted.  There's a clock gate register controlling the clocks for a
-few extra peripherals, and Martin Sperl has been working on the SPI
-driver for 2/3 of them (the other is a simple UART).  This gives those
-drivers the clock gate enable they need to access their registers.
+These will be used for enabling UART1, SPI1, and SPI2.
 
-The full series is available for testing at:
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ arch/arm/boot/dts/bcm2835.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-https://github.com/anholt/linux/tree/bcm2385-clock-aux
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index a6a55b7..7c37956 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -73,6 +73,13 @@
+ 			clocks = <&clk_osc>;
+ 		};
+ 
++		aux_clocks: aux-clocks at 0x7e215004 {
++			compatible = "brcm,bcm2835-aux-clock";
++			#clock-cells = <1>;
++			reg = <0x7e215004 0x4>;
++			clocks = <&clocks BCM2835_CLOCK_VPU>;
++		};
++
+ 		rng at 7e104000 {
+ 			compatible = "brcm,bcm2835-rng";
+ 			reg = <0x7e104000 0x10>;
+-- 
+2.1.4
