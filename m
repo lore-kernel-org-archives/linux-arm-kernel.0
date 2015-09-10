@@ -1,178 +1,123 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 10 Sep 2015 11:37:47 +0300
-Subject: [PATCH 18/21] dmaengine: edma: Consolidate the comments for functions
+Date: Thu, 10 Sep 2015 11:37:38 +0300
+Subject: [PATCH 09/21] ARM: davinci: Add set dma_mask to eDMA devices
 In-Reply-To: <1441874270-2399-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1441874270-2399-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1441874270-2399-19-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1441874270-2399-10-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove or rewrite the comments for the internal functions.
+The upcoming change to merge the arch/arm/common/edma.c into
+drivers/dma/edma.c will need this change when booting daVinci devices in
+no DT mode.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/edma.c | 86 +++++++-----------------------------------------------
- 1 file changed, 11 insertions(+), 75 deletions(-)
+ arch/arm/mach-davinci/devices-da8xx.c | 8 ++++++++
+ arch/arm/mach-davinci/dm355.c         | 8 +++++++-
+ arch/arm/mach-davinci/dm644x.c        | 8 +++++++-
+ arch/arm/mach-davinci/dm646x.c        | 8 +++++++-
+ 4 files changed, 29 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 2c6be4c62a73..f869d130819b 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -486,19 +486,7 @@ static void edma_setup_interrupt(struct edma_cc *ecc, unsigned lch,
- }
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index 9ae049ae816a..495e9293ed2a 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -213,21 +213,29 @@ static struct resource da850_edma1_resources[] = {
+ 	},
+ };
  
- /*
-- * paRAM management functions
-- */
--
--/**
-- * edma_write_slot - write parameter RAM data for slot
-- * @ecc: pointer to edma_cc struct
-- * @slot: number of parameter RAM slot being modified
-- * @param: data to be written into parameter RAM slot
-- *
-- * Use this to assign all parameters of a transfer at once.  This
-- * allows more efficient setup of transfers than issuing multiple
-- * calls to set up those parameters in small pieces, and provides
-- * complete control over all transfer options.
-+ * paRAM slot management functions
-  */
- static void edma_write_slot(struct edma_cc *ecc, unsigned slot,
- 			    const struct edmacc_param *param)
-@@ -509,15 +497,6 @@ static void edma_write_slot(struct edma_cc *ecc, unsigned slot,
- 	memcpy_toio(ecc->base + PARM_OFFSET(slot), param, PARM_SIZE);
- }
++static u64 da8xx_edma0_dmamask = DMA_BIT_MASK(32);
++
+ static struct platform_device da8xx_edma0_device = {
+ 	.name		= "edma",
+ 	.id		= 0,
+ 	.dev = {
+ 		.platform_data = &da8xx_edma0_pdata,
++		.dma_mask = &da8xx_edma0_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
+ 	},
+ 	.num_resources	= ARRAY_SIZE(da8xx_edma0_resources),
+ 	.resource	= da8xx_edma0_resources,
+ };
  
--/**
-- * edma_read_slot - read parameter RAM data from slot
-- * @ecc: pointer to edma_cc struct
-- * @slot: number of parameter RAM slot being copied
-- * @param: where to store copy of parameter RAM data
-- *
-- * Use this to read data from a parameter RAM slot, perhaps to
-- * save them as a template for later reuse.
-- */
- static void edma_read_slot(struct edma_cc *ecc, unsigned slot,
- 			   struct edmacc_param *param)
- {
-@@ -568,15 +547,6 @@ static int edma_alloc_slot(struct edma_cc *ecc, int slot)
- 	return EDMA_CTLR_CHAN(ecc->id, slot);
- }
++static u64 da850_edma1_dmamask = DMA_BIT_MASK(32);
++
+ static struct platform_device da850_edma1_device = {
+ 	.name		= "edma",
+ 	.id		= 1,
+ 	.dev = {
+ 		.platform_data = &da850_edma1_pdata,
++		.dma_mask = &da850_edma1_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
+ 	},
+ 	.num_resources	= ARRAY_SIZE(da850_edma1_resources),
+ 	.resource	= da850_edma1_resources,
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index a50bb9c66952..0f8c0ab48872 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -613,10 +613,16 @@ static struct resource edma_resources[] = {
+ 	/* not using (or muxing) TC*_ERR */
+ };
  
--/**
-- * edma_free_slot - deallocate DMA parameter RAM
-- * @ecc: pointer to edma_cc struct
-- * @slot: parameter RAM slot returned from edma_alloc_slot()
-- *
-- * This deallocates the parameter RAM slot allocated by edma_alloc_slot().
-- * Callers are responsible for ensuring the slot is inactive, and will
-- * not be activated.
-- */
- static void edma_free_slot(struct edma_cc *ecc, unsigned slot)
- {
++static u64 dm355_edma_dmamask = DMA_BIT_MASK(32);
++
+ static struct platform_device dm355_edma_device = {
+ 	.name			= "edma",
+ 	.id			= 0,
+-	.dev.platform_data	= &dm355_edma_pdata,
++	.dev = {
++		.platform_data	= &dm355_edma_pdata,
++		.dma_mask	= &dm355_edma_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++	},
+ 	.num_resources		= ARRAY_SIZE(edma_resources),
+ 	.resource		= edma_resources,
+ };
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index d759ca8e58e8..fc8950e5a9a0 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -542,10 +542,16 @@ static struct resource edma_resources[] = {
+ 	/* not using TC*_ERR */
+ };
  
-@@ -686,10 +656,9 @@ static int edma_start(struct edma_cc *ecc, unsigned channel)
-  * @ecc: pointer to edma_cc struct
-  * @channel: channel being deactivated
-  *
-- * When @lch is a channel, any active transfer is paused and
-- * all pending hardware events are cleared.  The current transfer
-- * may not be resumed, and the channel's Parameter RAM should be
-- * reinitialized before being reused.
-+ * Any active transfer is paused and all pending hardware events are cleared.
-+ * The current transfer may not be resumed, and the channel's Parameter RAM
-+ * should be reinitialized before being reused.
-  */
- static void edma_stop(struct edma_cc *ecc, unsigned channel)
- {
-@@ -721,13 +690,9 @@ static void edma_stop(struct edma_cc *ecc, unsigned channel)
- 	}
- }
++static u64 dm644x_edma_dmamask = DMA_BIT_MASK(32);
++
+ static struct platform_device dm644x_edma_device = {
+ 	.name			= "edma",
+ 	.id			= 0,
+-	.dev.platform_data	= &dm644x_edma_pdata,
++	.dev = {
++		.platform_data	= &dm644x_edma_pdata,
++		.dma_mask	= &dm644x_edma_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++	},
+ 	.num_resources		= ARRAY_SIZE(edma_resources),
+ 	.resource		= edma_resources,
+ };
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index 219ebc8f674a..77df905949bc 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -589,10 +589,16 @@ static struct resource edma_resources[] = {
+ 	/* not using TC*_ERR */
+ };
  
--/**
-- * edma_pause - pause dma on a channel
-- * @ecc: pointer to edma_cc struct
-- * @channel: on which edma_start() has been called
-- *
-- * This temporarily disables EDMA hardware events on the specified channel,
-- * preventing them from triggering new transfers on its behalf
-+/*
-+ * Temporarily disable EDMA hardware events on the specified channel,
-+ * preventing them from triggering new transfers
-  */
- static void edma_pause(struct edma_cc *ecc, unsigned channel)
- {
-@@ -745,13 +710,7 @@ static void edma_pause(struct edma_cc *ecc, unsigned channel)
- 	}
- }
- 
--/**
-- * edma_resume - resumes dma on a paused channel
-- * @ecc: pointer to edma_cc struct
-- * @channel: on which edma_pause() has been called
-- *
-- * This re-enables EDMA hardware events on the specified channel.
-- */
-+/* Re-enable EDMA hardware events on the specified channel.  */
- static void edma_resume(struct edma_cc *ecc, unsigned channel)
- {
- 	if (ecc->id != EDMA_CTLR(channel)) {
-@@ -787,19 +746,6 @@ static int edma_trigger_channel(struct edma_cc *ecc, unsigned channel)
- 	return 0;
- }
- 
--/******************************************************************************
-- *
-- * It cleans ParamEntry qand bring back EDMA to initial state if media has
-- * been removed before EDMA has finished.It is usedful for removable media.
-- * Arguments:
-- *      ch_no     - channel no
-- *
-- * Return: zero on success, or corresponding error no on failure
-- *
-- * FIXME this should not be needed ... edma_stop() should suffice.
-- *
-- *****************************************************************************/
--
- static void edma_clean_channel(struct edma_cc *ecc, unsigned channel)
- {
- 	if (ecc->id != EDMA_CTLR(channel)) {
-@@ -956,14 +902,7 @@ static void edma_free_channel(struct edma_cc *ecc, unsigned channel)
- 	clear_bit(channel, ecc->edma_inuse);
- }
- 
--/*
-- * edma_assign_channel_eventq - move given channel to desired eventq
-- * Arguments:
-- *	channel - channel number
-- *	eventq_no - queue to move the channel
-- *
-- * Can be used to move a channel to a selected event queue.
-- */
-+/* Move channel to a specific event queue */
- static void edma_assign_channel_eventq(struct edma_cc *ecc, unsigned channel,
- 				       enum dma_event_q eventq_no)
- {
-@@ -986,6 +925,7 @@ static void edma_assign_channel_eventq(struct edma_cc *ecc, unsigned channel,
- 	edma_map_dmach_to_queue(ecc, channel, eventq_no);
- }
- 
-+/* eDMA interrupt handler */
- static irqreturn_t dma_irq_handler(int irq, void *data)
- {
- 	struct edma_cc *ecc = data;
-@@ -1037,11 +977,7 @@ static irqreturn_t dma_irq_handler(int irq, void *data)
- 	return IRQ_HANDLED;
- }
- 
--/******************************************************************************
-- *
-- * DMA error interrupt handler
-- *
-- *****************************************************************************/
-+/* eDMA error interrupt handler */
- static irqreturn_t dma_ccerr_handler(int irq, void *data)
- {
- 	struct edma_cc *ecc = data;
++static u64 dm646x_edma_dmamask = DMA_BIT_MASK(32);
++
+ static struct platform_device dm646x_edma_device = {
+ 	.name			= "edma",
+ 	.id			= 0,
+-	.dev.platform_data	= &dm646x_edma_pdata,
++	.dev = {
++		.platform_data	= &dm646x_edma_pdata,
++		.dma_mask	= &dm646x_edma_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++	},
+ 	.num_resources		= ARRAY_SIZE(edma_resources),
+ 	.resource		= edma_resources,
+ };
 -- 
 2.5.1
