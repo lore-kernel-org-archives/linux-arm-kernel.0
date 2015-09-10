@@ -1,166 +1,67 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 10 Sep 2015 20:50:10 +0200
-Subject: [PATCH 2/4] devicetree: bindings: Add header file with evdev type
- and abs/rel code defines
-In-Reply-To: <CAKdAkRSpsze_EjaQ3Rre_wjN7dWJ3XNvkt9S=CMktEsNXGYg_w@mail.gmail.com>
-References: <1441789886-5868-1-git-send-email-hdegoede@redhat.com>
- <1441789886-5868-2-git-send-email-hdegoede@redhat.com>
- <55F1BCFA.5010404@kernel.org>
- <CAKdAkRRFcn5+SXNfU4J+v4tcFyA1mZR1hMhT2y3QJeQJ1tTDYQ@mail.gmail.com>
- <55F1CE8B.5050302@redhat.com>
- <CAKdAkRSpsze_EjaQ3Rre_wjN7dWJ3XNvkt9S=CMktEsNXGYg_w@mail.gmail.com>
-Message-ID: <55F1D0E2.6010805@redhat.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 10 Sep 2015 21:01:41 +0200
+Subject: [PATCH] ARM: fix alignement of __bug_table section entries
+In-Reply-To: <87mvwvurae.fsf@belgarion.home> (Robert Jarzmik's message of
+ "Thu, 10 Sep 2015 01:06:01 +0200")
+References: <20150902103955.GF6281@e103592.cambridge.arm.com>
+ <878u8lx9hl.fsf@belgarion.home>
+ <20150905142519.GN21084@n2100.arm.linux.org.uk>
+ <87y4gkx04m.fsf@belgarion.home>
+ <20150905203818.GO21084@n2100.arm.linux.org.uk>
+ <87lhcjwjde.fsf@belgarion.home>
+ <20150906194805.GP21084@n2100.arm.linux.org.uk>
+ <87egibw7yh.fsf@belgarion.home>
+ <20150906235414.GQ21084@n2100.arm.linux.org.uk>
+ <877fo0x2ur.fsf@belgarion.home>
+ <20150908200809.GC21084@n2100.arm.linux.org.uk>
+ <87mvwvurae.fsf@belgarion.home>
+Message-ID: <87egi6umi2.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-On 10-09-15 20:42, Dmitry Torokhov wrote:
-> On Thu, Sep 10, 2015 at 11:40 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->>
->> On 10-09-15 20:34, Dmitry Torokhov wrote:
->>>
->>> On Thu, Sep 10, 2015 at 10:25 AM, Rob Herring <robh@kernel.org> wrote:
->>>>
->>>> On 09/09/2015 04:11 AM, Hans de Goede wrote:
->>>>>
->>>>> This header provides evdev constants for linux,code, and linux,input-*
->>>>> properties.
->>>>>
->>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>>> ---
->>>>>    include/dt-bindings/input/evdev.h | 76
->>>>> +++++++++++++++++++++++++++++++++++++++
->>>>
->>>>
->>>> This looks fine, but please just add to input/input.h.
->>>>
->>>> Rob
->>>>
->>>>>    1 file changed, 76 insertions(+)
->>>>>    create mode 100644 include/dt-bindings/input/evdev.h
->>>>>
->>>>> diff --git a/include/dt-bindings/input/evdev.h
->>>>> b/include/dt-bindings/input/evdev.h
->>>>> new file mode 100644
->>>>> index 0000000..c1f7e0d
->>>>> --- /dev/null
->>>>> +++ b/include/dt-bindings/input/evdev.h
->>>>> @@ -0,0 +1,76 @@
->>>>> +/*
->>>>> + * This header provides evdev constants for linux,code, and
->>>>> linux,input-*
->>>>> + * properties.
->>>>> + */
->>>>> +
->>>>> +#ifndef _DT_BINDINGS_INPUT_LINUX_H
->>>>> +#define _DT_BINDINGS_INPUT_LINUX_H
->>>>> +
->>>>> +/*
->>>>> + * Event types
->>>>> + */
->>>>> +
->>>>> +#define EV_SYN                       0x00
->>>>> +#define EV_KEY                       0x01
->>>>> +#define EV_REL                       0x02
->>>>> +#define EV_ABS                       0x03
->>>>> +#define EV_MSC                       0x04
->>>>> +#define EV_SW                        0x05
->>>>> +#define EV_LED                       0x11
->>>>> +#define EV_SND                       0x12
->>>>> +#define EV_REP                       0x14
->>>>> +#define EV_FF                        0x15
->>>>> +#define EV_PWR                       0x16
->>>>> +#define EV_FF_STATUS         0x17
->>>>> +#define EV_MAX                       0x1f
->>>>> +
->>>>> +/*
->>>>> + * Relative axes
->>>>> + */
->>>>> +
->>>>> +#define REL_X                        0x00
->>>>> +#define REL_Y                        0x01
->>>>> +#define REL_Z                        0x02
->>>>> +#define REL_RX                       0x03
->>>>> +#define REL_RY                       0x04
->>>>> +#define REL_RZ                       0x05
->>>>> +#define REL_HWHEEL           0x06
->>>>> +#define REL_DIAL             0x07
->>>>> +#define REL_WHEEL            0x08
->>>>> +#define REL_MISC             0x09
->>>>> +#define REL_MAX                      0x0f
->>>>> +
->>>>> +/*
->>>>> + * Absolute axes
->>>>> + */
->>>>> +
->>>>> +#define ABS_X                        0x00
->>>>> +#define ABS_Y                        0x01
->>>>> +#define ABS_Z                        0x02
->>>>> +#define ABS_RX                       0x03
->>>>> +#define ABS_RY                       0x04
->>>>> +#define ABS_RZ                       0x05
->>>>> +#define ABS_THROTTLE         0x06
->>>>> +#define ABS_RUDDER           0x07
->>>>> +#define ABS_WHEEL            0x08
->>>>> +#define ABS_GAS                      0x09
->>>>> +#define ABS_BRAKE            0x0a
->>>>> +#define ABS_HAT0X            0x10
->>>>> +#define ABS_HAT0Y            0x11
->>>>> +#define ABS_HAT1X            0x12
->>>>> +#define ABS_HAT1Y            0x13
->>>>> +#define ABS_HAT2X            0x14
->>>>> +#define ABS_HAT2Y            0x15
->>>>> +#define ABS_HAT3X            0x16
->>>>> +#define ABS_HAT3Y            0x17
->>>>> +#define ABS_PRESSURE         0x18
->>>>> +#define ABS_DISTANCE         0x19
->>>>> +#define ABS_TILT_X           0x1a
->>>>> +#define ABS_TILT_Y           0x1b
->>>>> +#define ABS_TOOL_WIDTH               0x1c
->>>>> +
->>>>> +#define ABS_VOLUME           0x20
->>>>> +
->>>>> +#define ABS_MISC             0x28
->>>>> +
->>>>> +#endif /* _DT_BINDINGS_INPUT_LINUX_H */
->>>>>
->>>>
->>>
->>> Actually I'd rather we removed include/dt-bindings/input/input.h and
->>> instead used the header file from uapi. As it is now we already
->>> duplicating definitions and the copy in dt-bindings is missing several
->>> key codes. Until we split DT bindings form the kernel code I'd rather
->>> have definitions in one place.
->>
->>
->> AFAIK we cannot do that as the uapi header also contains things like:
->>
->> struct input_event {
->>          struct timeval time;
->>          __u16 type;
->>          __u16 code;
->>          __s32 value;
->> };
->>
->> Which is not valid device tree syntax.
->>
->> If you want this we need to split the uapi headers in one with only
->> defines and one with all the rest.
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 >
-> That would be fine by me. event-codes.h?
+>> On Tue, Sep 08, 2015 at 07:01:00PM +0200, Robert Jarzmik wrote:
+>>> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>> At the point we call into this code, the DACR should be 0x75, which
+>> should allow us to read the instruction at 0xbf00202c.  But this is
+>> failing with a permission error - which it would do if it thought
+>> the kernel domain was in manager mode (iow, 0x55).
+>
+> Okay Russell, I have a good idea what's happening now. Basically, it boils down
+> to compiler optimization of get_domain() which is called twice (set_fs() ->
+> modify_domain() -> get_domain()). See the piece in [1] for a more complete
+> explanation.
+>
+> I still haven't finished my work, as I need to disassemble the do_alignment()
+And I have the proof of gcc optimization, which I'll add to the commit message
+if you want :
+00000728 <do_alignment>:
+     ...
+     770:	ee134f10 	mrc	15, 0, r4, cr3, cr0, {0}
+     ... no r4 or mrc/mcr usage
+     788:	e3842030 	orr	r2, r4, #48	; 0x30
+     ... no r2/r4 or mrc/mcr usage
+     794:	ee032f10 	mcr	15, 0, r2, cr3, cr0, {0}
+     798:	ee07cf95 	mcr	15, 0, ip, cr7, cr5, {4}
+     ... no r4 or mrc/mcr usage
+     7ac:	e3c4300c 	bic	r3, r4, #12
+     7b0:	e3833004 	orr	r3, r3, #4
+     7b4:	ee033f10 	mcr	15, 0, r3, cr3, cr0, {0}
+     ... no mrc/mcr usage
+     7cc:	ebfffffe 	bl	0 <arm_copy_from_user>
 
-Since this will live in the generic include/linux namespace (for userspace)
-maybe input-event-codes ?
+Here, we have in probe_kernel_address() in do_alignment():
+ - @770 : r4 = DACR
+ - @794 : DACR = r4 | 0x30
+ - @7b4 : DACR = (r4 & 0x0c) | 0x04 => the 0x30 is lost !!!
 
-Rob are you ok with including uapi headers from dts files if those uapi
-headers are guaranteed to have only #define-s in them?
+I'll send my patch to the mailing list tomorrow, as well as the other one to
+align the __bug_table session.
 
-I currently have a bit too much on my plate. So if someone else can take
-care of this (assuming Rob acks it) that would be great.
+Cheers.
 
-Regards,
-
-Hans
+--
+Robert
