@@ -1,39 +1,40 @@
-From: linux@mniewoehner.de (Michael Niewoehner)
-Date: Thu, 10 Sep 2015 18:40:02 +0200
-Subject: [PATCH v2] clk: rockchip: Add pclk_peri to critical clocks on
- RK3066/RK3188
-In-Reply-To: <CABgxDo+8xPs-GOWnWhBnVN6xXn41=Dm_pTHpDyA2uoCrg93=Mw@mail.gmail.com>
-References: <1440322357-2621-1-git-send-email-romain.perier@gmail.com>
- <CABgxDo+otZrYoqTNK-ea=L6Dsd5p_b_MFCi4H4XJZZ25PV_qnA@mail.gmail.com>
- <CABgxDoLgqfzO-Sb_rKHe=-GuMaKWMihHhktx6sDSM6M=Q+Koaw@mail.gmail.com>
- <20150904162402.GN15099@codeaurora.org>
- <CABgxDo+0qN5GJdCNpQi4g_CdW67PvxsogMseRoAa5cuAbWk1wQ@mail.gmail.com>
- <CABgxDoJRdF_k0EZLrEWXqpDrmj5LVRL24izGLJY4AmtUNOk7PQ@mail.gmail.com>
- <20150909214705.GV15099@codeaurora.org>
- <CABgxDo+8xPs-GOWnWhBnVN6xXn41=Dm_pTHpDyA2uoCrg93=Mw@mail.gmail.com>
-Message-ID: <994A907A-09DB-419C-9BD5-772B379D02B3@mniewoehner.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 10 Sep 2015 18:43:21 +0200
+Subject: [PATCH 3/3] ARM: dts: sun4i: Add dts file for iNet-1 based tablets
+In-Reply-To: <1441787004-4660-3-git-send-email-hdegoede@redhat.com>
+References: <1441787004-4660-1-git-send-email-hdegoede@redhat.com>
+ <1441787004-4660-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150910164321.GL9885@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Am 10.09.2015 um 09:05 schrieb Romain Perier <romain.perier@gmail.com>:
-
-> It was based on linux-next few weeks ago. I will rebase it today and send a v3.
+On Wed, Sep 09, 2015 at 10:23:24AM +0200, Hans de Goede wrote:
+> The iNet-tek iNet-1 PCB is a PCB found in various generic 10.1" 1024x600
+> A10 based tablets such as the Point of View Protab2 XXL and the
+> Cherry M1007.
 > 
-> 2015-09-09 23:47 GMT+02:00 Stephen Boyd <sboyd@codeaurora.org>:
->> On 09/09, Romain Perier wrote:
->>> so, which of you does take the patch for -rc1 ?
->>> 
->> Is there some other patch out there that's also needed?
+> This patch has been tested on both rev2 and rev5 of this board / these
+> tablets.
 > 
-> No, that's a single patch.
+> It comes with a rtl8188cus usb wifi connected to ehci1, focal ft5406ee8
+> touchscreen connected to i2c2 addr 0x38, bosch bma 250 accelerometer
+> connected to i2c1 addr 0x18 and the usual connectors: headphone,
+> mini hdmi, power-barrel, mini-usb and a micro-sd slot.
 > 
-> Romain
-> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Hi Stephen,
+Queued, thanks!
 
-Romain?s patch was applied after mine in his github tree so you?ll need to apply that first: [PATCH v3] clk: rockchip: add pclk_cpu to the list of rk3188 critical clocks
+Maxime
 
-Best regards
-Michael
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150910/17c44469/attachment-0001.sig>
