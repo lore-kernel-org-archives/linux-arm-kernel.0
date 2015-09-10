@@ -1,23 +1,53 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 10 Sep 2015 17:26:54 +0800
-Subject: [PATCH] crypto: sun4i-ss Fix a possible driver hang with ciphers
-In-Reply-To: <1441801627-31820-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1441801627-31820-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20150910092654.GB28753@gondor.apana.org.au>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 10 Sep 2015 11:29:03 +0200
+Subject: [PATCH] tty/serial: at91: move ATMEL_MAX_UART
+Message-ID: <1441877343-20248-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 09, 2015 at 02:27:07PM +0200, LABBE Corentin wrote:
-> The sun4i_ss_opti_poll function cipher data until the output miter have
-> a length of 0.
-> If the crypto API client, give more SGs than necessary this could result
-> in an infinite loop.
-> Fix it by checking for remaining bytes, just like sun4i_ss_cipher_poll().
-> 
-> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+Move ATMEL_MAX_UART from platform_data/atmel.h to atmel_serial.c as this is
+the only file using it and it is common practise from tty/serial drivers to
+define it directly in the driver file.
 
-Applied.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/tty/serial/atmel_serial.c   | 6 ++++++
+ include/linux/platform_data/atmel.h | 6 ------
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 5ca5cf3e9359..98c84038518e 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -112,6 +112,12 @@ struct atmel_uart_char {
+ #define ATMEL_SERIAL_RINGSIZE 1024
+ 
+ /*
++ * at91: 6 USARTs and one DBGU port (SAM9260)
++ * avr32: 4
++ */
++#define ATMEL_MAX_UART		7
++
++/*
+  * We wrap our port structure around the generic uart_port.
+  */
+ struct atmel_uart_port {
+diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
+index 527a85c61924..c4bc90bfebe0 100644
+--- a/include/linux/platform_data/atmel.h
++++ b/include/linux/platform_data/atmel.h
+@@ -19,12 +19,6 @@
+ #include <linux/serial.h>
+ #include <linux/platform_data/macb.h>
+ 
+-/*
+- * at91: 6 USARTs and one DBGU port (SAM9260)
+- * avr32: 4
+- */
+-#define ATMEL_MAX_UART	7
+-
+  /* USB Device */
+ struct at91_udc_data {
+ 	int	vbus_pin;		/* high == host powering us */
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.1.4
