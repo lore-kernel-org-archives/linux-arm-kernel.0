@@ -1,77 +1,43 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 10 Sep 2015 11:19:51 +0100
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <20150910095208.GA29293@leverpostej>
-References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
- <20150910095208.GA29293@leverpostej>
-Message-ID: <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Thu, 10 Sep 2015 12:25:32 +0200
+Subject: I.MX6 HDMI support in v4.2
+In-Reply-To: <20150908125756.GY21084@n2100.arm.linux.org.uk> (Russell King's
+ message of "Tue, 8 Sep 2015 13:57:56 +0100")
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m37fo25nrl.fsf@t19.piap.pl>
+ <20150908091625.GV21084@n2100.arm.linux.org.uk>
+ <m3y4gh41k4.fsf@t19.piap.pl>
+ <20150908125756.GY21084@n2100.arm.linux.org.uk>
+Message-ID: <m3a8su4llv.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Sep 2015, Mark Rutland wrote:
-> Hi,
-> 
-> I'm not necessarily opposed to the renaming, but I think that this is
-> the least important thing to standardize for this to work.
-> 
-> On Thu, Sep 10, 2015 at 09:41:56AM +0100, Shannon Zhao wrote:
-> > From: Shannon Zhao <shannon.zhao@linaro.org>
-> > 
-> > These EFI stub parameters are used to internal communication between EFI
-> > stub and Linux kernel and EFI stub creates these parameters. But for Xen
-> > on ARM when booting with UEFI, Xen will create a minimal DT providing
-> > these parameters for Dom0 and Dom0 is not only Linux kernel, but also
-> > other OS (such as FreeBSD) which will be used in the future.
-> 
-> Currently the Linux EFI stub and kernel have a symbiotic relationship,
-> because they're intimately coupled and we don't have kexec (yet) on EFI
-> platforms to loosen that coupling.
-> 
-> If an agent other than the (kernel-specific) stub is going to provide
-> this to the kernel, then we need more specified than just the property
-> names.
-> 
-> That at least includes the following:
-> 
-> * The state of boot services (we currently have the EFI stub call
->   ExitBootServices(), and I believe this is crucial to the plan for
->   kexec).
-> 
-> * The state of the address map (we currently have the EFI stub call
->   SetVirtualAddressMap()).
-> 
-> * The virtual address range(s) that SetVirtualAddressMap() may map
->   elements to (this logic is currently in the EFI stub, and this matches
->   the expectations of the kernel that it is tied to).
-> 
-> > So here we plan to standardize the names by dropping the prefix
-> > "linux," and make them common to other OS. Also this will not break
-> > the compatibility since these parameters are used to internal
-> > communication between EFI stub and kernel.
-> 
-> For the moment this is true, but will not be once we have kexec, so
-> there's a dependency (or anti-dependency) there.
-> 
-> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> > ---
-> > Look at [1] for the discussion about this in Xen ML. The purpose of this
-> > patch is to standardize the names to make Linux ARM kernel work on Xen
-> > with UEFI. Also it hopes other OS(e.g. FreeBSD), which will be used as
-> > Dom0 on Xen, could support this mechanism as well.
-> > 
-> > [1]http://lists.xenproject.org/archives/html/xen-devel/2015-08/msg02250.html
-> 
-> Per this post, it looks like to pass a DTB to the kernel Xen already
-> needs to know it's a Linux kernel...
-> 
-> I wasn't aware that there was a common standard for arm(64) kernels
-> other than a PE/COFF EFI application.
-> 
-> Does Xen not talk to EFI itself and/or give the kernel a virtual EFI
-> interface?
+Now I'm trying to use the imxdrm Xv output.
 
-Xen talks to EFI itself but the interface provided to dom0 is somewhat
-different: there are no BootServices (Xen calls ExitBootServices before
-running the kernel), and the RuntimeServices go via hypercalls (see
-drivers/xen/efi.c).
+$ mplayer -vo xv test.mp4 -x 720
+
+VO Config (720x576->720x576,flags=0,'MPlayer',0x32315659)
+VO: [xv] 720x576 => 720x576 Planar YV12
+Xvideo image format: 0x34325241 (AR24) packed
+Xvideo image format: 0x34325258 (XR24) packed
+Xvideo image format: 0x34324241 (AB24) packed
+Xvideo image format: 0x34324258 (XB24) packed
+Xvideo image format: 0x32595559 (YUY2) packed
+Xvideo image format: 0x30323449 (I420) planar
+Xvideo image format: 0x32315659 (YV12) planar
+Xvideo image format: 0x4f425658 (XVBO) planar
+using Xvideo port 85 for hw scaling
+*** [vo] Exporting mp_image_t, 720x576x12bpp YUV planar, 622080 bytes
+
+Adaptor #0: "Marvell Armada Overlay Video"
+number of ports: 1
+port base: 85
+
+The Y plane is ok, but the Xv window is green, like on old monochrome
+CRTs - what could that be? It looks like the UV planes are all wrong.
+-- 
+Krzysztof Halasa
+
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
