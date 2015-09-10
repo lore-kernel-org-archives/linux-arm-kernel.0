@@ -1,61 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 10 Sep 2015 11:07:54 +0100
-Subject: [PATCH] arm64: Add support for hardware updates of the access
- and dirty pte bits
-In-Reply-To: <55F06A87.3000204@citrix.com>
-References: <1436545468-1549-1-git-send-email-catalin.marinas@arm.com>
- <55F06A87.3000204@citrix.com>
-Message-ID: <20150910100753.GE12294@localhost>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 10 Sep 2015 11:19:51 +0100
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <20150910095208.GA29293@leverpostej>
+References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
+ <20150910095208.GA29293@leverpostej>
+Message-ID: <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 09, 2015 at 06:21:11PM +0100, Julien Grall wrote:
-> I've tried to boot the latest linus/master (a794b4f) which include this
-> patch as DOM0 on xgene. This is failing late in the boot with
-> a BUG (see trace below).
+On Thu, 10 Sep 2015, Mark Rutland wrote:
+> Hi,
 > 
-> The bisector pointed me to this patch. When I disable
-> CONFIG_ARM64_HW_AFDBM, I'm able to boot the kernel and use it
-> without any issue.
+> I'm not necessarily opposed to the renaming, but I think that this is
+> the least important thing to standardize for this to work.
 > 
-> Although, I'm not sure to understand how this patch could
-> possibly break the filesystem subsystem.
+> On Thu, Sep 10, 2015 at 09:41:56AM +0100, Shannon Zhao wrote:
+> > From: Shannon Zhao <shannon.zhao@linaro.org>
+> > 
+> > These EFI stub parameters are used to internal communication between EFI
+> > stub and Linux kernel and EFI stub creates these parameters. But for Xen
+> > on ARM when booting with UEFI, Xen will create a minimal DT providing
+> > these parameters for Dom0 and Dom0 is not only Linux kernel, but also
+> > other OS (such as FreeBSD) which will be used in the future.
+> 
+> Currently the Linux EFI stub and kernel have a symbiotic relationship,
+> because they're intimately coupled and we don't have kexec (yet) on EFI
+> platforms to loosen that coupling.
+> 
+> If an agent other than the (kernel-specific) stub is going to provide
+> this to the kernel, then we need more specified than just the property
+> names.
+> 
+> That at least includes the following:
+> 
+> * The state of boot services (we currently have the EFI stub call
+>   ExitBootServices(), and I believe this is crucial to the plan for
+>   kexec).
+> 
+> * The state of the address map (we currently have the EFI stub call
+>   SetVirtualAddressMap()).
+> 
+> * The virtual address range(s) that SetVirtualAddressMap() may map
+>   elements to (this logic is currently in the EFI stub, and this matches
+>   the expectations of the kernel that it is tied to).
+> 
+> > So here we plan to standardize the names by dropping the prefix
+> > "linux," and make them common to other OS. Also this will not break
+> > the compatibility since these parameters are used to internal
+> > communication between EFI stub and kernel.
+> 
+> For the moment this is true, but will not be once we have kexec, so
+> there's a dependency (or anti-dependency) there.
+> 
+> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> > ---
+> > Look at [1] for the discussion about this in Xen ML. The purpose of this
+> > patch is to standardize the names to make Linux ARM kernel work on Xen
+> > with UEFI. Also it hopes other OS(e.g. FreeBSD), which will be used as
+> > Dom0 on Xen, could support this mechanism as well.
+> > 
+> > [1]http://lists.xenproject.org/archives/html/xen-devel/2015-08/msg02250.html
+> 
+> Per this post, it looks like to pass a DTB to the kernel Xen already
+> needs to know it's a Linux kernel...
+> 
+> I wasn't aware that there was a common standard for arm(64) kernels
+> other than a PE/COFF EFI application.
+> 
+> Does Xen not talk to EFI itself and/or give the kernel a virtual EFI
+> interface?
 
-I don't understand either. It seems that the kernel raises a BUG on
-!PagePrivate but this patch never touches the page structure, only ptes.
-
-I recall to have tested it on XGene but I can try it again (bare metal).
-Is the bare metal error for you the same?
-
-> Do you have any insight for debugging this problem?
-[...]
-> > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> > index 39139a3aa16d..a8be513dff6f 100644
-> > --- a/arch/arm64/mm/proc.S
-> > +++ b/arch/arm64/mm/proc.S
-> > @@ -196,6 +196,19 @@ ENTRY(__cpu_setup)
-> >  	 */
-> >  	mrs	x9, ID_AA64MMFR0_EL1
-> >  	bfi	x10, x9, #32, #3
-> > +#ifdef CONFIG_ARM64_HW_AFDBM
-> > +	/*
-> > +	 * Hardware update of the Access and Dirty bits.
-> > +	 */
-> > +	mrs	x9, ID_AA64MMFR1_EL1
-> > +	and	x9, x9, #0xf
-> > +	cbz	x9, 2f
-> > +	cmp	x9, #2
-> > +	b.lt	1f
-> > +	orr	x10, x10, #TCR_HD		// hardware Dirty flag update
-> > +1:	orr	x10, x10, #TCR_HA		// hardware Access flag update
-> > +2:
-> > +#endif	/* CONFIG_ARM64_HW_AFDBM */
-> >  	msr	tcr_el1, x10
-> >  	ret					// return to head.S
-> >  ENDPROC(__cpu_setup)
-
-Just in case some ID registers are wrong, can you do an "#if 0" above
-instead of CONFIG_ARM64_HW_AFDBM?
-
--- 
-Catalin
+Xen talks to EFI itself but the interface provided to dom0 is somewhat
+different: there are no BootServices (Xen calls ExitBootServices before
+running the kernel), and the RuntimeServices go via hypercalls (see
+drivers/xen/efi.c).
