@@ -1,35 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 10 Sep 2015 12:24:19 +0100
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
-References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
- <20150910095208.GA29293@leverpostej>
- <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
-Message-ID: <20150910112418.GC29293@leverpostej>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Thu, 10 Sep 2015 13:29:41 +0200
+Subject: I.MX6 HDMI support in v4.2
+In-Reply-To: <20150910104930.GI21084@n2100.arm.linux.org.uk> (Russell King's
+ message of "Thu, 10 Sep 2015 11:49:30 +0100")
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m37fo25nrl.fsf@t19.piap.pl>
+ <20150908091625.GV21084@n2100.arm.linux.org.uk>
+ <m3y4gh41k4.fsf@t19.piap.pl>
+ <20150908125756.GY21084@n2100.arm.linux.org.uk>
+ <m3a8su4llv.fsf@t19.piap.pl>
+ <20150910104930.GI21084@n2100.arm.linux.org.uk>
+Message-ID: <m3613i4imy.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Does Xen not talk to EFI itself and/or give the kernel a virtual EFI
-> > interface?
-> 
-> Xen talks to EFI itself but the interface provided to dom0 is somewhat
-> different: there are no BootServices (Xen calls ExitBootServices before
-> running the kernel), and the RuntimeServices go via hypercalls (see
-> drivers/xen/efi.c).
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-That's somewhat hideous; a non Xen-aware OS wouild presumably die if
-trying to use any runtime services the normal way? I'm not keen on
-describing things that the OS cannot use.
+>>From a quick read of the imx-drm ipuv3-plane code, it looks like it
+> doesn't bother with the U/V planes for planar images.  Nothing looks
+> at fb->offsets[1,2] nor fb->pitches[1,2].  However, it claims to
+> support DRM_FORMAT_YUV420 and DRM_FORMAT_YVU420 formats - which is
+> wrong if it doesn't look at these other offsets and pitches.
 
-Why can't Xen give a virtual EFI interface to Dom0 / guests? e.g.
-create pages of RuntimeServicesCode that are trivial assembly shims
-doing hypercalls, and plumb these into the virtual EFI memory map and
-tables?
+Well... I have to agree.
+-- 
+Krzysztof Halasa
 
-That would keep things sane for any guest, allow for easy addition of
-EFI features, and you could even enter the usual EFI entry point,
-simulate ExitBootServices(), SetVirtualAddressMap(), and allow the guest
-to make things sane for itself...
-
-Mark.
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
