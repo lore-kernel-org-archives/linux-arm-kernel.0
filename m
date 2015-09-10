@@ -1,57 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 Sep 2015 20:16:52 +0100
-Subject: [PATCH] ARM: fix alignement of __bug_table section entries
-In-Reply-To: <87egi6umi2.fsf@belgarion.home>
-References: <87y4gkx04m.fsf@belgarion.home>
- <20150905203818.GO21084@n2100.arm.linux.org.uk>
- <87lhcjwjde.fsf@belgarion.home>
- <20150906194805.GP21084@n2100.arm.linux.org.uk>
- <87egibw7yh.fsf@belgarion.home>
- <20150906235414.GQ21084@n2100.arm.linux.org.uk>
- <877fo0x2ur.fsf@belgarion.home>
- <20150908200809.GC21084@n2100.arm.linux.org.uk>
- <87mvwvurae.fsf@belgarion.home> <87egi6umi2.fsf@belgarion.home>
-Message-ID: <20150910191652.GJ21084@n2100.arm.linux.org.uk>
+From: aalonso@freescale.com (Adrian Alonso)
+Date: Thu, 10 Sep 2015 14:21:41 -0500
+Subject: [PATCH v3 1/8] pinctrl: freescale: imx: fix system crash if enable
+ two pinctl instances
+Message-ID: <1441912908-21946-1-git-send-email-aalonso@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 10, 2015 at 09:01:41PM +0200, Robert Jarzmik wrote:
-> And I have the proof of gcc optimization, which I'll add to the commit message
-> if you want :
-> 00000728 <do_alignment>:
->      ...
->      770:	ee134f10 	mrc	15, 0, r4, cr3, cr0, {0}
->      ... no r4 or mrc/mcr usage
->      788:	e3842030 	orr	r2, r4, #48	; 0x30
->      ... no r2/r4 or mrc/mcr usage
->      794:	ee032f10 	mcr	15, 0, r2, cr3, cr0, {0}
->      798:	ee07cf95 	mcr	15, 0, ip, cr7, cr5, {4}
->      ... no r4 or mrc/mcr usage
->      7ac:	e3c4300c 	bic	r3, r4, #12
->      7b0:	e3833004 	orr	r3, r3, #4
->      7b4:	ee033f10 	mcr	15, 0, r3, cr3, cr0, {0}
->      ... no mrc/mcr usage
->      7cc:	ebfffffe 	bl	0 <arm_copy_from_user>
-> 
-> Here, we have in probe_kernel_address() in do_alignment():
->  - @770 : r4 = DACR
->  - @794 : DACR = r4 | 0x30
->  - @7b4 : DACR = (r4 & 0x0c) | 0x04 => the 0x30 is lost !!!
-> 
-> I'll send my patch to the mailing list tomorrow, as well as the other one to
-> align the __bug_table session.
+From: Robin Gong <b38343@freescale.com>
 
-I've been wondering whether we can teach GCC that set_domain modifies
-the value that get_domain returns, rather than throwing a volatile
-onto the asm in get_domain.  The issue with a volatile there is that
-even if the result is unused, but the code is reachable, gcc still has
-to output the code to read the register.
+Fix system chrash caused by groups whose number is smaller than the number
+of groups of the last pinctl instance which is not initialized.
 
-We might be able to get away with a memory clobber on the set_domain,
-and fake a memory read in get_domain, eg, by passing
-	"m" (current_thread_info()->cpu_domain))
-to the get_domain asm.
+iMX7D supports two iomux controllers (iomuxc-lpsr and iomuxc) on probing
+the second instance (iomuxc) the chrash below occurs.
 
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.2.0-next-20150901-00006-gebfa43c (aalonso at bluefly)
+[    0.000000] CPU: ARMv7 Processor [410fc075] revision 5 (ARMv7)
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasin instruction cache
+[    0.000000] Machine model: Freescale i.MX7 SabreSD Board
+[    0.661012] [<802a6cb0>] (strcmp) from [<802cc80c>] (imx_dt_node_to_map+0x58/0x208)
+[    0.668879] [<802cc80c>] (imx_dt_node_to_map) from [<802cbe24>] (pinctrl_dt_to_map+0x174/0x2b0)
+[    0.677654] [<802cbe24>] (pinctrl_dt_to_map) from [<802c8f18>] (pinctrl_get+0x100/0x424)
+[    0.685878] [<802c8f18>] (pinctrl_get) from [<802c9510>] (pinctrl_register+0x26c/0x480)
+[    0.694104] [<802c9510>] (pinctrl_register) from [<802ccf3c>] (imx_pinctrl_probe+0x580/0x6e8)
+[    0.702706] [<802ccf3c>] (imx_pinctrl_probe) from [<80351b58>] (platform_drv_probe+0x44/0xa4)
+[    0.711455] [<80351b58>] (platform_drv_probe) from [<803503ec>] (driver_probe_device+0x174/0x2b4)
+[    0.720405] [<803503ec>] (driver_probe_device) from [<803505fc>] (__driver_attach+0x8c/0x90)
+[    0.728982] [<803505fc>] (__driver_attach) from [<8034e930>] (bus_for_each_dev+0x6c/0xa0)
+[    0.737381] [<8034e930>] (bus_for_each_dev) from [<8034fb88>] (bus_add_driver+0x148/0x1f0)
+[    0.745804] [<8034fb88>] (bus_add_driver) from [<80350c00>] (driver_register+0x78/0xf8)
+[    0.753880] [<80350c00>] (driver_register) from [<800097d0>] (do_one_initcall+0x8c/0x1d4)
+[    0.762282] [<800097d0>] (do_one_initcall) from [<80987dac>] (kernel_init_freeable+0x144/0x1e4)
+[    0.771061] [<80987dac>] (kernel_init_freeable) from [<806d9c7c>] (kernel_init+0x8/0xe8)
+[    0.779285] [<806d9c7c>] (kernel_init) from [<8000f628>] (ret_from_fork+0x14/0x2c)
+[    0.786981] Code: e3520000 e5e32001 1afffffb e12fff1e (e4d03001)
+
+Signed-off-by: Robin Gong <b38343@freescale.com>
+Signed-off-by: Adrian Alonso <aalonso@freescale.com>
+---
+Chages for V2:
+- Reorder patch series
+- Add platform boot up information on kernel error
+- Move gpr_index to imx_pinctrl_soc_info
+Changes for V3:
+- Rename grp_index to group_index
+
+ drivers/pinctrl/freescale/pinctrl-imx.c | 3 +--
+ drivers/pinctrl/freescale/pinctrl-imx.h | 1 +
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+index d7b98ba..b9c6deb 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+@@ -580,7 +580,6 @@ static int imx_pinctrl_parse_functions(struct device_node *np,
+ 	struct device_node *child;
+ 	struct imx_pmx_func *func;
+ 	struct imx_pin_group *grp;
+-	static u32 grp_index;
+ 	u32 i = 0;
+ 
+ 	dev_dbg(info->dev, "parse function(%d): %s\n", index, np->name);
+@@ -599,7 +598,7 @@ static int imx_pinctrl_parse_functions(struct device_node *np,
+ 
+ 	for_each_child_of_node(np, child) {
+ 		func->groups[i] = child->name;
+-		grp = &info->groups[grp_index++];
++		grp = &info->groups[info->group_index++];
+ 		imx_pinctrl_parse_groups(child, grp, info, i++);
+ 	}
+ 
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h b/drivers/pinctrl/freescale/pinctrl-imx.h
+index 49e55d3..2a5fe72 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.h
++++ b/drivers/pinctrl/freescale/pinctrl-imx.h
+@@ -78,6 +78,7 @@ struct imx_pinctrl_soc_info {
+ 	struct imx_pin_reg *pin_regs;
+ 	struct imx_pin_group *groups;
+ 	unsigned int ngroups;
++	unsigned int group_index;
+ 	struct imx_pmx_func *functions;
+ 	unsigned int nfunctions;
+ 	unsigned int flags;
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
