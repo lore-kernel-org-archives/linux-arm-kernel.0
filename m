@@ -1,44 +1,33 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 10 Sep 2015 16:55:25 +0100
-Subject: [RFC PATCH 01/10] arm64: feature registers: Documentation
-In-Reply-To: <55CA16CA.8060609@arm.com>
-References: <1437731037-25795-1-git-send-email-suzuki.poulose@arm.com>
- <1437731037-25795-2-git-send-email-suzuki.poulose@arm.com>
- <20150810160636.GB15394@e104818-lin.cambridge.arm.com>
- <55C8E12E.6030305@arm.com>
- <CAKv+Gu-9GTzjqyT=NeBKjcaL7q-uFMToqPpprkyD-faG0J3mkQ@mail.gmail.com>
- <20150811142301.GE23307@e104818-lin.cambridge.arm.com>
- <55CA16CA.8060609@arm.com>
-Message-ID: <20150910155523.GH6281@e103592.cambridge.arm.com>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Thu, 10 Sep 2015 17:57:49 +0200
+Subject: [PATCH v5 0/6] bcm2835: auxiliar device support for spi
+In-Reply-To: <55F1A651.5090102@tronnes.org>
+References: <1441359711-2800-1-git-send-email-kernel@martin.sperl.org>
+ <87h9n4weg8.fsf@eliezer.anholt.net> <55F1A651.5090102@tronnes.org>
+Message-ID: <8B777380-A2A1-475E-8A1C-942BF28EE160@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 11, 2015 at 04:37:46PM +0100, Suzuki K. Poulose wrote:
-> On 11/08/15 15:23, Catalin Marinas wrote:
-> >On Mon, Aug 10, 2015 at 07:48:48PM +0200, Ard Biesheuvel wrote:
-> >>>On 10/08/15 17:06, Catalin Marinas wrote:
-> >>>>And to debunk some of the counter arguments:
-> >>>>
-> >>>>a) Running out of HWCAP bits - I really doubt this, we can always
-> >>>>     introduce 64 more via a new elf_hwcapX
-> >>
-> >>Note that ELF_HWCAP is also wired into ifunc resolution of GNU
-> >>indirect functions, which looks like a useful feature although it
-> >>isn't used that widely yet.
-> >
-> >I forgot to mention, we also need an HWCAP_CPUID with these patches when
-> >we expose the MRS interface. The ifunc resolver could use MRS when
-> >available. But I would still keep adding HWCAP bits for new features,
-> >even if we risk running out of the 64-bit we have now.
-> >
+
+> On 10.09.2015, at 17:48, Noralf Tr?nnes <noralf@tronnes.org> wrote:
 > 
-> Sure, I will add the HWCAP_CPUID in the next version of the series.
+> This looks interesting.
+> But there's a challenge with the uart1 and the 8250 driver.
+> 
+> Phil Elwell has this to say:
+> This means that that UART1 isn't an exact clone of a 8250 UART.
+> In a particular, the clock divisor is calculated differently.
+> A standard 8250 derives the baud rate as clock/(divisor16),
+> whereas the BCM2835 mini UART uses clock/(divisor8). This means
+> that if you want to use the standard driver then you need to lie
+> about the clock frequency, providing a value is twice the real
+> value, in order for a suitable divisor to be calculated.
+> 
+> Ref: https://github.com/raspberrypi/linux/pull/1008#issuecomment-139234607
+> 
+> So either we need a new uart1 driver or a doubled clock freq. somehow.
 
-+1
+Found out the same thing and communicated it to Eric - not 
+knowing about the different divider?
 
-Playing with this, I realise that I get a splat if my userspace code
-tries to do an MRS for an ID register when this series is absent -- we
-need an hwcap that we can check first.
-
-Cheers
----Dave
+Martin
