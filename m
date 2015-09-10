@@ -1,110 +1,38 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 10 Sep 2015 15:00:35 +0200
-Subject: [PATCH] ARM: dts: sun8i: Add new sun8i-a33-q8-tzx-723q4.dts file
-Message-ID: <1441890035-3687-1-git-send-email-hdegoede@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 10 Sep 2015 14:01:34 +0100
+Subject: [PATCH] arm64: Add support for hardware updates of the access
+ and dirty pte bits
+In-Reply-To: <55F06A87.3000204@citrix.com>
+References: <1436545468-1549-1-git-send-email-catalin.marinas@arm.com>
+ <55F06A87.3000204@citrix.com>
+Message-ID: <55F17F2E.7080808@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TZX 723Q4 PCB is a pcb used in some q8 case 7" A33 tablets.
-This PCB has an interesting issue, its micro sdcards slot will not work
-unless the drive-strength on the mmc pins is lowered from 30mA to 10mA.
+Hi Julien,
 
-Therefor this commit introduces a separate dts file for this board.
+On 09/09/15 18:21, Julien Grall wrote:
+> Hi Catalin,
+> 
+> I've tried to boot the latest linus/master (a794b4f) which include this
+> patch as DOM0 on xgene. This is failing late in the boot with
+> a BUG (see trace below).
+> 
+> The bisector pointed me to this patch. When I disable
+> CONFIG_ARM64_HW_AFDBM, I'm able to boot the kernel and use it
+> without any issue.
+> 
+> Although, I'm not sure to understand how this patch could
+> possibly break the filesystem subsystem.
+> 
+> Do you have any insight for debugging this problem?
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/Makefile                   |  1 +
- arch/arm/boot/dts/sun8i-a33-q8-tzx-723q4.dts | 70 ++++++++++++++++++++++++++++
- 2 files changed, 71 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-a33-q8-tzx-723q4.dts
+I've just given it a good shake on the Mustang we have here, and I'm not
+experiencing anything like this. Any chance you could print out the
+ID_AA64MMFR1_EL1 register value, just in case?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 1dbfd1b..1034922 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -613,6 +613,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a33-et-q8-v1.6.dtb \
- 	sun8i-a33-ga10h-v1.1.dtb \
- 	sun8i-a33-ippo-q8h-v1.2.dtb \
-+	sun8i-a33-q8-tzx-723q4.dtb \
- 	sun8i-a33-sinlinx-sina33.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-a33-q8-tzx-723q4.dts b/arch/arm/boot/dts/sun8i-a33-q8-tzx-723q4.dts
-new file mode 100644
-index 0000000..04f396a
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-a33-q8-tzx-723q4.dts
-@@ -0,0 +1,70 @@
-+/*
-+ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-a33.dtsi"
-+#include "sun8i-q8-common.dtsi"
-+
-+/ {
-+	model = "Q8 TZX 723Q4 Quad Core Tablet";
-+	compatible = "tzx,q8-tzx-723q4", "allwinner,sun8i-a33";
-+};
-+
-+/* The TZX 723Q[a]4 PCB mmc only works properly with a lower drive-strenght */
-+&mmc0_pins_a {
-+	allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+};
-+
-+/*
-+ * FIXME for now we only support host mode and rely on u-boot to have
-+ * turned on Vbus which is controlled by the axp223 pmic on the board.
-+ *
-+ * Once we have axp223 support we should switch to fully supporting otg.
-+ */
-+&usb_otg {
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
+Thanks,
+
+	M.
 -- 
-2.4.3
+Jazz is not dead. It just smells funny...
