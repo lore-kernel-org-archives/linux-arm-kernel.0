@@ -1,32 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Sep 2015 20:31:46 +0200
-Subject: [PATCH v2 0/5] Add eeprom to the Olimex series of boards
-In-Reply-To: <1441873881-3665-1-git-send-email-o.schinagl@ultimaker.com>
-References: <1441873881-3665-1-git-send-email-o.schinagl@ultimaker.com>
-Message-ID: <20150910183146.GO9885@lukather>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 10 Sep 2015 20:33:32 +0200
+Subject: [PATCH 2/2] [media] media-device: split media initialization and
+ registration
+In-Reply-To: <55F1C04C.1040906@linux.intel.com>
+References: <1441890195-11650-1-git-send-email-javier@osg.samsung.com>
+ <1441890195-11650-3-git-send-email-javier@osg.samsung.com>
+ <55F1C04C.1040906@linux.intel.com>
+Message-ID: <55F1CCFC.4080604@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 10, 2015 at 10:31:16AM +0200, Olliver Schinagl wrote:
-> Some of the olimex series of boards feature a permanently connected eeprom on
-> i2c-1. This patch series adds them on all the boards that I personally have and
-> where tested with.
+Hello Sakari,
+
+On 09/10/2015 07:39 PM, Sakari Ailus wrote:
+> Javier Martinez Canillas wrote:
+>> Also, add a media_entity_cleanup() function that will destroy the
+>> graph_mutex that is initialized in media_entity_init().
 > 
-> Additionally, it brings the eeprom on the OLinuXino a10s in line with the rest
-> and now follows the binding documentation.
+> media_device_init() and media_device_cleanup()?
+>
 
-Queued all 5 patches, thanks!
+Right, sorry about that. I'll fix it.
 
-Maxime
-
+Thanks!
+ 
+Best regards,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150910/ff86f030/attachment.sig>
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
