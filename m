@@ -1,256 +1,48 @@
-From: dongsheng.wang@freescale.com (Dongsheng Wang)
-Date: Thu, 10 Sep 2015 17:36:36 +0800
-Subject: [PATCH] arm/ls1021a: Add Sleep feature for ls1021
-Message-ID: <1441877796-32232-1-git-send-email-dongsheng.wang@freescale.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 10 Sep 2015 11:48:19 +0200
+Subject: [PATCH 14/14][RFC] arm64: defconfig: add CS2000 driver support
+In-Reply-To: <87oahalijm.wl%kuninori.morimoto.gx@renesas.com>
+References: <87si6mn452.wl%kuninori.morimoto.gx@renesas.com>
+ <87613in3sc.wl%kuninori.morimoto.gx@renesas.com>
+ <CAMuHMdWXw+sOudjGOcJzctaRVH9L1c6eotGmHgsEjUXdhUvvEQ@mail.gmail.com>
+ <87oahalijm.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <CAMuHMdUxaeN72WJ9_aS2kJjrNF+TMv7m3VzgDFEZUjZ=J9rLjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wang Dongsheng <dongsheng.wang@freescale.com>
+Hi Morimoto-san,
 
-Based on PSCI framework, add system STANDBY implement for ls1021 platform.
+On Thu, Sep 10, 2015 at 11:43 AM, Kuninori Morimoto
+<kuninori.morimoto.gx@renesas.com> wrote:
+>> <kuninori.morimoto.gx@renesas.com> wrote:
+>> > --- a/arch/arm64/configs/defconfig
+>> > +++ b/arch/arm64/configs/defconfig
+>> > @@ -82,6 +82,7 @@ CONFIG_DEVTMPFS_MOUNT=y
+>> >  CONFIG_DMA_CMA=y
+>> >  CONFIG_BLK_DEV_LOOP=y
+>> >  CONFIG_VIRTIO_BLK=y
+>> > +CONFIG_CS2000_CP=y
+>>
+>> =m?
+>
+> not sure. no one is selecting =m on defconfig ?
 
-Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
-Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+I guess the arm64 kernel binaries are still small ;-)
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index fb689d8..d7a2d1d 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -90,6 +90,7 @@ ifeq ($(CONFIG_SUSPEND),y)
- AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
- obj-$(CONFIG_SOC_IMX6) += suspend-imx6.o
- obj-$(CONFIG_SOC_IMX53) += suspend-imx53.o
-+obj-$(CONFIG_SOC_LS1021A) += pm-ls1.o
- endif
- obj-$(CONFIG_SOC_IMX6) += pm-imx6.o
- 
-diff --git a/arch/arm/mach-imx/pm-ls1.c b/arch/arm/mach-imx/pm-ls1.c
-new file mode 100644
-index 0000000..f80b24d
---- /dev/null
-+++ b/arch/arm/mach-imx/pm-ls1.c
-@@ -0,0 +1,222 @@
-+/*
-+ * Support Power Management Control for LS1
-+ *
-+ * Copyright 2015 Freescale Semiconductor Inc.
-+ *
-+ * This program is free software; you can redistribute	it and/or modify it
-+ * under  the terms of	the GNU General	 Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_address.h>
-+#include <linux/psci.h>
-+#include <linux/suspend.h>
-+
-+#include <uapi/linux/psci.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/psci.h>
-+#include <asm/suspend.h>
-+
-+#define FSL_SLEEP			0x1
-+#define FSL_DEEP_SLEEP			0x2
-+
-+#define CCSR_SCFG_CLUSTERPMCR		0x904
-+#define CCSR_SCFG_CLUSTERPMCR_WFIL2EN	0x80000000
-+#define CCSR_SCFG_CLUSTERPM_ENABLE	1
-+#define CCSR_SCFG_CLUSTERPM_DISABLE	0
-+
-+#define CCSR_RCPM_IPPDEXPCR0		0x140
-+#define CCSR_RCPM_IPPDEXPCR1		0x144
-+#define CCSR_RCPM_IPPDEXPCR1_OCRAM1	0x10000000
-+
-+#define SLEEP_ARRAY_SIZE		3
-+
-+#define LS1_SLEEP_PARAM \
-+	 (PSCI_POWER_STATE_TYPE_STANDBY << PSCI_0_2_POWER_STATE_TYPE_SHIFT)
-+
-+static u32 ippdexpcr0, ippdexpcr1;
-+
-+struct ls1_pm_baseaddr {
-+	void __iomem *rcpm;
-+	void __iomem *scfg;
-+};
-+
-+static struct ls1_pm_baseaddr ls1_pm_base;
-+
-+static int ls1_pm_iomap(suspend_state_t state)
-+{
-+	struct device_node *np;
-+	void *base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-scfg");
-+	if (!np) {
-+		pr_err("Missing SCFG node in the device tree\n");
-+		return -EINVAL;
-+	}
-+
-+	base = of_iomap(np, 0);
-+	of_node_put(np);
-+	if (!base) {
-+		pr_err("Couldn't map SCFG registers\n");
-+		return -EINVAL;
-+	}
-+
-+	ls1_pm_base.scfg = base;
-+
-+	return 0;
-+}
-+
-+static void ls1_pm_uniomap(suspend_state_t state)
-+{
-+	iounmap(ls1_pm_base.scfg);
-+}
-+
-+/* set IP powerdown exception, make them work during sleep/deep sleep */
-+static void ls1_set_powerdown(void)
-+{
-+	iowrite32be(ippdexpcr0, ls1_pm_base.rcpm + CCSR_RCPM_IPPDEXPCR0);
-+	iowrite32be(ippdexpcr1,	ls1_pm_base.rcpm + CCSR_RCPM_IPPDEXPCR1);
-+}
-+
-+static void ls1_set_power_except(struct device *dev, int on)
-+{
-+	int ret;
-+	u32 value[SLEEP_ARRAY_SIZE];
-+
-+	/*
-+	 * Get the values in the "rcpm-wakeup" property. There are three values.
-+	 * The first points to the RCPM node, the second is the value of
-+	 * the ippdexpcr0 register, and the third is the value of
-+	 * the ippdexpcr1 register.
-+	 */
-+	ret = of_property_read_u32_array(dev->of_node, "rcpm-wakeup",
-+					 value, SLEEP_ARRAY_SIZE);
-+	if (ret) {
-+		dev_err(dev, "%s: Can not find the \"sleep\" property.\n",
-+			__func__);
-+		return;
-+	}
-+
-+	ippdexpcr0 |= value[1];
-+	ippdexpcr1 |= value[2];
-+
-+	pr_debug("%s: set %s as a wakeup source", __func__,
-+		 dev->of_node->full_name);
-+}
-+
-+static void ls1_set_wakeup_device(struct device *dev, void *enable)
-+{
-+	/* set each device which can act as wakeup source */
-+	if (device_may_wakeup(dev))
-+		ls1_set_power_except(dev, *((int *)enable));
-+}
-+
-+/* enable cluster to enter the PCL10 state */
-+void ls1_set_clusterpm(int enable)
-+{
-+	u32 val = 0;
-+
-+	if (enable)
-+		val = CCSR_SCFG_CLUSTERPMCR_WFIL2EN;
-+
-+	iowrite32be(val, ls1_pm_base.scfg + CCSR_SCFG_CLUSTERPMCR);
-+}
-+
-+static int ls1_suspend_enter(suspend_state_t state)
-+{
-+	int ret = -EINVAL;
-+	u32 psci_state = 0;
-+
-+	ls1_set_powerdown();
-+	ls1_set_clusterpm(CCSR_SCFG_CLUSTERPM_ENABLE);
-+
-+	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+		psci_state |= LS1_SLEEP_PARAM;
-+
-+		flush_cache_louis();
-+		if (psci_ops.cpu_suspend)
-+			ret = psci_ops.cpu_suspend(psci_state,
-+						   __pa(secondary_startup));
-+		break;
-+	case PM_SUSPEND_MEM:
-+	default:
-+		break;
-+	}
-+
-+	ls1_set_clusterpm(CCSR_SCFG_CLUSTERPM_DISABLE);
-+
-+	return ret;
-+}
-+
-+static int ls1_suspend_valid(suspend_state_t state)
-+{
-+	if (state == PM_SUSPEND_STANDBY)
-+		return 1;
-+
-+	return 0;
-+}
-+
-+static int ls1_suspend_begin(suspend_state_t state)
-+{
-+	int res = -EINVAL;
-+
-+	ippdexpcr0 = 0;
-+	ippdexpcr1 = 0;
-+
-+	if (state == PM_SUSPEND_STANDBY)
-+		res = ls1_pm_iomap(state);
-+
-+	if (!res)
-+		dpm_for_each_dev(NULL, ls1_set_wakeup_device);
-+
-+	return res;
-+}
-+
-+static void ls1_suspend_end(void)
-+{
-+	ls1_pm_uniomap(PM_SUSPEND_STANDBY);
-+}
-+
-+static const struct platform_suspend_ops ls1_suspend_ops = {
-+	.valid = ls1_suspend_valid,
-+	.enter = ls1_suspend_enter,
-+	.begin = ls1_suspend_begin,
-+	.end = ls1_suspend_end,
-+};
-+
-+static const struct of_device_id rcpm_matches[] = {
-+	{
-+		.compatible = "fsl,ls1021a-rcpm",
-+	},
-+	{}
-+};
-+
-+static int __init ls1_pm_init(void)
-+{
-+	const struct of_device_id *match;
-+	struct device_node *np;
-+
-+	np = of_find_matching_node_and_match(NULL, rcpm_matches, &match);
-+	if (!np) {
-+		pr_err("%s: can't find the rcpm node.\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	ls1_pm_base.rcpm = of_iomap(np, 0);
-+	of_node_put(np);
-+	if (!ls1_pm_base.rcpm)
-+		return -ENOMEM;
-+
-+	suspend_set_ops(&ls1_suspend_ops);
-+
-+	pr_info("Freescale Power Management Control Registered\n");
-+
-+	return 0;
-+}
-+arch_initcall(ls1_pm_init);
--- 
-2.1.0.27.g96db324
+> It seems ARM ML topic ?
+
+Yes. But for arm32, the arm-soc maintainers prefer modules where
+appropriate (i.e. for anything not critical for booting).
+
+Let's ask (cfr. CC).
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
