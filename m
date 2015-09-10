@@ -1,31 +1,74 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 10 Sep 2015 16:58:51 +0200
-Subject: [PATCH] ARM: at91/dt: sama5d3 xplained: disable pmic
-Message-ID: <1441897131-6686-1-git-send-email-nicolas.ferre@atmel.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Thu, 10 Sep 2015 15:58:39 +0100
+Subject: [PATCH] arm64: Add support for hardware updates of the access
+ and dirty pte bits
+In-Reply-To: <55F1985C.8050602@arm.com>
+References: <1436545468-1549-1-git-send-email-catalin.marinas@arm.com>
+ <55F06A87.3000204@citrix.com> <55F17F2E.7080808@arm.com>
+ <55F193BE.90608@citrix.com> <55F1985C.8050602@arm.com>
+Message-ID: <55F19A9F.2040109@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As PMIC act8865 can disturb communication on i2c1, and as it should be setup
-correctly then its i2c interface disabled by bootloader, we simply disregard it
-in DT.
+On 10/09/15 15:49, Marc Zyngier wrote:
+> On 10/09/15 15:29, Julien Grall wrote:
+>> On 10/09/15 14:01, Marc Zyngier wrote:
+>>> Hi Julien,
+>>>
+>>> On 09/09/15 18:21, Julien Grall wrote:
+>>>> Hi Catalin,
+>>>>
+>>>> I've tried to boot the latest linus/master (a794b4f) which include this
+>>>> patch as DOM0 on xgene. This is failing late in the boot with
+>>>> a BUG (see trace below).
+>>>>
+>>>> The bisector pointed me to this patch. When I disable
+>>>> CONFIG_ARM64_HW_AFDBM, I'm able to boot the kernel and use it
+>>>> without any issue.
+>>>>
+>>>> Although, I'm not sure to understand how this patch could
+>>>> possibly break the filesystem subsystem.
+>>>>
+>>>> Do you have any insight for debugging this problem?
+>>>
+>>> I've just given it a good shake on the Mustang we have here, and I'm not
+>>> experiencing anything like this. Any chance you could print out the
+>>> ID_AA64MMFR1_EL1 register value, just in case?
+>>
+>> The value of ID_AA64MMFR1_EL1 is 0000000000000000
+>>
+>> I'm using Debian Jessie for the userspace with an LVM partition for the
+>> home. U-boot is used to boot the kernel.
+> 
+> Similar setup here (except for LVM). The box seems quite solid (multiple
+> kernel compiles, and nothing is screaming).
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91-sama5d3_xplained.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+It screams very easily with a "find ." sometimes I don't even need that.
 
-diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-index d81474e0bcd6..8488ac53d22d 100644
---- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-@@ -76,7 +76,7 @@
- 				pmic: act8865 at 5b {
- 					compatible = "active-semi,act8865";
- 					reg = <0x5b>;
--					status = "okay";
-+					status = "disabled";
- 
- 					regulators {
- 						vcc_1v8_reg: DCDC_REG1 {
+> My u-boot says:
+> 
+> CPU0: APM ARM 64-bit Potenza Rev A3 2400MHz PCP 2400MHz
+>      32 KB ICACHE, 32 KB DCACHE
+>      SOC 2000MHz IOBAXI 400MHz AXI 250MHz AHB 200MHz GFC 125MHz
+> 
+> How does this compares to yours?
+
+I have the same:
+
+U-Boot 2013.04-mustang_sw_1.15.12 (May 20 2015 - 10:03:33)
+
+CPU0: APM ARM 64-bit Potenza Rev A3 2400MHz PCP 2400MHz
+     32 KB ICACHE, 32 KB DCACHE
+     SOC 2000MHz IOBAXI 400MHz AXI 250MHz AHB 200MHz GFC 125MHz
+Boot from SPI-NOR
+Slimpro FW:
+        Ver: 2.1
+Board: Mustang - AppliedMicro APM883208-xNA24SPT Reference Board
+I2C:   ready
+DRAM:  ECC 16 GiB @ 1600MHz
+SF: Detected N25Q256 with page size 256 Bytes, total 32 MiB
+
+Regards,
+
 -- 
-2.1.3
+Julien Grall
