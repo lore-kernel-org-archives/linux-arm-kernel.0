@@ -1,43 +1,51 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 10 Sep 2015 12:13:14 +0300
-Subject: [PATCH 09/21] ARM: davinci: Add set dma_mask to eDMA devices
-In-Reply-To: <1510483.LNzviKQJ8l@wuerfel>
-References: <1441874270-2399-1-git-send-email-peter.ujfalusi@ti.com>
- <1441874270-2399-10-git-send-email-peter.ujfalusi@ti.com>
- <1510483.LNzviKQJ8l@wuerfel>
-Message-ID: <55F149AA.3030301@ti.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 10 Sep 2015 17:15:58 +0800
+Subject: [PATCH V3 0/4] PCI: ACPI: Setting up DMA coherency for PCI device
+ from _CCA attribute
+In-Reply-To: <1440597279-11802-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1440597279-11802-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <55F14A4E.80206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2015 11:45 AM, Arnd Bergmann wrote:
-> On Thursday 10 September 2015 11:37:38 Peter Ujfalusi wrote:
->> +static u64 da8xx_edma0_dmamask = DMA_BIT_MASK(32);
->> +
->>  static struct platform_device da8xx_edma0_device = {
->>         .name           = "edma",
->>         .id             = 0,
->>         .dev = {
->>                 .platform_data = &da8xx_edma0_pdata,
->> +               .dma_mask = &da8xx_edma0_dmamask,
->> +               .coherent_dma_mask = DMA_BIT_MASK(32),
->>         },
->>         .num_resources  = ARRAY_SIZE(da8xx_edma0_resources),
->>         .resource       = da8xx_edma0_resources,
->>  };
-> 
-> While this is technically correct for all I can tell, could you
-> convert it to use __initconst platform_device_info and
-> platform_device_register_full() instead?
+On 08/26/2015 09:54 PM, Suravee Suthikulpanit wrote:
+> This patch adds support to setup DMA coherency for PCI device using
+> the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
+> is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
+> support for ARM64 which is currently in development.
+>
+> Also, this should not affect other architectures that does not define
+> CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
+>
+> I have included the following patch from Jeremy before cleaning up
+> the acpi_check_dma() function (in patch 2).
+>
+>      http://www.spinics.net/lists/linux-usb/msg128582.html)
+>
+> Changes from V2: (https://lkml.org/lkml/2015/8/25/549)
+>      * Return -ENOSUPP instead of -1 (per Rafael's suggestion)
+>      * Add WARN() when fail to setup DMA for PCI device when booting
+>        ACPI (per Arnd's suggestion)
+>      * Added Acked-by from Rob.
+>      * Minor clean up
+>
+> Changes from V1: (https://lkml.org/lkml/2015/8/13/182)
+>      * Include patch 1 from Jeremy to enable support for _CCA=0
+>      * Clean up acpi_check_dma() per Bjorn suggestions
+>      * Split the original V1 patch into two patches (patch 3 and 4)
+>
+>
+> Jeremy Linton (1):
+>    Honor ACPI _CCA attribute setting
+>
+> Suravee Suthikulpanit (3):
+>    ACPI/scan: Clean up acpi_check_dma
+>    PCI: OF: Move of_pci_dma_configure() to pci_dma_configure()
+>    PCI: ACPI: Add support for PCI device DMA coherency
 
-Yes, I can do that for the eDMAs. I was also thought about this, but looking
-around the mach-davinci, I thought to stick with this mode.
+For this series,
 
-> statically declaring platform_devices has been frowned upon for a long
-> time (even though a lot of arm platforms still do it), and statically
-> declaring the dma mask seems worse to me (and yes, I realize we also
-> do that elsewhere).
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Will be part of v2.
-
--- 
-P?ter
+Thanks
+Hanjun
