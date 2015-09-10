@@ -1,79 +1,97 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Sep 2015 15:56:10 +0200
-Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun4i: Add dts file for the
- pov protab2-ips9 tablet
-In-Reply-To: <55EE92E0.1010805@redhat.com>
-References: <1441441319-10658-1-git-send-email-hdegoede@redhat.com>
- <20150906163023.GR31584@lukather> <55ED3739.609@redhat.com>
- <1441612142.14422.34.camel@plaes.org> <55ED4F8F.6080502@redhat.com>
- <1441617262.21530.4.camel@plaes.org> <55ED591B.7050705@redhat.com>
- <20150907205216.GW31584@lukather> <55EE92E0.1010805@redhat.com>
-Message-ID: <20150910135610.GI9885@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 10 Sep 2015 15:04:19 +0100
+Subject: [PATCH v2] arm64/efi: don't pad between EFI_MEMORY_RUNTIME regions
+In-Reply-To: <CAKv+Gu91fT=bQ1C3AETDCeKzgJ0fpwm1+gdKF02F7t8VzqVYFA@mail.gmail.com>
+References: <1441371986-4554-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1441782414-16284-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150910132211.GF29293@leverpostej>
+ <CAKv+Gu91fT=bQ1C3AETDCeKzgJ0fpwm1+gdKF02F7t8VzqVYFA@mail.gmail.com>
+Message-ID: <20150910140419.GH29293@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2015 at 09:48:48AM +0200, Hans de Goede wrote:
-> Hi,
+> >> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> >> index e8ca6eaedd02..13671a9cf016 100644
+> >> --- a/arch/arm64/kernel/efi.c
+> >> +++ b/arch/arm64/kernel/efi.c
+> >> @@ -258,7 +258,8 @@ static bool __init efi_virtmap_init(void)
+> >>                */
+> >>               if (!is_normal_ram(md))
+> >>                       prot = __pgprot(PROT_DEVICE_nGnRE);
+> >> -             else if (md->type == EFI_RUNTIME_SERVICES_CODE)
+> >> +             else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
+> >> +                      !PAGE_ALIGNED(md->phys_addr))
+> >>                       prot = PAGE_KERNEL_EXEC;
+> >
+> > This looks coarser than necessary. For memory organised like:
+> >
+> > 0x00000000 - 0x0000F000 (60KiB) : EFI_RUNTIME_SERVICES_CODE
+> > 0x0000F000 - 0x00020000 (68KiB) : EFI_RUNTIME_SERVICES_DATA
+> >
+> > We should be able to make the last 64K non-executable, but with this all
+> > 128K is executable, unless I've missed something?
+> >
 > 
-> On 07-09-15 22:52, Maxime Ripard wrote:
-> >Hi,
-> >
-> >On Mon, Sep 07, 2015 at 11:30:03AM +0200, Hans de Goede wrote:
-> >>>>>bma250 already has devicetree support. It is used in Gemei G9
-> >>>>>tablet (sun4i-gemei-g9.dts).
-> >>>>
-> >>>>Yes I've seen that, but does it actually work? I've not tried but
-> >>>>I do not see any compatible string in the actual bma250 code in
-> >>>>the kernel, so I believe that this part of the sun4i-gemei-g9.dts
-> >>>>file does not work ?
-> >>>
-> >>>It worked (even without IRQs) when I submitted the patch. Driver
-> >>>itself is under iio/accel/bma180.c
-> >>
-> >>That is really weird, because:
-> >>
-> >>https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/iio/accel/bma180.c
-> >>
-> >>Does not have an of_match_table ... ??
-> >
-> >Not really, when using DT, i2c will set the i2c_client name to the
-> >device part of the compatible [1] [2], and then if the of_device_id
-> >lookup fails, will fallback to matching the i2c_client name to the
-> >i2c_device_id [3]. Which in our case matches.
-> >
-> >Maxime
-> >
-> >[1] http://lxr.free-electrons.com/source/drivers/i2c/i2c-core.c#L1281
-> >[2] http://lxr.free-electrons.com/source/drivers/i2c/i2c-core.c#L969
-> >[3] http://lxr.free-electrons.com/source/drivers/i2c/i2c-core.c#L461
+> In theory, yes. But considering that
 > 
-> Hmm, not sure whether that is a useful feature or an ugly hack :)
-
-Don't shoot the messenger :)
-
-But I don't know either.
-
-> It is sorta unexpected either way. But I can make good use of this to
-> enable the accelerometer and maybe also some touchscreens on a bunch of
-> boards I have.
+> a) this only affects 64 KB pages kernels, and
+> b) this patch is intended for -stable
 > 
-> Still should we rely on this? This means relying on Linux kernel behavior,
-> rather then something documented in Documentation/devicetree/bindings/...
+> I chose to keep it simple and ignore this, and just relax the
+> permissions for any region that is not aligned to 64 KB.
+> 
+> Since these regions are only mapped during Runtime Services calls, the
+> window for abuse is not that large.
 
-AFAIK, the behaviour isn't going away, there's been a few patches to
-remove the need for i2c_device_id, and they've all been nacked, so I'd
-say we can use it as is.
+Ok, that does sound reasonable.
 
-Maxime
+> > Maybe we could do a two-step pass, first mapping the data as
+> > not-executable, then mapping any code pages executable (overriding any
+> > overlapping portions, but only for the overlapping parts).
+> >
+> 
+> Let me have a go at that.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150910/dab4bbeb/attachment.sig>
+Cheers!
+
+> >>               else
+> >>                       prot = PAGE_KERNEL;
+> >> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+> >> index e29560e6b40b..cb4e9c4de952 100644
+> >> --- a/drivers/firmware/efi/libstub/arm-stub.c
+> >> +++ b/drivers/firmware/efi/libstub/arm-stub.c
+> >> @@ -13,6 +13,7 @@
+> >>   */
+> >>
+> >>  #include <linux/efi.h>
+> >> +#include <linux/sort.h>
+> >
+> > Sort isn't an inline in this header. I thought it wasn't safe to call
+> > arbitary kernel functions from the stub?
+> >
+> 
+> We call string functions, cache maintenance functions, libfdt
+> functions etc etc so it seems not everyone got the memo :-)
+> 
+> I agree that treating vmlinux both as a static library and as a
+> payload from the stub's pov is a bit sloppy, and I do remember
+> discussing this, but for the life of me, I can't remember the exact
+> issue, other than the use of adrp/add and adrp/ldr pairs, which we
+> fixed by setting the PE/COFF section alignment to 4 KB.
+
+I only had a vague recollection that there was a problem, which I
+thought was more to do with potential use of absolute kernel virtual
+addresses, which would be incorrect in the context of an EFI
+application.
+
+Digging a bit, the stub code itself is safe due to commit
+f4f75ad5741fe033 ("efi: efistub: Convert into static library"), but that
+isn't necessarily true of anything it calls (libfdt uses callbacks in
+several places). I think the cache functions we call are all raw asm
+which is position-oblivious.
+
+We do seem to be ok so far, however. Maybe we just need to keep an eye
+out.
+
+Thanks,
+Mark.
