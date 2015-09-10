@@ -1,97 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 10 Sep 2015 15:04:19 +0100
-Subject: [PATCH v2] arm64/efi: don't pad between EFI_MEMORY_RUNTIME regions
-In-Reply-To: <CAKv+Gu91fT=bQ1C3AETDCeKzgJ0fpwm1+gdKF02F7t8VzqVYFA@mail.gmail.com>
-References: <1441371986-4554-1-git-send-email-ard.biesheuvel@linaro.org>
- <1441782414-16284-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150910132211.GF29293@leverpostej>
- <CAKv+Gu91fT=bQ1C3AETDCeKzgJ0fpwm1+gdKF02F7t8VzqVYFA@mail.gmail.com>
-Message-ID: <20150910140419.GH29293@leverpostej>
+From: ahs3@redhat.com (Al Stone)
+Date: Thu, 10 Sep 2015 08:13:36 -0600
+Subject: [Linaro-acpi] [PATCH v3 1/5] ACPI: add in a bad_madt_entry()
+ function to eventually replace the macro
+In-Reply-To: <20150910121413.GA11267@xora-haswell.xora.org.uk>
+References: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
+ <1441832991-28200-2-git-send-email-al.stone@linaro.org>
+ <20150910121413.GA11267@xora-haswell.xora.org.uk>
+Message-ID: <55F19010.9060603@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> >> index e8ca6eaedd02..13671a9cf016 100644
-> >> --- a/arch/arm64/kernel/efi.c
-> >> +++ b/arch/arm64/kernel/efi.c
-> >> @@ -258,7 +258,8 @@ static bool __init efi_virtmap_init(void)
-> >>                */
-> >>               if (!is_normal_ram(md))
-> >>                       prot = __pgprot(PROT_DEVICE_nGnRE);
-> >> -             else if (md->type == EFI_RUNTIME_SERVICES_CODE)
-> >> +             else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
-> >> +                      !PAGE_ALIGNED(md->phys_addr))
-> >>                       prot = PAGE_KERNEL_EXEC;
-> >
-> > This looks coarser than necessary. For memory organised like:
-> >
-> > 0x00000000 - 0x0000F000 (60KiB) : EFI_RUNTIME_SERVICES_CODE
-> > 0x0000F000 - 0x00020000 (68KiB) : EFI_RUNTIME_SERVICES_DATA
-> >
-> > We should be able to make the last 64K non-executable, but with this all
-> > 128K is executable, unless I've missed something?
-> >
+On 09/10/2015 06:14 AM, Graeme Gregory wrote:
+> On Wed, Sep 09, 2015 at 03:09:47PM -0600, Al Stone wrote:
+>> The existing BAD_MADT_ENTRY macro only checks that the size of the data
+>> structure for an MADT subtable matches the length entry in the subtable.
+>> This is, unfortunately, not reliable.  Nor, as it turns out, does it have
+>> anything to do with what the length should be in any particular table.
+>>
+
+[snip...]
+  			if (handler(entry, table_end))
+>>  				return -EINVAL;
+>>  
+>> @@ -349,7 +592,7 @@ int __init acpi_table_parse(char *id, acpi_tbl_table_handler handler)
+>>  		return -ENODEV;
+>>  }
+>>  
+>> -/* 
+>> +/*
+>>   * The BIOS is supposed to supply a single APIC/MADT,
+>>   * but some report two.  Provide a knob to use either.
+>>   * (don't you wish instance 0 and 1 were not the same?)
 > 
-> In theory, yes. But considering that
+> Unrelated whitespace change snuck in here.
 > 
-> a) this only affects 64 KB pages kernels, and
-> b) this patch is intended for -stable
-> 
-> I chose to keep it simple and ignore this, and just relax the
-> permissions for any region that is not aligned to 64 KB.
-> 
-> Since these regions are only mapped during Runtime Services calls, the
-> window for abuse is not that large.
+> Graeme
 
-Ok, that does sound reasonable.
+Bah.  Nice catch; not sure how that got in there, but duly noted.
 
-> > Maybe we could do a two-step pass, first mapping the data as
-> > not-executable, then mapping any code pages executable (overriding any
-> > overlapping portions, but only for the overlapping parts).
-> >
-> 
-> Let me have a go at that.
-
-Cheers!
-
-> >>               else
-> >>                       prot = PAGE_KERNEL;
-> >> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-> >> index e29560e6b40b..cb4e9c4de952 100644
-> >> --- a/drivers/firmware/efi/libstub/arm-stub.c
-> >> +++ b/drivers/firmware/efi/libstub/arm-stub.c
-> >> @@ -13,6 +13,7 @@
-> >>   */
-> >>
-> >>  #include <linux/efi.h>
-> >> +#include <linux/sort.h>
-> >
-> > Sort isn't an inline in this header. I thought it wasn't safe to call
-> > arbitary kernel functions from the stub?
-> >
-> 
-> We call string functions, cache maintenance functions, libfdt
-> functions etc etc so it seems not everyone got the memo :-)
-> 
-> I agree that treating vmlinux both as a static library and as a
-> payload from the stub's pov is a bit sloppy, and I do remember
-> discussing this, but for the life of me, I can't remember the exact
-> issue, other than the use of adrp/add and adrp/ldr pairs, which we
-> fixed by setting the PE/COFF section alignment to 4 KB.
-
-I only had a vague recollection that there was a problem, which I
-thought was more to do with potential use of absolute kernel virtual
-addresses, which would be incorrect in the context of an EFI
-application.
-
-Digging a bit, the stub code itself is safe due to commit
-f4f75ad5741fe033 ("efi: efistub: Convert into static library"), but that
-isn't necessarily true of anything it calls (libfdt uses callbacks in
-several places). I think the cache functions we call are all raw asm
-which is position-oblivious.
-
-We do seem to be ok so far, however. Maybe we just need to keep an eye
-out.
-
-Thanks,
-Mark.
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
