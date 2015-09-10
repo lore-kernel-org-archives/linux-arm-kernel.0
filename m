@@ -1,36 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Sep 2015 17:55:05 +0200
-Subject: [PATCH 1/3] ARM: dts: sun4i: Fix itead-iteaduino-plus reference
- in Makefile
-In-Reply-To: <1441787004-4660-1-git-send-email-hdegoede@redhat.com>
-References: <1441787004-4660-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150910155505.GJ9885@lukather>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 10 Sep 2015 16:55:25 +0100
+Subject: [RFC PATCH 01/10] arm64: feature registers: Documentation
+In-Reply-To: <55CA16CA.8060609@arm.com>
+References: <1437731037-25795-1-git-send-email-suzuki.poulose@arm.com>
+ <1437731037-25795-2-git-send-email-suzuki.poulose@arm.com>
+ <20150810160636.GB15394@e104818-lin.cambridge.arm.com>
+ <55C8E12E.6030305@arm.com>
+ <CAKv+Gu-9GTzjqyT=NeBKjcaL7q-uFMToqPpprkyD-faG0J3mkQ@mail.gmail.com>
+ <20150811142301.GE23307@e104818-lin.cambridge.arm.com>
+ <55CA16CA.8060609@arm.com>
+Message-ID: <20150910155523.GH6281@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
-
-On Wed, Sep 09, 2015 at 10:23:22AM +0200, Hans de Goede wrote:
-> Tell make to build a dtb, rather then the already existing dts.
+On Tue, Aug 11, 2015 at 04:37:46PM +0100, Suzuki K. Poulose wrote:
+> On 11/08/15 15:23, Catalin Marinas wrote:
+> >On Mon, Aug 10, 2015 at 07:48:48PM +0200, Ard Biesheuvel wrote:
+> >>>On 10/08/15 17:06, Catalin Marinas wrote:
+> >>>>And to debunk some of the counter arguments:
+> >>>>
+> >>>>a) Running out of HWCAP bits - I really doubt this, we can always
+> >>>>     introduce 64 more via a new elf_hwcapX
+> >>
+> >>Note that ELF_HWCAP is also wired into ifunc resolution of GNU
+> >>indirect functions, which looks like a useful feature although it
+> >>isn't used that widely yet.
+> >
+> >I forgot to mention, we also need an HWCAP_CPUID with these patches when
+> >we expose the MRS interface. The ifunc resolver could use MRS when
+> >available. But I would still keep adding HWCAP bits for new features,
+> >even if we risk running out of the 64-bit we have now.
+> >
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Sure, I will add the HWCAP_CPUID in the next version of the series.
 
-A patch to fix that have been sent already:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/367989.html
++1
 
-It's queued for the 4.3 fixes.
+Playing with this, I realise that I get a splat if my userspace code
+tries to do an MRS for an ID register when this series is absent -- we
+need an hwcap that we can check first.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150910/eee3d4af/attachment.sig>
+Cheers
+---Dave
