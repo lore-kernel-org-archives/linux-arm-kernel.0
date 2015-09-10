@@ -1,36 +1,39 @@
 From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Thu, 10 Sep 2015 10:31:16 +0200
-Subject: [PATCH v2 0/5] Add eeprom to the Olimex series of boards
-Message-ID: <1441873881-3665-1-git-send-email-o.schinagl@ultimaker.com>
+Date: Thu, 10 Sep 2015 10:31:18 +0200
+Subject: [PATCH v2 2/5] dts: sunxi: correct vendor prefix on OLinuXino a10s
+ micro
+In-Reply-To: <1441873881-3665-1-git-send-email-o.schinagl@ultimaker.com>
+References: <1441873881-3665-1-git-send-email-o.schinagl@ultimaker.com>
+Message-ID: <1441873881-3665-3-git-send-email-o.schinagl@ultimaker.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the olimex series of boards feature a permanently connected eeprom on
-i2c-1. This patch series adds them on all the boards that I personally have and
-where tested with.
+From: Olliver Schinagl <oliver@schinagl.nl>
 
-Additionally, it brings the eeprom on the OLinuXino a10s in line with the rest
-and now follows the binding documentation.
+The OLinuXino A10S micro features an eeprom. According to the eeprom.txt
+binding document, we should use the manufacturer and 'at' is not the
+proper manufacturer id according to the vendor-prefixes.
 
-Changes since v1:
-* Fixed SoB and removed Tested-by as that is implied with SoB.
-* Additionally tested it on an A20 OLinuXino micro as I did actually have one!
+This patch takes the proper vendor-prefix and uses it for the eeprom
+node.
 
 Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+---
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Olliver Schinagl (5):
-  dts: sunxi: add eeprom to A10 OLinuXino Lime board
-  dts: sunxi: correct vendor prefix on OLinuXino a10s micro
-  dts: sunxi: add eeprom to A20 OLinuXino Lime board
-  dts: sunxi: add eeprom to A20 OLinuXino Lime2 board
-  dts: sunxi: add eeprom to A20 OLinuXino micro board
-
- arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts   | 12 ++++++++++++
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  2 +-
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts   | 12 ++++++++++++
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts  |  6 ++++++
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts  |  6 ++++++
- 5 files changed, 37 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+index a7e19e4..49a1be6 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+@@ -104,7 +104,7 @@
+ 	status = "okay";
+ 
+ 	at24 at 50 {
+-		compatible = "at,24c16";
++		compatible = "atmel,24c16";
+ 		pagesize = <16>;
+ 		reg = <0x50>;
+ 		read-only;
 -- 
 2.1.4
