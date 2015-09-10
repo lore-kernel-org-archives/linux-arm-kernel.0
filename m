@@ -1,204 +1,115 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 Sep 2015 11:55:34 +0100
-Subject: [PATCH v4 3/4] irqchip: GIC: Convert to EOImode == 1
-In-Reply-To: <55F15353.2000800@arm.com>
-References: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
- <1440604845-28229-4-git-send-email-marc.zyngier@arm.com>
- <55F08731.3050402@citrix.com> <55F15353.2000800@arm.com>
-Message-ID: <55F161A6.7070602@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 10 Sep 2015 14:01:17 +0300
+Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
+In-Reply-To: <7h613kmuuv.fsf@deeprootsystems.com>
+References: <Pine.LNX.4.44L0.1509051133100.30865-100000@netrider.rowland.org>
+ <2657565.lxWtPmdjyp@vostro.rjw.lan> <55ED9328.2010501@ti.com>
+ <2355864.I8qZFusWfm@vostro.rjw.lan> <55EE9AA1.8020200@ti.com>
+ <7h613kmuuv.fsf@deeprootsystems.com>
+Message-ID: <55F162FD.4050401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/15 10:54, Marc Zyngier wrote:
-> Hi Julian,
+On 09/09/2015 01:03 AM, Kevin Hilman wrote:
+> Grygorii Strashko <grygorii.strashko@ti.com> writes:
 > 
-> On 09/09/15 20:23, Julien Grall wrote:
->> Hi,
+>> On 09/07/2015 11:42 PM, Rafael J. Wysocki wrote:
+>>> On Monday, September 07, 2015 04:37:44 PM Grygorii Strashko wrote:
+>>>> On 09/07/2015 04:04 PM, Rafael J. Wysocki wrote:
+>>>>> On Saturday, September 05, 2015 11:39:20 AM Alan Stern wrote:
+>>>>>> On Sat, 5 Sep 2015, Grygorii Strashko wrote:
+>>>>>>
+>>>>>>> On 09/04/2015 09:45 PM, Alan Stern wrote:
+>>>>>>>> On Fri, 4 Sep 2015, Grygorii Strashko wrote:
+>>>>>>>>
+>>>>>>>>> There is one "small" problem with such approach :(
+>>>>>>>>>
+>>>>>>>>> - It's incompatible with -RT kernel, because PM runtime can't be used
+>>>>>>>>> in atomic context on -RT.
+>>>>>>>>
+>>>>>>>> Can you explain this more fully?  Why can't runtime PM be used in
+>>>>>>>> atomic context in the -rt kernels?
+>>>>>>>>     
+>>>>>>>
+>>>>>>> See:
+>>>>>>>     http://lwn.net/Articles/146861/
+>>>>>>>     https://rt.wiki.kernel.org/index.php/Frequently_Asked_Questions#How_does_the_CONFIG_PREEMPT_RT_patch_work.3F
+>>>>>>>
+>>>>>>> spinlock_t
+>>>>>>>        Critical sections are preemptible. The _irq operations (e.g., spin_lock_irqsave())
+>>>>>>>     do -not- disable hardware interrupts. Priority inheritance is used to prevent priority
+>>>>>>>     inversion. An underlying rt_mutex is used to implement spinlock_t in PREEMPT_RT.
+>>>>>>>
+>>>>>>> As result, have to do things like:
+>>>>>>> https://lkml.org/lkml/2015/8/18/161
+>>>>>>> https://lkml.org/lkml/2015/8/18/162
+>>>>>>>
+>>>>>>> Sorry for brief reply - Friday/Sat night :)
+>>>>>>
+>>>>>> I see.  Although we normally think of interrupt contexts as being
+>>>>>> atomic, in an -rt kernel this isn't true any more because things like
+>>>>>> spin_lock_irq don't actually disable interrupts.
+>>>>>>
+>>>>>> Therefore it would be correct to say that in -rt kernels, runtime PM
+>>>>>> can be used in interrupt context (if the device is marked as irq-safe),
+>>>>>> but not in atomic context.  Right?
+>>>>>
+>>>>> Right.
+>>>>>
+>>>>> Whatever is suitable for interrupt context in the mainline, will be suitable
+>>>>> for that in -rt kernels too.
+>>>>
+>>>> Not exactly true :(, since spinlock is converted to [rt_] mutex.
+>>>> Usually, this difference can't be seen because on -RT kernel all or
+>>>> mostly all HW IRQ handlers will be forced to be threaded.
+>>>
+>>> Exactly.  And that's what I'm talking about.
+>>>
+>>>> For the cases, where such automatic conversion is not working,
+>>>> (like chained irq handlers or HW-handler+Threaded handler) the code
+>>>> has to be carefully patched to work properly as for non-RT as for -RT.
+>>>
+>>> Right.
+>>>
+>>>> Also, this triggers some -RT incompatibility issues, like with PM runtime or
+>>>
+>>> That I'm not sure about.  Why would runtime PM cause problems with -RT (apart
+>>> from attempts to use it from the idle loop, but that's not happening in the
+>>> mainline anyway)?
 >>
->> I've been trying the latest linus/master (a794b4f), which include this
->> patch, as baremetal kernel on X-gene. This is failing on early boot
->> without much log.
 >>
->> After bisecting the tree, I found the error coming from this patch.
->> While this patch is valid, it made me remembered that X-Gene (at least
->> the first version) as an odd GICv2.
+>> I have to be more specific - sorry. "irq_safe" mode of PM runtime is incompatible with -RT.
 >>
->> The GICC is divided in 2 area of 4K, each one aligned at a 64KB address.
->> This means that, the address of GICC_DIR won't be 0x1000 but 0x10000.
+>> Here is an example:
+>> - HW IRQ handler in TI OMAP GPIO driver is implemented as chained IRQ handler and
+>>    contains pm_runtime_get_sync()/pm_runtime_put(). This works properly with vanilla kernel
+>>    because OMAP GPIO devices marked as irq_safe.
+>>    Chained IRQ handlers can't be forced threaded and PM runtime APIs trigger
+>>   "sleeping function called from invalid context" issues there, so corresponding code has to be reworked.
 > 
-> Not really. I already mentioned that one a while ago:
+> Isn't that why those are being converted to raw_*[1] ?
 > 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/332249.html
+> Kevin
 > 
-> The first page of GIC is aliased over the first 64kB, and the second 
-> page aliased over the second 64kB. So you get a consistent mapping if 
-> you use (base + 0xF000) to address GICC. Also, the DT that's in 
-> mainline is showing a 4kB CPU interface, which doesn't enable 
-> EOImode==1. You must be using a firmware that's newer than mine, since 
-> I'm perfectly able to boot my Mustang with these patches.
-> 
->> We had the same issue on Xen when we did the first port of X-gene [1].
->> Although, we choose to add a quirk in Xen for this platform in order to
->> map contiguously in the virtual memory the 2 part of GICC.
->>
->> Note that, back then, Ian suggested to extend the bindings to support a
->> such platform [2]. AFAICT, there was no follow-up on it.
-> 
-> The main problem here is not to update the binding, but the fact that 
-> you *cannot* update the DT on x-gene (the firmware will replace your 
-> GIC node with what it thinks it is), and the APM guys can't be bothered 
-> to fix their stuff.
-> 
-> In the meantime, can you give the following patch a shot? My Mustang is 
-> wired to a 4kB CPU interface, so I'll need your help to test it.
-> 
-> Thanks,
-> 
-> 	M.
-> 
-> From f0f086a4462198a5a2ac840901d9b8fd23b25134 Mon Sep 17 00:00:00 2001
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> Date: Thu, 10 Sep 2015 10:23:45 +0100
-> Subject: [PATCH] irqchip/GIC: Add workaround for aliased GIC400
-> 
-> The GICv2 architecture mandates that the two 4kB GIC regions are
-> contiguous, and on two separate physical pages. This doesn't work
-> very well when PAGE_SIZE is 64kB.
-> 
-> A relatively common hack to work around this is to alias each 4kB
-> region over its own 64kB page. Of course in this case, the base
-> address you want to use is not really the begining of the region,
-> but base + 60kB (so that you get a contiguous 8kB region over two
-> distinct pages).
-> 
-> Normally, this would be describe in DT with a new property, but
-> some HW is already out there, and the firmware makes sure that
-> it will override whatever you put in the GIC node. Duh. And of course,
-> said firmware source code is not available, despite being based
-> on u-boot.
-> 
-> The workaround is to detect the case where the CPU interface size
-> is set to 128kB, and verify the aliasing by checking that the ID
-> register for GIC400 (which is the only GIC wired this way so far)
-> is the same at base and base + 0xF000. In this case, we update
-> the GIC base address and let it roll.
-> 
-> And if you feel slightly sick by looking at this, rest assured that
-> I do too...
-> 
-> Reported-by: Julien Grall <julien.grall@citrix.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-gic.c | 45 ++++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 40 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index e6b7ed5..b62f2b2 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -1119,12 +1119,50 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->  #ifdef CONFIG_OF
->  static int gic_cnt __initdata;
->  
-> +static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
-> +{
-> +	struct resource cpuif_res;
-> +
-> +	of_address_to_resource(node, 1, &cpuif_res);
-> +
-> +	if (!is_hyp_mode_available())
-> +		return false;
-> +	if (resource_size(&cpuif_res) < SZ_8K)
-> +		return false;
-> +	if (resource_size(&cpuif_res) == SZ_128K) {
-> +		u32 val;
-> +
-> +		/*
-> +		 * Verify that we have a GIC400 aliased over the first
-> +		 * 64kB by checking the GICC_IIDR register.
-> +		 */
-> +		val = readl_relaxed(*base + GIC_CPU_IDENT);
-> +		if (val != 0x0202043B)
-> +			return false;
-> +
-> +		val = readl_relaxed(*base + GIC_CPU_IDENT + 0xF000);
-> +		if (val != 0x0202043B)
-> +			return false;
-> +
-> +		/*
-> +		 * Move the base up by 60kB, so that we have a 8kB
-> +		 * contiguous region, which allows us to use GICC_DIR
-> +		 * at its normal offset.
-> +		 */
-> +		*base += 0xF000;
-> +		cpuif_res.start += 0xF000;
-> +		pr_warn("GIC: Adjusting CPU interface base to %pa",
-> +			&cpuif_res.start);
-> +	}
-> +
-> +	return true;
-> +}
-> +
->  static int __init
->  gic_of_init(struct device_node *node, struct device_node *parent)
->  {
->  	void __iomem *cpu_base;
->  	void __iomem *dist_base;
-> -	struct resource cpu_res;
->  	u32 percpu_offset;
->  	int irq;
->  
-> @@ -1137,14 +1175,11 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->  	cpu_base = of_iomap(node, 1);
->  	WARN(!cpu_base, "unable to map gic cpu registers\n");
->  
-> -	of_address_to_resource(node, 1, &cpu_res);
-> -
->  	/*
->  	 * Disable split EOI/Deactivate if either HYP is not available
->  	 * or the CPU interface is too small.
->  	 */
-> -	if (gic_cnt == 0 && (!is_hyp_mode_available() ||
-> -			     resource_size(&cpu_res) < SZ_8K))
-> +	if (gic_cnt == 0 && !gic_check_eoimode(node, &cpu_base))
->  		static_key_slow_dec(&supports_deactivate);
->  
->  	if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
+> [1] http://marc.info/?l=linux-omap&m=143749603401221&w=2
 > 
 
-Meh. Multiple revisions of GIC400. This patchlet on top of the above
-should take care of it:
+That's way I've tried to convert those to generic IRQ handler [2] :), 
+so on -RT it will be forced threaded. 
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index b62f2b2..a9ecb29 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1122,6 +1122,8 @@ static int gic_cnt __initdata;
- static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
- {
- 	struct resource cpuif_res;
-+	u32 mask = 0xffff0fff;
-+	u32 gic400_id = 0x0202043B;
- 
- 	of_address_to_resource(node, 1, &cpuif_res);
- 
-@@ -1137,11 +1139,11 @@ static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
- 		 * 64kB by checking the GICC_IIDR register.
- 		 */
- 		val = readl_relaxed(*base + GIC_CPU_IDENT);
--		if (val != 0x0202043B)
-+		if ((val & mask) != gic400_id)
- 			return false;
- 
- 		val = readl_relaxed(*base + GIC_CPU_IDENT + 0xF000);
--		if (val != 0x0202043B)
-+		if ((val & mask) != gic400_id)
- 			return false;
- 
- 		/*
+raw_* is different kind of problem in gpio-omap - IRQ controllers
+have to use raw_* inside irq_chip callbacks, because IRQ core guards those
+callbacks using raw_* locks. 
+.irq_bus_lock()/irq_bus_sync_unlock() callbacks can be used [3]
+for any kind of operations which require non-atomic context.
 
-Thanks,
+[2] https://lkml.org/lkml/2015/8/18/162
+gpio: omap: convert to use generic irq handler
+[3] https://lkml.org/lkml/2015/8/18/161
+gpio: omap: move pm runtime in irq_chip.irq_bus_lock/sync_unlock
 
-	M.
+
+
 -- 
-Jazz is not dead. It just smells funny...
+regards,
+-grygorii
