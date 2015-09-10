@@ -1,94 +1,45 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Thu, 10 Sep 2015 14:43:45 -0600
-Subject: [PATCH v2 1/5] ACPI: add in a bad_madt_entry() function to
- eventually replace the macro
-In-Reply-To: <55F1ADC4.7090005@arm.com>
-References: <1440022048-6285-1-git-send-email-al.stone@linaro.org>
- <1440022048-6285-2-git-send-email-al.stone@linaro.org>
- <55EDADF5.5060008@arm.com> <55F08F47.1070906@redhat.com>
- <55F1ADC4.7090005@arm.com>
-Message-ID: <55F1EB81.9030908@redhat.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 10 Sep 2015 13:51:55 -0700
+Subject: [PATCH v2] clk: rockchip: Add pclk_peri to critical clocks on
+ RK3066/RK3188
+In-Reply-To: <994A907A-09DB-419C-9BD5-772B379D02B3@mniewoehner.de>
+References: <1440322357-2621-1-git-send-email-romain.perier@gmail.com>
+ <CABgxDo+otZrYoqTNK-ea=L6Dsd5p_b_MFCi4H4XJZZ25PV_qnA@mail.gmail.com>
+ <CABgxDoLgqfzO-Sb_rKHe=-GuMaKWMihHhktx6sDSM6M=Q+Koaw@mail.gmail.com>
+ <20150904162402.GN15099@codeaurora.org>
+ <CABgxDo+0qN5GJdCNpQi4g_CdW67PvxsogMseRoAa5cuAbWk1wQ@mail.gmail.com>
+ <CABgxDoJRdF_k0EZLrEWXqpDrmj5LVRL24izGLJY4AmtUNOk7PQ@mail.gmail.com>
+ <20150909214705.GV15099@codeaurora.org>
+ <CABgxDo+8xPs-GOWnWhBnVN6xXn41=Dm_pTHpDyA2uoCrg93=Mw@mail.gmail.com>
+ <994A907A-09DB-419C-9BD5-772B379D02B3@mniewoehner.de>
+Message-ID: <20150910205155.GC15099@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2015 10:20 AM, Sudeep Holla wrote:
+On 09/10, Michael Niewoehner wrote:
 > 
+> Am 10.09.2015 um 09:05 schrieb Romain Perier <romain.perier@gmail.com>:
 > 
-> On 09/09/15 20:57, Al Stone wrote:
->> On 09/07/2015 09:32 AM, Sudeep Holla wrote:
->>> Hi Al,
->>>
->>> On 19/08/15 23:07, Al Stone wrote:
->>>
->>> I finally got a chance to try this series on Juno. Well it exposed a firmware
->>> bug in MADT table :)
->>>
->>> [..]
->>>
->>>>                   acpi_tbl_entry_handler handler,
->>>> @@ -245,6 +484,8 @@ acpi_parse_entries(char *id, unsigned long table_size,
->>>>                  table_end) {
->>>>                   if (entry->type == entry_id
->>>>                       && (!max_entries || count < max_entries)) {
->>>> +                       if (bad_madt_entry(table_header, entry))
->>>> +                               return -EINVAL;
->>>
->>> Not sure if we can have the above check here unconditionally.
->>> Currently I can see there are 2 other users of acpi_parse_entries i.e.
->>> PCC and NUMA. So may be it can be made conditional or return success for
->>> non-MADT tables from bad_madt_entry ?
->>
->> So, I went back and double checked the other users and they're looking at
->> the return value for acpi_parse_entries properly; adding in the check above
->> unconditionally should not cause any behavior change.
+> > It was based on linux-next few weeks ago. I will rebase it today and send a v3.
+> > 
+> > 2015-09-09 23:47 GMT+02:00 Stephen Boyd <sboyd@codeaurora.org>:
+> >> On 09/09, Romain Perier wrote:
+> >>> so, which of you does take the patch for -rc1 ?
+> >>> 
+> >> Is there some other patch out there that's also needed?
+> > 
+> > No, that's a single patch.
+> > 
+> > Romain
+> > 
 > 
-> I disagree. I populated PCCT table on Juno to get this error for
-> PCCT(PCCT header gets interpreted as MADT header):
-> "
-> ACPI: undefined version for either FADT 5.1 or MADT 1
-> Error parsing PCC subspaces from PCCT
-> "
-> And here the stacktrace:
-> [<ffffffc000881e58>] bad_madt_entry+0x90/0x16c
-> [<ffffffc000882030>] acpi_table_parse_entries+0xfc/0x180
-> [<ffffffc000895af8>] pcc_init+0x70/0x148
+> Hi Stephen,
 > 
->> Further, despite the name, acpi_parse_entries is only used to examine MADT
->> subtables.  Granted, we should probably make the name clearer at some point
->> (too ambiguous as to which entries are parsed right now).  Nonetheless, current
->> usage seems to be in order.
->>
+> Romain?s patch was applied after mine in his github tree so you?ll need to apply that first: [PATCH v3] clk: rockchip: add pclk_cpu to the list of rk3188 critical clocks
 > 
-> From the code inspection, I can see we have 3 users of acpi_parse_entries not
-> just MADT but also PCC and NUMA/SRAT
-> 
-> Something like this solves this issue:
-> -              if (bad_madt_entry(table_header, entry))
-> +              if (!strncmp(id, ACPI_SIG_MADT, 4) &&
-> +                      bad_madt_entry(table_header, entry)
-> 
-> 
-> Or am I still missing something ?
-> 
-> Regards,
-> Sudeep
 
-Nope, I missed it.  Your fix above will solve the problem; I misunderstood
-how acpi_parse_entries() was being used -- somehow I had it in my head that
-only MADT was in use, and just not seeing that it's being used for several
-other subtable traversals also.  Sorry about that, Sudeep.  My mistake.
-
-I'll add this fix for a v4, but I'll wait for a few days to see if I get any
-additional comments -- I haven't heard from any x86, ia64 or ACPI maintainers
-yet.  OTOH, it's nice to know we've already found and fixed two sets of arm64
-ACPI tables that are in error by using these patches, even with the flaws :).
+Ah ok. Consider both applied to clk-fixes.
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
