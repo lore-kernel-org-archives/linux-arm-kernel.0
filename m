@@ -1,52 +1,61 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 10 Sep 2015 12:37:57 +0100
+From: julien.grall@citrix.com (Julien Grall)
+Date: Thu, 10 Sep 2015 12:48:05 +0100
 Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
  parameters
-In-Reply-To: <20150910112418.GC29293@leverpostej>
+In-Reply-To: <20150910123251.7e0810d1@bender.Home>
 References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
- <20150910095208.GA29293@leverpostej>
- <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
- <20150910112418.GC29293@leverpostej>
-Message-ID: <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
+ <20150910123251.7e0810d1@bender.Home>
+Message-ID: <55F16DF5.1080705@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Sep 2015, Mark Rutland wrote:
-> > > Does Xen not talk to EFI itself and/or give the kernel a virtual EFI
-> > > interface?
-> > 
-> > Xen talks to EFI itself but the interface provided to dom0 is somewhat
-> > different: there are no BootServices (Xen calls ExitBootServices before
-> > running the kernel), and the RuntimeServices go via hypercalls (see
-> > drivers/xen/efi.c).
+On 10/09/15 12:32, Andrew Turner wrote:
+> On Thu, 10 Sep 2015 16:41:56 +0800
+> Shannon Zhao <zhaoshenglong@huawei.com> wrote:
 > 
-> That's somewhat hideous; a non Xen-aware OS wouild presumably die if
-> trying to use any runtime services the normal way? I'm not keen on
-> describing things that the OS cannot use.
- 
-I agree that is somewhat hideous, but a non-Xen aware OS traditionally
-has never been able to even boot as Dom0. On ARM it can, but it still
-wouldn't be very useful (one couldn't use it to start other guests).
-
-
-> Why can't Xen give a virtual EFI interface to Dom0 / guests? e.g.
-> create pages of RuntimeServicesCode that are trivial assembly shims
-> doing hypercalls, and plumb these into the virtual EFI memory map and
-> tables?
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> These EFI stub parameters are used to internal communication between
+>> EFI stub and Linux kernel and EFI stub creates these parameters. But
+>> for Xen on ARM when booting with UEFI, Xen will create a minimal DT
+>> providing these parameters for Dom0 and Dom0 is not only Linux
+>> kernel, but also other OS (such as FreeBSD) which will be used in the
+>> future. So here we plan to standardize the names by dropping the
+>> prefix "linux," and make them common to other OS. Also this will not
+>> break the compatibility since these parameters are used to internal
+>> communication between EFI stub and kernel.
 > 
-> That would keep things sane for any guest, allow for easy addition of
-> EFI features, and you could even enter the usual EFI entry point,
-> simulate ExitBootServices(), SetVirtualAddressMap(), and allow the guest
-> to make things sane for itself...
+> It is unlikely FreeBSD will use this property when booting ad Xen dom0.
+> The kernel expects to be passed a data structure to find boot this
+> information.
+> 
+> My preference would be to have the FreeBSD loader load the xen binary,
+> the FreeBSD kernel, and set up these data structs before passing
+> control to Xen, with the information it needs to boot the kernel. My
+> understanding is this is how it is done on x86.
 
-That's the way it was done on x86 and now we have common code both in
-Linux (drivers/xen/efi.c) and Xen (xen/common/efi) which implement this
-scheme.  Switching to a different solution for ARM, would mean diverging
-with x86, which is not nice, or reimplementing the x86 solution too,
-which is expensive.
+Well, AFAICT, there is no FreeBSD specific code in Xen for x86. We are
+faking a multiboot module which contains all the informations.
 
-BTW I think that the idea you proposed was actually considered at the
-time and deemed hard to implement, if I recall correctly.
+I know that the bootloader is at least involved, I don't remember if
+there is some code in FreeBSD to read this boot module. I've CCed Roger
+to confirm.
 
+> I can see a few issues with this where, for example, the device tree or
+> ACPI tables need to be modified, but these should be solvable.
 
-In any case this should be separate from the shim ABI discussion.
+Xen has to modify the firmware table in order to remove everything that
+it's used by itself (UART, virtual GIC...).
+
+So we would need to modify the FreeBSD data structure to pass the new
+DT/ACPI. Does the metadata are standardize? I.e is it stable from
+accross FreeBSD version?
+
+Anyway, I'd like to avoid any FreeBSD specific code in Xen, and even any
+OS specific code in Xen. It's better if we keep a common interface for
+everyone.
+
+Regards,
+
+-- 
+Julien Grall
