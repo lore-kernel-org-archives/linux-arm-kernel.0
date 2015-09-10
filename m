@@ -1,96 +1,79 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 10 Sep 2015 14:52:25 +0100
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <20150910121514.GE29293@leverpostej>
-References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
- <20150910095208.GA29293@leverpostej>
- <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
- <20150910112418.GC29293@leverpostej>
- <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
- <20150910121514.GE29293@leverpostej>
-Message-ID: <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 10 Sep 2015 15:56:10 +0200
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun4i: Add dts file for the
+ pov protab2-ips9 tablet
+In-Reply-To: <55EE92E0.1010805@redhat.com>
+References: <1441441319-10658-1-git-send-email-hdegoede@redhat.com>
+ <20150906163023.GR31584@lukather> <55ED3739.609@redhat.com>
+ <1441612142.14422.34.camel@plaes.org> <55ED4F8F.6080502@redhat.com>
+ <1441617262.21530.4.camel@plaes.org> <55ED591B.7050705@redhat.com>
+ <20150907205216.GW31584@lukather> <55EE92E0.1010805@redhat.com>
+Message-ID: <20150910135610.GI9885@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Sep 2015, Mark Rutland wrote:
-> On Thu, Sep 10, 2015 at 12:37:57PM +0100, Stefano Stabellini wrote:
-> > On Thu, 10 Sep 2015, Mark Rutland wrote:
-> > > > > Does Xen not talk to EFI itself and/or give the kernel a virtual EFI
-> > > > > interface?
-> > > > 
-> > > > Xen talks to EFI itself but the interface provided to dom0 is somewhat
-> > > > different: there are no BootServices (Xen calls ExitBootServices before
-> > > > running the kernel), and the RuntimeServices go via hypercalls (see
-> > > > drivers/xen/efi.c).
-> > > 
-> > > That's somewhat hideous; a non Xen-aware OS wouild presumably die if
-> > > trying to use any runtime services the normal way? I'm not keen on
-> > > describing things that the OS cannot use.
-> >  
-> > I agree that is somewhat hideous, but a non-Xen aware OS traditionally
-> > has never been able to even boot as Dom0. On ARM it can, but it still
-> > wouldn't be very useful (one couldn't use it to start other guests).
+On Tue, Sep 08, 2015 at 09:48:48AM +0200, Hans de Goede wrote:
+> Hi,
 > 
-> Sure, but it feels odd to provide the usual information in this manner
-> if it cannot be used. If you require Xen-specific code to make things
-> work, I would imagine this information could be dciscovered in a
-> Xen-specific manner.
-
-We need ACPI (or Device Tree) to find that Xen is available on the
-platform, so we cannot use Xen-specific code to get the ACPI tables.
-
-
-> > > Why can't Xen give a virtual EFI interface to Dom0 / guests? e.g.
-> > > create pages of RuntimeServicesCode that are trivial assembly shims
-> > > doing hypercalls, and plumb these into the virtual EFI memory map and
-> > > tables?
-> > > 
-> > > That would keep things sane for any guest, allow for easy addition of
-> > > EFI features, and you could even enter the usual EFI entry point,
-> > > simulate ExitBootServices(), SetVirtualAddressMap(), and allow the guest
-> > > to make things sane for itself...
-> > 
-> > That's the way it was done on x86 and now we have common code both in
-> > Linux (drivers/xen/efi.c) and Xen (xen/common/efi) which implement this
-> > scheme.
+> On 07-09-15 22:52, Maxime Ripard wrote:
+> >Hi,
+> >
+> >On Mon, Sep 07, 2015 at 11:30:03AM +0200, Hans de Goede wrote:
+> >>>>>bma250 already has devicetree support. It is used in Gemei G9
+> >>>>>tablet (sun4i-gemei-g9.dts).
+> >>>>
+> >>>>Yes I've seen that, but does it actually work? I've not tried but
+> >>>>I do not see any compatible string in the actual bma250 code in
+> >>>>the kernel, so I believe that this part of the sun4i-gemei-g9.dts
+> >>>>file does not work ?
+> >>>
+> >>>It worked (even without IRQs) when I submitted the patch. Driver
+> >>>itself is under iio/accel/bma180.c
+> >>
+> >>That is really weird, because:
+> >>
+> >>https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/iio/accel/bma180.c
+> >>
+> >>Does not have an of_match_table ... ??
+> >
+> >Not really, when using DT, i2c will set the i2c_client name to the
+> >device part of the compatible [1] [2], and then if the of_device_id
+> >lookup fails, will fallback to matching the i2c_client name to the
+> >i2c_device_id [3]. Which in our case matches.
+> >
+> >Maxime
+> >
+> >[1] http://lxr.free-electrons.com/source/drivers/i2c/i2c-core.c#L1281
+> >[2] http://lxr.free-electrons.com/source/drivers/i2c/i2c-core.c#L969
+> >[3] http://lxr.free-electrons.com/source/drivers/i2c/i2c-core.c#L461
 > 
-> This code is not currently used on arm. It might live in a location
-> where it may be shared, but that doesn't mean that it's common code yet.
+> Hmm, not sure whether that is a useful feature or an ugly hack :)
 
-Yeah, but that was clearly the intention.
+Don't shoot the messenger :)
 
+But I don't know either.
 
-> > Switching to a different solution for ARM, would mean diverging
-> > with x86, which is not nice, or reimplementing the x86 solution too,
-> > which is expensive.
-> > 
-> > BTW I think that the idea you proposed was actually considered at the
-> > time and deemed hard to implement, if I recall correctly.
+> It is sorta unexpected either way. But I can make good use of this to
+> enable the accelerometer and maybe also some touchscreens on a bunch of
+> boards I have.
 > 
-> I appreciate that divergence is painful. We already diverge in other
-> respects (e.g. lack of PV page tables) because things that used to be
-> the case on x86 never applied to ARM.
-> 
-> It would be interesting to see why that was the case for x86, and
-> whether that applies to ARM.
+> Still should we rely on this? This means relying on Linux kernel behavior,
+> rather then something documented in Documentation/devicetree/bindings/...
 
-I have been a big advocate of doing things differently, and more
-cleanly, on ARM, but in this case the code is already non-arch specific.
-We are not talking about pagetables, which of course cannot be reused
-as-is even if we wanted to.
+AFAIK, the behaviour isn't going away, there's been a few patches to
+remove the need for i2c_device_id, and they've all been nacked, so I'd
+say we can use it as is.
 
-For once, I think we should follow the x86 way, for convenience and for
-the reasons brought up by Jan.
+Maxime
 
-
-> > In any case this should be separate from the shim ABI discussion.
-> 
-> I disagree; I think this is very much relevant to the ABI discussion.
-> That's not to say that I insist on a particular approach, but I think
-> that they need to be considered together.
-
-Let's suppose Xen didn't expose any RuntimeServices at all, would that
-make it easier to discuss about the EFI stub parameters?  In the grant
-scheme of things, they are not that important, as Ian wrote what is
-important is how to pass the RSDP.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150910/dab4bbeb/attachment.sig>
