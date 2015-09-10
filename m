@@ -1,34 +1,43 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 10 Sep 2015 16:16:10 +0200
-Subject: [PATCH v8 10/55] [media] media: rename the function that create
- pad links
-In-Reply-To: <06bad8b26ee0cef02d9c52d578af3a51a0f03b1f.1440902901.git.mchehab@osg.samsung.com>
-References: <cover.1440902901.git.mchehab@osg.samsung.com>
- <06bad8b26ee0cef02d9c52d578af3a51a0f03b1f.1440902901.git.mchehab@osg.samsung.com>
-Message-ID: <CABxcv=mdyshSH5wzRRJHnhiavr_m74=Ax07=JzSTO1uxiCmJtA@mail.gmail.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Thu, 10 Sep 2015 15:29:18 +0100
+Subject: [PATCH] arm64: Add support for hardware updates of the access
+ and dirty pte bits
+In-Reply-To: <55F17F2E.7080808@arm.com>
+References: <1436545468-1549-1-git-send-email-catalin.marinas@arm.com>
+ <55F06A87.3000204@citrix.com> <55F17F2E.7080808@arm.com>
+Message-ID: <55F193BE.90608@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 30, 2015 at 5:06 AM, Mauro Carvalho Chehab
-<mchehab@osg.samsung.com> wrote:
-> With the new API, a link can be either between two PADs or between an interface
-> and an entity. So, we need to use a better name for the function that create
-> links between two pads.
->
-> So, rename the such function to media_create_pad_link().
->
-> No functional changes.
->
-> This patch was created via this shell script:
->         for i in $(find drivers/media -name '*.[ch]' -type f) $(find drivers/staging/media -name '*.[ch]' -type f) $(find include/ -name '*.h' -type f) ; do sed s,media_entity_create_link,media_create_pad_link,g <$i >a && mv a $i; done
->
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
->
+On 10/09/15 14:01, Marc Zyngier wrote:
+> Hi Julien,
+> 
+> On 09/09/15 18:21, Julien Grall wrote:
+>> Hi Catalin,
+>>
+>> I've tried to boot the latest linus/master (a794b4f) which include this
+>> patch as DOM0 on xgene. This is failing late in the boot with
+>> a BUG (see trace below).
+>>
+>> The bisector pointed me to this patch. When I disable
+>> CONFIG_ARM64_HW_AFDBM, I'm able to boot the kernel and use it
+>> without any issue.
+>>
+>> Although, I'm not sure to understand how this patch could
+>> possibly break the filesystem subsystem.
+>>
+>> Do you have any insight for debugging this problem?
+> 
+> I've just given it a good shake on the Mustang we have here, and I'm not
+> experiencing anything like this. Any chance you could print out the
+> ID_AA64MMFR1_EL1 register value, just in case?
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+The value of ID_AA64MMFR1_EL1 is 0000000000000000
 
-Best regards,
-Javier
+I'm using Debian Jessie for the userspace with an LVM partition for the
+home. U-boot is used to boot the kernel.
+
+Regards,
+
+-- 
+Julien Grall
