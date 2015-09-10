@@ -1,38 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 Sep 2015 14:01:34 +0100
-Subject: [PATCH] arm64: Add support for hardware updates of the access
- and dirty pte bits
-In-Reply-To: <55F06A87.3000204@citrix.com>
-References: <1436545468-1549-1-git-send-email-catalin.marinas@arm.com>
- <55F06A87.3000204@citrix.com>
-Message-ID: <55F17F2E.7080808@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 10 Sep 2015 15:03:13 +0200
+Subject: [PATCH 0/2] [media] Fix race between graph enumeration and entities
+ registration
+Message-ID: <1441890195-11650-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+Hello,
 
-On 09/09/15 18:21, Julien Grall wrote:
-> Hi Catalin,
-> 
-> I've tried to boot the latest linus/master (a794b4f) which include this
-> patch as DOM0 on xgene. This is failing late in the boot with
-> a BUG (see trace below).
-> 
-> The bisector pointed me to this patch. When I disable
-> CONFIG_ARM64_HW_AFDBM, I'm able to boot the kernel and use it
-> without any issue.
-> 
-> Although, I'm not sure to understand how this patch could
-> possibly break the filesystem subsystem.
-> 
-> Do you have any insight for debugging this problem?
+The Media Controller framework has an issue in which the media device node
+is registered before all the media entities and pads links are created so
+if user-space tries to enumerate the graph too early, it may get a partial
+graph since not everything has been registered yet.
 
-I've just given it a good shake on the Mustang we have here, and I'm not
-experiencing anything like this. Any chance you could print out the
-ID_AA64MMFR1_EL1 register value, just in case?
+This series fixes the issue by separate the media device registration from
+the initialization so drives can first initialize the media device, create
+the graph and then finally register the media device node once is finished.
+The solution was suggested by Sakari Ailus.
 
-Thanks,
+Patch #1 adds a check to the media_device_unregister() function to know if
+the media device has been registed yet so calling it will be safe and the
+cleanup functions of the drivers won't need to be changed in case register
+failed.
 
-	M.
+Patch #2 does the init and registration split, changing all the drivers to
+make the change atomic and also adds a cleanup function for media devices.
+
+The patches are on top of Mauro's "[PATCH v8 00/55] MC next generation" [0]
+but is not a dependency for that series, it was only be based on that patch
+series to avoid conflicts with in-flight patches.
+
+The patches have been tested on an OMAP3 IGEPv2 board that has a OMAP3 ISP
+device and an Exynos5800 Chromebook with a built-in UVC camera.
+
+[0]: http://permalink.gmane.org/gmane.linux.drivers.driver-project.devel/74515
+
+Best regards,
+Javier
+
+
+Javier Martinez Canillas (2):
+  [media] media-device: check before unregister if mdev was registered
+  [media] media-device: split media initialization and registration
+
+ drivers/media/common/siano/smsdvb-main.c      |  1 +
+ drivers/media/media-device.c                  | 44 ++++++++++++++++++++++++---
+ drivers/media/platform/exynos4-is/media-dev.c | 12 +++++---
+ drivers/media/platform/omap3isp/isp.c         | 11 +++++--
+ drivers/media/platform/s3c-camif/camif-core.c | 13 ++++++--
+ drivers/media/platform/vsp1/vsp1_drv.c        | 19 +++++++++---
+ drivers/media/platform/xilinx/xilinx-vipp.c   | 11 +++++--
+ drivers/media/usb/au0828/au0828-core.c        | 26 +++++++++++-----
+ drivers/media/usb/cx231xx/cx231xx-cards.c     | 22 ++++++++++----
+ drivers/media/usb/dvb-usb-v2/dvb_usb_core.c   | 11 +++++--
+ drivers/media/usb/dvb-usb/dvb-usb-dvb.c       | 13 ++++++--
+ drivers/media/usb/siano/smsusb.c              | 14 +++++++--
+ drivers/media/usb/uvc/uvc_driver.c            |  9 ++++--
+ include/media/media-device.h                  |  2 ++
+ 14 files changed, 162 insertions(+), 46 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+2.4.3
