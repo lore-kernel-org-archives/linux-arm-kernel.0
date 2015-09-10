@@ -1,49 +1,44 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Thu, 10 Sep 2015 08:13:36 -0600
-Subject: [Linaro-acpi] [PATCH v3 1/5] ACPI: add in a bad_madt_entry()
- function to eventually replace the macro
-In-Reply-To: <20150910121413.GA11267@xora-haswell.xora.org.uk>
-References: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
- <1441832991-28200-2-git-send-email-al.stone@linaro.org>
- <20150910121413.GA11267@xora-haswell.xora.org.uk>
-Message-ID: <55F19010.9060603@redhat.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Thu, 10 Sep 2015 15:13:46 +0100
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
+References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
+ <20150910095208.GA29293@leverpostej>
+ <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
+ <20150910112418.GC29293@leverpostej>
+ <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
+ <20150910121514.GE29293@leverpostej>
+ <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
+Message-ID: <20150910141346.GV10728@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2015 06:14 AM, Graeme Gregory wrote:
-> On Wed, Sep 09, 2015 at 03:09:47PM -0600, Al Stone wrote:
->> The existing BAD_MADT_ENTRY macro only checks that the size of the data
->> structure for an MADT subtable matches the length entry in the subtable.
->> This is, unfortunately, not reliable.  Nor, as it turns out, does it have
->> anything to do with what the length should be in any particular table.
->>
-
-[snip...]
-  			if (handler(entry, table_end))
->>  				return -EINVAL;
->>  
->> @@ -349,7 +592,7 @@ int __init acpi_table_parse(char *id, acpi_tbl_table_handler handler)
->>  		return -ENODEV;
->>  }
->>  
->> -/* 
->> +/*
->>   * The BIOS is supposed to supply a single APIC/MADT,
->>   * but some report two.  Provide a knob to use either.
->>   * (don't you wish instance 0 and 1 were not the same?)
+On Thu, Sep 10, 2015 at 02:52:25PM +0100, Stefano Stabellini wrote:
+> > > In any case this should be separate from the shim ABI discussion.
+> > 
+> > I disagree; I think this is very much relevant to the ABI discussion.
+> > That's not to say that I insist on a particular approach, but I think
+> > that they need to be considered together.
 > 
-> Unrelated whitespace change snuck in here.
-> 
-> Graeme
+> Let's suppose Xen didn't expose any RuntimeServices at all, would that
+> make it easier to discuss about the EFI stub parameters?
 
-Bah.  Nice catch; not sure how that got in there, but duly noted.
+Possibly :)
 
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+> In the grant
+> scheme of things, they are not that important, as Ian wrote what is
+> important is how to pass the RSDP.
+
+So, we have discussed in the past having the ability to get at
+configuration tables when UEFI is not available. Say, for example,
+that we wanted SMBIOS support on a platform with U-Boot firmware.
+
+Since all that is needed then is a UEFI System Table with a pointer to
+a configuration table array, this should be fairly straightforward to
+implement statically. The other parameters would not be necessary.
+
+It would however require minor changes to the arm64 kernel UEFI support.
+
+/
+    Leif
