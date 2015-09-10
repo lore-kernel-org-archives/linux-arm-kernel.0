@@ -1,27 +1,131 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Thu, 10 Sep 2015 09:05:14 +0200
-Subject: [PATCH v2] clk: rockchip: Add pclk_peri to critical clocks on
- RK3066/RK3188
-In-Reply-To: <20150909214705.GV15099@codeaurora.org>
-References: <1440322357-2621-1-git-send-email-romain.perier@gmail.com>
- <CABgxDo+otZrYoqTNK-ea=L6Dsd5p_b_MFCi4H4XJZZ25PV_qnA@mail.gmail.com>
- <CABgxDoLgqfzO-Sb_rKHe=-GuMaKWMihHhktx6sDSM6M=Q+Koaw@mail.gmail.com>
- <20150904162402.GN15099@codeaurora.org>
- <CABgxDo+0qN5GJdCNpQi4g_CdW67PvxsogMseRoAa5cuAbWk1wQ@mail.gmail.com>
- <CABgxDoJRdF_k0EZLrEWXqpDrmj5LVRL24izGLJY4AmtUNOk7PQ@mail.gmail.com>
- <20150909214705.GV15099@codeaurora.org>
-Message-ID: <CABgxDo+8xPs-GOWnWhBnVN6xXn41=Dm_pTHpDyA2uoCrg93=Mw@mail.gmail.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 10 Sep 2015 12:40:48 +0530
+Subject: sdhci: runtime suspend/resume on card insert/removal
+Message-ID: <55F12CF8.50003@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It was based on linux-next few weeks ago. I will rebase it today and send a v3.
+Hi,
 
-2015-09-09 23:47 GMT+02:00 Stephen Boyd <sboyd@codeaurora.org>:
-> On 09/09, Romain Perier wrote:
->> so, which of you does take the patch for -rc1 ?
->>
-> Is there some other patch out there that's also needed?
+During my testing of SDHCI-PXAV3 driver on Marvell's pxa1928
+based platform, I observed that runtime PM suspend/resume is having
+issues with card insertion and removal.
 
-No, that's a single patch.
+Let me try to explain it using execution sequence -
 
-Romain
+During boot:
+
+MMC SD card gets detected as expected.
+
+[    2.431012] mmc1: new high speed SDHC card at address 1234
+[    2.437235] mmcblk1: mmc1:1234 SA04G 3.63 GiB
+[    2.444841]  mmcblk1: p1
+
+
+Now after coming to the linux prompt, if card removal event occurs
+then the call sequence is -
+
+  sdhci_irq() -->
+   -> sdhci_thread_irq(): host->thread_isr - 0x80
+      -> sdhci_card_event()
+      -> mmc_detect_change()
+         --> _mmc_detect_change()
+             --->  mmc_sd_detect()
+                   mmc_sd_remove()
+                   mmc_remove_card()
+                   mmc_bus_remove()
+                   mmc_power_off()
+                   mmc_set_initial_state()
+                   sdhci_set_ios()
+                   ...
+        sdhci_pxav3_runtime_suspend()
+        sdhci_runtime_suspend_host()
+
+
+Till here everything looks perfect :) (if I got it right)
+
+Now on card insertion again, the expectation is, runtime resume should
+get called as part of interrupt trigger from the SDHCI controller on
+card insertion.
+
+But what I am observing here is, no interrupt is generated, as it is
+not enabled at all. And the reason being sdhci_runtime_suspend_host()
+
+
+int sdhci_runtime_suspend_host(struct sdhci_host *host)
+{
+     ....
+     spin_lock_irqsave(&host->lock, flags);
+     host->ier &= SDHCI_INT_CARD_INT;
+     sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+     sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+     spin_unlock_irqrestore(&host->lock, flags);
+     ...
+}
+
+
+In my case, I see SDHCI_INT_CARD_INT is not ON and with above step
+we are not ensuring that it is enabled either.
+Also we are not enabling card insertion and removal interrupts.
+
+I have done following change to the code -
+
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 418f381..3129292 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -2783,9 +2783,12 @@ int sdhci_runtime_suspend_host(struct sdhci_host 
+*host)
+         mmc_retune_needed(host->mmc);
+
+         spin_lock_irqsave(&host->lock, flags);
+-       host->ier &= SDHCI_INT_CARD_INT;
++
++       host->flags |= SDHCI_SDIO_IRQ_ENABLED;
++       host->ier |= SDHCI_INT_CARD_INT;
+         sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+         sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
++
+         spin_unlock_irqrestore(&host->lock, flags);
+
+         synchronize_hardirq(host->irq);
+
+
+
+And things started working as expected.
+The execution sequence of irq and sdhci_runtime_resume
+both looks ok to me.
+
+Card insertion event =
+
+  sdhci_irq() -->
+   -> sdhci_thread_irq: host->thread_isr - 40
+      --> sdhci_card_event()
+      -->  mmc_detect_change()
+           ---> _mmc_detect_change()
+       ...
+  -> sdhci_pxav3_runtime_resume()
+     --> sdhci_do_set_ios:1438
+
+
+
+I see card getting enumerated as expected -
+
+[   15.116098] mmc1: mmc_rescan_try_freq: trying to init card at 400000 Hz
+[   15.356473] mmc1: new high speed SDHC card at address 1234
+[   15.363962] mmcblk1: mmc1:1234 SA04G 3.63 GiB
+[   15.371043] sdhci_thread_irq:2642 host->thread_isr - 100
+[   15.376492]  mmcblk1: p1
+
+
+I believe (based on my understanding) the change I have done is right.
+I am not sure how other platforms using sdhci.c working so far,
+probably no runtime_pm support? Not sure though
+
+Please let me know if I am missing something here.
+And not, and everyone is ok with this, I will submit the patch fixing
+this issue.
+
+
+Thanks,
+Vaibhav
