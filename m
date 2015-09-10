@@ -1,32 +1,125 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Sep 2015 10:47:28 +0200
-Subject: [PATCH 00/21] dmaengine/ARM: Merge the edma drivers into one
-In-Reply-To: <1441874270-2399-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1441874270-2399-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1936630.COymDSFqK4@wuerfel>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 10 Sep 2015 16:41:56 +0800
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub parameters
+Message-ID: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 September 2015 11:37:29 Peter Ujfalusi wrote:
-> 
-> with this series the edma two driver setup will be changed to have only one
-> driver to support eDMA3. The legacy edma interface will be removed and eDMA can
-> only be used via dmaengine API from this point on.
-> In order to do the merge the following improvements has been done:
-> - One driver instance per eDMA:
->  - Any number of eDMA instances are supported (both legacy and DT boot)
-> - Not relying on global variables, arrays, etc
-> - Code simplification and optimizations in several places
-> 
-> This change will also help us to do bigger changes in the eDMA driver since,
-> since now we have only one driver to work with.
-> 
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Very nice series, thanks for addressing this long-standing issue!
+These EFI stub parameters are used to internal communication between EFI
+stub and Linux kernel and EFI stub creates these parameters. But for Xen
+on ARM when booting with UEFI, Xen will create a minimal DT providing
+these parameters for Dom0 and Dom0 is not only Linux kernel, but also
+other OS (such as FreeBSD) which will be used in the future. So here
+we plan to standardize the names by dropping the prefix "linux," and
+make them common to other OS. Also this will not break the compatibility
+since these parameters are used to internal communication between EFI
+stub and kernel.
 
-I've briefly read over the series and did not see anything major
-sticking out, but I did not attempt to do a thorough review.
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+---
+Look at [1] for the discussion about this in Xen ML. The purpose of this
+patch is to standardize the names to make Linux ARM kernel work on Xen
+with UEFI. Also it hopes other OS(e.g. FreeBSD), which will be used as
+Dom0 on Xen, could support this mechanism as well.
 
-I found two minor things that I commented on that could be improved.
+[1]http://lists.xenproject.org/archives/html/xen-devel/2015-08/msg02250.html
 
-	Arnd
+ Documentation/arm/uefi.txt         | 10 +++++-----
+ drivers/firmware/efi/efi.c         | 10 +++++-----
+ drivers/firmware/efi/libstub/fdt.c | 10 +++++-----
+ 3 files changed, 15 insertions(+), 15 deletions(-)
+
+diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
+index d60030a..8c83243 100644
+--- a/Documentation/arm/uefi.txt
++++ b/Documentation/arm/uefi.txt
+@@ -45,18 +45,18 @@ following parameters:
+ ________________________________________________________________________________
+ Name                      | Size   | Description
+ ================================================================================
+-linux,uefi-system-table   | 64-bit | Physical address of the UEFI System Table.
++uefi-system-table         | 64-bit | Physical address of the UEFI System Table.
+ --------------------------------------------------------------------------------
+-linux,uefi-mmap-start     | 64-bit | Physical address of the UEFI memory map,
++uefi-mmap-start           | 64-bit | Physical address of the UEFI memory map,
+                           |        | populated by the UEFI GetMemoryMap() call.
+ --------------------------------------------------------------------------------
+-linux,uefi-mmap-size      | 32-bit | Size in bytes of the UEFI memory map
++uefi-mmap-size            | 32-bit | Size in bytes of the UEFI memory map
+                           |        | pointed to in previous entry.
+ --------------------------------------------------------------------------------
+-linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
++uefi-mmap-desc-size       | 32-bit | Size in bytes of each entry in the UEFI
+                           |        | memory map.
+ --------------------------------------------------------------------------------
+-linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
++uefi-mmap-desc-ver        | 32-bit | Version of the mmap descriptor format.
+ --------------------------------------------------------------------------------
+ linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
+ --------------------------------------------------------------------------------
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index d6144e3..3878715 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -481,11 +481,11 @@ static __initdata struct {
+ 	int offset;
+ 	int size;
+ } dt_params[] = {
+-	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
+-	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
+-	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
+-	UEFI_PARAM("MemMap Desc. Size", "linux,uefi-mmap-desc-size", desc_size),
+-	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
++	UEFI_PARAM("System Table", "uefi-system-table", system_table),
++	UEFI_PARAM("MemMap Address", "uefi-mmap-start", mmap),
++	UEFI_PARAM("MemMap Size", "uefi-mmap-size", mmap_size),
++	UEFI_PARAM("MemMap Desc. Size", "uefi-mmap-desc-size", desc_size),
++	UEFI_PARAM("MemMap Desc. Version", "uefi-mmap-desc-ver", desc_ver)
+ };
+ 
+ struct param_info {
+diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+index ef5d764..e94589a 100644
+--- a/drivers/firmware/efi/libstub/fdt.c
++++ b/drivers/firmware/efi/libstub/fdt.c
+@@ -118,31 +118,31 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+ 	/* Add FDT entries for EFI runtime services in chosen node. */
+ 	node = fdt_subnode_offset(fdt, 0, "chosen");
+ 	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)sys_table);
+-	status = fdt_setprop(fdt, node, "linux,uefi-system-table",
++	status = fdt_setprop(fdt, node, "uefi-system-table",
+ 			     &fdt_val64, sizeof(fdt_val64));
+ 	if (status)
+ 		goto fdt_set_fail;
+ 
+ 	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)memory_map);
+-	status = fdt_setprop(fdt, node, "linux,uefi-mmap-start",
++	status = fdt_setprop(fdt, node, "uefi-mmap-start",
+ 			     &fdt_val64,  sizeof(fdt_val64));
+ 	if (status)
+ 		goto fdt_set_fail;
+ 
+ 	fdt_val32 = cpu_to_fdt32(map_size);
+-	status = fdt_setprop(fdt, node, "linux,uefi-mmap-size",
++	status = fdt_setprop(fdt, node, "uefi-mmap-size",
+ 			     &fdt_val32,  sizeof(fdt_val32));
+ 	if (status)
+ 		goto fdt_set_fail;
+ 
+ 	fdt_val32 = cpu_to_fdt32(desc_size);
+-	status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-size",
++	status = fdt_setprop(fdt, node, "uefi-mmap-desc-size",
+ 			     &fdt_val32, sizeof(fdt_val32));
+ 	if (status)
+ 		goto fdt_set_fail;
+ 
+ 	fdt_val32 = cpu_to_fdt32(desc_ver);
+-	status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-ver",
++	status = fdt_setprop(fdt, node, "uefi-mmap-desc-ver",
+ 			     &fdt_val32, sizeof(fdt_val32));
+ 	if (status)
+ 		goto fdt_set_fail;
+-- 
+2.0.4
