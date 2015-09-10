@@ -1,194 +1,191 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Sep 2015 15:09:17 +0200
-Subject: [PATCH 6/6] ARM: dts: sun6i: Add dts file for MSI Primo81 tablet
-In-Reply-To: <20150829074303.0b2a4c0d@i7>
-References: <1440755679-8266-1-git-send-email-wens@csie.org>
- <1440755679-8266-7-git-send-email-wens@csie.org>
- <20150828123805.GN29389@lukather> <20150828163144.239e9bd5@i7>
- <20150828210208.GU29389@lukather> <20150829074303.0b2a4c0d@i7>
-Message-ID: <20150910130917.GG9885@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 10 Sep 2015 14:22:12 +0100
+Subject: [PATCH v2] arm64/efi: don't pad between EFI_MEMORY_RUNTIME regions
+In-Reply-To: <1441782414-16284-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1441371986-4554-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1441782414-16284-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150910132211.GF29293@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 29, 2015 at 07:43:03AM +0300, Siarhei Siamashka wrote:
-> On Fri, 28 Aug 2015 23:02:08 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Hi,
+
+FWIW I gave this a spin on Seattle and Juno and saw no regressions (both
+are pre-2.5 EFI though).
+
+I have some concerns below.
+
+On Wed, Sep 09, 2015 at 08:06:54AM +0100, Ard Biesheuvel wrote:
+> The new Properties Table feature introduced in UEFIv2.5 may split
+> memory regions that cover PE/COFF memory images into separate code
+> and data regions. Since these regions only differ in the type (runtime
+> code vs runtime data) and the permission bits, but not in the memory
+> type attributes (UC/WC/WT/WB), the spec does not require them to be
+> aligned to 64 KB.
+
+We should require those to be 64k-aligned for permissions too. I can
+imagine vendors getting permissions wrong but things happening to work
+for a 64k kernel (where I assume we have to use the superset of all
+permissions within a 64k page).
+
+> As the relative offset of PE/COFF .text and .data segments cannot be
+> changed on the fly, this means that we can no longer pad out those
+> regions to be mappable using 64 KB pages.
+> Unfortunately, there is no annotation in the UEFI memory map that
+> identifies data regions that were split off from a code region, so we
+> must apply this logic to all adjacent runtime regions whose attributes
+> only differ in the permission bits.
 > 
-> > Hi,
-> > 
-> > On Fri, Aug 28, 2015 at 04:31:44PM +0300, Siarhei Siamashka wrote:
-> > > > > external connectors are represented by MicroSD slot, MiniHDMI, MicroUSB
-> > > > > OTG and 3.5mm headphone jack. More details are available at
-> > > > > 
-> > > > >     http://linux-sunxi.org/MSI_Primo81
-> > > > 
-> > > > Again, not a huge fan of the commit logs URL...
-> > > 
-> > > But you are not strongly objecting to it either, right?
-> > > 
-> > > AFAIK many people are in favour of having links to the device pages in
-> > > the linux-sunxi wiki listed somewhere in the commit logs or along with
-> > > the board maintainer contact information (in U-Boot).
-> > 
-> > [citation needed]
+> So instead of rounding each memory region to 64 KB alignment at both
+> ends, only round down regions that are not directly preceded by another
+> runtime region with the same type attributes. Since the UEFI spec does
+> not mandate that the memory map be sorted, this means we also need to
+> sort it first.
 > 
-> Sure. I'm not going to search for every possible post in the mailing
-> lists on this particular subject, but you can check this one for
-> example:
->     http://lists.denx.de/pipermail/u-boot/2015-June/215675.html
-
-I don't see any external links in the commit logs mentionned, just
-comments in the defconfig?
-
-> And also look here:
->     https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=0ff1ffd3fe86840c80458ea45c2379014c86b660
-
-Yeah, some slipped through. My bad.
-
-> > And it's a good thing that we're in Linux then.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
 > 
-> What do you mean by this?
-
-You mentionned that U-Boot had such a policy. This is not a U-Boot
-patch.
-
-> > > Because these pages contain the most relevant and up to date
-> > > information about the device, various pictures, tips and tricks,
-> > > etc.
-> > > 
-> > > If you are worried about linux-sunxi.org suddenly going down and not
-> > > coming back, there is also webarchive:
-> > > 
-> > >     http://web.archive.org/web/*/http://linux-sunxi.org/MSI_Primo81
-> > 
-> > If you have to look in web archive to find that page, you can just as
-> > well use google in the first place?
+> As discussed off list, this is the arm64 side of what we should backport
+> to stable to prevent firmware that adheres to the current version of the
+> UEFI v2.5 spec with the memprotect feature enabled from blowing up the system
+> upon the first OS call into the runtime services.
 > 
-> You *don't* have to look in web archive to find that page. That's
-> only an emergency option, just in case if shit hits the
-> fan. Hopefully we are never going to have to resort to this.
-
-And my point is that you don't have to use the commit log to find that
-page as well.
-
-> Do you mean that the users probably will not think about the
-> webarchive alternative in the case of emergency? If you are really
-> so paranoid, it is possible to provide both the real wiki page url
-> and the webarchive url. Does this solve the problem?
-
-No. My point is that it provides *no* additional information, while
-adding a fragile resource.
-
-How many times did you turn to the commit log to find the URL of that
-device on the wiki?
-
+> For arm64, we already map things in order, but since the spec does not mandate
+> a sorted memory map, we need to sort it to be sure. This also allows us to
+> easily find adjacent regions with < 64 KB granularity, which the current version
+> of the spec allows if they only differ in permission bits (which the spec says
+> are 'unused' on AArch64, which could be interpreted as 'allowed but ignored').
 > 
-> > > > This commit log is already fine without it.
-> > > 
-> > > This commit log is a nice example of why having a link to the wiki page
-> > > is a good idea. The errors and omissions in the wiki page can be
-> > > corrected. The old commit logs can't.
-> > 
-> > Which is exactly why we shouldn't have URLs. Because we can't fix them
-> > when they become irrelevant.
+> Changes since v1:
+> - Ensure that we don't inadvertently set the XN bit on the preceding region at
+>   mapping time if we the OS is running with >4 KB pages.
+>   
+>  arch/arm64/kernel/efi.c                 |  3 +-
+>  drivers/firmware/efi/libstub/arm-stub.c | 62 +++++++++++++++-----
+>  2 files changed, 49 insertions(+), 16 deletions(-)
 > 
-> By the very same reasoning, we shouldn't ever have e-mail addresses in
-> the commit messages, documentation or source files. Because you know,
-> they sometimes may change too. I mentioned e-mail addresses here because
-> wiki pages and e-mail addresses both serve a very similar purpose:
-> that's a contact information.
-> 
-> > 
-> > Plus, quoting SubmittingPatches
-> > 
-> > "
-> > When you submit or resubmit a patch or patch series, include the
-> > complete patch description and justification for it.  Don't just
-> > say that this is version N of the patch (series).  Don't expect the
-> > subsystem maintainer to refer back to earlier patch versions or referenced
-> > URLs to find the patch description and put that into the patch.
-> > I.e., the patch (series) and its description should be self-contained.
-> > "
-> 
-> There is a significant difference between "patch description" mentioned
-> in this quotation (in other words, a commit message) and an external
-> URL with additional useful information.
-> 
-> If you search "http:" substring in the "git log" output, then you can
-> find a lot of various links to external web pages. Most of them are
-> links to the archived discussions in the mailing lists or references
-> to bugtracker issues. AFAIK there is no strict policy about prohibiting
-> URLs in general.
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index e8ca6eaedd02..13671a9cf016 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -258,7 +258,8 @@ static bool __init efi_virtmap_init(void)
+>  		 */
+>  		if (!is_normal_ram(md))
+>  			prot = __pgprot(PROT_DEVICE_nGnRE);
+> -		else if (md->type == EFI_RUNTIME_SERVICES_CODE)
+> +		else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
+> +			 !PAGE_ALIGNED(md->phys_addr))
+>  			prot = PAGE_KERNEL_EXEC;
 
-Most of them hosted on kernel.org, which makes a huge difference.
+This looks coarser than necessary. For memory organised like:
 
-> > If the patch description is self-contained, there's no need for a
-> > URL. And I really don't care about the board description being
-> > comprehensive either, so there's nothing to edit.
-> 
-> Finally looks like we have the real reasoning for stripping out URLs
-> and other extra information: *you* don't care. Basically, that's your
-> whim. And don't get me wrong, that's a perfectly valid explanation.
+0x00000000 - 0x0000F000 (60KiB) : EFI_RUNTIME_SERVICES_CODE 
+0x0000F000 - 0x00020000 (68KiB) : EFI_RUNTIME_SERVICES_DATA
+
+We should be able to make the last 64K non-executable, but with this all
+128K is executable, unless I've missed something?
+
+Maybe we could do a two-step pass, first mapping the data as
+not-executable, then mapping any code pages executable (overriding any
+overlapping portions, but only for the overlapping parts).
+
+>  		else
+>  			prot = PAGE_KERNEL;
+> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+> index e29560e6b40b..cb4e9c4de952 100644
+> --- a/drivers/firmware/efi/libstub/arm-stub.c
+> +++ b/drivers/firmware/efi/libstub/arm-stub.c
+> @@ -13,6 +13,7 @@
+>   */
 >  
-> > > > > +&i2c1 {
-> > > > > +	pinctrl-names = "default";
-> > > > > +	pinctrl-0 = <&i2c1_pins_a>;
-> > > > > +	status = "okay";
-> > > > > +
-> > > > > +	ctp at 5d {
-> > > > > +		pinctrl-names = "default";
-> > > > > +		pinctrl-0 = <&gt911_int_primo81>;
-> > > > > +		compatible = "goodix,gt911";
-> > > > > +		reg = <0x5d>;
-> > > > > +		interrupt-parent = <&pio>;
-> > > > > +		interrupts = <0 3 IRQ_TYPE_LEVEL_HIGH>; /* PA3 */
-> > > > > +		/*
-> > > > > +		 * The default 0,0 coordinate is at the corner closest to
-> > > > > +		 * the headphone jack. X goes along the long side, while
-> > > > > +		 * Y goes along the short side.
-> > > > > +		 */
-> > > > 
-> > > > I'm not exactly sure what that comment is supposed to be for...
-> > > 
-> > > It's probably a human readable comment intended to be read by humans.
-> > > 
-> > > Yeah, this information might actually better belong to the wiki page.
-> > > But then again, this brings us to the question whether we should have
-> > > a link to the linux-sunxi wiki page somewhere in the dts.
-> > 
-> > I guess I'm not a human then, but a DT is definitely not the place I
-> > would look at for such information, and I'm not sure a user that
-> > didn't even build his kernel will either.
-> 
-> Why not? If the users are troubleshooting problems with the peripherals
-> in their devices (such as the touchscreen in this particular example),
-> why would they not look into a DTS file? It is one of the possible
-> culprits and also a source of valuable information, which may aid
-> debugging.
+>  #include <linux/efi.h>
+> +#include <linux/sort.h>
 
-Because it comes bundled as a binary in the distributions, without
-this comment? And since the code isn't indexed, it would be buried
-somewhere any random user wouldn't even know the existence?
+Sort isn't an inline in this header. I thought it wasn't safe to call
+arbitary kernel functions from the stub?
 
-> And if a user doesn't have any device yet, but is only considering to
-> buy something that is well supported by the Linux kernel, then why
-> would (s)he not look though the list of the available DTS files as
-> the first step in this search?
+>  #include <asm/efi.h>
+>  
+>  #include "efistub.h"
+> @@ -305,6 +306,13 @@ fail:
+>   */
+>  #define EFI_RT_VIRTUAL_BASE	0x40000000
+>  
+> +static int cmp_mem_desc(const void *a, const void *b)
+> +{
+> +	const efi_memory_desc_t *left = a, *right = b;
+> +
+> +	return (left->phys_addr > right->phys_addr) ? 1 : -1;
+> +}
 
-How is that relevant? The fact that X and Y are starting on that
-particular corner of the screen really reflects on the quality of the
-support in Linux?
+Nit: please chose names to make the relationship between these clearer.
+e.g. s/left/mem_a/, s/right/mem_b/.
 
-Maxime
+> +
+>  /*
+>   * efi_get_virtmap() - create a virtual mapping for the EFI memory map
+>   *
+> @@ -316,34 +324,58 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
+>  		     unsigned long desc_size, efi_memory_desc_t *runtime_map,
+>  		     int *count)
+>  {
+> +	static const u64 mem_type_mask = EFI_MEMORY_WB | EFI_MEMORY_WT |
+> +					 EFI_MEMORY_WC | EFI_MEMORY_UC |
+> +					 EFI_MEMORY_RUNTIME;
+> +
+>  	u64 efi_virt_base = EFI_RT_VIRTUAL_BASE;
+> -	efi_memory_desc_t *out = runtime_map;
+> +	efi_memory_desc_t *in, *prev = NULL, *out = runtime_map;
+>  	int l;
+>  
+> -	for (l = 0; l < map_size; l += desc_size) {
+> -		efi_memory_desc_t *in = (void *)memory_map + l;
+> +	/*
+> +	 * To work around potential issues with the Properties Table feature
+> +	 * introduced in UEFI 2.5, which may split PE/COFF executable images
+> +	 * in memory into several RuntimeServicesCode and RuntimeServicesData
+> +	 * regions, we need to preserve the relative offsets between adjacent
+> +	 * EFI_MEMORY_RUNTIME regions with the same memory type attributes.
+> +	 * The easiest way to find adjacent regions is to sort the memory map
+> +	 * before traversing it.
+> +	 */
+> +	sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc, NULL);
+> +
+> +	for (l = 0; l < map_size; l += desc_size, prev = in) {
+>  		u64 paddr, size;
+>  
+> +		in = (void *)memory_map + l;
+>  		if (!(in->attribute & EFI_MEMORY_RUNTIME))
+>  			continue;
+>  
+> +		paddr = in->phys_addr;
+> +		size = in->num_pages * EFI_PAGE_SIZE;
+> +
+>  		/*
+>  		 * Make the mapping compatible with 64k pages: this allows
+>  		 * a 4k page size kernel to kexec a 64k page size kernel and
+>  		 * vice versa.
+>  		 */
+> -		paddr = round_down(in->phys_addr, SZ_64K);
+> -		size = round_up(in->num_pages * EFI_PAGE_SIZE +
+> -				in->phys_addr - paddr, SZ_64K);
+> -
+> -		/*
+> -		 * Avoid wasting memory on PTEs by choosing a virtual base that
+> -		 * is compatible with section mappings if this region has the
+> -		 * appropriate size and physical alignment. (Sections are 2 MB
+> -		 * on 4k granule kernels)
+> -		 */
+> -		if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
+> -			efi_virt_base = round_up(efi_virt_base, SZ_2M);
+> +		if (!prev ||
+> +		    ((prev->attribute ^ in->attribute) & mem_type_mask) != 0 ||
+> +		    paddr != (prev->phys_addr + prev->num_pages * EFI_PAGE_SIZE)) {
+> +
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150910/b90cbd56/attachment.sig>
+This looks correct, though slightly painful to read. It might be nicer
+with helpers helpers like descs_have_same_attrs and
+descs_are_contiguous.
+
+Thanks,
+Mark.
