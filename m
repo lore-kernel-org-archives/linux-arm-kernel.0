@@ -1,295 +1,179 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Sep 2015 11:51:44 +0200
-Subject: [linux-next][PATCH v2] ARM: sun7i: dt: Add new Olimex A20 EVB
- device
-In-Reply-To: <1440614818-25765-1-git-send-email-codekipper@gmail.com>
-References: <1440614818-25765-1-git-send-email-codekipper@gmail.com>
-Message-ID: <20150910095144.GF9885@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 10 Sep 2015 10:52:09 +0100
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20150910095208.GA29293@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcus,
+Hi,
 
-On Wed, Aug 26, 2015 at 08:46:58PM +0200, codekipper at gmail.com wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
-> 
-> The A20-SOM-EVB is a reference design of a 2-layer board for the
-> A20-SOM.
-> It expands the features of A20-SOM by adding VGA connector, HDMI
-> connector, audio In/Out, LCD connector, 2 Mpix camera, gigabit
-> Ethernet, SATA, USB-OTG and 2 USB hosts.
-> 
-> This patch adds basic support for the device
-> https://www.olimex.com/Products/SOM/A20/A20-SOM-EVB/
-> 
-> More information on the SOM can be found here
-> http://linux-sunxi.org/Olimex_A20-SOM.
+I'm not necessarily opposed to the renaming, but I think that this is
+the least important thing to standardize for this to work.
 
-Please remove those links, they're redundant with your description,
-and will likely become dead at some point.
+On Thu, Sep 10, 2015 at 09:41:56AM +0100, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> These EFI stub parameters are used to internal communication between EFI
+> stub and Linux kernel and EFI stub creates these parameters. But for Xen
+> on ARM when booting with UEFI, Xen will create a minimal DT providing
+> these parameters for Dom0 and Dom0 is not only Linux kernel, but also
+> other OS (such as FreeBSD) which will be used in the future.
 
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+Currently the Linux EFI stub and kernel have a symbiotic relationship,
+because they're intimately coupled and we don't have kexec (yet) on EFI
+platforms to loosen that coupling.
+
+If an agent other than the (kernel-specific) stub is going to provide
+this to the kernel, then we need more specified than just the property
+names.
+
+That at least includes the following:
+
+* The state of boot services (we currently have the EFI stub call
+  ExitBootServices(), and I believe this is crucial to the plan for
+  kexec).
+
+* The state of the address map (we currently have the EFI stub call
+  SetVirtualAddressMap()).
+
+* The virtual address range(s) that SetVirtualAddressMap() may map
+  elements to (this logic is currently in the EFI stub, and this matches
+  the expectations of the kernel that it is tied to).
+
+> So here we plan to standardize the names by dropping the prefix
+> "linux," and make them common to other OS. Also this will not break
+> the compatibility since these parameters are used to internal
+> communication between EFI stub and kernel.
+
+For the moment this is true, but will not be once we have kexec, so
+there's a dependency (or anti-dependency) there.
+
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 > ---
-> Changes since v1:
-> - renamed dts from sun7i-a20-olinuxino-evb to sun7i-a20-olimex-som-evb
-> - added "axp209 dtsi"
-> - change regulator settings
-> ---
->  arch/arm/boot/dts/Makefile                     |   1 +
->  arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 216 +++++++++++++++++++++++++
->  2 files changed, 217 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> Look at [1] for the discussion about this in Xen ML. The purpose of this
+> patch is to standardize the names to make Linux ARM kernel work on Xen
+> with UEFI. Also it hopes other OS(e.g. FreeBSD), which will be used as
+> Dom0 on Xen, could support this mechanism as well.
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index f830e1f..e4e1d29 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -588,6 +588,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->  	sun7i-a20-i12-tvbox.dtb \
->  	sun7i-a20-m3.dtb \
->  	sun7i-a20-mk808c.dtb \
-> +	sun7i-a20-olimex-som-evb.dtb \
->  	sun7i-a20-olinuxino-lime.dtb \
->  	sun7i-a20-olinuxino-lime2.dtb \
->  	sun7i-a20-olinuxino-micro.dtb \
-> diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-> new file mode 100644
-> index 0000000..36d1e77
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-> @@ -0,0 +1,216 @@
-> +/*
-> + * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun7i-a20.dtsi"
-> +#include "sunxi-common-regulators.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
-> +
-> +/ {
-> +	model = "Olimex A20-Olimex-SOM-EVB";
-> +	compatible = "olimex,a20-olimex-som-evb", "allwinner,sun7i-a20";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pins_olimex_som_evb>;
-> +
-> +		green {
-> +			label = "a20-olimex-som-evb:green:usr";
-> +			gpios = <&pio 7 2 GPIO_ACTIVE_HIGH>;
-> +			default-state = "on";
-> +		};
-> +	};
-> +
-> +	reg_axp_ipsout: axp_ipsout {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "axp-ipsout";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-always-on;
-> +	};
-> +};
-> +
-> +&ahci {
-> +	target-supply = <&reg_ahci_5v>;
-> +	status = "okay";
-> +};
-> +
-> +&ehci0 {
-> +	status = "okay";
-> +};
-> +
-> +&ehci1 {
-> +	status = "okay";
-> +};
-> +
-> +&gmac {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&gmac_pins_rgmii_a>;
-> +	phy = <&phy1>;
-> +	phy-mode = "rgmii";
-> +	status = "okay";
-> +
-> +	phy1: ethernet-phy at 1 {
-> +		reg = <1>;
-> +	};
-> +};
-> +
-> +&i2c0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_pins_a>;
-> +	status = "okay";
-> +
-> +	axp209: pmic at 34 {
-> +		reg = <0x34>;
-> +		interrupt-parent = <&nmi_intc>;
-> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> +	};
-> +};
-> +
-> +&i2c1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c1_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&mmc0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-> +	vmmc-supply = <&reg_vcc3v3>;
-> +	bus-width = <4>;
-> +	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-> +	cd-inverted;
-> +	status = "okay";
-> +};
-> +
-> +&ohci0 {
-> +	status = "okay";
-> +};
-> +
-> +&ohci1 {
-> +	status = "okay";
-> +};
-> +
-> +&pio {
-> +	ahci_pwr_pin_olimex_som_evb: ahci_pwr_pin at 1 {
-> +		allwinner,pins = "PC3";
-> +		allwinner,function = "gpio_out";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +	};
-> +
-> +	led_pins_olimex_som_evb: led_pins at 0 {
-> +		allwinner,pins = "PH2";
-> +		allwinner,function = "gpio_out";
-> +		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +	};
-> +};
-> +
-> +&reg_ahci_5v {
-> +	pinctrl-0 = <&ahci_pwr_pin_olimex_som_evb>;
-> +	gpio = <&pio 2 3 GPIO_ACTIVE_HIGH>;
-> +	status = "okay";
-> +};
-> +
-> +#include "axp209.dtsi"
-> +
-> +&reg_dcdc2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1000000>;
-> +	regulator-max-microvolt = <1425000>;
+> [1]http://lists.xenproject.org/archives/html/xen-devel/2015-08/msg02250.html
 
-This is outside of the CPU operating voltage.
+Per this post, it looks like to pass a DTB to the kernel Xen already
+needs to know it's a Linux kernel...
 
-> +	regulator-name = "vdd-cpu";
-> +};
-> +
-> +&reg_dcdc3 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1000000>;
-> +	regulator-max-microvolt = <1400000>;
-> +	regulator-name = "vdd-int-dll";
-> +};
-> +
-> +&reg_ldo1 {
-> +	regulator-name = "vdd-rtc";
-> +};
-> +
-> +&reg_ldo2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3000000>;
-> +	regulator-max-microvolt = <3000000>;
-> +	regulator-name = "avcc";
-> +};
-> +
-> +&reg_usb0_vbus {
-> +	status = "okay";
-> +};
-> +
-> +&reg_usb1_vbus {
-> +	status = "okay";
-> +};
-> +
-> +&reg_usb2_vbus {
-> +	status = "okay";
-> +};
-> +
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&usbphy {
-> +	usb1_vbus-supply = <&reg_usb1_vbus>;
-> +	usb2_vbus-supply = <&reg_usb2_vbus>;
-> +	status = "okay";
-> +};
+I wasn't aware that there was a common standard for arm(64) kernels
+other than a PE/COFF EFI application.
 
-It looks good otherwise, thanks!
+Does Xen not talk to EFI itself and/or give the kernel a virtual EFI
+interface?
 
-Maxime
+Thanks,
+Mark.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150910/2979c35b/attachment-0001.sig>
+>  Documentation/arm/uefi.txt         | 10 +++++-----
+>  drivers/firmware/efi/efi.c         | 10 +++++-----
+>  drivers/firmware/efi/libstub/fdt.c | 10 +++++-----
+>  3 files changed, 15 insertions(+), 15 deletions(-)
+> 
+> diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
+> index d60030a..8c83243 100644
+> --- a/Documentation/arm/uefi.txt
+> +++ b/Documentation/arm/uefi.txt
+> @@ -45,18 +45,18 @@ following parameters:
+>  ________________________________________________________________________________
+>  Name                      | Size   | Description
+>  ================================================================================
+> -linux,uefi-system-table   | 64-bit | Physical address of the UEFI System Table.
+> +uefi-system-table         | 64-bit | Physical address of the UEFI System Table.
+>  --------------------------------------------------------------------------------
+> -linux,uefi-mmap-start     | 64-bit | Physical address of the UEFI memory map,
+> +uefi-mmap-start           | 64-bit | Physical address of the UEFI memory map,
+>                            |        | populated by the UEFI GetMemoryMap() call.
+>  --------------------------------------------------------------------------------
+> -linux,uefi-mmap-size      | 32-bit | Size in bytes of the UEFI memory map
+> +uefi-mmap-size            | 32-bit | Size in bytes of the UEFI memory map
+>                            |        | pointed to in previous entry.
+>  --------------------------------------------------------------------------------
+> -linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
+> +uefi-mmap-desc-size       | 32-bit | Size in bytes of each entry in the UEFI
+>                            |        | memory map.
+>  --------------------------------------------------------------------------------
+> -linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
+> +uefi-mmap-desc-ver        | 32-bit | Version of the mmap descriptor format.
+>  --------------------------------------------------------------------------------
+>  linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
+>  --------------------------------------------------------------------------------
+> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> index d6144e3..3878715 100644
+> --- a/drivers/firmware/efi/efi.c
+> +++ b/drivers/firmware/efi/efi.c
+> @@ -481,11 +481,11 @@ static __initdata struct {
+>  	int offset;
+>  	int size;
+>  } dt_params[] = {
+> -	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
+> -	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
+> -	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
+> -	UEFI_PARAM("MemMap Desc. Size", "linux,uefi-mmap-desc-size", desc_size),
+> -	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
+> +	UEFI_PARAM("System Table", "uefi-system-table", system_table),
+> +	UEFI_PARAM("MemMap Address", "uefi-mmap-start", mmap),
+> +	UEFI_PARAM("MemMap Size", "uefi-mmap-size", mmap_size),
+> +	UEFI_PARAM("MemMap Desc. Size", "uefi-mmap-desc-size", desc_size),
+> +	UEFI_PARAM("MemMap Desc. Version", "uefi-mmap-desc-ver", desc_ver)
+>  };
+>  
+>  struct param_info {
+> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+> index ef5d764..e94589a 100644
+> --- a/drivers/firmware/efi/libstub/fdt.c
+> +++ b/drivers/firmware/efi/libstub/fdt.c
+> @@ -118,31 +118,31 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+>  	/* Add FDT entries for EFI runtime services in chosen node. */
+>  	node = fdt_subnode_offset(fdt, 0, "chosen");
+>  	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)sys_table);
+> -	status = fdt_setprop(fdt, node, "linux,uefi-system-table",
+> +	status = fdt_setprop(fdt, node, "uefi-system-table",
+>  			     &fdt_val64, sizeof(fdt_val64));
+>  	if (status)
+>  		goto fdt_set_fail;
+>  
+>  	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)memory_map);
+> -	status = fdt_setprop(fdt, node, "linux,uefi-mmap-start",
+> +	status = fdt_setprop(fdt, node, "uefi-mmap-start",
+>  			     &fdt_val64,  sizeof(fdt_val64));
+>  	if (status)
+>  		goto fdt_set_fail;
+>  
+>  	fdt_val32 = cpu_to_fdt32(map_size);
+> -	status = fdt_setprop(fdt, node, "linux,uefi-mmap-size",
+> +	status = fdt_setprop(fdt, node, "uefi-mmap-size",
+>  			     &fdt_val32,  sizeof(fdt_val32));
+>  	if (status)
+>  		goto fdt_set_fail;
+>  
+>  	fdt_val32 = cpu_to_fdt32(desc_size);
+> -	status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-size",
+> +	status = fdt_setprop(fdt, node, "uefi-mmap-desc-size",
+>  			     &fdt_val32, sizeof(fdt_val32));
+>  	if (status)
+>  		goto fdt_set_fail;
+>  
+>  	fdt_val32 = cpu_to_fdt32(desc_ver);
+> -	status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-ver",
+> +	status = fdt_setprop(fdt, node, "uefi-mmap-desc-ver",
+>  			     &fdt_val32, sizeof(fdt_val32));
+>  	if (status)
+>  		goto fdt_set_fail;
+> -- 
+> 2.0.4
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
