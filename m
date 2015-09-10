@@ -1,90 +1,75 @@
-From: graeme.gregory@linaro.org (Graeme Gregory)
-Date: Thu, 10 Sep 2015 13:16:12 +0100
-Subject: [Linaro-acpi] [PATCH v3 0/5] ACPI: Provide better MADT subtable
- sanity checks
-In-Reply-To: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
-References: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
-Message-ID: <20150910121612.GB11267@xora-haswell.xora.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 10 Sep 2015 14:40:26 +0200
+Subject: [PATCH 3/8] mmc: core: Add mmc_regulator_set_vqmmc()
+In-Reply-To: <CAD=FV=Wy7foROYkmR+cX+NS5-=BaB36WsW1sc1XjmmdUnPCxsA@mail.gmail.com>
+References: <1441045446-30858-1-git-send-email-heiko@sntech.de>
+ <1441045446-30858-4-git-send-email-heiko@sntech.de>
+ <CAPDyKFqJp3VuOeTh4Abkn2X6gQxNHDXwJj8N51OxxSo+Agespw@mail.gmail.com>
+ <CAD=FV=Wy7foROYkmR+cX+NS5-=BaB36WsW1sc1XjmmdUnPCxsA@mail.gmail.com>
+Message-ID: <CAPDyKFqR-+GzV0SGiA_cnoNftcZ0Y_fwe5vW2NvDxd6HbO__UQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 09, 2015 at 03:09:46PM -0600, Al Stone wrote:
-> Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
-> check on the various subtables that are defined for the MADT.  The check
-> compares the size of the subtable data structure as defined by ACPICA to
-> the length entry in the subtable.  If they are not the same, the assumption
-> is that the subtable is incorrect.
-> 
-> Over time, the ACPI spec has allowed for MADT subtables where this can
-> never be true (the local SAPIC subtable, for example).  Or, more recently,
-> the spec has accumulated some minor flaws where there are three possible 
-> sizes for a subtable, all of which are valid, but only for specific versions
-> of the spec (the GICC subtable).  In both cases, BAD_MADT_ENTRY reports these
-> subtables as bad when they are not.  In order to retain some sanity check
-> on the MADT subtables, we now have to special case these subtables.  Of
-> necessity, these special cases have ended up in arch-dependent code (arm64)
-> or an arch has simply decided to forgo the check (ia64).
-> 
-> This patch set replaces the BAD_MADT_ENTRY macro with a function called
-> bad_madt_entry().  This function uses a data set of details about the
-> subtables to provide more sanity checking than before:
-> 
-> 	-- is the subtable legal for the version given in the FADT?
-> 
-> 	-- is the subtable legal for the revision of the MADT in use?
-> 
-> 	-- is the subtable of the proper length (including checking
-> 	   on the one variable length subtable that is currently ignored),
-> 	   given the FADT version and the MADT revision?
-> 
-> Further, this patch set adds in the call to bad_madt_entry() from the 
-> acpi_table_parse_madt() function, allowing it to be used consistently
-> by all architectures, for all subtables, and removing the need for each
-> of the subtable traversal callback functions to use BAD_MADT_ENTRY.
-> 
-> In theory, as the ACPI specification changes, we would only have to add
-> additional information to the data set describing the MADT subtables in
-> order to continue providing sanity checks, even when new subtables are
-> added.
-> 
-> These patches have been tested on an APM Mustang (arm64) and are known to
-> work there.  They have also been cross-compiled for x86 and ia64 with no
-> known failures.
-> 
-> Changes for v3:
->    -- Reviewed-and-tested-by from Sudeep Holla for arm64 parts
->    -- Clearer language in error messages (Graeme Gregory, Timur Tabi)
->    -- Double checked that inserting call to bad_madt_entry() into the
->       function acpi_parse_entries() does not impact current behavior
->       (Sudeep Holla)
->    
-> Changes for v2:
->    -- Acked-by on 2/5 from Marc Zyngier and Catalin Marinas for ARM
->    -- Correct faulty end of loop test found by Timur Tabi
-> 
-> 
-> Al Stone (5):
->   ACPI: add in a bad_madt_entry() function to eventually replace the
->     macro
->   ACPI / ARM64: remove usage of BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
->   ACPI / IA64: remove usage of BAD_MADT_ENTRY
->   ACPI / X86: remove usage of BAD_MADT_ENTRY
->   ACPI: remove definition of BAD_MADT_ENTRY macro
-> 
->  arch/arm64/include/asm/acpi.h |   8 --
->  arch/arm64/kernel/smp.c       |   2 -
->  arch/ia64/kernel/acpi.c       |  20 ----
->  arch/x86/kernel/acpi/boot.c   |  27 -----
->  drivers/acpi/tables.c         | 245 +++++++++++++++++++++++++++++++++++++++++-
->  drivers/irqchip/irq-gic.c     |   6 --
->  include/linux/acpi.h          |   4 -
->  7 files changed, 244 insertions(+), 68 deletions(-)
-> 
+On 2 September 2015 at 18:20, Doug Anderson <dianders@chromium.org> wrote:
+> Ulf,
+>
+> On Wed, Sep 2, 2015 at 4:38 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> +/**
+>>> + * mmc_regulator_set_vqmmc - Set VQMMC as per the ios
+>>> + *
+>>> + * For 3.3V signaling, we try to match VQMMC to VMMC as closely as possible.
+>>
+>> Looking at the code, I don't think this statement is entirely true.
+>> Isn't it so that we will be trying with a maximum tolerance of 0.3 V
+>> towards the VMMC voltage level (then fall-back to the complete range)?
+>> Perhaps you can find a better way to describe that in the change log.
+>
+> If regulator_set_voltage_triplet() is ever implemented more correctly
+> then the description here is correct.  ...the problem is that
+> regulator_set_voltage_triplet() is still using the same shortcut that
+> regulator_set_voltage_tol() was using.
 
-Whole series looks good to me apart from minor whitespace nit.
+Okay, let's mention that somehow.
 
-Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
+>
+>
+>>> +int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios)
+>>> +{
+>>> +       int volt, min_uV, max_uV;
+>>> +
+>>> +       /* If no vqmmc supply then we can't change the voltage */
+>>> +       if (IS_ERR(mmc->supply.vqmmc))
+>>> +               return -EINVAL;
+>>
+>> In general vqmmc is considered as an optional regulator and that's
+>> also how host drivers treat it. So perhaps it would make sense to
+>> return 0 here instead of an error code or what do you think?
+>
+> The idea is that since this is intended to be called by
+> start_signal_voltage_switch() and having no vqmmc should be considered
+> an error for start_signal_voltage_switch() then it should be an error
+> here.  What do you think?
 
-Thanks
+Okay!
 
-G
+>
+>
+>>> +
+>>> +               /* try to stay close to vmmc at first */
+>>> +               if (!mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
+>>> +                                               min_uV, volt, max_uV))
+>>> +                       return 0;
+>>> +
+>>> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
+>>> +                                               2700000, volt, 3600000);
+>
+> The whole fact that there are two calls here is really just because of
+> the limitations of the current implementation of
+> regulator_set_voltage_triplet().  If that implementation is ever fixed
+> then we'd just need a single call.  Probably worth a comment saying
+> that?
+
+Yes, please!
+
+Kind regards
+Uffe
