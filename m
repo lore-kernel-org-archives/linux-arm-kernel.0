@@ -1,102 +1,56 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu, 10 Sep 2015 13:21:12 +0530
-Subject: sdhci: runtime suspend/resume on card insert/removal
-In-Reply-To: <20150910153129.07adbe68@xhacker>
-References: <55F12CF8.50003@linaro.org> <20150910153129.07adbe68@xhacker>
-Message-ID: <55F13670.1020902@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 10 Sep 2015 09:53:41 +0200
+Subject: [PATCH v2 1/3] ARM: Make FORCE_MAX_ZONEORDER configurable if
+ ARM_SINGLE_ARMV7M
+In-Reply-To: <20150909054125.GA14598@pengutronix.de>
+References: <1441744686-20521-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1441744686-20521-2-git-send-email-mcoquelin.stm32@gmail.com>
+ <20150908221912.GE21084@n2100.arm.linux.org.uk>
+ <20150909054125.GA14598@pengutronix.de>
+Message-ID: <20150910075340.GJ14598@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Sep 09, 2015 at 07:41:25AM +0200, Uwe Kleine-K?nig wrote:
+> On Tue, Sep 08, 2015 at 11:19:13PM +0100, Russell King - ARM Linux wrote:
+> > On Tue, Sep 08, 2015 at 10:38:04PM +0200, Maxime Coquelin wrote:
+> > > This patch makes FORCE_MAX_ZONEORDER configurable in defconfig for ARMV7-M
+> > > when built for a single platform.
+> > 
+> > I'd prefer if we didn't do this, because this isn't supposed to be a user
+> > visible "option".  It's an option that was introduced to avoid having to
+> > throw masses of #ifdefs into the definition of MAX_ZONEORDER.
+> > 
+> > The problem with it is that it's a "well, what do I set this to?" option
+> > and that leads to "oh, I'll just choose the default because I don't know
+> > any better".
+> > 
+> > Do we know why EFM32 needs a value of 9 here?  It's not documented in
+> > the original commit, and it really _should_ have been.
+> IIRC it was done because of memory pressure. But not sure this makes any
+> sense. I will try with the default value later today and report back.
+I updated my patch stack to 4.2 and the difference between 9 and 11 is:
 
+Using 9:
 
-On Thursday 10 September 2015 01:01 PM, Jisheng Zhang wrote:
-> Hi Vaibhav,
->
-> On Thu, 10 Sep 2015 12:40:48 +0530
-> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
->
->> Hi,
->>
->> During my testing of SDHCI-PXAV3 driver on Marvell's pxa1928
->> based platform, I observed that runtime PM suspend/resume is having
->> issues with card insertion and removal.
->>
->> Let me try to explain it using execution sequence -
->>
->> During boot:
->>
->> MMC SD card gets detected as expected.
->>
->> [    2.431012] mmc1: new high speed SDHC card at address 1234
->> [    2.437235] mmcblk1: mmc1:1234 SA04G 3.63 GiB
->> [    2.444841]  mmcblk1: p1
->>
->>
->> Now after coming to the linux prompt, if card removal event occurs
->> then the call sequence is -
->>
->>    sdhci_irq() -->
->>     -> sdhci_thread_irq(): host->thread_isr - 0x80
->>        -> sdhci_card_event()
->>        -> mmc_detect_change()
->>           --> _mmc_detect_change()
->>               --->  mmc_sd_detect()
->>                     mmc_sd_remove()
->>                     mmc_remove_card()
->>                     mmc_bus_remove()
->>                     mmc_power_off()
->>                     mmc_set_initial_state()
->>                     sdhci_set_ios()
->>                     ...
->>          sdhci_pxav3_runtime_suspend()
->>          sdhci_runtime_suspend_host()
->>
->>
->> Till here everything looks perfect :) (if I got it right)
->>
->> Now on card insertion again, the expectation is, runtime resume should
->> get called as part of interrupt trigger from the SDHCI controller on
->> card insertion.
->
-> AFAIK, card insertion => wakeup irq, this irq doesn't come from SDHCI
-> controller itself because SDHCI controller is runtime suspended, clk gated
-> or power gated. So the wakeup irq should come from other always on components.
-> Take Marvell berlin SoC as an example:
->
-> there's gpio for sdcard detect, card insertion => trigger cd gpio interrupt
-> =>resume sdhci host etc.
+	/ # free
+		     total         used         free       shared      buffers
+	Mem:          3744         1688         2056            0            0
+	-/+ buffers:               1688         2056
 
-Not always.
+vs. using 11:
 
-In my case SDHCI controller is generating card insert and remove
-event/interrupts. Just to add here, I am not configuring any pins
-to GPIO mode. My pin configuration for card-detect is in MMC_CD mode.
+	/ # free
+		     total         used         free       shared      buffers
+	Mem:          3744         1696         2048            0            0
+	-/+ buffers:               1696         2048
 
-The card insertion and removal interrupt is mapped to SDHCI interrupt
-line, which is interrupt number 12 in my case.
+so it works with bearable costs. If you want to get rid of the special
+casing for efm32 that's fine for me.
 
-# cat /proc/interrupts
-            CPU0
-  11:         55       GIC 105 Level     mmc0
-  12:        220       GIC 101 Level     mmc1
+Best regards
+Uwe
 
-
->
-> If your changes work, the I guess your SDHCI host are not clk gated or
-> power gated during runtime suspended.
->
-
-This is what I suspected initially, but it doesn't look that way.
-
-Without this change, if I just disable/remove
-
-    pm_runtime_put_autosuspend(&pdev->dev);
-
-then also it works for me.  What it tells me that, if I disable 
-runtime_pm then it works.
-
-I can cross-check register values to make sure that it is really turned
-off. Let me do that as well.
-
-Thanks,
-Vaibhav
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
