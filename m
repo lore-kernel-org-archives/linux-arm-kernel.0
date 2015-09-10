@@ -1,72 +1,80 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 10 Sep 2015 17:20:20 +0100
-Subject: [PATCH v2 1/5] ACPI: add in a bad_madt_entry() function to
- eventually replace the macro
-In-Reply-To: <55F08F47.1070906@redhat.com>
-References: <1440022048-6285-1-git-send-email-al.stone@linaro.org>
- <1440022048-6285-2-git-send-email-al.stone@linaro.org>
- <55EDADF5.5060008@arm.com> <55F08F47.1070906@redhat.com>
-Message-ID: <55F1ADC4.7090005@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 10 Sep 2015 17:23:02 +0100
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
+References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
+ <20150910095208.GA29293@leverpostej>
+ <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
+ <20150910112418.GC29293@leverpostej>
+ <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
+ <20150910121514.GE29293@leverpostej>
+ <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
+ <20150910144938.GI29293@leverpostej>
+ <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
+Message-ID: <20150910162302.GN29293@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> > C) When you could go:
+> > 
+> >    DT -> Discover Xen -> Xen-specific stuff -> Xen-specific EFI/ACPI discovery
+> 
+> I take you mean discovering Xen with the usual Xen hypervisor node on
+> device tree. I think that C) is a good option actually. I like it. Not
+> sure why we didn't think about this earlier. Is there anything EFI or
+> ACPI which is needed before Xen support is discovered by
+> arch/arm64/kernel/setup.c:setup_arch -> xen_early_init()?
 
+Currently lots (including the memory map). With the stuff to support
+SPCR, the ACPI discovery would be moved before xen_early_init().
 
-On 09/09/15 20:57, Al Stone wrote:
-> On 09/07/2015 09:32 AM, Sudeep Holla wrote:
->> Hi Al,
->>
->> On 19/08/15 23:07, Al Stone wrote:
->>
->> I finally got a chance to try this series on Juno. Well it exposed a firmware
->> bug in MADT table :)
->>
->> [..]
->>
->>>                   acpi_tbl_entry_handler handler,
->>> @@ -245,6 +484,8 @@ acpi_parse_entries(char *id, unsigned long table_size,
->>>                  table_end) {
->>>                   if (entry->type == entry_id
->>>                       && (!max_entries || count < max_entries)) {
->>> +                       if (bad_madt_entry(table_header, entry))
->>> +                               return -EINVAL;
->>
->> Not sure if we can have the above check here unconditionally.
->> Currently I can see there are 2 other users of acpi_parse_entries i.e.
->> PCC and NUMA. So may be it can be made conditional or return success for
->> non-MADT tables from bad_madt_entry ?
->
-> So, I went back and double checked the other users and they're looking at
-> the return value for acpi_parse_entries properly; adding in the check above
-> unconditionally should not cause any behavior change.
+> If not, we could just go for this. A lot of complexity would go away.
 
-I disagree. I populated PCCT table on Juno to get this error for
-PCCT(PCCT header gets interpreted as MADT header):
-"
-ACPI: undefined version for either FADT 5.1 or MADT 1
-Error parsing PCC subspaces from PCCT
-"
-And here the stacktrace:
-[<ffffffc000881e58>] bad_madt_entry+0x90/0x16c
-[<ffffffc000882030>] acpi_table_parse_entries+0xfc/0x180
-[<ffffffc000895af8>] pcc_init+0x70/0x148
+I suspect this would still be fairly complex, but would at least prevent
+the Xen-specific EFI handling from adversely affecting the native case.
 
-> Further, despite the name, acpi_parse_entries is only used to examine MADT
-> subtables.  Granted, we should probably make the name clearer at some point
-> (too ambiguous as to which entries are parsed right now).  Nonetheless, current
-> usage seems to be in order.
->
+> > D) If you want to be generic:
+> >    EFI -> EFI application -> EFI tables -> ACPI tables -> Xen-specific stuff
+> >           \------------------------------------------/
+> > 	   (virtualize these, provide shims to Dom0, but handle
+> > 	    everything in Xen itself)
+> 
+> I think that this is good in theory but could turn out to be a lot of
+> work in practice. We could probably virtualize the RuntimeServices but
+> the BootServices are troublesome.
 
- From the code inspection, I can see we have 3 users of 
-acpi_parse_entries not just MADT but also PCC and NUMA/SRAT
+What's troublesome with the boot services?
 
-Something like this solves this issue:
--              if (bad_madt_entry(table_header, entry))
-+              if (!strncmp(id, ACPI_SIG_MADT, 4) &&
-+                      bad_madt_entry(table_header, entry)
+What can't be simulated?
 
+> > E) Partially-generic option:
+> >    EFI -> EFI application -> Xen detected by registered GUID -> Xen-specific EFI bootloader stuff -> OS in Xen-specific configuration
+> > 
+> > 
+> > > > > In any case this should be separate from the shim ABI discussion.
+> > > > 
+> > > > I disagree; I think this is very much relevant to the ABI discussion.
+> > > > That's not to say that I insist on a particular approach, but I think
+> > > > that they need to be considered together.
+> > > 
+> > > Let's suppose Xen didn't expose any RuntimeServices at all, would that
+> > > make it easier to discuss about the EFI stub parameters?
+> > 
+> > It would simply the protocol specific to Xen, certainly.
+> > 
+> > > In the grant scheme of things, they are not that important, as Ian
+> > > wrote what is important is how to pass the RSDP.
+> > 
+> > Unfortunately we're still going to have to care about this eventually,
+> > even if for something like kexec. So we still need to spec out the state
+> > of things if this is going to be truly generic.
+>  
+> Fair enough. My position is that if we restrict this to RuntimeServices,
+> it might be possible, but I still prefer C).
 
-Or am I still missing something ?
+Regardless of what we do we still need a well-defined state here, which
+brings us back to the initial problem eventually.
 
-Regards,
-Sudeep
+Thanks,
+Mark.
