@@ -1,27 +1,27 @@
 From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Thu, 10 Sep 2015 10:31:19 +0200
-Subject: [PATCH v2 3/5] dts: sunxi: add eeprom to A20 OLinuXino Lime board
+Date: Thu, 10 Sep 2015 10:31:17 +0200
+Subject: [PATCH v2 1/5] dts: sunxi: add eeprom to A10 OLinuXino Lime board
 In-Reply-To: <1441873881-3665-1-git-send-email-o.schinagl@ultimaker.com>
 References: <1441873881-3665-1-git-send-email-o.schinagl@ultimaker.com>
-Message-ID: <1441873881-3665-4-git-send-email-o.schinagl@ultimaker.com>
+Message-ID: <1441873881-3665-2-git-send-email-o.schinagl@ultimaker.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Olliver Schinagl <oliver@schinagl.nl>
 
-The Olimex A20 OLinuXino Lime features an eeprom that is always on the
+The Olimex A10 OLinuXino Lime features an eeprom that is always on the
 board. This patch adds it to the dts.
 
 Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 ---
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts | 12 ++++++++++++
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
-index 769726d..6710d25 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
-@@ -117,6 +117,18 @@
+diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+index b64aa4e..0f3ed86 100644
+--- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
++++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+@@ -124,6 +124,18 @@
  	};
  };
  
@@ -37,8 +37,8 @@ index 769726d..6710d25 100644
 +	};
 +};
 +
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
+ &mdio {
+ 	status = "okay";
+ 
 -- 
 2.1.4
