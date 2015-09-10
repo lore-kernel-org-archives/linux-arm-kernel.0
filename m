@@ -1,35 +1,112 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 10 Sep 2015 17:30:17 +0100
-Subject: [PATCH v4 3/4] irqchip: GIC: Convert to EOImode == 1
-In-Reply-To: <55F1B011.6090204@arm.com>
-References: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
- <1440604845-28229-4-git-send-email-marc.zyngier@arm.com>
- <55F08731.3050402@citrix.com> <55F15353.2000800@arm.com>
- <55F1AE75.6000405@citrix.com> <55F1B011.6090204@arm.com>
-Message-ID: <55F1B019.6050800@citrix.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 10 Sep 2015 17:29:52 +0100
+Subject: [PATCH 1/2] xen/swiotlb: Pass addresses rather than frame numbers
+ to xen_arch_need_swiotlb
+In-Reply-To: <1441892562-22059-2-git-send-email-julien.grall@citrix.com>
+References: <1441892562-22059-1-git-send-email-julien.grall@citrix.com>
+ <1441892562-22059-2-git-send-email-julien.grall@citrix.com>
+Message-ID: <alpine.DEB.2.02.1509101718400.2672@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/15 17:30, Marc Zyngier wrote:
-> On 10/09/15 17:23, Julien Grall wrote:
->> On 10/09/15 10:54, Marc Zyngier wrote:
+On Thu, 10 Sep 2015, Julien Grall wrote:
+> With 64KB page granularity support, the frame number will be different.
 > 
-> [...]
+> It will be easier to modify the behavior in a single place rather than
+> in each caller.
 > 
->>> In the meantime, can you give the following patch a shot? My Mustang is 
->>> wired to a 4kB CPU interface, so I'll need your help to test it.
->>
->> I applied the two patches on top of linus/master and I'm able to boot
->> correctly on X-gene. Thank you!
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
 > 
-> Thanks for testing. Can I put your Tested-by tag on the patch when I
-> send it to Thomas?
 
-Sure:
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-Tested-by: Julien Grall <julien.grall@citrix.com>
-
-Regards,
-
--- 
-Julien Grall
+> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: David Vrabel <david.vrabel@citrix.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: "H. Peter Anvin" <hpa@zytor.com>
+> Cc: x86 at kernel.org
+> ---
+>  arch/arm/include/asm/xen/page.h | 4 ++--
+>  arch/arm/xen/mm.c               | 7 +++++--
+>  arch/x86/include/asm/xen/page.h | 4 ++--
+>  drivers/xen/swiotlb-xen.c       | 4 ++--
+>  4 files changed, 11 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+> index e3d94cf..415dbc6 100644
+> --- a/arch/arm/include/asm/xen/page.h
+> +++ b/arch/arm/include/asm/xen/page.h
+> @@ -115,8 +115,8 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+>  #define xen_unmap(cookie) iounmap((cookie))
+>  
+>  bool xen_arch_need_swiotlb(struct device *dev,
+> -			   unsigned long pfn,
+> -			   unsigned long bfn);
+> +			   phys_addr_t phys,
+> +			   dma_addr_t dev_addr);
+>  unsigned long xen_get_swiotlb_free_pages(unsigned int order);
+>  
+>  #endif /* _ASM_ARM_XEN_PAGE_H */
+> diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+> index 6dd911d..7b517e91 100644
+> --- a/arch/arm/xen/mm.c
+> +++ b/arch/arm/xen/mm.c
+> @@ -138,9 +138,12 @@ void __xen_dma_sync_single_for_device(struct device *hwdev,
+>  }
+>  
+>  bool xen_arch_need_swiotlb(struct device *dev,
+> -			   unsigned long pfn,
+> -			   unsigned long bfn)
+> +			   phys_addr_t phys,
+> +			   dma_addr_t dev_addr)
+>  {
+> +	unsigned long pfn = PFN_DOWN(phys);
+> +	unsigned long bfn = PFN_DOWN(dev_addr);
+> +
+>  	return (!hypercall_cflush && (pfn != bfn) && !is_device_dma_coherent(dev));
+>  }
+>  
+> diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
+> index 2a05e691..84c4757 100644
+> --- a/arch/x86/include/asm/xen/page.h
+> +++ b/arch/x86/include/asm/xen/page.h
+> @@ -296,8 +296,8 @@ void make_lowmem_page_readwrite(void *vaddr);
+>  #define xen_unmap(cookie) iounmap((cookie))
+>  
+>  static inline bool xen_arch_need_swiotlb(struct device *dev,
+> -					 unsigned long pfn,
+> -					 unsigned long bfn)
+> +					 phys_addr_t phys,
+> +					 dma_addr_t dev_addr);
+>  {
+>  	return false;
+>  }
+> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+> index d757a3e..cfe755d 100644
+> --- a/drivers/xen/swiotlb-xen.c
+> +++ b/drivers/xen/swiotlb-xen.c
+> @@ -398,7 +398,7 @@ dma_addr_t xen_swiotlb_map_page(struct device *dev, struct page *page,
+>  	 */
+>  	if (dma_capable(dev, dev_addr, size) &&
+>  	    !range_straddles_page_boundary(phys, size) &&
+> -		!xen_arch_need_swiotlb(dev, PFN_DOWN(phys), PFN_DOWN(dev_addr)) &&
+> +		!xen_arch_need_swiotlb(dev, phys, dev_addr) &&
+>  		!swiotlb_force) {
+>  		/* we are not interested in the dma_addr returned by
+>  		 * xen_dma_map_page, only in the potential cache flushes executed
+> @@ -557,7 +557,7 @@ xen_swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl,
+>  		dma_addr_t dev_addr = xen_phys_to_bus(paddr);
+>  
+>  		if (swiotlb_force ||
+> -		    xen_arch_need_swiotlb(hwdev, PFN_DOWN(paddr), PFN_DOWN(dev_addr)) ||
+> +		    xen_arch_need_swiotlb(hwdev, paddr, dev_addr) ||
+>  		    !dma_capable(hwdev, dev_addr, sg->length) ||
+>  		    range_straddles_page_boundary(paddr, sg->length)) {
+>  			phys_addr_t map = swiotlb_tbl_map_single(hwdev,
+> -- 
+> 2.1.4
+> 
