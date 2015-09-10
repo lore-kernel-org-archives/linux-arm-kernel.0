@@ -1,53 +1,256 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 10 Sep 2015 11:29:03 +0200
-Subject: [PATCH] tty/serial: at91: move ATMEL_MAX_UART
-Message-ID: <1441877343-20248-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: dongsheng.wang@freescale.com (Dongsheng Wang)
+Date: Thu, 10 Sep 2015 17:36:36 +0800
+Subject: [PATCH] arm/ls1021a: Add Sleep feature for ls1021
+Message-ID: <1441877796-32232-1-git-send-email-dongsheng.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move ATMEL_MAX_UART from platform_data/atmel.h to atmel_serial.c as this is
-the only file using it and it is common practise from tty/serial drivers to
-define it directly in the driver file.
+From: Wang Dongsheng <dongsheng.wang@freescale.com>
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/tty/serial/atmel_serial.c   | 6 ++++++
- include/linux/platform_data/atmel.h | 6 ------
- 2 files changed, 6 insertions(+), 6 deletions(-)
+Based on PSCI framework, add system STANDBY implement for ls1021 platform.
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 5ca5cf3e9359..98c84038518e 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -112,6 +112,12 @@ struct atmel_uart_char {
- #define ATMEL_SERIAL_RINGSIZE 1024
+Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
+Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index fb689d8..d7a2d1d 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -90,6 +90,7 @@ ifeq ($(CONFIG_SUSPEND),y)
+ AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+ obj-$(CONFIG_SOC_IMX6) += suspend-imx6.o
+ obj-$(CONFIG_SOC_IMX53) += suspend-imx53.o
++obj-$(CONFIG_SOC_LS1021A) += pm-ls1.o
+ endif
+ obj-$(CONFIG_SOC_IMX6) += pm-imx6.o
  
- /*
-+ * at91: 6 USARTs and one DBGU port (SAM9260)
-+ * avr32: 4
-+ */
-+#define ATMEL_MAX_UART		7
-+
+diff --git a/arch/arm/mach-imx/pm-ls1.c b/arch/arm/mach-imx/pm-ls1.c
+new file mode 100644
+index 0000000..f80b24d
+--- /dev/null
++++ b/arch/arm/mach-imx/pm-ls1.c
+@@ -0,0 +1,222 @@
 +/*
-  * We wrap our port structure around the generic uart_port.
-  */
- struct atmel_uart_port {
-diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
-index 527a85c61924..c4bc90bfebe0 100644
---- a/include/linux/platform_data/atmel.h
-+++ b/include/linux/platform_data/atmel.h
-@@ -19,12 +19,6 @@
- #include <linux/serial.h>
- #include <linux/platform_data/macb.h>
- 
--/*
-- * at91: 6 USARTs and one DBGU port (SAM9260)
-- * avr32: 4
-- */
--#define ATMEL_MAX_UART	7
--
-  /* USB Device */
- struct at91_udc_data {
- 	int	vbus_pin;		/* high == host powering us */
++ * Support Power Management Control for LS1
++ *
++ * Copyright 2015 Freescale Semiconductor Inc.
++ *
++ * This program is free software; you can redistribute	it and/or modify it
++ * under  the terms of	the GNU General	 Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
++#include <linux/psci.h>
++#include <linux/suspend.h>
++
++#include <uapi/linux/psci.h>
++
++#include <asm/cacheflush.h>
++#include <asm/psci.h>
++#include <asm/suspend.h>
++
++#define FSL_SLEEP			0x1
++#define FSL_DEEP_SLEEP			0x2
++
++#define CCSR_SCFG_CLUSTERPMCR		0x904
++#define CCSR_SCFG_CLUSTERPMCR_WFIL2EN	0x80000000
++#define CCSR_SCFG_CLUSTERPM_ENABLE	1
++#define CCSR_SCFG_CLUSTERPM_DISABLE	0
++
++#define CCSR_RCPM_IPPDEXPCR0		0x140
++#define CCSR_RCPM_IPPDEXPCR1		0x144
++#define CCSR_RCPM_IPPDEXPCR1_OCRAM1	0x10000000
++
++#define SLEEP_ARRAY_SIZE		3
++
++#define LS1_SLEEP_PARAM \
++	 (PSCI_POWER_STATE_TYPE_STANDBY << PSCI_0_2_POWER_STATE_TYPE_SHIFT)
++
++static u32 ippdexpcr0, ippdexpcr1;
++
++struct ls1_pm_baseaddr {
++	void __iomem *rcpm;
++	void __iomem *scfg;
++};
++
++static struct ls1_pm_baseaddr ls1_pm_base;
++
++static int ls1_pm_iomap(suspend_state_t state)
++{
++	struct device_node *np;
++	void *base;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-scfg");
++	if (!np) {
++		pr_err("Missing SCFG node in the device tree\n");
++		return -EINVAL;
++	}
++
++	base = of_iomap(np, 0);
++	of_node_put(np);
++	if (!base) {
++		pr_err("Couldn't map SCFG registers\n");
++		return -EINVAL;
++	}
++
++	ls1_pm_base.scfg = base;
++
++	return 0;
++}
++
++static void ls1_pm_uniomap(suspend_state_t state)
++{
++	iounmap(ls1_pm_base.scfg);
++}
++
++/* set IP powerdown exception, make them work during sleep/deep sleep */
++static void ls1_set_powerdown(void)
++{
++	iowrite32be(ippdexpcr0, ls1_pm_base.rcpm + CCSR_RCPM_IPPDEXPCR0);
++	iowrite32be(ippdexpcr1,	ls1_pm_base.rcpm + CCSR_RCPM_IPPDEXPCR1);
++}
++
++static void ls1_set_power_except(struct device *dev, int on)
++{
++	int ret;
++	u32 value[SLEEP_ARRAY_SIZE];
++
++	/*
++	 * Get the values in the "rcpm-wakeup" property. There are three values.
++	 * The first points to the RCPM node, the second is the value of
++	 * the ippdexpcr0 register, and the third is the value of
++	 * the ippdexpcr1 register.
++	 */
++	ret = of_property_read_u32_array(dev->of_node, "rcpm-wakeup",
++					 value, SLEEP_ARRAY_SIZE);
++	if (ret) {
++		dev_err(dev, "%s: Can not find the \"sleep\" property.\n",
++			__func__);
++		return;
++	}
++
++	ippdexpcr0 |= value[1];
++	ippdexpcr1 |= value[2];
++
++	pr_debug("%s: set %s as a wakeup source", __func__,
++		 dev->of_node->full_name);
++}
++
++static void ls1_set_wakeup_device(struct device *dev, void *enable)
++{
++	/* set each device which can act as wakeup source */
++	if (device_may_wakeup(dev))
++		ls1_set_power_except(dev, *((int *)enable));
++}
++
++/* enable cluster to enter the PCL10 state */
++void ls1_set_clusterpm(int enable)
++{
++	u32 val = 0;
++
++	if (enable)
++		val = CCSR_SCFG_CLUSTERPMCR_WFIL2EN;
++
++	iowrite32be(val, ls1_pm_base.scfg + CCSR_SCFG_CLUSTERPMCR);
++}
++
++static int ls1_suspend_enter(suspend_state_t state)
++{
++	int ret = -EINVAL;
++	u32 psci_state = 0;
++
++	ls1_set_powerdown();
++	ls1_set_clusterpm(CCSR_SCFG_CLUSTERPM_ENABLE);
++
++	switch (state) {
++	case PM_SUSPEND_STANDBY:
++		psci_state |= LS1_SLEEP_PARAM;
++
++		flush_cache_louis();
++		if (psci_ops.cpu_suspend)
++			ret = psci_ops.cpu_suspend(psci_state,
++						   __pa(secondary_startup));
++		break;
++	case PM_SUSPEND_MEM:
++	default:
++		break;
++	}
++
++	ls1_set_clusterpm(CCSR_SCFG_CLUSTERPM_DISABLE);
++
++	return ret;
++}
++
++static int ls1_suspend_valid(suspend_state_t state)
++{
++	if (state == PM_SUSPEND_STANDBY)
++		return 1;
++
++	return 0;
++}
++
++static int ls1_suspend_begin(suspend_state_t state)
++{
++	int res = -EINVAL;
++
++	ippdexpcr0 = 0;
++	ippdexpcr1 = 0;
++
++	if (state == PM_SUSPEND_STANDBY)
++		res = ls1_pm_iomap(state);
++
++	if (!res)
++		dpm_for_each_dev(NULL, ls1_set_wakeup_device);
++
++	return res;
++}
++
++static void ls1_suspend_end(void)
++{
++	ls1_pm_uniomap(PM_SUSPEND_STANDBY);
++}
++
++static const struct platform_suspend_ops ls1_suspend_ops = {
++	.valid = ls1_suspend_valid,
++	.enter = ls1_suspend_enter,
++	.begin = ls1_suspend_begin,
++	.end = ls1_suspend_end,
++};
++
++static const struct of_device_id rcpm_matches[] = {
++	{
++		.compatible = "fsl,ls1021a-rcpm",
++	},
++	{}
++};
++
++static int __init ls1_pm_init(void)
++{
++	const struct of_device_id *match;
++	struct device_node *np;
++
++	np = of_find_matching_node_and_match(NULL, rcpm_matches, &match);
++	if (!np) {
++		pr_err("%s: can't find the rcpm node.\n", __func__);
++		return -EINVAL;
++	}
++
++	ls1_pm_base.rcpm = of_iomap(np, 0);
++	of_node_put(np);
++	if (!ls1_pm_base.rcpm)
++		return -ENOMEM;
++
++	suspend_set_ops(&ls1_suspend_ops);
++
++	pr_info("Freescale Power Management Control Registered\n");
++
++	return 0;
++}
++arch_initcall(ls1_pm_init);
 -- 
-2.1.4
+2.1.0.27.g96db324
