@@ -1,47 +1,81 @@
-From: bayi.cheng@mediatek.com (bayi.cheng)
-Date: Fri, 11 Sep 2015 17:51:16 +0800
-Subject: [PATCH 3/3] arm64: dts: mt8173: Add nor flash node
-In-Reply-To: <55EF7346.5040607@kernel.org>
-References: <1441705796-11365-1-git-send-email-bayi.cheng@mediatek.com>
- <1441705796-11365-4-git-send-email-bayi.cheng@mediatek.com>
- <CAD6G_RTR2r8ETMQ14uGosRn-85sssvVsFT4BjK9SkVSfMkG8Dw@mail.gmail.com>
- <CAAEAJfCg+O=b9pfndG2WfxKVk9gvcqHUL0MV4fDpHj_9CaCBbQ@mail.gmail.com>
- <55EF7346.5040607@kernel.org>
-Message-ID: <1441965076.23394.7.camel@mhfsdcap03>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Sep 2015 10:54:38 +0100
+Subject: [PATCH] ARM: fix alignement of __bug_table section entries
+In-Reply-To: <8737ymuhbc.fsf@belgarion.home>
+References: <87lhcjwjde.fsf@belgarion.home>
+ <20150906194805.GP21084@n2100.arm.linux.org.uk>
+ <87egibw7yh.fsf@belgarion.home>
+ <20150906235414.GQ21084@n2100.arm.linux.org.uk>
+ <877fo0x2ur.fsf@belgarion.home>
+ <20150908200809.GC21084@n2100.arm.linux.org.uk>
+ <87mvwvurae.fsf@belgarion.home> <87egi6umi2.fsf@belgarion.home>
+ <20150910191652.GJ21084@n2100.arm.linux.org.uk>
+ <8737ymuhbc.fsf@belgarion.home>
+Message-ID: <20150911095438.GL21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-09-08 at 18:46 -0500, Rob Herring wrote:
-> On 09/08/2015 10:18 AM, Ezequiel Garcia wrote:
-> > On 8 September 2015 at 08:53, Jagan Teki <jteki@openedev.com> wrote:
-> >> On 8 September 2015 at 15:19, Bayi Cheng <bayi.cheng@mediatek.com> wrote:
-> >>> Add Mediatek nor flash node
-> >>>
-> >>> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
-> >>> ---
-> >>>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 10 ++++++++++
-> >>>  1 file changed, 10 insertions(+)
-> >>>
-> >>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >>> index d18ee42..a14f005 100644
-> >>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >>> @@ -365,6 +365,16 @@
-> >>>                         status = "disabled";
-> >>>                 };
-> >>>
-> >>> +               nor_flash: nor at 1100d000 {
-> >>
-> >> Based on the comments from 1/3 - this notation needs to be change something like
-> >> qspi0: quadspi at 1100d000
-> >>
-> > 
-> > Actually, to follow ePAPR recomendations it should be named as flash at 1100d000.
-> > (See ePAPR, 2.2.2 Generic Names Recommendation).
+On Thu, Sep 10, 2015 at 10:53:43PM +0200, Robert Jarzmik wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 > 
-> The flash device node should, but this is the controller which should be
-> "spi" IMO even if this is not a general purpose controller.
+> > I've been wondering whether we can teach GCC that set_domain modifies
+> > the value that get_domain returns, rather than throwing a volatile
+> > onto the asm in get_domain.  The issue with a volatile there is that
+> > even if the result is unused, but the code is reachable, gcc still has
+> > to output the code to read the register.
+> >
+> > We might be able to get away with a memory clobber on the set_domain,
+> > and fake a memory read in get_domain, eg, by passing
+> > 	"m" (current_thread_info()->cpu_domain))
+> > to the get_domain asm.
+> Ok, let's say we do it that way.
 > 
-> Rob
+> I have some concerns about it:
+>   (a) I see an inbalance, as set_domain() doesn't actually modify
+>       current_thread_info()->cpu_domain. I don't see how it will protect use
+>       from this scenario :
+>         - get_domain()
+>         - set_domain()
+>         - set_domain()
+
+That should be fine, because if you've only got one get_domain(), then
+you only get the value of the DACR once.
+
+>   (b) domain.h is included from thread_info.h, not the other way around
+>       => current_thread_info() is not accessible from domain.h
+>       => that would require a bit of moving things around, as thread_info
+>          structure description should be available for example.
+>       This is currently my biggest problem with this approach.
+
+It's not a problem since 1eef5d2f1b46 removed the need for domain.h to be
+included by thread_info.h - the existing include can be dropped.
+
+>   (c) I was also wondering if a case like this could happen :
+>      - a function foo() does a get_domain()
+>        => an exception/irq whatever happens and modifies the DACR
+
+We always preserve the value of DACR across an exception.
+
+>      - foo() continues a makes a modify_domain()
+>        => and here the modify_domain() uses the old DACR value
+>       Or said differently, I wonder if there is a case of 2 get_domain() calls
+>       in a row with a DACR modification in between. I
 > 
-HI Rob, Thanks for your instruct! I will fix it !
+> What about something such as [1], without a memory clobber, but a "fake" memory
+> variable link ?
+
+The problem is the compiler will need to issue instructions to arrange
+for the address of this variable to end up in registers even though the
+assembly doesn't use it.
+
+That's true of my suggestion as well, but looking at the callsites, we
+generally already have, or very shortly there-after have the current
+thread_info address in a register.
+
+Patches to follow - I've not been able to confirm the instruction ordering
+you've observed with my compiler, so I can't prove whether this solves
+the problem locally.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
