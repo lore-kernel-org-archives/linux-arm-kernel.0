@@ -1,120 +1,554 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 11 Sep 2015 14:38:01 +0200
-Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
- v4.3-rc1
-In-Reply-To: <55F2AF45.5040706@nvidia.com>
-References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
- <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
- <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
- <20150819091358.GA26627@ulmo>
- <1439977724.4135.90.camel@collabora.co.uk>
- <20150819103305.GF26627@ulmo>
- <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
- <CAMAWPa_rus4z+Sg3Uff7ndqrpB8dF1c1rQBVQ9r7vXh6PFcVkQ@mail.gmail.com>
- <55F2AF45.5040706@nvidia.com>
-Message-ID: <20150911123759.GA8473@ulmo>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 11 Sep 2015 21:38:40 +0900
+Subject: [RFC] stack tracer on arm64
+Message-ID: <55F2CB50.3040109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 11:39:01AM +0100, Jon Hunter wrote:
-> Hi Kevin,
-> 
-> On 10/09/15 22:29, Kevin Hilman wrote:
-> 
-> [snip]
-> 
-> > Since there is no movement on this, and jetson hasn't been boot for
-> > multi_v7_defconfig for a while[1], I think it's time to undo the
-> > option causing this problem[2] so that v4.3 will actually boot on the
-> > jetson.
-> > 
-> > Unless I hear a good reason otherwise, I'll be posting a patch to
-> > disable the HDA related options in multi_v7_defconfig.
-> 
-> So curiosity got the better of this cat, as to why we are not seeing
-> this ;-)
-> 
-> The main difference I see between the tegra_defconfig and 
-> multi_v7_defconfig is all the sound drivers are modules (including 
-> this one).
-> 
-> So trying a quick modprobe of the hda-tegra driver I do see it hang ...
-> 
-> / # modprobe snd-hda-tegra
-> [  625.213864] snd_hda_tegra: Unknown symbol azx_probe_codecs (err 0)
-> [  625.220215] snd_hda_tegra: Unknown symbol azx_init_streams (err 0)
-> [  625.226480] snd_hda_tegra: Unknown symbol azx_stop_all_streams (err 0)
-> [  625.233168] snd_hda_tegra: Unknown symbol azx_bus_init (err 0)
-> [  625.239062] snd_hda_tegra: Unknown symbol azx_free_streams (err 0)
-> [  625.245314] snd_hda_tegra: Unknown symbol azx_init_chip (err 0)
-> [  625.251321] snd_hda_tegra: Unknown symbol snd_hda_set_power_save (err 0)
-> [  625.258081] snd_hda_tegra: Unknown symbol azx_stop_chip (err 0)
-> [  625.264078] snd_hda_tegra: Unknown symbol azx_codec_configure (err 0)
-> [  625.270607] snd_hda_tegra: Unknown symbol azx_interrupt (err 0)
-> [  840.117528] INFO: task modprobe:137 blocked for more than 120 seconds.
-> [  840.124192]       Not tainted 4.2.0-next-20150909-40826-gb799053 #1
-> [  840.130584] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
-> [  840.138540] modprobe        D c09ac3a4     0   137     82 0x00000000
-> [  840.145123] [<c09ac3a4>] (__schedule) from [<c09ac838>] (schedule+0x34/0x98)
-> [  840.152310] [<c09ac838>] (schedule) from [<c09acaac>] (schedule_preempt_disabled+0xc/0x10)
-> [  840.160734] [<c09acaac>] (schedule_preempt_disabled) from [<c09adeec>] (__mutex_lock_slowpath+0x9c/0x150)
-> [  840.170458] [<c09adeec>] (__mutex_lock_slowpath) from [<c09adfec>] (mutex_lock+0x4c/0x50)
-> [  840.178807] [<c09adfec>] (mutex_lock) from [<c062999c>] (__driver_attach+0x44/0x90)
-> [  840.186627] [<c062999c>] (__driver_attach) from [<c0627fcc>] (bus_for_each_dev+0x54/0x88)
-> [  840.194966] [<c0627fcc>] (bus_for_each_dev) from [<c0628f88>] (bus_add_driver+0xe4/0x1f0)
-> [  840.203305] [<c0628f88>] (bus_add_driver) from [<c062a1d0>] (driver_register+0x78/0xf4)
-> [  840.211475] [<c062a1d0>] (driver_register) from [<c020ac04>] (do_one_initcall+0x80/0x1d0)
-> [  840.219818] [<c020ac04>] (do_one_initcall) from [<c02c8abc>] (do_init_module+0x58/0x354)
-> [  840.228081] [<c02c8abc>] (do_init_module) from [<c02afae8>] (load_module+0x17e0/0x1d8c)
-> [  840.236258] [<c02afae8>] (load_module) from [<c02b016c>] (SyS_init_module+0xd8/0x138)
-> [  840.244260] [<c02b016c>] (SyS_init_module) from [<c0210b00>] (ret_fast_syscall+0x0/0x3c)
-> 
-> Adding some debug it appears to hang on snd-hda-codec-hdmi  (the following show
-> the order in which modules are being loaded) ...
-> 
-> / # modprobe snd-hda-tegra
-> [   22.450276] snd_hda_tegra: err = -2
-> [   22.484535] soundcore: err = 0
-> [   22.488964] snd: err = 0
-> [   22.493242] snd_timer: err = 0
-> [   22.498380] snd_pcm: err = 0
-> [   22.502479] snd_hda_core: err = 0
-> [   22.508337] snd_hda_codec: err = 0
-> [   22.513386] snd_hda_tegra: err = 0
-> [   22.740216] snd_hda_codec_hdmi: err = 0
-> 
-> [hangs here]
-> 
-> However, if I do the following, this works ...
-> 
-> / # modprobe snd-hda-codec-hdmi
-> / # modprobe snd-hda-tegra
-> 
-> So it implies that snd-hda-codec-hdmi needs to be loaded first otherwise it hangs.
-> 
-> Thierry, any thoughts?
+Junseok's bug report[1] about stack tracer on arm64 has exposed additional
+issues to me. I tried to fix them for the last few weeks, and submitted
+several RFC/patches.  But the problems seem to be more complicated than
+I first imagined.
 
-I can't reproduce this. Booting multi_v7_defconfig on my setup works
-just fine. I don't ever see snd-hda-codec-hdmi being probed, but then
-probing it manually works fine. No hangs.
+So, before taking further steps, I'd like you to have time to read
+the following document and give me your thoughts on it.
 
-What I do see is that after a little while network stops working. I
-noticed primarily because I boot with an NFS root, so the kernel started
-complaining about the NFS server not responding. Being on an NFS root
-could be one reason why this works for me, not sure what the kernelci
-labs are running. I don't see the network issues with tegra_defconfig.
-I've also tried a tegra_defconfig with all of sound support built as
-modules and that all works perfectly.
+Some of my ideas, particularly a function prologue analyzer, are difficult
+to implement, and may have no guarantee to handle all the cases correctly.
+Some may have impact on code size (and extra instructions at runtime).
+I think that we should find out the balance of accuracy/conveniences of
+this tool (stack tracer) and added complexities/open issues.
 
-I'll investigate the multi_v7_defconfig network issues, perhaps that'll
-give me some clues, or perhaps even allow me to reproduce the original
-issue.
+-Takahiro AKASHI
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150911/061e57af/attachment.sig>
+Table of Contents
+=================
+I.  basic flow of stack tracer
+
+II. issues on the naive implementation
+
+III.my approach and open issues
+
+
+I.  basic flow of stack tracer
+------------------------------
+Every C function invokes a ftrace hook routine, _mcount or ftrace_caller,
+in its function prologue.
+
+    step-1.If the current stack pointer indicates that we have a new record
+           of maximum stack usage, then do the followings.
+    step-2.call arch-specific save_stack_trace() to collect a list of functions
+           in current call chains (we name it a stack dump list here.)
+    step-3.For each function in a stack dump list, compare it against
+           every 4bytes of integer on the stack data.
+    step-4.If matched, we recognize the matched location in the stack as
+           a current stack pointer for this function
+           (for example, idxB for func_B:pcB)
+    step-5.calculate a "stack index" for this function as
+               <top address of stack> - <stack pointer>
+           and record the value into dump_stack_index[].
+
+LOW     |        |
+rspA    |        |
+         |  ... <----------- static/dynamic local variables in func_A
+         |        |
+rbpA    +--------+   func_A (pcA, rbpA, rspA)
+         |  rbpB  |
+    idxB +--------+
+         |  pcB   |
+         |  ... <----------- extra function args to func_A
+rspB    + - - - -+
+         |        |
+         |  ... <----------- static/dynamic local variables in func_B
+         |        |
+rbpB    +--------+   func_B (pcB, rbpB, rspB)
+         |  rbpC  |
+    idxC +--------+
+         |  pcC   |
+         |  ... <----------- extra function args to func_B
+rspC    + - - - -+
+         |        |
+         |  ... <----------- static/dynamic local variables in func_C
+         |        |
+rbpC    +--------+   func_C (pcC, rbpC, rspC)
+         |        |
+         |  ...   |
+top     + - - - -+
+HIGH
+	* In the figure above, rbp(frame pointer) and rsp(stack
+           pointer) point to respective addresses@the time after
+           a function prologue has been done but before a callee function
+           is called.
+
+Later on, "cat /sys/kernel/debug/tracing/stack_trace" shows the latest list
+of stack dump with sizes for each function.
+     - stack size for func_B, for example, is calculated as
+            <stack size> = (top - idxB) - (top - idxC)
+
+
+II. issues on the naive implementation
+--------------------------------------
+By "naive implementation," I mean how the mainline kernel without any
+modification behaves with ftrace-based stack tracer.
+(Currently, there is no arch-specific code on arm64 regarding stack tracer.)
+
+1) slurping stack
+
+    Assume that a given function A was invoked, and it was invoked again in
+    another context, then it called another function B which allocated a large
+    length of local variable on the stack, but it has not modified the variable
+    yet.
+    When stack tracer, in step-3, examines the stack looking for B, then A,
+    we may have a chance to accidentally find a staled, not current, stack
+    frame for A because the old frame might reside on the memory for
+    the variable which has not been overwritten.
+
+     a. The stack_trace output may have staled entries.
+
+2) differences between x86 and arm64
+
+    On x86, "call" instruction automatically pushes a return address on
+    the top of the stack and decrements a stack pointer. Then child function
+    allocates its local variables on the stack.
+
+    On arm64, a child function decreases reserve memory for local variables,
+    pushes a return address (LR) and old frame pointer then updates a frame
+    pointer to stack pointer.
+
+    So step-3/4 seems OK on x86, but on arm64, an estimated stack pointer,
+    idxB in the picture below, is not appropriate for our purpose because it
+    contains child function's "local variables."
+    We should instead use spB, if possible, for better result.
+
+     a. Stack size for a function in stack_trace output is inaccurate,
+        or rather wrong.
+        (It seems as if <Size> field is one-line offset against <Location>.)
+
+LOW     |  ...   |
+fpA     +--------+   func_A (pcA, fpA, spA)
+         |  fpB   |
+    idxB + - - - -+
+         |  pcB   |
+         |  ... <----------- static local variables in func_A
+         |  ...   |             and extra function args to func_A
+spB     + - - - -+
+         |  ... <----------- dynamically allocated variables in func_B
+fpB     +--------+   func_B (pcB, fpB, spB)
+         |  fpC   |
+    idxC + - - - -+
+         |  pcC   |
+         |  ... <----------- static local variables in func_B
+         |  ...   |             and extra function args to func_B
+spC     + - - - -+
+         |  ...   |
+fpC     +--------+   func_C (pcC, fpC, spC)
+HIGH    |        |
+
+3) Interrupted frame
+    We miss one or two functions when an interrupt occurs.
+    Assume that func_D calls func_C, func_C calls func_B, func_B is
+    interrupted by a device, el1_irq calls func_A, and so on.
+
+      a.Since el1_irq (and other exception vectors) doesn't update a frame
+        pointer (x29), the current wind_stackframe() tracks only
+            func_A -> el1_irq -> func_C -> func_D
+        and always misses func_B in a stack dump list.
+
+LOW     |        |
+fpA,spA +--------+   func_A (pcA, fpA, spA)
+         |  fpB   |
+         |  pcI   |
+         |  ...   |
+spI     +--------+   el1_irq (pcI, fpB, spI)
+         |        |
+         |  ...   |
+         |        |
+         |  fpB   |
+         |  spB   |
+         |  pcB   |
+         |  ...   |
+fpB,spB +--------+   func_B (pcB, fpB, spB)
+         |  fpC   |
+         |  pcC   |
+         |  ...   |
+fpC,spC +--------+   func_C (pcC, fpC, spC)
+         |  fpD   |
+         |  pcD   |
+         |  ...   |
+fpD,spD +--------+   func_D (pcD, fpD, spD)
+HIGH    |        |
+
+      b.Even worse, if an interrupt occurs in a function prolog of func_B,
+        a stack frame can be uncompleted and a frame pointer may still
+        points to one of func_C (fpC).
+        In this case, we also miss func_C in a stack dump list.
+      c.As a result, stack sizes for functions around el1_irq are wrong.
+
+4) functions under function_graph tracer
+
+    To catch an event of function return, function_graph tracer rewrites
+    LR register saved in a stack frame to a hook function, return_to_handler.
+    An original value is saved in current->ret_stack[] on entry and restored
+    later on exit by ftrace_return_to_handler() called in return_to_handler.
+
+     a. With function_graph tracer on, unwind_stackframe() will return lots of
+        bogus entries, "return_to_handler-0x4."
+
+    Apart from stack tracer, fixing this issue might make more sense, say,
+    for panic cases because panic_stack_dump() also uses unwind_frame().
+
+5) leaf function
+
+    gcc (on arm64) will, by default, optimize a leaf function by removing
+    a stack frame. This causes several issues:
+
+     a.we always miss a case of maximum stack size whenever a leaf function
+       is at the top of call chains because a stack tracer code will never
+       be executed against it.
+     b.When an interrupt occurs during a leaf function (func_B), we miss its
+       parent function (func_C) in a stack dump list because func_B has no
+       stack frame and elr_el1 still points to func_C's frame.
+       (This is a variant case as described in "interrupted frame" section.)
+
+LOW     |        |
+fpA,spA +--------+   func_A (pcA, fpA, spA)
+         |  fpB   |
+         |  pcI   |
+         |  ...   |
+spI     +--------+   el1_irq (pcI, fpC, spI)
+         (pt_regs)|
+         |  ...   |
+         |  fpC   |
+         |  spB   |
+         |  pcB   |
+spB     +--------+   func_B (pcB, fpC, spB)
+         |  ...   |
+fpC,spC +--------+   func_C (pcC, fpC, spC)
+HIGH    |        |
+
+6) KVM
+    (T.B.D.)
+
+
+III.my approach and open issues
+-------------------------------
+
+1) slurping stack, and
+2) differences between x86 and arm64
+
+    Instead of slurping stack data like at step-3/4, we extend save_stack_trace()
+    /wind_stackframe() to collect a list of stack pointers for all call chains.
+    Since arm64 ABI does not save a stack pointer in a stack frame, we try to
+    calculate that value from callee's stack frame.
+
+    For example, in the following case, a value of stack point when func_B
+    calls func_A is calculated as:
+
+         spB = fpA + (XX -- YY)
+
+    where XX and YY are determined by a "function prologue analyzer" described
+    in "interrupted frame" section.
+
+LOW     |  ...   |
+fpA     +--------+   func_A (pcA, fpA, spA)
+         |  fpB   |
+         |  pcB   |
+         |  ... <----------- static local variables in func_A
+         |  ...   |             and extra function args to func_A
+spB     + - - - -+
+         |  ... <----------- dynamically allocated variables in func_B
+fpB     +--------+   func_B (pcB, fpB, spB)
+         |  fpC   |
+         |  pcC   |
+         |  ... <----------- static local variables in func_B
+         |  ...   |             and extra function args to func_B
+spC     + - - - -+
+         |  ...   |
+fpC     +--------+   func_C (pcC, fpC, spC)
+HIGH    |        |
+
+         open issue-0: This fix also depends on function prologue analyzer
+                  being available.
+
+3) interrupted frame
+
+    First of all, we should update a frame pointer even in exception vector
+    code so that unwind_frame() can dereference stack frames.
+    Since exception handlers place data of 'struct pt_regs' instead of
+    'struct stackframe' in *normal* functions, we will take special
+    care of this case.
+
+	open issue-1: should we use the same form of stack frame here?
+
+    This way, we will see an additional entry, func_B in the figure above,
+    in a stack dump list but we still have a chance to miss func_C.
+
+    My idea here is to analyze a function prologue and determine where
+    an interrupt is actually taken, then to re-build a stack frame if necessary.
+
+         open issue-2: it seems to be very difficult to implement such a parser
+                  for all the possible patterns of function prologue. This is
+                  partly because gcc doesn't use a fixed template to generate
+                  a function prologue code, and partly because "instruction
+                  scheduling" may mess up a function prologue and a body.
+
+    According to comments from some toolchain guy, using libunwind with
+    compiler-generated "unwind tables" information would be most promising
+    for implementing an function prologue analyzer.
+    It seems, however, that any previous attempts to merge libunwind into
+    the kernel has been abandoned[2].
+
+    So, in the followings, I try to describe an outline of my own prototype
+    (simple) analyzer and how it is utilized in order to find out func_C.
+
+    My analyzer recognizes two patterns of function prologue, (A) and (B),
+    which I think cover most cases, and identifies a location of interrupt,
+    1, 2, 3 and 0 (a normal case).
+
+    function prologues
+    ------------------
+    (A)
+          sub sp, sp, #XX
+          stp x29, x30, [sp, #YY]
+          add x29, sp, #YY
+          ...
+    (B)
+          stp x29, x30, [sp, #-XX]
+          mov x29, sp
+          ...
+
+    Due to gcc's instruction scheduling, we may see other instructions
+    between those assembler lines of function prologue.
+
+    location of interrupt
+    ---------------------
+          (A)                     (B)
+    loc-1
+  	 sub sp, sp, #XX         stp, x29, x30, [sp, #-XX]
+    loc-2
+          stp x29, x30, [sp, #YY]
+    loc-3
+          add x29, sp, #YY        mov x29, sp
+    loc-0
+          <function body>         <function body>
+
+    Here,
+           loc-1: SP not updated, FP/LR not saved, FP not updated
+           loc-2: SP updated, FP/LR not saved, FP not updated
+           loc-3: SP updated, FP/LR saved, FP not updated
+           loc-0: SP updated, FP/LR saved, FP updated
+
+    Re-build a stack frame for func_B and func_C
+    --------------------------------------------
+    The following figures illustrate how we can re-build a stack frame for
+    func_B and func_C based on available data on the stack.
+
+    (loc-0)
+
+LOW     |        |
+fpA,spA +--------+   func_A (pcA, fpA, spA)
+         |  fpI   |
+         |  pcI   |
+         |  ...   |
+fpI,spI +--------+   el1_irq (pcI, fpI, spI)
+         |        |
+         |  ...   |
+         |        |
+         |  fpB   |
+         |  spB   |
+         |  pcB   |
+         |  ...   |
+fpB,spB +--------+   func_B (pcB, fpB, spB)
+         |  fpC   |
+         |  pcC   |
+         |  ...   |
+fpC,spC +--------+   func_C (pcC, fpC, spC)
+         |  fpD   |
+         |  pcD   |
+         |  ...   |
+fpD,spD +--------+   func_D (pcD, fpD, spD)
+HIGH    |        |
+
+    => calculate
+              frame B: sp: *(spI + S_SP)
+                       fp: *(spI + S_FP)
+                       pc: *(spI + S_PC)
+
+    (loc-3)
+
+LOW     |        |
+fpA,spA +--------+   func_A (pcA, fpA, spA)
+         |  fpI   |
+         |  pcI   |
+         |  ...   |
+fpI,spI +--------+   el1_irq (pcI, fpI, spI)
+         |        |
+         |  ...   |
+         |        |
+         |  fpC   |
+         |  spB   |
+         |  pcB   |
+         |  ...   |
+spB     +--------+   func_B (pcB, fpC, spB)
+         |  fpC   |
+         |  pcC   |
+         |  ...   |
+fpC,spC +--------+   func_C (pcC, fpC, spC)
+         |  fpD   |
+         |  pcD   |
+         |  ...   |
+fpD,spD +--------+   func_D (pcD, fpD, spD)
+HIGH    |        |
+
+    => calculate
+              frame B: sp: *(spI + F_SP)
+                       fp: *(spI + F_FP)
+                       pc: *(spI + F_PC)
+              frame C: sp: spB + XX
+                       fp: fpB'
+                       pc: *(spB + YY + 0x8)
+
+    (loc-2)
+
+LOW     |        |
+fpA,spA +--------+   func_A (pcA, fpA, spA)
+         |  fpI   |
+         |  pcI   |
+         |  ...   |
+fpI,spI +--------+   el1_irq (pcI, fpI, spI)
+         |        |
+         |  ...   |
+         |        |
+         |  fpC   |
+         |  spB   |
+         |  pcB   |
+         |  ...   |
+spB     +--------+   func_B (pcB, fpC, spB)
+         |   x    |
+         |   x    |
+         |  ...   |
+fpC,spC +--------+   func_C (pcC, fpC, spC)
+         |  fpD   |
+         |  pcD   |
+         |  ...   |
+fpD,spD +--------+   func_D (pcD, fpD, spD)
+HIGH    |        |
+
+    => calculate
+              frame B: sp: *(spI + F_SP)
+                       fp: *(spI + F_FP)
+                       pc: *(spI + F_PC)
+              frame C: sp: spB + XX
+                       fp: fpB'
+                       pc: "branch dest at pcD"
+
+    (loc-1)
+
+LOW     |        |
+fpA,spA +--------+   func_A (pcA, fpA, spA)
+         |  fpI   |
+         |  pcI   |
+         |  ...   |
+fpI,spI +--------+   el1_irq (pcI, fpI, spI)
+         |        |
+         |  ...   |
+         |        |
+         |  fpC   |
+         |  spC   |
+         |  pcB   |
+         |  ...   |   func_B (pcB, fpC, spC)
+fpC,spC +--------+   func_C (pcC, fpC, spC)
+         |  fpD   |
+         |  pcD   |
+         |  ...   |
+fpD,spD +--------+   func_D (pcD, fpD, spD)
+HIGH    |        |
+
+    => calculate
+              frame B: sp: *(spI + F_SP)
+                       fp: *(spI + F_FP)
+                       pc: *(spI + F_PC)
+              frame C: sp: spB'
+                       fp: fpB'
+                       pc: "branch dest at pcD"
+
+         In the case of loc-1 or loc-2,
+         open issue-3: PC derived from parent's bl instruction (pcC) is
+                  an entry address of the function, not the exact place
+                  when an interrupt is taken.
+         open issue-4: If parent's bl instruction is "blr", we have no way
+                  to identify a branch destination address.
+         open issue-5: Each tack pointer is determined from child to parent,
+                  so PC for func_C cannot be fixed within wind_stackframe().
+
+4) functions under function_graph tracer
+
+    Unwind_frame() tries to replace "frame->pc" with an original value by
+    looking it up in current->ret_stack[].
+
+    Unfortunately, saving a value to this array, incrementing an array index,
+    current->curr_ret_index, and updating memory on the stack are not done
+    atomically because ftrace does not disable interrupts.
+    So if an interrupt occurs and succeeding functions are also traced,
+    recovering a stack dump list (stack_trace->entries) from ret_stack[]
+    may result in a wrong list being created.
+
+         open issue-6: wrong replacement
+                  Assume that func_C calls func_B, func_B is interrupted, and
+                  el1_irq calls func_A. Depending on when an interrupt is taken
+                  during func_B, wind_stackframe() may return one of following
+                  stack dump lists:
+                  (please note that ftrace related functions are *not* traced.)
+
+                 (A) interrupt during a function prologue
+                         ...
+                         return_to_handler(for A)
+                         el1_irq
+                         ...
+                         ftrace_push_return_trace
+                         prepare_ftrace_return
+                         ftrace_caller
+                         func_B
+                         return_to_handler(for C)
+
+                   we have pushed func_B in ret_stack[], but LR in a stack frame
+                   has not yet been rewritten to return_to_handler.
+                   since ret_stack[] has func_A, func_B and func_C, we replace
+                         return_to_handler(for A) to func_A
+                         return_to_handler(for C) to func_B
+                   and so on.
+
+                 (B) interrupt during a return hook
+                         ...
+                         return_to_handler(for A)
+                         el1_irq
+                         ...
+                         ftrace_pop_return_trace
+                         ftrace_return_to_handler
+                         return_to_handler(for B)
+                         return_to_handler(for C)
+
+                   we may already have popped func_B from ret_stack[], and we
+                   replace
+                         return_to_handler(for A) to func_A
+                         return_to_handler(for B) to func_C
+                   and so on.
+
+    In fact, there are more variant cases as pushing/popping against ret_stack[]
+    is not an atomic operation and so data in this array and its index,
+    current->ret_stack_index, may get inconsistent.
+
+5) leaf function
+
+    Adding arch-specific gcc option, -mno-omit-leaf-frame-pointer, to
+    KBUILD_CFLAGS will assure that all the C functions have its own stack
+    frame (after its function prologue).
+    Then, issue 1-b will fall into issue-2.
+
+         open issue-7: This fix will increase the code size of the kernel and
+                  add extra instructions at runtime.
+
+
+---
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354126.html
+[2] https://lkml.org/lkml/2012/2/10/129
