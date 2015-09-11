@@ -1,96 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 11 Sep 2015 18:56:35 +0100
-Subject: [PATCH 11/11] ARM: STi: STiH407: Add spi default pinctrl groups.
-In-Reply-To: <1441991194-11948-12-git-send-email-peter.griffin@linaro.org>
-References: <1441991194-11948-1-git-send-email-peter.griffin@linaro.org>
- <1441991194-11948-12-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20150911175635.GG18779@x1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Sep 2015 18:56:49 +0100
+Subject: [PATCH] firmware: qcom: scm: Add function stubs for ARM64
+In-Reply-To: <1441993856-30178-1-git-send-email-agross@codeaurora.org>
+References: <1441993856-30178-1-git-send-email-agross@codeaurora.org>
+Message-ID: <20150911175649.GZ21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Sep 2015, Peter Griffin wrote:
-
-> Now we have default pinconfig groups for each SPI
-> controller ensure it is used by the SPI controller
-> node.
+On Fri, Sep 11, 2015 at 12:50:56PM -0500, Andy Gross wrote:
+> This patch adds stubs for the SCM functions exposed in the QCOM SCM API.
 > 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
 > ---
->  arch/arm/boot/dts/stih407-family.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+>  drivers/firmware/Makefile      |    4 +++
+>  drivers/firmware/qcom_scm-64.c |   63 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 67 insertions(+)
+>  create mode 100644 drivers/firmware/qcom_scm-64.c
+> 
+> diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
+> index 4a4b897..2f810c2 100644
+> --- a/drivers/firmware/Makefile
+> +++ b/drivers/firmware/Makefile
+> @@ -12,8 +12,12 @@ obj-$(CONFIG_ISCSI_IBFT_FIND)	+= iscsi_ibft_find.o
+>  obj-$(CONFIG_ISCSI_IBFT)	+= iscsi_ibft.o
+>  obj-$(CONFIG_FIRMWARE_MEMMAP)	+= memmap.o
+>  obj-$(CONFIG_QCOM_SCM)		+= qcom_scm.o
+> +ifdef CONFIG_ARM64
+> +obj-$(CONFIG_QCOM_SCM)		+= qcom_scm-64.o
+> +else
+>  obj-$(CONFIG_QCOM_SCM)		+= qcom_scm-32.o
+>  CFLAGS_qcom_scm-32.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
+> +endif
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
- 
-> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> index 838b812..94a2fec 100644
-> --- a/arch/arm/boot/dts/stih407-family.dtsi
-> +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> @@ -381,6 +381,8 @@
->  			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
->  			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
->  			clock-names = "ssc";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_spi1_default>;
->  
->  			status = "disabled";
->  		};
-> @@ -391,6 +393,8 @@
->  			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
->  			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
->  			clock-names = "ssc";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_spi2_default>;
->  
->  			status = "disabled";
->  		};
-> @@ -401,6 +405,8 @@
->  			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
->  			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
->  			clock-names = "ssc";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_spi3_default>;
->  
->  			status = "disabled";
->  		};
-> @@ -411,6 +417,8 @@
->  			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
->  			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
->  			clock-names = "ssc";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_spi4_default>;
->  
->  			status = "disabled";
->  		};
-> @@ -422,6 +430,8 @@
->  			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>;
->  			clocks = <&clk_sysin>;
->  			clock-names = "ssc";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_spi10_default>;
->  
->  			status = "disabled";
->  		};
-> @@ -432,6 +442,8 @@
->  			interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
->  			clocks = <&clk_sysin>;
->  			clock-names = "ssc";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_spi11_default>;
->  
->  			status = "disabled";
->  		};
-> @@ -442,6 +454,8 @@
->  			interrupts = <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>;
->  			clocks = <&clk_sysin>;
->  			clock-names = "ssc";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_spi12_default>;
->  
->  			status = "disabled";
->  		};
+Can we not start doing stuff like this.  Use the Kconfig to control what
+you build, not the Makefile system.
+
+config QCOM_SCM_32
+	def_bool y
+	depends on QCOM_SCM && ARM
+
+config QCOM_SCM_64
+	def_bool y
+	depends on QCOM_SCM && ARM64
+
+and then use those in the makefile.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
