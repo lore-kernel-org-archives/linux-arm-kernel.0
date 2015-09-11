@@ -1,70 +1,47 @@
-From: yvo@apm.com (Y Vo)
-Date: Fri, 11 Sep 2015 22:06:58 +0700
-Subject: [PATCH 2/2] Documentation: gpio: Update description for X-Gene
- standby GPIO controller DTS binding
-In-Reply-To: <3318725.Seeb48hirI@wuerfel>
-References: <1441963332-13329-1-git-send-email-yvo@apm.com>
- <14280808.2Weay6QlT1@wuerfel>
- <CAL4ahLeF8qQJciam467P2ixrxtMPTK2J9OtaVvcjtPF=9to0BQ@mail.gmail.com>
- <3318725.Seeb48hirI@wuerfel>
-Message-ID: <CAL4ahLeoeT79ct-M-Bd-O08K0Dmysas3HFmTfXUFGtHKJBRzsg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Sep 2015 16:10:17 +0100
+Subject: [PATCH 2/2] ARM: domains: add memory dependencies to
+ get_domain/set_domain
+In-Reply-To: <87si6lt36s.fsf@belgarion.home>
+References: <20150911095438.GL21084@n2100.arm.linux.org.uk>
+ <E1ZaL45-0003fs-1k@rmk-PC.arm.linux.org.uk>
+ <87si6lt36s.fsf@belgarion.home>
+Message-ID: <20150911151017.GS21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 9:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 11 September 2015 21:23:31 Y Vo wrote:
->> >> /* Board-specific: exclude GPIO_DS8 to leave it as GPIO */
->> >> &sbgpio {
->> >>        interrupts =    <0x0 0x29 0x1>,         /* GPIO_DS9 */
->> >>                        <0x0 0x2a 0x1>,         /* GPIO_DS10 */
->> >>                        <0x0 0x2b 0x1>,         /* GPIO_DS11 */
->> >>                        <0x0 0x2c 0x1>,         /* GPIO_DS12 */
->> >>                        <0x0 0x2d 0x1>;         /* GPIO_DS13 */
->> >> }
->> >
->> > This would be a very unusual binding, because that requires the driver
->> > to know the contents of the properties in advance and the driver
->> > cannot derive the function of an irq from the position in the array.
->> >
->> > Please come up with another approach that is more like other drivers
->> > do this and that makes it possible to reuse the driver if the
->> > interrupt numbers change.
->> The GPIO standby doesn't support interrupt controller itself, it only
->> wires the GPIO line to the external IRQ of GIC. So it is not similar
->> to other driver. Each GPIO is fixed to GIC IRQ index, and never
->> change.
->
-> That is not relevant here, what matters is just that each IRQ still
-> has a very specific function, which is basically what every driver
-> does.
->
->> Is that possible if we change to this approach:
->> - Keep all GPIO as GPIO mode by default.
->> - If anyone want to use them as interrupt, they must add the interrupt
->> node to DT specific-board below:
->>
->> Example to configure GPIO_DS11, 12, 13 as external irq:
->>
->> &sbgpio {
->>         interrupts = <0x0 0x2b 0x1>,         /* GPIO_DS11 */
->>                         <0x0 0x2c 0x1>,         /* GPIO_DS12 */
->>                         <0x0 0x2d 0x1>;         /* GPIO_DS13 */
->
-> That is exactly the same as you have in your patch. You should
-> always list all interrupts that the gpio controller is wired
-> to, whether they are used or not.
->
-> Ideally, the driver just decides at runtime how to wire that
-> mux, based on how the gpio is configured by the client driver.
-> If the client asks for an interrupt (with gpio_to_irq) and is
-> it is configured as an input, then you connect it to the GIC,
-> otherwise you leave it to be handled by the gpio chip itself.
-> Any reason you can't do that?
->
-As I just explained, the GPIO Standby doesn't support the interrupt.
-Both interrupts are came from GIC, so if the client asks for an
-interrupt, it will go to the GIC driver (not GPIO Standby driver), so
-that's my trouble. We can not implement the code to configured the
-GPIO standby at GIC driver.
+On Fri, Sep 11, 2015 at 04:56:27PM +0200, Robert Jarzmik wrote:
+> Russell King <rmk+kernel@arm.linux.org.uk> writes:
+> > We need to have memory dependencies on get_domain/set_domain to avoid
+> > the compiler over-optimising these inline assembly instructions.
+> >
+> > Loads/stores must not be reordered across a set_domain(), so introduce
+> > a compiler barrier for that assembly.
+> >
+> > The value of get_domain() must not be cached across a set_domain(), but
+> > we still want to allow the compiler to optimise it away.  Introduce a
+> > dependency on current_thread_info()->cpu_domain to avoid this; the new
+> > memory clobber in set_domain() should therefore cause the compiler to
+> > re-load this.  The other advantage of using this is we should have its
+> > address in the register set already, or very soon after at most call
+> > sites.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> 
+> The test is failing without these 2 patches, while with them, an unaligned
+> access is fixed, and the generated code looks good :
+>      7ac:       ee13cf10        mrc     15, 0, ip, cr3, cr0, {0}
+>      7b0:       e3cc300c        bic     r3, ip, #12
+>      7b4:       e58dc014        str     ip, [sp, #20]
+>      7b8:       e3833004        orr     r3, r3, #4
+>      7bc:       ee033f10        mcr     15, 0, r3, cr3, cr0, {0}
 
->         Arnd
+Thanks Robert, I've queued these as fixes now.
+
+If you want to put the bug alignment patch in the patch system, I'll get
+that off to Linus this weekend too.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
