@@ -1,10 +1,10 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 11 Sep 2015 15:50:06 -0700
-Subject: [PATCH 4.1 65/78] irqchip/crossbar: Restore the mask on suspend
- behaviour
+Date: Fri, 11 Sep 2015 15:50:05 -0700
+Subject: [PATCH 4.1 64/78] irqchip/crossbar: Restore the irq_set_type()
+ mechanism
 In-Reply-To: <20150911224606.758437370@linuxfoundation.org>
 References: <20150911224606.758437370@linuxfoundation.org>
-Message-ID: <20150911224615.803471623@linuxfoundation.org>
+Message-ID: <20150911224615.634002851@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,23 +14,19 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-commit 4fd8f47e7e5b64a74b60f23c2e08ba8234d659d1 upstream.
-
-The ARM GIC requires that all interrupts which are not used as a
-wakeup source have to be masked during suspend.
+commit e269ec42328783e51be08c191aa935dba56141fc upstream.
 
 The conversion of the crossbar irqchip to hierarchical irq domains
-failed to mark the crossbar irqchip with the IRQCHIP_MASK_ON_SUSPEND
-flag and therefor broke the suspend requirement of the GIC.
+failed to provide a mechanism to properly set the trigger type of an
+interrupt.
 
-Before the conversion the flags were visible because the GIC was the
-top level irqchip. After the conversion the crossbar irqchip is the
-top level irq chip whose flags are evaluated in suspend_device_irq().
-As the flag is not set the masking of the non-wakeup irqs is not
-invoked which breaks suspend.
+The crossbar irq chip itself has no mechanism and therefor no
+irq_set_type() callback. The code before the conversion relayed the
+trigger configuration directly to the underlying GIC.
 
-Add the IRQCHIP_MASK_ON_SUSPEND flag to the crossbar irqchip, so the
-GIC interrupts get masked properly.
+Restore the correct behaviour by setting the crossbar irq_set_type
+callback to irq_chip_set_type_parent(). This propagates the
+set_trigger() call to the underlying GIC irqchip.
 
 [ tglx: Massaged changelog ]
 
@@ -44,7 +40,7 @@ Cc: <balbi@ti.com>
 Cc: <linux-arm-kernel@lists.infradead.org>
 Cc: <tony@atomide.com>
 Cc: <marc.zyngier@arm.com>
-Link: http://lkml.kernel.org/r/1439554830-19502-6-git-send-email-grygorii.strashko at ti.com
+Link: http://lkml.kernel.org/r/1439554830-19502-4-git-send-email-grygorii.strashko at ti.com
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
@@ -54,11 +50,11 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -70,6 +70,7 @@ static struct irq_chip crossbar_chip = {
+@@ -69,6 +69,7 @@ static struct irq_chip crossbar_chip = {
+ 	.irq_unmask		= irq_chip_unmask_parent,
  	.irq_retrigger		= irq_chip_retrigger_hierarchy,
  	.irq_set_wake		= irq_chip_set_wake_parent,
- 	.irq_set_type		= irq_chip_set_type_parent,
-+	.flags			= IRQCHIP_MASK_ON_SUSPEND,
++	.irq_set_type		= irq_chip_set_type_parent,
  #ifdef CONFIG_SMP
  	.irq_set_affinity	= irq_chip_set_affinity_parent,
  #endif
