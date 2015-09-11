@@ -1,50 +1,64 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 11 Sep 2015 17:14:44 +0900
-Subject: [PATCH/RFC v2 net-next 3/4] ravb: Document binding for r8a7795 SoC
-In-Reply-To: <CAMuHMdWY+8Cv9ZnnzMcSYskFfArues8EnWgMiCMnQ16sN1TW_A@mail.gmail.com>
-References: <1441936878-18290-1-git-send-email-horms+renesas@verge.net.au>
- <1441936878-18290-4-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWY+8Cv9ZnnzMcSYskFfArues8EnWgMiCMnQ16sN1TW_A@mail.gmail.com>
-Message-ID: <20150911081443.GD2835@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Sep 2015 10:15:14 +0200
+Subject: cpufreq: mediatek: allow modular build
+Message-ID: <1768766.yu1lxjsjLL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 09:12:17AM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Fri, Sep 11, 2015 at 4:01 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > --- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> > +++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> > @@ -6,8 +6,11 @@ interface contains.
-> >  Required properties:
-> >  - compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
-> >               "renesas,etheravb-r8a7794" if the device is a part of R8A7794 SoC.
-> > +             "renesas,etheravb-r8a7795" if the device is a part of R8A7795 SoC.
-> >  - reg: offset and length of (1) the register block and (2) the stream buffer.
-> > -- interrupts: interrupt specifier for the sole interrupt.
-> > +- interrupts: interrupt specifiers.
-> > +             One for each entry in interrupt-names the R8A7795 SoC;
-> 
-> ... for the R8A7795 SoC
-> 
-> > +             One entry for a multiplexed interrupt otherwise.
-> >  - phy-mode: see ethernet.txt file in the same directory.
-> >  - phy-handle: see ethernet.txt file in the same directory.
-> >  - #address-cells: number of address cells for the MDIO bus, must be equal to 1.
-> > @@ -18,6 +21,9 @@ Required properties:
-> >  Optional properties:
-> >  - interrupt-parent: the phandle for the interrupt controller that services
-> >                     interrupts for this device.
-> > +- interrupt-names: One entry per interrupt named "ch%u".
-> > +                  For the R8A7795 SoC this property is mandatory,
-> > +                  and "ch0" through "ch24" are mandatory.
-> 
-> This suggests the single multiplexed interrupt on R-Car Gen2 can be called
-> "ch0". Is that what you want? I know the driver doesn't care.
+The newly merged cpufreq-mt8173 driver breaks the ARM allmodconfig
+build because of a dependency on the cpu-cooling infrastructure that
+may be built as a loadable module:
 
-No, its not what I intended.
+drivers/built-in.o: In function `mtk_cpufreq_ready':
+binder.c:(.text+0x324c8c): undefined reference to `of_cpufreq_cooling_register'
+drivers/built-in.o: In function `mtk_cpufreq_exit':
+binder.c:(.text+0x324ea0): undefined reference to `cpufreq_cooling_unregister'
 
-I think its reasonable to allow the multiplexed interrupt to be named,
-but to what I wonder. The documentation seems to call the interrupt
-"EthernetAVB", which isn't very exciting.
+This works around the issue by allowing this driver to be built
+as a module as well, and adding a dependency on THERMAL that prevents
+it from being built-in when the cpu-cooling driver is a module.
+
+This is not perfect because there is still a case where THERMAL=m
+and CPU_COOLING=n that should allow us to have this driver built-in
+as well, but I decided to follow existing practice in other drivers
+here, and that case seems irrelevant in practice.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+I have not checked if someone else has already sent a patch for this,
+just ignore mine if the issue has been fixed already.
+
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 77aa34eae92c..28844bdf026d 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -131,8 +131,8 @@ config ARM_KIRKWOOD_CPUFREQ
+ 	  SoCs.
+ 
+ config ARM_MT8173_CPUFREQ
+-	bool "Mediatek MT8173 CPUFreq support"
+-	depends on ARCH_MEDIATEK && REGULATOR
++	tristate "Mediatek MT8173 CPUFreq support"
++	depends on ARCH_MEDIATEK && REGULATOR && THERMAL
+ 	select PM_OPP
+ 	help
+ 	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
+diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+index 49caed293a3b..2131e1a81be9 100644
+--- a/drivers/cpufreq/mt8173-cpufreq.c
++++ b/drivers/cpufreq/mt8173-cpufreq.c
+@@ -17,6 +17,7 @@
+ #include <linux/cpu_cooling.h>
+ #include <linux/cpufreq.h>
+ #include <linux/cpumask.h>
++#include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_opp.h>
+@@ -524,4 +525,5 @@ static int mt8173_cpufreq_driver_init(void)
+ 
+ 	return 0;
+ }
+-device_initcall(mt8173_cpufreq_driver_init);
++module_init(mt8173_cpufreq_driver_init);
++MODULE_LICENSE("GPL v2");
