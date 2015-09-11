@@ -1,54 +1,57 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Fri, 11 Sep 2015 15:55:04 +0100
-Subject: [PATCH] arm/xen: Enable user access to the kernel before
- issuing a privcmd call
-In-Reply-To: <55F2E909.70600@citrix.com>
-References: <1441980963-9002-1-git-send-email-julien.grall@citrix.com>
- <1441981760.3549.57.camel@citrix.com> <55F2E909.70600@citrix.com>
-Message-ID: <1441983304.3549.73.camel@citrix.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 11 Sep 2015 15:56:38 +0100
+Subject: master build: 1 failures 73 warnings (v4.2-11142-gb0a1ea5)
+In-Reply-To: <20150911125830.GA11833@n2100.arm.linux.org.uk>
+References: <E1ZaL9B-0006QE-Kh@optimist> <20150911120150.GN12027@sirena.org.uk>
+ <20150911125830.GA11833@n2100.arm.linux.org.uk>
+Message-ID: <20150911145638.GL20922@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-09-11 at 15:45 +0100, Julien Grall wrote:
-> On 11/09/15 15:29, Ian Campbell wrote:
-> > On Fri, 2015-09-11 at 15:16 +0100, Julien Grall wrote:
-> > > When Xen is copyin data to/from the guest it will check if the kernel
-> > 
-> > "copying"
-> > 
-> > > has the right to do the access. If not, the hypercall will return an
-> > > error.
-> > > 
-> > > After the commit a5e090acbf545c0a3b04080f8a488b17ec41fe02 "ARM:
-> > > software-based priviledged-no-access support", the kernel can't
-> > > access
-> > 
-> > "privileged"
-> > 
-> > > anymore the user space by default. This will result to fail on every
-> > 
-> > "any more" (or "any longer")
-> > 
-> > > hypercall made by the userspace (i.e via privcmd).
-> > > 
-> > > We have to enable the userspace access and then restore the correct
-> > > permission everytime the privmcd is used to made an hypercall.
-> > 
-> > "every time" and "privcmd"
-> > 
-> > >  HYPERCALL1(tmem_op);
-> > >  HYPERCALL2(multicall);
-> > >  
-> > > -ENTRY(privcmd_call)
-> > > +ENTRY(__privcmd_call)
-> > 
-> > arch/arm/include/asm/assembler.h seems to contain uaccess_* macros
-> > which
-> > could be used right here directly I think? That would be preferable to
-> > wrapping I think.
-> 
-> Looking to the uaccess_save macro:
+On Fri, Sep 11, 2015 at 01:58:30PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 11, 2015 at 01:01:51PM +0100, Mark Brown wrote:
 
-I was thinking more about uaccess_enable/disable.
+> > Today's mainline fails to build on arm64 due to the above, introduced by
+> > efaa6e266ba (firmware: qcom_scm-32: replace open-coded call to
+> > __cpuc_flush_dcache_area()) which introduces a call to
+> > secure_flush_area() which isn't defined on arm64.
 
-Ian.
+> That commit has been in mainline for over a week now, so it shouldn't
+> be "today's mainline" but mainline from a week ago.
+
+I only noticed it today, given the thing selects with it's likely that
+as you say it's been triggered by a change in another tree rather than
+having been an issue in itself.
+
+> However, I've educated myself to hardly ever look at arm64-allmodconfig
+> because it's always broken for one reason or another, and the amount of
+> warnings it spits out is rediculous, many of them not the fault of ARM64
+> code, but of crappy driver code.
+
+Indeed, the initial reason I set up my builder was that I was doing work
+on arm64 and got fed up with the constant breakage in -next.  It's
+getting better slowly, we mostly at least compile now which wasn't the
+case originally.
+
+> Changing the "depends" on QCOM_SCM won't fix it - I think something's
+> been recently merged which has added another select QCOM_SCM which has
+> the effect of enabling this on ARM64.  _That_ is the cause of this
+> breakage.
+
+Yes, it'll be the combination of the two commits (hopefully whatever
+patch introduced the issue builds on its own branch as well).  There's a
+fix been merged into -next somewhere which fixes this - like I said I'm
+fairly sure that's 626ffb400e1e781 (firmware: qcom: scm: Add function
+stubs for ARM64) which means that an alternative stub implementation in
+qcom_scm-64.c gets build on arm64 but that's not hit mainline yet and
+we're getting near the end of the merge window.
+
+It would be sad to have yet another release where -rc1 doesn't build for
+common test configurations :/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150911/c70665e1/attachment.sig>
