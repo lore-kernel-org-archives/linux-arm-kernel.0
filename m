@@ -1,149 +1,89 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 11 Sep 2015 10:10:53 +0100
-Subject: [PATCH v2 02/22] KVM: ARM64: Define PMU data structure for each
- vcpu
-In-Reply-To: <1441961715-11688-3-git-send-email-zhaoshenglong@huawei.com>
-References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
- <1441961715-11688-3-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <55F29A9D.1080502@arm.com>
+From: yvo@apm.com (Y Vo)
+Date: Fri, 11 Sep 2015 16:22:11 +0700
+Subject: [PATCH 1/2] gpio: xgene: add support to configure GPIO line as input,
+ output or external IRQ pin
+In-Reply-To: <1441963332-13329-1-git-send-email-yvo@apm.com>
+References: <1441963332-13329-1-git-send-email-yvo@apm.com>
+Message-ID: <1441963332-13329-2-git-send-email-yvo@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/15 09:54, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Here we plan to support virtual PMU for guest by full software
-> emulation, so define some basic structs and functions preparing for
-> futher steps. Define struct kvm_pmc for performance monitor counter and
-> struct kvm_pmu for performance monitor unit for each vcpu. According to
-> ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
-> 
-> Since this only supports ARM64 (or PMUv3), add a separate config symbol
-> for it.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/include/asm/kvm_host.h |  2 ++
->  arch/arm64/include/asm/pmu.h      |  2 ++
->  arch/arm64/kvm/Kconfig            |  8 ++++++++
->  include/kvm/arm_pmu.h             | 39 +++++++++++++++++++++++++++++++++++++++
->  4 files changed, 51 insertions(+)
->  create mode 100644 include/kvm/arm_pmu.h
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 2709db2..3c88873 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -42,6 +42,7 @@
->  
->  #include <kvm/arm_vgic.h>
->  #include <kvm/arm_arch_timer.h>
-> +#include <kvm/arm_pmu.h>
->  
->  #define KVM_VCPU_MAX_FEATURES 3
->  
-> @@ -116,6 +117,7 @@ struct kvm_vcpu_arch {
->  	/* VGIC state */
->  	struct vgic_cpu vgic_cpu;
->  	struct arch_timer_cpu timer_cpu;
-> +	struct kvm_pmu pmu;
->  
->  	/*
->  	 * Anything that is not used directly from assembly code goes
-> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
-> index b9f394a..95681e6 100644
-> --- a/arch/arm64/include/asm/pmu.h
-> +++ b/arch/arm64/include/asm/pmu.h
-> @@ -19,6 +19,8 @@
->  #ifndef __ASM_PMU_H
->  #define __ASM_PMU_H
->  
-> +#include <linux/perf_event.h>
-> +
+Add support to configure GPIO line as input, output or external IRQ pin.
 
-This include file seems out of place here, as I don't think anything in
-this file is directly PMU related.
+Signed-off-by: Y Vo <yvo@apm.com>
+---
+ drivers/gpio/gpio-xgene-sb.c |   33 ++++++++++++++++++++++++++-------
+ 1 files changed, 26 insertions(+), 7 deletions(-)
 
->  #define ARMV8_MAX_COUNTERS      32
->  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
->  
-> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-> index bfffe8f..3c7c58d 100644
-> --- a/arch/arm64/kvm/Kconfig
-> +++ b/arch/arm64/kvm/Kconfig
-> @@ -31,6 +31,7 @@ config KVM
->  	select KVM_VFIO
->  	select HAVE_KVM_EVENTFD
->  	select HAVE_KVM_IRQFD
-> +	select KVM_ARM_PMU
->  	---help---
->  	  Support hosting virtualized guest machines.
->  
-> @@ -52,4 +53,11 @@ config KVM_ARM_MAX_VCPUS
->  	  large, so only choose a reasonable number that you expect to
->  	  actually use.
->  
-> +config KVM_ARM_PMU
-> +	bool
-> +	depends on KVM_ARM_HOST
-> +	---help---
-> +	  Adds support for a virtual Performance Monitoring Unit (PMU) in
-> +	  virtual machines.
-> +
->  endif # VIRTUALIZATION
-> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> new file mode 100644
-> index 0000000..64af88a
-> --- /dev/null
-> +++ b/include/kvm/arm_pmu.h
-> @@ -0,0 +1,39 @@
-> +/*
-> + * Copyright (C) 2015 Linaro Ltd.
-> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef __ASM_ARM_KVM_PMU_H
-> +#define __ASM_ARM_KVM_PMU_H
-> +
-> +#include <asm/pmu.h>
-> +
-> +struct kvm_pmc {
-> +	u8 idx;/* index into the pmu->pmc array */
-> +	struct perf_event *perf_event;
-> +	struct kvm_vcpu *vcpu;
-> +};
-> +
-
-Since you have a struct perf_event here, it makes more sense to #include
-linux/perf.h here.
-
-> +struct kvm_pmu {
-> +#ifdef CONFIG_KVM_ARM_PMU
-> +	/* PMU IRQ Number per VCPU */
-> +	int irq_num;
-> +	/* IRQ pending flag */
-> +	bool irq_pending;
-> +	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
-> +#endif
-> +};
-> +
-> +#endif
-> 
-
-Thanks,
-
-	M.
+diff --git a/drivers/gpio/gpio-xgene-sb.c b/drivers/gpio/gpio-xgene-sb.c
+index d57068b..76b15e0 100644
+--- a/drivers/gpio/gpio-xgene-sb.c
++++ b/drivers/gpio/gpio-xgene-sb.c
+@@ -32,6 +32,8 @@
+ 
+ #define XGENE_MAX_GPIO_DS		22
+ #define XGENE_MAX_GPIO_DS_IRQ		6
++#define XGENE_GPIO8_HWIRQ		0x48
++#define XGENE_GPIO8_IDX			8
+ 
+ #define GPIO_MASK(x)			(1U << ((x) % 32))
+ 
+@@ -82,11 +84,19 @@ static int apm_gpio_sb_to_irq(struct gpio_chip *gc, u32 gpio)
+ 	return -ENXIO;
+ }
+ 
++static int xgene_irq_to_line(u32 irq)
++{
++	u32 offset = irq_get_irq_data(irq)->hwirq - XGENE_GPIO8_HWIRQ;
++
++	return (offset < XGENE_MAX_GPIO_DS_IRQ) ?
++			(offset + XGENE_GPIO8_IDX) : -EINVAL;
++}
++
+ static int xgene_gpio_sb_probe(struct platform_device *pdev)
+ {
+ 	struct xgene_gpio_sb *priv;
+ 	u32 ret, i;
+-	u32 default_lines[] = {0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D};
++	int virq, line;
+ 	struct resource *res;
+ 	void __iomem *regs;
+ 
+@@ -109,20 +119,29 @@ static int xgene_gpio_sb_probe(struct platform_device *pdev)
+ 	priv->bgc.gc.to_irq = apm_gpio_sb_to_irq;
+ 	priv->bgc.gc.ngpio = XGENE_MAX_GPIO_DS;
+ 
+-	priv->nirq = XGENE_MAX_GPIO_DS_IRQ;
+-
+ 	priv->irq = devm_kzalloc(&pdev->dev, sizeof(u32) * XGENE_MAX_GPIO_DS,
+ 				   GFP_KERNEL);
+ 	if (!priv->irq)
+ 		return -ENOMEM;
+ 
+-	for (i = 0; i < priv->nirq; i++) {
+-		priv->irq[default_lines[i]] = platform_get_irq(pdev, i);
++	for (i = 0; i < XGENE_MAX_GPIO_DS_IRQ; i++) {
++		virq = platform_get_irq(pdev, i);
++		if (virq < 0)
++			break;
++		line = xgene_irq_to_line(virq);
++		if (line < XGENE_GPIO8_IDX)
++			break;
++		priv->irq[line] = virq;
+ 		xgene_gpio_set_bit(&priv->bgc, regs + MPA_GPIO_SEL_LO,
+-                                   default_lines[i] * 2, 1);
+-		xgene_gpio_set_bit(&priv->bgc, regs + MPA_GPIO_INT_LVL, i, 1);
++						line * 2, 1);
++		xgene_gpio_set_bit(&priv->bgc, regs + MPA_GPIO_INT_LVL,
++						(line - XGENE_GPIO8_IDX), 1);
++		dev_dbg(&pdev->dev,
++			"gpio line %d mapped as external irq pin\n", line);
+ 	}
+ 
++	priv->nirq = i;
++
+ 	platform_set_drvdata(pdev, priv);
+ 
+ 	ret = gpiochip_add(&priv->bgc.gc);
 -- 
-Jazz is not dead. It just smells funny...
+1.7.1
