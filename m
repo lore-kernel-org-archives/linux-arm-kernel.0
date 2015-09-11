@@ -1,36 +1,67 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 11 Sep 2015 14:49:07 -0700
-Subject: [PATCH 1/3] doc: dt: add documentation for Mediatek spi-nor
- controller
-In-Reply-To: <1441705796-11365-2-git-send-email-bayi.cheng@mediatek.com>
-References: <1441705796-11365-1-git-send-email-bayi.cheng@mediatek.com>
- <1441705796-11365-2-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <20150911214907.GE11487@google.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Fri, 11 Sep 2015 23:52:53 +0200
+Subject: [PATCH v2 3/3] ARM: mvebu: enable options for Seagate NAS in
+ mvebu_v7_defconfig
+In-Reply-To: <1442008373-19184-1-git-send-email-simon.guinot@sequanux.org>
+References: <1442008373-19184-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <1442008373-19184-4-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One more thing:
+This patch enables the following options needed by the Seagate
+Personal Cloud 1 and 2-Bay and the Seagate NAS 2 and 4-Bay:
 
-On Tue, Sep 08, 2015 at 05:49:54PM +0800, Bayi Cheng wrote:
-> +- clocks: spi nor source clock
+SATA_AHCI
+POWER_RESET_GPIO
+RTC_DRV_DS1307
+RTC_DRV_PCF8563
 
-^^ you only list one clock here
+Additionnally this patch also enables NEW_LEDS which was missing for
+some reasons.
 
-> +- clock-names: "spi_clk", "axi_clk", "mux_clk", "sf_clk"
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+---
+ arch/arm/configs/mvebu_v7_defconfig | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-But you have 4 names here.
-
-...
-> +	clocks = <&pericfg CLK_PERI_SPI>,
-> +		 <&topckgen CLK_TOP_AXI_SEL>,
-> +		 <&topckgen CLK_TOP_UNIVPLL2_D8>,
-> +		 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
-
-And you provide 4 clocks.
-
-> +	clock-names = "spi_clk", "axi_clk", "mux_clk", "sf_clk";
-
-Please list all 4 under the "clocks" property, not just under the
-"clock-names" property.
-
-Brian
+diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+index 13fcd020e375..c6729bf0a8dd 100644
+--- a/arch/arm/configs/mvebu_v7_defconfig
++++ b/arch/arm/configs/mvebu_v7_defconfig
+@@ -61,6 +61,7 @@ CONFIG_MTD_SPI_NOR=y
+ CONFIG_EEPROM_AT24=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_ATA=y
++CONFIG_SATA_AHCI=y
+ CONFIG_AHCI_MVEBU=y
+ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+@@ -85,6 +86,9 @@ CONFIG_SPI=y
+ CONFIG_SPI_ORION=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PCA953X=y
++CONFIG_POWER_SUPPLY=y
++CONFIG_POWER_RESET=y
++CONFIG_POWER_RESET_GPIO=y
+ CONFIG_SENSORS_GPIO_FAN=y
+ CONFIG_THERMAL=y
+ CONFIG_ARMADA_THERMAL=y
+@@ -111,12 +115,15 @@ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_DOVE=y
+ CONFIG_MMC_SDHCI_PXAV3=y
+ CONFIG_MMC_MVSDIO=y
+-CONFIG_LEDS_GPIO=y
++CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_DS1307=y
++CONFIG_RTC_DRV_PCF8563=y
+ CONFIG_RTC_DRV_S35390A=y
+ CONFIG_RTC_DRV_MV=y
+ CONFIG_RTC_DRV_ARMADA38X=y
+-- 
+2.1.4
