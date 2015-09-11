@@ -1,57 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 11 Sep 2015 19:01:51 +0100
-Subject: [PATCH 04/11] ARM: DT: STiH407: Add serial3 pinctrl configuration
-In-Reply-To: <1441991194-11948-5-git-send-email-peter.griffin@linaro.org>
-References: <1441991194-11948-1-git-send-email-peter.griffin@linaro.org>
- <1441991194-11948-5-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20150911180151.GN18779@x1>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 11 Sep 2015 20:53:12 +0200
+Subject: [PATCH-v5 RESEND 2/5] i2c: pxa: enable/disable i2c module across
+ msg xfer
+In-Reply-To: <1440395978-9065-3-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1440395978-9065-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1440395978-9065-3-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <20150911185312.GA1516@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Sep 2015, Peter Griffin wrote:
-
-> Add missing serial 3 pinctrl config. This can be used
-> on b2206 HVK, where it defaults to PIO31[3] & PIO31[4],
-> alternate 1.
+On Mon, Aug 24, 2015 at 11:29:35AM +0530, Vaibhav Hiremath wrote:
+> From: Yi Zhang <yizhang@marvell.com>
 > 
-> Signed-off-by: Erwan Le Ray <erwan.leray@st.com>
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Acked-by: Carmelo Amoroso <carmelo.amoroso@st.com>
-> Acked-by: Patrice Chotard <patrice.chotard@st.com>
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-
-Eek!
-
-For the patch: Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> ---
->  arch/arm/boot/dts/stih407-pinctrl.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
+> Enable i2c module/unit before transmission and disable when it
+> finishes.
 > 
-> diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> index bb3b0c7..6c81f35 100644
-> --- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> @@ -809,6 +809,15 @@
->  					};
->  				};
->  			};
-> +
-> +			serial3 {
-> +				pinctrl_serial3: serial3-0 {
-> +					st,pins {
-> +						tx = <&pio31 3 ALT1 OUT>;
-> +						rx = <&pio31 4 ALT1 IN>;
-> +					};
-> +				};
-> +			};
->  		};
->  
->  		pin-controller-flash {
+> why?
+> It's because the i2c bus may be disturbed if the slave device,
+> typically a touch, powers on.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I am not convinced, "may disturb" is too weak for me. It would need a
+way more detailed description of the problem which makes clear that
+this mechanism is the only way to go forward.
+
+Can't you use Runtime PM for that?
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150911/9527ea2d/attachment.sig>
