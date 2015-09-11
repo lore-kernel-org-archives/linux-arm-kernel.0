@@ -1,46 +1,51 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Fri, 11 Sep 2015 15:41:15 -0700
-Subject: Patch "genirq: Introduce irq_chip_set_type_parent() helper" has been
- added to the 4.1-stable tree
-Message-ID: <144201127595147@kroah.com>
+Date: Fri, 11 Sep 2015 15:41:21 -0700
+Subject: Patch "irqchip/crossbar: Restore the irq_set_type() mechanism" has
+ been added to the 4.1-stable tree
+Message-ID: <1442011281120210@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 This is a note to let you know that I've just added the patch titled
 
-    genirq: Introduce irq_chip_set_type_parent() helper
+    irqchip/crossbar: Restore the irq_set_type() mechanism
 
 to the 4.1-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
-     genirq-introduce-irq_chip_set_type_parent-helper.patch
+     irqchip-crossbar-restore-the-irq_set_type-mechanism.patch
 and it can be found in the queue-4.1 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
 
 
->From b7560de198222994374c1340a389f12d5efb244a Mon Sep 17 00:00:00 2001
+>From e269ec42328783e51be08c191aa935dba56141fc Mon Sep 17 00:00:00 2001
 From: Grygorii Strashko <grygorii.strashko@ti.com>
-Date: Fri, 14 Aug 2015 15:20:26 +0300
-Subject: genirq: Introduce irq_chip_set_type_parent() helper
+Date: Fri, 14 Aug 2015 15:20:27 +0300
+Subject: irqchip/crossbar: Restore the irq_set_type() mechanism
 
 From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-commit b7560de198222994374c1340a389f12d5efb244a upstream.
+commit e269ec42328783e51be08c191aa935dba56141fc upstream.
 
-This helper is required for irq chips which do not implement a
-irq_set_type callback and need to call down the irq domain hierarchy
-for the actual trigger type change.
+The conversion of the crossbar irqchip to hierarchical irq domains
+failed to provide a mechanism to properly set the trigger type of an
+interrupt.
 
-This helper is required to fix further wreckage caused by the
-conversion of TI OMAP to hierarchical irq domains and therefor tagged
-for stable.
+The crossbar irq chip itself has no mechanism and therefor no
+irq_set_type() callback. The code before the conversion relayed the
+trigger configuration directly to the underlying GIC.
+
+Restore the correct behaviour by setting the crossbar irq_set_type
+callback to irq_chip_set_type_parent(). This propagates the
+set_trigger() call to the underlying GIC irqchip.
 
 [ tglx: Massaged changelog ]
 
+Fixes: 783d31863fb8 ('irqchip: crossbar: Convert dra7 crossbar...')
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Cc: Sudeep Holla <sudeep.holla@arm.com>
 Cc: <linux@arm.linux.org.uk>
@@ -50,52 +55,24 @@ Cc: <balbi@ti.com>
 Cc: <linux-arm-kernel@lists.infradead.org>
 Cc: <tony@atomide.com>
 Cc: <marc.zyngier@arm.com>
-Cc: stable at vger.kernel.org # 4.1
-Link: http://lkml.kernel.org/r/1439554830-19502-3-git-send-email-grygorii.strashko at ti.com
+Link: http://lkml.kernel.org/r/1439554830-19502-4-git-send-email-grygorii.strashko at ti.com
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- include/linux/irq.h |    1 +
- kernel/irq/chip.c   |   17 +++++++++++++++++
- 2 files changed, 18 insertions(+)
+ drivers/irqchip/irq-crossbar.c |    1 +
+ 1 file changed, 1 insertion(+)
 
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -467,6 +467,7 @@ extern int irq_chip_set_affinity_parent(
- 					const struct cpumask *dest,
- 					bool force);
- extern int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on);
-+extern int irq_chip_set_type_parent(struct irq_data *data, unsigned int type);
+--- a/drivers/irqchip/irq-crossbar.c
++++ b/drivers/irqchip/irq-crossbar.c
+@@ -69,6 +69,7 @@ static struct irq_chip crossbar_chip = {
+ 	.irq_unmask		= irq_chip_unmask_parent,
+ 	.irq_retrigger		= irq_chip_retrigger_hierarchy,
+ 	.irq_set_wake		= irq_chip_set_wake_parent,
++	.irq_set_type		= irq_chip_set_type_parent,
+ #ifdef CONFIG_SMP
+ 	.irq_set_affinity	= irq_chip_set_affinity_parent,
  #endif
- 
- /* Handling of unhandled and spurious interrupts: */
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -934,6 +934,23 @@ int irq_chip_set_affinity_parent(struct
- }
- 
- /**
-+ * irq_chip_set_type_parent - Set IRQ type on the parent interrupt
-+ * @data:	Pointer to interrupt specific data
-+ * @type:	IRQ_TYPE_{LEVEL,EDGE}_* value - see include/linux/irq.h
-+ *
-+ * Conditional, as the underlying parent chip might not implement it.
-+ */
-+int irq_chip_set_type_parent(struct irq_data *data, unsigned int type)
-+{
-+	data = data->parent_data;
-+
-+	if (data->chip->irq_set_type)
-+		return data->chip->irq_set_type(data, type);
-+
-+	return -ENOSYS;
-+}
-+
-+/**
-  * irq_chip_retrigger_hierarchy - Retrigger an interrupt in hardware
-  * @data:	Pointer to interrupt specific data
-  *
 
 
 Patches currently in stable-queue which might be from grygorii.strashko at ti.com are
