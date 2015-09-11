@@ -1,10 +1,10 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 11 Sep 2015 15:50:05 -0700
-Subject: [PATCH 4.1 64/78] irqchip/crossbar: Restore the irq_set_type()
- mechanism
+Date: Fri, 11 Sep 2015 15:50:09 -0700
+Subject: [PATCH 4.1 68/78] genirq: Dont return ENOSYS in
+ irq_chip_retrigger_hierarchy
 In-Reply-To: <20150911224606.758437370@linuxfoundation.org>
 References: <20150911224606.758437370@linuxfoundation.org>
-Message-ID: <20150911224615.634002851@linuxfoundation.org>
+Message-ID: <20150911224616.295326971@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,24 +14,32 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-commit e269ec42328783e51be08c191aa935dba56141fc upstream.
+commit 6d4affea7d5aa5ca5ff4c3e5fbf3ee16801cc527 upstream.
 
-The conversion of the crossbar irqchip to hierarchical irq domains
-failed to provide a mechanism to properly set the trigger type of an
-interrupt.
+irq_chip_retrigger_hierarchy() returns -ENOSYS if it was not able to
+find at least one .irq_retrigger() callback implemented in the IRQ
+domain hierarchy.
 
-The crossbar irq chip itself has no mechanism and therefor no
-irq_set_type() callback. The code before the conversion relayed the
-trigger configuration directly to the underlying GIC.
+That's wrong, because check_irq_resend() expects a 0 return value from
+the callback in case that the hardware assisted resend was not
+possible. If the return value is non zero the core code assumes
+hardware resend success and the software resend is not invoked.
 
-Restore the correct behaviour by setting the crossbar irq_set_type
-callback to irq_chip_set_type_parent(). This propagates the
-set_trigger() call to the underlying GIC irqchip.
+This results in lost interrupts on platforms where none of the parent
+irq chips in the hierarchy implements the retrigger callback.
+
+This is observable on TI OMAP, where the hierarchy is:
+
+ ARM GIC <- OMAP wakeupgen <- TI Crossbar
+
+Return 0 instead so the software resend mechanism gets invoked.
 
 [ tglx: Massaged changelog ]
 
-Fixes: 783d31863fb8 ('irqchip: crossbar: Convert dra7 crossbar...')
+Fixes: 85f08c17de26 ('genirq: Introduce helper functions...')
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Jiang Liu <jiang.liu@linux.intel.com>
 Cc: Sudeep Holla <sudeep.holla@arm.com>
 Cc: <linux@arm.linux.org.uk>
 Cc: <nsekhar@ti.com>
@@ -39,22 +47,22 @@ Cc: <jason@lakedaemon.net>
 Cc: <balbi@ti.com>
 Cc: <linux-arm-kernel@lists.infradead.org>
 Cc: <tony@atomide.com>
-Cc: <marc.zyngier@arm.com>
-Link: http://lkml.kernel.org/r/1439554830-19502-4-git-send-email-grygorii.strashko at ti.com
+Link: http://lkml.kernel.org/r/1439554830-19502-2-git-send-email-grygorii.strashko at ti.com
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- drivers/irqchip/irq-crossbar.c |    1 +
- 1 file changed, 1 insertion(+)
+ kernel/irq/chip.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
---- a/drivers/irqchip/irq-crossbar.c
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -69,6 +69,7 @@ static struct irq_chip crossbar_chip = {
- 	.irq_unmask		= irq_chip_unmask_parent,
- 	.irq_retrigger		= irq_chip_retrigger_hierarchy,
- 	.irq_set_wake		= irq_chip_set_wake_parent,
-+	.irq_set_type		= irq_chip_set_type_parent,
- #ifdef CONFIG_SMP
- 	.irq_set_affinity	= irq_chip_set_affinity_parent,
- #endif
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -946,7 +946,7 @@ int irq_chip_retrigger_hierarchy(struct
+ 		if (data->chip && data->chip->irq_retrigger)
+ 			return data->chip->irq_retrigger(data);
+ 
+-	return -ENOSYS;
++	return 0;
+ }
+ 
+ /**
