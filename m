@@ -1,207 +1,100 @@
-From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Fri, 11 Sep 2015 08:37:36 +0200
-Subject: [PATCH v2 1/1] ARM: dts: sun7i: Enable axp209 driver on olinuxino
- lime2
-In-Reply-To: <CAGb2v67GTAM3tqOUOmUjKmWGyewJar2NWAzF4bk4g+-7Yfdm0A@mail.gmail.com>
-References: <1441805204-6037-1-git-send-email-o.schinagl@ultimaker.com>
- <1441805204-6037-2-git-send-email-o.schinagl@ultimaker.com>
- <20150910181315.GM9885@lukather>
- <CAGb2v67GTAM3tqOUOmUjKmWGyewJar2NWAzF4bk4g+-7Yfdm0A@mail.gmail.com>
-Message-ID: <1025948D-A8F7-4E5A-98AF-03801A53DE23@ultimaker.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 11 Sep 2015 15:00:14 +0800
+Subject: [PATCH v4 1/3] media: atmel-isi: setup the ISI_CFG2 register directly
+Message-ID: <1441954816-11285-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey chen,
+In the function configure_geometry(), we will setup the ISI CFG2
+according to the sensor output format.
 
-On September 11, 2015 4:57:03 AM CEST, Chen-Yu Tsai <wens@csie.org> wrote:
->On Fri, Sep 11, 2015 at 2:13 AM, Maxime Ripard
-><maxime.ripard@free-electrons.com> wrote:
->> Hi Oliver,
->>
->> On Wed, Sep 09, 2015 at 03:26:44PM +0200, Olliver Schinagl wrote:
->>> The Olimex OLinuXino Lime2 uses the same AXP209 as was recently
->>> introduced this driver for its power regulation.
->>>
->>> Signed-off-by: Olliver Schinagl <o.schinagl@ultimaker.com>
->>> ---
->>>  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 87
->+++++++++----------------
->>>  1 file changed, 31 insertions(+), 56 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
->b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
->>> index d5c796c..dd90a1d 100644
->>> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
->>> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
->>> @@ -71,14 +71,6 @@
->>>                       default-state = "on";
->>>               };
->>>       };
->>> -
->>> -     reg_axp_ipsout: axp_ipsout {
->>> -             compatible = "regulator-fixed";
->>> -             regulator-name = "axp-ipsout";
->>> -             regulator-min-microvolt = <5000000>;
->>> -             regulator-max-microvolt = <5000000>;
->>> -             regulator-always-on;
->>> -     };
->>
->> Why are you removing that regulator?
->
->This is really just a placeholder, rather than an actual regulator.
->
->From the bindings:
->
->- <input>-supply: a phandle to the regulator supply node. May be
->omitted if
->                inputs are unregulated, such as using the IPSOUT output
->                  from the PMIC.
->
->
->>>  };
->>>
->>>  &ahci {
->>> @@ -86,6 +78,10 @@
->>>       status = "okay";
->>>  };
->>>
->>> +&cpu0 {
->>> +     cpu-supply = <&reg_dcdc2>;
->>> +};
->>> +
->>>  &ehci0 {
->>>       status = "okay";
->>>  };
->>> @@ -112,57 +108,9 @@
->>>       status = "okay";
->>>
->>>       axp209: pmic at 34 {
->>> -             compatible = "x-powers,axp209";
->>>               reg = <0x34>;
->>>               interrupt-parent = <&nmi_intc>;
->>>               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->>> -
->>> -             interrupt-controller;
->>> -             #interrupt-cells = <1>;
->>> -
->>> -             acin-supply = <&reg_axp_ipsout>;
->>> -             vin2-supply = <&reg_axp_ipsout>;
->>> -             vin3-supply = <&reg_axp_ipsout>;
->>> -             ldo24in-supply = <&reg_axp_ipsout>;
->>> -             ldo3in-supply = <&reg_axp_ipsout>;
->>
->> And these supplies?
->>
->>> -             regulators {
->>> -                     vdd_rtc: ldo1 {
->>> -                             regulator-min-microvolt = <1300000>;
->>> -                             regulator-max-microvolt = <1300000>;
->>> -                             regulator-always-on;
->>> -                     };
->>> -
->>> -                     avcc: ldo2 {
->>> -                             regulator-min-microvolt = <1800000>;
->>> -                             regulator-max-microvolt = <3300000>;
->>> -                             regulator-always-on;
->>> -                     };
->>> -
->>> -                     vcc_csi0: ldo3 {
->>> -                             regulator-min-microvolt = <700000>;
->>> -                             regulator-max-microvolt = <3500000>;
->>> -                             regulator-always-on;
->>> -                     };
->>> -
->>> -                     vcc_csi1: ldo4 {
->>> -                             regulator-min-microvolt = <1250000>;
->>> -                             regulator-max-microvolt = <3300000>;
->>> -                             regulator-always-on;
->>> -                     };
->>> -
->>> -                     vdd_cpu: dcdc2 {
->>> -                             regulator-min-microvolt = <700000>;
->>> -                             regulator-max-microvolt = <2275000>;
->>> -                             regulator-always-on;
->>> -                     };
->>> -
->>> -                     vdd_int: dcdc3 {
->>> -                             regulator-min-microvolt = <700000>;
->>> -                             regulator-max-microvolt = <3500000>;
->>> -                             regulator-always-on;
->>> -                     };
->>> -             };
->>>       };
->>>  };
->>>
->>> @@ -243,6 +191,33 @@
->>>       status = "okay";
->>>  };
->>>
->>> +#include "axp209.dtsi"
->>> +
->>> +&reg_dcdc2 {
->>> +     regulator-always-on;
->>> +     regulator-min-microvolt = <1000000>;
->>> +     regulator-max-microvolt = <1450000>;
->>
->> This is outside of the operating voltages of the CPU.
->>
->>> +     regulator-name = "vdd-cpu";
->>> +};
->>> +
->>> +&reg_dcdc3 {
->>> +     regulator-always-on;
->>> +     regulator-min-microvolt = <1000000>;
->>> +     regulator-max-microvolt = <1400000>;
->>> +     regulator-name = "vdd-int-dll";
->>> +};
->>> +
->>> +&reg_ldo1 {
->>> +     regulator-name = "vdd-rtc";
->>> +};
->>> +
->>> +&reg_ldo2 {
->>> +     regulator-always-on;
->>> +     regulator-min-microvolt = <3000000>;
->>> +     regulator-max-microvolt = <3000000>;
->>> +     regulator-name = "avcc";
->>
->> You're changing the boundaries, why?
->
->The old boundaries seem to be from a very old dts, where we were
->listing the regulators' supported voltage range, instead of what
->the SoC could take.
-Is it very old? just checked the cubies in maxime's sunxi next and those where still there. I actually wrote these patches ages ago and forgot to submit them whats worse is on my behave, i didn't properly check for changes. Now that you mention it however, i do recall the discussion about these values. I will update them accordingly with the correct values.
+It make no sense to just read back the CFG2 register and just set part
+of it.
 
-Sorry,
-Olliver
+So just set up this register directly makes things simpler.
+Currently only support YUV format from camera sensor.
 
->
->Olliver you should explain all this in the commit log, probably
->starting with something like "update the dts to use axp209.dtsi
->, comply with axp20x bindings, and set proper voltage ranges for
->the regulators".
->
->>> +};
->>> +
->>>  &reg_usb0_vbus {
->>>       pinctrl-0 = <&usb0_vbus_pin_lime2>;
->>>       gpio = <&pio 2 17 GPIO_ACTIVE_HIGH>;
->>> --
->>> 2.1.4
->>
->> Thanks!
->> Maxime
->>
->> --
->> Maxime Ripard, Free Electrons
->> Embedded Linux, Kernel and Android engineering
->> http://free-electrons.com
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
 
+Changes in v4:
+- add a COL_SPACE_YCbCr for cfg2
+
+Changes in v3: None
+Changes in v2:
+- add Laurent's reviewed-by tag.
+
+ drivers/media/platform/soc_camera/atmel-isi.c | 20 +++++++-------------
+ include/media/atmel-isi.h                     |  2 ++
+ 2 files changed, 9 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+index f39132c..a76c609 100644
+--- a/drivers/media/platform/soc_camera/atmel-isi.c
++++ b/drivers/media/platform/soc_camera/atmel-isi.c
+@@ -105,24 +105,25 @@ static u32 isi_readl(struct atmel_isi *isi, u32 reg)
+ static int configure_geometry(struct atmel_isi *isi, u32 width,
+ 			u32 height, u32 code)
+ {
+-	u32 cfg2, cr;
++	u32 cfg2;
+ 
++	/* According to sensor's output format to set cfg2 */
+ 	switch (code) {
+ 	/* YUV, including grey */
+ 	case MEDIA_BUS_FMT_Y8_1X8:
+-		cr = ISI_CFG2_GRAYSCALE;
++		cfg2 = ISI_CFG2_GRAYSCALE | ISI_CFG2_COL_SPACE_YCbCr;
+ 		break;
+ 	case MEDIA_BUS_FMT_VYUY8_2X8:
+-		cr = ISI_CFG2_YCC_SWAP_MODE_3;
++		cfg2 = ISI_CFG2_YCC_SWAP_MODE_3 | ISI_CFG2_COL_SPACE_YCbCr;
+ 		break;
+ 	case MEDIA_BUS_FMT_UYVY8_2X8:
+-		cr = ISI_CFG2_YCC_SWAP_MODE_2;
++		cfg2 = ISI_CFG2_YCC_SWAP_MODE_2 | ISI_CFG2_COL_SPACE_YCbCr;
+ 		break;
+ 	case MEDIA_BUS_FMT_YVYU8_2X8:
+-		cr = ISI_CFG2_YCC_SWAP_MODE_1;
++		cfg2 = ISI_CFG2_YCC_SWAP_MODE_1 | ISI_CFG2_COL_SPACE_YCbCr;
+ 		break;
+ 	case MEDIA_BUS_FMT_YUYV8_2X8:
+-		cr = ISI_CFG2_YCC_SWAP_DEFAULT;
++		cfg2 = ISI_CFG2_YCC_SWAP_DEFAULT | ISI_CFG2_COL_SPACE_YCbCr;
+ 		break;
+ 	/* RGB, TODO */
+ 	default:
+@@ -130,17 +131,10 @@ static int configure_geometry(struct atmel_isi *isi, u32 width,
+ 	}
+ 
+ 	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+-
+-	cfg2 = isi_readl(isi, ISI_CFG2);
+-	/* Set YCC swap mode */
+-	cfg2 &= ~ISI_CFG2_YCC_SWAP_MODE_MASK;
+-	cfg2 |= cr;
+ 	/* Set width */
+-	cfg2 &= ~(ISI_CFG2_IM_HSIZE_MASK);
+ 	cfg2 |= ((width - 1) << ISI_CFG2_IM_HSIZE_OFFSET) &
+ 			ISI_CFG2_IM_HSIZE_MASK;
+ 	/* Set height */
+-	cfg2 &= ~(ISI_CFG2_IM_VSIZE_MASK);
+ 	cfg2 |= ((height - 1) << ISI_CFG2_IM_VSIZE_OFFSET)
+ 			& ISI_CFG2_IM_VSIZE_MASK;
+ 	isi_writel(isi, ISI_CFG2, cfg2);
+diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
+index 6008b09..e7a96b8 100644
+--- a/include/media/atmel-isi.h
++++ b/include/media/atmel-isi.h
+@@ -66,6 +66,8 @@
+ 
+ /* Bitfields in CFG2 */
+ #define ISI_CFG2_GRAYSCALE			(1 << 13)
++#define ISI_CFG2_COL_SPACE_YCbCr		(0 << 15)
++#define ISI_CFG2_COL_SPACE_RGB			(1 << 15)
+ /* Constants for YCC_SWAP(ISI_V2) */
+ #define		ISI_CFG2_YCC_SWAP_DEFAULT	(0 << 28)
+ #define		ISI_CFG2_YCC_SWAP_MODE_1	(1 << 28)
 -- 
-Sent from my Android device with K-9 Mail. Please excuse my brevity.
+1.9.1
