@@ -1,72 +1,102 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 Sep 2015 17:25:59 +0100
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <20150911124643.GB4530@olila.local.net-space.pl>
-References: <20150910095208.GA29293@leverpostej>
- <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
- <20150910112418.GC29293@leverpostej>
- <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
- <20150910121514.GE29293@leverpostej>
- <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
- <20150910144938.GI29293@leverpostej>
- <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
- <20150910162302.GN29293@leverpostej>
- <20150911124643.GB4530@olila.local.net-space.pl>
-Message-ID: <20150911162559.GA8726@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Sep 2015 17:27:49 +0100
+Subject: [PATCH v2 7/9] ARM: STi: DT: STiH407: Add FDMA driver dt nodes.
+In-Reply-To: <1441980871-24475-8-git-send-email-peter.griffin@linaro.org>
+References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
+ <1441980871-24475-8-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20150911162749.GD18779@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 01:46:43PM +0100, Daniel Kiper wrote:
-> On Thu, Sep 10, 2015 at 05:23:02PM +0100, Mark Rutland wrote:
-> > > > C) When you could go:
-> > > >
-> > > >    DT -> Discover Xen -> Xen-specific stuff -> Xen-specific EFI/ACPI discovery
-> > >
-> > > I take you mean discovering Xen with the usual Xen hypervisor node on
-> > > device tree. I think that C) is a good option actually. I like it. Not
-> > > sure why we didn't think about this earlier. Is there anything EFI or
-> > > ACPI which is needed before Xen support is discovered by
-> > > arch/arm64/kernel/setup.c:setup_arch -> xen_early_init()?
-> >
-> > Currently lots (including the memory map). With the stuff to support
-> > SPCR, the ACPI discovery would be moved before xen_early_init().
-> >
-> > > If not, we could just go for this. A lot of complexity would go away.
-> >
-> > I suspect this would still be fairly complex, but would at least prevent
-> > the Xen-specific EFI handling from adversely affecting the native case.
-> >
-> > > > D) If you want to be generic:
-> > > >    EFI -> EFI application -> EFI tables -> ACPI tables -> Xen-specific stuff
-> > > >           \------------------------------------------/
-> > > > 	   (virtualize these, provide shims to Dom0, but handle
-> > > > 	    everything in Xen itself)
-> > >
-> > > I think that this is good in theory but could turn out to be a lot of
-> > > work in practice. We could probably virtualize the RuntimeServices but
-> > > the BootServices are troublesome.
-> >
-> > What's troublesome with the boot services?
-> >
-> > What can't be simulated?
+On Fri, 11 Sep 2015, Peter Griffin wrote:
+
+> These nodes are required to get the fdma driver working
+> on STiH407 based silicon.
 > 
-> How do you want to access bare metal EFI boot services from dom0 if they
-> were shutdown long time ago before loading dom0 image?
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  arch/arm/boot/dts/stih407-family.dtsi | 51 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index 838b812..da07474b 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -565,5 +565,56 @@
+>  						  <&phy_port2 PHY_TYPE_USB3>;
+>  			};
+>  		};
+> +
+> +		fdma0: fdma0-audio at 8e20000 {
 
-I don't want to.
+I'm not familiar with the FDMA driver, so can't comment knowledgeably,
+but the <dev> part of <dev>@<base_address> should only describe the
+type of hardware.  I believe in this case it should just be
+dma at 08e20000.  Also notice the leading zero in the address, which I
+believe mitigates possible confusion.  Then you be more specific with
+the label, so something like 'fdma-audio' seems appropriate here.
 
-I asked "What can't be simulated?" because I assumed everything
-necessary/mandatory could be simulated without needinng access to any
-real EFI boot services.
+> +			compatible = "st,stih407-fdma-mpe31";
+> +			reg = <0x8e20000 0x20000>;
 
-As far as I can see all that's necessary is to provide a compatible
-interface.
+I personally find padding up to 32bits helpful in the addresses.
 
-> What do you need from EFI boot services in dom0?
+> +			interrupts = <GIC_SPI 5 IRQ_TYPE_NONE>;
+> +			dma-channels = <16>;
+> +			#dma-cells = <3>;
+> +			st,fdma-id = <0>;
 
-The ability to call ExitBootServices() and SetVirtualAddressMap() on a
-_virtual_ address map for _virtual_ services provided by the hypervisor.
-A console so that I can log things early on.
+We usually shy away from ID properties.  What is it required for in
+this case?
 
-Mark.
+> +			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
+> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
+> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
+> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> +			clock-names = "fdma_slim",
+> +				      "fdma_hi",
+> +				      "fdma_low",
+> +				      "fdma_ic";
+> +		};
+> +
+> +		fdma1: fdma1-app at 8e40000 {
+> +			compatible = "st,stih407-fdma-mpe31";
+> +			reg = <0x8e40000 0x20000>;
+> +			interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>;
+> +			dma-channels = <16>;
+> +			#dma-cells = <3>;
+> +			st,fdma-id = <1>;
+> +			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
+> +				 <&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
+> +				 <&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
+> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> +			clock-names = "fdma_slim",
+> +				      "fdma_hi",
+> +				      "fdma_low",
+> +				      "fdma_ic";
+> +		};
+> +
+> +		fdma2: fdma2-free_running at 8e60000 {
+> +			compatible = "st,stih407-fdma-mpe31";
+> +			reg = <0x8e60000 0x20000>;
+> +			interrupts = <GIC_SPI 9 IRQ_TYPE_NONE>;
+> +			dma-channels = <16>;
+> +			#dma-cells = <3>;
+> +			st,fdma-id = <2>;
+> +			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
+> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
+> +				 <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
+> +				 <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> +			clock-names = "fdma_slim",
+> +				      "fdma_hi",
+> +				      "fdma_low",
+> +				      "fdma_ic";
+> +		};
+>  	};
+>  };
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
