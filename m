@@ -1,103 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Sep 2015 17:24:17 +0100
-Subject: NFS/TCP/IPv6 acting strangely in 4.2
-In-Reply-To: <1441984723.4619.61.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <20150911113839.GO21084@n2100.arm.linux.org.uk>
- <1441976691.4619.58.camel@edumazet-glaptop2.roam.corp.google.com>
- <20150911143347.GQ21084@n2100.arm.linux.org.uk>
- <20150911150613.GR21084@n2100.arm.linux.org.uk>
- <1441984723.4619.61.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <20150911162416.GV21084@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 11 Sep 2015 17:25:59 +0100
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <20150911124643.GB4530@olila.local.net-space.pl>
+References: <20150910095208.GA29293@leverpostej>
+ <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
+ <20150910112418.GC29293@leverpostej>
+ <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
+ <20150910121514.GE29293@leverpostej>
+ <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
+ <20150910144938.GI29293@leverpostej>
+ <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
+ <20150910162302.GN29293@leverpostej>
+ <20150911124643.GB4530@olila.local.net-space.pl>
+Message-ID: <20150911162559.GA8726@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 08:18:43AM -0700, Eric Dumazet wrote:
-> On Fri, 2015-09-11 at 16:06 +0100, Russell King - ARM Linux wrote:
-> > On Fri, Sep 11, 2015 at 03:33:47PM +0100, Russell King - ARM Linux wrote:
-> > > It looks like 0c78789e3a030615c6650fde89546cadf40ec2cc might be relevant
-> > > too, but I don't see that solving the multiple _concurrent_ connection
-> > > attempts with the same port number - presumably it's somehow trying to
-> > > make the same socket repeatedly connect despite a previous connection
-> > > being in progress, which would have nothing to do with cleaning up a
-> > > previous attempt.
-> > 
-> > As I suspected, applying the above commit in addition does not solve the
-> > problem, I still see the same behaviour: SYN SYNACK SYN RSTACK, SYN
-> > SYNACK SYN RSTACK, and eventual SYN storms.
-> > 
-> > I do have this captured as well:
-> > 
-> > 2558   0.834316 armada388 -> n2100 TCP [TCP Port numbers reused] rpasswd?nfs [SYN] Seq=1053655487 Win=28800 Len=0 MSS=1440 SACK_PERM=1 TSval=60001 TSecr=0 WS=128
-> > 2559   0.834572 n2100 -> armada388 TCP nfs?rpasswd [SYN, ACK] Seq=3076611574 Ack=1053655488 Win=28560 Len=0 MSS=1440 SACK_PERM=1 TSval=869622246 TSecr=60001 WS=64
-> > 2560   0.834666 armada388 -> n2100 TCP [TCP Port numbers reused] rpasswd?nfs [SYN] Seq=1054228544 Win=28800 Len=0 MSS=1440 SACK_PERM=1 TSval=60005 TSecr=0 WS=128
-> > 2561   0.834895 n2100 -> armada388 TCP nfs?rpasswd [ACK] Seq=3076611575 Ack=1053655488 Win=28560 Len=0 TSval=869622246 TSecr=60001
-> > 
-> > The packet at 2561 looks wrong to me - this doesn't follow what I know
-> > would be the standard TCP setup of syn, synack, ack, because that final
-> > ack is in the wrong direction.
-> > 
+On Fri, Sep 11, 2015 at 01:46:43PM +0100, Daniel Kiper wrote:
+> On Thu, Sep 10, 2015 at 05:23:02PM +0100, Mark Rutland wrote:
+> > > > C) When you could go:
+> > > >
+> > > >    DT -> Discover Xen -> Xen-specific stuff -> Xen-specific EFI/ACPI discovery
+> > >
+> > > I take you mean discovering Xen with the usual Xen hypervisor node on
+> > > device tree. I think that C) is a good option actually. I like it. Not
+> > > sure why we didn't think about this earlier. Is there anything EFI or
+> > > ACPI which is needed before Xen support is discovered by
+> > > arch/arm64/kernel/setup.c:setup_arch -> xen_early_init()?
+> >
+> > Currently lots (including the memory map). With the stuff to support
+> > SPCR, the ACPI discovery would be moved before xen_early_init().
+> >
+> > > If not, we could just go for this. A lot of complexity would go away.
+> >
+> > I suspect this would still be fairly complex, but would at least prevent
+> > the Xen-specific EFI handling from adversely affecting the native case.
+> >
+> > > > D) If you want to be generic:
+> > > >    EFI -> EFI application -> EFI tables -> ACPI tables -> Xen-specific stuff
+> > > >           \------------------------------------------/
+> > > > 	   (virtualize these, provide shims to Dom0, but handle
+> > > > 	    everything in Xen itself)
+> > >
+> > > I think that this is good in theory but could turn out to be a lot of
+> > > work in practice. We could probably virtualize the RuntimeServices but
+> > > the BootServices are troublesome.
+> >
+> > What's troublesome with the boot services?
+> >
+> > What can't be simulated?
 > 
-> This 2561 packet is an ACK packet, because n2100 has a SYN_RECV socket
-> created by packet 2558.
-> 
-> It receives a SYN packet (2560) that it interprets as a packet slightly
-> out of sequence (1054228544 being above 1053655487) for this SYN_RECV
-> 
-> The wrong packet is 2560, not 2561
+> How do you want to access bare metal EFI boot services from dom0 if they
+> were shutdown long time ago before loading dom0 image?
 
-Ok.
+I don't want to.
 
-Looking deeper at the XPRT sunrpc code, I have to wonder about the
-sanity of this:
+I asked "What can't be simulated?" because I assumed everything
+necessary/mandatory could be simulated without needinng access to any
+real EFI boot services.
 
-void xprt_connect(struct rpc_task *task)
-{
-...
-        if (!xprt_connected(xprt)) {
-...
-                if (test_bit(XPRT_CLOSING, &xprt->state))
-                        return;
-                if (xprt_test_and_set_connecting(xprt))
-                        return;
-                xprt->stat.connect_start = jiffies;
-                xprt->ops->connect(xprt, task);
+As far as I can see all that's necessary is to provide a compatible
+interface.
 
-That calls into xs_connect(), which schedules a workqueue to do the
-connection.  The workqueue will call xs_tcp_setup_socket().
+> What do you need from EFI boot services in dom0?
 
-xs_tcp_setup_socket() creates a socket if one didn't exist, otherwise
-re-using the previously obtained socket (which'll be why its using the
-same socket) and then goes on to call xs_tcp_finish_connecting().
+The ability to call ExitBootServices() and SetVirtualAddressMap() on a
+_virtual_ address map for _virtual_ services provided by the hypervisor.
+A console so that I can log things early on.
 
-xs_tcp_finish_connecting() calls kernel_connect(), which will return
--EINPROGRESS.  We seem to treat EINPROGRESS as if the connection was
-successful:
-
-        case 0:
-        case -EINPROGRESS:
-        case -EALREADY:
-                xprt_unlock_connect(xprt, transport);
-                xprt_clear_connecting(xprt);
-                return;
-
-and the xprt_clear_connecting() results in this whole path being
-re-opened: the socket is not yet connected, so xprt_connected() will
-return false, and despite the socket connection still being mid-way
-through being connected, we clear the "connecting" status, causing
-xprt_test_and_set_connecting() to return false.
-
-That allows us to re-call xprt->ops->connect, re-queue the connect
-worker, and re-run the call to kernel_connect() for a socket which is
-already mid-way through being connected.
-
-Shouldn't the "connecting" status only be cleared when either the socket
-has _finished_ connecting, or when the connection has _failed_ to connect,
-and not when it's mid-way through connecting?
-
-I've not been able to prove this: I've set rpc_debug to 129 to log
-just xprt and trans RPC facilities, and that's sufficient to change
-the timing such that this doesn't happen.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Mark.
