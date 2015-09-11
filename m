@@ -1,58 +1,87 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 11 Sep 2015 18:06:33 +0100
-Subject: [PATCH 10/11] ARM: DT: STiH407: Add RMII pinctrl support
+Date: Fri, 11 Sep 2015 18:06:34 +0100
+Subject: [PATCH 11/11] ARM: STi: STiH407: Add spi default pinctrl groups.
 In-Reply-To: <1441991194-11948-1-git-send-email-peter.griffin@linaro.org>
 References: <1441991194-11948-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1441991194-11948-11-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1441991194-11948-12-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the RMII pinctrl support for the Synopsys
-MAC on STiH407 SoCs.
+Now we have default pinconfig groups for each SPI
+controller ensure it is used by the SPI controller
+node.
 
-Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- arch/arm/boot/dts/stih407-pinctrl.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/boot/dts/stih407-family.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-index 473f2ea..e80cac5 100644
---- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-@@ -256,6 +256,33 @@
- 						phyclk = <&pio2 3 ALT1 OUT NICLK 0 CLK_A>;
- 					};
- 				};
-+
-+				pinctrl_rmii1: rmii1-0 {
-+					st,pins {
-+						txd0 = <&pio0 0 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txd1 = <&pio0 1 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						txen = <&pio0 5 ALT1 OUT SE_NICLK_IO 0 CLK_A>;
-+						mdio = <&pio1 0 ALT1 OUT BYPASS 0>;
-+						mdc = <&pio1 1 ALT1 OUT NICLK 0 CLK_A>;
-+						mdint = <&pio1 3 ALT1 IN BYPASS 0>;
-+						rxd0 = <&pio1 4 ALT1 IN SE_NICLK_IO 0 CLK_B>;
-+						rxd1 = <&pio1 5 ALT1 IN SE_NICLK_IO 0 CLK_B>;
-+						rxdv = <&pio2 0 ALT1 IN SE_NICLK_IO 0 CLK_B>;
-+						rx_er = <&pio2 1 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+					};
-+				};
-+
-+				pinctrl_rmii1_phyclk: rmii1_phyclk {
-+					st,pins {
-+						phyclk = <&pio2 3 ALT1 OUT NICLK 0 CLK_A>;
-+					};
-+				};
-+
-+				pinctrl_rmii1_phyclk_ext: rmii1_phyclk_ext {
-+					st,pins {
-+						phyclk = <&pio2 3 ALT2 IN NICLK 0 CLK_A>;
-+					};
-+				};
- 			};
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 838b812..94a2fec 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -381,6 +381,8 @@
+ 			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+ 			clock-names = "ssc";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi1_default>;
  
- 			pwm1 {
+ 			status = "disabled";
+ 		};
+@@ -391,6 +393,8 @@
+ 			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+ 			clock-names = "ssc";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi2_default>;
+ 
+ 			status = "disabled";
+ 		};
+@@ -401,6 +405,8 @@
+ 			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+ 			clock-names = "ssc";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi3_default>;
+ 
+ 			status = "disabled";
+ 		};
+@@ -411,6 +417,8 @@
+ 			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+ 			clock-names = "ssc";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi4_default>;
+ 
+ 			status = "disabled";
+ 		};
+@@ -422,6 +430,8 @@
+ 			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk_sysin>;
+ 			clock-names = "ssc";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi10_default>;
+ 
+ 			status = "disabled";
+ 		};
+@@ -432,6 +442,8 @@
+ 			interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk_sysin>;
+ 			clock-names = "ssc";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi11_default>;
+ 
+ 			status = "disabled";
+ 		};
+@@ -442,6 +454,8 @@
+ 			interrupts = <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk_sysin>;
+ 			clock-names = "ssc";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi12_default>;
+ 
+ 			status = "disabled";
+ 		};
 -- 
 1.9.1
