@@ -1,70 +1,62 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 11 Sep 2015 15:45:29 +0100
-Subject: [PATCH] arm/xen: Enable user access to the kernel before issuing
- a privcmd call
-In-Reply-To: <1441981760.3549.57.camel@citrix.com>
-References: <1441980963-9002-1-git-send-email-julien.grall@citrix.com>
- <1441981760.3549.57.camel@citrix.com>
-Message-ID: <55F2E909.70600@citrix.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Sep 2015 16:47:28 +0200
+Subject: [PATCH 2/2] Documentation: gpio: Update description for X-Gene
+ standby GPIO controller DTS binding
+In-Reply-To: <CAL4ahLeF8qQJciam467P2ixrxtMPTK2J9OtaVvcjtPF=9to0BQ@mail.gmail.com>
+References: <1441963332-13329-1-git-send-email-yvo@apm.com>
+ <14280808.2Weay6QlT1@wuerfel>
+ <CAL4ahLeF8qQJciam467P2ixrxtMPTK2J9OtaVvcjtPF=9to0BQ@mail.gmail.com>
+Message-ID: <3318725.Seeb48hirI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/15 15:29, Ian Campbell wrote:
-> On Fri, 2015-09-11 at 15:16 +0100, Julien Grall wrote:
->> When Xen is copyin data to/from the guest it will check if the kernel
-> 
-> "copying"
-> 
->> has the right to do the access. If not, the hypercall will return an
->> error.
->>
->> After the commit a5e090acbf545c0a3b04080f8a488b17ec41fe02 "ARM:
->> software-based priviledged-no-access support", the kernel can't access
-> 
-> "privileged"
-> 
->> anymore the user space by default. This will result to fail on every
-> 
-> "any more" (or "any longer")
-> 
->> hypercall made by the userspace (i.e via privcmd).
->>
->> We have to enable the userspace access and then restore the correct
->> permission everytime the privmcd is used to made an hypercall.
-> 
-> "every time" and "privcmd"
-> 
->>  HYPERCALL1(tmem_op);
->>  HYPERCALL2(multicall);
->>  
->> -ENTRY(privcmd_call)
->> +ENTRY(__privcmd_call)
-> 
-> arch/arm/include/asm/assembler.h seems to contain uaccess_* macros which
-> could be used right here directly I think? That would be preferable to
-> wrapping I think.
+On Friday 11 September 2015 21:23:31 Y Vo wrote:
+> >> /* Board-specific: exclude GPIO_DS8 to leave it as GPIO */
+> >> &sbgpio {
+> >>        interrupts =    <0x0 0x29 0x1>,         /* GPIO_DS9 */
+> >>                        <0x0 0x2a 0x1>,         /* GPIO_DS10 */
+> >>                        <0x0 0x2b 0x1>,         /* GPIO_DS11 */
+> >>                        <0x0 0x2c 0x1>,         /* GPIO_DS12 */
+> >>                        <0x0 0x2d 0x1>;         /* GPIO_DS13 */
+> >> }
+> >
+> > This would be a very unusual binding, because that requires the driver
+> > to know the contents of the properties in advance and the driver
+> > cannot derive the function of an irq from the position in the array.
+> >
+> > Please come up with another approach that is more like other drivers
+> > do this and that makes it possible to reuse the driver if the
+> > interrupt numbers change.
+> The GPIO standby doesn't support interrupt controller itself, it only
+> wires the GPIO line to the external IRQ of GIC. So it is not similar
+> to other driver. Each GPIO is fixed to GIC IRQ index, and never
+> change.
 
-Looking to the uaccess_save macro:
+That is not relevant here, what matters is just that each IRQ still
+has a very specific function, which is basically what every driver
+does.
 
-        .macro  uaccess_save, tmp
-#ifdef CONFIG_CPU_SW_DOMAIN_PAN
-        mrc     p15, 0, \tmp, c3, c0, 0
-        str     \tmp, [sp, #S_FRAME_SIZE]
-#endif
-        .endm
+> Is that possible if we change to this approach:
+> - Keep all GPIO as GPIO mode by default.
+> - If anyone want to use them as interrupt, they must add the interrupt
+> node to DT specific-board below:
+> 
+> Example to configure GPIO_DS11, 12, 13 as external irq:
+> 
+> &sbgpio {
+>         interrupts = <0x0 0x2b 0x1>,         /* GPIO_DS11 */
+>                         <0x0 0x2c 0x1>,         /* GPIO_DS12 */
+>                         <0x0 0x2d 0x1>;         /* GPIO_DS13 */
 
+That is exactly the same as you have in your patch. You should
+always list all interrupts that the gpio controller is wired
+to, whether they are used or not.
 
-It's saving the register on the Stack with an offset S_FRAME_SIZE.
-AFAICT, S_FRAME_SIZE is the size of the pt_regs structure.
+Ideally, the driver just decides at runtime how to wire that
+mux, based on how the gpio is configured by the client driver.
+If the client asks for an interrupt (with gpio_to_irq) and is
+it is configured as an input, then you connect it to the GIC,
+otherwise you leave it to be handled by the gpio chip itself.
+Any reason you can't do that?
 
-So it looks like to me that they are unusable for any assembly functions
-but entry point.
-
-I though about using a static inline for privcmd_call but it was
-introducing changes on the arm64 in order to decouple hypercall.h (it's
-common right now).
-
-Regards,
-
--- 
-Julien Grall
+	Arnd
