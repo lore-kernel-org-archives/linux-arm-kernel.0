@@ -1,5 +1,5 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 11 Sep 2015 14:10:59 +0100
+Date: Fri, 11 Sep 2015 14:15:00 +0100
 Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
  v4.3-rc1
 In-Reply-To: <20150911123759.GA8473@ulmo>
@@ -11,7 +11,7 @@ References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
  <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
  <CAMAWPa_rus4z+Sg3Uff7ndqrpB8dF1c1rQBVQ9r7vXh6PFcVkQ@mail.gmail.com>
  <55F2AF45.5040706@nvidia.com> <20150911123759.GA8473@ulmo>
-Message-ID: <55F2D2E3.4010906@nvidia.com>
+Message-ID: <55F2D3D4.5090608@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -101,22 +101,12 @@ On 11/09/15 13:38, Thierry Reding wrote:
 > just fine. I don't ever see snd-hda-codec-hdmi being probed, but then
 > probing it manually works fine. No hangs.
 
-Did you try "modprobe snd-hda-tegra"? Fails for me 100% of the time.
-
-> What I do see is that after a little while network stops working. I
-> noticed primarily because I boot with an NFS root, so the kernel started
-> complaining about the NFS server not responding. Being on an NFS root
-> could be one reason why this works for me, not sure what the kernelci
-> labs are running. I don't see the network issues with tegra_defconfig.
-> I've also tried a tegra_defconfig with all of sound support built as
-> modules and that all works perfectly.
-> 
-> I'll investigate the multi_v7_defconfig network issues, perhaps that'll
-> give me some clues, or perhaps even allow me to reproduce the original
-> issue.
-
-Well I am not using any networking and booting with a simple ramdisk so
-I don't think that is the right place to look.
+To be clear, booting multi_v7_defconfig works just fine for me too and
+has been working fine for months. However, the reason I am not seeing
+the issue Kevin and Tyler are reporting is because I never attempt to
+"modprobe snd-hda-tegra" after boot. If I do then I see a hang. So I
+believe the only reason we don't see this is because their setup is
+loading modules.
 
 Cheers
 Jon
