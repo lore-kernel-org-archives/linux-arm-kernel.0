@@ -1,8 +1,8 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 11 Sep 2015 15:21:14 +0200
+Date: Fri, 11 Sep 2015 15:25:27 +0200
 Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
  v4.3-rc1
-In-Reply-To: <55F2D3D4.5090608@nvidia.com>
+In-Reply-To: <55F2D2E3.4010906@nvidia.com>
 References: <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
  <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
  <20150819091358.GA26627@ulmo>
@@ -11,12 +11,12 @@ References: <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
  <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
  <CAMAWPa_rus4z+Sg3Uff7ndqrpB8dF1c1rQBVQ9r7vXh6PFcVkQ@mail.gmail.com>
  <55F2AF45.5040706@nvidia.com> <20150911123759.GA8473@ulmo>
- <55F2D3D4.5090608@nvidia.com>
-Message-ID: <20150911132113.GA21673@ulmo>
+ <55F2D2E3.4010906@nvidia.com>
+Message-ID: <20150911132526.GB21673@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 02:15:00PM +0100, Jon Hunter wrote:
+On Fri, Sep 11, 2015 at 02:10:59PM +0100, Jon Hunter wrote:
 > 
 > On 11/09/15 13:38, Thierry Reding wrote:
 > > * PGP Signed by an unknown key
@@ -103,16 +103,31 @@ On Fri, Sep 11, 2015 at 02:15:00PM +0100, Jon Hunter wrote:
 > > just fine. I don't ever see snd-hda-codec-hdmi being probed, but then
 > > probing it manually works fine. No hangs.
 > 
-> To be clear, booting multi_v7_defconfig works just fine for me too and
-> has been working fine for months. However, the reason I am not seeing
-> the issue Kevin and Tyler are reporting is because I never attempt to
-> "modprobe snd-hda-tegra" after boot. If I do then I see a hang. So I
-> believe the only reason we don't see this is because their setup is
-> loading modules.
+> Did you try "modprobe snd-hda-tegra"? Fails for me 100% of the time.
 
-snd-hda-tegra is auto-loaded on boot for me as well and I don't see any
-hangs either. I can also unload and reload the module just fine. I've
-tested this on next-20150911.
+Works for me 100% of the time. Unloading and reloading isn't a problem
+either. What revision of the Jetson TK1 do you have? Mine is a C.2
+
+> > What I do see is that after a little while network stops working. I
+> > noticed primarily because I boot with an NFS root, so the kernel started
+> > complaining about the NFS server not responding. Being on an NFS root
+> > could be one reason why this works for me, not sure what the kernelci
+> > labs are running. I don't see the network issues with tegra_defconfig.
+> > I've also tried a tegra_defconfig with all of sound support built as
+> > modules and that all works perfectly.
+> > 
+> > I'll investigate the multi_v7_defconfig network issues, perhaps that'll
+> > give me some clues, or perhaps even allow me to reproduce the original
+> > issue.
+> 
+> Well I am not using any networking and booting with a simple ramdisk so
+> I don't think that is the right place to look.
+
+Looks like this might have been a transient issue with my networking
+setup. I can no longer reproduce the NFS hangs.
+
+What sort of ramdisk do you use? Can you share the instructions you use
+to create it? Perhaps I can reproduce that way.
 
 Thierry
 -------------- next part --------------
@@ -121,4 +136,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150911/5403c9b6/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150911/59a83fc8/attachment.sig>
