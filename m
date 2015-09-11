@@ -1,48 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 11 Sep 2015 10:57:48 +0100
-Subject: [PATCH v3 02/18] of/platform: add of_platform_probe
-In-Reply-To: <CAAObsKAZ0kaT2TZQdMnxy9ZjHMz2jFeYQvQjrCsa90J11bOVpA@mail.gmail.com>
-References: <1438870315-18689-1-git-send-email-tomeu.vizoso@collabora.com>
- <1438870315-18689-3-git-send-email-tomeu.vizoso@collabora.com>
- <20150807121913.GS20873@sirena.org.uk>
- <CAAObsKCrakupiZMQ9AoiWo6fDYT6Cfi_khdssUS6pv61zYS1Zg@mail.gmail.com>
- <CAAObsKAZ0kaT2TZQdMnxy9ZjHMz2jFeYQvQjrCsa90J11bOVpA@mail.gmail.com>
-Message-ID: <20150911095748.GC12027@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Sep 2015 10:58:20 +0100
+Subject: cpufreq: mediatek: allow modular build
+In-Reply-To: <20150911094003.GN9650@linux>
+References: <1768766.yu1lxjsjLL@wuerfel> <2329563.MhTbBXHVz1@wuerfel>
+ <20150911082536.GL9650@linux> <3071823.f1VzTWVMmV@wuerfel>
+ <20150911083806.GM9650@linux>
+ <20150911093454.GK21084@n2100.arm.linux.org.uk>
+ <20150911094003.GN9650@linux>
+Message-ID: <20150911095820.GM21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 07, 2015 at 02:31:06PM +0200, Tomeu Vizoso wrote:
-> On 11 August 2015 at 11:37, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
-> > On 7 August 2015 at 14:19, Mark Brown <broonie@kernel.org> wrote:
+On Fri, Sep 11, 2015 at 03:10:03PM +0530, Viresh Kumar wrote:
+> On 11-09-15, 10:34, Russell King - ARM Linux wrote:
+> > Well, that's got nothing to do with not having a module_exit().
+> 
+> Yeah, so we don't necessarily need a module_exit(), but the module
+> should have freed the resources with module unplug. And that was
+> missing with Arnd's patch..
 
-> >> This sounds like it's going to break in the case where we have MFDs that
-> >> represent their functions in DT (not a pattern I'm a fan of but it's a
-> >> thing people do).  We'll walk back to the platform device for the MFD
-> >> function, try to probe it and then give up.  Perhaps that's good enough
-> >> anyway but it's not clear to me why we don't just try every parent we
-> >> find?
+Not module "unplug" (I've never heard it called that before).  A module
+with a module_init() but no module_exit() can only be added to a running
+kernel, and never removed.  That's intentional behaviour.
 
-> > Agreed. In the attempt at probing dependencies before a device is
-> > probed, I considered that a device's parent is also a dependency and
+However, if you're talking about hot-unplug, presumably you're talking
+about _CPU_ hot-unplug, and that's something the code should definitely
+handle irrespective of whether it's built-in or a module.
 
-> Actually I'm not sure how we could probe the ascendants on demand, as
-> currently the parent's device lock is taken when probing so trying to
-> probe a sibling from within a probe callback will cause a deadlock.
+The two issues are entirely separate.
 
-How do silbilings come into this?  There is an issue there but it's
-going to happen anyway.
-
-> AFAICS this is only needed for USB interface devices and this
-> behaviour could be limited to them, but I don't like much assuming
-> that no USB device will ever have a dependency on a sibling (though
-> that probably won't happen ever).
-
-I don't see the connection with USB here, sorry - my initial thought was
-about MFDs?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150911/f70cb0ee/attachment.sig>
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
