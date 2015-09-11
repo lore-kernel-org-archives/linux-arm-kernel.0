@@ -1,53 +1,82 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 11 Sep 2015 09:12:17 +0200
-Subject: [PATCH/RFC v2 net-next 3/4] ravb: Document binding for r8a7795 SoC
-In-Reply-To: <1441936878-18290-4-git-send-email-horms+renesas@verge.net.au>
-References: <1441936878-18290-1-git-send-email-horms+renesas@verge.net.au>
- <1441936878-18290-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWY+8Cv9ZnnzMcSYskFfArues8EnWgMiCMnQ16sN1TW_A@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 11 Sep 2015 16:16:01 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Disable simplefb support
+In-Reply-To: <55F27D9F.1000702@osg.samsung.com>
+References: <1441892552-13819-1-git-send-email-javier@osg.samsung.com>
+ <55F26042.2080600@samsung.com> <55F27D9F.1000702@osg.samsung.com>
+Message-ID: <55F27FB1.50100@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On 11.09.2015 16:07, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
+> 
+> On 09/11/2015 07:01 AM, Krzysztof Kozlowski wrote:
+>> On 10.09.2015 22:42, Javier Martinez Canillas wrote:
+>>> The simplefb driver allows the kernel to render on a pre-allocated
+>>> buffer that's been initialized by firmware before the kernel boots.
+>>>
+>>> This option was enabled to have display working on the Exynos5250
+>>> Snow Chromebook by commit da9d0fbf5e9a ("ARM: exynos: defconfig
+>>> update") since proper DRM/KMS support did not exist at that time.
+>>>
+>>> But now that the Exynos DRM driver has support for this hardware,
+>>> there is no need to have simplefb enabled. In fact, if a user has
+>>> a u-boot that injects the simplefb dev node to the FDT before pass
+>>> it to the kernel, display won't be properly initialized and only a
+>>> blank screen will be shown since there isn't a proper handoff from
+>>> the simplefb driver to the Exynos DRM driver.
+>>>
+>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>>
+>>> ---
+>>>
+>>>  arch/arm/configs/exynos_defconfig | 1 -
+>>>  1 file changed, 1 deletion(-)
+>>
+>> Seems logical. None of the boards use simple-framebuffer compatible
+>> anyway. I understand that on Snow simplefb was needed along with change
+>> in Uboot like this one:
+>> https://chromium.googlesource.com/chromiumos/third_party/u-boot/+/refs/changes/58/49358/2
+>>
+> 
+> Exactly but you won't see the dev node with the "simple-framebuffer"
+> compatible string in the DTS since is the bootloader that adds this
+> device node to the FDT before passing it to the kernel.
+> 
+> The bootloader shouldn't mangle the FDT (with the exception of the
+> memory and choosen/bootargs nodes) but simplefb is just a hack to
+> re-use the display HW initialization made by the bootloader.
+> 
+>> and now none of Exynos boards use simplefb anymore?
+>>
+> 
+> Yes, there are no other Exynos boards using simplefb besides Snow
+> that I'm aware of but since Exynos DRM is working well on this board
+> from v4.0, there is no need for it anymore.
 
-On Fri, Sep 11, 2015 at 4:01 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> --- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> +++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> @@ -6,8 +6,11 @@ interface contains.
->  Required properties:
->  - compatible: "renesas,etheravb-r8a7790" if the device is a part of R8A7790 SoC.
->               "renesas,etheravb-r8a7794" if the device is a part of R8A7794 SoC.
-> +             "renesas,etheravb-r8a7795" if the device is a part of R8A7795 SoC.
->  - reg: offset and length of (1) the register block and (2) the stream buffer.
-> -- interrupts: interrupt specifier for the sole interrupt.
-> +- interrupts: interrupt specifiers.
-> +             One for each entry in interrupt-names the R8A7795 SoC;
+OK,
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-... for the R8A7795 SoC
+> 
+> In fact, as explained in the commit message, it could do more harm
+> than good since users that are still booting with a u-boot that adds
+> the simplefb device node, only get a blank screen since the simplefb
+> driver is probed, creates a console and later the Exynos DRM probes
+> and re-initializes the HW creating its own console, causing this issue.
+> 
+> I got several reports of users that says that mainline stop booting for
+> them but is just that they didn't get display working. Disabling simplefb
+> makes display to work again so maybe this is even -rc material and should
+> go to stable # v4.0+
 
-> +             One entry for a multiplexed interrupt otherwise.
->  - phy-mode: see ethernet.txt file in the same directory.
->  - phy-handle: see ethernet.txt file in the same directory.
->  - #address-cells: number of address cells for the MDIO bus, must be equal to 1.
-> @@ -18,6 +21,9 @@ Required properties:
->  Optional properties:
->  - interrupt-parent: the phandle for the interrupt controller that services
->                     interrupts for this device.
-> +- interrupt-names: One entry per interrupt named "ch%u".
-> +                  For the R8A7795 SoC this property is mandatory,
-> +                  and "ch0" through "ch24" are mandatory.
+You know, it is only a defconfig. The issue is there regardless of
+change in defconfig. I am not convinced that defconfig problems are
+worth backporting. multi_v7 has it enabled anyway.
 
-This suggests the single multiplexed interrupt on R-Car Gen2 can be called
-"ch0". Is that what you want? I know the driver doesn't care.
+Maybe the EXYNOS_DRM should have some anti-dependency on SIMPLE_FB? But
+on the other hand the issue is actually caused by hacks in bootloader...
 
-Gr{oetje,eeting}s,
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Krzysztof
