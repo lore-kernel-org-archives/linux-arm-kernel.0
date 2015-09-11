@@ -1,63 +1,68 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 11 Sep 2015 18:56:50 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Sep 2015 18:59:51 +0100
 Subject: [PATCH v2] arm/xen: Enable user access to the kernel before
  issuing a privcmd call
-In-Reply-To: <20150911175107.GY21084@n2100.arm.linux.org.uk>
+In-Reply-To: <alpine.DEB.2.02.1509111856020.2672@kaball.uk.xensource.com>
 References: <1441988759-4572-1-git-send-email-julien.grall@citrix.com>
- <20150911170027.GX21084@n2100.arm.linux.org.uk> <55F3102B.3090309@citrix.com>
- <55F31105.6070305@citrix.com> <20150911175107.GY21084@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1509111856020.2672@kaball.uk.xensource.com>
+ <20150911170027.GX21084@n2100.arm.linux.org.uk>
+ <55F3102B.3090309@citrix.com> <55F31105.6070305@citrix.com>
+ <20150911175107.GY21084@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1509111856020.2672@kaball.uk.xensource.com>
+Message-ID: <20150911175951.GA21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Sep 2015, Russell King - ARM Linux wrote:
-> On Fri, Sep 11, 2015 at 06:36:05PM +0100, Julien Grall wrote:
-> > On 11/09/15 18:32, Julien Grall wrote:
-> > > On 11/09/15 18:00, Russell King - ARM Linux wrote:
-> > >> On Fri, Sep 11, 2015 at 05:25:59PM +0100, Julien Grall wrote:
-> > >>> +	/*
-> > >>> +	 * Privcmd calls are issued by the userspace. We need to allow the
-> > >>> +	 * kernel to access the userspace memory before issuing the hypercall.
-> > >>> +	 */
-> > >>> +	uaccess_enable r4
-> > >>> +
-> > >>> +	/* r4 is loaded now as we use it as scratch register before */
-> > >>>  	ldr r4, [sp, #4]
-> > >>
-> > >> As I mentioned in one of my previous mails, "ip" should be safe to use
-> > >> here - it's a caller-corrupted register, just like r0-r3 and lr.  So,
-> > >> you could do:
-> > >>
-> > >> 	ldr r4, [sp, #4]
-> > >> +	uaccess_enable ip
+On Fri, Sep 11, 2015 at 06:56:50PM +0100, Stefano Stabellini wrote:
+> On Fri, 11 Sep 2015, Russell King - ARM Linux wrote:
+> > On Fri, Sep 11, 2015 at 06:36:05PM +0100, Julien Grall wrote:
+> > > On 11/09/15 18:32, Julien Grall wrote:
+> > > > On 11/09/15 18:00, Russell King - ARM Linux wrote:
+> > > >> On Fri, Sep 11, 2015 at 05:25:59PM +0100, Julien Grall wrote:
+> > > >>> +	/*
+> > > >>> +	 * Privcmd calls are issued by the userspace. We need to allow the
+> > > >>> +	 * kernel to access the userspace memory before issuing the hypercall.
+> > > >>> +	 */
+> > > >>> +	uaccess_enable r4
+> > > >>> +
+> > > >>> +	/* r4 is loaded now as we use it as scratch register before */
+> > > >>>  	ldr r4, [sp, #4]
+> > > >>
+> > > >> As I mentioned in one of my previous mails, "ip" should be safe to use
+> > > >> here - it's a caller-corrupted register, just like r0-r3 and lr.  So,
+> > > >> you could do:
+> > > >>
+> > > >> 	ldr r4, [sp, #4]
+> > > >> +	uaccess_enable ip
+> > > > 
+> > > > The register ip (aka r12) is used to store the hypercall number. So we
+> > > > can't reuse it as scratch register.
+> > > > 
+> > > > The easiest one is r4.
+> > > > 
+> > > >>
+> > > >> which fractionally tightens the window.
+> > > >>
+> > > >> However, there's nothing actually wrong with your version - there's no
+> > > >> way we could've got this far with sp pointing at userspace.
+> > > >>
+> > > >> I'm happy with either version, so:
+> > > >>
+> > > >> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > >>
+> > > >> How do you want to handle the patch?  I already have some other uaccess
+> > > >> fixes queued up to send to Linus before the merge window closes.
 > > > 
-> > > The register ip (aka r12) is used to store the hypercall number. So we
-> > > can't reuse it as scratch register.
+> > > Forgot to answer to this bits. I was thinking to ask Stefano carrying
+> > > the patch in xentip. Although it won't go until rc1.
 > > > 
-> > > The easiest one is r4.
-> > > 
-> > >>
-> > >> which fractionally tightens the window.
-> > >>
-> > >> However, there's nothing actually wrong with your version - there's no
-> > >> way we could've got this far with sp pointing at userspace.
-> > >>
-> > >> I'm happy with either version, so:
-> > >>
-> > >> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > >>
-> > >> How do you want to handle the patch?  I already have some other uaccess
-> > >> fixes queued up to send to Linus before the merge window closes.
+> > > I don't mind if it's going earlier in Linux/master.
 > > 
-> > Forgot to answer to this bits. I was thinking to ask Stefano carrying
-> > the patch in xentip. Although it won't go until rc1.
-> > 
-> > I don't mind if it's going earlier in Linux/master.
+> > Thanks, I've applied your patch as-is now.
 > 
-> Thanks, I've applied your patch as-is now.
+> That's fine by me, the patch looks good.
 
-That's fine by me, the patch looks good.
+If you'd like your ack on it, please send one, I can still do that.
 
-Thanks,
-
-Stefano
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
