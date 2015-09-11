@@ -1,78 +1,294 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 Sep 2015 17:33:32 +0100
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <CAKv+Gu9rN7_mxk0huX+34HSCC_aTWVTkUZKQMB1+9U56fRnwsA@mail.gmail.com>
-References: <20150910112418.GC29293@leverpostej>
- <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
- <20150910121514.GE29293@leverpostej>
- <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
- <20150910144938.GI29293@leverpostej>
- <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
- <20150910162302.GN29293@leverpostej>
- <20150911124643.GB4530@olila.local.net-space.pl>
- <alpine.DEB.2.02.1509111410180.2672@kaball.uk.xensource.com>
- <CAKv+Gu9rN7_mxk0huX+34HSCC_aTWVTkUZKQMB1+9U56fRnwsA@mail.gmail.com>
-Message-ID: <20150911163332.GB8726@leverpostej>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 11 Sep 2015 18:33:47 +0200
+Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
+ v4.3-rc1
+In-Reply-To: <20150911155946.GA13945@ulmo.nvidia.com>
+References: <1439977724.4135.90.camel@collabora.co.uk>
+ <20150819103305.GF26627@ulmo>
+ <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
+ <CAMAWPa_rus4z+Sg3Uff7ndqrpB8dF1c1rQBVQ9r7vXh6PFcVkQ@mail.gmail.com>
+ <55F2AF45.5040706@nvidia.com> <20150911123759.GA8473@ulmo>
+ <55F2D2E3.4010906@nvidia.com> <20150911132526.GB21673@ulmo>
+ <55F2F895.5040704@nvidia.com>
+ <20150911155946.GA13945@ulmo.nvidia.com>
+Message-ID: <20150911163346.GA20235@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> It feels like this discussion is going in circles.
+On Fri, Sep 11, 2015 at 05:59:48PM +0200, Thierry Reding wrote:
+> On Fri, Sep 11, 2015 at 04:51:49PM +0100, Jon Hunter wrote:
+> > 
+> > On 11/09/15 14:25, Thierry Reding wrote:
+> > 
+> > [snip]
+> > 
+> > > Works for me 100% of the time. Unloading and reloading isn't a problem
+> > > either. What revision of the Jetson TK1 do you have? Mine is a C.2
+> > 
+> > Unfortunately, I am not sure it is whatever is in Paul's automation rig
+> > [0]. However, I have also reproduced this on a tegra124 nyan-big in the
+> > office.
 > 
-> When we discussed this six months ago, we already concluded that,
-> since UEFI is the only specified way that the presence of ACPI is
-> advertised on an ARM system, we need to emulate UEFI to some extent.
-
-My understanding from the last time I was present at such a discussion
-was that the emulation was complete from the kernel's PoV (i.e. no
-special case handling was required). 
-
-Evidently I misunderstood.
-
-One of the main points of rationale for requiring EFI was that we'd have
-a well-defined system state as per the EFI (and ACPI) standards. We'd
-know we had the EFI memory map, services, etc (with the memory map and
-configuration tables being the most important elements). We didn't want
-to have to try to reconcile a DT memory map and ACPI, for instance.
-
-That is somewhat (though admitedly not entirely) broken if we require a
-set of rules to be applied beyond what the standards mandate.  That is
-broken if we require a non-standard set of rules to be applied, and
-limits what we can do in the !Xen case.
-
-> So we need the EFI system table to expose the UEFI configuration table
-> that carries the ACPI root pointer.
+> I was able to reproduce this using a busybox initial ramdisk. Just to
+> make sure I built a separate one from git and it exposes the same
+> behaviour. I suspect that this is some sort of weird interaction between
+> mdev and async probing and nobody's noticed so far because async probing
+> isn't very common (at least in the ARM world).
 > 
-> Since ACPI support also relies on the UEFI memory map (I think?), we
-> need that as well.
-> 
-> These two items are exactly what we pass via the UEFI DT properties,
-> so we should indeed promote the current de-facto binding to a proper
-> binding, and renaming the properties makes sense in that context.
+> I'll be off for the weekend soonish, but I'll try to find some more time
+> next week to track this down.
 
-I agree that we need to sort these out.
+Before I head into the weekend, here are my findings: looks like this
+might be some sort of recursive locking problem. Here's the output with
+a lot of debug messages:
 
-> I agree that this should also include a description of the expected
-> state of the firmware, i.e., that ExitBootServices() has been called,
-> and that the memory map has been populated with virtual address, which
-> have been installed using SetVirtualAddressMap() if they differ from
-> the physical addresses. (The current implementation on the kernel side
-> is perfectly capable of dealing with a 1:1 mapping).
-> 
-> Beyond that, there is no point in pretending to be a full UEFI
-> implementation, imo. Boot services are not required, nor are runtime
-> services (only the current EFI init code on arm needs to be modified
-> to deal with a NULL runtime services pointer)
+	/ # modprobe snd-hda-tegra
+	[  298.765514] snd_hda_tegra: Unknown symbol snd_hdac_bus_enter_link_reset (err 0)
+	[  298.773024] snd_hda_tegra: Unknown symbol azx_probe_codecs (err 0)
+	[  298.779332] snd_hda_tegra: Unknown symbol snd_card_register (err 0)
+	[  298.785834] snd_hda_tegra: Unknown symbol snd_card_free (err 0)
+	[  298.792015] snd_hda_tegra: Unknown symbol azx_init_streams (err 0)
+	[  298.798485] snd_hda_tegra: Unknown symbol azx_stop_all_streams (err 0)
+	[  298.805234] snd_hda_tegra: Unknown symbol snd_dma_free_pages (err 0)
+	[  298.811816] snd_hda_tegra: Unknown symbol snd_hdac_bus_free_stream_pages (err 0)
+	[  298.819413] snd_hda_tegra: Unknown symbol snd_hdac_bus_exit (err 0)
+	[  298.825919] snd_hda_tegra: Unknown symbol snd_card_new (err 0)
+	[  298.832003] snd_hda_tegra: Unknown symbol snd_pcm_lib_malloc_pages (err 0)
+	[  298.839080] snd_hda_tegra: Unknown symbol snd_pcm_lib_free_pages (err 0)
+	[  298.846033] snd_hda_tegra: Unknown symbol azx_bus_init (err 0)
+	[  298.852070] snd_hda_tegra: Unknown symbol azx_free_streams (err 0)
+	[  298.858475] snd_hda_tegra: Unknown symbol azx_init_chip (err 0)
+	[  298.864626] snd_hda_tegra: Unknown symbol snd_device_new (err 0)
+	[  298.870856] snd_hda_tegra: Unknown symbol snd_hda_set_power_save (err 0)
+	[  298.877802] snd_hda_tegra: Unknown symbol azx_stop_chip (err 0)
+	[  298.883953] snd_hda_tegra: Unknown symbol azx_codec_configure (err 0)
+	[  298.890598] snd_hda_tegra: Unknown symbol snd_dma_alloc_pages (err 0)
+	[  298.897274] snd_hda_tegra: Unknown symbol snd_hdac_bus_alloc_stream_pages (err 0)
+	[  298.904975] snd_hda_tegra: Unknown symbol azx_interrupt (err 0)
+	[  299.024167] device: 'timer': device_add
+	[  299.031120] > driver_register(drv=bf06dd24)
+	[  299.035294]   finding driver...
+	[  299.038495]   adding driver...
+	[  299.041605] > __driver_attach(dev=ed805810, data=bf06dd24)
+	[  299.047115]   matching device...
+	[  299.050352] > __driver_attach(dev=ed983e10, data=bf06dd24)
+	[  299.055857]   matching device...
+	[  299.059086] > __driver_attach(dev=ed9a2010, data=bf06dd24)
+	[  299.064606]   matching device...
+	[  299.067872] > __driver_attach(dev=ed9a2210, data=bf06dd24)
+	[  299.073384]   matching device...
+	[  299.076658] > __driver_attach(dev=ed9a2410, data=bf06dd24)
+	[  299.082171]   matching device...
+	[  299.085408] > __driver_attach(dev=ed9a2610, data=bf06dd24)
+	[  299.090912]   matching device...
+	[  299.094141] > __driver_attach(dev=ed9a2810, data=bf06dd24)
+	[  299.099655]   matching device...
+	[  299.102924] > __driver_attach(dev=ed9a2a10, data=bf06dd24)
+	[  299.108435]   matching device...
+	[  299.111710] > __driver_attach(dev=ed9a2c10, data=bf06dd24)
+	[  299.117221]   matching device...
+	[  299.120459] > __driver_attach(dev=ed9a2e10, data=bf06dd24)
+	[  299.125963]   matching device...
+	[  299.129192] > __driver_attach(dev=ed9a3010, data=bf06dd24)
+	[  299.134706]   matching device...
+	[  299.137976] > __driver_attach(dev=ed9a3210, data=bf06dd24)
+	[  299.143487]   matching device...
+	[  299.146762] > __driver_attach(dev=ed9a3410, data=bf06dd24)
+	[  299.152273]   matching device...
+	[  299.155511] > __driver_attach(dev=ed9a3610, data=bf06dd24)
+	[  299.161015]   matching device...
+	[  299.164253] > __driver_attach(dev=ed9a3810, data=bf06dd24)
+	[  299.169752]   matching device...
+	[  299.173016] > __driver_attach(dev=ed9a3a10, data=bf06dd24)
+	[  299.178527]   matching device...
+	[  299.181802] > __driver_attach(dev=ed9a3c10, data=bf06dd24)
+	[  299.187325]   matching device...
+	[  299.190560] > __driver_attach(dev=ed9a3e10, data=bf06dd24)
+	[  299.196062]   matching device...
+	[  299.199301] > __driver_attach(dev=ed9a4010, data=bf06dd24)
+	[  299.204799]   matching device...
+	[  299.208051] > __driver_attach(dev=ed9a4210, data=bf06dd24)
+	[  299.213534]   matching device...
+	[  299.216796] > __driver_attach(dev=ed9a4410, data=bf06dd24)
+	[  299.222307]   matching device...
+	[  299.225545] > __driver_attach(dev=ed9a4610, data=bf06dd24)
+	[  299.231060]   matching device...
+	[  299.234295] > __driver_attach(dev=ed9a4810, data=bf06dd24)
+	[  299.239798]   matching device...
+	[  299.243051] > __driver_attach(dev=ed9a4a10, data=bf06dd24)
+	[  299.248534]   matching device...
+	[  299.251799] > __driver_attach(dev=ed9a4c10, data=bf06dd24)
+	[  299.257309]   matching device...
+	[  299.260548] > __driver_attach(dev=ed9a4e10, data=bf06dd24)
+	[  299.266064]   matching device...
+	[  299.269298] > __driver_attach(dev=ed9a5010, data=bf06dd24)
+	[  299.274801]   matching device...
+	[  299.278054] > __driver_attach(dev=ed9a5210, data=bf06dd24)
+	[  299.283537]   matching device...
+	[  299.286799] > __driver_attach(dev=ed9a5410, data=bf06dd24)
+	[  299.292311]   matching device...
+	[  299.295549] > __driver_attach(dev=ed9a5610, data=bf06dd24)
+	[  299.301064]   matching device...
+	[  299.304296] > __driver_attach(dev=ed9a5810, data=bf06dd24)
+	[  299.309800]   matching device...
+	[  299.313054] > __driver_attach(dev=ed9a5a10, data=bf06dd24)
+	[  299.318537]   matching device...
+	[  299.321808]   done
+	[  299.323821]   locking parent...
+	[  299.326991]   done
+	[  299.329007]   locking device...
+	[  299.332191]   done
+	[  299.334201]   probing device...
+	[  299.337372] bus: 'platform': driver_probe_device: matched device 70030000.hda with driver tegra-hda
+	[  299.346453] bus: 'platform': really_probe: probing driver tegra-hda with device 70030000.hda
+	[  299.354990] devices_kset: Moving 70030000.hda to end of list
+	[  299.510965] device: 'hdaudioC0D3': device_add
+	[  299.590057] > __hda_codec_driver_register(drv=bf0795f0, name=snd_hda_codec_hdmi, owner=bf079680)
+	[  299.598862] > driver_register(drv=bf0795f0)
+	[  299.603054]   finding driver...
+	[  299.606206]   adding driver...
+	[  299.609265] > __driver_attach(dev=ede27c00, data=bf0795f0)
+	[  299.614756]   matching device...
+	[  299.617998] > hda_bus_match(dev=ede27c00, drv=bf0795f0)
+	[  299.623240] > hda_codec_match(dev=ede27c00, drv=bf0795f0)
+	[  299.628657] < hda_codec_match() match!
+	[  299.632429]   done
+	[  299.634443]   locking parent...
 
-I'm not keen on this because it involves applying Xen-specific caveats
-atop of what the UEFI spec says (e.g. as runtime services might be NULL
-under Xen). As the spec and Xen evolve, those caveats shift, and that's
-going to be fragile for all users regardleses of Xen.
+It hangs here, but interestingly I can interrupt it using Ctrl-C:
 
-If Xen needs special-casing, then I'd rather that Xen were detected
-first and provided us with what it knows is safe for us to use, rather
-than we tip-toe around until we're sure Xen isn't present and/or doesn't
-need additional constraints met.
+	^C[  329.774183] > __device_attach_driver(drv=bf0795f0, _data=ecbc3d08)
+	[  329.780536]   matching device...
+	[  329.783844] > hda_bus_match(dev=ede27c00, drv=bf0795f0)
+	[  329.789198] > hda_codec_match(dev=ede27c00, drv=bf0795f0)
+	[  329.794722] < hda_codec_match() match!
+	[  329.798600]   async allowed: 0
+	[  329.801790] bus: 'hdaudio': driver_probe_device: matched device hdaudioC0D3 with driver snd_hda_codec_hdmi
+	[  329.811577] bus: 'hdaudio': really_probe: probing driver snd_hda_codec_hdmi with device hdaudioC0D3
+	[  329.820913] devices_kset: Moving hdaudioC0D3 to end of list
+	[  329.826618] > hda_codec_driver_probe(dev=ede27c00)
+	[  329.831533]   device: hdaudioC0D3
+	[  329.835152] > patch_tegra_hdmi(codec=ede27c00)
+	[  329.916075] < patch_tegra_hdmi()
+	[  329.920029] ALSA pcmC0D3p,0:HDMI 0: cannot preallocate for size 65536
 
-Thanks,
-Mark.
+	[  330.946327] < hda_codec_driver_probe()
+	[  330.950122] driver: 'snd_hda_codec_hdmi': driver_bound: bound to device 'hdaudioC0D3'
+	[  330.958115] bus: 'hdaudio': really_probe: bound device hdaudioC0D3 to driver snd_hda_codec_hdmi
+	[  330.966903] < __device_attach_driver() = 1
+	[  330.971179] device: 'card0': device_add
+	[  330.975432] device: 'controlC0': device_add
+	[  330.981325] device: 'pcmC0D3p': device_add
+	[  330.987256] device: 'input1': device_add
+	[  330.991997] input: tegra-hda HDMI/DP,pcm=3 as /devices/soc0/70030000.hda/sound/card0/input1
+	[  331.000477] device: 'event1': device_add
+	[  331.136299] driver: 'tegra-hda': driver_bound: bound to device '70030000.hda'
+	[  331.143621] bus: 'platform': really_probe: bound device 70030000.hda to driver tegra-hda
+	[  331.151804]   done
+	[  331.153845]   unlocking device...
+	[  331.157288]   done
+	[  331.157473]   done
+	[  331.157483]   locking device...
+	[  331.157493]   done
+	[  331.157501]   unlocking device...
+	[  331.157508]   done
+	[  331.157514]   unlocking parent...
+	[  331.157522]   done
+	[  331.157532] < __driver_attach()
+	[  331.157714]   adding groups...
+	[  331.157722]   sending KOBJ_ADD event...
+	[  331.157772] < driver_register() = 0
+	[  331.157784] < __hda_codec_driver_register() = 0
+	[  331.196006]   unlocking parent...
+	[  331.199354]   done
+	[  331.201407] < __driver_attach()
+	[  331.204551] > __driver_attach(dev=ed9a5c10, data=bf06dd24)
+	[  331.210061]   matching device...
+	[  331.213325] > __driver_attach(dev=ed9a5e10, data=bf06dd24)
+	[  331.218826]   matching device...
+	[  331.222091] > __driver_attach(dev=ed9a6010, data=bf06dd24)
+	[  331.227593]   matching device...
+	[  331.230837] > __driver_attach(dev=ed9a6210, data=bf06dd24)
+	[  331.236341]   matching device...
+	[  331.239578] > __driver_attach(dev=ed9a6410, data=bf06dd24)
+	[  331.245079]   matching device...
+	[  331.248351] > __driver_attach(dev=ed9a6610, data=bf06dd24)
+	[  331.253854]   matching device...
+	[  331.257119] > __driver_attach(dev=ed9a6810, data=bf06dd24)
+	[  331.262623]   matching device...
+	[  331.265901] > __driver_attach(dev=ed9a6a10, data=bf06dd24)
+	[  331.271407]   matching device...
+	[  331.274645] > __driver_attach(dev=ed9a6c10, data=bf06dd24)
+	[  331.280146]   matching device...
+	[  331.283411] > __driver_attach(dev=ed9a6e10, data=bf06dd24)
+	[  331.288913]   matching device...
+	[  331.292178] > __driver_attach(dev=ed9a7010, data=bf06dd24)
+	[  331.297681]   matching device...
+	[  331.300955] > __driver_attach(dev=ed9a7210, data=bf06dd24)
+	[  331.306459]   matching device...
+	[  331.309696] > __driver_attach(dev=ed9a7410, data=bf06dd24)
+	[  331.315197]   matching device...
+	[  331.318461] > __driver_attach(dev=ed9a7610, data=bf06dd24)
+	[  331.323964]   matching device...
+	[  331.327229] > __driver_attach(dev=ed9a7810, data=bf06dd24)
+	[  331.332732]   matching device...
+	[  331.335993] > __driver_attach(dev=ed9a7a10, data=bf06dd24)
+	[  331.341497]   matching device...
+	[  331.344734] > __driver_attach(dev=ed9a7c10, data=bf06dd24)
+	[  331.350236]   matching device...
+	[  331.353502] > __driver_attach(dev=ed9a7e10, data=bf06dd24)
+	[  331.359005]   matching device...
+	[  331.362269] > __driver_attach(dev=ed9b0010, data=bf06dd24)
+	[  331.367772]   matching device...
+	[  331.371032] > __driver_attach(dev=ed9b0210, data=bf06dd24)
+	[  331.376533]   matching device...
+	[  331.379771] > __driver_attach(dev=ed9b0410, data=bf06dd24)
+	[  331.385272]   matching device...
+	[  331.388536] > __driver_attach(dev=ed9b0610, data=bf06dd24)
+	[  331.394039]   matching device...
+	[  331.397312] > __driver_attach(dev=ed9b0810, data=bf06dd24)
+	[  331.402816]   matching device...
+	[  331.406068] > __driver_attach(dev=ed9b0a10, data=bf06dd24)
+	[  331.411569]   matching device...
+	[  331.414807] > __driver_attach(dev=ed9b0c10, data=bf06dd24)
+	[  331.420307]   matching device...
+	[  331.423572] > __driver_attach(dev=ed9b0e10, data=bf06dd24)
+	[  331.429074]   matching device...
+	[  331.432339] > __driver_attach(dev=ed9b1010, data=bf06dd24)
+	[  331.437841]   matching device...
+	[  331.441092] > __driver_attach(dev=ed9b1210, data=bf06dd24)
+	[  331.446600]   matching device...
+	[  331.449836] > __driver_attach(dev=ed9b1410, data=bf06dd24)
+	[  331.455339]   matching device...
+	[  331.458604] > __driver_attach(dev=edad2410, data=bf06dd24)
+	[  331.464105]   matching device...
+	[  331.467368] > __driver_attach(dev=edcbb810, data=bf06dd24)
+	[  331.472870]   matching device...
+	[  331.476120] > __driver_attach(dev=edde4a10, data=bf06dd24)
+	[  331.481625]   matching device...
+	[  331.484863] > __driver_attach(dev=edde5210, data=bf06dd24)
+	[  331.490366]   matching device...
+	[  331.493630] > __driver_attach(dev=edde5410, data=bf06dd24)
+	[  331.499133]   matching device...
+	[  331.502384] > __driver_attach(dev=edde5610, data=bf06dd24)
+	[  331.507879]   matching device...
+	[  331.511129] > __driver_attach(dev=edde5810, data=bf06dd24)
+	[  331.516623]   matching device...
+	[  331.519855] > __driver_attach(dev=edde5a10, data=bf06dd24)
+	[  331.525348]   matching device...
+	[  331.528598] > __driver_attach(dev=ede78810, data=bf06dd24)
+	[  331.534092]   matching device...
+	[  331.537341] > __driver_attach(dev=edeb5e10, data=bf06dd24)
+	[  331.542838]   matching device...
+	[  331.546133]   adding groups...
+	[  331.549184]   sending KOBJ_ADD event...
+	[  331.553043] < driver_register() = 0
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150911/662524ec/attachment-0001.sig>
