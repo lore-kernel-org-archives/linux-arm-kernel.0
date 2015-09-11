@@ -1,54 +1,48 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 11 Sep 2015 09:49:43 +0100
-Subject: [PATCH v2 1/5] ACPI: add in a bad_madt_entry() function to
- eventually replace the macro
-In-Reply-To: <55F1EB81.9030908@redhat.com>
-References: <1440022048-6285-1-git-send-email-al.stone@linaro.org>
- <1440022048-6285-2-git-send-email-al.stone@linaro.org>
- <55EDADF5.5060008@arm.com> <55F08F47.1070906@redhat.com>
- <55F1ADC4.7090005@arm.com> <55F1EB81.9030908@redhat.com>
-Message-ID: <55F295A7.20406@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 11 Sep 2015 17:53:12 +0900
+Subject: [PATCH/RFC v2 net-next 3/4] ravb: Document binding for r8a7795 SoC
+In-Reply-To: <CAMuHMdUYhUrT9vBtfPOdDWxHDq+ENhKvg9bmsHZsyyDJ=YtcLw@mail.gmail.com>
+References: <1441936878-18290-1-git-send-email-horms+renesas@verge.net.au>
+ <1441936878-18290-4-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWY+8Cv9ZnnzMcSYskFfArues8EnWgMiCMnQ16sN1TW_A@mail.gmail.com>
+ <20150911081443.GD2835@verge.net.au>
+ <CAMuHMdUYhUrT9vBtfPOdDWxHDq+ENhKvg9bmsHZsyyDJ=YtcLw@mail.gmail.com>
+Message-ID: <20150911085311.GA8547@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Sep 11, 2015 at 10:41:31AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Fri, Sep 11, 2015 at 10:14 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> > @@ -18,6 +21,9 @@ Required properties:
+> >> >  Optional properties:
+> >> >  - interrupt-parent: the phandle for the interrupt controller that services
+> >> >                     interrupts for this device.
+> >> > +- interrupt-names: One entry per interrupt named "ch%u".
+> >> > +                  For the R8A7795 SoC this property is mandatory,
+> >> > +                  and "ch0" through "ch24" are mandatory.
+> >>
+> >> This suggests the single multiplexed interrupt on R-Car Gen2 can be called
+> >> "ch0". Is that what you want? I know the driver doesn't care.
+> >
+> > No, its not what I intended.
+> >
+> > I think its reasonable to allow the multiplexed interrupt to be named,
+> > but to what I wonder. The documentation seems to call the interrupt
+> > "EthernetAVB", which isn't very exciting.
+> 
+> Perhaps "mux", like I did for rspi, cfr.
+> Documentation/devicetree/bindings/spi/spi-rspi.txt:
+> 
+>   - interrupts       : A list of interrupt-specifiers, one for each entry in
+>                        interrupt-names.
+>                        If interrupt-names is not present, an interrupt specifier
+>                        for a single muxed interrupt.
+>   - interrupt-names  : A list of interrupt names. Should contain (if present):
+>                          - "error" for SPEI,
+>                          - "rx" for SPRI,
+>                          - "tx" to SPTI,
+>                          - "mux" for a single muxed interrupt.
 
-
-On 10/09/15 21:43, Al Stone wrote:
-> On 09/10/2015 10:20 AM, Sudeep Holla wrote:
->>
-
-[...]
-
->>
->>  From the code inspection, I can see we have 3 users of acpi_parse_entries not
->> just MADT but also PCC and NUMA/SRAT
->>
->> Something like this solves this issue:
->> -              if (bad_madt_entry(table_header, entry))
->> +              if (!strncmp(id, ACPI_SIG_MADT, 4) &&
->> +                      bad_madt_entry(table_header, entry)
->>
->>
->> Or am I still missing something ?
->
-> Nope, I missed it.  Your fix above will solve the problem; I misunderstood
-> how acpi_parse_entries() was being used -- somehow I had it in my head that
-> only MADT was in use, and just not seeing that it's being used for several
-> other subtable traversals also.  Sorry about that, Sudeep.  My mistake.
->
-
-No worries.
-
-> I'll add this fix for a v4, but I'll wait for a few days to see if I get any
-> additional comments -- I haven't heard from any x86, ia64 or ACPI maintainers
-
-Makes sense.
-
-> yet.  OTOH, it's nice to know we've already found and fixed two sets of arm64
-> ACPI tables that are in error by using these patches, even with the flaws :).
->
-
-Very much true indeed :)
-
-Regards,
-Sudeep
+Thanks for for that example. "mux" sounds good to me.
