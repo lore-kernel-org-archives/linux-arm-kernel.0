@@ -1,42 +1,54 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 11 Sep 2015 16:36:55 +0100
-Subject: [PATCH] arm/xen: Enable user access to the kernel before issuing
- a privcmd call
-In-Reply-To: <20150911152525.GU21084@n2100.arm.linux.org.uk>
-References: <1441980963-9002-1-git-send-email-julien.grall@citrix.com>
- <1441981760.3549.57.camel@citrix.com> <55F2E909.70600@citrix.com>
- <1441983304.3549.73.camel@citrix.com> <55F2EBA6.6060008@citrix.com>
- <20150911152525.GU21084@n2100.arm.linux.org.uk>
-Message-ID: <55F2F517.6020105@citrix.com>
+Date: Fri, 11 Sep 2015 16:43:47 +0100
+Subject: [PATCH] arm64: Add support for hardware updates of the access
+ and dirty pte bits
+In-Reply-To: <20150910153812.GG22439@arm.com>
+References: <1436545468-1549-1-git-send-email-catalin.marinas@arm.com>
+ <55F06A87.3000204@citrix.com> <20150910100753.GE12294@localhost>
+ <55F19785.4090106@citrix.com> <20150910153812.GG22439@arm.com>
+Message-ID: <55F2F6B3.2080108@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/15 16:25, Russell King - ARM Linux wrote:
-> On Fri, Sep 11, 2015 at 03:56:38PM +0100, Julien Grall wrote:
->> Well, we can't assume that the function will be called with uaccess
->> disabled.
+Hi Will,
+
+On 10/09/15 16:38, Will Deacon wrote:
+> Weird. That doesn't leave a lot of code. Two other things you could try
+> are:
 > 
-> Please explain your reasoning.
+>   (1) Put PTE_WRITE back to bit 57
 
-I think I was confused about the usage of uaccess.
-Thank you for the explanation.
+This change doesn't help.
 
-> The reason copy_from_user() et.al. need to save and restore the DACR is
-> because the DACR may be in one of two states on older ARM architectures.
-> It may have set the kernel domain to 'manager' mode, to allow these
-> accessors to work on kernel memory, or the kernel domain may be in
-> 'client' mode, thereby preventing the accessors from touching kernel
-> memory.
-> 
-> Unless the code path is reachable with the kernel domain in manager
-> mode, (iow, a set_fs(KERNEL_DS) or set_fs(get_ds()) has been done) then
-> it should be safe to use uaccess_disable/uaccess_enable.
+>   (2) Remove the pte_hw_dirty check/set in pte_modify
 
+This one too, if I only drop the check pte_hw_dirty in pte_modify.
 
-I believe that our privcmd driver doesn't made any usage of set_fs(...),
-so I will use the uaccess_{disable,enable} macro.
+But if I disable completely pte_hw_dirty (i.e always return 0 [1]),
+I'm able to use without any issue the userspace.
+
+Which means that the problem seems to come from the defition of pte_dirty:
+
+#define pte_dirty(pte)         (pte_sw_dirty(pte) || pte_hw_dirty(pte))
 
 Regards,
+
+[1]
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 6900b2d9..804ec87 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -145,7 +145,8 @@ extern struct page *empty_zero_page;
+ #define pte_write(pte)         (!!(pte_val(pte) & PTE_WRITE))
+ #define pte_exec(pte)          (!(pte_val(pte) & PTE_UXN))
+ 
+-#ifdef CONFIG_ARM64_HW_AFDBM
++//#ifdef CONFIG_ARM64_HW_AFDBM
++#if 0
+ #define pte_hw_dirty(pte)      (!(pte_val(pte) & PTE_RDONLY))
+ #else
+ #define pte_hw_dirty(pte)      (0)
+
 
 -- 
 Julien Grall
