@@ -1,87 +1,57 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 11 Sep 2015 18:06:34 +0100
-Subject: [PATCH 11/11] ARM: STi: STiH407: Add spi default pinctrl groups.
-In-Reply-To: <1441991194-11948-1-git-send-email-peter.griffin@linaro.org>
-References: <1441991194-11948-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1441991194-11948-12-git-send-email-peter.griffin@linaro.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 11 Sep 2015 10:08:06 -0700
+Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
+ v4.3-rc1
+In-Reply-To: <20150911163346.GA20235@ulmo.nvidia.com> (Thierry Reding's
+ message of "Fri, 11 Sep 2015 18:33:47 +0200")
+References: <1439977724.4135.90.camel@collabora.co.uk>
+ <20150819103305.GF26627@ulmo>
+ <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
+ <CAMAWPa_rus4z+Sg3Uff7ndqrpB8dF1c1rQBVQ9r7vXh6PFcVkQ@mail.gmail.com>
+ <55F2AF45.5040706@nvidia.com> <20150911123759.GA8473@ulmo>
+ <55F2D2E3.4010906@nvidia.com> <20150911132526.GB21673@ulmo>
+ <55F2F895.5040704@nvidia.com> <20150911155946.GA13945@ulmo.nvidia.com>
+ <20150911163346.GA20235@ulmo.nvidia.com>
+Message-ID: <7h7fnw3mvd.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we have default pinconfig groups for each SPI
-controller ensure it is used by the SPI controller
-node.
+Thierry Reding <thierry.reding@gmail.com> writes:
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stih407-family.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+> On Fri, Sep 11, 2015 at 05:59:48PM +0200, Thierry Reding wrote:
+>> On Fri, Sep 11, 2015 at 04:51:49PM +0100, Jon Hunter wrote:
+>> > 
+>> > On 11/09/15 14:25, Thierry Reding wrote:
+>> > 
+>> > [snip]
+>> > 
+>> > > Works for me 100% of the time. Unloading and reloading isn't a problem
+>> > > either. What revision of the Jetson TK1 do you have? Mine is a C.2
+>> > 
+>> > Unfortunately, I am not sure it is whatever is in Paul's automation rig
+>> > [0]. However, I have also reproduced this on a tegra124 nyan-big in the
+>> > office.
+>> 
+>> I was able to reproduce this using a busybox initial ramdisk. Just to
+>> make sure I built a separate one from git and it exposes the same
+>> behaviour. I suspect that this is some sort of weird interaction between
+>> mdev and async probing and nobody's noticed so far because async probing
+>> isn't very common (at least in the ARM world).
+>> 
+>> I'll be off for the weekend soonish, but I'll try to find some more time
+>> next week to track this down.
+>
+> Before I head into the weekend, here are my findings: looks like this
+> might be some sort of recursive locking problem. Here's the output with
+> a lot of debug messages:
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 838b812..94a2fec 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -381,6 +381,8 @@
- 			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
- 			clock-names = "ssc";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi1_default>;
- 
- 			status = "disabled";
- 		};
-@@ -391,6 +393,8 @@
- 			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
- 			clock-names = "ssc";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi2_default>;
- 
- 			status = "disabled";
- 		};
-@@ -401,6 +405,8 @@
- 			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
- 			clock-names = "ssc";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi3_default>;
- 
- 			status = "disabled";
- 		};
-@@ -411,6 +417,8 @@
- 			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
- 			clock-names = "ssc";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi4_default>;
- 
- 			status = "disabled";
- 		};
-@@ -422,6 +430,8 @@
- 			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clk_sysin>;
- 			clock-names = "ssc";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi10_default>;
- 
- 			status = "disabled";
- 		};
-@@ -432,6 +442,8 @@
- 			interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clk_sysin>;
- 			clock-names = "ssc";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi11_default>;
- 
- 			status = "disabled";
- 		};
-@@ -442,6 +454,8 @@
- 			interrupts = <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clk_sysin>;
- 			clock-names = "ssc";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi12_default>;
- 
- 			status = "disabled";
- 		};
--- 
-1.9.1
+FWIW, in kernelci we use a buildroot initramfs[1] with eudev enabled for
+module loading.  Before booting, modules are injected into the ramdisk
+so they are loaded during boot by eudev.
+
+The source is on github[2] and can be rebuilt using './configs/frags/build armel'
+
+Kevin
+
+[1] http://storage.kernelci.org/images/rootfs/buildroot/armel/
+[2] https://github.com/kernelci/buildroot/tree/kernelci/2015.02
