@@ -1,54 +1,79 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 11 Sep 2015 19:03:06 +0100
-Subject: [PATCH 01/11] ARM: STi: DT: STiH407: Add a cec0 pin definition
-In-Reply-To: <1441991194-11948-2-git-send-email-peter.griffin@linaro.org>
-References: <1441991194-11948-1-git-send-email-peter.griffin@linaro.org>
- <1441991194-11948-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20150911180306.GQ18779@x1>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 11 Sep 2015 19:06:35 +0100
+Subject: [PATCH v2 7/9] ARM: STi: DT: STiH407: Add FDMA driver dt nodes.
+In-Reply-To: <20150911175555.GF18779@x1>
+References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
+ <1441980871-24475-8-git-send-email-peter.griffin@linaro.org>
+ <20150911162749.GD18779@x1>
+ <20150911164822.GA1150@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20150911175555.GF18779@x1>
+Message-ID: <20150911180635.GA15803@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Sep 2015, Peter Griffin wrote:
+Hi Lee,
 
-> This pin setup provides the correct configuration in order to
-> interact with the CEC HW.
+On Fri, 11 Sep 2015, Lee Jones wrote:
+
+> On Fri, 11 Sep 2015, Peter Griffin wrote:
+> > On Fri, 11 Sep 2015, Lee Jones wrote:
+> > > On Fri, 11 Sep 2015, Peter Griffin wrote:
+> > > 
+> > > > These nodes are required to get the fdma driver working
+> > > > on STiH407 based silicon.
+> > > > 
+> > > > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > > > ---
+> > > >  arch/arm/boot/dts/stih407-family.dtsi | 51 +++++++++++++++++++++++++++++++++++
+> > > >  1 file changed, 51 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> > > > index 838b812..da07474b 100644
+> > > > --- a/arch/arm/boot/dts/stih407-family.dtsi
+> > > > +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> > > > @@ -565,5 +565,56 @@
+> > > >  						  <&phy_port2 PHY_TYPE_USB3>;
+> > > >  			};
+> > > >  		};
+> > > > +
+> > > > +		fdma0: fdma0-audio at 8e20000 {
+> > > 
+> > > I'm not familiar with the FDMA driver, so can't comment knowledgeably,
+> > > but the <dev> part of <dev>@<base_address> should only describe the
+> > > type of hardware.  I believe in this case it should just be
+> > > dma at 08e20000.  Also notice the leading zero in the address, which I
+> > > believe mitigates possible confusion.  Then you be more specific with
+> > > the label, so something like 'fdma-audio' seems appropriate here.
+> > 
+> > Ok, can change to that format in v3.
+> > 
+> > > 
+> > > > +			compatible = "st,stih407-fdma-mpe31";
+> > > > +			reg = <0x8e20000 0x20000>;
+> > > 
+> > > I personally find padding up to 32bits helpful in the addresses.
+> > 
+> > None of the stih407-family nodes I can see have this padding, including
+> > the ones merged by you.
 > 
-> Signed-off-by: Erwan Le Ray <erwan.leray@st.com>
-> Signed-off-by: Nicolas Vanhaelewyn <nicolas.vanhaelewyn@st.com>
-> Acked-by: Patrice Chotard <patrice.chotard@st.com>
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> Nither of these two facts mean it's correct.
 
-Duplicate.
+I thought it was a 'personal' thing. If it is mandated by the spec, then that
+is different.
 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  arch/arm/boot/dts/stih407-pinctrl.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> 
+> I'm happy to write a patch to correct them all.
 
-For the patch: Acked-by: Lee Jones <lee.jones@linaro.org>
+Are you sure your actually correcting anything? Where does it say you
+should have a leading zero?
 
-> diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> index 0a754f2..d86ccc8 100644
-> --- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> @@ -107,6 +107,14 @@
->  				st,retime-pin-mask = <0x3f>;
->  			};
->  
-> +			cec0 {
-> +				pinctrl_cec0_default: cec0-default {
-> +					st,pins {
-> +						hdmi_cec = <&pio2 4 ALT1 BIDIR>;
-> +					};
-> +				};
-> +			};
-> +
->  			rc {
->  				pinctrl_ir: ir0 {
->  					st,pins {
+> 
+> Bear in mind that this isn't a hard and fast rule.  Both work and are
+> legal.  I just think the padding is more consistent.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Surely adding a patch with how the nodes are currently formatted, is more consistent
+than adding a patch with padding?
+
+regards,
+
+Peter.
