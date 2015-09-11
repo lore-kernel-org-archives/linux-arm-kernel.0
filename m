@@ -1,60 +1,70 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 11 Sep 2015 15:35:36 +0100
-Subject: [PATCH v2] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <1441978255.18796.12.camel@redhat.com>
-References: <1441906822-9222-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1441978255.18796.12.camel@redhat.com>
-Message-ID: <20150911143536.GB13033@red-moon>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 11 Sep 2015 15:45:29 +0100
+Subject: [PATCH] arm/xen: Enable user access to the kernel before issuing
+ a privcmd call
+In-Reply-To: <1441981760.3549.57.camel@citrix.com>
+References: <1441980963-9002-1-git-send-email-julien.grall@citrix.com>
+ <1441981760.3549.57.camel@citrix.com>
+Message-ID: <55F2E909.70600@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 02:30:55PM +0100, Mark Salter wrote:
-> On Thu, 2015-09-10 at 18:40 +0100, Lorenzo Pieralisi wrote:
+On 11/09/15 15:29, Ian Campbell wrote:
+> On Fri, 2015-09-11 at 15:16 +0100, Julien Grall wrote:
+>> When Xen is copyin data to/from the guest it will check if the kernel
+> 
+> "copying"
+> 
+>> has the right to do the access. If not, the hypercall will return an
+>> error.
+>>
+>> After the commit a5e090acbf545c0a3b04080f8a488b17ec41fe02 "ARM:
+>> software-based priviledged-no-access support", the kernel can't access
+> 
+> "privileged"
+> 
+>> anymore the user space by default. This will result to fail on every
+> 
+> "any more" (or "any longer")
+> 
+>> hypercall made by the userspace (i.e via privcmd).
+>>
+>> We have to enable the userspace access and then restore the correct
+>> permission everytime the privmcd is used to made an hypercall.
+> 
+> "every time" and "privcmd"
+> 
+>>  HYPERCALL1(tmem_op);
+>>  HYPERCALL2(multicall);
+>>  
+>> -ENTRY(privcmd_call)
+>> +ENTRY(__privcmd_call)
+> 
+> arch/arm/include/asm/assembler.h seems to contain uaccess_* macros which
+> could be used right here directly I think? That would be preferable to
+> wrapping I think.
 
-[...]
+Looking to the uaccess_save macro:
 
-> > +++ b/arch/arm64/kernel/acpi_parking_protocol.c
-> > @@ -0,0 +1,153 @@
-> > +/*
-> > + * ARM64 ACPI Parking Protocol implementation
-> > + *
-> > + * Authors: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > + *       Mark Salter <msalter@redhat.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +#include <linux/acpi.h>
-> > +#include <linux/types.h>
-> > +
-> > +#include <asm/cpu_ops.h>
-> > +
-> > +struct cpu_mailbox_entry {
-> > +     phys_addr_t mailbox_addr;
-> > +     u8 version;
-> > +     u8 gic_cpu_id;
->         ^^^
-> Shouldn't that be u32?
+        .macro  uaccess_save, tmp
+#ifdef CONFIG_CPU_SW_DOMAIN_PAN
+        mrc     p15, 0, \tmp, c3, c0, 0
+        str     \tmp, [sp, #S_FRAME_SIZE]
+#endif
+        .endm
 
-If I read the ACPI specs and the parking protocol specs correctly answer
-is no, allowed values are 0 to 7. The ACPI MADT GICC is rather unclear on
-that, I think the definition of the "CPU Interface Number" field in the
-GICC structure corresponds to the Processor ID definition in the parking
-protocol document attached, but I will countercheck on that and ask for
-clarification.
 
-I can certainly update both version and gic CPU id to u32, but the
-question on GICC specification for the CPU Interface number is still
-valid.
+It's saving the register on the Stack with an offset S_FRAME_SIZE.
+AFAICT, S_FRAME_SIZE is the size of the pt_regs structure.
 
-Thanks,
-Lorenzo
+So it looks like to me that they are unusable for any assembly functions
+but entry point.
+
+I though about using a static inline for privcmd_call but it was
+introducing changes on the arm64 in order to decouple hypercall.h (it's
+common right now).
+
+Regards,
+
+-- 
+Julien Grall
