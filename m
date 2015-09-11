@@ -1,57 +1,39 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 11 Sep 2015 14:20:03 -0500
-Subject: [PATCH] firmware: qcom: scm: Add function stubs for ARM64
-In-Reply-To: <20150911175649.GZ21084@n2100.arm.linux.org.uk>
-References: <1441993856-30178-1-git-send-email-agross@codeaurora.org>
- <20150911175649.GZ21084@n2100.arm.linux.org.uk>
-Message-ID: <20150911192003.GB32107@qualcomm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Sep 2015 21:08:24 +0100
+Subject: [PATCH 0/6] hwrng: Add support for STMicroelectronics' RNG IP
+Message-ID: <1442002110-28733-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 06:56:49PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Sep 11, 2015 at 12:50:56PM -0500, Andy Gross wrote:
-> > This patch adds stubs for the SCM functions exposed in the QCOM SCM API.
-> > 
-> > Signed-off-by: Andy Gross <agross@codeaurora.org>
-> > ---
-> >  drivers/firmware/Makefile      |    4 +++
-> >  drivers/firmware/qcom_scm-64.c |   63 ++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 67 insertions(+)
-> >  create mode 100644 drivers/firmware/qcom_scm-64.c
-> > 
-> > diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
-> > index 4a4b897..2f810c2 100644
-> > --- a/drivers/firmware/Makefile
-> > +++ b/drivers/firmware/Makefile
-> > @@ -12,8 +12,12 @@ obj-$(CONFIG_ISCSI_IBFT_FIND)	+= iscsi_ibft_find.o
-> >  obj-$(CONFIG_ISCSI_IBFT)	+= iscsi_ibft.o
-> >  obj-$(CONFIG_FIRMWARE_MEMMAP)	+= memmap.o
-> >  obj-$(CONFIG_QCOM_SCM)		+= qcom_scm.o
-> > +ifdef CONFIG_ARM64
-> > +obj-$(CONFIG_QCOM_SCM)		+= qcom_scm-64.o
-> > +else
-> >  obj-$(CONFIG_QCOM_SCM)		+= qcom_scm-32.o
-> >  CFLAGS_qcom_scm-32.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
-> > +endif
-> 
-> Can we not start doing stuff like this.  Use the Kconfig to control what
-> you build, not the Makefile system.
-> 
-> config QCOM_SCM_32
-> 	def_bool y
-> 	depends on QCOM_SCM && ARM
-> 
-> config QCOM_SCM_64
-> 	def_bool y
-> 	depends on QCOM_SCM && ARM64
-> 
-> and then use those in the makefile.
+The main aim of this set is to allow users to access ST's hardware
+random number generator.  It's a simple device, which only requires
+a simple driver.
 
-That's a fair implementation.  There is going to be a bit of work
-going into getting the 64 bit SCM un-stubbed.  So I can respin to incorporate
-your comments or we can wait for the unstubbing.
+We're also taking the liberty to update some out of date HWRNG
+documentation and making the sysfs interface a little easier to
+use by ignoring any '\n' which may have been inadvertently passed.
+
+Lee Jones (6):
+  Documentation: hw_random: Fix device node name /dev/hw_random =>
+    /dev/hwrng
+  hwrng: core: Simplify RNG switching from sysfs
+  hwrng: st: Provide DT bindings for ST's Random Number Generator
+  hwrng: st: Add support for ST's HW Random Number Generator
+  ARM: STi: STiH407: Enable the 2 HW Random Number Generators for
+    STiH4{07,10}
+  MAINTAINERS: Add ST's Random Number Generator to the ST entry
+
+ Documentation/devicetree/bindings/rng/st,rng.txt |  15 +++
+ Documentation/hw_random.txt                      |   8 +-
+ MAINTAINERS                                      |   1 +
+ arch/arm/boot/dts/stih407-family.dtsi            |  14 +++
+ drivers/char/hw_random/Kconfig                   |  10 ++
+ drivers/char/hw_random/Makefile                  |   1 +
+ drivers/char/hw_random/core.c                    |   7 +-
+ drivers/char/hw_random/st-rng.c                  | 142 +++++++++++++++++++++++
+ 8 files changed, 193 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rng/st,rng.txt
+ create mode 100644 drivers/char/hw_random/st-rng.c
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
