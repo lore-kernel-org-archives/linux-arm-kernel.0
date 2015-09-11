@@ -1,39 +1,32 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 11 Sep 2015 12:53:31 +0100
-Subject: [PATCH v4 10/10] ASoC: rockchip_i2s: modify DMA max burst to 1
-In-Reply-To: <1441502008-14116-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1441501881-13700-1-git-send-email-shawn.lin@rock-chips.com>
- <1441502008-14116-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <20150911115331.GM12027@sirena.org.uk>
+Date: Fri, 11 Sep 2015 13:01:51 +0100
+Subject: master build: 1 failures 73 warnings (v4.2-11142-gb0a1ea5)
+In-Reply-To: <E1ZaL9B-0006QE-Kh@optimist>
+References: <E1ZaL9B-0006QE-Kh@optimist>
+Message-ID: <20150911120150.GN12027@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 06, 2015 at 09:13:28AM +0800, Shawn Lin wrote:
+On Fri, Sep 11, 2015 at 11:01:35AM +0100, Build bot for Mark Brown wrote:
 
-> @@ -460,7 +463,6 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
->  	i2s->playback_dma_data.addr = res->start + I2S_TXDR;
->  	i2s->playback_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
->  	i2s->playback_dma_data.maxburst = 4;
-> -
->  	i2s->capture_dma_data.addr = res->start + I2S_RXDR;
->  	i2s->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
->  	i2s->capture_dma_data.maxburst = 4;
+> 	arm64-allmodconfig
+> ../drivers/firmware/qcom_scm-32.c:196:4: error: expected string literal before '__asmeq'
+> ../drivers/firmware/qcom_scm-32.c:221:2: error: implicit declaration of function 'secure_flush_area' [-Werror=implicit-function-declaration]
+> ../drivers/firmware/qcom_scm-32.c:239:2: error: implicit declaration of function 'outer_inv_range' [-Werror=implicit-function-declaration]
+> ../drivers/firmware/qcom_scm-32.c:331:4: error: expected string literal before '__asmeq'
+> ../drivers/firmware/qcom_scm-32.c:361:4: error: expected string literal before '__asmeq'
 
-This random whitespace change shouldn't be in here.
-
-> @@ -489,6 +491,18 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
->  		goto err_pcm_register;
->  	}
->  
-> +	dma_quirk = snd_dmaengine_pcm_get_quirks(&pdev->dev);
-> +	if (dma_quirk == ROCKCHIP_I2S_BROKEN_BURST_LEN) {
-> +		/*
-
-I'd expect this to be a switch statement given the way this is written.
+Today's mainline fails to build on arm64 due to the above, introduced by
+efaa6e266ba (firmware: qcom_scm-32: replace open-coded call to
+__cpuc_flush_dcache_area()) which introduces a call to
+secure_flush_area() which isn't defined on arm64.  This does not happen
+in -next as 626ffb400e1e781 (firmware: qcom: scm: Add function stubs for
+ARM64) which fixes this and IIRC other issues on arm64 - what is the
+plan for getting that change into mainline?
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150911/31c03541/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150911/b2ab4134/attachment.sig>
