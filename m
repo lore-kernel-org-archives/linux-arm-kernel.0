@@ -1,33 +1,33 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 11 Sep 2015 15:26:33 +0200
-Subject: [PATCH 0/4] ARM: sun8i: Fix A23 and A33 clock gates indices 
-Message-ID: <1441977997-29041-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 11 Sep 2015 15:26:34 +0200
+Subject: [PATCH 1/4] clk: sunxi: Add A33 gates support
+In-Reply-To: <1441977997-29041-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1441977997-29041-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1441977997-29041-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The A33 gates are different from the A23 ones, add a new hook to simple
+gates to handle this clock
 
-Here is a patch set that adds the missing clocks for the message box
-in the A33 and A23 SoCs.
+Reported-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clk/sunxi/clk-simple-gates.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-In order to support that properly, the addition of a new clock driver
-for the A33 has been needed, and we split the gates definition that
-was previously shared to each DTSI.
-
-Let me know what you think,
-Maxime
-
-Maxime Ripard (4):
-  clk: sunxi: Add A33 gates support
-  ARM: sun8i: Add the A33 AHB1 gates clock driver
-  ARM: sun8i: Move A23 AHB1 gates out of common DTSI
-  ARM: sun8i: A23: Add missing msgbox gate
-
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 25 -------------------------
- arch/arm/boot/dts/sun8i-a23.dtsi     | 25 +++++++++++++++++++++++++
- arch/arm/boot/dts/sun8i-a33.dtsi     | 27 +++++++++++++++++++++++++++
- drivers/clk/sunxi/clk-simple-gates.c |  2 ++
- 4 files changed, 54 insertions(+), 25 deletions(-)
-
+diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
+index 6ce91180da1b..0214c6548afd 100644
+--- a/drivers/clk/sunxi/clk-simple-gates.c
++++ b/drivers/clk/sunxi/clk-simple-gates.c
+@@ -128,6 +128,8 @@ CLK_OF_DECLARE(sun8i_a23_apb1, "allwinner,sun8i-a23-apb1-gates-clk",
+ 	       sunxi_simple_gates_init);
+ CLK_OF_DECLARE(sun8i_a23_apb2, "allwinner,sun8i-a23-apb2-gates-clk",
+ 	       sunxi_simple_gates_init);
++CLK_OF_DECLARE(sun8i_a33_ahb1, "allwinner,sun8i-a33-ahb1-gates-clk",
++	       sunxi_simple_gates_init);
+ CLK_OF_DECLARE(sun9i_a80_ahb0, "allwinner,sun9i-a80-ahb0-gates-clk",
+ 	       sunxi_simple_gates_init);
+ CLK_OF_DECLARE(sun9i_a80_ahb1, "allwinner,sun9i-a80-ahb1-gates-clk",
 -- 
 2.5.1
