@@ -1,185 +1,192 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 11 Sep 2015 11:01:18 +0900
-Subject: [PATCH/RFC v2 net-next 4/4] ravb: Add support for r8a7795 SoC
-In-Reply-To: <1441936878-18290-1-git-send-email-horms+renesas@verge.net.au>
-References: <1441936878-18290-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1441936878-18290-5-git-send-email-horms+renesas@verge.net.au>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 11 Sep 2015 10:57:03 +0800
+Subject: [PATCH v2 1/1] ARM: dts: sun7i: Enable axp209 driver on olinuxino
+ lime2
+In-Reply-To: <20150910181315.GM9885@lukather>
+References: <1441805204-6037-1-git-send-email-o.schinagl@ultimaker.com>
+ <1441805204-6037-2-git-send-email-o.schinagl@ultimaker.com>
+ <20150910181315.GM9885@lukather>
+Message-ID: <CAGb2v67GTAM3tqOUOmUjKmWGyewJar2NWAzF4bk4g+-7Yfdm0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+On Fri, Sep 11, 2015 at 2:13 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Oliver,
+>
+> On Wed, Sep 09, 2015 at 03:26:44PM +0200, Olliver Schinagl wrote:
+>> The Olimex OLinuXino Lime2 uses the same AXP209 as was recently
+>> introduced this driver for its power regulation.
+>>
+>> Signed-off-by: Olliver Schinagl <o.schinagl@ultimaker.com>
+>> ---
+>>  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 87 +++++++++----------------
+>>  1 file changed, 31 insertions(+), 56 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+>> index d5c796c..dd90a1d 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+>> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+>> @@ -71,14 +71,6 @@
+>>                       default-state = "on";
+>>               };
+>>       };
+>> -
+>> -     reg_axp_ipsout: axp_ipsout {
+>> -             compatible = "regulator-fixed";
+>> -             regulator-name = "axp-ipsout";
+>> -             regulator-min-microvolt = <5000000>;
+>> -             regulator-max-microvolt = <5000000>;
+>> -             regulator-always-on;
+>> -     };
+>
+> Why are you removing that regulator?
 
-This patch supports the r8a7795 SoC by:
-- Using two interrupts
-  + One for E-MAC
-  + One for everything else
-  + Both can be handled by the existing common interrupt handler, which
-    affords a simpler update to support the new SoC. In future some
-    consideration may be given to implementing multiple interrupt handlers
-- Limiting the phy speed to 100Mbit/s for the new SoC;
-  at this time it is not clear how this restriction may be lifted
-  but I hope it will be possible as more information comes to light
+This is really just a placeholder, rather than an actual regulator.
 
-Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-[horms: reworked]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>From the bindings:
 
----
+- <input>-supply: a phandle to the regulator supply node. May be omitted if
+                  inputs are unregulated, such as using the IPSOUT output
+                  from the PMIC.
 
-v0 [Kazuya Mizuguchi]
 
-v1 [Simon Horman]
-* Updated patch subject
+>>  };
+>>
+>>  &ahci {
+>> @@ -86,6 +78,10 @@
+>>       status = "okay";
+>>  };
+>>
+>> +&cpu0 {
+>> +     cpu-supply = <&reg_dcdc2>;
+>> +};
+>> +
+>>  &ehci0 {
+>>       status = "okay";
+>>  };
+>> @@ -112,57 +108,9 @@
+>>       status = "okay";
+>>
+>>       axp209: pmic at 34 {
+>> -             compatible = "x-powers,axp209";
+>>               reg = <0x34>;
+>>               interrupt-parent = <&nmi_intc>;
+>>               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>> -
+>> -             interrupt-controller;
+>> -             #interrupt-cells = <1>;
+>> -
+>> -             acin-supply = <&reg_axp_ipsout>;
+>> -             vin2-supply = <&reg_axp_ipsout>;
+>> -             vin3-supply = <&reg_axp_ipsout>;
+>> -             ldo24in-supply = <&reg_axp_ipsout>;
+>> -             ldo3in-supply = <&reg_axp_ipsout>;
+>
+> And these supplies?
+>
+>> -             regulators {
+>> -                     vdd_rtc: ldo1 {
+>> -                             regulator-min-microvolt = <1300000>;
+>> -                             regulator-max-microvolt = <1300000>;
+>> -                             regulator-always-on;
+>> -                     };
+>> -
+>> -                     avcc: ldo2 {
+>> -                             regulator-min-microvolt = <1800000>;
+>> -                             regulator-max-microvolt = <3300000>;
+>> -                             regulator-always-on;
+>> -                     };
+>> -
+>> -                     vcc_csi0: ldo3 {
+>> -                             regulator-min-microvolt = <700000>;
+>> -                             regulator-max-microvolt = <3500000>;
+>> -                             regulator-always-on;
+>> -                     };
+>> -
+>> -                     vcc_csi1: ldo4 {
+>> -                             regulator-min-microvolt = <1250000>;
+>> -                             regulator-max-microvolt = <3300000>;
+>> -                             regulator-always-on;
+>> -                     };
+>> -
+>> -                     vdd_cpu: dcdc2 {
+>> -                             regulator-min-microvolt = <700000>;
+>> -                             regulator-max-microvolt = <2275000>;
+>> -                             regulator-always-on;
+>> -                     };
+>> -
+>> -                     vdd_int: dcdc3 {
+>> -                             regulator-min-microvolt = <700000>;
+>> -                             regulator-max-microvolt = <3500000>;
+>> -                             regulator-always-on;
+>> -                     };
+>> -             };
+>>       };
+>>  };
+>>
+>> @@ -243,6 +191,33 @@
+>>       status = "okay";
+>>  };
+>>
+>> +#include "axp209.dtsi"
+>> +
+>> +&reg_dcdc2 {
+>> +     regulator-always-on;
+>> +     regulator-min-microvolt = <1000000>;
+>> +     regulator-max-microvolt = <1450000>;
+>
+> This is outside of the operating voltages of the CPU.
+>
+>> +     regulator-name = "vdd-cpu";
+>> +};
+>> +
+>> +&reg_dcdc3 {
+>> +     regulator-always-on;
+>> +     regulator-min-microvolt = <1000000>;
+>> +     regulator-max-microvolt = <1400000>;
+>> +     regulator-name = "vdd-int-dll";
+>> +};
+>> +
+>> +&reg_ldo1 {
+>> +     regulator-name = "vdd-rtc";
+>> +};
+>> +
+>> +&reg_ldo2 {
+>> +     regulator-always-on;
+>> +     regulator-min-microvolt = <3000000>;
+>> +     regulator-max-microvolt = <3000000>;
+>> +     regulator-name = "avcc";
+>
+> You're changing the boundaries, why?
 
-v2 [Simon Horman]
-* Reworked based on extensive feedback from
-  Geert Uytterhoeven and Sergei Shtylyov.
-* Broke binding update out into separate patch
----
- drivers/net/ethernet/renesas/ravb.h      |  7 ++++
- drivers/net/ethernet/renesas/ravb_main.c | 57 +++++++++++++++++++++++++++-----
- 2 files changed, 55 insertions(+), 9 deletions(-)
+The old boundaries seem to be from a very old dts, where we were
+listing the regulators' supported voltage range, instead of what
+the SoC could take.
 
-diff --git a/drivers/net/ethernet/renesas/ravb.h b/drivers/net/ethernet/renesas/ravb.h
-index a157aaaaff6a..0623fff932e4 100644
---- a/drivers/net/ethernet/renesas/ravb.h
-+++ b/drivers/net/ethernet/renesas/ravb.h
-@@ -766,6 +766,11 @@ struct ravb_ptp {
- 	struct ravb_ptp_perout perout[N_PER_OUT];
- };
- 
-+enum ravb_chip_id {
-+	RCAR_GEN2,
-+	RCAR_GEN3,
-+};
-+
- struct ravb_private {
- 	struct net_device *ndev;
- 	struct platform_device *pdev;
-@@ -806,6 +811,8 @@ struct ravb_private {
- 	int msg_enable;
- 	int speed;
- 	int duplex;
-+	int emac_irq;
-+	enum ravb_chip_id chip_id;
- 
- 	unsigned no_avb_link:1;
- 	unsigned avb_link_active_low:1;
-diff --git a/drivers/net/ethernet/renesas/ravb_main.c b/drivers/net/ethernet/renesas/ravb_main.c
-index 4ca093d033f8..cc6702e33d65 100644
---- a/drivers/net/ethernet/renesas/ravb_main.c
-+++ b/drivers/net/ethernet/renesas/ravb_main.c
-@@ -889,6 +889,14 @@ static int ravb_phy_init(struct net_device *ndev)
- 		return -ENOENT;
- 	}
- 
-+	/* This driver only support 10/100Mbit speeds on Gen3
-+	 * at this time.
-+	 */
-+	if (priv->chip_id == RCAR_GEN3) {
-+		netdev_info(ndev, "limiting PHY to 100Mbit/s\n");
-+		phy_set_max_speed(phydev, SPEED_100);
-+	}
-+
- 	netdev_info(ndev, "attached PHY %d (IRQ %d) to driver %s\n",
- 		    phydev->addr, phydev->irq, phydev->drv->name);
- 
-@@ -1197,6 +1205,15 @@ static int ravb_open(struct net_device *ndev)
- 		goto out_napi_off;
- 	}
- 
-+	if (priv->chip_id == RCAR_GEN3) {
-+		error = request_irq(priv->emac_irq, ravb_interrupt,
-+				    IRQF_SHARED, ndev->name, ndev);
-+		if (error) {
-+			netdev_err(ndev, "cannot request IRQ\n");
-+			goto out_free_irq;
-+		}
-+	}
-+
- 	/* Device init */
- 	error = ravb_dmac_init(ndev);
- 	if (error)
-@@ -1220,6 +1237,7 @@ out_ptp_stop:
- 	ravb_ptp_stop(ndev);
- out_free_irq:
- 	free_irq(ndev->irq, ndev);
-+	free_irq(priv->emac_irq, ndev);
- out_napi_off:
- 	napi_disable(&priv->napi[RAVB_NC]);
- 	napi_disable(&priv->napi[RAVB_BE]);
-@@ -1625,13 +1643,23 @@ static int ravb_mdio_release(struct ravb_private *priv)
- 	return 0;
- }
- 
-+static const struct of_device_id ravb_match_table[] = {
-+	{ .compatible = "renesas,etheravb-r8a7790", .data = (void *)RCAR_GEN2 },
-+	{ .compatible = "renesas,etheravb-r8a7794", .data = (void *)RCAR_GEN2 },
-+	{ .compatible = "renesas,etheravb-r8a7795", .data = (void *)RCAR_GEN3 },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, ravb_match_table);
-+
- static int ravb_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-+	const struct of_device_id *match;
- 	struct ravb_private *priv;
-+	enum ravb_chip_id chip_id;
- 	struct net_device *ndev;
--	int error, irq, q;
- 	struct resource *res;
-+	int error, irq, q;
- 
- 	if (!np) {
- 		dev_err(&pdev->dev,
-@@ -1657,7 +1685,14 @@ static int ravb_probe(struct platform_device *pdev)
- 	/* The Ether-specific entries in the device structure. */
- 	ndev->base_addr = res->start;
- 	ndev->dma = -1;
--	irq = platform_get_irq(pdev, 0);
-+
-+	match = of_match_device(of_match_ptr(ravb_match_table), &pdev->dev);
-+	chip_id = (enum ravb_chip_id)match->data;
-+
-+	if (chip_id == RCAR_GEN3)
-+		irq = platform_get_irq_byname(pdev, "ch22");
-+	else
-+		irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
- 		error = irq;
- 		goto out_release;
-@@ -1688,6 +1723,17 @@ static int ravb_probe(struct platform_device *pdev)
- 	priv->avb_link_active_low =
- 		of_property_read_bool(np, "renesas,ether-link-active-low");
- 
-+	if (chip_id == RCAR_GEN3) {
-+		irq = platform_get_irq_byname(pdev, "ch24");
-+		if (irq < 0) {
-+			error = irq;
-+			goto out_release;
-+		}
-+		priv->emac_irq = irq;
-+	}
-+
-+	priv->chip_id = chip_id;
-+
- 	/* Set function */
- 	ndev->netdev_ops = &ravb_netdev_ops;
- 	ndev->ethtool_ops = &ravb_ethtool_ops;
-@@ -1818,13 +1864,6 @@ static const struct dev_pm_ops ravb_dev_pm_ops = {
- #define RAVB_PM_OPS NULL
- #endif
- 
--static const struct of_device_id ravb_match_table[] = {
--	{ .compatible = "renesas,etheravb-r8a7790" },
--	{ .compatible = "renesas,etheravb-r8a7794" },
--	{ }
--};
--MODULE_DEVICE_TABLE(of, ravb_match_table);
--
- static struct platform_driver ravb_driver = {
- 	.probe		= ravb_probe,
- 	.remove		= ravb_remove,
--- 
-2.1.4
+Olliver you should explain all this in the commit log, probably
+starting with something like "update the dts to use axp209.dtsi
+, comply with axp20x bindings, and set proper voltage ranges for
+the regulators".
+
+>> +};
+>> +
+>>  &reg_usb0_vbus {
+>>       pinctrl-0 = <&usb0_vbus_pin_lime2>;
+>>       gpio = <&pio 2 17 GPIO_ACTIVE_HIGH>;
+>> --
+>> 2.1.4
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
