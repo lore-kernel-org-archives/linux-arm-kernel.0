@@ -1,72 +1,61 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 11 Sep 2015 17:25:59 +0100
-Subject: [PATCH v2] arm/xen: Enable user access to the kernel before issuing a
- privcmd call
-Message-ID: <1441988759-4572-1-git-send-email-julien.grall@citrix.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Sep 2015 18:45:34 +0200
+Subject: [PATCH 2/2] Documentation: gpio: Update description for X-Gene
+ standby GPIO controller DTS binding
+In-Reply-To: <CAL4ahLeoeT79ct-M-Bd-O08K0Dmysas3HFmTfXUFGtHKJBRzsg@mail.gmail.com>
+References: <1441963332-13329-1-git-send-email-yvo@apm.com>
+ <3318725.Seeb48hirI@wuerfel>
+ <CAL4ahLeoeT79ct-M-Bd-O08K0Dmysas3HFmTfXUFGtHKJBRzsg@mail.gmail.com>
+Message-ID: <2311005.jUde56dLfB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When Xen is copying data to/from the guest it will check if the kernel
-has the right to do the access. If not, the hypercall will return an
-error.
+On Friday 11 September 2015 22:06:58 Y Vo wrote:
+> On Fri, Sep 11, 2015 at 9:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 11 September 2015 21:23:31 Y Vo wrote:
+> >> Is that possible if we change to this approach:
+> >> - Keep all GPIO as GPIO mode by default.
+> >> - If anyone want to use them as interrupt, they must add the interrupt
+> >> node to DT specific-board below:
+> >>
+> >> Example to configure GPIO_DS11, 12, 13 as external irq:
+> >>
+> >> &sbgpio {
+> >>         interrupts = <0x0 0x2b 0x1>,         /* GPIO_DS11 */
+> >>                         <0x0 0x2c 0x1>,         /* GPIO_DS12 */
+> >>                         <0x0 0x2d 0x1>;         /* GPIO_DS13 */
+> >
+> > That is exactly the same as you have in your patch. You should
+> > always list all interrupts that the gpio controller is wired
+> > to, whether they are used or not.
+> >
+> > Ideally, the driver just decides at runtime how to wire that
+> > mux, based on how the gpio is configured by the client driver.
+> > If the client asks for an interrupt (with gpio_to_irq) and is
+> > it is configured as an input, then you connect it to the GIC,
+> > otherwise you leave it to be handled by the gpio chip itself.
+> > Any reason you can't do that?
+> >
+> As I just explained, the GPIO Standby doesn't support the interrupt.
+> Both interrupts are came from GIC, so if the client asks for an
+> interrupt, it will go to the GIC driver (not GPIO Standby driver), so
+> that's my trouble. We can not implement the code to configured the
+> GPIO standby at GIC driver.
 
-After the commit a5e090acbf545c0a3b04080f8a488b17ec41fe02 "ARM:
-software-based privileged-no-access support", the kernel can't access
-any longer the user space by default. This will result to fail on every
-hypercall made by the userspace (i.e via privcmd).
+So you are saying we merged a binding that is incapable of describing
+the hardware? If that is the case, we may have to go back to
+the drawing board and come up with a working binding.
 
-We have to enable the userspace access and then restore the correct
-permission every time the privcmd is used to made an hypercall.
+One part that I don't understand yet is how the driver handles
+irqs to start with, as it does not register a nested irq domain
+or irqchip, so I'm guessing that client drivers cannot actually
+use the IRQ functionality. Is that right?
 
-I didn't find generic helpers to do a these operations, so the change
-is only arm32 specific.
+It also seems to me that the binding cannot distinguish between a
+line configured as an input and one that is configured as an
+interrupt, which are for other gpio chips the same thing, but
+not on this one.  Could this be rectified by using another bit
+of the second gpio cell? The low bit is used for active-high/active-low,
+so you could use the second bit for irq/input.
 
-Reported-by: Riku Voipio <riku.voipio@linaro.org>
-Signed-off-by: Julien Grall <julien.grall@citrix.com>
-
----
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-
-    Changes in v2:
-        - Directly enable/disable the user space access in assembly
-        - Typoes
-
-    ARM64 doesn't seem to have priviledge no-access support yet so there
-    is nothing to do for now.
-
-    I haven't look x86 at all.
----
- arch/arm/xen/hypercall.S | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
-index f00e080..10fd99c 100644
---- a/arch/arm/xen/hypercall.S
-+++ b/arch/arm/xen/hypercall.S
-@@ -98,8 +98,23 @@ ENTRY(privcmd_call)
- 	mov r1, r2
- 	mov r2, r3
- 	ldr r3, [sp, #8]
-+	/*
-+	 * Privcmd calls are issued by the userspace. We need to allow the
-+	 * kernel to access the userspace memory before issuing the hypercall.
-+	 */
-+	uaccess_enable r4
-+
-+	/* r4 is loaded now as we use it as scratch register before */
- 	ldr r4, [sp, #4]
- 	__HVC(XEN_IMM)
-+
-+	/*
-+	 * Disable userspace access from kernel. This is fine to do it
-+	 * unconditionally as no set_fs(KERNEL_DS)/set_fs(get_ds()) is
-+	 * called before.
-+	 */
-+	uaccess_disable r4
-+
- 	ldm sp!, {r4}
- 	ret lr
- ENDPROC(privcmd_call);
--- 
-2.1.4
+	Arnd
