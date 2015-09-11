@@ -1,142 +1,149 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Fri, 11 Sep 2015 06:07:28 -0300
-Subject: [PATCH 2/2] [media] media-device: split media initialization
- and registration
-In-Reply-To: <55F28358.1070007@osg.samsung.com>
-References: <1441890195-11650-1-git-send-email-javier@osg.samsung.com>
- <1441890195-11650-3-git-send-email-javier@osg.samsung.com>
- <55F1BA5C.50508@linux.intel.com> <55F1CC72.6000204@osg.samsung.com>
- <55F26BDF.8050600@linux.intel.com>
- <55F28358.1070007@osg.samsung.com>
-Message-ID: <20150911060728.0d8c061d@recife.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 11 Sep 2015 10:10:53 +0100
+Subject: [PATCH v2 02/22] KVM: ARM64: Define PMU data structure for each
+ vcpu
+In-Reply-To: <1441961715-11688-3-git-send-email-zhaoshenglong@huawei.com>
+References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
+ <1441961715-11688-3-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <55F29A9D.1080502@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, 11 Sep 2015 09:31:36 +0200
-Javier Martinez Canillas <javier@osg.samsung.com> escreveu:
-
-> Hello Sakari,
+On 11/09/15 09:54, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> On 09/11/2015 07:51 AM, Sakari Ailus wrote:
-> > Hi Javier,
-> > 
-> > Javier Martinez Canillas wrote:
-> >> Hello Sakari,
-> >>
-> >> On 09/10/2015 07:14 PM, Sakari Ailus wrote:
-> >>> Hi Javier,
-> >>>
-> >>> Thanks for the set! A few comments below.
-> >>>
-> >>
-> >> Thanks to you for your feedback.
-> >>
-> >>> Javier Martinez Canillas wrote:
-> >>>> The media device node is registered and so made visible to user-space
-> >>>> before entities are registered and links created which means that the
-> >>>> media graph obtained by user-space could be only partially enumerated
-> >>>> if that happens too early before all the graph has been created.
-> >>>>
-> >>>> To avoid this race condition, split the media init and registration
-> >>>> in separate functions and only register the media device node when
-> >>>> all the pending subdevices have been registered, either explicitly
-> >>>> by the driver or asynchronously using v4l2_async_register_subdev().
-> >>>>
-> >>>> Also, add a media_entity_cleanup() function that will destroy the
-> >>>> graph_mutex that is initialized in media_entity_init().
-> >>>>
-> >>>> Suggested-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> >>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> >>>>
-> >>>> ---
-> >>>>
-> >>>>   drivers/media/common/siano/smsdvb-main.c      |  1 +
-> >>>>   drivers/media/media-device.c                  | 38 +++++++++++++++++++++++----
-> >>>>   drivers/media/platform/exynos4-is/media-dev.c | 12 ++++++---
-> >>>>   drivers/media/platform/omap3isp/isp.c         | 11 +++++---
-> >>>>   drivers/media/platform/s3c-camif/camif-core.c | 13 ++++++---
-> >>>>   drivers/media/platform/vsp1/vsp1_drv.c        | 19 ++++++++++----
-> >>>>   drivers/media/platform/xilinx/xilinx-vipp.c   | 11 +++++---
-> >>>>   drivers/media/usb/au0828/au0828-core.c        | 26 +++++++++++++-----
-> >>>>   drivers/media/usb/cx231xx/cx231xx-cards.c     | 22 +++++++++++-----
-> >>>>   drivers/media/usb/dvb-usb-v2/dvb_usb_core.c   | 11 +++++---
-> >>>>   drivers/media/usb/dvb-usb/dvb-usb-dvb.c       | 13 ++++++---
-> >>>>   drivers/media/usb/siano/smsusb.c              | 14 ++++++++--
-> >>>>   drivers/media/usb/uvc/uvc_driver.c            |  9 +++++--
-> >>>>   include/media/media-device.h                  |  2 ++
-> >>>>   14 files changed, 156 insertions(+), 46 deletions(-)
-> >>>>
-> >>>> diff --git a/drivers/media/common/siano/smsdvb-main.c b/drivers/media/common/siano/smsdvb-main.c
-> >>>> index ab345490a43a..8a1ea2192439 100644
-> >>>> --- a/drivers/media/common/siano/smsdvb-main.c
-> >>>> +++ b/drivers/media/common/siano/smsdvb-main.c
-> >>>> @@ -617,6 +617,7 @@ static void smsdvb_media_device_unregister(struct smsdvb_client_t *client)
-> >>>>       if (!coredev->media_dev)
-> >>>>           return;
-> >>>>       media_device_unregister(coredev->media_dev);
-> >>>> +    media_device_cleanup(coredev->media_dev);
-> >>>>       kfree(coredev->media_dev);
-> >>>>       coredev->media_dev = NULL;
-> >>>>   #endif
-> >>>> diff --git a/drivers/media/media-device.c b/drivers/media/media-device.c
-> >>>> index 745defb34b33..a8beb0b445a6 100644
-> >>>> --- a/drivers/media/media-device.c
-> >>>> +++ b/drivers/media/media-device.c
-> >>>> @@ -526,7 +526,7 @@ static void media_device_release(struct media_devnode *mdev)
-> >>>>   }
-> >>>>
-> >>>>   /**
-> >>>> - * media_device_register - register a media device
-> >>>> + * media_device_init() - initialize a media device
-> >>>>    * @mdev:    The media device
-> >>>>    *
-> >>>>    * The caller is responsible for initializing the media device before
-> >>>> @@ -534,12 +534,11 @@ static void media_device_release(struct media_devnode *mdev)
-> >>>>    *
-> >>>>    * - dev must point to the parent device
-> >>>>    * - model must be filled with the device model name
-> >>>> + *
-> >>>> + * returns zero on success or a negative error code.
-> >>>>    */
-> >>>> -int __must_check __media_device_register(struct media_device *mdev,
-> >>>> -                     struct module *owner)
-> >>>> +int __must_check media_device_init(struct media_device *mdev)
-> >>>
-> >>> I think I suggested making media_device_init() return void as the only
-> >>> remaining source of errors would be driver bugs.
-> >>>
-> >>
-> >> Yes you did and I think I explained why I preferred to leave it as
-> >> is and I thought we agreed :)
-> > 
-> > I thought we agreed, too. But my understanding was that the agreement was different. ;-)
-> >
+> Here we plan to support virtual PMU for guest by full software
+> emulation, so define some basic structs and functions preparing for
+> futher steps. Define struct kvm_pmc for performance monitor counter and
+> struct kvm_pmu for performance monitor unit for each vcpu. According to
+> ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
 > 
-> Fair enough :)
+> Since this only supports ARM64 (or PMUv3), add a separate config symbol
+> for it.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_host.h |  2 ++
+>  arch/arm64/include/asm/pmu.h      |  2 ++
+>  arch/arm64/kvm/Kconfig            |  8 ++++++++
+>  include/kvm/arm_pmu.h             | 39 +++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 51 insertions(+)
+>  create mode 100644 include/kvm/arm_pmu.h
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 2709db2..3c88873 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -42,6 +42,7 @@
 >  
-> >>
-> >> Currently media_device_register() is failing gracefully if a buggy
-> >> driver is not setting mdev->dev. So changing media_device_init() to
-> >> return void instead, would be a semantic change and if drivers are
-> >> not checking that anymore, can lead to NULL pointer dereference bugs.
-> > 
-> > Do we have such drivers? Would they ever have worked in the first place, as media device registration would have failed?
+>  #include <kvm/arm_vgic.h>
+>  #include <kvm/arm_arch_timer.h>
+> +#include <kvm/arm_pmu.h>
+>  
+>  #define KVM_VCPU_MAX_FEATURES 3
+>  
+> @@ -116,6 +117,7 @@ struct kvm_vcpu_arch {
+>  	/* VGIC state */
+>  	struct vgic_cpu vgic_cpu;
+>  	struct arch_timer_cpu timer_cpu;
+> +	struct kvm_pmu pmu;
+>  
+>  	/*
+>  	 * Anything that is not used directly from assembly code goes
+> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+> index b9f394a..95681e6 100644
+> --- a/arch/arm64/include/asm/pmu.h
+> +++ b/arch/arm64/include/asm/pmu.h
+> @@ -19,6 +19,8 @@
+>  #ifndef __ASM_PMU_H
+>  #define __ASM_PMU_H
+>  
+> +#include <linux/perf_event.h>
+> +
 
-Actually we do. The media controller is an optional feature at the DVB
-only drivers (dvb-usb, dvb-usb-v2, siano), as it is used only to show
-the interfaces associated to them, and no functionality will be lost
-if it fails to register the MC (except for the enumeration).
+This include file seems out of place here, as I don't think anything in
+this file is directly PMU related.
 
-I don't see any reason why making it mandatory at those PC customer
-DVB drivers. If it fails... well, G_TOPOLOGY won't work, but all
-the rest will.
+>  #define ARMV8_MAX_COUNTERS      32
+>  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
+>  
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index bfffe8f..3c7c58d 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -31,6 +31,7 @@ config KVM
+>  	select KVM_VFIO
+>  	select HAVE_KVM_EVENTFD
+>  	select HAVE_KVM_IRQFD
+> +	select KVM_ARM_PMU
+>  	---help---
+>  	  Support hosting virtualized guest machines.
+>  
+> @@ -52,4 +53,11 @@ config KVM_ARM_MAX_VCPUS
+>  	  large, so only choose a reasonable number that you expect to
+>  	  actually use.
+>  
+> +config KVM_ARM_PMU
+> +	bool
+> +	depends on KVM_ARM_HOST
+> +	---help---
+> +	  Adds support for a virtual Performance Monitoring Unit (PMU) in
+> +	  virtual machines.
+> +
+>  endif # VIRTUALIZATION
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> new file mode 100644
+> index 0000000..64af88a
+> --- /dev/null
+> +++ b/include/kvm/arm_pmu.h
+> @@ -0,0 +1,39 @@
+> +/*
+> + * Copyright (C) 2015 Linaro Ltd.
+> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __ASM_ARM_KVM_PMU_H
+> +#define __ASM_ARM_KVM_PMU_H
+> +
+> +#include <asm/pmu.h>
+> +
+> +struct kvm_pmc {
+> +	u8 idx;/* index into the pmu->pmc array */
+> +	struct perf_event *perf_event;
+> +	struct kvm_vcpu *vcpu;
+> +};
+> +
 
-For hybrid devices (au0828 and cx231xx), they're currently optional.
-I wrote a patch already on my WIP branch making it mandatory for au0828,
-provided that the MEDIA_CONTROLLER config option is enabled, and
-I intend to do the same for cx231xx. The rationale is that we'll use
-it to lock between analog and digital part, so it should be mandatory
-there.
+Since you have a struct perf_event here, it makes more sense to #include
+linux/perf.h here.
 
-Regards,
-Mauro
+> +struct kvm_pmu {
+> +#ifdef CONFIG_KVM_ARM_PMU
+> +	/* PMU IRQ Number per VCPU */
+> +	int irq_num;
+> +	/* IRQ pending flag */
+> +	bool irq_pending;
+> +	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
+> +#endif
+> +};
+> +
+> +#endif
+> 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
