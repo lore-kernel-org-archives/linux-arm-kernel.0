@@ -1,151 +1,142 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 11 Sep 2015 16:55:12 +0800
-Subject: [PATCH v2 19/22] KVM: ARM64: Add PMU overflow interrupt routing
-In-Reply-To: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1441961715-11688-20-git-send-email-zhaoshenglong@huawei.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Fri, 11 Sep 2015 06:07:28 -0300
+Subject: [PATCH 2/2] [media] media-device: split media initialization
+ and registration
+In-Reply-To: <55F28358.1070007@osg.samsung.com>
+References: <1441890195-11650-1-git-send-email-javier@osg.samsung.com>
+ <1441890195-11650-3-git-send-email-javier@osg.samsung.com>
+ <55F1BA5C.50508@linux.intel.com> <55F1CC72.6000204@osg.samsung.com>
+ <55F26BDF.8050600@linux.intel.com>
+ <55F28358.1070007@osg.samsung.com>
+Message-ID: <20150911060728.0d8c061d@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+Em Fri, 11 Sep 2015 09:31:36 +0200
+Javier Martinez Canillas <javier@osg.samsung.com> escreveu:
 
-When calling perf_event_create_kernel_counter to create perf_event,
-assign a overflow handler. Then when perf event overflows, set
-irq_pending and call kvm_vcpu_kick() to sync the interrupt.
+> Hello Sakari,
+> 
+> On 09/11/2015 07:51 AM, Sakari Ailus wrote:
+> > Hi Javier,
+> > 
+> > Javier Martinez Canillas wrote:
+> >> Hello Sakari,
+> >>
+> >> On 09/10/2015 07:14 PM, Sakari Ailus wrote:
+> >>> Hi Javier,
+> >>>
+> >>> Thanks for the set! A few comments below.
+> >>>
+> >>
+> >> Thanks to you for your feedback.
+> >>
+> >>> Javier Martinez Canillas wrote:
+> >>>> The media device node is registered and so made visible to user-space
+> >>>> before entities are registered and links created which means that the
+> >>>> media graph obtained by user-space could be only partially enumerated
+> >>>> if that happens too early before all the graph has been created.
+> >>>>
+> >>>> To avoid this race condition, split the media init and registration
+> >>>> in separate functions and only register the media device node when
+> >>>> all the pending subdevices have been registered, either explicitly
+> >>>> by the driver or asynchronously using v4l2_async_register_subdev().
+> >>>>
+> >>>> Also, add a media_entity_cleanup() function that will destroy the
+> >>>> graph_mutex that is initialized in media_entity_init().
+> >>>>
+> >>>> Suggested-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> >>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> >>>>
+> >>>> ---
+> >>>>
+> >>>>   drivers/media/common/siano/smsdvb-main.c      |  1 +
+> >>>>   drivers/media/media-device.c                  | 38 +++++++++++++++++++++++----
+> >>>>   drivers/media/platform/exynos4-is/media-dev.c | 12 ++++++---
+> >>>>   drivers/media/platform/omap3isp/isp.c         | 11 +++++---
+> >>>>   drivers/media/platform/s3c-camif/camif-core.c | 13 ++++++---
+> >>>>   drivers/media/platform/vsp1/vsp1_drv.c        | 19 ++++++++++----
+> >>>>   drivers/media/platform/xilinx/xilinx-vipp.c   | 11 +++++---
+> >>>>   drivers/media/usb/au0828/au0828-core.c        | 26 +++++++++++++-----
+> >>>>   drivers/media/usb/cx231xx/cx231xx-cards.c     | 22 +++++++++++-----
+> >>>>   drivers/media/usb/dvb-usb-v2/dvb_usb_core.c   | 11 +++++---
+> >>>>   drivers/media/usb/dvb-usb/dvb-usb-dvb.c       | 13 ++++++---
+> >>>>   drivers/media/usb/siano/smsusb.c              | 14 ++++++++--
+> >>>>   drivers/media/usb/uvc/uvc_driver.c            |  9 +++++--
+> >>>>   include/media/media-device.h                  |  2 ++
+> >>>>   14 files changed, 156 insertions(+), 46 deletions(-)
+> >>>>
+> >>>> diff --git a/drivers/media/common/siano/smsdvb-main.c b/drivers/media/common/siano/smsdvb-main.c
+> >>>> index ab345490a43a..8a1ea2192439 100644
+> >>>> --- a/drivers/media/common/siano/smsdvb-main.c
+> >>>> +++ b/drivers/media/common/siano/smsdvb-main.c
+> >>>> @@ -617,6 +617,7 @@ static void smsdvb_media_device_unregister(struct smsdvb_client_t *client)
+> >>>>       if (!coredev->media_dev)
+> >>>>           return;
+> >>>>       media_device_unregister(coredev->media_dev);
+> >>>> +    media_device_cleanup(coredev->media_dev);
+> >>>>       kfree(coredev->media_dev);
+> >>>>       coredev->media_dev = NULL;
+> >>>>   #endif
+> >>>> diff --git a/drivers/media/media-device.c b/drivers/media/media-device.c
+> >>>> index 745defb34b33..a8beb0b445a6 100644
+> >>>> --- a/drivers/media/media-device.c
+> >>>> +++ b/drivers/media/media-device.c
+> >>>> @@ -526,7 +526,7 @@ static void media_device_release(struct media_devnode *mdev)
+> >>>>   }
+> >>>>
+> >>>>   /**
+> >>>> - * media_device_register - register a media device
+> >>>> + * media_device_init() - initialize a media device
+> >>>>    * @mdev:    The media device
+> >>>>    *
+> >>>>    * The caller is responsible for initializing the media device before
+> >>>> @@ -534,12 +534,11 @@ static void media_device_release(struct media_devnode *mdev)
+> >>>>    *
+> >>>>    * - dev must point to the parent device
+> >>>>    * - model must be filled with the device model name
+> >>>> + *
+> >>>> + * returns zero on success or a negative error code.
+> >>>>    */
+> >>>> -int __must_check __media_device_register(struct media_device *mdev,
+> >>>> -                     struct module *owner)
+> >>>> +int __must_check media_device_init(struct media_device *mdev)
+> >>>
+> >>> I think I suggested making media_device_init() return void as the only
+> >>> remaining source of errors would be driver bugs.
+> >>>
+> >>
+> >> Yes you did and I think I explained why I preferred to leave it as
+> >> is and I thought we agreed :)
+> > 
+> > I thought we agreed, too. But my understanding was that the agreement was different. ;-)
+> >
+> 
+> Fair enough :)
+>  
+> >>
+> >> Currently media_device_register() is failing gracefully if a buggy
+> >> driver is not setting mdev->dev. So changing media_device_init() to
+> >> return void instead, would be a semantic change and if drivers are
+> >> not checking that anymore, can lead to NULL pointer dereference bugs.
+> > 
+> > Do we have such drivers? Would they ever have worked in the first place, as media device registration would have failed?
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
----
- arch/arm/kvm/arm.c    |  3 +++
- include/kvm/arm_pmu.h |  2 ++
- virt/kvm/arm/pmu.c    | 54 ++++++++++++++++++++++++++++++++++++++++++++++++++-
- 3 files changed, 58 insertions(+), 1 deletion(-)
+Actually we do. The media controller is an optional feature at the DVB
+only drivers (dvb-usb, dvb-usb-v2, siano), as it is used only to show
+the interfaces associated to them, and no functionality will be lost
+if it fails to register the MC (except for the enumeration).
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index bc738d2..ee5d667 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -28,6 +28,7 @@
- #include <linux/sched.h>
- #include <linux/kvm.h>
- #include <trace/events/kvm.h>
-+#include <kvm/arm_pmu.h>
- 
- #define CREATE_TRACE_POINTS
- #include "trace.h"
-@@ -547,6 +548,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			preempt_enable();
- 			kvm_timer_sync_hwstate(vcpu);
- 			kvm_vgic_sync_hwstate(vcpu);
-+			kvm_pmu_sync_hwstate(vcpu);
- 			continue;
- 		}
- 
-@@ -591,6 +593,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 		kvm_timer_sync_hwstate(vcpu);
- 		kvm_vgic_sync_hwstate(vcpu);
-+		kvm_pmu_sync_hwstate(vcpu);
- 
- 		ret = handle_exit(vcpu, run, ret);
- 	}
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index 1a27357..5f1ea2b 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -37,6 +37,7 @@ struct kvm_pmu {
- };
- 
- #ifdef CONFIG_KVM_ARM_PMU
-+void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
- unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu,
- 					unsigned long select_idx);
- void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, unsigned long val);
-@@ -45,6 +46,7 @@ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, unsigned long val);
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
- 				    unsigned long select_idx);
- #else
-+void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
- unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu,
- 					unsigned long select_idx)
- {
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 5f5a483..9e75372 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -21,6 +21,7 @@
- #include <linux/perf_event.h>
- #include <asm/kvm_emulate.h>
- #include <kvm/arm_pmu.h>
-+#include <kvm/arm_vgic.h>
- 
- /* PMU HW events mapping. */
- static struct kvm_pmu_hw_event_map {
-@@ -90,6 +91,56 @@ static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu,
- }
- 
- /**
-+ * kvm_pmu_sync_hwstate - sync pmu state for cpu
-+ * @vcpu: The vcpu pointer
-+ *
-+ * Inject virtual PMU IRQ if IRQ is pending for this cpu.
-+ */
-+void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+
-+	if (pmu->irq_pending && (pmu->irq_num != -1)) {
-+		kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, pmu->irq_num, 1);
-+		pmu->irq_pending = false;
-+	}
-+}
-+
-+/**
-+ * When perf event overflows, set irq_pending and call kvm_vcpu_kick() to inject
-+ * the interrupt.
-+ */
-+static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
-+				  struct perf_sample_data *data,
-+				  struct pt_regs *regs)
-+{
-+	struct kvm_pmc *pmc = perf_event->overflow_handler_context;
-+	struct kvm_vcpu *vcpu = pmc->vcpu;
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	int idx = pmc->idx;
-+
-+	if (!vcpu_mode_is_32bit(vcpu)) {
-+		if ((vcpu_sys_reg(vcpu, PMINTENSET_EL1) >> idx) & 0x1) {
-+			__set_bit(idx,
-+			    (unsigned long *)&vcpu_sys_reg(vcpu, PMOVSSET_EL0));
-+			__set_bit(idx,
-+			    (unsigned long *)&vcpu_sys_reg(vcpu, PMOVSCLR_EL0));
-+			pmu->irq_pending = true;
-+			kvm_vcpu_kick(vcpu);
-+		}
-+	} else {
-+		if ((vcpu_cp15(vcpu, c9_PMINTENSET) >> idx) & 0x1) {
-+			__set_bit(idx,
-+				(unsigned long *)&vcpu_cp15(vcpu, c9_PMOVSSET));
-+			__set_bit(idx,
-+				(unsigned long *)&vcpu_cp15(vcpu, c9_PMOVSCLR));
-+			pmu->irq_pending = true;
-+			kvm_vcpu_kick(vcpu);
-+		}
-+	}
-+}
-+
-+/**
-  * kvm_pmu_get_counter_value - get PMU counter value
-  * @vcpu: The vcpu pointer
-  * @select_idx: The counter index
-@@ -311,7 +362,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
- 	/* The initial sample period (overflow count) of an event. */
- 	attr.sample_period = (-counter) & (((u64)1 << overflow_bit) - 1);
- 
--	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
-+	event = perf_event_create_kernel_counter(&attr, -1, current,
-+						 kvm_pmu_perf_overflow, pmc);
- 	if (IS_ERR(event)) {
- 		printk_once("kvm: pmu event creation failed %ld\n",
- 			    PTR_ERR(event));
--- 
-2.0.4
+I don't see any reason why making it mandatory at those PC customer
+DVB drivers. If it fails... well, G_TOPOLOGY won't work, but all
+the rest will.
+
+For hybrid devices (au0828 and cx231xx), they're currently optional.
+I wrote a patch already on my WIP branch making it mandatory for au0828,
+provided that the MEDIA_CONTROLLER config option is enabled, and
+I intend to do the same for cx231xx. The rationale is that we'll use
+it to lock between analog and digital part, so it should be mandatory
+there.
+
+Regards,
+Mauro
