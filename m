@@ -1,31 +1,56 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 11 Sep 2015 16:21:53 -0700
-Subject: [PATCH 0/6] PCI: generic: Misc. bug fixes and enhanced support for
- MSI.
-Message-ID: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
+Date: Fri, 11 Sep 2015 16:21:57 -0700
+Subject: [PATCH 4/6] PCI: generic: Correct, and avoid overflow,
+ in bus_max calculation.
+In-Reply-To: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1442013719-5001-5-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-While using the pci-host-generic driver to add PCI support for the
-Cavium ThunderX processors, several bugs were discovered.  We also
-need the ability to specify a per-bus MSI controller, so support for
-that was added.
+There are two problems with the bus_max calculation:
 
-David Daney (6):
-  PCI: Make global and export pdev_fixup_irq().
-  PCI: generic: Only fixup irqs for bus we are creating.
-  PCI: generic: Quit clobbering our pci_ops.
-  PCI: generic: Correct, and avoid overflow, in bus_max calculation.
-  PCI: generic: Pass proper starting bus number to pci_scan_root_bus().
-  PCI: generic: Allow bus default MSI controller to be specified.
+1) The u8 data type can overflow for large config space windows.
 
- .../devicetree/bindings/pci/host-generic-pci.txt   |  5 ++
- drivers/pci/host/pci-host-generic.c                | 55 +++++++++++++++-------
- drivers/pci/setup-irq.c                            |  7 +--
- include/linux/pci.h                                |  3 ++
- 4 files changed, 50 insertions(+), 20 deletions(-)
+2) The calculation is incorrect for a bus range that doesn't start at
+   zero.
 
+Since the configuration space is relative to bus zero, make bus_max
+just be the size of the config window scaled by bus_shift.  Then clamp
+it to a maximum of 255, per PCI.  Use a data type of int to avoid
+overflow problems.
+
+Signed-off-by: David Daney <david.daney@cavium.com>
+---
+ drivers/pci/host/pci-host-generic.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+index cd6f898..fce5bf7 100644
+--- a/drivers/pci/host/pci-host-generic.c
++++ b/drivers/pci/host/pci-host-generic.c
+@@ -164,7 +164,7 @@ out_release_res:
+ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+ {
+ 	int err;
+-	u8 bus_max;
++	int bus_max;
+ 	resource_size_t busn;
+ 	struct resource *bus_range;
+ 	struct device *dev = pci->host.dev.parent;
+@@ -177,8 +177,9 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+ 	}
+ 
+ 	/* Limit the bus-range to fit within reg */
+-	bus_max = pci->cfg.bus_range->start +
+-		  (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
++	bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
++	if (bus_max > 255)
++		bus_max = 255;
+ 	pci->cfg.bus_range->end = min_t(resource_size_t,
+ 					pci->cfg.bus_range->end, bus_max);
+ 
 -- 
 1.7.11.7
