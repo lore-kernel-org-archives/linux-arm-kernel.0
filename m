@@ -1,11 +1,11 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 11 Sep 2015 11:16:07 +0100
+Date: Fri, 11 Sep 2015 11:17:55 +0100
 Subject: [PATCH v2 05/22] KVM: ARM64: Add a helper for CP15 registers
  reset to UNKNOWN
 In-Reply-To: <1441961715-11688-6-git-send-email-zhaoshenglong@huawei.com>
 References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
  <1441961715-11688-6-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <55F2A9E7.7000100@arm.com>
+Message-ID: <55F2AA53.40503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,14 +28,11 @@ On 11/09/15 09:54, Shannon Zhao wrote:
 > +static inline void reset_unknown_cp15(struct kvm_vcpu *vcpu,
 > +				      const struct sys_reg_desc *r)
 > +{
-> +	BUG_ON(!r->reg);
-> +	BUG_ON(r->reg >= NR_COPRO_REGS);
-> +	vcpu_cp15(vcpu, r->reg) = 0xdecafbad;
 
-Given how many times we use this constant, maybe we should consider
-having a #define for it?
+Oh, and given that you are using this as a function pointer in the next
+patch, why is it an inline function?
 
-Thanks,
+Please merge this with patch #6.
 
 	M.
 -- 
