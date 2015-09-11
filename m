@@ -1,90 +1,39 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Fri, 11 Sep 2015 15:41:24 -0700
-Subject: Patch "irqchip/crossbar: Restore the mask on suspend behaviour" has
- been added to the 4.1-stable tree
-Message-ID: <144201128410165@kroah.com>
+From: greg@kroah.com (Greg Kroah-Hartman)
+Date: Fri, 11 Sep 2015 15:43:35 -0700
+Subject: [GIT PULL] arm64: updates for 4.3
+In-Reply-To: <CAOZdJXWwLJBwGZ0tDMi6wmoAU0uiDBuE-Hb+ytR1isQQsk02Yg@mail.gmail.com>
+References: <20150904102656.GC4818@arm.com>
+ <CAOZdJXX_avYXi9JSk=Ge6fuBLzS1n2jd7yBmhnFx4u_ptvNS5A@mail.gmail.com>
+ <20150910170257.GH22439@arm.com>
+ <CAOZdJXWwLJBwGZ0tDMi6wmoAU0uiDBuE-Hb+ytR1isQQsk02Yg@mail.gmail.com>
+Message-ID: <20150911224335.GA13373@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Sep 11, 2015 at 04:58:08PM -0500, Timur Tabi wrote:
+> On Thu, Sep 10, 2015 at 12:02 PM, Will Deacon <will.deacon@arm.com> wrote:
+> 
+> >> [v5] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
+> >> [v3] hvc_dcc: don't ignore errors during initialization
+> >
+> > Those patches should go via the usual route for tty changes (i.e. Greg).
+> > I merged the arm64 change here because it (a) makes sense as a standalone
+> > patch and (b) is a dependency for your other stuff.
+> 
+> Greg,
+> 
+> Any chance these patches can get into 4.3-rc1?
+> 
+> https://patchwork.kernel.org/patch/7039851/
+> https://patchwork.kernel.org/patch/7039841/
 
-This is a note to let you know that I've just added the patch titled
+My tty/serial tree is long closed and has been merged with Linus last
+week.  And, I don't even see these in my queue, as I don't even know if
+they were sent to me.
 
-    irqchip/crossbar: Restore the mask on suspend behaviour
+If you want them in, please resend, but note that it will have to wait
+for 4.4-rc1.
 
-to the 4.1-stable tree which can be found at:
-    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
+thanks,
 
-The filename of the patch is:
-     irqchip-crossbar-restore-the-mask-on-suspend-behaviour.patch
-and it can be found in the queue-4.1 subdirectory.
-
-If you, or anyone else, feels it should not be added to the stable tree,
-please let <stable@vger.kernel.org> know about it.
-
-
->From 4fd8f47e7e5b64a74b60f23c2e08ba8234d659d1 Mon Sep 17 00:00:00 2001
-From: Grygorii Strashko <grygorii.strashko@ti.com>
-Date: Fri, 14 Aug 2015 15:20:29 +0300
-Subject: irqchip/crossbar: Restore the mask on suspend behaviour
-
-From: Grygorii Strashko <grygorii.strashko@ti.com>
-
-commit 4fd8f47e7e5b64a74b60f23c2e08ba8234d659d1 upstream.
-
-The ARM GIC requires that all interrupts which are not used as a
-wakeup source have to be masked during suspend.
-
-The conversion of the crossbar irqchip to hierarchical irq domains
-failed to mark the crossbar irqchip with the IRQCHIP_MASK_ON_SUSPEND
-flag and therefor broke the suspend requirement of the GIC.
-
-Before the conversion the flags were visible because the GIC was the
-top level irqchip. After the conversion the crossbar irqchip is the
-top level irq chip whose flags are evaluated in suspend_device_irq().
-As the flag is not set the masking of the non-wakeup irqs is not
-invoked which breaks suspend.
-
-Add the IRQCHIP_MASK_ON_SUSPEND flag to the crossbar irqchip, so the
-GIC interrupts get masked properly.
-
-[ tglx: Massaged changelog ]
-
-Fixes: 783d31863fb8 ('irqchip: crossbar: Convert dra7 crossbar...')
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: <linux@arm.linux.org.uk>
-Cc: <nsekhar@ti.com>
-Cc: <jason@lakedaemon.net>
-Cc: <balbi@ti.com>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Cc: <tony@atomide.com>
-Cc: <marc.zyngier@arm.com>
-Link: http://lkml.kernel.org/r/1439554830-19502-6-git-send-email-grygorii.strashko at ti.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- drivers/irqchip/irq-crossbar.c |    1 +
- 1 file changed, 1 insertion(+)
-
---- a/drivers/irqchip/irq-crossbar.c
-+++ b/drivers/irqchip/irq-crossbar.c
-@@ -70,6 +70,7 @@ static struct irq_chip crossbar_chip = {
- 	.irq_retrigger		= irq_chip_retrigger_hierarchy,
- 	.irq_set_wake		= irq_chip_set_wake_parent,
- 	.irq_set_type		= irq_chip_set_type_parent,
-+	.flags			= IRQCHIP_MASK_ON_SUSPEND,
- #ifdef CONFIG_SMP
- 	.irq_set_affinity	= irq_chip_set_affinity_parent,
- #endif
-
-
-Patches currently in stable-queue which might be from grygorii.strashko at ti.com are
-
-queue-4.1/irqchip-crossbar-restore-the-mask-on-suspend-behaviour.patch
-queue-4.1/genirq-don-t-return-enosys-in-irq_chip_retrigger_hierarchy.patch
-queue-4.1/irqchip-crossbar-restore-set_wake-functionality.patch
-queue-4.1/irqchip-crossbar-restore-the-irq_set_type-mechanism.patch
-queue-4.1/arm-dts-dra7-fix-broken-pbias-device-creation.patch
-queue-4.1/genirq-introduce-irq_chip_set_type_parent-helper.patch
-queue-4.1/arm-omap-wakeupgen-restore-the-irq_set_type-mechanism.patch
+greg k-h
