@@ -1,47 +1,49 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Fri, 11 Sep 2015 15:41:21 -0700
-Subject: Patch "irqchip/crossbar: Restore the irq_set_type() mechanism" has
- been added to the 4.1-stable tree
-Message-ID: <1442011281120210@kroah.com>
+Date: Fri, 11 Sep 2015 15:41:18 -0700
+Subject: Patch "irqchip/crossbar: Restore set_wake functionality" has been
+ added to the 4.1-stable tree
+Message-ID: <1442011278165210@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 This is a note to let you know that I've just added the patch titled
 
-    irqchip/crossbar: Restore the irq_set_type() mechanism
+    irqchip/crossbar: Restore set_wake functionality
 
 to the 4.1-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
-     irqchip-crossbar-restore-the-irq_set_type-mechanism.patch
+     irqchip-crossbar-restore-set_wake-functionality.patch
 and it can be found in the queue-4.1 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
 
 
->From e269ec42328783e51be08c191aa935dba56141fc Mon Sep 17 00:00:00 2001
+>From 8200fe4347870d4ad6475048bcdf3e7c106c5268 Mon Sep 17 00:00:00 2001
 From: Grygorii Strashko <grygorii.strashko@ti.com>
-Date: Fri, 14 Aug 2015 15:20:27 +0300
-Subject: irqchip/crossbar: Restore the irq_set_type() mechanism
+Date: Fri, 14 Aug 2015 15:20:30 +0300
+Subject: irqchip/crossbar: Restore set_wake functionality
 
 From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-commit e269ec42328783e51be08c191aa935dba56141fc upstream.
+commit 8200fe4347870d4ad6475048bcdf3e7c106c5268 upstream.
 
-The conversion of the crossbar irqchip to hierarchical irq domains
-failed to provide a mechanism to properly set the trigger type of an
-interrupt.
+The TI crossbar irqchip doesn't provides any facility to configure the
+wakeup sources, but the conversion to hierarchical irqdomains set the
+irq_set_wake callback to irq_chip_set_wake_parent. The parent chip
+(OMAP wakeupgen) has no irq_set_wake function either so the call will
+fail with -ENOSYS. As a result the irq_set_wake() call in the resume
+path will trigger an 'Unbalanced wake disable' warning.
 
-The crossbar irq chip itself has no mechanism and therefor no
-irq_set_type() callback. The code before the conversion relayed the
-trigger configuration directly to the underlying GIC.
+Before the conversion the GIC irqchip was the top level irqchip and
+correctly flagged with IRQCHIP_SKIP_SET_WAKE.
 
-Restore the correct behaviour by setting the crossbar irq_set_type
-callback to irq_chip_set_type_parent(). This propagates the
-set_trigger() call to the underlying GIC irqchip.
+Restore the correct behaviour by removing the irq_set_type callback
+from the crossbar irqchip and set the IRQCHIP_SKIP_SET_WAKE flag which
+lets the irq_set_irq_wake() call from the driver succeed.
 
 [ tglx: Massaged changelog ]
 
@@ -55,21 +57,25 @@ Cc: <balbi@ti.com>
 Cc: <linux-arm-kernel@lists.infradead.org>
 Cc: <tony@atomide.com>
 Cc: <marc.zyngier@arm.com>
-Link: http://lkml.kernel.org/r/1439554830-19502-4-git-send-email-grygorii.strashko at ti.com
+Link: http://lkml.kernel.org/r/1439554830-19502-7-git-send-email-grygorii.strashko at ti.com
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- drivers/irqchip/irq-crossbar.c |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/irqchip/irq-crossbar.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -69,6 +69,7 @@ static struct irq_chip crossbar_chip = {
+@@ -68,9 +68,9 @@ static struct irq_chip crossbar_chip = {
+ 	.irq_mask		= irq_chip_mask_parent,
  	.irq_unmask		= irq_chip_unmask_parent,
  	.irq_retrigger		= irq_chip_retrigger_hierarchy,
- 	.irq_set_wake		= irq_chip_set_wake_parent,
-+	.irq_set_type		= irq_chip_set_type_parent,
+-	.irq_set_wake		= irq_chip_set_wake_parent,
+ 	.irq_set_type		= irq_chip_set_type_parent,
+-	.flags			= IRQCHIP_MASK_ON_SUSPEND,
++	.flags			= IRQCHIP_MASK_ON_SUSPEND |
++				  IRQCHIP_SKIP_SET_WAKE,
  #ifdef CONFIG_SMP
  	.irq_set_affinity	= irq_chip_set_affinity_parent,
  #endif
