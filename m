@@ -1,31 +1,23 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 11 Sep 2015 18:33:27 +0900
-Subject: [PATCH v2 0/2] pinctrl: uniphier: one fix, one addition
-Message-ID: <1441964010-6885-1-git-send-email-yamada.masahiro@socionext.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 11 Sep 2015 15:10:03 +0530
+Subject: cpufreq: mediatek: allow modular build
+In-Reply-To: <20150911093454.GK21084@n2100.arm.linux.org.uk>
+References: <1768766.yu1lxjsjLL@wuerfel> <2329563.MhTbBXHVz1@wuerfel>
+ <20150911082536.GL9650@linux> <3071823.f1VzTWVMmV@wuerfel>
+ <20150911083806.GM9650@linux>
+ <20150911093454.GK21084@n2100.arm.linux.org.uk>
+Message-ID: <20150911094003.GN9650@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11-09-15, 10:34, Russell King - ARM Linux wrote:
+> Well, that's got nothing to do with not having a module_exit().
 
-1/2 is a bug fix, but it is not very critical.
-I can wait until 4.4-rc1 if it is a hassle.
+Yeah, so we don't necessarily need a module_exit(), but the module
+should have freed the resources with module unplug. And that was
+missing with Arnd's patch..
 
-2/2 provides some more pin-mux settings.
-
-
-Changes in v2:
-  - trivial.  Fix a typo in git-log.  s/value/values/
-
-Masahiro Yamada (2):
-  pinctrl: uniphier: fix input enable settings for PH1-sLD8
-  pinctrl: uniphier: add SD card pinmux settings
-
- drivers/pinctrl/uniphier/pinctrl-ph1-ld4.c     |   5 +
- drivers/pinctrl/uniphier/pinctrl-ph1-ld6b.c    |   5 +
- drivers/pinctrl/uniphier/pinctrl-ph1-pro4.c    |  11 ++
- drivers/pinctrl/uniphier/pinctrl-ph1-pro5.c    |   5 +
- drivers/pinctrl/uniphier/pinctrl-ph1-sld8.c    | 230 +++++++++++++------------
- drivers/pinctrl/uniphier/pinctrl-proxstream2.c |   5 +
- 6 files changed, 148 insertions(+), 113 deletions(-)
+Or did I misinterpret your comment ?
 
 -- 
-1.9.1
+viresh
