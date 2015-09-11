@@ -1,64 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 11 Sep 2015 13:30:11 +0900
-Subject: [PATCH/RFC v2 net-next 1/4] phylib: Add phy_set_max_speed helper
-In-Reply-To: <55F2552A.1010509@gmail.com>
-References: <1441936878-18290-1-git-send-email-horms+renesas@verge.net.au>
- <1441936878-18290-2-git-send-email-horms+renesas@verge.net.au>
- <55F2552A.1010509@gmail.com>
-Message-ID: <20150911043011.GA20882@verge.net.au>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 11 Sep 2015 14:01:54 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Disable simplefb support
+In-Reply-To: <1441892552-13819-1-git-send-email-javier@osg.samsung.com>
+References: <1441892552-13819-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <55F26042.2080600@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 10, 2015 at 09:14:34PM -0700, Florian Fainelli wrote:
-> Le 09/10/15 19:01, Simon Horman a ?crit :
-> > Add a helper to allow ethernet drivers to limit the speed of a phy
-> > (that they are attached to).
-> > 
-> > This mainly involves factoring out the business-end of
-> > of_set_phy_supported() and exporting a new symbol.
-> > 
-> > This code seems to be open coded in several places, in several different
-> > variants.
-> > 
-> > This code is envisaged this will be used in situations where setting
-> > the "max-speed" property is not appropriate, e.g. because the maximum
-> > speed is not a property of the phy hardware.
+On 10.09.2015 22:42, Javier Martinez Canillas wrote:
+> The simplefb driver allows the kernel to render on a pre-allocated
+> buffer that's been initialized by firmware before the kernel boots.
 > 
-> This looks good to me, one minor comment, see below:
+> This option was enabled to have display working on the Exynos5250
+> Snow Chromebook by commit da9d0fbf5e9a ("ARM: exynos: defconfig
+> update") since proper DRM/KMS support did not exist at that time.
 > 
-> > 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > ---
-> > 
-> > v2
-> > * First post
-> > ---
-> >  drivers/net/phy/phy_device.c | 52 ++++++++++++++++++++++++++++----------------
-> >  include/linux/phy.h          |  1 +
-> >  2 files changed, 34 insertions(+), 19 deletions(-)
-> > 
-> > diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
-> > index c0f211127274..d9a020095972 100644
-> > --- a/drivers/net/phy/phy_device.c
-> > +++ b/drivers/net/phy/phy_device.c
-> > @@ -1205,6 +1205,37 @@ static int gen10g_resume(struct phy_device *phydev)
-> >  	return 0;
-> >  }
-> >  
-> > +static void __set_phy_supported(struct phy_device *phydev, u32 max_speed)
-> > +{
-> > +	if (!IS_ENABLED(CONFIG_OF_MDIO))
-> > +		return;
+> But now that the Exynos DRM driver has support for this hardware,
+> there is no need to have simplefb enabled. In fact, if a user has
+> a u-boot that injects the simplefb dev node to the FDT before pass
+> it to the kernel, display won't be properly initialized and only a
+> blank screen will be shown since there isn't a proper handoff from
+> the simplefb driver to the Exynos DRM driver.
 > 
-> I think that part should be moved to of_set_phy_supported(), since your
-> are exporting phy_set_max_speed() which should therefore be available
-> regardless of whether Device Tree is used.
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> 
+>  arch/arm/configs/exynos_defconfig | 1 -
+>  1 file changed, 1 deletion(-)
 
-Yes of course, silly me.
+Seems logical. None of the boards use simple-framebuffer compatible
+anyway. I understand that on Snow simplefb was needed along with change
+in Uboot like this one:
+https://chromium.googlesource.com/chromiumos/third_party/u-boot/+/refs/changes/58/49358/2
 
-> While you are it, it might be nice to either warn or return -ENOTSUPP if
-> the speed does not match 10, 100 or 1000, but that might be worth a
-> second patch.
+and now none of Exynos boards use simplefb anymore?
 
-Sure, that sounds reasonable.
+Best regards,
+Krzysztof
