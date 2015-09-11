@@ -1,78 +1,86 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Fri, 11 Sep 2015 15:40:52 -0700
-Subject: Patch "ARM: OMAP: wakeupgen: Restore the irq_set_type() mechanism"
+Date: Fri, 11 Sep 2015 15:41:12 -0700
+Subject: Patch "genirq: Don't return ENOSYS in irq_chip_retrigger_hierarchy"
  has been added to the 4.1-stable tree
-Message-ID: <1442011252231252@kroah.com>
+Message-ID: <1442011272159222@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 This is a note to let you know that I've just added the patch titled
 
-    ARM: OMAP: wakeupgen: Restore the irq_set_type() mechanism
+    genirq: Don't return ENOSYS in irq_chip_retrigger_hierarchy
 
 to the 4.1-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
-     arm-omap-wakeupgen-restore-the-irq_set_type-mechanism.patch
+     genirq-don-t-return-enosys-in-irq_chip_retrigger_hierarchy.patch
 and it can be found in the queue-4.1 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
 
 
->From 63059a272398ef5dc1bd7065a036e8b6e82d1af7 Mon Sep 17 00:00:00 2001
+>From 6d4affea7d5aa5ca5ff4c3e5fbf3ee16801cc527 Mon Sep 17 00:00:00 2001
 From: Grygorii Strashko <grygorii.strashko@ti.com>
-Date: Fri, 14 Aug 2015 15:20:28 +0300
-Subject: ARM: OMAP: wakeupgen: Restore the irq_set_type() mechanism
+Date: Fri, 14 Aug 2015 15:20:25 +0300
+Subject: genirq: Don't return ENOSYS in irq_chip_retrigger_hierarchy
 
 From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-commit 63059a272398ef5dc1bd7065a036e8b6e82d1af7 upstream.
+commit 6d4affea7d5aa5ca5ff4c3e5fbf3ee16801cc527 upstream.
 
-The conversion of the wakeupgen irqchip to hierarchical irq domains
-failed to provide a mechanism to properly set the trigger type of an
-interrupt.
+irq_chip_retrigger_hierarchy() returns -ENOSYS if it was not able to
+find at least one .irq_retrigger() callback implemented in the IRQ
+domain hierarchy.
 
-The wakeupgen irq chip itself has no mechanism and therefor no
-irq_set_type() callback. The code before the conversion relayed the
-trigger configuration directly to the underlying GIC.
+That's wrong, because check_irq_resend() expects a 0 return value from
+the callback in case that the hardware assisted resend was not
+possible. If the return value is non zero the core code assumes
+hardware resend success and the software resend is not invoked.
 
-Restore the correct behaviour by setting the wakeupgen irq_set_type
-callback to irq_chip_set_type_parent(). This propagates the
-set_trigger() call to the underlying GIC irqchip.
+This results in lost interrupts on platforms where none of the parent
+irq chips in the hierarchy implements the retrigger callback.
+
+This is observable on TI OMAP, where the hierarchy is:
+
+ ARM GIC <- OMAP wakeupgen <- TI Crossbar
+
+Return 0 instead so the software resend mechanism gets invoked.
 
 [ tglx: Massaged changelog ]
 
-Fixes: 7136d457f365 ('ARM: omap: convert wakeupgen to stacked domains')
+Fixes: 85f08c17de26 ('genirq: Introduce helper functions...')
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Jiang Liu <jiang.liu@linux.intel.com>
 Cc: Sudeep Holla <sudeep.holla@arm.com>
 Cc: <linux@arm.linux.org.uk>
 Cc: <nsekhar@ti.com>
 Cc: <jason@lakedaemon.net>
 Cc: <balbi@ti.com>
 Cc: <linux-arm-kernel@lists.infradead.org>
-Cc: <marc.zyngier@arm.com>
-Link: http://lkml.kernel.org/r/1439554830-19502-5-git-send-email-grygorii.strashko at ti.com
+Cc: <tony@atomide.com>
+Link: http://lkml.kernel.org/r/1439554830-19502-2-git-send-email-grygorii.strashko at ti.com
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- arch/arm/mach-omap2/omap-wakeupgen.c |    1 +
- 1 file changed, 1 insertion(+)
+ kernel/irq/chip.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -392,6 +392,7 @@ static struct irq_chip wakeupgen_chip =
- 	.irq_mask		= wakeupgen_mask,
- 	.irq_unmask		= wakeupgen_unmask,
- 	.irq_retrigger		= irq_chip_retrigger_hierarchy,
-+	.irq_set_type		= irq_chip_set_type_parent,
- 	.flags			= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND,
- #ifdef CONFIG_SMP
- 	.irq_set_affinity	= irq_chip_set_affinity_parent,
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -946,7 +946,7 @@ int irq_chip_retrigger_hierarchy(struct
+ 		if (data->chip && data->chip->irq_retrigger)
+ 			return data->chip->irq_retrigger(data);
+ 
+-	return -ENOSYS;
++	return 0;
+ }
+ 
+ /**
 
 
 Patches currently in stable-queue which might be from grygorii.strashko at ti.com are
