@@ -1,33 +1,119 @@
-From: martin@sperl.org (Martin Sperl)
-Date: Fri, 11 Sep 2015 12:24:50 +0200
-Subject: [PATCH 2/3] clk: bcm2835: Add a driver for the auxiliary
- peripheral clock gates.
-In-Reply-To: <1441923750-19404-3-git-send-email-eric@anholt.net>
-References: <1441923750-19404-1-git-send-email-eric@anholt.net>
- <1441923750-19404-3-git-send-email-eric@anholt.net>
-Message-ID: <D051D944-F10B-460F-AF10-8C177A3A7E3D@sperl.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 11 Sep 2015 11:27:52 +0100
+Subject: [PATCH v2 07/22] KVM: ARM64: Add reset and access handlers for
+ PMCEID0 and PMCEID1 register
+In-Reply-To: <1441961715-11688-8-git-send-email-zhaoshenglong@huawei.com>
+References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
+ <1441961715-11688-8-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <55F2ACA8.2020403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On 11.09.2015, at 00:22, Eric Anholt <eric@anholt.net> wrote:
+On 11/09/15 09:55, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> There are a pair of SPI masters and a mini UART that were last minute
-> additions.  As a result, they didn't get integrated in the same way as
-> the other gates off of the VPU clock in CPRMAN.
+> Add reset handler which gets host value of PMCEID0 or PMCEID1. Since
+> write action to PMCEID0 or PMCEID1 is ignored, add a new case for this.
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 > ---
+>  arch/arm64/kvm/sys_regs.c | 36 ++++++++++++++++++++++++++++++++----
+>  1 file changed, 32 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 24b8972..b3bc717 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -251,6 +251,26 @@ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>  					  | (ARMV8_PMCR_MASK & 0xdecafbad);
+>  }
+>  
+> +static void reset_pmceid(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+> +{
+> +	u32 pmceid;
+> +
+> +	if (r->reg == PMCEID0_EL0 || r->reg == c9_PMCEID0) {
+> +		asm volatile("mrs %0, pmceid0_el0\n" : "=r" (pmceid));
 
-Tested with the spi-bcm2835aux driver and it works perfectly.
-I will now post the latest incarnation of the driver for inclusion.
+Careful here. mrs always acts on a 64bit quantity, even if the register is
+internally 32bit. I'd rather you use a u64 variable.
 
-I have also tested with the uart1 and it works in principle.
+> +		if (!vcpu_mode_is_32bit(vcpu))
+> +			vcpu_sys_reg(vcpu, r->reg) = pmceid;
+> +		else
+> +			vcpu_cp15(vcpu, r->reg) = pmceid;
+> +	} else {
+> +		/* PMCEID1_EL0 or c9_PMCEID1 */
+> +		asm volatile("mrs %0, pmceid1_el0\n" : "=r" (pmceid));
+> +		if (!vcpu_mode_is_32bit(vcpu))
+> +			vcpu_sys_reg(vcpu, r->reg) = pmceid;
+> +		else
+> +			vcpu_cp15(vcpu, r->reg) = pmceid;
 
-Note that there is one issue (as mentioned elsewhere) with uart1:
-the 8250 serial driver has a (hardcoded) internal clock divider 16,
-while the hardware has an internal divider of 8.
+Maybe we could have a helper for this kind of sequence:
 
-This results in baud rates that are a factor of 2 higher than requested.
+static void vcpu_sysreg_write(vcpu, const struct sys_reg_desc *r, u64 val)
+{
+	if (!vcpu_mode_is_32_bit(vcpu))
+		vcpu_sys_reg(vcpu, r->reg) = val;
+	else
+		vcpu_cp15(vcpu, r->reg) = lower_32_bit(val);
+}
 
-Tested-by: Martin Sperl <kernel@martin.sperl.org>
+> +	}
+> +}
+> +
+>  /* PMU registers accessor. */
+>  static bool access_pmu_regs(struct kvm_vcpu *vcpu,
+>  			    const struct sys_reg_params *p,
+> @@ -268,6 +288,9 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
+>  			vcpu_sys_reg(vcpu, r->reg) = val;
+>  			break;
+>  		}
+> +		case PMCEID0_EL0:
+> +		case PMCEID1_EL0:
+> +			return ignore_write(vcpu, p);
+>  		default:
+>  			vcpu_sys_reg(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
+>  			break;
+> @@ -488,10 +511,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  access_pmu_regs, reset_unknown, PMSELR_EL0 },
+>  	/* PMCEID0_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
+> -	  trap_raz_wi },
+> +	  access_pmu_regs, reset_pmceid, PMCEID0_EL0 },
+>  	/* PMCEID1_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b111),
+> -	  trap_raz_wi },
+> +	  access_pmu_regs, reset_pmceid, PMCEID1_EL0 },
+>  	/* PMCCNTR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
+>  	  trap_raz_wi },
+> @@ -692,6 +715,9 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
+>  			vcpu_cp15(vcpu, r->reg) = val;
+>  			break;
+>  		}
+> +		case c9_PMCEID0:
+> +		case c9_PMCEID1:
+> +			return ignore_write(vcpu, p);
+>  		default:
+>  			vcpu_cp15(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
+>  			break;
+> @@ -738,8 +764,10 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmu_cp15_regs,
+>  	  reset_unknown_cp15, c9_PMSELR },
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmu_cp15_regs,
+> +	  reset_pmceid, c9_PMCEID0 },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmu_cp15_regs,
+> +	  reset_pmceid, c9_PMCEID1 },
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), trap_raz_wi },
+> 
+
+
+-- 
+Jazz is not dead. It just smells funny...
