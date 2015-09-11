@@ -1,29 +1,34 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 11 Sep 2015 11:59:27 +0100
-Subject: [PATCH v4 3/4] irqchip: GIC: Convert to EOImode == 1
-In-Reply-To: <1441968881.3549.20.camel@citrix.com>
-References: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
- <1440604845-28229-4-git-send-email-marc.zyngier@arm.com>
- <55F08731.3050402@citrix.com> <55F15353.2000800@arm.com>
- <55F1AE75.6000405@citrix.com> <1441968881.3549.20.camel@citrix.com>
-Message-ID: <55F2B40F.3070405@citrix.com>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Fri, 11 Sep 2015 12:00:00 +0100
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
+References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
+ <20150910095208.GA29293@leverpostej>
+ <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
+ <20150910112418.GC29293@leverpostej>
+ <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
+ <20150910121514.GE29293@leverpostej>
+ <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
+ <20150910144938.GI29293@leverpostej>
+ <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
+Message-ID: <1441969200.3549.23.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2015-09-10 at 17:10 +0100, Stefano Stabellini wrote:
 
+> > C) When you could go:
+> > 
+> >    DT -> Discover Xen -> Xen-specific stuff -> Xen-specific EFI/ACPI
+> > discovery
+> 
+> I take you mean discovering Xen with the usual Xen hypervisor node on
+> device tree.
 
-On 11/09/2015 11:54, Ian Campbell wrote:
-> On Thu, 2015-09-10 at 17:23 +0100, Julien Grall wrote:
->> I applied the two patches on top of linus/master and I'm able to boot
->> correctly on X-gene. Thank you!
->
-> Perhaps we should replicate this approach in Xen and get rid of
->   PLATFORM_QUIRK_GIC_64K_STRIDE?
+There may be other options, such as ARM defining an architectural mechanism
+to do early detection of hypervisors e.g. by defining some bit in some
+hypervisor controllable register (MPIDR?) to say "a hypervisor is present"
+and defining an hvc or smc call which can be used to ask which one it is.
 
-I was thinking to do it. But, I wasn't sure if it was worth to get a 
-such "ugly" patch compare to the quirk.
-
-Regards,
-
--- 
-Julien Grall
+Ian.
