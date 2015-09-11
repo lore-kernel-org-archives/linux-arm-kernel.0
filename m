@@ -1,60 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Sep 2015 14:00:06 +0100
-Subject: master build: 1 failures 73 warnings (v4.2-11142-gb0a1ea5)
-In-Reply-To: <20150911124045.GA16833@arm.com>
-References: <E1ZaL9B-0006QE-Kh@optimist> <20150911120150.GN12027@sirena.org.uk>
- <20150911124045.GA16833@arm.com>
-Message-ID: <20150911130006.GB11833@n2100.arm.linux.org.uk>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Fri, 11 Sep 2015 06:04:51 -0700
+Subject: NFS/TCP/IPv6 acting strangely in 4.2
+In-Reply-To: <20150911113839.GO21084@n2100.arm.linux.org.uk>
+References: <20150911113839.GO21084@n2100.arm.linux.org.uk>
+Message-ID: <1441976691.4619.58.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 01:40:45PM +0100, Will Deacon wrote:
-> On Fri, Sep 11, 2015 at 01:01:51PM +0100, Mark Brown wrote:
-> > On Fri, Sep 11, 2015 at 11:01:35AM +0100, Build bot for Mark Brown wrote:
-> > 
-> > > 	arm64-allmodconfig
-> > > ../drivers/firmware/qcom_scm-32.c:196:4: error: expected string literal before '__asmeq'
-> > > ../drivers/firmware/qcom_scm-32.c:221:2: error: implicit declaration of function 'secure_flush_area' [-Werror=implicit-function-declaration]
-> > > ../drivers/firmware/qcom_scm-32.c:239:2: error: implicit declaration of function 'outer_inv_range' [-Werror=implicit-function-declaration]
-> > > ../drivers/firmware/qcom_scm-32.c:331:4: error: expected string literal before '__asmeq'
-> > > ../drivers/firmware/qcom_scm-32.c:361:4: error: expected string literal before '__asmeq'
-> > 
-> > Today's mainline fails to build on arm64 due to the above, introduced by
-> > efaa6e266ba (firmware: qcom_scm-32: replace open-coded call to
-> > __cpuc_flush_dcache_area()) which introduces a call to
-> > secure_flush_area() which isn't defined on arm64.  This does not happen
-> > in -next as 626ffb400e1e781 (firmware: qcom: scm: Add function stubs for
-> > ARM64) which fixes this and IIRC other issues on arm64 - what is the
-> > plan for getting that change into mainline?
+On Fri, 2015-09-11 at 12:38 +0100, Russell King - ARM Linux wrote:
+> I have a recent Marvell Armada 388 board here which uses the mvneta
+> driver.  I'm seeing some weird effects with NFS with it acting as a
+> client.  Unfortunately, the board does not have a functional RTC.
 > 
-> There's no way in hell that driver is going to build for arm64, so I'd
-> suggest something like the following until it's sorted out.
-
-The below doesn't help.  QCOM_SCM can only be enabled if something
-selects it (it has no prompt).  Somewhere, a new commit selecting
-this option from ARM64 builds has appeared.
-
-Modifying the dependencies of this option in the way you're doing will
-cause a Kconfig warning, because the dependencies of a selected option
-are not met.
-
-> --->8
+> The NFS server is the same NFS server that I've used for years with
+> multiple other clients (it's my main NFS server) and it continues to
+> support all other clients without any ill effect.  The NFS server
+> kernel is rather old now, being a 3.x kernel.
 > 
-> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-> index 99c69a3205c4..2f51e249829f 100644
-> --- a/drivers/firmware/Kconfig
-> +++ b/drivers/firmware/Kconfig
-> @@ -134,7 +134,7 @@ config ISCSI_IBFT
->  
->  config QCOM_SCM
->  	bool
-> -	depends on ARM || ARM64
-> +	depends on ARM
->  
->  source "drivers/firmware/broadcom/Kconfig"
->  source "drivers/firmware/google/Kconfig"
+> The NFS client appears to connect using TCP/IPv6 and initially is
+> accessible.  Everything appears to work normally, and then the NFS
+> server appears to stop responding.
 > 
+> Running tcpdump on the NFS server, and then dumping the captured
+> packets
+> with tshark (because tcpdump appears not to understand IPv6 SYNs on
+> the
+> NFS port) shows:
+> 
+>   3   0.030036 armada388 -> n2100 TCP 843?nfs [SYN] Seq=936803106
+> Win=28800 Len=0 MSS=1440 SACK_PERM=1 TSval=892366 TSecr=0 WS=128
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>   4   0.030409 n2100 -> armada388 TCP nfs?843 [SYN, ACK] Seq=409465870
+> Ack=936803107 Win=28560 Len=0 MSS=1440 SACK_PERM=1
+>  TSval=818169117 TSecr=892366 WS=64
+
+>   5   0.030493 armada388 -> n2100 TCP [TCP Port numbers reused]
+> 843?nfs [SYN] Seq=936803633 Win=28800 Len=0 MSS=1440 SACK_PERM=1
+> TSval=892366 TSecr=0 WS=128
+
+Yes, this packet looks very wrong. Like two simultaneous connect with
+same source port. It is not a retransmit (Seq numbers differ)
+
+>   6   0.030699 n2100 -> armada388 TCP nfs?843 [RST, ACK] Seq=0
+> Ack=936803634 Win=0 Len=0
+>   7   0.030766 armada388 -> n2100 TCP 843?nfs [RST] Seq=936803107
+> Win=0 Len=0
+
+I suspect port reuse in NFS being broken.
+
+Have you tried to apply
+
+commit 099392048cd443349c50310f7fdc96070e40f4e7
+Author: Trond Myklebust <trond.myklebust@primarydata.com>
+Date:   Sat Aug 29 19:11:21 2015 -0700
+
+    SUNRPC: Prevent SYN+SYNACK+RST storms
+    
+    Add a shutdown() call before we release the socket in order to ensure the
+    reset is sent before we try to reconnect.
+    
+    Signed-off-by: Trond Myklebust <trond.myklebust@primarydata.com>
+
+diff --git a/net/sunrpc/xprtsock.c b/net/sunrpc/xprtsock.c
+index 214ca9dfb14e..7be90bc1a7c2 100644
+--- a/net/sunrpc/xprtsock.c
++++ b/net/sunrpc/xprtsock.c
+@@ -822,6 +822,8 @@ static void xs_reset_transport(struct sock_xprt *transport)
+        if (atomic_read(&transport->xprt.swapper))
+                sk_clear_memalloc(sk);
+ 
++       kernel_sock_shutdown(sock, SHUT_RDWR);
++
+        write_lock_bh(&sk->sk_callback_lock);
+        transport->inet = NULL;
+        transport->sock = NULL;
