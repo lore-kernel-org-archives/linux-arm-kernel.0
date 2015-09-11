@@ -1,39 +1,39 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 11 Sep 2015 21:08:24 +0100
-Subject: [PATCH 0/6] hwrng: Add support for STMicroelectronics' RNG IP
-Message-ID: <1442002110-28733-1-git-send-email-lee.jones@linaro.org>
+Date: Fri, 11 Sep 2015 21:08:27 +0100
+Subject: [PATCH 3/6] hwrng: st: Provide DT bindings for ST's Random Number
+ Generator
+In-Reply-To: <1442002110-28733-1-git-send-email-lee.jones@linaro.org>
+References: <1442002110-28733-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1442002110-28733-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The main aim of this set is to allow users to access ST's hardware
-random number generator.  It's a simple device, which only requires
-a simple driver.
-
-We're also taking the liberty to update some out of date HWRNG
-documentation and making the sysfs interface a little easier to
-use by ignoring any '\n' which may have been inadvertently passed.
-
-Lee Jones (6):
-  Documentation: hw_random: Fix device node name /dev/hw_random =>
-    /dev/hwrng
-  hwrng: core: Simplify RNG switching from sysfs
-  hwrng: st: Provide DT bindings for ST's Random Number Generator
-  hwrng: st: Add support for ST's HW Random Number Generator
-  ARM: STi: STiH407: Enable the 2 HW Random Number Generators for
-    STiH4{07,10}
-  MAINTAINERS: Add ST's Random Number Generator to the ST entry
-
- Documentation/devicetree/bindings/rng/st,rng.txt |  15 +++
- Documentation/hw_random.txt                      |   8 +-
- MAINTAINERS                                      |   1 +
- arch/arm/boot/dts/stih407-family.dtsi            |  14 +++
- drivers/char/hw_random/Kconfig                   |  10 ++
- drivers/char/hw_random/Makefile                  |   1 +
- drivers/char/hw_random/core.c                    |   7 +-
- drivers/char/hw_random/st-rng.c                  | 142 +++++++++++++++++++++++
- 8 files changed, 193 insertions(+), 5 deletions(-)
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ Documentation/devicetree/bindings/rng/st,rng.txt | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/rng/st,rng.txt
- create mode 100644 drivers/char/hw_random/st-rng.c
 
+diff --git a/Documentation/devicetree/bindings/rng/st,rng.txt b/Documentation/devicetree/bindings/rng/st,rng.txt
+new file mode 100644
+index 0000000..dbc64e6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rng/st,rng.txt
+@@ -0,0 +1,15 @@
++STMicroelectronics HW Random Number Generator
++----------------------------------------------
++
++Required parameters:
++compatible	: Should be "st,rng"
++reg		: Base address and size of IP's register map.
++clocks		: Phandle to device's clock (See: ../clocks/clock-bindings.txt)
++
++Example:
++
++rng at 0xfee80000 {
++	compatible      = "st,rng";
++	reg		= <0xfee80000 0x1000>;
++	clocks          = <&clk_sysin>;
++}
 -- 
 1.9.1
