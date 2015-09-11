@@ -1,82 +1,77 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 11 Sep 2015 15:14:28 +0100
-Subject: [PATCH v2 6/9] dmaengine: st_fdma: Add fdma suspend and resume
- callbacks.
-In-Reply-To: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
-References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1441980871-24475-7-git-send-email-peter.griffin@linaro.org>
+Date: Fri, 11 Sep 2015 15:14:22 +0100
+Subject: [PATCH v2 0/9] Add support for FDMA DMA controller found on STi
+ chipsets
+Message-ID: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the functions to gate the xp70 clock on
-suspend and resume.
+Hi Vinod,
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- drivers/dma/st_fdma.c | 46 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+This patchset adds support for the Flexible Direct Memory Access (FDMA) core
+found on STi chipsets from STMicroelectronics. The FDMA is a slim (xp70) core CPU
+with a dedicated firmware. It is a general purpose DMA controller supporting
+16 independent channels and data can be moved from memory to memory or between
+memory and paced latency critical real time targets.
 
-diff --git a/drivers/dma/st_fdma.c b/drivers/dma/st_fdma.c
-index 4288e79..de3afefb 100644
---- a/drivers/dma/st_fdma.c
-+++ b/drivers/dma/st_fdma.c
-@@ -1127,10 +1127,56 @@ static int st_fdma_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int st_fdma_pm_suspend(struct device *dev)
-+{
-+	struct st_fdma_dev *fdev = dev_get_drvdata(dev);
-+	int ret;
-+
-+	if (atomic_read(&fdev->fw_loaded)) {
-+		ret = st_fdma_disable(fdev);
-+		if (ret & FDMA_EN_RUN) {
-+			dev_warn(fdev->dev, "Failed to disable channels");
-+			return -EBUSY;
-+		}
-+	}
-+
-+	st_fdma_clk_disable(fdev);
-+
-+	return 0;
-+}
-+
-+static int st_fdma_pm_resume(struct device *dev)
-+{
-+	struct st_fdma_dev *fdev = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = st_fdma_clk_enable(fdev);
-+	if (ret) {
-+		dev_err(fdev->dev, "Failed to enable clocks\n");
-+		goto out;
-+	}
-+
-+	ret = st_fdma_get_fw(fdev);
-+out:
-+	return ret;
-+}
-+
-+static const struct dev_pm_ops st_fdma_pm = {
-+	.suspend_late = st_fdma_pm_suspend,
-+	.resume_early = st_fdma_pm_resume,
-+};
-+
-+#define ST_FDMA_PM	(&st_fdma_pm)
-+#else
-+#define ST_FDMA_PM	NULL
-+#endif
-+
- static struct platform_driver st_fdma_platform_driver = {
- 	.driver = {
- 		.name = "st-fdma",
- 		.of_match_table = st_fdma_match,
-+		.pm = ST_FDMA_PM,
- 	},
- 	.probe = st_fdma_probe,
- 	.remove = st_fdma_remove,
+After some discussion with the DT maintainers I've decided not to include the
+firmware name in DT, and generate the name based on the compatible string.
+This is in keeping with how most other kernel drivers request firmware, and avoids
+a new DT firmware name binding.
+
+I've also dropped the xbar support for the moment, as I believe it should be
+re-worked based on some of the xbar API's that TI recently added. As requested
+I've also split it into smaller patches to help with faster review.
+
+regards,
+
+Peter.
+
+Changes since v1:
+ - split into smaller patches for easier / faster review (Vinod)
+ - new fill_hw_mode() with common code (Vinod)
+ - new config_reqctrl() called from *_prep() instead of device_config cb (Vinod)
+ - fdma-xbar support removed (Peter)
+ - rework firmware name mechanism so fwname isn't in DT (Peter / Lee)
+ - st_fdma_seg_to_mem can be static (Paul)
+ - EXPORT_SYMBOL st_fdma_filter_fn not required (Paul)
+ - s/channel/channels (vinod)
+ - better describe "Must be <3>" (vinod)
+ - sizeof(*ehdr) (vinod)
+ - print values on error debug (vinod)
+ - empty line (Vinod)
+ - Update to -EIO (Vinod)
+ - Make st_fdma tristate (Paul)
+ - Remove __exit tag from .remove (Maxime)
+ - Update MAINTAINERS rule to fdma* (Lee)
+ - Unit address should match reg property (Lee)
+
+Peter Griffin (9):
+  dmaengine: st_fdma: Add STMicroelectronics FDMA DT binding
+    documentation
+  dmaengine: st_fdma: Add st fdma platform specific header
+  dmaengine: st_fdma:  Add STMicroelectronics FDMA driver header file
+  dmaengine: st_fdma: Add STMicroelectronics FDMA engine driver support
+  dmaengine: st_fdma: Add xp70 firmware loading mechanism.
+  dmaengine: st_fdma: Add fdma suspend and resume callbacks.
+  ARM: STi: DT: STiH407: Add FDMA driver dt nodes.
+  MAINTAINERS: Add FDMA driver files to STi section.
+  ARM: multi_v7_defconfig: Enable STi FDMA driver
+
+ Documentation/devicetree/bindings/dma/st_fdma.txt |   78 ++
+ MAINTAINERS                                       |    1 +
+ arch/arm/boot/dts/stih407-family.dtsi             |   51 +
+ arch/arm/configs/multi_v7_defconfig               |    1 +
+ drivers/dma/Kconfig                               |   14 +
+ drivers/dma/Makefile                              |    1 +
+ drivers/dma/st_fdma.c                             | 1204 +++++++++++++++++++++
+ drivers/dma/st_fdma.h                             |  237 ++++
+ include/linux/platform_data/dma-st_fdma.h         |   72 ++
+ 9 files changed, 1659 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
+ create mode 100644 drivers/dma/st_fdma.c
+ create mode 100644 drivers/dma/st_fdma.h
+ create mode 100644 include/linux/platform_data/dma-st_fdma.h
+
 -- 
 1.9.1
