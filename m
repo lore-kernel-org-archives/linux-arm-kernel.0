@@ -1,111 +1,36 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 11 Sep 2015 09:40:43 +0200
-Subject: [PATCH] ARM: exynos_defconfig: Disable simplefb support
-In-Reply-To: <55F27FB1.50100@samsung.com>
-References: <1441892552-13819-1-git-send-email-javier@osg.samsung.com>
- <55F26042.2080600@samsung.com> <55F27D9F.1000702@osg.samsung.com>
- <55F27FB1.50100@samsung.com>
-Message-ID: <55F2857B.4020800@osg.samsung.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 11 Sep 2015 15:49:47 +0800
+Subject: [PATCH] arm64: dma-mapping: check whether cma area is initialized or
+ not
+Message-ID: <1441957787-5526-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+If CMA is turned on and CMA size is set to zero, kernel should
+behave as if CMA was not enabled at compile time.
+Every dma allocation should check existence of cma area
+before requesting memory.
 
-On 09/11/2015 09:16 AM, Krzysztof Kozlowski wrote:
-> On 11.09.2015 16:07, Javier Martinez Canillas wrote:
->> Hello Krzysztof,
->>
->> On 09/11/2015 07:01 AM, Krzysztof Kozlowski wrote:
->>> On 10.09.2015 22:42, Javier Martinez Canillas wrote:
->>>> The simplefb driver allows the kernel to render on a pre-allocated
->>>> buffer that's been initialized by firmware before the kernel boots.
->>>>
->>>> This option was enabled to have display working on the Exynos5250
->>>> Snow Chromebook by commit da9d0fbf5e9a ("ARM: exynos: defconfig
->>>> update") since proper DRM/KMS support did not exist at that time.
->>>>
->>>> But now that the Exynos DRM driver has support for this hardware,
->>>> there is no need to have simplefb enabled. In fact, if a user has
->>>> a u-boot that injects the simplefb dev node to the FDT before pass
->>>> it to the kernel, display won't be properly initialized and only a
->>>> blank screen will be shown since there isn't a proper handoff from
->>>> the simplefb driver to the Exynos DRM driver.
->>>>
->>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>>>
->>>> ---
->>>>
->>>>  arch/arm/configs/exynos_defconfig | 1 -
->>>>  1 file changed, 1 deletion(-)
->>>
->>> Seems logical. None of the boards use simple-framebuffer compatible
->>> anyway. I understand that on Snow simplefb was needed along with change
->>> in Uboot like this one:
->>> https://chromium.googlesource.com/chromiumos/third_party/u-boot/+/refs/changes/58/49358/2
->>>
->>
->> Exactly but you won't see the dev node with the "simple-framebuffer"
->> compatible string in the DTS since is the bootloader that adds this
->> device node to the FDT before passing it to the kernel.
->>
->> The bootloader shouldn't mangle the FDT (with the exception of the
->> memory and choosen/bootargs nodes) but simplefb is just a hack to
->> re-use the display HW initialization made by the bootloader.
->>
->>> and now none of Exynos boards use simplefb anymore?
->>>
->>
->> Yes, there are no other Exynos boards using simplefb besides Snow
->> that I'm aware of but since Exynos DRM is working well on this board
->> from v4.0, there is no need for it anymore.
-> 
-> OK,
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
+Arm has done this by commit e464ef16c4f0 ("arm: dma-mapping: add
+checking cma area initialized"), also do this for arm64.
 
-Thanks!
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ arch/arm64/mm/dma-mapping.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 0bcc4bc..99224dc 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -100,7 +100,7 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
+ 	if (IS_ENABLED(CONFIG_ZONE_DMA) &&
+ 	    dev->coherent_dma_mask <= DMA_BIT_MASK(32))
+ 		flags |= GFP_DMA;
+-	if (IS_ENABLED(CONFIG_DMA_CMA) && (flags & __GFP_WAIT)) {
++	if (dev_get_cma_area(dev) && (flags & __GFP_WAIT)) {
+ 		struct page *page;
+ 		void *addr;
  
->>
->> In fact, as explained in the commit message, it could do more harm
->> than good since users that are still booting with a u-boot that adds
->> the simplefb device node, only get a blank screen since the simplefb
->> driver is probed, creates a console and later the Exynos DRM probes
->> and re-initializes the HW creating its own console, causing this issue.
->>
->> I got several reports of users that says that mainline stop booting for
->> them but is just that they didn't get display working. Disabling simplefb
->> makes display to work again so maybe this is even -rc material and should
->> go to stable # v4.0+
-> 
-> You know, it is only a defconfig. The issue is there regardless of
-> change in defconfig. I am not convinced that defconfig problems are
-> worth backporting. multi_v7 has it enabled anyway.
->
-
-Yes, that's why I said "maybe" :)
- 
-> Maybe the EXYNOS_DRM should have some anti-dependency on SIMPLE_FB? But
-
-hrmm I don't know, I think this issue happens with any DRM driver. Hopefully
-there should be soon a nice hand off from simplefb to DRM drivers like early
-console does to the real console drivers for UARTs.
-
-> on the other hand the issue is actually caused by hacks in bootloader...
->
-
-Yeah and in fact this does not happen with the stock bootloader that comes
-shipped on these devices, is with a special build that has this hack enabled.
- 
-> 
-> Best regards,
-> Krzysztof
-> 
->
-
-Thanks a lot for your feedback.
-
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.5.1
