@@ -1,345 +1,112 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 11 Sep 2015 12:04:15 +0100
-Subject: [PATCH v2 08/22] KVM: ARM64: PMU: Add perf event map and introduce
- perf event creating function
-In-Reply-To: <1441961715-11688-9-git-send-email-zhaoshenglong@huawei.com>
-References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
- <1441961715-11688-9-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <55F2B52F.8000300@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 11 Sep 2015 12:04:59 +0100
+Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
+ v4.3-rc1
+In-Reply-To: <55F2AF45.5040706@nvidia.com>
+References: <1439563720-13189-1-git-send-email-thierry.reding@gmail.com>
+ <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
+ <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
+ <20150819091358.GA26627@ulmo> <1439977724.4135.90.camel@collabora.co.uk>
+ <20150819103305.GF26627@ulmo>
+ <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
+ <CAMAWPa_rus4z+Sg3Uff7ndqrpB8dF1c1rQBVQ9r7vXh6PFcVkQ@mail.gmail.com>
+ <55F2AF45.5040706@nvidia.com>
+Message-ID: <55F2B55B.5020004@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/15 09:55, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+
+On 11/09/15 11:39, Jon Hunter wrote:
+> Hi Kevin,
 > 
-> When we use tools like perf on host, perf passes the event type and the
-> id of this event type category to kernel, then kernel will map them to
-> hardware event number and write this number to PMU PMEVTYPER<n>_EL0
-> register. While we're trapping and emulating guest accesses to PMU
-> registers, we get the hardware event number and map it to the event type
-> and the id reversely. Then call perf_event kernel API to create an event
-> for it.
+> On 10/09/15 22:29, Kevin Hilman wrote:
 > 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/include/asm/pmu.h |   2 +
->  arch/arm64/kvm/Makefile      |   1 +
->  include/kvm/arm_pmu.h        |  15 +++
->  virt/kvm/arm/pmu.c           | 240 +++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 258 insertions(+)
->  create mode 100644 virt/kvm/arm/pmu.c
+> [snip]
 > 
-> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
-> index 95681e6..42e7093 100644
-> --- a/arch/arm64/include/asm/pmu.h
-> +++ b/arch/arm64/include/asm/pmu.h
-> @@ -33,6 +33,8 @@
->  #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
->  #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
->  #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
-> +/* Determines which PMCCNTR_EL0 bit generates an overflow */
-> +#define ARMV8_PMCR_LC		(1 << 6)
->  #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
->  #define	ARMV8_PMCR_N_MASK	0x1f
->  #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
-> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> index f90f4aa..78db4ee 100644
-> --- a/arch/arm64/kvm/Makefile
-> +++ b/arch/arm64/kvm/Makefile
-> @@ -27,3 +27,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
-> +kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> index 64af88a..387ec6f 100644
-> --- a/include/kvm/arm_pmu.h
-> +++ b/include/kvm/arm_pmu.h
-> @@ -36,4 +36,19 @@ struct kvm_pmu {
->  #endif
->  };
->  
-> +#ifdef CONFIG_KVM_ARM_PMU
-> +unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu,
-> +					unsigned long select_idx);
-> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
-> +				    unsigned long select_idx);
-> +#else
-> +unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu,
-> +					unsigned long select_idx)
-> +{
-> +	return 0;
-> +}
-> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
-> +				    unsigned long select_idx) {}
-> +#endif
-> +
->  #endif
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> new file mode 100644
-> index 0000000..0c7fe5c
-> --- /dev/null
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -0,0 +1,240 @@
-> +/*
-> + * Copyright (C) 2015 Linaro Ltd.
-> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/cpu.h>
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +#include <linux/perf_event.h>
-> +#include <asm/kvm_emulate.h>
-> +#include <kvm/arm_pmu.h>
-> +
-> +/* PMU HW events mapping. */
-> +static struct kvm_pmu_hw_event_map {
-> +	unsigned eventsel;
-> +	unsigned event_type;
-> +} kvm_pmu_hw_events[] = {
-> +	[0] = { 0x11, PERF_COUNT_HW_CPU_CYCLES },
-> +	[1] = { 0x08, PERF_COUNT_HW_INSTRUCTIONS },
-> +	[2] = { 0x04, PERF_COUNT_HW_CACHE_REFERENCES },
-> +	[3] = { 0x03, PERF_COUNT_HW_CACHE_MISSES },
-> +	[4] = { 0x10, PERF_COUNT_HW_BRANCH_MISSES },
-
-How about using enum armv8_pmuv3_perf_types here?
-
-> +};
-> +
-> +/* PMU HW cache events mapping. */
-> +static struct kvm_pmu_hw_cache_event_map {
-> +	unsigned eventsel;
-> +	unsigned cache_type;
-> +	unsigned cache_op;
-> +	unsigned cache_result;
-> +} kvm_pmu_hw_cache_events[] = {
-> +	[0] = { 0x12, PERF_COUNT_HW_CACHE_BPU, PERF_COUNT_HW_CACHE_OP_READ,
-> +		      PERF_COUNT_HW_CACHE_RESULT_ACCESS },
-> +	[1] = { 0x12, PERF_COUNT_HW_CACHE_BPU, PERF_COUNT_HW_CACHE_OP_WRITE,
-> +		      PERF_COUNT_HW_CACHE_RESULT_ACCESS },
-> +};
-> +
-> +static void kvm_pmu_set_evttyper(struct kvm_vcpu *vcpu, unsigned long idx,
-> +				 unsigned long val)
-> +{
-> +	if (!vcpu_mode_is_32bit(vcpu))
-> +		vcpu_sys_reg(vcpu, PMEVTYPER0_EL0 + idx) = val;
-> +	else
-> +		vcpu_cp15(vcpu, c14_PMEVTYPER0 + idx) = val;
-> +}
-> +
-> +static unsigned long kvm_pmu_get_evttyper(struct kvm_vcpu *vcpu,
-> +					  unsigned long idx)
-> +{
-> +	if (!vcpu_mode_is_32bit(vcpu))
-> +		return vcpu_sys_reg(vcpu, PMEVTYPER0_EL0 + idx)
-> +		       & ARMV8_EVTYPE_EVENT;
-> +	else
-> +		return vcpu_cp15(vcpu, c14_PMEVTYPER0 + idx)
-> +		       & ARMV8_EVTYPE_EVENT;
-> +}
-> +
-> +/**
-> + * kvm_pmu_stop_counter - stop PMU counter for the selected counter
-> + * @vcpu: The vcpu pointer
-> + * @select_idx: The counter index
-> + *
-> + * If this counter has been configured to monitor some event, disable and
-> + * release it.
-> + */
-> +static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu,
-> +				 unsigned long select_idx)
-> +{
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-> +
-> +	if (pmc->perf_event) {
-> +		perf_event_disable(pmc->perf_event);
-> +		perf_event_release_kernel(pmc->perf_event);
-> +		pmc->perf_event = NULL;
-> +	}
-> +	kvm_pmu_set_evttyper(vcpu, select_idx, ARMV8_EVTYPE_EVENT);
-> +}
-> +
-> +/**
-> + * kvm_pmu_get_counter_value - get PMU counter value
-> + * @vcpu: The vcpu pointer
-> + * @select_idx: The counter index
-> + */
-> +unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu,
-> +					unsigned long select_idx)
-> +{
-> +	u64 enabled, running;
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-> +	unsigned long counter;
-> +
-> +	if (!vcpu_mode_is_32bit(vcpu))
-> +		counter = vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + select_idx);
-> +	else
-> +		counter = vcpu_cp15(vcpu, c14_PMEVCNTR0 + select_idx);
-> +
-> +	if (pmc->perf_event) {
-> +		counter += perf_event_read_value(pmc->perf_event,
-> +						&enabled, &running);
-> +	}
-> +	return counter;
-> +}
-> +
-> +/**
-> + * kvm_pmu_find_hw_event - find hardware event
-> + * @pmu: The pmu pointer
-> + * @event_select: The number of selected event type
-> + *
-> + * Based on the number of selected event type, find out whether it belongs to
-> + * PERF_TYPE_HARDWARE. If so, return the corresponding event id.
-> + */
-> +static unsigned kvm_pmu_find_hw_event(struct kvm_pmu *pmu,
-> +				      unsigned long event_select)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(kvm_pmu_hw_events); i++)
-> +		if (kvm_pmu_hw_events[i].eventsel == event_select)
-> +			return kvm_pmu_hw_events[i].event_type;
-> +
-> +	return PERF_COUNT_HW_MAX;
-> +}
-> +
-> +/**
-> + * kvm_pmu_find_hw_cache_event - find hardware cache event
-> + * @pmu: The pmu pointer
-> + * @event_select: The number of selected event type
-> + *
-> + * Based on the number of selected event type, find out whether it belongs to
-> + * PERF_TYPE_HW_CACHE. If so, return the corresponding event id.
-> + */
-> +static unsigned kvm_pmu_find_hw_cache_event(struct kvm_pmu *pmu,
-> +					    unsigned long event_select)
-> +{
-> +	int i;
-> +	unsigned config;
-
-Please use an explicitely sized type (u32, u64).
-
-> +
-> +	for (i = 0; i < ARRAY_SIZE(kvm_pmu_hw_cache_events); i++)
-> +		if (kvm_pmu_hw_cache_events[i].eventsel == event_select) {
-> +			config = (kvm_pmu_hw_cache_events[i].cache_type & 0xff)
-> +		     | ((kvm_pmu_hw_cache_events[i].cache_op & 0xff) << 8)
-> +		     | ((kvm_pmu_hw_cache_events[i].cache_result & 0xff) << 16);
-
-I don't understand what this does. You only update a local variable?
-
-> +		}
-> +
-> +	return PERF_COUNT_HW_CACHE_MAX;
-> +}
-> +
-> +/**
-> + * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
-> + * @vcpu: The vcpu pointer
-> + * @data: The data guest writes to PMXEVTYPER_EL0
-> + * @select_idx: The number of selected counter
-> + *
-> + * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
-> + * event with given hardware event number. Here we call perf_event API to
-> + * emulate this action and create a kernel perf event for it.
-> + */
-> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
-> +				    unsigned long select_idx)
-> +{
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-> +	struct perf_event *event;
-> +	struct perf_event_attr attr;
-> +	unsigned config, type = PERF_TYPE_RAW;
-> +	unsigned int new_eventsel, old_eventsel;
-> +	u64 counter;
-> +	int overflow_bit, pmcr_lc;
-> +
-> +	old_eventsel = kvm_pmu_get_evttyper(vcpu, select_idx);
-> +	new_eventsel = data & ARMV8_EVTYPE_EVENT;
-> +	if (new_eventsel == old_eventsel) {
-> +		if (pmc->perf_event)
-> +			local64_set(&pmc->perf_event->count, 0);
-> +		return;
-> +	}
-> +
-> +	kvm_pmu_stop_counter(vcpu, select_idx);
-> +	kvm_pmu_set_evttyper(vcpu, select_idx, data);
-> +
-> +	config = kvm_pmu_find_hw_event(pmu, new_eventsel);
-> +	if (config != PERF_COUNT_HW_MAX) {
-> +		type = PERF_TYPE_HARDWARE;
-> +	} else {
-> +		config = kvm_pmu_find_hw_cache_event(pmu, new_eventsel);
-> +		if (config != PERF_COUNT_HW_CACHE_MAX)
-> +			type = PERF_TYPE_HW_CACHE;
-> +	}
-> +
-> +	if (type == PERF_TYPE_RAW)
-> +		config = new_eventsel;
-> +
-> +	memset(&attr, 0, sizeof(struct perf_event_attr));
-> +	attr.type = type;
-> +	attr.size = sizeof(attr);
-> +	attr.pinned = 1;
-> +	attr.disabled = 1;
-> +	attr.exclude_user = data & ARMV8_EXCLUDE_EL0 ? 1 : 0;
-> +	attr.exclude_kernel = data & ARMV8_EXCLUDE_EL1 ? 1 : 0;
-> +	attr.exclude_host = 1; /* Don't count host events */
-> +	attr.config = config;
-> +
-> +	overflow_bit = 31; /* Generic counters are 32-bit registers*/
-> +	if (new_eventsel == 0x11) {
-> +		/* Cycle counter overflow on increment that changes PMCCNTR[63]
-> +		 * or PMCCNTR[31] from 1 to 0 according to the value of
-> +		 * ARMV8_PMCR_LC
-> +		 */
-> +		if (!vcpu_mode_is_32bit(vcpu))
-> +			pmcr_lc = vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_LC;
-> +		else
-> +			pmcr_lc = vcpu_cp15(vcpu, c9_PMCR) & ARMV8_PMCR_LC;
-> +
-> +		overflow_bit = pmcr_lc ? 63 : 31;
-> +	}
-> +	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
-> +	/* The initial sample period (overflow count) of an event. */
-> +	attr.sample_period = (-counter) & (((u64)1 << overflow_bit) - 1);
-> +
-> +	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
-> +	if (IS_ERR(event)) {
-> +		printk_once("kvm: pmu event creation failed %ld\n",
-> +			    PTR_ERR(event));
-> +		return;
-> +	}
-> +	pmc->perf_event = event;
-> +}
+>> Since there is no movement on this, and jetson hasn't been boot for
+>> multi_v7_defconfig for a while[1], I think it's time to undo the
+>> option causing this problem[2] so that v4.3 will actually boot on the
+>> jetson.
+>>
+>> Unless I hear a good reason otherwise, I'll be posting a patch to
+>> disable the HDA related options in multi_v7_defconfig.
 > 
+> So curiosity got the better of this cat, as to why we are not seeing
+> this ;-)
+> 
+> The main difference I see between the tegra_defconfig and 
+> multi_v7_defconfig is all the sound drivers are modules (including 
+> this one).
+> 
+> So trying a quick modprobe of the hda-tegra driver I do see it hang ...
+> 
+> / # modprobe snd-hda-tegra
+> [  625.213864] snd_hda_tegra: Unknown symbol azx_probe_codecs (err 0)
+> [  625.220215] snd_hda_tegra: Unknown symbol azx_init_streams (err 0)
+> [  625.226480] snd_hda_tegra: Unknown symbol azx_stop_all_streams (err 0)
+> [  625.233168] snd_hda_tegra: Unknown symbol azx_bus_init (err 0)
+> [  625.239062] snd_hda_tegra: Unknown symbol azx_free_streams (err 0)
+> [  625.245314] snd_hda_tegra: Unknown symbol azx_init_chip (err 0)
+> [  625.251321] snd_hda_tegra: Unknown symbol snd_hda_set_power_save (err 0)
+> [  625.258081] snd_hda_tegra: Unknown symbol azx_stop_chip (err 0)
+> [  625.264078] snd_hda_tegra: Unknown symbol azx_codec_configure (err 0)
+> [  625.270607] snd_hda_tegra: Unknown symbol azx_interrupt (err 0)
+> [  840.117528] INFO: task modprobe:137 blocked for more than 120 seconds.
+> [  840.124192]       Not tainted 4.2.0-next-20150909-40826-gb799053 #1
+> [  840.130584] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+> [  840.138540] modprobe        D c09ac3a4     0   137     82 0x00000000
+> [  840.145123] [<c09ac3a4>] (__schedule) from [<c09ac838>] (schedule+0x34/0x98)
+> [  840.152310] [<c09ac838>] (schedule) from [<c09acaac>] (schedule_preempt_disabled+0xc/0x10)
+> [  840.160734] [<c09acaac>] (schedule_preempt_disabled) from [<c09adeec>] (__mutex_lock_slowpath+0x9c/0x150)
+> [  840.170458] [<c09adeec>] (__mutex_lock_slowpath) from [<c09adfec>] (mutex_lock+0x4c/0x50)
+> [  840.178807] [<c09adfec>] (mutex_lock) from [<c062999c>] (__driver_attach+0x44/0x90)
+> [  840.186627] [<c062999c>] (__driver_attach) from [<c0627fcc>] (bus_for_each_dev+0x54/0x88)
+> [  840.194966] [<c0627fcc>] (bus_for_each_dev) from [<c0628f88>] (bus_add_driver+0xe4/0x1f0)
+> [  840.203305] [<c0628f88>] (bus_add_driver) from [<c062a1d0>] (driver_register+0x78/0xf4)
+> [  840.211475] [<c062a1d0>] (driver_register) from [<c020ac04>] (do_one_initcall+0x80/0x1d0)
+> [  840.219818] [<c020ac04>] (do_one_initcall) from [<c02c8abc>] (do_init_module+0x58/0x354)
+> [  840.228081] [<c02c8abc>] (do_init_module) from [<c02afae8>] (load_module+0x17e0/0x1d8c)
+> [  840.236258] [<c02afae8>] (load_module) from [<c02b016c>] (SyS_init_module+0xd8/0x138)
+> [  840.244260] [<c02b016c>] (SyS_init_module) from [<c0210b00>] (ret_fast_syscall+0x0/0x3c)
+> 
+> Adding some debug it appears to hang on snd-hda-codec-hdmi  (the following show
+> the order in which modules are being loaded) ...
+> 
+> / # modprobe snd-hda-tegra
+> [   22.450276] snd_hda_tegra: err = -2
+> [   22.484535] soundcore: err = 0
+> [   22.488964] snd: err = 0
+> [   22.493242] snd_timer: err = 0
+> [   22.498380] snd_pcm: err = 0
+> [   22.502479] snd_hda_core: err = 0
+> [   22.508337] snd_hda_codec: err = 0
+> [   22.513386] snd_hda_tegra: err = 0
+> [   22.740216] snd_hda_codec_hdmi: err = 0
 
-Having had a chat with Will, it appears that a much better solution
-would be to ask perf to use raw events instead of trying to map things
-to perf events (which the guest has already done).
+Ftrace shows a similar thing ...
 
-See drivers/oprofile/oprofile_perf.c::op_perf_setup().
+/ # cat /debug/tracing/trace
+# tracer: nop
+#
+# entries-in-buffer/entries-written: 8/8   #P:4
+#
+#                              _-----=> irqs-off
+#                             / _----=> need-resched
+#                            | / _---=> hardirq/softirq
+#                            || / _--=> preempt-depth
+#                            ||| /     delay
+#           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
+#              | |       |   ||||       |         |
+        modprobe-110   [000] ....    46.095279: module_load: soundcore 
+        modprobe-110   [000] .n..    46.096443: module_load: snd 
+        modprobe-110   [000] .n..    46.097719: module_load: snd_timer 
+        modprobe-110   [000] ....    46.099242: module_load: snd_pcm 
+        modprobe-110   [000] ....    46.100231: module_load: snd_hda_core 
+        modprobe-110   [000] ....    46.102418: module_load: snd_hda_codec 
+        modprobe-110   [000] ....    46.102915: module_load: snd_hda_tegra 
+        modprobe-122   [000] ....    46.341224: module_load: snd_hda_codec_hdmi 
 
-Thoughts?
+However, would imply that snd-hda-codec-hdmi is loaded ok and the hang occurs afterwards
+as the trace message is printed once the module has been loaded.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Jon
