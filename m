@@ -1,102 +1,137 @@
-From: Dongsheng.Wang@freescale.com (Wang Dongsheng)
-Date: Fri, 11 Sep 2015 03:53:04 +0000
-Subject: [PATCH] arm/ls1021a: Add Sleep feature for ls1021
-References: <1441877796-32232-1-git-send-email-dongsheng.wang@freescale.com>
- <20150910095920.GB29293@leverpostej>
-Message-ID: <SN1PR0301MB161620AA4926EEF6541D901E9D500@SN1PR0301MB1616.namprd03.prod.outlook.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 11 Sep 2015 09:23:33 +0530
+Subject: [PATCH v5 2/4] Documentation: arm64/arm: dt bindings for numa.
+In-Reply-To: <CAFpQJXV66dAfDMttMNTApyy1554-rvw=Q0n60BOtsp=61gJ+zQ@mail.gmail.com>
+References: <1439570374-4079-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1439570374-4079-3-git-send-email-gkulkarni@caviumnetworks.com>
+ <20150828123228.GE31748@leverpostej>
+ <CAL_JsqLOpUTVeKbkJ6uPi0EYistd=BowAHdtSmaUYYDhU6c9Sg@mail.gmail.com>
+ <55E17F58.5020101@huawei.com>
+ <CAFpQJXWO0xT0kxWf09L_XcAOXm1Lov8i2U2BQzk-x0TStj7vBg@mail.gmail.com>
+ <55EEE229.7070301@linaro.org>
+ <CAFpQJXV66dAfDMttMNTApyy1554-rvw=Q0n60BOtsp=61gJ+zQ@mail.gmail.com>
+Message-ID: <CAFpQJXX0KYiKKgxM3B467PFLS0jCakTp8A2u=QEs8_Fj4EZYBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Thunder,
 
-> -----Original Message-----
-> From: Wang Dongsheng-B40534
-> Sent: Friday, September 11, 2015 11:42 AM
-> To: 'Mark Rutland'
-> Cc: shawnguo at kernel.org; Catalin Marinas; Wang Huan-B18965; Zhao Chenhui-B35336;
-> Jin Zhengxiong-R64188; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org
-> Subject: RE: [PATCH] arm/ls1021a: Add Sleep feature for ls1021
-> 
-> Hi Mark,
-> 
-> Thanks for your review.
-> 
-> > -----Original Message-----
-> > From: Mark Rutland [mailto:mark.rutland at arm.com]
-> > Sent: Thursday, September 10, 2015 5:59 PM
-> > To: Wang Dongsheng-B40534
-> > Cc: shawnguo at kernel.org; Catalin Marinas; Wang Huan-B18965; Zhao
-> > Chenhui-B35336; Jin Zhengxiong-R64188;
-> > linux-arm-kernel at lists.infradead.org; linux- kernel at vger.kernel.org
-> > Subject: Re: [PATCH] arm/ls1021a: Add Sleep feature for ls1021
-> >
-> > On Thu, Sep 10, 2015 at 10:36:36AM +0100, Dongsheng Wang wrote:
-> > > From: Wang Dongsheng <dongsheng.wang@freescale.com>
-> > >
-> > > Based on PSCI framework, add system STANDBY implement for ls1021 platform.
-> > >
-> > > Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
-> > > Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
-> > >
-> > > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> > > index fb689d8..d7a2d1d 100644
-> > > --- a/arch/arm/mach-imx/Makefile
-> > > +++ b/arch/arm/mach-imx/Makefile
-> > > @@ -90,6 +90,7 @@ ifeq ($(CONFIG_SUSPEND),y)  AFLAGS_suspend-imx6.o
-> > > :=-Wa,-march=armv7-a
-> > >  obj-$(CONFIG_SOC_IMX6) += suspend-imx6.o
-> > >  obj-$(CONFIG_SOC_IMX53) += suspend-imx53.o
-> > > +obj-$(CONFIG_SOC_LS1021A) += pm-ls1.o
-> > >  endif
-> > >  obj-$(CONFIG_SOC_IMX6) += pm-imx6.o
-> > >
-> > > diff --git a/arch/arm/mach-imx/pm-ls1.c b/arch/arm/mach-imx/pm-ls1.c
-> > > new file mode 100644 index 0000000..f80b24d
-> > > --- /dev/null
-> > > +++ b/arch/arm/mach-imx/pm-ls1.c
-> > > @@ -0,0 +1,222 @@
-> > > +/*
-> > > + * Support Power Management Control for LS1
-> > > + *
-> > > + * Copyright 2015 Freescale Semiconductor Inc.
-> > > + *
-> > > + * This program is free software; you can redistribute	it and/or modify it
-> > > + * under  the terms of	the GNU General	 Public License as
-> published by
-> > the
-> > > + * Free Software Foundation;  either version 2 of the  License, or
-> > > +(at your
-> > > + * option) any later version.
-> > > + */
-> > > +
-> > > +#include <linux/io.h>
-> > > +#include <linux/kernel.h>
-> > > +#include <linux/of_platform.h>
-> > > +#include <linux/of_address.h>
-> > > +#include <linux/psci.h>
-> > > +#include <linux/suspend.h>
-> > > +
-> > > +#include <uapi/linux/psci.h>
-> > > +
-> > > +#include <asm/cacheflush.h>
-> > > +#include <asm/psci.h>
-> >
-> > NAK.
-> >
-> > No new platform code should be calling the PSCI functions directly;
-> > you should not need to include these files in platform code.
-> 
-> PSCI 1.0 define SYSTEM_SUSPEND, and 0.2 and 0.1 not support this feature.
-> 
-> I will drop psci-cpu_suspend to implement SYSTEM SUSPEND, and implement system
-> suspend in platform code.
 
-Now 0.1 and 0.2 not support SYSTEM SUSPEND, means if do system suspend we still
-need to use platform_suspend_ops to implement system suspend in platform code and
-cannot use PSCI interface to do it?
-
-How about PSCI 1.0 support, could you share some information about it?
-
-Regards,
--Dongsheng
+On Tue, Sep 8, 2015 at 9:57 PM, Ganapatrao Kulkarni
+<gpkulkarni@gmail.com> wrote:
+> Hi Hanjun,
+>
+> On Tue, Sep 8, 2015 at 6:57 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> Hi Ganapatrao,
+>>
+>>
+>> On 08/29/2015 10:56 PM, Ganapatrao Kulkarni wrote:
+>>>
+>>> Hi Thunder,
+>>>
+>>> On Sat, Aug 29, 2015 at 3:16 PM, Leizhen (ThunderTown)
+>>> <thunder.leizhen@huawei.com> wrote:
+>>>>
+>>>>
+>>>>
+>>>> On 2015/8/28 22:02, Rob Herring wrote:
+>>>>>
+>>>>> +benh
+>>>>>
+>>>>> On Fri, Aug 28, 2015 at 7:32 AM, Mark Rutland <mark.rutland@arm.com>
+>>>>> wrote:
+>>>>>>
+>>>>>> Hi,
+>>>>>>
+>>>>>> On Fri, Aug 14, 2015 at 05:39:32PM +0100, Ganapatrao Kulkarni wrote:
+>>>>>>>
+>>>>>>> DT bindings for numa map for memory, cores and IOs using
+>>>>>>> arm,associativity device node property.
+>>>>>>
+>>>>>>
+>>>>>> Given this is just a copy of ibm,associativity, I'm not sure I see much
+>>>>>> point in renaming the properties.
+>>>>>
+>>>>>
+>>>>> So just keep the ibm? I'm okay with that. That would help move to
+>>>>> common code. Alternatively, we could drop the vendor prefix and have
+>>>>> common code just check for both.
+>>>>>
+>>>>
+>>>> Hi all,
+>>>>
+>>>> Why not copy the method of ACPI numa? There only three elements should be
+>>>> configured:
+>>>> 1) a cpu belong to which node
+>>>> 2) a memory block belong to which node
+>>>> 3) the distance of each two nodes
+I too thought acpi only defines mapping for cpu and memory to numa
+nodes and no specification to define for IOs.
+however after going through the x86 implementation, i can see there is
+provision for mapping IOs to numa node in acpi.
+in x86 code, function pci_acpi_scan_root calls acpi_get_node to get
+associated node for pci bus using _PXM object.
+it imply there is entry in acpi tables to map pci bus for numa
+node(proximity domain).
+so in dt also, we should  have binding to define cpu, memory and IOs
+to node mapping.
+>>>>
+>>>> The devicetree nodes of numa can be like below:
+>>>> / {
+>>>>          ...
+>>>>
+>>>>          numa-nodes-info {
+>>>>                  node-name: node-description {
+>>>>                          mem-ranges = <...>;
+>>>>                          cpus-list = <...>;
+>>>>                  };
+>>>>
+>>>>                  nodes-distance {
+>>>>                          distance-list = <...>;
+>>>>                  };
+>>>>          };
+>>>>
+>>>>          ...
+>>>> };
+>>>>
+>>> some what similar to what your are proposing is already implemented in
+>>> my v2 patchset.
+>>> https://lwn.net/Articles/623920/
+>>>
+>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305164.html
+>>> we have went to associativity property based implementation to keep it
+>>> more generic.
+>>> i do have both acpi(using linaro/hanjun's patches) and associativity
+>>> based implementations on our internal tree
+>>> and tested on thunderx platform.
+>>
+>>
+>> Great thanks!
+>>
+>>> i do see issue in creating numa mapping using ACPI for IOs(for
+>>> example, i am not able to create numa mapping for ITS which is on each
+>>> node, using ACPI tables),  since ACPI spec (tables SRAT and SLIT)
+>>> talks only about processor and memory.
+>>
+>>
+>> I'm not sure why the ITS needs to know the NUMA domain, for my
+>> understanding, the interrupt will route to the correct NUMA domain
+>> using setting the affinity, ITS will configured to route it to
+>> the right GICR(cpu), so I think the ITS don't need to know which
+>> NUMA node belonging to, correct me if I missed something.
+> IIUC, GICR/collection is per cpu and can be mapped to numa node using
+> cpu to node mapping.
+> However there are multiple its in multi-socket platform(at-least one
+> its per socket),
+> knowing its to numa node mapping will help in routing(optimal) the
+> interrupts to  any one of GICR/collections of that node
+> Hence, we need to find which its belongs to which socket/node using dt.
+> same applies to pci bus too.
+>>
+>> Thanks
+>> Hanjun
+>
+> thanks
+> Ganapat
+thanks
+Ganapat
