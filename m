@@ -1,54 +1,72 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 Sep 2015 17:36:05 +0100
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <55F1B89802000078000A1C9B@prv-mh.provo.novell.com>
-References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
- <20150910095208.GA29293@leverpostej>
- <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
- <20150910112418.GC29293@leverpostej>
- <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
- <55F199DD02000078000A1B1E@prv-mh.provo.novell.com>
- <20150910145331.GJ29293@leverpostej>
- <55F1B89802000078000A1C9B@prv-mh.provo.novell.com>
-Message-ID: <20150911163605.GC8726@leverpostej>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 11 Sep 2015 17:25:59 +0100
+Subject: [PATCH v2] arm/xen: Enable user access to the kernel before issuing a
+ privcmd call
+Message-ID: <1441988759-4572-1-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> Considering that the EFI support is just for Dom0, and Dom0 (at
-> >> the time) had to be PV anyway, it was the more natural solution to
-> >> expose the interface via hypercalls, the more that this allows better
-> >> control over what is and primarily what is not being exposed to
-> >> Dom0. With the wrapper approach we'd be back to the same
-> >> problem (discussed elsewhere) of which EFI version to surface: The
-> >> host one would impose potentially missing extensions, while the
-> >> most recent hypervisor known one might imply hiding valuable
-> >> information from Dom0. Plus there are incompatible changes like
-> >> the altered meaning of EFI_MEMORY_WP in 2.5.
-> > 
-> > I'm not sure I follow how hypercalls solve any impedance mismatch here;
-> > you're still expecting Dom0 to call up to Xen in order to perform calls,
-> > and all I suggested was a different location for those hypercalls.
-> > 
-> > If Xen is happy to make such calls blindly, why does it matter if the
-> > hypercall was in the kernel binary or an external shim?
-> 
-> Because there could be new entries in SystemTable->RuntimeServices
-> (expected and blindly but validly called by the kernel). Even worse
-> (because likely harder to deal with) would be new fields in other
-> structures.
+When Xen is copying data to/from the guest it will check if the kernel
+has the right to do the access. If not, the hypercall will return an
+error.
 
-Any of these could cause Xen to blow up, while Xen could always provide
-a known-safe (but potentially sub-optimal) view to the kernel by
-default.
+After the commit a5e090acbf545c0a3b04080f8a488b17ec41fe02 "ARM:
+software-based privileged-no-access support", the kernel can't access
+any longer the user space by default. This will result to fail on every
+hypercall made by the userspace (i.e via privcmd).
 
-> > Incompatible changes are a spec problem regardless of how this is
-> > handled.
-> 
-> Not necessarily - we don't expose the memory map (we'd have to
-> if we were to mimic EFI for Dom0), and hence the mentioned issue
-> doesn't exist in our model.
+We have to enable the userspace access and then restore the correct
+permission every time the privcmd is used to made an hypercall.
 
-We have to expose _some_ memory map, so I don't follow this point.
+I didn't find generic helpers to do a these operations, so the change
+is only arm32 specific.
 
-Mark.
+Reported-by: Riku Voipio <riku.voipio@linaro.org>
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
+
+---
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+
+    Changes in v2:
+        - Directly enable/disable the user space access in assembly
+        - Typoes
+
+    ARM64 doesn't seem to have priviledge no-access support yet so there
+    is nothing to do for now.
+
+    I haven't look x86 at all.
+---
+ arch/arm/xen/hypercall.S | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
+index f00e080..10fd99c 100644
+--- a/arch/arm/xen/hypercall.S
++++ b/arch/arm/xen/hypercall.S
+@@ -98,8 +98,23 @@ ENTRY(privcmd_call)
+ 	mov r1, r2
+ 	mov r2, r3
+ 	ldr r3, [sp, #8]
++	/*
++	 * Privcmd calls are issued by the userspace. We need to allow the
++	 * kernel to access the userspace memory before issuing the hypercall.
++	 */
++	uaccess_enable r4
++
++	/* r4 is loaded now as we use it as scratch register before */
+ 	ldr r4, [sp, #4]
+ 	__HVC(XEN_IMM)
++
++	/*
++	 * Disable userspace access from kernel. This is fine to do it
++	 * unconditionally as no set_fs(KERNEL_DS)/set_fs(get_ds()) is
++	 * called before.
++	 */
++	uaccess_disable r4
++
+ 	ldm sp!, {r4}
+ 	ret lr
+ ENDPROC(privcmd_call);
+-- 
+2.1.4
