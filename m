@@ -1,95 +1,124 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Sep 2015 14:18:18 +0100
-Subject: NFS/TCP/IPv6 acting strangely in 4.2
-In-Reply-To: <1441976691.4619.58.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <20150911113839.GO21084@n2100.arm.linux.org.uk>
- <1441976691.4619.58.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <20150911131818.GP21084@n2100.arm.linux.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 11 Sep 2015 15:21:14 +0200
+Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
+ v4.3-rc1
+In-Reply-To: <55F2D3D4.5090608@nvidia.com>
+References: <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
+ <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
+ <20150819091358.GA26627@ulmo>
+ <1439977724.4135.90.camel@collabora.co.uk>
+ <20150819103305.GF26627@ulmo>
+ <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
+ <CAMAWPa_rus4z+Sg3Uff7ndqrpB8dF1c1rQBVQ9r7vXh6PFcVkQ@mail.gmail.com>
+ <55F2AF45.5040706@nvidia.com> <20150911123759.GA8473@ulmo>
+ <55F2D3D4.5090608@nvidia.com>
+Message-ID: <20150911132113.GA21673@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 06:04:51AM -0700, Eric Dumazet wrote:
-> On Fri, 2015-09-11 at 12:38 +0100, Russell King - ARM Linux wrote:
-> > I have a recent Marvell Armada 388 board here which uses the mvneta
-> > driver.  I'm seeing some weird effects with NFS with it acting as a
-> > client.  Unfortunately, the board does not have a functional RTC.
+On Fri, Sep 11, 2015 at 02:15:00PM +0100, Jon Hunter wrote:
+> 
+> On 11/09/15 13:38, Thierry Reding wrote:
+> > * PGP Signed by an unknown key
 > > 
-> > The NFS server is the same NFS server that I've used for years with
-> > multiple other clients (it's my main NFS server) and it continues to
-> > support all other clients without any ill effect.  The NFS server
-> > kernel is rather old now, being a 3.x kernel.
+> > On Fri, Sep 11, 2015 at 11:39:01AM +0100, Jon Hunter wrote:
+> >> Hi Kevin,
+> >>
+> >> On 10/09/15 22:29, Kevin Hilman wrote:
+> >>
+> >> [snip]
+> >>
+> >>> Since there is no movement on this, and jetson hasn't been boot for
+> >>> multi_v7_defconfig for a while[1], I think it's time to undo the
+> >>> option causing this problem[2] so that v4.3 will actually boot on the
+> >>> jetson.
+> >>>
+> >>> Unless I hear a good reason otherwise, I'll be posting a patch to
+> >>> disable the HDA related options in multi_v7_defconfig.
+> >>
+> >> So curiosity got the better of this cat, as to why we are not seeing
+> >> this ;-)
+> >>
+> >> The main difference I see between the tegra_defconfig and 
+> >> multi_v7_defconfig is all the sound drivers are modules (including 
+> >> this one).
+> >>
+> >> So trying a quick modprobe of the hda-tegra driver I do see it hang ...
+> >>
+> >> / # modprobe snd-hda-tegra
+> >> [  625.213864] snd_hda_tegra: Unknown symbol azx_probe_codecs (err 0)
+> >> [  625.220215] snd_hda_tegra: Unknown symbol azx_init_streams (err 0)
+> >> [  625.226480] snd_hda_tegra: Unknown symbol azx_stop_all_streams (err 0)
+> >> [  625.233168] snd_hda_tegra: Unknown symbol azx_bus_init (err 0)
+> >> [  625.239062] snd_hda_tegra: Unknown symbol azx_free_streams (err 0)
+> >> [  625.245314] snd_hda_tegra: Unknown symbol azx_init_chip (err 0)
+> >> [  625.251321] snd_hda_tegra: Unknown symbol snd_hda_set_power_save (err 0)
+> >> [  625.258081] snd_hda_tegra: Unknown symbol azx_stop_chip (err 0)
+> >> [  625.264078] snd_hda_tegra: Unknown symbol azx_codec_configure (err 0)
+> >> [  625.270607] snd_hda_tegra: Unknown symbol azx_interrupt (err 0)
+> >> [  840.117528] INFO: task modprobe:137 blocked for more than 120 seconds.
+> >> [  840.124192]       Not tainted 4.2.0-next-20150909-40826-gb799053 #1
+> >> [  840.130584] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+> >> [  840.138540] modprobe        D c09ac3a4     0   137     82 0x00000000
+> >> [  840.145123] [<c09ac3a4>] (__schedule) from [<c09ac838>] (schedule+0x34/0x98)
+> >> [  840.152310] [<c09ac838>] (schedule) from [<c09acaac>] (schedule_preempt_disabled+0xc/0x10)
+> >> [  840.160734] [<c09acaac>] (schedule_preempt_disabled) from [<c09adeec>] (__mutex_lock_slowpath+0x9c/0x150)
+> >> [  840.170458] [<c09adeec>] (__mutex_lock_slowpath) from [<c09adfec>] (mutex_lock+0x4c/0x50)
+> >> [  840.178807] [<c09adfec>] (mutex_lock) from [<c062999c>] (__driver_attach+0x44/0x90)
+> >> [  840.186627] [<c062999c>] (__driver_attach) from [<c0627fcc>] (bus_for_each_dev+0x54/0x88)
+> >> [  840.194966] [<c0627fcc>] (bus_for_each_dev) from [<c0628f88>] (bus_add_driver+0xe4/0x1f0)
+> >> [  840.203305] [<c0628f88>] (bus_add_driver) from [<c062a1d0>] (driver_register+0x78/0xf4)
+> >> [  840.211475] [<c062a1d0>] (driver_register) from [<c020ac04>] (do_one_initcall+0x80/0x1d0)
+> >> [  840.219818] [<c020ac04>] (do_one_initcall) from [<c02c8abc>] (do_init_module+0x58/0x354)
+> >> [  840.228081] [<c02c8abc>] (do_init_module) from [<c02afae8>] (load_module+0x17e0/0x1d8c)
+> >> [  840.236258] [<c02afae8>] (load_module) from [<c02b016c>] (SyS_init_module+0xd8/0x138)
+> >> [  840.244260] [<c02b016c>] (SyS_init_module) from [<c0210b00>] (ret_fast_syscall+0x0/0x3c)
+> >>
+> >> Adding some debug it appears to hang on snd-hda-codec-hdmi  (the following show
+> >> the order in which modules are being loaded) ...
+> >>
+> >> / # modprobe snd-hda-tegra
+> >> [   22.450276] snd_hda_tegra: err = -2
+> >> [   22.484535] soundcore: err = 0
+> >> [   22.488964] snd: err = 0
+> >> [   22.493242] snd_timer: err = 0
+> >> [   22.498380] snd_pcm: err = 0
+> >> [   22.502479] snd_hda_core: err = 0
+> >> [   22.508337] snd_hda_codec: err = 0
+> >> [   22.513386] snd_hda_tegra: err = 0
+> >> [   22.740216] snd_hda_codec_hdmi: err = 0
+> >>
+> >> [hangs here]
+> >>
+> >> However, if I do the following, this works ...
+> >>
+> >> / # modprobe snd-hda-codec-hdmi
+> >> / # modprobe snd-hda-tegra
+> >>
+> >> So it implies that snd-hda-codec-hdmi needs to be loaded first otherwise it hangs.
+> >>
+> >> Thierry, any thoughts?
 > > 
-> > The NFS client appears to connect using TCP/IPv6 and initially is
-> > accessible.  Everything appears to work normally, and then the NFS
-> > server appears to stop responding.
-> > 
-> > Running tcpdump on the NFS server, and then dumping the captured
-> > packets
-> > with tshark (because tcpdump appears not to understand IPv6 SYNs on
-> > the
-> > NFS port) shows:
-> > 
-> >   3   0.030036 armada388 -> n2100 TCP 843?nfs [SYN] Seq=936803106
-> > Win=28800 Len=0 MSS=1440 SACK_PERM=1 TSval=892366 TSecr=0 WS=128
+> > I can't reproduce this. Booting multi_v7_defconfig on my setup works
+> > just fine. I don't ever see snd-hda-codec-hdmi being probed, but then
+> > probing it manually works fine. No hangs.
 > 
-> >   4   0.030409 n2100 -> armada388 TCP nfs?843 [SYN, ACK] Seq=409465870
-> > Ack=936803107 Win=28560 Len=0 MSS=1440 SACK_PERM=1
-> >  TSval=818169117 TSecr=892366 WS=64
-> 
-> >   5   0.030493 armada388 -> n2100 TCP [TCP Port numbers reused]
-> > 843?nfs [SYN] Seq=936803633 Win=28800 Len=0 MSS=1440 SACK_PERM=1
-> > TSval=892366 TSecr=0 WS=128
-> 
-> Yes, this packet looks very wrong. Like two simultaneous connect with
-> same source port. It is not a retransmit (Seq numbers differ)
-> 
-> >   6   0.030699 n2100 -> armada388 TCP nfs?843 [RST, ACK] Seq=0
-> > Ack=936803634 Win=0 Len=0
-> >   7   0.030766 armada388 -> n2100 TCP 843?nfs [RST] Seq=936803107
-> > Win=0 Len=0
-> 
-> I suspect port reuse in NFS being broken.
-> 
-> Have you tried to apply
+> To be clear, booting multi_v7_defconfig works just fine for me too and
+> has been working fine for months. However, the reason I am not seeing
+> the issue Kevin and Tyler are reporting is because I never attempt to
+> "modprobe snd-hda-tegra" after boot. If I do then I see a hang. So I
+> believe the only reason we don't see this is because their setup is
+> loading modules.
 
-Thanks, I'll give this a go and report back.
+snd-hda-tegra is auto-loaded on boot for me as well and I don't see any
+hangs either. I can also unload and reload the module just fine. I've
+tested this on next-20150911.
 
-I've been trying to debug this unsuccessfully.  It's really not helpful
-to enable rpc debugging, and then be greeted with this from printk:
-
-[ 2760.156924] RPC:       state 4 conn 1 dead 0 zapped 1 sk_shutdown 3
-[ 2760.163218] RPC:       xs_tcp_state_change client ee240800...
-[ 2760.168976] RPC:       state 5 conn 0 dead 0 zapped 1 sk_shutdown 3
-[ 2760.175273] RPC:       xs_tcp_state_change client ee240800...
-[ 2760.181032] RPC:       state 7 conn 0 dead 0 zapped 1 sk_shutdown 3
-[ 2760.187315] RPC:       disconnected transport ee240800
-[ 2760.192467] RPC:       xs_tcp_state_change client ee240800...
-[ 2760.198224] RPC:       state 7 conn 0 dead 0 zapped 1 sk_shutdown 3
-[ 2760.204505] RPC:       disconnected transport ee240800
-[ 2760.209653] RPC:       xs_tcp_data_ready...
-[ 2760.215001] RPC:       wake_up_first(ee240918 "xprt_sending")
-lspci -vvx |less
-[ 2805.912330] RPC:       looking up Generic cred
-[ 2805.916791] RPC:       looking up Generic cred
-[ 2805.921259] RPC:       looking up Generic cred
-[ 2805.921784] RPC:       looking up Generic cred
-[ 2805.921787] RPC:       looking up Generic cred
-[ 2805.921788] RPC:       looking up Generic cred
-[ 2805.921792] RPC:       new task initialized, procpid 327
-[ 2805.921794] RPC:       allocated task ee358300
-[ 2805.921797] RPC:  1335 __rpc_execute flags=0x80
-[ 2805.921800] RPC:  1335 call_start nfs3 proc ACCESS (sync)
-[ 2805.921801] RPC:  1335 call_reserve (status 0)
-[ 2805.921805] RPC:  1335 reserved req ee8a2900 xid af74741b
-** 168 printk messages dropped ** [ 2805.928207] RPC:       read reply XID b174741b
-** 366 printk messages dropped ** [ 2805.941242] RPC:  1343 setting alarm for 60000 ms
-** 310 printk messages dropped ** [ 2805.958274] RPC:       xprt = ee240800, tcp_copied = 120, tcp_offset = 120, tcp_reclen = 120
-** 89 printk messages dropped ** [ 2805.959613] RPC:  1350 reserved req ee8a2900 xid be74741b
-[ 2805.959614] RPC:       wake_up_first(ee240918 "xprt_sending")
-
-which is just where we want to see the printk messages.  This kind'a
-makes printk and the rpc debug stuff rather useless. :(
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150911/5403c9b6/attachment.sig>
