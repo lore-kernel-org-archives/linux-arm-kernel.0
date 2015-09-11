@@ -1,60 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 11 Sep 2015 15:06:47 +0100
-Subject: [PATCH 0/5] ACPI probing infrastructure
-In-Reply-To: <55F14753.5070703@linaro.org>
-References: <1441386412-8139-1-git-send-email-marc.zyngier@arm.com>
- <55EEE071.7040506@linaro.org> <55F14753.5070703@linaro.org>
-Message-ID: <55F2DFF7.6090301@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 11 Sep 2015 15:08:32 +0100
+Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
+ v4.3-rc1
+In-Reply-To: <20150911135738.GA23109@ulmo.nvidia.com>
+References: <20150819091358.GA26627@ulmo>
+ <1439977724.4135.90.camel@collabora.co.uk> <20150819103305.GF26627@ulmo>
+ <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
+ <CAMAWPa_rus4z+Sg3Uff7ndqrpB8dF1c1rQBVQ9r7vXh6PFcVkQ@mail.gmail.com>
+ <55F2AF45.5040706@nvidia.com> <20150911123759.GA8473@ulmo>
+ <55F2D3D4.5090608@nvidia.com> <20150911132113.GA21673@ulmo>
+ <55F2D995.50906@nvidia.com> <20150911135738.GA23109@ulmo.nvidia.com>
+Message-ID: <55F2E060.9080106@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/15 10:03, Hanjun Guo wrote:
-> On 09/08/2015 09:19 PM, Hanjun Guo wrote:
->> Hi Marc,
->>
->> Sorry for the late response for quite a while...
->>
->> On 09/05/2015 01:06 AM, Marc Zyngier wrote:
->>> IRQ controllers and timers are the two types of device the kernel
->>> requires before being able to use the device driver model.
->>>
->>> ACPI so far lacks a proper probing infrastructure similar to the one
->>> we have with DT, where we're able to declare IRQ chips and
->>> clocksources inside the driver code, and let the core code pick it up
->>> and call us back on a match. This leads to all kind of really ugly
->>> hacks all over the arm64 code and even in the ACPI layer.
->>>
->>> It turns out that providing such a probing infrastructure is rather
->>> easy, and provides a much deserved cleanup in both the arch code, the
->>> GIC driver, and the architected timer driver.
->>>
->>> I'm sure there is some more code to be deleted, and one can only
->>> wonder why this wasn't done before the arm64 code was initially merged
->>> (the diffstat says it all...).
->>>
->>> Patches are against v4.2, and a branch is available at
->>>
->>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
->>> acpi/device-probing
-> 
-> I pulled, and noticed that there is v2, it's cleaner than v1 for the
-> patch 1/5 to me :)
-> 
->>
->> Great thanks to cleanup these stuff, I will test
->> this patch set and review it, will get back to you
->> if I get anything.
-> 
-> I tested the v2 and it boots pretty happy as before, if
-> you post to maillist,
-> 
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-I'm still working on v2, so I'm afraid this is still a bit premature.
+On 11/09/15 14:57, Thierry Reding wrote:
 
-Thanks,
+[snip]
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Then I did the following:
+> 
+> 	-sh-4.3# modprobe snd-hda-tegra
+> 	[ 2243.786143] hdaudio hdaudioC0D3: Unable to bind the codec
+> 	-sh-4.3# lsmod
+> 	Module                  Size  Used by
+> 	snd_hda_tegra           4764  0 
+> 	snd_hda_codec          75955  1 snd_hda_tegra
+> 	snd_hda_core           26603  2 snd_hda_codec,snd_hda_tegra
+> 	snd_pcm                69108  3 snd_hda_codec,snd_hda_tegra,snd_hda_core
+> 	snd_timer              17264  1 snd_pcm
+> 	snd                    42248  4 snd_timer,snd_pcm,snd_hda_codec,snd_hda_tegra
+> 	soundcore                858  1 snd
+> 	nouveau              1302185  0 
+> 	tegra_devfreq           5375  0 
+> 	ttm                    65238  1 nouveau
+> 	-sh-4.3# modprobe snd-hda-codec-hdmi
+> 	-sh-4.3# modprobe -r snd-hda-tegra
+> 	-sh-4.3# modprobe snd-hda-tegra
+> 	[ 2263.934328] input: tegra-hda HDMI/DP,pcm=3 as /devices/soc0/70030000.hda/sound/card0/input4
+> 
+> So all worked just fine.
+
+That's interesting. For me (as per my earlier email), I did not see the
+"unable to bind the codec" and modprobe attempted to load
+snd-hda-codec-hdmi after snd-hda-tega. Puzzled.
+
+Jon
