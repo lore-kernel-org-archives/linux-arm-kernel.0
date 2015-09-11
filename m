@@ -1,91 +1,71 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 11 Sep 2015 16:55:06 +0800
-Subject: [PATCH v2 13/22] KVM: ARM64: Add reset and access handlers for
- PMINTENSET and PMINTENCLR register
+Date: Fri, 11 Sep 2015 16:55:04 +0800
+Subject: [PATCH v2 11/22] KVM: ARM64: Add reset and access handlers for
+ PMCCNTR register
 In-Reply-To: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1441961715-11688-14-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1441961715-11688-12-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Since the reset value of PMINTENSET and PMINTENCLR is UNKNOWN, use
-reset_unknown for its reset handler. Add a new case to emulate writing
-PMINTENSET or PMINTENCLR register.
+Since the reset value of PMCCNTR is UNKNOWN, use reset_unknown for its
+reset handler. Add a new case to emulate reading to PMCCNTR register.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 34 ++++++++++++++++++++++++++++++----
- 1 file changed, 30 insertions(+), 4 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 8307189..c3d4fb5 100644
+index a51c8de..f8d7de0 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -311,6 +311,18 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
- 			vcpu_sys_reg(vcpu, PMCNTENSET_EL0) &= ~val;
- 			break;
+@@ -310,6 +310,12 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
  		}
-+		case PMINTENSET_EL1: {
-+			val = *vcpu_reg(vcpu, p->Rt);
-+			vcpu_sys_reg(vcpu, r->reg) |= val;
-+			vcpu_sys_reg(vcpu, PMINTENCLR_EL1) |= val;
+ 	} else {
+ 		switch (r->reg) {
++		case PMCCNTR_EL0: {
++			val = kvm_pmu_get_counter_value(vcpu,
++							ARMV8_MAX_COUNTERS - 1);
++			*vcpu_reg(vcpu, p->Rt) = val;
 +			break;
 +		}
-+		case PMINTENCLR_EL1: {
-+			val = *vcpu_reg(vcpu, p->Rt);
-+			vcpu_sys_reg(vcpu, r->reg) &= ~val;
-+			vcpu_sys_reg(vcpu, PMINTENSET_EL1) &= ~val;
-+			break;
-+		}
- 		case PMCR_EL0: {
- 			/* Only update writeable bits of PMCR */
- 			val = vcpu_sys_reg(vcpu, r->reg);
-@@ -500,10 +512,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 
- 	/* PMINTENSET_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b001),
+ 		case PMXEVCNTR_EL0: {
+ 			val = kvm_pmu_get_counter_value(vcpu,
+ 						vcpu_sys_reg(vcpu, PMSELR_EL0));
+@@ -540,7 +546,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  access_pmu_regs, reset_pmceid, PMCEID1_EL0 },
+ 	/* PMCCNTR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
 -	  trap_raz_wi },
-+	  access_pmu_regs, reset_unknown, PMINTENSET_EL1 },
- 	/* PMINTENCLR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b010),
--	  trap_raz_wi },
-+	  access_pmu_regs, reset_unknown, PMINTENCLR_EL1 },
- 
- 	/* MAIR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
-@@ -785,6 +797,18 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
- 			vcpu_cp15(vcpu, c9_PMCNTENSET) &= ~val;
- 			break;
++	  access_pmu_regs, reset_unknown, PMCCNTR_EL0 },
+ 	/* PMXEVTYPER_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b001),
+ 	  access_pmu_regs, reset_unknown, PMXEVTYPER_EL0 },
+@@ -760,6 +766,12 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
  		}
-+		case c9_PMINTENSET: {
-+			val = *vcpu_reg(vcpu, p->Rt);
-+			vcpu_cp15(vcpu, r->reg) |= val;
-+			vcpu_cp15(vcpu, c9_PMINTENCLR) |= val;
+ 	} else {
+ 		switch (r->reg) {
++		case c9_PMCCNTR: {
++			val = kvm_pmu_get_counter_value(vcpu,
++							ARMV8_MAX_COUNTERS - 1);
++			*vcpu_reg(vcpu, p->Rt) = val;
 +			break;
 +		}
-+		case c9_PMINTENCLR: {
-+			val = *vcpu_reg(vcpu, p->Rt);
-+			vcpu_cp15(vcpu, r->reg) &= ~val;
-+			vcpu_cp15(vcpu, c9_PMINTENSET) &= ~val;
-+			break;
-+		}
- 		case c9_PMCR: {
- 			/* Only update writeable bits of PMCR */
- 			val = vcpu_cp15(vcpu, r->reg);
-@@ -871,8 +895,10 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 		case c9_PMXEVCNTR: {
+ 			val = kvm_pmu_get_counter_value(vcpu,
+ 						    vcpu_cp15(vcpu, c9_PMSELR));
+@@ -814,7 +826,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	  reset_pmceid, c9_PMCEID0 },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmu_cp15_regs,
+ 	  reset_pmceid, c9_PMCEID1 },
+-	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), access_pmu_cp15_regs,
++	  reset_unknown_cp15, c9_PMCCNTR },
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_cp15_regs,
+ 	  reset_unknown_cp15, c9_PMXEVTYPER },
  	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_cp15_regs,
- 	  reset_unknown_cp15, c9_PMXEVCNTR },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
--	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
--	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pmu_cp15_regs,
-+	  reset_unknown_cp15, c9_PMINTENSET },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pmu_cp15_regs,
-+	  reset_unknown_cp15, c9_PMINTENCLR },
- 
- 	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
- 	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
 -- 
 2.0.4
