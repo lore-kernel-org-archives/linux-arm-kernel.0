@@ -1,87 +1,59 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Sep 2015 18:48:37 +0100
-Subject: mysterious crashes on OMAP5 uevm
-In-Reply-To: <EF62F09C0797D947AD4180A1043C0DF740C23E8D@DLEE11.ent.ti.com>
-References: <CANOLnOO3NdK1r1jZQtS=TcHEE7SQwhGHh0YsqqoCJpFW3NO05Q@mail.gmail.com>
- <20150908143810.GD4215@atomide.com>
- <CANOLnOODjTaBcL1QzAm7o4YOB=_P-s7JYovu6fhNSqJSV2Bq+Q@mail.gmail.com>
- <20150908210708.GH4215@atomide.com>
- <E0068B56-0DEE-4E2F-94CF-DB104AE16D63@goldelico.com>
- <20150910083026.GA21098@n2100.arm.linux.org.uk>
- <CANOLnOM-PYcAL=f4rgucfdWZ1+U3HkP34bfwrKP4Rob+J6iTfw@mail.gmail.com>
- <20150911140306.GB21098@n2100.arm.linux.org.uk>
- <EF62F09C0797D947AD4180A1043C0DF740C23E8D@DLEE11.ent.ti.com>
-Message-ID: <20150911174837.GC21098@n2100.arm.linux.org.uk>
+Date: Fri, 11 Sep 2015 18:51:08 +0100
+Subject: [PATCH v2] arm/xen: Enable user access to the kernel before
+ issuing a privcmd call
+In-Reply-To: <55F31105.6070305@citrix.com>
+References: <1441988759-4572-1-git-send-email-julien.grall@citrix.com>
+ <20150911170027.GX21084@n2100.arm.linux.org.uk>
+ <55F3102B.3090309@citrix.com> <55F31105.6070305@citrix.com>
+Message-ID: <20150911175107.GY21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 04:12:21PM +0000, Woodruff, Richard wrote:
-> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> > owner at vger.kernel.org] On Behalf Of Russell King - ARM Linux
-> > Sent: Friday, September 11, 2015 9:03 AM
-> > To: Grazvydas Ignotas
-> 
-> > However, even the idea that it's ARMv7 or later is wrong.  According to
-> > the ARM ARM, the IT instruction is present in ARMv6T2 as well, which
-> > means it's ARMv6 too (which would have __LINUX_ARM_ARCH__ = 6).
-> 
-> I recall seeing ARMv6T2 first implemented in the ARM1156 which is a
-> v6 CPU with T2 option added.
-
-Exactly, which is why we need to be dealing with the IT bits in signal
-handling for >= ARMv6, not >= ARMv7.
-
-> > Looking at the ARM ARM, these bits are "reserved" in previous non-T2
-> > architectures, have an undefined value at reset, and are probably zero
-> > anyway.
+On Fri, Sep 11, 2015 at 06:36:05PM +0100, Julien Grall wrote:
+> On 11/09/15 18:32, Julien Grall wrote:
+> > On 11/09/15 18:00, Russell King - ARM Linux wrote:
+> >> On Fri, Sep 11, 2015 at 05:25:59PM +0100, Julien Grall wrote:
+> >>> +	/*
+> >>> +	 * Privcmd calls are issued by the userspace. We need to allow the
+> >>> +	 * kernel to access the userspace memory before issuing the hypercall.
+> >>> +	 */
+> >>> +	uaccess_enable r4
+> >>> +
+> >>> +	/* r4 is loaded now as we use it as scratch register before */
+> >>>  	ldr r4, [sp, #4]
+> >>
+> >> As I mentioned in one of my previous mails, "ip" should be safe to use
+> >> here - it's a caller-corrupted register, just like r0-r3 and lr.  So,
+> >> you could do:
+> >>
+> >> 	ldr r4, [sp, #4]
+> >> +	uaccess_enable ip
 > > 
-> > Merely changing __LINUX_ARM_ARCH__ >= 7 to >= 6 should fix the
-> > problem,
-> > and I doubt there's any ARMv6 non-T2 systems out there that would be
-> > affected by clearing the IT state bits.
+> > The register ip (aka r12) is used to store the hypercall number. So we
+> > can't reuse it as scratch register.
+> > 
+> > The easiest one is r4.
+> > 
+> >>
+> >> which fractionally tightens the window.
+> >>
+> >> However, there's nothing actually wrong with your version - there's no
+> >> way we could've got this far with sp pointing at userspace.
+> >>
+> >> I'm happy with either version, so:
+> >>
+> >> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> >>
+> >> How do you want to handle the patch?  I already have some other uaccess
+> >> fixes queued up to send to Linus before the merge window closes.
 > 
-> Probably you already looked, but cpsr.it usage is not restricted to this
-> one spot.
+> Forgot to answer to this bits. I was thinking to ask Stefano carrying
+> the patch in xentip. Although it won't go until rc1.
+> 
+> I don't mind if it's going earlier in Linux/master.
 
-Other places:
-
-arch/arm/mm/extable.c-#ifdef CONFIG_THUMB2_KERNEL
-arch/arm/mm/extable.c-          /* Clear the IT state to avoid nasty surprises in the fixup */
-arch/arm/mm/extable.c:          regs->ARM_cpsr &= ~PSR_IT_MASK;
-arch/arm/mm/extable.c-#endif
-
-which is irrelevant here.  This code only deals with kernel mode, and
-the only time that this makes sense is when the kernel is built using
-Thumb2 instructions.  CONFIG_THUMB2_KERNEL covers the case properly.
-
-arch/arm/probes/kprobes/test-core.c-    regs->ARM_lr = val ^ (14 << 8);
-arch/arm/probes/kprobes/test-core.c:    regs->ARM_cpsr &= ~(APSR_MASK | PSR_IT_MASK);
-arch/arm/probes/kprobes/test-core.c-    regs->ARM_cpsr |= test_context_cpsr(scenario);
-
->From what I can see, this happens unconditionally.
-
-KVM and Xen code... that requires virtualisation support, which is ARMv7.
-
-arch/arm/probes/kprobes/actions-thumb.c... emulating an IT instruction.
-arch/arm/probes/decode.h::it_advance... emulating Thumb2.
-
-So really there's no other places that need fixing.
-
-> Looking back at old notes I think both debug and signal handler code
-> keyed on bit usage.  I see from LXR kernel KVM code also uses in some
-> capacity.
-
-Frankly, Richard, you're getting on my nerves in this thread - you
-seem to know all about this problem, yet you never reported the problem
-upstream, so people are effectively having to waste time re-doing the
-work that you've already done.
-
-Nothing annoys me more than having people say "oh yes, I found that
-problem and worked on it" and nothing coming of it (no report, no
-patch, no nothing.)
-
-As you have "old notes" you've already investigated this issue, and
-presumably you came up with a patch.  Where is it?
+Thanks, I've applied your patch as-is now.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
