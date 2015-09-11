@@ -1,60 +1,59 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 11 Sep 2015 15:50:08 -0700
-Subject: [PATCH 4.1 67/78] ARM: OMAP: wakeupgen: Restore the irq_set_type()
- mechanism
-In-Reply-To: <20150911224606.758437370@linuxfoundation.org>
-References: <20150911224606.758437370@linuxfoundation.org>
-Message-ID: <20150911224616.133048470@linuxfoundation.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 11 Sep 2015 15:53:40 -0700
+Subject: [PATCH v3] mtd: nand: sunxi: rely on nand_dt_init initialization
+In-Reply-To: <1441182625-525-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1441182625-525-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150911225340.GI11487@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.1-stable review patch.  If anyone has any objections, please let me know.
+On Wed, Sep 02, 2015 at 10:30:25AM +0200, Boris Brezillon wrote:
+> nand_dt_init(), called from nand_scan_ident(), is already parsing the
+> generic MTD/NAND DT properties, and initializing the nand_chip struct
+> accordingly.
+> Rely on this initialization instead of manually parsing those properties.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+> Changes since v2:
+> - fix a bug forcing ecc.mode to HW_ECC
+> Changes since v1:
+> - drop unused strength and blk_size variables
+> ---
+>  drivers/mtd/nand/sunxi_nand.c | 27 ++++++++++-----------------
+>  1 file changed, 10 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+> index 0c29f6c..d644548 100644
+> --- a/drivers/mtd/nand/sunxi_nand.c
+> +++ b/drivers/mtd/nand/sunxi_nand.c
+[...]
+> @@ -1224,15 +1211,18 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+>  	/* Default tR value specified in the ONFI spec (chapter 4.15.1) */
+>  	nand->chip_delay = 200;
+>  	nand->controller = &nfc->controller;
+> +	/*
+> +	 * Set the ECC mode to the default value in case nothing is specified
+> +	 * in the DT.
+> +	 */
+> +	nand->ecc.mode = NAND_ECC_HW;
+> +	nand->dn = np;
 
-------------------
+Renamed dn -> flash_node, due to [1], and applied to l2-mtd.git/next
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+>  	nand->select_chip = sunxi_nfc_select_chip;
+>  	nand->cmd_ctrl = sunxi_nfc_cmd_ctrl;
+>  	nand->read_buf = sunxi_nfc_read_buf;
+>  	nand->write_buf = sunxi_nfc_write_buf;
+>  	nand->read_byte = sunxi_nfc_read_byte;
+>  
+> -	if (of_get_nand_on_flash_bbt(np))
+> -		nand->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
+> -
+>  	mtd = &chip->mtd;
+>  	mtd->dev.parent = dev;
+>  	mtd->priv = nand;
 
-commit 63059a272398ef5dc1bd7065a036e8b6e82d1af7 upstream.
+Brian
 
-The conversion of the wakeupgen irqchip to hierarchical irq domains
-failed to provide a mechanism to properly set the trigger type of an
-interrupt.
-
-The wakeupgen irq chip itself has no mechanism and therefor no
-irq_set_type() callback. The code before the conversion relayed the
-trigger configuration directly to the underlying GIC.
-
-Restore the correct behaviour by setting the wakeupgen irq_set_type
-callback to irq_chip_set_type_parent(). This propagates the
-set_trigger() call to the underlying GIC irqchip.
-
-[ tglx: Massaged changelog ]
-
-Fixes: 7136d457f365 ('ARM: omap: convert wakeupgen to stacked domains')
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: <linux@arm.linux.org.uk>
-Cc: <nsekhar@ti.com>
-Cc: <jason@lakedaemon.net>
-Cc: <balbi@ti.com>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Cc: <marc.zyngier@arm.com>
-Link: http://lkml.kernel.org/r/1439554830-19502-5-git-send-email-grygorii.strashko at ti.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- arch/arm/mach-omap2/omap-wakeupgen.c |    1 +
- 1 file changed, 1 insertion(+)
-
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -392,6 +392,7 @@ static struct irq_chip wakeupgen_chip =
- 	.irq_mask		= wakeupgen_mask,
- 	.irq_unmask		= wakeupgen_unmask,
- 	.irq_retrigger		= irq_chip_retrigger_hierarchy,
-+	.irq_set_type		= irq_chip_set_type_parent,
- 	.flags			= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND,
- #ifdef CONFIG_SMP
- 	.irq_set_affinity	= irq_chip_set_affinity_parent,
+[1] http://patchwork.ozlabs.org/patch/514205/
