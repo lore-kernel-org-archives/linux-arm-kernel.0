@@ -1,9 +1,10 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 11 Sep 2015 15:50:07 -0700
-Subject: [PATCH 4.1 66/78] irqchip/crossbar: Restore set_wake functionality
+Date: Fri, 11 Sep 2015 15:50:06 -0700
+Subject: [PATCH 4.1 65/78] irqchip/crossbar: Restore the mask on suspend
+ behaviour
 In-Reply-To: <20150911224606.758437370@linuxfoundation.org>
 References: <20150911224606.758437370@linuxfoundation.org>
-Message-ID: <20150911224615.999831410@linuxfoundation.org>
+Message-ID: <20150911224615.803471623@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +14,23 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-commit 8200fe4347870d4ad6475048bcdf3e7c106c5268 upstream.
+commit 4fd8f47e7e5b64a74b60f23c2e08ba8234d659d1 upstream.
 
-The TI crossbar irqchip doesn't provides any facility to configure the
-wakeup sources, but the conversion to hierarchical irqdomains set the
-irq_set_wake callback to irq_chip_set_wake_parent. The parent chip
-(OMAP wakeupgen) has no irq_set_wake function either so the call will
-fail with -ENOSYS. As a result the irq_set_wake() call in the resume
-path will trigger an 'Unbalanced wake disable' warning.
+The ARM GIC requires that all interrupts which are not used as a
+wakeup source have to be masked during suspend.
 
-Before the conversion the GIC irqchip was the top level irqchip and
-correctly flagged with IRQCHIP_SKIP_SET_WAKE.
+The conversion of the crossbar irqchip to hierarchical irq domains
+failed to mark the crossbar irqchip with the IRQCHIP_MASK_ON_SUSPEND
+flag and therefor broke the suspend requirement of the GIC.
 
-Restore the correct behaviour by removing the irq_set_type callback
-from the crossbar irqchip and set the IRQCHIP_SKIP_SET_WAKE flag which
-lets the irq_set_irq_wake() call from the driver succeed.
+Before the conversion the flags were visible because the GIC was the
+top level irqchip. After the conversion the crossbar irqchip is the
+top level irq chip whose flags are evaluated in suspend_device_irq().
+As the flag is not set the masking of the non-wakeup irqs is not
+invoked which breaks suspend.
+
+Add the IRQCHIP_MASK_ON_SUSPEND flag to the crossbar irqchip, so the
+GIC interrupts get masked properly.
 
 [ tglx: Massaged changelog ]
 
@@ -41,25 +44,21 @@ Cc: <balbi@ti.com>
 Cc: <linux-arm-kernel@lists.infradead.org>
 Cc: <tony@atomide.com>
 Cc: <marc.zyngier@arm.com>
-Link: http://lkml.kernel.org/r/1439554830-19502-7-git-send-email-grygorii.strashko at ti.com
+Link: http://lkml.kernel.org/r/1439554830-19502-6-git-send-email-grygorii.strashko at ti.com
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- drivers/irqchip/irq-crossbar.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-crossbar.c |    1 +
+ 1 file changed, 1 insertion(+)
 
 --- a/drivers/irqchip/irq-crossbar.c
 +++ b/drivers/irqchip/irq-crossbar.c
-@@ -68,9 +68,9 @@ static struct irq_chip crossbar_chip = {
- 	.irq_mask		= irq_chip_mask_parent,
- 	.irq_unmask		= irq_chip_unmask_parent,
+@@ -70,6 +70,7 @@ static struct irq_chip crossbar_chip = {
  	.irq_retrigger		= irq_chip_retrigger_hierarchy,
--	.irq_set_wake		= irq_chip_set_wake_parent,
+ 	.irq_set_wake		= irq_chip_set_wake_parent,
  	.irq_set_type		= irq_chip_set_type_parent,
--	.flags			= IRQCHIP_MASK_ON_SUSPEND,
-+	.flags			= IRQCHIP_MASK_ON_SUSPEND |
-+				  IRQCHIP_SKIP_SET_WAKE,
++	.flags			= IRQCHIP_MASK_ON_SUSPEND,
  #ifdef CONFIG_SMP
  	.irq_set_affinity	= irq_chip_set_affinity_parent,
  #endif
