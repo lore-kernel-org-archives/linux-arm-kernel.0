@@ -1,39 +1,43 @@
-From: greg@kroah.com (Greg Kroah-Hartman)
-Date: Fri, 11 Sep 2015 15:43:35 -0700
-Subject: [GIT PULL] arm64: updates for 4.3
-In-Reply-To: <CAOZdJXWwLJBwGZ0tDMi6wmoAU0uiDBuE-Hb+ytR1isQQsk02Yg@mail.gmail.com>
-References: <20150904102656.GC4818@arm.com>
- <CAOZdJXX_avYXi9JSk=Ge6fuBLzS1n2jd7yBmhnFx4u_ptvNS5A@mail.gmail.com>
- <20150910170257.GH22439@arm.com>
- <CAOZdJXWwLJBwGZ0tDMi6wmoAU0uiDBuE-Hb+ytR1isQQsk02Yg@mail.gmail.com>
-Message-ID: <20150911224335.GA13373@kroah.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 12 Sep 2015 00:45 +0200
+Subject: [PATCH 2/2] ARM: dts: support Highspeed for rk3066a platform
+In-Reply-To: <1441956341-10623-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1441956268-10418-1-git-send-email-shawn.lin@rock-chips.com>
+ <1441956341-10623-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <25757012.mQz0HMffNZ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 04:58:08PM -0500, Timur Tabi wrote:
-> On Thu, Sep 10, 2015 at 12:02 PM, Will Deacon <will.deacon@arm.com> wrote:
-> 
-> >> [v5] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
-> >> [v3] hvc_dcc: don't ignore errors during initialization
-> >
-> > Those patches should go via the usual route for tty changes (i.e. Greg).
-> > I merged the arm64 change here because it (a) makes sense as a standalone
-> > patch and (b) is a dependency for your other stuff.
-> 
-> Greg,
-> 
-> Any chance these patches can get into 4.3-rc1?
-> 
-> https://patchwork.kernel.org/patch/7039851/
-> https://patchwork.kernel.org/patch/7039841/
+Hi Shawn,
 
-My tty/serial tree is long closed and has been merged with Linus last
-week.  And, I don't even see these in my queue, as I don't even know if
-they were sent to me.
+Am Freitag, 11. September 2015, 15:25:41 schrieb Shawn Lin:
+> Add cap-sd-highspeed and cap-mmc-highspeed for rk3066a
+> platform to make sd cards running faster.
+> 
+> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> ---
+> 
+>  arch/arm/boot/dts/rk3066a.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+> index 946f187..b50a785 100644
+> --- a/arch/arm/boot/dts/rk3066a.dtsi
+> +++ b/arch/arm/boot/dts/rk3066a.dtsi
+> @@ -595,6 +595,8 @@
+>  &mmc0 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4>;
+> +	cap-mmc-highspeed;
+> +	cap-sd-highspeed;
+>  };
+> 
 
-If you want them in, please resend, but note that it will have to wait
-for 4.4-rc1.
+Currently we're setting the dw_mmc capabilities in the individual board files 
+and patch1 also correctly adds the cap to the radxarock file.
 
-thanks,
+So I'd think we should stay with one scheme and probably add the rk3066 caps 
+to the bqcurie2, marsboard and rayeager where applicable.
 
-greg k-h
+
+Heiko
