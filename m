@@ -1,72 +1,57 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 11 Sep 2015 20:39:33 +0100
-Subject: [Xen-devel] [PATCH v4 00/20] xen/arm64: Add support for 64KB
- page in Linux
-In-Reply-To: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
-References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <55F32DF5.5050504@citrix.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 11 Sep 2015 14:20:03 -0500
+Subject: [PATCH] firmware: qcom: scm: Add function stubs for ARM64
+In-Reply-To: <20150911175649.GZ21084@n2100.arm.linux.org.uk>
+References: <1441993856-30178-1-git-send-email-agross@codeaurora.org>
+ <20150911175649.GZ21084@n2100.arm.linux.org.uk>
+Message-ID: <20150911192003.GB32107@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Sep 11, 2015 at 06:56:49PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 11, 2015 at 12:50:56PM -0500, Andy Gross wrote:
+> > This patch adds stubs for the SCM functions exposed in the QCOM SCM API.
+> > 
+> > Signed-off-by: Andy Gross <agross@codeaurora.org>
+> > ---
+> >  drivers/firmware/Makefile      |    4 +++
+> >  drivers/firmware/qcom_scm-64.c |   63 ++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 67 insertions(+)
+> >  create mode 100644 drivers/firmware/qcom_scm-64.c
+> > 
+> > diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
+> > index 4a4b897..2f810c2 100644
+> > --- a/drivers/firmware/Makefile
+> > +++ b/drivers/firmware/Makefile
+> > @@ -12,8 +12,12 @@ obj-$(CONFIG_ISCSI_IBFT_FIND)	+= iscsi_ibft_find.o
+> >  obj-$(CONFIG_ISCSI_IBFT)	+= iscsi_ibft.o
+> >  obj-$(CONFIG_FIRMWARE_MEMMAP)	+= memmap.o
+> >  obj-$(CONFIG_QCOM_SCM)		+= qcom_scm.o
+> > +ifdef CONFIG_ARM64
+> > +obj-$(CONFIG_QCOM_SCM)		+= qcom_scm-64.o
+> > +else
+> >  obj-$(CONFIG_QCOM_SCM)		+= qcom_scm-32.o
+> >  CFLAGS_qcom_scm-32.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
+> > +endif
+> 
+> Can we not start doing stuff like this.  Use the Kconfig to control what
+> you build, not the Makefile system.
+> 
+> config QCOM_SCM_32
+> 	def_bool y
+> 	depends on QCOM_SCM && ARM
+> 
+> config QCOM_SCM_64
+> 	def_bool y
+> 	depends on QCOM_SCM && ARM64
+> 
+> and then use those in the makefile.
 
-A quick update on the TODO.
-
-On 07/09/15 16:33, Julien Grall wrote:
-> ARM64 Linux is supporting both 4KB and 64KB page granularity. Although, Xen
-> hypercall interface and PV protocol are always based on 4KB page granularity.
-> 
-> Any attempt to boot a Linux guest with 64KB pages enabled will result to a
-> guest crash.
-> 
-> This series is a first attempt to allow those Linux running with the current
-> hypercall interface and PV protocol.
-> 
-> This solution has been chosen because we want to run Linux 64KB in released
-> Xen ARM version or/and platform using an old version of Linux DOM0.
-> 
-> There is room for improvement, such as support of 64KB grant, modification
-> of PV protocol to support different page size... They will be explored in a
-> separate patch series later.
-> 
-> TODO list:
->     - Convert swiotlb to 64KB
-
-Sent http://lists.xen.org/archives/html/xen-devel/2015-09/msg01292.html
-
->     - Convert xenfb to 64KB
->     - Support for multiple page ring support
->     - Support for 64KB in gnttdev
->     - Support of non-indirect grant with 64KB frontend
-
-Sent http://lists.xen.org/archives/html/xen-devel/2015-09/msg01577.html
-
->     - It may be possible to move some common define between
->     netback/netfront and blkfront/blkback in an header
-> 
-> I've got most of the patches for the TODO items. I'm planning to send them as
-> a follow-up as it's not a requirement for a basic guests.
-> 
-> All patches has been built tested for ARM32, ARM64, x86. But I haven't tested
-> to run it on x86 as I don't have a box with Xen x86 running. I would be
-> happy if someone give a try and see possible regression for x86.
-> 
-> I know that Konrad as a test-suite for x86. Konrand, would it be possible to
-> give a run to for this series?
-> 
-> A branch based on the latest xentip/for-linus-4.3 can be found here:
-> 
-> git://xenbits.xen.org/people/julieng/linux-arm.git branch xen-64k-v4
-
-I will resend a new version when 4.3-rc1 is out in order to fix any
-possible conflict with linux/master. I already know that the netback
-patch (#18) is conflicting with 1d5d48523900a4b0f25d6b52f1a93c84bd671186
-"xen-netback: require fewer guest Rx slots when not using GSO".
-
-If the 2 series above are completely acked/reviewed, I will fold them in
-this series.
-
-Regards,
+That's a fair implementation.  There is going to be a bit of work
+going into getting the 64 bit SCM un-stubbed.  So I can respin to incorporate
+your comments or we can wait for the unstubbing.
 
 -- 
-Julien Grall
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
