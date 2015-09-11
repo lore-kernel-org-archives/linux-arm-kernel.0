@@ -1,49 +1,62 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Fri, 11 Sep 2015 16:26:16 -0700
-Subject: [Patch v2] firmware: qcom: scm: Add function stubs for ARM64
-In-Reply-To: <1442005276-31971-1-git-send-email-agross@codeaurora.org>
-References: <1442005276-31971-1-git-send-email-agross@codeaurora.org>
-Message-ID: <20150911232616.GE13472@usrtlx11787.corpusers.net>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Sat, 12 Sep 2015 07:44:37 +0800
+Subject: [PATCH 2/2] ARM: dts: support Highspeed for rk3066a platform
+In-Reply-To: <25757012.mQz0HMffNZ@diego>
+References: <1441956268-10418-1-git-send-email-shawn.lin@rock-chips.com>
+ <1441956341-10623-1-git-send-email-shawn.lin@rock-chips.com>
+ <25757012.mQz0HMffNZ@diego>
+Message-ID: <55F36765.2040703@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 11 Sep 14:01 PDT 2015, Andy Gross wrote:
+? 2015/9/12 6:45, Heiko St?bner ??:
+> Hi Shawn,
+>
+> Am Freitag, 11. September 2015, 15:25:41 schrieb Shawn Lin:
+>> Add cap-sd-highspeed and cap-mmc-highspeed for rk3066a
+>> platform to make sd cards running faster.
+>>
+>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+>> ---
+>>
+>>   arch/arm/boot/dts/rk3066a.dtsi | 2 ++
+>>   1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+>> index 946f187..b50a785 100644
+>> --- a/arch/arm/boot/dts/rk3066a.dtsi
+>> +++ b/arch/arm/boot/dts/rk3066a.dtsi
+>> @@ -595,6 +595,8 @@
+>>   &mmc0 {
+>>   	pinctrl-names = "default";
+>>   	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_cd &sd0_bus4>;
+>> +	cap-mmc-highspeed;
+>> +	cap-sd-highspeed;
+>>   };
+>>
+>
+> Currently we're setting the dw_mmc capabilities in the individual board files
+> and patch1 also correctly adds the cap to the radxarock file.
+>
 
-> This patch adds stubs for the SCM functions exposed in the QCOM SCM API.
-> 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> ---
->  drivers/firmware/Kconfig       |    8 +++++
->  drivers/firmware/Makefile      |    3 +-
->  drivers/firmware/qcom_scm-64.c |   63 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 73 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/firmware/qcom_scm-64.c
-> 
-> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-> index 99c69a3..72720eb 100644
-> --- a/drivers/firmware/Kconfig
-> +++ b/drivers/firmware/Kconfig
-> @@ -136,6 +136,14 @@ config QCOM_SCM
->  	bool
->  	depends on ARM || ARM64
->  
-> +config QCOM_SCM_32
-> +	def_bool y
-> +	depends on QCOM_SCM && ARM
-> +
-> +config QCOM_SCM_64
-> +	def_bool y
-> +	depends on QCOM_SCM && ARM64
-> +
+Thanks, Heiko. :)
 
-So if QCOM_SCM is selected by a consumer then the dependencies here will
-be met and the correct implementation will be chosen, as these aren't
-possible to deselect?
+Right, I was condering add caps in rk3066a for all boards which include 
+it or for each individual board. Unfortunately, I chose the wrong one.:(
 
 
-I guess that's an okay approach, so:
+Done in the v2.
 
-Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> So I'd think we should stay with one scheme and probably add the rk3066 caps
+> to the bqcurie2, marsboard and rayeager where applicable.
+>
+>
+> Heiko
+>
+>
+>
 
-Regards,
-Bjorn
+
+-- 
+Best Regards
+Shawn Lin
