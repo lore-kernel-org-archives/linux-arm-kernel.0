@@ -1,47 +1,46 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 11 Sep 2015 17:59:48 +0200
-Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
- v4.3-rc1
-In-Reply-To: <55F2F895.5040704@nvidia.com>
-References: <20150819091358.GA26627@ulmo>
- <1439977724.4135.90.camel@collabora.co.uk>
- <20150819103305.GF26627@ulmo>
- <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
- <CAMAWPa_rus4z+Sg3Uff7ndqrpB8dF1c1rQBVQ9r7vXh6PFcVkQ@mail.gmail.com>
- <55F2AF45.5040706@nvidia.com> <20150911123759.GA8473@ulmo>
- <55F2D2E3.4010906@nvidia.com> <20150911132526.GB21673@ulmo>
- <55F2F895.5040704@nvidia.com>
-Message-ID: <20150911155946.GA13945@ulmo.nvidia.com>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Fri, 11 Sep 2015 16:12:21 +0000
+Subject: mysterious crashes on OMAP5 uevm
+In-Reply-To: <20150911140306.GB21098@n2100.arm.linux.org.uk>
+References: <CANOLnOO3NdK1r1jZQtS=TcHEE7SQwhGHh0YsqqoCJpFW3NO05Q@mail.gmail.com>
+ <20150908143810.GD4215@atomide.com>
+ <CANOLnOODjTaBcL1QzAm7o4YOB=_P-s7JYovu6fhNSqJSV2Bq+Q@mail.gmail.com>
+ <20150908210708.GH4215@atomide.com>
+ <E0068B56-0DEE-4E2F-94CF-DB104AE16D63@goldelico.com>
+ <20150910083026.GA21098@n2100.arm.linux.org.uk>
+ <CANOLnOM-PYcAL=f4rgucfdWZ1+U3HkP34bfwrKP4Rob+J6iTfw@mail.gmail.com>
+ <20150911140306.GB21098@n2100.arm.linux.org.uk>
+Message-ID: <EF62F09C0797D947AD4180A1043C0DF740C23E8D@DLEE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 04:51:49PM +0100, Jon Hunter wrote:
-> 
-> On 11/09/15 14:25, Thierry Reding wrote:
-> 
-> [snip]
-> 
-> > Works for me 100% of the time. Unloading and reloading isn't a problem
-> > either. What revision of the Jetson TK1 do you have? Mine is a C.2
-> 
-> Unfortunately, I am not sure it is whatever is in Paul's automation rig
-> [0]. However, I have also reproduced this on a tegra124 nyan-big in the
-> office.
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Russell King - ARM Linux
+> Sent: Friday, September 11, 2015 9:03 AM
+> To: Grazvydas Ignotas
 
-I was able to reproduce this using a busybox initial ramdisk. Just to
-make sure I built a separate one from git and it exposes the same
-behaviour. I suspect that this is some sort of weird interaction between
-mdev and async probing and nobody's noticed so far because async probing
-isn't very common (at least in the ARM world).
+> However, even the idea that it's ARMv7 or later is wrong.  According to
+> the ARM ARM, the IT instruction is present in ARMv6T2 as well, which
+> means it's ARMv6 too (which would have __LINUX_ARM_ARCH__ = 6).
 
-I'll be off for the weekend soonish, but I'll try to find some more time
-next week to track this down.
+I recall seeing ARMv6T2 first implemented in the ARM1156 which is a v6 CPU with T2 option added.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150911/c162e34f/attachment.sig>
+Cortex-R class was the ARMv7 successor to the 1156 CPU which also use T2.
+
+> Looking at the ARM ARM, these bits are "reserved" in previous non-T2
+> architectures, have an undefined value at reset, and are probably zero
+> anyway.
+> 
+> Merely changing __LINUX_ARM_ARCH__ >= 7 to >= 6 should fix the
+> problem,
+> and I doubt there's any ARMv6 non-T2 systems out there that would be
+> affected by clearing the IT state bits.
+
+Probably you already looked, but cpsr.it usage is not restricted to this one spot.
+
+Looking back at old notes I think both debug and signal handler code keyed on bit usage.  I see from LXR kernel KVM code also uses in some capacity.
+
+The 1156/Cortex-R are typically MMU-less.   They may (or not) have something else to consider when fixing.
+
+Regards,
+Richard W.
