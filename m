@@ -1,107 +1,205 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 11 Sep 2015 16:54:56 +0800
-Subject: [PATCH v2 03/22] KVM: ARM64: Add offset defines for PMU registers
+Date: Fri, 11 Sep 2015 16:55:15 +0800
+Subject: [PATCH v2 22/22] KVM: ARM64: Add a new kvm ARM PMU device
 In-Reply-To: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1441961715-11688-4-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1441961715-11688-23-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-We are about to trap and emulate acccesses to each PMU register
-individually. This adds the context offsets for the AArch64 PMU
-registers and their AArch32 counterparts.
+Add a new kvm device type KVM_DEV_TYPE_ARM_PMU_V3 for ARM PMU. Implement
+the kvm_device_ops for it.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm64/include/asm/kvm_asm.h | 59 +++++++++++++++++++++++++++++++++++-----
- 1 file changed, 52 insertions(+), 7 deletions(-)
+ Documentation/virtual/kvm/devices/arm-pmu.txt | 15 +++++
+ arch/arm64/include/uapi/asm/kvm.h             |  3 +
+ include/linux/kvm_host.h                      |  1 +
+ include/uapi/linux/kvm.h                      |  2 +
+ virt/kvm/arm/pmu.c                            | 88 +++++++++++++++++++++++++++
+ virt/kvm/kvm_main.c                           |  4 ++
+ 6 files changed, 113 insertions(+)
+ create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 3c5fe68..3a1df48 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -56,14 +56,36 @@
- #define DBGWVR15_EL1	86
- #define MDCCINT_EL1	87	/* Monitor Debug Comms Channel Interrupt Enable Reg */
+diff --git a/Documentation/virtual/kvm/devices/arm-pmu.txt b/Documentation/virtual/kvm/devices/arm-pmu.txt
+new file mode 100644
+index 0000000..49481c4
+--- /dev/null
++++ b/Documentation/virtual/kvm/devices/arm-pmu.txt
+@@ -0,0 +1,15 @@
++ARM Virtual Performance Monitor Unit (vPMU)
++===========================================
++
++Device types supported:
++  KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
++
++Instantiate one PMU instance for per VCPU through this API.
++
++Groups:
++  KVM_DEV_ARM_PMU_GRP_IRQ
++  Attributes:
++    A value describing the interrupt number of PMU overflow interrupt.
++
++  Errors:
++    -EINVAL: Value set is out of the expected range
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index d268320..9960889 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -171,6 +171,9 @@ struct kvm_arch_memory_slot {
+ #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
+ #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
  
-+/* Performance Monitors Registers */
-+#define PMCR_EL0	88	/* Control Register */
-+#define PMOVSSET_EL0	89	/* Overflow Flag Status Set Register */
-+#define PMOVSCLR_EL0	90	/* Overflow Flag Status Clear Register */
-+#define PMSELR_EL0	91	/* Event Counter Selection Register */
-+#define PMCEID0_EL0	92	/* Common Event Identification Register 0 */
-+#define PMCEID1_EL0	93	/* Common Event Identification Register 1 */
-+#define PMEVCNTR0_EL0	94	/* Event Counter Register (0-30) */
-+#define PMEVCNTR30_EL0	124
-+#define PMCCNTR_EL0	125	/* Cycle Counter Register */
-+#define PMEVTYPER0_EL0	126	/* Event Type Register (0-30) */
-+#define PMEVTYPER30_EL0	156
-+#define PMCCFILTR_EL0	157	/* Cycle Count Filter Register */
-+#define PMXEVCNTR_EL0	158	/* Selected Event Count Register */
-+#define PMXEVTYPER_EL0	159	/* Selected Event Type Register */
-+#define PMCNTENSET_EL0	160	/* Count Enable Set Register */
-+#define PMCNTENCLR_EL0	161	/* Count Enable Clear Register */
-+#define PMINTENSET_EL1	162	/* Interrupt Enable Set Register */
-+#define PMINTENCLR_EL1	163	/* Interrupt Enable Clear Register */
-+#define PMUSERENR_EL0	164	/* User Enable Register */
-+#define PMSWINC_EL0	165	/* Software Increment Register */
++/* Device Control API: ARM PMU */
++#define KVM_DEV_ARM_PMU_GRP_IRQ		0
 +
- /* 32bit specific registers. Keep them at the end of the range */
--#define	DACR32_EL2	88	/* Domain Access Control Register */
--#define	IFSR32_EL2	89	/* Instruction Fault Status Register */
--#define	FPEXC32_EL2	90	/* Floating-Point Exception Control Register */
--#define	DBGVCR32_EL2	91	/* Debug Vector Catch Register */
--#define	TEECR32_EL1	92	/* ThumbEE Configuration Register */
--#define	TEEHBR32_EL1	93	/* ThumbEE Handler Base Register */
--#define	NR_SYS_REGS	94
-+#define	DACR32_EL2	166	/* Domain Access Control Register */
-+#define	IFSR32_EL2	167	/* Instruction Fault Status Register */
-+#define	FPEXC32_EL2	168	/* Floating-Point Exception Control Register */
-+#define	DBGVCR32_EL2	169	/* Debug Vector Catch Register */
-+#define	TEECR32_EL1	170	/* ThumbEE Configuration Register */
-+#define	TEEHBR32_EL1	171	/* ThumbEE Handler Base Register */
-+#define	NR_SYS_REGS	172
+ /* KVM_IRQ_LINE irq field index values */
+ #define KVM_ARM_IRQ_TYPE_SHIFT		24
+ #define KVM_ARM_IRQ_TYPE_MASK		0xff
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index 05e99b8..9136dec 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -1129,6 +1129,7 @@ extern struct kvm_device_ops kvm_mpic_ops;
+ extern struct kvm_device_ops kvm_xics_ops;
+ extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
+ extern struct kvm_device_ops kvm_arm_vgic_v3_ops;
++extern struct kvm_device_ops kvm_arm_pmu_ops;
  
- /* 32bit mapping */
- #define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
-@@ -85,6 +107,24 @@
- #define c6_IFAR		(c6_DFAR + 1)	/* Instruction Fault Address Register */
- #define c7_PAR		(PAR_EL1 * 2)	/* Physical Address Register */
- #define c7_PAR_high	(c7_PAR + 1)	/* PAR top 32 bits */
-+
-+/* Performance Monitors*/
-+#define c9_PMCR		(PMCR_EL0 * 2)
-+#define c9_PMOVSSET	(PMOVSSET_EL0 * 2)
-+#define c9_PMOVSCLR	(PMOVSCLR_EL0 * 2)
-+#define c9_PMCCNTR	(PMCCNTR_EL0 * 2)
-+#define c9_PMSELR	(PMSELR_EL0 * 2)
-+#define c9_PMCEID0	(PMCEID0_EL0 * 2)
-+#define c9_PMCEID1	(PMCEID1_EL0 * 2)
-+#define c9_PMXEVCNTR	(PMXEVCNTR_EL0 * 2)
-+#define c9_PMXEVTYPER	(PMXEVTYPER_EL0 * 2)
-+#define c9_PMCNTENSET	(PMCNTENSET_EL0 * 2)
-+#define c9_PMCNTENCLR	(PMCNTENCLR_EL0 * 2)
-+#define c9_PMINTENSET	(PMINTENSET_EL1 * 2)
-+#define c9_PMINTENCLR	(PMINTENCLR_EL1 * 2)
-+#define c9_PMUSERENR	(PMUSERENR_EL0 * 2)
-+#define c9_PMSWINC	(PMSWINC_EL0 * 2)
-+
- #define c10_PRRR	(MAIR_EL1 * 2)	/* Primary Region Remap Register */
- #define c10_NMRR	(c10_PRRR + 1)	/* Normal Memory Remap Register */
- #define c12_VBAR	(VBAR_EL1 * 2)	/* Vector Base Address Register */
-@@ -96,6 +136,11 @@
- #define c10_AMAIR1	(c10_AMAIR0 + 1)/* Aux Memory Attr Indirection Reg */
- #define c14_CNTKCTL	(CNTKCTL_EL1 * 2) /* Timer Control Register (PL1) */
+ #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
  
-+/* Performance Monitors*/
-+#define c14_PMEVCNTR0	(PMEVCNTR0_EL0 * 2)
-+#define c14_PMEVTYPER0	(PMEVTYPER0_EL0 * 2)
-+#define c14_PMCCFILTR	(PMCCFILTR_EL0 * 2)
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 716ad4a..591d185 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -1018,6 +1018,8 @@ enum kvm_device_type {
+ #define KVM_DEV_TYPE_FLIC		KVM_DEV_TYPE_FLIC
+ 	KVM_DEV_TYPE_ARM_VGIC_V3,
+ #define KVM_DEV_TYPE_ARM_VGIC_V3	KVM_DEV_TYPE_ARM_VGIC_V3
++	KVM_DEV_TYPE_ARM_PMU_V3,
++#define	KVM_DEV_TYPE_ARM_PMU_V3		KVM_DEV_TYPE_ARM_PMU_V3
+ 	KVM_DEV_TYPE_MAX,
+ };
+ 
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 8eccac9..d9f2e5b 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -19,6 +19,7 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <linux/perf_event.h>
++#include <linux/uaccess.h>
+ #include <asm/kvm_emulate.h>
+ #include <kvm/arm_pmu.h>
+ #include <kvm/arm_vgic.h>
+@@ -410,3 +411,90 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
+ 	}
+ 	pmc->perf_event = event;
+ }
 +
- #define cp14_DBGDSCRext	(MDSCR_EL1 * 2)
- #define cp14_DBGBCR0	(DBGBCR0_EL1 * 2)
- #define cp14_DBGBVR0	(DBGBVR0_EL1 * 2)
++static int kvm_arm_pmu_set_irq(struct kvm *kvm, int irq)
++{
++	int j;
++	struct kvm_vcpu *vcpu;
++
++	kvm_for_each_vcpu(j, vcpu, kvm) {
++		struct kvm_pmu *pmu = &vcpu->arch.pmu;
++
++		kvm_debug("Set kvm ARM PMU irq: %d\n", irq);
++		pmu->irq_num = irq;
++	}
++
++	return 0;
++}
++
++static int kvm_arm_pmu_create(struct kvm_device *dev, u32 type)
++{
++	int i, j;
++	struct kvm_vcpu *vcpu;
++	struct kvm *kvm = dev->kvm;
++
++	kvm_for_each_vcpu(j, vcpu, kvm) {
++		struct kvm_pmu *pmu = &vcpu->arch.pmu;
++
++		memset(pmu, 0, sizeof(*pmu));
++		for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
++			pmu->pmc[i].idx = i;
++			pmu->pmc[i].vcpu = vcpu;
++		}
++		pmu->irq_num = -1;
++	}
++
++	return 0;
++}
++
++static void kvm_arm_pmu_destroy(struct kvm_device *dev)
++{
++	kfree(dev);
++}
++
++static int kvm_arm_pmu_set_attr(struct kvm_device *dev,
++				struct kvm_device_attr *attr)
++{
++	switch (attr->group) {
++	case KVM_DEV_ARM_PMU_GRP_IRQ: {
++		int __user *uaddr = (int __user *)(long)attr->addr;
++		int reg;
++
++		if (get_user(reg, uaddr))
++			return -EFAULT;
++
++		if (reg < VGIC_NR_SGIS || reg > dev->kvm->arch.vgic.nr_irqs)
++			return -EINVAL;
++
++		return kvm_arm_pmu_set_irq(dev->kvm, reg);
++	}
++	}
++
++	return -ENXIO;
++}
++
++static int kvm_arm_pmu_get_attr(struct kvm_device *dev,
++				struct kvm_device_attr *attr)
++{
++	return 0;
++}
++
++static int kvm_arm_pmu_has_attr(struct kvm_device *dev,
++				struct kvm_device_attr *attr)
++{
++	switch (attr->group) {
++	case KVM_DEV_ARM_PMU_GRP_IRQ:
++		return 0;
++	}
++
++	return -ENXIO;
++}
++
++struct kvm_device_ops kvm_arm_pmu_ops = {
++	.name = "kvm-arm-pmu",
++	.create = kvm_arm_pmu_create,
++	.destroy = kvm_arm_pmu_destroy,
++	.set_attr = kvm_arm_pmu_set_attr,
++	.get_attr = kvm_arm_pmu_get_attr,
++	.has_attr = kvm_arm_pmu_has_attr,
++};
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index 8b8a444..31aa245 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -2549,6 +2549,10 @@ static struct kvm_device_ops *kvm_device_ops_table[KVM_DEV_TYPE_MAX] = {
+ #ifdef CONFIG_KVM_XICS
+ 	[KVM_DEV_TYPE_XICS]		= &kvm_xics_ops,
+ #endif
++
++#ifdef CONFIG_KVM_ARM_PMU
++	[KVM_DEV_TYPE_ARM_PMU_V3]	= &kvm_arm_pmu_ops,
++#endif
+ };
+ 
+ int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type)
 -- 
 2.0.4
