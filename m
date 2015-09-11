@@ -1,97 +1,106 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 11 Sep 2015 15:14:24 +0100
-Subject: [PATCH v2 2/9] dmaengine: st_fdma: Add st fdma platform specific
- header
+Date: Fri, 11 Sep 2015 15:14:23 +0100
+Subject: [PATCH v2 1/9] dmaengine: st_fdma: Add STMicroelectronics FDMA DT
+ binding documentation
 In-Reply-To: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
 References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1441980871-24475-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1441980871-24475-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+This patch adds the DT binding documentation for the FDMA constroller
+found on STi based chipsets from STMicroelectronics.
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- include/linux/platform_data/dma-st_fdma.h | 72 +++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
- create mode 100644 include/linux/platform_data/dma-st_fdma.h
+ Documentation/devicetree/bindings/dma/st_fdma.txt | 78 +++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
 
-diff --git a/include/linux/platform_data/dma-st_fdma.h b/include/linux/platform_data/dma-st_fdma.h
+diff --git a/Documentation/devicetree/bindings/dma/st_fdma.txt b/Documentation/devicetree/bindings/dma/st_fdma.txt
 new file mode 100644
-index 0000000..ea2523b
+index 0000000..c24b8d7
 --- /dev/null
-+++ b/include/linux/platform_data/dma-st_fdma.h
-@@ -0,0 +1,72 @@
-+/*
-+ * dma-st-fdma.h
-+ *
-+ * Copyright (C) 2014 STMicroelectronics
-+ * Author: Ludovic Barre <Ludovic.barre@st.com>
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+#ifndef __PLAT_ST_FDMA_H
-+#define __PLAT_ST_FDMA_H
++++ b/Documentation/devicetree/bindings/dma/st_fdma.txt
+@@ -0,0 +1,78 @@
++* STMicroelectronics Flexible Direct Memory Access Device Tree bindings
 +
-+#include <linux/dmaengine.h>
++The FDMA is a general-purpose direct memory access controller capable of
++supporting 16 independent DMA channels. It accepts up to 32 DMA requests.
++The FDMA is based on a Slim processor which require a firmware.
 +
-+/*
-+ * Channel type
-+ */
-+enum st_fdma_type {
-+	ST_FDMA_TYPE_FREE_RUN,
-+	ST_FDMA_TYPE_PACED,
-+};
++* FDMA Controller
 +
-+struct st_fdma_cfg {
-+	struct device_node *of_node;
-+	enum st_fdma_type type;
-+	dma_addr_t dev_addr;
-+	enum dma_transfer_direction dir;
-+	int req_line; /* request line */
-+	u32 req_ctrl; /* Request control */
-+};
++Required properties:
++- compatible	: Should be "st,stih407-fdma-mpe31"
++- reg		: Should contain DMA registers location and length
++- interrupts	: Should contain one interrupt shared by all channels
++- dma-channels	: Number of channels supported by the controller
++- #dma-cells	: Must be <3>. See DMA client section below
++- st,fdma-id	: Must contain fdma controller number
++- clocks	: Must contain an entry for each name in clock-names
++- clock-names	: Must contain "fdma_slim, fdma_hi, fdma_low, fdma_ic" entries
++See: Documentation/devicetree/bindings/clock/clock-bindings.txt
 +
-+#define FW_NAME_SIZE 30
 +
-+/**
-+ * struct st_fdma_platform_data - platform specific data for FDMA engine
-+ *
-+ * @nr_channels:	Number of channels supported by hardware
-+ * @fw_name:		The firmware name
-+ */
-+struct st_fdma_platform_data {
-+	u32 nr_channels;
-+	u32 id;
-+	char fw_name[FW_NAME_SIZE];
-+};
++Example:
 +
-+/*
-+ * request control bits
-+ */
-+#define REQ_CTRL_NUM_OPS_MASK		GENMASK(31, 24)
-+#define REQ_CTRL_NUM_OPS(n)		(REQ_CTRL_NUM_OPS_MASK & ((n) << 24))
-+#define REQ_CTRL_INITIATOR_MASK		BIT(22)
-+#define	REQ_CTRL_INIT0			(0x0 << 22)
-+#define	REQ_CTRL_INIT1			(0x1 << 22)
-+#define REQ_CTRL_INC_ADDR_ON		BIT(21)
-+#define REQ_CTRL_DATA_SWAP_ON		BIT(17)
-+#define REQ_CTRL_WNR			BIT(14)
-+#define REQ_CTRL_OPCODE_MASK		GENMASK(7, 4)
-+#define REQ_CTRL_OPCODE_LD_ST1		(0x0 << 4)
-+#define REQ_CTRL_OPCODE_LD_ST2		(0x1 << 4)
-+#define REQ_CTRL_OPCODE_LD_ST4		(0x2 << 4)
-+#define REQ_CTRL_OPCODE_LD_ST8		(0x3 << 4)
-+#define REQ_CTRL_OPCODE_LD_ST16		(0x4 << 4)
-+#define REQ_CTRL_OPCODE_LD_ST32		(0x5 << 4)
-+#define REQ_CTRL_OPCODE_LD_ST64		(0x6 << 4)
-+#define REQ_CTRL_HOLDOFF_MASK		GENMASK(2, 0)
-+#define REQ_CTRL_HOLDOFF(n)		((n) & REQ_CTRL_HOLDOFF_MASK)
++	fdma1: fdma-app at 8e40000 {
++		compatible = "st,stih407-fdma-mpe31";
++		reg = <0x8e40000 0x20000>;
++		interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>;
++		dma-channels = <16>;
++		#dma-cells = <3>;
++		st,fdma-id = <0>;
++		clocks = <&CLK_S_C0_FLEXGEN CLK_FDMA>,
++			 <&CLK_S_C0_FLEXGEN CLK_TX_ICN_DMU>,
++			 <&CLK_S_C0_FLEXGEN CLK_TX_ICN_DMU>,
++			 <&CLK_S_C0_FLEXGEN CLK_EXT2F_A9>;
++		clock-names = "fdma_slim",
++			      "fdma_hi",
++			      "fdma_low",
++			      "fdma_ic";
++		};
 +
-+/* bits used by client to configure request control */
-+#define REQ_CTRL_CFG_MASK (REQ_CTRL_HOLDOFF_MASK | REQ_CTRL_DATA_SWAP_ON \
-+			| REQ_CTRL_INC_ADDR_ON | REQ_CTRL_INITIATOR_MASK)
++* DMA client
 +
-+bool st_fdma_filter_fn(struct dma_chan *chan, void *param);
++Required properties:
++- dmas: Comma separated list of dma channel requests
++- dma-names: Names of the aforementioned requested channels
 +
-+#endif	/* __PLAT_ST_FDMA_H */
++Each dmas request consists of 4 cells:
++1. A phandle pointing to the FDMA controller
++2. The request line number
++3. A 32bit mask specifying (see include/linux/platform_data/dma-st-fdma.h)
++ -bit 2-0: Holdoff value, dreq will be masked for
++	0x0: 0-0.5us
++	0x1: 0.5-1us
++	0x2: 1-1.5us
++ -bit 17: data swap
++	0x0: disabled
++	0x1: enabled
++ -bit 21: Increment Address
++	0x0: no address increment between transfers
++	0x1: increment address between transfers
++ -bit 22: 2 STBus Initiator Coprocessor interface
++	0x0: high priority port
++	0x1: low priority port
++4. transfers type
++ 0 free running
++ 1 paced
++
++Example:
++
++	snd_uni_player2: snd-uni-player at 2 {
++		compatible = "st,snd_uni_player";
++		status = "okay";
++		reg = <0x8D82000  0x158>;
++		interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
++		version = <5>;
++		dmas = <&fdma0 4 0 1>;
++		dma-names = "tx";
++		description = "Uni Player #2 (DAC)";
++	};
 -- 
 1.9.1
