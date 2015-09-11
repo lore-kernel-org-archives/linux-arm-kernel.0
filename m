@@ -1,47 +1,97 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Fri, 11 Sep 2015 15:27:13 +0200
-Subject: mysterious crashes on OMAP5 uevm
-In-Reply-To: <20150910083026.GA21098@n2100.arm.linux.org.uk>
-References: <CANOLnOO3NdK1r1jZQtS=TcHEE7SQwhGHh0YsqqoCJpFW3NO05Q@mail.gmail.com>
- <20150908143810.GD4215@atomide.com>
- <CANOLnOODjTaBcL1QzAm7o4YOB=_P-s7JYovu6fhNSqJSV2Bq+Q@mail.gmail.com>
- <20150908210708.GH4215@atomide.com>
- <E0068B56-0DEE-4E2F-94CF-DB104AE16D63@goldelico.com>
- <20150910083026.GA21098@n2100.arm.linux.org.uk>
-Message-ID: <CANOLnOM-PYcAL=f4rgucfdWZ1+U3HkP34bfwrKP4Rob+J6iTfw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 11 Sep 2015 15:30:15 +0200
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <alpine.DEB.2.02.1509111410180.2672@kaball.uk.xensource.com>
+References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
+ <20150910095208.GA29293@leverpostej>
+ <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
+ <20150910112418.GC29293@leverpostej>
+ <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
+ <20150910121514.GE29293@leverpostej>
+ <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
+ <20150910144938.GI29293@leverpostej>
+ <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
+ <20150910162302.GN29293@leverpostej>
+ <20150911124643.GB4530@olila.local.net-space.pl>
+ <alpine.DEB.2.02.1509111410180.2672@kaball.uk.xensource.com>
+Message-ID: <CAKv+Gu9rN7_mxk0huX+34HSCC_aTWVTkUZKQMB1+9U56fRnwsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 10, 2015 at 10:30 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Sep 10, 2015 at 08:42:57AM +0200, Dr. H. Nikolaus Schaller wrote:
->> ...
+On 11 September 2015 at 15:14, Stefano Stabellini
+<stefano.stabellini@eu.citrix.com> wrote:
+> On Fri, 11 Sep 2015, Daniel Kiper wrote:
+>> On Thu, Sep 10, 2015 at 05:23:02PM +0100, Mark Rutland wrote:
+>> > > > C) When you could go:
+>> > > >
+>> > > >    DT -> Discover Xen -> Xen-specific stuff -> Xen-specific EFI/ACPI discovery
+>> > >
+>> > > I take you mean discovering Xen with the usual Xen hypervisor node on
+>> > > device tree. I think that C) is a good option actually. I like it. Not
+>> > > sure why we didn't think about this earlier. Is there anything EFI or
+>> > > ACPI which is needed before Xen support is discovered by
+>> > > arch/arm64/kernel/setup.c:setup_arch -> xen_early_init()?
+>> >
+>> > Currently lots (including the memory map). With the stuff to support
+>> > SPCR, the ACPI discovery would be moved before xen_early_init().
+>> >
+>> > > If not, we could just go for this. A lot of complexity would go away.
+>> >
+>> > I suspect this would still be fairly complex, but would at least prevent
+>> > the Xen-specific EFI handling from adversely affecting the native case.
+>> >
+>> > > > D) If you want to be generic:
+>> > > >    EFI -> EFI application -> EFI tables -> ACPI tables -> Xen-specific stuff
+>> > > >           \------------------------------------------/
+>> > > >            (virtualize these, provide shims to Dom0, but handle
+>> > > >             everything in Xen itself)
+>> > >
+>> > > I think that this is good in theory but could turn out to be a lot of
+>> > > work in practice. We could probably virtualize the RuntimeServices but
+>> > > the BootServices are troublesome.
+>> >
+>> > What's troublesome with the boot services?
+>> >
+>> > What can't be simulated?
 >>
->> Now, disabling CONFIG_ARCH_MULTI_V6 also makes the bug go away and adding the
->> >> #if 0 //__LINUX_ARM_ARCH__ >= 7
->> makes it re-appear.
->>
->> A while ago I tried to debug running the x-server under strace and could find that it also has
->> something to do with SIGALRM.
->>
->> And that is very consistent with ?enable/disable? by modifying arch/arm/kernel/signal.c
+>> How do you want to access bare metal EFI boot services from dom0 if they
+>> were shutdown long time ago before loading dom0 image? What do you need
+>> from EFI boot services in dom0?
 >
-> It would be really nice if someone could diagnose what's going on here.
-> What exception is causing the X server to be killed (someone said a
-> segfault)?  What is the register state at the point that happens?  What
-> does the code look like  Is it happening inside the SIGALRM handler, or
-> when the SIGALRM handler has returned?
+> That's right. Trying to emulate BootServices after the real
+> ExitBootServices has already been called seems like a very bad plan.
 >
-> I'd suggest attaching gdb to the X server, but remember to set gdb to
-> ignore SIGPIPEs.
+> I think that whatever interface we come up with, would need to be past
+> ExitBootServices.
 
-It's actually pretty random, see some debug sessions in [1].
-The first one is the most useful one, but I haven't though of checking
-what pixman_rasterize_edges() was doing when the signal arrived, and
-most often the "less useful" segfaults occur. However from the
-disassembly (see debug1_libpixman.gz) it can be seen that the signal
-arrived right after IT.
+It feels like this discussion is going in circles.
 
-[1] http://notaz.gp2x.de/tmp/thumb_segfault/
+When we discussed this six months ago, we already concluded that,
+since UEFI is the only specified way that the presence of ACPI is
+advertised on an ARM system, we need to emulate UEFI to some extent.
 
-Gra?vydas
+So we need the EFI system table to expose the UEFI configuration table
+that carries the ACPI root pointer.
+
+Since ACPI support also relies on the UEFI memory map (I think?), we
+need that as well.
+
+These two items are exactly what we pass via the UEFI DT properties,
+so we should indeed promote the current de-facto binding to a proper
+binding, and renaming the properties makes sense in that context.
+
+I agree that this should also include a description of the expected
+state of the firmware, i.e., that ExitBootServices() has been called,
+and that the memory map has been populated with virtual address, which
+have been installed using SetVirtualAddressMap() if they differ from
+the physical addresses. (The current implementation on the kernel side
+is perfectly capable of dealing with a 1:1 mapping).
+
+Beyond that, there is no point in pretending to be a full UEFI
+implementation, imo. Boot services are not required, nor are runtime
+services (only the current EFI init code on arm needs to be modified
+to deal with a NULL runtime services pointer)
+
+-- 
+Ard.
