@@ -1,46 +1,39 @@
-From: r-woodruff2@ti.com (Woodruff, Richard)
-Date: Fri, 11 Sep 2015 16:12:21 +0000
-Subject: mysterious crashes on OMAP5 uevm
-In-Reply-To: <20150911140306.GB21098@n2100.arm.linux.org.uk>
-References: <CANOLnOO3NdK1r1jZQtS=TcHEE7SQwhGHh0YsqqoCJpFW3NO05Q@mail.gmail.com>
- <20150908143810.GD4215@atomide.com>
- <CANOLnOODjTaBcL1QzAm7o4YOB=_P-s7JYovu6fhNSqJSV2Bq+Q@mail.gmail.com>
- <20150908210708.GH4215@atomide.com>
- <E0068B56-0DEE-4E2F-94CF-DB104AE16D63@goldelico.com>
- <20150910083026.GA21098@n2100.arm.linux.org.uk>
- <CANOLnOM-PYcAL=f4rgucfdWZ1+U3HkP34bfwrKP4Rob+J6iTfw@mail.gmail.com>
- <20150911140306.GB21098@n2100.arm.linux.org.uk>
-Message-ID: <EF62F09C0797D947AD4180A1043C0DF740C23E8D@DLEE11.ent.ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Sep 2015 17:22:15 +0100
+Subject: [PATCH v2 9/9] ARM: multi_v7_defconfig: Enable STi FDMA driver
+In-Reply-To: <1441980871-24475-10-git-send-email-peter.griffin@linaro.org>
+References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
+ <1441980871-24475-10-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20150911162215.GB18779@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Russell King - ARM Linux
-> Sent: Friday, September 11, 2015 9:03 AM
-> To: Grazvydas Ignotas
+On Fri, 11 Sep 2015, Peter Griffin wrote:
 
-> However, even the idea that it's ARMv7 or later is wrong.  According to
-> the ARM ARM, the IT instruction is present in ARMv6T2 as well, which
-> means it's ARMv6 too (which would have __LINUX_ARM_ARCH__ = 6).
-
-I recall seeing ARMv6T2 first implemented in the ARM1156 which is a v6 CPU with T2 option added.
-
-Cortex-R class was the ARMv7 successor to the 1156 CPU which also use T2.
-
-> Looking at the ARM ARM, these bits are "reserved" in previous non-T2
-> architectures, have an undefined value at reset, and are probably zero
-> anyway.
+> This DMA controller is found on all STi chipsets.
 > 
-> Merely changing __LINUX_ARM_ARCH__ >= 7 to >= 6 should fix the
-> problem,
-> and I doubt there's any ARMv6 non-T2 systems out there that would be
-> affected by clearing the IT state bits.
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 
-Probably you already looked, but cpsr.it usage is not restricted to this one spot.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Looking back at old notes I think both debug and signal handler code keyed on bit usage.  I see from LXR kernel KVM code also uses in some capacity.
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 5fd8df6..ce3c8c1 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -587,6 +587,7 @@ CONFIG_IMX_DMA=y
+>  CONFIG_MXS_DMA=y
+>  CONFIG_DMA_OMAP=y
+>  CONFIG_XILINX_VDMA=y
+> +CONFIG_ST_FDMA=y
+>  CONFIG_STAGING=y
+>  CONFIG_SENSORS_ISL29018=y
+>  CONFIG_SENSORS_ISL29028=y
 
-The 1156/Cortex-R are typically MMU-less.   They may (or not) have something else to consider when fixing.
-
-Regards,
-Richard W.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
