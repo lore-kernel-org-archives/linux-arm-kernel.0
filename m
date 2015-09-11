@@ -1,65 +1,34 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 11 Sep 2015 15:27:22 +0300
-Subject: [PATCH v2 23/23] dmaengine: edma: Read channel mapping support only
- once from HW
+Date: Fri, 11 Sep 2015 15:27:17 +0300
+Subject: [PATCH v2 18/23] dmaengine: edma: Print warning when linking slots
+ from different eDMA
 In-Reply-To: <1441974442-8233-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1441974442-8233-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1441974442-8233-24-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1441974442-8233-19-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of directly reading it from CCCFG register take the information out
-once when we set up the configuration from the HW.
+Warning message in case of linking between paRAM slots in different eDMA
+controllers.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/edma.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/dma/edma.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 5fd5cf924daf..bcb3404058cf 100644
+index fcd612fbf00d..5dd0cd478523 100644
 --- a/drivers/dma/edma.c
 +++ b/drivers/dma/edma.c
-@@ -223,6 +223,7 @@ struct edma_cc {
- 	unsigned			num_region;
- 	unsigned			num_slots;
- 	unsigned			num_tc;
-+	bool				chmap_exist;
- 	enum dma_event_q 		default_queue;
- 
- 	bool				unused_chan_list_done;
-@@ -1904,11 +1905,14 @@ static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
- 	value = GET_NUM_EVQUE(cccfg);
- 	ecc->num_tc = value + 1;
- 
-+	ecc->chmap_exist = (cccfg & CHMAP_EXIST) ? true : false;
+@@ -598,6 +598,9 @@ static void edma_free_slot(struct edma_cc *ecc, unsigned slot)
+  */
+ static void edma_link(struct edma_cc *ecc, unsigned from, unsigned to)
+ {
++	if (unlikely(EDMA_CTLR(from) != EDMA_CTLR(to)))
++		dev_warn(ecc->dev, "Ignoring eDMA instance for linking\n");
 +
- 	dev_dbg(dev, "eDMA3 CC HW configuration (cccfg: 0x%08x):\n", cccfg);
- 	dev_dbg(dev, "num_region: %u\n", ecc->num_region);
- 	dev_dbg(dev, "num_channels: %u\n", ecc->num_channels);
- 	dev_dbg(dev, "num_slots: %u\n", ecc->num_slots);
- 	dev_dbg(dev, "num_tc: %u\n", ecc->num_tc);
-+	dev_dbg(dev, "chmap_exist: %s\n", ecc->chmap_exist ? "yes" : "no");
- 
- 	/* Nothing need to be done if queue priority is provided */
- 	if (pdata->queue_priority_mapping)
-@@ -2198,7 +2202,7 @@ static int edma_probe(struct platform_device *pdev)
- 					      queue_priority_mapping[i][1]);
- 
- 	/* Map the channel to param entry if channel mapping logic exist */
--	if (edma_read(ecc, EDMA_CCCFG) & CHMAP_EXIST)
-+	if (ecc->chmap_exist)
- 		edma_direct_dmach_to_param_mapping(ecc);
- 
- 	for (i = 0; i < ecc->num_region; i++) {
-@@ -2268,7 +2272,7 @@ static int edma_pm_resume(struct device *dev)
- 					      queue_priority_mapping[i][1]);
- 
- 	/* Map the channel to param entry if channel mapping logic */
--	if (edma_read(ecc, EDMA_CCCFG) & CHMAP_EXIST)
-+	if (ecc->chmap_exist)
- 		edma_direct_dmach_to_param_mapping(ecc);
- 
- 	for (i = 0; i < ecc->num_channels; i++) {
+ 	from = EDMA_CHAN_SLOT(from);
+ 	to = EDMA_CHAN_SLOT(to);
+ 	if (from >= ecc->num_slots || to >= ecc->num_slots)
 -- 
 2.5.1
