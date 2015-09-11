@@ -1,47 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Sep 2015 16:10:17 +0100
-Subject: [PATCH 2/2] ARM: domains: add memory dependencies to
- get_domain/set_domain
-In-Reply-To: <87si6lt36s.fsf@belgarion.home>
-References: <20150911095438.GL21084@n2100.arm.linux.org.uk>
- <E1ZaL45-0003fs-1k@rmk-PC.arm.linux.org.uk>
- <87si6lt36s.fsf@belgarion.home>
-Message-ID: <20150911151017.GS21084@n2100.arm.linux.org.uk>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Fri, 11 Sep 2015 08:18:43 -0700
+Subject: NFS/TCP/IPv6 acting strangely in 4.2
+In-Reply-To: <20150911150613.GR21084@n2100.arm.linux.org.uk>
+References: <20150911113839.GO21084@n2100.arm.linux.org.uk>
+ <1441976691.4619.58.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20150911143347.GQ21084@n2100.arm.linux.org.uk>
+ <20150911150613.GR21084@n2100.arm.linux.org.uk>
+Message-ID: <1441984723.4619.61.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 04:56:27PM +0200, Robert Jarzmik wrote:
-> Russell King <rmk+kernel@arm.linux.org.uk> writes:
-> > We need to have memory dependencies on get_domain/set_domain to avoid
-> > the compiler over-optimising these inline assembly instructions.
-> >
-> > Loads/stores must not be reordered across a set_domain(), so introduce
-> > a compiler barrier for that assembly.
-> >
-> > The value of get_domain() must not be cached across a set_domain(), but
-> > we still want to allow the compiler to optimise it away.  Introduce a
-> > dependency on current_thread_info()->cpu_domain to avoid this; the new
-> > memory clobber in set_domain() should therefore cause the compiler to
-> > re-load this.  The other advantage of using this is we should have its
-> > address in the register set already, or very soon after at most call
-> > sites.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+On Fri, 2015-09-11 at 16:06 +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 11, 2015 at 03:33:47PM +0100, Russell King - ARM Linux wrote:
+> > It looks like 0c78789e3a030615c6650fde89546cadf40ec2cc might be relevant
+> > too, but I don't see that solving the multiple _concurrent_ connection
+> > attempts with the same port number - presumably it's somehow trying to
+> > make the same socket repeatedly connect despite a previous connection
+> > being in progress, which would have nothing to do with cleaning up a
+> > previous attempt.
 > 
-> The test is failing without these 2 patches, while with them, an unaligned
-> access is fixed, and the generated code looks good :
->      7ac:       ee13cf10        mrc     15, 0, ip, cr3, cr0, {0}
->      7b0:       e3cc300c        bic     r3, ip, #12
->      7b4:       e58dc014        str     ip, [sp, #20]
->      7b8:       e3833004        orr     r3, r3, #4
->      7bc:       ee033f10        mcr     15, 0, r3, cr3, cr0, {0}
+> As I suspected, applying the above commit in addition does not solve the
+> problem, I still see the same behaviour: SYN SYNACK SYN RSTACK, SYN
+> SYNACK SYN RSTACK, and eventual SYN storms.
+> 
+> I do have this captured as well:
+> 
+> 2558   0.834316 armada388 -> n2100 TCP [TCP Port numbers reused] rpasswd?nfs [SYN] Seq=1053655487 Win=28800 Len=0 MSS=1440 SACK_PERM=1 TSval=60001 TSecr=0 WS=128
+> 2559   0.834572 n2100 -> armada388 TCP nfs?rpasswd [SYN, ACK] Seq=3076611574 Ack=1053655488 Win=28560 Len=0 MSS=1440 SACK_PERM=1 TSval=869622246 TSecr=60001 WS=64
+> 2560   0.834666 armada388 -> n2100 TCP [TCP Port numbers reused] rpasswd?nfs [SYN] Seq=1054228544 Win=28800 Len=0 MSS=1440 SACK_PERM=1 TSval=60005 TSecr=0 WS=128
+> 2561   0.834895 n2100 -> armada388 TCP nfs?rpasswd [ACK] Seq=3076611575 Ack=1053655488 Win=28560 Len=0 TSval=869622246 TSecr=60001
+> 
+> The packet at 2561 looks wrong to me - this doesn't follow what I know
+> would be the standard TCP setup of syn, synack, ack, because that final
+> ack is in the wrong direction.
+> 
 
-Thanks Robert, I've queued these as fixes now.
+This 2561 packet is an ACK packet, because n2100 has a SYN_RECV socket
+created by packet 2558.
 
-If you want to put the bug alignment patch in the patch system, I'll get
-that off to Linus this weekend too.
+It receives a SYN packet (2560) that it interprets as a packet slightly
+out of sequence (1054228544 being above 1053655487) for this SYN_RECV
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+The wrong packet is 2560, not 2561
