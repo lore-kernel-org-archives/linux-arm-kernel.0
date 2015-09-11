@@ -1,47 +1,32 @@
-From: martin@sperl.org (Martin Sperl)
-Date: Fri, 11 Sep 2015 12:08:21 +0200
-Subject: [PATCH v2 3/4] clk: bcm2835: Add support for programming the
- audio domain clocks.
-In-Reply-To: <1441922305-2298-3-git-send-email-eric@anholt.net>
-References: <1441922305-2298-1-git-send-email-eric@anholt.net>
- <1441922305-2298-3-git-send-email-eric@anholt.net>
-Message-ID: <DA82061A-F4FF-4B05-A6B4-BFD5F3F2E52C@sperl.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 11 Sep 2015 15:39:16 +0530
+Subject: cpufreq: mediatek: allow modular build
+In-Reply-To: <20150911095820.GM21084@n2100.arm.linux.org.uk>
+References: <1768766.yu1lxjsjLL@wuerfel> <2329563.MhTbBXHVz1@wuerfel>
+ <20150911082536.GL9650@linux> <3071823.f1VzTWVMmV@wuerfel>
+ <20150911083806.GM9650@linux>
+ <20150911093454.GK21084@n2100.arm.linux.org.uk>
+ <20150911094003.GN9650@linux>
+ <20150911095820.GM21084@n2100.arm.linux.org.uk>
+Message-ID: <20150911100916.GO9650@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11-09-15, 10:58, Russell King - ARM Linux wrote:
+> Not module "unplug" (I've never heard it called that before).  A module
+> with a module_init() but no module_exit() can only be added to a running
+> kernel, and never removed.  That's intentional behaviour.
 
-> On 10.09.2015, at 23:58, Eric Anholt <eric@anholt.net> wrote:
+Ah, I see. I wasn't sure that a module with no module_exit() can't be
+removed.
+
+> However, if you're talking about hot-unplug, presumably you're talking
+> about _CPU_ hot-unplug, and that's something the code should definitely
+> handle irrespective of whether it's built-in or a module.
 > 
-> This adds support for enabling, disabling, and setting the rate of the
-> audio domain clocks.  It will be necessary for setting the pixel clock
-> for HDMI in the VC4 driver and let us write a cpufreq driver.  It will
-> also improve compatibility with user changes to the firmware's
-> config.txt, since our previous fixed clocks are unaware of it.
-> 
-> The firmware also has support for configuring the clocks through the
-> mailbox channel, but the pixel clock setup by the firmware doesn't
-> work, and it's Raspberry Pi specific anyway.  The only conflicts we
-> should have with the firmware would be if we made firmware calls that
-> result in clock management (like opening firmware V3D or ISP access,
-> which we don't support in upstream), or on hardware over-thermal or
-> under-voltage (when the firmware would rewrite PLLB to take the ARM
-> out of overclock).  If that happens, our cached .recalc_rate() results
-> would be incorrect, but that's no worse than our current state where
-> we used fixed clocks.
-> 
-> The existing fixed clocks in the code are left in place to provide
-> backwards compatibility with old device tree files.
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+> The two issues are entirely separate.
 
-This patch-sets sets the emmc clock to correct frequency - no longer
-overclocking SDCards by a factor of 2.5.
-This means booting from the eMMC on the Compute module works now
-without issues.
+Bah, all this time I meant module insertion/removal, sorry :(
 
-Note that the DT bcm2835-rpi-b-plus.dtb can get used to boot
-the compute module.
-
-Thanks
-
-Tested-by: Martin Sperl <kernel@martin.sperl.org>
+-- 
+viresh
