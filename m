@@ -1,63 +1,43 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 11 Sep 2015 15:56:38 +0100
-Subject: [PATCH] arm/xen: Enable user access to the kernel before issuing
- a privcmd call
-In-Reply-To: <1441983304.3549.73.camel@citrix.com>
-References: <1441980963-9002-1-git-send-email-julien.grall@citrix.com>
- <1441981760.3549.57.camel@citrix.com> <55F2E909.70600@citrix.com>
- <1441983304.3549.73.camel@citrix.com>
-Message-ID: <55F2EBA6.6060008@citrix.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 11 Sep 2015 16:56:27 +0200
+Subject: [PATCH 2/2] ARM: domains: add memory dependencies to
+ get_domain/set_domain
+In-Reply-To: <E1ZaL45-0003fs-1k@rmk-PC.arm.linux.org.uk> (Russell King's
+ message of "Fri, 11 Sep 2015 10:56:17 +0100")
+References: <20150911095438.GL21084@n2100.arm.linux.org.uk>
+ <E1ZaL45-0003fs-1k@rmk-PC.arm.linux.org.uk>
+Message-ID: <87si6lt36s.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/15 15:55, Ian Campbell wrote:
-> On Fri, 2015-09-11 at 15:45 +0100, Julien Grall wrote:
->> On 11/09/15 15:29, Ian Campbell wrote:
->>> On Fri, 2015-09-11 at 15:16 +0100, Julien Grall wrote:
->>>> When Xen is copyin data to/from the guest it will check if the kernel
->>>
->>> "copying"
->>>
->>>> has the right to do the access. If not, the hypercall will return an
->>>> error.
->>>>
->>>> After the commit a5e090acbf545c0a3b04080f8a488b17ec41fe02 "ARM:
->>>> software-based priviledged-no-access support", the kernel can't
->>>> access
->>>
->>> "privileged"
->>>
->>>> anymore the user space by default. This will result to fail on every
->>>
->>> "any more" (or "any longer")
->>>
->>>> hypercall made by the userspace (i.e via privcmd).
->>>>
->>>> We have to enable the userspace access and then restore the correct
->>>> permission everytime the privmcd is used to made an hypercall.
->>>
->>> "every time" and "privcmd"
->>>
->>>>  HYPERCALL1(tmem_op);
->>>>  HYPERCALL2(multicall);
->>>>  
->>>> -ENTRY(privcmd_call)
->>>> +ENTRY(__privcmd_call)
->>>
->>> arch/arm/include/asm/assembler.h seems to contain uaccess_* macros
->>> which
->>> could be used right here directly I think? That would be preferable to
->>> wrapping I think.
->>
->> Looking to the uaccess_save macro:
-> 
-> I was thinking more about uaccess_enable/disable.
+Russell King <rmk+kernel@arm.linux.org.uk> writes:
 
-Well, we can't assume that the function will be called with uaccess
-disabled.  So we have to save the state and restore it after issuing the
-hypercall.
+> We need to have memory dependencies on get_domain/set_domain to avoid
+> the compiler over-optimising these inline assembly instructions.
+>
+> Loads/stores must not be reordered across a set_domain(), so introduce
+> a compiler barrier for that assembly.
+>
+> The value of get_domain() must not be cached across a set_domain(), but
+> we still want to allow the compiler to optimise it away.  Introduce a
+> dependency on current_thread_info()->cpu_domain to avoid this; the new
+> memory clobber in set_domain() should therefore cause the compiler to
+> re-load this.  The other advantage of using this is we should have its
+> address in the register set already, or very soon after at most call
+> sites.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Regards,
+The test is failing without these 2 patches, while with them, an unaligned
+access is fixed, and the generated code looks good :
+     7ac:       ee13cf10        mrc     15, 0, ip, cr3, cr0, {0}
+     7b0:       e3cc300c        bic     r3, ip, #12
+     7b4:       e58dc014        str     ip, [sp, #20]
+     7b8:       e3833004        orr     r3, r3, #4
+     7bc:       ee033f10        mcr     15, 0, r3, cr3, cr0, {0}
 
--- 
-Julien Grall
+Cheers.
+
+--
+Robert
