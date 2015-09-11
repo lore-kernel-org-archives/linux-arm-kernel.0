@@ -1,59 +1,82 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 11 Sep 2015 15:53:40 -0700
-Subject: [PATCH v3] mtd: nand: sunxi: rely on nand_dt_init initialization
-In-Reply-To: <1441182625-525-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1441182625-525-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150911225340.GI11487@google.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 11 Sep 2015 15:50:10 -0700
+Subject: [PATCH 4.1 69/78] genirq: Introduce irq_chip_set_type_parent() helper
+In-Reply-To: <20150911224606.758437370@linuxfoundation.org>
+References: <20150911224606.758437370@linuxfoundation.org>
+Message-ID: <20150911224616.466370883@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2015 at 10:30:25AM +0200, Boris Brezillon wrote:
-> nand_dt_init(), called from nand_scan_ident(), is already parsing the
-> generic MTD/NAND DT properties, and initializing the nand_chip struct
-> accordingly.
-> Rely on this initialization instead of manually parsing those properties.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
-> Changes since v2:
-> - fix a bug forcing ecc.mode to HW_ECC
-> Changes since v1:
-> - drop unused strength and blk_size variables
-> ---
->  drivers/mtd/nand/sunxi_nand.c | 27 ++++++++++-----------------
->  1 file changed, 10 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-> index 0c29f6c..d644548 100644
-> --- a/drivers/mtd/nand/sunxi_nand.c
-> +++ b/drivers/mtd/nand/sunxi_nand.c
-[...]
-> @@ -1224,15 +1211,18 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
->  	/* Default tR value specified in the ONFI spec (chapter 4.15.1) */
->  	nand->chip_delay = 200;
->  	nand->controller = &nfc->controller;
-> +	/*
-> +	 * Set the ECC mode to the default value in case nothing is specified
-> +	 * in the DT.
-> +	 */
-> +	nand->ecc.mode = NAND_ECC_HW;
-> +	nand->dn = np;
+4.1-stable review patch.  If anyone has any objections, please let me know.
 
-Renamed dn -> flash_node, due to [1], and applied to l2-mtd.git/next
+------------------
 
->  	nand->select_chip = sunxi_nfc_select_chip;
->  	nand->cmd_ctrl = sunxi_nfc_cmd_ctrl;
->  	nand->read_buf = sunxi_nfc_read_buf;
->  	nand->write_buf = sunxi_nfc_write_buf;
->  	nand->read_byte = sunxi_nfc_read_byte;
->  
-> -	if (of_get_nand_on_flash_bbt(np))
-> -		nand->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
-> -
->  	mtd = &chip->mtd;
->  	mtd->dev.parent = dev;
->  	mtd->priv = nand;
+From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Brian
+commit b7560de198222994374c1340a389f12d5efb244a upstream.
 
-[1] http://patchwork.ozlabs.org/patch/514205/
+This helper is required for irq chips which do not implement a
+irq_set_type callback and need to call down the irq domain hierarchy
+for the actual trigger type change.
+
+This helper is required to fix further wreckage caused by the
+conversion of TI OMAP to hierarchical irq domains and therefor tagged
+for stable.
+
+[ tglx: Massaged changelog ]
+
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: <linux@arm.linux.org.uk>
+Cc: <nsekhar@ti.com>
+Cc: <jason@lakedaemon.net>
+Cc: <balbi@ti.com>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Cc: <tony@atomide.com>
+Cc: <marc.zyngier@arm.com>
+Cc: stable at vger.kernel.org # 4.1
+Link: http://lkml.kernel.org/r/1439554830-19502-3-git-send-email-grygorii.strashko at ti.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ include/linux/irq.h |    1 +
+ kernel/irq/chip.c   |   17 +++++++++++++++++
+ 2 files changed, 18 insertions(+)
+
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -467,6 +467,7 @@ extern int irq_chip_set_affinity_parent(
+ 					const struct cpumask *dest,
+ 					bool force);
+ extern int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on);
++extern int irq_chip_set_type_parent(struct irq_data *data, unsigned int type);
+ #endif
+ 
+ /* Handling of unhandled and spurious interrupts: */
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -934,6 +934,23 @@ int irq_chip_set_affinity_parent(struct
+ }
+ 
+ /**
++ * irq_chip_set_type_parent - Set IRQ type on the parent interrupt
++ * @data:	Pointer to interrupt specific data
++ * @type:	IRQ_TYPE_{LEVEL,EDGE}_* value - see include/linux/irq.h
++ *
++ * Conditional, as the underlying parent chip might not implement it.
++ */
++int irq_chip_set_type_parent(struct irq_data *data, unsigned int type)
++{
++	data = data->parent_data;
++
++	if (data->chip->irq_set_type)
++		return data->chip->irq_set_type(data, type);
++
++	return -ENOSYS;
++}
++
++/**
+  * irq_chip_retrigger_hierarchy - Retrigger an interrupt in hardware
+  * @data:	Pointer to interrupt specific data
+  *
