@@ -1,54 +1,103 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Fri, 11 Sep 2015 21:54:29 +0530
-Subject: [LINUX RFC v2 1/4] spi: add support of two chip selects & data
- stripe
-In-Reply-To: <20150911123644.GU12027@sirena.org.uk>
-References: <1440570367-22569-1-git-send-email-ranjit.waghmode@xilinx.com>
- <1440570367-22569-2-git-send-email-ranjit.waghmode@xilinx.com>
- <20150903121232.GW12027@sirena.org.uk>
- <7CFCFE83B8145347A1D424EC939F1C3C014B0D67@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20150911123644.GU12027@sirena.org.uk>
-Message-ID: <CAFcVECJ_sF6Sav4NffMkwS5iQnPk2x7SE=qji5ByF17ejX0n=g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Sep 2015 17:24:17 +0100
+Subject: NFS/TCP/IPv6 acting strangely in 4.2
+In-Reply-To: <1441984723.4619.61.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <20150911113839.GO21084@n2100.arm.linux.org.uk>
+ <1441976691.4619.58.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20150911143347.GQ21084@n2100.arm.linux.org.uk>
+ <20150911150613.GR21084@n2100.arm.linux.org.uk>
+ <1441984723.4619.61.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <20150911162416.GV21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Fri, Sep 11, 2015 at 08:18:43AM -0700, Eric Dumazet wrote:
+> On Fri, 2015-09-11 at 16:06 +0100, Russell King - ARM Linux wrote:
+> > On Fri, Sep 11, 2015 at 03:33:47PM +0100, Russell King - ARM Linux wrote:
+> > > It looks like 0c78789e3a030615c6650fde89546cadf40ec2cc might be relevant
+> > > too, but I don't see that solving the multiple _concurrent_ connection
+> > > attempts with the same port number - presumably it's somehow trying to
+> > > make the same socket repeatedly connect despite a previous connection
+> > > being in progress, which would have nothing to do with cleaning up a
+> > > previous attempt.
+> > 
+> > As I suspected, applying the above commit in addition does not solve the
+> > problem, I still see the same behaviour: SYN SYNACK SYN RSTACK, SYN
+> > SYNACK SYN RSTACK, and eventual SYN storms.
+> > 
+> > I do have this captured as well:
+> > 
+> > 2558   0.834316 armada388 -> n2100 TCP [TCP Port numbers reused] rpasswd?nfs [SYN] Seq=1053655487 Win=28800 Len=0 MSS=1440 SACK_PERM=1 TSval=60001 TSecr=0 WS=128
+> > 2559   0.834572 n2100 -> armada388 TCP nfs?rpasswd [SYN, ACK] Seq=3076611574 Ack=1053655488 Win=28560 Len=0 MSS=1440 SACK_PERM=1 TSval=869622246 TSecr=60001 WS=64
+> > 2560   0.834666 armada388 -> n2100 TCP [TCP Port numbers reused] rpasswd?nfs [SYN] Seq=1054228544 Win=28800 Len=0 MSS=1440 SACK_PERM=1 TSval=60005 TSecr=0 WS=128
+> > 2561   0.834895 n2100 -> armada388 TCP nfs?rpasswd [ACK] Seq=3076611575 Ack=1053655488 Win=28560 Len=0 TSval=869622246 TSecr=60001
+> > 
+> > The packet at 2561 looks wrong to me - this doesn't follow what I know
+> > would be the standard TCP setup of syn, synack, ack, because that final
+> > ack is in the wrong direction.
+> > 
+> 
+> This 2561 packet is an ACK packet, because n2100 has a SYN_RECV socket
+> created by packet 2558.
+> 
+> It receives a SYN packet (2560) that it interprets as a packet slightly
+> out of sequence (1054228544 being above 1053655487) for this SYN_RECV
+> 
+> The wrong packet is 2560, not 2561
 
-On Fri, Sep 11, 2015 at 6:06 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Sep 04, 2015 at 12:02:21PM +0000, Ranjit Abhimanyu Waghmode wrote:
->
-> Please fix your mail client to word wrap within paragraphs and to quote
-> text without reflowing it - your messages are very hard to read.
->
->> > > + /* Controller may support more than one chip.
->> > > +  * This flag will enable that feature.
->> > > +  */
->> > > +#define SPI_MASTER_BOTH_CS               BIT(8)          /* enable both
->> > chips */
->
->> Now we can consider following use cases:
->
->> Suppose we need to send the same data to multiple slaves of same kind:
->> Here the application need not to do individual slave access for writing, instead it can send data to all the devices in one go.
->
-> That's a *very* specific application which will only work for write only
-> devices - I'd be surprised if such systems actually had distinct chip
-> select lines at the CPU level.
->
+Ok.
 
-Agreed that it is very specific but here are a few ways it is used
-when communicating with two flash devices in parallel configuration:
-- Write enable is sent to both devices using a single operation.
-- Writing to any configuration registers in the flash is done in one go
-- Some application that want to mirror important data to both devices.
-Even with reading, the assertion of multiple cs combined with stripe
-will mean:
-- Two status bytes, one form each will be obtained in one operation
-- Similarly data that was written using stripe is read back and combined.
+Looking deeper at the XPRT sunrpc code, I have to wonder about the
+sanity of this:
 
-Such systems could still maintain separate chip selects to perform
-individual operations such as reading flash ID, debugging failures or
-locking specific sectors.
+void xprt_connect(struct rpc_task *task)
+{
+...
+        if (!xprt_connected(xprt)) {
+...
+                if (test_bit(XPRT_CLOSING, &xprt->state))
+                        return;
+                if (xprt_test_and_set_connecting(xprt))
+                        return;
+                xprt->stat.connect_start = jiffies;
+                xprt->ops->connect(xprt, task);
 
-Regards,
-Harini
+That calls into xs_connect(), which schedules a workqueue to do the
+connection.  The workqueue will call xs_tcp_setup_socket().
+
+xs_tcp_setup_socket() creates a socket if one didn't exist, otherwise
+re-using the previously obtained socket (which'll be why its using the
+same socket) and then goes on to call xs_tcp_finish_connecting().
+
+xs_tcp_finish_connecting() calls kernel_connect(), which will return
+-EINPROGRESS.  We seem to treat EINPROGRESS as if the connection was
+successful:
+
+        case 0:
+        case -EINPROGRESS:
+        case -EALREADY:
+                xprt_unlock_connect(xprt, transport);
+                xprt_clear_connecting(xprt);
+                return;
+
+and the xprt_clear_connecting() results in this whole path being
+re-opened: the socket is not yet connected, so xprt_connected() will
+return false, and despite the socket connection still being mid-way
+through being connected, we clear the "connecting" status, causing
+xprt_test_and_set_connecting() to return false.
+
+That allows us to re-call xprt->ops->connect, re-queue the connect
+worker, and re-run the call to kernel_connect() for a socket which is
+already mid-way through being connected.
+
+Shouldn't the "connecting" status only be cleared when either the socket
+has _finished_ connecting, or when the connection has _failed_ to connect,
+and not when it's mid-way through connecting?
+
+I've not been able to prove this: I've set rpc_debug to 129 to log
+just xprt and trans RPC facilities, and that's sufficient to change
+the timing such that this doesn't happen.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
