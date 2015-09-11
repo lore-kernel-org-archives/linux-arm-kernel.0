@@ -1,47 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Sep 2015 13:40:45 +0100
-Subject: master build: 1 failures 73 warnings (v4.2-11142-gb0a1ea5)
-In-Reply-To: <20150911120150.GN12027@sirena.org.uk>
-References: <E1ZaL9B-0006QE-Kh@optimist> <20150911120150.GN12027@sirena.org.uk>
-Message-ID: <20150911124045.GA16833@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 11 Sep 2015 13:43:52 +0100
+Subject: [PATCH v4] pinctrl: mediatek: Implement wake handler and suspend
+ resume
+In-Reply-To: <CAM2ehZaDwQtckXcDQQh+XkYKXvVzy-6Tp+kdvRku0w2xVibPtQ@mail.gmail.com>
+References: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>
+ <55DB4609.5040904@arm.com>
+ <CAGS+omBnoitju07KQ1Y7JHTbce6+DO4WqWHTaKz5D+T157zEJA@mail.gmail.com>
+ <1441535972.22230.5.camel@mhfsdcap03> <55EEAA24.6080706@arm.com>
+ <55EF11E6.7030307@arm.com>
+ <CAM2ehZaDwQtckXcDQQh+XkYKXvVzy-6Tp+kdvRku0w2xVibPtQ@mail.gmail.com>
+Message-ID: <55F2CC88.3030304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 01:01:51PM +0100, Mark Brown wrote:
-> On Fri, Sep 11, 2015 at 11:01:35AM +0100, Build bot for Mark Brown wrote:
-> 
-> > 	arm64-allmodconfig
-> > ../drivers/firmware/qcom_scm-32.c:196:4: error: expected string literal before '__asmeq'
-> > ../drivers/firmware/qcom_scm-32.c:221:2: error: implicit declaration of function 'secure_flush_area' [-Werror=implicit-function-declaration]
-> > ../drivers/firmware/qcom_scm-32.c:239:2: error: implicit declaration of function 'outer_inv_range' [-Werror=implicit-function-declaration]
-> > ../drivers/firmware/qcom_scm-32.c:331:4: error: expected string literal before '__asmeq'
-> > ../drivers/firmware/qcom_scm-32.c:361:4: error: expected string literal before '__asmeq'
-> 
-> Today's mainline fails to build on arm64 due to the above, introduced by
-> efaa6e266ba (firmware: qcom_scm-32: replace open-coded call to
-> __cpuc_flush_dcache_area()) which introduces a call to
-> secure_flush_area() which isn't defined on arm64.  This does not happen
-> in -next as 626ffb400e1e781 (firmware: qcom: scm: Add function stubs for
-> ARM64) which fixes this and IIRC other issues on arm64 - what is the
-> plan for getting that change into mainline?
 
-There's no way in hell that driver is going to build for arm64, so I'd
-suggest something like the following until it's sorted out.
 
-Will
+On 11/09/15 12:22, Chung-Yih Wang (???) wrote:
+> Hi Sudeep and Maoguang,
+>
+>     Please correct me if I am wrong. I think the wake_mask Maoguang
+> implemented is the wake-up configuration and it is how he disabled
+> other unwanted interrupt sources(e.g. audio jacket insertion) during
+> suspend.
+>
 
---->8
+OK, you are right, I think I now understand the issue. I misread the
+code initially thinking the suspend/resume are implemented as
+syscore_ops but they are standard device pm ops.
 
-diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-index 99c69a3205c4..2f51e249829f 100644
---- a/drivers/firmware/Kconfig
-+++ b/drivers/firmware/Kconfig
-@@ -134,7 +134,7 @@ config ISCSI_IBFT
- 
- config QCOM_SCM
- 	bool
--	depends on ARM || ARM64
-+	depends on ARM
- 
- source "drivers/firmware/broadcom/Kconfig"
- source "drivers/firmware/google/Kconfig"
+>    With Sudeep's patch which we had similar one before, the system got
+> waken up by audio jack insertion which we don't want. Maoguang tried
+> to implement wake_mask as the wake-up configuration to keep track of
+> effective wakeup sources(i.e. those who makes enable_irq_wake) and
+> write the wake-up configuration in mtk_eint_suspend(). What is your
+> suggestion to address this issue? Thanks!
+>
+
+One option is to convert them to *_noirq callbacks assuming all the
+users of this pinctrl irqchip have sanely implemented their
+suspend/resume and don't trigger interrupts between dpm_suspend and
+suspend_device_irqs. What do you think ?
+
+Regards,
+Sudeep
+
+---->8
+
+@@ -1130,8 +1130,8 @@ static int mtk_eint_resume(struct device *device)
+  }
+
+  const struct dev_pm_ops mtk_eint_pm_ops = {
+-       .suspend = mtk_eint_suspend,
+-       .resume = mtk_eint_resume,
++       .suspend_noirq = mtk_eint_suspend,
++       .resume_noirq = mtk_eint_resume,
+  };
