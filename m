@@ -1,61 +1,31 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 11 Sep 2015 16:21:54 -0700
-Subject: [PATCH 1/6] PCI: Make global and export pdev_fixup_irq().
-In-Reply-To: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1442013719-5001-2-git-send-email-ddaney.cavm@gmail.com>
+Date: Fri, 11 Sep 2015 16:21:53 -0700
+Subject: [PATCH 0/6] PCI: generic: Misc. bug fixes and enhanced support for
+ MSI.
+Message-ID: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-Follow-on patch will use pdev_fixup_irq().  So, make it visible and
-export it.
+While using the pci-host-generic driver to add PCI support for the
+Cavium ThunderX processors, several bugs were discovered.  We also
+need the ability to specify a per-bus MSI controller, so support for
+that was added.
 
-Signed-off-by: David Daney <david.daney@cavium.com>
----
- drivers/pci/setup-irq.c | 7 ++++---
- include/linux/pci.h     | 3 +++
- 2 files changed, 7 insertions(+), 3 deletions(-)
+David Daney (6):
+  PCI: Make global and export pdev_fixup_irq().
+  PCI: generic: Only fixup irqs for bus we are creating.
+  PCI: generic: Quit clobbering our pci_ops.
+  PCI: generic: Correct, and avoid overflow, in bus_max calculation.
+  PCI: generic: Pass proper starting bus number to pci_scan_root_bus().
+  PCI: generic: Allow bus default MSI controller to be specified.
 
-diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
-index 95c225b..ac7ffaf 100644
---- a/drivers/pci/setup-irq.c
-+++ b/drivers/pci/setup-irq.c
-@@ -22,9 +22,9 @@ void __weak pcibios_update_irq(struct pci_dev *dev, int irq)
- 	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
- }
- 
--static void pdev_fixup_irq(struct pci_dev *dev,
--			   u8 (*swizzle)(struct pci_dev *, u8 *),
--			   int (*map_irq)(const struct pci_dev *, u8, u8))
-+void pdev_fixup_irq(struct pci_dev *dev,
-+		    u8 (*swizzle)(struct pci_dev *, u8 *),
-+		    int (*map_irq)(const struct pci_dev *, u8, u8))
- {
- 	u8 pin, slot;
- 	int irq = 0;
-@@ -56,6 +56,7 @@ static void pdev_fixup_irq(struct pci_dev *dev,
- 	   the real IRQ to use; the device does not use it. */
- 	pcibios_update_irq(dev, irq);
- }
-+EXPORT_SYMBOL_GPL(pdev_fixup_irq);
- 
- void pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
- 		    int (*map_irq)(const struct pci_dev *, u8, u8))
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index e90eb22..50e66ab 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1120,6 +1120,9 @@ void pdev_enable_device(struct pci_dev *);
- int pci_enable_resources(struct pci_dev *, int mask);
- void pci_fixup_irqs(u8 (*)(struct pci_dev *, u8 *),
- 		    int (*)(const struct pci_dev *, u8, u8));
-+void pdev_fixup_irq(struct pci_dev *,
-+		    u8 (*)(struct pci_dev *, u8 *),
-+		    int (*)(const struct pci_dev *, u8, u8));
- #define HAVE_PCI_REQ_REGIONS	2
- int __must_check pci_request_regions(struct pci_dev *, const char *);
- int __must_check pci_request_regions_exclusive(struct pci_dev *, const char *);
+ .../devicetree/bindings/pci/host-generic-pci.txt   |  5 ++
+ drivers/pci/host/pci-host-generic.c                | 55 +++++++++++++++-------
+ drivers/pci/setup-irq.c                            |  7 +--
+ include/linux/pci.h                                |  3 ++
+ 4 files changed, 50 insertions(+), 20 deletions(-)
+
 -- 
 1.7.11.7
