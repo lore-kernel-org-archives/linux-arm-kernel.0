@@ -1,42 +1,63 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 11 Sep 2015 13:53:31 +0100
-Subject: [PATCH v4 3/4] irqchip: GIC: Convert to EOImode == 1
-In-Reply-To: <55F2B65E.9060303@arm.com>
-References: <1440604845-28229-1-git-send-email-marc.zyngier@arm.com>
- <1440604845-28229-4-git-send-email-marc.zyngier@arm.com>
- <55F08731.3050402@citrix.com> <55F15353.2000800@arm.com>
- <55F1AE75.6000405@citrix.com> <1441968881.3549.20.camel@citrix.com>
- <55F2B40F.3070405@citrix.com> <55F2B65E.9060303@arm.com>
-Message-ID: <55F2CECB.10801@citrix.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Sep 2015 13:58:30 +0100
+Subject: master build: 1 failures 73 warnings (v4.2-11142-gb0a1ea5)
+In-Reply-To: <20150911120150.GN12027@sirena.org.uk>
+References: <E1ZaL9B-0006QE-Kh@optimist> <20150911120150.GN12027@sirena.org.uk>
+Message-ID: <20150911125830.GA11833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/15 12:09, Marc Zyngier wrote:
-> On 11/09/15 11:59, Julien Grall wrote:
->>
->>
->> On 11/09/2015 11:54, Ian Campbell wrote:
->>> On Thu, 2015-09-10 at 17:23 +0100, Julien Grall wrote:
->>>> I applied the two patches on top of linus/master and I'm able to boot
->>>> correctly on X-gene. Thank you!
->>>
->>> Perhaps we should replicate this approach in Xen and get rid of
->>>   PLATFORM_QUIRK_GIC_64K_STRIDE?
->>
->> I was thinking to do it. But, I wasn't sure if it was worth to get a 
->> such "ugly" patch compare to the quirk.
+On Fri, Sep 11, 2015 at 01:01:51PM +0100, Mark Brown wrote:
+> On Fri, Sep 11, 2015 at 11:01:35AM +0100, Build bot for Mark Brown wrote:
 > 
-> It is not a quirk. It is actually recommended in the SBSA spec. The
-> patch is ugly because we can't do the right thing on the one platform
-> that actually implemented ARM's own recommendation (we can't tell the
-> bloody firmware to stop overriding our DT).
+> > 	arm64-allmodconfig
+> > ../drivers/firmware/qcom_scm-32.c:196:4: error: expected string literal before '__asmeq'
+> > ../drivers/firmware/qcom_scm-32.c:221:2: error: implicit declaration of function 'secure_flush_area' [-Werror=implicit-function-declaration]
+> > ../drivers/firmware/qcom_scm-32.c:239:2: error: implicit declaration of function 'outer_inv_range' [-Werror=implicit-function-declaration]
+> > ../drivers/firmware/qcom_scm-32.c:331:4: error: expected string literal before '__asmeq'
+> > ../drivers/firmware/qcom_scm-32.c:361:4: error: expected string literal before '__asmeq'
 > 
-> I would otherwise have added a "arm,use-sbsa-aliasing" property (or
-> something similar) instead of trying to guess things...
+> Today's mainline fails to build on arm64 due to the above, introduced by
+> efaa6e266ba (firmware: qcom_scm-32: replace open-coded call to
+> __cpuc_flush_dcache_area()) which introduces a call to
+> secure_flush_area() which isn't defined on arm64.
 
-I will give a look to port this patch on Xen.
+That commit has been in mainline for over a week now, so it shouldn't
+be "today's mainline" but mainline from a week ago.
 
-Regards,
+Olof's builder didn't find this error, even when building just my for-next
+branch.  I don't remember whether it builds arm64-allmodconfig though, but
+I do, and the error hasn't cropped up there.
+
+However, I've educated myself to hardly ever look at arm64-allmodconfig
+because it's always broken for one reason or another, and the amount of
+warnings it spits out is rediculous, many of them not the fault of ARM64
+code, but of crappy driver code.
+
+In my arm64-allmodconfig builds, qcom_scm-32.c never gets built:
+
+  LD [M]  drivers/firewire/firewire-net.o
+  CC      drivers/firmware/psci.o
+  CC      drivers/firmware/memmap.o
+  LD      drivers/firmware/broadcom/built-in.o
+  LD      drivers/firmware/built-in.o
+
+That's because QCOM_SCM has to be selected by something:
+
++config QCOM_SCM
++       bool
++       depends on ARM || ARM64
++
+
+and currently the only place that's selected is:
+
+arch/arm/mach-qcom/Kconfig:     select QCOM_SCM if SMP
+
+Changing the "depends" on QCOM_SCM won't fix it - I think something's
+been recently merged which has added another select QCOM_SCM which has
+the effect of enabling this on ARM64.  _That_ is the cause of this
+breakage.
 
 -- 
-Julien Grall
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
