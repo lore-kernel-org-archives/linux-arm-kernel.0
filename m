@@ -1,8 +1,8 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 11 Sep 2015 14:39:33 +0100
+Date: Fri, 11 Sep 2015 14:43:45 +0100
 Subject: [GIT PULL 9/9] ARM: tegra: Default configuration updates for
  v4.3-rc1
-In-Reply-To: <20150911132113.GA21673@ulmo>
+In-Reply-To: <20150911132526.GB21673@ulmo>
 References: <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
  <CANMBJr7PKy-eCcB3HiBajpApHS_BYPa7xfKjTqV4o8Z1hwY99A@mail.gmail.com>
  <20150819091358.GA26627@ulmo> <1439977724.4135.90.camel@collabora.co.uk>
@@ -10,16 +10,16 @@ References: <1439563720-13189-10-git-send-email-thierry.reding@gmail.com>
  <CANMBJr6DSXW-h8P8__LKBu-Xv77T35JwxHWvarvqy1keVrtVQQ@mail.gmail.com>
  <CAMAWPa_rus4z+Sg3Uff7ndqrpB8dF1c1rQBVQ9r7vXh6PFcVkQ@mail.gmail.com>
  <55F2AF45.5040706@nvidia.com> <20150911123759.GA8473@ulmo>
- <55F2D3D4.5090608@nvidia.com> <20150911132113.GA21673@ulmo>
-Message-ID: <55F2D995.50906@nvidia.com>
+ <55F2D2E3.4010906@nvidia.com> <20150911132526.GB21673@ulmo>
+Message-ID: <55F2DA91.6070707@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 11/09/15 14:21, Thierry Reding wrote:
+On 11/09/15 14:25, Thierry Reding wrote:
 > * PGP Signed by an unknown key
 > 
-> On Fri, Sep 11, 2015 at 02:15:00PM +0100, Jon Hunter wrote:
+> On Fri, Sep 11, 2015 at 02:10:59PM +0100, Jon Hunter wrote:
 >>
 >> On 11/09/15 13:38, Thierry Reding wrote:
 >>>> Old Signed by an unknown key
@@ -106,22 +106,33 @@ On 11/09/15 14:21, Thierry Reding wrote:
 >>> just fine. I don't ever see snd-hda-codec-hdmi being probed, but then
 >>> probing it manually works fine. No hangs.
 >>
->> To be clear, booting multi_v7_defconfig works just fine for me too and
->> has been working fine for months. However, the reason I am not seeing
->> the issue Kevin and Tyler are reporting is because I never attempt to
->> "modprobe snd-hda-tegra" after boot. If I do then I see a hang. So I
->> believe the only reason we don't see this is because their setup is
->> loading modules.
+>> Did you try "modprobe snd-hda-tegra"? Fails for me 100% of the time.
 > 
-> snd-hda-tegra is auto-loaded on boot for me as well and I don't see any
-> hangs either. I can also unload and reload the module just fine. I've
-> tested this on next-20150911.
+> Works for me 100% of the time. Unloading and reloading isn't a problem
+> either. What revision of the Jetson TK1 do you have? Mine is a C.2
+> 
+>>> What I do see is that after a little while network stops working. I
+>>> noticed primarily because I boot with an NFS root, so the kernel started
+>>> complaining about the NFS server not responding. Being on an NFS root
+>>> could be one reason why this works for me, not sure what the kernelci
+>>> labs are running. I don't see the network issues with tegra_defconfig.
+>>> I've also tried a tegra_defconfig with all of sound support built as
+>>> modules and that all works perfectly.
+>>>
+>>> I'll investigate the multi_v7_defconfig network issues, perhaps that'll
+>>> give me some clues, or perhaps even allow me to reproduce the original
+>>> issue.
+>>
+>> Well I am not using any networking and booting with a simple ramdisk so
+>> I don't think that is the right place to look.
+> 
+> Looks like this might have been a transient issue with my networking
+> setup. I can no longer reproduce the NFS hangs.
+> 
+> What sort of ramdisk do you use? Can you share the instructions you use
+> to create it? Perhaps I can reproduce that way.
 
-What else are you auto-loading? For my testing there appears to be a
-sensitivity to order outside of the depmod order.
-
-Can you try unloading all the sound modules and then do a "modprobe
-snd-hda-tegra"?
+It is just a simple busybox based file-system. I can share it with you.
 
 Cheers
 Jon
