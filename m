@@ -1,242 +1,207 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Fri, 11 Sep 2015 14:22:20 +0800
-Subject: [PATCH v2] ARM: rockchip: add reboot notifier
-In-Reply-To: <55F24D1B.6050609@rock-chips.com>
-References: <1441883089-26567-1-git-send-email-andy.yan@rock-chips.com>
- <CANCyOWb4ih1Dt8MoAKZD-eYtH-xuhgo1b6o7-oh3eCsfZnncRQ@mail.gmail.com>
- <55F24D1B.6050609@rock-chips.com>
-Message-ID: <55F2731C.40006@gmail.com>
+From: o.schinagl@ultimaker.com (Olliver Schinagl)
+Date: Fri, 11 Sep 2015 08:37:36 +0200
+Subject: [PATCH v2 1/1] ARM: dts: sun7i: Enable axp209 driver on olinuxino
+ lime2
+In-Reply-To: <CAGb2v67GTAM3tqOUOmUjKmWGyewJar2NWAzF4bk4g+-7Yfdm0A@mail.gmail.com>
+References: <1441805204-6037-1-git-send-email-o.schinagl@ultimaker.com>
+ <1441805204-6037-2-git-send-email-o.schinagl@ultimaker.com>
+ <20150910181315.GM9885@lukather>
+ <CAGb2v67GTAM3tqOUOmUjKmWGyewJar2NWAzF4bk4g+-7Yfdm0A@mail.gmail.com>
+Message-ID: <1025948D-A8F7-4E5A-98AF-03801A53DE23@ultimaker.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hey chen,
 
-? 2015?09?11? 11:40, Andy Yan ??:
-> Hi Eddie:
->
-> On 2015?09?11? 10:01, Eddie Cai wrote:
->> Hi Andy
+On September 11, 2015 4:57:03 AM CEST, Chen-Yu Tsai <wens@csie.org> wrote:
+>On Fri, Sep 11, 2015 at 2:13 AM, Maxime Ripard
+><maxime.ripard@free-electrons.com> wrote:
+>> Hi Oliver,
 >>
->> 2015-09-10 19:04 GMT+08:00 Andy Yan <andy.yan@rock-chips.com>:
->>> rockchip platform have a protocol to pass the kernel reboot
->>> mode to bootloader by some special registers when system reboot.
->>> By this way the bootloader can take different action according
->>> to the different kernel reboot mode, for example, command
->>> "reboot loader" will reboot the board to rockusb mode, this is
->>> a very convenient way to get the board enter download mode.
+>> On Wed, Sep 09, 2015 at 03:26:44PM +0200, Olliver Schinagl wrote:
+>>> The Olimex OLinuXino Lime2 uses the same AXP209 as was recently
+>>> introduced this driver for its power regulation.
 >>>
->>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+>>> Signed-off-by: Olliver Schinagl <o.schinagl@ultimaker.com>
 >>> ---
+>>>  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 87
+>+++++++++----------------
+>>>  1 file changed, 31 insertions(+), 56 deletions(-)
 >>>
->>> Changes in v2:
->>>    - check cpu dt node
->>>    - remove a unnecessary of_put_node in function 
->>> rockchip_get_pmu_regmap
->>>    - fix a align issue
->>>    - use reboot_notifier instead of restart_handler
->>>
->>>   arch/arm/mach-rockchip/Makefile |   2 +-
->>>   arch/arm/mach-rockchip/loader.h |  22 ++++++++
->>>   arch/arm/mach-rockchip/reboot.c | 111 
->>> ++++++++++++++++++++++++++++++++++++++++
->>>   3 files changed, 134 insertions(+), 1 deletion(-)
->>>   create mode 100644 arch/arm/mach-rockchip/loader.h
->>>   create mode 100644 arch/arm/mach-rockchip/reboot.c
->>>
->>> diff --git a/arch/arm/mach-rockchip/Makefile 
->>> b/arch/arm/mach-rockchip/Makefile
->>> index 5c3a9b2..cd291e3 100644
->>> --- a/arch/arm/mach-rockchip/Makefile
->>> +++ b/arch/arm/mach-rockchip/Makefile
->>> @@ -1,5 +1,5 @@
->>>   CFLAGS_platsmp.o := -march=armv7-a
->>>
->>> -obj-$(CONFIG_ARCH_ROCKCHIP) += rockchip.o
->>> +obj-$(CONFIG_ARCH_ROCKCHIP) += rockchip.o reboot.o
->>>   obj-$(CONFIG_PM_SLEEP) += pm.o sleep.o
->>>   obj-$(CONFIG_SMP) += headsmp.o platsmp.o
->>> diff --git a/arch/arm/mach-rockchip/loader.h 
->>> b/arch/arm/mach-rockchip/loader.h
->>> new file mode 100644
->>> index 0000000..bf51baa
->>> --- /dev/null
->>> +++ b/arch/arm/mach-rockchip/loader.h
->>> @@ -0,0 +1,22 @@
->>> +#ifndef __MACH_ROCKCHIP_LOADER_H
->>> +#define __MACH_ROCKCHIP_LOADER_H
->>> +
->>> +/*high 24 bits is tag, low 8 bits is type*/
->>> +#define SYS_LOADER_REBOOT_FLAG   0x5242C300
->>> +
->>> +enum {
->>> +       BOOT_NORMAL = 0, /* normal boot */
->>> +       BOOT_LOADER,     /* enter loader rockusb mode */
->>> +       BOOT_MASKROM,    /* enter maskrom rockusb mode (not support 
->>> now) */
->>> +       BOOT_RECOVER,    /* enter recover */
->>> +       BOOT_NORECOVER,  /* do not enter recover */
->>> +       BOOT_SECONDOS,   /* boot second OS (not support now)*/
->>> +       BOOT_WIPEDATA,   /* enter recover and wipe data. */
->>> +       BOOT_WIPEALL,    /* enter recover and wipe all data. */
->>> +       BOOT_CHECKIMG,   /* check firmware img with backup part*/
->>> +       BOOT_FASTBOOT,   /* enter fast boot mode */
->>> +       BOOT_SECUREBOOT_DISABLE,
->>> +       BOOT_CHARGING,   /* enter charge mode */
->>> +       BOOT_MAX         /* MAX VALID BOOT TYPE.*/
->>> +};
->>> +#endif
->>> diff --git a/arch/arm/mach-rockchip/reboot.c 
->>> b/arch/arm/mach-rockchip/reboot.c
->>> new file mode 100644
->>> index 0000000..c29f031e
->>> --- /dev/null
->>> +++ b/arch/arm/mach-rockchip/reboot.c
->>> @@ -0,0 +1,111 @@
->>> +/*
->>> + * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
->>> + *
->>> + * This program is free software; you can redistribute it and/or 
->>> modify
->>> + * it under the terms of the GNU General Public License as 
->>> published by
->>> + * the Free Software Foundation; either version 2 of the License, or
->>> + * (at your option) any later version.
->>> + */
->>> +#include <linux/init.h>
->>> +#include <linux/module.h>
->>> +#include <linux/kernel.h>
->>> +#include <linux/of.h>
->>> +#include <linux/of_address.h>
->>> +#include <linux/reboot.h>
->>> +#include <linux/regmap.h>
->>> +#include <linux/mfd/syscon.h>
->>> +#include "loader.h"
->>> +
->>> +#define RK3188_PMU_SYS_REG0             0x40
->>> +#define RK3288_PMU_SYS_REG0             0x94
->> I think RK3066 and RK3368 also supported in upstream kernel. And the
->> protocol is the same. So it would be better to support it here.
->    RK3066 is supported, please see function 
-> rockchip_get_reboot_flag_regmap bellow
->    it uses the same register offset as rk3188
+>>> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+>b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+>>> index d5c796c..dd90a1d 100644
+>>> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+>>> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+>>> @@ -71,14 +71,6 @@
+>>>                       default-state = "on";
+>>>               };
+>>>       };
+>>> -
+>>> -     reg_axp_ipsout: axp_ipsout {
+>>> -             compatible = "regulator-fixed";
+>>> -             regulator-name = "axp-ipsout";
+>>> -             regulator-min-microvolt = <5000000>;
+>>> -             regulator-max-microvolt = <5000000>;
+>>> -             regulator-always-on;
+>>> -     };
+>>
+>> Why are you removing that regulator?
 >
->    RK3368 related code is under arm64, I don't know how to handle it.
-
-Maybe, can we put the driver into  drivers/soc/rockchip/?
-
-> Heiko, do you have any suggestion?
->>> +
->>> +struct regmap *regmap;
->>> +int flag_reg;
->>> +
->>> +static int rockchip_get_pmu_regmap(void)
->>> +{
->>> +       struct device_node *node;
->>> +
->>> +       node = of_find_node_by_path("/cpus");
->>> +       if (!node)
->>> +               return -ENODEV;
->>> +
->>> +       regmap = syscon_regmap_lookup_by_phandle(node, "rockchip,pmu");
->>> +       of_node_put(node);
->>> +       if (!IS_ERR(regmap))
->>> +               return 0;
->>> +
->>> +       regmap = 
->>> syscon_regmap_lookup_by_compatible("rockchip,rk3066-pmu");
->>> +       if (!IS_ERR(regmap))
->>> +               return 0;
->>> +
->>> +       return -ENODEV;
->>> +}
->>> +
->>> +static int rockchip_get_reboot_flag_regmap(void)
->>> +{
->>> +       int ret = rockchip_get_pmu_regmap();
->>> +
->>> +       if (ret < 0)
->>> +               return ret;
->>> +
->>> +       if (of_machine_is_compatible("rockchip,rk3288")) {
->>> +               flag_reg = RK3288_PMU_SYS_REG0;
->>> +               return 0;
->>> +       } else if (of_machine_is_compatible("rockchip,rk3066a") ||
->>> + of_machine_is_compatible("rockchip,rk3066b") ||
->>> + of_machine_is_compatible("rockchip,rk3188")) {
->>> +               flag_reg = RK3188_PMU_SYS_REG0;
->>> +               return 0;
->>> +       }
->>> +
->>> +       return -ENODEV;
->>> +}
->>> +
->>> +static void rockchip_get_reboot_flag(const char *cmd, u32 *flag)
->>> +{
->>> +       *flag = SYS_LOADER_REBOOT_FLAG + BOOT_NORMAL;
->>> +
->>> +       if (cmd) {
->>> +               if (!strcmp(cmd, "loader") || !strcmp(cmd, 
->>> "bootloader"))
->>> +                       *flag = SYS_LOADER_REBOOT_FLAG + BOOT_LOADER;
->>> +               else if (!strcmp(cmd, "recovery"))
->>> +                       *flag = SYS_LOADER_REBOOT_FLAG + BOOT_RECOVER;
->>> +               else if (!strcmp(cmd, "charge"))
->>> +                       *flag = SYS_LOADER_REBOOT_FLAG + BOOT_CHARGING;
->>> +       }
->>> +}
->>> +
->>> +static int rockchip_reboot_notify(struct notifier_block *this,
->>> +                                 unsigned long mode, void *cmd)
->>> +{
->>> +       u32 flag;
->>> +
->>> +       rockchip_get_reboot_flag(cmd, &flag);
->>> +       regmap_write(regmap, flag_reg, flag);
->>> +
->>> +       return NOTIFY_DONE;
->>> +}
->>> +
->>> +static struct notifier_block rockchip_reboot_handler = {
->>> +       .notifier_call = rockchip_reboot_notify,
+>This is really just a placeholder, rather than an actual regulator.
+>
+>From the bindings:
+>
+>- <input>-supply: a phandle to the regulator supply node. May be
+>omitted if
+>                inputs are unregulated, such as using the IPSOUT output
+>                  from the PMIC.
+>
+>
+>>>  };
+>>>
+>>>  &ahci {
+>>> @@ -86,6 +78,10 @@
+>>>       status = "okay";
+>>>  };
+>>>
+>>> +&cpu0 {
+>>> +     cpu-supply = <&reg_dcdc2>;
 >>> +};
 >>> +
->>> +static int __init rockchip_reboot_init(void)
->>> +{
->>> +       int ret = 0;
->>> +
->>> +       if (!rockchip_get_reboot_flag_regmap()) {
->>> +               ret = 
->>> register_reboot_notifier(&rockchip_reboot_handler);
->>> +               if (ret)
->>> +                       pr_err("%s: cannot register reboot handler, 
->>> %d\n",
->>> +                              __func__, ret);
->>> +       }
->>> +
->>> +       return ret;
->>> +}
->>> +
->>> +module_init(rockchip_reboot_init);
->>> +MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
->>> +MODULE_DESCRIPTION("Rockchip platform reboot notifier driver");
->>> +MODULE_LICENSE("GPL");
->>> -- 
->>> 1.9.1
+>>>  &ehci0 {
+>>>       status = "okay";
+>>>  };
+>>> @@ -112,57 +108,9 @@
+>>>       status = "okay";
 >>>
+>>>       axp209: pmic at 34 {
+>>> -             compatible = "x-powers,axp209";
+>>>               reg = <0x34>;
+>>>               interrupt-parent = <&nmi_intc>;
+>>>               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>>> -
+>>> -             interrupt-controller;
+>>> -             #interrupt-cells = <1>;
+>>> -
+>>> -             acin-supply = <&reg_axp_ipsout>;
+>>> -             vin2-supply = <&reg_axp_ipsout>;
+>>> -             vin3-supply = <&reg_axp_ipsout>;
+>>> -             ldo24in-supply = <&reg_axp_ipsout>;
+>>> -             ldo3in-supply = <&reg_axp_ipsout>;
+>>
+>> And these supplies?
+>>
+>>> -             regulators {
+>>> -                     vdd_rtc: ldo1 {
+>>> -                             regulator-min-microvolt = <1300000>;
+>>> -                             regulator-max-microvolt = <1300000>;
+>>> -                             regulator-always-on;
+>>> -                     };
+>>> -
+>>> -                     avcc: ldo2 {
+>>> -                             regulator-min-microvolt = <1800000>;
+>>> -                             regulator-max-microvolt = <3300000>;
+>>> -                             regulator-always-on;
+>>> -                     };
+>>> -
+>>> -                     vcc_csi0: ldo3 {
+>>> -                             regulator-min-microvolt = <700000>;
+>>> -                             regulator-max-microvolt = <3500000>;
+>>> -                             regulator-always-on;
+>>> -                     };
+>>> -
+>>> -                     vcc_csi1: ldo4 {
+>>> -                             regulator-min-microvolt = <1250000>;
+>>> -                             regulator-max-microvolt = <3300000>;
+>>> -                             regulator-always-on;
+>>> -                     };
+>>> -
+>>> -                     vdd_cpu: dcdc2 {
+>>> -                             regulator-min-microvolt = <700000>;
+>>> -                             regulator-max-microvolt = <2275000>;
+>>> -                             regulator-always-on;
+>>> -                     };
+>>> -
+>>> -                     vdd_int: dcdc3 {
+>>> -                             regulator-min-microvolt = <700000>;
+>>> -                             regulator-max-microvolt = <3500000>;
+>>> -                             regulator-always-on;
+>>> -                     };
+>>> -             };
+>>>       };
+>>>  };
 >>>
->>> _______________________________________________
->>> Linux-rockchip mailing list
->>> Linux-rockchip at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>>> @@ -243,6 +191,33 @@
+>>>       status = "okay";
+>>>  };
+>>>
+>>> +#include "axp209.dtsi"
+>>> +
+>>> +&reg_dcdc2 {
+>>> +     regulator-always-on;
+>>> +     regulator-min-microvolt = <1000000>;
+>>> +     regulator-max-microvolt = <1450000>;
+>>
+>> This is outside of the operating voltages of the CPU.
+>>
+>>> +     regulator-name = "vdd-cpu";
+>>> +};
+>>> +
+>>> +&reg_dcdc3 {
+>>> +     regulator-always-on;
+>>> +     regulator-min-microvolt = <1000000>;
+>>> +     regulator-max-microvolt = <1400000>;
+>>> +     regulator-name = "vdd-int-dll";
+>>> +};
+>>> +
+>>> +&reg_ldo1 {
+>>> +     regulator-name = "vdd-rtc";
+>>> +};
+>>> +
+>>> +&reg_ldo2 {
+>>> +     regulator-always-on;
+>>> +     regulator-min-microvolt = <3000000>;
+>>> +     regulator-max-microvolt = <3000000>;
+>>> +     regulator-name = "avcc";
+>>
+>> You're changing the boundaries, why?
+>
+>The old boundaries seem to be from a very old dts, where we were
+>listing the regulators' supported voltage range, instead of what
+>the SoC could take.
+Is it very old? just checked the cubies in maxime's sunxi next and those where still there. I actually wrote these patches ages ago and forgot to submit them whats worse is on my behave, i didn't properly check for changes. Now that you mention it however, i do recall the discussion about these values. I will update them accordingly with the correct values.
+
+Sorry,
+Olliver
+
+>
+>Olliver you should explain all this in the commit log, probably
+>starting with something like "update the dts to use axp209.dtsi
+>, comply with axp20x bindings, and set proper voltage ranges for
+>the regulators".
+>
+>>> +};
+>>> +
+>>>  &reg_usb0_vbus {
+>>>       pinctrl-0 = <&usb0_vbus_pin_lime2>;
+>>>       gpio = <&pio 2 17 GPIO_ACTIVE_HIGH>;
+>>> --
+>>> 2.1.4
+>>
+>> Thanks!
+>> Maxime
+>>
+>> --
+>> Maxime Ripard, Free Electrons
+>> Embedded Linux, Kernel and Android engineering
+>> http://free-electrons.com
+>>
 >> _______________________________________________
->> Linux-rockchip mailing list
->> Linux-rockchip at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >>
->>
->>
->
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+
+-- 
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
