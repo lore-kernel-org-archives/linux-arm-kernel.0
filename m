@@ -1,24 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Sep 2015 18:21:59 +0100
-Subject: [PATCH 0/3] arm64 fixes following support for hardware AF/DBM
-Message-ID: <1441992122-19888-1-git-send-email-catalin.marinas@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Sep 2015 18:00:27 +0100
+Subject: [PATCH v2] arm/xen: Enable user access to the kernel before
+ issuing a privcmd call
+In-Reply-To: <1441988759-4572-1-git-send-email-julien.grall@citrix.com>
+References: <1441988759-4572-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <20150911170027.GX21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems that the recent patch for handling hardware updates to the AF
-and dirty bits also breaks hardware without such feature because of
-changes to how a pte is detected as dirty. The first patch fixes the
-non-DBM hardware case. The second is fixes losing of the dirty
-information for hardware DBM (as a consequence of the first patch,
-otherwise a pte was pretty much always dirty anyway). The third patch is
-a clean-up.
+On Fri, Sep 11, 2015 at 05:25:59PM +0100, Julien Grall wrote:
+> +	/*
+> +	 * Privcmd calls are issued by the userspace. We need to allow the
+> +	 * kernel to access the userspace memory before issuing the hypercall.
+> +	 */
+> +	uaccess_enable r4
+> +
+> +	/* r4 is loaded now as we use it as scratch register before */
+>  	ldr r4, [sp, #4]
 
-Catalin Marinas (2):
-  arm64: Fix the pte_hw_dirty() check when AF/DBM is enabled
-  arm64: Fix pte_modify() to preserve the hardware dirty information
+As I mentioned in one of my previous mails, "ip" should be safe to use
+here - it's a caller-corrupted register, just like r0-r3 and lr.  So,
+you could do:
 
-Will Deacon (1):
-  arm64: pgtable: use a single bit for PTE_WRITE regardless of DBM
+	ldr r4, [sp, #4]
++	uaccess_enable ip
 
- arch/arm64/include/asm/pgtable.h | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+which fractionally tightens the window.
+
+However, there's nothing actually wrong with your version - there's no
+way we could've got this far with sp pointing at userspace.
+
+I'm happy with either version, so:
+
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+How do you want to handle the patch?  I already have some other uaccess
+fixes queued up to send to Linus before the merge window closes.
+
+>  	__HVC(XEN_IMM)
+> +
+> +	/*
+> +	 * Disable userspace access from kernel. This is fine to do it
+> +	 * unconditionally as no set_fs(KERNEL_DS)/set_fs(get_ds()) is
+> +	 * called before.
+> +	 */
+> +	uaccess_disable r4
+> +
+>  	ldm sp!, {r4}
+>  	ret lr
+>  ENDPROC(privcmd_call);
+> -- 
+> 2.1.4
+> 
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
