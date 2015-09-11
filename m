@@ -1,54 +1,90 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 11 Sep 2015 18:09:21 +0100
-Subject: [PATCH v2] arm/xen: Enable user access to the kernel before
- issuing a privcmd call
-In-Reply-To: <20150911170027.GX21084@n2100.arm.linux.org.uk>
-References: <1441988759-4572-1-git-send-email-julien.grall@citrix.com>
- <20150911170027.GX21084@n2100.arm.linux.org.uk>
-Message-ID: <55F30AC1.5020202@citrix.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Sep 2015 18:55:55 +0100
+Subject: [PATCH v2 7/9] ARM: STi: DT: STiH407: Add FDMA driver dt nodes.
+In-Reply-To: <20150911164822.GA1150@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
+ <1441980871-24475-8-git-send-email-peter.griffin@linaro.org>
+ <20150911162749.GD18779@x1>
+ <20150911164822.GA1150@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20150911175555.GF18779@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/15 18:00, Russell King - ARM Linux wrote:
-> On Fri, Sep 11, 2015 at 05:25:59PM +0100, Julien Grall wrote:
->> +	/*
->> +	 * Privcmd calls are issued by the userspace. We need to allow the
->> +	 * kernel to access the userspace memory before issuing the hypercall.
->> +	 */
->> +	uaccess_enable r4
->> +
->> +	/* r4 is loaded now as we use it as scratch register before */
->>  	ldr r4, [sp, #4]
+On Fri, 11 Sep 2015, Peter Griffin wrote:
+> On Fri, 11 Sep 2015, Lee Jones wrote:
+> > On Fri, 11 Sep 2015, Peter Griffin wrote:
+> > 
+> > > These nodes are required to get the fdma driver working
+> > > on STiH407 based silicon.
+> > > 
+> > > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > > ---
+> > >  arch/arm/boot/dts/stih407-family.dtsi | 51 +++++++++++++++++++++++++++++++++++
+> > >  1 file changed, 51 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> > > index 838b812..da07474b 100644
+> > > --- a/arch/arm/boot/dts/stih407-family.dtsi
+> > > +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> > > @@ -565,5 +565,56 @@
+> > >  						  <&phy_port2 PHY_TYPE_USB3>;
+> > >  			};
+> > >  		};
+> > > +
+> > > +		fdma0: fdma0-audio at 8e20000 {
+> > 
+> > I'm not familiar with the FDMA driver, so can't comment knowledgeably,
+> > but the <dev> part of <dev>@<base_address> should only describe the
+> > type of hardware.  I believe in this case it should just be
+> > dma at 08e20000.  Also notice the leading zero in the address, which I
+> > believe mitigates possible confusion.  Then you be more specific with
+> > the label, so something like 'fdma-audio' seems appropriate here.
 > 
-> As I mentioned in one of my previous mails, "ip" should be safe to use
-> here - it's a caller-corrupted register, just like r0-r3 and lr.  So,
-> you could do:
+> Ok, can change to that format in v3.
 > 
-> 	ldr r4, [sp, #4]
-> +	uaccess_enable ip
-
-The register ip (aka r12) is used to store the hypercall number.
-The easiest one, without much changes, was r4.
-
-> which fractionally tightens the window.
+> > 
+> > > +			compatible = "st,stih407-fdma-mpe31";
+> > > +			reg = <0x8e20000 0x20000>;
+> > 
+> > I personally find padding up to 32bits helpful in the addresses.
 > 
-> However, there's nothing actually wrong with your version - there's no
-> way we could've got this far with sp pointing at userspace.
+> None of the stih407-family nodes I can see have this padding, including
+> the ones merged by you.
+
+Nither of these two facts mean it's correct.
+
+I'm happy to write a patch to correct them all.
+
+Bear in mind that this isn't a hard and fast rule.  Both work and are
+legal.  I just think the padding is more consistent.
+
+> > > +			interrupts = <GIC_SPI 5 IRQ_TYPE_NONE>;
+> > > +			dma-channels = <16>;
+> > > +			#dma-cells = <3>;
+> > > +			st,fdma-id = <0>;
+> > 
+> > We usually shy away from ID properties.  What is it required for in
+> > this case?
 > 
-> I'm happy with either version, so:
+> Yes Rob did already mention that over here, see my reply at the bottom
+> http://www.spinics.net/lists/devicetree/msg92529.html.
 > 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> However I can't think of any other useful properties we could add
+> to derive this information. The fdma controller number is used
+> by the driver to generate a unique firmware filename.
 
-Thank you!
+Who chooses the naming scheme of the firmware binary?
 
-> 
-> How do you want to handle the patch?  I already have some other uaccess
-> fixes queued up to send to Linus before the merge window closes.
+Is there any reason they can't be:
 
-I was thinking to ask Stefano to carry it in Xen tree. But I don't mind
-if it goes with your tree.
+  fdma_STiH407_audio.elf
+  fdma_STiH407_app.elf
+  fdma_STiH407_free_running.elf
 
-Regards,
+Then you can have a different compatible for each.
 
 -- 
-Julien Grall
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
