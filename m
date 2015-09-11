@@ -1,56 +1,38 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 11 Sep 2015 16:21:57 -0700
-Subject: [PATCH 4/6] PCI: generic: Correct, and avoid overflow,
- in bus_max calculation.
+Date: Fri, 11 Sep 2015 16:21:58 -0700
+Subject: [PATCH 5/6] PCI: generic: Pass proper starting bus number to
+ pci_scan_root_bus().
 In-Reply-To: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1442013719-5001-5-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1442013719-5001-6-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-There are two problems with the bus_max calculation:
-
-1) The u8 data type can overflow for large config space windows.
-
-2) The calculation is incorrect for a bus range that doesn't start at
-   zero.
-
-Since the configuration space is relative to bus zero, make bus_max
-just be the size of the config window scaled by bus_shift.  Then clamp
-it to a maximum of 255, per PCI.  Use a data type of int to avoid
-overflow problems.
+If the bus is being configured with a bus-range that does not start at
+zero, pass that starting bus number to pci_scan_root_bus().  Passing
+the incorrect value of zero causes attempted config accesses outside
+of the supported range, which cascades to an OOPs spew and eventual
+kernel panic.
 
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- drivers/pci/host/pci-host-generic.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/pci/host/pci-host-generic.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-index cd6f898..fce5bf7 100644
+index fce5bf7..8219c0b 100644
 --- a/drivers/pci/host/pci-host-generic.c
 +++ b/drivers/pci/host/pci-host-generic.c
-@@ -164,7 +164,7 @@ out_release_res:
- static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
- {
- 	int err;
--	u8 bus_max;
-+	int bus_max;
- 	resource_size_t busn;
- 	struct resource *bus_range;
- 	struct device *dev = pci->host.dev.parent;
-@@ -177,8 +177,9 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
- 	}
+@@ -265,7 +265,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+ 	if (!pci_has_flag(PCI_PROBE_ONLY))
+ 		pci_add_flags(PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS);
  
- 	/* Limit the bus-range to fit within reg */
--	bus_max = pci->cfg.bus_range->start +
--		  (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
-+	bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
-+	if (bus_max > 255)
-+		bus_max = 255;
- 	pci->cfg.bus_range->end = min_t(resource_size_t,
- 					pci->cfg.bus_range->end, bus_max);
- 
+-	bus = pci_scan_root_bus(dev, 0,
++	bus = pci_scan_root_bus(dev, pci->cfg.bus_range->start,
+ 				&pci->cfg.ops.ops, pci, &pci->resources);
+ 	if (!bus) {
+ 		dev_err(dev, "Scanning rootbus failed");
 -- 
 1.7.11.7
