@@ -1,70 +1,102 @@
-From: yvo@apm.com (Y Vo)
-Date: Fri, 11 Sep 2015 21:23:31 +0700
-Subject: [PATCH 2/2] Documentation: gpio: Update description for X-Gene
- standby GPIO controller DTS binding
-In-Reply-To: <14280808.2Weay6QlT1@wuerfel>
-References: <1441963332-13329-1-git-send-email-yvo@apm.com>
- <11539535.sS04eUgSdg@wuerfel>
- <CAL4ahLepjn-VG9WCLEovzjwc=8fpncP6xTS68gRO2VtVaEDc1g@mail.gmail.com>
- <14280808.2Weay6QlT1@wuerfel>
-Message-ID: <CAL4ahLeF8qQJciam467P2ixrxtMPTK2J9OtaVvcjtPF=9to0BQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 11 Sep 2015 17:25:17 +0300
+Subject: [PATCH/RFC v2 net-next 3/4] ravb: Document binding for r8a7795 SoC
+In-Reply-To: <1441936878-18290-4-git-send-email-horms+renesas@verge.net.au>
+References: <1441936878-18290-1-git-send-email-horms+renesas@verge.net.au>
+ <1441936878-18290-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <55F2E44D.6010505@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 7:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 11 September 2015 18:24:47 Y Vo wrote:
->> On Fri, Sep 11, 2015 at 4:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Friday 11 September 2015 16:22:12 Y Vo wrote:
->> >>  There are 20 GPIO pins from 0..21. There is no GPIO_DS14 or GPIO_DS15,
->> >> -only GPIO_DS8..GPIO_DS13 support interrupts. The IRQ mapping
->> >> +only GPIO_DS8..GPIO_DS13 support external interrupts. The IRQ mapping
->> >>  is currently 1-to-1 on interrupts 0x28 thru 0x2d.
->> >> +GPIO pins from GPIO_DS8 to GPIO_DS13 are configured as external interrupt
->> >> +by default. If one wish not to use any of these pins as external interrupts,
->> >> +the corresponding interrupt resource for those pins should be removed.
->> >
->> > According to this description, I fail to see how one would specify
->> > a missing interrupt for one of the pins that is not the last one in
->> > the list.
->> >
->> All GPIO_DS8..GPIO_DS13 are configured as external IRQ by default. So
->> if anyone want to use one of them as gpio mode, they can drop add the
->> sbgpio node to their DTB board-specific, and remove that GPIO from
->> interrupts property. As example below I want to leave GPIO_DS8 as gpio
->> mode, so I remove it as below:
->>
->> /* Board-specific: exclude GPIO_DS8 to leave it as GPIO */
->> &sbgpio {
->>        interrupts =    <0x0 0x29 0x1>,         /* GPIO_DS9 */
->>                        <0x0 0x2a 0x1>,         /* GPIO_DS10 */
->>                        <0x0 0x2b 0x1>,         /* GPIO_DS11 */
->>                        <0x0 0x2c 0x1>,         /* GPIO_DS12 */
->>                        <0x0 0x2d 0x1>;         /* GPIO_DS13 */
->> }
+Hello.
+
+On 9/11/2015 5:01 AM, Simon Horman wrote:
+
+> From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
 >
-> This would be a very unusual binding, because that requires the driver
-> to know the contents of the properties in advance and the driver
-> cannot derive the function of an irq from the position in the array.
+> This patch updates the ravb binding to support the r8a7795 SoC by:
+> - Adding a compat string for the new hardware
+> - Adding 25 named interrupts to binding for the new SoC;
+>    older SoCs continue to use a single multiplexed interrupt
 >
-> Please come up with another approach that is more like other drivers
-> do this and that makes it possible to reuse the driver if the
-> interrupt numbers change.
-The GPIO standby doesn't support interrupt controller itself, it only
-wires the GPIO line to the external IRQ of GIC. So it is not similar
-to other driver. Each GPIO is fixed to GIC IRQ index, and never
-change.
+> The example is also updated to reflect the r8a7795 as this is the
+> more complex case.
+>
+> Based on work by Kazuya Mizuguchi and others.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>
+> ---
+>
+> v2
+> * First post; broken out of a driver update patch
+> * As discussed with Geert Uytterhoeven and Sergei Shtylyov
+>    - Binding: Make all interrupts mandatory as named-interrupts of
+>      the form ch%u
+> ---
+>   .../devicetree/bindings/net/renesas,ravb.txt       | 65 +++++++++++++++++++---
+>   1 file changed, 58 insertions(+), 7 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> index 1fd8831437bf..6c360f993d33 100644
+> --- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> +++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+[...]
+> @@ -27,13 +33,46 @@ Optional properties:
+>   Example:
+>
+>   	ethernet at e6800000 {
+> -		compatible = "renesas,etheravb-r8a7790";
+> -		reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
+> +		compatible = "renesas,etheravb-r8a7795";
+> +		reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
+>   		interrupt-parent = <&gic>;
+> -		interrupts = <0 163 IRQ_TYPE_LEVEL_HIGH>;
+> -		clocks = <&mstp8_clks R8A7790_CLK_ETHERAVB>;
+> -		phy-mode = "rmii";
+> +		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "ch0", "ch1", "ch2", "ch3",
+> +				  "ch4", "ch5", "ch6", "ch7",
+> +				  "ch8", "ch9", "ch10", "ch11",
+> +				  "ch12", "ch13", "ch14", "ch15",
+> +				  "ch16", "ch17", "ch18", "ch19",
+> +				  "ch20", "ch21", "ch22", "ch23",
+> +				  "ch24";
 
-Is that possible if we change to this approach:
-- Keep all GPIO as GPIO mode by default.
-- If anyone want to use them as interrupt, they must add the interrupt
-node to DT specific-board below:
+    To me, these names don't look very helpful. You could as well omit them 
+and use platform_get_irq() with the channel #.
 
-Example to configure GPIO_DS11, 12, 13 as external irq:
+> +		clocks = <&mstp8_clks R8A7795_CLK_ETHERAVB>;
+> +		phy-mode = "rgmii-id";
+> +		phy-reset-gpio = <&gpio2 10 0>;
 
-&sbgpio {
-        interrupts = <0x0 0x2b 0x1>,         /* GPIO_DS11 */
-                        <0x0 0x2c 0x1>,         /* GPIO_DS12 */
-                        <0x0 0x2d 0x1>;         /* GPIO_DS13 */
+    I don't see how this prop is used by the driver and it's not documented in 
+the bindings.
 
+[...]
 
->         Arnd
+MBR, Sergei
