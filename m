@@ -1,147 +1,109 @@
-From: Dongsheng.Wang@freescale.com (Wang Dongsheng)
-Date: Fri, 11 Sep 2015 03:19:14 +0000
-Subject: [PATCH 1/2] fsl: Add binding for RCPM
-In-Reply-To: <1441903615.2909.0.camel@freescale.com>
-References: <1441780967-30879-1-git-send-email-dongsheng.wang@freescale.com>
- <1441828599.29081.36.camel@freescale.com>
- <SN1PR0301MB16165F9EE9B7CE08A3BA68299D510@SN1PR0301MB1616.namprd03.prod.outlook.com>
- <1441903615.2909.0.camel@freescale.com>
-Message-ID: <SN1PR0301MB1616D50C94CADBFC6DE626509D500@SN1PR0301MB1616.namprd03.prod.outlook.com>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Fri, 11 Sep 2015 11:34:22 +0800
+Subject: [PATCH v7 1/5] dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
+In-Reply-To: <55EF7A70.1080701@kernel.org>
+References: <1441693083-8440-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1441693083-8440-2-git-send-email-chunfeng.yun@mediatek.com>
+ <55EF7A70.1080701@kernel.org>
+Message-ID: <1441942462.25974.0.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Wood Scott-B07421
-> Sent: Friday, September 11, 2015 12:47 AM
-> To: Wang Dongsheng-B40534
-> Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org; Jin Zhengxiong-
-> R64188; Zhao Chenhui-B35336; Tang Yuantian-B29983; Wang Huan-B18965;
-> robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] fsl: Add binding for RCPM
+Hi,
+On Tue, 2015-09-08 at 19:16 -0500, Rob Herring wrote:
+> On 09/08/2015 01:17 AM, Chunfeng Yun wrote:
+> > add a DT binding documentation of usb3.0 phy for MT65xx
+> > SoCs from Mediatek.
+> > 
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 > 
-> On Wed, 2015-09-09 at 21:03 -0500, Wang Dongsheng-B40534 wrote:
-> > Hi Scott,
-> >
-> > Thanks for your review.
-> >
-> > > -----Original Message-----
-> > > From: Wood Scott-B07421
-> > > Sent: Thursday, September 10, 2015 3:57 AM
-> > > To: Wang Dongsheng-B40534
-> > > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org; Jin
-> > > Zhengxiong-
-> > > R64188; Zhao Chenhui-B35336; Tang Yuantian-B29983; Wang Huan-B18965;
-> > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org
-> > > Subject: Re: [PATCH 1/2] fsl: Add binding for RCPM
-> > >
-> > > On Wed, 2015-09-09 at 14:42 +0800, Dongsheng Wang wrote:
-> > > > From: Wang Dongsheng <dongsheng.wang@freescale.com>
-> > > >
-> > > > RCPM is the Run Control and Power Management module performs all
-> > > > device-level tasks associated with device run control and power
-> > > > management.
-> > > >
-> > > > Add this for freescale powerpc platform and layerscape platform.
-> > > >
-> > > > Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
-> > > > Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
-> > > > Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
-> > > >
-> > > > diff --git a/Documentation/devicetree/bindings/soc/fsl/rcpm.txt
-> > > > b/Documentation/devicetree/bindings/soc/fsl/rcpm.txt
-> > > > new file mode 100644
-> > > > index 0000000..284070c
-> > > > --- /dev/null
-> > > > +++ b/Documentation/devicetree/bindings/soc/fsl/rcpm.txt
-> > > > @@ -0,0 +1,64 @@
-> > > > +* Run Control and Power Management
-> > > > +-------------------------------------------
-> > > > +The RCPM performs all device-level tasks associated with device
-> > > > +run
-> > > > control
-> > > > +and power management.
-> > > > +
-> > > > +Required properites:
-> > > > +  - reg : Offset and length of the register set of RCPM block.
-> > > > +  - compatible : Sould contain a chip-specific RCPM block
-> > > > +compatible
-> > > > string
-> > > > +     and (if applicable) may contain a chassis-version RCPM
-> > > > + compatible
-> > > > string.
-> > > > +     Chip-specific strings are of the form "fsl,<chip>-rcpm", such as:
-> > > > +     * "fsl,p2041-rcpm"
-> > > > +     * "fsl,p3041-rcpm"
-> > > > +     * "fsl,p4080-rcpm"
-> > > > +     * "fsl,p5020-rcpm"
-> > > > +     * "fsl,p5040-rcpm"
-> > > > +     * "fsl,t4240-rcpm"
-> > > > +     * "fsl,b4420-rcpm"
-> > > > +     * "fsl,b4860-rcpm"
-> > > > +
-> > > > +     Chassis-version strings are of the form "fsl,qoriq-rcpm-
-> > > > <version>",
-> > > > +     such as:
-> > > > +     * "fsl,qoriq-rcpm-1.0": for chassis 1.0 rcpm
-> > > > +     * "fsl,qoriq-rcpm-2.0": for chassis 2.0 rcpm
-> > > > +     * "fsl,qoriq-rcpm-2.1": for chassis 2.1 rcpm
-> > > > +
-> > > > +All references to "1.0" and "2.0" refer to the QorIQ chassis
-> > > > +version to which the chip complies.
-> > > > +Chassis Version              Example Chips
-> > > > +---------------              -------------------------------
-> > > > +1.0                          p4080, p5020, p5040, p2041, p3041
-> > > > +2.0                          t4240, b4860, b4420
-> > > > +2.1                          t1040, ls1021
-> > > > +
-> > > > +Example:
-> > > > +The RCPM node for T4240:
-> > > > +     rcpm:  global-utilities at e2000{
-> > > > +             compatible = "fsl,t4240-rcpm", "fsl,qoriq-rcpm-2.0";
-> > > > +             reg = <0xe2000 0x1000>;
-> > > > +     };
-> > > > +
-> > > > +The RCPM node for P4080:
-> > > > +     rcpm:  global-utilities at e2000{
-> > > > +             compatible = "fsl,qoriq-rcpm-1.0";
-> > > > +             reg = <0xe2000 0x1000>;
-> > > > +     };
-> > >
-> > > I would avoid putting the p4080 example in the binding, as we don't
-> > > want to make it look like it's OK to leave out the specific chip
-> > > compatible.
-> > >
-> >
-> > Fine, I will add the specific chip compatible in this example.
-> > compatible = "fsl,p4080-rcpm", "fsl,qoriq-rcpm-1.0";
+> One comment, otherwise:
 > 
-> Just drop that example.
+> Acked-by: Rob Herring <robh@kernel.org>
 > 
-
-Thanks.
-
-> > > > +* Freescale RCPM Wakeup Source Device Tree Bindings
-> > > > +-------------------------------------------
-> > > > +Required rcpm-wakeup property should be added to a device node if
-> > > > +the
-> > > > device
-> > > > +can be used as a wakeup source.
-> > > > +
-> > > > +  - rcpm-wakeup: should contain a pointer to the rcpm node and the
-> > > > +     corresponding bit of device in the register.
-> > >
-> > > The corresponding bit in *what* register?
-> > >
-> >
-> > RCPM_IPPDEXPCRx register, I will add a explain to this.
+> > ---
+> >  .../devicetree/bindings/phy/phy-mt65xx-usb.txt     | 69 ++++++++++++++++++++++
+> >  1 file changed, 69 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> > new file mode 100644
+> > index 0000000..5812d20
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> > @@ -0,0 +1,69 @@
+> > +mt65xx USB3.0 PHY binding
+> > +--------------------------
+> > +
+> > +This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
+> > +
+> > +Required properties (controller (parent) node):
+> > + - compatible	: should be "mediatek,mt8173-u3phy"
+> > + - reg		: offset and length of register for phy, exclude port's
+> > +		  register.
+> > + - clocks	: a list of phandle + clock-specifier pairs, one for each
+> > +		  entry in clock-names
+> > + - clock-names	: must contain
+> > +		  "u3phya_ref": for reference clock of usb3.0 analog phy.
+> > +
+> > +Required nodes	: a sub-node is required for each port the controller
+> > +		  provides. Address range information including the usual
+> > +		  'reg' property is used inside these nodes to describe
+> > +		  the controller's topology. These nodes are translated
+> > +		  by the driver's .xlate() function.
 > 
-> How do you encode which "x" it is?
-
-Just means IPPDEXPCR0 IPPDEXPCR1.
-
-"&rcpm IPPDEXPCR0 IPPDEXPCR1" will explain "what register" in this property.
-
-Regards,
--Dongsheng
+> The last sentence is Linux specific. Please remove.
+> 
+Ok, I will remove it later. Thanks
+> > +
+> > +Required properties (port (child) node):
+> > +- reg		: address and length of the register set for the port.
+> > +- #phy-cells	: should be 1 (See second example)
+> > +		  cell after port phandle is phy type from:
+> > +			- PHY_TYPE_USB2
+> > +			- PHY_TYPE_USB3
+> > +
+> > +Example:
+> > +
+> > +u3phy: usb-phy at 11290000 {
+> > +	compatible = "mediatek,mt8173-u3phy";
+> > +	reg = <0 0x11290000 0 0x800>;
+> > +	clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+> > +	clock-names = "u3phya_ref";
+> > +	#address-cells = <2>;
+> > +	#size-cells = <2>;
+> > +	ranges;
+> > +	status = "okay";
+> > +
+> > +	phy_port0: port at 11290800 {
+> > +		reg = <0 0x11290800 0 0x800>;
+> > +		#phy-cells = <1>;
+> > +		status = "okay";
+> > +	};
+> > +
+> > +	phy_port1: port at 11291000 {
+> > +		reg = <0 0x11291000 0 0x800>;
+> > +		#phy-cells = <1>;
+> > +		status = "okay";
+> > +	};
+> > +};
+> > +
+> > +Specifying phy control of devices
+> > +---------------------------------
+> > +
+> > +Device nodes should specify the configuration required in their "phys"
+> > +property, containing a phandle to the phy port node and a device type;
+> > +phy-names for each port are optional.
+> > +
+> > +Example:
+> > +
+> > +#include <dt-bindings/phy/phy.h>
+> > +
+> > +usb30: usb at 11270000 {
+> > +	...
+> > +	phys = <&phy_port0 PHY_TYPE_USB3>;
+> > +	phy-names = "usb3-0";
+> > +	...
+> > +};
+> > 
+> 
