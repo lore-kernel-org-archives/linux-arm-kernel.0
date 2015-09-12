@@ -1,46 +1,38 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 12 Sep 2015 12:40:37 +0200
-Subject: [PATCH 1/2] pinctrl: rockchip: Define GPIO banks 7 and 8
-In-Reply-To: <1442011005-4828-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1442011005-4828-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <4186674.JafPHeXURU@diego>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Sat, 12 Sep 2015 13:17:36 +0200
+Subject: [PATCH] ARM: BCM5301X: add NAND flash chip description for Asus
+ RT-AC87U
+Message-ID: <1442056656-11491-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sjoerd,
+The NAND flash chip description were not imported for the Asus RT-AC87U
+dts file when this was done for all the other dts files, because these
+patches were send in parallel.
 
-Am Samstag, 12. September 2015, 00:36:44 schrieb Sjoerd Simons:
-> Rockchip RK3288 has 9 GPIO banks (0 to 8) add definitions for the last
-> two.
-> 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> ---
-> 
->  include/dt-bindings/pinctrl/rockchip.h | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/include/dt-bindings/pinctrl/rockchip.h
-> b/include/dt-bindings/pinctrl/rockchip.h index 743e66a..efc57cf 100644
-> --- a/include/dt-bindings/pinctrl/rockchip.h
-> +++ b/include/dt-bindings/pinctrl/rockchip.h
-> @@ -24,6 +24,8 @@
->  #define RK_GPIO3	3
->  #define RK_GPIO4	4
->  #define RK_GPIO6	6
-> +#define RK_GPIO7	7
-> +#define RK_GPIO8	8
-> 
->  #define RK_FUNC_GPIO	0
->  #define RK_FUNC_1	1
+This adds a missing NAND flash chip description to this patch:
+commit 9faa5960eef3204cae6637b530f5e23e53b5a9ef
+Author: Hauke Mehrtens <hauke@hauke-m.de>
+Date: Fri May 29 23:39:47 2015 +0200
 
-I'm actually not sure about these. In retrospect the RK_GPIOx -> x defines do 
-not provide any additional value compared to just having the actual value in 
-the pinctrl-nodes, so we phased them out largely for the rk3288 boards.
+ARM: BCM5301X: add NAND flash chip description
 
-While looking through some boards, I saw that some slipped in for stuff that 
-gets copy'n'paste treatment most of the time, but generally we're only using 
-the real numbers on boards - and I'd like to keep it that way and phase out 
-the RK_GPIOx constants in new boards.
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-Heiko
+diff --git a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
+index aedf3c4..8ade7de 100644
+--- a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
++++ b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
+@@ -10,6 +10,7 @@
+ /dts-v1/;
+ 
+ #include "bcm4708.dtsi"
++#include "bcm5301x-nand-cs0-bch8.dtsi"
+ 
+ / {
+ 	compatible = "asus,rt-ac87u", "brcm,bcm4709", "brcm,bcm4708";
+-- 
+2.1.4
