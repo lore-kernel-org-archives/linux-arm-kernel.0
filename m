@@ -1,60 +1,62 @@
-From: daniel.kiper@oracle.com (Daniel Kiper)
-Date: Sat, 12 Sep 2015 13:36:55 +0200
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <20150911162559.GA8726@leverpostej>
-References: <alpine.DEB.2.02.1509101116580.2672@kaball.uk.xensource.com>
- <20150910112418.GC29293@leverpostej>
- <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
- <20150910121514.GE29293@leverpostej>
- <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
- <20150910144938.GI29293@leverpostej>
- <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
- <20150910162302.GN29293@leverpostej>
- <20150911124643.GB4530@olila.local.net-space.pl>
- <20150911162559.GA8726@leverpostej>
-Message-ID: <20150912113655.GG4530@olila.local.net-space.pl>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Sat, 12 Sep 2015 13:07:52 +0100
+Subject: [PATCH v2 1/9] dmaengine: st_fdma: Add STMicroelectronics FDMA
+ DT binding documentation
+In-Reply-To: <51503956.PMFrWKUjxX@wuerfel>
+References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
+ <1441980871-24475-2-git-send-email-peter.griffin@linaro.org>
+ <51503956.PMFrWKUjxX@wuerfel>
+Message-ID: <20150912120752.GA19897@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 05:25:59PM +0100, Mark Rutland wrote:
-> On Fri, Sep 11, 2015 at 01:46:43PM +0100, Daniel Kiper wrote:
-> > On Thu, Sep 10, 2015 at 05:23:02PM +0100, Mark Rutland wrote:
+Hi Arnd,
 
-[...]
+On Fri, 11 Sep 2015, Arnd Bergmann wrote:
 
-> > > What's troublesome with the boot services?
-> > >
-> > > What can't be simulated?
-> >
-> > How do you want to access bare metal EFI boot services from dom0 if they
-> > were shutdown long time ago before loading dom0 image?
->
-> I don't want to.
->
-> I asked "What can't be simulated?" because I assumed everything
-> necessary/mandatory could be simulated without needinng access to any
-> real EFI boot services.
->
-> As far as I can see all that's necessary is to provide a compatible
-> interface.
+> On Friday 11 September 2015 15:14:23 Peter Griffin wrote:
+> > +- st,fdma-id	: Must contain fdma controller number
+> 
+> What for?
 
-Could you be more precise what do you need? Please enumerate. UEFI spec has
-more than 2500 pages and I do not think that we need all stuff in dom0.
+It is used by the driver to generate a unique firmware name.
+Basically we need to know which controller instance we
+are as each controller has a different firmware which needs
+to be loaded.
 
-> > What do you need from EFI boot services in dom0?
->
-> The ability to call ExitBootServices() and SetVirtualAddressMap() on a
-> _virtual_ address map for _virtual_ services provided by the hypervisor.
+Rob did say that having a index type property is undesirable
+over here, see my reply at the bottom
+http://www.spinics.net/lists/devicetree/msg92529.html.
 
-I am confused. Why do you need that? Please remember, EFI is owned and
-operated by Xen hypervisor. dom0 does not have direct access to EFI.
-All stuff required in dom0 is provided via hypercalls. If you need an
-extra data form EFI in dom0 please extend currently exiting API. Do
-not emulate whole EFI if you need one or a few things from spec.
+However I can't think of any other useful properties we could add
+to derive this information.
 
-> A console so that I can log things early on.
+> > +Example:
+> > +
+> > +	fdma1: fdma-app at 8e40000 {
+> 
+> The name should be "dma-controller", not "fdma-app".
 
-IIUC, log from dom0. Please use machinery provided by Xen hypervisor.
+Ok will fix in v3
 
-Daniel
+> 
+> > +Example:
+> > +
+> > +	snd_uni_player2: snd-uni-player at 2 {
+> > +		compatible = "st,snd_uni_player";
+> 
+> Maybe change the compatible string to "st,snd-uni-player"?
+
+Just checking the upstream driver which got merged for v4.3
+and the compatible has changed to "st,sti-uni-player" so I
+can update the DT doc example to use this in v3.
+
+> 
+> The string you use here would not be acceptable for a binding.
+
+Presumably it is the use of "underscores" in the compatible which
+is not allowed? Is that correct?
+
+regards,
+
+Peter.
