@@ -1,57 +1,69 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 12 Sep 2015 14:58:33 +0200
-Subject: [PATCH v2] devicetree: bindings: Update gpio-keys-polled with support
- for abs/rel axis
-In-Reply-To: <1442062713-21260-1-git-send-email-hdegoede@redhat.com>
-References: <1442062713-21260-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1442062713-21260-2-git-send-email-hdegoede@redhat.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 12 Sep 2015 15:08:34 +0200
+Subject: [PATCH 1/3] dmaengine: virt-dma: don't always free descriptor
+ upon completion
+In-Reply-To: <1441539654-19055-1-git-send-email-robert.jarzmik@free.fr>
+ (Robert Jarzmik's message of "Sun, 6 Sep 2015 13:40:52 +0200")
+References: <1441539654-19055-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <878u8bu6nh.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The devicetree binding for gpio-keys-polled already allows specifying
-what type of events (key / rel / abs) a button generates when pressed.
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-But for rel / abs axis we also need to specify which value this specific
-gpio represents.
+> This patch attempts to enhance the case of a transfer submitted multiple
+> times, and where the cost of creating the descriptors chain is not
+> negligible.
+>
+> This happens with big video buffers (several megabytes, ie. several
+> thousands of linked descriptors in one scatter-gather list). In these
+> cases, a video driver would want to do :
+>  - tx = dmaengine_prep_slave_sg()
+>  - dma_engine_submit(tx);
+>  - dma_async_issue_pending()
+>  - wait for video completion
+>  - read video data (or not, skipping a frame is also possible)
+>  - dma_engine_submit(tx)
+>    => here, the descriptors chain recalculation will take time
+>    => the dma coherent allocation over and over might create holes in
+>       the dma pool, which is counter-productive.
+>  - dma_async_issue_pending()
+>  - etc ...
+>
+> In order to cope with this case, virt-dma is modified to prevent freeing
+> the descriptors upon completion if DMA_CTRL_REUSE flag is set in the
+> transfer.
+>
+> This patch is a respin of the former DMA_CTRL_ACK approach, which was
+> reverted due to a regression in audio drivers.
+>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-One usecase is digital joysticks / direction-pads which are hooked up to
-gpio, in this case we've left and right buttons which we want to map to
-EV_ABS, ABS_X and we want generate events for left with a value of -1 and
-for right with a value of +1 (and similar for up / down and ABS_Y).
+Hi Jun, Lars-Peter and Vinod,
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
-Changes in v2:
--Add Rob's ack
--s/send/sent/
--Make the remarks of axis reporting a value of 0 when all buttons tied to
- that axis are released also apply to EV_REL axis
----
- Documentation/devicetree/bindings/input/gpio-keys-polled.txt | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+The revert of the former patch of this type, 8c8fe97b2b8a ("Revert "dmaengine:
+virt-dma: don't always free descriptor upon completion"") broke pxa_dma driver.
 
-diff --git a/Documentation/devicetree/bindings/input/gpio-keys-polled.txt b/Documentation/devicetree/bindings/input/gpio-keys-polled.txt
-index 313abef..283f85e 100644
---- a/Documentation/devicetree/bindings/input/gpio-keys-polled.txt
-+++ b/Documentation/devicetree/bindings/input/gpio-keys-polled.txt
-@@ -13,11 +13,16 @@ Subnode properties:
- 
- 	- gpios: OF device-tree gpio specification.
- 	- label: Descriptive name of the key.
--	- linux,code: Keycode to emit.
-+	- linux,code: Key / Axis code to emit.
- 
- Optional subnode-properties:
- 	- linux,input-type: Specify event type this button/key generates.
- 	  If not specified defaults to <1> == EV_KEY.
-+	- linux,input-value: If linux,input-type is EV_ABS or EV_REL then this
-+	  value is sent for events this button generates when pressed.
-+	  EV_ABS/EV_REL axis will generate an event with a value of 0 when
-+	  all buttons with linux,input-type == type and linux,code == axis
-+	  are released.
- 	- debounce-interval: Debouncing interval time in milliseconds.
- 	  If not specified defaults to 5.
- 	- gpio-key,wakeup: Boolean, button can wake-up the system.
+The reason behind is that pxa_dma was designed, upon transfer submission (in
+pxad_tx_submit()), to "move" the virtual descriptor to the submitted list,
+rather than adding it at its tail (because it was previously on the allocated
+list).
+
+As a consequence, the list_head is not initialized, pxa_dma fails, and the
+current status is that pxa_dma Oopses in linux-next, and therefore in Linus's
+tree once the merge window is closed.
+
+I'd really like to have this patch as the fix, ie. that at transfer preparation
+in vchan_tx_prep(), the virtual descriptor is added on "allocated" list tail.
+
+But to be sure there is no regression on other platforms, I need a test,
+especially from someone who suffered from the former version of this patch
+(where we had DMA_CTRL_ACK instead of DMA_CTRL_REUSE).
+
+Could anybody give it a try, as I need a fix to go in the early -rc of v4.3
+please ?
+
+Cheers.
+
 -- 
-2.4.3
+Robert
