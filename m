@@ -1,48 +1,62 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 12 Sep 2015 15:26:22 +0200
-Subject: [PATCH 0/2] ASoC: Add support for the Allwinner A10 codec
-Message-ID: <1442064384-23379-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sat, 12 Sep 2015 15:26:23 +0200
+Subject: [PATCH 1/2] Documentation: bindings: Add the Allwinner A10 codec
+ bindings
+In-Reply-To: <1442064384-23379-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1442064384-23379-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1442064384-23379-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The Allwinner SoCs have an in-SoC audio controller taking the role of a DAI
+and a codec.
 
-This patch set adds the support for what Allwinner calls the codec on
-their SoCs.
+Add the binding documentation for that controller on the A10.
 
-This codec is actually a combination of a codec and DAI, tied together
-in a single memory-mapped IP. It is completely standalone, and outputs
-directly the analog signal.
-
-While it supports both playback and capture, the capture is not
-implemented in this patch, and will be posted eventually as a separate
-one.
-
-This set, in order to be functional, has a dependency on the audio
-clocks patch set posted separately. However, it doesn't needs this to
-compile properly, so I guess it can be merged without really caring
-for the merging status of the clock patches.
-
-Let me know what you think,
-Maxime
-
-Emilio L?pez (1):
-  ASoC: sunxi: add support for the on-chip codec on early Allwinner SoCs
-
-Maxime Ripard (1):
-  Documentation: bindings: Add the Allwinner A10 codec bindings
-
- .../devicetree/bindings/sound/sun4i-codec.txt      |  33 +
- sound/soc/Kconfig                                  |   1 +
- sound/soc/Makefile                                 |   1 +
- sound/soc/sunxi/Kconfig                            |  11 +
- sound/soc/sunxi/Makefile                           |   2 +
- sound/soc/sunxi/sun4i-codec.c                      | 720 +++++++++++++++++++++
- 6 files changed, 767 insertions(+)
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ .../devicetree/bindings/sound/sun4i-codec.txt      | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/sound/sun4i-codec.txt
- create mode 100644 sound/soc/sunxi/Kconfig
- create mode 100644 sound/soc/sunxi/Makefile
- create mode 100644 sound/soc/sunxi/sun4i-codec.c
 
+diff --git a/Documentation/devicetree/bindings/sound/sun4i-codec.txt b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
+new file mode 100644
+index 000000000000..680144b74ae9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
+@@ -0,0 +1,33 @@
++* Allwinner A10 Codec
++
++Required properties:
++- compatible: must be either "allwinner,sun4i-a10-codec" or
++  "allwinner,sun7i-a20-codec"
++- reg: must contain the registers location and length
++- interrupts: must contain the codec interrupt
++- dmas: DMA channels for tx and rx dma. See the DMA client binding,
++	Documentation/devicetree/bindings/dma/dma.txt
++- dma-names: should include "tx" and "rx".
++- clocks: a list of phandle + clock-specifer pairs, one for each entry
++  in clock-names.
++- clock-names: should contain followings:
++   - "apb": the parent APB clock for this controller
++   - "codec": the parent module clock
++- routing : A list of the connections between audio components.  Each
++  entry is a pair of strings, the first being the connection's sink,
++  the second being the connection's source.
++
++
++Example:
++codec: codec at 01c22c00 {
++	#sound-dai-cells = <0>;
++	compatible = "allwinner,sun7i-a20-codec";
++	reg = <0x01c22c00 0x40>;
++	interrupts = <0 30 4>;
++	clocks = <&apb0_gates 0>, <&codec_clk>;
++	clock-names = "apb", "codec";
++	dmas = <&dma 0 19>, <&dma 0 19>;
++	dma-names = "rx", "tx";
++	routing = "Headphone Jack", "HP Right",
++		  "Headphone Jack", "HP Left";
++};
 -- 
 2.5.1
