@@ -1,36 +1,48 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 12 Sep 2015 15:43:09 +0200
-Subject: [PATCH v2] ARM: pxa: ssp: Fix build error by removing originally
- incorrect DT binding
-In-Reply-To: <1441610581-11434-1-git-send-email-jarkko.nikula@linux.intel.com>
- (Jarkko Nikula's message of "Mon, 7 Sep 2015 10:23:01 +0300")
-References: <1441610581-11434-1-git-send-email-jarkko.nikula@linux.intel.com>
-Message-ID: <87zj0rsqhe.fsf@belgarion.home>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 12 Sep 2015 15:26:22 +0200
+Subject: [PATCH 0/2] ASoC: Add support for the Allwinner A10 codec
+Message-ID: <1442064384-23379-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jarkko Nikula <jarkko.nikula@linux.intel.com> writes:
+Hi everyone,
 
-> Commit 03fbf488cece ("spi: pxa2xx: Differentiate Intel LPSS types") caused
-> build error here because it removed the type LPSS_SSP and I didn't notice
-> the type was used here too.
->
-> I believe commit a6e56c28a178 ("ARM: pxa: ssp: add DT bindings") added it
-> accidentally by copying all enum pxa_ssp_type types from
-> include/linux/pxa2xx_ssp.h even LPSS_SSP was for Intel LPSS SPI devices.
->
-> Fix the build error by removing this incorrect binding.
->
-> Fixes: 03fbf488cece ("spi: pxa2xx: Differentiate Intel LPSS types")
-> Signed-off-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
-> Reported-by: Axel Lin <axel.lin@ingics.com>
-> Cc: <stable@vger.kernel.org> # 4.2
-> ---
-> v2: Added Fixes tag suggested by Robert Jarzmik
+This patch set adds the support for what Allwinner calls the codec on
+their SoCs.
 
-Queued into pxa/fixes, thanks.
+This codec is actually a combination of a codec and DAI, tied together
+in a single memory-mapped IP. It is completely standalone, and outputs
+directly the analog signal.
 
-Cheers.
+While it supports both playback and capture, the capture is not
+implemented in this patch, and will be posted eventually as a separate
+one.
 
---
-Robert
+This set, in order to be functional, has a dependency on the audio
+clocks patch set posted separately. However, it doesn't needs this to
+compile properly, so I guess it can be merged without really caring
+for the merging status of the clock patches.
+
+Let me know what you think,
+Maxime
+
+Emilio L?pez (1):
+  ASoC: sunxi: add support for the on-chip codec on early Allwinner SoCs
+
+Maxime Ripard (1):
+  Documentation: bindings: Add the Allwinner A10 codec bindings
+
+ .../devicetree/bindings/sound/sun4i-codec.txt      |  33 +
+ sound/soc/Kconfig                                  |   1 +
+ sound/soc/Makefile                                 |   1 +
+ sound/soc/sunxi/Kconfig                            |  11 +
+ sound/soc/sunxi/Makefile                           |   2 +
+ sound/soc/sunxi/sun4i-codec.c                      | 720 +++++++++++++++++++++
+ 6 files changed, 767 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/sun4i-codec.txt
+ create mode 100644 sound/soc/sunxi/Kconfig
+ create mode 100644 sound/soc/sunxi/Makefile
+ create mode 100644 sound/soc/sunxi/sun4i-codec.c
+
+-- 
+2.5.1
