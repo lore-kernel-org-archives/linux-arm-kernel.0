@@ -1,66 +1,50 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 13 Sep 2015 02:00:19 +0300
-Subject: [PATCH] ARM: shmobile: r8a7794: link PCI USB devices to USB PHY
-Message-ID: <10927620.1TFu7PRvi4@wasted.cogentembedded.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 12 Sep 2015 20:04:49 -0300
+Subject: [PATCH 4/6] hwrng: st: Add support for ST's HW Random Number
+ Generator
+In-Reply-To: <1442002110-28733-5-git-send-email-lee.jones@linaro.org>
+References: <1442002110-28733-1-git-send-email-lee.jones@linaro.org>
+ <1442002110-28733-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAOMZO5CWywFHd1HE2=G-KEvQZpu_rJibmJL4fL5yCWRsnpi05Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the PCI USB devices that are behind the PCI bridges, adding necessary
-links to the USB PHY device.
+On Fri, Sep 11, 2015 at 5:08 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       base = devm_ioremap_resource(&pdev->dev, res);
+> +       if (IS_ERR(base))
+> +               return PTR_ERR(base);
+> +
+> +       clk = devm_clk_get(&pdev->dev, NULL);
+> +       if (!clk)
+> +               return -EINVAL;
 
----
-This patch is against 'renesas-devel-20150911v2-v4.2' tag of Simon Horman's
-'renesas.git' repo plus the R8A7794/SILK PCI USB and USB PHY support patches
-just posted.
+This should be:
 
-arch/arm/boot/dts/r8a7794.dtsi |   28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+    if (IS_ERR(clk))
+        return PTR_ERR(clk);
 
-Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-@@ -667,6 +667,20 @@
- 		interrupt-map = <0x0000 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
- 				 0x0800 0 0 1 &gic 0 108 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic 0 108 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		usb at 0,1 {
-+			reg = <0x800 0 0 0 0>;
-+			device_type = "pci";
-+			phys = <&usb0 0>;
-+			phy-names = "usb";
-+		};
-+
-+		usb at 0,2 {
-+			reg = <0x1000 0 0 0 0>;
-+			device_type = "pci";
-+			phys = <&usb0 0>;
-+			phy-names = "usb";
-+		};
- 	};
- 
- 	pci1: pci at ee0d0000 {
-@@ -688,6 +702,20 @@
- 		interrupt-map = <0x0000 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
- 				 0x0800 0 0 1 &gic 0 113 IRQ_TYPE_LEVEL_HIGH
- 				 0x1000 0 0 2 &gic 0 113 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		usb at 0,1 {
-+			reg = <0x800 0 0 0 0>;
-+			device_type = "pci";
-+			phys = <&usb2 0>;
-+			phy-names = "usb";
-+		};
-+
-+		usb at 0,2 {
-+			reg = <0x1000 0 0 0 0>;
-+			device_type = "pci";
-+			phys = <&usb2 0>;
-+			phy-names = "usb";
-+		};
- 	};
- 
- 	usbphy: usb-phy at e6590100 {
+> +
+> +       clk_prepare_enable(clk);
+
+This may fail, so better check its return value and propagate it on error.
+
+> +
+> +       ddata->ops.priv = (unsigned long)ddata;
+> +       ddata->ops.read = st_rng_read;
+> +       ddata->ops.name = pdev->name;
+> +       ddata->base     = base;
+> +       ddata->clk      = clk;
+> +
+> +       dev_set_drvdata(&pdev->dev, ddata);
+> +
+> +       ret = hwrng_register(&ddata->ops);
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "Failed to register HW RNG\n");
+> +               return ret;
+> +       }
+> +
+> +       dev_info(&pdev->dev, "Successfully registered HW RNG\n");
+
+No need to put this info.
