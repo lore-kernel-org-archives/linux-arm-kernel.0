@@ -1,38 +1,53 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 12 Sep 2015 13:17:36 +0200
-Subject: [PATCH] ARM: BCM5301X: add NAND flash chip description for Asus
- RT-AC87U
-Message-ID: <1442056656-11491-1-git-send-email-hauke@hauke-m.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sat, 12 Sep 2015 16:51:12 +0530
+Subject: [PATCH v2 00/23] dmaengine/ARM: Merge the edma drivers into one
+In-Reply-To: <1441974442-8233-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1441974442-8233-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <55F40AA8.9050706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NAND flash chip description were not imported for the Asus RT-AC87U
-dts file when this was done for all the other dts files, because these
-patches were send in parallel.
+On Friday 11 September 2015 05:56 PM, Peter Ujfalusi wrote:
+> Hi,
+> 
+> Changes since v1:
+> - Convert edma platform device registration to use platform_device_register_full
+> - Moved the PM callback also to the dmaengine driver - missed in v1
+> - Commit message added to:
+>   ARM/dmaengine: edma: Remove limitation on the number of eDMA controllers
+> - New patch which reads the flag for the channel mapping support in one place
+> 
+> Cover letter:
+> 
+> with this series the edma two driver setup will be changed to have only one
+> driver to support eDMA3. The legacy edma interface will be removed and eDMA can
+> only be used via dmaengine API from this point on.
+> In order to do the merge the following improvements has been done:
+> - One driver instance per eDMA:
+>  - Any number of eDMA instances are supported (both legacy and DT boot)
+> - Not relying on global variables, arrays, etc
+> - Code simplification and optimizations in several places
+> 
+> This change will also help us to do bigger changes in the eDMA driver since,
+> since now we have only one driver to work with.
+> 
+> The series has been tested on:
+> da850-evm (OMAP-L138)
+> - with legacy and DT boot (both eDMA0 and eDMA1 is enabled)
+> - In code swapping the eDMA instances in legacy mode to make sure the second
+>   instance is handled correctly.
+> 
+> am335x-evmsk
+> - DT boot
+> 
+> I think this series could go via the dmaengine tree. Changes are trivial under
+> arch/arm/
 
-This adds a missing NAND flash chip description to this patch:
-commit 9faa5960eef3204cae6637b530f5e23e53b5a9ef
-Author: Hauke Mehrtens <hauke@hauke-m.de>
-Date: Fri May 29 23:39:47 2015 +0200
+I looked at the series, it looks pretty good. Thanks for getting it done!
 
-ARM: BCM5301X: add NAND flash chip description
+No problem with entire series going through dmaengine. The week after
+next, when I am back in office, I would like to test on DM365 as well.
+But really no need to wait for it if the series is ready otherwise.
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
----
- arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-index aedf3c4..8ade7de 100644
---- a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-+++ b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-@@ -10,6 +10,7 @@
- /dts-v1/;
- 
- #include "bcm4708.dtsi"
-+#include "bcm5301x-nand-cs0-bch8.dtsi"
- 
- / {
- 	compatible = "asus,rt-ac87u", "brcm,bcm4709", "brcm,bcm4708";
--- 
-2.1.4
+Thanks,
+Sekhar
