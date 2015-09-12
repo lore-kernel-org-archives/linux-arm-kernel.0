@@ -1,21 +1,17 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 12 Sep 2015 13:23:35 -0700
-Subject: [PATCH 4/7] soc: brcmstb: add PM suspend/resume support (S2/S3/S5)
-In-Reply-To: <1434672696-13632-5-git-send-email-computersforpeace@gmail.com>
-References: <1434672696-13632-1-git-send-email-computersforpeace@gmail.com>
- <1434672696-13632-5-git-send-email-computersforpeace@gmail.com>
-Message-ID: <55F489C7.4010007@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 13 Sep 2015 01:28:32 +0300
+Subject: [PATCH 0/2] Add R8A7794/SILK board PCI USB DT support
+Message-ID: <3151312.grtDDBsSl8@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 06/18/15 17:11, Brian Norris a ?crit :
-> Support S2, S3, and S5 through /sys/power/state ("standby" and "mem")
-> and the poweroff code paths. See comments in pm.c for a few more details
-> about these system suspend modes.
-> 
-> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+Hello.
 
-Applied to soc/next with an appropriate AFLAGS to force the assembler in
-ARMv7-a mode for s2.S, thanks!
--- 
-Florian
+   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
+'renesas-devel-20150911v2-v4.2' tag. Here we add PCI USB device tree support
+for the R8A7794-based SILK board.
+
+[1/2] ARM: shmobile: r8a7794: add internal PCI bridge nodes
+[2/2] ARM: shmobile: silk: enable internal PCI
+
+WBR, Sergei
