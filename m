@@ -1,81 +1,50 @@
-From: yvo@apm.com (Y Vo)
-Date: Sat, 12 Sep 2015 12:55:55 +0700
-Subject: [PATCH 2/2] Documentation: gpio: Update description for X-Gene
- standby GPIO controller DTS binding
-In-Reply-To: <2311005.jUde56dLfB@wuerfel>
-References: <1441963332-13329-1-git-send-email-yvo@apm.com>
- <3318725.Seeb48hirI@wuerfel>
- <CAL4ahLeoeT79ct-M-Bd-O08K0Dmysas3HFmTfXUFGtHKJBRzsg@mail.gmail.com>
- <2311005.jUde56dLfB@wuerfel>
-Message-ID: <CAL4ahLeuPX7viZ5=RaC92=n+jT82=Fa3tF7oH8Q=kE=PKVBSwQ@mail.gmail.com>
+From: udknight@gmail.com (Wang YanQing)
+Date: Sat, 12 Sep 2015 14:04:30 +0800
+Subject: [PATCH] ARM: mm: avoid unneeded page protection fault for memory
+ range with (VM_PFNMAP|VM_PFNWRITE)
+Message-ID: <20150912060430.GA16768@udknight>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 11:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 11 September 2015 22:06:58 Y Vo wrote:
->> On Fri, Sep 11, 2015 at 9:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Friday 11 September 2015 21:23:31 Y Vo wrote:
->> >> Is that possible if we change to this approach:
->> >> - Keep all GPIO as GPIO mode by default.
->> >> - If anyone want to use them as interrupt, they must add the interrupt
->> >> node to DT specific-board below:
->> >>
->> >> Example to configure GPIO_DS11, 12, 13 as external irq:
->> >>
->> >> &sbgpio {
->> >>         interrupts = <0x0 0x2b 0x1>,         /* GPIO_DS11 */
->> >>                         <0x0 0x2c 0x1>,         /* GPIO_DS12 */
->> >>                         <0x0 0x2d 0x1>;         /* GPIO_DS13 */
->> >
->> > That is exactly the same as you have in your patch. You should
->> > always list all interrupts that the gpio controller is wired
->> > to, whether they are used or not.
->> >
->> > Ideally, the driver just decides at runtime how to wire that
->> > mux, based on how the gpio is configured by the client driver.
->> > If the client asks for an interrupt (with gpio_to_irq) and is
->> > it is configured as an input, then you connect it to the GIC,
->> > otherwise you leave it to be handled by the gpio chip itself.
->> > Any reason you can't do that?
->> >
->> As I just explained, the GPIO Standby doesn't support the interrupt.
->> Both interrupts are came from GIC, so if the client asks for an
->> interrupt, it will go to the GIC driver (not GPIO Standby driver), so
->> that's my trouble. We can not implement the code to configured the
->> GPIO standby at GIC driver.
->
-> So you are saying we merged a binding that is incapable of describing
-> the hardware? If that is the case, we may have to go back to
-> the drawing board and come up with a working binding.
->
-> One part that I don't understand yet is how the driver handles
-> irqs to start with, as it does not register a nested irq domain
-> or irqchip, so I'm guessing that client drivers cannot actually
-> use the IRQ functionality. Is that right?
-For our case the irq_domain is in irq-gic driver, the GPIO driver only
-is responsible to wire 2 the external irq of GIC to GPIO pin.
+Add L_PTE_DIRTY to PTEs for memory range with (VM_PFNMAP|VM_PFNWRITE),
+then we could avoid unneeded page protection fault in write access
+first time due to L_PTE_RDONLY.
 
-Example for configure GPIO_DS13 as interrupt and use as button with
-the current gpio driver:
-        gpio-keys {
-                compatible = "gpio-keys";
-                button at 1 {
-                        label = "POWER";
-                        linux,code = <116>;
-                        linux,input-type = <0x1>;
-                        interrupts = <0x0 0x2d 0x1>;
-                };
-        };
+There are no valid struct pages behind VM_PFNMAP range, so it make no
+sense to set L_PTE_DIRTY in page fault handler.
 
->
-> It also seems to me that the binding cannot distinguish between a
-> line configured as an input and one that is configured as an
-> interrupt, which are for other gpio chips the same thing, but
-> not on this one.  Could this be rectified by using another bit
-> of the second gpio cell? The low bit is used for active-high/active-low,
-> so you could use the second bit for irq/input.
->
-Do you mean #gpio-cells property and using the high bit of the second
-bit for irq/input  ?
+Signed-off-by: Wang YanQing <udknight@gmail.com>
+---
+ arch/arm/include/asm/mman.h | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 arch/arm/include/asm/mman.h
 
->         Arnd
+diff --git a/arch/arm/include/asm/mman.h b/arch/arm/include/asm/mman.h
+new file mode 100644
+index 0000000..f59bbf3
+--- /dev/null
++++ b/arch/arm/include/asm/mman.h
+@@ -0,0 +1,21 @@
++/*
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
++ */
++#ifndef __ASM_ARM_MMAN_H
++#define __ASM_ARM_MMAN_H
++
++#include <uapi/asm/mman.h>
++
++static inline pgprot_t arch_vm_get_page_prot(unsigned long vm_flags)
++{
++	if ((vm_flags & (VM_PFNMAP|VM_WRITE)) == (VM_PFNMAP|VM_WRITE))
++		return __pgprot(L_PTE_DIRTY);
++	else
++		return __pgprot(0);
++}
++#define arch_vm_get_page_prot(vm_flags) arch_vm_get_page_prot(vm_flags)
++
++#endif	/* __ASM_ARM_MMAN_H */
+-- 
+1.8.5.6.2.g3d8a54e.dirty
