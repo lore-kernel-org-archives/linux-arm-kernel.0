@@ -1,36 +1,35 @@
 From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Sat, 12 Sep 2015 18:00:50 +0800
-Subject: [PATCH v2 1/3] ARM: dts: support Highspeed for rk3188-radxarock
-Message-ID: <1442052050-20110-1-git-send-email-shawn.lin@rock-chips.com>
+Date: Sat, 12 Sep 2015 18:01:39 +0800
+Subject: [PATCH v2 2/3] ARM: dts: support Highspeed for rk3066a-bqcurie2
+In-Reply-To: <1442052050-20110-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1442052050-20110-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <1442052099-20149-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cap-sd-highspeed and cap-mmc-highspeed for rk3188-radxarock
+Add cap-sd-highspeed and cap-mmc-highspeed for rk3066a-bqcurie2
 board to make sd cards running faster.
 
 Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-
 ---
 
-Changes in v2:
-- Add mmc caps for individual board file
+Changes in v2: None
 
- arch/arm/boot/dts/rk3188-radxarock.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/rk3066a-bqcurie2.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
-index d2180e5..2f37ea7 100644
---- a/arch/arm/boot/dts/rk3188-radxarock.dts
-+++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-@@ -287,7 +287,8 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sd0_clk>, <&sd0_cmd>, <&sd0_cd>, <&sd0_bus4>;
+diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+index c027375..bf09038 100644
+--- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
++++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+@@ -187,6 +187,8 @@
  	vmmc-supply = <&vcc_sd0>;
--
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
  	bus-width = <4>;
  	disable-wp;
++	cap-mmc-highspeed;
++	cap-sd-highspeed;
  };
+ 
+ &mmc1 { /* wifi */
 -- 
 2.3.7
