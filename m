@@ -1,54 +1,27 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 12 Sep 2015 12:58:51 -0700
-Subject: [PATCH 2/7] Documentation: dt: brcmstb: add waketimer
- documentation
-In-Reply-To: <1434672696-13632-3-git-send-email-computersforpeace@gmail.com>
+Date: Sat, 12 Sep 2015 13:00:45 -0700
+Subject: [PATCH 5/7] soc: brcmstb: add wake-timer driver
+In-Reply-To: <1434672696-13632-6-git-send-email-computersforpeace@gmail.com>
 References: <1434672696-13632-1-git-send-email-computersforpeace@gmail.com>
- <1434672696-13632-3-git-send-email-computersforpeace@gmail.com>
-Message-ID: <55F483FB.1010109@gmail.com>
+ <1434672696-13632-6-git-send-email-computersforpeace@gmail.com>
+Message-ID: <55F4846D.5040304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Le 06/18/15 17:11, Brian Norris a ?crit :
-> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-
-Although the binding looks good to me, I am not applying this one just
-yet since we would want to merge the wake-timer driver and its binding
-at the same time, thanks!
-
-> ---
->  .../bindings/soc/brcmstb/brcm,brcmstb-waketimer.txt  | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/brcmstb/brcm,brcmstb-waketimer.txt
+> Useful for waking the system from suspend after a specified period of
+> time.
 > 
-> diff --git a/Documentation/devicetree/bindings/soc/brcmstb/brcm,brcmstb-waketimer.txt b/Documentation/devicetree/bindings/soc/brcmstb/brcm,brcmstb-waketimer.txt
-> new file mode 100644
-> index 000000000000..68c4329b6af0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/brcmstb/brcm,brcmstb-waketimer.txt
-> @@ -0,0 +1,20 @@
-> +* Broadcom STB Wake-up Timer
-> +
-> +The Broadcom STB wake-up timer provides a high-resolution timer, with the
-> +ability to wake up the system from low-power suspend/standby modes.
-> +
-> +Required properties:
-> +- compatible     : should contain "brcm,brcmstb-waketimer"
-> +- reg            : the register start and length for the WKTMR block
-> +- interrupts     : The TIMER interrupt
-> +- interrupt-parent: The phandle to the Always-On (AON) Power Management (PM) L2
-> +                    interrupt controller node
-> +
-> +Example:
-> +
-> +waketimer at f0411580 {
-> +	compatible = "brcm,brcmstb-waketimer";
-> +	reg = <0xf0411580 0x14>;
-> +	interrupts = <0x3>;
-> +	interrupt-parent = <&aon_pm_l2_intc>;
-> +};
-> 
+> This IP could potentially be supported as an RTC driver (for use with
+> the 'rtcwake' utility), but it is not battery backed, so that's not a
+> great fit. Implement a custom sysfs interface instead.
 
+I would very much like to see this driver be implemented as a degenerate
+RTC driver because this sorts of maps pretty well to the "rtcwake" use
+mode, and this is a persistent clock source, and even a clock source as
+well (I would rather avoid going the MFD route to expose these 3
+"functions" though).
 
+Thanks!
 -- 
 Florian
