@@ -1,55 +1,19 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 13 Sep 2015 01:32:12 +0300
-Subject: [PATCH 2/2] ARM: shmobile: silk: enable internal PCI
+Date: Sun, 13 Sep 2015 01:33:52 +0300
+Subject: [PATCH 0/2] Add R8A7794/SILK board PCI USB DT support
 In-Reply-To: <3151312.grtDDBsSl8@wasted.cogentembedded.com>
 References: <3151312.grtDDBsSl8@wasted.cogentembedded.com>
-Message-ID: <3172073.DtCLeXEVqG@wasted.cogentembedded.com>
+Message-ID: <55F4A850.3050806@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable internal AHB-PCI bridges for the USB EHCI/OHCI controllers attached to
-them.
+On 09/13/2015 01:28 AM, Sergei Shtylyov wrote:
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>     Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
+> 'renesas-devel-20150911v2-v4.2' tag. Here we add PCI USB device tree support
+> for the R8A7794-based SILK board.
 
----
- arch/arm/boot/dts/r8a7794-silk.dts |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+    Oops, forgot to say that the patches need the 'pci-rcar-gen2' driver patch 
+posted yesterday in order to work.
 
-Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794-silk.dts
-+++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -80,6 +80,16 @@
- 		renesas,groups = "vin0_data8", "vin0_clk";
- 		renesas,function = "vin0";
- 	};
-+
-+	usb0_pins: usb0 {
-+		renesas,groups = "usb0";
-+		renesas,function = "usb0";
-+	};
-+
-+	usb1_pins: usb1 {
-+		renesas,groups = "usb1";
-+		renesas,function = "usb1";
-+	};
- };
- 
- &scif2 {
-@@ -188,3 +198,15 @@
- 		};
- 	};
- };
-+
-+&pci0 {
-+	status = "okay";
-+	pinctrl-0 = <&usb0_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&pci1 {
-+	status = "okay";
-+	pinctrl-0 = <&usb1_pins>;
-+	pinctrl-names = "default";
-+};
+WBR, Sergei
