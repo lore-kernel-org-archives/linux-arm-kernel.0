@@ -1,47 +1,43 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 13 Sep 2015 11:03:51 +0200
-Subject: Build regressions/improvements in v4.3-rc1
-In-Reply-To: <1442134868-17607-1-git-send-email-geert@linux-m68k.org>
-References: <1442134868-17607-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CAMuHMdV31w=aDD-=uUPOqW71xLpOnH1jWeQpH=6x=vxNSo94FQ@mail.gmail.com>
+From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
+Date: Sun, 13 Sep 2015 18:32:16 +0900
+Subject: [PATCH v2] ARM: dts: Fix LEDs on exynos5422-odroidxu3
+Message-ID: <1442136736-28672-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 13, 2015 at 11:01 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Below is the list of build error/warning regressions/improvements in
-> v4.3-rc1[1] compared to v4.2[2].
->
-> Summarized:
->   - build errors: +15/-6
+The LEDs on Odroid XU3 family boards could not properly probe because PWM
+outputs were reduced only to PWM for fan. Fix it for Odroid XU3 and
+XU3-Lite boards by switching to usage of all 4 outputs (although the PWM
+for MIPI probably is redundant because board does not have MIPI
+connector available).
 
-> [1] http://kisskb.ellerman.id.au/kisskb/head/9353/ (all 254 configs)
-> [2] http://kisskb.ellerman.id.au/kisskb/head/9309/ (all 254 configs)
+This fixes warnings on dmesg:
+[    4.838712] samsung-pwm 12dd0000.pwm: tried to request PWM channel 1 without output
+[    4.838725] leds_pwm pwmleds: unable to request PWM for green:mmc0: -22
+[    4.838767] leds_pwm: probe of pwmleds failed with error -22
 
->   + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit declaration of function 'early_init_dt_scan_nodes' [-Werror=implicit-function-declaration]:  => 244:2
->   + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit declaration of function 'early_init_dt_verify' [-Werror=implicit-function-declaration]:  => 215:2
->   + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit declaration of function 'of_flat_dt_match_machine' [-Werror=implicit-function-declaration]:  => 218:2
->   + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit declaration of function 'of_get_flat_dt_prop' [-Werror=implicit-function-declaration]:  => 229:3
->   + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit declaration of function 'of_get_flat_dt_root' [-Werror=implicit-function-declaration]:  => 228:3
->   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_DIRTY' undeclared (first use in this function):  => 39:2
->   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_MT_WRITEBACK' undeclared (first use in this function):  => 39:2
->   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_PRESENT' undeclared (first use in this function):  => 39:2
->   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_XN' undeclared (first use in this function):  => 39:2
->   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_YOUNG' undeclared (first use in this function):  => 39:2
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 
-arm-randconfig
+---
 
->   + /home/kisskb/slave/src/arch/powerpc/kvm/book3s_pr.c: error: 'last_sc' may be used uninitialized in this function [-Werror=uninitialized]:  => 1094:31
+Changes since v1:
+1. Do not rebase on patchset adding support for Odroid XU4 board. Rebase
+   just on current next.
+---
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-powerpc-allyesconfig, powerpc-randconfig, powerpc-allmodconfig
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+index dd8bc86d9de4..90d298dce851 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+@@ -473,7 +473,6 @@
+ 	 */
+ 	pinctrl-0 = <&pwm0_out &pwm1_out &pwm2_out &pwm3_out>;
+ 	pinctrl-names = "default";
+-	samsung,pwm-outputs = <0>;
+ 	status = "okay";
+ };
+ 
+-- 
+2.1.4
