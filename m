@@ -1,50 +1,53 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 12 Sep 2015 20:04:49 -0300
-Subject: [PATCH 4/6] hwrng: st: Add support for ST's HW Random Number
- Generator
-In-Reply-To: <1442002110-28733-5-git-send-email-lee.jones@linaro.org>
-References: <1442002110-28733-1-git-send-email-lee.jones@linaro.org>
- <1442002110-28733-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAOMZO5CWywFHd1HE2=G-KEvQZpu_rJibmJL4fL5yCWRsnpi05Q@mail.gmail.com>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Sun, 13 Sep 2015 03:35:42 +0200
+Subject: [PATCH] ARM: pxa: add resources to pxaficp_ir
+In-Reply-To: <1442057809-9586-1-git-send-email-robert.jarzmik@free.fr>
+References: <1442057809-9586-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <55F4D2EE.9070607@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 5:08 PM, Lee Jones <lee.jones@linaro.org> wrote:
-
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       base = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(base))
-> +               return PTR_ERR(base);
-> +
-> +       clk = devm_clk_get(&pdev->dev, NULL);
-> +       if (!clk)
-> +               return -EINVAL;
-
-This should be:
-
-    if (IS_ERR(clk))
-        return PTR_ERR(clk);
-
-> +
-> +       clk_prepare_enable(clk);
-
-This may fail, so better check its return value and propagate it on error.
-
-> +
-> +       ddata->ops.priv = (unsigned long)ddata;
-> +       ddata->ops.read = st_rng_read;
-> +       ddata->ops.name = pdev->name;
-> +       ddata->base     = base;
-> +       ddata->clk      = clk;
-> +
-> +       dev_set_drvdata(&pdev->dev, ddata);
-> +
-> +       ret = hwrng_register(&ddata->ops);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "Failed to register HW RNG\n");
-> +               return ret;
-> +       }
-> +
-> +       dev_info(&pdev->dev, "Successfully registered HW RNG\n");
-
-No need to put this info.
+Dne 12.9.2015 v 13:36 Robert Jarzmik napsal(a):
+> Add io memory and dma requestor lines to the irda pxa device. This is
+> part of the conversion of pxaficp_ir to dmaengine, and to shrink its
+> adherence to 'mach' includes.
+> 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> Cc: Petr Cvek <petr.cvek@tul.cz>
+> ---
+>  arch/arm/mach-pxa/devices.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
+> index 35434662dc7c..9592667453b0 100644
+> --- a/arch/arm/mach-pxa/devices.c
+> +++ b/arch/arm/mach-pxa/devices.c
+> @@ -394,6 +394,26 @@ static struct resource pxa_ir_resources[] = {
+>  		.end    = IRQ_ICP,
+>  		.flags  = IORESOURCE_IRQ,
+>  	},
+> +	[3] = {
+> +		.start  = 0x40800000,
+> +		.end	= 0x4080001b,
+> +		.flags  = IORESOURCE_MEM,
+> +	},
+> +	[4] = {
+> +		.start  = 0x40700000,
+> +		.end	= 0x40700023,
+> +		.flags  = IORESOURCE_MEM,
+> +	},
+> +	[5] = {
+> +		.start  = 17,
+> +		.end	= 17,
+> +		.flags  = IORESOURCE_DMA,
+> +	},
+> +	[6] = {
+> +		.start  = 18,
+> +		.end	= 18,
+> +		.flags  = IORESOURCE_DMA,
+> +	},
+>  };
+>  
+>  struct platform_device pxa_device_ficp = {
+> 
+Tested-by: Petr Cvek <petr.cvek@tul.cz>
