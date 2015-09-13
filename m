@@ -1,189 +1,105 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 13 Sep 2015 15:02:19 +0100
-Subject: [PATCH v2 1/5] acpi: Add basic device probing infrastructure
-In-Reply-To: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
-References: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1442152943-24493-2-git-send-email-marc.zyngier@arm.com>
+Date: Sun, 13 Sep 2015 15:02:18 +0100
+Subject: [PATCH v2 0/5] ACPI probing infrastructure
+Message-ID: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 IRQ controllers and timers are the two types of device the kernel
 requires before being able to use the device driver model.
 
-ACPI so far lacks a proper probing infrastructure similar to the one
-we have with DT, where we're able to declare IRQ chips and
-clocksources inside the driver code, and let the core code pick it up
-and call us back on a match. This leads to all kind of really ugly
-hacks all over the arm64 code and even in the ACPI layer.
+The Device Tree infrastructure makes it very easy to make these
+discoverable by the rest of the kernel. For example, each interrupt
+controller driver has at least one entry like this:
 
-In order to allow some basic probing based on the ACPI tables,
-introduce "struct acpi_probe_entry" which contains just enough
-data and callbacks to match a table, an optional subtable, and
-call a probe function. A driver can, at build time, register itself
-and expect being called if the right entry exists in the ACPI
-table.
+IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
 
-A acpi_probe_device_table() is provided, taking an identifier for
-a set of acpi_prove_entries, and iterating over the registered
-entries.
+which says: if you find a node having "arm,gic-400" as a compatible
+string in the device tree, then call gic_of_init with this node as a
+parameter. The probing itself is done by the OF layer when the
+architecture code calls of_irq_init() (usually via irqchip_init).
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/acpi/scan.c               | 39 +++++++++++++++++++++++
- include/asm-generic/vmlinux.lds.h | 10 ++++++
- include/linux/acpi.h              | 65 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 114 insertions(+)
+This has a number of benefits:
 
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index 01136b8..ac3030b 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -1933,3 +1933,42 @@ int __init acpi_scan_init(void)
- 	mutex_unlock(&acpi_scan_lock);
- 	return result;
- }
-+
-+static struct acpi_probe_entry *ape;
-+static int acpi_probe_count;
-+static DEFINE_SPINLOCK(acpi_probe_lock);
-+
-+static int __init acpi_match_madt(struct acpi_subtable_header *header,
-+				  const unsigned long end)
-+{
-+	if (!ape->validate_subtbl || ape->validate_subtbl(header, ape))
-+		if (!ape->probe_subtbl(header, end))
-+			acpi_probe_count++;
-+
-+	return 0;
-+}
-+
-+int __init __acpi_probe_device_table(struct acpi_probe_entry *ap_head, int nr)
-+{
-+	int count = 0;
-+
-+	if (acpi_disabled)
-+		return 0;
-+
-+	spin_lock(&acpi_probe_lock);
-+	for (ape = ap_head; nr; ape++, nr--) {
-+		if (ACPI_COMPARE_NAME(ACPI_SIG_MADT, ape->id)) {
-+			acpi_probe_count = 0;
-+			acpi_table_parse_madt(ape->type, acpi_match_madt, 0);
-+			count += acpi_probe_count;
-+		} else {
-+			int res;
-+			res = acpi_table_parse(ape->id, ape->probe_table);
-+			if (!res)
-+				count++;
-+		}
-+	}
-+	spin_unlock(&acpi_probe_lock);
-+
-+	return count;
-+}
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 1781e54..efd7ed1 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -181,6 +181,16 @@
- #define CPUIDLE_METHOD_OF_TABLES() OF_TABLE(CONFIG_CPU_IDLE, cpuidle_method)
- #define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
- 
-+#ifdef CONFIG_ACPI
-+#define ACPI_PROBE_TABLE(name)						\
-+	. = ALIGN(8);							\
-+	VMLINUX_SYMBOL(__##name##_acpi_probe_table) = .;		\
-+	*(__##name##_acpi_probe_table)					\
-+	VMLINUX_SYMBOL(__##name##_acpi_probe_table_end) = .;
-+#else
-+#define ACPI_PROBE_TABLE(name)
-+#endif
-+
- #define KERNEL_DTB()							\
- 	STRUCT_ALIGN();							\
- 	VMLINUX_SYMBOL(__dtb_start) = .;				\
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 7235c48..c63fbda 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -759,6 +759,61 @@ int acpi_dev_prop_read(struct acpi_device *adev, const char *propname,
- 
- struct acpi_device *acpi_get_next_child(struct device *dev,
- 					struct acpi_device *child);
-+
-+struct acpi_probe_entry;
-+typedef bool (*acpi_probe_entry_validate_subtbl)(struct acpi_subtable_header *,
-+						 struct acpi_probe_entry *);
-+
-+#define ACPI_TABLE_ID_LEN	5
-+
-+/**
-+ * struct acpi_probe_entry - boot-time probing entry
-+ * @id:			ACPI table name
-+ * @type:		Optional subtable type to match
-+ *			(if @id contains subtables)
-+ * @validate_subtbl:	Optional callback to check the validity of
-+ *			the subtable
-+ * @probe_table:	Callback to the driver being probed when table
-+ *			match is successful
-+ * @probe_subtbl:	Callback to the driver being probed when table and
-+ *			subtable match (and optionnal callback is successful)
-+ * @driver_data:	Sideband data provided back to the driver
-+ */
-+struct acpi_probe_entry {
-+	__u8 id[ACPI_TABLE_ID_LEN];
-+	__u8 type;
-+	acpi_probe_entry_validate_subtbl validate_subtbl;
-+	union {
-+		acpi_tbl_table_handler probe_table;
-+		acpi_tbl_entry_handler probe_subtbl;
-+	};
-+	kernel_ulong_t driver_data;
-+};
-+
-+#define ACPI_DECLARE(table, name, table_id, subtable, valid, data, fn)	\
-+	static const struct acpi_probe_entry __acpi_probe_##name	\
-+		__used __section(__##table##_acpi_probe_table)		\
-+		 = {							\
-+			.id = table_id,					\
-+			.type = subtable,				\
-+			.validate_subtbl = valid,			\
-+			.probe_table = (acpi_tbl_table_handler)fn,	\
-+			.driver_data = data, 				\
-+		   }
-+
-+#define ACPI_PROBE_TABLE(name)		__##name##_acpi_probe_table
-+#define ACPI_PROBE_TABLE_END(name)	__##name##_acpi_probe_table_end
-+
-+int __acpi_probe_device_table(struct acpi_probe_entry *start, int nr);
-+
-+#define acpi_probe_device_table(t)					\
-+	({ 								\
-+		extern struct acpi_probe_entry ACPI_PROBE_TABLE(t),	\
-+			                       ACPI_PROBE_TABLE_END(t);	\
-+		__acpi_probe_device_table(&ACPI_PROBE_TABLE(t),		\
-+					  (&ACPI_PROBE_TABLE_END(t) -	\
-+					   &ACPI_PROBE_TABLE(t)));	\
-+	})
- #else
- static inline int acpi_dev_get_property(struct acpi_device *adev,
- 					const char *name, acpi_object_type type,
-@@ -809,6 +864,16 @@ static inline struct acpi_device *acpi_get_next_child(struct device *dev,
- 	return NULL;
- }
- 
-+#define ACPI_DECLARE(table, name, table_id, subtable, validate, data, fn) \
-+	static const void * __acpi_table_##name[]			\
-+		__attribute__((unused))					\
-+		 = { (void *) table_id,					\
-+		     (void *) subtable,					\
-+		     (void *) valid,					\
-+		     (void *) fn,					\
-+		     (void *) data }
-+
-+#define acpi_probe_device_table(t)	({ int __r = 0; __r;})
- #endif
- 
- #endif	/*_LINUX_ACPI_H*/
+- The irqchip code is self-contained. No architecture specific entry
+point, no exposed symbols. Just a standard interface.
+
+- The low-level architecture code doesn't have to know about which
+interrupt controller is present. It just calls into the firmware
+interface (of_irq_init) which is going to sort things out.
+
+Similar infrastructure is provided for the timers/clock sources. Note
+that this is not a replacement for the device model, but acts as a
+probing infrastructure for things that are required too early for the
+device infrastructure to be available.
+
+What I'm aiming for is to introduce the same level of abstraction for
+ACPI, or at least for the few bits that are required before a full blown
+ACPI/device model can be used. For this, I introduce something vaguely
+similar:
+
+IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
+		     gic_validate_dist, ACPI_MADT_GIC_VERSION_V2,
+		     gic_v2_acpi_init);
+
+which says: if you find a ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR entry in
+MADT (implied by the macro), and that entry is of type
+ACPI_MADT_GIC_VERSION_V2 (as checked by gic_validate_dist), then call
+gic_v2_acpi_init with the entry as a parameter. A bit more convoluted,
+but still without any special entry point.
+
+The various interrupt controller drivers can then implement the above,
+and the arch code can use a firmware-specific call to get the probing
+done, still oblivious to what interrupt controller is being used. It
+also makes the adaptation of a DT driver to ACPI easier.
+
+It turns out that providing such a probing infrastructure is rather
+easy, and provides a much deserved cleanup in both the arch code, the
+GIC driver, and the architected timer driver.
+
+I'm sure there is some more code to be deleted, and one can only
+wonder why this wasn't done before the arm64 code was initially merged
+(the diffstat says it all...).
+
+Patches are against v4.3-rc1, and a branch is available at
+
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git acpi/device-probing-v2
+
+* From the initial version:
+  - Make the infrastructure more DT like by providing an
+    acpi_probe_entry array per "device type" (one for irqchips, one
+    for clocksources). This means that entries can depend on any ACPI
+    static table.
+  - Use some cpp magic to reduce the amount of code added to an
+    absolute minimum.
+  - Rebased on v4.3-rc1
+
+Marc Zyngier (5):
+  acpi: Add basic device probing infrastructure
+  irqchip/acpi: Add probing infrastructure for ACPI-based irqchips
+  irqchip/gic: Convert the GIC driver to ACPI probing
+  clocksource/acpi: Add probing infrastructure for ACPI-based
+    clocksources
+  clocksource/arm_arch_timer: Convert to ACPI probing
+
+ arch/arm64/include/asm/acpi.h        |  1 -
+ arch/arm64/include/asm/irq.h         | 13 -------
+ arch/arm64/kernel/acpi.c             | 25 -------------
+ arch/arm64/kernel/time.c             |  6 ----
+ drivers/acpi/scan.c                  | 39 ++++++++++++++++++++
+ drivers/clocksource/arm_arch_timer.c | 10 +-----
+ drivers/clocksource/clksrc-of.c      |  4 +++
+ drivers/irqchip/irq-gic.c            | 69 ++++++++++++++++++------------------
+ drivers/irqchip/irqchip.c            |  5 ++-
+ include/asm-generic/vmlinux.lds.h    | 12 +++++++
+ include/linux/acpi.h                 | 65 +++++++++++++++++++++++++++++++++
+ include/linux/acpi_irq.h             | 10 ------
+ include/linux/clocksource.h          |  7 ++--
+ include/linux/irqchip.h              | 16 +++++++++
+ include/linux/irqchip/arm-gic-acpi.h | 31 ----------------
+ 15 files changed, 176 insertions(+), 137 deletions(-)
+ delete mode 100644 include/linux/acpi_irq.h
+ delete mode 100644 include/linux/irqchip/arm-gic-acpi.h
+
 -- 
 2.1.4
