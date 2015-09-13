@@ -1,75 +1,33 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 13 Sep 2015 11:56:37 +0100
-Subject: [PATCH 3/4] arm64: KVM: set {v,}TCR_EL2 RES1 bits
-In-Reply-To: <1442141798-19191-1-git-send-email-marc.zyngier@arm.com>
-References: <1442141798-19191-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1442141798-19191-4-git-send-email-marc.zyngier@arm.com>
+Date: Sun, 13 Sep 2015 12:14:30 +0100
+Subject: [PATCH 0/3] GIC fixes for 4.3-rc2
+Message-ID: <1442142873-20213-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+Thomas, Jason,
 
-Currently we don't set the RES1 bits of TCR_EL2 and VTCR_EL2 when
-configuring them, which could lead to unexpected behaviour when an
-architectural meaning is defined for those bits.
+This small collection of patches address a number of issues all over
+the GIC spectrum, ranging from boot issues, ITS corruption and compile
+warnings.
 
-Set the RES1 bits to avoid issues.
+It would be good if these fixes could make it into 4.3-rc2.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/kvm_arm.h | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+Thanks,
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 7605e09..cbc5e1a 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -95,6 +95,7 @@
- 			 SCTLR_EL2_SA | SCTLR_EL2_I)
- 
- /* TCR_EL2 Registers bits */
-+#define TCR_EL2_RES1	((1 << 31) | (1 << 23))
- #define TCR_EL2_TBI	(1 << 20)
- #define TCR_EL2_PS	(7 << 16)
- #define TCR_EL2_PS_40B	(2 << 16)
-@@ -106,9 +107,10 @@
- #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
- 			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
- 
--#define TCR_EL2_FLAGS	(TCR_EL2_PS_40B)
-+#define TCR_EL2_FLAGS	(TCR_EL2_RES1 | TCR_EL2_PS_40B)
- 
- /* VTCR_EL2 Registers bits */
-+#define VTCR_EL2_RES1		(1 << 31)
- #define VTCR_EL2_PS_MASK	(7 << 16)
- #define VTCR_EL2_TG0_MASK	(1 << 14)
- #define VTCR_EL2_TG0_4K		(0 << 14)
-@@ -147,7 +149,8 @@
-  */
- #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
- 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
--				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
-+				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B | \
-+				 VTCR_EL2_RES1)
- #define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
- #else
- /*
-@@ -158,7 +161,8 @@
-  */
- #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
- 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
--				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
-+				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B | \
-+				 VTCR_EL2_RES1)
- #define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
- #endif
- 
+	M.
+
+Marc Zyngier (2):
+  irqchip/GIC: Add workaround for aliased GIC400
+  irqchip/gic-v3-its: Add missing cache flushes
+
+Pavel Fedin (1):
+  irqchip/GICv2m: Fix GICv2m build warning on 32 bits
+
+ drivers/irqchip/irq-gic-v2m.c    |  4 ++--
+ drivers/irqchip/irq-gic-v3-its.c |  6 +++++-
+ drivers/irqchip/irq-gic.c        | 44 +++++++++++++++++++++++++++++++++++-----
+ 3 files changed, 46 insertions(+), 8 deletions(-)
+
 -- 
 2.1.4
