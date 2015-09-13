@@ -1,43 +1,53 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sun, 13 Sep 2015 18:32:16 +0900
-Subject: [PATCH v2] ARM: dts: Fix LEDs on exynos5422-odroidxu3
-Message-ID: <1442136736-28672-1-git-send-email-k.kozlowski.k@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 13 Sep 2015 11:56:34 +0100
+Subject: [GIT PULL] KVM/ARM fixes for 4.3-rc2
+Message-ID: <1442141798-19191-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LEDs on Odroid XU3 family boards could not properly probe because PWM
-outputs were reduced only to PWM for fan. Fix it for Odroid XU3 and
-XU3-Lite boards by switching to usage of all 4 outputs (although the PWM
-for MIPI probably is redundant because board does not have MIPI
-connector available).
+Hi Paolo,
 
-This fixes warnings on dmesg:
-[    4.838712] samsung-pwm 12dd0000.pwm: tried to request PWM channel 1 without output
-[    4.838725] leds_pwm pwmleds: unable to request PWM for green:mmc0: -22
-[    4.838767] leds_pwm: probe of pwmleds failed with error -22
+This is the KVM/ARM pull request for Linux 4.3-rc2. Not much so far,
+just a small set of fixes.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+Thanks!
 
----
+        M.
 
-Changes since v1:
-1. Do not rebase on patchset adding support for Odroid XU4 board. Rebase
-   just on current next.
----
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+The following changes since commit 054167b3d55127feb64978eddf3f9f3a84fe493b:
 
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index dd8bc86d9de4..90d298dce851 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -473,7 +473,6 @@
- 	 */
- 	pinctrl-0 = <&pwm0_out &pwm1_out &pwm2_out &pwm3_out>;
- 	pinctrl-names = "default";
--	samsung,pwm-outputs = <0>;
- 	status = "okay";
- };
- 
--- 
-2.1.4
+  arm: KVM: keep arm vfp/simd exit handling consistent with arm64 (2015-08-19 22:27:58 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.3-rc2
+
+for you to fetch changes up to 0c0672922dcc70ffba11d96385e98e42fb3ae08d:
+
+  arm/arm64: KVM: Fix PSCI affinity info return value for non valid cores (2015-09-04 17:02:48 +0100)
+
+----------------------------------------------------------------
+KVM/ARM changes for 4.3-rc2
+
+- Fix timer interrupt injection after the rework
+  that went in during the merge window
+- Reset the timer to zero on reboot
+- Make sure the TCR_EL2 RES1 bits are really set to 1
+- Fix a PSCI affinity bug for non-existing vcpus
+
+----------------------------------------------------------------
+Alexander Spyridakis (1):
+      arm/arm64: KVM: Fix PSCI affinity info return value for non valid cores
+
+Christoffer Dall (2):
+      arm/arm64: KVM: vgic: Move active state handling to flush_hwstate
+      arm/arm64: KVM: arch timer: Reset CNTV_CTL to 0
+
+Mark Rutland (1):
+      arm64: KVM: set {v,}TCR_EL2 RES1 bits
+
+ arch/arm/kvm/psci.c              | 12 ++++++++----
+ arch/arm64/include/asm/kvm_arm.h | 10 +++++++---
+ virt/kvm/arm/arch_timer.c        |  8 ++++++++
+ virt/kvm/arm/vgic.c              | 42 +++++++++++++++++++++++++---------------
+ 4 files changed, 49 insertions(+), 23 deletions(-)
