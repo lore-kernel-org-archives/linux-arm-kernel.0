@@ -1,55 +1,72 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 13 Sep 2015 08:19:26 -0700
-Subject: Build regressions/improvements in v4.3-rc1
-In-Reply-To: <CAMuHMdV31w=aDD-=uUPOqW71xLpOnH1jWeQpH=6x=vxNSo94FQ@mail.gmail.com>
-References: <1442134868-17607-1-git-send-email-geert@linux-m68k.org>
- <CAMuHMdV31w=aDD-=uUPOqW71xLpOnH1jWeQpH=6x=vxNSo94FQ@mail.gmail.com>
-Message-ID: <20150913151926.GA19850@roeck-us.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 13 Sep 2015 17:22:24 +0200
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun4i: Add dts file for the
+ pov protab2-ips9 tablet
+In-Reply-To: <55EE9230.70209@redhat.com>
+References: <1441441319-10658-1-git-send-email-hdegoede@redhat.com>
+ <20150906163023.GR31584@lukather> <55ED3739.609@redhat.com>
+ <20150907205603.GX31584@lukather> <55EE9230.70209@redhat.com>
+Message-ID: <20150913152224.GU9885@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 13, 2015 at 11:03:51AM +0200, Geert Uytterhoeven wrote:
-> On Sun, Sep 13, 2015 at 11:01 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
-> > Below is the list of build error/warning regressions/improvements in
-> > v4.3-rc1[1] compared to v4.2[2].
+On Tue, Sep 08, 2015 at 09:45:52AM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 07-09-15 22:56, Maxime Ripard wrote:
+> >On Mon, Sep 07, 2015 at 09:05:29AM +0200, Hans de Goede wrote:
+> >>>>+&reg_ldo3 {
+> >>>>+	/*
+> >>>>+	 * We need to always power the camera sensor, otherwhise all access
+> >>>>+	 * to i2c1 is blocked.
+> >>>>+	 */
+> >>>>+	regulator-always-on;
+> >>>>+	regulator-min-microvolt = <2800000>;
+> >>>>+	regulator-max-microvolt = <2800000>;
+> >>>>+	regulator-name = "vdd-csi";
+> >>>>+};
+> >>>
+> >>>What is connected on i2c1 ? Just the camera sensor? or it has some
+> >>>other devices there?
+> >>
+> >>The bma250 accelerometer sits there, and the kernel already has a driver
+> >>for it. That driver needs to have devicetree binding support added, and
+> >>then we should be able to use the accelerometer.
 > >
-[ ... ]
-
+> >Ok, so if this regulator is disable, you can't access the other
+> >devices as well, right?
 > 
-> >   + /home/kisskb/slave/src/arch/powerpc/kvm/book3s_pr.c: error: 'last_sc' may be used uninitialized in this function [-Werror=uninitialized]:  => 1094:31
+> Right, the controller reports the bus as being stuck.
+
+Which is pretty bad... :/
+
+> >Do you know why? Is it the regulator providing
+> >the pull-up voltage?
 > 
-> powerpc-allyesconfig, powerpc-randconfig, powerpc-allmodconfig
-> 
+> I've tried enabling the pull ups on the SoC i2c pins, so I do not think
+> that it is that, it seems that somehow when not powered the camera sensor is
+> actively keeping the lines low. Either it has multiple power planes, or
+> it is using normally-on fet-s between ground and its i2c lines.
 
-I think that only affects powerpc-randconfig.
+Well, if a regulator is powered down, it's also tied to the ground,
+which means you would actually have pull-down. Maybe the in-SoC
+pullups simply aren't strong enough in such a case.
 
-Also:
+Anyway. In both cases, the regulator really shouldn't be drifting
+along like this. If the i2c bus needs a regulator to be operationaly,
+then we can just add an optional bus-supply property or something to
+give that to the i2c driver so that it can enable it when needed.
 
-alpha:allmodconfig:
+Maxime
 
-drivers/video/fbdev/aty/atyfb_base.c: In function 'atyfb_setup_generic':
-drivers/video/fbdev/aty/atyfb_base.c:3447:2: error: implicit declaration of function 'ioremap_uc'
-
-arm:rpc_defconfig:
-
-fs/fat/dir.c: In function 'fat_ioctl_filldir':
-fs/fat/dir.c:752:43: internal compiler error: Max. number of generated reload insns per insn is achieved (90)
-
-[ gcc 4.9.1, 4.9.2 ]
-
-arm64:allmodconfig:
-
-drivers/firmware/qcom_scm-32.c:196:4: error: expected string literal before ?__asmeq?
-drivers/firmware/qcom_scm-32.c:221:2: error: implicit declaration of function ?secure_flush_area?
-drivers/firmware/qcom_scm-32.c:239:2: error: implicit declaration of function ?outer_inv_range?
-drivers/firmware/qcom_scm-32.c:331:4: error: expected string literal before ?__asmeq?
-drivers/firmware/qcom_scm-32.c:361:4: error: expected string literal before ?__asmeq?
-
-h8300:edosk2674_defconfig, h8300:h8s-sim_defconfig:
-
-drivers/clk/h8300/clk-h8s2678.c: In function ?h8s2678_pll_clk_setup?:
-drivers/clk/h8300/clk-h8s2678.c:99:14: error: implicit declaration of function ?kzalloc?
-drivers/clk/h8300/clk-h8s2678.c:138:2: error: implicit declaration of function ?kfree?
-
-Guenter
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150913/99e67cef/attachment.sig>
