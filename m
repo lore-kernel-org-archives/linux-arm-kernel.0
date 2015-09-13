@@ -1,54 +1,49 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Sun, 13 Sep 2015 17:15:53 -0300
-Subject: [PATCH] dmaengine: sun4i: fix unsafe list iteration
-Message-ID: <1442175353-4433-1-git-send-email-emilio@elopez.com.ar>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sun, 13 Sep 2015 22:23:49 +0200
+Subject: Build regressions/improvements in v4.3-rc1
+In-Reply-To: <20150913151926.GA19850@roeck-us.net>
+References: <1442134868-17607-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdV31w=aDD-=uUPOqW71xLpOnH1jWeQpH=6x=vxNSo94FQ@mail.gmail.com>
+ <20150913151926.GA19850@roeck-us.net>
+Message-ID: <CAMuHMdVGEDKFxD7wf6ZOAGiOByM5c0Awx-anLsYGLQHV1yJW+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, sun4i_dma_free_contract iterates over lists and frees memory
-as it goes through them, causing reads to recently freed memory to
-be performed. Fix this by using the safe version of the iterator, so
-freed memory is not referenced at all.
+On Sun, Sep 13, 2015 at 5:19 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> On Sun, Sep 13, 2015 at 11:03:51AM +0200, Geert Uytterhoeven wrote:
+>> On Sun, Sep 13, 2015 at 11:01 AM, Geert Uytterhoeven
+>> <geert@linux-m68k.org> wrote:
+>> > Below is the list of build error/warning regressions/improvements in
+>> > v4.3-rc1[1] compared to v4.2[2].
+>> >
+> [ ... ]
+>
+>>
+>> >   + /home/kisskb/slave/src/arch/powerpc/kvm/book3s_pr.c: error: 'last_sc' may be used uninitialized in this function [-Werror=uninitialized]:  => 1094:31
+>>
+>> powerpc-allyesconfig, powerpc-randconfig, powerpc-allmodconfig
+>
+> I think that only affects powerpc-randconfig.
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
-Hi,
+Right, on powerpc-all{mod,yes}config it's just a build warning, not an error.
 
-This is a patch to fix an issue pointed out by Dan on
+> arm64:allmodconfig:
+>
+> drivers/firmware/qcom_scm-32.c:196:4: error: expected string literal before ?__asmeq?
+> drivers/firmware/qcom_scm-32.c:221:2: error: implicit declaration of function ?secure_flush_area?
+> drivers/firmware/qcom_scm-32.c:239:2: error: implicit declaration of function ?outer_inv_range?
+> drivers/firmware/qcom_scm-32.c:331:4: error: expected string literal before ?__asmeq?
+> drivers/firmware/qcom_scm-32.c:361:4: error: expected string literal before ?__asmeq?
 
-http://www.spinics.net/lists/dmaengine/msg05822.html
+Time for kisskb to gain arm64 support?
 
-I didn't get a chance to test a system with this, but it looks trivial
-enough and it builds. This should go in the -rc cycle, and there's no
-need for stable as the driver just landed this merge window.
+Gr{oetje,eeting}s,
 
-Cheers,
-Emilio
+                        Geert
 
- drivers/dma/sun4i-dma.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-diff --git a/drivers/dma/sun4i-dma.c b/drivers/dma/sun4i-dma.c
-index a1a500d..1661d518 100644
---- a/drivers/dma/sun4i-dma.c
-+++ b/drivers/dma/sun4i-dma.c
-@@ -599,13 +599,13 @@ get_next_cyclic_promise(struct sun4i_dma_contract *contract)
- static void sun4i_dma_free_contract(struct virt_dma_desc *vd)
- {
- 	struct sun4i_dma_contract *contract = to_sun4i_dma_contract(vd);
--	struct sun4i_dma_promise *promise;
-+	struct sun4i_dma_promise *promise, *tmp;
- 
- 	/* Free all the demands and completed demands */
--	list_for_each_entry(promise, &contract->demands, list)
-+	list_for_each_entry_safe(promise, tmp, &contract->demands, list)
- 		kfree(promise);
- 
--	list_for_each_entry(promise, &contract->completed_demands, list)
-+	list_for_each_entry_safe(promise, tmp, &contract->completed_demands, list)
- 		kfree(promise);
- 
- 	kfree(contract);
--- 
-2.5.1
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
