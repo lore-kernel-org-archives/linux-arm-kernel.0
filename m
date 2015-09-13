@@ -1,53 +1,51 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 13 Sep 2015 11:56:34 +0100
-Subject: [GIT PULL] KVM/ARM fixes for 4.3-rc2
-Message-ID: <1442141798-19191-1-git-send-email-marc.zyngier@arm.com>
+Date: Sun, 13 Sep 2015 11:56:36 +0100
+Subject: [PATCH 2/4] arm/arm64: KVM: arch timer: Reset CNTV_CTL to 0
+In-Reply-To: <1442141798-19191-1-git-send-email-marc.zyngier@arm.com>
+References: <1442141798-19191-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1442141798-19191-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo,
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-This is the KVM/ARM pull request for Linux 4.3-rc2. Not much so far,
-just a small set of fixes.
+Provide a better quality of implementation and be architecture compliant
+on ARMv7 for the architected timer by resetting the CNTV_CTL to 0 on
+reset of the timer.
 
-Thanks!
+This change alone fixes the UEFI reset issue reported by Laszlo back in
+February.
 
-        M.
+Cc: Laszlo Ersek <lersek@redhat.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Drew Jones <drjones@redhat.com>
+Cc: Wei Huang <wei@redhat.com>
+Cc: Peter Maydell <peter.maydell@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/arch_timer.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-The following changes since commit 054167b3d55127feb64978eddf3f9f3a84fe493b:
-
-  arm: KVM: keep arm vfp/simd exit handling consistent with arm64 (2015-08-19 22:27:58 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.3-rc2
-
-for you to fetch changes up to 0c0672922dcc70ffba11d96385e98e42fb3ae08d:
-
-  arm/arm64: KVM: Fix PSCI affinity info return value for non valid cores (2015-09-04 17:02:48 +0100)
-
-----------------------------------------------------------------
-KVM/ARM changes for 4.3-rc2
-
-- Fix timer interrupt injection after the rework
-  that went in during the merge window
-- Reset the timer to zero on reboot
-- Make sure the TCR_EL2 RES1 bits are really set to 1
-- Fix a PSCI affinity bug for non-existing vcpus
-
-----------------------------------------------------------------
-Alexander Spyridakis (1):
-      arm/arm64: KVM: Fix PSCI affinity info return value for non valid cores
-
-Christoffer Dall (2):
-      arm/arm64: KVM: vgic: Move active state handling to flush_hwstate
-      arm/arm64: KVM: arch timer: Reset CNTV_CTL to 0
-
-Mark Rutland (1):
-      arm64: KVM: set {v,}TCR_EL2 RES1 bits
-
- arch/arm/kvm/psci.c              | 12 ++++++++----
- arch/arm64/include/asm/kvm_arm.h | 10 +++++++---
- virt/kvm/arm/arch_timer.c        |  8 ++++++++
- virt/kvm/arm/vgic.c              | 42 +++++++++++++++++++++++++---------------
- 4 files changed, 49 insertions(+), 23 deletions(-)
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 76e38d2..48c6e1a 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -200,6 +200,14 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 	timer->irq = irq;
+ 
+ 	/*
++	 * The bits in CNTV_CTL are architecturally reset to UNKNOWN for ARMv8
++	 * and to 0 for ARMv7.  We provide an implementation that always
++	 * resets the timer to be disabled and unmasked and is compliant with
++	 * the ARMv7 architecture.
++	 */
++	timer->cntv_ctl = 0;
++
++	/*
+ 	 * Tell the VGIC that the virtual interrupt is tied to a
+ 	 * physical interrupt. We do that once per VCPU.
+ 	 */
+-- 
+2.1.4
