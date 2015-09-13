@@ -1,34 +1,36 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 13 Sep 2015 18:59:44 +0200
-Subject: [PATCH 2/2] ARM: dts: rockchip: Add dtb for the Radxa Rock 2
- Square board
-In-Reply-To: <1442011005-4828-2-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1442011005-4828-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1442011005-4828-2-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <1898861.3c2qccBTle@diego>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 13 Sep 2015 17:57:59 +0100
+Subject: Build regressions/improvements in v4.3-rc1
+In-Reply-To: <20150913151926.GA19850@roeck-us.net>
+References: <1442134868-17607-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdV31w=aDD-=uUPOqW71xLpOnH1jWeQpH=6x=vxNSo94FQ@mail.gmail.com>
+ <20150913151926.GA19850@roeck-us.net>
+Message-ID: <20150913165758.GE21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sjoerd,
+On Sun, Sep 13, 2015 at 08:19:26AM -0700, Guenter Roeck wrote:
+> arm:rpc_defconfig:
+> 
+> fs/fat/dir.c: In function 'fat_ioctl_filldir':
+> fs/fat/dir.c:752:43: internal compiler error: Max. number of generated reload insns per insn is achieved (90)
 
-Am Samstag, 12. September 2015, 00:36:45 schrieb Sjoerd Simons:
+Not much can be done about that - gcc people aren't interested in fixing
+ARMv3 compiler support anymore, although this is still buildable with
+older compilers.  I don't see any point in removing the platform just
+because GCC has decided to break itself.
 
-one thing I forgot:
+> arm64:allmodconfig:
+> 
+> drivers/firmware/qcom_scm-32.c:196:4: error: expected string literal before ?__asmeq?
+> drivers/firmware/qcom_scm-32.c:221:2: error: implicit declaration of function ?secure_flush_area?
+> drivers/firmware/qcom_scm-32.c:239:2: error: implicit declaration of function ?outer_inv_range?
+> drivers/firmware/qcom_scm-32.c:331:4: error: expected string literal before ?__asmeq?
+> drivers/firmware/qcom_scm-32.c:361:4: error: expected string literal before ?__asmeq?
 
-> +&emmc {
-> +	broken-cd;
-> +	bus-width = <8>;
-> +	cap-mmc-highspeed;
-> +	disable-wp;
-> +	non-removable;
-> +	num-slots = <1>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_pwr &emmc_bus8>;
-> +	vmmc-supply = <&vcc_io>;
-> +	status = "okay";
-> +};
+This file shouldn't be built on ARM64, and there's a fix in the pipeline
+which obviously didn't make -rc1 for it.
 
-this could probably use a mmc powersequence to handle the emmc-reset pin?
-
-
-Heiko
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
