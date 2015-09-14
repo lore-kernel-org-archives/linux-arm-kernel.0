@@ -1,73 +1,92 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Mon, 14 Sep 2015 10:39:15 +0200
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <1441709778.13536.8.camel@pengutronix.de> (Lucas Stach's message
- of "Tue, 08 Sep 2015 12:56:18 +0200")
-References: <m3bnde5whx.fsf@t19.piap.pl>
- <20150907112555.GS21084@n2100.arm.linux.org.uk>
- <m337yp5gvv.fsf@t19.piap.pl> <1441709778.13536.8.camel@pengutronix.de>
-Message-ID: <m3bnd52y4s.fsf@t19.piap.pl>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 14 Sep 2015 10:41:03 +0200
+Subject: [PATCH v4] mtd: nand: sunxi: fix OOB handling in ->write_xxx()
+ functions
+Message-ID: <1442220063-7520-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Another round of tests, I noticed the new git versions :-)
-Testing Linux v4.2 + PLL5 DTS patch (for HDMI output with enabled LVDS).
-Using mplayer with YUV420 (DRM Xvideo would probably work with packed
-UYVY-alike formats but I need YUV420 because H.264 decoder produces it).
-The driver is git://ftp.arm.linux.org.uk/~rmk/xf86-video-armada.git,
-branch unstable-devel, and it uses
-git://ftp.arm.linux.org.uk/~rmk/libdrm-armada.git/.
+The USER_DATA register cannot be accessed using byte accessors on A13
+SoCs, thus triggering a bug when using memcpy_toio on this register.
+Declare an helper macros to convert an OOB buffer into a suitable
+USER_DATA value and vice-versa.
 
-	IMX DRM Xvideo output:
+This patch also fixes an error in the oob_required logic (some OOB data
+are not written even if the user required it) by removing the
+oob_required condition, which is perfectly valid since the core already
+fill ->oob_poi with FFs when oob_required is false.
 
-Only unscaled video: no color (luminance is good but the color
-components are green). The driver doesn't use color information.
-I hope this is easily fixable.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: <stable@vger.kernel.org> # 3.19+
+Fixes: 1fef62c1423b ("mtd: nand: add sunxi NAND flash controller support")
 
+---
+Changes since v3:
+- drop the NFC_USER_DATA_TO_BUF() macro
 
-	rmk/drm-etnaviv-devel:
+Changes since v2:
+- add the NFC_USER_DATA_TO_BUF() macro and rename NFC_USER_DATA() into
+  NFC_BUF_TO_USER_DATA()
+- rework the commit message
 
-With unscaled video, the only visible problem is tearing in the middle
-of the screen (unability to sync with screen refresh).
+Changes since v1:
+- drop the !oob_required conditional path
+- replace endianness conversions by a macro relying on byte shifting
+  operations
+---
+ drivers/mtd/nand/sunxi_nand.c | 26 +++++++++-----------------
+ 1 file changed, 9 insertions(+), 17 deletions(-)
 
-With scaling, I'm getting horizontal lines (mostly visible when the
-scene changes) and some sort of stalls - sometimes two frames are
-alternating for few seconds then it goes forward.
-
-
-	pengutronix/etnaviv-for-upstream:
-No etnaviv Xvideo:
-(==) armada(0): Backing store enabled
-(==) armada(0): Silken mouse enabled
-(EE) armada(0): etnaviv: unable to open: Not a directory
-(WW) armada(0): [drm] Vivante initialization failed, running unaccelerated
-
-I assume I need a newer something.
-
-
-	pengutronix/v4.2/topic/etnaviv-for-rmk:
-It requires:
---- a/drivers/base/dma-contiguous.c
-+++ b/drivers/base/dma-contiguous.c
-@@ -216,6 +216,7 @@ phys_addr_t dma_get_contiguous_base(struct device *dev)
- {
- 	return cma_get_base(dev_get_cma_area(dev));
- }
-+EXPORT_SYMBOL(dma_get_contiguous_base);
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index f97a58d..279cafd 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -147,6 +147,10 @@
+ #define NFC_ECC_MODE		GENMASK(15, 12)
+ #define NFC_RANDOM_SEED		GENMASK(30, 16)
  
- /*
-  * Support for reserved memory regions defined in device tree
-
-
-Likewise, no etnaviv XVideo:
-(--) armada(0): Vivante GC320 GPU revision 5007 (etnaviv) 2d PE2.0
-(EE) armada(0): etnaviv: unable to create context: (null)
-(WW) armada(0): [drm] Vivante initialization failed, running unaccelerated
-
-
-Comments?
++/* NFC_USER_DATA helper macros */
++#define NFC_BUF_TO_USER_DATA(buf)	((buf)[0] | ((buf)[1] << 8) | \
++					((buf)[2] << 16) | ((buf)[3] << 24))
++
+ #define NFC_DEFAULT_TIMEOUT_MS	1000
+ 
+ #define NFC_SRAM_SIZE		1024
+@@ -646,15 +650,9 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
+ 		offset = layout->eccpos[i * ecc->bytes] - 4 + mtd->writesize;
+ 
+ 		/* Fill OOB data in */
+-		if (oob_required) {
+-			tmp = 0xffffffff;
+-			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, &tmp,
+-				    4);
+-		} else {
+-			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE,
+-				    chip->oob_poi + offset - mtd->writesize,
+-				    4);
+-		}
++		writel(NFC_BUF_TO_USER_DATA(chip->oob_poi +
++					    layout->oobfree[i].offset),
++		       nfc->regs + NFC_REG_USER_DATA_BASE);
+ 
+ 		chip->cmdfunc(mtd, NAND_CMD_RNDIN, offset, -1);
+ 
+@@ -784,14 +782,8 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
+ 		offset += ecc->size;
+ 
+ 		/* Fill OOB data in */
+-		if (oob_required) {
+-			tmp = 0xffffffff;
+-			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, &tmp,
+-				    4);
+-		} else {
+-			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, oob,
+-				    4);
+-		}
++		writel(NFC_BUF_TO_USER_DATA(oob),
++		       nfc->regs + NFC_REG_USER_DATA_BASE);
+ 
+ 		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ACCESS_DIR |
+ 		      (1 << 30);
 -- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+1.9.1
