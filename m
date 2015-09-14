@@ -1,109 +1,92 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 14 Sep 2015 14:32:47 +0100
-Subject: [PATCH v2 3/3] drivers: firmware: psci: add system suspend support
-In-Reply-To: <20150914132346.GB25469@red-moon>
-References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-4-git-send-email-sudeep.holla@arm.com>
- <20150914132346.GB25469@red-moon>
-Message-ID: <55F6CC7F.6080308@arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 14 Sep 2015 14:34:03 +0100
+Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
+In-Reply-To: <20150914131448.GC7002@leverpostej> (Mark Rutland's message of
+ "Mon, 14 Sep 2015 14:14:48 +0100")
+References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+ <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
+ <20150914131448.GC7002@leverpostej>
+Message-ID: <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mark,
 
+Thanks for taking a look.
 
-On 14/09/15 14:23, Lorenzo Pieralisi wrote:
-> On Thu, Jun 18, 2015 at 03:41:34PM +0100, Sudeep Holla wrote:
->> PSCI v1.0 introduces a new API called PSCI_SYSTEM_SUSPEND. This API
->> provides the mechanism by which the calling OS can request entry into
->> the deepest possible system sleep state.
->>
->> It meets all the necessary preconditions for entering suspend to RAM
->> state in Linux. This patch adds support for PSCI_SYSTEM_SUSPEND in psci
->> firmware and registers a psci system suspend operation to implement the
->> suspend-to-RAM(s2r) in a generic way on all the platforms implementing
->> PSCI.
->>
+Mark Rutland <mark.rutland@arm.com> writes:
+
+> On Mon, Sep 14, 2015 at 02:00:14PM +0100, Punit Agrawal wrote:
+>> The System Control Processor (SCP) provides access to SoC sensors via
+>> the System Control and Power Interface (SCPI) Message Protocol. Add
+>> bindings to allow probing of these sensors. Also support referencing
+>> of the sensors for setting up thermal zones via the thermal DT
+>> bindings.
+>> 
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
 >> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
 >> ---
->>   drivers/firmware/psci.c   | 31 +++++++++++++++++++++++++++++++
->>   include/uapi/linux/psci.h |  3 +++
->>   2 files changed, 34 insertions(+)
->>
->> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
->> index 752ca7c9eb97..f2b2b3e1c6e4 100644
->> --- a/drivers/firmware/psci.c
->> +++ b/drivers/firmware/psci.c
->> @@ -20,11 +20,13 @@
->>   #include <linux/printk.h>
->>   #include <linux/psci.h>
->>   #include <linux/reboot.h>
->> +#include <linux/suspend.h>
->>
->>   #include <uapi/linux/psci.h>
->>
->>   #include <asm/system_misc.h>
->>   #include <asm/smp_plat.h>
->> +#include <asm/suspend.h>
->>
->>   /*
->>    * While a 64-bit OS can make calls with SMC32 calling conventions, for some
->> @@ -222,6 +224,33 @@ static int __init psci_features(u32 psci_func_id)
->>   			      psci_func_id, 0, 0);
->>   }
->>
->> +static int psci_system_suspend(unsigned long unused)
->> +{
->> +	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
->> +			      virt_to_phys(cpu_resume), 0, 0);
->> +}
+>>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 15 +++++++++++++++
+>>  1 file changed, 15 insertions(+)
+>> 
+>> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> index f002460..af66f7f 100644
+>> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> @@ -72,8 +72,18 @@ Required sub-node properties:
+>>  - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
+>>  	       shared memory on Juno platforms
+>>  
+>> +Sensor bindings for the sensors based on SCPI Message Protocol
+>> +--------------------------------------------------------------
+>> +SCPI provides an API to access the various sensors on the SoC.
 >> +
->> +static int psci_system_suspend_enter(suspend_state_t state)
->> +{
->> +	return cpu_suspend(0, psci_system_suspend);
->> +}
->> +
->> +static const struct platform_suspend_ops psci_suspend_ops = {
->> +	.valid          = suspend_valid_only_mem,
->> +	.enter          = psci_system_suspend_enter,
->> +};
->> +
->> +static void __init psci_init_system_suspend(void)
->> +{
->> +	if (!IS_ENABLED(CONFIG_SUSPEND))
->> +		return;
->> +
->> +	if (psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND)))
->> +		return;
->> +
->> +	suspend_set_ops(&psci_suspend_ops);
+>> +Required properties:
+>> +- compatible : should be "arm,scpi-sensors".
+>> +- #thermal-sensor-cells: should be set to 1. This property follows the
+>> +			 thermal device tree bindings[2].
 >
-> For consistency with psci_init_cpu_suspend I rewrote it like this:
->
-> static void __init psci_init_system_suspend(void)
-> {
-> 	int ret;
->
-> 	if (!IS_ENABLED(CONFIG_SUSPEND))
-> 		return;
->
-> 	ret = psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND));
->
-> 	if (ret != PSCI_RET_NOT_SUPPORTED)
-> 		suspend_set_ops(&psci_suspend_ops);
-> }
->
-> Let me know if it is ok with you. Other than that:
->
+> You need to specify what the valid values for this cell are.
 
-Looks fine to me. Thanks for the fixup.
+The enumeration depends on the number of sensors exported by SCP
+firmware - which is platform dependent. I could add add something like
+if you think that is helpful -
 
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+"Valid cell value is a number between 0..n-1, where n is the number
+of sensors exported by SCP firmware."
+
+Thanks,
+
+Punit
+
 >
-
-Thanks.
-
-Regards,
-Sudeep
+> Mark.
+>
+>> +
+>>  [0] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
+>>  [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +[2] Documentation/devicetree/bindings/thermal/thermal.txt
+>>  
+>>  Example:
+>>  
+>> @@ -122,6 +132,11 @@ scpi_protocol: scpi at 2e000000 {
+>>  			clock-output-names = "pxlclk0", "pxlclk1";
+>>  		};
+>>  	};
+>> +
+>> +	scpi_sensors0: sensors {
+>> +		compatible = "arm,scpi-sensors";
+>> +		#thermal-sensor-cells = <1>;
+>> +	};
+>>  };
+>>  
+>>  cpu at 0 {
+>> -- 
+>> 2.5.0
+>> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
