@@ -1,55 +1,60 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 14 Sep 2015 19:08:08 +0100
-Subject: [PATCH] arm64: cpu hotplug: ensure we mask out CPU_TASKS_FROZEN
- in notifiers
-In-Reply-To: <1442249991-13345-1-git-send-email-will.deacon@arm.com>
-References: <1442249991-13345-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20150914180808.GA12541@red-moon>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 14 Sep 2015 19:26:00 +0100
+Subject: [PATCH 2/5] spi: spi-ti-qspi: add mmap mode read support
+In-Reply-To: <1441355402-6837-3-git-send-email-vigneshr@ti.com>
+References: <1441355402-6837-1-git-send-email-vigneshr@ti.com>
+ <1441355402-6837-3-git-send-email-vigneshr@ti.com>
+Message-ID: <20150914182600.GC12027@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 05:59:51PM +0100, Will Deacon wrote:
-> We have a couple of CPU hotplug notifiers for resetting the CPU debug
-> state to a sane value when a CPU comes online.
-> 
-> This patch ensures that we mask out CPU_TASKS_FROZEN so that we don't
-> miss any online events occuring due to suspend/resume.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/debug-monitors.c | 2 +-
->  arch/arm64/kernel/hw_breakpoint.c  | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+On Fri, Sep 04, 2015 at 01:59:59PM +0530, Vignesh R wrote:
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> +static int ti_qspi_spi_mtd_mmap_read(struct  spi_device *spi,
+> +				     loff_t from, size_t len,
+> +				     size_t *retlen, u_char *buf,
+> +				     u8 read_opcode, u8 addr_width,
+> +				     u8 dummy_bytes)
+> +{
+> +	struct ti_qspi *qspi = spi_master_get_devdata(spi->master);
+> +	int ret = 0;
+> +
+> +	spi_bus_lock(qspi->master);
 
-> 
-> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-> index 9b3b62ac9c24..cebf78661a55 100644
-> --- a/arch/arm64/kernel/debug-monitors.c
-> +++ b/arch/arm64/kernel/debug-monitors.c
-> @@ -134,7 +134,7 @@ static int os_lock_notify(struct notifier_block *self,
->  				    unsigned long action, void *data)
->  {
->  	int cpu = (unsigned long)data;
-> -	if (action == CPU_ONLINE)
-> +	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE)
->  		smp_call_function_single(cpu, clear_os_lock, NULL, 1);
->  	return NOTIFY_OK;
->  }
-> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-> index 565244fd57ff..2926c3dd6479 100644
-> --- a/arch/arm64/kernel/hw_breakpoint.c
-> +++ b/arch/arm64/kernel/hw_breakpoint.c
-> @@ -878,7 +878,7 @@ static int hw_breakpoint_reset_notify(struct notifier_block *self,
->  						void *hcpu)
->  {
->  	int cpu = (long)hcpu;
-> -	if (action == CPU_ONLINE)
-> +	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE)
->  		smp_call_function_single(cpu, hw_breakpoint_reset, NULL, 1);
->  	return NOTIFY_OK;
->  }
-> -- 
-> 2.1.4
-> 
+I suspect I'm going to see the answer to this in another patch but the
+fact that we're having to take this lock in a driver when it's an op the
+core should be calling.
+
+> +	ret = pm_runtime_get_sync(qspi->dev);
+> +	if (ret < 0) {
+> +		dev_err(qspi->dev, "pm_runtime_get_sync() failed\n");
+> +		return ret;
+> +	}
+
+This would be better outside the lock, there's no need to have the lock
+before we power on and this fixes the fact that you don't release the
+lock here.
+
+> +	memcpy(buf, (__force void *)(qspi->mmap_base + from), len);
+
+The fact that you're having to cast here should be a warning that
+there's someting wrong here.  I think you're looking for
+memcpy_fromio().
+
+> @@ -479,6 +576,7 @@ static int ti_qspi_probe(struct platform_device *pdev)
+>  	master->setup = ti_qspi_setup;
+>  	master->auto_runtime_pm = true;
+>  	master->transfer_one_message = ti_qspi_start_transfer_one;
+> +	master->spi_mtd_mmap_read = ti_qspi_spi_mtd_mmap_read;
+>  	master->dev.of_node = pdev->dev.of_node;
+>  	master->bits_per_word_mask = SPI_BPW_MASK(32) | SPI_BPW_MASK(16) |
+>  				     SPI_BPW_MASK(8);
+
+Don't we need to map a resource somewhere?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/f3c7975c/attachment.sig>
