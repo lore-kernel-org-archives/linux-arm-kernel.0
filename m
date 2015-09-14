@@ -1,59 +1,61 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 14 Sep 2015 16:08:58 +0900
-Subject: [PATCH v5 0/4] cpufreq-dt: add suspend frequency support
-In-Reply-To: <2547413.Uj7KDUeGpY@vostro.rjw.lan>
-References: <1441730464-7947-1-git-send-email-b.zolnierkie@samsung.com>
- <2547413.Uj7KDUeGpY@vostro.rjw.lan>
-Message-ID: <55F6728A.2070805@samsung.com>
+From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Mon, 14 Sep 2015 12:39:14 +0530
+Subject: [PATCH] arm64, mm, numa: Adding numa balancing support for arm64.
+Message-ID: <1442214554-11106-1-git-send-email-gkulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.09.2015 10:16, Rafael J. Wysocki wrote:
-> On Tuesday, September 08, 2015 06:41:00 PM Bartlomiej Zolnierkiewicz wrote:
->> Hi,
->>
->> This patch series adds suspend frequency support (using opp-v2
->> bindings and suspend-opp functionality) to cpufreq-dt driver and
->> then adds suspend opp for Exynos4412 based boards.
->>
->> This patch series fixes suspend/resume support on Exynos4412
->> based Trats2 board and reboot hang on Exynos4412 based Odroid
->> U3 board.
->>
->> Changes since v4:
->> - removed superfluous CONFIG_PM ifdefs
->> - added Acked-by tag from Krzysztof to patch #4
->> - added Acked-by tag from Viresh to patches #1-3
->>
->> Changes since v3:
->> - fixed dev_pm_opp_get_suspend_opp() locking
->> - shortened variable name in dev_pm_opp_get_suspend_opp()
->> - adjusted cpufreq_generic_suspend() to work with cpufreq-dt
->> - removed no longer needed cpufreq_dt_suspend()
->> - added Acked-by tag from Viresh to patch #4
->>
->> Changes since v2:
->> - rewrote to use suspend-opp functionality
->>
->> Changes since v1:
->> - removed superfluous ";"
->>
->> Depends on:
->> - next-20150902 branch of linux-next kernel tree
-> 
-> I've queued up [1-3/4] for the next PM pull request.
-> 
-> The [4/4] has to go in separately through the platform tree.
+enable numa balancing for arm64 platforms.
+add pte, pmd protnone helpers for use by automatic NUMA balancing.
 
-Dear Rafael,
+Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
 
-If you want, the fourth patch can go now through your tree - the late
-SoC changes were pulled by Linus. No difference... I can grab it as I
-had other DT related fix in queue.
+this patch is on top of numa v5 patchset.
 
-The only important thing is to get entire patchset to 4.3 because it is
-a fix for regression introduced in cpufreq for exynos. Do you plan to
-send your part in current 4.3 cycle?
+---
+ arch/arm64/Kconfig               |  1 +
+ arch/arm64/include/asm/pgtable.h | 17 +++++++++++++++++
+ 2 files changed, 18 insertions(+)
 
-Best regards,
-Krzysztof
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7d95663..d2e3c23 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -10,6 +10,7 @@ config ARM64
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+ 	select ARCH_USE_CMPXCHG_LOCKREF
+ 	select ARCH_SUPPORTS_ATOMIC_RMW
++	select ARCH_SUPPORTS_NUMA_BALANCING if NUMA
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+ 	select ARCH_WANT_FRAME_POINTERS
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 6900b2d9..0e4847d 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -308,6 +308,23 @@ static inline pgprot_t mk_sect_prot(pgprot_t prot)
+ 	return __pgprot(pgprot_val(prot) & ~PTE_TABLE_BIT);
+ }
+ 
++#ifdef CONFIG_NUMA_BALANCING
++/*
++ * These work without NUMA balancing but the kernel does not care. See the
++ * comment in include/asm-generic/pgtable.h
++ */
++static inline int pte_protnone(pte_t pte)
++{
++	return ((pte_val(pte) & (PTE_VALID | PTE_PROT_NONE)) == PTE_PROT_NONE);
++}
++
++static inline int pmd_protnone(pmd_t pmd)
++{
++	return pte_protnone(pmd_pte(pmd));
++}
++
++#endif /* CONFIG_NUMA_BALANCING */
++
+ /*
+  * THP definitions.
+  */
+-- 
+1.8.1.4
