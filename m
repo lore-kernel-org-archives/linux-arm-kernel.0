@@ -1,48 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Sep 2015 16:06:03 +0100
-Subject: [PATCH] KVM: arm64: add workaround for Cortex-A57 erratum #852523
-Message-ID: <1442243163-2675-1-git-send-email-will.deacon@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 14 Sep 2015 17:06:05 +0200
+Subject: [PATCH] clk: rockchip: add critical clock for rk3368
+In-Reply-To: <20150914141920.GF7002@leverpostej>
+References: <5267432.TORlj1Iv40@diego> <20150914141920.GF7002@leverpostej>
+Message-ID: <6675833.8DAAvDYooL@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When restoring the system register state for an AArch32 guest at EL2,
-writes to DACR32_EL2 may not be correctly synchronised by Cortex-A57,
-which can lead to the guest effectively running with junk in the DACR
-and running into unexpected domain faults.
+Am Montag, 14. September 2015, 15:19:21 schrieb Mark Rutland:
+> On Sun, Sep 13, 2015 at 12:20:36PM +0100, Heiko St?bner wrote:
+> > Again a result of the gpio-clock-liberation the rk3368 needs the
+> > pclk_pd_pmu marked as critical, to boot successfully.
+> > 
+> > Reported-by: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> FWIW: Tested-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> I'm surprised that we don't describe these as critical in the DT, given
+> that this isn't really an internal property of the clock controller, but
+> rather what happens to be attached to it. That ship appears to have
+> sailed, however.
 
-This patch works around the issue by re-ordering our restoration of the
-AArch32 register aliases so that they happen before the AArch64 system
-registers. Ensuring that the registers are restored in this order
-guarantees that they will be correctly synchronised by the core.
+I wouldn't necessarily think so ... what is called critical only means "don't 
+turn off when walking the clock-tree upwards".
 
-Cc: <stable@vger.kernel.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kvm/hyp.S | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+The pclk_pd_pmu for example simply supplies some more clocks we don't handle 
+at all currently (pclk_pmu_noc, ...). That we currently choose to ignore those 
+[because we don't have any code nor dt-bindings to handle the components 
+supplied] sounds very much like an implementation-specific detail, not 
+something about the hardware.
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 3c4f641451bb..c4016d411f4a 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -739,6 +739,9 @@ ENTRY(__kvm_vcpu_run)
- 	// Guest context
- 	add	x2, x0, #VCPU_CONTEXT
- 
-+	// We must restore the 32-bit state before the sysregs, thanks
-+	// to Cortex-A57 erratum #852523.
-+	restore_guest_32bit_state
- 	bl __restore_sysregs
- 
- 	skip_debug_state x3, 1f
-@@ -746,7 +749,6 @@ ENTRY(__kvm_vcpu_run)
- 	kern_hyp_va x3
- 	bl	__restore_debug
- 1:
--	restore_guest_32bit_state
- 	restore_guest_regs
- 
- 	// That's it, no more messing around.
--- 
-2.1.4
+I really like the concept of critical clock handling Mike is working on, which 
+implements some sort of hand-off and keeps so marked clocks on until a real 
+components picks them up.
