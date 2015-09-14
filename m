@@ -1,113 +1,33 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 14 Sep 2015 08:33:58 -0700
-Subject: [PATCH v2 1/3] sysfs: Support is_visible() on binary attributes
-In-Reply-To: <1442234049-18637-2-git-send-email-emilio.lopez@collabora.co.uk>
-References: <1442234049-18637-1-git-send-email-emilio.lopez@collabora.co.uk>
- <1442234049-18637-2-git-send-email-emilio.lopez@collabora.co.uk>
-Message-ID: <55F6E8E6.9030509@roeck-us.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Sep 2015 16:46:28 +0100
+Subject: [PATCH] KVM: arm64: add workaround for Cortex-A57 erratum #852523
+In-Reply-To: <1442243163-2675-1-git-send-email-will.deacon@arm.com>
+References: <1442243163-2675-1-git-send-email-will.deacon@arm.com>
+Message-ID: <55F6EBD4.30809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/2015 05:34 AM, Emilio L?pez wrote:
-> According to the sysfs header file:
->
->      "The returned value will replace static permissions defined in
->       struct attribute or struct bin_attribute."
->
-> but this isn't the case, as is_visible is only called on struct attribute
-> only. This patch introduces a new is_bin_visible() function to implement
-> the same functionality for binary attributes, and updates documentation
-> accordingly.
->
-> Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
+On 14/09/15 16:06, Will Deacon wrote:
+> When restoring the system register state for an AArch32 guest at EL2,
+> writes to DACR32_EL2 may not be correctly synchronised by Cortex-A57,
+> which can lead to the guest effectively running with junk in the DACR
+> and running into unexpected domain faults.
+> 
+> This patch works around the issue by re-ordering our restoration of the
+> AArch32 register aliases so that they happen before the AArch64 system
+> registers. Ensuring that the registers are restored in this order
+> guarantees that they will be correctly synchronised by the core.
+> 
+> Cc: <stable@vger.kernel.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Nitpick below, but otherwise looks ok to me.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+I'll queue that together with the next batch of fixes.
 
-Guenter
+Thanks,
 
-> ---
->
-> Changes from v1:
->   - Don't overload is_visible, introduce is_bin_visible instead as
->     discussed on the list.
->
->   fs/sysfs/group.c      | 17 +++++++++++++++--
->   include/linux/sysfs.h | 18 ++++++++++++++----
->   2 files changed, 29 insertions(+), 6 deletions(-)
->
-> diff --git a/fs/sysfs/group.c b/fs/sysfs/group.c
-> index 39a0199..51b56e6 100644
-> --- a/fs/sysfs/group.c
-> +++ b/fs/sysfs/group.c
-> @@ -73,13 +73,26 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
->   	}
->
->   	if (grp->bin_attrs) {
-> -		for (bin_attr = grp->bin_attrs; *bin_attr; bin_attr++) {
-> +		for (i = 0, bin_attr = grp->bin_attrs; *bin_attr; i++, bin_attr++) {
-> +			umode_t mode = (*bin_attr)->attr.mode;
-> +
->   			if (update)
->   				kernfs_remove_by_name(parent,
->   						(*bin_attr)->attr.name);
-> +			if (grp->is_bin_visible) {
-> +				mode = grp->is_bin_visible(kobj, *bin_attr, i);
-> +				if (!mode)
-> +					continue;
-> +			}
-> +
-> +			WARN(mode & ~(SYSFS_PREALLOC | 0664),
-> +			     "Attribute %s: Invalid permissions 0%o\n",
-> +			     (*bin_attr)->attr.name, mode);
-> +
-> +			mode &= SYSFS_PREALLOC | 0664;
-
-Strictly speaking, the mode validation for binary attributes is new and logically
-separate. Should it be mentioned in the commit log, or even be a separate patch ?
-
->   			error = sysfs_add_file_mode_ns(parent,
->   					&(*bin_attr)->attr, true,
-> -					(*bin_attr)->attr.mode, NULL);
-> +					mode, NULL);
->   			if (error)
->   				break;
->   		}
-> diff --git a/include/linux/sysfs.h b/include/linux/sysfs.h
-> index 9f65758..2f66050 100644
-> --- a/include/linux/sysfs.h
-> +++ b/include/linux/sysfs.h
-> @@ -64,10 +64,18 @@ do {							\
->    *		a new subdirectory with this name.
->    * @is_visible:	Optional: Function to return permissions associated with an
->    *		attribute of the group. Will be called repeatedly for each
-> - *		attribute in the group. Only read/write permissions as well as
-> - *		SYSFS_PREALLOC are accepted. Must return 0 if an attribute is
-> - *		not visible. The returned value will replace static permissions
-> - *		defined in struct attribute or struct bin_attribute.
-> + *		non-binary attribute in the group. Only read/write
-> + *		permissions as well as SYSFS_PREALLOC are accepted. Must
-> + *		return 0 if an attribute is not visible. The returned value
-> + *		will replace static permissions defined in struct attribute.
-> + * @is_bin_visible:
-> + *		Optional: Function to return permissions associated with a
-> + *		binary attribute of the group. Will be called repeatedly
-> + *		for each binary attribute in the group. Only read/write
-> + *		permissions as well as SYSFS_PREALLOC are accepted. Must
-> + *		return 0 if a binary attribute is not visible. The returned
-> + *		value will replace static permissions defined in
-> + *		struct bin_attribute.
->    * @attrs:	Pointer to NULL terminated list of attributes.
->    * @bin_attrs:	Pointer to NULL terminated list of binary attributes.
->    *		Either attrs or bin_attrs or both must be provided.
-> @@ -76,6 +84,8 @@ struct attribute_group {
->   	const char		*name;
->   	umode_t			(*is_visible)(struct kobject *,
->   					      struct attribute *, int);
-> +	umode_t			(*is_bin_visible)(struct kobject *,
-> +						  struct bin_attribute *, int);
->   	struct attribute	**attrs;
->   	struct bin_attribute	**bin_attrs;
->   };
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
