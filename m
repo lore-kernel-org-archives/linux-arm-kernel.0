@@ -1,84 +1,74 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 14 Sep 2015 11:41:13 +0200
-Subject: [PATCH v4] mtd: nand: sunxi: fix OOB handling in ->write_xxx()
- functions
-In-Reply-To: <1472478.qiY0UY0ao8@wuerfel>
-References: <1442220063-7520-1-git-send-email-boris.brezillon@free-electrons.com>
- <1472478.qiY0UY0ao8@wuerfel>
-Message-ID: <20150914114113.4aa7ea03@bbrezillon>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Mon, 14 Sep 2015 15:12:53 +0530
+Subject: [RFC 2/3] mmc: sdhci: add host_ops->voltage_switch callback for
+ all other voltages
+In-Reply-To: <CAPDyKFqOGsKXTCOG89Kq=F6VsDpyfnpwo+jNb+6otgPUFE_bzw@mail.gmail.com>
+References: <1441135938-8056-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1441135938-8056-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150902150442.118d3305@xhacker> <55E6B129.1030002@linaro.org>
+ <20150902162627.682cdedf@xhacker> <55E6E0FD.7000806@linaro.org>
+ <CAPDyKFqOGsKXTCOG89Kq=F6VsDpyfnpwo+jNb+6otgPUFE_bzw@mail.gmail.com>
+Message-ID: <55F6969D.7090004@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Mon, 14 Sep 2015 10:59:02 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Monday 14 September 2015 10:41:03 Boris Brezillon wrote:
-> >                 /* Fill OOB data in */
-> > -               if (oob_required) {
-> > -                       tmp = 0xffffffff;
-> > -                       memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, &tmp,
-> > -                                   4);
-> > -               } else {
-> > -                       memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE,
-> > -                                   chip->oob_poi + offset - mtd->writesize,
-> > -                                   4);
-> > -               }
-> > +               writel(NFC_BUF_TO_USER_DATA(chip->oob_poi +
-> > +                                           layout->oobfree[i].offset),
-> > +                      nfc->regs + NFC_REG_USER_DATA_BASE);
-> 
-> This looks like you are changing the endianess of the data that gets written.
-> Is that intentional?
-
-Hm, the real goal of this patch was to avoid accessing the
-NFC_REG_USER_DATA_BASE register using byte accessors (writeb()).
-The first version of this series was directly copying data from the
-buffer into a temporary u32 variable, thus forcing the data to be stored
-in little endian (tell me if I'm wrong), and then changing endianness
-using le32_to_cpu().
-Brian suggested to use __raw_writel() (as you seem to suggest too), but
-I was worried about the missing mem barrier in this function.
-That's why I made my own macro doing the little endian to CPU conversion
-manually, but still using the standard writel() accessor (which will
-do the conversion in reverse order).
-Maybe I should use __raw_writel() and add an explicit memory barrier.
-
-> 
-> memcpy_toio() uses the same endianess for source and destination, while writel()
-> assumes that the destination is a little-endian register, and that could break
-> if the kernel is built to run as big-endian. I also see that sunxi_nfc_write_buf()
-> uses memcpy_toio() for writing the actual data, and you are not changing that.
-
-AFAIU the peripheral is always in little endian, and only the CPU can
-be switched to big endian, right?
-Are you saying that memcpy_toio() uses writel? Because according to
-this implementation [2] it uses writeb, which should be safe (accessing
-the internal SRAM using byte accessors is authorized).
-
-> 
-> If all hardware can do 32-bit accesses here and the size is guaranteed to be a
-> multiple of four bytes, you can probably improve performance by using a
-> __raw_writel() loop there. Using __raw_writel() in general is almost always
-> a bug, but here it actually makes sense. See also the powerpc implementation
-> of _memcpy_toio().
-
-AFAICT, buffer passed to ->write_bu() are not necessarily aligned on
-32bits, so using writel here might require copying data in temporary
-buffers :-/.
-
-Don't hesitate to point where I'm wrong ;-).
-
-Best Regards,
-
-Boris
-
-[1]https://patchwork.ozlabs.org/patch/502041/
-[2]http://lxr.free-electrons.com/source/arch/arm/kernel/io.c#L56
 
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+On Monday 14 September 2015 03:00 PM, Ulf Hansson wrote:
+> [...]
+>
+>>>>>
+>>>>> Could this be implemented by regulator API? From patch set 3/3, the
+>>>>> pxa1928
+>>>>> voltage_switch hook is to operate the IO pad registers, this seems not
+>>>>> belong
+>>>>> to the SDHC IP core.
+>>>>>
+>>>>
+>>>> Not quite sure whether regulator would be right fit for this.
+>>>
+>>>
+>>>   From the patche[3/3], this can be achieved by abstracting the IO PAD as
+>>> regulators
+>>> then, we may not need to touch the core sdhci.c. But I'm not sure whether
+>>> this
+>>> is the good solution or not.
+>>
+>>
+>> Exactly...
+>>
+>>> sdhci Maintainers and experts may have better
+>>> suggestions.
+>>>
+>>
+>> Thats is the reason I stamped it as a RFC :)
+>>
+>
+> [...]
+>
+>  From an mmc core perspective it would be preferred if you implement
+> this as a regulator (vqmmc).
+>
+> Especially since we will soon have an API for how to set the I/O
+> voltages - and the intelligence within that API is not something we
+> would like to implement for each and every host driver.
+> https://lkml.org/lkml/2015/8/31/367
+>
+
+
+I would still consider this as a regulator specific and may not address
+the IO configuration within the SoC which are module specific.
+The API regulator_set_voltage_triplet() will not have intelligence to
+differentiate whether the call is coming from MMC or somewhere else.
+
+Note that, the IO pad voltage configuration which I am referring to is
+MMC specific and applicable only when pad is configured in MMC mode. So
+technically it is not simply common pad voltage configuration.
+
+
+And I am still not sure regulator framework would be right fit for
+this. Pinctrl would have been right fit, but...since I saw f_sdh30
+driver is already doing this, which is easy fit; so adopted the same.
+
+Thanks,
+Vaibhav
