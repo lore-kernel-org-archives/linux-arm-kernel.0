@@ -1,125 +1,78 @@
-From: roger.pau@citrix.com (=?UTF-8?Q?Roger_Pau_Monn=c3=a9?=)
-Date: Mon, 14 Sep 2015 14:08:44 +0200
-Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
-In-Reply-To: <55F6ADAE.1010609@citrix.com>
-References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
- <55F68BC9.6020509@citrix.com> <55F6A437.3040403@citrix.com>
- <55F6A9DB.8040503@citrix.com> <55F6ADAE.1010609@citrix.com>
-Message-ID: <55F6B8CC.5090406@citrix.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Sep 2015 13:11:37 +0100
+Subject: [PATCH v2 04/22] KVM: ARM64: Add reset and access handlers for
+ PMCR_EL0 register
+In-Reply-To: <55F63B87.4020205@huawei.com>
+References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
+ <1441961715-11688-5-git-send-email-zhaoshenglong@huawei.com>
+ <55F2A7F7.4010801@arm.com> <55F63B87.4020205@huawei.com>
+Message-ID: <55F6B979.3010006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El 14/09/15 a les 13.21, Julien Grall ha escrit:
-> On 14/09/15 12:04, Roger Pau Monn? wrote:
->> Hello,
->>
->> El 14/09/15 a les 12.40, Julien Grall ha escrit:
->>> Hi Roger,
->>>
->>> On 14/09/15 09:56, Roger Pau Monn? wrote:
->>>> El 07/09/15 a les 17.33, Julien Grall ha escrit:
->>>>> Hi all,
->>>>>
->>>>> ARM64 Linux is supporting both 4KB and 64KB page granularity. Although, Xen
->>>>> hypercall interface and PV protocol are always based on 4KB page granularity.
->>>>>
->>>>> Any attempt to boot a Linux guest with 64KB pages enabled will result to a
->>>>> guest crash.
->>>>>
->>>>> This series is a first attempt to allow those Linux running with the current
->>>>> hypercall interface and PV protocol.
->>>>>
->>>>> This solution has been chosen because we want to run Linux 64KB in released
->>>>> Xen ARM version or/and platform using an old version of Linux DOM0.
->>>>>
->>>>> There is room for improvement, such as support of 64KB grant, modification
->>>>> of PV protocol to support different page size... They will be explored in a
->>>>> separate patch series later.
->>>>>
->>>>> TODO list:
->>>>>     - Convert swiotlb to 64KB
->>>>>     - Convert xenfb to 64KB
->>>>>     - Support for multiple page ring support
->>>>>     - Support for 64KB in gnttdev
->>>>>     - Support of non-indirect grant with 64KB frontend
->>>>>     - It may be possible to move some common define between
->>>>>     netback/netfront and blkfront/blkback in an header
->>>>>
->>>>> I've got most of the patches for the TODO items. I'm planning to send them as
->>>>> a follow-up as it's not a requirement for a basic guests.
->>>>>
->>>>> All patches has been built tested for ARM32, ARM64, x86. But I haven't tested
->>>>> to run it on x86 as I don't have a box with Xen x86 running. I would be
->>>>> happy if someone give a try and see possible regression for x86.
+On 14/09/15 04:14, Shannon Zhao wrote:
+> 
+> 
+> On 2015/9/11 18:07, Marc Zyngier wrote:
+>> On 11/09/15 09:54, Shannon Zhao wrote:
+>>>> From: Shannon Zhao <shannon.zhao@linaro.org>
 >>>>
->>>> Do you have figures regarding if/how much performance penalty do the
->>>> blkfront/blkback patches add to the traditional 4KB scenario (frontend
->>>> and backend running on guests using 4KB pages)?
->>>
->>> Which benchmark do you advice? Although, I don't have SSD on this
->>> platform so it may be possible that the bottleneck will be the hard drive.
->>
->> I've normally used a ramdisk in order to test performance, but it seems
->> nullblk would be a better option (it wasn't available before) and it
->> doesn't reduce the size of RAM available to the system:
->>
->> https://www.kernel.org/doc/Documentation/block/null_blk.txt
-> 
-> I will give a look to this.
-> 
+>>>> Add reset handler which gets host value of PMCR_EL0 and make writable
+>>>> bits architecturally UNKNOWN. Add a common access handler for PMU
+>>>> registers which emulates writing and reading register and add emulation
+>>>> for PMCR.
 >>>>
->>>> Since there's been no design document about this and the TODO list
->>>> doesn't contain it, I would like to know which plans do we have in order
->>>> to fix this properly.
->>>
->>> Can you explain what kind of design document you were expecting? The
->>> support of 64KB page granularity is pretty straight-forward and there is
->>> not many way to do it. We have to split the page in 4KB chunk to feed
->>> the ring.
+>>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>>> ---
+>>>>  arch/arm64/kvm/sys_regs.c | 76 +++++++++++++++++++++++++++++++++++++++++++++--
+>>>>  1 file changed, 74 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>>>> index c370b40..db1be44 100644
+>>>> --- a/arch/arm64/kvm/sys_regs.c
+>>>> +++ b/arch/arm64/kvm/sys_regs.c
+>>>> @@ -33,6 +33,7 @@
+>>>>  #include <asm/kvm_emulate.h>
+>>>>  #include <asm/kvm_host.h>
+>>>>  #include <asm/kvm_mmu.h>
+>>>> +#include <asm/pmu.h>
+>>>>  
+>>>>  #include <trace/events/kvm.h>
+>>>>  
+>>>> @@ -236,6 +237,48 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>>>>  	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
+>>>>  }
+>>>>  
+>>>> +static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>>>> +{
+>>>> +	u32 pmcr;
+>>>> +
+>>>> +	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
+>>>> +	/* Writable bits of PMCR_EL0 (ARMV8_PMCR_MASK) is reset to UNKNOWN*/
+>>>> +	if (!vcpu_mode_is_32bit(vcpu))
+>>>> +		vcpu_sys_reg(vcpu, r->reg) = (pmcr & ~ARMV8_PMCR_MASK)
+>>>> +					     | (ARMV8_PMCR_MASK & 0xdecafbad);
+>>>> +	else
+>>>> +		vcpu_cp15(vcpu, r->reg) = (pmcr & ~ARMV8_PMCR_MASK)
+>>>> +					  | (ARMV8_PMCR_MASK & 0xdecafbad);
+>> I have some concerns about blindly reusing the top bits of the host's
+>> PMCR_EL0 register, specially when it comes to the PMCR_EL0.N. Given that
+>> we're fully emulating the PMU, shouldn't we simply define how many
+>> counters we're emulating?
 >>
->> I was thinking about adding support for 64KB grants with the aim of
->> eventually removing the splitting done in xen-blkfront and the
->> grant-table code in general.
 > 
-> I'd like to see a basic support of 64KB page granularity upstream before
-> starting to think about performance improvement. And there is still a
-> lot to do.
+> But how many counters should we define? And what does this definition
+> based on? The only gist I think is the number of counters on host. And
+> what's the reason to define less or more than PMCR_EL0.N? I didn't find
+> one. So I choose to be consistent with host.
 
-I wasn't actually thinking of this as a performance improvement, but
-rather as a way of fixing this properly and removing the complexity
-added to xen-blkfront, thus providing a PV block protocol that natively
-supports 64KB pages. This would be like hardware components already do
-AFAIK, because I don't think there are other drivers in the Linux tree
-that do this kind of splitting.
+The problem is that choosing the host value may be just the wrong thing
+once you migrate it. It is not a big deal, but it is worth keeping it in
+mind. it should anyway be possible to size the PMU from userspace,
+overriding the value you've selected at reset.
 
-> Although, having 64KB grants won't remove the splitting as we would
-> still have to support frontend/backend which only handle 4KB grant.
+Thanks,
 
-IMHO, given enough time I would just drop those.
-
->>> TBH, I'm expecting a small impact to the performance. It would be hard
->>> to get the exactly the same performance as today if we keep the helpers
->>> to avoid the backend dealing himself with the splitting and page
->>> granularity.
->>>
->>> Although, if the performance impact is not acceptable, it may be
->>> possible to optimize gnttab_foreach_grant_in_range by moving the
->>> function inline. The current way to the loop is the fastest I've found
->>> (I've wrote a small program to test different way) and we will need it
->>> when different of size will be supported.
->>
->> I don't expect the performance to drop massively with this patches
->> applied, but it would be good to al least have an idea of the impact.
-> 
-> I will only be able to give percentage. I guess this would be sufficient
-> for you?
-
-Well, absolute numbers together with the standard deviation are IMHO the
-best way to provide those figures (ie: see ministat(1) output for
-example), but percentages should also be fine.
-
-I'm just interested in knowing the performance difference between having
-this patches applied or not when using 4KB pages on the frontend and the
-backend.
-
-Roger.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
