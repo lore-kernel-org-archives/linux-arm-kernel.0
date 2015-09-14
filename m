@@ -1,38 +1,73 @@
-From: riku.voipio@linaro.org (Riku Voipio)
-Date: Mon, 14 Sep 2015 11:35:56 +0300
-Subject: [PATCH] ARM: multi_v7_defconfig: enable usb3503
-In-Reply-To: <4414616.t6CSY5FxHU@wuerfel>
-References: <1426254866-24772-1-git-send-email-riku.voipio@linaro.org>
- <556FF260.5060006@collabora.co.uk>
- <7hd21b2wo4.fsf@deeprootsystems.com> <4414616.t6CSY5FxHU@wuerfel>
-Message-ID: <CAAqcGHmaWXFAVairN+2pw6adDG8AMc-MTMKp4g5aUP9Kw+8i7A@mail.gmail.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Mon, 14 Sep 2015 10:39:15 +0200
+Subject: I.MX6 HDMI support in v4.2
+In-Reply-To: <1441709778.13536.8.camel@pengutronix.de> (Lucas Stach's message
+ of "Tue, 08 Sep 2015 12:56:18 +0200")
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m337yp5gvv.fsf@t19.piap.pl> <1441709778.13536.8.camel@pengutronix.de>
+Message-ID: <m3bnd52y4s.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 June 2015 at 15:45, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 04 June 2015 10:47:07 Kevin Hilman wrote:
->>
->> > But I wonder why is not working, shouldn't the driver defer and
->> > be probed again once the PHY driver probe succeeds?
->>
->> Yeah, I'm not sure why that isn't working, and didn't look into it.
->>
->> FWIW, the same problem happens when both are modules.  If you modprobe
->> usb3503 first, then the phy, it doesn't work.  You have to load the phy
->> before the usb3503.
+Another round of tests, I noticed the new git versions :-)
+Testing Linux v4.2 + PLL5 DTS patch (for HDMI output with enabled LVDS).
+Using mplayer with YUV420 (DRM Xvideo would probably work with packed
+UYVY-alike formats but I need YUV420 because H.264 decoder produces it).
+The driver is git://ftp.arm.linux.org.uk/~rmk/xf86-video-armada.git,
+branch unstable-devel, and it uses
+git://ftp.arm.linux.org.uk/~rmk/libdrm-armada.git/.
 
-> The driver does not try to get a reference to the phy, and it does
-> not return -EPROBE_DEFER in any circumstance, so I assume it just
-> runs into an error condition on the first probe and does not
-> try again.
+	IMX DRM Xvideo output:
 
-> I don't really understand why the driver registers both an i2c_driver
-> and a platform_driver, or if that is required, but it may also
-> complicate getting deferred probing to work here.
+Only unscaled video: no color (luminance is good but the color
+components are green). The driver doesn't use color information.
+I hope this is easily fixable.
 
-Is someone looking into fixing it? Having to load this as module would
-be an inconvenience for me, as I like to boot arndale with nfsroot.
-Yet I understand that eventually I'll need to use an initrd - so not a
-blocker, just grumpy work.
 
-Riku
+	rmk/drm-etnaviv-devel:
+
+With unscaled video, the only visible problem is tearing in the middle
+of the screen (unability to sync with screen refresh).
+
+With scaling, I'm getting horizontal lines (mostly visible when the
+scene changes) and some sort of stalls - sometimes two frames are
+alternating for few seconds then it goes forward.
+
+
+	pengutronix/etnaviv-for-upstream:
+No etnaviv Xvideo:
+(==) armada(0): Backing store enabled
+(==) armada(0): Silken mouse enabled
+(EE) armada(0): etnaviv: unable to open: Not a directory
+(WW) armada(0): [drm] Vivante initialization failed, running unaccelerated
+
+I assume I need a newer something.
+
+
+	pengutronix/v4.2/topic/etnaviv-for-rmk:
+It requires:
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -216,6 +216,7 @@ phys_addr_t dma_get_contiguous_base(struct device *dev)
+ {
+ 	return cma_get_base(dev_get_cma_area(dev));
+ }
++EXPORT_SYMBOL(dma_get_contiguous_base);
+ 
+ /*
+  * Support for reserved memory regions defined in device tree
+
+
+Likewise, no etnaviv XVideo:
+(--) armada(0): Vivante GC320 GPU revision 5007 (etnaviv) 2d PE2.0
+(EE) armada(0): etnaviv: unable to create context: (null)
+(WW) armada(0): [drm] Vivante initialization failed, running unaccelerated
+
+
+Comments?
+-- 
+Krzysztof Halasa
+
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
