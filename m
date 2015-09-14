@@ -1,50 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Sep 2015 17:31:55 +0100
-Subject: [PATCH] arm: dma-mapping: fix build warning with new
- DMA_ERROR_CODE definition
-In-Reply-To: <1442247198-12435-1-git-send-email-andre.przywara@arm.com>
-References: <1442247198-12435-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20150914163155.GO21084@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Sep 2015 09:33:53 -0700
+Subject: [PATCH 1/2] ARM: OMAP2+: Remove legacy OMAP3 ISP instantiation
+In-Reply-To: <55F6F5FF.2060801@ti.com>
+References: <1437051319-9904-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <1437051319-9904-2-git-send-email-laurent.pinchart@ideasonboard.com>
+ <20150716125800.GN17550@atomide.com> <55E8CAE7.3010301@ti.com>
+ <55F6F5FF.2060801@ti.com>
+Message-ID: <20150914163353.GN4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 05:13:18PM +0100, Andre Przywara wrote:
-> Commit 96231b2686b5: ("ARM: 8419/1: dma-mapping: harmonize definition
-> of DMA_ERROR_CODE") changed the definition of DMA_ERROR_CODE to use
-> dma_addr_t, which makes the compiler barf on assigning this to an
-> "int" variable on ARM with LPAE enabled:
-> -------------------
-> In file included from /src/linux/include/linux/dma-mapping.h:86:0,
->                  from /src/linux/arch/arm/mm/dma-mapping.c:21:
-> /src/linux/arch/arm/mm/dma-mapping.c: In function '__iommu_create_mapping':
-> /src/linux/arch/arm/include/asm/dma-mapping.h:16:24: warning:
-> overflow in implicit constant conversion [-Woverflow]
->  #define DMA_ERROR_CODE (~(dma_addr_t)0x0)
->                         ^
-> /src/linux/arch/arm/mm/dma-mapping.c:1252:15: note: in expansion of
-> macro DMA_ERROR_CODE'
->   int i, ret = DMA_ERROR_CODE;
->                ^
-
-It's absolutely right to barf on this.  DMA_ERROR_CODE is _supposed_
-to be a dma_addr_t cookie.  It isn't an int.
-
-> Remove the actually unneeded initialization of "ret" in
-> __iommu_create_mapping() and move the variable declaration inside the
-> for-loop to make the scope of this variable more clear.
+* Suman Anna <s-anna@ti.com> [150914 09:33]:
+> Hi Tony,
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  arch/arm/mm/dma-mapping.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+> On 09/03/2015 05:34 PM, Suman Anna wrote:
+> > Hi Sakari,
+> > 
+> > On 07/16/2015 07:58 AM, Tony Lindgren wrote:
+> >> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [150716 05:57]:
+> >>> The OMAP3 ISP is now fully supported in DT, remove its instantiation
+> >>> from C code.
+> >>
+> >> Please feel to queue this along with the second patch in this series,
+> >> this should not cause any merge conflicts:
+> >>
+> >> Acked-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > Just wondering if you have already queued this, I see the v4l changes in
+> > linux-next, but not this patch. Also, can you confirm if this series is
+> > making it into 4.3?
+> > 
 > 
-> Hi Russell,
-> 
-> I hope that hasn't turned up before, but this triggers with my config.
-> Please apply for 4.3.
+> This patch is not in 4.3-rc1, can you pick this up for the next merge
+> window? I am gonna send out some additional cleanup patches (removing
+> legacy mailbox and iommu pieces) on top on this patch. The second patch
+> in this series did make it.
 
-The patch looks correct, please put it in the patch system, thanks.
+OK tagging this one for next, will apply once I'm done with fixes.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Tony
