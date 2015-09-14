@@ -1,56 +1,80 @@
-From: JBeulich@suse.com (Jan Beulich)
-Date: Mon, 14 Sep 2015 04:39:49 -0600
-Subject: [Xen-devel] [PATCH] efi/libstub/fdt: Standardize the names
- of EFI stub parameters
-In-Reply-To: <CAKv+Gu-2kyd3Gf3ceSa1jdgCjqJ8zBCesa4xehLiZ+VzergS3Q@mail.gmail.com>
-References: <20150910112418.GC29293@leverpostej>
- <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
- <20150910121514.GE29293@leverpostej>
- <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
- <20150910144938.GI29293@leverpostej>
- <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
- <20150910162302.GN29293@leverpostej>
- <20150911124643.GB4530@olila.local.net-space.pl>
- <alpine.DEB.2.02.1509111410180.2672@kaball.uk.xensource.com>
- <CAKv+Gu9rN7_mxk0huX+34HSCC_aTWVTkUZKQMB1+9U56fRnwsA@mail.gmail.com>
- <20150911154534.GD4530@olila.local.net-space.pl>
- <55F6886D.1090900@huawei.com>
- <CAKv+Gu-xAAd=xTOh+qZvPDthgbRPLy=YwT4xfi4dS53EgJRh1Q@mail.gmail.com>
- <55F693F5.8030203@huawei.com>
- <CAKv+Gu-2kyd3Gf3ceSa1jdgCjqJ8zBCesa4xehLiZ+VzergS3Q@mail.gmail.com>
-Message-ID: <55F6C01502000078000A2823@prv-mh.provo.novell.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 14 Sep 2015 11:40:55 +0100
+Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
+In-Reply-To: <55F68BC9.6020509@citrix.com>
+References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+ <55F68BC9.6020509@citrix.com>
+Message-ID: <55F6A437.3040403@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> On 14.09.15 at 11:36, <ard.biesheuvel@linaro.org> wrote:
-> On 14 September 2015 at 11:31, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->> My understanding is that if there are no EFI_MEMORY_RUNTIME regions, it
->> means we can't use runtime services and should not set the bit
->> EFI_RUNTIME_SERVICES of efi.flags. But if efi_virtmap_init() return
->> true, the bit will be set.
->>
-> 
-> As I said, if you don't want the EFI_RUNTIME_SERVICES bit to be set
-> for other reasons, don't rig efi_virtmap_init() to return false when
-> it shouldn't.
-> 
->>> The absence of such regions is allowed by the spec, so
->>> efi_virtmap_init() is correct imo to return success.
->>>
->> Sorry, not well know about the spec. Could you point out where the spec
->> says this?
->>
-> 
-> Well, I think it doesn't work that way. You are claiming that a memory
-> map without at least one EFI_MEMORY_RUNTIME constitutes an error
-> condition, so the burden is on you to provide a reference to the spec
-> that says you must have at least one such region.
+Hi Roger,
 
-Sure, from a spec pov you're right. But where would runtime
-services code/data live when there's not a single region marked
-as needing a runtime mapping. IOW while the spec doesn't say
-so, assuming no runtime services when there's not at least one
-executable region with the runtime flag set could serve as a stop
-gap measure against flawed firmware.
+On 14/09/15 09:56, Roger Pau Monn? wrote:
+> El 07/09/15 a les 17.33, Julien Grall ha escrit:
+>> Hi all,
+>>
+>> ARM64 Linux is supporting both 4KB and 64KB page granularity. Although, Xen
+>> hypercall interface and PV protocol are always based on 4KB page granularity.
+>>
+>> Any attempt to boot a Linux guest with 64KB pages enabled will result to a
+>> guest crash.
+>>
+>> This series is a first attempt to allow those Linux running with the current
+>> hypercall interface and PV protocol.
+>>
+>> This solution has been chosen because we want to run Linux 64KB in released
+>> Xen ARM version or/and platform using an old version of Linux DOM0.
+>>
+>> There is room for improvement, such as support of 64KB grant, modification
+>> of PV protocol to support different page size... They will be explored in a
+>> separate patch series later.
+>>
+>> TODO list:
+>>     - Convert swiotlb to 64KB
+>>     - Convert xenfb to 64KB
+>>     - Support for multiple page ring support
+>>     - Support for 64KB in gnttdev
+>>     - Support of non-indirect grant with 64KB frontend
+>>     - It may be possible to move some common define between
+>>     netback/netfront and blkfront/blkback in an header
+>>
+>> I've got most of the patches for the TODO items. I'm planning to send them as
+>> a follow-up as it's not a requirement for a basic guests.
+>>
+>> All patches has been built tested for ARM32, ARM64, x86. But I haven't tested
+>> to run it on x86 as I don't have a box with Xen x86 running. I would be
+>> happy if someone give a try and see possible regression for x86.
+> 
+> Do you have figures regarding if/how much performance penalty do the
+> blkfront/blkback patches add to the traditional 4KB scenario (frontend
+> and backend running on guests using 4KB pages)?
 
-Jan
+Which benchmark do you advice? Although, I don't have SSD on this
+platform so it may be possible that the bottleneck will be the hard drive.
+
+> 
+> Since there's been no design document about this and the TODO list
+> doesn't contain it, I would like to know which plans do we have in order
+> to fix this properly.
+
+Can you explain what kind of design document you were expecting? The
+support of 64KB page granularity is pretty straight-forward and there is
+not many way to do it. We have to split the page in 4KB chunk to feed
+the ring.
+
+TBH, I'm expecting a small impact to the performance. It would be hard
+to get the exactly the same performance as today if we keep the helpers
+to avoid the backend dealing himself with the splitting and page
+granularity.
+
+Although, if the performance impact is not acceptable, it may be
+possible to optimize gnttab_foreach_grant_in_range by moving the
+function inline. The current way to the loop is the fastest I've found
+(I've wrote a small program to test different way) and we will need it
+when different of size will be supported.
+
+Regards,
+
+-- 
+Julien Grall
