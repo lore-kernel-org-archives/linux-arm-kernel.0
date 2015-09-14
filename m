@@ -1,49 +1,51 @@
-From: emilio.lopez@collabora.co.uk (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 14 Sep 2015 09:34:09 -0300
-Subject: [PATCH v2 3/3] ARM: dts: Enable EC vboot context support on Peach
- boards
-In-Reply-To: <1442234049-18637-1-git-send-email-emilio.lopez@collabora.co.uk>
-References: <1442234049-18637-1-git-send-email-emilio.lopez@collabora.co.uk>
-Message-ID: <1442234049-18637-4-git-send-email-emilio.lopez@collabora.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Sep 2015 14:36 +0200
+Subject: [PATCH v4] mtd: nand: sunxi: fix OOB handling in ->write_xxx()
+ functions
+In-Reply-To: <3809181.WuS0af6Yyz@wuerfel>
+References: <1442220063-7520-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150914114113.4aa7ea03@bbrezillon> <3809181.WuS0af6Yyz@wuerfel>
+Message-ID: <3052942.HDd39OoZnN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Peach boards use the EC to store the vboot context information,
-so add the corresponding properties on the EC node to indicate so.
+On Monday 14 September 2015 13:49:12 Arnd Bergmann wrote:
+> > > If all hardware can do 32-bit accesses here and the size is guaranteed to be a
+> > > multiple of four bytes, you can probably improve performance by using a
+> > > __raw_writel() loop there. Using __raw_writel() in general is almost always
+> > > a bug, but here it actually makes sense. See also the powerpc implementation
+> > > of _memcpy_toio().
+> > 
+> > AFAICT, buffer passed to ->write_bu() are not necessarily aligned on
+> > 32bits, so using writel here might require copying data in temporary
+> > buffers :-/.
+> > 
+> > Don't hesitate to point where I'm wrong ;-).
+> 
+> Brian or Dwmw2 should be able to know for sure. I think it's definitely
+> worth trying as the potential performance gains could be huge, if you
+> replace
+> 
+>         for (p = start; p < start + length; data++, p++) {
+>                 writeb(*data, p);
+>                 wmb();
+>         }
+> 
+> with
+> 
+>         for (p = start; p < start + length; data++, p+=4) {
+>                 writel(*data, p);
+>         };
+>         wmb();
+> 
 
-Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
----
+As Boris pointed out on IRC, we have an optimized version of
+memcpy_toio on little-endian, which already does this. I'm not completely
+sure why we don't use it for big-endian architectures as well.
 
-Changes from v1:
- - none
+Powerpc uses the same method on big-endian, but it's possible that
+it does not do the right thing on one of the older platforms using
+BE32 mode, or one that has a weird bus mode.
 
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 1 +
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 1 +
- 2 files changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 8f4d76c..ac02fb4 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -935,6 +935,7 @@
- 		pinctrl-0 = <&ec_spi_cs &ec_irq>;
- 		reg = <0>;
- 		spi-max-frequency = <3125000>;
-+		google,has-vbc-nvram;
+	Arnd
  
- 		controller-data {
- 			samsung,spi-feedback-delay = <1>;
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 7d5b386..b60dec0 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -898,6 +898,7 @@
- 		pinctrl-0 = <&ec_spi_cs &ec_irq>;
- 		reg = <0>;
- 		spi-max-frequency = <3125000>;
-+		google,has-vbc-nvram;
- 
- 		controller-data {
- 			samsung,spi-feedback-delay = <1>;
--- 
-2.1.4
