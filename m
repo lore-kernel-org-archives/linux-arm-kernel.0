@@ -1,46 +1,38 @@
-From: tanxiaojun@huawei.com (Tan Xiaojun)
-Date: Mon, 14 Sep 2015 10:23:30 +0800
-Subject: [PATCH] CMA: fix CONFIG_CMA_SIZE_MBYTES overflow in 64bit
-In-Reply-To: <1441599672-1360-1-git-send-email-tanxiaojun@huawei.com>
-References: <1441599672-1360-1-git-send-email-tanxiaojun@huawei.com>
-Message-ID: <55F62FA2.8000006@huawei.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Sun, 13 Sep 2015 19:31:32 -0700
+Subject: [PATCHv2 03/10] thermal: rockchip: allow compile test
+In-Reply-To: <1442197899-5952-1-git-send-email-edubezval@gmail.com>
+References: <1442197899-5952-1-git-send-email-edubezval@gmail.com>
+Message-ID: <1442197899-5952-4-git-send-email-edubezval@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, please review and give some suggestions.
+Adding COMPILE_TEST flag to rockchip driver to facilitate
+maintenance.
 
-Any suggestion by anyone is fine to me.
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: linux-pm at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
+---
+ drivers/thermal/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks
-Xiaojun
-
-On 2015/9/7 12:21, Tan Xiaojun wrote:
-> In 64bit system, if you set CONFIG_CMA_SIZE_MBYTES>=2048, it will
-> overflow and size_bytes will be a big wrong number.
-> 
-> Set CONFIG_CMA_SIZE_MBYTES=2048 and you will get an info below
-> during system boot:
-> 
-> *********
-> cma: Failed to reserve 17592186042368 MiB
-> *********
-> 
-> Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
-> ---
->  drivers/base/dma-contiguous.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> index 950fff9..426ba27 100644
-> --- a/drivers/base/dma-contiguous.c
-> +++ b/drivers/base/dma-contiguous.c
-> @@ -46,7 +46,7 @@ struct cma *dma_contiguous_default_area;
->   * Users, who want to set the size of global CMA area for their system
->   * should use cma= kernel parameter.
->   */
-> -static const phys_addr_t size_bytes = CMA_SIZE_MBYTES * SZ_1M;
-> +static const phys_addr_t size_bytes = (phys_addr_t)CMA_SIZE_MBYTES * SZ_1M;
->  static phys_addr_t size_cmdline = -1;
->  static phys_addr_t base_cmdline;
->  static phys_addr_t limit_cmdline;
-> 
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index 0334886..2e0aaee 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -190,7 +190,7 @@ config SPEAR_THERMAL
+ 
+ config ROCKCHIP_THERMAL
+ 	tristate "Rockchip thermal driver"
+-	depends on ARCH_ROCKCHIP
++	depends on ARCH_ROCKCHIP || COMPILE_TEST
+ 	depends on RESET_CONTROLLER
+ 	help
+ 	  Rockchip thermal driver provides support for Temperature sensor
+-- 
+2.5.0
