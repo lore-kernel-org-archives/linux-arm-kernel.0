@@ -1,38 +1,48 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Sep 2015 17:58:55 +0100
-Subject: [PATCH] arm64: head.S: initialise mdcr_el2 in el2_setup
-Message-ID: <1442249935-13277-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 14 Sep 2015 17:59:51 +0100
+Subject: [PATCH] arm64: cpu hotplug: ensure we mask out CPU_TASKS_FROZEN in
+ notifiers
+Message-ID: <1442249991-13345-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When entering the kernel at EL2, we fail to initialise the MDCR_EL2
-register which controls debug access and PMU capabilities at EL1.
+We have a couple of CPU hotplug notifiers for resetting the CPU debug
+state to a sane value when a CPU comes online.
 
-This patch ensures that the register is initialised so that all traps
-are disabled and all the PMU counters are available to the host. When a
-guest is scheduled, KVM takes care to configure trapping appropriately.
+This patch ensures that we mask out CPU_TASKS_FROZEN so that we don't
+miss any online events occuring due to suspend/resume.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/head.S | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/kernel/debug-monitors.c | 2 +-
+ arch/arm64/kernel/hw_breakpoint.c  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index a055be6125cf..90d09eddd5b2 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -523,6 +523,11 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
- 	msr	hstr_el2, xzr			// Disable CP15 traps to EL2
- #endif
- 
-+	/* EL2 debug */
-+	mrs	x0, pmcr_el0			// Disable debug access traps
-+	ubfx	x0, x0, #11, #5			// to EL2 and allow access to
-+	msr	mdcr_el2, x0			// all PMU counters from EL1
-+
- 	/* Stage-2 translation */
- 	msr	vttbr_el2, xzr
- 
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index 9b3b62ac9c24..cebf78661a55 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -134,7 +134,7 @@ static int os_lock_notify(struct notifier_block *self,
+ 				    unsigned long action, void *data)
+ {
+ 	int cpu = (unsigned long)data;
+-	if (action == CPU_ONLINE)
++	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE)
+ 		smp_call_function_single(cpu, clear_os_lock, NULL, 1);
+ 	return NOTIFY_OK;
+ }
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index 565244fd57ff..2926c3dd6479 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -878,7 +878,7 @@ static int hw_breakpoint_reset_notify(struct notifier_block *self,
+ 						void *hcpu)
+ {
+ 	int cpu = (long)hcpu;
+-	if (action == CPU_ONLINE)
++	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE)
+ 		smp_call_function_single(cpu, hw_breakpoint_reset, NULL, 1);
+ 	return NOTIFY_OK;
+ }
 -- 
 2.1.4
