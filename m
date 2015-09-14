@@ -1,68 +1,94 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 Sep 2015 14:14:48 +0100
-Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
-In-Reply-To: <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
-References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
- <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20150914131448.GC7002@leverpostej>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 14 Sep 2015 14:17:45 +0100
+Subject: [PATCH v2 2/3] drivers: firmware: psci: define more generic
+ PSCI_FN_NATIVE macro
+In-Reply-To: <1434638494-514-3-git-send-email-sudeep.holla@arm.com>
+References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
+ <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
+ <1434638494-514-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20150914131745.GA25469@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 02:00:14PM +0100, Punit Agrawal wrote:
-> The System Control Processor (SCP) provides access to SoC sensors via
-> the System Control and Power Interface (SCPI) Message Protocol. Add
-> bindings to allow probing of these sensors. Also support referencing
-> of the sensors for setting up thermal zones via the thermal DT
-> bindings.
+On Thu, Jun 18, 2015 at 03:41:33PM +0100, Sudeep Holla wrote:
+> This patch replaces the definition and usage of PSCI_0_2_FN_NATIVE with
+> the new and more generic macro PSCI_FN_NATIVE that can be used with any
+> version. This will be useful for the new features introduced in PSCIv1.0
+> and for any future revisions.
 > 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
 > Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
->  Documentation/devicetree/bindings/arm/arm,scpi.txt | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
+>  drivers/firmware/psci.c | 17 +++++++++--------
+>  1 file changed, 9 insertions(+), 8 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> index f002460..af66f7f 100644
-> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> @@ -72,8 +72,18 @@ Required sub-node properties:
->  - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
->  	       shared memory on Juno platforms
->  
-> +Sensor bindings for the sensors based on SCPI Message Protocol
-> +--------------------------------------------------------------
-> +SCPI provides an API to access the various sensors on the SoC.
-> +
-> +Required properties:
-> +- compatible : should be "arm,scpi-sensors".
-> +- #thermal-sensor-cells: should be set to 1. This property follows the
-> +			 thermal device tree bindings[2].
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index 68d0c2f6d004..752ca7c9eb97 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -29,13 +29,13 @@
+>  /*
+>   * While a 64-bit OS can make calls with SMC32 calling conventions, for some
+>   * calls it is necessary to use SMC64 to pass or return 64-bit values. For such
+> - * calls PSCI_0_2_FN_NATIVE(x) will choose the appropriate (native-width)
+> + * calls PSCI_FN_NATIVE(x) will choose the appropriate (native-width)
 
-You need to specify what the valid values for this cell are.
+Nit: Comment should be PSCI_FN_NATIVE(version, name), fixed it up in my
+branch.
 
-Mark.
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-> +
->  [0] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
->  [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +[2] Documentation/devicetree/bindings/thermal/thermal.txt
+>   * function ID.
+>   */
+>  #ifdef CONFIG_64BIT
+> -#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN64_##name
+> +#define PSCI_FN_NATIVE(version, name)	PSCI_##version##_FN64_##name
+>  #else
+> -#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN_##name
+> +#define PSCI_FN_NATIVE(version, name)	PSCI_##version##_FN_##name
+>  #endif
 >  
->  Example:
+>  /*
+> @@ -169,7 +169,7 @@ static int psci_migrate(unsigned long cpuid)
+>  static int psci_affinity_info(unsigned long target_affinity,
+>  		unsigned long lowest_affinity_level)
+>  {
+> -	return invoke_psci_fn(PSCI_0_2_FN_NATIVE(AFFINITY_INFO),
+> +	return invoke_psci_fn(PSCI_FN_NATIVE(0_2, AFFINITY_INFO),
+>  			      target_affinity, lowest_affinity_level, 0);
+>  }
 >  
-> @@ -122,6 +132,11 @@ scpi_protocol: scpi at 2e000000 {
->  			clock-output-names = "pxlclk0", "pxlclk1";
->  		};
->  	};
-> +
-> +	scpi_sensors0: sensors {
-> +		compatible = "arm,scpi-sensors";
-> +		#thermal-sensor-cells = <1>;
-> +	};
->  };
+> @@ -180,7 +180,7 @@ static int psci_migrate_info_type(void)
 >  
->  cpu at 0 {
+>  static unsigned long psci_migrate_info_up_cpu(void)
+>  {
+> -	return invoke_psci_fn(PSCI_0_2_FN_NATIVE(MIGRATE_INFO_UP_CPU),
+> +	return invoke_psci_fn(PSCI_FN_NATIVE(0_2, MIGRATE_INFO_UP_CPU),
+>  			      0, 0, 0);
+>  }
+>  
+> @@ -267,16 +267,17 @@ static void __init psci_init_migrate(void)
+>  static void __init psci_0_2_set_functions(void)
+>  {
+>  	pr_info("Using standard PSCI v0.2 function IDs\n");
+> -	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN_NATIVE(CPU_SUSPEND);
+> +	psci_function_id[PSCI_FN_CPU_SUSPEND] =
+> +					PSCI_FN_NATIVE(0_2, CPU_SUSPEND);
+>  	psci_ops.cpu_suspend = psci_cpu_suspend;
+>  
+>  	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+>  	psci_ops.cpu_off = psci_cpu_off;
+>  
+> -	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN_NATIVE(CPU_ON);
+> +	psci_function_id[PSCI_FN_CPU_ON] = PSCI_FN_NATIVE(0_2, CPU_ON);
+>  	psci_ops.cpu_on = psci_cpu_on;
+>  
+> -	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN_NATIVE(MIGRATE);
+> +	psci_function_id[PSCI_FN_MIGRATE] = PSCI_FN_NATIVE(0_2, MIGRATE);
+>  	psci_ops.migrate = psci_migrate;
+>  
+>  	psci_ops.affinity_info = psci_affinity_info;
 > -- 
-> 2.5.0
+> 1.9.1
 > 
