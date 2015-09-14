@@ -1,77 +1,50 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 14 Sep 2015 16:51:35 +0100
-Subject: [PATCH v2 7/8] arm/arm64: KVM: Rework the arch timer to use
- level-triggered semantics
-In-Reply-To: <1441395650-19663-8-git-send-email-christoffer.dall@linaro.org>
-References: <1441395650-19663-1-git-send-email-christoffer.dall@linaro.org>
- <1441395650-19663-8-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <55F6ED07.6070101@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 14 Sep 2015 17:55:26 +0200
+Subject: [PATCH 0/3] arm64: remove UEFI reserved regions from linear mapping
+Message-ID: <1442246129-13930-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+This is an alternative approach to the series I posted in November 2014:
+thread.gmane.org/gmane.linux.kernel.efi/5133
 
-just one small nit I stumbled upon:
+For arm64, we need to keep track of which parts of the physical memory space
+are backed by normal memory, since device mappings and memory mappings are
+mutually incompatible (device mappings don't allow unaligned accesses which
+may occur when parsing ACPI tables, for instance, and mapping devices as
+memory is also not allowed)
+ 
+Instead of adding a physmem memblock table that contains all of memory,
+including the memory that should not be covered by the linear mapping,
+this series introduces a MEMBLOCK_NOMAP attribute that allows us to
+carry the same information in the ordinary 'memory' memblock table.
 
-On 04/09/15 20:40, Christoffer Dall wrote:
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 9ed8d53..f4ea950 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1422,34 +1422,43 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->  /*
->   * Save the physical active state, and reset it to inactive.
->   *
-> - * Return 1 if HW interrupt went from active to inactive, and 0 otherwise.
-> + * Return true if there's a pending level triggered interrupt line to queue.
->   */
-> -static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
-> +static bool vgic_sync_hwirq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
->  {
->  	struct irq_phys_map *map;
-> +	bool phys_active;
->  	int ret;
->  
->  	if (!(vlr.state & LR_HW))
->  		return 0;
+Patch #1 introduces the attribute and the associated plumbing to interpret
+the attribute and to ensure MEMBLOCK_NOMAP regions are not considered for
+allocations.
 
-This should read "return false;" now.
+Patch #2 makes the arm64 core mapping code aware of MEMBLOCK_NOMAP, by
+honoring it when setting up the linear mapping, and by making pfn_valid()
+aware of it.
 
-Cheers,
-Andre.
+Patch #3 updates the UEFI memory map handling logic to mark reserved regions
+as MEMBLOCK_NOMAP.
 
->  
->  	map = vgic_irq_map_search(vcpu, vlr.irq);
-> -	BUG_ON(!map || !map->active);
-> +	BUG_ON(!map);
->  
->  	ret = irq_get_irqchip_state(map->irq,
->  				    IRQCHIP_STATE_ACTIVE,
-> -				    &map->active);
-> +				    &phys_active);
->  
->  	WARN_ON(ret);
->  
-> -	if (map->active) {
-> +	if (phys_active) {
-> +		/*
-> +		 * Interrupt still marked as active on the physical
-> +		 * distributor, so guest did not EOI it yet.  Reset to
-> +		 * non-active so that other VMs can see interrupts from this
-> +		 * device.
-> +		 */
->  		ret = irq_set_irqchip_state(map->irq,
->  					    IRQCHIP_STATE_ACTIVE,
->  					    false);
->  		WARN_ON(ret);
-> -		return 0;
-> +		return false;
->  	}
->  
-> -	return 1;
-> +	/* Mapped edge-triggered interrupts not yet supported. */
-> +	WARN_ON(vgic_irq_is_edge(vcpu, vlr.irq));
-> +	return process_level_irq(vcpu, lr, vlr);
->  }
->  
->  /* Sync back the VGIC state after a guest run */
+Notable about this series is that it does not require any changes to the
+iomem resource table handling or the definition of page_is_ram(), since
+the nomap regions are still registered as 'System RAM'.
+
+Ard Biesheuvel (3):
+  mm/memblock: add MEMBLOCK_NOMAP attribute to memblock memory table
+  arm64: only consider memblocks with NOMAP cleared for linear mapping
+  arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP
+
+ arch/arm64/kernel/efi.c  |  5 ++--
+ arch/arm64/mm/init.c     |  2 +-
+ arch/arm64/mm/mmu.c      |  2 ++
+ include/linux/memblock.h |  8 ++++++
+ mm/memblock.c            | 28 ++++++++++++++++++++
+ 5 files changed, 41 insertions(+), 4 deletions(-)
+
+-- 
+1.9.1
