@@ -1,98 +1,46 @@
-From: roger.pau@citrix.com (=?UTF-8?Q?Roger_Pau_Monn=c3=a9?=)
-Date: Mon, 14 Sep 2015 13:04:59 +0200
-Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
-In-Reply-To: <55F6A437.3040403@citrix.com>
-References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
- <55F68BC9.6020509@citrix.com> <55F6A437.3040403@citrix.com>
-Message-ID: <55F6A9DB.8040503@citrix.com>
+From: stsp@list.ru (Stas Sergeev)
+Date: Mon, 14 Sep 2015 14:06:13 +0300
+Subject: mvneta: SGMII fixed-link not so fixed
+In-Reply-To: <20150914103207.GH21084@n2100.arm.linux.org.uk>
+References: <20150914103207.GH21084@n2100.arm.linux.org.uk>
+Message-ID: <55F6AA25.2070603@list.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-El 14/09/15 a les 12.40, Julien Grall ha escrit:
-> Hi Roger,
-> 
-> On 14/09/15 09:56, Roger Pau Monn? wrote:
->> El 07/09/15 a les 17.33, Julien Grall ha escrit:
->>> Hi all,
->>>
->>> ARM64 Linux is supporting both 4KB and 64KB page granularity. Although, Xen
->>> hypercall interface and PV protocol are always based on 4KB page granularity.
->>>
->>> Any attempt to boot a Linux guest with 64KB pages enabled will result to a
->>> guest crash.
->>>
->>> This series is a first attempt to allow those Linux running with the current
->>> hypercall interface and PV protocol.
->>>
->>> This solution has been chosen because we want to run Linux 64KB in released
->>> Xen ARM version or/and platform using an old version of Linux DOM0.
->>>
->>> There is room for improvement, such as support of 64KB grant, modification
->>> of PV protocol to support different page size... They will be explored in a
->>> separate patch series later.
->>>
->>> TODO list:
->>>     - Convert swiotlb to 64KB
->>>     - Convert xenfb to 64KB
->>>     - Support for multiple page ring support
->>>     - Support for 64KB in gnttdev
->>>     - Support of non-indirect grant with 64KB frontend
->>>     - It may be possible to move some common define between
->>>     netback/netfront and blkfront/blkback in an header
->>>
->>> I've got most of the patches for the TODO items. I'm planning to send them as
->>> a follow-up as it's not a requirement for a basic guests.
->>>
->>> All patches has been built tested for ARM32, ARM64, x86. But I haven't tested
->>> to run it on x86 as I don't have a box with Xen x86 running. I would be
->>> happy if someone give a try and see possible regression for x86.
->>
->> Do you have figures regarding if/how much performance penalty do the
->> blkfront/blkback patches add to the traditional 4KB scenario (frontend
->> and backend running on guests using 4KB pages)?
-> 
-> Which benchmark do you advice? Although, I don't have SSD on this
-> platform so it may be possible that the bottleneck will be the hard drive.
-
-I've normally used a ramdisk in order to test performance, but it seems
-nullblk would be a better option (it wasn't available before) and it
-doesn't reduce the size of RAM available to the system:
-
-https://www.kernel.org/doc/Documentation/block/null_blk.txt
-
->>
->> Since there's been no design document about this and the TODO list
->> doesn't contain it, I would like to know which plans do we have in order
->> to fix this properly.
-> 
-> Can you explain what kind of design document you were expecting? The
-> support of 64KB page granularity is pretty straight-forward and there is
-> not many way to do it. We have to split the page in 4KB chunk to feed
-> the ring.
-
-I was thinking about adding support for 64KB grants with the aim of
-eventually removing the splitting done in xen-blkfront and the
-grant-table code in general.
-
-Some modifications would be needed in xen-blkback in order to support
-mapping 64KB grants, but this could also be used by x86 if we ever
-enable 2MB grants and allow them to be used in the block PV protocol,
-while the current code can only be used by ARM.
-
-> TBH, I'm expecting a small impact to the performance. It would be hard
-> to get the exactly the same performance as today if we keep the helpers
-> to avoid the backend dealing himself with the splitting and page
-> granularity.
-> 
-> Although, if the performance impact is not acceptable, it may be
-> possible to optimize gnttab_foreach_grant_in_range by moving the
-> function inline. The current way to the loop is the fastest I've found
-> (I've wrote a small program to test different way) and we will need it
-> when different of size will be supported.
-
-I don't expect the performance to drop massively with this patches
-applied, but it would be good to al least have an idea of the impact.
-
-Roger.
+14.09.2015 13:32, Russell King - ARM Linux ?????:
+> I've been bringing up the mainline kernel on a new board, which has
+> an Marvell SoC with a mvneta interface connected to a Marvell DSA
+> switch.  The DSA switch is a 88E6176.
+>
+> In the DT block for the interface, I specify:
+>
+> 	ethernet at ... {
+> 	        phy-mode = "sgmii";
+> 		status = "okay";
+>
+> 		fixed-link {
+> 			speed = <1000>;
+> 			full-duplex;
+> 		};
+> 	};
+>
+> However, this doesn't work without patching mvneta to disable the
+> autonegotiation and forcing the link up:
+>
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index 62e48bc0cb23..e1698731e429 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -1010,6 +1010,10 @@ static void mvneta_defaults_set(struct mvneta_port *pp)
+>   		val |= MVNETA_GMAC_INBAND_AN_ENABLE |
+>   		       MVNETA_GMAC_AN_SPEED_EN |
+>   		       MVNETA_GMAC_AN_DUPLEX_EN;
+> +		/* We appear to need the interface forced for DSA switches */
+> +		val &= ~(MVNETA_GMAC_AN_DUPLEX_EN |
+> +			 MVNETA_GMAC_AN_SPEED_EN);
+> +		val |= MVNETA_GMAC_FORCE_LINK_PASS;
+>   		mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG, val);
+>   		val = mvreg_read(pp, MVNETA_GMAC_CLOCK_DIVIDER);
+>   		val |= MVNETA_GMAC_1MS_CLOCK_ENABLE;
+Hello Russell, just to make sure, aren't you missing this by any chance:
+https://lkml.org/lkml/2015/7/20/710
