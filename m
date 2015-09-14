@@ -1,134 +1,81 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Mon, 14 Sep 2015 21:24:18 +0800
-Subject: [PATCH v2 00/22] KVM: ARM64: Add guest PMU support
-In-Reply-To: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <55F6CA82.9090607@linaro.org>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 14 Sep 2015 14:26:14 +0100
+Subject: [RFC PATCH v2 0/7] Pseudo-NMI for arm64 using ICC_PMR_EL1 (GICv3)
+Message-ID: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, I forgot the changlog. Below are the main changes of this v2 
-patchset.
+This patchset provides a pseudo-NMI for arm64 kernels by reimplementing
+the irqflags macros to modify the GIC PMR (the priority mask register is
+accessible as a system register on GICv3 and later) rather than the
+PSR. The patchset includes an implementation of
+arch_trigger_all_cpu_backtrace() for arm64 allowing the new code to be
+exercised.
 
-Changes since v1->v2:
-* Use switch...case for registers access handler instead of adding
-   alone handler for each register
-* Try to use the sys_regs to store the register value instead of adding
-   new variables in struct kvm_pmc
-* Fix the handle of cp15 regs
-* Create a new kvm device vPMU, then userspace could choose whether to
-   create PMU
-* Fix the handle of PMU overflow interrupt
+The code works-for-me (tm) and is much more "real" than the last time I
+shared these patches. However there remain a couple of limitations and
+caveats:
 
-On 2015/9/11 16:54, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
->
-> This patchset adds guest PMU support for KVM on ARM64. It takes
-> trap-and-emulate approach. When guest wants to monitor one event, it
-> will be trapped by KVM and KVM will call perf_event API to create a perf
-> event and call relevant perf_event APIs to get the count value of event.
->
-> Use perf to test this patchset in guest. When using "perf list", it
-> shows the list of the hardware events and hardware cache events perf
-> supports. Then use "perf stat -e EVENT" to monitor some event. For
-> example, use "perf stat -e cycles" to count cpu cycles and
-> "perf stat -e cache-misses" to count cache misses.
->
-> Below are the outputs of "perf stat -r 5 sleep 5" when running in host
-> and guest.
->
-> Host:
->   Performance counter stats for 'sleep 5' (5 runs):
->
->            0.551428      task-clock (msec)         #    0.000 CPUs utilized            ( +-  0.91% )
->                   1      context-switches          #    0.002 M/sec
->                   0      cpu-migrations            #    0.000 K/sec
->                  48      page-faults               #    0.088 M/sec                    ( +-  1.05% )
->             1150265      cycles                    #    2.086 GHz                      ( +-  0.92% )
->     <not supported>      stalled-cycles-frontend
->     <not supported>      stalled-cycles-backend
->              526398      instructions              #    0.46  insns per cycle          ( +-  0.89% )
->     <not supported>      branches
->                9485      branch-misses             #   17.201 M/sec                    ( +-  2.35% )
->
->         5.000831616 seconds time elapsed                                          ( +-  0.00% )
->
-> Guest:
->   Performance counter stats for 'sleep 5' (5 runs):
->
->            0.730868      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.13% )
->                   1      context-switches          #    0.001 M/sec
->                   0      cpu-migrations            #    0.000 K/sec
->                  48      page-faults               #    0.065 M/sec                    ( +-  0.42% )
->             1642982      cycles                    #    2.248 GHz                      ( +-  1.04% )
->     <not supported>      stalled-cycles-frontend
->     <not supported>      stalled-cycles-backend
->              637964      instructions              #    0.39  insns per cycle          ( +-  0.65% )
->     <not supported>      branches
->               10377      branch-misses             #   14.198 M/sec                    ( +-  1.09% )
->
->         5.001289068 seconds time elapsed                                          ( +-  0.00% )
->
-> This patchset can be fetched from [1] and the relevant QEMU version for
-> test can be fetched from [2].
->
-> Thanks,
-> Shannon
->
-> [1] https://git.linaro.org/people/shannon.zhao/linux-mainline.git  KVM_ARM64_PMU_v2
-> [2] https://git.linaro.org/people/shannon.zhao/qemu.git  PMU_v2
->
-> Shannon Zhao (22):
->    ARM64: Move PMU register related defines to asm/pmu.h
->    KVM: ARM64: Define PMU data structure for each vcpu
->    KVM: ARM64: Add offset defines for PMU registers
->    KVM: ARM64: Add reset and access handlers for PMCR_EL0 register
->    KVM: ARM64: Add a helper for CP15 registers reset to UNKNOWN
->    KVM: ARM64: Add reset and access handlers for PMSELR register
->    KVM: ARM64: Add reset and access handlers for PMCEID0 and PMCEID1
->      register
->    KVM: ARM64: PMU: Add perf event map and introduce perf event creating
->      function
->    KVM: ARM64: Add reset and access handlers for PMXEVTYPER register
->    KVM: ARM64: Add reset and access handlers for PMXEVCNTR register
->    KVM: ARM64: Add reset and access handlers for PMCCNTR register
->    KVM: ARM64: Add reset and access handlers for PMCNTENSET and
->      PMCNTENCLR register
->    KVM: ARM64: Add reset and access handlers for PMINTENSET and
->      PMINTENCLR register
->    KVM: ARM64: Add reset and access handlers for PMOVSSET and PMOVSCLR
->      register
->    KVM: ARM64: Add a helper for CP15 registers reset to specified value
->    KVM: ARM64: Add reset and access handlers for PMUSERENR register
->    KVM: ARM64: Add reset and access handlers for PMSWINC register
->    KVM: ARM64: Add access handlers for PMEVCNTRn and PMEVTYPERn register
->    KVM: ARM64: Add PMU overflow interrupt routing
->    KVM: ARM64: Reset PMU state when resetting vcpu
->    KVM: ARM64: Free perf event of PMU when destroying vcpu
->    KVM: ARM64: Add a new kvm ARM PMU device
->
->   Documentation/virtual/kvm/devices/arm-pmu.txt |  15 +
->   arch/arm/kvm/arm.c                            |   4 +
->   arch/arm64/include/asm/kvm_asm.h              |  59 ++-
->   arch/arm64/include/asm/kvm_host.h             |   2 +
->   arch/arm64/include/asm/pmu.h                  |  49 +++
->   arch/arm64/include/uapi/asm/kvm.h             |   3 +
->   arch/arm64/kernel/perf_event.c                |  35 --
->   arch/arm64/kvm/Kconfig                        |   8 +
->   arch/arm64/kvm/Makefile                       |   1 +
->   arch/arm64/kvm/reset.c                        |   3 +
->   arch/arm64/kvm/sys_regs.c                     | 490 +++++++++++++++++++++++--
->   arch/arm64/kvm/sys_regs.h                     |  16 +
->   include/kvm/arm_pmu.h                         |  66 ++++
->   include/linux/kvm_host.h                      |   1 +
->   include/uapi/linux/kvm.h                      |   2 +
->   virt/kvm/arm/pmu.c                            | 500 ++++++++++++++++++++++++++
->   virt/kvm/kvm_main.c                           |   4 +
->   17 files changed, 1188 insertions(+), 70 deletions(-)
->   create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
->   create mode 100644 include/kvm/arm_pmu.h
->   create mode 100644 virt/kvm/arm/pmu.c
->
+ 1. Requires GICv3+ hardware to be effective. The alternatives runtime
+    patching system is employed so systems with earlier GIC architectures
+    are still bootable but will not benefit from NMI simulation.
 
--- 
-Shannon
+ 2. Currently hardcoded to use ICC_PMR_EL1. Extra work might be needed
+    on the alternatives system so we can peacefully coexist with ARMv8.1
+    KVM support (when kernel will be running at EL2).
+
+ 3. FVP needs a bit of hacking to be able to run <SysRq-L> from an ISR.
+    That's a shame because <SysRq-L> is a great way to observe an NMI
+    preempting an IRQ handler. Testers are welcome to ping me offline
+    and I can share the hacks (and DTs) I have been using to test with.
+
+ 4. Testing for non regression on a GICv2 system will require this patch
+    to avoid crashes during <SysRq-L>:
+    http://article.gmane.org/gmane.linux.kernel/2037558
+
+v2:
+
+ * Removed the isb instructions. The PMR is self-synchronizing so
+   these are not needed (Dave Martin)
+
+ * Use alternative runtime patching to allow the same kernel binary
+   to boot systems with and without GICv3+ (Dave Martin).
+
+ * Added code to properly distinguish between NMI and normal IRQ and to
+   call into NMI handling code where needed.
+
+ * Replaced the IPI backtrace logic with a newer version (from Russell
+   King).
+
+
+Daniel Thompson (7):
+  irqchip: gic-v3: Reset BPR during initialization
+  arm64: Add support for on-demand backtrace of other CPUs
+  arm64: alternative: Apply alternatives early in boot process
+  arm64: irqflags: Reorder the fiq & async macros
+  arm64: irqflags: Use ICC sysregs to implement IRQ masking
+  arm64: Implement IPI_CPU_BACKTRACE using pseudo-NMIs
+  arm64: irqflags: Automatically identify I bit mis-management
+
+ arch/arm64/Kconfig                   |  15 ++++
+ arch/arm64/include/asm/alternative.h |   1 +
+ arch/arm64/include/asm/assembler.h   |  56 ++++++++++++-
+ arch/arm64/include/asm/hardirq.h     |   2 +-
+ arch/arm64/include/asm/irq.h         |   3 +
+ arch/arm64/include/asm/irqflags.h    | 154 +++++++++++++++++++++++++++++++++--
+ arch/arm64/include/asm/ptrace.h      |  18 ++++
+ arch/arm64/include/asm/smp.h         |   2 +
+ arch/arm64/kernel/alternative.c      |  15 ++++
+ arch/arm64/kernel/entry.S            | 149 +++++++++++++++++++++++++++------
+ arch/arm64/kernel/head.S             |  35 ++++++++
+ arch/arm64/kernel/setup.c            |  13 +++
+ arch/arm64/kernel/smp.c              |  44 ++++++++++
+ arch/arm64/mm/proc.S                 |  23 ++++++
+ drivers/irqchip/irq-gic-v3.c         | 117 +++++++++++++++++++++++++-
+ include/linux/irqchip/arm-gic-v3.h   |  10 +++
+ include/linux/irqchip/arm-gic.h      |   2 +-
+ lib/nmi_backtrace.c                  |   8 +-
+ 18 files changed, 629 insertions(+), 38 deletions(-)
+
+--
+2.4.3
