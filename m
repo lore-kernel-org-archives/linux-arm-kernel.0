@@ -1,43 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Sep 2015 10:26:25 -0700
-Subject: [PATCH 1/2] ARM: dts: am335x-phycore-som: Fix mpu voltage
-In-Reply-To: <1441281607-35457-1-git-send-email-t.remmet@phytec.de>
-References: <1441281607-35457-1-git-send-email-t.remmet@phytec.de>
-Message-ID: <20150914172625.GR4215@atomide.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 14 Sep 2015 10:29:15 -0700
+Subject: [PATCH 6/7] ARM: brcmstb: mask GIC IRQs on suspend
+In-Reply-To: <55F482BC.4050202@gmail.com>
+References: <1434672696-13632-1-git-send-email-computersforpeace@gmail.com>
+ <1434672696-13632-7-git-send-email-computersforpeace@gmail.com>
+ <55F482BC.4050202@gmail.com>
+Message-ID: <20150914172915.GN11487@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Teresa Remmet <t.remmet@phytec.de> [150903 05:03]:
-> Fix the mpu voltage as it is set to low for the silicon
-> revision 2.1.
+On Sat, Sep 12, 2015 at 12:53:32PM -0700, Florian Fainelli wrote:
+> Le 06/18/15 17:11, Brian Norris a ?crit :
+> > Lazily-masked IRQs can cause system suspend problems (e.g., spurious
+> > wakeups from WFI), so we need to be sure non-wakeup GIC interrupts get
+> > masked, not just disabled, during system suspend.
+> > 
+> > Signed-off-by: Brian Norris <computersforpeace@gmail.com>
 > 
-> Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
+> Dropped this patch, no longer needed as of 4.3-rc0 with
 
-Applying this one into omap-for-v4.3/fixes thanks.
+Ooh, rc0! I didn't know we started doing sane numbering :)
 
-Tony
+> aec89ef72ba6c94420f599dcb684ed66937cdacf ("irqchip/gic: Enable
+> SKIP_SET_WAKE and MASK_ON_SUSPEND")
 
-> ---
->  arch/arm/boot/dts/am335x-phycore-som.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-> index 4d28fc3..5dd084f 100644
-> --- a/arch/arm/boot/dts/am335x-phycore-som.dtsi
-> +++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-> @@ -252,10 +252,10 @@
->  		};
->  
->  		vdd1_reg: regulator at 2 {
-> -			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
-> +			/* VDD_MPU voltage limits 0.95V - 1.325V with +/-4% tolerance */
->  			regulator-name = "vdd_mpu";
->  			regulator-min-microvolt = <912500>;
-> -			regulator-max-microvolt = <1312500>;
-> +			regulator-max-microvolt = <1378000>;
->  			regulator-boot-on;
->  			regulator-always-on;
->  		};
-> -- 
-> 1.9.1
-> 
+Nice! I was wanting this done for a while, but I believe this approach
+was rejected a few times before. Glad Sudeep dug to the bottom of the
+issue to argue *why* that's the right thing to do.
+
+Brian
