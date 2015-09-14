@@ -1,181 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Sep 2015 13:12:48 +0100
-Subject: mysterious crashes on OMAP5 uevm
-In-Reply-To: <20150911140306.GB21098@n2100.arm.linux.org.uk>
-References: <CANOLnOO3NdK1r1jZQtS=TcHEE7SQwhGHh0YsqqoCJpFW3NO05Q@mail.gmail.com>
- <20150908143810.GD4215@atomide.com>
- <CANOLnOODjTaBcL1QzAm7o4YOB=_P-s7JYovu6fhNSqJSV2Bq+Q@mail.gmail.com>
- <20150908210708.GH4215@atomide.com>
- <E0068B56-0DEE-4E2F-94CF-DB104AE16D63@goldelico.com>
- <20150910083026.GA21098@n2100.arm.linux.org.uk>
- <CANOLnOM-PYcAL=f4rgucfdWZ1+U3HkP34bfwrKP4Rob+J6iTfw@mail.gmail.com>
- <20150911140306.GB21098@n2100.arm.linux.org.uk>
-Message-ID: <20150914121248.GD21098@n2100.arm.linux.org.uk>
+From: daniel.kiper@oracle.com (Daniel Kiper)
+Date: Mon, 14 Sep 2015 14:19:36 +0200
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <20150914092518.GA10307@leverpostej>
+References: <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
+ <20150910121514.GE29293@leverpostej>
+ <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
+ <20150910144938.GI29293@leverpostej>
+ <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
+ <20150910162302.GN29293@leverpostej>
+ <20150911124643.GB4530@olila.local.net-space.pl>
+ <20150911162559.GA8726@leverpostej>
+ <20150912113655.GG4530@olila.local.net-space.pl>
+ <20150914092518.GA10307@leverpostej>
+Message-ID: <20150914121936.GH4530@olila.local.net-space.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 03:03:07PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Sep 11, 2015 at 03:27:13PM +0200, Grazvydas Ignotas wrote:
-> > On Thu, Sep 10, 2015 at 10:30 AM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > On Thu, Sep 10, 2015 at 08:42:57AM +0200, Dr. H. Nikolaus Schaller wrote:
-> > >> ...
-> > >>
-> > >> Now, disabling CONFIG_ARCH_MULTI_V6 also makes the bug go away and adding the
-> > >> >> #if 0 //__LINUX_ARM_ARCH__ >= 7
-> > >> makes it re-appear.
-> > >>
-> > >> A while ago I tried to debug running the x-server under strace and could find that it also has
-> > >> something to do with SIGALRM.
-> > >>
-> > >> And that is very consistent with ?enable/disable? by modifying arch/arm/kernel/signal.c
+On Mon, Sep 14, 2015 at 10:25:19AM +0100, Mark Rutland wrote:
+> On Sat, Sep 12, 2015 at 12:36:55PM +0100, Daniel Kiper wrote:
+> > On Fri, Sep 11, 2015 at 05:25:59PM +0100, Mark Rutland wrote:
+> > > On Fri, Sep 11, 2015 at 01:46:43PM +0100, Daniel Kiper wrote:
+> > > > On Thu, Sep 10, 2015 at 05:23:02PM +0100, Mark Rutland wrote:
+> >
+> > [...]
+> >
+> > > > > What's troublesome with the boot services?
+> > > > >
+> > > > > What can't be simulated?
+> > > >
+> > > > How do you want to access bare metal EFI boot services from dom0 if they
+> > > > were shutdown long time ago before loading dom0 image?
 > > >
-> > > It would be really nice if someone could diagnose what's going on here.
-> > > What exception is causing the X server to be killed (someone said a
-> > > segfault)?  What is the register state at the point that happens?  What
-> > > does the code look like  Is it happening inside the SIGALRM handler, or
-> > > when the SIGALRM handler has returned?
+> > > I don't want to.
 > > >
-> > > I'd suggest attaching gdb to the X server, but remember to set gdb to
-> > > ignore SIGPIPEs.
-> > 
-> > It's actually pretty random, see some debug sessions in [1].
-> > The first one is the most useful one, but I haven't though of checking
-> > what pixman_rasterize_edges() was doing when the signal arrived, and
-> > most often the "less useful" segfaults occur. However from the
-> > disassembly (see debug1_libpixman.gz) it can be seen that the signal
-> > arrived right after IT.
-> > 
-> > [1] http://notaz.gp2x.de/tmp/thumb_segfault/
-> 
-> We're not going from ARM -> Thumb or Thumb -> ARM here, but Thumb code
-> in libpixman is being interrupted calling a Thumb signal handler.
-> 
-> Working through the code:
-> 
->    0x7f717ec8 <SmartScheduleTimer>:     ldr     r2, [pc, #20]   ; = 0x0004112e
->    0x7f717eca <SmartScheduleTimer+2>:   ldr     r1, [pc, #24]   ; = 0x00000c48
->    0x7f717ecc <SmartScheduleTimer+4>:   ldr     r3, [pc, #24]   ; = 0x00000e6c
->    0x7f717ece <SmartScheduleTimer+6>:   add     r2, pc
->    0x7f717ed0 <SmartScheduleTimer+8>:   ldr     r1, [r2, r1]
->    0x7f717ed2 <SmartScheduleTimer+10>:  ldr     r3, [r2, r3]
-> => 0x7f717ed4 <SmartScheduleTimer+12>:  ldr     r2, [r1, #0]
-> 
-> The instruction at 0x7f717ed4 was trying to access 0xd1242963 which
-> is in kernel space, and this is the faulting instruction.
-> 
-> At this point, r2 should contain 0x0004112e plus the PC value.  r2 in
-> the register dump was 0x7f717fa0.  Let's calculate the value that PC
-> should be here.  0x7f717fa0 - 0x0004112e = 0x7f6d6e72, which is
-> clearly wrong.
-> 
-> So, I don't think the first instruction here was executed by the CPU.
-> 
-> gdb indicates that the parent context to the signal frame, pc was at
-> 0xb6dd87f8, which works out at 0x297f8 into the libpixman-1 library:
-> 
->    297f0:       449c            add     ip, r3
->    297f2:       f1bc 0fff       cmp.w   ip, #255        ; 0xff
->    297f6:       bfd4            ite     le
->    297f8:       fa5f fc8c       uxtble.w        ip, ip
->    297fc:       f04f 0cff       movgt.w ip, #255        ; 0xff
->    29800:       f88a c000       strb.w  ip, [sl]
-> 
-> and as you say, is just after an IT instruction, which would have
-> set the IT execution state to appropriately skip either the first or
-> the second instruction.
-> 
-> Unfortunately, the IT instruction's condition is being carried forward
-> to the signal handler, causing either the first or second instruction
-> there to be skipped.
-> 
-> Looking back at the history, the original commit introducing the
-> clearing of the PSR_IT_MASK bits is just wrong:
-> 
-> -               if (thumb)
-> +               if (thumb) {
->                         cpsr |= PSR_T_BIT;
-> -               else
-> +#if __LINUX_ARM_ARCH__ >= 7
-> +                       /* clear the If-Then Thumb-2 execution state */
-> +                       cpsr &= ~PSR_IT_MASK;
-> +#endif
-> +               } else
->                         cpsr &= ~PSR_T_BIT;
-> 
-> This shouldn't be a compile-time decision at all, and it certainly should
-> not be dependent on __LINUX_ARM_ARCH__, which marks the _lowest_ supported
-> architecture.
-> 
-> However, even the idea that it's ARMv7 or later is wrong.  According to
-> the ARM ARM, the IT instruction is present in ARMv6T2 as well, which
-> means it's ARMv6 too (which would have __LINUX_ARM_ARCH__ = 6).
-> 
-> Looking at the ARM ARM, these bits are "reserved" in previous non-T2
-> architectures, have an undefined value at reset, and are probably zero
-> anyway.
-> 
-> Merely changing __LINUX_ARM_ARCH__ >= 7 to >= 6 should fix the problem,
-> and I doubt there's any ARMv6 non-T2 systems out there that would be
-> affected by clearing the IT state bits.
+> > > I asked "What can't be simulated?" because I assumed everything
+> > > necessary/mandatory could be simulated without needinng access to any
+> > > real EFI boot services.
+> > >
+> > > As far as I can see all that's necessary is to provide a compatible
+> > > interface.
+> >
+> > Could you be more precise what do you need? Please enumerate. UEFI spec has
+> > more than 2500 pages and I do not think that we need all stuff in dom0.
+> >
+> > > > What do you need from EFI boot services in dom0?
+> > >
+> > > The ability to call ExitBootServices() and SetVirtualAddressMap() on a
+> > > _virtual_ address map for _virtual_ services provided by the hypervisor.
+> >
+> > I am confused. Why do you need that? Please remember, EFI is owned and
+> > operated by Xen hypervisor. dom0 does not have direct access to EFI.
+>
+> Let's take a step back.
+>
+> My objection here is to passing the Dom0 kernel properties as if it were
+> booted with direct access to a full UEFI, then later fixing that up
+> (when Xen is detected and we apply its hypercall EFI implementation).
+>
+> If the kernel cannot use EFI natively, why pretend to the kernel that it
+> can? The hypercall implementation is _not_ EFI (though it provides
+> access to some services).
+>
+> The two ways I can see providing Dom0 with EFI services are:
+>
+> * Have Xen create shims for any services, in which any hypercalls live,
+>   and pass these to the kernel with a virtual system table. This keeps
+>   the interface to the kernel the same regardless of Xen.
+>
+> * Have the kernel detect Xen EFI capability via Xen, without passing the
+>   usual native EFI parameters. This can then be installed into the
+>   kernel in a Xen-specific manner, and we know from the outset that
+>   Xen-specific caveats apply.
 
-Please test the following patch:
+It works on x86 in that way and I suppose that it can work in that way on ARM too.
+So, just go and reuse existing code. That is all.
 
-8<===
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-Subject: [PATCH] ARM: fix Thumb2 signal handling when ARMv6 is enabled
-
-When a kernel is built covering ARMv6 to ARMv7, we omit to clear the
-IT state when entering a signal handler.  This can cause the first
-few instructions to be conditionally executed depending on the parent
-context.
-
-In any case, the original test for >= ARMv7 is broken - ARMv6 can have
-Thumb-2 support as well, and an ARMv6T2 specific build would omit this
-code too.
-
-Relax the test back to ARMv6 or greater.  This results in us always
-clearing the IT state bits in the PSR, even on CPUs where these bits
-are reserved.  However, they're reserved for the IT state, so this
-should cause no harm.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/kernel/signal.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index b6cda06b455f..b43b4d360bab 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -343,12 +343,17 @@ setup_return(struct pt_regs *regs, struct ksignal *ksig,
- 		 */
- 		thumb = handler & 1;
- 
--#if __LINUX_ARM_ARCH__ >= 7
-+#if __LINUX_ARM_ARCH__ >= 6
- 		/*
--		 * Clear the If-Then Thumb-2 execution state
--		 * ARM spec requires this to be all 000s in ARM mode
--		 * Snapdragon S4/Krait misbehaves on a Thumb=>ARM
--		 * signal transition without this.
-+		 * Clear the If-Then Thumb-2 execution state.  ARM spec
-+		 * requires this to be all 000s in ARM mode.  Snapdragon
-+		 * S4/Krait misbehaves on a Thumb=>ARM signal transition
-+		 * without this.
-+		 *
-+		 * We must do this whenever we are running on a Thumb-2
-+		 * capable CPU, which includes ARMv6T2.  However, we elect
-+		 * to do this whenever we're on an ARMv6 or later CPU for
-+		 * simplicity.
- 		 */
- 		cpsr &= ~PSR_IT_MASK;
- #endif
--- 
-2.1.0
-
-
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Daniel
