@@ -1,90 +1,120 @@
-From: binmlist@gmail.com (Bin Liu)
-Date: Mon, 14 Sep 2015 09:44:41 -0500
-Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
- host-only mode
-In-Reply-To: <55F1CE2E.7010409@redhat.com>
-References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
- <55C31963.2010701@schinagl.nl> <55C3709C.4080609@redhat.com>
- <55C47041.3000603@schinagl.nl> <55E93D8C.9020804@schinagl.nl>
- <55F1CA9B.3070204@redhat.com> <20150910183017.GN9885@lukather>
- <55F1CE2E.7010409@redhat.com>
-Message-ID: <CADYTM3Z89oa3akqFaaY4BqJrQ4j+scQawRK0xRkthQde=OQ5tg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Sep 2015 16:47 +0200
+Subject: [PATCH 2/2] Documentation: gpio: Update description for X-Gene
+ standby GPIO controller DTS binding
+In-Reply-To: <CAL4ahLfRdfC=nReqqic=1vahgtD3-E_ncqnNhHsGw04P_HjvVA@mail.gmail.com>
+References: <1441963332-13329-1-git-send-email-yvo@apm.com>
+ <2971356.lYN9OVO6Id@wuerfel>
+ <CAL4ahLfRdfC=nReqqic=1vahgtD3-E_ncqnNhHsGw04P_HjvVA@mail.gmail.com>
+Message-ID: <2516438.vcQPNoorc9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday 14 September 2015 16:39:43 Y Vo wrote:
+> On Mon, Sep 14, 2015 at 4:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Saturday 12 September 2015 12:55:55 Y Vo wrote:
+> >> On Fri, Sep 11, 2015 at 11:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > On Friday 11 September 2015 22:06:58 Y Vo wrote:
+> >>
+> >> Example for configure GPIO_DS13 as interrupt and use as button with
+> >> the current gpio driver:
+> >>         gpio-keys {
+> >>                 compatible = "gpio-keys";
+> >>                 button at 1 {
+> >>                         label = "POWER";
+> >>                         linux,code = <116>;
+> >>                         linux,input-type = <0x1>;
+> >>                         interrupts = <0x0 0x2d 0x1>;
+> >>                 };
+> >>         };
+> >
+> > Wait, this looks wrong: the gpio driver doesn't actually see
+> > the connection here and won't be able to configure the interrupt
+> > correctly. The interrupt is already owned by the gpio driver, so
+> > you cannot use it in the button node.
+> 
+> In summary:
+> - Our GPIO doesn't support interrupt controller.
+> - There are 6 pins which used the external interrupt from GIC, so all
+> setup for those irqs are from gic driver. The GPIO driver only
+> configure to wire those lines.
+> 
+> For your concern:
+> - That's correct: if we use that defined, the gpio driver never saw
+> the connection here (That's why it already is configued at the
+> beginning).
+> - At the first time, we tried to use the define: <&sbgpio 13 1>, it
+> means using the GPIO_DS13, it will go into the GPIO driver to setup,
+> but there is another problem which I have sent out to all of you:
+> + It will go into gpio_keys_setup_key (gpio_keys.c driver) function,
+> then set the irqflags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+> but the gic only support IRQ_TYPE_LEVEL_HIGH && IRQF_TRIGGER_RISING,
+> so it always returns failed at gpio_keys_setup_key function. Please
+> see the gic_set_type at gic driver.
 
-On Thu, Sep 10, 2015 at 1:38 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 10-09-15 20:30, Maxime Ripard wrote:
->>
->> On Thu, Sep 10, 2015 at 08:23:23PM +0200, Hans de Goede wrote:
->>>
->>> Hi,
->>>
->>> On 04-09-15 08:43, Olliver Schinagl wrote:
->>>>
->>>> Hey Hans,
->>>>
->>>> On 07-08-15 10:45, Olliver Schinagl wrote:
->>>>>
->>>>> <snip>
->>>>>>
->>>>>> If you change the dr_mode to host then you _must_ also remove any
->>>>>> id_det and vbus_det
->>>>>> gpio settings from the usb_phy node in the dts, as the sun4i phy code
->>>>>> detects
->>>>>> host vs otg mode by checking for the presence of these.
->>>>>
->>>>> Yes, this fixes it and makes it work. Thanks.
->>>>>
->>>> I've been going back to this and am wondering if this is something I can
->>>> look into to fix properly? E.g. if the dts sets dr_mode = host, can we
->>>> simply ignore the pins and treat them as unset?
->>>
->>>
->>> AFAIK you cannot unset something in dts. The only solution I
->>> can comeup with is to add a dr_mode argument to the phy like
->>> we already have for the otg controller itself.
->>>
->>> This is something which we likely need to do anyways to add
->>> support for peripheral only mode, which we seem to need for
->>> some "hdmi sticks".
->>
->>
->> I haven't really followed the rest of the discussion, so sorry if you
->> already talked about that, but why can't you just set the dr_mode to
->> peripheral in such a case?
->
->
-> This is about the usbphy code not the musb-controller code, which are
-> 2 different dts nodes, atm only the musb-controller node has a
-> dr_mode property, and the phy code decides between host-only
-> and otg mode based on whether an id pin is assigned or not.
->
-> My proposal is to get rid of the id-pin hack to determine the mode
-> and add a dr_mode property to the usbphy dts node.
+Hmm, I see now how the event handling in the gpio-keys driver differs
+between irq mode and gpio mode, where gpio mode relies on getting
+a separate event for the release. This is certainly something that
+could be changed in the gpio-keys driver as an extension, but that
+seems to be what Laxman Dewangan did when he introduced the irq-mode.
 
-I would try to avoid adding dr_mode in the usbphy node if possible,
-since it is already specified in the controller node.
+> static int gic_set_type(struct irq_data *d, unsigned int type)
+> {
+>         void __iomem *base = gic_dist_base(d);
+>         unsigned int gicirq = gic_irq(d);
+> 
+>         /* Interrupt configuration for SGIs can't be changed */
+>         if (gicirq < 16)
+>                 return -EINVAL;
+> 
+>         /* SPIs have restrictions on the supported types */
+>         if (gicirq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
+>                             type != IRQ_TYPE_EDGE_RISING)
+>                 return -EINVAL;
+> 
+>         return gic_configure_irq(gicirq, type, base, NULL);
+> }
+> + Another issue: in order gpio_key works it needs the status of GPIO.
+> For our chip, when the GPIO is configued as interrupt, we need to
+> access to GIC register to read the real status, it is not acceptable
+> to implement accessing GIC registers at gpio driver. The function
+> irq_get_irqchip_state(..) also doesn't work in our chip too. Because
+> it needs to access different offset.
 
-Since the phy node is referenced in the controller node, is it
-possible that the phy driver looks up the controller of properties to
-find its dr_mode setting?
+I thought we had solved that problem long ago when you first
+submitted the driver.
 
-I am currently doing the same thing for musb_dsps.
-Experienmenting...since I don't much about dts handling yet.
+Did 1b7047edfcfb25 ("genirq: Allow the irqchip state of an IRQ to be
+save/restored") not address the problem for you? You were on
+Cc to that patch and should have spoken up when the code that was
+merged was not sufficient.
 
-Regards,
--Bin.
+> >> > It also seems to me that the binding cannot distinguish between a
+> >> > line configured as an input and one that is configured as an
+> >> > interrupt, which are for other gpio chips the same thing, but
+> >> > not on this one.  Could this be rectified by using another bit
+> >> > of the second gpio cell? The low bit is used for active-high/active-low,
+> >> > so you could use the second bit for irq/input.
+> >> >
+> >> Do you mean #gpio-cells property and using the high bit of the second
+> >> bit for irq/input  ?
+> >
+> > Yes, that would be an option.
+> I will look into it.
+> 
+> Is there possible if:
+> - Keep GPIO8..GPIO as interrupt by default.
+> - Anyone want to use these GPIO pins as GPIO, we will re-configure
+> them to GPIO mode ?
 
->
->
-> Regards,
->
-> Hans
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+That's not perfect but better than the patch you sent here.
+The main disadvantage is that you end up with two references
+to the same IRQ. It can still work, but only as long as nothing
+tries to walk the entire DT to parse all the interrupts properties.
+
+It would be ok for gpio-keys, as that does not need both the state
+and the event together, but for other gpio users, you still need a
+working driver that supports reading the state and getting an
+interrupt.
+
+	Arnd
