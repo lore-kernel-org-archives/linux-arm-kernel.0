@@ -1,121 +1,85 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 14 Sep 2015 14:26:21 +0100
-Subject: [RFC PATCH v2 7/7] arm64: irqflags: Automatically identify I bit
- mis-management
-In-Reply-To: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
-References: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1442237181-17064-8-git-send-email-daniel.thompson@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Sep 2015 15:30:22 +0200
+Subject: [PATCH v6 1/3] can: Allwinner A10/A20 CAN Controller support -
+ Devicetree bindings
+In-Reply-To: <55F6C46D.7090203@pengutronix.de>
+References: <1442235299-5885-1-git-send-email-info@gerhard-bertelsmann.de>
+ <1442235299-5885-2-git-send-email-info@gerhard-bertelsmann.de>
+ <55F6C46D.7090203@pengutronix.de>
+Message-ID: <20150914133022.GB4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is self-test code to identify circumstances where the I bit is
-set by hardware but no software exists to copy its state to the PMR.
+Hi,
 
-I don't really expect this patch to be retained much after the RFC stage.
-However I have included it in this RFC series to document the testing I
-have done and to allow further testing under different workloads.
+On Mon, Sep 14, 2015 at 02:58:21PM +0200, Marc Kleine-Budde wrote:
+> On 09/14/2015 02:54 PM, Gerhard Bertelsmann wrote:
+> > Signed-off-by: Gerhard Bertelsmann <info@gerhard-bertelsmann.de>
+> > ---
+> > 
+> >  .../devicetree/bindings/net/can/sun4i_can.txt      |  37 +
+> >  1 files changed, 37 insertions(+)
+> > 
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/can/sun4i_can.txt b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
+> > new file mode 100644
+> > index 0000000..b572e2b
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
+> > @@ -0,0 +1,37 @@
+> > +Allwinner A10/A20 CAN controller Device Tree Bindings
+> > +-----------------------------------------------------
+> > +
+> > +Required properties:
+> > +- compatible: "allwinner,sunxican"
+> > +- reg: physical base address and size of the Allwinner A10/A20 CAN register map.
+> > +- interrupts: interrupt specifier for the sole interrupt.
+> > +- clock: phandle and clock specifier.
+> > +
+> > +Example
+> > +-------
+> > +
+> > +SoC common .dtsi file:
+> > +
+> > +	can0_pins_a: can0 <at> 0 {
+> 
+> That's supposed to be a proper "@":
+> 
+>     can0 at 0
+> 
+> > +		allwinner,pins = "PH20","PH21";
+> > +		allwinner,function = "can";
+> > +		allwinner,drive = <0>;
+> > +		allwinner,pull = <0>;
+> > +	};
+> > +
+> > +	can0: can <at> 01c2bc00 {
+> 
+>     can0 at 01c2bc00
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm64/include/asm/irqflags.h | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+Actually, beside '<at>' vs '@', he was right.
 
-diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
-index cf8a5184fce7..b2998b7946b6 100644
---- a/arch/arm64/include/asm/irqflags.h
-+++ b/arch/arm64/include/asm/irqflags.h
-@@ -19,8 +19,10 @@
- #ifdef __KERNEL__
- 
- #include <linux/irqchip/arm-gic-v3.h>
-+#include <linux/preempt.h>
- 
- #include <asm/alternative.h>
-+#include <asm/bug.h>
- #include <asm/cpufeature.h>
- #include <asm/ptrace.h>
- 
-@@ -94,6 +96,33 @@ static inline void maybe_switch_to_sysreg_gic_cpuif(void) {}
- 
- #else /* CONFIG_IRQFLAGS_GIC_MASKING */
- 
-+static inline void check_for_i_bit(void)
-+{
-+#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-+	unsigned long flags;
-+
-+	/* check whether the I-bit is spuriously enabled */
-+	if (!in_nmi()) {
-+		asm volatile(ALTERNATIVE(
-+			"mov	%0, #0",
-+			"mrs	%0, daif",
-+			ARM64_HAS_SYSREG_GIC_CPUIF)
-+			: "=r" (flags));
-+
-+		WARN_ONCE(flags & PSR_I_BIT, "I bit is set: %08lx\n", flags);
-+	}
-+
-+	/* check that the PMR has a legal value */
-+	asm volatile(ALTERNATIVE(
-+		"mov	%0, #" __stringify(ICC_PMR_EL1_MASKED),
-+		"mrs_s  %0, " __stringify(ICC_PMR_EL1),
-+		ARM64_HAS_SYSREG_GIC_CPUIF)
-+		: "=r" (flags));
-+	WARN_ONCE((flags & ICC_PMR_EL1_MASKED) != ICC_PMR_EL1_MASKED,
-+		  "ICC_PMR_EL1 has a bad value: %08lx\n", flags);
-+#endif
-+}
-+
- /*
-  * CPU interrupt mask handling.
-  */
-@@ -101,6 +130,7 @@ static inline unsigned long arch_local_irq_save(void)
- {
- 	unsigned long flags, masked = ICC_PMR_EL1_MASKED;
- 
-+	check_for_i_bit();
- 	asm volatile(ALTERNATIVE(
- 		"mrs	%0, daif		// arch_local_irq_save\n"
- 		"msr	daifset, #2",
-@@ -119,6 +149,7 @@ static inline void arch_local_irq_enable(void)
- {
- 	unsigned long unmasked = ICC_PMR_EL1_UNMASKED;
- 
-+	check_for_i_bit();
- 	asm volatile(ALTERNATIVE(
- 		"msr	daifclr, #2		// arch_local_irq_enable",
- 		"msr_s  " __stringify(ICC_PMR_EL1) ",%0",
-@@ -132,6 +163,7 @@ static inline void arch_local_irq_disable(void)
- {
- 	unsigned long masked = ICC_PMR_EL1_MASKED;
- 
-+	check_for_i_bit();
- 	asm volatile(ALTERNATIVE(
- 		"msr	daifset, #2		// arch_local_irq_disable",
- 		"msr_s  " __stringify(ICC_PMR_EL1) ",%0",
-@@ -148,6 +180,7 @@ static inline unsigned long arch_local_save_flags(void)
- {
- 	unsigned long flags;
- 
-+	check_for_i_bit();
- 	asm volatile(ALTERNATIVE(
- 		"mrs	%0, daif		// arch_local_save_flags",
- 		"mrs_s  %0, " __stringify(ICC_PMR_EL1),
-@@ -164,6 +197,7 @@ static inline unsigned long arch_local_save_flags(void)
-  */
- static inline void arch_local_irq_restore(unsigned long flags)
- {
-+	check_for_i_bit();
- 	asm volatile(ALTERNATIVE(
- 		"msr	daif, %0		// arch_local_irq_restore",
- 		"msr_s  " __stringify(ICC_PMR_EL1) ",%0",
-@@ -175,6 +209,7 @@ static inline void arch_local_irq_restore(unsigned long flags)
- 
- static inline int arch_irqs_disabled_flags(unsigned long flags)
- {
-+	check_for_i_bit();
- 	asm volatile(ALTERNATIVE(
- 		"and	%0, %0, #" __stringify(PSR_I_BIT) "\n"
- 		"nop",
+The name of the node in the DT should be:
+
+<device class>@<address>
+
+Which in our case is can at 01c2bc00, like he used.
+
+> 
+> > +		compatible = "allwinner,sunxican";
+
+However, the compatible is still not right.
+
+Maxime
+
 -- 
-2.4.3
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/2ce4e278/attachment-0001.sig>
