@@ -1,35 +1,43 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 14 Sep 2015 20:40:04 +0200
-Subject: [PATCH v18 1/4] dt-bindings: add document of Rockchip power
- domains
-In-Reply-To: <1441693103-26712-2-git-send-email-wxt@rock-chips.com>
-References: <1441693103-26712-1-git-send-email-wxt@rock-chips.com>
- <1441693103-26712-2-git-send-email-wxt@rock-chips.com>
-Message-ID: <4150283.UtCYfG61Ys@diego>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Sep 2015 19:23:14 +0100
+Subject: DSA: phy polling
+In-Reply-To: <55F703D7.1070707@gmail.com>
+References: <20150914104254.GI21084@n2100.arm.linux.org.uk>
+ <55F703D7.1070707@gmail.com>
+Message-ID: <20150914182314.GP21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar, Jinkun,
+On Mon, Sep 14, 2015 at 10:28:55AM -0700, Florian Fainelli wrote:
+> Just my 2 cents here, I suspect the original intention behind this code
+> was to help utilize the switch's built-in PHY polling unit when
+> available, and use the HW to collect the state of all PHYs in fewer
+> register to read, instead of having to do individual (and quite possibly
+> expensive) MDIO reads towards each individual per-port PHYs (at least
+> two reads per PHY to latch MII_BMSR).
 
-Am Dienstag, 8. September 2015, 14:18:20 schrieb Caesar Wang:
-> This add the necessary binding documentation for the power domains
-> found on Rockchip SoCs.
-> 
-> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Does the Marvell phy have such a register?  Looking at the register
+dump and plugging/unplugging cables seems not to show a register
+reporting whether any particular interface has changed state, and
+I haven't noticed there being any combined register in anything I've
+seen on these switches.
 
-What is Jinkun Hong's relationship to the patches?
+> Now, I do agree there is a duplication of functionality here, and a
+> potential fix would be to avoid starting the PHY state machine if/when
+> the switch supports such a feature (not call phy_start*), that should
+> still get you consistent consistent link partner advertised/status
+> values, question is, does that really benefit anybody though?
 
-The issue behind this is, that Caesar is the sender of the patches and how 
-they stand right now would also be the author, but Jinkun was the first to 
-sign them off, which is normally the line of the author.
+I disagree - it's the DSA polling that needs to go.  The DSA polling
+only looks at the port status, and derives from it the carrier
+state.  The rest of the information is only turned into a printk().
+The PHY state machine does a lot more, recording the link speed so
+that ethtool works on the interface.
 
-Please decide who gets to be author of patches 1,3 and 4. If it's Caesar, 
-we'll drop the Signed-off-by or if it's Jinkun we'll change the author.
+If we do want to go the other way, then the phy code needs a rework so
+that it can be properly classed and drivers with non-standard MII
+registers supported without needing to build register emulation layers.
 
-There is no big need to resend the patches, I can adapt authorship if 
-necessary.
-
-
-Thanks
-Heiko
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
