@@ -1,58 +1,123 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Sep 2015 11:50:14 +0100
-Subject: sdhci: runtime suspend/resume on card insert/removal
-In-Reply-To: <55F69E4F.8010608@linaro.org>
-References: <55F12CF8.50003@linaro.org> <20150910153129.07adbe68@xhacker>
- <20150910080233.GH21084@n2100.arm.linux.org.uk>
- <20150910160402.3b78b5c6@xhacker> <55F66874.2000609@linaro.org>
- <20150914142838.07ec6a07@xhacker> <55F681AC.2010605@linaro.org>
- <20150914161804.101dfc55@xhacker> <55F69121.3030700@linaro.org>
- <55F69E4F.8010608@linaro.org>
-Message-ID: <20150914105014.GJ21084@n2100.arm.linux.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 14 Sep 2015 12:59:31 +0200
+Subject: [PATCH v3 07/10] KVM: arm/arm64: vgic: Allow HW interrupts for
+ non-shared devices
+In-Reply-To: <55EECEBF.200@linaro.org>
+References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
+ <1439212864-12954-8-git-send-email-eric.auger@linaro.org>
+ <20150902194246.GV10991@cbox> <55EECEBF.200@linaro.org>
+Message-ID: <20150914105931.GE15712@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 03:45:43PM +0530, Vaibhav Hiremath wrote:
-> Came across below lines in the datasheet,
+On Tue, Sep 08, 2015 at 02:04:15PM +0200, Eric Auger wrote:
+> Hi Christoffer,
+> On 09/02/2015 09:42 PM, Christoffer Dall wrote:
+> > On Mon, Aug 10, 2015 at 03:21:01PM +0200, Eric Auger wrote:
+> >> From: Marc Zyngier <marc.zyngier@arm.com>
+> >>
+> >> So far, the only use of the HW interrupt facility was the timer,
+> >> implying that the active state is context-switched for each vcpu,
+> >> as the device is is shared across all vcpus.
+> >>
+> >> This does not work for a device that has been assigned to a VM,
+> >> as the guest is entierely in control of that device (the HW is
+> >> not shared). In that case, it makes sense to bypass the whole
+> >> active state switching.
+> >>
+> >> Also the VGIC state machine is adapted to support those assigned
+> >> (non shared) HW IRQs:
+> >> - nly can be sampled when it is pending
+> >> - when queueing the IRQ (programming the LR), the pending state is
+> >>   removed as for edge sensitive IRQs
+> >> - queued state is not modelled. Level state is not modelled
+> >> - its injection always is valid since steming from the HW.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> >>
+> >> ---
+> >>
+> >> - a mix of
+> >>   [PATCH v4 11/11] KVM: arm/arm64: vgic: Allow HW interrupts for
+> >>                    non-shared devices
+> >>   [RFC v2 2/4] KVM: arm: vgic: fix state machine for forwarded IRQ
+> >> ---
+> >>  include/kvm/arm_vgic.h    |  6 +++--
+> >>  virt/kvm/arm/arch_timer.c |  3 ++-
+> >>  virt/kvm/arm/vgic.c       | 58 +++++++++++++++++++++++++++++++++++------------
+> >>  3 files changed, 49 insertions(+), 18 deletions(-)
+> >>
+> >> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> >> index d901f1a..7ef9ce0 100644
+> >> --- a/include/kvm/arm_vgic.h
+> >> +++ b/include/kvm/arm_vgic.h
+> >> @@ -163,7 +163,8 @@ struct irq_phys_map {
+> >>  	u32			virt_irq;
+> >>  	u32			phys_irq;
+> >>  	u32			irq;
+> >> -	bool			active;
+> >> +	bool			shared;
+> >> +	bool			active; /* Only valid if shared */
+> >>  };
+> >>  
+> >>  struct irq_phys_map_entry {
+> >> @@ -356,7 +357,8 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+> >>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+> >>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
+> >>  struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+> >> -					   int virt_irq, int irq);
+> >> +					   int virt_irq, int irq,
+> >> +					   bool shared);
+> >>  int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
+> >>  bool kvm_vgic_get_phys_irq_active(struct irq_phys_map *map);
+> >>  void kvm_vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
+> >> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> >> index 76e38d2..db21d8f 100644
+> >> --- a/virt/kvm/arm/arch_timer.c
+> >> +++ b/virt/kvm/arm/arch_timer.c
+> >> @@ -203,7 +203,8 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+> >>  	 * Tell the VGIC that the virtual interrupt is tied to a
+> >>  	 * physical interrupt. We do that once per VCPU.
+> >>  	 */
+> >> -	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
+> >> +	map = kvm_vgic_map_phys_irq(vcpu, irq->irq,
+> >> +				    host_vtimer_irq, true);
+> >>  	if (WARN_ON(IS_ERR(map)))
+> >>  		return PTR_ERR(map);
+> >>  
+> >> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> >> index 9eb489a..fbd5ba5 100644
+> >> --- a/virt/kvm/arm/vgic.c
+> >> +++ b/virt/kvm/arm/vgic.c
+> >> @@ -400,7 +400,11 @@ void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
+> >>  
+> >>  static bool vgic_can_sample_irq(struct kvm_vcpu *vcpu, int irq)
+> >>  {
+> >> -	return !vgic_irq_is_queued(vcpu, irq);
+> >> +	struct irq_phys_map *map = vgic_irq_map_search(vcpu, irq);
+> >> +	bool shared_hw = map && !map->shared;
+> > 
+> > why is shared true when map->shared is false?
+> definitively upside down
+> > 
+> >> +
+> >> +	return !vgic_irq_is_queued(vcpu, irq) ||
+> >> +			(shared_hw && vgic_dist_irq_is_pending(vcpu, irq));
+> > 
+> > so for forwarded, non-shared, level-triggered IRQs, we always sample the
+> > line if it's pending?  Why?
 > 
-> ========= Copy-n-paste from datasheet============
+> No we only sampled it if it was pending. The pending state was reset
+> when programming the LR.
 > 
-> All SDH interfaces share the same clock which is enabled when any of the SDH
-> clock enables are
-> set (from PMUA_SDH1_CLK_RES_CTRL, PMUA_SDH2_CLK_RES_CTRL,
-> PMUA_SDH3_CLK_RES_CTRL, PMUA_SDH4_CLK_RES_CTRL,
-> PMUA_SDH5_CLK_RES_CTRL), with clock source select and divider ratio
-> controlled by
-> PMUA_SDH1_CLK_RES_CTRL.
-> 
-> ==================================================
-> 
-> 
-> And I can confirm that after disabling AXI interface clock for all the
-> SDH modules (1-5) I see I get an abort.
-> 
-> This clearly explains/justifies/proves that the existing code is
-> working as expected. I have eMMC mounted on the board, which makes
-> clock to always stay ON on SDH3.
-> 
-> So there is an OR gate implemented inside which takes input from
-> SDHx_AXI_EN and feeds back to all SDHx instances. Don't ask me why it
-> has been designed that way :)
-> 
-> And I did some experiment as well, so what I have observed is,
-> SDH_AXI_CLOCK is required to generate card detection, without that I do
-> not see card detection working.
+> Now that we model the queued state for mapped IRQ I will use that instead
 
-What that means is that if DT configures the interface to use its
-internal card detection, the AXI clock must never shut off when entering
-runtime-PM.
+ok, it is certainly very counterintuitive to have to check the pending
+state only if the pending state is set.
 
-Yes, it means you don't get the same savings as you would by turning
-off that clock, but that's the choice between using the internal card
-detection and a GPIO for this.  The code shouldn't force you to use a
-GPIO just because the Linux driver implementation dumbly disables the
-AXI clock.
+Not sure how this will look after your rework, but it may deserve a
+comment in either case.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+-Christoffer
