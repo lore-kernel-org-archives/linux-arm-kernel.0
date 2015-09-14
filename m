@@ -1,112 +1,139 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 14 Sep 2015 10:02:04 -0700
-Subject: [PATCH v4] mtd: nand: sunxi: fix OOB handling in ->write_xxx()
- functions
-In-Reply-To: <1442220063-7520-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1442220063-7520-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150914170204.GL11487@google.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 14 Sep 2015 19:08:56 +0200
+Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
+ host-only mode
+In-Reply-To: <CADYTM3Y10PsRZ3x9vf73px4T28M0naHnwyyRMZyPdrXc_Y-vLA@mail.gmail.com>
+References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
+ <55C31963.2010701@schinagl.nl> <55C3709C.4080609@redhat.com>
+ <55C47041.3000603@schinagl.nl> <55E93D8C.9020804@schinagl.nl>
+ <55F1CA9B.3070204@redhat.com> <20150910183017.GN9885@lukather>
+ <55F1CE2E.7010409@redhat.com>
+ <CADYTM3Z89oa3akqFaaY4BqJrQ4j+scQawRK0xRkthQde=OQ5tg@mail.gmail.com>
+ <55F6E0CA.2010004@redhat.com>
+ <CADYTM3Y10PsRZ3x9vf73px4T28M0naHnwyyRMZyPdrXc_Y-vLA@mail.gmail.com>
+Message-ID: <55F6FF28.80109@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 10:41:03AM +0200, Boris Brezillon wrote:
-> The USER_DATA register cannot be accessed using byte accessors on A13
-> SoCs, thus triggering a bug when using memcpy_toio on this register.
-> Declare an helper macros to convert an OOB buffer into a suitable
-> USER_DATA value and vice-versa.
-> 
-> This patch also fixes an error in the oob_required logic (some OOB data
-> are not written even if the user required it) by removing the
-> oob_required condition, which is perfectly valid since the core already
-> fill ->oob_poi with FFs when oob_required is false.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Cc: <stable@vger.kernel.org> # 3.19+
-> Fixes: 1fef62c1423b ("mtd: nand: add sunxi NAND flash controller support")
-> 
-> ---
-> Changes since v3:
-> - drop the NFC_USER_DATA_TO_BUF() macro
+Hi,
 
-I don't have any real objections to this version, and I think some IRC
-discussion helped clear up a few questions. I'll take this for 4.3 soon,
-unless I see any objections.
+On 14-09-15 18:58, Bin Liu wrote:
+> Hi,
+>
+> On Mon, Sep 14, 2015 at 9:59 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
+>>
+>>
+>> On 14-09-15 16:44, Bin Liu wrote:
+>>>
+>>> Hi,
+>>>
+>>> On Thu, Sep 10, 2015 at 1:38 PM, Hans de Goede <hdegoede@redhat.com>
+>>> wrote:
+>>>>
+>>>> Hi,
+>>>>
+>>>> On 10-09-15 20:30, Maxime Ripard wrote:
+>>>>>
+>>>>>
+>>>>> On Thu, Sep 10, 2015 at 08:23:23PM +0200, Hans de Goede wrote:
+>>>>>>
+>>>>>>
+>>>>>> Hi,
+>>>>>>
+>>>>>> On 04-09-15 08:43, Olliver Schinagl wrote:
+>>>>>>>
+>>>>>>>
+>>>>>>> Hey Hans,
+>>>>>>>
+>>>>>>> On 07-08-15 10:45, Olliver Schinagl wrote:
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> <snip>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> If you change the dr_mode to host then you _must_ also remove any
+>>>>>>>>> id_det and vbus_det
+>>>>>>>>> gpio settings from the usb_phy node in the dts, as the sun4i phy
+>>>>>>>>> code
+>>>>>>>>> detects
+>>>>>>>>> host vs otg mode by checking for the presence of these.
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> Yes, this fixes it and makes it work. Thanks.
+>>>>>>>>
+>>>>>>> I've been going back to this and am wondering if this is something I
+>>>>>>> can
+>>>>>>> look into to fix properly? E.g. if the dts sets dr_mode = host, can we
+>>>>>>> simply ignore the pins and treat them as unset?
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> AFAIK you cannot unset something in dts. The only solution I
+>>>>>> can comeup with is to add a dr_mode argument to the phy like
+>>>>>> we already have for the otg controller itself.
+>>>>>>
+>>>>>> This is something which we likely need to do anyways to add
+>>>>>> support for peripheral only mode, which we seem to need for
+>>>>>> some "hdmi sticks".
+>>>>>
+>>>>>
+>>>>>
+>>>>> I haven't really followed the rest of the discussion, so sorry if you
+>>>>> already talked about that, but why can't you just set the dr_mode to
+>>>>> peripheral in such a case?
+>>>>
+>>>>
+>>>>
+>>>> This is about the usbphy code not the musb-controller code, which are
+>>>> 2 different dts nodes, atm only the musb-controller node has a
+>>>> dr_mode property, and the phy code decides between host-only
+>>>> and otg mode based on whether an id pin is assigned or not.
+>>>>
+>>>> My proposal is to get rid of the id-pin hack to determine the mode
+>>>> and add a dr_mode property to the usbphy dts node.
+>>>
+>>>
+>>> I would try to avoid adding dr_mode in the usbphy node if possible,
+>>> since it is already specified in the controller node.
+>>>
+>>> Since the phy node is referenced in the controller node, is it
+>>> possible that the phy driver looks up the controller of properties to
+>>> find its dr_mode setting?
+>>
+>>
+>> That is possible, but it very much goes against how devicetree normally
+>> works, where every node is more or less a standalone unit which
+>> contains enough info for the associated driver to do its work.
+>
+> I guess you are right, but duplicating dr_mode would cause more
+> trouble for end user.
 
-> Changes since v2:
-> - add the NFC_USER_DATA_TO_BUF() macro and rename NFC_USER_DATA() into
->   NFC_BUF_TO_USER_DATA()
-> - rework the commit message
-> 
-> Changes since v1:
-> - drop the !oob_required conditional path
-> - replace endianness conversions by a macro relying on byte shifting
->   operations
-> ---
->  drivers/mtd/nand/sunxi_nand.c | 26 +++++++++-----------------
->  1 file changed, 9 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-> index f97a58d..279cafd 100644
-> --- a/drivers/mtd/nand/sunxi_nand.c
-> +++ b/drivers/mtd/nand/sunxi_nand.c
-> @@ -147,6 +147,10 @@
->  #define NFC_ECC_MODE		GENMASK(15, 12)
->  #define NFC_RANDOM_SEED		GENMASK(30, 16)
->  
-> +/* NFC_USER_DATA helper macros */
-> +#define NFC_BUF_TO_USER_DATA(buf)	((buf)[0] | ((buf)[1] << 8) | \
-> +					((buf)[2] << 16) | ((buf)[3] << 24))
-> +
->  #define NFC_DEFAULT_TIMEOUT_MS	1000
->  
->  #define NFC_SRAM_SIZE		1024
-> @@ -646,15 +650,9 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
->  		offset = layout->eccpos[i * ecc->bytes] - 4 + mtd->writesize;
->  
->  		/* Fill OOB data in */
-> -		if (oob_required) {
-> -			tmp = 0xffffffff;
-> -			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, &tmp,
-> -				    4);
-> -		} else {
-> -			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE,
-> -				    chip->oob_poi + offset - mtd->writesize,
-> -				    4);
-> -		}
-> +		writel(NFC_BUF_TO_USER_DATA(chip->oob_poi +
-> +					    layout->oobfree[i].offset),
-> +		       nfc->regs + NFC_REG_USER_DATA_BASE);
+The user already needs to set up regulators, vbus-det and id-det
+for otg mode in the usbphy node. Although there are 2 nodes in dts /
+2 separate hardware blocks involved in reality the 2 are closely
+related and the user already must take care to have the settings match.
 
-I believe the few remaining questionable points were:
+Besides that writing dts files is not something which end users do,
+so a normal user will never see this.
 
- * you don't actually need to add the barrier, thus __raw_writel() would
-   suffice
- * you're still doing a double swap for the (likely theoretical) big
-   endian case
+> Felipe, could you please give your comments on this issue? I have to
+> do the similar change for musb_dsps.
+>
+>>
+>> Currently there is no link from the phy node to the controller node
+>> (only the other way around) and adding such a link requires more code
+>> then simple having a duplicate dr_mode.
+>
+> I guess I did not make my previous comment clearly, we don't need to
+> add the link from the phy node to the controller node. We don't need
+> to change the current dts, just in the phy driver to look up dr_mode
+> of the controller node, if possible.
 
-Neither point matters much to me, so as noted above, LGTM.
+And how does the phy code now where the controller node lives without
+having a link to it in its node? Hardcode the full path to the
+controller node ? That is both ugly and error prone.
 
->  
->  		chip->cmdfunc(mtd, NAND_CMD_RNDIN, offset, -1);
->  
-> @@ -784,14 +782,8 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
->  		offset += ecc->size;
->  
->  		/* Fill OOB data in */
-> -		if (oob_required) {
-> -			tmp = 0xffffffff;
-> -			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, &tmp,
-> -				    4);
-> -		} else {
-> -			memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, oob,
-> -				    4);
-> -		}
-> +		writel(NFC_BUF_TO_USER_DATA(oob),
-> +		       nfc->regs + NFC_REG_USER_DATA_BASE);
+Regards,
 
-Same here.
-
->  
->  		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ACCESS_DIR |
->  		      (1 << 30);
-
-Brian
+Hans
