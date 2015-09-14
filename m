@@ -1,52 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Sep 2015 17:55:29 +0200
-Subject: [PATCH 3/3] arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP
-In-Reply-To: <1442246129-13930-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1442246129-13930-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1442246129-13930-4-git-send-email-ard.biesheuvel@linaro.org>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 14 Sep 2015 17:03:16 +0100
+Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
+In-Reply-To: <20150914151540.GI7002@leverpostej> (Mark Rutland's message of
+ "Mon, 14 Sep 2015 16:15:40 +0100")
+References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+ <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
+ <20150914131448.GC7002@leverpostej>
+ <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
+ <20150914134949.GE7002@leverpostej>
+ <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
+ <20150914144330.GH7002@leverpostej>
+ <9hhfv2hdozu.fsf@e105922-lin.cambridge.arm.com>
+ <20150914151540.GI7002@leverpostej>
+Message-ID: <9hh7fntdm4b.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the EFI memory reservation logic to use memblock_mark_nomap()
-rather than memblock_reserve() to mark UEFI reserved regions as
-occupied. In addition to reserving them against allocations done by
-memblock, this will also prevent them from being covered by the linear
-mapping.
+Mark Rutland <mark.rutland@arm.com> writes:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/efi.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+> On Mon, Sep 14, 2015 at 04:01:09PM +0100, Punit Agrawal wrote:
+>> Mark Rutland <mark.rutland@arm.com> writes:
+>> 
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index e8ca6eaedd02..f609325c4a83 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -193,7 +193,7 @@ static __init void reserve_regions(void)
- 			early_init_dt_add_memory_arch(paddr, size);
- 
- 		if (is_reserve_region(md)) {
--			memblock_reserve(paddr, size);
-+			memblock_mark_nomap(paddr, size);
- 			if (uefi_debug)
- 				pr_cont("*");
- 		}
-@@ -215,8 +215,6 @@ void __init efi_init(void)
- 
- 	efi_system_table = params.system_table;
- 
--	memblock_reserve(params.mmap & PAGE_MASK,
--			 PAGE_ALIGN(params.mmap_size + (params.mmap & ~PAGE_MASK)));
- 	memmap.phys_map = (void *)params.mmap;
- 	memmap.map = early_memremap(params.mmap, params.mmap_size);
- 	memmap.map_end = memmap.map + params.mmap_size;
-@@ -228,6 +226,7 @@ void __init efi_init(void)
- 
- 	reserve_regions();
- 	early_memunmap(memmap.map, params.mmap_size);
-+	memblock_mark_nomap(params.mmap, params.mmap_size);
- }
- 
- static bool __init efi_virtmap_init(void)
--- 
-1.9.1
+[...]
+
+>> 
+>> After seeing the mapping already published, I am wondering if there is
+>> any value in duplicating the information. If there are no objections,
+>> I'll update this patch to add pointers instead.
+>
+> That's fine by me. The important part is that the value is a raw Sensor
+> ID as the FW uses. So long as we state that, the IDs themselves can come
+> from whatever documentation is valid for a particular instance.
+>
+> Thanks for the info!
+
+Sure. I've updated the patch to explain what the valid cell values are
+along with a pointer to platform documentation for Juno R0 and R1.
+
+I've also added an example to show usage of the sensors to create a
+thermal zone.
+
+I'll post a new version shortly.
+
+Thanks for your having a look.
+
+>
+> Thanks,
+> Mark.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
