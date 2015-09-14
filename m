@@ -1,98 +1,90 @@
-From: kieranbingham@gmail.com (Kieran Bingham)
-Date: Mon, 14 Sep 2015 15:57:36 +0100
-Subject: [PATCH 1/6] Documentation: hw_random: Fix device node name
- /dev/hw_random => /dev/hwrng
-In-Reply-To: <1442002110-28733-2-git-send-email-lee.jones@linaro.org>
-References: <1442002110-28733-1-git-send-email-lee.jones@linaro.org>
- <1442002110-28733-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAB3z_RrGS-z_xWWuaeJ=TJWS741EpDO9pEJuNb6TnSyO_3qOPA@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 14 Sep 2015 16:59:22 +0200
+Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
+ host-only mode
+In-Reply-To: <CADYTM3Z89oa3akqFaaY4BqJrQ4j+scQawRK0xRkthQde=OQ5tg@mail.gmail.com>
+References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
+ <55C31963.2010701@schinagl.nl> <55C3709C.4080609@redhat.com>
+ <55C47041.3000603@schinagl.nl> <55E93D8C.9020804@schinagl.nl>
+ <55F1CA9B.3070204@redhat.com> <20150910183017.GN9885@lukather>
+ <55F1CE2E.7010409@redhat.com>
+ <CADYTM3Z89oa3akqFaaY4BqJrQ4j+scQawRK0xRkthQde=OQ5tg@mail.gmail.com>
+Message-ID: <55F6E0CA.2010004@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi,
 
-On 11 September 2015 at 21:08, Lee Jones <lee.jones@linaro.org> wrote:
-> In April 2099, commit d405640
+On 14-09-15 16:44, Bin Liu wrote:
+> Hi,
+>
+> On Thu, Sep 10, 2015 at 1:38 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
+>>
+>> On 10-09-15 20:30, Maxime Ripard wrote:
+>>>
+>>> On Thu, Sep 10, 2015 at 08:23:23PM +0200, Hans de Goede wrote:
+>>>>
+>>>> Hi,
+>>>>
+>>>> On 04-09-15 08:43, Olliver Schinagl wrote:
+>>>>>
+>>>>> Hey Hans,
+>>>>>
+>>>>> On 07-08-15 10:45, Olliver Schinagl wrote:
+>>>>>>
+>>>>>> <snip>
+>>>>>>>
+>>>>>>> If you change the dr_mode to host then you _must_ also remove any
+>>>>>>> id_det and vbus_det
+>>>>>>> gpio settings from the usb_phy node in the dts, as the sun4i phy code
+>>>>>>> detects
+>>>>>>> host vs otg mode by checking for the presence of these.
+>>>>>>
+>>>>>> Yes, this fixes it and makes it work. Thanks.
+>>>>>>
+>>>>> I've been going back to this and am wondering if this is something I can
+>>>>> look into to fix properly? E.g. if the dts sets dr_mode = host, can we
+>>>>> simply ignore the pins and treat them as unset?
+>>>>
+>>>>
+>>>> AFAIK you cannot unset something in dts. The only solution I
+>>>> can comeup with is to add a dr_mode argument to the phy like
+>>>> we already have for the otg controller itself.
+>>>>
+>>>> This is something which we likely need to do anyways to add
+>>>> support for peripheral only mode, which we seem to need for
+>>>> some "hdmi sticks".
+>>>
+>>>
+>>> I haven't really followed the rest of the discussion, so sorry if you
+>>> already talked about that, but why can't you just set the dr_mode to
+>>> peripheral in such a case?
+>>
+>>
+>> This is about the usbphy code not the musb-controller code, which are
+>> 2 different dts nodes, atm only the musb-controller node has a
+>> dr_mode property, and the phy code decides between host-only
+>> and otg mode based on whether an id pin is assigned or not.
+>>
+>> My proposal is to get rid of the id-pin hack to determine the mode
+>> and add a dr_mode property to the usbphy dts node.
+>
+> I would try to avoid adding dr_mode in the usbphy node if possible,
+> since it is already specified in the controller node.
+>
+> Since the phy node is referenced in the controller node, is it
+> possible that the phy driver looks up the controller of properties to
+> find its dr_mode setting?
 
-That's impressive ... :D
+That is possible, but it very much goes against how devicetree normally
+works, where every node is more or less a standalone unit which
+contains enough info for the associated driver to do its work.
 
-> ("Driver Core: misc: add node name support
-> for misc devices.") inadvertently changed the device node name from
-> /dev/hw_random to /dev/hwrng.  Since 6 years has passed since the change
-> it seems unpractical to change it back now, as this node name is probably
-> considered ABI by now.  So instead, we'll just change the documentation
-> to match the current situation.
+Currently there is no link from the phy node to the controller node
+(only the other way around) and adding such a link requires more code
+then simple having a duplicate dr_mode.
 
-Ugh ... how messy ... but yes - I agree it may be too late to change
-back as rngd already defaults to /dev/hwrng
+Regards,
 
-Perhaps you could just use your time machine to continue back in time
-to before it was used :-) In fact can I borrow it after you're done
-please :)
-
-Other than 's/2099/2009/g' - The patch is OK. All entries to
-/dev/hw_random in hw_random.txt converted,
-but outside of Documentation, drivers/char/hw_random/Kconfig also
-references /dev/hw_random ...
-
-Therefore perhaps that could be updated in this patch too?
---
-Kieran
-
-Now available for:
-  $GREATCOMPANY add -A linuxdevs/kieranbingham/ && \
-  $GREATCOMPANY commit -m "HR: Add fantastic new employee"
-
-
-> NB: It looks like rng-tools have already been updated.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  Documentation/hw_random.txt | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/Documentation/hw_random.txt b/Documentation/hw_random.txt
-> index 026e237..fce1634 100644
-> --- a/Documentation/hw_random.txt
-> +++ b/Documentation/hw_random.txt
-> @@ -3,7 +3,7 @@ Introduction:
->         The hw_random framework is software that makes use of a
->         special hardware feature on your CPU or motherboard,
->         a Random Number Generator (RNG).  The software has two parts:
-> -       a core providing the /dev/hw_random character device and its
-> +       a core providing the /dev/hwrng character device and its
->         sysfs support, plus a hardware-specific driver that plugs
->         into that core.
->
-> @@ -14,7 +14,7 @@ Introduction:
->
->                 http://sourceforge.net/projects/gkernel/
->
-> -       Those tools use /dev/hw_random to fill the kernel entropy pool,
-> +       Those tools use /dev/hwrng to fill the kernel entropy pool,
->         which is used internally and exported by the /dev/urandom and
->         /dev/random special files.
->
-> @@ -32,13 +32,13 @@ Theory of operation:
->         The rng-tools package uses such tests in "rngd", and lets you
->         run them by hand with a "rngtest" utility.
->
-> -       /dev/hw_random is char device major 10, minor 183.
-> +       /dev/hwrng is char device major 10, minor 183.
->
->         CLASS DEVICE.  There is a /sys/class/misc/hw_random node with
->         two unique attributes, "rng_available" and "rng_current".  The
->         "rng_available" attribute lists the hardware-specific drivers
->         available, while "rng_current" lists the one which is currently
-> -       connected to /dev/hw_random.  If your system has more than one
-> +       connected to /dev/hwrng.  If your system has more than one
->         RNG available, you may change the one used by writing a name from
->         the list in "rng_available" into "rng_current".
->
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Hans
