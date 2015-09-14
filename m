@@ -1,65 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Sep 2015 11:36:32 +0200
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <55F693F5.8030203@huawei.com>
-References: <20150910112418.GC29293@leverpostej>
- <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
- <20150910121514.GE29293@leverpostej>
- <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
- <20150910144938.GI29293@leverpostej>
- <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
- <20150910162302.GN29293@leverpostej>
- <20150911124643.GB4530@olila.local.net-space.pl>
- <alpine.DEB.2.02.1509111410180.2672@kaball.uk.xensource.com>
- <CAKv+Gu9rN7_mxk0huX+34HSCC_aTWVTkUZKQMB1+9U56fRnwsA@mail.gmail.com>
- <20150911154534.GD4530@olila.local.net-space.pl>
- <55F6886D.1090900@huawei.com>
- <CAKv+Gu-xAAd=xTOh+qZvPDthgbRPLy=YwT4xfi4dS53EgJRh1Q@mail.gmail.com>
- <55F693F5.8030203@huawei.com>
-Message-ID: <CAKv+Gu-2kyd3Gf3ceSa1jdgCjqJ8zBCesa4xehLiZ+VzergS3Q@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 14 Sep 2015 10:37:19 +0100
+Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
+ ECAM) and ACPI code out of arch/x86/ directory
+In-Reply-To: <55F2CA98.7050905@linaro.org>
+References: <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
+ <557504A2.3060203@linaro.org> <20150608151443.GA16151@red-moon>
+ <55E4340D.6050004@linaro.org> <55ED6010.3020406@linaro.org>
+ <20150908150727.GF29293@red-moon> <55F0388B.1090607@linaro.org>
+ <20150911112018.GA13033@red-moon> <55F2CA98.7050905@linaro.org>
+Message-ID: <20150914093719.GC18410@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(snip some cc's)
+On Fri, Sep 11, 2015 at 01:35:36PM +0100, Tomasz Nowicki wrote:
+> On 11.09.2015 13:20, Lorenzo Pieralisi wrote:
 
-On 14 September 2015 at 11:31, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->
->
-> On 2015/9/14 17:09, Ard Biesheuvel wrote:
->> On 14 September 2015 at 10:42, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->> [..]
->>
->>>
->>> It only needs to apply following patch to fix a bug in Linux kernel when
->>> mapping EFI_MEMORY_RUNTIME memory.
->>>
->>
->> Could you explain why you think efi_virtmap_init() should fail if
->> there are no EFI_MEMORY_RUNTIME regions?
->>
->
-> My understanding is that if there are no EFI_MEMORY_RUNTIME regions, it
-> means we can't use runtime services and should not set the bit
-> EFI_RUNTIME_SERVICES of efi.flags. But if efi_virtmap_init() return
-> true, the bit will be set.
->
+[...]
 
-As I said, if you don't want the EFI_RUNTIME_SERVICES bit to be set
-for other reasons, don't rig efi_virtmap_init() to return false when
-it shouldn't.
+> >>> With that in place using raw_pci_write/read or the generic accessors
+> >>> becomes almost identical, with code requiring the pci_bus to be
+> >>> created using the generic accessors and ACPICA using the raw version.
+> >>>
+> >>> I might be missing something, so apologies if that's the case.
+> >>>
+> >>
+> >> Actually, I think you showed me the right direction :) Here are some
+> >> conclusions/comments/concerns. Please correct me if I am wrong:
+> >>
+> >> 1. We need raw_pci_write/read accessors (based on ECAM) for ARM64 too
+> >> but only up to the point where buses are enumerated. From that point on,
+> >> we should reuse generic accessors from access.c file, right?
+> >
+> > Well, I still have not figured out whether on arm64 the raw accessors
+> > required by ACPICA make sense.
+> >
+> > So either arm64 relies on the generic MCFG based raw read and writes
+> > or we define the global raw read and writes as empty (ie x86 overrides
+> > them anyway).
+> >
+> > I will get back to you on this.
+> >
+> >> 2. For ARM64 ACPI PCI, we can use generic accessors right away, .map_bus
+> >> would call common code part (pci_dev_base()). The only thing that worry
+> >> me is fact that MCFG regions are RCU list so it needs rcu_read_lock()
+> >> for the .map_bus (mcfg lookup) *and* read/write operation.
+> >
+> > Do you mean the address look-up and the mmio operation should be carried
+> > out atomically right ?
+> Yes.
 
->> The absence of such regions is allowed by the spec, so
->> efi_virtmap_init() is correct imo to return success.
->>
-> Sorry, not well know about the spec. Could you point out where the spec
-> says this?
->
+We can wrap the calls pci_generic_read/write() within a function and
+add rcu_read_lock()/unlock() around them, eg:
 
-Well, I think it doesn't work that way. You are claiming that a memory
-map without at least one EFI_MEMORY_RUNTIME constitutes an error
-condition, so the burden is on you to provide a reference to the spec
-that says you must have at least one such region.
+int pci_generic_config_read_rcu()
+{
+	rcu_read_lock();
+	pci_generic_config_read(...);
+	rcu_read_unlock();
+}
 
--- 
-Ard.
+Honestly it seems the RCU API is needed just because config space
+can be also accessed by raw_ accessors in ACPICA code, that's the only
+reason I see to protect the config structs against config space
+removal (basically config entries are removed only when the host
+bridge is released if I read the code correctly, and the only way
+this can happen concurrently is having ACPICA code reusing the
+same config space but accessing it with no pci_bus struct attached
+to it, by just using the (segment, bus, dev, fn) tuple).
+
+Lorenzo
