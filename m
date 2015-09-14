@@ -1,69 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Sep 2015 13:22:30 -0700
-Subject: [PATCH v3 0/2] regulator: Fix pbias regulator enable
-In-Reply-To: <CAPDyKFqCYx0JfXGq0T-44034UcR=v8nvKp7Fww=Zxa7N-z_vFg@mail.gmail.com>
-References: <1441368025-21182-1-git-send-email-kishon@ti.com>
- <CAPDyKFqCYx0JfXGq0T-44034UcR=v8nvKp7Fww=Zxa7N-z_vFg@mail.gmail.com>
-Message-ID: <20150914202230.GY4215@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Sep 2015 22:25:33 +0200
+Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
+ host-only mode
+In-Reply-To: <55F1CE2E.7010409@redhat.com>
+References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
+ <55C31963.2010701@schinagl.nl> <55C3709C.4080609@redhat.com>
+ <55C47041.3000603@schinagl.nl> <55E93D8C.9020804@schinagl.nl>
+ <55F1CA9B.3070204@redhat.com> <20150910183017.GN9885@lukather>
+ <55F1CE2E.7010409@redhat.com>
+Message-ID: <20150914202533.GF4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-* Ulf Hansson <ulf.hansson@linaro.org> [150904 05:48]:
+On Thu, Sep 10, 2015 at 08:38:38PM +0200, Hans de Goede wrote:
+> Hi,
 > 
-> Okay, just to be clear on the way forward. I spoked with Mark Brown
-> offlist, and he will/has picked up the regulator patch and will send
-> it as fix for the 4.3 rc[n].
+> On 10-09-15 20:30, Maxime Ripard wrote:
+> >On Thu, Sep 10, 2015 at 08:23:23PM +0200, Hans de Goede wrote:
+> >>Hi,
+> >>
+> >>On 04-09-15 08:43, Olliver Schinagl wrote:
+> >>>Hey Hans,
+> >>>
+> >>>On 07-08-15 10:45, Olliver Schinagl wrote:
+> >>>><snip>
+> >>>>>If you change the dr_mode to host then you _must_ also remove any id_det and vbus_det
+> >>>>>gpio settings from the usb_phy node in the dts, as the sun4i phy code detects
+> >>>>>host vs otg mode by checking for the presence of these.
+> >>>>Yes, this fixes it and makes it work. Thanks.
+> >>>>
+> >>>I've been going back to this and am wondering if this is something I can look into to fix properly? E.g. if the dts sets dr_mode = host, can we simply ignore the pins and treat them as unset?
+> >>
+> >>AFAIK you cannot unset something in dts. The only solution I
+> >>can comeup with is to add a dr_mode argument to the phy like
+> >>we already have for the otg controller itself.
+> >>
+> >>This is something which we likely need to do anyways to add
+> >>support for peripheral only mode, which we seem to need for
+> >>some "hdmi sticks".
+> >
+> >I haven't really followed the rest of the discussion, so sorry if you
+> >already talked about that, but why can't you just set the dr_mode to
+> >peripheral in such a case?
 > 
-> Regarding the ARM patch here, I guess Tony might as well handle it and
-> send through arm-soc, especially since the regression won't be fixed
-> within my mmc tree anyway.
+> This is about the usbphy code not the musb-controller code, which are
+> 2 different dts nodes, atm only the musb-controller node has a
+> dr_mode property, and the phy code decides between host-only
+> and otg mode based on whether an id pin is assigned or not.
 > 
-> So, I am going to leave my next branch as is - and thus relying on
-> teet the regression for OMAP will be fixed in some the 4.3 rc[n].
+> My proposal is to get rid of the id-pin hack to determine the mode
+> and add a dr_mode property to the usbphy dts node.
 
-I'm picking up the .dts changes from this series into
-omap-for-v4.3/fixes as those are safe to apply while waiting
-for the pbias-regulator.c fix to hit mainline.
+I agree that we should get rid of that hack, especially since a lack
+of an ID pin might also be used on a peripheral-only device.
 
-I'm not yet applying the related dts change "fix address translation
-for pbias" as that depends on the pbias-regulator.c change.
+However, we already have that information in the musb node, and
+duplicating the info seems error prone. We already have a custom
+function, maybe that's a case for another one, and that would allow to
+handle "hard" cases more easily (like CONFIG_USB_MUSB_HOST selected,
+with the otg node set to otg).
 
-Howver, when testing all the patches applied, I'm still getting
-the following splat at least on duovero (with MMC working):
+Maxime
 
-WARNING: CPU: 0 PID: 6 at drivers/regulator/core.c:2105 _regulator_disable+0x13c/0x1d4()
-unbalanced disables for pbias_mmc_omap4
-Modules linked in:
-CPU: 0 PID: 6 Comm: kworker/u4:0 Not tainted 4.3.0-rc1-00015-gf5c4173-dirty #1295
-Hardware name: Generic OMAP4 (Flattened Device Tree)
-Workqueue: deferwq deferred_probe_work_func
-[<c001770c>] (unwind_backtrace) from [<c0013a58>] (show_stack+0x10/0x14)
-[<c0013a58>] (show_stack) from [<c0346628>] (dump_stack+0x84/0x9c)
-[<c0346628>] (dump_stack) from [<c003e958>] (warn_slowpath_common+0x78/0xb4)
-[<c003e958>] (warn_slowpath_common) from [<c003e9c4>] (warn_slowpath_fmt+0x30/0x40)
-[<c003e9c4>] (warn_slowpath_fmt) from [<c03a4e74>] (_regulator_disable+0x13c/0x1d4)
-[<c03a4e74>] (_regulator_disable) from [<c03a4f3c>] (regulator_disable+0x30/0x6c)
-[<c03a4f3c>] (regulator_disable) from [<c04c55a8>] (omap_hsmmc_set_power+0x158/0x1e8)
-[<c04c55a8>] (omap_hsmmc_set_power) from [<c04c57d0>] (omap_hsmmc_set_ios+0x198/0x318)
-[<c04c57d0>] (omap_hsmmc_set_ios) from [<c04af404>] (mmc_power_up.part.10+0x30/0xf8)
-[<c04af404>] (mmc_power_up.part.10) from [<c04b0310>] (mmc_start_host+0x40/0x7c)
-[<c04b0310>] (mmc_start_host) from [<c04b1424>] (mmc_add_host+0x5c/0x84)
-[<c04b1424>] (mmc_add_host) from [<c04c5010>] (omap_hsmmc_probe+0x5b0/0x9f0)
-[<c04c5010>] (omap_hsmmc_probe) from [<c03e0e9c>] (platform_drv_probe+0x44/0xac)
-[<c03e0e9c>] (platform_drv_probe) from [<c03df550>] (driver_probe_device+0x1f4/0x2f0)
-[<c03df550>] (driver_probe_device) from [<c03dda5c>] (bus_for_each_drv+0x64/0x98)
-[<c03dda5c>] (bus_for_each_drv) from [<c03df2d0>] (__device_attach+0xb0/0x118)
-[<c03df2d0>] (__device_attach) from [<c03de878>] (bus_probe_device+0x88/0x90)
-[<c03de878>] (bus_probe_device) from [<c03deca0>] (deferred_probe_work_func+0x60/0x90)
-[<c03deca0>] (deferred_probe_work_func) from [<c005899c>] (process_one_work+0x1a4/0x558)
-[<c005899c>] (process_one_work) from [<c0058d8c>] (worker_thread+0x3c/0x514)
-[<c0058d8c>] (worker_thread) from [<c005eb1c>] (kthread+0xd4/0xf0)
-[<c005eb1c>] (kthread) from [<c000f710>] (ret_from_fork+0x14/0x24)
-
-Kishon, can you please take a look?
-
-Regards,
-
-Tony
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/58e2107d/attachment.sig>
