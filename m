@@ -1,55 +1,31 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Sep 2015 11:56:43 -0700
-Subject: [PATCH] ARM: dts: am57xx-beagle-x15: Add wakeup irq for mcp79410
-In-Reply-To: <1441308240-26725-1-git-send-email-nm@ti.com>
-References: <1441308240-26725-1-git-send-email-nm@ti.com>
-Message-ID: <20150914185643.GT4215@atomide.com>
+Date: Mon, 14 Sep 2015 11:58:45 -0700
+Subject: [PATCH] ARM: dts: omap3-igep: Move eth IRQ pinmux to IGEPv2
+ common dtsi
+In-Reply-To: <CAFqH_50Hbzu1WDV7O3_jnUKVZ2Hhg_0PvV9jR_R1PkhfJ1MAxQ@mail.gmail.com>
+References: <1441643058-8641-1-git-send-email-javier@osg.samsung.com>
+ <CAFqH_50Hbzu1WDV7O3_jnUKVZ2Hhg_0PvV9jR_R1PkhfJ1MAxQ@mail.gmail.com>
+Message-ID: <20150914185844.GU4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [150903 12:27]:
-> With the support in the generic PM framework for wakeirq and capability
-> added to the rtc-ds1307 driver to support this, we can now define the
-> optional wakeup irq to allow the RTC to wakeup the system from low power
-> modes as part of suspend.
+* Enric Balletbo Serra <eballetbo@gmail.com> [150907 12:43]:
+> 2015-09-07 18:24 GMT+02:00 Javier Martinez Canillas <javier@osg.samsung.com>:
+> > Only the IGEPv2 boards have a LAN9221i chip connected to the GPMC
+> > so the pinmux configuration for the GPIO connected to the IRQ line
+> > of the LAN chip should not be defined in the IGEP common dtsi but
+> > in the one common to the IGEPv2 boards.
+> >
+> > While there, use the OMAP3_CORE1_IOPAD() macro for the padconf reg.
+> >
+> > Suggested-by: Ladislav Michl <ladis@linux-mips.org>
+> > Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+...
 > 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
+> Looks good to me.
 > 
-> This patch depends on upcoming merge for RTC
-> https://git.kernel.org/cgit/linux/kernel/git/abelloni/linux.git/log/?h=rtc-next&ofs=50
-> 
-> merge to master of:
-> 9901c41bd019 rtc: ds1307: Support optional wakeup interrupt source
-> 496a7ede6cac rtc: ds1307: Sort the headers
-> e28475b15b65 rtc: ds1307: Switch to managed irq allocation
-> 27a1dce6528a rtc: ds1307: Convert to threaded IRQ
-> 
-> Tested with the above commits from linux-next: http://pastebin.ubuntu.com/12265857/
-> 
-> Could probably go in round 2 of merges for 4.3?
+> Acked-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 
 Applying into omap-for-v4.3/fixes thanks.
 
 Tony
- 
->  arch/arm/boot/dts/am57xx-beagle-x15.dts |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> index ede7fb73c717..8464f3cea280 100644
-> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> @@ -526,7 +526,8 @@
->  	mcp_rtc: rtc at 6f {
->  		compatible = "microchip,mcp7941x";
->  		reg = <0x6f>;
-> -		interrupts = <GIC_SPI 2 IRQ_TYPE_EDGE_RISING>;  /* IRQ_SYS_1N */
-> +		interrupts-extended = <&crossbar_mpu GIC_SPI 2 IRQ_TYPE_EDGE_RISING>,
-> +				      <&dra7_pmx_core 0x424>;
->  
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&mcp79410_pins_default>;
-> -- 
-> 1.7.9.5
-> 
