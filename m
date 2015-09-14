@@ -1,90 +1,80 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 14 Sep 2015 14:58:21 +0200
-Subject: [PATCH v6 1/3] can: Allwinner A10/A20 CAN Controller support -
- Devicetree bindings
-In-Reply-To: <1442235299-5885-2-git-send-email-info@gerhard-bertelsmann.de>
-References: <1442235299-5885-1-git-send-email-info@gerhard-bertelsmann.de>
- <1442235299-5885-2-git-send-email-info@gerhard-bertelsmann.de>
-Message-ID: <55F6C46D.7090203@pengutronix.de>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Mon, 14 Sep 2015 20:58:47 +0800
+Subject: [PATCH v2 00/22] KVM: ARM64: Add guest PMU support
+In-Reply-To: <20150914115300.GM15712@cbox>
+References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
+ <20150914115300.GM15712@cbox>
+Message-ID: <55F6C487.5060801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/2015 02:54 PM, Gerhard Bertelsmann wrote:
-> Signed-off-by: Gerhard Bertelsmann <info@gerhard-bertelsmann.de>
-> ---
-> 
->  .../devicetree/bindings/net/can/sun4i_can.txt      |  37 +
->  1 files changed, 37 insertions(+)
-> 
-> 
-> diff --git a/Documentation/devicetree/bindings/net/can/sun4i_can.txt b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
-> new file mode 100644
-> index 0000000..b572e2b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
-> @@ -0,0 +1,37 @@
-> +Allwinner A10/A20 CAN controller Device Tree Bindings
-> +-----------------------------------------------------
-> +
-> +Required properties:
-> +- compatible: "allwinner,sunxican"
-> +- reg: physical base address and size of the Allwinner A10/A20 CAN register map.
-> +- interrupts: interrupt specifier for the sole interrupt.
-> +- clock: phandle and clock specifier.
-> +
-> +Example
-> +-------
-> +
-> +SoC common .dtsi file:
-> +
-> +	can0_pins_a: can0 <at> 0 {
 
-That's supposed to be a proper "@":
 
-    can0 at 0
+On 2015/9/14 19:53, Christoffer Dall wrote:
+> Hi Shannon,
+>
+> On Fri, Sep 11, 2015 at 04:54:53PM +0800, Shannon Zhao wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> This patchset adds guest PMU support for KVM on ARM64. It takes
+>> trap-and-emulate approach. When guest wants to monitor one event, it
+>> will be trapped by KVM and KVM will call perf_event API to create a perf
+>> event and call relevant perf_event APIs to get the count value of event.
+>>
+>> Use perf to test this patchset in guest. When using "perf list", it
+>> shows the list of the hardware events and hardware cache events perf
+>> supports. Then use "perf stat -e EVENT" to monitor some event. For
+>> example, use "perf stat -e cycles" to count cpu cycles and
+>> "perf stat -e cache-misses" to count cache misses.
+>>
+>> Below are the outputs of "perf stat -r 5 sleep 5" when running in host
+>> and guest.
+>>
+>> Host:
+>>   Performance counter stats for 'sleep 5' (5 runs):
+>>
+>>            0.551428      task-clock (msec)         #    0.000 CPUs utilized            ( +-  0.91% )
+>>                   1      context-switches          #    0.002 M/sec
+>>                   0      cpu-migrations            #    0.000 K/sec
+>>                  48      page-faults               #    0.088 M/sec                    ( +-  1.05% )
+>>             1150265      cycles                    #    2.086 GHz                      ( +-  0.92% )
+>>     <not supported>      stalled-cycles-frontend
+>>     <not supported>      stalled-cycles-backend
+>>              526398      instructions              #    0.46  insns per cycle          ( +-  0.89% )
+>>     <not supported>      branches
+>>                9485      branch-misses             #   17.201 M/sec                    ( +-  2.35% )
+>>
+>>         5.000831616 seconds time elapsed                                          ( +-  0.00% )
+>>
+>> Guest:
+>>   Performance counter stats for 'sleep 5' (5 runs):
+>>
+>>            0.730868      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.13% )
+>>                   1      context-switches          #    0.001 M/sec
+>>                   0      cpu-migrations            #    0.000 K/sec
+>>                  48      page-faults               #    0.065 M/sec                    ( +-  0.42% )
+>>             1642982      cycles                    #    2.248 GHz                      ( +-  1.04% )
+>>     <not supported>      stalled-cycles-frontend
+>>     <not supported>      stalled-cycles-backend
+>>              637964      instructions              #    0.39  insns per cycle          ( +-  0.65% )
+>>     <not supported>      branches
+>>               10377      branch-misses             #   14.198 M/sec                    ( +-  1.09% )
+>>
+>>         5.001289068 seconds time elapsed                                          ( +-  0.00% )
+>>
+>> This patchset can be fetched from [1] and the relevant QEMU version for
+>> test can be fetched from [2].
+>>
+> Is there a changelog for this patch set somewhere?
+>
 
-> +		allwinner,pins = "PH20","PH21";
-> +		allwinner,function = "can";
-> +		allwinner,drive = <0>;
-> +		allwinner,pull = <0>;
-> +	};
-> +
-> +	can0: can <at> 01c2bc00 {
+I forgot this, while I realized it after sending this patchset out.
 
-    can0 at 01c2bc00
-
-> +		compatible = "allwinner,sunxican";
-> +		reg = <0x01c2bc00 0x400>;
-> +		interrupts = <0 26 4>;
-> +		clocks = <&apb1_gates 4>;
-> +		status = "disabled";
-> +	};
-> +
-> +Board specific .dts file:
-> +
-> +	can0: can <at> 01c2bc00 {
-
-can0 at 01c2bc00
-
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&can0_pins_a>;
-> +		status = "okay";
-> +	};
-> +
-> 
-
-Marc
+> If not, can you include this in v3 addressing Marc's comments?
+>
+> Thanks,
+> -Christoffer
+>
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/faf4ee40/attachment.sig>
+Shannon
