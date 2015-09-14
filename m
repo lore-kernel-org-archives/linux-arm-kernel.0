@@ -1,182 +1,113 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 14 Sep 2015 14:19:18 +0100
-Subject: [Patch v3 4/5] hwmon: Support registration of thermal zones for
- SCP temperature sensors
-In-Reply-To: <1442235619-4029-5-git-send-email-punit.agrawal@arm.com> (Punit
- Agrawal's message of "Mon, 14 Sep 2015 14:00:17 +0100")
-References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
- <1442235619-4029-5-git-send-email-punit.agrawal@arm.com>
-Message-ID: <9hhlhc9f8a1.fsf@e105922-lin.cambridge.arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 14 Sep 2015 15:20:25 +0200
+Subject: at91sam9 Main crystal frequency problems
+In-Reply-To: <55F6C07C.8080803@overkiz.com>
+References: <55ED3D3B.8060700@overkiz.com> <20150908181212.0b4336f0@bbrezillon>
+ <55F6C07C.8080803@overkiz.com>
+Message-ID: <20150914152025.059e2c8d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please ignore this particular patch. I had an earlier one lying around
-when I used git send-email *.
+Hi Antoine,
 
-Punit Agrawal <punit.agrawal@arm.com> writes:
+On Mon, 14 Sep 2015 14:41:32 +0200
+Antoine Aubert <a.aubert@overkiz.com> wrote:
 
-> Add support to create thermal zones based on the temperature sensors
-> provided by the SCP. The thermal zones can be defined using the
-> thermal DT bindings and should refer to the SCP sensor id to select
-> the sensor.
->
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Acked-by: Guenter Roeck <linux@roeck-us.net>
-> Cc: Eduardo Valentin <edubezval@gmail.com>
-> ---
->  drivers/hwmon/scpi-hwmon.c | 104 ++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 103 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/hwmon/scpi-hwmon.c b/drivers/hwmon/scpi-hwmon.c
-> index c7d1d14..2c1241b 100644
-> --- a/drivers/hwmon/scpi-hwmon.c
-> +++ b/drivers/hwmon/scpi-hwmon.c
-> @@ -20,6 +20,7 @@
->  #include <linux/scpi_protocol.h>
->  #include <linux/slab.h>
->  #include <linux/sysfs.h>
-> +#include <linux/thermal.h>
->  
->  struct sensor_data {
->  	struct scpi_sensor_info info;
-> @@ -29,14 +30,39 @@ struct sensor_data {
->  	char label[20];
->  };
->  
-> +struct scpi_thermal_zone {
-> +	struct list_head list;
-> +	int sensor_id;
-> +	struct scpi_sensors *scpi_sensors;
-> +	struct thermal_zone_device *tzd;
-> +};
-> +
->  struct scpi_sensors {
->  	struct scpi_ops *scpi_ops;
->  	struct sensor_data *data;
-> +	struct list_head thermal_zones;
->  	struct attribute **attrs;
->  	struct attribute_group group;
->  	const struct attribute_group *groups[2];
->  };
->  
-> +static int scpi_read_temp(void *dev, int *temp)
-> +{
-> +	struct scpi_thermal_zone *zone = dev;
-> +	struct scpi_sensors *scpi_sensors = zone->scpi_sensors;
-> +	struct scpi_ops *scpi_ops = scpi_sensors->scpi_ops;
-> +	struct sensor_data *sensor = &scpi_sensors->data[zone->sensor_id];
-> +	u32 value;
-> +	int ret;
-> +
-> +	ret = scpi_ops->sensor_get_value(sensor->info.sensor_id, &value);
-> +	if (ret)
-> +		return ret;
-> +
-> +	*temp = value;
-> +	return 0;
-> +}
-> +
->  /* hwmon callback functions */
->  static ssize_t
->  scpi_show_sensor(struct device *dev, struct device_attribute *attr, char *buf)
-> @@ -66,6 +92,24 @@ scpi_show_label(struct device *dev, struct device_attribute *attr, char *buf)
->  	return sprintf(buf, "%s\n", sensor->info.name);
->  }
->  
-> +static void
-> +unregister_thermal_zones(struct platform_device *pdev,
-> +			 struct scpi_sensors *scpi_sensors)
-> +{
-> +	struct list_head *pos;
-> +
-> +	list_for_each(pos, &scpi_sensors->thermal_zones) {
-> +		struct scpi_thermal_zone *zone;
-> +
-> +		zone = list_entry(pos, struct scpi_thermal_zone, list);
-> +		thermal_zone_of_sensor_unregister(&pdev->dev, zone->tzd);
-> +	}
-> +}
-> +
-> +static struct thermal_zone_of_device_ops scpi_sensor_ops = {
-> +	.get_temp = scpi_read_temp,
-> +};
-> +
->  static int scpi_hwmon_probe(struct platform_device *pdev)
->  {
->  	u16 nr_sensors, i;
-> @@ -160,10 +204,67 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
->  	scpi_sensors->group.attrs = scpi_sensors->attrs;
->  	scpi_sensors->groups[0] = &scpi_sensors->group;
->  
-> +	platform_set_drvdata(pdev, scpi_sensors);
-> +
->  	hwdev = devm_hwmon_device_register_with_groups(dev,
->  			"scpi_sensors", scpi_sensors, scpi_sensors->groups);
->  
-> -	return PTR_ERR_OR_ZERO(hwdev);
-> +	if (IS_ERR(hwdev))
-> +		return PTR_ERR(hwdev);
-> +
-> +	/*
-> +	 * Register the temperature sensors with the thermal framework
-> +	 * to allow their usage in setting up the thermal zones from
-> +	 * device tree.
-> +	 *
-> +	 * NOTE: Not all temperature sensors maybe used for thermal
-> +	 * control
-> +	 */
-> +	INIT_LIST_HEAD(&scpi_sensors->thermal_zones);
-> +	for (i = 0; i < nr_sensors; i++) {
-> +		struct sensor_data *sensor = &scpi_sensors->data[i];
-> +		struct scpi_thermal_zone *zone;
-> +
-> +		if (sensor->info.class != TEMPERATURE)
-> +			continue;
-> +
-> +		zone = devm_kzalloc(dev, sizeof(*zone), GFP_KERNEL);
-> +		if (!zone) {
-> +			ret = -ENOMEM;
-> +			goto unregister_tzd;
-> +		}
-> +
-> +		zone->sensor_id = i;
-> +		zone->scpi_sensors = scpi_sensors;
-> +		zone->tzd = thermal_zone_of_sensor_register(dev, i, zone,
-> +							    &scpi_sensor_ops);
-> +		/*
-> +		 * The call to thermal_zone_of_sensor_register returns
-> +		 * an error for sensors that are not associated with
-> +		 * any thermal zones or if the thermal subsystem is
-> +		 * not configured.
-> +		 */
-> +		if (IS_ERR(zone->tzd)) {
-> +			devm_kfree(dev, zone);
-> +			continue;
-> +		}
-> +		list_add(&zone->list, &scpi_sensors->thermal_zones);
-> +	}
-> +
-> +	return 0;
-> +
-> +unregister_tzd:
-> +	unregister_thermal_zones(pdev, scpi_sensors);
-> +	return ret;
-> +}
-> +
-> +static int scpi_hwmon_remove(struct platform_device *pdev)
-> +{
-> +	struct scpi_sensors *scpi_sensors = platform_get_drvdata(pdev);
-> +
-> +	unregister_thermal_zones(pdev, scpi_sensors);
-> +
-> +	return 0;
->  }
->  
->  static const struct of_device_id scpi_of_match[] = {
-> @@ -178,6 +279,7 @@ static struct platform_driver scpi_hwmon_platdrv = {
->  		.of_match_table = scpi_of_match,
->  	},
->  	.probe		= scpi_hwmon_probe,
-> +	.remove		= scpi_hwmon_remove,
->  };
->  module_platform_driver(scpi_hwmon_platdrv);
+> Hi Boris,
+> 
+> Thank you for your help. I have some news thanks to traces in clk driver.
+> 
+> 
+> Le 08/09/2015 18:12, Boris Brezillon a ?crit :
+> > Hi Antoine,
+> > 
+> > On Mon, 7 Sep 2015 09:31:07 +0200
+> > Antoine Aubert <a.aubert@overkiz.com> wrote:
+> > 
+> >> Hi,
+> >>
+> >> I currently bring up a board based on AT91SAM9G25cu, and I having
+> >> problems of watchdogs resets.
+> >>
+> >> We use linux-4.04 mainline, and i found some weird warnings on kernel
+> >> traces, concerning main clk.
+> >>
+> >> [    0.000000] Main crystal frequency not set, using approximate value
+> >> [    0.000000] master clk is overclocked
+> >> [    0.000000] sched_clock: 32 bits at 128 Hz, resolution 7812500ns,
+> >> wraps every 16777216000000000ns
+> >> [    0.007812] Calibrating delay loop... 198.76 BogoMIPS (lpj=775168)
+> >>
+> >> I set crystal clock in the DT, but it doesn't seems to work.. I feel
+> >> that the board works out of the specified range.
+> > 
+> > According to your clk_summary dump that's not the case.
+> > 
+> >>
+> >> So here comes my questions:
+> >> Can there be a relationship with watchdog problems ? (1 per day)
+> > 
+> > I'd say no, but could you tell me more about your watchdog issues.
+> 
+> Yet, we did not take the analysis. We just observed these resets.
+> 
+> But, I found a clue:
+> We recently removed the slow clock to the PCB. I forgot to disabled the
+> slow_xtal. :/
+>  Can there be a link ? (I think so...)
+
+Yep. The watchdog timer is based on the slow clock, which is taking its
+source from the crystal oscillator (requires a 32KHz external crystal),
+or the internal RC oscillator.
+Since the internal RC oscillator is not as accurate as the one using an
+external crystal (+-5%), you might just reset the watchdog a bit too
+late.
+
+Also, if you don't have this crystal, the clk event device is not
+reliable (unless you made a patch to change its source to one of the
+main clk divisor instead of the slow clk), but that should not impact
+the watchdog part.
+
+> 
+> > 
+> >> Why is it that the frequency of Crystal is not found ?
+> > 
+> > That's a good question, and honestly I don't. Everything seems to be
+> > defined properly in your device tree.
+> > 
+> > Could you add some traces in the fixed-rate clk driver [1] to see if the
+> > main_xtal is correctly registered and if its registration occurs before
+> > the main_osc registration?
+> 
+> On our board, there is two kernel boot phases.
+> 
+> First, we boot from at91-bootstrap.
+> Second we launched kexec with an other kernel.
+
+Yes, I kinda know this workflow :-).
+
+> 
+> I found that the device tree is well loaded from the at91-bootstrap. Any
+> crystal issues. But, on kexec --exec, (with the same kernel) those
+> issues appears. (see dmesg attached)
+> 
+> If I launch kexec with --dtb, it's working ...
+> I thought kexec keep old dtb. Was I wrong ?
+
+AFAIR, kexec is able to use the content of /proc/device-tree and create
+a dtb image to pass to the new kernel, but are you using the same
+kernel (4.0.4) for your "linux-based" bootloader?
+If that's not the case, then you're not supposed to pass the same
+device tree (see this note [1]).
+
+Best Regards,
+
+Boris
+
+
+[1]http://lxr.free-electrons.com/source/Documentation/arm/Atmel/README#L105
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
