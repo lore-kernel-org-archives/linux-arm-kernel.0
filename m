@@ -1,94 +1,182 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 14 Sep 2015 14:17:45 +0100
-Subject: [PATCH v2 2/3] drivers: firmware: psci: define more generic
- PSCI_FN_NATIVE macro
-In-Reply-To: <1434638494-514-3-git-send-email-sudeep.holla@arm.com>
-References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-3-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20150914131745.GA25469@red-moon>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 14 Sep 2015 14:19:18 +0100
+Subject: [Patch v3 4/5] hwmon: Support registration of thermal zones for
+ SCP temperature sensors
+In-Reply-To: <1442235619-4029-5-git-send-email-punit.agrawal@arm.com> (Punit
+ Agrawal's message of "Mon, 14 Sep 2015 14:00:17 +0100")
+References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+ <1442235619-4029-5-git-send-email-punit.agrawal@arm.com>
+Message-ID: <9hhlhc9f8a1.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 03:41:33PM +0100, Sudeep Holla wrote:
-> This patch replaces the definition and usage of PSCI_0_2_FN_NATIVE with
-> the new and more generic macro PSCI_FN_NATIVE that can be used with any
-> version. This will be useful for the new features introduced in PSCIv1.0
-> and for any future revisions.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Please ignore this particular patch. I had an earlier one lying around
+when I used git send-email *.
+
+Punit Agrawal <punit.agrawal@arm.com> writes:
+
+> Add support to create thermal zones based on the temperature sensors
+> provided by the SCP. The thermal zones can be defined using the
+> thermal DT bindings and should refer to the SCP sensor id to select
+> the sensor.
+>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Acked-by: Guenter Roeck <linux@roeck-us.net>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
 > ---
->  drivers/firmware/psci.c | 17 +++++++++--------
->  1 file changed, 9 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 68d0c2f6d004..752ca7c9eb97 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -29,13 +29,13 @@
->  /*
->   * While a 64-bit OS can make calls with SMC32 calling conventions, for some
->   * calls it is necessary to use SMC64 to pass or return 64-bit values. For such
-> - * calls PSCI_0_2_FN_NATIVE(x) will choose the appropriate (native-width)
-> + * calls PSCI_FN_NATIVE(x) will choose the appropriate (native-width)
-
-Nit: Comment should be PSCI_FN_NATIVE(version, name), fixed it up in my
-branch.
-
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
->   * function ID.
->   */
->  #ifdef CONFIG_64BIT
-> -#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN64_##name
-> +#define PSCI_FN_NATIVE(version, name)	PSCI_##version##_FN64_##name
->  #else
-> -#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN_##name
-> +#define PSCI_FN_NATIVE(version, name)	PSCI_##version##_FN_##name
->  #endif
+>  drivers/hwmon/scpi-hwmon.c | 104 ++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 103 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/hwmon/scpi-hwmon.c b/drivers/hwmon/scpi-hwmon.c
+> index c7d1d14..2c1241b 100644
+> --- a/drivers/hwmon/scpi-hwmon.c
+> +++ b/drivers/hwmon/scpi-hwmon.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/scpi_protocol.h>
+>  #include <linux/slab.h>
+>  #include <linux/sysfs.h>
+> +#include <linux/thermal.h>
 >  
->  /*
-> @@ -169,7 +169,7 @@ static int psci_migrate(unsigned long cpuid)
->  static int psci_affinity_info(unsigned long target_affinity,
->  		unsigned long lowest_affinity_level)
->  {
-> -	return invoke_psci_fn(PSCI_0_2_FN_NATIVE(AFFINITY_INFO),
-> +	return invoke_psci_fn(PSCI_FN_NATIVE(0_2, AFFINITY_INFO),
->  			      target_affinity, lowest_affinity_level, 0);
+>  struct sensor_data {
+>  	struct scpi_sensor_info info;
+> @@ -29,14 +30,39 @@ struct sensor_data {
+>  	char label[20];
+>  };
+>  
+> +struct scpi_thermal_zone {
+> +	struct list_head list;
+> +	int sensor_id;
+> +	struct scpi_sensors *scpi_sensors;
+> +	struct thermal_zone_device *tzd;
+> +};
+> +
+>  struct scpi_sensors {
+>  	struct scpi_ops *scpi_ops;
+>  	struct sensor_data *data;
+> +	struct list_head thermal_zones;
+>  	struct attribute **attrs;
+>  	struct attribute_group group;
+>  	const struct attribute_group *groups[2];
+>  };
+>  
+> +static int scpi_read_temp(void *dev, int *temp)
+> +{
+> +	struct scpi_thermal_zone *zone = dev;
+> +	struct scpi_sensors *scpi_sensors = zone->scpi_sensors;
+> +	struct scpi_ops *scpi_ops = scpi_sensors->scpi_ops;
+> +	struct sensor_data *sensor = &scpi_sensors->data[zone->sensor_id];
+> +	u32 value;
+> +	int ret;
+> +
+> +	ret = scpi_ops->sensor_get_value(sensor->info.sensor_id, &value);
+> +	if (ret)
+> +		return ret;
+> +
+> +	*temp = value;
+> +	return 0;
+> +}
+> +
+>  /* hwmon callback functions */
+>  static ssize_t
+>  scpi_show_sensor(struct device *dev, struct device_attribute *attr, char *buf)
+> @@ -66,6 +92,24 @@ scpi_show_label(struct device *dev, struct device_attribute *attr, char *buf)
+>  	return sprintf(buf, "%s\n", sensor->info.name);
 >  }
 >  
-> @@ -180,7 +180,7 @@ static int psci_migrate_info_type(void)
->  
->  static unsigned long psci_migrate_info_up_cpu(void)
+> +static void
+> +unregister_thermal_zones(struct platform_device *pdev,
+> +			 struct scpi_sensors *scpi_sensors)
+> +{
+> +	struct list_head *pos;
+> +
+> +	list_for_each(pos, &scpi_sensors->thermal_zones) {
+> +		struct scpi_thermal_zone *zone;
+> +
+> +		zone = list_entry(pos, struct scpi_thermal_zone, list);
+> +		thermal_zone_of_sensor_unregister(&pdev->dev, zone->tzd);
+> +	}
+> +}
+> +
+> +static struct thermal_zone_of_device_ops scpi_sensor_ops = {
+> +	.get_temp = scpi_read_temp,
+> +};
+> +
+>  static int scpi_hwmon_probe(struct platform_device *pdev)
 >  {
-> -	return invoke_psci_fn(PSCI_0_2_FN_NATIVE(MIGRATE_INFO_UP_CPU),
-> +	return invoke_psci_fn(PSCI_FN_NATIVE(0_2, MIGRATE_INFO_UP_CPU),
->  			      0, 0, 0);
+>  	u16 nr_sensors, i;
+> @@ -160,10 +204,67 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
+>  	scpi_sensors->group.attrs = scpi_sensors->attrs;
+>  	scpi_sensors->groups[0] = &scpi_sensors->group;
+>  
+> +	platform_set_drvdata(pdev, scpi_sensors);
+> +
+>  	hwdev = devm_hwmon_device_register_with_groups(dev,
+>  			"scpi_sensors", scpi_sensors, scpi_sensors->groups);
+>  
+> -	return PTR_ERR_OR_ZERO(hwdev);
+> +	if (IS_ERR(hwdev))
+> +		return PTR_ERR(hwdev);
+> +
+> +	/*
+> +	 * Register the temperature sensors with the thermal framework
+> +	 * to allow their usage in setting up the thermal zones from
+> +	 * device tree.
+> +	 *
+> +	 * NOTE: Not all temperature sensors maybe used for thermal
+> +	 * control
+> +	 */
+> +	INIT_LIST_HEAD(&scpi_sensors->thermal_zones);
+> +	for (i = 0; i < nr_sensors; i++) {
+> +		struct sensor_data *sensor = &scpi_sensors->data[i];
+> +		struct scpi_thermal_zone *zone;
+> +
+> +		if (sensor->info.class != TEMPERATURE)
+> +			continue;
+> +
+> +		zone = devm_kzalloc(dev, sizeof(*zone), GFP_KERNEL);
+> +		if (!zone) {
+> +			ret = -ENOMEM;
+> +			goto unregister_tzd;
+> +		}
+> +
+> +		zone->sensor_id = i;
+> +		zone->scpi_sensors = scpi_sensors;
+> +		zone->tzd = thermal_zone_of_sensor_register(dev, i, zone,
+> +							    &scpi_sensor_ops);
+> +		/*
+> +		 * The call to thermal_zone_of_sensor_register returns
+> +		 * an error for sensors that are not associated with
+> +		 * any thermal zones or if the thermal subsystem is
+> +		 * not configured.
+> +		 */
+> +		if (IS_ERR(zone->tzd)) {
+> +			devm_kfree(dev, zone);
+> +			continue;
+> +		}
+> +		list_add(&zone->list, &scpi_sensors->thermal_zones);
+> +	}
+> +
+> +	return 0;
+> +
+> +unregister_tzd:
+> +	unregister_thermal_zones(pdev, scpi_sensors);
+> +	return ret;
+> +}
+> +
+> +static int scpi_hwmon_remove(struct platform_device *pdev)
+> +{
+> +	struct scpi_sensors *scpi_sensors = platform_get_drvdata(pdev);
+> +
+> +	unregister_thermal_zones(pdev, scpi_sensors);
+> +
+> +	return 0;
 >  }
 >  
-> @@ -267,16 +267,17 @@ static void __init psci_init_migrate(void)
->  static void __init psci_0_2_set_functions(void)
->  {
->  	pr_info("Using standard PSCI v0.2 function IDs\n");
-> -	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN_NATIVE(CPU_SUSPEND);
-> +	psci_function_id[PSCI_FN_CPU_SUSPEND] =
-> +					PSCI_FN_NATIVE(0_2, CPU_SUSPEND);
->  	psci_ops.cpu_suspend = psci_cpu_suspend;
->  
->  	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
->  	psci_ops.cpu_off = psci_cpu_off;
->  
-> -	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN_NATIVE(CPU_ON);
-> +	psci_function_id[PSCI_FN_CPU_ON] = PSCI_FN_NATIVE(0_2, CPU_ON);
->  	psci_ops.cpu_on = psci_cpu_on;
->  
-> -	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN_NATIVE(MIGRATE);
-> +	psci_function_id[PSCI_FN_MIGRATE] = PSCI_FN_NATIVE(0_2, MIGRATE);
->  	psci_ops.migrate = psci_migrate;
->  
->  	psci_ops.affinity_info = psci_affinity_info;
-> -- 
-> 1.9.1
-> 
+>  static const struct of_device_id scpi_of_match[] = {
+> @@ -178,6 +279,7 @@ static struct platform_driver scpi_hwmon_platdrv = {
+>  		.of_match_table = scpi_of_match,
+>  	},
+>  	.probe		= scpi_hwmon_probe,
+> +	.remove		= scpi_hwmon_remove,
+>  };
+>  module_platform_driver(scpi_hwmon_platdrv);
