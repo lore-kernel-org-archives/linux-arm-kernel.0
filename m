@@ -1,69 +1,39 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 14 Sep 2015 13:53:00 +0200
-Subject: [PATCH v2 00/22] KVM: ARM64: Add guest PMU support
-In-Reply-To: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <20150914115300.GM15712@cbox>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 14 Sep 2015 14:04:19 +0200
+Subject: [PATCH v2] ARM: exynos_defconfig: Enable USB Video Class support
+Message-ID: <1442232259-777-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shannon,
+The Exynos5420 Peach Pit and Exynos5800 Peach Pi boards have a built-in
+Silicon Motion USB UVC WebCam. Enable support for the USB Video Class
+driver and its needed media Kconfig symbols so the camera is supported.
 
-On Fri, Sep 11, 2015 at 04:54:53PM +0800, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> This patchset adds guest PMU support for KVM on ARM64. It takes
-> trap-and-emulate approach. When guest wants to monitor one event, it
-> will be trapped by KVM and KVM will call perf_event API to create a perf
-> event and call relevant perf_event APIs to get the count value of event.
-> 
-> Use perf to test this patchset in guest. When using "perf list", it
-> shows the list of the hardware events and hardware cache events perf
-> supports. Then use "perf stat -e EVENT" to monitor some event. For
-> example, use "perf stat -e cycles" to count cpu cycles and
-> "perf stat -e cache-misses" to count cache misses.
-> 
-> Below are the outputs of "perf stat -r 5 sleep 5" when running in host
-> and guest.
-> 
-> Host:
->  Performance counter stats for 'sleep 5' (5 runs):
-> 
->           0.551428      task-clock (msec)         #    0.000 CPUs utilized            ( +-  0.91% )
->                  1      context-switches          #    0.002 M/sec
->                  0      cpu-migrations            #    0.000 K/sec
->                 48      page-faults               #    0.088 M/sec                    ( +-  1.05% )
->            1150265      cycles                    #    2.086 GHz                      ( +-  0.92% )
->    <not supported>      stalled-cycles-frontend
->    <not supported>      stalled-cycles-backend
->             526398      instructions              #    0.46  insns per cycle          ( +-  0.89% )
->    <not supported>      branches
->               9485      branch-misses             #   17.201 M/sec                    ( +-  2.35% )
-> 
->        5.000831616 seconds time elapsed                                          ( +-  0.00% )
-> 
-> Guest:
->  Performance counter stats for 'sleep 5' (5 runs):
-> 
->           0.730868      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.13% )
->                  1      context-switches          #    0.001 M/sec
->                  0      cpu-migrations            #    0.000 K/sec
->                 48      page-faults               #    0.065 M/sec                    ( +-  0.42% )
->            1642982      cycles                    #    2.248 GHz                      ( +-  1.04% )
->    <not supported>      stalled-cycles-frontend
->    <not supported>      stalled-cycles-backend
->             637964      instructions              #    0.39  insns per cycle          ( +-  0.65% )
->    <not supported>      branches
->              10377      branch-misses             #   14.198 M/sec                    ( +-  1.09% )
-> 
->        5.001289068 seconds time elapsed                                          ( +-  0.00% )
-> 
-> This patchset can be fetched from [1] and the relevant QEMU version for
-> test can be fetched from [2].
-> 
-Is there a changelog for this patch set somewhere?
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-If not, can you include this in v3 addressing Marc's comments?
+---
 
-Thanks,
--Christoffer
+Changes in v2:
+- Enable tristate Kconfig options as module instead of built-in.
+  Suggested by Krzysztof Kozlowski.
+
+ arch/arm/configs/exynos_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 711cb0a3893d..d4f6063d8a72 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -126,6 +126,10 @@ CONFIG_REGULATOR_S2MPA01=y
+ CONFIG_REGULATOR_S2MPS11=y
+ CONFIG_REGULATOR_S5M8767=y
+ CONFIG_REGULATOR_TPS65090=y
++CONFIG_MEDIA_SUPPORT=m
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_MEDIA_USB_SUPPORT=y
++CONFIG_USB_VIDEO_CLASS=m
+ CONFIG_DRM=y
+ CONFIG_DRM_NXP_PTN3460=y
+ CONFIG_DRM_PARADE_PS8622=y
+-- 
+2.4.3
