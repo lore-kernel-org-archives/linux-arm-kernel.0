@@ -1,148 +1,40 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Mon, 14 Sep 2015 16:42:21 +0800
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <20150911154534.GD4530@olila.local.net-space.pl>
-References: <20150910112418.GC29293@leverpostej>
- <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
- <20150910121514.GE29293@leverpostej>
- <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
- <20150910144938.GI29293@leverpostej>
- <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
- <20150910162302.GN29293@leverpostej>
- <20150911124643.GB4530@olila.local.net-space.pl>
- <alpine.DEB.2.02.1509111410180.2672@kaball.uk.xensource.com>
- <CAKv+Gu9rN7_mxk0huX+34HSCC_aTWVTkUZKQMB1+9U56fRnwsA@mail.gmail.com>
- <20150911154534.GD4530@olila.local.net-space.pl>
-Message-ID: <55F6886D.1090900@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Sep 2015 10:59:02 +0200
+Subject: [PATCH v4] mtd: nand: sunxi: fix OOB handling in ->write_xxx()
+ functions
+In-Reply-To: <1442220063-7520-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1442220063-7520-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1472478.qiY0UY0ao8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 14 September 2015 10:41:03 Boris Brezillon wrote:
+>                 /* Fill OOB data in */
+> -               if (oob_required) {
+> -                       tmp = 0xffffffff;
+> -                       memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, &tmp,
+> -                                   4);
+> -               } else {
+> -                       memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE,
+> -                                   chip->oob_poi + offset - mtd->writesize,
+> -                                   4);
+> -               }
+> +               writel(NFC_BUF_TO_USER_DATA(chip->oob_poi +
+> +                                           layout->oobfree[i].offset),
+> +                      nfc->regs + NFC_REG_USER_DATA_BASE);
 
+This looks like you are changing the endianess of the data that gets written.
+Is that intentional?
 
-On 2015/9/11 23:45, Daniel Kiper wrote:
-> On Fri, Sep 11, 2015 at 03:30:15PM +0200, Ard Biesheuvel wrote:
->> On 11 September 2015 at 15:14, Stefano Stabellini
->> <stefano.stabellini@eu.citrix.com> wrote:
->>> On Fri, 11 Sep 2015, Daniel Kiper wrote:
->>>> On Thu, Sep 10, 2015 at 05:23:02PM +0100, Mark Rutland wrote:
->>>>>>> C) When you could go:
->>>>>>>
->>>>>>>    DT -> Discover Xen -> Xen-specific stuff -> Xen-specific EFI/ACPI discovery
->>>>>>
->>>>>> I take you mean discovering Xen with the usual Xen hypervisor node on
->>>>>> device tree. I think that C) is a good option actually. I like it. Not
->>>>>> sure why we didn't think about this earlier. Is there anything EFI or
->>>>>> ACPI which is needed before Xen support is discovered by
->>>>>> arch/arm64/kernel/setup.c:setup_arch -> xen_early_init()?
->>>>>
->>>>> Currently lots (including the memory map). With the stuff to support
->>>>> SPCR, the ACPI discovery would be moved before xen_early_init().
->>>>>
->>>>>> If not, we could just go for this. A lot of complexity would go away.
->>>>>
->>>>> I suspect this would still be fairly complex, but would at least prevent
->>>>> the Xen-specific EFI handling from adversely affecting the native case.
->>>>>
->>>>>>> D) If you want to be generic:
->>>>>>>    EFI -> EFI application -> EFI tables -> ACPI tables -> Xen-specific stuff
->>>>>>>           \------------------------------------------/
->>>>>>>            (virtualize these, provide shims to Dom0, but handle
->>>>>>>             everything in Xen itself)
->>>>>>
->>>>>> I think that this is good in theory but could turn out to be a lot of
->>>>>> work in practice. We could probably virtualize the RuntimeServices but
->>>>>> the BootServices are troublesome.
->>>>>
->>>>> What's troublesome with the boot services?
->>>>>
->>>>> What can't be simulated?
->>>>
->>>> How do you want to access bare metal EFI boot services from dom0 if they
->>>> were shutdown long time ago before loading dom0 image? What do you need
->>>> from EFI boot services in dom0?
->>>
->>> That's right. Trying to emulate BootServices after the real
->>> ExitBootServices has already been called seems like a very bad plan.
->>>
->>> I think that whatever interface we come up with, would need to be past
->>> ExitBootServices.
->>
->> It feels like this discussion is going in circles.
->>
->> When we discussed this six months ago, we already concluded that,
->> since UEFI is the only specified way that the presence of ACPI is
->> advertised on an ARM system, we need to emulate UEFI to some extent.
->>
->> So we need the EFI system table to expose the UEFI configuration table
->> that carries the ACPI root pointer.
->>
->> Since ACPI support also relies on the UEFI memory map (I think?), we
->> need that as well.
->>
->> These two items are exactly what we pass via the UEFI DT properties,
->> so we should indeed promote the current de-facto binding to a proper
->> binding, and renaming the properties makes sense in that context.
->>
->> I agree that this should also include a description of the expected
->> state of the firmware, i.e., that ExitBootServices() has been called,
->> and that the memory map has been populated with virtual address, which
->> have been installed using SetVirtualAddressMap() if they differ from
->> the physical addresses. (The current implementation on the kernel side
->> is perfectly capable of dealing with a 1:1 mapping).
->>
->> Beyond that, there is no point in pretending to be a full UEFI
->> implementation, imo. Boot services are not required, nor are runtime
->> services (only the current EFI init code on arm needs to be modified
->> to deal with a NULL runtime services pointer)
-> 
-> Taking into account above I think that you have most of the code in place.
-> Please take a look at linux/arch/x86/xen/efi.c, linux/drivers/acpi/osl.c
-> and linux/drivers/xen/efi.c (maybe somewhere else). In general you should
-> create ARM version of xen_efi_init() (x86 version you can find in
-> linux/drivers/xen/efi.c; it is very simple thing), maybe add some
-> code in a few places and voila.
-> 
+memcpy_toio() uses the same endianess for source and destination, while writel()
+assumes that the destination is a little-endian register, and that could break
+if the kernel is built to run as big-endian. I also see that sunxi_nfc_write_buf()
+uses memcpy_toio() for writing the actual data, and you are not changing that.
 
-It only needs to apply following patch to fix a bug in Linux kernel when
-mapping EFI_MEMORY_RUNTIME memory.
+If all hardware can do 32-bit accesses here and the size is guaranteed to be a
+multiple of four bytes, you can probably improve performance by using a
+__raw_writel() loop there. Using __raw_writel() in general is almost always
+a bug, but here it actually makes sense. See also the powerpc implementation
+of _memcpy_toio().
 
-Author: Shannon Zhao <shannon.zhao@linaro.org>
-Date:   Thu Aug 20 14:54:58 2015 +0800
-
-    arm64/efi: Fix a bug when no EFI_MEMORY_RUNTIME memory found
-
-    Currently if the attribute type of all the EFI Memory Descriptors are
-    not EFI_MEMORY_RUNTIME, efi_virtmap_init will return true. But at this
-    case, it expect false as there are no EFI memory for RUNTIME. Fix it by
-    introducing a status to show whether it finds EFI_MEMORY_RUNTIME.
-
-    Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index e8ca6ea..bad7f87 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -233,6 +233,7 @@ void __init efi_init(void)
- static bool __init efi_virtmap_init(void)
- {
-        efi_memory_desc_t *md;
-+       bool status = false;
-
-        for_each_efi_memory_desc(&memmap, md) {
-                u64 paddr, npages, size;
-@@ -264,8 +265,11 @@ static bool __init efi_virtmap_init(void)
-                        prot = PAGE_KERNEL;
-
-                create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size,
-prot);
-+               status = true;
-        }
--       return true;
-+       if (status)
-+               return true;
-+       return false;
- }
-
--- 
-Shannon
+	Arnd
