@@ -1,60 +1,43 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 14 Sep 2015 15:38:36 +0100
-Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
-In-Reply-To: <20150914134949.GE7002@leverpostej> (Mark Rutland's message of
- "Mon, 14 Sep 2015 14:49:49 +0100")
-References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
- <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
- <20150914131448.GC7002@leverpostej>
- <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
- <20150914134949.GE7002@leverpostej>
-Message-ID: <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Sep 2015 16:40:40 +0200
+Subject: [PATCH 2/4] ARM: sun8i: Add the A33 AHB1 gates clock driver
+In-Reply-To: <87wpvu2vzr.fsf@dell.be.48ers.dk>
+References: <1441977997-29041-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1441977997-29041-3-git-send-email-maxime.ripard@free-electrons.com>
+ <87wpvu2vzr.fsf@dell.be.48ers.dk>
+Message-ID: <20150914144040.GD4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Rutland <mark.rutland@arm.com> writes:
+Hi Peter,
 
->> >> +Sensor bindings for the sensors based on SCPI Message Protocol
->> >> +--------------------------------------------------------------
->> >> +SCPI provides an API to access the various sensors on the SoC.
->> >> +
->> >> +Required properties:
->> >> +- compatible : should be "arm,scpi-sensors".
->> >> +- #thermal-sensor-cells: should be set to 1. This property follows the
->> >> +			 thermal device tree bindings[2].
->> >
->> > You need to specify what the valid values for this cell are.
->> 
->> The enumeration depends on the number of sensors exported by SCP
->> firmware - which is platform dependent. I could add add something like
->> if you think that is helpful -
->> 
->> "Valid cell value is a number between 0..n-1, where n is the number
->> of sensors exported by SCP firmware."
->
-> Can the FW identifer space have holes? Or are they always contiguous?
+On Sun, Sep 13, 2015 at 05:13:12PM +0200, Peter Korsgaard wrote:
+> >>>>> "Maxime" == Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+> 
+>  > The A33 has different a different gates array than the A23, add the node to
+>  > the DT.
+> 
+> NIT: 2x different.
 
-The way the SCP interface is defined, the sensor identifiers are
-contiguous, but not all are temperature sensors.
+Ah, good catch, thanks!
 
->
-> If this is the same as the raw FW identifer value, specify that.
-> Otherwise, you need to specify the mapping.
+> Shouldn't the a23 one then move from sun8i-a23-a33.dtsi to
+> sun8i-a23.dtsi?
 
-I'll update the patch to add mappings for Juno r0 (and r1 if I can get
-my hands on one).
+It is, but in order to preserve bisectability, I declared the A33 node
+first, that has precedence over the A23 still in the common DTSI, and
+removed the A23 in the next patch.
 
->
-> There needs to be enough information for a dts author to figure out
-> which values to place in the DT.
+Maxime
 
-I understand. Except sometimes it is hard to get the firmware to commit to not
-modify the ordering - discoverability and all that. :)
-
->
-> Thanks,
-> Mark.
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/a3566487/attachment.sig>
