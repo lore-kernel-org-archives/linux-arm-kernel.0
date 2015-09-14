@@ -1,112 +1,46 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 14 Sep 2015 18:17:03 +0530
-Subject: [RFC 2/3] mmc: sdhci: add host_ops->voltage_switch callback for
- all other voltages
-In-Reply-To: <55F6C080.8000604@linaro.org>
-References: <1441135938-8056-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1441135938-8056-3-git-send-email-vaibhav.hiremath@linaro.org>
- <20150902150442.118d3305@xhacker> <55E6B129.1030002@linaro.org>
- <20150902162627.682cdedf@xhacker> <55E6E0FD.7000806@linaro.org>
- <CAPDyKFqOGsKXTCOG89Kq=F6VsDpyfnpwo+jNb+6otgPUFE_bzw@mail.gmail.com>
- <55F6969D.7090004@linaro.org>
- <CAPDyKFrpDPaCLNEdwP7vYM4CJfxyz-zwC8+9AJMcUG+O=GCBOA@mail.gmail.com>
- <55F6C080.8000604@linaro.org>
-Message-ID: <55F6C1C7.8030107@linaro.org>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 14 Sep 2015 13:47:14 +0100
+Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
+In-Reply-To: <55F6B8CC.5090406@citrix.com>
+References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+ <55F68BC9.6020509@citrix.com> <55F6A437.3040403@citrix.com>
+ <55F6A9DB.8040503@citrix.com> <55F6ADAE.1010609@citrix.com>
+ <55F6B8CC.5090406@citrix.com>
+Message-ID: <55F6C1D2.7010206@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 14/09/15 13:08, Roger Pau Monn? wrote:
+>> I'd like to see a basic support of 64KB page granularity upstream before
+>> starting to think about performance improvement. And there is still a
+>> lot to do.
+> 
+> I wasn't actually thinking of this as a performance improvement, but
+> rather as a way of fixing this properly and removing the complexity
+> added to xen-blkfront, thus providing a PV block protocol that natively
+> supports 64KB pages. This would be like hardware components already do
+> AFAIK, because I don't think there are other drivers in the Linux tree
+> that do this kind of splitting.
+> 
+>> Although, having 64KB grants won't remove the splitting as we would
+>> still have to support frontend/backend which only handle 4KB grant.
+> 
+> IMHO, given enough time I would just drop those.
 
+The PV protocol has always been backward compatible.
 
-On Monday 14 September 2015 06:11 PM, Vaibhav Hiremath wrote:
->
->
-> On Monday 14 September 2015 04:04 PM, Ulf Hansson wrote:
->> On 14 September 2015 at 11:42, Vaibhav Hiremath
->> <vaibhav.hiremath@linaro.org> wrote:
->>>
->>>
->>> On Monday 14 September 2015 03:00 PM, Ulf Hansson wrote:
->>>>
->>>> [...]
->>>>
->>>>>>>>
->>>>>>>> Could this be implemented by regulator API? From patch set 3/3, the
->>>>>>>> pxa1928
->>>>>>>> voltage_switch hook is to operate the IO pad registers, this
->>>>>>>> seems not
->>>>>>>> belong
->>>>>>>> to the SDHC IP core.
->>>>>>>>
->>>>>>>
->>>>>>> Not quite sure whether regulator would be right fit for this.
->>>>>>
->>>>>>
->>>>>>
->>>>>>    From the patche[3/3], this can be achieved by abstracting the
->>>>>> IO PAD
->>>>>> as
->>>>>> regulators
->>>>>> then, we may not need to touch the core sdhci.c. But I'm not sure
->>>>>> whether
->>>>>> this
->>>>>> is the good solution or not.
->>>>>
->>>>>
->>>>>
->>>>> Exactly...
->>>>>
->>>>>> sdhci Maintainers and experts may have better
->>>>>> suggestions.
->>>>>>
->>>>>
->>>>> Thats is the reason I stamped it as a RFC :)
->>>>>
->>>>
->>>> [...]
->>>>
->>>>   From an mmc core perspective it would be preferred if you implement
->>>> this as a regulator (vqmmc).
->>>>
->>>> Especially since we will soon have an API for how to set the I/O
->>>> voltages - and the intelligence within that API is not something we
->>>> would like to implement for each and every host driver.
->>>> https://lkml.org/lkml/2015/8/31/367
->>>>
->>>
->>>
->>> I would still consider this as a regulator specific and may not address
->>> the IO configuration within the SoC which are module specific.
->>> The API regulator_set_voltage_triplet() will not have intelligence to
->>> differentiate whether the call is coming from MMC or somewhere else.
->>>
->>> Note that, the IO pad voltage configuration which I am referring to is
->>> MMC specific and applicable only when pad is configured in MMC mode. So
->>> technically it is not simply common pad voltage configuration.
->>>
->>>
->>> And I am still not sure regulator framework would be right fit for
->>> this. Pinctrl would have been right fit, but...since I saw f_sdh30
->>> driver is already doing this, which is easy fit; so adopted the same.
->>
->> Pinctrl would work as well, or perhaps a combination of both pinctrl
->> and a regulator.
->
->
-> Not sure, how I can propagate "call coming from MMC/SD" to both
-> regulator and pinctrl.
-> Probably pinctrl would already know, but then it doesn't know the
-> voltage settings.
->
-> Let me spend some time, but atleast at this point I am not sure.
->
->>
+Introducing the support of 64KB grant will require some changes in Xen
+which won't surely be backported to older version. We still have to be
+able to run new Linux guest on older Xen and vice versa.
 
-On the side note,
-Lets park this patch aside, till I get back with better option.
+To give you an example, Centos 7, which will support Xen and only 64KB
+page granularity, will be supported for years. Dropping any splitting in
+a short future (3-5 years) will just break those guests to boot on Xen.
 
-It would be nice if you could review other patches, let them notget
-blocked due to this.
+AFAIK, we never took a such radical decision on Xen based on the
+complexity of the code.
 
+Regards,
 
-Thanks,
-Vaibhav
+-- 
+Julien Grall
