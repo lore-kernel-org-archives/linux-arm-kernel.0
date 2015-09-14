@@ -1,85 +1,64 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 Sep 2015 17:44:03 +0100
-Subject: [PATCH v3 4/8] genirq: irqdomain: Add irq_create_acpi_mapping
+Date: Mon, 14 Sep 2015 17:44:07 +0100
+Subject: [PATCH v3 8/8] acpi: gsi: Cleanup acpi_register_gsi
 In-Reply-To: <1442249047-21182-1-git-send-email-marc.zyngier@arm.com>
 References: <1442249047-21182-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1442249047-21182-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1442249047-21182-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to help ACPI on arm64 to make use of most of the irqdomain
-goodies, add a new entry point (irq_create_acpi_mapping) which
-mimics irq_create_of_mapping, except that it takes a new
-struct acpi_gsi_descriptor, which is the pendent of of_phandle_args
-in the OF world.
+As the only user of drivers/acpi/gsi.c is now using acpi_set_irq_model
+to set acpi_gsi_descriptor_populate to something meaningful, we can
+always rely on that information to be present (its absence is an error),
+and guarantee that new interrupt controllers will use this API.
 
-We assume that the way the acpi_gsi_descriptor is populated matches
-that of of_phandle_args, as the latter is still the building block
-for interrupt descriptor in the whole kernel.
-
-Eventually, these two representations should be merged in a single
-structure, but that's probably for another day.
+Take this opportunity to cleanup acpi_register_gsi.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/acpi.h   |  9 +++++++++
- kernel/irq/irqdomain.c | 18 ++++++++++++++++++
- 2 files changed, 27 insertions(+)
+ drivers/acpi/gsi.c | 24 ++++++++----------------
+ 1 file changed, 8 insertions(+), 16 deletions(-)
 
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 7235c48..4db2f01 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -201,6 +201,15 @@ int acpi_register_gsi (struct device *dev, u32 gsi, int triggering, int polarity
- int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
- int acpi_isa_irq_to_gsi (unsigned isa_irq, u32 *gsi);
+diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
+index 07f5fef5..2dde6a1 100644
+--- a/drivers/acpi/gsi.c
++++ b/drivers/acpi/gsi.c
+@@ -75,28 +75,20 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
+ 		      int polarity)
+ {
+ 	int err;
+-	unsigned int irq;
++	struct acpi_gsi_descriptor data;
+ 	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
+ 	struct irq_domain *d = irq_find_host(acpi_gsi_domain_token);
  
-+#define MAX_GSI_DESC_PARAMS 16
-+struct acpi_gsi_descriptor {
-+	int param_count;
-+	u32 param[MAX_GSI_DESC_PARAMS];
-+};
-+
-+unsigned int irq_create_acpi_mapping(struct irq_domain *d,
-+				     struct acpi_gsi_descriptor *irq_data);
-+
- #ifdef CONFIG_X86_IO_APIC
- extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
- #else
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 619552a..ca1301b 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -1,5 +1,6 @@
- #define pr_fmt(fmt)  "irq: " fmt
+-	if (acpi_gsi_descriptor_populate) {
+-		struct acpi_gsi_descriptor data;
+-		err = acpi_gsi_descriptor_populate(&data, gsi, irq_type);
+-		if (err)
+-			return err;
+-
+-		return irq_create_acpi_mapping(d, &data);
++	if (WARN_ON(!acpi_gsi_descriptor_populate)) {
++		pr_warn("GSI: No registered irqchip, giving up\n");
++		return -EINVAL;
+ 	}
  
-+#include <linux/acpi.h>
- #include <linux/debugfs.h>
- #include <linux/hardirq.h>
- #include <linux/idr.h>
-@@ -687,6 +688,23 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+-	irq = irq_create_mapping(d, gsi);
+-	if (!irq)
+-		return -EINVAL;
++	err = acpi_gsi_descriptor_populate(&data, gsi, irq_type);
++	if (err)
++		return err;
+ 
+-	/* Set irq type if specified and different than the current one */
+-	if (irq_type != IRQ_TYPE_NONE &&
+-		irq_type != irq_get_trigger_type(irq))
+-		irq_set_irq_type(irq, irq_type);
+-	return irq;
++	return irq_create_acpi_mapping(d, &data);
  }
- EXPORT_SYMBOL_GPL(irq_create_of_mapping);
+ EXPORT_SYMBOL_GPL(acpi_register_gsi);
  
-+#ifdef CONFIG_ACPI
-+unsigned int irq_create_acpi_mapping(struct irq_domain *d,
-+				     struct acpi_gsi_descriptor *irq_data)
-+{
-+	struct of_phandle_args args;
-+	int i;
-+
-+	for (i = 0; i < min(irq_data->param_count, MAX_PHANDLE_ARGS); i++)
-+		args.args[i] = irq_data->param[i];
-+
-+	args.np = d ? d->domain_token : NULL;
-+	args.args_count = i;
-+
-+	return irq_create_of_mapping(&args);
-+}
-+#endif
-+
- /**
-  * irq_dispose_mapping() - Unmap an interrupt
-  * @virq: linux irq number of the interrupt to unmap
 -- 
 2.1.4
