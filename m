@@ -1,96 +1,134 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 14 Sep 2015 14:23:46 +0100
-Subject: [PATCH v2 3/3] drivers: firmware: psci: add system suspend support
-In-Reply-To: <1434638494-514-4-git-send-email-sudeep.holla@arm.com>
-References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-4-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20150914132346.GB25469@red-moon>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Mon, 14 Sep 2015 21:24:18 +0800
+Subject: [PATCH v2 00/22] KVM: ARM64: Add guest PMU support
+In-Reply-To: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <55F6CA82.9090607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 03:41:34PM +0100, Sudeep Holla wrote:
-> PSCI v1.0 introduces a new API called PSCI_SYSTEM_SUSPEND. This API
-> provides the mechanism by which the calling OS can request entry into
-> the deepest possible system sleep state.
-> 
-> It meets all the necessary preconditions for entering suspend to RAM
-> state in Linux. This patch adds support for PSCI_SYSTEM_SUSPEND in psci
-> firmware and registers a psci system suspend operation to implement the
-> suspend-to-RAM(s2r) in a generic way on all the platforms implementing
-> PSCI.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/firmware/psci.c   | 31 +++++++++++++++++++++++++++++++
->  include/uapi/linux/psci.h |  3 +++
->  2 files changed, 34 insertions(+)
-> 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 752ca7c9eb97..f2b2b3e1c6e4 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -20,11 +20,13 @@
->  #include <linux/printk.h>
->  #include <linux/psci.h>
->  #include <linux/reboot.h>
-> +#include <linux/suspend.h>
->  
->  #include <uapi/linux/psci.h>
->  
->  #include <asm/system_misc.h>
->  #include <asm/smp_plat.h>
-> +#include <asm/suspend.h>
->  
->  /*
->   * While a 64-bit OS can make calls with SMC32 calling conventions, for some
-> @@ -222,6 +224,33 @@ static int __init psci_features(u32 psci_func_id)
->  			      psci_func_id, 0, 0);
->  }
->  
-> +static int psci_system_suspend(unsigned long unused)
-> +{
-> +	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
-> +			      virt_to_phys(cpu_resume), 0, 0);
-> +}
-> +
-> +static int psci_system_suspend_enter(suspend_state_t state)
-> +{
-> +	return cpu_suspend(0, psci_system_suspend);
-> +}
-> +
-> +static const struct platform_suspend_ops psci_suspend_ops = {
-> +	.valid          = suspend_valid_only_mem,
-> +	.enter          = psci_system_suspend_enter,
-> +};
-> +
-> +static void __init psci_init_system_suspend(void)
-> +{
-> +	if (!IS_ENABLED(CONFIG_SUSPEND))
-> +		return;
-> +
-> +	if (psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND)))
-> +		return;
-> +
-> +	suspend_set_ops(&psci_suspend_ops);
+Sorry, I forgot the changlog. Below are the main changes of this v2 
+patchset.
 
-For consistency with psci_init_cpu_suspend I rewrote it like this:
+Changes since v1->v2:
+* Use switch...case for registers access handler instead of adding
+   alone handler for each register
+* Try to use the sys_regs to store the register value instead of adding
+   new variables in struct kvm_pmc
+* Fix the handle of cp15 regs
+* Create a new kvm device vPMU, then userspace could choose whether to
+   create PMU
+* Fix the handle of PMU overflow interrupt
 
-static void __init psci_init_system_suspend(void)
-{
-	int ret;
+On 2015/9/11 16:54, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+>
+> This patchset adds guest PMU support for KVM on ARM64. It takes
+> trap-and-emulate approach. When guest wants to monitor one event, it
+> will be trapped by KVM and KVM will call perf_event API to create a perf
+> event and call relevant perf_event APIs to get the count value of event.
+>
+> Use perf to test this patchset in guest. When using "perf list", it
+> shows the list of the hardware events and hardware cache events perf
+> supports. Then use "perf stat -e EVENT" to monitor some event. For
+> example, use "perf stat -e cycles" to count cpu cycles and
+> "perf stat -e cache-misses" to count cache misses.
+>
+> Below are the outputs of "perf stat -r 5 sleep 5" when running in host
+> and guest.
+>
+> Host:
+>   Performance counter stats for 'sleep 5' (5 runs):
+>
+>            0.551428      task-clock (msec)         #    0.000 CPUs utilized            ( +-  0.91% )
+>                   1      context-switches          #    0.002 M/sec
+>                   0      cpu-migrations            #    0.000 K/sec
+>                  48      page-faults               #    0.088 M/sec                    ( +-  1.05% )
+>             1150265      cycles                    #    2.086 GHz                      ( +-  0.92% )
+>     <not supported>      stalled-cycles-frontend
+>     <not supported>      stalled-cycles-backend
+>              526398      instructions              #    0.46  insns per cycle          ( +-  0.89% )
+>     <not supported>      branches
+>                9485      branch-misses             #   17.201 M/sec                    ( +-  2.35% )
+>
+>         5.000831616 seconds time elapsed                                          ( +-  0.00% )
+>
+> Guest:
+>   Performance counter stats for 'sleep 5' (5 runs):
+>
+>            0.730868      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.13% )
+>                   1      context-switches          #    0.001 M/sec
+>                   0      cpu-migrations            #    0.000 K/sec
+>                  48      page-faults               #    0.065 M/sec                    ( +-  0.42% )
+>             1642982      cycles                    #    2.248 GHz                      ( +-  1.04% )
+>     <not supported>      stalled-cycles-frontend
+>     <not supported>      stalled-cycles-backend
+>              637964      instructions              #    0.39  insns per cycle          ( +-  0.65% )
+>     <not supported>      branches
+>               10377      branch-misses             #   14.198 M/sec                    ( +-  1.09% )
+>
+>         5.001289068 seconds time elapsed                                          ( +-  0.00% )
+>
+> This patchset can be fetched from [1] and the relevant QEMU version for
+> test can be fetched from [2].
+>
+> Thanks,
+> Shannon
+>
+> [1] https://git.linaro.org/people/shannon.zhao/linux-mainline.git  KVM_ARM64_PMU_v2
+> [2] https://git.linaro.org/people/shannon.zhao/qemu.git  PMU_v2
+>
+> Shannon Zhao (22):
+>    ARM64: Move PMU register related defines to asm/pmu.h
+>    KVM: ARM64: Define PMU data structure for each vcpu
+>    KVM: ARM64: Add offset defines for PMU registers
+>    KVM: ARM64: Add reset and access handlers for PMCR_EL0 register
+>    KVM: ARM64: Add a helper for CP15 registers reset to UNKNOWN
+>    KVM: ARM64: Add reset and access handlers for PMSELR register
+>    KVM: ARM64: Add reset and access handlers for PMCEID0 and PMCEID1
+>      register
+>    KVM: ARM64: PMU: Add perf event map and introduce perf event creating
+>      function
+>    KVM: ARM64: Add reset and access handlers for PMXEVTYPER register
+>    KVM: ARM64: Add reset and access handlers for PMXEVCNTR register
+>    KVM: ARM64: Add reset and access handlers for PMCCNTR register
+>    KVM: ARM64: Add reset and access handlers for PMCNTENSET and
+>      PMCNTENCLR register
+>    KVM: ARM64: Add reset and access handlers for PMINTENSET and
+>      PMINTENCLR register
+>    KVM: ARM64: Add reset and access handlers for PMOVSSET and PMOVSCLR
+>      register
+>    KVM: ARM64: Add a helper for CP15 registers reset to specified value
+>    KVM: ARM64: Add reset and access handlers for PMUSERENR register
+>    KVM: ARM64: Add reset and access handlers for PMSWINC register
+>    KVM: ARM64: Add access handlers for PMEVCNTRn and PMEVTYPERn register
+>    KVM: ARM64: Add PMU overflow interrupt routing
+>    KVM: ARM64: Reset PMU state when resetting vcpu
+>    KVM: ARM64: Free perf event of PMU when destroying vcpu
+>    KVM: ARM64: Add a new kvm ARM PMU device
+>
+>   Documentation/virtual/kvm/devices/arm-pmu.txt |  15 +
+>   arch/arm/kvm/arm.c                            |   4 +
+>   arch/arm64/include/asm/kvm_asm.h              |  59 ++-
+>   arch/arm64/include/asm/kvm_host.h             |   2 +
+>   arch/arm64/include/asm/pmu.h                  |  49 +++
+>   arch/arm64/include/uapi/asm/kvm.h             |   3 +
+>   arch/arm64/kernel/perf_event.c                |  35 --
+>   arch/arm64/kvm/Kconfig                        |   8 +
+>   arch/arm64/kvm/Makefile                       |   1 +
+>   arch/arm64/kvm/reset.c                        |   3 +
+>   arch/arm64/kvm/sys_regs.c                     | 490 +++++++++++++++++++++++--
+>   arch/arm64/kvm/sys_regs.h                     |  16 +
+>   include/kvm/arm_pmu.h                         |  66 ++++
+>   include/linux/kvm_host.h                      |   1 +
+>   include/uapi/linux/kvm.h                      |   2 +
+>   virt/kvm/arm/pmu.c                            | 500 ++++++++++++++++++++++++++
+>   virt/kvm/kvm_main.c                           |   4 +
+>   17 files changed, 1188 insertions(+), 70 deletions(-)
+>   create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
+>   create mode 100644 include/kvm/arm_pmu.h
+>   create mode 100644 virt/kvm/arm/pmu.c
+>
 
-	if (!IS_ENABLED(CONFIG_SUSPEND))
-		return;
-
-	ret = psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND));
-
-	if (ret != PSCI_RET_NOT_SUPPORTED)
-		suspend_set_ops(&psci_suspend_ops);
-}
-
-Let me know if it is ok with you. Other than that:
-
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+-- 
+Shannon
