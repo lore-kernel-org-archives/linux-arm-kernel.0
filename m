@@ -1,78 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 Sep 2015 17:44:04 +0100
-Subject: [PATCH v3 5/8] acpi: gsi: Always perform an irq domain lookup
-In-Reply-To: <1442249047-21182-1-git-send-email-marc.zyngier@arm.com>
-References: <1442249047-21182-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1442249047-21182-6-git-send-email-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 14 Sep 2015 17:54:39 +0100
+Subject: [PATCH] drivers/perf: arm_pmu: avoid CPU device_node reference leak
+Message-ID: <1442249679-12899-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of directly passing NULL to the various irq_domain functions,
-start by looking up the domain with a domain_token.
+of_cpu_device_node_get increments the reference count on the CPU
+device_node, so we must take care to of_node_put once we've finished
+with it.
 
-As domain_token is permanently set to NULL, the lookup function will
-return the same value (no domain found) and the default will be used,
-preserving the current behaviour.
+This patch fixes the perf IRQ probing code to avoid the leak.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/acpi/gsi.c | 22 +++++++++-------------
- 1 file changed, 9 insertions(+), 13 deletions(-)
+ drivers/perf/arm_pmu.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-index 38208f2..b2af93b 100644
---- a/drivers/acpi/gsi.c
-+++ b/drivers/acpi/gsi.c
-@@ -14,6 +14,8 @@
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index 2365a32a595e..be3755c973e9 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -823,9 +823,15 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
+ 		}
  
- enum acpi_irq_model_id acpi_irq_model;
- 
-+static void *acpi_gsi_domain_token;
+ 		/* Now look up the logical CPU number */
+-		for_each_possible_cpu(cpu)
+-			if (dn == of_cpu_device_node_get(cpu))
++		for_each_possible_cpu(cpu) {
++			struct device_node *cpu_dn;
 +
- static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
- {
- 	switch (polarity) {
-@@ -45,12 +47,9 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
-  */
- int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
- {
--	/*
--	 * Only default domain is supported at present, always find
--	 * the mapping corresponding to default domain by passing NULL
--	 * as irq_domain parameter
--	 */
--	*irq = irq_find_mapping(NULL, gsi);
-+	struct irq_domain *d = irq_find_host(acpi_gsi_domain_token);
++			cpu_dn = of_cpu_device_node_get(cpu);
++			of_node_put(cpu_dn);
 +
-+	*irq = irq_find_mapping(d, gsi);
- 	/*
- 	 * *irq == 0 means no mapping, that should
- 	 * be reported as a failure
-@@ -74,13 +73,9 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
- {
- 	unsigned int irq;
- 	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
-+	struct irq_domain *d = irq_find_host(acpi_gsi_domain_token);
++			if (dn == cpu_dn)
+ 				break;
++		}
  
--	/*
--	 * There is no way at present to look-up the IRQ domain on ACPI,
--	 * hence always create mapping referring to the default domain
--	 * by passing NULL as irq_domain parameter
--	 */
--	irq = irq_create_mapping(NULL, gsi);
-+	irq = irq_create_mapping(d, gsi);
- 	if (!irq)
- 		return -EINVAL;
- 
-@@ -98,7 +93,8 @@ EXPORT_SYMBOL_GPL(acpi_register_gsi);
-  */
- void acpi_unregister_gsi(u32 gsi)
- {
--	int irq = irq_find_mapping(NULL, gsi);
-+	struct irq_domain *d = irq_find_host(acpi_gsi_domain_token);
-+	int irq = irq_find_mapping(d, gsi);
- 
- 	irq_dispose_mapping(irq);
- }
+ 		if (cpu >= nr_cpu_ids) {
+ 			pr_warn("Failed to find logical CPU for %s\n",
 -- 
 2.1.4
