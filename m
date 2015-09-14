@@ -1,92 +1,73 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 14 Sep 2015 14:34:03 +0100
-Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
-In-Reply-To: <20150914131448.GC7002@leverpostej> (Mark Rutland's message of
- "Mon, 14 Sep 2015 14:14:48 +0100")
-References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
- <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
- <20150914131448.GC7002@leverpostej>
-Message-ID: <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 14 Sep 2015 14:35:10 +0100
+Subject: [PATCH v2 0/5] drivers: firmware: psci: add basic v1.0 support
+In-Reply-To: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20150914133510.GA26707@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wed, Jul 08, 2015 at 06:16:46PM +0100, Lorenzo Pieralisi wrote:
+> This series is a v2 of a previous posting:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347352.html
+> 
+> v1 -> v2:
+> 
+> - rebased against v4.2-rc1
+> - added version to 1.0 specific macros
+> 
+> The PSCI v1.0 specification[1] introduces a brand new set of features
+> (ie OS initiated mode and system suspend being the most notable ones)
+> and provides updates to the PSCI 0.2 specification, keeping backward
+> compatibility.
+> 
+> PSCI v1.0 applies minor changes to function return codes and function
+> behaviour (ie AFFINITY_INFO requirements, INVALID_ADDRESS return value)
+> and introduces a new power_state parameter format (extended stateid)
+> that is probeable with the newly introduced PSCI_FEATURES call.
+> 
+> This series upgrades the current kernel PSCI layer implementation with
+> a set of patches that make the kernel PSCI v1.0 compliant.
+> 
+> The series augments the PSCI firmware layer with a hook to retrieve
+> the features for a specific PSCI function (ie based on the PSCI_FEATURES
+> call) and uses it to detect the power_state parameter format, updating
+> the power_state parameter handling functions accordingly.
+> 
+> In order to prevent firmware interfaces mismatch, a new compatible
+> string is added to the DT bindings to characterize a 1.0 compliant
+> firmware interface.
+> 
+> The series is built on top of M.Rutland's patch series:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/353795.html
+> 
+> Tested on a Juno board.
 
-Thanks for taking a look.
-
-Mark Rutland <mark.rutland@arm.com> writes:
-
-> On Mon, Sep 14, 2015 at 02:00:14PM +0100, Punit Agrawal wrote:
->> The System Control Processor (SCP) provides access to SoC sensors via
->> the System Control and Power Interface (SCPI) Message Protocol. Add
->> bindings to allow probing of these sensors. Also support referencing
->> of the sensors for setting up thermal zones via the thermal DT
->> bindings.
->> 
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
->> 
->> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
->> index f002460..af66f7f 100644
->> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
->> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
->> @@ -72,8 +72,18 @@ Required sub-node properties:
->>  - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
->>  	       shared memory on Juno platforms
->>  
->> +Sensor bindings for the sensors based on SCPI Message Protocol
->> +--------------------------------------------------------------
->> +SCPI provides an API to access the various sensors on the SoC.
->> +
->> +Required properties:
->> +- compatible : should be "arm,scpi-sensors".
->> +- #thermal-sensor-cells: should be set to 1. This property follows the
->> +			 thermal device tree bindings[2].
->
-> You need to specify what the valid values for this cell are.
-
-The enumeration depends on the number of sensors exported by SCP
-firmware - which is platform dependent. I could add add something like
-if you think that is helpful -
-
-"Valid cell value is a number between 0..n-1, where n is the number
-of sensors exported by SCP firmware."
+Rebased against 4.3-rc1 (that includes the patch series above), if there
+are no objections I will queue this series for v4.4.
 
 Thanks,
+Lorenzo
 
-Punit
-
->
-> Mark.
->
->> +
->>  [0] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
->>  [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->> +[2] Documentation/devicetree/bindings/thermal/thermal.txt
->>  
->>  Example:
->>  
->> @@ -122,6 +132,11 @@ scpi_protocol: scpi at 2e000000 {
->>  			clock-output-names = "pxlclk0", "pxlclk1";
->>  		};
->>  	};
->> +
->> +	scpi_sensors0: sensors {
->> +		compatible = "arm,scpi-sensors";
->> +		#thermal-sensor-cells = <1>;
->> +	};
->>  };
->>  
->>  cpu at 0 {
->> -- 
->> 2.5.0
->> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
+> 
+> Lorenzo Pieralisi (5):
+>   drivers: firmware: psci: add INVALID_ADDRESS return value
+>   drivers: firmware: psci: move power_state handling to generic code
+>   drivers: firmware: psci: add PSCI_FEATURES call
+>   drivers: firmware: psci: add extended stateid power_state support
+>   drivers: firmware: psci: add PSCI v1.0 DT bindings
+> 
+>  Documentation/devicetree/bindings/arm/psci.txt |  6 +++
+>  arch/arm64/kernel/psci.c                       | 14 -------
+>  drivers/firmware/psci.c                        | 53 ++++++++++++++++++++++++++
+>  include/linux/psci.h                           |  2 +
+>  include/uapi/linux/psci.h                      | 15 ++++++++
+>  5 files changed, 76 insertions(+), 14 deletions(-)
+> 
+> -- 
+> 2.2.1
+> 
