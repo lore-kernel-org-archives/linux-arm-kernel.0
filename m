@@ -1,239 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 14 Sep 2015 09:04:51 +0100
-Subject: [PATCH 4/6] hwrng: st: Add support for ST's HW Random Number
- Generator
-In-Reply-To: <CAB3z_Rpz6-mjfsvi55HOrePSVDEn7u-MR_N3e9wL6hT=wfLLYg@mail.gmail.com>
-References: <1442002110-28733-1-git-send-email-lee.jones@linaro.org>
- <1442002110-28733-5-git-send-email-lee.jones@linaro.org>
- <CAB3z_Rpz6-mjfsvi55HOrePSVDEn7u-MR_N3e9wL6hT=wfLLYg@mail.gmail.com>
-Message-ID: <20150914080451.GD27591@x1>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon, 14 Sep 2015 10:05:58 +0200
+Subject: [PATCH 2/2] ARM: dts: rockchip: Add dtb for the Radxa Rock 2
+ Square board
+In-Reply-To: <CABxcv==JF5QKG8qmrRRUSi4j0=7guQQJTzVzR2bgSxdtUDBv7Q@mail.gmail.com>
+References: <1442011005-4828-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1442011005-4828-2-git-send-email-sjoerd.simons@collabora.co.uk>
+ <CABxcv=nRjge1qMeoXt6U6McKbv30oYUhh9C417mX0B=bt9Jg-g@mail.gmail.com>
+ <1442215849.8778.101.camel@collabora.co.uk>
+ <CABxcv==JF5QKG8qmrRRUSi4j0=7guQQJTzVzR2bgSxdtUDBv7Q@mail.gmail.com>
+Message-ID: <1442217958.8778.103.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 12 Sep 2015, Kieran Bingham wrote:
-> On 11 September 2015 at 21:08, Lee Jones <lee.jones@linaro.org> wrote:
-> > Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/char/hw_random/Kconfig  |  10 +++
-> >  drivers/char/hw_random/Makefile |   1 +
-> >  drivers/char/hw_random/st-rng.c | 142 ++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 153 insertions(+)
-> >  create mode 100644 drivers/char/hw_random/st-rng.c
-> >
-> > diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-> > index f48cf11..bb6cb77 100644
-> > --- a/drivers/char/hw_random/Kconfig
-> > +++ b/drivers/char/hw_random/Kconfig
-> > @@ -346,6 +346,16 @@ config HW_RANDOM_MSM
-> >
-> >           If unsure, say Y.
-> >
-> > +config HW_RANDOM_ST
-> > +       tristate "ST Microelectronics HW Random Number Generator support"
-> > +       depends on HW_RANDOM && ARCH_STI
-> > +       ---help---
-> > +         This driver provides kernel-side support for the Random Number
-> > +         Generator hardware found on STi series of SoCs.
-> > +
-> > +         To compile this driver as a module, choose M here: the
-> > +         module will be called st-rng.
-> > +
-> >  config HW_RANDOM_XGENE
-> >         tristate "APM X-Gene True Random Number Generator (TRNG) support"
-> >         depends on HW_RANDOM && ARCH_XGENE
-> > diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
-> > index 055bb01..8bcfb45 100644
-> > --- a/drivers/char/hw_random/Makefile
-> > +++ b/drivers/char/hw_random/Makefile
-> > @@ -30,4 +30,5 @@ obj-$(CONFIG_HW_RANDOM_TPM) += tpm-rng.o
-> >  obj-$(CONFIG_HW_RANDOM_BCM2835) += bcm2835-rng.o
-> >  obj-$(CONFIG_HW_RANDOM_IPROC_RNG200) += iproc-rng200.o
-> >  obj-$(CONFIG_HW_RANDOM_MSM) += msm-rng.o
-> > +obj-$(CONFIG_HW_RANDOM_ST) += st-rng.o
-> >  obj-$(CONFIG_HW_RANDOM_XGENE) += xgene-rng.o
-> > diff --git a/drivers/char/hw_random/st-rng.c b/drivers/char/hw_random/st-rng.c
-> > new file mode 100644
-> > index 0000000..717a831
-> > --- /dev/null
-> > +++ b/drivers/char/hw_random/st-rng.c
-> > @@ -0,0 +1,142 @@
-> > +/*
-> > + * ST Random Number Generator Driver ST's Platforms
-> > + *
-> > + * Author: Pankaj Dev: <pankaj.dev@st.com>
-> > + *         Lee Jones <lee.jones@linaro.org>
-> > + *
-> > + * Copyright (C) 2015 STMicroelectronics (R&D) Limited
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/hw_random.h>
-> > +#include <linux/io.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/slab.h>
-> > +
-> > +/* Registers */
-> > +#define ST_RNG_STATUS_REG              0x20
-> > +#define ST_RNG_DATA_REG                        0x24
-> > +
-> > +/* Registers fields */
-> > +#define ST_RNG_STATUS_BAD_SEQUENCE     BIT(0)
-> > +#define ST_RNG_STATUS_BAD_ALTERNANCE   BIT(1)
-> > +#define ST_RNG_STATUS_FIFO_FULL                BIT(5)
-> > +
-> > +#define ST_RNG_FIFO_SIZE               8
-> > +#define ST_RNG_SAMPLE_SIZE             2 /* 2 Byte (16bit) samples */
-> > +
-> > +/* Samples are available every 0.667us, which we round to 1us */
-> > +#define ST_RNG_FILL_FIFO_TIMEOUT   (1 * (ST_RNG_FIFO_SIZE / ST_RNG_SAMPLE_SIZE))
-> > +
-> > +struct st_rng_data {
-> > +       void __iomem    *base;
-> > +       struct clk      *clk;
-> > +       struct hwrng    ops;
-> > +};
-> > +
-> > +static int st_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
-> > +{
-> > +       struct st_rng_data *ddata = (struct st_rng_data *)rng->priv;
-> > +       u32 status;
-> > +       int i;
-> > +
-> > +       if (max < sizeof(u16))
-> > +               return -EINVAL;
-> > +
-> > +       /* Wait until FIFO is full - max 4uS*/
-> > +       for (i = 0; i < ST_RNG_FILL_FIFO_TIMEOUT; i++) {
-> > +               status = readl_relaxed(ddata->base + ST_RNG_STATUS_REG);
-> > +               if (status & ST_RNG_STATUS_FIFO_FULL)
-> > +                       break;
-> > +               udelay(1);
-> > +       }
-> > +
-> > +       if (i == ST_RNG_FILL_FIFO_TIMEOUT)
-> > +               return 0;
-> > +
-> > +       for (i = 0; i < ST_RNG_FIFO_SIZE && i < max; i += 2)
-> > +               *(u16 *)(data + i) =
-> > +                       readl_relaxed(ddata->base + ST_RNG_DATA_REG);
+Hey Javier,
+
+On Mon, 2015-09-14 at 09:50 +0200, Javier Martinez Canillas wrote:
+> Hello Sjoerd,
 > 
-> Will this code always be called with max % 2 == 0? ...
->  I.e. will
->     st_rng_read(rng, data[5], 5, waitflg)
->  overflow an array?
+> On Mon, Sep 14, 2015 at 9:30 AM, Sjoerd Simons
+> <sjoerd.simons@collabora.co.uk> wrote:
 
-.read() can be called with either 16, 32 or the size of the cache,
-which is unlikely to be anything !(N^2) (it's 64 in our case).
-
-> > +
-> > +       return i - 2;   /* No of bytes read */
+> > For the first patch i do prefer to keep them on so we can have get
+> > some
+> > more testing  with this board before fine-tuning those things
+> > (fwiw,
 > 
->   Really? Doesn't this return 0 on st_rng_read(rng, data[2], 2, waitflg);
-
-Hmm... I assumed the OA's math was good here.
-
-Good spot.  I will run some tests to confirm.
-
-> > +}
-> > +
-> > +static int st_rng_probe(struct platform_device *pdev)
-> > +{
-> > +       struct st_rng_data *ddata;
-> > +       struct resource *res;
-> > +       struct clk *clk;
-> > +       void __iomem *base;
-> > +       int ret;
-> > +
-> > +       ddata = devm_kzalloc(&pdev->dev, sizeof(*ddata), GFP_KERNEL);
-> > +       if (!ddata)
-> > +               return -ENOMEM;
-> > +
-> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +       base = devm_ioremap_resource(&pdev->dev, res);
-> > +       if (IS_ERR(base))
+> Ok.
 > 
-> Are we leaking ddata here ? I.e. before its attached with set_drvdata?
-
-It won't leak.  That's the point of devm_*.
-
-Please see: Documentation/driver-model/devres.txt
-
-> > +               return PTR_ERR(base);
-> > +
-> > +       clk = devm_clk_get(&pdev->dev, NULL);
-> > +       if (!clk)
+> > the rockchip evb board and others with essentially the same pmic
+> > setup
+> > all also have them always-on)
 > 
-> And here ...
+> Yes but I believe that's because it was easier and there are
+> regulators on these boards that don't need to be always-on as well.
 
-Nope.
-
-> > +               return -EINVAL;
-> > +
-> > +       clk_prepare_enable(clk);
-> > +
-> > +       ddata->ops.priv = (unsigned long)ddata;
-> > +       ddata->ops.read = st_rng_read;
-> > +       ddata->ops.name = pdev->name;
-> > +       ddata->base     = base;
-> > +       ddata->clk      = clk;
-> > +
-> > +       dev_set_drvdata(&pdev->dev, ddata);
-> > +
-> > +       ret = hwrng_register(&ddata->ops);
-> > +       if (ret) {
-> > +               dev_err(&pdev->dev, "Failed to register HW RNG\n");
-> > +               return ret;
-> > +       }
-> > +
-> > +       dev_info(&pdev->dev, "Successfully registered HW RNG\n");
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int st_rng_remove(struct platform_device *pdev)
-> > +{
-> > +       struct st_rng_data *ddata = dev_get_drvdata(&pdev->dev);
-> > +
-> > +       hwrng_unregister(&ddata->ops);
-> > +
-> > +       clk_disable_unprepare(ddata->clk);
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static const struct of_device_id st_rng_match[] = {
-> > +       { .compatible = "st,rng" },
-> > +       {},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, st_rng_match);
-> > +
-> > +static struct platform_driver st_rng_driver = {
-> > +       .driver = {
-> > +               .name = "st-hwrandom",
-> > +               .of_match_table = of_match_ptr(st_rng_match),
-> > +       },
-> > +       .probe = st_rng_probe,
-> > +       .remove = st_rng_remove
-> > +};
-> > +
-> > +module_platform_driver(st_rng_driver);
-> > +
-> > +MODULE_AUTHOR("Pankaj Dev <pankaj.dev@st.com>");
-> > +MODULE_LICENSE("GPL v2");
-> >
-> 
-> 
+Yes what i was trying to say is that it's not an uncommon to keep these
+on for convenience while fine-tuning the device-tree setups ;)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Collabora Ltd.
