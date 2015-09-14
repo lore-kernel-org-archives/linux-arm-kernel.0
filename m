@@ -1,139 +1,46 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 14 Sep 2015 19:08:56 +0200
-Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
- host-only mode
-In-Reply-To: <CADYTM3Y10PsRZ3x9vf73px4T28M0naHnwyyRMZyPdrXc_Y-vLA@mail.gmail.com>
-References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
- <55C31963.2010701@schinagl.nl> <55C3709C.4080609@redhat.com>
- <55C47041.3000603@schinagl.nl> <55E93D8C.9020804@schinagl.nl>
- <55F1CA9B.3070204@redhat.com> <20150910183017.GN9885@lukather>
- <55F1CE2E.7010409@redhat.com>
- <CADYTM3Z89oa3akqFaaY4BqJrQ4j+scQawRK0xRkthQde=OQ5tg@mail.gmail.com>
- <55F6E0CA.2010004@redhat.com>
- <CADYTM3Y10PsRZ3x9vf73px4T28M0naHnwyyRMZyPdrXc_Y-vLA@mail.gmail.com>
-Message-ID: <55F6FF28.80109@redhat.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Sep 2015 10:12:42 -0700
+Subject: [PATCH 12/17] ARM: dts: am57xx-beagle-x15: Fix regulator
+ populated in MMC1 dt node
+In-Reply-To: <55DC0D07.7030504@ti.com>
+References: <1438168187-1614-1-git-send-email-kishon@ti.com>
+ <1438168187-1614-13-git-send-email-kishon@ti.com>
+ <55B92B88.1080409@ti.com> <55DC0D07.7030504@ti.com>
+Message-ID: <20150914171242.GO4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Kishon Vijay Abraham I <kishon@ti.com> [150824 23:40]:
+> Hi Tony,
+> 
+> On Thursday 30 July 2015 01:07 AM, Nishanth Menon wrote:
+> > On 07/29/2015 06:09 AM, Kishon Vijay Abraham I wrote:
+> >> For beagle x15, both the vdd and io lines are connected to the
+> >> same regulator (ldo1_reg). However vmmc_aux is populated to vdd_3v3.
+> >> Remove it.
+> >>
+> >> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >> ---
+> >>  arch/arm/boot/dts/am57xx-beagle-x15.dts |    1 -
+> >>  1 file changed, 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> >> index a63bf78..d0db5c5 100644
+> >> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> >> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> >> @@ -579,7 +579,6 @@
+> >>  	pinctrl-0 = <&mmc1_pins_default>;
+> >>  
+> >>  	vmmc-supply = <&ldo1_reg>;
+> >> -	vmmc_aux-supply = <&vdd_3v3>;
+> >>  	pbias-supply = <&pbias_mmc_reg>;
+> >>  	bus-width = <4>;
+> >>  	cd-gpios = <&gpio6 27 0>; /* gpio 219 */
+> >>
+> > Acked-by: Nishanth Menon <nm@ti.com>
+> 
+> Can you pick this one or you want me to resend it?
 
-On 14-09-15 18:58, Bin Liu wrote:
-> Hi,
->
-> On Mon, Sep 14, 2015 at 9:59 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->>
->> On 14-09-15 16:44, Bin Liu wrote:
->>>
->>> Hi,
->>>
->>> On Thu, Sep 10, 2015 at 1:38 PM, Hans de Goede <hdegoede@redhat.com>
->>> wrote:
->>>>
->>>> Hi,
->>>>
->>>> On 10-09-15 20:30, Maxime Ripard wrote:
->>>>>
->>>>>
->>>>> On Thu, Sep 10, 2015 at 08:23:23PM +0200, Hans de Goede wrote:
->>>>>>
->>>>>>
->>>>>> Hi,
->>>>>>
->>>>>> On 04-09-15 08:43, Olliver Schinagl wrote:
->>>>>>>
->>>>>>>
->>>>>>> Hey Hans,
->>>>>>>
->>>>>>> On 07-08-15 10:45, Olliver Schinagl wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>> <snip>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> If you change the dr_mode to host then you _must_ also remove any
->>>>>>>>> id_det and vbus_det
->>>>>>>>> gpio settings from the usb_phy node in the dts, as the sun4i phy
->>>>>>>>> code
->>>>>>>>> detects
->>>>>>>>> host vs otg mode by checking for the presence of these.
->>>>>>>>
->>>>>>>>
->>>>>>>> Yes, this fixes it and makes it work. Thanks.
->>>>>>>>
->>>>>>> I've been going back to this and am wondering if this is something I
->>>>>>> can
->>>>>>> look into to fix properly? E.g. if the dts sets dr_mode = host, can we
->>>>>>> simply ignore the pins and treat them as unset?
->>>>>>
->>>>>>
->>>>>>
->>>>>> AFAIK you cannot unset something in dts. The only solution I
->>>>>> can comeup with is to add a dr_mode argument to the phy like
->>>>>> we already have for the otg controller itself.
->>>>>>
->>>>>> This is something which we likely need to do anyways to add
->>>>>> support for peripheral only mode, which we seem to need for
->>>>>> some "hdmi sticks".
->>>>>
->>>>>
->>>>>
->>>>> I haven't really followed the rest of the discussion, so sorry if you
->>>>> already talked about that, but why can't you just set the dr_mode to
->>>>> peripheral in such a case?
->>>>
->>>>
->>>>
->>>> This is about the usbphy code not the musb-controller code, which are
->>>> 2 different dts nodes, atm only the musb-controller node has a
->>>> dr_mode property, and the phy code decides between host-only
->>>> and otg mode based on whether an id pin is assigned or not.
->>>>
->>>> My proposal is to get rid of the id-pin hack to determine the mode
->>>> and add a dr_mode property to the usbphy dts node.
->>>
->>>
->>> I would try to avoid adding dr_mode in the usbphy node if possible,
->>> since it is already specified in the controller node.
->>>
->>> Since the phy node is referenced in the controller node, is it
->>> possible that the phy driver looks up the controller of properties to
->>> find its dr_mode setting?
->>
->>
->> That is possible, but it very much goes against how devicetree normally
->> works, where every node is more or less a standalone unit which
->> contains enough info for the associated driver to do its work.
->
-> I guess you are right, but duplicating dr_mode would cause more
-> trouble for end user.
+Picking into omap-for-v4.3/fixes thanks.
 
-The user already needs to set up regulators, vbus-det and id-det
-for otg mode in the usbphy node. Although there are 2 nodes in dts /
-2 separate hardware blocks involved in reality the 2 are closely
-related and the user already must take care to have the settings match.
-
-Besides that writing dts files is not something which end users do,
-so a normal user will never see this.
-
-> Felipe, could you please give your comments on this issue? I have to
-> do the similar change for musb_dsps.
->
->>
->> Currently there is no link from the phy node to the controller node
->> (only the other way around) and adding such a link requires more code
->> then simple having a duplicate dr_mode.
->
-> I guess I did not make my previous comment clearly, we don't need to
-> add the link from the phy node to the controller node. We don't need
-> to change the current dts, just in the phy driver to look up dr_mode
-> of the controller node, if possible.
-
-And how does the phy code now where the controller node lives without
-having a link to it in its node? Hardcode the full path to the
-controller node ? That is both ugly and error prone.
-
-Regards,
-
-Hans
+Tony
