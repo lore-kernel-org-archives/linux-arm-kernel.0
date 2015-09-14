@@ -1,111 +1,194 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 14 Sep 2015 09:42:08 +0900
-Subject: [PATCH/RFC v2 net-next 3/4] ravb: Document binding for r8a7795 SoC
-In-Reply-To: <55F2E44D.6010505@cogentembedded.com>
-References: <1441936878-18290-1-git-send-email-horms+renesas@verge.net.au>
- <1441936878-18290-4-git-send-email-horms+renesas@verge.net.au>
- <55F2E44D.6010505@cogentembedded.com>
-Message-ID: <20150914004207.GA6230@verge.net.au>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 14 Sep 2015 09:47:48 +0900
+Subject: [PATCH v3 1/2] ARM: dts: Split audio configuration to separate
+ exynos5422-odroidxu3-audio
+Message-ID: <1442191669-3366-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 05:25:17PM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 9/11/2015 5:01 AM, Simon Horman wrote:
-> 
-> >From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-> >
-> >This patch updates the ravb binding to support the r8a7795 SoC by:
-> >- Adding a compat string for the new hardware
-> >- Adding 25 named interrupts to binding for the new SoC;
-> >   older SoCs continue to use a single multiplexed interrupt
-> >
-> >The example is also updated to reflect the r8a7795 as this is the
-> >more complex case.
-> >
-> >Based on work by Kazuya Mizuguchi and others.
-> >
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >
-> >---
-> >
-> >v2
-> >* First post; broken out of a driver update patch
-> >* As discussed with Geert Uytterhoeven and Sergei Shtylyov
-> >   - Binding: Make all interrupts mandatory as named-interrupts of
-> >     the form ch%u
-> >---
-> >  .../devicetree/bindings/net/renesas,ravb.txt       | 65 +++++++++++++++++++---
-> >  1 file changed, 58 insertions(+), 7 deletions(-)
-> >
-> >diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt b/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> >index 1fd8831437bf..6c360f993d33 100644
-> >--- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> >+++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
-> [...]
-> >@@ -27,13 +33,46 @@ Optional properties:
-> >  Example:
-> >
-> >  	ethernet at e6800000 {
-> >-		compatible = "renesas,etheravb-r8a7790";
-> >-		reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
-> >+		compatible = "renesas,etheravb-r8a7795";
-> >+		reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
-> >  		interrupt-parent = <&gic>;
-> >-		interrupts = <0 163 IRQ_TYPE_LEVEL_HIGH>;
-> >-		clocks = <&mstp8_clks R8A7790_CLK_ETHERAVB>;
-> >-		phy-mode = "rmii";
-> >+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
-> >+			     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
-> >+		interrupt-names = "ch0", "ch1", "ch2", "ch3",
-> >+				  "ch4", "ch5", "ch6", "ch7",
-> >+				  "ch8", "ch9", "ch10", "ch11",
-> >+				  "ch12", "ch13", "ch14", "ch15",
-> >+				  "ch16", "ch17", "ch18", "ch19",
-> >+				  "ch20", "ch21", "ch22", "ch23",
-> >+				  "ch24";
-> 
->    To me, these names don't look very helpful. You could as well omit them
-> and use platform_get_irq() with the channel #.
+The Odroid XU4 board does not have audio codec so before adding DTS for
+new board split the audio codec to separate DTSI file. Include the audio codec
+DTSI in Odroid XU3 and XU3-Lite boards.
 
-These names reflect the hardware; which is the aim of DT.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-As I believe you pointed out earlier it is preferred to use named
-interrupts when there is more than one. Do I misunderstand the situation
-there?
+---
+Changes since v2:
+1. Add Javier's reviewed-by.
 
-If you have a positive contribution to make regarding better names then
-I am all ears.
+Changes since v1:
+1. New patch (refactor).
+---
+ arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi  | 61 ++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 47 -----------------
+ arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |  1 +
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts         |  1 +
+ 4 files changed, 63 insertions(+), 47 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi
 
-> >+		clocks = <&mstp8_clks R8A7795_CLK_ETHERAVB>;
-> >+		phy-mode = "rgmii-id";
-> >+		phy-reset-gpio = <&gpio2 10 0>;
-> 
->    I don't see how this prop is used by the driver and it's not documented
-> in the bindings.
-
-Thanks for pointing that out. It looks like I should remove phy-reset-gpio.
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi
+new file mode 100644
+index 000000000000..9493923ec652
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi
+@@ -0,0 +1,61 @@
++/*
++ * Hardkernel Odroid XU3 Audio Codec device tree source
++ *
++ * Copyright (c) 2015 Krzysztof Kozlowski
++ * Copyright (c) 2014 Collabora Ltd.
++ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/ {
++	sound: sound {
++		compatible = "simple-audio-card";
++
++		simple-audio-card,name = "Odroid-XU3";
++		simple-audio-card,widgets =
++			"Headphone", "Headphone Jack",
++			"Speakers", "Speakers";
++		simple-audio-card,routing =
++			"Headphone Jack", "HPL",
++			"Headphone Jack", "HPR",
++			"Headphone Jack", "MICBIAS",
++			"IN1", "Headphone Jack",
++			"Speakers", "SPKL",
++			"Speakers", "SPKR";
++
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&link0_codec>;
++		simple-audio-card,frame-master = <&link0_codec>;
++
++		simple-audio-card,cpu {
++			sound-dai = <&i2s0 0>;
++			system-clock-frequency = <19200000>;
++		};
++
++		link0_codec: simple-audio-card,codec {
++			sound-dai = <&max98090>;
++			clocks = <&i2s0 CLK_I2S_CDCLK>;
++		};
++	};
++};
++
++&hsi2c_5 {
++	status = "okay";
++	max98090: max98090 at 10 {
++		compatible = "maxim,max98090";
++		reg = <0x10>;
++		interrupt-parent = <&gpx3>;
++		interrupts = <2 0>;
++		clocks = <&i2s0 CLK_I2S_CDCLK>;
++		clock-names = "mclk";
++		#sound-dai-cells = <0>;
++	};
++};
++
++&i2s0 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+index 90d298dce851..2f0fb8678e9f 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+@@ -80,36 +80,6 @@
+ 		};
+ 	};
+ 
+-	sound: sound {
+-		compatible = "simple-audio-card";
+-
+-		simple-audio-card,name = "Odroid-XU3";
+-		simple-audio-card,widgets =
+-			"Headphone", "Headphone Jack",
+-			"Speakers", "Speakers";
+-		simple-audio-card,routing =
+-			"Headphone Jack", "HPL",
+-			"Headphone Jack", "HPR",
+-			"Headphone Jack", "MICBIAS",
+-			"IN1", "Headphone Jack",
+-			"Speakers", "SPKL",
+-			"Speakers", "SPKR";
+-
+-		simple-audio-card,format = "i2s";
+-		simple-audio-card,bitclock-master = <&link0_codec>;
+-		simple-audio-card,frame-master = <&link0_codec>;
+-
+-		simple-audio-card,cpu {
+-			sound-dai = <&i2s0 0>;
+-			system-clock-frequency = <19200000>;
+-		};
+-
+-		link0_codec: simple-audio-card,codec {
+-			sound-dai = <&max98090>;
+-			clocks = <&i2s0 CLK_I2S_CDCLK>;
+-		};
+-	};
+-
+ 	fan0: pwm-fan {
+ 		compatible = "pwm-fan";
+ 		pwms = <&pwm 0 20972 0>;
+@@ -376,19 +346,6 @@
+ 	};
+ };
+ 
+-&hsi2c_5 {
+-	status = "okay";
+-	max98090: max98090 at 10 {
+-		compatible = "maxim,max98090";
+-		reg = <0x10>;
+-		interrupt-parent = <&gpx3>;
+-		interrupts = <2 0>;
+-		clocks = <&i2s0 CLK_I2S_CDCLK>;
+-		clock-names = "mclk";
+-		#sound-dai-cells = <0>;
+-	};
+-};
+-
+ &i2c_2 {
+ 	samsung,i2c-sda-delay = <100>;
+ 	samsung,i2c-max-bus-freq = <66000>;
+@@ -400,10 +357,6 @@
+ 	};
+ };
+ 
+-&i2s0 {
+-	status = "okay";
+-};
+-
+ &mfc {
+ 	samsung,mfc-r = <0x43000000 0x800000>;
+ 	samsung,mfc-l = <0x51000000 0x800000>;
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
+index c06882bbb822..9c0cea99c996 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
+@@ -13,6 +13,7 @@
+ 
+ /dts-v1/;
+ #include "exynos5422-odroidxu3-common.dtsi"
++#include "exynos5422-odroidxu3-audio.dtsi"
+ 
+ / {
+ 	model = "Hardkernel Odroid XU3 Lite";
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+index 78e6a502f320..d8647a469a86 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+@@ -12,6 +12,7 @@
+ 
+ /dts-v1/;
+ #include "exynos5422-odroidxu3-common.dtsi"
++#include "exynos5422-odroidxu3-audio.dtsi"
+ 
+ / {
+ 	model = "Hardkernel Odroid XU3";
+-- 
+1.9.1
