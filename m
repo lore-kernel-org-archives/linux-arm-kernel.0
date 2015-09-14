@@ -1,50 +1,48 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Sep 2015 17:55:26 +0200
-Subject: [PATCH 0/3] arm64: remove UEFI reserved regions from linear mapping
-Message-ID: <1442246129-13930-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon, 14 Sep 2015 17:55:28 +0200
+Subject: [PATCH 2/3] arm64: only consider memblocks with NOMAP cleared for
+ linear mapping
+In-Reply-To: <1442246129-13930-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1442246129-13930-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1442246129-13930-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is an alternative approach to the series I posted in November 2014:
-thread.gmane.org/gmane.linux.kernel.efi/5133
+Take the new memblock attribute MEMBLOCK_NOMAP into account when
+deciding whether a certain region is or should covered by the
+kernel direct mapping.
 
-For arm64, we need to keep track of which parts of the physical memory space
-are backed by normal memory, since device mappings and memory mappings are
-mutually incompatible (device mappings don't allow unaligned accesses which
-may occur when parsing ACPI tables, for instance, and mapping devices as
-memory is also not allowed)
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/init.c | 2 +-
+ arch/arm64/mm/mmu.c  | 2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index f5c0680d17d9..48133235d9f5 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -119,7 +119,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+ #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+ int pfn_valid(unsigned long pfn)
+ {
+-	return memblock_is_memory(pfn << PAGE_SHIFT);
++	return memblock_is_map_memory(pfn << PAGE_SHIFT);
+ }
+ EXPORT_SYMBOL(pfn_valid);
+ #endif
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 9211b8527f25..7067ae232bed 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -370,6 +370,8 @@ static void __init map_mem(void)
  
-Instead of adding a physmem memblock table that contains all of memory,
-including the memory that should not be covered by the linear mapping,
-this series introduces a MEMBLOCK_NOMAP attribute that allows us to
-carry the same information in the ordinary 'memory' memblock table.
-
-Patch #1 introduces the attribute and the associated plumbing to interpret
-the attribute and to ensure MEMBLOCK_NOMAP regions are not considered for
-allocations.
-
-Patch #2 makes the arm64 core mapping code aware of MEMBLOCK_NOMAP, by
-honoring it when setting up the linear mapping, and by making pfn_valid()
-aware of it.
-
-Patch #3 updates the UEFI memory map handling logic to mark reserved regions
-as MEMBLOCK_NOMAP.
-
-Notable about this series is that it does not require any changes to the
-iomem resource table handling or the definition of page_is_ram(), since
-the nomap regions are still registered as 'System RAM'.
-
-Ard Biesheuvel (3):
-  mm/memblock: add MEMBLOCK_NOMAP attribute to memblock memory table
-  arm64: only consider memblocks with NOMAP cleared for linear mapping
-  arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP
-
- arch/arm64/kernel/efi.c  |  5 ++--
- arch/arm64/mm/init.c     |  2 +-
- arch/arm64/mm/mmu.c      |  2 ++
- include/linux/memblock.h |  8 ++++++
- mm/memblock.c            | 28 ++++++++++++++++++++
- 5 files changed, 41 insertions(+), 4 deletions(-)
-
+ 		if (start >= end)
+ 			break;
++		if (memblock_is_nomap(reg))
++			continue;
+ 
+ #ifndef CONFIG_ARM64_64K_PAGES
+ 		/*
 -- 
 1.9.1
