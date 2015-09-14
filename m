@@ -1,120 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Sep 2015 16:47 +0200
-Subject: [PATCH 2/2] Documentation: gpio: Update description for X-Gene
- standby GPIO controller DTS binding
-In-Reply-To: <CAL4ahLfRdfC=nReqqic=1vahgtD3-E_ncqnNhHsGw04P_HjvVA@mail.gmail.com>
-References: <1441963332-13329-1-git-send-email-yvo@apm.com>
- <2971356.lYN9OVO6Id@wuerfel>
- <CAL4ahLfRdfC=nReqqic=1vahgtD3-E_ncqnNhHsGw04P_HjvVA@mail.gmail.com>
-Message-ID: <2516438.vcQPNoorc9@wuerfel>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 14 Sep 2015 15:46:12 +0100
+Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
+In-Reply-To: <55F6D9DC.8060607@citrix.com>
+References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+ <55F68BC9.6020509@citrix.com> <55F6A437.3040403@citrix.com>
+ <55F6A9DB.8040503@citrix.com> <55F6ADAE.1010609@citrix.com>
+ <55F6B8CC.5090406@citrix.com> <55F6C1D2.7010206@citrix.com>
+ <55F6D9DC.8060607@citrix.com>
+Message-ID: <55F6DDB4.5000403@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 September 2015 16:39:43 Y Vo wrote:
-> On Mon, Sep 14, 2015 at 4:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Saturday 12 September 2015 12:55:55 Y Vo wrote:
-> >> On Fri, Sep 11, 2015 at 11:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > On Friday 11 September 2015 22:06:58 Y Vo wrote:
-> >>
-> >> Example for configure GPIO_DS13 as interrupt and use as button with
-> >> the current gpio driver:
-> >>         gpio-keys {
-> >>                 compatible = "gpio-keys";
-> >>                 button at 1 {
-> >>                         label = "POWER";
-> >>                         linux,code = <116>;
-> >>                         linux,input-type = <0x1>;
-> >>                         interrupts = <0x0 0x2d 0x1>;
-> >>                 };
-> >>         };
-> >
-> > Wait, this looks wrong: the gpio driver doesn't actually see
-> > the connection here and won't be able to configure the interrupt
-> > correctly. The interrupt is already owned by the gpio driver, so
-> > you cannot use it in the button node.
+On 14/09/15 15:29, Roger Pau Monn? wrote:
+>> To give you an example, Centos 7, which will support Xen and only 64KB
+>> page granularity, will be supported for years. Dropping any splitting in
+>> a short future (3-5 years) will just break those guests to boot on Xen.
 > 
-> In summary:
-> - Our GPIO doesn't support interrupt controller.
-> - There are 6 pins which used the external interrupt from GIC, so all
-> setup for those irqs are from gic driver. The GPIO driver only
-> configure to wire those lines.
-> 
-> For your concern:
-> - That's correct: if we use that defined, the gpio driver never saw
-> the connection here (That's why it already is configued at the
-> beginning).
-> - At the first time, we tried to use the define: <&sbgpio 13 1>, it
-> means using the GPIO_DS13, it will go into the GPIO driver to setup,
-> but there is another problem which I have sent out to all of you:
-> + It will go into gpio_keys_setup_key (gpio_keys.c driver) function,
-> then set the irqflags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-> but the gic only support IRQ_TYPE_LEVEL_HIGH && IRQF_TRIGGER_RISING,
-> so it always returns failed at gpio_keys_setup_key function. Please
-> see the gic_set_type at gic driver.
+> Can't the patches to support 64KB grants be backported to CentOS? In the
+> past you said that distros had no problem in picking the needed Xen
+> patches for 64KB support, I don't see how that would be different.
 
-Hmm, I see now how the event handling in the gpio-keys driver differs
-between irq mode and gpio mode, where gpio mode relies on getting
-a separate event for the release. This is certainly something that
-could be changed in the gpio-keys driver as an extension, but that
-seems to be what Laxman Dewangan did when he introduced the irq-mode.
+Centos 7 is not yet released so it's more easy to get patch in. I don't
+know what will be position when the guest is shipped.
 
-> static int gic_set_type(struct irq_data *d, unsigned int type)
-> {
->         void __iomem *base = gic_dist_base(d);
->         unsigned int gicirq = gic_irq(d);
-> 
->         /* Interrupt configuration for SGIs can't be changed */
->         if (gicirq < 16)
->                 return -EINVAL;
-> 
->         /* SPIs have restrictions on the supported types */
->         if (gicirq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
->                             type != IRQ_TYPE_EDGE_RISING)
->                 return -EINVAL;
-> 
->         return gic_configure_irq(gicirq, type, base, NULL);
-> }
-> + Another issue: in order gpio_key works it needs the status of GPIO.
-> For our chip, when the GPIO is configued as interrupt, we need to
-> access to GIC register to read the real status, it is not acceptable
-> to implement accessing GIC registers at gpio driver. The function
-> irq_get_irqchip_state(..) also doesn't work in our chip too. Because
-> it needs to access different offset.
+I bet they will still want to support 64KB with older Xen (i.e where
+64KB grant is not supported).
 
-I thought we had solved that problem long ago when you first
-submitted the driver.
+Anyway, I don't expect to see the 64KB grants support before next year
+as my TODO list is already pretty full. So let's talk about it when I
+(or someone else) will send an RFC to extend the grant size.
 
-Did 1b7047edfcfb25 ("genirq: Allow the irqchip state of an IRQ to be
-save/restored") not address the problem for you? You were on
-Cc to that patch and should have spoken up when the code that was
-merged was not sufficient.
+Regards,
 
-> >> > It also seems to me that the binding cannot distinguish between a
-> >> > line configured as an input and one that is configured as an
-> >> > interrupt, which are for other gpio chips the same thing, but
-> >> > not on this one.  Could this be rectified by using another bit
-> >> > of the second gpio cell? The low bit is used for active-high/active-low,
-> >> > so you could use the second bit for irq/input.
-> >> >
-> >> Do you mean #gpio-cells property and using the high bit of the second
-> >> bit for irq/input  ?
-> >
-> > Yes, that would be an option.
-> I will look into it.
-> 
-> Is there possible if:
-> - Keep GPIO8..GPIO as interrupt by default.
-> - Anyone want to use these GPIO pins as GPIO, we will re-configure
-> them to GPIO mode ?
-
-That's not perfect but better than the patch you sent here.
-The main disadvantage is that you end up with two references
-to the same IRQ. It can still work, but only as long as nothing
-tries to walk the entire DT to parse all the interrupts properties.
-
-It would be ok for gpio-keys, as that does not need both the state
-and the event together, but for other gpio users, you still need a
-working driver that supports reading the state and getting an
-interrupt.
-
-	Arnd
+-- 
+Julien Grall
