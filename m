@@ -1,80 +1,100 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 14 Sep 2015 11:40:55 +0100
-Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
-In-Reply-To: <55F68BC9.6020509@citrix.com>
-References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
- <55F68BC9.6020509@citrix.com>
-Message-ID: <55F6A437.3040403@citrix.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Sep 2015 11:42:54 +0100
+Subject: DSA: phy polling
+Message-ID: <20150914104254.GI21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+Andrew,
 
-On 14/09/15 09:56, Roger Pau Monn? wrote:
-> El 07/09/15 a les 17.33, Julien Grall ha escrit:
->> Hi all,
->>
->> ARM64 Linux is supporting both 4KB and 64KB page granularity. Although, Xen
->> hypercall interface and PV protocol are always based on 4KB page granularity.
->>
->> Any attempt to boot a Linux guest with 64KB pages enabled will result to a
->> guest crash.
->>
->> This series is a first attempt to allow those Linux running with the current
->> hypercall interface and PV protocol.
->>
->> This solution has been chosen because we want to run Linux 64KB in released
->> Xen ARM version or/and platform using an old version of Linux DOM0.
->>
->> There is room for improvement, such as support of 64KB grant, modification
->> of PV protocol to support different page size... They will be explored in a
->> separate patch series later.
->>
->> TODO list:
->>     - Convert swiotlb to 64KB
->>     - Convert xenfb to 64KB
->>     - Support for multiple page ring support
->>     - Support for 64KB in gnttdev
->>     - Support of non-indirect grant with 64KB frontend
->>     - It may be possible to move some common define between
->>     netback/netfront and blkfront/blkback in an header
->>
->> I've got most of the patches for the TODO items. I'm planning to send them as
->> a follow-up as it's not a requirement for a basic guests.
->>
->> All patches has been built tested for ARM32, ARM64, x86. But I haven't tested
->> to run it on x86 as I don't have a box with Xen x86 running. I would be
->> happy if someone give a try and see possible regression for x86.
-> 
-> Do you have figures regarding if/how much performance penalty do the
-> blkfront/blkback patches add to the traditional 4KB scenario (frontend
-> and backend running on guests using 4KB pages)?
+I think you're the current maintainer of the Marvell DSA code, as being
+the most recent author of changes to it. :)
 
-Which benchmark do you advice? Although, I don't have SSD on this
-platform so it may be possible that the bottleneck will be the hard drive.
+I've noticed in my testing that the Marvell DSA code seems to poll the
+internal phy link status in mv88e6xxx_poll_link(), and set the network
+device carrier status according to the results.
 
-> 
-> Since there's been no design document about this and the TODO list
-> doesn't contain it, I would like to know which plans do we have in order
-> to fix this properly.
+However, the internal phys are created using phylib, which also polls
+the phys for their link status, and controls the associated netdev
+carrier status.
 
-Can you explain what kind of design document you were expecting? The
-support of 64KB page granularity is pretty straight-forward and there is
-not many way to do it. We have to split the page in 4KB chunk to feed
-the ring.
+The side effect of this is that I see duplicated link status messages in
+the kernel log when connecting or disconnecting cables from the switch,
+caused by the code in mv88e6xxx_poll_link() racing with the phylib code.
+>From what I can see, the code in mv88e6xxx_poll_link() is entirely
+redundant as the phylib layer will take care of any phy attached to the
+switch.
 
-TBH, I'm expecting a small impact to the performance. It would be hard
-to get the exactly the same performance as today if we keep the helpers
-to avoid the backend dealing himself with the splitting and page
-granularity.
+To prove this, I have the following code in my tree, which disables the
+polling on a port where we have a phy attached (either an internal or
+external phy).  The result is that the per-port network devices are still
+updated with the link status even though this code is disabled - thanks
+to the phylib polling.
 
-Although, if the performance impact is not acceptable, it may be
-possible to optimize gnttab_foreach_grant_in_range by moving the
-function inline. The current way to the loop is the fastest I've found
-(I've wrote a small program to test different way) and we will need it
-when different of size will be supported.
+I'm left wondering whether the DSA specific phy polling does anything
+useful, or whether the entire polling code both in mv88e6xxx.c and
+net/dsa can be removed (mv88e6xxx.c seems to be its only user.)
 
-Regards,
+diff --git a/drivers/net/dsa/mv88e6xxx.c b/drivers/net/dsa/mv88e6xxx.c
+index 26ec2fbfaa89..4c324eafeef2 100644
+--- a/drivers/net/dsa/mv88e6xxx.c
++++ b/drivers/net/dsa/mv88e6xxx.c
+@@ -400,6 +400,13 @@ void mv88e6xxx_poll_link(struct dsa_switch *ds)
+ 		if (dev == NULL)
+ 			continue;
+ 
++		/*
++		 * Ignore ports which have a phy; phylib will take care
++		 * of polling the link status for these.
++		 */
++		if (dsa_slave_has_phy(dev))
++			continue;
++
+ 		link = 0;
+ 		if (dev->flags & IFF_UP) {
+ 			port_status = mv88e6xxx_reg_read(ds, REG_PORT(i),
+diff --git a/include/net/dsa.h b/include/net/dsa.h
+index fbca63ba8f73..b31e9da43ea7 100644
+--- a/include/net/dsa.h
++++ b/include/net/dsa.h
+@@ -176,6 +176,8 @@ static inline bool dsa_is_port_initialized(struct dsa_switch *ds, int p)
+ 	return ds->phys_port_mask & (1 << p) && ds->ports[p];
+ }
+ 
++extern bool dsa_slave_has_phy(struct net_device *);
++
+ static inline u8 dsa_upstream_port(struct dsa_switch *ds)
+ {
+ 	struct dsa_switch_tree *dst = ds->dst;
+diff --git a/net/dsa/slave.c b/net/dsa/slave.c
+index 35c47ddd04f0..a107242816ff 100644
+--- a/net/dsa/slave.c
++++ b/net/dsa/slave.c
+@@ -10,6 +10,7 @@
+ 
+ #include <linux/list.h>
+ #include <linux/etherdevice.h>
++#include <linux/export.h>
+ #include <linux/netdevice.h>
+ #include <linux/phy.h>
+ #include <linux/phy_fixed.h>
+@@ -873,6 +874,14 @@ int dsa_slave_resume(struct net_device *slave_dev)
+ 	return 0;
+ }
+ 
++bool dsa_slave_has_phy(struct net_device *slave_dev)
++{
++	struct dsa_slave_priv *p = netdev_priv(slave_dev);
++
++	return p->phy != NULL;
++}
++EXPORT_SYMBOL_GPL(dsa_slave_has_phy);
++
+ int dsa_slave_create(struct dsa_switch *ds, struct device *parent,
+ 		     int port, char *name)
+ {
+
 
 -- 
-Julien Grall
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
