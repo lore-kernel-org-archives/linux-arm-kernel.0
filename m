@@ -1,40 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Sep 2015 10:59:02 +0200
-Subject: [PATCH v4] mtd: nand: sunxi: fix OOB handling in ->write_xxx()
- functions
-In-Reply-To: <1442220063-7520-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1442220063-7520-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1472478.qiY0UY0ao8@wuerfel>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Mon, 14 Sep 2015 11:04:53 +0200
+Subject: [PATCH v4 20/22] driver core: Allow deferring probes until late
+ init
+In-Reply-To: <20150911121746.GR12027@sirena.org.uk>
+References: <1441628627-5143-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1441628627-5143-21-git-send-email-tomeu.vizoso@collabora.com>
+ <20150911121746.GR12027@sirena.org.uk>
+Message-ID: <CAAObsKA24=JZH_ukwCcaQ+cCxL1BcVLZe=W54X-5V=3idogW5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 September 2015 10:41:03 Boris Brezillon wrote:
->                 /* Fill OOB data in */
-> -               if (oob_required) {
-> -                       tmp = 0xffffffff;
-> -                       memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE, &tmp,
-> -                                   4);
-> -               } else {
-> -                       memcpy_toio(nfc->regs + NFC_REG_USER_DATA_BASE,
-> -                                   chip->oob_poi + offset - mtd->writesize,
-> -                                   4);
-> -               }
-> +               writel(NFC_BUF_TO_USER_DATA(chip->oob_poi +
-> +                                           layout->oobfree[i].offset),
-> +                      nfc->regs + NFC_REG_USER_DATA_BASE);
+On 11 September 2015 at 14:17, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, Sep 07, 2015 at 02:23:45PM +0200, Tomeu Vizoso wrote:
+>> Add a field to struct device that instructs the device-driver core to
+>> defer the probe of this device until the late_initcall level.
+>>
+>> By letting all built-in drivers to register before starting to probe, we
+>> can avoid any deferred probes by probing dependencies on demand.
+>
+> Is this not going to resut in massive churn as we go through and set
+> this flag for a massive proportion of drivers?  Could we mitigate this
+> by having a first pass at setting this per subsystem or something so
+> that we get a good proportion of drivers with changes in core code?
 
-This looks like you are changing the endianess of the data that gets written.
-Is that intentional?
+I think this flag should be only set during the initial registration
+of devices (eg. acpi_device_add, of_device_add, etc), as by delaying
+the probe of those we are automatically delaying the probe of the
+rest.
 
-memcpy_toio() uses the same endianess for source and destination, while writel()
-assumes that the destination is a little-endian register, and that could break
-if the kernel is built to run as big-endian. I also see that sunxi_nfc_write_buf()
-uses memcpy_toio() for writing the actual data, and you are not changing that.
+Regards,
 
-If all hardware can do 32-bit accesses here and the size is guaranteed to be a
-multiple of four bytes, you can probably improve performance by using a
-__raw_writel() loop there. Using __raw_writel() in general is almost always
-a bug, but here it actually makes sense. See also the powerpc implementation
-of _memcpy_toio().
-
-	Arnd
+Tomeu
