@@ -1,80 +1,78 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Mon, 14 Sep 2015 20:58:47 +0800
-Subject: [PATCH v2 00/22] KVM: ARM64: Add guest PMU support
-In-Reply-To: <20150914115300.GM15712@cbox>
-References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
- <20150914115300.GM15712@cbox>
-Message-ID: <55F6C487.5060801@linaro.org>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 14 Sep 2015 14:00:13 +0100
+Subject: [PATCH v3 0/5] SCPI Sensor support
+Message-ID: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi
 
+The series adds support for SCPI based sensors for ARM development
+platform. In addition to supporting sensors, when a temperature sensor
+is discovered the driver registers the sensor with the thermal
+framework.
 
-On 2015/9/14 19:53, Christoffer Dall wrote:
-> Hi Shannon,
->
-> On Fri, Sep 11, 2015 at 04:54:53PM +0800, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> This patchset adds guest PMU support for KVM on ARM64. It takes
->> trap-and-emulate approach. When guest wants to monitor one event, it
->> will be trapped by KVM and KVM will call perf_event API to create a perf
->> event and call relevant perf_event APIs to get the count value of event.
->>
->> Use perf to test this patchset in guest. When using "perf list", it
->> shows the list of the hardware events and hardware cache events perf
->> supports. Then use "perf stat -e EVENT" to monitor some event. For
->> example, use "perf stat -e cycles" to count cpu cycles and
->> "perf stat -e cache-misses" to count cache misses.
->>
->> Below are the outputs of "perf stat -r 5 sleep 5" when running in host
->> and guest.
->>
->> Host:
->>   Performance counter stats for 'sleep 5' (5 runs):
->>
->>            0.551428      task-clock (msec)         #    0.000 CPUs utilized            ( +-  0.91% )
->>                   1      context-switches          #    0.002 M/sec
->>                   0      cpu-migrations            #    0.000 K/sec
->>                  48      page-faults               #    0.088 M/sec                    ( +-  1.05% )
->>             1150265      cycles                    #    2.086 GHz                      ( +-  0.92% )
->>     <not supported>      stalled-cycles-frontend
->>     <not supported>      stalled-cycles-backend
->>              526398      instructions              #    0.46  insns per cycle          ( +-  0.89% )
->>     <not supported>      branches
->>                9485      branch-misses             #   17.201 M/sec                    ( +-  2.35% )
->>
->>         5.000831616 seconds time elapsed                                          ( +-  0.00% )
->>
->> Guest:
->>   Performance counter stats for 'sleep 5' (5 runs):
->>
->>            0.730868      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.13% )
->>                   1      context-switches          #    0.001 M/sec
->>                   0      cpu-migrations            #    0.000 K/sec
->>                  48      page-faults               #    0.065 M/sec                    ( +-  0.42% )
->>             1642982      cycles                    #    2.248 GHz                      ( +-  1.04% )
->>     <not supported>      stalled-cycles-frontend
->>     <not supported>      stalled-cycles-backend
->>              637964      instructions              #    0.39  insns per cycle          ( +-  0.65% )
->>     <not supported>      branches
->>               10377      branch-misses             #   14.198 M/sec                    ( +-  1.09% )
->>
->>         5.001289068 seconds time elapsed                                          ( +-  0.00% )
->>
->> This patchset can be fetched from [1] and the relevant QEMU version for
->> test can be fetched from [2].
->>
-> Is there a changelog for this patch set somewhere?
->
+The sensor patches here have been split out from a longer series
+adding support for registering power model based cooling devices for
+the CPU via device tree. Earliers postings can be seen at [0], [1].
 
-I forgot this, while I realized it after sending this patchset out.
+Patches 1-3 create a hwmon sensor driver for sensors provided by SCPI
+firmware. Patch 4 adds support for the temperature sensors to register
+with the thermal framework. This allows setting up platform thermals
+using OF thermal bindings.
 
-> If not, can you include this in v3 addressing Marc's comments?
->
-> Thanks,
-> -Christoffer
->
+The last patch adds support for the sensors in the Juno device tree.
+
+The patches depend on SCPI and mailbox patches[2] from Sudeep. The
+SCPI protocol document with details of the sensor interface can be
+found at [3].
+
+I'd like to aim for merging the patches with the SCPI changes if
+possible. The hwmon patches have been acked by Guenter. If there
+aren't any objections, I would like to request acks for the binding
+updates in Patch 1.
+
+Thanks,
+Punit
+
+Changes v2->v3
+  - split out the sensor patches (posted here)
+  - rebase onto v4.3-rc1
+  
+Changes v1->v2
+  - added documentation for the scpi-hwmon driver
+  - replaced static allocation of platform structure in scpi-hwmon.c
+    with dynamic allocation
+  - re-structured registering of thermal zones to better handle
+    error conditions
+  - reduced chattiness in scpi-hwmon.c
+  - corrected sensor numbering to align with hwmon documentation
+  - dynamic allocation of attributes and attribute groups
+
+[0] http://thread.gmane.org/gmane.linux.kernel/2002152
+[1] http://thread.gmane.org/gmane.linux.kernel/2011466
+[2] http://thread.gmane.org/gmane.linux.kernel/2009735
+[3] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
+
+Punit Agrawal (5):
+  Documentation: add DT bindings for ARM SCPI sensors
+  firmware: arm_scpi: Extend to support sensors
+  hwmon: Support sensors exported via ARM SCP interface
+  hwmon: Support registration of thermal zones for SCP temperature
+    sensors
+  arm64: dts: Add sensor node to Juno dt
+
+ Documentation/devicetree/bindings/arm/arm,scpi.txt |  15 ++
+ Documentation/hwmon/scpi-hwmon                     |  33 +++
+ arch/arm64/boot/dts/arm/juno-base.dtsi             |   5 +
+ drivers/firmware/arm_scpi.c                        |  60 +++++
+ drivers/hwmon/Kconfig                              |   8 +
+ drivers/hwmon/Makefile                             |   1 +
+ drivers/hwmon/scpi-hwmon.c                         | 288 +++++++++++++++++++++
+ include/linux/scpi_protocol.h                      |  17 ++
+ 8 files changed, 427 insertions(+)
+ create mode 100644 Documentation/hwmon/scpi-hwmon
+ create mode 100644 drivers/hwmon/scpi-hwmon.c
 
 -- 
-Shannon
+2.5.0
