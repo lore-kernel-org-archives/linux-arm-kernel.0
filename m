@@ -1,127 +1,178 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Sep 2015 15:09:34 +0200
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <20150914122858.GI4530@olila.local.net-space.pl>
-References: <20150910121514.GE29293@leverpostej>
- <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
- <20150910144938.GI29293@leverpostej>
- <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
- <20150910162302.GN29293@leverpostej>
- <20150911124643.GB4530@olila.local.net-space.pl>
- <20150911162559.GA8726@leverpostej>
- <20150912113655.GG4530@olila.local.net-space.pl>
- <20150914092518.GA10307@leverpostej>
- <CAKv+Gu9ER1cKvPHobq-wo7ggPesJj4OQ7=aTr24GVpubHvVqjQ@mail.gmail.com>
- <20150914122858.GI4530@olila.local.net-space.pl>
-Message-ID: <CAKv+Gu_z2X=9-qgoKTS7dKLqtSUvysyu9LzZryJqcSR4X8Ss6A@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 14 Sep 2015 14:00:17 +0100
+Subject: [Patch v3 4/5] hwmon: Support registration of thermal zones for SCP
+ temperature sensors
+In-Reply-To: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1442235619-4029-5-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 September 2015 at 14:28, Daniel Kiper <daniel.kiper@oracle.com> wrote:
-> On Mon, Sep 14, 2015 at 11:43:27AM +0200, Ard Biesheuvel wrote:
->> On 14 September 2015 at 11:25, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Sat, Sep 12, 2015 at 12:36:55PM +0100, Daniel Kiper wrote:
->> >> On Fri, Sep 11, 2015 at 05:25:59PM +0100, Mark Rutland wrote:
->> >> > On Fri, Sep 11, 2015 at 01:46:43PM +0100, Daniel Kiper wrote:
->> >> > > On Thu, Sep 10, 2015 at 05:23:02PM +0100, Mark Rutland wrote:
->> >>
->> >> [...]
->> >>
->> >> > > > What's troublesome with the boot services?
->> >> > > >
->> >> > > > What can't be simulated?
->> >> > >
->> >> > > How do you want to access bare metal EFI boot services from dom0 if they
->> >> > > were shutdown long time ago before loading dom0 image?
->> >> >
->> >> > I don't want to.
->> >> >
->> >> > I asked "What can't be simulated?" because I assumed everything
->> >> > necessary/mandatory could be simulated without needinng access to any
->> >> > real EFI boot services.
->> >> >
->> >> > As far as I can see all that's necessary is to provide a compatible
->> >> > interface.
->> >>
->> >> Could you be more precise what do you need? Please enumerate. UEFI spec has
->> >> more than 2500 pages and I do not think that we need all stuff in dom0.
->> >>
->> >> > > What do you need from EFI boot services in dom0?
->> >> >
->> >> > The ability to call ExitBootServices() and SetVirtualAddressMap() on a
->> >> > _virtual_ address map for _virtual_ services provided by the hypervisor.
->> >>
->> >> I am confused. Why do you need that? Please remember, EFI is owned and
->> >> operated by Xen hypervisor. dom0 does not have direct access to EFI.
->> >
->> > Let's take a step back.
->> >
->> > My objection here is to passing the Dom0 kernel properties as if it were
->> > booted with direct access to a full UEFI, then later fixing that up
->> > (when Xen is detected and we apply its hypercall EFI implementation).
->> >
->>
->> To be honest, I don't think that has ever been suggested here. What
->> was suggested is to provide a minimal EFI like environment that allows
->> the post-stub EFI code to proceed and find the ACPI root pointer.
->>
->> > If the kernel cannot use EFI natively, why pretend to the kernel that it
->> > can? The hypercall implementation is _not_ EFI (though it provides
->> > access to some services).
->> >
->>
->> To get access to the ACPI root pointer, for which there is only one
->> specified way of obtaining it on ARM, which is via the UEFI
->> configuration table database
->>
->> > The two ways I can see providing Dom0 with EFI services are:
->> >
->> > * Have Xen create shims for any services, in which any hypercalls live,
->> >   and pass these to the kernel with a virtual system table. This keeps
->> >   the interface to the kernel the same regardless of Xen.
->> >
->> > * Have the kernel detect Xen EFI capability via Xen, without passing the
->> >   usual native EFI parameters. This can then be installed into the
->> >   kernel in a Xen-specific manner, and we know from the outset that
->> >   Xen-specific caveats apply.
->> >
->> > As per my original email, I'm not against the renaming of the stub
->> > parameters if we standardise the rest of the details, but I believe
->> > that's orthogonal to the Xen Dom0 case.
->> >
->>
->> Xen will not boot the kernel via the stub, but directly. It needs to
->> supply a EFI like environment so that the kernel can boot via ACPI.
->> There is no reason whatsoever to mock up boot services or other pieces
->> of UEFI functionality that are not needed. The core kernel does not
->> call any boot services or SetVirtualAddressMap/ConvertPointer, and
->> there is already paravirtualized plumbing in place for the remaining
->> runtime services.
->>
->> Hence my claim earlier that we should cope with the runtime services
->> pointer being NULL, since that is really the only thing standing in
->
-> I suppose that you thought about EFI_INVALID_TABLE_ADDR...
->
+Add support to create thermal zones based on the temperature sensors
+provided by the SCP. The thermal zones can be defined using the
+thermal DT bindings and should refer to the SCP sensor id to select
+the sensor.
 
-Simply whatever we decide, so perhaps EFI_INVALID_TABLE_ADDR is better
-if x86 uses that already. But that value is still outside of the UEFI
-spec, so in that sense, it is not more appropriate than NULL.
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Acked-by: Guenter Roeck <linux@roeck-us.net>
+Cc: Eduardo Valentin <edubezval@gmail.com>
+---
+ drivers/hwmon/scpi-hwmon.c | 104 ++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 103 insertions(+), 1 deletion(-)
 
->> the way from the kernel side. If you feel that violates the spec in
->
-> If yes then you should know that dom0 on x86 EFI platform works
-> with efi.runtime == EFI_INVALID_TABLE_ADDR without any issue.
-> So, I think that all problems are solved.
->
-
-So there is precedent, which is good. But please note that x86 has a
-lot of baggage and *lots* of quirks for buggy firmware that was only
-ever tested with Windows. So before blindly copying x86 when it comes
-to UEFI interworking, we still need to have the discussion whether
-what x86 is appropriate for ARM as well (since it does not have the
-above problems)
-
+diff --git a/drivers/hwmon/scpi-hwmon.c b/drivers/hwmon/scpi-hwmon.c
+index c7d1d14..2c1241b 100644
+--- a/drivers/hwmon/scpi-hwmon.c
++++ b/drivers/hwmon/scpi-hwmon.c
+@@ -20,6 +20,7 @@
+ #include <linux/scpi_protocol.h>
+ #include <linux/slab.h>
+ #include <linux/sysfs.h>
++#include <linux/thermal.h>
+ 
+ struct sensor_data {
+ 	struct scpi_sensor_info info;
+@@ -29,14 +30,39 @@ struct sensor_data {
+ 	char label[20];
+ };
+ 
++struct scpi_thermal_zone {
++	struct list_head list;
++	int sensor_id;
++	struct scpi_sensors *scpi_sensors;
++	struct thermal_zone_device *tzd;
++};
++
+ struct scpi_sensors {
+ 	struct scpi_ops *scpi_ops;
+ 	struct sensor_data *data;
++	struct list_head thermal_zones;
+ 	struct attribute **attrs;
+ 	struct attribute_group group;
+ 	const struct attribute_group *groups[2];
+ };
+ 
++static int scpi_read_temp(void *dev, int *temp)
++{
++	struct scpi_thermal_zone *zone = dev;
++	struct scpi_sensors *scpi_sensors = zone->scpi_sensors;
++	struct scpi_ops *scpi_ops = scpi_sensors->scpi_ops;
++	struct sensor_data *sensor = &scpi_sensors->data[zone->sensor_id];
++	u32 value;
++	int ret;
++
++	ret = scpi_ops->sensor_get_value(sensor->info.sensor_id, &value);
++	if (ret)
++		return ret;
++
++	*temp = value;
++	return 0;
++}
++
+ /* hwmon callback functions */
+ static ssize_t
+ scpi_show_sensor(struct device *dev, struct device_attribute *attr, char *buf)
+@@ -66,6 +92,24 @@ scpi_show_label(struct device *dev, struct device_attribute *attr, char *buf)
+ 	return sprintf(buf, "%s\n", sensor->info.name);
+ }
+ 
++static void
++unregister_thermal_zones(struct platform_device *pdev,
++			 struct scpi_sensors *scpi_sensors)
++{
++	struct list_head *pos;
++
++	list_for_each(pos, &scpi_sensors->thermal_zones) {
++		struct scpi_thermal_zone *zone;
++
++		zone = list_entry(pos, struct scpi_thermal_zone, list);
++		thermal_zone_of_sensor_unregister(&pdev->dev, zone->tzd);
++	}
++}
++
++static struct thermal_zone_of_device_ops scpi_sensor_ops = {
++	.get_temp = scpi_read_temp,
++};
++
+ static int scpi_hwmon_probe(struct platform_device *pdev)
+ {
+ 	u16 nr_sensors, i;
+@@ -160,10 +204,67 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
+ 	scpi_sensors->group.attrs = scpi_sensors->attrs;
+ 	scpi_sensors->groups[0] = &scpi_sensors->group;
+ 
++	platform_set_drvdata(pdev, scpi_sensors);
++
+ 	hwdev = devm_hwmon_device_register_with_groups(dev,
+ 			"scpi_sensors", scpi_sensors, scpi_sensors->groups);
+ 
+-	return PTR_ERR_OR_ZERO(hwdev);
++	if (IS_ERR(hwdev))
++		return PTR_ERR(hwdev);
++
++	/*
++	 * Register the temperature sensors with the thermal framework
++	 * to allow their usage in setting up the thermal zones from
++	 * device tree.
++	 *
++	 * NOTE: Not all temperature sensors maybe used for thermal
++	 * control
++	 */
++	INIT_LIST_HEAD(&scpi_sensors->thermal_zones);
++	for (i = 0; i < nr_sensors; i++) {
++		struct sensor_data *sensor = &scpi_sensors->data[i];
++		struct scpi_thermal_zone *zone;
++
++		if (sensor->info.class != TEMPERATURE)
++			continue;
++
++		zone = devm_kzalloc(dev, sizeof(*zone), GFP_KERNEL);
++		if (!zone) {
++			ret = -ENOMEM;
++			goto unregister_tzd;
++		}
++
++		zone->sensor_id = i;
++		zone->scpi_sensors = scpi_sensors;
++		zone->tzd = thermal_zone_of_sensor_register(dev, i, zone,
++							    &scpi_sensor_ops);
++		/*
++		 * The call to thermal_zone_of_sensor_register returns
++		 * an error for sensors that are not associated with
++		 * any thermal zones or if the thermal subsystem is
++		 * not configured.
++		 */
++		if (IS_ERR(zone->tzd)) {
++			devm_kfree(dev, zone);
++			continue;
++		}
++		list_add(&zone->list, &scpi_sensors->thermal_zones);
++	}
++
++	return 0;
++
++unregister_tzd:
++	unregister_thermal_zones(pdev, scpi_sensors);
++	return ret;
++}
++
++static int scpi_hwmon_remove(struct platform_device *pdev)
++{
++	struct scpi_sensors *scpi_sensors = platform_get_drvdata(pdev);
++
++	unregister_thermal_zones(pdev, scpi_sensors);
++
++	return 0;
+ }
+ 
+ static const struct of_device_id scpi_of_match[] = {
+@@ -178,6 +279,7 @@ static struct platform_driver scpi_hwmon_platdrv = {
+ 		.of_match_table = scpi_of_match,
+ 	},
+ 	.probe		= scpi_hwmon_probe,
++	.remove		= scpi_hwmon_remove,
+ };
+ module_platform_driver(scpi_hwmon_platdrv);
+ 
 -- 
-Ard.
+2.5.0
