@@ -1,38 +1,232 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 14 Sep 2015 10:43:53 -0700
-Subject: [PATCH 6/7] ARM: brcmstb: mask GIC IRQs on suspend
-In-Reply-To: <20150914174209.GQ11487@google.com>
-References: <1434672696-13632-1-git-send-email-computersforpeace@gmail.com>
- <1434672696-13632-7-git-send-email-computersforpeace@gmail.com>
- <55F482BC.4050202@gmail.com> <20150914174209.GQ11487@google.com>
-Message-ID: <55F70759.2070008@gmail.com>
+From: binmlist@gmail.com (Bin Liu)
+Date: Mon, 14 Sep 2015 12:53:30 -0500
+Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
+ host-only mode
+In-Reply-To: <55F702EE.5070903@redhat.com>
+References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
+ <55C31963.2010701@schinagl.nl> <55C3709C.4080609@redhat.com>
+ <55C47041.3000603@schinagl.nl> <55E93D8C.9020804@schinagl.nl>
+ <55F1CA9B.3070204@redhat.com> <20150910183017.GN9885@lukather>
+ <55F1CE2E.7010409@redhat.com>
+ <CADYTM3Z89oa3akqFaaY4BqJrQ4j+scQawRK0xRkthQde=OQ5tg@mail.gmail.com>
+ <55F6E0CA.2010004@redhat.com>
+ <CADYTM3Y10PsRZ3x9vf73px4T28M0naHnwyyRMZyPdrXc_Y-vLA@mail.gmail.com>
+ <55F6FF28.80109@redhat.com>
+ <CADYTM3b3w+c=F2MG+UZbWNHA6zpXPfFo4A2sNnajobBhPmBpAw@mail.gmail.com>
+ <55F702EE.5070903@redhat.com>
+Message-ID: <CADYTM3b3U0iPGiWdnRiXL4WoAjP=_PvZazuArgJgvJ9fJNPV0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/09/15 10:42, Brian Norris wrote:
-> One more thing:
-> 
-> On Sat, Sep 12, 2015 at 12:53:32PM -0700, Florian Fainelli wrote:
->> Le 06/18/15 17:11, Brian Norris a ?crit :
->>> Lazily-masked IRQs can cause system suspend problems (e.g., spurious
->>> wakeups from WFI), so we need to be sure non-wakeup GIC interrupts get
->>> masked, not just disabled, during system suspend.
->>>
->>> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+Hi,
+
+On Mon, Sep 14, 2015 at 12:25 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+>
+> On 14-09-15 19:14, Bin Liu wrote:
 >>
->> Dropped this patch, no longer needed as of 4.3-rc0 with
->> aec89ef72ba6c94420f599dcb684ed66937cdacf ("irqchip/gic: Enable
->> SKIP_SET_WAKE and MASK_ON_SUSPEND")
-> 
-> With this patch dropped, then we really don't need
-> arch/arm/mach-bcm/brcmstb.c any more, AFAICT. Unless you have more plans
-> for this file, I can send a patch...
+>> Hi,
+>>
+>> On Mon, Sep 14, 2015 at 12:08 PM, Hans de Goede <hdegoede@redhat.com>
+>> wrote:
+>>>
+>>> Hi,
+>>>
+>>>
+>>> On 14-09-15 18:58, Bin Liu wrote:
+>>>>
+>>>>
+>>>> Hi,
+>>>>
+>>>> On Mon, Sep 14, 2015 at 9:59 AM, Hans de Goede <hdegoede@redhat.com>
+>>>> wrote:
+>>>>>
+>>>>>
+>>>>> Hi,
+>>>>>
+>>>>>
+>>>>> On 14-09-15 16:44, Bin Liu wrote:
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> Hi,
+>>>>>>
+>>>>>> On Thu, Sep 10, 2015 at 1:38 PM, Hans de Goede <hdegoede@redhat.com>
+>>>>>> wrote:
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> Hi,
+>>>>>>>
+>>>>>>> On 10-09-15 20:30, Maxime Ripard wrote:
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> On Thu, Sep 10, 2015 at 08:23:23PM +0200, Hans de Goede wrote:
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> Hi,
+>>>>>>>>>
+>>>>>>>>> On 04-09-15 08:43, Olliver Schinagl wrote:
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>> Hey Hans,
+>>>>>>>>>>
+>>>>>>>>>> On 07-08-15 10:45, Olliver Schinagl wrote:
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>> <snip>
+>>>>>>>>>>>>
+>>>>>>>>>>>>
+>>>>>>>>>>>>
+>>>>>>>>>>>>
+>>>>>>>>>>>> If you change the dr_mode to host then you _must_ also remove
+>>>>>>>>>>>> any
+>>>>>>>>>>>> id_det and vbus_det
+>>>>>>>>>>>> gpio settings from the usb_phy node in the dts, as the sun4i phy
+>>>>>>>>>>>> code
+>>>>>>>>>>>> detects
+>>>>>>>>>>>> host vs otg mode by checking for the presence of these.
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>> Yes, this fixes it and makes it work. Thanks.
+>>>>>>>>>>>
+>>>>>>>>>> I've been going back to this and am wondering if this is something
+>>>>>>>>>> I
+>>>>>>>>>> can
+>>>>>>>>>> look into to fix properly? E.g. if the dts sets dr_mode = host,
+>>>>>>>>>> can
+>>>>>>>>>> we
+>>>>>>>>>> simply ignore the pins and treat them as unset?
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> AFAIK you cannot unset something in dts. The only solution I
+>>>>>>>>> can comeup with is to add a dr_mode argument to the phy like
+>>>>>>>>> we already have for the otg controller itself.
+>>>>>>>>>
+>>>>>>>>> This is something which we likely need to do anyways to add
+>>>>>>>>> support for peripheral only mode, which we seem to need for
+>>>>>>>>> some "hdmi sticks".
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> I haven't really followed the rest of the discussion, so sorry if
+>>>>>>>> you
+>>>>>>>> already talked about that, but why can't you just set the dr_mode to
+>>>>>>>> peripheral in such a case?
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> This is about the usbphy code not the musb-controller code, which are
+>>>>>>> 2 different dts nodes, atm only the musb-controller node has a
+>>>>>>> dr_mode property, and the phy code decides between host-only
+>>>>>>> and otg mode based on whether an id pin is assigned or not.
+>>>>>>>
+>>>>>>> My proposal is to get rid of the id-pin hack to determine the mode
+>>>>>>> and add a dr_mode property to the usbphy dts node.
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> I would try to avoid adding dr_mode in the usbphy node if possible,
+>>>>>> since it is already specified in the controller node.
+>>>>>>
+>>>>>> Since the phy node is referenced in the controller node, is it
+>>>>>> possible that the phy driver looks up the controller of properties to
+>>>>>> find its dr_mode setting?
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>> That is possible, but it very much goes against how devicetree normally
+>>>>> works, where every node is more or less a standalone unit which
+>>>>> contains enough info for the associated driver to do its work.
+>>>>
+>>>>
+>>>>
+>>>> I guess you are right, but duplicating dr_mode would cause more
+>>>> trouble for end user.
+>>>
+>>>
+>>>
+>>> The user already needs to set up regulators, vbus-det and id-det
+>>> for otg mode in the usbphy node. Although there are 2 nodes in dts /
+>>> 2 separate hardware blocks involved in reality the 2 are closely
+>>> related and the user already must take care to have the settings match.
+>>>
+>>> Besides that writing dts files is not something which end users do,
+>>> so a normal user will never see this.
+>>>
+>>>> Felipe, could you please give your comments on this issue? I have to
+>>>> do the similar change for musb_dsps.
+>>>>
+>>>>>
+>>>>> Currently there is no link from the phy node to the controller node
+>>>>> (only the other way around) and adding such a link requires more code
+>>>>> then simple having a duplicate dr_mode.
+>>>>
+>>>>
+>>>>
+>>>> I guess I did not make my previous comment clearly, we don't need to
+>>>> add the link from the phy node to the controller node. We don't need
+>>>> to change the current dts, just in the phy driver to look up dr_mode
+>>>> of the controller node, if possible.
+>>>
+>>>
+>>>
+>>> And how does the phy code now where the controller node lives without
+>>> having a link to it in its node? Hardcode the full path to the
+>>> controller node ? That is both ugly and error prone.
+>>
+>>
+>> This is my first time looking at dts handling in drivers, so I might
+>> be completely wrong, but I am thinking that since the controller node
+>> links to the phy node, so the controller node is the parent of the phy
+>> node, so if there is an of api can look it up?
+>
+>
+> If the phy is a child of the controller, then yes this would work,
+> but in the case of sunxi the phy is a built-in mmio mapped peripheral
+> just like the controller, so they sit at the same level and have no
+> parent child relation.
 
-I am in the process of cleaning up the BIU control register setup for
-the memory controller write-pairing support to get that submitted, and
-that needs to be initialized before SMP, so we will still need an entry
-point in the machine code to do that.
+musb_dsps dts is the same.
 
-Thanks!
--- 
-Florian
+sun8i-a33.dtsi:
+
+    soc {
+        usb_otg: {
+            phys = <&usbphy 0>;
+        }
+        usbphy: {
+        }
+    }
+
+As in the example above, usb_otg node refers to usbphy node, so I am
+wondering if there is an of api to look up the usb_otg properties in
+the usbphy driver.
+
+Regards,
+-Bin.
+
+>
+> Regards,
+>
+> Hans
