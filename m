@@ -1,122 +1,40 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Mon, 14 Sep 2015 16:55:50 +0200
-Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
- ECAM) and ACPI code out of arch/x86/ directory
-In-Reply-To: <20150911112018.GA13033@red-moon>
-References: <20150602133215.GC23650@red-moon> <55701A31.808@linaro.org>
- <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
- <557504A2.3060203@linaro.org> <20150608151443.GA16151@red-moon>
- <55E4340D.6050004@linaro.org> <55ED6010.3020406@linaro.org>
- <20150908150727.GF29293@red-moon> <55F0388B.1090607@linaro.org>
- <20150911112018.GA13033@red-moon>
-Message-ID: <55F6DFF6.4010807@linaro.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 14 Sep 2015 15:54:21 +0100
+Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
+In-Reply-To: <55F6D9DC.8060607@citrix.com>
+References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+ <55F68BC9.6020509@citrix.com> <55F6A437.3040403@citrix.com>
+ <55F6A9DB.8040503@citrix.com> <55F6ADAE.1010609@citrix.com>
+ <55F6B8CC.5090406@citrix.com> <55F6C1D2.7010206@citrix.com>
+ <55F6D9DC.8060607@citrix.com>
+Message-ID: <alpine.DEB.2.02.1509141542430.2672@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.09.2015 13:20, Lorenzo Pieralisi wrote:
-> On Wed, Sep 09, 2015 at 02:47:55PM +0100, Tomasz Nowicki wrote:
->
-> [...]
->
->>> I think (but I am happy to be corrected) that the map_bus() hook
->>> (ie that's why struct pci_bus is required in eg pci_generic_config_write)
->>> is there to ensure that when the generic accessors are called
->>> a) we have a valid bus b) the host controllers implementing it
->>> has been initialized.
->>>
->>> I had another look and I noticed you are trying to solve multiple
->>> things at once:
->>>
->>> 1) ACPICA seems to need PCI config space on bus 0 to be working
->>>      before PCI enumerates (ie before we have a root bus), we need to
->>>      countercheck on that, but you can't use the generic PCI accessors
->>>      for that reasons (ie root bus might not be available, you do not
->>>      have a pci_bus struct)
->>> 2) the raw_pci_read/write require _generic_ mmio back-ends, since AMD
->>>      can't cope with standard x86 read/write{b,w,l}
->>>
->>> Overall, it seems to me that we can avoid code duplication by
->>> shuffling your code a bit.
->>>
->>> You could modify the generic accessors in drivers/pci/access.c to
->>> use your mmio back-end instead of using plain read/write{b,w,l}
->>> functions (we should check if RobH is ok with that there can be
->>> reasons that prevent this from happening). This would solve the
->>> AMD mmio issue.
->>>
->>> By factoring out the code that actually carries out the reads
->>> and writes in the accessors basically you decouple the functions
->>> requiring the struct pci_bus from the ones that does not require it
->>> (ie raw_pci_{read/write}.
->>>
->>> The generic MMIO layer belongs in the drivers/pci/access.c file, it has
->>> nothing to do with ECAM.
->>>
->>> The mmcfg interface should probably live in pci-acpi.c, I do not think
->>> you need an extra file in there but that's a detail.
->>>
->>> Basically the generic accessors would become something like eg:
->>>
->>> int pci_generic_config_write(struct pci_bus *bus, unsigned int devfn,
->>>                             int where, int size, u32 val)
->>> {
->>>        void __iomem *addr;
->>>
->>>        addr = bus->ops->map_bus(bus, devfn, where);
->>>        if (!addr)
->>>                return PCIBIOS_DEVICE_NOT_FOUND;
->>>
->>>        pci_mmio_write(size, addr + where, value);
->>>
->>>        return PCIBIOS_SUCCESSFUL;
->>> }
->>>
->>> With that in place using raw_pci_write/read or the generic accessors
->>> becomes almost identical, with code requiring the pci_bus to be
->>> created using the generic accessors and ACPICA using the raw version.
->>>
->>> I might be missing something, so apologies if that's the case.
->>>
->>
->> Actually, I think you showed me the right direction :) Here are some
->> conclusions/comments/concerns. Please correct me if I am wrong:
->>
->> 1. We need raw_pci_write/read accessors (based on ECAM) for ARM64 too
->> but only up to the point where buses are enumerated. From that point on,
->> we should reuse generic accessors from access.c file, right?
->
-> Well, I still have not figured out whether on arm64 the raw accessors
-> required by ACPICA make sense.
->
-> So either arm64 relies on the generic MCFG based raw read and writes
-> or we define the global raw read and writes as empty (ie x86 overrides
-> them anyway).
->
+On Mon, 14 Sep 2015, Roger Pau Monn? wrote:
+> IMHO this splitting is just a workaround for the fact that we don't have
+> a 64KB PV block protocol, and this is the real problem that should be
+> solved.
 
-My concerns/ideas related to raw accessors for ARM64, please correct me 
-at any point.
+64K is a pure one guest kernel configuration option, not a platform wide
+option. The hypervisor interfaces are still the same, the ABI is the
+same and all the other guests are still the same, the Xen binary is
+still the same.
 
-ACPI spec - chapter: 19.5.96 OperationRegion (Declare Operation Region)
-defines PCI_Config as one of region types. Every time ASL opcode 
-operates on corresponding PCI config space region, ASL interpreter is 
-dispatching address space to our raw accessors, please see 
-acpi_ex_pci_config_space_handler, acpi_ev_pci_config_region_setup calls. 
-What is more important, such operations may happen after (yes after) bus 
-enumeration, but always raw accessors are called at the end with the 
-{segment, bus, dev, fn} tuple.
+A 64K block protocol could be a good performance imprevement, but should
+not be required to run kernels which have different config options.
 
-Giving above, here are some ideas:
-1. We force somehow vendors to avoid operations on PCI config regions in 
-ASL code. PCI config region definitions still fall into Hardware Reduced 
-profile, so new ACPICA special subset for ARM64 is need. Then raw ACPI 
-accessors can be empty (and overridden by x86).
-2. We provide raw accessors which translate {segment, bus, dev, fn} 
-tuple to Linux generic accessors (this can be considered only if PCI 
-config accesses happened after bus enumeration for HR profile, thus 
-tuple to bus structure map is possible).
-4. We rely on the generic MCFG based raw read and writes.
 
-Let me know your opinion.
+> In the long term this will put a burden on all blkfronts (if 64KB pages
+> are also used by other OSes), while introducing a 64KB PV block protocol
+> will make the blkfront implementation in all OSes very similar to what
+> we have now, without replicating the splitting code amongst all the
+> possible blkfront implementations.
+> 
+> Granted that some changes to blkback will be needed in order to support
+> mapping 64KB grants, but there are much fewer blkback implementations
+> out there than blkfronts.
 
-Thanks,
-Tomasz
+I don't think we can rely on blkback having something in order to run
+new guests, otherwise we break compatibility: new guests won't run on
+old hypervisors.
