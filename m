@@ -1,85 +1,64 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 14 Sep 2015 22:06:44 +0200
-Subject: [PATCH v2 2/2] irqchip: gic: Document optional Clock and Power Domain
- properties
+Date: Mon, 14 Sep 2015 22:06:43 +0200
+Subject: [PATCH v2 1/2] irqchip: gic: Add arm,pl390 support
 In-Reply-To: <1442261204-30931-1-git-send-email-geert+renesas@glider.be>
 References: <1442261204-30931-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1442261204-30931-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1442261204-30931-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Depending on the GIC variant, the GIC module has one or more clock
-inputs. Document the optional "clocks" and "clock-names" properties,
-and their possible values, based on the Technical Reference Manuals.
-optional.
+Add support for the PrimeCell? Generic Interrupt Controller (PL390) to
+the GIC DT bindings and driver.
 
-Add the optional "power-domains" property.
+Currently the GIC driver treats this GIC variant the same as other GIC
+variants, but there are differences in hardware topology (e.g. clock
+inputs).
 
-This will allow to describe in DT the relationship between the GIC and
-the Clock and/or Power Domain topology on SoCs where this is relevant
-and needed for proper operation.
-
-Note: As the current GIC driver doesn't support Runtime PM yet, PM
-Domain constraints must be handled elsewhere in e.g. platform code.
+Sort the list of compatible values while we're at it.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-Note: v1 was Acked-by: Rob Herring <robh@kernel.org>, but I didn't add
-      it, due to the addition of clock-names.
-
 v2:
-  - Add "clock-names",
-  - Document clock inputs on various GIC variants.
+  - New.
 
-Clock inputs are based on the following documentation:
-  - "ARM11 MPCore Processor Technical Reference Manual" (r2p0),
-  - "Cortex-A9 MPCore Technical Reference Manual" (r4p1, r2p0),
-  - "Cortex-A15 Technical Reference Manual" (r4p0, r2p0),
-  - "CoreLink GIC-400 Generic Interrupt Controller Technical Reference
-    Manual" (r0p1, r0p0),
-  - "PrimeCell Generic Interrupt Controller (PL390) Technical Reference
-    Manual" (r0p0).
-
-I could not find clock input information in:
-  - "ARM1176JZF Development Chip Technical Reference Manual" (r0p0),
-  - "Cortex-A7 MPCore processors" (r0p5, r0p3).
-
-Other:
-  - "brcm,brahma-b15-gic" seems to be always used together with
-    "arm,cortex-a15-gic".
-
-No access to datasheets:
-  - "qcom,msm-8660-qgic",
-  - "qcom,msm-qgic2".
----
- Documentation/devicetree/bindings/arm/gic.txt | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ Documentation/devicetree/bindings/arm/gic.txt | 9 +++++----
+ drivers/irqchip/irq-gic.c                     | 1 +
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-index 24742853ba460223..cc56021eb60babea 100644
+index 2da059a4790cb3c6..24742853ba460223 100644
 --- a/Documentation/devicetree/bindings/arm/gic.txt
 +++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -59,6 +59,21 @@ Optional
-   regions, used when the GIC doesn't have banked registers. The offset is
-   cpu-offset * cpu-nr.
+@@ -11,13 +11,14 @@ have PPIs or SGIs.
+ Main node required properties:
  
-+- clocks        : List of phandle and clock-specific pairs, one for each entry
-+  in clock-names.
-+- clock-names   : List of names for the GIC clock input(s). Valid clock names
-+  depend on the GIC variant:
-+	"ic_clk" (for "arm,arm11mp-gic")
-+	"PERIPHCLKEN" (for "arm,cortex-a15-gic")
-+	"PERIPHCLK", "PERIPHCLKEN" (for "arm,cortex-a9-gic")
-+	"clk" (for "arm,gic-400")
-+	"gclk" (for "arm,pl390")
-+
-+- power-domains : A phandle and PM domain specifier as defined by bindings of
-+		  the power controller specified by phandle, used when the GIC
-+		  is part of a Power or Clock Domain.
-+
-+
- Example:
+ - compatible : should be one of:
+-	"arm,gic-400"
++	"arm,arm1176jzf-devchip-gic"
++	"arm,arm11mp-gic"
+ 	"arm,cortex-a15-gic"
+-	"arm,cortex-a9-gic"
+ 	"arm,cortex-a7-gic"
+-	"arm,arm11mp-gic"
++	"arm,cortex-a9-gic"
++	"arm,gic-400"
++	"arm,pl390"
+ 	"brcm,brahma-b15-gic"
+-	"arm,arm1176jzf-devchip-gic"
+ 	"qcom,msm-8660-qgic"
+ 	"qcom,msm-qgic2"
+ - interrupt-controller : Identifies the node as an interrupt controller
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 4b2255317e4764f9..81179d01f14de2fe 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -1046,6 +1046,7 @@ IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
+ IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
+ IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
+ IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
++IRQCHIP_DECLARE(pl390, "arm,pl390", gic_of_init);
  
- 	intc: interrupt-controller at fff11000 {
+ #endif
+ 
 -- 
 1.9.1
