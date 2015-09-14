@@ -1,64 +1,62 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 14 Sep 2015 16:40:28 +0200
-Subject: [PATCH 2/2] clk: at91: system: don't try to free_irq when there
- is no IRQ
-In-Reply-To: <1441982047-11303-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1441982047-11303-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1441982047-11303-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150914164028.7f38505d@bbrezillon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 14 Sep 2015 15:43:30 +0100
+Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
+In-Reply-To: <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
+References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+ <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
+ <20150914131448.GC7002@leverpostej>
+ <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
+ <20150914134949.GE7002@leverpostej>
+ <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20150914144330.GH7002@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
-
-On Fri, 11 Sep 2015 16:34:07 +0200
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-
-> In the error path of at91_clk_register_system(), sys->irq is freed
-> unconditionally but it may not exist or be request at all.
-
-Not sure this is really needed since free_irq() seems to gracefully
-handle the case where the irq has not been previously requested [1]
-(it does not complain about invalid irq descriptors), but I guess
-this extra check cannot hurt.
-
-BTW, that's kinda weird that free_irq() accepts this case, but complains
-when you're trying to free a wrong (or already freed) shared irq handler
-[2].
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-Best Regards,
-
-Boris
-
-[1]http://lxr.free-electrons.com/source/kernel/irq/manage.c#L1471
-[2]http://lxr.free-electrons.com/source/kernel/irq/manage.c#L1377
-
+On Mon, Sep 14, 2015 at 03:38:36PM +0100, Punit Agrawal wrote:
+> Mark Rutland <mark.rutland@arm.com> writes:
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/clk/at91/clk-system.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> >> >> +Sensor bindings for the sensors based on SCPI Message Protocol
+> >> >> +--------------------------------------------------------------
+> >> >> +SCPI provides an API to access the various sensors on the SoC.
+> >> >> +
+> >> >> +Required properties:
+> >> >> +- compatible : should be "arm,scpi-sensors".
+> >> >> +- #thermal-sensor-cells: should be set to 1. This property follows the
+> >> >> +			 thermal device tree bindings[2].
+> >> >
+> >> > You need to specify what the valid values for this cell are.
+> >> 
+> >> The enumeration depends on the number of sensors exported by SCP
+> >> firmware - which is platform dependent. I could add add something like
+> >> if you think that is helpful -
+> >> 
+> >> "Valid cell value is a number between 0..n-1, where n is the number
+> >> of sensors exported by SCP firmware."
+> >
+> > Can the FW identifer space have holes? Or are they always contiguous?
 > 
-> diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
-> index 58008b3e8bc1..3f5314344286 100644
-> --- a/drivers/clk/at91/clk-system.c
-> +++ b/drivers/clk/at91/clk-system.c
-> @@ -138,7 +138,8 @@ at91_clk_register_system(struct at91_pmc *pmc, const char *name,
->  
->  	clk = clk_register(NULL, &sys->hw);
->  	if (IS_ERR(clk)) {
-> -		free_irq(sys->irq, sys);
-> +		if (irq)
-> +			free_irq(sys->irq, sys);
->  		kfree(sys);
->  	}
->  
+> The way the SCP interface is defined, the sensor identifiers are
+> contiguous, but not all are temperature sensors.
 
+Ok. So how exactly are they enumerated for this binding?
 
+> > If this is the same as the raw FW identifer value, specify that.
+> > Otherwise, you need to specify the mapping.
+> 
+> I'll update the patch to add mappings for Juno r0 (and r1 if I can get
+> my hands on one).
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+If there's identical logic mapping the two, we might just be able to
+describe that rather than having to add tables all the time.
+
+> > There needs to be enough information for a dts author to figure out
+> > which values to place in the DT.
+> 
+> I understand. Except sometimes it is hard to get the firmware to commit to not
+> modify the ordering - discoverability and all that. :)
+
+If they do that, then things are broken regardless, no? I guess that'll
+be clear if/when I see how the mapping works.
+
+Thanks,
+Mark.
