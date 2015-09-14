@@ -1,63 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Sep 2015 12:00:23 +0100
-Subject: sdhci: runtime suspend/resume on card insert/removal
-In-Reply-To: <20150914105014.GJ21084@n2100.arm.linux.org.uk>
-References: <20150910153129.07adbe68@xhacker>
- <20150910080233.GH21084@n2100.arm.linux.org.uk>
- <20150910160402.3b78b5c6@xhacker> <55F66874.2000609@linaro.org>
- <20150914142838.07ec6a07@xhacker> <55F681AC.2010605@linaro.org>
- <20150914161804.101dfc55@xhacker> <55F69121.3030700@linaro.org>
- <55F69E4F.8010608@linaro.org>
- <20150914105014.GJ21084@n2100.arm.linux.org.uk>
-Message-ID: <20150914110023.GK21084@n2100.arm.linux.org.uk>
+From: roger.pau@citrix.com (=?UTF-8?Q?Roger_Pau_Monn=c3=a9?=)
+Date: Mon, 14 Sep 2015 13:04:59 +0200
+Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
+In-Reply-To: <55F6A437.3040403@citrix.com>
+References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+ <55F68BC9.6020509@citrix.com> <55F6A437.3040403@citrix.com>
+Message-ID: <55F6A9DB.8040503@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 11:50:14AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 14, 2015 at 03:45:43PM +0530, Vaibhav Hiremath wrote:
-> > Came across below lines in the datasheet,
-> > 
-> > ========= Copy-n-paste from datasheet============
-> > 
-> > All SDH interfaces share the same clock which is enabled when any of the SDH
-> > clock enables are
-> > set (from PMUA_SDH1_CLK_RES_CTRL, PMUA_SDH2_CLK_RES_CTRL,
-> > PMUA_SDH3_CLK_RES_CTRL, PMUA_SDH4_CLK_RES_CTRL,
-> > PMUA_SDH5_CLK_RES_CTRL), with clock source select and divider ratio
-> > controlled by
-> > PMUA_SDH1_CLK_RES_CTRL.
-> > 
-> > ==================================================
-> > 
-> > 
-> > And I can confirm that after disabling AXI interface clock for all the
-> > SDH modules (1-5) I see I get an abort.
-> > 
-> > This clearly explains/justifies/proves that the existing code is
-> > working as expected. I have eMMC mounted on the board, which makes
-> > clock to always stay ON on SDH3.
-> > 
-> > So there is an OR gate implemented inside which takes input from
-> > SDHx_AXI_EN and feeds back to all SDHx instances. Don't ask me why it
-> > has been designed that way :)
-> > 
-> > And I did some experiment as well, so what I have observed is,
-> > SDH_AXI_CLOCK is required to generate card detection, without that I do
-> > not see card detection working.
-> 
-> What that means is that if DT configures the interface to use its
-> internal card detection, the AXI clock must never shut off when entering
-> runtime-PM.
-> 
-> Yes, it means you don't get the same savings as you would by turning
-> off that clock, but that's the choice between using the internal card
-> detection and a GPIO for this.  The code shouldn't force you to use a
-> GPIO just because the Linux driver implementation dumbly disables the
-> AXI clock.
+Hello,
 
-Note that should also happen if a SDIO card is inserted, and the SDIO IRQ
-is enabled - so the SDIO card can signal an interrupt back to the host.
+El 14/09/15 a les 12.40, Julien Grall ha escrit:
+> Hi Roger,
+> 
+> On 14/09/15 09:56, Roger Pau Monn? wrote:
+>> El 07/09/15 a les 17.33, Julien Grall ha escrit:
+>>> Hi all,
+>>>
+>>> ARM64 Linux is supporting both 4KB and 64KB page granularity. Although, Xen
+>>> hypercall interface and PV protocol are always based on 4KB page granularity.
+>>>
+>>> Any attempt to boot a Linux guest with 64KB pages enabled will result to a
+>>> guest crash.
+>>>
+>>> This series is a first attempt to allow those Linux running with the current
+>>> hypercall interface and PV protocol.
+>>>
+>>> This solution has been chosen because we want to run Linux 64KB in released
+>>> Xen ARM version or/and platform using an old version of Linux DOM0.
+>>>
+>>> There is room for improvement, such as support of 64KB grant, modification
+>>> of PV protocol to support different page size... They will be explored in a
+>>> separate patch series later.
+>>>
+>>> TODO list:
+>>>     - Convert swiotlb to 64KB
+>>>     - Convert xenfb to 64KB
+>>>     - Support for multiple page ring support
+>>>     - Support for 64KB in gnttdev
+>>>     - Support of non-indirect grant with 64KB frontend
+>>>     - It may be possible to move some common define between
+>>>     netback/netfront and blkfront/blkback in an header
+>>>
+>>> I've got most of the patches for the TODO items. I'm planning to send them as
+>>> a follow-up as it's not a requirement for a basic guests.
+>>>
+>>> All patches has been built tested for ARM32, ARM64, x86. But I haven't tested
+>>> to run it on x86 as I don't have a box with Xen x86 running. I would be
+>>> happy if someone give a try and see possible regression for x86.
+>>
+>> Do you have figures regarding if/how much performance penalty do the
+>> blkfront/blkback patches add to the traditional 4KB scenario (frontend
+>> and backend running on guests using 4KB pages)?
+> 
+> Which benchmark do you advice? Although, I don't have SSD on this
+> platform so it may be possible that the bottleneck will be the hard drive.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I've normally used a ramdisk in order to test performance, but it seems
+nullblk would be a better option (it wasn't available before) and it
+doesn't reduce the size of RAM available to the system:
+
+https://www.kernel.org/doc/Documentation/block/null_blk.txt
+
+>>
+>> Since there's been no design document about this and the TODO list
+>> doesn't contain it, I would like to know which plans do we have in order
+>> to fix this properly.
+> 
+> Can you explain what kind of design document you were expecting? The
+> support of 64KB page granularity is pretty straight-forward and there is
+> not many way to do it. We have to split the page in 4KB chunk to feed
+> the ring.
+
+I was thinking about adding support for 64KB grants with the aim of
+eventually removing the splitting done in xen-blkfront and the
+grant-table code in general.
+
+Some modifications would be needed in xen-blkback in order to support
+mapping 64KB grants, but this could also be used by x86 if we ever
+enable 2MB grants and allow them to be used in the block PV protocol,
+while the current code can only be used by ARM.
+
+> TBH, I'm expecting a small impact to the performance. It would be hard
+> to get the exactly the same performance as today if we keep the helpers
+> to avoid the backend dealing himself with the splitting and page
+> granularity.
+> 
+> Although, if the performance impact is not acceptable, it may be
+> possible to optimize gnttab_foreach_grant_in_range by moving the
+> function inline. The current way to the loop is the fastest I've found
+> (I've wrote a small program to test different way) and we will need it
+> when different of size will be supported.
+
+I don't expect the performance to drop massively with this patches
+applied, but it would be good to al least have an idea of the impact.
+
+Roger.
