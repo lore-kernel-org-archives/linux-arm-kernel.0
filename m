@@ -1,10 +1,10 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 14 Sep 2015 14:00:17 +0100
-Subject: [Patch v3 4/5] hwmon: Support registration of thermal zones for SCP
+Date: Mon, 14 Sep 2015 14:00:18 +0100
+Subject: [PATCH v3 4/5] hwmon: Support thermal zones registration for SCP
  temperature sensors
 In-Reply-To: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
 References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1442235619-4029-5-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1442235619-4029-6-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
