@@ -1,71 +1,67 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 14 Sep 2015 10:37:19 +0100
-Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
- ECAM) and ACPI code out of arch/x86/ directory
-In-Reply-To: <55F2CA98.7050905@linaro.org>
-References: <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
- <557504A2.3060203@linaro.org> <20150608151443.GA16151@red-moon>
- <55E4340D.6050004@linaro.org> <55ED6010.3020406@linaro.org>
- <20150908150727.GF29293@red-moon> <55F0388B.1090607@linaro.org>
- <20150911112018.GA13033@red-moon> <55F2CA98.7050905@linaro.org>
-Message-ID: <20150914093719.GC18410@red-moon>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 14 Sep 2015 10:36:55 +0100
+Subject: [PATCH v2] arm/xen: Enable user access to the kernel before
+ issuing a privcmd call
+In-Reply-To: <20150911175951.GA21084@n2100.arm.linux.org.uk>
+References: <1441988759-4572-1-git-send-email-julien.grall@citrix.com>
+ <20150911170027.GX21084@n2100.arm.linux.org.uk> <55F3102B.3090309@citrix.com>
+ <55F31105.6070305@citrix.com> <20150911175107.GY21084@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1509111856020.2672@kaball.uk.xensource.com>
+ <20150911175951.GA21084@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1509141036430.2672@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 01:35:36PM +0100, Tomasz Nowicki wrote:
-> On 11.09.2015 13:20, Lorenzo Pieralisi wrote:
+On Fri, 11 Sep 2015, Russell King - ARM Linux wrote:
+> On Fri, Sep 11, 2015 at 06:56:50PM +0100, Stefano Stabellini wrote:
+> > On Fri, 11 Sep 2015, Russell King - ARM Linux wrote:
+> > > On Fri, Sep 11, 2015 at 06:36:05PM +0100, Julien Grall wrote:
+> > > > On 11/09/15 18:32, Julien Grall wrote:
+> > > > > On 11/09/15 18:00, Russell King - ARM Linux wrote:
+> > > > >> On Fri, Sep 11, 2015 at 05:25:59PM +0100, Julien Grall wrote:
+> > > > >>> +	/*
+> > > > >>> +	 * Privcmd calls are issued by the userspace. We need to allow the
+> > > > >>> +	 * kernel to access the userspace memory before issuing the hypercall.
+> > > > >>> +	 */
+> > > > >>> +	uaccess_enable r4
+> > > > >>> +
+> > > > >>> +	/* r4 is loaded now as we use it as scratch register before */
+> > > > >>>  	ldr r4, [sp, #4]
+> > > > >>
+> > > > >> As I mentioned in one of my previous mails, "ip" should be safe to use
+> > > > >> here - it's a caller-corrupted register, just like r0-r3 and lr.  So,
+> > > > >> you could do:
+> > > > >>
+> > > > >> 	ldr r4, [sp, #4]
+> > > > >> +	uaccess_enable ip
+> > > > > 
+> > > > > The register ip (aka r12) is used to store the hypercall number. So we
+> > > > > can't reuse it as scratch register.
+> > > > > 
+> > > > > The easiest one is r4.
+> > > > > 
+> > > > >>
+> > > > >> which fractionally tightens the window.
+> > > > >>
+> > > > >> However, there's nothing actually wrong with your version - there's no
+> > > > >> way we could've got this far with sp pointing at userspace.
+> > > > >>
+> > > > >> I'm happy with either version, so:
+> > > > >>
+> > > > >> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > > >>
+> > > > >> How do you want to handle the patch?  I already have some other uaccess
+> > > > >> fixes queued up to send to Linus before the merge window closes.
+> > > > 
+> > > > Forgot to answer to this bits. I was thinking to ask Stefano carrying
+> > > > the patch in xentip. Although it won't go until rc1.
+> > > > 
+> > > > I don't mind if it's going earlier in Linux/master.
+> > > 
+> > > Thanks, I've applied your patch as-is now.
+> > 
+> > That's fine by me, the patch looks good.
+> 
+> If you'd like your ack on it, please send one, I can still do that.
 
-[...]
-
-> >>> With that in place using raw_pci_write/read or the generic accessors
-> >>> becomes almost identical, with code requiring the pci_bus to be
-> >>> created using the generic accessors and ACPICA using the raw version.
-> >>>
-> >>> I might be missing something, so apologies if that's the case.
-> >>>
-> >>
-> >> Actually, I think you showed me the right direction :) Here are some
-> >> conclusions/comments/concerns. Please correct me if I am wrong:
-> >>
-> >> 1. We need raw_pci_write/read accessors (based on ECAM) for ARM64 too
-> >> but only up to the point where buses are enumerated. From that point on,
-> >> we should reuse generic accessors from access.c file, right?
-> >
-> > Well, I still have not figured out whether on arm64 the raw accessors
-> > required by ACPICA make sense.
-> >
-> > So either arm64 relies on the generic MCFG based raw read and writes
-> > or we define the global raw read and writes as empty (ie x86 overrides
-> > them anyway).
-> >
-> > I will get back to you on this.
-> >
-> >> 2. For ARM64 ACPI PCI, we can use generic accessors right away, .map_bus
-> >> would call common code part (pci_dev_base()). The only thing that worry
-> >> me is fact that MCFG regions are RCU list so it needs rcu_read_lock()
-> >> for the .map_bus (mcfg lookup) *and* read/write operation.
-> >
-> > Do you mean the address look-up and the mmio operation should be carried
-> > out atomically right ?
-> Yes.
-
-We can wrap the calls pci_generic_read/write() within a function and
-add rcu_read_lock()/unlock() around them, eg:
-
-int pci_generic_config_read_rcu()
-{
-	rcu_read_lock();
-	pci_generic_config_read(...);
-	rcu_read_unlock();
-}
-
-Honestly it seems the RCU API is needed just because config space
-can be also accessed by raw_ accessors in ACPICA code, that's the only
-reason I see to protect the config structs against config space
-removal (basically config entries are removed only when the host
-bridge is released if I read the code correctly, and the only way
-this can happen concurrently is having ACPICA code reusing the
-same config space but accessing it with no pci_bus struct attached
-to it, by just using the (segment, bus, dev, fn) tuple).
-
-Lorenzo
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
