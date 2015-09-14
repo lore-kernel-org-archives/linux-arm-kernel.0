@@ -1,133 +1,97 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 14 Sep 2015 16:18:04 +0800
-Subject: sdhci: runtime suspend/resume on card insert/removal
-In-Reply-To: <55F681AC.2010605@linaro.org>
-References: <55F12CF8.50003@linaro.org>	<20150910153129.07adbe68@xhacker>
- <20150910080233.GH21084@n2100.arm.linux.org.uk>
- <20150910160402.3b78b5c6@xhacker>	<55F66874.2000609@linaro.org>
- <20150914142838.07ec6a07@xhacker>	<55F681AC.2010605@linaro.org>
-Message-ID: <20150914161804.101dfc55@xhacker>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Mon, 14 Sep 2015 10:30:30 +0200
+Subject: [PATCH v5 1/5] arm/arm64: add smccc ARCH32
+In-Reply-To: <20150821114331.GA11701@ermac>
+References: <1439973629-19505-1-git-send-email-jens.wiklander@linaro.org>
+ <1439973629-19505-2-git-send-email-jens.wiklander@linaro.org>
+ <20150819165009.GC10297@arm.com> <20150820113729.GA25962@ermac>
+ <20150821092430.GC30930@arm.com> <20150821114331.GA11701@ermac>
+Message-ID: <20150914083029.GA13963@ermac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Sep 2015 13:43:32 +0530
-Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
+On Fri, Aug 21, 2015 at 01:43:31PM +0200, Jens Wiklander wrote:
+> On Fri, Aug 21, 2015 at 10:24:30AM +0100, Will Deacon wrote:
+> > On Thu, Aug 20, 2015 at 12:37:29PM +0100, Jens Wiklander wrote:
+> > > On Wed, Aug 19, 2015 at 05:50:09PM +0100, Will Deacon wrote:
+> > > > On Wed, Aug 19, 2015 at 09:40:25AM +0100, Jens Wiklander wrote:
+> > > > > Adds helpers to do SMC based on ARM SMC Calling Convention.
+> > > > > CONFIG_HAVE_SMCCC is enabled for architectures that may support
+> > > > > the SMC instruction. It's the responsibility of the caller to
+> > > > > know if the SMC instruction is supported by the platform.
+> > > > 
+> > > > [...]
+> > > > > diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+> > > > > new file mode 100644
+> > > > > index 0000000..3ce7fe8
+> > > > > --- /dev/null
+> > > > > +++ b/arch/arm64/kernel/smccc-call.S
+> > > > > @@ -0,0 +1,34 @@
+> > > > > +/*
+> > > > > + * Copyright (c) 2015, Linaro Limited
+> > > > > + *
+> > > > > + * This program is free software; you can redistribute it and/or modify
+> > > > > + * it under the terms of the GNU General Public License Version 2 as
+> > > > > + * published by the Free Software Foundation.
+> > > > > + *
+> > > > > + * This program is distributed in the hope that it will be useful,
+> > > > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > > > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> > > > > + * GNU General Public License for more details.
+> > > > > + *
+> > > > > + */
+> > > > > +#include <linux/linkage.h>
+> > > > > +
+> > > > > +#define SMC_PARAM_W0_OFFS      0
+> > > > > +#define SMC_PARAM_W2_OFFS      8
+> > > > > +#define SMC_PARAM_W4_OFFS      16
+> > > > > +#define SMC_PARAM_W6_OFFS      24
+> > > > > +
+> > > > > +/* void smccc_call32(struct smccc_param32 *param) */
+> > > > > +ENTRY(smccc_call32)
+> > > > > +       stp     x28, x30, [sp, #-16]!
+> > > > 
+> > > > Why are you saving lr?
+> > > 
+> > > Agree, no point in saving lr, but I still need to decrease sp with 16 to
+> > > maintain correct alignment. I'll do it with an str instruction instead.
+> > 
+> > That or pad out with xzr
+> > 
+> > > > 
+> > > > > +       mov     x28, x0
+> > > > > +       ldp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
+> > > > > +       ldp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
+> > > > > +       ldp     w4, w5, [x28, #SMC_PARAM_W4_OFFS]
+> > > > > +       ldp     w6, w7, [x28, #SMC_PARAM_W6_OFFS]
+> > > > > +       smc     #0
+> > > > > +       stp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
+> > > > > +       stp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
+> > > > > +       ldp     x28, x30, [sp], #16
+> > > > > +       ret
+> > > > > +ENDPROC(smccc_call32)
+> > > > 
+> > > > Could we deal with this like we do for PSCI instead? (see
+> > > > __invoke_psci_fn_smc). We could also then rename psci-call.S to fw-call.S
+> > > > and stick this in there too.
+> > > 
+> > > I assume you're referring to when to use "hvc" and "smc".
+> > 
+> > No, I mean use a C prototype to avoid marshalling the parameters in assembly
+> > like this. As Rutland pointed out, the return value is a bit messy, but
+> > the arguments align nicely with the PCS afaict.
+> 
+> If possible I'd like the function to have the same prototype for both
+> arm and arm64. For arm it's not possible to supply more than 4
+> parameters. To fully support SMC Calling Convention we need to be able
+> to pass 8 parameters and have 4 return values. The OP-TEE driver in this
+> patch set depends on this. I don't see how we can avoid the marshalling
+> here.
+> 
+> We could have two versions of the SMCCC functions, one simplified which
+> only uses registers and one complete like this one with marshalling.
 
-> 
-> 
-> On Monday 14 September 2015 11:58 AM, Jisheng Zhang wrote:
-> > On Mon, 14 Sep 2015 11:55:56 +0530
-> > Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
-> >
-> >>
-> >>
-> >> On Thursday 10 September 2015 01:34 PM, Jisheng Zhang wrote:
-> >>> Hi Russell,
-> >>>
-> >>> On Thu, 10 Sep 2015 09:02:33 +0100
-> >>> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> >>>
-> >>>> On Thu, Sep 10, 2015 at 03:31:29PM +0800, Jisheng Zhang wrote:
-> >>>>> Hi Vaibhav,
-> >>>>>
-> >>>>> On Thu, 10 Sep 2015 12:40:48 +0530
-> >>>>> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
-> >>>>>
-> >>>>>> Hi,
-> >>>>>>
-> >>>>>> During my testing of SDHCI-PXAV3 driver on Marvell's pxa1928
-> >>>>>> based platform, I observed that runtime PM suspend/resume is having
-> >>>>>> issues with card insertion and removal.
-> >>>>>>
-> >>>>>> Let me try to explain it using execution sequence -
-> >>>>>>
-> >>>>>> During boot:
-> >>>>>>
-> >>>>>> MMC SD card gets detected as expected.
-> >>>>>>
-> >>>>>> [    2.431012] mmc1: new high speed SDHC card at address 1234
-> >>>>>> [    2.437235] mmcblk1: mmc1:1234 SA04G 3.63 GiB
-> >>>>>> [    2.444841]  mmcblk1: p1
-> >>>>>>
-> >>>>>>
-> >>>>>> Now after coming to the linux prompt, if card removal event occurs
-> >>>>>> then the call sequence is -
-> >>>>>>
-> >>>>>>     sdhci_irq() -->
-> >>>>>>      -> sdhci_thread_irq(): host->thread_isr - 0x80
-> >>>>>>         -> sdhci_card_event()
-> >>>>>>         -> mmc_detect_change()
-> >>>>>>            --> _mmc_detect_change()
-> >>>>>>                --->  mmc_sd_detect()
-> >>>>>>                      mmc_sd_remove()
-> >>>>>>                      mmc_remove_card()
-> >>>>>>                      mmc_bus_remove()
-> >>>>>>                      mmc_power_off()
-> >>>>>>                      mmc_set_initial_state()
-> >>>>>>                      sdhci_set_ios()
-> >>>>>>                      ...
-> >>>>>>           sdhci_pxav3_runtime_suspend()
-> >>>>>>           sdhci_runtime_suspend_host()
-> >>>>>>
-> >>>>>>
-> >>>>>> Till here everything looks perfect :) (if I got it right)
-> >>>>>>
-> >>>>>> Now on card insertion again, the expectation is, runtime resume should
-> >>>>>> get called as part of interrupt trigger from the SDHCI controller on
-> >>>>>> card insertion.
-> >>>>>
-> >>>>> AFAIK, card insertion => wakeup irq, this irq doesn't come from SDHCI
-> >>>>
-> >>>> Wakeup IRQs are what happens when the _system_ is in suspend, not
-> >>>> when the device is runtime suspended.
-> >>>
-> >>> Oh, yes. Sorry for misleading, I didn't express myself clearly. What
-> >>> I really means is that the card insertion/remove irq which could finally
-> >>> cause sdhci host resumed.
-> >>>
-> >>
-> >> So Jisheng,
-> >>
-> >> You are ok with above change, right?
-> >
-> > Nope. the above is just to clarify my mixing "wakeup IRQs" and the card
-> > insertion/remove irq that brings sdhci host resumed.
-> >
-> > IMHO, your patch is still not necessary and perhaps wrong.
-> >
-> 
-> Don't be in hurry to conclude,
-> Let's understand the technical aspect fist.
-> 
-> 
-> Let me clarify once again here,
-> 
-> 
-> The card detect interrupt is coming from SDHCI controller itself,
+Will, what do think about this?
 
-But how the SDHCI controller generate CD interrupt when it's in runtime suspended
-state, i.e clock gated or power gated?
-
-> I have confirmed that the runtime PM is working perfectly fine,
-> clock is gated/disabled on card removal.
-
-But seems we still didn't know the sdhci host is clock gated or power gated.
-
-> 
-> 
-> Clock Gating:
-> =============
-> #
-> # devmem 0xd4282854
-> 0x0000181B
-> # [ 1318.948460] mmc1: card 1234 removed
-> 
-> #
-> # devmem 0xd4282854
-> 0x00001800
-> #
-
-Can you plz read the SDHCI host registers after this step? If the host is
-clock gated, we should get "asynchronous external abort" in theory.
-
-Thanks
+Thanks,
+Jens
