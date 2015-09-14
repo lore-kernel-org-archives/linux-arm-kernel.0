@@ -1,40 +1,34 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 14 Sep 2015 10:37:08 +0530
-Subject: [PATCH-v5 RESEND 2/5] i2c: pxa: enable/disable i2c module across
- msg xfer
-In-Reply-To: <20150911185312.GA1516@katana>
-References: <1440395978-9065-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1440395978-9065-3-git-send-email-vaibhav.hiremath@linaro.org>
- <20150911185312.GA1516@katana>
-Message-ID: <55F655FC.8070308@linaro.org>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Mon, 14 Sep 2015 10:38:10 +0530
+Subject: [PATCH] arm64: dts: Add BUS1 instance pinctrl support
+In-Reply-To: <55E3E95D.50003@samsung.com>
+References: <1440761134-27639-1-git-send-email-alim.akhtar@samsung.com>
+ <55E3E95D.50003@samsung.com>
+Message-ID: <55F6563A.2030107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi
 
-
-On Saturday 12 September 2015 12:23 AM, Wolfram Sang wrote:
-> On Mon, Aug 24, 2015 at 11:29:35AM +0530, Vaibhav Hiremath wrote:
->> From: Yi Zhang <yizhang@marvell.com>
+On 08/31/2015 11:12 AM, Krzysztof Kozlowski wrote:
+> On 28.08.2015 20:25, Alim Akhtar wrote:
+>> This adds BUS1 instance pinctrl for exynos7 soc.
 >>
->> Enable i2c module/unit before transmission and disable when it
->> finishes.
->>
->> why?
->> It's because the i2c bus may be disturbed if the slave device,
->> typically a touch, powers on.
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> ---
+>>   arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi |  111 +++++++++++++++++++++++
+>>   arch/arm64/boot/dts/exynos/exynos7.dtsi         |    7 ++
+>>   2 files changed, 118 insertions(+)
 >
-> I am not convinced, "may disturb" is too weak for me. It would need a
-> way more detailed description of the problem which makes clear that
-> this mechanism is the only way to go forward.
+> The "etc1" GPIO in my datasheet is not fully documented but the rest
+> looks good:
 >
+Ok will send v2 and remove etc1 gpio node.
 
-Hmm, Ok.
-Not sure what else I can bring up here.
-
-> Can't you use Runtime PM for that?
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 >
-
-I haven't tried it though, I can give a try and check.
-
-Thanks,
-Vaibhav
+Thanks!!
+> Best regards,
+> Krzysztof
+>
+>
