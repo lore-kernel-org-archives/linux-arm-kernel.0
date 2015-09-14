@@ -1,50 +1,53 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 14 Sep 2015 11:50:40 +0300
-Subject: [PATCH 00/11] ARM: OMAP/DTS: dra7/72-evm/beagle-x15: Audio support
-In-Reply-To: <1440400807-32274-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1440400807-32274-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <55F68A60.6050900@ti.com>
+From: roger.pau@citrix.com (=?UTF-8?Q?Roger_Pau_Monn=c3=a9?=)
+Date: Mon, 14 Sep 2015 10:56:41 +0200
+Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
+In-Reply-To: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <55F68BC9.6020509@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 08/24/2015 10:19 AM, Peter Ujfalusi wrote:
-> Hi,
+El 07/09/15 a les 17.33, Julien Grall ha escrit:
+> Hi all,
 > 
-> this series will enable analog audio (via onboard aic310x codec) for dra7-evm,
-> dra72-evm and am57xx-beagle-x15 boards.
-> In these board McASP3 is connected to the codec and for the McASP3 we needed to
-> have the DMA crossbar in place since the request lines are not mapped by
-> default.
-
-Did you had a chance to look at this series?
-
-> Regars,
-> Peter
-> ---
-> Peter Ujfalusi (11):
->   ARM: OMAP: DRA7: hwmod: Add data for McASP3
->   ARM: DTS: dra7: Add McASP3 node
->   ARM: DTS: dra7-evm: Rename mmc2_3v3 supply to evm_3v3_sw
->   ARM: DTS: dra7-evm: Add fixed regulator to be used by aic3106's DVDD
->   ARM: DTS: dra7-evm: Enable pcf8575 (0x26 address) on i2c2 bus
->   ARM: DTS: dra7-evm: Audio support
->   ARM: DTS: dra72-evm: Add fixed regulator representing DVDD supply for
->     aic3106
->   ARM: DTS: dra72-evm: Add gpio hog for vin6_sel_s0 to select audio
->   ARM: DTS: dra72-evm: Audio support
->   ARM: DTS: am57xx-beagle-x15: Add fixed regulator for aic3104's DVDD
->   ARM: DTS: am57xx-beagle-x15: Enable analog audio support
+> ARM64 Linux is supporting both 4KB and 64KB page granularity. Although, Xen
+> hypercall interface and PV protocol are always based on 4KB page granularity.
 > 
->  arch/arm/boot/dts/am57xx-beagle-x15.dts   |  95 ++++++++++++++++++++
->  arch/arm/boot/dts/dra7-evm.dts            | 142 +++++++++++++++++++++++++++++-
->  arch/arm/boot/dts/dra7.dtsi               |  15 ++++
->  arch/arm/boot/dts/dra72-evm.dts           | 138 +++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  41 +++++++++
->  5 files changed, 428 insertions(+), 3 deletions(-)
+> Any attempt to boot a Linux guest with 64KB pages enabled will result to a
+> guest crash.
 > 
+> This series is a first attempt to allow those Linux running with the current
+> hypercall interface and PV protocol.
+> 
+> This solution has been chosen because we want to run Linux 64KB in released
+> Xen ARM version or/and platform using an old version of Linux DOM0.
+> 
+> There is room for improvement, such as support of 64KB grant, modification
+> of PV protocol to support different page size... They will be explored in a
+> separate patch series later.
+> 
+> TODO list:
+>     - Convert swiotlb to 64KB
+>     - Convert xenfb to 64KB
+>     - Support for multiple page ring support
+>     - Support for 64KB in gnttdev
+>     - Support of non-indirect grant with 64KB frontend
+>     - It may be possible to move some common define between
+>     netback/netfront and blkfront/blkback in an header
+> 
+> I've got most of the patches for the TODO items. I'm planning to send them as
+> a follow-up as it's not a requirement for a basic guests.
+> 
+> All patches has been built tested for ARM32, ARM64, x86. But I haven't tested
+> to run it on x86 as I don't have a box with Xen x86 running. I would be
+> happy if someone give a try and see possible regression for x86.
 
+Do you have figures regarding if/how much performance penalty do the
+blkfront/blkback patches add to the traditional 4KB scenario (frontend
+and backend running on guests using 4KB pages)?
 
--- 
-P?ter
+Since there's been no design document about this and the TODO list
+doesn't contain it, I would like to know which plans do we have in order
+to fix this properly.
+
+Roger.
