@@ -1,46 +1,101 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 14 Sep 2015 13:47:14 +0100
-Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
-In-Reply-To: <55F6B8CC.5090406@citrix.com>
-References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
- <55F68BC9.6020509@citrix.com> <55F6A437.3040403@citrix.com>
- <55F6A9DB.8040503@citrix.com> <55F6ADAE.1010609@citrix.com>
- <55F6B8CC.5090406@citrix.com>
-Message-ID: <55F6C1D2.7010206@citrix.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Sep 2015 13:49:49 +0100
+Subject: sdhci: runtime suspend/resume on card insert/removal
+In-Reply-To: <55F6BEA4.1070803@linaro.org>
+References: <20150910080233.GH21084@n2100.arm.linux.org.uk>
+ <20150910160402.3b78b5c6@xhacker> <55F66874.2000609@linaro.org>
+ <20150914142838.07ec6a07@xhacker> <55F681AC.2010605@linaro.org>
+ <20150914161804.101dfc55@xhacker> <55F69121.3030700@linaro.org>
+ <55F69E4F.8010608@linaro.org>
+ <20150914105014.GJ21084@n2100.arm.linux.org.uk>
+ <55F6BEA4.1070803@linaro.org>
+Message-ID: <20150914124949.GM21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/09/15 13:08, Roger Pau Monn? wrote:
->> I'd like to see a basic support of 64KB page granularity upstream before
->> starting to think about performance improvement. And there is still a
->> lot to do.
+On Mon, Sep 14, 2015 at 06:03:40PM +0530, Vaibhav Hiremath wrote:
+> On Monday 14 September 2015 04:20 PM, Russell King - ARM Linux wrote:
+> >On Mon, Sep 14, 2015 at 03:45:43PM +0530, Vaibhav Hiremath wrote:
+> >>Came across below lines in the datasheet,
+> >>
+> >>========= Copy-n-paste from datasheet============
+> >>
+> >>All SDH interfaces share the same clock which is enabled when any of the SDH
+> >>clock enables are
+> >>set (from PMUA_SDH1_CLK_RES_CTRL, PMUA_SDH2_CLK_RES_CTRL,
+> >>PMUA_SDH3_CLK_RES_CTRL, PMUA_SDH4_CLK_RES_CTRL,
+> >>PMUA_SDH5_CLK_RES_CTRL), with clock source select and divider ratio
+> >>controlled by
+> >>PMUA_SDH1_CLK_RES_CTRL.
+> >>
+> >>==================================================
+> >>
+> >>
+> >>And I can confirm that after disabling AXI interface clock for all the
+> >>SDH modules (1-5) I see I get an abort.
+> >>
+> >>This clearly explains/justifies/proves that the existing code is
+> >>working as expected. I have eMMC mounted on the board, which makes
+> >>clock to always stay ON on SDH3.
+> >>
+> >>So there is an OR gate implemented inside which takes input from
+> >>SDHx_AXI_EN and feeds back to all SDHx instances. Don't ask me why it
+> >>has been designed that way :)
+> >>
+> >>And I did some experiment as well, so what I have observed is,
+> >>SDH_AXI_CLOCK is required to generate card detection, without that I do
+> >>not see card detection working.
+> >
+> >What that means is that if DT configures the interface to use its
+> >internal card detection, the AXI clock must never shut off when entering
+> >runtime-PM.
+> >
 > 
-> I wasn't actually thinking of this as a performance improvement, but
-> rather as a way of fixing this properly and removing the complexity
-> added to xen-blkfront, thus providing a PV block protocol that natively
-> supports 64KB pages. This would be like hardware components already do
-> AFAIK, because I don't think there are other drivers in the Linux tree
-> that do this kind of splitting.
+> Yes, exactly.
+> Its clock driver which is doing this.
 > 
->> Although, having 64KB grants won't remove the splitting as we would
->> still have to support frontend/backend which only handle 4KB grant.
+> static struct mmp_param_gate_clk apmu_gate_clks[] = {
+>         /* The gate clocks has mux parent. */
+>         {PXA1928_CLK_SDH0, "sdh0_clk", "sdh_div", CLK_SET_RATE_PARENT,
+> PXA1928_CLK_SDH0 * 4, 0x1b, 0x1b, 0x0, 0, &sdh0_lock},
+> };
 > 
-> IMHO, given enough time I would just drop those.
+> Here the mask and enable_val both are set to 0x1b, which means it
+> shuts off both peripheral and AXI clock both.
 
-The PV protocol has always been backward compatible.
+*Sigh*.
 
-Introducing the support of 64KB grant will require some changes in Xen
-which won't surely be backported to older version. We still have to be
-able to run new Linux guest on older Xen and vice versa.
+So, rather than represent the hardware in DT by telling the SDHCI code
+that you have two independent clocks, you've chosen to do the brain
+dead thing, and combine the two clocks *which are logically different*
+to suit the Linux implementation, thereby leaking implementation details
+into DT, and creating a compatibility headache through doing so.
 
-To give you an example, Centos 7, which will support Xen and only 64KB
-page granularity, will be supported for years. Dropping any splitting in
-a short future (3-5 years) will just break those guests to boot on Xen.
+Stop doing this.  Just stop it.  It's broken, it's wrong, and it's down
+right idiotic.
 
-AFAIK, we never took a such radical decision on Xen based on the
-complexity of the code.
+DT should _always_ describe the bloody hardware, not the implementation.
 
-Regards,
+I suggest that you have only one way to solve this on this platform.
+
+1. Declare new clocks from your PXA clock driver which expose the AXI
+   and peripheral clock separately.
+2. Add code (if not already there) to the SDHCI crap-pile to claim and
+   appropriately manage these two clocks, falling back to the existing
+   but broken method with existing DT.
+3. Change DT to provide the new clocks to SDHCI.
+
+That's about the only way I can see to ensure that an old DT file would
+continue to work with a new kernel, given this fsckup.
+
+Please.  In future, be careful when describing stuff in DT.  Don't take
+short cuts to suit the implementation.  Always describe the hardware,
+don't describe the implementation.  *Especially* when it comes to things
+like device resources.
+
+It really doesn't matter if the driver doesn't cope with them - the
+important thing is that the DT always correctly describes the hardware.
 
 -- 
-Julien Grall
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
