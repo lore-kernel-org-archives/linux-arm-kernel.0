@@ -1,49 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Sep 2015 12:09:39 -0700
-Subject: [PATCH] ARM: omap2plus_defconfig: make PCF857x built-in
-In-Reply-To: <1438782229-25118-1-git-send-email-kishon@ti.com>
-References: <1438782229-25118-1-git-send-email-kishon@ti.com>
-Message-ID: <20150914190938.GW4215@atomide.com>
+From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
+Date: Mon, 14 Sep 2015 21:35:10 +0200
+Subject: mysterious crashes on OMAP5 uevm
+In-Reply-To: <20150914190236.GV4215@atomide.com>
+References: <CANOLnOO3NdK1r1jZQtS=TcHEE7SQwhGHh0YsqqoCJpFW3NO05Q@mail.gmail.com>
+ <20150908143810.GD4215@atomide.com>
+ <CANOLnOODjTaBcL1QzAm7o4YOB=_P-s7JYovu6fhNSqJSV2Bq+Q@mail.gmail.com>
+ <20150908210708.GH4215@atomide.com>
+ <E0068B56-0DEE-4E2F-94CF-DB104AE16D63@goldelico.com>
+ <20150910083026.GA21098@n2100.arm.linux.org.uk>
+ <CANOLnOM-PYcAL=f4rgucfdWZ1+U3HkP34bfwrKP4Rob+J6iTfw@mail.gmail.com>
+ <20150911140306.GB21098@n2100.arm.linux.org.uk>
+ <20150914121248.GD21098@n2100.arm.linux.org.uk>
+ <20150914190236.GV4215@atomide.com>
+Message-ID: <4A24D632-D980-4C37-B2C9-88D3E9D429D7@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [150805 06:47]:
-> One of the lines from PCF857x is connected to the vdd line of MMC1
-> in DRA74x and DRA72x EVMs and is modelled as a regulator. If PCF857x
-> is not made as built-in, the regulator_get in omap_hsmmc fails making
-> it difficult to use MMC1 as rootfs.
-> 
-> Make PCF857x built-in.
 
-OK applying as it's a common boot device. But once we're done with
-the legacy code removal and initcall clean-up, let's plan on making
-everything modular and using a initramfs. People can still change
-their .config files to have things built in and the modular .config
-should be usable as is for distros.
+Am 14.09.2015 um 21:02 schrieb Tony Lindgren <tony@atomide.com>:
 
-Regards,
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150914 05:16]:
+>> On Fri, Sep 11, 2015 at 03:03:07PM +0100, Russell King - ARM Linux wrote:
+>>> 
+>>> Merely changing __LINUX_ARM_ARCH__ >= 7 to >= 6 should fix the problem,
+>>> and I doubt there's any ARMv6 non-T2 systems out there that would be
+>>> affected by clearing the IT state bits.
+>> 
+>> Please test the following patch:
+> 
+> While we're waiting for Grazvydas to test.. Looks good to me:
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-Tony
- 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
->  arch/arm/configs/omap2plus_defconfig |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index ac521e7..7cedfe9 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -236,7 +236,7 @@ CONFIG_SSI_PROTOCOL=m
->  CONFIG_PINCTRL_SINGLE=y
->  CONFIG_DEBUG_GPIO=y
->  CONFIG_GPIO_SYSFS=y
-> -CONFIG_GPIO_PCF857X=m
-> +CONFIG_GPIO_PCF857X=y
->  CONFIG_GPIO_TWL4030=y
->  CONFIG_GPIO_PALMAS=y
->  CONFIG_W1=m
-> -- 
-> 1.7.9.5
-> 
+I have tested on:
+* GTA04 with DM3730 (OMAP3)
+* Pyra prototype with OMAP5432
+No X server crashes seen any more.
+
+Tested-by: H. Nikolaus Schaller <hns@goldelico.com>
