@@ -1,64 +1,98 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 14 Sep 2015 15:41:46 -0700
-Subject: DSA: phy polling
-In-Reply-To: <20150914182314.GP21084@n2100.arm.linux.org.uk>
-References: <20150914104254.GI21084@n2100.arm.linux.org.uk>
- <55F703D7.1070707@gmail.com> <20150914182314.GP21084@n2100.arm.linux.org.uk>
-Message-ID: <55F74D2A.8010104@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 15 Sep 2015 01:15:12 +0200
+Subject: [PATCH v3 2/8] genirq: irqdomain: Remove irqdomain dependency on
+ struct device_node
+In-Reply-To: <1442249047-21182-3-git-send-email-marc.zyngier@arm.com>
+References: <1442249047-21182-1-git-send-email-marc.zyngier@arm.com>
+ <1442249047-21182-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <2330801.UsQO8cZmqT@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/09/15 11:23, Russell King - ARM Linux wrote:
-> On Mon, Sep 14, 2015 at 10:28:55AM -0700, Florian Fainelli wrote:
->> Just my 2 cents here, I suspect the original intention behind this code
->> was to help utilize the switch's built-in PHY polling unit when
->> available, and use the HW to collect the state of all PHYs in fewer
->> register to read, instead of having to do individual (and quite possibly
->> expensive) MDIO reads towards each individual per-port PHYs (at least
->> two reads per PHY to latch MII_BMSR).
+On Monday, September 14, 2015 05:44:01 PM Marc Zyngier wrote:
+> struct device_node is very much DT specific, and the original authors
+> of the irqdomain subsystem recognized that tie, and went as far as
+> mentionning that this could be replaced by some "void *token",
+> should another firmware infrastructure be using it.
 > 
-> Does the Marvell phy have such a register?  Looking at the register
-> dump and plugging/unplugging cables seems not to show a register
-> reporting whether any particular interface has changed state, and
-> I haven't noticed there being any combined register in anything I've
-> seen on these switches.
-
-It seemed to me like the PPU was meant to provide that, but I cannot
-find any "summary" register which would give you such a status, must
-have conflated that with what Broadcom switches support.
-
+> As we move ACPI on arm64 towards this model too, it makes a lot of sense
+> to perform that particular move.
 > 
->> Now, I do agree there is a duplication of functionality here, and a
->> potential fix would be to avoid starting the PHY state machine if/when
->> the switch supports such a feature (not call phy_start*), that should
->> still get you consistent consistent link partner advertised/status
->> values, question is, does that really benefit anybody though?
+> We replace "struct device_node *of_node" with "void *domain_token", which
+> is a benign enough transformation. A non DT user of irqdomain can now
+> identify its domains using this pointer.
 > 
-> I disagree - it's the DSA polling that needs to go.  The DSA polling
-> only looks at the port status, and derives from it the carrier
-> state.  The rest of the information is only turned into a printk().
-> The PHY state machine does a lot more, recording the link speed so
-> that ethtool works on the interface.
-
-I am fine with that approach, it was not exactly clear to me before
-reading the code whether the link polling workqueue was doing anything
-useful in mv88e6xxx.c, now it is pretty clear to me, this is as
-expensive (more actually because of the PPU get/put) and useless since
-the PHY library directly polls the individual per-port PHYs.
-
+> Also, in order to prevent the introduction of sideband type information,
+> only DT is allowed to store a valid kernel pointer in domain_token
+> (a pointer that passes the virt_addr_valid() test will be considered
+> as a valid device_node).
 > 
-> If we do want to go the other way, then the phy code needs a rework so
-> that it can be properly classed and drivers with non-standard MII
-> registers supported without needing to build register emulation layers.
+> non-DT users that wish to store valid pointers in domain_token are
+> required to use another structure such as an IDR.
 > 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  include/linux/irqdomain.h | 68 +++++++++++++++++++-----------------
+>  kernel/irq/irqdomain.c    | 89 ++++++++++++++++++++++++++++++++++-------------
+>  2 files changed, 101 insertions(+), 56 deletions(-)
+> 
+> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> index f644fdb..ac7041b 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -17,16 +17,14 @@
+>   * model). It's the domain callbacks that are responsible for setting the
+>   * irq_chip on a given irq_desc after it's been mapped.
+>   *
+> - * The host code and data structures are agnostic to whether or not
+> - * we use an open firmware device-tree. We do have references to struct
+> - * device_node in two places: in irq_find_host() to find the host matching
+> - * a given interrupt controller node, and of course as an argument to its
+> - * counterpart domain->ops->match() callback. However, those are treated as
+> - * generic pointers by the core and the fact that it's actually a device-node
+> - * pointer is purely a convention between callers and implementation. This
+> - * code could thus be used on other architectures by replacing those two
+> - * by some sort of arch-specific void * "token" used to identify interrupt
+> - * controllers.
+> + * The host code and data structures are agnostic to whether or not we
+> + * use an open firmware device-tree. Domains can be assigned a
+> + * "void *domain_token" identifier, which is assumed to represent a
+> + * "struct device_node" if the pointer is a valid virtual address.
+> + *
+> + * Otherwise, the value is assumed to be an opaque identifier. Should
+> + * a pointer to a non "struct device_node" be required, another data
+> + * structure should be used to indirect it (an IDR for example).
+>   */
+>  
+>  #ifndef _LINUX_IRQDOMAIN_H
+> @@ -108,8 +106,8 @@ struct irq_domain_chip_generic;
+>   * @flags: host per irq_domain flags
+>   *
+>   * Optional elements
+> - * @of_node: Pointer to device tree nodes associated with the irq_domain. Used
+> - *           when decoding device tree interrupt specifiers.
+> + * @domain_token: optional firmware-specific identifier for
+> + *                the interrupt controller
+>   * @gc: Pointer to a list of generic chips. There is a helper function for
+>   *      setting up one or more generic chips for interrupt controllers
+>   *      drivers using the generic chip library which uses this pointer.
+> @@ -130,7 +128,7 @@ struct irq_domain {
+>  	unsigned int flags;
+>  
+>  	/* Optional data */
+> -	struct device_node *of_node;
+> +	void *domain_token;
 
-That part is going to be challenging, all the ethtool/PHY library/MII
-code is built around the assumption of translating user-configurable
-settings into standard MII calls (all the adv_to* etc.), but, then
-again, MII is just one possible translation layer here, you could "plug"
-another one if your HW supports that (e.g: non-MDIO, but MMIO for
-instance which understands basic concepts like speed/link/duplex/pause).
+I'm wondering if that may be something which isn't (void *), but a specific
+pointer type, so the compiler warns us when something suspicious is assigned
+to it?
 
-Oh well.
--- 
-Florian
+[Somewhat along the lines struct fwnode_handle is used elsewehere.]
+
+>  	enum irq_domain_bus_token bus_token;
+>  	struct irq_domain_chip_generic *gc;
+>  #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+> @@ -161,70 +159,73 @@ enum {
+
+Thanks,
+Rafael
