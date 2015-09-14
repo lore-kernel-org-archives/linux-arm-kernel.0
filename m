@@ -1,164 +1,80 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 14 Sep 2015 14:49:29 +0530
-Subject: sdhci: runtime suspend/resume on card insert/removal
-In-Reply-To: <20150914161804.101dfc55@xhacker>
-References: <55F12CF8.50003@linaro.org> <20150910153129.07adbe68@xhacker>
- <20150910080233.GH21084@n2100.arm.linux.org.uk>
- <20150910160402.3b78b5c6@xhacker> <55F66874.2000609@linaro.org>
- <20150914142838.07ec6a07@xhacker> <55F681AC.2010605@linaro.org>
- <20150914161804.101dfc55@xhacker>
-Message-ID: <55F69121.3030700@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 14 Sep 2015 10:25:19 +0100
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <20150912113655.GG4530@olila.local.net-space.pl>
+References: <20150910112418.GC29293@leverpostej>
+ <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
+ <20150910121514.GE29293@leverpostej>
+ <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
+ <20150910144938.GI29293@leverpostej>
+ <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
+ <20150910162302.GN29293@leverpostej>
+ <20150911124643.GB4530@olila.local.net-space.pl>
+ <20150911162559.GA8726@leverpostej>
+ <20150912113655.GG4530@olila.local.net-space.pl>
+Message-ID: <20150914092518.GA10307@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Sep 12, 2015 at 12:36:55PM +0100, Daniel Kiper wrote:
+> On Fri, Sep 11, 2015 at 05:25:59PM +0100, Mark Rutland wrote:
+> > On Fri, Sep 11, 2015 at 01:46:43PM +0100, Daniel Kiper wrote:
+> > > On Thu, Sep 10, 2015 at 05:23:02PM +0100, Mark Rutland wrote:
+> 
+> [...]
+> 
+> > > > What's troublesome with the boot services?
+> > > >
+> > > > What can't be simulated?
+> > >
+> > > How do you want to access bare metal EFI boot services from dom0 if they
+> > > were shutdown long time ago before loading dom0 image?
+> >
+> > I don't want to.
+> >
+> > I asked "What can't be simulated?" because I assumed everything
+> > necessary/mandatory could be simulated without needinng access to any
+> > real EFI boot services.
+> >
+> > As far as I can see all that's necessary is to provide a compatible
+> > interface.
+> 
+> Could you be more precise what do you need? Please enumerate. UEFI spec has
+> more than 2500 pages and I do not think that we need all stuff in dom0.
+> 
+> > > What do you need from EFI boot services in dom0?
+> >
+> > The ability to call ExitBootServices() and SetVirtualAddressMap() on a
+> > _virtual_ address map for _virtual_ services provided by the hypervisor.
+> 
+> I am confused. Why do you need that? Please remember, EFI is owned and
+> operated by Xen hypervisor. dom0 does not have direct access to EFI.
 
+Let's take a step back.
 
-On Monday 14 September 2015 01:48 PM, Jisheng Zhang wrote:
-> On Mon, 14 Sep 2015 13:43:32 +0530
-> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
->
->>
->>
->> On Monday 14 September 2015 11:58 AM, Jisheng Zhang wrote:
->>> On Mon, 14 Sep 2015 11:55:56 +0530
->>> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
->>>
->>>>
->>>>
->>>> On Thursday 10 September 2015 01:34 PM, Jisheng Zhang wrote:
->>>>> Hi Russell,
->>>>>
->>>>> On Thu, 10 Sep 2015 09:02:33 +0100
->>>>> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->>>>>
->>>>>> On Thu, Sep 10, 2015 at 03:31:29PM +0800, Jisheng Zhang wrote:
->>>>>>> Hi Vaibhav,
->>>>>>>
->>>>>>> On Thu, 10 Sep 2015 12:40:48 +0530
->>>>>>> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
->>>>>>>
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> During my testing of SDHCI-PXAV3 driver on Marvell's pxa1928
->>>>>>>> based platform, I observed that runtime PM suspend/resume is having
->>>>>>>> issues with card insertion and removal.
->>>>>>>>
->>>>>>>> Let me try to explain it using execution sequence -
->>>>>>>>
->>>>>>>> During boot:
->>>>>>>>
->>>>>>>> MMC SD card gets detected as expected.
->>>>>>>>
->>>>>>>> [    2.431012] mmc1: new high speed SDHC card at address 1234
->>>>>>>> [    2.437235] mmcblk1: mmc1:1234 SA04G 3.63 GiB
->>>>>>>> [    2.444841]  mmcblk1: p1
->>>>>>>>
->>>>>>>>
->>>>>>>> Now after coming to the linux prompt, if card removal event occurs
->>>>>>>> then the call sequence is -
->>>>>>>>
->>>>>>>>      sdhci_irq() -->
->>>>>>>>       -> sdhci_thread_irq(): host->thread_isr - 0x80
->>>>>>>>          -> sdhci_card_event()
->>>>>>>>          -> mmc_detect_change()
->>>>>>>>             --> _mmc_detect_change()
->>>>>>>>                 --->  mmc_sd_detect()
->>>>>>>>                       mmc_sd_remove()
->>>>>>>>                       mmc_remove_card()
->>>>>>>>                       mmc_bus_remove()
->>>>>>>>                       mmc_power_off()
->>>>>>>>                       mmc_set_initial_state()
->>>>>>>>                       sdhci_set_ios()
->>>>>>>>                       ...
->>>>>>>>            sdhci_pxav3_runtime_suspend()
->>>>>>>>            sdhci_runtime_suspend_host()
->>>>>>>>
->>>>>>>>
->>>>>>>> Till here everything looks perfect :) (if I got it right)
->>>>>>>>
->>>>>>>> Now on card insertion again, the expectation is, runtime resume should
->>>>>>>> get called as part of interrupt trigger from the SDHCI controller on
->>>>>>>> card insertion.
->>>>>>>
->>>>>>> AFAIK, card insertion => wakeup irq, this irq doesn't come from SDHCI
->>>>>>
->>>>>> Wakeup IRQs are what happens when the _system_ is in suspend, not
->>>>>> when the device is runtime suspended.
->>>>>
->>>>> Oh, yes. Sorry for misleading, I didn't express myself clearly. What
->>>>> I really means is that the card insertion/remove irq which could finally
->>>>> cause sdhci host resumed.
->>>>>
->>>>
->>>> So Jisheng,
->>>>
->>>> You are ok with above change, right?
->>>
->>> Nope. the above is just to clarify my mixing "wakeup IRQs" and the card
->>> insertion/remove irq that brings sdhci host resumed.
->>>
->>> IMHO, your patch is still not necessary and perhaps wrong.
->>>
->>
->> Don't be in hurry to conclude,
->> Let's understand the technical aspect fist.
->>
->>
->> Let me clarify once again here,
->>
->>
->> The card detect interrupt is coming from SDHCI controller itself,
->
-> But how the SDHCI controller generate CD interrupt when it's in runtime suspended
-> state, i.e clock gated or power gated?
->
+My objection here is to passing the Dom0 kernel properties as if it were
+booted with direct access to a full UEFI, then later fixing that up
+(when Xen is detected and we apply its hypercall EFI implementation).
 
-Due to lack of detailed Documentation its difficult to conclude here
+If the kernel cannot use EFI natively, why pretend to the kernel that it
+can? The hypercall implementation is _not_ EFI (though it provides
+access to some services).
 
+The two ways I can see providing Dom0 with EFI services are:
 
->> I have confirmed that the runtime PM is working perfectly fine,
->> clock is gated/disabled on card removal.
->
-> But seems we still didn't know the sdhci host is clock gated or power gated.
->
+* Have Xen create shims for any services, in which any hypercalls live,
+  and pass these to the kernel with a virtual system table. This keeps
+  the interface to the kernel the same regardless of Xen.
 
-Register above is
-SDIO Host 1 Clock/Reset Control Register
+* Have the kernel detect Xen EFI capability via Xen, without passing the
+  usual native EFI parameters. This can then be installed into the
+  kernel in a Xen-specific manner, and we know from the outset that
+  Xen-specific caveats apply.
 
-And bit 3 & 4 says
-
-BIT 3:
-
-SD Host 1 Peripheral Clock Enable
-   0x1: Peripheral clock enabled
-   0x0: Peripheral clock disabled
-
-BIT4:
-
-SD Host 1 AXI Clock Enable
-   0x1: AXI clock enabled
-   0x0: AXI clock disabled
-
-
->>
->>
->> Clock Gating:
->> =============
->> #
->> # devmem 0xd4282854
->> 0x0000181B
->> # [ 1318.948460] mmc1: card 1234 removed
->>
->> #
->> # devmem 0xd4282854
->> 0x00001800
->> #
->
-> Can you plz read the SDHCI host registers after this step? If the host is
-> clock gated, we should get "asynchronous external abort" in theory.
->
-
-Ok, that's another way. I can cross check on this.
+As per my original email, I'm not against the renaming of the stub
+parameters if we standardise the rest of the details, but I believe
+that's orthogonal to the Xen Dom0 case.
 
 Thanks,
-Vaibhav
+Mark.
