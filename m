@@ -1,59 +1,146 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 14 Sep 2015 08:27:01 +0100
-Subject: [PATCH 2/6] hwrng: core: Simplify RNG switching from sysfs
-In-Reply-To: <87a8sq4ctu.fsf@dell.be.48ers.dk>
-References: <1442002110-28733-1-git-send-email-lee.jones@linaro.org>
- <1442002110-28733-3-git-send-email-lee.jones@linaro.org>
- <87a8sq4ctu.fsf@dell.be.48ers.dk>
-Message-ID: <20150914072701.GB27591@x1>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon, 14 Sep 2015 09:30:49 +0200
+Subject: [PATCH 2/2] ARM: dts: rockchip: Add dtb for the Radxa Rock 2
+ Square board
+In-Reply-To: <CABxcv=nRjge1qMeoXt6U6McKbv30oYUhh9C417mX0B=bt9Jg-g@mail.gmail.com>
+References: <1442011005-4828-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1442011005-4828-2-git-send-email-sjoerd.simons@collabora.co.uk>
+ <CABxcv=nRjge1qMeoXt6U6McKbv30oYUhh9C417mX0B=bt9Jg-g@mail.gmail.com>
+Message-ID: <1442215849.8778.101.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 13 Sep 2015, Peter Korsgaard wrote:
+On Mon, 2015-09-14 at 01:00 +0200, Javier Martinez Canillas wrote:
+> Hello Sjoerd,
+> 
+> On Sat, Sep 12, 2015 at 12:36 AM, Sjoerd Simons
+> <sjoerd.simons@collabora.co.uk> wrote:
+> 
+> [snip]
+> 
+> > +
+> > +               regulators {
+> > +                       vcc_ddr: REG1 {
+> > +                               regulator-name = "VCC_DDR";
+> > +                               regulator-min-microvolt =
+> > <1200000>;
+> > +                               regulator-max-microvolt =
+> > <1200000>;
+> > +                               regulator-always-on;
+> > +                       };
+> > +
+> > +                       vcc_io: REG2 {
+> > +                               regulator-name = "VCC_IO";
+> > +                               regulator-min-microvolt =
+> > <3300000>;
+> > +                               regulator-max-microvolt =
+> > <3300000>;
+> > +                               regulator-always-on;
+> > +                       };
+> > +
+> > +                       vdd_log: REG3 {
+> > +                               regulator-name = "VDD_LOG";
+> > +                               regulator-min-microvolt =
+> > <1000000>;
+> > +                               regulator-max-microvolt =
+> > <1000000>;
+> > +                               regulator-always-on;
+> > +                       };
+> > +
+> > +                       vcc_20: REG4 {
+> > +                               regulator-name = "VCC_20";
+> > +                               regulator-min-microvolt =
+> > <2000000>;
+> > +                               regulator-max-microvolt =
+> > <2000000>;
+> > +                               regulator-always-on;
+> > +                       };
+> > +
+> > +                       vccio_sd: REG5 {
+> > +                               regulator-name = "VCCIO_SD";
+> > +                               regulator-min-microvolt =
+> > <3300000>;
+> > +                               regulator-max-microvolt =
+> > <3300000>;
+> > +                               regulator-always-on;
+> > +                       };
+> > +
+> > +                       vdd10_lcd: REG6 {
+> > +                               regulator-name = "VDD10_LCD";
+> > +                               regulator-min-microvolt =
+> > <1000000>;
+> > +                               regulator-max-microvolt =
+> > <1000000>;
+> > +                               regulator-always-on;
+> > +                       };
+> > +
+> > +                       vcca_codec: REG7 {
+> > +                               regulator-name = "VCCA_CODEC";
+> > +                               regulator-min-microvolt =
+> > <3300000>;
+> > +                               regulator-max-microvolt =
+> > <3300000>;
+> > +                               regulator-always-on;
+> > +                       };
+> > +
+> > +                       vcca_tp: REG8 {
+> > +                               regulator-name = "VCCA_TP";
+> > +                               regulator-min-microvolt =
+> > <3300000>;
+> > +                               regulator-max-microvolt =
+> > <3300000>;
+> > +                               regulator-always-on;
+> > +                       };
+> > +
+> > +                       vccio_pmu: REG9 {
+> > +                               regulator-name = "VCCIO_PMU";
+> > +                               regulator-min-microvolt =
+> > <3300000>;
+> > +                               regulator-max-microvolt =
+> > <3300000>;
+> > +                               regulator-always-on;
+> > +                       };
+> > +
+> > +                       vdd_10: REG10 {
+> > +                               regulator-name = "VDD_10";
+> > +                               regulator-min-microvolt =
+> > <1000000>;
+> > +                               regulator-max-microvolt =
+> > <1000000>;
+> > +                               regulator-always-on;
+> > +                       };
+> > +
+> > +                       vcc_18: REG11 {
+> > +                               regulator-name = "VCC_18";
+> > +                               regulator-min-microvolt =
+> > <1800000>;
+> > +                               regulator-max-microvolt =
+> > <1800000>;
+> > +                               regulator-always-on;
+> > +                       };
+> > +
+> > +                       vcc18_lcd: REG12 {
+> > +                               regulator-name = "VCC18_LCD";
+> > +                               regulator-min-microvolt =
+> > <1800000>;
+> > +                               regulator-max-microvolt =
+> > <1800000>;
+> > +                               regulator-always-on;
+> > +                       };
+> 
+> Should all these regulators really need to be always-on?
 
-> >>>>> "Lee" == Lee Jones <lee.jones@linaro.org> writes:
-> 
->  > If we attempt to use sysfs to change the current RNG in the usual
->  > way i.e. issuing something like:
-> 
->  > `echo 8a8a000.rng > /sys/devices/virtual/misc/hw_random/rng_current`
-> 
->  > ... it will fail because the code doesn't currently take the '\n'
->  > into consideration.  Well, now it does.
-> 
->  > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->  > ---
->  >  drivers/char/hw_random/core.c | 7 ++++++-
->  >  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
->  > diff --git a/drivers/char/hw_random/core.c b/drivers/char/hw_random/core.c
->  > index da8faf7..14dc984 100644
->  > --- a/drivers/char/hw_random/core.c
->  > +++ b/drivers/char/hw_random/core.c
->  > @@ -316,6 +316,7 @@ static ssize_t hwrng_attr_current_store(struct device *dev,
->  >  					const char *buf, size_t len)
->  >  {
->  >  	int err;
->  > +	int snip = 0;
->  >  	struct hwrng *rng;
->  
->  >  	err = mutex_lock_interruptible(&rng_mutex);
->  > @@ -323,7 +324,11 @@ static ssize_t hwrng_attr_current_store(struct device *dev,
->  >  		return -ERESTARTSYS;
->  >  	err = -ENODEV;
->  >  	list_for_each_entry(rng, &rng_list, list) {
->  > -		if (strcmp(rng->name, buf) == 0) {
->  > +
->  > +		if (buf[len-1] == '\n')
->  > +			snip = 1; /* Snip one character */
->  > +
-> 
-> How about using sysfs_streq() instead, which is what is done elsewhere?
+Ideally not all of them, turning the ones that aren't needed off is
+definately on my list of things to do (together with the other
+pheripherals, leds, hw. keys etc). 
 
-Perfect.  This is exactly what I'm trying to do, thanks.
+For the first patch i do prefer to keep them on so we can have get some
+more testing  with this board before fine-tuning those things (fwiw,
+the rockchip evb board and others with essentially the same pmic setup
+all also have them always-on)
+
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Sjoerd Simons
+Collabora Ltd.
