@@ -1,159 +1,111 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 14 Sep 2015 00:40:03 +0000 (UTC)
-Subject: OMAP baseline test results for v4.3-rc1
-Message-ID: <alpine.DEB.2.02.1509140035120.1998@utopia.booyaka.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 14 Sep 2015 09:42:08 +0900
+Subject: [PATCH/RFC v2 net-next 3/4] ravb: Document binding for r8a7795 SoC
+In-Reply-To: <55F2E44D.6010505@cogentembedded.com>
+References: <1441936878-18290-1-git-send-email-horms+renesas@verge.net.au>
+ <1441936878-18290-4-git-send-email-horms+renesas@verge.net.au>
+ <55F2E44D.6010505@cogentembedded.com>
+Message-ID: <20150914004207.GA6230@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Sep 11, 2015 at 05:25:17PM +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 9/11/2015 5:01 AM, Simon Horman wrote:
+> 
+> >From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+> >
+> >This patch updates the ravb binding to support the r8a7795 SoC by:
+> >- Adding a compat string for the new hardware
+> >- Adding 25 named interrupts to binding for the new SoC;
+> >   older SoCs continue to use a single multiplexed interrupt
+> >
+> >The example is also updated to reflect the r8a7795 as this is the
+> >more complex case.
+> >
+> >Based on work by Kazuya Mizuguchi and others.
+> >
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> >---
+> >
+> >v2
+> >* First post; broken out of a driver update patch
+> >* As discussed with Geert Uytterhoeven and Sergei Shtylyov
+> >   - Binding: Make all interrupts mandatory as named-interrupts of
+> >     the form ch%u
+> >---
+> >  .../devicetree/bindings/net/renesas,ravb.txt       | 65 +++++++++++++++++++---
+> >  1 file changed, 58 insertions(+), 7 deletions(-)
+> >
+> >diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> >index 1fd8831437bf..6c360f993d33 100644
+> >--- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> >+++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+> [...]
+> >@@ -27,13 +33,46 @@ Optional properties:
+> >  Example:
+> >
+> >  	ethernet at e6800000 {
+> >-		compatible = "renesas,etheravb-r8a7790";
+> >-		reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
+> >+		compatible = "renesas,etheravb-r8a7795";
+> >+		reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
+> >  		interrupt-parent = <&gic>;
+> >-		interrupts = <0 163 IRQ_TYPE_LEVEL_HIGH>;
+> >-		clocks = <&mstp8_clks R8A7790_CLK_ETHERAVB>;
+> >-		phy-mode = "rmii";
+> >+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
+> >+			     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+> >+		interrupt-names = "ch0", "ch1", "ch2", "ch3",
+> >+				  "ch4", "ch5", "ch6", "ch7",
+> >+				  "ch8", "ch9", "ch10", "ch11",
+> >+				  "ch12", "ch13", "ch14", "ch15",
+> >+				  "ch16", "ch17", "ch18", "ch19",
+> >+				  "ch20", "ch21", "ch22", "ch23",
+> >+				  "ch24";
+> 
+>    To me, these names don't look very helpful. You could as well omit them
+> and use platform_get_irq() with the channel #.
 
-Here are some basic OMAP test results for Linux v4.3-rc1.
-Logs and other details at:
+These names reflect the hardware; which is the aim of DT.
 
-    http://www.pwsan.com/omap/testlogs/test_v4.3-rc1/20150913170656/
+As I believe you pointed out earlier it is preferred to use named
+interrupts when there is more than one. Do I misunderstand the situation
+there?
 
+If you have a positive contribution to make regarding better names then
+I am all ears.
 
-Test summary
-------------
+> >+		clocks = <&mstp8_clks R8A7795_CLK_ETHERAVB>;
+> >+		phy-mode = "rgmii-id";
+> >+		phy-reset-gpio = <&gpio2 10 0>;
+> 
+>    I don't see how this prop is used by the driver and it's not documented
+> in the bindings.
 
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-stk-om44,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
-
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Build warnings from toolchain: uImage:
-    FAIL ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build warnings from toolchain: uImage+dtb:
-    (none)
-
-Build warnings from toolchain: zImage:
-    FAIL (13/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 5/17): 4430es2panda, 4460pandaes, 4460varsomom, 2430sdp,
-		  5430es2uevm
-    skip ( 3/17): 5912osk, 3517evm, 5430es2sbct54
-    Pass ( 9/17): am335xbonelt, am335xbone, 37xxevm, 3530es3beagle,
-		  3530es31beagle, 3730beaglexm, 3730es12beaglexm,
-		  cmt3517, 2420n800
-
-Kernel warnings during boot to userspace:
-    FAIL ( 4/17): 4430es2panda, 4460pandaes, 4460varsomom, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 7/11): am335xbonelt, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 2430sdp, 5430es2uevm
-    Pass ( 4/11): 3530es3beagle, 3530es31beagle, 3730beaglexm,
-		  3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 7/11): am335xbonelt, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 2430sdp, 5430es2uevm
-    Pass ( 4/11): 3530es3beagle, 3530es31beagle, 3730beaglexm,
-		  3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 1/ 4): 37xxevm
-    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    FAIL ( 1/ 4): 37xxevm
-    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
-
-Kernel warnings during PM test:
-    FAIL ( 3/17): 4430es2panda, 4460pandaes, 4460varsomom
-
-Obsolete Kconfig symbols:
-    FAIL ( 2/20): omap2plus_defconfig, multi_v7_defconfig
-
-
-vmlinux object size
-(delta in bytes from test_v4.2 (64291f7db5bd8150a74ad2036f1037e6a0428df2)):
-   text     data      bss    total  kernel
-+289901   +18816    +2496  +311213  omap1_defconfig
-+288849   +18792    +2496  +310137  omap1_defconfig_1510innovator_only
-+284789   +18784    +2496  +306069  omap1_defconfig_5912osk_only
-+490573    +6536   +14016  +511125  multi_v7_defconfig
-+301942   +25296   +39016  +366254  omap2plus_defconfig
-+261223   +19984   +38824  +320031  omap2plus_defconfig_2430sdp_only
-+296672   +25592   +39016  +361280  omap2plus_defconfig_am33xx_only
-+297648   +25976   +38952  +362576  omap2plus_defconfig_am43xx_only
-+306038   +25304   +39016  +370358  omap2plus_defconfig_cpupm
-+302160   +25656   +39080  +366896  omap2plus_defconfig_dra7xx_only
-+287741   +18024    +4520  +310285  omap2plus_defconfig_n800_multi_omap2xxx
-+284805   +17672    +4520  +306997  omap2plus_defconfig_n800_only_a
-+306078   +26960   +38888  +371926  omap2plus_defconfig_no_pm
-+303422   +26128   +39016  +368566  omap2plus_defconfig_omap2_4_only
-+300236   +22416   +39016  +361668  omap2plus_defconfig_omap3_4_only
-+302176   +25784   +39016  +366976  omap2plus_defconfig_omap5_only
- +35552   +15076    +1248   +51876  rmk_omap3430_ldp_allnoconfig
-+313000   +24864    +4700  +342564  rmk_omap3430_ldp_oldconfig
- +39004   +16840     +284   +56128  rmk_omap4430_sdp_allnoconfig
-+322935   +23336    +4956  +351227  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v4.2 (64291f7db5bd8150a74ad2036f1037e6a0428df2))
-  avail  rsrvd   high  freed  board          kconfig
-  -304k   304k      .    20k  2420n800       omap2plus_defconfig_n800_only_a
- -1388k   364k      .      .  2430sdp        omap2plus_defconfig
- -1388k   364k      .    16k  3530es31beagle omap2plus_defconfig
- -1388k   364k      .    16k  3530es3beagle  omap2plus_defconfig
- -1388k   364k      .    16k  3730beaglexm   omap2plus_defconfig
- -1388k   364k      .    16k  3730es12beaglexmomap2plus_defconfig
- -1388k   364k      .    16k  37xxevm        omap2plus_defconfig
- -1392k   368k      .  -436k  4430es2panda   omap2plus_defconfig
- -1388k   364k -1024k  -436k  4460pandaes    omap2plus_defconfig
- -1392k   368k -1024k  -436k  4460varsomom   omap2plus_defconfig
- -1392k   368k -1024k  -436k  5430es2uevm    omap2plus_defconfig
-  -368k   368k      .    24k  am335xbone     omap2plus_defconfig_am33xx_only
- -1384k   360k      .    16k  am335xbonelt   omap2plus_defconfig
-
-
-Over a megabyte of additional runtime memory usage.  OMAP4 & 5 boards 
-are no longer booting to userspace.
+Thanks for pointing that out. It looks like I should remove phy-reset-gpio.
