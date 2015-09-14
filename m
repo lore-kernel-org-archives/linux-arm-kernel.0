@@ -1,60 +1,119 @@
-From: roger.pau@citrix.com (=?UTF-8?Q?Roger_Pau_Monn=c3=a9?=)
-Date: Mon, 14 Sep 2015 17:23:04 +0200
-Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
-In-Reply-To: <alpine.DEB.2.02.1509141542430.2672@kaball.uk.xensource.com>
-References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
- <55F68BC9.6020509@citrix.com> <55F6A437.3040403@citrix.com>
- <55F6A9DB.8040503@citrix.com> <55F6ADAE.1010609@citrix.com>
- <55F6B8CC.5090406@citrix.com> <55F6C1D2.7010206@citrix.com>
- <55F6D9DC.8060607@citrix.com>
- <alpine.DEB.2.02.1509141542430.2672@kaball.uk.xensource.com>
-Message-ID: <55F6E658.4070908@citrix.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Sep 2015 16:23:42 +0100
+Subject: [PATCH 2/2] Documentation: gpio: Update description for X-Gene
+ standby GPIO controller DTS binding
+In-Reply-To: <CAL4ahLdOtJ=W2xZbORYFi9ocnqB3oX0OzfC9zGiarBezjuxGwQ@mail.gmail.com>
+References: <1441963332-13329-1-git-send-email-yvo@apm.com>
+ <2971356.lYN9OVO6Id@wuerfel>
+ <CAL4ahLfRdfC=nReqqic=1vahgtD3-E_ncqnNhHsGw04P_HjvVA@mail.gmail.com>
+ <2516438.vcQPNoorc9@wuerfel>
+ <CAL4ahLdOtJ=W2xZbORYFi9ocnqB3oX0OzfC9zGiarBezjuxGwQ@mail.gmail.com>
+Message-ID: <55F6E67E.1080609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El 14/09/15 a les 16.54, Stefano Stabellini ha escrit:
-> On Mon, 14 Sep 2015, Roger Pau Monn? wrote:
->> IMHO this splitting is just a workaround for the fact that we don't have
->> a 64KB PV block protocol, and this is the real problem that should be
->> solved.
-> 
-> 64K is a pure one guest kernel configuration option, not a platform wide
-> option. The hypervisor interfaces are still the same, the ABI is the
-> same and all the other guests are still the same, the Xen binary is
-> still the same.
-
-Yes, I understand that, but the PV block protocol is missing 64KB page
-support, and that's a fact that cannot be ignored. To put an example, is
-there a hardware SATA controller on ARM that doesn't support 64KB pages
-and needs a similar workaround?
-
-> A 64K block protocol could be a good performance imprevement, but should
-> not be required to run kernels which have different config options.
-> 
->> In the long term this will put a burden on all blkfronts (if 64KB pages
->> are also used by other OSes), while introducing a 64KB PV block protocol
->> will make the blkfront implementation in all OSes very similar to what
->> we have now, without replicating the splitting code amongst all the
->> possible blkfront implementations.
+On 14/09/15 16:06, Y Vo wrote:
+> On Mon, Sep 14, 2015 at 9:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Monday 14 September 2015 16:39:43 Y Vo wrote:
+>>> On Mon, Sep 14, 2015 at 4:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> On Saturday 12 September 2015 12:55:55 Y Vo wrote:
+>>>>> On Fri, Sep 11, 2015 at 11:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>>>> On Friday 11 September 2015 22:06:58 Y Vo wrote:
+>>>>>
+>>>>> Example for configure GPIO_DS13 as interrupt and use as button with
+>>>>> the current gpio driver:
+>>>>>         gpio-keys {
+>>>>>                 compatible = "gpio-keys";
+>>>>>                 button at 1 {
+>>>>>                         label = "POWER";
+>>>>>                         linux,code = <116>;
+>>>>>                         linux,input-type = <0x1>;
+>>>>>                         interrupts = <0x0 0x2d 0x1>;
+>>>>>                 };
+>>>>>         };
+>>>>
+>>>> Wait, this looks wrong: the gpio driver doesn't actually see
+>>>> the connection here and won't be able to configure the interrupt
+>>>> correctly. The interrupt is already owned by the gpio driver, so
+>>>> you cannot use it in the button node.
+>>>
+>>> In summary:
+>>> - Our GPIO doesn't support interrupt controller.
+>>> - There are 6 pins which used the external interrupt from GIC, so all
+>>> setup for those irqs are from gic driver. The GPIO driver only
+>>> configure to wire those lines.
+>>>
+>>> For your concern:
+>>> - That's correct: if we use that defined, the gpio driver never saw
+>>> the connection here (That's why it already is configued at the
+>>> beginning).
+>>> - At the first time, we tried to use the define: <&sbgpio 13 1>, it
+>>> means using the GPIO_DS13, it will go into the GPIO driver to setup,
+>>> but there is another problem which I have sent out to all of you:
+>>> + It will go into gpio_keys_setup_key (gpio_keys.c driver) function,
+>>> then set the irqflags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+>>> but the gic only support IRQ_TYPE_LEVEL_HIGH && IRQF_TRIGGER_RISING,
+>>> so it always returns failed at gpio_keys_setup_key function. Please
+>>> see the gic_set_type at gic driver.
 >>
->> Granted that some changes to blkback will be needed in order to support
->> mapping 64KB grants, but there are much fewer blkback implementations
->> out there than blkfronts.
+>> Hmm, I see now how the event handling in the gpio-keys driver differs
+>> between irq mode and gpio mode, where gpio mode relies on getting
+>> a separate event for the release. This is certainly something that
+>> could be changed in the gpio-keys driver as an extension, but that
+>> seems to be what Laxman Dewangan did when he introduced the irq-mode.
+>>
+>>> static int gic_set_type(struct irq_data *d, unsigned int type)
+>>> {
+>>>         void __iomem *base = gic_dist_base(d);
+>>>         unsigned int gicirq = gic_irq(d);
+>>>
+>>>         /* Interrupt configuration for SGIs can't be changed */
+>>>         if (gicirq < 16)
+>>>                 return -EINVAL;
+>>>
+>>>         /* SPIs have restrictions on the supported types */
+>>>         if (gicirq >= 32 && type != IRQ_TYPE_LEVEL_HIGH &&
+>>>                             type != IRQ_TYPE_EDGE_RISING)
+>>>                 return -EINVAL;
+>>>
+>>>         return gic_configure_irq(gicirq, type, base, NULL);
+>>> }
+>>> + Another issue: in order gpio_key works it needs the status of GPIO.
+>>> For our chip, when the GPIO is configued as interrupt, we need to
+>>> access to GIC register to read the real status, it is not acceptable
+>>> to implement accessing GIC registers at gpio driver. The function
+>>> irq_get_irqchip_state(..) also doesn't work in our chip too. Because
+>>> it needs to access different offset.
+>>
+>> I thought we had solved that problem long ago when you first
+>> submitted the driver.
+>>
+>> Did 1b7047edfcfb25 ("genirq: Allow the irqchip state of an IRQ to be
+>> save/restored") not address the problem for you? You were on
+>> Cc to that patch and should have spoken up when the code that was
+>> merged was not sufficient.
 > 
-> I don't think we can rely on blkback having something in order to run
-> new guests, otherwise we break compatibility: new guests won't run on
-> old hypervisors.
+> Yes, I am in this mail-list too, but I also had a issue on this, I
+> think you are still in my submitted for this.
+> Currently, irq_get|set_irqchip_state(..) supports access to
+> GIC_DIST_ENABLE_SET, GIC_DIST_ACTIVE_SET, GIC_DIST_PENDING_SET. But
+> our hw only has the valid value at SPISR register ("[PATCH v4 2/3]
+> irqchip: GIC: Add support for irq_{get,set}_irqchip_state"), so I
+> still can not use it.
 
-I agree that this is far from ideal, but I don't think it's so
-outrageous. For example Linux PVOPS Dom0 kernels require Xen 4.0.1 at
-least in order to run, because previous versions lack the necessary
-IOAPIC setup hypercall. Also, it won't prevent guests from booting, it
-would just prevent them from using blkfront, but you can still get a
-root filesystem using iSCSI, NFS or other means.
+And I asked Feng Kan to explain *why* it doesn't work, but nobody ever
+bothered giving me a straight answer on that:
 
-I'm not saying that we shouldn't take those patches, I'm just saying
-that IMHO this is a workaround, and I would like to see a plan and
-somebody committed to have it fixed in a proper way, by introducing a
-64KB PV block protocol.
+https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg892972.html
 
-Roger.
+The GIC400 TRM explicitly states that reading GICD_SPISRn is the same as
+reading GICD_ICPENDRn. if that doesn't work for you please explain why.
+
+If I can get a reasonable explanation on *why* it doesn't work, then we
+can look at having an X-Gene specific workaround.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
