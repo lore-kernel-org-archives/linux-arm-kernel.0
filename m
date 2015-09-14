@@ -1,32 +1,70 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 14 Sep 2015 22:35:34 +0200
-Subject: [PATCH] ARM: dts: sun6i: Add accelerometer on Columbus A31
-In-Reply-To: <1442168761-2564-1-git-send-email-hdegoede@redhat.com>
-References: <1442168761-2564-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150914203534.GI4684@lukather>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 14 Sep 2015 15:36:41 -0500
+Subject: [PATCH 1/3] Documentation: bindings: brcmstb: Document
+ write-pairing
+In-Reply-To: <1442260369-6575-2-git-send-email-f.fainelli@gmail.com>
+References: <1442260369-6575-1-git-send-email-f.fainelli@gmail.com>
+ <1442260369-6575-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <55F72FD9.60607@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 13, 2015 at 08:26:01PM +0200, Hans de Goede wrote:
-> From: Sander Vermin <sander@vermin.nl>
+On 09/14/2015 02:52 PM, Florian Fainelli wrote:
+> Document the hif-cpubiuctrl node a bit more, and add a documentation
+> entry for the optional "brcm,write-pairing" property.
 > 
-> Add mma8452 accelerometer to sun6i-a31-colombus.dts.
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt          | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
 > 
-> Signed-off-by: Sander Vermin <sander@vermin.nl>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
+> index 430608ec09f0..602fa5f308bb 100644
+> --- a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
+> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
+> @@ -20,6 +20,20 @@ system control is required:
+>      - compatible: "brcm,bcm<chip_id>-hif-cpubiuctrl", "syscon"
 
-Applied, thanks!
+This has multiple chips allowed, but...
 
-Maxime
+>      - compatible: "brcm,bcm<chip_id>-hif-continuation", "syscon"
+>  
+> +hif-cpubiuctrl node
+> +-------------------
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/bd850e68/attachment.sig>
+Perhaps it is outside this context, but a description of the block would
+be nice.
+
+> +
+> +Required properties:
+> +
+> +    - compatible
+> +	The string should be "brcm.bcm7445-hif-cpubiuctrl", "syscon"
+
+This is just one.
+
+> +
+> +Optional properties:
+> +
+> +    - brcm,write-pairing:
+> +	Boolean property, which when present indicatse that the chip
+
+s/indicatse/indicates/
+
+> +	supports write-pairing.
+
+What is write pairing? Please give brief description.
+
+> +
+>  example:
+>      rdb {
+>          #address-cells = <1>;
+> @@ -35,6 +49,7 @@ example:
+>          hif_cpubiuctrl: syscon at 3e2400 {
+>              compatible = "brcm,bcm7445-hif-cpubiuctrl", "syscon";
+>              reg = <0x3e2400 0x5b4>;
+> +            brcm,write-pairing;
+>          };
+>  
+>          hif_continuation: syscon at 452000 {
+> 
