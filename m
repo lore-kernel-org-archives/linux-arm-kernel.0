@@ -1,99 +1,57 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Sep 2015 11:42:54 +0100
-Subject: DSA: phy polling
-Message-ID: <20150914104254.GI21084@n2100.arm.linux.org.uk>
+Date: Mon, 14 Sep 2015 11:50:14 +0100
+Subject: sdhci: runtime suspend/resume on card insert/removal
+In-Reply-To: <55F69E4F.8010608@linaro.org>
+References: <55F12CF8.50003@linaro.org> <20150910153129.07adbe68@xhacker>
+ <20150910080233.GH21084@n2100.arm.linux.org.uk>
+ <20150910160402.3b78b5c6@xhacker> <55F66874.2000609@linaro.org>
+ <20150914142838.07ec6a07@xhacker> <55F681AC.2010605@linaro.org>
+ <20150914161804.101dfc55@xhacker> <55F69121.3030700@linaro.org>
+ <55F69E4F.8010608@linaro.org>
+Message-ID: <20150914105014.GJ21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
+On Mon, Sep 14, 2015 at 03:45:43PM +0530, Vaibhav Hiremath wrote:
+> Came across below lines in the datasheet,
+> 
+> ========= Copy-n-paste from datasheet============
+> 
+> All SDH interfaces share the same clock which is enabled when any of the SDH
+> clock enables are
+> set (from PMUA_SDH1_CLK_RES_CTRL, PMUA_SDH2_CLK_RES_CTRL,
+> PMUA_SDH3_CLK_RES_CTRL, PMUA_SDH4_CLK_RES_CTRL,
+> PMUA_SDH5_CLK_RES_CTRL), with clock source select and divider ratio
+> controlled by
+> PMUA_SDH1_CLK_RES_CTRL.
+> 
+> ==================================================
+> 
+> 
+> And I can confirm that after disabling AXI interface clock for all the
+> SDH modules (1-5) I see I get an abort.
+> 
+> This clearly explains/justifies/proves that the existing code is
+> working as expected. I have eMMC mounted on the board, which makes
+> clock to always stay ON on SDH3.
+> 
+> So there is an OR gate implemented inside which takes input from
+> SDHx_AXI_EN and feeds back to all SDHx instances. Don't ask me why it
+> has been designed that way :)
+> 
+> And I did some experiment as well, so what I have observed is,
+> SDH_AXI_CLOCK is required to generate card detection, without that I do
+> not see card detection working.
 
-I think you're the current maintainer of the Marvell DSA code, as being
-the most recent author of changes to it. :)
+What that means is that if DT configures the interface to use its
+internal card detection, the AXI clock must never shut off when entering
+runtime-PM.
 
-I've noticed in my testing that the Marvell DSA code seems to poll the
-internal phy link status in mv88e6xxx_poll_link(), and set the network
-device carrier status according to the results.
-
-However, the internal phys are created using phylib, which also polls
-the phys for their link status, and controls the associated netdev
-carrier status.
-
-The side effect of this is that I see duplicated link status messages in
-the kernel log when connecting or disconnecting cables from the switch,
-caused by the code in mv88e6xxx_poll_link() racing with the phylib code.
->From what I can see, the code in mv88e6xxx_poll_link() is entirely
-redundant as the phylib layer will take care of any phy attached to the
-switch.
-
-To prove this, I have the following code in my tree, which disables the
-polling on a port where we have a phy attached (either an internal or
-external phy).  The result is that the per-port network devices are still
-updated with the link status even though this code is disabled - thanks
-to the phylib polling.
-
-I'm left wondering whether the DSA specific phy polling does anything
-useful, or whether the entire polling code both in mv88e6xxx.c and
-net/dsa can be removed (mv88e6xxx.c seems to be its only user.)
-
-diff --git a/drivers/net/dsa/mv88e6xxx.c b/drivers/net/dsa/mv88e6xxx.c
-index 26ec2fbfaa89..4c324eafeef2 100644
---- a/drivers/net/dsa/mv88e6xxx.c
-+++ b/drivers/net/dsa/mv88e6xxx.c
-@@ -400,6 +400,13 @@ void mv88e6xxx_poll_link(struct dsa_switch *ds)
- 		if (dev == NULL)
- 			continue;
- 
-+		/*
-+		 * Ignore ports which have a phy; phylib will take care
-+		 * of polling the link status for these.
-+		 */
-+		if (dsa_slave_has_phy(dev))
-+			continue;
-+
- 		link = 0;
- 		if (dev->flags & IFF_UP) {
- 			port_status = mv88e6xxx_reg_read(ds, REG_PORT(i),
-diff --git a/include/net/dsa.h b/include/net/dsa.h
-index fbca63ba8f73..b31e9da43ea7 100644
---- a/include/net/dsa.h
-+++ b/include/net/dsa.h
-@@ -176,6 +176,8 @@ static inline bool dsa_is_port_initialized(struct dsa_switch *ds, int p)
- 	return ds->phys_port_mask & (1 << p) && ds->ports[p];
- }
- 
-+extern bool dsa_slave_has_phy(struct net_device *);
-+
- static inline u8 dsa_upstream_port(struct dsa_switch *ds)
- {
- 	struct dsa_switch_tree *dst = ds->dst;
-diff --git a/net/dsa/slave.c b/net/dsa/slave.c
-index 35c47ddd04f0..a107242816ff 100644
---- a/net/dsa/slave.c
-+++ b/net/dsa/slave.c
-@@ -10,6 +10,7 @@
- 
- #include <linux/list.h>
- #include <linux/etherdevice.h>
-+#include <linux/export.h>
- #include <linux/netdevice.h>
- #include <linux/phy.h>
- #include <linux/phy_fixed.h>
-@@ -873,6 +874,14 @@ int dsa_slave_resume(struct net_device *slave_dev)
- 	return 0;
- }
- 
-+bool dsa_slave_has_phy(struct net_device *slave_dev)
-+{
-+	struct dsa_slave_priv *p = netdev_priv(slave_dev);
-+
-+	return p->phy != NULL;
-+}
-+EXPORT_SYMBOL_GPL(dsa_slave_has_phy);
-+
- int dsa_slave_create(struct dsa_switch *ds, struct device *parent,
- 		     int port, char *name)
- {
-
+Yes, it means you don't get the same savings as you would by turning
+off that clock, but that's the choice between using the internal card
+detection and a GPIO for this.  The code shouldn't force you to use a
+GPIO just because the Linux driver implementation dumbly disables the
+AXI clock.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
