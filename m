@@ -1,54 +1,59 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Mon, 14 Sep 2015 14:51:17 +0800
-Subject: [PATCH] ASoC: mediatek: Increase periods_min in capture
-Message-ID: <1442213477-63721-1-git-send-email-koro.chen@mediatek.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 14 Sep 2015 16:08:58 +0900
+Subject: [PATCH v5 0/4] cpufreq-dt: add suspend frequency support
+In-Reply-To: <2547413.Uj7KDUeGpY@vostro.rjw.lan>
+References: <1441730464-7947-1-git-send-email-b.zolnierkie@samsung.com>
+ <2547413.Uj7KDUeGpY@vostro.rjw.lan>
+Message-ID: <55F6728A.2070805@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In capture, there is chance that hw_ptr reported at IRQ is
-a little smaller than period_size due to internal AFE buffer.
-In the case of ping-pong buffer:
+On 09.09.2015 10:16, Rafael J. Wysocki wrote:
+> On Tuesday, September 08, 2015 06:41:00 PM Bartlomiej Zolnierkiewicz wrote:
+>> Hi,
+>>
+>> This patch series adds suspend frequency support (using opp-v2
+>> bindings and suspend-opp functionality) to cpufreq-dt driver and
+>> then adds suspend opp for Exynos4412 based boards.
+>>
+>> This patch series fixes suspend/resume support on Exynos4412
+>> based Trats2 board and reboot hang on Exynos4412 based Odroid
+>> U3 board.
+>>
+>> Changes since v4:
+>> - removed superfluous CONFIG_PM ifdefs
+>> - added Acked-by tag from Krzysztof to patch #4
+>> - added Acked-by tag from Viresh to patches #1-3
+>>
+>> Changes since v3:
+>> - fixed dev_pm_opp_get_suspend_opp() locking
+>> - shortened variable name in dev_pm_opp_get_suspend_opp()
+>> - adjusted cpufreq_generic_suspend() to work with cpufreq-dt
+>> - removed no longer needed cpufreq_dt_suspend()
+>> - added Acked-by tag from Viresh to patch #4
+>>
+>> Changes since v2:
+>> - rewrote to use suspend-opp functionality
+>>
+>> Changes since v1:
+>> - removed superfluous ";"
+>>
+>> Depends on:
+>> - next-20150902 branch of linux-next kernel tree
+> 
+> I've queued up [1-3/4] for the next PM pull request.
+> 
+> The [4/4] has to go in separately through the platform tree.
 
-|xxxxxxxxxxxxxxxxxxxxxxxxxxxx--|-----------------------------|
-                            hw_ptr < period_size
+Dear Rafael,
 
-This available buffer will not be read since its size is smaller than
-avail_min (which is period_size by default), and read thread continues
-to sleep. If the next hw_ptr is just a little larger than buffer_size,
-overrun occurs. One more period can hold the possible unread buffer.
+If you want, the fourth patch can go now through your tree - the late
+SoC changes were pulled by Linus. No difference... I can grab it as I
+had other DT related fix in queue.
 
-Signed-off-by: Koro Chen <koro.chen@mediatek.com>
----
- sound/soc/mediatek/mtk-afe-pcm.c |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+The only important thing is to get entire patchset to 4.3 because it is
+a fix for regression introduced in cpufreq for exynos. Do you plan to
+send your part in current 4.3 cycle?
 
-diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
-index d190fe0..f5baf3c 100644
---- a/sound/soc/mediatek/mtk-afe-pcm.c
-+++ b/sound/soc/mediatek/mtk-afe-pcm.c
-@@ -549,6 +549,23 @@ static int mtk_afe_dais_startup(struct snd_pcm_substream *substream,
- 	memif->substream = substream;
- 
- 	snd_soc_set_runtime_hwparams(substream, &mtk_afe_hardware);
-+
-+	/*
-+	 * Capture cannot use ping-pong buffer since hw_ptr at IRQ may be
-+	 * smaller than period_size due to AFE's internal buffer.
-+	 * This easily leads to overrun when avail_min is period_size.
-+	 * One more period can hold the possible unread buffer.
-+	 */
-+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-+		ret = snd_pcm_hw_constraint_minmax(runtime,
-+						   SNDRV_PCM_HW_PARAM_PERIODS,
-+						   3,
-+						   mtk_afe_hardware.periods_max);
-+		if (ret < 0) {
-+			dev_err(afe->dev, "hw_constraint_minmax failed\n");
-+			return ret;
-+		}
-+	}
- 	ret = snd_pcm_hw_constraint_integer(runtime,
- 					    SNDRV_PCM_HW_PARAM_PERIODS);
- 	if (ret < 0)
--- 
-1.7.9.5
+Best regards,
+Krzysztof
