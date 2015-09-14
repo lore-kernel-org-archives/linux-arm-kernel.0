@@ -1,54 +1,67 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 14 Sep 2015 17:03:16 +0100
-Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
-In-Reply-To: <20150914151540.GI7002@leverpostej> (Mark Rutland's message of
- "Mon, 14 Sep 2015 16:15:40 +0100")
-References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
- <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
- <20150914131448.GC7002@leverpostej>
- <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
- <20150914134949.GE7002@leverpostej>
- <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
- <20150914144330.GH7002@leverpostej>
- <9hhfv2hdozu.fsf@e105922-lin.cambridge.arm.com>
- <20150914151540.GI7002@leverpostej>
-Message-ID: <9hh7fntdm4b.fsf@e105922-lin.cambridge.arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 14 Sep 2015 17:13:18 +0100
+Subject: [PATCH] arm: dma-mapping: fix build warning with new DMA_ERROR_CODE
+ definition
+Message-ID: <1442247198-12435-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Rutland <mark.rutland@arm.com> writes:
+Commit 96231b2686b5: ("ARM: 8419/1: dma-mapping: harmonize definition
+of DMA_ERROR_CODE") changed the definition of DMA_ERROR_CODE to use
+dma_addr_t, which makes the compiler barf on assigning this to an
+"int" variable on ARM with LPAE enabled:
+-------------------
+In file included from /src/linux/include/linux/dma-mapping.h:86:0,
+                 from /src/linux/arch/arm/mm/dma-mapping.c:21:
+/src/linux/arch/arm/mm/dma-mapping.c: In function '__iommu_create_mapping':
+/src/linux/arch/arm/include/asm/dma-mapping.h:16:24: warning:
+overflow in implicit constant conversion [-Woverflow]
+ #define DMA_ERROR_CODE (~(dma_addr_t)0x0)
+                        ^
+/src/linux/arch/arm/mm/dma-mapping.c:1252:15: note: in expansion of
+macro DMA_ERROR_CODE'
+  int i, ret = DMA_ERROR_CODE;
+               ^
+-------------------
 
-> On Mon, Sep 14, 2015 at 04:01:09PM +0100, Punit Agrawal wrote:
->> Mark Rutland <mark.rutland@arm.com> writes:
->> 
+Remove the actually unneeded initialization of "ret" in
+__iommu_create_mapping() and move the variable declaration inside the
+for-loop to make the scope of this variable more clear.
 
-[...]
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ arch/arm/mm/dma-mapping.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
->> 
->> After seeing the mapping already published, I am wondering if there is
->> any value in duplicating the information. If there are no objections,
->> I'll update this patch to add pointers instead.
->
-> That's fine by me. The important part is that the value is a raw Sensor
-> ID as the FW uses. So long as we state that, the IDs themselves can come
-> from whatever documentation is valid for a particular instance.
->
-> Thanks for the info!
+Hi Russell,
 
-Sure. I've updated the patch to explain what the valid cell values are
-along with a pointer to platform documentation for Juno R0 and R1.
+I hope that hasn't turned up before, but this triggers with my config.
+Please apply for 4.3.
 
-I've also added an example to show usage of the sensors to create a
-thermal zone.
+Cheers,
+Andre.
 
-I'll post a new version shortly.
-
-Thanks for your having a look.
-
->
-> Thanks,
-> Mark.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index e626043..1a7815e 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1249,7 +1249,7 @@ __iommu_create_mapping(struct device *dev, struct page **pages, size_t size)
+ 	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+ 	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+ 	dma_addr_t dma_addr, iova;
+-	int i, ret = DMA_ERROR_CODE;
++	int i;
+ 
+ 	dma_addr = __alloc_iova(mapping, size);
+ 	if (dma_addr == DMA_ERROR_CODE)
+@@ -1257,6 +1257,8 @@ __iommu_create_mapping(struct device *dev, struct page **pages, size_t size)
+ 
+ 	iova = dma_addr;
+ 	for (i = 0; i < count; ) {
++		int ret;
++
+ 		unsigned int next_pfn = page_to_pfn(pages[i]) + 1;
+ 		phys_addr_t phys = page_to_phys(pages[i]);
+ 		unsigned int len, j;
+-- 
+2.5.1
