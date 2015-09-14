@@ -1,19 +1,18 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 14 Sep 2015 14:57:28 -0700
-Subject: [PATCH 2/2] clk: at91: system: don't try to free_irq when there
- is no IRQ
-In-Reply-To: <1441982047-11303-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1441982047-11303-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1441982047-11303-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150914215728.GB23081@codeaurora.org>
+Date: Mon, 14 Sep 2015 14:59:17 -0700
+Subject: [PATCH 3/5] clk: sunxi: sun6i-ar100: Fix module autoload for OF
+ platform driver
+In-Reply-To: <20150828124354.GA26610@goodgumbo.baconseed.org>
+References: <20150828124354.GA26610@goodgumbo.baconseed.org>
+Message-ID: <20150914215917.GE23081@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11, Alexandre Belloni wrote:
-> In the error path of at91_clk_register_system(), sys->irq is freed
-> unconditionally but it may not exist or be request at all.
+On 08/28, Luis de Bethencourt wrote:
+> This platform driver has a OF device ID table but the OF module
+> alias information is not created so module autoloading won't work.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Luis de Bethencourt <luis@debethencourt.com>
 > ---
 
 Applied to clk-next
