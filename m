@@ -1,34 +1,27 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 14 Sep 2015 10:38:10 +0530
-Subject: [PATCH] arm64: dts: Add BUS1 instance pinctrl support
-In-Reply-To: <55E3E95D.50003@samsung.com>
-References: <1440761134-27639-1-git-send-email-alim.akhtar@samsung.com>
- <55E3E95D.50003@samsung.com>
-Message-ID: <55F6563A.2030107@samsung.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Mon, 14 Sep 2015 15:19:46 +1000
+Subject: Build regressions/improvements in v4.3-rc1
+In-Reply-To: <CAMuHMdVGEDKFxD7wf6ZOAGiOByM5c0Awx-anLsYGLQHV1yJW+w@mail.gmail.com>
+References: <1442134868-17607-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdV31w=aDD-=uUPOqW71xLpOnH1jWeQpH=6x=vxNSo94FQ@mail.gmail.com>
+ <20150913151926.GA19850@roeck-us.net>
+ <CAMuHMdVGEDKFxD7wf6ZOAGiOByM5c0Awx-anLsYGLQHV1yJW+w@mail.gmail.com>
+Message-ID: <1442207986.8149.0.camel@ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Sun, 2015-09-13 at 22:23 +0200, Geert Uytterhoeven wrote:
+> On Sun, Sep 13, 2015 at 5:19 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > arm64:allmodconfig:
+> >
+> > drivers/firmware/qcom_scm-32.c:196:4: error: expected string literal before ?__asmeq?
+> > drivers/firmware/qcom_scm-32.c:221:2: error: implicit declaration of function ?secure_flush_area?
+> > drivers/firmware/qcom_scm-32.c:239:2: error: implicit declaration of function ?outer_inv_range?
+> > drivers/firmware/qcom_scm-32.c:331:4: error: expected string literal before ?__asmeq?
+> > drivers/firmware/qcom_scm-32.c:361:4: error: expected string literal before ?__asmeq?
+> 
+> Time for kisskb to gain arm64 support?
 
-On 08/31/2015 11:12 AM, Krzysztof Kozlowski wrote:
-> On 28.08.2015 20:25, Alim Akhtar wrote:
->> This adds BUS1 instance pinctrl for exynos7 soc.
->>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> ---
->>   arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi |  111 +++++++++++++++++++++++
->>   arch/arm64/boot/dts/exynos/exynos7.dtsi         |    7 ++
->>   2 files changed, 118 insertions(+)
->
-> The "etc1" GPIO in my datasheet is not fully documented but the rest
-> looks good:
->
-Ok will send v2 and remove etc1 gpio node.
+Yes. I'll add it to my TODO list.
 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
-Thanks!!
-> Best regards,
-> Krzysztof
->
->
+cheers
