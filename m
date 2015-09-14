@@ -1,24 +1,22 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 14 Sep 2015 22:34:47 +0200
-Subject: [PATCH] dmaengine: sun4i: fix unsafe list iteration
-In-Reply-To: <1442175353-4433-1-git-send-email-emilio@elopez.com.ar>
-References: <1442175353-4433-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <20150914203447.GH4684@lukather>
+Date: Mon, 14 Sep 2015 22:35:34 +0200
+Subject: [PATCH] ARM: dts: sun6i: Add accelerometer on Columbus A31
+In-Reply-To: <1442168761-2564-1-git-send-email-hdegoede@redhat.com>
+References: <1442168761-2564-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150914203534.GI4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 13, 2015 at 05:15:53PM -0300, Emilio L?pez wrote:
-> Currently, sun4i_dma_free_contract iterates over lists and frees memory
-> as it goes through them, causing reads to recently freed memory to
-> be performed. Fix this by using the safe version of the iterator, so
-> freed memory is not referenced at all.
+On Sun, Sep 13, 2015 at 08:26:01PM +0200, Hans de Goede wrote:
+> From: Sander Vermin <sander@vermin.nl>
 > 
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> Add mma8452 accelerometer to sun6i-a31-colombus.dts.
+> 
+> Signed-off-by: Sander Vermin <sander@vermin.nl>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Applied, thanks!
 
-Thanks!
 Maxime
 
 -- 
@@ -31,4 +29,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/2f38ad27/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/bd850e68/attachment.sig>
