@@ -1,79 +1,75 @@
-From: daniel.kiper@oracle.com (Daniel Kiper)
-Date: Mon, 14 Sep 2015 14:19:36 +0200
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <20150914092518.GA10307@leverpostej>
-References: <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
- <20150910121514.GE29293@leverpostej>
- <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
- <20150910144938.GI29293@leverpostej>
- <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
- <20150910162302.GN29293@leverpostej>
- <20150911124643.GB4530@olila.local.net-space.pl>
- <20150911162559.GA8726@leverpostej>
- <20150912113655.GG4530@olila.local.net-space.pl>
- <20150914092518.GA10307@leverpostej>
-Message-ID: <20150914121936.GH4530@olila.local.net-space.pl>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 14 Sep 2015 14:21:39 +0200
+Subject: [PATCH v2 0/2] [media] Fix race between graph enumeration and
+ entities registration
+Message-ID: <1442233301-25181-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 10:25:19AM +0100, Mark Rutland wrote:
-> On Sat, Sep 12, 2015 at 12:36:55PM +0100, Daniel Kiper wrote:
-> > On Fri, Sep 11, 2015 at 05:25:59PM +0100, Mark Rutland wrote:
-> > > On Fri, Sep 11, 2015 at 01:46:43PM +0100, Daniel Kiper wrote:
-> > > > On Thu, Sep 10, 2015 at 05:23:02PM +0100, Mark Rutland wrote:
-> >
-> > [...]
-> >
-> > > > > What's troublesome with the boot services?
-> > > > >
-> > > > > What can't be simulated?
-> > > >
-> > > > How do you want to access bare metal EFI boot services from dom0 if they
-> > > > were shutdown long time ago before loading dom0 image?
-> > >
-> > > I don't want to.
-> > >
-> > > I asked "What can't be simulated?" because I assumed everything
-> > > necessary/mandatory could be simulated without needinng access to any
-> > > real EFI boot services.
-> > >
-> > > As far as I can see all that's necessary is to provide a compatible
-> > > interface.
-> >
-> > Could you be more precise what do you need? Please enumerate. UEFI spec has
-> > more than 2500 pages and I do not think that we need all stuff in dom0.
-> >
-> > > > What do you need from EFI boot services in dom0?
-> > >
-> > > The ability to call ExitBootServices() and SetVirtualAddressMap() on a
-> > > _virtual_ address map for _virtual_ services provided by the hypervisor.
-> >
-> > I am confused. Why do you need that? Please remember, EFI is owned and
-> > operated by Xen hypervisor. dom0 does not have direct access to EFI.
->
-> Let's take a step back.
->
-> My objection here is to passing the Dom0 kernel properties as if it were
-> booted with direct access to a full UEFI, then later fixing that up
-> (when Xen is detected and we apply its hypercall EFI implementation).
->
-> If the kernel cannot use EFI natively, why pretend to the kernel that it
-> can? The hypercall implementation is _not_ EFI (though it provides
-> access to some services).
->
-> The two ways I can see providing Dom0 with EFI services are:
->
-> * Have Xen create shims for any services, in which any hypercalls live,
->   and pass these to the kernel with a virtual system table. This keeps
->   the interface to the kernel the same regardless of Xen.
->
-> * Have the kernel detect Xen EFI capability via Xen, without passing the
->   usual native EFI parameters. This can then be installed into the
->   kernel in a Xen-specific manner, and we know from the outset that
->   Xen-specific caveats apply.
+Hello,
 
-It works on x86 in that way and I suppose that it can work in that way on ARM too.
-So, just go and reuse existing code. That is all.
+The Media Controller framework has an issue in which the media device node
+is registered before all the media entities and pads links are created so
+if user-space tries to enumerate the graph too early, it may get a partial
+graph since not everything has been registered yet.
 
-Daniel
+This series fixes the issue by separate the media device registration from
+the initialization so drives can first initialize the media device, create
+the graph and then finally register the media device node once is finished.
+The solution was suggested by Sakari Ailus.
+
+This is the second version of the series that fixes issues pointed out by
+Sakari Ailus. The first version was [0].
+
+Patch #1 adds a check to the media_device_unregister() function to know if
+the media device has been registed yet so calling it will be safe and the
+cleanup functions of the drivers won't need to be changed in case register
+failed.
+
+Patch #2 does the init and registration split, changing all the drivers to
+make the change atomic and also adds a cleanup function for media devices.
+
+The patches are on top of Mauro's "[PATCH v8 00/55] MC next generation" [1]
+but is not a dependency for that series, it was only be based on that patch
+series to avoid conflicts with in-flight patches.
+
+The patches have been tested on an OMAP3 IGEPv2 board that has a OMAP3 ISP
+device and an Exynos5800 Chromebook with a built-in UVC camera.
+
+[0]: https://lkml.org/lkml/2015/9/10/311
+[1]: http://permalink.gmane.org/gmane.linux.drivers.driver-project.devel/74515
+
+Best regards,
+Javier
+
+Changes in v2:
+- Reword the documentation for media_device_unregister(). Suggested by Sakari.
+- Added Sakari's Acked-by tag for patch #1.
+- Change media_device_init() to return void instead of an error.
+  Suggested by Sakari Ailus.
+- Remove the error messages when media_device_register() fails.
+  Suggested by Sakari Ailus.
+- Fix typos in commit message of patch #2. Suggested by Sakari Ailus.
+
+Javier Martinez Canillas (2):
+  [media] media-device: check before unregister if mdev was registered
+  [media] media-device: split media initialization and registration
+
+ drivers/media/common/siano/smsdvb-main.c      |  1 +
+ drivers/media/media-device.c                  | 43 ++++++++++++++++++++++-----
+ drivers/media/platform/exynos4-is/media-dev.c | 15 +++++-----
+ drivers/media/platform/omap3isp/isp.c         | 14 ++++-----
+ drivers/media/platform/s3c-camif/camif-core.c | 15 ++++++----
+ drivers/media/platform/vsp1/vsp1_drv.c        | 12 ++++----
+ drivers/media/platform/xilinx/xilinx-vipp.c   | 12 +++-----
+ drivers/media/usb/au0828/au0828-core.c        | 27 ++++++++---------
+ drivers/media/usb/cx231xx/cx231xx-cards.c     | 30 +++++++++----------
+ drivers/media/usb/dvb-usb-v2/dvb_usb_core.c   | 23 +++++++-------
+ drivers/media/usb/dvb-usb/dvb-usb-dvb.c       | 24 ++++++++-------
+ drivers/media/usb/siano/smsusb.c              |  5 ++--
+ drivers/media/usb/uvc/uvc_driver.c            | 10 +++++--
+ include/media/media-device.h                  |  2 ++
+ 14 files changed, 136 insertions(+), 97 deletions(-)
+
+-- 
+2.4.3
