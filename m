@@ -1,64 +1,69 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 14 Sep 2015 22:06:43 +0200
-Subject: [PATCH v2 1/2] irqchip: gic: Add arm,pl390 support
-In-Reply-To: <1442261204-30931-1-git-send-email-geert+renesas@glider.be>
-References: <1442261204-30931-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1442261204-30931-2-git-send-email-geert+renesas@glider.be>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Sep 2015 13:22:30 -0700
+Subject: [PATCH v3 0/2] regulator: Fix pbias regulator enable
+In-Reply-To: <CAPDyKFqCYx0JfXGq0T-44034UcR=v8nvKp7Fww=Zxa7N-z_vFg@mail.gmail.com>
+References: <1441368025-21182-1-git-send-email-kishon@ti.com>
+ <CAPDyKFqCYx0JfXGq0T-44034UcR=v8nvKp7Fww=Zxa7N-z_vFg@mail.gmail.com>
+Message-ID: <20150914202230.GY4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the PrimeCell? Generic Interrupt Controller (PL390) to
-the GIC DT bindings and driver.
+Hi,
 
-Currently the GIC driver treats this GIC variant the same as other GIC
-variants, but there are differences in hardware topology (e.g. clock
-inputs).
+* Ulf Hansson <ulf.hansson@linaro.org> [150904 05:48]:
+> 
+> Okay, just to be clear on the way forward. I spoked with Mark Brown
+> offlist, and he will/has picked up the regulator patch and will send
+> it as fix for the 4.3 rc[n].
+> 
+> Regarding the ARM patch here, I guess Tony might as well handle it and
+> send through arm-soc, especially since the regression won't be fixed
+> within my mmc tree anyway.
+> 
+> So, I am going to leave my next branch as is - and thus relying on
+> teet the regression for OMAP will be fixed in some the 4.3 rc[n].
 
-Sort the list of compatible values while we're at it.
+I'm picking up the .dts changes from this series into
+omap-for-v4.3/fixes as those are safe to apply while waiting
+for the pbias-regulator.c fix to hit mainline.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-  - New.
+I'm not yet applying the related dts change "fix address translation
+for pbias" as that depends on the pbias-regulator.c change.
 
- Documentation/devicetree/bindings/arm/gic.txt | 9 +++++----
- drivers/irqchip/irq-gic.c                     | 1 +
- 2 files changed, 6 insertions(+), 4 deletions(-)
+Howver, when testing all the patches applied, I'm still getting
+the following splat at least on duovero (with MMC working):
 
-diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-index 2da059a4790cb3c6..24742853ba460223 100644
---- a/Documentation/devicetree/bindings/arm/gic.txt
-+++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -11,13 +11,14 @@ have PPIs or SGIs.
- Main node required properties:
- 
- - compatible : should be one of:
--	"arm,gic-400"
-+	"arm,arm1176jzf-devchip-gic"
-+	"arm,arm11mp-gic"
- 	"arm,cortex-a15-gic"
--	"arm,cortex-a9-gic"
- 	"arm,cortex-a7-gic"
--	"arm,arm11mp-gic"
-+	"arm,cortex-a9-gic"
-+	"arm,gic-400"
-+	"arm,pl390"
- 	"brcm,brahma-b15-gic"
--	"arm,arm1176jzf-devchip-gic"
- 	"qcom,msm-8660-qgic"
- 	"qcom,msm-qgic2"
- - interrupt-controller : Identifies the node as an interrupt controller
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 4b2255317e4764f9..81179d01f14de2fe 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1046,6 +1046,7 @@ IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
- IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
- IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
- IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
-+IRQCHIP_DECLARE(pl390, "arm,pl390", gic_of_init);
- 
- #endif
- 
--- 
-1.9.1
+WARNING: CPU: 0 PID: 6 at drivers/regulator/core.c:2105 _regulator_disable+0x13c/0x1d4()
+unbalanced disables for pbias_mmc_omap4
+Modules linked in:
+CPU: 0 PID: 6 Comm: kworker/u4:0 Not tainted 4.3.0-rc1-00015-gf5c4173-dirty #1295
+Hardware name: Generic OMAP4 (Flattened Device Tree)
+Workqueue: deferwq deferred_probe_work_func
+[<c001770c>] (unwind_backtrace) from [<c0013a58>] (show_stack+0x10/0x14)
+[<c0013a58>] (show_stack) from [<c0346628>] (dump_stack+0x84/0x9c)
+[<c0346628>] (dump_stack) from [<c003e958>] (warn_slowpath_common+0x78/0xb4)
+[<c003e958>] (warn_slowpath_common) from [<c003e9c4>] (warn_slowpath_fmt+0x30/0x40)
+[<c003e9c4>] (warn_slowpath_fmt) from [<c03a4e74>] (_regulator_disable+0x13c/0x1d4)
+[<c03a4e74>] (_regulator_disable) from [<c03a4f3c>] (regulator_disable+0x30/0x6c)
+[<c03a4f3c>] (regulator_disable) from [<c04c55a8>] (omap_hsmmc_set_power+0x158/0x1e8)
+[<c04c55a8>] (omap_hsmmc_set_power) from [<c04c57d0>] (omap_hsmmc_set_ios+0x198/0x318)
+[<c04c57d0>] (omap_hsmmc_set_ios) from [<c04af404>] (mmc_power_up.part.10+0x30/0xf8)
+[<c04af404>] (mmc_power_up.part.10) from [<c04b0310>] (mmc_start_host+0x40/0x7c)
+[<c04b0310>] (mmc_start_host) from [<c04b1424>] (mmc_add_host+0x5c/0x84)
+[<c04b1424>] (mmc_add_host) from [<c04c5010>] (omap_hsmmc_probe+0x5b0/0x9f0)
+[<c04c5010>] (omap_hsmmc_probe) from [<c03e0e9c>] (platform_drv_probe+0x44/0xac)
+[<c03e0e9c>] (platform_drv_probe) from [<c03df550>] (driver_probe_device+0x1f4/0x2f0)
+[<c03df550>] (driver_probe_device) from [<c03dda5c>] (bus_for_each_drv+0x64/0x98)
+[<c03dda5c>] (bus_for_each_drv) from [<c03df2d0>] (__device_attach+0xb0/0x118)
+[<c03df2d0>] (__device_attach) from [<c03de878>] (bus_probe_device+0x88/0x90)
+[<c03de878>] (bus_probe_device) from [<c03deca0>] (deferred_probe_work_func+0x60/0x90)
+[<c03deca0>] (deferred_probe_work_func) from [<c005899c>] (process_one_work+0x1a4/0x558)
+[<c005899c>] (process_one_work) from [<c0058d8c>] (worker_thread+0x3c/0x514)
+[<c0058d8c>] (worker_thread) from [<c005eb1c>] (kthread+0xd4/0xf0)
+[<c005eb1c>] (kthread) from [<c000f710>] (ret_from_fork+0x14/0x24)
+
+Kishon, can you please take a look?
+
+Regards,
+
+Tony
