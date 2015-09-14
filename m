@@ -1,74 +1,108 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 14 Sep 2015 15:12:53 +0530
-Subject: [RFC 2/3] mmc: sdhci: add host_ops->voltage_switch callback for
- all other voltages
-In-Reply-To: <CAPDyKFqOGsKXTCOG89Kq=F6VsDpyfnpwo+jNb+6otgPUFE_bzw@mail.gmail.com>
-References: <1441135938-8056-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1441135938-8056-3-git-send-email-vaibhav.hiremath@linaro.org>
- <20150902150442.118d3305@xhacker> <55E6B129.1030002@linaro.org>
- <20150902162627.682cdedf@xhacker> <55E6E0FD.7000806@linaro.org>
- <CAPDyKFqOGsKXTCOG89Kq=F6VsDpyfnpwo+jNb+6otgPUFE_bzw@mail.gmail.com>
-Message-ID: <55F6969D.7090004@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 14 Sep 2015 11:43:27 +0200
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <20150914092518.GA10307@leverpostej>
+References: <20150910112418.GC29293@leverpostej>
+ <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
+ <20150910121514.GE29293@leverpostej>
+ <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
+ <20150910144938.GI29293@leverpostej>
+ <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
+ <20150910162302.GN29293@leverpostej>
+ <20150911124643.GB4530@olila.local.net-space.pl>
+ <20150911162559.GA8726@leverpostej>
+ <20150912113655.GG4530@olila.local.net-space.pl>
+ <20150914092518.GA10307@leverpostej>
+Message-ID: <CAKv+Gu9ER1cKvPHobq-wo7ggPesJj4OQ7=aTr24GVpubHvVqjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Monday 14 September 2015 03:00 PM, Ulf Hansson wrote:
-> [...]
->
->>>>>
->>>>> Could this be implemented by regulator API? From patch set 3/3, the
->>>>> pxa1928
->>>>> voltage_switch hook is to operate the IO pad registers, this seems not
->>>>> belong
->>>>> to the SDHC IP core.
->>>>>
->>>>
->>>> Not quite sure whether regulator would be right fit for this.
->>>
->>>
->>>   From the patche[3/3], this can be achieved by abstracting the IO PAD as
->>> regulators
->>> then, we may not need to touch the core sdhci.c. But I'm not sure whether
->>> this
->>> is the good solution or not.
+On 14 September 2015 at 11:25, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Sat, Sep 12, 2015 at 12:36:55PM +0100, Daniel Kiper wrote:
+>> On Fri, Sep 11, 2015 at 05:25:59PM +0100, Mark Rutland wrote:
+>> > On Fri, Sep 11, 2015 at 01:46:43PM +0100, Daniel Kiper wrote:
+>> > > On Thu, Sep 10, 2015 at 05:23:02PM +0100, Mark Rutland wrote:
 >>
+>> [...]
 >>
->> Exactly...
+>> > > > What's troublesome with the boot services?
+>> > > >
+>> > > > What can't be simulated?
+>> > >
+>> > > How do you want to access bare metal EFI boot services from dom0 if they
+>> > > were shutdown long time ago before loading dom0 image?
+>> >
+>> > I don't want to.
+>> >
+>> > I asked "What can't be simulated?" because I assumed everything
+>> > necessary/mandatory could be simulated without needinng access to any
+>> > real EFI boot services.
+>> >
+>> > As far as I can see all that's necessary is to provide a compatible
+>> > interface.
 >>
->>> sdhci Maintainers and experts may have better
->>> suggestions.
->>>
+>> Could you be more precise what do you need? Please enumerate. UEFI spec has
+>> more than 2500 pages and I do not think that we need all stuff in dom0.
 >>
->> Thats is the reason I stamped it as a RFC :)
+>> > > What do you need from EFI boot services in dom0?
+>> >
+>> > The ability to call ExitBootServices() and SetVirtualAddressMap() on a
+>> > _virtual_ address map for _virtual_ services provided by the hypervisor.
 >>
+>> I am confused. Why do you need that? Please remember, EFI is owned and
+>> operated by Xen hypervisor. dom0 does not have direct access to EFI.
 >
-> [...]
+> Let's take a step back.
 >
->  From an mmc core perspective it would be preferred if you implement
-> this as a regulator (vqmmc).
->
-> Especially since we will soon have an API for how to set the I/O
-> voltages - and the intelligence within that API is not something we
-> would like to implement for each and every host driver.
-> https://lkml.org/lkml/2015/8/31/367
+> My objection here is to passing the Dom0 kernel properties as if it were
+> booted with direct access to a full UEFI, then later fixing that up
+> (when Xen is detected and we apply its hypercall EFI implementation).
 >
 
+To be honest, I don't think that has ever been suggested here. What
+was suggested is to provide a minimal EFI like environment that allows
+the post-stub EFI code to proceed and find the ACPI root pointer.
 
-I would still consider this as a regulator specific and may not address
-the IO configuration within the SoC which are module specific.
-The API regulator_set_voltage_triplet() will not have intelligence to
-differentiate whether the call is coming from MMC or somewhere else.
+> If the kernel cannot use EFI natively, why pretend to the kernel that it
+> can? The hypercall implementation is _not_ EFI (though it provides
+> access to some services).
+>
 
-Note that, the IO pad voltage configuration which I am referring to is
-MMC specific and applicable only when pad is configured in MMC mode. So
-technically it is not simply common pad voltage configuration.
+To get access to the ACPI root pointer, for which there is only one
+specified way of obtaining it on ARM, which is via the UEFI
+configuration table database
 
+> The two ways I can see providing Dom0 with EFI services are:
+>
+> * Have Xen create shims for any services, in which any hypercalls live,
+>   and pass these to the kernel with a virtual system table. This keeps
+>   the interface to the kernel the same regardless of Xen.
+>
+> * Have the kernel detect Xen EFI capability via Xen, without passing the
+>   usual native EFI parameters. This can then be installed into the
+>   kernel in a Xen-specific manner, and we know from the outset that
+>   Xen-specific caveats apply.
+>
+> As per my original email, I'm not against the renaming of the stub
+> parameters if we standardise the rest of the details, but I believe
+> that's orthogonal to the Xen Dom0 case.
+>
 
-And I am still not sure regulator framework would be right fit for
-this. Pinctrl would have been right fit, but...since I saw f_sdh30
-driver is already doing this, which is easy fit; so adopted the same.
+Xen will not boot the kernel via the stub, but directly. It needs to
+supply a EFI like environment so that the kernel can boot via ACPI.
+There is no reason whatsoever to mock up boot services or other pieces
+of UEFI functionality that are not needed. The core kernel does not
+call any boot services or SetVirtualAddressMap/ConvertPointer, and
+there is already paravirtualized plumbing in place for the remaining
+runtime services.
 
-Thanks,
-Vaibhav
+Hence my claim earlier that we should cope with the runtime services
+pointer being NULL, since that is really the only thing standing in
+the way from the kernel side. If you feel that violates the spec in
+some way, we could at least conditionalise it on EFI_RUNTIME_SERVICES
+having been set already, this gives the Xen code a chance of
+overriding them.
+
+-- 
+Ard.
