@@ -1,68 +1,51 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 14 Sep 2015 14:21:53 -0700
-Subject: [PATCH 1/3] Documentation: bindings: brcmstb: Document
- write-pairing
-In-Reply-To: <55F72FD9.60607@kernel.org>
-References: <1442260369-6575-1-git-send-email-f.fainelli@gmail.com>
- <1442260369-6575-2-git-send-email-f.fainelli@gmail.com>
- <55F72FD9.60607@kernel.org>
-Message-ID: <55F73A71.8040500@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 14 Sep 2015 16:24:26 -0500
+Subject: [PATCH 6/6] ARM: dts: set up trigger type for edt-ft5x06
+ interrupts
+In-Reply-To: <2adcbfd1d5b237598d37edcbeec4a8dbd443f36f.1442079408.git.dmitry.torokhov@gmail.com>
+References: <5044530af510d6686e78f8dfa912d89ef824f899.1442079408.git.dmitry.torokhov@gmail.com>
+ <2adcbfd1d5b237598d37edcbeec4a8dbd443f36f.1442079408.git.dmitry.torokhov@gmail.com>
+Message-ID: <20150914212426.GA9968@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/09/15 13:36, Rob Herring wrote:
-> On 09/14/2015 02:52 PM, Florian Fainelli wrote:
->> Document the hif-cpubiuctrl node a bit more, and add a documentation
->> entry for the optional "brcm,write-pairing" property.
->>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->>  .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt          | 15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
->> index 430608ec09f0..602fa5f308bb 100644
->> --- a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
->> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
->> @@ -20,6 +20,20 @@ system control is required:
->>      - compatible: "brcm,bcm<chip_id>-hif-cpubiuctrl", "syscon"
+On Sat, Sep 12, 2015 at 10:45:51AM -0700, Dmitry Torokhov wrote:
+> Now that the driver respects IRQ trigger settings from device tree, let's
+> fix them up in individual DTSes (note that the driver is still compatible
+> with older DTSes).
 > 
-> This has multiple chips allowed, but...
+> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> ---
+>  arch/arm/boot/dts/am437x-sk-evm.dts   | 2 +-
+>  arch/arm/boot/dts/imx28-tx28.dts      | 3 ++-
+>  arch/arm/boot/dts/imx53-tx53-x03x.dts | 3 ++-
+>  arch/arm/boot/dts/imx6qdl-tx6.dtsi    | 3 ++-
+>  4 files changed, 7 insertions(+), 4 deletions(-)
 > 
->>      - compatible: "brcm,bcm<chip_id>-hif-continuation", "syscon"
->>  
->> +hif-cpubiuctrl node
->> +-------------------
-> 
-> Perhaps it is outside this context, but a description of the block would
-> be nice.
+> diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
+> index c17097d..d83fdcd 100644
+> --- a/arch/arm/boot/dts/am437x-sk-evm.dts
+> +++ b/arch/arm/boot/dts/am437x-sk-evm.dts
+> @@ -471,7 +471,7 @@
+>  
+>  		reg = <0x38>;
+>  		interrupt-parent = <&gpio0>;
+> -		interrupts = <31 0>;
+> +		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
 
-Sure.
+for AM437x SK:
 
-> 
->> +
->> +Required properties:
->> +
->> +    - compatible
->> +	The string should be "brcm.bcm7445-hif-cpubiuctrl", "syscon"
-> 
-> This is just one.
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-Right, will fix that.
+Seems like there are no changes considering driver was always using
+IRQF_TRIGGER_FALLING.
 
-> 
->> +
->> +Optional properties:
->> +
->> +    - brcm,write-pairing:
->> +	Boolean property, which when present indicatse that the chip
-> 
-> s/indicatse/indicates/
-> 
->> +	supports write-pairing.
-> 
-> What is write pairing? Please give brief description.
-
-I will provide an explanation in v2 for what that is.
 -- 
-Florian
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/b5ec186d/attachment.sig>
