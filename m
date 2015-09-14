@@ -1,46 +1,38 @@
-From: stsp@list.ru (Stas Sergeev)
-Date: Mon, 14 Sep 2015 14:06:13 +0300
-Subject: mvneta: SGMII fixed-link not so fixed
-In-Reply-To: <20150914103207.GH21084@n2100.arm.linux.org.uk>
-References: <20150914103207.GH21084@n2100.arm.linux.org.uk>
-Message-ID: <55F6AA25.2070603@list.ru>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Mon, 14 Sep 2015 19:06:35 +0800
+Subject: [PATCH 0/3] mailbox: rockchip: Add mailbox driver for Rockchip
+ platform
+Message-ID: <1442228798-15191-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-14.09.2015 13:32, Russell King - ARM Linux ?????:
-> I've been bringing up the mainline kernel on a new board, which has
-> an Marvell SoC with a mvneta interface connected to a Marvell DSA
-> switch.  The DSA switch is a 88E6176.
->
-> In the DT block for the interface, I specify:
->
-> 	ethernet at ... {
-> 	        phy-mode = "sgmii";
-> 		status = "okay";
->
-> 		fixed-link {
-> 			speed = <1000>;
-> 			full-duplex;
-> 		};
-> 	};
->
-> However, this doesn't work without patching mvneta to disable the
-> autonegotiation and forcing the link up:
->
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index 62e48bc0cb23..e1698731e429 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -1010,6 +1010,10 @@ static void mvneta_defaults_set(struct mvneta_port *pp)
->   		val |= MVNETA_GMAC_INBAND_AN_ENABLE |
->   		       MVNETA_GMAC_AN_SPEED_EN |
->   		       MVNETA_GMAC_AN_DUPLEX_EN;
-> +		/* We appear to need the interface forced for DSA switches */
-> +		val &= ~(MVNETA_GMAC_AN_DUPLEX_EN |
-> +			 MVNETA_GMAC_AN_SPEED_EN);
-> +		val |= MVNETA_GMAC_FORCE_LINK_PASS;
->   		mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG, val);
->   		val = mvreg_read(pp, MVNETA_GMAC_CLOCK_DIVIDER);
->   		val |= MVNETA_GMAC_1MS_CLOCK_ENABLE;
-Hello Russell, just to make sure, aren't you missing this by any chance:
-https://lkml.org/lkml/2015/7/20/710
+Mailbox is used by the Rockchip CPU cores to communicate
+requests to MCU processorm.
+
+This driver is found on RK3368 SoCs.
+
+The Mailbox module is a simple APB peripheral that allows both
+the Cortex-A53 MCU system to communicate by writing operation to
+generate interrupt.
+The registers are accessible by both CPU via APB interface.
+
+Tested on RK3368 SDK board.
+
+
+
+Caesar Wang (3):
+  dt-bindings: Add document of Rockchip mailbox
+  mailbox: rockchip: Add Rockchip mailbox driver
+  ARM64: dts: rk3368: Add mailbox device nodes
+
+ .../bindings/mailbox/rockchip-mailbox.txt          |  33 +++
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  13 +
+ drivers/mailbox/Kconfig                            |   9 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/rockchip-mailbox.c                 | 317 +++++++++++++++++++++
+ 5 files changed, 374 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/rockchip-mailbox.txt
+ create mode 100644 drivers/mailbox/rockchip-mailbox.c
+
+-- 
+1.9.1
