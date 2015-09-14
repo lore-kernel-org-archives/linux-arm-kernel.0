@@ -1,61 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Sep 2015 09:28:51 -0700
-Subject: [PATCH 00/11] ARM: OMAP/DTS: dra7/72-evm/beagle-x15: Audio support
-In-Reply-To: <55F68A60.6050900@ti.com>
-References: <1440400807-32274-1-git-send-email-peter.ujfalusi@ti.com>
- <55F68A60.6050900@ti.com>
-Message-ID: <20150914162851.GM4215@atomide.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 14 Sep 2015 11:29:51 -0500
+Subject: [PATCH 1/2] ARM: OMAP2+: Remove legacy OMAP3 ISP instantiation
+In-Reply-To: <55E8CAE7.3010301@ti.com>
+References: <1437051319-9904-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <1437051319-9904-2-git-send-email-laurent.pinchart@ideasonboard.com>
+ <20150716125800.GN17550@atomide.com> <55E8CAE7.3010301@ti.com>
+Message-ID: <55F6F5FF.2060801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [150914 01:54]:
-> Hi Tony,
-> 
-> On 08/24/2015 10:19 AM, Peter Ujfalusi wrote:
-> > Hi,
-> > 
-> > this series will enable analog audio (via onboard aic310x codec) for dra7-evm,
-> > dra72-evm and am57xx-beagle-x15 boards.
-> > In these board McASP3 is connected to the codec and for the McASP3 we needed to
-> > have the DMA crossbar in place since the request lines are not mapped by
-> > default.
-> 
-> Did you had a chance to look at this series?
+Hi Tony,
 
-Looks OK to me, will look at it more once we have the fixes merged.
-
-Paul may have comments on the hwmod chage, looks like you forgot
-to Cc him on it. Can you please resend that one with Paul in Cc?
-
-Regards,
-
-Tony
- 
-> > Regars,
-> > Peter
-> > ---
-> > Peter Ujfalusi (11):
-> >   ARM: OMAP: DRA7: hwmod: Add data for McASP3
-> >   ARM: DTS: dra7: Add McASP3 node
-> >   ARM: DTS: dra7-evm: Rename mmc2_3v3 supply to evm_3v3_sw
-> >   ARM: DTS: dra7-evm: Add fixed regulator to be used by aic3106's DVDD
-> >   ARM: DTS: dra7-evm: Enable pcf8575 (0x26 address) on i2c2 bus
-> >   ARM: DTS: dra7-evm: Audio support
-> >   ARM: DTS: dra72-evm: Add fixed regulator representing DVDD supply for
-> >     aic3106
-> >   ARM: DTS: dra72-evm: Add gpio hog for vin6_sel_s0 to select audio
-> >   ARM: DTS: dra72-evm: Audio support
-> >   ARM: DTS: am57xx-beagle-x15: Add fixed regulator for aic3104's DVDD
-> >   ARM: DTS: am57xx-beagle-x15: Enable analog audio support
-> > 
-> >  arch/arm/boot/dts/am57xx-beagle-x15.dts   |  95 ++++++++++++++++++++
-> >  arch/arm/boot/dts/dra7-evm.dts            | 142 +++++++++++++++++++++++++++++-
-> >  arch/arm/boot/dts/dra7.dtsi               |  15 ++++
-> >  arch/arm/boot/dts/dra72-evm.dts           | 138 +++++++++++++++++++++++++++++
-> >  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  41 +++++++++
-> >  5 files changed, 428 insertions(+), 3 deletions(-)
-> > 
+On 09/03/2015 05:34 PM, Suman Anna wrote:
+> Hi Sakari,
 > 
+> On 07/16/2015 07:58 AM, Tony Lindgren wrote:
+>> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [150716 05:57]:
+>>> The OMAP3 ISP is now fully supported in DT, remove its instantiation
+>>> from C code.
+>>
+>> Please feel to queue this along with the second patch in this series,
+>> this should not cause any merge conflicts:
+>>
+>> Acked-by: Tony Lindgren <tony@atomide.com>
 > 
-> -- 
-> P?ter
+> Just wondering if you have already queued this, I see the v4l changes in
+> linux-next, but not this patch. Also, can you confirm if this series is
+> making it into 4.3?
+> 
+
+This patch is not in 4.3-rc1, can you pick this up for the next merge
+window? I am gonna send out some additional cleanup patches (removing
+legacy mailbox and iommu pieces) on top on this patch. The second patch
+in this series did make it.
+
+regards
+Suman
