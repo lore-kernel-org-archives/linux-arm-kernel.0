@@ -1,379 +1,278 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 14 Sep 2015 13:24:12 +0200
-Subject: [PATCH v3 09/10] KVM: arm/arm64: vgic: forwarding control
-In-Reply-To: <55F6937E.2060605@linaro.org>
-References: <1439212864-12954-1-git-send-email-eric.auger@linaro.org>
- <1439212864-12954-10-git-send-email-eric.auger@linaro.org>
- <20150902195825.GW10991@cbox> <55F6937E.2060605@linaro.org>
-Message-ID: <20150914112412.GG15712@cbox>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Mon, 14 Sep 2015 19:27:52 +0800
+Subject: [PATCH v6] clk: mediatek: Export CPU mux clocks for CPU frequency
+ control
+Message-ID: <1442230072-31593-1-git-send-email-pi-cheng.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 11:29:34AM +0200, Eric Auger wrote:
-> Christoffer,
-> On 09/02/2015 09:58 PM, Christoffer Dall wrote:
-> > On Mon, Aug 10, 2015 at 03:21:03PM +0200, Eric Auger wrote:
-> >> Implements kvm_vgic_[set|unset]_forward.
-> >>
-> >> Handle low-level VGIC programming: physical IRQ/guest IRQ mapping,
-> >> list register cleanup, VGIC state machine. Also interacts with
-> >> the irqchip.
-> >>
-> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> >>
-> >> ---
-> >>
-> >> v2 -> v3:
-> >> - on unforward, we do not compute & output the active state anymore.
-> >>   This means if the unforward happens while the physical IRQ is
-> >>   active, we will not VFIO mask the IRQ while deactiving it. If a
-> >>   new physical IRQ hits, the corresponding virtual IRQ might not
-> >>   be injected (hence lost) due to VGIC state machine.
-> >>
-> >> bypass rfc v2:
-> >> - use irq_set_vcpu_affinity API
-> >> - use irq_set_irqchip_state instead of chip->irq_eoi
-> >>
-> >> bypass rfc:
-> >> - rename kvm_arch_{set|unset}_forward into
-> >>   kvm_vgic_{set|unset}_forward. Remove __KVM_HAVE_ARCH_HALT_GUEST.
-> >>   The function is bound to be called by ARM code only.
-> >>
-> >> v4 -> v5:
-> >> - fix arm64 compilation issues, ie. also defines
-> >>   __KVM_HAVE_ARCH_HALT_GUEST for arm64
-> >>
-> >> v3 -> v4:
-> >> - code originally located in kvm_vfio_arm.c
-> >> - kvm_arch_vfio_{set|unset}_forward renamed into
-> >>   kvm_arch_{set|unset}_forward
-> >> - split into 2 functions (set/unset) since unset does not fail anymore
-> >> - unset can be invoked at whatever time. Extra care is taken to handle
-> >>   transition in VGIC state machine, LR cleanup, ...
-> >>
-> >> v2 -> v3:
-> >> - renaming of kvm_arch_set_fwd_state into kvm_arch_vfio_set_forward
-> >> - takes a bool arg instead of kvm_fwd_irq_action enum
-> >> - removal of KVM_VFIO_IRQ_CLEANUP
-> >> - platform device check now happens here
-> >> - more precise errors returned
-> >> - irq_eoi handled externally to this patch (VGIC)
-> >> - correct enable_irq bug done twice
-> >> - reword the commit message
-> >> - correct check of platform_bus_type
-> >> - use raw_spin_lock_irqsave and check the validity of the handler
-> >> ---
-> >>  include/kvm/arm_vgic.h |   6 ++
-> >>  virt/kvm/arm/vgic.c    | 149 +++++++++++++++++++++++++++++++++++++++++++++++++
-> >>  2 files changed, 155 insertions(+)
-> >>
-> >> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> >> index 7ef9ce0..409ac0f 100644
-> >> --- a/include/kvm/arm_vgic.h
-> >> +++ b/include/kvm/arm_vgic.h
-> >> @@ -363,6 +363,12 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
-> >>  bool kvm_vgic_get_phys_irq_active(struct irq_phys_map *map);
-> >>  void kvm_vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
-> >>  
-> >> +int kvm_vgic_set_forward(struct kvm *kvm,
-> >> +			 unsigned int host_irq, unsigned int guest_irq);
-> >> +
-> >> +void kvm_vgic_unset_forward(struct kvm *kvm,
-> >> +			    unsigned int host_irq, unsigned int guest_irq);
-> >> +
-> >>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
-> >>  #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
-> >>  #define vgic_ready(k)		((k)->arch.vgic.ready)
-> >> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> >> index 03a85b3..b15999a 100644
-> >> --- a/virt/kvm/arm/vgic.c
-> >> +++ b/virt/kvm/arm/vgic.c
-> >> @@ -2551,3 +2551,152 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
-> >>  {
-> >>  	return 0;
-> >>  }
-> >> +
-> >> +/**
-> >> + * kvm_vgic_set_forward - Set IRQ forwarding
-> >> + *
-> >> + * @kvm: handle to the VM
-> >> + * @host_irq: physical IRQ number
-> >> + * @guest_irq: virtual IRQ number
-> >> + *
-> >> + * This function is supposed to be called only if the IRQ
-> >> + * is not in progress: ie. not active at GIC level and not
-> >> + * currently under injection in the guest. The physical IRQ must
-> >> + * also be disabled and the guest must have been exited and
-> > 
-> > when you say the guest you mean all VCPUs, right?
-> 
-> yes that's correct.
-> > 
-> >> + * prevented from being re-entered.
-> >> + */
-> >> +int kvm_vgic_set_forward(struct kvm *kvm,
-> >> +			 unsigned int host_irq,
-> >> +			 unsigned int guest_irq)
-> >> +{
-> >> +	struct irq_phys_map *map = NULL;
-> >> +	struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, 0);
-> >> +	int spi_id = guest_irq + VGIC_NR_PRIVATE_IRQS;
-> >> +
-> >> +	kvm_debug("%s host_irq=%d guest_irq=%d\n",
-> >> +		__func__, host_irq, guest_irq);
-> >> +
-> >> +	if (!vcpu)
-> >> +		return 0;
-> >> +
-> >> +	irq_set_vcpu_affinity(host_irq, vcpu);
-> > 
-> > why are we hard-coding this to vcpu 0 ?
-> is that OK if I use dist->irq_spi_target[guest_irq]
+From: "pi-cheng.chen" <pi-cheng.chen@linaro.org>
 
-I would think so, yes.  Be careful about locking/barriers and
-initialization, though.
+This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
+for intermediate clock source switching.
 
-> > 
-> > missing white space before the code block.  Where does the code block
-> > belong exactly?
-> > 
-> >> +	/*
-> >> +	 * next physical IRQ will be be handled as forwarded
-> > 
-> > what do you mean with 'next' here?
-> I mean the next occurrence of the same physical IRQ
+Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+---
+Changes in v6:
+- Relace __clk_get_num_parents with clk_hw_get_num_parents to reflect
+  API change
 
-Then I suggest wording it something like:
+Changes in v5:
+- Replace __initdata with __initconst to fix compiling error
 
->From this point, this physical IRQ will be handled as forwarded.
+Changes in v4:
+- Fix some minor issues for v3
+- Rebase to the patch that adds 13mhz clock for MT8173[1]
 
-> > 
-> >> +	 * by the host (priority drop only)
-> >> +	 */
-> >> +
-> >> +	map = kvm_vgic_map_phys_irq(vcpu, spi_id, host_irq, false);
-> >> +	/*
-> >> +	 * next guest_irq injection will be considered as
-> >> +	 * forwarded and next flush will program LR
-> >> +	 * without maintenance IRQ but with HW bit set
-> >> +	 */
-> > 
-> > also here, I don't understand what you mean by next.
-> I meant the next occurrence of the same IRQ injection into the guest
+Changes in v3:
+- Rebase to 4.2-rc1
+- Fix some issues of v2
 
-hmm, I find it a little hard to understand.
+Changes in v2:
+- Remove use of .determine_rate callback
+---
+ drivers/clk/mediatek/Makefile          |   2 +-
+ drivers/clk/mediatek/clk-cpumux.c      | 127 +++++++++++++++++++++++++++++++++
+ drivers/clk/mediatek/clk-cpumux.h      |  22 ++++++
+ drivers/clk/mediatek/clk-mt8173.c      |  23 ++++++
+ include/dt-bindings/clock/mt8173-clk.h |   4 +-
+ 5 files changed, 176 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/clk/mediatek/clk-cpumux.c
+ create mode 100644 drivers/clk/mediatek/clk-cpumux.h
 
-> > 
-> > Perhaps these comments were supposed to come before the function calls?
-> OK I see what you mean, I will rephrase to set comments before the
-> function calls.
-
-Sounds good, I'll have a look when it has been reworked.
-
-> > 
-> >> +	return !map;
-> >> +}
-> >> +
-> >> +/**
-> >> + * kvm_vgic_unset_forward - Unset IRQ forwarding
-> >> + *
-> >> + * @kvm: handle to the VM
-> >> + * @host_irq: physical IRQ number
-> >> + * @guest_irq: virtual IRQ number
-> >> + *
-> >> + * This function must be called when the host_irq is disabled
-> >> + * and guest has been exited and prevented from being re-entered.
-> >> + *
-> > 
-> > extra white space here
-> OK
-> > 
-> >> + */
-> >> +void kvm_vgic_unset_forward(struct kvm *kvm,
-> >> +			    unsigned int host_irq,
-> >> +			    unsigned int guest_irq)
-> >> +{
-> >> +	struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, 0);
-> >> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> >> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> >> +	int ret, lr;
-> >> +	struct vgic_lr vlr;
-> >> +	int spi_id = guest_irq + VGIC_NR_PRIVATE_IRQS;
-> >> +	bool queued = false, needs_deactivate = true;
-> >> +	struct irq_phys_map *map;
-> >> +	bool active;
-> >> +
-> >> +	kvm_debug("%s host_irq=%d guest_irq=%d\n",
-> >> +		__func__, host_irq, guest_irq);
-> >> +
-> >> +	spin_lock(&dist->lock);
-> >> +
-> >> +	irq_get_irqchip_state(host_irq, IRQCHIP_STATE_ACTIVE, &active);
-> >> +
-> >> +	if (!vcpu)
-> >> +		goto out;
-> >> +
-> >> +	map = vgic_irq_map_search(vcpu, spi_id);
-> >> +	BUG_ON(!map);
-> >> +	ret = kvm_vgic_unmap_phys_irq(vcpu, map);
-> >> +	BUG_ON(ret);
-> >> +	/*
-> >> +	 * subsequent update_irq_pending or flush will handle this
-> >> +	 * irq as not forwarded
-> >> +	 */
-> > 
-> > missing white space before this comment block as well, also here with
-> > 'subsequent' do you mean "At this point" ?
-> I mean any new execution of update_irq_pending/flush will handle this
-> irq as not forwarded. Since the state machine for forwarded IRQ and non
-> forwarded IRQ is different, we need to convert the states into the new
-> state machine's ones.
-
-Ok, perhaps this comment is more clear if it simply states:
-
-At this point the IRQ is marked as non-forwarded.
-
-> > 
-> >> +	if (likely(!(active))) {
-> >> +		/*
-> >> +		 * the IRQ was not active. let's simply prepare the states
-> >> +		 * for subsequent non forwarded injection.
-> >> +		 */
-> >> +		vgic_dist_irq_clear_level(vcpu, spi_id);
-> >> +		vgic_dist_irq_clear_pending(vcpu, spi_id);
-> >> +		vgic_irq_clear_queued(vcpu, spi_id);
-> >> +		needs_deactivate = false;
-> >> +		goto out;
-> >> +	}
-> >> +
-> >> +	/* is there any list register with valid state? */
-> >> +	lr = vgic_cpu->vgic_irq_lr_map[spi_id];
-> >> +	if (lr != LR_EMPTY) {
-> >> +		vlr = vgic_get_lr(vcpu, lr);
-> >> +		if (vlr.state & LR_STATE_MASK)
-> >> +			queued = true;
-> >> +	}
-> >> +
-> >> +	if (!queued) {
-> >> +		vgic_irq_clear_queued(vcpu, spi_id);
-> >> +		if (vgic_dist_irq_is_pending(vcpu, spi_id)) {
-> >> +			/*
-> >> +			 * IRQ is injected but not yet queued. LR will be
-> >> +			 * written with EOI_INT and process_maintenance will
-> >> +			 * reset the states: queued, level(resampler). Pending
-> >> +			 * will be reset on flush.
-> >> +			 */
-> >> +			vgic_dist_irq_set_level(vcpu, spi_id);
-> > 
-> > so this is all only valid for level-triggered interrupts?  Do we check
-> > this somewhere along the call path?
-> Up to now I only tested with level-sensitive IRQs. Now I have the means
-> I will also test with non shared edge-sensitive mapped IRQs.
-
-I don't think we should ever set the level field for edge-triggered
-IRQs.
-
-> > 
-> >> +		} else {
-> >> +			/*
-> >> +			 * We are somewhere before the update_irq_pending.
-> >> +			 * we can't be sure the virtual IRQ will ever be
-> >> +			 * injected (due to previous disable_irq).
-> > 
-> > I don't understand this.  Do we somehow know at this point that there is
-> > a pending IRQ to inject as a virtual IRQ?
-> No we just know the physical IRQ is active at physical distributor level.
-
-how do we know this?
-
-> 
-> There can be a long path before the virtual IRQ gets injected into the
-> guest:
-> phys IRQ hits (1) -> genirq handler(2) -> VFIO handler(3) ->
-> update_irq_pending in irqfd thread (4) -> flush (LR programming,5) ->
-> guest deactivates the virq/pirq (6)
-> 
-> There is no valid state LR. There is no pending state recorded. So we
-> are between (1) an (4) excluded.
-
-you can also be before (1), no ?
-
-> 
-> 
-> However we cannot be sure a virtual IRQ will ever be injected. Typically
-> since the physical IRQ was disabled previously, it might happen that the
-> VFIO physical handler is never reached and irqfd is never signalled.
-> (genirq handler never calls the VFIO handler)
-
-Isn't the point here simply that if you disconnect the virtual IRQ from
-the that of the physical device, then you reset the state by clearing
-the LR and if this virtual IRQ is to be used again as a purely virtual
-IRQ or forwarding is configured again, then it must be re-injected?
-
-If so, I think the comment can simply be:
-
-Since we are changing this IRQ from fowarded to non-fowarded, reset its
-state.
-
-> > 
-> >> +			 * Let's simply clear the level which was not correctly
-> >> +			 * modelled in forwarded state.
-> >> +			 */
-> >> +			vgic_dist_irq_clear_level(vcpu, spi_id);
-> >> +		}
-> >> +		goto out;
-> >> +	}
-> >> +
-> >> +	/*
-> >> +	 * the virtual IRQ is queued and a valid LR exists, let's patch it so
-> >> +	 * that when EOI happens a maintenance IRQ gets triggered
-> >> +	 */
-> >> +	vlr.state |= LR_EOI_INT;
-> >> +	vgic_set_lr(vcpu, lr, vlr);
-> >> +
-> >> +	vgic_dist_irq_set_level(vcpu, spi_id);
-> >> +	vgic_dist_irq_set_pending(vcpu, spi_id);
-> > 
-> > how do you know this is the case?  couldn't it be active in the LR?
-> for a level sensitive IRQ the pending state stays active until the EOI
-> maintenance gets called right? pending is set by vgic_queue_hwirq and
-> reset by process_queued_irq?
-
-ok, fair enough for the pending state (deserves a comment though), but I
-don't see why you'd need to set the level field?  If there is no
-connected virtual device that lowers the line afterwards, you'll keep
-injecting this IRQ indefinitely I think.
-
-> > 
-> >> +	vgic_irq_set_queued(vcpu, spi_id);
-> >> +	 /* The maintenance IRQ will reset all states above */
-
-is this actually true for the level field?  It shouldn't, should it?
-
-> > 
-> > then why do we bother setting them to anything here?
-> well isn't it cleaner? What if somebody else queries those values before
-> the EOI maintenance gets called, a new injection for instance?
-
-I guess, but then the comment could say that, "make sure this looks like
-a regular virtual interrupt" or something like that.
-
-> > 
-> >> +
-> >> +out:
-> >> +	irq_set_irqchip_state(host_irq, IRQCHIP_STATE_ACTIVE, false);
-> >> +	irq_set_vcpu_affinity(host_irq, NULL);
-> >> +	/* next occurrence will be deactivated by the host */
-> > 
-> > I'm beginning to understand what you mean by 'next' here.
-> 
-> > 
-> > Can you make it more explicit by saying "After this function returns, a
-> > physical IRQ will be..." ?
-> 
-> yes. I was failing finding the appropriate wording I aknowledge.
-> 
-me too, it's hard.
-
-Thanks,
--Christoffer
+diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+index 8e4b2a4..299917a 100644
+--- a/drivers/clk/mediatek/Makefile
++++ b/drivers/clk/mediatek/Makefile
+@@ -1,4 +1,4 @@
+-obj-y += clk-mtk.o clk-pll.o clk-gate.o
++obj-y += clk-mtk.o clk-pll.o clk-gate.o clk-cpumux.o
+ obj-$(CONFIG_RESET_CONTROLLER) += reset.o
+ obj-y += clk-mt8135.o
+ obj-y += clk-mt8173.o
+diff --git a/drivers/clk/mediatek/clk-cpumux.c b/drivers/clk/mediatek/clk-cpumux.c
+new file mode 100644
+index 0000000..91b5238
+--- /dev/null
++++ b/drivers/clk/mediatek/clk-cpumux.c
+@@ -0,0 +1,127 @@
++/*
++ * Copyright (c) 2015 Linaro Ltd.
++ * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/mfd/syscon.h>
++#include <linux/slab.h>
++
++#include "clk-mtk.h"
++#include "clk-cpumux.h"
++
++struct mtk_clk_cpumux {
++	struct clk_hw	hw;
++	struct regmap	*regmap;
++	u32		reg;
++	u32		mask;
++	u8		shift;
++};
++
++static inline struct mtk_clk_cpumux *to_clk_mux(struct clk_hw *_hw)
++{
++	return container_of(_hw, struct mtk_clk_cpumux, hw);
++}
++
++static u8 clk_cpumux_get_parent(struct clk_hw *hw)
++{
++	struct mtk_clk_cpumux *mux = to_clk_mux(hw);
++	int num_parents = clk_hw_get_num_parents(hw);
++	unsigned int val;
++
++	regmap_read(mux->regmap, mux->reg, &val);
++
++	val >>= mux->shift;
++	val &= mux->mask;
++
++	if (val >= num_parents)
++		return -EINVAL;
++
++	return val;
++}
++
++static int clk_cpumux_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct mtk_clk_cpumux *mux = to_clk_mux(hw);
++	u32 mask, val;
++
++	val = index << mux->shift;
++	mask = mux->mask << mux->shift;
++
++	return regmap_update_bits(mux->regmap, mux->reg, mask, val);
++}
++
++static const struct clk_ops clk_cpumux_ops = {
++	.get_parent = clk_cpumux_get_parent,
++	.set_parent = clk_cpumux_set_parent,
++};
++
++static struct clk __init *mtk_clk_register_cpumux(const struct mtk_composite *mux,
++					   struct regmap *regmap)
++{
++	struct mtk_clk_cpumux *cpumux;
++	struct clk *clk;
++	struct clk_init_data init;
++
++	cpumux = kzalloc(sizeof(*cpumux), GFP_KERNEL);
++	if (!cpumux)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = mux->name;
++	init.ops = &clk_cpumux_ops;
++	init.parent_names = mux->parent_names;
++	init.num_parents = mux->num_parents;
++	init.flags = mux->flags;
++
++	cpumux->reg = mux->mux_reg;
++	cpumux->shift = mux->mux_shift;
++	cpumux->mask = BIT(mux->mux_width) - 1;
++	cpumux->regmap = regmap;
++	cpumux->hw.init = &init;
++
++	clk = clk_register(NULL, &cpumux->hw);
++	if (IS_ERR(clk))
++		kfree(cpumux);
++
++	return clk;
++}
++
++int __init mtk_clk_register_cpumuxes(struct device_node *node,
++			      const struct mtk_composite *clks, int num,
++			      struct clk_onecell_data *clk_data)
++{
++	int i;
++	struct clk *clk;
++	struct regmap *regmap;
++
++	regmap = syscon_node_to_regmap(node);
++	if (IS_ERR(regmap)) {
++		pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
++		       PTR_ERR(regmap));
++		return PTR_ERR(regmap);
++	}
++
++	for (i = 0; i < num; i++) {
++		const struct mtk_composite *mux = &clks[i];
++
++		clk = mtk_clk_register_cpumux(mux, regmap);
++		if (IS_ERR(clk)) {
++			pr_err("Failed to register clk %s: %ld\n",
++			       mux->name, PTR_ERR(clk));
++			continue;
++		}
++
++		clk_data->clks[mux->id] = clk;
++	}
++
++	return 0;
++}
+diff --git a/drivers/clk/mediatek/clk-cpumux.h b/drivers/clk/mediatek/clk-cpumux.h
+new file mode 100644
+index 0000000..52c769f
+--- /dev/null
++++ b/drivers/clk/mediatek/clk-cpumux.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (c) 2015 Linaro Ltd.
++ * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __DRV_CLK_CPUMUX_H
++#define __DRV_CLK_CPUMUX_H
++
++int mtk_clk_register_cpumuxes(struct device_node *node,
++			      const struct mtk_composite *clks, int num,
++			      struct clk_onecell_data *clk_data);
++
++#endif /* __DRV_CLK_CPUMUX_H */
+diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+index 9ea6aa1..b02d310 100644
+--- a/drivers/clk/mediatek/clk-mt8173.c
++++ b/drivers/clk/mediatek/clk-mt8173.c
+@@ -20,6 +20,7 @@
+ 
+ #include "clk-mtk.h"
+ #include "clk-gate.h"
++#include "clk-cpumux.h"
+ 
+ #include <dt-bindings/clock/mt8173-clk.h>
+ 
+@@ -518,6 +519,25 @@ static const char * const i2s3_b_ck_parents[] __initconst = {
+ 	"apll2_div5"
+ };
+ 
++static const char * const ca53_parents[] __initconst = {
++	"clk26m",
++	"armca7pll",
++	"mainpll",
++	"univpll"
++};
++
++static const char * const ca57_parents[] __initconst = {
++	"clk26m",
++	"armca15pll",
++	"mainpll",
++	"univpll"
++};
++
++static const struct mtk_composite cpu_muxes[] __initconst = {
++	MUX(CLK_INFRA_CA53SEL, "infra_ca53_sel", ca53_parents, 0x0000, 0, 2),
++	MUX(CLK_INFRA_CA57SEL, "infra_ca57_sel", ca57_parents, 0x0000, 2, 2),
++};
++
+ static const struct mtk_composite top_muxes[] __initconst = {
+ 	/* CLK_CFG_0 */
+ 	MUX(CLK_TOP_AXI_SEL, "axi_sel", axi_parents, 0x0040, 0, 3),
+@@ -760,6 +780,9 @@ static void __init mtk_infrasys_init(struct device_node *node)
+ 						clk_data);
+ 	mtk_clk_register_factors(infra_divs, ARRAY_SIZE(infra_divs), clk_data);
+ 
++	mtk_clk_register_cpumuxes(node, cpu_muxes, ARRAY_SIZE(cpu_muxes),
++						clk_data);
++
+ 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+ 	if (r)
+ 		pr_err("%s(): could not register clock provider: %d\n",
+diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
+index fa2a2bb..a17cbaa 100644
+--- a/include/dt-bindings/clock/mt8173-clk.h
++++ b/include/dt-bindings/clock/mt8173-clk.h
+@@ -188,7 +188,9 @@
+ #define CLK_INFRA_PMICSPI		10
+ #define CLK_INFRA_PMICWRAP		11
+ #define CLK_INFRA_CLK_13M		12
+-#define CLK_INFRA_NR_CLK		13
++#define CLK_INFRA_CA53SEL		13
++#define CLK_INFRA_CA57SEL		14
++#define CLK_INFRA_NR_CLK		15
+ 
+ /* PERI_SYS */
+ 
+-- 
+1.9.1
