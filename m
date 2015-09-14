@@ -1,85 +1,109 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 14 Sep 2015 15:30:22 +0200
-Subject: [PATCH v6 1/3] can: Allwinner A10/A20 CAN Controller support -
- Devicetree bindings
-In-Reply-To: <55F6C46D.7090203@pengutronix.de>
-References: <1442235299-5885-1-git-send-email-info@gerhard-bertelsmann.de>
- <1442235299-5885-2-git-send-email-info@gerhard-bertelsmann.de>
- <55F6C46D.7090203@pengutronix.de>
-Message-ID: <20150914133022.GB4684@lukather>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 14 Sep 2015 14:32:47 +0100
+Subject: [PATCH v2 3/3] drivers: firmware: psci: add system suspend support
+In-Reply-To: <20150914132346.GB25469@red-moon>
+References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
+ <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
+ <1434638494-514-4-git-send-email-sudeep.holla@arm.com>
+ <20150914132346.GB25469@red-moon>
+Message-ID: <55F6CC7F.6080308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Mon, Sep 14, 2015 at 02:58:21PM +0200, Marc Kleine-Budde wrote:
-> On 09/14/2015 02:54 PM, Gerhard Bertelsmann wrote:
-> > Signed-off-by: Gerhard Bertelsmann <info@gerhard-bertelsmann.de>
-> > ---
-> > 
-> >  .../devicetree/bindings/net/can/sun4i_can.txt      |  37 +
-> >  1 files changed, 37 insertions(+)
-> > 
-> > 
-> > diff --git a/Documentation/devicetree/bindings/net/can/sun4i_can.txt b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
-> > new file mode 100644
-> > index 0000000..b572e2b
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
-> > @@ -0,0 +1,37 @@
-> > +Allwinner A10/A20 CAN controller Device Tree Bindings
-> > +-----------------------------------------------------
-> > +
-> > +Required properties:
-> > +- compatible: "allwinner,sunxican"
-> > +- reg: physical base address and size of the Allwinner A10/A20 CAN register map.
-> > +- interrupts: interrupt specifier for the sole interrupt.
-> > +- clock: phandle and clock specifier.
-> > +
-> > +Example
-> > +-------
-> > +
-> > +SoC common .dtsi file:
-> > +
-> > +	can0_pins_a: can0 <at> 0 {
-> 
-> That's supposed to be a proper "@":
-> 
->     can0 at 0
-> 
-> > +		allwinner,pins = "PH20","PH21";
-> > +		allwinner,function = "can";
-> > +		allwinner,drive = <0>;
-> > +		allwinner,pull = <0>;
-> > +	};
-> > +
-> > +	can0: can <at> 01c2bc00 {
-> 
->     can0 at 01c2bc00
 
-Actually, beside '<at>' vs '@', he was right.
+On 14/09/15 14:23, Lorenzo Pieralisi wrote:
+> On Thu, Jun 18, 2015 at 03:41:34PM +0100, Sudeep Holla wrote:
+>> PSCI v1.0 introduces a new API called PSCI_SYSTEM_SUSPEND. This API
+>> provides the mechanism by which the calling OS can request entry into
+>> the deepest possible system sleep state.
+>>
+>> It meets all the necessary preconditions for entering suspend to RAM
+>> state in Linux. This patch adds support for PSCI_SYSTEM_SUSPEND in psci
+>> firmware and registers a psci system suspend operation to implement the
+>> suspend-to-RAM(s2r) in a generic way on all the platforms implementing
+>> PSCI.
+>>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>   drivers/firmware/psci.c   | 31 +++++++++++++++++++++++++++++++
+>>   include/uapi/linux/psci.h |  3 +++
+>>   2 files changed, 34 insertions(+)
+>>
+>> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+>> index 752ca7c9eb97..f2b2b3e1c6e4 100644
+>> --- a/drivers/firmware/psci.c
+>> +++ b/drivers/firmware/psci.c
+>> @@ -20,11 +20,13 @@
+>>   #include <linux/printk.h>
+>>   #include <linux/psci.h>
+>>   #include <linux/reboot.h>
+>> +#include <linux/suspend.h>
+>>
+>>   #include <uapi/linux/psci.h>
+>>
+>>   #include <asm/system_misc.h>
+>>   #include <asm/smp_plat.h>
+>> +#include <asm/suspend.h>
+>>
+>>   /*
+>>    * While a 64-bit OS can make calls with SMC32 calling conventions, for some
+>> @@ -222,6 +224,33 @@ static int __init psci_features(u32 psci_func_id)
+>>   			      psci_func_id, 0, 0);
+>>   }
+>>
+>> +static int psci_system_suspend(unsigned long unused)
+>> +{
+>> +	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
+>> +			      virt_to_phys(cpu_resume), 0, 0);
+>> +}
+>> +
+>> +static int psci_system_suspend_enter(suspend_state_t state)
+>> +{
+>> +	return cpu_suspend(0, psci_system_suspend);
+>> +}
+>> +
+>> +static const struct platform_suspend_ops psci_suspend_ops = {
+>> +	.valid          = suspend_valid_only_mem,
+>> +	.enter          = psci_system_suspend_enter,
+>> +};
+>> +
+>> +static void __init psci_init_system_suspend(void)
+>> +{
+>> +	if (!IS_ENABLED(CONFIG_SUSPEND))
+>> +		return;
+>> +
+>> +	if (psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND)))
+>> +		return;
+>> +
+>> +	suspend_set_ops(&psci_suspend_ops);
+>
+> For consistency with psci_init_cpu_suspend I rewrote it like this:
+>
+> static void __init psci_init_system_suspend(void)
+> {
+> 	int ret;
+>
+> 	if (!IS_ENABLED(CONFIG_SUSPEND))
+> 		return;
+>
+> 	ret = psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND));
+>
+> 	if (ret != PSCI_RET_NOT_SUPPORTED)
+> 		suspend_set_ops(&psci_suspend_ops);
+> }
+>
+> Let me know if it is ok with you. Other than that:
+>
 
-The name of the node in the DT should be:
+Looks fine to me. Thanks for the fixup.
 
-<device class>@<address>
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>
 
-Which in our case is can at 01c2bc00, like he used.
+Thanks.
 
-> 
-> > +		compatible = "allwinner,sunxican";
-
-However, the compatible is still not right.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/2ce4e278/attachment-0001.sig>
+Regards,
+Sudeep
