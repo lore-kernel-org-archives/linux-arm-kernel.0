@@ -1,36 +1,50 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 14 Sep 2015 15:46:12 +0100
-Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
-In-Reply-To: <55F6D9DC.8060607@citrix.com>
-References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
- <55F68BC9.6020509@citrix.com> <55F6A437.3040403@citrix.com>
- <55F6A9DB.8040503@citrix.com> <55F6ADAE.1010609@citrix.com>
- <55F6B8CC.5090406@citrix.com> <55F6C1D2.7010206@citrix.com>
- <55F6D9DC.8060607@citrix.com>
-Message-ID: <55F6DDB4.5000403@citrix.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 14 Sep 2015 10:53:16 -0400
+Subject: [PATCH 0/4] bcm2835: enable auxiliary uart1
+In-Reply-To: <1441974053-2630-1-git-send-email-kernel@martin.sperl.org>
+References: <1441974053-2630-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87r3m1jbmr.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/09/15 15:29, Roger Pau Monn? wrote:
->> To give you an example, Centos 7, which will support Xen and only 64KB
->> page granularity, will be supported for years. Dropping any splitting in
->> a short future (3-5 years) will just break those guests to boot on Xen.
-> 
-> Can't the patches to support 64KB grants be backported to CentOS? In the
-> past you said that distros had no problem in picking the needed Xen
-> patches for 64KB support, I don't see how that would be different.
+kernel at martin.sperl.org writes:
 
-Centos 7 is not yet released so it's more easy to get patch in. I don't
-know what will be position when the guest is shipped.
+> From: Martin Sperl <kernel@martin.sperl.org>
+>
+> The bcm2835 SOC contains an auxiliary uart, which is very close
+> to the ns16550 with some differences.
+>
+> The big difference is that the uart HW is not using an internal divider
+> of 16 but 8, which results in an effictive baud-rate being twice
+> the requested baud-rate.
+>
+> The bcm2835-aux-uart is also special in such that it is enabled/disabled
+> by a gate in the clock, which is managed by the clk-bcm2835-aux
+> clock driver.
+>
+> there are 2 options:
+> * defining the clock-frequency property in the device tree to 500k
+>   instead of 250k, but this keeps the HW block disabled making the
+>   uart not work.
+> * defining a clock in the device tree, but this results in a baud rate
+>   that is twice the requested baud-rate.
+>
+> To address this this patch-set introduce a new property in the device tree
+> to define a clock divider other than 16.
+>
+> This currently just scales the clock by a factor of 16/divider.
+>
+> Note that the use of fixed-factor-clock has also been proposed as a
+> workarround, but this does not really describe the hw in the device tree
+> so another solution was needed that allows a correct representation of
+> the HW in the device tree.
 
-I bet they will still want to support 64KB with older Xen (i.e where
-64KB grant is not supported).
-
-Anyway, I don't expect to see the 64KB grants support before next year
-as my TODO list is already pretty full. So let's talk about it when I
-(or someone else) will send an RFC to extend the grant size.
-
-Regards,
-
--- 
-Julien Grall
+I personally lean toward the fixed-factor-clock solution, but could go
+either way.  Serial maintainers, what do you think?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/02685b3e/attachment.sig>
