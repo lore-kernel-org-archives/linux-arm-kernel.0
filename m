@@ -1,90 +1,86 @@
-From: b18965@freescale.com (Alison Wang)
-Date: Mon, 14 Sep 2015 17:03:24 +0800
-Subject: [PATCH v2] audio: sai: Add Power Management support
-Message-ID: <1442221404-35240-1-git-send-email-b18965@freescale.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 14 Sep 2015 11:09:25 +0200
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <55F6886D.1090900@huawei.com>
+References: <20150910112418.GC29293@leverpostej>
+ <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
+ <20150910121514.GE29293@leverpostej>
+ <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
+ <20150910144938.GI29293@leverpostej>
+ <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
+ <20150910162302.GN29293@leverpostej>
+ <20150911124643.GB4530@olila.local.net-space.pl>
+ <alpine.DEB.2.02.1509111410180.2672@kaball.uk.xensource.com>
+ <CAKv+Gu9rN7_mxk0huX+34HSCC_aTWVTkUZKQMB1+9U56fRnwsA@mail.gmail.com>
+ <20150911154534.GD4530@olila.local.net-space.pl>
+ <55F6886D.1090900@huawei.com>
+Message-ID: <CAKv+Gu-xAAd=xTOh+qZvPDthgbRPLy=YwT4xfi4dS53EgJRh1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Power Management support for SAI.
-Activate regmap cache with REGCACHE_FLAT, and use
-regmap cache code to save and restore registers in
-suspend and resume. The Transmit Control Register
-(TCSR) and Receive Control Register(RCSR) should
-be volatile registers.
+On 14 September 2015 at 10:42, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+[..]
 
-Signed-off-by: Alison Wang <alison.wang@freescale.com>
----
-Changes since v1:
-- Use REGCACHE_FLAT instead of REGCACHE_RBTREE.
-- Use SIMPLE_DEV_PM_OPS to simplify the code. 
+>
+> It only needs to apply following patch to fix a bug in Linux kernel when
+> mapping EFI_MEMORY_RUNTIME memory.
+>
 
- sound/soc/fsl/fsl_sai.c | 31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
+Could you explain why you think efi_virtmap_init() should fail if
+there are no EFI_MEMORY_RUNTIME regions?
 
-diff --git a/sound/soc/fsl/fsl_sai.c b/sound/soc/fsl/fsl_sai.c
-index a18fd92..030f71e 100644
---- a/sound/soc/fsl/fsl_sai.c
-+++ b/sound/soc/fsl/fsl_sai.c
-@@ -637,9 +637,11 @@ static bool fsl_sai_readable_reg(struct device *dev, unsigned int reg)
- static bool fsl_sai_volatile_reg(struct device *dev, unsigned int reg)
- {
- 	switch (reg) {
-+	case FSL_SAI_TCSR:
- 	case FSL_SAI_TFR:
--	case FSL_SAI_RFR:
- 	case FSL_SAI_TDR:
-+	case FSL_SAI_RCSR:
-+	case FSL_SAI_RFR:
- 	case FSL_SAI_RDR:
- 		return true;
- 	default:
-@@ -681,6 +683,7 @@ static const struct regmap_config fsl_sai_regmap_config = {
- 	.readable_reg = fsl_sai_readable_reg,
- 	.volatile_reg = fsl_sai_volatile_reg,
- 	.writeable_reg = fsl_sai_writeable_reg,
-+	.cache_type = REGCACHE_FLAT,
- };
- 
- static int fsl_sai_probe(struct platform_device *pdev)
-@@ -796,6 +799,31 @@ static int fsl_sai_probe(struct platform_device *pdev)
- 		return devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int fsl_sai_suspend(struct device *dev)
-+{
-+	struct fsl_sai *sai = dev_get_drvdata(dev);
-+
-+	regcache_cache_only(sai->regmap, true);
-+	regcache_mark_dirty(sai->regmap);
-+
-+	return 0;
-+}
-+
-+static int fsl_sai_resume(struct device *dev)
-+{
-+	struct fsl_sai *sai = dev_get_drvdata(dev);
-+
-+	/* Restore all registers */
-+	regcache_cache_only(sai->regmap, false);
-+	regcache_sync(sai->regmap);
-+
-+	return 0;
-+}
-+#endif /* CONFIG_PM_SLEEP */
-+
-+static SIMPLE_DEV_PM_OPS(fsl_sai_pm, fsl_sai_suspend, fsl_sai_resume);
-+
- static const struct of_device_id fsl_sai_ids[] = {
- 	{ .compatible = "fsl,vf610-sai", },
- 	{ .compatible = "fsl,imx6sx-sai", },
-@@ -807,6 +835,7 @@ static struct platform_driver fsl_sai_driver = {
- 	.driver = {
- 		.name = "fsl-sai",
- 		.of_match_table = fsl_sai_ids,
-+		.pm = &fsl_sai_pm,
- 	},
- };
- module_platform_driver(fsl_sai_driver);
+The absence of such regions is allowed by the spec, so
+efi_virtmap_init() is correct imo to return success.
+
+If you are trying to work around the issue where Xen does not expose
+any Runtime Services regions, there is simply no way to do that and be
+still UEFI compliant. I have suggested before that we should perhaps
+tolerate this anyway, by considering the case where the EFI System
+Table has a NULL runtime services pointer. But rigging
+efi_virtmap_init() like this is really not the way to achieve that.
+
 -- 
-2.1.0.27.g96db324
+Ard.
+
+
+> Author: Shannon Zhao <shannon.zhao@linaro.org>
+> Date:   Thu Aug 20 14:54:58 2015 +0800
+>
+>     arm64/efi: Fix a bug when no EFI_MEMORY_RUNTIME memory found
+>
+>     Currently if the attribute type of all the EFI Memory Descriptors are
+>     not EFI_MEMORY_RUNTIME, efi_virtmap_init will return true. But at this
+>     case, it expect false as there are no EFI memory for RUNTIME. Fix it by
+>     introducing a status to show whether it finds EFI_MEMORY_RUNTIME.
+>
+>     Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index e8ca6ea..bad7f87 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -233,6 +233,7 @@ void __init efi_init(void)
+>  static bool __init efi_virtmap_init(void)
+>  {
+>         efi_memory_desc_t *md;
+> +       bool status = false;
+>
+>         for_each_efi_memory_desc(&memmap, md) {
+>                 u64 paddr, npages, size;
+> @@ -264,8 +265,11 @@ static bool __init efi_virtmap_init(void)
+>                         prot = PAGE_KERNEL;
+>
+>                 create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size,
+> prot);
+> +               status = true;
+>         }
+> -       return true;
+> +       if (status)
+> +               return true;
+> +       return false;
+>  }
+>
+> --
+> Shannon
+>
