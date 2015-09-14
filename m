@@ -1,47 +1,113 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 14 Sep 2015 17:24:55 +0200
-Subject: [PATCH] clk: rockchip: add critical clock for rk3368
-In-Reply-To: <20150914151942.GJ7002@leverpostej>
-References: <5267432.TORlj1Iv40@diego> <6675833.8DAAvDYooL@diego>
- <20150914151942.GJ7002@leverpostej>
-Message-ID: <5892333.KZLmY9MJYK@diego>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 14 Sep 2015 08:33:58 -0700
+Subject: [PATCH v2 1/3] sysfs: Support is_visible() on binary attributes
+In-Reply-To: <1442234049-18637-2-git-send-email-emilio.lopez@collabora.co.uk>
+References: <1442234049-18637-1-git-send-email-emilio.lopez@collabora.co.uk>
+ <1442234049-18637-2-git-send-email-emilio.lopez@collabora.co.uk>
+Message-ID: <55F6E8E6.9030509@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 14. September 2015, 16:19:42 schrieb Mark Rutland:
-> On Mon, Sep 14, 2015 at 04:06:05PM +0100, Heiko St?bner wrote:
-> > Am Montag, 14. September 2015, 15:19:21 schrieb Mark Rutland:
-> > > On Sun, Sep 13, 2015 at 12:20:36PM +0100, Heiko St?bner wrote:
-> > > > Again a result of the gpio-clock-liberation the rk3368 needs the
-> > > > pclk_pd_pmu marked as critical, to boot successfully.
-> > > > 
-> > > > Reported-by: Mark Rutland <mark.rutland@arm.com>
-> > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > 
-> > > FWIW: Tested-by: Mark Rutland <mark.rutland@arm.com>
-> > > 
-> > > I'm surprised that we don't describe these as critical in the DT, given
-> > > that this isn't really an internal property of the clock controller, but
-> > > rather what happens to be attached to it. That ship appears to have
-> > > sailed, however.
-> > 
-> > I wouldn't necessarily think so ... what is called critical only means
-> > "don't turn off when walking the clock-tree upwards".
-> > 
-> > The pclk_pd_pmu for example simply supplies some more clocks we don't
-> > handle at all currently (pclk_pmu_noc, ...). That we currently choose to
-> > ignore those [because we don't have any code nor dt-bindings to handle
-> > the components supplied] sounds very much like an implementation-specific
-> > detail, not something about the hardware.
-> 
-> Sure, but the specific case that lead to this report was the fact that
-> this clock (directly?) feeds the pinctrl programming interface, and that
-> fact is neither described in the DT nor handled by the driver. Surely
-> that should be described and handled?
+On 09/14/2015 05:34 AM, Emilio L?pez wrote:
+> According to the sysfs header file:
+>
+>      "The returned value will replace static permissions defined in
+>       struct attribute or struct bin_attribute."
+>
+> but this isn't the case, as is_visible is only called on struct attribute
+> only. This patch introduces a new is_bin_visible() function to implement
+> the same functionality for binary attributes, and updates documentation
+> accordingly.
+>
+> Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
 
-nope it doesn't :-) pclk_pd_pmu feeds pclk_gpio0.
+Nitpick below, but otherwise looks ok to me.
 
-Before the pinctrl patch, pclk_gpio0 was just statically on all the time, now 
-it gets turned off when bank0 is not in use (between reads/writes and if no 
-interrupts are enabled). This in turn makes the clock framework turn off 
-pclk_pd_pmu (and thus its other unhandled child-clocks).
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+
+Guenter
+
+> ---
+>
+> Changes from v1:
+>   - Don't overload is_visible, introduce is_bin_visible instead as
+>     discussed on the list.
+>
+>   fs/sysfs/group.c      | 17 +++++++++++++++--
+>   include/linux/sysfs.h | 18 ++++++++++++++----
+>   2 files changed, 29 insertions(+), 6 deletions(-)
+>
+> diff --git a/fs/sysfs/group.c b/fs/sysfs/group.c
+> index 39a0199..51b56e6 100644
+> --- a/fs/sysfs/group.c
+> +++ b/fs/sysfs/group.c
+> @@ -73,13 +73,26 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
+>   	}
+>
+>   	if (grp->bin_attrs) {
+> -		for (bin_attr = grp->bin_attrs; *bin_attr; bin_attr++) {
+> +		for (i = 0, bin_attr = grp->bin_attrs; *bin_attr; i++, bin_attr++) {
+> +			umode_t mode = (*bin_attr)->attr.mode;
+> +
+>   			if (update)
+>   				kernfs_remove_by_name(parent,
+>   						(*bin_attr)->attr.name);
+> +			if (grp->is_bin_visible) {
+> +				mode = grp->is_bin_visible(kobj, *bin_attr, i);
+> +				if (!mode)
+> +					continue;
+> +			}
+> +
+> +			WARN(mode & ~(SYSFS_PREALLOC | 0664),
+> +			     "Attribute %s: Invalid permissions 0%o\n",
+> +			     (*bin_attr)->attr.name, mode);
+> +
+> +			mode &= SYSFS_PREALLOC | 0664;
+
+Strictly speaking, the mode validation for binary attributes is new and logically
+separate. Should it be mentioned in the commit log, or even be a separate patch ?
+
+>   			error = sysfs_add_file_mode_ns(parent,
+>   					&(*bin_attr)->attr, true,
+> -					(*bin_attr)->attr.mode, NULL);
+> +					mode, NULL);
+>   			if (error)
+>   				break;
+>   		}
+> diff --git a/include/linux/sysfs.h b/include/linux/sysfs.h
+> index 9f65758..2f66050 100644
+> --- a/include/linux/sysfs.h
+> +++ b/include/linux/sysfs.h
+> @@ -64,10 +64,18 @@ do {							\
+>    *		a new subdirectory with this name.
+>    * @is_visible:	Optional: Function to return permissions associated with an
+>    *		attribute of the group. Will be called repeatedly for each
+> - *		attribute in the group. Only read/write permissions as well as
+> - *		SYSFS_PREALLOC are accepted. Must return 0 if an attribute is
+> - *		not visible. The returned value will replace static permissions
+> - *		defined in struct attribute or struct bin_attribute.
+> + *		non-binary attribute in the group. Only read/write
+> + *		permissions as well as SYSFS_PREALLOC are accepted. Must
+> + *		return 0 if an attribute is not visible. The returned value
+> + *		will replace static permissions defined in struct attribute.
+> + * @is_bin_visible:
+> + *		Optional: Function to return permissions associated with a
+> + *		binary attribute of the group. Will be called repeatedly
+> + *		for each binary attribute in the group. Only read/write
+> + *		permissions as well as SYSFS_PREALLOC are accepted. Must
+> + *		return 0 if a binary attribute is not visible. The returned
+> + *		value will replace static permissions defined in
+> + *		struct bin_attribute.
+>    * @attrs:	Pointer to NULL terminated list of attributes.
+>    * @bin_attrs:	Pointer to NULL terminated list of binary attributes.
+>    *		Either attrs or bin_attrs or both must be provided.
+> @@ -76,6 +84,8 @@ struct attribute_group {
+>   	const char		*name;
+>   	umode_t			(*is_visible)(struct kobject *,
+>   					      struct attribute *, int);
+> +	umode_t			(*is_bin_visible)(struct kobject *,
+> +						  struct bin_attribute *, int);
+>   	struct attribute	**attrs;
+>   	struct bin_attribute	**bin_attrs;
+>   };
+>
