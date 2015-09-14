@@ -1,63 +1,55 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 14 Sep 2015 19:56:55 +0200
-Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
- host-only mode
-In-Reply-To: <CADYTM3b3U0iPGiWdnRiXL4WoAjP=_PvZazuArgJgvJ9fJNPV0g@mail.gmail.com>
-References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
- <55C31963.2010701@schinagl.nl> <55C3709C.4080609@redhat.com>
- <55C47041.3000603@schinagl.nl> <55E93D8C.9020804@schinagl.nl>
- <55F1CA9B.3070204@redhat.com> <20150910183017.GN9885@lukather>
- <55F1CE2E.7010409@redhat.com>
- <CADYTM3Z89oa3akqFaaY4BqJrQ4j+scQawRK0xRkthQde=OQ5tg@mail.gmail.com>
- <55F6E0CA.2010004@redhat.com>
- <CADYTM3Y10PsRZ3x9vf73px4T28M0naHnwyyRMZyPdrXc_Y-vLA@mail.gmail.com>
- <55F6FF28.80109@redhat.com>
- <CADYTM3b3w+c=F2MG+UZbWNHA6zpXPfFo4A2sNnajobBhPmBpAw@mail.gmail.com>
- <55F702EE.5070903@redhat.com>
- <CADYTM3b3U0iPGiWdnRiXL4WoAjP=_PvZazuArgJgvJ9fJNPV0g@mail.gmail.com>
-Message-ID: <55F70A67.3020502@redhat.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 14 Sep 2015 19:08:08 +0100
+Subject: [PATCH] arm64: cpu hotplug: ensure we mask out CPU_TASKS_FROZEN
+ in notifiers
+In-Reply-To: <1442249991-13345-1-git-send-email-will.deacon@arm.com>
+References: <1442249991-13345-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20150914180808.GA12541@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Sep 14, 2015 at 05:59:51PM +0100, Will Deacon wrote:
+> We have a couple of CPU hotplug notifiers for resetting the CPU debug
+> state to a sane value when a CPU comes online.
+> 
+> This patch ensures that we mask out CPU_TASKS_FROZEN so that we don't
+> miss any online events occuring due to suspend/resume.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/debug-monitors.c | 2 +-
+>  arch/arm64/kernel/hw_breakpoint.c  | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 
-On 14-09-15 19:53, Bin Liu wrote:
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-<snip>
-
->>> This is my first time looking at dts handling in drivers, so I might
->>> be completely wrong, but I am thinking that since the controller node
->>> links to the phy node, so the controller node is the parent of the phy
->>> node, so if there is an of api can look it up?
->>
->>
->> If the phy is a child of the controller, then yes this would work,
->> but in the case of sunxi the phy is a built-in mmio mapped peripheral
->> just like the controller, so they sit at the same level and have no
->> parent child relation.
->
-> musb_dsps dts is the same.
->
-> sun8i-a33.dtsi:
->
->      soc {
->          usb_otg: {
->              phys = <&usbphy 0>;
->          }
->          usbphy: {
->          }
->      }
->
-> As in the example above, usb_otg node refers to usbphy node, so I am
-> wondering if there is an of api to look up the usb_otg properties in
-> the usbphy driver.
-
-That would boil down to hardcoding the node name / path compatible
-which is not acceptable from a devicetree pov.
-
-Really having to duplicate the dr_mode is not that bad / such big
-a deal.
-
-Regards,
-
-Hans
+> 
+> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+> index 9b3b62ac9c24..cebf78661a55 100644
+> --- a/arch/arm64/kernel/debug-monitors.c
+> +++ b/arch/arm64/kernel/debug-monitors.c
+> @@ -134,7 +134,7 @@ static int os_lock_notify(struct notifier_block *self,
+>  				    unsigned long action, void *data)
+>  {
+>  	int cpu = (unsigned long)data;
+> -	if (action == CPU_ONLINE)
+> +	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE)
+>  		smp_call_function_single(cpu, clear_os_lock, NULL, 1);
+>  	return NOTIFY_OK;
+>  }
+> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+> index 565244fd57ff..2926c3dd6479 100644
+> --- a/arch/arm64/kernel/hw_breakpoint.c
+> +++ b/arch/arm64/kernel/hw_breakpoint.c
+> @@ -878,7 +878,7 @@ static int hw_breakpoint_reset_notify(struct notifier_block *self,
+>  						void *hcpu)
+>  {
+>  	int cpu = (long)hcpu;
+> -	if (action == CPU_ONLINE)
+> +	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE)
+>  		smp_call_function_single(cpu, hw_breakpoint_reset, NULL, 1);
+>  	return NOTIFY_OK;
+>  }
+> -- 
+> 2.1.4
+> 
