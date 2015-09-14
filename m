@@ -1,81 +1,111 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 14 Sep 2015 20:25:00 +0800
-Subject: [PATCH v3 3/6] iommu: add ARM short descriptor page table
- allocator.
-In-Reply-To: <20150721171101.GN31095@arm.com>
-References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
- <1437037475-9065-4-git-send-email-yong.wu@mediatek.com>
- <20150721171101.GN31095@arm.com>
-Message-ID: <1442233500.19588.35.camel@mhfsdcap03>
+From: daniel.kiper@oracle.com (Daniel Kiper)
+Date: Mon, 14 Sep 2015 14:28:58 +0200
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <CAKv+Gu9ER1cKvPHobq-wo7ggPesJj4OQ7=aTr24GVpubHvVqjQ@mail.gmail.com>
+References: <20150910121514.GE29293@leverpostej>
+ <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
+ <20150910144938.GI29293@leverpostej>
+ <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
+ <20150910162302.GN29293@leverpostej>
+ <20150911124643.GB4530@olila.local.net-space.pl>
+ <20150911162559.GA8726@leverpostej>
+ <20150912113655.GG4530@olila.local.net-space.pl>
+ <20150914092518.GA10307@leverpostej>
+ <CAKv+Gu9ER1cKvPHobq-wo7ggPesJj4OQ7=aTr24GVpubHvVqjQ@mail.gmail.com>
+Message-ID: <20150914122858.GI4530@olila.local.net-space.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-07-21 at 18:11 +0100, Will Deacon wrote:
-[...]
-> > +static int arm_short_map(struct io_pgtable_ops *ops, unsigned long iova,
-> > +                        phys_addr_t paddr, size_t size, int prot)
-> > +{
-> > +       struct arm_short_io_pgtable *data = io_pgtable_ops_to_data(ops);
-> > +       const struct iommu_gather_ops *tlb = data->iop.cfg.tlb;
-> > +       int ret;
-> > +       arm_short_iopte pgdprot = 0, pteprot = 0;
-> > +       bool large;
-> > +
-> > +       /* If no access, then nothing to do */
-> > +       if (!(prot & (IOMMU_READ | IOMMU_WRITE)))
-> > +               return 0;
-> > +
-> > +       switch (size) {
-> > +       case SZ_4K:
-> > +       case SZ_64K:
-> > +               large = (size == SZ_64K) ? true : false;
-> > +               pteprot = __arm_short_pte_prot(data, prot, large);
-> > +               pgdprot = __arm_short_pgtable_prot(data, prot & IOMMU_NOEXEC);
-> > +               break;
-> > +
-> > +       case SZ_1M:
-> > +       case SZ_16M:
-> > +               large = (size == SZ_16M) ? true : false;
-> > +               pgdprot = __arm_short_pgd_prot(data, prot, large);
-> > +               break;
-> > +       default:
-> > +               return -EINVAL;
-> > +       }
-> > +
-> > +       if (WARN_ON((iova | paddr) & (size - 1)))
-> > +               return -EINVAL;
-> > +
-> > +       ret = _arm_short_map(data, iova, paddr, pgdprot, pteprot, large);
-> > +
-> > +       tlb->tlb_add_flush(iova, size, true, data->iop.cookie);
-> > +       tlb->tlb_sync(data->iop.cookie);
-> 
-> In _arm_short_map, it looks like you can only go from invalid -> valid,
-> so why do you need to flush the TLB here?
+On Mon, Sep 14, 2015 at 11:43:27AM +0200, Ard Biesheuvel wrote:
+> On 14 September 2015 at 11:25, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Sat, Sep 12, 2015 at 12:36:55PM +0100, Daniel Kiper wrote:
+> >> On Fri, Sep 11, 2015 at 05:25:59PM +0100, Mark Rutland wrote:
+> >> > On Fri, Sep 11, 2015 at 01:46:43PM +0100, Daniel Kiper wrote:
+> >> > > On Thu, Sep 10, 2015 at 05:23:02PM +0100, Mark Rutland wrote:
+> >>
+> >> [...]
+> >>
+> >> > > > What's troublesome with the boot services?
+> >> > > >
+> >> > > > What can't be simulated?
+> >> > >
+> >> > > How do you want to access bare metal EFI boot services from dom0 if they
+> >> > > were shutdown long time ago before loading dom0 image?
+> >> >
+> >> > I don't want to.
+> >> >
+> >> > I asked "What can't be simulated?" because I assumed everything
+> >> > necessary/mandatory could be simulated without needinng access to any
+> >> > real EFI boot services.
+> >> >
+> >> > As far as I can see all that's necessary is to provide a compatible
+> >> > interface.
+> >>
+> >> Could you be more precise what do you need? Please enumerate. UEFI spec has
+> >> more than 2500 pages and I do not think that we need all stuff in dom0.
+> >>
+> >> > > What do you need from EFI boot services in dom0?
+> >> >
+> >> > The ability to call ExitBootServices() and SetVirtualAddressMap() on a
+> >> > _virtual_ address map for _virtual_ services provided by the hypervisor.
+> >>
+> >> I am confused. Why do you need that? Please remember, EFI is owned and
+> >> operated by Xen hypervisor. dom0 does not have direct access to EFI.
+> >
+> > Let's take a step back.
+> >
+> > My objection here is to passing the Dom0 kernel properties as if it were
+> > booted with direct access to a full UEFI, then later fixing that up
+> > (when Xen is detected and we apply its hypercall EFI implementation).
+> >
+>
+> To be honest, I don't think that has ever been suggested here. What
+> was suggested is to provide a minimal EFI like environment that allows
+> the post-stub EFI code to proceed and find the ACPI root pointer.
+>
+> > If the kernel cannot use EFI natively, why pretend to the kernel that it
+> > can? The hypercall implementation is _not_ EFI (though it provides
+> > access to some services).
+> >
+>
+> To get access to the ACPI root pointer, for which there is only one
+> specified way of obtaining it on ARM, which is via the UEFI
+> configuration table database
+>
+> > The two ways I can see providing Dom0 with EFI services are:
+> >
+> > * Have Xen create shims for any services, in which any hypercalls live,
+> >   and pass these to the kernel with a virtual system table. This keeps
+> >   the interface to the kernel the same regardless of Xen.
+> >
+> > * Have the kernel detect Xen EFI capability via Xen, without passing the
+> >   usual native EFI parameters. This can then be installed into the
+> >   kernel in a Xen-specific manner, and we know from the outset that
+> >   Xen-specific caveats apply.
+> >
+> > As per my original email, I'm not against the renaming of the stub
+> > parameters if we standardise the rest of the details, but I believe
+> > that's orthogonal to the Xen Dom0 case.
+> >
+>
+> Xen will not boot the kernel via the stub, but directly. It needs to
+> supply a EFI like environment so that the kernel can boot via ACPI.
+> There is no reason whatsoever to mock up boot services or other pieces
+> of UEFI functionality that are not needed. The core kernel does not
+> call any boot services or SetVirtualAddressMap/ConvertPointer, and
+> there is already paravirtualized plumbing in place for the remaining
+> runtime services.
+>
+> Hence my claim earlier that we should cope with the runtime services
+> pointer being NULL, since that is really the only thing standing in
 
-Hi Will,
-   Here is about flush-tlb after map iova, I have deleted it in v4
-following this suggestion. But We meet a problem about it.
+I suppose that you thought about EFI_INVALID_TABLE_ADDR...
 
-Take a example with JPEG. the test steps is:
-a).JPEG HW decode a picture with the source iova,like 0xfd780000.
-b).JPEG HW decode done, It will unmap the iova(write 0 in pagetable and
-flush tlb).
-c).JPEG HW decode the second picture, whose source iova is also
-0xfd780000.
-   Then our HW maybe fail due to it will auto prefetch, It may prefecth
-between the step b) and c). then the HW may fetch the pagetable content
-which has been unmapped in step b). then the HW will get the iova's
-physical address is 0, It will translation fault!
+> the way from the kernel side. If you feel that violates the spec in
 
-    So I think our HW need flush-tlb after map iova. Could we add a
-QUIRK like "IO_PGTABLE_QUIRK_AUTO_PREFETCH_ENABLE" for it?
-If it's not allowed, we will have to add this in our internal function
-mtk_iommu_map of mtk_iommu.c.
-Thanks.
+If yes then you should know that dom0 on x86 EFI platform works
+with efi.runtime == EFI_INVALID_TABLE_ADDR without any issue.
+So, I think that all problems are solved.
 
-> 
-> > +       return ret;
-> > +}
-> > +
-[...]
+Daniel
