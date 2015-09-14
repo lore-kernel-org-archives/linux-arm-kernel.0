@@ -1,157 +1,39 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 14 Sep 2015 11:01:33 +0530
-Subject: [PATCH v2] arm64: dts: Add BUS1 instance pinctrl support
-Message-ID: <1442208693-23644-1-git-send-email-alim.akhtar@samsung.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 14 Sep 2015 14:51:43 +0900
+Subject: [PATCH] arm64: dts: Add BUS1 instance pinctrl support
+In-Reply-To: <55F6563A.2030107@samsung.com>
+References: <1440761134-27639-1-git-send-email-alim.akhtar@samsung.com>
+ <55E3E95D.50003@samsung.com> <55F6563A.2030107@samsung.com>
+Message-ID: <55F6606F.3090000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds BUS1 instance pinctrl for exynos7 soc.
+On 14.09.2015 14:08, Alim Akhtar wrote:
+> Hi
+> 
+> On 08/31/2015 11:12 AM, Krzysztof Kozlowski wrote:
+>> On 28.08.2015 20:25, Alim Akhtar wrote:
+>>> This adds BUS1 instance pinctrl for exynos7 soc.
+>>>
+>>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>>> ---
+>>>   arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi |  111
+>>> +++++++++++++++++++++++
+>>>   arch/arm64/boot/dts/exynos/exynos7.dtsi         |    7 ++
+>>>   2 files changed, 118 insertions(+)
+>>
+>> The "etc1" GPIO in my datasheet is not fully documented but the rest
+>> looks good:
+>>
+> Ok will send v2 and remove etc1 gpio node.
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
-Changes since v1:
-- Removed etc1 gpio as per Krzysztof review comments.
+You don't have to. I mentioned it only for reference that I cannot
+review the etc GPIO node because it is not mentioned in my datasheet.
+However you may have different (e.g. newer) datasheet and etc1 could be
+documented there.
 
- arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi |  103 +++++++++++++++++++++++
- arch/arm64/boot/dts/exynos/exynos7.dtsi         |    7 ++
- 2 files changed, 110 insertions(+)
+I applied the first version of patch some time ago (your response is
+after two weeks). Do you want me to replace it with v2?
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi b/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
-index 2eef4a2..f77ddaf 100644
---- a/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
-@@ -586,3 +586,106 @@
- 		samsung,pin-drv = <2>;
- 	};
- };
-+
-+&pinctrl_bus1 {
-+	gpf0: gpf0 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf1: gpf1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf2: gpf2 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf3: gpf3 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf4: gpf4 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpf5: gpf5 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpg1: gpg1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpg2: gpg2 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gph1: gph1 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	gpv6: gpv6 {
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
-+	spi5_bus: spi5-bus {
-+		samsung,pins = "gpf2-0", "gpf2-1", "gpf2-2", "gpf2-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	ufs_refclk_out: ufs-refclk-out {
-+		samsung,pins = "gpg2-4";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <2>;
-+	};
-+
-+	ufs_rst_n: ufs-rst-n {
-+		samsung,pins = "gph1-5";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-index d7a37c3..f9c5a54 100644
---- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-@@ -26,6 +26,7 @@
- 		pinctrl5 = &pinctrl_ese;
- 		pinctrl6 = &pinctrl_fsys0;
- 		pinctrl7 = &pinctrl_fsys1;
-+		pinctrl8 = &pinctrl_bus1;
- 	};
- 
- 	cpus {
-@@ -278,6 +279,12 @@
- 			interrupts = <0 203 0>;
- 		};
- 
-+		pinctrl_bus1: pinctrl at 14870000 {
-+			compatible = "samsung,exynos7-pinctrl";
-+			reg = <0x14870000 0x1000>;
-+			interrupts = <0 384 0>;
-+		};
-+
- 		hsi2c_0: hsi2c at 13640000 {
- 			compatible = "samsung,exynos7-hsi2c";
- 			reg = <0x13640000 0x1000>;
--- 
-1.7.10.4
+Best regards,
+Krzysztof
