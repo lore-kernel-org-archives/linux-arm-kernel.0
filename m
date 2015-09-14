@@ -1,142 +1,32 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 14 Sep 2015 14:00:15 +0100
-Subject: [PATCH v3 2/5] firmware: arm_scpi: Extend to support sensors
-In-Reply-To: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
-References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1442235619-4029-3-git-send-email-punit.agrawal@arm.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 14 Sep 2015 15:04:46 +0200
+Subject: [PATCH v6 2/3] can: Allwinner A10/A20 CAN Controller support -
+ Defconfigs
+In-Reply-To: <1442235299-5885-3-git-send-email-info@gerhard-bertelsmann.de>
+References: <1442235299-5885-1-git-send-email-info@gerhard-bertelsmann.de>
+ <1442235299-5885-3-git-send-email-info@gerhard-bertelsmann.de>
+Message-ID: <55F6C5EE.7030104@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM System Control Processor (SCP) provides an API to query and use
-the sensors available in the system. Extend the SCPI driver to support
- sensor messages.
+On 09/14/2015 02:54 PM, Gerhard Bertelsmann wrote:
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/firmware/arm_scpi.c   | 60 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/scpi_protocol.h | 17 ++++++++++++
- 2 files changed, 77 insertions(+)
+You might want to add a commit message here. :D
 
-diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index cb75c75..321680e 100644
---- a/drivers/firmware/arm_scpi.c
-+++ b/drivers/firmware/arm_scpi.c
-@@ -219,6 +219,21 @@ struct dvfs_set {
- 	u8 index;
- } __packed;
- 
-+struct sensor_capabilities {
-+	__le16 sensors;
-+} __packed;
-+
-+struct _scpi_sensor_info {
-+	__le16 sensor_id;
-+	u8 class;
-+	u8 trigger_type;
-+	char name[20];
-+};
-+
-+struct sensor_value {
-+	__le32 val;
-+} __packed;
-+
- static struct scpi_drvinfo *scpi_info;
- 
- static int scpi_linux_errmap[SCPI_ERR_MAX] = {
-@@ -481,6 +496,48 @@ static struct scpi_dvfs_info *scpi_dvfs_get_info(u8 domain)
- 	return info;
- }
- 
-+static int scpi_sensor_get_capability(u16 *sensors)
-+{
-+	struct sensor_capabilities cap_buf;
-+	int ret;
-+
-+	ret = scpi_send_message(SCPI_CMD_SENSOR_CAPABILITIES, NULL, 0, &cap_buf,
-+				sizeof(cap_buf));
-+	if (!ret)
-+		*sensors = le16_to_cpu(cap_buf.sensors);
-+
-+	return ret;
-+}
-+
-+static int scpi_sensor_get_info(u16 sensor_id, struct scpi_sensor_info *info)
-+{
-+	__le16 id = cpu_to_le16(sensor_id);
-+	struct _scpi_sensor_info _info;
-+	int ret;
-+
-+	ret = scpi_send_message(SCPI_CMD_SENSOR_INFO, &id,
-+				 sizeof(id), &_info, sizeof(_info));
-+	if (!ret) {
-+		memcpy(info, &_info, sizeof(*info));
-+		info->sensor_id = le16_to_cpu(_info.sensor_id);
-+	}
-+
-+	return ret;
-+}
-+
-+int scpi_sensor_get_value(u16 sensor, u32 *val)
-+{
-+	struct sensor_value buf;
-+	int ret;
-+
-+	ret = scpi_send_message(SCPI_CMD_SENSOR_VALUE, &sensor, sizeof(sensor),
-+				&buf, sizeof(buf));
-+	if (!ret)
-+		*val = le32_to_cpu(buf.val);
-+
-+	return ret;
-+}
-+
- static struct scpi_ops scpi_ops = {
- 	.get_version = scpi_get_version,
- 	.clk_get_range = scpi_clk_get_range,
-@@ -489,6 +546,9 @@ static struct scpi_ops scpi_ops = {
- 	.dvfs_get_idx = scpi_dvfs_get_idx,
- 	.dvfs_set_idx = scpi_dvfs_set_idx,
- 	.dvfs_get_info = scpi_dvfs_get_info,
-+	.sensor_get_capability = scpi_sensor_get_capability,
-+	.sensor_get_info = scpi_sensor_get_info,
-+	.sensor_get_value = scpi_sensor_get_value,
- };
- 
- struct scpi_ops *get_scpi_ops(void)
-diff --git a/include/linux/scpi_protocol.h b/include/linux/scpi_protocol.h
-index e7169cd..80af3cd 100644
---- a/include/linux/scpi_protocol.h
-+++ b/include/linux/scpi_protocol.h
-@@ -28,6 +28,20 @@ struct scpi_dvfs_info {
- 	struct scpi_opp *opps;
- };
- 
-+enum scpi_sensor_class {
-+	TEMPERATURE,
-+	VOLTAGE,
-+	CURRENT,
-+	POWER,
-+};
-+
-+struct scpi_sensor_info {
-+	u16 sensor_id;
-+	u8 class;
-+	u8 trigger_type;
-+	char name[20];
-+} __packed;
-+
- /**
-  * struct scpi_ops - represents the various operations provided
-  *	by SCP through SCPI message protocol
-@@ -52,6 +66,9 @@ struct scpi_ops {
- 	int (*dvfs_get_idx)(u8);
- 	int (*dvfs_set_idx)(u8, u8);
- 	struct scpi_dvfs_info *(*dvfs_get_info)(u8);
-+	int (*sensor_get_capability)(u16 *sensors);
-+	int (*sensor_get_info)(u16 sensor_id, struct scpi_sensor_info *);
-+	int (*sensor_get_value)(u16, u32 *);
- };
- 
- #if IS_ENABLED(CONFIG_ARM_SCPI_PROTOCOL)
+> Signed-off-by: Gerhard Bertelsmann <info@gerhard-bertelsmann.de>
+
+Marc
+
 -- 
-2.5.0
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/92f4f203/attachment-0001.sig>
