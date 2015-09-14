@@ -1,78 +1,60 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 14 Sep 2015 14:00:13 +0100
-Subject: [PATCH v3 0/5] SCPI Sensor support
-Message-ID: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+Date: Mon, 14 Sep 2015 14:00:14 +0100
+Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
+In-Reply-To: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+The System Control Processor (SCP) provides access to SoC sensors via
+the System Control and Power Interface (SCPI) Message Protocol. Add
+bindings to allow probing of these sensors. Also support referencing
+of the sensors for setting up thermal zones via the thermal DT
+bindings.
 
-The series adds support for SCPI based sensors for ARM development
-platform. In addition to supporting sensors, when a temperature sensor
-is discovered the driver registers the sensor with the thermal
-framework.
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+---
+ Documentation/devicetree/bindings/arm/arm,scpi.txt | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-The sensor patches here have been split out from a longer series
-adding support for registering power model based cooling devices for
-the CPU via device tree. Earliers postings can be seen at [0], [1].
-
-Patches 1-3 create a hwmon sensor driver for sensors provided by SCPI
-firmware. Patch 4 adds support for the temperature sensors to register
-with the thermal framework. This allows setting up platform thermals
-using OF thermal bindings.
-
-The last patch adds support for the sensors in the Juno device tree.
-
-The patches depend on SCPI and mailbox patches[2] from Sudeep. The
-SCPI protocol document with details of the sensor interface can be
-found at [3].
-
-I'd like to aim for merging the patches with the SCPI changes if
-possible. The hwmon patches have been acked by Guenter. If there
-aren't any objections, I would like to request acks for the binding
-updates in Patch 1.
-
-Thanks,
-Punit
-
-Changes v2->v3
-  - split out the sensor patches (posted here)
-  - rebase onto v4.3-rc1
-  
-Changes v1->v2
-  - added documentation for the scpi-hwmon driver
-  - replaced static allocation of platform structure in scpi-hwmon.c
-    with dynamic allocation
-  - re-structured registering of thermal zones to better handle
-    error conditions
-  - reduced chattiness in scpi-hwmon.c
-  - corrected sensor numbering to align with hwmon documentation
-  - dynamic allocation of attributes and attribute groups
-
-[0] http://thread.gmane.org/gmane.linux.kernel/2002152
-[1] http://thread.gmane.org/gmane.linux.kernel/2011466
-[2] http://thread.gmane.org/gmane.linux.kernel/2009735
-[3] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
-
-Punit Agrawal (5):
-  Documentation: add DT bindings for ARM SCPI sensors
-  firmware: arm_scpi: Extend to support sensors
-  hwmon: Support sensors exported via ARM SCP interface
-  hwmon: Support registration of thermal zones for SCP temperature
-    sensors
-  arm64: dts: Add sensor node to Juno dt
-
- Documentation/devicetree/bindings/arm/arm,scpi.txt |  15 ++
- Documentation/hwmon/scpi-hwmon                     |  33 +++
- arch/arm64/boot/dts/arm/juno-base.dtsi             |   5 +
- drivers/firmware/arm_scpi.c                        |  60 +++++
- drivers/hwmon/Kconfig                              |   8 +
- drivers/hwmon/Makefile                             |   1 +
- drivers/hwmon/scpi-hwmon.c                         | 288 +++++++++++++++++++++
- include/linux/scpi_protocol.h                      |  17 ++
- 8 files changed, 427 insertions(+)
- create mode 100644 Documentation/hwmon/scpi-hwmon
- create mode 100644 drivers/hwmon/scpi-hwmon.c
-
+diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+index f002460..af66f7f 100644
+--- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
++++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+@@ -72,8 +72,18 @@ Required sub-node properties:
+ - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
+ 	       shared memory on Juno platforms
+ 
++Sensor bindings for the sensors based on SCPI Message Protocol
++--------------------------------------------------------------
++SCPI provides an API to access the various sensors on the SoC.
++
++Required properties:
++- compatible : should be "arm,scpi-sensors".
++- #thermal-sensor-cells: should be set to 1. This property follows the
++			 thermal device tree bindings[2].
++
+ [0] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
+ [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++[2] Documentation/devicetree/bindings/thermal/thermal.txt
+ 
+ Example:
+ 
+@@ -122,6 +132,11 @@ scpi_protocol: scpi at 2e000000 {
+ 			clock-output-names = "pxlclk0", "pxlclk1";
+ 		};
+ 	};
++
++	scpi_sensors0: sensors {
++		compatible = "arm,scpi-sensors";
++		#thermal-sensor-cells = <1>;
++	};
+ };
+ 
+ cpu at 0 {
 -- 
 2.5.0
