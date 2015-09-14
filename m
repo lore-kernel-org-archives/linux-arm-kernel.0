@@ -1,174 +1,48 @@
-From: binmlist@gmail.com (Bin Liu)
-Date: Mon, 14 Sep 2015 12:14:00 -0500
-Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
- host-only mode
-In-Reply-To: <55F6FF28.80109@redhat.com>
-References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
- <55C31963.2010701@schinagl.nl> <55C3709C.4080609@redhat.com>
- <55C47041.3000603@schinagl.nl> <55E93D8C.9020804@schinagl.nl>
- <55F1CA9B.3070204@redhat.com> <20150910183017.GN9885@lukather>
- <55F1CE2E.7010409@redhat.com>
- <CADYTM3Z89oa3akqFaaY4BqJrQ4j+scQawRK0xRkthQde=OQ5tg@mail.gmail.com>
- <55F6E0CA.2010004@redhat.com>
- <CADYTM3Y10PsRZ3x9vf73px4T28M0naHnwyyRMZyPdrXc_Y-vLA@mail.gmail.com>
- <55F6FF28.80109@redhat.com>
-Message-ID: <CADYTM3b3w+c=F2MG+UZbWNHA6zpXPfFo4A2sNnajobBhPmBpAw@mail.gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 14 Sep 2015 18:18:12 +0100
+Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
+In-Reply-To: <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
+References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+ <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
+ <20150914131448.GC7002@leverpostej>
+ <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
+ <20150914134949.GE7002@leverpostej>
+ <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <1442251092.2850.53.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 2015-09-14 at 15:38 +0100, Punit Agrawal wrote:
+> Mark Rutland <mark.rutland@arm.com> writes:
+> 
+> >> >> +Sensor bindings for the sensors based on SCPI Message Protocol
+> >> >> +--------------------------------------------------------------
+> >> >> +SCPI provides an API to access the various sensors on the SoC.
+> >> >> +
+> >> >> +Required properties:
+> >> >> +- compatible : should be "arm,scpi-sensors".
+> >> >> +- #thermal-sensor-cells: should be set to 1. This property follows the
+> >> >> +			 thermal device tree bindings[2].
+> >> >
+> >> > You need to specify what the valid values for this cell are.
+> >> 
+> >> The enumeration depends on the number of sensors exported by SCP
+> >> firmware - which is platform dependent. I could add add something like
+> >> if you think that is helpful -
+> >> 
+> >> "Valid cell value is a number between 0..n-1, where n is the number
+> >> of sensors exported by SCP firmware."
+> >
+> > Can the FW identifer space have holes? Or are they always contiguous?
+> 
+> The way the SCP interface is defined, the sensor identifiers are
+> contiguous,
 
-On Mon, Sep 14, 2015 at 12:08 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
->
-> On 14-09-15 18:58, Bin Liu wrote:
->>
->> Hi,
->>
->> On Mon, Sep 14, 2015 at 9:59 AM, Hans de Goede <hdegoede@redhat.com>
->> wrote:
->>>
->>> Hi,
->>>
->>>
->>> On 14-09-15 16:44, Bin Liu wrote:
->>>>
->>>>
->>>> Hi,
->>>>
->>>> On Thu, Sep 10, 2015 at 1:38 PM, Hans de Goede <hdegoede@redhat.com>
->>>> wrote:
->>>>>
->>>>>
->>>>> Hi,
->>>>>
->>>>> On 10-09-15 20:30, Maxime Ripard wrote:
->>>>>>
->>>>>>
->>>>>>
->>>>>> On Thu, Sep 10, 2015 at 08:23:23PM +0200, Hans de Goede wrote:
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> Hi,
->>>>>>>
->>>>>>> On 04-09-15 08:43, Olliver Schinagl wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>> Hey Hans,
->>>>>>>>
->>>>>>>> On 07-08-15 10:45, Olliver Schinagl wrote:
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> <snip>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> If you change the dr_mode to host then you _must_ also remove any
->>>>>>>>>> id_det and vbus_det
->>>>>>>>>> gpio settings from the usb_phy node in the dts, as the sun4i phy
->>>>>>>>>> code
->>>>>>>>>> detects
->>>>>>>>>> host vs otg mode by checking for the presence of these.
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> Yes, this fixes it and makes it work. Thanks.
->>>>>>>>>
->>>>>>>> I've been going back to this and am wondering if this is something I
->>>>>>>> can
->>>>>>>> look into to fix properly? E.g. if the dts sets dr_mode = host, can
->>>>>>>> we
->>>>>>>> simply ignore the pins and treat them as unset?
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> AFAIK you cannot unset something in dts. The only solution I
->>>>>>> can comeup with is to add a dr_mode argument to the phy like
->>>>>>> we already have for the otg controller itself.
->>>>>>>
->>>>>>> This is something which we likely need to do anyways to add
->>>>>>> support for peripheral only mode, which we seem to need for
->>>>>>> some "hdmi sticks".
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> I haven't really followed the rest of the discussion, so sorry if you
->>>>>> already talked about that, but why can't you just set the dr_mode to
->>>>>> peripheral in such a case?
->>>>>
->>>>>
->>>>>
->>>>>
->>>>> This is about the usbphy code not the musb-controller code, which are
->>>>> 2 different dts nodes, atm only the musb-controller node has a
->>>>> dr_mode property, and the phy code decides between host-only
->>>>> and otg mode based on whether an id pin is assigned or not.
->>>>>
->>>>> My proposal is to get rid of the id-pin hack to determine the mode
->>>>> and add a dr_mode property to the usbphy dts node.
->>>>
->>>>
->>>>
->>>> I would try to avoid adding dr_mode in the usbphy node if possible,
->>>> since it is already specified in the controller node.
->>>>
->>>> Since the phy node is referenced in the controller node, is it
->>>> possible that the phy driver looks up the controller of properties to
->>>> find its dr_mode setting?
->>>
->>>
->>>
->>> That is possible, but it very much goes against how devicetree normally
->>> works, where every node is more or less a standalone unit which
->>> contains enough info for the associated driver to do its work.
->>
->>
->> I guess you are right, but duplicating dr_mode would cause more
->> trouble for end user.
->
->
-> The user already needs to set up regulators, vbus-det and id-det
-> for otg mode in the usbphy node. Although there are 2 nodes in dts /
-> 2 separate hardware blocks involved in reality the 2 are closely
-> related and the user already must take care to have the settings match.
->
-> Besides that writing dts files is not something which end users do,
-> so a normal user will never see this.
->
->> Felipe, could you please give your comments on this issue? I have to
->> do the similar change for musb_dsps.
->>
->>>
->>> Currently there is no link from the phy node to the controller node
->>> (only the other way around) and adding such a link requires more code
->>> then simple having a duplicate dr_mode.
->>
->>
->> I guess I did not make my previous comment clearly, we don't need to
->> add the link from the phy node to the controller node. We don't need
->> to change the current dts, just in the phy driver to look up dr_mode
->> of the controller node, if possible.
->
->
-> And how does the phy code now where the controller node lives without
-> having a link to it in its node? Hardcode the full path to the
-> controller node ? That is both ugly and error prone.
+Is there any documentation other than DUI0922A? [1] From what I can seen
+that just says it's a 16-bit value and doesn't put any particular
+constraints on its value.
 
-This is my first time looking at dts handling in drivers, so I might
-be completely wrong, but I am thinking that since the controller node
-links to the phy node, so the controller node is the parent of the phy
-node, so if there is an of api can look it up?
+[1] http://community.arm.com/servlet/JiveServlet/download/8401-40-18262/DUI0922A_scp_message_interface.pdf
 
-Regards,
--Bin.
-
->
-> Regards,
->
-> Hans
+-- 
+Tixy
