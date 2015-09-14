@@ -1,132 +1,78 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 14 Sep 2015 13:43:32 +0530
-Subject: sdhci: runtime suspend/resume on card insert/removal
-In-Reply-To: <20150914142838.07ec6a07@xhacker>
-References: <55F12CF8.50003@linaro.org> <20150910153129.07adbe68@xhacker>
- <20150910080233.GH21084@n2100.arm.linux.org.uk>
- <20150910160402.3b78b5c6@xhacker> <55F66874.2000609@linaro.org>
- <20150914142838.07ec6a07@xhacker>
-Message-ID: <55F681AC.2010605@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 14 Sep 2015 09:19:37 +0100
+Subject: [PATCH v2 1/9] dmaengine: st_fdma: Add STMicroelectronics FDMA
+ DT binding documentation
+In-Reply-To: <20150912120752.GA19897@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
+ <1441980871-24475-2-git-send-email-peter.griffin@linaro.org>
+ <51503956.PMFrWKUjxX@wuerfel>
+ <20150912120752.GA19897@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20150914081937.GF27591@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, 12 Sep 2015, Peter Griffin wrote:
 
+> Hi Arnd,
+> 
+> On Fri, 11 Sep 2015, Arnd Bergmann wrote:
+> 
+> > On Friday 11 September 2015 15:14:23 Peter Griffin wrote:
+> > > +- st,fdma-id	: Must contain fdma controller number
+> > 
+> > What for?
+> 
+> It is used by the driver to generate a unique firmware name.
+> Basically we need to know which controller instance we
+> are as each controller has a different firmware which needs
+> to be loaded.
+> 
+> Rob did say that having a index type property is undesirable
+> over here, see my reply at the bottom
+> http://www.spinics.net/lists/devicetree/msg92529.html.
+> 
+> However I can't think of any other useful properties we could add
+> to derive this information.
 
-On Monday 14 September 2015 11:58 AM, Jisheng Zhang wrote:
-> On Mon, 14 Sep 2015 11:55:56 +0530
-> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
->
->>
->>
->> On Thursday 10 September 2015 01:34 PM, Jisheng Zhang wrote:
->>> Hi Russell,
->>>
->>> On Thu, 10 Sep 2015 09:02:33 +0100
->>> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->>>
->>>> On Thu, Sep 10, 2015 at 03:31:29PM +0800, Jisheng Zhang wrote:
->>>>> Hi Vaibhav,
->>>>>
->>>>> On Thu, 10 Sep 2015 12:40:48 +0530
->>>>> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> wrote:
->>>>>
->>>>>> Hi,
->>>>>>
->>>>>> During my testing of SDHCI-PXAV3 driver on Marvell's pxa1928
->>>>>> based platform, I observed that runtime PM suspend/resume is having
->>>>>> issues with card insertion and removal.
->>>>>>
->>>>>> Let me try to explain it using execution sequence -
->>>>>>
->>>>>> During boot:
->>>>>>
->>>>>> MMC SD card gets detected as expected.
->>>>>>
->>>>>> [    2.431012] mmc1: new high speed SDHC card at address 1234
->>>>>> [    2.437235] mmcblk1: mmc1:1234 SA04G 3.63 GiB
->>>>>> [    2.444841]  mmcblk1: p1
->>>>>>
->>>>>>
->>>>>> Now after coming to the linux prompt, if card removal event occurs
->>>>>> then the call sequence is -
->>>>>>
->>>>>>     sdhci_irq() -->
->>>>>>      -> sdhci_thread_irq(): host->thread_isr - 0x80
->>>>>>         -> sdhci_card_event()
->>>>>>         -> mmc_detect_change()
->>>>>>            --> _mmc_detect_change()
->>>>>>                --->  mmc_sd_detect()
->>>>>>                      mmc_sd_remove()
->>>>>>                      mmc_remove_card()
->>>>>>                      mmc_bus_remove()
->>>>>>                      mmc_power_off()
->>>>>>                      mmc_set_initial_state()
->>>>>>                      sdhci_set_ios()
->>>>>>                      ...
->>>>>>           sdhci_pxav3_runtime_suspend()
->>>>>>           sdhci_runtime_suspend_host()
->>>>>>
->>>>>>
->>>>>> Till here everything looks perfect :) (if I got it right)
->>>>>>
->>>>>> Now on card insertion again, the expectation is, runtime resume should
->>>>>> get called as part of interrupt trigger from the SDHCI controller on
->>>>>> card insertion.
->>>>>
->>>>> AFAIK, card insertion => wakeup irq, this irq doesn't come from SDHCI
->>>>
->>>> Wakeup IRQs are what happens when the _system_ is in suspend, not
->>>> when the device is runtime suspended.
->>>
->>> Oh, yes. Sorry for misleading, I didn't express myself clearly. What
->>> I really means is that the card insertion/remove irq which could finally
->>> cause sdhci host resumed.
->>>
->>
->> So Jisheng,
->>
->> You are ok with above change, right?
->
-> Nope. the above is just to clarify my mixing "wakeup IRQs" and the card
-> insertion/remove irq that brings sdhci host resumed.
->
-> IMHO, your patch is still not necessary and perhaps wrong.
->
+I wouldn't use a property at all.  Why not use the compatible string?
 
-Don't be in hurry to conclude,
-Let's understand the technical aspect fist.
+Who chooses the naming scheme of the firmware binary?
 
+Is there any reason they can't be:
 
-Let me clarify once again here,
+  fdma_STiH407_audio.elf
+  fdma_STiH407_app.elf
+  fdma_STiH407_free_running.elf
 
+Then you can have a different compatible for each:
 
-The card detect interrupt is coming from SDHCI controller itself,
-I have confirmed that the runtime PM is working perfectly fine,
-clock is gated/disabled on card removal.
+  compatible = "st,stih407-fdma-mpe31-audio";
+  compatible = "st,stih407-fdma-mpe31-app";
+  compatible = "st,stih407-fdma-mpe31-free-running";
 
+[...]
 
-Clock Gating:
-=============
-#
-# devmem 0xd4282854
-0x0000181B
-# [ 1318.948460] mmc1: card 1234 removed
+> > > +Example:
+> > > +
+> > > +	snd_uni_player2: snd-uni-player at 2 {
+> > > +		compatible = "st,snd_uni_player";
+> > 
+> > Maybe change the compatible string to "st,snd-uni-player"?
+> 
+> Just checking the upstream driver which got merged for v4.3
+> and the compatible has changed to "st,sti-uni-player" so I
+> can update the DT doc example to use this in v3.
+> 
+> > 
+> > The string you use here would not be acceptable for a binding.
+> 
+> Presumably it is the use of "underscores" in the compatible which
+> is not allowed? Is that correct?
 
-#
-# devmem 0xd4282854
-0x00001800
-#
+Yes.
 
-
-
-Power from the regulator -
-==========================
-
-Only "vqmmc" stays on, and it is required for the card detection.
-I have confirmed it.
-
-
-So my patch still makes sense.
-
-Thanks,
-Vaibhav
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
