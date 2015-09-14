@@ -1,47 +1,47 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Mon, 14 Sep 2015 17:31:33 +0800
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <CAKv+Gu-xAAd=xTOh+qZvPDthgbRPLy=YwT4xfi4dS53EgJRh1Q@mail.gmail.com>
-References: <20150910112418.GC29293@leverpostej>	<alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>	<20150910121514.GE29293@leverpostej>	<alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>	<20150910144938.GI29293@leverpostej>	<alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>	<20150910162302.GN29293@leverpostej>	<20150911124643.GB4530@olila.local.net-space.pl>	<alpine.DEB.2.02.1509111410180.2672@kaball.uk.xensource.com>	<CAKv+Gu9rN7_mxk0huX+34HSCC_aTWVTkUZKQMB1+9U56fRnwsA@mail.gmail.com>	<20150911154534.GD4530@olila.local.net-space.pl>	<55F6886D.1090900@huawei.com>
- <CAKv+Gu-xAAd=xTOh+qZvPDthgbRPLy=YwT4xfi4dS53EgJRh1Q@mail.gmail.com>
-Message-ID: <55F693F5.8030203@huawei.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Mon, 14 Sep 2015 17:29:03 +0800
+Subject: [RFC PATCH v2 1/3] irqchip: GICv3: set non-percpu irqs status with
+ IRQ_MOVE_PCNTXT
+In-Reply-To: <1442222945-10628-1-git-send-email-yangyingliang@huawei.com>
+References: <1442222945-10628-1-git-send-email-yangyingliang@huawei.com>
+Message-ID: <1442222945-10628-2-git-send-email-yangyingliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use irq_set_status_flags() helper set irqs status with
+IRQ_MOVE_PCNTXT. So that it can do set affinity when
+calling irq_set_affinity_locked().
 
+Cc: Jiang Liu <jiang.liu@linux.intel.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+---
+ drivers/irqchip/irq-gic-v3.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-On 2015/9/14 17:09, Ard Biesheuvel wrote:
-> On 14 September 2015 at 10:42, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> [..]
-> 
->>
->> It only needs to apply following patch to fix a bug in Linux kernel when
->> mapping EFI_MEMORY_RUNTIME memory.
->>
-> 
-> Could you explain why you think efi_virtmap_init() should fail if
-> there are no EFI_MEMORY_RUNTIME regions?
-> 
-
-My understanding is that if there are no EFI_MEMORY_RUNTIME regions, it
-means we can't use runtime services and should not set the bit
-EFI_RUNTIME_SERVICES of efi.flags. But if efi_virtmap_init() return
-true, the bit will be set.
-
-> The absence of such regions is allowed by the spec, so
-> efi_virtmap_init() is correct imo to return success.
-> 
-Sorry, not well know about the spec. Could you point out where the spec
-says this?
-
-> If you are trying to work around the issue where Xen does not expose
-> any Runtime Services regions, there is simply no way to do that and be
-> still UEFI compliant. I have suggested before that we should perhaps
-> tolerate this anyway, by considering the case where the EFI System
-> Table has a NULL runtime services pointer. But rigging
-> efi_virtmap_init() like this is really not the way to achieve that.
-> 
-
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 7deed6e..3d8f400 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -761,6 +761,7 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 		irq_domain_set_info(d, irq, hw, chip, d->host_data,
+ 				    handle_fasteoi_irq, NULL, NULL);
+ 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++		irq_set_status_flags(irq, IRQ_MOVE_PCNTXT);
+ 	}
+ 	/* LPIs */
+ 	if (hw >= 8192 && hw < GIC_ID_NR) {
+@@ -769,6 +770,7 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 		irq_domain_set_info(d, irq, hw, chip, d->host_data,
+ 				    handle_fasteoi_irq, NULL, NULL);
+ 		set_irq_flags(irq, IRQF_VALID);
++		irq_set_status_flags(irq, IRQ_MOVE_PCNTXT);
+ 	}
+ 
+ 	return 0;
 -- 
-Shannon
+2.5.0
