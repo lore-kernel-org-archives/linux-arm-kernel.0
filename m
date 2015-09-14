@@ -1,40 +1,82 @@
-From: songjun.wu@atmel.com (Wu, Songjun)
-Date: Mon, 14 Sep 2015 14:34:02 +0800
-Subject: [PATCH 1/2] ASoC: atmel-classd: add the Audio Class D Amplifier
- code
-In-Reply-To: <20150911103417.GF12027@sirena.org.uk>
-References: <1441086101-15303-1-git-send-email-songjun.wu@atmel.com>
- <1441086101-15303-2-git-send-email-songjun.wu@atmel.com>
- <20150903113716.GU12027@sirena.org.uk> <55EC0AF5.8060403@atmel.com>
- <20150907162350.GV5313@sirena.org.uk> <55EEAC01.3080409@atmel.com>
- <20150908122322.GB9751@sirena.org.uk> <55EFA478.1000109@atmel.com>
- <20150909095245.GG9751@sirena.org.uk> <55F0EB68.9070800@atmel.com>
- <20150911103417.GF12027@sirena.org.uk>
-Message-ID: <55F66A5A.7010502@atmel.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 14 Sep 2015 09:49:35 +0200
+Subject: [PATCH v3] mtd: nand: sunxi: fix OOB handling in ->write_xxx()
+ functions
+In-Reply-To: <20150911224603.GG11487@google.com>
+References: <1441264008-24569-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150911224603.GG11487@google.com>
+Message-ID: <20150914094935.5a20b6d8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Brian,
 
+On Fri, 11 Sep 2015 15:46:03 -0700
+Brian Norris <computersforpeace@gmail.com> wrote:
 
-On 9/11/2015 18:34, Mark Brown wrote:
-> On Thu, Sep 10, 2015 at 10:31:04AM +0800, Wu, Songjun wrote:
->> On 9/9/2015 17:52, Mark Brown wrote:
->
->>> Yes, that's what's going to end up happening but it's not how controls
->>> are expected to behave - applications will expect changing one control
->>> to leave others unaffected so it's better to return an error rather than
->>> change the other control.
->
->> If application change non EQ controls, the others will be unaffected. But
->> the classD IP can only supports one EQ control at once, these three EQ
->> controls point to the same register field, if application set a different EQ
->> control, the error occurs, there will be many errors, it's not very
->> reasonable to application. The best way I think is if application set one EQ
->> control, the other EQ controls will change to 0dB, it's also consistent with
->> fact.
->
-> There's no really good solutions here - this is why my initial
-> suggestion was to have a single enumerated control.
->
-You are right, your suggestion is reasonable, to have a single 
-enumerated control. The second version will be made and sent soon.
+> On Thu, Sep 03, 2015 at 09:06:48AM +0200, Boris Brezillon wrote:
+> > The USER_DATA register cannot be accessed using byte accessors on A13
+> > SoCs, thus triggering a bug when using memcpy_toio on this register.
+> > Declare two helper macros to convert an OOB buffer into a suitable
+> > USER_DATA value and vice-versa.
+> > 
+> > This patch also fixes an error in the oob_required logic (some OOB data
+> > are not written even if the user required it) by removing the
+> > oob_required condition, which is perfectly valid since the core already
+> > fill ->oob_poi with FFs when oob_required is false.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Cc: <stable@vger.kernel.org> # 3.19+
+> > Fixes: 1fef62c1423b ("mtd: nand: add sunxi NAND flash controller support")
+> > 
+> > ---
+> > Changes since v2:
+> > - add the NFC_USER_DATA_TO_BUF() macro and rename NFC_USER_DATA() into
+> >   NFC_BUF_TO_USER_DATA()
+> > - rework the commit message
+> > 
+> > Changes since v1:
+> > - drop the !oob_required conditional path
+> > - replace endianness conversions by a macro relying on byte shifting
+> >   operations
+> > ---
+> >  drivers/mtd/nand/sunxi_nand.c | 33 ++++++++++++++++-----------------
+> >  1 file changed, 16 insertions(+), 17 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+> > index f97a58d..f9b5a4c 100644
+> > --- a/drivers/mtd/nand/sunxi_nand.c
+> > +++ b/drivers/mtd/nand/sunxi_nand.c
+> > @@ -147,6 +147,17 @@
+> >  #define NFC_ECC_MODE		GENMASK(15, 12)
+> >  #define NFC_RANDOM_SEED		GENMASK(30, 16)
+> >  
+> > +/* NFC_USER_DATA helper macros */
+> > +#define NFC_BUF_TO_USER_DATA(buf)	((buf)[0] | ((buf)[1] << 8) | \
+> > +					((buf)[2] << 16) | ((buf)[3] << 24))
+> 
+> I thought you were treading on thin ice with bit-shifting a uint8_t, but
+> it appears that C integer promotion rules are on your side here. (The
+> result of this operation should be an int.)
+
+Yep. I used to cast the first element to an u32 to deal with such use
+cases until I realized it was actually not needed ;-).
+
+> 
+> > +#define NFC_USER_DATA_TO_BUF(buf, val)	\
+> 
+> BTW, why do you need this macro? It's currently unused. Just as an
+> example? I can take it as-is if you'd like, but I was curious why you
+> felt the need for this in v3, especially for -stable.
+
+You're right, it's not needed in this patch. I'll remove it from this
+commit and re-introduce it when needed.
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
