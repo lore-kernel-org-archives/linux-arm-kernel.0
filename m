@@ -1,50 +1,179 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 Sep 2015 18:22:09 +0100
-Subject: [PATCH] arm64: head.S: initialise mdcr_el2 in el2_setup
-In-Reply-To: <1442249935-13277-1-git-send-email-will.deacon@arm.com>
-References: <1442249935-13277-1-git-send-email-will.deacon@arm.com>
-Message-ID: <55F70241.20903@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 14 Sep 2015 19:25:02 +0200
+Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
+ host-only mode
+In-Reply-To: <CADYTM3b3w+c=F2MG+UZbWNHA6zpXPfFo4A2sNnajobBhPmBpAw@mail.gmail.com>
+References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
+ <55C31963.2010701@schinagl.nl> <55C3709C.4080609@redhat.com>
+ <55C47041.3000603@schinagl.nl> <55E93D8C.9020804@schinagl.nl>
+ <55F1CA9B.3070204@redhat.com> <20150910183017.GN9885@lukather>
+ <55F1CE2E.7010409@redhat.com>
+ <CADYTM3Z89oa3akqFaaY4BqJrQ4j+scQawRK0xRkthQde=OQ5tg@mail.gmail.com>
+ <55F6E0CA.2010004@redhat.com>
+ <CADYTM3Y10PsRZ3x9vf73px4T28M0naHnwyyRMZyPdrXc_Y-vLA@mail.gmail.com>
+ <55F6FF28.80109@redhat.com>
+ <CADYTM3b3w+c=F2MG+UZbWNHA6zpXPfFo4A2sNnajobBhPmBpAw@mail.gmail.com>
+Message-ID: <55F702EE.5070903@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/09/15 17:58, Will Deacon wrote:
-> When entering the kernel at EL2, we fail to initialise the MDCR_EL2
-> register which controls debug access and PMU capabilities at EL1.
-> 
-> This patch ensures that the register is initialised so that all traps
-> are disabled and all the PMU counters are available to the host. When a
-> guest is scheduled, KVM takes care to configure trapping appropriately.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/head.S | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index a055be6125cf..90d09eddd5b2 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -523,6 +523,11 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
->  	msr	hstr_el2, xzr			// Disable CP15 traps to EL2
->  #endif
->  
-> +	/* EL2 debug */
-> +	mrs	x0, pmcr_el0			// Disable debug access traps
-> +	ubfx	x0, x0, #11, #5			// to EL2 and allow access to
-> +	msr	mdcr_el2, x0			// all PMU counters from EL1
-> +
->  	/* Stage-2 translation */
->  	msr	vttbr_el2, xzr
->  
-> 
+Hi,
 
-Ah! I guess we've been quite lucky so far... FWIW:
+On 14-09-15 19:14, Bin Liu wrote:
+> Hi,
+>
+> On Mon, Sep 14, 2015 at 12:08 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
+>>
+>>
+>> On 14-09-15 18:58, Bin Liu wrote:
+>>>
+>>> Hi,
+>>>
+>>> On Mon, Sep 14, 2015 at 9:59 AM, Hans de Goede <hdegoede@redhat.com>
+>>> wrote:
+>>>>
+>>>> Hi,
+>>>>
+>>>>
+>>>> On 14-09-15 16:44, Bin Liu wrote:
+>>>>>
+>>>>>
+>>>>> Hi,
+>>>>>
+>>>>> On Thu, Sep 10, 2015 at 1:38 PM, Hans de Goede <hdegoede@redhat.com>
+>>>>> wrote:
+>>>>>>
+>>>>>>
+>>>>>> Hi,
+>>>>>>
+>>>>>> On 10-09-15 20:30, Maxime Ripard wrote:
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> On Thu, Sep 10, 2015 at 08:23:23PM +0200, Hans de Goede wrote:
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> Hi,
+>>>>>>>>
+>>>>>>>> On 04-09-15 08:43, Olliver Schinagl wrote:
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> Hey Hans,
+>>>>>>>>>
+>>>>>>>>> On 07-08-15 10:45, Olliver Schinagl wrote:
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>> <snip>
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>>
+>>>>>>>>>>> If you change the dr_mode to host then you _must_ also remove any
+>>>>>>>>>>> id_det and vbus_det
+>>>>>>>>>>> gpio settings from the usb_phy node in the dts, as the sun4i phy
+>>>>>>>>>>> code
+>>>>>>>>>>> detects
+>>>>>>>>>>> host vs otg mode by checking for the presence of these.
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>> Yes, this fixes it and makes it work. Thanks.
+>>>>>>>>>>
+>>>>>>>>> I've been going back to this and am wondering if this is something I
+>>>>>>>>> can
+>>>>>>>>> look into to fix properly? E.g. if the dts sets dr_mode = host, can
+>>>>>>>>> we
+>>>>>>>>> simply ignore the pins and treat them as unset?
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> AFAIK you cannot unset something in dts. The only solution I
+>>>>>>>> can comeup with is to add a dr_mode argument to the phy like
+>>>>>>>> we already have for the otg controller itself.
+>>>>>>>>
+>>>>>>>> This is something which we likely need to do anyways to add
+>>>>>>>> support for peripheral only mode, which we seem to need for
+>>>>>>>> some "hdmi sticks".
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> I haven't really followed the rest of the discussion, so sorry if you
+>>>>>>> already talked about that, but why can't you just set the dr_mode to
+>>>>>>> peripheral in such a case?
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> This is about the usbphy code not the musb-controller code, which are
+>>>>>> 2 different dts nodes, atm only the musb-controller node has a
+>>>>>> dr_mode property, and the phy code decides between host-only
+>>>>>> and otg mode based on whether an id pin is assigned or not.
+>>>>>>
+>>>>>> My proposal is to get rid of the id-pin hack to determine the mode
+>>>>>> and add a dr_mode property to the usbphy dts node.
+>>>>>
+>>>>>
+>>>>>
+>>>>> I would try to avoid adding dr_mode in the usbphy node if possible,
+>>>>> since it is already specified in the controller node.
+>>>>>
+>>>>> Since the phy node is referenced in the controller node, is it
+>>>>> possible that the phy driver looks up the controller of properties to
+>>>>> find its dr_mode setting?
+>>>>
+>>>>
+>>>>
+>>>> That is possible, but it very much goes against how devicetree normally
+>>>> works, where every node is more or less a standalone unit which
+>>>> contains enough info for the associated driver to do its work.
+>>>
+>>>
+>>> I guess you are right, but duplicating dr_mode would cause more
+>>> trouble for end user.
+>>
+>>
+>> The user already needs to set up regulators, vbus-det and id-det
+>> for otg mode in the usbphy node. Although there are 2 nodes in dts /
+>> 2 separate hardware blocks involved in reality the 2 are closely
+>> related and the user already must take care to have the settings match.
+>>
+>> Besides that writing dts files is not something which end users do,
+>> so a normal user will never see this.
+>>
+>>> Felipe, could you please give your comments on this issue? I have to
+>>> do the similar change for musb_dsps.
+>>>
+>>>>
+>>>> Currently there is no link from the phy node to the controller node
+>>>> (only the other way around) and adding such a link requires more code
+>>>> then simple having a duplicate dr_mode.
+>>>
+>>>
+>>> I guess I did not make my previous comment clearly, we don't need to
+>>> add the link from the phy node to the controller node. We don't need
+>>> to change the current dts, just in the phy driver to look up dr_mode
+>>> of the controller node, if possible.
+>>
+>>
+>> And how does the phy code now where the controller node lives without
+>> having a link to it in its node? Hardcode the full path to the
+>> controller node ? That is both ugly and error prone.
+>
+> This is my first time looking at dts handling in drivers, so I might
+> be completely wrong, but I am thinking that since the controller node
+> links to the phy node, so the controller node is the parent of the phy
+> node, so if there is an of api can look it up?
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+If the phy is a child of the controller, then yes this would work,
+but in the case of sunxi the phy is a built-in mmio mapped peripheral
+just like the controller, so they sit at the same level and have no
+parent child relation.
 
-I guess you'll merge this via the arm64 tree?
+Regards,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Hans
