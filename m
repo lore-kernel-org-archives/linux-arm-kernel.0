@@ -1,50 +1,54 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 14 Sep 2015 12:52:49 -0700
-Subject: [PATCH 3/3] ARM: brcmstb: Setup BIU control registers during boot
-In-Reply-To: <1442260369-6575-1-git-send-email-f.fainelli@gmail.com>
-References: <1442260369-6575-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1442260369-6575-4-git-send-email-f.fainelli@gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 14 Sep 2015 22:06:42 +0200
+Subject: [PATCH v2 0/2] ARM: gic: Document optional Clock and Power Domain
+ properties
+Message-ID: <1442261204-30931-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call brcmstb_biuctrl_init() in brcmstb's init_irq machine descriptor
-callback since we need to setup the Bus Interface Unit before SMP in
-particular, but we also need to be able to remap registers.
+	Hi,
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/mach-bcm/brcmstb.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+On some SoCs, the GIC may be part of a PM Domain (hardware Power and/or
+Clock Domain).  Document the related optional DT properties.
 
-diff --git a/arch/arm/mach-bcm/brcmstb.c b/arch/arm/mach-bcm/brcmstb.c
-index 3a60f7ee3f0c..99a67cfb7c0d 100644
---- a/arch/arm/mach-bcm/brcmstb.c
-+++ b/arch/arm/mach-bcm/brcmstb.c
-@@ -12,11 +12,19 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/irqchip.h>
- #include <linux/of_platform.h>
-+#include <linux/soc/brcmstb/brcmstb.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-+static void __init brcmstb_init_irq(void)
-+{
-+	irqchip_init();
-+	brcmstb_biuctrl_init();
-+}
-+
- static const char *const brcmstb_match[] __initconst = {
- 	"brcm,bcm7445",
- 	"brcm,brcmstb",
-@@ -25,4 +33,5 @@ static const char *const brcmstb_match[] __initconst = {
- 
- DT_MACHINE_START(BRCMSTB, "Broadcom STB (Flattened Device Tree)")
- 	.dt_compat	= brcmstb_match,
-+	.init_irq	= brcmstb_init_irq,
- MACHINE_END
+This patch series:
+  - Adds support for the PL390 GIC variant, as the PL390 has different
+    clock inputs than the A9 MPCore GIC that is currently (incorrectly)
+    described in various Renesas DTSes instead,
+  - Documents optional Clock and Power Domain properties.
+
+This will allow to properly describe later the relationship between the
+GIC and the Clock and/or Power Domain topology on Renesas SoCs, and
+prevent clocks from being disabled inadvertently.
+
+This is v2 of "[PATCH] ARM: gic: Document Power and Clock Domain optional
+properties" (https://lkml.org/lkml/2015/4/27/401).
+
+Changes since v1:
+  - Add "arm,pl390",
+  - Add "clock-names" to DT bindings,
+  - Document clock inputs on various GIC variants.
+
+Thanks for your comments!
+
+Geert Uytterhoeven (2):
+  irqchip: gic: Add arm,pl390 support
+  irqchip: gic: Document optional Clock and Power Domain properties
+
+ Documentation/devicetree/bindings/arm/gic.txt | 24 ++++++++++++++++++++----
+ drivers/irqchip/irq-gic.c                     |  1 +
+ 2 files changed, 21 insertions(+), 4 deletions(-)
+
 -- 
-2.1.0
+1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
