@@ -1,73 +1,143 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 14 Sep 2015 14:26:15 +0100
-Subject: [RFC PATCH v2 1/7] irqchip: gic-v3: Reset BPR during initialization
+Date: Mon, 14 Sep 2015 14:26:16 +0100
+Subject: [RFC PATCH v2 2/7] arm64: Add support for on-demand backtrace of
+ other CPUs
 In-Reply-To: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
 References: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1442237181-17064-2-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1442237181-17064-3-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, when running on FVP, CPU 0 boots up with its BPR changed from
-the reset value. This renders it impossible to (preemptively) prioritize
-interrupts on CPU 0.
+Currently arm64 has no implementation of arch_trigger_all_cpu_backtace.
+The patch provides one using library code recently added by Russell King
+for for the majority of the implementation. Currently this is realized
+using regular irqs but could, in the future, be implemented using
+NMI-like mechanisms.
 
-This is harmless on normal systems since Linux typically does not
-support preemptive interrupts. It does however cause problems in
-systems with additional changes (such as patches for NMI simulation).
+Note: There is a small (and nasty) change to the generic code to ensure
+      good stack traces. The generic code currently assumes that
+      show_regs() will include a stack trace but arch/arm64 does not do
+      this so we must add extra code here. Ideas on a better approach
+      here would be very welcome (is there any appetite to change arm64
+      show_regs() or should we just tease out the dump code into a
+      callback?).
 
-Many thanks to Andrew Thoelke for suggesting the BPR as having the
-potential to harm preemption.
-
-Suggested-by: Andrew Thoelke <andrew.thoelke@arm.com>
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/irqchip/irq-gic-v3.c       | 13 +++++++++++++
- include/linux/irqchip/arm-gic-v3.h |  2 ++
- 2 files changed, 15 insertions(+)
+ arch/arm64/include/asm/hardirq.h |  2 +-
+ arch/arm64/include/asm/irq.h     |  3 +++
+ arch/arm64/kernel/smp.c          | 26 ++++++++++++++++++++++++++
+ lib/nmi_backtrace.c              |  8 ++++++--
+ 4 files changed, 36 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 7deed6ef54c2..b47bd971038e 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -127,6 +127,11 @@ static void __maybe_unused gic_write_pmr(u64 val)
- 	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
- }
+diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
+index 2bb7009bdac7..0af4cdb4b5a9 100644
+--- a/arch/arm64/include/asm/hardirq.h
++++ b/arch/arm64/include/asm/hardirq.h
+@@ -20,7 +20,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
  
-+static void __maybe_unused gic_write_bpr1(u64 val)
+-#define NR_IPI	5
++#define NR_IPI	6
+ 
+ typedef struct {
+ 	unsigned int __softirq_pending;
+diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
+index bbb251b14746..6b2724b2a803 100644
+--- a/arch/arm64/include/asm/irq.h
++++ b/arch/arm64/include/asm/irq.h
+@@ -21,4 +21,7 @@ static inline void acpi_irq_init(void)
+ }
+ #define acpi_irq_init acpi_irq_init
+ 
++extern void arch_trigger_all_cpu_backtrace(bool);
++#define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
++
+ #endif
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index dbdaacddd9a5..0f37a33499e2 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -37,6 +37,7 @@
+ #include <linux/completion.h>
+ #include <linux/of.h>
+ #include <linux/irq_work.h>
++#include <linux/nmi.h>
+ 
+ #include <asm/alternative.h>
+ #include <asm/atomic.h>
+@@ -70,6 +71,7 @@ enum ipi_msg_type {
+ 	IPI_CPU_STOP,
+ 	IPI_TIMER,
+ 	IPI_IRQ_WORK,
++	IPI_CPU_BACKTRACE,
+ };
+ 
+ /*
+@@ -623,6 +625,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
+ 	S(IPI_CPU_STOP, "CPU stop interrupts"),
+ 	S(IPI_TIMER, "Timer broadcast interrupts"),
+ 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
++	S(IPI_CPU_BACKTRACE, "backtrace interrupts"),
+ };
+ 
+ static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
+@@ -743,6 +746,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		break;
+ #endif
+ 
++	case IPI_CPU_BACKTRACE:
++		irq_enter();
++		nmi_cpu_backtrace(regs);
++		irq_exit();
++		break;
++
+ 	default:
+ 		pr_crit("CPU%u: Unknown IPI message 0x%x\n", cpu, ipinr);
+ 		break;
+@@ -794,3 +803,20 @@ int setup_profiling_timer(unsigned int multiplier)
+ {
+ 	return -EINVAL;
+ }
++
++static void raise_nmi(cpumask_t *mask)
 +{
-+	asm volatile("msr_s " __stringify(ICC_BPR1_EL1) ", %0" : : "r" (val));
++	/*
++	 * Generate the backtrace directly if we are running in a
++	 * calling context that is not preemptible by the backtrace IPI.
++	 */
++	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
++		nmi_cpu_backtrace(NULL);
++
++	smp_cross_call(mask, IPI_CPU_BACKTRACE);
 +}
 +
- static void __maybe_unused gic_write_ctlr(u64 val)
- {
- 	asm volatile("msr_s " __stringify(ICC_CTLR_EL1) ", %0" : : "r" (val));
-@@ -501,6 +506,14 @@ static void gic_cpu_sys_reg_init(void)
- 	/* Set priority mask register */
- 	gic_write_pmr(DEFAULT_PMR_VALUE);
++void arch_trigger_all_cpu_backtrace(bool include_self)
++{
++	nmi_trigger_all_cpu_backtrace(include_self, raise_nmi);
++}
+diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
+index be0466a80d0b..29f7c4585f7f 100644
+--- a/lib/nmi_backtrace.c
++++ b/lib/nmi_backtrace.c
+@@ -149,10 +149,14 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
+ 		/* Replace printk to write into the NMI seq */
+ 		this_cpu_write(printk_func, nmi_vprintk);
+ 		pr_warn("NMI backtrace for cpu %d\n", cpu);
+-		if (regs)
++		if (regs) {
+ 			show_regs(regs);
+-		else
++#ifdef CONFIG_ARM64
++			show_stack(NULL, NULL);
++#endif
++		} else {
+ 			dump_stack();
++		}
+ 		this_cpu_write(printk_func, printk_func_save);
  
-+	/*
-+	 * Some firmwares hand over to the kernel with the BPR changed from
-+	 * its reset value (and with a value large enough to prevent
-+	 * any pre-emptive interrupts from working at all). Writing a zero
-+	 * to BPR restores is reset value.
-+	 */
-+	gic_write_bpr1(0);
-+
- 	if (static_key_true(&supports_deactivate)) {
- 		/* EOI drops priority only (mode 1) */
- 		gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop);
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 9eeeb9589acf..60cc91749e7d 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -292,6 +292,8 @@
- #define ICH_VMCR_PMR_SHIFT		24
- #define ICH_VMCR_PMR_MASK		(0xffUL << ICH_VMCR_PMR_SHIFT)
- 
-+#define ICC_BPR0_EL1			sys_reg(3, 0, 12, 8, 3)
-+#define ICC_BPR1_EL1			sys_reg(3, 0, 12, 12, 3)
- #define ICC_EOIR1_EL1			sys_reg(3, 0, 12, 12, 1)
- #define ICC_DIR_EL1			sys_reg(3, 0, 12, 11, 1)
- #define ICC_IAR1_EL1			sys_reg(3, 0, 12, 12, 0)
+ 		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
 -- 
 2.4.3
