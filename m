@@ -1,61 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 Sep 2015 15:19:21 +0100
-Subject: [PATCH] clk: rockchip: add critical clock for rk3368
-In-Reply-To: <5267432.TORlj1Iv40@diego>
-References: <5267432.TORlj1Iv40@diego>
-Message-ID: <20150914141920.GF7002@leverpostej>
+From: roger.pau@citrix.com (=?UTF-8?Q?Roger_Pau_Monn=c3=a9?=)
+Date: Mon, 14 Sep 2015 16:29:48 +0200
+Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
+In-Reply-To: <55F6C1D2.7010206@citrix.com>
+References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+ <55F68BC9.6020509@citrix.com> <55F6A437.3040403@citrix.com>
+ <55F6A9DB.8040503@citrix.com> <55F6ADAE.1010609@citrix.com>
+ <55F6B8CC.5090406@citrix.com> <55F6C1D2.7010206@citrix.com>
+Message-ID: <55F6D9DC.8060607@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 13, 2015 at 12:20:36PM +0100, Heiko St?bner wrote:
-> Again a result of the gpio-clock-liberation the rk3368 needs the
-> pclk_pd_pmu marked as critical, to boot successfully.
-> 
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Hello,
 
-FWIW: Tested-by: Mark Rutland <mark.rutland@arm.com>
+El 14/09/15 a les 14.47, Julien Grall ha escrit:
+> On 14/09/15 13:08, Roger Pau Monn? wrote:
+>>> I'd like to see a basic support of 64KB page granularity upstream before
+>>> starting to think about performance improvement. And there is still a
+>>> lot to do.
+>>
+>> I wasn't actually thinking of this as a performance improvement, but
+>> rather as a way of fixing this properly and removing the complexity
+>> added to xen-blkfront, thus providing a PV block protocol that natively
+>> supports 64KB pages. This would be like hardware components already do
+>> AFAIK, because I don't think there are other drivers in the Linux tree
+>> that do this kind of splitting.
+>>
+>>> Although, having 64KB grants won't remove the splitting as we would
+>>> still have to support frontend/backend which only handle 4KB grant.
+>>
+>> IMHO, given enough time I would just drop those.
+> 
+> The PV protocol has always been backward compatible.
+> 
+> Introducing the support of 64KB grant will require some changes in Xen
+> which won't surely be backported to older version. We still have to be
+> able to run new Linux guest on older Xen and vice versa.
 
-I'm surprised that we don't describe these as critical in the DT, given
-that this isn't really an internal property of the clock controller, but
-rather what happens to be attached to it. That ship appears to have
-sailed, however.
+OK, so let's wait a couple of Xen and Linux releases before dropping
+this from the Linux kernel once 64KB grant support is added. Guests
+should still be able to boot, it's just the disk that won't be attached.
 
-Thanks,
-Mark.
+IMHO this splitting is just a workaround for the fact that we don't have
+a 64KB PV block protocol, and this is the real problem that should be
+solved.
 
-> ---
-> should go on top of clk-fixes. Sorry only finding these piece
-> by piece :-) .
-> 
->  drivers/clk/rockchip/clk-rk3368.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/clk/rockchip/clk-rk3368.c b/drivers/clk/rockchip/clk-rk3368.c
-> index 9c5d61e..7e6b783 100644
-> --- a/drivers/clk/rockchip/clk-rk3368.c
-> +++ b/drivers/clk/rockchip/clk-rk3368.c
-> @@ -818,6 +818,10 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
->  	GATE(0, "sclk_timer00", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 0, GFLAGS),
->  };
->  
-> +static const char *const rk3368_critical_clocks[] __initconst = {
-> +	"pclk_pd_pmu",
-> +};
-> +
->  static void __init rk3368_clk_init(struct device_node *np)
->  {
->  	void __iomem *reg_base;
-> @@ -862,6 +866,8 @@ static void __init rk3368_clk_init(struct device_node *np)
->  				   RK3368_GRF_SOC_STATUS0);
->  	rockchip_clk_register_branches(rk3368_clk_branches,
->  				  ARRAY_SIZE(rk3368_clk_branches));
-> +	rockchip_clk_protect_critical(rk3368_critical_clocks,
-> +				      ARRAY_SIZE(rk3368_critical_clocks));
->  
->  	rockchip_clk_register_armclk(ARMCLKB, "armclkb",
->  			mux_armclkb_p, ARRAY_SIZE(mux_armclkb_p),
-> -- 
-> 2.5.1
-> 
-> 
+In the long term this will put a burden on all blkfronts (if 64KB pages
+are also used by other OSes), while introducing a 64KB PV block protocol
+will make the blkfront implementation in all OSes very similar to what
+we have now, without replicating the splitting code amongst all the
+possible blkfront implementations.
+
+Granted that some changes to blkback will be needed in order to support
+mapping 64KB grants, but there are much fewer blkback implementations
+out there than blkfronts.
+
+> To give you an example, Centos 7, which will support Xen and only 64KB
+> page granularity, will be supported for years. Dropping any splitting in
+> a short future (3-5 years) will just break those guests to boot on Xen.
+
+Can't the patches to support 64KB grants be backported to CentOS? In the
+past you said that distros had no problem in picking the needed Xen
+patches for 64KB support, I don't see how that would be different.
+
+Also, a blkfront with the splitting code should also be able to work
+perfectly fine once we have a 64KB PV block protocol, it will just be
+treated like it's using 4KB pages, that's all.
+
+> AFAIK, we never took a such radical decision on Xen based on the
+> complexity of the code.
+
+We never had to deal with a problem like this I'm afraid (mixing guests
+with different page sizes), so I don't think we can make statements
+about that.
+
+And it's not just about the complexity, it's because as stated above
+this IMHO is just sweeping the real problem under the carpet instead of
+solving it.
+
+Roger.
