@@ -1,394 +1,46 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Mon, 14 Sep 2015 19:06:37 +0800
-Subject: [PATCH 2/3] mailbox: rockchip: Add Rockchip mailbox driver
+Date: Mon, 14 Sep 2015 19:06:38 +0800
+Subject: [PATCH 3/3] ARM64: dts: rk3368: Add mailbox device nodes
 In-Reply-To: <1442228798-15191-1-git-send-email-wxt@rock-chips.com>
 References: <1442228798-15191-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1442228798-15191-3-git-send-email-wxt@rock-chips.com>
+Message-ID: <1442228798-15191-4-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is found on RK3368 SoCs.
+This adds mailbox device nodes in dts.
 
-The Mailbox module is a simple APB peripheral that allows both
-the Cortex-A53 MCU system to communicate by writing operation to
-generate interrupt.
-The registers are accessible by both CPU via APB interface.
-
-The Mailbox has the following main features:
-
-@ Support dual-core system: Cortex-A53 and MCU.
-@ Support APB interface.
-@ Support four mailbox elements, each element includes one data word, one
-  command word register and one flag bit that can represent one interrupt.
-@ Four interrupts to Cortex-A53.
-@ Four interrupts to MCU.
-@ Provide 32 lock registers for software to use to indicate whether mailbox
-  is occupied.
+mailbox is used by the Rockchip CPU cores to communicate
+requests to MCU processormZ
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 ---
 
- drivers/mailbox/Kconfig            |   9 ++
- drivers/mailbox/Makefile           |   2 +
- drivers/mailbox/rockchip-mailbox.c | 317 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 328 insertions(+)
- create mode 100644 drivers/mailbox/rockchip-mailbox.c
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-index bbec500..a548d700 100644
---- a/drivers/mailbox/Kconfig
-+++ b/drivers/mailbox/Kconfig
-@@ -43,6 +43,15 @@ config OMAP_MBOX_KFIFO_SIZE
- 	  This can also be changed at runtime (via the mbox_kfifo_size
- 	  module parameter).
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index a712bea..9ac5cca 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -484,6 +484,19 @@
+ 		status = "disabled";
+ 	};
  
-+config ROCKCHIP_MBOX
-+	bool "Rockchip Soc Intergrated Mailbox Support"
-+	depends on ARCH_ROCKCHIP
-+	help
-+	  This driver provides support for inter-processor communication
-+	  between CPU cores and MCU processor on Some Rockchip SOCs.
-+	  Please check it that the Soc you use have Mailbox hardware.
-+	  Say Y here if you want to use the Rockchip Mailbox support.
-+
- config PCC
- 	bool "Platform Communication Channel Driver"
- 	depends on ACPI
-diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-index 8e6d822..730cb5d 100644
---- a/drivers/mailbox/Makefile
-+++ b/drivers/mailbox/Makefile
-@@ -8,6 +8,8 @@ obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
- 
- obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
- 
-+obj-$(CONFIG_ROCKCHIP_MBOX)	+= rockchip-mailbox.o
-+
- obj-$(CONFIG_PCC)		+= pcc.o
- 
- obj-$(CONFIG_ALTERA_MBOX)	+= mailbox-altera.o
-diff --git a/drivers/mailbox/rockchip-mailbox.c b/drivers/mailbox/rockchip-mailbox.c
-new file mode 100644
-index 0000000..715ab96
---- /dev/null
-+++ b/drivers/mailbox/rockchip-mailbox.c
-@@ -0,0 +1,317 @@
-+/*
-+ * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
-+ *
-+ * Authors:	Addy Ke <addy.ke@rock-chips.com>
-+ *		Caesar Wang <wxt@rock-chips.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mailbox_controller.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+
-+#define MAILBOX_A2B_INTEN		0x00
-+#define MAILBOX_A2B_STATUS		0x04
-+#define MAILBOX_A2B_CMD(x)		(0x08 + (x) * 8)
-+#define MAILBOX_A2B_DAT(x)		(0x0c + (x) * 8)
-+
-+#define MAILBOX_B2A_INTEN		0x28
-+#define MAILBOX_B2A_STATUS		0x2C
-+#define MAILBOX_B2A_CMD(x)		(0x30 + (x) * 8)
-+#define MAILBOX_B2A_DAT(x)		(0x34 + (x) * 8)
-+
-+#define MAILBOX_ATOMIC_LOCK(x)		(0x100 + (x) * 8)
-+
-+/* A2B: 0 - 2k */
-+#define A2B_BUF(size, idx)		((idx) * (size))
-+
-+/* B2A: 2k - 4k */
-+#define B2A_BUF(size, idx)		(((idx) + 4) * (size))
-+
-+struct rockchip_mbox_msg {
-+	u32 cmd;
-+	int tx_size;
-+	void *tx_buf;
-+	int rx_size;
-+	void *rx_buf;
-+	void *cl_data;
-+};
-+
-+struct rockchip_mbox_data {
-+	int num_chans;
-+};
-+
-+struct rockchip_mbox_chan {
-+	int idx;
-+	int irq;
-+	struct rockchip_mbox_msg *msg;
-+	struct rockchip_mbox *mb;
-+};
-+
-+struct rockchip_mbox {
-+	struct mbox_controller mbox;
-+	struct clk *pclk;
-+	void __iomem *mbox_base;
-+
-+	/* The base address of share memory to transfer data */
-+	void __iomem *buf_base;
-+
-+	/* The maximum size of buf for each channel */
-+	u32 buf_size;
-+
-+	struct rockchip_mbox_chan *chans;
-+};
-+
-+static inline int chan_to_idx(struct rockchip_mbox *mb,
-+			      struct mbox_chan *chan)
-+{
-+	return (chan - mb->mbox.chans);
-+}
-+
-+static int rockchip_mbox_send_data(struct mbox_chan *chan, void *data)
-+{
-+	struct rockchip_mbox *mb = dev_get_drvdata(chan->mbox->dev);
-+	struct rockchip_mbox_msg *msg = data;
-+	int idx = chan_to_idx(mb, chan);
-+
-+	if (!msg)
-+		return -EINVAL;
-+
-+	if ((msg->tx_size > mb->buf_size) ||
-+	    (msg->rx_size > mb->buf_size)) {
-+		dev_err(mb->mbox.dev, "Transmit size over buf size(%d)\n",
-+			mb->buf_size);
-+		return -EINVAL;
-+	}
-+
-+	dev_dbg(mb->mbox.dev, "Chan[%d]: A2B message, cmd 0x%08x\n",
-+		idx, msg->cmd);
-+
-+	mb->chans[idx].msg = msg;
-+
-+	if (msg->tx_buf)
-+		memcpy(mb->buf_base + A2B_BUF(mb->buf_size, idx),
-+		       msg->tx_buf, msg->tx_size);
-+
-+	writel_relaxed(msg->cmd, mb->mbox_base + MAILBOX_A2B_CMD(idx));
-+	writel_relaxed(msg->rx_size, mb->mbox_base + MAILBOX_A2B_DAT(idx));
-+
-+	return 0;
-+}
-+
-+static int rockchip_mbox_startup(struct mbox_chan *chan)
-+{
-+	return 0;
-+}
-+
-+static void rockchip_mbox_shutdown(struct mbox_chan *chan)
-+{
-+	struct rockchip_mbox *mb = dev_get_drvdata(chan->mbox->dev);
-+	int idx = chan_to_idx(mb, chan);
-+
-+	mb->chans[idx].msg = NULL;
-+}
-+
-+static const struct mbox_chan_ops rockchip_mbox_chan_ops = {
-+	.send_data	= rockchip_mbox_send_data,
-+	.startup	= rockchip_mbox_startup,
-+	.shutdown	= rockchip_mbox_shutdown,
-+};
-+
-+static irqreturn_t rockchip_mbox_irq(int irq, void *dev_id)
-+{
-+	int idx;
-+	struct rockchip_mbox *mb = (struct rockchip_mbox *)dev_id;
-+	u32 status = readl_relaxed(mb->mbox_base + MAILBOX_B2A_STATUS);
-+
-+	for (idx = 0; idx < mb->mbox.num_chans; idx++) {
-+		if ((status & (1 << idx)) && (irq == mb->chans[idx].irq)) {
-+			/* Clear mbox interrupt */
-+			writel_relaxed(1 << idx,
-+				       mb->mbox_base + MAILBOX_B2A_STATUS);
-+			return IRQ_WAKE_THREAD;
-+		}
-+	}
-+
-+	return IRQ_NONE;
-+}
-+
-+static irqreturn_t rockchip_mbox_isr(int irq, void *dev_id)
-+{
-+	int idx;
-+	struct rockchip_mbox_msg *msg = NULL;
-+	struct rockchip_mbox *mb = (struct rockchip_mbox *)dev_id;
-+
-+	for (idx = 0; idx < mb->mbox.num_chans; idx++) {
-+		if (irq != mb->chans[idx].irq)
-+			continue;
-+
-+		msg = mb->chans[idx].msg;
-+		if (!msg) {
-+			dev_err(mb->mbox.dev,
-+				"Chan[%d]: B2A message is NULL\n", idx);
-+			break; /* spurious */
-+		}
-+
-+		if (msg->rx_buf)
-+			memcpy(msg->rx_buf,
-+			       mb->buf_base + B2A_BUF(mb->buf_size, idx),
-+			       msg->rx_size);
-+
-+		mbox_chan_received_data(&mb->mbox.chans[idx], msg);
-+		mb->chans[idx].msg = NULL;
-+
-+		dev_dbg(mb->mbox.dev, "Chan[%d]: B2A message, cmd 0x%08x\n",
-+			idx, msg->cmd);
-+
-+		break;
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static const struct rockchip_mbox_data rk3368_drv_data = {
-+	.num_chans = 4,
-+};
-+
-+static const struct of_device_id rockchip_mbox_of_match[] = {
-+	{ .compatible = "rockchip,rk3368-mailbox", .data = &rk3368_drv_data},
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, rockchp_mbox_of_match);
-+
-+static int rockchip_mbox_probe(struct platform_device *pdev)
-+{
-+	struct rockchip_mbox *mb;
-+	const struct of_device_id *match;
-+	const struct rockchip_mbox_data *drv_data;
-+	struct resource *res;
-+	int ret, irq, i;
-+
-+	if (!pdev->dev.of_node)
-+		return -ENODEV;
-+
-+	match = of_match_node(rockchip_mbox_of_match, pdev->dev.of_node);
-+	drv_data = (const struct rockchip_mbox_data *)match->data;
-+
-+	mb = devm_kzalloc(&pdev->dev, sizeof(*mb), GFP_KERNEL);
-+	if (!mb)
-+		return -ENOMEM;
-+
-+	mb->chans = devm_kcalloc(&pdev->dev, drv_data->num_chans,
-+				 sizeof(*mb->chans), GFP_KERNEL);
-+	if (!mb->chans)
-+		return -ENOMEM;
-+
-+	mb->mbox.chans = devm_kcalloc(&pdev->dev, drv_data->num_chans,
-+				      sizeof(*mb->mbox.chans), GFP_KERNEL);
-+	if (!mb->mbox.chans)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, mb);
-+
-+	mb->mbox.dev = &pdev->dev;
-+	mb->mbox.num_chans = drv_data->num_chans;
-+	mb->mbox.ops = &rockchip_mbox_chan_ops;
-+	mb->mbox.txdone_irq = true;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENODEV;
-+
-+	mb->mbox_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(mb->mbox_base))
-+		return PTR_ERR(mb->mbox_base);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res)
-+		return -ENODEV;
-+
-+	/* Each channel has two buffers for A2B and B2A */
-+	mb->buf_size = resource_size(res) / (drv_data->num_chans * 2);
-+	mb->buf_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(mb->buf_base))
-+		return PTR_ERR(mb->buf_base);
-+
-+	mb->pclk = devm_clk_get(&pdev->dev, "pclk_mailbox");
-+	if (IS_ERR(mb->pclk)) {
-+		ret = PTR_ERR(mb->pclk);
-+		dev_err(&pdev->dev, "failed to get pclk_mailbox clock: %d\n",
-+			ret);
-+		return ret;
-+	}
-+
-+	ret = clk_prepare_enable(mb->pclk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to enable pclk: %d\n", ret);
-+		return ret;
-+	}
-+
-+	for (i = 0; i < mb->mbox.num_chans; i++) {
-+		irq = platform_get_irq(pdev, i);
-+		if (irq < 0)
-+			return irq;
-+
-+		ret = devm_request_threaded_irq(&pdev->dev, irq,
-+						rockchip_mbox_irq,
-+						rockchip_mbox_isr, IRQF_ONESHOT,
-+						dev_name(&pdev->dev), mb);
-+		if (ret < 0)
-+			return ret;
-+
-+		mb->chans[i].idx = i;
-+		mb->chans[i].mb = mb;
-+		mb->chans[i].msg = NULL;
-+		mb->chans[i].irq = irq;
-+	}
-+
-+	/* Enable all B2A interrupts */
-+	writel_relaxed((1 << mb->mbox.num_chans) - 1,
-+		       mb->mbox_base + MAILBOX_B2A_INTEN);
-+
-+	ret = mbox_controller_register(&mb->mbox);
-+	if (ret < 0)
-+		dev_err(&pdev->dev, "Failed to register mailbox: %d\n", ret);
-+
-+	return ret;
-+}
-+
-+static int rockchip_mbox_remove(struct platform_device *pdev)
-+{
-+	struct rockchip_mbox *mb = platform_get_drvdata(pdev);
-+
-+	if (!mb)
-+		return -EINVAL;
-+
-+	mbox_controller_unregister(&mb->mbox);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver rockchip_mbox_driver = {
-+	.probe	= rockchip_mbox_probe,
-+	.remove	= rockchip_mbox_remove,
-+	.driver = {
-+		.name = "rockchip-mailbox",
-+		.of_match_table = of_match_ptr(rockchip_mbox_of_match),
-+	},
-+};
-+
-+static int __init rockchip_mbox_init(void)
-+{
-+	return platform_driver_register(&rockchip_mbox_driver);
-+}
-+subsys_initcall(rockchip_mbox_init);
++	mbox: mbox at ff6b0000 {
++		compatible = "rockchip,rk3368-mailbox";
++		reg = <0x0 0xff6b0000 0x0 0x1000>,
++		      <0x0 0xff8cf000 0x0 0x1000>; /* the end 4k of sram */
++		interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru PCLK_MAILBOX>;
++		clock-names = "pclk_mailbox";
++		#mbox-cells = <1>;
++	};
++
+ 	pmugrf: syscon at ff738000 {
+ 		compatible = "rockchip,rk3368-pmugrf", "syscon";
+ 		reg = <0x0 0xff738000 0x0 0x1000>;
 -- 
 1.9.1
