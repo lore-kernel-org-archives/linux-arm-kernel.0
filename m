@@ -1,51 +1,40 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 14 Sep 2015 16:24:26 -0500
-Subject: [PATCH 6/6] ARM: dts: set up trigger type for edt-ft5x06
- interrupts
-In-Reply-To: <2adcbfd1d5b237598d37edcbeec4a8dbd443f36f.1442079408.git.dmitry.torokhov@gmail.com>
-References: <5044530af510d6686e78f8dfa912d89ef824f899.1442079408.git.dmitry.torokhov@gmail.com>
- <2adcbfd1d5b237598d37edcbeec4a8dbd443f36f.1442079408.git.dmitry.torokhov@gmail.com>
-Message-ID: <20150914212426.GA9968@saruman.tx.rr.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 14 Sep 2015 14:29:30 -0700
+Subject: [PATCH 3/3] ARM: brcmstb: Setup BIU control registers during boot
+In-Reply-To: <55F73A47.9070900@gmail.com>
+References: <1442260369-6575-1-git-send-email-f.fainelli@gmail.com>
+ <1442260369-6575-4-git-send-email-f.fainelli@gmail.com>
+ <20150914204833.GA53555@google.com> <55F73A47.9070900@gmail.com>
+Message-ID: <20150914212930.GA64093@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 12, 2015 at 10:45:51AM -0700, Dmitry Torokhov wrote:
-> Now that the driver respects IRQ trigger settings from device tree, let's
-> fix them up in individual DTSes (note that the driver is still compatible
-> with older DTSes).
+On Mon, Sep 14, 2015 at 02:21:11PM -0700, Florian Fainelli wrote:
+> On 14/09/15 13:48, Brian Norris wrote:
+> > On Mon, Sep 14, 2015 at 12:52:49PM -0700, Florian Fainelli wrote:
+> >> Call brcmstb_biuctrl_init() in brcmstb's init_irq machine descriptor
+> >> callback since we need to setup the Bus Interface Unit before SMP in
+> >> particular, but we also need to be able to remap registers.
+> >>
+> >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> >> ---
+> >> +static void __init brcmstb_init_irq(void)
+> >> +{
+> >> +	irqchip_init();
+> >> +	brcmstb_biuctrl_init();
+> > 
+> > I believe you're introducing a dependency on CONFIG_SOC_BRCMSTB, but
+> > it's not represented in Kconfig. Maybe SOC_BRCMSTB shouldn't be
+> > user-selectable, and it should just be select-ed by ARCH_BRCMSTB?
 > 
-> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> ---
->  arch/arm/boot/dts/am437x-sk-evm.dts   | 2 +-
->  arch/arm/boot/dts/imx28-tx28.dts      | 3 ++-
->  arch/arm/boot/dts/imx53-tx53-x03x.dts | 3 ++-
->  arch/arm/boot/dts/imx6qdl-tx6.dtsi    | 3 ++-
->  4 files changed, 7 insertions(+), 4 deletions(-)
+> It is thanks to your previous commit, which is why I mentioned in the
+> cover letter that this was based on the 'soc/next' branch.
 > 
-> diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-> index c17097d..d83fdcd 100644
-> --- a/arch/arm/boot/dts/am437x-sk-evm.dts
-> +++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-> @@ -471,7 +471,7 @@
->  
->  		reg = <0x38>;
->  		interrupt-parent = <&gpio0>;
-> -		interrupts = <31 0>;
-> +		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
+> https://github.com/Broadcom/stblinux/commit/b19826efa15f94084416d5fc7749c45eabfbee36
 
-for AM437x SK:
+Hah, bad memory I have. I suppose a user-selectable option that is also
+selected by another symbol is OK if the former has few/no dependencies.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+> Thanks for taking a look though!
 
-Seems like there are no changes considering driver was always using
-IRQF_TRIGGER_FALLING.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/b5ec186d/attachment.sig>
+Brian
