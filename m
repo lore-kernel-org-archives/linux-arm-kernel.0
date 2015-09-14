@@ -1,29 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Sep 2015 12:36:56 -0700
-Subject: [PATCH 0/4] ARM: OMAP5/DRA7: minor fixes
-In-Reply-To: <1441833494-32450-1-git-send-email-nm@ti.com>
-References: <1441833494-32450-1-git-send-email-nm@ti.com>
-Message-ID: <20150914193656.GX4215@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 14 Sep 2015 12:49:54 -0700
+Subject: [PATCH] clk: rockchip: add critical clock for rk3368
+In-Reply-To: <5267432.TORlj1Iv40@diego>
+References: <5267432.TORlj1Iv40@diego>
+Message-ID: <20150914194954.GA21561@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [150909 14:21]:
-> Hi,
+On 09/13, Heiko St?bner wrote:
+> Again a result of the gpio-clock-liberation the rk3368 needs the
+> pclk_pd_pmu marked as critical, to boot successfully.
 > 
-> While doing a SoC only build for DRA7, a few bugs did pop up. The
-> following series provides necessary fixups for the same.
-> 
-> Nishanth Menon (4):
->   ARM: OMAP4+: PM: erratum is used by OMAP5 and DRA7 as well
->   ARM: omap2+: board-generic: Remove stale of_irq macros
->   ARM: DRA7: Select missing options for SoC only build
->   ARM: OMAP5: Cleanup options for SoC only build
-> 
->  arch/arm/mach-omap2/Kconfig         |    6 +++++-
->  arch/arm/mach-omap2/board-generic.c |    7 -------
->  arch/arm/mach-omap2/pm.h            |    3 ++-
->  3 files changed, 7 insertions(+), 9 deletions(-)
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
 
-Applying all into omap-for-v4.3/fixes thanks.
+Applied to clk-fixes
 
-Tony
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
