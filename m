@@ -1,80 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 Sep 2015 10:25:19 +0100
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <20150912113655.GG4530@olila.local.net-space.pl>
-References: <20150910112418.GC29293@leverpostej>
- <alpine.DEB.2.02.1509101223580.2672@kaball.uk.xensource.com>
- <20150910121514.GE29293@leverpostej>
- <alpine.DEB.2.02.1509101429480.2672@kaball.uk.xensource.com>
- <20150910144938.GI29293@leverpostej>
- <alpine.DEB.2.02.1509101655020.2672@kaball.uk.xensource.com>
- <20150910162302.GN29293@leverpostej>
- <20150911124643.GB4530@olila.local.net-space.pl>
- <20150911162559.GA8726@leverpostej>
- <20150912113655.GG4530@olila.local.net-space.pl>
-Message-ID: <20150914092518.GA10307@leverpostej>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 14 Sep 2015 12:29:39 +0300
+Subject: [PATCH] ARM: davinci: clock: Correct return values for API functions
+Message-ID: <1442222979-9703-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 12, 2015 at 12:36:55PM +0100, Daniel Kiper wrote:
-> On Fri, Sep 11, 2015 at 05:25:59PM +0100, Mark Rutland wrote:
-> > On Fri, Sep 11, 2015 at 01:46:43PM +0100, Daniel Kiper wrote:
-> > > On Thu, Sep 10, 2015 at 05:23:02PM +0100, Mark Rutland wrote:
-> 
-> [...]
-> 
-> > > > What's troublesome with the boot services?
-> > > >
-> > > > What can't be simulated?
-> > >
-> > > How do you want to access bare metal EFI boot services from dom0 if they
-> > > were shutdown long time ago before loading dom0 image?
-> >
-> > I don't want to.
-> >
-> > I asked "What can't be simulated?" because I assumed everything
-> > necessary/mandatory could be simulated without needinng access to any
-> > real EFI boot services.
-> >
-> > As far as I can see all that's necessary is to provide a compatible
-> > interface.
-> 
-> Could you be more precise what do you need? Please enumerate. UEFI spec has
-> more than 2500 pages and I do not think that we need all stuff in dom0.
-> 
-> > > What do you need from EFI boot services in dom0?
-> >
-> > The ability to call ExitBootServices() and SetVirtualAddressMap() on a
-> > _virtual_ address map for _virtual_ services provided by the hypervisor.
-> 
-> I am confused. Why do you need that? Please remember, EFI is owned and
-> operated by Xen hypervisor. dom0 does not have direct access to EFI.
+Fix the values returned by the publicly used functions.
+These function should return 0 when they are called with clk == NULL in
+similar manner as the clock API does to avoid different behavior in drivers
+used by daVinci and other architectures.
 
-Let's take a step back.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+Hi Sekhar,
 
-My objection here is to passing the Dom0 kernel properties as if it were
-booted with direct access to a full UEFI, then later fixing that up
-(when Xen is detected and we apply its hypercall EFI implementation).
+This issue is visible when using generic drivers like ASoC simnple card for
+audio support.
+They rely on the fact that these functions will not return with error in case
+of clk == NULL.
 
-If the kernel cannot use EFI natively, why pretend to the kernel that it
-can? The hypercall implementation is _not_ EFI (though it provides
-access to some services).
+Regards,
+Peter
 
-The two ways I can see providing Dom0 with EFI services are:
+ arch/arm/mach-davinci/clock.c | 16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
 
-* Have Xen create shims for any services, in which any hypercalls live,
-  and pass these to the kernel with a virtual system table. This keeps
-  the interface to the kernel the same regardless of Xen.
-
-* Have the kernel detect Xen EFI capability via Xen, without passing the
-  usual native EFI parameters. This can then be installed into the
-  kernel in a Xen-specific manner, and we know from the outset that
-  Xen-specific caveats apply.
-
-As per my original email, I'm not against the renaming of the stub
-parameters if we standardise the rest of the details, but I believe
-that's orthogonal to the Xen Dom0 case.
-
-Thanks,
-Mark.
+diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
+index c70bb0a4dfb4..3caff9637a82 100644
+--- a/arch/arm/mach-davinci/clock.c
++++ b/arch/arm/mach-davinci/clock.c
+@@ -97,7 +97,9 @@ int clk_enable(struct clk *clk)
+ {
+ 	unsigned long flags;
+ 
+-	if (clk == NULL || IS_ERR(clk))
++	if (!clk)
++		return 0;
++	else if (IS_ERR(clk))
+ 		return -EINVAL;
+ 
+ 	spin_lock_irqsave(&clockfw_lock, flags);
+@@ -124,7 +126,7 @@ EXPORT_SYMBOL(clk_disable);
+ unsigned long clk_get_rate(struct clk *clk)
+ {
+ 	if (clk == NULL || IS_ERR(clk))
+-		return -EINVAL;
++		return 0;
+ 
+ 	return clk->rate;
+ }
+@@ -159,8 +161,10 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+ 	unsigned long flags;
+ 	int ret = -EINVAL;
+ 
+-	if (clk == NULL || IS_ERR(clk))
+-		return ret;
++	if (!clk)
++		return 0;
++	else if (IS_ERR(clk))
++		return -EINVAL;
+ 
+ 	if (clk->set_rate)
+ 		ret = clk->set_rate(clk, rate);
+@@ -181,7 +185,9 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ {
+ 	unsigned long flags;
+ 
+-	if (clk == NULL || IS_ERR(clk))
++	if (!clk)
++		return 0;
++	else if (IS_ERR(clk))
+ 		return -EINVAL;
+ 
+ 	/* Cannot change parent on enabled clock */
+-- 
+2.5.2
