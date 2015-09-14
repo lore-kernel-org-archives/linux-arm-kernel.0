@@ -1,50 +1,122 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 14 Sep 2015 10:53:16 -0400
-Subject: [PATCH 0/4] bcm2835: enable auxiliary uart1
-In-Reply-To: <1441974053-2630-1-git-send-email-kernel@martin.sperl.org>
-References: <1441974053-2630-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87r3m1jbmr.fsf@eliezer.anholt.net>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Mon, 14 Sep 2015 16:55:50 +0200
+Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
+ ECAM) and ACPI code out of arch/x86/ directory
+In-Reply-To: <20150911112018.GA13033@red-moon>
+References: <20150602133215.GC23650@red-moon> <55701A31.808@linaro.org>
+ <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
+ <557504A2.3060203@linaro.org> <20150608151443.GA16151@red-moon>
+ <55E4340D.6050004@linaro.org> <55ED6010.3020406@linaro.org>
+ <20150908150727.GF29293@red-moon> <55F0388B.1090607@linaro.org>
+ <20150911112018.GA13033@red-moon>
+Message-ID: <55F6DFF6.4010807@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel at martin.sperl.org writes:
+On 11.09.2015 13:20, Lorenzo Pieralisi wrote:
+> On Wed, Sep 09, 2015 at 02:47:55PM +0100, Tomasz Nowicki wrote:
+>
+> [...]
+>
+>>> I think (but I am happy to be corrected) that the map_bus() hook
+>>> (ie that's why struct pci_bus is required in eg pci_generic_config_write)
+>>> is there to ensure that when the generic accessors are called
+>>> a) we have a valid bus b) the host controllers implementing it
+>>> has been initialized.
+>>>
+>>> I had another look and I noticed you are trying to solve multiple
+>>> things at once:
+>>>
+>>> 1) ACPICA seems to need PCI config space on bus 0 to be working
+>>>      before PCI enumerates (ie before we have a root bus), we need to
+>>>      countercheck on that, but you can't use the generic PCI accessors
+>>>      for that reasons (ie root bus might not be available, you do not
+>>>      have a pci_bus struct)
+>>> 2) the raw_pci_read/write require _generic_ mmio back-ends, since AMD
+>>>      can't cope with standard x86 read/write{b,w,l}
+>>>
+>>> Overall, it seems to me that we can avoid code duplication by
+>>> shuffling your code a bit.
+>>>
+>>> You could modify the generic accessors in drivers/pci/access.c to
+>>> use your mmio back-end instead of using plain read/write{b,w,l}
+>>> functions (we should check if RobH is ok with that there can be
+>>> reasons that prevent this from happening). This would solve the
+>>> AMD mmio issue.
+>>>
+>>> By factoring out the code that actually carries out the reads
+>>> and writes in the accessors basically you decouple the functions
+>>> requiring the struct pci_bus from the ones that does not require it
+>>> (ie raw_pci_{read/write}.
+>>>
+>>> The generic MMIO layer belongs in the drivers/pci/access.c file, it has
+>>> nothing to do with ECAM.
+>>>
+>>> The mmcfg interface should probably live in pci-acpi.c, I do not think
+>>> you need an extra file in there but that's a detail.
+>>>
+>>> Basically the generic accessors would become something like eg:
+>>>
+>>> int pci_generic_config_write(struct pci_bus *bus, unsigned int devfn,
+>>>                             int where, int size, u32 val)
+>>> {
+>>>        void __iomem *addr;
+>>>
+>>>        addr = bus->ops->map_bus(bus, devfn, where);
+>>>        if (!addr)
+>>>                return PCIBIOS_DEVICE_NOT_FOUND;
+>>>
+>>>        pci_mmio_write(size, addr + where, value);
+>>>
+>>>        return PCIBIOS_SUCCESSFUL;
+>>> }
+>>>
+>>> With that in place using raw_pci_write/read or the generic accessors
+>>> becomes almost identical, with code requiring the pci_bus to be
+>>> created using the generic accessors and ACPICA using the raw version.
+>>>
+>>> I might be missing something, so apologies if that's the case.
+>>>
+>>
+>> Actually, I think you showed me the right direction :) Here are some
+>> conclusions/comments/concerns. Please correct me if I am wrong:
+>>
+>> 1. We need raw_pci_write/read accessors (based on ECAM) for ARM64 too
+>> but only up to the point where buses are enumerated. From that point on,
+>> we should reuse generic accessors from access.c file, right?
+>
+> Well, I still have not figured out whether on arm64 the raw accessors
+> required by ACPICA make sense.
+>
+> So either arm64 relies on the generic MCFG based raw read and writes
+> or we define the global raw read and writes as empty (ie x86 overrides
+> them anyway).
+>
 
-> From: Martin Sperl <kernel@martin.sperl.org>
->
-> The bcm2835 SOC contains an auxiliary uart, which is very close
-> to the ns16550 with some differences.
->
-> The big difference is that the uart HW is not using an internal divider
-> of 16 but 8, which results in an effictive baud-rate being twice
-> the requested baud-rate.
->
-> The bcm2835-aux-uart is also special in such that it is enabled/disabled
-> by a gate in the clock, which is managed by the clk-bcm2835-aux
-> clock driver.
->
-> there are 2 options:
-> * defining the clock-frequency property in the device tree to 500k
->   instead of 250k, but this keeps the HW block disabled making the
->   uart not work.
-> * defining a clock in the device tree, but this results in a baud rate
->   that is twice the requested baud-rate.
->
-> To address this this patch-set introduce a new property in the device tree
-> to define a clock divider other than 16.
->
-> This currently just scales the clock by a factor of 16/divider.
->
-> Note that the use of fixed-factor-clock has also been proposed as a
-> workarround, but this does not really describe the hw in the device tree
-> so another solution was needed that allows a correct representation of
-> the HW in the device tree.
+My concerns/ideas related to raw accessors for ARM64, please correct me 
+at any point.
 
-I personally lean toward the fixed-factor-clock solution, but could go
-either way.  Serial maintainers, what do you think?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/02685b3e/attachment.sig>
+ACPI spec - chapter: 19.5.96 OperationRegion (Declare Operation Region)
+defines PCI_Config as one of region types. Every time ASL opcode 
+operates on corresponding PCI config space region, ASL interpreter is 
+dispatching address space to our raw accessors, please see 
+acpi_ex_pci_config_space_handler, acpi_ev_pci_config_region_setup calls. 
+What is more important, such operations may happen after (yes after) bus 
+enumeration, but always raw accessors are called at the end with the 
+{segment, bus, dev, fn} tuple.
+
+Giving above, here are some ideas:
+1. We force somehow vendors to avoid operations on PCI config regions in 
+ASL code. PCI config region definitions still fall into Hardware Reduced 
+profile, so new ACPICA special subset for ARM64 is need. Then raw ACPI 
+accessors can be empty (and overridden by x86).
+2. We provide raw accessors which translate {segment, bus, dev, fn} 
+tuple to Linux generic accessors (this can be considered only if PCI 
+config accesses happened after bus enumeration for HR profile, thus 
+tuple to bus structure map is possible).
+4. We rely on the generic MCFG based raw read and writes.
+
+Let me know your opinion.
+
+Thanks,
+Tomasz
