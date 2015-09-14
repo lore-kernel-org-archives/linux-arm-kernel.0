@@ -1,27 +1,75 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Mon, 14 Sep 2015 15:19:46 +1000
-Subject: Build regressions/improvements in v4.3-rc1
-In-Reply-To: <CAMuHMdVGEDKFxD7wf6ZOAGiOByM5c0Awx-anLsYGLQHV1yJW+w@mail.gmail.com>
-References: <1442134868-17607-1-git-send-email-geert@linux-m68k.org>
- <CAMuHMdV31w=aDD-=uUPOqW71xLpOnH1jWeQpH=6x=vxNSo94FQ@mail.gmail.com>
- <20150913151926.GA19850@roeck-us.net>
- <CAMuHMdVGEDKFxD7wf6ZOAGiOByM5c0Awx-anLsYGLQHV1yJW+w@mail.gmail.com>
-Message-ID: <1442207986.8149.0.camel@ellerman.id.au>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Mon, 14 Sep 2015 10:58:23 +0530
+Subject: [PATCH-v5 RESEND 3/5] i2c: pxa: Add support for pxa910/988 & new
+ configuration features
+In-Reply-To: <20150911190619.GB1516@katana>
+References: <1440395978-9065-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1440395978-9065-4-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150911190619.GB1516@katana>
+Message-ID: <55F65AF7.8090706@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2015-09-13 at 22:23 +0200, Geert Uytterhoeven wrote:
-> On Sun, Sep 13, 2015 at 5:19 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> > arm64:allmodconfig:
-> >
-> > drivers/firmware/qcom_scm-32.c:196:4: error: expected string literal before ?__asmeq?
-> > drivers/firmware/qcom_scm-32.c:221:2: error: implicit declaration of function ?secure_flush_area?
-> > drivers/firmware/qcom_scm-32.c:239:2: error: implicit declaration of function ?outer_inv_range?
-> > drivers/firmware/qcom_scm-32.c:331:4: error: expected string literal before ?__asmeq?
-> > drivers/firmware/qcom_scm-32.c:361:4: error: expected string literal before ?__asmeq?
-> 
-> Time for kisskb to gain arm64 support?
 
-Yes. I'll add it to my TODO list.
 
-cheers
+On Saturday 12 September 2015 12:36 AM, Wolfram Sang wrote:
+> On Mon, Aug 24, 2015 at 11:29:36AM +0530, Vaibhav Hiremath wrote:
+>> TWSI_ILCR & TWSI_IWCR registers are used to adjust clock rate
+>> of standard & fast mode in pxa910/988; so this patch adds these two new
+>> entries to "struct pxa_reg_layout" and "struct pxa_i2c".
+>>
+>> As discussed in the previous patch-series, the idea here is to add standard
+>> DT properties for ilcr and iwcr configuration fields.
+>> In case of Master ilcr is used for low/high time and in case of slave mode
+>> of operation iwcr is used for setup/hold time.
+>
+> I need to rethink how to describe i2c bus timing parameters in DT in the
+> next days. But this is planned for 4.4., promised.
+>
+> One thing I already wonder about this one...
+>
+>>   static const struct platform_device_id i2c_pxa_id_table[] = {
+>>   	{ "pxa2xx-i2c",		REGS_PXA2XX },
+>>   	{ "pxa3xx-pwri2c",	REGS_PXA3XX },
+>>   	{ "ce4100-i2c",		REGS_CE4100 },
+>> +	{ "pxa910-i2c",		REGS_PXA910 },
+>>   	{ },
+>
+> You add a new platform_id...
+>
+>> @@ -1135,7 +1170,7 @@ static const struct i2c_algorithm i2c_pxa_pio_algorithm = {
+>>   static const struct of_device_id i2c_pxa_dt_ids[] = {
+>>   	{ .compatible = "mrvl,pxa-i2c", .data = (void *)REGS_PXA2XX },
+>>   	{ .compatible = "mrvl,pwri2c", .data = (void *)REGS_PXA3XX },
+>> -	{ .compatible = "mrvl,mmp-twsi", .data = (void *)REGS_PXA2XX },
+>> +	{ .compatible = "mrvl,mmp-twsi", .data = (void *)REGS_PXA910 },
+>>   	{}
+>
+> ...but change the compatible binding instead of adding a new one?
+>
+
+Yes, because the offset for both REGS_PXA2XX and REGS_PXA910 are same,
+and for REGS_PXA2XX we already have compatible entry "mrvl,pxa-i2c".
+And the i2c binding documentation, which says,
+for platforms using REGS_PXA2XX, they need to provide additional node
+"mrvl,pxa-i2c". Which is confusing :)
+
+Also, when I did git-blame on the driver file to see why "mmp-twsi"
+entry has been added without anyone really using it. But I did not find
+anything meaningful.
+So, from the code it was very clear that, "mmp-twsi" and "pxa-i2c" both
+are same, its the code which I am adding here brings difference between 
+them.
+
+I tried to find datasheet for the platforms using "mmp-twsi", but was
+unlucky.
+
+
+Thanks,
+Vaibhav
+
+
+
+
+Thanks,
+Vaibhav
