@@ -1,22 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 14 Sep 2015 19:39:25 +0100
-Subject: [PATCH] spi: mediatek: fix wrong error return value on probe
-In-Reply-To: <1441320656-8666-1-git-send-email-javier@osg.samsung.com>
-References: <1441320656-8666-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <20150914183925.GG12027@sirena.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 14 Sep 2015 20:40:04 +0200
+Subject: [PATCH v18 1/4] dt-bindings: add document of Rockchip power
+ domains
+In-Reply-To: <1441693103-26712-2-git-send-email-wxt@rock-chips.com>
+References: <1441693103-26712-1-git-send-email-wxt@rock-chips.com>
+ <1441693103-26712-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <4150283.UtCYfG61Ys@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 04, 2015 at 12:50:56AM +0200, Javier Martinez Canillas wrote:
-> Commit adcbcfea15d62 ("spi: mediatek: fix spi clock usage error")
-> added a new sel_clk but introduced bugs in the error paths since
-> the wrong struct clk pointers are passed to PTR_ERR().
+Hi Caesar, Jinkun,
 
-This doesn't apply against current code, please check and resend.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/3adc7575/attachment.sig>
+Am Dienstag, 8. September 2015, 14:18:20 schrieb Caesar Wang:
+> This add the necessary binding documentation for the power domains
+> found on Rockchip SoCs.
+> 
+> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+
+What is Jinkun Hong's relationship to the patches?
+
+The issue behind this is, that Caesar is the sender of the patches and how 
+they stand right now would also be the author, but Jinkun was the first to 
+sign them off, which is normally the line of the author.
+
+Please decide who gets to be author of patches 1,3 and 4. If it's Caesar, 
+we'll drop the Signed-off-by or if it's Jinkun we'll change the author.
+
+There is no big need to resend the patches, I can adapt authorship if 
+necessary.
+
+
+Thanks
+Heiko
