@@ -1,101 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Sep 2015 13:49:49 +0100
-Subject: sdhci: runtime suspend/resume on card insert/removal
-In-Reply-To: <55F6BEA4.1070803@linaro.org>
-References: <20150910080233.GH21084@n2100.arm.linux.org.uk>
- <20150910160402.3b78b5c6@xhacker> <55F66874.2000609@linaro.org>
- <20150914142838.07ec6a07@xhacker> <55F681AC.2010605@linaro.org>
- <20150914161804.101dfc55@xhacker> <55F69121.3030700@linaro.org>
- <55F69E4F.8010608@linaro.org>
- <20150914105014.GJ21084@n2100.arm.linux.org.uk>
- <55F6BEA4.1070803@linaro.org>
-Message-ID: <20150914124949.GM21084@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Sep 2015 13:50:58 +0100
+Subject: [RFC PATCH v2 1/3] irqchip: GICv3: set non-percpu irqs status
+ with IRQ_MOVE_PCNTXT
+In-Reply-To: <1442222945-10628-2-git-send-email-yangyingliang@huawei.com>
+References: <1442222945-10628-1-git-send-email-yangyingliang@huawei.com>
+ <1442222945-10628-2-git-send-email-yangyingliang@huawei.com>
+Message-ID: <55F6C2B2.2060808@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 06:03:40PM +0530, Vaibhav Hiremath wrote:
-> On Monday 14 September 2015 04:20 PM, Russell King - ARM Linux wrote:
-> >On Mon, Sep 14, 2015 at 03:45:43PM +0530, Vaibhav Hiremath wrote:
-> >>Came across below lines in the datasheet,
-> >>
-> >>========= Copy-n-paste from datasheet============
-> >>
-> >>All SDH interfaces share the same clock which is enabled when any of the SDH
-> >>clock enables are
-> >>set (from PMUA_SDH1_CLK_RES_CTRL, PMUA_SDH2_CLK_RES_CTRL,
-> >>PMUA_SDH3_CLK_RES_CTRL, PMUA_SDH4_CLK_RES_CTRL,
-> >>PMUA_SDH5_CLK_RES_CTRL), with clock source select and divider ratio
-> >>controlled by
-> >>PMUA_SDH1_CLK_RES_CTRL.
-> >>
-> >>==================================================
-> >>
-> >>
-> >>And I can confirm that after disabling AXI interface clock for all the
-> >>SDH modules (1-5) I see I get an abort.
-> >>
-> >>This clearly explains/justifies/proves that the existing code is
-> >>working as expected. I have eMMC mounted on the board, which makes
-> >>clock to always stay ON on SDH3.
-> >>
-> >>So there is an OR gate implemented inside which takes input from
-> >>SDHx_AXI_EN and feeds back to all SDHx instances. Don't ask me why it
-> >>has been designed that way :)
-> >>
-> >>And I did some experiment as well, so what I have observed is,
-> >>SDH_AXI_CLOCK is required to generate card detection, without that I do
-> >>not see card detection working.
-> >
-> >What that means is that if DT configures the interface to use its
-> >internal card detection, the AXI clock must never shut off when entering
-> >runtime-PM.
-> >
+On 14/09/15 10:29, Yang Yingliang wrote:
+> Use irq_set_status_flags() helper set irqs status with
+> IRQ_MOVE_PCNTXT. So that it can do set affinity when
+> calling irq_set_affinity_locked().
 > 
-> Yes, exactly.
-> Its clock driver which is doing this.
+> Cc: Jiang Liu <jiang.liu@linux.intel.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+> ---
+>  drivers/irqchip/irq-gic-v3.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> static struct mmp_param_gate_clk apmu_gate_clks[] = {
->         /* The gate clocks has mux parent. */
->         {PXA1928_CLK_SDH0, "sdh0_clk", "sdh_div", CLK_SET_RATE_PARENT,
-> PXA1928_CLK_SDH0 * 4, 0x1b, 0x1b, 0x0, 0, &sdh0_lock},
-> };
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index 7deed6e..3d8f400 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -761,6 +761,7 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>  		irq_domain_set_info(d, irq, hw, chip, d->host_data,
+>  				    handle_fasteoi_irq, NULL, NULL);
+>  		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+> +		irq_set_status_flags(irq, IRQ_MOVE_PCNTXT);
+>  	}
+>  	/* LPIs */
+>  	if (hw >= 8192 && hw < GIC_ID_NR) {
+> @@ -769,6 +770,7 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>  		irq_domain_set_info(d, irq, hw, chip, d->host_data,
+>  				    handle_fasteoi_irq, NULL, NULL);
+>  		set_irq_flags(irq, IRQF_VALID);
+> +		irq_set_status_flags(irq, IRQ_MOVE_PCNTXT);
+>  	}
+>  
+>  	return 0;
 > 
-> Here the mask and enable_val both are set to 0x1b, which means it
-> shuts off both peripheral and AXI clock both.
 
-*Sigh*.
+I'm still not keen on this approach. As far as I can tell, the only
+reason you are setting this flag is to be able to use
+GENERIC_PENDING_IRQ. irq_set_affinity_locked would work even if you
+don't select this config option, because irq_can_move_pcntxt() will
+always return true if this is not selected.
 
-So, rather than represent the hardware in DT by telling the SDHCI code
-that you have two independent clocks, you've chosen to do the brain
-dead thing, and combine the two clocks *which are logically different*
-to suit the Linux implementation, thereby leaking implementation details
-into DT, and creating a compatibility headache through doing so.
+So instead of adding flags that are not required on ARM, why don't you
+just make migration.c to compile even when GENERIC_PENDING_IRQ is not
+selected? I think this would make a lot more sense.
 
-Stop doing this.  Just stop it.  It's broken, it's wrong, and it's down
-right idiotic.
+Thanks,
 
-DT should _always_ describe the bloody hardware, not the implementation.
-
-I suggest that you have only one way to solve this on this platform.
-
-1. Declare new clocks from your PXA clock driver which expose the AXI
-   and peripheral clock separately.
-2. Add code (if not already there) to the SDHCI crap-pile to claim and
-   appropriately manage these two clocks, falling back to the existing
-   but broken method with existing DT.
-3. Change DT to provide the new clocks to SDHCI.
-
-That's about the only way I can see to ensure that an old DT file would
-continue to work with a new kernel, given this fsckup.
-
-Please.  In future, be careful when describing stuff in DT.  Don't take
-short cuts to suit the implementation.  Always describe the hardware,
-don't describe the implementation.  *Especially* when it comes to things
-like device resources.
-
-It really doesn't matter if the driver doesn't cope with them - the
-important thing is that the DT always correctly describes the hardware.
-
+	M.
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny...
