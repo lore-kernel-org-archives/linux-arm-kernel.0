@@ -1,60 +1,66 @@
 From: info@gerhard-bertelsmann.de (Gerhard Bertelsmann)
-Date: Mon, 14 Sep 2015 14:54:57 +0200
-Subject: [PATCH v6 1/3] can: Allwinner A10/A20 CAN Controller support -
- Devicetree bindings
-In-Reply-To: <1442235299-5885-1-git-send-email-info@gerhard-bertelsmann.de>
-References: <1442235299-5885-1-git-send-email-info@gerhard-bertelsmann.de>
-Message-ID: <1442235299-5885-2-git-send-email-info@gerhard-bertelsmann.de>
+Date: Mon, 14 Sep 2015 14:54:56 +0200
+Subject: [PATCH v6 0/3] can: Allwinner A10/A20 CAN Controller support - Summary
+Message-ID: <1442235299-5885-1-git-send-email-info@gerhard-bertelsmann.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi,
+
+please find attached the next try. Thanks to Marc an Maxime for their reviews.
+To be honest I made the defconfig the best of my belief.
+
+Please test and report bugs if exists.
+
+[PATCH v6 1/3] Device Tree Binding Documentation
+[PATCH v6 2/3] Defconfigs
+[PATCH v6 3/3] Kernel Module
+
+History:
+    V6: renamed the driver to sun4i as suggested by Maxime Ripard
+        removed module version
+        removed suspend and resume
+        moved clk enable from can_start into open / should be balanced
+          between enabling and disabling now
+        freeing resources on error
+        
+    v5: fix license
+        modify prefix to mode select defines
+        enable and disable clock in sunxican_get_berr_counter
+        delete set_normal_mode at the end of sunxi_can_start
+        removed sunxican_id_table
+        use devm_clk_get instead of clk_get
+        use devm_ioremap_resource to simplify probe and remove
+        make set-normal-mode and set-reset-mode more readable
+        
+    v4: defines prefixed with SUNXI_
+        sunxi_can_write_cmdreg tweaked
+        loops in set_xxx_mode reworked
+        add return value to set_xxx_mode
+        sunxican_start_xmit reworked
+        struct platform_driver stripped
+        moved set_bittiming into open
+        moved clock start into open
+        add clock stop to close
+        suspend reworked
+        resume reworked
+        fixed double counting bug
+
+    v3: changed error state change handling (thx Andri for the hint)
+        use bittiming function correct (no need to call it)
+        strip down priv (suggested by Marc)
+        scripts/checkpatch.pl-> no matches anymore
+        sparse -> no errors or warnings anymore
+    v2: cleaning
+    v1: initial
 
 Signed-off-by: Gerhard Bertelsmann <info@gerhard-bertelsmann.de>
 ---
 
  .../devicetree/bindings/net/can/sun4i_can.txt      |  37 +
- 1 files changed, 37 insertions(+)
-
-
-diff --git a/Documentation/devicetree/bindings/net/can/sun4i_can.txt b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
-new file mode 100644
-index 0000000..b572e2b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
-@@ -0,0 +1,37 @@
-+Allwinner A10/A20 CAN controller Device Tree Bindings
-+-----------------------------------------------------
-+
-+Required properties:
-+- compatible: "allwinner,sunxican"
-+- reg: physical base address and size of the Allwinner A10/A20 CAN register map.
-+- interrupts: interrupt specifier for the sole interrupt.
-+- clock: phandle and clock specifier.
-+
-+Example
-+-------
-+
-+SoC common .dtsi file:
-+
-+	can0_pins_a: can0 <at> 0 {
-+		allwinner,pins = "PH20","PH21";
-+		allwinner,function = "can";
-+		allwinner,drive = <0>;
-+		allwinner,pull = <0>;
-+	};
-+
-+	can0: can <at> 01c2bc00 {
-+		compatible = "allwinner,sunxican";
-+		reg = <0x01c2bc00 0x400>;
-+		interrupts = <0 26 4>;
-+		clocks = <&apb1_gates 4>;
-+		status = "disabled";
-+	};
-+
-+Board specific .dts file:
-+
-+	can0: can <at> 01c2bc00 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&can0_pins_a>;
-+		status = "okay";
-+	};
-+
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/configs/sunxi_defconfig                   |   2 +
+ drivers/net/can/Kconfig                            |  10 +
+ drivers/net/can/Makefile                           |   1 +
+ drivers/net/can/sun4i_can.c                        | 824 +++++++++++++++++++++
+ 6 files changed, 875 insertions(+)
