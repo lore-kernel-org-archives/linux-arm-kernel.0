@@ -1,47 +1,50 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 14 Sep 2015 10:47:19 +0200
-Subject: [PATCH 2/2] ARM: dts: rockchip: Add dtb for the Radxa Rock 2
- Square board
-In-Reply-To: <1442217958.8778.103.camel@collabora.co.uk>
-References: <1442011005-4828-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <CABxcv==JF5QKG8qmrRRUSi4j0=7guQQJTzVzR2bgSxdtUDBv7Q@mail.gmail.com>
- <1442217958.8778.103.camel@collabora.co.uk>
-Message-ID: <7783425.5jykIre40o@diego>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 14 Sep 2015 11:50:40 +0300
+Subject: [PATCH 00/11] ARM: OMAP/DTS: dra7/72-evm/beagle-x15: Audio support
+In-Reply-To: <1440400807-32274-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1440400807-32274-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <55F68A60.6050900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 14. September 2015, 10:05:58 schrieb Sjoerd Simons:
-> Hey Javier,
+Hi Tony,
+
+On 08/24/2015 10:19 AM, Peter Ujfalusi wrote:
+> Hi,
 > 
-> On Mon, 2015-09-14 at 09:50 +0200, Javier Martinez Canillas wrote:
-> > Hello Sjoerd,
-> > 
-> > On Mon, Sep 14, 2015 at 9:30 AM, Sjoerd Simons
-> > 
-> > <sjoerd.simons@collabora.co.uk> wrote:
-> > > For the first patch i do prefer to keep them on so we can have get
-> > > some
-> > > more testing  with this board before fine-tuning those things
-> > > (fwiw,
-> > 
-> > Ok.
-> > 
-> > > the rockchip evb board and others with essentially the same pmic
-> > > setup
-> > > all also have them always-on)
-> > 
-> > Yes but I believe that's because it was easier and there are
-> > regulators on these boards that don't need to be always-on as well.
+> this series will enable analog audio (via onboard aic310x codec) for dra7-evm,
+> dra72-evm and am57xx-beagle-x15 boards.
+> In these board McASP3 is connected to the codec and for the McASP3 we needed to
+> have the DMA crossbar in place since the request lines are not mapped by
+> default.
+
+Did you had a chance to look at this series?
+
+> Regars,
+> Peter
+> ---
+> Peter Ujfalusi (11):
+>   ARM: OMAP: DRA7: hwmod: Add data for McASP3
+>   ARM: DTS: dra7: Add McASP3 node
+>   ARM: DTS: dra7-evm: Rename mmc2_3v3 supply to evm_3v3_sw
+>   ARM: DTS: dra7-evm: Add fixed regulator to be used by aic3106's DVDD
+>   ARM: DTS: dra7-evm: Enable pcf8575 (0x26 address) on i2c2 bus
+>   ARM: DTS: dra7-evm: Audio support
+>   ARM: DTS: dra72-evm: Add fixed regulator representing DVDD supply for
+>     aic3106
+>   ARM: DTS: dra72-evm: Add gpio hog for vin6_sel_s0 to select audio
+>   ARM: DTS: dra72-evm: Audio support
+>   ARM: DTS: am57xx-beagle-x15: Add fixed regulator for aic3104's DVDD
+>   ARM: DTS: am57xx-beagle-x15: Enable analog audio support
 > 
-> Yes what i was trying to say is that it's not an uncommon to keep these
-> on for convenience while fine-tuning the device-tree setups ;)
-
-Also, a lot of drivers do not yet do proper regulator handling (our drm/kms 
-driver as a prime example), so the number of regulators able to being actually 
-turned off is quite slim.
-
-So I guess I'm ok, with handling these once driver components can actually do 
-something with their supplies :-) .
+>  arch/arm/boot/dts/am57xx-beagle-x15.dts   |  95 ++++++++++++++++++++
+>  arch/arm/boot/dts/dra7-evm.dts            | 142 +++++++++++++++++++++++++++++-
+>  arch/arm/boot/dts/dra7.dtsi               |  15 ++++
+>  arch/arm/boot/dts/dra72-evm.dts           | 138 +++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  41 +++++++++
+>  5 files changed, 428 insertions(+), 3 deletions(-)
+> 
 
 
-Heiko
+-- 
+P?ter
