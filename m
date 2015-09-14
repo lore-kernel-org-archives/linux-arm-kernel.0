@@ -1,67 +1,46 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 14 Sep 2015 14:47:45 +0800
-Subject: [PATCH RESEND 2/2] arm: berlin: add CPU hotplug support
-In-Reply-To: <1442213265-1002-1-git-send-email-jszhang@marvell.com>
-References: <1442213265-1002-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1442213265-1002-3-git-send-email-jszhang@marvell.com>
+From: b18965@freescale.com (Alison Wang)
+Date: Mon, 14 Sep 2015 14:45:28 +0800
+Subject: [PATCH] ARM: ls1021a: Add dma-coherent property for eTSEC nodes
+Message-ID: <1442213128-39279-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cpu hotplug support for berlin SoCs such as BG2 and BG2Q. These SoC
-don't support power off cpu independently, but we also want cpu hotplug
-support in these SoCs. We achieve this goal by putting the dying CPU in
-WFI state after the coherency is disabled, then asserting the dying CPU
-reset bit to put the CPU in reset state.
+This patch adds dma-coherent property for eTSEC nodes, so
+coherent DMA operations are supported.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Signed-off-by: Alison Wang <alison.wang@freescale.com>
+Signed-off-by: Shawn Guo <shawnguo@kernel.org>
 ---
- arch/arm/mach-berlin/platsmp.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/ls1021a.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
-index bde327b..c1e0540 100644
---- a/arch/arm/mach-berlin/platsmp.c
-+++ b/arch/arm/mach-berlin/platsmp.c
-@@ -14,6 +14,7 @@
- #include <linux/of_address.h>
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 973a496..e1a16ed 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -405,6 +405,7 @@
+ 			model = "eTSEC";
+ 			fsl,magic-packet;
+ 			ranges;
++			dma-coherent;
  
- #include <asm/cacheflush.h>
-+#include <asm/cp15.h>
- #include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
+ 			queue-group at 2d10000 {
+ 				#address-cells = <2>;
+@@ -433,6 +434,7 @@
+ 			interrupt-parent = <&gic>;
+ 			model = "eTSEC";
+ 			ranges;
++			dma-coherent;
  
-@@ -93,8 +94,32 @@ unmap_scu:
- 	iounmap(scu_base);
- }
+ 			queue-group at 2d50000  {
+ 				#address-cells = <2>;
+@@ -461,6 +463,7 @@
+ 			interrupt-parent = <&gic>;
+ 			model = "eTSEC";
+ 			ranges;
++			dma-coherent;
  
-+#ifdef CONFIG_HOTPLUG_CPU
-+static void berlin_cpu_die(unsigned int cpu)
-+{
-+	v7_exit_coherency_flush(louis);
-+	while (1)
-+		cpu_do_idle();
-+}
-+
-+static int berlin_cpu_kill(unsigned int cpu)
-+{
-+	u32 val;
-+
-+	val = readl(cpu_ctrl + CPU_RESET);
-+	val &= ~BIT(cpu_logical_map(cpu));
-+	writel(val, cpu_ctrl + CPU_RESET);
-+
-+	return 1;
-+}
-+#endif
-+
- static struct smp_operations berlin_smp_ops __initdata = {
- 	.smp_prepare_cpus	= berlin_smp_prepare_cpus,
- 	.smp_boot_secondary	= berlin_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= berlin_cpu_die,
-+	.cpu_kill		= berlin_cpu_kill,
-+#endif
- };
- CPU_METHOD_OF_DECLARE(berlin_smp, "marvell,berlin-smp", &berlin_smp_ops);
+ 			queue-group at 2d90000  {
+ 				#address-cells = <2>;
 -- 
-2.5.1
+2.1.0.27.g96db324
