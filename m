@@ -1,43 +1,64 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 14 Sep 2015 16:40:40 +0200
-Subject: [PATCH 2/4] ARM: sun8i: Add the A33 AHB1 gates clock driver
-In-Reply-To: <87wpvu2vzr.fsf@dell.be.48ers.dk>
-References: <1441977997-29041-1-git-send-email-maxime.ripard@free-electrons.com>
- <1441977997-29041-3-git-send-email-maxime.ripard@free-electrons.com>
- <87wpvu2vzr.fsf@dell.be.48ers.dk>
-Message-ID: <20150914144040.GD4684@lukather>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 14 Sep 2015 16:40:28 +0200
+Subject: [PATCH 2/2] clk: at91: system: don't try to free_irq when there
+ is no IRQ
+In-Reply-To: <1441982047-11303-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1441982047-11303-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1441982047-11303-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20150914164028.7f38505d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi Alexandre,
 
-On Sun, Sep 13, 2015 at 05:13:12PM +0200, Peter Korsgaard wrote:
-> >>>>> "Maxime" == Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+On Fri, 11 Sep 2015 16:34:07 +0200
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+
+> In the error path of at91_clk_register_system(), sys->irq is freed
+> unconditionally but it may not exist or be request at all.
+
+Not sure this is really needed since free_irq() seems to gracefully
+handle the case where the irq has not been previously requested [1]
+(it does not complain about invalid irq descriptors), but I guess
+this extra check cannot hurt.
+
+BTW, that's kinda weird that free_irq() accepts this case, but complains
+when you're trying to free a wrong (or already freed) shared irq handler
+[2].
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+Best Regards,
+
+Boris
+
+[1]http://lxr.free-electrons.com/source/kernel/irq/manage.c#L1471
+[2]http://lxr.free-electrons.com/source/kernel/irq/manage.c#L1377
+
 > 
->  > The A33 has different a different gates array than the A23, add the node to
->  > the DT.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/clk/at91/clk-system.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> NIT: 2x different.
+> diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
+> index 58008b3e8bc1..3f5314344286 100644
+> --- a/drivers/clk/at91/clk-system.c
+> +++ b/drivers/clk/at91/clk-system.c
+> @@ -138,7 +138,8 @@ at91_clk_register_system(struct at91_pmc *pmc, const char *name,
+>  
+>  	clk = clk_register(NULL, &sys->hw);
+>  	if (IS_ERR(clk)) {
+> -		free_irq(sys->irq, sys);
+> +		if (irq)
+> +			free_irq(sys->irq, sys);
+>  		kfree(sys);
+>  	}
+>  
 
-Ah, good catch, thanks!
 
-> Shouldn't the a23 one then move from sun8i-a23-a33.dtsi to
-> sun8i-a23.dtsi?
-
-It is, but in order to preserve bisectability, I declared the A33 node
-first, that has precedence over the A23 still in the common DTSI, and
-removed the A23 in the next patch.
-
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150914/a3566487/attachment.sig>
