@@ -1,61 +1,251 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Sep 2015 12:42:09 +0100
-Subject: mvneta: SGMII fixed-link not so fixed
-In-Reply-To: <55F6AA25.2070603@list.ru>
-References: <20150914103207.GH21084@n2100.arm.linux.org.uk>
- <55F6AA25.2070603@list.ru>
-Message-ID: <20150914114209.GL21084@n2100.arm.linux.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 14 Sep 2015 13:46:48 +0200
+Subject: [PATCH v2 6/8] arm/arm64: KVM: Add forwarded physical interrupts
+ documentation
+In-Reply-To: <55EDBF36.4040307@linaro.org>
+References: <1441395650-19663-1-git-send-email-christoffer.dall@linaro.org>
+ <1441395650-19663-7-git-send-email-christoffer.dall@linaro.org>
+ <55EDBF36.4040307@linaro.org>
+Message-ID: <20150914114648.GK15712@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 02:06:13PM +0300, Stas Sergeev wrote:
-> 14.09.2015 13:32, Russell King - ARM Linux ?????:
-> >I've been bringing up the mainline kernel on a new board, which has
-> >an Marvell SoC with a mvneta interface connected to a Marvell DSA
-> >switch.  The DSA switch is a 88E6176.
-> >
-> >In the DT block for the interface, I specify:
-> >
-> >	ethernet at ... {
-> >	        phy-mode = "sgmii";
-> >		status = "okay";
-> >
-> >		fixed-link {
-> >			speed = <1000>;
-> >			full-duplex;
-> >		};
-> >	};
-> >
-> >However, this doesn't work without patching mvneta to disable the
-> >autonegotiation and forcing the link up:
-> >
-> >diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> >index 62e48bc0cb23..e1698731e429 100644
-> >--- a/drivers/net/ethernet/marvell/mvneta.c
-> >+++ b/drivers/net/ethernet/marvell/mvneta.c
-> >@@ -1010,6 +1010,10 @@ static void mvneta_defaults_set(struct mvneta_port *pp)
-> >  		val |= MVNETA_GMAC_INBAND_AN_ENABLE |
-> >  		       MVNETA_GMAC_AN_SPEED_EN |
-> >  		       MVNETA_GMAC_AN_DUPLEX_EN;
-> >+		/* We appear to need the interface forced for DSA switches */
-> >+		val &= ~(MVNETA_GMAC_AN_DUPLEX_EN |
-> >+			 MVNETA_GMAC_AN_SPEED_EN);
-> >+		val |= MVNETA_GMAC_FORCE_LINK_PASS;
-> >  		mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG, val);
-> >  		val = mvreg_read(pp, MVNETA_GMAC_CLOCK_DIVIDER);
-> >  		val |= MVNETA_GMAC_1MS_CLOCK_ENABLE;
-> Hello Russell, just to make sure, aren't you missing this by any chance:
-> https://lkml.org/lkml/2015/7/20/710
+On Mon, Sep 07, 2015 at 06:45:42PM +0200, Eric Auger wrote:
+> Hi Christoffer,
+> On 09/04/2015 09:40 PM, Christoffer Dall wrote:
+> > Forwarded physical interrupts on arm/arm64 is a tricky concept and the
+> > way we deal with them is not apparently easy to understand by reading
+> > various specs.
+> > 
+> > Therefore, add a proper documentation file explaining the flow and
+> > rationale of the behavior of the vgic.
+> > 
+> > Some of this text was contributed by Marc Zyngier and edited by me.
+> > Omissions and errors are all mine.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt | 181 +++++++++++++++++++++
+> >  1 file changed, 181 insertions(+)
+> >  create mode 100644 Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+> > 
+> > diff --git a/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+> > new file mode 100644
+> > index 0000000..24b6f28
+> > --- /dev/null
+> > +++ b/Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+> > @@ -0,0 +1,181 @@
+> > +KVM/ARM VGIC Forwarded Physical Interrupts
+> > +==========================================
+> > +
+> > +The KVM/ARM code implements software support for the ARM Generic
+> > +Interrupt Controller's (GIC's) hardware support for virtualization by
+> > +allowing software to inject virtual interrupts to a VM, which the guest
+> > +OS sees as regular interrupts.  The code is famously known as the VGIC.
+> > +
+> > +Some of these virtual interrupts, however, correspond to physical
+> > +interrupts from real physical devices.  One example could be the
+> > +architected timer, which itself supports virtualization, and therefore
+> > +lets a guest OS program the hardware device directly to raise an
+> > +interrupt at some point in time.  When such an interrupt is raised, the
+> > +host OS initially handles the interrupt and must somehow signal this
+> > +event as a virtual interrupt to the guest.  Another example could be a
+> > +passthrough device, where the physical interrupts are initially handled
+> > +by the host, but the device driver for the device lives in the guest OS
+> > +and KVM must therefore somehow inject a virtual interrupt on behalf of
+> > +the physical one to the guest OS.
+> > +
+> > +These virtual interrupts corresponding to a physical interrupt on the
+> > +host are called forwarded physical interrupts, but are also sometimes
+> > +referred to as 'virtualized physical interrupts' and 'mapped interrupts'.
+> > +
+> > +Forwarded physical interrupts are handled slightly differently compared
+> > +to virtual interrupts generated purely by a software emulated device.
+> > +
+> > +
+> > +The HW bit
+> > +----------
+> > +Virtual interrupts are signalled to the guest by programming the List
+> > +Registers (LRs) on the GIC before running a VCPU.  The LR is programmed
+> > +with the virtual IRQ number and the state of the interrupt (Pending,
+> > +Active, or Pending+Active).  When the guest ACKs and EOIs a virtual
+> > +interrupt, the LR state moves from Pending to Active, and finally to
+> > +inactive.
+> > +
+> > +The LRs include an extra bit, called the HW bit.  When this bit is set,
+> > +KVM must also program an additional field in the LR, the physical IRQ
+> > +number, to link the virtual with the physical IRQ.
+> > +
+> > +When the HW bit is set, KVM must EITHER set the Pending OR the Active
+> > +bit, never both at the same time.
+> > +
+> > +Setting the HW bit causes the hardware to deactivate the physical
+> > +interrupt on the physical distributor when the guest deactivates the
+> > +corresponding virtual interrupt.
+> > +
+> > +
+> > +Forwarded Physical Interrupts Life Cycle
+> > +----------------------------------------
+> > +
+> > +The state of forwarded physical interrupts is managed in the following way:
+> > +
+> > +  - The physical interrupt is acked by the host, and becomes active on
+> > +    the physical distributor (*).
+> > +  - KVM sets the LR.Pending bit, because this is the only way the GICV
+> > +    interface is going to present it to the guest.
+> > +  - LR.Pending will stay set as long as the guest has not acked the interrupt.
+> > +  - LR.Pending transitions to LR.Active on the guest read of the IAR, as
+> > +    expected.
+> > +  - On guest EOI, the *physical distributor* active bit gets cleared,
+> > +    but the LR.Active is left untouched (set).
+> > +  - KVM clears the LR when on VM exits when the physical distributor
+> s/when//?
+> > +    active state has been cleared.
+> > +
+> > +(*): The host handling is slightly more complicated.  For some devices
+> > +(shared), KVM directly sets the active state on the physical distributor
+> > +before entering the guest, and for some devices (non-shared) the host
+> > +configures the GIC such that it does not deactivate the interrupt on
+> > +host EOIs, but only performs a priority drop allowing the GIC to receive
+> > +other interrupts and leaves the interrupt in the active state on the
+> > +physical distributor.
+> EOIMode == 1 is set globally and impacts all forwarded SPI/PPIs, shared
+> or not shared I think. reading the above lines I have the impression
+> this is a per-device programming.
 
-Thanks, I think that will solve it.  I have to wonder why that patch
-(f8af8e6eb9509 in mainline) didn't made it into v4.2 though, as it's
-billed as a regression that occurred in the previous merge window, and
-given that it was sent in July, and we're now in September.  As it
-wasn't in v4.2, it looks like it should be a stable candidate.
+true, this was me remembering incorrectly.
 
-David, any objections to having the stable guys pick this regression
-fix up, if not already done so?
+> 
+> My understanding is for the timer it is needed to manually set the
+> physical distributor state because 1) the HW (GIC) does not do it and 2)
+> we need to context switch depending on the vCPU. For non shared device
+> the GIC sets the physical distributor state and the state is fully
+> maintained by HW until the guest deactivation.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+true, I'll try to rework this slightly.
+
+> 
+> > +
+> > +
+> > +Forwarded Edge and Level Triggered PPIs and SPIs
+> > +------------------------------------------------
+> > +Forwarded physical interrupts injected should always be active on the
+> > +physical distributor when injected to a guest.
+> > +
+> > +Level-triggered interrupts will keep the interrupt line to the GIC
+> > +asserted, typically until the guest programs the device to deassert the
+> > +line.  This means that the interrupt will remain pending on the physical
+> > +distributor until the guest has reprogrammed the device.  Since we
+> > +always run the VM with interrupts enabled on the CPU, a pending
+> > +interrupt will exit the guest as soon as we switch into the guest,
+> > +preventing the guest from ever making progress as the process repeats
+> > +over and over.  Therefore, the active state on the physical distributor
+> > +must be set when entering the guest, preventing the GIC from forwarding
+> > +the pending interrupt to the CPU.  As soon as the guest deactivates
+> > +(EOIs) the interrupt, the physical line is sampled by the hardware again
+> I think you can remove "(EOI)". This depends on EOI mode setting on
+> guest side. it can be 2-in-1 EOI or EOI+DIR.
+
+right, fair enough.
+
+> > +and the host takes a new interrupt if and only if the physical line is
+> > +still asserted.
+> > +
+> > +Edge-triggered interrupts do not exhibit the same problem with
+> > +preventing guest execution that level-triggered interrupts do.  One
+> > +option is to not use HW bit at all, and inject edge-triggered interrupts
+> > +from a physical device as pure virtual interrupts.  But that would
+> > +potentially slow down handling of the interrupt in the guest, because a
+> > +physical interrupt occurring in the middle of the guest ISR would
+> > +preempt the guest for the host to handle the interrupt.  Additionally,
+> > +if you configure the system to handle interrupts on a separate physical
+> > +core from that running your VCPU, you still have to interrupt the VCPU
+> > +to queue the pending state onto the LR, even though the guest won't use
+> > +this information until the guest ISR completes.  Therefore, the HW
+> > +bit should always be set for forwarded edge-triggered interrupts.  With
+> > +the HW bit set, the virtual interrupt is injected and additional
+> > +physical interrupts occurring before the guest deactivates the interrupt
+> > +simply mark the state on the physical distributor as Pending+Active.  As
+> > +soon as the guest deactivates the interrupt, the host takes another
+> > +interrupt if and only if there was a physical interrupt between
+> > +injecting the forwarded interrupt to the guest
+> missing and?
+
+yes, thanks.
+
+>  the guest deactivating
+> > +the interrupt.
+> > +
+> > +Consequently, whenever we schedule a VCPU with one or more LRs with the
+> > +HW bit set, the interrupt must also be active on the physical
+> > +distributor.
+> > +
+> > +
+> > +Forwarded LPIs
+> > +--------------
+> > +LPIs, introduced in GICv3, are always edge-triggered and do not have an
+> > +active state.  They become pending when a device signal them, and as
+> > +soon as they are acked by the CPU, they are inactive again.
+> > +
+> > +It therefore doesn't make sense, and is not supported, to set the HW bit
+> > +for physical LPIs that are forwarded to a VM as virtual interrupts,
+> > +typically virtual SPIs.
+> > +
+> > +For LPIs, there is no other choice than to preempt the VCPU thread if
+> > +necessary, and queue the pending state onto the LR.
+> > +
+> > +
+> > +Putting It Together: The Architected Timer
+> > +------------------------------------------
+> > +The architected timer is a device that signals interrupts with level
+> > +triggered semantics.  The timer hardware is directly accessed by VCPUs
+> > +which program the timer to fire at some point in time.  Each VCPU on a
+> > +system programs the timer to fire at different times, and therefore the
+> > +hardware is multiplexed between multiple VCPUs.  This is implemented by
+> > +context-switching the timer state along with each VCPU thread.
+> > +
+> > +However, this means that a scenario like the following is entirely
+> > +possible, and in fact, typical:
+> > +
+> > +1.  KVM runs the VCPU
+> > +2.  The guest programs the time to fire in T+100
+> > +3.  The guest is idle and calls WFI (wait-for-interrupts)
+> > +4.  The hardware traps to the host
+> > +5.  KVM stores the timer state to memory and disables the hardware timer
+> > +6.  KVM schedules a soft timer to fire in T+(100 - time since step 2)
+> > +7.  KVM puts the VCPU thread to sleep (on a waitqueue)
+> > +8.  The soft timer fires, waking up the VCPU thread
+> > +9.  KVM reprograms the timer hardware with the VCPU's values
+> > +10. KVM marks the timer interrupt as active on the physical distributor
+> > +11. KVM injects a forwarded physical interrupt to the guest
+> > +12. KVM runs the VCPU
+> > +
+> > +Notice that KVM injects a forwarded physical interrupt in step 11 without
+> > +the corresponding interrupt having actually fired on the host.  That is
+> > +exactly why we mark the timer interrupt as active in step 10, because
+> > +the active state on the physical distributor is part of the state
+> > +belonging to the timer hardware, which is context-switched along with
+> > +the VCPU thread.
+> > +
+> > +If the guest does not idle because it is busy, flow looks like this
+> > +instead:
+> > +
+> > +1.  KVM runs the VCPU
+> > +2.  The guest programs the time to fire in T+100
+> > +4.  At T+100 the timer fires and a physical IRQ causes the VM to exit
+> > +5.  With interrupts disabled on the CPU, KVM looks at the timer state
+> > +    and injects a forwarded physical interrupt because it concludes the
+> > +    timer has expired.
+> I don't get how we can trap without the virtual timer PPI handler being
+> entered on host side. Please can you elaborate on this?
+
+As Marc pointed out, we trap with interrupts disabled, disable the
+virtual timer, then re-enable interrupts and since the interrupt is now
+disabled the interrupt is not taken.
+
+Recall that the way we deal with physical interrupts is basically (1)
+trap to EL2 with interrupts disable (2) switch all state (3) re-enable
+interrupts on the CPU (4) the interrupt hits again and then the host ISR
+runs.
+
+-Christoffer
