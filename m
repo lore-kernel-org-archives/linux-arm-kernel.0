@@ -1,134 +1,174 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 15 Sep 2015 16:16:07 +0100
-Subject: [PATCH v2 6/8] arm/arm64: KVM: Add forwarded physical interrupts
- documentation
-In-Reply-To: <20150914114219.GJ15712@cbox>
-References: <1441395650-19663-1-git-send-email-christoffer.dall@linaro.org>
- <1441395650-19663-7-git-send-email-christoffer.dall@linaro.org>
- <55ED7427.1020901@arm.com> <55EE9FA4.3060204@linaro.org>
- <55EF1389.10802@arm.com>
- <CAMJs5B_Qxkfu=KSA0oUm386_mgZ73_NQEqS6e+gBGxwBMJVezg@mail.gmail.com>
- <55F2B932.2030901@arm.com> <20150914114219.GJ15712@cbox>
-Message-ID: <55F83637.3060400@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 15 Sep 2015 17:23:30 +0200
+Subject: [PATCH] ARM: multi_v7: Rebuild default configuration on v4.3-rc1
+In-Reply-To: <20150915142321.GU21084@n2100.arm.linux.org.uk>
+References: <1442314300-4714-1-git-send-email-thierry.reding@gmail.com>
+ <20150915111257.GR21084@n2100.arm.linux.org.uk>
+ <20150915134639.GC2983@ulmo.nvidia.com>
+ <20150915142321.GU21084@n2100.arm.linux.org.uk>
+Message-ID: <20150915152328.GA25966@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 14/09/15 12:42, Christoffer Dall wrote:
-....
->>>> Where is this done? I see that the physical dist state is altered on the
->>>> actual IRQ forwarding, but not on later exits/entries? Do you mean
->>>> kvm_vgic_flush_hwstate() with "flush"?
->>>
->>> this is a bug and should be fixed in the 'fixes' patches I sent last
->>> week.  We should set active state on every entry to the guest for IRQs
->>> with the HW bit set in either pending or active state.
->>
->> OK, sorry, I missed that one patch, I was looking at what should become
->> -rc1 soon (because that's what I want to rebase my ITS emulation patches
->> on). That patch wasn't in queue at the time I started looking at it.
->>
->> So I updated to the latest queue containing those two fixes and also
->> applied your v2 series. Indeed this series addresses some of the things
->> I was wondering about the last time, but the main thing still persists:
->> - Every time the physical dist state is active we have the virtual state
->> still at pending or active.
+On Tue, Sep 15, 2015 at 03:23:21PM +0100, Russell King - ARM Linux wrote:
+> [Added Linus]
 > 
-> For the arch timer, yes.
+> On Tue, Sep 15, 2015 at 03:46:40PM +0200, Thierry Reding wrote:
+> > On Tue, Sep 15, 2015 at 12:12:57PM +0100, Russell King - ARM Linux wrote:
+> > > On Tue, Sep 15, 2015 at 12:51:40PM +0200, Thierry Reding wrote:
+> > > > From: Thierry Reding <treding@nvidia.com>
+> > > > 
+> > > > It's becoming more and more difficult to update the multi_v7 default
+> > > > configuration because it hasn't been kept in proper order. Typically the
+> > > > workflow to update it would be to do the following:
+> > > 
+> > > If we start regularly updating the defconfigs, it'll annoy Linus,
+> > > because it will create a lot of useless churn, bloating his diffstats
+> > > needlessly.
+> > 
+> > We are already regularly updating defconfigs. It's a natural thing to do
+> > as new features are implemented.
+> > 
+> > > Since the defconfig files are not order specific, it would have been
+> > > a good idea if savedefconfig had sorted the options into alphanumeric
+> > > order propr to outputting them.  That would cut down on the useless
+> > > churn, some of which is in your patch.
+> > 
+> > That would be one solution. But it would also mean that people need to
+> > actually go and check that things are properly sorted. Most of the churn
+> > here doesn't come from the fact that these options have moved in Kconfig
+> > but because people have inserted them in the wrong places. The same
+> > could happen even if savedefconfig sorted options alphanumerically,
+> > because evidently people aren't using the tools properly.
 > 
-> For a passthrough device, there should be a situation where the physical
-> dist state is active but we didn't see the virtual state updated at the
-> vgic yet (after physical IRQ fires and before the VFIO ISR calls
-> kvm_set_irq).
+> Hardly surprising - if people are going around adding an option to
+> all architectures, they're not going to run 'make savedefconfig' on
+> each and every configuration they find to add that option.  That's
+> far too much work.  It's not that "people aren't using the tools
+> properly" it's that the tools are too much effort when you've got a
+> global change to do.
 
-But then we wouldn't get into vgic_sync_hwirq(), because we wouldn't
-inject a mapped IRQ before kvm_set_irq() is called, would we?
+I don't expect people to do this for every option they add. What I was
+expecting people to do is when they add a new feature to a default
+configuration that they add it in the right place. I'm also not
+advocating for doing this for every default configuration, but the
+multi_v7_defconfig is where pretty much everyone in the ARM world adds
+options. It is also one which /should/ be updated through the ARM SoC
+tree only, so there's technically a way to enforce this.
 
->> - If the physical dist state is non-active, the virtual state is
->> inactive (LR.state==8: HW bit) as well. The associated ELRSR bit is 1
->> (LR empty).
->> (I was tracing every HW mapped LR in vgic_sync_hwirq() for this)
->>
->> So that contradicts:
->>
->> +  - On guest EOI, the *physical distributor* active bit gets cleared,
->> +    but the LR.Active is left untouched (set).
->>
->> This is the main point I was actually wondering about: I cannot confirm
->> this statement. In my tests the LR state and the physical dist state
->> always correspond, as excepted by reading the spec.
->>
->> I reckon that these observations are mostly independent from the actual
->> KVM code, as I try to observe hardware state (physical distributor and
->> LRs) before KVM tinkers with them.
+> However, there's not really anything that can be done about it,
+> because nothing is simpler than concatenating an option to all
+> configs, or adding it using an editor.
+
+It's not that easy. As a platform maintainer I often need to deal with
+the situation where the default configuration needs to be updated with
+the latest options so that "everything works". But because the default
+configuration is all messed up there is no easy way for me to do that,
+because once I have a .config that has all the new options enabled the
+corresponding defconfig has a huge diff compared to the default and it
+takes a ridiculous amount of work to sort out the actual changes.
+
+I doubt that I'm the only one in that position and I think this has the
+potential to make things a little easier for everyone contributing to
+this default configuration.
+
+> > > In fact, most of this patch is pure churn - it's merely moving options
+> > > about.  It provides very little in the way of useful benefit for its
+> > > size.  We need to do better than this.
+> > 
+> > Yes, I know. In fact I stated that in the commit message. But this
+> > really should be a one-time thing.
 > 
-> ok, I got this paragraph from Marc, so we really need to ask him?  Which
-> hardware are you seeing this behavior on?  Perhaps implementations vary
-> on this point?
+> The fact is, this won't be a one-time thing.  People will continue to
+> add options in random places in these files, and we'll need to "fix"
+> it with useless churn yet again, and again, and again.
 
-I checked this on Midway and Juno. Both have a GIC-400, but I don't have
-access to any other GIC implementations.
-I added the two BUG_ONs shown below to prove that assumption.
+Like I said, this file should only ever get modified via the ARM SoC
+tree and hence we should be able to enforce proper updates.
 
-Eric, I've been told you observed the behaviour with the GIC not syncing
-LR and phys state for a mapped HWIRQ which was not the timer.
-Can you reproduce this? Does it complain with the patch below?
-
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 5942ce9..7fac16e 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1459,9 +1459,12 @@ static bool vgic_sync_hwirq(struct kvm_vcpu
- 					     IRQCHIP_STATE_ACTIVE,
- 					     false);
- 		WARN_ON(ret);
-+		BUG_ON(!(vlr.state & 3));
- 		return false;
- 	}
-
-+	BUG_ON(vlr.state & 3);
-+
- 	return process_queued_irq(vcpu, lr, vlr);
- }
-
+> > If we make it easy for people to
+> > properly update the default configuration there will be less churn
+> > further down the road. The changes that end up in multi_v7 default
+> > configuration patches should be what's generated from the defconfig
+> > output. So unless options get removed from Kconfig there should not
+> > be any unnecessary churn subsequently.
 > 
-> I have no objections removing this point from the doc though, I'm just
-> relaying information on this one.
+> I think you're living in an ideal world...
+> 
+> > As for changes that move options in Kconfig, I think those should be
+> > discouraged. The sane thing to do is order them alphabetically, which
+> > will remove any need to move things around.
+> 
+> ... which is why you re-ordered drivers/gpu/drm/Kconfig, moving
+> bridge/Kconfig after the panel Kconfig, which now resulted in this
+> churn in _this_ churn filled patch:
+> 
+>  CONFIG_DRM=y
+>  # CONFIG_DRM_I2C_CH7006 is not set
+>  # CONFIG_DRM_I2C_SIL164 is not set
+> -CONFIG_DRM_NXP_PTN3460=m
+> -CONFIG_DRM_PARADE_PS8622=m
+>  CONFIG_DRM_NOUVEAU=m
+>  CONFIG_DRM_EXYNOS=m
+> ...
+>  CONFIG_DRM_PANEL_SIMPLE=y
+> +CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
+> +CONFIG_DRM_NXP_PTN3460=m
+> +CONFIG_DRM_PARADE_PS8622=m
+>  CONFIG_FB_ARMCLCD=y
 
-I see, I talked with Marc and I am about to gather more data with the
-above patch to prove that this never happens.
+The reason for those changes were that bridge drivers were completely
+randomly added in Kconfig. That should've never happened in the first
+place and the changes you mentioned are actually supposed to prevent
+this kind of random additions in the future and keep things properly
+sorted.
 
->>
->> ...
->>
->>>
->>>> Is this an observation, an implementation bug or is this mentioned in
->>>> the spec? Needing to spoon-feed the VGIC by doing it's job sounds a bit
->>>> awkward to me.
->>>
->>> What do you mean?  How are we spoon-feeding the VGIC?
->>
->> By looking at the physical dist state and all LRs and clearing the LR we
->> do what the GIC is actually supposed to do for us - and what it actually
->> does according to my observations.
->>
->> The point is that patch 1 in my ITS emulation series is reworking the LR
->> handling and this patch was based on assumptions that seem to be no
->> longer true (i.e. we don't care about inactive LRs except for our LR
->> mapping code). So I want to be sure that I fully get what is going on
->> here and I struggle at this at the moment due to the above statement.
->>
->> What are the plans regarding your "v2: Rework architected timer..."
->> series? Will this be queued for 4.4? I want to do the
->> rebasing^Wrewriting of my series only once if possible ;-)
->>
-> I think we should settle on this series ASAP and base your ITS stuff on
-> top of it.  What do you think?
+> > > > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> > > > index 03deb7fb35e8..56775eb9b9cc 100644
+> > > > --- a/arch/arm/configs/multi_v7_defconfig
+> > > > +++ b/arch/arm/configs/multi_v7_defconfig
+> > > > @@ -12,7 +12,6 @@ CONFIG_MODULE_UNLOAD=y
+> > > >  CONFIG_PARTITION_ADVANCED=y
+> > > >  CONFIG_CMDLINE_PARTITION=y
+> > > >  CONFIG_ARCH_VIRT=y
+> > > > -CONFIG_ARCH_ALPINE=y
+> > > >  CONFIG_ARCH_MVEBU=y
+> > > >  CONFIG_MACH_ARMADA_370=y
+> > > >  CONFIG_MACH_ARMADA_375=y
+> > > > @@ -20,14 +19,15 @@ CONFIG_MACH_ARMADA_38X=y
+> > > >  CONFIG_MACH_ARMADA_39X=y
+> > > >  CONFIG_MACH_ARMADA_XP=y
+> > > >  CONFIG_MACH_DOVE=y
+> > > > +CONFIG_ARCH_ALPINE=y
+> > > 
+> > > This option has moved, and the above two changes are therefore nothing
+> > > but churn.
+> > [...]
+> > 
+> > This and all the below I know already. I went through each and every one
+> > of these options and checked what happened to them. Those listed in the
+> > commit message are the ones that have actually changed. Those not listed
+> > are the ones that have only moved around.
+> 
+> Right, so from me this patch gets a NAK, because it's mostly churn
+> with very little benefit.
+> 
+> Linus has threatened to remove the defconfigs in the past for this
+> kind of stupid churn.  For me to say anything else about this would
+> be re-inviting their removal.
 
-Yeah, that's what I was thinking too. So I will be working against
-4.3-rc1 with your timer-rework-v2 branch plus the other fixes from the
-kvm-arm queue merged.
+Like I said, I consider the churn a mostly one-time thing. But keeping
+this file properly up to date is going to help prevent it from becoming
+stale and crufty.
 
-Cheers,
-Andre.
+But if everyone else feels really strongly about this, consider the
+patch dropped. I'll go and do something else instead.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150915/da1af186/attachment.sig>
