@@ -1,63 +1,52 @@
-From: oren@igneous.io (Oren Laskin)
-Date: Tue, 15 Sep 2015 14:19:45 -0700
-Subject: [PATCH] net: mvneta: fix DMA buffer unmapping in mvneta_rx()
-In-Reply-To: <1442349681-27437-1-git-send-email-simon.guinot@sequanux.org>
-References: <20150915203634.GI7306@kw.sim.vm.gnt>
- <1442349681-27437-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <CAA-51jMAHa=sU8B5eSTLHnqYDSy93bO1Jbc2=qHY6S=qM1__MA@mail.gmail.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Tue, 15 Sep 2015 14:20:01 -0700
+Subject: [PATCH v1 1/2] soc: ti: display firmware file name as part of
+ boot log
+In-Reply-To: <55F8600D.2070701@ti.com>
+References: <1441403199-10936-1-git-send-email-m-karicheri2@ti.com>
+ <55EA673F.8010904@oracle.com> <55F06075.6050405@ti.com>
+ <55F8600D.2070701@ti.com>
+Message-ID: <55F88B81.2000308@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the regression we saw.
+On 9/15/2015 11:14 AM, Murali Karicheri wrote:
+> On 09/09/2015 12:38 PM, Murali Karicheri wrote:
+>> On 09/04/2015 11:53 PM, santosh.shilimkar at oracle.com wrote:
+>>> On 9/4/15 5:46 PM, Murali Karicheri wrote:
+>>>> To help the user, print the PDSP file name as part of
+>>>> knav_queue_load_pdsp(). This will be useful for users to know what
+>>>> version of the firmware is loaded to PDSP. Also update the
+>>>> document for the location of the QMSS accumulator PDSP firmware.
+>>>>
+>>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>>>> ---
+>>>
+>>> Looks fine. Will pick both the patches.
+>>>
+>>
+>> Thanks Santhosh.
+>>
+>> Is there a requirement to add the firmware to linux-firmware.git. Right
+>> now I have provided link to ti git repo that has the firmware. I have
+>> the patch ready in case this is required. Do you know?
+>>
+>> Murali
+>>> Regards,
+>>> Santosh
+>>>
+>>>
+>>
+>>
+> Santosh,
+>
+> I have checked v4.3-rc1 and I don't see it. Did you send the pull request?
+>
+They are in the queue fo 4.4-rc1. They were too late for 4.3.
+You might know already, typically as a rule of thumb followed
+on arm-soc, we need to get patches reviewed/acked by rc4 to make
+it for next merge window.
+Ofcourse genuine bug fixes can make it to the same cycle.
 
-Tested-by: Oren Laskin <oren@igneous.io>
-
-On Tue, Sep 15, 2015 at 1:41 PM, Simon Guinot <simon.guinot@sequanux.org> wrote:
-> This patch fixes a regression introduced by the commit a84e32894191
-> ("net: mvneta: fix refilling for Rx DMA buffers"). Due to this commit
-> the newly allocated Rx buffers are DMA-unmapped in place of those passed
-> to the networking stack. Obviously, this causes data corruptions.
->
-> This patch fixes the issue by ensuring that the right Rx buffers are
-> DMA-unmapped.
->
-> Reported-by: Oren Laskin <oren@igneous.io>
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> Fixes: a84e32894191 ("net: mvneta: fix refilling for Rx DMA buffers")
-> Cc: <stable@vger.kernel.org> # v3.8+
-> ---
->  drivers/net/ethernet/marvell/mvneta.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index 62e48bc0cb23..03e052a1cf5a 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -1479,6 +1479,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
->                 struct mvneta_rx_desc *rx_desc = mvneta_rxq_next_desc_get(rxq);
->                 struct sk_buff *skb;
->                 unsigned char *data;
-> +               dma_addr_t phys_addr;
->                 u32 rx_status;
->                 int rx_bytes, err;
->
-> @@ -1486,6 +1487,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
->                 rx_status = rx_desc->status;
->                 rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
->                 data = (unsigned char *)rx_desc->buf_cookie;
-> +               phys_addr = rx_desc->buf_phys_addr;
->
->                 if (!mvneta_rxq_desc_is_first_last(rx_status) ||
->                     (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
-> @@ -1534,7 +1536,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
->                 if (!skb)
->                         goto err_drop_frame;
->
-> -               dma_unmap_single(dev->dev.parent, rx_desc->buf_phys_addr,
-> +               dma_unmap_single(dev->dev.parent, phys_addr,
->                                  MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
->
->                 rcvd_pkts++;
-> --
-> 2.1.4
->
+Regards,
+Santosh
