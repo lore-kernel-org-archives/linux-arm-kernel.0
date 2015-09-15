@@ -1,38 +1,59 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 15 Sep 2015 13:25:37 -0500
-Subject: [PATCH RFC 6/8] drm: hisilicon: Add support for fbdev
-In-Reply-To: <1442309834-21420-7-git-send-email-kong.kongxinwei@hisilicon.com>
-References: <1442309834-21420-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <1442309834-21420-7-git-send-email-kong.kongxinwei@hisilicon.com>
-Message-ID: <55F862A1.30308@kernel.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Sep 2015 19:26:45 +0100
+Subject: [PATCH v5 1/5] arm/arm64: add smccc ARCH32
+In-Reply-To: <20150914083029.GA13963@ermac>
+References: <1439973629-19505-1-git-send-email-jens.wiklander@linaro.org>
+ <1439973629-19505-2-git-send-email-jens.wiklander@linaro.org>
+ <20150819165009.GC10297@arm.com> <20150820113729.GA25962@ermac>
+ <20150821092430.GC30930@arm.com> <20150821114331.GA11701@ermac>
+ <20150914083029.GA13963@ermac>
+Message-ID: <20150915182645.GQ31157@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2015 04:37 AM, Xinwei Kong wrote:
-> If you config DRM_HISI_FBDEV optional, this patch will only support fbdev
-> mode while also supporting double buffer.
+On Mon, Sep 14, 2015 at 09:30:30AM +0100, Jens Wiklander wrote:
+> On Fri, Aug 21, 2015 at 01:43:31PM +0200, Jens Wiklander wrote:
+> > On Fri, Aug 21, 2015 at 10:24:30AM +0100, Will Deacon wrote:
+> > > On Thu, Aug 20, 2015 at 12:37:29PM +0100, Jens Wiklander wrote:
+> > > > On Wed, Aug 19, 2015 at 05:50:09PM +0100, Will Deacon wrote:
+> > > > > On Wed, Aug 19, 2015 at 09:40:25AM +0100, Jens Wiklander wrote:
+> > > > > > +       mov     x28, x0
+> > > > > > +       ldp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
+> > > > > > +       ldp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
+> > > > > > +       ldp     w4, w5, [x28, #SMC_PARAM_W4_OFFS]
+> > > > > > +       ldp     w6, w7, [x28, #SMC_PARAM_W6_OFFS]
+> > > > > > +       smc     #0
+> > > > > > +       stp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
+> > > > > > +       stp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
+> > > > > > +       ldp     x28, x30, [sp], #16
+> > > > > > +       ret
+> > > > > > +ENDPROC(smccc_call32)
+> > > > > 
+> > > > > Could we deal with this like we do for PSCI instead? (see
+> > > > > __invoke_psci_fn_smc). We could also then rename psci-call.S to fw-call.S
+> > > > > and stick this in there too.
+> > > > 
+> > > > I assume you're referring to when to use "hvc" and "smc".
+> > > 
+> > > No, I mean use a C prototype to avoid marshalling the parameters in assembly
+> > > like this. As Rutland pointed out, the return value is a bit messy, but
+> > > the arguments align nicely with the PCS afaict.
+> > 
+> > If possible I'd like the function to have the same prototype for both
+> > arm and arm64. For arm it's not possible to supply more than 4
+> > parameters. To fully support SMC Calling Convention we need to be able
+> > to pass 8 parameters and have 4 return values. The OP-TEE driver in this
+> > patch set depends on this. I don't see how we can avoid the marshalling
+> > here.
+> > 
+> > We could have two versions of the SMCCC functions, one simplified which
+> > only uses registers and one complete like this one with marshalling.
+> 
+> Will, what do think about this?
 
-This is a lot of duplicated code from CMA fbdev. Is double buffering the
-only reason why CMA fbdev can't be used or are there some other
-constraints? Double buffering in fbdev has always been a hack, so I'm
-guessing that is not a feature that should be added here.
+I still think you should make use of a C prototype to avoid explicit
+parameter marshalling in assembly. If you want to maintain a compatible
+API between arm and arm64, then you can easily have an intermediate
+function in arm64 that sits between the API entry point and the assembly.
 
-Rob
-
-> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
-> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> Signed-off-by: Andy Green <andy.green@linaro.org>
-> Signed-off-by: Jiwen Qi <qijiwen@hisilicon.com>
-> Signed-off-by: Yu Gong <gongyu@hisilicon.com>
-> ---
->  drivers/gpu/drm/hisilicon/Kconfig              |  13 +
->  drivers/gpu/drm/hisilicon/Makefile             |   3 +-
->  drivers/gpu/drm/hisilicon/hisi_drm_connector.c |   4 +
->  drivers/gpu/drm/hisilicon/hisi_drm_drv.c       |   9 +
->  drivers/gpu/drm/hisilicon/hisi_drm_dsi.c       |  15 +
->  drivers/gpu/drm/hisilicon/hisi_drm_fb.h        |   5 +
->  drivers/gpu/drm/hisilicon/hisi_drm_fbdev.c     | 395 +++++++++++++++++++++++++
->  drivers/gpu/drm/hisilicon/hisi_drm_fbdev.h     |  24 ++
->  8 files changed, 467 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_fbdev.c
->  create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_fbdev.h
+Will
