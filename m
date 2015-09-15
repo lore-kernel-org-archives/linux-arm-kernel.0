@@ -1,45 +1,89 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Tue, 15 Sep 2015 17:27:58 +0200
-Subject: [linux-next RFC v7 0/6] mtd: spi-nor: improve support of QSPI nor
-Message-ID: <cover.1442330503.git.cyrille.pitchen@atmel.com>
+Date: Tue, 15 Sep 2015 17:27:59 +0200
+Subject: [linux-next RFC v7 1/6] mtd: spi-nor: remove unused
+ read_xfer/write_xfer hooks
+In-Reply-To: <cover.1442330503.git.cyrille.pitchen@atmel.com>
+References: <cover.1442330503.git.cyrille.pitchen@atmel.com>
+Message-ID: <32c4c31077756fe8918c6d5560632f716b9d5df7.1442330503.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+struct spi_nor_xfer_cfg and read_xfer/write_xfer hooks were never used by
+any driver. Do some cleanup by removing them.
 
-this series is still a work in progress though it is almost finished.
-The support of Macronix dummy code to configure the number of dummy cycles
-is still missing...
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+---
+ include/linux/mtd/spi-nor.h | 35 -----------------------------------
+ 1 file changed, 35 deletions(-)
 
-However I would like some feedbacks to synchronize this work with other
-mtd / spi-nor improvements as I see lots of patches on the mailing list.
-
-Best Regards,
-
-Cyrille
-
-Cyrille Pitchen (6):
-  mtd: spi-nor: remove unused read_xfer/write_xfer hooks
-  mtd: spi-nor: read JEDEC ID with multiple I/O protocols
-  mtd: spi-nor: set the read op code and protocol based on the
-    manufacturer
-  mtd: m25p80: add support of dual and quad spi protocols to all
-    commands
-  Documentation: atmel-quadspi: add binding file for Atmel QSPI driver
-  mtd: atmel-quadspi: add driver for Atmel QSPI controller
-
- .../devicetree/bindings/mtd/atmel-quadspi.txt      |  29 +
- drivers/mtd/devices/m25p80.c                       | 262 ++++--
- drivers/mtd/spi-nor/Kconfig                        |   7 +
- drivers/mtd/spi-nor/Makefile                       |   1 +
- drivers/mtd/spi-nor/atmel-quadspi.c                | 880 +++++++++++++++++++++
- drivers/mtd/spi-nor/fsl-quadspi.c                  |   2 +-
- drivers/mtd/spi-nor/nxp-spifi.c                    |  13 +-
- drivers/mtd/spi-nor/spi-nor.c                      | 603 ++++++++++++--
- include/linux/mtd/spi-nor.h                        |  68 +-
- 9 files changed, 1689 insertions(+), 176 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
- create mode 100644 drivers/mtd/spi-nor/atmel-quadspi.c
-
+diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+index e9c912d73141..672595a381c5 100644
+--- a/include/linux/mtd/spi-nor.h
++++ b/include/linux/mtd/spi-nor.h
+@@ -87,33 +87,6 @@ enum read_mode {
+ 	SPI_NOR_QUAD,
+ };
+ 
+-/**
+- * struct spi_nor_xfer_cfg - Structure for defining a Serial Flash transfer
+- * @wren:		command for "Write Enable", or 0x00 for not required
+- * @cmd:		command for operation
+- * @cmd_pins:		number of pins to send @cmd (1, 2, 4)
+- * @addr:		address for operation
+- * @addr_pins:		number of pins to send @addr (1, 2, 4)
+- * @addr_width:		number of address bytes
+- *			(3,4, or 0 for address not required)
+- * @mode:		mode data
+- * @mode_pins:		number of pins to send @mode (1, 2, 4)
+- * @mode_cycles:	number of mode cycles (0 for mode not required)
+- * @dummy_cycles:	number of dummy cycles (0 for dummy not required)
+- */
+-struct spi_nor_xfer_cfg {
+-	u8		wren;
+-	u8		cmd;
+-	u8		cmd_pins;
+-	u32		addr;
+-	u8		addr_pins;
+-	u8		addr_width;
+-	u8		mode;
+-	u8		mode_pins;
+-	u8		mode_cycles;
+-	u8		dummy_cycles;
+-};
+-
+ #define SPI_NOR_MAX_CMD_SIZE	8
+ enum spi_nor_ops {
+ 	SPI_NOR_OPS_READ = 0,
+@@ -144,14 +117,11 @@ struct mtd_info;
+  * @flash_read:		the mode of the read
+  * @sst_write_second:	used by the SST write operation
+  * @flags:		flag options for the current SPI-NOR (SNOR_F_*)
+- * @cfg:		used by the read_xfer/write_xfer
+  * @cmd_buf:		used by the write_reg
+  * @prepare:		[OPTIONAL] do some preparations for the
+  *			read/write/erase/lock/unlock operations
+  * @unprepare:		[OPTIONAL] do some post work after the
+  *			read/write/erase/lock/unlock operations
+- * @read_xfer:		[OPTIONAL] the read fundamental primitive
+- * @write_xfer:		[OPTIONAL] the writefundamental primitive
+  * @read_reg:		[DRIVER-SPECIFIC] read out the register
+  * @write_reg:		[DRIVER-SPECIFIC] write data to the register
+  * @read:		[DRIVER-SPECIFIC] read data from the SPI NOR
+@@ -176,15 +146,10 @@ struct spi_nor {
+ 	enum read_mode		flash_read;
+ 	bool			sst_write_second;
+ 	u32			flags;
+-	struct spi_nor_xfer_cfg	cfg;
+ 	u8			cmd_buf[SPI_NOR_MAX_CMD_SIZE];
+ 
+ 	int (*prepare)(struct spi_nor *nor, enum spi_nor_ops ops);
+ 	void (*unprepare)(struct spi_nor *nor, enum spi_nor_ops ops);
+-	int (*read_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
+-			 u8 *buf, size_t len);
+-	int (*write_xfer)(struct spi_nor *nor, struct spi_nor_xfer_cfg *cfg,
+-			  u8 *buf, size_t len);
+ 	int (*read_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len);
+ 	int (*write_reg)(struct spi_nor *nor, u8 opcode, u8 *buf, int len);
+ 
 -- 
 1.8.2.2
