@@ -1,45 +1,81 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 15 Sep 2015 10:50:05 +0200
-Subject: [PATCH 2/3] gpiolib: gpiod_hog remove separate name argument
-In-Reply-To: <20150907080818.GQ9999@pengutronix.de>
-References: <1439979512-3894-1-git-send-email-mpa@pengutronix.de>
- <1439979512-3894-3-git-send-email-mpa@pengutronix.de>
- <20150907080818.GQ9999@pengutronix.de>
-Message-ID: <20150915085005.GC1537@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 15 Sep 2015 10:52:33 +0200
+Subject: [PATCH 2/5] pinctrl: dt-binding: Add DT binding documentation
+ for Atmel PIO4
+In-Reply-To: <1439281685-3020-3-git-send-email-ludovic.desroches@atmel.com>
+References: <1439281685-3020-1-git-send-email-ludovic.desroches@atmel.com>
+ <1439281685-3020-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20150915085233.GA4044@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Sep 07, 2015 at 10:08:18AM +0200, Uwe Kleine-K?nig wrote:
-> On Wed, Aug 19, 2015 at 12:18:31PM +0200, Markus Pargmann wrote:
-> > From: Markus Pargmann <mpa@devmp.org>
-> > 
-> > The gpio name is now stored in the gpio descriptor, so we can simply use
+On Tue, Aug 11, 2015 at 10:28:02AM +0200, Ludovic Desroches wrote:
+> Add documentation for the Atmel PIO4 controller introduced with SAMA5D2
+> chip family.
 > 
-> What is now? Does this introduce a dependency; maybe better reference a
-> commit here?
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>  .../bindings/pinctrl/atmel,at91-pio4-pinctrl.txt   | 90 ++++++++++++++++++++++
+>  1 file changed, 90 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/atmel,at91-pio4-pinctrl.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pio4-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pio4-pinctrl.txt
+> new file mode 100644
+> index 0000000..61ac757
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pio4-pinctrl.txt
+> @@ -0,0 +1,90 @@
+> +* Atmel PIO4 Controller
+> +
+> +The Atmel PIO4 controller is used to select the function of a pin and to
+> +configure it.
+> +
+> +Required properties:
+> +- compatible: "atmel,sama5d2-pinctrl".
+> +- reg: base address and length of the PIO controller.
+> +- interrupts: interrupt outputs from the controller, one for each bank.
+> +- interrupt-controller: mark the device node as an interrupt controller.
+> +- #interrupt-cells: should be two.
+> +- gpio-controller: mark the device node as a gpio controller.
+> +- #gpio-cells: should be two.
+> +
+> +Please refer to ../gpio/gpio.txt and ../interrupt-controller/interrupts.txt for
+> +a general description of GPIO and interrupt bindings.
+> +
+> +Please refer to pinctrl-bindings.txt in this directory for details of the
+> +common pinctrl bindings used by client devices.
+> +
+> +Subnode format
+> +Each node (or subnode) will list the pins it needs and how to configured these
+> +pins.
+> +
+> +	node {
+> +		pinmux = <PIN_NUMBER_PINMUX>;
+> +		GENERIC_PINCONFIG;
+> +	};
+> +
+> +Required properties:
+> +- pinmux: integer array. Each integer represents a pin number plus mux and
+> +ioset settings. Use the macros from boot/dts/<soc>-pinfunc.h file to get the
+> +right representation of the pin.
+> +
+> +Optional properties:
+> +- GENERIC_PINCONFIG: generic pinconfig options to use, bias-disable,
+> +bias-pull-down, bias-pull-up, drive-open-drain, input-schmitt-enable,
+> +input-debounce, output-low, output-high.
 
-Thanks. Yes this was refering to patch 3 of series
-"gpiolib: Add GPIO name support",
-patch "gpiolib: Use GPIO name from names array for gpio descriptor".
+For the binding:
 
-However I can only reference by name here. Will add it to the commit
-message.
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Best Regards,
+It matches the Mediatek pinctrl binding and IMO the pinmux property
+as described here is very suitable for controllers which can mux each
+pin individually.
 
-Markus
+Sascha
 
 -- 
 Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
 Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150915/74eb2c75/attachment.sig>
