@@ -1,33 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Sep 2015 17:36:42 +0100
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <1442332425.2637.16.camel@pengutronix.de>
-References: <m3bnde5whx.fsf@t19.piap.pl>
- <20150907112555.GS21084@n2100.arm.linux.org.uk>
- <m337yp5gvv.fsf@t19.piap.pl>
- <1441709778.13536.8.camel@pengutronix.de>
- <m3bnd52y4s.fsf@t19.piap.pl>
- <1442332425.2637.16.camel@pengutronix.de>
-Message-ID: <20150915163642.GW21084@n2100.arm.linux.org.uk>
+From: bayi.cheng@mediatek.com (bayi.cheng)
+Date: Wed, 16 Sep 2015 00:37:46 +0800
+Subject: [PATCH 2/3] mtd: mtk-nor: mtk serial flash controller driver
+In-Reply-To: <20150909150050.44d2b197@ipc1.ka-ro>
+References: <1441705796-11365-1-git-send-email-bayi.cheng@mediatek.com>
+ <1441705796-11365-3-git-send-email-bayi.cheng@mediatek.com>
+ <20150909063701.GD18700@pengutronix.de>
+ <20150909150050.44d2b197@ipc1.ka-ro>
+Message-ID: <1442335066.27250.25.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 05:53:45PM +0200, Lucas Stach wrote:
-> It includes a new kernel<->userspace interface, so needs a modified
-> xf86-video-armada to go with it. You can pick that up here:
-> git://git.pengutronix.de/git/lst/xf86-video-armada.git for-rmk
+On Wed, 2015-09-09 at 15:00 +0200, Lothar Wa?mann wrote:
+> Hi,
 > 
-> Caution: the armada code is WIP and needs further cleanups. It should
-> work though.
-
-And it needs updating to the latest version - you seem to be missing
-a whole load of changes, including the changes which update the
-kernel API.
-
-So... you seem to be talking about the kernel API having changed from
-the version which you picked up years ago, rather than the current
-version.  It's really unclear what you're talking about.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> > > +	writeb(len, mt8173_nor->base + MTK_NOR_CNT_REG);
+> > > +	return mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_PRG_CMD);
+> > > +}
+> > > +
+> > > +static int mt8173_nor_get_para(struct mt8173_nor *mt8173_nor, u8 *buf, int len)
+> > > +{
+> > > +	if (len > 1) {
+> > > +		/* read JEDEC ID need 4 bytes commands */
+> > > +		mt8173_nor_set_cmd(mt8173_nor, 0, 32, SPINOR_OP_RDID);
+> > > +		buf[2] = readb(mt8173_nor->base + MTK_NOR_SHREG0_REG);
+> > > +		buf[1] = readb(mt8173_nor->base + MTK_NOR_SHREG1_REG);
+> > > +		buf[0] = readb(mt8173_nor->base + MTK_NOR_SHREG2_REG);
+> > > +	} else {
+> > > +		if (mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_RDSR_CMD)) {
+> > > +			dev_err(mt8173_nor->dev, "read status failed!\n");
+> > > +			return -EINVAL;
+> > > +		}
+> > > +		*buf = readb(mt8173_nor->base + MTK_NOR_RDSR_REG);
+> > > +	}
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +/* cmd1 sent to nor flash, cmd2 write to nor controller */
+> > > +static int mt8173_nor_set_para(struct mt8173_nor *mt8173_nor, int cmd1,
+> > > +			       int cmd2)
+> > > +{
+> > > +	if (mt8173_nor_set_cmd(mt8173_nor, 0, 8, SPINOR_OP_WREN)) {
+> > > +		dev_err(mt8173_nor->dev,
+> > > +			"write enable failed in write protect!\n");
+> > > +		return -EINVAL;
+> > > +	}
+> > > +	writeb(cmd1, mt8173_nor->base + MTK_NOR_PRGDATA5_REG);
+> > > +	writeb(8, mt8173_nor->base + MTK_NOR_CNT_REG);
+> > > +	if (mt8173_nor_execute_cmd(mt8173_nor, cmd2)) {
+> > > +		dev_err(mt8173_nor->dev, "execute cmd failed!\n");
+> > 
+> > mt8173_nor_execute_cmd() will already have printed an error message.
+> > 
+> And mt8173_nor_execute_cmd()/mt8173_nor_set_cmd() returned an error
+> code which should be promoted to the caller rather than
+> inventing a new one.
+> The same for other instances of this code fragment.
+Sorry for later reply ,and Thanks for your instruct, and I will promote
+the error code to the caller. 
+> 
+> 
+> Lothar Wa?mann
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
