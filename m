@@ -1,56 +1,33 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 15 Sep 2015 17:31:29 +0100
-Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
-In-Reply-To: <9hheghzvfbz.fsf@e105922-lin.cambridge.arm.com>
-References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
- <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
- <20150914131448.GC7002@leverpostej>
- <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
- <20150914134949.GE7002@leverpostej>
- <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
- <1442251092.2850.53.camel@linaro.org>
- <9hhy4g89g64.fsf@e105922-lin.cambridge.arm.com>
- <1442313962.2917.25.camel@linaro.org>
- <9hheghzvfbz.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <1442334689.4040.68.camel@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Sep 2015 17:36:42 +0100
+Subject: I.MX6 HDMI support in v4.2
+In-Reply-To: <1442332425.2637.16.camel@pengutronix.de>
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m337yp5gvv.fsf@t19.piap.pl>
+ <1441709778.13536.8.camel@pengutronix.de>
+ <m3bnd52y4s.fsf@t19.piap.pl>
+ <1442332425.2637.16.camel@pengutronix.de>
+Message-ID: <20150915163642.GW21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-09-15 at 17:04 +0100, Punit Agrawal wrote:
-> "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
+On Tue, Sep 15, 2015 at 05:53:45PM +0200, Lucas Stach wrote:
+> It includes a new kernel<->userspace interface, so needs a modified
+> xf86-video-armada to go with it. You can pick that up here:
+> git://git.pengutronix.de/git/lst/xf86-video-armada.git for-rmk
 > 
-> > On Tue, 2015-09-15 at 10:37 +0100, Punit Agrawal wrote:
-> >> "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
-> >> 
-> >> > On Mon, 2015-09-14 at 15:38 +0100, Punit Agrawal wrote:
-> >> >> Mark Rutland <mark.rutland@arm.com> writes:
-> >> >> 
-> > [...]
-> >> >> The way the SCP interface is defined, the sensor identifiers are
-> >> >> contiguous,
-> >> >
-> >> > Is there any documentation other than DUI0922A? [1] From what I can seen
-> >> > that just says it's a 16-bit value and doesn't put any particular
-> >> > constraints on its value.
-> >> 
-> >> Although not explicitly stated, if you look at the Get Sensor Capability
-> >> [2] and Get Sensor Info [3] commands you can indirectly infer that the
-> >> Sensor IDs are contiguous.
-> >
-> > I personally wouldn't even indirectly infer they are contiguous from
-> > what the document says. If I were implementing the firmware I would feel
-> > quite in my rights to, for example, use the top 8 bits of the ID for a
-> > sensor type and the bottom 8 for an index, if that made dispatching of
-> > requests more efficient. Or if some optional hardware was detected as
-> > missing, leaving some holes in ID space.
-> 
-> True. And without a command to convey the list of valid IDs, the
-> consumer of the API would have to iterate over the entire 16bit space to
-> locate valid IDs.
+> Caution: the armada code is WIP and needs further cleanups. It should
+> work though.
 
-Or get IDs from device-tree :-) Anyway, I'm not arguing that the IDs
-shouldn't be 0..N-1, just that it should explicitly documented in the
-SCPI doc, which we're are in agreement on.
+And it needs updating to the latest version - you seem to be missing
+a whole load of changes, including the changes which update the
+kernel API.
+
+So... you seem to be talking about the kernel API having changed from
+the version which you picked up years ago, rather than the current
+version.  It's really unclear what you're talking about.
 
 -- 
-Tixy
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
