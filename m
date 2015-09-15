@@ -1,21 +1,35 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 15 Sep 2015 15:30:06 +0200
-Subject: [PATCH] ARM: Remove __ref on hotplug cpu die path
-In-Reply-To: <1442276597-14325-1-git-send-email-sboyd@codeaurora.org>
-References: <1442276597-14325-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150915133005.GB2983@ulmo.nvidia.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 15 Sep 2015 19:03:02 +0530
+Subject: [PATCH v2 1/4] ARM: dts: dra7: Add dt node for the sycon pcie
+In-Reply-To: <1442323985-29939-1-git-send-email-kishon@ti.com>
+References: <1442323985-29939-1-git-send-email-kishon@ti.com>
+Message-ID: <1442323985-29939-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 05:23:17PM -0700, Stephen Boyd wrote:
-[...]
->  arch/arm/mach-tegra/hotplug.c        | 2 +-
+Add new device tree node for the control module register space where
+PCIe registers are present.
 
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150915/135d9671/attachment-0001.sig>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 5d65db9..0769b5d 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -154,6 +154,11 @@
+ 					compatible = "syscon";
+ 					reg = <0x1c04 0x0020>;
+ 				};
++
++				scm_conf_pcie: tisyscon at 1c24 {
++					compatible = "syscon";
++					reg = <0x1c24 0x0024>;
++				};
+ 			};
+ 
+ 			cm_core_aon: cm_core_aon at 5000 {
+-- 
+1.7.9.5
