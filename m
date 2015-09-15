@@ -1,34 +1,56 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 15 Sep 2015 21:38:52 +0100
-Subject: [RFC PATCH] ARM: enable highmem by default on ARMv6/ARMv7 CPUs
-Message-ID: <E1Zbx08-0001A3-PQ@rmk-PC.arm.linux.org.uk>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 15 Sep 2015 22:41:21 +0200
+Subject: [PATCH] net: mvneta: fix DMA buffer unmapping in mvneta_rx()
+In-Reply-To: <20150915203634.GI7306@kw.sim.vm.gnt>
+References: <20150915203634.GI7306@kw.sim.vm.gnt>
+Message-ID: <1442349681-27437-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv6 and ARMv7 normally have more than 1G of memory, so it makes sense
-to have highmem enabled by default.  Users can still turn highmem off if
-they wish by enabling the EXPERT option, which then allows the option to
-be visible.
+This patch fixes a regression introduced by the commit a84e32894191
+("net: mvneta: fix refilling for Rx DMA buffers"). Due to this commit
+the newly allocated Rx buffers are DMA-unmapped in place of those passed
+to the networking stack. Obviously, this causes data corruptions.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+This patch fixes the issue by ensuring that the right Rx buffers are
+DMA-unmapped.
+
+Reported-by: Oren Laskin <oren@igneous.io>
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+Fixes: a84e32894191 ("net: mvneta: fix refilling for Rx DMA buffers")
+Cc: <stable@vger.kernel.org> # v3.8+
 ---
- arch/arm/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/marvell/mvneta.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 02eb51b6d324..49250dc9856b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1694,8 +1694,9 @@ config HAVE_GENERIC_RCU_GUP
- 	depends on ARM_LPAE
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 62e48bc0cb23..03e052a1cf5a 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -1479,6 +1479,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
+ 		struct mvneta_rx_desc *rx_desc = mvneta_rxq_next_desc_get(rxq);
+ 		struct sk_buff *skb;
+ 		unsigned char *data;
++		dma_addr_t phys_addr;
+ 		u32 rx_status;
+ 		int rx_bytes, err;
  
- config HIGHMEM
--	bool "High Memory Support"
-+	bool "High Memory Support" if !(CPU_32v6 || CPU_32v7) || EXPERT
- 	depends on MMU
-+	default y if CPU_32v6 || CPU_32v7
- 	help
- 	  The address space of ARM processors is only 4 Gigabytes large
- 	  and it has to accommodate user address space, kernel address
+@@ -1486,6 +1487,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
+ 		rx_status = rx_desc->status;
+ 		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
+ 		data = (unsigned char *)rx_desc->buf_cookie;
++		phys_addr = rx_desc->buf_phys_addr;
+ 
+ 		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
+ 		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
+@@ -1534,7 +1536,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
+ 		if (!skb)
+ 			goto err_drop_frame;
+ 
+-		dma_unmap_single(dev->dev.parent, rx_desc->buf_phys_addr,
++		dma_unmap_single(dev->dev.parent, phys_addr,
+ 				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
+ 
+ 		rcvd_pkts++;
 -- 
-2.1.0
+2.1.4
