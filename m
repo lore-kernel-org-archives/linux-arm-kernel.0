@@ -1,56 +1,65 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 15 Sep 2015 22:41:21 +0200
-Subject: [PATCH] net: mvneta: fix DMA buffer unmapping in mvneta_rx()
-In-Reply-To: <20150915203634.GI7306@kw.sim.vm.gnt>
-References: <20150915203634.GI7306@kw.sim.vm.gnt>
-Message-ID: <1442349681-27437-1-git-send-email-simon.guinot@sequanux.org>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Tue, 15 Sep 2015 23:05:59 +0200
+Subject: [PATCH v5 1/5] arm/arm64: add smccc ARCH32
+In-Reply-To: <20150915182645.GQ31157@arm.com>
+References: <1439973629-19505-1-git-send-email-jens.wiklander@linaro.org>
+ <1439973629-19505-2-git-send-email-jens.wiklander@linaro.org>
+ <20150819165009.GC10297@arm.com> <20150820113729.GA25962@ermac>
+ <20150821092430.GC30930@arm.com> <20150821114331.GA11701@ermac>
+ <20150914083029.GA13963@ermac> <20150915182645.GQ31157@arm.com>
+Message-ID: <20150915210557.GA31578@ermac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a regression introduced by the commit a84e32894191
-("net: mvneta: fix refilling for Rx DMA buffers"). Due to this commit
-the newly allocated Rx buffers are DMA-unmapped in place of those passed
-to the networking stack. Obviously, this causes data corruptions.
+On Tue, Sep 15, 2015 at 07:26:45PM +0100, Will Deacon wrote:
+> On Mon, Sep 14, 2015 at 09:30:30AM +0100, Jens Wiklander wrote:
+> > On Fri, Aug 21, 2015 at 01:43:31PM +0200, Jens Wiklander wrote:
+> > > On Fri, Aug 21, 2015 at 10:24:30AM +0100, Will Deacon wrote:
+> > > > On Thu, Aug 20, 2015 at 12:37:29PM +0100, Jens Wiklander wrote:
+> > > > > On Wed, Aug 19, 2015 at 05:50:09PM +0100, Will Deacon wrote:
+> > > > > > On Wed, Aug 19, 2015 at 09:40:25AM +0100, Jens Wiklander wrote:
+> > > > > > > +       mov     x28, x0
+> > > > > > > +       ldp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
+> > > > > > > +       ldp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
+> > > > > > > +       ldp     w4, w5, [x28, #SMC_PARAM_W4_OFFS]
+> > > > > > > +       ldp     w6, w7, [x28, #SMC_PARAM_W6_OFFS]
+> > > > > > > +       smc     #0
+> > > > > > > +       stp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
+> > > > > > > +       stp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
+> > > > > > > +       ldp     x28, x30, [sp], #16
+> > > > > > > +       ret
+> > > > > > > +ENDPROC(smccc_call32)
+> > > > > > 
+> > > > > > Could we deal with this like we do for PSCI instead? (see
+> > > > > > __invoke_psci_fn_smc). We could also then rename psci-call.S to fw-call.S
+> > > > > > and stick this in there too.
+> > > > > 
+> > > > > I assume you're referring to when to use "hvc" and "smc".
+> > > > 
+> > > > No, I mean use a C prototype to avoid marshalling the parameters in assembly
+> > > > like this. As Rutland pointed out, the return value is a bit messy, but
+> > > > the arguments align nicely with the PCS afaict.
+> > > 
+> > > If possible I'd like the function to have the same prototype for both
+> > > arm and arm64. For arm it's not possible to supply more than 4
+> > > parameters. To fully support SMC Calling Convention we need to be able
+> > > to pass 8 parameters and have 4 return values. The OP-TEE driver in this
+> > > patch set depends on this. I don't see how we can avoid the marshalling
+> > > here.
+> > > 
+> > > We could have two versions of the SMCCC functions, one simplified which
+> > > only uses registers and one complete like this one with marshalling.
+> > 
+> > Will, what do think about this?
+> 
+> I still think you should make use of a C prototype to avoid explicit
+> parameter marshalling in assembly. If you want to maintain a compatible
+> API between arm and arm64, then you can easily have an intermediate
+> function in arm64 that sits between the API entry point and the assembly.
 
-This patch fixes the issue by ensuring that the right Rx buffers are
-DMA-unmapped.
+Yes, I see how that's convenient for passing argument values in
+registers, but that doesn't help with storing the returned values in
+x0..x3 into something accessible in C. Am I missing something?
 
-Reported-by: Oren Laskin <oren@igneous.io>
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-Fixes: a84e32894191 ("net: mvneta: fix refilling for Rx DMA buffers")
-Cc: <stable@vger.kernel.org> # v3.8+
----
- drivers/net/ethernet/marvell/mvneta.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 62e48bc0cb23..03e052a1cf5a 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -1479,6 +1479,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
- 		struct mvneta_rx_desc *rx_desc = mvneta_rxq_next_desc_get(rxq);
- 		struct sk_buff *skb;
- 		unsigned char *data;
-+		dma_addr_t phys_addr;
- 		u32 rx_status;
- 		int rx_bytes, err;
- 
-@@ -1486,6 +1487,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
- 		rx_status = rx_desc->status;
- 		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
- 		data = (unsigned char *)rx_desc->buf_cookie;
-+		phys_addr = rx_desc->buf_phys_addr;
- 
- 		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
- 		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
-@@ -1534,7 +1536,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
- 		if (!skb)
- 			goto err_drop_frame;
- 
--		dma_unmap_single(dev->dev.parent, rx_desc->buf_phys_addr,
-+		dma_unmap_single(dev->dev.parent, phys_addr,
- 				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
- 
- 		rcvd_pkts++;
--- 
-2.1.4
+Thanks,
+Jens
