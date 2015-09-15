@@ -1,122 +1,66 @@
-From: emilio.lopez@collabora.co.uk (=?UTF-8?Q?Emilio_L=c3=b3pez?=)
-Date: Tue, 15 Sep 2015 17:24:50 -0300
-Subject: [PATCH v2 2/3] platform/chrome: Support reading/writing the vboot
- context
-In-Reply-To: <CABxcv=mnCNQPtVBU4tPOWD237_-RojoW+RVLTj+F=3PHbUHfQQ@mail.gmail.com>
-References: <1442234049-18637-1-git-send-email-emilio.lopez@collabora.co.uk>
- <1442234049-18637-3-git-send-email-emilio.lopez@collabora.co.uk>
- <CABxcv=m23sfK=jOCswirQRB1SbP70VnomKp6hhwFhRLHiabq4w@mail.gmail.com>
- <55F86E74.9010907@collabora.co.uk>
- <CABxcv=mnCNQPtVBU4tPOWD237_-RojoW+RVLTj+F=3PHbUHfQQ@mail.gmail.com>
-Message-ID: <55F87E92.8000609@collabora.co.uk>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 15 Sep 2015 22:36:34 +0200
+Subject: [PATCH v2] net: mvneta: fix refilling for Rx DMA buffers
+In-Reply-To: <CAA-51jPPDHfE1uT2NuJ53wWTvEgh7DcW0K0-xZgQdjAD2CC04w@mail.gmail.com>
+References: <1437303653-2236-1-git-send-email-simon.guinot@sequanux.org>
+ <20150721.003033.1524284435822402813.davem@davemloft.net>
+ <CAA-51jPPDHfE1uT2NuJ53wWTvEgh7DcW0K0-xZgQdjAD2CC04w@mail.gmail.com>
+Message-ID: <20150915203634.GI7306@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On Mon, Sep 14, 2015 at 01:22:12PM -0700, Oren Laskin wrote:
+> I had to undo this change on my Amada 370 based board.  It was causing
+> corrupt data to make it through on large downloads.  I'm using wget to get
+> the same 30MB file many times and the SHA would occasionally be different.
+> I tracked it down to this commit.  In it, I would find on the order of a
+> few hundred bytes to simply be wrong data.
 
-On 15/09/15 16:43, Javier Martinez Canillas wrote:
-> Hello Emilio,
->
-> On Tue, Sep 15, 2015 at 9:16 PM, Emilio L?pez
-> <emilio.lopez@collabora.co.uk> wrote:
->
-> [snip]
->
->>>>
->>>>    obj-$(CONFIG_CHROMEOS_LAPTOP)  += chromeos_laptop.o
->>>>    obj-$(CONFIG_CHROMEOS_PSTORE)  += chromeos_pstore.o
->>>> -cros_ec_devs-objs               := cros_ec_dev.o cros_ec_sysfs.o
->>>> cros_ec_lightbar.o
->>>> +cros_ec_devs-objs               := cros_ec_dev.o
->>>> +cros_ec_devs-objs               += cros_ec_lightbar.o
->>>> +cros_ec_devs-objs               += cros_ec_sysfs.o
->>>> +cros_ec_devs-objs               += cros_ec_vbc.o
->>>
->>>
->>> Why are you changing the Makefile? AFAIK += is usually used when the
->>> compilation is conditional based on a Kconfig symbol but since these
->>> are build unconditionally, I'll just keep it as foo := bar baz
->>
->>
->> As far as I'm aware, += is append[0]. It's used for stuff like
->> obj-$(CONFIG_CHROMEOS_LAPTOP)  += chromeos_laptop.o
->> because the left part will resolve to "obj-y" or similar, and you want to
->> add to it, not replace it. I only changed the Makefile here because the line
->> was growing too long, and I thought it looked neater this way; it shouldn't
->> cause any functional change apart from the intended one.
->>
->> [0] https://www.gnu.org/software/make/manual/html_node/Appending.html
->>
->
-> Yes, I know how Kbuild works. What I tried to say is that you usually
-> append based on a Kconfig symbol. In fact even you are mentioning such
-> an example.
-> So appending unconditionally like you are doing makes the Makefile
-> harder to read IMHO. If the line grows to long you can use a backlash
-> (\) char to split the line.
+Hi Oren,
 
-I guess it just boils down to personal preference; I don't feel that 
-strongly about it, I'll change it in v3
+Well, you are right. This patch actually introduces a pretty serious
+bug. I still don't understand how I missed that in a first place and
+I apologize for the inconvenience.
 
-(...)
->>>> +       struct device *dev = container_of(kobj, struct device, kobj);
->>>> +       struct cros_ec_dev *ec = container_of(dev, struct cros_ec_dev,
->>>> +                                             class_dev);
->>>> +       struct cros_ec_device *ecdev = ec->ec_dev;
->>>> +       struct ec_params_vbnvcontext *params;
->>>> +       struct cros_ec_command *msg;
->>>> +       int err;
->>>> +       const size_t para_sz = sizeof(struct ec_params_vbnvcontext);
->>>> +       const size_t resp_sz = sizeof(struct ec_response_vbnvcontext);
->>>> +       const size_t payload = max(para_sz, resp_sz);
->>>> +
->>>> +       msg = kmalloc(sizeof(*msg) + payload, GFP_KERNEL);
->>>> +       if (!msg)
->>>> +               return -ENOMEM;
->>>> +
->>>> +       params = (struct ec_params_vbnvcontext *)msg->data;
->>>> +       params->op = EC_VBNV_CONTEXT_OP_READ;
->>>> +
->>>> +       msg->version = EC_VER_VBNV_CONTEXT;
->>>> +       msg->command = EC_CMD_VBNV_CONTEXT;
->>>> +       msg->outsize = sizeof(params->op);
->>>
->>>
->>> Shouldn't this be para_sz ? Since you are sending to the EC the whole
->>> struct ec_params_vbnvcontext and not only the op field.
->>>
->>> Or if the EC only expects to get the u32 op field, then I think your
->>> max payload calculation is not correct.
->>
->>
->> The params struct is the same for both read and write ops, so it has the op
->
-> That's not true, struct ec_response_vbnvcontext has only the block
-> field while struct ec_param_vbnvcontext has both the op and block
-> fields.
+Anyway, I am about to send a patch fixing the issue. Please, can you
+test it ?
 
-The former is a response struct, not a params struct.
+Thanks in advance,
 
->> flag and a buffer for the write op. During the read op I believe there's no
->> need to send this potentially-garbage-filled buffer to the EC, so outsize is
->> set accordingly here.
->
-> Yes, I agree with you but then as I mentioned I think your payload
-> calculation is wrong since you want instead max(sizeof(struct
-> ec_response_vbnvcontext), sizeof(param->op)). Otherwise you are
-> allocating 4 bytes more than needed.
+Simon
 
-Yeah, I can see that. If I do that though, max(...) would be less than 
-the size of the full params struct, and casting data to it could lead to 
-subtle bugs in the future. I can change it and add a comment mentioning 
-this, deal?
-
-(...)
-
-> with the needed changes, feel free to add my:
->
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Ok, thanks!
-
-Emilio
+> On Tue, Jul 21, 2015 at 12:30 AM, David Miller <davem@davemloft.net> wrote:
+> 
+> > From: Simon Guinot <simon.guinot@sequanux.org>
+> > Date: Sun, 19 Jul 2015 13:00:53 +0200
+> >
+> > > With the actual code, if a memory allocation error happens while
+> > > refilling a Rx descriptor, then the original Rx buffer is both passed
+> > > to the networking stack (in a SKB) and let in the Rx ring. This leads
+> > > to various kernel oops and crashes.
+> > >
+> > > As a fix, this patch moves Rx descriptor refilling ahead of building
+> > > SKB with the associated Rx buffer. In case of a memory allocation
+> > > failure, data is dropped and the original DMA buffer is put back into
+> > > the Rx ring.
+> > >
+> > > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> > > Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP
+> > network unit")
+> > > Cc: <stable@vger.kernel.org> # v3.8+
+> > > Tested-by: Yoann Sculo <yoann@sculo.fr>
+> >
+> > Applied, thanks.
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150915/eb15d66a/attachment.sig>
