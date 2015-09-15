@@ -1,69 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Sep 2015 13:22:22 +0100
-Subject: [PATCH v3 2/8] genirq: irqdomain: Remove irqdomain dependency
- on struct device_node
-In-Reply-To: <55F7F9E2.3070105@linaro.org>
-References: <1442249047-21182-1-git-send-email-marc.zyngier@arm.com>
- <1442249047-21182-3-git-send-email-marc.zyngier@arm.com>
- <55F7F9E2.3070105@linaro.org>
-Message-ID: <55F80D7E.9090208@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 15 Sep 2015 14:28:33 +0200
+Subject: [PATCH-v2 0/3] mmc: sdhci-pxav3: Fix tabbing issue
+In-Reply-To: <1441625471-16315-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1441625471-16315-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <CAPDyKFov6uADy_o944hZS9es6hkr4WM9EV1t9MXe94TcwEHuwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/15 11:58, Tomasz Nowicki wrote:
-> On 14.09.2015 18:44, Marc Zyngier wrote:
->> struct device_node is very much DT specific, and the original authors
->> of the irqdomain subsystem recognized that tie, and went as far as
->> mentionning that this could be replaced by some "void *token",
->> should another firmware infrastructure be using it.
->>
->> As we move ACPI on arm64 towards this model too, it makes a lot of sense
->> to perform that particular move.
->>
->> We replace "struct device_node *of_node" with "void *domain_token", which
->> is a benign enough transformation. A non DT user of irqdomain can now
->> identify its domains using this pointer.
->>
->> Also, in order to prevent the introduction of sideband type information,
->> only DT is allowed to store a valid kernel pointer in domain_token
->> (a pointer that passes the virt_addr_valid() test will be considered
->> as a valid device_node).
->>
->> non-DT users that wish to store valid pointers in domain_token are
->> required to use another structure such as an IDR.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>   include/linux/irqdomain.h | 68 +++++++++++++++++++-----------------
->>   kernel/irq/irqdomain.c    | 89 ++++++++++++++++++++++++++++++++++-------------
->>   2 files changed, 101 insertions(+), 56 deletions(-)
->>
+On 7 September 2015 at 13:31, Vaibhav Hiremath
+<vaibhav.hiremath@linaro.org> wrote:
+> Trivial patch-series, which fixes the tabbing issue in the driver,
+> uses the BIT macro for bit fields and prints notice on -EPROBE_DEFER
+> in sdhci_add_host() function on regulator unavailability.
+>
+> V1 => V2
+> ========
+>  - Fixed all comments from Joe, mostly alignment changes
+>  - Separated BIT macro usage patch into new one.
+>  - changed error to kernel notice for EPROBE_DEFER in sdhci_add_host()
+>
+> Note: This patch-series should get merged before another series -
+>
+> [PATCH-v2 0/7] mmc: sdhci-pxav3: Enable support for PXA1928 SDCHI controller
+>
+> Vaibhav Hiremath (3):
+>   mmc: sdhci-pxav3: Fix tabbing issue
+>   mmc: sdhci-pxav3: Use BIT macro for bit field definitions
+>   mmc: sdhci: print notice on -EPROBE_DEFER in sdhci_add_host() fn
+>
+>  drivers/mmc/host/sdhci-pxav3.c | 46 +++++++++++++++++++++---------------------
+>  drivers/mmc/host/sdhci.c       |  5 ++++-
+>  2 files changed, 27 insertions(+), 24 deletions(-)
+>
+> --
+> 1.9.1
+>
 
-[...]
+Hi Vaibhav,
 
->> -struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
->> +struct irq_domain *__irq_domain_add(void *domain_token, int size,
->>   				    irq_hw_number_t hwirq_max, int direct_max,
->>   				    const struct irq_domain_ops *ops,
->>   				    void *host_data)
->>   {
->> +	struct device_node *of_node;
->>   	struct irq_domain *domain;
->>
->> +	of_node = irq_domain_token_to_of_node(domain_token);
->>   	domain = kzalloc_node(sizeof(*domain) + (sizeof(unsigned int) * size),
->>   			      GFP_KERNEL, of_node_to_nid(of_node));
-> 
-> While we are here, do you think it makes sense to abstract 
-> of_node_to_nid as well? Then we would really remove device_node 
-> dependency for irqdomain.
+FYI, I won't be picking up any of these patches. Primarily because I
+don't think they improves the code and other people also seems to
+agree to that.
 
-Not quite sure yet. I've decided to completely ignore the whole NUMA
-thing for the time being. This is a performance issue, not a
-functionality problem.
+Regarding patch1 and similar patches which deals with only fixing
+checkpatch warnings/errors. In most cases I don't like such changes,
+as they makes it harder to use "git blame" when you want to find out
+which commit that introduced a change.
 
-Once we have something that actually makes sense, we can have a look.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Kind regards
+Uffe
