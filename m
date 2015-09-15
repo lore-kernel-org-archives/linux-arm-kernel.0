@@ -1,49 +1,96 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Tue, 15 Sep 2015 17:09:03 -0500
-Subject: [PATCH] arm64: dts: fsl-ls2085a: Add serial aliases
-In-Reply-To: <2766847.5egOSlNQ7I@wuerfel>
-References: <20150915004827.GA19862@home.buserror.net>
- <2766847.5egOSlNQ7I@wuerfel>
-Message-ID: <1442354943.2909.140.camel@freescale.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 16 Sep 2015 00:26:09 +0200
+Subject: [PATCH v2 2/3] platform/chrome: Support reading/writing the vboot
+ context
+In-Reply-To: <55F87E92.8000609@collabora.co.uk>
+References: <1442234049-18637-1-git-send-email-emilio.lopez@collabora.co.uk>
+ <1442234049-18637-3-git-send-email-emilio.lopez@collabora.co.uk>
+ <CABxcv=m23sfK=jOCswirQRB1SbP70VnomKp6hhwFhRLHiabq4w@mail.gmail.com>
+ <55F86E74.9010907@collabora.co.uk>
+ <CABxcv=mnCNQPtVBU4tPOWD237_-RojoW+RVLTj+F=3PHbUHfQQ@mail.gmail.com>
+ <55F87E92.8000609@collabora.co.uk>
+Message-ID: <CABxcv=kqigrfX3ruOUW=wJU1cAs1DmN41AmrUjYRB5f0phhy7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-09-15 at 08:43 +0200, Arnd Bergmann wrote:
-> On Monday 14 September 2015 19:48:27 Scott Wood wrote:
-> > These will allow U-Boot to set linux,stdout-path in /chosen based on
-> > the active console device, which will allow devicetree-based earlycon.
-> > 
-> > Signed-off-by: Scott Wood <scottwood@freescale.com>
-> > ---
-> >  arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi 
-> > b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
-> > index e281ceb..eae454e 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
-> > @@ -55,6 +55,11 @@
-> >         #address-cells = <2>;
-> >         #size-cells = <2>;
-> >  
-> > +       aliases {
-> > +               serial0 = &serial0;
-> > +               serial1 = &serial1;
-> > +       };
-> > +
-> 
-> I normally ask people to put the aliases into the board specific dts file,
-> to account for machines that do not have all the uarts, or that number them
-> differently from the SoC.
+Hello Emilio,
 
-OK, I'll respin on top of https://patchwork.kernel.org/patch/7120211/
+On Tue, Sep 15, 2015 at 10:24 PM, Emilio L?pez
+<emilio.lopez@collabora.co.uk> wrote:
 
-> I didn't know about U-Boot setting the stdout-path property, but that's
-> great, as long as U-Boot uses the same numbering of the uarts that the
-> board uses. Do you know if that is normally the case?
+[snip]
 
-Yes, the numbering of the serial aliases in the dts should match the 
-numbering that U-Boot uses.
+>>>>> +
+>>>>> +       params = (struct ec_params_vbnvcontext *)msg->data;
+>>>>> +       params->op = EC_VBNV_CONTEXT_OP_READ;
+>>>>> +
+>>>>> +       msg->version = EC_VER_VBNV_CONTEXT;
+>>>>> +       msg->command = EC_CMD_VBNV_CONTEXT;
+>>>>> +       msg->outsize = sizeof(params->op);
+>>>>
+>>>>
+>>>>
+>>>> Shouldn't this be para_sz ? Since you are sending to the EC the whole
+>>>> struct ec_params_vbnvcontext and not only the op field.
+>>>>
+>>>> Or if the EC only expects to get the u32 op field, then I think your
+>>>> max payload calculation is not correct.
+>>>
+>>>
+>>>
+>>> The params struct is the same for both read and write ops, so it has the
+>>> op
+>>
+>>
+>> That's not true, struct ec_response_vbnvcontext has only the block
+>> field while struct ec_param_vbnvcontext has both the op and block
+>> fields.
+>
+>
+> The former is a response struct, not a params struct.
+>
 
--Scott
+I misread read/write as request/response in the previous email, sorry
+about that.
+
+>>> flag and a buffer for the write op. During the read op I believe there's
+>>> no
+>>> need to send this potentially-garbage-filled buffer to the EC, so outsize
+>>> is
+>>> set accordingly here.
+>>
+>>
+>> Yes, I agree with you but then as I mentioned I think your payload
+>> calculation is wrong since you want instead max(sizeof(struct
+>> ec_response_vbnvcontext), sizeof(param->op)). Otherwise you are
+>> allocating 4 bytes more than needed.
+>
+>
+> Yeah, I can see that. If I do that though, max(...) would be less than the
+> size of the full params struct, and casting data to it could lead to subtle
+> bugs in the future. I can change it and add a comment mentioning this, deal?
+>
+
+But by setting outsize to sizeof(params->op) you are allocating less
+than the params struct anyways in the transport driver. Take a look
+for example to cros_ec_cmd_xfer_i2c():
+
+http://lxr.free-electrons.com/source/drivers/mfd/cros_ec_i2c.c#L187
+
+But I don't have a strong opinion on this tbh, I was just pointing out
+that it's strange that max(insize,outsize) does not match
+msg->{insize,outsize}.
+
+> (...)
+>
+>> with the needed changes, feel free to add my:
+>>
+>> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>
+>
+> Ok, thanks!
+>
+> Emilio
+
+Best regards,
+Javier
