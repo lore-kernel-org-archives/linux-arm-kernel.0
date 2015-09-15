@@ -1,47 +1,26 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Sep 2015 15:44:09 +0100
-Subject: [PATCH] arm64: enable generic idle loop
-In-Reply-To: <20150915143135.GG14287@e104818-lin.cambridge.arm.com>
-References: <1440128422-4170-1-git-send-email-leo.yan@linaro.org>
- <20150821090043.GA14072@e104818-lin.cambridge.arm.com>
- <20150821091446.GB4280@leoy-linaro>
- <20150821155425.GC16410@e104818-lin.cambridge.arm.com>
- <20150915112008.GA30920@leoy-linaro>
- <20150915143135.GG14287@e104818-lin.cambridge.arm.com>
-Message-ID: <20150915144409.GF31157@arm.com>
+Date: Tue, 15 Sep 2015 15:46:29 +0100
+Subject: [RFC PATCH] arm64/efi: isolate EFI stub from the kernel proper
+In-Reply-To: <1442311903-19213-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1442311903-19213-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150915144629.GG31157@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 03:31:35PM +0100, Catalin Marinas wrote:
-> On Tue, Sep 15, 2015 at 07:20:08PM +0800, Leo Yan wrote:
-> > On Fri, Aug 21, 2015 at 04:54:25PM +0100, Catalin Marinas wrote:
-> > > On Fri, Aug 21, 2015 at 05:14:46PM +0800, Leo Yan wrote:
-> > > > On Fri, Aug 21, 2015 at 10:00:43AM +0100, Catalin Marinas wrote:
-> > > > > On Fri, Aug 21, 2015 at 11:40:22AM +0800, Leo Yan wrote:
-> > > > > > Enable generic idle loop for ARM64, so can support for hlt/nohlt
-> > > > > > command line options to override default idle loop behavior.
-> > > > > 
-> > > > > Just curious, what do you need this for?
-> > > > 
-> > > > With this config, usually we can add "nohlt" in command line to force
-> > > > the cpu will never be powered off; so can quickly narrow down if some
-> > > > issues are related with cpuidle or not.
-> > > > 
-> > > > And if CPU is powered off, then its debug logic also will be powered off.
-> > > > So we can simply use this method to let debugger always hot connect with
-> > > > the target CPU.
-> > > 
-> > > OK.
-> > > 
-> > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > 
-> > Suppose you have missed this patch at previous merge window,
-> > so just for reminding.
+On Tue, Sep 15, 2015 at 11:11:43AM +0100, Ard Biesheuvel wrote:
+> Since arm64 does not use a builtin decompressor, the EFI stub is built
+> into the kernel proper. So far, this has been working fine, but actually,
+> since the stub is in fact a PE/COFF relocatable binary that is executed
+> at an unknown offset in the 1:1 mapping provided by the UEFI firmware, we
+> should not be seamlessly sharing code with the kernel proper, which is a
+> position dependent executable linked at a high virtual offset.
 > 
-> It looks like it missed the merging window. Will, can this still be
-> picked for 4.3? If not, it will be 4.4.
+> So instead, separate the contents of libstub and its dependencies, by
+> putting them into their own namespace by prefixing all of its symbols
+> with __efistub. This way, we have tight control over what parts of the
+> kernel proper are referenced by the stub.
 
-Yeah, it's harmless enough to pick up with the current crop of fixes.
-Sorry I missed it.
+Could we add an __efistub annotation to spit out warnings if the stub
+calls into unexpected kernel code, like we do for __init/__ref?
 
 Will
