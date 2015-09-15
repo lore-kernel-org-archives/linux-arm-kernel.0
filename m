@@ -1,77 +1,58 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Sep 2015 19:35:01 +0100
-Subject: [PATCH 4/6] PCI: generic: Correct, and avoid overflow, in
- bus_max calculation.
-In-Reply-To: <55F85D4E.9020604@caviumnetworks.com>
-References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
- <1442013719-5001-5-git-send-email-ddaney.cavm@gmail.com>
- <20150915174934.GL31157@arm.com>
- <55F85D4E.9020604@caviumnetworks.com>
-Message-ID: <20150915183500.GR31157@arm.com>
+Date: Tue, 15 Sep 2015 19:40:03 +0100
+Subject: [PATCH] PCI: generic: Add support for Cavium ThunderX PCIe root
+ complexes.
+In-Reply-To: <1442016439-7636-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1442016439-7636-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150915184003.GS31157@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 07:02:54PM +0100, David Daney wrote:
-> On 09/15/2015 10:49 AM, Will Deacon wrote:
-> > On Sat, Sep 12, 2015 at 12:21:57AM +0100, David Daney wrote:
-> >>   	/* Limit the bus-range to fit within reg */
-> >> -	bus_max = pci->cfg.bus_range->start +
-> >> -		  (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
-> >> +	bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
-> >> +	if (bus_max > 255)
-> >> +		bus_max = 255;
-> >>   	pci->cfg.bus_range->end = min_t(resource_size_t,
-> >>   					pci->cfg.bus_range->end, bus_max);
-> >
-> > Hmm, this is changing the meaning of the bus-range property in the
-> > device-tree, which really needs to match what IEEE Std 1275-1994 requires.
+On Sat, Sep 12, 2015 at 01:07:19AM +0100, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
 > 
-> I doesn't change the bus-range.
-
-Not directly, but pci->cfg.bus_range is a resource populated from the
-"bus-range" property in the device-tree, so it's changing how the driver
-uses that property.
-
-> > My understanding was that the bus-range could be used to offset the config
-> > space, which is why it's subtracted from the bus number in
-> > gen_pci_map_cfg_bus_[e]cam.
+> The config space for external PCIe root complexes on some Cavium
+> ThunderX SoCs is very similar to CAM and ECAM, but differs in the
+> shift values that have to be applied to the bus and devfn numbers to
+> compose that address window offset.  These root complexes also have
+> the interesting property that there is no root bridge, so the standard
+> manner of limiting scanning to only the first device doesn't work.  We
+> can use the standard pci-host-generic driver if we make a minor
+> addition to handle these differences, so we...
 > 
-> There is an inconsistency in the current code.  The calculation of the 
-> cfg.win[?] pointers is done such that the beginning of the config space 
-> specified in the "reg" property corresponds to bus 0.
-
-I don't follow you here. The mapping functions explicitly subtract the
-start of the bus range when calculating the window offset:
-
-  resource_size_t idx = bus->number - pci->cfg.bus_range->start;
-
-so if I have bus-range = <128 255>; then bus 128 lives at the start of
-the configuration space described by the reg property, not bus 0.
-
-Sorry if I'm being thick; I just can't see the inconsistency.
-
-> The calculation that I am changing, was done such that the beginning of 
-> the config space specified in the "reg" property corresponds to the 
-> first bus of the "bus-range"
+> Add a mapping function for ThunderX PCIe root complexes with a bus
+> shift of 24 and devfn shift of 16.  Ignore accesses for devices other
+> than the first device on the primary bus.
 > 
-> Which is correct?  I assumed that the config space specified in the 
-> "reg" property corresponds to bus 0.  Based on this assumption, I made 
-> the bus_max calculation match.
+> Document the whole thing in devicetree/bindings/pci/host-generic-pci.txt
 > 
-> Due to hardware peculiarities, our bus-range starts at a non-zero bus 
-> number.  So, something has to be done to make all the code agree on a 
-> single interpretation of the meaning "reg" property.
-
-I think you're the first to exercise this code, so it's definitely worth
-us fixing whatever's going wrong.
-
-> > Also, why is your config space so large that
-> > we end up overflowing bus_max?
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
 > 
-> It isn't.  The part of the patch that changes the type from u8 to int 
-> was just to add some sanity.  The  code was easily susceptible to 
-> overflow failures, it seemed best to change to int.
+> This patch depends on the set I recently sent:
+> https://lkml.org/lkml/2015/9/11/764
+> 
+>  .../devicetree/bindings/pci/host-generic-pci.txt   |  5 +++-
+>  drivers/pci/host/pci-host-generic.c                | 29 ++++++++++++++++++++++
+>  2 files changed, 33 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> index daa6942..51cc1d1 100644
+> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> @@ -16,7 +16,10 @@ Properties of the host controller node:
+>  
+>  - compatible     : Must be "pci-host-cam-generic" or "pci-host-ecam-generic"
+>                     depending on the layout of configuration space (CAM vs
+> -                   ECAM respectively).
+> +                   ECAM respectively). Also supported is
+> +                   "cavium,pci-host-thunder-pem" which has bus:devfn:reg in
+> +                   bits 24:16:0 respectively of the PCI config space address
+> +                   window.
 
-Can we drop this part for now if it's not actually needed?
+It's probably easier to read and maintain if we reword this as a list of
+property + comment rather than continue the freeform text.
+
+Other than that, I'm fine with special-casing your accessors if need-be.
 
 Will
