@@ -1,83 +1,89 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 15 Sep 2015 20:51:31 +0200
-Subject: [PATCH] ASoC: fix broken pxa SoC support
-Message-ID: <1442343091-2295-1-git-send-email-robert.jarzmik@free.fr>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 15 Sep 2015 13:57:01 -0500
+Subject: [PATCH v2 2/2] irqchip: gic: Document optional Clock and Power
+ Domain properties
+In-Reply-To: <1442261204-30931-3-git-send-email-geert+renesas@glider.be>
+References: <1442261204-30931-1-git-send-email-geert+renesas@glider.be>
+ <1442261204-30931-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <55F869FD.4090900@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The previous fix of pxa library support, which was introduced to fix the
-library dependency, broke the previous SoC behavior, where a machine
-code binding pxa2xx-ac97 with a coded relied on :
- - sound/soc/pxa/pxa2xx-ac97.c
- - sound/soc/codecs/XXX.c
+On 09/14/2015 03:06 PM, Geert Uytterhoeven wrote:
+> Depending on the GIC variant, the GIC module has one or more clock
+> inputs. Document the optional "clocks" and "clock-names" properties,
+> and their possible values, based on the Technical Reference Manuals.
+> optional.
+> 
+> Add the optional "power-domains" property.
+> 
+> This will allow to describe in DT the relationship between the GIC and
+> the Clock and/or Power Domain topology on SoCs where this is relevant
+> and needed for proper operation.
+> 
+> Note: As the current GIC driver doesn't support Runtime PM yet, PM
+> Domain constraints must be handled elsewhere in e.g. platform code.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Note: v1 was Acked-by: Rob Herring <robh@kernel.org>, but I didn't add
+>       it, due to the addition of clock-names.
 
-For example, the mioa701_wm9713.c machine code is currently broken. The
-"select ARM" statement wrongly selects the soc/arm/pxa2xx-ac97 for
-compilation, as per an unfortunate fate SND_PXA2XX_AC97 is both declared
-in sound/arm/Kconfig and sound/soc/pxa/Kconfig.
+For both: ack.
 
-Fix this by ensuring that SND_PXA2XX_SOC correctly triggers the correct
-pxa2xx-ac97 compilation.
-
-Fixes: 846172dfe33c ("ASoC: fix SND_PXA2XX_LIB Kconfig warning")
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- sound/arm/Kconfig     | 15 ++++++++-------
- sound/soc/pxa/Kconfig |  2 --
- 2 files changed, 8 insertions(+), 9 deletions(-)
-
-diff --git a/sound/arm/Kconfig b/sound/arm/Kconfig
-index 885683a3b0bd..e0406211716b 100644
---- a/sound/arm/Kconfig
-+++ b/sound/arm/Kconfig
-@@ -9,6 +9,14 @@ menuconfig SND_ARM
- 	  Drivers that are implemented on ASoC can be found in
- 	  "ALSA for SoC audio support" section.
- 
-+config SND_PXA2XX_LIB
-+	tristate
-+	select SND_AC97_CODEC if SND_PXA2XX_LIB_AC97
-+	select SND_DMAENGINE_PCM
-+
-+config SND_PXA2XX_LIB_AC97
-+	bool
-+
- if SND_ARM
- 
- config SND_ARMAACI
-@@ -21,13 +29,6 @@ config SND_PXA2XX_PCM
- 	tristate
- 	select SND_PCM
- 
--config SND_PXA2XX_LIB
--	tristate
--	select SND_AC97_CODEC if SND_PXA2XX_LIB_AC97
--
--config SND_PXA2XX_LIB_AC97
--	bool
--
- config SND_PXA2XX_AC97
- 	tristate "AC97 driver for the Intel PXA2xx chip"
- 	depends on ARCH_PXA
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 39cea80846c3..f2bf8661dd21 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -1,7 +1,6 @@
- config SND_PXA2XX_SOC
- 	tristate "SoC Audio for the Intel PXA2xx chip"
- 	depends on ARCH_PXA
--	select SND_ARM
- 	select SND_PXA2XX_LIB
- 	help
- 	  Say Y or M if you want to add support for codecs attached to
-@@ -25,7 +24,6 @@ config SND_PXA2XX_AC97
- config SND_PXA2XX_SOC_AC97
- 	tristate
- 	select AC97_BUS
--	select SND_ARM
- 	select SND_PXA2XX_LIB_AC97
- 	select SND_SOC_AC97_BUS
- 
--- 
-2.1.4
+> 
+> v2:
+>   - Add "clock-names",
+>   - Document clock inputs on various GIC variants.
+> 
+> Clock inputs are based on the following documentation:
+>   - "ARM11 MPCore Processor Technical Reference Manual" (r2p0),
+>   - "Cortex-A9 MPCore Technical Reference Manual" (r4p1, r2p0),
+>   - "Cortex-A15 Technical Reference Manual" (r4p0, r2p0),
+>   - "CoreLink GIC-400 Generic Interrupt Controller Technical Reference
+>     Manual" (r0p1, r0p0),
+>   - "PrimeCell Generic Interrupt Controller (PL390) Technical Reference
+>     Manual" (r0p0).
+> 
+> I could not find clock input information in:
+>   - "ARM1176JZF Development Chip Technical Reference Manual" (r0p0),
+>   - "Cortex-A7 MPCore processors" (r0p5, r0p3).
+> 
+> Other:
+>   - "brcm,brahma-b15-gic" seems to be always used together with
+>     "arm,cortex-a15-gic".
+> 
+> No access to datasheets:
+>   - "qcom,msm-8660-qgic",
+>   - "qcom,msm-qgic2".
+> ---
+>  Documentation/devicetree/bindings/arm/gic.txt | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+> index 24742853ba460223..cc56021eb60babea 100644
+> --- a/Documentation/devicetree/bindings/arm/gic.txt
+> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+> @@ -59,6 +59,21 @@ Optional
+>    regions, used when the GIC doesn't have banked registers. The offset is
+>    cpu-offset * cpu-nr.
+>  
+> +- clocks        : List of phandle and clock-specific pairs, one for each entry
+> +  in clock-names.
+> +- clock-names   : List of names for the GIC clock input(s). Valid clock names
+> +  depend on the GIC variant:
+> +	"ic_clk" (for "arm,arm11mp-gic")
+> +	"PERIPHCLKEN" (for "arm,cortex-a15-gic")
+> +	"PERIPHCLK", "PERIPHCLKEN" (for "arm,cortex-a9-gic")
+> +	"clk" (for "arm,gic-400")
+> +	"gclk" (for "arm,pl390")
+> +
+> +- power-domains : A phandle and PM domain specifier as defined by bindings of
+> +		  the power controller specified by phandle, used when the GIC
+> +		  is part of a Power or Clock Domain.
+> +
+> +
+>  Example:
+>  
+>  	intc: interrupt-controller at fff11000 {
+> 
