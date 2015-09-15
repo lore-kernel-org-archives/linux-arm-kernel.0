@@ -1,66 +1,75 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Sep 2015 12:03:30 +0100
-Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
-In-Reply-To: <1442313962.2917.25.camel@linaro.org>
-References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
- <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
- <20150914131448.GC7002@leverpostej>
- <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
- <20150914134949.GE7002@leverpostej>
- <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
- <1442251092.2850.53.camel@linaro.org>
- <9hhy4g89g64.fsf@e105922-lin.cambridge.arm.com>
- <1442313962.2917.25.camel@linaro.org>
-Message-ID: <20150915110330.GA6507@leverpostej>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 15 Sep 2015 12:05:12 +0100
+Subject: [PATCH v2] arm: Fix backtrace generation when IPI is masked
+In-Reply-To: <1442222294-2756-1-git-send-email-daniel.thompson@linaro.org>
+References: <1442222294-2756-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1442315112-14039-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 11:46:02AM +0100, Jon Medhurst (Tixy) wrote:
-> On Tue, 2015-09-15 at 10:37 +0100, Punit Agrawal wrote:
-> > "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
-> > 
-> > > On Mon, 2015-09-14 at 15:38 +0100, Punit Agrawal wrote:
-> > >> Mark Rutland <mark.rutland@arm.com> writes:
-> > >> 
-> [...]
-> > >> The way the SCP interface is defined, the sensor identifiers are
-> > >> contiguous,
-> > >
-> > > Is there any documentation other than DUI0922A? [1] From what I can seen
-> > > that just says it's a 16-bit value and doesn't put any particular
-> > > constraints on its value.
-> > 
-> > Although not explicitly stated, if you look at the Get Sensor Capability
-> > [2] and Get Sensor Info [3] commands you can indirectly infer that the
-> > Sensor IDs are contiguous.
-> 
-> I personally wouldn't even indirectly infer they are contiguous from
-> what the document says. If I were implementing the firmware I would feel
-> quite in my rights to, for example, use the top 8 bits of the ID for a
-> sensor type and the bottom 8 for an index, if that made dispatching of
-> requests more efficient. Or if some optional hardware was detected as
-> missing, leaving some holes in ID space.
-> 
-> As a specification of a 'standard' the document seems to be rather
-> lacking. So, Sensor ID should be documented as being "an unsigned
-> integer less than then number of sensors returned by the Get Sensor
-> Capability command", or something like that. I guess clocks and other
-> devices suffer from similar lack of specificity.
+Currently on ARM when <SysRq-L> is triggered from an interrupt handler
+(e.g. a SysRq issued using UART or kbd) the main CPU will wedge for ten
+seconds with interrupts masked before issuing a backtrace for every CPU
+except itself.
 
-I think from the PoV of the binding, this doesn't matter. The value is
-just an arbitrary opaue token written down in a spec, that the FW
-understands how to interpret.
+The new backtrace code introduced by commit 96f0e00378d4 ("ARM: add
+basic support for on-demand backtrace of other CPUs") does not work
+correctly when run from an interrupt handler because IPI_CPU_BACKTRACE
+is used to generate the backtrace on all CPUs but cannot preempt the
+current calling context.
 
-I only asked about how the IDs were organised because I thought there
-was additional translation in the kernel, but this is not the case.
+This can be fixed by detecting that the calling context cannot be
+preempted and issuing the backtrace directly in this case. Issuing
+directly leaves us without any pt_regs to pass to nmi_cpu_backtrace()
+so we also modify the generic code to call dump_stack() when its
+argument is NULL.
 
-The only potential problem is bit-width. Punit, I assume the value is
-32-bit (or less) in the messages to the FW?
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
 
-If for the moment we assume the values can index a small array, then we
-can change that later (though ideally we'd handle the most geeneral case
-we're aware of from the outset). We just need to not infer any semantics
-from a value alone.
+Notes:
+    Changes in v2:
+    
+    * Improved commit message to better describe the changes to the generic
+      code (Hillf Danton).
 
-Thanks,
-Mark.
+ arch/arm/kernel/smp.c | 7 +++++++
+ lib/nmi_backtrace.c   | 5 ++++-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 48185a773852..4d8a80328c74 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -748,6 +748,13 @@ core_initcall(register_cpufreq_notifier);
+
+ static void raise_nmi(cpumask_t *mask)
+ {
++	/*
++	 * Generate the backtrace directly if we are running in a
++	 * calling context that is not preemptible by the backtrace IPI.
++	 */
++	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
++		nmi_cpu_backtrace(NULL);
++
+ 	smp_cross_call(mask, IPI_CPU_BACKTRACE);
+ }
+
+diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
+index 88d3d32e5923..be0466a80d0b 100644
+--- a/lib/nmi_backtrace.c
++++ b/lib/nmi_backtrace.c
+@@ -149,7 +149,10 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
+ 		/* Replace printk to write into the NMI seq */
+ 		this_cpu_write(printk_func, nmi_vprintk);
+ 		pr_warn("NMI backtrace for cpu %d\n", cpu);
+-		show_regs(regs);
++		if (regs)
++			show_regs(regs);
++		else
++			dump_stack();
+ 		this_cpu_write(printk_func, printk_func_save);
+
+ 		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
+--
+2.4.3
