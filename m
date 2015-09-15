@@ -1,53 +1,53 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 15 Sep 2015 15:16:12 +0200
-Subject: [PATCH v4 21/22] driver core: Start processing deferred probes
- earlier
-In-Reply-To: <20150911122423.GS12027@sirena.org.uk>
-References: <1441628627-5143-1-git-send-email-tomeu.vizoso@collabora.com>
- <1441628627-5143-22-git-send-email-tomeu.vizoso@collabora.com>
- <20150911122423.GS12027@sirena.org.uk>
-Message-ID: <CAAObsKCOZ3TkQB6oKt+UmBSvUoM-kXT0Rs=FaFKs8bY76065LA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Sep 2015 15:24:06 +0200
+Subject: [Xen-devel] [PATCH v4 00/20] xen/arm64: Add support for 64KB page
+ in Linux
+In-Reply-To: <55F819A1.8070609@citrix.com>
+References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+ <2415578.qstFX0Ux2G@wuerfel> <55F819A1.8070609@citrix.com>
+Message-ID: <1539842.T2XY1FNaDl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 September 2015 at 14:24, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Sep 07, 2015 at 02:23:46PM +0200, Tomeu Vizoso wrote:
->> Some initcalls in the late level assume that some devices will have
->> already probed without explicitly checking for that.
->>
->> After the recent move to defer most device probes when they are
->> registered, pressure increased in the late initcall level.
->>
->> By starting the processing of the deferred queue in device_initcall_sync
->> we increase the chances that the initcalls mentioned before will find
->> the devices they depend on to have already probed.
->
-> Which cases do we have that are outside the driver model and thus
-> affected by this?  USB gadgets are one case I'm aware of, and cpufreq is
-> still problematic.  I'm wondering if it might be tractable to address
-> the actual problems with the remaining reliance on init ordering here.
+On Tuesday 15 September 2015 14:14:09 David Vrabel wrote:
+> On 14/09/15 12:32, Arnd Bergmann wrote:
+> > On Monday 14 September 2015 13:04:59 Roger Pau Monn? wrote:
+> >>> TBH, I'm expecting a small impact to the performance. It would be hard
+> >>> to get the exactly the same performance as today if we keep the helpers
+> >>> to avoid the backend dealing himself with the splitting and page
+> >>> granularity.
+> >>>
+> >>> Although, if the performance impact is not acceptable, it may be
+> >>> possible to optimize gnttab_foreach_grant_in_range by moving the
+> >>> function inline. The current way to the loop is the fastest I've found
+> >>> (I've wrote a small program to test different way) and we will need it
+> >>> when different of size will be supported.
+> >>
+> >> I don't expect the performance to drop massively with this patches
+> >> applied, but it would be good to al least have an idea of the impact.
+> > 
+> > Note that using 64kb pages in Linux tends to destroy performance
+> > in Linux in any case, as the memory consumption for most workloads
+> > explodes. In a virtualized environment you already tend to be
+> > memory constrained, so any measurement should take that into account
+> > and put the extra overhead into perspective to the massive overhead
+> > of running 64kb pages when RAM is tight.
+> 
+> If this is the case, why are some distros using 64 KiB pages then?
 
-Actually, I don't know of any specific case that needs this commit.
-The present series without this patch passes on all the boards in
-kernelci, but Grygorii Strashko argued for it during the review of the
-earlier version of this series:
-http://lkml.kernel.org/g/55CE3D04.8000607 at ti.com
+I believe that IBM started this on PowerPC64 when they found that it
+performs better in microbenchmarks and for certain database workloads
+when you do have enough memory and do not work with small files or
+many processes.
 
-IMO it would be better to not apply this patch until the need arises,
-and even then, it may be better to make the dependencies explicit
-instead of relying on implicit ordering and messing with the link
-order.
+I also believe that the AIX memory management code is designed differently
+enough that it suffers less from large pages (or suffers more from
+small pages), so the hardware designers pushed Linux to do the same as AIX.
 
-> I'm also wondering if we might end up running into situations where this
-> makes the problem with havinng to defer probes more of an issue on some
-> systems - since we start trying earlier while we are still doing our
-> first pass initialisation we could end up deferring some device then
-> retrying it a bunch of times while going through the earlier phases of
-> init as we continue to register more devices.
+Why you'd do it on ARM64 I have no idea at all, other than copying what
+IBM did on PowerPC. If your TLB is too small, hardware designers may
+of course try to push the OS to using pages as large as possible for the
+low-level benchmarks to suck less, but in general, you'd be better off
+with transparent hugepages and 4kb or 8kb pages for real workloads.
 
-With the rest of the series this shouldn't happen as all/most deferred
-probes should be avoided.
-
-Regards,
-
-Tomeu
+	Arnd
