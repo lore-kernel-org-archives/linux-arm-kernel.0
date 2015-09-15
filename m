@@ -1,45 +1,96 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 15 Sep 2015 16:41:14 +0100
-Subject: [PATCH 05/15] arm64: Handle 4 level page table for swapper
-In-Reply-To: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
-References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1442331684-28818-6-git-send-email-suzuki.poulose@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 15 Sep 2015 08:46:50 -0700
+Subject: [GIT PULL] omap fixes against v4.3-rc1
+Message-ID: <20150915154650.GS10928@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
-At the moment, we only support maximum of 3-level page table for
-swapper. With 48bit VA, 64K has only 3 levels and 4K uses section
-mapping. Add support for 4-level page table for swapper, needed
-by 16K pages.
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/head.S |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+are available in the git repository at:
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 46670bf..01b8e58 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -271,7 +271,10 @@ ENDPROC(preserve_boot_args)
-  */
- 	.macro	create_pgd_entry, tbl, virt, tmp1, tmp2
- 	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
--#if SWAPPER_PGTABLE_LEVELS == 3
-+#if SWAPPER_PGTABLE_LEVELS > 3
-+	create_table_entry \tbl, \virt, PUD_SHIFT, PTRS_PER_PUD, \tmp1, \tmp2
-+#endif
-+#if SWAPPER_PGTABLE_LEVELS > 2
- 	create_table_entry \tbl, \virt, SWAPPER_TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
- #endif
- 	.endm
--- 
-1.7.9.5
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/fixes-rc1
+
+for you to fetch changes up to 60fdcb8863d9b4a8b6c6b367886fadb50d4c0b07:
+
+  ARM: dts: Fixup model name for HP t410 dts (2015-09-14 13:33:47 -0700)
+
+----------------------------------------------------------------
+Fixes for omaps against v4.3-rc1:
+
+- Fix long time regression on beagle for tfp410 pin muxing
+
+- Fix dm814x control base address typo and related Ethernet
+  phy configuration
+
+- Fix igepv2 Ethernet pinmuxing as only some boards have it
+
+- Fix pbias regulator compatible values as a pending regulator
+  fix needs those for MMC1 to work properly
+
+- Fix beagle-x15 MMC1 regulator and make pcf857x built-in
+
+- Fix omap5 and dra7 Kconfig options when built as the only
+  SoCs selected
+
+- Fix PM errata for omap5 and dra7 as they too need it
+
+- Fix phycore mpu voltage
+
+Also included are a few cosmetic fixes:
+
+- Remove unused of_irq macros
+
+- Fix dra7 ethernet name
+
+----------------------------------------------------------------
+Carl Frederik Werner (1):
+      ARM: dts: omap3-beagle: make i2c3, ddc and tfp410 gpio work again
+
+Javier Martinez Canillas (1):
+      ARM: dts: omap3-igep: Move eth IRQ pinmux to IGEPv2 common dtsi
+
+Kishon Vijay Abraham I (3):
+      ARM: dts: am57xx-beagle-x15: Fix regulator populated in MMC1 dt node
+      ARM: dts: Use ti,pbias compatible string for pbias
+      ARM: omap2plus_defconfig: make PCF857x built-in
+
+Nicolas Chauvet (1):
+      ARM: dts: Fixup model name for HP t410 dts
+
+Nishanth Menon (5):
+      ARM: dts: am57xx-beagle-x15: Add wakeup irq for mcp79410
+      ARM: OMAP4+: PM: erratum is used by OMAP5 and DRA7 as well
+      ARM: OMAP2+: board-generic: Remove stale of_irq macros
+      ARM: DRA7: Select missing options for SoC only build
+      ARM: OMAP5: Cleanup options for SoC only build
+
+Teresa Remmet (1):
+      ARM: dts: am335x-phycore-som: Fix mpu voltage
+
+Tony Lindgren (1):
+      ARM: dts: Fix dm814x control base to properly initialize Ethernet PHY
+
+Vishal Mahaveer (1):
+      ARM: dts: DRA7: fix a typo in ethernet
+
+ arch/arm/boot/dts/am335x-phycore-som.dtsi    | 4 ++--
+ arch/arm/boot/dts/am57xx-beagle-x15.dts      | 4 ++--
+ arch/arm/boot/dts/dm8148-evm.dts             | 4 ++--
+ arch/arm/boot/dts/dm8148-t410.dts            | 6 +++---
+ arch/arm/boot/dts/dm814x.dtsi                | 8 ++++----
+ arch/arm/boot/dts/dra7.dtsi                  | 4 ++--
+ arch/arm/boot/dts/omap2430.dtsi              | 2 +-
+ arch/arm/boot/dts/omap3-beagle.dts           | 2 +-
+ arch/arm/boot/dts/omap3-igep.dtsi            | 6 ------
+ arch/arm/boot/dts/omap3-igep0020-common.dtsi | 6 ++++++
+ arch/arm/boot/dts/omap3.dtsi                 | 2 +-
+ arch/arm/boot/dts/omap4.dtsi                 | 2 +-
+ arch/arm/boot/dts/omap5.dtsi                 | 2 +-
+ arch/arm/configs/omap2plus_defconfig         | 2 +-
+ arch/arm/mach-omap2/Kconfig                  | 6 +++++-
+ arch/arm/mach-omap2/board-generic.c          | 7 -------
+ arch/arm/mach-omap2/pm.h                     | 3 ++-
+ 17 files changed, 34 insertions(+), 36 deletions(-)
