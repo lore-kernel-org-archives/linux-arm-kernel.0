@@ -1,40 +1,54 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 15 Sep 2015 19:20:08 +0800
-Subject: [PATCH] arm64: enable generic idle loop
-In-Reply-To: <20150821155425.GC16410@e104818-lin.cambridge.arm.com>
-References: <1440128422-4170-1-git-send-email-leo.yan@linaro.org>
- <20150821090043.GA14072@e104818-lin.cambridge.arm.com>
- <20150821091446.GB4280@leoy-linaro>
- <20150821155425.GC16410@e104818-lin.cambridge.arm.com>
-Message-ID: <20150915112008.GA30920@leoy-linaro>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Tue, 15 Sep 2015 14:20:18 +0300
+Subject: [PATCH] spmi-pmic-arb: support configurable number of peripherals
+In-Reply-To: <55F77451.9070900@codeaurora.org>
+References: <1442267672-11287-1-git-send-email-sboyd@codeaurora.org>
+ <55F77451.9070900@codeaurora.org>
+Message-ID: <1442316018.15519.4.camel@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
 
-On Fri, Aug 21, 2015 at 04:54:25PM +0100, Catalin Marinas wrote:
-> On Fri, Aug 21, 2015 at 05:14:46PM +0800, Leo Yan wrote:
-> > On Fri, Aug 21, 2015 at 10:00:43AM +0100, Catalin Marinas wrote:
-> > > On Fri, Aug 21, 2015 at 11:40:22AM +0800, Leo Yan wrote:
-> > > > Enable generic idle loop for ARM64, so can support for hlt/nohlt
-> > > > command line options to override default idle loop behavior.
-> > > 
-> > > Just curious, what do you need this for?
+On Mon, 2015-09-14 at 18:28 -0700, Stephen Boyd wrote:
+> On 09/14/2015 02:54 PM, Stephen Boyd wrote:
+> > The current driver implementation supports only 128 peripherals.
+> > Add support for more than 128 peripherals by taking a lazy
+> > caching approach to the mapping tables. Instead of reading the
+> > tables at boot given some fixed size, read them on an as needed
+> > basis and cache the results. We still assume a max number of 512
+> > peripherals, trading off some space for simplicity.
 > > 
-> > With this config, usually we can add "nohlt" in command line to force
-> > the cpu will never be powered off; so can quickly narrow down if some
-> > issues are related with cpuidle or not.
+> > Based on a patch by Gilad Avidov <gavidov@codeaurora.org> and
+> > Sagar Dharia <sdharia@codeaurora.org>.
 > > 
-> > And if CPU is powered off, then its debug logic also will be powered off.
-> > So we can simply use this method to let debugger always hot connect with
-> > the target CPU.
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
 > 
-> OK.
+> Hi Ivan,
 > 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> This patch causes 8916 to crash, because there isn't a mapping for ppid
+> 257 in the ppid to channel table. It seems that we're reading the revid
+> from the slave id 1 pmic by going through channel 0, which seems to be
+> setup for ppid 9 (slave id 0 and the peripheral starting at 0x900). Can
+> we stop reading the revid registers from non-zero slave id pmic devices?
+> That would be one solution to fix this problem. Or maybe we need to
+> special case this in the pmic arbiter code to fold ppid 0xN01 (slave id
+> N and address 0x100) onto channel 0 all the time?
+> 
 
-Suppose you have missed this patch at previous merge window,
-so just for reminding.
+Yes, we can. We are not using this information at the moment.
+Right now, revision read is more or less for debug purposes.
 
-Thanks,
-Leo Yan
+Would following patch work for you? Of course it will be difficult
+to guaranties that some other driver misbehave and touch non-existing
+register, right?
+
+Regards,
+Ivan
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-mfd-qcom-spmi-pmic-Do-not-access-non-existing-regist.patch
+Type: text/x-patch
+Size: 1392 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150915/40e07889/attachment.bin>
