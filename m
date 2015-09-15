@@ -1,31 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 15 Sep 2015 10:57:03 +0200
-Subject: [PATCH 0/5] New Atmel PIO4 pinctrl/gpio driver
-In-Reply-To: <20150907131210.GC32379@odux.rfo.atmel.com>
-References: <1439281685-3020-1-git-send-email-ludovic.desroches@atmel.com>
- <20150907131210.GC32379@odux.rfo.atmel.com>
-Message-ID: <20150915085703.GA4018@pengutronix.de>
+From: tomeu.vizoso@gmail.com (Tomeu Vizoso)
+Date: Tue, 15 Sep 2015 11:00:17 +0200
+Subject: [PATCH] ARM: tegra: Enable CPUFreq support for Tegra124
+ Chromebooks
+In-Reply-To: <20150915081234.GA25970@ulmo.nvidia.com>
+References: <1433331821-9648-1-git-send-email-jonathanh@nvidia.com>
+ <556EE8B0.2060205@nvidia.com> <55A3B848.2080205@nvidia.com>
+ <CAAObsKA0N50gfPA9sMZfnM8N+N9Oo-YHMCDdF7JdWjpxXtFJbA@mail.gmail.com>
+ <20150915081234.GA25970@ulmo.nvidia.com>
+Message-ID: <CAAObsKAuJz6KoexA2VHPxxVCZ9PbUAFWUx6tSOmdPYq50u_=-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
+On 15 September 2015 at 10:12, Thierry Reding <thierry.reding@gmail.com> wrote:
+> On Thu, Sep 03, 2015 at 03:40:45PM +0200, Tomeu Vizoso wrote:
+>> On 13 July 2015 at 15:08, Jon Hunter <jonathanh@nvidia.com> wrote:
+>> > On 03/06/15 12:44, Jon Hunter wrote:
+>> >> Adding LAKML. Jon
+>> >>
+>> >> On 03/06/15 12:43, Jon Hunter wrote:
+>> >>> Add the device-tree DFLL clock node and CPU regulator phandle for
+>> >>> tegra124 chromebooks to enable CPUFreq support on these boards.
+>>
+>> Ping.
+>>
+>> Thanks,
+>
+> Sorry that this has gone unnoticed for so long. I've applied it now to
+> the for-4.4/dt branch.
+>
+> Tomeu, do you want me to add your Tested-by, Reviewed-by or Acked-by
+> before I push this out?
 
-On Mon, Sep 07, 2015 at 03:12:10PM +0200, Ludovic Desroches wrote:
-> Hi Sascha,
-> 
-> Any comments about this version? Maybe you missed it since you answered
-> me on the RFC version. Of course I'll do the changes you requested for
-> the next version (remove gpio_request_*() stuff and add macros for gpio
-> muxing case).
+I haven't done proper tests, but I have tested for several weeks a
+branch containing these changes on a nyan-big and have found no
+issues.
 
-The binding looks good to me. I wonder where the pinmux defines have
-gone, they were part of the last series but not of this one.
+You can add my Reviewed-by though. Sorry for not having made this clear.
 
-Sascha
+Thanks,
 
+Tomeu
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> Thierry
