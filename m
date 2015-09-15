@@ -1,18 +1,39 @@
 From: yassinjaffer@gmail.com (yassinjaffer at gmail.com)
-Date: Wed, 16 Sep 2015 00:05:53 +1000
-Subject: NEW SUN4i KEYPAD DRIVER 
-Message-ID: <1442325957-10102-1-git-send-email-yassinjaffer@gmail.com>
+Date: Wed, 16 Sep 2015 00:05:54 +1000
+Subject: [PATCH 1/4] ARM:dts:sun7i: Add keypad clk node
+In-Reply-To: <1442325957-10102-1-git-send-email-yassinjaffer@gmail.com>
+References: <1442325957-10102-1-git-send-email-yassinjaffer@gmail.com>
+Message-ID: <1442325957-10102-2-git-send-email-yassinjaffer@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for the sun4i keypad Controller
-I've tested the driver in a A20 custom board (4x4) only
-Allwinner keypad controller does not seem to handle more
-than two key press
+From: Yassin Jaffer <yassinjaffer@gmail.com>
 
-Please test and report bugs. Thank you in advance
+This patch add support to the keypad clock on sun7i
 
-[PATCH 1/4] ARM:dts:sun7i: Add keypad clk node
-[PATCH 2/4] ARM: dts: sun7i: Add keypad node to Allwinner A20 SoC
-[PATCH 3/4] input: Add new sun4i-keypad driver
-[PATCH 4/4] devicetree: bindings:Allwinner sun4i keypad
+Signed-off-by: Yassin Jaffer <yassinjaffer@gmail.com>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 2bebaa2..333604a 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -465,6 +465,14 @@
+ 			clock-output-names = "ir1";
+ 		};
+ 
++		keypad_clk: clk at 01c200c4 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c200c4 0x4>;
++			clocks = <&osc24M>;
++			clock-output-names = "keypad";
++		};
++
+ 		usb_clk: clk at 01c200cc {
+ 			#clock-cells = <1>;
+ 			#reset-cells = <1>;
+-- 
+1.9.1
