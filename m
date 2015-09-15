@@ -1,47 +1,41 @@
-From: bayi.cheng@mediatek.com (bayi.cheng)
-Date: Tue, 15 Sep 2015 14:39:45 +0800
-Subject: [PATCH 1/3] doc: dt: add documentation for Mediatek spi-nor
- controller
-In-Reply-To: <20150909054734.GC18700@pengutronix.de>
-References: <1441705796-11365-1-git-send-email-bayi.cheng@mediatek.com>
- <1441705796-11365-2-git-send-email-bayi.cheng@mediatek.com>
- <20150909054734.GC18700@pengutronix.de>
-Message-ID: <1442299185.27250.1.camel@mhfsdcap03>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Sep 2015 08:43:38 +0200
+Subject: [PATCH] arm64: dts: fsl-ls2085a: Add serial aliases
+In-Reply-To: <20150915004827.GA19862@home.buserror.net>
+References: <20150915004827.GA19862@home.buserror.net>
+Message-ID: <2766847.5egOSlNQ7I@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-09-09 at 07:47 +0200, Sascha Hauer wrote:
-> On Tue, Sep 08, 2015 at 05:49:54PM +0800, Bayi Cheng wrote:
-> > Add device tree binding documentation for serial flash with
-> > Mediatek serial flash controller
-> > 
-> > Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
-> > ---
-> >  Documentation/devicetree/bindings/mtd/mtk_nor.txt | 25 +++++++++++++++++++++++
-> >  1 file changed, 25 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mtd/mtk_nor.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mtd/mtk_nor.txt b/Documentation/devicetree/bindings/mtd/mtk_nor.txt
-> > new file mode 100644
-> > index 0000000..0eca0cd
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mtd/mtk_nor.txt
-> > @@ -0,0 +1,25 @@
-> > +* MTD SPI nor driver for MTK MT81xx (and similar) serial flash controller
-> > +
-> > +MTK MT81xx serial flash controller is designed for serial Flash device.
-> > +It supports one Flash device with signal mode, dual mode and quad mode.
-> > +
-> > +Required properties:
-> > +- compatible: should be "mediatek,mt8173-nor";
-> > +- reg: physical base address and length of the controller's register
-> > +- clocks: spi nor source clock
-> > +- clock-names: "spi_clk", "axi_clk", "mux_clk", "sf_clk"
+On Monday 14 September 2015 19:48:27 Scott Wood wrote:
+> These will allow U-Boot to set linux,stdout-path in /chosen based on
+> the active console device, which will allow devicetree-based earlycon.
 > 
-> Drop the _clk suffix. It's the clock-names property which already makes
-> it clear that these are clock names.
+> Signed-off-by: Scott Wood <scottwood@freescale.com>
+> ---
+>  arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> Sascha
-> 
-> 
-OK, I will drop the _clk suffix here!
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+> index e281ceb..eae454e 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+> @@ -55,6 +55,11 @@
+>         #address-cells = <2>;
+>         #size-cells = <2>;
+>  
+> +       aliases {
+> +               serial0 = &serial0;
+> +               serial1 = &serial1;
+> +       };
+> +
+
+I normally ask people to put the aliases into the board specific dts file,
+to account for machines that do not have all the uarts, or that number them
+differently from the SoC.
+
+I didn't know about U-Boot setting the stdout-path property, but that's
+great, as long as U-Boot uses the same numbering of the uarts that the
+board uses. Do you know if that is normally the case?
+
+	Arnd
