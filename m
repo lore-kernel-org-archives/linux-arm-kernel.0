@@ -1,84 +1,234 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 15 Sep 2015 16:41:09 +0100
-Subject: [PATCHv2 00/15] arm64: 16K translation granule support
-Message-ID: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
+Date: Tue, 15 Sep 2015 16:41:10 +0100
+Subject: [PATCH 01/15] arm64: Move swapper pagetable definitions
+In-Reply-To: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
+References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1442331684-28818-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-This series enables the 16K page size support on Linux for arm64.
-Adds support for 48bit VA(4 level), 47bit VA(3 level) and
-36bit VA(2 level) with 16K. 16K was a late addition to the architecture
-and is not implemented by all CPUs. Added a check to ensure the
-selected granule size is supported by the CPU, failing which the CPU
-won't proceed with booting. Also the kernel page size is added to the
-kernel image header (patch from Ard).
+Move the kernel pagetable (both swapper and idmap) definitions
+from the generic asm/page.h to a new file, asm/kernel-pgtable.h.
 
-KVM bits have been tested on a fast model with GICv3 using kvmtool [1].
+This is mostly a cosmetic change, to clean up the asm/page.h to
+get rid of the arch specific details which are not needed by the
+generic code.
 
-Patches 1-7	cleans up the kernel page size handling code.
-Patch 8		Adds a check to ensure the CPU supports the selected granule size.
-Patch 9		Adds the page size information to image header.
-Patches 10-13	Fixes some issues with the KVM bits, mainly the fake PGD
-             	handling code.
-Patches 14-15	Adds the 16k page size support bits.
+Also renames the symbols to prevent conflicts. e.g,
+ 	BLOCK_SHIFT => SWAPPER_BLOCK_SHIFT
 
-This series applies on top of 4.3-rc1.
-
-The tree is also available here:
-
-        git://linux-arm.org/linux-skp.git  16k/v2-4.3-rc1
-
-Changes since V1:
-  - Rebase to 4.3-rc1
-  - Fix vmemmap_populate for 16K (use !ARM64_SWAPPER_USES_SECTION_MAPS)
-  - Better description for patch2 (suggested-by: Ard)
-  - Add page size information to the image header flags.
-  - Added reviewed-by/tested-by Ard.
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/will/kvmtool.git
-
-Ard Biesheuvel (1):
-  arm64: Add page size to the kernel image header
-
-Suzuki K. Poulose (14):
-  arm64: Move swapper pagetable definitions
-  arm64: Handle section maps for swapper/idmap
-  arm64: Introduce helpers for page table levels
-  arm64: Calculate size for idmap_pg_dir at compile time
-  arm64: Handle 4 level page table for swapper
-  arm64: Clean config usages for page size
-  arm64: Kconfig: Fix help text about AArch32 support with 64K pages
-  arm64: Check for selected granule support
-  arm64: kvm: Fix {V}TCR_EL2_TG0 mask
-  arm64: Cleanup VTCR_EL2 computation
-  arm: kvm: Move fake PGD handling to arch specific files
-  arm64: kvm: Rewrite fake pgd handling
-  arm64: Add 16K page size support
-  arm64: 36 bit VA
-
- Documentation/arm64/booting.txt         |    7 +-
- arch/arm/include/asm/kvm_mmu.h          |    7 ++
- arch/arm/kvm/mmu.c                      |   44 ++--------
- arch/arm64/Kconfig                      |   37 +++++++--
- arch/arm64/Kconfig.debug                |    2 +-
- arch/arm64/include/asm/boot.h           |    1 +
- arch/arm64/include/asm/fixmap.h         |    4 +-
- arch/arm64/include/asm/kernel-pgtable.h |   77 ++++++++++++++++++
- arch/arm64/include/asm/kvm_arm.h        |   29 +++++--
- arch/arm64/include/asm/kvm_mmu.h        |  135 +++++++++++++++++++++----------
- arch/arm64/include/asm/page.h           |   20 +----
- arch/arm64/include/asm/pgtable-hwdef.h  |   15 +++-
- arch/arm64/include/asm/sysreg.h         |    8 ++
- arch/arm64/include/asm/thread_info.h    |    4 +-
- arch/arm64/kernel/head.S                |   71 +++++++++-------
- arch/arm64/kernel/image.h               |    5 +-
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/kernel-pgtable.h |   65 +++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/page.h           |   18 ---------
+ arch/arm64/kernel/head.S                |   37 ++++--------------
  arch/arm64/kernel/vmlinux.lds.S         |    1 +
- arch/arm64/mm/mmu.c                     |   72 ++++++++---------
- arch/arm64/mm/proc.S                    |    4 +-
- 19 files changed, 348 insertions(+), 195 deletions(-)
+ 4 files changed, 74 insertions(+), 47 deletions(-)
  create mode 100644 arch/arm64/include/asm/kernel-pgtable.h
 
+diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
+new file mode 100644
+index 0000000..622929d
+--- /dev/null
++++ b/arch/arm64/include/asm/kernel-pgtable.h
+@@ -0,0 +1,65 @@
++/*
++ * asm/kernel-pgtable.h : Kernel page table mapping
++ *
++ * Copyright (C) 2015 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __ASM_KERNEL_PGTABLE_H
++#define __ASM_KERNEL_PGTABLE_H
++
++/*
++ * The idmap and swapper page tables need some space reserved in the kernel
++ * image. Both require pgd, pud (4 levels only) and pmd tables to (section)
++ * map the kernel. With the 64K page configuration, swapper and idmap need to
++ * map to pte level. The swapper also maps the FDT (see __create_page_tables
++ * for more information). Note that the number of ID map translation levels
++ * could be increased on the fly if system RAM is out of reach for the default
++ * VA range, so 3 pages are reserved in all cases.
++ */
++#ifdef CONFIG_ARM64_64K_PAGES
++#define SWAPPER_PGTABLE_LEVELS	(CONFIG_PGTABLE_LEVELS)
++#else
++#define SWAPPER_PGTABLE_LEVELS	(CONFIG_PGTABLE_LEVELS - 1)
++#endif
++
++#define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
++#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
++
++/* Initial memory map size */
++#ifdef CONFIG_ARM64_64K_PAGES
++#define SWAPPER_BLOCK_SHIFT	PAGE_SHIFT
++#define SWAPPER_BLOCK_SIZE	PAGE_SIZE
++#define SWAPPER_TABLE_SHIFT	PMD_SHIFT
++#else
++#define SWAPPER_BLOCK_SHIFT	SECTION_SHIFT
++#define SWAPPER_BLOCK_SIZE	SECTION_SIZE
++#define SWAPPER_TABLE_SHIFT	PUD_SHIFT
++#endif
++
++
++/*
++ * Initial memory map attributes.
++ */
++#define SWAPPER_PTE_FLAGS	PTE_TYPE_PAGE | PTE_AF | PTE_SHARED
++#define SWAPPER_PMD_FLAGS	PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S
++
++#ifdef CONFIG_ARM64_64K_PAGES
++#define SWAPPER_MM_MMUFLAGS	PTE_ATTRINDX(MT_NORMAL) | SWAPPER_PTE_FLAGS
++#else
++#define SWAPPER_MM_MMUFLAGS	PMD_ATTRINDX(MT_NORMAL) | SWAPPER_PMD_FLAGS
++#endif
++
++
++#endif
+diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+index 7d9c7e4..3c9ce8c 100644
+--- a/arch/arm64/include/asm/page.h
++++ b/arch/arm64/include/asm/page.h
+@@ -28,24 +28,6 @@
+ #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
+ #define PAGE_MASK		(~(PAGE_SIZE-1))
+ 
+-/*
+- * The idmap and swapper page tables need some space reserved in the kernel
+- * image. Both require pgd, pud (4 levels only) and pmd tables to (section)
+- * map the kernel. With the 64K page configuration, swapper and idmap need to
+- * map to pte level. The swapper also maps the FDT (see __create_page_tables
+- * for more information). Note that the number of ID map translation levels
+- * could be increased on the fly if system RAM is out of reach for the default
+- * VA range, so 3 pages are reserved in all cases.
+- */
+-#ifdef CONFIG_ARM64_64K_PAGES
+-#define SWAPPER_PGTABLE_LEVELS	(CONFIG_PGTABLE_LEVELS)
+-#else
+-#define SWAPPER_PGTABLE_LEVELS	(CONFIG_PGTABLE_LEVELS - 1)
+-#endif
+-
+-#define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
+-#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
+-
+ #ifndef __ASSEMBLY__
+ 
+ #include <asm/pgtable-types.h>
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index a055be6..46670bf 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -29,6 +29,7 @@
+ #include <asm/asm-offsets.h>
+ #include <asm/cache.h>
+ #include <asm/cputype.h>
++#include <asm/kernel-pgtable.h>
+ #include <asm/memory.h>
+ #include <asm/thread_info.h>
+ #include <asm/pgtable-hwdef.h>
+@@ -46,32 +47,10 @@
+ #error TEXT_OFFSET must be less than 2MB
+ #endif
+ 
+-#ifdef CONFIG_ARM64_64K_PAGES
+-#define BLOCK_SHIFT	PAGE_SHIFT
+-#define BLOCK_SIZE	PAGE_SIZE
+-#define TABLE_SHIFT	PMD_SHIFT
+-#else
+-#define BLOCK_SHIFT	SECTION_SHIFT
+-#define BLOCK_SIZE	SECTION_SIZE
+-#define TABLE_SHIFT	PUD_SHIFT
+-#endif
+-
+ #define KERNEL_START	_text
+ #define KERNEL_END	_end
+ 
+ /*
+- * Initial memory map attributes.
+- */
+-#define PTE_FLAGS	PTE_TYPE_PAGE | PTE_AF | PTE_SHARED
+-#define PMD_FLAGS	PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S
+-
+-#ifdef CONFIG_ARM64_64K_PAGES
+-#define MM_MMUFLAGS	PTE_ATTRINDX(MT_NORMAL) | PTE_FLAGS
+-#else
+-#define MM_MMUFLAGS	PMD_ATTRINDX(MT_NORMAL) | PMD_FLAGS
+-#endif
+-
+-/*
+  * Kernel startup entry point.
+  * ---------------------------
+  *
+@@ -293,7 +272,7 @@ ENDPROC(preserve_boot_args)
+ 	.macro	create_pgd_entry, tbl, virt, tmp1, tmp2
+ 	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
+ #if SWAPPER_PGTABLE_LEVELS == 3
+-	create_table_entry \tbl, \virt, TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
++	create_table_entry \tbl, \virt, SWAPPER_TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
+ #endif
+ 	.endm
+ 
+@@ -305,15 +284,15 @@ ENDPROC(preserve_boot_args)
+  * Corrupts:	phys, start, end, pstate
+  */
+ 	.macro	create_block_map, tbl, flags, phys, start, end
+-	lsr	\phys, \phys, #BLOCK_SHIFT
+-	lsr	\start, \start, #BLOCK_SHIFT
++	lsr	\phys, \phys, #SWAPPER_BLOCK_SHIFT
++	lsr	\start, \start, #SWAPPER_BLOCK_SHIFT
+ 	and	\start, \start, #PTRS_PER_PTE - 1	// table index
+-	orr	\phys, \flags, \phys, lsl #BLOCK_SHIFT	// table entry
+-	lsr	\end, \end, #BLOCK_SHIFT
++	orr	\phys, \flags, \phys, lsl #SWAPPER_BLOCK_SHIFT	// table entry
++	lsr	\end, \end, #SWAPPER_BLOCK_SHIFT
+ 	and	\end, \end, #PTRS_PER_PTE - 1		// table end index
+ 9999:	str	\phys, [\tbl, \start, lsl #3]		// store the entry
+ 	add	\start, \start, #1			// next entry
+-	add	\phys, \phys, #BLOCK_SIZE		// next block
++	add	\phys, \phys, #SWAPPER_BLOCK_SIZE		// next block
+ 	cmp	\start, \end
+ 	b.ls	9999b
+ 	.endm
+@@ -350,7 +329,7 @@ __create_page_tables:
+ 	cmp	x0, x6
+ 	b.lo	1b
+ 
+-	ldr	x7, =MM_MMUFLAGS
++	ldr	x7, =SWAPPER_MM_MMUFLAGS
+ 
+ 	/*
+ 	 * Create the identity mapping.
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 9807333..8a5d97b 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -5,6 +5,7 @@
+  */
+ 
+ #include <asm-generic/vmlinux.lds.h>
++#include <asm/kernel-pgtable.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/page.h>
 -- 
 1.7.9.5
