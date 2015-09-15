@@ -1,71 +1,72 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 15 Sep 2015 04:54:00 +0200
-Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
- host-only mode
-In-Reply-To: <20150914202533.GF4684@lukather>
-References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
- <55C31963.2010701@schinagl.nl> <55C3709C.4080609@redhat.com>
- <55C47041.3000603@schinagl.nl> <55E93D8C.9020804@schinagl.nl>
- <55F1CA9B.3070204@redhat.com> <20150910183017.GN9885@lukather>
- <55F1CE2E.7010409@redhat.com> <20150914202533.GF4684@lukather>
-Message-ID: <55F78848.6020403@redhat.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Tue, 15 Sep 2015 11:07:33 +0800
+Subject: [RFC PATCH v2 1/3] irqchip: GICv3: set non-percpu irqs status
+ with IRQ_MOVE_PCNTXT
+In-Reply-To: <55F6C2B2.2060808@arm.com>
+References: <1442222945-10628-1-git-send-email-yangyingliang@huawei.com>
+ <1442222945-10628-2-git-send-email-yangyingliang@huawei.com>
+ <55F6C2B2.2060808@arm.com>
+Message-ID: <55F78B75.1020105@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 09/14/2015 10:25 PM, Maxime Ripard wrote:
-> On Thu, Sep 10, 2015 at 08:38:38PM +0200, Hans de Goede wrote:
->> Hi,
+
+On 2015/9/14 20:50, Marc Zyngier wrote:
+> On 14/09/15 10:29, Yang Yingliang wrote:
+>> Use irq_set_status_flags() helper set irqs status with
+>> IRQ_MOVE_PCNTXT. So that it can do set affinity when
+>> calling irq_set_affinity_locked().
 >>
->> On 10-09-15 20:30, Maxime Ripard wrote:
->>> On Thu, Sep 10, 2015 at 08:23:23PM +0200, Hans de Goede wrote:
->>>> Hi,
->>>>
->>>> On 04-09-15 08:43, Olliver Schinagl wrote:
->>>>> Hey Hans,
->>>>>
->>>>> On 07-08-15 10:45, Olliver Schinagl wrote:
->>>>>> <snip>
->>>>>>> If you change the dr_mode to host then you _must_ also remove any id_det and vbus_det
->>>>>>> gpio settings from the usb_phy node in the dts, as the sun4i phy code detects
->>>>>>> host vs otg mode by checking for the presence of these.
->>>>>> Yes, this fixes it and makes it work. Thanks.
->>>>>>
->>>>> I've been going back to this and am wondering if this is something I can look into to fix properly? E.g. if the dts sets dr_mode = host, can we simply ignore the pins and treat them as unset?
->>>>
->>>> AFAIK you cannot unset something in dts. The only solution I
->>>> can comeup with is to add a dr_mode argument to the phy like
->>>> we already have for the otg controller itself.
->>>>
->>>> This is something which we likely need to do anyways to add
->>>> support for peripheral only mode, which we seem to need for
->>>> some "hdmi sticks".
->>>
->>> I haven't really followed the rest of the discussion, so sorry if you
->>> already talked about that, but why can't you just set the dr_mode to
->>> peripheral in such a case?
+>> Cc: Jiang Liu <jiang.liu@linux.intel.com>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+>> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+>> ---
+>>   drivers/irqchip/irq-gic-v3.c | 2 ++
+>>   1 file changed, 2 insertions(+)
 >>
->> This is about the usbphy code not the musb-controller code, which are
->> 2 different dts nodes, atm only the musb-controller node has a
->> dr_mode property, and the phy code decides between host-only
->> and otg mode based on whether an id pin is assigned or not.
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index 7deed6e..3d8f400 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -761,6 +761,7 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>>   		irq_domain_set_info(d, irq, hw, chip, d->host_data,
+>>   				    handle_fasteoi_irq, NULL, NULL);
+>>   		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+>> +		irq_set_status_flags(irq, IRQ_MOVE_PCNTXT);
+>>   	}
+>>   	/* LPIs */
+>>   	if (hw >= 8192 && hw < GIC_ID_NR) {
+>> @@ -769,6 +770,7 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>>   		irq_domain_set_info(d, irq, hw, chip, d->host_data,
+>>   				    handle_fasteoi_irq, NULL, NULL);
+>>   		set_irq_flags(irq, IRQF_VALID);
+>> +		irq_set_status_flags(irq, IRQ_MOVE_PCNTXT);
+>>   	}
 >>
->> My proposal is to get rid of the id-pin hack to determine the mode
->> and add a dr_mode property to the usbphy dts node.
+>>   	return 0;
+>>
 >
-> I agree that we should get rid of that hack, especially since a lack
-> of an ID pin might also be used on a peripheral-only device.
+> I'm still not keen on this approach. As far as I can tell, the only
+> reason you are setting this flag is to be able to use
+> GENERIC_PENDING_IRQ. irq_set_affinity_locked would work even if you
+> don't select this config option, because irq_can_move_pcntxt() will
+> always return true if this is not selected.
 >
-> However, we already have that information in the musb node, and
-> duplicating the info seems error prone. We already have a custom
-> function, maybe that's a case for another one
+> So instead of adding flags that are not required on ARM, why don't you
+> just make migration.c to compile even when GENERIC_PENDING_IRQ is not
+> selected? I think this would make a lot more sense.
 
-AFAIK the musb / phy maintainers really want to avoid adding more
-custom functions ...
+OK, I will try this way.
 
-Felipe, Kishon any comments on this ?
-
-Regards,
-
-Hans
+Thanks,
+Yang
+>
+> Thanks,
+>
+> 	M.
+>
