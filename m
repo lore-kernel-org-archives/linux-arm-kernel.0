@@ -1,50 +1,36 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 15 Sep 2015 11:15:00 -0700
-Subject: [PATCH v2 3/3] ARM: brcmstb: Setup BIU control registers during boot
-In-Reply-To: <1442340900-15320-1-git-send-email-f.fainelli@gmail.com>
-References: <1442340900-15320-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1442340900-15320-4-git-send-email-f.fainelli@gmail.com>
+Date: Tue, 15 Sep 2015 11:14:57 -0700
+Subject: [PATCH v2 0/3] ARM: brcmstb: Bus Interface Unit support
+Message-ID: <1442340900-15320-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call brcmstb_biuctrl_init() in brcmstb's init_irq machine descriptor
-callback since we need to setup the Bus Interface Unit before SMP in
-particular, but we also need to be able to remap registers.
+Hi all,
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/mach-bcm/brcmstb.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+This patch series adds support for early boot time Bus Interface Unit control
+register setup which is required to occur before SMP is brought-up, but needs
+to remap registers, so init_irq() is chosen for that.
 
-diff --git a/arch/arm/mach-bcm/brcmstb.c b/arch/arm/mach-bcm/brcmstb.c
-index 3a60f7ee3f0c..99a67cfb7c0d 100644
---- a/arch/arm/mach-bcm/brcmstb.c
-+++ b/arch/arm/mach-bcm/brcmstb.c
-@@ -12,11 +12,19 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/irqchip.h>
- #include <linux/of_platform.h>
-+#include <linux/soc/brcmstb/brcmstb.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-+static void __init brcmstb_init_irq(void)
-+{
-+	irqchip_init();
-+	brcmstb_biuctrl_init();
-+}
-+
- static const char *const brcmstb_match[] __initconst = {
- 	"brcm,bcm7445",
- 	"brcm,brcmstb",
-@@ -25,4 +33,5 @@ static const char *const brcmstb_match[] __initconst = {
- 
- DT_MACHINE_START(BRCMSTB, "Broadcom STB (Flattened Device Tree)")
- 	.dt_compat	= brcmstb_match,
-+	.init_irq	= brcmstb_init_irq,
- MACHINE_END
+This builds on top of the 'soc/next' branch at github.com/Broadcom/stblinux
+
+Major changes in v2:
+
+- updated Device Tree documentation based on Rob's feedback
+- added a better pr_fmt format for pr_* calls in biuctrl.c
+
+Florian Fainelli (3):
+  Documentation: bindings: brcmstb: Document write-pairing
+  soc: brcmstb: Add Bus Interface Unit control setup
+  ARM: brcmstb: Setup BIU control registers during boot
+
+ .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |  20 ++++
+ arch/arm/mach-bcm/brcmstb.c                        |   9 ++
+ drivers/soc/brcmstb/Makefile                       |   2 +-
+ drivers/soc/brcmstb/biuctrl.c                      | 119 +++++++++++++++++++++
+ include/linux/soc/brcmstb/brcmstb.h                |  10 ++
+ 5 files changed, 159 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/soc/brcmstb/biuctrl.c
+ create mode 100644 include/linux/soc/brcmstb/brcmstb.h
+
 -- 
 2.1.0
