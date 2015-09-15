@@ -1,100 +1,63 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Tue, 15 Sep 2015 15:13:12 -0600
-Subject: [PATCH v3 0/5] ACPI: Provide better MADT subtable sanity checks
-In-Reply-To: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
-References: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
-Message-ID: <55F889E8.3070706@redhat.com>
+From: oren@igneous.io (Oren Laskin)
+Date: Tue, 15 Sep 2015 14:19:45 -0700
+Subject: [PATCH] net: mvneta: fix DMA buffer unmapping in mvneta_rx()
+In-Reply-To: <1442349681-27437-1-git-send-email-simon.guinot@sequanux.org>
+References: <20150915203634.GI7306@kw.sim.vm.gnt>
+ <1442349681-27437-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <CAA-51jMAHa=sU8B5eSTLHnqYDSy93bO1Jbc2=qHY6S=qM1__MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2015 03:09 PM, Al Stone wrote:
-> Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
-> check on the various subtables that are defined for the MADT.  The check
-> compares the size of the subtable data structure as defined by ACPICA to
-> the length entry in the subtable.  If they are not the same, the assumption
-> is that the subtable is incorrect.
-> 
-> Over time, the ACPI spec has allowed for MADT subtables where this can
-> never be true (the local SAPIC subtable, for example).  Or, more recently,
-> the spec has accumulated some minor flaws where there are three possible 
-> sizes for a subtable, all of which are valid, but only for specific versions
-> of the spec (the GICC subtable).  In both cases, BAD_MADT_ENTRY reports these
-> subtables as bad when they are not.  In order to retain some sanity check
-> on the MADT subtables, we now have to special case these subtables.  Of
-> necessity, these special cases have ended up in arch-dependent code (arm64)
-> or an arch has simply decided to forgo the check (ia64).
-> 
-> This patch set replaces the BAD_MADT_ENTRY macro with a function called
-> bad_madt_entry().  This function uses a data set of details about the
-> subtables to provide more sanity checking than before:
-> 
-> 	-- is the subtable legal for the version given in the FADT?
-> 
-> 	-- is the subtable legal for the revision of the MADT in use?
-> 
-> 	-- is the subtable of the proper length (including checking
-> 	   on the one variable length subtable that is currently ignored),
-> 	   given the FADT version and the MADT revision?
-> 
-> Further, this patch set adds in the call to bad_madt_entry() from the 
-> acpi_table_parse_madt() function, allowing it to be used consistently
-> by all architectures, for all subtables, and removing the need for each
-> of the subtable traversal callback functions to use BAD_MADT_ENTRY.
-> 
-> In theory, as the ACPI specification changes, we would only have to add
-> additional information to the data set describing the MADT subtables in
-> order to continue providing sanity checks, even when new subtables are
-> added.
-> 
-> These patches have been tested on an APM Mustang (arm64) and are known to
-> work there.  They have also been cross-compiled for x86 and ia64 with no
-> known failures.
-> 
-> Changes for v3:
->    -- Reviewed-and-tested-by from Sudeep Holla for arm64 parts
->    -- Clearer language in error messages (Graeme Gregory, Timur Tabi)
->    -- Double checked that inserting call to bad_madt_entry() into the
->       function acpi_parse_entries() does not impact current behavior
->       (Sudeep Holla)
->    
-> Changes for v2:
->    -- Acked-by on 2/5 from Marc Zyngier and Catalin Marinas for ARM
->    -- Correct faulty end of loop test found by Timur Tabi
-> 
-> 
-> Al Stone (5):
->   ACPI: add in a bad_madt_entry() function to eventually replace the
->     macro
->   ACPI / ARM64: remove usage of BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
->   ACPI / IA64: remove usage of BAD_MADT_ENTRY
->   ACPI / X86: remove usage of BAD_MADT_ENTRY
->   ACPI: remove definition of BAD_MADT_ENTRY macro
-> 
->  arch/arm64/include/asm/acpi.h |   8 --
->  arch/arm64/kernel/smp.c       |   2 -
->  arch/ia64/kernel/acpi.c       |  20 ----
->  arch/x86/kernel/acpi/boot.c   |  27 -----
->  drivers/acpi/tables.c         | 245 +++++++++++++++++++++++++++++++++++++++++-
->  drivers/irqchip/irq-gic.c     |   6 --
->  include/linux/acpi.h          |   4 -
->  7 files changed, 244 insertions(+), 68 deletions(-)
-> 
+This fixes the regression we saw.
 
-Ping?  Any additional comments on this version?  I have only received
-feedback from arm64 reviewers so far, over three revisions, even though
-everyone that needs to be (ACPI, ia64, x86) has also been CCd.
+Tested-by: Oren Laskin <oren@igneous.io>
 
-Anyone else before I fix a couple of things for v4 that the arm64 folks
-found?  ACKs?  NAKs?  Please don't bother me, I'm in the merge window :)?
-
-Thanks.
-
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+On Tue, Sep 15, 2015 at 1:41 PM, Simon Guinot <simon.guinot@sequanux.org> wrote:
+> This patch fixes a regression introduced by the commit a84e32894191
+> ("net: mvneta: fix refilling for Rx DMA buffers"). Due to this commit
+> the newly allocated Rx buffers are DMA-unmapped in place of those passed
+> to the networking stack. Obviously, this causes data corruptions.
+>
+> This patch fixes the issue by ensuring that the right Rx buffers are
+> DMA-unmapped.
+>
+> Reported-by: Oren Laskin <oren@igneous.io>
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> Fixes: a84e32894191 ("net: mvneta: fix refilling for Rx DMA buffers")
+> Cc: <stable@vger.kernel.org> # v3.8+
+> ---
+>  drivers/net/ethernet/marvell/mvneta.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index 62e48bc0cb23..03e052a1cf5a 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -1479,6 +1479,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
+>                 struct mvneta_rx_desc *rx_desc = mvneta_rxq_next_desc_get(rxq);
+>                 struct sk_buff *skb;
+>                 unsigned char *data;
+> +               dma_addr_t phys_addr;
+>                 u32 rx_status;
+>                 int rx_bytes, err;
+>
+> @@ -1486,6 +1487,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
+>                 rx_status = rx_desc->status;
+>                 rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
+>                 data = (unsigned char *)rx_desc->buf_cookie;
+> +               phys_addr = rx_desc->buf_phys_addr;
+>
+>                 if (!mvneta_rxq_desc_is_first_last(rx_status) ||
+>                     (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
+> @@ -1534,7 +1536,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
+>                 if (!skb)
+>                         goto err_drop_frame;
+>
+> -               dma_unmap_single(dev->dev.parent, rx_desc->buf_phys_addr,
+> +               dma_unmap_single(dev->dev.parent, phys_addr,
+>                                  MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
+>
+>                 rcvd_pkts++;
+> --
+> 2.1.4
+>
