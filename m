@@ -1,45 +1,63 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 15 Sep 2015 14:14:37 -0400
-Subject: [PATCH v1 1/2] soc: ti: display firmware file name as part of
- boot log
-In-Reply-To: <55F06075.6050405@ti.com>
-References: <1441403199-10936-1-git-send-email-m-karicheri2@ti.com>
- <55EA673F.8010904@oracle.com> <55F06075.6050405@ti.com>
-Message-ID: <55F8600D.2070701@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 15 Sep 2015 11:14:58 -0700
+Subject: [PATCH v2 1/3] Documentation: bindings: brcmstb: Document
+ write-pairing
+In-Reply-To: <1442340900-15320-1-git-send-email-f.fainelli@gmail.com>
+References: <1442340900-15320-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1442340900-15320-2-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2015 12:38 PM, Murali Karicheri wrote:
-> On 09/04/2015 11:53 PM, santosh.shilimkar at oracle.com wrote:
->> On 9/4/15 5:46 PM, Murali Karicheri wrote:
->>> To help the user, print the PDSP file name as part of
->>> knav_queue_load_pdsp(). This will be useful for users to know what
->>> version of the firmware is loaded to PDSP. Also update the
->>> document for the location of the QMSS accumulator PDSP firmware.
->>>
->>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>> ---
->>
->> Looks fine. Will pick both the patches.
->>
->
-> Thanks Santhosh.
->
-> Is there a requirement to add the firmware to linux-firmware.git. Right
-> now I have provided link to ti git repo that has the firmware. I have
-> the patch ready in case this is required. Do you know?
->
-> Murali
->> Regards,
->> Santosh
->>
->>
->
->
-Santosh,
+Document the hif-cpubiuctrl node a bit more, and add a documentation
+entry for the optional "brcm,write-pairing" property.
 
-I have checked v4.3-rc1 and I don't see it. Did you send the pull request?
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+Changes in v2:
 
+- added a description of what the BIU stands for and what write pairing is
+- fixed the compatible string description
+
+ .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt     | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
+index 430608ec09f0..8ac28eb4a5a1 100644
+--- a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
+@@ -20,6 +20,25 @@ system control is required:
+     - compatible: "brcm,bcm<chip_id>-hif-cpubiuctrl", "syscon"
+     - compatible: "brcm,bcm<chip_id>-hif-continuation", "syscon"
+ 
++hif-cpubiuctrl node
++-------------------
++SoCs with Broadcom Brahma15 ARM-based CPUs have a specific Bus Interface Unit
++(BIU) block which controls and interfaces the CPU complex to the different
++Memory Controller Ports (MCP), one per memory controller (MEMC). This BIU block
++offers a feature called Write Pairing which consists in collapsing two adjacent
++cache lines into a single (bursted) write transaction towards the memory
++controller (MEMC) to maximize write bandwidth.
++
++Required properties:
++
++    - compatible: must be "brcm,bcm7445-hif-cpubiuctrl", "syscon"
++
++Optional properties:
++
++    - brcm,write-pairing:
++	Boolean property, which when present indicates that the chip
++	supports write-pairing.
++
+ example:
+     rdb {
+         #address-cells = <1>;
+@@ -35,6 +54,7 @@ example:
+         hif_cpubiuctrl: syscon at 3e2400 {
+             compatible = "brcm,bcm7445-hif-cpubiuctrl", "syscon";
+             reg = <0x3e2400 0x5b4>;
++            brcm,write-pairing;
+         };
+ 
+         hif_continuation: syscon at 452000 {
 -- 
-Murali Karicheri
-Linux Kernel, Keystone
+2.1.0
