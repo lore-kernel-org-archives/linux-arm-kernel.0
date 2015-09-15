@@ -1,75 +1,665 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 15 Sep 2015 12:05:12 +0100
-Subject: [PATCH v2] arm: Fix backtrace generation when IPI is masked
-In-Reply-To: <1442222294-2756-1-git-send-email-daniel.thompson@linaro.org>
-References: <1442222294-2756-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1442315112-14039-1-git-send-email-daniel.thompson@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Sep 2015 12:12:57 +0100
+Subject: [PATCH] ARM: multi_v7: Rebuild default configuration on v4.3-rc1
+In-Reply-To: <1442314300-4714-1-git-send-email-thierry.reding@gmail.com>
+References: <1442314300-4714-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20150915111257.GR21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently on ARM when <SysRq-L> is triggered from an interrupt handler
-(e.g. a SysRq issued using UART or kbd) the main CPU will wedge for ten
-seconds with interrupts masked before issuing a backtrace for every CPU
-except itself.
+On Tue, Sep 15, 2015 at 12:51:40PM +0200, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> It's becoming more and more difficult to update the multi_v7 default
+> configuration because it hasn't been kept in proper order. Typically the
+> workflow to update it would be to do the following:
 
-The new backtrace code introduced by commit 96f0e00378d4 ("ARM: add
-basic support for on-demand backtrace of other CPUs") does not work
-correctly when run from an interrupt handler because IPI_CPU_BACKTRACE
-is used to generate the backtrace on all CPUs but cannot preempt the
-current calling context.
+If we start regularly updating the defconfigs, it'll annoy Linus,
+because it will create a lot of useless churn, bloating his diffstats
+needlessly.
 
-This can be fixed by detecting that the calling context cannot be
-preempted and issuing the backtrace directly in this case. Issuing
-directly leaves us without any pt_regs to pass to nmi_cpu_backtrace()
-so we also modify the generic code to call dump_stack() when its
-argument is NULL.
+Since the defconfig files are not order specific, it would have been
+a good idea if savedefconfig had sorted the options into alphanumeric
+order propr to outputting them.  That would cut down on the useless
+churn, some of which is in your patch.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
+In fact, most of this patch is pure churn - it's merely moving options
+about.  It provides very little in the way of useful benefit for its
+size.  We need to do better than this.
 
-Notes:
-    Changes in v2:
-    
-    * Improved commit message to better describe the changes to the generic
-      code (Hillf Danton).
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 03deb7fb35e8..56775eb9b9cc 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -12,7 +12,6 @@ CONFIG_MODULE_UNLOAD=y
+>  CONFIG_PARTITION_ADVANCED=y
+>  CONFIG_CMDLINE_PARTITION=y
+>  CONFIG_ARCH_VIRT=y
+> -CONFIG_ARCH_ALPINE=y
+>  CONFIG_ARCH_MVEBU=y
+>  CONFIG_MACH_ARMADA_370=y
+>  CONFIG_MACH_ARMADA_375=y
+> @@ -20,14 +19,15 @@ CONFIG_MACH_ARMADA_38X=y
+>  CONFIG_MACH_ARMADA_39X=y
+>  CONFIG_MACH_ARMADA_XP=y
+>  CONFIG_MACH_DOVE=y
+> +CONFIG_ARCH_ALPINE=y
 
- arch/arm/kernel/smp.c | 7 +++++++
- lib/nmi_backtrace.c   | 5 ++++-
- 2 files changed, 11 insertions(+), 1 deletion(-)
+This option has moved, and the above two changes are therefore nothing
+but churn.
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 48185a773852..4d8a80328c74 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -748,6 +748,13 @@ core_initcall(register_cpufreq_notifier);
+>  CONFIG_ARCH_AT91=y
+>  CONFIG_SOC_SAMA5D3=y
+>  CONFIG_SOC_SAMA5D4=y
+>  CONFIG_ARCH_BCM=y
+>  CONFIG_ARCH_BCM_CYGNUS=y
+> -CONFIG_ARCH_BCM_21664=y
+> -CONFIG_ARCH_BCM_281XX=y
+>  CONFIG_ARCH_BCM_5301X=y
+> +CONFIG_ARCH_BCM_281XX=y
+> +CONFIG_ARCH_BCM_21664=y
 
- static void raise_nmi(cpumask_t *mask)
- {
-+	/*
-+	 * Generate the backtrace directly if we are running in a
-+	 * calling context that is not preemptible by the backtrace IPI.
-+	 */
-+	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
-+		nmi_cpu_backtrace(NULL);
-+
- 	smp_cross_call(mask, IPI_CPU_BACKTRACE);
- }
+Same here.
 
-diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
-index 88d3d32e5923..be0466a80d0b 100644
---- a/lib/nmi_backtrace.c
-+++ b/lib/nmi_backtrace.c
-@@ -149,7 +149,10 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
- 		/* Replace printk to write into the NMI seq */
- 		this_cpu_write(printk_func, nmi_vprintk);
- 		pr_warn("NMI backtrace for cpu %d\n", cpu);
--		show_regs(regs);
-+		if (regs)
-+			show_regs(regs);
-+		else
-+			dump_stack();
- 		this_cpu_write(printk_func, printk_func_save);
+>  CONFIG_ARCH_BRCMSTB=y
+>  CONFIG_ARCH_BERLIN=y
+>  CONFIG_MACH_BERLIN_BG2=y
+> @@ -37,9 +37,9 @@ CONFIG_ARCH_DIGICOLOR=y
+>  CONFIG_ARCH_HIGHBANK=y
+>  CONFIG_ARCH_HISI=y
+>  CONFIG_ARCH_HI3xxx=y
+> -CONFIG_ARCH_HIX5HD2=y
+>  CONFIG_ARCH_HIP01=y
+>  CONFIG_ARCH_HIP04=y
+> +CONFIG_ARCH_HIX5HD2=y
 
- 		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
---
-2.4.3
+Same here.
+
+>  CONFIG_ARCH_KEYSTONE=y
+>  CONFIG_ARCH_MESON=y
+>  CONFIG_ARCH_MXC=y
+> @@ -51,8 +51,9 @@ CONFIG_SOC_IMX6SL=y
+>  CONFIG_SOC_IMX6SX=y
+>  CONFIG_SOC_IMX6UL=y
+>  CONFIG_SOC_IMX7D=y
+> -CONFIG_SOC_VF610=y
+>  CONFIG_SOC_LS1021A=y
+> +CONFIG_SOC_VF610=y
+
+Same here.
+
+> +CONFIG_ARCH_MEDIATEK=y
+>  CONFIG_ARCH_OMAP3=y
+>  CONFIG_ARCH_OMAP4=y
+>  CONFIG_SOC_OMAP5=y
+> @@ -60,7 +61,6 @@ CONFIG_SOC_AM33XX=y
+>  CONFIG_SOC_AM43XX=y
+>  CONFIG_SOC_DRA7XX=y
+>  CONFIG_ARCH_QCOM=y
+> -CONFIG_ARCH_MEDIATEK=y
+
+Same here.
+
+>  CONFIG_ARCH_MSM8X60=y
+>  CONFIG_ARCH_MSM8960=y
+>  CONFIG_ARCH_MSM8974=y
+> @@ -85,7 +85,6 @@ CONFIG_ARCH_R8A7791=y
+>  CONFIG_ARCH_R8A7793=y
+>  CONFIG_ARCH_R8A7794=y
+>  CONFIG_ARCH_SH73A0=y
+> -CONFIG_MACH_MARZEN=y
+
+First possibly useful change, but as it's an option which has gone away,
+it serves little benefit.
+
+>  CONFIG_ARCH_SUNXI=y
+>  CONFIG_ARCH_SIRF=y
+>  CONFIG_ARCH_TEGRA=y
+> @@ -93,27 +92,20 @@ CONFIG_ARCH_TEGRA_2x_SOC=y
+>  CONFIG_ARCH_TEGRA_3x_SOC=y
+>  CONFIG_ARCH_TEGRA_114_SOC=y
+>  CONFIG_ARCH_TEGRA_124_SOC=y
+> -CONFIG_TEGRA_EMC_SCALING_ENABLE=y
+
+Same comment as above.
+
+>  CONFIG_ARCH_UNIPHIER=y
+>  CONFIG_ARCH_U8500=y
+>  CONFIG_MACH_HREFV60=y
+>  CONFIG_MACH_SNOWBALL=y
+> -CONFIG_MACH_UX500_DT=y
+
+Same as above.
+
+>  CONFIG_ARCH_VEXPRESS=y
+> -CONFIG_ARCH_VEXPRESS_CA9X4=y
+
+Same as above.
+
+>  CONFIG_ARCH_VEXPRESS_TC2_PM=y
+>  CONFIG_ARCH_WM8850=y
+>  CONFIG_ARCH_ZYNQ=y
+> -CONFIG_TRUSTED_FOUNDATIONS=y
+> -CONFIG_PCI=y
+> -CONFIG_PCI_HOST_GENERIC=y
+
+Same as above.
+
+> -CONFIG_PCI_KEYSTONE=y
+
+This one has only moved location.
+
+>  CONFIG_PCI_MSI=y
+>  CONFIG_PCI_MVEBU=y
+>  CONFIG_PCI_TEGRA=y
+>  CONFIG_PCI_RCAR_GEN2=y
+>  CONFIG_PCI_RCAR_GEN2_PCIE=y
+> -CONFIG_PCIEPORTBUS=y
+
+Questionable - if something selects this, then yes.  Otherwise, this
+should be enabled if booting on PCIe systems.  Some PCIe devices seem
+to burn power unless they think they're in a proper PCIe system.
+(I have an ASM1062 SATA board which the chip gets noticably "smelly"
+and hot without the PCIEPORTBUS enabled, thereby setting the common
+clock bit in the link control register.)
+
+> +CONFIG_PCI_KEYSTONE=y
+>  CONFIG_SMP=y
+>  CONFIG_NR_CPUS=16
+>  CONFIG_HIGHPTE=y
+> @@ -124,12 +116,12 @@ CONFIG_KEXEC=y
+>  CONFIG_CPU_FREQ=y
+>  CONFIG_CPU_FREQ_STAT_DETAILS=y
+>  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+> +CONFIG_CPUFREQ_DT=y
+
+Churn.
+
+>  CONFIG_CPU_IDLE=y
+>  CONFIG_ARM_CPUIDLE=y
+> -CONFIG_NEON=y
+> -CONFIG_KERNEL_MODE_NEON=y
+>  CONFIG_ARM_ZYNQ_CPUIDLE=y
+>  CONFIG_ARM_EXYNOS_CPUIDLE=y
+> +CONFIG_KERNEL_MODE_NEON=y
+
+Churn.
+
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+> @@ -147,9 +139,6 @@ CONFIG_IPV6_MIP6=m
+>  CONFIG_IPV6_TUNNEL=m
+>  CONFIG_IPV6_MULTIPLE_TABLES=y
+>  CONFIG_CAN=y
+> -CONFIG_CAN_RAW=y
+> -CONFIG_CAN_BCM=y
+> -CONFIG_CAN_DEV=y
+
+Possibly useful.
+
+>  CONFIG_CAN_AT91=m
+>  CONFIG_CAN_XILINXCAN=y
+>  CONFIG_CAN_MCP251X=y
+> @@ -186,10 +175,8 @@ CONFIG_ATMEL_SSC=m
+>  CONFIG_APDS9802ALS=y
+>  CONFIG_ISL29003=y
+>  CONFIG_EEPROM_AT24=y
+> -CONFIG_EEPROM_SUNXI_SID=y
+>  CONFIG_BLK_DEV_SD=y
+>  CONFIG_BLK_DEV_SR=y
+> -CONFIG_SCSI_MULTI_LUN=y
+
+Possibly useful.
+
+>  CONFIG_ATA=y
+>  CONFIG_SATA_AHCI=y
+>  CONFIG_SATA_AHCI_PLATFORM=y
+> @@ -200,10 +187,10 @@ CONFIG_SATA_HIGHBANK=y
+>  CONFIG_SATA_MV=y
+>  CONFIG_SATA_RCAR=y
+>  CONFIG_NETDEVICES=y
+> -CONFIG_HIX5HD2_GMAC=y
+>  CONFIG_SUN4I_EMAC=y
+>  CONFIG_MACB=y
+>  CONFIG_NET_CALXEDA_XGMAC=y
+> +CONFIG_HIX5HD2_GMAC=y
+
+Churn.
+
+>  CONFIG_IGB=y
+>  CONFIG_MV643XX_ETH=y
+>  CONFIG_MVNETA=y
+> @@ -234,8 +221,8 @@ CONFIG_INPUT_EVDEV=y
+>  CONFIG_KEYBOARD_QT1070=m
+>  CONFIG_KEYBOARD_GPIO=y
+>  CONFIG_KEYBOARD_TEGRA=y
+> -CONFIG_KEYBOARD_SPEAR=y
+>  CONFIG_KEYBOARD_ST_KEYSCAN=y
+> +CONFIG_KEYBOARD_SPEAR=y
+
+Churn.
+
+>  CONFIG_KEYBOARD_CROS_EC=y
+>  CONFIG_MOUSE_PS2_ELANTECH=y
+>  CONFIG_MOUSE_CYAPA=m
+> @@ -289,17 +276,16 @@ CONFIG_SERIAL_CONEXANT_DIGICOLOR_CONSOLE=y
+>  CONFIG_SERIAL_ST_ASC=y
+>  CONFIG_SERIAL_ST_ASC_CONSOLE=y
+>  CONFIG_I2C_CHARDEV=y
+> -CONFIG_I2C_DAVINCI=y
+>  CONFIG_I2C_MUX=y
+>  CONFIG_I2C_ARB_GPIO_CHALLENGE=m
+>  CONFIG_I2C_MUX_PCA954x=y
+>  CONFIG_I2C_MUX_PINCTRL=y
+>  CONFIG_I2C_AT91=m
+>  CONFIG_I2C_CADENCE=y
+> +CONFIG_I2C_DAVINCI=y
+
+Churn.
+
+>  CONFIG_I2C_DESIGNWARE_PLATFORM=y
+>  CONFIG_I2C_DIGICOLOR=m
+>  CONFIG_I2C_GPIO=m
+> -CONFIG_I2C_EXYNOS5=y
+
+Possibly useful.
+
+>  CONFIG_I2C_MV64XXX=y
+>  CONFIG_I2C_RIIC=y
+>  CONFIG_I2C_S3C2410=y
+> @@ -334,21 +320,20 @@ CONFIG_PINCTRL_AS3722=y
+>  CONFIG_PINCTRL_PALMAS=y
+>  CONFIG_PINCTRL_APQ8084=y
+>  CONFIG_GPIO_SYSFS=y
+> -CONFIG_GPIO_GENERIC_PLATFORM=y
+
+Possibly useful.
+
+>  CONFIG_GPIO_DAVINCI=y
+>  CONFIG_GPIO_DWAPB=y
+>  CONFIG_GPIO_EM=y
+>  CONFIG_GPIO_RCAR=y
+> +CONFIG_GPIO_SYSCON=y
+
+Churn.
+
+>  CONFIG_GPIO_XILINX=y
+>  CONFIG_GPIO_ZYNQ=y
+>  CONFIG_GPIO_PCA953X=y
+>  CONFIG_GPIO_PCA953X_IRQ=y
+>  CONFIG_GPIO_PCF857X=y
+> -CONFIG_GPIO_TWL4030=y
+>  CONFIG_GPIO_PALMAS=y
+> -CONFIG_GPIO_SYSCON=y
+>  CONFIG_GPIO_TPS6586X=y
+>  CONFIG_GPIO_TPS65910=y
+> +CONFIG_GPIO_TWL4030=y
+
+Churn.
+
+>  CONFIG_BATTERY_SBS=y
+>  CONFIG_BATTERY_MAX17040=m
+>  CONFIG_BATTERY_MAX17042=m
+> @@ -359,24 +344,23 @@ CONFIG_POWER_RESET_AS3722=y
+>  CONFIG_POWER_RESET_GPIO=y
+>  CONFIG_POWER_RESET_GPIO_RESTART=y
+>  CONFIG_POWER_RESET_KEYSTONE=y
+> +CONFIG_POWER_RESET_SYSCON=y
+
+Churn (moved from below.)
+
+>  CONFIG_POWER_RESET_RMOBILE=y
+>  CONFIG_SENSORS_LM90=y
+>  CONFIG_SENSORS_LM95245=y
+>  CONFIG_SENSORS_NTC_THERMISTOR=m
+> -CONFIG_THERMAL=y
+
+Possibly useful.
+
+>  CONFIG_CPU_THERMAL=y
+>  CONFIG_RCAR_THERMAL=y
+>  CONFIG_ARMADA_THERMAL=y
+> -CONFIG_DAVINCI_WATCHDOG=m
+> -CONFIG_EXYNOS_THERMAL=m
+
+Possibly useful.
+
+>  CONFIG_ST_THERMAL_SYSCFG=y
+>  CONFIG_ST_THERMAL_MEMMAP=y
+>  CONFIG_WATCHDOG=y
+>  CONFIG_XILINX_WATCHDOG=y
+>  CONFIG_ARM_SP805_WATCHDOG=y
+> +CONFIG_DAVINCI_WATCHDOG=m
+
+Churn.
+
+>  CONFIG_ORION_WATCHDOG=y
+> -CONFIG_ST_LPC_WATCHDOG=y
+>  CONFIG_SUNXI_WATCHDOG=y
+> +CONFIG_ST_LPC_WATCHDOG=y
+
+Churn.
+
+>  CONFIG_TEGRA_WATCHDOG=m
+>  CONFIG_MESON_WATCHDOG=y
+>  CONFIG_DIGICOLOR_WATCHDOG=y
+> @@ -404,8 +388,6 @@ CONFIG_REGULATOR_AXP20X=y
+>  CONFIG_REGULATOR_BCM590XX=y
+>  CONFIG_REGULATOR_DA9210=y
+>  CONFIG_REGULATOR_GPIO=y
+> -CONFIG_MFD_SYSCON=y
+> -CONFIG_POWER_RESET_SYSCON=y
+>  CONFIG_REGULATOR_MAX14577=m
+>  CONFIG_REGULATOR_MAX8907=y
+>  CONFIG_REGULATOR_MAX8973=y
+> @@ -429,8 +411,7 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
+>  CONFIG_MEDIA_CONTROLLER=y
+>  CONFIG_VIDEO_V4L2_SUBDEV_API=y
+>  CONFIG_MEDIA_USB_SUPPORT=y
+> -CONFIG_USB_VIDEO_CLASS=y
+> -CONFIG_USB_GSPCA=y
+> +CONFIG_USB_VIDEO_CLASS=m
+
+Possibly useful.
+
+>  CONFIG_V4L_PLATFORM_DRIVERS=y
+>  CONFIG_SOC_CAMERA=m
+>  CONFIG_SOC_CAMERA_PLATFORM=m
+> @@ -443,24 +424,22 @@ CONFIG_VIDEO_ML86V7667=m
+>  CONFIG_DRM=y
+>  # CONFIG_DRM_I2C_CH7006 is not set
+>  # CONFIG_DRM_I2C_SIL164 is not set
+> -CONFIG_DRM_NXP_PTN3460=m
+> -CONFIG_DRM_PARADE_PS8622=m
+>  CONFIG_DRM_NOUVEAU=m
+>  CONFIG_DRM_EXYNOS=m
+> -CONFIG_DRM_EXYNOS_DSI=y
+>  CONFIG_DRM_EXYNOS_FIMD=y
+> +CONFIG_DRM_EXYNOS_DSI=y
+
+Churn.
+
+>  CONFIG_DRM_EXYNOS_HDMI=y
+>  CONFIG_DRM_RCAR_DU=m
+>  CONFIG_DRM_TEGRA=y
+> -CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
+>  CONFIG_DRM_PANEL_SIMPLE=y
+> +CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
+> +CONFIG_DRM_NXP_PTN3460=m
+> +CONFIG_DRM_PARADE_PS8622=m
+
+Churn.
+
+>  CONFIG_FB_ARMCLCD=y
+>  CONFIG_FB_WM8505=y
+>  CONFIG_FB_SH_MOBILE_LCDC=y
+>  CONFIG_FB_SIMPLE=y
+>  CONFIG_FB_SH_MOBILE_MERAM=y
+> -CONFIG_BACKLIGHT_LCD_SUPPORT=y
+> -CONFIG_BACKLIGHT_CLASS_DEVICE=y
+>  CONFIG_LCD_PLATFORM=m
+>  CONFIG_BACKLIGHT_PWM=y
+>  CONFIG_BACKLIGHT_AS3711=y
+> @@ -474,7 +453,7 @@ CONFIG_SND_HDA_INPUT_BEEP=y
+>  CONFIG_SND_HDA_PATCH_LOADER=y
+>  CONFIG_SND_HDA_CODEC_REALTEK=m
+>  CONFIG_SND_HDA_CODEC_HDMI=m
+> -CONFIG_SND_USB_AUDIO=y
+> +CONFIG_SND_USB_AUDIO=m
+>  CONFIG_SND_SOC=m
+>  CONFIG_SND_ATMEL_SOC=m
+>  CONFIG_SND_ATMEL_SOC_WM8904=m
+> @@ -494,14 +473,11 @@ CONFIG_USB=y
+>  CONFIG_USB_XHCI_HCD=y
+>  CONFIG_USB_XHCI_MVEBU=y
+>  CONFIG_USB_EHCI_HCD=y
+> -CONFIG_USB_EHCI_EXYNOS=y
+> -CONFIG_USB_EHCI_TEGRA=y
+>  CONFIG_USB_EHCI_HCD_STI=y
+> -CONFIG_USB_EHCI_HCD_PLATFORM=y
+
+Possibly useful.
+
+> -CONFIG_USB_ISP1760=y
+> +CONFIG_USB_EHCI_TEGRA=y
+> +CONFIG_USB_EHCI_EXYNOS=y
+
+Churn.
+
+>  CONFIG_USB_OHCI_HCD=y
+>  CONFIG_USB_OHCI_HCD_STI=y
+> -CONFIG_USB_OHCI_HCD_PLATFORM=y
+>  CONFIG_USB_OHCI_EXYNOS=m
+>  CONFIG_USB_R8A66597_HCD=m
+>  CONFIG_USB_RENESAS_USBHS=m
+> @@ -509,9 +485,9 @@ CONFIG_USB_STORAGE=y
+>  CONFIG_USB_DWC3=y
+>  CONFIG_USB_CHIPIDEA=y
+>  CONFIG_USB_CHIPIDEA_HOST=y
+> +CONFIG_USB_ISP1760=y
+
+Churn.
+
+>  CONFIG_AB8500_USB=y
+>  CONFIG_KEYSTONE_USB_PHY=y
+> -CONFIG_OMAP_USB3=y
+
+Possibly useful.
+
+>  CONFIG_USB_GPIO_VBUS=y
+>  CONFIG_USB_ISP1301=y
+>  CONFIG_USB_MXS_PHY=y
+> @@ -527,9 +503,9 @@ CONFIG_MMC_SDHCI_OF_ARASAN=y
+>  CONFIG_MMC_SDHCI_ESDHC_IMX=y
+>  CONFIG_MMC_SDHCI_DOVE=y
+>  CONFIG_MMC_SDHCI_TEGRA=y
+> +CONFIG_MMC_SDHCI_S3C=y
+
+Churn.
+
+>  CONFIG_MMC_SDHCI_PXAV3=y
+>  CONFIG_MMC_SDHCI_SPEAR=y
+> -CONFIG_MMC_SDHCI_S3C=y
+>  CONFIG_MMC_SDHCI_S3C_DMA=y
+>  CONFIG_MMC_SDHCI_BCM_KONA=y
+>  CONFIG_MMC_SDHCI_ST=y
+> @@ -540,7 +516,6 @@ CONFIG_MMC_MVSDIO=y
+>  CONFIG_MMC_SDHI=y
+>  CONFIG_MMC_DW=y
+>  CONFIG_MMC_DW_IDMAC=y
+> -CONFIG_MMC_DW_PLTFM=y
+
+Possibly useful.
+
+>  CONFIG_MMC_DW_EXYNOS=y
+>  CONFIG_MMC_DW_ROCKCHIP=y
+>  CONFIG_MMC_SH_MMCIF=y
+> @@ -571,15 +546,14 @@ CONFIG_RTC_DRV_MAX77686=y
+>  CONFIG_RTC_DRV_MAX77802=m
+>  CONFIG_RTC_DRV_RS5C372=m
+>  CONFIG_RTC_DRV_PALMAS=y
+> -CONFIG_RTC_DRV_ST_LPC=y
+>  CONFIG_RTC_DRV_TWL4030=y
+>  CONFIG_RTC_DRV_TPS6586X=y
+>  CONFIG_RTC_DRV_TPS65910=y
+>  CONFIG_RTC_DRV_S35390A=m
+>  CONFIG_RTC_DRV_RX8581=m
+>  CONFIG_RTC_DRV_EM3027=y
+> -CONFIG_RTC_DRV_DIGICOLOR=m
+>  CONFIG_RTC_DRV_S5M=m
+> +CONFIG_RTC_DRV_DIGICOLOR=m
+
+Churn.
+
+>  CONFIG_RTC_DRV_S3C=m
+>  CONFIG_RTC_DRV_PL031=y
+>  CONFIG_RTC_DRV_AT91RM9200=m
+> @@ -589,24 +563,25 @@ CONFIG_RTC_DRV_SUN6I=y
+>  CONFIG_RTC_DRV_SUNXI=y
+>  CONFIG_RTC_DRV_MV=y
+>  CONFIG_RTC_DRV_TEGRA=y
+> +CONFIG_RTC_DRV_ST_LPC=y
+
+Churn.
+
+>  CONFIG_DMADEVICES=y
+> -CONFIG_DW_DMAC=y
+>  CONFIG_AT_HDMAC=y
+>  CONFIG_AT_XDMAC=y
+> +CONFIG_DMA_OMAP=y
+> +CONFIG_DMA_SUN6I=y
+> +CONFIG_IMX_DMA=y
+> +CONFIG_IMX_SDMA=y
+>  CONFIG_MV_XOR=y
+> -CONFIG_TEGRA20_APB_DMA=y
+> -CONFIG_SH_DMAE=y
+> -CONFIG_RCAR_DMAC=y
+> -CONFIG_STE_DMA40=y
+> +CONFIG_MXS_DMA=y
+
+Churn.
+
+> +CONFIG_PL330_DMA=y
+
+Churn.
+
+>  CONFIG_SIRF_DMA=y
+> +CONFIG_STE_DMA40=y
+
+Churn.
+
+> +CONFIG_TEGRA20_APB_DMA=y
+
+Churn.
+
+>  CONFIG_TI_EDMA=y
+> -CONFIG_PL330_DMA=y
+> -CONFIG_IMX_SDMA=y
+> -CONFIG_IMX_DMA=y
+> -CONFIG_MXS_DMA=y
+> -CONFIG_DMA_OMAP=y
+>  CONFIG_XILINX_VDMA=y
+> -CONFIG_DMA_SUN6I=y
+> +CONFIG_DW_DMAC=y
+
+Churn.
+
+> +CONFIG_SH_DMAE=y
+
+Churn.
+
+> +CONFIG_RCAR_DMAC=y
+
+Churn.
+
+>  CONFIG_STAGING=y
+>  CONFIG_SENSORS_ISL29018=y
+>  CONFIG_SENSORS_ISL29028=y
+> @@ -615,23 +590,21 @@ CONFIG_KEYBOARD_NVEC=y
+>  CONFIG_SERIO_NVEC_PS2=y
+>  CONFIG_NVEC_POWER=y
+>  CONFIG_NVEC_PAZ00=y
+> -CONFIG_QCOM_GSBI=y
+> -CONFIG_QCOM_PM=y
+> -CONFIG_COMMON_CLK_QCOM=y
+> -CONFIG_CHROME_PLATFORMS=y
+>  CONFIG_CROS_EC_CHARDEV=m
+>  CONFIG_COMMON_CLK_MAX77686=y
+>  CONFIG_COMMON_CLK_MAX77802=m
+>  CONFIG_COMMON_CLK_S2MPS11=m
+> +CONFIG_COMMON_CLK_QCOM=y
+>  CONFIG_APQ_MMCC_8084=y
+>  CONFIG_MSM_GCC_8660=y
+>  CONFIG_MSM_MMCC_8960=y
+>  CONFIG_MSM_MMCC_8974=y
+>  CONFIG_TEGRA_IOMMU_GART=y
+>  CONFIG_TEGRA_IOMMU_SMMU=y
+> +CONFIG_QCOM_GSBI=y
+
+Churn.
+
+> +CONFIG_QCOM_PM=y
+
+Churn.
+
+>  CONFIG_PM_DEVFREQ=y
+>  CONFIG_ARM_TEGRA_DEVFREQ=m
+> -CONFIG_MEMORY=y
+>  CONFIG_EXTCON=y
+>  CONFIG_TI_AEMIF=y
+>  CONFIG_IIO=y
+> @@ -644,21 +617,24 @@ CONFIG_PWM_ATMEL=m
+>  CONFIG_PWM_ATMEL_TCB=m
+>  CONFIG_PWM_RENESAS_TPU=y
+>  CONFIG_PWM_SAMSUNG=m
+> +CONFIG_PWM_STI=m
+
+Churn.
+
+>  CONFIG_PWM_SUN4I=y
+>  CONFIG_PWM_TEGRA=y
+>  CONFIG_PWM_VT8500=y
+> -CONFIG_PHY_HIX5HD2_SATA=y
+> -CONFIG_PWM_STI=m
+> -CONFIG_OMAP_USB2=y
+> -CONFIG_TI_PIPE3=y
+> +CONFIG_KEYSTONE_IRQ=y
+>  CONFIG_PHY_MIPHY28LP=y
+>  CONFIG_PHY_MIPHY365X=y
+>  CONFIG_PHY_RCAR_GEN2=m
+> -CONFIG_PHY_STIH41X_USB=y
+> -CONFIG_PHY_STIH407_USB=y
+> +CONFIG_OMAP_USB2=y
+> +CONFIG_TI_PIPE3=y
+> +CONFIG_PHY_HIX5HD2_SATA=y
+>  CONFIG_PHY_SUN4I_USB=y
+>  CONFIG_PHY_SUN9I_USB=y
+>  CONFIG_PHY_SAMSUNG_USB2=m
+> +CONFIG_PHY_STIH407_USB=y
+> +CONFIG_PHY_STIH41X_USB=y
+> +CONFIG_NVMEM=y
+> +CONFIG_NVMEM_SUNXI_SID=y
+>  CONFIG_EXT4_FS=y
+>  CONFIG_AUTOFS4_FS=y
+>  CONFIG_MSDOS_FS=y
+> @@ -666,7 +642,6 @@ CONFIG_VFAT_FS=y
+>  CONFIG_NTFS_FS=y
+>  CONFIG_TMPFS_POSIX_ACL=y
+>  CONFIG_UBIFS_FS=y
+> -CONFIG_TMPFS=y
+>  CONFIG_SQUASHFS=y
+>  CONFIG_SQUASHFS_LZO=y
+>  CONFIG_SQUASHFS_XZ=y
+> @@ -681,21 +656,15 @@ CONFIG_PRINTK_TIME=y
+>  CONFIG_DEBUG_FS=y
+>  CONFIG_MAGIC_SYSRQ=y
+>  CONFIG_LOCKUP_DETECTOR=y
+> -CONFIG_CRYPTO_DEV_TEGRA_AES=y
+> -CONFIG_CPUFREQ_DT=y
+> -CONFIG_KEYSTONE_IRQ=y
+> +CONFIG_CRYPTO_DEV_ATMEL_AES=m
+> +CONFIG_CRYPTO_DEV_ATMEL_TDES=m
+> +CONFIG_CRYPTO_DEV_ATMEL_SHA=m
+>  CONFIG_CRYPTO_DEV_SUN4I_SS=m
+>  CONFIG_ARM_CRYPTO=y
+> -CONFIG_CRYPTO_SHA1_ARM=m
+>  CONFIG_CRYPTO_SHA1_ARM_NEON=m
+>  CONFIG_CRYPTO_SHA1_ARM_CE=m
+>  CONFIG_CRYPTO_SHA2_ARM_CE=m
+> -CONFIG_CRYPTO_SHA256_ARM=m
+>  CONFIG_CRYPTO_SHA512_ARM=m
+> -CONFIG_CRYPTO_AES_ARM=m
+>  CONFIG_CRYPTO_AES_ARM_BS=m
+>  CONFIG_CRYPTO_AES_ARM_CE=m
+>  CONFIG_CRYPTO_GHASH_ARM_CE=m
+> -CONFIG_CRYPTO_DEV_ATMEL_AES=m
+> -CONFIG_CRYPTO_DEV_ATMEL_TDES=m
+> -CONFIG_CRYPTO_DEV_ATMEL_SHA=m
+> -- 
+> 2.5.0
+> 
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
