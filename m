@@ -1,54 +1,49 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 16 Sep 2015 00:09 +0200
-Subject: [PATCH 6/8] mmc: dw_mmc: Generic MMC tuning with the clock phase
- framework
-In-Reply-To: <55F7D602.70003@samsung.com>
-References: <1441045446-30858-1-git-send-email-heiko@sntech.de>
- <1441045446-30858-7-git-send-email-heiko@sntech.de>
- <55F7D602.70003@samsung.com>
-Message-ID: <8878355.D5Q8mk4qcM@diego>
+From: scottwood@freescale.com (Scott Wood)
+Date: Tue, 15 Sep 2015 17:09:03 -0500
+Subject: [PATCH] arm64: dts: fsl-ls2085a: Add serial aliases
+In-Reply-To: <2766847.5egOSlNQ7I@wuerfel>
+References: <20150915004827.GA19862@home.buserror.net>
+ <2766847.5egOSlNQ7I@wuerfel>
+Message-ID: <1442354943.2909.140.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Dienstag, 15. September 2015, 17:25:38 schrieb Jaehoon Chung:
-> On 09/01/2015 03:24 AM, Heiko Stuebner wrote:
-> > From: Alexandru M Stan <amstan@chromium.org>
+On Tue, 2015-09-15 at 08:43 +0200, Arnd Bergmann wrote:
+> On Monday 14 September 2015 19:48:27 Scott Wood wrote:
+> > These will allow U-Boot to set linux,stdout-path in /chosen based on
+> > the active console device, which will allow devicetree-based earlycon.
 > > 
-> > This algorithm will try 1 degree increments, since there's no way to tell
-> > what resolution the underlying phase code uses. As an added bonus, doing
-> > many tunings yields better results since some tests are run more than once
-> > (ex: if the underlying driver uses 45 degree increments, the tuning code
-> > will try the same angle more than once).
+> > Signed-off-by: Scott Wood <scottwood@freescale.com>
+> > ---
+> >  arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi | 5 +++++
+> >  1 file changed, 5 insertions(+)
 > > 
-> > It will then construct a list of good phase ranges (even ranges that cross
-> > 360/0), will pick the biggest range then it will set the sample_clk to the
-> > middle of that range.
-> > 
-> > We do not touch ciu_drive (and by extension define default-drive-phase).
-> > Drive phase is mostly used to define minimum hold times, while one could
-> > write some code to determine what phase meets the minimum hold time (ex 10
-> > degrees) this will not work with the current clock phase framework (which
-> > floors angles, so we'll get 0 deg, and there's no way to know what
-> > resolution the floors happen at). We assume that the default drive angles
-> > set by the hardware are good enough.
-> > 
-> > If a device has device specific code (like exynos) then that will still
-> > take precedence, otherwise this new code will execute. If the device wants
-> > to tune, but has no sample_clk defined we'll return EIO with an error
-> > message.
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi 
+> > b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+> > index e281ceb..eae454e 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+> > @@ -55,6 +55,11 @@
+> >         #address-cells = <2>;
+> >         #size-cells = <2>;
+> >  
+> > +       aliases {
+> > +               serial0 = &serial0;
+> > +               serial1 = &serial1;
+> > +       };
+> > +
 > 
-> Which point is "_generic_"? I don't find the code that control the register
-> relevant to CLK_DRV/SMPL PHASE. It seems that posted the similar patches at
-> u-boot mailing list..
+> I normally ask people to put the aliases into the board specific dts file,
+> to account for machines that do not have all the uarts, or that number them
+> differently from the SoC.
 
-The "generic" part is that it uses the clk phase API for dw_mmc 
-implementations where the clkgen controlling interface is outside the dw_mmc 
-IP itself. So it's open for other implementations as well.
+OK, I'll respin on top of https://patchwork.kernel.org/patch/7120211/
 
-But if you are more comfortable with it, I can also move it into the dw_mmc-
-rockchip variant for the time being, until another user comes along.
+> I didn't know about U-Boot setting the stdout-path property, but that's
+> great, as long as U-Boot uses the same numbering of the uarts that the
+> board uses. Do you know if that is normally the case?
 
+Yes, the numbering of the serial aliases in the dts should match the 
+numbering that U-Boot uses.
 
-Heiko
+-Scott
