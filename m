@@ -1,84 +1,106 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Tue, 15 Sep 2015 11:52:53 +0800
-Subject: [PATCH v7 0/3] Add MediaTek display PWM driver
-In-Reply-To: <1439882875-19596-1-git-send-email-yh.huang@mediatek.com>
-References: <1439882875-19596-1-git-send-email-yh.huang@mediatek.com>
-Message-ID: <1442289173.11445.5.camel@mtksdaap41>
+From: binmlist@gmail.com (Bin Liu)
+Date: Mon, 14 Sep 2015 23:20:22 -0500
+Subject: [linux-sunxi] [PATCH] musb: sunxi: Ignore VBus errors in
+ host-only mode
+In-Reply-To: <55F78848.6020403@redhat.com>
+References: <1438723553-4136-1-git-send-email-hdegoede@redhat.com>
+ <55C31963.2010701@schinagl.nl> <55C3709C.4080609@redhat.com>
+ <55C47041.3000603@schinagl.nl> <55E93D8C.9020804@schinagl.nl>
+ <55F1CA9B.3070204@redhat.com> <20150910183017.GN9885@lukather>
+ <55F1CE2E.7010409@redhat.com> <20150914202533.GF4684@lukather>
+ <55F78848.6020403@redhat.com>
+Message-ID: <CADYTM3bJjZtwV+vKEAQmPs8tA_FjRmGxx_XjMUFLE3aLcJ6DtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-08-18 at 15:27 +0800, YH Huang wrote:
-> This patch series add the use of display PWM driver, documentation
-> and device tree for Mediatek SoCs. The driver is used to support
-> the backlight of the panel. This is based on v4.2-rc1.
-> 
-> The clock definitions (CLK_MM_DISP_PWM*) are added by James Liao's patch:
-> clk: mediatek: Add subsystem clocks of MT8173
-> 
-> Change in v7:
-> 1. Add the dependency HAS_IOMEM in Kconfig.
-> 2. Revise misprints and coding style for readability.
-> 
-> Change in v6:
-> 1. Enable clocks in the pwm_enable function.
-> 2. Remove suspend/resume code since pwm-backlight driver has done the
-> same things.
-> 3. Revise some code to make it easier to read.
-> 
-> Change in v5:
-> 1. Configure PWM output via pinctrl.
-> 2. Fix the parameter name in dtsi.
-> 
-> Change in v4:
-> 1. Codebase is on v4.2-rc1.
-> 2. Add the PWM node in dtsi.
-> 3. Change the dependency in Kconfig.
-> 4. Rewrite some code for readability.
-> 
-> Change in v3:
-> 1. Add suspend/resume function.
-> 2. Fix the formula for high_width calculation.
-> 3. Rewrite some code to make it easier to read.
-> 4. Add more information in the commit message.
-> 
-> Change in v2:
-> 1. Rewrite descriptions for driver in kconfig to make it much clear.
-> 2. Rename the driver from "pwm-mediatek-disp" to "pwm-mtk-disp".
-> 3. Disable clocks in the error path.
-> 4. Change the shift values in decimal instead of hex.
-> 5. Rename and add some variables or function name for consistency and
-> readability.
-> 6. Drop unnecessary parentheses, spaces, variables and add newlines to
-> make the code easiler to read.
-> 
-> YH Huang (3):
->   dt-bindings: pwm: add MediaTek display PWM bindings
->   pwm: add MediaTek display PWM driver support
->   arm64: dts: mt8173: add MT8173 display PWM driver support node
-> 
->  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       |   42 ++++
->  arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |   13 ++
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   22 ++
->  drivers/pwm/Kconfig                                |   11 +
->  drivers/pwm/Makefile                               |    1 +
->  drivers/pwm/pwm-mtk-disp.c                         |  232 ++++++++++++++++++++
->  6 files changed, 321 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
->  create mode 100644 drivers/pwm/pwm-mtk-disp.c
-> 
-> --
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Hi,
 
-Hi Thierry,
+On Mon, Sep 14, 2015 at 9:54 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+>
+> On 09/14/2015 10:25 PM, Maxime Ripard wrote:
+>>
+>> On Thu, Sep 10, 2015 at 08:38:38PM +0200, Hans de Goede wrote:
+>>>
+>>> Hi,
+>>>
+>>> On 10-09-15 20:30, Maxime Ripard wrote:
+>>>>
+>>>> On Thu, Sep 10, 2015 at 08:23:23PM +0200, Hans de Goede wrote:
+>>>>>
+>>>>> Hi,
+>>>>>
+>>>>> On 04-09-15 08:43, Olliver Schinagl wrote:
+>>>>>>
+>>>>>> Hey Hans,
+>>>>>>
+>>>>>> On 07-08-15 10:45, Olliver Schinagl wrote:
+>>>>>>>
+>>>>>>> <snip>
+>>>>>>>>
+>>>>>>>> If you change the dr_mode to host then you _must_ also remove any
+>>>>>>>> id_det and vbus_det
+>>>>>>>> gpio settings from the usb_phy node in the dts, as the sun4i phy
+>>>>>>>> code detects
+>>>>>>>> host vs otg mode by checking for the presence of these.
+>>>>>>>
+>>>>>>> Yes, this fixes it and makes it work. Thanks.
+>>>>>>>
+>>>>>> I've been going back to this and am wondering if this is something I
+>>>>>> can look into to fix properly? E.g. if the dts sets dr_mode = host, can we
+>>>>>> simply ignore the pins and treat them as unset?
+>>>>>
+>>>>>
+>>>>> AFAIK you cannot unset something in dts. The only solution I
+>>>>> can comeup with is to add a dr_mode argument to the phy like
+>>>>> we already have for the otg controller itself.
+>>>>>
+>>>>> This is something which we likely need to do anyways to add
+>>>>> support for peripheral only mode, which we seem to need for
+>>>>> some "hdmi sticks".
+>>>>
+>>>>
+>>>> I haven't really followed the rest of the discussion, so sorry if you
+>>>> already talked about that, but why can't you just set the dr_mode to
+>>>> peripheral in such a case?
+>>>
+>>>
+>>> This is about the usbphy code not the musb-controller code, which are
+>>> 2 different dts nodes, atm only the musb-controller node has a
+>>> dr_mode property, and the phy code decides between host-only
+>>> and otg mode based on whether an id pin is assigned or not.
+>>>
+>>> My proposal is to get rid of the id-pin hack to determine the mode
+>>> and add a dr_mode property to the usbphy dts node.
+>>
+>>
+>> I agree that we should get rid of that hack, especially since a lack
+>> of an ID pin might also be used on a peripheral-only device.
+>>
+>> However, we already have that information in the musb node, and
+>> duplicating the info seems error prone. We already have a custom
+>> function, maybe that's a case for another one
+>
+>
+> AFAIK the musb / phy maintainers really want to avoid adding more
+> custom functions ...
 
-Will you please pick up these patches in your pwm tree?
-Should I rebase to 4.3-rc1?
+I add a function called of_usb_get_dr_mode_by_phy() in usb/common.c,
+so that other phy drivers can call it to get dr_mode of the
+controller. I will send the patch tomorrow morning for review.
 
 Regards,
-YH Huang
+-Bin.
+
+>
+> Felipe, Kishon any comments on this ?
+>
+>
+> Regards,
+>
+> Hans
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
