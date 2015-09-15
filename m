@@ -1,84 +1,39 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 15 Sep 2015 09:10:57 +0100
-Subject: [PATCH] arm: Fix backtrace generation when IPI is masked
-In-Reply-To: <017001d0ef83$e18a5d00$a49f1700$@alibaba-inc.com>
-References: <016701d0ef82$c303d6a0$490b83e0$@alibaba-inc.com>
- <017001d0ef83$e18a5d00$a49f1700$@alibaba-inc.com>
-Message-ID: <55F7D291.5090509@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 15 Sep 2015 10:12:36 +0200
+Subject: [PATCH] ARM: tegra: Enable CPUFreq support for Tegra124
+ Chromebooks
+In-Reply-To: <CAAObsKA0N50gfPA9sMZfnM8N+N9Oo-YHMCDdF7JdWjpxXtFJbA@mail.gmail.com>
+References: <1433331821-9648-1-git-send-email-jonathanh@nvidia.com>
+ <556EE8B0.2060205@nvidia.com> <55A3B848.2080205@nvidia.com>
+ <CAAObsKA0N50gfPA9sMZfnM8N+N9Oo-YHMCDdF7JdWjpxXtFJbA@mail.gmail.com>
+Message-ID: <20150915081234.GA25970@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/15 07:58, Hillf Danton wrote:
->> Currently on ARM when <SysRq-L> is triggered from an interrupt handler
->> (e.g. a SysRq issued using UART or kbd) the main CPU will wedge for ten
->> seconds with interrupts masked before issuing a backtrace for every CPU
->> except itself.
->>
->> The new backtrace code introduced by commit 96f0e00378d4 ("ARM: add
->> basic support for on-demand backtrace of other CPUs") does not work
->> correctly when run from an interrupt handler because IPI_CPU_BACKTRACE
->> is used to generate the backtrace on all CPUs but cannot preempt the
->> current calling context.
->>
->> This can be fixed by detecting that the calling context cannot be
->> preempted and issuing the backtrace directly in this case. Some small
->> changes to the generic code are required to support this.
->>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->> ---
->>   arch/arm/kernel/smp.c | 7 +++++++
->>   lib/nmi_backtrace.c   | 5 ++++-
->>   2 files changed, 11 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
->> index 48185a773852..4d8a80328c74 100644
->> --- a/arch/arm/kernel/smp.c
->> +++ b/arch/arm/kernel/smp.c
->> @@ -748,6 +748,13 @@ core_initcall(register_cpufreq_notifier);
->>
->>   static void raise_nmi(cpumask_t *mask)
->>   {
->> +	/*
->> +	 * Generate the backtrace directly if we are running in a
->> +	 * calling context that is not preemptible by the backtrace IPI.
->> +	 */
->> +	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
->> +		nmi_cpu_backtrace(NULL);
->> +
->>   	smp_cross_call(mask, IPI_CPU_BACKTRACE);
->>   }
->>
->> diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
->> index 88d3d32e5923..be0466a80d0b 100644
->> --- a/lib/nmi_backtrace.c
->> +++ b/lib/nmi_backtrace.c
->> @@ -149,7 +149,10 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
->>   		/* Replace printk to write into the NMI seq */
->>   		this_cpu_write(printk_func, nmi_vprintk);
->>   		pr_warn("NMI backtrace for cpu %d\n", cpu);
->> -		show_regs(regs);
->> +		if (regs)
->> +			show_regs(regs);
->> +		else
->> +			dump_stack();
->
-> Better if dump_stack() is added in a separate patch, given that
-> it is not mentioned in commit message.
+On Thu, Sep 03, 2015 at 03:40:45PM +0200, Tomeu Vizoso wrote:
+> On 13 July 2015 at 15:08, Jon Hunter <jonathanh@nvidia.com> wrote:
+> > On 03/06/15 12:44, Jon Hunter wrote:
+> >> Adding LAKML. Jon
+> >>
+> >> On 03/06/15 12:43, Jon Hunter wrote:
+> >>> Add the device-tree DFLL clock node and CPU regulator phandle for
+> >>> tegra124 chromebooks to enable CPUFreq support on these boards.
+> 
+> Ping.
+> 
+> Thanks,
 
-Adding dump_stack() is mentioned in passing ("Some small changes to the 
-generic code are required to support this.") but you're right that the 
-reason for the change is not explicitly called out.
+Sorry that this has gone unnoticed for so long. I've applied it now to
+the for-4.4/dt branch.
 
-I can certainly respin as two patches but perhaps its better just to 
-improve the commit message. Something like:
+Tomeu, do you want me to add your Tested-by, Reviewed-by or Acked-by
+before I push this out?
 
- > This can be fixed by detecting that the calling context cannot be
- > preempted and issuing the backtrace directly in this case. Issuing
- > directly leaves us without any pt_regs to pass to nmi_cpu_backtrace().
- > Modify the generic code to call dump_stack() when its argument is
- > NULL.
-
-Which do you prefer?
-
-
-Daniel.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150915/40189def/attachment.sig>
