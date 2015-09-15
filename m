@@ -1,34 +1,29 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 15 Sep 2015 10:12:36 +0200
-Subject: [PATCH] ARM: tegra: Enable CPUFreq support for Tegra124
- Chromebooks
-In-Reply-To: <CAAObsKA0N50gfPA9sMZfnM8N+N9Oo-YHMCDdF7JdWjpxXtFJbA@mail.gmail.com>
-References: <1433331821-9648-1-git-send-email-jonathanh@nvidia.com>
- <556EE8B0.2060205@nvidia.com> <55A3B848.2080205@nvidia.com>
- <CAAObsKA0N50gfPA9sMZfnM8N+N9Oo-YHMCDdF7JdWjpxXtFJbA@mail.gmail.com>
-Message-ID: <20150915081234.GA25970@ulmo.nvidia.com>
+Date: Tue, 15 Sep 2015 10:14:26 +0200
+Subject: [PATCH] arm: tegra: dtsi whitespace clean-up for tegra20,
+ tegra30 and tegra124
+In-Reply-To: <1440668688-17288-1-git-send-email-marcel.ziswiler@toradex.com>
+References: <1440668688-17288-1-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <20150915081425.GB25970@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 03, 2015 at 03:40:45PM +0200, Tomeu Vizoso wrote:
-> On 13 July 2015 at 15:08, Jon Hunter <jonathanh@nvidia.com> wrote:
-> > On 03/06/15 12:44, Jon Hunter wrote:
-> >> Adding LAKML. Jon
-> >>
-> >> On 03/06/15 12:43, Jon Hunter wrote:
-> >>> Add the device-tree DFLL clock node and CPU regulator phandle for
-> >>> tegra124 chromebooks to enable CPUFreq support on these boards.
+On Thu, Aug 27, 2015 at 11:44:48AM +0200, Marcel Ziswiler wrote:
+> There were a few cases of eight spaces being used instead of a tab
+> character plus one case of using two spaces after an equal sign instead
+> of just one which this patch fixes.
 > 
-> Ping.
+> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> ---
 > 
-> Thanks,
+>  arch/arm/boot/dts/tegra124.dtsi |  2 +-
+>  arch/arm/boot/dts/tegra20.dtsi  |  4 ++--
+>  arch/arm/boot/dts/tegra30.dtsi  | 10 +++++-----
+>  3 files changed, 8 insertions(+), 8 deletions(-)
 
-Sorry that this has gone unnoticed for so long. I've applied it now to
-the for-4.4/dt branch.
+Applied with tiny fixups of the commit message.
 
-Tomeu, do you want me to add your Tested-by, Reviewed-by or Acked-by
-before I push this out?
-
+Thanks,
 Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
@@ -36,4 +31,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150915/40189def/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150915/ee62e9c9/attachment.sig>
