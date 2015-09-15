@@ -1,131 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Sep 2015 18:40:38 +0100
-Subject: [PATCH 3/6] PCI: generic: Quit clobbering our pci_ops.
-In-Reply-To: <1442013719-5001-4-git-send-email-ddaney.cavm@gmail.com>
-References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
- <1442013719-5001-4-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20150915174038.GK31157@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 15 Sep 2015 18:48:07 +0100
+Subject: [PATCH v4] pinctrl: mediatek: Implement wake handler and suspend
+ resume
+In-Reply-To: <CAKdAkRSFE2KJOzbUarxAQMNwHOkkyGHXmRLGhn55VTvG-SJ4Kg@mail.gmail.com>
+References: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>
+ <55DB4609.5040904@arm.com>
+ <CAGS+omBnoitju07KQ1Y7JHTbce6+DO4WqWHTaKz5D+T157zEJA@mail.gmail.com>
+ <1441535972.22230.5.camel@mhfsdcap03> <55EEAA24.6080706@arm.com>
+ <55EF11E6.7030307@arm.com> <1442051454.5661.12.camel@mhfsdcap03>
+ <55F6AC87.4040301@arm.com>
+ <CAKdAkRSFE2KJOzbUarxAQMNwHOkkyGHXmRLGhn55VTvG-SJ4Kg@mail.gmail.com>
+Message-ID: <55F859D7.1000803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 12, 2015 at 12:21:56AM +0100, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> The pci-host-generic driver keeps a global struct pci_ops which it
-> then patches with the .map_bus method appropriate for the bus device.
-> A problem arises when the driver is used for two different types of
-> bus devices, the .map_bus method for the last device probed clobbers
-> the method for all previous devices.  The result, only the last bus
-> device probed has the proper .map_bus, and the others fail.
-> 
-> Move the struct pci_ops into the bus specific structure, and
-> initialize it when the bus device is probed.  Keep a copy of the
-> gen_pci_cfg_bus_ops structure, instead of a pointer to a global copy,
-> to future proof against the addition of bus specific elements to
-> struct pci_ops.
 
-This looks ok to me:
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+On 15/09/15 03:52, Dmitry Torokhov wrote:
+> On Mon, Sep 14, 2015 at 4:16 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-Will
+[...]
 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  drivers/pci/host/pci-host-generic.c | 31 +++++++++++++++++--------------
->  1 file changed, 17 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> index a0fb241..cd6f898 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -27,7 +27,7 @@
->  
->  struct gen_pci_cfg_bus_ops {
->  	u32 bus_shift;
-> -	void __iomem *(*map_bus)(struct pci_bus *, unsigned int, int);
-> +	struct pci_ops ops;
->  };
->  
->  struct gen_pci_cfg_windows {
-> @@ -35,7 +35,7 @@ struct gen_pci_cfg_windows {
->  	struct resource				*bus_range;
->  	void __iomem				**win;
->  
-> -	const struct gen_pci_cfg_bus_ops	*ops;
-> +	struct gen_pci_cfg_bus_ops		ops;
->  };
->  
->  /*
-> @@ -65,7 +65,11 @@ static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
->  
->  static struct gen_pci_cfg_bus_ops gen_pci_cfg_cam_bus_ops = {
->  	.bus_shift	= 16,
-> -	.map_bus	= gen_pci_map_cfg_bus_cam,
-> +	.ops		= {
-> +		.map_bus	= gen_pci_map_cfg_bus_cam,
-> +		.read		= pci_generic_config_read,
-> +		.write		= pci_generic_config_write,
-> +	}
->  };
->  
->  static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
-> @@ -80,12 +84,11 @@ static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
->  
->  static struct gen_pci_cfg_bus_ops gen_pci_cfg_ecam_bus_ops = {
->  	.bus_shift	= 20,
-> -	.map_bus	= gen_pci_map_cfg_bus_ecam,
-> -};
-> -
-> -static struct pci_ops gen_pci_ops = {
-> -	.read	= pci_generic_config_read,
-> -	.write	= pci_generic_config_write,
-> +	.ops		= {
-> +		.map_bus	= gen_pci_map_cfg_bus_ecam,
-> +		.read		= pci_generic_config_read,
-> +		.write		= pci_generic_config_write,
-> +	}
->  };
->  
->  static const struct of_device_id gen_pci_of_match[] = {
-> @@ -175,7 +178,7 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->  
->  	/* Limit the bus-range to fit within reg */
->  	bus_max = pci->cfg.bus_range->start +
-> -		  (resource_size(&pci->cfg.res) >> pci->cfg.ops->bus_shift) - 1;
-> +		  (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
->  	pci->cfg.bus_range->end = min_t(resource_size_t,
->  					pci->cfg.bus_range->end, bus_max);
->  
-> @@ -193,7 +196,7 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->  	bus_range = pci->cfg.bus_range;
->  	for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
->  		u32 idx = busn - bus_range->start;
-> -		u32 sz = 1 << pci->cfg.ops->bus_shift;
-> +		u32 sz = 1 << pci->cfg.ops.bus_shift;
->  
->  		pci->cfg.win[idx] = devm_ioremap(dev,
->  						 pci->cfg.res.start + busn * sz,
-> @@ -240,8 +243,7 @@ static int gen_pci_probe(struct platform_device *pdev)
->  	}
->  
->  	of_id = of_match_node(gen_pci_of_match, np);
-> -	pci->cfg.ops = of_id->data;
-> -	gen_pci_ops.map_bus = pci->cfg.ops->map_bus;
-> +	pci->cfg.ops = *(struct gen_pci_cfg_bus_ops *)of_id->data;
->  	pci->host.dev.parent = dev;
->  	INIT_LIST_HEAD(&pci->host.windows);
->  	INIT_LIST_HEAD(&pci->resources);
-> @@ -262,7 +264,8 @@ static int gen_pci_probe(struct platform_device *pdev)
->  	if (!pci_has_flag(PCI_PROBE_ONLY))
->  		pci_add_flags(PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS);
->  
-> -	bus = pci_scan_root_bus(dev, 0, &gen_pci_ops, pci, &pci->resources);
-> +	bus = pci_scan_root_bus(dev, 0,
-> +				&pci->cfg.ops.ops, pci, &pci->resources);
->  	if (!bus) {
->  		dev_err(dev, "Scanning rootbus failed");
->  		return -ENODEV;
-> -- 
-> 1.7.11.7
-> 
+>>
+>> This is wrong assumption in the driver. enable_irq_wake doesn't
+>> implicitly enable the IRQ. So the disable_irq should be moved to else.
+>> And the resume patch also needs to be fixed accordingly, otherwise you
+>> may get unbalanced irq. But this should not be the reason for fixing the
+>> pinctrl suspend/resume.
+>>
+>
+> Elan driver does not want to enable servicing IRQs, it just wants to
+> configure them as wakeup sources. Hence the current elan_suspend() is
+> fine. When system wakes up and the device is resumed and the driver is
+> ready to service interrupts it will enable IRQ again.
+>
+
+Fair enough. But I am struggling to understand how this fits into
+existing IRQ infrastructure. Few controllers that don't have wakeup
+source configuration facility can set IRQCHIP_SKIP_SET_WAKE and just
+leave the interrupts enabled in suspend path to wake it up. So IMO,
+the above strategy might not work on such controllers.
+
+> IOW enable_irq_wake() and enable_irq() are 2 completely different
+> calls and it is perfectly fine to disable IRQ and then ebale it as a
+> wakeup source.
+
+I agree that they are entirely different APIs, I am not sure if we can
+support different interrupt controller with such strategy.
+
+Since the irq/pm core handle disabling device IRQs and section "System
+Wakeup Interrupts, enable_irq_wake() and disable_irq_wake()" in
+Documentation/power/suspend-and-interrupts.txt gives me different
+understanding, we can check with tglx on how to handle this.
+
+Regards,
+Sudeep
