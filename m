@@ -1,65 +1,100 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Tue, 15 Sep 2015 23:05:59 +0200
-Subject: [PATCH v5 1/5] arm/arm64: add smccc ARCH32
-In-Reply-To: <20150915182645.GQ31157@arm.com>
-References: <1439973629-19505-1-git-send-email-jens.wiklander@linaro.org>
- <1439973629-19505-2-git-send-email-jens.wiklander@linaro.org>
- <20150819165009.GC10297@arm.com> <20150820113729.GA25962@ermac>
- <20150821092430.GC30930@arm.com> <20150821114331.GA11701@ermac>
- <20150914083029.GA13963@ermac> <20150915182645.GQ31157@arm.com>
-Message-ID: <20150915210557.GA31578@ermac>
+From: ahs3@redhat.com (Al Stone)
+Date: Tue, 15 Sep 2015 15:13:12 -0600
+Subject: [PATCH v3 0/5] ACPI: Provide better MADT subtable sanity checks
+In-Reply-To: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
+References: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
+Message-ID: <55F889E8.3070706@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 07:26:45PM +0100, Will Deacon wrote:
-> On Mon, Sep 14, 2015 at 09:30:30AM +0100, Jens Wiklander wrote:
-> > On Fri, Aug 21, 2015 at 01:43:31PM +0200, Jens Wiklander wrote:
-> > > On Fri, Aug 21, 2015 at 10:24:30AM +0100, Will Deacon wrote:
-> > > > On Thu, Aug 20, 2015 at 12:37:29PM +0100, Jens Wiklander wrote:
-> > > > > On Wed, Aug 19, 2015 at 05:50:09PM +0100, Will Deacon wrote:
-> > > > > > On Wed, Aug 19, 2015 at 09:40:25AM +0100, Jens Wiklander wrote:
-> > > > > > > +       mov     x28, x0
-> > > > > > > +       ldp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
-> > > > > > > +       ldp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
-> > > > > > > +       ldp     w4, w5, [x28, #SMC_PARAM_W4_OFFS]
-> > > > > > > +       ldp     w6, w7, [x28, #SMC_PARAM_W6_OFFS]
-> > > > > > > +       smc     #0
-> > > > > > > +       stp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
-> > > > > > > +       stp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
-> > > > > > > +       ldp     x28, x30, [sp], #16
-> > > > > > > +       ret
-> > > > > > > +ENDPROC(smccc_call32)
-> > > > > > 
-> > > > > > Could we deal with this like we do for PSCI instead? (see
-> > > > > > __invoke_psci_fn_smc). We could also then rename psci-call.S to fw-call.S
-> > > > > > and stick this in there too.
-> > > > > 
-> > > > > I assume you're referring to when to use "hvc" and "smc".
-> > > > 
-> > > > No, I mean use a C prototype to avoid marshalling the parameters in assembly
-> > > > like this. As Rutland pointed out, the return value is a bit messy, but
-> > > > the arguments align nicely with the PCS afaict.
-> > > 
-> > > If possible I'd like the function to have the same prototype for both
-> > > arm and arm64. For arm it's not possible to supply more than 4
-> > > parameters. To fully support SMC Calling Convention we need to be able
-> > > to pass 8 parameters and have 4 return values. The OP-TEE driver in this
-> > > patch set depends on this. I don't see how we can avoid the marshalling
-> > > here.
-> > > 
-> > > We could have two versions of the SMCCC functions, one simplified which
-> > > only uses registers and one complete like this one with marshalling.
-> > 
-> > Will, what do think about this?
+On 09/09/2015 03:09 PM, Al Stone wrote:
+> Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
+> check on the various subtables that are defined for the MADT.  The check
+> compares the size of the subtable data structure as defined by ACPICA to
+> the length entry in the subtable.  If they are not the same, the assumption
+> is that the subtable is incorrect.
 > 
-> I still think you should make use of a C prototype to avoid explicit
-> parameter marshalling in assembly. If you want to maintain a compatible
-> API between arm and arm64, then you can easily have an intermediate
-> function in arm64 that sits between the API entry point and the assembly.
+> Over time, the ACPI spec has allowed for MADT subtables where this can
+> never be true (the local SAPIC subtable, for example).  Or, more recently,
+> the spec has accumulated some minor flaws where there are three possible 
+> sizes for a subtable, all of which are valid, but only for specific versions
+> of the spec (the GICC subtable).  In both cases, BAD_MADT_ENTRY reports these
+> subtables as bad when they are not.  In order to retain some sanity check
+> on the MADT subtables, we now have to special case these subtables.  Of
+> necessity, these special cases have ended up in arch-dependent code (arm64)
+> or an arch has simply decided to forgo the check (ia64).
+> 
+> This patch set replaces the BAD_MADT_ENTRY macro with a function called
+> bad_madt_entry().  This function uses a data set of details about the
+> subtables to provide more sanity checking than before:
+> 
+> 	-- is the subtable legal for the version given in the FADT?
+> 
+> 	-- is the subtable legal for the revision of the MADT in use?
+> 
+> 	-- is the subtable of the proper length (including checking
+> 	   on the one variable length subtable that is currently ignored),
+> 	   given the FADT version and the MADT revision?
+> 
+> Further, this patch set adds in the call to bad_madt_entry() from the 
+> acpi_table_parse_madt() function, allowing it to be used consistently
+> by all architectures, for all subtables, and removing the need for each
+> of the subtable traversal callback functions to use BAD_MADT_ENTRY.
+> 
+> In theory, as the ACPI specification changes, we would only have to add
+> additional information to the data set describing the MADT subtables in
+> order to continue providing sanity checks, even when new subtables are
+> added.
+> 
+> These patches have been tested on an APM Mustang (arm64) and are known to
+> work there.  They have also been cross-compiled for x86 and ia64 with no
+> known failures.
+> 
+> Changes for v3:
+>    -- Reviewed-and-tested-by from Sudeep Holla for arm64 parts
+>    -- Clearer language in error messages (Graeme Gregory, Timur Tabi)
+>    -- Double checked that inserting call to bad_madt_entry() into the
+>       function acpi_parse_entries() does not impact current behavior
+>       (Sudeep Holla)
+>    
+> Changes for v2:
+>    -- Acked-by on 2/5 from Marc Zyngier and Catalin Marinas for ARM
+>    -- Correct faulty end of loop test found by Timur Tabi
+> 
+> 
+> Al Stone (5):
+>   ACPI: add in a bad_madt_entry() function to eventually replace the
+>     macro
+>   ACPI / ARM64: remove usage of BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
+>   ACPI / IA64: remove usage of BAD_MADT_ENTRY
+>   ACPI / X86: remove usage of BAD_MADT_ENTRY
+>   ACPI: remove definition of BAD_MADT_ENTRY macro
+> 
+>  arch/arm64/include/asm/acpi.h |   8 --
+>  arch/arm64/kernel/smp.c       |   2 -
+>  arch/ia64/kernel/acpi.c       |  20 ----
+>  arch/x86/kernel/acpi/boot.c   |  27 -----
+>  drivers/acpi/tables.c         | 245 +++++++++++++++++++++++++++++++++++++++++-
+>  drivers/irqchip/irq-gic.c     |   6 --
+>  include/linux/acpi.h          |   4 -
+>  7 files changed, 244 insertions(+), 68 deletions(-)
+> 
 
-Yes, I see how that's convenient for passing argument values in
-registers, but that doesn't help with storing the returned values in
-x0..x3 into something accessible in C. Am I missing something?
+Ping?  Any additional comments on this version?  I have only received
+feedback from arm64 reviewers so far, over three revisions, even though
+everyone that needs to be (ACPI, ia64, x86) has also been CCd.
 
-Thanks,
-Jens
+Anyone else before I fix a couple of things for v4 that the arm64 folks
+found?  ACKs?  NAKs?  Please don't bother me, I'm in the merge window :)?
+
+Thanks.
+
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
