@@ -1,59 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Sep 2015 19:26:45 +0100
-Subject: [PATCH v5 1/5] arm/arm64: add smccc ARCH32
-In-Reply-To: <20150914083029.GA13963@ermac>
-References: <1439973629-19505-1-git-send-email-jens.wiklander@linaro.org>
- <1439973629-19505-2-git-send-email-jens.wiklander@linaro.org>
- <20150819165009.GC10297@arm.com> <20150820113729.GA25962@ermac>
- <20150821092430.GC30930@arm.com> <20150821114331.GA11701@ermac>
- <20150914083029.GA13963@ermac>
-Message-ID: <20150915182645.GQ31157@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 15 Sep 2015 11:27:28 -0700
+Subject: [PATCH] spmi-pmic-arb: support configurable number of peripherals
+In-Reply-To: <1442316018.15519.4.camel@mm-sol.com>
+References: <1442267672-11287-1-git-send-email-sboyd@codeaurora.org>
+ <55F77451.9070900@codeaurora.org>
+ <1442316018.15519.4.camel@mm-sol.com>
+Message-ID: <20150915182728.GA11715@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 09:30:30AM +0100, Jens Wiklander wrote:
-> On Fri, Aug 21, 2015 at 01:43:31PM +0200, Jens Wiklander wrote:
-> > On Fri, Aug 21, 2015 at 10:24:30AM +0100, Will Deacon wrote:
-> > > On Thu, Aug 20, 2015 at 12:37:29PM +0100, Jens Wiklander wrote:
-> > > > On Wed, Aug 19, 2015 at 05:50:09PM +0100, Will Deacon wrote:
-> > > > > On Wed, Aug 19, 2015 at 09:40:25AM +0100, Jens Wiklander wrote:
-> > > > > > +       mov     x28, x0
-> > > > > > +       ldp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
-> > > > > > +       ldp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
-> > > > > > +       ldp     w4, w5, [x28, #SMC_PARAM_W4_OFFS]
-> > > > > > +       ldp     w6, w7, [x28, #SMC_PARAM_W6_OFFS]
-> > > > > > +       smc     #0
-> > > > > > +       stp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
-> > > > > > +       stp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
-> > > > > > +       ldp     x28, x30, [sp], #16
-> > > > > > +       ret
-> > > > > > +ENDPROC(smccc_call32)
-> > > > > 
-> > > > > Could we deal with this like we do for PSCI instead? (see
-> > > > > __invoke_psci_fn_smc). We could also then rename psci-call.S to fw-call.S
-> > > > > and stick this in there too.
-> > > > 
-> > > > I assume you're referring to when to use "hvc" and "smc".
-> > > 
-> > > No, I mean use a C prototype to avoid marshalling the parameters in assembly
-> > > like this. As Rutland pointed out, the return value is a bit messy, but
-> > > the arguments align nicely with the PCS afaict.
-> > 
-> > If possible I'd like the function to have the same prototype for both
-> > arm and arm64. For arm it's not possible to supply more than 4
-> > parameters. To fully support SMC Calling Convention we need to be able
-> > to pass 8 parameters and have 4 return values. The OP-TEE driver in this
-> > patch set depends on this. I don't see how we can avoid the marshalling
-> > here.
-> > 
-> > We could have two versions of the SMCCC functions, one simplified which
-> > only uses registers and one complete like this one with marshalling.
+On 09/15, Ivan T. Ivanov wrote:
 > 
-> Will, what do think about this?
+> On Mon, 2015-09-14 at 18:28 -0700, Stephen Boyd wrote:
+> > On 09/14/2015 02:54 PM, Stephen Boyd wrote:
+> > > The current driver implementation supports only 128 peripherals.
+> > > Add support for more than 128 peripherals by taking a lazy
+> > > caching approach to the mapping tables. Instead of reading the
+> > > tables at boot given some fixed size, read them on an as needed
+> > > basis and cache the results. We still assume a max number of 512
+> > > peripherals, trading off some space for simplicity.
+> > > 
+> > > Based on a patch by Gilad Avidov <gavidov@codeaurora.org> and
+> > > Sagar Dharia <sdharia@codeaurora.org>.
+> > > 
+> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > > ---
+> > 
+> > Hi Ivan,
+> > 
+> > This patch causes 8916 to crash, because there isn't a mapping for ppid
+> > 257 in the ppid to channel table. It seems that we're reading the revid
+> > from the slave id 1 pmic by going through channel 0, which seems to be
+> > setup for ppid 9 (slave id 0 and the peripheral starting at 0x900). Can
+> > we stop reading the revid registers from non-zero slave id pmic devices?
+> > That would be one solution to fix this problem. Or maybe we need to
+> > special case this in the pmic arbiter code to fold ppid 0xN01 (slave id
+> > N and address 0x100) onto channel 0 all the time?
+> > 
+> 
+> Yes, we can. We are not using this information at the moment.
+> Right now, revision read is more or less for debug purposes.
+> 
+> Would following patch work for you? Of course it will be difficult
 
-I still think you should make use of a C prototype to avoid explicit
-parameter marshalling in assembly. If you want to maintain a compatible
-API between arm and arm64, then you can easily have an intermediate
-function in arm64 that sits between the API entry point and the assembly.
+Yes the patch works fine. Feel free to add a
 
-Will
+Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+
+> to guaranties that some other driver misbehave and touch non-existing
+> register, right?
+
+Yeah some driver could misbehave and try to read/write something
+that doesn't exist. As in this case, the device will reset. Given
+that all this stuff is in the kernel though, it seems fine to
+blow up instead of add a bunch of checks that aren't ever going
+to matter in practice.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
