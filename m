@@ -1,112 +1,49 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 15 Sep 2015 16:46:33 +0200
-Subject: [PATCH v7 3/3] can: Allwinner A10/A20 CAN Controller support -
- Kernel module
-In-Reply-To: <20150915142810.GM4684@lukather>
-References: <1442272632-20251-1-git-send-email-info@gerhard-bertelsmann.de>
- <1442272632-20251-4-git-send-email-info@gerhard-bertelsmann.de>
- <20150915142810.GM4684@lukather>
-Message-ID: <55F82F49.8020901@pengutronix.de>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 15 Sep 2015 22:51:16 +0800
+Subject: [PATCH] arm64: enable generic idle loop
+In-Reply-To: <20150915144409.GF31157@arm.com>
+References: <1440128422-4170-1-git-send-email-leo.yan@linaro.org>
+ <20150821090043.GA14072@e104818-lin.cambridge.arm.com>
+ <20150821091446.GB4280@leoy-linaro>
+ <20150821155425.GC16410@e104818-lin.cambridge.arm.com>
+ <20150915112008.GA30920@leoy-linaro>
+ <20150915143135.GG14287@e104818-lin.cambridge.arm.com>
+ <20150915144409.GF31157@arm.com>
+Message-ID: <20150915145116.GA2727@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2015 04:28 PM, Maxime Ripard wrote:
->> +static int sunxican_get_berr_counter(const struct net_device *dev,
->> +				     struct can_berr_counter *bec)
->> +{
->> +	struct sunxican_priv *priv = netdev_priv(dev);
->> +	u32 errors;
->> +	int err;
->> +
->> +	err = clk_prepare_enable(priv->clk);
->> +	if (err) {
->> +		netdev_err(dev, "could not enable clock\n");
->> +		return err;
->> +	}
+On Tue, Sep 15, 2015 at 03:44:09PM +0100, Will Deacon wrote:
+> On Tue, Sep 15, 2015 at 03:31:35PM +0100, Catalin Marinas wrote:
+> > On Tue, Sep 15, 2015 at 07:20:08PM +0800, Leo Yan wrote:
+> > > On Fri, Aug 21, 2015 at 04:54:25PM +0100, Catalin Marinas wrote:
+> > > > On Fri, Aug 21, 2015 at 05:14:46PM +0800, Leo Yan wrote:
+> > > > > On Fri, Aug 21, 2015 at 10:00:43AM +0100, Catalin Marinas wrote:
+> > > > > > On Fri, Aug 21, 2015 at 11:40:22AM +0800, Leo Yan wrote:
+> > > > > > > Enable generic idle loop for ARM64, so can support for hlt/nohlt
+> > > > > > > command line options to override default idle loop behavior.
+> > > > > > 
+> > > > > > Just curious, what do you need this for?
+> > > > > 
+> > > > > With this config, usually we can add "nohlt" in command line to force
+> > > > > the cpu will never be powered off; so can quickly narrow down if some
+> > > > > issues are related with cpuidle or not.
+> > > > > 
+> > > > > And if CPU is powered off, then its debug logic also will be powered off.
+> > > > > So we can simply use this method to let debugger always hot connect with
+> > > > > the target CPU.
+> > > > 
+> > > > OK.
+> > > > 
+> > > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > > 
+> > > Suppose you have missed this patch at previous merge window,
+> > > so just for reminding.
+> > 
+> > It looks like it missed the merging window. Will, can this still be
+> > picked for 4.3? If not, it will be 4.4.
 > 
-> Can this function be called if the device is closed? If not, then this
-> clock calls are useless.
+> Yeah, it's harmless enough to pick up with the current crop of fixes.
+> Sorry I missed it.
 
-Yes, that's why there are there.
-
-> 
->> +	errors = readl(priv->base + SUNXI_REG_ERRC_ADDR);
->> +
->> +	bec->txerr = errors & 0xFF;
->> +	bec->rxerr = (errors >> 16) & 0xFF;
->> +
->> +	clk_disable_unprepare(priv->clk);
->> +
->> +	return 0;
->> +}
-
-[...]
-
->> +static int sunxican_open(struct net_device *dev)
->> +{
->> +	struct sunxican_priv *priv = netdev_priv(dev);
->> +	int err;
->> +
->> +	/* common open */
->> +	err = open_candev(dev);
->> +	if (err)
->> +		return err;
->> +
->> +	/* register interrupt handler */
->> +	err = request_irq(dev->irq, sunxi_can_interrupt, IRQF_SHARED,
-> 
-> We don't have any shared interrupt as far as I know, do you really
-> need this flag?
-
-Not needed, but the IRQ handler properly returns HANDLED or NONE. So
-it's better to remove this flag then?
-
-> 
->> +			  dev->name, dev);
->> +	if (err) {
->> +		netdev_err(dev, "request_irq err: %d\n", err);
->> +		goto exit_irq;
->> +	}
->> +
->> +	/* turn on clocking for CAN peripheral block */
->> +	err = clk_prepare_enable(priv->clk);
->> +	if (err) {
->> +		netdev_err(dev, "could not enable CAN peripheral clock\n");
->> +		goto exit_clock;
->> +	}
->> +
->> +	err = sunxi_can_start(dev);
->> +	if (err) {
->> +		netdev_err(dev, "could not start CAN peripheral\n");
->> +		goto exit_can_start;
->> +	}
->> +
->> +	can_led_event(dev, CAN_LED_EVENT_OPEN);
->> +	netif_start_queue(dev);
->> +
->> +	return 0;
->> +
->> +exit_can_start:
->> +	clk_disable_unprepare(priv->clk);
->> +exit_clock:
->> +	free_irq(dev->irq, dev);
->> +exit_irq:
->> +	close_candev(dev);
->> +	return err;
->> +}
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150915/9ddd99fc/attachment-0001.sig>
+It's fine and thanks :)
