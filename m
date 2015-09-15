@@ -1,67 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Sep 2015 17:16:13 +0100
-Subject: [PATCH] arm64: hw_breakpoint: use target state to determine ABI
- behaviour
-Message-ID: <1442333773-16446-1-git-send-email-will.deacon@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 15 Sep 2015 17:19:54 +0100
+Subject: [PATCH 2/2] arm64: compat: fix vfp save/restore across signal
+ handlers in big-endian
+In-Reply-To: <1442316997-32282-2-git-send-email-will.deacon@arm.com>
+References: <1442316997-32282-1-git-send-email-will.deacon@arm.com>
+ <1442316997-32282-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20150915161954.GH14287@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 hw_breakpoint interface is slightly less flexible than its
-32-bit counterpart, thanks to some changes in the architecture rendering
-unaligned watchpoint addresses obselete for AArch64.
+On Tue, Sep 15, 2015 at 12:36:37PM +0100, Will Deacon wrote:
+> @@ -235,10 +253,15 @@ static int compat_preserve_vfp_context(struct compat_vfp_sigframe __user *frame)
+>  	/*
+>  	 * Now copy the FP registers. Since the registers are packed,
+>  	 * we can copy the prefix we want (V0-V15) as it is.
+> -	 * FIXME: Won't work if big endian.
+>  	 */
+> -	err |= __copy_to_user(&frame->ufp.fpregs, fpsimd->vregs,
+> -			      sizeof(frame->ufp.fpregs));
+> +	for (i = 0; i < ARRAY_SIZE(frame->ufp.fpregs); i++) {
+> +		union __fpsimd_vreg vreg = {
+> +			.raw = fpsimd->vregs[i >> 1],
+> +		};
+> +
+> +		__put_user_error(vreg.lo, &frame->ufp.fpregs[i++], err);
+> +		__put_user_error(vreg.hi, &frame->ufp.fpregs[i], err);
+> +	}
 
-However, in a multi-arch environment (i.e. debugging a 32-bit target
-with a 64-bit GDB under a 64-bit kernel), we need to provide a feature
-compatible interface to GDB in order for debugging to function correctly.
+Nitpick: I find it easier to read as (same for the other hunk):
 
-This patch adds a new helper, is_compat_bp,  to our hw_breakpoint
-implementation which changes the interface behaviour based on the
-architecture of the debug target as opposed to the debugger itself.
-This allows debugged to function as expected for multi-arch
-configurations without relying on deprecated architectural behaviours
-when debugging native applications.
+	for (i = 0; i < ARRAY_SIZE(frame->ufp.fpregs); i += 2) {
+		...
 
-Cc: Yao Qi <yao.qi@arm.com>
-Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/hw_breakpoint.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+		__put_user_error(vreg.lo, &frame->ufp.fpregs[i], err);
+		__put_user_error(vreg.hi, &frame->ufp.fpregs[i + 1], err);
+	}
 
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index bba85c8f8037..2926c3dd6479 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -163,6 +163,12 @@ enum hw_breakpoint_ops {
- 	HW_BREAKPOINT_RESTORE
- };
- 
-+static int is_compat_bp(struct perf_event *bp)
-+{
-+	struct task_struct *tsk = bp->hw.target;
-+	return tsk && is_compat_thread(task_thread_info(tsk));
-+}
-+
- /**
-  * hw_breakpoint_slot_setup - Find and setup a perf slot according to
-  *			      operations
-@@ -420,7 +426,7 @@ static int arch_build_bp_info(struct perf_event *bp)
- 	 * Watchpoints can be of length 1, 2, 4 or 8 bytes.
- 	 */
- 	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE) {
--		if (is_compat_task()) {
-+		if (is_compat_bp(bp)) {
- 			if (info->ctrl.len != ARM_BREAKPOINT_LEN_2 &&
- 			    info->ctrl.len != ARM_BREAKPOINT_LEN_4)
- 				return -EINVAL;
-@@ -477,7 +483,7 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
- 	 * AArch32 tasks expect some simple alignment fixups, so emulate
- 	 * that here.
- 	 */
--	if (is_compat_task()) {
-+	if (is_compat_bp(bp)) {
- 		if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
- 			alignment_mask = 0x7;
- 		else
+It's up to you. Anyway:
+
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+
 -- 
-2.1.4
+Catalin
