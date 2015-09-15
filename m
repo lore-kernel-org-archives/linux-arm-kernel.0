@@ -1,57 +1,65 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 15 Sep 2015 18:48:07 +0100
-Subject: [PATCH v4] pinctrl: mediatek: Implement wake handler and suspend
- resume
-In-Reply-To: <CAKdAkRSFE2KJOzbUarxAQMNwHOkkyGHXmRLGhn55VTvG-SJ4Kg@mail.gmail.com>
-References: <1439541486-22203-1-git-send-email-maoguang.meng@mediatek.com>
- <55DB4609.5040904@arm.com>
- <CAGS+omBnoitju07KQ1Y7JHTbce6+DO4WqWHTaKz5D+T157zEJA@mail.gmail.com>
- <1441535972.22230.5.camel@mhfsdcap03> <55EEAA24.6080706@arm.com>
- <55EF11E6.7030307@arm.com> <1442051454.5661.12.camel@mhfsdcap03>
- <55F6AC87.4040301@arm.com>
- <CAKdAkRSFE2KJOzbUarxAQMNwHOkkyGHXmRLGhn55VTvG-SJ4Kg@mail.gmail.com>
-Message-ID: <55F859D7.1000803@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Sep 2015 18:49:34 +0100
+Subject: [PATCH 4/6] PCI: generic: Correct, and avoid overflow, in
+ bus_max calculation.
+In-Reply-To: <1442013719-5001-5-git-send-email-ddaney.cavm@gmail.com>
+References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442013719-5001-5-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150915174934.GL31157@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Sep 12, 2015 at 12:21:57AM +0100, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> There are two problems with the bus_max calculation:
+> 
+> 1) The u8 data type can overflow for large config space windows.
+> 
+> 2) The calculation is incorrect for a bus range that doesn't start at
+>    zero.
+> 
+> Since the configuration space is relative to bus zero, make bus_max
+> just be the size of the config window scaled by bus_shift.  Then clamp
+> it to a maximum of 255, per PCI.  Use a data type of int to avoid
+> overflow problems.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  drivers/pci/host/pci-host-generic.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index cd6f898..fce5bf7 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -164,7 +164,7 @@ out_release_res:
+>  static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>  {
+>  	int err;
+> -	u8 bus_max;
+> +	int bus_max;
+>  	resource_size_t busn;
+>  	struct resource *bus_range;
+>  	struct device *dev = pci->host.dev.parent;
+> @@ -177,8 +177,9 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>  	}
+>  
+>  	/* Limit the bus-range to fit within reg */
+> -	bus_max = pci->cfg.bus_range->start +
+> -		  (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
+> +	bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
+> +	if (bus_max > 255)
+> +		bus_max = 255;
+>  	pci->cfg.bus_range->end = min_t(resource_size_t,
+>  					pci->cfg.bus_range->end, bus_max);
 
+Hmm, this is changing the meaning of the bus-range property in the
+device-tree, which really needs to match what IEEE Std 1275-1994 requires.
 
-On 15/09/15 03:52, Dmitry Torokhov wrote:
-> On Mon, Sep 14, 2015 at 4:16 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+My understanding was that the bus-range could be used to offset the config
+space, which is why it's subtracted from the bus number in
+gen_pci_map_cfg_bus_[e]cam. Also, why is your config space so large that
+we end up overflowing bus_max?
 
-[...]
-
->>
->> This is wrong assumption in the driver. enable_irq_wake doesn't
->> implicitly enable the IRQ. So the disable_irq should be moved to else.
->> And the resume patch also needs to be fixed accordingly, otherwise you
->> may get unbalanced irq. But this should not be the reason for fixing the
->> pinctrl suspend/resume.
->>
->
-> Elan driver does not want to enable servicing IRQs, it just wants to
-> configure them as wakeup sources. Hence the current elan_suspend() is
-> fine. When system wakes up and the device is resumed and the driver is
-> ready to service interrupts it will enable IRQ again.
->
-
-Fair enough. But I am struggling to understand how this fits into
-existing IRQ infrastructure. Few controllers that don't have wakeup
-source configuration facility can set IRQCHIP_SKIP_SET_WAKE and just
-leave the interrupts enabled in suspend path to wake it up. So IMO,
-the above strategy might not work on such controllers.
-
-> IOW enable_irq_wake() and enable_irq() are 2 completely different
-> calls and it is perfectly fine to disable IRQ and then ebale it as a
-> wakeup source.
-
-I agree that they are entirely different APIs, I am not sure if we can
-support different interrupt controller with such strategy.
-
-Since the irq/pm core handle disabling device IRQs and section "System
-Wakeup Interrupts, enable_irq_wake() and disable_irq_wake()" in
-Documentation/power/suspend-and-interrupts.txt gives me different
-understanding, we can check with tglx on how to handle this.
-
-Regards,
-Sudeep
+Will
