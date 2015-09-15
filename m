@@ -1,84 +1,84 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Tue, 15 Sep 2015 17:10:41 +0900
-Subject: [RFC PATCH v7 02/10] mmc: dw_mmc: use macro for HCON register
- operations
-In-Reply-To: <1440379554-24444-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1440379479-24308-1-git-send-email-shawn.lin@rock-chips.com>
- <1440379554-24444-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <55F7D281.6080103@samsung.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 15 Sep 2015 09:10:57 +0100
+Subject: [PATCH] arm: Fix backtrace generation when IPI is masked
+In-Reply-To: <017001d0ef83$e18a5d00$a49f1700$@alibaba-inc.com>
+References: <016701d0ef82$c303d6a0$490b83e0$@alibaba-inc.com>
+ <017001d0ef83$e18a5d00$a49f1700$@alibaba-inc.com>
+Message-ID: <55F7D291.5090509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Shawn.
+On 15/09/15 07:58, Hillf Danton wrote:
+>> Currently on ARM when <SysRq-L> is triggered from an interrupt handler
+>> (e.g. a SysRq issued using UART or kbd) the main CPU will wedge for ten
+>> seconds with interrupts masked before issuing a backtrace for every CPU
+>> except itself.
+>>
+>> The new backtrace code introduced by commit 96f0e00378d4 ("ARM: add
+>> basic support for on-demand backtrace of other CPUs") does not work
+>> correctly when run from an interrupt handler because IPI_CPU_BACKTRACE
+>> is used to generate the backtrace on all CPUs but cannot preempt the
+>> current calling context.
+>>
+>> This can be fixed by detecting that the calling context cannot be
+>> preempted and issuing the backtrace directly in this case. Some small
+>> changes to the generic code are required to support this.
+>>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> ---
+>>   arch/arm/kernel/smp.c | 7 +++++++
+>>   lib/nmi_backtrace.c   | 5 ++++-
+>>   2 files changed, 11 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+>> index 48185a773852..4d8a80328c74 100644
+>> --- a/arch/arm/kernel/smp.c
+>> +++ b/arch/arm/kernel/smp.c
+>> @@ -748,6 +748,13 @@ core_initcall(register_cpufreq_notifier);
+>>
+>>   static void raise_nmi(cpumask_t *mask)
+>>   {
+>> +	/*
+>> +	 * Generate the backtrace directly if we are running in a
+>> +	 * calling context that is not preemptible by the backtrace IPI.
+>> +	 */
+>> +	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
+>> +		nmi_cpu_backtrace(NULL);
+>> +
+>>   	smp_cross_call(mask, IPI_CPU_BACKTRACE);
+>>   }
+>>
+>> diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
+>> index 88d3d32e5923..be0466a80d0b 100644
+>> --- a/lib/nmi_backtrace.c
+>> +++ b/lib/nmi_backtrace.c
+>> @@ -149,7 +149,10 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
+>>   		/* Replace printk to write into the NMI seq */
+>>   		this_cpu_write(printk_func, nmi_vprintk);
+>>   		pr_warn("NMI backtrace for cpu %d\n", cpu);
+>> -		show_regs(regs);
+>> +		if (regs)
+>> +			show_regs(regs);
+>> +		else
+>> +			dump_stack();
+>
+> Better if dump_stack() is added in a separate patch, given that
+> it is not mentioned in commit message.
 
-Looks good to me.
+Adding dump_stack() is mentioned in passing ("Some small changes to the 
+generic code are required to support this.") but you're right that the 
+reason for the change is not explicitly called out.
 
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+I can certainly respin as two patches but perhaps its better just to 
+improve the commit message. Something like:
 
-Best Regards,
-Jaehoon Chung
+ > This can be fixed by detecting that the calling context cannot be
+ > preempted and issuing the backtrace directly in this case. Issuing
+ > directly leaves us without any pt_regs to pass to nmi_cpu_backtrace().
+ > Modify the generic code to call dump_stack() when its argument is
+ > NULL.
 
-On 08/24/2015 10:25 AM, Shawn Lin wrote:
-> This patch add some macros for HCON register operations
-> to make code more readable.
-> 
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> ---
-> 
-> Changes in v7: None
-> Changes in v6: None
-> Changes in v5: None
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
-> 
->  drivers/mmc/host/dw_mmc.c | 6 +++---
->  drivers/mmc/host/dw_mmc.h | 3 +++
->  2 files changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 9c91983..0a3c63c 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -2678,7 +2678,7 @@ static void dw_mci_init_dma(struct dw_mci *host)
->  		* Check ADDR_CONFIG bit in HCON to find
->  		* IDMAC address bus width
->  		*/
-> -		addr_config = (mci_readl(host, HCON) >> 27) & 0x01;
-> +		addr_config = SDMMC_GET_ADDR_CONFIG(mci_readl(host, HCON));
->  
->  		if (addr_config == 1) {
->  			/* host supports IDMAC in 64-bit address mode */
-> @@ -3060,7 +3060,7 @@ int dw_mci_probe(struct dw_mci *host)
->  	 * Get the host data width - this assumes that HCON has been set with
->  	 * the correct values.
->  	 */
-> -	i = (mci_readl(host, HCON) >> 7) & 0x7;
-> +	i = SDMMC_GET_HDATA_WIDTH(mci_readl(host, HCON));
->  	if (!i) {
->  		host->push_data = dw_mci_push_data16;
->  		host->pull_data = dw_mci_pull_data16;
-> @@ -3142,7 +3142,7 @@ int dw_mci_probe(struct dw_mci *host)
->  	if (host->pdata->num_slots)
->  		host->num_slots = host->pdata->num_slots;
->  	else
-> -		host->num_slots = ((mci_readl(host, HCON) >> 1) & 0x1F) + 1;
-> +		host->num_slots = SDMMC_GET_SLOT_NUM(mci_readl(host, HCON));
->  
->  	/*
->  	 * Enable interrupts for command done, data over, data empty,
-> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-> index 811d467..f2a88d4 100644
-> --- a/drivers/mmc/host/dw_mmc.h
-> +++ b/drivers/mmc/host/dw_mmc.h
-> @@ -154,6 +154,9 @@
->  #define DMA_INTERFACE_GDMA		(0x2)
->  #define DMA_INTERFACE_NODMA		(0x3)
->  #define SDMMC_GET_TRANS_MODE(x)		(((x)>>16) & 0x3)
-> +#define SDMMC_GET_SLOT_NUM(x)		((((x)>>1) & 0x1F) + 1)
-> +#define SDMMC_GET_HDATA_WIDTH(x)	(((x)>>7) & 0x7)
-> +#define SDMMC_GET_ADDR_CONFIG(x)	(((x)>>27) & 0x1)
->  /* Internal DMAC interrupt defines */
->  #define SDMMC_IDMAC_INT_AI		BIT(9)
->  #define SDMMC_IDMAC_INT_NI		BIT(8)
-> 
+Which do you prefer?
+
+
+Daniel.
