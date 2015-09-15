@@ -1,14 +1,14 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 15 Sep 2015 21:37:50 +0100
-Subject: [PATCH] ARM: make highpte an expert option
-Message-ID: <E1Zbwz8-00016Z-5C@rmk-PC.arm.linux.org.uk>
+Date: Tue, 15 Sep 2015 21:38:52 +0100
+Subject: [RFC PATCH] ARM: enable highmem by default on ARMv6/ARMv7 CPUs
+Message-ID: <E1Zbx08-0001A3-PQ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When highmem is enabled, there's little reason not to also enable
-highpte support as well.  Rather than leaving this to chance, make
-it an expert option, and default it to be enabled if highmem is
-enabled.  Add some help text to the option while we're here.
+ARMv6 and ARMv7 normally have more than 1G of memory, so it makes sense
+to have highmem enabled by default.  Users can still turn highmem off if
+they wish by enabling the EXPERT option, which then allows the option to
+be visible.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
@@ -16,19 +16,19 @@ Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 17ac5d26ebaa..02eb51b6d324 100644
+index 02eb51b6d324..49250dc9856b 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -1711,8 +1711,9 @@ config HIGHMEM
- 	  If unsure, say n.
+@@ -1694,8 +1694,9 @@ config HAVE_GENERIC_RCU_GUP
+ 	depends on ARM_LPAE
  
- config HIGHPTE
--	bool "Allocate 2nd-level pagetables from highmem"
-+	bool "Allocate 2nd-level pagetables from highmem" if EXPERT
- 	depends on HIGHMEM
-+	default y
+ config HIGHMEM
+-	bool "High Memory Support"
++	bool "High Memory Support" if !(CPU_32v6 || CPU_32v7) || EXPERT
+ 	depends on MMU
++	default y if CPU_32v6 || CPU_32v7
  	help
- 	  The VM uses one page of physical memory for each page table.
- 	  For systems with a lot of processes, this can use a lot of
+ 	  The address space of ARM processors is only 4 Gigabytes large
+ 	  and it has to accommodate user address space, kernel address
 -- 
 2.1.0
