@@ -1,94 +1,35 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 15 Sep 2015 14:28:39 +0200
-Subject: [PATCH v2] clk: samsung: fix cpu clock's flags checking
-In-Reply-To: <1440762575-21520-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1440762575-21520-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <4294976.g7Mb9GifR6@amdc1976>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 15 Sep 2015 13:34:07 +0100
+Subject: [PATCH] spi: mediatek: fix wrong error return value on probe
+In-Reply-To: <55F805B7.7020706@osg.samsung.com>
+References: <1441320656-8666-1-git-send-email-javier@osg.samsung.com>
+ <20150914183925.GG12027@sirena.org.uk>
+ <55F805B7.7020706@osg.samsung.com>
+Message-ID: <20150915123407.GC11268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 15, 2015 at 01:49:11PM +0200, Javier Martinez Canillas wrote:
+> On 09/14/2015 08:39 PM, Mark Brown wrote:
+> > On Fri, Sep 04, 2015 at 12:50:56AM +0200, Javier Martinez Canillas wrote:
+> >> Commit adcbcfea15d62 ("spi: mediatek: fix spi clock usage error")
+> >> added a new sel_clk but introduced bugs in the error paths since
+> >> the wrong struct clk pointers are passed to PTR_ERR().
 
-[ + Stephen on cc: ]
+> > This doesn't apply against current code, please check and resend.
 
-On Friday, August 28, 2015 01:49:35 PM Bartlomiej Zolnierkiewicz wrote:
-> CLK_CPU_HAS_DIV1 and CLK_CPU_NEEDS_DEBUG_ALT_DIV masks were
-> incorrectly used as a bit numbers.  Fix it.
-> 
-> Tested on Exynos4210 based Origen board and on Exynos5250 based
-> Arndale board.
-> 
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Fixes: ddeac8d96 ("clk: samsung: add infrastructure to register cpu clocks")
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@dowhile0.org>
-> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
-> v2:
-> - added Reviewed-by, Acked-by and Fixes tags (no code changes)
-> 
-> Michael, please apply.  Thank you.
+> Which branch should I use as a baseline then? The patch applies cleanly
+> on both today's linux-next (next-20150915) and your for-linus branch:
 
-Gentle ping.
+> https://git.kernel.org/cgit/linux/kernel/git/broonie/spi.git/log/?h=for-linus
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
->  drivers/clk/samsung/clk-cpu.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-cpu.c b/drivers/clk/samsung/clk-cpu.c
-> index 7c1e1f5..2fe37f7 100644
-> --- a/drivers/clk/samsung/clk-cpu.c
-> +++ b/drivers/clk/samsung/clk-cpu.c
-> @@ -164,7 +164,7 @@ static int exynos_cpuclk_pre_rate_change(struct clk_notifier_data *ndata,
->  	 * the values for DIV_COPY and DIV_HPM dividers need not be set.
->  	 */
->  	div0 = cfg_data->div0;
-> -	if (test_bit(CLK_CPU_HAS_DIV1, &cpuclk->flags)) {
-> +	if (cpuclk->flags & CLK_CPU_HAS_DIV1) {
->  		div1 = cfg_data->div1;
->  		if (readl(base + E4210_SRC_CPU) & E4210_MUX_HPM_MASK)
->  			div1 = readl(base + E4210_DIV_CPU1) &
-> @@ -185,7 +185,7 @@ static int exynos_cpuclk_pre_rate_change(struct clk_notifier_data *ndata,
->  		alt_div = DIV_ROUND_UP(alt_prate, tmp_rate) - 1;
->  		WARN_ON(alt_div >= MAX_DIV);
->  
-> -		if (test_bit(CLK_CPU_NEEDS_DEBUG_ALT_DIV, &cpuclk->flags)) {
-> +		if (cpuclk->flags & CLK_CPU_NEEDS_DEBUG_ALT_DIV) {
->  			/*
->  			 * In Exynos4210, ATB clock parent is also mout_core. So
->  			 * ATB clock also needs to be mantained at safe speed.
-> @@ -206,7 +206,7 @@ static int exynos_cpuclk_pre_rate_change(struct clk_notifier_data *ndata,
->  	writel(div0, base + E4210_DIV_CPU0);
->  	wait_until_divider_stable(base + E4210_DIV_STAT_CPU0, DIV_MASK_ALL);
->  
-> -	if (test_bit(CLK_CPU_HAS_DIV1, &cpuclk->flags)) {
-> +	if (cpuclk->flags & CLK_CPU_HAS_DIV1) {
->  		writel(div1, base + E4210_DIV_CPU1);
->  		wait_until_divider_stable(base + E4210_DIV_STAT_CPU1,
->  				DIV_MASK_ALL);
-> @@ -225,7 +225,7 @@ static int exynos_cpuclk_post_rate_change(struct clk_notifier_data *ndata,
->  	unsigned long mux_reg;
->  
->  	/* find out the divider values to use for clock data */
-> -	if (test_bit(CLK_CPU_NEEDS_DEBUG_ALT_DIV, &cpuclk->flags)) {
-> +	if (cpuclk->flags & CLK_CPU_NEEDS_DEBUG_ALT_DIV) {
->  		while ((cfg_data->prate * 1000) != ndata->new_rate) {
->  			if (cfg_data->prate == 0)
->  				return -EINVAL;
-> @@ -240,7 +240,7 @@ static int exynos_cpuclk_post_rate_change(struct clk_notifier_data *ndata,
->  	writel(mux_reg & ~(1 << 16), base + E4210_SRC_CPU);
->  	wait_until_mux_stable(base + E4210_STAT_CPU, 16, 1);
->  
-> -	if (test_bit(CLK_CPU_NEEDS_DEBUG_ALT_DIV, &cpuclk->flags)) {
-> +	if (cpuclk->flags & CLK_CPU_NEEDS_DEBUG_ALT_DIV) {
->  		div |= (cfg_data->div0 & E4210_DIV0_ATB_MASK);
->  		div_mask |= E4210_DIV0_ATB_MASK;
->  	}
+On the relevant fix brach (so mediatek in this case) or my -linus
+branch - I don't think there's any development fixes queued for this
+driver yet.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150915/44ac10fb/attachment.sig>
