@@ -1,34 +1,47 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Tue, 15 Sep 2015 08:32:38 +0200
-Subject: DSA: phy polling
-In-Reply-To: <55F74D2A.8010104@gmail.com> (Florian Fainelli's message of "Mon,
- 14 Sep 2015 15:41:46 -0700")
-References: <20150914104254.GI21084@n2100.arm.linux.org.uk>
- <55F703D7.1070707@gmail.com>
- <20150914182314.GP21084@n2100.arm.linux.org.uk>
- <55F74D2A.8010104@gmail.com>
-Message-ID: <87y4g8xke1.fsf@dell.be.48ers.dk>
+From: bayi.cheng@mediatek.com (bayi.cheng)
+Date: Tue, 15 Sep 2015 14:39:45 +0800
+Subject: [PATCH 1/3] doc: dt: add documentation for Mediatek spi-nor
+ controller
+In-Reply-To: <20150909054734.GC18700@pengutronix.de>
+References: <1441705796-11365-1-git-send-email-bayi.cheng@mediatek.com>
+ <1441705796-11365-2-git-send-email-bayi.cheng@mediatek.com>
+ <20150909054734.GC18700@pengutronix.de>
+Message-ID: <1442299185.27250.1.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Florian" == Florian Fainelli <f.fainelli@gmail.com> writes:
-
-Hi,
-
- >> Does the Marvell phy have such a register?  Looking at the register
- >> dump and plugging/unplugging cables seems not to show a register
- >> reporting whether any particular interface has changed state, and
- >> I haven't noticed there being any combined register in anything I've
- >> seen on these switches.
-
- > It seemed to me like the PPU was meant to provide that, but I cannot
- > find any "summary" register which would give you such a status, must
- > have conflated that with what Broadcom switches support.
-
-It's been some years, but I think the PPU was just to automatically
-configure the switch MACs to to match the phy autonegotiation results.
-
-I also don't see any summery register though.
-
--- 
-Bye, Peter Korsgaard
+On Wed, 2015-09-09 at 07:47 +0200, Sascha Hauer wrote:
+> On Tue, Sep 08, 2015 at 05:49:54PM +0800, Bayi Cheng wrote:
+> > Add device tree binding documentation for serial flash with
+> > Mediatek serial flash controller
+> > 
+> > Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+> > ---
+> >  Documentation/devicetree/bindings/mtd/mtk_nor.txt | 25 +++++++++++++++++++++++
+> >  1 file changed, 25 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mtd/mtk_nor.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mtd/mtk_nor.txt b/Documentation/devicetree/bindings/mtd/mtk_nor.txt
+> > new file mode 100644
+> > index 0000000..0eca0cd
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mtd/mtk_nor.txt
+> > @@ -0,0 +1,25 @@
+> > +* MTD SPI nor driver for MTK MT81xx (and similar) serial flash controller
+> > +
+> > +MTK MT81xx serial flash controller is designed for serial Flash device.
+> > +It supports one Flash device with signal mode, dual mode and quad mode.
+> > +
+> > +Required properties:
+> > +- compatible: should be "mediatek,mt8173-nor";
+> > +- reg: physical base address and length of the controller's register
+> > +- clocks: spi nor source clock
+> > +- clock-names: "spi_clk", "axi_clk", "mux_clk", "sf_clk"
+> 
+> Drop the _clk suffix. It's the clock-names property which already makes
+> it clear that these are clock names.
+> 
+> Sascha
+> 
+> 
+OK, I will drop the _clk suffix here!
