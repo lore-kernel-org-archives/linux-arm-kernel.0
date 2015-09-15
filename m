@@ -1,44 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 15 Sep 2015 17:24:09 +0200
-Subject: [RFC PATCH] arm64/efi: isolate EFI stub from the kernel proper
-In-Reply-To: <20150915144629.GG31157@arm.com>
-References: <1442311903-19213-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150915144629.GG31157@arm.com>
-Message-ID: <CAKv+Gu8j1APZkGnFhZArNAtoyYOokP2bgemYH5n7Pn8jQ1b1XA@mail.gmail.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Tue, 15 Sep 2015 17:27:58 +0200
+Subject: [linux-next RFC v7 0/6] mtd: spi-nor: improve support of QSPI nor
+Message-ID: <cover.1442330503.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 September 2015 at 16:46, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Sep 15, 2015 at 11:11:43AM +0100, Ard Biesheuvel wrote:
->> Since arm64 does not use a builtin decompressor, the EFI stub is built
->> into the kernel proper. So far, this has been working fine, but actually,
->> since the stub is in fact a PE/COFF relocatable binary that is executed
->> at an unknown offset in the 1:1 mapping provided by the UEFI firmware, we
->> should not be seamlessly sharing code with the kernel proper, which is a
->> position dependent executable linked at a high virtual offset.
->>
->> So instead, separate the contents of libstub and its dependencies, by
->> putting them into their own namespace by prefixing all of its symbols
->> with __efistub. This way, we have tight control over what parts of the
->> kernel proper are referenced by the stub.
->
-> Could we add an __efistub annotation to spit out warnings if the stub
-> calls into unexpected kernel code, like we do for __init/__ref?
->
+Hi all,
 
-Currently, it will break the build rather than warn if you use a
-disallowed symbol, which I think is not unreasonable.
+this series is still a work in progress though it is almost finished.
+The support of Macronix dummy code to configure the number of dummy cycles
+is still missing...
 
-But I suppose that the objcopy step in this patch could rename the
-sections to .efistub.xxx sections, which would allow us to reuse some
-of the section mismatch code.
-However, this would involve marking things like the generic string and
-memcpy routines __efistub as well, which I think may be too much.
-Also, note that the logic is inverted here: with __init, we disallow
-normal code to call __init functions, but with __efistub, it will be
-the other way around, which may be more difficult to accomplish
-(Rutland and I did discuss this option when we talked about this over
-IRC)
+However I would like some feedbacks to synchronize this work with other
+mtd / spi-nor improvements as I see lots of patches on the mailing list.
+
+Best Regards,
+
+Cyrille
+
+Cyrille Pitchen (6):
+  mtd: spi-nor: remove unused read_xfer/write_xfer hooks
+  mtd: spi-nor: read JEDEC ID with multiple I/O protocols
+  mtd: spi-nor: set the read op code and protocol based on the
+    manufacturer
+  mtd: m25p80: add support of dual and quad spi protocols to all
+    commands
+  Documentation: atmel-quadspi: add binding file for Atmel QSPI driver
+  mtd: atmel-quadspi: add driver for Atmel QSPI controller
+
+ .../devicetree/bindings/mtd/atmel-quadspi.txt      |  29 +
+ drivers/mtd/devices/m25p80.c                       | 262 ++++--
+ drivers/mtd/spi-nor/Kconfig                        |   7 +
+ drivers/mtd/spi-nor/Makefile                       |   1 +
+ drivers/mtd/spi-nor/atmel-quadspi.c                | 880 +++++++++++++++++++++
+ drivers/mtd/spi-nor/fsl-quadspi.c                  |   2 +-
+ drivers/mtd/spi-nor/nxp-spifi.c                    |  13 +-
+ drivers/mtd/spi-nor/spi-nor.c                      | 603 ++++++++++++--
+ include/linux/mtd/spi-nor.h                        |  68 +-
+ 9 files changed, 1689 insertions(+), 176 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+ create mode 100644 drivers/mtd/spi-nor/atmel-quadspi.c
 
 -- 
-Ard.
+1.8.2.2
