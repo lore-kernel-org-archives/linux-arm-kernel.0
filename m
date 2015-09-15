@@ -1,79 +1,113 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 15 Sep 2015 17:04:48 +0100
-Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
-In-Reply-To: <1442313962.2917.25.camel@linaro.org> (Jon Medhurst's message of
- "Tue, 15 Sep 2015 11:46:02 +0100")
-References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
- <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
- <20150914131448.GC7002@leverpostej>
- <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
- <20150914134949.GE7002@leverpostej>
- <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
- <1442251092.2850.53.camel@linaro.org>
- <9hhy4g89g64.fsf@e105922-lin.cambridge.arm.com>
- <1442313962.2917.25.camel@linaro.org>
-Message-ID: <9hheghzvfbz.fsf@e105922-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Sep 2015 17:15:33 +0100
+Subject: [PATCH] KVM: arm64: remove all traces of the ThumbEE registers
+Message-ID: <1442333733-16347-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
+Although the ThumbEE registers and traps were present in earlier
+versions of the v8 architecture, it was retrospectively removed and so
+we can do the same.
 
-> On Tue, 2015-09-15 at 10:37 +0100, Punit Agrawal wrote:
->> "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
->> 
->> > On Mon, 2015-09-14 at 15:38 +0100, Punit Agrawal wrote:
->> >> Mark Rutland <mark.rutland@arm.com> writes:
->> >> 
-> [...]
->> >> The way the SCP interface is defined, the sensor identifiers are
->> >> contiguous,
->> >
->> > Is there any documentation other than DUI0922A? [1] From what I can seen
->> > that just says it's a 16-bit value and doesn't put any particular
->> > constraints on its value.
->> 
->> Although not explicitly stated, if you look at the Get Sensor Capability
->> [2] and Get Sensor Info [3] commands you can indirectly infer that the
->> Sensor IDs are contiguous.
->
-> I personally wouldn't even indirectly infer they are contiguous from
-> what the document says. If I were implementing the firmware I would feel
-> quite in my rights to, for example, use the top 8 bits of the ID for a
-> sensor type and the bottom 8 for an index, if that made dispatching of
-> requests more efficient. Or if some optional hardware was detected as
-> missing, leaving some holes in ID space.
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/kvm_arm.h |  1 -
+ arch/arm64/include/asm/kvm_asm.h |  4 +---
+ arch/arm64/kvm/hyp.S             | 22 ++++------------------
+ arch/arm64/kvm/sys_regs.c        |  7 -------
+ 4 files changed, 5 insertions(+), 29 deletions(-)
 
-True. And without a command to convey the list of valid IDs, the
-consumer of the API would have to iterate over the entire 16bit space to
-locate valid IDs.
-
->
-> As a specification of a 'standard' the document seems to be rather
-> lacking. So, Sensor ID should be documented as being "an unsigned
-> integer less than then number of sensors returned by the Get Sensor
-> Capability command", or something like that. I guess clocks and other
-> devices suffer from similar lack of specificity.
-
-I was thinking of suggesting something similar as an update.
-
->
->>  Not the strongest guarantee I know.
->> 
->> All platforms currently using SCP (Juno R0 and R1) do indeed expose
->> contiguous identifiers.
->
-> IMO, Linux drivers should be coded to the standard or written
-> specification (where they are available) not the particular
-> implementations available.
->
->> >
->> > [1] http://community.arm.com/servlet/JiveServlet/download/8401-40-18262/DUI0922A_scp_message_interface.pdf
->> [2] http://arminfo.emea.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/ch03s02s21.html
->> [3] http://arminfo.emea.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/BABCCCJJ.html
->
-> I think those links are on ARM's intranet, they return NXDOMAIN for me.
-
-Apologies, the below should work.
-
-[2] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/ch03s02s21.html
-[3] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/BABCCCJJ.html
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 7605e095217f..cdc9888134e5 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -168,7 +168,6 @@
+ #define VTTBR_VMID_MASK	  (UL(0xFF) << VTTBR_VMID_SHIFT)
+ 
+ /* Hyp System Trap Register */
+-#define HSTR_EL2_TTEE	(1 << 16)
+ #define HSTR_EL2_T(x)	(1 << x)
+ 
+ /* Hyp Coproccessor Trap Register Shifts */
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 67fa0de3d483..5e377101f919 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -53,9 +53,7 @@
+ #define	IFSR32_EL2	25	/* Instruction Fault Status Register */
+ #define	FPEXC32_EL2	26	/* Floating-Point Exception Control Register */
+ #define	DBGVCR32_EL2	27	/* Debug Vector Catch Register */
+-#define	TEECR32_EL1	28	/* ThumbEE Configuration Register */
+-#define	TEEHBR32_EL1	29	/* ThumbEE Handler Base Register */
+-#define	NR_SYS_REGS	30
++#define	NR_SYS_REGS	28
+ 
+ /* 32bit mapping */
+ #define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 6addf97aadb3..c4016d411f4a 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -433,20 +433,13 @@
+ 	mrs	x5, ifsr32_el2
+ 	stp	x4, x5, [x3]
+ 
+-	skip_fpsimd_state x8, 3f
++	skip_fpsimd_state x8, 2f
+ 	mrs	x6, fpexc32_el2
+ 	str	x6, [x3, #16]
+-3:
+-	skip_debug_state x8, 2f
++2:
++	skip_debug_state x8, 1f
+ 	mrs	x7, dbgvcr32_el2
+ 	str	x7, [x3, #24]
+-2:
+-	skip_tee_state x8, 1f
+-
+-	add	x3, x2, #CPU_SYSREG_OFFSET(TEECR32_EL1)
+-	mrs	x4, teecr32_el1
+-	mrs	x5, teehbr32_el1
+-	stp	x4, x5, [x3]
+ 1:
+ .endm
+ 
+@@ -466,16 +459,9 @@
+ 	msr	dacr32_el2, x4
+ 	msr	ifsr32_el2, x5
+ 
+-	skip_debug_state x8, 2f
++	skip_debug_state x8, 1f
+ 	ldr	x7, [x3, #24]
+ 	msr	dbgvcr32_el2, x7
+-2:
+-	skip_tee_state x8, 1f
+-
+-	add	x3, x2, #CPU_SYSREG_OFFSET(TEECR32_EL1)
+-	ldp	x4, x5, [x3]
+-	msr	teecr32_el1, x4
+-	msr	teehbr32_el1, x5
+ 1:
+ .endm
+ 
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index b41607d270ac..6c35e49757d8 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -539,13 +539,6 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	{ Op0(0b10), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b110),
+ 	  trap_dbgauthstatus_el1 },
+ 
+-	/* TEECR32_EL1 */
+-	{ Op0(0b10), Op1(0b010), CRn(0b0000), CRm(0b0000), Op2(0b000),
+-	  NULL, reset_val, TEECR32_EL1, 0 },
+-	/* TEEHBR32_EL1 */
+-	{ Op0(0b10), Op1(0b010), CRn(0b0001), CRm(0b0000), Op2(0b000),
+-	  NULL, reset_val, TEEHBR32_EL1, 0 },
+-
+ 	/* MDCCSR_EL1 */
+ 	{ Op0(0b10), Op1(0b011), CRn(0b0000), CRm(0b0001), Op2(0b000),
+ 	  trap_raz_wi },
+-- 
+2.1.4
