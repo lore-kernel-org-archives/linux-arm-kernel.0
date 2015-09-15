@@ -1,63 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Sep 2015 12:36:36 +0100
-Subject: [PATCH 1/2] arm64: fpsimd: Fix FPSIMD corruption in rt_sigreturn with
- CONFIG_PREEMPT
-Message-ID: <1442316997-32282-1-git-send-email-will.deacon@arm.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 15 Sep 2015 12:37:22 +0100
+Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
+In-Reply-To: <20150915110330.GA6507@leverpostej>
+References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+ <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
+ <20150914131448.GC7002@leverpostej>
+ <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
+ <20150914134949.GE7002@leverpostej>
+ <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
+ <1442251092.2850.53.camel@linaro.org>
+ <9hhy4g89g64.fsf@e105922-lin.cambridge.arm.com>
+ <1442313962.2917.25.camel@linaro.org> <20150915110330.GA6507@leverpostej>
+Message-ID: <1442317042.2917.29.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave P Martin <Dave.Martin@arm.com>
+On Tue, 2015-09-15 at 12:03 +0100, Mark Rutland wrote:
+> On Tue, Sep 15, 2015 at 11:46:02AM +0100, Jon Medhurst (Tixy) wrote:
+> > On Tue, 2015-09-15 at 10:37 +0100, Punit Agrawal wrote:
+> > > "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
+> > > 
+> > > > On Mon, 2015-09-14 at 15:38 +0100, Punit Agrawal wrote:
+> > > >> Mark Rutland <mark.rutland@arm.com> writes:
+> > > >> 
+> > [...]
+> > > >> The way the SCP interface is defined, the sensor identifiers are
+> > > >> contiguous,
+> > > >
+> > > > Is there any documentation other than DUI0922A? [1] From what I can seen
+> > > > that just says it's a 16-bit value and doesn't put any particular
+> > > > constraints on its value.
+> > > 
+> > > Although not explicitly stated, if you look at the Get Sensor Capability
+> > > [2] and Get Sensor Info [3] commands you can indirectly infer that the
+> > > Sensor IDs are contiguous.
+> > 
+> > I personally wouldn't even indirectly infer they are contiguous from
+> > what the document says. If I were implementing the firmware I would feel
+> > quite in my rights to, for example, use the top 8 bits of the ID for a
+> > sensor type and the bottom 8 for an index, if that made dispatching of
+> > requests more efficient. Or if some optional hardware was detected as
+> > missing, leaving some holes in ID space.
+> > 
+> > As a specification of a 'standard' the document seems to be rather
+> > lacking. So, Sensor ID should be documented as being "an unsigned
+> > integer less than then number of sensors returned by the Get Sensor
+> > Capability command", or something like that. I guess clocks and other
+> > devices suffer from similar lack of specificity.
+> 
+> I think from the PoV of the binding, this doesn't matter. The value is
+> just an arbitrary opaue token written down in a spec, that the FW
+> understands how to interpret.
 
-The arm64 context switch implementation uses a flag
-TIF_FOREIGN_FPSTATE to track whether the hardware FPSIMD regs are
-out of sync with the logical state of current's registers.
-
-During sigreturn, the registers and task_struct are temporarily out
-of sync, between writing the task_struct and loading its contents
-back into the FPSIMD registers -- however, TIF_FOREIGN_FPSTATE is
-not set.  This can cause the context switch code to discard some or
-all of the restored FPSIMD state if preemption occurs during the
-critical region of rt_sigreturn.
-
-This patch sets TIF_FOREIGN_FPSTATE before transferring the
-sigframe's saved registers back to the task_struct, so that the
-task_struct data will take precedence over the hardware registers
-if a context switch occurs before everything is back in sync.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-[will: removed preempt_{enable,disable} calls, added compat version]
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/signal.c   | 3 +++
- arch/arm64/kernel/signal32.c | 2 ++
- 2 files changed, 5 insertions(+)
-
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index e18c48cb6db1..6d50d839b6e9 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -79,6 +79,9 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
- 	if (magic != FPSIMD_MAGIC || size != sizeof(struct fpsimd_context))
- 		return -EINVAL;
+True, it's the Linux implementation in following patches that has
+assumptions, e.g. for loops iterating over id's 0..N-1
  
-+	/* Ensure we don't reload stale data from the hardware registers */
-+	set_ti_thread_flag(current_thread_info(), TIF_FOREIGN_FPSTATE);
-+
- 	/* copy the FP and status/control registers */
- 	err = __copy_from_user(fpsimd.vregs, ctx->vregs,
- 			       sizeof(fpsimd.vregs));
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 948f0ad2de23..ae46ffad5aea 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -273,6 +273,8 @@ static int compat_restore_vfp_context(struct compat_vfp_sigframe __user *frame)
- 	if (magic != VFP_MAGIC || size != VFP_STORAGE_SIZE)
- 		return -EINVAL;
- 
-+	set_ti_thread_flag(current_thread_info(), TIF_FOREIGN_FPSTATE);
-+
- 	/*
- 	 * Copy the FP registers into the start of the fpsimd_state.
- 	 * FIXME: Won't work if big endian.
+> 
+> I only asked about how the IDs were organised because I thought there
+> was additional translation in the kernel, but this is not the case.
+> 
+> The only potential problem is bit-width. Punit, I assume the value is
+> 32-bit (or less) in the messages to the FW?
+
+It's 16 bit.
+
 -- 
-2.1.4
+Tixy
