@@ -1,64 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 15 Sep 2015 17:37:07 -0500
-Subject: [PATCH v5 2/5] dt/bindings: add bindings for optee
-In-Reply-To: <1439973629-19505-3-git-send-email-jens.wiklander@linaro.org>
-References: <1439973629-19505-1-git-send-email-jens.wiklander@linaro.org>
- <1439973629-19505-3-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <55F89D93.4080608@kernel.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 15 Sep 2015 15:58:15 -0700
+Subject: [PATCH 0/3] Add __ioread32_copy() and use it
+In-Reply-To: <1442346089-32077-1-git-send-email-sboyd@codeaurora.org>
+References: <1442346089-32077-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150915155815.5a41a8dc537610ab44d8d3dc@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2015 03:40 AM, Jens Wiklander wrote:
-> Introduces optee prefix and adds bindings for ARM TrustZone based OP-TEE
-> implementation.
-> 
-> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
-> ---
->  Documentation/devicetree/bindings/optee/optee.txt     | 17 +++++++++++++++++
+On Tue, 15 Sep 2015 12:41:26 -0700 Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-How about bindings/arm/firmware/... where the *other* TZ binding is located.
+> The SMD driver is reading and writing chunks of data to iomem,
+> and there's an __iowrite32_copy() function for the writing part, but
+> no __ioread32_copy() function for the reading part. This series
+> adds __ioread32_copy() and uses it in two places. Andrew is on Cc in
+> case this should go through the -mm tree. Otherwise the target
+> of this patch series is SMD, so I've sent it to Andy.
 
->  Documentation/devicetree/bindings/vendor-prefixes.txt |  1 +
->  2 files changed, 18 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/optee/optee.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/optee/optee.txt b/Documentation/devicetree/bindings/optee/optee.txt
-> new file mode 100644
-> index 0000000..4a6ff10
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/optee/optee.txt
-> @@ -0,0 +1,17 @@
-> +OP-TEE Device Tree Bindings
-> +
-> +OP-TEE is a piece of software using hardware features to provide a Trusted
-> +Execution Environment. The security can be provided with ARM TrustZone, but
-> +also by virtualization or a separate chip. As there's no single OP-TEE
+"soc: qcom: smd: Use __ioread32_copy() instead of open-coding it" no
+longer applies, because smd_copy_from_fifo() has switched to
+readl_relaxed().
 
-I don't see how the Linux side would not need to know what the
-communication channel is whether it is smc, hvc, or something else.
+Let's use the __weak macro rather than open-coding it (and convert
+__iowrite32_copy() while we're in there).
 
-> +vendor we're using "optee" as the first part of compatible property,
-> +indicating the OP-TEE protocol is used when communicating with the secure
-> +world.
-> +
-> +* OP-TEE based on ARM TrustZone required properties:
-> +
-> +- compatible="optee,optee-tz"
-> +
-> +Example:
-> +	optee {
-> +		compatible="optee,optee-tz";
-> +	};
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 8033919..17c2a7e 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -141,6 +141,7 @@ nvidia	NVIDIA
->  nxp	NXP Semiconductors
->  onnn	ON Semiconductor Corp.
->  opencores	OpenCores.org
-> +optee	OP-TEE, Open Portable Trusted Execution Environment
->  ortustech	Ortus Technology Co., Ltd.
->  ovti	OmniVision Technologies
->  panasonic	Panasonic Corporation
-> 
+It's unclear why __iowrite32_copy() is a weak function - nothing
+overrides it.  Perhaps we should just take that away rather than
+copying it into __ioread32_copy().
+
+__iowrite32_copy() is marked __visible.  I don't actually know what
+that does and Andi's d47d5c8194579bc changelog (which sucks the big
+one) didn't explain it.  Apparently it has something to do with being
+implemented in assembly, but zillions of functions are implemented in
+assembly, so why are only two functions marked this way?  Anyway,
+__ioread32_copy() is implemented in C so I guess __visible isn't needed
+there.
