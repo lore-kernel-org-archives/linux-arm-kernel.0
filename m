@@ -1,184 +1,50 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 15 Sep 2015 11:14:59 -0700
-Subject: [PATCH v2 2/3] soc: brcmstb: Add Bus Interface Unit control setup
+Date: Tue, 15 Sep 2015 11:15:00 -0700
+Subject: [PATCH v2 3/3] ARM: brcmstb: Setup BIU control registers during boot
 In-Reply-To: <1442340900-15320-1-git-send-email-f.fainelli@gmail.com>
 References: <1442340900-15320-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1442340900-15320-3-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1442340900-15320-4-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Broadcom STB SoCs (brcmstb) require an early setup of their Bus
-Interface Unit control register, this needs to happen before SMP is
-brought up because it affects how the CPU complex will be interfaced to
-the memory controller.
-
-Add support code which properly initializes the BIU registers based on
-whether "brcm,write-pairing" is present in Device Tree, and take care of
-saving and restoring credit register settings during system-wide
-suspend/resume operations.
+Call brcmstb_biuctrl_init() in brcmstb's init_irq machine descriptor
+callback since we need to setup the Bus Interface Unit before SMP in
+particular, but we also need to be able to remap registers.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
-Changes in v2:
+ arch/arm/mach-bcm/brcmstb.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-- add a pr_fmt prefix which is more descriptive
-
- drivers/soc/brcmstb/Makefile        |   2 +-
- drivers/soc/brcmstb/biuctrl.c       | 119 ++++++++++++++++++++++++++++++++++++
- include/linux/soc/brcmstb/brcmstb.h |  10 +++
- 3 files changed, 130 insertions(+), 1 deletion(-)
- create mode 100644 drivers/soc/brcmstb/biuctrl.c
- create mode 100644 include/linux/soc/brcmstb/brcmstb.h
-
-diff --git a/drivers/soc/brcmstb/Makefile b/drivers/soc/brcmstb/Makefile
-index 677e3fa0d042..75df0e0c091d 100644
---- a/drivers/soc/brcmstb/Makefile
-+++ b/drivers/soc/brcmstb/Makefile
-@@ -1,3 +1,3 @@
- obj-$(CONFIG_BRCMSTB_PM)	+= pm/
+diff --git a/arch/arm/mach-bcm/brcmstb.c b/arch/arm/mach-bcm/brcmstb.c
+index 3a60f7ee3f0c..99a67cfb7c0d 100644
+--- a/arch/arm/mach-bcm/brcmstb.c
++++ b/arch/arm/mach-bcm/brcmstb.c
+@@ -12,11 +12,19 @@
+  */
  
--obj-y				+= common.o
-+obj-y				+= common.o biuctrl.o
-diff --git a/drivers/soc/brcmstb/biuctrl.c b/drivers/soc/brcmstb/biuctrl.c
-new file mode 100644
-index 000000000000..1d4deada1c4d
---- /dev/null
-+++ b/drivers/soc/brcmstb/biuctrl.c
-@@ -0,0 +1,119 @@
-+/*
-+ * Broadcom STB SoCs Bus Unit Interface controls
-+ *
-+ * Copyright (C) 2015, Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#define pr_fmt(fmt)	"brcmstb: " KBUILD_MODNAME ": " fmt
-+
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/syscore_ops.h>
-+
-+#define CPU_CREDIT_REG_OFFSET			0x184
-+#define  CPU_CREDIT_REG_MCPx_WR_PAIRING_EN_MASK	0x70000000
-+
-+static void __iomem *cpubiuctrl_base;
-+static bool mcp_wr_pairing_en;
-+
-+static int __init mcp_write_pairing_set(void)
+ #include <linux/init.h>
++#include <linux/irqchip.h>
+ #include <linux/of_platform.h>
++#include <linux/soc/brcmstb/brcmstb.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
++static void __init brcmstb_init_irq(void)
 +{
-+	u32 creds = 0;
-+
-+	if (!cpubiuctrl_base)
-+		return -1;
-+
-+	creds = readl_relaxed(cpubiuctrl_base + CPU_CREDIT_REG_OFFSET);
-+	if (mcp_wr_pairing_en) {
-+		pr_info("MCP: Enabling write pairing\n");
-+		writel_relaxed(creds | CPU_CREDIT_REG_MCPx_WR_PAIRING_EN_MASK,
-+			     cpubiuctrl_base + CPU_CREDIT_REG_OFFSET);
-+	} else if (creds & CPU_CREDIT_REG_MCPx_WR_PAIRING_EN_MASK) {
-+		pr_info("MCP: Disabling write pairing\n");
-+		writel_relaxed(creds & ~CPU_CREDIT_REG_MCPx_WR_PAIRING_EN_MASK,
-+				cpubiuctrl_base + CPU_CREDIT_REG_OFFSET);
-+	} else {
-+		pr_info("MCP: Write pairing already disabled\n");
-+	}
-+
-+	return 0;
++	irqchip_init();
++	brcmstb_biuctrl_init();
 +}
 +
-+static int __init setup_hifcpubiuctrl_regs(void)
-+{
-+	struct device_node *np;
-+	int ret = 0;
-+
-+	np = of_find_compatible_node(NULL, NULL, "brcm,brcmstb-cpu-biu-ctrl");
-+	if (!np) {
-+		pr_err("missing BIU control node\n");
-+		return -ENODEV;
-+	}
-+
-+	cpubiuctrl_base = of_iomap(np, 0);
-+	if (!cpubiuctrl_base) {
-+		pr_err("failed to remap BIU control base\n");
-+		ret = -ENOMEM;
-+		goto out;
-+	}
-+
-+	mcp_wr_pairing_en = of_property_read_bool(np, "brcm,write-pairing");
-+out:
-+	of_node_put(np);
-+	return ret;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+static u32 cpu_credit_reg_dump;  /* for save/restore */
-+
-+static int brcmstb_cpu_credit_reg_suspend(void)
-+{
-+	if (cpubiuctrl_base)
-+		cpu_credit_reg_dump =
-+			readl_relaxed(cpubiuctrl_base + CPU_CREDIT_REG_OFFSET);
-+	return 0;
-+}
-+
-+static void brcmstb_cpu_credit_reg_resume(void)
-+{
-+	if (cpubiuctrl_base)
-+		writel_relaxed(cpu_credit_reg_dump,
-+				cpubiuctrl_base + CPU_CREDIT_REG_OFFSET);
-+}
-+
-+static struct syscore_ops brcmstb_cpu_credit_syscore_ops = {
-+	.suspend = brcmstb_cpu_credit_reg_suspend,
-+	.resume = brcmstb_cpu_credit_reg_resume,
-+};
-+#endif
-+
-+
-+int __init brcmstb_biuctrl_init(void)
-+{
-+	int ret = 0;
-+
-+	ret = setup_hifcpubiuctrl_regs();
-+	if (ret)
-+		return ret;
-+
-+	ret = mcp_write_pairing_set();
-+	if (ret) {
-+		pr_err("MCP: Unable to disable write pairing!\n");
-+		return ret;
-+	}
-+
-+#ifdef CONFIG_PM_SLEEP
-+	register_syscore_ops(&brcmstb_cpu_credit_syscore_ops);
-+#endif
-+	return ret;
-+}
-diff --git a/include/linux/soc/brcmstb/brcmstb.h b/include/linux/soc/brcmstb/brcmstb.h
-new file mode 100644
-index 000000000000..7009f61ea24c
---- /dev/null
-+++ b/include/linux/soc/brcmstb/brcmstb.h
-@@ -0,0 +1,10 @@
-+#ifndef __BRCMSTB_SOC_H
-+#define __BRCMSTB_SOC_H
-+
-+/*
-+ * Bus Interface Unit control register setup, must happen early during boot,
-+ * before SMP is brought up, called by machine entry point.
-+ */
-+int brcmstb_biuctrl_init(void);
-+
-+#endif /* __BRCMSTB_SOC_H */
+ static const char *const brcmstb_match[] __initconst = {
+ 	"brcm,bcm7445",
+ 	"brcm,brcmstb",
+@@ -25,4 +33,5 @@ static const char *const brcmstb_match[] __initconst = {
+ 
+ DT_MACHINE_START(BRCMSTB, "Broadcom STB (Flattened Device Tree)")
+ 	.dt_compat	= brcmstb_match,
++	.init_irq	= brcmstb_init_irq,
+ MACHINE_END
 -- 
 2.1.0
