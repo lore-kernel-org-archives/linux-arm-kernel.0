@@ -1,521 +1,87 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Tue, 15 Sep 2015 08:57:21 +0200
-Subject: [PATCH v2] ARM: dts: rockchip: Add dtb for the Radxa Rock 2 Square
- board
-Message-ID: <1442300242-510-1-git-send-email-sjoerd.simons@collabora.co.uk>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 15 Sep 2015 15:13:17 +0800
+Subject: [PATCH 1/2] mmc: core: enable CMD19 tuning for DDR50 mode
+In-Reply-To: <CAPDyKFpEwWvu3tnbMT9ZvM0TUvEHp0Qa8PADohyJoTaNZ9HS9g@mail.gmail.com>
+References: <1439282492-6274-1-git-send-email-21cnbao@gmail.com>
+ <CAPDyKFpXZD28NwNAhKQyxmWasVhk_7AeyOW6oXaBPHKuSTmGUA@mail.gmail.com>
+ <CAGsJ_4wvvQdyjFi=JmWfASm-LbJMybrhC=Wxxn7jHZEP5dUfEw@mail.gmail.com>
+ <CAPDyKFpEwWvu3tnbMT9ZvM0TUvEHp0Qa8PADohyJoTaNZ9HS9g@mail.gmail.com>
+Message-ID: <CAGsJ_4x5Nd3Cts1BHsUyB_mCejxbHPPjznUVWUcFoZhxKy+Tcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Radxa Rock 2 Square board is a combination of the Radxa Rock 2 SoM
-with the Square baseboard. Add a dtsi for the SoM which can be included
-into the dts for the various baseboards (e.g. full and square) and a dts
-for the square board.
+2015-08-25 20:05 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
+> On 20 August 2015 at 02:16, Barry Song <21cnbao@gmail.com> wrote:
+>> 2015-08-18 1:11 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
+>>> On 11 August 2015 at 10:41, Barry Song <21cnbao@gmail.com> wrote:
+>>>> From: Weijun Yang <york.yang@csr.com>
+>>>>
+>>>> As SD Specifications Part1 Physical Layer Specification Version
+>>>> 3.01 says, CMD19 tuning is available for unlocked cards in transfer
+>>>> state of 1.8V signaling mode. The small difference between v3.00
+>>>> and 3.01 spec means that CMD19 tuning is also available for DDR50
+>>>> mode.
+>>>
+>>> So what happens with cards following the 3.0 spec version, those
+>>> doesn't need to support the tuning CMD right? Perhaps that needs to be
+>>> addressed in this patch well!?
+>>
+>> from HW registers of the card, we cann't know whether the HW needs
+>> tuning. it is said 3.0.x need tuning, but 3.0 doesn't need.  @weijun,
+>> pls fix me if i am wrong.
+>> if so, it seems we need a static flag somewhere to indicate whether
+>> the tuning is needed. we can't detect to find the tuning requirement.
+>
+> Another way is to always try doing the tuning for DDR50, but in case
+> of errors just ignore them and print a debug/info message!?
 
-Currently supported are serial console, wired networking, hdmi output,
-eMMC and SD storage and USB.
+Uffe, do you mean something like below:
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
+index 4e7366a..d4df9f0 100644
+--- a/drivers/mmc/core/sd.c
++++ b/drivers/mmc/core/sd.c
+@@ -629,8 +629,23 @@ static int mmc_sd_init_uhs_card(struct mmc_card *card)
+      */
+     if (!mmc_host_is_spi(card->host) &&
+         (card->sd_bus_speed == UHS_SDR50_BUS_SPEED ||
+-         card->sd_bus_speed == UHS_SDR104_BUS_SPEED))
++         card->sd_bus_speed == UHS_DDR50_BUS_SPEED ||
++         card->sd_bus_speed == UHS_SDR104_BUS_SPEED)) {
+         err = mmc_execute_tuning(card);
++
++        /*
++         * As SD Specifications Part1 Physical Layer Specification Version
++         * 3.01 says, CMD19 tuning is available for unlocked cards in transfer
++         * state of 1.8V signaling mode. The small difference between v3.00
++         * and 3.01 spec means that CMD19 tuning is also available for DDR50
++         * mode.
++         */
++        if (err && (card->sd_bus_speed == UHS_DDR50_BUS_SPEED))
++            pr_err("%s: ddr50 tuning failed\n", mmc_hostname(card->host));
++            kfree(status);
++            return 0;
++        }
++    }
+ out:
+     kfree(status);
 
----
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 64b7fdb..382810d 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1915,6 +1915,7 @@ static int sdhci_execute_tuning(struct mmc_host
+*mmc, u32 opcode)
+         break;
 
-Changes in v2:
-- Use gpio bank numbers directly instead RK_GPIO<number>
-- Use radxa,rock2-square as compatibility string and document it in
-  rockchip.txt
-- Fix ordering in memory node
-- Don't add broken-cd in the emmc node, unneeded as non-removable is set
-- coding-style fixes (double empty lines, comment style)
-- Removed redundant status properity in the act8846 node
-- Use emmc reset power-sequence to ensure proper MMC card reset
+     case MMC_TIMING_UHS_SDR104:
++    case MMC_TIMING_UHS_DDR50:
+         break;
 
- Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/rk3288-rock2-som.dtsi            | 277 +++++++++++++++++++++
- arch/arm/boot/dts/rk3288-rock2-square.dts          | 165 ++++++++++++
- 4 files changed, 447 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3288-rock2-som.dtsi
- create mode 100644 arch/arm/boot/dts/rk3288-rock2-square.dts
+     case MMC_TIMING_UHS_SDR50:
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index af58cd7..40ba0eb 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -17,6 +17,10 @@ Rockchip platforms device tree bindings
-     Required root node properties:
-       - compatible = "radxa,rock", "rockchip,rk3188";
- 
-+- Radxa Rock2 Square board:
-+    Required root node properties:
-+      - compatible = "radxa,rock2-square", "rockchip,rk3288";
-+
- - Firefly Firefly-RK3288 board:
-     Required root node properties:
-       - compatible = "firefly,firefly-rk3288", "rockchip,rk3288";
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 233159d..1ed8ec1 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -507,6 +507,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3288-firefly-beta.dtb \
- 	rk3288-firefly.dtb \
- 	rk3288-r89.dtb \
-+	rk3288-rock2-square.dtb \
- 	rk3288-veyron-jerry.dtb \
- 	rk3288-veyron-minnie.dtb \
- 	rk3288-veyron-pinky.dtb \
-diff --git a/arch/arm/boot/dts/rk3288-rock2-som.dtsi b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-new file mode 100644
-index 0000000..bebaed7
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-@@ -0,0 +1,277 @@
-+/*
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include <dt-bindings/pwm/pwm.h>
-+#include "rk3288.dtsi"
-+
-+/ {
-+	memory {
-+		reg = <0x0 0x80000000>;
-+		device_type = "memory";
-+	};
-+
-+	emmc_pwrseq: emmc-pwrseq {
-+		compatible = "mmc-pwrseq-emmc";
-+		pinctrl-0 = <&emmc_reset>;
-+		pinctrl-names = "default";
-+		reset-gpios = <&gpio3 9 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	ext_gmac: external-gmac-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+		clock-output-names = "ext_gmac";
-+	};
-+
-+	vcc_sys: vsys-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+};
-+
-+&cpu0 {
-+	cpu0-supply = <&vdd_cpu>;
-+};
-+
-+&emmc {
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+	disable-wp;
-+	non-removable;
-+	num-slots = <1>;
-+	mmc-pwrseq = <&emmc_pwrseq>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8>;
-+	vmmc-supply = <&vcc_io>;
-+	status = "okay";
-+};
-+
-+&gmac {
-+	assigned-clocks = <&cru SCLK_MAC>;
-+	assigned-clock-parents = <&ext_gmac>;
-+	clock_in_out = "input";
-+	phy-mode = "rgmii";
-+	phy-supply = <&vccio_pmu>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins &phy_rst>;
-+	snps,reset-gpio = <&gpio4 8 GPIO_ACTIVE_LOW>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 30000>;
-+	rx_delay = <0x10>;
-+	tx_delay = <0x30>;
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	act8846: act8846 at 5a {
-+		compatible = "active-semi,act8846";
-+		reg = <0x5a>;
-+		inl1-supply = <&vcc_io>;
-+		inl2-supply = <&vcc_sys>;
-+		inl3-supply = <&vcc_20>;
-+		vp1-supply = <&vcc_sys>;
-+		vp2-supply = <&vcc_sys>;
-+		vp3-supply = <&vcc_sys>;
-+		vp4-supply = <&vcc_sys>;
-+
-+		regulators {
-+			vcc_ddr: REG1 {
-+				regulator-name = "VCC_DDR";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc_io: REG2 {
-+				regulator-name = "VCC_IO";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_log: REG3 {
-+				regulator-name = "VDD_LOG";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc_20: REG4 {
-+				regulator-name = "VCC_20";
-+				regulator-min-microvolt = <2000000>;
-+				regulator-max-microvolt = <2000000>;
-+				regulator-always-on;
-+			};
-+
-+			vccio_sd: REG5 {
-+				regulator-name = "VCCIO_SD";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd10_lcd: REG6 {
-+				regulator-name = "VDD10_LCD";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			vcca_codec: REG7 {
-+				regulator-name = "VCCA_CODEC";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vcca_tp: REG8 {
-+				regulator-name = "VCCA_TP";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vccio_pmu: REG9 {
-+				regulator-name = "VCCIO_PMU";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_10: REG10 {
-+				regulator-name = "VDD_10";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc_18: REG11 {
-+				regulator-name = "VCC_18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc18_lcd: REG12 {
-+				regulator-name = "VCC18_LCD";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+
-+	vdd_cpu: syr827 at 40 {
-+		compatible = "silergy,syr827";
-+		reg = <0x40>;
-+		fcs,suspend-voltage-selector = <1>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		regulator-enable-ramp-delay = <300>;
-+		regulator-name = "vdd_cpu";
-+		regulator-min-microvolt = <850000>;
-+		regulator-max-microvolt = <1350000>;
-+		regulator-ramp-delay = <8000>;
-+		vin-supply = <&vcc_sys>;
-+	};
-+
-+	vdd_gpu: syr828 at 41 {
-+		compatible = "silergy,syr828";
-+		reg = <0x41>;
-+		fcs,suspend-voltage-selector = <1>;
-+		regulator-always-on;
-+		regulator-enable-ramp-delay = <300>;
-+		regulator-min-microvolt = <850000>;
-+		regulator-max-microvolt = <1350000>;
-+		regulator-name = "vdd_gpu";
-+		regulator-ramp-delay = <8000>;
-+		vin-supply = <&vcc_sys>;
-+	};
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
-+
-+&tsadc {
-+	rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
-+	rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
-+	status = "okay";
-+};
-+
-+&pinctrl {
-+	pcfg_output_high: pcfg-output-high {
-+		output-high;
-+	};
-+
-+	emmc {
-+			emmc_reset: emmc-reset {
-+				rockchip,pins = <3 9 RK_FUNC_GPIO &pcfg_pull_none>;
-+			};
-+	};
-+
-+	gmac {
-+		phy_rst: phy-rst {
-+			rockchip,pins = <4 8 RK_FUNC_GPIO  &pcfg_output_high>;
-+		};
-+	};
-+};
-+
-+&vopb {
-+	status = "okay";
-+};
-+
-+&vopb_mmu {
-+	status = "okay";
-+};
-+
-+&vopl {
-+	status = "okay";
-+};
-+
-+&vopl_mmu {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts b/arch/arm/boot/dts/rk3288-rock2-square.dts
-new file mode 100644
-index 0000000..bce50cd
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
-@@ -0,0 +1,165 @@
-+/*
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "rk3288-rock2-som.dtsi"
-+
-+/ {
-+	model = "Radxa Rock 2 Square";
-+	compatible = "radxa,rock2-square", "rockchip,rk3288";
-+
-+	chosen {
-+		stdout-path = "serial2:115200n8";
-+	};
-+
-+	vcc_usb_host: vcc-host-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio0 14 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&host_vbus_drv>;
-+		/* Always on as the rockchip usb phy doesn't have a vbus-supply
-+		 * property
-+		 */
-+		regulator-always-on;
-+		regulator-name = "vcc_host";
-+	};
-+
-+	vcc_sd: sdmmc-regulator {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio7 11 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sdmmc_pwr>;
-+		regulator-name = "vcc_sd";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+};
-+
-+&sdmmc {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	card-detect-delay = <200>;
-+	disable-wp;	/* wp not hooked up */
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
-+	vmmc-supply = <&vcc_sd>;
-+	vqmmc-supply = <&vccio_sd>;
-+	status = "okay";
-+};
-+
-+&gmac {
-+	status = "ok";
-+};
-+
-+&hdmi {
-+	ddc-i2c-bus = <&i2c5>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	hym8563 at 51 {
-+		compatible = "haoyu,hym8563";
-+		reg = <0x51>;
-+		#clock-cells = <0>;
-+		clock-frequency = <32768>;
-+		clock-output-names = "xin32k";
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int>;
-+
-+	};
-+};
-+
-+&i2c5 {
-+	status = "okay";
-+};
-+
-+&pinctrl {
-+	pmic {
-+		pmic_int: pmic-int {
-+			rockchip,pins = <0 4 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+
-+	usb {
-+		host_vbus_drv: host-vbus-drv {
-+			rockchip,pins = <0 14 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	sdmmc {
-+		sdmmc_pwr: sdmmc-pwr {
-+			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
-+
-+&usb_host0_ehci {
-+	status = "okay";
-+};
-+
-+&vopb {
-+	status = "okay";
-+};
-+
-+&vopb_mmu {
-+	status = "okay";
-+};
-+
-+&vopl {
-+	status = "okay";
-+};
-+
-+&vopl_mmu {
-+	status = "okay";
-+};
--- 
-2.5.1
+>
+> Kind regards
+> Uffe
+
+-barry
