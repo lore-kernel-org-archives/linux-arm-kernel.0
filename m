@@ -1,116 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Sep 2015 11:12:20 +0100
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <m337yg2ip4.fsf@t19.piap.pl>
-References: <m3bnde5whx.fsf@t19.piap.pl>
- <20150907112555.GS21084@n2100.arm.linux.org.uk>
- <m337yp5gvv.fsf@t19.piap.pl>
- <1441709778.13536.8.camel@pengutronix.de>
- <m3bnd52y4s.fsf@t19.piap.pl> <m337yg2ip4.fsf@t19.piap.pl>
-Message-ID: <20150915101220.GQ21084@n2100.arm.linux.org.uk>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 15 Sep 2015 12:32:25 +0200
+Subject: [PATCH v4 0/2] [media] Fix race between graph enumeration and
+ entities registration
+Message-ID: <1442313147-24566-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 10:24:55AM +0200, Krzysztof Ha?asa wrote:
-> 1024 x 768 for now. I noticed a strange thing: XvShmPutImage() usually
-> takes (much) less than 4 milliseconds, but every 315 frames, it takes
-> much longer (when started, it takes 1259 frames). The following is with
-> constant image, i.e., not altered between frames. Source attached (one
-> may need to change xv_port variable).
+Hello,
 
-Testing on Dove and Armada DRM, I've had to make several changes to your
-program:
+The Media Controller framework has an issue in which the media device node
+is registered before all the media entities and pads links are created so
+if user-space tries to enumerate the graph too early, it may get a partial
+graph since not everything has been registered yet.
 
-1. Don't hard code the Xv port ID (worth mentioning somewhere so people
-   testing it don't spend something like a quarter of an hour trying to
-   debug why it doesn't work.)
+This series fixes the issue by separate the media device registration from
+the initialization so drives can first initialize the media device, create
+the graph and then finally register the media device node once is finished.
+The solution was suggested by Sakari Ailus.
 
-2. Added _GNU_SOURCE at the top to get various structs and functions
-   that the program uses.
+This is the fourth version of the series that fixes issues pointed out by
+Sakari Ailus.
 
-3. Added a line detailing the GCC flags to be used
+Patch #1 adds a check to the media_device_unregister() function to know if
+the media device has been registed yet so calling it will be safe and the
+cleanup functions of the drivers won't need to be changed in case register
+failed.
 
-4. A description of what the program is doing would be nice.  For the
-   record, it appears to try and call XvShmPutImage() as quickly as
-   possible, recording the absolute time between calls, and reporting
-   when it is more than 4ms.
+Patch #2 does the init and registration split, changing all the drivers to
+make the change atomic and also adds a cleanup function for media devices.
 
-5. Added a call to XSync(display, 1) after the call to XvShmPutImage()
-   to ensure that the XvShmPutImage() gets pushed to the X server in a
-   timely manner, doesn't sit in the applications X queue, and ensure
-   that we wait for the X server to respond.
+The patches are on top of Mauro's "[PATCH v8 00/55] MC next generation" [0]
+but is not a dependency for that series, it was only be based on that patch
+series to avoid conflicts with in-flight patches.
 
-6. Extended the 4ms timeout to something sane, like 17ms.  If we're
-   talking about synchronising to the vertical sync, then the period
-   when we want to complain is when it takes much longer than that.
+The patches have been tested on an OMAP3 IGEPv2 board that has a OMAP3 ISP
+device and an Exynos5800 Chromebook with a built-in UVC camera.
 
-   If the display is synchronised to the vertical sync to avoid tearing,
-   then you can only update the display once per vertical sync, and at
-   60Hz, that's about 17ms.  At 50Hz, that's 20ms.
+[0]: http://permalink.gmane.org/gmane.linux.drivers.driver-project.devel/74515
 
-Now, running on Dove overlay, I see about 17ms being the average time,
-which is slightly longer than the vsync.
+Best regards,
+Javier
 
-Further analysis with strace of the X server (which pushes things up to
-20ms average time):
-- The X server takes about 1ms between select() indicating that there's
-  an event available, and reading the event.
-- It takes 14ms from reading the event to the DDX calling the DRM ioctl
-  to display the image - mostly spent memcpy()'ing the image.
-- 900us to return the response to the X client
-- The X server then takes about 4ms to get back to calling select().
+Changes in v4:
+- Remove the model check from BUG_ON() since shold not be fatal.
+  Suggested by Sakari Ailus.
 
-The big chunk of that is the memcpy() - that's something which can't be
-eliminated for several reasons:
-- With XvShm, the image buffer is shared between the X client and the
-  X server.  The X server has no control over how the X client manipulates
-  that buffer after the X server has returned from its call - however the
-  displayed image must remain stable and free from manipulation until the
-  next PutImage call.
-- The X shm buffer can't be passed directly into DRM - DRM needs the
-  image to be displayed to be in DRM buffer objects, which are then
-  wrapped as frame buffers (a frame buffer can contain several buffer
-  objects, one for each plane), and lastly the overlay plane updated
-  with the new framebuffer.
+Changes in v3:
+- Replace the WARN_ON() in media_device_init() for a BUG_ON().
+  Suggested by Sakari Ailus.
 
-Let's not forget that Dove hardware is slower than iMX6, so I think that
-iMX6 should manage to comfortably achieve the 16.6ms required for
-frame-by-frame display from your program.
+Changes in v2:
+- Reword the documentation for media_device_unregister(). Suggested by Sakari.
+- Added Sakari's Acked-by tag for patch #1.
+- Change media_device_init() to return void instead of an error.
+  Suggested by Sakari Ailus.
+- Remove the error messages when media_device_register() fails.
+  Suggested by Sakari Ailus.
+- Fix typos in commit message of patch #2. Suggested by Sakari Ailus.
 
-Now, as for using the GPU, X server analysis:
-- Again about 1ms between select() and read() of the event
-- 1ms to the first WAIT_VBLANK ioctl on the display adapter to read the
-  last VSYNC time
-- 200us later to map the user pointer
-- 300us to the WAIT_VBLANK ioctl to wait for the vblank (which takes in this
-  instance 3.5ms to fire)
-- 130us to first attempt to submit the GPU queue, which returns -EAGAIN
-  after 6.4ms
-- second attempt takes 9.5ms to complete successfully
-- 1ms (with intervening SIGALRM handler) to wait for the GPU to finish,
-  which takes 11.5ms
-- 450us to ask DRM to release the user pointer buffer, which takes 9.4ms
-- 1ms (with intervening SIGALRM handler) to report completion of the operation
-- The X server then takes about 4ms to get back to calling select().
+Javier Martinez Canillas (2):
+  [media] media-device: check before unregister if mdev was registered
+  [media] media-device: split media initialization and registration
 
-So, you can see that using the GPU is a much heavier and complex operation
-all round.  The long delays in mapping and releasing the buffer are of
-course the DMA mapping/unmapping of the buffer object to ensure that the
-GPU can see the data in those buffers.
-
-What's also notable is that it takes the GPU on the order of 10ms to do the
-operation - it's actually two operations: a vertical filter blit followed
-by a horizontal filter blit.  None of the Vivante GPUs that I've access to
-support a single-pass filter blit scaling in both directions (the feature
-bit for that is clear on both Dove's GC600 and iMX6 GC320 GPUs.)  I
-suspect a Vivante GPU supporting that would take around half the time,
-or better.
-
-Of course, the time each of these operations take scales with the image
-size, so an image half the width and height (which will be a quarter of
-the size) will take a quarter of the time, and will be comfortably
-within 17ms.
+ drivers/media/common/siano/smsdvb-main.c      |  1 +
+ drivers/media/media-device.c                  | 42 +++++++++++++++++++++++----
+ drivers/media/platform/exynos4-is/media-dev.c | 15 +++++-----
+ drivers/media/platform/omap3isp/isp.c         | 14 ++++-----
+ drivers/media/platform/s3c-camif/camif-core.c | 15 ++++++----
+ drivers/media/platform/vsp1/vsp1_drv.c        | 12 ++++----
+ drivers/media/platform/xilinx/xilinx-vipp.c   | 12 +++-----
+ drivers/media/usb/au0828/au0828-core.c        | 27 +++++++++--------
+ drivers/media/usb/cx231xx/cx231xx-cards.c     | 30 +++++++++----------
+ drivers/media/usb/dvb-usb-v2/dvb_usb_core.c   | 23 ++++++++-------
+ drivers/media/usb/dvb-usb/dvb-usb-dvb.c       | 24 ++++++++-------
+ drivers/media/usb/siano/smsusb.c              |  5 ++--
+ drivers/media/usb/uvc/uvc_driver.c            | 10 +++++--
+ include/media/media-device.h                  |  2 ++
+ 14 files changed, 137 insertions(+), 95 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.4.3
