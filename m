@@ -1,209 +1,50 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 15 Sep 2015 19:03:05 +0530
-Subject: [PATCH v2 4/4] ARM: dts: <am4372/dra7/omap5>: Use "syscon-phy-power"
- instead of "ctrl-module"
-In-Reply-To: <1442323985-29939-1-git-send-email-kishon@ti.com>
-References: <1442323985-29939-1-git-send-email-kishon@ti.com>
-Message-ID: <1442323985-29939-5-git-send-email-kishon@ti.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 15 Sep 2015 15:36:00 +0200
+Subject: [PATCH 2/4] dmaengine: at_xdmac: change block increment addressing
+ mode
+In-Reply-To: <1442323770-20266-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1442323770-20266-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1442324163-20389-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "syscon-phy-power" property and remove the deprecated "ctrl-module"
-property from SATA and USB PHY node. Also remove the unused control
-module dt nodes.
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+The addressing mode we were using was not only incrementing the address at
+each microblock, but also at each data boundary, which was severely slowing
+the transfer, without any benefit since we were not using the data stride.
+
+Switch to the micro block increment only in order to get back to an
+acceptable performance level.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Fixes: 6007ccb57744 ("dmaengine: xdmac: Add interleaved transfer support")
+Cc: stable at vger.kernel.org #4.2
 ---
- arch/arm/boot/dts/am4372.dtsi |   16 ++--------------
- arch/arm/boot/dts/dra7.dtsi   |   34 ++++------------------------------
- arch/arm/boot/dts/omap5.dtsi  |   26 +++-----------------------
- 3 files changed, 9 insertions(+), 67 deletions(-)
+ drivers/dma/at_xdmac.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 0447c04a..fd162d8 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -852,18 +852,6 @@
- 			status = "disabled";
- 		};
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index 0190d1c..3952bff 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -875,14 +875,14 @@ at_xdmac_interleaved_queue_desc(struct dma_chan *chan,
  
--		am43xx_control_usb2phy1: control-phy at 44e10620 {
--			compatible = "ti,control-phy-usb2-am437";
--			reg = <0x44e10620 0x4>;
--			reg-names = "power";
--		};
--
--		am43xx_control_usb2phy2: control-phy at 0x44e10628 {
--			compatible = "ti,control-phy-usb2-am437";
--			reg = <0x44e10628 0x4>;
--			reg-names = "power";
--		};
--
- 		ocp2scp0: ocp2scp at 483a8000 {
- 			compatible = "ti,am437x-ocp2scp", "ti,omap-ocp2scp";
- 			#address-cells = <1>;
-@@ -874,7 +862,7 @@
- 			usb2_phy1: phy at 483a8000 {
- 				compatible = "ti,am437x-usb2";
- 				reg = <0x483a8000 0x8000>;
--				ctrl-module = <&am43xx_control_usb2phy1>;
-+				syscon-phy-power = <&scm_conf 0x620>;
- 				clocks = <&usb_phy0_always_on_clk32k>,
- 					 <&usb_otg_ss0_refclk960m>;
- 				clock-names = "wkupclk", "refclk";
-@@ -893,7 +881,7 @@
- 			usb2_phy2: phy at 483e8000 {
- 				compatible = "ti,am437x-usb2";
- 				reg = <0x483e8000 0x8000>;
--				ctrl-module = <&am43xx_control_usb2phy2>;
-+				syscon-phy-power = <&scm_conf 0x628>;
- 				clocks = <&usb_phy1_always_on_clk32k>,
- 					 <&usb_otg_ss1_refclk960m>;
- 				clock-names = "wkupclk", "refclk";
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 65eecb3..ad1bb2d 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1124,14 +1124,6 @@
- 			status = "disabled";
- 		};
+ 	if (xt->src_inc) {
+ 		if (xt->src_sgl)
+-			chan_cc |=  AT_XDMAC_CC_SAM_UBS_DS_AM;
++			chan_cc |=  AT_XDMAC_CC_SAM_UBS_AM;
+ 		else
+ 			chan_cc |=  AT_XDMAC_CC_SAM_INCREMENTED_AM;
+ 	}
  
--		omap_control_sata: control-phy at 4a002374 {
--			compatible = "ti,control-phy-pipe3";
--			reg = <0x4a002374 0x4>;
--			reg-names = "power";
--			clocks = <&sys_clkin1>;
--			clock-names = "sysclk";
--		};
--
- 		/* OCP2SCP3 */
- 		ocp2scp at 4a090000 {
- 			compatible = "ti,omap-ocp2scp";
-@@ -1146,7 +1138,7 @@
- 				      <0x4A096400 0x64>, /* phy_tx */
- 				      <0x4A096800 0x40>; /* pll_ctrl */
- 				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
--				ctrl-module = <&omap_control_sata>;
-+				syscon-phy-power = <&scm_conf 0x374>;
- 				clocks = <&sys_clkin1>, <&sata_ref_clk>;
- 				clock-names = "sysclk", "refclk";
- 				syscon-pllreset = <&scm_conf 0x3fc>;
-@@ -1213,24 +1205,6 @@
- 			clocks = <&sys_32k_ck>;
- 		};
- 
--		omap_control_usb2phy1: control-phy at 4a002300 {
--			compatible = "ti,control-phy-usb2";
--			reg = <0x4a002300 0x4>;
--			reg-names = "power";
--		};
--
--		omap_control_usb3phy1: control-phy at 4a002370 {
--			compatible = "ti,control-phy-pipe3";
--			reg = <0x4a002370 0x4>;
--			reg-names = "power";
--		};
--
--		omap_control_usb2phy2: control-phy at 0x4a002e74 {
--			compatible = "ti,control-phy-usb2-dra7";
--			reg = <0x4a002e74 0x4>;
--			reg-names = "power";
--		};
--
- 		/* OCP2SCP1 */
- 		ocp2scp at 4a080000 {
- 			compatible = "ti,omap-ocp2scp";
-@@ -1243,7 +1217,7 @@
- 			usb2_phy1: phy at 4a084000 {
- 				compatible = "ti,omap-usb2";
- 				reg = <0x4a084000 0x400>;
--				ctrl-module = <&omap_control_usb2phy1>;
-+				syscon-phy-power = <&scm_conf 0x300>;
- 				clocks = <&usb_phy1_always_on_clk32k>,
- 					 <&usb_otg_ss1_refclk960m>;
- 				clock-names =	"wkupclk",
-@@ -1254,7 +1228,7 @@
- 			usb2_phy2: phy at 4a085000 {
- 				compatible = "ti,dra7x-usb2-phy2", "ti,omap-usb2";
- 				reg = <0x4a085000 0x400>;
--				ctrl-module = <&omap_control_usb2phy2>;
-+				syscon-phy-power = <&scm_conf 0xe74>;
- 				clocks = <&usb_phy2_always_on_clk32k>,
- 					 <&usb_otg_ss2_refclk960m>;
- 				clock-names =	"wkupclk",
-@@ -1268,7 +1242,7 @@
- 				      <0x4a084800 0x64>,
- 				      <0x4a084c00 0x40>;
- 				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
--				ctrl-module = <&omap_control_usb3phy1>;
-+				syscon-phy-power = <&scm_conf 0x370>;
- 				clocks = <&usb_phy3_always_on_clk32k>,
- 					 <&sys_clkin1>,
- 					 <&usb_otg_ss1_refclk960m>;
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 4205a8a..6335449 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -849,18 +849,6 @@
- 			hw-caps-temp-alert;
- 		};
- 
--		omap_control_usb2phy: control-phy at 4a002300 {
--			compatible = "ti,control-phy-usb2";
--			reg = <0x4a002300 0x4>;
--			reg-names = "power";
--		};
--
--		omap_control_usb3phy: control-phy at 4a002370 {
--			compatible = "ti,control-phy-pipe3";
--			reg = <0x4a002370 0x4>;
--			reg-names = "power";
--		};
--
- 		usb3: omap_dwc3 at 4a020000 {
- 			compatible = "ti,dwc3";
- 			ti,hwmods = "usb_otg_ss";
-@@ -896,7 +884,7 @@
- 			usb2_phy: usb2phy at 4a084000 {
- 				compatible = "ti,omap-usb2";
- 				reg = <0x4a084000 0x7c>;
--				ctrl-module = <&omap_control_usb2phy>;
-+				syscon-phy-power = <&scm_conf 0x300>;
- 				clocks = <&usb_phy_cm_clk32k>, <&usb_otg_ss_refclk960m>;
- 				clock-names = "wkupclk", "refclk";
- 				#phy-cells = <0>;
-@@ -908,7 +896,7 @@
- 				      <0x4a084800 0x64>,
- 				      <0x4a084c00 0x40>;
- 				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
--				ctrl-module = <&omap_control_usb3phy>;
-+				syscon-phy-power = <&scm_conf 0x370>;
- 				clocks = <&usb_phy_cm_clk32k>,
- 					 <&sys_clkin>,
- 					 <&usb_otg_ss_refclk960m>;
-@@ -964,14 +952,6 @@
- 			#thermal-sensor-cells = <1>;
- 		};
- 
--		omap_control_sata: control-phy at 4a002374 {
--			compatible = "ti,control-phy-pipe3";
--			reg = <0x4a002374 0x4>;
--			reg-names = "power";
--			clocks = <&sys_clkin>;
--			clock-names = "sysclk";
--		};
--
- 		/* OCP2SCP3 */
- 		ocp2scp at 4a090000 {
- 			compatible = "ti,omap-ocp2scp";
-@@ -986,7 +966,7 @@
- 				      <0x4A096400 0x64>, /* phy_tx */
- 				      <0x4A096800 0x40>; /* pll_ctrl */
- 				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
--				ctrl-module = <&omap_control_sata>;
-+				syscon-phy-power = <&scm_conf 0x374>;
- 				clocks = <&sys_clkin>, <&sata_ref_clk>;
- 				clock-names = "sysclk", "refclk";
- 				#phy-cells = <0>;
+ 	if (xt->dst_inc) {
+ 		if (xt->dst_sgl)
+-			chan_cc |=  AT_XDMAC_CC_DAM_UBS_DS_AM;
++			chan_cc |=  AT_XDMAC_CC_DAM_UBS_AM;
+ 		else
+ 			chan_cc |=  AT_XDMAC_CC_DAM_INCREMENTED_AM;
+ 	}
 -- 
-1.7.9.5
+2.5.0
