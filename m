@@ -1,65 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Sep 2015 18:49:34 +0100
-Subject: [PATCH 4/6] PCI: generic: Correct, and avoid overflow, in
- bus_max calculation.
-In-Reply-To: <1442013719-5001-5-git-send-email-ddaney.cavm@gmail.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 15 Sep 2015 10:49:24 -0700
+Subject: [PATCH 2/6] PCI: generic: Only fixup irqs for bus we are creating.
+In-Reply-To: <20150915173654.GJ31157@arm.com>
 References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
- <1442013719-5001-5-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20150915174934.GL31157@arm.com>
+ <1442013719-5001-3-git-send-email-ddaney.cavm@gmail.com>
+ <20150915173654.GJ31157@arm.com>
+Message-ID: <55F85A24.2010600@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 12, 2015 at 12:21:57AM +0100, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> There are two problems with the bus_max calculation:
-> 
-> 1) The u8 data type can overflow for large config space windows.
-> 
-> 2) The calculation is incorrect for a bus range that doesn't start at
->    zero.
-> 
-> Since the configuration space is relative to bus zero, make bus_max
-> just be the size of the config window scaled by bus_shift.  Then clamp
-> it to a maximum of 255, per PCI.  Use a data type of int to avoid
-> overflow problems.
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  drivers/pci/host/pci-host-generic.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> index cd6f898..fce5bf7 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -164,7 +164,7 @@ out_release_res:
->  static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->  {
->  	int err;
-> -	u8 bus_max;
-> +	int bus_max;
->  	resource_size_t busn;
->  	struct resource *bus_range;
->  	struct device *dev = pci->host.dev.parent;
-> @@ -177,8 +177,9 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->  	}
->  
->  	/* Limit the bus-range to fit within reg */
-> -	bus_max = pci->cfg.bus_range->start +
-> -		  (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
-> +	bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
-> +	if (bus_max > 255)
-> +		bus_max = 255;
->  	pci->cfg.bus_range->end = min_t(resource_size_t,
->  					pci->cfg.bus_range->end, bus_max);
+On 09/15/2015 10:36 AM, Will Deacon wrote:
+> Hi David,
+>
+> On Sat, Sep 12, 2015 at 12:21:55AM +0100, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> Use pci_walk_bus() to restrict the fixup irq actions to only the bus
+>> being created.
+>>
+>> If we create multiple buses with pci-host-generic, or there are buses
+>> created by other drivers, we don't want to call pci_fixup_irqs() which
+>> operates on all devices, not just the devices on the bus being added.
+>> The consequence is that either the fixups are done more than once, or
+>> in some cases incorrect fixups could be applied.
+>>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   drivers/pci/host/pci-host-generic.c | 8 +++++++-
+>>   1 file changed, 7 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+>> index 265dd25..a0fb241 100644
+>> --- a/drivers/pci/host/pci-host-generic.c
+>> +++ b/drivers/pci/host/pci-host-generic.c
+>> @@ -205,6 +205,12 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>>   	return 0;
+>>   }
+>>
+>> +static int gen_pci_fixup_irq_cb(struct pci_dev *dev, void *arg)
+>> +{
+>> +	pdev_fixup_irq(dev, pci_common_swizzle, of_irq_parse_and_map_pci);
+>> +	return 0;
+>> +}
+>> +
+>>   static int gen_pci_probe(struct platform_device *pdev)
+>>   {
+>>   	int err;
+>> @@ -262,7 +268,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+>>   		return -ENODEV;
+>>   	}
+>>
+>> -	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+>> +	pci_walk_bus(bus, gen_pci_fixup_irq_cb, NULL);
+>
+> Any chance we could put something in the core PCI code for this? I think
+> any host controller wanting to work with arm64 is potentially going to
+> run into the same problem.
 
-Hmm, this is changing the meaning of the bus-range property in the
-device-tree, which really needs to match what IEEE Std 1275-1994 requires.
+Good idea.
 
-My understanding was that the bus-range could be used to offset the config
-space, which is why it's subtracted from the bus number in
-gen_pci_map_cfg_bus_[e]cam. Also, why is your config space so large that
-we end up overflowing bus_max?
+I will move the walking code into setup-irq.c (the current home of 
+pci_fixup_irqs()), and make it part of patch 1/6.
 
-Will
+Thanks,
+David Daney
+
+
+>
+> Will
+>
