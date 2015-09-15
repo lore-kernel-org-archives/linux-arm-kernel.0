@@ -1,31 +1,16 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 15 Sep 2015 14:47:34 -0500
-Subject: [PATCH] ARM: OMAP2+: AM43XX: Enable autoidle for clks in
- am43xx_init_late
-Message-ID: <1442346454-5305-1-git-send-email-d-gerlach@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 15 Sep 2015 12:48:04 -0700 (PDT)
+Subject: [PATCH net-next 0/2] driver: net: xgene: Enable 2nd 10GbE port
+ on APM X-Gene SoC
+In-Reply-To: <1441752627-9326-1-git-send-email-isubramanian@apm.com>
+References: <1441752627-9326-1-git-send-email-isubramanian@apm.com>
+Message-ID: <20150915.124804.1866228386336351704.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add omap2_clk_enable_autoidle_all to am43xx_init_late otherwise the call
-to omap2_clk_disable_autoidle_all in am43xx_init_early may cause some
-clocks to always stay active and prevent low power mode transitions.
+From: Iyappan Subramanian <isubramanian@apm.com>
+Date: Tue,  8 Sep 2015 15:50:25 -0700
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- arch/arm/mach-omap2/io.c | 1 +
- 1 file changed, 1 insertion(+)
+> This patch adds support for 2nd 10GbE on APM X-Gene SoC
 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 980c937..3eaeaca 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -676,6 +676,7 @@ void __init am43xx_init_early(void)
- void __init am43xx_init_late(void)
- {
- 	omap_common_late_init();
-+	omap2_clk_enable_autoidle_all();
- }
- #endif
- 
--- 
-2.4.6
+Series applied, thanks.
