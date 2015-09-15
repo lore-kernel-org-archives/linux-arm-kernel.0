@@ -1,46 +1,31 @@
-From: colin.king@canonical.com (Colin King)
-Date: Tue, 15 Sep 2015 12:42:27 +0100
-Subject: [PATCH] [media] c8sectpfe: fix ininitialized error return on firmware
- load failure
-Message-ID: <1442317347-6384-1-git-send-email-colin.king@canonical.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 15 Sep 2015 13:49:11 +0200
+Subject: [PATCH] spi: mediatek: fix wrong error return value on probe
+In-Reply-To: <20150914183925.GG12027@sirena.org.uk>
+References: <1441320656-8666-1-git-send-email-javier@osg.samsung.com>
+ <20150914183925.GG12027@sirena.org.uk>
+Message-ID: <55F805B7.7020706@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+Hello Mark,
 
-static analysis with cppcheck detected the following error:
+On 09/14/2015 08:39 PM, Mark Brown wrote:
+> On Fri, Sep 04, 2015 at 12:50:56AM +0200, Javier Martinez Canillas wrote:
+>> Commit adcbcfea15d62 ("spi: mediatek: fix spi clock usage error")
+>> added a new sel_clk but introduced bugs in the error paths since
+>> the wrong struct clk pointers are passed to PTR_ERR().
+> 
+> This doesn't apply against current code, please check and resend.
+> 
 
-[drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c:1210]:
-  (error) Uninitialized variable: ret
+Which branch should I use as a baseline then? The patch applies cleanly
+on both today's linux-next (next-20150915) and your for-linus branch:
 
-ret is never initialised, so garbage is being returned. Instead
-return the error return from the call of request_firmware_nowait
+https://git.kernel.org/cgit/linux/kernel/git/broonie/spi.git/log/?h=for-linus
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-index 486aef5..16aa494 100644
---- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-+++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-@@ -1192,7 +1192,6 @@ err:
- 
- static int load_c8sectpfe_fw_step1(struct c8sectpfei *fei)
- {
--	int ret;
- 	int err;
- 
- 	dev_info(fei->dev, "Loading firmware: %s\n", FIRMWARE_MEMDMA);
-@@ -1207,7 +1206,7 @@ static int load_c8sectpfe_fw_step1(struct c8sectpfei *fei)
- 	if (err) {
- 		dev_err(fei->dev, "request_firmware_nowait err: %d.\n", err);
- 		complete_all(&fei->fw_ack);
--		return ret;
-+		return err;
- 	}
- 
- 	return 0;
+Best regards,
 -- 
-2.5.0
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
