@@ -1,66 +1,34 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 15 Sep 2015 22:36:34 +0200
-Subject: [PATCH v2] net: mvneta: fix refilling for Rx DMA buffers
-In-Reply-To: <CAA-51jPPDHfE1uT2NuJ53wWTvEgh7DcW0K0-xZgQdjAD2CC04w@mail.gmail.com>
-References: <1437303653-2236-1-git-send-email-simon.guinot@sequanux.org>
- <20150721.003033.1524284435822402813.davem@davemloft.net>
- <CAA-51jPPDHfE1uT2NuJ53wWTvEgh7DcW0K0-xZgQdjAD2CC04w@mail.gmail.com>
-Message-ID: <20150915203634.GI7306@kw.sim.vm.gnt>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 15 Sep 2015 21:37:50 +0100
+Subject: [PATCH] ARM: make highpte an expert option
+Message-ID: <E1Zbwz8-00016Z-5C@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 01:22:12PM -0700, Oren Laskin wrote:
-> I had to undo this change on my Amada 370 based board.  It was causing
-> corrupt data to make it through on large downloads.  I'm using wget to get
-> the same 30MB file many times and the SHA would occasionally be different.
-> I tracked it down to this commit.  In it, I would find on the order of a
-> few hundred bytes to simply be wrong data.
+When highmem is enabled, there's little reason not to also enable
+highpte support as well.  Rather than leaving this to chance, make
+it an expert option, and default it to be enabled if highmem is
+enabled.  Add some help text to the option while we're here.
 
-Hi Oren,
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Well, you are right. This patch actually introduces a pretty serious
-bug. I still don't understand how I missed that in a first place and
-I apologize for the inconvenience.
-
-Anyway, I am about to send a patch fixing the issue. Please, can you
-test it ?
-
-Thanks in advance,
-
-Simon
-
-> On Tue, Jul 21, 2015 at 12:30 AM, David Miller <davem@davemloft.net> wrote:
-> 
-> > From: Simon Guinot <simon.guinot@sequanux.org>
-> > Date: Sun, 19 Jul 2015 13:00:53 +0200
-> >
-> > > With the actual code, if a memory allocation error happens while
-> > > refilling a Rx descriptor, then the original Rx buffer is both passed
-> > > to the networking stack (in a SKB) and let in the Rx ring. This leads
-> > > to various kernel oops and crashes.
-> > >
-> > > As a fix, this patch moves Rx descriptor refilling ahead of building
-> > > SKB with the associated Rx buffer. In case of a memory allocation
-> > > failure, data is dropped and the original DMA buffer is put back into
-> > > the Rx ring.
-> > >
-> > > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> > > Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP
-> > network unit")
-> > > Cc: <stable@vger.kernel.org> # v3.8+
-> > > Tested-by: Yoann Sculo <yoann@sculo.fr>
-> >
-> > Applied, thanks.
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150915/eb15d66a/attachment.sig>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 17ac5d26ebaa..02eb51b6d324 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1711,8 +1711,9 @@ config HIGHMEM
+ 	  If unsure, say n.
+ 
+ config HIGHPTE
+-	bool "Allocate 2nd-level pagetables from highmem"
++	bool "Allocate 2nd-level pagetables from highmem" if EXPERT
+ 	depends on HIGHMEM
++	default y
+ 	help
+ 	  The VM uses one page of physical memory for each page table.
+ 	  For systems with a lot of processes, this can use a lot of
+-- 
+2.1.0
