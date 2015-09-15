@@ -1,84 +1,84 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 15 Sep 2015 11:23:43 +0800
-Subject: [PATCH v2 0/5] drivers: firmware: psci: add basic v1.0 support
-In-Reply-To: <20150914133510.GA26707@red-moon>
-References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20150914133510.GA26707@red-moon>
-Message-ID: <20150915112343.24d72c19@xhacker>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Tue, 15 Sep 2015 11:52:53 +0800
+Subject: [PATCH v7 0/3] Add MediaTek display PWM driver
+In-Reply-To: <1439882875-19596-1-git-send-email-yh.huang@mediatek.com>
+References: <1439882875-19596-1-git-send-email-yh.huang@mediatek.com>
+Message-ID: <1442289173.11445.5.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Sep 2015 14:35:10 +0100
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-
-> On Wed, Jul 08, 2015 at 06:16:46PM +0100, Lorenzo Pieralisi wrote:
-> > This series is a v2 of a previous posting:
-> > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347352.html
-> > 
-> > v1 -> v2:
-> > 
-> > - rebased against v4.2-rc1
-> > - added version to 1.0 specific macros
-> > 
-> > The PSCI v1.0 specification[1] introduces a brand new set of features
-> > (ie OS initiated mode and system suspend being the most notable ones)
-> > and provides updates to the PSCI 0.2 specification, keeping backward
-> > compatibility.
-> > 
-> > PSCI v1.0 applies minor changes to function return codes and function
-> > behaviour (ie AFFINITY_INFO requirements, INVALID_ADDRESS return value)
-> > and introduces a new power_state parameter format (extended stateid)
-> > that is probeable with the newly introduced PSCI_FEATURES call.
-> > 
-> > This series upgrades the current kernel PSCI layer implementation with
-> > a set of patches that make the kernel PSCI v1.0 compliant.
-> > 
-> > The series augments the PSCI firmware layer with a hook to retrieve
-> > the features for a specific PSCI function (ie based on the PSCI_FEATURES
-> > call) and uses it to detect the power_state parameter format, updating
-> > the power_state parameter handling functions accordingly.
-> > 
-> > In order to prevent firmware interfaces mismatch, a new compatible
-> > string is added to the DT bindings to characterize a 1.0 compliant
-> > firmware interface.
-> > 
-> > The series is built on top of M.Rutland's patch series:
-> > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/353795.html
-> > 
-> > Tested on a Juno board.
+On Tue, 2015-08-18 at 15:27 +0800, YH Huang wrote:
+> This patch series add the use of display PWM driver, documentation
+> and device tree for Mediatek SoCs. The driver is used to support
+> the backlight of the panel. This is based on v4.2-rc1.
 > 
-> Rebased against 4.3-rc1 (that includes the patch series above), if there
-> are no objections I will queue this series for v4.4.
-
-Tested on Marvell BG4CT DMP board. So feel free to add
-
-Tested-by: Jisheng Zhang <jszhang@marvell.com>
-
-Thanks
-
+> The clock definitions (CLK_MM_DISP_PWM*) are added by James Liao's patch:
+> clk: mediatek: Add subsystem clocks of MT8173
 > 
-> Thanks,
-> Lorenzo
+> Change in v7:
+> 1. Add the dependency HAS_IOMEM in Kconfig.
+> 2. Revise misprints and coding style for readability.
 > 
-> > 
-> > [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
-> > 
-> > Lorenzo Pieralisi (5):
-> >   drivers: firmware: psci: add INVALID_ADDRESS return value
-> >   drivers: firmware: psci: move power_state handling to generic code
-> >   drivers: firmware: psci: add PSCI_FEATURES call
-> >   drivers: firmware: psci: add extended stateid power_state support
-> >   drivers: firmware: psci: add PSCI v1.0 DT bindings
-> > 
-> >  Documentation/devicetree/bindings/arm/psci.txt |  6 +++
-> >  arch/arm64/kernel/psci.c                       | 14 -------
-> >  drivers/firmware/psci.c                        | 53 ++++++++++++++++++++++++++
-> >  include/linux/psci.h                           |  2 +
-> >  include/uapi/linux/psci.h                      | 15 ++++++++
-> >  5 files changed, 76 insertions(+), 14 deletions(-)
-> > 
-> > -- 
-> > 2.2.1
-> > 
+> Change in v6:
+> 1. Enable clocks in the pwm_enable function.
+> 2. Remove suspend/resume code since pwm-backlight driver has done the
+> same things.
+> 3. Revise some code to make it easier to read.
+> 
+> Change in v5:
+> 1. Configure PWM output via pinctrl.
+> 2. Fix the parameter name in dtsi.
+> 
+> Change in v4:
+> 1. Codebase is on v4.2-rc1.
+> 2. Add the PWM node in dtsi.
+> 3. Change the dependency in Kconfig.
+> 4. Rewrite some code for readability.
+> 
+> Change in v3:
+> 1. Add suspend/resume function.
+> 2. Fix the formula for high_width calculation.
+> 3. Rewrite some code to make it easier to read.
+> 4. Add more information in the commit message.
+> 
+> Change in v2:
+> 1. Rewrite descriptions for driver in kconfig to make it much clear.
+> 2. Rename the driver from "pwm-mediatek-disp" to "pwm-mtk-disp".
+> 3. Disable clocks in the error path.
+> 4. Change the shift values in decimal instead of hex.
+> 5. Rename and add some variables or function name for consistency and
+> readability.
+> 6. Drop unnecessary parentheses, spaces, variables and add newlines to
+> make the code easiler to read.
+> 
+> YH Huang (3):
+>   dt-bindings: pwm: add MediaTek display PWM bindings
+>   pwm: add MediaTek display PWM driver support
+>   arm64: dts: mt8173: add MT8173 display PWM driver support node
+> 
+>  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       |   42 ++++
+>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |   13 ++
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   22 ++
+>  drivers/pwm/Kconfig                                |   11 +
+>  drivers/pwm/Makefile                               |    1 +
+>  drivers/pwm/pwm-mtk-disp.c                         |  232 ++++++++++++++++++++
+>  6 files changed, 321 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+>  create mode 100644 drivers/pwm/pwm-mtk-disp.c
+> 
+> --
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Hi Thierry,
+
+Will you please pick up these patches in your pwm tree?
+Should I rebase to 4.3-rc1?
+
+Regards,
+YH Huang
