@@ -1,52 +1,29 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Tue, 15 Sep 2015 14:20:01 -0700
-Subject: [PATCH v1 1/2] soc: ti: display firmware file name as part of
- boot log
-In-Reply-To: <55F8600D.2070701@ti.com>
-References: <1441403199-10936-1-git-send-email-m-karicheri2@ti.com>
- <55EA673F.8010904@oracle.com> <55F06075.6050405@ti.com>
- <55F8600D.2070701@ti.com>
-Message-ID: <55F88B81.2000308@oracle.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Sep 2015 23:22:06 +0200
+Subject: [RFC PATCH] ARM: enable highmem by default on ARMv6/ARMv7 CPUs
+In-Reply-To: <E1Zbx08-0001A3-PQ@rmk-PC.arm.linux.org.uk>
+References: <E1Zbx08-0001A3-PQ@rmk-PC.arm.linux.org.uk>
+Message-ID: <3759947.Gi7mMFUgb4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/15/2015 11:14 AM, Murali Karicheri wrote:
-> On 09/09/2015 12:38 PM, Murali Karicheri wrote:
->> On 09/04/2015 11:53 PM, santosh.shilimkar at oracle.com wrote:
->>> On 9/4/15 5:46 PM, Murali Karicheri wrote:
->>>> To help the user, print the PDSP file name as part of
->>>> knav_queue_load_pdsp(). This will be useful for users to know what
->>>> version of the firmware is loaded to PDSP. Also update the
->>>> document for the location of the QMSS accumulator PDSP firmware.
->>>>
->>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>>> ---
->>>
->>> Looks fine. Will pick both the patches.
->>>
->>
->> Thanks Santhosh.
->>
->> Is there a requirement to add the firmware to linux-firmware.git. Right
->> now I have provided link to ti git repo that has the firmware. I have
->> the patch ready in case this is required. Do you know?
->>
->> Murali
->>> Regards,
->>> Santosh
->>>
->>>
->>
->>
-> Santosh,
->
-> I have checked v4.3-rc1 and I don't see it. Did you send the pull request?
->
-They are in the queue fo 4.4-rc1. They were too late for 4.3.
-You might know already, typically as a rule of thumb followed
-on arm-soc, we need to get patches reviewed/acked by rc4 to make
-it for next merge window.
-Ofcourse genuine bug fixes can make it to the same cycle.
+On Tuesday 15 September 2015 21:38:52 Russell King wrote:
+> ARMv6 and ARMv7 normally have more than 1G of memory, so it makes sense
+> to have highmem enabled by default.  Users can still turn highmem off if
+> they wish by enabling the EXPERT option, which then allows the option to
+> be visible.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Regards,
-Santosh
+I would have guessed that the cost of kmap_atomic (and the
+preempt_disable() when CONFIG_PREEMPT is set) is high enough
+even for lowmem-only systems that we want this disabled wherever
+we can.
+
+Looking through the memory properties of the dts files in the kernel,
+my impression is that all ARMv6 and a majority of the currently supported
+ARMv7 machines actually have less than 1GB. This is of course changing if you
+take into account only the ARMv7 machines that are getting added these
+days, but I would drop at least the ARMv6 dependency.
+
+	Arnd
