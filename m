@@ -1,52 +1,30 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 15 Sep 2015 15:39:11 +0200
-Subject: [PATCH 4/4] dmaengine: at_xdmac: clean used descriptor
-In-Reply-To: <1442323770-20266-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1442323770-20266-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1442324353-20557-1-git-send-email-ludovic.desroches@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Sep 2015 14:42:09 +0100
+Subject: [PATCH v2] arm: Fix backtrace generation when IPI is masked
+In-Reply-To: <55F819DE.9040704@linaro.org>
+References: <1442222294-2756-1-git-send-email-daniel.thompson@linaro.org>
+ <1442315112-14039-1-git-send-email-daniel.thompson@linaro.org>
+ <20150915113003.GS21084@n2100.arm.linux.org.uk>
+ <55F819DE.9040704@linaro.org>
+Message-ID: <20150915134208.GT21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When putting back a descriptor to the free descs list, some fields are
-not set to 0, it can cause bugs if someone uses it without having this
-in mind.
-Descriptor are not put back one by one so it is easier to clean
-descriptors when we request them.
+On Tue, Sep 15, 2015 at 02:15:10PM +0100, Daniel Thompson wrote:
+> Actually it already gets masked out. The argument to raise_nmi() points to a
+> data structure owned by the backtrace library functions and this structure
+> if altered during the execution of nmi_cpu_backtrace() to clear the calling
+> CPU.
+> 
+> I had originally planned to use cpumask_test_and_clear_cpu() for the
+> conditional branch but that would be broken because nmi_cpu_backtrace()
+> would become a nop if we clear anything from the mask before calling it!
+> 
+> I guess I should add a comment about this to save us from broken but
+> "obviously correct" cleanups in the future...
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: stable at vger.kernel.org #4.2
----
- drivers/dma/at_xdmac.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+Absolutely.
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index fbd4093..b5e132d 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -455,6 +455,15 @@ static struct at_xdmac_desc *at_xdmac_alloc_desc(struct dma_chan *chan,
- 	return desc;
- }
- 
-+void at_xdmac_init_used_desc(struct at_xdmac_desc *desc)
-+{
-+	memset(&desc->lld, 0, sizeof(desc->lld));
-+	INIT_LIST_HEAD(&desc->descs_list);
-+	desc->direction = DMA_TRANS_NONE;
-+	desc->xfer_size = 0;
-+	desc->active_xfer = false;
-+}
-+
- /* Call must be protected by lock. */
- static struct at_xdmac_desc *at_xdmac_get_desc(struct at_xdmac_chan *atchan)
- {
-@@ -466,7 +475,7 @@ static struct at_xdmac_desc *at_xdmac_get_desc(struct at_xdmac_chan *atchan)
- 		desc = list_first_entry(&atchan->free_descs_list,
- 					struct at_xdmac_desc, desc_node);
- 		list_del(&desc->desc_node);
--		desc->active_xfer = false;
-+		at_xdmac_init_used_desc(desc);
- 	}
- 
- 	return desc;
 -- 
-2.5.0
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
