@@ -1,47 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 15 Sep 2015 08:40:58 -0700
-Subject: [PATCH 6/6] ARM: dts: set up trigger type for edt-ft5x06
- interrupts
-In-Reply-To: <20150914212426.GA9968@saruman.tx.rr.com>
-References: <5044530af510d6686e78f8dfa912d89ef824f899.1442079408.git.dmitry.torokhov@gmail.com>
- <2adcbfd1d5b237598d37edcbeec4a8dbd443f36f.1442079408.git.dmitry.torokhov@gmail.com>
- <20150914212426.GA9968@saruman.tx.rr.com>
-Message-ID: <20150915154058.GA4215@atomide.com>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 15 Sep 2015 16:41:18 +0100
+Subject: [PATCH 09/15] arm64: Add page size to the kernel image header
+In-Reply-To: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
+References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1442331684-28818-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150914 14:28]:
-> On Sat, Sep 12, 2015 at 10:45:51AM -0700, Dmitry Torokhov wrote:
-> > Now that the driver respects IRQ trigger settings from device tree, let's
-> > fix them up in individual DTSes (note that the driver is still compatible
-> > with older DTSes).
-> > 
-> > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/am437x-sk-evm.dts   | 2 +-
-> >  arch/arm/boot/dts/imx28-tx28.dts      | 3 ++-
-> >  arch/arm/boot/dts/imx53-tx53-x03x.dts | 3 ++-
-> >  arch/arm/boot/dts/imx6qdl-tx6.dtsi    | 3 ++-
-> >  4 files changed, 7 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-> > index c17097d..d83fdcd 100644
-> > --- a/arch/arm/boot/dts/am437x-sk-evm.dts
-> > +++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-> > @@ -471,7 +471,7 @@
-> >  
-> >  		reg = <0x38>;
-> >  		interrupt-parent = <&gpio0>;
-> > -		interrupts = <31 0>;
-> > +		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
-> 
-> for AM437x SK:
-> 
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> 
-> Seems like there are no changes considering driver was always using
-> IRQF_TRIGGER_FALLING.
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Should not cause merge conflicts AFAIK:
+This patch adds the page size to the arm64 kernel image header
+so that one can infer the PAGESIZE used by the kernel. This will
+be helpful to diagnose failures to boot the kernel with page size
+not supported by the CPU.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ Documentation/arm64/booting.txt |    7 ++++++-
+ arch/arm64/kernel/image.h       |    5 ++++-
+ 2 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 7d9d3c2..aaf6d77 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -104,7 +104,12 @@ Header notes:
+ - The flags field (introduced in v3.17) is a little-endian 64-bit field
+   composed as follows:
+   Bit 0:	Kernel endianness.  1 if BE, 0 if LE.
+-  Bits 1-63:	Reserved.
++  Bit 1-2:	Kernel Page size.
++			0 - Unspecified.
++			1 - 4K
++			2 - 16K
++			3 - 64K
++  Bits 3-63:	Reserved.
+ 
+ - When image_size is zero, a bootloader should attempt to keep as much
+   memory as possible free for use by the kernel immediately after the
+diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+index 8fae075..73b736c 100644
+--- a/arch/arm64/kernel/image.h
++++ b/arch/arm64/kernel/image.h
+@@ -47,7 +47,10 @@
+ #define __HEAD_FLAG_BE	0
+ #endif
+ 
+-#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0)
++#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
++
++#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0) |		\
++			(__HEAD_FLAG_PAGE_SIZE << 1)
+ 
+ /*
+  * These will output as part of the Image header, which should be little-endian
+-- 
+1.7.9.5
