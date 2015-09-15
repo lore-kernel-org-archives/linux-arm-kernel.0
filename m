@@ -1,149 +1,211 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 15 Sep 2015 21:09:23 +0200
-Subject: [PATCH v2 6/8] arm/arm64: KVM: Add forwarded physical interrupts
- documentation
-In-Reply-To: <55F83637.3060400@arm.com>
-References: <1441395650-19663-1-git-send-email-christoffer.dall@linaro.org>
- <1441395650-19663-7-git-send-email-christoffer.dall@linaro.org>
- <55ED7427.1020901@arm.com> <55EE9FA4.3060204@linaro.org>
- <55EF1389.10802@arm.com>
- <CAMJs5B_Qxkfu=KSA0oUm386_mgZ73_NQEqS6e+gBGxwBMJVezg@mail.gmail.com>
- <55F2B932.2030901@arm.com> <20150914114219.GJ15712@cbox>
- <55F83637.3060400@arm.com>
-Message-ID: <20150915190923.GS15712@cbox>
+From: emilio.lopez@collabora.co.uk (=?UTF-8?Q?Emilio_L=c3=b3pez?=)
+Date: Tue, 15 Sep 2015 16:16:04 -0300
+Subject: [PATCH v2 2/3] platform/chrome: Support reading/writing the vboot
+ context
+In-Reply-To: <CABxcv=m23sfK=jOCswirQRB1SbP70VnomKp6hhwFhRLHiabq4w@mail.gmail.com>
+References: <1442234049-18637-1-git-send-email-emilio.lopez@collabora.co.uk>
+ <1442234049-18637-3-git-send-email-emilio.lopez@collabora.co.uk>
+ <CABxcv=m23sfK=jOCswirQRB1SbP70VnomKp6hhwFhRLHiabq4w@mail.gmail.com>
+Message-ID: <55F86E74.9010907@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 04:16:07PM +0100, Andre Przywara wrote:
-> Hi Christoffer,
-> 
-> On 14/09/15 12:42, Christoffer Dall wrote:
-> ....
-> >>>> Where is this done? I see that the physical dist state is altered on the
-> >>>> actual IRQ forwarding, but not on later exits/entries? Do you mean
-> >>>> kvm_vgic_flush_hwstate() with "flush"?
-> >>>
-> >>> this is a bug and should be fixed in the 'fixes' patches I sent last
-> >>> week.  We should set active state on every entry to the guest for IRQs
-> >>> with the HW bit set in either pending or active state.
-> >>
-> >> OK, sorry, I missed that one patch, I was looking at what should become
-> >> -rc1 soon (because that's what I want to rebase my ITS emulation patches
-> >> on). That patch wasn't in queue at the time I started looking at it.
-> >>
-> >> So I updated to the latest queue containing those two fixes and also
-> >> applied your v2 series. Indeed this series addresses some of the things
-> >> I was wondering about the last time, but the main thing still persists:
-> >> - Every time the physical dist state is active we have the virtual state
-> >> still at pending or active.
-> > 
-> > For the arch timer, yes.
-> > 
-> > For a passthrough device, there should be a situation where the physical
-> > dist state is active but we didn't see the virtual state updated at the
-> > vgic yet (after physical IRQ fires and before the VFIO ISR calls
-> > kvm_set_irq).
-> 
-> But then we wouldn't get into vgic_sync_hwirq(), because we wouldn't
-> inject a mapped IRQ before kvm_set_irq() is called, would we?
+Hi Javier,
 
-Ah, you meant, if we are in vgic_sync_hwirq() and the dist state is
-active, then we have the virtual state still at pending or active?
+Thanks for the review. You'll find my answers inline
 
-That's a slightly different question from what you posed above.
+On 15/09/15 10:47, Javier Martinez Canillas wrote:
+> Hello Emilio,
+>
+> Patch looks mostly good to me, I just have a few comments.
+>
+> On Mon, Sep 14, 2015 at 2:34 PM, Emilio L?pez
+> <emilio.lopez@collabora.co.uk> wrote:
+>> Some EC implementations include a small nvram space used to store
+>> verified boot context data. This patch offers a way to expose this
+>> data to userspace.
+>>
+>> Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
+>> ---
+>> Changes from v1:
+>>   - Use is_bin_visible instead of is_visible
+>>
+>>   Documentation/devicetree/bindings/mfd/cros-ec.txt |   4 +
+>>   drivers/platform/chrome/Makefile                  |   5 +-
+>>   drivers/platform/chrome/cros_ec_dev.c             |   1 +
+>>   drivers/platform/chrome/cros_ec_vbc.c             | 137 ++++++++++++++++++++++
+>>   include/linux/mfd/cros_ec.h                       |   1 +
+>>   5 files changed, 147 insertions(+), 1 deletion(-)
+>>   create mode 100644 drivers/platform/chrome/cros_ec_vbc.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/cros-ec.txt b/Documentation/devicetree/bindings/mfd/cros-ec.txt
+>> index 1777916..136e0c2 100644
+>> --- a/Documentation/devicetree/bindings/mfd/cros-ec.txt
+>> +++ b/Documentation/devicetree/bindings/mfd/cros-ec.txt
+>> @@ -34,6 +34,10 @@ Required properties (LPC):
+>>   - compatible: "google,cros-ec-lpc"
+>>   - reg: List of (IO address, size) pairs defining the interface uses
+>>
+>> +Optional properties (all):
+>> +- google,has-vbc-nvram: Some implementations of the EC include a small
+>> +  nvram space used to store verified boot context data. This boolean flag
+>> +  is used to specify whether this nvram is present or not.
+>>
+>>   Example for I2C:
+>>
+>
+> I would split the DT binding part from the actual implementation, see
+> Documentation/devicetree/bindings/submitting-patches.txt.
 
-I haven't thought extremely carefully about it, but could you not have
-(1) guest deactivates (2) physical interrupt is handled on different CPU
-on host for passthrough device (3) VFIO ISR leaves the IRQ active (3)
-guest exits and you now hit vgic_sync_hwirq() and the virtual interrupt
-is now inactive but the physical interrupt is active?
+Ok, I'll do
 
-> 
-> >> - If the physical dist state is non-active, the virtual state is
-> >> inactive (LR.state==8: HW bit) as well. The associated ELRSR bit is 1
-> >> (LR empty).
-> >> (I was tracing every HW mapped LR in vgic_sync_hwirq() for this)
-> >>
-> >> So that contradicts:
-> >>
-> >> +  - On guest EOI, the *physical distributor* active bit gets cleared,
-> >> +    but the LR.Active is left untouched (set).
-> >>
-> >> This is the main point I was actually wondering about: I cannot confirm
-> >> this statement. In my tests the LR state and the physical dist state
-> >> always correspond, as excepted by reading the spec.
-> >>
-> >> I reckon that these observations are mostly independent from the actual
-> >> KVM code, as I try to observe hardware state (physical distributor and
-> >> LRs) before KVM tinkers with them.
-> > 
-> > ok, I got this paragraph from Marc, so we really need to ask him?  Which
-> > hardware are you seeing this behavior on?  Perhaps implementations vary
-> > on this point?
-> 
-> I checked this on Midway and Juno. Both have a GIC-400, but I don't have
-> access to any other GIC implementations.
-> I added the two BUG_ONs shown below to prove that assumption.
-> 
-> Eric, I've been told you observed the behaviour with the GIC not syncing
-> LR and phys state for a mapped HWIRQ which was not the timer.
-> Can you reproduce this? Does it complain with the patch below?
-> 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 5942ce9..7fac16e 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1459,9 +1459,12 @@ static bool vgic_sync_hwirq(struct kvm_vcpu
->  					     IRQCHIP_STATE_ACTIVE,
->  					     false);
->  		WARN_ON(ret);
-> +		BUG_ON(!(vlr.state & 3));
->  		return false;
->  	}
-> 
-> +	BUG_ON(vlr.state & 3);
-> +
->  	return process_queued_irq(vcpu, lr, vlr);
->  }
-> 
-> > 
-> > I have no objections removing this point from the doc though, I'm just
-> > relaying information on this one.
-> 
-> I see, I talked with Marc and I am about to gather more data with the
-> above patch to prove that this never happens.
-> 
-> >>
-> >> ...
-> >>
-> >>>
-> >>>> Is this an observation, an implementation bug or is this mentioned in
-> >>>> the spec? Needing to spoon-feed the VGIC by doing it's job sounds a bit
-> >>>> awkward to me.
-> >>>
-> >>> What do you mean?  How are we spoon-feeding the VGIC?
-> >>
-> >> By looking at the physical dist state and all LRs and clearing the LR we
-> >> do what the GIC is actually supposed to do for us - and what it actually
-> >> does according to my observations.
-> >>
-> >> The point is that patch 1 in my ITS emulation series is reworking the LR
-> >> handling and this patch was based on assumptions that seem to be no
-> >> longer true (i.e. we don't care about inactive LRs except for our LR
-> >> mapping code). So I want to be sure that I fully get what is going on
-> >> here and I struggle at this at the moment due to the above statement.
-> >>
-> >> What are the plans regarding your "v2: Rework architected timer..."
-> >> series? Will this be queued for 4.4? I want to do the
-> >> rebasing^Wrewriting of my series only once if possible ;-)
-> >>
-> > I think we should settle on this series ASAP and base your ITS stuff on
-> > top of it.  What do you think?
-> 
-> Yeah, that's what I was thinking too. So I will be working against
-> 4.3-rc1 with your timer-rework-v2 branch plus the other fixes from the
-> kvm-arm queue merged.
-> 
-Sounds good!  Thanks.
+>> diff --git a/drivers/platform/chrome/Makefile b/drivers/platform/chrome/Makefile
+>> index 4a11b01..787be61 100644
+>> --- a/drivers/platform/chrome/Makefile
+>> +++ b/drivers/platform/chrome/Makefile
+>> @@ -1,7 +1,10 @@
+>>
+>>   obj-$(CONFIG_CHROMEOS_LAPTOP)  += chromeos_laptop.o
+>>   obj-$(CONFIG_CHROMEOS_PSTORE)  += chromeos_pstore.o
+>> -cros_ec_devs-objs               := cros_ec_dev.o cros_ec_sysfs.o cros_ec_lightbar.o
+>> +cros_ec_devs-objs               := cros_ec_dev.o
+>> +cros_ec_devs-objs               += cros_ec_lightbar.o
+>> +cros_ec_devs-objs               += cros_ec_sysfs.o
+>> +cros_ec_devs-objs               += cros_ec_vbc.o
+>
+> Why are you changing the Makefile? AFAIK += is usually used when the
+> compilation is conditional based on a Kconfig symbol but since these
+> are build unconditionally, I'll just keep it as foo := bar baz
 
--Christoffer
+As far as I'm aware, += is append[0]. It's used for stuff like
+obj-$(CONFIG_CHROMEOS_LAPTOP)  += chromeos_laptop.o
+because the left part will resolve to "obj-y" or similar, and you want 
+to add to it, not replace it. I only changed the Makefile here because 
+the line was growing too long, and I thought it looked neater this way; 
+it shouldn't cause any functional change apart from the intended one.
+
+[0] https://www.gnu.org/software/make/manual/html_node/Appending.html
+
+> Which makes me think, do we need a Kconfig option for this feature
+> since not all machines have it?
+
+Not all machines have a lightbar either; both of the features are 
+runtime-conditional. IMO, it makes more sense this way when you consider 
+a kernel will likely support multiple platforms.
+
+>>   obj-$(CONFIG_CROS_EC_CHARDEV)   += cros_ec_devs.o
+>>   obj-$(CONFIG_CROS_EC_LPC)       += cros_ec_lpc.o
+>>   obj-$(CONFIG_CROS_EC_PROTO)    += cros_ec_proto.o
+>> diff --git a/drivers/platform/chrome/cros_ec_dev.c b/drivers/platform/chrome/cros_ec_dev.c
+>> index e8fcdc2..d19263f 100644
+>> --- a/drivers/platform/chrome/cros_ec_dev.c
+>> +++ b/drivers/platform/chrome/cros_ec_dev.c
+>> @@ -32,6 +32,7 @@ static int ec_major;
+>>   static const struct attribute_group *cros_ec_groups[] = {
+>>          &cros_ec_attr_group,
+>>          &cros_ec_lightbar_attr_group,
+>> +       &cros_ec_vbc_attr_group,
+>>          NULL,
+>>   };
+>>
+>> diff --git a/drivers/platform/chrome/cros_ec_vbc.c b/drivers/platform/chrome/cros_ec_vbc.c
+>> new file mode 100644
+>> index 0000000..a0e8d38
+>> --- /dev/null
+>> +++ b/drivers/platform/chrome/cros_ec_vbc.c
+>> @@ -0,0 +1,137 @@
+>> +/*
+>> + * cros_ec_vbc - Expose the vboot context nvram to userspace
+>> + *
+>> + * Copyright (C) 2015 Collabora Ltd.
+>> + *
+>> + * based on vendor driver,
+>> + *
+>> + * Copyright (C) 2012 The Chromium OS Authors
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/of.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/mfd/cros_ec.h>
+>> +#include <linux/mfd/cros_ec_commands.h>
+>> +#include <linux/slab.h>
+>> +
+>> +static ssize_t vboot_context_read(struct file *filp, struct kobject *kobj,
+>> +                                 struct bin_attribute *att, char *buf,
+>> +                                 loff_t pos, size_t count)
+>> +{
+>> +       struct device *dev = container_of(kobj, struct device, kobj);
+>> +       struct cros_ec_dev *ec = container_of(dev, struct cros_ec_dev,
+>> +                                             class_dev);
+>> +       struct cros_ec_device *ecdev = ec->ec_dev;
+>> +       struct ec_params_vbnvcontext *params;
+>> +       struct cros_ec_command *msg;
+>> +       int err;
+>> +       const size_t para_sz = sizeof(struct ec_params_vbnvcontext);
+>> +       const size_t resp_sz = sizeof(struct ec_response_vbnvcontext);
+>> +       const size_t payload = max(para_sz, resp_sz);
+>> +
+>> +       msg = kmalloc(sizeof(*msg) + payload, GFP_KERNEL);
+>> +       if (!msg)
+>> +               return -ENOMEM;
+>> +
+>> +       params = (struct ec_params_vbnvcontext *)msg->data;
+>> +       params->op = EC_VBNV_CONTEXT_OP_READ;
+>> +
+>> +       msg->version = EC_VER_VBNV_CONTEXT;
+>> +       msg->command = EC_CMD_VBNV_CONTEXT;
+>> +       msg->outsize = sizeof(params->op);
+>
+> Shouldn't this be para_sz ? Since you are sending to the EC the whole
+> struct ec_params_vbnvcontext and not only the op field.
+>
+> Or if the EC only expects to get the u32 op field, then I think your
+> max payload calculation is not correct.
+
+The params struct is the same for both read and write ops, so it has the 
+op flag and a buffer for the write op. During the read op I believe 
+there's no need to send this potentially-garbage-filled buffer to the 
+EC, so outsize is set accordingly here.
+
+The vendor tree does it this way, but I can change it to send the full 
+buffer if you prefer so.
+
+ec code is at 
+https://chromium.googlesource.com/chromiumos/platform/ec/+/master/common/system.c 
+L1086+ if you want to take a look
+
+>> +       msg->insize = resp_sz;
+>> +
+>> +       err = cros_ec_cmd_xfer(ecdev, msg);
+>> +       if (err < 0) {
+>> +               dev_err(dev, "Error sending read request: %d\n", err);
+>> +               kfree(msg);
+>> +               return err;
+>> +       }
+>> +
+>> +       BUILD_BUG_ON(resp_sz > PAGE_SIZE);
+>
+> Why you need this? struct ec_response_vbnvcontext is really small AFAICT.
+
+This is just me being paranoid about memcpy :) Indeed, the struct should 
+be way smaller than a page. I can drop it if you think it's too much.
+
+>> +       memcpy(buf, msg->data, resp_sz);
+>> +
+>> +       kfree(msg);
+>> +       return resp_sz;
+>> +}
+>> +
+
+Thanks!
+Emilio
