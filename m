@@ -1,113 +1,67 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Sep 2015 17:15:33 +0100
-Subject: [PATCH] KVM: arm64: remove all traces of the ThumbEE registers
-Message-ID: <1442333733-16347-1-git-send-email-will.deacon@arm.com>
+Date: Tue, 15 Sep 2015 17:16:13 +0100
+Subject: [PATCH] arm64: hw_breakpoint: use target state to determine ABI
+ behaviour
+Message-ID: <1442333773-16446-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although the ThumbEE registers and traps were present in earlier
-versions of the v8 architecture, it was retrospectively removed and so
-we can do the same.
+The arm64 hw_breakpoint interface is slightly less flexible than its
+32-bit counterpart, thanks to some changes in the architecture rendering
+unaligned watchpoint addresses obselete for AArch64.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+However, in a multi-arch environment (i.e. debugging a 32-bit target
+with a 64-bit GDB under a 64-bit kernel), we need to provide a feature
+compatible interface to GDB in order for debugging to function correctly.
+
+This patch adds a new helper, is_compat_bp,  to our hw_breakpoint
+implementation which changes the interface behaviour based on the
+architecture of the debug target as opposed to the debugger itself.
+This allows debugged to function as expected for multi-arch
+configurations without relying on deprecated architectural behaviours
+when debugging native applications.
+
+Cc: Yao Qi <yao.qi@arm.com>
+Cc: Catalin Marinas <Catalin.Marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h |  1 -
- arch/arm64/include/asm/kvm_asm.h |  4 +---
- arch/arm64/kvm/hyp.S             | 22 ++++------------------
- arch/arm64/kvm/sys_regs.c        |  7 -------
- 4 files changed, 5 insertions(+), 29 deletions(-)
+ arch/arm64/kernel/hw_breakpoint.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 7605e095217f..cdc9888134e5 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -168,7 +168,6 @@
- #define VTTBR_VMID_MASK	  (UL(0xFF) << VTTBR_VMID_SHIFT)
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index bba85c8f8037..2926c3dd6479 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -163,6 +163,12 @@ enum hw_breakpoint_ops {
+ 	HW_BREAKPOINT_RESTORE
+ };
  
- /* Hyp System Trap Register */
--#define HSTR_EL2_TTEE	(1 << 16)
- #define HSTR_EL2_T(x)	(1 << x)
- 
- /* Hyp Coproccessor Trap Register Shifts */
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 67fa0de3d483..5e377101f919 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -53,9 +53,7 @@
- #define	IFSR32_EL2	25	/* Instruction Fault Status Register */
- #define	FPEXC32_EL2	26	/* Floating-Point Exception Control Register */
- #define	DBGVCR32_EL2	27	/* Debug Vector Catch Register */
--#define	TEECR32_EL1	28	/* ThumbEE Configuration Register */
--#define	TEEHBR32_EL1	29	/* ThumbEE Handler Base Register */
--#define	NR_SYS_REGS	30
-+#define	NR_SYS_REGS	28
- 
- /* 32bit mapping */
- #define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 6addf97aadb3..c4016d411f4a 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -433,20 +433,13 @@
- 	mrs	x5, ifsr32_el2
- 	stp	x4, x5, [x3]
- 
--	skip_fpsimd_state x8, 3f
-+	skip_fpsimd_state x8, 2f
- 	mrs	x6, fpexc32_el2
- 	str	x6, [x3, #16]
--3:
--	skip_debug_state x8, 2f
-+2:
-+	skip_debug_state x8, 1f
- 	mrs	x7, dbgvcr32_el2
- 	str	x7, [x3, #24]
--2:
--	skip_tee_state x8, 1f
--
--	add	x3, x2, #CPU_SYSREG_OFFSET(TEECR32_EL1)
--	mrs	x4, teecr32_el1
--	mrs	x5, teehbr32_el1
--	stp	x4, x5, [x3]
- 1:
- .endm
- 
-@@ -466,16 +459,9 @@
- 	msr	dacr32_el2, x4
- 	msr	ifsr32_el2, x5
- 
--	skip_debug_state x8, 2f
-+	skip_debug_state x8, 1f
- 	ldr	x7, [x3, #24]
- 	msr	dbgvcr32_el2, x7
--2:
--	skip_tee_state x8, 1f
--
--	add	x3, x2, #CPU_SYSREG_OFFSET(TEECR32_EL1)
--	ldp	x4, x5, [x3]
--	msr	teecr32_el1, x4
--	msr	teehbr32_el1, x5
- 1:
- .endm
- 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index b41607d270ac..6c35e49757d8 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -539,13 +539,6 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ Op0(0b10), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b110),
- 	  trap_dbgauthstatus_el1 },
- 
--	/* TEECR32_EL1 */
--	{ Op0(0b10), Op1(0b010), CRn(0b0000), CRm(0b0000), Op2(0b000),
--	  NULL, reset_val, TEECR32_EL1, 0 },
--	/* TEEHBR32_EL1 */
--	{ Op0(0b10), Op1(0b010), CRn(0b0001), CRm(0b0000), Op2(0b000),
--	  NULL, reset_val, TEEHBR32_EL1, 0 },
--
- 	/* MDCCSR_EL1 */
- 	{ Op0(0b10), Op1(0b011), CRn(0b0000), CRm(0b0001), Op2(0b000),
- 	  trap_raz_wi },
++static int is_compat_bp(struct perf_event *bp)
++{
++	struct task_struct *tsk = bp->hw.target;
++	return tsk && is_compat_thread(task_thread_info(tsk));
++}
++
+ /**
+  * hw_breakpoint_slot_setup - Find and setup a perf slot according to
+  *			      operations
+@@ -420,7 +426,7 @@ static int arch_build_bp_info(struct perf_event *bp)
+ 	 * Watchpoints can be of length 1, 2, 4 or 8 bytes.
+ 	 */
+ 	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE) {
+-		if (is_compat_task()) {
++		if (is_compat_bp(bp)) {
+ 			if (info->ctrl.len != ARM_BREAKPOINT_LEN_2 &&
+ 			    info->ctrl.len != ARM_BREAKPOINT_LEN_4)
+ 				return -EINVAL;
+@@ -477,7 +483,7 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
+ 	 * AArch32 tasks expect some simple alignment fixups, so emulate
+ 	 * that here.
+ 	 */
+-	if (is_compat_task()) {
++	if (is_compat_bp(bp)) {
+ 		if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
+ 			alignment_mask = 0x7;
+ 		else
 -- 
 2.1.4
