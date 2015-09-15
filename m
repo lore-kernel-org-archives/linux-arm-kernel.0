@@ -1,95 +1,47 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 15 Sep 2015 15:40:05 +0100
-Subject: [PATCH v3] arm: Fix backtrace generation when IPI is masked
-In-Reply-To: <1442222294-2756-1-git-send-email-daniel.thompson@linaro.org>
-References: <1442222294-2756-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1442328005-13661-1-git-send-email-daniel.thompson@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Sep 2015 15:44:09 +0100
+Subject: [PATCH] arm64: enable generic idle loop
+In-Reply-To: <20150915143135.GG14287@e104818-lin.cambridge.arm.com>
+References: <1440128422-4170-1-git-send-email-leo.yan@linaro.org>
+ <20150821090043.GA14072@e104818-lin.cambridge.arm.com>
+ <20150821091446.GB4280@leoy-linaro>
+ <20150821155425.GC16410@e104818-lin.cambridge.arm.com>
+ <20150915112008.GA30920@leoy-linaro>
+ <20150915143135.GG14287@e104818-lin.cambridge.arm.com>
+Message-ID: <20150915144409.GF31157@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently on ARM when <SysRq-L> is triggered from an interrupt handler
-(e.g. a SysRq issued using UART or kbd) the main CPU will wedge for ten
-seconds with interrupts masked before issuing a backtrace for every CPU
-except itself.
+On Tue, Sep 15, 2015 at 03:31:35PM +0100, Catalin Marinas wrote:
+> On Tue, Sep 15, 2015 at 07:20:08PM +0800, Leo Yan wrote:
+> > On Fri, Aug 21, 2015 at 04:54:25PM +0100, Catalin Marinas wrote:
+> > > On Fri, Aug 21, 2015 at 05:14:46PM +0800, Leo Yan wrote:
+> > > > On Fri, Aug 21, 2015 at 10:00:43AM +0100, Catalin Marinas wrote:
+> > > > > On Fri, Aug 21, 2015 at 11:40:22AM +0800, Leo Yan wrote:
+> > > > > > Enable generic idle loop for ARM64, so can support for hlt/nohlt
+> > > > > > command line options to override default idle loop behavior.
+> > > > > 
+> > > > > Just curious, what do you need this for?
+> > > > 
+> > > > With this config, usually we can add "nohlt" in command line to force
+> > > > the cpu will never be powered off; so can quickly narrow down if some
+> > > > issues are related with cpuidle or not.
+> > > > 
+> > > > And if CPU is powered off, then its debug logic also will be powered off.
+> > > > So we can simply use this method to let debugger always hot connect with
+> > > > the target CPU.
+> > > 
+> > > OK.
+> > > 
+> > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > 
+> > Suppose you have missed this patch at previous merge window,
+> > so just for reminding.
+> 
+> It looks like it missed the merging window. Will, can this still be
+> picked for 4.3? If not, it will be 4.4.
 
-The new backtrace code introduced by commit 96f0e00378d4 ("ARM: add
-basic support for on-demand backtrace of other CPUs") does not work
-correctly when run from an interrupt handler because IPI_CPU_BACKTRACE
-is used to generate the backtrace on all CPUs but cannot preempt the
-current calling context.
+Yeah, it's harmless enough to pick up with the current crop of fixes.
+Sorry I missed it.
 
-This can be fixed by detecting that the calling context cannot be
-preempted and issuing the backtrace directly in this case. Issuing
-directly leaves us without any pt_regs to pass to nmi_cpu_backtrace()
-so we also modify the generic code to call dump_stack() when its
-argument is NULL.
-
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
-
-Notes:
-    Changes in v3:
-    
-    * Added comments to describe how raise_nmi() and nmi_cpu_backtrace()
-      interact with backtrace_mask (Russell King).
-    
-    Changes in v2:
-    
-    * Improved commit message to better describe the changes to the generic
-      code (Hillf Danton).
-
- arch/arm/kernel/smp.c |  9 +++++++++
- lib/nmi_backtrace.c   | 11 ++++++++++-
- 2 files changed, 19 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 48185a773852..0c4e7fdb9636 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -748,6 +748,15 @@ core_initcall(register_cpufreq_notifier);
-
- static void raise_nmi(cpumask_t *mask)
- {
-+	/*
-+	 * Generate the backtrace directly if we are running in a calling
-+	 * context that is not preemptible by the backtrace IPI. Note
-+	 * that nmi_cpu_backtrace() automatically removes the current cpu
-+	 * from mask.
-+	 */
-+	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
-+		nmi_cpu_backtrace(NULL);
-+
- 	smp_cross_call(mask, IPI_CPU_BACKTRACE);
- }
-
-diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
-index 88d3d32e5923..6019c53c669e 100644
---- a/lib/nmi_backtrace.c
-+++ b/lib/nmi_backtrace.c
-@@ -43,6 +43,12 @@ static void print_seq_line(struct nmi_seq_buf *s, int start, int end)
- 	printk("%.*s", (end - start) + 1, buf);
- }
-
-+/*
-+ * When raise() is called it will be is passed a pointer to the
-+ * backtrace_mask. Architectures that call nmi_cpu_backtrace()
-+ * directly from their raise() functions may rely on the mask
-+ * they are passed being updated as a side effect of this call.
-+ */
- void nmi_trigger_all_cpu_backtrace(bool include_self,
- 				   void (*raise)(cpumask_t *mask))
- {
-@@ -149,7 +155,10 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
- 		/* Replace printk to write into the NMI seq */
- 		this_cpu_write(printk_func, nmi_vprintk);
- 		pr_warn("NMI backtrace for cpu %d\n", cpu);
--		show_regs(regs);
-+		if (regs)
-+			show_regs(regs);
-+		else
-+			dump_stack();
- 		this_cpu_write(printk_func, printk_func_save);
-
- 		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
---
-2.4.3
+Will
