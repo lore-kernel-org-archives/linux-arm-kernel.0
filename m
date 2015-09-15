@@ -1,39 +1,56 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 15 Sep 2015 17:23:09 +0100
-Subject: [PATCH] KVM: arm64: remove all traces of the ThumbEE registers
-In-Reply-To: <1442333733-16347-1-git-send-email-will.deacon@arm.com>
-References: <1442333733-16347-1-git-send-email-will.deacon@arm.com>
-Message-ID: <CAFEAcA94VNogBEGh9ohB3M8fEqfLRPWVj8yaCK-3HGa-ht2fLg@mail.gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 15 Sep 2015 17:31:29 +0100
+Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
+In-Reply-To: <9hheghzvfbz.fsf@e105922-lin.cambridge.arm.com>
+References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+ <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
+ <20150914131448.GC7002@leverpostej>
+ <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
+ <20150914134949.GE7002@leverpostej>
+ <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
+ <1442251092.2850.53.camel@linaro.org>
+ <9hhy4g89g64.fsf@e105922-lin.cambridge.arm.com>
+ <1442313962.2917.25.camel@linaro.org>
+ <9hheghzvfbz.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <1442334689.4040.68.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 September 2015 at 17:15, Will Deacon <will.deacon@arm.com> wrote:
-> Although the ThumbEE registers and traps were present in earlier
-> versions of the v8 architecture, it was retrospectively removed and so
-> we can do the same.
->
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Tue, 2015-09-15 at 17:04 +0100, Punit Agrawal wrote:
+> "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
+> 
+> > On Tue, 2015-09-15 at 10:37 +0100, Punit Agrawal wrote:
+> >> "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
+> >> 
+> >> > On Mon, 2015-09-14 at 15:38 +0100, Punit Agrawal wrote:
+> >> >> Mark Rutland <mark.rutland@arm.com> writes:
+> >> >> 
+> > [...]
+> >> >> The way the SCP interface is defined, the sensor identifiers are
+> >> >> contiguous,
+> >> >
+> >> > Is there any documentation other than DUI0922A? [1] From what I can seen
+> >> > that just says it's a 16-bit value and doesn't put any particular
+> >> > constraints on its value.
+> >> 
+> >> Although not explicitly stated, if you look at the Get Sensor Capability
+> >> [2] and Get Sensor Info [3] commands you can indirectly infer that the
+> >> Sensor IDs are contiguous.
+> >
+> > I personally wouldn't even indirectly infer they are contiguous from
+> > what the document says. If I were implementing the firmware I would feel
+> > quite in my rights to, for example, use the top 8 bits of the ID for a
+> > sensor type and the bottom 8 for an index, if that made dispatching of
+> > requests more efficient. Or if some optional hardware was detected as
+> > missing, leaving some holes in ID space.
+> 
+> True. And without a command to convey the list of valid IDs, the
+> consumer of the API would have to iterate over the entire 16bit space to
+> locate valid IDs.
 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index b41607d270ac..6c35e49757d8 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -539,13 +539,6 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->         { Op0(0b10), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b110),
->           trap_dbgauthstatus_el1 },
->
-> -       /* TEECR32_EL1 */
-> -       { Op0(0b10), Op1(0b010), CRn(0b0000), CRm(0b0000), Op2(0b000),
-> -         NULL, reset_val, TEECR32_EL1, 0 },
-> -       /* TEEHBR32_EL1 */
-> -       { Op0(0b10), Op1(0b010), CRn(0b0001), CRm(0b0000), Op2(0b000),
-> -         NULL, reset_val, TEEHBR32_EL1, 0 },
-> -
+Or get IDs from device-tree :-) Anyway, I'm not arguing that the IDs
+shouldn't be 0..N-1, just that it should explicitly documented in the
+SCPI doc, which we're are in agreement on.
 
-I guess this is a VM migration compatibility break between kernels
-without this patch and kernels with it? I think that's OK at this
-point, but it would be nice to mention it in the commit message.
-
-thanks
--- PMM
+-- 
+Tixy
