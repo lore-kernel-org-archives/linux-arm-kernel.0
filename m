@@ -1,96 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 15 Sep 2015 08:46:50 -0700
-Subject: [GIT PULL] omap fixes against v4.3-rc1
-Message-ID: <20150915154650.GS10928@atomide.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 15 Sep 2015 17:53:45 +0200
+Subject: I.MX6 HDMI support in v4.2
+In-Reply-To: <m3bnd52y4s.fsf@t19.piap.pl>
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m337yp5gvv.fsf@t19.piap.pl> <1441709778.13536.8.camel@pengutronix.de>
+ <m3bnd52y4s.fsf@t19.piap.pl>
+Message-ID: <1442332425.2637.16.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+Am Montag, den 14.09.2015, 10:39 +0200 schrieb Krzysztof Ha?asa:
+> Another round of tests, I noticed the new git versions :-)
+> Testing Linux v4.2 + PLL5 DTS patch (for HDMI output with enabled
+> LVDS).
+> Using mplayer with YUV420 (DRM Xvideo would probably work with packed
+> UYVY-alike formats but I need YUV420 because H.264 decoder produces
+> it).
+> The driver is git://ftp.arm.linux.org.uk/~rmk/xf86-video-armada.git,
+> branch unstable-devel, and it uses
+> git://ftp.arm.linux.org.uk/~rmk/libdrm-armada.git/.
+> 
+> 	IMX DRM Xvideo output:
+> 
+> Only unscaled video: no color (luminance is good but the color
+> components are green). The driver doesn't use color information.
+> I hope this is easily fixable.
+> 
+There were patches for that some weeks ago already, I would hope they
+got applied to some tree destinied for upstream. Will look at that and
+ping people if necessary.
 
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+> 
+> 	rmk/drm-etnaviv-devel:
+> 
+> With unscaled video, the only visible problem is tearing in the
+> middle
+> of the screen (unability to sync with screen refresh).
+> 
+> With scaling, I'm getting horizontal lines (mostly visible when the
+> scene changes) and some sort of stalls - sometimes two frames are
+> alternating for few seconds then it goes forward.
+> 
+> 
+> 	pengutronix/etnaviv-for-upstream:
+That is the right branch, containing the changes I sent out for review.
 
-are available in the git repository at:
+It includes a new kernel<->userspace interface, so needs a modified
+xf86-video-armada to go with it. You can pick that up here:
+git://git.pengutronix.de/git/lst/xf86-video-armada.git for-rmk
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/fixes-rc1
+Caution: the armada code is WIP and needs further cleanups. It should
+work though.
 
-for you to fetch changes up to 60fdcb8863d9b4a8b6c6b367886fadb50d4c0b07:
+> No etnaviv Xvideo:
+> (==) armada(0): Backing store enabled
+> (==) armada(0): Silken mouse enabled
+> (EE) armada(0): etnaviv: unable to open: Not a directory
+> (WW) armada(0): [drm] Vivante initialization failed, running
+> unaccelerated
+> 
+> I assume I need a newer something.
+> 
+> 
+> 	pengutronix/v4.2/topic/etnaviv-for-rmk:
 
-  ARM: dts: Fixup model name for HP t410 dts (2015-09-14 13:33:47 -0700)
+Please don't use that branch. It just there to keep stability for
+people that already know about it.
 
-----------------------------------------------------------------
-Fixes for omaps against v4.3-rc1:
-
-- Fix long time regression on beagle for tfp410 pin muxing
-
-- Fix dm814x control base address typo and related Ethernet
-  phy configuration
-
-- Fix igepv2 Ethernet pinmuxing as only some boards have it
-
-- Fix pbias regulator compatible values as a pending regulator
-  fix needs those for MMC1 to work properly
-
-- Fix beagle-x15 MMC1 regulator and make pcf857x built-in
-
-- Fix omap5 and dra7 Kconfig options when built as the only
-  SoCs selected
-
-- Fix PM errata for omap5 and dra7 as they too need it
-
-- Fix phycore mpu voltage
-
-Also included are a few cosmetic fixes:
-
-- Remove unused of_irq macros
-
-- Fix dra7 ethernet name
-
-----------------------------------------------------------------
-Carl Frederik Werner (1):
-      ARM: dts: omap3-beagle: make i2c3, ddc and tfp410 gpio work again
-
-Javier Martinez Canillas (1):
-      ARM: dts: omap3-igep: Move eth IRQ pinmux to IGEPv2 common dtsi
-
-Kishon Vijay Abraham I (3):
-      ARM: dts: am57xx-beagle-x15: Fix regulator populated in MMC1 dt node
-      ARM: dts: Use ti,pbias compatible string for pbias
-      ARM: omap2plus_defconfig: make PCF857x built-in
-
-Nicolas Chauvet (1):
-      ARM: dts: Fixup model name for HP t410 dts
-
-Nishanth Menon (5):
-      ARM: dts: am57xx-beagle-x15: Add wakeup irq for mcp79410
-      ARM: OMAP4+: PM: erratum is used by OMAP5 and DRA7 as well
-      ARM: OMAP2+: board-generic: Remove stale of_irq macros
-      ARM: DRA7: Select missing options for SoC only build
-      ARM: OMAP5: Cleanup options for SoC only build
-
-Teresa Remmet (1):
-      ARM: dts: am335x-phycore-som: Fix mpu voltage
-
-Tony Lindgren (1):
-      ARM: dts: Fix dm814x control base to properly initialize Ethernet PHY
-
-Vishal Mahaveer (1):
-      ARM: dts: DRA7: fix a typo in ethernet
-
- arch/arm/boot/dts/am335x-phycore-som.dtsi    | 4 ++--
- arch/arm/boot/dts/am57xx-beagle-x15.dts      | 4 ++--
- arch/arm/boot/dts/dm8148-evm.dts             | 4 ++--
- arch/arm/boot/dts/dm8148-t410.dts            | 6 +++---
- arch/arm/boot/dts/dm814x.dtsi                | 8 ++++----
- arch/arm/boot/dts/dra7.dtsi                  | 4 ++--
- arch/arm/boot/dts/omap2430.dtsi              | 2 +-
- arch/arm/boot/dts/omap3-beagle.dts           | 2 +-
- arch/arm/boot/dts/omap3-igep.dtsi            | 6 ------
- arch/arm/boot/dts/omap3-igep0020-common.dtsi | 6 ++++++
- arch/arm/boot/dts/omap3.dtsi                 | 2 +-
- arch/arm/boot/dts/omap4.dtsi                 | 2 +-
- arch/arm/boot/dts/omap5.dtsi                 | 2 +-
- arch/arm/configs/omap2plus_defconfig         | 2 +-
- arch/arm/mach-omap2/Kconfig                  | 6 +++++-
- arch/arm/mach-omap2/board-generic.c          | 7 -------
- arch/arm/mach-omap2/pm.h                     | 3 ++-
- 17 files changed, 34 insertions(+), 36 deletions(-)
+Regards,
+Lucas
