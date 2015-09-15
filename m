@@ -1,89 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 15 Sep 2015 13:57:01 -0500
-Subject: [PATCH v2 2/2] irqchip: gic: Document optional Clock and Power
- Domain properties
-In-Reply-To: <1442261204-30931-3-git-send-email-geert+renesas@glider.be>
-References: <1442261204-30931-1-git-send-email-geert+renesas@glider.be>
- <1442261204-30931-3-git-send-email-geert+renesas@glider.be>
-Message-ID: <55F869FD.4090900@kernel.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 15 Sep 2015 21:00:59 +0200
+Subject: [PATCH] KVM: arm64: add workaround for Cortex-A57 erratum #852523
+In-Reply-To: <55F6EBD4.30809@arm.com>
+References: <1442243163-2675-1-git-send-email-will.deacon@arm.com>
+ <55F6EBD4.30809@arm.com>
+Message-ID: <20150915190059.GR15712@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/2015 03:06 PM, Geert Uytterhoeven wrote:
-> Depending on the GIC variant, the GIC module has one or more clock
-> inputs. Document the optional "clocks" and "clock-names" properties,
-> and their possible values, based on the Technical Reference Manuals.
-> optional.
+On Mon, Sep 14, 2015 at 04:46:28PM +0100, Marc Zyngier wrote:
+> On 14/09/15 16:06, Will Deacon wrote:
+> > When restoring the system register state for an AArch32 guest at EL2,
+> > writes to DACR32_EL2 may not be correctly synchronised by Cortex-A57,
+> > which can lead to the guest effectively running with junk in the DACR
+> > and running into unexpected domain faults.
+> > 
+> > This patch works around the issue by re-ordering our restoration of the
+> > AArch32 register aliases so that they happen before the AArch64 system
+> > registers. Ensuring that the registers are restored in this order
+> > guarantees that they will be correctly synchronised by the core.
+> > 
+> > Cc: <stable@vger.kernel.org>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> Add the optional "power-domains" property.
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> This will allow to describe in DT the relationship between the GIC and
-> the Clock and/or Power Domain topology on SoCs where this is relevant
-> and needed for proper operation.
-> 
-> Note: As the current GIC driver doesn't support Runtime PM yet, PM
-> Domain constraints must be handled elsewhere in e.g. platform code.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Note: v1 was Acked-by: Rob Herring <robh@kernel.org>, but I didn't add
->       it, due to the addition of clock-names.
 
-For both: ack.
+Looks good to me too, and I just gave this a spin with my loop test on
+Juno as well.
 
-> 
-> v2:
->   - Add "clock-names",
->   - Document clock inputs on various GIC variants.
-> 
-> Clock inputs are based on the following documentation:
->   - "ARM11 MPCore Processor Technical Reference Manual" (r2p0),
->   - "Cortex-A9 MPCore Technical Reference Manual" (r4p1, r2p0),
->   - "Cortex-A15 Technical Reference Manual" (r4p0, r2p0),
->   - "CoreLink GIC-400 Generic Interrupt Controller Technical Reference
->     Manual" (r0p1, r0p0),
->   - "PrimeCell Generic Interrupt Controller (PL390) Technical Reference
->     Manual" (r0p0).
-> 
-> I could not find clock input information in:
->   - "ARM1176JZF Development Chip Technical Reference Manual" (r0p0),
->   - "Cortex-A7 MPCore processors" (r0p5, r0p3).
-> 
-> Other:
->   - "brcm,brahma-b15-gic" seems to be always used together with
->     "arm,cortex-a15-gic".
-> 
-> No access to datasheets:
->   - "qcom,msm-8660-qgic",
->   - "qcom,msm-qgic2".
-> ---
->  Documentation/devicetree/bindings/arm/gic.txt | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-> index 24742853ba460223..cc56021eb60babea 100644
-> --- a/Documentation/devicetree/bindings/arm/gic.txt
-> +++ b/Documentation/devicetree/bindings/arm/gic.txt
-> @@ -59,6 +59,21 @@ Optional
->    regions, used when the GIC doesn't have banked registers. The offset is
->    cpu-offset * cpu-nr.
->  
-> +- clocks        : List of phandle and clock-specific pairs, one for each entry
-> +  in clock-names.
-> +- clock-names   : List of names for the GIC clock input(s). Valid clock names
-> +  depend on the GIC variant:
-> +	"ic_clk" (for "arm,arm11mp-gic")
-> +	"PERIPHCLKEN" (for "arm,cortex-a15-gic")
-> +	"PERIPHCLK", "PERIPHCLKEN" (for "arm,cortex-a9-gic")
-> +	"clk" (for "arm,gic-400")
-> +	"gclk" (for "arm,pl390")
-> +
-> +- power-domains : A phandle and PM domain specifier as defined by bindings of
-> +		  the power controller specified by phandle, used when the GIC
-> +		  is part of a Power or Clock Domain.
-> +
-> +
->  Example:
->  
->  	intc: interrupt-controller at fff11000 {
-> 
+Thanks,
+-Christoffer
