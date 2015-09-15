@@ -1,564 +1,497 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 15 Sep 2015 12:51:40 +0200
-Subject: [PATCH] ARM: multi_v7: Rebuild default configuration on v4.3-rc1
-Message-ID: <1442314300-4714-1-git-send-email-thierry.reding@gmail.com>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Tue, 15 Sep 2015 12:58:42 +0200
+Subject: [PATCH v3 2/8] genirq: irqdomain: Remove irqdomain dependency on
+ struct device_node
+In-Reply-To: <1442249047-21182-3-git-send-email-marc.zyngier@arm.com>
+References: <1442249047-21182-1-git-send-email-marc.zyngier@arm.com>
+ <1442249047-21182-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55F7F9E2.3070105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On 14.09.2015 18:44, Marc Zyngier wrote:
+> struct device_node is very much DT specific, and the original authors
+> of the irqdomain subsystem recognized that tie, and went as far as
+> mentionning that this could be replaced by some "void *token",
+> should another firmware infrastructure be using it.
+>
+> As we move ACPI on arm64 towards this model too, it makes a lot of sense
+> to perform that particular move.
+>
+> We replace "struct device_node *of_node" with "void *domain_token", which
+> is a benign enough transformation. A non DT user of irqdomain can now
+> identify its domains using this pointer.
+>
+> Also, in order to prevent the introduction of sideband type information,
+> only DT is allowed to store a valid kernel pointer in domain_token
+> (a pointer that passes the virt_addr_valid() test will be considered
+> as a valid device_node).
+>
+> non-DT users that wish to store valid pointers in domain_token are
+> required to use another structure such as an IDR.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   include/linux/irqdomain.h | 68 +++++++++++++++++++-----------------
+>   kernel/irq/irqdomain.c    | 89 ++++++++++++++++++++++++++++++++++-------------
+>   2 files changed, 101 insertions(+), 56 deletions(-)
+>
+> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> index f644fdb..ac7041b 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -17,16 +17,14 @@
+>    * model). It's the domain callbacks that are responsible for setting the
+>    * irq_chip on a given irq_desc after it's been mapped.
+>    *
+> - * The host code and data structures are agnostic to whether or not
+> - * we use an open firmware device-tree. We do have references to struct
+> - * device_node in two places: in irq_find_host() to find the host matching
+> - * a given interrupt controller node, and of course as an argument to its
+> - * counterpart domain->ops->match() callback. However, those are treated as
+> - * generic pointers by the core and the fact that it's actually a device-node
+> - * pointer is purely a convention between callers and implementation. This
+> - * code could thus be used on other architectures by replacing those two
+> - * by some sort of arch-specific void * "token" used to identify interrupt
+> - * controllers.
+> + * The host code and data structures are agnostic to whether or not we
+> + * use an open firmware device-tree. Domains can be assigned a
+> + * "void *domain_token" identifier, which is assumed to represent a
+> + * "struct device_node" if the pointer is a valid virtual address.
+> + *
+> + * Otherwise, the value is assumed to be an opaque identifier. Should
+> + * a pointer to a non "struct device_node" be required, another data
+> + * structure should be used to indirect it (an IDR for example).
+>    */
+>
+>   #ifndef _LINUX_IRQDOMAIN_H
+> @@ -108,8 +106,8 @@ struct irq_domain_chip_generic;
+>    * @flags: host per irq_domain flags
+>    *
+>    * Optional elements
+> - * @of_node: Pointer to device tree nodes associated with the irq_domain. Used
+> - *           when decoding device tree interrupt specifiers.
+> + * @domain_token: optional firmware-specific identifier for
+> + *                the interrupt controller
+>    * @gc: Pointer to a list of generic chips. There is a helper function for
+>    *      setting up one or more generic chips for interrupt controllers
+>    *      drivers using the generic chip library which uses this pointer.
+> @@ -130,7 +128,7 @@ struct irq_domain {
+>   	unsigned int flags;
+>
+>   	/* Optional data */
+> -	struct device_node *of_node;
+> +	void *domain_token;
+>   	enum irq_domain_bus_token bus_token;
+>   	struct irq_domain_chip_generic *gc;
+>   #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+> @@ -161,70 +159,73 @@ enum {
+>   	IRQ_DOMAIN_FLAG_NONCORE		= (1 << 16),
+>   };
+>
+> +#ifdef CONFIG_IRQ_DOMAIN
+> +extern struct device_node *irq_domain_token_to_of_node(void *domain_token);
+> +
+>   static inline struct device_node *irq_domain_get_of_node(struct irq_domain *d)
+>   {
+> -	return d->of_node;
+> +	return irq_domain_token_to_of_node(d->domain_token);
+>   }
+>
+> -#ifdef CONFIG_IRQ_DOMAIN
+> -struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
+> +struct irq_domain *__irq_domain_add(void *domain_token, int size,
+>   				    irq_hw_number_t hwirq_max, int direct_max,
+>   				    const struct irq_domain_ops *ops,
+>   				    void *host_data);
+> -struct irq_domain *irq_domain_add_simple(struct device_node *of_node,
+> +struct irq_domain *irq_domain_add_simple(void *domain_token,
+>   					 unsigned int size,
+>   					 unsigned int first_irq,
+>   					 const struct irq_domain_ops *ops,
+>   					 void *host_data);
+> -struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
+> +struct irq_domain *irq_domain_add_legacy(void *domain_token,
+>   					 unsigned int size,
+>   					 unsigned int first_irq,
+>   					 irq_hw_number_t first_hwirq,
+>   					 const struct irq_domain_ops *ops,
+>   					 void *host_data);
+> -extern struct irq_domain *irq_find_matching_host(struct device_node *node,
+> +extern struct irq_domain *irq_find_matching_host(void *domain_token,
+>   						 enum irq_domain_bus_token bus_token);
+>   extern void irq_set_default_host(struct irq_domain *host);
+>
+> -static inline struct irq_domain *irq_find_host(struct device_node *node)
+> +static inline struct irq_domain *irq_find_host(void *domain_token)
+>   {
+> -	return irq_find_matching_host(node, DOMAIN_BUS_ANY);
+> +	return irq_find_matching_host(domain_token, DOMAIN_BUS_ANY);
+>   }
+>
+>   /**
+>    * irq_domain_add_linear() - Allocate and register a linear revmap irq_domain.
+> - * @of_node: pointer to interrupt controller's device tree node.
+> + * @domain_token: optional firmware-specific identifier for
+> + *                the interrupt controller
+>    * @size: Number of interrupts in the domain.
+>    * @ops: map/unmap domain callbacks
+>    * @host_data: Controller private data pointer
+>    */
+> -static inline struct irq_domain *irq_domain_add_linear(struct device_node *of_node,
+> +static inline struct irq_domain *irq_domain_add_linear(void *domain_token,
+>   					 unsigned int size,
+>   					 const struct irq_domain_ops *ops,
+>   					 void *host_data)
+>   {
+> -	return __irq_domain_add(of_node, size, size, 0, ops, host_data);
+> +	return __irq_domain_add(domain_token, size, size, 0, ops, host_data);
+>   }
+> -static inline struct irq_domain *irq_domain_add_nomap(struct device_node *of_node,
+> +static inline struct irq_domain *irq_domain_add_nomap(void *domain_token,
+>   					 unsigned int max_irq,
+>   					 const struct irq_domain_ops *ops,
+>   					 void *host_data)
+>   {
+> -	return __irq_domain_add(of_node, 0, max_irq, max_irq, ops, host_data);
+> +	return __irq_domain_add(domain_token, 0, max_irq, max_irq, ops, host_data);
+>   }
+>   static inline struct irq_domain *irq_domain_add_legacy_isa(
+> -				struct device_node *of_node,
+> +				void *domain_token,
+>   				const struct irq_domain_ops *ops,
+>   				void *host_data)
+>   {
+> -	return irq_domain_add_legacy(of_node, NUM_ISA_INTERRUPTS, 0, 0, ops,
+> +	return irq_domain_add_legacy(domain_token, NUM_ISA_INTERRUPTS, 0, 0, ops,
+>   				     host_data);
+>   }
+> -static inline struct irq_domain *irq_domain_add_tree(struct device_node *of_node,
+> +static inline struct irq_domain *irq_domain_add_tree(void *domain_token,
+>   					 const struct irq_domain_ops *ops,
+>   					 void *host_data)
+>   {
+> -	return __irq_domain_add(of_node, 0, ~0, 0, ops, host_data);
+> +	return __irq_domain_add(domain_token, 0, ~0, 0, ops, host_data);
+>   }
+>
+>   extern void irq_domain_remove(struct irq_domain *host);
+> @@ -292,7 +293,7 @@ extern void irq_domain_set_info(struct irq_domain *domain, unsigned int virq,
+>   #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+>   extern struct irq_domain *irq_domain_add_hierarchy(struct irq_domain *parent,
+>   			unsigned int flags, unsigned int size,
+> -			struct device_node *node,
+> +			void *domain_token,
+>   			const struct irq_domain_ops *ops, void *host_data);
+>   extern int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
+>   				   unsigned int nr_irqs, int node, void *arg,
+> @@ -347,6 +348,11 @@ static inline bool irq_domain_is_hierarchy(struct irq_domain *domain)
+>   #endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+>
+>   #else /* CONFIG_IRQ_DOMAIN */
+> +static inline struct device_node *irq_domain_get_of_node(struct irq_domain *d)
+> +{
+> +	return d->domain_token;
+> +}
+> +
+>   static inline void irq_dispose_mapping(unsigned int virq) { }
+>   static inline void irq_domain_activate_irq(struct irq_data *data) { }
+>   static inline void irq_domain_deactivate_irq(struct irq_data *data) { }
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index 79baaf8..a00e0ce 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -6,6 +6,7 @@
+>   #include <linux/irq.h>
+>   #include <linux/irqdesc.h>
+>   #include <linux/irqdomain.h>
+> +#include <linux/mm.h>
+>   #include <linux/module.h>
+>   #include <linux/mutex.h>
+>   #include <linux/of.h>
+> @@ -27,9 +28,24 @@ static int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+>   				  irq_hw_number_t hwirq, int node);
+>   static void irq_domain_check_hierarchy(struct irq_domain *domain);
+>
+> +struct device_node *irq_domain_token_to_of_node(void *domain_token)
+> +{
+> +	/*
+> +	 * Assume that anything represented by a valid kernel address
+> +	 * is a device_node. Anything else must be a "small integer",
+> +	 * and indirected by some other structure (an IDR, for
+> +	 * example) if a pointer is required.
+> +	 */
+> +	if (virt_addr_valid(domain_token))
+> +		return domain_token;
+> +
+> +	return NULL;
+> +}
+> +
+>   /**
+>    * __irq_domain_add() - Allocate a new irq_domain data structure
+> - * @of_node: optional device-tree node of the interrupt controller
+> + * @domain_token: optional firmware-specific identifier for
+> + *                the interrupt controller
+>    * @size: Size of linear map; 0 for radix mapping only
+>    * @hwirq_max: Maximum number of interrupts supported by controller
+>    * @direct_max: Maximum value of direct maps; Use ~0 for no limit; 0 for no
+> @@ -40,13 +56,15 @@ static void irq_domain_check_hierarchy(struct irq_domain *domain);
+>    * Allocates and initialize and irq_domain structure.
+>    * Returns pointer to IRQ domain, or NULL on failure.
+>    */
+> -struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
+> +struct irq_domain *__irq_domain_add(void *domain_token, int size,
+>   				    irq_hw_number_t hwirq_max, int direct_max,
+>   				    const struct irq_domain_ops *ops,
+>   				    void *host_data)
+>   {
+> +	struct device_node *of_node;
+>   	struct irq_domain *domain;
+>
+> +	of_node = irq_domain_token_to_of_node(domain_token);
+>   	domain = kzalloc_node(sizeof(*domain) + (sizeof(unsigned int) * size),
+>   			      GFP_KERNEL, of_node_to_nid(of_node));
 
-It's becoming more and more difficult to update the multi_v7 default
-configuration because it hasn't been kept in proper order. Typically the
-workflow to update it would be to do the following:
+While we are here, do you think it makes sense to abstract 
+of_node_to_nid as well? Then we would really remove device_node 
+dependency for irqdomain.
 
-	$ make multi_v7_defconfig
-	$ make menuconfig
-	[select new options]
-	$ make
-	[to verify that everything still builds fine]
-	$ make savedefconfig
-	$ mv defconfig arch/arm/configs/multi_v7_defconfig
+Thanks,
+Tomasz
 
-However, the savedefconfig target will write options in the order that
-they appear in Kconfig, which means that if multi_v7_defconfig isn't
-kept properly sorted then it becomes very difficult to create a proper
-patch that contains only the actual changes.
-
-A relatively common practice for platform-specific default configuration
-files is to rebuild the configuration on the latest -rc1 shortly after
-it is released. That way everybody can start from a clean slate and the
-diff will show only the actual changes.
-
-This commit rebuilds the multi_v7 default configuration on top of
-v4.3-rc1. A lot of the changes are merely moving things around to match
-the order in which they appear in Kconfig. Some symbols have been
-converted from 'y' to 'm' to satisfy dependencies.
-
-Other options are dropped because they:
-
-  * have been removed are dropped, such as:
-    - MACH_MARZEN
-    - TEGRA_EMC_SCALING_ENABLE
-    - MACH_UX500_DT
-    - ARCH_VEXPRESS_CA9X4
-    - SCSI_MULTI_LUN
-    - OMAP_USB3
-    - CRYPTO_DEV_TEGRA_AES
-
-  * are enabled by default:
-    - TRUSTED_FOUNDATIONS
-    - CAN_RAW
-    - CAN_BCM
-    - CAN_DEV
-    - I2C_EXYNOS5
-    - USB_GSPCA
-
-  * selected by other options:
-    - PCI
-    - PCI_HOST_GENERIC
-    - PCIEPORTBUS
-    - NEON
-    - GPIO_GENERIC_PLATFORM
-    - THERMAL
-    - EXYNOS_THERMAL
-    - MFD_SYSCON
-    - BACKLIGHT_LCD_SUPPORT
-    - BACKLIGHT_CLASS_DEVICE
-    - USB_EHCI_HCD_PLATFORM
-    - USB_OHCI_HCD_PLATFORM
-    - MMC_DW_PLTFM
-    - CHROME_PLATFORMS
-    - MEMORY
-    - TMPFS
-    - CRYPTO_SHA1_ARM
-    - CRYPTO_SHA256_ARM
-    - CRYPTO_AES_ARM
-
-One of the drivers has been replaced by another, but the new option was
-never selected, so this commit selects the new one to ensure the same
-compile coverage:
-
-  - EEPROM_SUNXI_SID -> NVMEM_SUNXI_SID
-
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm/configs/multi_v7_defconfig | 141 ++++++++++++++----------------------
- 1 file changed, 55 insertions(+), 86 deletions(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 03deb7fb35e8..56775eb9b9cc 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -12,7 +12,6 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_CMDLINE_PARTITION=y
- CONFIG_ARCH_VIRT=y
--CONFIG_ARCH_ALPINE=y
- CONFIG_ARCH_MVEBU=y
- CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_375=y
-@@ -20,14 +19,15 @@ CONFIG_MACH_ARMADA_38X=y
- CONFIG_MACH_ARMADA_39X=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_MACH_DOVE=y
-+CONFIG_ARCH_ALPINE=y
- CONFIG_ARCH_AT91=y
- CONFIG_SOC_SAMA5D3=y
- CONFIG_SOC_SAMA5D4=y
- CONFIG_ARCH_BCM=y
- CONFIG_ARCH_BCM_CYGNUS=y
--CONFIG_ARCH_BCM_21664=y
--CONFIG_ARCH_BCM_281XX=y
- CONFIG_ARCH_BCM_5301X=y
-+CONFIG_ARCH_BCM_281XX=y
-+CONFIG_ARCH_BCM_21664=y
- CONFIG_ARCH_BRCMSTB=y
- CONFIG_ARCH_BERLIN=y
- CONFIG_MACH_BERLIN_BG2=y
-@@ -37,9 +37,9 @@ CONFIG_ARCH_DIGICOLOR=y
- CONFIG_ARCH_HIGHBANK=y
- CONFIG_ARCH_HISI=y
- CONFIG_ARCH_HI3xxx=y
--CONFIG_ARCH_HIX5HD2=y
- CONFIG_ARCH_HIP01=y
- CONFIG_ARCH_HIP04=y
-+CONFIG_ARCH_HIX5HD2=y
- CONFIG_ARCH_KEYSTONE=y
- CONFIG_ARCH_MESON=y
- CONFIG_ARCH_MXC=y
-@@ -51,8 +51,9 @@ CONFIG_SOC_IMX6SL=y
- CONFIG_SOC_IMX6SX=y
- CONFIG_SOC_IMX6UL=y
- CONFIG_SOC_IMX7D=y
--CONFIG_SOC_VF610=y
- CONFIG_SOC_LS1021A=y
-+CONFIG_SOC_VF610=y
-+CONFIG_ARCH_MEDIATEK=y
- CONFIG_ARCH_OMAP3=y
- CONFIG_ARCH_OMAP4=y
- CONFIG_SOC_OMAP5=y
-@@ -60,7 +61,6 @@ CONFIG_SOC_AM33XX=y
- CONFIG_SOC_AM43XX=y
- CONFIG_SOC_DRA7XX=y
- CONFIG_ARCH_QCOM=y
--CONFIG_ARCH_MEDIATEK=y
- CONFIG_ARCH_MSM8X60=y
- CONFIG_ARCH_MSM8960=y
- CONFIG_ARCH_MSM8974=y
-@@ -85,7 +85,6 @@ CONFIG_ARCH_R8A7791=y
- CONFIG_ARCH_R8A7793=y
- CONFIG_ARCH_R8A7794=y
- CONFIG_ARCH_SH73A0=y
--CONFIG_MACH_MARZEN=y
- CONFIG_ARCH_SUNXI=y
- CONFIG_ARCH_SIRF=y
- CONFIG_ARCH_TEGRA=y
-@@ -93,27 +92,20 @@ CONFIG_ARCH_TEGRA_2x_SOC=y
- CONFIG_ARCH_TEGRA_3x_SOC=y
- CONFIG_ARCH_TEGRA_114_SOC=y
- CONFIG_ARCH_TEGRA_124_SOC=y
--CONFIG_TEGRA_EMC_SCALING_ENABLE=y
- CONFIG_ARCH_UNIPHIER=y
- CONFIG_ARCH_U8500=y
- CONFIG_MACH_HREFV60=y
- CONFIG_MACH_SNOWBALL=y
--CONFIG_MACH_UX500_DT=y
- CONFIG_ARCH_VEXPRESS=y
--CONFIG_ARCH_VEXPRESS_CA9X4=y
- CONFIG_ARCH_VEXPRESS_TC2_PM=y
- CONFIG_ARCH_WM8850=y
- CONFIG_ARCH_ZYNQ=y
--CONFIG_TRUSTED_FOUNDATIONS=y
--CONFIG_PCI=y
--CONFIG_PCI_HOST_GENERIC=y
--CONFIG_PCI_KEYSTONE=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_MVEBU=y
- CONFIG_PCI_TEGRA=y
- CONFIG_PCI_RCAR_GEN2=y
- CONFIG_PCI_RCAR_GEN2_PCIE=y
--CONFIG_PCIEPORTBUS=y
-+CONFIG_PCI_KEYSTONE=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=16
- CONFIG_HIGHPTE=y
-@@ -124,12 +116,12 @@ CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_STAT_DETAILS=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_CPUFREQ_DT=y
- CONFIG_CPU_IDLE=y
- CONFIG_ARM_CPUIDLE=y
--CONFIG_NEON=y
--CONFIG_KERNEL_MODE_NEON=y
- CONFIG_ARM_ZYNQ_CPUIDLE=y
- CONFIG_ARM_EXYNOS_CPUIDLE=y
-+CONFIG_KERNEL_MODE_NEON=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -147,9 +139,6 @@ CONFIG_IPV6_MIP6=m
- CONFIG_IPV6_TUNNEL=m
- CONFIG_IPV6_MULTIPLE_TABLES=y
- CONFIG_CAN=y
--CONFIG_CAN_RAW=y
--CONFIG_CAN_BCM=y
--CONFIG_CAN_DEV=y
- CONFIG_CAN_AT91=m
- CONFIG_CAN_XILINXCAN=y
- CONFIG_CAN_MCP251X=y
-@@ -186,10 +175,8 @@ CONFIG_ATMEL_SSC=m
- CONFIG_APDS9802ALS=y
- CONFIG_ISL29003=y
- CONFIG_EEPROM_AT24=y
--CONFIG_EEPROM_SUNXI_SID=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_BLK_DEV_SR=y
--CONFIG_SCSI_MULTI_LUN=y
- CONFIG_ATA=y
- CONFIG_SATA_AHCI=y
- CONFIG_SATA_AHCI_PLATFORM=y
-@@ -200,10 +187,10 @@ CONFIG_SATA_HIGHBANK=y
- CONFIG_SATA_MV=y
- CONFIG_SATA_RCAR=y
- CONFIG_NETDEVICES=y
--CONFIG_HIX5HD2_GMAC=y
- CONFIG_SUN4I_EMAC=y
- CONFIG_MACB=y
- CONFIG_NET_CALXEDA_XGMAC=y
-+CONFIG_HIX5HD2_GMAC=y
- CONFIG_IGB=y
- CONFIG_MV643XX_ETH=y
- CONFIG_MVNETA=y
-@@ -234,8 +221,8 @@ CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_QT1070=m
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_TEGRA=y
--CONFIG_KEYBOARD_SPEAR=y
- CONFIG_KEYBOARD_ST_KEYSCAN=y
-+CONFIG_KEYBOARD_SPEAR=y
- CONFIG_KEYBOARD_CROS_EC=y
- CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_MOUSE_CYAPA=m
-@@ -289,17 +276,16 @@ CONFIG_SERIAL_CONEXANT_DIGICOLOR_CONSOLE=y
- CONFIG_SERIAL_ST_ASC=y
- CONFIG_SERIAL_ST_ASC_CONSOLE=y
- CONFIG_I2C_CHARDEV=y
--CONFIG_I2C_DAVINCI=y
- CONFIG_I2C_MUX=y
- CONFIG_I2C_ARB_GPIO_CHALLENGE=m
- CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_MUX_PINCTRL=y
- CONFIG_I2C_AT91=m
- CONFIG_I2C_CADENCE=y
-+CONFIG_I2C_DAVINCI=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_I2C_DIGICOLOR=m
- CONFIG_I2C_GPIO=m
--CONFIG_I2C_EXYNOS5=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_RIIC=y
- CONFIG_I2C_S3C2410=y
-@@ -334,21 +320,20 @@ CONFIG_PINCTRL_AS3722=y
- CONFIG_PINCTRL_PALMAS=y
- CONFIG_PINCTRL_APQ8084=y
- CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_GENERIC_PLATFORM=y
- CONFIG_GPIO_DAVINCI=y
- CONFIG_GPIO_DWAPB=y
- CONFIG_GPIO_EM=y
- CONFIG_GPIO_RCAR=y
-+CONFIG_GPIO_SYSCON=y
- CONFIG_GPIO_XILINX=y
- CONFIG_GPIO_ZYNQ=y
- CONFIG_GPIO_PCA953X=y
- CONFIG_GPIO_PCA953X_IRQ=y
- CONFIG_GPIO_PCF857X=y
--CONFIG_GPIO_TWL4030=y
- CONFIG_GPIO_PALMAS=y
--CONFIG_GPIO_SYSCON=y
- CONFIG_GPIO_TPS6586X=y
- CONFIG_GPIO_TPS65910=y
-+CONFIG_GPIO_TWL4030=y
- CONFIG_BATTERY_SBS=y
- CONFIG_BATTERY_MAX17040=m
- CONFIG_BATTERY_MAX17042=m
-@@ -359,24 +344,23 @@ CONFIG_POWER_RESET_AS3722=y
- CONFIG_POWER_RESET_GPIO=y
- CONFIG_POWER_RESET_GPIO_RESTART=y
- CONFIG_POWER_RESET_KEYSTONE=y
-+CONFIG_POWER_RESET_SYSCON=y
- CONFIG_POWER_RESET_RMOBILE=y
- CONFIG_SENSORS_LM90=y
- CONFIG_SENSORS_LM95245=y
- CONFIG_SENSORS_NTC_THERMISTOR=m
--CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
- CONFIG_RCAR_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
--CONFIG_DAVINCI_WATCHDOG=m
--CONFIG_EXYNOS_THERMAL=m
- CONFIG_ST_THERMAL_SYSCFG=y
- CONFIG_ST_THERMAL_MEMMAP=y
- CONFIG_WATCHDOG=y
- CONFIG_XILINX_WATCHDOG=y
- CONFIG_ARM_SP805_WATCHDOG=y
-+CONFIG_DAVINCI_WATCHDOG=m
- CONFIG_ORION_WATCHDOG=y
--CONFIG_ST_LPC_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
-+CONFIG_ST_LPC_WATCHDOG=y
- CONFIG_TEGRA_WATCHDOG=m
- CONFIG_MESON_WATCHDOG=y
- CONFIG_DIGICOLOR_WATCHDOG=y
-@@ -404,8 +388,6 @@ CONFIG_REGULATOR_AXP20X=y
- CONFIG_REGULATOR_BCM590XX=y
- CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_GPIO=y
--CONFIG_MFD_SYSCON=y
--CONFIG_POWER_RESET_SYSCON=y
- CONFIG_REGULATOR_MAX14577=m
- CONFIG_REGULATOR_MAX8907=y
- CONFIG_REGULATOR_MAX8973=y
-@@ -429,8 +411,7 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_MEDIA_CONTROLLER=y
- CONFIG_VIDEO_V4L2_SUBDEV_API=y
- CONFIG_MEDIA_USB_SUPPORT=y
--CONFIG_USB_VIDEO_CLASS=y
--CONFIG_USB_GSPCA=y
-+CONFIG_USB_VIDEO_CLASS=m
- CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_SOC_CAMERA=m
- CONFIG_SOC_CAMERA_PLATFORM=m
-@@ -443,24 +424,22 @@ CONFIG_VIDEO_ML86V7667=m
- CONFIG_DRM=y
- # CONFIG_DRM_I2C_CH7006 is not set
- # CONFIG_DRM_I2C_SIL164 is not set
--CONFIG_DRM_NXP_PTN3460=m
--CONFIG_DRM_PARADE_PS8622=m
- CONFIG_DRM_NOUVEAU=m
- CONFIG_DRM_EXYNOS=m
--CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_FIMD=y
-+CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_RCAR_DU=m
- CONFIG_DRM_TEGRA=y
--CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
- CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
-+CONFIG_DRM_NXP_PTN3460=m
-+CONFIG_DRM_PARADE_PS8622=m
- CONFIG_FB_ARMCLCD=y
- CONFIG_FB_WM8505=y
- CONFIG_FB_SH_MOBILE_LCDC=y
- CONFIG_FB_SIMPLE=y
- CONFIG_FB_SH_MOBILE_MERAM=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
--CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_LCD_PLATFORM=m
- CONFIG_BACKLIGHT_PWM=y
- CONFIG_BACKLIGHT_AS3711=y
-@@ -474,7 +453,7 @@ CONFIG_SND_HDA_INPUT_BEEP=y
- CONFIG_SND_HDA_PATCH_LOADER=y
- CONFIG_SND_HDA_CODEC_REALTEK=m
- CONFIG_SND_HDA_CODEC_HDMI=m
--CONFIG_SND_USB_AUDIO=y
-+CONFIG_SND_USB_AUDIO=m
- CONFIG_SND_SOC=m
- CONFIG_SND_ATMEL_SOC=m
- CONFIG_SND_ATMEL_SOC_WM8904=m
-@@ -494,14 +473,11 @@ CONFIG_USB=y
- CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_XHCI_MVEBU=y
- CONFIG_USB_EHCI_HCD=y
--CONFIG_USB_EHCI_EXYNOS=y
--CONFIG_USB_EHCI_TEGRA=y
- CONFIG_USB_EHCI_HCD_STI=y
--CONFIG_USB_EHCI_HCD_PLATFORM=y
--CONFIG_USB_ISP1760=y
-+CONFIG_USB_EHCI_TEGRA=y
-+CONFIG_USB_EHCI_EXYNOS=y
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_OHCI_HCD_STI=y
--CONFIG_USB_OHCI_HCD_PLATFORM=y
- CONFIG_USB_OHCI_EXYNOS=m
- CONFIG_USB_R8A66597_HCD=m
- CONFIG_USB_RENESAS_USBHS=m
-@@ -509,9 +485,9 @@ CONFIG_USB_STORAGE=y
- CONFIG_USB_DWC3=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_HOST=y
-+CONFIG_USB_ISP1760=y
- CONFIG_AB8500_USB=y
- CONFIG_KEYSTONE_USB_PHY=y
--CONFIG_OMAP_USB3=y
- CONFIG_USB_GPIO_VBUS=y
- CONFIG_USB_ISP1301=y
- CONFIG_USB_MXS_PHY=y
-@@ -527,9 +503,9 @@ CONFIG_MMC_SDHCI_OF_ARASAN=y
- CONFIG_MMC_SDHCI_ESDHC_IMX=y
- CONFIG_MMC_SDHCI_DOVE=y
- CONFIG_MMC_SDHCI_TEGRA=y
-+CONFIG_MMC_SDHCI_S3C=y
- CONFIG_MMC_SDHCI_PXAV3=y
- CONFIG_MMC_SDHCI_SPEAR=y
--CONFIG_MMC_SDHCI_S3C=y
- CONFIG_MMC_SDHCI_S3C_DMA=y
- CONFIG_MMC_SDHCI_BCM_KONA=y
- CONFIG_MMC_SDHCI_ST=y
-@@ -540,7 +516,6 @@ CONFIG_MMC_MVSDIO=y
- CONFIG_MMC_SDHI=y
- CONFIG_MMC_DW=y
- CONFIG_MMC_DW_IDMAC=y
--CONFIG_MMC_DW_PLTFM=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_ROCKCHIP=y
- CONFIG_MMC_SH_MMCIF=y
-@@ -571,15 +546,14 @@ CONFIG_RTC_DRV_MAX77686=y
- CONFIG_RTC_DRV_MAX77802=m
- CONFIG_RTC_DRV_RS5C372=m
- CONFIG_RTC_DRV_PALMAS=y
--CONFIG_RTC_DRV_ST_LPC=y
- CONFIG_RTC_DRV_TWL4030=y
- CONFIG_RTC_DRV_TPS6586X=y
- CONFIG_RTC_DRV_TPS65910=y
- CONFIG_RTC_DRV_S35390A=m
- CONFIG_RTC_DRV_RX8581=m
- CONFIG_RTC_DRV_EM3027=y
--CONFIG_RTC_DRV_DIGICOLOR=m
- CONFIG_RTC_DRV_S5M=m
-+CONFIG_RTC_DRV_DIGICOLOR=m
- CONFIG_RTC_DRV_S3C=m
- CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_AT91RM9200=m
-@@ -589,24 +563,25 @@ CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_SUNXI=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_RTC_DRV_TEGRA=y
-+CONFIG_RTC_DRV_ST_LPC=y
- CONFIG_DMADEVICES=y
--CONFIG_DW_DMAC=y
- CONFIG_AT_HDMAC=y
- CONFIG_AT_XDMAC=y
-+CONFIG_DMA_OMAP=y
-+CONFIG_DMA_SUN6I=y
-+CONFIG_IMX_DMA=y
-+CONFIG_IMX_SDMA=y
- CONFIG_MV_XOR=y
--CONFIG_TEGRA20_APB_DMA=y
--CONFIG_SH_DMAE=y
--CONFIG_RCAR_DMAC=y
--CONFIG_STE_DMA40=y
-+CONFIG_MXS_DMA=y
-+CONFIG_PL330_DMA=y
- CONFIG_SIRF_DMA=y
-+CONFIG_STE_DMA40=y
-+CONFIG_TEGRA20_APB_DMA=y
- CONFIG_TI_EDMA=y
--CONFIG_PL330_DMA=y
--CONFIG_IMX_SDMA=y
--CONFIG_IMX_DMA=y
--CONFIG_MXS_DMA=y
--CONFIG_DMA_OMAP=y
- CONFIG_XILINX_VDMA=y
--CONFIG_DMA_SUN6I=y
-+CONFIG_DW_DMAC=y
-+CONFIG_SH_DMAE=y
-+CONFIG_RCAR_DMAC=y
- CONFIG_STAGING=y
- CONFIG_SENSORS_ISL29018=y
- CONFIG_SENSORS_ISL29028=y
-@@ -615,23 +590,21 @@ CONFIG_KEYBOARD_NVEC=y
- CONFIG_SERIO_NVEC_PS2=y
- CONFIG_NVEC_POWER=y
- CONFIG_NVEC_PAZ00=y
--CONFIG_QCOM_GSBI=y
--CONFIG_QCOM_PM=y
--CONFIG_COMMON_CLK_QCOM=y
--CONFIG_CHROME_PLATFORMS=y
- CONFIG_CROS_EC_CHARDEV=m
- CONFIG_COMMON_CLK_MAX77686=y
- CONFIG_COMMON_CLK_MAX77802=m
- CONFIG_COMMON_CLK_S2MPS11=m
-+CONFIG_COMMON_CLK_QCOM=y
- CONFIG_APQ_MMCC_8084=y
- CONFIG_MSM_GCC_8660=y
- CONFIG_MSM_MMCC_8960=y
- CONFIG_MSM_MMCC_8974=y
- CONFIG_TEGRA_IOMMU_GART=y
- CONFIG_TEGRA_IOMMU_SMMU=y
-+CONFIG_QCOM_GSBI=y
-+CONFIG_QCOM_PM=y
- CONFIG_PM_DEVFREQ=y
- CONFIG_ARM_TEGRA_DEVFREQ=m
--CONFIG_MEMORY=y
- CONFIG_EXTCON=y
- CONFIG_TI_AEMIF=y
- CONFIG_IIO=y
-@@ -644,21 +617,24 @@ CONFIG_PWM_ATMEL=m
- CONFIG_PWM_ATMEL_TCB=m
- CONFIG_PWM_RENESAS_TPU=y
- CONFIG_PWM_SAMSUNG=m
-+CONFIG_PWM_STI=m
- CONFIG_PWM_SUN4I=y
- CONFIG_PWM_TEGRA=y
- CONFIG_PWM_VT8500=y
--CONFIG_PHY_HIX5HD2_SATA=y
--CONFIG_PWM_STI=m
--CONFIG_OMAP_USB2=y
--CONFIG_TI_PIPE3=y
-+CONFIG_KEYSTONE_IRQ=y
- CONFIG_PHY_MIPHY28LP=y
- CONFIG_PHY_MIPHY365X=y
- CONFIG_PHY_RCAR_GEN2=m
--CONFIG_PHY_STIH41X_USB=y
--CONFIG_PHY_STIH407_USB=y
-+CONFIG_OMAP_USB2=y
-+CONFIG_TI_PIPE3=y
-+CONFIG_PHY_HIX5HD2_SATA=y
- CONFIG_PHY_SUN4I_USB=y
- CONFIG_PHY_SUN9I_USB=y
- CONFIG_PHY_SAMSUNG_USB2=m
-+CONFIG_PHY_STIH407_USB=y
-+CONFIG_PHY_STIH41X_USB=y
-+CONFIG_NVMEM=y
-+CONFIG_NVMEM_SUNXI_SID=y
- CONFIG_EXT4_FS=y
- CONFIG_AUTOFS4_FS=y
- CONFIG_MSDOS_FS=y
-@@ -666,7 +642,6 @@ CONFIG_VFAT_FS=y
- CONFIG_NTFS_FS=y
- CONFIG_TMPFS_POSIX_ACL=y
- CONFIG_UBIFS_FS=y
--CONFIG_TMPFS=y
- CONFIG_SQUASHFS=y
- CONFIG_SQUASHFS_LZO=y
- CONFIG_SQUASHFS_XZ=y
-@@ -681,21 +656,15 @@ CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_FS=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_LOCKUP_DETECTOR=y
--CONFIG_CRYPTO_DEV_TEGRA_AES=y
--CONFIG_CPUFREQ_DT=y
--CONFIG_KEYSTONE_IRQ=y
-+CONFIG_CRYPTO_DEV_ATMEL_AES=m
-+CONFIG_CRYPTO_DEV_ATMEL_TDES=m
-+CONFIG_CRYPTO_DEV_ATMEL_SHA=m
- CONFIG_CRYPTO_DEV_SUN4I_SS=m
- CONFIG_ARM_CRYPTO=y
--CONFIG_CRYPTO_SHA1_ARM=m
- CONFIG_CRYPTO_SHA1_ARM_NEON=m
- CONFIG_CRYPTO_SHA1_ARM_CE=m
- CONFIG_CRYPTO_SHA2_ARM_CE=m
--CONFIG_CRYPTO_SHA256_ARM=m
- CONFIG_CRYPTO_SHA512_ARM=m
--CONFIG_CRYPTO_AES_ARM=m
- CONFIG_CRYPTO_AES_ARM_BS=m
- CONFIG_CRYPTO_AES_ARM_CE=m
- CONFIG_CRYPTO_GHASH_ARM_CE=m
--CONFIG_CRYPTO_DEV_ATMEL_AES=m
--CONFIG_CRYPTO_DEV_ATMEL_TDES=m
--CONFIG_CRYPTO_DEV_ATMEL_SHA=m
--- 
-2.5.0
+>   	if (WARN_ON(!domain))
+> @@ -56,7 +74,7 @@ struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
+>   	INIT_RADIX_TREE(&domain->revmap_tree, GFP_KERNEL);
+>   	domain->ops = ops;
+>   	domain->host_data = host_data;
+> -	domain->of_node = of_node_get(of_node);
+> +	domain->domain_token = of_node_get(of_node) ?: domain_token;
+>   	domain->hwirq_max = hwirq_max;
+>   	domain->revmap_size = size;
+>   	domain->revmap_direct_max_irq = direct_max;
+> @@ -102,14 +120,15 @@ void irq_domain_remove(struct irq_domain *domain)
+>
+>   	pr_debug("Removed domain %s\n", domain->name);
+>
+> -	of_node_put(domain->of_node);
+> +	of_node_put(irq_domain_get_of_node(domain));
+>   	kfree(domain);
+>   }
+>   EXPORT_SYMBOL_GPL(irq_domain_remove);
+>
+>   /**
+>    * irq_domain_add_simple() - Register an irq_domain and optionally map a range of irqs
+> - * @of_node: pointer to interrupt controller's device tree node.
+> + * @domain_token: optional firmware-specific identifier for
+> + *                the interrupt controller
+>    * @size: total number of irqs in mapping
+>    * @first_irq: first number of irq block assigned to the domain,
+>    *	pass zero to assign irqs on-the-fly. If first_irq is non-zero, then
+> @@ -125,18 +144,20 @@ EXPORT_SYMBOL_GPL(irq_domain_remove);
+>    * irqs get mapped dynamically on the fly. However, if the controller requires
+>    * static virq assignments (non-DT boot) then it will set that up correctly.
+>    */
+> -struct irq_domain *irq_domain_add_simple(struct device_node *of_node,
+> +struct irq_domain *irq_domain_add_simple(void *domain_token,
+>   					 unsigned int size,
+>   					 unsigned int first_irq,
+>   					 const struct irq_domain_ops *ops,
+>   					 void *host_data)
+>   {
+> +	struct device_node *of_node;
+>   	struct irq_domain *domain;
+>
+> -	domain = __irq_domain_add(of_node, size, size, 0, ops, host_data);
+> +	domain = __irq_domain_add(domain_token, size, size, 0, ops, host_data);
+>   	if (!domain)
+>   		return NULL;
+>
+> +	of_node = irq_domain_token_to_of_node(domain_token);
+>   	if (first_irq > 0) {
+>   		if (IS_ENABLED(CONFIG_SPARSE_IRQ)) {
+>   			/* attempt to allocated irq_descs */
+> @@ -155,7 +176,8 @@ EXPORT_SYMBOL_GPL(irq_domain_add_simple);
+>
+>   /**
+>    * irq_domain_add_legacy() - Allocate and register a legacy revmap irq_domain.
+> - * @of_node: pointer to interrupt controller's device tree node.
+> + * @domain_token: optional firmware-specific identifier for
+> + *                the interrupt controller
+>    * @size: total number of irqs in legacy mapping
+>    * @first_irq: first number of irq block assigned to the domain
+>    * @first_hwirq: first hwirq number to use for the translation. Should normally
+> @@ -168,7 +190,7 @@ EXPORT_SYMBOL_GPL(irq_domain_add_simple);
+>    * for all legacy interrupts except 0 (which is always the invalid irq for
+>    * a legacy controller).
+>    */
+> -struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
+> +struct irq_domain *irq_domain_add_legacy(void *domain_token,
+>   					 unsigned int size,
+>   					 unsigned int first_irq,
+>   					 irq_hw_number_t first_hwirq,
+> @@ -177,7 +199,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
+>   {
+>   	struct irq_domain *domain;
+>
+> -	domain = __irq_domain_add(of_node, first_hwirq + size,
+> +	domain = __irq_domain_add(domain_token, first_hwirq + size,
+>   				  first_hwirq + size, 0, ops, host_data);
+>   	if (domain)
+>   		irq_domain_associate_many(domain, first_irq, first_hwirq, size);
+> @@ -188,10 +210,12 @@ EXPORT_SYMBOL_GPL(irq_domain_add_legacy);
+>
+>   /**
+>    * irq_find_matching_host() - Locates a domain for a given device node
+> - * @node: device-tree node of the interrupt controller
+> + * @domain_token: global identifier of the interrupt controller. If this
+> + *                is a valid kernel pointer, it is assumed to be a
+> + *                struct device_node pointer.
+>    * @bus_token: domain-specific data
+>    */
+> -struct irq_domain *irq_find_matching_host(struct device_node *node,
+> +struct irq_domain *irq_find_matching_host(void *domain_token,
+>   					  enum irq_domain_bus_token bus_token)
+>   {
+>   	struct irq_domain *h, *found = NULL;
+> @@ -208,12 +232,16 @@ struct irq_domain *irq_find_matching_host(struct device_node *node,
+>   	 */
+>   	mutex_lock(&irq_domain_mutex);
+>   	list_for_each_entry(h, &irq_domain_list, link) {
+> -		if (h->ops->match)
+> +		if (h->ops->match) {
+> +			struct device_node *node;
+> +			node = irq_domain_get_of_node(h);
+>   			rc = h->ops->match(h, node, bus_token);
+> -		else
+> -			rc = ((h->of_node != NULL) && (h->of_node == node) &&
+> +		} else {
+> +			rc = ((h->domain_token != NULL) &&
+> +			      (h->domain_token == domain_token) &&
+>   			      ((bus_token == DOMAIN_BUS_ANY) ||
+>   			       (h->bus_token == bus_token)));
+> +		}
+>
+>   		if (rc) {
+>   			found = h;
+> @@ -336,10 +364,12 @@ EXPORT_SYMBOL_GPL(irq_domain_associate);
+>   void irq_domain_associate_many(struct irq_domain *domain, unsigned int irq_base,
+>   			       irq_hw_number_t hwirq_base, int count)
+>   {
+> +	struct device_node *of_node;
+>   	int i;
+>
+> +	of_node = irq_domain_get_of_node(domain);
+>   	pr_debug("%s(%s, irqbase=%i, hwbase=%i, count=%i)\n", __func__,
+> -		of_node_full_name(domain->of_node), irq_base, (int)hwirq_base, count);
+> +		of_node_full_name(of_node), irq_base, (int)hwirq_base, count);
+>
+>   	for (i = 0; i < count; i++) {
+>   		irq_domain_associate(domain, irq_base + i, hwirq_base + i);
+> @@ -359,12 +389,14 @@ EXPORT_SYMBOL_GPL(irq_domain_associate_many);
+>    */
+>   unsigned int irq_create_direct_mapping(struct irq_domain *domain)
+>   {
+> +	struct device_node *of_node;
+>   	unsigned int virq;
+>
+>   	if (domain == NULL)
+>   		domain = irq_default_domain;
+>
+> -	virq = irq_alloc_desc_from(1, of_node_to_nid(domain->of_node));
+> +	of_node = irq_domain_get_of_node(domain);
+> +	virq = irq_alloc_desc_from(1, of_node_to_nid(of_node));
+>   	if (!virq) {
+>   		pr_debug("create_direct virq allocation failed\n");
+>   		return 0;
+> @@ -399,6 +431,7 @@ EXPORT_SYMBOL_GPL(irq_create_direct_mapping);
+>   unsigned int irq_create_mapping(struct irq_domain *domain,
+>   				irq_hw_number_t hwirq)
+>   {
+> +	struct device_node *of_node;
+>   	int virq;
+>
+>   	pr_debug("irq_create_mapping(0x%p, 0x%lx)\n", domain, hwirq);
+> @@ -419,9 +452,11 @@ unsigned int irq_create_mapping(struct irq_domain *domain,
+>   		return virq;
+>   	}
+>
+> +	of_node = irq_domain_get_of_node(domain);
+> +
+>   	/* Allocate a virtual interrupt number */
+>   	virq = irq_domain_alloc_descs(-1, 1, hwirq,
+> -				      of_node_to_nid(domain->of_node));
+> +				      of_node_to_nid(of_node));
+>   	if (virq <= 0) {
+>   		pr_debug("-> virq allocation failed\n");
+>   		return 0;
+> @@ -433,7 +468,7 @@ unsigned int irq_create_mapping(struct irq_domain *domain,
+>   	}
+>
+>   	pr_debug("irq %lu on domain %s mapped to virtual irq %u\n",
+> -		hwirq, of_node_full_name(domain->of_node), virq);
+> +		hwirq, of_node_full_name(of_node), virq);
+>
+>   	return virq;
+>   }
+> @@ -460,10 +495,12 @@ EXPORT_SYMBOL_GPL(irq_create_mapping);
+>   int irq_create_strict_mappings(struct irq_domain *domain, unsigned int irq_base,
+>   			       irq_hw_number_t hwirq_base, int count)
+>   {
+> +	struct device_node *of_node;
+>   	int ret;
+>
+> +	of_node = irq_domain_get_of_node(domain);
+>   	ret = irq_alloc_descs(irq_base, irq_base, count,
+> -			      of_node_to_nid(domain->of_node));
+> +			      of_node_to_nid(of_node));
+>   	if (unlikely(ret < 0))
+>   		return ret;
+>
+> @@ -590,14 +627,16 @@ static int virq_debug_show(struct seq_file *m, void *private)
+>   		   "name", "mapped", "linear-max", "direct-max", "devtree-node");
+>   	mutex_lock(&irq_domain_mutex);
+>   	list_for_each_entry(domain, &irq_domain_list, link) {
+> +		struct device_node *of_node;
+>   		int count = 0;
+> +		of_node = irq_domain_token_get_node(domain);
+>   		radix_tree_for_each_slot(slot, &domain->revmap_tree, &iter, 0)
+>   			count++;
+>   		seq_printf(m, "%c%-16s  %6u  %10u  %10u  %s\n",
+>   			   domain == irq_default_domain ? '*' : ' ', domain->name,
+>   			   domain->revmap_size + count, domain->revmap_size,
+>   			   domain->revmap_direct_max_irq,
+> -			   domain->of_node ? of_node_full_name(domain->of_node) : "");
+> +			   of_node ? of_node_full_name(of_node) : "");
+>   	}
+>   	mutex_unlock(&irq_domain_mutex);
+>
+> @@ -755,7 +794,7 @@ static int irq_domain_alloc_descs(int virq, unsigned int cnt,
+>    * @parent:	Parent irq domain to associate with the new domain
+>    * @flags:	Irq domain flags associated to the domain
+>    * @size:	Size of the domain. See below
+> - * @node:	Optional device-tree node of the interrupt controller
+> + * @domain_token:	Optional global identifier of the interrupt controller
+>    * @ops:	Pointer to the interrupt domain callbacks
+>    * @host_data:	Controller private data pointer
+>    *
+> @@ -768,16 +807,16 @@ static int irq_domain_alloc_descs(int virq, unsigned int cnt,
+>   struct irq_domain *irq_domain_add_hierarchy(struct irq_domain *parent,
+>   					    unsigned int flags,
+>   					    unsigned int size,
+> -					    struct device_node *node,
+> +					    void *domain_token,
+>   					    const struct irq_domain_ops *ops,
+>   					    void *host_data)
+>   {
+>   	struct irq_domain *domain;
+>
+>   	if (size)
+> -		domain = irq_domain_add_linear(node, size, ops, host_data);
+> +		domain = irq_domain_add_linear(domain_token, size, ops, host_data);
+>   	else
+> -		domain = irq_domain_add_tree(node, ops, host_data);
+> +		domain = irq_domain_add_tree(domain_token, ops, host_data);
+>   	if (domain) {
+>   		domain->parent = parent;
+>   		domain->flags |= flags;
+>
