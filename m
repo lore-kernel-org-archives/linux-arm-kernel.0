@@ -1,114 +1,149 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 15 Sep 2015 15:01:34 -0400
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <20150915170444.GX21084@n2100.arm.linux.org.uk>
-References: <m3bnde5whx.fsf@t19.piap.pl>
- <20150907112555.GS21084@n2100.arm.linux.org.uk>
- <m337yp5gvv.fsf@t19.piap.pl> <1441709778.13536.8.camel@pengutronix.de>
- <m3bnd52y4s.fsf@t19.piap.pl> <1442332425.2637.16.camel@pengutronix.de>
- <20150915163642.GW21084@n2100.arm.linux.org.uk>
- <1442336034.2637.20.camel@pengutronix.de>
- <20150915170444.GX21084@n2100.arm.linux.org.uk>
-Message-ID: <1442343694.2637.38.camel@pengutronix.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 15 Sep 2015 21:09:23 +0200
+Subject: [PATCH v2 6/8] arm/arm64: KVM: Add forwarded physical interrupts
+ documentation
+In-Reply-To: <55F83637.3060400@arm.com>
+References: <1441395650-19663-1-git-send-email-christoffer.dall@linaro.org>
+ <1441395650-19663-7-git-send-email-christoffer.dall@linaro.org>
+ <55ED7427.1020901@arm.com> <55EE9FA4.3060204@linaro.org>
+ <55EF1389.10802@arm.com>
+ <CAMJs5B_Qxkfu=KSA0oUm386_mgZ73_NQEqS6e+gBGxwBMJVezg@mail.gmail.com>
+ <55F2B932.2030901@arm.com> <20150914114219.GJ15712@cbox>
+ <55F83637.3060400@arm.com>
+Message-ID: <20150915190923.GS15712@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 15.09.2015, 18:04 +0100 schrieb Russell King - ARM
-Linux:
-> On Tue, Sep 15, 2015 at 12:53:54PM -0400, Lucas Stach wrote:
-> > Hi Russell,
+On Tue, Sep 15, 2015 at 04:16:07PM +0100, Andre Przywara wrote:
+> Hi Christoffer,
+> 
+> On 14/09/15 12:42, Christoffer Dall wrote:
+> ....
+> >>>> Where is this done? I see that the physical dist state is altered on the
+> >>>> actual IRQ forwarding, but not on later exits/entries? Do you mean
+> >>>> kvm_vgic_flush_hwstate() with "flush"?
+> >>>
+> >>> this is a bug and should be fixed in the 'fixes' patches I sent last
+> >>> week.  We should set active state on every entry to the guest for IRQs
+> >>> with the HW bit set in either pending or active state.
+> >>
+> >> OK, sorry, I missed that one patch, I was looking at what should become
+> >> -rc1 soon (because that's what I want to rebase my ITS emulation patches
+> >> on). That patch wasn't in queue at the time I started looking at it.
+> >>
+> >> So I updated to the latest queue containing those two fixes and also
+> >> applied your v2 series. Indeed this series addresses some of the things
+> >> I was wondering about the last time, but the main thing still persists:
+> >> - Every time the physical dist state is active we have the virtual state
+> >> still at pending or active.
 > > 
-> > Am Dienstag, den 15.09.2015, 17:36 +0100 schrieb Russell King - ARM
-> > Linux:
-> > > On Tue, Sep 15, 2015 at 05:53:45PM +0200, Lucas Stach wrote:
-> > > > It includes a new kernel<->userspace interface, so needs a
-> > > > modified
-> > > > xf86-video-armada to go with it. You can pick that up here:
-> > > > git://git.pengutronix.de/git/lst/xf86-video-armada.git for-rmk
-> > > > 
-> > > > Caution: the armada code is WIP and needs further cleanups. It
-> > > > should
-> > > > work though.
-> > > 
-> > > And it needs updating to the latest version - you seem to be
-> > > missing
-> > > a whole load of changes, including the changes which update the
-> > > kernel API.
-> > > 
-> > > So... you seem to be talking about the kernel API having changed
-> > > from
-> > > the version which you picked up years ago, rather than the
-> > > current
-> > > version.  It's really unclear what you're talking about.
-> > > 
-> > What do you mean with missing a lot of stuff? The "for-rmk" branch
-> > in
-> > that repo is your upstream "unstable-devel" branch minus the few
-> > XvBO
-> > commits with my changes on top.
+> > For the arch timer, yes.
+> > 
+> > For a passthrough device, there should be a situation where the physical
+> > dist state is active but we didn't see the virtual state updated at the
+> > vgic yet (after physical IRQ fires and before the VFIO ISR calls
+> > kvm_set_irq).
 > 
-> Ah, probably because I haven't pushed the stuff out :)
-> 
-> Anyway, I've taken two of your patches, reworking the second
-> slightly:
-> 
-> 1fec728 etnaviv: fix compilation without DRI2 support
-> 1663382 make sure that system strndup doesn't collide with X.Org
-> server version
-> 
-> which are _both_ fixes, and would have been nice for them to have
-> been
-> sent in a timely manner.
-> 
-Sorry about that. I'll try to single out the fixes more quickly going
-forward.
+> But then we wouldn't get into vgic_sync_hwirq(), because we wouldn't
+> inject a mapped IRQ before kvm_set_irq() is called, would we?
 
-> Looking at "etnaviv: fix XV resize for UYVY source format", this is
-> wrong
-> to the documentation for the GC320.  Documentation which was around
-> for
-> the GC320 indicates that the _only_ YUV format it supports as a
-> target
-> is YUY2 with the vertical filter blit.  It's very specifically worded
-> to
-> indicate that this is the only YUV target format which is supported.
-> What testing have you done to prove uyvy support, and on which GPUs?
+Ah, you meant, if we are in vgic_sync_hwirq() and the dist state is
+active, then we have the virtual state still at pending or active?
+
+That's a slightly different question from what you posed above.
+
+I haven't thought extremely carefully about it, but could you not have
+(1) guest deactivates (2) physical interrupt is handled on different CPU
+on host for passthrough device (3) VFIO ISR leaves the IRQ active (3)
+guest exits and you now hit vgic_sync_hwirq() and the virtual interrupt
+is now inactive but the physical interrupt is active?
+
 > 
-I've tested this on i.MX6Q hardware with some GStreamer pipelines using
-the videotestsrc. Without this commit the GPU will write out only zerosin the first step, so the video image will show up as fully green after CSC.
-
-I don't think I have that documentation you are talking about. Is this
-doc under NDA?
-
-Chapter "31.4.1.6 Filter BLT" of the i.MX6 RM seems to agree with you,
-so this commit depends on unspecified behavior. But it fixes a real bug
-where the GPU writes out only zeros to the intermediate buffer if the
-source is UYVY, so videos show up as fully green after CSC. So this
-needs more investigation.
-
-> "etnaviv: align vximage buffer size to pagesize" I have issues with
-> as
-> well - mapping more memory than was passed to the X server is really
-> not
-> permissible.  If we need the image size to be larger, we need to
-> report
-> a larger buffer size - and in fact, that's already done.
-> QueryImageAttributes indicates that the image size is to be rounded
-> up to a page size.  The X server will reject smaller buffers at
-> higher
-> levels.  So, this patch isn't required.
+> >> - If the physical dist state is non-active, the virtual state is
+> >> inactive (LR.state==8: HW bit) as well. The associated ELRSR bit is 1
+> >> (LR empty).
+> >> (I was tracing every HW mapped LR in vgic_sync_hwirq() for this)
+> >>
+> >> So that contradicts:
+> >>
+> >> +  - On guest EOI, the *physical distributor* active bit gets cleared,
+> >> +    but the LR.Active is left untouched (set).
+> >>
+> >> This is the main point I was actually wondering about: I cannot confirm
+> >> this statement. In my tests the LR state and the physical dist state
+> >> always correspond, as excepted by reading the spec.
+> >>
+> >> I reckon that these observations are mostly independent from the actual
+> >> KVM code, as I try to observe hardware state (physical distributor and
+> >> LRs) before KVM tinkers with them.
+> > 
+> > ok, I got this paragraph from Marc, so we really need to ask him?  Which
+> > hardware are you seeing this behavior on?  Perhaps implementations vary
+> > on this point?
 > 
-This does not seem to be be working. I've certainly seen GStreamer
-pushing non-aligned buffers which cause the GEM import to fail.
-Ignoring the real size may well be a GStreamer bug (I'll look into that
-code), but the server doesn't seem to reject that.
-
-> The last patch is your final one, I'll look at that at some point,
-> but for now I'm pushing out the tree as it now stands.
+> I checked this on Midway and Juno. Both have a GIC-400, but I don't have
+> access to any other GIC implementations.
+> I added the two BUG_ONs shown below to prove that assumption.
 > 
-If you're not going to look at this too soonish I can rebase that on
-top of what you just pushed out and mybe clean it up some more. But
-certainly not this week, as I'm physically away from any test hardware.
+> Eric, I've been told you observed the behaviour with the GIC not syncing
+> LR and phys state for a mapped HWIRQ which was not the timer.
+> Can you reproduce this? Does it complain with the patch below?
+> 
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 5942ce9..7fac16e 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1459,9 +1459,12 @@ static bool vgic_sync_hwirq(struct kvm_vcpu
+>  					     IRQCHIP_STATE_ACTIVE,
+>  					     false);
+>  		WARN_ON(ret);
+> +		BUG_ON(!(vlr.state & 3));
+>  		return false;
+>  	}
+> 
+> +	BUG_ON(vlr.state & 3);
+> +
+>  	return process_queued_irq(vcpu, lr, vlr);
+>  }
+> 
+> > 
+> > I have no objections removing this point from the doc though, I'm just
+> > relaying information on this one.
+> 
+> I see, I talked with Marc and I am about to gather more data with the
+> above patch to prove that this never happens.
+> 
+> >>
+> >> ...
+> >>
+> >>>
+> >>>> Is this an observation, an implementation bug or is this mentioned in
+> >>>> the spec? Needing to spoon-feed the VGIC by doing it's job sounds a bit
+> >>>> awkward to me.
+> >>>
+> >>> What do you mean?  How are we spoon-feeding the VGIC?
+> >>
+> >> By looking at the physical dist state and all LRs and clearing the LR we
+> >> do what the GIC is actually supposed to do for us - and what it actually
+> >> does according to my observations.
+> >>
+> >> The point is that patch 1 in my ITS emulation series is reworking the LR
+> >> handling and this patch was based on assumptions that seem to be no
+> >> longer true (i.e. we don't care about inactive LRs except for our LR
+> >> mapping code). So I want to be sure that I fully get what is going on
+> >> here and I struggle at this at the moment due to the above statement.
+> >>
+> >> What are the plans regarding your "v2: Rework architected timer..."
+> >> series? Will this be queued for 4.4? I want to do the
+> >> rebasing^Wrewriting of my series only once if possible ;-)
+> >>
+> > I think we should settle on this series ASAP and base your ITS stuff on
+> > top of it.  What do you think?
+> 
+> Yeah, that's what I was thinking too. So I will be working against
+> 4.3-rc1 with your timer-rework-v2 branch plus the other fixes from the
+> kvm-arm queue merged.
+> 
+Sounds good!  Thanks.
 
-Regards,
-Lucas
+-Christoffer
