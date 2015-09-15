@@ -1,51 +1,66 @@
-From: sakari.ailus@linux.intel.com (Sakari Ailus)
-Date: Tue, 15 Sep 2015 14:01:54 +0300
-Subject: [PATCH v4 2/2] [media] media-device: split media initialization
- and registration
-In-Reply-To: <1442313147-24566-3-git-send-email-javier@osg.samsung.com>
-References: <1442313147-24566-1-git-send-email-javier@osg.samsung.com>
- <1442313147-24566-3-git-send-email-javier@osg.samsung.com>
-Message-ID: <55F7FAA2.2090605@linux.intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Sep 2015 12:03:30 +0100
+Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
+In-Reply-To: <1442313962.2917.25.camel@linaro.org>
+References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+ <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
+ <20150914131448.GC7002@leverpostej>
+ <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
+ <20150914134949.GE7002@leverpostej>
+ <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
+ <1442251092.2850.53.camel@linaro.org>
+ <9hhy4g89g64.fsf@e105922-lin.cambridge.arm.com>
+ <1442313962.2917.25.camel@linaro.org>
+Message-ID: <20150915110330.GA6507@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
-
-Javier Martinez Canillas wrote:
-> The media device node is registered and so made visible to user-space
-> before entities are registered and links created which means that the
-> media graph obtained by user-space could be only partially enumerated
-> if that happens too early before all the graph has been created.
+On Tue, Sep 15, 2015 at 11:46:02AM +0100, Jon Medhurst (Tixy) wrote:
+> On Tue, 2015-09-15 at 10:37 +0100, Punit Agrawal wrote:
+> > "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
+> > 
+> > > On Mon, 2015-09-14 at 15:38 +0100, Punit Agrawal wrote:
+> > >> Mark Rutland <mark.rutland@arm.com> writes:
+> > >> 
+> [...]
+> > >> The way the SCP interface is defined, the sensor identifiers are
+> > >> contiguous,
+> > >
+> > > Is there any documentation other than DUI0922A? [1] From what I can seen
+> > > that just says it's a 16-bit value and doesn't put any particular
+> > > constraints on its value.
+> > 
+> > Although not explicitly stated, if you look at the Get Sensor Capability
+> > [2] and Get Sensor Info [3] commands you can indirectly infer that the
+> > Sensor IDs are contiguous.
 > 
-> To avoid this race condition, split the media init and registration
-> in separate functions and only register the media device node when
-> all the pending subdevices have been registered, either explicitly
-> by the driver or asynchronously using v4l2_async_register_subdev().
+> I personally wouldn't even indirectly infer they are contiguous from
+> what the document says. If I were implementing the firmware I would feel
+> quite in my rights to, for example, use the top 8 bits of the ID for a
+> sensor type and the bottom 8 for an index, if that made dispatching of
+> requests more efficient. Or if some optional hardware was detected as
+> missing, leaving some holes in ID space.
 > 
-> The media_device_register() had a check for drivers not filling dev
-> and model fields but all drivers in mainline set them and not doing
-> it will be a driver bug so change the function return to void and
-> add a BUG_ON() for dev being NULL instead.
-> 
-> Also, add a media_device_cleanup() function that will destroy the
-> graph_mutex that is initialized in media_device_init().
-> 
-> Suggested-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> As a specification of a 'standard' the document seems to be rather
+> lacking. So, Sensor ID should be documented as being "an unsigned
+> integer less than then number of sensors returned by the Get Sensor
+> Capability command", or something like that. I guess clocks and other
+> devices suffer from similar lack of specificity.
 
-Thanks!
+I think from the PoV of the binding, this doesn't matter. The value is
+just an arbitrary opaue token written down in a spec, that the FW
+understands how to interpret.
 
-For drivers/media/media-device.c, drivers/media/platform/omap3isp/isp.c
-and include/media/media-device.h:
+I only asked about how the IDs were organised because I thought there
+was additional translation in the kernel, but this is not the case.
 
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+The only potential problem is bit-width. Punit, I assume the value is
+32-bit (or less) in the messages to the FW?
 
-Laurent, could you ack these if you're fine with them?
+If for the moment we assume the values can index a small array, then we
+can change that later (though ideally we'd handle the most geeneral case
+we're aware of from the outset). We just need to not infer any semantics
+from a value alone.
 
-They depend on Mauro's patches so they should be applied after them.
-
--- 
-Kind regards,
-
-Sakari Ailus
-sakari.ailus at linux.intel.com
+Thanks,
+Mark.
