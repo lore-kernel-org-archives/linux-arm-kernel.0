@@ -1,39 +1,40 @@
 From: yassinjaffer@gmail.com (yassinjaffer at gmail.com)
-Date: Wed, 16 Sep 2015 00:05:54 +1000
-Subject: [PATCH 1/4] ARM:dts:sun7i: Add keypad clk node
+Date: Wed, 16 Sep 2015 00:05:55 +1000
+Subject: [PATCH 2/4] ARM: dts: sun7i: Add keypad node to Allwinner A20 SoC
 In-Reply-To: <1442325957-10102-1-git-send-email-yassinjaffer@gmail.com>
 References: <1442325957-10102-1-git-send-email-yassinjaffer@gmail.com>
-Message-ID: <1442325957-10102-2-git-send-email-yassinjaffer@gmail.com>
+Message-ID: <1442325957-10102-3-git-send-email-yassinjaffer@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yassin Jaffer <yassinjaffer@gmail.com>
 
-This patch add support to the keypad clock on sun7i
+Add Keypad controller node definition to the A20 SoC.
 
 Signed-off-by: Yassin Jaffer <yassinjaffer@gmail.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 2bebaa2..333604a 100644
+index 333604a..35cc8d0 100644
 --- a/arch/arm/boot/dts/sun7i-a20.dtsi
 +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -465,6 +465,14 @@
- 			clock-output-names = "ir1";
+@@ -1198,6 +1198,15 @@
+ 			status = "disabled";
  		};
  
-+		keypad_clk: clk at 01c200c4 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod0-clk";
-+			reg = <0x01c200c4 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "keypad";
++		kp: kp at 01c23000 {
++			compatible = "allwinner,sun4i-a10-keypad";
++			reg = <0x01c23000 0x400>;
++			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&apb0_gates 10>, <&keypad_clk>;
++			clock-names = "apb", "keypad";
++			status = "disabled";
 +		};
 +
- 		usb_clk: clk at 01c200cc {
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
+ 		sid: eeprom at 01c23800 {
+ 			compatible = "allwinner,sun7i-a20-sid";
+ 			reg = <0x01c23800 0x200>;
 -- 
 1.9.1
