@@ -1,43 +1,53 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 15 Sep 2015 14:15:10 +0100
-Subject: [PATCH v2] arm: Fix backtrace generation when IPI is masked
-In-Reply-To: <20150915113003.GS21084@n2100.arm.linux.org.uk>
-References: <1442222294-2756-1-git-send-email-daniel.thompson@linaro.org>
- <1442315112-14039-1-git-send-email-daniel.thompson@linaro.org>
- <20150915113003.GS21084@n2100.arm.linux.org.uk>
-Message-ID: <55F819DE.9040704@linaro.org>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 15 Sep 2015 15:16:12 +0200
+Subject: [PATCH v4 21/22] driver core: Start processing deferred probes
+ earlier
+In-Reply-To: <20150911122423.GS12027@sirena.org.uk>
+References: <1441628627-5143-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1441628627-5143-22-git-send-email-tomeu.vizoso@collabora.com>
+ <20150911122423.GS12027@sirena.org.uk>
+Message-ID: <CAAObsKCOZ3TkQB6oKt+UmBSvUoM-kXT0Rs=FaFKs8bY76065LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/15 12:30, Russell King - ARM Linux wrote:
-> On Tue, Sep 15, 2015 at 12:05:12PM +0100, Daniel Thompson wrote:
->> Currently on ARM when <SysRq-L> is triggered from an interrupt handler
->> (e.g. a SysRq issued using UART or kbd) the main CPU will wedge for ten
->> seconds with interrupts masked before issuing a backtrace for every CPU
->> except itself.
+On 11 September 2015 at 14:24, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, Sep 07, 2015 at 02:23:46PM +0200, Tomeu Vizoso wrote:
+>> Some initcalls in the late level assume that some devices will have
+>> already probed without explicitly checking for that.
 >>
->> The new backtrace code introduced by commit 96f0e00378d4 ("ARM: add
->> basic support for on-demand backtrace of other CPUs") does not work
->> correctly when run from an interrupt handler because IPI_CPU_BACKTRACE
->> is used to generate the backtrace on all CPUs but cannot preempt the
->> current calling context.
+>> After the recent move to defer most device probes when they are
+>> registered, pressure increased in the late initcall level.
+>>
+>> By starting the processing of the deferred queue in device_initcall_sync
+>> we increase the chances that the initcalls mentioned before will find
+>> the devices they depend on to have already probed.
 >
-> This patch needs a little more work - what happens to the IPI_CPU_BACKTRACE
-> we've sent to ourselves?  (It fires after the interrupt handler for the
-> UART/kbd has finished.)  It ought to be masked out if we're going to
-> handle it a different way.
+> Which cases do we have that are outside the driver model and thus
+> affected by this?  USB gadgets are one case I'm aware of, and cpufreq is
+> still problematic.  I'm wondering if it might be tractable to address
+> the actual problems with the remaining reliance on init ordering here.
 
-Actually it already gets masked out. The argument to raise_nmi() points 
-to a data structure owned by the backtrace library functions and this 
-structure if altered during the execution of nmi_cpu_backtrace() to 
-clear the calling CPU.
+Actually, I don't know of any specific case that needs this commit.
+The present series without this patch passes on all the boards in
+kernelci, but Grygorii Strashko argued for it during the review of the
+earlier version of this series:
+http://lkml.kernel.org/g/55CE3D04.8000607 at ti.com
 
-I had originally planned to use cpumask_test_and_clear_cpu() for the 
-conditional branch but that would be broken because nmi_cpu_backtrace() 
-would become a nop if we clear anything from the mask before calling it!
+IMO it would be better to not apply this patch until the need arises,
+and even then, it may be better to make the dependencies explicit
+instead of relying on implicit ordering and messing with the link
+order.
 
-I guess I should add a comment about this to save us from broken but 
-"obviously correct" cleanups in the future...
+> I'm also wondering if we might end up running into situations where this
+> makes the problem with havinng to defer probes more of an issue on some
+> systems - since we start trying earlier while we are still doing our
+> first pass initialisation we could end up deferring some device then
+> retrying it a bunch of times while going through the earlier phases of
+> init as we continue to register more devices.
 
+With the rest of the series this shouldn't happen as all/most deferred
+probes should be avoided.
 
-Daniel.
+Regards,
+
+Tomeu
