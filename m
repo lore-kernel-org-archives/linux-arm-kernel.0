@@ -1,28 +1,68 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 15 Sep 2015 12:41:26 -0700
-Subject: [PATCH 0/3] Add __ioread32_copy() and use it
-Message-ID: <1442346089-32077-1-git-send-email-sboyd@codeaurora.org>
+Date: Tue, 15 Sep 2015 12:41:27 -0700
+Subject: [PATCH 1/3] lib: iomap_copy: Add __ioread32_copy()
+In-Reply-To: <1442346089-32077-1-git-send-email-sboyd@codeaurora.org>
+References: <1442346089-32077-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1442346089-32077-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMD driver is reading and writing chunks of data to iomem,
-and there's an __iowrite32_copy() function for the writing part, but
-no __ioread32_copy() function for the reading part. This series
-adds __ioread32_copy() and uses it in two places. Andrew is on Cc in
-case this should go through the -mm tree. Otherwise the target
-of this patch series is SMD, so I've sent it to Andy.
+Some drivers need to read data out of iomem areas 32-bits at a
+time. Add an API to do this.
 
-Stephen Boyd (3):
-  lib: iomap_copy: Add __ioread32_copy()
-  soc: qcom: smd: Use __ioread32_copy() instead of open-coding it
-  FIRMWARE: bcm47xx_nvram: Use __ioread32_copy() instead of open-coding
+Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ include/linux/io.h |  1 +
+ lib/iomap_copy.c   | 23 +++++++++++++++++++++++
+ 2 files changed, 24 insertions(+)
 
- drivers/firmware/broadcom/bcm47xx_nvram.c | 11 +++--------
- drivers/soc/qcom/smd.c                    | 13 ++++---------
- include/linux/io.h                        |  1 +
- lib/iomap_copy.c                          | 23 +++++++++++++++++++++++
- 4 files changed, 31 insertions(+), 17 deletions(-)
-
+diff --git a/include/linux/io.h b/include/linux/io.h
+index de64c1e53612..72c35e0a41d1 100644
+--- a/include/linux/io.h
++++ b/include/linux/io.h
+@@ -29,6 +29,7 @@ struct device;
+ struct resource;
+ 
+ __visible void __iowrite32_copy(void __iomem *to, const void *from, size_t count);
++void __ioread32_copy(void *to, const void __iomem *from, size_t count);
+ void __iowrite64_copy(void __iomem *to, const void *from, size_t count);
+ 
+ #ifdef CONFIG_MMU
+diff --git a/lib/iomap_copy.c b/lib/iomap_copy.c
+index 4527e751b5e0..f174d4759ef3 100644
+--- a/lib/iomap_copy.c
++++ b/lib/iomap_copy.c
+@@ -42,6 +42,29 @@ void __attribute__((weak)) __iowrite32_copy(void __iomem *to,
+ EXPORT_SYMBOL_GPL(__iowrite32_copy);
+ 
+ /**
++ * __ioread32_copy - copy data from MMIO space, in 32-bit units
++ * @to: destination (must be 32-bit aligned)
++ * @from: source, in MMIO space (must be 32-bit aligned)
++ * @count: number of 32-bit quantities to copy
++ *
++ * Copy data from MMIO space to kernel space, in units of 32 bits at a
++ * time.  Order of access is not guaranteed, nor is a memory barrier
++ * performed afterwards.
++ */
++void __attribute__((weak)) __ioread32_copy(void *to,
++					   const void __iomem *from,
++					   size_t count)
++{
++	u32 *dst = to;
++	const u32 __iomem *src = from;
++	const u32 __iomem *end = src + count;
++
++	while (src < end)
++		*dst++ = __raw_readl(src++);
++}
++EXPORT_SYMBOL_GPL(__ioread32_copy);
++
++/**
+  * __iowrite64_copy - copy data to MMIO space, in 64-bit or 32-bit units
+  * @to: destination, in MMIO space (must be 64-bit aligned)
+  * @from: source (must be 64-bit aligned)
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
