@@ -1,78 +1,95 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Sep 2015 15:39:53 +0100
-Subject: [PATCH 1/2] arm64: fpsimd: Fix FPSIMD corruption in rt_sigreturn
- with CONFIG_PREEMPT
-In-Reply-To: <CAKv+Gu8Yt0T6AF7MmOtpPpk8VcDBVraSNMbgm03dW5BR1QMqsA@mail.gmail.com>
-References: <1442316997-32282-1-git-send-email-will.deacon@arm.com>
- <CAKv+Gu8Yt0T6AF7MmOtpPpk8VcDBVraSNMbgm03dW5BR1QMqsA@mail.gmail.com>
-Message-ID: <20150915143952.GE31157@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 15 Sep 2015 15:40:05 +0100
+Subject: [PATCH v3] arm: Fix backtrace generation when IPI is masked
+In-Reply-To: <1442222294-2756-1-git-send-email-daniel.thompson@linaro.org>
+References: <1442222294-2756-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1442328005-13661-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 01:11:10PM +0100, Ard Biesheuvel wrote:
-> Hi Will,
+Currently on ARM when <SysRq-L> is triggered from an interrupt handler
+(e.g. a SysRq issued using UART or kbd) the main CPU will wedge for ten
+seconds with interrupts masked before issuing a backtrace for every CPU
+except itself.
 
-Hi Ard,
+The new backtrace code introduced by commit 96f0e00378d4 ("ARM: add
+basic support for on-demand backtrace of other CPUs") does not work
+correctly when run from an interrupt handler because IPI_CPU_BACKTRACE
+is used to generate the backtrace on all CPUs but cannot preempt the
+current calling context.
 
-Thanks for having a look.
+This can be fixed by detecting that the calling context cannot be
+preempted and issuing the backtrace directly in this case. Issuing
+directly leaves us without any pt_regs to pass to nmi_cpu_backtrace()
+so we also modify the generic code to call dump_stack() when its
+argument is NULL.
 
-> On 15 September 2015 at 13:36, Will Deacon <will.deacon@arm.com> wrote:
-> > From: Dave P Martin <Dave.Martin@arm.com>
-> >
-> > The arm64 context switch implementation uses a flag
-> > TIF_FOREIGN_FPSTATE to track whether the hardware FPSIMD regs are
-> > out of sync with the logical state of current's registers.
-> >
-> > During sigreturn, the registers and task_struct are temporarily out
-> > of sync, between writing the task_struct and loading its contents
-> > back into the FPSIMD registers -- however, TIF_FOREIGN_FPSTATE is
-> > not set.  This can cause the context switch code to discard some or
-> > all of the restored FPSIMD state if preemption occurs during the
-> > critical region of rt_sigreturn.
-> >
-> > This patch sets TIF_FOREIGN_FPSTATE before transferring the
-> > sigframe's saved registers back to the task_struct, so that the
-> > task_struct data will take precedence over the hardware registers
-> > if a context switch occurs before everything is back in sync.
-> >
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > [will: removed preempt_{enable,disable} calls, added compat version]
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/kernel/signal.c   | 3 +++
-> >  arch/arm64/kernel/signal32.c | 2 ++
-> >  2 files changed, 5 insertions(+)
-> >
-> > diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> > index e18c48cb6db1..6d50d839b6e9 100644
-> > --- a/arch/arm64/kernel/signal.c
-> > +++ b/arch/arm64/kernel/signal.c
-> > @@ -79,6 +79,9 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
-> >         if (magic != FPSIMD_MAGIC || size != sizeof(struct fpsimd_context))
-> >                 return -EINVAL;
-> >
-> > +       /* Ensure we don't reload stale data from the hardware registers */
-> > +       set_ti_thread_flag(current_thread_info(), TIF_FOREIGN_FPSTATE);
-> > +
-> >         /* copy the FP and status/control registers */
-> >         err = __copy_from_user(fpsimd.vregs, ctx->vregs,
-> >                                sizeof(fpsimd.vregs));
-> 
-> I am not following something here. If the task gets preempted before
-> the call to fpsimd_update_current_state(), it will proceed to
-> overwrite the registers with whatever is on the stack in fpsimd after
-> being scheduled back in, and everything should work fine, right?.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
 
-You're completely right, sorry for wasting your time. Dave and I have
-been working on the fpsimd code recently and have another patch that
-restores the state directly into the current thread to avoid the stack
-entirely. *That* is what caused this problem, and I incorrectly
-identified this as a fix for mainline (it's extremely similar to
-2af276dfb172 ("ARM: 7306/1: vfp: flush thread hwstate before restoring
-context from sigframe"), which continues to haunt me).
+Notes:
+    Changes in v3:
+    
+    * Added comments to describe how raise_nmi() and nmi_cpu_backtrace()
+      interact with backtrace_mask (Russell King).
+    
+    Changes in v2:
+    
+    * Improved commit message to better describe the changes to the generic
+      code (Hillf Danton).
 
-Anyway, that also explains why we hadn't seen any problems in our
-previous testing! The second patch (compat big-endian fix) still stands,
-however.
+ arch/arm/kernel/smp.c |  9 +++++++++
+ lib/nmi_backtrace.c   | 11 ++++++++++-
+ 2 files changed, 19 insertions(+), 1 deletion(-)
 
-Will
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 48185a773852..0c4e7fdb9636 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -748,6 +748,15 @@ core_initcall(register_cpufreq_notifier);
+
+ static void raise_nmi(cpumask_t *mask)
+ {
++	/*
++	 * Generate the backtrace directly if we are running in a calling
++	 * context that is not preemptible by the backtrace IPI. Note
++	 * that nmi_cpu_backtrace() automatically removes the current cpu
++	 * from mask.
++	 */
++	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
++		nmi_cpu_backtrace(NULL);
++
+ 	smp_cross_call(mask, IPI_CPU_BACKTRACE);
+ }
+
+diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
+index 88d3d32e5923..6019c53c669e 100644
+--- a/lib/nmi_backtrace.c
++++ b/lib/nmi_backtrace.c
+@@ -43,6 +43,12 @@ static void print_seq_line(struct nmi_seq_buf *s, int start, int end)
+ 	printk("%.*s", (end - start) + 1, buf);
+ }
+
++/*
++ * When raise() is called it will be is passed a pointer to the
++ * backtrace_mask. Architectures that call nmi_cpu_backtrace()
++ * directly from their raise() functions may rely on the mask
++ * they are passed being updated as a side effect of this call.
++ */
+ void nmi_trigger_all_cpu_backtrace(bool include_self,
+ 				   void (*raise)(cpumask_t *mask))
+ {
+@@ -149,7 +155,10 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
+ 		/* Replace printk to write into the NMI seq */
+ 		this_cpu_write(printk_func, nmi_vprintk);
+ 		pr_warn("NMI backtrace for cpu %d\n", cpu);
+-		show_regs(regs);
++		if (regs)
++			show_regs(regs);
++		else
++			dump_stack();
+ 		this_cpu_write(printk_func, printk_func_save);
+
+ 		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
+--
+2.4.3
