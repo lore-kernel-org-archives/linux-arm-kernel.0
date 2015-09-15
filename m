@@ -1,36 +1,40 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 15 Sep 2015 11:14:57 -0700
-Subject: [PATCH v2 0/3] ARM: brcmstb: Bus Interface Unit support
-Message-ID: <1442340900-15320-1-git-send-email-f.fainelli@gmail.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 15 Sep 2015 11:25:25 -0700
+Subject: [PATCH 6/6] PCI: generic: Allow bus default MSI controller to
+ be specified.
+In-Reply-To: <20150915175327.GM31157@arm.com>
+References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442013719-5001-7-git-send-email-ddaney.cavm@gmail.com>
+ <20150915175327.GM31157@arm.com>
+Message-ID: <55F86295.9030409@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 09/15/2015 10:53 AM, Will Deacon wrote:
+> On Sat, Sep 12, 2015 at 12:21:59AM +0100, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> If the device tree node for the bus has a "msi-parent" property, use
+>> that as the default MSI controller for devices on the bus.  Add device
+>> tree binding documentation describing the new property.
+>>
+>> This allows the pci-host-generic driver to be used in systems with
+>> multiple MSI controllers.
+>>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   .../devicetree/bindings/pci/host-generic-pci.txt          |  5 +++++
+>>   drivers/pci/host/pci-host-generic.c                       | 15 +++++++++++++--
+>>   2 files changed, 18 insertions(+), 2 deletions(-)
+>
+> I don't think you need this anymore with 4.3-rc1. The core IRQ subsystem
+> should take care of parsing and configuring the MSI parents.
 
-This patch series adds support for early boot time Bus Interface Unit control
-register setup which is required to occur before SMP is brought-up, but needs
-to remap registers, so init_irq() is chosen for that.
+I will re-test and see if I can make it work.
 
-This builds on top of the 'soc/next' branch at github.com/Broadcom/stblinux
+David Daney
 
-Major changes in v2:
 
-- updated Device Tree documentation based on Rob's feedback
-- added a better pr_fmt format for pr_* calls in biuctrl.c
-
-Florian Fainelli (3):
-  Documentation: bindings: brcmstb: Document write-pairing
-  soc: brcmstb: Add Bus Interface Unit control setup
-  ARM: brcmstb: Setup BIU control registers during boot
-
- .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |  20 ++++
- arch/arm/mach-bcm/brcmstb.c                        |   9 ++
- drivers/soc/brcmstb/Makefile                       |   2 +-
- drivers/soc/brcmstb/biuctrl.c                      | 119 +++++++++++++++++++++
- include/linux/soc/brcmstb/brcmstb.h                |  10 ++
- 5 files changed, 159 insertions(+), 1 deletion(-)
- create mode 100644 drivers/soc/brcmstb/biuctrl.c
- create mode 100644 include/linux/soc/brcmstb/brcmstb.h
-
--- 
-2.1.0
+>
+> Will
+>
