@@ -1,72 +1,79 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 15 Sep 2015 17:53:45 +0200
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <m3bnd52y4s.fsf@t19.piap.pl>
-References: <m3bnde5whx.fsf@t19.piap.pl>
- <20150907112555.GS21084@n2100.arm.linux.org.uk>
- <m337yp5gvv.fsf@t19.piap.pl> <1441709778.13536.8.camel@pengutronix.de>
- <m3bnd52y4s.fsf@t19.piap.pl>
-Message-ID: <1442332425.2637.16.camel@pengutronix.de>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 15 Sep 2015 17:04:48 +0100
+Subject: [PATCH v3 1/5] Documentation: add DT bindings for ARM SCPI sensors
+In-Reply-To: <1442313962.2917.25.camel@linaro.org> (Jon Medhurst's message of
+ "Tue, 15 Sep 2015 11:46:02 +0100")
+References: <1442235619-4029-1-git-send-email-punit.agrawal@arm.com>
+ <1442235619-4029-2-git-send-email-punit.agrawal@arm.com>
+ <20150914131448.GC7002@leverpostej>
+ <9hhh9mxf7lg.fsf@e105922-lin.cambridge.arm.com>
+ <20150914134949.GE7002@leverpostej>
+ <9hhk2rtdq1f.fsf@e105922-lin.cambridge.arm.com>
+ <1442251092.2850.53.camel@linaro.org>
+ <9hhy4g89g64.fsf@e105922-lin.cambridge.arm.com>
+ <1442313962.2917.25.camel@linaro.org>
+Message-ID: <9hheghzvfbz.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 14.09.2015, 10:39 +0200 schrieb Krzysztof Ha?asa:
-> Another round of tests, I noticed the new git versions :-)
-> Testing Linux v4.2 + PLL5 DTS patch (for HDMI output with enabled
-> LVDS).
-> Using mplayer with YUV420 (DRM Xvideo would probably work with packed
-> UYVY-alike formats but I need YUV420 because H.264 decoder produces
-> it).
-> The driver is git://ftp.arm.linux.org.uk/~rmk/xf86-video-armada.git,
-> branch unstable-devel, and it uses
-> git://ftp.arm.linux.org.uk/~rmk/libdrm-armada.git/.
-> 
-> 	IMX DRM Xvideo output:
-> 
-> Only unscaled video: no color (luminance is good but the color
-> components are green). The driver doesn't use color information.
-> I hope this is easily fixable.
-> 
-There were patches for that some weeks ago already, I would hope they
-got applied to some tree destinied for upstream. Will look at that and
-ping people if necessary.
+"Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
 
-> 
-> 	rmk/drm-etnaviv-devel:
-> 
-> With unscaled video, the only visible problem is tearing in the
-> middle
-> of the screen (unability to sync with screen refresh).
-> 
-> With scaling, I'm getting horizontal lines (mostly visible when the
-> scene changes) and some sort of stalls - sometimes two frames are
-> alternating for few seconds then it goes forward.
-> 
-> 
-> 	pengutronix/etnaviv-for-upstream:
-That is the right branch, containing the changes I sent out for review.
+> On Tue, 2015-09-15 at 10:37 +0100, Punit Agrawal wrote:
+>> "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
+>> 
+>> > On Mon, 2015-09-14 at 15:38 +0100, Punit Agrawal wrote:
+>> >> Mark Rutland <mark.rutland@arm.com> writes:
+>> >> 
+> [...]
+>> >> The way the SCP interface is defined, the sensor identifiers are
+>> >> contiguous,
+>> >
+>> > Is there any documentation other than DUI0922A? [1] From what I can seen
+>> > that just says it's a 16-bit value and doesn't put any particular
+>> > constraints on its value.
+>> 
+>> Although not explicitly stated, if you look at the Get Sensor Capability
+>> [2] and Get Sensor Info [3] commands you can indirectly infer that the
+>> Sensor IDs are contiguous.
+>
+> I personally wouldn't even indirectly infer they are contiguous from
+> what the document says. If I were implementing the firmware I would feel
+> quite in my rights to, for example, use the top 8 bits of the ID for a
+> sensor type and the bottom 8 for an index, if that made dispatching of
+> requests more efficient. Or if some optional hardware was detected as
+> missing, leaving some holes in ID space.
 
-It includes a new kernel<->userspace interface, so needs a modified
-xf86-video-armada to go with it. You can pick that up here:
-git://git.pengutronix.de/git/lst/xf86-video-armada.git for-rmk
+True. And without a command to convey the list of valid IDs, the
+consumer of the API would have to iterate over the entire 16bit space to
+locate valid IDs.
 
-Caution: the armada code is WIP and needs further cleanups. It should
-work though.
+>
+> As a specification of a 'standard' the document seems to be rather
+> lacking. So, Sensor ID should be documented as being "an unsigned
+> integer less than then number of sensors returned by the Get Sensor
+> Capability command", or something like that. I guess clocks and other
+> devices suffer from similar lack of specificity.
 
-> No etnaviv Xvideo:
-> (==) armada(0): Backing store enabled
-> (==) armada(0): Silken mouse enabled
-> (EE) armada(0): etnaviv: unable to open: Not a directory
-> (WW) armada(0): [drm] Vivante initialization failed, running
-> unaccelerated
-> 
-> I assume I need a newer something.
-> 
-> 
-> 	pengutronix/v4.2/topic/etnaviv-for-rmk:
+I was thinking of suggesting something similar as an update.
 
-Please don't use that branch. It just there to keep stability for
-people that already know about it.
+>
+>>  Not the strongest guarantee I know.
+>> 
+>> All platforms currently using SCP (Juno R0 and R1) do indeed expose
+>> contiguous identifiers.
+>
+> IMO, Linux drivers should be coded to the standard or written
+> specification (where they are available) not the particular
+> implementations available.
+>
+>> >
+>> > [1] http://community.arm.com/servlet/JiveServlet/download/8401-40-18262/DUI0922A_scp_message_interface.pdf
+>> [2] http://arminfo.emea.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/ch03s02s21.html
+>> [3] http://arminfo.emea.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/BABCCCJJ.html
+>
+> I think those links are on ARM's intranet, they return NXDOMAIN for me.
 
-Regards,
-Lucas
+Apologies, the below should work.
+
+[2] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/ch03s02s21.html
+[3] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/BABCCCJJ.html
