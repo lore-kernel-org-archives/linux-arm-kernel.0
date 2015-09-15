@@ -1,53 +1,58 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Tue, 15 Sep 2015 20:31:44 +0300
-Subject: mysterious crashes on OMAP5 uevm
-In-Reply-To: <4A24D632-D980-4C37-B2C9-88D3E9D429D7@goldelico.com>
-References: <CANOLnOO3NdK1r1jZQtS=TcHEE7SQwhGHh0YsqqoCJpFW3NO05Q@mail.gmail.com>
- <20150908143810.GD4215@atomide.com>
- <CANOLnOODjTaBcL1QzAm7o4YOB=_P-s7JYovu6fhNSqJSV2Bq+Q@mail.gmail.com>
- <20150908210708.GH4215@atomide.com>
- <E0068B56-0DEE-4E2F-94CF-DB104AE16D63@goldelico.com>
- <20150910083026.GA21098@n2100.arm.linux.org.uk>
- <CANOLnOM-PYcAL=f4rgucfdWZ1+U3HkP34bfwrKP4Rob+J6iTfw@mail.gmail.com>
- <20150911140306.GB21098@n2100.arm.linux.org.uk>
- <20150914121248.GD21098@n2100.arm.linux.org.uk>
- <20150914190236.GV4215@atomide.com>
- <4A24D632-D980-4C37-B2C9-88D3E9D429D7@goldelico.com>
-Message-ID: <CANOLnOOgYh9vqU6Bq8VkRQ9Oe64NBkD8115T0iG-R6eoXHOe7w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Sep 2015 18:36:55 +0100
+Subject: [PATCH 2/6] PCI: generic: Only fixup irqs for bus we are creating.
+In-Reply-To: <1442013719-5001-3-git-send-email-ddaney.cavm@gmail.com>
+References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442013719-5001-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150915173654.GJ31157@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 10:35 PM, Dr. H. Nikolaus Schaller
-<hns@goldelico.com> wrote:
->
-> Am 14.09.2015 um 21:02 schrieb Tony Lindgren <tony@atomide.com>:
->
->> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150914 05:16]:
->>> On Fri, Sep 11, 2015 at 03:03:07PM +0100, Russell King - ARM Linux wrote:
->>>>
->>>> Merely changing __LINUX_ARM_ARCH__ >= 7 to >= 6 should fix the problem,
->>>> and I doubt there's any ARMv6 non-T2 systems out there that would be
->>>> affected by clearing the IT state bits.
->>>
->>> Please test the following patch:
->>
->> While we're waiting for Grazvydas to test.. Looks good to me:
->>
->> Acked-by: Tony Lindgren <tony@atomide.com>
->
-> I have tested on:
-> * GTA04 with DM3730 (OMAP3)
-> * Pyra prototype with OMAP5432
-> No X server crashes seen any more.
->
-> Tested-by: H. Nikolaus Schaller <hns@goldelico.com>
+Hi David,
 
-Tested-by: Grazvydas Ignotas <notasas@gmail.com>
-on OMAP5 uevm running v4.2 built with omap2plus_defconfig.
-On v4.3-rc1 hsmmc controller probe is deferred for whatever reason and
-never reprobes, so my rootfs is never mounted and I could not test,
-but that looks unrelated.
+On Sat, Sep 12, 2015 at 12:21:55AM +0100, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> Use pci_walk_bus() to restrict the fixup irq actions to only the bus
+> being created.
+> 
+> If we create multiple buses with pci-host-generic, or there are buses
+> created by other drivers, we don't want to call pci_fixup_irqs() which
+> operates on all devices, not just the devices on the bus being added.
+> The consequence is that either the fixups are done more than once, or
+> in some cases incorrect fixups could be applied.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  drivers/pci/host/pci-host-generic.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 265dd25..a0fb241 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -205,6 +205,12 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>  	return 0;
+>  }
+>  
+> +static int gen_pci_fixup_irq_cb(struct pci_dev *dev, void *arg)
+> +{
+> +	pdev_fixup_irq(dev, pci_common_swizzle, of_irq_parse_and_map_pci);
+> +	return 0;
+> +}
+> +
+>  static int gen_pci_probe(struct platform_device *pdev)
+>  {
+>  	int err;
+> @@ -262,7 +268,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  		return -ENODEV;
+>  	}
+>  
+> -	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> +	pci_walk_bus(bus, gen_pci_fixup_irq_cb, NULL);
 
-I guess it's worth marking this one for stable.
+Any chance we could put something in the core PCI code for this? I think
+any host controller wanting to work with arm64 is potentially going to
+run into the same problem.
 
-Gra?vydas
+Will
