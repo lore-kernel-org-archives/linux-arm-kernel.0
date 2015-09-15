@@ -1,40 +1,84 @@
-From: songjun.wu@atmel.com (Wu, Songjun)
-Date: Tue, 15 Sep 2015 11:11:53 +0800
-Subject: [PATCH 2/2] ASoC: atmel-classd: DT binding for Class D audio
- amplifier driver
-In-Reply-To: <20150908122340.GC9751@sirena.org.uk>
-References: <1441086101-15303-1-git-send-email-songjun.wu@atmel.com>
- <1441086101-15303-3-git-send-email-songjun.wu@atmel.com>
- <20150903114316.GV12027@sirena.org.uk> <55EC0AFE.3080809@atmel.com>
- <20150907162548.GW5313@sirena.org.uk> <55EEAC0D.7010003@atmel.com>
- <20150908122340.GC9751@sirena.org.uk>
-Message-ID: <55F78C79.30102@atmel.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 15 Sep 2015 11:23:43 +0800
+Subject: [PATCH v2 0/5] drivers: firmware: psci: add basic v1.0 support
+In-Reply-To: <20150914133510.GA26707@red-moon>
+References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20150914133510.GA26707@red-moon>
+Message-ID: <20150915112343.24d72c19@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 14 Sep 2015 14:35:10 +0100
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
 
+> On Wed, Jul 08, 2015 at 06:16:46PM +0100, Lorenzo Pieralisi wrote:
+> > This series is a v2 of a previous posting:
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347352.html
+> > 
+> > v1 -> v2:
+> > 
+> > - rebased against v4.2-rc1
+> > - added version to 1.0 specific macros
+> > 
+> > The PSCI v1.0 specification[1] introduces a brand new set of features
+> > (ie OS initiated mode and system suspend being the most notable ones)
+> > and provides updates to the PSCI 0.2 specification, keeping backward
+> > compatibility.
+> > 
+> > PSCI v1.0 applies minor changes to function return codes and function
+> > behaviour (ie AFFINITY_INFO requirements, INVALID_ADDRESS return value)
+> > and introduces a new power_state parameter format (extended stateid)
+> > that is probeable with the newly introduced PSCI_FEATURES call.
+> > 
+> > This series upgrades the current kernel PSCI layer implementation with
+> > a set of patches that make the kernel PSCI v1.0 compliant.
+> > 
+> > The series augments the PSCI firmware layer with a hook to retrieve
+> > the features for a specific PSCI function (ie based on the PSCI_FEATURES
+> > call) and uses it to detect the power_state parameter format, updating
+> > the power_state parameter handling functions accordingly.
+> > 
+> > In order to prevent firmware interfaces mismatch, a new compatible
+> > string is added to the DT bindings to characterize a 1.0 compliant
+> > firmware interface.
+> > 
+> > The series is built on top of M.Rutland's patch series:
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/353795.html
+> > 
+> > Tested on a Juno board.
+> 
+> Rebased against 4.3-rc1 (that includes the patch series above), if there
+> are no objections I will queue this series for v4.4.
 
-On 9/8/2015 20:23, Mark Brown wrote:
-> On Tue, Sep 08, 2015 at 05:36:13PM +0800, Wu, Songjun wrote:
->> On 9/8/2015 00:25, Mark Brown wrote:
->
->>> Sure, there's no problem at all having that structure in software but it
->>> should be possible to do this without having to represent this structure
->>> in DT.  It should be possible to register the card at the same time as
->>> the rest of the components rather than needing the separate device in
->>> the DT.
->
->> Do you mean using a single entry in the DT for the whole classD system and
->> instantiate ASoC components from it.
->> For now, there are two entry, they could be combined to one entry.
->
-> Yes, exactly.
->
-I try to use one entry, but there is a problem.
-It's about 'driver_data' in struct device.
-In function snd_soc_register_card, the parameter 'card' will be set to 
-'driver_data' by the code 'dev_set_drvdata(card->dev, card)'.
-Then some resources(eg. regmap, clock) also need be recorded by 
-'driver_data'. One entry could only has one 'driver_data'. I think the 
-best way is to create two entries, like the current dts.
-What's your opinion?
+Tested on Marvell BG4CT DMP board. So feel free to add
+
+Tested-by: Jisheng Zhang <jszhang@marvell.com>
+
+Thanks
+
+> 
+> Thanks,
+> Lorenzo
+> 
+> > 
+> > [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
+> > 
+> > Lorenzo Pieralisi (5):
+> >   drivers: firmware: psci: add INVALID_ADDRESS return value
+> >   drivers: firmware: psci: move power_state handling to generic code
+> >   drivers: firmware: psci: add PSCI_FEATURES call
+> >   drivers: firmware: psci: add extended stateid power_state support
+> >   drivers: firmware: psci: add PSCI v1.0 DT bindings
+> > 
+> >  Documentation/devicetree/bindings/arm/psci.txt |  6 +++
+> >  arch/arm64/kernel/psci.c                       | 14 -------
+> >  drivers/firmware/psci.c                        | 53 ++++++++++++++++++++++++++
+> >  include/linux/psci.h                           |  2 +
+> >  include/uapi/linux/psci.h                      | 15 ++++++++
+> >  5 files changed, 76 insertions(+), 14 deletions(-)
+> > 
+> > -- 
+> > 2.2.1
+> > 
