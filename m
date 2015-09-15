@@ -1,73 +1,51 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Tue, 15 Sep 2015 13:01:25 +0200
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <20150915101220.GQ21084@n2100.arm.linux.org.uk> (Russell King's
- message of "Tue, 15 Sep 2015 11:12:20 +0100")
-References: <m3bnde5whx.fsf@t19.piap.pl>
- <20150907112555.GS21084@n2100.arm.linux.org.uk>
- <m337yp5gvv.fsf@t19.piap.pl> <1441709778.13536.8.camel@pengutronix.de>
- <m3bnd52y4s.fsf@t19.piap.pl> <m337yg2ip4.fsf@t19.piap.pl>
- <20150915101220.GQ21084@n2100.arm.linux.org.uk>
-Message-ID: <m3wpvs0wvu.fsf@t19.piap.pl>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Tue, 15 Sep 2015 14:01:54 +0300
+Subject: [PATCH v4 2/2] [media] media-device: split media initialization
+ and registration
+In-Reply-To: <1442313147-24566-3-git-send-email-javier@osg.samsung.com>
+References: <1442313147-24566-1-git-send-email-javier@osg.samsung.com>
+ <1442313147-24566-3-git-send-email-javier@osg.samsung.com>
+Message-ID: <55F7FAA2.2090605@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+Hi Javier,
 
->> 1024 x 768 for now. I noticed a strange thing: XvShmPutImage() usually
->> takes (much) less than 4 milliseconds, but every 315 frames, it takes
->> much longer (when started, it takes 1259 frames). The following is with
->> constant image, i.e., not altered between frames. Source attached (one
->> may need to change xv_port variable).
-   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Javier Martinez Canillas wrote:
+> The media device node is registered and so made visible to user-space
+> before entities are registered and links created which means that the
+> media graph obtained by user-space could be only partially enumerated
+> if that happens too early before all the graph has been created.
+> 
+> To avoid this race condition, split the media init and registration
+> in separate functions and only register the media device node when
+> all the pending subdevices have been registered, either explicitly
+> by the driver or asynchronously using v4l2_async_register_subdev().
+> 
+> The media_device_register() had a check for drivers not filling dev
+> and model fields but all drivers in mainline set them and not doing
+> it will be a driver bug so change the function return to void and
+> add a BUG_ON() for dev being NULL instead.
+> 
+> Also, add a media_device_cleanup() function that will destroy the
+> graph_mutex that is initialized in media_device_init().
+> 
+> Suggested-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-> 1. Don't hard code the Xv port ID (worth mentioning somewhere so people
->    testing it don't spend something like a quarter of an hour trying to
->    debug why it doesn't work.)
+Thanks!
 
-Well, I actually mentioned it.
+For drivers/media/media-device.c, drivers/media/platform/omap3isp/isp.c
+and include/media/media-device.h:
 
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
 
-So this means the delay was only "grouped" by the X protocol, and it
-won't be magically faster.
+Laurent, could you ack these if you're fine with them?
 
-> Now, running on Dove overlay, I see about 17ms being the average time,
-> which is slightly longer than the vsync.
+They depend on Mauro's patches so they should be applied after them.
 
-> Let's not forget that Dove hardware is slower than iMX6, so I think that
-> iMX6 should manage to comfortably achieve the 16.6ms required for
-> frame-by-frame display from your program.
-
-Interestingly, i.MX6 seems to achive about 3.2 ms, which is much faster.
-If not for the missing color planes (and scaling), it would be perfect.
-(and I only need 30 FPS).
-
-> Now, as for using the GPU, X server analysis:
-> - Again about 1ms between select() and read() of the event
-> - 1ms to the first WAIT_VBLANK ioctl on the display adapter to read the
->   last VSYNC time
-> - 200us later to map the user pointer
-> - 300us to the WAIT_VBLANK ioctl to wait for the vblank (which takes in this
->   instance 3.5ms to fire)
-> - 130us to first attempt to submit the GPU queue, which returns -EAGAIN
->   after 6.4ms
-> - second attempt takes 9.5ms to complete successfully
-> - 1ms (with intervening SIGALRM handler) to wait for the GPU to finish,
->   which takes 11.5ms
-> - 450us to ask DRM to release the user pointer buffer, which takes 9.4ms
-> - 1ms (with intervening SIGALRM handler) to report completion of the operation
-> - The X server then takes about 4ms to get back to calling select().
-
-Sure, I know it has to be slower.
-
-So this takes (on Dove) about 50 ms (at 1024x768), thus is way too slow
-to display video at this (or higher) resolution and frame rate.
-On i.MX6q, it takes about 66 - 74 ms, depending on actual clock speed
-(frequency scaling, up to 1 GHz).
-
-Thanks for testing.
 -- 
-Krzysztof Halasa
+Kind regards,
 
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+Sakari Ailus
+sakari.ailus at linux.intel.com
