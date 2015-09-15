@@ -1,40 +1,71 @@
-From: bayi.cheng@mediatek.com (bayi.cheng)
-Date: Tue, 15 Sep 2015 14:53:41 +0800
-Subject: [PATCH 1/3] doc: dt: add documentation for Mediatek spi-nor
- controller
-In-Reply-To: <20150911214907.GE11487@google.com>
-References: <1441705796-11365-1-git-send-email-bayi.cheng@mediatek.com>
- <1441705796-11365-2-git-send-email-bayi.cheng@mediatek.com>
- <20150911214907.GE11487@google.com>
-Message-ID: <1442300021.27250.10.camel@mhfsdcap03>
+From: hillf.zj@alibaba-inc.com (Hillf Danton)
+Date: Tue, 15 Sep 2015 14:58:08 +0800
+Subject: [PATCH] arm: Fix backtrace generation when IPI is masked
+In-Reply-To: <016701d0ef82$c303d6a0$490b83e0$@alibaba-inc.com>
+References: <016701d0ef82$c303d6a0$490b83e0$@alibaba-inc.com>
+Message-ID: <017001d0ef83$e18a5d00$a49f1700$@alibaba-inc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-09-11 at 14:49 -0700, Brian Norris wrote:
-> One more thing:
 > 
-> On Tue, Sep 08, 2015 at 05:49:54PM +0800, Bayi Cheng wrote:
-> > +- clocks: spi nor source clock
+> Currently on ARM when <SysRq-L> is triggered from an interrupt handler
+> (e.g. a SysRq issued using UART or kbd) the main CPU will wedge for ten
+> seconds with interrupts masked before issuing a backtrace for every CPU
+> except itself.
 > 
-> ^^ you only list one clock here
+> The new backtrace code introduced by commit 96f0e00378d4 ("ARM: add
+> basic support for on-demand backtrace of other CPUs") does not work
+> correctly when run from an interrupt handler because IPI_CPU_BACKTRACE
+> is used to generate the backtrace on all CPUs but cannot preempt the
+> current calling context.
 > 
-Ok, I will add other clocks
-> > +- clock-names: "spi_clk", "axi_clk", "mux_clk", "sf_clk"
+> This can be fixed by detecting that the calling context cannot be
+> preempted and issuing the backtrace directly in this case. Some small
+> changes to the generic code are required to support this.
 > 
-> But you have 4 names here.
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> ---
+>  arch/arm/kernel/smp.c | 7 +++++++
+>  lib/nmi_backtrace.c   | 5 ++++-
+>  2 files changed, 11 insertions(+), 1 deletion(-)
 > 
-> ...
-> > +	clocks = <&pericfg CLK_PERI_SPI>,
-> > +		 <&topckgen CLK_TOP_AXI_SEL>,
-> > +		 <&topckgen CLK_TOP_UNIVPLL2_D8>,
-> > +		 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 48185a773852..4d8a80328c74 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -748,6 +748,13 @@ core_initcall(register_cpufreq_notifier);
 > 
-> And you provide 4 clocks.
+>  static void raise_nmi(cpumask_t *mask)
+>  {
+> +	/*
+> +	 * Generate the backtrace directly if we are running in a
+> +	 * calling context that is not preemptible by the backtrace IPI.
+> +	 */
+> +	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
+> +		nmi_cpu_backtrace(NULL);
+> +
+>  	smp_cross_call(mask, IPI_CPU_BACKTRACE);
+>  }
 > 
-> > +	clock-names = "spi_clk", "axi_clk", "mux_clk", "sf_clk";
+> diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
+> index 88d3d32e5923..be0466a80d0b 100644
+> --- a/lib/nmi_backtrace.c
+> +++ b/lib/nmi_backtrace.c
+> @@ -149,7 +149,10 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
+>  		/* Replace printk to write into the NMI seq */
+>  		this_cpu_write(printk_func, nmi_vprintk);
+>  		pr_warn("NMI backtrace for cpu %d\n", cpu);
+> -		show_regs(regs);
+> +		if (regs)
+> +			show_regs(regs);
+> +		else
+> +			dump_stack();
+
+Better if dump_stack() is added in a separate patch, given that
+it is not mentioned in commit message.
+
+>  		this_cpu_write(printk_func, printk_func_save);
 > 
-> Please list all 4 under the "clocks" property, not just under the
-> "clock-names" property.
-> 
-OK,  Thanks for your remind!
-> Brian
+>  		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
+> --
+> 2.4.3
