@@ -1,42 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Sep 2015 18:55:20 +0100
-Subject: [PATCH 5/6] PCI: generic: Pass proper starting bus number to
- pci_scan_root_bus().
-In-Reply-To: <1442013719-5001-6-git-send-email-ddaney.cavm@gmail.com>
-References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
- <1442013719-5001-6-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20150915175519.GN31157@arm.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 15 Sep 2015 12:58:55 -0500
+Subject: [PATCH] ARM: Remove __ref on hotplug cpu die path
+In-Reply-To: <1442276597-14325-1-git-send-email-sboyd@codeaurora.org>
+References: <1442276597-14325-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150915175855.GA18435@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 12, 2015 at 12:21:58AM +0100, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
+On Mon, Sep 14, 2015 at 05:23:17PM -0700, Stephen Boyd wrote:
+> Now that __cpuinit has been removed, the __ref markings on these
+> functions are useless. Remove them. This also reduces the size of
+> the multi_v7_defconfig image:
 > 
-> If the bus is being configured with a bus-range that does not start at
-> zero, pass that starting bus number to pci_scan_root_bus().  Passing
-> the incorrect value of zero causes attempted config accesses outside
-> of the supported range, which cascades to an OOPs spew and eventual
-> kernel panic.
+> $ size before after
+>    text    data     bss     dec     hex filename
+>    12683578        1470996  348904 14503478         dd4e36 before
+>    12683274        1470996  348904 14503174         dd4d06 after
 > 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  drivers/pci/host/pci-host-generic.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> index fce5bf7..8219c0b 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -265,7 +265,7 @@ static int gen_pci_probe(struct platform_device *pdev)
->  	if (!pci_has_flag(PCI_PROBE_ONLY))
->  		pci_add_flags(PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS);
->  
-> -	bus = pci_scan_root_bus(dev, 0,
-> +	bus = pci_scan_root_bus(dev, pci->cfg.bus_range->start,
->  				&pci->cfg.ops.ops, pci, &pci->resources);
->  	if (!bus) {
->  		dev_err(dev, "Scanning rootbus failed");
+> presumably because now we don't have to jump to code in the
+> .ref.text section and/or the noinline marking is removed.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+<snip>
 
-Will
+Acked-by: Andy Gross <agross@codeaurora.org>
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
