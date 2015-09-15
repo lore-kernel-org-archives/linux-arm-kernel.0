@@ -1,260 +1,246 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 15 Sep 2015 16:41:22 +0100
-Subject: [PATCH 13/15] arm64: kvm: Rewrite fake pgd handling
+Date: Tue, 15 Sep 2015 16:41:23 +0100
+Subject: [PATCH 14/15] arm64: Add 16K page size support
 In-Reply-To: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
 References: <1442331684-28818-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1442331684-28818-14-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1442331684-28818-15-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-The existing fake pgd handling code assumes that the stage-2 entry
-level can only be one level down that of the host, which may not be
-true always(e.g, with the introduction of 16k pagesize).
+This patch turns on the 16K page support in the kernel. We
+support 48bit VA (4 level page tables) and 47bit VA (3 level
+page tables).
 
-e.g.
-With 16k page size and 48bit VA and 40bit IPA we have the following
-split for page table levels:
-
-level:  0       1         2         3
-bits : [47] [46 - 36] [35 - 25] [24 - 14] [13 - 0]
-         ^       ^     ^
-         |       |     |
-   host entry    |     x---- stage-2 entry
-                 |
-        IPA -----x
-
-The stage-2 entry level is 2, due to the concatenation of 16tables
-at level 2(mandated by the hardware). So, we need to fake two levels
-to actually reach the hyp page table. This case cannot be handled
-with the existing code, as, all we know about is KVM_PREALLOC_LEVEL
-which kind of stands for two different pieces of information.
-
-1) Whether we have fake page table entry levels.
-2) The entry level of stage-2 translation.
-
-We loose the information about the number of fake levels that
-we may have to use. Also, KVM_PREALLOC_LEVEL computation itself
-is wrong, as we assume the hw entry level is always 1 level down
-from the host.
-
-This patch introduces two seperate indicators :
-1) Accurate entry level for stage-2 translation - HYP_PGTABLE_ENTRY_LEVEL -
-   using the new helpers.
-2) Number of levels of fake pagetable entries. (KVM_FAKE_PGTABLE_LEVELS)
-
-The following conditions hold true for all cases(with 40bit IPA)
-1) The stage-2 entry level <= 2
-2) Number of fake page-table entries is in the inclusive range [0, 2].
-
-Cc: kvmarm at lists.cs.columbia.edu
-Cc: christoffer.dall at linaro.org
-Cc: Marc.Zyngier at arm.com
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/kvm_mmu.h |  114 ++++++++++++++++++++------------------
- 1 file changed, 61 insertions(+), 53 deletions(-)
+ arch/arm64/Kconfig                   |   25 ++++++++++++++++++++-----
+ arch/arm64/include/asm/fixmap.h      |    4 +++-
+ arch/arm64/include/asm/kvm_arm.h     |   12 ++++++++++++
+ arch/arm64/include/asm/page.h        |    2 ++
+ arch/arm64/include/asm/sysreg.h      |    2 ++
+ arch/arm64/include/asm/thread_info.h |    2 ++
+ arch/arm64/kernel/head.S             |    7 ++++++-
+ arch/arm64/mm/proc.S                 |    4 +++-
+ 8 files changed, 50 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 2567fe8..72cfd9e 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -41,18 +41,6 @@
-  */
- #define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 83bca48..2253819 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -171,7 +171,8 @@ config PGTABLE_LEVELS
+ 	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
+ 	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48
+ 	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
+-	default 4 if ARM64_4K_PAGES && ARM64_VA_BITS_48
++	default 3 if ARM64_16K_PAGES && ARM64_VA_BITS_47
++	default 4 if !ARM64_64K_PAGES && ARM64_VA_BITS_48
  
--/*
-- * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation
-- * levels in addition to the PGD and potentially the PUD which are
-- * pre-allocated (we pre-allocate the fake PGD and the PUD when the Stage-2
-- * tables use one level of tables less than the kernel.
-- */
+ source "init/Kconfig"
+ 
+@@ -345,6 +346,13 @@ config ARM64_4K_PAGES
+ 	help
+ 	  This feature enables 4KB pages support.
+ 
++config ARM64_16K_PAGES
++	bool "16KB"
++	help
++	  The system will use 16KB pages support. AArch32 emulation
++	  requires applications compiled with 16K(or multiple of 16K)
++	  aligned segments.
++
+ config ARM64_64K_PAGES
+ 	bool "64KB"
+ 	help
+@@ -358,6 +366,7 @@ endchoice
+ choice
+ 	prompt "Virtual address space size"
+ 	default ARM64_VA_BITS_39 if ARM64_4K_PAGES
++	default ARM64_VA_BITS_47 if ARM64_16K_PAGES
+ 	default ARM64_VA_BITS_42 if ARM64_64K_PAGES
+ 	help
+ 	  Allows choosing one of multiple possible virtual address
+@@ -372,6 +381,10 @@ config ARM64_VA_BITS_42
+ 	bool "42-bit"
+ 	depends on ARM64_64K_PAGES
+ 
++config ARM64_VA_BITS_47
++	bool "47-bit"
++	depends on ARM64_16K_PAGES
++
+ config ARM64_VA_BITS_48
+ 	bool "48-bit"
+ 
+@@ -381,6 +394,7 @@ config ARM64_VA_BITS
+ 	int
+ 	default 39 if ARM64_VA_BITS_39
+ 	default 42 if ARM64_VA_BITS_42
++	default 47 if ARM64_VA_BITS_47
+ 	default 48 if ARM64_VA_BITS_48
+ 
+ config CPU_BIG_ENDIAN
+@@ -451,7 +465,7 @@ config ARCH_WANT_GENERAL_HUGETLB
+ 	def_bool y
+ 
+ config ARCH_WANT_HUGE_PMD_SHARE
+-	def_bool y if ARM64_4K_PAGES
++	def_bool y if ARM64_4K_PAGES || ARM64_16K_PAGES
+ 
+ config HAVE_ARCH_TRANSPARENT_HUGEPAGE
+ 	def_bool y
+@@ -488,6 +502,7 @@ config XEN
+ config FORCE_MAX_ZONEORDER
+ 	int
+ 	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
++	default "12" if (ARM64_16K_PAGES && TRANSPARENT_HUGEPAGE)
+ 	default "11"
+ 
+ menuconfig ARMV8_DEPRECATED
+@@ -674,9 +689,9 @@ config COMPAT
+ 	  the user helper functions, VFP support and the ptrace interface are
+ 	  handled appropriately by the kernel.
+ 
+-	  If you also enabled CONFIG_ARM64_64K_PAGES, please be aware that you
+-	  will only be able to execute AArch32 binaries that were compiled with
+-	  64k aligned segments.
++	  If you use a page size other than 4KB(i.e, 16KB or 64KB), please be aware
++	  that you will only be able to execute AArch32 binaries that were compiled
++	  with page size aligned segments.
+ 
+ 	  If you want to execute 32-bit userspace applications, say Y.
+ 
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index 8b9884c..a294c70 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -55,8 +55,10 @@ enum fixed_addresses {
+ 	 * Temporary boot-time mappings, used by early_ioremap(),
+ 	 * before ioremap() is functional.
+ 	 */
 -#ifdef CONFIG_ARM64_64K_PAGES
--#define KVM_MMU_CACHE_MIN_PAGES	1
--#else
--#define KVM_MMU_CACHE_MIN_PAGES	2
--#endif
--
- #ifdef __ASSEMBLY__
- 
++#if	defined(CONFIG_ARM64_64K_PAGES)
+ #define NR_FIX_BTMAPS		4
++#elif	defined (CONFIG_ARM64_16K_PAGES)
++#define NR_FIX_BTMAPS		16
+ #else
+ #define NR_FIX_BTMAPS		64
+ #endif
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 699554d..b28a06e 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -113,6 +113,7 @@
+ #define VTCR_EL2_TG0_MASK	(3 << 14)
+ #define VTCR_EL2_TG0_4K		(0 << 14)
+ #define VTCR_EL2_TG0_64K	(1 << 14)
++#define VTCR_EL2_TG0_16K	(2 << 14)
+ #define VTCR_EL2_SH0_MASK	(3 << 12)
+ #define VTCR_EL2_SH0_INNER	(3 << 12)
+ #define VTCR_EL2_ORGN0_MASK	(3 << 10)
+@@ -134,6 +135,8 @@
+  *
+  * Note that when using 4K pages, we concatenate two first level page tables
+  * together.
++ * With 16K pages, we concatenate 16 first level page tables and enter at
++ * level 2.
+  *
+  * The magic numbers used for VTTBR_X in this patch can be found in Tables
+  * D4-23 and D4-25 in ARM DDI 0487A.b.
+@@ -151,6 +154,15 @@
+ #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1 | \
+ 				 VTCR_EL2_COMMON_BITS)
+ #define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
++#elif defined(CONFIG_ARM64_16K_PAGES)
++/*
++ * Stage2 translation configuration:
++ * 16kB pages (TG0 = 2)
++ * 2 level page tables (SL0 = 1)
++ */
++#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1 | \
++				 VTCR_EL2_COMMON_BITS)
++#define VTTBR_X			(42 - VTCR_EL2_T0SZ_40B)
+ #else
  /*
-@@ -80,6 +68,26 @@
- #define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
- #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
- 
-+/*
-+ * At stage-2 entry level, upto 16 tables can be concatenated and
-+ * the hardware expects us to use concatenation, whenever possible.
-+ * So, number of page table levels for KVM_PHYS_SHIFT is always
-+ * the number of normal page table levels for (KVM_PHYS_SHIFT - 4).
-+ */
-+#define HYP_PGTABLE_LEVELS	ARM64_HW_PGTABLE_LEVELS(KVM_PHYS_SHIFT - 4)
-+/* Number of bits normally addressed by HYP_PGTABLE_LEVELS */
-+#define HYP_PGTABLE_SHIFT	ARM64_HW_PGTABLE_LEVEL_SHIFT(HYP_PGTABLE_LEVELS + 1)
-+#define HYP_PGDIR_SHIFT		ARM64_HW_PGTABLE_LEVEL_SHIFT(HYP_PGTABLE_LEVELS)
-+#define HYP_PGTABLE_ENTRY_LEVEL	(4 - HYP_PGTABLE_LEVELS)
-+
-+/*
-+ * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation
-+ * levels in addition to the PGD and potentially the PUD which are
-+ * pre-allocated (we pre-allocate the fake PGD and the PUD when the Stage-2
-+ * tables use one level of tables less than the kernel.
-+ */
-+#define KVM_MMU_CACHE_MIN_PAGES	(HYP_PGTABLE_LEVELS - 1)
-+
- int create_hyp_mappings(void *from, void *to);
- int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
- void free_boot_hyp_pgd(void);
-@@ -145,56 +153,41 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
- #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
- #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
- 
--/*
-- * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
-- * the entire IPA input range with a single pgd entry, and we would only need
-- * one pgd entry.  Note that in this case, the pgd is actually not used by
-- * the MMU for Stage-2 translations, but is merely a fake pgd used as a data
-- * structure for the kernel pgtable macros to work.
-- */
--#if PGDIR_SHIFT > KVM_PHYS_SHIFT
--#define PTRS_PER_S2_PGD_SHIFT	0
-+/* Number of concatenated tables in stage-2 entry level */
-+#if KVM_PHYS_SHIFT > HYP_PGTABLE_SHIFT
-+#define S2_ENTRY_TABLES_SHIFT	(KVM_PHYS_SHIFT - HYP_PGTABLE_SHIFT)
+  * Stage2 translation configuration:
+diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+index 3c9ce8c..6aee732 100644
+--- a/arch/arm64/include/asm/page.h
++++ b/arch/arm64/include/asm/page.h
+@@ -22,6 +22,8 @@
+ /* PAGE_SHIFT determines the page size */
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define PAGE_SHIFT		16
++#elif defined(CONFIG_ARM64_16K_PAGES)
++#define PAGE_SHIFT		14
  #else
--#define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - PGDIR_SHIFT)
-+#define S2_ENTRY_TABLES_SHIFT	0
+ #define PAGE_SHIFT		12
  #endif
-+#define S2_ENTRY_TABLES		(1 << (S2_ENTRY_TABLES_SHIFT))
-+
-+/* Number of page table levels we fake to reach the hw pgtable for hyp */
-+#define KVM_FAKE_PGTABLE_LEVELS	(CONFIG_PGTABLE_LEVELS - HYP_PGTABLE_LEVELS)
-+
-+#define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - HYP_PGDIR_SHIFT)
- #define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
- #define S2_PGD_ORDER		get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index e01d323..310592c 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -89,8 +89,10 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
  
- #define kvm_pgd_index(addr)	(((addr) >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
+ #define ID_AA64MMFR0_TGran4_SHIFT	28
+ #define ID_AA64MMFR0_TGran64_SHIFT	24
++#define ID_AA64MMFR0_TGran16_SHIFT	20
  
--/*
-- * If we are concatenating first level stage-2 page tables, we would have less
-- * than or equal to 16 pointers in the fake PGD, because that's what the
-- * architecture allows.  In this case, (4 - CONFIG_PGTABLE_LEVELS)
-- * represents the first level for the host, and we add 1 to go to the next
-- * level (which uses contatenation) for the stage-2 tables.
-- */
--#if PTRS_PER_S2_PGD <= 16
--#define KVM_PREALLOC_LEVEL	(4 - CONFIG_PGTABLE_LEVELS + 1)
+ #define ID_AA64MMFR0_TGran4_ENABLED	0x0
+ #define ID_AA64MMFR0_TGran64_ENABLED	0x0
++#define ID_AA64MMFR0_TGran16_ENABLED	0x1
+ 
+ #endif	/* __ASM_SYSREG_H */
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index d9c8c9f..338a4ac 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -25,6 +25,8 @@
+ 
+ #ifdef CONFIG_ARM64_4K_PAGES
+ #define THREAD_SIZE_ORDER	2
++#elif defined(CONFIG_ARM64_16K_PAGES)
++#define THREAD_SIZE_ORDER	0
+ #endif
+ 
+ #define THREAD_SIZE		16384
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 0cb04db..959100b 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -614,7 +614,12 @@ ENDPROC(__secondary_switched)
+ #define ID_AA64MMFR0_TGran_SHIFT	ID_AA64MMFR0_TGran64_SHIFT
+ #define ID_AA64MMFR0_TGran_ENABLED	ID_AA64MMFR0_TGran64_ENABLED
+ 
 -#else
--#define KVM_PREALLOC_LEVEL	(0)
--#endif
--
- static inline void *kvm_get_hwpgd(struct kvm *kvm)
- {
- 	pgd_t *pgd = kvm->arch.pgd;
- 	pud_t *pud;
- 
--	if (KVM_PREALLOC_LEVEL == 0)
-+	if (KVM_FAKE_PGTABLE_LEVELS == 0)
- 		return pgd;
- 
- 	pud = pud_offset(pgd, 0);
--	if (KVM_PREALLOC_LEVEL == 1)
-+	if (HYP_PGTABLE_ENTRY_LEVEL == 1)
- 		return pud;
- 
--	BUG_ON(KVM_PREALLOC_LEVEL != 2);
-+	BUG_ON(HYP_PGTABLE_ENTRY_LEVEL != 2);
- 	return pmd_offset(pud, 0);
- }
- 
- static inline unsigned int kvm_get_hwpgd_size(void)
- {
--	if (KVM_PREALLOC_LEVEL > 0)
--		return PTRS_PER_S2_PGD * PAGE_SIZE;
- 	return PTRS_PER_S2_PGD * sizeof(pgd_t);
- }
- 
-@@ -207,27 +200,38 @@ static inline pgd_t* kvm_setup_fake_pgd(pgd_t *hwpgd)
- {
- 	int i;
- 	pgd_t *pgd;
-+	pud_t *pud;
- 
--	if (!KVM_PREALLOC_LEVEL)
-+	if (KVM_FAKE_PGTABLE_LEVELS == 0)
- 		return hwpgd;
--	/*
--	 * When KVM_PREALLOC_LEVEL==2, we allocate a single page for
--	 * the PMD and the kernel will use folded pud.
--	 * When KVM_PREALLOC_LEVEL==1, we allocate 2 consecutive PUD
--	 * pages.
--	 */
++#elif	defined(CONFIG_ARM64_16K_PAGES)
 +
- 	pgd = kmalloc(PTRS_PER_S2_PGD * sizeof(pgd_t),
- 			GFP_KERNEL | __GFP_ZERO);
++#define ID_AA64MMFR0_TGran_SHIFT	ID_AA64MMFR0_TGran16_SHIFT
++#define ID_AA64MMFR0_TGran_ENABLED	ID_AA64MMFR0_TGran16_ENABLED
++
++#elif	defined(CONFIG_ARM64_4K_PAGES)
  
- 	if (!pgd)
- 		return ERR_PTR(-ENOMEM);
-+	/*
-+	 * If the stage-2 entry is two level down from that of the host,
-+	 * we are using a 4-level table on host (since HYP_PGTABLE_ENTRY_LEVEL
-+	 * cannot be < 2. So, this implies we need to allocat a PUD table
-+	 * to map the concatenated PMD tables.
-+	 */
-+	if (KVM_FAKE_PGTABLE_LEVELS == 2) {
-+		pud = (pud_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 0);
-+		if (!pud) {
-+			kfree(pgd);
-+			return ERR_PTR(-ENOMEM);
-+		}
-+		/* plug the pud into the PGD */
-+		pgd_populate(NULL, pgd, pud);
-+	}
+ #define ID_AA64MMFR0_TGran_SHIFT	ID_AA64MMFR0_TGran4_SHIFT
+ #define ID_AA64MMFR0_TGran_ENABLED	ID_AA64MMFR0_TGran4_ENABLED
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index e4ee7bd..994bf7b 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -30,7 +30,9 @@
  
- 	/* Plug the HW PGD into the fake one. */
--	for (i = 0; i < PTRS_PER_S2_PGD; i++) {
--		if (KVM_PREALLOC_LEVEL == 1)
-+	for (i = 0; i < S2_ENTRY_TABLES; i++) {
-+		if (HYP_PGTABLE_ENTRY_LEVEL == 1)
- 			pgd_populate(NULL, pgd + i,
- 				     (pud_t *)hwpgd + i * PTRS_PER_PUD);
--		else if (KVM_PREALLOC_LEVEL == 2)
-+		else if (HYP_PGTABLE_ENTRY_LEVEL == 2)
- 			pud_populate(NULL, pud_offset(pgd, 0) + i,
- 				     (pmd_t *)hwpgd + i * PTRS_PER_PMD);
- 	}
-@@ -237,8 +241,12 @@ static inline pgd_t* kvm_setup_fake_pgd(pgd_t *hwpgd)
- 
- static inline void kvm_free_fake_pgd(pgd_t *pgd)
- {
--	if (KVM_PREALLOC_LEVEL > 0)
-+	if (KVM_FAKE_PGTABLE_LEVELS > 0) {
-+		/* free the PUD table */
-+		if (KVM_FAKE_PGTABLE_LEVELS == 2)
-+			free_page((unsigned long)pud_offset(pgd, 0));
- 		kfree(pgd);
-+	}
- }
- 
- static inline bool kvm_page_empty(void *ptr)
-@@ -253,14 +261,14 @@ static inline bool kvm_page_empty(void *ptr)
- #define kvm_pmd_table_empty(kvm, pmdp) (0)
- #else
- #define kvm_pmd_table_empty(kvm, pmdp) \
--	(kvm_page_empty(pmdp) && (!(kvm) || KVM_PREALLOC_LEVEL < 2))
-+	(kvm_page_empty(pmdp) && (!(kvm) || HYP_PGTABLE_ENTRY_LEVEL < 2))
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
+-#else
++#elif defined(CONFIG_ARM64_16K_PAGES)
++#define TCR_TG_FLAGS	TCR_TG0_16K | TCR_TG1_16K
++#else /* CONFIG_ARM64_4K_PAGES */
+ #define TCR_TG_FLAGS	TCR_TG0_4K | TCR_TG1_4K
  #endif
- 
- #ifdef __PAGETABLE_PUD_FOLDED
- #define kvm_pud_table_empty(kvm, pudp) (0)
- #else
- #define kvm_pud_table_empty(kvm, pudp) \
--	(kvm_page_empty(pudp) && (!(kvm) || KVM_PREALLOC_LEVEL < 1))
-+	(kvm_page_empty(pudp) && (!(kvm) || HYP_PGTABLE_ENTRY_LEVEL < 1))
- #endif
- 
  
 -- 
 1.7.9.5
