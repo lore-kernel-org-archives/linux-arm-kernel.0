@@ -1,40 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 16 Sep 2015 15:39:25 -0700
-Subject: [PATCH v2 4/9] clk: qcom: create virtual child device for TSENS
-In-Reply-To: <1442384603-26053-5-git-send-email-rnayak@codeaurora.org>
-References: <1442384603-26053-1-git-send-email-rnayak@codeaurora.org>
- <1442384603-26053-5-git-send-email-rnayak@codeaurora.org>
-Message-ID: <20150916223925.GP23081@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Sep 2015 23:18:19 +0100
+Subject: [PATCH v3 2/2] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
+ support
+In-Reply-To: <CAD=FV=Vk+qziHohVL_Zaag0qqh_R6DnA1s-ppVFC=cBccAn4EA@mail.gmail.com>
+References: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <CAD=FV=XZ4cY4o-=vL79GDE4m57B+Rw_Yr_QwtB6T7DbQNzmU0Q@mail.gmail.com>
+ <55F9D7F0.4070402@mentor.com>
+ <CAD=FV=Vk+qziHohVL_Zaag0qqh_R6DnA1s-ppVFC=cBccAn4EA@mail.gmail.com>
+Message-ID: <20150916221819.GJ21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16, Rajendra Nayak wrote:
-> @@ -3520,7 +3522,26 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
->  	if (IS_ERR(clk))
->  		return PTR_ERR(clk);
->  
-> -	return qcom_cc_probe(pdev, match->data);
-> +	ret = qcom_cc_probe(pdev, match->data);
-> +	if (ret)
-> +		return ret;
-> +
-> +	tsens = platform_device_alloc("qcom-tsens", -1);
-> +	if (!tsens) {
-> +		ret = -ENOMEM;
-> +		goto err_alloc;
-> +	}
-> +
-> +	tsens->dev.parent = &pdev->dev;
-> +	ret = platform_device_add(tsens);
-> +	if (ret)
-> +		goto err_add;
+On Wed, Sep 16, 2015 at 02:56:57PM -0700, Doug Anderson wrote:
+> Yes, I'd expect 100kHz and 400kHz.
+> 
+> I agree that 50ms is non-trivial, but it's also not something you're
+> doing lots of.  I'd expect that the EDID is read over this channel at
+> cable plugin time and then not used much after that.  Adding an extra
+> 40ms (10ms vs 50ms) before we can access the TV doesn't seem terrible
+> for compatibility.
+> 
+> Doing a quick scan for what others in mainline do:
+> 
+> A few can be found with:
+> 
+> $ git grep -A3 hdmiddc | grep clock-freq
+> arch/arm/boot/dts/stihxxx-b2120.dtsi-
+> clock-frequency = <100000>;
+> arch/arm/boot/dts/tegra30-apalis.dtsi-          clock-frequency = <100000>;
+> arch/arm/boot/dts/tegra30-beaver.dts-           clock-frequency = <100000>;
+> arch/arm/boot/dts/tegra30-colibri.dtsi-         clock-frequency = <100000>;
 
-platform_device_register_data() instead of all these lines? We
-should probably remove the device when this driver is removed
-too.
+This is a sure way to propagate a bug.
 
-> +	return 0;
+I said in a previous email that you need to check the HDMI and CEA
+specs.  I've done this, and HDMI 1.3a specifies a maximum SCL clock
+rate of 100kHz.
+
+So that's settled then.  100kHz is must be.  Using 400kHz is out of
+specification.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
