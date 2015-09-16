@@ -1,46 +1,40 @@
-From: marek.majtyka@tieto.com (marek.majtyka)
-Date: Wed, 16 Sep 2015 12:04:55 +0200
-Subject: [PATCH] kvm: arm: LPAE: Incorrect device to IPA mapping
-Message-ID: <1442397895-2124-1-git-send-email-marek.majtyka@tieto.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Sep 2015 12:06:36 +0200
+Subject: [PATCH 01/31] arch/arm/mach-lpc32xx: use kmemdup rather than
+ duplicating its implementation
+In-Reply-To: <55F93BE5.60508@samsung.com>
+References: <1438934377-4922-1-git-send-email-a.hajda@samsung.com>
+ <1438934377-4922-2-git-send-email-a.hajda@samsung.com>
+ <55F93BE5.60508@samsung.com>
+Message-ID: <80137044.ODrprXt1av@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Majtyka <marek.majtyka@tieto.com>
+On Wednesday 16 September 2015 11:52:37 Andrzej Hajda wrote:
+> > @@ -87,7 +87,8 @@ static int lpc32xx_pm_enter(suspend_state_t state)
+> >       void *iram_swap_area;
+> >  
+> >       /* Allocate some space for temporary IRAM storage */
+> > -     iram_swap_area = kmalloc(lpc32xx_sys_suspend_sz, GFP_KERNEL);
+> > +     iram_swap_area = kmemdup((void *)TEMP_IRAM_AREA,
+> > +                              lpc32xx_sys_suspend_sz, GFP_KERNEL);
+> >       if (!iram_swap_area) {
+> >               printk(KERN_ERR
+> >                      "PM Suspend: cannot allocate memory to save portion "
+> > @@ -95,10 +96,6 @@ static int lpc32xx_pm_enter(suspend_state_t state)
+> >               return -ENOMEM;
+> >       }
+> >  
+> > -     /* Backup a small area of IRAM used for the suspend code */
+> > -     memcpy(iram_swap_area, (void *) TEMP_IRAM_AREA,
+> > -             lpc32xx_sys_suspend_sz);
+> 
 
-A critical bug has been found in device memory stage1 translation for machines
-with more then 4GB of RAM. Once vm_pgoff size is smaller then pa (which is true
-for LPAE case, u32 and u64 respectively) some more significant bits of pa may
-be lost as a shift operation is performed on u32 and later cast onto u64.
+Hmm, the patch looks correct in principle, but I think I'd rather leave the
+original version with the comment in place, because the source is not
+just random memory but instead some SRAM.
 
-Example: vm_pgoff(u32)=0x00210030, PAGE_SHIFT=12
-        expected pa(u64):   0x0000002010030000
-        produced pa(u64):   0x0000000010030000
+We might want to use memcpy_fromio()/memcpy_toio here and remove the cast for
+both copies instead.
 
-A suggested fix is changing the order of operations (casting first onto
-phys_addr_t and then shifting), which works for both alternatives
-(with and without LPAE).
-
-A bug has been found, fixed and tested on kernel v3.19. However, it seems to be
-valid for most, if not all, newer version starting from v3.18.
-
-Signed-off-by: Marek Majtyka <marek.majtyka@tieto.com>
----
- arch/arm/kvm/mmu.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 1366625..602bc63 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1408,7 +1408,8 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
- 		if (vma->vm_flags & VM_PFNMAP) {
- 			gpa_t gpa = mem->guest_phys_addr +
- 				    (vm_start - mem->userspace_addr);
--			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) +
-+			phys_addr_t pa =
-+				((phys_addr_t) vma->vm_pgoff << PAGE_SHIFT) +
- 					 vm_start - vma->vm_start;
- 
- 			ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
--- 
-1.9.1
+	Arnd
