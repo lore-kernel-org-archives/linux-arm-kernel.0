@@ -1,93 +1,57 @@
-From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Wed, 16 Sep 2015 16:34:20 +0800
-Subject: [PATCH RFC 1/8] dt-bindings: Document the hi6220 bindings for
- DRM driver
-In-Reply-To: <55F85F54.1020807@kernel.org>
-References: <1442309834-21420-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <1442309834-21420-2-git-send-email-kong.kongxinwei@hisilicon.com>
- <55F85F54.1020807@kernel.org>
-Message-ID: <55F9298C.3020009@hisilicon.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 16 Sep 2015 09:35:48 +0100
+Subject: Tegra baseline test results for v4.3-rc1
+Message-ID: <55F929E4.7000602@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi architt
+Tegra baseline test results for v4.3-rc1
 
-On 2015/9/16 2:11, Rob Herring wrote:
-> On 09/15/2015 04:37 AM, Xinwei Kong wrote:
->> This adds documentation of device tree bindings for the
->> Graphics Processing Unit of hi6220 SOC.
->>
->> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
->> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
->> Signed-off-by: Andy Green <andy.green@linaro.org>
->> Signed-off-by: Jiwen Qi <qijiwen@hisilicon.com>
->> Signed-off-by: Yu Gong <gongyu@hisilicon.com>
->> ---
->>  .../devicetree/bindings/gpu/hisilicon,hi6220.txt   | 69 ++++++++++++++++++++++
->>  1 file changed, 69 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt
->>
->> diff --git a/Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt b/Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt
->> new file mode 100644
->> index 0000000..173ac63
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt
->> @@ -0,0 +1,69 @@
->> + * Hisilicon hi6220 Graphics Processing Unit for HiKey board
->> +
->> + ** display-subsystem: Master device for binding DRM sub-components
-> 
-> DRM is a Linuxism that doesn't belong in the binding.
-> 
->> +    This master device is parent node and it will be responsible to bind all
->> +    sub-components devices node.
-> 
-> Are these nodes a single block in the h/w? If not, you should describe
-> the connection of sub-nodes with of-graph instead.
-> 
->> +    - Required properties :
->> +      - compatible: "hisilicon,display-subsystem".
->> +      - #address-cells, #size-cells: Must be present if the device has sub-nodes.
->> +      - ranges: to allow probing of subdevices.
->> +      - dma-coherent: Present if dma operations are coherent.
->> +
->> + ** ade: Graphic overlay, Graphic post-processing, display timing control.
->> +    This device is child node of display-subsystem
->> +    - Required properties :
->> +      - compatible: "hisilicon,hi6220-ade".
->> +      - reg: physical base address of the ADE register and length of memory
->> +	region.
->> +      - reg-names: Should contain the reg names "ade_base" and "media_base".
->> +      - interrupt: The interrupt number to the cpu. Defines the interrupt
->> +        by ADE.
->> +      - clocks: The clocks needed by the ADE module.
->> +      - clock-names: the name of the clocks.
->> +
->> + ** dsi: support mipi dsi interface
->> +    This device is child node of display-subsystem
->> +    - Required properties :
->> +      - compatible: "hisilicon,hi6220-dsi".
->> +      - reg: physical base address of the DSI register and length of memory
->> +	region.
->> +      - clocks: The clocks needed by the DSI module.
->> +      - clock-names: the name of the clocks.
->> +      -	encoder-slave: phandles to a 'encoder-slave' subnode which DSI connect
->> +        ADV7533 in order to support hdmi display.
-> 
-> What the ADV7533 binding looks like is still being discussed.
-> "encoder-slave" is certainly DRM specific and not how it should be done.
-> Most likely, this needs to use the of-graph ports.
-> 
-I dont how to implement the encoder bridge stuff in upstream,
-you think that I will how to handle this part?
 
-Thank you
-xinwei
+Here are some basic Tegra test results for Linux v4.3-rc1.
+Logs and other details at:
 
-> Also, the ADV7533 connection is specific to HiKey. This binding should
-> just generically describe how any bridge or panel is connected.
-> 
-> Rob
-> 
-> .
-> 
+    https://nvtb.github.io//linux/test_v4.3-rc1/20150912170103/
+
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.2 (64291f7db5bd8150a74ad2036f1037e6a0428df2)):
+   text     data      bss    total  kernel
+ -37902   +71864     +856   +34818  defconfig
++487145    +6536   +14016  +507697  multi_v7_defconfig
+ -14232   +12960     +200    -1072  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.2 (64291f7db5bd8150a74ad2036f1037e6a0428df2))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+    -520k     520k        .      84k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+     -12k      12k        .      12k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+    -524k     524k        .      84k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+     -16k      16k        .      12k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+    -512k     512k        .      84k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+      -4k       4k        .      12k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+    -520k     520k        .      84k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+     -12k      12k        .      12k       tegra30-beaver      tegra_defconfig       tegra30-beaver
