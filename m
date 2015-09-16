@@ -1,68 +1,62 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 15 Sep 2015 17:39:18 -0700
-Subject: [PATCH 4/8] PCI: iproc: Fix PCIe reset logic
-In-Reply-To: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
-References: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1442363962-29805-5-git-send-email-rjui@broadcom.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 15 Sep 2015 17:50:53 -0700
+Subject: [PATCH 0/3] Add __ioread32_copy() and use it
+In-Reply-To: <20150915155815.5a41a8dc537610ab44d8d3dc@linux-foundation.org>
+References: <1442346089-32077-1-git-send-email-sboyd@codeaurora.org>
+ <20150915155815.5a41a8dc537610ab44d8d3dc@linux-foundation.org>
+Message-ID: <20150916005053.GL23081@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current iProc PCIe reset logic does not always properly reset the
-device. For example, in the case when the perst_b signal is already
-de-asserted in the bootloader, the current reset logic fails to trigger
-a proper asssert -> de-assert reset sequence. This patch fixes the issue
-by always triggering the proper reset sequence
+On 09/15, Andrew Morton wrote:
+> On Tue, 15 Sep 2015 12:41:26 -0700 Stephen Boyd <sboyd@codeaurora.org> wrote:
+> 
+> > The SMD driver is reading and writing chunks of data to iomem,
+> > and there's an __iowrite32_copy() function for the writing part, but
+> > no __ioread32_copy() function for the reading part. This series
+> > adds __ioread32_copy() and uses it in two places. Andrew is on Cc in
+> > case this should go through the -mm tree. Otherwise the target
+> > of this patch series is SMD, so I've sent it to Andy.
+> 
+> "soc: qcom: smd: Use __ioread32_copy() instead of open-coding it" no
+> longer applies, because smd_copy_from_fifo() has switched to
+> readl_relaxed().
 
-This patch also explicitly selects the desired reset source, i.e.,
-perst_b and reduces the wait time after the device comes out of reset
-from 250 ms to 100 ms, based on recommendation from the ASIC team
+Yes. There are some other patches in flight on the mailing list
+to this file from me[1]. Those would need to be applied first to
+avoid conflicts.
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Vladimir Dreizin <vdreizin@broadcom.com>
-Reviewed-by: Trac Hoang <trhoang@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
-Tested-by: Vladimir Dreizin <vdreizin@broadcom.com>
-Tested-by: Darren Edamura <dedamura@broadcom.com>
----
- drivers/pci/host/pcie-iproc.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+> 
+> Let's use the __weak macro rather than open-coding it (and convert
+> __iowrite32_copy() while we're in there).
 
-diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index 52e7ff2..80e0541 100644
---- a/drivers/pci/host/pcie-iproc.c
-+++ b/drivers/pci/host/pcie-iproc.c
-@@ -31,6 +31,8 @@
- #include "pcie-iproc.h"
- 
- #define CLK_CONTROL_OFFSET           0x000
-+#define EP_PERST_SOURCE_SELECT_SHIFT 2
-+#define EP_PERST_SOURCE_SELECT       BIT(EP_PERST_SOURCE_SELECT_SHIFT)
- #define EP_MODE_SURVIVE_PERST_SHIFT  1
- #define EP_MODE_SURVIVE_PERST        BIT(EP_MODE_SURVIVE_PERST_SHIFT)
- #define RC_PCIE_RST_OUTPUT_SHIFT     0
-@@ -119,15 +121,18 @@ static void iproc_pcie_reset(struct iproc_pcie *pcie)
- 	u32 val;
- 
- 	/*
--	 * Configure the PCIe controller as root complex and send a downstream
--	 * reset
-+	 * Select perst_b signal as reset source. Put the device into reset,
-+	 * and then bring it out of reset
- 	 */
--	val = EP_MODE_SURVIVE_PERST | RC_PCIE_RST_OUTPUT;
-+	val = readl(pcie->base + CLK_CONTROL_OFFSET);
-+	val &= ~EP_PERST_SOURCE_SELECT & ~EP_MODE_SURVIVE_PERST &
-+		~RC_PCIE_RST_OUTPUT;
- 	writel(val, pcie->base + CLK_CONTROL_OFFSET);
- 	udelay(250);
--	val &= ~EP_MODE_SURVIVE_PERST;
-+
-+	val |= RC_PCIE_RST_OUTPUT;
- 	writel(val, pcie->base + CLK_CONTROL_OFFSET);
--	msleep(250);
-+	msleep(100);
- }
- 
- static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
+Yep, I converted the __iowrite32_copy() open-code in there too in
+the patch series I mentioned above. See [2].
+
+> 
+> It's unclear why __iowrite32_copy() is a weak function - nothing
+> overrides it.  Perhaps we should just take that away rather than
+> copying it into __ioread32_copy().
+
+Huh? I see that x86 has an implementation in arch/x86/lib/iomap_copy_64.S
+
+> 
+> __iowrite32_copy() is marked __visible.  I don't actually know what
+> that does and Andi's d47d5c8194579bc changelog (which sucks the big
+> one) didn't explain it.  Apparently it has something to do with being
+> implemented in assembly, but zillions of functions are implemented in
+> assembly, so why are only two functions marked this way?  Anyway,
+> __ioread32_copy() is implemented in C so I guess __visible isn't needed
+> there.
+
+Yeah, I didn't add visible because there isn't an assembly
+version of __ioread32_copy() so far. I can remove __weak if
+desired. I left it there to match __iowrite32_copy() in case
+x86 wanted to override it but we can do that later or never.
+
+[1] http://lkml.kernel.org/g/1441234011-4259-7-git-send-email-sboyd at codeaurora.org
+[2] http://lkml.kernel.org/g/1441234011-4259-5-git-send-email-sboyd at codeaurora.org
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
