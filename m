@@ -1,69 +1,33 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 16 Sep 2015 09:31:15 +0200
+From: damien.thebault@vitec.com (=?utf-8?B?RGFtaWVuIFRow6liYXVsdA==?=)
+Date: Wed, 16 Sep 2015 07:39:17 +0000
 Subject: NFS/TCP/IPv6 acting strangely in 4.2
-In-Reply-To: <1442386435.3756.282.camel@vitec.com>
+In-Reply-To: <87zj0mbzsj.fsf@free-electrons.com>
 References: <20150911113839.GO21084@n2100.arm.linux.org.uk>
- <1442386435.3756.282.camel@vitec.com>
-Message-ID: <20150916073115.GB29740@1wt.eu>
+ <1442386435.3756.282.camel@vitec.com> <87zj0mbzsj.fsf@free-electrons.com>
+Message-ID: <1442389156.3756.285.camel@vitec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 2015-09-16 at 09:15 +0200, Gregory CLEMENT wrote:
+> > Since it worked fine on 4.0 I bisected until I found commit
+> > a84e32894191cfcbffa54180d78d7d4654d56c20 "net: mvneta: fix
+> > refilling
+> > for Rx DMA buffers".
+> > 
+> > If I revert this commit, everything seems to get back to normal.
+> > Could you try it ? The two issues look very similar.
+> Actually there was a bug with this commit, but a fix had been
+> submitted
+> and accepted yesterday, you can find him here:
+> https://patchwork.ozlabs.org/patch/518111/.
 
-On Wed, Sep 16, 2015 at 06:53:57AM +0000, Damien Th?bault wrote:
-> On Fri, 2015-09-11 at 12:38 +0100, Russell King - ARM Linux wrote:
-> > I have a recent Marvell Armada 388 board here which uses the mvneta
-> > driver.  I'm seeing some weird effects with NFS with it acting as a
-> > client.
-> 
-> Hello,
-> 
-> I'm upgrading a Marvelle Armada 370 board using the mvneta driver from
-> 4.0 to 4.2 and noticed issues with NFS booting.
-> Basically, most of the time init returns with an error code, or
-> programs segfault or throw illegal instructions.
-> 
-> Since it worked fine on 4.0 I bisected until I found commit
-> a84e32894191cfcbffa54180d78d7d4654d56c20 "net: mvneta: fix refilling
-> for Rx DMA buffers".
-> 
-> If I revert this commit, everything seems to get back to normal.
-> Could you try it ? The two issues look very similar.
+Hello, this indeed fixes the issue for me, thanks.
+-- 
+Damien Th?bault
+R&D Engineer
+VITEC
 
-I'm not sure but I'm seeing that the accounting was changed by this
-patch without being certain of the implications; if the revert above
-works, it would be nice to try to only apply this just to see if
-that's indeed an accounting error or not :
-
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 62e48bc..4205867 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -1463,6 +1463,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
- {
- 	struct net_device *dev = pp->dev;
- 	int rx_done;
-+	int missed = 0;
- 	u32 rcvd_pkts = 0;
- 	u32 rcvd_bytes = 0;
- 
-@@ -1527,6 +1528,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
- 		if (err) {
- 			netdev_err(dev, "Linux processing - Can't refill\n");
- 			rxq->missed++;
-+			missed++;
- 			goto err_drop_frame;
- 		}
- 
-@@ -1561,7 +1563,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
- 	}
- 
- 	/* Update rxq management counters */
--	mvneta_rxq_desc_num_update(pp, rxq, rx_done, rx_done);
-+	mvneta_rxq_desc_num_update(pp, rxq, rx_done, rx_done - missed);
- 
- 	return rx_done;
- }
-
-Regards,
-Willy
+T. +33 1 46 73 06 06
+F. +33 9 59 85 99 92
+E. damien.thebault at vitec.com
+http://www.vitec.com
