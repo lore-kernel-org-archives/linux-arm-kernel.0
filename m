@@ -1,68 +1,125 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 16 Sep 2015 18:16:35 +0100
-Subject: [PATCH REPOST v6 4/8] clk: scpi: add support for cpufreq virtual
- device
+Date: Wed, 16 Sep 2015 18:16:39 +0100
+Subject: [PATCH REPOST v6 8/8] arm64: dts: add clock support for all the cpus
 In-Reply-To: <1442423799-23892-1-git-send-email-sudeep.holla@arm.com>
 References: <1442423799-23892-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1442423799-23892-5-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1442423799-23892-9-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clocks for the CPUs are provided by SCP and are managed by this
-clock driver. So the cpufreq device needs to be added only after the
-clock get registered and removed when this driver is unloaded.
-
-This patch manages the cpufreq virtual device based on the clock
-availability.
+This patch adds the CPU clocks so that the CPU DVFS can be enabled.
 
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Mike Turquette <mturquette@baylibre.com>
-Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
-Cc: linux-clk at vger.kernel.org
 ---
- drivers/clk/clk-scpi.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/boot/dts/arm/juno-r1.dts | 6 ++++++
+ arch/arm64/boot/dts/arm/juno.dts    | 6 ++++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/drivers/clk/clk-scpi.c b/drivers/clk/clk-scpi.c
-index e8323db300e2..a201781287b3 100644
---- a/drivers/clk/clk-scpi.c
-+++ b/drivers/clk/clk-scpi.c
-@@ -34,6 +34,8 @@ struct scpi_clk {
+diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+index 69130840c6cd..5eef4aa0c532 100644
+--- a/arch/arm64/boot/dts/arm/juno-r1.dts
++++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+@@ -66,6 +66,7 @@
+ 			device_type = "cpu";
+ 			enable-method = "psci";
+ 			next-level-cache = <&A57_L2>;
++			clocks = <&scpi_dvfs 0>;
+ 		};
  
- #define to_scpi_clk(clk) container_of(clk, struct scpi_clk, hw)
+ 		A57_1: cpu at 1 {
+@@ -74,6 +75,7 @@
+ 			device_type = "cpu";
+ 			enable-method = "psci";
+ 			next-level-cache = <&A57_L2>;
++			clocks = <&scpi_dvfs 0>;
+ 		};
  
-+static struct platform_device *cpufreq_dev;
-+
- static unsigned long scpi_clk_recalc_rate(struct clk_hw *hw,
- 					  unsigned long parent_rate)
- {
-@@ -263,6 +265,11 @@ static int scpi_clocks_remove(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct device_node *child, *np = dev->of_node;
+ 		A53_0: cpu at 100 {
+@@ -82,6 +84,7 @@
+ 			device_type = "cpu";
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
++			clocks = <&scpi_dvfs 1>;
+ 		};
  
-+	if (cpufreq_dev) {
-+		platform_device_unregister(cpufreq_dev);
-+		cpufreq_dev = NULL;
-+	}
-+
- 	for_each_available_child_of_node(np, child)
- 		of_clk_del_provider(np);
- 	return 0;
-@@ -288,6 +295,12 @@ static int scpi_clocks_probe(struct platform_device *pdev)
- 			return ret;
- 		}
- 	}
-+	/* Add the virtual cpufreq device */
-+	cpufreq_dev = platform_device_register_simple("scpi-cpufreq",
-+						      -1, NULL, 0);
-+	if (!cpufreq_dev)
-+		pr_warn("unable to register cpufreq device");
-+
- 	return 0;
- }
+ 		A53_1: cpu at 101 {
+@@ -90,6 +93,7 @@
+ 			device_type = "cpu";
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
++			clocks = <&scpi_dvfs 1>;
+ 		};
  
+ 		A53_2: cpu at 102 {
+@@ -98,6 +102,7 @@
+ 			device_type = "cpu";
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
++			clocks = <&scpi_dvfs 1>;
+ 		};
+ 
+ 		A53_3: cpu at 103 {
+@@ -106,6 +111,7 @@
+ 			device_type = "cpu";
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
++			clocks = <&scpi_dvfs 1>;
+ 		};
+ 
+ 		A57_L2: l2-cache0 {
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index ce1128a54c8d..c02f880584e8 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -66,6 +66,7 @@
+ 			device_type = "cpu";
+ 			enable-method = "psci";
+ 			next-level-cache = <&A57_L2>;
++			clocks = <&scpi_dvfs 0>;
+ 		};
+ 
+ 		A57_1: cpu at 1 {
+@@ -74,6 +75,7 @@
+ 			device_type = "cpu";
+ 			enable-method = "psci";
+ 			next-level-cache = <&A57_L2>;
++			clocks = <&scpi_dvfs 0>;
+ 		};
+ 
+ 		A53_0: cpu at 100 {
+@@ -82,6 +84,7 @@
+ 			device_type = "cpu";
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
++			clocks = <&scpi_dvfs 1>;
+ 		};
+ 
+ 		A53_1: cpu at 101 {
+@@ -90,6 +93,7 @@
+ 			device_type = "cpu";
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
++			clocks = <&scpi_dvfs 1>;
+ 		};
+ 
+ 		A53_2: cpu at 102 {
+@@ -98,6 +102,7 @@
+ 			device_type = "cpu";
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
++			clocks = <&scpi_dvfs 1>;
+ 		};
+ 
+ 		A53_3: cpu at 103 {
+@@ -106,6 +111,7 @@
+ 			device_type = "cpu";
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
++			clocks = <&scpi_dvfs 1>;
+ 		};
+ 
+ 		A57_L2: l2-cache0 {
 -- 
 1.9.1
