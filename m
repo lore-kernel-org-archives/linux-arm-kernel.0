@@ -1,77 +1,105 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Wed, 16 Sep 2015 14:41:50 +0800
-Subject: [RFC PATCH v8 03/10] Documentation: synopsys-dw-mshc: add bindings
- for idmac and edmac
-In-Reply-To: <1442385625-26775-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1442385625-26775-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <1442385710-29778-1-git-send-email-shawn.lin@rock-chips.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 16 Sep 2015 14:44:19 +0800
+Subject: [PATCH v8 0/5] Mediatek xHCI support
+Message-ID: <1442385864-4368-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-synopsys-dw-mshc supports three types of transfer mode. We add
-bindings and description for how to use them at runtime.
+>From e731877598e7564171bea62955b4e50b04d88d34 Mon Sep 17 00:00:00 2001
+From: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Date: Wed, 16 Sep 2015 14:24:11 +0800
+Subject: [PATCH v8 0/5] Mediatek xHCI support
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
----
+The patch supports MediaTek's xHCI controller.
 
-Changes in v8: None
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+There are some differences from xHCI spec:
+1. The interval is specified in 250 * 8ns increments for Interrupt Moderation
+Interval(IMODI) of the Interrupter Moderation(IMOD) register, it is 8 times as
+much as that defined in xHCI spec.
 
- .../devicetree/bindings/mmc/synopsys-dw-mshc.txt   | 25 ++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+2. For the value of TD Size in Normal TRB, MTK's xHCI controller defines a
+number of packets that remain to be transferred for a TD after processing all
+Max packets in all previous TRBs,that means don't include the current TRB's,
+but in xHCI spec it includes the current ones.
 
-diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-index 346c609..8636f5a 100644
---- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-+++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-@@ -75,6 +75,12 @@ Optional properties:
- * vmmc-supply: The phandle to the regulator to use for vmmc.  If this is
-   specified we'll defer probe until we can find this regulator.
- 
-+* dmas: List of DMA specifiers with the controller specific format as described
-+  in the generic DMA client binding. Refer to dma.txt for details.
-+
-+* dma-names: request names for generic DMA client binding. Must be "rx-tx".
-+  Refer to dma.txt for details.
-+
- Aliases:
- 
- - All the MSHC controller nodes should be represented in the aliases node using
-@@ -95,6 +101,23 @@ board specific portions as listed below.
- 		#size-cells = <0>;
- 	};
- 
-+[board specific internal DMA resources]
-+
-+	dwmmc0 at 12200000 {
-+		clock-frequency = <400000000>;
-+		clock-freq-min-max = <400000 200000000>;
-+		num-slots = <1>;
-+		broken-cd;
-+		fifo-depth = <0x80>;
-+		card-detect-delay = <200>;
-+		vmmc-supply = <&buck8>;
-+		bus-width = <8>;
-+		cap-mmc-highspeed;
-+		cap-sd-highspeed;
-+	};
-+
-+[board specific generic DMA request binding]
-+
- 	dwmmc0 at 12200000 {
- 		clock-frequency = <400000000>;
- 		clock-freq-min-max = <400000 200000000>;
-@@ -106,4 +129,6 @@ board specific portions as listed below.
- 		bus-width = <8>;
- 		cap-mmc-highspeed;
- 		cap-sd-highspeed;
-+		dmas = <&pdma 12>;
-+		dma-names = "rx-tx";
- 	};
--- 
-2.3.7
+3. To minimize the scheduling effort for synchronous endpoints in xHC, the MTK
+architecture defines some extra SW scheduling parameters for HW. According to
+these parameters provided by SW, the xHC can easily decide whether a
+synchronous endpoint should be scheduled in a specific uFrame. The extra SW
+scheduling parameters are put into reserved DWs in Slot and Endpoint Context.
+And a bandwidth scheduler algorithm is added to support such feature.
+
+A usb3.0 phy driver is also added which used by mt65xx SoCs platform, it
+supports two usb2.0 ports and one usb3.0 port.
+
+depend on the patch for TDS calculation:
+https://patchwork.kernel.org/patch/7140041/
+
+Change in v8:
+1. use struct overlay for ippc register
+2. change usb wakeup as optional feature
+3. add TDS quirk into unified TDS calculation function
+
+Change in v7:
+1. remove xHCI timing setting which only for FPGA
+2. revise xHCI scheduler algorithms
+3. replace "usb" by "USB" in xHCI binding file
+
+Change in v6:
+1. get register base address of port in probe instead of of_xlate
+2. enable clock in phy_init instead of probe
+
+Change in v5:
+1. descripte more exactly for each specifiers in xHCI binding
+2. make use of new multi-phy feature for phy driver
+
+Change in v4:
+1. descripte more exactly for each specifiers in binding file
+2. use BIT() to define a bit mask mcro
+
+Change in v3:
+1. implement generic phy
+2. move opperations for IPPC and wakeup from phy driver to xHCI driver
+3. seperate quirk functions into a single C file to fix up dependence issue
+
+Change in v2:
+1. Rebase to 4.2-rc1
+2. Remove probe phy before add usb_hcd patch from this series due to 4.2-rc1
+   already fix this issue
+3. add xhci mac clocks
+4. add suspend/resume
+5. support remote wakeup
+
+
+Chunfeng Yun (5):
+  dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
+  dt-bindings: Add a binding for Mediatek xHCI host controller
+  usb: phy: add usb3.0 phy driver for mt65xx SoCs
+  xhci: mediatek: support MTK xHCI host controller
+  arm64: dts: mediatek: add xHCI & usb phy for mt8173
+
+ .../devicetree/bindings/phy/phy-mt65xx-usb.txt     |  68 ++
+ .../devicetree/bindings/usb/mt8173-xhci.txt        |  52 ++
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  16 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  43 ++
+ drivers/phy/Kconfig                                |   9 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-mt65xx-usb3.c                      | 456 +++++++++++++
+ drivers/usb/host/Kconfig                           |   9 +
+ drivers/usb/host/Makefile                          |   4 +
+ drivers/usb/host/xhci-mtk-sch.c                    | 419 ++++++++++++
+ drivers/usb/host/xhci-mtk.c                        | 744 +++++++++++++++++++++
+ drivers/usb/host/xhci-mtk.h                        | 156 +++++
+ drivers/usb/host/xhci-ring.c                       |  22 +-
+ drivers/usb/host/xhci.c                            |  19 +-
+ drivers/usb/host/xhci.h                            |   1 +
+ 15 files changed, 2012 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+ create mode 100644 drivers/phy/phy-mt65xx-usb3.c
+ create mode 100644 drivers/usb/host/xhci-mtk-sch.c
+ create mode 100644 drivers/usb/host/xhci-mtk.c
+ create mode 100644 drivers/usb/host/xhci-mtk.h
+
+--
+1.8.1.1.dirty
