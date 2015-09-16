@@ -1,73 +1,79 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 16 Sep 2015 22:53:12 +0800
-Subject: [PATCH] arm64: add cpu_idle tracepoints to arch_cpu_idle
-In-Reply-To: <20150916144738.GA23245@red-moon>
-References: <1442413401-2955-1-git-send-email-jszhang@marvell.com>
- <20150916144738.GA23245@red-moon>
-Message-ID: <20150916225312.0d4d32c5@xhacker>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 16 Sep 2015 23:05:09 +0800
+Subject: [PATCH v2 3/5] irqchip/gic: Convert the GIC driver to ACPI probing
+In-Reply-To: <1442152943-24493-4-git-send-email-marc.zyngier@arm.com>
+References: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
+ <1442152943-24493-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55F98525.7030900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lorenzo,
+Hi Marc,
 
-On Wed, 16 Sep 2015 15:47:38 +0100
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+On 09/13/2015 10:02 PM, Marc Zyngier wrote:
+[...]
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index e6b7ed5..8a0b9c3 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -41,7 +41,6 @@
+>   #include <linux/irqchip.h>
+>   #include <linux/irqchip/chained_irq.h>
+>   #include <linux/irqchip/arm-gic.h>
+> -#include <linux/irqchip/arm-gic-acpi.h>
+>
+>   #include <asm/cputype.h>
+>   #include <asm/irq.h>
+> @@ -1177,7 +1176,7 @@ IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
+>   #endif
+>
+>   #ifdef CONFIG_ACPI
+> -static phys_addr_t dist_phy_base, cpu_phy_base __initdata;
+> +static phys_addr_t cpu_phy_base __initdata;
+>
+>   static int __init
+>   gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+> @@ -1205,60 +1204,56 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+>   	return 0;
+>   }
+>
+> -static int __init
+> -gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
+> -				const unsigned long end)
+> +/* The things you have to do to just *count* something... */
+> +static int __init acpi_dummy_func(struct acpi_subtable_header *header,
+> +				  const unsigned long end)
+>   {
+> -	struct acpi_madt_generic_distributor *dist;
+> +	return 0;
+> +}
+>
+> -	dist = (struct acpi_madt_generic_distributor *)header;
+> +static bool __init acpi_gic_redist_is_present(void)
+> +{
+> +	return acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
+> +				     acpi_dummy_func, 0) > 0;
+> +}
+>
+> -	if (BAD_MADT_ENTRY(dist, end))
+> -		return -EINVAL;
+> +static bool __init gic_validate_dist(struct acpi_subtable_header *header,
+> +				     struct acpi_probe_entry *ape)
+> +{
+> +	struct acpi_madt_generic_distributor *dist;
+> +	dist = (struct acpi_madt_generic_distributor *)header;
+>
+> -	dist_phy_base = dist->base_address;
+> -	return 0;
+> +	return (dist->version == ape->driver_data &&
+> +		(dist->version != ACPI_MADT_GIC_VERSION_NONE ||
+> +		 !acpi_gic_redist_is_present()));
+>
 
-> On Wed, Sep 16, 2015 at 03:23:21PM +0100, Jisheng Zhang wrote:
-> > Currently, if cpuidle is disabled or not supported, powertop reports
-> > zero wakeups and zero events. This is due to the cpu_idle tracepoints
-> > are missing.
-> > 
-> > This patch is to make cpu_idle tracepoints always available even if
-> > cpuidle is disabled or not supported.
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> 
-> Is there a reason why this code cannot be moved to the generic idle loop ?
+When I was rebasing the GICv3 patches on top of yours, I noticed
+that GICv3 will also needs to check the acpi_gic_redist_is_present(),
+can we move the code above to some common place, or just leave
+the code duplicate but self-contained?
 
-Do you mean the cpu_idle_loop() in kernel/sched/idle.c? To be honest, I
-dunno. Maybe kernel experts can give some hints.
-
-Thanks,
-Jisheng
-
-> 
-> Thanks,
-> Lorenzo
-> 
-> > ---
-> >  arch/arm64/kernel/process.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> > index 223b093..f75b540 100644
-> > --- a/arch/arm64/kernel/process.c
-> > +++ b/arch/arm64/kernel/process.c
-> > @@ -44,6 +44,7 @@
-> >  #include <linux/hw_breakpoint.h>
-> >  #include <linux/personality.h>
-> >  #include <linux/notifier.h>
-> > +#include <trace/events/power.h>
-> >  
-> >  #include <asm/compat.h>
-> >  #include <asm/cacheflush.h>
-> > @@ -75,8 +76,10 @@ void arch_cpu_idle(void)
-> >  	 * This should do all the clock switching and wait for interrupt
-> >  	 * tricks
-> >  	 */
-> > +	trace_cpu_idle_rcuidle(1, smp_processor_id());
-> >  	cpu_do_idle();
-> >  	local_irq_enable();
-> > +	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
-> >  }
-> >  
-> >  #ifdef CONFIG_HOTPLUG_CPU
-> > -- 
-> > 2.5.1
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
-> > 
+Thanks
+Hanjun
