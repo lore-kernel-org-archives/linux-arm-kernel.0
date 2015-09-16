@@ -1,32 +1,35 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 16 Sep 2015 10:21:57 +0200 (CEST)
-Subject: [RFC PATCH v3 3/3] arm/arm64: fix a migrating irq bug when
- hotplug cpu
-In-Reply-To: <1442375907-11496-4-git-send-email-yangyingliang@huawei.com>
-References: <1442375907-11496-1-git-send-email-yangyingliang@huawei.com>
- <1442375907-11496-4-git-send-email-yangyingliang@huawei.com>
-Message-ID: <alpine.DEB.2.11.1509161013430.3951@nanos>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Wed, 16 Sep 2015 08:22:56 +0000
+Subject: [PATCH v3] ARM: configs: Add Freescale LS1021A defconfig
+In-Reply-To: <CAOMZO5DY+HqH-FeFF5rD5rCettfdmni62nHJRAPU5fdXijw=sA@mail.gmail.com>
+References: <1438941784-38403-1-git-send-email-b18965@freescale.com>
+ <55CB4829.40204@freescale.com>	<55CE1FFE.2080200@freescale.com>
+ <CAOMZO5By_15OCsb7z2pbywPi3n9vKGj=393hWYHVEQ32=jDNaA@mail.gmail.com>
+ <BN3PR0301MB08672520CA978383BBF2CF6CFE790@BN3PR0301MB0867.namprd03.prod.outlook.com>
+ <55D6073C.1020000@freescale.com>
+ <BN3PR0301MB0867591B07957C47F30C9711FE6E0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+ <CAOMZO5DY+HqH-FeFF5rD5rCettfdmni62nHJRAPU5fdXijw=sA@mail.gmail.com>
+Message-ID: <BN3PR0301MB0867F79377E77636E8B80EEEFE5B0@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Sep 2015, Yang Yingliang wrote:
->  arch/arm/Kconfig             |  1 +
->  arch/arm/include/asm/irq.h   |  1 -
->  arch/arm/kernel/irq.c        | 62 -----------------------------------------
->  arch/arm64/Kconfig           |  1 +
->  arch/arm64/include/asm/irq.h |  1 -
->  arch/arm64/kernel/irq.c      | 62 -----------------------------------------
->  include/linux/irq.h          |  4 +++
->  kernel/irq/migration.c       | 66 ++++++++++++++++++++++++++++++++++++++++++++
+Hi, Shawn,
 
-This want's to be split into seperate patches:
+> On Fri, Aug 28, 2015 at 5:04 AM, Huan Wang <alison.wang@freescale.com>
+> wrote:
+> 
+> > I need Fabio's confirmation about removing CONFIG_SOC_LS1021A from
+> imx_v6_v7_config.
+> >
+> > Fabio, Do you agree it?
+> 
+> Yes, if Shawn accepts ls1021a_defconfig then we should remove
+> CONFIG_SOC_LS1021A from imx_v6_v7_config.
+> 
+[Alison Wang] Could you help to review this patch?
 
-#1 Provide the core infrastructure
+Thanks.
 
-#2 Switch ARM to use it
 
-#3 Switch ARM64 to use it
-
-Thanks,
-
-	tglx
+Best Regards,
+Alison Wang
