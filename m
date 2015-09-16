@@ -1,131 +1,51 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 16 Sep 2015 03:53:25 +0200
-Subject: [PATCH v3 2/8] genirq: irqdomain: Remove irqdomain dependency on
- struct device_node
-In-Reply-To: <55F7E268.1040302@arm.com>
-References: <1442249047-21182-1-git-send-email-marc.zyngier@arm.com>
- <2330801.UsQO8cZmqT@vostro.rjw.lan> <55F7E268.1040302@arm.com>
-Message-ID: <2173233.CY7mtnyU1M@vostro.rjw.lan>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 16 Sep 2015 09:35:25 +0800
+Subject: [PATCH] arm64: mt8173.dtsi: correct i2c node names
+Message-ID: <1442367325-55819-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 15, 2015 10:18:32 AM Marc Zyngier wrote:
-> On 15/09/15 00:15, Rafael J. Wysocki wrote:
-> > On Monday, September 14, 2015 05:44:01 PM Marc Zyngier wrote:
-> >> struct device_node is very much DT specific, and the original authors
-> >> of the irqdomain subsystem recognized that tie, and went as far as
-> >> mentionning that this could be replaced by some "void *token",
-> >> should another firmware infrastructure be using it.
-> >>
-> >> As we move ACPI on arm64 towards this model too, it makes a lot of sense
-> >> to perform that particular move.
-> >>
-> >> We replace "struct device_node *of_node" with "void *domain_token", which
-> >> is a benign enough transformation. A non DT user of irqdomain can now
-> >> identify its domains using this pointer.
-> >>
-> >> Also, in order to prevent the introduction of sideband type information,
-> >> only DT is allowed to store a valid kernel pointer in domain_token
-> >> (a pointer that passes the virt_addr_valid() test will be considered
-> >> as a valid device_node).
-> >>
-> >> non-DT users that wish to store valid pointers in domain_token are
-> >> required to use another structure such as an IDR.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  include/linux/irqdomain.h | 68 +++++++++++++++++++-----------------
-> >>  kernel/irq/irqdomain.c    | 89 ++++++++++++++++++++++++++++++++++-------------
-> >>  2 files changed, 101 insertions(+), 56 deletions(-)
-> >>
-> >> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> >> index f644fdb..ac7041b 100644
-> >> --- a/include/linux/irqdomain.h
-> >> +++ b/include/linux/irqdomain.h
-> >> @@ -17,16 +17,14 @@
-> >>   * model). It's the domain callbacks that are responsible for setting the
-> >>   * irq_chip on a given irq_desc after it's been mapped.
-> >>   *
-> >> - * The host code and data structures are agnostic to whether or not
-> >> - * we use an open firmware device-tree. We do have references to struct
-> >> - * device_node in two places: in irq_find_host() to find the host matching
-> >> - * a given interrupt controller node, and of course as an argument to its
-> >> - * counterpart domain->ops->match() callback. However, those are treated as
-> >> - * generic pointers by the core and the fact that it's actually a device-node
-> >> - * pointer is purely a convention between callers and implementation. This
-> >> - * code could thus be used on other architectures by replacing those two
-> >> - * by some sort of arch-specific void * "token" used to identify interrupt
-> >> - * controllers.
-> >> + * The host code and data structures are agnostic to whether or not we
-> >> + * use an open firmware device-tree. Domains can be assigned a
-> >> + * "void *domain_token" identifier, which is assumed to represent a
-> >> + * "struct device_node" if the pointer is a valid virtual address.
-> >> + *
-> >> + * Otherwise, the value is assumed to be an opaque identifier. Should
-> >> + * a pointer to a non "struct device_node" be required, another data
-> >> + * structure should be used to indirect it (an IDR for example).
-> >>   */
-> >>  
-> >>  #ifndef _LINUX_IRQDOMAIN_H
-> >> @@ -108,8 +106,8 @@ struct irq_domain_chip_generic;
-> >>   * @flags: host per irq_domain flags
-> >>   *
-> >>   * Optional elements
-> >> - * @of_node: Pointer to device tree nodes associated with the irq_domain. Used
-> >> - *           when decoding device tree interrupt specifiers.
-> >> + * @domain_token: optional firmware-specific identifier for
-> >> + *                the interrupt controller
-> >>   * @gc: Pointer to a list of generic chips. There is a helper function for
-> >>   *      setting up one or more generic chips for interrupt controllers
-> >>   *      drivers using the generic chip library which uses this pointer.
-> >> @@ -130,7 +128,7 @@ struct irq_domain {
-> >>  	unsigned int flags;
-> >>  
-> >>  	/* Optional data */
-> >> -	struct device_node *of_node;
-> >> +	void *domain_token;
-> > 
-> > I'm wondering if that may be something which isn't (void *), but a specific
-> > pointer type, so the compiler warns us when something suspicious is assigned
-> > to it?
-> > 
-> > [Somewhat along the lines struct fwnode_handle is used elsewehere.]
-> 
-> Yeah, I'm obviously being lazy ;-).
-> 
-> More seriously, I'm trying hard to avoid anything that will require an
-> additional memory allocation. Going from a device_node to a
-> fwnode_handle-like structure requires such an allocation which is going
-> to be a massive pain to retrofit - not impossible, but painful.
-> 
-> What I'm currently aiming for is tagged pointers, where the two bottom
-> bits indicate the type of the pointed object (see patch #3):
-> - 00 indicates a device node
-> - 01 indicates an IDR entry (shifted left by two bits)
-> - 10 and 11 are currently unallocated, and one of them could be used to
-> encode a fwnode_handle.
-> 
-> It would be slightly easier to replace the (void *) with a union of the
-> above types:
-> 
-> 	union domain_token {
-> 		struct device_node *of_node;
-> 		struct fwnode_handle *fwnode;
-> 		unsigned long id;
-> 	};
-> 
-> That would remove the need for an extra allocation (at the cost of the
-> above hack). We just need the accessors to strip the tag. Still need to
-> repaint all the users of irq_domain_add_*, which is going to be
-> amazingly invasive.
-> 
-> Thoughts?
+Node name in device tree should describe general class of the
+device. Correct incorrect i2c node names.
 
-Well, I'm not sure this is worth the effort to be honest.
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+---
+This is based on v4.3-rc1.
+All the other i2c node names are correct.
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-I've just seen quite a few bugs where a pointer to something completely invalid
-have been silently passed via (void *) which often results in very interesting
-breakage (that is really hard to debug for that matter).
-
-Thanks,
-Rafael
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index d18ee42..7f360b7 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -365,7 +365,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		i2c3: i2c3 at 11010000 {
++		i2c3: i2c at 11010000 {
+ 			compatible = "mediatek,mt8173-i2c";
+ 			reg = <0 0x11010000 0 0x70>,
+ 			      <0 0x11000280 0 0x80>;
+@@ -381,7 +381,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		i2c4: i2c4 at 11011000 {
++		i2c4: i2c at 11011000 {
+ 			compatible = "mediatek,mt8173-i2c";
+ 			reg = <0 0x11011000 0 0x70>,
+ 			      <0 0x11000300 0 0x80>;
+@@ -397,7 +397,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		i2c6: i2c6 at 11013000 {
++		i2c6: i2c at 11013000 {
+ 			compatible = "mediatek,mt8173-i2c";
+ 			reg = <0 0x11013000 0 0x70>,
+ 			      <0 0x11000080 0 0x80>;
+-- 
+1.9.1
