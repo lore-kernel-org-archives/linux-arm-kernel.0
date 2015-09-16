@@ -1,45 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Sep 2015 23:18:19 +0100
-Subject: [PATCH v3 2/2] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
- support
-In-Reply-To: <CAD=FV=Vk+qziHohVL_Zaag0qqh_R6DnA1s-ppVFC=cBccAn4EA@mail.gmail.com>
-References: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <CAD=FV=XZ4cY4o-=vL79GDE4m57B+Rw_Yr_QwtB6T7DbQNzmU0Q@mail.gmail.com>
- <55F9D7F0.4070402@mentor.com>
- <CAD=FV=Vk+qziHohVL_Zaag0qqh_R6DnA1s-ppVFC=cBccAn4EA@mail.gmail.com>
-Message-ID: <20150916221819.GJ21084@n2100.arm.linux.org.uk>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 17 Sep 2015 07:44:53 +0900
+Subject: [PATCH v4 0/4] cpufreq-dt: add suspend frequency support
+In-Reply-To: <20150908051053.GA18554@linux>
+References: <1441640501-13613-1-git-send-email-b.zolnierkie@samsung.com>
+ <20150908024659.GF26760@linux> <55EE5C79.2030604@samsung.com>
+ <20150908042017.GJ26760@linux> <55EE6892.3010304@samsung.com>
+ <20150908051053.GA18554@linux>
+Message-ID: <55F9F0E5.7000805@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 02:56:57PM -0700, Doug Anderson wrote:
-> Yes, I'd expect 100kHz and 400kHz.
+On 09/08/15 14:10, Viresh Kumar wrote:
+> On 08-09-15, 13:48, Krzysztof Kozlowski wrote:
+>> Somehow my mind stuck on solving Exynos4x12 cpufreq issues.
+>>
+>> Right, it should go through Rafael's, probably except DTS patch (4/4)
+>> because it depends on previous DTS changes. These changes are still in
+>> arm-soc, not in Linus' tree [0].
 > 
-> I agree that 50ms is non-trivial, but it's also not something you're
-> doing lots of.  I'd expect that the EDID is read over this channel at
-> cable plugin time and then not used much after that.  Adding an extra
-> 40ms (10ms vs 50ms) before we can access the TV doesn't seem terrible
-> for compatibility.
+> That's bad :(
 > 
-> Doing a quick scan for what others in mainline do:
+> Anyway, 4/4 is kind of independent to this series, in the sense that
+> it wouldn't harm even if it gets applied separately.
 > 
-> A few can be found with:
+> So, go ahead and apply 4/4 to Samsung's tree and rest of this can be
+> picked by Rafael.
 > 
-> $ git grep -A3 hdmiddc | grep clock-freq
-> arch/arm/boot/dts/stihxxx-b2120.dtsi-
-> clock-frequency = <100000>;
-> arch/arm/boot/dts/tegra30-apalis.dtsi-          clock-frequency = <100000>;
-> arch/arm/boot/dts/tegra30-beaver.dts-           clock-frequency = <100000>;
-> arch/arm/boot/dts/tegra30-colibri.dtsi-         clock-frequency = <100000>;
+Applied 4/4 into samsung tree, thanks.
 
-This is a sure way to propagate a bug.
-
-I said in a previous email that you need to check the HDMI and CEA
-specs.  I've done this, and HDMI 1.3a specifies a maximum SCL clock
-rate of 100kHz.
-
-So that's settled then.  100kHz is must be.  Using 400kHz is out of
-specification.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+- Kukjin
