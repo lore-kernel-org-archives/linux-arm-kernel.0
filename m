@@ -1,130 +1,71 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 16 Sep 2015 17:37:03 +0200
-Subject: [PATCH v2 7/7] ARM: at91/dt: sama5d2 Xplained: add device pin muxing
-In-Reply-To: <1442417823-15850-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1442417823-15850-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1442417823-15850-8-git-send-email-ludovic.desroches@atmel.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 16 Sep 2015 16:51:12 +0100
+Subject: [RFC PATCH v2 3/7] arm64: alternative: Apply alternatives early
+ in boot process
+In-Reply-To: <20150916130549.GJ28771@arm.com>
+References: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
+ <1442237181-17064-4-git-send-email-daniel.thompson@linaro.org>
+ <20150916130549.GJ28771@arm.com>
+Message-ID: <55F98FF0.7030605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device pin muxing for the sama5d2 Xplained board.
+On 16/09/15 14:05, Will Deacon wrote:
+> On Mon, Sep 14, 2015 at 02:26:17PM +0100, Daniel Thompson wrote:
+>> Currently alternatives are applied very late in the boot process (and
+>> a long time after we enable scheduling). Some alternative sequences,
+>> such as those that alter the way CPU context is stored, must be applied
+>> much earlier in the boot sequence.
+>>
+>> Introduce apply_alternatives_early() to allow some alternatives to be
+>> applied immediately after we detect the CPU features of the boot CPU.
+>>
+>> Currently apply_alternatives_all() is not optimized and will re-patch
+>> code that has already been updated. This is harmless but could be
+>> removed by adding extra flags to the alternatives store.
+>>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> ---
+> [snip]
+>>   /*
+>> + * This is called very early in the boot process (directly after we run
+>> + * a feature detect on the boot CPU). No need to worry about other CPUs
+>> + * here.
+>> + */
+>> +void apply_alternatives_early(void)
+>> +{
+>> +	struct alt_region region = {
+>> +		.begin	= __alt_instructions,
+>> +		.end	= __alt_instructions_end,
+>> +	};
+>> +
+>> +	__apply_alternatives(&region);
+>> +}
+>
+> How do you choose which alternatives are applied early and which are
+> applied later? AFAICT, this just applies everything before we've
+> established the capabilities of the CPUs in the system, which could cause
+> problems for big/little SoCs.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 61 +++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
+They are applied twice. This relies for correctness on the fact that 
+cpufeatures can be set but not unset.
 
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index e8d63afd..dc23979 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -44,6 +44,7 @@
-  */
- /dts-v1/;
- #include "sama5d2.dtsi"
-+#include "sama5d2-pinfunc.h"
- 
- / {
- 	model = "Atmel SAMA5D2 Xplained";
-@@ -92,6 +93,8 @@
- 
- 		apb {
- 			spi0: spi at f8000000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0_default>;
- 				status = "okay";
- 
- 				m25p80 at 0 {
-@@ -102,25 +105,35 @@
- 			};
- 
- 			macb0: ethernet at f8008000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_macb0_default>;
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
- 
- 			uart1: serial at f8020000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart1_default>;
- 				status = "okay";
- 			};
- 
- 			i2c0: i2c at f8028000 {
- 				dmas = <0>, <0>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_i2c0_default>;
- 				status = "okay";
- 			};
- 
- 			uart3: serial at fc008000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart3_default>;
- 				status = "okay";
- 			};
- 
- 			i2c1: i2c at fc028000 {
- 				dmas = <0>, <0>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_i2c1_default>;
- 				status = "okay";
- 
- 				at24 at 54 {
-@@ -129,6 +142,54 @@
- 					pagesize = <16>;
- 				};
- 			};
-+
-+			pinctrl at fc038000 {
-+				pinctrl_i2c0_default: i2c0_default {
-+					pinmux = <PIN_PD21__TWD0>,
-+						 <PIN_PD22__TWCK0>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_i2c1_default: i2c1_default {
-+					pinmux = <PIN_PD4__TWD1>,
-+						 <PIN_PD5__TWCK1>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_macb0_default: macb0_default {
-+					pinmux = <PIN_PB14__GTXCK>,
-+						 <PIN_PB15__GTXEN>,
-+						 <PIN_PB16__GRXDV>,
-+						 <PIN_PB17__GRXER>,
-+						 <PIN_PB18__GRX0>,
-+						 <PIN_PB19__GRX1>,
-+						 <PIN_PB20__GTX0>,
-+						 <PIN_PB21__GTX1>,
-+						 <PIN_PB22__GMDC>,
-+						 <PIN_PB23__GMDIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_spi0_default: spi0_default {
-+					pinmux = <PIN_PA14__SPI0_SPCK>,
-+						 <PIN_PA15__SPI0_MOSI>,
-+						 <PIN_PA16__SPI0_MISO>,
-+						 <PIN_PA17__SPI0_NPCS0>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_uart1_default: uart1_default {
-+					pinmux = <PIN_PD2__URXD1>,
-+						 <PIN_PD3__UTXD1>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_uart3_default: uart3_default {
-+					pinmux = <PIN_PB11__URXD3>,
-+						 <PIN_PB12__UTXD3>;
-+					bias-disable;
-+				};
-+			};
- 		};
- 	};
- };
--- 
-2.5.0
+In other words the boot CPU does a feature detect and, as a result, a 
+subset of the required alternatives will be applied. However after this 
+the other CPUs will boot and the the remaining alternatives applied as 
+before.
+
+The current implementation is inefficient (because it will redundantly 
+patch the same code twice) but I don't think it is broken.
+
+
+> Also, why do we need this for the NMI?
+
+I was/am concerned that a context saved before the alternatives are 
+applied might be restored afterwards. If that happens the bit that 
+indicates what value to put into the PMR would read during the restore 
+without having been saved first. Applying early ensures that the context 
+save/restore code is updated before it is ever used.
+
+
+Daniel.
