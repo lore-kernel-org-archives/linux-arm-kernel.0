@@ -1,86 +1,95 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Sep 2015 18:28:39 +0100
-Subject: [PATCH v2 3/5] irqchip/gic: Convert the GIC driver to ACPI probing
-In-Reply-To: <55F98525.7030900@linaro.org>
-References: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
- <1442152943-24493-4-git-send-email-marc.zyngier@arm.com>
- <55F98525.7030900@linaro.org>
-Message-ID: <55F9A6C7.6000007@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Sep 2015 18:29:35 +0100
+Subject: [PATCH 4/6] PCI: generic: Correct, and avoid overflow, in
+ bus_max calculation.
+In-Reply-To: <20150916112852.GC17510@red-moon>
+References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442013719-5001-5-git-send-email-ddaney.cavm@gmail.com>
+ <20150915174934.GL31157@arm.com>
+ <55F85D4E.9020604@caviumnetworks.com>
+ <20150915183500.GR31157@arm.com>
+ <55F86764.4060502@caviumnetworks.com>
+ <20150916104152.GC28771@arm.com> <20150916112852.GC17510@red-moon>
+Message-ID: <20150916172935.GT28771@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/09/15 16:05, Hanjun Guo wrote:
-> Hi Marc,
+Hi Lorenzo,
+
+On Wed, Sep 16, 2015 at 12:28:52PM +0100, Lorenzo Pieralisi wrote:
+> On Wed, Sep 16, 2015 at 11:41:53AM +0100, Will Deacon wrote:
+> > > Here is the current code:
+> > > 
+> > > >> 	bus_range = pci->cfg.bus_range;
+> > > >> 	for (busn = bus_range->start; busn <= bus_range->end; ++busn) {
+> > > >> 		u32 idx = busn - bus_range->start;
+> > > 
+> > > The index is offset by the bus range start...
+> > > 
+> > > >> 		u32 sz = 1 << pci->cfg.ops.bus_shift;
+> > > >>
+> > > >> 		pci->cfg.win[idx] = devm_ioremap(dev,
+> > > >> 						 pci->cfg.res.start + busn * sz,
+> > > >> 						 sz);
+> > > 
+> > > But, the offset into the "reg" property is the raw bus number.
+> > > 
+> > > 
+> > > >> 		if (!pci->cfg.win[idx])
+> > > >> 			return -ENOMEM;
+> > > >> 	}
+> > > 
+> > > 
+> > > I hope that makes it more clear.
+> > 
+> > Got it. So we should be using idx instead of busn in the devm_ioremap
+> > call above.
 > 
-> On 09/13/2015 10:02 PM, Marc Zyngier wrote:
-> [...]
->> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> index e6b7ed5..8a0b9c3 100644
->> --- a/drivers/irqchip/irq-gic.c
->> +++ b/drivers/irqchip/irq-gic.c
->> @@ -41,7 +41,6 @@
->>   #include <linux/irqchip.h>
->>   #include <linux/irqchip/chained_irq.h>
->>   #include <linux/irqchip/arm-gic.h>
->> -#include <linux/irqchip/arm-gic-acpi.h>
->>
->>   #include <asm/cputype.h>
->>   #include <asm/irq.h>
->> @@ -1177,7 +1176,7 @@ IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
->>   #endif
->>
->>   #ifdef CONFIG_ACPI
->> -static phys_addr_t dist_phy_base, cpu_phy_base __initdata;
->> +static phys_addr_t cpu_phy_base __initdata;
->>
->>   static int __init
->>   gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
->> @@ -1205,60 +1204,56 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
->>   	return 0;
->>   }
->>
->> -static int __init
->> -gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
->> -				const unsigned long end)
->> +/* The things you have to do to just *count* something... */
->> +static int __init acpi_dummy_func(struct acpi_subtable_header *header,
->> +				  const unsigned long end)
->>   {
->> -	struct acpi_madt_generic_distributor *dist;
->> +	return 0;
->> +}
->>
->> -	dist = (struct acpi_madt_generic_distributor *)header;
->> +static bool __init acpi_gic_redist_is_present(void)
->> +{
->> +	return acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
->> +				     acpi_dummy_func, 0) > 0;
->> +}
->>
->> -	if (BAD_MADT_ENTRY(dist, end))
->> -		return -EINVAL;
->> +static bool __init gic_validate_dist(struct acpi_subtable_header *header,
->> +				     struct acpi_probe_entry *ape)
->> +{
->> +	struct acpi_madt_generic_distributor *dist;
->> +	dist = (struct acpi_madt_generic_distributor *)header;
->>
->> -	dist_phy_base = dist->base_address;
->> -	return 0;
->> +	return (dist->version == ape->driver_data &&
->> +		(dist->version != ACPI_MADT_GIC_VERSION_NONE ||
->> +		 !acpi_gic_redist_is_present()));
->>
+> I think that's not what's specified in the PCI firmware specification,
+> at least for the MMCFG regions. For MMCFG regions (quoting the specs)
+> the "base address of the memory mapped configuration space always
+> corresponds to bus number 0 (regardless of the start bus number decoded
+> by the host bridge)..."
 > 
-> When I was rebasing the GICv3 patches on top of yours, I noticed
-> that GICv3 will also needs to check the acpi_gic_redist_is_present(),
-> can we move the code above to some common place, or just leave
-> the code duplicate but self-contained?
+> For the x86 implementation have a look at:
+> 
+> arch/x86/pci/mmconfig_64.c mcfg_ioremap()
+> 
+> static void __iomem *mcfg_ioremap(struct pci_mmcfg_region *cfg)
+> {
+> 	void __iomem *addr;
+> 	u64 start, size;
+> 	int num_buses;
+> 
+> 	start = cfg->address + PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
+> 	num_buses = cfg->end_bus - cfg->start_bus + 1;
+> 	size = PCI_MMCFG_BUS_OFFSET(num_buses);
+> 	addr = ioremap_nocache(start, size);
+> 	if (addr)
+> 		addr -= PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
+> 	return addr;
+> }
+> 
+> The MCFG config accessors add back the PCI_MMCFG_BUS_OFFSET(cfg->start_bus)
+> to the virtual address so that the proper virtual address is used when
+> issuing the config cycles, that's my understanding.
 
-Please keep it self-contained so far. We can "optimize" later.
+Ok. I think that whether the config space mapping or the config accessors
+do the fixup should remain an implementation detail, but the resource
+identifying config space should be dealt with consistently.
 
-Thanks,
+So that means the reg property should describe everything from bus 0,
+but then we only map the region corresponding to the bus-range.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> So IMO we have to define what "reg" represents for ECAM in DT, we can't
+> leave this open to interpretation (and I think makng MCFG and DT config
+> work the same way would be ideal).
+
+If we define reg to cover the whole config space from bus 0 onwards,
+then I think the driver should work as-is today. It's slightly odd, in
+that there may be a prefix of config space that maps to god-knows-where,
+but it's consistent with ACPI and doesn't require us to change the driver.
+
+David?
+
+Will
