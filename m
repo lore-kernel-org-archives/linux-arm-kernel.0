@@ -1,76 +1,100 @@
-From: horia.geanta@freescale.com (=?UTF-8?Q?Horia_Geant=c4=83?=)
-Date: Wed, 16 Sep 2015 18:28:41 +0300
-Subject: [PATCH] ARM: dts: ls1021a: add crypto node
-In-Reply-To: <1439365361-24129-1-git-send-email-horia.geanta@freescale.com>
-References: <1439365361-24129-1-git-send-email-horia.geanta@freescale.com>
-Message-ID: <55F98AA9.1030607@freescale.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Wed, 16 Sep 2015 17:30:36 +0200
+Subject: [PATCH 1/5] spi: introduce mmap read support for spi flash devices
+In-Reply-To: <CAD6G_RQOazkS7KHrG75wgMXx1cH_pKjx43Mve6fz1qOJGPpq9w@mail.gmail.com>
+References: <1441355402-6837-1-git-send-email-vigneshr@ti.com>
+ <1441355402-6837-2-git-send-email-vigneshr@ti.com>
+ <CAD6G_RT8Q+Uyp1ZjzHf54Tno1wHm0SmLKEwRAe2gkdp772FD9A@mail.gmail.com>
+ <20150914183553.GE12027@sirena.org.uk>
+ <CAD6G_RQOazkS7KHrG75wgMXx1cH_pKjx43Mve6fz1qOJGPpq9w@mail.gmail.com>
+Message-ID: <CAOMqctRWCkVg8gthkkkgg7_6=c00SORNx7_6_NperxXfgGf5xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping
+On 16 September 2015 at 14:46, Jagan Teki <jteki@openedev.com> wrote:
+> On 15 September 2015 at 00:05, Mark Brown <broonie@kernel.org> wrote:
+>> On Fri, Sep 04, 2015 at 04:55:33PM +0530, Jagan Teki wrote:
+>>> On 4 September 2015 at 13:59, Vignesh R <vigneshr@ti.com> wrote:
+>>
+>>> > + * @spi_mtd_mmap_read: some spi-controller hardwares provide memory
+>>> > + *                     mapped interface to communicate with mtd flashes.
+>>> > + *                     For this, spi  controller needs to know flash
+>>> > + *                     memory settings like read command to use, dummy
+>>> > + *                     bytes and address width. Once these settings are
+>>> > + *                     populated in hardware registers, any read
+>>> > + *                     accesses to flash's memory map region(as defined
+>>> > + *                     by SoC) through memcpy or mem-to-mem DMA copy
+>>> > + *                     will be handled by controller hardware. The
+>>> > + *                     hardware will automatically generate spi signals
+>>> > + *                     required to read data from flash and present it
+>>> > + *                     to CPU or DMA. SPI master drivers can use this
+>>> > + *                     callback to implement memory mapped read
+>>> > + *                     interface. Flash driver (like m25p80) requests
+>>> > + *                     memory mapped read via this method. The interface
+>>> > + *                     should  only be used mtd flashes and cannot be
+>>> > + *                     used with other spi devices.
+>>
+>> This comment is *way* too verbose - probably you just need up to the
+>> "Once" here.
+>>
+>>> > +       int (*spi_mtd_mmap_read)(struct  spi_device *spi,
+>>> > +                                loff_t from, size_t len, size_t *retlen,
+>>> > +                                u_char *buf, u8 read_opcode,
+>>> > +                                u8 addr_width, u8 dummy_bytes);
+>>
+>>> This looks un-manageable to know spi core or master knows what are the
+>>> command or opcode used by spi-nor flash and also I think mmap support
+>>> seems to be flash related or any justification this is spi bus
+>>> master/controller feature?
+>>
+>> There seem to be a reasonable number of SPI controllers out there which
+>> have as an extension the ability to do memory mapped reads but are
+>> otherwise perfectly normal SPI controllers and which rely on that for
+>> everything except reads.
+>
+> This is true, but exposing direct spi-nor arguments or features like
+> read_opcode, addr_width or dummy_byte to spi layer isn't fine? because
+> for spi layer there is a spi to flash transition mtd m25p80.c is there
+> to handle is it?
 
-On 8/12/2015 10:42 AM, Horia Geant? wrote:
-> Signed-off-by: Horia Geant? <horia.geanta@freescale.com>
-> ---
->  arch/arm/boot/dts/ls1021a.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-> index 973a496207fc..5bd64a4df4d3 100644
-> --- a/arch/arm/boot/dts/ls1021a.dtsi
-> +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> @@ -63,6 +63,7 @@
->  		serial4 = &lpuart4;
->  		serial5 = &lpuart5;
->  		sysclk = &sysclk;
-> +		crypto = &crypto;
->  	};
->  
->  	cpus {
-> @@ -148,6 +149,45 @@
->  			big-endian;
->  		};
->  
-> +		crypto: crypto at 1700000 {
-> +			compatible = "fsl,sec-v5.0", "fsl,sec-v4.0";
-> +			fsl,sec-era = <7>;
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			reg		 = <0x0 0x1700000 0x0 0x100000>;
-> +			ranges		 = <0x0 0x0 0x1700000 0x100000>;
-> +			interrupts	 = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
-> +
-> +			sec_jr0: jr at 10000 {
-> +				compatible = "fsl,sec-v5.0-job-ring",
-> +				     "fsl,sec-v4.0-job-ring";
-> +				reg = <0x10000 0x10000>;
-> +				interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +			sec_jr1: jr at 20000 {
-> +				compatible = "fsl,sec-v5.0-job-ring",
-> +				     "fsl,sec-v4.0-job-ring";
-> +				reg = <0x20000 0x10000>;
-> +				interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +			sec_jr2: jr at 30000 {
-> +				compatible = "fsl,sec-v5.0-job-ring",
-> +				     "fsl,sec-v4.0-job-ring";
-> +				reg = <0x30000 0x10000>;
-> +				interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +			sec_jr3: jr at 40000 {
-> +				compatible = "fsl,sec-v5.0-job-ring",
-> +				     "fsl,sec-v4.0-job-ring";
-> +				reg = <0x40000 0x10000>;
-> +				interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +		};
-> +
->  		clockgen: clocking at 1ee1000 {
->  			#address-cells = <1>;
->  			#size-cells = <1>;
-> 
+For the TI SPI controller this is programmable. So instead of
+composing a SPI message that sends the opcode (and address and dummy
+bytes) you set the opcode in a controller register and then perform
+the memory read which sends the configured opcode to the flash memory.
+So this needs to be exposed in an API which the m25p80 driver can use.
+
+On 16 September 2015 at 12:08, Vignesh R <vigneshr@ti.com> wrote:
+>
+>
+> On 09/15/2015 12:07 AM, Mark Brown wrote:
+>> On Fri, Sep 04, 2015 at 01:59:58PM +0530, Vignesh R wrote:
+>>> In addition to providing direct access to SPI bus, some spi controller
+>>> hardwares (like ti-qspi) provide special memory mapped port
+>>> to accesses SPI flash devices in order to increase read performance.
+>>> This means the controller can automatically send the SPI signals
+>>> required to read data from the SPI flash device.
+>>
+>> Sorry, also meant to say here: as I kind of indicated in response to the
+>> flash patch I'd expect to see the SPI core know something about this and
+>> export an API for this which is integrated with things like the existing
+>> message queue.
+>>
+>
+>
+> Adding an API to SPI core makes sense to me. This can take care of spi
+> bus locking and runtime pm.
+> But, I didn't get how to integrate with existing message queue. Memory
+> mapped read by-passes message queue of SPI core. Could you please
+> explain a bit more on integrating with message queue? Did you mean
+> locking the existing message queue when memory mapped read is being
+> requested?
+
+Presumably when you have a function in SPI core for this it takes the
+same lock transfer_one does so either you do mmap transfer or normal
+SPI transfer. You can probably manually sync on transfer completion in
+a driver that uses both normal SPI messages and mmap transfer - which
+m25p80 does anyway.
+
+Thanks
+
+Michal
