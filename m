@@ -1,518 +1,153 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 16 Sep 2015 09:46:37 +0200
-Subject: [PATCH 2/2] mtd: sunxi: nand: refactor ->read_page()/->write_page()
- code
-In-Reply-To: <1442389597-30698-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1442389597-30698-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1442389597-30698-3-git-send-email-boris.brezillon@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 16 Sep 2015 08:49:27 +0100
+Subject: [PATCH v3 2/8] genirq: irqdomain: Remove irqdomain dependency
+ on struct device_node
+In-Reply-To: <2173233.CY7mtnyU1M@vostro.rjw.lan>
+References: <1442249047-21182-1-git-send-email-marc.zyngier@arm.com>
+ <2330801.UsQO8cZmqT@vostro.rjw.lan> <55F7E268.1040302@arm.com>
+ <2173233.CY7mtnyU1M@vostro.rjw.lan>
+Message-ID: <55F91F07.3040807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the logic to read/write pages with the HW ECC engine enabled
-is common to the HW_ECC and NAND_ECC_HW_SYNDROME scheme.
-Refactor the code to avoid code duplication.
+On 16/09/15 02:53, Rafael J. Wysocki wrote:
+> On Tuesday, September 15, 2015 10:18:32 AM Marc Zyngier wrote:
+>> On 15/09/15 00:15, Rafael J. Wysocki wrote:
+>>> On Monday, September 14, 2015 05:44:01 PM Marc Zyngier wrote:
+>>>> struct device_node is very much DT specific, and the original authors
+>>>> of the irqdomain subsystem recognized that tie, and went as far as
+>>>> mentionning that this could be replaced by some "void *token",
+>>>> should another firmware infrastructure be using it.
+>>>>
+>>>> As we move ACPI on arm64 towards this model too, it makes a lot of sense
+>>>> to perform that particular move.
+>>>>
+>>>> We replace "struct device_node *of_node" with "void *domain_token", which
+>>>> is a benign enough transformation. A non DT user of irqdomain can now
+>>>> identify its domains using this pointer.
+>>>>
+>>>> Also, in order to prevent the introduction of sideband type information,
+>>>> only DT is allowed to store a valid kernel pointer in domain_token
+>>>> (a pointer that passes the virt_addr_valid() test will be considered
+>>>> as a valid device_node).
+>>>>
+>>>> non-DT users that wish to store valid pointers in domain_token are
+>>>> required to use another structure such as an IDR.
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  include/linux/irqdomain.h | 68 +++++++++++++++++++-----------------
+>>>>  kernel/irq/irqdomain.c    | 89 ++++++++++++++++++++++++++++++++++-------------
+>>>>  2 files changed, 101 insertions(+), 56 deletions(-)
+>>>>
+>>>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+>>>> index f644fdb..ac7041b 100644
+>>>> --- a/include/linux/irqdomain.h
+>>>> +++ b/include/linux/irqdomain.h
+>>>> @@ -17,16 +17,14 @@
+>>>>   * model). It's the domain callbacks that are responsible for setting the
+>>>>   * irq_chip on a given irq_desc after it's been mapped.
+>>>>   *
+>>>> - * The host code and data structures are agnostic to whether or not
+>>>> - * we use an open firmware device-tree. We do have references to struct
+>>>> - * device_node in two places: in irq_find_host() to find the host matching
+>>>> - * a given interrupt controller node, and of course as an argument to its
+>>>> - * counterpart domain->ops->match() callback. However, those are treated as
+>>>> - * generic pointers by the core and the fact that it's actually a device-node
+>>>> - * pointer is purely a convention between callers and implementation. This
+>>>> - * code could thus be used on other architectures by replacing those two
+>>>> - * by some sort of arch-specific void * "token" used to identify interrupt
+>>>> - * controllers.
+>>>> + * The host code and data structures are agnostic to whether or not we
+>>>> + * use an open firmware device-tree. Domains can be assigned a
+>>>> + * "void *domain_token" identifier, which is assumed to represent a
+>>>> + * "struct device_node" if the pointer is a valid virtual address.
+>>>> + *
+>>>> + * Otherwise, the value is assumed to be an opaque identifier. Should
+>>>> + * a pointer to a non "struct device_node" be required, another data
+>>>> + * structure should be used to indirect it (an IDR for example).
+>>>>   */
+>>>>  
+>>>>  #ifndef _LINUX_IRQDOMAIN_H
+>>>> @@ -108,8 +106,8 @@ struct irq_domain_chip_generic;
+>>>>   * @flags: host per irq_domain flags
+>>>>   *
+>>>>   * Optional elements
+>>>> - * @of_node: Pointer to device tree nodes associated with the irq_domain. Used
+>>>> - *           when decoding device tree interrupt specifiers.
+>>>> + * @domain_token: optional firmware-specific identifier for
+>>>> + *                the interrupt controller
+>>>>   * @gc: Pointer to a list of generic chips. There is a helper function for
+>>>>   *      setting up one or more generic chips for interrupt controllers
+>>>>   *      drivers using the generic chip library which uses this pointer.
+>>>> @@ -130,7 +128,7 @@ struct irq_domain {
+>>>>  	unsigned int flags;
+>>>>  
+>>>>  	/* Optional data */
+>>>> -	struct device_node *of_node;
+>>>> +	void *domain_token;
+>>>
+>>> I'm wondering if that may be something which isn't (void *), but a specific
+>>> pointer type, so the compiler warns us when something suspicious is assigned
+>>> to it?
+>>>
+>>> [Somewhat along the lines struct fwnode_handle is used elsewehere.]
+>>
+>> Yeah, I'm obviously being lazy ;-).
+>>
+>> More seriously, I'm trying hard to avoid anything that will require an
+>> additional memory allocation. Going from a device_node to a
+>> fwnode_handle-like structure requires such an allocation which is going
+>> to be a massive pain to retrofit - not impossible, but painful.
+>>
+>> What I'm currently aiming for is tagged pointers, where the two bottom
+>> bits indicate the type of the pointed object (see patch #3):
+>> - 00 indicates a device node
+>> - 01 indicates an IDR entry (shifted left by two bits)
+>> - 10 and 11 are currently unallocated, and one of them could be used to
+>> encode a fwnode_handle.
+>>
+>> It would be slightly easier to replace the (void *) with a union of the
+>> above types:
+>>
+>> 	union domain_token {
+>> 		struct device_node *of_node;
+>> 		struct fwnode_handle *fwnode;
+>> 		unsigned long id;
+>> 	};
+>>
+>> That would remove the need for an extra allocation (at the cost of the
+>> above hack). We just need the accessors to strip the tag. Still need to
+>> repaint all the users of irq_domain_add_*, which is going to be
+>> amazingly invasive.
+>>
+>> Thoughts?
+> 
+> Well, I'm not sure this is worth the effort to be honest.
+> 
+> I've just seen quite a few bugs where a pointer to something completely invalid
+> have been silently passed via (void *) which often results in very interesting
+> breakage (that is really hard to debug for that matter).
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/mtd/nand/sunxi_nand.c | 404 ++++++++++++++++++++++--------------------
- 1 file changed, 212 insertions(+), 192 deletions(-)
+I actually tried to prototype this yesterday, and ended up in hell. The
+main issue is the point where the generic irqdomain code meets the DT
+subsystem (which is basically any interrupt controller, including those
+being ACPI driven). The domain_token to of_node path is dead easy, but
+you cannot do the reverse conversion, so this would have to spread
+around like a cancer. I gave up.
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index dc44435..640b96c 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -159,6 +159,13 @@
- /* NFC_USER_DATA helper macros */
- #define NFC_BUF_TO_USER_DATA(buf)	((buf)[0] | ((buf)[1] << 8) | \
- 					((buf)[2] << 16) | ((buf)[3] << 24))
-+#define NFC_USER_DATA_TO_BUF(buf, val)	\
-+	{				\
-+		(buf)[0] = val;		\
-+		(buf)[1] = val >> 8;	\
-+		(buf)[2] = val >> 16;	\
-+		(buf)[3] = val >> 24;	\
-+	}
- 
- #define NFC_DEFAULT_TIMEOUT_MS	1000
- 
-@@ -543,153 +550,228 @@ static void sunxi_nfc_cmd_ctrl(struct mtd_info *mtd, int dat,
- 	sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
- }
- 
--static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
--				      struct nand_chip *chip, uint8_t *buf,
--				      int oob_required, int page)
-+static void sunxi_nfc_hw_ecc_enable(struct mtd_info *mtd)
- {
--	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
--	struct nand_ecc_ctrl *ecc = &chip->ecc;
--	struct nand_ecclayout *layout = ecc->layout;
--	struct sunxi_nand_hw_ecc *data = ecc->priv;
--	unsigned int max_bitflips = 0;
--	int offset;
--	int ret;
--	u32 tmp;
--	int i;
--	int cnt;
-+	struct nand_chip *nand = mtd->priv;
-+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
-+	struct sunxi_nand_hw_ecc *data = nand->ecc.priv;
-+	u32 ecc_ctl;
- 
--	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
--	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
--	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
-+	ecc_ctl = readl(nfc->regs + NFC_REG_ECC_CTL);
-+	ecc_ctl &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE |
-+		     NFC_ECC_BLOCK_SIZE_MSK);
-+	ecc_ctl |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
- 
--	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
-+	writel(ecc_ctl, nfc->regs + NFC_REG_ECC_CTL);
-+}
- 
--	for (i = 0; i < ecc->steps; i++) {
--		if (i)
--			chip->cmdfunc(mtd, NAND_CMD_RNDOUT, i * ecc->size, -1);
-+static void sunxi_nfc_hw_ecc_disable(struct mtd_info *mtd)
-+{
-+	struct nand_chip *nand = mtd->priv;
-+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
- 
--		offset = mtd->writesize + layout->eccpos[i * ecc->bytes] - 4;
-+	writel(readl(nfc->regs + NFC_REG_ECC_CTL) & ~NFC_ECC_EN,
-+	       nfc->regs + NFC_REG_ECC_CTL);
-+}
- 
--		chip->read_buf(mtd, NULL, ecc->size);
-+static int sunxi_nfc_hw_ecc_read_chunk(struct mtd_info *mtd,
-+				       u8 *data, int data_off,
-+				       u8 *oob, int oob_off,
-+				       int *cur_off,
-+				       unsigned int *max_bitflips)
-+{
-+	struct nand_chip *nand = mtd->priv;
-+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
-+	struct nand_ecc_ctrl *ecc = &nand->ecc;
-+	u32 status;
-+	int ret;
- 
--		chip->cmdfunc(mtd, NAND_CMD_RNDOUT, offset, -1);
-+	if (*cur_off != data_off)
-+		nand->cmdfunc(mtd, NAND_CMD_RNDOUT, data_off, -1);
- 
--		ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
--		if (ret)
--			return ret;
-+	sunxi_nfc_read_buf(mtd, data, ecc->size);
- 
--		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ECC_OP;
--		writel(tmp, nfc->regs + NFC_REG_CMD);
-+	if (data_off + ecc->bytes != oob_off)
-+		nand->cmdfunc(mtd, NAND_CMD_RNDOUT, oob_off, -1);
- 
--		ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
--		if (ret)
--			return ret;
-+	ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
-+	if (ret)
-+		return ret;
- 
--		memcpy_fromio(buf + (i * ecc->size),
--			      nfc->regs + NFC_RAM0_BASE, ecc->size);
-+	writel(NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ECC_OP,
-+	       nfc->regs + NFC_REG_CMD);
- 
--		if (readl(nfc->regs + NFC_REG_ECC_ST) & NFC_ECC_ERR(0)) {
--			mtd->ecc_stats.failed++;
--		} else {
--			tmp = readl(nfc->regs + NFC_REG_ECC_ERR_CNT(0));
--			mtd->ecc_stats.corrected += NFC_ECC_ERR_CNT(0, tmp);
--			max_bitflips = max_t(unsigned int, max_bitflips, tmp);
--		}
-+	ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
-+	if (ret)
-+		return ret;
- 
--		if (oob_required) {
--			chip->cmdfunc(mtd, NAND_CMD_RNDOUT, offset, -1);
-+	status = readl(nfc->regs + NFC_REG_ECC_ST);
-+	ret = NFC_ECC_ERR_CNT(0, readl(nfc->regs + NFC_REG_ECC_ERR_CNT(0)));
- 
--			ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
--			if (ret)
--				return ret;
-+	memcpy_fromio(data, nfc->regs + NFC_RAM0_BASE, ecc->size);
- 
--			offset -= mtd->writesize;
--			chip->read_buf(mtd, chip->oob_poi + offset,
--				      ecc->bytes + 4);
--		}
-+	nand->cmdfunc(mtd, NAND_CMD_RNDOUT, oob_off, -1);
-+	sunxi_nfc_read_buf(mtd, oob, ecc->bytes + 4);
-+
-+	if (status & NFC_ECC_ERR(0)) {
-+		ret = -EIO;
-+	} else {
-+		/*
-+		 * The engine protects 4 bytes OOB data per chunk.
-+		 * Retrieve the corrected OOB bytes.
-+		 */
-+		NFC_USER_DATA_TO_BUF(oob,
-+				     readl(nfc->regs + NFC_REG_USER_DATA(0)));
- 	}
- 
--	if (oob_required) {
--		cnt = ecc->layout->oobfree[ecc->steps].length;
--		if (cnt > 0) {
--			offset = mtd->writesize +
--				 ecc->layout->oobfree[ecc->steps].offset;
--			chip->cmdfunc(mtd, NAND_CMD_RNDOUT, offset, -1);
--			offset -= mtd->writesize;
--			chip->read_buf(mtd, chip->oob_poi + offset, cnt);
--		}
-+	if (ret < 0) {
-+		mtd->ecc_stats.failed++;
-+	} else {
-+		mtd->ecc_stats.corrected += ret;
-+		*max_bitflips = max_t(unsigned int, *max_bitflips, ret);
- 	}
- 
--	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
--	tmp &= ~NFC_ECC_EN;
-+	*cur_off = oob_off + ecc->bytes + 4;
- 
--	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
-+	return 0;
-+}
- 
--	return max_bitflips;
-+static void sunxi_nfc_hw_ecc_read_extra_oob(struct mtd_info *mtd,
-+					    u8 *oob, int *cur_off)
-+{
-+	struct nand_chip *nand = mtd->priv;
-+	struct nand_ecc_ctrl *ecc = &nand->ecc;
-+	int offset = ((ecc->bytes + 4) * ecc->steps);
-+	int len = mtd->oobsize - offset;
-+
-+	if (len <= 0)
-+		return;
-+
-+	if (*cur_off != offset)
-+		nand->cmdfunc(mtd, NAND_CMD_RNDOUT,
-+			      offset + mtd->writesize, -1);
-+
-+	sunxi_nfc_read_buf(mtd, oob + offset, len);
-+
-+	*cur_off = mtd->oobsize + mtd->writesize;
- }
- 
--static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
--				       struct nand_chip *chip,
--				       const uint8_t *buf, int oob_required)
-+static int sunxi_nfc_hw_ecc_write_chunk(struct mtd_info *mtd,
-+					const u8 *data, int data_off,
-+					const u8 *oob, int oob_off,
-+					int *cur_off)
- {
--	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
--	struct nand_ecc_ctrl *ecc = &chip->ecc;
--	struct nand_ecclayout *layout = ecc->layout;
--	struct sunxi_nand_hw_ecc *data = ecc->priv;
--	int offset;
-+	struct nand_chip *nand = mtd->priv;
-+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
-+	struct nand_ecc_ctrl *ecc = &nand->ecc;
- 	int ret;
--	u32 tmp;
--	int i;
--	int cnt;
- 
--	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
--	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
--	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
-+	if (data_off != *cur_off)
-+		nand->cmdfunc(mtd, NAND_CMD_RNDIN, data_off, -1);
- 
--	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
-+	sunxi_nfc_write_buf(mtd, data, ecc->size);
- 
--	for (i = 0; i < ecc->steps; i++) {
--		if (i)
--			chip->cmdfunc(mtd, NAND_CMD_RNDIN, i * ecc->size, -1);
-+	/* Fill OOB data in */
-+	writel(NFC_BUF_TO_USER_DATA(oob), nfc->regs + NFC_REG_USER_DATA(0));
- 
--		chip->write_buf(mtd, buf + (i * ecc->size), ecc->size);
-+	if (data_off + ecc->bytes != oob_off)
-+		nand->cmdfunc(mtd, NAND_CMD_RNDIN, oob_off, -1);
- 
--		offset = layout->eccpos[i * ecc->bytes] - 4 + mtd->writesize;
-+	ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
-+	if (ret)
-+		return ret;
- 
--		/* Fill OOB data in */
--		writel(NFC_BUF_TO_USER_DATA(chip->oob_poi +
--					    layout->oobfree[i].offset),
--		       nfc->regs + NFC_REG_USER_DATA(0));
-+	writel(NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD |
-+	       NFC_ACCESS_DIR | NFC_ECC_OP,
-+	       nfc->regs + NFC_REG_CMD);
- 
--		chip->cmdfunc(mtd, NAND_CMD_RNDIN, offset, -1);
-+	ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
-+	if (ret)
-+		return ret;
- 
--		ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
--		if (ret)
--			return ret;
-+	*cur_off = oob_off + ecc->bytes + 4;
- 
--		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ACCESS_DIR |
--		      NFC_ECC_OP;
--		writel(tmp, nfc->regs + NFC_REG_CMD);
--		ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
-+	return 0;
-+}
-+
-+static void sunxi_nfc_hw_ecc_write_extra_oob(struct mtd_info *mtd,
-+					     u8 *oob, int *cur_off)
-+{
-+	struct nand_chip *nand = mtd->priv;
-+	struct nand_ecc_ctrl *ecc = &nand->ecc;
-+	int offset = ((ecc->bytes + 4) * ecc->steps);
-+	int len = mtd->oobsize - offset;
-+
-+	if (len <= 0)
-+		return;
-+
-+	if (*cur_off != offset)
-+		nand->cmdfunc(mtd, NAND_CMD_RNDIN,
-+			      offset + mtd->writesize, -1);
-+
-+	sunxi_nfc_write_buf(mtd, oob + offset, len);
-+
-+	*cur_off = mtd->oobsize + mtd->writesize;
-+}
-+
-+static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
-+				      struct nand_chip *chip, uint8_t *buf,
-+				      int oob_required, int page)
-+{
-+	struct nand_ecc_ctrl *ecc = &chip->ecc;
-+	unsigned int max_bitflips = 0;
-+	int ret, i, cur_off = 0;
-+
-+	sunxi_nfc_hw_ecc_enable(mtd);
-+
-+	for (i = 0; i < ecc->steps; i++) {
-+		int data_off = i * ecc->size;
-+		int oob_off = i * (ecc->bytes + 4);
-+		u8 *data = buf + data_off;
-+		u8 *oob = chip->oob_poi + oob_off;
-+
-+		ret = sunxi_nfc_hw_ecc_read_chunk(mtd, data, data_off, oob,
-+						  oob_off + mtd->writesize,
-+						  &cur_off, &max_bitflips);
- 		if (ret)
- 			return ret;
- 	}
- 
--	if (oob_required) {
--		cnt = ecc->layout->oobfree[i].length;
--		if (cnt > 0) {
--			offset = mtd->writesize +
--				 ecc->layout->oobfree[i].offset;
--			chip->cmdfunc(mtd, NAND_CMD_RNDIN, offset, -1);
--			offset -= mtd->writesize;
--			chip->write_buf(mtd, chip->oob_poi + offset, cnt);
--		}
-+	if (oob_required)
-+		sunxi_nfc_hw_ecc_read_extra_oob(mtd, chip->oob_poi,
-+						&cur_off);
-+
-+	sunxi_nfc_hw_ecc_disable(mtd);
-+
-+	return max_bitflips;
-+}
-+
-+static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
-+				       struct nand_chip *chip,
-+				       const uint8_t *buf, int oob_required)
-+{
-+	struct nand_ecc_ctrl *ecc = &chip->ecc;
-+	int ret, i, cur_off = 0;
-+
-+	sunxi_nfc_hw_ecc_enable(mtd);
-+
-+	for (i = 0; i < ecc->steps; i++) {
-+		int data_off = i * ecc->size;
-+		int oob_off = i * (ecc->bytes + 4);
-+		const u8 *data = buf + data_off;
-+		const u8 *oob = chip->oob_poi + oob_off;
-+
-+		ret = sunxi_nfc_hw_ecc_write_chunk(mtd, data, data_off, oob,
-+						   oob_off + mtd->writesize,
-+						   &cur_off);
-+		if (ret)
-+			return ret;
- 	}
- 
--	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
--	tmp &= ~NFC_ECC_EN;
-+	if (oob_required)
-+		sunxi_nfc_hw_ecc_write_extra_oob(mtd, chip->oob_poi, &cur_off);
- 
--	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
-+	sunxi_nfc_hw_ecc_disable(mtd);
- 
- 	return 0;
- }
-@@ -699,64 +781,29 @@ static int sunxi_nfc_hw_syndrome_ecc_read_page(struct mtd_info *mtd,
- 					       uint8_t *buf, int oob_required,
- 					       int page)
- {
--	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
- 	struct nand_ecc_ctrl *ecc = &chip->ecc;
--	struct sunxi_nand_hw_ecc *data = ecc->priv;
- 	unsigned int max_bitflips = 0;
--	uint8_t *oob = chip->oob_poi;
--	int offset = 0;
--	int ret;
--	int cnt;
--	u32 tmp;
--	int i;
--
--	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
--	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
--	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
-+	int ret, i, cur_off = 0;
- 
--	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
-+	sunxi_nfc_hw_ecc_enable(mtd);
- 
- 	for (i = 0; i < ecc->steps; i++) {
--		chip->read_buf(mtd, NULL, ecc->size);
--
--		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ECC_OP;
--		writel(tmp, nfc->regs + NFC_REG_CMD);
--
--		ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
-+		int data_off = i * (ecc->size + ecc->bytes + 4);
-+		int oob_off = data_off + ecc->size;
-+		u8 *data = buf + (i * ecc->size);
-+		u8 *oob = chip->oob_poi + (i * (ecc->bytes + 4));
-+
-+		ret = sunxi_nfc_hw_ecc_read_chunk(mtd, data, data_off, oob,
-+						  oob_off, &cur_off,
-+						  &max_bitflips);
- 		if (ret)
- 			return ret;
--
--		memcpy_fromio(buf, nfc->regs + NFC_RAM0_BASE, ecc->size);
--		buf += ecc->size;
--		offset += ecc->size;
--
--		if (readl(nfc->regs + NFC_REG_ECC_ST) & NFC_ECC_ERR(0)) {
--			mtd->ecc_stats.failed++;
--		} else {
--			tmp = readl(nfc->regs + NFC_REG_ECC_ERR_CNT(0));
--			mtd->ecc_stats.corrected += NFC_ECC_ERR_CNT(0, tmp);
--			max_bitflips = max_t(unsigned int, max_bitflips, tmp);
--		}
--
--		if (oob_required) {
--			chip->cmdfunc(mtd, NAND_CMD_RNDOUT, offset, -1);
--			chip->read_buf(mtd, oob, ecc->bytes + ecc->prepad);
--			oob += ecc->bytes + ecc->prepad;
--		}
--
--		offset += ecc->bytes + ecc->prepad;
- 	}
- 
--	if (oob_required) {
--		cnt = mtd->oobsize - (oob - chip->oob_poi);
--		if (cnt > 0) {
--			chip->cmdfunc(mtd, NAND_CMD_RNDOUT, offset, -1);
--			chip->read_buf(mtd, oob, cnt);
--		}
--	}
-+	if (oob_required)
-+		sunxi_nfc_hw_ecc_read_extra_oob(mtd, chip->oob_poi, &cur_off);
- 
--	writel(readl(nfc->regs + NFC_REG_ECC_CTL) & ~NFC_ECC_EN,
--	       nfc->regs + NFC_REG_ECC_CTL);
-+	sunxi_nfc_hw_ecc_disable(mtd);
- 
- 	return max_bitflips;
- }
-@@ -766,54 +813,27 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
- 						const uint8_t *buf,
- 						int oob_required)
- {
--	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
- 	struct nand_ecc_ctrl *ecc = &chip->ecc;
--	struct sunxi_nand_hw_ecc *data = ecc->priv;
--	uint8_t *oob = chip->oob_poi;
--	int offset = 0;
--	int ret;
--	int cnt;
--	u32 tmp;
--	int i;
--
--	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
--	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
--	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
-+	int ret, i, cur_off = 0;
- 
--	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
-+	sunxi_nfc_hw_ecc_enable(mtd);
- 
- 	for (i = 0; i < ecc->steps; i++) {
--		chip->write_buf(mtd, buf + (i * ecc->size), ecc->size);
--		offset += ecc->size;
-+		int data_off = i * (ecc->size + ecc->bytes + 4);
-+		int oob_off = data_off + ecc->size;
-+		const u8 *data = buf + (i * ecc->size);
-+		const u8 *oob = chip->oob_poi + (i * (ecc->bytes + 4));
- 
--		/* Fill OOB data in */
--		writel(NFC_BUF_TO_USER_DATA(oob),
--		       nfc->regs + NFC_REG_USER_DATA(0));
--
--		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ACCESS_DIR |
--		      NFC_ECC_OP;
--		writel(tmp, nfc->regs + NFC_REG_CMD);
--
--		ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
-+		ret = sunxi_nfc_hw_ecc_write_chunk(mtd, data, data_off,
-+						   oob, oob_off, &cur_off);
- 		if (ret)
- 			return ret;
--
--		offset += ecc->bytes + ecc->prepad;
--		oob += ecc->bytes + ecc->prepad;
--	}
--
--	if (oob_required) {
--		cnt = mtd->oobsize - (oob - chip->oob_poi);
--		if (cnt > 0) {
--			chip->cmdfunc(mtd, NAND_CMD_RNDIN, offset, -1);
--			chip->write_buf(mtd, oob, cnt);
--		}
- 	}
- 
--	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
--	tmp &= ~NFC_ECC_EN;
-+	if (oob_required)
-+		sunxi_nfc_hw_ecc_write_extra_oob(mtd, chip->oob_poi, &cur_off);
- 
--	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
-+	sunxi_nfc_hw_ecc_disable(mtd);
- 
- 	return 0;
- }
+At this stage, I see two options: sticking with (void *) with the risk
+of breakage and subtle bugs which we all love to track down (not!), or
+do a major U-turn and make device_node a strict requirement for domain
+lookup.
+
+After the above experiment, I now see some value in actually keeping
+device_node around, using it as the token, and allocating it when
+required (the typical case being those interrupt controllers that are
+both DT and ACPI). I'll play with it a bit more.
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
