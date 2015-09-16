@@ -1,92 +1,121 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 16 Sep 2015 15:21:08 +0100
-Subject: [PATCH 10/22] arm64: Cleanup mixed endian support detection
+Date: Wed, 16 Sep 2015 15:21:04 +0100
+Subject: [PATCH 06/22] arm64: sys_reg: Define System register encoding
 In-Reply-To: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
 References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1442413280-31885-11-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1442413280-31885-7-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-Make use of the system wide safe register to decide the support
-for mixed endian.
+sys_reg defines the encoding of a system register as usable
+in the mrs/msr instructions. i.e, the encoding is shifted to the left
+by 5bits. Change it to the actual encoding of the register and
+use shifted encoding in the mrs_s/msr_s macros. Also cleans up
+some white space issues and alignments in the file.
+
+This will be used in later patches for defining the encoding for the
+CPU feature register infrastructure.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c |   32 ++++++++++----------------------
- 1 file changed, 10 insertions(+), 22 deletions(-)
+ arch/arm64/include/asm/sysreg.h |   51 +++++++++++++++++++++++++++++----------
+ 1 file changed, 38 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index a736c13..7010617 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -24,7 +24,6 @@
- #include <asm/processor.h>
- #include <asm/sysreg.h>
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 4246e41..04e11b1 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -22,11 +22,11 @@
  
--static bool mixed_endian_el0 = true;
- unsigned long elf_hwcap __read_mostly;
- EXPORT_SYMBOL_GPL(elf_hwcap);
+ #include <asm/opcodes.h>
  
-@@ -42,22 +41,6 @@ unsigned int compat_elf_hwcap2 __read_mostly;
- 
- DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- 
+-#define SCTLR_EL1_CP15BEN	(0x1 << 5)
+-#define SCTLR_EL1_SED		(0x1 << 8)
 -
--bool cpu_supports_mixed_endian_el0(void)
--{
--	return id_aa64mmfr0_mixed_endian_el0(read_cpuid(ID_AA64MMFR0_EL1));
--}
--
--bool system_supports_mixed_endian_el0(void)
--{
--	return mixed_endian_el0;
--}
--
--static void update_mixed_endian_el0_support(struct cpuinfo_arm64 *info)
--{
--	mixed_endian_el0 &= id_aa64mmfr0_mixed_endian_el0(info->reg_id_aa64mmfr0);
--}
--
- #define ARM64_FTR_BITS(ftr_strict, ftr_type, ftr_shift, ftr_width, ftr_safe_val) \
- 	{							\
- 		.strict = ftr_strict,				\
-@@ -437,9 +420,6 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
- 	init_cpu_ftr_reg(SYS_MVFR0_EL1, info->reg_mvfr0);
- 	init_cpu_ftr_reg(SYS_MVFR1_EL1, info->reg_mvfr1);
- 	init_cpu_ftr_reg(SYS_MVFR2_EL1, info->reg_mvfr2);
--
--	/* This will be removed later, once we start using the infrastructure */
--	update_mixed_endian_el0_support(info);
- }
- 
- static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
-@@ -589,8 +569,6 @@ void update_cpu_features(int cpu,
- 	 */
- 	WARN_TAINT_ONCE(taint, TAINT_CPU_OUT_OF_SPEC,
- 			"Unsupported CPU feature variation.\n");
--
--	update_mixed_endian_el0_support(info);
- }
- 
- u64 read_system_reg(u32 id)
-@@ -680,6 +658,16 @@ void check_local_cpu_features(void)
- 	check_cpu_capabilities(arm64_features, "detected feature:");
- }
- 
-+bool cpu_supports_mixed_endian_el0(void)
-+{
-+	return id_aa64mmfr0_mixed_endian_el0(read_cpuid(ID_AA64MMFR0_EL1));
-+}
+ /*
+- * ARMv8 ARM reserves the following encoding for system registers:
++ * sys_reg: Defines the ARMv8 ARM encoding for the System register.
++ *
++ * ARMv8 ARM reserves the following encoding for system registers in the
++ * instructions accessing them.
+  * (Ref: ARMv8 ARM, Section: "System instruction class encoding overview",
+  *  C5.2, version:ARM DDI 0487A.f)
+  *	[20-19] : Op0
+@@ -34,15 +34,40 @@
+  *	[15-12] : CRn
+  *	[11-8]  : CRm
+  *	[7-5]   : Op2
++ * Hence we use [ sys_reg() << 5 ] in the mrs/msr instructions.
++ *
+  */
++#define Op0_shift	14
++#define Op0_mask	0x3
++#define Op1_shift	11
++#define Op1_mask	0x7
++#define CRn_shift	7
++#define CRn_mask	0xf
++#define CRm_shift	3
++#define CRm_mask	0xf
++#define Op2_shift	0
++#define Op2_mask	0x7
 +
-+bool system_supports_mixed_endian_el0(void)
-+{
-+	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
-+}
++#define sys_reg_Op0(id)	(((id) >> Op0_shift) & Op0_mask)
++#define sys_reg_Op1(id)	(((id) >> Op1_shift) & Op1_mask)
++#define sys_reg_CRn(id)	(((id) >> CRn_shift) & CRn_mask)
++#define sys_reg_CRm(id)	(((id) >> CRm_shift) & CRm_mask)
++#define sys_reg_Op2(id)	(((id) >> Op2_shift) & Op2_mask)
 +
- void __init setup_cpu_features(void)
- {
- 	u64 features;
+ #define sys_reg(op0, op1, crn, crm, op2) \
+-	((((op0)&3)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
++	(((op0 & Op0_mask) << Op0_shift) | ((op1) << Op1_shift) | \
++	 ((crn) << CRn_shift) | ((crm) << CRm_shift) | ((op2) << Op2_shift))
++
++
++#define REG_PSTATE_PAN_IMM	sys_reg(0, 0, 4, 0, 4)
++#define SET_PSTATE_PAN(x)	__inst_arm(0xd5000000 |\
++					   (REG_PSTATE_PAN_IMM << 5) |\
++					   (!!x)<<8 | 0x1f)
+ 
+-#define REG_PSTATE_PAN_IMM                     sys_reg(0, 0, 4, 0, 4)
+-#define SCTLR_EL1_SPAN                         (1 << 23)
+ 
+-#define SET_PSTATE_PAN(x) __inst_arm(0xd5000000 | REG_PSTATE_PAN_IMM |\
+-				     (!!x)<<8 | 0x1f)
++#define SCTLR_EL1_CP15BEN	(0x1 << 5)
++#define SCTLR_EL1_SED		(0x1 << 8)
++#define SCTLR_EL1_SPAN		(0x1 << 23)
+ 
+ #define ID_AA64MMFR0_BIGENDEL0_SHIFT	16
+ #define ID_AA64MMFR0_BIGENDEL_SHIFT	8
+@@ -55,11 +80,11 @@
+ 	.equ	__reg_num_xzr, 31
+ 
+ 	.macro	mrs_s, rt, sreg
+-	.inst	0xd5200000|(\sreg)|(__reg_num_\rt)
++	.inst	0xd5200000|((\sreg) << 5)|(__reg_num_\rt)
+ 	.endm
+ 
+ 	.macro	msr_s, sreg, rt
+-	.inst	0xd5000000|(\sreg)|(__reg_num_\rt)
++	.inst	0xd5000000|((\sreg) << 5)|(__reg_num_\rt)
+ 	.endm
+ 
+ #else
+@@ -71,11 +96,11 @@ asm(
+ "	.equ	__reg_num_xzr, 31\n"
+ "\n"
+ "	.macro	mrs_s, rt, sreg\n"
+-"	.inst	0xd5200000|(\\sreg)|(__reg_num_\\rt)\n"
++"	.inst	0xd5200000|((\\sreg) << 5)|(__reg_num_\\rt)\n"
+ "	.endm\n"
+ "\n"
+ "	.macro	msr_s, sreg, rt\n"
+-"	.inst	0xd5000000|(\\sreg)|(__reg_num_\\rt)\n"
++"	.inst	0xd5000000|((\\sreg) << 5)|(__reg_num_\\rt)\n"
+ "	.endm\n"
+ );
+ 
 -- 
 1.7.9.5
