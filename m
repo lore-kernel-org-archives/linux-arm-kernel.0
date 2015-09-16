@@ -1,47 +1,48 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Sep 2015 16:58:05 +0100
-Subject: [PATCH 1/3] arm/arm64: KVM: vgic: Check for !irqchip_in_kernel() when
- mapping resources
+Date: Wed, 16 Sep 2015 16:58:06 +0100
+Subject: [PATCH 2/3] arm64: KVM: Disable virtual timer even if the guest is
+ not using it
 In-Reply-To: <1442419087-24648-1-git-send-email-marc.zyngier@arm.com>
 References: <1442419087-24648-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1442419087-24648-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1442419087-24648-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pavel Fedin <p.fedin@samsung.com>
+When running a guest with the architected timer disabled (with QEMU and
+the kernel_irqchip=off option, for example), it is important to make
+sure the timer gets turned off. Otherwise, the guest may try to
+enable it anyway, leading to a screaming HW interrupt.
 
-Until b26e5fdac43c ("arm/arm64: KVM: introduce per-VM ops"),
-kvm_vgic_map_resources() used to include a check on irqchip_in_kernel(),
-and vgic_v2_map_resources() still has it.
+The fix is to unconditionally turn off the virtual timer on guest
+exit.
 
-But now vm_ops are not initialized until we call kvm_vgic_create().
-Therefore kvm_vgic_map_resources() can being called without a VGIC,
-and we die because vm_ops.map_resources is NULL.
-
-Fixing this restores QEMU's kernel-irqchip=off option to a working state,
-allowing to use GIC emulation in userspace.
-
-Fixes: b26e5fdac43c ("arm/arm64: KVM: introduce per-VM ops")
 Cc: stable at vger.kernel.org
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
-[maz: reworked commit message]
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/arm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kvm/hyp.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index ce404a5..dc017ad 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -446,7 +446,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- 	 * Map the VGIC hardware resources before running a vcpu the first
- 	 * time on this VM.
- 	 */
--	if (unlikely(!vgic_ready(kvm))) {
-+	if (unlikely(irqchip_in_kernel(kvm) && !vgic_ready(kvm))) {
- 		ret = kvm_vgic_map_resources(kvm);
- 		if (ret)
- 			return ret;
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 6addf97..38f5434 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -570,8 +570,6 @@ alternative_endif
+ 	mrs	x3, cntv_ctl_el0
+ 	and	x3, x3, #3
+ 	str	w3, [x0, #VCPU_TIMER_CNTV_CTL]
+-	bic	x3, x3, #1		// Clear Enable
+-	msr	cntv_ctl_el0, x3
+ 
+ 	isb
+ 
+@@ -579,6 +577,8 @@ alternative_endif
+ 	str	x3, [x0, #VCPU_TIMER_CNTV_CVAL]
+ 
+ 1:
++	msr	cntv_ctl_el0, xzr
++
+ 	// Allow physical timer/counter access for the host
+ 	mrs	x2, cnthctl_el2
+ 	orr	x2, x2, #3
 -- 
 2.1.4
