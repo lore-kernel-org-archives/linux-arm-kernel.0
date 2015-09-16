@@ -1,64 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Sep 2015 17:28:18 +0100
-Subject: [PATCH] arm: add cpu_idle tracepoints to arch_cpu_idle
-In-Reply-To: <1442414220-7204-1-git-send-email-jszhang@marvell.com>
-References: <1442414220-7204-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20150916162817.GC21084@n2100.arm.linux.org.uk>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 16 Sep 2015 09:33:14 -0700
+Subject: [GIT PULL] omap fixes against v4.3-rc1
+In-Reply-To: <20150915154650.GS10928@atomide.com> (Tony Lindgren's message of
+ "Tue, 15 Sep 2015 08:46:50 -0700")
+References: <20150915154650.GS10928@atomide.com>
+Message-ID: <7hwpvqfho5.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 10:37:00PM +0800, Jisheng Zhang wrote:
-> Currently, if cpuidle is disabled or not supported, powertop reports
-> zero wakeups and zero events. This is due to the cpu_idle tracepoints
-> are missing.
-> 
-> This patch is to make cpu_idle tracepoints always available even if
-> cpuidle is disabled or not supported.
+Tony Lindgren <tony@atomide.com> writes:
 
-This seems like a hack to me.  These are cpu_idle tracepoints which
-tell people when something happens in cpuidle.  If cpuidle is disabled,
-then surely the tracepoints shouldn't fire.
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+>
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/fixes-rc1
+>
+> for you to fetch changes up to 60fdcb8863d9b4a8b6c6b367886fadb50d4c0b07:
+>
+>   ARM: dts: Fixup model name for HP t410 dts (2015-09-14 13:33:47 -0700)
+>
+> ----------------------------------------------------------------
+> Fixes for omaps against v4.3-rc1:
+>
+> - Fix long time regression on beagle for tfp410 pin muxing
+>
+> - Fix dm814x control base address typo and related Ethernet
+>   phy configuration
+>
+> - Fix igepv2 Ethernet pinmuxing as only some boards have it
+>
+> - Fix pbias regulator compatible values as a pending regulator
+>   fix needs those for MMC1 to work properly
+>
+> - Fix beagle-x15 MMC1 regulator and make pcf857x built-in
+>
+> - Fix omap5 and dra7 Kconfig options when built as the only
+>   SoCs selected
+>
+> - Fix PM errata for omap5 and dra7 as they too need it
+>
+> - Fix phycore mpu voltage
+>
+> Also included are a few cosmetic fixes:
+>
+> - Remove unused of_irq macros
+>
+> - Fix dra7 ethernet name
+>
+> ----------------------------------------------------------------
 
-However, I'll leave it to the tracing people to have the final word on
-whether this is the right thing to do as I've very little experience
-with the tracing design.
+Thanks, pulled into fixes.
 
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  arch/arm/kernel/process.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index f192a2a..aa78e09 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -28,6 +28,7 @@
->  #include <linux/random.h>
->  #include <linux/hw_breakpoint.h>
->  #include <linux/leds.h>
-> +#include <trace/events/power.h>
->  
->  #include <asm/processor.h>
->  #include <asm/thread_notify.h>
-> @@ -66,11 +67,13 @@ void (*arm_pm_idle)(void);
->  
->  void arch_cpu_idle(void)
->  {
-> +	trace_cpu_idle_rcuidle(1, smp_processor_id());
->  	if (arm_pm_idle)
->  		arm_pm_idle();
->  	else
->  		cpu_do_idle();
->  	local_irq_enable();
-> +	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
->  }
->  
->  void arch_cpu_idle_prepare(void)
-> -- 
-> 2.5.1
-> 
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Kevin
