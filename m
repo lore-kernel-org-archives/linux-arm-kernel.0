@@ -1,60 +1,35 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 16 Sep 2015 15:47:38 +0100
-Subject: [PATCH] arm64: add cpu_idle tracepoints to arch_cpu_idle
-In-Reply-To: <1442413401-2955-1-git-send-email-jszhang@marvell.com>
-References: <1442413401-2955-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20150916144738.GA23245@red-moon>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 16 Sep 2015 15:48:09 +0100
+Subject: [PATCH 1/3] arm64/cpufeature.h: Add macros for a cpu features
+ testing
+In-Reply-To: <CANCZXo4rtkVr-m3p1kyavS6Ruu7Gbwp-qqR9BhEtiZ39+NahvQ@mail.gmail.com>
+References: <1441303911-9421-1-git-send-email-kuleshovmail@gmail.com>
+ <55E987CA.4090302@arm.com>
+ <CANCZXo4rtkVr-m3p1kyavS6Ruu7Gbwp-qqR9BhEtiZ39+NahvQ@mail.gmail.com>
+Message-ID: <55F98129.9080609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 03:23:21PM +0100, Jisheng Zhang wrote:
-> Currently, if cpuidle is disabled or not supported, powertop reports
-> zero wakeups and zero events. This is due to the cpu_idle tracepoints
-> are missing.
-> 
-> This patch is to make cpu_idle tracepoints always available even if
-> cpuidle is disabled or not supported.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+On 04/09/15 13:19, Alexander Kuleshov wrote:
+> 2015-09-04 18:00 GMT+06:00 Suzuki K. Poulose <Suzuki.Poulose@arm.com>:
+>> There is generic CPUID feature helper queued for 4.3, which can extract
+>> the feature bits
+>>
+>>   cpuid_feature_extract_field(feature, shift)
+>>
+>> You might want to use it instead. Btw, I have a patch series(waiting for
+>> the merge window, before I post), which changes the way we initialise the
+>> HWCAP bits.
+>
+> Hello,
+>
+> Thanks for feedback first of all. So, I'll wait while your changes will be
+> in the mainline kernel and will reconsider the changes.
+>
 
-Is there a reason why this code cannot be moved to the generic idle loop ?
+Please find the series here :
 
-Thanks,
-Lorenzo
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/370386.html
 
-> ---
->  arch/arm64/kernel/process.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 223b093..f75b540 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -44,6 +44,7 @@
->  #include <linux/hw_breakpoint.h>
->  #include <linux/personality.h>
->  #include <linux/notifier.h>
-> +#include <trace/events/power.h>
->  
->  #include <asm/compat.h>
->  #include <asm/cacheflush.h>
-> @@ -75,8 +76,10 @@ void arch_cpu_idle(void)
->  	 * This should do all the clock switching and wait for interrupt
->  	 * tricks
->  	 */
-> +	trace_cpu_idle_rcuidle(1, smp_processor_id());
->  	cpu_do_idle();
->  	local_irq_enable();
-> +	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
->  }
->  
->  #ifdef CONFIG_HOTPLUG_CPU
-> -- 
-> 2.5.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+Thanks
+Suzuki
