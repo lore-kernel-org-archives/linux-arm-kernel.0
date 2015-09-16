@@ -1,131 +1,60 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Wed, 16 Sep 2015 08:54:10 +0800
-Subject: earlycon issues in -next with amba-pl011 updates
-In-Reply-To: <CAKU3ayWkXxmF1cp=fOAL6kNKY3wY1u=XhPROKiLqkx4oZ9xZ0g@mail.gmail.com>
-References: <20150810232312.GB10728@bivouac.eciton.net>
- <CABymUCNYrDxciKrfWhcTp_kJT1cQFEpEYCkaZ7-sgBiJmgXuyQ@mail.gmail.com>
- <55E81F93.1020104@arm.com> <20150903155255.GA28336@kroah.com>
- <55E87095.4030600@arm.com>
- <CABymUCP4s+ePs-sphJkQ4b61EcNT51FQat2ADWoy1Tgww35GMg@mail.gmail.com>
- <20150909195402.GA7979@kroah.com>
- <CAKU3ayWkXxmF1cp=fOAL6kNKY3wY1u=XhPROKiLqkx4oZ9xZ0g@mail.gmail.com>
-Message-ID: <CABymUCOSmGXJzZQGGABxgx5bbX+NfYP=E7AjAS5tHPvwBuSK-A@mail.gmail.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Wed, 16 Sep 2015 09:14:16 +0800
+Subject: [PATCH v9 5/6] Documentation: DT: Add HiSilicon PCIe host binding
+In-Reply-To: <55F874F9.1060804@kernel.org>
+References: <1442321361-174300-1-git-send-email-wangzhou1@hisilicon.com>
+ <1442321361-174300-6-git-send-email-wangzhou1@hisilicon.com>
+ <55F874F9.1060804@kernel.org>
+Message-ID: <55F8C268.2020809@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-09-16 7:20 GMT+08:00 Peter Hurley <peter@hurleysoftware.com>:
-> On Wed, Sep 9, 2015 at 3:54 PM, Greg Kroah-Hartman <greg@kroah.com> wrote:
+On 2015/9/16 3:43, Rob Herring wrote:
+> On 09/15/2015 07:49 AM, Zhou Wang wrote:
+>> This patch adds related DTS binding document for HiSilicon PCIe host driver.
 >>
->> On Sat, Sep 05, 2015 at 10:42:03PM +0800, Jun Nie wrote:
->> > 2015-09-04 0:08 GMT+08:00 Marc Zyngier <marc.zyngier@arm.com>:
->> > > On 03/09/15 16:52, Greg Kroah-Hartman wrote:
->> > >> On Thu, Sep 03, 2015 at 11:23:15AM +0100, Marc Zyngier wrote:
->> > >>> On 11/08/15 02:48, Jun Nie wrote:
->> > >>>> 2015-08-11 7:23 GMT+08:00 Leif Lindholm <leif.lindholm@linaro.org>:
->> > >>>>> Hi all,
->> > >>>>>
->> > >>>>> The kernelci.org bot picked up a complete boot failure (no output
->> > >>>>> past
->> > >>>>> UEFI stub) with next-20150806 and Tyler bisected it down to
->> > >>>>> somewhere
->> > >>>>> in
->> > >>>>> 8cd90e5 uart: pl011: Add support to ZTE ZX296702 uart
->> > >>>>> 09dcc7d uart: pl011: Improve LCRH register access decision
->> > >>>>> 2c096a9 uart: pl011: Introduce register look up table
->> > >>>>> 7b753f3 uart: pl011: Introduce register accessor
->> > >>>>>
->> > >>>>> The issue only appears with earlycon on command line, for pl011
->> > >>>>> consoles.
->> > >>>>>
->> > >>>>> Some investigation shows that the cause lies with
->> > >>>>> commit 7b753f318d14 ("uart: pl011: Introduce register accessor")
->> > >>>>> and
->> > >>>>> commit 2c096a9eedc6 ("uart: pl011: Introduce register look up
->> > >>>>> table")
->> > >>>>>
->> > >>>>> Specifically, the changes to pl011_putc() are incorrect:
->> > >>>>> The new pl011_ accessors take a (struct uart_amba_port *) input,
->> > >>>>> but
->> > >>>>> pl011_putc() directly uses the incoming (struct uart_port *) for
->> > >>>>> this.
->> > >>>>>
->> > >>>>> Apart from ending up with an unintended/incorrect UART base
->> > >>>>> address,
->> > >>>>> the introduction of the lookup table for register offsets also
->> > >>>>> means
->> > >>>>> the accessors try to dereference (struct uart_amba_port
->> > >>>>> *)->reg_lut.
->> > >>>>>
->> > >>>>> The below is a hack that shows/resolves the issue, but some
->> > >>>>> refactoring of the original patches might be in order.
->> > >>>>>
->> > >>>>> /
->> > >>>>>     Leif
->> > >>>>
->> > >>>> Leif,
->> > >>>>
->> > >>>> Sorry for the inconvenience. I do not have idea of early console
->> > >>>> till
->> > >>>> now and I always have debug console for early panic debug. Learned
->> > >>>> more from this issue.
->> > >>>>
->> > >>>> Suppose Peter's patch will resolve your issue.
->> > >>>
->> > >>> [+ Greg KH]
->> > >>>
->> > >>> So -next has now been broken for a while on a number of ARM
->> > >>> platforms
->> > >>> because of this (they simply cannot boot), and no progress has been
->> > >>> made
->> > >>> towards resolving this problem.
->> > >>>
->> > >>> Can we please drop this series (at least commits 7b753f3 and
->> > >>> following)
->> > >>> from -next until is has been reworked and reviewed?
->> > >>
->> > >> I don't have any patches in my -next tree, everything is in Linus's
->> > >> tree
->> > >> now.  So if I've missed something, or need to revert something,
->> > >> please
->> > >> let me know specifcally what to do.
->> > >
->> > > Gahhh... Given that there is no obvious fix, that the discussion has
->> > > stalled and that the author of the series is apparently away, the
->> > > following patches should be reverted:
->> >
->> > Marc,
->> >
->> > There had a patch from Peter that revert early console part, which I
->> > thought will be merged to mainline. It's my fault for not fix the bug
->> > on time. Also sorry for late response to you as I took three days
->> > leave.
->> >
->> > Could you help test attached patch? Thank you in advance!
->> >
->> >
->> > Greg,
->> >
->> > Would you please hold the merging of revert patches for one or two
->> > days so that the fix can be verified? Thank you!
+>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+>> ---
+>>  .../devicetree/bindings/pci/hisilicon-pcie.txt     | 46 ++++++++++++++++++++++
+>>  1 file changed, 46 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
 >>
->> Given that this took way more than a few days, Linus now has the reverts
->> in his tree.  Please feel free to resend the series, in a form that does
->> not break people's machines, for inclusion in 4.4-rc1.
->
->
-> Jun,
->
-> I suggest you keep the series largely as is, while leaving the earlycon
-> support unmodified.
->
-> Be sure to address the series to all in this email so they have adequate
-> opportunity to test your driver changes, prior to inclusion in mainline.
->
-> Regards,
-> Peter Hurley
+>> diff --git a/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+>> new file mode 100644
+>> index 0000000..2afc9d1
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+>> @@ -0,0 +1,46 @@
+>> +HiSilicon PCIe host bridge DT description
+>> +
+>> +HiSilicon PCIe host controller is based on Designware PCI core.
+>> +It shares common functions with PCIe Designware core driver and inherits
+>> +common properties defined in
+>> +Documentation/devicetree/bindings/pci/designware-pci.txt.
+>> +
+>> +Additional properties are described here:
+>> +
+>> +Required properties:
+>> +- compatible: Should contain "hisilicon,hip05-pcie".
+>> +- reg: Should contain rc_dbi, subctrl, config registers location and length.
+>> +- reg-names: Must include the following entries:
+>> +  "rc_dbi": controller configuration registers;
+>> +  "subctrl": whole PCIe hosts configuration registers;
+>> +  "config": PCIe configuration space registers.
+>> +- msi-parent: Should be its_pcie which is an ITS receiving MSI interrupts.
+>> +- port-id: Should be 0, 1, 2 or 3.
+> 
+> What is port-id for? Use of instance indexes need to have good reason.
+> 
+> Rob
 
-Will do in one month due to occupied in internal tasks. Thanks for
-your suggestion!
+There are four PCIe controllers in HiSilicon Hip05 SoC, port-id just indicates
+which one we use. And we will use port-id to locate related registers in driver.
 
-Best Regards,
-Jun
+Thanks,
+Zhou
+
+>
+> 
+> .
+> 
