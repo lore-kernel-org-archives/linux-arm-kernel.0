@@ -1,221 +1,183 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 16 Sep 2015 10:03:28 +0530
-Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
-In-Reply-To: <20150910083146.GG3260@x1>
-References: <20150909062722.GA5266@linux> <20150909075930.GB3260@x1>
- <20150909083031.GB5266@linux> <20150909133930.GE3260@x1>
- <20150909160212.GJ5266@linux> <20150909163620.GF3260@x1>
- <55F0C5AB.5060609@kernel.org>
- <20150910005722.GA15099@codeaurora.org>
- <20150910010426.GM5266@linux> <20150910083146.GG3260@x1>
-Message-ID: <20150916043328.GA29943@linux>
+From: Dongsheng.Wang@freescale.com (Wang Dongsheng)
+Date: Wed, 16 Sep 2015 05:11:24 +0000
+Subject: [PATCH v2 1/2] fsl: Add binding for RCPM
+In-Reply-To: <1442376832.2909.174.camel@freescale.com>
+References: <1442307339-15225-1-git-send-email-dongsheng.wang@freescale.com>
+ <1442361398.2909.164.camel@freescale.com>
+ <SN1PR0301MB1616C48FB3D990BCA45289AB9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+ <1442369955.2909.166.camel@freescale.com>
+ <SN1PR0301MB161688E3AF527ADC76AB2B8F9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+ <1442370701.2909.167.camel@freescale.com>
+ <DM2PR03MB574196E1A0D55C185CE1B4BFA5B0@DM2PR03MB574.namprd03.prod.outlook.com>
+ <1442371076.2909.171.camel@freescale.com>
+ <SN1PR0301MB1616C6AB0EF4ACE4624865159D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+ <1442376832.2909.174.camel@freescale.com>
+Message-ID: <SN1PR0301MB1616D67E93736683CFD199579D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10-09-15, 09:31, Lee Jones wrote:
-> I think you answered your own question.
+
+
+> -----Original Message-----
+> From: Wood Scott-B07421
+> Sent: Wednesday, September 16, 2015 12:14 PM
+> To: Wang Dongsheng-B40534
+> Cc: Tang Yuantian-B29983; devicetree at vger.kernel.org; linuxppc-
+> dev at lists.ozlabs.org; robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org;
+> Wang Huan-B18965; Jin Zhengxiong-R64188; Zhao Chenhui-B35336
+> Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
 > 
-> No users == !ABI == Strip it out.
+> On Tue, 2015-09-15 at 22:18 -0500, Wang Dongsheng-B40534 wrote:
+> > Hi Scott,
+> >
+> > > -----Original Message-----
+> > > From: Wang Dongsheng-B40534
+> > > Sent: Wednesday, September 16, 2015 10:44 AM
+> > > To: Wood Scott-B07421; Tang Yuantian-B29983
+> > > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
+> > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang Huan-
+> > > B18965; Jin
+> > > Zhengxiong-R64188; Zhao Chenhui-B35336
+> > > Subject: RE: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > >
+> > >
+> > >
+> > > > -----Original Message-----
+> > > > From: Wood Scott-B07421
+> > > > Sent: Wednesday, September 16, 2015 10:38 AM
+> > > > To: Tang Yuantian-B29983
+> > > > Cc: Wang Dongsheng-B40534; devicetree at vger.kernel.org; linuxppc-
+> > > > dev at lists.ozlabs.org; robh+dt at kernel.org;
+> > > > linux-arm-kernel at lists.infradead.org;
+> > > > Wang Huan-B18965; Jin Zhengxiong-R64188; Zhao Chenhui-B35336
+> > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > > >
+> > > > On Tue, 2015-09-15 at 21:35 -0500, Tang Yuantian-B29983 wrote:
+> > > > >
+> > > > > > -----Original Message-----
+> > > > > > From: Wood Scott-B07421
+> > > > > > Sent: Wednesday, September 16, 2015 10:32 AM
+> > > > > > To: Wang Dongsheng-B40534 <Dongsheng.Wang@freescale.com>
+> > > > > > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
+> > > > > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang
+> > > > > > robh+Huan-
+> > > > > > B18965 <alison.wang@freescale.com>; Jin Zhengxiong-R64188
+> > > > > > <Jason.Jin@freescale.com>; Zhao Chenhui-B35336
+> > > > > > <chenhui.zhao@freescale.com>; Tang Yuantian-B29983
+> > > > > > <Yuantian.Tang@freescale.com>
+> > > > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > > > > >
+> > > > > > On Tue, 2015-09-15 at 21:30 -0500, Wang Dongsheng-B40534 wrote:
+> > > > > > > Hi Scott,
+> > > > > > >
+> > > > > > > > -----Original Message-----
+> > > > > > > > From: Wood Scott-B07421
+> > > > > > > > Sent: Wednesday, September 16, 2015 10:19 AM
+> > > > > > > > To: Wang Dongsheng-B40534
+> > > > > > > > Cc: devicetree at vger.kernel.org;
+> > > > > > > > linuxppc-dev at lists.ozlabs.org;
+> > > > > > > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org;
+> > > > > > > > robh+Wang
+> > > > > > > > robh+Huan-
+> > > > > > > > B18965; Jin
+> > > > > > > > Zhengxiong-R64188; Zhao Chenhui-B35336; Tang
+> > > > > > > > Yuantian-B29983
+> > > > > > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > > > > > > >
+> > > > > > > > On Tue, 2015-09-15 at 21:15 -0500, Wang Dongsheng-B40534 wrote:
+> > > > > > > > > Hi Scott,
+> > > > > > > > >
+> > > > > > > > > > -----Original Message-----
+> > > > > > > > > > From: Wood Scott-B07421
+> > > > > > > > > > Sent: Wednesday, September 16, 2015 7:57 AM
+> > > > > > > > > > To: Wang Dongsheng-B40534
+> > > > > > > > > > Cc: devicetree at vger.kernel.org;
+> > > > > > > > > > linuxppc-dev at lists.ozlabs.org;
+> > > > > > > > > > robh+dt at kernel.org;
+> > > > > > > > > > robh+linux-arm-kernel at lists.infradead.org;
+> > > > > > > > > > robh+Wang
+> > > > > > > > > > robh+Huan-
+> > > > > > > > > > B18965; Jin
+> > > > > > > > > > Zhengxiong-R64188; Zhao Chenhui-B35336; Tang
+> > > > > > > > > > Yuantian-B29983
+> > > > > > > > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > > > > > > > > >
+> > > > > > > > > > On Tue, 2015-09-15 at 16:55 +0800, Dongsheng Wang wrote:
+> > > > > > > > > > > +* Freescale RCPM Wakeup Source Device Tree Bindings
+> > > > > > > > > > > +-------------------------------------------
+> > > > > > > > > > > +Required rcpm-wakeup property should be added to a
+> > > > > > > > > > > +device node if the
+> > > > > > > > > > > device
+> > > > > > > > > > > +can be used as a wakeup source.
+> > > > > > > > > > > +
+> > > > > > > > > > > +  - rcpm-wakeup: The value of the property consists
+> > > > > > > > > > > + of 3
+> > > > > > > > > > > cells.
+> > > > > > > > > > > + The
+> > > > > > > > > > > first
+> > > > > > > > > > > cell
+> > > > > > > > > > > +     is a pointer to the rcpm node, the second cell
+> > > > > > > > > > > + is the bit mask
+> > > > > > > > > > > that
+> > > > > > > > > > > +     should be set in IPPDEXPCR0, and the last cell
+> > > > > > > > > > > + is for
+> > > > > > > > > > > IPPDEXPCR1.
+> > > > > > > > > > > +     Note: If the platform has no IPPDEXPCR1
+> > > > > > > > > > > + register, put a zero
+> > > > > > > > > > > here.
+> > > > > > > > > >
+> > > > > > > > > > What if a future platform has more than two of these
+> > > > > > > > > > registers?
+> > > > > > > > >
+> > > > > > > > > Those registers are only used for wakeup device, we have
+> > > > > > > > > a lot of available bit for feature. For example, In
+> > > > > > > > > LS1021a platform only 7bits has used in the registers,
+> > > > > > > > > and 57bits is
+> > > reserved.
+> > > > > > > >
+> > > > > > > > Still, it'd be better to for the rcpm node to advertise
+> > > > > > > > the number of cells it expects.
+> > > > > > >
+> > > > > > > For the foreseeable future it should be enough to use, even
+> > > > > > > if not enough to use in the future at that time we can
+> > > > > > > update the binding.
+> > > > > >
+> > > > > > That's the whole point.  Device tree is stable ABI.  Updating
+> > > > > > it later to not be fixed to two cells would be a lot harder
+> > > > > > than getting it right from the beginning.  Putting the number
+> > > > > > of cells in the phandle target is a standard device tree idiom.
+> > > > > >
+> > > > > I agree with you. But what's the point a SOC has more than 64
+> > > > > wakeup source?
+> > > >
+> > > > I don't know.  Hardware people do strange things sometimes.  They
+> > > > might not want to reuse bits they once used for something on some
+> > > > other chip, or they might have some encoding scheme in mind that
+> > > > results in the bits not being packed as tightly as possible, or
+> > > > there may be some big array of similar devices...
+> > > >
+> > > > What's the point of skipping this part of the
+> > > > phandle-plus-arguments idiom?
+> > >
+> > > Fine, I will add a property in rcpm node to describe the number of
+> > > register.
+> > >
+> >
+> > How about the following modify? If okay for you I will fix in next version.
+> >
+> > Required properites:
+> >    - reg : Offset and length of the register set of RCPM block.
+> > +  - fsl,rcpm-wakeup-cell-num : The number of cell in rcpm-wakeup property.
+> >
+> >         rcpm:  global-utilities at e2000{
+> >                 compatible = "fsl,t4240-rcpm", "fsl,qoriq-rcpm-2.0";
+> >                 reg = <0xe2000 0x1000>;
+> > +               fsl,rcpm-wakeup-cell-num = <2>;
+> >         };
+> 
+> OK, though "fsl,#rcpm-wakeup-cells" would be more idiomatic.
 
-Okay, as I have delayed things enough for you, didn't wanted to do
-that anymore. And so worked on it despite very tight schedule :)
+OK, thanks. Will fix it in next version.
 
-Below is the refreshed binding changes (I have split that into 3
-patches, but kept the diff here for simplicity).
-
-Other than that, all code changes you need to test your driver are
-pushed here:
-
-https://git.linaro.org/people/viresh.kumar/linux.git opp/supported-hw-prop-name-v1
-
-I am not gonna post the patches to the lists, until the time existing
-patches get reviewed.
-
--- 
-viresh
-
--------------------------8<-------------------------
-diff --git a/Documentation/devicetree/bindings/opp/opp.txt b/Documentation/devicetree/bindings/opp/opp.txt
-index 719603b87353..b652d0403e93 100644
---- a/Documentation/devicetree/bindings/opp/opp.txt
-+++ b/Documentation/devicetree/bindings/opp/opp.txt
-@@ -45,21 +45,10 @@ Devices supporting OPPs must set their "operating-points-v2" property with
- phandle to a OPP table in their DT node. The OPP core will use this phandle to
- find the operating points for the device.
- 
--Devices may want to choose OPP tables at runtime and so can provide a list of
--phandles here. But only *one* of them should be chosen@runtime. This must be
--accompanied by a corresponding "operating-points-names" property, to uniquely
--identify the OPP tables.
--
- If required, this can be extended for SoC vendor specfic bindings. Such bindings
- should be documented as Documentation/devicetree/bindings/power/<vendor>-opp.txt
- and should have a compatible description like: "operating-points-v2-<vendor>".
- 
--Optional properties:
--- operating-points-names: Names of OPP tables (required if multiple OPP
--  tables are present), to uniquely identify them. The same list must be present
--  for all the CPUs which are sharing clock/voltage rails and hence the OPP
--  tables.
--
- * OPP Table Node
- 
- This describes the OPPs belonging to a device. This node can have following
-@@ -117,6 +106,14 @@ properties.
-   Entries for multiple regulators must be present in the same order as their
-   names are present in 'supply-names' property of the opp-table.
- 
-+- opp-microvolt-<name>: Named opp-microvolt property. This is exactly similar to
-+  the above opp-microvolt property, but allows multiple voltage ranges to be
-+  provided for the same OPP. At runtime, the platform can pick a <name> and
-+  matching opp-microvolt-<name> property will be enabled for all OPPs. If the
-+  platform doesn't pick a specific <name> or the <name> doesn't match with any
-+  opp-microvolt-<name> properties, then opp-microvolt property shall be used, if
-+  present.
-+
- - opp-microamp: The maximum current drawn by the device in microamperes
-   considering system specific parameters (such as transients, process, aging,
-   maximum operating temperature range etc.) as necessary. This may be used to
-@@ -131,6 +128,9 @@ properties.
-   as zero for them. If it isn't required for any regulator, then this property
-   need not be present.
- 
-+- opp-microamp-<name>: Named opp-microamp property. Similar to
-+  opp-microvolt-<name> property, but for microamp instead.
-+
- - clock-latency-ns: Specifies the maximum possible transition latency (in
-   nanoseconds) for switching to this OPP from any other OPP.
- 
-@@ -139,9 +139,27 @@ properties.
-   frequency for a short duration of time limited by the device's power, current
-   and thermal limits.
- 
-+- turbo-mode-<name>: Named turbo-mode property. Similar to opp-microvolt-<name>
-+  property, but for turbo mode instead.
-+
- - opp-suspend: Marks the OPP to be used during device suspend. Only one OPP in
-   the table should have this.
- 
-+- opp-suspend-<name>: Named opp-suspend property. Similar to
-+  opp-microvolt-<name> property, but for suspend opp instead.
-+
-+- opp-supported-hw: User defined array containing a hierarchy of hardware
-+  version numbers, supported by the OPP. For example: a platform with hierarchy
-+  of three levels of versions (A, B and C), this field should be like <X Y Z>,
-+  where X corresponds to Version hierarchy A, Y corresponds to version hierarchy
-+  B and Z corresponds to version hierarchy C.
-+
-+  Each level of hierarchy is represented by a 32 bit value, and so there can be
-+  only 32 different supported version per hierarchy. i.e. 1 bit per version. A
-+  value of 0xFFFFFFFF will enable the OPP for all versions for that hierarchy
-+  level. And a value of 0x00000000 will disable the OPP completely, and so we
-+  never want that to happen.
-+
- - status: Marks the node enabled/disabled.
- 
- Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
-@@ -443,7 +461,8 @@ Example 4: Handling multiple regulators
- 	};
- };
- 
--Example 5: Multiple OPP tables
-+Example 5: opp-supported-hw
-+(example: three level hierarchy of versions: cuts, substrate and process)
- 
- / {
- 	cpus {
-@@ -452,40 +471,84 @@ Example 5: Multiple OPP tables
- 			...
- 
- 			cpu-supply = <&cpu_supply>
--			operating-points-v2 = <&cpu0_opp_table_slow>, <&cpu0_opp_table_fast>;
--			operating-points-names = "slow", "fast";
-+			operating-points-v2 = <&cpu0_opp_table_slow>;
- 		};
- 	};
- 
--	cpu0_opp_table_slow: opp_table_slow {
-+	opp_table {
- 		compatible = "operating-points-v2";
- 		status = "okay";
- 		opp-shared;
- 
- 		opp00 {
-+			/*
-+			 * Supports all substrate and process versions for 0xF
-+			 * cuts, i.e. only first four cuts.
-+			 */
-+			opp-supported-hw = <0xF 0xFFFFFFFF 0xFFFFFFFF>
- 			opp-hz = /bits/ 64 <600000000>;
-+			opp-microvolt = <900000 915000 925000>;
- 			...
- 		};
- 
- 		opp01 {
-+			/*
-+			 * Supports:
-+			 * - cuts: only one, 6th cut (represented by 6th bit).
-+			 * - substrate: supports 16 different substrate versions
-+			 * - process: supports 9 different process versions
-+			 */
-+			opp-supported-hw = <0x20 0xff0000ff 0x0000f4f0>
- 			opp-hz = /bits/ 64 <800000000>;
-+			opp-microvolt = <900000 915000 925000>;
- 			...
- 		};
- 	};
-+};
-+
-+Example 6: opp-microvolt-<name>, opp-microamp-<name>, turbo-mode-<name>,
-+opp-suspend-<name>:
-+(example: device with 2 supplies: vcc0 and vcc1, with two possible ranges: slow
-+and fast)
-+
-+/ {
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			...
- 
--	cpu0_opp_table_fast: opp_table_fast {
-+			vcc0-supply = <&cpu_supply0>;
-+			vcc1-supply = <&cpu_supply1>;
-+			operating-points-v2 = <&cpu0_opp_table>;
-+		};
-+	};
-+
-+	cpu0_opp_table: opp_table0 {
- 		compatible = "operating-points-v2";
--		status = "okay";
-+		supply-names = "vcc0", "vcc1";
- 		opp-shared;
- 
--		opp10 {
-+		opp00 {
- 			opp-hz = /bits/ 64 <1000000000>;
--			...
-+			opp-microvolt-slow = <900000 915000 925000>, /* Supply vcc0 */
-+					      <910000 925000 935000>; /* Supply vcc1 */
-+			opp-microvolt-fast = <970000 975000 985000>, /* Supply vcc0 */
-+					     <960000 965000 975000>; /* Supply vcc1 */
-+			opp-microamp-slow =  <70000>;
-+			opp-microamp-fast =  <71000>;
-+			turbo-mode-slow; /* Will marked as turbo only if 'slow' is chosen */
-+			opp-suspend-slow; /* Will marked as suspend-opp only if 'slow' is chosen */
- 		};
- 
--		opp11 {
--			opp-hz = /bits/ 64 <1100000000>;
--			...
-+		opp01 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt-slow = <900000 915000 925000>, /* Supply vcc0 */
-+					      <910000 925000 935000>; /* Supply vcc1 */
-+			opp-microvolt-fast = <970000 975000 985000>, /* Supply vcc0 */
-+					     <960000 965000 975000>; /* Supply vcc1 */
-+			opp-microamp =  <70000>; /* Will be used for both slow/fast */
-+			turbo-mode; /* Always marked as turbo */
-+			opp-suspend-fast; /* Will marked as suspend opp only if 'fast' is chosen */
- 		};
- 	};
- };
+Regards,
+-Dongsheng
