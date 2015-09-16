@@ -1,42 +1,37 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Wed, 16 Sep 2015 16:05:40 +0800
-Subject: [PATCH] ARM: zx: zx296702-pm-domain.c: Fix check return value of
- devm_ioremap_resource
-Message-ID: <1442390740.28314.1.camel@ingics.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 16 Sep 2015 10:13:06 +0200 (CEST)
+Subject: [RFC PATCH v3 1/3] genirq: introduce CONFIG_GENERIC_IRQ_MIGRATION
+In-Reply-To: <1442375907-11496-2-git-send-email-yangyingliang@huawei.com>
+References: <1442375907-11496-1-git-send-email-yangyingliang@huawei.com>
+ <1442375907-11496-2-git-send-email-yangyingliang@huawei.com>
+Message-ID: <alpine.DEB.2.11.1509161011371.3951@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_ioremap_resource() returns ERR_PTR on failure.
-devm_ioremap_resource() will also check res argument and show proper error
-on error path, so remove the redundant checking for res and error messages.
+On Wed, 16 Sep 2015, Yang Yingliang wrote:
+> diff --git a/arch/arc/Kconfig b/arch/arc/Kconfig
+> index 78c0621..4133070 100644
+> --- a/arch/arc/Kconfig
+> +++ b/arch/arc/Kconfig
+> @@ -20,6 +20,7 @@ config ARC
+>  	# for now, we don't need GENERIC_IRQ_PROBE, CONFIG_GENERIC_IRQ_CHIP
+>  	select GENERIC_IRQ_SHOW
+>  	select GENERIC_PENDING_IRQ if SMP
+> +	select GENERIC_IRQ_MIGRATION if SMP
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
- arch/arm/mach-zx/zx296702-pm-domain.c | 11 ++---------
- 1 file changed, 2 insertions(+), 9 deletions(-)
+What's the point of this?
 
-diff --git a/arch/arm/mach-zx/zx296702-pm-domain.c b/arch/arm/mach-zx/zx296702-pm-domain.c
-index e08574d..17f778b 100644
---- a/arch/arm/mach-zx/zx296702-pm-domain.c
-+++ b/arch/arm/mach-zx/zx296702-pm-domain.c
-@@ -163,16 +163,9 @@ static int zx296702_pd_probe(struct platform_device *pdev)
- 	genpd_data->num_domains = ARRAY_SIZE(zx296702_pm_domains);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		dev_err(&pdev->dev, "no memory resource defined\n");
--		return -ENODEV;
--	}
--
- 	pcubase = devm_ioremap_resource(&pdev->dev, res);
--	if (!pcubase) {
--		dev_err(&pdev->dev, "ioremap fail.\n");
--		return -EIO;
--	}
-+	if (IS_ERR(pcubase))
-+		return PTR_ERR(pcubase);
- 
- 	for (i = 0; i < ARRAY_SIZE(zx296702_pm_domains); ++i)
- 		pm_genpd_init(zx296702_pm_domains[i], NULL, false);
--- 
-2.1.4
+> --- a/kernel/irq/Kconfig
+> +++ b/kernel/irq/Kconfig
+> @@ -30,6 +30,10 @@ config GENERIC_IRQ_LEGACY_ALLOC_HWIRQ
+>  config GENERIC_PENDING_IRQ
+>  	bool
+
++	select GENERIC_IRQ_MIGRATION
+
+Will do it automatically without touching any of the arch Kconfig
+files.
+
+Thanks,
+
+	tglx
