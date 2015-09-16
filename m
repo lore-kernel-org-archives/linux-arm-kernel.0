@@ -1,87 +1,209 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 16 Sep 2015 18:16:31 +0100
-Subject: [PATCH REPOST v6 0/8] ARM64: juno: add SCPI mailbox protocol,
- clock and CPUFreq support
-Message-ID: <1442423799-23892-1-git-send-email-sudeep.holla@arm.com>
+Date: Wed, 16 Sep 2015 18:16:32 +0100
+Subject: [PATCH REPOST v6 1/8] Documentation: add DT binding for ARM System
+ Control and Power Interface(SCPI) protocol
+In-Reply-To: <1442423799-23892-1-git-send-email-sudeep.holla@arm.com>
+References: <1442423799-23892-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1442423799-23892-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM-SoC guys,
+This patch adds devicetree binding for System Control and Power
+Interface (SCPI) Message Protocol used between the Application Cores(AP)
+and the System Control Processor(SCP). The MHU peripheral provides a
+mechanism for inter-processor communication between SCP's M3 processor
+and AP.
 
-Olof had confused this with PSCI[0]. I assume the confusion is now
-resolved ? I have now rebased the series on top of v4.3-rc1 and just
-resending them again.
+SCP offers control and management of the core/cluster power states,
+various power domain DVFS including the core/cluster, certain system
+clocks configuration, thermal sensors and many others.
 
-Please pull this series for v4.4
-
-You can access it from:
-	git://linux-arm.org/linux-skn.git juno_dvfs
-
-BUT the ARM external git repository is still unreliable and hence I am
-avoiding pull request. Can I request to pull it from the mails directly
-instead ? Extremely sorry for the inconvenience.
-
-Regards,
-Sudeep
-
-This patch series adds support for:
-  1. SCPI(System Control and Power Interface) mailbox protocol driver.
-     It uses ARM MHU mailbox controller driver on Juno but can work with
-     any mailbox controllers using standard mailbox APIs
-  2. Add support for clocks provided by SCP firmware through the SCPI
-     interface
-  3. Using the existing arm_big_little cpufreq driver and the newly
-     added SCPI clock driver, it also adds support for CPU DVFS on
-     ARM64 JUNO development platforms.
-
-The SCPI protocol document is available @[1]
-
-[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/364229.html
-[1] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
-v1: https://lkml.org/lkml/2015/4/27/232
-v2: https://lkml.org/lkml/2015/5/14/470
-v3: https://lkml.org/lkml/2015/5/27/220
-v4: https://lkml.org/lkml/2015/6/8/178
-v5: https://lkml.org/lkml/2015/7/23/270
-v6: https://lkml.org/lkml/2015/7/31/692
-
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+CC: Jassi Brar <jassisinghbrar@gmail.com>
+Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
 Cc: devicetree at vger.kernel.org
-Cc: linux-clk at vger.kernel.org
-Cc: linux-pm at vger.kernel.org
-
-Sudeep Holla (8):
-  Documentation: add DT binding for ARM System Control and Power
-    Interface(SCPI) protocol
-  firmware: add support for ARM System Control and Power Interface(SCPI)
-    protocol
-  clk: add support for clocks provided by SCP(System Control Processor)
-  clk: scpi: add support for cpufreq virtual device
-  cpufreq: arm_big_little: add SCPI interface driver
-  arm64: dts: add SRAM, MHU mailbox and SCPI support on Juno
-  arm64: dts: add CPU topology on Juno
-  arm64: dts: add clock support for all the cpus
-
- Documentation/devicetree/bindings/arm/arm,scpi.txt | 150 +++++
- MAINTAINERS                                        |  10 +
- arch/arm64/boot/dts/arm/juno-base.dtsi             |  54 ++
- arch/arm64/boot/dts/arm/juno-r1.dts                |  32 +
- arch/arm64/boot/dts/arm/juno.dts                   |  32 +
- drivers/clk/Kconfig                                |  10 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk-scpi.c                             | 325 ++++++++++
- drivers/cpufreq/Kconfig.arm                        |  10 +
- drivers/cpufreq/Makefile                           |   1 +
- drivers/cpufreq/scpi-cpufreq.c                     | 124 ++++
- drivers/firmware/Kconfig                           |  19 +
- drivers/firmware/Makefile                          |   1 +
- drivers/firmware/arm_scpi.c                        | 711 +++++++++++++++++++++
- include/linux/scpi_protocol.h                      |  61 ++
- 15 files changed, 1541 insertions(+)
+---
+ Documentation/devicetree/bindings/arm/arm,scpi.txt | 150 +++++++++++++++++++++
+ MAINTAINERS                                        |   6 +
+ 2 files changed, 156 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/arm,scpi.txt
- create mode 100644 drivers/clk/clk-scpi.c
- create mode 100644 drivers/cpufreq/scpi-cpufreq.c
- create mode 100644 drivers/firmware/arm_scpi.c
- create mode 100644 include/linux/scpi_protocol.h
 
+diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+new file mode 100644
+index 000000000000..f0024605f416
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+@@ -0,0 +1,150 @@
++System Control and Power Interface (SCPI) Message Protocol
++----------------------------------------------------------
++
++Firmware implementing the SCPI described in ARM document number ARM DUI 0922B
++("ARM Compute Subsystem SCP: Message Interface Protocols")[0] can be used
++by Linux to initiate various system control and power operations.
++
++Required properties:
++
++- compatible : should be "arm,scpi"
++- mboxes: List of phandle and mailbox channel specifiers
++	  All the channels reserved by remote SCP firmware for use by
++	  SCPI message protocol should be specified in any order
++- shmem : List of phandle pointing to the shared memory(SHM) area between the
++	  processors using these mailboxes for IPC, one for each mailbox
++	  SHM can be any memory reserved for the purpose of this communication
++	  between the processors.
++
++See Documentation/devicetree/bindings/mailbox/mailbox.txt
++for more details about the generic mailbox controller and
++client driver bindings.
++
++Clock bindings for the clocks based on SCPI Message Protocol
++------------------------------------------------------------
++
++This binding uses the common clock binding[1].
++
++Container Node
++==============
++Required properties:
++- compatible : should be "arm,scpi-clocks"
++	       All the clocks provided by SCP firmware via SCPI message
++	       protocol much be listed as sub-nodes under this node.
++
++Sub-nodes
++=========
++Required properties:
++- compatible : shall include one of the following
++	"arm,scpi-dvfs-clocks" - all the clocks that are variable and index based.
++		These clocks don't provide an entire range of values between the
++		limits but only discrete points within the range. The firmware
++		provides the mapping for each such operating frequency and the
++		index associated with it. The firmware also manages the
++		voltage scaling appropriately with the clock scaling.
++	"arm,scpi-variable-clocks" - all the clocks that are variable and provide full
++		range within the specified range. The firmware provides the
++		range of values within a specified range.
++
++Other required properties for all clocks(all from common clock binding):
++- #clock-cells : Should be 1. Contains the Clock ID value used by SCPI commands.
++- clock-output-names : shall be the corresponding names of the outputs.
++- clock-indices: The identifying number for the clocks(i.e.clock_id) in the
++	node. It can be non linear and hence provide the mapping of identifiers
++	into the clock-output-names array.
++
++SRAM and Shared Memory for SCPI
++-------------------------------
++
++A small area of SRAM is reserved for SCPI communication between application
++processors and SCP.
++
++Required properties:
++- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno
++
++The rest of the properties should follow the generic mmio-sram description
++found in ../../misc/sysram.txt
++
++Each sub-node represents the reserved area for SCPI.
++
++Required sub-node properties:
++- reg : The base offset and size of the reserved area with the SRAM
++- compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
++	       shared memory on Juno platforms
++
++[0] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Example:
++
++sram: sram at 50000000 {
++	compatible = "arm,juno-sram-ns", "mmio-sram";
++	reg = <0x0 0x50000000 0x0 0x10000>;
++
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges = <0 0x0 0x50000000 0x10000>;
++
++	cpu_scp_lpri: scp-shmem at 0 {
++		compatible = "arm,juno-scp-shmem";
++		reg = <0x0 0x200>;
++	};
++
++	cpu_scp_hpri: scp-shmem at 200 {
++		compatible = "arm,juno-scp-shmem";
++		reg = <0x200 0x200>;
++	};
++};
++
++mailbox: mailbox0 at 40000000 {
++	....
++	#mbox-cells = <1>;
++};
++
++scpi_protocol: scpi at 2e000000 {
++	compatible = "arm,scpi";
++	mboxes = <&mailbox 0 &mailbox 1>;
++	shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
++
++	clocks {
++		compatible = "arm,scpi-clocks";
++
++		scpi_dvfs: scpi_clocks at 0 {
++			compatible = "arm,scpi-dvfs-clocks";
++			#clock-cells = <1>;
++			clock-indices = <0>, <1>, <2>;
++			clock-output-names = "atlclk", "aplclk","gpuclk";
++		};
++		scpi_clk: scpi_clocks at 3 {
++			compatible = "arm,scpi-variable-clocks";
++			#clock-cells = <1>;
++			clock-indices = <3>, <4>;
++			clock-output-names = "pxlclk0", "pxlclk1";
++		};
++	};
++};
++
++cpu at 0 {
++	...
++	reg = <0 0>;
++	clocks = <&scpi_dvfs 0>;
++};
++
++hdlcd at 7ff60000 {
++	...
++	reg = <0 0x7ff60000 0 0x1000>;
++	clocks = <&scpi_clk 4>;
++};
++
++In the above example, the #clock-cells is set to 1 as required.
++scpi_dvfs has 3 output clocks namely: atlclk, aplclk, and gpuclk with 0,
++1 and 2 as clock-indices. scpi_clk has 2 output clocks namely: pxlclk0
++and pxlclk1 with 3 and 4 as clock-indices.
++
++The first consumer in the example is cpu at 0 and it has '0' as the clock
++specifier which points to the first entry in the output clocks of
++scpi_dvfs i.e. "atlclk".
++
++Similarly the second example is hdlcd at 7ff60000 and it has pxlclk1 as input
++clock. '4' in the clock specifier here points to the second entry
++in the output clocks of scpi_clocks  i.e. "pxlclk1"
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7ba7ab749c85..be7d5c14729b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9149,6 +9149,12 @@ W:	http://www.sunplus.com
+ S:	Supported
+ F:	arch/score/
+ 
++SYSTEM CONTROL & POWER INTERFACE (SCPI) Message Protocol drivers
++M:	Sudeep Holla <sudeep.holla@arm.com>
++L:	linux-arm-kernel at lists.infradead.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/arm/arm,scpi.txt
++
+ SCSI CDROM DRIVER
+ M:	Jens Axboe <axboe@kernel.dk>
+ L:	linux-scsi at vger.kernel.org
 -- 
 1.9.1
