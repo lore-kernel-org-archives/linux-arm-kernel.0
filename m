@@ -1,53 +1,136 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 16 Sep 2015 14:03:02 -0500
-Subject: [PATCH 3/7] arm64: PTE/PMD contiguous bit definition
+Date: Wed, 16 Sep 2015 14:03:06 -0500
+Subject: [PATCH 7/7] arm64: Mark kernel page ranges contiguous
 In-Reply-To: <1442430186-9083-1-git-send-email-jeremy.linton@arm.com>
 References: <1442430186-9083-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1442430186-9083-4-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1442430186-9083-8-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the bit positions in the PTE and PMD for the
-contiguous bit.
+With 64k pages, the next larger segment size is 512M. The linux
+kernel also uses different protection flags to cover its code and data.
+Because of this requirement, the vast majority of the kernel code and
+data structures end up being mapped with 64k pages instead of the larger
+pages common with a 4k page kernel.
+
+Recent ARM processors support a contiguous bit in the
+page tables which allows the a TLB to cover a range larger than a
+single PTE if that range is mapped into physically contiguous
+ram.
+
+So, for the kernel its a good idea to set this flag. Some basic
+micro benchmarks show it can significantly reduce the number of
+L1 dTLB refills.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/include/asm/pgtable-hwdef.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/mm/mmu.c | 70 +++++++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 62 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 4489cf6..80eeebf 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -55,6 +55,13 @@
- #define SECTION_MASK		(~(SECTION_SIZE-1))
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 9211b85..c7abbcc 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -80,19 +80,55 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
+ 	do {
+ 		/*
+ 		 * Need to have the least restrictive permissions available
+-		 * permissions will be fixed up later
++		 * permissions will be fixed up later. Default the new page
++		 * range as contiguous ptes.
+ 		 */
+-		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
++		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC_CONT));
+ 		pfn++;
+ 	} while (pte++, i++, i < PTRS_PER_PTE);
+ }
  
- /*
-+ * Contiguous page definitions.
++/*
++ * Given a PTE with the CONT bit set, determine where the CONT range
++ * starts, and clear the entire range of PTE CONT bits.
 + */
-+#define CONT_RANGE		(_AC(1, UL) << CONT_SHIFT)
-+#define CONT_RANGE_MASK	((CONT_RANGE-1) << PAGE_SHIFT)
-+#define CONT_RANGE_OFFSET(addr) (((addr)>>PAGE_SHIFT)&(CONT_RANGE-1))
++static void clear_cont_pte_range(pte_t *pte, unsigned long addr)
++{
++	int i;
++
++	pte -= CONT_RANGE_OFFSET(addr);
++	for (i = 0; i < CONT_RANGE; i++) {
++		set_pte(pte, pte_mknoncont(*pte));
++		pte++;
++	}
++	flush_tlb_all();
++}
 +
 +/*
-  * Hardware page table definitions.
-  *
-  * Level 1 descriptor (PUD).
-@@ -83,6 +90,7 @@
- #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
- #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
- #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
-+#define PMD_SECT_CONT		(_AT(pmdval_t, 1) << 52)
- #define PMD_SECT_PXN		(_AT(pmdval_t, 1) << 53)
- #define PMD_SECT_UXN		(_AT(pmdval_t, 1) << 54)
++ * Given a range of PTEs set the pfn and provided page protection flags
++ */
++static void __populate_init_pte(pte_t *pte, unsigned long addr,
++				unsigned long end, phys_addr_t phys,
++				pgprot_t prot)
++{
++	unsigned long pfn = __phys_to_pfn(phys);
++
++	do {
++		/* clear all the bits except the pfn, then apply the prot */
++		set_pte(pte, pfn_pte(pfn, prot));
++		pte++;
++		pfn++;
++		addr += PAGE_SIZE;
++	} while (addr != end);
++}
++
+ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+-				  unsigned long end, unsigned long pfn,
++				  unsigned long end, phys_addr_t phys,
+ 				  pgprot_t prot,
+ 				  void *(*alloc)(unsigned long size))
+ {
+ 	pte_t *pte;
++	unsigned long next;
  
-@@ -105,6 +113,7 @@
- #define PTE_AF			(_AT(pteval_t, 1) << 10) /* Access Flag */
- #define PTE_NG			(_AT(pteval_t, 1) << 11) /* nG */
- #define PTE_DBM			(_AT(pteval_t, 1) << 51) /* Dirty Bit Mgmt */
-+#define PTE_CONT		(_AT(pteval_t, 1) << 52) /* Contiguous range */
- #define PTE_PXN			(_AT(pteval_t, 1) << 53) /* Privileged XN */
- #define PTE_UXN			(_AT(pteval_t, 1) << 54) /* User XN */
+ 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
+ 		pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
+@@ -105,9 +141,28 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
  
+ 	pte = pte_offset_kernel(pmd, addr);
+ 	do {
+-		set_pte(pte, pfn_pte(pfn, prot));
+-		pfn++;
+-	} while (pte++, addr += PAGE_SIZE, addr != end);
++		next = min(end, (addr + CONT_SIZE) & CONT_MASK);
++		if (((addr | next | phys) & CONT_RANGE_MASK) == 0) {
++			/* a block of CONT_RANGE_SIZE PTEs */
++			__populate_init_pte(pte, addr, next, phys,
++					    prot | __pgprot(PTE_CONT));
++			pte += CONT_RANGE;
++		} else {
++			/*
++			 * If the range being split is already inside of a
++			 * contiguous range but this PTE isn't going to be
++			 * contiguous, then we want to unmark the adjacent
++			 * ranges, then update the portion of the range we
++			 * are interrested in.
++			 */
++			 clear_cont_pte_range(pte, addr);
++			 __populate_init_pte(pte, addr, next, phys, prot);
++			 pte += CONT_RANGE_OFFSET(next - addr);
++		}
++
++		phys += next - addr;
++		addr = next;
++	} while (addr != end);
+ }
+ 
+ void split_pud(pud_t *old_pud, pmd_t *pmd)
+@@ -168,8 +223,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 				}
+ 			}
+ 		} else {
+-			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
+-				       prot, alloc);
++			alloc_init_pte(pmd, addr, next, phys, prot, alloc);
+ 		}
+ 		phys += next - addr;
+ 	} while (pmd++, addr = next, addr != end);
 -- 
 2.4.3
