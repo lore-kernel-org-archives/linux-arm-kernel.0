@@ -1,42 +1,77 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 16 Sep 2015 07:52:46 +0100
-Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
-In-Reply-To: <20150916043328.GA29943@linux>
-References: <20150909075930.GB3260@x1> <20150909083031.GB5266@linux>
- <20150909133930.GE3260@x1> <20150909160212.GJ5266@linux>
- <20150909163620.GF3260@x1> <55F0C5AB.5060609@kernel.org>
- <20150910005722.GA15099@codeaurora.org>
- <20150910010426.GM5266@linux> <20150910083146.GG3260@x1>
- <20150916043328.GA29943@linux>
-Message-ID: <20150916065246.GA3218@x1>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed, 16 Sep 2015 09:13:31 +0200
+Subject: [PATCH v5 2/5] dt/bindings: add bindings for optee
+In-Reply-To: <55F89D93.4080608@kernel.org>
+References: <1439973629-19505-1-git-send-email-jens.wiklander@linaro.org>
+ <1439973629-19505-3-git-send-email-jens.wiklander@linaro.org>
+ <55F89D93.4080608@kernel.org>
+Message-ID: <20150916071330.GA4515@ermac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Sep 2015, Viresh Kumar wrote:
-
-> On 10-09-15, 09:31, Lee Jones wrote:
-> > I think you answered your own question.
+On Tue, Sep 15, 2015 at 05:37:07PM -0500, Rob Herring wrote:
+> On 08/19/2015 03:40 AM, Jens Wiklander wrote:
+> > Introduces optee prefix and adds bindings for ARM TrustZone based OP-TEE
+> > implementation.
 > > 
-> > No users == !ABI == Strip it out.
+> > Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> > ---
+> >  Documentation/devicetree/bindings/optee/optee.txt     | 17 +++++++++++++++++
 > 
-> Okay, as I have delayed things enough for you, didn't wanted to do
-> that anymore. And so worked on it despite very tight schedule :)
-> 
-> Below is the refreshed binding changes (I have split that into 3
-> patches, but kept the diff here for simplicity).
-> 
-> Other than that, all code changes you need to test your driver are
-> pushed here:
-> 
-> https://git.linaro.org/people/viresh.kumar/linux.git opp/supported-hw-prop-name-v1
-> 
-> I am not gonna post the patches to the lists, until the time existing
-> patches get reviewed.
+> How about bindings/arm/firmware/... where the *other* TZ binding is located.
 
-Thanks dude.
+OK, I'll move it.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> 
+> >  Documentation/devicetree/bindings/vendor-prefixes.txt |  1 +
+> >  2 files changed, 18 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/optee/optee.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/optee/optee.txt b/Documentation/devicetree/bindings/optee/optee.txt
+> > new file mode 100644
+> > index 0000000..4a6ff10
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/optee/optee.txt
+> > @@ -0,0 +1,17 @@
+> > +OP-TEE Device Tree Bindings
+> > +
+> > +OP-TEE is a piece of software using hardware features to provide a Trusted
+> > +Execution Environment. The security can be provided with ARM TrustZone, but
+> > +also by virtualization or a separate chip. As there's no single OP-TEE
+> 
+> I don't see how the Linux side would not need to know what the
+> communication channel is whether it is smc, hvc, or something else.
+
+I assume you're missing something similar to the "method" property
+defined for PSCI. I'll add that.
+
+> 
+> > +vendor we're using "optee" as the first part of compatible property,
+> > +indicating the OP-TEE protocol is used when communicating with the secure
+> > +world.
+> > +
+> > +* OP-TEE based on ARM TrustZone required properties:
+> > +
+> > +- compatible="optee,optee-tz"
+> > +
+> > +Example:
+> > +	optee {
+> > +		compatible="optee,optee-tz";
+> > +	};
+> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > index 8033919..17c2a7e 100644
+> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > @@ -141,6 +141,7 @@ nvidia	NVIDIA
+> >  nxp	NXP Semiconductors
+> >  onnn	ON Semiconductor Corp.
+> >  opencores	OpenCores.org
+> > +optee	OP-TEE, Open Portable Trusted Execution Environment
+> >  ortustech	Ortus Technology Co., Ltd.
+> >  ovti	OmniVision Technologies
+> >  panasonic	Panasonic Corporation
+> > 
+> 
+
+Thanks,
+Jens
