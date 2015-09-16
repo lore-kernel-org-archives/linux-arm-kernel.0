@@ -1,46 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Sep 2015 18:34:25 +0100
-Subject: [PATCH] KVM: arm64: remove all traces of the ThumbEE registers
-In-Reply-To: <CAFEAcA94VNogBEGh9ohB3M8fEqfLRPWVj8yaCK-3HGa-ht2fLg@mail.gmail.com>
-References: <1442333733-16347-1-git-send-email-will.deacon@arm.com>
- <CAFEAcA94VNogBEGh9ohB3M8fEqfLRPWVj8yaCK-3HGa-ht2fLg@mail.gmail.com>
-Message-ID: <55F9A821.1000707@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 17 Sep 2015 01:32:40 +0800
+Subject: [PATCH v2] arm: add cpu_idle tracepoints to arch_cpu_idle
+Message-ID: <1442424760-4104-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/15 17:23, Peter Maydell wrote:
-> On 15 September 2015 at 17:15, Will Deacon <will.deacon@arm.com> wrote:
->> Although the ThumbEE registers and traps were present in earlier
->> versions of the v8 architecture, it was retrospectively removed and so
->> we can do the same.
->>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
->> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> index b41607d270ac..6c35e49757d8 100644
->> --- a/arch/arm64/kvm/sys_regs.c
->> +++ b/arch/arm64/kvm/sys_regs.c
->> @@ -539,13 +539,6 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->>         { Op0(0b10), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b110),
->>           trap_dbgauthstatus_el1 },
->>
->> -       /* TEECR32_EL1 */
->> -       { Op0(0b10), Op1(0b010), CRn(0b0000), CRm(0b0000), Op2(0b000),
->> -         NULL, reset_val, TEECR32_EL1, 0 },
->> -       /* TEEHBR32_EL1 */
->> -       { Op0(0b10), Op1(0b010), CRn(0b0001), CRm(0b0000), Op2(0b000),
->> -         NULL, reset_val, TEEHBR32_EL1, 0 },
->> -
-> 
-> I guess this is a VM migration compatibility break between kernels
-> without this patch and kernels with it? I think that's OK at this
-> point, but it would be nice to mention it in the commit message.
+Currently, if cpuidle is disabled or not supported, powertop reports
+zero wakeups and zero events. This is due to the cpu_idle tracepoints
+are missing.
 
-I'll add comment to that effect.
+This patch is to make cpu_idle tracepoints always available even if
+cpuidle is disabled or not supported.
 
-Thanks,
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ Since v1:
+   - ignore arm_pm_idle.
+ arch/arm/kernel/process.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-	M.
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 7a7c4ce..83d2dc5 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -28,6 +28,7 @@
+ #include <linux/random.h>
+ #include <linux/hw_breakpoint.h>
+ #include <linux/leds.h>
++#include <trace/events/power.h>
+ 
+ #include <asm/processor.h>
+ #include <asm/thread_notify.h>
+@@ -66,11 +67,15 @@ void (*arm_pm_idle)(void);
+ 
+ void arch_cpu_idle(void)
+ {
+-	if (arm_pm_idle)
++	if (arm_pm_idle) {
+ 		arm_pm_idle();
+-	else
++		local_irq_enable();
++	} else {
++		trace_cpu_idle_rcuidle(1, smp_processor_id());
+ 		cpu_do_idle();
+-	local_irq_enable();
++		local_irq_enable();
++		trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
++	}
+ }
+ 
+ void arch_cpu_idle_prepare(void)
 -- 
-Jazz is not dead. It just smells funny...
+2.5.1
