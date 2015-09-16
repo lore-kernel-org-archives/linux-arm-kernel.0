@@ -1,80 +1,73 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 16 Sep 2015 16:52:26 +0200
-Subject: [PATCH 6/8] mmc: dw_mmc: Generic MMC tuning with the clock phase
- framework
-In-Reply-To: <55F8D442.5020004@samsung.com>
-References: <1441045446-30858-1-git-send-email-heiko@sntech.de>
- <8878355.D5Q8mk4qcM@diego> <55F8D442.5020004@samsung.com>
-Message-ID: <2272810.k4vHSW5D0y@diego>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 16 Sep 2015 22:53:12 +0800
+Subject: [PATCH] arm64: add cpu_idle tracepoints to arch_cpu_idle
+In-Reply-To: <20150916144738.GA23245@red-moon>
+References: <1442413401-2955-1-git-send-email-jszhang@marvell.com>
+ <20150916144738.GA23245@red-moon>
+Message-ID: <20150916225312.0d4d32c5@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Lorenzo,
 
-Am Mittwoch, 16. September 2015, 11:30:26 schrieb Jaehoon Chung:
-> On 09/16/2015 07:09 AM, Heiko St?bner wrote:
-> > Am Dienstag, 15. September 2015, 17:25:38 schrieb Jaehoon Chung:
-> >> On 09/01/2015 03:24 AM, Heiko Stuebner wrote:
-> >>> From: Alexandru M Stan <amstan@chromium.org>
-> >>> 
-> >>> This algorithm will try 1 degree increments, since there's no way to
-> >>> tell
-> >>> what resolution the underlying phase code uses. As an added bonus, doing
-> >>> many tunings yields better results since some tests are run more than
-> >>> once
-> >>> (ex: if the underlying driver uses 45 degree increments, the tuning code
-> >>> will try the same angle more than once).
-> >>> 
-> >>> It will then construct a list of good phase ranges (even ranges that
-> >>> cross
-> >>> 360/0), will pick the biggest range then it will set the sample_clk to
-> >>> the
-> >>> middle of that range.
-> >>> 
-> >>> We do not touch ciu_drive (and by extension define default-drive-phase).
-> >>> Drive phase is mostly used to define minimum hold times, while one could
-> >>> write some code to determine what phase meets the minimum hold time (ex
-> >>> 10
-> >>> degrees) this will not work with the current clock phase framework
-> >>> (which
-> >>> floors angles, so we'll get 0 deg, and there's no way to know what
-> >>> resolution the floors happen at). We assume that the default drive
-> >>> angles
-> >>> set by the hardware are good enough.
-> >>> 
-> >>> If a device has device specific code (like exynos) then that will still
-> >>> take precedence, otherwise this new code will execute. If the device
-> >>> wants
-> >>> to tune, but has no sample_clk defined we'll return EIO with an error
-> >>> message.
-> >> 
-> >> Which point is "_generic_"? I don't find the code that control the
-> >> register
-> >> relevant to CLK_DRV/SMPL PHASE. It seems that posted the similar patches
-> >> at
-> >> u-boot mailing list..
+On Wed, 16 Sep 2015 15:47:38 +0100
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+
+> On Wed, Sep 16, 2015 at 03:23:21PM +0100, Jisheng Zhang wrote:
+> > Currently, if cpuidle is disabled or not supported, powertop reports
+> > zero wakeups and zero events. This is due to the cpu_idle tracepoints
+> > are missing.
 > > 
-> > The "generic" part is that it uses the clk phase API for dw_mmc
-> > implementations where the clkgen controlling interface is outside the
-> > dw_mmc IP itself. So it's open for other implementations as well.
+> > This patch is to make cpu_idle tracepoints always available even if
+> > cpuidle is disabled or not supported.
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > 
-> Designware IP also has the CLK phase register(UHS_REG_EXT register)...
-> if this code is related with it, it should be located into dw-mmc.c.
+> Is there a reason why this code cannot be moved to the generic idle loop ?
 
-UHS_REG_EXT is acutally "reserved" on both the rk3288 as well as the rk3368. 
-rk3036/rk3128 (Cortex-A7) provide a bit description, but the tuning 
-documentation still uses the controls located in the clock controller.
+Do you mean the cpu_idle_loop() in kernel/sched/idle.c? To be honest, I
+dunno. Maybe kernel experts can give some hints.
 
-So I guess UHS_REG_EXT is the real "generic" solution.
+Thanks,
+Jisheng
 
-> > But if you are more comfortable with it, I can also move it into the
-> > dw_mmc- rockchip variant for the time being, until another user comes
-> > along.
-> I think more better that this code is located into dw_mmc-rockchip. how
-> about?
-
-As described above, moving that to the rockchip part sounds sensible. And I 
-guess we can think more about it, once a second user appears.
-
-
-Heiko
+> 
+> Thanks,
+> Lorenzo
+> 
+> > ---
+> >  arch/arm64/kernel/process.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> > index 223b093..f75b540 100644
+> > --- a/arch/arm64/kernel/process.c
+> > +++ b/arch/arm64/kernel/process.c
+> > @@ -44,6 +44,7 @@
+> >  #include <linux/hw_breakpoint.h>
+> >  #include <linux/personality.h>
+> >  #include <linux/notifier.h>
+> > +#include <trace/events/power.h>
+> >  
+> >  #include <asm/compat.h>
+> >  #include <asm/cacheflush.h>
+> > @@ -75,8 +76,10 @@ void arch_cpu_idle(void)
+> >  	 * This should do all the clock switching and wait for interrupt
+> >  	 * tricks
+> >  	 */
+> > +	trace_cpu_idle_rcuidle(1, smp_processor_id());
+> >  	cpu_do_idle();
+> >  	local_irq_enable();
+> > +	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+> >  }
+> >  
+> >  #ifdef CONFIG_HOTPLUG_CPU
+> > -- 
+> > 2.5.1
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> > 
