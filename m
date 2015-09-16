@@ -1,107 +1,99 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Tue, 15 Sep 2015 21:37:56 -0500
-Subject: [PATCH v2 1/2] fsl: Add binding for RCPM
-In-Reply-To: <DM2PR03MB574196E1A0D55C185CE1B4BFA5B0@DM2PR03MB574.namprd03.prod.outlook.com>
-References: <1442307339-15225-1-git-send-email-dongsheng.wang@freescale.com>
- <1442361398.2909.164.camel@freescale.com>
- <SN1PR0301MB1616C48FB3D990BCA45289AB9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
- <1442369955.2909.166.camel@freescale.com>
- <SN1PR0301MB161688E3AF527ADC76AB2B8F9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
- <1442370701.2909.167.camel@freescale.com>
- <DM2PR03MB574196E1A0D55C185CE1B4BFA5B0@DM2PR03MB574.namprd03.prod.outlook.com>
-Message-ID: <1442371076.2909.171.camel@freescale.com>
+From: hillf.zj@alibaba-inc.com (Hillf Danton)
+Date: Wed, 16 Sep 2015 10:43:41 +0800
+Subject: [PATCH v3] arm: Fix backtrace generation when IPI is masked
+In-Reply-To: <1442328005-13661-1-git-send-email-daniel.thompson@linaro.org>
+References: <1442222294-2756-1-git-send-email-daniel.thompson@linaro.org>
+ <1442328005-13661-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <00d201d0f029$80210f40$80632dc0$@alibaba-inc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-09-15 at 21:35 -0500, Tang Yuantian-B29983 wrote:
 > 
-> > -----Original Message-----
-> > From: Wood Scott-B07421
-> > Sent: Wednesday, September 16, 2015 10:32 AM
-> > To: Wang Dongsheng-B40534 <Dongsheng.Wang@freescale.com>
-> > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
-> > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang Huan-
-> > B18965 <alison.wang@freescale.com>; Jin Zhengxiong-R64188
-> > <Jason.Jin@freescale.com>; Zhao Chenhui-B35336
-> > <chenhui.zhao@freescale.com>; Tang Yuantian-B29983
-> > <Yuantian.Tang@freescale.com>
-> > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
-> > 
-> > On Tue, 2015-09-15 at 21:30 -0500, Wang Dongsheng-B40534 wrote:
-> > > Hi Scott,
-> > > 
-> > > > -----Original Message-----
-> > > > From: Wood Scott-B07421
-> > > > Sent: Wednesday, September 16, 2015 10:19 AM
-> > > > To: Wang Dongsheng-B40534
-> > > > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
-> > > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang Huan-
-> > > > B18965; Jin
-> > > > Zhengxiong-R64188; Zhao Chenhui-B35336; Tang Yuantian-B29983
-> > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
-> > > > 
-> > > > On Tue, 2015-09-15 at 21:15 -0500, Wang Dongsheng-B40534 wrote:
-> > > > > Hi Scott,
-> > > > > 
-> > > > > > -----Original Message-----
-> > > > > > From: Wood Scott-B07421
-> > > > > > Sent: Wednesday, September 16, 2015 7:57 AM
-> > > > > > To: Wang Dongsheng-B40534
-> > > > > > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
-> > > > > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang
-> > > > > > robh+Huan-
-> > > > > > B18965; Jin
-> > > > > > Zhengxiong-R64188; Zhao Chenhui-B35336; Tang Yuantian-B29983
-> > > > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
-> > > > > > 
-> > > > > > On Tue, 2015-09-15 at 16:55 +0800, Dongsheng Wang wrote:
-> > > > > > > +* Freescale RCPM Wakeup Source Device Tree Bindings
-> > > > > > > +-------------------------------------------
-> > > > > > > +Required rcpm-wakeup property should be added to a device
-> > > > > > > +node if the
-> > > > > > > device
-> > > > > > > +can be used as a wakeup source.
-> > > > > > > +
-> > > > > > > +  - rcpm-wakeup: The value of the property consists of 3 cells.
-> > > > > > > + The
-> > > > > > > first
-> > > > > > > cell
-> > > > > > > +     is a pointer to the rcpm node, the second cell is the
-> > > > > > > + bit mask
-> > > > > > > that
-> > > > > > > +     should be set in IPPDEXPCR0, and the last cell is for
-> > > > > > > IPPDEXPCR1.
-> > > > > > > +     Note: If the platform has no IPPDEXPCR1 register, put a
-> > > > > > > + zero
-> > > > > > > here.
-> > > > > > 
-> > > > > > What if a future platform has more than two of these registers?
-> > > > > 
-> > > > > Those registers are only used for wakeup device, we have a lot of
-> > > > > available bit for feature. For example, In LS1021a platform only
-> > > > > 7bits has used in the registers, and 57bits is reserved.
-> > > > 
-> > > > Still, it'd be better to for the rcpm node to advertise the number
-> > > > of cells it expects.
-> > > 
-> > > For the foreseeable future it should be enough to use, even if not
-> > > enough to use in the future at that time we can update the binding.
-> > 
-> > That's the whole point.  Device tree is stable ABI.  Updating it later to 
-> > not be
-> > fixed to two cells would be a lot harder than getting it right from the
-> > beginning.  Putting the number of cells in the phandle target is a 
-> > standard
-> > device tree idiom.
-> > 
-> I agree with you. But what's the point a SOC has more than 64 wakeup source?
+> Currently on ARM when <SysRq-L> is triggered from an interrupt handler
+> (e.g. a SysRq issued using UART or kbd) the main CPU will wedge for ten
+> seconds with interrupts masked before issuing a backtrace for every CPU
+> except itself.
+> 
+> The new backtrace code introduced by commit 96f0e00378d4 ("ARM: add
+> basic support for on-demand backtrace of other CPUs") does not work
+> correctly when run from an interrupt handler because IPI_CPU_BACKTRACE
+> is used to generate the backtrace on all CPUs but cannot preempt the
+> current calling context.
+> 
+> This can be fixed by detecting that the calling context cannot be
+> preempted and issuing the backtrace directly in this case. Issuing
+> directly leaves us without any pt_regs to pass to nmi_cpu_backtrace()
+> so we also modify the generic code to call dump_stack() when its
+> argument is NULL.
+> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> ---
 
-I don't know.  Hardware people do strange things sometimes.  They might not 
-want to reuse bits they once used for something on some other chip, or they 
-might have some encoding scheme in mind that results in the bits not being 
-packed as tightly as possible, or there may be some big array of similar 
-devices...
-
-What's the point of skipping this part of the phandle-plus-arguments idiom?
-
--Scott
+Acked-by: Hillf Danton <hillf.zj@alibaba-inc.com>
+> 
+> Notes:
+>     Changes in v3:
+> 
+>     * Added comments to describe how raise_nmi() and nmi_cpu_backtrace()
+>       interact with backtrace_mask (Russell King).
+> 
+>     Changes in v2:
+> 
+>     * Improved commit message to better describe the changes to the generic
+>       code (Hillf Danton).
+> 
+>  arch/arm/kernel/smp.c |  9 +++++++++
+>  lib/nmi_backtrace.c   | 11 ++++++++++-
+>  2 files changed, 19 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 48185a773852..0c4e7fdb9636 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -748,6 +748,15 @@ core_initcall(register_cpufreq_notifier);
+> 
+>  static void raise_nmi(cpumask_t *mask)
+>  {
+> +	/*
+> +	 * Generate the backtrace directly if we are running in a calling
+> +	 * context that is not preemptible by the backtrace IPI. Note
+> +	 * that nmi_cpu_backtrace() automatically removes the current cpu
+> +	 * from mask.
+> +	 */
+> +	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
+> +		nmi_cpu_backtrace(NULL);
+> +
+>  	smp_cross_call(mask, IPI_CPU_BACKTRACE);
+>  }
+> 
+> diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
+> index 88d3d32e5923..6019c53c669e 100644
+> --- a/lib/nmi_backtrace.c
+> +++ b/lib/nmi_backtrace.c
+> @@ -43,6 +43,12 @@ static void print_seq_line(struct nmi_seq_buf *s, int start, int end)
+>  	printk("%.*s", (end - start) + 1, buf);
+>  }
+> 
+> +/*
+> + * When raise() is called it will be is passed a pointer to the
+> + * backtrace_mask. Architectures that call nmi_cpu_backtrace()
+> + * directly from their raise() functions may rely on the mask
+> + * they are passed being updated as a side effect of this call.
+> + */
+>  void nmi_trigger_all_cpu_backtrace(bool include_self,
+>  				   void (*raise)(cpumask_t *mask))
+>  {
+> @@ -149,7 +155,10 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
+>  		/* Replace printk to write into the NMI seq */
+>  		this_cpu_write(printk_func, nmi_vprintk);
+>  		pr_warn("NMI backtrace for cpu %d\n", cpu);
+> -		show_regs(regs);
+> +		if (regs)
+> +			show_regs(regs);
+> +		else
+> +			dump_stack();
+>  		this_cpu_write(printk_func, printk_func_save);
+> 
+>  		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
+> --
+> 2.4.3
