@@ -1,69 +1,79 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 16 Sep 2015 11:30:26 +0900
-Subject: [PATCH 6/8] mmc: dw_mmc: Generic MMC tuning with the clock phase
- framework
-In-Reply-To: <8878355.D5Q8mk4qcM@diego>
-References: <1441045446-30858-1-git-send-email-heiko@sntech.de>
- <1441045446-30858-7-git-send-email-heiko@sntech.de>
- <55F7D602.70003@samsung.com> <8878355.D5Q8mk4qcM@diego>
-Message-ID: <55F8D442.5020004@samsung.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Tue, 15 Sep 2015 21:31:41 -0500
+Subject: [PATCH v2 1/2] fsl: Add binding for RCPM
+In-Reply-To: <SN1PR0301MB161688E3AF527ADC76AB2B8F9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+References: <1442307339-15225-1-git-send-email-dongsheng.wang@freescale.com>
+ <1442361398.2909.164.camel@freescale.com>
+ <SN1PR0301MB1616C48FB3D990BCA45289AB9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+ <1442369955.2909.166.camel@freescale.com>
+ <SN1PR0301MB161688E3AF527ADC76AB2B8F9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+Message-ID: <1442370701.2909.167.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 2015-09-15 at 21:30 -0500, Wang Dongsheng-B40534 wrote:
+> Hi Scott,
+> 
+> > -----Original Message-----
+> > From: Wood Scott-B07421
+> > Sent: Wednesday, September 16, 2015 10:19 AM
+> > To: Wang Dongsheng-B40534
+> > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
+> > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang Huan-
+> > B18965; Jin
+> > Zhengxiong-R64188; Zhao Chenhui-B35336; Tang Yuantian-B29983
+> > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > 
+> > On Tue, 2015-09-15 at 21:15 -0500, Wang Dongsheng-B40534 wrote:
+> > > Hi Scott,
+> > > 
+> > > > -----Original Message-----
+> > > > From: Wood Scott-B07421
+> > > > Sent: Wednesday, September 16, 2015 7:57 AM
+> > > > To: Wang Dongsheng-B40534
+> > > > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
+> > > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang Huan-
+> > > > B18965; Jin
+> > > > Zhengxiong-R64188; Zhao Chenhui-B35336; Tang Yuantian-B29983
+> > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > > > 
+> > > > On Tue, 2015-09-15 at 16:55 +0800, Dongsheng Wang wrote:
+> > > > > +* Freescale RCPM Wakeup Source Device Tree Bindings
+> > > > > +-------------------------------------------
+> > > > > +Required rcpm-wakeup property should be added to a device node if
+> > > > > +the
+> > > > > device
+> > > > > +can be used as a wakeup source.
+> > > > > +
+> > > > > +  - rcpm-wakeup: The value of the property consists of 3 cells.
+> > > > > + The
+> > > > > first
+> > > > > cell
+> > > > > +     is a pointer to the rcpm node, the second cell is the bit
+> > > > > + mask
+> > > > > that
+> > > > > +     should be set in IPPDEXPCR0, and the last cell is for 
+> > > > > IPPDEXPCR1.
+> > > > > +     Note: If the platform has no IPPDEXPCR1 register, put a zero 
+> > > > > here.
+> > > > 
+> > > > What if a future platform has more than two of these registers?
+> > > 
+> > > Those registers are only used for wakeup device, we have a lot of
+> > > available bit for feature. For example, In LS1021a platform only 7bits
+> > > has used in the registers, and 57bits is reserved.
+> > 
+> > Still, it'd be better to for the rcpm node to advertise the number of 
+> > cells it
+> > expects.
+> 
+> For the foreseeable future it should be enough to use, even if not enough 
+> to use in
+> the future at that time we can update the binding.
 
-On 09/16/2015 07:09 AM, Heiko St?bner wrote:
-> Hi,
-> 
-> Am Dienstag, 15. September 2015, 17:25:38 schrieb Jaehoon Chung:
->> On 09/01/2015 03:24 AM, Heiko Stuebner wrote:
->>> From: Alexandru M Stan <amstan@chromium.org>
->>>
->>> This algorithm will try 1 degree increments, since there's no way to tell
->>> what resolution the underlying phase code uses. As an added bonus, doing
->>> many tunings yields better results since some tests are run more than once
->>> (ex: if the underlying driver uses 45 degree increments, the tuning code
->>> will try the same angle more than once).
->>>
->>> It will then construct a list of good phase ranges (even ranges that cross
->>> 360/0), will pick the biggest range then it will set the sample_clk to the
->>> middle of that range.
->>>
->>> We do not touch ciu_drive (and by extension define default-drive-phase).
->>> Drive phase is mostly used to define minimum hold times, while one could
->>> write some code to determine what phase meets the minimum hold time (ex 10
->>> degrees) this will not work with the current clock phase framework (which
->>> floors angles, so we'll get 0 deg, and there's no way to know what
->>> resolution the floors happen at). We assume that the default drive angles
->>> set by the hardware are good enough.
->>>
->>> If a device has device specific code (like exynos) then that will still
->>> take precedence, otherwise this new code will execute. If the device wants
->>> to tune, but has no sample_clk defined we'll return EIO with an error
->>> message.
->>
->> Which point is "_generic_"? I don't find the code that control the register
->> relevant to CLK_DRV/SMPL PHASE. It seems that posted the similar patches at
->> u-boot mailing list..
-> 
-> The "generic" part is that it uses the clk phase API for dw_mmc 
-> implementations where the clkgen controlling interface is outside the dw_mmc 
-> IP itself. So it's open for other implementations as well.
+That's the whole point.  Device tree is stable ABI.  Updating it later to not 
+be fixed to two cells would be a lot harder than getting it right from the 
+beginning.  Putting the number of cells in the phandle target is a standard 
+device tree idiom.
 
-Designware IP also has the CLK phase register(UHS_REG_EXT register)...
-if this code is related with it, it should be located into dw-mmc.c.
-
-> 
-> But if you are more comfortable with it, I can also move it into the dw_mmc-
-> rockchip variant for the time being, until another user comes along.
-
-I think more better that this code is located into dw_mmc-rockchip. how about?
-
-Best Regards,
-Jaehoon Chung
-
-> 
-> 
-> Heiko
-> 
-> 
+-Scott
