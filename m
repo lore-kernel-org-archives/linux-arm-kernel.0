@@ -1,104 +1,139 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 15 Sep 2015 20:54:42 -0700
-Subject: [PATCH] arm: rpi: Device tree modifications for U-Boot
-In-Reply-To: <CAPnjgZ2L1TOOmiUSKk-=gpAUt8tvZU1SkGBmdbHJR1tBhE2nTA@mail.gmail.com>
-References: <1439303153-12171-1-git-send-email-sjg@chromium.org>
- <1439312701.2451.3.camel@lynxeye.de>
- <CAPnjgZ3ztXnkxZJvitiXiKMzq5+x46hbv0PW4HcF7yGgsXUV+Q@mail.gmail.com>
- <CAPnjgZ0hzyjy=8o8ocaGCoOC7Js4CirhystidbvtabzbhRi4RQ@mail.gmail.com>
- <CAL_Jsq++ihz6svJAKWwT7-=KyJvyWXjdf=tZb4aDGgV_Dc=-Nw@mail.gmail.com>
- <CAPnjgZ3ubK_5j4AV4wO6xgoRf8iN+G8YSQm0pSW5fVzwpxYu5Q@mail.gmail.com>
- <CAL_JsqJ-N+nFEMEEmg4O45DVF0g382fUvjGTH=fP_HbgK38aKw@mail.gmail.com>
- <CAPnjgZ2L1TOOmiUSKk-=gpAUt8tvZU1SkGBmdbHJR1tBhE2nTA@mail.gmail.com>
-Message-ID: <55F8E802.7090008@wwwdotorg.org>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Wed, 16 Sep 2015 11:58:25 +0800
+Subject: [RFC PATCH v3 1/3] genirq: introduce CONFIG_GENERIC_IRQ_MIGRATION
+In-Reply-To: <1442375907-11496-1-git-send-email-yangyingliang@huawei.com>
+References: <1442375907-11496-1-git-send-email-yangyingliang@huawei.com>
+Message-ID: <1442375907-11496-2-git-send-email-yangyingliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2015 11:27 AM, Simon Glass wrote:
-> Hi Rob,
-> 
-> On 25 August 2015 at 10:22, Rob Herring <robherring2@gmail.com> wrote:
->> On Sat, Aug 15, 2015 at 8:46 AM, Simon Glass <sjg@chromium.org> wrote:
->>> Hi Rob,
->>>
->>> On 14 August 2015 at 14:29, Rob Herring <robherring2@gmail.com> wrote:
->>>> On Fri, Aug 14, 2015 at 1:34 PM, Simon Glass <sjg@chromium.org> wrote:
->>>>> -linux-tegra
->>>>>
->>>>> Hi,
->>>>>
->>>>> On 12 August 2015 at 07:21, Simon Glass <sjg@chromium.org> wrote:
->>>>>> Hi Lucas,
->>>>>>
->>>>>> On 11 August 2015 at 11:05, Lucas Stach <dev@lynxeye.de> wrote:
->>>>>>> Hi Simon,
->>>>>>>
->>>>>>> why did you send this to the Tegra ML?
->>>>>>>
->>>>>>> Am Dienstag, den 11.08.2015, 08:25 -0600 schrieb Simon Glass:
->>>>>>>> This updates the device tree from the kernel version to something suitable
->>>>>>>> for U-Boot:
->>>>>>>>
->>>>>>>> - Add stdout-path alias for console
->>>>>>>> - Mark the /soc node to be available pre-relocation so that the early
->>>>>>>> serial console works (we need the 'ranges' property to be available)
+Introduce a more general config for compile kernel/irq/migration.c.
+Move the CONFIG_GENERIC_PENDING_IRQ into migration.c. So we can
+move other migration interrupts code into migration.c without
+select CONFIG_GENERIC_PENDING_IRQ.
 
-[... discussion of u-boot,dm-pre-reloc property]
->>>> Can't the need for that property change over time? Either as more
->>>> drivers are converted to DM you need to add this or you add some
->>>> feature that depends on a driver (e.g. get a board rev or boot mode
->>>> from GPIO). You would have backwards compatibility issues with this.
->>>> I'm somewhat less worried about that for u-boot as we should be
->>>> bundling the dtb and bootloader rather than kernel and dtb. For the
->>>> UART, you can just get which UART to initialize early from
->>>> stdout-path. But for other cases, couldn't you just have the platform
->>>> provide the list of needed drivers. Then when u-boot needs change, you
->>>> just change u-boot.
->>>
->>> Yes U-Boot and its device tree are normally built from the same tree
->>> at the same time. We don't expect to have to support an older or newer
->>> device tree with the same U-Boot binary. So I don't see a problem
->>> here.
->>
->> My point is that if I had to pick how bootloader+dtb+kernel are
->> bundled or not, I would rather see the dtb in sync with the bootloader
->> rather than the kernel. But I can't decide that for everyone and
->> neither can you. You still have a compatibility problem and that has
->> to be addressed.
-> 
-> What are you getting at here? If I move to a new kernel and still use
-> an old device tree I may be missing features, or fail to boot. Don't
-> do that!
+Cc: Jiang Liu <jiang.liu@linux.intel.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+---
+ arch/arc/Kconfig       | 1 +
+ arch/hexagon/Kconfig   | 1 +
+ arch/ia64/Kconfig      | 1 +
+ arch/tile/Kconfig      | 1 +
+ arch/x86/Kconfig       | 1 +
+ kernel/irq/Kconfig     | 4 ++++
+ kernel/irq/Makefile    | 2 +-
+ kernel/irq/migration.c | 2 ++
+ 8 files changed, 12 insertions(+), 1 deletion(-)
 
-One of the central points of DT is that it is an ABI. As such, moving to
-a new kernel and continuing to use the same old DTB *MUST NOT* break
-anything. Of course, you won't get any features enabled/described in any
-new DT if you don't use it.
-
-...
-> After reading your email I am none the wiser about what you are suggesting.
-> 
-> This is not a screwy case. Every board will have a console. In some
-> cases it is inside a 'soc {' node and in some cases it is not. The
-> pure solution would be to mark every UART node with
-> u-boot,dm-pre-reloc and we can do that if you prefer. It isn't
-> necessary though for the reasons I previously explained.
-> 
-> It seems reasonable that U-Boot should be able to add private
-> properties to the device tree, intended for U-Boot, just as Linux
-> does. What is the problem here?
-
-Why is that reasonable? DT is intended to describe the HW. It is
-supposed to be OS-agnostic. Having U-Boot-specific properties completely
-goes against that.
-
-What Linux-specific properties are you referring to? The only one I
-recall you mentioning (although I'm missing a lot of sleep right now) is
-the keycodes in the input binding. While the DT property name for those
-is linux,... and the values happen to match internal Linux numbering,
-there's absolutely nothing Linux specific about the /concept/ of a
-keycode, and some numbering scheme had to be picked. There's nothing
-practical or conceptual stopping any other OS/SW-stack from translating
-those Linux IDs into something internally meaningful. Conversely, the
-concept of e.g. "u-boot,dm-pre-reloc" is not something that translates
-at all to any other OS/WW-stack.
+diff --git a/arch/arc/Kconfig b/arch/arc/Kconfig
+index 78c0621..4133070 100644
+--- a/arch/arc/Kconfig
++++ b/arch/arc/Kconfig
+@@ -20,6 +20,7 @@ config ARC
+ 	# for now, we don't need GENERIC_IRQ_PROBE, CONFIG_GENERIC_IRQ_CHIP
+ 	select GENERIC_IRQ_SHOW
+ 	select GENERIC_PENDING_IRQ if SMP
++	select GENERIC_IRQ_MIGRATION if SMP
+ 	select GENERIC_SMP_IDLE_THREAD
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_ARCH_TRACEHOOK
+diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
+index 4dc89d1..18d3255 100644
+--- a/arch/hexagon/Kconfig
++++ b/arch/hexagon/Kconfig
+@@ -12,6 +12,7 @@ config HEXAGON
+ 	# select ARCH_REQUIRE_GPIOLIB
+ 	# select HAVE_CLK
+ 	# select GENERIC_PENDING_IRQ if SMP
++	# select GENERIC_IRQ_MIGRATION if SMP
+ 	select GENERIC_ATOMIC64
+ 	select HAVE_PERF_EVENTS
+ 	# GENERIC_ALLOCATOR is used by dma_alloc_coherent()
+diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+index eb0249e..e48c2c8 100644
+--- a/arch/ia64/Kconfig
++++ b/arch/ia64/Kconfig
+@@ -37,6 +37,7 @@ config IA64
+ 	select ARCH_DISCARD_MEMBLOCK
+ 	select GENERIC_IRQ_PROBE
+ 	select GENERIC_PENDING_IRQ if SMP
++	select GENERIC_IRQ_MIGRATION if SMP
+ 	select GENERIC_IRQ_SHOW
+ 	select GENERIC_IRQ_LEGACY
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+diff --git a/arch/tile/Kconfig b/arch/tile/Kconfig
+index 106c21b..bf8b059 100644
+--- a/arch/tile/Kconfig
++++ b/arch/tile/Kconfig
+@@ -14,6 +14,7 @@ config TILE
+ 	select HAVE_DEBUG_KMEMLEAK
+ 	select GENERIC_IRQ_PROBE
+ 	select GENERIC_PENDING_IRQ if SMP
++	select GENERIC_IRQ_MIGRATION if SMP
+ 	select GENERIC_IRQ_SHOW
+ 	select HAVE_DEBUG_BUGVERBOSE
+ 	select VIRT_TO_BUS
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 7aef2d5..a217a23 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -68,6 +68,7 @@ config X86
+ 	select GENERIC_IRQ_PROBE
+ 	select GENERIC_IRQ_SHOW
+ 	select GENERIC_PENDING_IRQ		if SMP
++	select GENERIC_IRQ_MIGRATION		if SMP
+ 	select GENERIC_SMP_IDLE_THREAD
+ 	select GENERIC_STRNCPY_FROM_USER
+ 	select GENERIC_STRNLEN_USER
+diff --git a/kernel/irq/Kconfig b/kernel/irq/Kconfig
+index 9a76e3b..530c54a 100644
+--- a/kernel/irq/Kconfig
++++ b/kernel/irq/Kconfig
+@@ -30,6 +30,10 @@ config GENERIC_IRQ_LEGACY_ALLOC_HWIRQ
+ config GENERIC_PENDING_IRQ
+ 	bool
+ 
++# Support for generic irq migration
++config GENERIC_IRQ_MIGRATION
++	bool
++
+ # Alpha specific irq affinity mechanism
+ config AUTO_IRQ_AFFINITY
+        bool
+diff --git a/kernel/irq/Makefile b/kernel/irq/Makefile
+index d121235..bdd31b7 100644
+--- a/kernel/irq/Makefile
++++ b/kernel/irq/Makefile
+@@ -4,6 +4,6 @@ obj-$(CONFIG_GENERIC_IRQ_CHIP) += generic-chip.o
+ obj-$(CONFIG_GENERIC_IRQ_PROBE) += autoprobe.o
+ obj-$(CONFIG_IRQ_DOMAIN) += irqdomain.o
+ obj-$(CONFIG_PROC_FS) += proc.o
+-obj-$(CONFIG_GENERIC_PENDING_IRQ) += migration.o
++obj-$(CONFIG_GENERIC_IRQ_MIGRATION) += migration.o
+ obj-$(CONFIG_PM_SLEEP) += pm.o
+ obj-$(CONFIG_GENERIC_MSI_IRQ) += msi.o
+diff --git a/kernel/irq/migration.c b/kernel/irq/migration.c
+index 37ddb7b..1ff2b77 100644
+--- a/kernel/irq/migration.c
++++ b/kernel/irq/migration.c
+@@ -4,6 +4,7 @@
+ 
+ #include "internals.h"
+ 
++#ifdef CONFIG_GENERIC_PENDING_IRQ
+ void irq_move_masked_irq(struct irq_data *idata)
+ {
+ 	struct irq_desc *desc = irq_data_to_desc(idata);
+@@ -77,3 +78,4 @@ void irq_move_irq(struct irq_data *idata)
+ 	if (!masked)
+ 		idata->chip->irq_unmask(idata);
+ }
++#endif
+-- 
+2.5.0
