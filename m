@@ -1,75 +1,55 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 16 Sep 2015 15:21:16 +0100
-Subject: [PATCH 18/22] arm64: Add helper to decode register from instruction
+Date: Wed, 16 Sep 2015 15:21:07 +0100
+Subject: [PATCH 09/22] arm64: Read system wide CPUID value
 In-Reply-To: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
 References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1442413280-31885-19-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1442413280-31885-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-Add a helper to extract the register field from a given
-instruction.
+Add an API for reading the safe CPUID value across the
+system from the new infrastructure.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/insn.h |    2 ++
- arch/arm64/kernel/insn.c      |   29 +++++++++++++++++++++++++++++
- 2 files changed, 31 insertions(+)
+ arch/arm64/include/asm/cpufeature.h |    2 ++
+ arch/arm64/kernel/cpufeature.c      |    9 +++++++++
+ 2 files changed, 11 insertions(+)
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 30e50eb..6dea3bc 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -289,6 +289,8 @@ enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
- u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn);
- u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
- 				  u32 insn, u64 imm);
-+u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
-+					 u32 insn);
- u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
- 				enum aarch64_insn_branch_type type);
- u32 aarch64_insn_gen_comp_branch_imm(unsigned long pc, unsigned long addr,
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index f341866..4286fed 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -388,6 +388,35 @@ u32 __kprobes aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
- 	return insn;
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 7927ac2..f59e90a 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -149,6 +149,8 @@ void check_local_cpu_features(void);
+ bool cpu_supports_mixed_endian_el0(void);
+ bool system_supports_mixed_endian_el0(void);
+ 
++u64 read_system_reg(u32 id);
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 960a62f..a736c13 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -593,6 +593,15 @@ void update_cpu_features(int cpu,
+ 	update_mixed_endian_el0_support(info);
  }
  
-+u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
-+					u32 insn)
++u64 read_system_reg(u32 id)
 +{
-+	int shift;
++	struct arm64_ftr_reg *regp = get_arm64_sys_reg(id);
 +
-+	switch (type) {
-+	case AARCH64_INSN_REGTYPE_RT:
-+	case AARCH64_INSN_REGTYPE_RD:
-+		shift = 0;
-+		break;
-+	case AARCH64_INSN_REGTYPE_RN:
-+		shift = 5;
-+		break;
-+	case AARCH64_INSN_REGTYPE_RT2:
-+	case AARCH64_INSN_REGTYPE_RA:
-+		shift = 10;
-+		break;
-+	case AARCH64_INSN_REGTYPE_RM:
-+		shift = 16;
-+		break;
-+	default:
-+		pr_err("%s: unknown register type encoding %d\n", __func__,
-+		       type);
-+		return 0;
-+	}
-+
-+	return (insn >> shift) & GENMASK(4, 0);
++	/* We shouldn't get a request for an unsupported register */
++	BUG_ON(!regp);
++	return regp->sys_val;
 +}
 +
- static u32 aarch64_insn_encode_register(enum aarch64_insn_register_type type,
- 					u32 insn,
- 					enum aarch64_insn_register reg)
+ static bool
+ feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
+ {
 -- 
 1.7.9.5
