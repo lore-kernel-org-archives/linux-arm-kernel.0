@@ -1,51 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Sep 2015 18:05:05 +0100
-Subject: [PATCH] arm64: Add support for PTE contiguous bit.
-In-Reply-To: <1442340117-3964-1-git-send-email-dwoods@ezchip.com>
-References: <1442340117-3964-1-git-send-email-dwoods@ezchip.com>
-Message-ID: <20150916170505.GR28771@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 17 Sep 2015 01:10:21 +0800
+Subject: Regression by 01f779f4862b ("irqchip/GIC: Don't deactivate
+ interrupts forwarded to a guest")
+In-Reply-To: <20150917005908.111c00ca@xhacker>
+References: <20150917003202.498ff83c@xhacker>
+ <alpine.DEB.2.11.1509161851330.3951@nanos>	<20150917005908.111c00ca@xhacker>
+Message-ID: <20150917011021.0460792d@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Dear Thomas,
 
-On Tue, Sep 15, 2015 at 07:01:57PM +0100, David Woods wrote:
-> The arm64 MMU supports a Contiguous bit which is a hint that the TTE
-> is one of a set of contiguous entries which can be cached in a single
-> TLB entry.  Supporting this bit adds new intermediate huge page sizes.
-> 
-> The set of huge page sizes available depends on the base page size.
-> Without using contiguous pages the huge page sizes are as follows.
-> 
->  4KB:   2MB  1GB
-> 64KB: 512MB  4TB
-> 
-> With 4KB pages, the contiguous bit groups together sets of 16 pages
-> and with 64KB pages it groups sets of 32 pages.  This enables two new
-> huge page sizes in each case, so that the full set of available sizes
-> is as follows.
-> 
->  4KB:  64KB   2MB  32MB  1GB
-> 64KB:   2MB 512MB  16GB  4TB
-> 
-> If the base page size is set to 64KB then 2MB pages are enabled by
-> default.  It is possible in the future to make 2MB the default huge
-> page size for both 4KB and 64KB pages.
-> 
-> Signed-off-by: David Woods <dwoods@ezchip.com>
-> Reviewed-by: Chris Metcalf <cmetcalf@ezchip.com>
-> ---
->  arch/arm64/Kconfig                     |   3 -
->  arch/arm64/include/asm/hugetlb.h       |   4 +
->  arch/arm64/include/asm/pgtable-hwdef.h |  15 +++
->  arch/arm64/include/asm/pgtable.h       |  30 +++++-
->  arch/arm64/mm/hugetlbpage.c            | 165 ++++++++++++++++++++++++++++++++-
->  5 files changed, 210 insertions(+), 7 deletions(-)
+On Thu, 17 Sep 2015 00:59:08 +0800
+Jisheng Zhang <jszhang@marvell.com> wrote:
 
-I glanced briefly at this, and I think you'll need to do some extra work
-for the CONFIG_HW_AFDBM=y case, where the CPU can set access/dirty bits
-in any (i.e. not necessarily all) of the page table entries in a
-contiguous mapping. In this case, things like huge_pte_dirty might need
-overriding.
+> On Wed, 16 Sep 2015 18:52:41 +0200
+> Thomas Gleixner <tglx@linutronix.de> wrote:
+> 
+> > On Thu, 17 Sep 2015, Jisheng Zhang wrote:
+> > 
+> > > Hi Marc,
+> > > 
+> > > Commit 01f779f4862b ("irqchip/GIC: Don't deactivate interrupts forwarded to a
+> > > guest") causes a regression on Marvell BG4CT SoC. In this SoC, there's only one
+> > > GIC, the secondary irq controller is Synopsys DW iCtl:
+> > > drivers/irqchip/irq-dw-apb-ictl.c
+> > > 
+> > > So cascading_gic_irq() should return true on Marvell BG4CT SoC, but it returns
+> > > false. The logic in cascading_gic_irq() doesn't take cascaded irq controller
+> > > which is provided by non-gic controllers.
+> > 
+> > I have a fix pending for this in
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git tmp.irq
+> > 
+> > 714665351cc7: irqchip/gic: Use IRQD_FORWARDED_TO_VCPU flag
+> > 
+> > Can you please give that a try?
+> 
+> Sure, Will try and get back to you
 
-Will
+Good news! The regression is fixed, cascaded irq works again!
+
+Feel free to add
+
+Tested-by: Jisheng Zhang <jszhang@marvell.com>
+
+Thanks lot for this patch,
+Jisheng
