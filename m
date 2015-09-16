@@ -1,65 +1,143 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed, 16 Sep 2015 11:53:18 +0530
-Subject: [PATCH v2 4/9] clk: qcom: create virtual child device for TSENS
+Date: Wed, 16 Sep 2015 11:53:20 +0530
+Subject: [PATCH v2 6/9] arm: dts: msm8974: Add thermal zones,
+ tsens and qfprom nodes
 In-Reply-To: <1442384603-26053-1-git-send-email-rnayak@codeaurora.org>
 References: <1442384603-26053-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1442384603-26053-5-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1442384603-26053-7-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-8960 family of devices have TSENS as part of GCC in hardware.
-Hence DT would represent a GCC node with GCC properties as well
-as TSENS. Create a virtual platform child device here for TSENS
-so the driver can probe it and use the parent (GCC) to extract DT
-properties.
+Add thermal zones, tsens and qfprom nodes
 
-Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- drivers/clk/qcom/gcc-msm8960.c | 23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 105 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 105 insertions(+)
 
-diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
-index aa294b1..51db3a5 100644
---- a/drivers/clk/qcom/gcc-msm8960.c
-+++ b/drivers/clk/qcom/gcc-msm8960.c
-@@ -3506,6 +3506,8 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
- 	struct clk *clk;
- 	struct device *dev = &pdev->dev;
- 	const struct of_device_id *match;
-+	struct platform_device *tsens;
-+	int ret;
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index ab8e572..cc88412 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -86,6 +86,88 @@
+ 		};
+ 	};
  
- 	match = of_match_device(gcc_msm8960_match_table, &pdev->dev);
- 	if (!match)
-@@ -3520,7 +3522,26 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
- 	if (IS_ERR(clk))
- 		return PTR_ERR(clk);
- 
--	return qcom_cc_probe(pdev, match->data);
-+	ret = qcom_cc_probe(pdev, match->data);
-+	if (ret)
-+		return ret;
++	thermal-zones {
++		cpu-thermal0 {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
 +
-+	tsens = platform_device_alloc("qcom-tsens", -1);
-+	if (!tsens) {
-+		ret = -ENOMEM;
-+		goto err_alloc;
-+	}
++			thermal-sensors = <&tsens 5>;
 +
-+	tsens->dev.parent = &pdev->dev;
-+	ret = platform_device_add(tsens);
-+	if (ret)
-+		goto err_add;
-+	return 0;
-+err_add:
-+	platform_device_put(tsens);
-+err_alloc:
-+	qcom_cc_remove(pdev);
-+	return ret;
- }
++			trips {
++				cpu_alert0: trip at 0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++				cpu_crit0: trip at 1 {
++					temperature = <95000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++		};
++
++		cpu-thermal1 {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens 6>;
++
++			trips {
++				cpu_alert1: trip at 0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++				cpu_crit1: trip at 1 {
++					temperature = <95000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++		};
++
++		cpu-thermal2 {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens 7>;
++
++			trips {
++				cpu_alert2: trip at 0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++				cpu_crit2: trip at 1 {
++					temperature = <95000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++		};
++
++		cpu-thermal3 {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens 8>;
++
++			trips {
++				cpu_alert3: trip at 0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++				cpu_crit3: trip at 1 {
++					temperature = <95000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++		};
++	};
++
+ 	cpu-pmu {
+ 		compatible = "qcom,krait-pmu";
+ 		interrupts = <1 7 0xf04>;
+@@ -114,6 +196,29 @@
+ 			      <0xf9002000 0x1000>;
+ 		};
  
- static int gcc_msm8960_remove(struct platform_device *pdev)
++		qfprom: qfprom at fc4bc000 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "qcom,qfprom";
++			reg = <0xfc4bc000 0x1000>;
++			tsens_calib: calib at d0 {
++				reg = <0xd0 0x18>;
++			};
++			tsens_backup: backup at 440 {
++				reg = <0x440 0x10>;
++			};
++		};
++
++		tsens: thermal-sensor at fc4a8000 {
++			compatible = "qcom,msm8974-tsens";
++			reg = <0xfc4a8000 0x2000>;
++			nvmem-cells = <&tsens_calib>, <&tsens_backup>;
++			nvmem-cell-names = "calib", "calib_backup";
++			qcom,tsens-slopes = <3200 3200 3200 3200 3200 3200
++				3200 3200 3200 3200 3200>;
++			#thermal-sensor-cells = <1>;
++		};
++
+ 		timer at f9020000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
