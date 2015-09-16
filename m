@@ -1,82 +1,70 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 16 Sep 2015 11:32:32 +0100
-Subject: [PATCH 2/6] PCI: generic: Only fixup irqs for bus we are creating.
-In-Reply-To: <55F85A24.2010600@caviumnetworks.com>
-References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
- <1442013719-5001-3-git-send-email-ddaney.cavm@gmail.com>
- <20150915173654.GJ31157@arm.com>
- <55F85A24.2010600@caviumnetworks.com>
-Message-ID: <20150916103232.GB17510@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 16 Sep 2015 11:33:37 +0100
+Subject: [PATCH] kvm: arm: LPAE: Incorrect device to IPA mapping
+In-Reply-To: <1442397895-2124-1-git-send-email-marek.majtyka@tieto.com>
+References: <1442397895-2124-1-git-send-email-marek.majtyka@tieto.com>
+Message-ID: <55F94581.2060002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 06:49:24PM +0100, David Daney wrote:
-> On 09/15/2015 10:36 AM, Will Deacon wrote:
-> > Hi David,
-> >
-> > On Sat, Sep 12, 2015 at 12:21:55AM +0100, David Daney wrote:
-> >> From: David Daney <david.daney@cavium.com>
-> >>
-> >> Use pci_walk_bus() to restrict the fixup irq actions to only the bus
-> >> being created.
-> >>
-> >> If we create multiple buses with pci-host-generic, or there are buses
-> >> created by other drivers, we don't want to call pci_fixup_irqs() which
-> >> operates on all devices, not just the devices on the bus being added.
-> >> The consequence is that either the fixups are done more than once, or
-> >> in some cases incorrect fixups could be applied.
-> >>
-> >> Signed-off-by: David Daney <david.daney@cavium.com>
-> >> ---
-> >>   drivers/pci/host/pci-host-generic.c | 8 +++++++-
-> >>   1 file changed, 7 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> >> index 265dd25..a0fb241 100644
-> >> --- a/drivers/pci/host/pci-host-generic.c
-> >> +++ b/drivers/pci/host/pci-host-generic.c
-> >> @@ -205,6 +205,12 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
-> >>   	return 0;
-> >>   }
-> >>
-> >> +static int gen_pci_fixup_irq_cb(struct pci_dev *dev, void *arg)
-> >> +{
-> >> +	pdev_fixup_irq(dev, pci_common_swizzle, of_irq_parse_and_map_pci);
-> >> +	return 0;
-> >> +}
-> >> +
-> >>   static int gen_pci_probe(struct platform_device *pdev)
-> >>   {
-> >>   	int err;
-> >> @@ -262,7 +268,7 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >>   		return -ENODEV;
-> >>   	}
-> >>
-> >> -	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-> >> +	pci_walk_bus(bus, gen_pci_fixup_irq_cb, NULL);
-> >
-> > Any chance we could put something in the core PCI code for this? I think
-> > any host controller wanting to work with arm64 is potentially going to
-> > run into the same problem.
+Hi Marek,
+
+On 16/09/15 11:04, marek.majtyka wrote:
+> From: Marek Majtyka <marek.majtyka@tieto.com>
 > 
-> Good idea.
+> A critical bug has been found in device memory stage1 translation for machines
+> with more then 4GB of RAM. Once vm_pgoff size is smaller then pa (which is true
+> for LPAE case, u32 and u64 respectively) some more significant bits of pa may
+> be lost as a shift operation is performed on u32 and later cast onto u64.
 > 
-> I will move the walking code into setup-irq.c (the current home of 
-> pci_fixup_irqs()), and make it part of patch 1/6.
+> Example: vm_pgoff(u32)=0x00210030, PAGE_SHIFT=12
+>         expected pa(u64):   0x0000002010030000
+>         produced pa(u64):   0x0000000010030000
+> 
+> A suggested fix is changing the order of operations (casting first onto
+> phys_addr_t and then shifting), which works for both alternatives
+> (with and without LPAE).
 
-For arm64 we could even compile out pci_fixup_irqs() since the IRQ mapping
-is done in pcibios_add_device() through DT, I agree on CONFIG_ARM this
-needs fixing though, so yes, make it common code and patch all host
-controllers that make use of pci_fixup_irqs() since that's a common
-issue as far as I can see (ARM pcibios works around it by having a
-IRQ mapping function per bus and it provides an API to initialize
-multiple host controllers at once and fixing up IRQs before devices
-are added, still, for host controllers that do not use that
-functionality - eg drivers/pci/host/pcie-designware.c - if there are
-multiple host controllers instances we run into the same problem).
+Well, you can't use KVM without LPAE, so that's a moot point. Also, the
+issue is when you place things above 4GB, not when you have more than
+4GB of RAM (I cannot see how you allocate that amount of memory from
+userspace on 32bit).
 
-Side note: do you have any PCI host controller where mapping IRQs through
-of_irq_parse_and_map_pci() does not work ? If yes, why ?
+> 
+> A bug has been found, fixed and tested on kernel v3.19. However, it seems to be
+> valid for most, if not all, newer version starting from v3.18.
+> 
+> Signed-off-by: Marek Majtyka <marek.majtyka@tieto.com>
+> ---
+>  arch/arm/kvm/mmu.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 1366625..602bc63 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -1408,7 +1408,8 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+>  		if (vma->vm_flags & VM_PFNMAP) {
+>  			gpa_t gpa = mem->guest_phys_addr +
+>  				    (vm_start - mem->userspace_addr);
+> -			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) +
+> +			phys_addr_t pa =
+> +				((phys_addr_t) vma->vm_pgoff << PAGE_SHIFT) +
+>  					 vm_start - vma->vm_start;
+>  
+>  			ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
+> 
 
-Cheers,
-Lorenzo
+Looks perfectly valid to me (the formatting is horrible, but I can fix
+that - I can only guess you've followed checkpatch's silly advise).
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Christoffer: if you're OK with that one, I'll add it to the next batch
+of fixes.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
