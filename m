@@ -1,31 +1,42 @@
-From: damien.thebault@vitec.com (=?utf-8?B?RGFtaWVuIFRow6liYXVsdA==?=)
-Date: Wed, 16 Sep 2015 06:53:57 +0000
-Subject: NFS/TCP/IPv6 acting strangely in 4.2
-In-Reply-To: <20150911113839.GO21084@n2100.arm.linux.org.uk>
-References: <20150911113839.GO21084@n2100.arm.linux.org.uk>
-Message-ID: <1442386435.3756.282.camel@vitec.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 16 Sep 2015 07:52:46 +0100
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <20150916043328.GA29943@linux>
+References: <20150909075930.GB3260@x1> <20150909083031.GB5266@linux>
+ <20150909133930.GE3260@x1> <20150909160212.GJ5266@linux>
+ <20150909163620.GF3260@x1> <55F0C5AB.5060609@kernel.org>
+ <20150910005722.GA15099@codeaurora.org>
+ <20150910010426.GM5266@linux> <20150910083146.GG3260@x1>
+ <20150916043328.GA29943@linux>
+Message-ID: <20150916065246.GA3218@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-09-11 at 12:38 +0100, Russell King - ARM Linux wrote:
-> I have a recent Marvell Armada 388 board here which uses the mvneta
-> driver.  I'm seeing some weird effects with NFS with it acting as a
-> client.
+On Wed, 16 Sep 2015, Viresh Kumar wrote:
 
-Hello,
+> On 10-09-15, 09:31, Lee Jones wrote:
+> > I think you answered your own question.
+> > 
+> > No users == !ABI == Strip it out.
+> 
+> Okay, as I have delayed things enough for you, didn't wanted to do
+> that anymore. And so worked on it despite very tight schedule :)
+> 
+> Below is the refreshed binding changes (I have split that into 3
+> patches, but kept the diff here for simplicity).
+> 
+> Other than that, all code changes you need to test your driver are
+> pushed here:
+> 
+> https://git.linaro.org/people/viresh.kumar/linux.git opp/supported-hw-prop-name-v1
+> 
+> I am not gonna post the patches to the lists, until the time existing
+> patches get reviewed.
 
-I'm upgrading a Marvelle Armada 370 board using the mvneta driver from
-4.0 to 4.2 and noticed issues with NFS booting.
-Basically, most of the time init returns with an error code, or
-programs segfault or throw illegal instructions.
+Thanks dude.
 
-Since it worked fine on 4.0 I bisected until I found commit
-a84e32894191cfcbffa54180d78d7d4654d56c20 "net: mvneta: fix refilling
-for Rx DMA buffers".
-
-If I revert this commit, everything seems to get back to normal.
-Could you try it ? The two issues look very similar.
-
-Regards
 -- 
-Damien Th?bault
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
