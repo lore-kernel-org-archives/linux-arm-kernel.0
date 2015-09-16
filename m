@@ -1,22 +1,99 @@
-From: andi@firstfloor.org (Andi Kleen)
-Date: Wed, 16 Sep 2015 04:32:19 +0200
-Subject: [PATCH 0/3] Add __ioread32_copy() and use it
-In-Reply-To: <20150915155815.5a41a8dc537610ab44d8d3dc@linux-foundation.org>
-References: <1442346089-32077-1-git-send-email-sboyd@codeaurora.org>
- <20150915155815.5a41a8dc537610ab44d8d3dc@linux-foundation.org>
-Message-ID: <20150916023219.GD1747@two.firstfloor.org>
+From: Yuantian.Tang@freescale.com (Yuantian Tang)
+Date: Wed, 16 Sep 2015 02:35:10 +0000
+Subject: [PATCH v2 1/2] fsl: Add binding for RCPM
+In-Reply-To: <1442370701.2909.167.camel@freescale.com>
+References: <1442307339-15225-1-git-send-email-dongsheng.wang@freescale.com>
+ <1442361398.2909.164.camel@freescale.com>
+ <SN1PR0301MB1616C48FB3D990BCA45289AB9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+ <1442369955.2909.166.camel@freescale.com>
+ <SN1PR0301MB161688E3AF527ADC76AB2B8F9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+ <1442370701.2909.167.camel@freescale.com>
+Message-ID: <DM2PR03MB574196E1A0D55C185CE1B4BFA5B0@DM2PR03MB574.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> __iowrite32_copy() is marked __visible.  I don't actually know what
-> that does and Andi's d47d5c8194579bc changelog (which sucks the big
-> one) didn't explain it.  Apparently it has something to do with being
-> implemented in assembly, but zillions of functions are implemented in
-> assembly, so why are only two functions marked this way?  Anyway,
-> __ioread32_copy() is implemented in C so I guess __visible isn't needed
-> there.
 
-__visible is needed for C functions that are called from assembler.
-Otherwise the compiler may optimize them away.
 
--Andi
+> -----Original Message-----
+> From: Wood Scott-B07421
+> Sent: Wednesday, September 16, 2015 10:32 AM
+> To: Wang Dongsheng-B40534 <Dongsheng.Wang@freescale.com>
+> Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
+> robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang Huan-
+> B18965 <alison.wang@freescale.com>; Jin Zhengxiong-R64188
+> <Jason.Jin@freescale.com>; Zhao Chenhui-B35336
+> <chenhui.zhao@freescale.com>; Tang Yuantian-B29983
+> <Yuantian.Tang@freescale.com>
+> Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> 
+> On Tue, 2015-09-15 at 21:30 -0500, Wang Dongsheng-B40534 wrote:
+> > Hi Scott,
+> >
+> > > -----Original Message-----
+> > > From: Wood Scott-B07421
+> > > Sent: Wednesday, September 16, 2015 10:19 AM
+> > > To: Wang Dongsheng-B40534
+> > > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
+> > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang Huan-
+> > > B18965; Jin
+> > > Zhengxiong-R64188; Zhao Chenhui-B35336; Tang Yuantian-B29983
+> > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > >
+> > > On Tue, 2015-09-15 at 21:15 -0500, Wang Dongsheng-B40534 wrote:
+> > > > Hi Scott,
+> > > >
+> > > > > -----Original Message-----
+> > > > > From: Wood Scott-B07421
+> > > > > Sent: Wednesday, September 16, 2015 7:57 AM
+> > > > > To: Wang Dongsheng-B40534
+> > > > > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
+> > > > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang
+> > > > > robh+Huan-
+> > > > > B18965; Jin
+> > > > > Zhengxiong-R64188; Zhao Chenhui-B35336; Tang Yuantian-B29983
+> > > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > > > >
+> > > > > On Tue, 2015-09-15 at 16:55 +0800, Dongsheng Wang wrote:
+> > > > > > +* Freescale RCPM Wakeup Source Device Tree Bindings
+> > > > > > +-------------------------------------------
+> > > > > > +Required rcpm-wakeup property should be added to a device
+> > > > > > +node if the
+> > > > > > device
+> > > > > > +can be used as a wakeup source.
+> > > > > > +
+> > > > > > +  - rcpm-wakeup: The value of the property consists of 3 cells.
+> > > > > > + The
+> > > > > > first
+> > > > > > cell
+> > > > > > +     is a pointer to the rcpm node, the second cell is the
+> > > > > > + bit mask
+> > > > > > that
+> > > > > > +     should be set in IPPDEXPCR0, and the last cell is for
+> > > > > > IPPDEXPCR1.
+> > > > > > +     Note: If the platform has no IPPDEXPCR1 register, put a
+> > > > > > + zero
+> > > > > > here.
+> > > > >
+> > > > > What if a future platform has more than two of these registers?
+> > > >
+> > > > Those registers are only used for wakeup device, we have a lot of
+> > > > available bit for feature. For example, In LS1021a platform only
+> > > > 7bits has used in the registers, and 57bits is reserved.
+> > >
+> > > Still, it'd be better to for the rcpm node to advertise the number
+> > > of cells it expects.
+> >
+> > For the foreseeable future it should be enough to use, even if not
+> > enough to use in the future at that time we can update the binding.
+> 
+> That's the whole point.  Device tree is stable ABI.  Updating it later to not be
+> fixed to two cells would be a lot harder than getting it right from the
+> beginning.  Putting the number of cells in the phandle target is a standard
+> device tree idiom.
+> 
+I agree with you. But what's the point a SOC has more than 64 wakeup source?
+
+Regards,
+Yuantian
+
+> -Scott
