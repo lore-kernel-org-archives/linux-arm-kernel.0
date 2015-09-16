@@ -1,46 +1,57 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 15 Sep 2015 17:39:22 -0700
-Subject: [PATCH 8/8] PCI: iproc: Fix compile warnings
+Date: Tue, 15 Sep 2015 17:39:20 -0700
+Subject: [PATCH 6/8] PCI: iproc: Update iProc PCIe device tree bindings
 In-Reply-To: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
 References: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1442363962-29805-9-git-send-email-rjui@broadcom.com>
+Message-ID: <1442363962-29805-7-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are several compile warnings in pcie-iproc.c related to the
-printing of a size_t value.  This is a 32bit value on arm, and 64bit on
-arm64.  However, the printks are for 64bit values (thus the warning).
-Using the %pap printk for these values (per
-Documentation/printk-formats.txt) corrects the issue.
+This patch updates the iProc PCIe device tree bindings with added
+support for outbound mapping configurations
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
+Signed-off-by: Ray Jui <rjui@broadcom.com>
 ---
- drivers/pci/host/pcie-iproc.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/pci/brcm,iproc-pcie.txt      | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index 2ba3c4b..f3481dd 100644
---- a/drivers/pci/host/pcie-iproc.c
-+++ b/drivers/pci/host/pcie-iproc.c
-@@ -244,15 +244,15 @@ static int iproc_pcie_setup_ob(struct iproc_pcie *pcie, u64 axi_addr,
+diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+index f7ce50e..45c2a80 100644
+--- a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+@@ -17,6 +17,21 @@ Optional properties:
+ - phys: phandle of the PCIe PHY device
+ - phy-names: must be "pcie-phy"
  
- 	if (size > max_size) {
- 		dev_err(pcie->dev,
--			"res size 0x%llx exceeds max supported size 0x%llx\n",
--			(u64)size, max_size);
-+			"res size 0x%pap exceeds max supported size 0x%llx\n",
-+			&size, max_size);
- 		return -EINVAL;
- 	}
++- brcm,pcie-ob: Some iProc SoCs do not have the outbound address mapping done
++by the ASIC after power on reset. In this case, SW needs to configure it
++
++If the brcm,pcie-ob property is present, the following properties become
++effective:
++
++Required:
++- brcm,pcie-ob-axi-offset: The offset from the AXI address to the internal
++address used by the iProc PCIe core (not the PCIe address)
++- brcm,pcie-ob-window-size: The outbound address mapping window size (in MB)
++
++Optional:
++- brcm,pcie-ob-oarr-size: Some iProc SoCs need the OARR size bit to be set to
++increase the outbound window size
++
+ Example:
+ 	pcie0: pcie at 18012000 {
+ 		compatible = "brcm,iproc-pcie";
+@@ -38,6 +53,11 @@ Example:
  
- 	if (size % ob->window_size) {
- 		dev_err(pcie->dev,
--			"res size 0x%llx needs to be multiple of "
--			"window size 0x%llx\n", (u64)size, ob->window_size);
-+			"res size %pap needs to be multiple of window size %pap\n",
-+			&size, &ob->window_size);
- 		return -EINVAL;
- 	}
+ 		phys = <&phy 0 5>;
+ 		phy-names = "pcie-phy";
++
++		brcm,pcie-ob;
++		brcm,pcie-ob-oarr-size;
++		brcm,pcie-ob-axi-offset = <0x00000000>;
++		brcm,pcie-ob-window-size = <256>;
+ 	};
  
+ 	pcie1: pcie at 18013000 {
 -- 
 1.9.1
