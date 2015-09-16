@@ -1,33 +1,48 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 16 Sep 2015 14:03:04 -0500
-Subject: [PATCH 5/7] arm64: Default kernel pages should be contiguous
+Date: Wed, 16 Sep 2015 14:03:03 -0500
+Subject: [PATCH 4/7] arm64: Macros to check/set/unset the contiguous bit
 In-Reply-To: <1442430186-9083-1-git-send-email-jeremy.linton@arm.com>
 References: <1442430186-9083-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1442430186-9083-6-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1442430186-9083-5-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default page attributes for a PMD being broken should have the CONT bit
-set. Create a new definition for an early boot range of PTE's that are
-contiguous.
+Add the supporting macros to check if the contiguous bit
+is set, set the bit, or clear it in a PTE entry.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/include/asm/pgtable.h | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/include/asm/pgtable.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index d43e1d1..252499e 100644
+index 6900b2d9..d43e1d1 100644
 --- a/arch/arm64/include/asm/pgtable.h
 +++ b/arch/arm64/include/asm/pgtable.h
-@@ -76,6 +76,8 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
+@@ -144,6 +144,7 @@ extern struct page *empty_zero_page;
+ #define pte_special(pte)	(!!(pte_val(pte) & PTE_SPECIAL))
+ #define pte_write(pte)		(!!(pte_val(pte) & PTE_WRITE))
+ #define pte_exec(pte)		(!(pte_val(pte) & PTE_UXN))
++#define pte_cont(pte)		(!!(pte_val(pte) & PTE_CONT))
  
- #define PAGE_KERNEL		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
- #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
-+#define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | \
-+					 PTE_WRITE | PTE_CONT)
+ #ifdef CONFIG_ARM64_HW_AFDBM
+ #define pte_hw_dirty(pte)	(!(pte_val(pte) & PTE_RDONLY))
+@@ -206,6 +207,16 @@ static inline pte_t pte_mkspecial(pte_t pte)
+ 	return set_pte_bit(pte, __pgprot(PTE_SPECIAL));
+ }
  
- #define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP)
- #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
++static inline pte_t pte_mkcont(pte_t pte)
++{
++	return set_pte_bit(pte, __pgprot(PTE_CONT));
++}
++
++static inline pte_t pte_mknoncont(pte_t pte)
++{
++	return clear_pte_bit(pte, __pgprot(PTE_CONT));
++}
++
+ static inline void set_pte(pte_t *ptep, pte_t pte)
+ {
+ 	*ptep = pte;
 -- 
 2.4.3
