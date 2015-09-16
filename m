@@ -1,98 +1,66 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 16 Sep 2015 04:44:25 +0200
-Subject: [PATCH v3 0/5] ACPI: Provide better MADT subtable sanity checks
-In-Reply-To: <55F889E8.3070706@redhat.com>
-References: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
- <55F889E8.3070706@redhat.com>
-Message-ID: <1880799.vMhNVMG5Vc@vostro.rjw.lan>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 15 Sep 2015 21:17:17 -0500
+Subject: [PATCH v9 5/6] Documentation: DT: Add HiSilicon PCIe host binding
+In-Reply-To: <55F8C268.2020809@hisilicon.com>
+References: <1442321361-174300-1-git-send-email-wangzhou1@hisilicon.com>
+ <1442321361-174300-6-git-send-email-wangzhou1@hisilicon.com>
+ <55F874F9.1060804@kernel.org> <55F8C268.2020809@hisilicon.com>
+Message-ID: <55F8D12D.50107@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 15, 2015 03:13:12 PM Al Stone wrote:
-> On 09/09/2015 03:09 PM, Al Stone wrote:
-> > Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
-> > check on the various subtables that are defined for the MADT.  The check
-> > compares the size of the subtable data structure as defined by ACPICA to
-> > the length entry in the subtable.  If they are not the same, the assumption
-> > is that the subtable is incorrect.
-> > 
-> > Over time, the ACPI spec has allowed for MADT subtables where this can
-> > never be true (the local SAPIC subtable, for example).  Or, more recently,
-> > the spec has accumulated some minor flaws where there are three possible 
-> > sizes for a subtable, all of which are valid, but only for specific versions
-> > of the spec (the GICC subtable).  In both cases, BAD_MADT_ENTRY reports these
-> > subtables as bad when they are not.  In order to retain some sanity check
-> > on the MADT subtables, we now have to special case these subtables.  Of
-> > necessity, these special cases have ended up in arch-dependent code (arm64)
-> > or an arch has simply decided to forgo the check (ia64).
-> > 
-> > This patch set replaces the BAD_MADT_ENTRY macro with a function called
-> > bad_madt_entry().  This function uses a data set of details about the
-> > subtables to provide more sanity checking than before:
-> > 
-> > 	-- is the subtable legal for the version given in the FADT?
-> > 
-> > 	-- is the subtable legal for the revision of the MADT in use?
-> > 
-> > 	-- is the subtable of the proper length (including checking
-> > 	   on the one variable length subtable that is currently ignored),
-> > 	   given the FADT version and the MADT revision?
-> > 
-> > Further, this patch set adds in the call to bad_madt_entry() from the 
-> > acpi_table_parse_madt() function, allowing it to be used consistently
-> > by all architectures, for all subtables, and removing the need for each
-> > of the subtable traversal callback functions to use BAD_MADT_ENTRY.
-> > 
-> > In theory, as the ACPI specification changes, we would only have to add
-> > additional information to the data set describing the MADT subtables in
-> > order to continue providing sanity checks, even when new subtables are
-> > added.
-> > 
-> > These patches have been tested on an APM Mustang (arm64) and are known to
-> > work there.  They have also been cross-compiled for x86 and ia64 with no
-> > known failures.
-> > 
-> > Changes for v3:
-> >    -- Reviewed-and-tested-by from Sudeep Holla for arm64 parts
-> >    -- Clearer language in error messages (Graeme Gregory, Timur Tabi)
-> >    -- Double checked that inserting call to bad_madt_entry() into the
-> >       function acpi_parse_entries() does not impact current behavior
-> >       (Sudeep Holla)
-> >    
-> > Changes for v2:
-> >    -- Acked-by on 2/5 from Marc Zyngier and Catalin Marinas for ARM
-> >    -- Correct faulty end of loop test found by Timur Tabi
-> > 
-> > 
-> > Al Stone (5):
-> >   ACPI: add in a bad_madt_entry() function to eventually replace the
-> >     macro
-> >   ACPI / ARM64: remove usage of BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
-> >   ACPI / IA64: remove usage of BAD_MADT_ENTRY
-> >   ACPI / X86: remove usage of BAD_MADT_ENTRY
-> >   ACPI: remove definition of BAD_MADT_ENTRY macro
-> > 
-> >  arch/arm64/include/asm/acpi.h |   8 --
-> >  arch/arm64/kernel/smp.c       |   2 -
-> >  arch/ia64/kernel/acpi.c       |  20 ----
-> >  arch/x86/kernel/acpi/boot.c   |  27 -----
-> >  drivers/acpi/tables.c         | 245 +++++++++++++++++++++++++++++++++++++++++-
-> >  drivers/irqchip/irq-gic.c     |   6 --
-> >  include/linux/acpi.h          |   4 -
-> >  7 files changed, 244 insertions(+), 68 deletions(-)
-> > 
+On 09/15/2015 08:14 PM, Zhou Wang wrote:
+> On 2015/9/16 3:43, Rob Herring wrote:
+>> On 09/15/2015 07:49 AM, Zhou Wang wrote:
+>>> This patch adds related DTS binding document for HiSilicon PCIe host driver.
+>>>
+>>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+>>> ---
+>>>  .../devicetree/bindings/pci/hisilicon-pcie.txt     | 46 ++++++++++++++++++++++
+>>>  1 file changed, 46 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+>>> new file mode 100644
+>>> index 0000000..2afc9d1
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+>>> @@ -0,0 +1,46 @@
+>>> +HiSilicon PCIe host bridge DT description
+>>> +
+>>> +HiSilicon PCIe host controller is based on Designware PCI core.
+>>> +It shares common functions with PCIe Designware core driver and inherits
+>>> +common properties defined in
+>>> +Documentation/devicetree/bindings/pci/designware-pci.txt.
+>>> +
+>>> +Additional properties are described here:
+>>> +
+>>> +Required properties:
+>>> +- compatible: Should contain "hisilicon,hip05-pcie".
+>>> +- reg: Should contain rc_dbi, subctrl, config registers location and length.
+>>> +- reg-names: Must include the following entries:
+>>> +  "rc_dbi": controller configuration registers;
+>>> +  "subctrl": whole PCIe hosts configuration registers;
+>>> +  "config": PCIe configuration space registers.
+>>> +- msi-parent: Should be its_pcie which is an ITS receiving MSI interrupts.
+>>> +- port-id: Should be 0, 1, 2 or 3.
+>>
+>> What is port-id for? Use of instance indexes need to have good reason.
+>>
+>> Rob
 > 
-> Ping?  Any additional comments on this version?  I have only received
-> feedback from arm64 reviewers so far, over three revisions, even though
-> everyone that needs to be (ACPI, ia64, x86) has also been CCd.
-> 
-> Anyone else before I fix a couple of things for v4 that the arm64 folks
-> found?  ACKs?  NAKs?  Please don't bother me, I'm in the merge window :)?
+> There are four PCIe controllers in HiSilicon Hip05 SoC, port-id just indicates
+> which one we use. And we will use port-id to locate related registers in driver.
 
-The merge window is actually over, so why would you expect anything like that?
+Just having multiple instances is not a reason. So looking at the
+driver, port-id is used to calculate register addresses for these registers:
 
-I'm going to apply this series if people have no problems with it.  I do think
-it is slightly overkill, but then as long as it works ...
+#define PCIE_SUBCTRL_MODE_REG                           0x2800
+#define PCIE_SUBCTRL_SYS_STATE4_REG                     0x6818
 
-Thanks,
-Rafael
+Is the base address of subctrl the same on all 4 ports? If so, you
+should not have overlapping resources in the DT. Either split these 2
+registers into 2 reg regions (for each register) or use syscon to
+provide access to the region.
+
+Rob
