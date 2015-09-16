@@ -1,57 +1,49 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 16 Sep 2015 09:35:48 +0100
-Subject: Tegra baseline test results for v4.3-rc1
-Message-ID: <55F929E4.7000602@nvidia.com>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Wed, 16 Sep 2015 16:39:49 +0800
+Subject: [PATCH] ARM: zx: zx296702-pm-domain.c: Fix check return value of
+ devm_ioremap_resource
+In-Reply-To: <1442390740.28314.1.camel@ingics.com>
+References: <1442390740.28314.1.camel@ingics.com>
+Message-ID: <CABymUCNn4izor0Mrw4erLMYSMY7AMaQR5X9EtCYhC34ZBxCXng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra baseline test results for v4.3-rc1
-
-
-Here are some basic Tegra test results for Linux v4.3-rc1.
-Logs and other details at:
-
-    https://nvtb.github.io//linux/test_v4.3-rc1/20150912170103/
-
-
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 1/ 1): qemu-vexpress64
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.2 (64291f7db5bd8150a74ad2036f1037e6a0428df2)):
-   text     data      bss    total  kernel
- -37902   +71864     +856   +34818  defconfig
-+487145    +6536   +14016  +507697  multi_v7_defconfig
- -14232   +12960     +200    -1072  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.2 (64291f7db5bd8150a74ad2036f1037e6a0428df2))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-    -520k     520k        .      84k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-     -12k      12k        .      12k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-    -524k     524k        .      84k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-     -16k      16k        .      12k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-    -512k     512k        .      84k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-      -4k       4k        .      12k    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-    -520k     520k        .      84k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-     -12k      12k        .      12k       tegra30-beaver      tegra_defconfig       tegra30-beaver
+2015-09-16 16:05 GMT+08:00 Axel Lin <axel.lin@ingics.com>:
+> devm_ioremap_resource() returns ERR_PTR on failure.
+> devm_ioremap_resource() will also check res argument and show proper error
+> on error path, so remove the redundant checking for res and error messages.
+>
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> ---
+>  arch/arm/mach-zx/zx296702-pm-domain.c | 11 ++---------
+>  1 file changed, 2 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/mach-zx/zx296702-pm-domain.c b/arch/arm/mach-zx/zx296702-pm-domain.c
+> index e08574d..17f778b 100644
+> --- a/arch/arm/mach-zx/zx296702-pm-domain.c
+> +++ b/arch/arm/mach-zx/zx296702-pm-domain.c
+> @@ -163,16 +163,9 @@ static int zx296702_pd_probe(struct platform_device *pdev)
+>         genpd_data->num_domains = ARRAY_SIZE(zx296702_pm_domains);
+>
+>         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -       if (!res) {
+> -               dev_err(&pdev->dev, "no memory resource defined\n");
+> -               return -ENODEV;
+> -       }
+> -
+>         pcubase = devm_ioremap_resource(&pdev->dev, res);
+> -       if (!pcubase) {
+> -               dev_err(&pdev->dev, "ioremap fail.\n");
+> -               return -EIO;
+> -       }
+> +       if (IS_ERR(pcubase))
+> +               return PTR_ERR(pcubase);
+>
+>         for (i = 0; i < ARRAY_SIZE(zx296702_pm_domains); ++i)
+>                 pm_genpd_init(zx296702_pm_domains[i], NULL, false);
+> --
+> 2.1.4
+>
+>
+>
+Reviewed-by: Jun Nie <jun.nie@linaro.org>
