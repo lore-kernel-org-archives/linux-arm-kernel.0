@@ -1,70 +1,41 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 16 Sep 2015 14:48:57 -0400
-Subject: [PATCH] irqchip: bcm2835: Add FIQ support
-In-Reply-To: <20150916162157.GB21084@n2100.arm.linux.org.uk>
-References: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
- <87d1zj6fq2.fsf@eliezer.anholt.net> <55F5CD80.3020700@tronnes.org>
- <20150914090853.GF21084@n2100.arm.linux.org.uk>
- <87wpvtjcka.fsf@eliezer.anholt.net>
- <20150914143459.GN21084@n2100.arm.linux.org.uk>
- <87613a31jb.fsf@eliezer.anholt.net>
- <20150916162157.GB21084@n2100.arm.linux.org.uk>
-Message-ID: <87si6e9p46.fsf@eliezer.anholt.net>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 16 Sep 2015 14:02:59 -0500
+Subject: [PATCH 0/7] arm64: Use contigous PTE bit for the kernel linear mapping
+Message-ID: <1442430186-9083-1-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+When running 64k pages it became apparent that it was possible that the
+kernel could create more TLB pressure in certain circumstances when
+compared to the 4k page kernel. This is due to the fact that large
+portions of the 4k kernel can be mapped with 2M blocks.
+While the larger block size for 64k pages is 512M, it 
+frequently won't be used for assorted reasons.
 
-> On Wed, Sep 16, 2015 at 10:02:32AM -0400, Eric Anholt wrote:
->> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
->> 
->> > On Mon, Sep 14, 2015 at 07:33:09AM -0700, Eric Anholt wrote:
->> >> So, while FIQ isn't used in upstream, I think it's worthwhile to merge.
->> >> It is another step to bringing the downstream developers into the fold.
->> >
->> > I want to see the code _first_.  Until then, I'm sorry, this patch can't
->> > go in.
->> 
->> If you just want to see "Yes, GPL-compatible code using this is
->> available", then that is:
->
-> It's got nothing to do with "GPL-compatible code".  I want to audit
-> _all_ code that makes use of FIQ.  It disgusts me that you're trying
-> to dress this up as a licensing issue.  It isn't.
->
->> https://github.com/raspberrypi/linux/blob/rpi-4.1.y/drivers/usb/host/dwc_otg/dwc_otg_fiq_stub.S
->> https://github.com/raspberrypi/linux/blob/rpi-4.1.y/drivers/usb/host/dwc_otg/dwc_otg_fiq_fsm.c
->> 
->> If not, I'm curious what exactly is the reason the patch can't go in.
->
-> In any case, I'm not going to say yes to code which provides a new
-> internal kernel facility for mainline kernels, but with no mainline
-> kernel users.  Such code can only be to make external tree maintanence
-> easlier, but it has the unintended effect of making mainline kernel
-> maintanence harder.
->
-> Such facilities _should_ always come with a user of that new facility.
->
-> It's nothing personal, it's sane policy from experience.  I've had stuff
-> like this in the past, where people have sent new facilities without any
-> users, years have gone by without that facility being used.  The facility
-> has eventually been removed from the mainline kernel _because_ it doesn't
-> have any users.
->
-> Moreover, there are people who audit the kernel looking for facilities
-> which have no users and propose patches to remove them.
->
-> So, if you want some new facility to be merged into mainline kernels,
-> and for it to remain in the kernel, always accompany it with a user.
+ARMv8 has a contiguous PTE bit that allows the TLBs to map a range larger
+than a single PTE if the range is physically contiguous. So its
+a good idea to use this where appropriate for the kernel mapping.
 
-Thanks, this was all I needed.  In the subsystem I work in, the rule has
-been "You need to have open userspace using the thing that you can
-show", but obviously you only get to merge the user once the core stuff
-is done.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150916/49a2a36d/attachment.sig>
+This patch adds the definitions for the contiguous bit, updates the kernel
+page range dump to understand them (and block translations),
+and updates the code in mmu.c to use the contiguous bit where appropriate
+for the kernel linear mapping.
+
+Jeremy Linton (7):
+  arm64: Add contiguous page flag shifts and constants
+  arm64: Shorten lines which exceed 80 characters
+  arm64: PTE/PMD contiguous bit definition
+  arm64: Macros to check/set/unset the contiguous bit
+  arm64: Default kernel pages should be contiguous
+  arm64: Make the kernel page dump utility aware of the CONT bit
+  arm64: Mark kernel page ranges contiguous
+
+ arch/arm64/include/asm/page.h          |  8 +++-
+ arch/arm64/include/asm/pgtable-hwdef.h | 25 ++++++++----
+ arch/arm64/include/asm/pgtable.h       | 13 +++++++
+ arch/arm64/mm/dump.c                   | 18 ++++++++-
+ arch/arm64/mm/mmu.c                    | 70 ++++++++++++++++++++++++++++++----
+ 5 files changed, 116 insertions(+), 18 deletions(-)
+
+-- 
+2.4.3
