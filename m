@@ -1,56 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Sep 2015 17:55:28 +0100
-Subject: Regression by 01f779f4862b ("irqchip/GIC: Don't deactivate
- interrupts forwarded to a guest")
-In-Reply-To: <20150917004330.208ec1c6@xhacker>
-References: <20150917003202.498ff83c@xhacker> <20150917004330.208ec1c6@xhacker>
-Message-ID: <55F99F00.4040708@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Sep 2015 17:57:08 +0100
+Subject: [PATCH] ARM: multi_v7: Rebuild default configuration on v4.3-rc1
+In-Reply-To: <7h37yegwpw.fsf@deeprootsystems.com>
+References: <1442314300-4714-1-git-send-email-thierry.reding@gmail.com>
+ <20150915111257.GR21084@n2100.arm.linux.org.uk>
+ <20150915134639.GC2983@ulmo.nvidia.com>
+ <20150915142321.GU21084@n2100.arm.linux.org.uk>
+ <20150915152328.GA25966@ulmo.nvidia.com>
+ <7h37yegwpw.fsf@deeprootsystems.com>
+Message-ID: <20150916165708.GG21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/09/15 17:43, Jisheng Zhang wrote:
-> Hi Marc,
-> 
-> On Thu, 17 Sep 2015 00:32:02 +0800
-> Jisheng Zhang <jszhang@marvell.com> wrote:
-> 
->> Hi Marc,
->>
->> Commit 01f779f4862b ("irqchip/GIC: Don't deactivate interrupts forwarded to a
->> guest") causes a regression on Marvell BG4CT SoC. In this SoC, there's only one
-> 
-> The regression phenomenon is all cascaded irq can't be handled correctly.
-> 
-> Thanks,
-> Jisheng
-> 
->> GIC, the secondary irq controller is Synopsys DW iCtl:
->> drivers/irqchip/irq-dw-apb-ictl.c
->>
->> So cascading_gic_irq() should return true on Marvell BG4CT SoC, but it returns
->> false. The logic in cascading_gic_irq() doesn't take cascaded irq controller
->> which is provided by non-gic controllers.
+On Wed, Sep 16, 2015 at 09:22:51AM -0700, Kevin Hilman wrote:
+> As one of the maintainers of multi_v7_defconfig, I'm fully supportive of
 
-This logic is only for secondary GICs, and doesn't make any sense
-for another interrupt controller.
+As ARM maintainer...
 
-More importantly, I don't quite understand how this:
+> avoiding the growing cruftyness of this file, and making it more
+> maintainable, especially because we have a better opportunity to enforce
+> it.  IMO, there's a big difference between churn and cleanup for better
+> maintainability.
 
- static void gic_eoimode1_eoi_irq(struct irq_data *d)
- {
-+       /* Do not deactivate an IRQ forwarded to a vcpu. */
-+       if (forwarded_irq(d))
-+               return;
-+
-        writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DEACTIVATE);
- }
+Moving options around (which is the majority of what this patch does)
+is not cruftyness.  It's a fact of life that changes to the Kconfig
+files change the order of configuration options all the time.  It's
+got nothing to do with the order that the options appear.  Just adding
+another dependency can change the ordering.
 
-can break any system since there is no caller of the forwarding API
-just yet. Can you pinpoint why part of the patch breaks your system?
-Is any code calling the irq_set_vcpu_affinity() function?
+I've no problem with adding and removing options where it's appropriate
+to do so.  What I have a problem with is all the needless churn such as
+in this patch, where options are moved from one place to another without
+any benefit what so ever.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
