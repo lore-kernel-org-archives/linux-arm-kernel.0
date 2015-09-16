@@ -1,56 +1,42 @@
 From: kernel@martin.sperl.org (Martin Sperl)
-Date: Wed, 16 Sep 2015 07:13:19 +0200
-Subject: [PATCH] ARM: dt: bcm2835: set mmc clock to the correct value of
- 250MHz
-In-Reply-To: <55F8EA59.3070900@wwwdotorg.org>
-References: <1441362818-4323-1-git-send-email-kernel@martin.sperl.org>
- <87k2s0wllm.fsf@eliezer.anholt.net> <55F8EA59.3070900@wwwdotorg.org>
-Message-ID: <51E1EF85-4056-4E6D-B2EA-51493AB0BCC5@martin.sperl.org>
+Date: Wed, 16 Sep 2015 07:25:51 +0200
+Subject: [PATCH v4 3/5] dt/bindings: bcm2835: add binding documentation
+ for bcm2835-aux
+In-Reply-To: <55F8EC22.7020909@wwwdotorg.org>
+References: <1440405608-3995-1-git-send-email-kernel@martin.sperl.org>
+ <1440405608-3995-4-git-send-email-kernel@martin.sperl.org>
+ <55DD1A13.7010705@wwwdotorg.org>
+ <9D45476C-88E2-4F76-AB55-9D0C7194E29C@martin.sperl.org>
+ <55F8EC22.7020909@wwwdotorg.org>
+Message-ID: <77103FCE-5756-45AF-B764-310E51097781@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On 16.09.2015, at 06:04, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 16.09.2015, at 06:12, Stephen Warren <swarren@wwwdotorg.org> wrote:
 > 
-> On 09/08/2015 04:13 PM, Eric Anholt wrote:
->> kernel at martin.sperl.org writes:
+> On 09/04/2015 01:26 AM, Martin Sperl wrote:
 >> 
->>> From: Martin Sperl <kernel@martin.sperl.org>
+>>> On 26.08.2015, at 03:44, Stephen Warren <swarren@wwwdotorg.org> wrote:
 >>> 
->>> This patch sets the clock speed to 250MHz to make the SD card 
->>> work at the correct clock speed without overclocking by 2.5.
+>>> On 08/24/2015 02:40 AM, kernel at martin.sperl.org wrote:
 >>> 
->>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org> --- 
->>> arch/arm/boot/dts/bcm2835.dtsi |    2 +- 1 file changed, 1
->>> insertion(+), 1 deletion(-)
+>>>> +Example:
+>>>> +
+>>>> +aux_enable: aux_enable at 0x7e215004 {
+>>>> +	compatible = "bcrm,bcm2835-aux";
+>>>> +	reg = <0x7e215004 0x04>;
 >>> 
->>> Analysis with a logic-analyzer found that the current setting of
->>> the mmc clock at 100MHz is wrong and results in overclocking the
->>> SD-card and eMMC on the Compute Module.
->>> 
->>> Exact measurements show that when 25Mhz are selected by the
->>> sdhci driver effectively 62.5MHz are used (so 2.5 times faster),
->>> which is what is expected when the clock is configured to a fixed
->>> 100MHz instead of the 250MHz that the clock is actually running
->>> at.
+>>> I'd expect that to be <0x7e215000 0x8>;
 >> 
->> Looks like this became the default in the firmware in November 2013
->> (you can, of course, still do lots of configuration that would
->> change it higher or lower).
+>> The reason is that we just handle enable with this driver,
+>> which just requires access to the 0x7e215004 register.
 >> 
->> I don't know what the downside would be of running MMC with too
->> large of a divisor for devices running pre-November firmware.  I
->> suspect we should just wait until the new clock driver lands, to
->> avoid any backwards-compatibility issues.  Sorry for the trouble
->> :(
+>> The 0x7e215000 register (interrupt mask) could be used by a
+>> cascaded interrupt-controller, but as the spi and uart drivers
+>> can run with shared interrupts this is not a necessity.
 > 
-> I imagine we'd just end up with a slower-than-expected clock rate
-> which should work just fine albeit at lower than expected/possible
-> performance. Conversely, the effect of not fixing this is errors or
-> corruption, which seems somewhat worse. Still, if the real clock
-> driver is showing up very very imminently it just might be worth
-> waiting for that (although we could set this patch Cc: stable which
-> might help some people?)
-> 
-Solved by the patch of Eric with regards to clocks (normal and
-auxiliar) - since I have applied that patch the CM works fine.
+> The DT is supposed to describe the HW, not any particular SW's use of
+> the HW. If the HW block has 2 registers, so must the DT reg property.
+
+Please look at V6 of the patch-series, that uses Erics clock-patch.
