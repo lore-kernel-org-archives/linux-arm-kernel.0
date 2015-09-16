@@ -1,284 +1,117 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 16 Sep 2015 15:21:01 +0100
-Subject: [PATCH 03/22] arm64: Move cpu feature detection code
+Date: Wed, 16 Sep 2015 15:21:14 +0100
+Subject: [PATCH 16/22] arm64/debug: Make use of the system wide safe value
 In-Reply-To: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
 References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1442413280-31885-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1442413280-31885-17-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-This patch moves the CPU feature detection code from
- arch/arm64/kernel/{setup.c to cpufeature.c}
-
-The plan is to consolidate all the CPU feature handling
-in cpufeature.c.
-
-Changes pr_fmt from "alternatives" to "cpu features"
+Use the system wide value of ID_AA64DFR0 to make safer decisions
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c |  111 +++++++++++++++++++++++++++++++++++++++-
- arch/arm64/kernel/setup.c      |  107 --------------------------------------
- 2 files changed, 110 insertions(+), 108 deletions(-)
+ arch/arm64/include/asm/hw_breakpoint.h |   14 ++------------
+ arch/arm64/kernel/debug-monitors.c     |    6 ++++--
+ arch/arm64/kernel/hw_breakpoint.c      |   19 ++++++++++++++++++-
+ 3 files changed, 24 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 3c9aed3..bdb3eb4 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -16,13 +16,31 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
+index 4c47cb2..0251768 100644
+--- a/arch/arm64/include/asm/hw_breakpoint.h
++++ b/arch/arm64/include/asm/hw_breakpoint.h
+@@ -119,6 +119,8 @@ extern int arch_install_hw_breakpoint(struct perf_event *bp);
+ extern void arch_uninstall_hw_breakpoint(struct perf_event *bp);
+ extern void hw_breakpoint_pmu_read(struct perf_event *bp);
+ extern int hw_breakpoint_slots(int type);
++extern int get_num_brps(void);
++extern int get_num_wrps(void);
  
--#define pr_fmt(fmt) "alternatives: " fmt
-+#define pr_fmt(fmt) "CPU features: " fmt
+ #ifdef CONFIG_HAVE_HW_BREAKPOINT
+ extern void hw_breakpoint_thread_switch(struct task_struct *next);
+@@ -134,17 +136,5 @@ static inline void ptrace_hw_copy_thread(struct task_struct *task)
  
- #include <linux/types.h>
- #include <asm/cpu.h>
- #include <asm/cpufeature.h>
- #include <asm/processor.h>
+ extern struct pmu perf_ops_bp;
  
-+unsigned long elf_hwcap __read_mostly;
-+EXPORT_SYMBOL_GPL(elf_hwcap);
-+
-+#ifdef CONFIG_COMPAT
-+#define COMPAT_ELF_HWCAP_DEFAULT	\
-+				(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
-+				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
-+				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
-+				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
-+				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV|\
-+				 COMPAT_HWCAP_LPAE)
-+unsigned int compat_elf_hwcap __read_mostly = COMPAT_ELF_HWCAP_DEFAULT;
-+unsigned int compat_elf_hwcap2 __read_mostly;
-+#endif
-+
-+DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
-+
-+
- static bool
- feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
- {
-@@ -100,3 +118,94 @@ void check_local_cpu_features(void)
- {
- 	check_cpu_capabilities(arm64_features, "detected feature:");
- }
-+
-+void __init setup_cpu_features(void)
-+{
-+	u64 features;
-+	s64 block;
-+	u32 cwg;
-+	int cls;
-+
-+	/*
-+	 * Check for sane CTR_EL0.CWG value.
-+	 */
-+	cwg = cache_type_cwg();
-+	cls = cache_line_size();
-+	if (!cwg)
-+		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
-+			cls);
-+	if (L1_CACHE_BYTES < cls)
-+		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
-+			L1_CACHE_BYTES, cls);
-+
-+	/*
-+	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
-+	 * The blocks we test below represent incremental functionality
-+	 * for non-negative values. Negative values are reserved.
-+	 */
-+	features = read_cpuid(ID_AA64ISAR0_EL1);
-+	block = cpuid_feature_extract_field(features, 4);
-+	if (block > 0) {
-+		switch (block) {
-+		default:
-+		case 2:
-+			elf_hwcap |= HWCAP_PMULL;
-+		case 1:
-+			elf_hwcap |= HWCAP_AES;
-+		case 0:
-+			break;
-+		}
-+	}
-+
-+	if (cpuid_feature_extract_field(features, 8) > 0)
-+		elf_hwcap |= HWCAP_SHA1;
-+
-+	if (cpuid_feature_extract_field(features, 12) > 0)
-+		elf_hwcap |= HWCAP_SHA2;
-+
-+	if (cpuid_feature_extract_field(features, 16) > 0)
-+		elf_hwcap |= HWCAP_CRC32;
-+
-+	block = cpuid_feature_extract_field(features, 20);
-+	if (block > 0) {
-+		switch (block) {
-+		default:
-+		case 2:
-+			elf_hwcap |= HWCAP_ATOMICS;
-+		case 1:
-+			/* RESERVED */
-+		case 0:
-+			break;
-+		}
-+	}
-+
-+#ifdef CONFIG_COMPAT
-+	/*
-+	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
-+	 * the AArch32 32-bit execution state.
-+	 */
-+	features = read_cpuid(ID_ISAR5_EL1);
-+	block = cpuid_feature_extract_field(features, 4);
-+	if (block > 0) {
-+		switch (block) {
-+		default:
-+		case 2:
-+			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
-+		case 1:
-+			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
-+		case 0:
-+			break;
-+		}
-+	}
-+
-+	if (cpuid_feature_extract_field(features, 8) > 0)
-+		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
-+
-+	if (cpuid_feature_extract_field(features, 12) > 0)
-+		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
-+
-+	if (cpuid_feature_extract_field(features, 16) > 0)
-+		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
-+#endif
-+}
-+
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index d149c18..4c7bca8 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -64,23 +64,6 @@
- #include <asm/efi.h>
- #include <asm/xen/hypervisor.h>
- 
--unsigned long elf_hwcap __read_mostly;
--EXPORT_SYMBOL_GPL(elf_hwcap);
--
--#ifdef CONFIG_COMPAT
--#define COMPAT_ELF_HWCAP_DEFAULT	\
--				(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
--				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
--				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
--				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
--				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV|\
--				 COMPAT_HWCAP_LPAE)
--unsigned int compat_elf_hwcap __read_mostly = COMPAT_ELF_HWCAP_DEFAULT;
--unsigned int compat_elf_hwcap2 __read_mostly;
--#endif
--
--DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
--
- phys_addr_t __fdt_pointer __initdata;
- 
- /*
-@@ -195,96 +178,6 @@ static void __init smp_build_mpidr_hash(void)
- 	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
- }
- 
--void __init setup_cpu_features(void)
+-/* Determine number of BRP registers available. */
+-static inline int get_num_brps(void)
 -{
--	u64 features;
--	s64 block;
--	u32 cwg;
--	int cls;
--
--	/*
--	 * Check for sane CTR_EL0.CWG value.
--	 */
--	cwg = cache_type_cwg();
--	cls = cache_line_size();
--	if (!cwg)
--		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
--			cls);
--	if (L1_CACHE_BYTES < cls)
--		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
--			L1_CACHE_BYTES, cls);
--
--	/*
--	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
--	 * The blocks we test below represent incremental functionality
--	 * for non-negative values. Negative values are reserved.
--	 */
--	features = read_cpuid(ID_AA64ISAR0_EL1);
--	block = cpuid_feature_extract_field(features, 4);
--	if (block > 0) {
--		switch (block) {
--		default:
--		case 2:
--			elf_hwcap |= HWCAP_PMULL;
--		case 1:
--			elf_hwcap |= HWCAP_AES;
--		case 0:
--			break;
--		}
--	}
--
--	if (cpuid_feature_extract_field(features, 8) > 0)
--		elf_hwcap |= HWCAP_SHA1;
--
--	if (cpuid_feature_extract_field(features, 12) > 0)
--		elf_hwcap |= HWCAP_SHA2;
--
--	if (cpuid_feature_extract_field(features, 16) > 0)
--		elf_hwcap |= HWCAP_CRC32;
--
--	block = cpuid_feature_extract_field(features, 20);
--	if (block > 0) {
--		switch (block) {
--		default:
--		case 2:
--			elf_hwcap |= HWCAP_ATOMICS;
--		case 1:
--			/* RESERVED */
--		case 0:
--			break;
--		}
--	}
--
--#ifdef CONFIG_COMPAT
--	/*
--	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
--	 * the AArch32 32-bit execution state.
--	 */
--	features = read_cpuid(ID_ISAR5_EL1);
--	block = cpuid_feature_extract_field(features, 4);
--	if (block > 0) {
--		switch (block) {
--		default:
--		case 2:
--			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
--		case 1:
--			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
--		case 0:
--			break;
--		}
--	}
--
--	if (cpuid_feature_extract_field(features, 8) > 0)
--		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
--
--	if (cpuid_feature_extract_field(features, 12) > 0)
--		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
--
--	if (cpuid_feature_extract_field(features, 16) > 0)
--		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
--#endif
+-	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
 -}
 -
- static void __init setup_processor(void)
+-/* Determine number of WRP registers available. */
+-static inline int get_num_wrps(void)
+-{
+-	return ((read_cpuid(ID_AA64DFR0_EL1) >> 20) & 0xf) + 1;
+-}
+-
+ #endif	/* __KERNEL__ */
+ #endif	/* __ASM_BREAKPOINT_H */
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index 9b3b62a..9ca5f77 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -26,14 +26,16 @@
+ #include <linux/stat.h>
+ #include <linux/uaccess.h>
+ 
+-#include <asm/debug-monitors.h>
++#include <asm/cpufeature.h>
+ #include <asm/cputype.h>
++#include <asm/debug-monitors.h>
+ #include <asm/system_misc.h>
+ 
+ /* Determine debug architecture. */
+ u8 debug_monitors_arch(void)
  {
- 	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
+-	return read_cpuid(ID_AA64DFR0_EL1) & 0xf;
++	return cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
++						ID_AA64DFR0_DEBUGVER_SHIFT);
+ }
+ 
+ /*
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index c97040e..1fa0476 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -28,11 +28,12 @@
+ #include <linux/ptrace.h>
+ #include <linux/smp.h>
+ 
++#include <asm/cpufeature.h>
++#include <asm/cputype.h>
+ #include <asm/current.h>
+ #include <asm/debug-monitors.h>
+ #include <asm/hw_breakpoint.h>
+ #include <asm/traps.h>
+-#include <asm/cputype.h>
+ #include <asm/system_misc.h>
+ 
+ /* Breakpoint currently in use for each BRP. */
+@@ -48,6 +49,22 @@ static DEFINE_PER_CPU(int, stepping_kernel_bp);
+ static int core_num_brps;
+ static int core_num_wrps;
+ 
++/* Determine number of BRP registers available. */
++int get_num_brps(void)
++{
++	return 1 +
++	      	cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
++						ID_AA64DFR0_BRPS_SHIFT);
++}
++
++/* Determine number of WRP registers available. */
++int get_num_wrps(void)
++{
++	return 1 +
++	      	cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
++						ID_AA64DFR0_WRPS_SHIFT);
++}
++
+ int hw_breakpoint_slots(int type)
+ {
+ 	/*
 -- 
 1.7.9.5
