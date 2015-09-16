@@ -1,40 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Sep 2015 12:06:36 +0200
-Subject: [PATCH 01/31] arch/arm/mach-lpc32xx: use kmemdup rather than
- duplicating its implementation
-In-Reply-To: <55F93BE5.60508@samsung.com>
-References: <1438934377-4922-1-git-send-email-a.hajda@samsung.com>
- <1438934377-4922-2-git-send-email-a.hajda@samsung.com>
- <55F93BE5.60508@samsung.com>
-Message-ID: <80137044.ODrprXt1av@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Sep 2015 11:07:07 +0100
+Subject: mysterious crashes on OMAP5 uevm
+In-Reply-To: <CANOLnOOgYh9vqU6Bq8VkRQ9Oe64NBkD8115T0iG-R6eoXHOe7w@mail.gmail.com>
+References: <CANOLnOODjTaBcL1QzAm7o4YOB=_P-s7JYovu6fhNSqJSV2Bq+Q@mail.gmail.com>
+ <20150908210708.GH4215@atomide.com>
+ <E0068B56-0DEE-4E2F-94CF-DB104AE16D63@goldelico.com>
+ <20150910083026.GA21098@n2100.arm.linux.org.uk>
+ <CANOLnOM-PYcAL=f4rgucfdWZ1+U3HkP34bfwrKP4Rob+J6iTfw@mail.gmail.com>
+ <20150911140306.GB21098@n2100.arm.linux.org.uk>
+ <20150914121248.GD21098@n2100.arm.linux.org.uk>
+ <20150914190236.GV4215@atomide.com>
+ <4A24D632-D980-4C37-B2C9-88D3E9D429D7@goldelico.com>
+ <CANOLnOOgYh9vqU6Bq8VkRQ9Oe64NBkD8115T0iG-R6eoXHOe7w@mail.gmail.com>
+Message-ID: <20150916100706.GE21098@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 September 2015 11:52:37 Andrzej Hajda wrote:
-> > @@ -87,7 +87,8 @@ static int lpc32xx_pm_enter(suspend_state_t state)
-> >       void *iram_swap_area;
-> >  
-> >       /* Allocate some space for temporary IRAM storage */
-> > -     iram_swap_area = kmalloc(lpc32xx_sys_suspend_sz, GFP_KERNEL);
-> > +     iram_swap_area = kmemdup((void *)TEMP_IRAM_AREA,
-> > +                              lpc32xx_sys_suspend_sz, GFP_KERNEL);
-> >       if (!iram_swap_area) {
-> >               printk(KERN_ERR
-> >                      "PM Suspend: cannot allocate memory to save portion "
-> > @@ -95,10 +96,6 @@ static int lpc32xx_pm_enter(suspend_state_t state)
-> >               return -ENOMEM;
-> >       }
-> >  
-> > -     /* Backup a small area of IRAM used for the suspend code */
-> > -     memcpy(iram_swap_area, (void *) TEMP_IRAM_AREA,
-> > -             lpc32xx_sys_suspend_sz);
+On Tue, Sep 15, 2015 at 08:31:44PM +0300, Grazvydas Ignotas wrote:
+> On Mon, Sep 14, 2015 at 10:35 PM, Dr. H. Nikolaus Schaller
+> <hns@goldelico.com> wrote:
+> >
+> > Am 14.09.2015 um 21:02 schrieb Tony Lindgren <tony@atomide.com>:
+> >
+> >> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150914 05:16]:
+> >>> On Fri, Sep 11, 2015 at 03:03:07PM +0100, Russell King - ARM Linux wrote:
+> >>>>
+> >>>> Merely changing __LINUX_ARM_ARCH__ >= 7 to >= 6 should fix the problem,
+> >>>> and I doubt there's any ARMv6 non-T2 systems out there that would be
+> >>>> affected by clearing the IT state bits.
+> >>>
+> >>> Please test the following patch:
+> >>
+> >> While we're waiting for Grazvydas to test.. Looks good to me:
+> >>
+> >> Acked-by: Tony Lindgren <tony@atomide.com>
+> >
+> > I have tested on:
+> > * GTA04 with DM3730 (OMAP3)
+> > * Pyra prototype with OMAP5432
+> > No X server crashes seen any more.
+> >
+> > Tested-by: H. Nikolaus Schaller <hns@goldelico.com>
 > 
+> Tested-by: Grazvydas Ignotas <notasas@gmail.com>
+> on OMAP5 uevm running v4.2 built with omap2plus_defconfig.
+> On v4.3-rc1 hsmmc controller probe is deferred for whatever reason and
+> never reprobes, so my rootfs is never mounted and I could not test,
+> but that looks unrelated.
 
-Hmm, the patch looks correct in principle, but I think I'd rather leave the
-original version with the comment in place, because the source is not
-just random memory but instead some SRAM.
+Thanks.
 
-We might want to use memcpy_fromio()/memcpy_toio here and remove the cast for
-both copies instead.
+> I guess it's worth marking this one for stable.
 
-	Arnd
+Indeed.
+
+Having looked closer at the ARM ARM, these bits on older CPUs are marked
+as UNK/SBZP (unknown, should be zero or preserved).  So it's safe to get
+rid of that #if entirely.  Removing that #if won't affect the validity
+of your testing as you've only tested on ARMv7 platforms with ARMv6
+included in the kernel.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
