@@ -1,47 +1,59 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 16 Sep 2015 15:21:09 +0100
-Subject: [PATCH 11/22] arm64: Populate cpuinfo after notify_cpu_starting
+Date: Wed, 16 Sep 2015 15:21:15 +0100
+Subject: [PATCH 17/22] arm64/kvm: Make use of the system wide safe values
 In-Reply-To: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
 References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1442413280-31885-12-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1442413280-31885-18-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-This patch delays populating the cpuinfo for a new (hotplugged)
-CPU until the notifiers have executed. This will enable us to verify
-if the new (hotplugged) CPU has all the capabilities which the system
-already has. If it doesn't, we could prevent it from turning online and
-also modifying the system wide feature register status.
+Use the system wide safe value from the new API for safer
+decisions
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/smp.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/kvm/reset.c    |    2 +-
+ arch/arm64/kvm/sys_regs.c |   12 ++++++------
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index cb3e0d8..6987de4 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -163,14 +163,14 @@ asmlinkage void secondary_start_kernel(void)
- 		cpu_ops[cpu]->cpu_postboot();
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 91cf535..f34745c 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -53,7 +53,7 @@ static bool cpu_has_32bit_el1(void)
+ {
+ 	u64 pfr0;
  
- 	/*
--	 * Log the CPU info before it is marked online and might get read.
-+	 * Enable GIC and timers.
- 	 */
--	cpuinfo_store_cpu();
-+	notify_cpu_starting(cpu);
+-	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
++	pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
+ 	return !!(pfr0 & 0x20);
+ }
  
- 	/*
--	 * Enable GIC and timers.
-+	 * Log the CPU info before it is marked online and might get read.
- 	 */
--	notify_cpu_starting(cpu);
-+	cpuinfo_store_cpu();
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index b41607d..fe19206 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -700,13 +700,13 @@ static bool trap_dbgidr(struct kvm_vcpu *vcpu,
+ 	if (p->is_write) {
+ 		return ignore_write(vcpu, p);
+ 	} else {
+-		u64 dfr = read_cpuid(ID_AA64DFR0_EL1);
+-		u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
+-		u32 el3 = !!((pfr >> 12) & 0xf);
++		u64 dfr = read_system_reg(SYS_ID_AA64DFR0_EL1);
++		u64 pfr = read_system_reg(SYS_ID_AA64PFR0_EL1);
++		u32 el3 = !!cpuid_feature_extract_field(pfr, ID_AA64PFR0_EL3_SHIFT);
  
- 	smp_store_cpu_info(cpu);
- 
+-		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> 20) & 0xf) << 28) |
+-					  (((dfr >> 12) & 0xf) << 24) |
+-					  (((dfr >> 28) & 0xf) << 20) |
++		*vcpu_reg(vcpu, p->Rt) = ((((dfr >> ID_AA64DFR0_WRPS_SHIFT) & 0xf) << 28) |
++					  (((dfr >> ID_AA64DFR0_BRPS_SHIFT) & 0xf) << 24) |
++					  (((dfr >> ID_AA64DFR0_CTX_CMPS_SHIFT) & 0xf) << 20) |
+ 					  (6 << 16) | (el3 << 14) | (el3 << 12));
+ 		return true;
+ 	}
 -- 
 1.7.9.5
