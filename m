@@ -1,25 +1,35 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Tue, 15 Sep 2015 18:56:38 -0500
-Subject: [PATCH v2 1/2] fsl: Add binding for RCPM
-In-Reply-To: <1442307339-15225-1-git-send-email-dongsheng.wang@freescale.com>
-References: <1442307339-15225-1-git-send-email-dongsheng.wang@freescale.com>
-Message-ID: <1442361398.2909.164.camel@freescale.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 15 Sep 2015 17:39:15 -0700
+Subject: [PATCH 1/8] PCI: iproc: Fix code comment
+In-Reply-To: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
+References: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
+Message-ID: <1442363962-29805-2-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-09-15 at 16:55 +0800, Dongsheng Wang wrote:
-> +* Freescale RCPM Wakeup Source Device Tree Bindings
-> +-------------------------------------------
-> +Required rcpm-wakeup property should be added to a device node if the 
-> device
-> +can be used as a wakeup source.
-> +
-> +  - rcpm-wakeup: The value of the property consists of 3 cells. The first 
-> cell
-> +     is a pointer to the rcpm node, the second cell is the bit mask that
-> +     should be set in IPPDEXPCR0, and the last cell is for IPPDEXPCR1.
-> +     Note: If the platform has no IPPDEXPCR1 register, put a zero here.
+Fix code comment in pcie-iproc.h so it matches the code
 
-What if a future platform has more than two of these registers?
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+---
+ drivers/pci/host/pcie-iproc.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
--Scott
+diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
+index c9e4c10..4880b09 100644
+--- a/drivers/pci/host/pcie-iproc.h
++++ b/drivers/pci/host/pcie-iproc.h
+@@ -20,11 +20,11 @@
+  * iProc PCIe device
+  * @dev: pointer to device data structure
+  * @base: PCIe host controller I/O register base
+- * @resources: linked list of all PCI resources
+  * @sysdata: Per PCI controller data (ARM-specific)
+  * @root_bus: pointer to root bus
+  * @phy: optional PHY device that controls the Serdes
+  * @irqs: interrupt IDs
++ * @map_irq: function callback to map interrupts
+  */
+ struct iproc_pcie {
+ 	struct device *dev;
+-- 
+1.9.1
