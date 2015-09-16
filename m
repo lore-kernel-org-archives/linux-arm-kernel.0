@@ -1,36 +1,164 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 15 Sep 2015 21:12:18 -0700
-Subject: [PATCH v4 3/5] dt/bindings: bcm2835: add binding documentation
- for bcm2835-aux
-In-Reply-To: <9D45476C-88E2-4F76-AB55-9D0C7194E29C@martin.sperl.org>
-References: <1440405608-3995-1-git-send-email-kernel@martin.sperl.org>
- <1440405608-3995-4-git-send-email-kernel@martin.sperl.org>
- <55DD1A13.7010705@wwwdotorg.org>
- <9D45476C-88E2-4F76-AB55-9D0C7194E29C@martin.sperl.org>
-Message-ID: <55F8EC22.7020909@wwwdotorg.org>
+From: scottwood@freescale.com (Scott Wood)
+Date: Tue, 15 Sep 2015 23:13:52 -0500
+Subject: [PATCH v2 1/2] fsl: Add binding for RCPM
+In-Reply-To: <SN1PR0301MB1616C6AB0EF4ACE4624865159D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+References: <1442307339-15225-1-git-send-email-dongsheng.wang@freescale.com>
+ <1442361398.2909.164.camel@freescale.com>
+ <SN1PR0301MB1616C48FB3D990BCA45289AB9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+ <1442369955.2909.166.camel@freescale.com>
+ <SN1PR0301MB161688E3AF527ADC76AB2B8F9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+ <1442370701.2909.167.camel@freescale.com>
+ <DM2PR03MB574196E1A0D55C185CE1B4BFA5B0@DM2PR03MB574.namprd03.prod.outlook.com>
+ <1442371076.2909.171.camel@freescale.com>
+ <SN1PR0301MB1616C6AB0EF4ACE4624865159D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+Message-ID: <1442376832.2909.174.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2015 01:26 AM, Martin Sperl wrote:
+On Tue, 2015-09-15 at 22:18 -0500, Wang Dongsheng-B40534 wrote:
+> Hi Scott,
 > 
->> On 26.08.2015, at 03:44, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>
->> On 08/24/2015 02:40 AM, kernel at martin.sperl.org wrote:
->>
->>> +Example:
->>> +
->>> +aux_enable: aux_enable at 0x7e215004 {
->>> +	compatible = "bcrm,bcm2835-aux";
->>> +	reg = <0x7e215004 0x04>;
->>
->> I'd expect that to be <0x7e215000 0x8>;
+> > -----Original Message-----
+> > From: Wang Dongsheng-B40534
+> > Sent: Wednesday, September 16, 2015 10:44 AM
+> > To: Wood Scott-B07421; Tang Yuantian-B29983
+> > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
+> > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang Huan-
+> > B18965; Jin
+> > Zhengxiong-R64188; Zhao Chenhui-B35336
+> > Subject: RE: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > 
+> > 
+> > 
+> > > -----Original Message-----
+> > > From: Wood Scott-B07421
+> > > Sent: Wednesday, September 16, 2015 10:38 AM
+> > > To: Tang Yuantian-B29983
+> > > Cc: Wang Dongsheng-B40534; devicetree at vger.kernel.org; linuxppc-
+> > > dev at lists.ozlabs.org; robh+dt at kernel.org;
+> > > linux-arm-kernel at lists.infradead.org;
+> > > Wang Huan-B18965; Jin Zhengxiong-R64188; Zhao Chenhui-B35336
+> > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > > 
+> > > On Tue, 2015-09-15 at 21:35 -0500, Tang Yuantian-B29983 wrote:
+> > > > 
+> > > > > -----Original Message-----
+> > > > > From: Wood Scott-B07421
+> > > > > Sent: Wednesday, September 16, 2015 10:32 AM
+> > > > > To: Wang Dongsheng-B40534 <Dongsheng.Wang@freescale.com>
+> > > > > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
+> > > > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang
+> > > > > robh+Huan-
+> > > > > B18965 <alison.wang@freescale.com>; Jin Zhengxiong-R64188
+> > > > > <Jason.Jin@freescale.com>; Zhao Chenhui-B35336
+> > > > > <chenhui.zhao@freescale.com>; Tang Yuantian-B29983
+> > > > > <Yuantian.Tang@freescale.com>
+> > > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > > > > 
+> > > > > On Tue, 2015-09-15 at 21:30 -0500, Wang Dongsheng-B40534 wrote:
+> > > > > > Hi Scott,
+> > > > > > 
+> > > > > > > -----Original Message-----
+> > > > > > > From: Wood Scott-B07421
+> > > > > > > Sent: Wednesday, September 16, 2015 10:19 AM
+> > > > > > > To: Wang Dongsheng-B40534
+> > > > > > > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
+> > > > > > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang
+> > > > > > > robh+Huan-
+> > > > > > > B18965; Jin
+> > > > > > > Zhengxiong-R64188; Zhao Chenhui-B35336; Tang Yuantian-B29983
+> > > > > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > > > > > > 
+> > > > > > > On Tue, 2015-09-15 at 21:15 -0500, Wang Dongsheng-B40534 wrote:
+> > > > > > > > Hi Scott,
+> > > > > > > > 
+> > > > > > > > > -----Original Message-----
+> > > > > > > > > From: Wood Scott-B07421
+> > > > > > > > > Sent: Wednesday, September 16, 2015 7:57 AM
+> > > > > > > > > To: Wang Dongsheng-B40534
+> > > > > > > > > Cc: devicetree at vger.kernel.org;
+> > > > > > > > > linuxppc-dev at lists.ozlabs.org;
+> > > > > > > > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org;
+> > > > > > > > > robh+Wang
+> > > > > > > > > robh+Huan-
+> > > > > > > > > B18965; Jin
+> > > > > > > > > Zhengxiong-R64188; Zhao Chenhui-B35336; Tang
+> > > > > > > > > Yuantian-B29983
+> > > > > > > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> > > > > > > > > 
+> > > > > > > > > On Tue, 2015-09-15 at 16:55 +0800, Dongsheng Wang wrote:
+> > > > > > > > > > +* Freescale RCPM Wakeup Source Device Tree Bindings
+> > > > > > > > > > +-------------------------------------------
+> > > > > > > > > > +Required rcpm-wakeup property should be added to a
+> > > > > > > > > > +device node if the
+> > > > > > > > > > device
+> > > > > > > > > > +can be used as a wakeup source.
+> > > > > > > > > > +
+> > > > > > > > > > +  - rcpm-wakeup: The value of the property consists of 3 
+> > > > > > > > > > cells.
+> > > > > > > > > > + The
+> > > > > > > > > > first
+> > > > > > > > > > cell
+> > > > > > > > > > +     is a pointer to the rcpm node, the second cell is
+> > > > > > > > > > + the bit mask
+> > > > > > > > > > that
+> > > > > > > > > > +     should be set in IPPDEXPCR0, and the last cell is
+> > > > > > > > > > + for
+> > > > > > > > > > IPPDEXPCR1.
+> > > > > > > > > > +     Note: If the platform has no IPPDEXPCR1 register,
+> > > > > > > > > > + put a zero
+> > > > > > > > > > here.
+> > > > > > > > > 
+> > > > > > > > > What if a future platform has more than two of these 
+> > > > > > > > > registers?
+> > > > > > > > 
+> > > > > > > > Those registers are only used for wakeup device, we have a
+> > > > > > > > lot of available bit for feature. For example, In LS1021a
+> > > > > > > > platform only 7bits has used in the registers, and 57bits is
+> > reserved.
+> > > > > > > 
+> > > > > > > Still, it'd be better to for the rcpm node to advertise the
+> > > > > > > number of cells it expects.
+> > > > > > 
+> > > > > > For the foreseeable future it should be enough to use, even if
+> > > > > > not enough to use in the future at that time we can update the 
+> > > > > > binding.
+> > > > > 
+> > > > > That's the whole point.  Device tree is stable ABI.  Updating it
+> > > > > later to not be fixed to two cells would be a lot harder than
+> > > > > getting it right from the beginning.  Putting the number of cells
+> > > > > in the phandle target is a standard device tree idiom.
+> > > > > 
+> > > > I agree with you. But what's the point a SOC has more than 64 wakeup 
+> > > > source?
+> > > 
+> > > I don't know.  Hardware people do strange things sometimes.  They
+> > > might not want to reuse bits they once used for something on some
+> > > other chip, or they might have some encoding scheme in mind that
+> > > results in the bits not being packed as tightly as possible, or there
+> > > may be some big array of similar devices...
+> > > 
+> > > What's the point of skipping this part of the phandle-plus-arguments 
+> > > idiom?
+> > 
+> > Fine, I will add a property in rcpm node to describe the number of 
+> > register.
+> > 
 > 
-> The reason is that we just handle enable with this driver,
-> which just requires access to the 0x7e215004 register.
+> How about the following modify? If okay for you I will fix in next version.
 > 
-> The 0x7e215000 register (interrupt mask) could be used by a
-> cascaded interrupt-controller, but as the spi and uart drivers
-> can run with shared interrupts this is not a necessity.
+> Required properites:
+>    - reg : Offset and length of the register set of RCPM block.
+> +  - fsl,rcpm-wakeup-cell-num : The number of cell in rcpm-wakeup property.
+> 
+>         rcpm:  global-utilities at e2000{
+>                 compatible = "fsl,t4240-rcpm", "fsl,qoriq-rcpm-2.0";
+>                 reg = <0xe2000 0x1000>;
+> +               fsl,rcpm-wakeup-cell-num = <2>;
+>         };
 
-The DT is supposed to describe the HW, not any particular SW's use of
-the HW. If the HW block has 2 registers, so must the DT reg property.
+OK, though "fsl,#rcpm-wakeup-cells" would be more idiomatic.
+
+Also s/number of cell/number of cells/
+
+-Scott
