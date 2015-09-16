@@ -1,29 +1,34 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 17 Sep 2015 07:59:14 +0900
-Subject: [PATCH v2] ARM: exynos_defconfig: Enable USB Video Class support
-In-Reply-To: <55F7602C.5060108@samsung.com>
-References: <1442232259-777-1-git-send-email-javier@osg.samsung.com>
- <55F7602C.5060108@samsung.com>
-Message-ID: <55F9F442.60905@kernel.org>
+Date: Thu, 17 Sep 2015 08:09:26 +0900
+Subject: [PATCH] ARM: dts: Fix LEDs on exynos5422-odroidxu3
+In-Reply-To: <1441205288-22047-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1441205288-22047-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <55F9F6A6.6080206@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/15 09:02, Krzysztof Kozlowski wrote:
-> On 14.09.2015 21:04, Javier Martinez Canillas wrote:
->> The Exynos5420 Peach Pit and Exynos5800 Peach Pi boards have a built-in
->> Silicon Motion USB UVC WebCam. Enable support for the USB Video Class
->> driver and its needed media Kconfig symbols so the camera is supported.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>
->> ---
->>
->> Changes in v2:
->> - Enable tristate Kconfig options as module instead of built-in.
->>   Suggested by Krzysztof Kozlowski.
+On 09/02/15 23:48, Krzysztof Kozlowski wrote:
+> The LEDs on Odroid XU3 family boards could not properly probe because PWM
+> outputs were reduced only to PWM for fan. Fix this to:
+>  - Odroid XU3 and XU3-Lite: 4 outputs (although the PWM for MIPI
+>    probably is redundant because board does not have MIPI connector
+>    available);
+>  - Odroid XU4: 2 outputs.
 > 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> This fixes warnings on dmesg:
+> [    4.838712] samsung-pwm 12dd0000.pwm: tried to request PWM channel 1 without output
+> [    4.838725] leds_pwm pwmleds: unable to request PWM for green:mmc0: -22
+> [    4.838767] leds_pwm: probe of pwmleds failed with error -22
 > 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+> 
+> ---
+> 
+> Patch depends/is rebased on latest DTS for Odroid XU4 board:
+>  - http://www.spinics.net/lists/arm-kernel/msg442474.html
+>  - http://www.spinics.net/lists/arm-kernel/msg442475.html
+> ---
+
 Applied, thanks.
 
 - Kukjin
