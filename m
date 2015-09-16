@@ -1,125 +1,82 @@
-From: wei@redhat.com (Wei Huang)
-Date: Wed, 16 Sep 2015 16:07:08 -0500
-Subject: [PATCH v2 00/22] KVM: ARM64: Add guest PMU support
-In-Reply-To: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <55F9D9FC.6010905@redhat.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Thu, 17 Sep 2015 00:16:00 +0300
+Subject: [PATCH v3 2/2] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
+ support
+In-Reply-To: <CAD=FV=XO0cjmmXniGnqvvoWZ=e1EL7t5XDUXVhiNMqWvmaOpMw@mail.gmail.com>
+References: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <CAD=FV=WvUp7xhsmXJgVzm1Awqej12hNF_QPJhrQq7z=Fa4Nnuw@mail.gmail.com>
+ <20150902225008.GQ21084@n2100.arm.linux.org.uk>
+ <CAD=FV=U2BR=Qk2cVS-cq78Rx=VjriZiE6nC3cn+_SBHx2_5ihg@mail.gmail.com>
+ <20150902230408.GR21084@n2100.arm.linux.org.uk>
+ <CAD=FV=XO0cjmmXniGnqvvoWZ=e1EL7t5XDUXVhiNMqWvmaOpMw@mail.gmail.com>
+Message-ID: <55F9DC10.9020508@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Doug,
 
+On 03.09.2015 02:19, Doug Anderson wrote:
+> Russell,
+> 
+> On Wed, Sep 2, 2015 at 4:04 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>>>> Also, is it appropriate to hook non-DDC devices to a DDC bus?  I suspect
+>>>> that's asking for trouble.
+>>>
+>>> I doubt it's appropriate.  Why do you ask?
+>>
+>> To find out why you want to "specify the I2C bus".
+>>
+>> Surely if we're talking about the DDC bus, we either want to use a
+>> separate I2C bus (in which case the HDMI DT description needs to
+>> specify which I2C bus to use) or we want to use the HDMI-internal
+>> I2C bus, which being part of the HDMI driver, the HDMI driver will
+>> know how to find it itself - there should be no need to put an
+>> explicit ddc-i2c-bus self-reference there in that case.
+> 
+> Overall it comes down to bus numbering.  Possibly that's a stupid
+> reason, but it is my reason nevertheless.
 
-On 09/11/2015 03:54 AM, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> This patchset adds guest PMU support for KVM on ARM64. It takes
-> trap-and-emulate approach. When guest wants to monitor one event, it
-> will be trapped by KVM and KVM will call perf_event API to create a perf
-> event and call relevant perf_event APIs to get the count value of event.
-> 
-> Use perf to test this patchset in guest. When using "perf list", it
-> shows the list of the hardware events and hardware cache events perf
-> supports. Then use "perf stat -e EVENT" to monitor some event. For
-> example, use "perf stat -e cycles" to count cpu cycles and
-> "perf stat -e cache-misses" to count cache misses.
-> 
-> Below are the outputs of "perf stat -r 5 sleep 5" when running in host
-> and guest.
-> 
-> Host:
->  Performance counter stats for 'sleep 5' (5 runs):
-> 
->           0.551428      task-clock (msec)         #    0.000 CPUs utilized            ( +-  0.91% )
->                  1      context-switches          #    0.002 M/sec
->                  0      cpu-migrations            #    0.000 K/sec
->                 48      page-faults               #    0.088 M/sec                    ( +-  1.05% )
->            1150265      cycles                    #    2.086 GHz                      ( +-  0.92% )
->    <not supported>      stalled-cycles-frontend
->    <not supported>      stalled-cycles-backend
->             526398      instructions              #    0.46  insns per cycle          ( +-  0.89% )
->    <not supported>      branches
->               9485      branch-misses             #   17.201 M/sec                    ( +-  2.35% )
-> 
->        5.000831616 seconds time elapsed                                          ( +-  0.00% )
-> 
-> Guest:
->  Performance counter stats for 'sleep 5' (5 runs):
-> 
->           0.730868      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.13% )
->                  1      context-switches          #    0.001 M/sec
->                  0      cpu-migrations            #    0.000 K/sec
->                 48      page-faults               #    0.065 M/sec                    ( +-  0.42% )
->            1642982      cycles                    #    2.248 GHz                      ( +-  1.04% )
->    <not supported>      stalled-cycles-frontend
->    <not supported>      stalled-cycles-backend
->             637964      instructions              #    0.39  insns per cycle          ( +-  0.65% )
->    <not supported>      branches
->              10377      branch-misses             #   14.198 M/sec                    ( +-  1.09% )
-> 
->        5.001289068 seconds time elapsed                                          ( +-  0.00% )
-> 
-> This patchset can be fetched from [1] and the relevant QEMU version for
-> test can be fetched from [2].
-> 
-> Thanks,
-> Shannon
-> 
-> [1] https://git.linaro.org/people/shannon.zhao/linux-mainline.git  KVM_ARM64_PMU_v2
-> [2] https://git.linaro.org/people/shannon.zhao/qemu.git  PMU_v2
+this is a known issue regarding I2C bus numbering.
 
-I am testing this series. The first question is: do you plan to add ACPI
-support in QEMU? My in-house kernel uses ACPI for device probing. I had
-to force "acpi=off" when I test this patch series.
+> Specifically it significantly helps my brain process kernel log
+> messages if the i2c bus that's referred to "bus 5" in my SoC's user
+> manual shows up consistently as "i2c5" in kernel log messages.  It's
+> helpful it it shows up as "i2c5" even if "i2c0" - "i2c4" aren't
+> enabled.
+> 
+> That's all totally possible by using this type of syntax, like in rk3288.dtsi:
+> 
+> aliases {
+>   i2c0 = &i2c0;
+>   i2c1 = &i2c1;
+>   i2c2 = &i2c2;
+>   i2c3 = &i2c3;
+>   i2c4 = &i2c4;
+>   i2c5 = &i2c5;
+> 
+> Similarly, I'd like "bus 0" to show up as i2c0, which will happen as
+> you can see in the above.
+> 
+> The problem is that if another bus registers itself before the SoC's
+> i2c0 registers itself and that bus doesn't give a number to itself
+> then the i2c subsystem will chose "I2C 0".  ...and then when the main
+> SoC i2c bus registers itself it will fail because i2c0 is already
+> taken.
+> 
+> By having a of_node for the hdmi i2c bus, we can assign a number to it like:
+>   i2c15 = &hdmi;
+> 
+> This is all described in the two links I referenced in my original reply.
+> 
+> 
+> A possible other option is to have the i2c subsystem try to start
+> numbering at a larger base for all automatically numbered busses
+> (those that didn't specify a number).  Then it's more likely (though
+> still not guaranteed) to conflict with another bus...
 
-> 
-> Shannon Zhao (22):
->   ARM64: Move PMU register related defines to asm/pmu.h
->   KVM: ARM64: Define PMU data structure for each vcpu
->   KVM: ARM64: Add offset defines for PMU registers
->   KVM: ARM64: Add reset and access handlers for PMCR_EL0 register
->   KVM: ARM64: Add a helper for CP15 registers reset to UNKNOWN
->   KVM: ARM64: Add reset and access handlers for PMSELR register
->   KVM: ARM64: Add reset and access handlers for PMCEID0 and PMCEID1
->     register
->   KVM: ARM64: PMU: Add perf event map and introduce perf event creating
->     function
->   KVM: ARM64: Add reset and access handlers for PMXEVTYPER register
->   KVM: ARM64: Add reset and access handlers for PMXEVCNTR register
->   KVM: ARM64: Add reset and access handlers for PMCCNTR register
->   KVM: ARM64: Add reset and access handlers for PMCNTENSET and
->     PMCNTENCLR register
->   KVM: ARM64: Add reset and access handlers for PMINTENSET and
->     PMINTENCLR register
->   KVM: ARM64: Add reset and access handlers for PMOVSSET and PMOVSCLR
->     register
->   KVM: ARM64: Add a helper for CP15 registers reset to specified value
->   KVM: ARM64: Add reset and access handlers for PMUSERENR register
->   KVM: ARM64: Add reset and access handlers for PMSWINC register
->   KVM: ARM64: Add access handlers for PMEVCNTRn and PMEVTYPERn register
->   KVM: ARM64: Add PMU overflow interrupt routing
->   KVM: ARM64: Reset PMU state when resetting vcpu
->   KVM: ARM64: Free perf event of PMU when destroying vcpu
->   KVM: ARM64: Add a new kvm ARM PMU device
-> 
->  Documentation/virtual/kvm/devices/arm-pmu.txt |  15 +
->  arch/arm/kvm/arm.c                            |   4 +
->  arch/arm64/include/asm/kvm_asm.h              |  59 ++-
->  arch/arm64/include/asm/kvm_host.h             |   2 +
->  arch/arm64/include/asm/pmu.h                  |  49 +++
->  arch/arm64/include/uapi/asm/kvm.h             |   3 +
->  arch/arm64/kernel/perf_event.c                |  35 --
->  arch/arm64/kvm/Kconfig                        |   8 +
->  arch/arm64/kvm/Makefile                       |   1 +
->  arch/arm64/kvm/reset.c                        |   3 +
->  arch/arm64/kvm/sys_regs.c                     | 490 +++++++++++++++++++++++--
->  arch/arm64/kvm/sys_regs.h                     |  16 +
->  include/kvm/arm_pmu.h                         |  66 ++++
->  include/linux/kvm_host.h                      |   1 +
->  include/uapi/linux/kvm.h                      |   2 +
->  virt/kvm/arm/pmu.c                            | 500 ++++++++++++++++++++++++++
->  virt/kvm/kvm_main.c                           |   4 +
->  17 files changed, 1188 insertions(+), 70 deletions(-)
->  create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
->  create mode 100644 include/kvm/arm_pmu.h
->  create mode 100644 virt/kvm/arm/pmu.c
-> 
+Could you please check if commit 03bde7c31a3 serves you?
+
+--
+With best wishes,
+Vladimir
