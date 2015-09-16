@@ -1,41 +1,31 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Wed, 16 Sep 2015 14:43:28 +0800
-Subject: [RFC PATCH v8 10/10] arm: zx_defconfig: remove CONFIG_MMC_DW_IDMAC
-In-Reply-To: <1442385625-26775-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1442385625-26775-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <1442385808-1433-1-git-send-email-shawn.lin@rock-chips.com>
+From: damien.thebault@vitec.com (=?utf-8?B?RGFtaWVuIFRow6liYXVsdA==?=)
+Date: Wed, 16 Sep 2015 06:53:57 +0000
+Subject: NFS/TCP/IPv6 acting strangely in 4.2
+In-Reply-To: <20150911113839.GO21084@n2100.arm.linux.org.uk>
+References: <20150911113839.GO21084@n2100.arm.linux.org.uk>
+Message-ID: <1442386435.3756.282.camel@vitec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DesignWare MMC Controller's transfer mode should be decided
-at runtime instead of compile-time. So we remove this config
-option and read dw_mmc's register to select DMA master.
+On Fri, 2015-09-11 at 12:38 +0100, Russell King - ARM Linux wrote:
+> I have a recent Marvell Armada 388 board here which uses the mvneta
+> driver.  I'm seeing some weird effects with NFS with it acting as a
+> client.
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
----
+Hello,
 
-Changes in v8: None
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+I'm upgrading a Marvelle Armada 370 board using the mvneta driver from
+4.0 to 4.2 and noticed issues with NFS booting.
+Basically, most of the time init returns with an error code, or
+programs segfault or throw illegal instructions.
 
- arch/arm/configs/zx_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+Since it worked fine on 4.0 I bisected until I found commit
+a84e32894191cfcbffa54180d78d7d4654d56c20 "net: mvneta: fix refilling
+for Rx DMA buffers".
 
-diff --git a/arch/arm/configs/zx_defconfig b/arch/arm/configs/zx_defconfig
-index b200bb0..ab683fb 100644
---- a/arch/arm/configs/zx_defconfig
-+++ b/arch/arm/configs/zx_defconfig
-@@ -83,7 +83,6 @@ CONFIG_MMC=y
- CONFIG_MMC_UNSAFE_RESUME=y
- CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_MMC_DW=y
--CONFIG_MMC_DW_IDMAC=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT4_FS=y
- CONFIG_EXT4_FS_POSIX_ACL=y
+If I revert this commit, everything seems to get back to normal.
+Could you try it ? The two issues look very similar.
+
+Regards
 -- 
-2.3.7
+Damien Th?bault
