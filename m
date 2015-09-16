@@ -1,44 +1,64 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Wed, 16 Sep 2015 10:27:57 -0600
-Subject: [PATCH v3 0/5] ACPI: Provide better MADT subtable sanity checks
-In-Reply-To: <55F997C1.20606@linaro.org>
-References: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
- <55F889E8.3070706@redhat.com> <1880799.vMhNVMG5Vc@vostro.rjw.lan>
- <55F997C1.20606@linaro.org>
-Message-ID: <55F9988D.5080002@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Sep 2015 17:28:18 +0100
+Subject: [PATCH] arm: add cpu_idle tracepoints to arch_cpu_idle
+In-Reply-To: <1442414220-7204-1-git-send-email-jszhang@marvell.com>
+References: <1442414220-7204-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20150916162817.GC21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2015 10:24 AM, Al Stone wrote:
-> On 09/15/2015 08:44 PM, Rafael J. Wysocki wrote:
->> On Tuesday, September 15, 2015 03:13:12 PM Al Stone wrote:
->>> On 09/09/2015 03:09 PM, Al Stone wrote:
->>>> Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
->>>> check on the various subtables that are defined for the MADT.  The check
->>>> compares the size of the subtable data structure as defined by ACPICA to
->>>> the length entry in the subtable.  If they are not the same, the assumption
->>>> is that the subtable is incorrect.
->>>>
+On Wed, Sep 16, 2015 at 10:37:00PM +0800, Jisheng Zhang wrote:
+> Currently, if cpuidle is disabled or not supported, powertop reports
+> zero wakeups and zero events. This is due to the cpu_idle tracepoints
+> are missing.
+> 
+> This patch is to make cpu_idle tracepoints always available even if
+> cpuidle is disabled or not supported.
 
-[snip...]
+This seems like a hack to me.  These are cpu_idle tracepoints which
+tell people when something happens in cpuidle.  If cpuidle is disabled,
+then surely the tracepoints shouldn't fire.
 
->> I'm going to apply this series if people have no problems with it.  I do think
->> it is slightly overkill, but then as long as it works ...
->>
->> Thanks,
->> Rafael
->>
+However, I'll leave it to the tracing people to have the final word on
+whether this is the right thing to do as I've very little experience
+with the tracing design.
 
-Would you prefer I send out the updated version with Sudeep's fix to apply
-instead of this version?  Or have you picked that up already?  Easily updated
-and sent out, if it'll make your life simpler....
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  arch/arm/kernel/process.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index f192a2a..aa78e09 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/random.h>
+>  #include <linux/hw_breakpoint.h>
+>  #include <linux/leds.h>
+> +#include <trace/events/power.h>
+>  
+>  #include <asm/processor.h>
+>  #include <asm/thread_notify.h>
+> @@ -66,11 +67,13 @@ void (*arm_pm_idle)(void);
+>  
+>  void arch_cpu_idle(void)
+>  {
+> +	trace_cpu_idle_rcuidle(1, smp_processor_id());
+>  	if (arm_pm_idle)
+>  		arm_pm_idle();
+>  	else
+>  		cpu_do_idle();
+>  	local_irq_enable();
+> +	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+>  }
+>  
+>  void arch_cpu_idle_prepare(void)
+> -- 
+> 2.5.1
+> 
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
