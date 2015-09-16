@@ -1,95 +1,118 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 16 Sep 2015 14:44:20 +0800
-Subject: [PATCH v8 1/5] dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
+Date: Wed, 16 Sep 2015 14:44:24 +0800
+Subject: [PATCH v8 5/5] arm64: dts: mediatek: add xHCI & usb phy for mt8173
 In-Reply-To: <1442385864-4368-1-git-send-email-chunfeng.yun@mediatek.com>
 References: <1442385864-4368-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1442385864-4368-2-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1442385864-4368-6-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add a DT binding documentation of usb3.0 phy for MT65xx
-SoCs from Mediatek.
+add xHCI and phy drivers for MT8173-EVB
 
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- .../devicetree/bindings/phy/phy-mt65xx-usb.txt     | 68 ++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 16 +++++++++++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 43 +++++++++++++++++++++++++++++
+ 2 files changed, 59 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
-new file mode 100644
-index 0000000..00100cf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
-@@ -0,0 +1,68 @@
-+mt65xx USB3.0 PHY binding
-+--------------------------
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+index 4be66ca..d039a1c 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
++++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+@@ -13,6 +13,7 @@
+  */
+ 
+ /dts-v1/;
++#include <dt-bindings/gpio/gpio.h>
+ #include "mt8173.dtsi"
+ 
+ / {
+@@ -32,6 +33,15 @@
+ 	};
+ 
+ 	chosen { };
 +
-+This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
-+
-+Required properties (controller (parent) node):
-+ - compatible	: should be "mediatek,mt8173-u3phy"
-+ - reg		: offset and length of register for phy, exclude port's
-+		  register.
-+ - clocks	: a list of phandle + clock-specifier pairs, one for each
-+		  entry in clock-names
-+ - clock-names	: must contain
-+		  "u3phya_ref": for reference clock of usb3.0 analog phy.
-+
-+Required nodes	: a sub-node is required for each port the controller
-+		  provides. Address range information including the usual
-+		  'reg' property is used inside these nodes to describe
-+		  the controller's topology.
-+
-+Required properties (port (child) node):
-+- reg		: address and length of the register set for the port.
-+- #phy-cells	: should be 1 (See second example)
-+		  cell after port phandle is phy type from:
-+			- PHY_TYPE_USB2
-+			- PHY_TYPE_USB3
-+
-+Example:
-+
-+u3phy: usb-phy at 11290000 {
-+	compatible = "mediatek,mt8173-u3phy";
-+	reg = <0 0x11290000 0 0x800>;
-+	clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
-+	clock-names = "u3phya_ref";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+	ranges;
-+	status = "okay";
-+
-+	phy_port0: port at 11290800 {
-+		reg = <0 0x11290800 0 0x800>;
-+		#phy-cells = <1>;
-+		status = "okay";
++	usb_p1_vbus: regulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&pio 130 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
 +	};
+ };
+ 
+ &i2c1 {
+@@ -390,3 +400,9 @@
+ &uart0 {
+ 	status = "okay";
+ };
 +
-+	phy_port1: port at 11291000 {
-+		reg = <0 0x11291000 0 0x800>;
-+		#phy-cells = <1>;
-+		status = "okay";
-+	};
++&usb30 {
++	vusb33-supply = <&mt6397_vusb_reg>;
++	vbus-supply = <&usb_p1_vbus>;
++	mediatek,wakeup-src = <1>;
 +};
-+
-+Specifying phy control of devices
-+---------------------------------
-+
-+Device nodes should specify the configuration required in their "phys"
-+property, containing a phandle to the phy port node and a device type;
-+phy-names for each port are optional.
-+
-+Example:
-+
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index d18ee42..ceca7a5 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -14,6 +14,7 @@
+ #include <dt-bindings/clock/mt8173-clk.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
 +#include <dt-bindings/phy/phy.h>
+ #include <dt-bindings/power/mt8173-power.h>
+ #include <dt-bindings/reset-controller/mt8173-resets.h>
+ #include "mt8173-pinfunc.h"
+@@ -487,6 +488,48 @@
+ 			clock-names = "source", "hclk";
+ 			status = "disabled";
+ 		};
 +
-+usb30: usb at 11270000 {
-+	...
-+	phys = <&phy_port0 PHY_TYPE_USB3>;
-+	phy-names = "usb3-0";
-+	...
-+};
++		usb30: usb at 11270000 {
++			compatible = "mediatek,mt8173-xhci";
++			reg = <0 0x11270000 0 0x1000>,
++			      <0 0x11280700 0 0x0100>;
++			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
++			power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++			clocks = <&topckgen CLK_TOP_USB30_SEL>,
++				 <&pericfg CLK_PERI_USB0>,
++				 <&pericfg CLK_PERI_USB1>;
++			clock-names = "sys_ck",
++				      "wakeup_deb_p0",
++				      "wakeup_deb_p1";
++			phys = <&phy_port0 PHY_TYPE_USB3>,
++			       <&phy_port1 PHY_TYPE_USB2>;
++			usb3-lpm-capable;
++			mediatek,syscon-wakeup = <&pericfg>;
++			status = "okay";
++		};
++
++		u3phy: usb-phy at 11290000 {
++			compatible = "mediatek,mt8173-u3phy";
++			reg = <0 0x11290000 0 0x800>;
++			clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
++			clock-names = "u3phya_ref";
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges;
++			status = "okay";
++
++			phy_port0: port at 11290800 {
++				reg = <0 0x11290800 0 0x800>;
++				#phy-cells = <1>;
++				status = "okay";
++			};
++
++			phy_port1: port at 11291000 {
++				reg = <0 0x11291000 0 0x800>;
++				#phy-cells = <1>;
++				status = "okay";
++			};
++		};
+ 	};
+ };
+ 
 -- 
 1.8.1.1.dirty
