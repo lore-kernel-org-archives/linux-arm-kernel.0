@@ -1,338 +1,221 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Wed, 16 Sep 2015 11:58:27 +0800
-Subject: [RFC PATCH v3 3/3] arm/arm64: fix a migrating irq bug when hotplug cpu
-In-Reply-To: <1442375907-11496-1-git-send-email-yangyingliang@huawei.com>
-References: <1442375907-11496-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <1442375907-11496-4-git-send-email-yangyingliang@huawei.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 16 Sep 2015 10:03:28 +0530
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <20150910083146.GG3260@x1>
+References: <20150909062722.GA5266@linux> <20150909075930.GB3260@x1>
+ <20150909083031.GB5266@linux> <20150909133930.GE3260@x1>
+ <20150909160212.GJ5266@linux> <20150909163620.GF3260@x1>
+ <55F0C5AB.5060609@kernel.org>
+ <20150910005722.GA15099@codeaurora.org>
+ <20150910010426.GM5266@linux> <20150910083146.GG3260@x1>
+Message-ID: <20150916043328.GA29943@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When cpu is disabled, all irqs will be migratged to another cpu.
-In some cases, a new affinity is different, it needed to be coppied
-to irq's affinity. But if the type of irq is LPI, it's affinity will
-not be coppied because of irq_set_affinity's return value. Fix it by
-using irq_do_set_affinity.
+On 10-09-15, 09:31, Lee Jones wrote:
+> I think you answered your own question.
+> 
+> No users == !ABI == Strip it out.
 
-And migrating interrupts is a core code matter, so move the code to
-kernel/irq/migration.c and select CONFIG_GENERIC_IRQ_MIGRATION when
-CONFIG_HOTPLUG_CPU and CONFIG_SMP is enabled.
+Okay, as I have delayed things enough for you, didn't wanted to do
+that anymore. And so worked on it despite very tight schedule :)
 
-Cc: Jiang Liu <jiang.liu@linux.intel.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
----
- arch/arm/Kconfig             |  1 +
- arch/arm/include/asm/irq.h   |  1 -
- arch/arm/kernel/irq.c        | 62 -----------------------------------------
- arch/arm64/Kconfig           |  1 +
- arch/arm64/include/asm/irq.h |  1 -
- arch/arm64/kernel/irq.c      | 62 -----------------------------------------
- include/linux/irq.h          |  4 +++
- kernel/irq/migration.c       | 66 ++++++++++++++++++++++++++++++++++++++++++++
- 8 files changed, 72 insertions(+), 126 deletions(-)
+Below is the refreshed binding changes (I have split that into 3
+patches, but kept the diff here for simplicity).
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 72ad724..d70ddd5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -22,6 +22,7 @@ config ARM
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
- 	select GENERIC_IDLE_POLL_SETUP
- 	select GENERIC_IRQ_PROBE
-+	select GENERIC_IRQ_MIGRATION if SMP && HOTPLUG_CPU
- 	select GENERIC_IRQ_SHOW
- 	select GENERIC_IRQ_SHOW_LEVEL
- 	select GENERIC_PCI_IOMAP
-diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-index be1d07d..882bf98 100644
---- a/arch/arm/include/asm/irq.h
-+++ b/arch/arm/include/asm/irq.h
-@@ -24,7 +24,6 @@
- #ifndef __ASSEMBLY__
- struct irqaction;
- struct pt_regs;
--extern void migrate_irqs(void);
- 
- extern void asm_do_IRQ(unsigned int, struct pt_regs *);
- void handle_IRQ(unsigned int, struct pt_regs *);
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 5ff4826..78abea8 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -31,7 +31,6 @@
- #include <linux/smp.h>
- #include <linux/init.h>
- #include <linux/seq_file.h>
--#include <linux/ratelimit.h>
- #include <linux/errno.h>
- #include <linux/list.h>
- #include <linux/kallsyms.h>
-@@ -136,64 +135,3 @@ int __init arch_probe_nr_irqs(void)
- 	return nr_irqs;
- }
- #endif
--
--#ifdef CONFIG_HOTPLUG_CPU
--static bool migrate_one_irq(struct irq_desc *desc)
--{
--	struct irq_data *d = irq_desc_get_irq_data(desc);
--	const struct cpumask *affinity = irq_data_get_affinity_mask(d);
--	struct irq_chip *c;
--	bool ret = false;
--
--	/*
--	 * If this is a per-CPU interrupt, or the affinity does not
--	 * include this CPU, then we have nothing to do.
--	 */
--	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
--		return false;
--
--	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
--		affinity = cpu_online_mask;
--		ret = true;
--	}
--
--	c = irq_data_get_irq_chip(d);
--	if (!c->irq_set_affinity)
--		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
--	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
--		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
--
--	return ret;
--}
--
--/*
-- * The current CPU has been marked offline.  Migrate IRQs off this CPU.
-- * If the affinity settings do not allow other CPUs, force them onto any
-- * available CPU.
-- *
-- * Note: we must iterate over all IRQs, whether they have an attached
-- * action structure or not, as we need to get chained interrupts too.
-- */
--void migrate_irqs(void)
--{
--	unsigned int i;
--	struct irq_desc *desc;
--	unsigned long flags;
--
--	local_irq_save(flags);
--
--	for_each_irq_desc(i, desc) {
--		bool affinity_broken;
--
--		raw_spin_lock(&desc->lock);
--		affinity_broken = migrate_one_irq(desc);
--		raw_spin_unlock(&desc->lock);
--
--		if (affinity_broken)
--			pr_warn_ratelimited("IRQ%u no longer affine to CPU%u\n",
--				i, smp_processor_id());
--	}
--
--	local_irq_restore(flags);
--}
--#endif /* CONFIG_HOTPLUG_CPU */
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7d95663..70d5b23 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -33,6 +33,7 @@ config ARM64
- 	select GENERIC_CPU_AUTOPROBE
- 	select GENERIC_EARLY_IOREMAP
- 	select GENERIC_IRQ_PROBE
-+	select GENERIC_IRQ_MIGRATION if SMP && HOTPLUG_CPU
- 	select GENERIC_IRQ_SHOW
- 	select GENERIC_IRQ_SHOW_LEVEL
- 	select GENERIC_PCI_IOMAP
-diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-index bbb251b..0916929 100644
---- a/arch/arm64/include/asm/irq.h
-+++ b/arch/arm64/include/asm/irq.h
-@@ -7,7 +7,6 @@
- 
- struct pt_regs;
- 
--extern void migrate_irqs(void);
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- 
- static inline void acpi_irq_init(void)
-diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-index 11dc3fd..9f17ec0 100644
---- a/arch/arm64/kernel/irq.c
-+++ b/arch/arm64/kernel/irq.c
-@@ -27,7 +27,6 @@
- #include <linux/init.h>
- #include <linux/irqchip.h>
- #include <linux/seq_file.h>
--#include <linux/ratelimit.h>
- 
- unsigned long irq_err_count;
- 
-@@ -54,64 +53,3 @@ void __init init_IRQ(void)
- 	if (!handle_arch_irq)
- 		panic("No interrupt controller found.");
- }
--
--#ifdef CONFIG_HOTPLUG_CPU
--static bool migrate_one_irq(struct irq_desc *desc)
--{
--	struct irq_data *d = irq_desc_get_irq_data(desc);
--	const struct cpumask *affinity = irq_data_get_affinity_mask(d);
--	struct irq_chip *c;
--	bool ret = false;
--
--	/*
--	 * If this is a per-CPU interrupt, or the affinity does not
--	 * include this CPU, then we have nothing to do.
--	 */
--	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
--		return false;
--
--	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
--		affinity = cpu_online_mask;
--		ret = true;
--	}
--
--	c = irq_data_get_irq_chip(d);
--	if (!c->irq_set_affinity)
--		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
--	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
--		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
--
--	return ret;
--}
--
--/*
-- * The current CPU has been marked offline.  Migrate IRQs off this CPU.
-- * If the affinity settings do not allow other CPUs, force them onto any
-- * available CPU.
-- *
-- * Note: we must iterate over all IRQs, whether they have an attached
-- * action structure or not, as we need to get chained interrupts too.
-- */
--void migrate_irqs(void)
--{
--	unsigned int i;
--	struct irq_desc *desc;
--	unsigned long flags;
--
--	local_irq_save(flags);
--
--	for_each_irq_desc(i, desc) {
--		bool affinity_broken;
--
--		raw_spin_lock(&desc->lock);
--		affinity_broken = migrate_one_irq(desc);
--		raw_spin_unlock(&desc->lock);
--
--		if (affinity_broken)
--			pr_warn_ratelimited("IRQ%u no longer affine to CPU%u\n",
--					    i, smp_processor_id());
--	}
--
--	local_irq_restore(flags);
--}
--#endif /* CONFIG_HOTPLUG_CPU */
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 6f8b340..59e5e52 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -446,6 +446,10 @@ static inline void irq_move_irq(struct irq_data *data) { }
- static inline void irq_move_masked_irq(struct irq_data *data) { }
- #endif
- 
-+#if defined(CONFIG_SMP) && defined(CONFIG_GENERIC_IRQ_MIGRATION) && defined(CONFIG_HOTPLUG_CPU)
-+void migrate_irqs(void);
-+#endif
-+
- extern int no_irq_affinity;
- 
- #ifdef CONFIG_HARDIRQS_SW_RESEND
-diff --git a/kernel/irq/migration.c b/kernel/irq/migration.c
-index 1ff2b77..89c9765 100644
---- a/kernel/irq/migration.c
-+++ b/kernel/irq/migration.c
-@@ -1,6 +1,7 @@
- 
- #include <linux/irq.h>
- #include <linux/interrupt.h>
-+#include <linux/ratelimit.h>
- 
- #include "internals.h"
- 
-@@ -79,3 +80,68 @@ void irq_move_irq(struct irq_data *idata)
- 		idata->chip->irq_unmask(idata);
- }
- #endif
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+static bool migrate_one_irq(struct irq_desc *desc)
-+{
-+	struct irq_data *d = irq_desc_get_irq_data(desc);
-+	const struct cpumask *affinity = d->affinity;
-+	struct irq_chip *c;
-+	bool ret = false;
-+
-+	/*
-+	 * If this is a per-CPU interrupt, or the affinity does not
-+	 * include this CPU, then we have nothing to do.
-+	 */
-+	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
-+		return false;
-+
-+	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
-+		affinity = cpu_online_mask;
-+		ret = true;
-+	}
-+
-+	c = irq_data_get_irq_chip(d);
-+	if (!c->irq_set_affinity) {
-+		pr_warn_ratelimited("IRQ%u: unable to set affinity\n", d->irq);
-+	} else {
-+		int r = irq_do_set_affinity(d, affinity, false);
-+		if (r)
-+			pr_warn_ratelimited("IRQ%u: set affinity failed(%d).\n", d->irq, r);
-+	}
-+
-+	return ret;
-+}
-+
-+/*
-+ * The current CPU has been marked offline.  Migrate IRQs off this CPU.
-+ * If the affinity settings do not allow other CPUs, force them onto any
-+ * available CPU.
-+ *
-+ * Note: we must iterate over all IRQs, whether they have an attached
-+ * action structure or not, as we need to get chained interrupts too.
-+ */
-+void migrate_irqs(void)
-+{
-+	unsigned int irq;
-+	struct irq_desc *desc;
-+	unsigned long flags;
-+
-+	local_irq_save(flags);
-+
-+	for_each_active_irq(irq) {
-+		bool affinity_broken;
-+
-+		desc = irq_to_desc(irq);
-+		raw_spin_lock(&desc->lock);
-+		affinity_broken = migrate_one_irq(desc);
-+		raw_spin_unlock(&desc->lock);
-+
-+		if (affinity_broken)
-+			pr_warn_ratelimited("IRQ%u no longer affine to CPU%u\n",
-+					    irq, smp_processor_id());
-+	}
-+
-+	local_irq_restore(flags);
-+}
-+#endif /* CONFIG_HOTPLUG_CPU */
+Other than that, all code changes you need to test your driver are
+pushed here:
+
+https://git.linaro.org/people/viresh.kumar/linux.git opp/supported-hw-prop-name-v1
+
+I am not gonna post the patches to the lists, until the time existing
+patches get reviewed.
+
 -- 
-2.5.0
+viresh
+
+-------------------------8<-------------------------
+diff --git a/Documentation/devicetree/bindings/opp/opp.txt b/Documentation/devicetree/bindings/opp/opp.txt
+index 719603b87353..b652d0403e93 100644
+--- a/Documentation/devicetree/bindings/opp/opp.txt
++++ b/Documentation/devicetree/bindings/opp/opp.txt
+@@ -45,21 +45,10 @@ Devices supporting OPPs must set their "operating-points-v2" property with
+ phandle to a OPP table in their DT node. The OPP core will use this phandle to
+ find the operating points for the device.
+ 
+-Devices may want to choose OPP tables at runtime and so can provide a list of
+-phandles here. But only *one* of them should be chosen@runtime. This must be
+-accompanied by a corresponding "operating-points-names" property, to uniquely
+-identify the OPP tables.
+-
+ If required, this can be extended for SoC vendor specfic bindings. Such bindings
+ should be documented as Documentation/devicetree/bindings/power/<vendor>-opp.txt
+ and should have a compatible description like: "operating-points-v2-<vendor>".
+ 
+-Optional properties:
+-- operating-points-names: Names of OPP tables (required if multiple OPP
+-  tables are present), to uniquely identify them. The same list must be present
+-  for all the CPUs which are sharing clock/voltage rails and hence the OPP
+-  tables.
+-
+ * OPP Table Node
+ 
+ This describes the OPPs belonging to a device. This node can have following
+@@ -117,6 +106,14 @@ properties.
+   Entries for multiple regulators must be present in the same order as their
+   names are present in 'supply-names' property of the opp-table.
+ 
++- opp-microvolt-<name>: Named opp-microvolt property. This is exactly similar to
++  the above opp-microvolt property, but allows multiple voltage ranges to be
++  provided for the same OPP. At runtime, the platform can pick a <name> and
++  matching opp-microvolt-<name> property will be enabled for all OPPs. If the
++  platform doesn't pick a specific <name> or the <name> doesn't match with any
++  opp-microvolt-<name> properties, then opp-microvolt property shall be used, if
++  present.
++
+ - opp-microamp: The maximum current drawn by the device in microamperes
+   considering system specific parameters (such as transients, process, aging,
+   maximum operating temperature range etc.) as necessary. This may be used to
+@@ -131,6 +128,9 @@ properties.
+   as zero for them. If it isn't required for any regulator, then this property
+   need not be present.
+ 
++- opp-microamp-<name>: Named opp-microamp property. Similar to
++  opp-microvolt-<name> property, but for microamp instead.
++
+ - clock-latency-ns: Specifies the maximum possible transition latency (in
+   nanoseconds) for switching to this OPP from any other OPP.
+ 
+@@ -139,9 +139,27 @@ properties.
+   frequency for a short duration of time limited by the device's power, current
+   and thermal limits.
+ 
++- turbo-mode-<name>: Named turbo-mode property. Similar to opp-microvolt-<name>
++  property, but for turbo mode instead.
++
+ - opp-suspend: Marks the OPP to be used during device suspend. Only one OPP in
+   the table should have this.
+ 
++- opp-suspend-<name>: Named opp-suspend property. Similar to
++  opp-microvolt-<name> property, but for suspend opp instead.
++
++- opp-supported-hw: User defined array containing a hierarchy of hardware
++  version numbers, supported by the OPP. For example: a platform with hierarchy
++  of three levels of versions (A, B and C), this field should be like <X Y Z>,
++  where X corresponds to Version hierarchy A, Y corresponds to version hierarchy
++  B and Z corresponds to version hierarchy C.
++
++  Each level of hierarchy is represented by a 32 bit value, and so there can be
++  only 32 different supported version per hierarchy. i.e. 1 bit per version. A
++  value of 0xFFFFFFFF will enable the OPP for all versions for that hierarchy
++  level. And a value of 0x00000000 will disable the OPP completely, and so we
++  never want that to happen.
++
+ - status: Marks the node enabled/disabled.
+ 
+ Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
+@@ -443,7 +461,8 @@ Example 4: Handling multiple regulators
+ 	};
+ };
+ 
+-Example 5: Multiple OPP tables
++Example 5: opp-supported-hw
++(example: three level hierarchy of versions: cuts, substrate and process)
+ 
+ / {
+ 	cpus {
+@@ -452,40 +471,84 @@ Example 5: Multiple OPP tables
+ 			...
+ 
+ 			cpu-supply = <&cpu_supply>
+-			operating-points-v2 = <&cpu0_opp_table_slow>, <&cpu0_opp_table_fast>;
+-			operating-points-names = "slow", "fast";
++			operating-points-v2 = <&cpu0_opp_table_slow>;
+ 		};
+ 	};
+ 
+-	cpu0_opp_table_slow: opp_table_slow {
++	opp_table {
+ 		compatible = "operating-points-v2";
+ 		status = "okay";
+ 		opp-shared;
+ 
+ 		opp00 {
++			/*
++			 * Supports all substrate and process versions for 0xF
++			 * cuts, i.e. only first four cuts.
++			 */
++			opp-supported-hw = <0xF 0xFFFFFFFF 0xFFFFFFFF>
+ 			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <900000 915000 925000>;
+ 			...
+ 		};
+ 
+ 		opp01 {
++			/*
++			 * Supports:
++			 * - cuts: only one, 6th cut (represented by 6th bit).
++			 * - substrate: supports 16 different substrate versions
++			 * - process: supports 9 different process versions
++			 */
++			opp-supported-hw = <0x20 0xff0000ff 0x0000f4f0>
+ 			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <900000 915000 925000>;
+ 			...
+ 		};
+ 	};
++};
++
++Example 6: opp-microvolt-<name>, opp-microamp-<name>, turbo-mode-<name>,
++opp-suspend-<name>:
++(example: device with 2 supplies: vcc0 and vcc1, with two possible ranges: slow
++and fast)
++
++/ {
++	cpus {
++		cpu at 0 {
++			compatible = "arm,cortex-a7";
++			...
+ 
+-	cpu0_opp_table_fast: opp_table_fast {
++			vcc0-supply = <&cpu_supply0>;
++			vcc1-supply = <&cpu_supply1>;
++			operating-points-v2 = <&cpu0_opp_table>;
++		};
++	};
++
++	cpu0_opp_table: opp_table0 {
+ 		compatible = "operating-points-v2";
+-		status = "okay";
++		supply-names = "vcc0", "vcc1";
+ 		opp-shared;
+ 
+-		opp10 {
++		opp00 {
+ 			opp-hz = /bits/ 64 <1000000000>;
+-			...
++			opp-microvolt-slow = <900000 915000 925000>, /* Supply vcc0 */
++					      <910000 925000 935000>; /* Supply vcc1 */
++			opp-microvolt-fast = <970000 975000 985000>, /* Supply vcc0 */
++					     <960000 965000 975000>; /* Supply vcc1 */
++			opp-microamp-slow =  <70000>;
++			opp-microamp-fast =  <71000>;
++			turbo-mode-slow; /* Will marked as turbo only if 'slow' is chosen */
++			opp-suspend-slow; /* Will marked as suspend-opp only if 'slow' is chosen */
+ 		};
+ 
+-		opp11 {
+-			opp-hz = /bits/ 64 <1100000000>;
+-			...
++		opp01 {
++			opp-hz = /bits/ 64 <1200000000>;
++			opp-microvolt-slow = <900000 915000 925000>, /* Supply vcc0 */
++					      <910000 925000 935000>; /* Supply vcc1 */
++			opp-microvolt-fast = <970000 975000 985000>, /* Supply vcc0 */
++					     <960000 965000 975000>; /* Supply vcc1 */
++			opp-microamp =  <70000>; /* Will be used for both slow/fast */
++			turbo-mode; /* Always marked as turbo */
++			opp-suspend-fast; /* Will marked as suspend opp only if 'fast' is chosen */
+ 		};
+ 	};
+ };
