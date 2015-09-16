@@ -1,100 +1,44 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Wed, 16 Sep 2015 17:30:36 +0200
-Subject: [PATCH 1/5] spi: introduce mmap read support for spi flash devices
-In-Reply-To: <CAD6G_RQOazkS7KHrG75wgMXx1cH_pKjx43Mve6fz1qOJGPpq9w@mail.gmail.com>
-References: <1441355402-6837-1-git-send-email-vigneshr@ti.com>
- <1441355402-6837-2-git-send-email-vigneshr@ti.com>
- <CAD6G_RT8Q+Uyp1ZjzHf54Tno1wHm0SmLKEwRAe2gkdp772FD9A@mail.gmail.com>
- <20150914183553.GE12027@sirena.org.uk>
- <CAD6G_RQOazkS7KHrG75wgMXx1cH_pKjx43Mve6fz1qOJGPpq9w@mail.gmail.com>
-Message-ID: <CAOMqctRWCkVg8gthkkkgg7_6=c00SORNx7_6_NperxXfgGf5xA@mail.gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 16 Sep 2015 17:36:56 +0200
+Subject: [PATCH v2 0/7] New Atmel PIO4 pinctrl/gpio driver
+Message-ID: <1442417823-15850-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 September 2015 at 14:46, Jagan Teki <jteki@openedev.com> wrote:
-> On 15 September 2015 at 00:05, Mark Brown <broonie@kernel.org> wrote:
->> On Fri, Sep 04, 2015 at 04:55:33PM +0530, Jagan Teki wrote:
->>> On 4 September 2015 at 13:59, Vignesh R <vigneshr@ti.com> wrote:
->>
->>> > + * @spi_mtd_mmap_read: some spi-controller hardwares provide memory
->>> > + *                     mapped interface to communicate with mtd flashes.
->>> > + *                     For this, spi  controller needs to know flash
->>> > + *                     memory settings like read command to use, dummy
->>> > + *                     bytes and address width. Once these settings are
->>> > + *                     populated in hardware registers, any read
->>> > + *                     accesses to flash's memory map region(as defined
->>> > + *                     by SoC) through memcpy or mem-to-mem DMA copy
->>> > + *                     will be handled by controller hardware. The
->>> > + *                     hardware will automatically generate spi signals
->>> > + *                     required to read data from flash and present it
->>> > + *                     to CPU or DMA. SPI master drivers can use this
->>> > + *                     callback to implement memory mapped read
->>> > + *                     interface. Flash driver (like m25p80) requests
->>> > + *                     memory mapped read via this method. The interface
->>> > + *                     should  only be used mtd flashes and cannot be
->>> > + *                     used with other spi devices.
->>
->> This comment is *way* too verbose - probably you just need up to the
->> "Once" here.
->>
->>> > +       int (*spi_mtd_mmap_read)(struct  spi_device *spi,
->>> > +                                loff_t from, size_t len, size_t *retlen,
->>> > +                                u_char *buf, u8 read_opcode,
->>> > +                                u8 addr_width, u8 dummy_bytes);
->>
->>> This looks un-manageable to know spi core or master knows what are the
->>> command or opcode used by spi-nor flash and also I think mmap support
->>> seems to be flash related or any justification this is spi bus
->>> master/controller feature?
->>
->> There seem to be a reasonable number of SPI controllers out there which
->> have as an extension the ability to do memory mapped reads but are
->> otherwise perfectly normal SPI controllers and which rely on that for
->> everything except reads.
->
-> This is true, but exposing direct spi-nor arguments or features like
-> read_opcode, addr_width or dummy_byte to spi layer isn't fine? because
-> for spi layer there is a spi to flash transition mtd m25p80.c is there
-> to handle is it?
+Hi,
 
-For the TI SPI controller this is programmable. So instead of
-composing a SPI message that sends the opcode (and address and dummy
-bytes) you set the opcode in a controller register and then perform
-the memory read which sends the configured opcode to the flash memory.
-So this needs to be exposed in an API which the m25p80 driver can use.
+The Atmel PIO4 controller has been introduced with SAMA5D2 chip family. This
+drivers manages both pinmux/pinconf and gpio stuff. It is inspired by Mediatek
+pinctrl driver.
 
-On 16 September 2015 at 12:08, Vignesh R <vigneshr@ti.com> wrote:
->
->
-> On 09/15/2015 12:07 AM, Mark Brown wrote:
->> On Fri, Sep 04, 2015 at 01:59:58PM +0530, Vignesh R wrote:
->>> In addition to providing direct access to SPI bus, some spi controller
->>> hardwares (like ti-qspi) provide special memory mapped port
->>> to accesses SPI flash devices in order to increase read performance.
->>> This means the controller can automatically send the SPI signals
->>> required to read data from the SPI flash device.
->>
->> Sorry, also meant to say here: as I kind of indicated in response to the
->> flash patch I'd expect to see the SPI core know something about this and
->> export an API for this which is integrated with things like the existing
->> message queue.
->>
->
->
-> Adding an API to SPI core makes sense to me. This can take care of spi
-> bus locking and runtime pm.
-> But, I didn't get how to integrate with existing message queue. Memory
-> mapped read by-passes message queue of SPI core. Could you please
-> explain a bit more on integrating with message queue? Did you mean
-> locking the existing message queue when memory mapped read is being
-> requested?
+Changes from v1:
+- remove some unneeded gpio specific ops (gpio_request, gpio_free,
+  gpio_request_enable, gpio_disable_free and gpio_set_direction).
+- code styling fixes.
+- add sama5d2 pin description and device pin muxing.
 
-Presumably when you have a function in SPI core for this it takes the
-same lock transfer_one does so either you do mmap transfer or normal
-SPI transfer. You can probably manually sync on transfer completion in
-a driver that uses both normal SPI messages and mmap transfer - which
-m25p80 does anyway.
+Ludovic Desroches (7):
+  pinctrl: introduce driver for Atmel PIO4 controller
+  pinctrl: dt-binding: Add DT binding documentation for Atmel PIO4
+  MAINTAINERS: Add an entry for pinctrl-at91-pio4
+  ARM: at91/dt: sama5d2: add pio controller node
+  ARM: at91/defconfig: sama5: add PIO4 controller support
+  ARM: at91/dt: add sama5d2 pinmux
+  ARM: at91/dt: sama5d2 Xplained: add device pin muxing
 
-Thanks
+ .../bindings/pinctrl/atmel,at91-pio4-pinctrl.txt   |   90 ++
+ MAINTAINERS                                        |    7 +
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts        |   61 ++
+ arch/arm/boot/dts/sama5d2-pinfunc.h                |  880 +++++++++++++++++
+ arch/arm/boot/dts/sama5d2.dtsi                     |   14 +
+ arch/arm/mach-at91/Kconfig                         |    1 +
+ drivers/pinctrl/Kconfig                            |   13 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/pinctrl-at91-pio4.c                | 1017 ++++++++++++++++++++
+ 9 files changed, 2084 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/atmel,at91-pio4-pinctrl.txt
+ create mode 100644 arch/arm/boot/dts/sama5d2-pinfunc.h
+ create mode 100644 drivers/pinctrl/pinctrl-at91-pio4.c
 
-Michal
+-- 
+2.5.0
