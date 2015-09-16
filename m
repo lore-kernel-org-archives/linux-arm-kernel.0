@@ -1,89 +1,352 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Wed, 16 Sep 2015 15:40:43 +0100
-Subject: [PATCH 2/3] devicetree: bindings: use input-event-codes.h for
- evdev codes
-In-Reply-To: <55F97C3D.5020702@redhat.com>
-References: <1442064372-3030-1-git-send-email-hdegoede@redhat.com>
- <1442064372-3030-3-git-send-email-hdegoede@redhat.com>
- <1442316292.3549.386.camel@hellion.org.uk> <55F97C3D.5020702@redhat.com>
-Message-ID: <1442414443.18856.110.camel@hellion.org.uk>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 16 Sep 2015 15:21:06 +0100
+Subject: [PATCH 08/22] arm64: Consolidate CPU Sanity check to CPU Feature
+ infrastructure
+In-Reply-To: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
+References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1442413280-31885-9-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-09-16 at 10:27 -0400, Hans de Goede wrote:
-> Hi,
-> 
-> On 09/15/2015 07:24 AM, Ian Campbell wrote:
-> > On Sat, 2015-09-12 at 15:26 +0200, Hans de Goede wrote:
-> > > Add a symlink to uapi/linux/input-event-codes.h, and include that
-> > > instead
-> > > of (re)defining all the evdev type and code values in
-> > > dt-bindings/input/input.h. This way we do not need to keep all the
-> > > event codes synced manually.
-> > > 
-> > > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> > > ---
-> > >   include/dt-bindings/input/input-event-codes.h |   1 +
-> > >   include/dt-bindings/input/input.h             | 510 +--------------
-> > > -----
-> > > ------
-> > >   2 files changed, 2 insertions(+), 509 deletions(-)
-> > >   create mode 120000 include/dt-bindings/input/input-event-codes.h
-> > > 
-> > > diff --git a/include/dt-bindings/input/input-event-codes.h
-> > > b/include/dt
-> > > -bindings/input/input-event-codes.h
-> > > new file mode 120000
-> > > index 0000000..693bbcd
-> > > --- /dev/null
-> > > +++ b/include/dt-bindings/input/input-event-codes.h
-> > > @@ -0,0 +1 @@
-> > > +../../uapi/linux/input-event-codes.h
-> > > \ No newline at end of file
-> > 
-> > Hrm, I think this is going to cause trouble for the split DT repository
-> > at
-> > https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-reba
-> > sing.git/
-> > 
-> > Since ../../ == include in both trees I think I can make it work by
-> > including include/uapi/linux in the conversion, either wholesale
-> > (easiest)
-> > or partially (potentially cleaner).
-> > 
-> > Any opinions on that?
-> 
-> The intend of the symlink was that the conversion script would copy the target,
-> rather then follow the symlink. This sorta assumes that there are will be not
-> symlinks under dt-bindings which link to files inside dt-bindings and thus
-> should be preserved as symlinks.
-> 
-> If the copy done in the script will follow the symlink then nothing should
-> really change for the split DT repo.
+From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-Interesting idea. I'll see if I can make the conversion routine do that.
+This patch consolidates the CPU Sanity check to the new infrastructure.
 
-TBH I have a horrid feeling that this is going to be beyond git rewrite
--branch, at least in the mode it is used in today.
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/cpufeature.h |    3 +-
+ arch/arm64/kernel/cpufeature.c      |  163 ++++++++++++++++++++++++++++-------
+ arch/arm64/kernel/cpuinfo.c         |  113 +-----------------------
+ 3 files changed, 133 insertions(+), 146 deletions(-)
 
-> > In principal I ought to regenerate the tree from scratch such that
-> > include/uapi/linux was "always" there and has history but I think we
-> > can
-> > live with it just appearing at some point in time wen the conversion
-> > script
-> > was updated?
-> > 
-> > AIUI these values are required to only be used with properties whose
-> > names
-> > are of the form "linux,*", otherwise there would be strong complaints
-> > about
-> > include Linux uapi stuff into a generic device-tree binding.
-> 
-> Correct, these values are only for linux,* properties, which is why I
-> initially put them in a file named dt-bindings/input/linux-event-codes.h
-
-I think that would be a better name for the symlink (but not the target of
-that symlink) and usage in the .dts*, given it's (hopefully) going to turn
-into a regular file in the exported repo.
-
-Ian.
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 14302e0..7927ac2 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -139,7 +139,8 @@ static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
+ 
+ void __init init_cpu_features(struct cpuinfo_arm64 *info);
+ void __init setup_cpu_features(void);
+-void update_cpu_features(struct cpuinfo_arm64 *info);
++void update_cpu_features(int cpu, struct cpuinfo_arm64 *info,
++				 struct cpuinfo_arm64 *boot);
+ 
+ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			    const char *info);
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 9e7d886..960a62f 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -442,12 +442,9 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+ 	update_mixed_endian_el0_support(info);
+ }
+ 
+-static void update_cpu_ftr_reg(u32 sys_reg, u64 new)
++static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
+ {
+ 	struct arm64_ftr_bits *ftrp;
+-	struct arm64_ftr_reg *reg = get_arm64_sys_reg(sys_reg);
+-
+-	BUG_ON(!reg);
+ 
+ 	for(ftrp = reg->ftr_bits; ftrp->width; ftrp++) {
+ 		s64 ftr_cur = arm64_ftr_value(ftrp, reg->sys_val);
+@@ -462,36 +459,136 @@ static void update_cpu_ftr_reg(u32 sys_reg, u64 new)
+ 
+ }
+ 
+-/* Update CPU feature register from non-boot CPU */
+-void update_cpu_features(struct cpuinfo_arm64 *info)
++static int check_update_ftr_reg(u32 sys_reg, int cpu, u64 val, u64 boot)
+ {
+-	update_cpu_ftr_reg(SYS_CTR_EL0, info->reg_ctr);
+-	update_cpu_ftr_reg(SYS_DCZID_EL0, info->reg_dczid);
+-	update_cpu_ftr_reg(SYS_CNTFRQ_EL0, info->reg_cntfrq);
+-	update_cpu_ftr_reg(SYS_ID_AA64DFR0_EL1, info->reg_id_aa64dfr0);
+-	update_cpu_ftr_reg(SYS_ID_AA64DFR1_EL1, info->reg_id_aa64dfr1);
+-	update_cpu_ftr_reg(SYS_ID_AA64ISAR0_EL1, info->reg_id_aa64isar0);
+-	update_cpu_ftr_reg(SYS_ID_AA64ISAR1_EL1, info->reg_id_aa64isar1);
+-	update_cpu_ftr_reg(SYS_ID_AA64MMFR0_EL1, info->reg_id_aa64mmfr0);
+-	update_cpu_ftr_reg(SYS_ID_AA64MMFR1_EL1, info->reg_id_aa64mmfr1);
+-	update_cpu_ftr_reg(SYS_ID_AA64PFR0_EL1, info->reg_id_aa64pfr0);
+-	update_cpu_ftr_reg(SYS_ID_AA64PFR1_EL1, info->reg_id_aa64pfr1);
+-	update_cpu_ftr_reg(SYS_ID_DFR0_EL1, info->reg_id_dfr0);
+-	update_cpu_ftr_reg(SYS_ID_ISAR0_EL1, info->reg_id_isar0);
+-	update_cpu_ftr_reg(SYS_ID_ISAR1_EL1, info->reg_id_isar1);
+-	update_cpu_ftr_reg(SYS_ID_ISAR2_EL1, info->reg_id_isar2);
+-	update_cpu_ftr_reg(SYS_ID_ISAR3_EL1, info->reg_id_isar3);
+-	update_cpu_ftr_reg(SYS_ID_ISAR4_EL1, info->reg_id_isar4);
+-	update_cpu_ftr_reg(SYS_ID_ISAR5_EL1, info->reg_id_isar5);
+-	update_cpu_ftr_reg(SYS_ID_MMFR0_EL1, info->reg_id_mmfr0);
+-	update_cpu_ftr_reg(SYS_ID_MMFR1_EL1, info->reg_id_mmfr1);
+-	update_cpu_ftr_reg(SYS_ID_MMFR2_EL1, info->reg_id_mmfr2);
+-	update_cpu_ftr_reg(SYS_ID_MMFR3_EL1, info->reg_id_mmfr3);
+-	update_cpu_ftr_reg(SYS_ID_PFR0_EL1, info->reg_id_pfr0);
+-	update_cpu_ftr_reg(SYS_ID_PFR1_EL1, info->reg_id_pfr1);
+-	update_cpu_ftr_reg(SYS_MVFR0_EL1, info->reg_mvfr0);
+-	update_cpu_ftr_reg(SYS_MVFR1_EL1, info->reg_mvfr1);
+-	update_cpu_ftr_reg(SYS_MVFR2_EL1, info->reg_mvfr2);
++	struct arm64_ftr_reg *regp = get_arm64_sys_reg(sys_reg);
++
++	BUG_ON(!regp);
++	update_cpu_ftr_reg(regp, val);
++	if ((boot & regp->strict_mask) == (val & regp->strict_mask))
++		return 0;
++	pr_warn("SANITY CHECK: Unexpected variation in %s. Boot CPU: %#016llx, CPU%d: %#016llx\n",
++			regp->name, boot, cpu, val);
++	return 1;
++}
++
++/*
++ * Update CPU feature register from non-boot CPU.
++ * Also performs SANITY check w.r.t the values from boot CPU.
++ */
++void update_cpu_features(int cpu,
++			 struct cpuinfo_arm64 *info,
++			 struct cpuinfo_arm64 *boot)
++{
++	int taint = 0;
++
++	/*
++	 * The kernel can handle differing I-cache policies, but otherwise
++	 * caches should look identical. Userspace JITs will make use of
++	 * *minLine.
++	 */
++	taint |= check_update_ftr_reg(SYS_CTR_EL0, cpu,
++				      info->reg_ctr, boot->reg_ctr);
++
++	/*
++	 * Userspace may perform DC ZVA instructions. Mismatched block sizes
++	 * could result in too much or too little memory being zeroed if a
++	 * process is preempted and migrated between CPUs.
++	 */
++	taint |= check_update_ftr_reg(SYS_DCZID_EL0, cpu,
++				      info->reg_dczid, boot->reg_dczid);
++
++	/* If different, timekeeping will be broken (especially with KVM) */
++	taint |= check_update_ftr_reg(SYS_CNTFRQ_EL0, cpu,
++				      info->reg_cntfrq, boot->reg_cntfrq);
++
++	/*
++	 * The kernel uses self-hosted debug features and expects CPUs to
++	 * support identical debug features. We presently need CTX_CMPs, WRPs,
++	 * and BRPs to be identical.
++	 * ID_AA64DFR1 is currently RES0.
++	 */
++	taint |= check_update_ftr_reg(SYS_ID_AA64DFR0_EL1, cpu,
++				      info->reg_id_aa64dfr0, boot->reg_id_aa64dfr0);
++	taint |= check_update_ftr_reg(SYS_ID_AA64DFR1_EL1, cpu,
++				      info->reg_id_aa64dfr1, boot->reg_id_aa64dfr1);
++	/*
++	 * Even in big.LITTLE, processors should be identical instruction-set
++	 * wise.
++	 */
++	taint |= check_update_ftr_reg(SYS_ID_AA64ISAR0_EL1, cpu,
++				      info->reg_id_aa64isar0, boot->reg_id_aa64isar0);
++	taint |= check_update_ftr_reg(SYS_ID_AA64ISAR1_EL1, cpu,
++				      info->reg_id_aa64isar1, boot->reg_id_aa64isar1);
++
++	/*
++	 * Differing PARange support is fine as long as all peripherals and
++	 * memory are mapped within the minimum PARange of all CPUs.
++	 * Linux should not care about secure memory.
++	 */
++	taint |= check_update_ftr_reg(SYS_ID_AA64MMFR0_EL1, cpu,
++				      info->reg_id_aa64mmfr0, boot->reg_id_aa64mmfr0);
++	taint |= check_update_ftr_reg(SYS_ID_AA64MMFR1_EL1, cpu,
++				      info->reg_id_aa64mmfr1, boot->reg_id_aa64mmfr1);
++
++	/*
++	 * EL3 is not our concern.
++	 * ID_AA64PFR1 is currently RES0.
++	 */
++	taint |= check_update_ftr_reg(SYS_ID_AA64PFR0_EL1, cpu,
++				      info->reg_id_aa64pfr0, boot->reg_id_aa64pfr0);
++	taint |= check_update_ftr_reg(SYS_ID_AA64PFR1_EL1, cpu,
++				      info->reg_id_aa64pfr1, boot->reg_id_aa64pfr1);
++
++	/*
++	 * If we have AArch32, we care about 32-bit features for compat. These
++	 * registers should be RES0 otherwise.
++	 */
++	taint |= check_update_ftr_reg(SYS_ID_DFR0_EL1, cpu,
++				      info->reg_id_dfr0, boot->reg_id_dfr0);
++	taint |= check_update_ftr_reg(SYS_ID_ISAR0_EL1, cpu,
++				      info->reg_id_isar0, boot->reg_id_isar0);
++	taint |= check_update_ftr_reg(SYS_ID_ISAR1_EL1, cpu,
++				      info->reg_id_isar1, boot->reg_id_isar1);
++	taint |= check_update_ftr_reg(SYS_ID_ISAR2_EL1, cpu,
++				      info->reg_id_isar2, boot->reg_id_isar2);
++	taint |= check_update_ftr_reg(SYS_ID_ISAR3_EL1, cpu,
++				      info->reg_id_isar3, boot->reg_id_isar3);
++	taint |= check_update_ftr_reg(SYS_ID_ISAR4_EL1, cpu,
++			    	      info->reg_id_isar4, boot->reg_id_isar4);
++	taint |= check_update_ftr_reg(SYS_ID_ISAR5_EL1, cpu,
++				      info->reg_id_isar5, boot->reg_id_isar5);
++
++	/*
++	 * Regardless of the value of the AuxReg field, the AIFSR, ADFSR, and
++	 * ACTLR formats could differ across CPUs and therefore would have to
++	 * be trapped for virtualization anyway.
++	 */
++	taint |= check_update_ftr_reg(SYS_ID_MMFR0_EL1, cpu,
++				     info->reg_id_mmfr0, boot->reg_id_mmfr0);
++	taint |= check_update_ftr_reg(SYS_ID_MMFR1_EL1, cpu,
++				      info->reg_id_mmfr1, boot->reg_id_mmfr1);
++	taint |= check_update_ftr_reg(SYS_ID_MMFR2_EL1, cpu,
++				      info->reg_id_mmfr2, boot->reg_id_mmfr2);
++	taint |= check_update_ftr_reg(SYS_ID_MMFR3_EL1, cpu,
++				      info->reg_id_mmfr3, boot->reg_id_mmfr3);
++	taint |= check_update_ftr_reg(SYS_ID_PFR0_EL1, cpu,
++				      info->reg_id_pfr0, boot->reg_id_pfr0);
++	taint |= check_update_ftr_reg(SYS_ID_PFR1_EL1, cpu,
++				      info->reg_id_pfr1, boot->reg_id_pfr1);
++	taint |= check_update_ftr_reg(SYS_MVFR0_EL1, cpu,
++				      info->reg_mvfr0, boot->reg_mvfr0);
++	taint |= check_update_ftr_reg(SYS_MVFR1_EL1, cpu,
++				      info->reg_mvfr1, boot->reg_mvfr1);
++	taint |= check_update_ftr_reg(SYS_MVFR2_EL1, cpu,
++				      info->reg_mvfr2, boot->reg_mvfr2);
++
++	/*
++	 * Mismatched CPU features are a recipe for disaster. Don't even
++	 * pretend to support them.
++	 */
++	WARN_TAINT_ONCE(taint, TAINT_CPU_OUT_OF_SPEC,
++			"Unsupported CPU feature variation.\n");
+ 
+ 	update_mixed_endian_el0_support(info);
+ }
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 857aaf0..f25869e 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -192,116 +192,6 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
+ 	pr_info("Detected %s I-cache on CPU%d\n", icache_policy_str[l1ip], cpu);
+ }
+ 
+-static int check_reg_mask(char *name, u64 mask, u64 boot, u64 cur, int cpu)
+-{
+-	if ((boot & mask) == (cur & mask))
+-		return 0;
+-
+-	pr_warn("SANITY CHECK: Unexpected variation in %s. Boot CPU: %#016lx, CPU%d: %#016lx\n",
+-		name, (unsigned long)boot, cpu, (unsigned long)cur);
+-
+-	return 1;
+-}
+-
+-#define CHECK_MASK(field, mask, boot, cur, cpu) \
+-	check_reg_mask(#field, mask, (boot)->reg_ ## field, (cur)->reg_ ## field, cpu)
+-
+-#define CHECK(field, boot, cur, cpu) \
+-	CHECK_MASK(field, ~0ULL, boot, cur, cpu)
+-
+-/*
+- * Verify that CPUs don't have unexpected differences that will cause problems.
+- */
+-static void cpuinfo_sanity_check(struct cpuinfo_arm64 *cur)
+-{
+-	unsigned int cpu = smp_processor_id();
+-	struct cpuinfo_arm64 *boot = &boot_cpu_data;
+-	unsigned int diff = 0;
+-
+-	/*
+-	 * The kernel can handle differing I-cache policies, but otherwise
+-	 * caches should look identical. Userspace JITs will make use of
+-	 * *minLine.
+-	 */
+-	diff |= CHECK_MASK(ctr, 0xffff3fff, boot, cur, cpu);
+-
+-	/*
+-	 * Userspace may perform DC ZVA instructions. Mismatched block sizes
+-	 * could result in too much or too little memory being zeroed if a
+-	 * process is preempted and migrated between CPUs.
+-	 */
+-	diff |= CHECK(dczid, boot, cur, cpu);
+-
+-	/* If different, timekeeping will be broken (especially with KVM) */
+-	diff |= CHECK(cntfrq, boot, cur, cpu);
+-
+-	/*
+-	 * The kernel uses self-hosted debug features and expects CPUs to
+-	 * support identical debug features. We presently need CTX_CMPs, WRPs,
+-	 * and BRPs to be identical.
+-	 * ID_AA64DFR1 is currently RES0.
+-	 */
+-	diff |= CHECK(id_aa64dfr0, boot, cur, cpu);
+-	diff |= CHECK(id_aa64dfr1, boot, cur, cpu);
+-
+-	/*
+-	 * Even in big.LITTLE, processors should be identical instruction-set
+-	 * wise.
+-	 */
+-	diff |= CHECK(id_aa64isar0, boot, cur, cpu);
+-	diff |= CHECK(id_aa64isar1, boot, cur, cpu);
+-
+-	/*
+-	 * Differing PARange support is fine as long as all peripherals and
+-	 * memory are mapped within the minimum PARange of all CPUs.
+-	 * Linux should not care about secure memory.
+-	 * ID_AA64MMFR1 is currently RES0.
+-	 */
+-	diff |= CHECK_MASK(id_aa64mmfr0, 0xffffffffffff0ff0, boot, cur, cpu);
+-	diff |= CHECK(id_aa64mmfr1, boot, cur, cpu);
+-
+-	/*
+-	 * EL3 is not our concern.
+-	 * ID_AA64PFR1 is currently RES0.
+-	 */
+-	diff |= CHECK_MASK(id_aa64pfr0, 0xffffffffffff0fff, boot, cur, cpu);
+-	diff |= CHECK(id_aa64pfr1, boot, cur, cpu);
+-
+-	/*
+-	 * If we have AArch32, we care about 32-bit features for compat. These
+-	 * registers should be RES0 otherwise.
+-	 */
+-	diff |= CHECK(id_dfr0, boot, cur, cpu);
+-	diff |= CHECK(id_isar0, boot, cur, cpu);
+-	diff |= CHECK(id_isar1, boot, cur, cpu);
+-	diff |= CHECK(id_isar2, boot, cur, cpu);
+-	diff |= CHECK(id_isar3, boot, cur, cpu);
+-	diff |= CHECK(id_isar4, boot, cur, cpu);
+-	diff |= CHECK(id_isar5, boot, cur, cpu);
+-	/*
+-	 * Regardless of the value of the AuxReg field, the AIFSR, ADFSR, and
+-	 * ACTLR formats could differ across CPUs and therefore would have to
+-	 * be trapped for virtualization anyway.
+-	 */
+-	diff |= CHECK_MASK(id_mmfr0, 0xff0fffff, boot, cur, cpu);
+-	diff |= CHECK(id_mmfr1, boot, cur, cpu);
+-	diff |= CHECK(id_mmfr2, boot, cur, cpu);
+-	diff |= CHECK(id_mmfr3, boot, cur, cpu);
+-	diff |= CHECK(id_pfr0, boot, cur, cpu);
+-	diff |= CHECK(id_pfr1, boot, cur, cpu);
+-
+-	diff |= CHECK(mvfr0, boot, cur, cpu);
+-	diff |= CHECK(mvfr1, boot, cur, cpu);
+-	diff |= CHECK(mvfr2, boot, cur, cpu);
+-
+-	/*
+-	 * Mismatched CPU features are a recipe for disaster. Don't even
+-	 * pretend to support them.
+-	 */
+-	WARN_TAINT_ONCE(diff, TAINT_CPU_OUT_OF_SPEC,
+-			"Unsupported CPU feature variation.\n");
+-}
+-
+ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
+ {
+ 	info->reg_cntfrq = arch_timer_get_cntfrq();
+@@ -346,8 +236,7 @@ void cpuinfo_store_cpu(void)
+ {
+ 	struct cpuinfo_arm64 *info = this_cpu_ptr(&cpu_data);
+ 	__cpuinfo_store_cpu(info);
+-	cpuinfo_sanity_check(info);
+-	update_cpu_features(info);
++	update_cpu_features(smp_processor_id(), info, &boot_cpu_data);
+ }
+ 
+ void __init cpuinfo_store_boot_cpu(void)
+-- 
+1.7.9.5
