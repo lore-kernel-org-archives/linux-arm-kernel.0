@@ -1,96 +1,50 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 16 Sep 2015 23:11:05 +0800
-Subject: [PATCH] arm64: add cpu_idle tracepoints to arch_cpu_idle
-In-Reply-To: <20150916225312.0d4d32c5@xhacker>
-References: <1442413401-2955-1-git-send-email-jszhang@marvell.com>
- <20150916144738.GA23245@red-moon>	<20150916225312.0d4d32c5@xhacker>
-Message-ID: <20150916231105.11a0e65e@xhacker>
+From: tklauser@distanz.ch (Tobias Klauser)
+Date: Wed, 16 Sep 2015 17:18:56 +0200
+Subject: [PATCH] ARM: topology: Use of_property_read_u32 instead of
+ open-coding it
+Message-ID: <1442416736-10185-1-git-send-email-tklauser@distanz.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lorenzo,
+Use of_property_read_u32 to read the "clock-frequency" property instead
+of using of_get_property with return value checks and endianness
+conversion.
 
-On Wed, 16 Sep 2015 22:53:12 +0800
-Jisheng Zhang <jszhang@marvell.com> wrote:
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ arch/arm/kernel/topology.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-> Dear Lorenzo,
-> 
-> On Wed, 16 Sep 2015 15:47:38 +0100
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> 
-> > On Wed, Sep 16, 2015 at 03:23:21PM +0100, Jisheng Zhang wrote:
-> > > Currently, if cpuidle is disabled or not supported, powertop reports
-> > > zero wakeups and zero events. This is due to the cpu_idle tracepoints
-> > > are missing.
-> > > 
-> > > This patch is to make cpu_idle tracepoints always available even if
-> > > cpuidle is disabled or not supported.
-> > > 
-> > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > 
-> > Is there a reason why this code cannot be moved to the generic idle loop ?
-> 
-> Do you mean the cpu_idle_loop() in kernel/sched/idle.c? To be honest, I
-
-Maybe I know now. we need to trace different idle level, for example:
-
-WFI idle: trace_cpu_idle_rcuidle(1, ...);
-
-deeper idle: trace_cpu_idle_rcuidle(2, ...);
-
-Usually, the first argument of trace_cpu_idle_rcuidle() equals to the index
-of the idle level.
-
-so generic idle loop is not a good candidate.
-
-> dunno. Maybe kernel experts can give some hints.
-> 
-> Thanks,
-> Jisheng
-> 
-> > 
-> > Thanks,
-> > Lorenzo
-> > 
-> > > ---
-> > >  arch/arm64/kernel/process.c | 3 +++
-> > >  1 file changed, 3 insertions(+)
-> > > 
-> > > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> > > index 223b093..f75b540 100644
-> > > --- a/arch/arm64/kernel/process.c
-> > > +++ b/arch/arm64/kernel/process.c
-> > > @@ -44,6 +44,7 @@
-> > >  #include <linux/hw_breakpoint.h>
-> > >  #include <linux/personality.h>
-> > >  #include <linux/notifier.h>
-> > > +#include <trace/events/power.h>
-> > >  
-> > >  #include <asm/compat.h>
-> > >  #include <asm/cacheflush.h>
-> > > @@ -75,8 +76,10 @@ void arch_cpu_idle(void)
-> > >  	 * This should do all the clock switching and wait for interrupt
-> > >  	 * tricks
-> > >  	 */
-> > > +	trace_cpu_idle_rcuidle(1, smp_processor_id());
-> > >  	cpu_do_idle();
-> > >  	local_irq_enable();
-> > > +	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
-> > >  }
-> > >  
-> > >  #ifdef CONFIG_HOTPLUG_CPU
-> > > -- 
-> > > 2.5.1
-> > > 
-> > > --
-> > > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > > the body of a message to majordomo at vger.kernel.org
-> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > > Please read the FAQ at  http://www.tux.org/lkml/
-> > > 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 08b7847..615a13c 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -100,8 +100,7 @@ static void __init parse_dt_topology(void)
+ 				 GFP_NOWAIT);
+ 
+ 	for_each_possible_cpu(cpu) {
+-		const u32 *rate;
+-		int len;
++		u32 rate;
+ 
+ 		/* too early to use cpu->of_node */
+ 		cn = of_get_cpu_node(cpu, NULL);
+@@ -117,14 +116,13 @@ static void __init parse_dt_topology(void)
+ 		if (cpu_eff->compatible == NULL)
+ 			continue;
+ 
+-		rate = of_get_property(cn, "clock-frequency", &len);
+-		if (!rate || len != 4) {
++		if (of_property_read_u32(cn, "clock-frequency", &rate)) {
+ 			pr_err("%s missing clock-frequency property\n",
+ 				cn->full_name);
+ 			continue;
+ 		}
+ 
+-		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
++		capacity = (rate >> 20) * cpu_eff->efficiency;
+ 
+ 		/* Save min capacity of the system */
+ 		if (capacity < min_capacity)
+-- 
+2.5.0
