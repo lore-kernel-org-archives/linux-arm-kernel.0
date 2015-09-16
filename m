@@ -1,34 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 16 Sep 2015 20:42:34 +0100
-Subject: [PATCH 2/2] ASoC: atmel-classd: DT binding for Class D audio
- amplifier driver
-In-Reply-To: <55F78C79.30102@atmel.com>
-References: <1441086101-15303-1-git-send-email-songjun.wu@atmel.com>
- <1441086101-15303-3-git-send-email-songjun.wu@atmel.com>
- <20150903114316.GV12027@sirena.org.uk> <55EC0AFE.3080809@atmel.com>
- <20150907162548.GW5313@sirena.org.uk> <55EEAC0D.7010003@atmel.com>
- <20150908122340.GC9751@sirena.org.uk> <55F78C79.30102@atmel.com>
-Message-ID: <20150916194234.GR12027@sirena.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 16 Sep 2015 21:42:41 +0200
+Subject: [PATCH] ARM: pxa: add wm9713 codec
+Message-ID: <1442432561-32722-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 11:11:53AM +0800, Wu, Songjun wrote:
+The mioa701 is using the wm9713 for audio, battery and touchscreen. Add
+the missing audio part, which disappeared.
 
-> I try to use one entry, but there is a problem.
-> It's about 'driver_data' in struct device.
-> In function snd_soc_register_card, the parameter 'card' will be set to
-> 'driver_data' by the code 'dev_set_drvdata(card->dev, card)'.
-> Then some resources(eg. regmap, clock) also need be recorded by
-> 'driver_data'. One entry could only has one 'driver_data'. I think the best
-> way is to create two entries, like the current dts.
-> What's your opinion?
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/mach-pxa/mioa701.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Look at the recently applied sunxi driver for an example of how to do
-this - it's a similar piece of hardware (entirely in the SoC and so on).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150916/3d474210/attachment.sig>
+diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+index a7b392415a9e..d8e356d63471 100644
+--- a/arch/arm/mach-pxa/mioa701.c
++++ b/arch/arm/mach-pxa/mioa701.c
+@@ -680,6 +680,7 @@ MIO_SIMPLE_DEV(mioa701_led,	  "leds-gpio",	    &gpio_led_info)
+ MIO_SIMPLE_DEV(pxa2xx_pcm,	  "pxa2xx-pcm",	    NULL)
+ MIO_SIMPLE_DEV(mioa701_sound,	  "mioa701-wm9713", NULL)
+ MIO_SIMPLE_DEV(mioa701_board,	  "mioa701-board",  NULL)
++MIO_SIMPLE_DEV(wm9713_acodec,	  "wm9713-codec",   NULL);
+ MIO_SIMPLE_DEV(gpio_vbus,	  "gpio-vbus",      &gpio_vbus_data);
+ MIO_SIMPLE_DEV(mioa701_camera,	  "soc-camera-pdrv",&iclink);
+ 
+@@ -687,6 +688,7 @@ static struct platform_device *devices[] __initdata = {
+ 	&mioa701_gpio_keys,
+ 	&mioa701_backlight,
+ 	&mioa701_led,
++	&wm9713_acodec,
+ 	&pxa2xx_pcm,
+ 	&mioa701_sound,
+ 	&power_dev,
+-- 
+2.1.4
