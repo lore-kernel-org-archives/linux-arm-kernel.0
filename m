@@ -1,65 +1,86 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 16 Sep 2015 13:01:18 -0400
-Subject: [PATCH v1 1/2] soc: ti: display firmware file name as part of
- boot log
-In-Reply-To: <55F88B81.2000308@oracle.com>
-References: <1441403199-10936-1-git-send-email-m-karicheri2@ti.com>
- <55EA673F.8010904@oracle.com> <55F06075.6050405@ti.com>
- <55F8600D.2070701@ti.com> <55F88B81.2000308@oracle.com>
-Message-ID: <55F9A05E.4090000@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 16 Sep 2015 18:28:39 +0100
+Subject: [PATCH v2 3/5] irqchip/gic: Convert the GIC driver to ACPI probing
+In-Reply-To: <55F98525.7030900@linaro.org>
+References: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
+ <1442152943-24493-4-git-send-email-marc.zyngier@arm.com>
+ <55F98525.7030900@linaro.org>
+Message-ID: <55F9A6C7.6000007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2015 05:20 PM, santosh shilimkar wrote:
-> On 9/15/2015 11:14 AM, Murali Karicheri wrote:
->> On 09/09/2015 12:38 PM, Murali Karicheri wrote:
->>> On 09/04/2015 11:53 PM, santosh.shilimkar at oracle.com wrote:
->>>> On 9/4/15 5:46 PM, Murali Karicheri wrote:
->>>>> To help the user, print the PDSP file name as part of
->>>>> knav_queue_load_pdsp(). This will be useful for users to know what
->>>>> version of the firmware is loaded to PDSP. Also update the
->>>>> document for the location of the QMSS accumulator PDSP firmware.
->>>>>
->>>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>>>> ---
->>>>
->>>> Looks fine. Will pick both the patches.
->>>>
->>>
->>> Thanks Santhosh.
->>>
->>> Is there a requirement to add the firmware to linux-firmware.git. Right
->>> now I have provided link to ti git repo that has the firmware. I have
->>> the patch ready in case this is required. Do you know?
->>>
->>> Murali
->>>> Regards,
->>>> Santosh
->>>>
->>>>
->>>
->>>
->> Santosh,
+On 16/09/15 16:05, Hanjun Guo wrote:
+> Hi Marc,
+> 
+> On 09/13/2015 10:02 PM, Marc Zyngier wrote:
+> [...]
+>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> index e6b7ed5..8a0b9c3 100644
+>> --- a/drivers/irqchip/irq-gic.c
+>> +++ b/drivers/irqchip/irq-gic.c
+>> @@ -41,7 +41,6 @@
+>>   #include <linux/irqchip.h>
+>>   #include <linux/irqchip/chained_irq.h>
+>>   #include <linux/irqchip/arm-gic.h>
+>> -#include <linux/irqchip/arm-gic-acpi.h>
 >>
->> I have checked v4.3-rc1 and I don't see it. Did you send the pull
->> request?
+>>   #include <asm/cputype.h>
+>>   #include <asm/irq.h>
+>> @@ -1177,7 +1176,7 @@ IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
+>>   #endif
 >>
-> They are in the queue fo 4.4-rc1. They were too late for 4.3.
-> You might know already, typically as a rule of thumb followed
-> on arm-soc, we need to get patches reviewed/acked by rc4 to make
-> it for next merge window.
-> Ofcourse genuine bug fixes can make it to the same cycle.
-Is there a branch where you have applied the patches that you can 
-provide me? I want to send it to internal list for merge.
+>>   #ifdef CONFIG_ACPI
+>> -static phys_addr_t dist_phy_base, cpu_phy_base __initdata;
+>> +static phys_addr_t cpu_phy_base __initdata;
+>>
+>>   static int __init
+>>   gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+>> @@ -1205,60 +1204,56 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+>>   	return 0;
+>>   }
+>>
+>> -static int __init
+>> -gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
+>> -				const unsigned long end)
+>> +/* The things you have to do to just *count* something... */
+>> +static int __init acpi_dummy_func(struct acpi_subtable_header *header,
+>> +				  const unsigned long end)
+>>   {
+>> -	struct acpi_madt_generic_distributor *dist;
+>> +	return 0;
+>> +}
+>>
+>> -	dist = (struct acpi_madt_generic_distributor *)header;
+>> +static bool __init acpi_gic_redist_is_present(void)
+>> +{
+>> +	return acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
+>> +				     acpi_dummy_func, 0) > 0;
+>> +}
+>>
+>> -	if (BAD_MADT_ENTRY(dist, end))
+>> -		return -EINVAL;
+>> +static bool __init gic_validate_dist(struct acpi_subtable_header *header,
+>> +				     struct acpi_probe_entry *ape)
+>> +{
+>> +	struct acpi_madt_generic_distributor *dist;
+>> +	dist = (struct acpi_madt_generic_distributor *)header;
+>>
+>> -	dist_phy_base = dist->base_address;
+>> -	return 0;
+>> +	return (dist->version == ape->driver_data &&
+>> +		(dist->version != ACPI_MADT_GIC_VERSION_NONE ||
+>> +		 !acpi_gic_redist_is_present()));
+>>
+> 
+> When I was rebasing the GICv3 patches on top of yours, I noticed
+> that GICv3 will also needs to check the acpi_gic_redist_is_present(),
+> can we move the code above to some common place, or just leave
+> the code duplicate but self-contained?
 
-Murali
->
-> Regards,
-> Santosh
->
->
+Please keep it self-contained so far. We can "optimize" later.
 
+Thanks,
 
+	M.
 -- 
-Murali Karicheri
-Linux Kernel, Keystone
+Jazz is not dead. It just smells funny...
