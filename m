@@ -1,37 +1,76 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 16 Sep 2015 16:24:21 +0100
-Subject: [PATCH 1/5] spi: introduce mmap read support for spi flash devices
-In-Reply-To: <CAD6G_RQOazkS7KHrG75wgMXx1cH_pKjx43Mve6fz1qOJGPpq9w@mail.gmail.com>
-References: <1441355402-6837-1-git-send-email-vigneshr@ti.com>
- <1441355402-6837-2-git-send-email-vigneshr@ti.com>
- <CAD6G_RT8Q+Uyp1ZjzHf54Tno1wHm0SmLKEwRAe2gkdp772FD9A@mail.gmail.com>
- <20150914183553.GE12027@sirena.org.uk>
- <CAD6G_RQOazkS7KHrG75wgMXx1cH_pKjx43Mve6fz1qOJGPpq9w@mail.gmail.com>
-Message-ID: <20150916152421.GL11268@sirena.org.uk>
+From: horia.geanta@freescale.com (=?UTF-8?Q?Horia_Geant=c4=83?=)
+Date: Wed, 16 Sep 2015 18:28:41 +0300
+Subject: [PATCH] ARM: dts: ls1021a: add crypto node
+In-Reply-To: <1439365361-24129-1-git-send-email-horia.geanta@freescale.com>
+References: <1439365361-24129-1-git-send-email-horia.geanta@freescale.com>
+Message-ID: <55F98AA9.1030607@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 06:16:55PM +0530, Jagan Teki wrote:
-> On 15 September 2015 at 00:05, Mark Brown <broonie@kernel.org> wrote:
+ping
 
-> > There seem to be a reasonable number of SPI controllers out there which
-> > have as an extension the ability to do memory mapped reads but are
-> > otherwise perfectly normal SPI controllers and which rely on that for
-> > everything except reads.
-
-> This is true, but exposing direct spi-nor arguments or features like
-> read_opcode, addr_width or dummy_byte to spi layer isn't fine? because
-> for spi layer there is a spi to flash transition mtd m25p80.c is there
-> to handle is it?
-
-The m25p80 driver is a generic, SPI level piece of code not a driver for
-specific controller hardware.  The controller hardware drivers live in
-the SPI subsystem.  In order to support this memory mapped feature we
-need the controller drivers to expose an interface for controlling it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150916/d875d560/attachment.sig>
+On 8/12/2015 10:42 AM, Horia Geant? wrote:
+> Signed-off-by: Horia Geant? <horia.geanta@freescale.com>
+> ---
+>  arch/arm/boot/dts/ls1021a.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index 973a496207fc..5bd64a4df4d3 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -63,6 +63,7 @@
+>  		serial4 = &lpuart4;
+>  		serial5 = &lpuart5;
+>  		sysclk = &sysclk;
+> +		crypto = &crypto;
+>  	};
+>  
+>  	cpus {
+> @@ -148,6 +149,45 @@
+>  			big-endian;
+>  		};
+>  
+> +		crypto: crypto at 1700000 {
+> +			compatible = "fsl,sec-v5.0", "fsl,sec-v4.0";
+> +			fsl,sec-era = <7>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg		 = <0x0 0x1700000 0x0 0x100000>;
+> +			ranges		 = <0x0 0x0 0x1700000 0x100000>;
+> +			interrupts	 = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
+> +
+> +			sec_jr0: jr at 10000 {
+> +				compatible = "fsl,sec-v5.0-job-ring",
+> +				     "fsl,sec-v4.0-job-ring";
+> +				reg = <0x10000 0x10000>;
+> +				interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +			sec_jr1: jr at 20000 {
+> +				compatible = "fsl,sec-v5.0-job-ring",
+> +				     "fsl,sec-v4.0-job-ring";
+> +				reg = <0x20000 0x10000>;
+> +				interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +			sec_jr2: jr at 30000 {
+> +				compatible = "fsl,sec-v5.0-job-ring",
+> +				     "fsl,sec-v4.0-job-ring";
+> +				reg = <0x30000 0x10000>;
+> +				interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +			sec_jr3: jr at 40000 {
+> +				compatible = "fsl,sec-v5.0-job-ring",
+> +				     "fsl,sec-v4.0-job-ring";
+> +				reg = <0x40000 0x10000>;
+> +				interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +		};
+> +
+>  		clockgen: clocking at 1ee1000 {
+>  			#address-cells = <1>;
+>  			#size-cells = <1>;
+> 
