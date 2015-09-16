@@ -1,40 +1,35 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Wed, 16 Sep 2015 16:20:43 +0800
-Subject: [PATCH] arm/dts: Add node for ina220 on LS1021ATWR
-Message-ID: <1442391643-37883-1-git-send-email-yao.yuan@freescale.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 16 Sep 2015 10:28:25 +0200
+Subject: [PATCH 0/6] pinctrl: Remove unneded semicolons in drivers
+Message-ID: <1442392111-8448-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The INA220 monitors both shunt drop and supply voltage.
+Hello Linus,
 
-Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
----
- arch/arm/boot/dts/ls1021a-twr.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+This series contains trivial patches that removes unneeded
+semicolons in pinctrl drivers. These are clearly typo errors
+and are just creating null statements.
 
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index e008f93..fbb89d1 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -144,6 +144,19 @@
- 
- &i2c0 {
- 	status = "okay";
-+
-+	ina220 at 40 {
-+		compatible = "ti,ina220";
-+		reg = <0x40>;
-+		shunt-resistor = <1000>;
-+	};
-+
-+	ina220 at 41 {
-+		compatible = "ti,ina220";
-+		reg = <0x41>;
-+		shunt-resistor = <1000>;
-+	};
-+
- };
- 
- &i2c1 {
+Best regards,
+Javier
+
+
+Javier Martinez Canillas (6):
+  pinctrl: tz1090: Remove unneded semicolons
+  pinctrl: tz1090-pdc: Remove unneded semicolons
+  pinctrl: mxs: Remove unneded semicolon
+  pinctrl: sunxi: Remove unneeded semicolon
+  pinctrl: mediatek: Remove unneded semicolon
+  pinctrl: samsung: Remove unneded semicolon
+
+ drivers/pinctrl/freescale/pinctrl-mxs.c       | 2 +-
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 2 +-
+ drivers/pinctrl/pinctrl-tz1090-pdc.c          | 4 ++--
+ drivers/pinctrl/pinctrl-tz1090.c              | 4 ++--
+ drivers/pinctrl/samsung/pinctrl-exynos5440.c  | 2 +-
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c         | 2 +-
+ 6 files changed, 8 insertions(+), 8 deletions(-)
+
 -- 
-2.1.0.27.g96db324
+2.4.3
