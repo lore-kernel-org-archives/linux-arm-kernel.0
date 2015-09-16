@@ -1,109 +1,45 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 16 Sep 2015 18:48:21 -0500
-Subject: [PATCH 3/4] ARM: OMAP4: hwmod data: Remove legacy IOMMU attr and addrs
-In-Reply-To: <1442447302-5246-1-git-send-email-s-anna@ti.com>
-References: <1442447302-5246-1-git-send-email-s-anna@ti.com>
-Message-ID: <1442447302-5246-4-git-send-email-s-anna@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 17 Sep 2015 02:53:58 +0300
+Subject: [PATCH] ARM: shmobile: r8a7794: add HS-USB DT support
+In-Reply-To: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+Message-ID: <49756124.B9jeO4ArbL@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP4 has been DT-boot only for some time, and the legacy-mode
-device creation logic for IOMMU devices has also been cleaned up,
-so the dev_attr and address data is no longer required. So, remove
-these attribute data and hwmod addr space for the IPU & DSP IOMMU
-devices.
+Define the R8A7794 generic part of the HS-USB device node.
+It is up to the board file to enable the device.
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 31 ------------------------------
- 1 file changed, 31 deletions(-)
+This patch is against  'renesas-devel-20150914-v4.3-rc1' tag  of Simon Horman's
+'renesas.git' repo plus the R8A7794/ PCI USB and USB PHY support patches posted
+last week.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 43eebf2c59e2..56586b5d6051 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -30,7 +30,6 @@
+ arch/arm/boot/dts/r8a7794.dtsi |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
++++ renesas/arch/arm/boot/dts/r8a7794.dtsi
+@@ -718,6 +718,18 @@
+ 		};
+ 	};
  
- #include <linux/platform_data/spi-omap2-mcspi.h>
- #include <linux/platform_data/asoc-ti-mcbsp.h>
--#include <linux/platform_data/iommu-omap.h>
- #include <plat/dmtimer.h>
- 
- #include "omap_hwmod.h"
-@@ -2088,30 +2087,16 @@ static struct omap_hwmod_class omap44xx_mmu_hwmod_class = {
- 
- /* mmu ipu */
- 
--static struct omap_mmu_dev_attr mmu_ipu_dev_attr = {
--	.nr_tlb_entries = 32,
--};
--
- static struct omap_hwmod omap44xx_mmu_ipu_hwmod;
- static struct omap_hwmod_rst_info omap44xx_mmu_ipu_resets[] = {
- 	{ .name = "mmu_cache", .rst_shift = 2 },
- };
- 
--static struct omap_hwmod_addr_space omap44xx_mmu_ipu_addrs[] = {
--	{
--		.pa_start	= 0x55082000,
--		.pa_end		= 0x550820ff,
--		.flags		= ADDR_TYPE_RT,
--	},
--	{ }
--};
--
- /* l3_main_2 -> mmu_ipu */
- static struct omap_hwmod_ocp_if omap44xx_l3_main_2__mmu_ipu = {
- 	.master		= &omap44xx_l3_main_2_hwmod,
- 	.slave		= &omap44xx_mmu_ipu_hwmod,
- 	.clk		= "l3_div_ck",
--	.addr		= omap44xx_mmu_ipu_addrs,
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-@@ -2130,35 +2115,20 @@ static struct omap_hwmod omap44xx_mmu_ipu_hwmod = {
- 			.modulemode   = MODULEMODE_HWCTRL,
- 		},
- 	},
--	.dev_attr	= &mmu_ipu_dev_attr,
- };
- 
- /* mmu dsp */
- 
--static struct omap_mmu_dev_attr mmu_dsp_dev_attr = {
--	.nr_tlb_entries = 32,
--};
--
- static struct omap_hwmod omap44xx_mmu_dsp_hwmod;
- static struct omap_hwmod_rst_info omap44xx_mmu_dsp_resets[] = {
- 	{ .name = "mmu_cache", .rst_shift = 1 },
- };
- 
--static struct omap_hwmod_addr_space omap44xx_mmu_dsp_addrs[] = {
--	{
--		.pa_start	= 0x4a066000,
--		.pa_end		= 0x4a0660ff,
--		.flags		= ADDR_TYPE_RT,
--	},
--	{ }
--};
--
- /* l4_cfg -> dsp */
- static struct omap_hwmod_ocp_if omap44xx_l4_cfg__mmu_dsp = {
- 	.master		= &omap44xx_l4_cfg_hwmod,
- 	.slave		= &omap44xx_mmu_dsp_hwmod,
- 	.clk		= "l4_div_ck",
--	.addr		= omap44xx_mmu_dsp_addrs,
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-@@ -2177,7 +2147,6 @@ static struct omap_hwmod omap44xx_mmu_dsp_hwmod = {
- 			.modulemode   = MODULEMODE_HWCTRL,
- 		},
- 	},
--	.dev_attr	= &mmu_dsp_dev_attr,
- };
- 
- /*
--- 
-2.5.0
++	hsusb: usb at e6590000 {
++		compatible = "renesas,usbhs-r8a7794";
++		reg = <0 0xe6590000 0 0x100>;
++		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp7_clks R8A7794_CLK_HSUSB>;
++		power-domains = <&cpg_clocks>;
++		renesas,buswait = <4>;
++		phys = <&usb0 1>;
++		phy-names = "usb";
++		status = "disabled";
++	};
++
+ 	usbphy: usb-phy at e6590100 {
+ 		compatible = "renesas,usb-phy-r8a7794";
+ 		reg = <0 0xe6590100 0 0x100>;
