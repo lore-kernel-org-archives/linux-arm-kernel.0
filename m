@@ -1,87 +1,96 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 16 Sep 2015 10:11:12 -0500
-Subject: [PATCH] ARM: dts: am57xx-beagle-x15: Update Phy supplies
-In-Reply-To: <1441308226-26690-1-git-send-email-nm@ti.com>
-References: <1441308226-26690-1-git-send-email-nm@ti.com>
-Message-ID: <55F98690.6070601@ti.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 16 Sep 2015 23:11:05 +0800
+Subject: [PATCH] arm64: add cpu_idle tracepoints to arch_cpu_idle
+In-Reply-To: <20150916225312.0d4d32c5@xhacker>
+References: <1442413401-2955-1-git-send-email-jszhang@marvell.com>
+ <20150916144738.GA23245@red-moon>	<20150916225312.0d4d32c5@xhacker>
+Message-ID: <20150916231105.11a0e65e@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Dear Lorenzo,
 
-On 09/03/2015 02:23 PM, Nishanth Menon wrote:
-> Originally, all the SoC PHY rails were supplied by LDO3. However, as a
-> result of characterization, it was determined that this posed a risk in
-> extreme load  conditions. Hence the PHY rails are split between two
-> different LDOs. Update the related node as a result
-> 
-> LDO3/VDDA_1V8_PHYA supplies vdda_usb1, vdda_usb2, vdda_sata, vdda_usb3
-> LDO4/VDDA_1V8_PHYB supplies vdda_pcie1, vdda_pcie0, vdda_hdmi, vdda_pcie
-> 
-> NOTE: We break compatibility with pre-production boards with this change
-> since, the PMIC LDO4 is disabled at OTP level.
-> 
-> The new configuration is the plan of record and all pre-production
-> boards are supposed to be replaced with the latest boards matching the
-> mentioned configuration.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
+On Wed, 16 Sep 2015 22:53:12 +0800
+Jisheng Zhang <jszhang@marvell.com> wrote:
 
-Gentle ping. Some very few 10 something boards have been created and
-stopped production till the latest modifications were done (PMIC USB
-interrupt, LDO4 etc) - and all of those boards are now getting
-scrapped.. If there are any (as per tracking information, there should
-not be any), TI should be contacted to have them replaced.
-
-Is it possible for us to consider this patch in 4.3 cycle - given that
-we are this close, might have been great to see 4.3 vanilla function on
-the production platform.
-
->  arch/arm/boot/dts/am57xx-beagle-x15.dts |   13 +++++++++++--
->  1 file changed, 11 insertions(+), 2 deletions(-)
+> Dear Lorenzo,
 > 
-> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> index 3a05b94f59ed..ede7fb73c717 100644
-> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> @@ -432,7 +432,7 @@
->  				};
->  
->  				ldo3_reg: ldo3 {
-> -					/* VDDA_1V8_PHY */
-> +					/* VDDA_1V8_PHYA */
->  					regulator-name = "ldo3";
->  					regulator-min-microvolt = <1800000>;
->  					regulator-max-microvolt = <1800000>;
-> @@ -440,6 +440,15 @@
->  					regulator-boot-on;
->  				};
->  
-> +				ldo4_reg: ldo4 {
-> +					/* VDDA_1V8_PHYB */
-> +					regulator-name = "ldo4";
-> +					regulator-min-microvolt = <1800000>;
-> +					regulator-max-microvolt = <1800000>;
-> +					regulator-always-on;
-> +					regulator-boot-on;
-> +				};
-> +
->  				ldo9_reg: ldo9 {
->  					/* VDD_RTC */
->  					regulator-name = "ldo9";
-> @@ -681,7 +690,7 @@
->  
->  &hdmi {
->  	status = "ok";
-> -	vdda-supply = <&ldo3_reg>;
-> +	vdda-supply = <&ldo4_reg>;
->  
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&hdmi_pins>;
+> On Wed, 16 Sep 2015 15:47:38 +0100
+> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
 > 
+> > On Wed, Sep 16, 2015 at 03:23:21PM +0100, Jisheng Zhang wrote:
+> > > Currently, if cpuidle is disabled or not supported, powertop reports
+> > > zero wakeups and zero events. This is due to the cpu_idle tracepoints
+> > > are missing.
+> > > 
+> > > This patch is to make cpu_idle tracepoints always available even if
+> > > cpuidle is disabled or not supported.
+> > > 
+> > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > 
+> > Is there a reason why this code cannot be moved to the generic idle loop ?
+> 
+> Do you mean the cpu_idle_loop() in kernel/sched/idle.c? To be honest, I
 
+Maybe I know now. we need to trace different idle level, for example:
 
--- 
-Regards,
-Nishanth Menon
+WFI idle: trace_cpu_idle_rcuidle(1, ...);
+
+deeper idle: trace_cpu_idle_rcuidle(2, ...);
+
+Usually, the first argument of trace_cpu_idle_rcuidle() equals to the index
+of the idle level.
+
+so generic idle loop is not a good candidate.
+
+> dunno. Maybe kernel experts can give some hints.
+> 
+> Thanks,
+> Jisheng
+> 
+> > 
+> > Thanks,
+> > Lorenzo
+> > 
+> > > ---
+> > >  arch/arm64/kernel/process.c | 3 +++
+> > >  1 file changed, 3 insertions(+)
+> > > 
+> > > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> > > index 223b093..f75b540 100644
+> > > --- a/arch/arm64/kernel/process.c
+> > > +++ b/arch/arm64/kernel/process.c
+> > > @@ -44,6 +44,7 @@
+> > >  #include <linux/hw_breakpoint.h>
+> > >  #include <linux/personality.h>
+> > >  #include <linux/notifier.h>
+> > > +#include <trace/events/power.h>
+> > >  
+> > >  #include <asm/compat.h>
+> > >  #include <asm/cacheflush.h>
+> > > @@ -75,8 +76,10 @@ void arch_cpu_idle(void)
+> > >  	 * This should do all the clock switching and wait for interrupt
+> > >  	 * tricks
+> > >  	 */
+> > > +	trace_cpu_idle_rcuidle(1, smp_processor_id());
+> > >  	cpu_do_idle();
+> > >  	local_irq_enable();
+> > > +	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+> > >  }
+> > >  
+> > >  #ifdef CONFIG_HOTPLUG_CPU
+> > > -- 
+> > > 2.5.1
+> > > 
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > > the body of a message to majordomo at vger.kernel.org
+> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > > Please read the FAQ at  http://www.tux.org/lkml/
+> > > 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
