@@ -1,44 +1,42 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 16 Sep 2015 10:04:55 +0800
-Subject: [PATCH 2/2] arm64: dts: mt8173: add timer node
-In-Reply-To: <1442369095-1094-1-git-send-email-yingjoe.chen@mediatek.com>
-References: <1442369095-1094-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1442369095-1094-2-git-send-email-yingjoe.chen@mediatek.com>
+From: Dongsheng.Wang@freescale.com (Wang Dongsheng)
+Date: Wed, 16 Sep 2015 02:15:45 +0000
+Subject: [PATCH v2 1/2] fsl: Add binding for RCPM
+In-Reply-To: <1442361398.2909.164.camel@freescale.com>
+References: <1442307339-15225-1-git-send-email-dongsheng.wang@freescale.com>
+ <1442361398.2909.164.camel@freescale.com>
+Message-ID: <SN1PR0301MB1616C48FB3D990BCA45289AB9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Kurtz <djkurtz@chromium.org>
+Hi Scott,
 
-Add device node to enable GPT timer. This timer will be
-used as sched clock source.
+> -----Original Message-----
+> From: Wood Scott-B07421
+> Sent: Wednesday, September 16, 2015 7:57 AM
+> To: Wang Dongsheng-B40534
+> Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
+> robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang Huan-B18965; Jin
+> Zhengxiong-R64188; Zhao Chenhui-B35336; Tang Yuantian-B29983
+> Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
+> 
+> On Tue, 2015-09-15 at 16:55 +0800, Dongsheng Wang wrote:
+> > +* Freescale RCPM Wakeup Source Device Tree Bindings
+> > +-------------------------------------------
+> > +Required rcpm-wakeup property should be added to a device node if the
+> > device
+> > +can be used as a wakeup source.
+> > +
+> > +  - rcpm-wakeup: The value of the property consists of 3 cells. The first
+> > cell
+> > +     is a pointer to the rcpm node, the second cell is the bit mask that
+> > +     should be set in IPPDEXPCR0, and the last cell is for IPPDEXPCR1.
+> > +     Note: If the platform has no IPPDEXPCR1 register, put a zero here.
+> 
+> What if a future platform has more than two of these registers?
 
-Change-Id: Idc4e3f0ee80b5c36cae6f0f2328f94aafcca1253
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Those registers are only used for wakeup device, we have a lot of available bit
+for feature. For example, In LS1021a platform only 7bits has used in the registers,
+and 57bits is reserved.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index d18ee42..d763803 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -238,6 +238,15 @@
- 			reg = <0 0x10007000 0 0x100>;
- 		};
- 
-+		timer: timer at 10008000 {
-+			compatible = "mediatek,mt8173-timer",
-+				     "mediatek,mt6577-timer";
-+			reg = <0 0x10008000 0 0x1000>;
-+			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&infracfg CLK_INFRA_CLK_13M>,
-+				 <&topckgen CLK_TOP_RTC_SEL>;
-+		};
-+
- 		pwrap: pwrap at 1000d000 {
- 			compatible = "mediatek,mt8173-pwrap";
- 			reg = <0 0x1000d000 0 0x1000>;
--- 
-1.9.1
+Regards,
+-Dongsheng
