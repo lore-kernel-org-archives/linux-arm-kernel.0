@@ -1,79 +1,95 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 16 Sep 2015 14:44:21 +0800
-Subject: [PATCH v8 2/5] dt-bindings: Add a binding for Mediatek xHCI host
- controller
+Date: Wed, 16 Sep 2015 14:44:20 +0800
+Subject: [PATCH v8 1/5] dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
 In-Reply-To: <1442385864-4368-1-git-send-email-chunfeng.yun@mediatek.com>
 References: <1442385864-4368-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1442385864-4368-3-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1442385864-4368-2-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add a DT binding documentation of xHCI host controller for the
-MT8173 SoC from Mediatek.
+add a DT binding documentation of usb3.0 phy for MT65xx
+SoCs from Mediatek.
 
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- .../devicetree/bindings/usb/mt8173-xhci.txt        | 52 ++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+ .../devicetree/bindings/phy/phy-mt65xx-usb.txt     | 68 ++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
 
-diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
 new file mode 100644
-index 0000000..0c96273
+index 0000000..00100cf
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-@@ -0,0 +1,52 @@
-+MT8173 xHCI
++++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+@@ -0,0 +1,68 @@
++mt65xx USB3.0 PHY binding
++--------------------------
 +
-+The device node for Mediatek SOC USB3.0 host controller
++This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
 +
-+Required properties:
-+ - compatible : should contain "mediatek,mt8173-xhci"
-+ - reg : specifies physical base address and size of the registers,
-+	the first one for MAC, the second for IPPC
-+ - interrupts : interrupt used by the controller
-+ - power-domains : a phandle to USB power domain node to control USB's
-+	mtcmos
-+ - vusb33-supply : regulator of USB avdd3.3v
++Required properties (controller (parent) node):
++ - compatible	: should be "mediatek,mt8173-u3phy"
++ - reg		: offset and length of register for phy, exclude port's
++		  register.
++ - clocks	: a list of phandle + clock-specifier pairs, one for each
++		  entry in clock-names
++ - clock-names	: must contain
++		  "u3phya_ref": for reference clock of usb3.0 analog phy.
 +
-+ - clocks : a list of phandle + clock-specifier pairs, one for each
-+	entry in clock-names
-+ - clock-names : must contain
-+	"sys_ck": for clock of xHCI MAC
-+	"wakeup_deb_p0": for USB wakeup debounce clock of port0
-+	"wakeup_deb_p0": for USB wakeup debounce clock of port1
++Required nodes	: a sub-node is required for each port the controller
++		  provides. Address range information including the usual
++		  'reg' property is used inside these nodes to describe
++		  the controller's topology.
 +
-+ - phys : a list of phandle + phy specifier pairs
-+ - usb3-lpm-capable : supports USB3.0 LPM
-+
-+Optional properties:
-+ - mediatek,wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup
-+	mode;
-+ - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
-+	control register, it depends on "mediatek,wakeup-src".
-+ - vbus-supply : reference to the VBUS regulator;
++Required properties (port (child) node):
++- reg		: address and length of the register set for the port.
++- #phy-cells	: should be 1 (See second example)
++		  cell after port phandle is phy type from:
++			- PHY_TYPE_USB2
++			- PHY_TYPE_USB3
 +
 +Example:
-+usb30: usb at 11270000 {
-+	compatible = "mediatek,mt8173-xhci";
-+	reg = <0 0x11270000 0 0x1000>,
-+	      <0 0x11280700 0 0x0100>;
-+	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+	clocks = <&topckgen CLK_TOP_USB30_SEL>,
-+		 <&pericfg CLK_PERI_USB0>,
-+		 <&pericfg CLK_PERI_USB1>;
-+	clock-names = "sys_ck",
-+		      "wakeup_deb_p0",
-+		      "wakeup_deb_p1";
-+	phys = <&phy_port0 PHY_TYPE_USB3>,
-+	       <&phy_port1 PHY_TYPE_USB2>;
-+	vusb33-supply = <&mt6397_vusb_reg>;
-+	vbus-supply = <&usb_p1_vbus>;
-+	usb3-lpm-capable;
-+	mediatek,syscon-wakeup = <&pericfg>;
-+	mediatek,wakeup-src = <1>;
++
++u3phy: usb-phy at 11290000 {
++	compatible = "mediatek,mt8173-u3phy";
++	reg = <0 0x11290000 0 0x800>;
++	clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
++	clock-names = "u3phya_ref";
++	#address-cells = <2>;
++	#size-cells = <2>;
++	ranges;
 +	status = "okay";
++
++	phy_port0: port at 11290800 {
++		reg = <0 0x11290800 0 0x800>;
++		#phy-cells = <1>;
++		status = "okay";
++	};
++
++	phy_port1: port at 11291000 {
++		reg = <0 0x11291000 0 0x800>;
++		#phy-cells = <1>;
++		status = "okay";
++	};
++};
++
++Specifying phy control of devices
++---------------------------------
++
++Device nodes should specify the configuration required in their "phys"
++property, containing a phandle to the phy port node and a device type;
++phy-names for each port are optional.
++
++Example:
++
++#include <dt-bindings/phy/phy.h>
++
++usb30: usb at 11270000 {
++	...
++	phys = <&phy_port0 PHY_TYPE_USB3>;
++	phy-names = "usb3-0";
++	...
 +};
 -- 
 1.8.1.1.dirty
