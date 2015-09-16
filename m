@@ -1,28 +1,28 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 16 Sep 2015 20:22:09 +0100
-Subject: [PATCH v5 10/10] ASoC: rockchip_i2s: modify DMA max burst to 1
-In-Reply-To: <1442188182-6181-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1442187923-5736-1-git-send-email-shawn.lin@rock-chips.com>
- <1442188182-6181-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <20150916192209.GN12027@sirena.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 16 Sep 2015 21:20:24 +0200
+Subject: [PATCH 1/3] dmaengine: virt-dma: don't always free descriptor
+ upon completion
+In-Reply-To: <878u8bu6nh.fsf@belgarion.home> (Robert Jarzmik's message of
+ "Sat, 12 Sep 2015 15:08:34 +0200")
+References: <1441539654-19055-1-git-send-email-robert.jarzmik@free.fr>
+ <878u8bu6nh.fsf@belgarion.home>
+Message-ID: <87613arx1j.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 07:49:42AM +0800, Shawn Lin wrote:
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-> +	default:
-> +		dev_info(&pdev->dev, "Default no dma_quirk!\n");
-> +		break;
-> +	}
+> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+> Hi Jun, Lars-Peter and Vinod,
+>
+> The revert of the former patch of this type, 8c8fe97b2b8a ("Revert "dmaengine:
+> virt-dma: don't always free descriptor upon completion"") broke pxa_dma
+> driver.
 
-Probably printing a message when not using the quirk is a bit noisy
-(hopefully future devices will fix this!).  Otherwise
+So ... what's the plan, Vinod ? I need to fix pxa-dma driver in the early -rc
+stages, how does it work with your schedule ?
 
-Acked-by: Mark Brown <broonie@kernel.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150916/6a335bf9/attachment.sig>
+Cheers.
+
+--
+Robert
