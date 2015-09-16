@@ -1,55 +1,100 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 16 Sep 2015 15:21:07 +0100
-Subject: [PATCH 09/22] arm64: Read system wide CPUID value
+Date: Wed, 16 Sep 2015 15:21:11 +0100
+Subject: [PATCH 13/22] arm64: Make use of system wide capability checks
 In-Reply-To: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
 References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1442413280-31885-10-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1442413280-31885-14-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-Add an API for reading the safe CPUID value across the
-system from the new infrastructure.
+Now that we can reliably read the system wide safe value for a
+feature register, use that to compute the system capability.
+This patch also replaces the 'feature-register-specific'
+methods with a generic routine to check the capability.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |    2 ++
- arch/arm64/kernel/cpufeature.c      |    9 +++++++++
- 2 files changed, 11 insertions(+)
+ arch/arm64/include/asm/cpufeature.h |    1 +
+ arch/arm64/kernel/cpufeature.c      |   34 ++++++++++++++++------------------
+ 2 files changed, 17 insertions(+), 18 deletions(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 7927ac2..f59e90a 100644
+index e2b5a21..e74a2ac 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -149,6 +149,8 @@ void check_local_cpu_features(void);
- bool cpu_supports_mixed_endian_el0(void);
- bool system_supports_mixed_endian_el0(void);
+@@ -80,6 +80,7 @@ struct arm64_cpu_capabilities {
+ 		};
  
-+u64 read_system_reg(u32 id);
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif
+ 		struct {	/* Feature register checking */
++			u32 sys_reg;
+ 			int field_pos;
+ 			int min_field_value;
+ 		};
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 960a62f..a736c13 100644
+index c68d15e..3582af9 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -593,6 +593,15 @@ void update_cpu_features(int cpu,
- 	update_mixed_endian_el0_support(info);
+@@ -589,34 +589,31 @@ feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
+ 	return val >= entry->min_field_value;
  }
  
-+u64 read_system_reg(u32 id)
+-#define __ID_FEAT_CHK(reg)						\
+-static bool __maybe_unused						\
+-has_##reg##_feature(const struct arm64_cpu_capabilities *entry)		\
+-{									\
+-	u64 val;							\
+-									\
+-	val = read_cpuid(reg##_el1);					\
+-	return feature_matches(val, entry);				\
+-}
++static bool
++has_cpuid_feature(const struct arm64_cpu_capabilities *entry)
 +{
-+	struct arm64_ftr_reg *regp = get_arm64_sys_reg(id);
-+
-+	/* We shouldn't get a request for an unsupported register */
-+	BUG_ON(!regp);
-+	return regp->sys_val;
++	u64 val;
+ 
+-__ID_FEAT_CHK(id_aa64pfr0);
+-__ID_FEAT_CHK(id_aa64mmfr1);
+-__ID_FEAT_CHK(id_aa64isar0);
++	val = read_system_reg(entry->sys_reg);
++	return feature_matches(val, entry);
 +}
-+
- static bool
- feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
- {
+ 
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "GIC system register CPU interface",
+ 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+-		.matches = has_id_aa64pfr0_feature,
+-		.field_pos = 24,
++		.matches = has_cpuid_feature,
++		.sys_reg = SYS_ID_AA64PFR0_EL1,
++		.field_pos = ID_AA64PFR0_GIC_SHIFT,
+ 		.min_field_value = 1,
+ 	},
+ #ifdef CONFIG_ARM64_PAN
+ 	{
+ 		.desc = "Privileged Access Never",
+ 		.capability = ARM64_HAS_PAN,
+-		.matches = has_id_aa64mmfr1_feature,
+-		.field_pos = 20,
++		.matches = has_cpuid_feature,
++		.sys_reg = SYS_ID_AA64MMFR1_EL1,
++		.field_pos = ID_AA64MMFR1_PAN_SHIFT,
+ 		.min_field_value = 1,
+ 		.enable = cpu_enable_pan,
+ 	},
+@@ -625,8 +622,9 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "LSE atomic instructions",
+ 		.capability = ARM64_HAS_LSE_ATOMICS,
+-		.matches = has_id_aa64isar0_feature,
+-		.field_pos = 20,
++		.matches = has_cpuid_feature,
++		.sys_reg = SYS_ID_AA64ISAR0_EL1,
++		.field_pos = ID_AA64ISAR0_ATOMICS_SHIFT,
+ 		.min_field_value = 2,
+ 	},
+ #endif /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
 -- 
 1.7.9.5
