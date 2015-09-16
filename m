@@ -1,50 +1,37 @@
-From: tklauser@distanz.ch (Tobias Klauser)
-Date: Wed, 16 Sep 2015 17:18:56 +0200
-Subject: [PATCH] ARM: topology: Use of_property_read_u32 instead of
- open-coding it
-Message-ID: <1442416736-10185-1-git-send-email-tklauser@distanz.ch>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 16 Sep 2015 16:24:21 +0100
+Subject: [PATCH 1/5] spi: introduce mmap read support for spi flash devices
+In-Reply-To: <CAD6G_RQOazkS7KHrG75wgMXx1cH_pKjx43Mve6fz1qOJGPpq9w@mail.gmail.com>
+References: <1441355402-6837-1-git-send-email-vigneshr@ti.com>
+ <1441355402-6837-2-git-send-email-vigneshr@ti.com>
+ <CAD6G_RT8Q+Uyp1ZjzHf54Tno1wHm0SmLKEwRAe2gkdp772FD9A@mail.gmail.com>
+ <20150914183553.GE12027@sirena.org.uk>
+ <CAD6G_RQOazkS7KHrG75wgMXx1cH_pKjx43Mve6fz1qOJGPpq9w@mail.gmail.com>
+Message-ID: <20150916152421.GL11268@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use of_property_read_u32 to read the "clock-frequency" property instead
-of using of_get_property with return value checks and endianness
-conversion.
+On Wed, Sep 16, 2015 at 06:16:55PM +0530, Jagan Teki wrote:
+> On 15 September 2015 at 00:05, Mark Brown <broonie@kernel.org> wrote:
 
-Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
----
- arch/arm/kernel/topology.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+> > There seem to be a reasonable number of SPI controllers out there which
+> > have as an extension the ability to do memory mapped reads but are
+> > otherwise perfectly normal SPI controllers and which rely on that for
+> > everything except reads.
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 08b7847..615a13c 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -100,8 +100,7 @@ static void __init parse_dt_topology(void)
- 				 GFP_NOWAIT);
- 
- 	for_each_possible_cpu(cpu) {
--		const u32 *rate;
--		int len;
-+		u32 rate;
- 
- 		/* too early to use cpu->of_node */
- 		cn = of_get_cpu_node(cpu, NULL);
-@@ -117,14 +116,13 @@ static void __init parse_dt_topology(void)
- 		if (cpu_eff->compatible == NULL)
- 			continue;
- 
--		rate = of_get_property(cn, "clock-frequency", &len);
--		if (!rate || len != 4) {
-+		if (of_property_read_u32(cn, "clock-frequency", &rate)) {
- 			pr_err("%s missing clock-frequency property\n",
- 				cn->full_name);
- 			continue;
- 		}
- 
--		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
-+		capacity = (rate >> 20) * cpu_eff->efficiency;
- 
- 		/* Save min capacity of the system */
- 		if (capacity < min_capacity)
--- 
-2.5.0
+> This is true, but exposing direct spi-nor arguments or features like
+> read_opcode, addr_width or dummy_byte to spi layer isn't fine? because
+> for spi layer there is a spi to flash transition mtd m25p80.c is there
+> to handle is it?
+
+The m25p80 driver is a generic, SPI level piece of code not a driver for
+specific controller hardware.  The controller hardware drivers live in
+the SPI subsystem.  In order to support this memory mapped feature we
+need the controller drivers to expose an interface for controlling it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150916/d875d560/attachment.sig>
