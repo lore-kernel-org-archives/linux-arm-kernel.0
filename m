@@ -1,55 +1,87 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Sep 2015 18:16:50 +0100
-Subject: Regression by 01f779f4862b ("irqchip/GIC: Don't deactivate
- interrupts forwarded to a guest")
-In-Reply-To: <20150917011021.0460792d@xhacker>
-References: <20150917003202.498ff83c@xhacker>	<alpine.DEB.2.11.1509161851330.3951@nanos>	<20150917005908.111c00ca@xhacker>
- <20150917011021.0460792d@xhacker>
-Message-ID: <55F9A402.1060408@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 16 Sep 2015 18:16:31 +0100
+Subject: [PATCH REPOST v6 0/8] ARM64: juno: add SCPI mailbox protocol,
+ clock and CPUFreq support
+Message-ID: <1442423799-23892-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/09/15 18:10, Jisheng Zhang wrote:
-> Dear Thomas,
-> 
-> On Thu, 17 Sep 2015 00:59:08 +0800
-> Jisheng Zhang <jszhang@marvell.com> wrote:
-> 
->> On Wed, 16 Sep 2015 18:52:41 +0200
->> Thomas Gleixner <tglx@linutronix.de> wrote:
->>
->>> On Thu, 17 Sep 2015, Jisheng Zhang wrote:
->>>
->>>> Hi Marc,
->>>>
->>>> Commit 01f779f4862b ("irqchip/GIC: Don't deactivate interrupts forwarded to a
->>>> guest") causes a regression on Marvell BG4CT SoC. In this SoC, there's only one
->>>> GIC, the secondary irq controller is Synopsys DW iCtl:
->>>> drivers/irqchip/irq-dw-apb-ictl.c
->>>>
->>>> So cascading_gic_irq() should return true on Marvell BG4CT SoC, but it returns
->>>> false. The logic in cascading_gic_irq() doesn't take cascaded irq controller
->>>> which is provided by non-gic controllers.
->>>
->>> I have a fix pending for this in
->>>
->>>   git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git tmp.irq
->>>
->>> 714665351cc7: irqchip/gic: Use IRQD_FORWARDED_TO_VCPU flag
->>>
->>> Can you please give that a try?
->>
->> Sure, Will try and get back to you
-> 
-> Good news! The regression is fixed, cascaded irq works again!
-> 
-> Feel free to add
-> 
-> Tested-by: Jisheng Zhang <jszhang@marvell.com>
+Hi ARM-SoC guys,
 
-Ah, excellent. Probably a case of handler_data being reused... Thanks a
-lot for testing this!
+Olof had confused this with PSCI[0]. I assume the confusion is now
+resolved ? I have now rebased the series on top of v4.3-rc1 and just
+resending them again.
 
-	M.
+Please pull this series for v4.4
+
+You can access it from:
+	git://linux-arm.org/linux-skn.git juno_dvfs
+
+BUT the ARM external git repository is still unreliable and hence I am
+avoiding pull request. Can I request to pull it from the mails directly
+instead ? Extremely sorry for the inconvenience.
+
+Regards,
+Sudeep
+
+This patch series adds support for:
+  1. SCPI(System Control and Power Interface) mailbox protocol driver.
+     It uses ARM MHU mailbox controller driver on Juno but can work with
+     any mailbox controllers using standard mailbox APIs
+  2. Add support for clocks provided by SCP firmware through the SCPI
+     interface
+  3. Using the existing arm_big_little cpufreq driver and the newly
+     added SCPI clock driver, it also adds support for CPU DVFS on
+     ARM64 JUNO development platforms.
+
+The SCPI protocol document is available @[1]
+
+[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/364229.html
+[1] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
+v1: https://lkml.org/lkml/2015/4/27/232
+v2: https://lkml.org/lkml/2015/5/14/470
+v3: https://lkml.org/lkml/2015/5/27/220
+v4: https://lkml.org/lkml/2015/6/8/178
+v5: https://lkml.org/lkml/2015/7/23/270
+v6: https://lkml.org/lkml/2015/7/31/692
+
+Cc: devicetree at vger.kernel.org
+Cc: linux-clk at vger.kernel.org
+Cc: linux-pm at vger.kernel.org
+
+Sudeep Holla (8):
+  Documentation: add DT binding for ARM System Control and Power
+    Interface(SCPI) protocol
+  firmware: add support for ARM System Control and Power Interface(SCPI)
+    protocol
+  clk: add support for clocks provided by SCP(System Control Processor)
+  clk: scpi: add support for cpufreq virtual device
+  cpufreq: arm_big_little: add SCPI interface driver
+  arm64: dts: add SRAM, MHU mailbox and SCPI support on Juno
+  arm64: dts: add CPU topology on Juno
+  arm64: dts: add clock support for all the cpus
+
+ Documentation/devicetree/bindings/arm/arm,scpi.txt | 150 +++++
+ MAINTAINERS                                        |  10 +
+ arch/arm64/boot/dts/arm/juno-base.dtsi             |  54 ++
+ arch/arm64/boot/dts/arm/juno-r1.dts                |  32 +
+ arch/arm64/boot/dts/arm/juno.dts                   |  32 +
+ drivers/clk/Kconfig                                |  10 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-scpi.c                             | 325 ++++++++++
+ drivers/cpufreq/Kconfig.arm                        |  10 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/scpi-cpufreq.c                     | 124 ++++
+ drivers/firmware/Kconfig                           |  19 +
+ drivers/firmware/Makefile                          |   1 +
+ drivers/firmware/arm_scpi.c                        | 711 +++++++++++++++++++++
+ include/linux/scpi_protocol.h                      |  61 ++
+ 15 files changed, 1541 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/arm,scpi.txt
+ create mode 100644 drivers/clk/clk-scpi.c
+ create mode 100644 drivers/cpufreq/scpi-cpufreq.c
+ create mode 100644 drivers/firmware/arm_scpi.c
+ create mode 100644 include/linux/scpi_protocol.h
+
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
