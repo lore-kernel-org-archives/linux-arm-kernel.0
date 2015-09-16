@@ -1,70 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Sep 2015 18:18:31 +0100
-Subject: [PATCH v5 1/5] arm/arm64: add smccc ARCH32
-In-Reply-To: <20150915210557.GA31578@ermac>
-References: <1439973629-19505-1-git-send-email-jens.wiklander@linaro.org>
- <1439973629-19505-2-git-send-email-jens.wiklander@linaro.org>
- <20150819165009.GC10297@arm.com> <20150820113729.GA25962@ermac>
- <20150821092430.GC30930@arm.com> <20150821114331.GA11701@ermac>
- <20150914083029.GA13963@ermac> <20150915182645.GQ31157@arm.com>
- <20150915210557.GA31578@ermac>
-Message-ID: <20150916171831.GS28771@arm.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 16 Sep 2015 13:01:18 -0400
+Subject: [PATCH v1 1/2] soc: ti: display firmware file name as part of
+ boot log
+In-Reply-To: <55F88B81.2000308@oracle.com>
+References: <1441403199-10936-1-git-send-email-m-karicheri2@ti.com>
+ <55EA673F.8010904@oracle.com> <55F06075.6050405@ti.com>
+ <55F8600D.2070701@ti.com> <55F88B81.2000308@oracle.com>
+Message-ID: <55F9A05E.4090000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 10:05:59PM +0100, Jens Wiklander wrote:
-> On Tue, Sep 15, 2015 at 07:26:45PM +0100, Will Deacon wrote:
-> > On Mon, Sep 14, 2015 at 09:30:30AM +0100, Jens Wiklander wrote:
-> > > On Fri, Aug 21, 2015 at 01:43:31PM +0200, Jens Wiklander wrote:
-> > > > On Fri, Aug 21, 2015 at 10:24:30AM +0100, Will Deacon wrote:
-> > > > > On Thu, Aug 20, 2015 at 12:37:29PM +0100, Jens Wiklander wrote:
-> > > > > > On Wed, Aug 19, 2015 at 05:50:09PM +0100, Will Deacon wrote:
-> > > > > > > On Wed, Aug 19, 2015 at 09:40:25AM +0100, Jens Wiklander wrote:
-> > > > > > > > +       mov     x28, x0
-> > > > > > > > +       ldp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
-> > > > > > > > +       ldp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
-> > > > > > > > +       ldp     w4, w5, [x28, #SMC_PARAM_W4_OFFS]
-> > > > > > > > +       ldp     w6, w7, [x28, #SMC_PARAM_W6_OFFS]
-> > > > > > > > +       smc     #0
-> > > > > > > > +       stp     w0, w1, [x28, #SMC_PARAM_W0_OFFS]
-> > > > > > > > +       stp     w2, w3, [x28, #SMC_PARAM_W2_OFFS]
-> > > > > > > > +       ldp     x28, x30, [sp], #16
-> > > > > > > > +       ret
-> > > > > > > > +ENDPROC(smccc_call32)
-> > > > > > > 
-> > > > > > > Could we deal with this like we do for PSCI instead? (see
-> > > > > > > __invoke_psci_fn_smc). We could also then rename psci-call.S to fw-call.S
-> > > > > > > and stick this in there too.
-> > > > > > 
-> > > > > > I assume you're referring to when to use "hvc" and "smc".
-> > > > > 
-> > > > > No, I mean use a C prototype to avoid marshalling the parameters in assembly
-> > > > > like this. As Rutland pointed out, the return value is a bit messy, but
-> > > > > the arguments align nicely with the PCS afaict.
-> > > > 
-> > > > If possible I'd like the function to have the same prototype for both
-> > > > arm and arm64. For arm it's not possible to supply more than 4
-> > > > parameters. To fully support SMC Calling Convention we need to be able
-> > > > to pass 8 parameters and have 4 return values. The OP-TEE driver in this
-> > > > patch set depends on this. I don't see how we can avoid the marshalling
-> > > > here.
-> > > > 
-> > > > We could have two versions of the SMCCC functions, one simplified which
-> > > > only uses registers and one complete like this one with marshalling.
-> > > 
-> > > Will, what do think about this?
-> > 
-> > I still think you should make use of a C prototype to avoid explicit
-> > parameter marshalling in assembly. If you want to maintain a compatible
-> > API between arm and arm64, then you can easily have an intermediate
-> > function in arm64 that sits between the API entry point and the assembly.
-> 
-> Yes, I see how that's convenient for passing argument values in
-> registers, but that doesn't help with storing the returned values in
-> x0..x3 into something accessible in C. Am I missing something?
+On 09/15/2015 05:20 PM, santosh shilimkar wrote:
+> On 9/15/2015 11:14 AM, Murali Karicheri wrote:
+>> On 09/09/2015 12:38 PM, Murali Karicheri wrote:
+>>> On 09/04/2015 11:53 PM, santosh.shilimkar at oracle.com wrote:
+>>>> On 9/4/15 5:46 PM, Murali Karicheri wrote:
+>>>>> To help the user, print the PDSP file name as part of
+>>>>> knav_queue_load_pdsp(). This will be useful for users to know what
+>>>>> version of the firmware is loaded to PDSP. Also update the
+>>>>> document for the location of the QMSS accumulator PDSP firmware.
+>>>>>
+>>>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>>>>> ---
+>>>>
+>>>> Looks fine. Will pick both the patches.
+>>>>
+>>>
+>>> Thanks Santhosh.
+>>>
+>>> Is there a requirement to add the firmware to linux-firmware.git. Right
+>>> now I have provided link to ti git repo that has the firmware. I have
+>>> the patch ready in case this is required. Do you know?
+>>>
+>>> Murali
+>>>> Regards,
+>>>> Santosh
+>>>>
+>>>>
+>>>
+>>>
+>> Santosh,
+>>
+>> I have checked v4.3-rc1 and I don't see it. Did you send the pull
+>> request?
+>>
+> They are in the queue fo 4.4-rc1. They were too late for 4.3.
+> You might know already, typically as a rule of thumb followed
+> on arm-soc, we need to get patches reviewed/acked by rc4 to make
+> it for next merge window.
+> Ofcourse genuine bug fixes can make it to the same cycle.
+Is there a branch where you have applied the patches that you can 
+provide me? I want to send it to internal list for merge.
 
-Your approach using a struct looked fine to me, just place it after the
-parameters and use it only for the return values. Then __invoke_psci*
-can wrap this and unpack r0/x0 from the structure.
+Murali
+>
+> Regards,
+> Santosh
+>
+>
 
-Will
+
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
