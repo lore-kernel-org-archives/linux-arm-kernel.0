@@ -1,91 +1,35 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 15 Sep 2015 17:39:19 -0700
-Subject: [PATCH 5/8] PCI: iproc: Improve link detection logic
+Date: Tue, 15 Sep 2015 17:39:17 -0700
+Subject: [PATCH 3/8] PCI: iproc: Remove ARCH specific flag
 In-Reply-To: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
 References: <1442363962-29805-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1442363962-29805-6-git-send-email-rjui@broadcom.com>
+Message-ID: <1442363962-29805-4-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch further improves the iProc PCIe link detection logic by
-explicitly querying the link status register to ensure link is active
-
-It also forces class to PCI_CLASS_BRIDGE_PCI (0x0604) through the host
-configuration space register
+Now setup-irq.o is built for arm64, in 'commit 459a07721c11
+("PCI: Build setup-irq.o for arm64")' by Jayachandran, pci_fixup_irqs
+can be referenced. We no longer need the CONFIG_ARM flag to wrap
+around call to pci_fixup_irqs
 
 Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- drivers/pci/host/pcie-iproc.c | 29 +++++++++++++++++++++++------
- 1 file changed, 23 insertions(+), 6 deletions(-)
+ drivers/pci/host/pcie-iproc.c | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index 80e0541..62e8085 100644
+index fe2efb1..52e7ff2 100644
 --- a/drivers/pci/host/pcie-iproc.c
 +++ b/drivers/pci/host/pcie-iproc.c
-@@ -60,6 +60,12 @@
- #define SYS_RC_INTX_EN               0x330
- #define SYS_RC_INTX_MASK             0xf
+@@ -238,9 +238,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
  
-+#define PCIE_LINK_STATUS_OFFSET      0xf0c
-+#define PCIE_PHYLINKUP_SHIFT         3
-+#define PCIE_PHYLINKUP               BIT(PCIE_PHYLINKUP_SHIFT)
-+#define PCIE_DL_ACTIVE_SHIFT         2
-+#define PCIE_DL_ACTIVE               BIT(PCIE_DL_ACTIVE_SHIFT)
-+
- static inline struct iproc_pcie *iproc_data(struct pci_bus *bus)
- {
- 	struct iproc_pcie *pcie;
-@@ -138,9 +144,15 @@ static void iproc_pcie_reset(struct iproc_pcie *pcie)
- static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
- {
- 	u8 hdr_type;
--	u32 link_ctrl;
-+	u32 link_ctrl, class, val;
- 	u16 pos, link_status;
--	int link_is_active = 0;
-+	bool link_is_active = false;
-+
-+	val = readl(pcie->base + PCIE_LINK_STATUS_OFFSET);
-+	if (!(val & PCIE_PHYLINKUP) || !(val & PCIE_DL_ACTIVE)) {
-+		dev_err(pcie->dev, "PHY or data link is INACTIVE!\n");
-+		return -ENODEV;
-+	}
+ 	pci_scan_child_bus(bus);
+ 	pci_assign_unassigned_bus_resources(bus);
+-#ifdef CONFIG_ARM
+ 	pci_fixup_irqs(pci_common_swizzle, pcie->map_irq);
+-#endif
+ 	pci_bus_add_devices(bus);
  
- 	/* make sure we are not in EP mode */
- 	pci_bus_read_config_byte(bus, 0, PCI_HEADER_TYPE, &hdr_type);
-@@ -150,14 +162,19 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
- 	}
- 
- 	/* force class to PCI_CLASS_BRIDGE_PCI (0x0604) */
--	pci_bus_write_config_word(bus, 0, PCI_CLASS_DEVICE,
--				  PCI_CLASS_BRIDGE_PCI);
-+#define PCI_BRIDGE_CTRL_REG_OFFSET 0x43c
-+#define PCI_CLASS_BRIDGE_MASK      0xffff00
-+#define PCI_CLASS_BRIDGE_SHIFT     8
-+	pci_bus_read_config_dword(bus, 0, PCI_BRIDGE_CTRL_REG_OFFSET, &class);
-+	class &= ~PCI_CLASS_BRIDGE_MASK;
-+	class |= (PCI_CLASS_BRIDGE_PCI << PCI_CLASS_BRIDGE_SHIFT);
-+	pci_bus_write_config_dword(bus, 0, PCI_BRIDGE_CTRL_REG_OFFSET, class);
- 
- 	/* check link status to see if link is active */
- 	pos = pci_bus_find_capability(bus, 0, PCI_CAP_ID_EXP);
- 	pci_bus_read_config_word(bus, 0, pos + PCI_EXP_LNKSTA, &link_status);
- 	if (link_status & PCI_EXP_LNKSTA_NLW)
--		link_is_active = 1;
-+		link_is_active = true;
- 
- 	if (!link_is_active) {
- 		/* try GEN 1 link speed */
-@@ -181,7 +198,7 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
- 			pci_bus_read_config_word(bus, 0, pos + PCI_EXP_LNKSTA,
- 						 &link_status);
- 			if (link_status & PCI_EXP_LNKSTA_NLW)
--				link_is_active = 1;
-+				link_is_active = true;
- 		}
- 	}
- 
+ 	return 0;
 -- 
 1.9.1
