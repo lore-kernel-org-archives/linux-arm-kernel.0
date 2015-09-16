@@ -1,79 +1,87 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 16 Sep 2015 23:09:21 +0800
-Subject: [PATCH v2 3/5] irqchip/gic: Convert the GIC driver to ACPI probing
-In-Reply-To: <1442152943-24493-4-git-send-email-marc.zyngier@arm.com>
-References: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
- <1442152943-24493-4-git-send-email-marc.zyngier@arm.com>
-Message-ID: <55F98621.1030201@linaro.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 16 Sep 2015 10:11:12 -0500
+Subject: [PATCH] ARM: dts: am57xx-beagle-x15: Update Phy supplies
+In-Reply-To: <1441308226-26690-1-git-send-email-nm@ti.com>
+References: <1441308226-26690-1-git-send-email-nm@ti.com>
+Message-ID: <55F98690.6070601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Tony,
 
-On 09/13/2015 10:02 PM, Marc Zyngier wrote:
-[...]
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index e6b7ed5..8a0b9c3 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -41,7 +41,6 @@
->   #include <linux/irqchip.h>
->   #include <linux/irqchip/chained_irq.h>
->   #include <linux/irqchip/arm-gic.h>
-> -#include <linux/irqchip/arm-gic-acpi.h>
->
->   #include <asm/cputype.h>
->   #include <asm/irq.h>
-> @@ -1177,7 +1176,7 @@ IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
->   #endif
->
->   #ifdef CONFIG_ACPI
-> -static phys_addr_t dist_phy_base, cpu_phy_base __initdata;
-> +static phys_addr_t cpu_phy_base __initdata;
->
->   static int __init
->   gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
-> @@ -1205,60 +1204,56 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
->   	return 0;
->   }
->
-> -static int __init
-> -gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
-> -				const unsigned long end)
-> +/* The things you have to do to just *count* something... */
-> +static int __init acpi_dummy_func(struct acpi_subtable_header *header,
-> +				  const unsigned long end)
->   {
-> -	struct acpi_madt_generic_distributor *dist;
-> +	return 0;
-> +}
->
-> -	dist = (struct acpi_madt_generic_distributor *)header;
-> +static bool __init acpi_gic_redist_is_present(void)
-> +{
-> +	return acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
-> +				     acpi_dummy_func, 0) > 0;
-> +}
->
-> -	if (BAD_MADT_ENTRY(dist, end))
-> -		return -EINVAL;
-> +static bool __init gic_validate_dist(struct acpi_subtable_header *header,
-> +				     struct acpi_probe_entry *ape)
-> +{
-> +	struct acpi_madt_generic_distributor *dist;
-> +	dist = (struct acpi_madt_generic_distributor *)header;
->
-> -	dist_phy_base = dist->base_address;
-> -	return 0;
-> +	return (dist->version == ape->driver_data &&
-> +		(dist->version != ACPI_MADT_GIC_VERSION_NONE ||
-> +		 !acpi_gic_redist_is_present()));
->
+On 09/03/2015 02:23 PM, Nishanth Menon wrote:
+> Originally, all the SoC PHY rails were supplied by LDO3. However, as a
+> result of characterization, it was determined that this posed a risk in
+> extreme load  conditions. Hence the PHY rails are split between two
+> different LDOs. Update the related node as a result
+> 
+> LDO3/VDDA_1V8_PHYA supplies vdda_usb1, vdda_usb2, vdda_sata, vdda_usb3
+> LDO4/VDDA_1V8_PHYB supplies vdda_pcie1, vdda_pcie0, vdda_hdmi, vdda_pcie
+> 
+> NOTE: We break compatibility with pre-production boards with this change
+> since, the PMIC LDO4 is disabled at OTP level.
+> 
+> The new configuration is the plan of record and all pre-production
+> boards are supposed to be replaced with the latest boards matching the
+> mentioned configuration.
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
 
-When I was rebasing the GICv3 patches on top of yours, I noticed
-that GICv3 will also needs to check the acpi_gic_redist_is_present(),
-can we move the code above to some common place, or just leave
-the code duplicate but self-contained?
+Gentle ping. Some very few 10 something boards have been created and
+stopped production till the latest modifications were done (PMIC USB
+interrupt, LDO4 etc) - and all of those boards are now getting
+scrapped.. If there are any (as per tracking information, there should
+not be any), TI should be contacted to have them replaced.
 
-Thanks
-Hanjun
+Is it possible for us to consider this patch in 4.3 cycle - given that
+we are this close, might have been great to see 4.3 vanilla function on
+the production platform.
+
+>  arch/arm/boot/dts/am57xx-beagle-x15.dts |   13 +++++++++++--
+>  1 file changed, 11 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> index 3a05b94f59ed..ede7fb73c717 100644
+> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> @@ -432,7 +432,7 @@
+>  				};
+>  
+>  				ldo3_reg: ldo3 {
+> -					/* VDDA_1V8_PHY */
+> +					/* VDDA_1V8_PHYA */
+>  					regulator-name = "ldo3";
+>  					regulator-min-microvolt = <1800000>;
+>  					regulator-max-microvolt = <1800000>;
+> @@ -440,6 +440,15 @@
+>  					regulator-boot-on;
+>  				};
+>  
+> +				ldo4_reg: ldo4 {
+> +					/* VDDA_1V8_PHYB */
+> +					regulator-name = "ldo4";
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <1800000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+>  				ldo9_reg: ldo9 {
+>  					/* VDD_RTC */
+>  					regulator-name = "ldo9";
+> @@ -681,7 +690,7 @@
+>  
+>  &hdmi {
+>  	status = "ok";
+> -	vdda-supply = <&ldo3_reg>;
+> +	vdda-supply = <&ldo4_reg>;
+>  
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&hdmi_pins>;
+> 
+
+
+-- 
+Regards,
+Nishanth Menon
