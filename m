@@ -1,32 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 16 Sep 2015 07:11:45 +0200
-Subject: [PATCH 1/4] ARM:dts:sun7i: Add keypad clk node
-In-Reply-To: <1442325957-10102-2-git-send-email-yassinjaffer@gmail.com>
-References: <1442325957-10102-1-git-send-email-yassinjaffer@gmail.com>
- <1442325957-10102-2-git-send-email-yassinjaffer@gmail.com>
-Message-ID: <20150916051145.GP4684@lukather>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Wed, 16 Sep 2015 07:13:19 +0200
+Subject: [PATCH] ARM: dt: bcm2835: set mmc clock to the correct value of
+ 250MHz
+In-Reply-To: <55F8EA59.3070900@wwwdotorg.org>
+References: <1441362818-4323-1-git-send-email-kernel@martin.sperl.org>
+ <87k2s0wllm.fsf@eliezer.anholt.net> <55F8EA59.3070900@wwwdotorg.org>
+Message-ID: <51E1EF85-4056-4E6D-B2EA-51493AB0BCC5@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 12:05:54AM +1000, yassinjaffer at gmail.com wrote:
-> From: Yassin Jaffer <yassinjaffer@gmail.com>
+
+> On 16.09.2015, at 06:04, Stephen Warren <swarren@wwwdotorg.org> wrote:
 > 
-> This patch add support to the keypad clock on sun7i
+> On 09/08/2015 04:13 PM, Eric Anholt wrote:
+>> kernel at martin.sperl.org writes:
+>> 
+>>> From: Martin Sperl <kernel@martin.sperl.org>
+>>> 
+>>> This patch sets the clock speed to 250MHz to make the SD card 
+>>> work at the correct clock speed without overclocking by 2.5.
+>>> 
+>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org> --- 
+>>> arch/arm/boot/dts/bcm2835.dtsi |    2 +- 1 file changed, 1
+>>> insertion(+), 1 deletion(-)
+>>> 
+>>> Analysis with a logic-analyzer found that the current setting of
+>>> the mmc clock at 100MHz is wrong and results in overclocking the
+>>> SD-card and eMMC on the Compute Module.
+>>> 
+>>> Exact measurements show that when 25Mhz are selected by the
+>>> sdhci driver effectively 62.5MHz are used (so 2.5 times faster),
+>>> which is what is expected when the clock is configured to a fixed
+>>> 100MHz instead of the 250MHz that the clock is actually running
+>>> at.
+>> 
+>> Looks like this became the default in the firmware in November 2013
+>> (you can, of course, still do lots of configuration that would
+>> change it higher or lower).
+>> 
+>> I don't know what the downside would be of running MMC with too
+>> large of a divisor for devices running pre-November firmware.  I
+>> suspect we should just wait until the new clock driver lands, to
+>> avoid any backwards-compatibility issues.  Sorry for the trouble
+>> :(
 > 
-> Signed-off-by: Yassin Jaffer <yassinjaffer@gmail.com>
-
-Applied, thanks!
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150916/f17ac74e/attachment-0001.sig>
+> I imagine we'd just end up with a slower-than-expected clock rate
+> which should work just fine albeit at lower than expected/possible
+> performance. Conversely, the effect of not fixing this is errors or
+> corruption, which seems somewhat worse. Still, if the real clock
+> driver is showing up very very imminently it just might be worth
+> waiting for that (although we could set this patch Cc: stable which
+> might help some people?)
+> 
+Solved by the patch of Eric with regards to clocks (normal and
+auxiliar) - since I have applied that patch the CM works fine.
