@@ -1,35 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Sep 2015 15:06:57 +0100
-Subject: [PATCH] arm64: KVM: Fix user access for debug registers
-In-Reply-To: <20150916134141.GA15903@cbox>
-References: <1442400070-23316-1-git-send-email-marc.zyngier@arm.com>
- <20150916134141.GA15903@cbox>
-Message-ID: <55F97781.1060502@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 16 Sep 2015 09:12:13 -0500
+Subject: [PATCH v3 RESEND 0/5] Remaining part of kill off set_irq_flags
+ usage
+In-Reply-To: <1440889285-5637-1-git-send-email-robh@kernel.org>
+References: <1440889285-5637-1-git-send-email-robh@kernel.org>
+Message-ID: <55F978BD.3030203@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/09/15 14:41, Christoffer Dall wrote:
-> On Wed, Sep 16, 2015 at 11:41:10AM +0100, Marc Zyngier wrote:
->> When setting the debug register from userspace, make sure that
->> copy_from_user() is called with its parameters in the expected
->> order. It otherwise doesn't do what you think.
->>
->> Reported-by: Peter Maydell <peter.maydell@linaro.org>
->> Cc: Alex Benn?e <alex.bennee@linaro.org>
->> Fixes: 84e690bfbed1 ("KVM: arm64: introduce vcpu->arch.debug_ptr")
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->
-> yikes!
->
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->
+On 08/29/2015 06:01 PM, Rob Herring wrote:
+> Thomas,
+> 
+> As requested, here are the remaining patches for killing off 
+> set_irq_flags which have not been picked up. The rest of the 
+> series has been picked up and are in -next. 
 
-Thanks. Merged and pushed out to -next, together with the physaddr_t patch.
+Thomas, are you going to pick up these remaining patches?
 
-        M.
---
-Jazz is not dead. It just smells funny...
+Rob
 
-________________________________
-
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+> 
+> Rob
+> 
+> Rob Herring (5):
+>   gpu/drm: kill off set_irq_flags usage
+>   irqchip: kill off set_irq_flags usage
+>   sh: kill off set_irq_flags usage
+>   ARM: remove ununsed set_irq_flags
+>   arm64: remove ununsed set_irq_flags
+> 
+>  arch/arm/include/asm/hw_irq.h             |  6 ------
+>  arch/arm/kernel/irq.c                     | 20 --------------------
+>  arch/arm64/include/asm/hardirq.h          |  5 -----
+>  drivers/gpu/drm/msm/mdp/mdp5/mdp5_irq.c   |  1 -
+>  drivers/gpu/ipu-v3/ipu-common.c           |  3 +--
+>  drivers/irqchip/exynos-combiner.c         |  2 +-
+>  drivers/irqchip/irq-armada-370-xp.c       |  3 +--
+>  drivers/irqchip/irq-bcm2835.c             |  2 +-
+>  drivers/irqchip/irq-clps711x.c            |  6 +++---
+>  drivers/irqchip/irq-gic-v3.c              |  5 ++---
+>  drivers/irqchip/irq-gic.c                 |  4 ++--
+>  drivers/irqchip/irq-hip04.c               |  4 ++--
+>  drivers/irqchip/irq-keystone.c            |  2 +-
+>  drivers/irqchip/irq-mmp.c                 |  3 ---
+>  drivers/irqchip/irq-mxs.c                 |  1 -
+>  drivers/irqchip/irq-renesas-intc-irqpin.c |  1 -
+>  drivers/irqchip/irq-renesas-irqc.c        |  1 -
+>  drivers/irqchip/irq-s3c24xx.c             | 14 ++------------
+>  drivers/irqchip/irq-sun4i.c               |  2 +-
+>  drivers/irqchip/irq-versatile-fpga.c      |  2 +-
+>  drivers/irqchip/irq-vic.c                 |  2 +-
+>  drivers/irqchip/irq-vt8500.c              |  1 -
+>  drivers/irqchip/spear-shirq.c             |  1 -
+>  drivers/sh/intc/internals.h               | 10 +---------
+>  24 files changed, 20 insertions(+), 81 deletions(-)
+> 
