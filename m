@@ -1,243 +1,90 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 16 Sep 2015 15:21:12 +0100
-Subject: [PATCH 14/22] arm64: Cleanup HWCAP handling
+Date: Wed, 16 Sep 2015 15:21:00 +0100
+Subject: [PATCH 02/22] arm64: Delay ELF HWCAP initialisation until all CPUs
+ are up
 In-Reply-To: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
 References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1442413280-31885-15-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1442413280-31885-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-Extend struct arm64_cpu_capabilities to handle the HWCAP detection
-and make use of the system wide value for the feature register.
+Delay the ELF HWCAP initialisation untill all the (enabled) CPUs are
+up, i.e, smp_cpus_done(). This is in preparation for detecting the
+common features across the CPUS and creating a consistent ELF HWCAP
+for the system.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |    2 +
- arch/arm64/include/asm/hwcap.h      |    8 ++
- arch/arm64/kernel/cpufeature.c      |  153 ++++++++++++++++++-----------------
- 3 files changed, 91 insertions(+), 72 deletions(-)
+ arch/arm64/include/asm/cpufeature.h |    1 +
+ arch/arm64/kernel/setup.c           |   16 ++++++++--------
+ arch/arm64/kernel/smp.c             |    1 +
+ 3 files changed, 10 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index e74a2ac..089c742 100644
+index 1715707..b7769f6 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -83,6 +83,8 @@ struct arm64_cpu_capabilities {
- 			u32 sys_reg;
- 			int field_pos;
- 			int min_field_value;
-+			int hwcap_type;
-+			unsigned long hwcap;
- 		};
- 	};
- };
-diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
-index 0ad7351..400b80b 100644
---- a/arch/arm64/include/asm/hwcap.h
-+++ b/arch/arm64/include/asm/hwcap.h
-@@ -52,6 +52,14 @@
- extern unsigned int compat_elf_hwcap, compat_elf_hwcap2;
- #endif
- 
-+enum {
-+	CAP_HWCAP = 1,
-+#ifdef CONFIG_COMPAT
-+	CAP_COMPAT_HWCAP,
-+	CAP_COMPAT_HWCAP2,
-+#endif
-+};
-+
- extern unsigned long elf_hwcap;
- #endif
- #endif
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 3582af9..3f273a3 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -631,6 +631,79 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{},
- };
- 
-+#define HWCAP_CAP(reg, field, min_value, type, cap)		\
-+	{							\
-+		.desc = #cap,					\
-+		.matches = has_cpuid_feature,			\
-+		.sys_reg = reg,					\
-+		.field_pos = field,				\
-+		.min_field_value = min_value,			\
-+		.hwcap_type = type,				\
-+		.hwcap = cap,					\
-+	}
-+
-+static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, 2, CAP_HWCAP, HWCAP_PMULL),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, 1, CAP_HWCAP, HWCAP_AES),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA1_SHIFT, 1, CAP_HWCAP, HWCAP_SHA1),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA2_SHIFT, 1, CAP_HWCAP, HWCAP_SHA2),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_CRC32_SHIFT, 1, CAP_HWCAP, HWCAP_CRC32),
-+	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_ATOMICS_SHIFT, 2, CAP_HWCAP, HWCAP_ATOMICS),
-+#ifdef CONFIG_COMPAT
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 2, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_PMULL),
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_AES),
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_SHA1_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_SHA1),
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_SHA2_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_SHA2),
-+	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_CRC32_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_CRC32),
-+#endif
-+};
-+
-+static void cap_set_hwcap(const struct arm64_cpu_capabilities * cap)
-+{
-+	switch(cap->hwcap_type) {
-+	case CAP_HWCAP:
-+		elf_hwcap |= cap->hwcap;
-+		break;
-+#ifdef CONFIG_COMPAT
-+	case CAP_COMPAT_HWCAP:
-+		compat_elf_hwcap |= (u32)cap->hwcap;
-+		break;
-+	case CAP_COMPAT_HWCAP2:
-+		compat_elf_hwcap2 |= (u32)cap->hwcap;
-+		break;
-+#endif
-+	default:
-+		BUG();
-+		break;
-+	}
-+}
-+
-+static bool cpus_have_hwcap(const struct arm64_cpu_capabilities *cap)
-+{
-+	switch(cap->hwcap_type) {
-+	case CAP_HWCAP:
-+		return !!(elf_hwcap & cap->hwcap);
-+#ifdef CONFIG_COMPAT
-+	case CAP_COMPAT_HWCAP:
-+		return !!(compat_elf_hwcap & (u32)cap->hwcap);
-+	case CAP_COMPAT_HWCAP2:
-+		return !!(compat_elf_hwcap2 & (u32)cap->hwcap);
-+#endif
-+	default:
-+		BUG();
-+		return false;
-+	}
-+}
-+
-+void check_cpu_hwcaps(void)
-+{
-+	int i;
-+	const struct arm64_cpu_capabilities *hwcaps = arm64_hwcaps;
-+	for(i = 0; i < ARRAY_SIZE(arm64_hwcaps); i ++)
-+		if (hwcaps[i].matches(&hwcaps[i]))
-+			cap_set_hwcap(&hwcaps[i]);
-+}
-+
- void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info)
- {
-@@ -738,6 +811,13 @@ void cpu_enable_features(void)
- 		if (caps[i].enable)
- 			caps[i].enable(NULL);
- 	}
-+
-+	for(i =0, caps = arm64_hwcaps; caps[i].desc; i++) {
-+		if (!cpus_have_hwcap(&caps[i]))
-+			continue;
-+		if (!feature_matches(read_cpu_sysreg(caps[i].sys_reg), &caps[i]))
-+			fail_incapable_cpu("arm64_hwcaps", &caps[i]);
-+	}
+@@ -81,6 +81,7 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u64 features,
+ 	return (s64)(features << (64 - 4 - field)) >> (64 - 4);
  }
  
- static int cpu_feature_hotplug_notify(struct notifier_block *nb,
-@@ -772,12 +852,11 @@ bool system_supports_mixed_endian_el0(void)
++void __init setup_cpu_features(void);
  
- void __init setup_cpu_features(void)
+ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			    const char *info);
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 60fc9a9..d149c18 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -195,20 +195,13 @@ static void __init smp_build_mpidr_hash(void)
+ 	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
+ }
+ 
+-static void __init setup_processor(void)
++void __init setup_cpu_features(void)
  {
--	u64 features;
--	s64 block;
+ 	u64 features;
+ 	s64 block;
  	u32 cwg;
  	int cls;
  
- 	check_cpu_features();
-+	check_cpu_hwcaps();
+-	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
+-
+-	sprintf(init_utsname()->machine, ELF_PLATFORM);
+-	elf_hwcap = 0;
+-
+-	cpuinfo_store_boot_cpu();
+-
  	/*
  	 * Check for sane CTR_EL0.CWG value.
  	 */
-@@ -789,75 +868,5 @@ void __init setup_cpu_features(void)
- 	if (L1_CACHE_BYTES < cls)
- 		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
- 			L1_CACHE_BYTES, cls);
--
--	/*
--	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
--	 * The blocks we test below represent incremental functionality
--	 * for non-negative values. Negative values are reserved.
--	 */
--	features = read_cpuid(ID_AA64ISAR0_EL1);
--	block = cpuid_feature_extract_field(features, 4);
--	if (block > 0) {
--		switch (block) {
--		default:
--		case 2:
--			elf_hwcap |= HWCAP_PMULL;
--		case 1:
--			elf_hwcap |= HWCAP_AES;
--		case 0:
--			break;
--		}
--	}
--
--	if (cpuid_feature_extract_field(features, 8) > 0)
--		elf_hwcap |= HWCAP_SHA1;
--
--	if (cpuid_feature_extract_field(features, 12) > 0)
--		elf_hwcap |= HWCAP_SHA2;
--
--	if (cpuid_feature_extract_field(features, 16) > 0)
--		elf_hwcap |= HWCAP_CRC32;
--
--	block = cpuid_feature_extract_field(features, 20);
--	if (block > 0) {
--		switch (block) {
--		default:
--		case 2:
--			elf_hwcap |= HWCAP_ATOMICS;
--		case 1:
--			/* RESERVED */
--		case 0:
--			break;
--		}
--	}
--
--#ifdef CONFIG_COMPAT
--	/*
--	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
--	 * the AArch32 32-bit execution state.
--	 */
--	features = read_cpuid(ID_ISAR5_EL1);
--	block = cpuid_feature_extract_field(features, 4);
--	if (block > 0) {
--		switch (block) {
--		default:
--		case 2:
--			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
--		case 1:
--			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
--		case 0:
--			break;
--		}
--	}
--
--	if (cpuid_feature_extract_field(features, 8) > 0)
--		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
--
--	if (cpuid_feature_extract_field(features, 12) > 0)
--		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
--
--	if (cpuid_feature_extract_field(features, 16) > 0)
--		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
--#endif
+@@ -292,6 +285,13 @@ static void __init setup_processor(void)
+ #endif
  }
  
++static void __init setup_processor(void)
++{
++	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
++	sprintf(init_utsname()->machine, ELF_PLATFORM);
++	cpuinfo_store_boot_cpu();
++}
++
+ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ {
+ 	void *dt_virt = fixmap_remap_fdt(dt_phys);
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 641f529..cb3e0d8 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -326,6 +326,7 @@ static void __init hyp_mode_check(void)
+ void __init smp_cpus_done(unsigned int max_cpus)
+ {
+ 	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
++	setup_cpu_features();
+ 	hyp_mode_check();
+ 	apply_alternatives_all();
+ }
 -- 
 1.7.9.5
