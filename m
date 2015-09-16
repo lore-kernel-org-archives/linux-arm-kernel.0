@@ -1,80 +1,71 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 16 Sep 2015 15:42:45 +0100
-Subject: [PATCH] arm64: KVM: Fix user access for debug registers
-In-Reply-To: <1442400070-23316-1-git-send-email-marc.zyngier@arm.com>
-References: <1442400070-23316-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <87vbbamnmi.fsf@linaro.org>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Wed, 16 Sep 2015 22:42:36 +0800
+Subject: [PATCH] pwm-backlight: fix the panel power sequence
+Message-ID: <1442414556-32381-1-git-send-email-yh.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In order to match the panel power sequence, disable the enable_gpio
+in the probe function. Also, reorder the code in the power_on and
+power_off function to match the timing.
 
-Marc Zyngier <marc.zyngier@arm.com> writes:
+Signed-off-by: YH Huang <yh.huang@mediatek.com>
+---
+ drivers/video/backlight/pwm_bl.c |   15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-> When setting the debug register from userspace, make sure that
-> copy_from_user() is called with its parameters in the expected
-> order. It otherwise doesn't do what you think.
-
-Oops. Well that exposes a big hole in my testing. While I tested
-debugging inside the guest worked before and after being guest debugged
-I think GDBs tendency to reload all the debug registers between each
-step may have masked this.
-
-Debugging GDB in action or some sort of migration event would of course
-screw this up but I'm afraid my testing wasn't evil enough.
-
-Anyway have a:
-
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
->
-> Reported-by: Peter Maydell <peter.maydell@linaro.org>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
-> Fixes: 84e690bfbed1 ("KVM: arm64: introduce vcpu->arch.debug_ptr")
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/sys_regs.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index b41607d..1d0463e 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -272,7 +272,7 @@ static int set_bvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
->  {
->  	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
->  
-> -	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-> +	if (copy_from_user(r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
->  		return -EFAULT;
->  	return 0;
->  }
-> @@ -314,7 +314,7 @@ static int set_bcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
->  {
->  	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
->  
-> -	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-> +	if (copy_from_user(r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
->  		return -EFAULT;
->  
->  	return 0;
-> @@ -358,7 +358,7 @@ static int set_wvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
->  {
->  	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg];
->  
-> -	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-> +	if (copy_from_user(r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
->  		return -EFAULT;
->  	return 0;
->  }
-> @@ -400,7 +400,7 @@ static int set_wcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
->  {
->  	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg];
->  
-> -	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-> +	if (copy_from_user(r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
->  		return -EFAULT;
->  	return 0;
->  }
-
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index eff379b..99eca1e 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -54,10 +54,11 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
+ 	if (err < 0)
+ 		dev_err(pb->dev, "failed to enable power supply\n");
+ 
++	pwm_enable(pb->pwm);
++
+ 	if (pb->enable_gpio)
+ 		gpiod_set_value(pb->enable_gpio, 1);
+ 
+-	pwm_enable(pb->pwm);
+ 	pb->enabled = true;
+ }
+ 
+@@ -66,12 +67,12 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
+ 	if (!pb->enabled)
+ 		return;
+ 
+-	pwm_config(pb->pwm, 0, pb->period);
+-	pwm_disable(pb->pwm);
+-
+ 	if (pb->enable_gpio)
+ 		gpiod_set_value(pb->enable_gpio, 0);
+ 
++	pwm_config(pb->pwm, 0, pb->period);
++	pwm_disable(pb->pwm);
++
+ 	regulator_disable(pb->power_supply);
+ 	pb->enabled = false;
+ }
+@@ -241,8 +242,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	pb->dev = &pdev->dev;
+ 	pb->enabled = false;
+ 
+-	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+-						  GPIOD_OUT_HIGH);
++	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
+ 	if (IS_ERR(pb->enable_gpio)) {
+ 		ret = PTR_ERR(pb->enable_gpio);
+ 		goto err_alloc;
+@@ -264,6 +264,9 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
+ 	}
+ 
++	if (pb->enable_gpio)
++		gpiod_direction_output(pb->enable_gpio, 0);
++
+ 	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
+ 	if (IS_ERR(pb->power_supply)) {
+ 		ret = PTR_ERR(pb->power_supply);
 -- 
-Alex Benn?e
+1.7.9.5
