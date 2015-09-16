@@ -1,44 +1,73 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 16 Sep 2015 22:23:21 +0800
-Subject: [PATCH] arm64: add cpu_idle tracepoints to arch_cpu_idle
-Message-ID: <1442413401-2955-1-git-send-email-jszhang@marvell.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 16 Sep 2015 10:27:09 -0400
+Subject: [PATCH 2/3] devicetree: bindings: use input-event-codes.h for
+ evdev codes
+In-Reply-To: <1442316292.3549.386.camel@hellion.org.uk>
+References: <1442064372-3030-1-git-send-email-hdegoede@redhat.com>
+ <1442064372-3030-3-git-send-email-hdegoede@redhat.com>
+ <1442316292.3549.386.camel@hellion.org.uk>
+Message-ID: <55F97C3D.5020702@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, if cpuidle is disabled or not supported, powertop reports
-zero wakeups and zero events. This is due to the cpu_idle tracepoints
-are missing.
+Hi,
 
-This patch is to make cpu_idle tracepoints always available even if
-cpuidle is disabled or not supported.
+On 09/15/2015 07:24 AM, Ian Campbell wrote:
+> On Sat, 2015-09-12 at 15:26 +0200, Hans de Goede wrote:
+>> Add a symlink to uapi/linux/input-event-codes.h, and include that instead
+>> of (re)defining all the evdev type and code values in
+>> dt-bindings/input/input.h. This way we do not need to keep all the
+>> event codes synced manually.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   include/dt-bindings/input/input-event-codes.h |   1 +
+>>   include/dt-bindings/input/input.h             | 510 +-------------------
+>> ------
+>>   2 files changed, 2 insertions(+), 509 deletions(-)
+>>   create mode 120000 include/dt-bindings/input/input-event-codes.h
+>>
+>> diff --git a/include/dt-bindings/input/input-event-codes.h b/include/dt
+>> -bindings/input/input-event-codes.h
+>> new file mode 120000
+>> index 0000000..693bbcd
+>> --- /dev/null
+>> +++ b/include/dt-bindings/input/input-event-codes.h
+>> @@ -0,0 +1 @@
+>> +../../uapi/linux/input-event-codes.h
+>> \ No newline at end of file
+>
+> Hrm, I think this is going to cause trouble for the split DT repository at
+> https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
+>
+> Since ../../ == include in both trees I think I can make it work by
+> including include/uapi/linux in the conversion, either wholesale (easiest)
+> or partially (potentially cleaner).
+>
+> Any opinions on that?
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm64/kernel/process.c | 3 +++
- 1 file changed, 3 insertions(+)
+The intend of the symlink was that the conversion script would copy the target,
+rather then follow the symlink. This sorta assumes that there are will be not
+symlinks under dt-bindings which link to files inside dt-bindings and thus
+should be preserved as symlinks.
 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 223b093..f75b540 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -44,6 +44,7 @@
- #include <linux/hw_breakpoint.h>
- #include <linux/personality.h>
- #include <linux/notifier.h>
-+#include <trace/events/power.h>
- 
- #include <asm/compat.h>
- #include <asm/cacheflush.h>
-@@ -75,8 +76,10 @@ void arch_cpu_idle(void)
- 	 * This should do all the clock switching and wait for interrupt
- 	 * tricks
- 	 */
-+	trace_cpu_idle_rcuidle(1, smp_processor_id());
- 	cpu_do_idle();
- 	local_irq_enable();
-+	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
- }
- 
- #ifdef CONFIG_HOTPLUG_CPU
--- 
-2.5.1
+If the copy done in the script will follow the symlink then nothing should
+really change for the split DT repo.
+
+
+>
+> In principal I ought to regenerate the tree from scratch such that
+> include/uapi/linux was "always" there and has history but I think we can
+> live with it just appearing at some point in time wen the conversion script
+> was updated?
+>
+> AIUI these values are required to only be used with properties whose names
+> are of the form "linux,*", otherwise there would be strong complaints about
+> include Linux uapi stuff into a generic device-tree binding.
+
+Correct, these values are only for linux,* properties, which is why I
+initially put them in a file named dt-bindings/input/linux-event-codes.h
+
+Regards,
+
+Hans
