@@ -1,32 +1,47 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 16 Sep 2015 15:35:55 +0100
-Subject: [PATCH] arm64: KVM: Fix user access for debug registers
-In-Reply-To: <20150916134141.GA15903@cbox>
-References: <1442400070-23316-1-git-send-email-marc.zyngier@arm.com>
- <20150916134141.GA15903@cbox>
-Message-ID: <87wpvqmnxw.fsf@linaro.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 16 Sep 2015 22:37:00 +0800
+Subject: [PATCH] arm: add cpu_idle tracepoints to arch_cpu_idle
+Message-ID: <1442414220-7204-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently, if cpuidle is disabled or not supported, powertop reports
+zero wakeups and zero events. This is due to the cpu_idle tracepoints
+are missing.
 
-Christoffer Dall <christoffer.dall@linaro.org> writes:
+This patch is to make cpu_idle tracepoints always available even if
+cpuidle is disabled or not supported.
 
-> On Wed, Sep 16, 2015 at 11:41:10AM +0100, Marc Zyngier wrote:
->> When setting the debug register from userspace, make sure that
->> copy_from_user() is called with its parameters in the expected
->> order. It otherwise doesn't do what you think.
->> 
->> Reported-by: Peter Maydell <peter.maydell@linaro.org>
->> Cc: Alex Benn?e <alex.bennee@linaro.org>
->> Fixes: 84e690bfbed1 ("KVM: arm64: introduce vcpu->arch.debug_ptr")
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->
-> yikes!
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ arch/arm/kernel/process.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-OK I'm now muchly confused as to how it could have worked...
-
->
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index f192a2a..aa78e09 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -28,6 +28,7 @@
+ #include <linux/random.h>
+ #include <linux/hw_breakpoint.h>
+ #include <linux/leds.h>
++#include <trace/events/power.h>
+ 
+ #include <asm/processor.h>
+ #include <asm/thread_notify.h>
+@@ -66,11 +67,13 @@ void (*arm_pm_idle)(void);
+ 
+ void arch_cpu_idle(void)
+ {
++	trace_cpu_idle_rcuidle(1, smp_processor_id());
+ 	if (arm_pm_idle)
+ 		arm_pm_idle();
+ 	else
+ 		cpu_do_idle();
+ 	local_irq_enable();
++	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+ }
+ 
+ void arch_cpu_idle_prepare(void)
 -- 
-Alex Benn?e
+2.5.1
