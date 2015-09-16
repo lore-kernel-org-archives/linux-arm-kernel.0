@@ -1,38 +1,70 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Wed, 16 Sep 2015 11:36:07 -0700
-Subject: [PATCH 5/6] pinctrl: mediatek: Remove unneded semicolon
-In-Reply-To: <1442392111-8448-6-git-send-email-javier@osg.samsung.com>
-References: <1442392111-8448-1-git-send-email-javier@osg.samsung.com>
- <1442392111-8448-6-git-send-email-javier@osg.samsung.com>
-Message-ID: <1442428567.39832.1.camel@mussux00.eus.mediatek.inc>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 16 Sep 2015 14:48:57 -0400
+Subject: [PATCH] irqchip: bcm2835: Add FIQ support
+In-Reply-To: <20150916162157.GB21084@n2100.arm.linux.org.uk>
+References: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
+ <87d1zj6fq2.fsf@eliezer.anholt.net> <55F5CD80.3020700@tronnes.org>
+ <20150914090853.GF21084@n2100.arm.linux.org.uk>
+ <87wpvtjcka.fsf@eliezer.anholt.net>
+ <20150914143459.GN21084@n2100.arm.linux.org.uk>
+ <87613a31jb.fsf@eliezer.anholt.net>
+ <20150916162157.GB21084@n2100.arm.linux.org.uk>
+Message-ID: <87si6e9p46.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-09-16 at 10:28 +0200, Javier Martinez Canillas wrote:
-> It's not needed an is just creating a null statement, so remove it.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
-> 
->  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> index 7726c6caaf83..652ec125adb3 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> @@ -1436,7 +1436,7 @@ int mtk_pctrl_init(struct platform_device *pdev,
->  		irq_set_chip_and_handler(virq, &mtk_pinctrl_irq_chip,
->  			handle_level_irq);
->  		irq_set_chip_data(virq, pctl);
-> -	};
-> +	}
->  
->  	irq_set_chained_handler_and_data(irq, mtk_eint_irq_handler, pctl);
->  	return 0;
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
+> On Wed, Sep 16, 2015 at 10:02:32AM -0400, Eric Anholt wrote:
+>> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>> 
+>> > On Mon, Sep 14, 2015 at 07:33:09AM -0700, Eric Anholt wrote:
+>> >> So, while FIQ isn't used in upstream, I think it's worthwhile to merge.
+>> >> It is another step to bringing the downstream developers into the fold.
+>> >
+>> > I want to see the code _first_.  Until then, I'm sorry, this patch can't
+>> > go in.
+>> 
+>> If you just want to see "Yes, GPL-compatible code using this is
+>> available", then that is:
+>
+> It's got nothing to do with "GPL-compatible code".  I want to audit
+> _all_ code that makes use of FIQ.  It disgusts me that you're trying
+> to dress this up as a licensing issue.  It isn't.
+>
+>> https://github.com/raspberrypi/linux/blob/rpi-4.1.y/drivers/usb/host/dwc_otg/dwc_otg_fiq_stub.S
+>> https://github.com/raspberrypi/linux/blob/rpi-4.1.y/drivers/usb/host/dwc_otg/dwc_otg_fiq_fsm.c
+>> 
+>> If not, I'm curious what exactly is the reason the patch can't go in.
+>
+> In any case, I'm not going to say yes to code which provides a new
+> internal kernel facility for mainline kernels, but with no mainline
+> kernel users.  Such code can only be to make external tree maintanence
+> easlier, but it has the unintended effect of making mainline kernel
+> maintanence harder.
+>
+> Such facilities _should_ always come with a user of that new facility.
+>
+> It's nothing personal, it's sane policy from experience.  I've had stuff
+> like this in the past, where people have sent new facilities without any
+> users, years have gone by without that facility being used.  The facility
+> has eventually been removed from the mainline kernel _because_ it doesn't
+> have any users.
+>
+> Moreover, there are people who audit the kernel looking for facilities
+> which have no users and propose patches to remove them.
+>
+> So, if you want some new facility to be merged into mainline kernels,
+> and for it to remain in the kernel, always accompany it with a user.
 
-Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-
-Thanks
-Hongzhou
+Thanks, this was all I needed.  In the subsystem I work in, the rule has
+been "You need to have open userspace using the thing that you can
+show", but obviously you only get to merge the user once the core stuff
+is done.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150916/49a2a36d/attachment.sig>
