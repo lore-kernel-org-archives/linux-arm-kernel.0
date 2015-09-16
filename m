@@ -1,49 +1,31 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Wed, 16 Sep 2015 16:39:49 +0800
-Subject: [PATCH] ARM: zx: zx296702-pm-domain.c: Fix check return value of
- devm_ioremap_resource
-In-Reply-To: <1442390740.28314.1.camel@ingics.com>
-References: <1442390740.28314.1.camel@ingics.com>
-Message-ID: <CABymUCNn4izor0Mrw4erLMYSMY7AMaQR5X9EtCYhC34ZBxCXng@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 16 Sep 2015 10:41:52 +0200
+Subject: [PATCH 4/6] pinctrl: sunxi: Remove unneeded semicolon
+In-Reply-To: <1442392111-8448-5-git-send-email-javier@osg.samsung.com>
+References: <1442392111-8448-1-git-send-email-javier@osg.samsung.com>
+ <1442392111-8448-5-git-send-email-javier@osg.samsung.com>
+Message-ID: <20150916084152.GR4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-09-16 16:05 GMT+08:00 Axel Lin <axel.lin@ingics.com>:
-> devm_ioremap_resource() returns ERR_PTR on failure.
-> devm_ioremap_resource() will also check res argument and show proper error
-> on error path, so remove the redundant checking for res and error messages.
->
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
-> ---
->  arch/arm/mach-zx/zx296702-pm-domain.c | 11 ++---------
->  1 file changed, 2 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/arm/mach-zx/zx296702-pm-domain.c b/arch/arm/mach-zx/zx296702-pm-domain.c
-> index e08574d..17f778b 100644
-> --- a/arch/arm/mach-zx/zx296702-pm-domain.c
-> +++ b/arch/arm/mach-zx/zx296702-pm-domain.c
-> @@ -163,16 +163,9 @@ static int zx296702_pd_probe(struct platform_device *pdev)
->         genpd_data->num_domains = ARRAY_SIZE(zx296702_pm_domains);
->
->         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -       if (!res) {
-> -               dev_err(&pdev->dev, "no memory resource defined\n");
-> -               return -ENODEV;
-> -       }
-> -
->         pcubase = devm_ioremap_resource(&pdev->dev, res);
-> -       if (!pcubase) {
-> -               dev_err(&pdev->dev, "ioremap fail.\n");
-> -               return -EIO;
-> -       }
-> +       if (IS_ERR(pcubase))
-> +               return PTR_ERR(pcubase);
->
->         for (i = 0; i < ARRAY_SIZE(zx296702_pm_domains); ++i)
->                 pm_genpd_init(zx296702_pm_domains[i], NULL, false);
-> --
-> 2.1.4
->
->
->
-Reviewed-by: Jun Nie <jun.nie@linaro.org>
+On Wed, Sep 16, 2015 at 10:28:29AM +0200, Javier Martinez Canillas wrote:
+> It's not needed an is just creating a null statement, so remove it.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150916/7a091429/attachment.sig>
