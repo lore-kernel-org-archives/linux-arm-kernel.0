@@ -1,45 +1,45 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 16 Sep 2015 14:03:01 -0500
-Subject: [PATCH 2/7] arm64: Shorten lines which exceed 80 characters
+Date: Wed, 16 Sep 2015 14:03:00 -0500
+Subject: [PATCH 1/7] arm64: Add contiguous page flag shifts and constants
 In-Reply-To: <1442430186-9083-1-git-send-email-jeremy.linton@arm.com>
 References: <1442430186-9083-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1442430186-9083-3-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1442430186-9083-2-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PTE definitions in this file exceed 80 characters
+Add the number of pages required to form a contiguous range,
+as well as some supporting constants.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/include/asm/pgtable-hwdef.h | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/page.h | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 24154b0..4489cf6 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -99,14 +99,14 @@
- #define PTE_TYPE_FAULT		(_AT(pteval_t, 0) << 0)
- #define PTE_TYPE_PAGE		(_AT(pteval_t, 3) << 0)
- #define PTE_TABLE_BIT		(_AT(pteval_t, 1) << 1)
--#define PTE_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
--#define PTE_RDONLY		(_AT(pteval_t, 1) << 7)		/* AP[2] */
--#define PTE_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
--#define PTE_AF			(_AT(pteval_t, 1) << 10)	/* Access Flag */
--#define PTE_NG			(_AT(pteval_t, 1) << 11)	/* nG */
--#define PTE_DBM			(_AT(pteval_t, 1) << 51)	/* Dirty Bit Management */
--#define PTE_PXN			(_AT(pteval_t, 1) << 53)	/* Privileged XN */
--#define PTE_UXN			(_AT(pteval_t, 1) << 54)	/* User XN */
-+#define PTE_USER		(_AT(pteval_t, 1) << 6)  /* AP[1] */
-+#define PTE_RDONLY		(_AT(pteval_t, 1) << 7)  /* AP[2] */
-+#define PTE_SHARED		(_AT(pteval_t, 3) << 8)  /* inner shareable */
-+#define PTE_AF			(_AT(pteval_t, 1) << 10) /* Access Flag */
-+#define PTE_NG			(_AT(pteval_t, 1) << 11) /* nG */
-+#define PTE_DBM			(_AT(pteval_t, 1) << 51) /* Dirty Bit Mgmt */
-+#define PTE_PXN			(_AT(pteval_t, 1) << 53) /* Privileged XN */
-+#define PTE_UXN			(_AT(pteval_t, 1) << 54) /* User XN */
+diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+index 7d9c7e4..33892ef 100644
+--- a/arch/arm64/include/asm/page.h
++++ b/arch/arm64/include/asm/page.h
+@@ -20,14 +20,20 @@
+ #define __ASM_PAGE_H
  
+ /* PAGE_SHIFT determines the page size */
++/* CONT_SHIFT determines the number of pages which can be tracked together  */
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define PAGE_SHIFT		16
++#define CONT_SHIFT		5
+ #else
+ #define PAGE_SHIFT		12
++#define CONT_SHIFT		4
+ #endif
+-#define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
++#define PAGE_SIZE		(_AC(1, UL) << PAGE_SHIFT)
+ #define PAGE_MASK		(~(PAGE_SIZE-1))
+ 
++#define CONT_SIZE		(_AC(1, UL) << (CONT_SHIFT + PAGE_SHIFT))
++#define CONT_MASK		(~(CONT_SIZE-1))
++
  /*
-  * AttrIndx[2:0] encoding (mapping attributes defined in the MAIR* registers).
+  * The idmap and swapper page tables need some space reserved in the kernel
+  * image. Both require pgd, pud (4 levels only) and pmd tables to (section)
 -- 
 2.4.3
