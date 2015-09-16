@@ -1,48 +1,129 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 Sep 2015 10:09:11 +0100
-Subject: [PATCH] arm64: hw_breakpoint: use target state to determine ABI
- behaviour
-In-Reply-To: <20150915165528.GH31157@arm.com>
-References: <1442333773-16446-1-git-send-email-will.deacon@arm.com>
- <20150915164301.GI14287@e104818-lin.cambridge.arm.com>
- <20150915165528.GH31157@arm.com>
-Message-ID: <20150916090911.GA25444@e104818-lin.cambridge.arm.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Wed, 16 Sep 2015 14:40:54 +0530
+Subject: [PATCH RFC 1/8] dt-bindings: Document the hi6220 bindings for DRM
+ driver
+In-Reply-To: <55F9298C.3020009@hisilicon.com>
+References: <1442309834-21420-1-git-send-email-kong.kongxinwei@hisilicon.com>
+ <1442309834-21420-2-git-send-email-kong.kongxinwei@hisilicon.com>
+ <55F85F54.1020807@kernel.org> <55F9298C.3020009@hisilicon.com>
+Message-ID: <55F9321E.7090100@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 05:55:29PM +0100, Will Deacon wrote:
-> On Tue, Sep 15, 2015 at 05:43:01PM +0100, Catalin Marinas wrote:
-> > On Tue, Sep 15, 2015 at 05:16:13PM +0100, Will Deacon wrote:
-> > > diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-> > > index bba85c8f8037..2926c3dd6479 100644
-> > > --- a/arch/arm64/kernel/hw_breakpoint.c
-> > > +++ b/arch/arm64/kernel/hw_breakpoint.c
-> > > @@ -163,6 +163,12 @@ enum hw_breakpoint_ops {
-> > >  	HW_BREAKPOINT_RESTORE
-> > >  };
-> > >  
-> > > +static int is_compat_bp(struct perf_event *bp)
-> > > +{
-> > > +	struct task_struct *tsk = bp->hw.target;
-> > > +	return tsk && is_compat_thread(task_thread_info(tsk));
-> > > +}
-> > 
-> > What are the conditions for tsk == NULL?
-> 
-> If you create a per-cpu breakpoint (i.e. a breakpoint that isn't affine
-> to a task), then the target is NULL. These can only be created by the
-> perf_event_open syscall, not from ptrace.
+Hi,
 
-OK, so can sys_perf_event_open() be called from a compat task? If that's
-the case, is_compat_bp() should do:
+On 09/16/2015 02:04 PM, Xinwei Kong wrote:
+> hi architt
+>
+> On 2015/9/16 2:11, Rob Herring wrote:
+>> On 09/15/2015 04:37 AM, Xinwei Kong wrote:
+>>> This adds documentation of device tree bindings for the
+>>> Graphics Processing Unit of hi6220 SOC.
+>>>
+>>> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+>>> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>>> Signed-off-by: Andy Green <andy.green@linaro.org>
+>>> Signed-off-by: Jiwen Qi <qijiwen@hisilicon.com>
+>>> Signed-off-by: Yu Gong <gongyu@hisilicon.com>
+>>> ---
+>>>   .../devicetree/bindings/gpu/hisilicon,hi6220.txt   | 69 ++++++++++++++++++++++
+>>>   1 file changed, 69 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt b/Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt
+>>> new file mode 100644
+>>> index 0000000..173ac63
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt
+>>> @@ -0,0 +1,69 @@
+>>> + * Hisilicon hi6220 Graphics Processing Unit for HiKey board
+>>> +
+>>> + ** display-subsystem: Master device for binding DRM sub-components
+>>
+>> DRM is a Linuxism that doesn't belong in the binding.
+>>
+>>> +    This master device is parent node and it will be responsible to bind all
+>>> +    sub-components devices node.
+>>
+>> Are these nodes a single block in the h/w? If not, you should describe
+>> the connection of sub-nodes with of-graph instead.
+>>
+>>> +    - Required properties :
+>>> +      - compatible: "hisilicon,display-subsystem".
+>>> +      - #address-cells, #size-cells: Must be present if the device has sub-nodes.
+>>> +      - ranges: to allow probing of subdevices.
+>>> +      - dma-coherent: Present if dma operations are coherent.
+>>> +
+>>> + ** ade: Graphic overlay, Graphic post-processing, display timing control.
+>>> +    This device is child node of display-subsystem
+>>> +    - Required properties :
+>>> +      - compatible: "hisilicon,hi6220-ade".
+>>> +      - reg: physical base address of the ADE register and length of memory
+>>> +	region.
+>>> +      - reg-names: Should contain the reg names "ade_base" and "media_base".
+>>> +      - interrupt: The interrupt number to the cpu. Defines the interrupt
+>>> +        by ADE.
+>>> +      - clocks: The clocks needed by the ADE module.
+>>> +      - clock-names: the name of the clocks.
+>>> +
+>>> + ** dsi: support mipi dsi interface
+>>> +    This device is child node of display-subsystem
+>>> +    - Required properties :
+>>> +      - compatible: "hisilicon,hi6220-dsi".
+>>> +      - reg: physical base address of the DSI register and length of memory
+>>> +	region.
+>>> +      - clocks: The clocks needed by the DSI module.
+>>> +      - clock-names: the name of the clocks.
+>>> +      -	encoder-slave: phandles to a 'encoder-slave' subnode which DSI connect
+>>> +        ADV7533 in order to support hdmi display.
+>>
+>> What the ADV7533 binding looks like is still being discussed.
+>> "encoder-slave" is certainly DRM specific and not how it should be done.
+>> Most likely, this needs to use the of-graph ports.
+>>
+> I dont how to implement the encoder bridge stuff in upstream,
+> you think that I will how to handle this part?
 
-	if (tsk)
-		return is_compat_thread(task_thread_info(tsk));
-	else
-		return is_compat_task();
+You can use of-graph ports to link the dsi output with the adv7533
+bridge.
 
-and a comment on why this is (not) needed. Your patch changes the
-current code behaviour when tsk == NULL.
+An example of the binding looks like:
+
+Documentation/devicetree/bindings/drm/msm/dsi.txt
+
+The implementation of this on the dsi host side of drm/msm
+can be found in dsi_host_parse_dt, in:
+
+drivers/gpu/drm/msm/dsi/dsi_host.c
+
+You can get to know more about of-graph parsing here:
+
+Documentation/devicetree/bindings/graph.txt
+
+I'd started going through the drm/hisil patches. I'll
+share more comments there.
+
+Thanks,
+Archit
+
+>
+> Thank you
+> xinwei
+>
+>> Also, the ADV7533 connection is specific to HiKey. This binding should
+>> just generically describe how any bridge or panel is connected.
+>>
+>> Rob
+>>
+>> .
+>>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
 
 -- 
-Catalin
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
