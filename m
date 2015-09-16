@@ -1,34 +1,60 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Wed, 16 Sep 2015 12:13:37 -0700
-Subject: [PATCH v1 1/2] soc: ti: display firmware file name as part of
- boot log
-In-Reply-To: <55F9A05E.4090000@ti.com>
-References: <1441403199-10936-1-git-send-email-m-karicheri2@ti.com>
- <55EA673F.8010904@oracle.com> <55F06075.6050405@ti.com>
- <55F8600D.2070701@ti.com> <55F88B81.2000308@oracle.com>
- <55F9A05E.4090000@ti.com>
-Message-ID: <55F9BF61.4080200@oracle.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 16 Sep 2015 20:16:12 +0100
+Subject: [PATCH 2/2] ASoC: sunxi: add support for the on-chip codec on
+ early Allwinner SoCs
+In-Reply-To: <1442064384-23379-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1442064384-23379-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1442064384-23379-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150916191612.GM12027@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/16/2015 10:01 AM, Murali Karicheri wrote:
-> On 09/15/2015 05:20 PM, santosh shilimkar wrote:
->> On 9/15/2015 11:14 AM, Murali Karicheri wrote:
->>> On 09/09/2015 12:38 PM, Murali Karicheri wrote:
+On Sat, Sep 12, 2015 at 03:26:24PM +0200, Maxime Ripard wrote:
 
-[..]
->>> Santosh,
->>>
->>> I have checked v4.3-rc1 and I don't see it. Did you send the pull
->>> request?
->>>
->> They are in the queue fo 4.4-rc1. They were too late for 4.3.
->> You might know already, typically as a rule of thumb followed
->> on arm-soc, we need to get patches reviewed/acked by rc4 to make
->> it for next merge window.
->> Ofcourse genuine bug fixes can make it to the same cycle.
-> Is there a branch where you have applied the patches that you can
-> provide me? I want to send it to internal list for merge.
->
-Yes. I will push it out later this week. Will drop you
-note when I do that.
+This looks pretty good, there's a few minor things below but I'll apply
+anyway - please send followup patches fixing these.
+
+> +	if (clk_set_rate(scodec->clk_module, clk_freq))
+> +		return -EINVAL;
+
+Better to pass back the error code here rather than silently discard it
+(it might have more information).
+
+> +static struct snd_soc_dai_driver sun4i_codec_dai = {
+> +	.name	= "Codec",
+> +	.ops	= &sun4i_codec_dai_ops,
+> +	.playback = {
+> +		.stream_name	= "Codec Playback",
+> +		.channels_min	= 1,
+> +		.channels_max	= 2,
+> +		.rate_min	= 8000,
+> +		.rate_max	= 192000,
+> +		.rates		= SNDRV_PCM_RATE_8000_48000 |
+> +				  SNDRV_PCM_RATE_96000 |
+> +				  SNDRV_PCM_RATE_192000 |
+> +				  SNDRV_PCM_RATE_KNOT,
+
+No need to specify both explicit rates and _KNOT, _KNOT covers
+everything.
+
+> +		.formats	= SNDRV_PCM_FMTBIT_S16_LE |
+> +				  SNDRV_PCM_FMTBIT_S32_LE,
+> +		.sig_bits	= 24,
+
+So presumably also S24_LE (ie, 24 bits packed into a 32 bit word)?
+
+> +	/* Enable the bus clock */
+> +	if (clk_prepare_enable(scodec->clk_apb)) {
+> +		dev_err(&pdev->dev, "Failed to enable the APB clock\n");
+> +		return -EINVAL;
+> +	}
+
+Ideally we'd have runtime power management to disable the clocks when
+idle.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150916/dafe13fe/attachment.sig>
