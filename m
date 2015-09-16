@@ -1,51 +1,46 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Tue, 15 Sep 2015 21:19:15 -0500
-Subject: [PATCH v2 1/2] fsl: Add binding for RCPM
-In-Reply-To: <SN1PR0301MB1616C48FB3D990BCA45289AB9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
-References: <1442307339-15225-1-git-send-email-dongsheng.wang@freescale.com>
- <1442361398.2909.164.camel@freescale.com>
- <SN1PR0301MB1616C48FB3D990BCA45289AB9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
-Message-ID: <1442369955.2909.166.camel@freescale.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 16 Sep 2015 10:21:31 +0800
+Subject: [PATCH 1/2] arm64: mediatek: enable MTK_TIMER
+In-Reply-To: <1442369095-1094-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1442369095-1094-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1442370091.14347.10.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-09-15 at 21:15 -0500, Wang Dongsheng-B40534 wrote:
-> Hi Scott,
-> 
-> > -----Original Message-----
-> > From: Wood Scott-B07421
-> > Sent: Wednesday, September 16, 2015 7:57 AM
-> > To: Wang Dongsheng-B40534
-> > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
-> > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang Huan-
-> > B18965; Jin
-> > Zhengxiong-R64188; Zhao Chenhui-B35336; Tang Yuantian-B29983
-> > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
-> > 
-> > On Tue, 2015-09-15 at 16:55 +0800, Dongsheng Wang wrote:
-> > > +* Freescale RCPM Wakeup Source Device Tree Bindings
-> > > +-------------------------------------------
-> > > +Required rcpm-wakeup property should be added to a device node if the
-> > > device
-> > > +can be used as a wakeup source.
-> > > +
-> > > +  - rcpm-wakeup: The value of the property consists of 3 cells. The 
-> > > first
-> > > cell
-> > > +     is a pointer to the rcpm node, the second cell is the bit mask 
-> > > that
-> > > +     should be set in IPPDEXPCR0, and the last cell is for IPPDEXPCR1.
-> > > +     Note: If the platform has no IPPDEXPCR1 register, put a zero here.
-> > 
-> > What if a future platform has more than two of these registers?
-> 
-> Those registers are only used for wakeup device, we have a lot of available 
-> bit
-> for feature. For example, In LS1021a platform only 7bits has used in the 
-> registers,
-> and 57bits is reserved.
+On Wed, 2015-09-16 at 10:04 +0800, Yingjoe Chen wrote:
+> Enable MTK_TIMER for MediaTek plaform, which will be used as
+> schedule clock.
 
-Still, it'd be better to for the rcpm node to advertise the number of cells 
-it expects.
+Sorry, sending this series too early without cover letter and removing
+Change-Id. Here's the cover letter:
 
--Scott
+
+This is actually v3 of "add GPT timer support for mt8173" series. This
+is based on v4.3-rc1 + clockevents-4.4[1] and James's mediatek-clk
+tree[2].
+
+Changes compare to previous version[3]:
+- the first two mtk_timer related changes are removed because they are
+replaced/accepted in clockevents tree.
+- Remove 'add 13mhz clock for MT8173' because it is accepted in
+mediatek-clk tree.
+- Kconfig.platforms path change.
+
+So we only have 2 patches left here.
+Matthias, can you take these and help to remove the Change-Id?
+
+
+Daniel Kurtz (1):
+  arm64: dts: mt8173: add timer node
+
+Yingjoe Chen (1):
+  arm64: mediatek: enable MTK_TIMER
+
+
+
+[1]
+https://git.linaro.org/people/daniel.lezcano/linux.git clockevents/4.4
+[2]
+http://lists.infradead.org/pipermail/linux-mediatek/2015-August/002069.html
+[3]
+http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001544.html
