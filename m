@@ -1,100 +1,368 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 16 Sep 2015 15:21:11 +0100
-Subject: [PATCH 13/22] arm64: Make use of system wide capability checks
+Date: Wed, 16 Sep 2015 15:21:17 +0100
+Subject: [PATCH 19/22] arm64: cpufeature: Track the user visible fields
 In-Reply-To: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
 References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1442413280-31885-14-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1442413280-31885-20-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-Now that we can reliably read the system wide safe value for a
-feature register, use that to compute the system capability.
-This patch also replaces the 'feature-register-specific'
-methods with a generic routine to check the capability.
+Track the user visible fields of a CPU feature register.
+This will be used later for exposing the value to the userspace
+via emulation of MRS instruction. For more information, check
+the documentation (patch follows).
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |    1 +
- arch/arm64/kernel/cpufeature.c      |   34 ++++++++++++++++------------------
- 2 files changed, 17 insertions(+), 18 deletions(-)
+ arch/arm64/include/asm/cpufeature.h |   10 +-
+ arch/arm64/kernel/cpufeature.c      |  190 ++++++++++++++++++-----------------
+ 2 files changed, 108 insertions(+), 92 deletions(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index e2b5a21..e74a2ac 100644
+index 089c742..c7fef3d 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -80,6 +80,7 @@ struct arm64_cpu_capabilities {
- 		};
+@@ -45,25 +45,33 @@ enum ftr_type {
  
- 		struct {	/* Feature register checking */
-+			u32 sys_reg;
- 			int field_pos;
- 			int min_field_value;
- 		};
+ #define FTR_STRICT	true
+ #define FTR_NONSTRICT	false
++#define FTR_VISIBLE	true
++#define FTR_HIDDEN	false
+ 
+ struct arm64_ftr_bits {
++	bool		visible;	/* visible to userspace ? */
+ 	bool		strict;		/* CPU Sanity check
+ 					 *  strict matching required ? */
+ 	enum ftr_type	type;
+ 	u8		shift;
+ 	u8		width;
+-	s64		safe_val;	/* safe value for discrete features */
++	s64		safe_val;	/* safe value for discrete or
++					 * user invisible features */
+ };
+ 
+ /*
+  * @arm64_ftr_reg - Feature register
++ * @user_mask		Bits of @sys_val visible to user space.
+  * @strict_mask 	Bits which should match across all CPUs for sanity.
++ * @user_val		Safe value for user invisible fields.
+  * @sys_val		Safe value across the CPUs (system view)
+  */
+ struct arm64_ftr_reg {
+ 	u32			sys_id;
+ 	const char*		name;
++	u64			user_mask;
+ 	u64			strict_mask;
++	u64			user_val;
+ 	u64			sys_val;
+ 	struct arm64_ftr_bits*	ftr_bits;
+ };
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index c68d15e..3582af9 100644
+index 34fc2a2..c898ef1 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -589,34 +589,31 @@ feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
- 	return val >= entry->min_field_value;
+@@ -42,8 +42,9 @@ unsigned int compat_elf_hwcap2 __read_mostly;
+ 
+ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 
+-#define ARM64_FTR_BITS(ftr_strict, ftr_type, ftr_shift, ftr_width, ftr_safe_val) \
++#define ARM64_FTR_BITS(ftr_visible, ftr_strict, ftr_type, ftr_shift, ftr_width, ftr_safe_val)	\
+ 	{							\
++		.visible = ftr_visible,				\
+ 		.strict = ftr_strict,				\
+ 		.type = ftr_type,				\
+ 		.shift = ftr_shift,				\
+@@ -57,138 +58,138 @@ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 	}
+ 
+ static struct arm64_ftr_bits ftr_id_aa64isar0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 24, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_AES_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 24, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64ISAR0_AES_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// RAZ
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 28, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 28, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_GIC_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
+ 	/* Linux doesn't care about the EL3 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_DISCRETE, ID_AA64PFR0_EL3_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_EL2_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_EL1_SHIFT, 4, ID_AA64PFR0_EL1_64BIT_ONLY),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_EL0_SHIFT, 4, ID_AA64PFR0_EL0_64BIT_ONLY),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_DISCRETE, ID_AA64PFR0_EL3_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_EL2_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_EL1_SHIFT, 4, ID_AA64PFR0_EL1_64BIT_ONLY),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64PFR0_EL0_SHIFT, 4, ID_AA64PFR0_EL0_64BIT_ONLY),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_BIGENDEL0_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_BIGENDEL0_SHIFT, 4, 0),
+ 	/* Linux shouldn't care about secure memory */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_DISCRETE, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_BIGENDEL_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_DISCRETE, ID_AA64MMFR0_SNSMEM_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_BIGENDEL_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR0_ASID_SHIFT, 4, 0),
+ 	/*
+ 	 * Differing PARange is fine as long as all peripherals and memory are mapped
+ 	 * within the minimum PARange of all CPUs
+ 	 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_SCALAR_MIN, ID_AA64MMFR0_PARANGE_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_SCALAR_MIN, ID_AA64MMFR0_PARANGE_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_HPD_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_HPD_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_VHE_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64MMFR1_HADBS_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_ctr[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 31, 1, 1),	// RAO
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 28, 3, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MAX, 24, 4, 0),	// CWG
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 20, 4, 0),	// ERG
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 16, 4, 1),	// DminLine
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 31, 1, 1),	// RAO
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 28, 3, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MAX, 24, 4, 0),	// CWG
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 20, 4, 0),	// ERG
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 16, 4, 1),	// DminLine
+ 	/*
+ 	 * Linux can handle differing I-cache policies. Userspace JITs will
+ 	 * make use of *minLine
+ 	 */
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_DISCRETE, 14, 2, 0),	// L1Ip
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 10, 0),	// RAZ
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 0, 4, 0),	// IminLine
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_DISCRETE, 14, 2, 0),	// L1Ip
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 4, 10, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 0, 4, 0),	// IminLine
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_mmfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 28, 4, 0),	// InnerShr
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 24, 4, 0),	// FCSE
+-	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_SCALAR_MIN, 20, 4, 0),	// AuxReg
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 16, 4, 0),	// TCM
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 12, 4, 0),	// ShareLvl
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 8, 4, 0),	// OuterShr
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// PMSA
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// VMSA
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 28, 4, 0),	// InnerShr
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 24, 4, 0),	// FCSE
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_NONSTRICT, FTR_SCALAR_MIN, 20, 4, 0),	// AuxReg
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 16, 4, 0),	// TCM
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 12, 4, 0),	// ShareLvl
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 8, 4, 0),	// OuterShr
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// PMSA
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// VMSA
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 32, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_mvfr2[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 8, 24, 0),	// RAZ
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// FPMisc
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// SIMDMisc
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 8, 24, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// FPMisc
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// SIMDMisc
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_dczid[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 5, 27, 0),// RAZ
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 1, 1),	// DZP
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 0, 4, 0),	// BS
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 5, 27, 0),// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 4, 1, 1),	// DZP
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 0, 4, 0),	// BS
+ 	ARM64_FTR_END,
+ };
+ 
+ 
+ static struct arm64_ftr_bits ftr_id_isar5[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_ISAR5_RDM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 20, 4, 0),	// RAZ
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_ISAR5_CRC32_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_ISAR5_SHA2_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_ISAR5_SHA1_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_ISAR5_AES_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, ID_ISAR5_SEVL_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_ISAR5_RDM_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 20, 4, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_ISAR5_CRC32_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_ISAR5_SHA2_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_ISAR5_SHA1_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_ISAR5_AES_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, ID_ISAR5_SEVL_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_mmfr4[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 8, 24, 0),	// RAZ
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// ac2
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 8, 24, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// ac2
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// RAZ
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_pfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 16, 16, 0),	// RAZ
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 12, 4, 0),	// State3
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 8, 4, 0),	// State2
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// State1
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// State0
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 16, 16, 0),	// RAZ
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 12, 4, 0),	// State3
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 8, 4, 0),	// State2
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 4, 4, 0),	// State1
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 4, 0),	// State0
+ 	ARM64_FTR_END,
+ };
+ 
+@@ -199,29 +200,29 @@ static struct arm64_ftr_bits ftr_id_pfr0[] = {
+  * id_isar[0-4], id_mmfr[1-3], id_pfr1, mvfr[0-1]
+  */
+ static struct arm64_ftr_bits ftr_generic_scalar_32bit[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 28, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 24, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 20, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 16, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 12, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 8, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 4, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_SCALAR_MIN, 0, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 28, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 24, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 20, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 16, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 12, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 8, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 4, 4, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_SCALAR_MIN, 0, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_generic[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 64, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 64, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_generic32[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 32, 0),
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_DISCRETE, 0, 32, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+ static struct arm64_ftr_bits ftr_aa64raz[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_DISCRETE, 0, 64, 0),
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_DISCRETE, 0, 64, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+@@ -370,12 +371,13 @@ static s64 arm64_ftr_safe_value(struct arm64_ftr_bits *ftrp, s64 new, s64 cur)
+ 
+ /*
+  * Initialise the CPU feature register from Boot CPU values.
+- * Also initiliases the strict_mask for the register.
++ * Also initiliases the strict_mask, user_mask and user_val
++ * for the register.
+  */
+ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+ {
+ 	u64 val = 0;
+-	u64 strict_mask = ~0x0ULL;
++	u64 user_mask = 0, strict_mask = ~0x0ULL;
+ 	struct arm64_ftr_bits *ftrp;
+ 	struct arm64_ftr_reg *reg = get_arm64_sys_reg(sys_reg);
+ 
+@@ -385,10 +387,16 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+ 		s64 ftr_new = arm64_ftr_value(ftrp, new);
+ 
+ 		val = arm64_ftr_set_value(ftrp, val, ftr_new);
++		if (ftrp->visible)
++			user_mask |= ftr_mask(ftrp);
++		else
++			reg->user_val = arm64_ftr_set_value(ftrp, reg->user_val,
++								ftrp->safe_val);
+ 		if (!ftrp->strict)
+ 			strict_mask &= ~ftr_mask(ftrp);
+ 	}
+ 	reg->sys_val = val;
++	reg->user_mask = user_mask;
+ 	reg->strict_mask = strict_mask;
  }
  
--#define __ID_FEAT_CHK(reg)						\
--static bool __maybe_unused						\
--has_##reg##_feature(const struct arm64_cpu_capabilities *entry)		\
--{									\
--	u64 val;							\
--									\
--	val = read_cpuid(reg##_el1);					\
--	return feature_matches(val, entry);				\
--}
-+static bool
-+has_cpuid_feature(const struct arm64_cpu_capabilities *entry)
-+{
-+	u64 val;
- 
--__ID_FEAT_CHK(id_aa64pfr0);
--__ID_FEAT_CHK(id_aa64mmfr1);
--__ID_FEAT_CHK(id_aa64isar0);
-+	val = read_system_reg(entry->sys_reg);
-+	return feature_matches(val, entry);
-+}
- 
- static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{
- 		.desc = "GIC system register CPU interface",
- 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
--		.matches = has_id_aa64pfr0_feature,
--		.field_pos = 24,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64PFR0_EL1,
-+		.field_pos = ID_AA64PFR0_GIC_SHIFT,
- 		.min_field_value = 1,
- 	},
- #ifdef CONFIG_ARM64_PAN
- 	{
- 		.desc = "Privileged Access Never",
- 		.capability = ARM64_HAS_PAN,
--		.matches = has_id_aa64mmfr1_feature,
--		.field_pos = 20,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64MMFR1_EL1,
-+		.field_pos = ID_AA64MMFR1_PAN_SHIFT,
- 		.min_field_value = 1,
- 		.enable = cpu_enable_pan,
- 	},
-@@ -625,8 +622,9 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{
- 		.desc = "LSE atomic instructions",
- 		.capability = ARM64_HAS_LSE_ATOMICS,
--		.matches = has_id_aa64isar0_feature,
--		.field_pos = 20,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64ISAR0_EL1,
-+		.field_pos = ID_AA64ISAR0_ATOMICS_SHIFT,
- 		.min_field_value = 2,
- 	},
- #endif /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
 -- 
 1.7.9.5
