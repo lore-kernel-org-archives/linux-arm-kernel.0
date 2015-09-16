@@ -1,303 +1,518 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 16 Sep 2015 09:46:36 +0200
-Subject: [PATCH 1/2] mtd: nand: sunxi: rework macros
+Date: Wed, 16 Sep 2015 09:46:37 +0200
+Subject: [PATCH 2/2] mtd: sunxi: nand: refactor ->read_page()/->write_page()
+ code
 In-Reply-To: <1442389597-30698-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1442389597-30698-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1442389597-30698-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1442389597-30698-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suffix mask macros with _MSK and add new helper macros to avoid manually
-shifting values.
+Most of the logic to read/write pages with the HW ECC engine enabled
+is common to the HW_ECC and NAND_ECC_HW_SYNDROME scheme.
+Refactor the code to avoid code duplication.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/sunxi_nand.c | 123 ++++++++++++++++++++++--------------------
- 1 file changed, 64 insertions(+), 59 deletions(-)
+ drivers/mtd/nand/sunxi_nand.c | 404 ++++++++++++++++++++++--------------------
+ 1 file changed, 212 insertions(+), 192 deletions(-)
 
 diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index ef1fe61..dc44435 100644
+index dc44435..640b96c 100644
 --- a/drivers/mtd/nand/sunxi_nand.c
 +++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -57,11 +57,8 @@
- #define NFC_REG_ECC_CTL		0x0034
- #define NFC_REG_ECC_ST		0x0038
- #define NFC_REG_DEBUG		0x003C
--#define NFC_REG_ECC_CNT0	0x0040
--#define NFC_REG_ECC_CNT1	0x0044
--#define NFC_REG_ECC_CNT2	0x0048
--#define NFC_REG_ECC_CNT3	0x004c
--#define NFC_REG_USER_DATA_BASE	0x0050
-+#define NFC_REG_ECC_ERR_CNT(x)	((0x0040 + (x)) & ~0x3)
-+#define NFC_REG_USER_DATA(x)	(0x0050 + ((x) * 4))
- #define NFC_REG_SPARE_AREA	0x00A0
- #define NFC_RAM0_BASE		0x0400
- #define NFC_RAM1_BASE		0x0800
-@@ -69,12 +66,16 @@
- /* define bit use in NFC_CTL */
- #define NFC_EN			BIT(0)
- #define NFC_RESET		BIT(1)
--#define NFC_BUS_WIDYH		BIT(2)
--#define NFC_RB_SEL		BIT(3)
--#define NFC_CE_SEL		GENMASK(26, 24)
-+#define NFC_BUS_WIDTH_MSK	BIT(2)
-+#define NFC_BUS_WIDTH_8		(0 << 2)
-+#define NFC_BUS_WIDTH_16	(1 << 2)
-+#define NFC_RB_SEL_MSK		BIT(3)
-+#define NFC_RB_SEL(x)		((x) << 3)
-+#define NFC_CE_SEL_MSK		GENMASK(26, 24)
-+#define NFC_CE_SEL(x)		((x) << 24)
- #define NFC_CE_CTL		BIT(6)
--#define NFC_CE_CTL1		BIT(7)
--#define NFC_PAGE_SIZE		GENMASK(11, 8)
-+#define NFC_PAGE_SHIFT_MSK	GENMASK(11, 8)
-+#define NFC_PAGE_SHIFT(x)	(((x) < 10 ? 0 : (x) - 10) << 8)
- #define NFC_SAM			BIT(12)
- #define NFC_RAM_METHOD		BIT(14)
- #define NFC_DEBUG_CTL		BIT(31)
-@@ -86,10 +87,7 @@
- #define NFC_CMD_FIFO_STATUS	BIT(3)
- #define NFC_STA			BIT(4)
- #define NFC_NATCH_INT_FLAG	BIT(5)
--#define NFC_RB_STATE0		BIT(8)
--#define NFC_RB_STATE1		BIT(9)
--#define NFC_RB_STATE2		BIT(10)
--#define NFC_RB_STATE3		BIT(11)
-+#define NFC_RB_STATE(x)		BIT(x + 8)
- 
- /* define bit use in NFC_INT */
- #define NFC_B2R_INT_ENABLE	BIT(0)
-@@ -109,9 +107,11 @@
- 	(((tCAD) & 0x7) << 8))
- 
- /* define bit use in NFC_CMD */
--#define NFC_CMD_LOW_BYTE	GENMASK(7, 0)
--#define NFC_CMD_HIGH_BYTE	GENMASK(15, 8)
--#define NFC_ADR_NUM		GENMASK(18, 16)
-+#define NFC_CMD_LOW_BYTE_MSK	GENMASK(7, 0)
-+#define NFC_CMD_HIGH_BYTE_MSK	GENMASK(15, 8)
-+#define NFC_CMD(x)		(x)
-+#define NFC_ADR_NUM_MSK		GENMASK(18, 16)
-+#define NFC_ADR_NUM(x)		(((x) - 1) << 16)
- #define NFC_SEND_ADR		BIT(19)
- #define NFC_ACCESS_DIR		BIT(20)
- #define NFC_DATA_TRANS		BIT(21)
-@@ -123,29 +123,38 @@
- #define NFC_ROW_AUTO_INC	BIT(27)
- #define NFC_SEND_CMD3		BIT(28)
- #define NFC_SEND_CMD4		BIT(29)
--#define NFC_CMD_TYPE		GENMASK(31, 30)
-+#define NFC_CMD_TYPE_MSK	GENMASK(31, 30)
-+#define NFC_NORMAL_OP		(0 << 30)
-+#define NFC_ECC_OP		(1 << 30)
-+#define NFC_PAGE_OP		(2 << 30)
- 
- /* define bit use in NFC_RCMD_SET */
--#define NFC_READ_CMD		GENMASK(7, 0)
--#define NFC_RANDOM_READ_CMD0	GENMASK(15, 8)
--#define NFC_RANDOM_READ_CMD1	GENMASK(23, 16)
-+#define NFC_READ_CMD_MSK	GENMASK(7, 0)
-+#define NFC_RND_READ_CMD0_MSK	GENMASK(15, 8)
-+#define NFC_RND_READ_CMD1_MSK	GENMASK(23, 16)
- 
- /* define bit use in NFC_WCMD_SET */
--#define NFC_PROGRAM_CMD		GENMASK(7, 0)
--#define NFC_RANDOM_WRITE_CMD	GENMASK(15, 8)
--#define NFC_READ_CMD0		GENMASK(23, 16)
--#define NFC_READ_CMD1		GENMASK(31, 24)
-+#define NFC_PROGRAM_CMD_MSK	GENMASK(7, 0)
-+#define NFC_RND_WRITE_CMD_MSK	GENMASK(15, 8)
-+#define NFC_READ_CMD0_MSK	GENMASK(23, 16)
-+#define NFC_READ_CMD1_MSK	GENMASK(31, 24)
- 
- /* define bit use in NFC_ECC_CTL */
- #define NFC_ECC_EN		BIT(0)
- #define NFC_ECC_PIPELINE	BIT(3)
- #define NFC_ECC_EXCEPTION	BIT(4)
--#define NFC_ECC_BLOCK_SIZE	BIT(5)
-+#define NFC_ECC_BLOCK_SIZE_MSK	BIT(5)
- #define NFC_RANDOM_EN		BIT(9)
- #define NFC_RANDOM_DIRECTION	BIT(10)
--#define NFC_ECC_MODE_SHIFT	12
--#define NFC_ECC_MODE		GENMASK(15, 12)
--#define NFC_RANDOM_SEED		GENMASK(30, 16)
-+#define NFC_ECC_MODE_MSK	GENMASK(15, 12)
-+#define NFC_ECC_MODE(x)		((x) << 12)
-+#define NFC_RANDOM_SEED_MSK	GENMASK(30, 16)
-+#define NFC_RANDOM_SEED(x)	((x) << 16)
-+
-+/* define bit use in NFC_ECC_ST */
-+#define NFC_ECC_ERR(x)		BIT(x)
-+#define NFC_ECC_PAT_FOUND(x)	BIT(x + 16)
-+#define NFC_ECC_ERR_CNT(b, x)	(((x) >> ((b) * 8)) & 0xff)
- 
+@@ -159,6 +159,13 @@
  /* NFC_USER_DATA helper macros */
  #define NFC_BUF_TO_USER_DATA(buf)	((buf)[0] | ((buf)[1] << 8) | \
-@@ -360,13 +369,13 @@ static int sunxi_nfc_dev_ready(struct mtd_info *mtd)
- 	switch (rb->type) {
- 	case RB_NATIVE:
- 		ret = !!(readl(nfc->regs + NFC_REG_ST) &
--			 (NFC_RB_STATE0 << rb->info.nativeid));
-+			 NFC_RB_STATE(rb->info.nativeid));
- 		if (ret)
- 			break;
+ 					((buf)[2] << 16) | ((buf)[3] << 24))
++#define NFC_USER_DATA_TO_BUF(buf, val)	\
++	{				\
++		(buf)[0] = val;		\
++		(buf)[1] = val >> 8;	\
++		(buf)[2] = val >> 16;	\
++		(buf)[3] = val >> 24;	\
++	}
  
- 		sunxi_nfc_wait_int(nfc, NFC_RB_B2R, timeo);
- 		ret = !!(readl(nfc->regs + NFC_REG_ST) &
--			 (NFC_RB_STATE0 << rb->info.nativeid));
-+			 NFC_RB_STATE(rb->info.nativeid));
- 		break;
- 	case RB_GPIO:
- 		ret = gpio_get_value(rb->info.gpio);
-@@ -396,19 +405,19 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
- 		return;
+ #define NFC_DEFAULT_TIMEOUT_MS	1000
  
- 	ctl = readl(nfc->regs + NFC_REG_CTL) &
--	      ~(NFC_CE_SEL | NFC_RB_SEL | NFC_EN);
-+	      ~(NFC_PAGE_SHIFT_MSK | NFC_CE_SEL_MSK | NFC_RB_SEL_MSK | NFC_EN);
+@@ -543,153 +550,228 @@ static void sunxi_nfc_cmd_ctrl(struct mtd_info *mtd, int dat,
+ 	sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
+ }
  
- 	if (chip >= 0) {
- 		sel = &sunxi_nand->sels[chip];
+-static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
+-				      struct nand_chip *chip, uint8_t *buf,
+-				      int oob_required, int page)
++static void sunxi_nfc_hw_ecc_enable(struct mtd_info *mtd)
+ {
+-	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
+-	struct nand_ecc_ctrl *ecc = &chip->ecc;
+-	struct nand_ecclayout *layout = ecc->layout;
+-	struct sunxi_nand_hw_ecc *data = ecc->priv;
+-	unsigned int max_bitflips = 0;
+-	int offset;
+-	int ret;
+-	u32 tmp;
+-	int i;
+-	int cnt;
++	struct nand_chip *nand = mtd->priv;
++	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
++	struct sunxi_nand_hw_ecc *data = nand->ecc.priv;
++	u32 ecc_ctl;
  
--		ctl |= (sel->cs << 24) | NFC_EN |
--		       (((nand->page_shift - 10) & 0xf) << 8);
-+		ctl |= NFC_CE_SEL(sel->cs) | NFC_EN |
-+		       NFC_PAGE_SHIFT(nand->page_shift - 10);
- 		if (sel->rb.type == RB_NONE) {
- 			nand->dev_ready = NULL;
- 		} else {
- 			nand->dev_ready = sunxi_nfc_dev_ready;
- 			if (sel->rb.type == RB_NATIVE)
--				ctl |= (sel->rb.info.nativeid << 3);
-+				ctl |= NFC_RB_SEL(sel->rb.info.nativeid);
- 		}
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
+-	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
++	ecc_ctl = readl(nfc->regs + NFC_REG_ECC_CTL);
++	ecc_ctl &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE |
++		     NFC_ECC_BLOCK_SIZE_MSK);
++	ecc_ctl |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
  
- 		writel(mtd->writesize, nfc->regs + NFC_REG_SPARE_AREA);
-@@ -550,9 +559,8 @@ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
- 	int cnt;
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	writel(ecc_ctl, nfc->regs + NFC_REG_ECC_CTL);
++}
  
- 	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
--	tmp &= ~(NFC_ECC_MODE | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE);
--	tmp |= NFC_ECC_EN | (data->mode << NFC_ECC_MODE_SHIFT) |
--	       NFC_ECC_EXCEPTION;
-+	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
-+	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
+-	for (i = 0; i < ecc->steps; i++) {
+-		if (i)
+-			chip->cmdfunc(mtd, NAND_CMD_RNDOUT, i * ecc->size, -1);
++static void sunxi_nfc_hw_ecc_disable(struct mtd_info *mtd)
++{
++	struct nand_chip *nand = mtd->priv;
++	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
  
- 	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
+-		offset = mtd->writesize + layout->eccpos[i * ecc->bytes] - 4;
++	writel(readl(nfc->regs + NFC_REG_ECC_CTL) & ~NFC_ECC_EN,
++	       nfc->regs + NFC_REG_ECC_CTL);
++}
  
-@@ -570,7 +578,7 @@ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
+-		chip->read_buf(mtd, NULL, ecc->size);
++static int sunxi_nfc_hw_ecc_read_chunk(struct mtd_info *mtd,
++				       u8 *data, int data_off,
++				       u8 *oob, int oob_off,
++				       int *cur_off,
++				       unsigned int *max_bitflips)
++{
++	struct nand_chip *nand = mtd->priv;
++	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
++	struct nand_ecc_ctrl *ecc = &nand->ecc;
++	u32 status;
++	int ret;
+ 
+-		chip->cmdfunc(mtd, NAND_CMD_RNDOUT, offset, -1);
++	if (*cur_off != data_off)
++		nand->cmdfunc(mtd, NAND_CMD_RNDOUT, data_off, -1);
+ 
+-		ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
+-		if (ret)
+-			return ret;
++	sunxi_nfc_read_buf(mtd, data, ecc->size);
+ 
+-		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ECC_OP;
+-		writel(tmp, nfc->regs + NFC_REG_CMD);
++	if (data_off + ecc->bytes != oob_off)
++		nand->cmdfunc(mtd, NAND_CMD_RNDOUT, oob_off, -1);
+ 
+-		ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
+-		if (ret)
+-			return ret;
++	ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
++	if (ret)
++		return ret;
+ 
+-		memcpy_fromio(buf + (i * ecc->size),
+-			      nfc->regs + NFC_RAM0_BASE, ecc->size);
++	writel(NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ECC_OP,
++	       nfc->regs + NFC_REG_CMD);
+ 
+-		if (readl(nfc->regs + NFC_REG_ECC_ST) & NFC_ECC_ERR(0)) {
+-			mtd->ecc_stats.failed++;
+-		} else {
+-			tmp = readl(nfc->regs + NFC_REG_ECC_ERR_CNT(0));
+-			mtd->ecc_stats.corrected += NFC_ECC_ERR_CNT(0, tmp);
+-			max_bitflips = max_t(unsigned int, max_bitflips, tmp);
+-		}
++	ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
++	if (ret)
++		return ret;
+ 
+-		if (oob_required) {
+-			chip->cmdfunc(mtd, NAND_CMD_RNDOUT, offset, -1);
++	status = readl(nfc->regs + NFC_REG_ECC_ST);
++	ret = NFC_ECC_ERR_CNT(0, readl(nfc->regs + NFC_REG_ECC_ERR_CNT(0)));
+ 
+-			ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
+-			if (ret)
+-				return ret;
++	memcpy_fromio(data, nfc->regs + NFC_RAM0_BASE, ecc->size);
+ 
+-			offset -= mtd->writesize;
+-			chip->read_buf(mtd, chip->oob_poi + offset,
+-				      ecc->bytes + 4);
+-		}
++	nand->cmdfunc(mtd, NAND_CMD_RNDOUT, oob_off, -1);
++	sunxi_nfc_read_buf(mtd, oob, ecc->bytes + 4);
++
++	if (status & NFC_ECC_ERR(0)) {
++		ret = -EIO;
++	} else {
++		/*
++		 * The engine protects 4 bytes OOB data per chunk.
++		 * Retrieve the corrected OOB bytes.
++		 */
++		NFC_USER_DATA_TO_BUF(oob,
++				     readl(nfc->regs + NFC_REG_USER_DATA(0)));
+ 	}
+ 
+-	if (oob_required) {
+-		cnt = ecc->layout->oobfree[ecc->steps].length;
+-		if (cnt > 0) {
+-			offset = mtd->writesize +
+-				 ecc->layout->oobfree[ecc->steps].offset;
+-			chip->cmdfunc(mtd, NAND_CMD_RNDOUT, offset, -1);
+-			offset -= mtd->writesize;
+-			chip->read_buf(mtd, chip->oob_poi + offset, cnt);
+-		}
++	if (ret < 0) {
++		mtd->ecc_stats.failed++;
++	} else {
++		mtd->ecc_stats.corrected += ret;
++		*max_bitflips = max_t(unsigned int, *max_bitflips, ret);
+ 	}
+ 
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~NFC_ECC_EN;
++	*cur_off = oob_off + ecc->bytes + 4;
+ 
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	return 0;
++}
+ 
+-	return max_bitflips;
++static void sunxi_nfc_hw_ecc_read_extra_oob(struct mtd_info *mtd,
++					    u8 *oob, int *cur_off)
++{
++	struct nand_chip *nand = mtd->priv;
++	struct nand_ecc_ctrl *ecc = &nand->ecc;
++	int offset = ((ecc->bytes + 4) * ecc->steps);
++	int len = mtd->oobsize - offset;
++
++	if (len <= 0)
++		return;
++
++	if (*cur_off != offset)
++		nand->cmdfunc(mtd, NAND_CMD_RNDOUT,
++			      offset + mtd->writesize, -1);
++
++	sunxi_nfc_read_buf(mtd, oob + offset, len);
++
++	*cur_off = mtd->oobsize + mtd->writesize;
+ }
+ 
+-static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
+-				       struct nand_chip *chip,
+-				       const uint8_t *buf, int oob_required)
++static int sunxi_nfc_hw_ecc_write_chunk(struct mtd_info *mtd,
++					const u8 *data, int data_off,
++					const u8 *oob, int oob_off,
++					int *cur_off)
+ {
+-	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
+-	struct nand_ecc_ctrl *ecc = &chip->ecc;
+-	struct nand_ecclayout *layout = ecc->layout;
+-	struct sunxi_nand_hw_ecc *data = ecc->priv;
+-	int offset;
++	struct nand_chip *nand = mtd->priv;
++	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
++	struct nand_ecc_ctrl *ecc = &nand->ecc;
+ 	int ret;
+-	u32 tmp;
+-	int i;
+-	int cnt;
+ 
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
+-	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
++	if (data_off != *cur_off)
++		nand->cmdfunc(mtd, NAND_CMD_RNDIN, data_off, -1);
+ 
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_write_buf(mtd, data, ecc->size);
+ 
+-	for (i = 0; i < ecc->steps; i++) {
+-		if (i)
+-			chip->cmdfunc(mtd, NAND_CMD_RNDIN, i * ecc->size, -1);
++	/* Fill OOB data in */
++	writel(NFC_BUF_TO_USER_DATA(oob), nfc->regs + NFC_REG_USER_DATA(0));
+ 
+-		chip->write_buf(mtd, buf + (i * ecc->size), ecc->size);
++	if (data_off + ecc->bytes != oob_off)
++		nand->cmdfunc(mtd, NAND_CMD_RNDIN, oob_off, -1);
+ 
+-		offset = layout->eccpos[i * ecc->bytes] - 4 + mtd->writesize;
++	ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
++	if (ret)
++		return ret;
+ 
+-		/* Fill OOB data in */
+-		writel(NFC_BUF_TO_USER_DATA(chip->oob_poi +
+-					    layout->oobfree[i].offset),
+-		       nfc->regs + NFC_REG_USER_DATA(0));
++	writel(NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD |
++	       NFC_ACCESS_DIR | NFC_ECC_OP,
++	       nfc->regs + NFC_REG_CMD);
+ 
+-		chip->cmdfunc(mtd, NAND_CMD_RNDIN, offset, -1);
++	ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
++	if (ret)
++		return ret;
+ 
+-		ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
+-		if (ret)
+-			return ret;
++	*cur_off = oob_off + ecc->bytes + 4;
+ 
+-		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ACCESS_DIR |
+-		      NFC_ECC_OP;
+-		writel(tmp, nfc->regs + NFC_REG_CMD);
+-		ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
++	return 0;
++}
++
++static void sunxi_nfc_hw_ecc_write_extra_oob(struct mtd_info *mtd,
++					     u8 *oob, int *cur_off)
++{
++	struct nand_chip *nand = mtd->priv;
++	struct nand_ecc_ctrl *ecc = &nand->ecc;
++	int offset = ((ecc->bytes + 4) * ecc->steps);
++	int len = mtd->oobsize - offset;
++
++	if (len <= 0)
++		return;
++
++	if (*cur_off != offset)
++		nand->cmdfunc(mtd, NAND_CMD_RNDIN,
++			      offset + mtd->writesize, -1);
++
++	sunxi_nfc_write_buf(mtd, oob + offset, len);
++
++	*cur_off = mtd->oobsize + mtd->writesize;
++}
++
++static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
++				      struct nand_chip *chip, uint8_t *buf,
++				      int oob_required, int page)
++{
++	struct nand_ecc_ctrl *ecc = &chip->ecc;
++	unsigned int max_bitflips = 0;
++	int ret, i, cur_off = 0;
++
++	sunxi_nfc_hw_ecc_enable(mtd);
++
++	for (i = 0; i < ecc->steps; i++) {
++		int data_off = i * ecc->size;
++		int oob_off = i * (ecc->bytes + 4);
++		u8 *data = buf + data_off;
++		u8 *oob = chip->oob_poi + oob_off;
++
++		ret = sunxi_nfc_hw_ecc_read_chunk(mtd, data, data_off, oob,
++						  oob_off + mtd->writesize,
++						  &cur_off, &max_bitflips);
  		if (ret)
  			return ret;
+ 	}
  
--		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | (1 << 30);
-+		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ECC_OP;
- 		writel(tmp, nfc->regs + NFC_REG_CMD);
+-	if (oob_required) {
+-		cnt = ecc->layout->oobfree[i].length;
+-		if (cnt > 0) {
+-			offset = mtd->writesize +
+-				 ecc->layout->oobfree[i].offset;
+-			chip->cmdfunc(mtd, NAND_CMD_RNDIN, offset, -1);
+-			offset -= mtd->writesize;
+-			chip->write_buf(mtd, chip->oob_poi + offset, cnt);
+-		}
++	if (oob_required)
++		sunxi_nfc_hw_ecc_read_extra_oob(mtd, chip->oob_poi,
++						&cur_off);
++
++	sunxi_nfc_hw_ecc_disable(mtd);
++
++	return max_bitflips;
++}
++
++static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
++				       struct nand_chip *chip,
++				       const uint8_t *buf, int oob_required)
++{
++	struct nand_ecc_ctrl *ecc = &chip->ecc;
++	int ret, i, cur_off = 0;
++
++	sunxi_nfc_hw_ecc_enable(mtd);
++
++	for (i = 0; i < ecc->steps; i++) {
++		int data_off = i * ecc->size;
++		int oob_off = i * (ecc->bytes + 4);
++		const u8 *data = buf + data_off;
++		const u8 *oob = chip->oob_poi + oob_off;
++
++		ret = sunxi_nfc_hw_ecc_write_chunk(mtd, data, data_off, oob,
++						   oob_off + mtd->writesize,
++						   &cur_off);
++		if (ret)
++			return ret;
+ 	}
  
- 		ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
-@@ -580,11 +588,11 @@ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
- 		memcpy_fromio(buf + (i * ecc->size),
- 			      nfc->regs + NFC_RAM0_BASE, ecc->size);
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~NFC_ECC_EN;
++	if (oob_required)
++		sunxi_nfc_hw_ecc_write_extra_oob(mtd, chip->oob_poi, &cur_off);
  
--		if (readl(nfc->regs + NFC_REG_ECC_ST) & 0x1) {
-+		if (readl(nfc->regs + NFC_REG_ECC_ST) & NFC_ECC_ERR(0)) {
- 			mtd->ecc_stats.failed++;
- 		} else {
--			tmp = readl(nfc->regs + NFC_REG_ECC_CNT0) & 0xff;
--			mtd->ecc_stats.corrected += tmp;
-+			tmp = readl(nfc->regs + NFC_REG_ECC_ERR_CNT(0));
-+			mtd->ecc_stats.corrected += NFC_ECC_ERR_CNT(0, tmp);
- 			max_bitflips = max_t(unsigned int, max_bitflips, tmp);
- 		}
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_hw_ecc_disable(mtd);
  
-@@ -635,9 +643,8 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
- 	int cnt;
+ 	return 0;
+ }
+@@ -699,64 +781,29 @@ static int sunxi_nfc_hw_syndrome_ecc_read_page(struct mtd_info *mtd,
+ 					       uint8_t *buf, int oob_required,
+ 					       int page)
+ {
+-	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
+ 	struct nand_ecc_ctrl *ecc = &chip->ecc;
+-	struct sunxi_nand_hw_ecc *data = ecc->priv;
+ 	unsigned int max_bitflips = 0;
+-	uint8_t *oob = chip->oob_poi;
+-	int offset = 0;
+-	int ret;
+-	int cnt;
+-	u32 tmp;
+-	int i;
+-
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
+-	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
++	int ret, i, cur_off = 0;
  
- 	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
--	tmp &= ~(NFC_ECC_MODE | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE);
--	tmp |= NFC_ECC_EN | (data->mode << NFC_ECC_MODE_SHIFT) |
--	       NFC_ECC_EXCEPTION;
-+	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
-+	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
- 
- 	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
- 
-@@ -652,7 +659,7 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
- 		/* Fill OOB data in */
- 		writel(NFC_BUF_TO_USER_DATA(chip->oob_poi +
- 					    layout->oobfree[i].offset),
--		       nfc->regs + NFC_REG_USER_DATA_BASE);
-+		       nfc->regs + NFC_REG_USER_DATA(0));
- 
- 		chip->cmdfunc(mtd, NAND_CMD_RNDIN, offset, -1);
- 
-@@ -661,7 +668,7 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
- 			return ret;
- 
- 		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ACCESS_DIR |
--		      (1 << 30);
-+		      NFC_ECC_OP;
- 		writel(tmp, nfc->regs + NFC_REG_CMD);
- 		ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
- 		if (ret)
-@@ -704,16 +711,15 @@ static int sunxi_nfc_hw_syndrome_ecc_read_page(struct mtd_info *mtd,
- 	int i;
- 
- 	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
--	tmp &= ~(NFC_ECC_MODE | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE);
--	tmp |= NFC_ECC_EN | (data->mode << NFC_ECC_MODE_SHIFT) |
--	       NFC_ECC_EXCEPTION;
-+	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
-+	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
- 
- 	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_hw_ecc_enable(mtd);
  
  	for (i = 0; i < ecc->steps; i++) {
- 		chip->read_buf(mtd, NULL, ecc->size);
+-		chip->read_buf(mtd, NULL, ecc->size);
+-
+-		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ECC_OP;
+-		writel(tmp, nfc->regs + NFC_REG_CMD);
+-
+-		ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
++		int data_off = i * (ecc->size + ecc->bytes + 4);
++		int oob_off = data_off + ecc->size;
++		u8 *data = buf + (i * ecc->size);
++		u8 *oob = chip->oob_poi + (i * (ecc->bytes + 4));
++
++		ret = sunxi_nfc_hw_ecc_read_chunk(mtd, data, data_off, oob,
++						  oob_off, &cur_off,
++						  &max_bitflips);
+ 		if (ret)
+ 			return ret;
+-
+-		memcpy_fromio(buf, nfc->regs + NFC_RAM0_BASE, ecc->size);
+-		buf += ecc->size;
+-		offset += ecc->size;
+-
+-		if (readl(nfc->regs + NFC_REG_ECC_ST) & NFC_ECC_ERR(0)) {
+-			mtd->ecc_stats.failed++;
+-		} else {
+-			tmp = readl(nfc->regs + NFC_REG_ECC_ERR_CNT(0));
+-			mtd->ecc_stats.corrected += NFC_ECC_ERR_CNT(0, tmp);
+-			max_bitflips = max_t(unsigned int, max_bitflips, tmp);
+-		}
+-
+-		if (oob_required) {
+-			chip->cmdfunc(mtd, NAND_CMD_RNDOUT, offset, -1);
+-			chip->read_buf(mtd, oob, ecc->bytes + ecc->prepad);
+-			oob += ecc->bytes + ecc->prepad;
+-		}
+-
+-		offset += ecc->bytes + ecc->prepad;
+ 	}
  
--		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | (1 << 30);
-+		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ECC_OP;
- 		writel(tmp, nfc->regs + NFC_REG_CMD);
+-	if (oob_required) {
+-		cnt = mtd->oobsize - (oob - chip->oob_poi);
+-		if (cnt > 0) {
+-			chip->cmdfunc(mtd, NAND_CMD_RNDOUT, offset, -1);
+-			chip->read_buf(mtd, oob, cnt);
+-		}
+-	}
++	if (oob_required)
++		sunxi_nfc_hw_ecc_read_extra_oob(mtd, chip->oob_poi, &cur_off);
  
- 		ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
-@@ -724,11 +730,11 @@ static int sunxi_nfc_hw_syndrome_ecc_read_page(struct mtd_info *mtd,
- 		buf += ecc->size;
- 		offset += ecc->size;
+-	writel(readl(nfc->regs + NFC_REG_ECC_CTL) & ~NFC_ECC_EN,
+-	       nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_hw_ecc_disable(mtd);
  
--		if (readl(nfc->regs + NFC_REG_ECC_ST) & 0x1) {
-+		if (readl(nfc->regs + NFC_REG_ECC_ST) & NFC_ECC_ERR(0)) {
- 			mtd->ecc_stats.failed++;
- 		} else {
--			tmp = readl(nfc->regs + NFC_REG_ECC_CNT0) & 0xff;
--			mtd->ecc_stats.corrected += tmp;
-+			tmp = readl(nfc->regs + NFC_REG_ECC_ERR_CNT(0));
-+			mtd->ecc_stats.corrected += NFC_ECC_ERR_CNT(0, tmp);
- 			max_bitflips = max_t(unsigned int, max_bitflips, tmp);
- 		}
+ 	return max_bitflips;
+ }
+@@ -766,54 +813,27 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
+ 						const uint8_t *buf,
+ 						int oob_required)
+ {
+-	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
+ 	struct nand_ecc_ctrl *ecc = &chip->ecc;
+-	struct sunxi_nand_hw_ecc *data = ecc->priv;
+-	uint8_t *oob = chip->oob_poi;
+-	int offset = 0;
+-	int ret;
+-	int cnt;
+-	u32 tmp;
+-	int i;
+-
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
+-	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
++	int ret, i, cur_off = 0;
  
-@@ -771,9 +777,8 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
- 	int i;
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_hw_ecc_enable(mtd);
  
- 	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
--	tmp &= ~(NFC_ECC_MODE | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE);
--	tmp |= NFC_ECC_EN | (data->mode << NFC_ECC_MODE_SHIFT) |
--	       NFC_ECC_EXCEPTION;
-+	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
-+	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
+ 	for (i = 0; i < ecc->steps; i++) {
+-		chip->write_buf(mtd, buf + (i * ecc->size), ecc->size);
+-		offset += ecc->size;
++		int data_off = i * (ecc->size + ecc->bytes + 4);
++		int oob_off = data_off + ecc->size;
++		const u8 *data = buf + (i * ecc->size);
++		const u8 *oob = chip->oob_poi + (i * (ecc->bytes + 4));
  
- 	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
+-		/* Fill OOB data in */
+-		writel(NFC_BUF_TO_USER_DATA(oob),
+-		       nfc->regs + NFC_REG_USER_DATA(0));
+-
+-		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ACCESS_DIR |
+-		      NFC_ECC_OP;
+-		writel(tmp, nfc->regs + NFC_REG_CMD);
+-
+-		ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
++		ret = sunxi_nfc_hw_ecc_write_chunk(mtd, data, data_off,
++						   oob, oob_off, &cur_off);
+ 		if (ret)
+ 			return ret;
+-
+-		offset += ecc->bytes + ecc->prepad;
+-		oob += ecc->bytes + ecc->prepad;
+-	}
+-
+-	if (oob_required) {
+-		cnt = mtd->oobsize - (oob - chip->oob_poi);
+-		if (cnt > 0) {
+-			chip->cmdfunc(mtd, NAND_CMD_RNDIN, offset, -1);
+-			chip->write_buf(mtd, oob, cnt);
+-		}
+ 	}
  
-@@ -783,10 +788,10 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~NFC_ECC_EN;
++	if (oob_required)
++		sunxi_nfc_hw_ecc_write_extra_oob(mtd, chip->oob_poi, &cur_off);
  
- 		/* Fill OOB data in */
- 		writel(NFC_BUF_TO_USER_DATA(oob),
--		       nfc->regs + NFC_REG_USER_DATA_BASE);
-+		       nfc->regs + NFC_REG_USER_DATA(0));
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_hw_ecc_disable(mtd);
  
- 		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD | NFC_ACCESS_DIR |
--		      (1 << 30);
-+		      NFC_ECC_OP;
- 		writel(tmp, nfc->regs + NFC_REG_CMD);
- 
- 		ret = sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
+ 	return 0;
+ }
 -- 
 1.9.1
