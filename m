@@ -1,56 +1,72 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 16 Sep 2015 08:20:58 +0200
-Subject: [PATCH 5/6] ARM: dts: sun6i: Add support for Sinlinx A31s SDK
- board
-In-Reply-To: <CAGb2v64LF39Cj-KWQ5xLF_Pt3yATmzDJMa6XDaizectNRDping@mail.gmail.com>
-References: <1440755679-8266-1-git-send-email-wens@csie.org>
- <1440755679-8266-6-git-send-email-wens@csie.org>
- <20150828123443.GM29389@lukather>
- <CAGb2v64LF39Cj-KWQ5xLF_Pt3yATmzDJMa6XDaizectNRDping@mail.gmail.com>
-Message-ID: <20150916062058.GQ4684@lukather>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Wed, 16 Sep 2015 11:53:14 +0530
+Subject: [PATCH v2 0/9] qcom: Add support for TSENS driver
+Message-ID: <1442384603-26053-1-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 03:24:47PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Aug 28, 2015 at 8:34 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Fri, Aug 28, 2015 at 05:54:38PM +0800, Chen-Yu Tsai wrote:
-> >> The Sinlinx A31s SDK is a A31s based module/baseboard development kit.
-> >>
-> >> The core module has the SoC, PMIC, DRAM, eMMC and supporting components.
-> >> There are also pads for UART0, JTAG and I2S.
-> >
-> > Can you use that core module without that baseboard?
-> 
-> You could just solder 5v, gnd, and uart, and it should work.
-> Not that I actually tried it.
-> 
-> >> The baseboard has 100 Mbps Ethernet, 5x USB 2.0 host ports via a USB 2.0
-> >> hub chip, MMC, HDMI, SPDIF, CIR, audio jacks, 2 tablet-like volume
-> >> buttons, RS232 style UART and USB OTG (though VBUS is not connected).
-> >> Various headers are available for other addon modules, such as SDIO
-> >> WiFi, LCD display, camera sensor, UARTs, I2C, SPI and GPIOs.
-> >
-> > Can the baseboard be used with our core modules?
-> 
-> Doubtful. The baseboard is more like a demonstration platform for the
-> core board.
-> 
-> What do you suggest?
+Changes since v1:
+* Created virtual tsens device from gcc driver for 8960,
+with DT having a single node for gcc and tsens
+* Minor fixes with rebasing on 4.3-rc1
 
-Nothing then, I was just trying to understand the possible
-combinations, but it looks like there's none :)
+Changes since RFC:
+* Added support for 8916 and 8084
+* Based off the latest nvmem framework patches [1]
+* Minor review fixes for comments mostly from Lina
 
-Maxime
+This is an attempt to have a single TSENS driver for
+the different versions of the TSENS IP that exist, on
+different qcom msm/apq SoCs'
+Support is added for msm8916, msm8960 and msm8974 families.
+
+A lot of the work is based of original code from Stephen Boyd
+and Siddartha Mohanadoss. I have also picked some of what
+Narendran Rajan did in his attempt to upstream the support
+for 8960 family. I could not keep the original authorship on
+any of the patches because I ended up moving the code around
+quite a bit in an effort to have a single driver for the
+various devices. I would be glad to change the authorship
+for any of the patches if needed.
+
+Rajendra Nayak (9):
+  thermal: qcom: tsens: Add a skeletal TSENS drivers
+  thermal: qcom: tsens-8916: Add support for 8916 family of SoCs
+  thermal: qcom: tsens-8974: Add support for 8974 family of SoCs
+  clk: qcom: create virtual child device for TSENS
+  thermal: qcom: tsens-8960: Add support for 8960 family of SoCs
+  arm: dts: msm8974: Add thermal zones, tsens and qfprom nodes
+  arm: dts: apq8064: Add thermal zones, tsens and qfprom nodes
+  arm: dts: apq8084: Add thermal zones, tsens and qfprom nodes
+  arm64: dts: msm8916: Add thermal zones, tsens and qfprom nodes
+
+ .../devicetree/bindings/thermal/qcom-tsens.txt     |  36 +++
+ arch/arm/boot/dts/qcom-apq8064.dtsi                | 101 +++++++
+ arch/arm/boot/dts/qcom-apq8084.dtsi                | 105 ++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi                | 105 ++++++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |  66 +++++
+ drivers/clk/qcom/gcc-msm8960.c                     |  23 +-
+ drivers/thermal/Kconfig                            |   5 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/qcom/Kconfig                       |  10 +
+ drivers/thermal/qcom/Makefile                      |   2 +
+ drivers/thermal/qcom/tsens-8916.c                  | 107 ++++++++
+ drivers/thermal/qcom/tsens-8960.c                  | 291 +++++++++++++++++++++
+ drivers/thermal/qcom/tsens-8974.c                  | 239 +++++++++++++++++
+ drivers/thermal/qcom/tsens-common.c                | 130 +++++++++
+ drivers/thermal/qcom/tsens.c                       | 215 +++++++++++++++
+ drivers/thermal/qcom/tsens.h                       |  69 +++++
+ 16 files changed, 1504 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+ create mode 100644 drivers/thermal/qcom/Kconfig
+ create mode 100644 drivers/thermal/qcom/Makefile
+ create mode 100644 drivers/thermal/qcom/tsens-8916.c
+ create mode 100644 drivers/thermal/qcom/tsens-8960.c
+ create mode 100644 drivers/thermal/qcom/tsens-8974.c
+ create mode 100644 drivers/thermal/qcom/tsens-common.c
+ create mode 100644 drivers/thermal/qcom/tsens.c
+ create mode 100644 drivers/thermal/qcom/tsens.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150916/b469da46/attachment.sig>
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
