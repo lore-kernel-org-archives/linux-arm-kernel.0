@@ -1,73 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Sep 2015 14:05:49 +0100
-Subject: [RFC PATCH v2 3/7] arm64: alternative: Apply alternatives early
- in boot process
-In-Reply-To: <1442237181-17064-4-git-send-email-daniel.thompson@linaro.org>
-References: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
- <1442237181-17064-4-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20150916130549.GJ28771@arm.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed, 16 Sep 2015 21:34:46 +0800
+Subject: [PATCH] arm64: mt8173.dtsi: correct i2c node names
+In-Reply-To: <1442367325-55819-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1442367325-55819-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <CAGS+omCzycc+RFeDftooDcj_f9M4SXhoO79u8m9e=ZiL1QV1tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 02:26:17PM +0100, Daniel Thompson wrote:
-> Currently alternatives are applied very late in the boot process (and
-> a long time after we enable scheduling). Some alternative sequences,
-> such as those that alter the way CPU context is stored, must be applied
-> much earlier in the boot sequence.
-> 
-> Introduce apply_alternatives_early() to allow some alternatives to be
-> applied immediately after we detect the CPU features of the boot CPU.
-> 
-> Currently apply_alternatives_all() is not optimized and will re-patch
-> code that has already been updated. This is harmless but could be
-> removed by adding extra flags to the alternatives store.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+On Wed, Sep 16, 2015 at 9:35 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+> Node name in device tree should describe general class of the
+> device. Correct incorrect i2c node names.
+>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+
 > ---
->  arch/arm64/include/asm/alternative.h |  1 +
->  arch/arm64/kernel/alternative.c      | 15 +++++++++++++++
->  arch/arm64/kernel/setup.c            |  7 +++++++
->  3 files changed, 23 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-> index d56ec0715157..f9dad1b7c651 100644
-> --- a/arch/arm64/include/asm/alternative.h
-> +++ b/arch/arm64/include/asm/alternative.h
-> @@ -17,6 +17,7 @@ struct alt_instr {
->  	u8  alt_len;		/* size of new instruction(s), <= orig_len */
->  };
->  
-> +void __init apply_alternatives_early(void);
->  void __init apply_alternatives_all(void);
->  void apply_alternatives(void *start, size_t length);
->  void free_alternatives_memory(void);
-> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-> index ab9db0e9818c..59989a4bed7c 100644
-> --- a/arch/arm64/kernel/alternative.c
-> +++ b/arch/arm64/kernel/alternative.c
-> @@ -117,6 +117,21 @@ static void __apply_alternatives(void *alt_region)
->  }
->  
->  /*
-> + * This is called very early in the boot process (directly after we run
-> + * a feature detect on the boot CPU). No need to worry about other CPUs
-> + * here.
-> + */
-> +void apply_alternatives_early(void)
-> +{
-> +	struct alt_region region = {
-> +		.begin	= __alt_instructions,
-> +		.end	= __alt_instructions_end,
-> +	};
-> +
-> +	__apply_alternatives(&region);
-> +}
-
-How do you choose which alternatives are applied early and which are
-applied later? AFAICT, this just applies everything before we've
-established the capabilities of the CPUs in the system, which could cause
-problems for big/little SoCs.
-
-Also, why do we need this for the NMI?
-
-Will
+> This is based on v4.3-rc1.
+> All the other i2c node names are correct.
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index d18ee42..7f360b7 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -365,7 +365,7 @@
+>                         status = "disabled";
+>                 };
+>
+> -               i2c3: i2c3 at 11010000 {
+> +               i2c3: i2c at 11010000 {
+>                         compatible = "mediatek,mt8173-i2c";
+>                         reg = <0 0x11010000 0 0x70>,
+>                               <0 0x11000280 0 0x80>;
+> @@ -381,7 +381,7 @@
+>                         status = "disabled";
+>                 };
+>
+> -               i2c4: i2c4 at 11011000 {
+> +               i2c4: i2c at 11011000 {
+>                         compatible = "mediatek,mt8173-i2c";
+>                         reg = <0 0x11011000 0 0x70>,
+>                               <0 0x11000300 0 0x80>;
+> @@ -397,7 +397,7 @@
+>                         status = "disabled";
+>                 };
+>
+> -               i2c6: i2c6 at 11013000 {
+> +               i2c6: i2c at 11013000 {
+>                         compatible = "mediatek,mt8173-i2c";
+>                         reg = <0 0x11013000 0 0x70>,
+>                               <0 0x11000080 0 0x80>;
+> --
+> 1.9.1
+>
