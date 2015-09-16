@@ -1,59 +1,114 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Sep 2015 17:21:57 +0100
-Subject: [PATCH] irqchip: bcm2835: Add FIQ support
-In-Reply-To: <87613a31jb.fsf@eliezer.anholt.net>
-References: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
- <87d1zj6fq2.fsf@eliezer.anholt.net> <55F5CD80.3020700@tronnes.org>
- <20150914090853.GF21084@n2100.arm.linux.org.uk>
- <87wpvtjcka.fsf@eliezer.anholt.net>
- <20150914143459.GN21084@n2100.arm.linux.org.uk>
- <87613a31jb.fsf@eliezer.anholt.net>
-Message-ID: <20150916162157.GB21084@n2100.arm.linux.org.uk>
+From: al.stone@linaro.org (Al Stone)
+Date: Wed, 16 Sep 2015 10:24:33 -0600
+Subject: [PATCH v3 0/5] ACPI: Provide better MADT subtable sanity checks
+In-Reply-To: <1880799.vMhNVMG5Vc@vostro.rjw.lan>
+References: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
+ <55F889E8.3070706@redhat.com> <1880799.vMhNVMG5Vc@vostro.rjw.lan>
+Message-ID: <55F997C1.20606@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 10:02:32AM -0400, Eric Anholt wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+On 09/15/2015 08:44 PM, Rafael J. Wysocki wrote:
+> On Tuesday, September 15, 2015 03:13:12 PM Al Stone wrote:
+>> On 09/09/2015 03:09 PM, Al Stone wrote:
+>>> Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
+>>> check on the various subtables that are defined for the MADT.  The check
+>>> compares the size of the subtable data structure as defined by ACPICA to
+>>> the length entry in the subtable.  If they are not the same, the assumption
+>>> is that the subtable is incorrect.
+>>>
+>>> Over time, the ACPI spec has allowed for MADT subtables where this can
+>>> never be true (the local SAPIC subtable, for example).  Or, more recently,
+>>> the spec has accumulated some minor flaws where there are three possible 
+>>> sizes for a subtable, all of which are valid, but only for specific versions
+>>> of the spec (the GICC subtable).  In both cases, BAD_MADT_ENTRY reports these
+>>> subtables as bad when they are not.  In order to retain some sanity check
+>>> on the MADT subtables, we now have to special case these subtables.  Of
+>>> necessity, these special cases have ended up in arch-dependent code (arm64)
+>>> or an arch has simply decided to forgo the check (ia64).
+>>>
+>>> This patch set replaces the BAD_MADT_ENTRY macro with a function called
+>>> bad_madt_entry().  This function uses a data set of details about the
+>>> subtables to provide more sanity checking than before:
+>>>
+>>> 	-- is the subtable legal for the version given in the FADT?
+>>>
+>>> 	-- is the subtable legal for the revision of the MADT in use?
+>>>
+>>> 	-- is the subtable of the proper length (including checking
+>>> 	   on the one variable length subtable that is currently ignored),
+>>> 	   given the FADT version and the MADT revision?
+>>>
+>>> Further, this patch set adds in the call to bad_madt_entry() from the 
+>>> acpi_table_parse_madt() function, allowing it to be used consistently
+>>> by all architectures, for all subtables, and removing the need for each
+>>> of the subtable traversal callback functions to use BAD_MADT_ENTRY.
+>>>
+>>> In theory, as the ACPI specification changes, we would only have to add
+>>> additional information to the data set describing the MADT subtables in
+>>> order to continue providing sanity checks, even when new subtables are
+>>> added.
+>>>
+>>> These patches have been tested on an APM Mustang (arm64) and are known to
+>>> work there.  They have also been cross-compiled for x86 and ia64 with no
+>>> known failures.
+>>>
+>>> Changes for v3:
+>>>    -- Reviewed-and-tested-by from Sudeep Holla for arm64 parts
+>>>    -- Clearer language in error messages (Graeme Gregory, Timur Tabi)
+>>>    -- Double checked that inserting call to bad_madt_entry() into the
+>>>       function acpi_parse_entries() does not impact current behavior
+>>>       (Sudeep Holla)
+>>>    
+>>> Changes for v2:
+>>>    -- Acked-by on 2/5 from Marc Zyngier and Catalin Marinas for ARM
+>>>    -- Correct faulty end of loop test found by Timur Tabi
+>>>
+>>>
+>>> Al Stone (5):
+>>>   ACPI: add in a bad_madt_entry() function to eventually replace the
+>>>     macro
+>>>   ACPI / ARM64: remove usage of BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
+>>>   ACPI / IA64: remove usage of BAD_MADT_ENTRY
+>>>   ACPI / X86: remove usage of BAD_MADT_ENTRY
+>>>   ACPI: remove definition of BAD_MADT_ENTRY macro
+>>>
+>>>  arch/arm64/include/asm/acpi.h |   8 --
+>>>  arch/arm64/kernel/smp.c       |   2 -
+>>>  arch/ia64/kernel/acpi.c       |  20 ----
+>>>  arch/x86/kernel/acpi/boot.c   |  27 -----
+>>>  drivers/acpi/tables.c         | 245 +++++++++++++++++++++++++++++++++++++++++-
+>>>  drivers/irqchip/irq-gic.c     |   6 --
+>>>  include/linux/acpi.h          |   4 -
+>>>  7 files changed, 244 insertions(+), 68 deletions(-)
+>>>
+>>
+>> Ping?  Any additional comments on this version?  I have only received
+>> feedback from arm64 reviewers so far, over three revisions, even though
+>> everyone that needs to be (ACPI, ia64, x86) has also been CCd.
+>>
+>> Anyone else before I fix a couple of things for v4 that the arm64 folks
+>> found?  ACKs?  NAKs?  Please don't bother me, I'm in the merge window :)?
 > 
-> > On Mon, Sep 14, 2015 at 07:33:09AM -0700, Eric Anholt wrote:
-> >> So, while FIQ isn't used in upstream, I think it's worthwhile to merge.
-> >> It is another step to bringing the downstream developers into the fold.
-> >
-> > I want to see the code _first_.  Until then, I'm sorry, this patch can't
-> > go in.
+> The merge window is actually over, so why would you expect anything like that?
+
+I know.  Merely a feeble attempt at humor....
+
+> I'm going to apply this series if people have no problems with it.  I do think
+> it is slightly overkill, but then as long as it works ...
 > 
-> If you just want to see "Yes, GPL-compatible code using this is
-> available", then that is:
-
-It's got nothing to do with "GPL-compatible code".  I want to audit
-_all_ code that makes use of FIQ.  It disgusts me that you're trying
-to dress this up as a licensing issue.  It isn't.
-
-> https://github.com/raspberrypi/linux/blob/rpi-4.1.y/drivers/usb/host/dwc_otg/dwc_otg_fiq_stub.S
-> https://github.com/raspberrypi/linux/blob/rpi-4.1.y/drivers/usb/host/dwc_otg/dwc_otg_fiq_fsm.c
+> Thanks,
+> Rafael
 > 
-> If not, I'm curious what exactly is the reason the patch can't go in.
 
-In any case, I'm not going to say yes to code which provides a new
-internal kernel facility for mainline kernels, but with no mainline
-kernel users.  Such code can only be to make external tree maintanence
-easlier, but it has the unintended effect of making mainline kernel
-maintanence harder.
-
-Such facilities _should_ always come with a user of that new facility.
-
-It's nothing personal, it's sane policy from experience.  I've had stuff
-like this in the past, where people have sent new facilities without any
-users, years have gone by without that facility being used.  The facility
-has eventually been removed from the mainline kernel _because_ it doesn't
-have any users.
-
-Moreover, there are people who audit the kernel looking for facilities
-which have no users and propose patches to remove them.
-
-So, if you want some new facility to be merged into mainline kernels,
-and for it to remain in the kernel, always accompany it with a user.
+Thanks, Rafael.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
