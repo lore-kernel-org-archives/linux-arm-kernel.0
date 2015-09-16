@@ -1,77 +1,51 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed, 16 Sep 2015 09:13:31 +0200
-Subject: [PATCH v5 2/5] dt/bindings: add bindings for optee
-In-Reply-To: <55F89D93.4080608@kernel.org>
-References: <1439973629-19505-1-git-send-email-jens.wiklander@linaro.org>
- <1439973629-19505-3-git-send-email-jens.wiklander@linaro.org>
- <55F89D93.4080608@kernel.org>
-Message-ID: <20150916071330.GA4515@ermac>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 16 Sep 2015 09:15:24 +0200
+Subject: NFS/TCP/IPv6 acting strangely in 4.2
+In-Reply-To: <1442386435.3756.282.camel@vitec.com> ("Damien =?utf-8?Q?Th?=
+ =?utf-8?Q?=C3=A9bault=22's?=
+ message of "Wed, 16 Sep 2015 06:53:57 +0000")
+References: <20150911113839.GO21084@n2100.arm.linux.org.uk>
+ <1442386435.3756.282.camel@vitec.com>
+Message-ID: <87zj0mbzsj.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 05:37:07PM -0500, Rob Herring wrote:
-> On 08/19/2015 03:40 AM, Jens Wiklander wrote:
-> > Introduces optee prefix and adds bindings for ARM TrustZone based OP-TEE
-> > implementation.
-> > 
-> > Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
-> > ---
-> >  Documentation/devicetree/bindings/optee/optee.txt     | 17 +++++++++++++++++
-> 
-> How about bindings/arm/firmware/... where the *other* TZ binding is located.
+Hi Damien,
+ 
+ On mer., sept. 16 2015, Damien Th?bault <damien.thebault@vitec.com> wrote:
 
-OK, I'll move it.
+> On Fri, 2015-09-11 at 12:38 +0100, Russell King - ARM Linux wrote:
+>> I have a recent Marvell Armada 388 board here which uses the mvneta
+>> driver.  I'm seeing some weird effects with NFS with it acting as a
+>> client.
+>
+> Hello,
+>
+> I'm upgrading a Marvelle Armada 370 board using the mvneta driver from
+> 4.0 to 4.2 and noticed issues with NFS booting.
+> Basically, most of the time init returns with an error code, or
+> programs segfault or throw illegal instructions.
+>
+> Since it worked fine on 4.0 I bisected until I found commit
+> a84e32894191cfcbffa54180d78d7d4654d56c20 "net: mvneta: fix refilling
+> for Rx DMA buffers".
+>
+> If I revert this commit, everything seems to get back to normal.
+> Could you try it ? The two issues look very similar.
 
-> 
-> >  Documentation/devicetree/bindings/vendor-prefixes.txt |  1 +
-> >  2 files changed, 18 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/optee/optee.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/optee/optee.txt b/Documentation/devicetree/bindings/optee/optee.txt
-> > new file mode 100644
-> > index 0000000..4a6ff10
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/optee/optee.txt
-> > @@ -0,0 +1,17 @@
-> > +OP-TEE Device Tree Bindings
-> > +
-> > +OP-TEE is a piece of software using hardware features to provide a Trusted
-> > +Execution Environment. The security can be provided with ARM TrustZone, but
-> > +also by virtualization or a separate chip. As there's no single OP-TEE
-> 
-> I don't see how the Linux side would not need to know what the
-> communication channel is whether it is smc, hvc, or something else.
-
-I assume you're missing something similar to the "method" property
-defined for PSCI. I'll add that.
-
-> 
-> > +vendor we're using "optee" as the first part of compatible property,
-> > +indicating the OP-TEE protocol is used when communicating with the secure
-> > +world.
-> > +
-> > +* OP-TEE based on ARM TrustZone required properties:
-> > +
-> > +- compatible="optee,optee-tz"
-> > +
-> > +Example:
-> > +	optee {
-> > +		compatible="optee,optee-tz";
-> > +	};
-> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > index 8033919..17c2a7e 100644
-> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > @@ -141,6 +141,7 @@ nvidia	NVIDIA
-> >  nxp	NXP Semiconductors
-> >  onnn	ON Semiconductor Corp.
-> >  opencores	OpenCores.org
-> > +optee	OP-TEE, Open Portable Trusted Execution Environment
-> >  ortustech	Ortus Technology Co., Ltd.
-> >  ovti	OmniVision Technologies
-> >  panasonic	Panasonic Corporation
-> > 
-> 
+Actually there was a bug with this commit, but a fix had been submitted
+and accepted yesterday, you can find him here:
+https://patchwork.ozlabs.org/patch/518111/.
 
 Thanks,
-Jens
+
+Gregory
+
+>
+> Regards
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
