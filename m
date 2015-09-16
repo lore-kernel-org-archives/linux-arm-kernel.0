@@ -1,45 +1,47 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 17 Sep 2015 02:53:58 +0300
-Subject: [PATCH] ARM: shmobile: r8a7794: add HS-USB DT support
-In-Reply-To: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
-References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
-Message-ID: <49756124.B9jeO4ArbL@wasted.cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 16 Sep 2015 16:57:28 -0700
+Subject: [PATCH] ARM: dts: am57xx-beagle-x15: Update Phy supplies
+In-Reply-To: <55F98690.6070601@ti.com>
+References: <1441308226-26690-1-git-send-email-nm@ti.com>
+ <55F98690.6070601@ti.com>
+Message-ID: <20150916235727.GC4215@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the R8A7794 generic part of the HS-USB device node.
-It is up to the board file to enable the device.
+* Nishanth Menon <nm@ti.com> [150916 08:15]:
+> Hi Tony,
+> 
+> On 09/03/2015 02:23 PM, Nishanth Menon wrote:
+> > Originally, all the SoC PHY rails were supplied by LDO3. However, as a
+> > result of characterization, it was determined that this posed a risk in
+> > extreme load  conditions. Hence the PHY rails are split between two
+> > different LDOs. Update the related node as a result
+> > 
+> > LDO3/VDDA_1V8_PHYA supplies vdda_usb1, vdda_usb2, vdda_sata, vdda_usb3
+> > LDO4/VDDA_1V8_PHYB supplies vdda_pcie1, vdda_pcie0, vdda_hdmi, vdda_pcie
+> > 
+> > NOTE: We break compatibility with pre-production boards with this change
+> > since, the PMIC LDO4 is disabled at OTP level.
+> > 
+> > The new configuration is the plan of record and all pre-production
+> > boards are supposed to be replaced with the latest boards matching the
+> > mentioned configuration.
+> > 
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
+> > ---
+> 
+> Gentle ping. Some very few 10 something boards have been created and
+> stopped production till the latest modifications were done (PMIC USB
+> interrupt, LDO4 etc) - and all of those boards are now getting
+> scrapped.. If there are any (as per tracking information, there should
+> not be any), TI should be contacted to have them replaced.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
-This patch is against  'renesas-devel-20150914-v4.3-rc1' tag  of Simon Horman's
-'renesas.git' repo plus the R8A7794/ PCI USB and USB PHY support patches posted
-last week.
-
- arch/arm/boot/dts/r8a7794.dtsi |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-@@ -718,6 +718,18 @@
- 		};
- 	};
+Sounds OK to me as they are TI internal protos.
  
-+	hsusb: usb at e6590000 {
-+		compatible = "renesas,usbhs-r8a7794";
-+		reg = <0 0xe6590000 0 0x100>;
-+		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp7_clks R8A7794_CLK_HSUSB>;
-+		power-domains = <&cpg_clocks>;
-+		renesas,buswait = <4>;
-+		phys = <&usb0 1>;
-+		phy-names = "usb";
-+		status = "disabled";
-+	};
-+
- 	usbphy: usb-phy at e6590100 {
- 		compatible = "renesas,usb-phy-r8a7794";
- 		reg = <0 0xe6590100 0 0x100>;
+> Is it possible for us to consider this patch in 4.3 cycle - given that
+> we are this close, might have been great to see 4.3 vanilla function on
+> the production platform.
+
+Applying into omap-for-v4.3/fixes thanks.
+
+Tony
