@@ -1,117 +1,66 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 16 Sep 2015 15:21:14 +0100
-Subject: [PATCH 16/22] arm64/debug: Make use of the system wide safe value
+Date: Wed, 16 Sep 2015 15:21:13 +0100
+Subject: [PATCH 15/22] arm64: Move FP/ASIMD hwcap handling to common code
 In-Reply-To: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
 References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1442413280-31885-17-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1442413280-31885-16-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-Use the system wide value of ID_AA64DFR0 to make safer decisions
+The FP/ASIMD is detected in fpsimd_init(), which is built-in
+unconditionally. Lets move the hwcap handling to the central place.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/hw_breakpoint.h |   14 ++------------
- arch/arm64/kernel/debug-monitors.c     |    6 ++++--
- arch/arm64/kernel/hw_breakpoint.c      |   19 ++++++++++++++++++-
- 3 files changed, 24 insertions(+), 15 deletions(-)
+ arch/arm64/kernel/cpufeature.c |    2 ++
+ arch/arm64/kernel/fpsimd.c     |   16 +++++-----------
+ 2 files changed, 7 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-index 4c47cb2..0251768 100644
---- a/arch/arm64/include/asm/hw_breakpoint.h
-+++ b/arch/arm64/include/asm/hw_breakpoint.h
-@@ -119,6 +119,8 @@ extern int arch_install_hw_breakpoint(struct perf_event *bp);
- extern void arch_uninstall_hw_breakpoint(struct perf_event *bp);
- extern void hw_breakpoint_pmu_read(struct perf_event *bp);
- extern int hw_breakpoint_slots(int type);
-+extern int get_num_brps(void);
-+extern int get_num_wrps(void);
- 
- #ifdef CONFIG_HAVE_HW_BREAKPOINT
- extern void hw_breakpoint_thread_switch(struct task_struct *next);
-@@ -134,17 +136,5 @@ static inline void ptrace_hw_copy_thread(struct task_struct *task)
- 
- extern struct pmu perf_ops_bp;
- 
--/* Determine number of BRP registers available. */
--static inline int get_num_brps(void)
--{
--	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
--}
--
--/* Determine number of WRP registers available. */
--static inline int get_num_wrps(void)
--{
--	return ((read_cpuid(ID_AA64DFR0_EL1) >> 20) & 0xf) + 1;
--}
--
- #endif	/* __KERNEL__ */
- #endif	/* __ASM_BREAKPOINT_H */
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index 9b3b62a..9ca5f77 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -26,14 +26,16 @@
- #include <linux/stat.h>
- #include <linux/uaccess.h>
- 
--#include <asm/debug-monitors.h>
-+#include <asm/cpufeature.h>
- #include <asm/cputype.h>
-+#include <asm/debug-monitors.h>
- #include <asm/system_misc.h>
- 
- /* Determine debug architecture. */
- u8 debug_monitors_arch(void)
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 3f273a3..34fc2a2 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -649,6 +649,8 @@ static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA2_SHIFT, 1, CAP_HWCAP, HWCAP_SHA2),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_CRC32_SHIFT, 1, CAP_HWCAP, HWCAP_CRC32),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_ATOMICS_SHIFT, 2, CAP_HWCAP, HWCAP_ATOMICS),
++	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_FP_SHIFT, 0, CAP_HWCAP, HWCAP_FP),
++	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, 0, CAP_HWCAP, HWCAP_ASIMD),
+ #ifdef CONFIG_COMPAT
+ 	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 2, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_PMULL),
+ 	HWCAP_CAP(SYS_ID_ISAR5_EL1, ID_ISAR5_AES_SHIFT, 1, CAP_COMPAT_HWCAP2, COMPAT_HWCAP2_AES),
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index c56956a..4c46c54 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -332,21 +332,15 @@ static inline void fpsimd_hotplug_init(void) { }
+  */
+ static int __init fpsimd_init(void)
  {
--	return read_cpuid(ID_AA64DFR0_EL1) & 0xf;
-+	return cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
-+						ID_AA64DFR0_DEBUGVER_SHIFT);
+-	u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
+-
+-	if (pfr & (0xf << 16)) {
++	if (elf_hwcap & HWCAP_FP) {
++		fpsimd_pm_init();
++		fpsimd_hotplug_init();
++	} else {
+ 		pr_notice("Floating-point is not implemented\n");
+-		return 0;
+ 	}
+-	elf_hwcap |= HWCAP_FP;
+ 
+-	if (pfr & (0xf << 20))
++	if (!(elf_hwcap & HWCAP_ASIMD))
+ 		pr_notice("Advanced SIMD is not implemented\n");
+-	else
+-		elf_hwcap |= HWCAP_ASIMD;
+-
+-	fpsimd_pm_init();
+-	fpsimd_hotplug_init();
+ 
+ 	return 0;
  }
- 
- /*
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index c97040e..1fa0476 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -28,11 +28,12 @@
- #include <linux/ptrace.h>
- #include <linux/smp.h>
- 
-+#include <asm/cpufeature.h>
-+#include <asm/cputype.h>
- #include <asm/current.h>
- #include <asm/debug-monitors.h>
- #include <asm/hw_breakpoint.h>
- #include <asm/traps.h>
--#include <asm/cputype.h>
- #include <asm/system_misc.h>
- 
- /* Breakpoint currently in use for each BRP. */
-@@ -48,6 +49,22 @@ static DEFINE_PER_CPU(int, stepping_kernel_bp);
- static int core_num_brps;
- static int core_num_wrps;
- 
-+/* Determine number of BRP registers available. */
-+int get_num_brps(void)
-+{
-+	return 1 +
-+	      	cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
-+						ID_AA64DFR0_BRPS_SHIFT);
-+}
-+
-+/* Determine number of WRP registers available. */
-+int get_num_wrps(void)
-+{
-+	return 1 +
-+	      	cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
-+						ID_AA64DFR0_WRPS_SHIFT);
-+}
-+
- int hw_breakpoint_slots(int type)
- {
- 	/*
 -- 
 1.7.9.5
