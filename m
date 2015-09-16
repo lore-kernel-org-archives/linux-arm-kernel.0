@@ -1,46 +1,82 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 16 Sep 2015 15:37:00 +0530
-Subject: [PATCH 1/5] spi: introduce mmap read support for spi flash devices
-In-Reply-To: <20150914183553.GE12027@sirena.org.uk>
-References: <1441355402-6837-1-git-send-email-vigneshr@ti.com>
- <1441355402-6837-2-git-send-email-vigneshr@ti.com>
- <CAD6G_RT8Q+Uyp1ZjzHf54Tno1wHm0SmLKEwRAe2gkdp772FD9A@mail.gmail.com>
- <20150914183553.GE12027@sirena.org.uk>
-Message-ID: <55F93F44.3090706@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 16 Sep 2015 11:32:32 +0100
+Subject: [PATCH 2/6] PCI: generic: Only fixup irqs for bus we are creating.
+In-Reply-To: <55F85A24.2010600@caviumnetworks.com>
+References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442013719-5001-3-git-send-email-ddaney.cavm@gmail.com>
+ <20150915173654.GJ31157@arm.com>
+ <55F85A24.2010600@caviumnetworks.com>
+Message-ID: <20150916103232.GB17510@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 09/15/2015 12:05 AM, Mark Brown wrote:
-> On Fri, Sep 04, 2015 at 04:55:33PM +0530, Jagan Teki wrote:
->> On 4 September 2015 at 13:59, Vignesh R <vigneshr@ti.com> wrote:
+On Tue, Sep 15, 2015 at 06:49:24PM +0100, David Daney wrote:
+> On 09/15/2015 10:36 AM, Will Deacon wrote:
+> > Hi David,
+> >
+> > On Sat, Sep 12, 2015 at 12:21:55AM +0100, David Daney wrote:
+> >> From: David Daney <david.daney@cavium.com>
+> >>
+> >> Use pci_walk_bus() to restrict the fixup irq actions to only the bus
+> >> being created.
+> >>
+> >> If we create multiple buses with pci-host-generic, or there are buses
+> >> created by other drivers, we don't want to call pci_fixup_irqs() which
+> >> operates on all devices, not just the devices on the bus being added.
+> >> The consequence is that either the fixups are done more than once, or
+> >> in some cases incorrect fixups could be applied.
+> >>
+> >> Signed-off-by: David Daney <david.daney@cavium.com>
+> >> ---
+> >>   drivers/pci/host/pci-host-generic.c | 8 +++++++-
+> >>   1 file changed, 7 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> >> index 265dd25..a0fb241 100644
+> >> --- a/drivers/pci/host/pci-host-generic.c
+> >> +++ b/drivers/pci/host/pci-host-generic.c
+> >> @@ -205,6 +205,12 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+> >>   	return 0;
+> >>   }
+> >>
+> >> +static int gen_pci_fixup_irq_cb(struct pci_dev *dev, void *arg)
+> >> +{
+> >> +	pdev_fixup_irq(dev, pci_common_swizzle, of_irq_parse_and_map_pci);
+> >> +	return 0;
+> >> +}
+> >> +
+> >>   static int gen_pci_probe(struct platform_device *pdev)
+> >>   {
+> >>   	int err;
+> >> @@ -262,7 +268,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+> >>   		return -ENODEV;
+> >>   	}
+> >>
+> >> -	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> >> +	pci_walk_bus(bus, gen_pci_fixup_irq_cb, NULL);
+> >
+> > Any chance we could put something in the core PCI code for this? I think
+> > any host controller wanting to work with arm64 is potentially going to
+> > run into the same problem.
 > 
->>> + * @spi_mtd_mmap_read: some spi-controller hardwares provide memory
->>> + *                     mapped interface to communicate with mtd flashes.
->>> + *                     For this, spi  controller needs to know flash
->>> + *                     memory settings like read command to use, dummy
->>> + *                     bytes and address width. Once these settings are
->>> + *                     populated in hardware registers, any read
->>> + *                     accesses to flash's memory map region(as defined
->>> + *                     by SoC) through memcpy or mem-to-mem DMA copy
->>> + *                     will be handled by controller hardware. The
->>> + *                     hardware will automatically generate spi signals
->>> + *                     required to read data from flash and present it
->>> + *                     to CPU or DMA. SPI master drivers can use this
->>> + *                     callback to implement memory mapped read
->>> + *                     interface. Flash driver (like m25p80) requests
->>> + *                     memory mapped read via this method. The interface
->>> + *                     should  only be used mtd flashes and cannot be
->>> + *                     used with other spi devices.
+> Good idea.
 > 
-> This comment is *way* too verbose - probably you just need up to the
-> "Once" here.
-> 
+> I will move the walking code into setup-irq.c (the current home of 
+> pci_fixup_irqs()), and make it part of patch 1/6.
 
-Ok, I will move the extra text to commit log.
+For arm64 we could even compile out pci_fixup_irqs() since the IRQ mapping
+is done in pcibios_add_device() through DT, I agree on CONFIG_ARM this
+needs fixing though, so yes, make it common code and patch all host
+controllers that make use of pci_fixup_irqs() since that's a common
+issue as far as I can see (ARM pcibios works around it by having a
+IRQ mapping function per bus and it provides an API to initialize
+multiple host controllers at once and fixing up IRQs before devices
+are added, still, for host controllers that do not use that
+functionality - eg drivers/pci/host/pcie-designware.c - if there are
+multiple host controllers instances we run into the same problem).
 
+Side note: do you have any PCI host controller where mapping IRQs through
+of_irq_parse_and_map_pci() does not work ? If yes, why ?
 
--- 
-Thanks,
-Vignesh
+Cheers,
+Lorenzo
