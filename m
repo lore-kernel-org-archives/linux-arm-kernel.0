@@ -1,151 +1,79 @@
-From: Dongsheng.Wang@freescale.com (Wang Dongsheng)
-Date: Wed, 16 Sep 2015 03:18:55 +0000
-Subject: [PATCH v2 1/2] fsl: Add binding for RCPM
-References: <1442307339-15225-1-git-send-email-dongsheng.wang@freescale.com>
- <1442361398.2909.164.camel@freescale.com>
- <SN1PR0301MB1616C48FB3D990BCA45289AB9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
- <1442369955.2909.166.camel@freescale.com>
- <SN1PR0301MB161688E3AF527ADC76AB2B8F9D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
- <1442370701.2909.167.camel@freescale.com>
- <DM2PR03MB574196E1A0D55C185CE1B4BFA5B0@DM2PR03MB574.namprd03.prod.outlook.com>
- <1442371076.2909.171.camel@freescale.com>
-Message-ID: <SN1PR0301MB1616C6AB0EF4ACE4624865159D5B0@SN1PR0301MB1616.namprd03.prod.outlook.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Wed, 16 Sep 2015 11:24:31 +0800
+Subject: [PATCH v9 5/6] Documentation: DT: Add HiSilicon PCIe host binding
+In-Reply-To: <55F8D12D.50107@kernel.org>
+References: <1442321361-174300-1-git-send-email-wangzhou1@hisilicon.com>
+ <1442321361-174300-6-git-send-email-wangzhou1@hisilicon.com>
+ <55F874F9.1060804@kernel.org> <55F8C268.2020809@hisilicon.com>
+ <55F8D12D.50107@kernel.org>
+Message-ID: <55F8E0EF.3040900@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Scott,
+On 2015/9/16 10:17, Rob Herring wrote:
+> On 09/15/2015 08:14 PM, Zhou Wang wrote:
+>> On 2015/9/16 3:43, Rob Herring wrote:
+>>> On 09/15/2015 07:49 AM, Zhou Wang wrote:
+>>>> This patch adds related DTS binding document for HiSilicon PCIe host driver.
+>>>>
+>>>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+>>>> ---
+>>>>  .../devicetree/bindings/pci/hisilicon-pcie.txt     | 46 ++++++++++++++++++++++
+>>>>  1 file changed, 46 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+>>>> new file mode 100644
+>>>> index 0000000..2afc9d1
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+>>>> @@ -0,0 +1,46 @@
+>>>> +HiSilicon PCIe host bridge DT description
+>>>> +
+>>>> +HiSilicon PCIe host controller is based on Designware PCI core.
+>>>> +It shares common functions with PCIe Designware core driver and inherits
+>>>> +common properties defined in
+>>>> +Documentation/devicetree/bindings/pci/designware-pci.txt.
+>>>> +
+>>>> +Additional properties are described here:
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: Should contain "hisilicon,hip05-pcie".
+>>>> +- reg: Should contain rc_dbi, subctrl, config registers location and length.
+>>>> +- reg-names: Must include the following entries:
+>>>> +  "rc_dbi": controller configuration registers;
+>>>> +  "subctrl": whole PCIe hosts configuration registers;
+>>>> +  "config": PCIe configuration space registers.
+>>>> +- msi-parent: Should be its_pcie which is an ITS receiving MSI interrupts.
+>>>> +- port-id: Should be 0, 1, 2 or 3.
+>>>
+>>> What is port-id for? Use of instance indexes need to have good reason.
+>>>
+>>> Rob
+>>
+>> There are four PCIe controllers in HiSilicon Hip05 SoC, port-id just indicates
+>> which one we use. And we will use port-id to locate related registers in driver.
+> 
+> Just having multiple instances is not a reason. So looking at the
+> driver, port-id is used to calculate register addresses for these registers:
+> 
+> #define PCIE_SUBCTRL_MODE_REG                           0x2800
+> #define PCIE_SUBCTRL_SYS_STATE4_REG                     0x6818
+> 
+> Is the base address of subctrl the same on all 4 ports? If so, you
 
-> -----Original Message-----
-> From: Wang Dongsheng-B40534
-> Sent: Wednesday, September 16, 2015 10:44 AM
-> To: Wood Scott-B07421; Tang Yuantian-B29983
-> Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
-> robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang Huan-B18965; Jin
-> Zhengxiong-R64188; Zhao Chenhui-B35336
-> Subject: RE: [PATCH v2 1/2] fsl: Add binding for RCPM
+Yes, same subctrl address for 4 ports. Will use syscon to access subctrl
+registers in next version.
+
+Many thanks for pointing this,
+Zhou
+
+> should not have overlapping resources in the DT. Either split these 2
+> registers into 2 reg regions (for each register) or use syscon to
+> provide access to the region.
+> 
+> Rob
 > 
 > 
+> .
 > 
-> > -----Original Message-----
-> > From: Wood Scott-B07421
-> > Sent: Wednesday, September 16, 2015 10:38 AM
-> > To: Tang Yuantian-B29983
-> > Cc: Wang Dongsheng-B40534; devicetree at vger.kernel.org; linuxppc-
-> > dev at lists.ozlabs.org; robh+dt at kernel.org;
-> > linux-arm-kernel at lists.infradead.org;
-> > Wang Huan-B18965; Jin Zhengxiong-R64188; Zhao Chenhui-B35336
-> > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
-> >
-> > On Tue, 2015-09-15 at 21:35 -0500, Tang Yuantian-B29983 wrote:
-> > >
-> > > > -----Original Message-----
-> > > > From: Wood Scott-B07421
-> > > > Sent: Wednesday, September 16, 2015 10:32 AM
-> > > > To: Wang Dongsheng-B40534 <Dongsheng.Wang@freescale.com>
-> > > > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
-> > > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang
-> > > > robh+Huan-
-> > > > B18965 <alison.wang@freescale.com>; Jin Zhengxiong-R64188
-> > > > <Jason.Jin@freescale.com>; Zhao Chenhui-B35336
-> > > > <chenhui.zhao@freescale.com>; Tang Yuantian-B29983
-> > > > <Yuantian.Tang@freescale.com>
-> > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
-> > > >
-> > > > On Tue, 2015-09-15 at 21:30 -0500, Wang Dongsheng-B40534 wrote:
-> > > > > Hi Scott,
-> > > > >
-> > > > > > -----Original Message-----
-> > > > > > From: Wood Scott-B07421
-> > > > > > Sent: Wednesday, September 16, 2015 10:19 AM
-> > > > > > To: Wang Dongsheng-B40534
-> > > > > > Cc: devicetree at vger.kernel.org; linuxppc-dev at lists.ozlabs.org;
-> > > > > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org; Wang
-> > > > > > robh+Huan-
-> > > > > > B18965; Jin
-> > > > > > Zhengxiong-R64188; Zhao Chenhui-B35336; Tang Yuantian-B29983
-> > > > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
-> > > > > >
-> > > > > > On Tue, 2015-09-15 at 21:15 -0500, Wang Dongsheng-B40534 wrote:
-> > > > > > > Hi Scott,
-> > > > > > >
-> > > > > > > > -----Original Message-----
-> > > > > > > > From: Wood Scott-B07421
-> > > > > > > > Sent: Wednesday, September 16, 2015 7:57 AM
-> > > > > > > > To: Wang Dongsheng-B40534
-> > > > > > > > Cc: devicetree at vger.kernel.org;
-> > > > > > > > linuxppc-dev at lists.ozlabs.org;
-> > > > > > > > robh+dt at kernel.org; linux-arm-kernel at lists.infradead.org;
-> > > > > > > > robh+Wang
-> > > > > > > > robh+Huan-
-> > > > > > > > B18965; Jin
-> > > > > > > > Zhengxiong-R64188; Zhao Chenhui-B35336; Tang
-> > > > > > > > Yuantian-B29983
-> > > > > > > > Subject: Re: [PATCH v2 1/2] fsl: Add binding for RCPM
-> > > > > > > >
-> > > > > > > > On Tue, 2015-09-15 at 16:55 +0800, Dongsheng Wang wrote:
-> > > > > > > > > +* Freescale RCPM Wakeup Source Device Tree Bindings
-> > > > > > > > > +-------------------------------------------
-> > > > > > > > > +Required rcpm-wakeup property should be added to a
-> > > > > > > > > +device node if the
-> > > > > > > > > device
-> > > > > > > > > +can be used as a wakeup source.
-> > > > > > > > > +
-> > > > > > > > > +  - rcpm-wakeup: The value of the property consists of 3 cells.
-> > > > > > > > > + The
-> > > > > > > > > first
-> > > > > > > > > cell
-> > > > > > > > > +     is a pointer to the rcpm node, the second cell is
-> > > > > > > > > + the bit mask
-> > > > > > > > > that
-> > > > > > > > > +     should be set in IPPDEXPCR0, and the last cell is
-> > > > > > > > > + for
-> > > > > > > > > IPPDEXPCR1.
-> > > > > > > > > +     Note: If the platform has no IPPDEXPCR1 register,
-> > > > > > > > > + put a zero
-> > > > > > > > > here.
-> > > > > > > >
-> > > > > > > > What if a future platform has more than two of these registers?
-> > > > > > >
-> > > > > > > Those registers are only used for wakeup device, we have a
-> > > > > > > lot of available bit for feature. For example, In LS1021a
-> > > > > > > platform only 7bits has used in the registers, and 57bits is
-> reserved.
-> > > > > >
-> > > > > > Still, it'd be better to for the rcpm node to advertise the
-> > > > > > number of cells it expects.
-> > > > >
-> > > > > For the foreseeable future it should be enough to use, even if
-> > > > > not enough to use in the future at that time we can update the binding.
-> > > >
-> > > > That's the whole point.  Device tree is stable ABI.  Updating it
-> > > > later to not be fixed to two cells would be a lot harder than
-> > > > getting it right from the beginning.  Putting the number of cells
-> > > > in the phandle target is a standard device tree idiom.
-> > > >
-> > > I agree with you. But what's the point a SOC has more than 64 wakeup source?
-> >
-> > I don't know.  Hardware people do strange things sometimes.  They
-> > might not want to reuse bits they once used for something on some
-> > other chip, or they might have some encoding scheme in mind that
-> > results in the bits not being packed as tightly as possible, or there
-> > may be some big array of similar devices...
-> >
-> > What's the point of skipping this part of the phandle-plus-arguments idiom?
-> 
-> Fine, I will add a property in rcpm node to describe the number of register.
-> 
-
-How about the following modify? If okay for you I will fix in next version.
-
-Required properites:
-   - reg : Offset and length of the register set of RCPM block.
-+  - fsl,rcpm-wakeup-cell-num : The number of cell in rcpm-wakeup property.
-
-        rcpm: global-utilities at e2000 {
-                compatible = "fsl,t4240-rcpm", "fsl,qoriq-rcpm-2.0";
-                reg = <0xe2000 0x1000>;
-+               fsl,rcpm-wakeup-cell-num = <2>;
-        };
-
-Regards,
--Dongsheng
