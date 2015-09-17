@@ -1,108 +1,172 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Thu, 17 Sep 2015 19:07:06 +0800
-Subject: set rockchip-specific uboot bootmode flags on reboot
-In-Reply-To: <CAPnjgZ0n7aNY7FRnoDYUBEnQAtUO1BWKs6DDzaMQyHsg1kQ1Jg@mail.gmail.com>
-References: <1441716187-29446-1-git-send-email-andy.yan@rock-chips.com>
- <9364768.6AeuYh3EEP@diego>
- <CAPnjgZ0n7aNY7FRnoDYUBEnQAtUO1BWKs6DDzaMQyHsg1kQ1Jg@mail.gmail.com>
-Message-ID: <55FA9EDA.8010308@rock-chips.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Thu, 17 Sep 2015 16:43:57 +0530
+Subject: [PATCH RFC 2/8] drm: hisilicon: Add new DRM driver for hisilicon
+ Soc
+In-Reply-To: <1442309834-21420-3-git-send-email-kong.kongxinwei@hisilicon.com>
+References: <1442309834-21420-1-git-send-email-kong.kongxinwei@hisilicon.com>
+ <1442309834-21420-3-git-send-email-kong.kongxinwei@hisilicon.com>
+Message-ID: <55FAA075.4090200@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko:
+Hi,
 
+On 9/15/2015 3:07 PM, Xinwei Kong wrote:
+> This patch creates this driver itself and register all the sub-components
+> which is from DTS inode, this driver uses components framework mechanism
+> to bind all the sub-components.
+>
+> This patch also introduces a memory manager for hisilison drm. As cma
+> framebuffer helpers can no more be used.
+>
+> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> Signed-off-by: Andy Green <andy.green@linaro.org>
+> Signed-off-by: Jiwen Qi <qijiwen@hisilicon.com>
+> Signed-off-by: Yu Gong <gongyu@hisilicon.com>
+> ---
+>   arch/arm64/configs/defconfig             |   5 +
+>   drivers/gpu/drm/Kconfig                  |   2 +
+>   drivers/gpu/drm/Makefile                 |   1 +
+>   drivers/gpu/drm/hisilicon/Kconfig        |   9 ++
+>   drivers/gpu/drm/hisilicon/Makefile       |   7 ++
+>   drivers/gpu/drm/hisilicon/hisi_ade.c     | 166 +++++++++++++++++++++++++
+>   drivers/gpu/drm/hisilicon/hisi_drm_drv.c | 206 +++++++++++++++++++++++++++++++
+>   drivers/gpu/drm/hisilicon/hisi_drm_dsi.c | 131 ++++++++++++++++++++
+>   drivers/gpu/drm/hisilicon/hisi_drm_fb.c  | 156 +++++++++++++++++++++++
+>   drivers/gpu/drm/hisilicon/hisi_drm_fb.h  |  26 ++++
+>   10 files changed, 709 insertions(+)
+>   create mode 100644 drivers/gpu/drm/hisilicon/Kconfig
+>   create mode 100644 drivers/gpu/drm/hisilicon/Makefile
+>   create mode 100644 drivers/gpu/drm/hisilicon/hisi_ade.c
+>   create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_drv.c
+>   create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_dsi.c
+>   create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_fb.c
+>   create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_fb.h
+>
 
-On 2015?09?10? 02:05, Simon Glass wrote:
-> Hi,
->
-> On 8 September 2015 at 16:46, Heiko St?bner <heiko@sntech.de> wrote:
->> Hi Andy,
->>
->> Am Dienstag, 8. September 2015, 20:43:07 schrieb Andy Yan:
->>> rockchip platform have a protocol to pass the the kernel
->>> reboot mode to bootloader by some special registers when
->>> system reboot.By this way the bootloader can take different
->>> action according to the different kernel reboot mode, for
->>> example, command "reboot loader" will reboot the board to
->>> rockusb mode, this is a very convenient way to get the board
->>> to download mode.
->>>
->>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
->> [...]
->>
->>> @@ -0,0 +1,22 @@
->>> +#ifndef __MACH_ROCKCHIP_LOADER_H
->>> +#define __MACH_ROCKCHIP_LOADER_H
->>> +
->>> +/*high 24 bits is tag, low 8 bits is type*/
->>> +#define SYS_LOADER_REBOOT_FLAG   0x5242C300
->>> +
->>> +enum {
->>> +     BOOT_NORMAL = 0, /* normal boot */
->>> +     BOOT_LOADER,     /* enter loader rockusb mode */
->>> +     BOOT_MASKROM,    /* enter maskrom rockusb mode (not support now) */
->>> +     BOOT_RECOVER,    /* enter recover */
->>> +     BOOT_NORECOVER,  /* do not enter recover */
->>> +     BOOT_SECONDOS,   /* boot second OS (not support now)*/
->>> +     BOOT_WIPEDATA,   /* enter recover and wipe data. */
->>> +     BOOT_WIPEALL,    /* enter recover and wipe all data. */
->>> +     BOOT_CHECKIMG,   /* check firmware img with backup part*/
->>> +     BOOT_FASTBOOT,   /* enter fast boot mode */
->>> +     BOOT_SECUREBOOT_DISABLE,
->>> +     BOOT_CHARGING,   /* enter charge mode */
->>> +     BOOT_MAX         /* MAX VALID BOOT TYPE.*/
->>> +};
->>> +#endif
->> These flags rely on code in the bootloader to actually handle the target
->> action. Nowadays this is uboot, but still a rockchip-specific fork. And we're
->> actively moving away from that, with the recent rk3288 addition to mainline
->> uboot.
->>
->> So unless you convince uboot people that the _underlying special
->> functionality_ behind these flags should be part of uboot, I don't think this
->> is going to fly.
->>
->>
->> In a way this is similar to gpu kernel code talking to proprietary userspace
->> libs - these are also not eligible for the kernel. (meaning stuff like the
->> mali kernel driver not being allowed).
-> I don't want to comment on what Linux does or does not want. But I can
-> see this sort of feature being useful for devs at least. So long as it
-> is defined in a way that is not Rockchip-specific (and the above enum
-> looks pretty reasonable on that front, I think it makes sense.
->
-> Of course it's a bit odd to target a downstream U-Boot with a Linux
-> feature. But hopefully Rockchip's U-Boot support and development will
-> move to mainline with time.
-    Is there any chance for this patch to be landed?
-    As Simon says, it is useful for development. And
-    he is upstreaming Rockchip U-boot.
->> [...]
->>
->>> +static int rockchip_reboot_notify(struct notifier_block *this,
->>> +                               unsigned long mode, void *cmd)
->>> +{
->>> +     u32 flag;
->>> +
->>> +     rockchip_get_reboot_flag(cmd, &flag);
->>> +     regmap_write(regmap, flag_reg, flag);
->>> +
->>> +     return NOTIFY_DONE;
->>> +}
->>> +
->>> +static struct notifier_block rockchip_reboot_handler = {
->>> +     .notifier_call = rockchip_reboot_notify,
->>> +     .priority = 150,
->>> +};
->> the restart handlers are meant to really only restart the system, not to
->> execute some actions before the restart happens.
->>
->> See https://lkml.org/lkml/2015/6/3/707 for a similar case.
->>
->>
->> Heiko
-> Regards,
-> Simon
->
->
->
+<snip>
+
+> diff --git a/drivers/gpu/drm/hisilicon/hisi_drm_dsi.c b/drivers/gpu/drm/hisilicon/hisi_drm_dsi.c
+> new file mode 100644
+> index 0000000..a8dbaad
+> --- /dev/null
+> +++ b/drivers/gpu/drm/hisilicon/hisi_drm_dsi.c
+> @@ -0,0 +1,131 @@
+> +/*
+> + * Hisilicon Terminal SoCs drm driver
+> + *
+> + * Copyright (c) 2014-2015 Hisilicon Limited.
+> + * Author: Xinwei Kong <kong.kongxinwei@hisilicon.com> for hisilicon
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/component.h>
+> +
+> +#include <drm/drm_mipi_dsi.h>
+> +#include <drm/drm_encoder_slave.h>
+> +
+> +#define DSI_24BITS_1               (5)
+> +
+> +struct hisi_dsi {
+> +	u32 lanes;
+> +	u32 format;
+> +	u32 date_enable_pol;
+> +	u32 mode_flags;
+> +	u8 color_mode;
+> +	void *ctx;
+> +};
+> +
+> +struct hisi_dsi_context {
+> +	struct hisi_dsi dsi;
+> +	struct clk *dsi_cfg_clk;
+> +	struct drm_device *dev;
+> +
+> +	void __iomem *base;
+> +	int nominal_pixel_clk_kHz;
+> +};
+> +
+> +static int hisi_dsi_bind(struct device *dev, struct device *master,
+> +			 void *data)
+> +{
+> +	int ret = 0;
+> +
+> +	return ret;
+> +}
+> +
+> +static void hisi_dsi_unbind(struct device *dev, struct device *master,
+> +			    void *data)
+> +{
+> +	/* do nothing */
+> +}
+> +
+> +static const struct component_ops hisi_dsi_ops = {
+> +	.bind	= hisi_dsi_bind,
+> +	.unbind	= hisi_dsi_unbind,
+> +};
+> +
+> +static int hisi_dsi_probe(struct platform_device *pdev)
+> +{
+> +	struct hisi_dsi_context *ctx;
+> +	struct hisi_dsi *dsi;
+> +	struct resource *res;
+> +	struct device_node *slave_node;
+> +	struct device_node *np = pdev->dev.of_node;
+> +	int ret;
+> +
+> +	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
+> +	if (!ctx) {
+> +		DRM_ERROR("failed to allocate hisi dsi context.\n");
+> +		ret = -ENOMEM;
+> +	}
+> +
+> +	ctx->dsi_cfg_clk = devm_clk_get(&pdev->dev, "pclk_dsi");
+> +	if (IS_ERR(ctx->dsi_cfg_clk)) {
+> +		DRM_ERROR("failed to parse the dsi config clock\n");
+> +		ret = PTR_ERR(ctx->dsi_cfg_clk);
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	ctx->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(ctx->base)) {
+> +		DRM_ERROR("failed to remap dsi io region\n");
+> +		ret = PTR_ERR(ctx->base);
+> +	}
+> +
+> +	slave_node = of_parse_phandle(np, "encoder-slave", 0);
+> +	if (!slave_node) {
+> +		DRM_ERROR("failed to parse the slave encoder node\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	dsi = &ctx->dsi;
+> +	dsi->ctx = ctx;
+> +	dsi->lanes = 3;
+> +	dsi->date_enable_pol = 0;
+> +	dsi->color_mode = DSI_24BITS_1;
+> +	dsi->format = MIPI_DSI_FMT_RGB888;
+> +	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
+> +
+> +	return component_add(&pdev->dev, &hisi_dsi_ops);
+> +}
+> +
+
+The DSI driver should register the dsi host via 
+mipi_dsi_host_register(). That's the standard way of establishing a
+connection between a host and dsi peripherals.
+
+The dsi_context approach isn't something that will work very well.
+With this approach, you're forced to set DSI parameters like number of
+lanes, format, mode flags etc in the host driver, rather than receiving
+them from the connected device.
+
+Archit
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
