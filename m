@@ -1,40 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 16 Sep 2015 17:02:04 -0700
-Subject: [PATCH] ARM: OMAP2+: AM43XX: Enable autoidle for clks in
- am43xx_init_late
-In-Reply-To: <1442346454-5305-1-git-send-email-d-gerlach@ti.com>
-References: <1442346454-5305-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <20150917000203.GD4215@atomide.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 17 Sep 2015 02:34:26 +0200
+Subject: [PATCH v3 0/5] ACPI: Provide better MADT subtable sanity checks
+In-Reply-To: <55F9988D.5080002@redhat.com>
+References: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
+ <55F997C1.20606@linaro.org> <55F9988D.5080002@redhat.com>
+Message-ID: <2360913.mWVNIccye0@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [150915 12:51]:
-> Add omap2_clk_enable_autoidle_all to am43xx_init_late otherwise the call
-> to omap2_clk_disable_autoidle_all in am43xx_init_early may cause some
-> clocks to always stay active and prevent low power mode transitions.
+On Wednesday, September 16, 2015 10:27:57 AM Al Stone wrote:
+> On 09/16/2015 10:24 AM, Al Stone wrote:
+> > On 09/15/2015 08:44 PM, Rafael J. Wysocki wrote:
+> >> On Tuesday, September 15, 2015 03:13:12 PM Al Stone wrote:
+> >>> On 09/09/2015 03:09 PM, Al Stone wrote:
+> >>>> Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
+> >>>> check on the various subtables that are defined for the MADT.  The check
+> >>>> compares the size of the subtable data structure as defined by ACPICA to
+> >>>> the length entry in the subtable.  If they are not the same, the assumption
+> >>>> is that the subtable is incorrect.
+> >>>>
 > 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-
-Applying into omap-for-v4.3/fixes thanks.
-
-Tony
-
-> ---
->  arch/arm/mach-omap2/io.c | 1 +
->  1 file changed, 1 insertion(+)
+> [snip...]
 > 
-> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-> index 980c937..3eaeaca 100644
-> --- a/arch/arm/mach-omap2/io.c
-> +++ b/arch/arm/mach-omap2/io.c
-> @@ -676,6 +676,7 @@ void __init am43xx_init_early(void)
->  void __init am43xx_init_late(void)
->  {
->  	omap_common_late_init();
-> +	omap2_clk_enable_autoidle_all();
->  }
->  #endif
->  
-> -- 
-> 2.4.6
+> >> I'm going to apply this series if people have no problems with it.  I do think
+> >> it is slightly overkill, but then as long as it works ...
+> >>
+> >> Thanks,
+> >> Rafael
+> >>
 > 
+> Would you prefer I send out the updated version with Sudeep's fix to apply
+> instead of this version?
+
+Yes, I would.
+
+> Or have you picked that up already?
+
+No, I haven't.
+
+> Easily updated and sent out, if it'll make your life simpler....
+
+Yes, please.
+
+Thanks,
+Rafael
