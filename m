@@ -1,66 +1,80 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 17 Sep 2015 12:57:53 +0200
-Subject: [PATCH 1/3] clocksource: rockchip: Make the driver more
- readability and compatible
-In-Reply-To: <alpine.DEB.2.11.1509171217080.3951@nanos>
-References: <1442476272-31723-1-git-send-email-wxt@rock-chips.com>
- <1442476272-31723-2-git-send-email-wxt@rock-chips.com>
- <55FA83D5.9010504@linaro.org> <55FA87AA.4040807@gmail.com>
- <55FA9099.7000903@linaro.org> <alpine.DEB.2.11.1509171217080.3951@nanos>
-Message-ID: <55FA9CB1.8010402@linaro.org>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Thu, 17 Sep 2015 12:00:17 +0100
+Subject: [PATCH 2/3] devicetree: bindings: use input-event-codes.h for
+ evdev codes
+In-Reply-To: <1442414443.18856.110.camel@hellion.org.uk>
+References: <1442064372-3030-1-git-send-email-hdegoede@redhat.com>
+ <1442064372-3030-3-git-send-email-hdegoede@redhat.com>
+ <1442316292.3549.386.camel@hellion.org.uk> <55F97C3D.5020702@redhat.com>
+ <1442414443.18856.110.camel@hellion.org.uk>
+Message-ID: <1442487617.18856.177.camel@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2015 12:19 PM, Thomas Gleixner wrote:
-> On Thu, 17 Sep 2015, Daniel Lezcano wrote:
->> On 09/17/2015 11:28 AM, Caesar Wang wrote:
->>>> I think the NO_IRQ definition is missing for ARM64.
->>>
->>> Yep, Maybe better to compatible if we don't use the 'NO_IRQ',
->>
->> Hmm, after digging into drivers/of/irq.c and kernel/irq/irqdomain.c
->>
->> when there is an error it returns zero. So NO_IRQ and -1 are not correct and
->> on the other side zero can be a valid irq. That sounds a little bit fuzzy to
->> me.
->
-> IRQ0 is invalid for historical reasons. End of story.
+On Wed, 2015-09-16 at 15:40 +0100, Ian Campbell wrote:
+> > The intend of the symlink was that the conversion script would copy the target,
+> > rather then follow the symlink. This sorta assumes that there are will be not
+> > symlinks under dt-bindings which link to files inside dt-bindings and thus
+> > should be preserved as symlinks.
+> > 
+> > If the copy done in the script will follow the symlink then nothing should
+> > really change for the split DT repo.
+> 
+> Interesting idea. I'll see if I can make the conversion routine do that.
+> 
+> TBH I have a horrid feeling that this is going to be beyond git rewrite
+> -branch, at least in the mode it is used in today.
 
-Hi Thomas,
+It seems that it is possible, after a fashion.
 
-there is one thing I don't understand.
+The downside is that either _all_ symlinks (which end up in the output) get
+flattened or some sort of black/whitelisting is needed in the conversion
+scripts themselves (potentially leading to issues or discontinuities) as
+new stuff arrives).
 
-If the IRQ0 is invalid, irq_of_parse_and_map returning zero means an 
-error and from what you said it is ok.
+It isn't possible AFAICT tell if a symlink points to something outside of
+the converted set of paths and adjust, at least not without an unreasonable
+amount of overhead on each commit during the rewrite.
 
-But I see the NO_IRQ on ARM is (-1) and the drivers are checking with 
-NO_IRQ the return code of irq_of_parse_and_map. So if there is an error, 
-that won't be detected.
+Since this new file would be the first symlink in the converted repo I took
+the former approach in my lash up to try it out, which was essentially to
+insert the below script into the middle of the "git ls-files | rewrite
+-paths.sed" pipeline which is called by git filter-branch --index-filter.
+Not pretty but it does seem to work.
 
-For this specific use case above, shall irq_of_parse_and_map returns 
-NO_IRQ or the caller checks against zero ?
+I want to avoid switching to --tree-filter if at all possible because it
+checks out the tree and is therefore a _little_ I/O intensive ;-)
 
-Beside that, some drivers are internally defining NO_IRQ:
-drivers/scsi/NCR5380.h
-drivers/ata/sata_dwc_460ex.c
-drivers/input/touchscreen/ucb1400_ts.c
-drivers/mmc/host/of_mmc_spi.c
-drivers/rtc/rtc-m48t59.c
-drivers/scsi/NCR5380.h
+Ian.
 
-I don't know the historical changes and the subtleties of the irq 
-subsystem (I guess it is considerably complicated by each architecture 
-specific bits and the drivers supported on different architectures)
+#!/bin/bash
 
-If you have the time, can you give some clarification ?
+set -e
 
-Thanks
-
-   -- Daniel
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+while read mode object stage path ; do
+    case "$mode" in
+	120000)
+	    # symbolic link
+	    deref=$(echo $GIT_COMMIT:$path | git cat-file --batch-check='deref-ok %(objectname)' --follow-symlinks)
+	    case "$deref" in
+		deref-ok*)
+		    echo -e "100644 ${deref#deref-ok } $stage\t$path"
+		    ;;
+		dangling*) # skip
+		    ;;
+		*) # the rest, missing etc
+		    echo >&2 "Failed to parse symlink $GIT_COMMIT:$path $deref"
+		    exit 1
+		    ;;
+	    esac
+	    ;;
+	100*)
+	    # Regular file, just pass through
+	    echo -e "$mode $object $stage\t$path"
+	    ;;
+	*)
+	    echo >&2 "Unhandled ls-tree entry: $line"
+	    exit 1
+	    ;;
+    esac
+done
