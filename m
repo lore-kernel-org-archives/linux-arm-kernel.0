@@ -1,46 +1,62 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 17 Sep 2015 02:34:26 +0200
-Subject: [PATCH v3 0/5] ACPI: Provide better MADT subtable sanity checks
-In-Reply-To: <55F9988D.5080002@redhat.com>
-References: <1441832991-28200-1-git-send-email-al.stone@linaro.org>
- <55F997C1.20606@linaro.org> <55F9988D.5080002@redhat.com>
-Message-ID: <2360913.mWVNIccye0@vostro.rjw.lan>
+From: dhdang@apm.com (Duc Dang)
+Date: Wed, 16 Sep 2015 17:31:40 -0700
+Subject: [PATCH 1/1] PCI/MSI: X-Gene: Remove msi_controller assignment in
+ X-Gene PCIe driver
+Message-ID: <1442449900-30842-1-git-send-email-dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 16, 2015 10:27:57 AM Al Stone wrote:
-> On 09/16/2015 10:24 AM, Al Stone wrote:
-> > On 09/15/2015 08:44 PM, Rafael J. Wysocki wrote:
-> >> On Tuesday, September 15, 2015 03:13:12 PM Al Stone wrote:
-> >>> On 09/09/2015 03:09 PM, Al Stone wrote:
-> >>>> Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
-> >>>> check on the various subtables that are defined for the MADT.  The check
-> >>>> compares the size of the subtable data structure as defined by ACPICA to
-> >>>> the length entry in the subtable.  If they are not the same, the assumption
-> >>>> is that the subtable is incorrect.
-> >>>>
-> 
-> [snip...]
-> 
-> >> I'm going to apply this series if people have no problems with it.  I do think
-> >> it is slightly overkill, but then as long as it works ...
-> >>
-> >> Thanks,
-> >> Rafael
-> >>
-> 
-> Would you prefer I send out the updated version with Sudeep's fix to apply
-> instead of this version?
+With commit 8d63bc7beaee ("PCI/MSI: pci-xgene-msi: Get rid of
+struct msi_controller"), it is no longer required to assign
+msi_controller for X-Gene PCIe host bridge to support MSI. This
+patch removes this unnecessary code and also helps avoid a warning
+message ("failed to enable MSI") during boot.
 
-Yes, I would.
+Signed-off-by: Duc Dang <dhdang@apm.com>
+Cc: Tanmay Inamdar <tinamdar@apm.com>
+---
+ drivers/pci/host/pci-xgene.c | 22 ----------------------
+ 1 file changed, 22 deletions(-)
 
-> Or have you picked that up already?
-
-No, I haven't.
-
-> Easily updated and sent out, if it'll make your life simpler....
-
-Yes, please.
-
-Thanks,
-Rafael
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index 0236ab9..ae00ce2 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -509,24 +509,6 @@ static int xgene_pcie_setup(struct xgene_pcie_port *port,
+ 	return 0;
+ }
+ 
+-static int xgene_pcie_msi_enable(struct pci_bus *bus)
+-{
+-	struct device_node *msi_node;
+-
+-	msi_node = of_parse_phandle(bus->dev.of_node,
+-					"msi-parent", 0);
+-	if (!msi_node)
+-		return -ENODEV;
+-
+-	bus->msi = of_pci_find_msi_chip_by_node(msi_node);
+-	if (!bus->msi)
+-		return -ENODEV;
+-
+-	of_node_put(msi_node);
+-	bus->msi->dev = &bus->dev;
+-	return 0;
+-}
+-
+ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
+ {
+ 	struct device_node *dn = pdev->dev.of_node;
+@@ -567,10 +549,6 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
+ 	if (!bus)
+ 		return -ENOMEM;
+ 
+-	if (IS_ENABLED(CONFIG_PCI_MSI))
+-		if (xgene_pcie_msi_enable(bus))
+-			dev_info(port->dev, "failed to enable MSI\n");
+-
+ 	pci_scan_child_bus(bus);
+ 	pci_assign_unassigned_bus_resources(bus);
+ 	pci_bus_add_devices(bus);
+-- 
+1.9.1
