@@ -1,124 +1,38 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 17 Sep 2015 14:48:39 +0200
-Subject: [PATCH RESEND] ARM: dts: Move display-timings node from fimd to dp
-Message-ID: <1442494120-463-1-git-send-email-tomeu.vizoso@collabora.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Sep 2015 13:50:11 +0100
+Subject: [PATCH 02/10] arm64: proc: de-scope TLBI operation during cold boot
+In-Reply-To: <1442494219-6133-1-git-send-email-will.deacon@arm.com>
+References: <1442494219-6133-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1442494219-6133-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Paul <seanpaul@chromium.org>
+When cold-booting a CPU, we must invalidate any junk entries from the
+local TLB prior to enabling the MMU. This doesn't require broadcasting
+within the inner-shareable domain, so de-scope the operation to apply
+only to the local CPU.
 
-This patch moves the display-timings node from fimd to dp to reflect the
-device tree bindings change.
-
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
-[tomeu.vizoso at collabora.com: Rebased]
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
+ arch/arm64/mm/proc.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Hi,
-
-looks like a long time ago the bindings were changed and the DTs for
-these boards weren't updated.
-
-I have retaken Sean's forgotten patch and rebased it, but I have only
-tested on an Arndale that exynos-drm doesn't complain about missing
-timings.
-
-Regards,
-
-Tomeu
----
- arch/arm/boot/dts/exynos5250-arndale.dts  |  8 ++++----
- arch/arm/boot/dts/exynos5250-smdk5250.dts | 16 ++++++++--------
- arch/arm/boot/dts/exynos5420-smdk5420.dts |  7 ++++---
- 3 files changed, 16 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index db3f65f3eb45..c000532c1444 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -129,10 +129,6 @@
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <4>;
--};
--
--&fimd {
--	status = "okay";
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index e4ee7bd8830a..bbde13d77da5 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -146,8 +146,8 @@ ENDPROC(cpu_do_switch_mm)
+  *	value of the SCTLR_EL1 register.
+  */
+ ENTRY(__cpu_setup)
+-	tlbi	vmalle1is			// invalidate I + D TLBs
+-	dsb	ish
++	tlbi	vmalle1				// Invalidate local TLB
++	dsb	nsh
  
- 	display-timings {
- 		native-mode = <&timing0>;
-@@ -152,6 +148,10 @@
- 	};
- };
- 
-+&fimd {
-+	status = "okay";
-+};
-+
- &hdmi {
- 	hpd-gpio = <&gpx3 7 GPIO_ACTIVE_LOW>;
- 	vdd_osc-supply = <&ldo10_reg>;
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index c625e71217aa..0f5dcd418af8 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -89,14 +89,6 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&dp_hpd>;
- 	status = "okay";
--};
--
--&ehci {
--	samsung,vbus-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
--};
--
--&fimd {
--	status = "okay";
- 
- 	display-timings {
- 		native-mode = <&timing0>;
-@@ -116,6 +108,14 @@
- 	};
- };
- 
-+&ehci {
-+	samsung,vbus-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&fimd {
-+	status = "okay";
-+};
-+
- &hdmi {
- 	hpd-gpio = <&gpx3 7 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index 98871f972c8a..7520d52f4e22 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -98,10 +98,7 @@
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <4>;
- 	status = "okay";
--};
- 
--&fimd {
--	status = "okay";
- 	display-timings {
- 		native-mode = <&timing0>;
- 		timing0: timing at 0 {
-@@ -118,6 +115,10 @@
- 	};
- };
- 
-+&fimd {
-+	status = "okay";
-+};
-+
- &hdmi {
- 	status = "okay";
- 	hpd-gpio = <&gpx3 7 0>;
+ 	mov	x0, #3 << 20
+ 	msr	cpacr_el1, x0			// Enable FP/ASIMD
 -- 
-2.4.3
+2.1.4
