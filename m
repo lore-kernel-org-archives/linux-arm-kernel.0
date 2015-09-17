@@ -1,13 +1,13 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 17 Sep 2015 14:57:00 +0200
-Subject: [PATCH v5 06/23] gpio: Probe pinctrl devices on demand
+Date: Thu, 17 Sep 2015 14:56:59 +0200
+Subject: [PATCH v5 05/23] gpio: Probe GPIO drivers on demand
 In-Reply-To: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1442494637-3674-7-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1442494637-3674-6-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When looking up a pin controller through its OF node, probe it if it
+When looking up a gpiochip through its firmware node, probe it if it
 hasn't already.
 
 The goal is to reduce deferred probes to a minimum, as it makes it very
@@ -22,21 +22,29 @@ Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- drivers/gpio/gpiolib-of.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/gpio/gpiolib-of.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index 9a439dab7a87..05da9a56608d 100644
+index fa6e3c8823d6..9a439dab7a87 100644
 --- a/drivers/gpio/gpiolib-of.c
 +++ b/drivers/gpio/gpiolib-of.c
-@@ -359,6 +359,8 @@ static int of_gpiochip_add_pin_range(struct gpio_chip *chip)
- 		if (ret)
- 			break;
+@@ -19,6 +19,7 @@
+ #include <linux/gpio/consumer.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/of_gpio.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/slab.h>
+@@ -95,6 +96,8 @@ struct gpio_desc *of_get_named_gpiod_flags(struct device_node *np,
+ 		return ERR_PTR(ret);
+ 	}
  
-+		of_device_probe(pinspec.np);
++	of_device_probe(gg_data.gpiospec.np);
 +
- 		pctldev = of_pinctrl_get(pinspec.np);
- 		if (!pctldev)
- 			return -EPROBE_DEFER;
+ 	gpiochip_find(&gg_data, of_gpiochip_find_and_xlate);
+ 
+ 	of_node_put(gg_data.gpiospec.np);
 -- 
 2.4.3
