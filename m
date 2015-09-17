@@ -1,143 +1,88 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 17 Sep 2015 19:43:40 +0800
-Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
- parameters
-In-Reply-To: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <55FAA76C.4070607@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Sep 2015 13:11:24 +0100
+Subject: [PATCH 2/3] arm64: KVM: Disable virtual timer even if the guest
+ is not using it
+In-Reply-To: <20150917111735.GA19365@cbox>
+References: <1442419087-24648-1-git-send-email-marc.zyngier@arm.com>
+ <1442419087-24648-3-git-send-email-marc.zyngier@arm.com>
+ <20150917111735.GA19365@cbox>
+Message-ID: <55FAADEC.2020803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 17/09/15 12:17, Christoffer Dall wrote:
+> On Wed, Sep 16, 2015 at 04:58:06PM +0100, Marc Zyngier wrote:
+>> When running a guest with the architected timer disabled (with QEMU and
+>> the kernel_irqchip=off option, for example), it is important to make
+>> sure the timer gets turned off. Otherwise, the guest may try to
+>> enable it anyway, leading to a screaming HW interrupt.
+>>
+>> The fix is to unconditionally turn off the virtual timer on guest
+>> exit.
+>>
+>> Cc: stable at vger.kernel.org
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp.S | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>> index 6addf97..38f5434 100644
+>> --- a/arch/arm64/kvm/hyp.S
+>> +++ b/arch/arm64/kvm/hyp.S
+>> @@ -570,8 +570,6 @@ alternative_endif
+> 
+> The context confuses me; did you happen to base this on your VHE
+> patches?
 
->From the comments on this patch, IIUC, we don't object to the change
-brought by this patch. What we didn't reach an agreement is how to
-support runtime service for Dom0. Right? If so, I think this patch
-doesn't conflict with adding support for runtime service in the future.
-So could we move this patch forward? Then I could continue working on
-adding ARM ACPI support on Xen.
+No, that's on top of 4.3-rc1, which happens to have this:
 
-Any comments?
+[...]
+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
+	bl	__restore_vgic_v2_state
+alternative_else
+	bl	__restore_vgic_v3_state
+alternative_endif
+.endm
 
-Thanks,
+.macro save_timer_state
+[...]
+
+and for some reason git doesn't use save_timer_state as the context anchor.
+
+>>  	mrs	x3, cntv_ctl_el0
+>>  	and	x3, x3, #3
+>>  	str	w3, [x0, #VCPU_TIMER_CNTV_CTL]
+>> -	bic	x3, x3, #1		// Clear Enable
+>> -	msr	cntv_ctl_el0, x3
+>>  
+>>  	isb
+>>  
+>> @@ -579,6 +577,8 @@ alternative_endif
+>>  	str	x3, [x0, #VCPU_TIMER_CNTV_CVAL]
+>>  
+>>  1:
+>> +	msr	cntv_ctl_el0, xzr
+>> +
+> 
+> We could have a comment here, but ok.
+
+I'll add something.
+
+>>  	// Allow physical timer/counter access for the host
+>>  	mrs	x2, cnthctl_el2
+>>  	orr	x2, x2, #3
+>> -- 
+>> 2.1.4
+>>
+> 
+> Otherwise:
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+
+Thanks!
+
+	M.
 -- 
-Shannon
-
-On 2015/9/10 16:41, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> These EFI stub parameters are used to internal communication between EFI
-> stub and Linux kernel and EFI stub creates these parameters. But for Xen
-> on ARM when booting with UEFI, Xen will create a minimal DT providing
-> these parameters for Dom0 and Dom0 is not only Linux kernel, but also
-> other OS (such as FreeBSD) which will be used in the future. So here
-> we plan to standardize the names by dropping the prefix "linux," and
-> make them common to other OS. Also this will not break the compatibility
-> since these parameters are used to internal communication between EFI
-> stub and kernel.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
-> Look at [1] for the discussion about this in Xen ML. The purpose of this
-> patch is to standardize the names to make Linux ARM kernel work on Xen
-> with UEFI. Also it hopes other OS(e.g. FreeBSD), which will be used as
-> Dom0 on Xen, could support this mechanism as well.
-> 
-> [1]http://lists.xenproject.org/archives/html/xen-devel/2015-08/msg02250.html
-> 
->  Documentation/arm/uefi.txt         | 10 +++++-----
->  drivers/firmware/efi/efi.c         | 10 +++++-----
->  drivers/firmware/efi/libstub/fdt.c | 10 +++++-----
->  3 files changed, 15 insertions(+), 15 deletions(-)
-> 
-> diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
-> index d60030a..8c83243 100644
-> --- a/Documentation/arm/uefi.txt
-> +++ b/Documentation/arm/uefi.txt
-> @@ -45,18 +45,18 @@ following parameters:
->  ________________________________________________________________________________
->  Name                      | Size   | Description
->  ================================================================================
-> -linux,uefi-system-table   | 64-bit | Physical address of the UEFI System Table.
-> +uefi-system-table         | 64-bit | Physical address of the UEFI System Table.
->  --------------------------------------------------------------------------------
-> -linux,uefi-mmap-start     | 64-bit | Physical address of the UEFI memory map,
-> +uefi-mmap-start           | 64-bit | Physical address of the UEFI memory map,
->                            |        | populated by the UEFI GetMemoryMap() call.
->  --------------------------------------------------------------------------------
-> -linux,uefi-mmap-size      | 32-bit | Size in bytes of the UEFI memory map
-> +uefi-mmap-size            | 32-bit | Size in bytes of the UEFI memory map
->                            |        | pointed to in previous entry.
->  --------------------------------------------------------------------------------
-> -linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
-> +uefi-mmap-desc-size       | 32-bit | Size in bytes of each entry in the UEFI
->                            |        | memory map.
->  --------------------------------------------------------------------------------
-> -linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
-> +uefi-mmap-desc-ver        | 32-bit | Version of the mmap descriptor format.
->  --------------------------------------------------------------------------------
->  linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
->  --------------------------------------------------------------------------------
-> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-> index d6144e3..3878715 100644
-> --- a/drivers/firmware/efi/efi.c
-> +++ b/drivers/firmware/efi/efi.c
-> @@ -481,11 +481,11 @@ static __initdata struct {
->  	int offset;
->  	int size;
->  } dt_params[] = {
-> -	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
-> -	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
-> -	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
-> -	UEFI_PARAM("MemMap Desc. Size", "linux,uefi-mmap-desc-size", desc_size),
-> -	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
-> +	UEFI_PARAM("System Table", "uefi-system-table", system_table),
-> +	UEFI_PARAM("MemMap Address", "uefi-mmap-start", mmap),
-> +	UEFI_PARAM("MemMap Size", "uefi-mmap-size", mmap_size),
-> +	UEFI_PARAM("MemMap Desc. Size", "uefi-mmap-desc-size", desc_size),
-> +	UEFI_PARAM("MemMap Desc. Version", "uefi-mmap-desc-ver", desc_ver)
->  };
->  
->  struct param_info {
-> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-> index ef5d764..e94589a 100644
-> --- a/drivers/firmware/efi/libstub/fdt.c
-> +++ b/drivers/firmware/efi/libstub/fdt.c
-> @@ -118,31 +118,31 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->  	/* Add FDT entries for EFI runtime services in chosen node. */
->  	node = fdt_subnode_offset(fdt, 0, "chosen");
->  	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)sys_table);
-> -	status = fdt_setprop(fdt, node, "linux,uefi-system-table",
-> +	status = fdt_setprop(fdt, node, "uefi-system-table",
->  			     &fdt_val64, sizeof(fdt_val64));
->  	if (status)
->  		goto fdt_set_fail;
->  
->  	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)memory_map);
-> -	status = fdt_setprop(fdt, node, "linux,uefi-mmap-start",
-> +	status = fdt_setprop(fdt, node, "uefi-mmap-start",
->  			     &fdt_val64,  sizeof(fdt_val64));
->  	if (status)
->  		goto fdt_set_fail;
->  
->  	fdt_val32 = cpu_to_fdt32(map_size);
-> -	status = fdt_setprop(fdt, node, "linux,uefi-mmap-size",
-> +	status = fdt_setprop(fdt, node, "uefi-mmap-size",
->  			     &fdt_val32,  sizeof(fdt_val32));
->  	if (status)
->  		goto fdt_set_fail;
->  
->  	fdt_val32 = cpu_to_fdt32(desc_size);
-> -	status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-size",
-> +	status = fdt_setprop(fdt, node, "uefi-mmap-desc-size",
->  			     &fdt_val32, sizeof(fdt_val32));
->  	if (status)
->  		goto fdt_set_fail;
->  
->  	fdt_val32 = cpu_to_fdt32(desc_ver);
-> -	status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-ver",
-> +	status = fdt_setprop(fdt, node, "uefi-mmap-desc-ver",
->  			     &fdt_val32, sizeof(fdt_val32));
->  	if (status)
->  		goto fdt_set_fail;
-> 
+Jazz is not dead. It just smells funny...
