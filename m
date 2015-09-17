@@ -1,47 +1,67 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Sep 2015 11:48:23 +0100
-Subject: [PATCH v2] arm64: Introduce IRQ stack
-In-Reply-To: <55FA9708.5070200@arm.com>
-References: <1442155337-7020-1-git-send-email-jungseoklee85@gmail.com>
- <20150916112520.GH28771@arm.com> <55FA9708.5070200@arm.com>
-Message-ID: <20150917104823.GM25444@e104818-lin.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 17 Sep 2015 12:51:07 +0200
+Subject: [RFC PATCH] arm64/efi: isolate EFI stub from the kernel proper
+In-Reply-To: <CAKv+Gu8j1APZkGnFhZArNAtoyYOokP2bgemYH5n7Pn8jQ1b1XA@mail.gmail.com>
+References: <1442311903-19213-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150915144629.GG31157@arm.com>
+ <CAKv+Gu8j1APZkGnFhZArNAtoyYOokP2bgemYH5n7Pn8jQ1b1XA@mail.gmail.com>
+Message-ID: <CAKv+Gu_KuOxA+EMSV0YcQR9rmO+R=-y9tivweNym3o+E4DrnHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 11:33:44AM +0100, James Morse wrote:
-> Hi Will,
-> 
-> On 16/09/15 12:25, Will Deacon wrote:
-> > On Sun, Sep 13, 2015 at 03:42:17PM +0100, Jungseok Lee wrote:
-> >> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-> >> index dcd06d1..44839c0 100644
-> >> --- a/arch/arm64/include/asm/thread_info.h
-> >> +++ b/arch/arm64/include/asm/thread_info.h
-> >> @@ -73,8 +73,11 @@ static inline struct thread_info *current_thread_info(void) __attribute_const__;
-> >>  
-> >>  static inline struct thread_info *current_thread_info(void)
-> >>  {
-> >> -	return (struct thread_info *)
-> >> -		(current_stack_pointer & ~(THREAD_SIZE - 1));
-> >> +	unsigned long sp_el0;
-> >> +
-> >> +	asm volatile("mrs %0, sp_el0" : "=r" (sp_el0));
-> >> +
-> >> +	return (struct thread_info *)(sp_el0 & ~(THREAD_SIZE - 1));
-> > 
-> > This looks like it will generate worse code than our current implementation,
-> > thanks to the asm volatile. Maybe just add something like a global
-> > current_stack_pointer_el0?
-> 
-> Like current_stack_pointer does?:
-> > register unsigned long current_stack_pointer_el0 asm ("sp_el0");
-> 
-> Unfortunately the compiler won't accept this, as it doesn't like the
-> register name, it also won't accept instructions in this asm string.
+On 15 September 2015 at 17:24, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 15 September 2015 at 16:46, Will Deacon <will.deacon@arm.com> wrote:
+>> On Tue, Sep 15, 2015 at 11:11:43AM +0100, Ard Biesheuvel wrote:
+>>> Since arm64 does not use a builtin decompressor, the EFI stub is built
+>>> into the kernel proper. So far, this has been working fine, but actually,
+>>> since the stub is in fact a PE/COFF relocatable binary that is executed
+>>> at an unknown offset in the 1:1 mapping provided by the UEFI firmware, we
+>>> should not be seamlessly sharing code with the kernel proper, which is a
+>>> position dependent executable linked at a high virtual offset.
+>>>
+>>> So instead, separate the contents of libstub and its dependencies, by
+>>> putting them into their own namespace by prefixing all of its symbols
+>>> with __efistub. This way, we have tight control over what parts of the
+>>> kernel proper are referenced by the stub.
+>>
+>> Could we add an __efistub annotation to spit out warnings if the stub
+>> calls into unexpected kernel code, like we do for __init/__ref?
+>>
+>
+> Currently, it will break the build rather than warn if you use a
+> disallowed symbol, which I think is not unreasonable.
+>
+> But I suppose that the objcopy step in this patch could rename the
+> sections to .efistub.xxx sections, which would allow us to reuse some
+> of the section mismatch code.
+> However, this would involve marking things like the generic string and
+> memcpy routines __efistub as well, which I think may be too much.
+> Also, note that the logic is inverted here: with __init, we disallow
+> normal code to call __init functions, but with __efistub, it will be
+> the other way around, which may be more difficult to accomplish
+> (Rutland and I did discuss this option when we talked about this over
+> IRC)
+>
 
-But once we do SPSel = 0, can we not just use the SP register here?
+OK, I have given this a go, and as it turns out, it implies that we go
+and mark generic pieces of lib/ as __section(.text.efistubok) in order
+for modpost.c to accept it. Tweaking modpost.c itself seems quite
+doable, since the logic is fairly flexible and can easily be augmented
+to complain about unauthorized references from the stub to the kernel
+proper.
 
-(I haven't read the rest of the patch yet)
+So what we could do is fold libfdt and lib/sort.c (which are the
+primary generic dependencies) into the stub, but we would still need
+to retain the symbol prefixing bit to prevent the stub's symbols from
+clashing with the ones from the kernel proper. And with the symbol
+prefixing in place, we have something that is even stronger than
+section mismatch, which is to error out on undefined references rather
+than warn about section mismatches.
+
+I think the current approach is better, but only if we agree that we
+should do something in the first place. (Currently, there are no known
+issues, just the awareness that things are not quite as tidy as they
+should be)
 
 -- 
-Catalin
+Ard.
