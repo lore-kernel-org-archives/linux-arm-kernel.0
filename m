@@ -1,53 +1,85 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Thu, 17 Sep 2015 10:17:46 -0700
-Subject: [PATCH 6/6] dmaengine: xilinx: Fix module autoload for OF
- platform driver
-In-Reply-To: <2273902.ke3oao0baF@avalon>
-References: <20150916210017.GA5933@goodgumbo.baconseed.org>
- <2273902.ke3oao0baF@avalon>
-Message-ID: <CAAtXAHeRxP+HLCVaLO9Eg8V_CHBBPLb71qi2HeWP1yUiOx2iYw@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 17 Sep 2015 12:21:41 -0500
+Subject: [PATCH v4 0/4] PCI: arm64/powerpc: Fix parsing of linux,
+ pci-probe-only
+In-Reply-To: <55FAF5B1.1030401@arm.com>
+References: <1441385411-7624-1-git-send-email-marc.zyngier@arm.com>
+ <20150917153009.GH25767@google.com> <55FAF5B1.1030401@arm.com>
+Message-ID: <CAErSpo4KosLZa=YWvdVErEk-bNDr7witNEO76d1oJXdSmUP2yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 11:14 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Wednesday 16 September 2015 23:00:17 Luis de Bethencourt wrote:
->> This platform driver has a OF device ID table but the OF module
->> alias information is not created so module autoloading won't work.
+On Thu, Sep 17, 2015 at 12:17 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 17/09/15 16:30, Bjorn Helgaas wrote:
+>> On Fri, Sep 04, 2015 at 05:50:07PM +0100, Marc Zyngier wrote:
+>>> The pci-host-generic driver parses the linux,pci-probe-only property,
+>>> and assumes that it will have a boolean parameter.
+>>>
+>>> Turns out that the Seattle DTS file has a naked "linux,pci-probe-only"
+>>> property, which leads to the driver dereferencing some unsuspecting
+>>> memory location. Nothing really bad happens (we end up reading some
+>>> other bit of DT, fortunately), but that not a reason to keep it this
+>>> way. Turns out that the Pseries code (where this code was lifted from)
+>>> may suffer from the same issue.
+>>>
+>>> The first patch introduces a common (and fixed) version of that check
+>>> that can be used by drivers and architectures that require it. The two
+>>> following patches change the pci-host-generic driver and the powerpc
+>>> code to use it.
+>>>
+>>> Finally, the bad property is removed from the Seatle DTS, because it
+>>> is simply not necessary (it actually prevents me from using SR-IOV,
+>>> which otherwise runs fine without the probe-only thing).
+>>>
+>>> This has been tested on the offending Seattle board.
+>>>
+>>> * From v3:
+>>>   - Restrict the property lookup to /chosen (Rob)
+>>>   - Acked-by on patch #4 from Suravee
+>>>   - I swear this is the last time I rework these patches! ;-)
+>>>
+>>> * From v2:
+>>>   - Use of_property_read_u32 to safely read the property (Rob)
+>>>   - Add a log message to indicate when we enable probe-only
+>>>     (probably quite useful for debugging)
+>>>
+>>> * From v1:
+>>>   - Consolidate the parsing in of_pci.c (Bjorn)
+>>>
+>>> Marc Zyngier (4):
+>>>   of/pci: Add of_pci_check_probe_only to parse "linux,pci-probe-only"
+>>>   PCI: pci-host-generic: Fix lookup of linux,pci-probe-only property
+>>>   powerpc: PCI: Fix lookup of linux,pci-probe-only property
+>>>   arm64: dts: Drop linux,pci-probe-only from the Seattle DTS
+>>>
+>>>  arch/arm64/boot/dts/amd/amd-overdrive.dts |  1 -
+>>>  arch/powerpc/platforms/pseries/setup.c    | 14 ++------------
+>>>  drivers/of/of_pci.c                       | 28 ++++++++++++++++++++++++++++
+>>>  drivers/pci/host/pci-host-generic.c       |  9 +--------
+>>>  include/linux/of_pci.h                    |  3 +++
+>>>  5 files changed, 34 insertions(+), 21 deletions(-)
 >>
->> Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
+>> Applied with the comment tweak and acks to pci/host-generic for v4.4,
+>> thanks!
 >
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
+> Turns out that the 01.org infrastructure has picked up on a compilation
+> bug with randconfig. The following patch seems to fix it and should be
+> applied on the first patch:
 >
->> ---
->>  drivers/dma/xilinx/xilinx_vdma.c | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/dma/xilinx/xilinx_vdma.c
->> b/drivers/dma/xilinx/xilinx_vdma.c index d8434d4..6f4b501 100644
->> --- a/drivers/dma/xilinx/xilinx_vdma.c
->> +++ b/drivers/dma/xilinx/xilinx_vdma.c
->> @@ -1349,6 +1349,7 @@ static const struct of_device_id xilinx_vdma_of_ids[]
->> = { { .compatible = "xlnx,axi-vdma-1.00.a",},
->>       {}
->>  };
->> +MODULE_DEVICE_TABLE(of, xilinx_vdma_of_ids);
->>
->>  static struct platform_driver xilinx_vdma_driver = {
->>       .driver = {
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index 485d625..2da5abc 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -6,6 +6,8 @@
+>  #include <linux/of_pci.h>
+>  #include <linux/slab.h>
 >
-> --
-> Regards,
+> +#include <asm-generic/pci-bridge.h>
+> +
+>  static inline int __of_pci_pci_compare(struct device_node *node,
+>                                        unsigned int data)
+>  {
 >
-> Laurent Pinchart
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Sorry for the annoyance.
 
-Cheers,
-
-Moritz
+Folded in and re-pushed, thanks!
