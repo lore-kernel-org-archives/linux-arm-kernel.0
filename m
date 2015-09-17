@@ -1,84 +1,43 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 17 Sep 2015 17:13:16 +0100
-Subject: [PATCH 2/2] arm64: dts: mt8173: add timer node
-In-Reply-To: <1442501816.4784.3.camel@mtksdaap41>
-References: <1442369095-1094-1-git-send-email-yingjoe.chen@mediatek.com>
- <1442369095-1094-2-git-send-email-yingjoe.chen@mediatek.com>
- <55FAC570.8040307@arm.com> <1442501816.4784.3.camel@mtksdaap41>
-Message-ID: <55FAE69C.2000906@arm.com>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Thu, 17 Sep 2015 09:18:10 -0700
+Subject: [PATCH v1 1/2] soc: ti: display firmware file name as part of
+ boot log
+In-Reply-To: <55F9BF61.4080200@oracle.com>
+References: <1441403199-10936-1-git-send-email-m-karicheri2@ti.com>
+ <55EA673F.8010904@oracle.com> <55F06075.6050405@ti.com>
+ <55F8600D.2070701@ti.com> <55F88B81.2000308@oracle.com>
+ <55F9A05E.4090000@ti.com> <55F9BF61.4080200@oracle.com>
+Message-ID: <55FAE7C2.8030004@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 17/09/15 15:56, Yingjoe Chen wrote:
-> On Thu, 2015-09-17 at 14:51 +0100, Sudeep Holla wrote:
+On 9/16/15 12:13 PM, santosh shilimkar wrote:
+> On 9/16/2015 10:01 AM, Murali Karicheri wrote:
+>> On 09/15/2015 05:20 PM, santosh shilimkar wrote:
+>>> On 9/15/2015 11:14 AM, Murali Karicheri wrote:
+>>>> On 09/09/2015 12:38 PM, Murali Karicheri wrote:
+>
+> [..]
+>>>> Santosh,
+>>>>
+>>>> I have checked v4.3-rc1 and I don't see it. Did you send the pull
+>>>> request?
+>>>>
+>>> They are in the queue fo 4.4-rc1. They were too late for 4.3.
+>>> You might know already, typically as a rule of thumb followed
+>>> on arm-soc, we need to get patches reviewed/acked by rc4 to make
+>>> it for next merge window.
+>>> Ofcourse genuine bug fixes can make it to the same cycle.
+>> Is there a branch where you have applied the patches that you can
+>> provide me? I want to send it to internal list for merge.
 >>
->> On 16/09/15 03:04, Yingjoe Chen wrote:
->>> From: Daniel Kurtz <djkurtz@chromium.org>
->>>
->>> Add device node to enable GPT timer. This timer will be
->>> used as sched clock source.
->>>
->>
->> Interesting any known issues with or advantage over the arch timers
->> to prefer it as sched clock source. I see even arch timers are present
->> in DT, hence the question. Or is it just a incorrect commit log ?
->>
->> How does this get selected as sched clock source ? I don't see
->> sched_clock_register in mtk_timer.c
->>
->> To be clear, I am not against adding this timer support, but just want
->> to know is it preferred for sched clock source ? if yes why ? better
->> resolution ?
->
-> Hi Sudeep,
->
-> Thanks for your review.
->
-> I hit the send too soon and missed cover letter, please see:
-> http://lists.infradead.org/pipermail/linux-mediatek/2015-September/002303.html
->
+> Yes. I will push it out later this week. Will drop you
+> note when I do that.
 
-OK
+Rebased version against v4.3-rc1 are available below. They
+should also appear in linux-next soon.
 
-> The main reason to use GPT as sched clock is it won't stop during idle.
->
->
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
 
-I think your are confusing the system counter with arch timers. System
-counter is always-on, but the arch timers(logic implementing timers
-comparators) might not be off when the processor is powered down.
-
-I think you need this timer and are using it for low power idle states
-in which case you will use this as a clock event and not clock source.
-It will be used as a hardware broadcast event source.
-
-There's no call to sched_clock_register in mtk_timer.c, so it can't be
-the sched clock, so you need to fix the commit log.
-
-[...]
-
->>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->>> index d18ee42..d763803 100644
->>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->>> @@ -238,6 +238,15 @@
->>>    			reg = <0 0x10007000 0 0x100>;
->>>    		};
->>>
->>> +		timer: timer at 10008000 {
->>> +			compatible = "mediatek,mt8173-timer",
->>
->> Missing documentation ? I am referring upstream and it might be in some
->> patches already queued perhaps ?
->
-> This is documented in
-> Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt.
-> Do you mean I should add "mediatek,mt8173-timer" to that file?
->
-
-Yes
-
-Regards,
-Sudeep
+for_4.4/dts
+for_4.4/drivers-soc
