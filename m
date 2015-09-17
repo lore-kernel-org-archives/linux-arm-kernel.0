@@ -1,32 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Sep 2015 12:17:36 +0100
-Subject: [PATCH v2] arm64: Introduce IRQ stack
-In-Reply-To: <1442155337-7020-1-git-send-email-jungseoklee85@gmail.com>
-References: <1442155337-7020-1-git-send-email-jungseoklee85@gmail.com>
-Message-ID: <20150917111735.GN25444@e104818-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 17 Sep 2015 13:29:05 +0200
+Subject: [PATCH 2/4] ARM: dts: sun7i: Add keypad node to Allwinner A20 SoC
+In-Reply-To: <1442325957-10102-3-git-send-email-yassinjaffer@gmail.com>
+References: <1442325957-10102-1-git-send-email-yassinjaffer@gmail.com>
+ <1442325957-10102-3-git-send-email-yassinjaffer@gmail.com>
+Message-ID: <20150917112905.GC4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 13, 2015 at 02:42:17PM +0000, Jungseok Lee wrote:
-> Currently, kernel context and interrupts are handled using a single
-> kernel stack navigated by sp_el1. This forces many systems to use
-> 16KB stack, not 8KB one. Low memory platforms naturally suffer from
-> memory pressure accompanied by performance degradation.
-> 
-> This patch addresses the issue as introducing a separate percpu IRQ
-> stack to handle both hard and soft interrupts with two ground rules:
-> 
->   - Utilize sp_el0 in EL1 context, which is not used currently
->   - Do not complicate current_thread_info calculation
-> 
-> It is a core concept to trace struct thread_info using sp_el0 instead
-> of sp_el1. This approach helps arm64 align with other architectures
-> regarding object_is_on_stack() without additional complexity.
+Hi Yassin,
 
-I'm still trying to understand how this patch works. I initially thought
-that we would set SPSel = 0 while in kernel thread mode to make use of
-SP_EL0 but I can't find any such code. Do you still use SP_EL1 all the
-time and SP_EL0 just for temporary saving the thread stack?
+On Wed, Sep 16, 2015 at 12:05:55AM +1000, yassinjaffer at gmail.com wrote:
+> From: Yassin Jaffer <yassinjaffer@gmail.com>
+> 
+> Add Keypad controller node definition to the A20 SoC.
+> 
+> Signed-off-by: Yassin Jaffer <yassinjaffer@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 333604a..35cc8d0 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -1198,6 +1198,15 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		kp: kp at 01c23000 {
+
+The node name should reflect the class of the device. keypad at 01c23000
+would be better for example.
+
+It looks good otherwise.
+
+Thanks!
+Maxime
 
 -- 
-Catalin
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150917/5e4505a3/attachment.sig>
