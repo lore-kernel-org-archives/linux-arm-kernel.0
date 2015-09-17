@@ -1,63 +1,59 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 17 Sep 2015 10:42:18 -0700
-Subject: [PATCH v2 2/3] soc: brcmstb: Add Bus Interface Unit control setup
-In-Reply-To: <CADtm3G6SkczVkFK0n=fpMCkocj_ijGWtHkfipTZZfp8deC=6zg@mail.gmail.com>
-References: <1442340900-15320-1-git-send-email-f.fainelli@gmail.com>
- <1442340900-15320-3-git-send-email-f.fainelli@gmail.com>
- <CADtm3G6SkczVkFK0n=fpMCkocj_ijGWtHkfipTZZfp8deC=6zg@mail.gmail.com>
-Message-ID: <55FAFB7A.4010105@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Sep 2015 18:49:50 +0100
+Subject: Recent GIC v1 patch
+In-Reply-To: <55FAF6E1.7020107@free.fr>
+References: <55FAE26A.9040609@free.fr> <55FAEB4D.30306@arm.com>
+ <55FAF6E1.7020107@free.fr>
+Message-ID: <55FAFD3E.7010006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/09/15 23:08, Gregory Fong wrote:
->> [...]
->> diff --git a/drivers/soc/brcmstb/biuctrl.c b/drivers/soc/brcmstb/biuctrl.c
->> new file mode 100644
->> index 000000000000..1d4deada1c4d
->> --- /dev/null
->> +++ b/drivers/soc/brcmstb/biuctrl.c
->> @@ -0,0 +1,119 @@
->> [...]
->> +int __init brcmstb_biuctrl_init(void)
->> +{
->> +       int ret = 0;
->> +
->> +       ret = setup_hifcpubiuctrl_regs();
->> +       if (ret)
->> +               return ret;
->> +
->> +       ret = mcp_write_pairing_set();
->> +       if (ret) {
->> +               pr_err("MCP: Unable to disable write pairing!\n");
->> +               return ret;
+On 17/09/15 18:22, Mason wrote:
+> On 17/09/2015 18:33, Marc Zyngier wrote:
+>> Hi Mason,
+>>
+>> On 17/09/15 16:55, Mason wrote:
+>>> Hello Thomas, Marc,
+>>>
+>>> Mans pointed me to a recent patch of yours.
+>>> irqchip/gic: Use IRQD_FORWARDED_TO_VCPU flag
+>>> Get rid of the handler_data abuse.
+>>>
+>>> I'm using a Cortex A9 based SoC. The platform's interrupt
+>>> controller is cascaded into the GIC. I've been trying to
+>>> get this to work for two weeks with no success.
+>>>
+>>> Details can be found here:
+>>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/440327
+>>>
+>>> Do you think your patch my help with my situation?
+>>
+>> Not sure. A GICv1 shouldn't use EOImode==1 at all, so I don't quite see
+>> how you end-up there. Also, you seem to be using 4.2, and this code only
+>> landed during the 4.3 merge window.
 > 
-> The return value isn't used in patch 3.  Is there a point to returning
-> an error from this function in either of the above two locations,
-> considering that?
+> Sorry for being unclear. I'm having problems /without/ the patch,
+> and Mans suggested I try the patch.
+
+But that patch will only apply if you run 4.3, because it fixes an issue
+in another patch that only exists in 4.3.
+
+>>> Do you have any idea what might causing the problem?
+>>
+>> Not without more information, I'm afraid.
 > 
-> Looks good otherwise.
-> 
-> Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
+> Being the unimaginative type, I provided boot log, .config,
+> full port source code, and device tree description. Can you
+> explain what kind of information would be required to identify
+> the problem? (Maybe that would help me diagnose the problem.)
 
-Not really, how about this:
+It looks likely that when you enable your ethernet interface, this ends
+up calling into the GIC for some reason, screwing up something.
 
-void __init brcmstb_biuctrl_init(void)
-{
-        int ret;
+Can you trace things happening in the GIC for hwirq 34?
 
-        setup_hifcpubiuctrl_regs();
+Thanks,
 
-        ret = mcp_write_pairing_set();
-        if (ret) {
-                pr_err("MCP: Unable to disable write pairing!\n");
-                return;
-        }
-
-#ifdef CONFIG_PM_SLEEP
-        register_syscore_ops(&brcmstb_cpu_credit_syscore_ops);
-#endif
-}
-
-and updating the function prototype accordingly in the header file?
+	M.
 -- 
-Florian
+Jazz is not dead. It just smells funny...
