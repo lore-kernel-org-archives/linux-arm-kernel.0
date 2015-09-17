@@ -1,19 +1,39 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Wed, 16 Sep 2015 23:10:15 -0700
-Subject: [PATCH v2 3/3] ARM: brcmstb: Setup BIU control registers during
- boot
-In-Reply-To: <1442340900-15320-4-git-send-email-f.fainelli@gmail.com>
-References: <1442340900-15320-1-git-send-email-f.fainelli@gmail.com>
- <1442340900-15320-4-git-send-email-f.fainelli@gmail.com>
-Message-ID: <CADtm3G6LV+Xo+yKhCZBJpD+LE9GQHDAmSRu3FNWCanrzC5Ny3Q@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 17 Sep 2015 09:14:20 +0300
+Subject: [PATCH 6/6] dmaengine: xilinx: Fix module autoload for OF
+ platform driver
+In-Reply-To: <20150916210017.GA5933@goodgumbo.baconseed.org>
+References: <20150916210017.GA5933@goodgumbo.baconseed.org>
+Message-ID: <2273902.ke3oao0baF@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 15, 2015 at 11:15 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> Call brcmstb_biuctrl_init() in brcmstb's init_irq machine descriptor
-> callback since we need to setup the Bus Interface Unit before SMP in
-> particular, but we also need to be able to remap registers.
->
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+On Wednesday 16 September 2015 23:00:17 Luis de Bethencourt wrote:
+> This platform driver has a OF device ID table but the OF module
+> alias information is not created so module autoloading won't work.
+> 
+> Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
 
-Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+>  drivers/dma/xilinx/xilinx_vdma.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/dma/xilinx/xilinx_vdma.c
+> b/drivers/dma/xilinx/xilinx_vdma.c index d8434d4..6f4b501 100644
+> --- a/drivers/dma/xilinx/xilinx_vdma.c
+> +++ b/drivers/dma/xilinx/xilinx_vdma.c
+> @@ -1349,6 +1349,7 @@ static const struct of_device_id xilinx_vdma_of_ids[]
+> = { { .compatible = "xlnx,axi-vdma-1.00.a",},
+>  	{}
+>  };
+> +MODULE_DEVICE_TABLE(of, xilinx_vdma_of_ids);
+> 
+>  static struct platform_driver xilinx_vdma_driver = {
+>  	.driver = {
+
+-- 
+Regards,
+
+Laurent Pinchart
