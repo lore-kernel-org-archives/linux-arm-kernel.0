@@ -1,14 +1,14 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 17 Sep 2015 14:57:09 +0200
-Subject: [PATCH v5 15/23] usb: phy: Probe phy devices on demand
+Date: Thu, 17 Sep 2015 14:57:11 +0200
+Subject: [PATCH v5 17/23] pinctrl: Probe pinctrl devices on demand
 In-Reply-To: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1442494637-3674-16-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1442494637-3674-18-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When looking up a phy through its OF node, probe it if it hasn't
-already.
+When looking up a pin controller through its OF node, probe it if it
+hasn't already.
 
 The goal is to reduce deferred probes to a minimum, as it makes it very
 cumbersome to find out why a device failed to probe, and can introduce
@@ -22,29 +22,29 @@ Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- drivers/usb/phy/phy.c | 3 +++
+ drivers/pinctrl/devicetree.c | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
-index 98f75d2842b7..fb0b650bb494 100644
---- a/drivers/usb/phy/phy.c
-+++ b/drivers/usb/phy/phy.c
-@@ -15,6 +15,7 @@
- #include <linux/module.h>
- #include <linux/slab.h>
+diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
+index fe04e748dfe4..f5340b8e1dbe 100644
+--- a/drivers/pinctrl/devicetree.c
++++ b/drivers/pinctrl/devicetree.c
+@@ -18,6 +18,7 @@
+ 
+ #include <linux/device.h>
  #include <linux/of.h>
 +#include <linux/of_device.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/slab.h>
  
- #include <linux/usb/phy.h>
+@@ -110,6 +111,8 @@ static int dt_to_map_one_config(struct pinctrl *p, const char *statename,
+ 	struct pinctrl_map *map;
+ 	unsigned num_maps;
  
-@@ -196,6 +197,8 @@ struct  usb_phy *devm_usb_get_phy_by_node(struct device *dev,
- 		goto err0;
- 	}
- 
-+	of_device_probe(node);
++	of_device_probe(np_config);
 +
- 	spin_lock_irqsave(&phy_lock, flags);
- 
- 	phy = __of_usb_find_phy(node);
+ 	/* Find the pin controller containing np_config */
+ 	np_pctldev = of_node_get(np_config);
+ 	for (;;) {
 -- 
 2.4.3
