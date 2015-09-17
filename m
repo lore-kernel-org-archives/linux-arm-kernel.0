@@ -1,61 +1,68 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Thu, 17 Sep 2015 10:38:41 +0200
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <1442474516.6617.6.camel@pengutronix.de> (Philipp Zabel's message
- of "Thu, 17 Sep 2015 09:21:56 +0200")
-References: <m3bnde5whx.fsf@t19.piap.pl>
- <20150907112555.GS21084@n2100.arm.linux.org.uk>
- <m37fo25nrl.fsf@t19.piap.pl>
- <20150908091625.GV21084@n2100.arm.linux.org.uk>
- <m3y4gh41k4.fsf@t19.piap.pl>
- <20150908125756.GY21084@n2100.arm.linux.org.uk>
- <m3a8su4llv.fsf@t19.piap.pl>
- <20150910104930.GI21084@n2100.arm.linux.org.uk>
- <1442474516.6617.6.camel@pengutronix.de>
-Message-ID: <m3k2rp1lv2.fsf@t19.piap.pl>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 17 Sep 2015 09:40:27 +0100
+Subject: [PATCH] iommu-common: only compile lib/iommu_common.c for Sparc64
+Message-ID: <1442479227-18320-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philipp Zabel <p.zabel@pengutronix.de> writes:
+Though the file lib/iommu_common.c resides in a common directory, the
+code in there is actually only used by Sparc(64).
+The recent change of DMA_ERROR_CODE in the ARM tree now generates a
+compiler warning when compiled with LPAE support (where dma_addr_t is
+u64, but unsigned long is still u32):
+*********
+In file included from /src/linux/include/linux/dma-mapping.h:86:0,
+                 from /src/linux/lib/iommu-common.c:11:
+/src/linux/lib/iommu-common.c: In function 'iommu_tbl_range_alloc':
+/src/linux/arch/arm/include/asm/dma-mapping.h:16:24: warning: large
+integer implicitly truncated to unsigned type [-Woverflow]
+ #define DMA_ERROR_CODE (~(dma_addr_t)0x0)
+                        ^
+/src/linux/lib/iommu-common.c:127:10: note: in expansion of macro
+'DMA_ERROR_CODE'
+   return DMA_ERROR_CODE;
+          ^
+*********
 
-> The IDMAC has a few funny restrictions for multiplanar formats, and the
-> current code silently assumes that the U and V planes follow right after
-> Y.
->
-> I have a patch to enforce the same base address:
-> http://lists.freedesktop.org/archives/dri-devel/2015-August/089293.html
-> but it still doesn't check the offset/pitch limitations properly.
+It seems the types used in this file are not really correct, but a
+fix isn't trivial.
+So for the time being restrict this code to be compiled only when we
+actually need it.
+Compile tested on Sparc, Sparc64, PPC64, ARM, ARM64, x86.
 
-Do you mean the current code as in e.g. v4.2?
-I'm passing it (the i.MX6 IMX DRM overlay) a 1024x768 buffer:
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ arch/sparc/Kconfig | 3 +++
+ lib/Makefile       | 3 ++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-ipu_plane_mode_set pitches 1024 512 512 0 offsets 0 786432 983040 0
-
-so the U and V planes closely follow Y, and it doesn't work. The screen
-is green to magenta, sometimes there are diagonal stripes (color only,
-Y is fine).
-
-Also, e.g. mplayer shows a greenish output.
-
-I've posted a short test program:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/369988.html
-
-You will need to set xv_port = 0 (it will then use the first
-YUV420-capable adapter, which on my system is IMX DRM overlay) and you
-may want to stick "XSync(display, 0);" after the XvShmPutImage() call.
-
-Also, you may change the "memset(image->data, count, image->data_size)"
-into something smaller, e.g. to a subset of Y plane, leaving UV alone.
-For example:
-	memset(image->data, count % 0x100, 12345);
-	memset(image->data + image->pitches[0] * h, 0, (image->pitches[1] + image->pitches[2]) * h / 2);
-
-will set the first 12345 bytes of Y plane, while the U and V will be
-zero.
-
-Thanks for looking into this.
+diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
+index 56442d2..1cedb7e 100644
+--- a/arch/sparc/Kconfig
++++ b/arch/sparc/Kconfig
+@@ -93,6 +93,9 @@ config IOMMU_HELPER
+ 	bool
+ 	default y if SPARC64
+ 
++config IOMMU_TBL_HELPER
++	def_bool y if IOMMU_HELPER
++
+ config STACKTRACE_SUPPORT
+ 	bool
+ 	default y if SPARC64
+diff --git a/lib/Makefile b/lib/Makefile
+index 13a7c6a..82944a1 100644
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -113,7 +113,8 @@ obj-$(CONFIG_AUDIT_GENERIC) += audit.o
+ obj-$(CONFIG_AUDIT_COMPAT_GENERIC) += compat_audit.o
+ 
+ obj-$(CONFIG_SWIOTLB) += swiotlb.o
+-obj-$(CONFIG_IOMMU_HELPER) += iommu-helper.o iommu-common.o
++obj-$(CONFIG_IOMMU_HELPER) += iommu-helper.o
++obj-$(CONFIG_IOMMU_TBL_HELPER) += iommu-common.o
+ obj-$(CONFIG_FAULT_INJECTION) += fault-inject.o
+ obj-$(CONFIG_NOTIFIER_ERROR_INJECTION) += notifier-error-inject.o
+ obj-$(CONFIG_CPU_NOTIFIER_ERROR_INJECT) += cpu-notifier-error-inject.o
 -- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+2.5.1
