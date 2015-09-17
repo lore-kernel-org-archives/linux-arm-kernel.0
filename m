@@ -1,38 +1,30 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 17 Sep 2015 17:35:26 +0800
-Subject: [PATCH v2 00/22] KVM: ARM64: Add guest PMU support
-In-Reply-To: <20150917093007.GB5933@hawk.localdomain>
-References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
- <55F9D9FC.6010905@redhat.com> <55FA1832.3040008@linaro.org>
- <20150917093007.GB5933@hawk.localdomain>
-Message-ID: <55FA895E.8080304@huawei.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 17 Sep 2015 11:43:44 +0200
+Subject: [PATCH 1/3] clocksource: rockchip: Make the driver more
+ readability and compatible
+In-Reply-To: <55FA87AA.4040807@gmail.com>
+References: <1442476272-31723-1-git-send-email-wxt@rock-chips.com>
+ <55FA83D5.9010504@linaro.org> <55FA87AA.4040807@gmail.com>
+Message-ID: <1595765.iIuZsGWCYG@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi,
 
-On 2015/9/17 17:30, Andrew Jones wrote:
-> On Thu, Sep 17, 2015 at 09:32:34AM +0800, Shannon Zhao wrote:
->> > Hi Wei,
->> > 
->> > On 2015/9/17 5:07, Wei Huang wrote:
->>> > > I am testing this series. 
->> > Thanks for your time and help.
->> > 
->>> > > The first question is: do you plan to add ACPI
->>> > > support in QEMU?
->> > To the completeness, this should be added. Maybe this could be added at
->> > v3. But I have a look at the kernel PMU driver, it doesn't support
->> > probing through ACPI, although there are some patches[1] out-of-tree.
->> > 
->>> > > My in-house kernel uses ACPI for device probing. I had
->>> > > to force "acpi=off" when I test this patch series.
->> > Guest kernel only boots with ACPI when you add "acpi=force". No need to
->> > add "acpi=off".
-> The Red Hat kernel uses ACPI by default, when tables are present (Thanks
-> again for your QEMU table generation patches!)
+Am Donnerstag, 17. September 2015, 17:28:10 schrieb Caesar Wang:
+> >> The problem was different semantics of dsb on btw arm32 and arm64,
+> >> Here we can convert the dsb with insteading of dsb(sy).
+> > 
+> > What happens to ARM32 then ?
 > 
-Oh, I see. Thanks for your explanation.
+> The dsb() is ok for ARM32, the ARM32/64 are OK if we can convert the
+> dsb() to dsb(sy).
+> I believe all drivers with 'dsb()' have same issue on ARM64 platform.
 
--- 
-Shannon
+correct ... I read this up in the ARM docs 2 days ago too for something.
+
+The "sy" param is the default, which you are allow to omit, so on arm32 dsb() 
+and dsb(sy) are the same.
+
+
+Heiko
