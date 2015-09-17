@@ -1,42 +1,75 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Sep 2015 17:01:07 +0100
-Subject: [RFC PATCH v4 3/4] arm64: fix a migrating irq bug when hotplug cpu
-In-Reply-To: <1442467166-1460-4-git-send-email-yangyingliang@huawei.com>
-References: <1442467166-1460-1-git-send-email-yangyingliang@huawei.com>
- <1442467166-1460-4-git-send-email-yangyingliang@huawei.com>
-Message-ID: <20150917160107.GO25634@arm.com>
+Date: Thu, 17 Sep 2015 17:09:26 +0100
+Subject: [RFC PATCH] arm64/efi: isolate EFI stub from the kernel proper
+In-Reply-To: <CAKv+Gu_KuOxA+EMSV0YcQR9rmO+R=-y9tivweNym3o+E4DrnHQ@mail.gmail.com>
+References: <1442311903-19213-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150915144629.GG31157@arm.com>
+ <CAKv+Gu8j1APZkGnFhZArNAtoyYOokP2bgemYH5n7Pn8jQ1b1XA@mail.gmail.com>
+ <CAKv+Gu_KuOxA+EMSV0YcQR9rmO+R=-y9tivweNym3o+E4DrnHQ@mail.gmail.com>
+Message-ID: <20150917160925.GP25634@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 06:19:25AM +0100, Yang Yingliang wrote:
-> When cpu is disabled, all irqs will be migratged to another cpu.
-> In some cases, a new affinity is different, it needed to be coppied
-> to irq's affinity. But if the type of irq is LPI, it's affinity will
-> not be coppied because of irq_set_affinity's return value. Fix it by
-> using irq_do_set_affinity.
+Hi Ard,
+
+On Thu, Sep 17, 2015 at 11:51:07AM +0100, Ard Biesheuvel wrote:
+> On 15 September 2015 at 17:24, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 15 September 2015 at 16:46, Will Deacon <will.deacon@arm.com> wrote:
+> >> On Tue, Sep 15, 2015 at 11:11:43AM +0100, Ard Biesheuvel wrote:
+> >>> Since arm64 does not use a builtin decompressor, the EFI stub is built
+> >>> into the kernel proper. So far, this has been working fine, but actually,
+> >>> since the stub is in fact a PE/COFF relocatable binary that is executed
+> >>> at an unknown offset in the 1:1 mapping provided by the UEFI firmware, we
+> >>> should not be seamlessly sharing code with the kernel proper, which is a
+> >>> position dependent executable linked at a high virtual offset.
+> >>>
+> >>> So instead, separate the contents of libstub and its dependencies, by
+> >>> putting them into their own namespace by prefixing all of its symbols
+> >>> with __efistub. This way, we have tight control over what parts of the
+> >>> kernel proper are referenced by the stub.
+> >>
+> >> Could we add an __efistub annotation to spit out warnings if the stub
+> >> calls into unexpected kernel code, like we do for __init/__ref?
+> >>
+> >
+> > Currently, it will break the build rather than warn if you use a
+> > disallowed symbol, which I think is not unreasonable.
+> >
+> > But I suppose that the objcopy step in this patch could rename the
+> > sections to .efistub.xxx sections, which would allow us to reuse some
+> > of the section mismatch code.
+> > However, this would involve marking things like the generic string and
+> > memcpy routines __efistub as well, which I think may be too much.
+> > Also, note that the logic is inverted here: with __init, we disallow
+> > normal code to call __init functions, but with __efistub, it will be
+> > the other way around, which may be more difficult to accomplish
+> > (Rutland and I did discuss this option when we talked about this over
+> > IRC)
+> >
 > 
-> And migrating interrupts is a core code matter, so use the generic
-> function move_irqs() to migrate interrupts in kernel/irq/migration.c.
+> OK, I have given this a go, and as it turns out, it implies that we go
+> and mark generic pieces of lib/ as __section(.text.efistubok) in order
+> for modpost.c to accept it. Tweaking modpost.c itself seems quite
+> doable, since the logic is fairly flexible and can easily be augmented
+> to complain about unauthorized references from the stub to the kernel
+> proper.
 > 
-> Cc: Jiang Liu <jiang.liu@linux.intel.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
-> ---
->  arch/arm64/Kconfig           |  1 +
->  arch/arm64/include/asm/irq.h |  1 -
->  arch/arm64/kernel/irq.c      | 62 --------------------------------------------
->  arch/arm64/kernel/smp.c      |  2 +-
->  4 files changed, 2 insertions(+), 64 deletions(-)
+> So what we could do is fold libfdt and lib/sort.c (which are the
+> primary generic dependencies) into the stub, but we would still need
+> to retain the symbol prefixing bit to prevent the stub's symbols from
+> clashing with the ones from the kernel proper. And with the symbol
+> prefixing in place, we have something that is even stronger than
+> section mismatch, which is to error out on undefined references rather
+> than warn about section mismatches.
+> 
+> I think the current approach is better, but only if we agree that we
+> should do something in the first place. (Currently, there are no known
+> issues, just the awareness that things are not quite as tidy as they
+> should be)
 
-Removing code is always good, so:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-but obviously this depends on the core stuff.
+I agree, but thanks for looking into it. The only downside I still see
+with symbol namespacing is that the error produced won't be as obvious
+as something akin to a section mismatch, but then again, it's mainly you
+hacking on the stub so it's not really an issue :)
 
 Will
