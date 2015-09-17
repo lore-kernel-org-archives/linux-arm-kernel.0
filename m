@@ -1,42 +1,51 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 17 Sep 2015 21:01:38 +0200
-Subject: [PATCH 3/3] arm64: dts: rockchip: Add the needed timer for rk3368
- SoC
-In-Reply-To: <1442476272-31723-4-git-send-email-wxt@rock-chips.com>
-References: <1442476272-31723-1-git-send-email-wxt@rock-chips.com>
- <1442476272-31723-4-git-send-email-wxt@rock-chips.com>
-Message-ID: <10188118.z6mI84Cd5Z@diego>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 17 Sep 2015 12:02:10 -0700
+Subject: [PATCH v2 2/3] soc: qcom: smd: Use __ioread32_copy() instead of
+ open-coding it
+In-Reply-To: <1442516531-16071-1-git-send-email-sboyd@codeaurora.org>
+References: <1442516531-16071-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1442516531-16071-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 17. September 2015, 15:51:12 schrieb Caesar Wang:
-> There is a need of a broadcast timer in this case to ensure proper
-> wakeup when the cpus are in sleep mode and a timer expires.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
-> 
->  arch/arm64/boot/dts/rockchip/rk3368.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-> b/arch/arm64/boot/dts/rockchip/rk3368.dtsi index a712bea..99edbaa 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-> @@ -214,6 +214,12 @@
->  			(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
->  	};
-> 
-> +	timer at ff810000 {
-> +		compatible = "rockchip,rk3288-timer";
+Now that we have a generic library function for this, replace the
+open-coded instance.
 
-you probably want a
-		compatible = "rockchip,rk3368-timer", "rockchip,rk3288-timer";
+Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/soc/qcom/smd.c | 13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
 
-> +		reg = <0x0 0xff810000 0x0 0x20>;
-> +		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
-> +
->  	xin24m: oscillator {
->  		compatible = "fixed-clock";
->  		clock-frequency = <24000000>;
+diff --git a/drivers/soc/qcom/smd.c b/drivers/soc/qcom/smd.c
+index e2f85a714243..e81eac28b5ce 100644
+--- a/drivers/soc/qcom/smd.c
++++ b/drivers/soc/qcom/smd.c
+@@ -434,20 +434,15 @@ static void smd_copy_to_fifo(void __iomem *dst,
+ /*
+  * Copy count bytes of data using 32bit accesses, if that is required.
+  */
+-static void smd_copy_from_fifo(void *_dst,
+-			       const void __iomem *_src,
++static void smd_copy_from_fifo(void *dst,
++			       const void __iomem *src,
+ 			       size_t count,
+ 			       bool word_aligned)
+ {
+-	u32 *dst = (u32 *)_dst;
+-	u32 *src = (u32 *)_src;
+-
+ 	if (word_aligned) {
+-		count /= sizeof(u32);
+-		while (count--)
+-			*dst++ = __raw_readl(src++);
++		__ioread32_copy(dst, src, count / sizeof(u32));
+ 	} else {
+-		memcpy_fromio(_dst, _src, count);
++		memcpy_fromio(dst, src, count);
+ 	}
+ }
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
