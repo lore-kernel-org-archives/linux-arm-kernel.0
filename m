@@ -1,62 +1,57 @@
 From: dhdang@apm.com (Duc Dang)
-Date: Thu, 17 Sep 2015 11:19:45 -0700
-Subject: [PATCH v8 0/3] usb: xhci-platform: Configure 64-bit DMA mask if the
- platform is capable
-In-Reply-To: <CADaLNDno0cLXH3_4NG75fk6T31Pe5BCrbcUpA0cGriCwSh6OyQ@mail.gmail.com>
-References: <CADaLNDno0cLXH3_4NG75fk6T31Pe5BCrbcUpA0cGriCwSh6OyQ@mail.gmail.com>
-Message-ID: <cover.1442513540.git.dhdang@apm.com>
+Date: Thu, 17 Sep 2015 11:19:46 -0700
+Subject: [PATCH v8 1/3] usb: make xhci platform driver use 64 bit or 32 bit DMA
+In-Reply-To: <cover.1442513540.git.dhdang@apm.com>
+References: <cover.1442513540.git.dhdang@apm.com>
+Message-ID: <41fbbb49c112705a8c14a342e98bd557c15c8f0c.1442513540.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The xhci platform driver does not work with system that only supports
-64-bit DMA as it requests 32-bit DMA mask during driver initialization.
-This patch set addresses this issue and also adds XHCI-compliant USB
-Controller ACPI identification into xhci-platform driver.
+The xhci platform driver needs to work on systems that
+either only support 64-bit DMA or only support 32-bit DMA.
+Attempt to set a coherent dma mask for 64-bit DMA, and
+attempt again with 32-bit DMA if that fails.
 
-Changes from v7:
-        - Only use dma_coerce_mask_and_coherent when
-        dma_mask is NULL
-        - Check the controller DMA capability and configure
-        32-bit dma_mask if it only supports 32-bit DMA
-        - Patches is generated over v4.3-rc1
+[dhdang: regenerate the patch over v4.3-rc1 and address new comments]
+Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+Tested-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Duc Dang <dhdang@apm.com>
 
-Changes from v6:
-        -Add WARN_ON if dma_mask is NULL
-        -Use dma_coerce_mask_and_coherent to assign
-        dma_mask and coherent_dma_mask
+---
+ drivers/usb/host/xhci-plat.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
-Change from v5:
-        -Change comment to "XHCI-compliant USB Controller" as
-        "PNP0D10" ID is not X-Gene specific
-        -Change comment
-        -Assign dma_mask to coherent_dma_mask if dma_mask is NULL
-        to make sure dma_set_mask_and_coherent does not fail prematurely.
-
-Changes from v4:
-        -Remove #ifdef CONFIG_ACPI
-        -Change comment
-        -Assign dma_mask to coherent_dma_mask if dma_mask is NULL
-        to make sure dma_set_mask_and_coherent does not fail prematurely.
-
-Changes from v3:
-        -Regenerate the patch over 4.2-rc5
-        -No code change
-
-Changes from v2
-        -Replaced tristate with a boolean as the driver doesn't
-                compile as a module
-        -Correct --help-- to ---help---
-
-Changes from v1
-        -Consolidated to use dma_set_mask_and_coherent
-        -Got rid of the check against sizeof(dma_addr_t)
-        -Renamed from "add support for APM X-Gene to xhci-platform"
-        -Removed changes to arm64/Kconfig
-        -Made CONFIG_USB_XHCI_PLATFORM a user selectable config option
-
- drivers/usb/host/xhci-plat.c | 29 ++++++++++++++++++++++-------
- drivers/usb/host/xhci.c      | 10 ++++++++++
- 2 files changed, 32 insertions(+), 7 deletions(-)
-
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 890ad9d..34c93e8 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -93,14 +93,20 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (irq < 0)
+ 		return -ENODEV;
+ 
+-	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
+-	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+-	if (ret)
+-		return ret;
+-	if (!pdev->dev.dma_mask)
+-		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
++	/* Try to set 64-bit DMA first */
++	if (WARN_ON(!pdev->dev.dma_mask))
++		/* Platform did not initialize dma_mask */
++		ret = dma_coerce_mask_and_coherent(&pdev->dev,
++						   DMA_BIT_MASK(64));
+ 	else
+-		dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
++		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
++
++	/* If seting 64-bit DMA mask fails, fall back to 32-bit DMA mask */
++	if (ret) {
++		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
++		if (ret)
++			return ret;
++	}
+ 
+ 	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
+ 	if (!hcd)
 -- 
 1.9.1
