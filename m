@@ -1,57 +1,63 @@
 From: dhdang@apm.com (Duc Dang)
-Date: Thu, 17 Sep 2015 11:19:46 -0700
-Subject: [PATCH v8 1/3] usb: make xhci platform driver use 64 bit or 32 bit DMA
+Date: Thu, 17 Sep 2015 11:19:47 -0700
+Subject: [PATCH v8 2/3] usb: Add support for ACPI identification to
+ xhci-platform
 In-Reply-To: <cover.1442513540.git.dhdang@apm.com>
 References: <cover.1442513540.git.dhdang@apm.com>
-Message-ID: <41fbbb49c112705a8c14a342e98bd557c15c8f0c.1442513540.git.dhdang@apm.com>
+Message-ID: <03831105dc007f572a5c642740837435783baa55.1442513540.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The xhci platform driver needs to work on systems that
-either only support 64-bit DMA or only support 32-bit DMA.
-Attempt to set a coherent dma mask for 64-bit DMA, and
-attempt again with 32-bit DMA if that fails.
+Provide the methods to let ACPI identify the need to use
+xhci-platform. Change the Kconfig files so the
+xhci-plat.o file is selectable during kernel config.
+
+This has been tested on an ARM64 machine with platform XHCI, an
+x86_64 machine with XHCI, and an x86_64 machine without XHCI.
+There were no regressions or error messages on the machines
+without platform XHCI.
 
 [dhdang: regenerate the patch over v4.3-rc1 and address new comments]
 Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
-Tested-by: Mark Salter <msalter@redhat.com>
 Signed-off-by: Duc Dang <dhdang@apm.com>
 
 ---
- drivers/usb/host/xhci-plat.c | 20 +++++++++++++-------
- 1 file changed, 13 insertions(+), 7 deletions(-)
+ drivers/usb/host/xhci-plat.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 890ad9d..34c93e8 100644
+index 34c93e8..05647e6 100644
 --- a/drivers/usb/host/xhci-plat.c
 +++ b/drivers/usb/host/xhci-plat.c
-@@ -93,14 +93,20 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	if (irq < 0)
- 		return -ENODEV;
+@@ -19,6 +19,7 @@
+ #include <linux/usb/phy.h>
+ #include <linux/slab.h>
+ #include <linux/usb/xhci_pdriver.h>
++#include <linux/acpi.h>
  
--	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
--	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
--	if (ret)
--		return ret;
--	if (!pdev->dev.dma_mask)
--		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-+	/* Try to set 64-bit DMA first */
-+	if (WARN_ON(!pdev->dev.dma_mask))
-+		/* Platform did not initialize dma_mask */
-+		ret = dma_coerce_mask_and_coherent(&pdev->dev,
-+						   DMA_BIT_MASK(64));
- 	else
--		dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
-+		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+ #include "xhci.h"
+ #include "xhci-mvebu.h"
+@@ -268,6 +269,13 @@ static const struct of_device_id usb_xhci_of_match[] = {
+ MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
+ #endif
+ 
++static const struct acpi_device_id usb_xhci_acpi_match[] = {
++	/* XHCI-compliant USB Controller */
++	{ "PNP0D10", },
++	{ }
++};
++MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
 +
-+	/* If seting 64-bit DMA mask fails, fall back to 32-bit DMA mask */
-+	if (ret) {
-+		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-+		if (ret)
-+			return ret;
-+	}
- 
- 	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
- 	if (!hcd)
+ static struct platform_driver usb_xhci_driver = {
+ 	.probe	= xhci_plat_probe,
+ 	.remove	= xhci_plat_remove,
+@@ -275,6 +283,7 @@ static struct platform_driver usb_xhci_driver = {
+ 		.name = "xhci-hcd",
+ 		.pm = DEV_PM_OPS,
+ 		.of_match_table = of_match_ptr(usb_xhci_of_match),
++		.acpi_match_table = ACPI_PTR(usb_xhci_acpi_match),
+ 	},
+ };
+ MODULE_ALIAS("platform:xhci-hcd");
 -- 
 1.9.1
