@@ -1,32 +1,68 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Thu, 17 Sep 2015 09:32:34 +0800
-Subject: [PATCH v2 00/22] KVM: ARM64: Add guest PMU support
-In-Reply-To: <55F9D9FC.6010905@redhat.com>
-References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
- <55F9D9FC.6010905@redhat.com>
-Message-ID: <55FA1832.3040008@linaro.org>
+From: xerofoify@gmail.com (Nicholas Krause)
+Date: Wed, 16 Sep 2015 21:51:13 -0400
+Subject: [PATCH] mach-s3c64xx:Fix error handling for certain calls to
+ s3c_gpio_cfgpin_range in the file dev-audio.c
+Message-ID: <1442454673-26752-1-git-send-email-xerofoify@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+This fixes error handling for calls to the function
+s3c_gpio_cfgpin_range in the file dev-audio.c that
+assume calls to this particular function always run
+successfully to properly check now if these calls
+fail by returning a error code and if so return it
+directly to the call of these functions in order for
+the caller to be able to handle these failed calls in
+its own error path(s).
 
-On 2015/9/17 5:07, Wei Huang wrote:
-> I am testing this series. 
-Thanks for your time and help.
+Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+---
+ arch/arm/mach-s3c64xx/dev-audio.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-> The first question is: do you plan to add ACPI
-> support in QEMU?
-To the completeness, this should be added. Maybe this could be added at
-v3. But I have a look at the kernel PMU driver, it doesn't support
-probing through ACPI, although there are some patches[1] out-of-tree.
-
-> My in-house kernel uses ACPI for device probing. I had
-> to force "acpi=off" when I test this patch series.
-Guest kernel only boots with ACPI when you add "acpi=force". No need to
-add "acpi=off".
-
-Thanks,
-
-[1] http://marc.info/?l=linaro-acpi&m=137949337925645&w=2
+diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
+index ff780a8..81fabdb 100644
+--- a/arch/arm/mach-s3c64xx/dev-audio.c
++++ b/arch/arm/mach-s3c64xx/dev-audio.c
+@@ -27,6 +27,7 @@
+ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+ {
+ 	unsigned int base;
++	int ret;
+ 
+ 	switch (pdev->id) {
+ 	case 0:
+@@ -47,9 +48,9 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+-
+-	return 0;
++	ret = s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
++
++	return ret;
+ }
+ 
+ static struct resource s3c64xx_iis0_resource[] = {
+@@ -122,6 +123,7 @@ EXPORT_SYMBOL(s3c64xx_device_iisv4);
+ static int s3c64xx_pcm_cfg_gpio(struct platform_device *pdev)
+ {
+ 	unsigned int base;
++	int ret;
+ 
+ 	switch (pdev->id) {
+ 	case 0:
+@@ -136,8 +138,8 @@ static int s3c64xx_pcm_cfg_gpio(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(2));
+-	return 0;
++	ret = s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(2));
++	return ret;
+ }
+ 
+ static struct resource s3c64xx_pcm0_resource[] = {
 -- 
-Shannon
+2.1.4
