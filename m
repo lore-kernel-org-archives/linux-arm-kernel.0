@@ -1,84 +1,215 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 17 Sep 2015 17:21:11 +0100
-Subject: [PATCH v2] arm64: Introduce IRQ stack
-In-Reply-To: <CFF333D1-E771-4C50-902A-444DAE76C163@gmail.com>
-References: <1442155337-7020-1-git-send-email-jungseoklee85@gmail.com>
- <20150917111735.GN25444@e104818-lin.cambridge.arm.com>
- <3C2C78B3-4669-4DBA-98DC-362EB762FD9C@gmail.com>
- <CFF333D1-E771-4C50-902A-444DAE76C163@gmail.com>
-Message-ID: <20150917162110.GO25444@e104818-lin.cambridge.arm.com>
+From: bcodding@redhat.com (Benjamin Coddington)
+Date: Thu, 17 Sep 2015 12:27:51 -0400 (EDT)
+Subject: NFS/TCP/IPv6 acting strangely in 4.2
+In-Reply-To: <1442499509.2865.16.camel@primarydata.com>
+References: <20150911113839.GO21084@n2100.arm.linux.org.uk>
+ <1441976691.4619.58.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20150911143347.GQ21084@n2100.arm.linux.org.uk>
+ <20150911150613.GR21084@n2100.arm.linux.org.uk>
+ <1441984723.4619.61.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20150911162416.GV21084@n2100.arm.linux.org.uk>
+ <20150911164937.GW21084@n2100.arm.linux.org.uk>
+ <20150917135705.GQ21084@n2100.arm.linux.org.uk>
+ <1442499509.2865.16.camel@primarydata.com>
+Message-ID: <alpine.OSX.2.19.9992.1509171224520.17945@planck.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 10:22:26PM +0900, Jungseok Lee wrote:
-> On Sep 17, 2015, at 10:17 PM, Jungseok Lee wrote:
-> > On Sep 17, 2015, at 8:17 PM, Catalin Marinas wrote:
-> >> On Sun, Sep 13, 2015 at 02:42:17PM +0000, Jungseok Lee wrote:
-> >>> Currently, kernel context and interrupts are handled using a single
-> >>> kernel stack navigated by sp_el1. This forces many systems to use
-> >>> 16KB stack, not 8KB one. Low memory platforms naturally suffer from
-> >>> memory pressure accompanied by performance degradation.
-> >>> 
-> >>> This patch addresses the issue as introducing a separate percpu IRQ
-> >>> stack to handle both hard and soft interrupts with two ground rules:
-> >>> 
-> >>> - Utilize sp_el0 in EL1 context, which is not used currently
-> >>> - Do not complicate current_thread_info calculation
-> >>> 
-> >>> It is a core concept to trace struct thread_info using sp_el0 instead
-> >>> of sp_el1. This approach helps arm64 align with other architectures
-> >>> regarding object_is_on_stack() without additional complexity.
-> >> 
-> >> I'm still trying to understand how this patch works. I initially thought
-> >> that we would set SPSel = 0 while in kernel thread mode to make use of
-> >> SP_EL0 but I can't find any such code. Do you still use SP_EL1 all the
-> >> time and SP_EL0 just for temporary saving the thread stack?
-> > 
-> > Exactly.
-> > 
-> > My first approach was to set SPSel = 0 and implement EL1t Sync and IRQ.
-> > This idea originally comes from your comment [1]. A kernel thread could
-> > be handled easily and neatly, but it complicated current_thread_info
-> > calculation due to a user process.
-> > 
-> > Let's assume that a kernel thread uses SP_EL0 by default. When an interrupt
-> > comes in, a core jumps to EL1t IRQ. In case of a user process, a CPU goes
-> > into EL1h IRQ when an interrupt raises. To handle this scenario correctly,
-> > SPSel or spsr_el1 should be referenced. This reaches to quite big overhead
-> > in current_thread_info function.
-> 
-> This statement is described incorrectly. In case of user process, a CPU goes
-> into EL0 IRQ. Under this context, another interrupt could come in. At this
-> time, a core jumps to EL1h IRQ.
+On Thu, 17 Sep 2015, Trond Myklebust wrote:
 
-I don't I entirely follow you here.
+> Hi Russell,
+>
+> On Thu, 2015-09-17 at 14:57 +0100, Russell King - ARM Linux wrote:
+> > On Fri, Sep 11, 2015 at 05:49:38PM +0100, Russell King - ARM Linux
+> > wrote:
+> > > Following that idea, I just tried the patch below, and it seems to
+> > > work.
+> > > I don't know whether it handles all cases after a call to
+> > > kernel_connect(),
+> > > but it stops the multiple connection attempts:
+> > >
+> > >   1   0.000000 armada388 -> n2100 TCP 1009?nfs [SYN] Seq=3794066539
+> > > Win=28560 Len=0 MSS=1440 SACK_PERM=1 TSval=15712 TSecr=870317691
+> > > WS=128
+> > >   2   0.000414 n2100 -> armada388 TCP nfs?1009 [SYN, ACK]
+> > > Seq=1884476522 Ack=3794066540 Win=28560 Len=0 MSS=1440 SACK_PERM=1
+> > > TSval=870318939 TSecr=15712 WS=64
+> > >   3   0.000787 armada388 -> n2100 TCP 1009?nfs [ACK] Seq=3794066540
+> > > Ack=1884476523 Win=28672 Len=0 TSval=15712 TSecr=870318939
+> > >   4   0.001304 armada388 -> n2100 NFS V3 ACCESS Call, FH:
+> > > 0x905379cc, [Check: RD LU MD XT DL]
+> > >   5   0.001566 n2100 -> armada388 TCP nfs?1009 [ACK] Seq=1884476523
+> > > Ack=3794066660 Win=28608 Len=0 TSval=870318939 TSecr=15712
+> > >   6   0.001640 armada388 -> n2100 NFS V3 ACCESS Call, FH:
+> > > 0x905379cc, [Check: RD LU MD XT DL]
+> > >   7   0.001866 n2100 -> armada388 TCP nfs?1009 [ACK] Seq=1884476523
+> > > Ack=3794066780 Win=28608 Len=0 TSval=870318939 TSecr=15712
+> > >   8   0.003070 n2100 -> armada388 NFS V3 ACCESS Reply (Call In 4),
+> > > [Allowed: RD LU MD XT DL]
+> > >   9   0.003415 armada388 -> n2100 TCP 1009?nfs [ACK] Seq=3794066780
+> > > Ack=1884476647 Win=28672 Len=0 TSval=15712 TSecr=870318939
+> > >  10   0.003592 armada388 -> n2100 NFS V3 ACCESS Call, FH:
+> > > 0xe15fc9c9, [Check: RD LU MD XT DL]
+> > >  11   0.004354 n2100 -> armada388 NFS V3 ACCESS Reply (Call In 6),
+> > > [Allowed: RD LU MD XT DL]
+> > >  12   0.004682 armada388 -> n2100 NFS V3 ACCESS Call, FH:
+> > > 0xe15fc9c9, [Check: RD LU MD XT DL]
+> > >  13   0.005365 n2100 -> armada388 NFS V3 ACCESS Reply (Call In 10),
+> > > [Allowed: RD LU MD XT DL]
+> > >  14   0.005701 armada388 -> n2100 NFS V3 GETATTR Call, FH:
+> > > 0xe15fc9c9
+> > > ...
+> >
+> > NFS people - any comments on this patch?  Is it the correct way to
+> > solve
+> > this problem (please see the first message in this thread for the
+> > problem.)
+> > Without this patch, NFS is unusable as it tries to launch multiple
+> > new
+> > connections from the same port to the NFS server without giving the
+> > NFS
+> > server time to respond and establish the TCP connection.
+>
+> I agree that it addresses a real problem here, however there are a
+> couple of issues with the patch itself:
+>
+> AFAICS, the 2 possible next states for SYN_SENT are TCP_ESTABLISHED and
+> TCP_CLOSE, so if the connection attempt fails, this patch leaves the
+> XPRT_CONNECTING flag set.
+> There is also the issue that clearing XPRT_CONNECTING in TCP_FIN_WAIT1,
+> TCP_CLOSE_WAIT and TCP_CLOSING could interfere with another connection
+> attempt by canceling the XPRT_CONNECTING state.
+>
+> How about the following? It is based on your patch, but adds a check to
+> ensure that xs_tcp_state_change() doesn't clear the 'connecting' state
+> more than once (which could otherwise still happen in the TCP_CLOSE
+> case).
+>
+> 8<-------------------------------------------------------------------
+> From 4dbfdebbc09982a9248866f8256549456e2b2efd Mon Sep 17 00:00:00 2001
+> From: Trond Myklebust <trond.myklebust@primarydata.com>
+> Date: Wed, 16 Sep 2015 23:43:17 -0400
+> Subject: [PATCH] SUNRPC: Ensure that we wait for connections to complete
+>  before retrying
+>
+> Commit 718ba5b87343, moved the responsibility for unlocking the socket to
+> xs_tcp_setup_socket, meaning that the socket will be unlocked before we
+> know that it has finished trying to connect. The following patch is based on
+> an initial patch by Russell King to ensure that we delay clearing the
+> XPRT_SOCK_CONNECTING flag until we either know that we failed to initiate
+> a connection attempt, or the connection attempt itself failed.
+>
+> Fixes: 718ba5b87343 ("SUNRPC: Add helpers to prevent socket create from racing")
+> Reported-by: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Trond Myklebust <trond.myklebust@primarydata.com>
 
-First of all, we don't allow re-entrant IRQs, they are disabled during
-handling (there are patches for NMI via IRQ priorities but these would
-be a special case on a different code path; for the current code, let's
-just assume that IRQs are not re-entrant).
+This fixes up my network segmentation problem, tested on top of your "Fix
+races between socket connection and destroy code".
 
-Second, SPSel is automatically set to 1 when taking an exception. So we
-are guaranteed that the kernel entry code always switches to SP_EL1
-(EL1h mode).
+Tested-by: Benjamin Coddington <bcodding@redhat.com>
 
-My initial thought was to populate SP_EL1 per CPU as a handler stack and
-never change it afterwards. The entry code may continue to use SP_EL1 if
-in interrupt or switch to SP_EL0 and SPSel = 0 if in thread context.
-What I didn't realise is that SP_EL0 cannot be accessed directly when
-SPSel == 0, only as SP. This indeed complicates current_thread_info
-slightly.
+Ben
 
-I did some tests with using SPSel in current_thread_info() to read SP or
-SP_EL0 and it doesn't look good, it increased the .text section by 132KB
-(I may have been able to optimise it a bit but it is still quite large).
-With your approach to always use sp_el0, I get about 4KB larger .text
-section.
-
-So, without any better suggestion for current_thread_info(), I'm giving
-up the idea of using SPSel == 0 in the kernel. I'll look at your patch
-in more detail. BTW, I don't think we need the any count for the irq
-stack as we don't re-enter the same IRQ stack.
-
--- 
-Catalin
+> ---
+>  include/linux/sunrpc/xprtsock.h |  3 +++
+>  net/sunrpc/xprtsock.c           | 11 ++++++++---
+>  2 files changed, 11 insertions(+), 3 deletions(-)
+>
+> diff --git a/include/linux/sunrpc/xprtsock.h b/include/linux/sunrpc/xprtsock.h
+> index 7591788e9fbf..357e44c1a46b 100644
+> --- a/include/linux/sunrpc/xprtsock.h
+> +++ b/include/linux/sunrpc/xprtsock.h
+> @@ -42,6 +42,7 @@ struct sock_xprt {
+>  	/*
+>  	 * Connection of transports
+>  	 */
+> +	unsigned long		sock_state;
+>  	struct delayed_work	connect_worker;
+>  	struct sockaddr_storage	srcaddr;
+>  	unsigned short		srcport;
+> @@ -76,6 +77,8 @@ struct sock_xprt {
+>   */
+>  #define TCP_RPC_REPLY		(1UL << 6)
+>
+> +#define XPRT_SOCK_CONNECTING	1U
+> +
+>  #endif /* __KERNEL__ */
+>
+>  #endif /* _LINUX_SUNRPC_XPRTSOCK_H */
+> diff --git a/net/sunrpc/xprtsock.c b/net/sunrpc/xprtsock.c
+> index 7be90bc1a7c2..5bac27983e2a 100644
+> --- a/net/sunrpc/xprtsock.c
+> +++ b/net/sunrpc/xprtsock.c
+> @@ -1435,6 +1435,7 @@ out:
+>  static void xs_tcp_state_change(struct sock *sk)
+>  {
+>  	struct rpc_xprt *xprt;
+> +	struct sock_xprt *transport;
+>
+>  	read_lock_bh(&sk->sk_callback_lock);
+>  	if (!(xprt = xprt_from_sock(sk)))
+> @@ -1446,13 +1447,12 @@ static void xs_tcp_state_change(struct sock *sk)
+>  			sock_flag(sk, SOCK_ZAPPED),
+>  			sk->sk_shutdown);
+>
+> +	transport = container_of(xprt, struct sock_xprt, xprt);
+>  	trace_rpc_socket_state_change(xprt, sk->sk_socket);
+>  	switch (sk->sk_state) {
+>  	case TCP_ESTABLISHED:
+>  		spin_lock(&xprt->transport_lock);
+>  		if (!xprt_test_and_set_connected(xprt)) {
+> -			struct sock_xprt *transport = container_of(xprt,
+> -					struct sock_xprt, xprt);
+>
+>  			/* Reset TCP record info */
+>  			transport->tcp_offset = 0;
+> @@ -1461,6 +1461,8 @@ static void xs_tcp_state_change(struct sock *sk)
+>  			transport->tcp_flags =
+>  				TCP_RCV_COPY_FRAGHDR | TCP_RCV_COPY_XID;
+>  			xprt->connect_cookie++;
+> +			clear_bit(XPRT_SOCK_CONNECTING, &transport->sock_state);
+> +			xprt_clear_connecting(xprt);
+>
+>  			xprt_wake_pending_tasks(xprt, -EAGAIN);
+>  		}
+> @@ -1496,6 +1498,9 @@ static void xs_tcp_state_change(struct sock *sk)
+>  		smp_mb__after_atomic();
+>  		break;
+>  	case TCP_CLOSE:
+> +		if (test_and_clear_bit(XPRT_SOCK_CONNECTING,
+> +					&transport->sock_state))
+> +			xprt_clear_connecting(xprt);
+>  		xs_sock_mark_closed(xprt);
+>  	}
+>   out:
+> @@ -2179,6 +2184,7 @@ static int xs_tcp_finish_connecting(struct rpc_xprt *xprt, struct socket *sock)
+>  	/* Tell the socket layer to start connecting... */
+>  	xprt->stat.connect_count++;
+>  	xprt->stat.connect_start = jiffies;
+> +	set_bit(XPRT_SOCK_CONNECTING, &transport->sock_state);
+>  	ret = kernel_connect(sock, xs_addr(xprt), xprt->addrlen, O_NONBLOCK);
+>  	switch (ret) {
+>  	case 0:
+> @@ -2240,7 +2246,6 @@ static void xs_tcp_setup_socket(struct work_struct *work)
+>  	case -EINPROGRESS:
+>  	case -EALREADY:
+>  		xprt_unlock_connect(xprt, transport);
+> -		xprt_clear_connecting(xprt);
+>  		return;
+>  	case -EINVAL:
+>  		/* Happens, for instance, if the user specified a link
+> --
+> 2.4.3
+>
+> --
+> Trond Myklebust
+> Linux NFS client maintainer, PrimaryData
+> trond.myklebust at primarydata.com
+>
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-nfs" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
