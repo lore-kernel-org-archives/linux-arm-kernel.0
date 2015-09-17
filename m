@@ -1,137 +1,90 @@
-From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Thu, 17 Sep 2015 20:14:14 +0800
-Subject: [PATCH RFC 1/8] dt-bindings: Document the hi6220 bindings for
- DRM driver
-In-Reply-To: <55F9321E.7090100@codeaurora.org>
-References: <1442309834-21420-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <1442309834-21420-2-git-send-email-kong.kongxinwei@hisilicon.com>
- <55F85F54.1020807@kernel.org> <55F9298C.3020009@hisilicon.com>
- <55F9321E.7090100@codeaurora.org>
-Message-ID: <55FAAE96.1090801@hisilicon.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 17 Sep 2015 14:27:53 +0200
+Subject: [PATCH 1/2] mmc: core: enable CMD19 tuning for DDR50 mode
+In-Reply-To: <CAGsJ_4x5Nd3Cts1BHsUyB_mCejxbHPPjznUVWUcFoZhxKy+Tcg@mail.gmail.com>
+References: <1439282492-6274-1-git-send-email-21cnbao@gmail.com>
+ <CAPDyKFpXZD28NwNAhKQyxmWasVhk_7AeyOW6oXaBPHKuSTmGUA@mail.gmail.com>
+ <CAGsJ_4wvvQdyjFi=JmWfASm-LbJMybrhC=Wxxn7jHZEP5dUfEw@mail.gmail.com>
+ <CAPDyKFpEwWvu3tnbMT9ZvM0TUvEHp0Qa8PADohyJoTaNZ9HS9g@mail.gmail.com>
+ <CAGsJ_4x5Nd3Cts1BHsUyB_mCejxbHPPjznUVWUcFoZhxKy+Tcg@mail.gmail.com>
+Message-ID: <CAPDyKFpWfY9G4WG_GfCutJ2NkRbcAYZToYJXp3RvX=_25sgnWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi architt
-
-On 2015/9/16 17:10, Archit Taneja wrote:
-> Hi,
-> 
-> On 09/16/2015 02:04 PM, Xinwei Kong wrote:
->> hi architt
->>
->> On 2015/9/16 2:11, Rob Herring wrote:
->>> On 09/15/2015 04:37 AM, Xinwei Kong wrote:
->>>> This adds documentation of device tree bindings for the
->>>> Graphics Processing Unit of hi6220 SOC.
+On 15 September 2015 at 09:13, Barry Song <21cnbao@gmail.com> wrote:
+> 2015-08-25 20:05 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
+>> On 20 August 2015 at 02:16, Barry Song <21cnbao@gmail.com> wrote:
+>>> 2015-08-18 1:11 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
+>>>> On 11 August 2015 at 10:41, Barry Song <21cnbao@gmail.com> wrote:
+>>>>> From: Weijun Yang <york.yang@csr.com>
+>>>>>
+>>>>> As SD Specifications Part1 Physical Layer Specification Version
+>>>>> 3.01 says, CMD19 tuning is available for unlocked cards in transfer
+>>>>> state of 1.8V signaling mode. The small difference between v3.00
+>>>>> and 3.01 spec means that CMD19 tuning is also available for DDR50
+>>>>> mode.
 >>>>
->>>> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
->>>> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
->>>> Signed-off-by: Andy Green <andy.green@linaro.org>
->>>> Signed-off-by: Jiwen Qi <qijiwen@hisilicon.com>
->>>> Signed-off-by: Yu Gong <gongyu@hisilicon.com>
->>>> ---
->>>>   .../devicetree/bindings/gpu/hisilicon,hi6220.txt   | 69 ++++++++++++++++++++++
->>>>   1 file changed, 69 insertions(+)
->>>>   create mode 100644 Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt b/Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt
->>>> new file mode 100644
->>>> index 0000000..173ac63
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt
->>>> @@ -0,0 +1,69 @@
->>>> + * Hisilicon hi6220 Graphics Processing Unit for HiKey board
->>>> +
->>>> + ** display-subsystem: Master device for binding DRM sub-components
+>>>> So what happens with cards following the 3.0 spec version, those
+>>>> doesn't need to support the tuning CMD right? Perhaps that needs to be
+>>>> addressed in this patch well!?
 >>>
->>> DRM is a Linuxism that doesn't belong in the binding.
->>>
->>>> +    This master device is parent node and it will be responsible to bind all
->>>> +    sub-components devices node.
->>>
->>> Are these nodes a single block in the h/w? If not, you should describe
->>> the connection of sub-nodes with of-graph instead.
->>>
->>>> +    - Required properties :
->>>> +      - compatible: "hisilicon,display-subsystem".
->>>> +      - #address-cells, #size-cells: Must be present if the device has sub-nodes.
->>>> +      - ranges: to allow probing of subdevices.
->>>> +      - dma-coherent: Present if dma operations are coherent.
->>>> +
->>>> + ** ade: Graphic overlay, Graphic post-processing, display timing control.
->>>> +    This device is child node of display-subsystem
->>>> +    - Required properties :
->>>> +      - compatible: "hisilicon,hi6220-ade".
->>>> +      - reg: physical base address of the ADE register and length of memory
->>>> +    region.
->>>> +      - reg-names: Should contain the reg names "ade_base" and "media_base".
->>>> +      - interrupt: The interrupt number to the cpu. Defines the interrupt
->>>> +        by ADE.
->>>> +      - clocks: The clocks needed by the ADE module.
->>>> +      - clock-names: the name of the clocks.
->>>> +
->>>> + ** dsi: support mipi dsi interface
->>>> +    This device is child node of display-subsystem
->>>> +    - Required properties :
->>>> +      - compatible: "hisilicon,hi6220-dsi".
->>>> +      - reg: physical base address of the DSI register and length of memory
->>>> +    region.
->>>> +      - clocks: The clocks needed by the DSI module.
->>>> +      - clock-names: the name of the clocks.
->>>> +      -    encoder-slave: phandles to a 'encoder-slave' subnode which DSI connect
->>>> +        ADV7533 in order to support hdmi display.
->>>
->>> What the ADV7533 binding looks like is still being discussed.
->>> "encoder-slave" is certainly DRM specific and not how it should be done.
->>> Most likely, this needs to use the of-graph ports.
->>>
->> I dont how to implement the encoder bridge stuff in upstream,
->> you think that I will how to handle this part?
-> 
-> You can use of-graph ports to link the dsi output with the adv7533
-> bridge.
-> 
-> An example of the binding looks like:
-> 
-> Documentation/devicetree/bindings/drm/msm/dsi.txt
-> 
-> The implementation of this on the dsi host side of drm/msm
-> can be found in dsi_host_parse_dt, in:
-> 
-> drivers/gpu/drm/msm/dsi/dsi_host.c
-> 
-> You can get to know more about of-graph parsing here:
-> 
-> Documentation/devicetree/bindings/graph.txt
-> 
-I study your patch about of-graph parsing, I know that how to parse this
-dts endpoint node. Then i dont kow how to use this device_node (which is
-get by "of_graph_get_remote_port_parent" function.) to hook adv7533 operation.
+>>> from HW registers of the card, we cann't know whether the HW needs
+>>> tuning. it is said 3.0.x need tuning, but 3.0 doesn't need.  @weijun,
+>>> pls fix me if i am wrong.
+>>> if so, it seems we need a static flag somewhere to indicate whether
+>>> the tuning is needed. we can't detect to find the tuning requirement.
+>>
+>> Another way is to always try doing the tuning for DDR50, but in case
+>> of errors just ignore them and print a debug/info message!?
+>
+> Uffe, do you mean something like below:
+>
+> diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
+> index 4e7366a..d4df9f0 100644
+> --- a/drivers/mmc/core/sd.c
+> +++ b/drivers/mmc/core/sd.c
+> @@ -629,8 +629,23 @@ static int mmc_sd_init_uhs_card(struct mmc_card *card)
+>       */
+>      if (!mmc_host_is_spi(card->host) &&
+>          (card->sd_bus_speed == UHS_SDR50_BUS_SPEED ||
+> -         card->sd_bus_speed == UHS_SDR104_BUS_SPEED))
+> +         card->sd_bus_speed == UHS_DDR50_BUS_SPEED ||
+> +         card->sd_bus_speed == UHS_SDR104_BUS_SPEED)) {
+>          err = mmc_execute_tuning(card);
+> +
+> +        /*
+> +         * As SD Specifications Part1 Physical Layer Specification Version
+> +         * 3.01 says, CMD19 tuning is available for unlocked cards in transfer
+> +         * state of 1.8V signaling mode. The small difference between v3.00
+> +         * and 3.01 spec means that CMD19 tuning is also available for DDR50
+> +         * mode.
+> +         */
+> +        if (err && (card->sd_bus_speed == UHS_DDR50_BUS_SPEED))
+> +            pr_err("%s: ddr50 tuning failed\n", mmc_hostname(card->host));
 
-can you give me some help to how to use the adv7533 interface by device_node or
-other way to use adv7533?
+Perhaps pr_warn() instead.
 
-> I'd started going through the drm/hisil patches. I'll
-> share more comments there.
-> 
-> Thanks,
-> Archit
-> 
->>
->> Thank you
->> xinwei
->>
->>> Also, the ADV7533 connection is specific to HiKey. This binding should
->>> just generically describe how any bridge or panel is connected.
->>>
->>> Rob
->>>
->>> .
->>>
->>
->> -- 
->> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> 
+Moreover, you may just assign err = 0 and leave the return/kfree to
+the "out" label.
+
+> +            kfree(status);
+> +            return 0;
+> +        }
+> +    }
+>  out:
+>      kfree(status);
+>
+
+[...]
+
+Also, I was giving this a second thought...
+
+What happens with the SD 3.0 card when it *doesn't* support CMD19.
+Will it still be functional afterwards or will it move from "transfer
+state" to another not known state?
+
+So maybe we should just do the tuning and return the error if it
+fails, as you suggested in the original patch. :-)
+
+Kind regards
+Uffe
