@@ -1,78 +1,47 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Sep 2015 15:46:03 +0100
-Subject: [GIT PULL] Second set of KVM/ARM updates for 4.3-rc2
-Message-ID: <1442501171-24484-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 17 Sep 2015 15:46:07 +0100
+Subject: [PATCH 4/8] arm/arm64: KVM: vgic: Check for !irqchip_in_kernel() when
+ mapping resources
+In-Reply-To: <1442501171-24484-1-git-send-email-marc.zyngier@arm.com>
+References: <1442501171-24484-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1442501171-24484-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo,
+From: Pavel Fedin <p.fedin@samsung.com>
 
-We've had a "nice" collection of fixes trickling in this week, and
-since both Christoffer and I are away next week, I've decided to send
-everything your way a bit early. Fairly random stuff to be honnest,
-but a negative diffstat can't be that bad! :-)
+Until b26e5fdac43c ("arm/arm64: KVM: introduce per-VM ops"),
+kvm_vgic_map_resources() used to include a check on irqchip_in_kernel(),
+and vgic_v2_map_resources() still has it.
 
-Thanks,
+But now vm_ops are not initialized until we call kvm_vgic_create().
+Therefore kvm_vgic_map_resources() can being called without a VGIC,
+and we die because vm_ops.map_resources is NULL.
 
-       M.
+Fixing this restores QEMU's kernel-irqchip=off option to a working state,
+allowing to use GIC emulation in userspace.
 
-The following changes since commit 0c0672922dcc70ffba11d96385e98e42fb3ae08d:
+Fixes: b26e5fdac43c ("arm/arm64: KVM: introduce per-VM ops")
+Cc: stable at vger.kernel.org
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+[maz: reworked commit message]
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/arm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-  arm/arm64: KVM: Fix PSCI affinity info return value for non valid cores (2015-09-04 17:02:48 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.3-rc2-2
-
-for you to fetch changes up to ef748917b529847277f07c98c55e1c0ce416449f:
-
-  arm/arm64: KVM: Remove 'config KVM_ARM_MAX_VCPUS' (2015-09-17 13:13:27 +0100)
-
-----------------------------------------------------------------
-Second set of KVM/ARM changes for 4.3-rc2
-
-- Workaround for a Cortex-A57 erratum
-- Bug fix for the debugging infrastructure
-- Fix for 32bit guests with more than 4GB of address space
-  on a 32bit host
-- A number of fixes for the (unusual) case when we don't use
-  the in-kernel GIC emulation
-- Removal of ThumbEE handling on arm64, since these have been
-  dropped from the architecture before anyone actually ever
-  built a CPU
-- Remove the KVM_ARM_MAX_VCPUS limitation which has become
-  fairly pointless
-
-----------------------------------------------------------------
-Marc Zyngier (3):
-      arm64: KVM: Fix user access for debug registers
-      arm64: KVM: Disable virtual timer even if the guest is not using it
-      arm: KVM: Disable virtual timer even if the guest is not using it
-
-Marek Majtyka (1):
-      arm: KVM: Fix incorrect device to IPA mapping
-
-Ming Lei (1):
-      arm/arm64: KVM: Remove 'config KVM_ARM_MAX_VCPUS'
-
-Pavel Fedin (1):
-      arm/arm64: KVM: vgic: Check for !irqchip_in_kernel() when mapping resources
-
-Will Deacon (2):
-      KVM: arm64: add workaround for Cortex-A57 erratum #852523
-      arm64: KVM: Remove all traces of the ThumbEE registers
-
- arch/arm/include/asm/kvm_host.h   |  8 ++------
- arch/arm/kvm/Kconfig              | 11 -----------
- arch/arm/kvm/arm.c                |  2 +-
- arch/arm/kvm/interrupts_head.S    |  6 ++++--
- arch/arm/kvm/mmu.c                |  6 ++++--
- arch/arm64/include/asm/kvm_arm.h  |  1 -
- arch/arm64/include/asm/kvm_asm.h  |  4 +---
- arch/arm64/include/asm/kvm_host.h |  8 ++------
- arch/arm64/kvm/Kconfig            | 11 -----------
- arch/arm64/kvm/hyp.S              | 31 ++++++++++---------------------
- arch/arm64/kvm/sys_regs.c         | 15 ++++-----------
- include/kvm/arm_vgic.h            |  6 +-----
- virt/kvm/arm/vgic-v3.c            |  2 +-
- 13 files changed, 30 insertions(+), 81 deletions(-)
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index ce404a5..dc017ad 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -446,7 +446,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ 	 * Map the VGIC hardware resources before running a vcpu the first
+ 	 * time on this VM.
+ 	 */
+-	if (unlikely(!vgic_ready(kvm))) {
++	if (unlikely(irqchip_in_kernel(kvm) && !vgic_ready(kvm))) {
+ 		ret = kvm_vgic_map_resources(kvm);
+ 		if (ret)
+ 			return ret;
+-- 
+2.1.4
