@@ -1,109 +1,107 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 17 Sep 2015 17:02:31 +0200
-Subject: [PATCH 5/8] arm64: KVM: Disable virtual timer even if the guest
- is not using it
-In-Reply-To: <1442501171-24484-6-git-send-email-marc.zyngier@arm.com>
-References: <1442501171-24484-1-git-send-email-marc.zyngier@arm.com>
- <1442501171-24484-6-git-send-email-marc.zyngier@arm.com>
-Message-ID: <55FAD607.9040305@redhat.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 17 Sep 2015 17:05:35 +0200
+Subject: [PATCH v2 7/9] rockchip: make sure timer5 is enabled on rk3036
+ platforms
+In-Reply-To: <1442486244-1833-1-git-send-email-zhengxing@rock-chips.com>
+References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
+ <1442486244-1833-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <11125723.j2J5LpAGi4@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Donnerstag, 17. September 2015, 18:37:24 schrieb Xing Zheng:
+> The timer5 supplies the architected timer and thus as has to run when
+> the system clocksource and clockevents drivers are registered.
+
+please kindly ask the people doing uboot development to do this in uboot 
+itself in future socs :-) - for example Simon's rk3288 mainline uboot does 
+this correctly.
 
 
-On 17/09/2015 16:46, Marc Zyngier wrote:
-> When running a guest with the architected timer disabled (with QEMU and
-> the kernel_irqchip=off option, for example), it is important to make
-> sure the timer gets turned off. Otherwise, the guest may try to
-> enable it anyway, leading to a screaming HW interrupt.
 > 
-> The fix is to unconditionally turn off the virtual timer on guest
-> exit.
-> 
-> Cc: stable at vger.kernel.org
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 > ---
->  arch/arm64/kvm/hyp.S | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index 39aa322..60a83e2 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -562,8 +562,6 @@
->  	mrs	x3, cntv_ctl_el0
->  	and	x3, x3, #3
->  	str	w3, [x0, #VCPU_TIMER_CNTV_CTL]
-> -	bic	x3, x3, #1		// Clear Enable
-> -	msr	cntv_ctl_el0, x3
->  
->  	isb
->  
-> @@ -571,6 +569,9 @@
->  	str	x3, [x0, #VCPU_TIMER_CNTV_CVAL]
->  
->  1:
-> +	// Disable the virtual timer
-> +	msr	cntv_ctl_el0, xzr
+> Changes in v2: None
+> 
+>  arch/arm/mach-rockchip/rockchip.c |   22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+> 
+> diff --git a/arch/arm/mach-rockchip/rockchip.c
+> b/arch/arm/mach-rockchip/rockchip.c index b6cf3b4..937047f 100644
+> --- a/arch/arm/mach-rockchip/rockchip.c
+> +++ b/arch/arm/mach-rockchip/rockchip.c
+> @@ -32,6 +32,8 @@
+>  #define RK3288_GRF_SOC_CON0 0x244
+>  #define RK3288_TIMER6_7_PHYS 0xff810000
+> 
+> +#define RK3036_TIMER5_PHYS 0x200440a0
 > +
->  	// Allow physical timer/counter access for the host
->  	mrs	x2, cnthctl_el2
->  	orr	x2, x2, #3
+
+#define RK3036_TIMER_PHYS 0x20044000
+--> the actual base address of the timer block
+
+As it looks like that we'll need to duplicate that timer init at least for the 
+rk3036 and the timer ip in question is actually the same on both, please split 
+out the actual work into a separate function like
+
+static void rockchip_init_arch_timer_supply(resource_size_t phys, int offs)
+{
+		reg_base = ioremap(phys, SZ_16K);
+		if (reg_base) {
+			writel(0, reg_base + offs + 0x10);
+			writel(0xffffffff, reg_base + offs);
+			writel(0xffffffff, reg_base + offs + 0x04);
+			writel(1, reg_base + offs + 0x10);
+			dsb();
+			iounmap(reg_base);
+		} else {
+			pr_err("rockchip: could not map timer registers\n");
+		}
+}
+
+>  static void __init rockchip_timer_init(void)
+>  {
+>  	if (of_machine_is_compatible("rockchip,rk3288")) {
+> @@ -64,6 +66,25 @@ static void __init rockchip_timer_init(void)
+
+for the rk3288 exchange the timer init against
+rockchip_init_arch_timer_supply(RK3288_TIMER6_7_PHYS, 0x20);
+
+
+>  			regmap_write(grf, RK3288_GRF_SOC_CON0, 0x10000000);
+>  		else
+>  			pr_err("rockchip: could not get grf syscon\n");
+> +	} else if (of_machine_is_compatible("rockchip,rk3036")) {
+> +		void __iomem *reg_base;
+> +
+> +		/*
+> +		 * Most/all uboot versions for rk3036 don't enable timer5
+> +		 * which is needed for the architected timer to work.
+> +		 * So make sure it is running during early boot.
+> +		 */
+> +		reg_base = ioremap(RK3036_TIMER5_PHYS, SZ_16K);
+> +		if (reg_base) {
+> +			writel(0, reg_base + 0x10);
+> +			writel(0xffffffff, reg_base);
+> +			writel(0xffffffff, reg_base + 0x04);
+> +			writel(1, reg_base + 0x10);
+> +			dsb();
+> +			iounmap(reg_base);
+> +		} else {
+> +			pr_err("rockchip: could not map timer5 registers\n");
+> +		}
+
+rockchip_init_arch_timer_supply(RK3036_TIMER_PHYS, 0xa0);
+
+>  	}
 > 
-
-It looks like here in restore_timer_state:
-
-        ldr     w2, [x0, #VCPU_TIMER_CNTV_CTL]
-        and     x2, x2, #3
-        msr     cntv_ctl_el0, x2
-
-the "and" would be unnecessary if kvm_arm_timer_set_reg remembered to 
-do it.  Something like this, which would also make the code more 
-consistent between arm and arm64...
-
-diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-index 702740d37465..93e322b4d242 100644
---- a/arch/arm/kvm/interrupts_head.S
-+++ b/arch/arm/kvm/interrupts_head.S
-@@ -514,6 +514,7 @@ ARM_BE8(rev	r6, r6  )
- 	beq	1f
- 
- 	mrc	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
-+	and	r2, r2, #3
- 	str	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
- 	bic	r2, #1			@ Clear ENABLE
- 	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
-@@ -566,7 +567,6 @@ ARM_BE8(rev	r6, r6  )
- 	isb
- 
- 	ldr	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
--	and	r2, r2, #3
- 	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
- 1:
- .endm
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 10915aaf0b01..bfcd3f3a947b 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -887,7 +887,6 @@ alternative_endif
- 	isb
- 
- 	ldr	w2, [x0, #VCPU_TIMER_CNTV_CTL]
--	and	x2, x2, #3
- 	msr	cntv_ctl_el0, x2
- 1:
- .endm
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 98c95f2fcba4..9b03c9f5abbf 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -218,7 +218,7 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
- 
- 	switch (regid) {
- 	case KVM_REG_ARM_TIMER_CTL:
--		timer->cntv_ctl = value;
-+		timer->cntv_ctl = value & (ARCH_TIMER_CTRL_IT_MASK | ARCH_TIMER_CTRL_ENABLE);
- 		break;
- 	case KVM_REG_ARM_TIMER_CNT:
- 		vcpu->kvm->arch.timer.cntvoff = kvm_phys_timer_read() - value;
+>  	of_clk_init(NULL);
+> @@ -79,6 +100,7 @@ static void __init rockchip_dt_init(void)
+> 
+>  static const char * const rockchip_board_dt_compat[] = {
+>  	"rockchip,rk2928",
+> +	"rockchip,rk3036",
+>  	"rockchip,rk3066a",
+>  	"rockchip,rk3066b",
+>  	"rockchip,rk3188",
