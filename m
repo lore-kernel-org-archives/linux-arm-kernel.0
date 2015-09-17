@@ -1,30 +1,86 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 17 Sep 2015 12:19:18 +0200 (CEST)
-Subject: [PATCH 1/3] clocksource: rockchip: Make the driver more
- readability and compatible
-In-Reply-To: <55FA9099.7000903@linaro.org>
-References: <1442476272-31723-1-git-send-email-wxt@rock-chips.com>
- <1442476272-31723-2-git-send-email-wxt@rock-chips.com>
- <55FA83D5.9010504@linaro.org> <55FA87AA.4040807@gmail.com>
- <55FA9099.7000903@linaro.org>
-Message-ID: <alpine.DEB.2.11.1509171217080.3951@nanos>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Sep 2015 11:23:19 +0100
+Subject: [PATCH RFT] mach-s3c64xx:Fix error handling for certain calls to
+ s3c_gpio_cfgpin_range in the file dev-audio.c
+In-Reply-To: <1442458835-25520-1-git-send-email-xerofoify@gmail.com>
+References: <1442458835-25520-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <20150917102319.GL21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Sep 2015, Daniel Lezcano wrote:
-> On 09/17/2015 11:28 AM, Caesar Wang wrote:
-> > > I think the NO_IRQ definition is missing for ARM64.
-> > 
-> > Yep, Maybe better to compatible if we don't use the 'NO_IRQ',
-> 
-> Hmm, after digging into drivers/of/irq.c and kernel/irq/irqdomain.c
-> 
-> when there is an error it returns zero. So NO_IRQ and -1 are not correct and
-> on the other side zero can be a valid irq. That sounds a little bit fuzzy to
-> me.
+On Wed, Sep 16, 2015 at 11:00:35PM -0400, Nicholas Krause wrote:
+> diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
+> index ff780a8..81fabdb 100644
+> --- a/arch/arm/mach-s3c64xx/dev-audio.c
+> +++ b/arch/arm/mach-s3c64xx/dev-audio.c
+> @@ -27,6 +27,7 @@
+>  static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+>  {
+>  	unsigned int base;
+> +	int ret;
+>  
+>  	switch (pdev->id) {
+>  	case 0:
+> @@ -47,9 +48,9 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> -	s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+> -
+> -	return 0;
+> +	ret = s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+> +
+> +	return ret;
 
-IRQ0 is invalid for historical reasons. End of story.
+Let's look at the code:
 
-Thanks,
+        case 2:
+                s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5));
+                s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5));
+                s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5));
+                s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));
+                return 0;
+        default:
+                printk(KERN_DEBUG "Invalid I2S Controller number: %d\n",
+                        pdev->id);
+                return -EINVAL;
+        }
 
-	tglx
+        s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+
+        return 0;
+
+and you're changing it to:
+
+        case 2:
+                s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5));
+                s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5));
+                s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5));
+                s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));
+                return 0;
+        default:
+                printk(KERN_DEBUG "Invalid I2S Controller number: %d\n",
+                        pdev->id);
+                return -EINVAL;
+        }
+
+        ret = s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+
+        return ret;
+
+What about all the previous calls to s3c_gpio_cfgpin_range() and
+s3c_gpio_cfgpin() ?  Can't they fail as well?
+
+However, _maybe_ the original authors idea was "I don't care if these
+calls fail, it's safer to continue if they do" and your changes actually
+result in breakage.
+
+Maybe the better solution would be to add WARN_ON() around each of these.
+
+There's a lot of questions here, none of them are a trivial case of "lets
+generate a patch to just do some random change to the code and hope it's
+right."
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
