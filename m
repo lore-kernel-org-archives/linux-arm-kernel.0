@@ -1,71 +1,33 @@
-From: xerofoify@gmail.com (Nicholas Krause)
-Date: Wed, 16 Sep 2015 23:00:35 -0400
-Subject: [PATCH RFT] mach-s3c64xx:Fix error handling for certain calls to
- s3c_gpio_cfgpin_range in the file dev-audio.c
-Message-ID: <1442458835-25520-1-git-send-email-xerofoify@gmail.com>
+From: songjun.wu@atmel.com (Wu, Songjun)
+Date: Thu, 17 Sep 2015 11:07:20 +0800
+Subject: [PATCH 2/2] ASoC: atmel-classd: DT binding for Class D audio
+ amplifier driver
+In-Reply-To: <20150916194234.GR12027@sirena.org.uk>
+References: <1441086101-15303-1-git-send-email-songjun.wu@atmel.com>
+ <1441086101-15303-3-git-send-email-songjun.wu@atmel.com>
+ <20150903114316.GV12027@sirena.org.uk> <55EC0AFE.3080809@atmel.com>
+ <20150907162548.GW5313@sirena.org.uk> <55EEAC0D.7010003@atmel.com>
+ <20150908122340.GC9751@sirena.org.uk> <55F78C79.30102@atmel.com>
+ <20150916194234.GR12027@sirena.org.uk>
+Message-ID: <55FA2E68.5010104@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes error handling for calls to the function 
-s3c_gpio_cfgpin_range in the file dev-audio.c that
-assume calls to this particular function always run 
-successfully to properly check now if these calls
-fail by returning a error code and if so return it 
-directly as otherwise we fail to signal that the
-pins have failed to changed their configuration to 
-future function users of the gpio configuration
-of this device, therefore making them incorrectly 
-access a misconfigured gpio subsystem on the board
-using this gpio driver.
 
-Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
----
- arch/arm/mach-s3c64xx/dev-audio.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
-index ff780a8..81fabdb 100644
---- a/arch/arm/mach-s3c64xx/dev-audio.c
-+++ b/arch/arm/mach-s3c64xx/dev-audio.c
-@@ -27,6 +27,7 @@
- static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
- {
- 	unsigned int base;
-+	int ret;
- 
- 	switch (pdev->id) {
- 	case 0:
-@@ -47,9 +48,9 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
--
--	return 0;
-+	ret = s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
-+
-+	return ret;
- }
- 
- static struct resource s3c64xx_iis0_resource[] = {
-@@ -122,6 +123,7 @@ EXPORT_SYMBOL(s3c64xx_device_iisv4);
- static int s3c64xx_pcm_cfg_gpio(struct platform_device *pdev)
- {
- 	unsigned int base;
-+	int ret;
- 
- 	switch (pdev->id) {
- 	case 0:
-@@ -136,8 +138,8 @@ static int s3c64xx_pcm_cfg_gpio(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(2));
--	return 0;
-+	ret = s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(2));
-+	return ret;
- }
- 
- static struct resource s3c64xx_pcm0_resource[] = {
--- 
-2.1.4
+On 9/17/2015 03:42, Mark Brown wrote:
+> On Tue, Sep 15, 2015 at 11:11:53AM +0800, Wu, Songjun wrote:
+>
+>> I try to use one entry, but there is a problem.
+>> It's about 'driver_data' in struct device.
+>> In function snd_soc_register_card, the parameter 'card' will be set to
+>> 'driver_data' by the code 'dev_set_drvdata(card->dev, card)'.
+>> Then some resources(eg. regmap, clock) also need be recorded by
+>> 'driver_data'. One entry could only has one 'driver_data'. I think the best
+>> way is to create two entries, like the current dts.
+>> What's your opinion?
+>
+> Look at the recently applied sunxi driver for an example of how to do
+> this - it's a similar piece of hardware (entirely in the SoC and so on).
+>
+Thank you, It really helps me. I will make a second version soon.
