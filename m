@@ -1,14 +1,14 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 17 Sep 2015 14:57:10 +0200
-Subject: [PATCH v5 16/23] clk: Probe clk providers on demand
+Date: Thu, 17 Sep 2015 14:57:14 +0200
+Subject: [PATCH v5 20/23] power-supply: Probe power supplies on demand
 In-Reply-To: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1442494637-3674-17-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1442494637-3674-21-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When looking up a clock through its OF node, probe it if it hasn't
-already.
+When looking up a power supply through its OF node, probe it if it
+hasn't already.
 
 The goal is to reduce deferred probes to a minimum, as it makes it very
 cumbersome to find out why a device failed to probe, and can introduce
@@ -22,29 +22,29 @@ Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- drivers/clk/clk.c | 3 +++
+ drivers/power/power_supply_core.c | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 43e2c3ad6c31..e5fe02a11c36 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
+diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
+index 456987c88baa..80bc89f4ae89 100644
+--- a/drivers/power/power_supply_core.c
++++ b/drivers/power/power_supply_core.c
 @@ -19,6 +19,7 @@
- #include <linux/list.h>
- #include <linux/slab.h>
- #include <linux/of.h>
+ #include <linux/err.h>
+ #include <linux/power_supply.h>
+ #include <linux/thermal.h>
 +#include <linux/of_device.h>
- #include <linux/device.h>
- #include <linux/init.h>
- #include <linux/sched.h>
-@@ -3004,6 +3005,8 @@ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
- 	if (!clkspec)
- 		return ERR_PTR(-EINVAL);
+ #include "power_supply.h"
  
-+	of_device_probe(clkspec->np);
+ /* exported for the APM Power driver, APM emulation */
+@@ -206,6 +207,8 @@ static int power_supply_find_supply_from_node(struct device_node *supply_node)
+ {
+ 	int error;
+ 
++	of_device_probe(supply_node);
 +
- 	/* Check if we have such a provider in our array */
- 	mutex_lock(&of_clk_mutex);
- 	list_for_each_entry(provider, &of_clk_providers, link) {
+ 	/*
+ 	 * class_for_each_device() either returns its own errors or values
+ 	 * returned by __power_supply_find_supply_from_node().
 -- 
 2.4.3
