@@ -1,51 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 17 Sep 2015 13:29:05 +0200
-Subject: [PATCH 2/4] ARM: dts: sun7i: Add keypad node to Allwinner A20 SoC
-In-Reply-To: <1442325957-10102-3-git-send-email-yassinjaffer@gmail.com>
-References: <1442325957-10102-1-git-send-email-yassinjaffer@gmail.com>
- <1442325957-10102-3-git-send-email-yassinjaffer@gmail.com>
-Message-ID: <20150917112905.GC4684@lukather>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 17 Sep 2015 12:31:23 +0100
+Subject: [PATCH v2] audio: sai: Add Power Management support
+In-Reply-To: <BN3PR0301MB0867DCDF1F7F6391A94121B2FE5A0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+References: <1442221404-35240-1-git-send-email-b18965@freescale.com>
+ <20150917065732.GB54360@Asurada-CZ80>
+ <BN3PR0301MB0867DCDF1F7F6391A94121B2FE5A0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+Message-ID: <20150917113123.GD12027@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yassin,
+On Thu, Sep 17, 2015 at 09:53:57AM +0000, Huan Wang wrote:
+> > On Mon, Sep 14, 2015 at 05:03:24PM +0800, Alison Wang wrote:
 
-On Wed, Sep 16, 2015 at 12:05:55AM +1000, yassinjaffer at gmail.com wrote:
-> From: Yassin Jaffer <yassinjaffer@gmail.com>
-> 
-> Add Keypad controller node definition to the A20 SoC.
-> 
-> Signed-off-by: Yassin Jaffer <yassinjaffer@gmail.com>
-> ---
->  arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index 333604a..35cc8d0 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -1198,6 +1198,15 @@
->  			status = "disabled";
->  		};
->  
-> +		kp: kp at 01c23000 {
+> > Just to remind that there was a similar patch in review that I just
+> > acked. Please send your improvements as an incremental patch after that
+> > one gets applied.
 
-The node name should reflect the class of the device. keypad at 01c23000
-would be better for example.
+> [Alison Wang] Ok, I missed that patch.
 
-It looks good otherwise.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Unless that patch has already been applied I'm not sure what it is but I
+don't seem to have anything pending in my inbox.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150917/5e4505a3/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150917/7d1a22bc/attachment-0001.sig>
