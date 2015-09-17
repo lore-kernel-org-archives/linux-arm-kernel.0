@@ -1,52 +1,35 @@
 From: petr.cvek@tul.cz (Petr Cvek)
-Date: Thu, 17 Sep 2015 06:57:35 +0200
-Subject: [PATCH v3 09/26] ARM: pxa: magician: Optimize powerup delays for
- Samsung LCD
+Date: Thu, 17 Sep 2015 06:57:59 +0200
+Subject: [PATCH v3 10/26] ARM: pxa: magician: Optimize Samsung LCD refresh to
+ 50Hz
 In-Reply-To: <cover.1442462898.git.petr.cvek@tul.cz>
 References: <cover.1442462898.git.petr.cvek@tul.cz>
-Message-ID: <55FA483F.1040202@tul.cz>
+Message-ID: <55FA4857.5030904@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Delays for the Samsung LCD are greater than needed. These values were
-extracted from a datasheet.
+Change the default Samsung LCD refresh from an unrealistic 117Hz to 50Hz
+as no video applications on the HTC Magician can work that fast.
+
+The optimalization lowers the RAM latency at least by 3%.
 
 Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 ---
- arch/arm/mach-pxa/magician.c | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+ arch/arm/mach-pxa/magician.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index d78fc3a..14d1f55 100644
+index 14d1f55..2c487ae 100644
 --- a/arch/arm/mach-pxa/magician.c
 +++ b/arch/arm/mach-pxa/magician.c
-@@ -366,21 +366,19 @@ static void samsung_lcd_power(int on, struct fb_var_screeninfo *si)
- 			gpio_set_value(GPIO75_MAGICIAN_SAMSUNG_POWER, 1);
- 		else
- 			gpio_set_value(EGPIO_MAGICIAN_LCD_POWER, 1);
--		mdelay(10);
-+		mdelay(6);
- 		gpio_set_value(GPIO106_MAGICIAN_LCD_DCDC_NRESET, 1);
--		mdelay(10);
-+		mdelay(6);	/* Avdd -> Voff >5ms */
- 		gpio_set_value(GPIO104_MAGICIAN_LCD_VOFF_EN, 1);
--		mdelay(30);
-+		mdelay(16);	/* Voff -> Von >(5+10)ms */
- 		gpio_set_value(GPIO105_MAGICIAN_LCD_VON_EN, 1);
--		mdelay(10);
- 	} else {
--		mdelay(10);
- 		gpio_set_value(GPIO105_MAGICIAN_LCD_VON_EN, 0);
--		mdelay(30);
-+		mdelay(16);
- 		gpio_set_value(GPIO104_MAGICIAN_LCD_VOFF_EN, 0);
--		mdelay(10);
-+		mdelay(6);
- 		gpio_set_value(GPIO106_MAGICIAN_LCD_DCDC_NRESET, 0);
--		mdelay(10);
-+		mdelay(6);
- 		if (system_rev < 3)
- 			gpio_set_value(GPIO75_MAGICIAN_SAMSUNG_POWER, 0);
- 		else
+@@ -317,7 +317,7 @@ static struct pxafb_mode_info toppoly_modes[] = {
+ 
+ static struct pxafb_mode_info samsung_modes[] = {
+ 	{
+-		.pixclock	= 96153,
++		.pixclock	= 226469,
+ 		.bpp		= 16,
+ 		.xres		= 240,
+ 		.yres		= 320,
 -- 
 1.7.12.1
