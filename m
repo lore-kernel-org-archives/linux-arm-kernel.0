@@ -1,65 +1,104 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 17 Sep 2015 17:45:18 +0900
-Subject: [PATCH v4 15/16] clk: shmobile: mstp: Consider "zb_clk" suitable
- for power management
-In-Reply-To: <1438691297-29235-16-git-send-email-geert+renesas@glider.be>
-References: <1438691297-29235-1-git-send-email-geert+renesas@glider.be>
- <1438691297-29235-16-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150917084446.GA8197@verge.net.au>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 17 Sep 2015 16:44:24 +0800
+Subject: [PATCH v2] arm: add cpu_idle tracepoints to arch_cpu_idle
+In-Reply-To: <20150917160744.52400e0e@xhacker>
+References: <1442424760-4104-1-git-send-email-jszhang@marvell.com>
+ <20150917160744.52400e0e@xhacker>
+Message-ID: <20150917164424.513801a6@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Hi Stephen,
+Dear Steven,
 
-On Tue, Aug 04, 2015 at 02:28:16PM +0200, Geert Uytterhoeven wrote:
-> Currently the CPG/MSTP Clock Domain code looks for MSTP clocks to power
-> manage a device.
-> 
-> Unfortunately, on R-Mobile APE6 (r8a73a4) and SH-Mobile AG5 (sh73a0),
-> the Bus State Controller (BSC) is not power-managed by an MSTP clock,
-> but by a plain CPG clock (zb_clk).  Add a special case to handle this,
-> so the clock is properly managed, and devices connected to the BSC work
-> as expected.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Thu, 17 Sep 2015 16:07:44 +0800
+Jisheng Zhang <jszhang@marvell.com> wrote:
 
-for one reason or another I seem to have this patch queued up in
-my renesas tree for v4.4, without any Acks.
-
-I think it would be best if one of you took the patch instead.
-Though I'm also happy to take it with Acks.
-
-Let me know how you would like to proceed.
-
-> ---
-> v4:
->   - Add Reviewed-by,
+> Dear all,
 > 
-> v3:
->   - Use "CPG/MSTP Clock Domain" instead of "CPG Clock Domain",
+> On Thu, 17 Sep 2015 01:32:40 +0800
+> Jisheng Zhang <jszhang@marvell.com> wrote:
 > 
-> v2:
->   - New.
-> ---
->  drivers/clk/shmobile/clk-mstp.c | 4 ++++
->  1 file changed, 4 insertions(+)
+> > Currently, if cpuidle is disabled or not supported, powertop reports
+> > zero wakeups and zero events. This is due to the cpu_idle tracepoints
+> > are missing.
+> > 
+> > This patch is to make cpu_idle tracepoints always available even if
+> > cpuidle is disabled or not supported.
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  Since v1:
+> >    - ignore arm_pm_idle.
 > 
-> diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
-> index b1df7b2f1e970adb..a117c3f0f257b5e1 100644
-> --- a/drivers/clk/shmobile/clk-mstp.c
-> +++ b/drivers/clk/shmobile/clk-mstp.c
-> @@ -259,6 +259,10 @@ int cpg_mstp_attach_dev(struct generic_pm_domain *domain, struct device *dev)
->  					    "renesas,cpg-mstp-clocks"))
->  			goto found;
+> Something related: let's have a look at arch/arm/mach-omap2/pm34xx.c
+> the omap3_pm_idle(void) function, it uses trace_cpu_idle(), should we
+> use the _rcuidle version as below:
+
+484546509ce5 ("x86/tracing: Denote the power and cpuidle tracepoints as
+_rcuidle()") make me think we need to fix omap3_pm_idle, right?
+
+Thanks,
+Jisheng
+
+> 
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index 87b98bf9..b3bc972 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -301,11 +301,11 @@ static void omap3_pm_idle(void)
+>  	if (omap_irq_pending())
+>  		return;
 >  
-> +		/* BSC on r8a73a4/sh73a0 uses zb_clk instead of an mstp clock*/
-> +		if (!strcmp(clkspec.np->name, "zb_clk"))
-> +			goto found;
-> +
->  		of_node_put(clkspec.np);
->  		i++;
->  	}
-> -- 
-> 1.9.1
+> -	trace_cpu_idle(1, smp_processor_id());
+> +	trace_cpu_rcuidle(1, smp_processor_id());
+>  
+>  	omap_sram_idle();
+>  
+> -	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
+> +	trace_cpu_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+>  }
+>  
+>  #ifdef CONFIG_SUSPEND
 > 
+> 
+> 
+> >  arch/arm/kernel/process.c | 11 ++++++++---
+> >  1 file changed, 8 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> > index 7a7c4ce..83d2dc5 100644
+> > --- a/arch/arm/kernel/process.c
+> > +++ b/arch/arm/kernel/process.c
+> > @@ -28,6 +28,7 @@
+> >  #include <linux/random.h>
+> >  #include <linux/hw_breakpoint.h>
+> >  #include <linux/leds.h>
+> > +#include <trace/events/power.h>
+> >  
+> >  #include <asm/processor.h>
+> >  #include <asm/thread_notify.h>
+> > @@ -66,11 +67,15 @@ void (*arm_pm_idle)(void);
+> >  
+> >  void arch_cpu_idle(void)
+> >  {
+> > -	if (arm_pm_idle)
+> > +	if (arm_pm_idle) {
+> >  		arm_pm_idle();
+> > -	else
+> > +		local_irq_enable();
+> > +	} else {
+> > +		trace_cpu_idle_rcuidle(1, smp_processor_id());
+> >  		cpu_do_idle();
+> > -	local_irq_enable();
+> > +		local_irq_enable();
+> > +		trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+> > +	}
+> >  }
+> >  
+> >  void arch_cpu_idle_prepare(void)
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
