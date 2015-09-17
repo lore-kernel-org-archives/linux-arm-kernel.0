@@ -1,49 +1,64 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 17 Sep 2015 14:45:50 +0100
-Subject: [PATCH v2 0/7] hwrng: Add support for STMicroelectronics' RNG IP
-Message-ID: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
+Date: Thu, 17 Sep 2015 14:45:51 +0100
+Subject: [PATCH v2 1/7] Documentation: hw_random: Fix device node name
+ reference /dev/hw_random => /dev/hwrng
+In-Reply-To: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
+References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1442497557-9271-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v1 => v2:
- - New patch: Also fixing /dev/hw_random => /dev/hwrng in Kconfig
- - Fix 2099 => 2009 typo in commit log
- - Fix 'number of random numbers sourced' return value
- - Treat devm_clk_get()'s return value correctly
- - Check return value of clk_prepare_enable()
- - Use sysfs_streq() instead of manually stripping '\n' from sysfs
+In April 2009, commit d405640 ("Driver Core: misc: add node name support
+for misc devices.") inadvertently changed the device node name from
+/dev/hw_random to /dev/hwrng.  Since 6 years has passed since the change
+it seems unpractical to change it back, as this node name is probably
+considered ABI by now.  So instead, we'll just change the documentation
+to match the current situation.
 
-The main aim of this set is to allow users to access ST's hardware
-random number generator.  It's a simple device, which only requires
-a simple driver.
+NB: It looks like rng-tools have already been updated.
 
-We're also taking the liberty to update some out of date HWRNG
-documentation and making the sysfs interface a little easier to
-use by ignoring any '\n' which may have been inadvertently passed.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ Documentation/hw_random.txt | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Lee Jones (7):
-  Documentation: hw_random: Fix device node name reference
-    /dev/hw_random => /dev/hwrng
-  hwrng: Kconfig: Fix device node name reference /dev/hw_random =>
-    /dev/hwrng
-  hwrng: core: Simplify RNG switching from sysfs
-  hwrng: st: Provide DT bindings for ST's Random Number Generator
-  hwrng: st: Add support for ST's HW Random Number Generator
-  ARM: STi: STiH407: Enable the 2 HW Random Number Generators for
-    STiH4{07,10}
-  MAINTAINERS: Add ST's Random Number Generator to the ST entry
-
- Documentation/devicetree/bindings/rng/st,rng.txt |  15 +++
- Documentation/hw_random.txt                      |   8 +-
- MAINTAINERS                                      |   1 +
- arch/arm/boot/dts/stih407-family.dtsi            |  14 +++
- drivers/char/hw_random/Kconfig                   |  12 +-
- drivers/char/hw_random/Makefile                  |   1 +
- drivers/char/hw_random/core.c                    |   2 +-
- drivers/char/hw_random/st-rng.c                  | 144 +++++++++++++++++++++++
- 8 files changed, 191 insertions(+), 6 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/rng/st,rng.txt
- create mode 100644 drivers/char/hw_random/st-rng.c
-
+diff --git a/Documentation/hw_random.txt b/Documentation/hw_random.txt
+index 026e237..fce1634 100644
+--- a/Documentation/hw_random.txt
++++ b/Documentation/hw_random.txt
+@@ -3,7 +3,7 @@ Introduction:
+ 	The hw_random framework is software that makes use of a
+ 	special hardware feature on your CPU or motherboard,
+ 	a Random Number Generator (RNG).  The software has two parts:
+-	a core providing the /dev/hw_random character device and its
++	a core providing the /dev/hwrng character device and its
+ 	sysfs support, plus a hardware-specific driver that plugs
+ 	into that core.
+ 
+@@ -14,7 +14,7 @@ Introduction:
+ 
+ 		http://sourceforge.net/projects/gkernel/
+ 
+-	Those tools use /dev/hw_random to fill the kernel entropy pool,
++	Those tools use /dev/hwrng to fill the kernel entropy pool,
+ 	which is used internally and exported by the /dev/urandom and
+ 	/dev/random special files.
+ 
+@@ -32,13 +32,13 @@ Theory of operation:
+ 	The rng-tools package uses such tests in "rngd", and lets you
+ 	run them by hand with a "rngtest" utility.
+ 
+-	/dev/hw_random is char device major 10, minor 183.
++	/dev/hwrng is char device major 10, minor 183.
+ 
+ 	CLASS DEVICE.  There is a /sys/class/misc/hw_random node with
+ 	two unique attributes, "rng_available" and "rng_current".  The
+ 	"rng_available" attribute lists the hardware-specific drivers
+ 	available, while "rng_current" lists the one which is currently
+-	connected to /dev/hw_random.  If your system has more than one
++	connected to /dev/hwrng.  If your system has more than one
+ 	RNG available, you may change the one used by writing a name from
+ 	the list in "rng_available" into "rng_current".
+ 
 -- 
 1.9.1
