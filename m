@@ -1,110 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Sep 2015 14:57:07 +0100
-Subject: NFS/TCP/IPv6 acting strangely in 4.2
-In-Reply-To: <20150911164937.GW21084@n2100.arm.linux.org.uk>
-References: <20150911113839.GO21084@n2100.arm.linux.org.uk>
- <1441976691.4619.58.camel@edumazet-glaptop2.roam.corp.google.com>
- <20150911143347.GQ21084@n2100.arm.linux.org.uk>
- <20150911150613.GR21084@n2100.arm.linux.org.uk>
- <1441984723.4619.61.camel@edumazet-glaptop2.roam.corp.google.com>
- <20150911162416.GV21084@n2100.arm.linux.org.uk>
- <20150911164937.GW21084@n2100.arm.linux.org.uk>
-Message-ID: <20150917135705.GQ21084@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Sep 2015 15:01:26 +0100
+Subject: [RFC PATCH v2 3/7] arm64: alternative: Apply alternatives early
+ in boot process
+In-Reply-To: <55FABF64.3080404@linaro.org>
+References: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
+ <1442237181-17064-4-git-send-email-daniel.thompson@linaro.org>
+ <20150916130549.GJ28771@arm.com> <55F98FF0.7030605@linaro.org>
+ <20150916162452.GN28771@arm.com> <55FABF64.3080404@linaro.org>
+Message-ID: <20150917140126.GE25634@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 05:49:38PM +0100, Russell King - ARM Linux wrote:
-> Following that idea, I just tried the patch below, and it seems to work.
-> I don't know whether it handles all cases after a call to kernel_connect(),
-> but it stops the multiple connection attempts:
+On Thu, Sep 17, 2015 at 02:25:56PM +0100, Daniel Thompson wrote:
+> On 16/09/15 17:24, Will Deacon wrote:
+> > On Wed, Sep 16, 2015 at 04:51:12PM +0100, Daniel Thompson wrote:
+> >> On 16/09/15 14:05, Will Deacon wrote:
+> >>> On Mon, Sep 14, 2015 at 02:26:17PM +0100, Daniel Thompson wrote:
+> >>>>    /*
+> >>>> + * This is called very early in the boot process (directly after we run
+> >>>> + * a feature detect on the boot CPU). No need to worry about other CPUs
+> >>>> + * here.
+> >>>> + */
+> >>>> +void apply_alternatives_early(void)
+> >>>> +{
+> >>>> +	struct alt_region region = {
+> >>>> +		.begin	= __alt_instructions,
+> >>>> +		.end	= __alt_instructions_end,
+> >>>> +	};
+> >>>> +
+> >>>> +	__apply_alternatives(&region);
+> >>>> +}
+> >>>
+> >>> How do you choose which alternatives are applied early and which are
+> >>> applied later? AFAICT, this just applies everything before we've
+> >>> established the capabilities of the CPUs in the system, which could cause
+> >>> problems for big/little SoCs.
+> >>
+> >> They are applied twice. This relies for correctness on the fact that
+> >> cpufeatures can be set but not unset.
+> >>
+> >> In other words the boot CPU does a feature detect and, as a result, a
+> >> subset of the required alternatives will be applied. However after this
+> >> the other CPUs will boot and the the remaining alternatives applied as
+> >> before.
+> >>
+> >> The current implementation is inefficient (because it will redundantly
+> >> patch the same code twice) but I don't think it is broken.
+> >
+> > What about a big/little system where we boot on the big cores and only
+> > they support LSE atomics?
 > 
->   1   0.000000 armada388 -> n2100 TCP 1009?nfs [SYN] Seq=3794066539 Win=28560 Len=0 MSS=1440 SACK_PERM=1 TSval=15712 TSecr=870317691 WS=128
->   2   0.000414 n2100 -> armada388 TCP nfs?1009 [SYN, ACK] Seq=1884476522 Ack=3794066540 Win=28560 Len=0 MSS=1440 SACK_PERM=1 TSval=870318939 TSecr=15712 WS=64
->   3   0.000787 armada388 -> n2100 TCP 1009?nfs [ACK] Seq=3794066540 Ack=1884476523 Win=28672 Len=0 TSval=15712 TSecr=870318939
->   4   0.001304 armada388 -> n2100 NFS V3 ACCESS Call, FH: 0x905379cc, [Check: RD LU MD XT DL]
->   5   0.001566 n2100 -> armada388 TCP nfs?1009 [ACK] Seq=1884476523 Ack=3794066660 Win=28608 Len=0 TSval=870318939 TSecr=15712
->   6   0.001640 armada388 -> n2100 NFS V3 ACCESS Call, FH: 0x905379cc, [Check: RD LU MD XT DL]
->   7   0.001866 n2100 -> armada388 TCP nfs?1009 [ACK] Seq=1884476523 Ack=3794066780 Win=28608 Len=0 TSval=870318939 TSecr=15712
->   8   0.003070 n2100 -> armada388 NFS V3 ACCESS Reply (Call In 4), [Allowed: RD LU MD XT DL]
->   9   0.003415 armada388 -> n2100 TCP 1009?nfs [ACK] Seq=3794066780 Ack=1884476647 Win=28672 Len=0 TSval=15712 TSecr=870318939
->  10   0.003592 armada388 -> n2100 NFS V3 ACCESS Call, FH: 0xe15fc9c9, [Check: RD LU MD XT DL]
->  11   0.004354 n2100 -> armada388 NFS V3 ACCESS Reply (Call In 6), [Allowed: RD LU MD XT DL]
->  12   0.004682 armada388 -> n2100 NFS V3 ACCESS Call, FH: 0xe15fc9c9, [Check: RD LU MD XT DL]
->  13   0.005365 n2100 -> armada388 NFS V3 ACCESS Reply (Call In 10), [Allowed: RD LU MD XT DL]
->  14   0.005701 armada388 -> n2100 NFS V3 GETATTR Call, FH: 0xe15fc9c9
-> ...
+> Hmmnn... I don't think this patch will impact that.
+> 
+> Once something in the boot sequence calls cpus_set_cap() then if there 
+> is a corresponding alternative then it is *going* to be applied isn't 
+> it? The patch only means that some of the alternatives will be applied 
+> early. Once the boot is complete the patched .text should be the same 
+> with and without the patch.
+> 
+> Have I overlooked some code in the current kernel that prevents a system 
+> with mis-matched LSE support from applying the alternatives?
 
-NFS people - any comments on this patch?  Is it the correct way to solve
-this problem (please see the first message in this thread for the problem.)
-Without this patch, NFS is unusable as it tries to launch multiple new
-connections from the same port to the NFS server without giving the NFS
-server time to respond and establish the TCP connection.
+Sorry, I'm thinking slightly ahead of myself, but the series from Suzuki
+creates a shadow "safe" view of the ID registers in the system,
+corresponding to the intersection of CPU features:
 
-> 
->  net/sunrpc/xprtsock.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/net/sunrpc/xprtsock.c b/net/sunrpc/xprtsock.c
-> index ff5b6a2e62c3..c456d6e51c56 100644
-> --- a/net/sunrpc/xprtsock.c
-> +++ b/net/sunrpc/xprtsock.c
-> @@ -1450,6 +1450,7 @@ static void xs_tcp_state_change(struct sock *sk)
->  	switch (sk->sk_state) {
->  	case TCP_ESTABLISHED:
->  		spin_lock(&xprt->transport_lock);
-> +		xprt_clear_connecting(xprt);
->  		if (!xprt_test_and_set_connected(xprt)) {
->  			struct sock_xprt *transport = container_of(xprt,
->  					struct sock_xprt, xprt);
-> @@ -1474,12 +1475,14 @@ static void xs_tcp_state_change(struct sock *sk)
->  		smp_mb__before_atomic();
->  		clear_bit(XPRT_CONNECTED, &xprt->state);
->  		clear_bit(XPRT_CLOSE_WAIT, &xprt->state);
-> +		clear_bit(XPRT_CONNECTING, &xprt->state);		
->  		smp_mb__after_atomic();
->  		break;
->  	case TCP_CLOSE_WAIT:
->  		/* The server initiated a shutdown of the socket */
->  		xprt->connect_cookie++;
->  		clear_bit(XPRT_CONNECTED, &xprt->state);
-> +		clear_bit(XPRT_CONNECTING, &xprt->state);
->  		xs_tcp_force_close(xprt);
->  	case TCP_CLOSING:
->  		/*
-> @@ -1493,6 +1496,7 @@ static void xs_tcp_state_change(struct sock *sk)
->  		set_bit(XPRT_CLOSING, &xprt->state);
->  		smp_mb__before_atomic();
->  		clear_bit(XPRT_CONNECTED, &xprt->state);
-> +		clear_bit(XPRT_CONNECTING, &xprt->state);
->  		smp_mb__after_atomic();
->  		break;
->  	case TCP_CLOSE:
-> @@ -2237,11 +2241,13 @@ static void xs_tcp_setup_socket(struct work_struct *work)
->  		xs_tcp_force_close(xprt);
->  		break;
->  	case 0:
-> -	case -EINPROGRESS:
->  	case -EALREADY:
->  		xprt_unlock_connect(xprt, transport);
->  		xprt_clear_connecting(xprt);
->  		return;
-> +	case -EINPROGRESS:
-> +		xprt_unlock_connect(xprt, transport);
-> +		return;
->  	case -EINVAL:
->  		/* Happens, for instance, if the user specified a link
->  		 * local IPv6 address without a scope-id.
-> 
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/370386.html
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+In this case, it is necessary to inspect all of the possible CPUs before
+we can apply the patching, but as I say above, I'm prepared to make an
+exception for NMI because I don't think we can assume a safe value anyway
+for a system with mismatched GIC CPU interfaces. I just don't want to
+drag all of the alternatives patching earlier as well.
+
+> > We also need to think about how an incoming NMI interacts with
+> > concurrent patching of later features. I suspect we want to set the I
+> > bit, like you do for WFI, unless you can guarantee that no patched
+> > sequences run in NMI context.
+> 
+> Good point. I'll fix this in the next respin.
+
+Great, thanks. It probably also means that the NMI code needs
+__kprobes/__notrace annotations for similar reasons.
+
+Will
