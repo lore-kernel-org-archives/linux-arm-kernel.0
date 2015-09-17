@@ -1,58 +1,84 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Sep 2015 17:59:18 +0900
-Subject: [PATCH 02/21] ARM: shmobile: Remove obsolete sh-gpio.h
+Date: Thu, 17 Sep 2015 17:59:19 +0900
+Subject: [PATCH 03/21] ARM: shmobile: Remove obsolete custom earlyprintk code
 In-Reply-To: <cover.1442478814.git.horms+renesas@verge.net.au>
 References: <cover.1442478814.git.horms+renesas@verge.net.au>
-Message-ID: <26449ecc21dd690f5bc686fbee8037587c77ac5e.1442478814.git.horms+renesas@verge.net.au>
+Message-ID: <815fc8c06b57f283f942c6c25e3c58d6e4cb8fd7.1442478814.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The last user of "sh-gpio.h" was removed in commit 1fa59bda21c7fa36
-("ARM: shmobile: Remove legacy board code for Armadillo-800 EVA").
+The last caller of shmobile_setup_console() was removed in commit
+44d88c754e57a6d9 ("ARM: shmobile: Remove legacy SoC code for R-Mobile
+A1").
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/sh-gpio.h | 29 -----------------------------
- 1 file changed, 29 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/sh-gpio.h
+ arch/arm/mach-shmobile/Makefile  |  2 +-
+ arch/arm/mach-shmobile/common.h  |  1 -
+ arch/arm/mach-shmobile/console.c | 27 ---------------------------
+ 3 files changed, 1 insertion(+), 29 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/console.c
 
-diff --git a/arch/arm/mach-shmobile/sh-gpio.h b/arch/arm/mach-shmobile/sh-gpio.h
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 476de30798d7..b02841528e05 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -3,7 +3,7 @@
+ #
+ 
+ # Common objects
+-obj-y				:= timer.o console.o
++obj-y				:= timer.o
+ 
+ # CPU objects
+ obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o
+diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+index 8d27ec546a35..ee8fe9e473d7 100644
+--- a/arch/arm/mach-shmobile/common.h
++++ b/arch/arm/mach-shmobile/common.h
+@@ -4,7 +4,6 @@
+ extern void shmobile_earlytimer_init(void);
+ extern void shmobile_init_delay(void);
+ struct twd_local_timer;
+-extern void shmobile_setup_console(void);
+ extern void shmobile_boot_vector(void);
+ extern unsigned long shmobile_boot_fn;
+ extern unsigned long shmobile_boot_arg;
+diff --git a/arch/arm/mach-shmobile/console.c b/arch/arm/mach-shmobile/console.c
 deleted file mode 100644
-index 2c4141413db9..000000000000
---- a/arch/arm/mach-shmobile/sh-gpio.h
+index e329ccbd0a67..000000000000
+--- a/arch/arm/mach-shmobile/console.c
 +++ /dev/null
-@@ -1,29 +0,0 @@
+@@ -1,27 +0,0 @@
 -/*
-- * Generic GPIO API and pinmux table support
+- * SH-Mobile Console
 - *
-- * Copyright (c) 2008  Magnus Damm
+- * Copyright (C) 2010  Magnus Damm
 - *
-- * This file is subject to the terms and conditions of the GNU General Public
-- * License.  See the file "COPYING" in the main directory of this archive
-- * for more details.
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
 - */
--#ifndef __ASM_ARCH_GPIO_H
--#define __ASM_ARCH_GPIO_H
--
 -#include <linux/kernel.h>
--#include <linux/errno.h>
--#include <linux/io.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <asm/mach/map.h>
+-#include "common.h"
 -
--/*
-- * FIXME !!
-- *
-- * current gpio frame work doesn't have
-- * the method to control only pull up/down/free.
-- * this function should be replaced by correct gpio function
-- */
--static inline void __init gpio_direction_none(void __iomem * addr)
+-void __init shmobile_setup_console(void)
 -{
--	__raw_writeb(0x00, addr);
--}
+-	parse_early_param();
 -
--#endif /* __ASM_ARCH_GPIO_H */
+-	/* Let earlyprintk output early console messages */
+-	early_platform_driver_probe("earlyprintk", 1, 1);
+-}
 -- 
 2.1.4
