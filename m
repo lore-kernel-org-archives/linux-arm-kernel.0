@@ -1,54 +1,74 @@
 From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Thu, 17 Sep 2015 12:38:07 +0300
-Subject: [PATCH v6 1/6] arm64: introduce VA_START macro - the first kernel
- virtual address.
+Date: Thu, 17 Sep 2015 12:38:09 +0300
+Subject: [PATCH v6 3/6] x86, efi, kasan: #undef memset/memcpy/memmove per arch.
 In-Reply-To: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
 References: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
-Message-ID: <1442482692-6416-2-git-send-email-ryabinin.a.a@gmail.com>
+Message-ID: <1442482692-6416-4-git-send-email-ryabinin.a.a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to not use lengthy (UL(0xffffffffffffffff) << VA_BITS) everywhere,
-replace it with VA_START.
+In not-instrumented code KASAN replaces instrumented
+memset/memcpy/memmove with not-instrumented analogues
+__memset/__memcpy/__memove.
+However, on x86 the EFI stub is not linked with the kernel.
+It uses not-instrumented mem*() functions from
+arch/x86/boot/compressed/string.c
+So we don't replace them with __mem*() variants in EFI stub.
+
+On ARM64 the EFI stub is linked with the kernel, so we should
+replace mem*() functions with __mem*(), because the EFI stub
+runs before KASAN sets up early shadow.
+
+So let's move these #undef mem* into arch's asm/efi.h which is
+also included by the EFI stub.
+
+Also, this will fix the warning in 32-bit build reported by
+kbuild test robot <fengguang.wu@intel.com>:
+	efi-stub-helper.c:599:2: warning: implicit declaration of function 'memcpy'
 
 Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/memory.h  | 2 ++
- arch/arm64/include/asm/pgtable.h | 2 +-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/x86/include/asm/efi.h             | 12 ++++++++++++
+ drivers/firmware/efi/libstub/efistub.h |  4 ----
+ 2 files changed, 12 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 6b4c3ad..11ccf6c 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -42,12 +42,14 @@
-  * PAGE_OFFSET - the virtual address of the start of the kernel image (top
-  *		 (VA_BITS - 1))
-  * VA_BITS - the maximum number of bits for virtual addresses.
-+ * VA_START - the first kernel virtual address.
-  * TASK_SIZE - the maximum size of a user space task.
-  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
-  * The module space lives between the addresses given by TASK_SIZE
-  * and PAGE_OFFSET - it must be within 128MB of the kernel text.
-  */
- #define VA_BITS			(CONFIG_ARM64_VA_BITS)
-+#define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
- #define MODULES_END		(PAGE_OFFSET)
- #define MODULES_VADDR		(MODULES_END - SZ_64M)
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 6900b2d9..a53a126 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -45,7 +45,7 @@
-  *	fixed mappings and modules
-  */
- #define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
--#define VMALLOC_START		(UL(0xffffffffffffffff) << VA_BITS)
-+#define VMALLOC_START		(VA_START)
- #define VMALLOC_END		(PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
+diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
+index 155162e..6db2742 100644
+--- a/arch/x86/include/asm/efi.h
++++ b/arch/x86/include/asm/efi.h
+@@ -86,6 +86,18 @@ extern u64 asmlinkage efi_call(void *fp, ...);
+ extern void __iomem *__init efi_ioremap(unsigned long addr, unsigned long size,
+ 					u32 type, u64 attribute);
  
- #define vmemmap			((struct page *)(VMALLOC_END + SZ_64K))
++/*
++ * CONFIG_KASAN may redefine memset to __memset.
++ * __memset function is present only in kernel binary.
++ * Since the EFI stub linked into a separate binary it
++ * doesn't have __memset(). So we should use standard
++ * memset from arch/x86/boot/compressed/string.c
++ * The same applies to memcpy and memmove.
++ */
++#undef memcpy
++#undef memset
++#undef memmove
++
+ #endif /* CONFIG_X86_32 */
+ 
+ extern struct efi_scratch efi_scratch;
+diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
+index e334a01..6b6548f 100644
+--- a/drivers/firmware/efi/libstub/efistub.h
++++ b/drivers/firmware/efi/libstub/efistub.h
+@@ -5,10 +5,6 @@
+ /* error code which can't be mistaken for valid address */
+ #define EFI_ERROR	(~0UL)
+ 
+-#undef memcpy
+-#undef memset
+-#undef memmove
+-
+ void efi_char16_printk(efi_system_table_t *, efi_char16_t *);
+ 
+ efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg, void *__image,
 -- 
 2.4.6
