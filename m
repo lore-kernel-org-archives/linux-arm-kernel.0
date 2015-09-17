@@ -1,124 +1,66 @@
 From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Thu, 17 Sep 2015 13:19:24 +0800
-Subject: [RFC PATCH v4 2/4] genirq: add move_irqs() for cpu hotplug
-In-Reply-To: <1442467166-1460-1-git-send-email-yangyingliang@huawei.com>
-References: <1442467166-1460-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <1442467166-1460-3-git-send-email-yangyingliang@huawei.com>
+Date: Thu, 17 Sep 2015 13:19:22 +0800
+Subject: [RFC PATCH v4 0/4] arm/arm64: fix a migrating irq bug when hotplug cpu
+Message-ID: <1442467166-1460-1-git-send-email-yangyingliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add move_irqs() into kernel/irq/migration.c.
-So we can use it to migrate interrupts, when
-cpu is offline.
+----
+Changes in v4:
+ - select GENERIC_IRQ_MIGRATION when config GENERIC_IRQ_MIGRATION is enabled
+ - add move_irqs() into kerne/irq/migration.c for cpu hotplug
+ - use move_irqs() to migrate interrupts on arm/arm64 when cpu is going to down
+ - split bugfix patch into seperate patches for arm and arm64
 
-Cc: Jiang Liu <jiang.liu@linux.intel.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
----
- include/linux/irq.h    |  4 +++
- kernel/irq/migration.c | 66 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 70 insertions(+)
+Changes in v3:
+ - introduce config GENERIC_IRQ_MIGRATION for compiling migration.c
+ - rename migrate_irqs in arch/ia64/kernel/irq.c to avoid compiling error
 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 6f8b340..64e3a02 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -446,6 +446,10 @@ static inline void irq_move_irq(struct irq_data *data) { }
- static inline void irq_move_masked_irq(struct irq_data *data) { }
- #endif
- 
-+#if defined(CONFIG_SMP) && defined(CONFIG_GENERIC_IRQ_MIGRATION) && defined(CONFIG_HOTPLUG_CPU)
-+void move_irqs(void);
-+#endif
-+
- extern int no_irq_affinity;
- 
- #ifdef CONFIG_HARDIRQS_SW_RESEND
-diff --git a/kernel/irq/migration.c b/kernel/irq/migration.c
-index 1ff2b77..75bff60 100644
---- a/kernel/irq/migration.c
-+++ b/kernel/irq/migration.c
-@@ -1,6 +1,7 @@
- 
- #include <linux/irq.h>
- #include <linux/interrupt.h>
-+#include <linux/ratelimit.h>
- 
- #include "internals.h"
- 
-@@ -79,3 +80,68 @@ void irq_move_irq(struct irq_data *idata)
- 		idata->chip->irq_unmask(idata);
- }
- #endif
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+static bool migrate_one_irq(struct irq_desc *desc)
-+{
-+	struct irq_data *d = irq_desc_get_irq_data(desc);
-+	const struct cpumask *affinity = d->affinity;
-+	struct irq_chip *c;
-+	bool ret = false;
-+
-+	/*
-+	 * If this is a per-CPU interrupt, or the affinity does not
-+	 * include this CPU, then we have nothing to do.
-+	 */
-+	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
-+		return false;
-+
-+	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
-+		affinity = cpu_online_mask;
-+		ret = true;
-+	}
-+
-+	c = irq_data_get_irq_chip(d);
-+	if (!c->irq_set_affinity) {
-+		pr_warn_ratelimited("IRQ%u: unable to set affinity\n", d->irq);
-+	} else {
-+		int r = irq_do_set_affinity(d, affinity, false);
-+		if (r)
-+			pr_warn_ratelimited("IRQ%u: set affinity failed(%d).\n", d->irq, r);
-+	}
-+
-+	return ret;
-+}
-+
-+/*
-+ * The current CPU has been marked offline.  Migrate IRQs off this CPU.
-+ * If the affinity settings do not allow other CPUs, force them onto any
-+ * available CPU.
-+ *
-+ * Note: we must iterate over all IRQs, whether they have an attached
-+ * action structure or not, as we need to get chained interrupts too.
-+ */
-+void move_irqs(void)
-+{
-+	unsigned int irq;
-+	struct irq_desc *desc;
-+	unsigned long flags;
-+
-+	local_irq_save(flags);
-+
-+	for_each_active_irq(irq) {
-+		bool affinity_broken;
-+
-+		desc = irq_to_desc(irq);
-+		raw_spin_lock(&desc->lock);
-+		affinity_broken = migrate_one_irq(desc);
-+		raw_spin_unlock(&desc->lock);
-+
-+		if (affinity_broken)
-+			pr_warn_ratelimited("IRQ%u no longer affine to CPU%u\n",
-+					    irq, smp_processor_id());
-+	}
-+
-+	local_irq_restore(flags);
-+}
-+#endif /* CONFIG_HOTPLUG_CPU */
+Changes in v2:
+ - use the exiting helper to set IRQD_MOVE_PCNTXT flag
+ - use for_each_active_irq() instead of for_each_irq_desc()
+ - add some warn messages when affinity is null or do set affinity failed
+----
+
+Hi All,
+
+There is a bug:
+
+When cpu is disabled, all irqs will be migratged to another cpu.
+In some cases, a new affinity is different, it needed to be coppied
+to irq's affinity. But if the type of irq is LPI, it's affinity will
+not be coppied because of irq_set_affinity's return value.
+
+
+
+As Marc and Will suggested, I refactor the arm/arm64 migrating interrupts
+code and fix the migrating irq bug while cpu is offline.
+
+I'm trying let the core code do the migrating interrupts matter. kernel/irq/migration.c
+depends on CONFIG_GENERIC_PENDING_IRQ, so I introduce config GENERIC_IRQ_MIGRATION for
+compiling migration.c. Then add a generic function for migrating interrupts in migration.c.
+And then use the function when cpu is going to down on arm and arm64.
+
+
+Yang Yingliang (4):
+  genirq: introduce CONFIG_GENERIC_IRQ_MIGRATION
+  genirq: add move_irqs() for cpu hotplug
+  arm64: fix a migrating irq bug when hotplug cpu
+  arm: fix a migrating irq bug when hotplug cpu
+
+ arch/arm/Kconfig             |  1 +
+ arch/arm/include/asm/irq.h   |  1 -
+ arch/arm/kernel/irq.c        | 62 ----------------------------------------
+ arch/arm/kernel/smp.c        |  2 +-
+ arch/arm64/Kconfig           |  1 +
+ arch/arm64/include/asm/irq.h |  1 -
+ arch/arm64/kernel/irq.c      | 62 ----------------------------------------
+ arch/arm64/kernel/smp.c      |  2 +-
+ include/linux/irq.h          |  4 +++
+ kernel/irq/Kconfig           |  5 ++++
+ kernel/irq/Makefile          |  2 +-
+ kernel/irq/migration.c       | 68 ++++++++++++++++++++++++++++++++++++++++++++
+ 12 files changed, 82 insertions(+), 129 deletions(-)
+
 -- 
 2.5.0
