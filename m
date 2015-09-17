@@ -1,29 +1,25 @@
-From: socketcan@hartkopp.net (Oliver Hartkopp)
-Date: Thu, 17 Sep 2015 20:29:51 +0200
-Subject: [PATCH v8 0/4] can: Allwinner A10/A20 CAN Controller support
- - Summary
-In-Reply-To: <20150917182737.GK4684@lukather>
-References: <1442402482-7118-1-git-send-email-info@gerhard-bertelsmann.de>
- <20150917175444.GJ4684@lukather> <55FB028F.7070206@hartkopp.net>
- <20150917182737.GK4684@lukather>
-Message-ID: <55FB069F.8040804@hartkopp.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 17 Sep 2015 11:51:51 -0700
+Subject: [PATCH 2/2] drivers: clk: st: Rename st_pll3200c32_407_c0_x into
+ st_pll3200c32_cx_x
+In-Reply-To: <1442389379-9298-3-git-send-email-gabriel.fernandez@linaro.org>
+References: <1442389379-9298-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1442389379-9298-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <20150917185151.GT23081@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On 09/16, Gabriel Fernandez wrote:
+> Use a generic name for this kind of PLL
+> 
+> Correction in dts files are already done here:
+> commit 5eb26c605909 ("ARM: STi: DT: Rename st_pll3200c32_407_c0_x into st_pll3200c32_cx_x")
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
 
-On 17.09.2015 20:27, Maxime Ripard wrote:
-> On Thu, Sep 17, 2015 at 08:12:31PM +0200, Oliver Hartkopp wrote:
+Applied to clk-fixes
 
->> New CAN drivers go via can-next and net-next into mainline.
->>
-
->
-> Hmmm, actually, I meant 2 and 3, the two defconfig patches.
->
-> The driver and bindings should of course go through Marc's tree.
-
-Ok. Thanks for the fix :-)
-
-Regards,
-Oliver
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
