@@ -1,74 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 17 Sep 2015 17:53:14 +0900
-Subject: [PATCH v4 15/16] clk: shmobile: mstp: Consider "zb_clk" suitable
- for power management
-In-Reply-To: <20150917084446.GA8197@verge.net.au>
-References: <1438691297-29235-1-git-send-email-geert+renesas@glider.be>
- <1438691297-29235-16-git-send-email-geert+renesas@glider.be>
- <20150917084446.GA8197@verge.net.au>
-Message-ID: <20150917085314.GA29509@verge.net.au>
+From: bayi.cheng@mediatek.com (bayi.cheng)
+Date: Thu, 17 Sep 2015 17:02:53 +0800
+Subject: [PATCH 1/3] doc: dt: add documentation for Mediatek spi-nor
+ controller
+In-Reply-To: <1442478994-12467-1-git-send-email-bayi.cheng@mediatek.com>
+References: <1442478994-12467-1-git-send-email-bayi.cheng@mediatek.com>
+Message-ID: <1442480573.27250.28.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 05:45:18PM +0900, Simon Horman wrote:
-> Hi Mike, Hi Stephen,
-> 
-> On Tue, Aug 04, 2015 at 02:28:16PM +0200, Geert Uytterhoeven wrote:
-> > Currently the CPG/MSTP Clock Domain code looks for MSTP clocks to power
-> > manage a device.
-> > 
-> > Unfortunately, on R-Mobile APE6 (r8a73a4) and SH-Mobile AG5 (sh73a0),
-> > the Bus State Controller (BSC) is not power-managed by an MSTP clock,
-> > but by a plain CPG clock (zb_clk).  Add a special case to handle this,
-> > so the clock is properly managed, and devices connected to the BSC work
-> > as expected.
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> 
-> for one reason or another I seem to have this patch queued up in
-> my renesas tree for v4.4, without any Acks.
-> 
-> I think it would be best if one of you took the patch instead.
-> Though I'm also happy to take it with Acks.
-> 
-> Let me know how you would like to proceed.
+Sorry, Please ignore this mail, and I will publish new one.
 
-Sorry to revise the above, I should have checked more closely
-before I sent my previous email. I now see that I have an SoC patch
-that depends on this one. So if possible I'd like to take this one
-through my tree with an Ack or two.
 
-Thanks in advance!
 
-> > ---
-> > v4:
-> >   - Add Reviewed-by,
-> > 
-> > v3:
-> >   - Use "CPG/MSTP Clock Domain" instead of "CPG Clock Domain",
-> > 
-> > v2:
-> >   - New.
-> > ---
-> >  drivers/clk/shmobile/clk-mstp.c | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
-> > index b1df7b2f1e970adb..a117c3f0f257b5e1 100644
-> > --- a/drivers/clk/shmobile/clk-mstp.c
-> > +++ b/drivers/clk/shmobile/clk-mstp.c
-> > @@ -259,6 +259,10 @@ int cpg_mstp_attach_dev(struct generic_pm_domain *domain, struct device *dev)
-> >  					    "renesas,cpg-mstp-clocks"))
-> >  			goto found;
-> >  
-> > +		/* BSC on r8a73a4/sh73a0 uses zb_clk instead of an mstp clock*/
-> > +		if (!strcmp(clkspec.np->name, "zb_clk"))
-> > +			goto found;
-> > +
-> >  		of_node_put(clkspec.np);
-> >  		i++;
-> >  	}
-> > -- 
-> > 1.9.1
-> > 
+
+On Thu, 2015-09-17 at 16:36 +0800, Bayi Cheng wrote:
+> Add device tree binding documentation for serial flash with
+> Mediatek serial flash controller
+> 
+> Change-Id: Iaecd0bb7ba1b224f1e27bd7063f0b8d7ea30175a
+> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+> ---
+>  Documentation/devicetree/bindings/mtd/mtk_quadspi.txt | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/mtk_quadspi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/mtk_quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk_quadspi.txt
+> new file mode 100644
+> index 0000000..6153227
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/mtk_quadspi.txt
+> @@ -0,0 +1,18 @@
+> +* MTD SPI nor driver for MTK MT81xx (and similar) serial flash controller
+> +
+> +Required properties:
+> +- compatible: Should be "mediatek,mt8173-nor";
+> +- reg: Physical base address and length of the controller's register
+> +- clocks: spi source clock amd serial flash controller's clock
+> +- clock-names: "spi", "sf"
+> +  See Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
+> +
+> +Example:
+> +nor_flash: nor at 1100d000 {
+> +	compatible = "mediatek,mt8173-nor";
+> +	reg = <0 0x1100D000 0 0xE0>;
+> +	clocks = <&pericfg CLK_PERI_SPI>,
+> +			 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
+> +	clock-names = "spi", "sf";
+> +};
+> +
