@@ -1,56 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Sep 2015 15:06:25 +0100
-Subject: NFS/TCP/IPv6 acting strangely in 4.2
-In-Reply-To: <1442386435.3756.282.camel@vitec.com>
-References: <20150911113839.GO21084@n2100.arm.linux.org.uk>
- <1442386435.3756.282.camel@vitec.com>
-Message-ID: <20150917140625.GR21084@n2100.arm.linux.org.uk>
+From: peter@korsgaard.com (Peter Korsgaard)
+Date: Thu, 17 Sep 2015 16:08:38 +0200
+Subject: [PATCH v2 3/7] hwrng: core: Simplify RNG switching from sysfs
+In-Reply-To: <1442497557-9271-4-git-send-email-lee.jones@linaro.org> (Lee
+ Jones's message of "Thu, 17 Sep 2015 14:45:53 +0100")
+References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
+ <1442497557-9271-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <87fv2dt9y1.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 06:53:57AM +0000, Damien Th?bault wrote:
-> On Fri, 2015-09-11 at 12:38 +0100, Russell King - ARM Linux wrote:
-> > I have a recent Marvell Armada 388 board here which uses the mvneta
-> > driver.  I'm seeing some weird effects with NFS with it acting as a
-> > client.
-> 
-> Hello,
-> 
-> I'm upgrading a Marvelle Armada 370 board using the mvneta driver from
-> 4.0 to 4.2 and noticed issues with NFS booting.
-> Basically, most of the time init returns with an error code, or
-> programs segfault or throw illegal instructions.
-> 
-> Since it worked fine on 4.0 I bisected until I found commit
-> a84e32894191cfcbffa54180d78d7d4654d56c20 "net: mvneta: fix refilling
-> for Rx DMA buffers".
-> 
-> If I revert this commit, everything seems to get back to normal.
-> Could you try it ? The two issues look very similar.
+>>>>> "Lee" == Lee Jones <lee.jones@linaro.org> writes:
 
-If you look at my original problem report, you'll see that has nothing
-to do with the problem I'm seeing.
+ > If we attempt to use sysfs to change the current RNG in the usual
+ > way i.e. issuing something like:
 
-My problem is:
+ > `echo 8a8a000.rng > /sys/devices/virtual/misc/hw_random/rng_current`
 
-- TCP disconnects
-- NFS tries to establish a new connection with the server, sending a SYN
-- NFS server replies with a SYNACK
-- NFS client immediately sends another SYN with a different sequence
-   number, so it's a _new_ attempt to connect to the NFS server.
+ > ... it will fail because the code doesn't currently take the '\n'
+ > into consideration.  Well, now it does.
 
-At this point, the socket for the previous SYNACK'd connection has been
-destroyed mid-setup.
+ > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+ > ---
+ >  drivers/char/hw_random/core.c | 2 +-
+ >  1 file changed, 1 insertion(+), 1 deletion(-)
 
-This is because the sunrpc code is horribly racy - it doesn't block a
-second attempt to call kernel_connect() on a socket which is already in
-the process of connecting to the NFS server.
+ > diff --git a/drivers/char/hw_random/core.c b/drivers/char/hw_random/core.c
+ > index da8faf7..2d4a969 100644
+ > --- a/drivers/char/hw_random/core.c
+ > +++ b/drivers/char/hw_random/core.c
+ > @@ -323,7 +323,7 @@ static ssize_t hwrng_attr_current_store(struct device *dev,
+ >  		return -ERESTARTSYS;
+ >  	err = -ENODEV;
+ >  	list_for_each_entry(rng, &rng_list, list) {
+ > -		if (strcmp(rng->name, buf) == 0) {
+ > +		if (sysfs_streq(rng->name, buf)) {
 
-Even if the SYNACK had been corrupted (due to mvneta's rx code), that
-has no bearing on the race in the sunrpc layer that destroys the previous
-socket before the TCP SYN/SYNACK/ACK handshake has had a chance to
-complete.
+Looks good.
+
+Acked-by: Peter Korsgaard <peter@korsgaard.com>
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Venlig hilsen,
+Peter Korsgaard 
