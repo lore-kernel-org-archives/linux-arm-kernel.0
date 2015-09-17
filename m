@@ -1,38 +1,61 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Sep 2015 13:50:11 +0100
-Subject: [PATCH 02/10] arm64: proc: de-scope TLBI operation during cold boot
+Date: Thu, 17 Sep 2015 13:50:14 +0100
+Subject: [PATCH 05/10] arm64: tlbflush: remove redundant ASID casts to
+ (unsigned long)
 In-Reply-To: <1442494219-6133-1-git-send-email-will.deacon@arm.com>
 References: <1442494219-6133-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1442494219-6133-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1442494219-6133-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When cold-booting a CPU, we must invalidate any junk entries from the
-local TLB prior to enabling the MMU. This doesn't require broadcasting
-within the inner-shareable domain, so de-scope the operation to apply
-only to the local CPU.
+The ASID macro returns a 64-bit (long long) value, so there is no need
+to cast to (unsigned long) before shifting prior to a TLBI operation.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/proc.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/tlbflush.h | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index e4ee7bd8830a..bbde13d77da5 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -146,8 +146,8 @@ ENDPROC(cpu_do_switch_mm)
-  *	value of the SCTLR_EL1 register.
-  */
- ENTRY(__cpu_setup)
--	tlbi	vmalle1is			// invalidate I + D TLBs
--	dsb	ish
-+	tlbi	vmalle1				// Invalidate local TLB
-+	dsb	nsh
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 96f944e75dc4..93e9f964805c 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -81,7 +81,7 @@ static inline void flush_tlb_all(void)
  
- 	mov	x0, #3 << 20
- 	msr	cpacr_el1, x0			// Enable FP/ASIMD
+ static inline void flush_tlb_mm(struct mm_struct *mm)
+ {
+-	unsigned long asid = (unsigned long)ASID(mm) << 48;
++	unsigned long asid = ASID(mm) << 48;
+ 
+ 	dsb(ishst);
+ 	asm("tlbi	aside1is, %0" : : "r" (asid));
+@@ -91,8 +91,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
+ static inline void flush_tlb_page(struct vm_area_struct *vma,
+ 				  unsigned long uaddr)
+ {
+-	unsigned long addr = uaddr >> 12 |
+-		((unsigned long)ASID(vma->vm_mm) << 48);
++	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
+ 
+ 	dsb(ishst);
+ 	asm("tlbi	vale1is, %0" : : "r" (addr));
+@@ -109,7 +108,7 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
+ 				     unsigned long start, unsigned long end,
+ 				     bool last_level)
+ {
+-	unsigned long asid = (unsigned long)ASID(vma->vm_mm) << 48;
++	unsigned long asid = ASID(vma->vm_mm) << 48;
+ 	unsigned long addr;
+ 
+ 	if ((end - start) > MAX_TLB_RANGE) {
+@@ -162,7 +161,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
+ 				       unsigned long uaddr)
+ {
+-	unsigned long addr = uaddr >> 12 | ((unsigned long)ASID(mm) << 48);
++	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
+ 
+ 	dsb(ishst);
+ 	asm("tlbi	vae1is, %0" : : "r" (addr));
 -- 
 2.1.4
