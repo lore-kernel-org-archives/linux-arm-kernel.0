@@ -1,54 +1,44 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Thu, 17 Sep 2015 16:38:35 -0700
-Subject: [GIT PULL] ARM64: APM X-Gene 1 and X-Gene 2 DTS updates for 4.4
-Message-ID: <CADaLNDmeBz69eoU4PO6cAf2cKCQwVCORcXMUf5xdODJVUfb+Hw@mail.gmail.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Thu, 17 Sep 2015 16:58:01 -0700
+Subject: [PATCH 3/4] ARM: dts: Enable NAND support on bcm911360_entphn
+In-Reply-To: <1442534282-21356-1-git-send-email-rjui@broadcom.com>
+References: <1442534282-21356-1-git-send-email-rjui@broadcom.com>
+Message-ID: <1442534282-21356-4-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+This patch enables NAND support on Broadcom Cygnus form factor board
+(bcm911360_entphn)
 
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
+---
+ arch/arm/boot/dts/bcm911360_entphn.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-
-are available in the git repository at:
-
-  https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.4-1
-
-for you to fetch changes up to 1d8d53b62d80dc3a6ae1483891e7d840cd7a51bd:
-
-  arm64: dts: Add poweroff device nodes for APM X-Gene 2 platform
-(2015-09-16 12:04:25 -0700)
-
-----------------------------------------------------------------
-X-Gene DTS changes queued for v4.4
-
-----------------------------------------------------------------
-Duc Dang (4):
-      MAINTAINERS: Add Applied Micro (APM) X-Gene Device Tree maintainer
-      arm64: dts: Add X-Gene v2 reboot driver dts node
-      arm64: dts: Add APM X-Gene 2 standby GPIO controller DTS entries
-      arm64: dts: Add poweroff device nodes for APM X-Gene 2 platform
-
-Feng Kan (5):
-      Documentation: arm64: add SCU dts binding documentation to linux kernel
-      arm64: dts: Add X-Gene reboot driver dts node
-      arm64: dts: add APM Merlin Board device tree
-      Documentation: arm: pmu: Add Potenza PMU binding
-      arm64: dts: Add PMU node for APM X-Gene Storm SOC
-
-Tai Nguyen (1):
-      power: reset: Add syscon poweroff device node for APM X-Gene platform
-
- Documentation/devicetree/bindings/arm/apm/scu.txt |  17 ++
- Documentation/devicetree/bindings/arm/pmu.txt     |   1 +
- MAINTAINERS                                       |   5 +
- arch/arm64/boot/dts/apm/Makefile                  |   1 +
- arch/arm64/boot/dts/apm/apm-merlin.dts            |  72 ++++++
- arch/arm64/boot/dts/apm/apm-mustang.dts           |  12 +
- arch/arm64/boot/dts/apm/apm-shadowcat.dtsi        | 271 ++++++++++++++++++++++
- arch/arm64/boot/dts/apm/apm-storm.dtsi            |  17 ++
- 8 files changed, 396 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/apm/scu.txt
- create mode 100644 arch/arm64/boot/dts/apm/apm-merlin.dts
- create mode 100644 arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+diff --git a/arch/arm/boot/dts/bcm911360_entphn.dts b/arch/arm/boot/dts/bcm911360_entphn.dts
+index f791a3b..8b3800f 100644
+--- a/arch/arm/boot/dts/bcm911360_entphn.dts
++++ b/arch/arm/boot/dts/bcm911360_entphn.dts
+@@ -60,3 +60,19 @@
+ &uart3 {
+ 	status = "okay";
+ };
++
++&nand {
++	nandcs at 1 {
++		compatible = "brcm,nandcs";
++		reg = <0>;
++		nand-on-flash-bbt;
++
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		nand-ecc-strength = <24>;
++		nand-ecc-step-size = <1024>;
++
++		brcm,nand-oob-sector-size = <27>;
++	};
++};
+-- 
+1.9.1
