@@ -1,45 +1,162 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 17 Sep 2015 19:22:41 +0200
-Subject: Recent GIC v1 patch
-In-Reply-To: <55FAEB4D.30306@arm.com>
-References: <55FAE26A.9040609@free.fr> <55FAEB4D.30306@arm.com>
-Message-ID: <55FAF6E1.7020107@free.fr>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 17 Sep 2015 18:23:23 +0100
+Subject: [PATCH 7/7] arm64: Mark kernel page ranges contiguous
+In-Reply-To: <1442430186-9083-8-git-send-email-jeremy.linton@arm.com>
+References: <1442430186-9083-1-git-send-email-jeremy.linton@arm.com>
+ <1442430186-9083-8-git-send-email-jeremy.linton@arm.com>
+Message-ID: <CAPvkgC3QOvHdQRuvAmdRDnbfQCMOBX2aPcoLER7grc5yZ-MF4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/09/2015 18:33, Marc Zyngier wrote:
-> Hi Mason,
-> 
-> On 17/09/15 16:55, Mason wrote:
->> Hello Thomas, Marc,
->>
->> Mans pointed me to a recent patch of yours.
->> irqchip/gic: Use IRQD_FORWARDED_TO_VCPU flag
->> Get rid of the handler_data abuse.
->>
->> I'm using a Cortex A9 based SoC. The platform's interrupt
->> controller is cascaded into the GIC. I've been trying to
->> get this to work for two weeks with no success.
->>
->> Details can be found here:
->> http://thread.gmane.org/gmane.linux.ports.arm.kernel/440327
->>
->> Do you think your patch my help with my situation?
-> 
-> Not sure. A GICv1 shouldn't use EOImode==1 at all, so I don't quite see
-> how you end-up there. Also, you seem to be using 4.2, and this code only
-> landed during the 4.3 merge window.
+Hi Jeremy,
+One quick comment for now below.
+I ran into a problem testing this on my Seattle board, and needed the fix below.
 
-Sorry for being unclear. I'm having problems /without/ the patch,
-and Mans suggested I try the patch.
+Cheers,
+--
+Steve
 
->> Do you have any idea what might causing the problem?
-> 
-> Not without more information, I'm afraid.
+On 16 September 2015 at 20:03, Jeremy Linton <jeremy.linton@arm.com> wrote:
+> With 64k pages, the next larger segment size is 512M. The linux
+> kernel also uses different protection flags to cover its code and data.
+> Because of this requirement, the vast majority of the kernel code and
+> data structures end up being mapped with 64k pages instead of the larger
+> pages common with a 4k page kernel.
+>
+> Recent ARM processors support a contiguous bit in the
+> page tables which allows the a TLB to cover a range larger than a
+> single PTE if that range is mapped into physically contiguous
+> ram.
+>
+> So, for the kernel its a good idea to set this flag. Some basic
+> micro benchmarks show it can significantly reduce the number of
+> L1 dTLB refills.
+>
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/mm/mmu.c | 70 +++++++++++++++++++++++++++++++++++++++++++++++------
+>  1 file changed, 62 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 9211b85..c7abbcc 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -80,19 +80,55 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
+>         do {
+>                 /*
+>                  * Need to have the least restrictive permissions available
+> -                * permissions will be fixed up later
+> +                * permissions will be fixed up later. Default the new page
+> +                * range as contiguous ptes.
+>                  */
+> -               set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
+> +               set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC_CONT));
+>                 pfn++;
+>         } while (pte++, i++, i < PTRS_PER_PTE);
+>  }
+>
+> +/*
+> + * Given a PTE with the CONT bit set, determine where the CONT range
+> + * starts, and clear the entire range of PTE CONT bits.
+> + */
+> +static void clear_cont_pte_range(pte_t *pte, unsigned long addr)
+> +{
+> +       int i;
+> +
+> +       pte -= CONT_RANGE_OFFSET(addr);
+> +       for (i = 0; i < CONT_RANGE; i++) {
+> +               set_pte(pte, pte_mknoncont(*pte));
+> +               pte++;
+> +       }
+> +       flush_tlb_all();
+> +}
+> +
+> +/*
+> + * Given a range of PTEs set the pfn and provided page protection flags
+> + */
+> +static void __populate_init_pte(pte_t *pte, unsigned long addr,
+> +                               unsigned long end, phys_addr_t phys,
+> +                               pgprot_t prot)
+> +{
+> +       unsigned long pfn = __phys_to_pfn(phys);
+> +
+> +       do {
+> +               /* clear all the bits except the pfn, then apply the prot */
+> +               set_pte(pte, pfn_pte(pfn, prot));
+> +               pte++;
+> +               pfn++;
+> +               addr += PAGE_SIZE;
+> +       } while (addr != end);
+> +}
+> +
+>  static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+> -                                 unsigned long end, unsigned long pfn,
+> +                                 unsigned long end, phys_addr_t phys,
+>                                   pgprot_t prot,
+>                                   void *(*alloc)(unsigned long size))
+>  {
+>         pte_t *pte;
+> +       unsigned long next;
+>
+>         if (pmd_none(*pmd) || pmd_sect(*pmd)) {
+>                 pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
+> @@ -105,9 +141,28 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>
+>         pte = pte_offset_kernel(pmd, addr);
+>         do {
+> -               set_pte(pte, pfn_pte(pfn, prot));
+> -               pfn++;
+> -       } while (pte++, addr += PAGE_SIZE, addr != end);
+> +               next = min(end, (addr + CONT_SIZE) & CONT_MASK);
+> +               if (((addr | next | phys) & CONT_RANGE_MASK) == 0) {
+> +                       /* a block of CONT_RANGE_SIZE PTEs */
+> +                       __populate_init_pte(pte, addr, next, phys,
+> +                                           prot | __pgprot(PTE_CONT));
+> +                       pte += CONT_RANGE;
+> +               } else {
+> +                       /*
+> +                        * If the range being split is already inside of a
+> +                        * contiguous range but this PTE isn't going to be
+> +                        * contiguous, then we want to unmark the adjacent
+> +                        * ranges, then update the portion of the range we
+> +                        * are interrested in.
+> +                        */
+> +                        clear_cont_pte_range(pte, addr);
+> +                        __populate_init_pte(pte, addr, next, phys, prot);
+> +                        pte += CONT_RANGE_OFFSET(next - addr);
 
-Being the unimaginative type, I provided boot log, .config,
-full port source code, and device tree description. Can you
-explain what kind of information would be required to identify
-the problem? (Maybe that would help me diagnose the problem.)
+I think this should instead be:
+pte += (next - addr) >> PAGE_SHIFT;
 
-Regards.
+Without the above change, I get panics on boot with my Seattle board
+when efi_rtc is initialised.
+(I think the EFI runtime stuff exacerbates the non-contiguous code
+path hence I notice it on my system).
+
+> +               }
+> +
+> +               phys += next - addr;
+> +               addr = next;
+> +       } while (addr != end);
+>  }
+>
+>  void split_pud(pud_t *old_pud, pmd_t *pmd)
+> @@ -168,8 +223,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+>                                 }
+>                         }
+>                 } else {
+> -                       alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
+> -                                      prot, alloc);
+> +                       alloc_init_pte(pmd, addr, next, phys, prot, alloc);
+>                 }
+>                 phys += next - addr;
+>         } while (pmd++, addr = next, addr != end);
+> --
+> 2.4.3
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
