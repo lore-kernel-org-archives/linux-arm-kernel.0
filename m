@@ -1,65 +1,38 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Thu, 17 Sep 2015 12:38:11 +0300
-Subject: [PATCH v6 5/6] ARM64: kasan: print memory assignment
-In-Reply-To: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
-References: <1442482692-6416-1-git-send-email-ryabinin.a.a@gmail.com>
-Message-ID: <1442482692-6416-6-git-send-email-ryabinin.a.a@gmail.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 17 Sep 2015 17:35:26 +0800
+Subject: [PATCH v2 00/22] KVM: ARM64: Add guest PMU support
+In-Reply-To: <20150917093007.GB5933@hawk.localdomain>
+References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
+ <55F9D9FC.6010905@redhat.com> <55FA1832.3040008@linaro.org>
+ <20150917093007.GB5933@hawk.localdomain>
+Message-ID: <55FA895E.8080304@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hi Andrew,
 
-This prints out the virtual memory assigned to KASan in the
-boot crawl along with other memory assignments, if and only
-if KASan is activated.
+On 2015/9/17 17:30, Andrew Jones wrote:
+> On Thu, Sep 17, 2015 at 09:32:34AM +0800, Shannon Zhao wrote:
+>> > Hi Wei,
+>> > 
+>> > On 2015/9/17 5:07, Wei Huang wrote:
+>>> > > I am testing this series. 
+>> > Thanks for your time and help.
+>> > 
+>>> > > The first question is: do you plan to add ACPI
+>>> > > support in QEMU?
+>> > To the completeness, this should be added. Maybe this could be added at
+>> > v3. But I have a look at the kernel PMU driver, it doesn't support
+>> > probing through ACPI, although there are some patches[1] out-of-tree.
+>> > 
+>>> > > My in-house kernel uses ACPI for device probing. I had
+>>> > > to force "acpi=off" when I test this patch series.
+>> > Guest kernel only boots with ACPI when you add "acpi=force". No need to
+>> > add "acpi=off".
+> The Red Hat kernel uses ACPI by default, when tables are present (Thanks
+> again for your QEMU table generation patches!)
+> 
+Oh, I see. Thanks for your explanation.
 
-Example dmesg from the Juno Development board:
-
-Memory: 1691156K/2080768K available (5465K kernel code, 444K rwdata,
-2160K rodata, 340K init, 217K bss, 373228K reserved, 16384K cma-reserved)
-Virtual kernel memory layout:
-    kasan   : 0xffffff8000000000 - 0xffffff9000000000   (    64 GB)
-    vmalloc : 0xffffff9000000000 - 0xffffffbdbfff0000   (   182 GB)
-    vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
-              0xffffffbdc2000000 - 0xffffffbdc3fc0000   (    31 MB actual)
-    fixed   : 0xffffffbffabfd000 - 0xffffffbffac00000   (    12 KB)
-    PCI I/O : 0xffffffbffae00000 - 0xffffffbffbe00000   (    16 MB)
-    modules : 0xffffffbffc000000 - 0xffffffc000000000   (    64 MB)
-    memory  : 0xffffffc000000000 - 0xffffffc07f000000   (  2032 MB)
-      .init : 0xffffffc0007f5000 - 0xffffffc00084a000   (   340 KB)
-      .text : 0xffffffc000080000 - 0xffffffc0007f45b4   (  7634 KB)
-      .data : 0xffffffc000850000 - 0xffffffc0008bf200   (   445 KB)
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Andrey Ryabinin <ryabinin.a.a@gmail.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/mm/init.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index f5c0680..7a1f9a0 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -298,6 +298,9 @@ void __init mem_init(void)
- #define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
- 
- 	pr_notice("Virtual kernel memory layout:\n"
-+#ifdef CONFIG_KASAN
-+		  "    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n"
-+#endif
- 		  "    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n"
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
- 		  "    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n"
-@@ -310,6 +313,9 @@ void __init mem_init(void)
- 		  "      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
- 		  "      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
- 		  "      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-+#ifdef CONFIG_KASAN
-+		  MLG(KASAN_SHADOW_START, KASAN_SHADOW_END),
-+#endif
- 		  MLG(VMALLOC_START, VMALLOC_END),
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
- 		  MLG((unsigned long)vmemmap,
 -- 
-2.4.6
+Shannon
