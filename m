@@ -1,85 +1,45 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 17 Sep 2015 12:21:41 -0500
-Subject: [PATCH v4 0/4] PCI: arm64/powerpc: Fix parsing of linux,
- pci-probe-only
-In-Reply-To: <55FAF5B1.1030401@arm.com>
-References: <1441385411-7624-1-git-send-email-marc.zyngier@arm.com>
- <20150917153009.GH25767@google.com> <55FAF5B1.1030401@arm.com>
-Message-ID: <CAErSpo4KosLZa=YWvdVErEk-bNDr7witNEO76d1oJXdSmUP2yQ@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 17 Sep 2015 19:22:41 +0200
+Subject: Recent GIC v1 patch
+In-Reply-To: <55FAEB4D.30306@arm.com>
+References: <55FAE26A.9040609@free.fr> <55FAEB4D.30306@arm.com>
+Message-ID: <55FAF6E1.7020107@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 12:17 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 17/09/15 16:30, Bjorn Helgaas wrote:
->> On Fri, Sep 04, 2015 at 05:50:07PM +0100, Marc Zyngier wrote:
->>> The pci-host-generic driver parses the linux,pci-probe-only property,
->>> and assumes that it will have a boolean parameter.
->>>
->>> Turns out that the Seattle DTS file has a naked "linux,pci-probe-only"
->>> property, which leads to the driver dereferencing some unsuspecting
->>> memory location. Nothing really bad happens (we end up reading some
->>> other bit of DT, fortunately), but that not a reason to keep it this
->>> way. Turns out that the Pseries code (where this code was lifted from)
->>> may suffer from the same issue.
->>>
->>> The first patch introduces a common (and fixed) version of that check
->>> that can be used by drivers and architectures that require it. The two
->>> following patches change the pci-host-generic driver and the powerpc
->>> code to use it.
->>>
->>> Finally, the bad property is removed from the Seatle DTS, because it
->>> is simply not necessary (it actually prevents me from using SR-IOV,
->>> which otherwise runs fine without the probe-only thing).
->>>
->>> This has been tested on the offending Seattle board.
->>>
->>> * From v3:
->>>   - Restrict the property lookup to /chosen (Rob)
->>>   - Acked-by on patch #4 from Suravee
->>>   - I swear this is the last time I rework these patches! ;-)
->>>
->>> * From v2:
->>>   - Use of_property_read_u32 to safely read the property (Rob)
->>>   - Add a log message to indicate when we enable probe-only
->>>     (probably quite useful for debugging)
->>>
->>> * From v1:
->>>   - Consolidate the parsing in of_pci.c (Bjorn)
->>>
->>> Marc Zyngier (4):
->>>   of/pci: Add of_pci_check_probe_only to parse "linux,pci-probe-only"
->>>   PCI: pci-host-generic: Fix lookup of linux,pci-probe-only property
->>>   powerpc: PCI: Fix lookup of linux,pci-probe-only property
->>>   arm64: dts: Drop linux,pci-probe-only from the Seattle DTS
->>>
->>>  arch/arm64/boot/dts/amd/amd-overdrive.dts |  1 -
->>>  arch/powerpc/platforms/pseries/setup.c    | 14 ++------------
->>>  drivers/of/of_pci.c                       | 28 ++++++++++++++++++++++++++++
->>>  drivers/pci/host/pci-host-generic.c       |  9 +--------
->>>  include/linux/of_pci.h                    |  3 +++
->>>  5 files changed, 34 insertions(+), 21 deletions(-)
+On 17/09/2015 18:33, Marc Zyngier wrote:
+> Hi Mason,
+> 
+> On 17/09/15 16:55, Mason wrote:
+>> Hello Thomas, Marc,
 >>
->> Applied with the comment tweak and acks to pci/host-generic for v4.4,
->> thanks!
->
-> Turns out that the 01.org infrastructure has picked up on a compilation
-> bug with randconfig. The following patch seems to fix it and should be
-> applied on the first patch:
->
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 485d625..2da5abc 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -6,6 +6,8 @@
->  #include <linux/of_pci.h>
->  #include <linux/slab.h>
->
-> +#include <asm-generic/pci-bridge.h>
-> +
->  static inline int __of_pci_pci_compare(struct device_node *node,
->                                        unsigned int data)
->  {
->
-> Sorry for the annoyance.
+>> Mans pointed me to a recent patch of yours.
+>> irqchip/gic: Use IRQD_FORWARDED_TO_VCPU flag
+>> Get rid of the handler_data abuse.
+>>
+>> I'm using a Cortex A9 based SoC. The platform's interrupt
+>> controller is cascaded into the GIC. I've been trying to
+>> get this to work for two weeks with no success.
+>>
+>> Details can be found here:
+>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/440327
+>>
+>> Do you think your patch my help with my situation?
+> 
+> Not sure. A GICv1 shouldn't use EOImode==1 at all, so I don't quite see
+> how you end-up there. Also, you seem to be using 4.2, and this code only
+> landed during the 4.3 merge window.
 
-Folded in and re-pushed, thanks!
+Sorry for being unclear. I'm having problems /without/ the patch,
+and Mans suggested I try the patch.
+
+>> Do you have any idea what might causing the problem?
+> 
+> Not without more information, I'm afraid.
+
+Being the unimaginative type, I provided boot log, .config,
+full port source code, and device tree description. Can you
+explain what kind of information would be required to identify
+the problem? (Maybe that would help me diagnose the problem.)
+
+Regards.
