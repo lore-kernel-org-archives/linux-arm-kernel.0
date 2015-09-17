@@ -1,37 +1,27 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Thu, 17 Sep 2015 15:51:12 +0800
-Subject: [PATCH 3/3] arm64: dts: rockchip: Add the needed timer for rk3368 SoC
-In-Reply-To: <1442476272-31723-1-git-send-email-wxt@rock-chips.com>
-References: <1442476272-31723-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1442476272-31723-4-git-send-email-wxt@rock-chips.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 17 Sep 2015 16:55:21 +0900
+Subject: [PATCH 6/6] pinctrl: samsung: Remove unneded semicolon
+In-Reply-To: <1442392111-8448-7-git-send-email-javier@osg.samsung.com>
+References: <1442392111-8448-1-git-send-email-javier@osg.samsung.com>
+ <1442392111-8448-7-git-send-email-javier@osg.samsung.com>
+Message-ID: <55FA71E9.4010402@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a need of a broadcast timer in this case to ensure proper
-wakeup when the cpus are in sleep mode and a timer expires.
+On 16.09.2015 17:28, Javier Martinez Canillas wrote:
+> It's not needed an is just creating a null statement, so remove it.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> 
+>  drivers/pinctrl/samsung/pinctrl-exynos5440.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
+Quite obvious and pointed out by coccicheck, so:
 
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index a712bea..99edbaa 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -214,6 +214,12 @@
- 			(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
- 	};
- 
-+	timer at ff810000 {
-+		compatible = "rockchip,rk3288-timer";
-+		reg = <0x0 0xff810000 0x0 0x20>;
-+		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
- 	xin24m: oscillator {
- 		compatible = "fixed-clock";
- 		clock-frequency = <24000000>;
--- 
-1.9.1
+Best regards,
+Krzysztof
