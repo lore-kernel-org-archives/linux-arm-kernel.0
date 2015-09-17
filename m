@@ -1,346 +1,336 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Thu, 17 Sep 2015 15:17:05 +0200
-Subject: [PATCH 2/2] ARM: irqchip: mxs: add Alpascale ASM9260 support
-In-Reply-To: <1417193454-31417-3-git-send-email-linux@rempel-privat.de>
-References: <201411281509.19170.arnd@arndb.de>
- <1417193454-31417-1-git-send-email-linux@rempel-privat.de>
- <1417193454-31417-3-git-send-email-linux@rempel-privat.de>
-Message-ID: <55FABD51.80305@rempel-privat.de>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 17 Sep 2015 14:57:01 +0200
+Subject: [PATCH v5 07/23] regulator: core: Remove regulator_list
+In-Reply-To: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1442494637-3674-8-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping,
+As we are already registering a device with regulator_class for each
+regulator device, regulator_list is redundant and can be replaced with
+calls to class_find_device() and class_for_each_device().
 
-looks like this patches are lost.
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+---
 
-Am 28.11.2014 um 17:50 schrieb Oleksij Rempel:
-> Freescale iMX23/iMX28 and Alphascale ASM9260 have similar
-> interrupt collectors. It makes easy to reuse irq-mxs code for ASM9260.
-> Differences between this devices are fallowing:
-> - different register offsets
-> - different count of intterupt lines per register
-> - ASM9260 don't provide reset bit
-> - ASM9260 don't support FIQ.
-> 
-> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
-> ---
->  drivers/irqchip/Kconfig                    |   5 ++
->  drivers/irqchip/Makefile                   |   2 +-
->  drivers/irqchip/alphascale_asm9260-icoll.h | 109 +++++++++++++++++++++++++++++
->  drivers/irqchip/irq-mxs.c                  | 105 ++++++++++++++++++++++++---
->  4 files changed, 212 insertions(+), 9 deletions(-)
->  create mode 100644 drivers/irqchip/alphascale_asm9260-icoll.h
-> 
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index b21f12f..badc2dc 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -125,3 +125,8 @@ config KEYSTONE_IRQ
->  	help
->  		Support for Texas Instruments Keystone 2 IRQ controller IP which
->  		is part of the Keystone 2 IPC mechanism
-> +
-> +config IRQ_MXS
-> +	def_bool y if MACH_ASM9260 || ARCH_MXS
-> +	select IRQ_DOMAIN
-> +	select STMP_DEVICE
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 173bb5f..fd06d5e 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -5,7 +5,7 @@ obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
->  obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
->  obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
->  obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
-> -obj-$(CONFIG_ARCH_MXS)			+= irq-mxs.o
-> +obj-$(CONFIG_IRQ_MXS)			+= irq-mxs.o
->  obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
->  obj-$(CONFIG_DW_APB_ICTL)		+= irq-dw-apb-ictl.o
->  obj-$(CONFIG_METAG)			+= irq-metag-ext.o
-> diff --git a/drivers/irqchip/alphascale_asm9260-icoll.h b/drivers/irqchip/alphascale_asm9260-icoll.h
-> new file mode 100644
-> index 0000000..5cec108
-> --- /dev/null
-> +++ b/drivers/irqchip/alphascale_asm9260-icoll.h
-> @@ -0,0 +1,109 @@
-> +/*
-> + * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#ifndef _ALPHASCALE_ASM9260_ICOLL_H
-> +#define _ALPHASCALE_ASM9260_ICOLL_H
-> +
-> +#define ASM9260_NUM_IRQS		64
-> +/*
-> + * this device provide 4 offsets for each register:
-> + * 0x0 - plain read write mode
-> + * 0x4 - set mode, OR logic.
-> + * 0x8 - clr mode, XOR logic.
-> + * 0xc - togle mode.
-> + */
-> +
-> +#define ASM9260_HW_ICOLL_VECTOR				0x0000
-> +/*
-> + * bits 31:2
-> + * This register presents the vector address for the interrupt currently
-> + * active on the CPU IRQ input. Writing to this register notifies the
-> + * interrupt collector that the interrupt service routine for the current
-> + * interrupt has been entered.
-> + * The exception trap should have a LDPC instruction from this address:
-> + * LDPC ASM9260_HW_ICOLL_VECTOR_ADDR; IRQ exception at 0xffff0018
-> + */
-> +
-> +/*
-> + * The Interrupt Collector Level Acknowledge Register is used by software to
-> + * indicate the completion of an interrupt on a specific level.
-> + * This register is written at the very end of an interrupt service routine. If
-> + * nesting is used then the CPU irq must be turned on before writing to this
-> + * register to avoid a race condition in the CPU interrupt hardware.
-> + */
-> +#define ASM9260_HW_ICOLL_LEVELACK			0x0010
-> +#define ASM9260_BM_LEVELn(nr)				BIT(nr)
-> +
-> +#define ASM9260_HW_ICOLL_CTRL				0x0020
-> +/*
-> + * ASM9260_BM_CTRL_SFTRST and ASM9260_BM_CTRL_CLKGATE are not available on
-> + * asm9260.
-> + */
-> +#define ASM9260_BM_CTRL_SFTRST				BIT(31)
-> +#define ASM9260_BM_CTRL_CLKGATE				BIT(30)
-> +/* disable interrupt level nesting */
-> +#define ASM9260_BM_CTRL_NO_NESTING			BIT(19)
-> +/*
-> + * Set this bit to one enable the RISC32-style read side effect associated with
-> + * the vector address register. In this mode, interrupt in-service is signaled
-> + * by the read of the ASM9260_HW_ICOLL_VECTOR register to acquire the interrupt
-> + * vector address. Set this bit to zero for normal operation, in which the ISR
-> + * signals in-service explicitly by means of a write to the
-> + * ASM9260_HW_ICOLL_VECTOR register.
-> + * 0 - Must Write to Vector register to go in-service.
-> + * 1 - Go in-service as a read side effect
-> + */
-> +#define ASM9260_BM_CTRL_ARM_RSE_MODE			BIT(18)
-> +#define ASM9260_BM_CTRL_IRQ_ENABLE			BIT(16)
-> +
-> +#define ASM9260_HW_ICOLL_STAT_OFFSET			0x0030
-> +/*
-> + * bits 5:0
-> + * Vector number of current interrupt. Multiply by 4 and add to vector base
-> + * address to obtain the value in ASM9260_HW_ICOLL_VECTOR.
-> + */
-> +
-> +/*
-> + * RAW0 and RAW1 provides a read-only view of the raw interrupt request lines
-> + * coming from various parts of the chip. Its purpose is to improve diagnostic
-> + * observability.
-> + */
-> +#define ASM9260_HW_ICOLL_RAW0				0x0040
-> +#define ASM9260_HW_ICOLL_RAW1				0x0050
-> +
-> +#define ASM9260_HW_ICOLL_INTERRUPT0			0x0060
-> +#define ASM9260_HW_ICOLL_INTERRUPTn(n)		(0x0060 + ((n) >> 2) * 0x10)
-> +/*
-> + * WARNING: Modifying the priority of an enabled interrupt may result in
-> + * undefined behavior.
-> + */
-> +#define ASM9260_BM_INT_PRIORITY_MASK			0x3
-> +#define ASM9260_BM_INT_ENABLE				BIT(2)
-> +#define ASM9260_BM_INT_SOFTIRQ				BIT(3)
-> +
-> +#define ASM9260_BM_ICOLL_INTERRUPTn_SHIFT(n)		(((n) & 0x3) << 3)
-> +#define ASM9260_BM_ICOLL_INTERRUPTn_ENABLE(n)		(1 << (2 + \
-> +			ASM9260_BM_ICOLL_INTERRUPTn_SHIFT(n)))
-> +
-> +#define ASM9260_HW_ICOLL_VBASE				0x0160
-> +/*
-> + * bits 31:2
-> + * This bitfield holds the upper 30 bits of the base address of the vector
-> + * table.
-> + */
-> +
-> +#define ASM9260_HW_ICOLL_CLEAR0				0x01d0
-> +#define ASM9260_HW_ICOLL_CLEAR1				0x01e0
-> +#define ASM9260_HW_ICOLL_CLEARn(n)			(((n >> 5) * 0x10) \
-> +							+ SET_REG)
-> +#define ASM9260_BM_CLEAR_BIT(n)				BIT(n & 0x1f)
-> +
-> +/* Scratchpad */
-> +#define ASM9260_HW_ICOLL_UNDEF_VECTOR			0x01f0
-> +#endif
-> diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
-> index 681125d..8c5c3d2 100644
-> --- a/drivers/irqchip/irq-mxs.c
-> +++ b/drivers/irqchip/irq-mxs.c
-> @@ -1,5 +1,7 @@
->  /*
->   * Copyright (C) 2009-2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> + * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
-> + *	Add Alphascale ASM9260 support.
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License as published by
-> @@ -28,6 +30,7 @@
->  #include <asm/exception.h>
->  
->  #include "irqchip.h"
-> +#include "alphascale_asm9260-icoll.h"
->  
->  /*
->   * this device provide 4 offsets for each register:
-> @@ -63,6 +66,33 @@ struct icoll_priv {
->  
->  static struct icoll_priv icoll_priv;
->  static struct irq_domain *icoll_domain;
-> +static DEFINE_RAW_SPINLOCK(icoll_lock);
-> +
-> +/* calculate bit offset depending on number of intterupt per register */
-> +static u32 icoll_intr_bitshift(struct irq_data *d, u32 bit)
-> +{
-> +	/*
-> +	 * We expect intr_per_reg to be 4 or 1, it means
-> +	 * "n" will be 3 or 0.
-> +	 */
-> +	int n = icoll_priv.intr_per_reg - 1;
-> +
-> +	/*
-> +	 * If n = 0, "bit" is never shifted.
-> +	 * If n = 3, mask lower part of hwirq to convert it
-> +	 * in 0, 1, 2 or 3 and then multiply it by 8 (or shift by 3)
-> +	 */
-> +	return bit << ((d->hwirq & n) << n);
-> +}
-> +
-> +/* calculate mem offset depending on number of intterupt per register */
-> +static void __iomem *icoll_intr_reg(struct irq_data *d)
-> +{
-> +	int n = icoll_priv.intr_per_reg >> 1;
-> +
-> +	/* offset = hwirq / intr_per_reg * 0x10 */
-> +	return icoll_priv.intr + ((d->hwirq >> n) * 0x10);
-> +}
->  
->  static void icoll_ack_irq(struct irq_data *d)
->  {
-> @@ -77,14 +107,21 @@ static void icoll_ack_irq(struct irq_data *d)
->  
->  static void icoll_mask_irq(struct irq_data *d)
->  {
-> -	__raw_writel(BM_ICOLL_INTR_ENABLE,
-> -			icoll_priv.intr + CLR_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
-> +	__raw_writel(icoll_intr_bitshift(d, BM_ICOLL_INTR_ENABLE),
-> +			icoll_intr_reg(d) + CLR_REG);
->  }
->  
->  static void icoll_unmask_irq(struct irq_data *d)
->  {
-> -	__raw_writel(BM_ICOLL_INTR_ENABLE,
-> -			icoll_priv.intr + SET_REG + HW_ICOLL_INTERRUPTn(d->hwirq));
-> +	raw_spin_lock(&icoll_lock);
-> +	if (icoll_priv.clear)
-> +		__raw_writel(ASM9260_BM_CLEAR_BIT(d->hwirq),
-> +				icoll_priv.clear +
-> +				ASM9260_HW_ICOLL_CLEARn(d->hwirq));
-> +
-> +	__raw_writel(icoll_intr_bitshift(d, BM_ICOLL_INTR_ENABLE),
-> +			icoll_intr_reg(d) + SET_REG);
-> +	raw_spin_unlock(&icoll_lock);
->  }
->  
->  static struct irq_chip mxs_icoll_chip = {
-> @@ -116,12 +153,34 @@ static struct irq_domain_ops icoll_irq_domain_ops = {
->  	.xlate = irq_domain_xlate_onecell,
->  };
->  
-> +static void __init icoll_add_domain(struct device_node *np,
-> +			  int num)
-> +{
-> +	icoll_domain = irq_domain_add_linear(np, num,
-> +					     &icoll_irq_domain_ops, NULL);
-> +
-> +	if (!icoll_domain)
-> +		panic("%s: unable add irq domain", np->full_name);
-> +	irq_set_default_host(icoll_domain);
-> +	set_handle_irq(icoll_handle_irq);
-> +}
-> +
-> +static void __iomem * __init icoll_init_iobase(struct device_node *np)
-> +{
-> +	void __iomem *icoll_base;
-> +
-> +	icoll_base = of_io_request_and_map(np, 0, np->name);
-> +	if (!icoll_base)
-> +		panic("%s: unable to map resource", np->full_name);
-> +	return icoll_base;
-> +}
-> +
->  static int __init icoll_of_init(struct device_node *np,
->  			  struct device_node *interrupt_parent)
->  {
-> -	void __iomem *icoll_base = of_iomap(np, 0);
-> -	WARN_ON(!icoll_base);
-> +	void __iomem *icoll_base;
->  
-> +	icoll_base		= icoll_init_iobase(np);
->  	icoll_priv.vector	= icoll_base + HW_ICOLL_VECTOR;
->  	icoll_priv.levelack	= icoll_base + HW_ICOLL_LEVELACK;
->  	icoll_priv.ctrl		= icoll_base + HW_ICOLL_CTRL;
-> @@ -136,8 +195,38 @@ static int __init icoll_of_init(struct device_node *np,
->  	 */
->  	stmp_reset_block(icoll_priv.ctrl);
->  
-> -	icoll_domain = irq_domain_add_linear(np, ICOLL_NUM_IRQS,
-> -					     &icoll_irq_domain_ops, NULL);
-> +	icoll_add_domain(np, ICOLL_NUM_IRQS);
-> +
->  	return icoll_domain ? 0 : -ENODEV;
->  }
->  IRQCHIP_DECLARE(mxs, "fsl,icoll", icoll_of_init);
-> +
-> +static int __init asm9260_of_init(struct device_node *np,
-> +			  struct device_node *interrupt_parent)
-> +{
-> +	void __iomem *icoll_base;
-> +	int i;
-> +
-> +	icoll_base = icoll_init_iobase(np);
-> +	icoll_priv.vector	= icoll_base + ASM9260_HW_ICOLL_VECTOR;
-> +	icoll_priv.levelack	= icoll_base + ASM9260_HW_ICOLL_LEVELACK;
-> +	icoll_priv.ctrl		= icoll_base + ASM9260_HW_ICOLL_CTRL;
-> +	icoll_priv.stat		= icoll_base + ASM9260_HW_ICOLL_STAT_OFFSET;
-> +	icoll_priv.intr		= icoll_base + ASM9260_HW_ICOLL_INTERRUPT0;
-> +	icoll_priv.intr_per_reg	= 4;
-> +	icoll_priv.clear	= icoll_base + ASM9260_HW_ICOLL_CLEAR0;
-> +
-> +	writel_relaxed(ASM9260_BM_CTRL_IRQ_ENABLE,
-> +			icoll_priv.ctrl);
-> +	/*
-> +	 * ASM9260 don't provide reset bit. So, we need to set level 0
-> +	 * manually.
-> +	 */
-> +	for (i = 0; i < 16 * 0x10; i += 0x10)
-> +		writel(0, icoll_priv.intr + i);
-> +
-> +	icoll_add_domain(np, ASM9260_NUM_IRQS);
-> +
-> +	return icoll_domain ? 0 : -ENODEV;
-> +}
-> +IRQCHIP_DECLARE(asm9260, "alphascale,asm9260-icoll", asm9260_of_init);
-> 
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
+ drivers/regulator/core.c | 199 +++++++++++++++++++++++++++++------------------
+ 1 file changed, 125 insertions(+), 74 deletions(-)
 
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index b616d34a4afa..b048af9c1ae4 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -51,7 +51,6 @@
+ 	pr_debug("%s: " fmt, rdev_get_name(rdev), ##__VA_ARGS__)
+ 
+ static DEFINE_MUTEX(regulator_list_mutex);
+-static LIST_HEAD(regulator_list);
+ static LIST_HEAD(regulator_map_list);
+ static LIST_HEAD(regulator_ena_gpio_list);
+ static LIST_HEAD(regulator_supply_alias_list);
+@@ -59,6 +58,8 @@ static bool has_full_constraints;
+ 
+ static struct dentry *debugfs_root;
+ 
++static struct class regulator_class;
++
+ /*
+  * struct regulator_map
+  *
+@@ -1325,6 +1326,36 @@ static void regulator_supply_alias(struct device **dev, const char **supply)
+ 	}
+ }
+ 
++static int of_node_match(struct device *dev, const void *data)
++{
++	return dev->of_node == data;
++}
++
++static struct regulator_dev *of_find_regulator_by_node(struct device_node *np)
++{
++	struct device *dev;
++
++	dev = class_find_device(&regulator_class, NULL, np, of_node_match);
++
++	return dev ? dev_to_rdev(dev) : NULL;
++}
++
++static int regulator_match(struct device *dev, const void *data)
++{
++	struct regulator_dev *r = dev_to_rdev(dev);
++
++	return strcmp(rdev_get_name(r), data) == 0;
++}
++
++static struct regulator_dev *regulator_lookup_by_name(const char *name)
++{
++	struct device *dev;
++
++	dev = class_find_device(&regulator_class, NULL, name, regulator_match);
++
++	return dev ? dev_to_rdev(dev) : NULL;
++}
++
+ static struct regulator_dev *regulator_dev_lookup(struct device *dev,
+ 						  const char *supply,
+ 						  int *ret)
+@@ -1340,10 +1371,9 @@ static struct regulator_dev *regulator_dev_lookup(struct device *dev,
+ 	if (dev && dev->of_node) {
+ 		node = of_get_regulator(dev, supply);
+ 		if (node) {
+-			list_for_each_entry(r, &regulator_list, list)
+-				if (r->dev.parent &&
+-					node == r->dev.of_node)
+-					return r;
++			r = of_find_regulator_by_node(node);
++			if (r)
++				return r;
+ 			*ret = -EPROBE_DEFER;
+ 			return NULL;
+ 		} else {
+@@ -1361,9 +1391,9 @@ static struct regulator_dev *regulator_dev_lookup(struct device *dev,
+ 	if (dev)
+ 		devname = dev_name(dev);
+ 
+-	list_for_each_entry(r, &regulator_list, list)
+-		if (strcmp(rdev_get_name(r), supply) == 0)
+-			return r;
++	r = regulator_lookup_by_name(supply);
++	if (r)
++		return r;
+ 
+ 	list_for_each_entry(map, &regulator_map_list, list) {
+ 		/* If the mapping has a device set up it must match */
+@@ -3806,8 +3836,6 @@ regulator_register(const struct regulator_desc *regulator_desc,
+ 		}
+ 	}
+ 
+-	list_add(&rdev->list, &regulator_list);
+-
+ 	rdev_init_debugfs(rdev);
+ out:
+ 	mutex_unlock(&regulator_list_mutex);
+@@ -3861,6 +3889,19 @@ void regulator_unregister(struct regulator_dev *rdev)
+ }
+ EXPORT_SYMBOL_GPL(regulator_unregister);
+ 
++static int _regulator_suspend_prepare(struct device *dev, void *data)
++{
++	struct regulator_dev *rdev = dev_to_rdev(dev);
++	const suspend_state_t *state = data;
++	int ret;
++
++	mutex_lock(&rdev->mutex);
++	ret = suspend_prepare(rdev, *state);
++	mutex_unlock(&rdev->mutex);
++
++	return ret;
++}
++
+ /**
+  * regulator_suspend_prepare - prepare regulators for system wide suspend
+  * @state: system suspend state
+@@ -3870,30 +3911,45 @@ EXPORT_SYMBOL_GPL(regulator_unregister);
+  */
+ int regulator_suspend_prepare(suspend_state_t state)
+ {
+-	struct regulator_dev *rdev;
+-	int ret = 0;
+-
+ 	/* ON is handled by regulator active state */
+ 	if (state == PM_SUSPEND_ON)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&regulator_list_mutex);
+-	list_for_each_entry(rdev, &regulator_list, list) {
++	return class_for_each_device(&regulator_class, NULL, &state,
++				     _regulator_suspend_prepare);
++}
++EXPORT_SYMBOL_GPL(regulator_suspend_prepare);
+ 
+-		mutex_lock(&rdev->mutex);
+-		ret = suspend_prepare(rdev, state);
+-		mutex_unlock(&rdev->mutex);
++static int _regulator_suspend_finish(struct device *dev, void *data)
++{
++	struct regulator_dev *rdev = dev_to_rdev(dev);
++	int ret;
+ 
+-		if (ret < 0) {
+-			rdev_err(rdev, "failed to prepare\n");
+-			goto out;
++	mutex_lock(&rdev->mutex);
++	if (rdev->use_count > 0  || rdev->constraints->always_on) {
++		if (!_regulator_is_enabled(rdev)) {
++			ret = _regulator_do_enable(rdev);
++			if (ret)
++				dev_err(dev,
++					"Failed to resume regulator %d\n",
++					ret);
+ 		}
++	} else {
++		if (!have_full_constraints())
++			goto unlock;
++		if (!_regulator_is_enabled(rdev))
++			goto unlock;
++
++		ret = _regulator_do_disable(rdev);
++		if (ret)
++			dev_err(dev, "Failed to suspend regulator %d\n", ret);
+ 	}
+-out:
+-	mutex_unlock(&regulator_list_mutex);
+-	return ret;
++unlock:
++	mutex_unlock(&rdev->mutex);
++
++	/* Keep processing regulators in spite of any errors */
++	return 0;
+ }
+-EXPORT_SYMBOL_GPL(regulator_suspend_prepare);
+ 
+ /**
+  * regulator_suspend_finish - resume regulators from system wide suspend
+@@ -3903,33 +3959,8 @@ EXPORT_SYMBOL_GPL(regulator_suspend_prepare);
+  */
+ int regulator_suspend_finish(void)
+ {
+-	struct regulator_dev *rdev;
+-	int ret = 0, error;
+-
+-	mutex_lock(&regulator_list_mutex);
+-	list_for_each_entry(rdev, &regulator_list, list) {
+-		mutex_lock(&rdev->mutex);
+-		if (rdev->use_count > 0  || rdev->constraints->always_on) {
+-			if (!_regulator_is_enabled(rdev)) {
+-				error = _regulator_do_enable(rdev);
+-				if (error)
+-					ret = error;
+-			}
+-		} else {
+-			if (!have_full_constraints())
+-				goto unlock;
+-			if (!_regulator_is_enabled(rdev))
+-				goto unlock;
+-
+-			error = _regulator_do_disable(rdev);
+-			if (error)
+-				ret = error;
+-		}
+-unlock:
+-		mutex_unlock(&rdev->mutex);
+-	}
+-	mutex_unlock(&regulator_list_mutex);
+-	return ret;
++	return class_for_each_device(&regulator_class, NULL, NULL,
++				     _regulator_suspend_finish);
+ }
+ EXPORT_SYMBOL_GPL(regulator_suspend_finish);
+ 
+@@ -4049,14 +4080,35 @@ static const struct file_operations supply_map_fops = {
+ };
+ 
+ #ifdef CONFIG_DEBUG_FS
++struct summary_data {
++	struct seq_file *s;
++	struct regulator_dev *parent;
++	int level;
++};
++
++static void regulator_summary_show_subtree(struct seq_file *s,
++					   struct regulator_dev *rdev,
++					   int level);
++
++static int regulator_summary_show_children(struct device *dev, void *data)
++{
++	struct regulator_dev *rdev = dev_to_rdev(dev);
++	struct summary_data *summary_data = data;
++
++	if (rdev->supply && rdev->supply->rdev == summary_data->parent)
++		regulator_summary_show_subtree(summary_data->s, rdev,
++					       summary_data->level + 1);
++
++	return 0;
++}
++
+ static void regulator_summary_show_subtree(struct seq_file *s,
+ 					   struct regulator_dev *rdev,
+ 					   int level)
+ {
+-	struct list_head *list = s->private;
+-	struct regulator_dev *child;
+ 	struct regulation_constraints *c;
+ 	struct regulator *consumer;
++	struct summary_data summary_data;
+ 
+ 	if (!rdev)
+ 		return;
+@@ -4106,33 +4158,32 @@ static void regulator_summary_show_subtree(struct seq_file *s,
+ 		seq_puts(s, "\n");
+ 	}
+ 
+-	list_for_each_entry(child, list, list) {
+-		/* handle only non-root regulators supplied by current rdev */
+-		if (!child->supply || child->supply->rdev != rdev)
+-			continue;
++	summary_data.s = s;
++	summary_data.level = level;
++	summary_data.parent = rdev;
+ 
+-		regulator_summary_show_subtree(s, child, level + 1);
+-	}
++	class_for_each_device(&regulator_class, NULL, &summary_data,
++			      regulator_summary_show_children);
+ }
+ 
+-static int regulator_summary_show(struct seq_file *s, void *data)
++static int regulator_summary_show_roots(struct device *dev, void *data)
+ {
+-	struct list_head *list = s->private;
+-	struct regulator_dev *rdev;
+-
+-	seq_puts(s, " regulator                      use open bypass voltage current     min     max\n");
+-	seq_puts(s, "-------------------------------------------------------------------------------\n");
++	struct regulator_dev *rdev = dev_to_rdev(dev);
++	struct seq_file *s = data;
+ 
+-	mutex_lock(&regulator_list_mutex);
++	if (!rdev->supply)
++		regulator_summary_show_subtree(s, rdev, 0);
+ 
+-	list_for_each_entry(rdev, list, list) {
+-		if (rdev->supply)
+-			continue;
++	return 0;
++}
+ 
+-		regulator_summary_show_subtree(s, rdev, 0);
+-	}
++static int regulator_summary_show(struct seq_file *s, void *data)
++{
++	seq_puts(s, " regulator                      use open bypass voltage current     min     max\n");
++	seq_puts(s, "-------------------------------------------------------------------------------\n");
+ 
+-	mutex_unlock(&regulator_list_mutex);
++	class_for_each_device(&regulator_class, NULL, s,
++			      regulator_summary_show_roots);
+ 
+ 	return 0;
+ }
+@@ -4166,7 +4217,7 @@ static int __init regulator_init(void)
+ 			    &supply_map_fops);
+ 
+ 	debugfs_create_file("regulator_summary", 0444, debugfs_root,
+-			    &regulator_list, &regulator_summary_fops);
++			    NULL, &regulator_summary_fops);
+ 
+ 	regulator_dummy_init();
+ 
 -- 
-Regards,
-Oleksij
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150917/8f0dfcde/attachment.sig>
+2.4.3
