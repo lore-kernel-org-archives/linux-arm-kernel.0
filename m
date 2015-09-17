@@ -1,40 +1,124 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Thu, 17 Sep 2015 06:59:54 +0200
-Subject: [PATCH v3 15/26] ARM: pxa: magician: Fix redundant GPIO request for
- pxaficp_ir
-In-Reply-To: <cover.1442462898.git.petr.cvek@tul.cz>
-References: <cover.1442462898.git.petr.cvek@tul.cz>
-Message-ID: <55FA48CA.6000807@tul.cz>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Thu, 17 Sep 2015 13:19:24 +0800
+Subject: [RFC PATCH v4 2/4] genirq: add move_irqs() for cpu hotplug
+In-Reply-To: <1442467166-1460-1-git-send-email-yangyingliang@huawei.com>
+References: <1442467166-1460-1-git-send-email-yangyingliang@huawei.com>
+Message-ID: <1442467166-1460-3-git-send-email-yangyingliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pxaficp_ir driver requests a power GPIO for the transceiver internally,
-so a global GPIO allocation in magician_init() is redundant.
+Add move_irqs() into kernel/irq/migration.c.
+So we can use it to migrate interrupts, when
+cpu is offline.
 
-Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+Cc: Jiang Liu <jiang.liu@linux.intel.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
 ---
- arch/arm/mach-pxa/magician.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/linux/irq.h    |  4 +++
+ kernel/irq/migration.c | 66 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 70 insertions(+)
 
-diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index 86d395d..91b5ed0 100644
---- a/arch/arm/mach-pxa/magician.c
-+++ b/arch/arm/mach-pxa/magician.c
-@@ -189,6 +189,7 @@ static unsigned long magician_pin_config[] __initdata = {
- static struct pxaficp_platform_data magician_ficp_info = {
- 	.gpio_pwdown		= GPIO83_MAGICIAN_nIR_EN,
- 	.transceiver_cap	= IR_SIRMODE | IR_OFF,
-+	.gpio_pwdown_inverted	= 0,
- };
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index 6f8b340..64e3a02 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -446,6 +446,10 @@ static inline void irq_move_irq(struct irq_data *data) { }
+ static inline void irq_move_masked_irq(struct irq_data *data) { }
+ #endif
  
- /*
-@@ -854,7 +855,6 @@ static struct gpio magician_global_gpios[] = {
- 	{ GPIO106_MAGICIAN_LCD_DCDC_NRESET, GPIOF_OUT_INIT_LOW, "LCD DCDC nreset" },
- 	{ GPIO104_MAGICIAN_LCD_VOFF_EN, GPIOF_OUT_INIT_LOW, "LCD VOFF enable" },
- 	{ GPIO105_MAGICIAN_LCD_VON_EN, GPIOF_OUT_INIT_LOW, "LCD VON enable" },
--	{ GPIO83_MAGICIAN_nIR_EN, GPIOF_OUT_INIT_HIGH, "nIR_EN" },
- };
++#if defined(CONFIG_SMP) && defined(CONFIG_GENERIC_IRQ_MIGRATION) && defined(CONFIG_HOTPLUG_CPU)
++void move_irqs(void);
++#endif
++
+ extern int no_irq_affinity;
  
- static void __init magician_init(void)
+ #ifdef CONFIG_HARDIRQS_SW_RESEND
+diff --git a/kernel/irq/migration.c b/kernel/irq/migration.c
+index 1ff2b77..75bff60 100644
+--- a/kernel/irq/migration.c
++++ b/kernel/irq/migration.c
+@@ -1,6 +1,7 @@
+ 
+ #include <linux/irq.h>
+ #include <linux/interrupt.h>
++#include <linux/ratelimit.h>
+ 
+ #include "internals.h"
+ 
+@@ -79,3 +80,68 @@ void irq_move_irq(struct irq_data *idata)
+ 		idata->chip->irq_unmask(idata);
+ }
+ #endif
++
++#ifdef CONFIG_HOTPLUG_CPU
++static bool migrate_one_irq(struct irq_desc *desc)
++{
++	struct irq_data *d = irq_desc_get_irq_data(desc);
++	const struct cpumask *affinity = d->affinity;
++	struct irq_chip *c;
++	bool ret = false;
++
++	/*
++	 * If this is a per-CPU interrupt, or the affinity does not
++	 * include this CPU, then we have nothing to do.
++	 */
++	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
++		return false;
++
++	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
++		affinity = cpu_online_mask;
++		ret = true;
++	}
++
++	c = irq_data_get_irq_chip(d);
++	if (!c->irq_set_affinity) {
++		pr_warn_ratelimited("IRQ%u: unable to set affinity\n", d->irq);
++	} else {
++		int r = irq_do_set_affinity(d, affinity, false);
++		if (r)
++			pr_warn_ratelimited("IRQ%u: set affinity failed(%d).\n", d->irq, r);
++	}
++
++	return ret;
++}
++
++/*
++ * The current CPU has been marked offline.  Migrate IRQs off this CPU.
++ * If the affinity settings do not allow other CPUs, force them onto any
++ * available CPU.
++ *
++ * Note: we must iterate over all IRQs, whether they have an attached
++ * action structure or not, as we need to get chained interrupts too.
++ */
++void move_irqs(void)
++{
++	unsigned int irq;
++	struct irq_desc *desc;
++	unsigned long flags;
++
++	local_irq_save(flags);
++
++	for_each_active_irq(irq) {
++		bool affinity_broken;
++
++		desc = irq_to_desc(irq);
++		raw_spin_lock(&desc->lock);
++		affinity_broken = migrate_one_irq(desc);
++		raw_spin_unlock(&desc->lock);
++
++		if (affinity_broken)
++			pr_warn_ratelimited("IRQ%u no longer affine to CPU%u\n",
++					    irq, smp_processor_id());
++	}
++
++	local_irq_restore(flags);
++}
++#endif /* CONFIG_HOTPLUG_CPU */
 -- 
-1.7.12.1
+2.5.0
