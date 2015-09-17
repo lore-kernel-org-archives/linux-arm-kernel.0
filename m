@@ -1,67 +1,141 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Sep 2015 13:50:09 +0100
-Subject: [PATCH 00/10] arm64 switch_mm improvements
-Message-ID: <1442494219-6133-1-git-send-email-will.deacon@arm.com>
+Date: Thu, 17 Sep 2015 13:50:12 +0100
+Subject: [PATCH 03/10] arm64: flush: use local TLB and I-cache invalidation
+In-Reply-To: <1442494219-6133-1-git-send-email-will.deacon@arm.com>
+References: <1442494219-6133-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1442494219-6133-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+There are a number of places where a single CPU is running with a
+private page-table and we need to perform maintenance on the TLB and
+I-cache in order to ensure correctness, but do not require the operation
+to be broadcast to other CPUs.
 
-This series aims to improve out switch_mm implementation and bring the
-ASID allocator up-to-speed with what we already have for arch/arm/.
+This patch adds local variants of tlb_flush_all and __flush_icache_all
+to support these use-cases and updates the callers respectively.
+__local_flush_icache_all also implies an isb, since it is intended to be
+used synchronously.
 
-In particular, this series:
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/cacheflush.h | 7 +++++++
+ arch/arm64/include/asm/tlbflush.h   | 8 ++++++++
+ arch/arm64/kernel/efi.c             | 4 ++--
+ arch/arm64/kernel/smp.c             | 2 +-
+ arch/arm64/kernel/suspend.c         | 2 +-
+ arch/arm64/mm/context.c             | 4 ++--
+ arch/arm64/mm/mmu.c                 | 2 +-
+ 7 files changed, 22 insertions(+), 7 deletions(-)
 
-  - Introduces routines for CPU-local I-cache and TLB invalidation, and
-    converts relevant callers to use these in preference to the
-    inner-shareable variants
-
-  - Rewrites the ASID allocator to use the bitmap algorithm implemented
-    for arch/arm/ plus the new relaxed atomics introduced with 4.3 (a
-    subsequent patch series will optimise these for arm64).
-
-  - Degrades fullm TLB flushing on exit/execve to a NOP, since the ASID
-    allocator will never re-allocate a dirty ASID
-
-  - Kills mm_cpumask, as it is no longer used and therefore doesn't need
-    to be kept up-to-date
-
-  - Removes some redundant DSB instructions for synchronising page-table
-    updates
-
-Feedback (particularly as a result of testing!) is more than welcome.
-
-Will
-
---->8
-
-Will Deacon (10):
-  arm64: mm: remove unused cpu_set_idmap_tcr_t0sz function
-  arm64: proc: de-scope TLBI operation during cold boot
-  arm64: flush: use local TLB and I-cache invalidation
-  arm64: mm: rewrite ASID allocator and MM context-switching code
-  arm64: tlbflush: remove redundant ASID casts to (unsigned long)
-  arm64: tlbflush: avoid flushing when fullmm == 1
-  arm64: switch_mm: simplify mm and CPU checks
-  arm64: mm: kill mm_cpumask usage
-  arm64: tlb: remove redundant barrier from __flush_tlb_pgtable
-  arm64: mm: remove dsb from update_mmu_cache
-
- arch/arm64/include/asm/cacheflush.h  |   7 ++
- arch/arm64/include/asm/mmu.h         |  10 +-
- arch/arm64/include/asm/mmu_context.h | 113 ++++-------------
- arch/arm64/include/asm/pgtable.h     |   6 +-
- arch/arm64/include/asm/thread_info.h |   1 -
- arch/arm64/include/asm/tlb.h         |  26 ++--
- arch/arm64/include/asm/tlbflush.h    |  18 ++-
- arch/arm64/kernel/asm-offsets.c      |   2 +-
- arch/arm64/kernel/efi.c              |   5 +-
- arch/arm64/kernel/smp.c              |   9 +-
- arch/arm64/kernel/suspend.c          |   2 +-
- arch/arm64/mm/context.c              | 236 +++++++++++++++++++++--------------
- arch/arm64/mm/mmu.c                  |   2 +-
- arch/arm64/mm/proc.S                 |   6 +-
- 14 files changed, 217 insertions(+), 226 deletions(-)
-
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index c75b8d027eb1..54efedaf331f 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -115,6 +115,13 @@ extern void copy_to_user_page(struct vm_area_struct *, struct page *,
+ #define ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE 1
+ extern void flush_dcache_page(struct page *);
+ 
++static inline void __local_flush_icache_all(void)
++{
++	asm("ic iallu");
++	dsb(nsh);
++	isb();
++}
++
+ static inline void __flush_icache_all(void)
+ {
+ 	asm("ic	ialluis");
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 7bd2da021658..96f944e75dc4 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -63,6 +63,14 @@
+  *		only require the D-TLB to be invalidated.
+  *		- kaddr - Kernel virtual memory address
+  */
++static inline void local_flush_tlb_all(void)
++{
++	dsb(nshst);
++	asm("tlbi	vmalle1");
++	dsb(nsh);
++	isb();
++}
++
+ static inline void flush_tlb_all(void)
+ {
+ 	dsb(ishst);
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index e8ca6eaedd02..b0f6dbdc5260 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -343,9 +343,9 @@ static void efi_set_pgd(struct mm_struct *mm)
+ 	else
+ 		cpu_switch_mm(mm->pgd, mm);
+ 
+-	flush_tlb_all();
++	local_flush_tlb_all();
+ 	if (icache_is_aivivt())
+-		__flush_icache_all();
++		__local_flush_icache_all();
+ }
+ 
+ void efi_virtmap_load(void)
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index dbdaacddd9a5..fdd4d4dbd64f 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -152,7 +152,7 @@ asmlinkage void secondary_start_kernel(void)
+ 	 * point to zero page to avoid speculatively fetching new entries.
+ 	 */
+ 	cpu_set_reserved_ttbr0();
+-	flush_tlb_all();
++	local_flush_tlb_all();
+ 	cpu_set_default_tcr_t0sz();
+ 
+ 	preempt_disable();
+diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+index 8297d502217e..3c5e4e6dcf68 100644
+--- a/arch/arm64/kernel/suspend.c
++++ b/arch/arm64/kernel/suspend.c
+@@ -90,7 +90,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 		else
+ 			cpu_switch_mm(mm->pgd, mm);
+ 
+-		flush_tlb_all();
++		local_flush_tlb_all();
+ 
+ 		/*
+ 		 * Restore per-cpu offset before any kernel
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index d70ff14dbdbd..48b53fb381af 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -48,9 +48,9 @@ static void flush_context(void)
+ {
+ 	/* set the reserved TTBR0 before flushing the TLB */
+ 	cpu_set_reserved_ttbr0();
+-	flush_tlb_all();
++	local_flush_tlb_all();
+ 	if (icache_is_aivivt())
+-		__flush_icache_all();
++		__local_flush_icache_all();
+ }
+ 
+ static void set_mm_context(struct mm_struct *mm, unsigned int asid)
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 9211b8527f25..71a310478c9e 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -456,7 +456,7 @@ void __init paging_init(void)
+ 	 * point to zero page to avoid speculatively fetching new entries.
+ 	 */
+ 	cpu_set_reserved_ttbr0();
+-	flush_tlb_all();
++	local_flush_tlb_all();
+ 	cpu_set_default_tcr_t0sz();
+ }
+ 
 -- 
 2.1.4
