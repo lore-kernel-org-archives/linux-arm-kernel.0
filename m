@@ -1,163 +1,83 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Thu, 17 Sep 2015 17:09:37 +0530
-Subject: [PATCH RFC 5/8] drm: hisilicon: fill interface function of
- encoder\connector part
-In-Reply-To: <1442309834-21420-6-git-send-email-kong.kongxinwei@hisilicon.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Thu, 17 Sep 2015 07:52:10 -0400
+Subject: [PATCH RFC 6/8] drm: hisilicon: Add support for fbdev
+In-Reply-To: <CAGd==05f+XVg4ZSDihftjB2wcOGkAou=AxXYXB+1=ckM2J6EBQ@mail.gmail.com>
 References: <1442309834-21420-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <1442309834-21420-6-git-send-email-kong.kongxinwei@hisilicon.com>
-Message-ID: <55FAA679.2030902@codeaurora.org>
+ <1442309834-21420-7-git-send-email-kong.kongxinwei@hisilicon.com>
+ <55F862A1.30308@kernel.org>
+ <CAGd==05f+XVg4ZSDihftjB2wcOGkAou=AxXYXB+1=ckM2J6EBQ@mail.gmail.com>
+Message-ID: <CAF6AEGs1_9JsCfnbW=-PCunyapMGK4EB3eRzRLg9ZCpuQ-NEbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 9/15/2015 3:07 PM, Xinwei Kong wrote:
-> This patch enables the adv7533 module which is connecting hisilicon SOC
-> by dsi module. while using DSI module and adv7533 module to implement the
-> encoder/connector interface of DRM\KMS.
+On Wed, Sep 16, 2015 at 5:48 AM, Xinliang Liu <xinliang.liu@linaro.org> wrote:
 >
-> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
-> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> Signed-off-by: Andy Green <andy.green@linaro.org>
-> Signed-off-by: Jiwen Qi <qijiwen@hisilicon.com>
-> Signed-off-by: Yu Gong <gongyu@hisilicon.com>
-> ---
->   drivers/gpu/drm/hisilicon/Kconfig              |  10 +
->   drivers/gpu/drm/hisilicon/hisi_drm_connector.c |  34 ++
->   drivers/gpu/drm/hisilicon/hisi_drm_connector.h |   8 +
->   drivers/gpu/drm/hisilicon/hisi_drm_dsi.c       | 670 +++++++++++++++++++++++++
->   drivers/gpu/drm/hisilicon/hisi_drm_encoder.c   |  52 ++
->   drivers/gpu/drm/hisilicon/hisi_drm_encoder.h   |  19 +
->   drivers/gpu/drm/hisilicon/hisi_dsi_reg.h       |  91 ++++
->   7 files changed, 884 insertions(+)
->   create mode 100644 drivers/gpu/drm/hisilicon/hisi_dsi_reg.h
 >
-
-<snip>
-
-> +struct hisi_connector_funcs hisi_dsi_connector_ops = {
-> +	.get_modes = dsi_connector_get_modes,
-> +};
-> +
-> +struct hisi_encoder_funcs hisi_dsi_encoder_ops = {
-> +	.mode_set = dsi_encoder_mode_set,
-> +	.enable = dsi_encoder_enable,
-> +	.disable = dsi_encoder_disable,
-> +};
-> +
->   static int hisi_dsi_bind(struct device *dev, struct device *master,
->   			 void *data)
->   {
-> @@ -52,8 +682,23 @@ static int hisi_dsi_bind(struct device *dev, struct device *master,
+> On 16 September 2015 at 02:25, Rob Herring <robh@kernel.org> wrote:
+> Hi Rob, thanks a lot for reply:-)
 >
->   	hisi_drm_encoder_init(ctx->dev, &ctx->dsi.hisi_encoder.base.base);
+>> On 09/15/2015 04:37 AM, Xinwei Kong wrote:
+>> > If you config DRM_HISI_FBDEV optional, this patch will only support
+>> > fbdev
+>> > mode while also supporting double buffer.
+>>
+>> This is a lot of duplicated code from CMA fbdev. Is double buffering the
+>> only reason why CMA fbdev can't be used or are there some other
+>> constraints?
 >
-> +#ifdef CONFIG_DRM_HISI_HAS_SLAVE_ENCODER
-> +	ret = ctx->drm_i2c_driver->encoder_init(ctx->client, ctx->dev,
-> +						&ctx->dsi.hisi_encoder.base);
-> +	if (ret) {
-> +		DRM_ERROR("fail to init drm i2c encoder\n");
-> +		return ret;
-> +	}
-> +
-> +	if (!ctx->dsi.hisi_encoder.base.slave_funcs) {
-> +		DRM_ERROR("failed check encoder function\n");
-> +		return -ENODEV;
-> +	}
-> +#endif
-
-A slave encoder isn't supposed to be used this way. A slave encoder is
-supposed to register itself to drm as an encoder object. A slave
-encoder connects directly to a crtc, and operate like a normal encoder.
-In other words, a slave encoder isn't something that attaches to a
-'master' encoder as the driver does here. 'Slave encoder' here means
-that the encoder is a part of a different bus (like i2c etc).
-
-Currently, the driver is directly calling slave encoder ops in 
-hisi_drm_encoder.c.
-
-
-> +
->   	hisi_drm_connector_init(ctx->dev, &ctx->dsi.hisi_encoder.base.base,
->   				&ctx->dsi.hisi_connector.connector);
-> +
->   	return ret;
->   }
+> Yes, double buffering is the main reason we rewrite our own fbdev.
+> CMA fbdev only create one buffer. But we need at least  double buffer for
+> running Android with fbdev.
 >
-> @@ -102,6 +747,27 @@ static int hisi_dsi_probe(struct platform_device *pdev)
->   		return -EINVAL;
->   	}
->
-> +#ifdef CONFIG_DRM_HISI_HAS_SLAVE_ENCODER
-> +	ctx->client = of_find_i2c_device_by_node(slave_node);
-> +	of_node_put(slave_node);
-> +	if (!ctx->client) {
-> +		DRM_ERROR("failed to find slave encoder i2c client\n");
-> +		return -EPROBE_DEFER;
-> +	}
-> +
-> +	if (!ctx->client->dev.driver) {
-> +		DRM_ERROR("%s: NULL client driver\n", __func__);
-> +		return -EPROBE_DEFER;
-> +	}
-> +
-> +	ctx->drm_i2c_driver = to_drm_i2c_encoder_driver(
-> +		to_i2c_driver(ctx->client->dev.driver));
-> +	if (IS_ERR(ctx->drm_i2c_driver)) {
-> +		DRM_ERROR("failed to initialize encoder driver");
-> +		return -EPROBE_DEFER;
-> +	}
-> +#endif
-> +
->   	dsi = &ctx->dsi;
->   	dsi->ctx = ctx;
->   	dsi->lanes = 3;
-> @@ -110,6 +776,10 @@ static int hisi_dsi_probe(struct platform_device *pdev)
->   	dsi->format = MIPI_DSI_FMT_RGB888;
->   	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
->
-> +	dsi->hisi_encoder.ops = &hisi_dsi_encoder_ops;
-> +	dsi->hisi_connector.encoder = &dsi->hisi_encoder.base.base;
-> +	dsi->hisi_connector.ops = &hisi_dsi_connector_ops;
-> +
->   	return component_add(&pdev->dev, &hisi_dsi_ops);
->   }
->
-> diff --git a/drivers/gpu/drm/hisilicon/hisi_drm_encoder.c b/drivers/gpu/drm/hisilicon/hisi_drm_encoder.c
-> index 89fc73d..acd73d8 100644
-> --- a/drivers/gpu/drm/hisilicon/hisi_drm_encoder.c
-> +++ b/drivers/gpu/drm/hisilicon/hisi_drm_encoder.c
-> @@ -15,18 +15,49 @@
->
->   #include "hisi_drm_encoder.h"
->
-> +#define to_hisi_encoder(encoder) \
-> +	container_of(encoder, struct hisi_encoder, base.base)
-> +
->   void hisi_drm_encoder_disable(struct drm_encoder *encoder)
->   {
-> +	struct hisi_encoder *hencoder = to_hisi_encoder(encoder);
-> +	struct hisi_encoder_funcs *ops = hencoder->ops;
-> +	struct drm_encoder_slave_funcs *sfuncs = get_slave_funcs(encoder);
-> +
-> +	if (ops->enable)
-> +		ops->disable(encoder);
-> +
-> +	if (sfuncs && sfuncs->dpms)
-> +		sfuncs->dpms(encoder, DRM_MODE_DPMS_OFF);
->   }
->
+>> Double buffering in fbdev has always been a hack, so I'm
+>> guessing that is not a feature that should be added here.
+>>
+> If so, I think it is hard to be accepted for my cma fbdev patch to support
+> multi buffer.
+> This early week, I have sent a cma fbdev patch for supporting this. The
+> subject is
+> "[PATCH] drm/cma-helper: Add multi buffer support for cma fbdev".
+> We do have a strong will to support this feature. I described the reason in
+> the patch. Please take a look for me. Thank you very much.
 
-The encoder should represent only the DSI encoder hardware here. It
-shouldn't be calling slave encoder ops.
+fwiw, drm_gralloc has support for kms.  Currently it is expected to be
+paired w/ a mesa gpu driver, which might not work for everyone, but I
+suppose the display part of it could be extracted out for a
+gralloc.kms.so for pure sw rendering.. that might be a better
+approach.
 
-What you want is to have the encoder connect to a bridge. Something
-like:
+http://git.android-x86.org/?p=platform/hardware/drm_gralloc.git
 
-crtc(ade)->encoder(dsi)->bridge(adv7533)->connector
+BR,
+-R
 
-Archit
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> -Xinliang
+>
+>> Rob
+>>
+>> > Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+>> > Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>> > Signed-off-by: Andy Green <andy.green@linaro.org>
+>> > Signed-off-by: Jiwen Qi <qijiwen@hisilicon.com>
+>> > Signed-off-by: Yu Gong <gongyu@hisilicon.com>
+>> > ---
+>> >  drivers/gpu/drm/hisilicon/Kconfig              |  13 +
+>> >  drivers/gpu/drm/hisilicon/Makefile             |   3 +-
+>> >  drivers/gpu/drm/hisilicon/hisi_drm_connector.c |   4 +
+>> >  drivers/gpu/drm/hisilicon/hisi_drm_drv.c       |   9 +
+>> >  drivers/gpu/drm/hisilicon/hisi_drm_dsi.c       |  15 +
+>> >  drivers/gpu/drm/hisilicon/hisi_drm_fb.h        |   5 +
+>> >  drivers/gpu/drm/hisilicon/hisi_drm_fbdev.c     | 395
+>> > +++++++++++++++++++++++++
+>> >  drivers/gpu/drm/hisilicon/hisi_drm_fbdev.h     |  24 ++
+>> >  8 files changed, 467 insertions(+), 1 deletion(-)
+>> >  create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_fbdev.c
+>> >  create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_fbdev.h
+>>
+>
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
