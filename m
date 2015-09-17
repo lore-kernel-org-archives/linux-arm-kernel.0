@@ -1,39 +1,41 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 17 Sep 2015 09:14:20 +0300
-Subject: [PATCH 6/6] dmaengine: xilinx: Fix module autoload for OF
- platform driver
-In-Reply-To: <20150916210017.GA5933@goodgumbo.baconseed.org>
-References: <20150916210017.GA5933@goodgumbo.baconseed.org>
-Message-ID: <2273902.ke3oao0baF@avalon>
+From: shengjiu.wang@freescale.com (Shengjiu Wang)
+Date: Thu, 17 Sep 2015 14:15:48 +0800
+Subject: [PATCH] ARM: dts: imx6qdl: complement the missed clock of spdif
+Message-ID: <1442470548-10007-1-git-send-email-shengjiu.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 September 2015 23:00:17 Luis de Bethencourt wrote:
-> This platform driver has a OF device ID table but the OF module
-> alias information is not created so module autoloading won't work.
-> 
-> Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
+Complement the devicetree of spdif node
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-> ---
->  drivers/dma/xilinx/xilinx_vdma.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/dma/xilinx/xilinx_vdma.c
-> b/drivers/dma/xilinx/xilinx_vdma.c index d8434d4..6f4b501 100644
-> --- a/drivers/dma/xilinx/xilinx_vdma.c
-> +++ b/drivers/dma/xilinx/xilinx_vdma.c
-> @@ -1349,6 +1349,7 @@ static const struct of_device_id xilinx_vdma_of_ids[]
-> = { { .compatible = "xlnx,axi-vdma-1.00.a",},
->  	{}
->  };
-> +MODULE_DEVICE_TABLE(of, xilinx_vdma_of_ids);
-> 
->  static struct platform_driver xilinx_vdma_driver = {
->  	.driver = {
-
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 53044b0..2b6cc8b 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -219,15 +219,15 @@
+ 					       <&sdma 15 18 0>;
+ 					dma-names = "rx", "tx";
+ 					clocks = <&clks IMX6QDL_CLK_SPDIF_GCLK>, <&clks IMX6QDL_CLK_OSC>,
+-						 <&clks IMX6QDL_CLK_SPDIF>, <&clks IMX6QDL_CLK_DUMMY>,
+-						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_DUMMY>,
+-						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_DUMMY>,
+-						 <&clks IMX6QDL_CLK_DUMMY>;
++						 <&clks IMX6QDL_CLK_SPDIF>, <&clks IMX6QDL_CLK_ASRC>,
++						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_ESAI_EXTAL>,
++						 <&clks IMX6QDL_CLK_IPG>, <&clks IMX6QDL_CLK_MLB>,
++						 <&clks IMX6QDL_CLK_DUMMY>, <&clks IMX6QDL_CLK_SPBA>;
+ 					clock-names = "core",  "rxtx0",
+ 						      "rxtx1", "rxtx2",
+ 						      "rxtx3", "rxtx4",
+ 						      "rxtx5", "rxtx6",
+-						      "rxtx7";
++						      "rxtx7", "dma";
+ 					status = "disabled";
+ 				};
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+1.9.1
