@@ -1,61 +1,58 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Sep 2015 13:50:14 +0100
-Subject: [PATCH 05/10] arm64: tlbflush: remove redundant ASID casts to
- (unsigned long)
+Date: Thu, 17 Sep 2015 13:50:15 +0100
+Subject: [PATCH 06/10] arm64: tlbflush: avoid flushing when fullmm == 1
 In-Reply-To: <1442494219-6133-1-git-send-email-will.deacon@arm.com>
 References: <1442494219-6133-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1442494219-6133-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1442494219-6133-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ASID macro returns a 64-bit (long long) value, so there is no need
-to cast to (unsigned long) before shifting prior to a TLBI operation.
+The TLB gather code sets fullmm=1 when tearing down the entire address
+space for an mm_struct on exit or execve. Given that the ASID allocator
+will never re-allocate a dirty ASID, this flushing is not needed and can
+simply be avoided in the flushing code.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/tlbflush.h | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/tlb.h | 26 +++++++++++++++-----------
+ 1 file changed, 15 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index 96f944e75dc4..93e9f964805c 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -81,7 +81,7 @@ static inline void flush_tlb_all(void)
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index d6e6b6660380..ffdaea7954bb 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -37,17 +37,21 @@ static inline void __tlb_remove_table(void *_table)
  
- static inline void flush_tlb_mm(struct mm_struct *mm)
+ static inline void tlb_flush(struct mmu_gather *tlb)
  {
--	unsigned long asid = (unsigned long)ASID(mm) << 48;
-+	unsigned long asid = ASID(mm) << 48;
+-	if (tlb->fullmm) {
+-		flush_tlb_mm(tlb->mm);
+-	} else {
+-		struct vm_area_struct vma = { .vm_mm = tlb->mm, };
+-		/*
+-		 * The intermediate page table levels are already handled by
+-		 * the __(pte|pmd|pud)_free_tlb() functions, so last level
+-		 * TLBI is sufficient here.
+-		 */
+-		__flush_tlb_range(&vma, tlb->start, tlb->end, true);
+-	}
++	struct vm_area_struct vma = { .vm_mm = tlb->mm, };
++
++	/*
++	 * The ASID allocator will either invalidate the ASID or mark
++	 * it as used.
++	 */
++	if (tlb->fullmm)
++		return;
++
++	/*
++	 * The intermediate page table levels are already handled by
++	 * the __(pte|pmd|pud)_free_tlb() functions, so last level
++	 * TLBI is sufficient here.
++	 */
++	__flush_tlb_range(&vma, tlb->start, tlb->end, true);
+ }
  
- 	dsb(ishst);
- 	asm("tlbi	aside1is, %0" : : "r" (asid));
-@@ -91,8 +91,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
- static inline void flush_tlb_page(struct vm_area_struct *vma,
- 				  unsigned long uaddr)
- {
--	unsigned long addr = uaddr >> 12 |
--		((unsigned long)ASID(vma->vm_mm) << 48);
-+	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
- 
- 	dsb(ishst);
- 	asm("tlbi	vale1is, %0" : : "r" (addr));
-@@ -109,7 +108,7 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
- 				     unsigned long start, unsigned long end,
- 				     bool last_level)
- {
--	unsigned long asid = (unsigned long)ASID(vma->vm_mm) << 48;
-+	unsigned long asid = ASID(vma->vm_mm) << 48;
- 	unsigned long addr;
- 
- 	if ((end - start) > MAX_TLB_RANGE) {
-@@ -162,7 +161,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
- static inline void __flush_tlb_pgtable(struct mm_struct *mm,
- 				       unsigned long uaddr)
- {
--	unsigned long addr = uaddr >> 12 | ((unsigned long)ASID(mm) << 48);
-+	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
- 
- 	dsb(ishst);
- 	asm("tlbi	vae1is, %0" : : "r" (addr));
+ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
 -- 
 2.1.4
