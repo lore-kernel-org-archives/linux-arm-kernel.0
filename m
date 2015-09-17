@@ -1,83 +1,143 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 17 Sep 2015 07:52:10 -0400
-Subject: [PATCH RFC 6/8] drm: hisilicon: Add support for fbdev
-In-Reply-To: <CAGd==05f+XVg4ZSDihftjB2wcOGkAou=AxXYXB+1=ckM2J6EBQ@mail.gmail.com>
-References: <1442309834-21420-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <1442309834-21420-7-git-send-email-kong.kongxinwei@hisilicon.com>
- <55F862A1.30308@kernel.org>
- <CAGd==05f+XVg4ZSDihftjB2wcOGkAou=AxXYXB+1=ckM2J6EBQ@mail.gmail.com>
-Message-ID: <CAF6AEGs1_9JsCfnbW=-PCunyapMGK4EB3eRzRLg9ZCpuQ-NEbA@mail.gmail.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 17 Sep 2015 19:43:40 +0800
+Subject: [PATCH] efi/libstub/fdt: Standardize the names of EFI stub
+ parameters
+In-Reply-To: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1441874516-11364-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <55FAA76C.4070607@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 5:48 AM, Xinliang Liu <xinliang.liu@linaro.org> wrote:
->
->
-> On 16 September 2015 at 02:25, Rob Herring <robh@kernel.org> wrote:
-> Hi Rob, thanks a lot for reply:-)
->
->> On 09/15/2015 04:37 AM, Xinwei Kong wrote:
->> > If you config DRM_HISI_FBDEV optional, this patch will only support
->> > fbdev
->> > mode while also supporting double buffer.
->>
->> This is a lot of duplicated code from CMA fbdev. Is double buffering the
->> only reason why CMA fbdev can't be used or are there some other
->> constraints?
->
-> Yes, double buffering is the main reason we rewrite our own fbdev.
-> CMA fbdev only create one buffer. But we need at least  double buffer for
-> running Android with fbdev.
->
->> Double buffering in fbdev has always been a hack, so I'm
->> guessing that is not a feature that should be added here.
->>
-> If so, I think it is hard to be accepted for my cma fbdev patch to support
-> multi buffer.
-> This early week, I have sent a cma fbdev patch for supporting this. The
-> subject is
-> "[PATCH] drm/cma-helper: Add multi buffer support for cma fbdev".
-> We do have a strong will to support this feature. I described the reason in
-> the patch. Please take a look for me. Thank you very much.
+Hi,
 
-fwiw, drm_gralloc has support for kms.  Currently it is expected to be
-paired w/ a mesa gpu driver, which might not work for everyone, but I
-suppose the display part of it could be extracted out for a
-gralloc.kms.so for pure sw rendering.. that might be a better
-approach.
+>From the comments on this patch, IIUC, we don't object to the change
+brought by this patch. What we didn't reach an agreement is how to
+support runtime service for Dom0. Right? If so, I think this patch
+doesn't conflict with adding support for runtime service in the future.
+So could we move this patch forward? Then I could continue working on
+adding ARM ACPI support on Xen.
 
-http://git.android-x86.org/?p=platform/hardware/drm_gralloc.git
+Any comments?
 
-BR,
--R
+Thanks,
+-- 
+Shannon
 
-> -Xinliang
->
->> Rob
->>
->> > Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
->> > Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
->> > Signed-off-by: Andy Green <andy.green@linaro.org>
->> > Signed-off-by: Jiwen Qi <qijiwen@hisilicon.com>
->> > Signed-off-by: Yu Gong <gongyu@hisilicon.com>
->> > ---
->> >  drivers/gpu/drm/hisilicon/Kconfig              |  13 +
->> >  drivers/gpu/drm/hisilicon/Makefile             |   3 +-
->> >  drivers/gpu/drm/hisilicon/hisi_drm_connector.c |   4 +
->> >  drivers/gpu/drm/hisilicon/hisi_drm_drv.c       |   9 +
->> >  drivers/gpu/drm/hisilicon/hisi_drm_dsi.c       |  15 +
->> >  drivers/gpu/drm/hisilicon/hisi_drm_fb.h        |   5 +
->> >  drivers/gpu/drm/hisilicon/hisi_drm_fbdev.c     | 395
->> > +++++++++++++++++++++++++
->> >  drivers/gpu/drm/hisilicon/hisi_drm_fbdev.h     |  24 ++
->> >  8 files changed, 467 insertions(+), 1 deletion(-)
->> >  create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_fbdev.c
->> >  create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_fbdev.h
->>
->
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
->
+On 2015/9/10 16:41, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> These EFI stub parameters are used to internal communication between EFI
+> stub and Linux kernel and EFI stub creates these parameters. But for Xen
+> on ARM when booting with UEFI, Xen will create a minimal DT providing
+> these parameters for Dom0 and Dom0 is not only Linux kernel, but also
+> other OS (such as FreeBSD) which will be used in the future. So here
+> we plan to standardize the names by dropping the prefix "linux," and
+> make them common to other OS. Also this will not break the compatibility
+> since these parameters are used to internal communication between EFI
+> stub and kernel.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+> Look at [1] for the discussion about this in Xen ML. The purpose of this
+> patch is to standardize the names to make Linux ARM kernel work on Xen
+> with UEFI. Also it hopes other OS(e.g. FreeBSD), which will be used as
+> Dom0 on Xen, could support this mechanism as well.
+> 
+> [1]http://lists.xenproject.org/archives/html/xen-devel/2015-08/msg02250.html
+> 
+>  Documentation/arm/uefi.txt         | 10 +++++-----
+>  drivers/firmware/efi/efi.c         | 10 +++++-----
+>  drivers/firmware/efi/libstub/fdt.c | 10 +++++-----
+>  3 files changed, 15 insertions(+), 15 deletions(-)
+> 
+> diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
+> index d60030a..8c83243 100644
+> --- a/Documentation/arm/uefi.txt
+> +++ b/Documentation/arm/uefi.txt
+> @@ -45,18 +45,18 @@ following parameters:
+>  ________________________________________________________________________________
+>  Name                      | Size   | Description
+>  ================================================================================
+> -linux,uefi-system-table   | 64-bit | Physical address of the UEFI System Table.
+> +uefi-system-table         | 64-bit | Physical address of the UEFI System Table.
+>  --------------------------------------------------------------------------------
+> -linux,uefi-mmap-start     | 64-bit | Physical address of the UEFI memory map,
+> +uefi-mmap-start           | 64-bit | Physical address of the UEFI memory map,
+>                            |        | populated by the UEFI GetMemoryMap() call.
+>  --------------------------------------------------------------------------------
+> -linux,uefi-mmap-size      | 32-bit | Size in bytes of the UEFI memory map
+> +uefi-mmap-size            | 32-bit | Size in bytes of the UEFI memory map
+>                            |        | pointed to in previous entry.
+>  --------------------------------------------------------------------------------
+> -linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
+> +uefi-mmap-desc-size       | 32-bit | Size in bytes of each entry in the UEFI
+>                            |        | memory map.
+>  --------------------------------------------------------------------------------
+> -linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
+> +uefi-mmap-desc-ver        | 32-bit | Version of the mmap descriptor format.
+>  --------------------------------------------------------------------------------
+>  linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
+>  --------------------------------------------------------------------------------
+> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> index d6144e3..3878715 100644
+> --- a/drivers/firmware/efi/efi.c
+> +++ b/drivers/firmware/efi/efi.c
+> @@ -481,11 +481,11 @@ static __initdata struct {
+>  	int offset;
+>  	int size;
+>  } dt_params[] = {
+> -	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
+> -	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
+> -	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
+> -	UEFI_PARAM("MemMap Desc. Size", "linux,uefi-mmap-desc-size", desc_size),
+> -	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
+> +	UEFI_PARAM("System Table", "uefi-system-table", system_table),
+> +	UEFI_PARAM("MemMap Address", "uefi-mmap-start", mmap),
+> +	UEFI_PARAM("MemMap Size", "uefi-mmap-size", mmap_size),
+> +	UEFI_PARAM("MemMap Desc. Size", "uefi-mmap-desc-size", desc_size),
+> +	UEFI_PARAM("MemMap Desc. Version", "uefi-mmap-desc-ver", desc_ver)
+>  };
+>  
+>  struct param_info {
+> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+> index ef5d764..e94589a 100644
+> --- a/drivers/firmware/efi/libstub/fdt.c
+> +++ b/drivers/firmware/efi/libstub/fdt.c
+> @@ -118,31 +118,31 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+>  	/* Add FDT entries for EFI runtime services in chosen node. */
+>  	node = fdt_subnode_offset(fdt, 0, "chosen");
+>  	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)sys_table);
+> -	status = fdt_setprop(fdt, node, "linux,uefi-system-table",
+> +	status = fdt_setprop(fdt, node, "uefi-system-table",
+>  			     &fdt_val64, sizeof(fdt_val64));
+>  	if (status)
+>  		goto fdt_set_fail;
+>  
+>  	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)memory_map);
+> -	status = fdt_setprop(fdt, node, "linux,uefi-mmap-start",
+> +	status = fdt_setprop(fdt, node, "uefi-mmap-start",
+>  			     &fdt_val64,  sizeof(fdt_val64));
+>  	if (status)
+>  		goto fdt_set_fail;
+>  
+>  	fdt_val32 = cpu_to_fdt32(map_size);
+> -	status = fdt_setprop(fdt, node, "linux,uefi-mmap-size",
+> +	status = fdt_setprop(fdt, node, "uefi-mmap-size",
+>  			     &fdt_val32,  sizeof(fdt_val32));
+>  	if (status)
+>  		goto fdt_set_fail;
+>  
+>  	fdt_val32 = cpu_to_fdt32(desc_size);
+> -	status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-size",
+> +	status = fdt_setprop(fdt, node, "uefi-mmap-desc-size",
+>  			     &fdt_val32, sizeof(fdt_val32));
+>  	if (status)
+>  		goto fdt_set_fail;
+>  
+>  	fdt_val32 = cpu_to_fdt32(desc_ver);
+> -	status = fdt_setprop(fdt, node, "linux,uefi-mmap-desc-ver",
+> +	status = fdt_setprop(fdt, node, "uefi-mmap-desc-ver",
+>  			     &fdt_val32, sizeof(fdt_val32));
+>  	if (status)
+>  		goto fdt_set_fail;
+> 
