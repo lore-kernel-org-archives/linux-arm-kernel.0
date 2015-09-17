@@ -1,86 +1,75 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Sep 2015 15:01:26 +0100
-Subject: [RFC PATCH v2 3/7] arm64: alternative: Apply alternatives early
- in boot process
-In-Reply-To: <55FABF64.3080404@linaro.org>
-References: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
- <1442237181-17064-4-git-send-email-daniel.thompson@linaro.org>
- <20150916130549.GJ28771@arm.com> <55F98FF0.7030605@linaro.org>
- <20150916162452.GN28771@arm.com> <55FABF64.3080404@linaro.org>
-Message-ID: <20150917140126.GE25634@arm.com>
+Date: Thu, 17 Sep 2015 15:04:24 +0100
+Subject: [GIT PULL] arm64: fixes for -rc2
+Message-ID: <20150917140424.GF25634@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 02:25:56PM +0100, Daniel Thompson wrote:
-> On 16/09/15 17:24, Will Deacon wrote:
-> > On Wed, Sep 16, 2015 at 04:51:12PM +0100, Daniel Thompson wrote:
-> >> On 16/09/15 14:05, Will Deacon wrote:
-> >>> On Mon, Sep 14, 2015 at 02:26:17PM +0100, Daniel Thompson wrote:
-> >>>>    /*
-> >>>> + * This is called very early in the boot process (directly after we run
-> >>>> + * a feature detect on the boot CPU). No need to worry about other CPUs
-> >>>> + * here.
-> >>>> + */
-> >>>> +void apply_alternatives_early(void)
-> >>>> +{
-> >>>> +	struct alt_region region = {
-> >>>> +		.begin	= __alt_instructions,
-> >>>> +		.end	= __alt_instructions_end,
-> >>>> +	};
-> >>>> +
-> >>>> +	__apply_alternatives(&region);
-> >>>> +}
-> >>>
-> >>> How do you choose which alternatives are applied early and which are
-> >>> applied later? AFAICT, this just applies everything before we've
-> >>> established the capabilities of the CPUs in the system, which could cause
-> >>> problems for big/little SoCs.
-> >>
-> >> They are applied twice. This relies for correctness on the fact that
-> >> cpufeatures can be set but not unset.
-> >>
-> >> In other words the boot CPU does a feature detect and, as a result, a
-> >> subset of the required alternatives will be applied. However after this
-> >> the other CPUs will boot and the the remaining alternatives applied as
-> >> before.
-> >>
-> >> The current implementation is inefficient (because it will redundantly
-> >> patch the same code twice) but I don't think it is broken.
-> >
-> > What about a big/little system where we boot on the big cores and only
-> > they support LSE atomics?
-> 
-> Hmmnn... I don't think this patch will impact that.
-> 
-> Once something in the boot sequence calls cpus_set_cap() then if there 
-> is a corresponding alternative then it is *going* to be applied isn't 
-> it? The patch only means that some of the alternatives will be applied 
-> early. Once the boot is complete the patched .text should be the same 
-> with and without the patch.
-> 
-> Have I overlooked some code in the current kernel that prevents a system 
-> with mis-matched LSE support from applying the alternatives?
+Hi Linus,
 
-Sorry, I'm thinking slightly ahead of myself, but the series from Suzuki
-creates a shadow "safe" view of the ID registers in the system,
-corresponding to the intersection of CPU features:
+Please pull the following arm64 fixes for 4.3-rc2. They address some
+problems with filesystem writeback due to the recently merged hardware
+DBM patches, which caused us to treat some read-only pages as dirty.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/370386.html
+There are also some other, less significant fixes that are described in
+the tag.
 
-In this case, it is necessary to inspect all of the possible CPUs before
-we can apply the patching, but as I say above, I'm prepared to make an
-exception for NMI because I don't think we can assume a safe value anyway
-for a system with mismatched GIC CPU interfaces. I just don't want to
-drag all of the alternatives patching earlier as well.
-
-> > We also need to think about how an incoming NMI interacts with
-> > concurrent patching of later features. I suspect we want to set the I
-> > bit, like you do for WFI, unless you can guarantee that no patched
-> > sequences run in NMI context.
-> 
-> Good point. I'll fix this in the next respin.
-
-Great, thanks. It probably also means that the NMI code needs
-__kprobes/__notrace annotations for similar reasons.
+Cheers,
 
 Will
+
+--->8
+
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to df057cc7b4fa59e9b55f07ffdb6c62bf02e99a00:
+
+  arm64: errata: add module build workaround for erratum #843419 (2015-09-17 11:57:03 +0100)
+
+----------------------------------------------------------------
+arm64 fixes for 4.3-rc2
+
+A mixture of fixes for regressions introduced during the merge window,
+some longer standing problems that we spotted and a couple of hardware
+errata. The main changes are:
+
+  - Fix fallout from the h/w DBM patches, causing filesystem writeback
+    issues on both v8 and v8.1 CPUs
+  - Workaround for Cortex-A53 erratum #843419 in the module loader
+  - Fix for long-standing issue with compat big-endian signal handlers
+    using the saved floating point state
+
+----------------------------------------------------------------
+Catalin Marinas (2):
+      arm64: Fix the pte_hw_dirty() check when AF/DBM is enabled
+      arm64: Fix pte_modify() to preserve the hardware dirty information
+
+Jisheng Zhang (1):
+      arm64: dma-mapping: check whether cma area is initialized or not
+
+Leo Yan (1):
+      arm64: enable generic idle loop
+
+Will Deacon (5):
+      arm64: pgtable: use a single bit for PTE_WRITE regardless of DBM
+      arm64: head.S: initialise mdcr_el2 in el2_setup
+      arm64: cpu hotplug: ensure we mask out CPU_TASKS_FROZEN in notifiers
+      arm64: compat: fix vfp save/restore across signal handlers in big-endian
+      arm64: errata: add module build workaround for erratum #843419
+
+ arch/arm64/Kconfig                 | 17 ++++++++++++++
+ arch/arm64/Makefile                |  4 ++++
+ arch/arm64/include/asm/pgtable.h   | 12 ++++------
+ arch/arm64/kernel/debug-monitors.c |  2 +-
+ arch/arm64/kernel/head.S           |  5 ++++
+ arch/arm64/kernel/hw_breakpoint.c  |  2 +-
+ arch/arm64/kernel/module.c         |  2 ++
+ arch/arm64/kernel/signal32.c       | 47 +++++++++++++++++++++++++++++---------
+ arch/arm64/mm/dma-mapping.c        |  2 +-
+ 9 files changed, 71 insertions(+), 22 deletions(-)
