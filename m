@@ -1,42 +1,74 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 17 Sep 2015 12:56:51 -0700
-Subject: [PATCH v2 0/3] Add __ioread32_copy() and use it
-In-Reply-To: <1442516531-16071-1-git-send-email-sboyd@codeaurora.org>
-References: <1442516531-16071-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150917125651.d7ab504539016a149ea871e6@linux-foundation.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 17 Sep 2015 15:00:47 -0500
+Subject: [PATCH 2/3] devicetree: bindings: use input-event-codes.h for
+ evdev codes
+In-Reply-To: <55FB15E7.6080502@redhat.com>
+References: <1442064372-3030-1-git-send-email-hdegoede@redhat.com>
+ <1442064372-3030-3-git-send-email-hdegoede@redhat.com>
+ <1442316292.3549.386.camel@hellion.org.uk> <55F97C3D.5020702@redhat.com>
+ <1442414443.18856.110.camel@hellion.org.uk>
+ <1442487617.18856.177.camel@hellion.org.uk> <55FB15E7.6080502@redhat.com>
+Message-ID: <55FB1BEF.4090107@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Sep 2015 12:02:08 -0700 Stephen Boyd <sboyd@codeaurora.org> wrote:
-
-> The SMD driver is reading and writing chunks of data to iomem,
-> and there's an __iowrite32_copy() function for the writing part, but
-> no __ioread32_copy() function for the reading part. This series
-> adds __ioread32_copy() and uses it in two places. Andrew is on Cc in
-> case this should go through the -mm tree. Otherwise the target
-> of this patch series is SMD, so I've sent it to Andy.
+On 09/17/2015 02:35 PM, Hans de Goede wrote:
+> Hi,
 > 
-> Note this patch series relies on a previous patch on the list that
-> changes the readl() to __raw_readl() in the smd driver[1].
+> On 09/17/2015 07:00 AM, Ian Campbell wrote:
+>> On Wed, 2015-09-16 at 15:40 +0100, Ian Campbell wrote:
+>>>> The intend of the symlink was that the conversion script would copy
+>>>> the target,
+>>>> rather then follow the symlink. This sorta assumes that there are
+>>>> will be not
+>>>> symlinks under dt-bindings which link to files inside dt-bindings
+>>>> and thus
+>>>> should be preserved as symlinks.
+>>>>
+>>>> If the copy done in the script will follow the symlink then nothing
+>>>> should
+>>>> really change for the split DT repo.
+>>>
+>>> Interesting idea. I'll see if I can make the conversion routine do that.
+>>>
+>>> TBH I have a horrid feeling that this is going to be beyond git rewrite
+>>> -branch, at least in the mode it is used in today.
+>>
+>> It seems that it is possible, after a fashion.
+>>
+>> The downside is that either _all_ symlinks (which end up in the
+>> output) get
+>> flattened or some sort of black/whitelisting is needed in the conversion
+>> scripts themselves (potentially leading to issues or discontinuities) as
+>> new stuff arrives).
+>>
+>> It isn't possible AFAICT tell if a symlink points to something outside of
+>> the converted set of paths and adjust, at least not without an
+>> unreasonable
+>> amount of overhead on each commit during the rewrite.
+>>
+>> Since this new file would be the first symlink in the converted repo I
+>> took
+>> the former approach in my lash up to try it out
+> 
+> Ack, sounds good.
+> 
+>> which was essentially to
+>> insert the below script into the middle of the "git ls-files | rewrite
+>> -paths.sed" pipeline which is called by git filter-branch --index-filter.
+>> Not pretty but it does seem to work.
+>>
+>> I want to avoid switching to --tree-filter if at all possible because it
+>> checks out the tree and is therefore a _little_ I/O intensive ;-)
+> 
+> Thanks for your work on this, so what does this mean for moving forward
+> with the patch-set I posted. Can this be merged now ? And if not what
+> are we waiting for ?
 
-Well that's awkward.
+I thought you were sending another version using "linux-event-codes.h."
 
-"[PATCH v2 6/8] soc: qcom: smd: Handle big endian CPUs" is one patch in
-an eight-patch series.  My usual approach would be to suck in the whole
-series, stage it behind linux-next, drop patches if/when others merge
-them into subsystem trees and thus retain all the dependencies for this
-patch series in a maintainable-by-me fashion.
+Anyway, for the series for DT:
 
-But that 8-patch series doesn't apply:
+Acked-by: Rob Herring <robh@kernel.org>
 
-checking file drivers/soc/qcom/smd.c
-Hunk #6 FAILED at 360.
-Hunk #15 FAILED at 733.
-Hunk #16 FAILED at 741.
-3 out of 19 hunks FAILED
-Failed to apply soc-qcom-smd-handle-big-endian-cpus
-
-
-ho hum.  I think I'll go with plan B: merge just "lib: iomap_copy: Add
-__ioread32_copy()" and send that into Linus promptly.  That way you
-guys can sort out the driver patches in the usual fashion.
+Rob
