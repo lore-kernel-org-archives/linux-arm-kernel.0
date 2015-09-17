@@ -1,75 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Sep 2015 17:09:26 +0100
-Subject: [RFC PATCH] arm64/efi: isolate EFI stub from the kernel proper
-In-Reply-To: <CAKv+Gu_KuOxA+EMSV0YcQR9rmO+R=-y9tivweNym3o+E4DrnHQ@mail.gmail.com>
-References: <1442311903-19213-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150915144629.GG31157@arm.com>
- <CAKv+Gu8j1APZkGnFhZArNAtoyYOokP2bgemYH5n7Pn8jQ1b1XA@mail.gmail.com>
- <CAKv+Gu_KuOxA+EMSV0YcQR9rmO+R=-y9tivweNym3o+E4DrnHQ@mail.gmail.com>
-Message-ID: <20150917160925.GP25634@arm.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Thu, 17 Sep 2015 17:11:59 +0100
+Subject: Recent GIC v1 patch
+In-Reply-To: <55FAE26A.9040609@free.fr> (Mason's message of "Thu, 17 Sep 2015
+ 17:55:22 +0200")
+References: <55FAE26A.9040609@free.fr>
+Message-ID: <yw1xmvwlt48g.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Mason <slash.tmp@free.fr> writes:
 
-On Thu, Sep 17, 2015 at 11:51:07AM +0100, Ard Biesheuvel wrote:
-> On 15 September 2015 at 17:24, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > On 15 September 2015 at 16:46, Will Deacon <will.deacon@arm.com> wrote:
-> >> On Tue, Sep 15, 2015 at 11:11:43AM +0100, Ard Biesheuvel wrote:
-> >>> Since arm64 does not use a builtin decompressor, the EFI stub is built
-> >>> into the kernel proper. So far, this has been working fine, but actually,
-> >>> since the stub is in fact a PE/COFF relocatable binary that is executed
-> >>> at an unknown offset in the 1:1 mapping provided by the UEFI firmware, we
-> >>> should not be seamlessly sharing code with the kernel proper, which is a
-> >>> position dependent executable linked at a high virtual offset.
-> >>>
-> >>> So instead, separate the contents of libstub and its dependencies, by
-> >>> putting them into their own namespace by prefixing all of its symbols
-> >>> with __efistub. This way, we have tight control over what parts of the
-> >>> kernel proper are referenced by the stub.
-> >>
-> >> Could we add an __efistub annotation to spit out warnings if the stub
-> >> calls into unexpected kernel code, like we do for __init/__ref?
-> >>
-> >
-> > Currently, it will break the build rather than warn if you use a
-> > disallowed symbol, which I think is not unreasonable.
-> >
-> > But I suppose that the objcopy step in this patch could rename the
-> > sections to .efistub.xxx sections, which would allow us to reuse some
-> > of the section mismatch code.
-> > However, this would involve marking things like the generic string and
-> > memcpy routines __efistub as well, which I think may be too much.
-> > Also, note that the logic is inverted here: with __init, we disallow
-> > normal code to call __init functions, but with __efistub, it will be
-> > the other way around, which may be more difficult to accomplish
-> > (Rutland and I did discuss this option when we talked about this over
-> > IRC)
-> >
-> 
-> OK, I have given this a go, and as it turns out, it implies that we go
-> and mark generic pieces of lib/ as __section(.text.efistubok) in order
-> for modpost.c to accept it. Tweaking modpost.c itself seems quite
-> doable, since the logic is fairly flexible and can easily be augmented
-> to complain about unauthorized references from the stub to the kernel
-> proper.
-> 
-> So what we could do is fold libfdt and lib/sort.c (which are the
-> primary generic dependencies) into the stub, but we would still need
-> to retain the symbol prefixing bit to prevent the stub's symbols from
-> clashing with the ones from the kernel proper. And with the symbol
-> prefixing in place, we have something that is even stronger than
-> section mismatch, which is to error out on undefined references rather
-> than warn about section mismatches.
-> 
-> I think the current approach is better, but only if we agree that we
-> should do something in the first place. (Currently, there are no known
-> issues, just the awareness that things are not quite as tidy as they
-> should be)
+> Hello Thomas, Marc,
+>
+> Mans pointed me to a recent patch of yours.
+> irqchip/gic: Use IRQD_FORWARDED_TO_VCPU flag
+> Get rid of the handler_data abuse.
+>
+> I'm using a Cortex A9 based SoC. The platform's interrupt
+> controller is cascaded into the GIC. I've been trying to
+> get this to work for two weeks with no success.
+>
+> Details can be found here:
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/440327
+>
+> Do you think your patch my help with my situation?
 
-I agree, but thanks for looking into it. The only downside I still see
-with symbol namespacing is that the error produced won't be as obvious
-as something akin to a section mismatch, but then again, it's mainly you
-hacking on the stub so it's not really an issue :)
+Just try it and we'll know soon enough.
 
-Will
+-- 
+M?ns Rullg?rd
+mans at mansr.com
