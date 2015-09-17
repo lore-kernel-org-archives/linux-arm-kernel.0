@@ -1,57 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 17 Sep 2015 08:04:38 +0100
-Subject: [PATCH v3 00/26] ARM: pxa: magician: Rework HTC Magician support
-In-Reply-To: <55FA4756.9080309@tul.cz>
-References: <55FA4756.9080309@tul.cz>
-Message-ID: <20150917070438.GC3218@x1>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 17 Sep 2015 09:21:56 +0200
+Subject: I.MX6 HDMI support in v4.2
+In-Reply-To: <20150910104930.GI21084@n2100.arm.linux.org.uk>
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m37fo25nrl.fsf@t19.piap.pl>
+ <20150908091625.GV21084@n2100.arm.linux.org.uk>
+ <m3y4gh41k4.fsf@t19.piap.pl>
+ <20150908125756.GY21084@n2100.arm.linux.org.uk>
+ <m3a8su4llv.fsf@t19.piap.pl>
+ <20150910104930.GI21084@n2100.arm.linux.org.uk>
+Message-ID: <1442474516.6617.6.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Sep 2015, Petr Cvek wrote:
-
-[...]
-
-> Petr Cvek (26):
->   ARM: pxa: magician: Fix indentation in machine files
->   ARM: pxa: magician: Change comments to be more informative
->   ARM: pxa: magician: Print more specific error message for global
->     GPIOs
->   ARM: pxa: magician: Optimize debug messages for LCD power
->   ARM: pxa: magician: Change description of LCD power GPIO
->   ARM: pxa: magician: Add new discovered EGPIO pins
->   ARM: pxa: magician: Fix HTC Magician pin mux definitions
->   ARM: pxa: magician: Rename abstract LCD GPIOs
->   ARM: pxa: magician: Optimize powerup delays for Samsung LCD
->   ARM: pxa: magician: Optimize Samsung LCD refresh to 50Hz
->   ARM: pxa: magician: Optimize EGPIO initial values
->   ARM: pxa: magician: Rename charger cable detection EGPIOs
->   ARM: pxa: magician: Fix and add charging detection functions
->   ARM: pxa: magician: Fix platform data for both PXA27x I2C controllers
->   ARM: pxa: magician: Fix redundant GPIO request for pxaficp_ir
->   ARM: pxa: magician: Fix support for Intel Strata NOR Flash
->   ARM: pxa: magician: Fix wrongly enabled USB host ports
->   ARM: pxa: magician: Add support for ADS7846
->   ARM: pxa: magician: Add support for Omnivision OV9640 camera
->   ARM: pxa: magician: Add support for MAX1587A Vcore regulator
->   ARM: pxa: magician: Add support for PXA27x UDC
->   ARM: pxa: magician: Remove pdata for pasic3-leds
->   ARM: pxa: magician: Remove definition of the STUART port
->   ARM: pxa: magician: Add debug message for backlight brightness
->     function
->   ARM: pxa: magician: Add missing regulator for PWM backlight
->   ARM: pxa: magician: Move platform_add_devices() to the end of
->     magician_init()
-
-Why have you sent me 26 patches which have absolutely nothing to do
-with me?
-
->  arch/arm/mach-pxa/include/mach/magician.h |  78 +--
->  arch/arm/mach-pxa/magician.c              | 907 +++++++++++++++++++++---------
->  2 files changed, 682 insertions(+), 303 deletions(-)
+Am Donnerstag, den 10.09.2015, 11:49 +0100 schrieb Russell King - ARM
+Linux:
+> On Thu, Sep 10, 2015 at 12:25:32PM +0200, Krzysztof Ha?asa wrote:
+> > The Y plane is ok, but the Xv window is green, like on old monochrome
+> > CRTs - what could that be? It looks like the UV planes are all wrong.
 > 
+> From a quick read of the imx-drm ipuv3-plane code, it looks like it
+> doesn't bother with the U/V planes for planar images.  Nothing looks
+> at fb->offsets[1,2] nor fb->pitches[1,2].  However, it claims to
+> support DRM_FORMAT_YUV420 and DRM_FORMAT_YVU420 formats - which is
+> wrong if it doesn't look at these other offsets and pitches.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+The IDMAC has a few funny restrictions for multiplanar formats, and the
+current code silently assumes that the U and V planes follow right after
+Y.
+
+I have a patch to enforce the same base address:
+http://lists.freedesktop.org/archives/dri-devel/2015-August/089293.html
+but it still doesn't check the offset/pitch limitations properly.
+
+best regards
+Philipp
