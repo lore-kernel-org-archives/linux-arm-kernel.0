@@ -1,59 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Sep 2015 18:49:50 +0100
-Subject: Recent GIC v1 patch
-In-Reply-To: <55FAF6E1.7020107@free.fr>
-References: <55FAE26A.9040609@free.fr> <55FAEB4D.30306@arm.com>
- <55FAF6E1.7020107@free.fr>
-Message-ID: <55FAFD3E.7010006@arm.com>
+From: Jeremy.Linton@arm.com (Jeremy Linton)
+Date: Thu, 17 Sep 2015 10:33:39 -0700
+Subject: [PATCH 7/7] arm64: Mark kernel page ranges contiguous
+In-Reply-To: <CAPvkgC3QOvHdQRuvAmdRDnbfQCMOBX2aPcoLER7grc5yZ-MF4A@mail.gmail.com>
+References: <1442430186-9083-1-git-send-email-jeremy.linton@arm.com>
+ <1442430186-9083-8-git-send-email-jeremy.linton@arm.com>
+ <CAPvkgC3QOvHdQRuvAmdRDnbfQCMOBX2aPcoLER7grc5yZ-MF4A@mail.gmail.com>
+Message-ID: <F58048940DF89C44BFA5A966565B5D23EBA34EE592@SPOCK.usa.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/09/15 18:22, Mason wrote:
-> On 17/09/2015 18:33, Marc Zyngier wrote:
->> Hi Mason,
->>
->> On 17/09/15 16:55, Mason wrote:
->>> Hello Thomas, Marc,
->>>
->>> Mans pointed me to a recent patch of yours.
->>> irqchip/gic: Use IRQD_FORWARDED_TO_VCPU flag
->>> Get rid of the handler_data abuse.
->>>
->>> I'm using a Cortex A9 based SoC. The platform's interrupt
->>> controller is cascaded into the GIC. I've been trying to
->>> get this to work for two weeks with no success.
->>>
->>> Details can be found here:
->>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/440327
->>>
->>> Do you think your patch my help with my situation?
->>
->> Not sure. A GICv1 shouldn't use EOImode==1 at all, so I don't quite see
->> how you end-up there. Also, you seem to be using 4.2, and this code only
->> landed during the 4.3 merge window.
-> 
-> Sorry for being unclear. I'm having problems /without/ the patch,
-> and Mans suggested I try the patch.
+|Hi Jeremy,
+|One quick comment for now below.
+|I ran into a problem testing this on my Seattle board, and needed the fix
+|below.
+<snip>
+|> -       } while (pte++, addr += PAGE_SIZE, addr != end);
+|> +               next = min(end, (addr + CONT_SIZE) & CONT_MASK);
+|> +               if (((addr | next | phys) & CONT_RANGE_MASK) == 0) {
+|> +                       /* a block of CONT_RANGE_SIZE PTEs */
+|> +                       __populate_init_pte(pte, addr, next, phys,
+|> +                                           prot | __pgprot(PTE_CONT));
+|> +                       pte += CONT_RANGE;
+|> +               } else {
+|> +                       /*
+|> +                        * If the range being split is already inside of a
+|> +                        * contiguous range but this PTE isn't going to be
+|> +                        * contiguous, then we want to unmark the adjacent
+|> +                        * ranges, then update the portion of the range we
+|> +                        * are interrested in.
+|> +                        */
+|> +                        clear_cont_pte_range(pte, addr);
+|> +                        __populate_init_pte(pte, addr, next, phys, prot);
+|> +                        pte += CONT_RANGE_OFFSET(next - addr);
+|
+|I think this should instead be:
+|pte += (next - addr) >> PAGE_SHIFT;
+|
+|Without the above change, I get panics on boot with my Seattle board when
+|efi_rtc is initialised.
+|(I think the EFI runtime stuff exacerbates the non-contiguous code path
+|hence I notice it on my system).
 
-But that patch will only apply if you run 4.3, because it fixes an issue
-in another patch that only exists in 4.3.
+I think that implies you have linear mappings >= 2M that aren?t aligned. Ok, but that almost sounds like something we want to complain about if we detect it.
 
->>> Do you have any idea what might causing the problem?
->>
->> Not without more information, I'm afraid.
-> 
-> Being the unimaginative type, I provided boot log, .config,
-> full port source code, and device tree description. Can you
-> explain what kind of information would be required to identify
-> the problem? (Maybe that would help me diagnose the problem.)
 
-It looks likely that when you enable your ethernet interface, this ends
-up calling into the GIC for some reason, screwing up something.
 
-Can you trace things happening in the GIC for hwirq 34?
 
-Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+
+ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
