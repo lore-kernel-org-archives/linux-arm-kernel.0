@@ -1,30 +1,54 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 17 Sep 2015 11:43:44 +0200
-Subject: [PATCH 1/3] clocksource: rockchip: Make the driver more
- readability and compatible
-In-Reply-To: <55FA87AA.4040807@gmail.com>
-References: <1442476272-31723-1-git-send-email-wxt@rock-chips.com>
- <55FA83D5.9010504@linaro.org> <55FA87AA.4040807@gmail.com>
-Message-ID: <1595765.iIuZsGWCYG@diego>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 17 Sep 2015 10:45:34 +0100
+Subject: [PATCH 2/7] arm64: Shorten lines which exceed 80 characters
+In-Reply-To: <1442430186-9083-3-git-send-email-jeremy.linton@arm.com>
+References: <1442430186-9083-1-git-send-email-jeremy.linton@arm.com>
+ <1442430186-9083-3-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20150917094533.GL25444@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Donnerstag, 17. September 2015, 17:28:10 schrieb Caesar Wang:
-> >> The problem was different semantics of dsb on btw arm32 and arm64,
-> >> Here we can convert the dsb with insteading of dsb(sy).
-> > 
-> > What happens to ARM32 then ?
+On Wed, Sep 16, 2015 at 02:03:01PM -0500, Jeremy Linton wrote:
+> PTE definitions in this file exceed 80 characters
 > 
-> The dsb() is ok for ARM32, the ARM32/64 are OK if we can convert the
-> dsb() to dsb(sy).
-> I believe all drivers with 'dsb()' have same issue on ARM64 platform.
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/include/asm/pgtable-hwdef.h | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> index 24154b0..4489cf6 100644
+> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> @@ -99,14 +99,14 @@
+>  #define PTE_TYPE_FAULT		(_AT(pteval_t, 0) << 0)
+>  #define PTE_TYPE_PAGE		(_AT(pteval_t, 3) << 0)
+>  #define PTE_TABLE_BIT		(_AT(pteval_t, 1) << 1)
+> -#define PTE_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
+> -#define PTE_RDONLY		(_AT(pteval_t, 1) << 7)		/* AP[2] */
+> -#define PTE_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
+> -#define PTE_AF			(_AT(pteval_t, 1) << 10)	/* Access Flag */
+> -#define PTE_NG			(_AT(pteval_t, 1) << 11)	/* nG */
+> -#define PTE_DBM			(_AT(pteval_t, 1) << 51)	/* Dirty Bit Management */
+> -#define PTE_PXN			(_AT(pteval_t, 1) << 53)	/* Privileged XN */
+> -#define PTE_UXN			(_AT(pteval_t, 1) << 54)	/* User XN */
+> +#define PTE_USER		(_AT(pteval_t, 1) << 6)  /* AP[1] */
+> +#define PTE_RDONLY		(_AT(pteval_t, 1) << 7)  /* AP[2] */
+> +#define PTE_SHARED		(_AT(pteval_t, 3) << 8)  /* inner shareable */
+> +#define PTE_AF			(_AT(pteval_t, 1) << 10) /* Access Flag */
+> +#define PTE_NG			(_AT(pteval_t, 1) << 11) /* nG */
+> +#define PTE_DBM			(_AT(pteval_t, 1) << 51) /* Dirty Bit Mgmt */
+> +#define PTE_PXN			(_AT(pteval_t, 1) << 53) /* Privileged XN */
+> +#define PTE_UXN			(_AT(pteval_t, 1) << 54) /* User XN */
 
-correct ... I read this up in the ARM docs 2 days ago too for something.
+I told you already ;), I'm not taking this patch. Some (of my) rules for
+checkpatch usage:
 
-The "sy" param is the default, which you are allow to omit, so on arm32 dsb() 
-and dsb(sy) are the same.
+1. Don't run it on existing code with the aim of fixing it
+2. Existing coding style takes precedence over checkpatch warnings
 
+(I have another rule but I don't want to impose it on anyone: I never
+run checkpatch)
 
-Heiko
+-- 
+Catalin
