@@ -1,13 +1,13 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 17 Sep 2015 14:57:12 +0200
-Subject: [PATCH v5 18/23] phy: core: Probe phy providers on demand
+Date: Thu, 17 Sep 2015 14:57:05 +0200
+Subject: [PATCH v5 11/23] drm/tegra: Probe dpaux devices on demand
 In-Reply-To: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1442494637-3674-19-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1442494637-3674-12-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When looking up a phy provider through its OF node, probe it if it
+When looking up a dpaux device through its OF node, probe it if it
 hasn't already.
 
 The goal is to reduce deferred probes to a minimum, as it makes it very
@@ -22,29 +22,29 @@ Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- drivers/phy/phy-core.c | 3 +++
+ drivers/gpu/drm/tegra/dpaux.c | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-index fc48fac003a6..94e90031d7f3 100644
---- a/drivers/phy/phy-core.c
-+++ b/drivers/phy/phy-core.c
-@@ -18,6 +18,7 @@
- #include <linux/device.h>
- #include <linux/slab.h>
- #include <linux/of.h>
+diff --git a/drivers/gpu/drm/tegra/dpaux.c b/drivers/gpu/drm/tegra/dpaux.c
+index 6aecb6647313..40bdc2a98548 100644
+--- a/drivers/gpu/drm/tegra/dpaux.c
++++ b/drivers/gpu/drm/tegra/dpaux.c
+@@ -12,6 +12,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/of_gpio.h>
 +#include <linux/of_device.h>
- #include <linux/phy/phy.h>
- #include <linux/idr.h>
- #include <linux/pm_runtime.h>
-@@ -363,6 +364,8 @@ static struct phy *_of_phy_get(struct device_node *np, int index)
- 	if (ret)
- 		return ERR_PTR(-ENODEV);
+ #include <linux/platform_device.h>
+ #include <linux/reset.h>
+ #include <linux/regulator/consumer.h>
+@@ -440,6 +441,8 @@ struct tegra_dpaux *tegra_dpaux_find_by_of_node(struct device_node *np)
+ {
+ 	struct tegra_dpaux *dpaux;
  
-+	of_device_probe(args.np);
++	of_device_probe(np);
 +
- 	mutex_lock(&phy_provider_mutex);
- 	phy_provider = of_phy_provider_lookup(args.np);
- 	if (IS_ERR(phy_provider) || !try_module_get(phy_provider->owner)) {
+ 	mutex_lock(&dpaux_lock);
+ 
+ 	list_for_each_entry(dpaux, &dpaux_list, list)
 -- 
 2.4.3
