@@ -1,62 +1,52 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Wed, 16 Sep 2015 17:31:40 -0700
-Subject: [PATCH 1/1] PCI/MSI: X-Gene: Remove msi_controller assignment in
- X-Gene PCIe driver
-Message-ID: <1442449900-30842-1-git-send-email-dhdang@apm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 17 Sep 2015 09:04:16 +0800
+Subject: [PATCH] ARM: dts: vfxxx: Add iio_hwmon node for ADC temperature
+ channel
+In-Reply-To: <20150907084911.GA6877@Sanchayan-Arch.toradex.int>
+References: <b639ca620369d196491a4af8739b87d580e71bf6.1438876380.git.maitysanchayan@gmail.com>
+ <20150906043232.GD30746@tiger>
+ <20150907084911.GA6877@Sanchayan-Arch.toradex.int>
+Message-ID: <20150917010416.GH30746@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With commit 8d63bc7beaee ("PCI/MSI: pci-xgene-msi: Get rid of
-struct msi_controller"), it is no longer required to assign
-msi_controller for X-Gene PCIe host bridge to support MSI. This
-patch removes this unnecessary code and also helps avoid a warning
-message ("failed to enable MSI") during boot.
+On Mon, Sep 07, 2015 at 02:19:11PM +0530, maitysanchayan at gmail.com wrote:
+> Hi Shawn,
+> 
+> On 15-09-06 12:32:32, Shawn Guo wrote:
+> > On Thu, Aug 06, 2015 at 09:28:22PM +0530, Sanchayan Maity wrote:
+> > > Add iio_hwmon node to expose the temperature channel on Vybrid
+> > > as hardware monitor device using the iio_hwmon driver.
+> > > 
+> > > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> > > ---
+> > >  arch/arm/boot/dts/vfxxx.dtsi | 5 +++++
+> > >  1 file changed, 5 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> > > index 39173bb..0993d66 100644
+> > > --- a/arch/arm/boot/dts/vfxxx.dtsi
+> > > +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> > > @@ -597,5 +597,10 @@
+> > >  				status = "disabled";
+> > >  			};
+> > >  		};
+> > > +
+> > > +		iio_hwmon {
+> > 
+> > Hyphen rather than underscore should be used in node name.
+> 
+> As per iio-bindings.txt I did this. It is the same in imx23.dtsi and imx28.dtsi.
+> 
+> http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/iio/iio-bindings.txt#L85
+> http://lxr.free-electrons.com/source/arch/arm/boot/dts/imx23.dtsi#L570
+> http://lxr.free-electrons.com/source/arch/arm/boot/dts/imx28.dtsi#L1246
 
-Signed-off-by: Duc Dang <dhdang@apm.com>
-Cc: Tanmay Inamdar <tinamdar@apm.com>
----
- drivers/pci/host/pci-xgene.c | 22 ----------------------
- 1 file changed, 22 deletions(-)
+Oh, sorry, all these should be caught earlier.
 
-diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-index 0236ab9..ae00ce2 100644
---- a/drivers/pci/host/pci-xgene.c
-+++ b/drivers/pci/host/pci-xgene.c
-@@ -509,24 +509,6 @@ static int xgene_pcie_setup(struct xgene_pcie_port *port,
- 	return 0;
- }
- 
--static int xgene_pcie_msi_enable(struct pci_bus *bus)
--{
--	struct device_node *msi_node;
--
--	msi_node = of_parse_phandle(bus->dev.of_node,
--					"msi-parent", 0);
--	if (!msi_node)
--		return -ENODEV;
--
--	bus->msi = of_pci_find_msi_chip_by_node(msi_node);
--	if (!bus->msi)
--		return -ENODEV;
--
--	of_node_put(msi_node);
--	bus->msi->dev = &bus->dev;
--	return 0;
--}
--
- static int xgene_pcie_probe_bridge(struct platform_device *pdev)
- {
- 	struct device_node *dn = pdev->dev.of_node;
-@@ -567,10 +549,6 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
- 	if (!bus)
- 		return -ENOMEM;
- 
--	if (IS_ENABLED(CONFIG_PCI_MSI))
--		if (xgene_pcie_msi_enable(bus))
--			dev_info(port->dev, "failed to enable MSI\n");
--
- 	pci_scan_child_bus(bus);
- 	pci_assign_unassigned_bus_resources(bus);
- 	pci_bus_add_devices(bus);
--- 
-1.9.1
+> 
+> So should this be changed?
+
+Yeah, that would be nice, if the change doesn't break anything.
+
+Shawn
