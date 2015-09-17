@@ -1,84 +1,32 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 17 Sep 2015 16:04:47 -0400
-Subject: [PATCH 2/3] devicetree: bindings: use input-event-codes.h for
- evdev codes
-In-Reply-To: <55FB1BEF.4090107@kernel.org>
-References: <1442064372-3030-1-git-send-email-hdegoede@redhat.com>
- <1442064372-3030-3-git-send-email-hdegoede@redhat.com>
- <1442316292.3549.386.camel@hellion.org.uk> <55F97C3D.5020702@redhat.com>
- <1442414443.18856.110.camel@hellion.org.uk>
- <1442487617.18856.177.camel@hellion.org.uk> <55FB15E7.6080502@redhat.com>
- <55FB1BEF.4090107@kernel.org>
-Message-ID: <55FB1CDF.4070706@redhat.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Thu, 17 Sep 2015 13:29:39 -0700
+Subject: [PATCH v8 1/3] usb: make xhci platform driver use 64 bit or 32
+ bit DMA
+In-Reply-To: <6744567.5puXIbHVfS@wuerfel>
+References: <cover.1442513540.git.dhdang@apm.com>
+ <41fbbb49c112705a8c14a342e98bd557c15c8f0c.1442513540.git.dhdang@apm.com>
+ <6744567.5puXIbHVfS@wuerfel>
+Message-ID: <CADaLND=XynHAMxiCpvZhH7MyY+NrY3QW7JUiTarp_FgVpAHjJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 09/17/2015 04:00 PM, Rob Herring wrote:
-> On 09/17/2015 02:35 PM, Hans de Goede wrote:
->> Hi,
+On Thu, Sep 17, 2015 at 12:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 17 September 2015 11:19:46 Duc Dang wrote:
+>> The xhci platform driver needs to work on systems that
+>> either only support 64-bit DMA or only support 32-bit DMA.
+>> Attempt to set a coherent dma mask for 64-bit DMA, and
+>> attempt again with 32-bit DMA if that fails.
 >>
->> On 09/17/2015 07:00 AM, Ian Campbell wrote:
->>> On Wed, 2015-09-16 at 15:40 +0100, Ian Campbell wrote:
->>>>> The intend of the symlink was that the conversion script would copy
->>>>> the target,
->>>>> rather then follow the symlink. This sorta assumes that there are
->>>>> will be not
->>>>> symlinks under dt-bindings which link to files inside dt-bindings
->>>>> and thus
->>>>> should be preserved as symlinks.
->>>>>
->>>>> If the copy done in the script will follow the symlink then nothing
->>>>> should
->>>>> really change for the split DT repo.
->>>>
->>>> Interesting idea. I'll see if I can make the conversion routine do that.
->>>>
->>>> TBH I have a horrid feeling that this is going to be beyond git rewrite
->>>> -branch, at least in the mode it is used in today.
->>>
->>> It seems that it is possible, after a fashion.
->>>
->>> The downside is that either _all_ symlinks (which end up in the
->>> output) get
->>> flattened or some sort of black/whitelisting is needed in the conversion
->>> scripts themselves (potentially leading to issues or discontinuities) as
->>> new stuff arrives).
->>>
->>> It isn't possible AFAICT tell if a symlink points to something outside of
->>> the converted set of paths and adjust, at least not without an
->>> unreasonable
->>> amount of overhead on each commit during the rewrite.
->>>
->>> Since this new file would be the first symlink in the converted repo I
->>> took
->>> the former approach in my lash up to try it out
+>> [dhdang: regenerate the patch over v4.3-rc1 and address new comments]
+>> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+>> Tested-by: Mark Salter <msalter@redhat.com>
+>> Signed-off-by: Duc Dang <dhdang@apm.com>
 >>
->> Ack, sounds good.
->>
->>> which was essentially to
->>> insert the below script into the middle of the "git ls-files | rewrite
->>> -paths.sed" pipeline which is called by git filter-branch --index-filter.
->>> Not pretty but it does seem to work.
->>>
->>> I want to avoid switching to --tree-filter if at all possible because it
->>> checks out the tree and is therefore a _little_ I/O intensive ;-)
->>
->> Thanks for your work on this, so what does this mean for moving forward
->> with the patch-set I posted. Can this be merged now ? And if not what
->> are we waiting for ?
 >
-> I thought you were sending another version using "linux-event-codes.h."
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Yes I can do that if people want me to, I am / was waiting for things
-to settle down first. So if you want a v2 series with linux-event-codes.h
-and everything else unchanged, let me know and I'll do so.
+Thanks, Arnd.
 
-> Anyway, for the series for DT:
->
-> Acked-by: Rob Herring <robh@kernel.org>
-
-Thanks,
-
-Hans
+-- 
+Regards,
+Duc Dang.
