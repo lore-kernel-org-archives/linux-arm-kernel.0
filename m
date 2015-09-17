@@ -1,50 +1,171 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Sep 2015 15:46:09 +0100
-Subject: [PATCH 6/8] arm: KVM: Disable virtual timer even if the guest is not
- using it
+Date: Thu, 17 Sep 2015 15:46:11 +0100
+Subject: [PATCH 8/8] arm/arm64: KVM: Remove 'config KVM_ARM_MAX_VCPUS'
 In-Reply-To: <1442501171-24484-1-git-send-email-marc.zyngier@arm.com>
 References: <1442501171-24484-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1442501171-24484-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1442501171-24484-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When running a guest with the architected timer disabled (with QEMU and
-the kernel_irqchip=off option, for example), it is important to make
-sure the timer gets turned off. Otherwise, the guest may try to
-enable it anyway, leading to a screaming HW interrupt.
+From: Ming Lei <ming.lei@canonical.com>
 
-The fix is to unconditionally turn off the virtual timer on guest
-exit.
+This patch removes config option of KVM_ARM_MAX_VCPUS,
+and like other ARCHs, just choose the maximum allowed
+value from hardware, and follows the reasons:
 
-Cc: stable at vger.kernel.org
+1) from distribution view, the option has to be
+defined as the max allowed value because it need to
+meet all kinds of virtulization applications and
+need to support most of SoCs;
+
+2) using a bigger value doesn't introduce extra memory
+consumption, and the help text in Kconfig isn't accurate
+because kvm_vpu structure isn't allocated until request
+of creating VCPU is sent from QEMU;
+
+3) the main effect is that the field of vcpus[] in 'struct kvm'
+becomes a bit bigger(sizeof(void *) per vcpu) and need more cache
+lines to hold the structure, but 'struct kvm' is one generic struct,
+and it has worked well on other ARCHs already in this way. Also,
+the world switch frequecy is often low, for example, it is ~2000
+when running kernel building load in VM from APM xgene KVM host,
+so the effect is very small, and the difference can't be observed
+in my test at all.
+
+Cc: Dann Frazier <dann.frazier@canonical.com>
+Signed-off-by: Ming Lei <ming.lei@canonical.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/interrupts_head.S | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_host.h   |  8 ++------
+ arch/arm/kvm/Kconfig              | 11 -----------
+ arch/arm64/include/asm/kvm_host.h |  8 ++------
+ arch/arm64/kvm/Kconfig            | 11 -----------
+ include/kvm/arm_vgic.h            |  6 +-----
+ virt/kvm/arm/vgic-v3.c            |  2 +-
+ 6 files changed, 6 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-index 702740d..51a5950 100644
---- a/arch/arm/kvm/interrupts_head.S
-+++ b/arch/arm/kvm/interrupts_head.S
-@@ -515,8 +515,7 @@ ARM_BE8(rev	r6, r6  )
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index dcba0fa..c8c226a 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -29,12 +29,6 @@
  
- 	mrc	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
- 	str	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
--	bic	r2, #1			@ Clear ENABLE
--	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
+ #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+ 
+-#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
+-#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+-#else
+-#define KVM_MAX_VCPUS 0
+-#endif
+-
+ #define KVM_USER_MEM_SLOTS 32
+ #define KVM_PRIVATE_MEM_SLOTS 4
+ #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+@@ -44,6 +38,8 @@
+ 
+ #include <kvm/arm_vgic.h>
+ 
++#define KVM_MAX_VCPUS VGIC_V2_MAX_CPUS
 +
- 	isb
+ u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
+ int __attribute_const__ kvm_target_cpu(void);
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index bfb915d..210ecca 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -45,15 +45,4 @@ config KVM_ARM_HOST
+ 	---help---
+ 	  Provides host support for ARM processors.
  
- 	mrrc	p15, 3, rr_lo_hi(r2, r3), c14	@ CNTV_CVAL
-@@ -529,6 +528,9 @@ ARM_BE8(rev	r6, r6  )
- 	mcrr	p15, 4, r2, r2, c14	@ CNTVOFF
+-config KVM_ARM_MAX_VCPUS
+-	int "Number maximum supported virtual CPUs per VM"
+-	depends on KVM_ARM_HOST
+-	default 4
+-	help
+-	  Static number of max supported virtual CPUs per VM.
+-
+-	  If you choose a high number, the vcpu structures will be quite
+-	  large, so only choose a reasonable number that you expect to
+-	  actually use.
+-
+ endif # VIRTUALIZATION
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 415938d..3fb58ea 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -30,12 +30,6 @@
  
- 1:
-+	mov	r2, #0			@ Clear ENABLE
-+	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
+ #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+ 
+-#if defined(CONFIG_KVM_ARM_MAX_VCPUS)
+-#define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+-#else
+-#define KVM_MAX_VCPUS 0
+-#endif
+-
+ #define KVM_USER_MEM_SLOTS 32
+ #define KVM_PRIVATE_MEM_SLOTS 4
+ #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+@@ -43,6 +37,8 @@
+ #include <kvm/arm_vgic.h>
+ #include <kvm/arm_arch_timer.h>
+ 
++#define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
 +
- 	@ Allow physical timer/counter access for the host
- 	mrc	p15, 4, r2, c14, c1, 0	@ CNTHCTL
- 	orr	r2, r2, #(CNTHCTL_PL1PCEN | CNTHCTL_PL1PCTEN)
+ #define KVM_VCPU_MAX_FEATURES 3
+ 
+ int __attribute_const__ kvm_target_cpu(void);
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index bfffe8f..5c7e920 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -41,15 +41,4 @@ config KVM_ARM_HOST
+ 	---help---
+ 	  Provides host support for ARM processors.
+ 
+-config KVM_ARM_MAX_VCPUS
+-	int "Number maximum supported virtual CPUs per VM"
+-	depends on KVM_ARM_HOST
+-	default 4
+-	help
+-	  Static number of max supported virtual CPUs per VM.
+-
+-	  If you choose a high number, the vcpu structures will be quite
+-	  large, so only choose a reasonable number that you expect to
+-	  actually use.
+-
+ endif # VIRTUALIZATION
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index d901f1a..4e14dac 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -35,11 +35,7 @@
+ #define VGIC_V3_MAX_LRS		16
+ #define VGIC_MAX_IRQS		1024
+ #define VGIC_V2_MAX_CPUS	8
+-
+-/* Sanity checks... */
+-#if (KVM_MAX_VCPUS > 255)
+-#error Too many KVM VCPUs, the VGIC only supports up to 255 VCPUs for now
+-#endif
++#define VGIC_V3_MAX_CPUS	255
+ 
+ #if (VGIC_NR_IRQS_LEGACY & 31)
+ #error "VGIC_NR_IRQS must be a multiple of 32"
+diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+index afbf925..7dd5d62 100644
+--- a/virt/kvm/arm/vgic-v3.c
++++ b/virt/kvm/arm/vgic-v3.c
+@@ -288,7 +288,7 @@ int vgic_v3_probe(struct device_node *vgic_node,
+ 
+ 	vgic->vctrl_base = NULL;
+ 	vgic->type = VGIC_V3;
+-	vgic->max_gic_vcpus = KVM_MAX_VCPUS;
++	vgic->max_gic_vcpus = VGIC_V3_MAX_CPUS;
+ 
+ 	kvm_info("%s@%llx IRQ%d\n", vgic_node->name,
+ 		 vcpu_res.start, vgic->maint_irq);
 -- 
 2.1.4
