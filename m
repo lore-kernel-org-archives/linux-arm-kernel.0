@@ -1,34 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Sep 2015 11:50:27 +0200
-Subject: [PATCH] ARM: ux500: modify initial levelshifter status
-Message-ID: <1442483427-10500-1-git-send-email-linus.walleij@linaro.org>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Thu, 17 Sep 2015 09:53:57 +0000
+Subject: [PATCH v2] audio: sai: Add Power Management support
+In-Reply-To: <20150917065732.GB54360@Asurada-CZ80>
+References: <1442221404-35240-1-git-send-email-b18965@freescale.com>
+ <20150917065732.GB54360@Asurada-CZ80>
+Message-ID: <BN3PR0301MB0867DCDF1F7F6391A94121B2FE5A0@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 1d8aca9df612f5751892fb2642d72536f2f48fd0
-"ARM: ux500: fix MMC/SD card regression"
-fixed broken the level shifter: it should be default ON
-but became default OFF.
 
-Fixes: 1d8aca9df612 "ARM: ux500: fix MMC/SD card regression"
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-hrefv60plus.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> On Mon, Sep 14, 2015 at 05:03:24PM +0800, Alison Wang wrote:
+> > This patch adds Power Management support for SAI.
+> > Activate regmap cache with REGCACHE_FLAT, and use regmap cache code
+> to
+> > save and restore registers in suspend and resume. The Transmit
+> Control
+> > Register
+> > (TCSR) and Receive Control Register(RCSR) should be volatile
+> > registers.
+> >
+> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> 
+> Just to remind that there was a similar patch in review that I just
+> acked. Please send your improvements as an incremental patch after that
+> one gets applied.
+[Alison Wang] Ok, I missed that patch.
+> 
+> Please also pay attention to the patch subject which should follow the
+> pattern of previous patches of the driver: ASoC: fsl_sai: xxxx
+[Alison Wang] Ok, thanks.
 
-diff --git a/arch/arm/boot/dts/ste-hrefv60plus.dtsi b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-index 810cda743b6d..9c2387b34d0c 100644
---- a/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-@@ -56,7 +56,7 @@
- 					/* VMMCI level-shifter enable */
- 					default_hrefv60_cfg2 {
- 						pins = "GPIO169_D22";
--						ste,config = <&gpio_out_lo>;
-+						ste,config = <&gpio_out_hi>;
- 					};
- 					/* VMMCI level-shifter voltage select */
- 					default_hrefv60_cfg3 {
--- 
-2.4.3
+
+Best Regards,
+Alison Wang
