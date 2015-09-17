@@ -1,13 +1,13 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 17 Sep 2015 14:57:13 +0200
-Subject: [PATCH v5 19/23] dma: of: Probe DMA controllers on demand
+Date: Thu, 17 Sep 2015 14:57:12 +0200
+Subject: [PATCH v5 18/23] phy: core: Probe phy providers on demand
 In-Reply-To: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1442494637-3674-20-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1442494637-3674-19-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When looking up a DMA controller through its OF node, probe it if it
+When looking up a phy provider through its OF node, probe it if it
 hasn't already.
 
 The goal is to reduce deferred probes to a minimum, as it makes it very
@@ -22,29 +22,29 @@ Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- drivers/dma/of-dma.c | 3 +++
+ drivers/phy/phy-core.c | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
-index 1e1f2986eba8..e899832f7df3 100644
---- a/drivers/dma/of-dma.c
-+++ b/drivers/dma/of-dma.c
-@@ -16,6 +16,7 @@
- #include <linux/mutex.h>
+diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+index fc48fac003a6..94e90031d7f3 100644
+--- a/drivers/phy/phy-core.c
++++ b/drivers/phy/phy-core.c
+@@ -18,6 +18,7 @@
+ #include <linux/device.h>
  #include <linux/slab.h>
  #include <linux/of.h>
 +#include <linux/of_device.h>
- #include <linux/of_dma.h>
+ #include <linux/phy/phy.h>
+ #include <linux/idr.h>
+ #include <linux/pm_runtime.h>
+@@ -363,6 +364,8 @@ static struct phy *_of_phy_get(struct device_node *np, int index)
+ 	if (ret)
+ 		return ERR_PTR(-ENODEV);
  
- static LIST_HEAD(of_dma_list);
-@@ -263,6 +264,8 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
- 		if (of_dma_match_channel(np, name, i, &dma_spec))
- 			continue;
- 
-+		of_device_probe(dma_spec.np);
++	of_device_probe(args.np);
 +
- 		mutex_lock(&of_dma_lock);
- 		ofdma = of_dma_find_controller(&dma_spec);
- 
+ 	mutex_lock(&phy_provider_mutex);
+ 	phy_provider = of_phy_provider_lookup(args.np);
+ 	if (IS_ERR(phy_provider) || !try_module_get(phy_provider->owner)) {
 -- 
 2.4.3
