@@ -1,139 +1,106 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 17 Sep 2015 14:56:58 +0200
-Subject: [PATCH v5 04/23] of: add function to allow probing a device from a OF
- node
-In-Reply-To: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1442494637-3674-5-git-send-email-tomeu.vizoso@collabora.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 17 Sep 2015 14:25:56 +0100
+Subject: [RFC PATCH v2 3/7] arm64: alternative: Apply alternatives early
+ in boot process
+In-Reply-To: <20150916162452.GN28771@arm.com>
+References: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
+ <1442237181-17064-4-git-send-email-daniel.thompson@linaro.org>
+ <20150916130549.GJ28771@arm.com> <55F98FF0.7030605@linaro.org>
+ <20150916162452.GN28771@arm.com>
+Message-ID: <55FABF64.3080404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Walks the OF tree up and finds the closest ancestor that has a struct
-device associated with it, probing it if isn't bound to a driver yet.
+On 16/09/15 17:24, Will Deacon wrote:
+> On Wed, Sep 16, 2015 at 04:51:12PM +0100, Daniel Thompson wrote:
+>> On 16/09/15 14:05, Will Deacon wrote:
+>>> On Mon, Sep 14, 2015 at 02:26:17PM +0100, Daniel Thompson wrote:
+>>>> Currently alternatives are applied very late in the boot process (and
+>>>> a long time after we enable scheduling). Some alternative sequences,
+>>>> such as those that alter the way CPU context is stored, must be applied
+>>>> much earlier in the boot sequence.
+>>>>
+>>>> Introduce apply_alternatives_early() to allow some alternatives to be
+>>>> applied immediately after we detect the CPU features of the boot CPU.
+>>>>
+>>>> Currently apply_alternatives_all() is not optimized and will re-patch
+>>>> code that has already been updated. This is harmless but could be
+>>>> removed by adding extra flags to the alternatives store.
+>>>>
+>>>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>>>> ---
+>>> [snip]
+>>>>    /*
+>>>> + * This is called very early in the boot process (directly after we run
+>>>> + * a feature detect on the boot CPU). No need to worry about other CPUs
+>>>> + * here.
+>>>> + */
+>>>> +void apply_alternatives_early(void)
+>>>> +{
+>>>> +	struct alt_region region = {
+>>>> +		.begin	= __alt_instructions,
+>>>> +		.end	= __alt_instructions_end,
+>>>> +	};
+>>>> +
+>>>> +	__apply_alternatives(&region);
+>>>> +}
+>>>
+>>> How do you choose which alternatives are applied early and which are
+>>> applied later? AFAICT, this just applies everything before we've
+>>> established the capabilities of the CPUs in the system, which could cause
+>>> problems for big/little SoCs.
+>>
+>> They are applied twice. This relies for correctness on the fact that
+>> cpufeatures can be set but not unset.
+>>
+>> In other words the boot CPU does a feature detect and, as a result, a
+>> subset of the required alternatives will be applied. However after this
+>> the other CPUs will boot and the the remaining alternatives applied as
+>> before.
+>>
+>> The current implementation is inefficient (because it will redundantly
+>> patch the same code twice) but I don't think it is broken.
+>
+> What about a big/little system where we boot on the big cores and only
+> they support LSE atomics?
 
-The above should ensure that the dependency represented by the passed OF
-node is available, because probing a device should cause its descendants
-to be probed as well (when they get registered).
+Hmmnn... I don't think this patch will impact that.
 
-Subsystems can use this when looking up resources for drivers, to reduce
-the chances of deferred probes because of the probing order of devices.
+Once something in the boot sequence calls cpus_set_cap() then if there 
+is a corresponding alternative then it is *going* to be applied isn't 
+it? The patch only means that some of the alternatives will be applied 
+early. Once the boot is complete the patched .text should be the same 
+with and without the patch.
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
+Have I overlooked some code in the current kernel that prevents a system 
+with mis-matched LSE support from applying the alternatives?
 
-Changes in v5:
-- Move the assignment to device_node->device for AMBA devices to another
-  commit.
-- Hold a reference to the struct device while it's in use in
-  of_device_probe().
 
-Changes in v4:
-- Rename of_platform_probe to of_device_probe
-- Use device_node.device instead of device_node.platform_dev
+>>> Also, why do we need this for the NMI?
+>>
+>> I was/am concerned that a context saved before the alternatives are
+>> applied might be restored afterwards. If that happens the bit that
+>> indicates what value to put into the PMR would read during the restore
+>> without having been saved first. Applying early ensures that the context
+>> save/restore code is updated before it is ever used.
+>
+> Damn, and stop_machine makes use of local_irq_restore immediately after
+> the patching has completed, so it's a non-starter. Still, special-casing
+> this feature via an explicit apply_alternatives call would be better
+> than moving everything earlier, I think.
 
-Changes in v3:
-- Set and use device_node.platform_dev instead of reversing the logic to
-  find the platform device that encloses a device node.
-- Drop the fwnode API to probe firmware nodes and add OF-only API for
-  now. I think this same scheme could be used for machines with ACPI,
-  but I haven't been able to find one that had to defer its probes because
-  of the device probe order.
+Can you expand on you concerns here? Assuming I didn't miss anything 
+about how the current machinery works then it really is only a matter of 
+whether applying some alternatives early could harm the boot sequence. 
+After we have booted the results should be the same.
 
-Changes in v2: None
 
- drivers/of/device.c       | 61 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_device.h |  3 +++
- 2 files changed, 64 insertions(+)
+> We also need to think about how an incoming NMI interacts with
+> concurrent patching of later features. I suspect we want to set the I
+> bit, like you do for WFI, unless you can guarantee that no patched
+> sequences run in NMI context.
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 8b91ea241b10..836be71fc90e 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -286,3 +286,64 @@ int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env)
- 
- 	return 0;
- }
-+
-+/**
-+ * of_device_probe() - Probe device associated with OF node
-+ * @np: node to probe
-+ *
-+ * Probe the device associated with the passed device node.
-+ */
-+void of_device_probe(struct device_node *np)
-+{
-+	struct device_node *target;
-+	struct device *dev = NULL;
-+
-+	if (!of_root || !of_node_check_flag(of_root, OF_POPULATED_BUS))
-+		return;
-+
-+	if (!np)
-+		return;
-+
-+	of_node_get(np);
-+
-+	/* Find the closest ancestor that has a device associated */
-+	for (target = np;
-+	     !of_node_is_root(target);
-+	     target = of_get_next_parent(target))
-+		if (get_device(target->device)) {
-+			dev = target->device;
-+			break;
-+		}
-+
-+	of_node_put(target);
-+
-+	if (!dev) {
-+		pr_warn("Couldn't find a device for node '%s'\n",
-+			of_node_full_name(np));
-+		return;
-+	}
-+
-+	/*
-+	 * Device is bound or is being probed right now. If we have bad luck
-+	 * and the dependency isn't ready when it's needed, deferred probe
-+	 * will save us.
-+	 */
-+	if (dev->driver)
-+		goto out;
-+
-+	/*
-+	 * Probing a device should cause its descendants to be probed as
-+	 * well, which includes the passed device node.
-+	 */
-+	if (device_attach(dev) != 1)
-+		/*
-+		 * This cannot be a warning for now because clock nodes have a
-+		 * compatible string but the clock framework doesn't follow
-+		 * the device/driver model yet.
-+		 */
-+		dev_dbg(dev, "Probe failed for %s\n", of_node_full_name(np));
-+
-+out:
-+	put_device(dev);
-+}
-+EXPORT_SYMBOL_GPL(of_device_probe);
-diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-index cc7dd687a89d..da8d489e73ad 100644
---- a/include/linux/of_device.h
-+++ b/include/linux/of_device.h
-@@ -40,6 +40,7 @@ extern ssize_t of_device_get_modalias(struct device *dev,
- 
- extern void of_device_uevent(struct device *dev, struct kobj_uevent_env *env);
- extern int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env);
-+extern void of_device_probe(struct device_node *np);
- 
- static inline void of_device_node_put(struct device *dev)
- {
-@@ -84,6 +85,8 @@ static inline int of_device_uevent_modalias(struct device *dev,
- 	return -ENODEV;
- }
- 
-+static inline void of_device_probe(struct device_node *np) { }
-+
- static inline void of_device_node_put(struct device *dev) { }
- 
- static inline const struct of_device_id *__of_match_device(
--- 
-2.4.3
+Good point. I'll fix this in the next respin.
+
+
+Daniel.
