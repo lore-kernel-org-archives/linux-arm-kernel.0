@@ -1,107 +1,102 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 17 Sep 2015 17:05:35 +0200
-Subject: [PATCH v2 7/9] rockchip: make sure timer5 is enabled on rk3036
- platforms
-In-Reply-To: <1442486244-1833-1-git-send-email-zhengxing@rock-chips.com>
+Date: Thu, 17 Sep 2015 17:09:53 +0200
+Subject: [PATCH v2 5/9] dt-bindings: add documentation of rk3036 clock
+ controller
+In-Reply-To: <1442485969-1733-1-git-send-email-zhengxing@rock-chips.com>
 References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
- <1442486244-1833-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <11125723.j2J5LpAGi4@diego>
+ <1442485969-1733-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <14900712.fB7cIie92H@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 17. September 2015, 18:37:24 schrieb Xing Zheng:
-> The timer5 supplies the architected timer and thus as has to run when
-> the system clocksource and clockevents drivers are registered.
-
-please kindly ask the people doing uboot development to do this in uboot 
-itself in future socs :-) - for example Simon's rk3288 mainline uboot does 
-this correctly.
-
-
+Am Donnerstag, 17. September 2015, 18:32:49 schrieb Xing Zheng:
+> Add the devicetree binding for the cru on the rk3036 which quite similar
+> structured as previous clock controllers.
 > 
 > Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 > ---
 > 
 > Changes in v2: None
 > 
->  arch/arm/mach-rockchip/rockchip.c |   22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
+>  .../bindings/clock/rockchip,rk3036-cru.txt         |   60
+> ++++++++++++++++++++ 1 file changed, 60 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
 > 
-> diff --git a/arch/arm/mach-rockchip/rockchip.c
-> b/arch/arm/mach-rockchip/rockchip.c index b6cf3b4..937047f 100644
-> --- a/arch/arm/mach-rockchip/rockchip.c
-> +++ b/arch/arm/mach-rockchip/rockchip.c
-> @@ -32,6 +32,8 @@
->  #define RK3288_GRF_SOC_CON0 0x244
->  #define RK3288_TIMER6_7_PHYS 0xff810000
-> 
-> +#define RK3036_TIMER5_PHYS 0x200440a0
+> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
+> b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt new file
+> mode 100644
+> index 0000000..ac3037a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
+> @@ -0,0 +1,60 @@
+> +* Rockchip RK3036 Clock and Reset Unit
 > +
-
-#define RK3036_TIMER_PHYS 0x20044000
---> the actual base address of the timer block
-
-As it looks like that we'll need to duplicate that timer init at least for the 
-rk3036 and the timer ip in question is actually the same on both, please split 
-out the actual work into a separate function like
-
-static void rockchip_init_arch_timer_supply(resource_size_t phys, int offs)
-{
-		reg_base = ioremap(phys, SZ_16K);
-		if (reg_base) {
-			writel(0, reg_base + offs + 0x10);
-			writel(0xffffffff, reg_base + offs);
-			writel(0xffffffff, reg_base + offs + 0x04);
-			writel(1, reg_base + offs + 0x10);
-			dsb();
-			iounmap(reg_base);
-		} else {
-			pr_err("rockchip: could not map timer registers\n");
-		}
-}
-
->  static void __init rockchip_timer_init(void)
->  {
->  	if (of_machine_is_compatible("rockchip,rk3288")) {
-> @@ -64,6 +66,25 @@ static void __init rockchip_timer_init(void)
-
-for the rk3288 exchange the timer init against
-rockchip_init_arch_timer_supply(RK3288_TIMER6_7_PHYS, 0x20);
-
-
->  			regmap_write(grf, RK3288_GRF_SOC_CON0, 0x10000000);
->  		else
->  			pr_err("rockchip: could not get grf syscon\n");
-> +	} else if (of_machine_is_compatible("rockchip,rk3036")) {
-> +		void __iomem *reg_base;
+> +The RK3036 clock controller generates and supplies clock to various
+> +controllers within the SoC and also implements a reset controller for SoC
+> +peripherals.
 > +
-> +		/*
-> +		 * Most/all uboot versions for rk3036 don't enable timer5
-> +		 * which is needed for the architected timer to work.
-> +		 * So make sure it is running during early boot.
-> +		 */
-> +		reg_base = ioremap(RK3036_TIMER5_PHYS, SZ_16K);
-> +		if (reg_base) {
-> +			writel(0, reg_base + 0x10);
-> +			writel(0xffffffff, reg_base);
-> +			writel(0xffffffff, reg_base + 0x04);
-> +			writel(1, reg_base + 0x10);
-> +			dsb();
-> +			iounmap(reg_base);
-> +		} else {
-> +			pr_err("rockchip: could not map timer5 registers\n");
-> +		}
+> +Required Properties:
+> +
+> +- compatible: should be "rockchip,rk3036-cru"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- #clock-cells: should be 1.
+> +- #reset-cells: should be 1.
+> +
+> +Optional Properties:
+> +
+> +- rockchip,grf: phandle to the syscon managing the "general register files"
+> +  If missing pll rates are not changable, due to the missing pll lock
+> status. +
+> +Each clock is assigned an identifier and client nodes can use this
+> identifier +to specify the clock which they consume. All available clocks
+> are defined as +preprocessor macros in the dt-bindings/clock/rk3036-cru.h
+> headers and can be +used in device tree sources. Similar macros exist for
+> the reset sources in +these files.
+> +
+> +External clocks:
+> +
+> +There are several clocks that are generated outside the SoC. It is expected
+> +that they are defined using standard clock bindings with following
+> +clock-output-names:
+> + - "xin24m" - crystal input - required,
+> + - "xin32k" - rtc clock - optional,
 
-rockchip_init_arch_timer_supply(RK3036_TIMER_PHYS, 0xa0);
+The rk3036 does not seem to use a rtc clock, so this should probably go away
 
->  	}
-> 
->  	of_clk_init(NULL);
-> @@ -79,6 +100,7 @@ static void __init rockchip_dt_init(void)
-> 
->  static const char * const rockchip_board_dt_compat[] = {
->  	"rockchip,rk2928",
-> +	"rockchip,rk3036",
->  	"rockchip,rk3066a",
->  	"rockchip,rk3066b",
->  	"rockchip,rk3188",
+> + - "ext_i2s" - external I2S clock - optional,
+
+> + - "ext_hsadc" - external HSADC clock - optional,
+> + - "ext_vip" - external VIP clock - optional,
+> + - "ext_isp" - external ISP clock - optional,
+> + - "ext_jtag" - external JTAG clock - optional
+There do not seem to exist external clock sources for hsadc, vip, isp and jtag 
+in your clock tree?
+
+missing here:
+- ext_gmac
+
+> +
+> +Example: Clock controller node:
+> +
+> +	cru: cru at 20000000 {
+> +		compatible = "rockchip,rk3036-cru";
+> +		reg = <0x20000000 0x1000>;
+> +		rockchip,grf = <&grf>;
+> +
+> +		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+> +	};
+> +
+> +Example: UART controller node that consumes the clock generated by the
+> clock +  controller:
+> +
+> +	uart0: serial at 20060000 {
+> +		compatible = "snps,dw-apb-uart";
+> +		reg = <0x20060000 0x100>;
+> +		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+> +		reg-shift = <2>;
+> +		reg-io-width = <4>;
+> +		clocks = <&cru SCLK_UART0>;
+> +	};
