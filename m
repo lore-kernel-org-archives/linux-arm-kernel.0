@@ -1,58 +1,43 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Thu, 17 Sep 2015 17:28:10 +0800
-Subject: [PATCH 1/3] clocksource: rockchip: Make the driver more
- readability and compatible
-In-Reply-To: <55FA83D5.9010504@linaro.org>
-References: <1442476272-31723-1-git-send-email-wxt@rock-chips.com>
- <1442476272-31723-2-git-send-email-wxt@rock-chips.com>
- <55FA83D5.9010504@linaro.org>
-Message-ID: <55FA87AA.4040807@gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 17 Sep 2015 11:30:07 +0200
+Subject: [PATCH v2 00/22] KVM: ARM64: Add guest PMU support
+In-Reply-To: <55FA1832.3040008@linaro.org>
+References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
+ <55F9D9FC.6010905@redhat.com> <55FA1832.3040008@linaro.org>
+Message-ID: <20150917093007.GB5933@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Thu, Sep 17, 2015 at 09:32:34AM +0800, Shannon Zhao wrote:
+> Hi Wei,
+> 
+> On 2015/9/17 5:07, Wei Huang wrote:
+> > I am testing this series. 
+> Thanks for your time and help.
+> 
+> > The first question is: do you plan to add ACPI
+> > support in QEMU?
+> To the completeness, this should be added. Maybe this could be added at
+> v3. But I have a look at the kernel PMU driver, it doesn't support
+> probing through ACPI, although there are some patches[1] out-of-tree.
+> 
+> > My in-house kernel uses ACPI for device probing. I had
+> > to force "acpi=off" when I test this patch series.
+> Guest kernel only boots with ACPI when you add "acpi=force". No need to
+> add "acpi=off".
 
+The Red Hat kernel uses ACPI by default, when tables are present (Thanks
+again for your QEMU table generation patches!)
 
-? 2015?09?17? 17:11, Daniel Lezcano ??:
->
-> Hi Caesar,
->
->
-> On 09/17/2015 09:51 AM, Caesar Wang wrote:
->> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
->> There are some failure with build up on timer driver for rockchip.
->>
->> logs:
->> ...
->> drivers/clocksource/rockchip_timer.c:156:13: error: 'NO_IRQ' undeclared
->
-> I think the NO_IRQ definition is missing for ARM64.
+drew
 
-Yep, Maybe better to compatible if we don't use the 'NO_IRQ',
-
->
->> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand 1 --
->> `dsb`
->> ...
->>
->> The problem was different semantics of dsb on btw arm32 and arm64,
->> Here we can convert the dsb with insteading of dsb(sy).
->
-> What happens to ARM32 then ?
->
-
-The dsb() is ok for ARM32, the ARM32/64 are OK if we can convert the 
-dsb() to dsb(sy).
-I believe all drivers with 'dsb()' have same issue on ARM64 platform.
-
->> Meanwhile, I change a bit to make the code more readability for driver
->> when I check the code style.
->>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->
->
-
-
--- 
-Thanks,
-Caesar
+> 
+> Thanks,
+> 
+> [1] http://marc.info/?l=linaro-acpi&m=137949337925645&w=2
+> -- 
+> Shannon
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
