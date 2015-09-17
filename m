@@ -1,68 +1,65 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 17 Sep 2015 09:40:27 +0100
-Subject: [PATCH] iommu-common: only compile lib/iommu_common.c for Sparc64
-Message-ID: <1442479227-18320-1-git-send-email-andre.przywara@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 17 Sep 2015 17:45:18 +0900
+Subject: [PATCH v4 15/16] clk: shmobile: mstp: Consider "zb_clk" suitable
+ for power management
+In-Reply-To: <1438691297-29235-16-git-send-email-geert+renesas@glider.be>
+References: <1438691297-29235-1-git-send-email-geert+renesas@glider.be>
+ <1438691297-29235-16-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150917084446.GA8197@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Though the file lib/iommu_common.c resides in a common directory, the
-code in there is actually only used by Sparc(64).
-The recent change of DMA_ERROR_CODE in the ARM tree now generates a
-compiler warning when compiled with LPAE support (where dma_addr_t is
-u64, but unsigned long is still u32):
-*********
-In file included from /src/linux/include/linux/dma-mapping.h:86:0,
-                 from /src/linux/lib/iommu-common.c:11:
-/src/linux/lib/iommu-common.c: In function 'iommu_tbl_range_alloc':
-/src/linux/arch/arm/include/asm/dma-mapping.h:16:24: warning: large
-integer implicitly truncated to unsigned type [-Woverflow]
- #define DMA_ERROR_CODE (~(dma_addr_t)0x0)
-                        ^
-/src/linux/lib/iommu-common.c:127:10: note: in expansion of macro
-'DMA_ERROR_CODE'
-   return DMA_ERROR_CODE;
-          ^
-*********
+Hi Mike, Hi Stephen,
 
-It seems the types used in this file are not really correct, but a
-fix isn't trivial.
-So for the time being restrict this code to be compiled only when we
-actually need it.
-Compile tested on Sparc, Sparc64, PPC64, ARM, ARM64, x86.
+On Tue, Aug 04, 2015 at 02:28:16PM +0200, Geert Uytterhoeven wrote:
+> Currently the CPG/MSTP Clock Domain code looks for MSTP clocks to power
+> manage a device.
+> 
+> Unfortunately, on R-Mobile APE6 (r8a73a4) and SH-Mobile AG5 (sh73a0),
+> the Bus State Controller (BSC) is not power-managed by an MSTP clock,
+> but by a plain CPG clock (zb_clk).  Add a special case to handle this,
+> so the clock is properly managed, and devices connected to the BSC work
+> as expected.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/sparc/Kconfig | 3 +++
- lib/Makefile       | 3 ++-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+for one reason or another I seem to have this patch queued up in
+my renesas tree for v4.4, without any Acks.
 
-diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
-index 56442d2..1cedb7e 100644
---- a/arch/sparc/Kconfig
-+++ b/arch/sparc/Kconfig
-@@ -93,6 +93,9 @@ config IOMMU_HELPER
- 	bool
- 	default y if SPARC64
- 
-+config IOMMU_TBL_HELPER
-+	def_bool y if IOMMU_HELPER
-+
- config STACKTRACE_SUPPORT
- 	bool
- 	default y if SPARC64
-diff --git a/lib/Makefile b/lib/Makefile
-index 13a7c6a..82944a1 100644
---- a/lib/Makefile
-+++ b/lib/Makefile
-@@ -113,7 +113,8 @@ obj-$(CONFIG_AUDIT_GENERIC) += audit.o
- obj-$(CONFIG_AUDIT_COMPAT_GENERIC) += compat_audit.o
- 
- obj-$(CONFIG_SWIOTLB) += swiotlb.o
--obj-$(CONFIG_IOMMU_HELPER) += iommu-helper.o iommu-common.o
-+obj-$(CONFIG_IOMMU_HELPER) += iommu-helper.o
-+obj-$(CONFIG_IOMMU_TBL_HELPER) += iommu-common.o
- obj-$(CONFIG_FAULT_INJECTION) += fault-inject.o
- obj-$(CONFIG_NOTIFIER_ERROR_INJECTION) += notifier-error-inject.o
- obj-$(CONFIG_CPU_NOTIFIER_ERROR_INJECT) += cpu-notifier-error-inject.o
--- 
-2.5.1
+I think it would be best if one of you took the patch instead.
+Though I'm also happy to take it with Acks.
+
+Let me know how you would like to proceed.
+
+> ---
+> v4:
+>   - Add Reviewed-by,
+> 
+> v3:
+>   - Use "CPG/MSTP Clock Domain" instead of "CPG Clock Domain",
+> 
+> v2:
+>   - New.
+> ---
+>  drivers/clk/shmobile/clk-mstp.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
+> index b1df7b2f1e970adb..a117c3f0f257b5e1 100644
+> --- a/drivers/clk/shmobile/clk-mstp.c
+> +++ b/drivers/clk/shmobile/clk-mstp.c
+> @@ -259,6 +259,10 @@ int cpg_mstp_attach_dev(struct generic_pm_domain *domain, struct device *dev)
+>  					    "renesas,cpg-mstp-clocks"))
+>  			goto found;
+>  
+> +		/* BSC on r8a73a4/sh73a0 uses zb_clk instead of an mstp clock*/
+> +		if (!strcmp(clkspec.np->name, "zb_clk"))
+> +			goto found;
+> +
+>  		of_node_put(clkspec.np);
+>  		i++;
+>  	}
+> -- 
+> 1.9.1
+> 
