@@ -1,38 +1,30 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 17 Sep 2015 09:21:56 +0200
-Subject: I.MX6 HDMI support in v4.2
-In-Reply-To: <20150910104930.GI21084@n2100.arm.linux.org.uk>
-References: <m3bnde5whx.fsf@t19.piap.pl>
- <20150907112555.GS21084@n2100.arm.linux.org.uk>
- <m37fo25nrl.fsf@t19.piap.pl>
- <20150908091625.GV21084@n2100.arm.linux.org.uk>
- <m3y4gh41k4.fsf@t19.piap.pl>
- <20150908125756.GY21084@n2100.arm.linux.org.uk>
- <m3a8su4llv.fsf@t19.piap.pl>
- <20150910104930.GI21084@n2100.arm.linux.org.uk>
-Message-ID: <1442474516.6617.6.camel@pengutronix.de>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Thu, 17 Sep 2015 15:51:09 +0800
+Subject: [PATCH 0/3] Support the timer on RK3368 SoC
+Message-ID: <1442476272-31723-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 10.09.2015, 11:49 +0100 schrieb Russell King - ARM
-Linux:
-> On Thu, Sep 10, 2015 at 12:25:32PM +0200, Krzysztof Ha?asa wrote:
-> > The Y plane is ok, but the Xv window is green, like on old monochrome
-> > CRTs - what could that be? It looks like the UV planes are all wrong.
-> 
-> From a quick read of the imx-drm ipuv3-plane code, it looks like it
-> doesn't bother with the U/V planes for planar images.  Nothing looks
-> at fb->offsets[1,2] nor fb->pitches[1,2].  However, it claims to
-> support DRM_FORMAT_YUV420 and DRM_FORMAT_YVU420 formats - which is
-> wrong if it doesn't look at these other offsets and pitches.
+Timer0~11 count up from zero to a programmed value and
+generate an interrupt when the count reaches the programmed value.
 
-The IDMAC has a few funny restrictions for multiplanar formats, and the
-current code silently assumes that the U and V planes follow right after
-Y.
+TIMER0, TIMER1, TIMER2, Timer3, TIMER4 and TIMER5 are in the CPU
+subsystem, using timer ch0 ~ ch5 respectively. The timer clock is 24MHz
+OSC.
 
-I have a patch to enforce the same base address:
-http://lists.freedesktop.org/archives/dri-devel/2015-August/089293.html
-but it still doesn't check the offset/pitch limitations properly.
+This series are found on RK3368 SoC, verified on rk3368 evb board.
 
-best regards
-Philipp
+
+
+Caesar Wang (3):
+  clocksource: rockchip: Make the driver more readability and compatible
+  arm64: Enable the timer on Rockchip architecture
+  arm64: dts: rockchip: Add the needed timer for rk3368 SoC
+
+ arch/arm64/Kconfig.platforms             |  1 +
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi |  6 ++++++
+ drivers/clocksource/rockchip_timer.c     | 29 +++++++++++++++--------------
+ 3 files changed, 22 insertions(+), 14 deletions(-)
+
+-- 
+1.9.1
