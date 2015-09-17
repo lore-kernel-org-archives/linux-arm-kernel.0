@@ -1,90 +1,79 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 17 Sep 2015 14:27:53 +0200
-Subject: [PATCH 1/2] mmc: core: enable CMD19 tuning for DDR50 mode
-In-Reply-To: <CAGsJ_4x5Nd3Cts1BHsUyB_mCejxbHPPjznUVWUcFoZhxKy+Tcg@mail.gmail.com>
-References: <1439282492-6274-1-git-send-email-21cnbao@gmail.com>
- <CAPDyKFpXZD28NwNAhKQyxmWasVhk_7AeyOW6oXaBPHKuSTmGUA@mail.gmail.com>
- <CAGsJ_4wvvQdyjFi=JmWfASm-LbJMybrhC=Wxxn7jHZEP5dUfEw@mail.gmail.com>
- <CAPDyKFpEwWvu3tnbMT9ZvM0TUvEHp0Qa8PADohyJoTaNZ9HS9g@mail.gmail.com>
- <CAGsJ_4x5Nd3Cts1BHsUyB_mCejxbHPPjznUVWUcFoZhxKy+Tcg@mail.gmail.com>
-Message-ID: <CAPDyKFpWfY9G4WG_GfCutJ2NkRbcAYZToYJXp3RvX=_25sgnWA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 17 Sep 2015 13:31:55 +0100
+Subject: [PATCH] arm/ls1021a: Add Sleep feature for ls1021
+In-Reply-To: <SN1PR0301MB161620AA4926EEF6541D901E9D500@SN1PR0301MB1616.namprd03.prod.outlook.com>
+References: <1441877796-32232-1-git-send-email-dongsheng.wang@freescale.com>
+ <20150910095920.GB29293@leverpostej>
+ <SN1PR0301MB161620AA4926EEF6541D901E9D500@SN1PR0301MB1616.namprd03.prod.outlook.com>
+Message-ID: <20150917123155.GC12808@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 September 2015 at 09:13, Barry Song <21cnbao@gmail.com> wrote:
-> 2015-08-25 20:05 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
->> On 20 August 2015 at 02:16, Barry Song <21cnbao@gmail.com> wrote:
->>> 2015-08-18 1:11 GMT+08:00 Ulf Hansson <ulf.hansson@linaro.org>:
->>>> On 11 August 2015 at 10:41, Barry Song <21cnbao@gmail.com> wrote:
->>>>> From: Weijun Yang <york.yang@csr.com>
->>>>>
->>>>> As SD Specifications Part1 Physical Layer Specification Version
->>>>> 3.01 says, CMD19 tuning is available for unlocked cards in transfer
->>>>> state of 1.8V signaling mode. The small difference between v3.00
->>>>> and 3.01 spec means that CMD19 tuning is also available for DDR50
->>>>> mode.
->>>>
->>>> So what happens with cards following the 3.0 spec version, those
->>>> doesn't need to support the tuning CMD right? Perhaps that needs to be
->>>> addressed in this patch well!?
->>>
->>> from HW registers of the card, we cann't know whether the HW needs
->>> tuning. it is said 3.0.x need tuning, but 3.0 doesn't need.  @weijun,
->>> pls fix me if i am wrong.
->>> if so, it seems we need a static flag somewhere to indicate whether
->>> the tuning is needed. we can't detect to find the tuning requirement.
->>
->> Another way is to always try doing the tuning for DDR50, but in case
->> of errors just ignore them and print a debug/info message!?
->
-> Uffe, do you mean something like below:
->
-> diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
-> index 4e7366a..d4df9f0 100644
-> --- a/drivers/mmc/core/sd.c
-> +++ b/drivers/mmc/core/sd.c
-> @@ -629,8 +629,23 @@ static int mmc_sd_init_uhs_card(struct mmc_card *card)
->       */
->      if (!mmc_host_is_spi(card->host) &&
->          (card->sd_bus_speed == UHS_SDR50_BUS_SPEED ||
-> -         card->sd_bus_speed == UHS_SDR104_BUS_SPEED))
-> +         card->sd_bus_speed == UHS_DDR50_BUS_SPEED ||
-> +         card->sd_bus_speed == UHS_SDR104_BUS_SPEED)) {
->          err = mmc_execute_tuning(card);
-> +
-> +        /*
-> +         * As SD Specifications Part1 Physical Layer Specification Version
-> +         * 3.01 says, CMD19 tuning is available for unlocked cards in transfer
-> +         * state of 1.8V signaling mode. The small difference between v3.00
-> +         * and 3.01 spec means that CMD19 tuning is also available for DDR50
-> +         * mode.
-> +         */
-> +        if (err && (card->sd_bus_speed == UHS_DDR50_BUS_SPEED))
-> +            pr_err("%s: ddr50 tuning failed\n", mmc_hostname(card->host));
+On Fri, Sep 11, 2015 at 04:53:04AM +0100, Wang Dongsheng wrote:
+> Hi Mark,
 
-Perhaps pr_warn() instead.
+Hi,
 
-Moreover, you may just assign err = 0 and leave the return/kfree to
-the "out" label.
+> > > > diff --git a/arch/arm/mach-imx/pm-ls1.c b/arch/arm/mach-imx/pm-ls1.c
+> > > > new file mode 100644 index 0000000..f80b24d
+> > > > --- /dev/null
+> > > > +++ b/arch/arm/mach-imx/pm-ls1.c
+> > > > @@ -0,0 +1,222 @@
+> > > > +/*
+> > > > + * Support Power Management Control for LS1
+> > > > + *
+> > > > + * Copyright 2015 Freescale Semiconductor Inc.
+> > > > + *
+> > > > + * This program is free software; you can redistribute	it and/or modify it
+> > > > + * under  the terms of	the GNU General	 Public License as
+> > published by
+> > > the
+> > > > + * Free Software Foundation;  either version 2 of the  License, or
+> > > > +(at your
+> > > > + * option) any later version.
+> > > > + */
+> > > > +
+> > > > +#include <linux/io.h>
+> > > > +#include <linux/kernel.h>
+> > > > +#include <linux/of_platform.h>
+> > > > +#include <linux/of_address.h>
+> > > > +#include <linux/psci.h>
+> > > > +#include <linux/suspend.h>
+> > > > +
+> > > > +#include <uapi/linux/psci.h>
+> > > > +
+> > > > +#include <asm/cacheflush.h>
+> > > > +#include <asm/psci.h>
+> > >
+> > > NAK.
+> > >
+> > > No new platform code should be calling the PSCI functions directly;
+> > > you should not need to include these files in platform code.
+> > 
+> > PSCI 1.0 define SYSTEM_SUSPEND, and 0.2 and 0.1 not support this feature.
+> > 
+> > I will drop psci-cpu_suspend to implement SYSTEM SUSPEND, and implement system
+> > suspend in platform code.
+> 
+> Now 0.1 and 0.2 not support SYSTEM SUSPEND, means if do system suspend we still
+> need to use platform_suspend_ops to implement system suspend in platform code and
+> cannot use PSCI interface to do it?
 
-> +            kfree(status);
-> +            return 0;
-> +        }
-> +    }
->  out:
->      kfree(status);
->
+As PSCI_SYSTEM_SUSPEND was introduced in PSCI 1.0, you would need a PSCI
+1.0 implementation in order to use PSCI_SYSTEM_SUSPEND. Is there
+anything preventing implementing PSCI 1.0?
 
-[...]
+> How about PSCI 1.0 support, could you share some information about it?
 
-Also, I was giving this a second thought...
+Lorenzo has implemented basic PSCI 1.0 support [1,2], and Sudeep has
+been working on SYSTEM_SUSPEND [3], though I'm not immediately aware of
+the state of the world there.
 
-What happens with the SD 3.0 card when it *doesn't* support CMD19.
-Will it still be functional afterwards or will it move from "transfer
-state" to another not known state?
+Do you have any specific questions?
 
-So maybe we should just do the tuning and return the error if it
-fails, as you suggested in the original patch. :-)
+Thanks,
+Mark.
 
-Kind regards
-Uffe
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355098.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/369806.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/369804.html
