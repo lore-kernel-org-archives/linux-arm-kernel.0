@@ -1,84 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
 Date: Thu, 17 Sep 2015 12:06:17 +0200
-Subject: [PATCH v8 1/3] can: Allwinner A10/A20 CAN Controller support -
- Devicetree bindings
-In-Reply-To: <55FA7428.4030801@pengutronix.de>
-References: <1442402482-7118-1-git-send-email-info@gerhard-bertelsmann.de>
- <1442402482-7118-2-git-send-email-info@gerhard-bertelsmann.de>
- <55FA7428.4030801@pengutronix.de>
-Message-ID: <20150917100617.GB4684@lukather>
+Subject: [PATCH 1/3] clocksource: rockchip: Make the driver more
+ readability and compatible
+In-Reply-To: <55FA87AA.4040807@gmail.com>
+References: <1442476272-31723-1-git-send-email-wxt@rock-chips.com>
+ <1442476272-31723-2-git-send-email-wxt@rock-chips.com>
+ <55FA83D5.9010504@linaro.org> <55FA87AA.4040807@gmail.com>
+Message-ID: <55FA9099.7000903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 10:04:56AM +0200, Marc Kleine-Budde wrote:
-> On 09/16/2015 01:21 PM, Gerhard Bertelsmann wrote:
-> > Devicetree bindings for Allwinner A10/A20 CAN
-> > 
-> > Signed-off-by: Gerhard Bertelsmann <info@gerhard-bertelsmann.de>
-> > ---
-> > 
-> >  .../devicetree/bindings/net/can/sun4i_can.txt      |  38 +
-> >  1 files changed, 389 insertions(+)
-> > 
-> > 
-> > diff --git a/Documentation/devicetree/bindings/net/can/sun4i_can.txt b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
-> > new file mode 100644
-> > index 0000000..cd0f50c
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
-> > @@ -0,0 +1,38 @@
-> > +Allwinner A10/A20 CAN controller Device Tree Bindings
-> > +-----------------------------------------------------
-> > +
-> > +Required properties:
-> > +- compatible: "allwinner,sun4i-a10-can"
-> > +- reg: physical base address and size of the Allwinner A10/A20 CAN register map.
-> > +- interrupts: interrupt specifier for the sole interrupt.
-> > +- clock: phandle and clock specifier.
-> > +
-> > +
-> > +Example
-> > +-------
-> > +
-> > +SoC common .dtsi file:
-> > +
-> > +	can0_pins_a: can0 at 0 {
-> > +		allwinner,pins = "PH20","PH21";
-> > +		allwinner,function = "can";
-> > +		allwinner,drive = <0>;
-> > +		allwinner,pull = <0>;
-> > +	};
-> > +...
-> > +	can0: can at 01c2bc00 {
-> > +		compatible = "allwinner,sun4i-a10-can";
-> > +		reg = <0x01c2bc00 0x400>;
-> > +		interrupts = <0 26 4>;
-> > +		clocks = <&apb1_gates 4>;
-> > +		status = "disabled";
-> > +	};
-> 
-> What about adding this snippet to SoC where the CAN core is available?
-> Maxime, what's the policy on sinxi?
+On 09/17/2015 11:28 AM, Caesar Wang wrote:
+> Hi Daniel,
+>
+>
+> ? 2015?09?17? 17:11, Daniel Lezcano ??:
+>>
+>> Hi Caesar,
+>>
+>>
+>> On 09/17/2015 09:51 AM, Caesar Wang wrote:
+>>> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
+>>> There are some failure with build up on timer driver for rockchip.
+>>>
+>>> logs:
+>>> ...
+>>> drivers/clocksource/rockchip_timer.c:156:13: error: 'NO_IRQ' undeclared
+>>
+>> I think the NO_IRQ definition is missing for ARM64.
+>
+> Yep, Maybe better to compatible if we don't use the 'NO_IRQ',
 
-It would be great, but it can come as a second step.
+Hmm, after digging into drivers/of/irq.c and kernel/irq/irqdomain.c
 
-> If you give me an Ack I'd like to take the series via linux-can-next
-> (and to net-next) upstream.
+when there is an error it returns zero. So NO_IRQ and -1 are not correct 
+and on the other side zero can be a valid irq. That sounds a little bit 
+fuzzy to me.
 
-I just did so for this patch, I'll review the driver when I'll have a
-bit of time.
+>>> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand 1 --
+>>> `dsb`
+>>> ...
+>>>
+>>> The problem was different semantics of dsb on btw arm32 and arm64,
+>>> Here we can convert the dsb with insteading of dsb(sy).
+>>
+>> What happens to ARM32 then ?
+>>
+>
+> The dsb() is ok for ARM32, the ARM32/64 are OK if we can convert the
+> dsb() to dsb(sy).
+> I believe all drivers with 'dsb()' have same issue on ARM64 platform.
+>
+>>> Meanwhile, I change a bit to make the code more readability for driver
+>>> when I check the code style.
+>>>
+>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>>
+>>
+>
+>
 
-Thanks!
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150917/97e96eb7/attachment.sig>
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
