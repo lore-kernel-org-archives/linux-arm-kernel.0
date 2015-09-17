@@ -1,88 +1,137 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Sep 2015 13:11:24 +0100
-Subject: [PATCH 2/3] arm64: KVM: Disable virtual timer even if the guest
- is not using it
-In-Reply-To: <20150917111735.GA19365@cbox>
-References: <1442419087-24648-1-git-send-email-marc.zyngier@arm.com>
- <1442419087-24648-3-git-send-email-marc.zyngier@arm.com>
- <20150917111735.GA19365@cbox>
-Message-ID: <55FAADEC.2020803@arm.com>
+From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
+Date: Thu, 17 Sep 2015 20:14:14 +0800
+Subject: [PATCH RFC 1/8] dt-bindings: Document the hi6220 bindings for
+ DRM driver
+In-Reply-To: <55F9321E.7090100@codeaurora.org>
+References: <1442309834-21420-1-git-send-email-kong.kongxinwei@hisilicon.com>
+ <1442309834-21420-2-git-send-email-kong.kongxinwei@hisilicon.com>
+ <55F85F54.1020807@kernel.org> <55F9298C.3020009@hisilicon.com>
+ <55F9321E.7090100@codeaurora.org>
+Message-ID: <55FAAE96.1090801@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/09/15 12:17, Christoffer Dall wrote:
-> On Wed, Sep 16, 2015 at 04:58:06PM +0100, Marc Zyngier wrote:
->> When running a guest with the architected timer disabled (with QEMU and
->> the kernel_irqchip=off option, for example), it is important to make
->> sure the timer gets turned off. Otherwise, the guest may try to
->> enable it anyway, leading to a screaming HW interrupt.
->>
->> The fix is to unconditionally turn off the virtual timer on guest
->> exit.
->>
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/hyp.S | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
->> index 6addf97..38f5434 100644
->> --- a/arch/arm64/kvm/hyp.S
->> +++ b/arch/arm64/kvm/hyp.S
->> @@ -570,8 +570,6 @@ alternative_endif
+hi architt
+
+On 2015/9/16 17:10, Archit Taneja wrote:
+> Hi,
 > 
-> The context confuses me; did you happen to base this on your VHE
-> patches?
-
-No, that's on top of 4.3-rc1, which happens to have this:
-
-[...]
-alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
-	bl	__restore_vgic_v2_state
-alternative_else
-	bl	__restore_vgic_v3_state
-alternative_endif
-.endm
-
-.macro save_timer_state
-[...]
-
-and for some reason git doesn't use save_timer_state as the context anchor.
-
->>  	mrs	x3, cntv_ctl_el0
->>  	and	x3, x3, #3
->>  	str	w3, [x0, #VCPU_TIMER_CNTV_CTL]
->> -	bic	x3, x3, #1		// Clear Enable
->> -	msr	cntv_ctl_el0, x3
->>  
->>  	isb
->>  
->> @@ -579,6 +577,8 @@ alternative_endif
->>  	str	x3, [x0, #VCPU_TIMER_CNTV_CVAL]
->>  
->>  1:
->> +	msr	cntv_ctl_el0, xzr
->> +
+> On 09/16/2015 02:04 PM, Xinwei Kong wrote:
+>> hi architt
+>>
+>> On 2015/9/16 2:11, Rob Herring wrote:
+>>> On 09/15/2015 04:37 AM, Xinwei Kong wrote:
+>>>> This adds documentation of device tree bindings for the
+>>>> Graphics Processing Unit of hi6220 SOC.
+>>>>
+>>>> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+>>>> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>>>> Signed-off-by: Andy Green <andy.green@linaro.org>
+>>>> Signed-off-by: Jiwen Qi <qijiwen@hisilicon.com>
+>>>> Signed-off-by: Yu Gong <gongyu@hisilicon.com>
+>>>> ---
+>>>>   .../devicetree/bindings/gpu/hisilicon,hi6220.txt   | 69 ++++++++++++++++++++++
+>>>>   1 file changed, 69 insertions(+)
+>>>>   create mode 100644 Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt b/Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt
+>>>> new file mode 100644
+>>>> index 0000000..173ac63
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/gpu/hisilicon,hi6220.txt
+>>>> @@ -0,0 +1,69 @@
+>>>> + * Hisilicon hi6220 Graphics Processing Unit for HiKey board
+>>>> +
+>>>> + ** display-subsystem: Master device for binding DRM sub-components
+>>>
+>>> DRM is a Linuxism that doesn't belong in the binding.
+>>>
+>>>> +    This master device is parent node and it will be responsible to bind all
+>>>> +    sub-components devices node.
+>>>
+>>> Are these nodes a single block in the h/w? If not, you should describe
+>>> the connection of sub-nodes with of-graph instead.
+>>>
+>>>> +    - Required properties :
+>>>> +      - compatible: "hisilicon,display-subsystem".
+>>>> +      - #address-cells, #size-cells: Must be present if the device has sub-nodes.
+>>>> +      - ranges: to allow probing of subdevices.
+>>>> +      - dma-coherent: Present if dma operations are coherent.
+>>>> +
+>>>> + ** ade: Graphic overlay, Graphic post-processing, display timing control.
+>>>> +    This device is child node of display-subsystem
+>>>> +    - Required properties :
+>>>> +      - compatible: "hisilicon,hi6220-ade".
+>>>> +      - reg: physical base address of the ADE register and length of memory
+>>>> +    region.
+>>>> +      - reg-names: Should contain the reg names "ade_base" and "media_base".
+>>>> +      - interrupt: The interrupt number to the cpu. Defines the interrupt
+>>>> +        by ADE.
+>>>> +      - clocks: The clocks needed by the ADE module.
+>>>> +      - clock-names: the name of the clocks.
+>>>> +
+>>>> + ** dsi: support mipi dsi interface
+>>>> +    This device is child node of display-subsystem
+>>>> +    - Required properties :
+>>>> +      - compatible: "hisilicon,hi6220-dsi".
+>>>> +      - reg: physical base address of the DSI register and length of memory
+>>>> +    region.
+>>>> +      - clocks: The clocks needed by the DSI module.
+>>>> +      - clock-names: the name of the clocks.
+>>>> +      -    encoder-slave: phandles to a 'encoder-slave' subnode which DSI connect
+>>>> +        ADV7533 in order to support hdmi display.
+>>>
+>>> What the ADV7533 binding looks like is still being discussed.
+>>> "encoder-slave" is certainly DRM specific and not how it should be done.
+>>> Most likely, this needs to use the of-graph ports.
+>>>
+>> I dont how to implement the encoder bridge stuff in upstream,
+>> you think that I will how to handle this part?
 > 
-> We could have a comment here, but ok.
+> You can use of-graph ports to link the dsi output with the adv7533
+> bridge.
+> 
+> An example of the binding looks like:
+> 
+> Documentation/devicetree/bindings/drm/msm/dsi.txt
+> 
+> The implementation of this on the dsi host side of drm/msm
+> can be found in dsi_host_parse_dt, in:
+> 
+> drivers/gpu/drm/msm/dsi/dsi_host.c
+> 
+> You can get to know more about of-graph parsing here:
+> 
+> Documentation/devicetree/bindings/graph.txt
+> 
+I study your patch about of-graph parsing, I know that how to parse this
+dts endpoint node. Then i dont kow how to use this device_node (which is
+get by "of_graph_get_remote_port_parent" function.) to hook adv7533 operation.
 
-I'll add something.
+can you give me some help to how to use the adv7533 interface by device_node or
+other way to use adv7533?
 
->>  	// Allow physical timer/counter access for the host
->>  	mrs	x2, cnthctl_el2
->>  	orr	x2, x2, #3
+> I'd started going through the drm/hisil patches. I'll
+> share more comments there.
+> 
+> Thanks,
+> Archit
+> 
+>>
+>> Thank you
+>> xinwei
+>>
+>>> Also, the ADV7533 connection is specific to HiKey. This binding should
+>>> just generically describe how any bridge or panel is connected.
+>>>
+>>> Rob
+>>>
+>>> .
+>>>
+>>
 >> -- 
->> 2.1.4
+>> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >>
 > 
-> Otherwise:
-> 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-
-Thanks!
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
