@@ -1,52 +1,50 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Sep 2015 15:46:06 +0100
-Subject: [PATCH 3/8] arm: KVM: Fix incorrect device to IPA mapping
+Date: Thu, 17 Sep 2015 15:46:08 +0100
+Subject: [PATCH 5/8] arm64: KVM: Disable virtual timer even if the guest is
+ not using it
 In-Reply-To: <1442501171-24484-1-git-send-email-marc.zyngier@arm.com>
 References: <1442501171-24484-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1442501171-24484-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1442501171-24484-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Majtyka <marek.majtyka@tieto.com>
+When running a guest with the architected timer disabled (with QEMU and
+the kernel_irqchip=off option, for example), it is important to make
+sure the timer gets turned off. Otherwise, the guest may try to
+enable it anyway, leading to a screaming HW interrupt.
 
-A critical bug has been found in device memory stage1 translation for
-VMs with more then 4GB of address space. Once vm_pgoff size is smaller
-then pa (which is true for LPAE case, u32 and u64 respectively) some
-more significant bits of pa may be lost as a shift operation is performed
-on u32 and later cast onto u64.
+The fix is to unconditionally turn off the virtual timer on guest
+exit.
 
-Example: vm_pgoff(u32)=0x00210030, PAGE_SHIFT=12
-        expected pa(u64):   0x0000002010030000
-        produced pa(u64):   0x0000000010030000
-
-The fix is to change the order of operations (casting first onto phys_addr_t
-and then shifting).
-
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-[maz: fixed changelog and patch formatting]
 Cc: stable at vger.kernel.org
-Signed-off-by: Marek Majtyka <marek.majtyka@tieto.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/mmu.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/hyp.S | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 7b42012..6984342 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1792,8 +1792,10 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
- 		if (vma->vm_flags & VM_PFNMAP) {
- 			gpa_t gpa = mem->guest_phys_addr +
- 				    (vm_start - mem->userspace_addr);
--			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) +
--					 vm_start - vma->vm_start;
-+			phys_addr_t pa;
-+
-+			pa = (phys_addr_t)vma->vm_pgoff << PAGE_SHIFT;
-+			pa += vm_start - vma->vm_start;
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 39aa322..60a83e2 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -562,8 +562,6 @@
+ 	mrs	x3, cntv_ctl_el0
+ 	and	x3, x3, #3
+ 	str	w3, [x0, #VCPU_TIMER_CNTV_CTL]
+-	bic	x3, x3, #1		// Clear Enable
+-	msr	cntv_ctl_el0, x3
  
- 			/* IO region dirty page logging not allowed */
- 			if (memslot->flags & KVM_MEM_LOG_DIRTY_PAGES)
+ 	isb
+ 
+@@ -571,6 +569,9 @@
+ 	str	x3, [x0, #VCPU_TIMER_CNTV_CVAL]
+ 
+ 1:
++	// Disable the virtual timer
++	msr	cntv_ctl_el0, xzr
++
+ 	// Allow physical timer/counter access for the host
+ 	mrs	x2, cnthctl_el2
+ 	orr	x2, x2, #3
 -- 
 2.1.4
