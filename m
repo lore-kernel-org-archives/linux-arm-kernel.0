@@ -1,27 +1,76 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 17 Sep 2015 16:55:21 +0900
-Subject: [PATCH 6/6] pinctrl: samsung: Remove unneded semicolon
-In-Reply-To: <1442392111-8448-7-git-send-email-javier@osg.samsung.com>
-References: <1442392111-8448-1-git-send-email-javier@osg.samsung.com>
- <1442392111-8448-7-git-send-email-javier@osg.samsung.com>
-Message-ID: <55FA71E9.4010402@samsung.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 17 Sep 2015 10:04:56 +0200
+Subject: [PATCH v8 1/3] can: Allwinner A10/A20 CAN Controller support -
+ Devicetree bindings
+In-Reply-To: <1442402482-7118-2-git-send-email-info@gerhard-bertelsmann.de>
+References: <1442402482-7118-1-git-send-email-info@gerhard-bertelsmann.de>
+ <1442402482-7118-2-git-send-email-info@gerhard-bertelsmann.de>
+Message-ID: <55FA7428.4030801@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.09.2015 17:28, Javier Martinez Canillas wrote:
-> It's not needed an is just creating a null statement, so remove it.
+On 09/16/2015 01:21 PM, Gerhard Bertelsmann wrote:
+> Devicetree bindings for Allwinner A10/A20 CAN
 > 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
+> Signed-off-by: Gerhard Bertelsmann <info@gerhard-bertelsmann.de>
 > ---
 > 
->  drivers/pinctrl/samsung/pinctrl-exynos5440.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  .../devicetree/bindings/net/can/sun4i_can.txt      |  38 +
+>  1 files changed, 389 insertions(+)
 > 
+> 
+> diff --git a/Documentation/devicetree/bindings/net/can/sun4i_can.txt b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
+> new file mode 100644
+> index 0000000..cd0f50c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
+> @@ -0,0 +1,38 @@
+> +Allwinner A10/A20 CAN controller Device Tree Bindings
+> +-----------------------------------------------------
+> +
+> +Required properties:
+> +- compatible: "allwinner,sun4i-a10-can"
+> +- reg: physical base address and size of the Allwinner A10/A20 CAN register map.
+> +- interrupts: interrupt specifier for the sole interrupt.
+> +- clock: phandle and clock specifier.
+> +
+> +
+> +Example
+> +-------
+> +
+> +SoC common .dtsi file:
+> +
+> +	can0_pins_a: can0 at 0 {
+> +		allwinner,pins = "PH20","PH21";
+> +		allwinner,function = "can";
+> +		allwinner,drive = <0>;
+> +		allwinner,pull = <0>;
+> +	};
+> +...
+> +	can0: can at 01c2bc00 {
+> +		compatible = "allwinner,sun4i-a10-can";
+> +		reg = <0x01c2bc00 0x400>;
+> +		interrupts = <0 26 4>;
+> +		clocks = <&apb1_gates 4>;
+> +		status = "disabled";
+> +	};
 
-Quite obvious and pointed out by coccicheck, so:
+What about adding this snippet to SoC where the CAN core is available?
+Maxime, what's the policy on sinxi? If you give me an Ack I'd like to
+take the series via linux-can-next (and to net-next) upstream.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Marc
 
-Best regards,
-Krzysztof
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150917/b503fac9/attachment.sig>
