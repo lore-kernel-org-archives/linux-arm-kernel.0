@@ -1,100 +1,38 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 17 Sep 2015 15:35:03 -0400
-Subject: [PATCH 2/3] devicetree: bindings: use input-event-codes.h for
- evdev codes
-In-Reply-To: <1442487617.18856.177.camel@hellion.org.uk>
-References: <1442064372-3030-1-git-send-email-hdegoede@redhat.com>
- <1442064372-3030-3-git-send-email-hdegoede@redhat.com>
- <1442316292.3549.386.camel@hellion.org.uk> <55F97C3D.5020702@redhat.com>
- <1442414443.18856.110.camel@hellion.org.uk>
- <1442487617.18856.177.camel@hellion.org.uk>
-Message-ID: <55FB15E7.6080502@redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 17 Sep 2015 21:38:53 +0200
+Subject: [RFC PATCH 0/2] arm64: runtime workaround for erratum #843419
+Message-ID: <1442518735-16625-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This implements a workaround for the A53 erratum that results in adrp
+instructions to produce incorrect values if they appear in either of
+the last two instruction slots of a 4 KB page.
 
-On 09/17/2015 07:00 AM, Ian Campbell wrote:
-> On Wed, 2015-09-16 at 15:40 +0100, Ian Campbell wrote:
->>> The intend of the symlink was that the conversion script would copy the target,
->>> rather then follow the symlink. This sorta assumes that there are will be not
->>> symlinks under dt-bindings which link to files inside dt-bindings and thus
->>> should be preserved as symlinks.
->>>
->>> If the copy done in the script will follow the symlink then nothing should
->>> really change for the split DT repo.
->>
->> Interesting idea. I'll see if I can make the conversion routine do that.
->>
->> TBH I have a horrid feeling that this is going to be beyond git rewrite
->> -branch, at least in the mode it is used in today.
->
-> It seems that it is possible, after a fashion.
->
-> The downside is that either _all_ symlinks (which end up in the output) get
-> flattened or some sort of black/whitelisting is needed in the conversion
-> scripts themselves (potentially leading to issues or discontinuities) as
-> new stuff arrives).
->
-> It isn't possible AFAICT tell if a symlink points to something outside of
-> the converted set of paths and adjust, at least not without an unreasonable
-> amount of overhead on each commit during the rewrite.
->
-> Since this new file would be the first symlink in the converted repo I took
-> the former approach in my lash up to try it out
+Instead of building modules using the large code model, this approach
+uses veneers to call the adrp instructions at unaffected offsets, unless
+they can be converted into adr instructions, which is even better (this
+depends on whether the symbol is with 1 MB of the place)
 
-Ack, sounds good.
+Comments welcome.
 
-> which was essentially to
-> insert the below script into the middle of the "git ls-files | rewrite
-> -paths.sed" pipeline which is called by git filter-branch --index-filter.
-> Not pretty but it does seem to work.
->
-> I want to avoid switching to --tree-filter if at all possible because it
-> checks out the tree and is therefore a _little_ I/O intensive ;-)
+Ard Biesheuvel (2):
+  arm64: introduce infrastructure for emitting veneers at module reloc
+    time
+  arm64: errata: add module load workaround for erratum #843419
 
-Thanks for your work on this, so what does this mean for moving forward
-with the patch-set I posted. Can this be merged now ? And if not what
-are we waiting for ?
+ arch/arm64/Kconfig               |  21 +++
+ arch/arm64/Makefile              |   4 +
+ arch/arm64/include/asm/module.h  |   9 ++
+ arch/arm64/include/asm/veneers.h |  19 +++
+ arch/arm64/kernel/Makefile       |   1 +
+ arch/arm64/kernel/module.c       |  33 +++++
+ arch/arm64/kernel/module.lds     |   4 +
+ arch/arm64/kernel/veneers.c      | 134 ++++++++++++++++++++
+ 8 files changed, 225 insertions(+)
+ create mode 100644 arch/arm64/include/asm/veneers.h
+ create mode 100644 arch/arm64/kernel/module.lds
+ create mode 100644 arch/arm64/kernel/veneers.c
 
-Regards,
-
-Hans
-
-
-
->
-> Ian.
->
-> #!/bin/bash
->
-> set -e
->
-> while read mode object stage path ; do
->      case "$mode" in
-> 	120000)
-> 	    # symbolic link
-> 	    deref=$(echo $GIT_COMMIT:$path | git cat-file --batch-check='deref-ok %(objectname)' --follow-symlinks)
-> 	    case "$deref" in
-> 		deref-ok*)
-> 		    echo -e "100644 ${deref#deref-ok } $stage\t$path"
-> 		    ;;
-> 		dangling*) # skip
-> 		    ;;
-> 		*) # the rest, missing etc
-> 		    echo >&2 "Failed to parse symlink $GIT_COMMIT:$path $deref"
-> 		    exit 1
-> 		    ;;
-> 	    esac
-> 	    ;;
-> 	100*)
-> 	    # Regular file, just pass through
-> 	    echo -e "$mode $object $stage\t$path"
-> 	    ;;
-> 	*)
-> 	    echo >&2 "Unhandled ls-tree entry: $line"
-> 	    exit 1
-> 	    ;;
->      esac
-> done
->
+-- 
+1.9.1
