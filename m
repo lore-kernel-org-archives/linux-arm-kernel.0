@@ -1,67 +1,24 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Sep 2015 14:39:25 -0500
-Subject: [PATCH] Docs: dt: add #msi-cells to GICv3 ITS binding
-In-Reply-To: <1441619343-12087-1-git-send-email-mark.rutland@arm.com>
-References: <1441619343-12087-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <55FB16ED.5060407@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Sep 2015 21:51:05 +0200
+Subject: [PATCH v8 1/3] usb: make xhci platform driver use 64 bit or 32
+ bit DMA
+In-Reply-To: <41fbbb49c112705a8c14a342e98bd557c15c8f0c.1442513540.git.dhdang@apm.com>
+References: <cover.1442513540.git.dhdang@apm.com>
+ <41fbbb49c112705a8c14a342e98bd557c15c8f0c.1442513540.git.dhdang@apm.com>
+Message-ID: <6744567.5puXIbHVfS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2015 04:49 AM, Mark Rutland wrote:
-> The GICv3 ITS uses sideband master identification data (known as a
-> DeviceID) to identify which master wrote to a doorbell, and this data is
-> used to determine how to react in response to the write.
+On Thursday 17 September 2015 11:19:46 Duc Dang wrote:
+> The xhci platform driver needs to work on systems that
+> either only support 64-bit DMA or only support 32-bit DMA.
+> Attempt to set a coherent dma mask for 64-bit DMA, and
+> attempt again with 32-bit DMA if that fails.
 > 
-> Commit 1e6db000482fa65a ("irqchip/gicv3-its: Add platform MSI support")
-> added support per this binding, but failed to update the documentation.
-> This patch fixes the documentation.
+> [dhdang: regenerate the patch over v4.3-rc1 and address new comments]
+> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
+> Tested-by: Mark Salter <msalter@redhat.com>
+> Signed-off-by: Duc Dang <dhdang@apm.com>
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
 
-Applied, thanks.
-
-Rob
-
-> ---
->  Documentation/devicetree/bindings/arm/gic-v3.txt | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
-> index ddfade4..7803e77 100644
-> --- a/Documentation/devicetree/bindings/arm/gic-v3.txt
-> +++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
-> @@ -57,6 +57,8 @@ used to route Message Signalled Interrupts (MSI) to the CPUs.
->  These nodes must have the following properties:
->  - compatible : Should at least contain  "arm,gic-v3-its".
->  - msi-controller : Boolean property. Identifies the node as an MSI controller
-> +- #msi-cells: Must be <1>. The single msi-cell is the DeviceID of the device
-> +  which will generate the MSI.
->  - reg: Specifies the base physical address and size of the ITS
->    registers.
->  
-> @@ -83,6 +85,7 @@ Examples:
->  		gic-its at 2c200000 {
->  			compatible = "arm,gic-v3-its";
->  			msi-controller;
-> +			#msi-cells = <1>;
->  			reg = <0x0 0x2c200000 0 0x200000>;
->  		};
->  	};
-> @@ -107,12 +110,14 @@ Examples:
->  		gic-its at 2c200000 {
->  			compatible = "arm,gic-v3-its";
->  			msi-controller;
-> +			#msi-cells = <1>;
->  			reg = <0x0 0x2c200000 0 0x200000>;
->  		};
->  
->  		gic-its at 2c400000 {
->  			compatible = "arm,gic-v3-its";
->  			msi-controller;
-> +			#msi-cells = <1>;
->  			reg = <0x0 0x2c400000 0 0x200000>;
->  		};
->  	};
-> 
+Acked-by: Arnd Bergmann <arnd@arndb.de>
