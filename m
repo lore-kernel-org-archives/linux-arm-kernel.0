@@ -1,84 +1,54 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 17 Sep 2015 16:36:44 -0700
-Subject: mvneta: SGMII fixed-link not so fixed
-In-Reply-To: <20150917231422.GY21084@n2100.arm.linux.org.uk>
-References: <20150914103207.GH21084@n2100.arm.linux.org.uk>
- <55F6AA25.2070603@list.ru> <20150914114209.GL21084@n2100.arm.linux.org.uk>
- <20150917.151247.2129216999071943354.davem@davemloft.net>
- <20150917231422.GY21084@n2100.arm.linux.org.uk>
-Message-ID: <55FB4E8C.6050307@gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Thu, 17 Sep 2015 16:38:35 -0700
+Subject: [GIT PULL] ARM64: APM X-Gene 1 and X-Gene 2 DTS updates for 4.4
+Message-ID: <CADaLNDmeBz69eoU4PO6cAf2cKCQwVCORcXMUf5xdODJVUfb+Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/09/15 16:14, Russell King - ARM Linux wrote:
+Hi Olof,
 
-[snip]
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
->    with _no_ phy node.
-> 
-> 4. Going back to the SFP problem, the link is only up when the SFP
->    module pins indicate that there's no transmitter fault, no loss of
->    signal _and_ the PCS layer at the MAC indicates that it has completed
->    negotiation.  This pretty much rules out trying to emulate a SFP cage
->    as a software-based PHY.  I've code right now doing exactly that, and
->    it results in netif_carrier_on() being called far too early.
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 
-Andrew recently added support for having the fixed PHY emulated PHY poll
-a GPIO to determine link status. If this information comes differently
-(e.g: via MMIO/MAC registers) in your case, I guess we could either
-extend the fixed PHY to support that scheme, or just open-code the
-carrier state change in the mvneta driver.
+are available in the git repository at:
 
-> 
-> What I don't know is how many generations of the mvneta hardware have
-> support for both serdes modes, but what I'm basically saying is that
-> the solution we now have seems to be somewhat lacking - maybe it should
-> have been "auto", "in-band-sgmii" and "in-band-1000base-x" with the
-> ability to add additional modes later.
+  https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.4-1
 
-Staas and I had quite some discussions about this topic, and I think I
-changed my mind at least once about his initial proposal, but I seem to
-recall that I suggested making the auto-negotiation property something
-more flexible than it currently is (or maybe Staas did, and my mind
-plays tricks on me).
+for you to fetch changes up to 1d8d53b62d80dc3a6ae1483891e7d840cd7a51bd:
 
-> 
-> The other point I'm making above is that I'm forming the opinion that
-> the existing PHY layer isn't flexible enough for supporting SFP, and I
-> need some way to represent at least part of the autonegotiation at the
-> MAC level without involving the PHY level - especially when considering
-> that a real PHY might be inside the SFP cage which can be talked to
-> over I2C.
+  arm64: dts: Add poweroff device nodes for APM X-Gene 2 platform
+(2015-09-16 12:04:25 -0700)
 
-This is a fair conclusion, the PHY library is really designed to support
-well 10/100/1000 PHYs, anything else, including 10Gbits PHY are not that
-well supported. Anything that is not MDIO is not that well supported,
-and the fixed PHY has its limitations.
+----------------------------------------------------------------
+X-Gene DTS changes queued for v4.4
 
-It is unclear to me how much of the PHY library: state machine, link
-management, device abstraction, and ethtool interface is going to be
-useful if you have a SFP instead of a MDIO-connected PHY.
+----------------------------------------------------------------
+Duc Dang (4):
+      MAINTAINERS: Add Applied Micro (APM) X-Gene Device Tree maintainer
+      arm64: dts: Add X-Gene v2 reboot driver dts node
+      arm64: dts: Add APM X-Gene 2 standby GPIO controller DTS entries
+      arm64: dts: Add poweroff device nodes for APM X-Gene 2 platform
 
-> 
-> This is the problem I'm presently grappling with, and it's taking lots
-> of thought right now.  I'm aware of other drivers in the kernel which
-> support SFP, each using their own implementations to support that.
-> 
-> 
-> Lastly, while looking at this, I've a small stack of patches for the PHY
-> code resolving some of the issues I've mentioned above, and fixing broken
-> reference counting and mdio bus module removal issues:
-> 
->  phy: fixed-phy: properly validate phy in fixed_phy_update_state()
->  net: fix phy refcounting in a bunch of drivers
->  of_mdio: fix MDIO phy device refcounting
->  phy: add proper phy struct device refcounting
->  phy: fix mdiobus module safety
->  phy: fix of_mdio_find_bus() device refcount leak
-> 
-> I hope to be able to send those out in the next few days - they have
-> nothing to do with SFP itself but are the results of looking through the
-> PHY code.
-> 
--- 
-Florian
+Feng Kan (5):
+      Documentation: arm64: add SCU dts binding documentation to linux kernel
+      arm64: dts: Add X-Gene reboot driver dts node
+      arm64: dts: add APM Merlin Board device tree
+      Documentation: arm: pmu: Add Potenza PMU binding
+      arm64: dts: Add PMU node for APM X-Gene Storm SOC
+
+Tai Nguyen (1):
+      power: reset: Add syscon poweroff device node for APM X-Gene platform
+
+ Documentation/devicetree/bindings/arm/apm/scu.txt |  17 ++
+ Documentation/devicetree/bindings/arm/pmu.txt     |   1 +
+ MAINTAINERS                                       |   5 +
+ arch/arm64/boot/dts/apm/Makefile                  |   1 +
+ arch/arm64/boot/dts/apm/apm-merlin.dts            |  72 ++++++
+ arch/arm64/boot/dts/apm/apm-mustang.dts           |  12 +
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi        | 271 ++++++++++++++++++++++
+ arch/arm64/boot/dts/apm/apm-storm.dtsi            |  17 ++
+ 8 files changed, 396 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/apm/scu.txt
+ create mode 100644 arch/arm64/boot/dts/apm/apm-merlin.dts
+ create mode 100644 arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
