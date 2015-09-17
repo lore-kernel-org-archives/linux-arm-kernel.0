@@ -1,61 +1,37 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 17 Sep 2015 12:13:03 +0200
-Subject: [PATCH v6 0/5] ARM: berlin: PWM support
-Message-ID: <1442484788-15482-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Thu, 17 Sep 2015 12:13:06 +0200
+Subject: [PATCH v6 3/5] ARM: berlin: add a PWM node on the BG2Q
+In-Reply-To: <1442484788-15482-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1442484788-15482-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1442484788-15482-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patch adds a PWM node in the Berlin BG2Q device tree, using the
+newly added Berlin PWM driver.
 
-This series adds a driver for the Marvell Berlin PWM controller, which
-has 4 channels.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ arch/arm/boot/dts/berlin2q.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-This has been tested on a BG2Q DMP.
-
-Thanks,
-
-Antoine
-
-Changes since v5:
-	- Rebased on top of 4.3-rc1
-	- Added a call to clk_disable_unprepare() in case of failure
-
-Changes since v4:
-        - Reworked _remove()
-        - Reworked _enable()
-
-Changes since v3:
-        - Use readl_relaxed
-        - Reworked the clk enable / clk disable calls
-        - Removed BERLIN_PWM_DISABLE
-
-Changes since v2:
-        - Reworked the prescaler/tcnt calculation
-        - Added an input clock
-        - Updated the documentation
-        - Reordered the pwm node
-        - Added some definition for BIT()
-
-Changes since v1:
-        - Added a sentinel in berlin_pwm_match[]
-
-Antoine Tenart (5):
-  pwm: add the Berlin pwm controller driver
-  Documentation: bindings: document the Berlin PWM driver
-  ARM: berlin: add a PWM node on the BG2Q
-  ARM: berlin: add a PWM node on the BG2
-  ARM: berlin: add a PWM node on the BG2CD
-
- .../devicetree/bindings/pwm/pwm-berlin.txt         |  19 ++
- arch/arm/boot/dts/berlin2.dtsi                     |   7 +
- arch/arm/boot/dts/berlin2cd.dtsi                   |   7 +
- arch/arm/boot/dts/berlin2q.dtsi                    |   7 +
- drivers/pwm/Kconfig                                |   9 +
- drivers/pwm/Makefile                               |   1 +
- drivers/pwm/pwm-berlin.c                           | 229 +++++++++++++++++++++
- 7 files changed, 279 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-berlin.txt
- create mode 100644 drivers/pwm/pwm-berlin.c
-
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 63a48490e2f9..5bfa71a87617 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -477,6 +477,13 @@
+ 			status = "disabled";
+ 		};
+ 
++		pwm: pwm at f20000 {
++			compatible = "marvell,berlin-pwm";
++			reg = <0xf20000 0x40>;
++			clocks = <&chip_clk CLKID_CFG>;
++			#pwm-cells = <3>;
++		};
++
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
 -- 
 2.5.2
