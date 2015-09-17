@@ -1,95 +1,49 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 17 Sep 2015 11:59:28 +0200
-Subject: [PATCH v2 0/9] Build and support rk3036 SoC platform
-In-Reply-To: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
-References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <5090899.2Tj4WpOV4G@diego>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 17 Sep 2015 12:00:03 +0200
+Subject: [PATCH 0/3] ALSA: hda - Avoid potential deadlock
+Message-ID: <1442484006-9614-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Thierry Reding <treding@nvidia.com>
 
-Am Donnerstag, 17. September 2015, 16:28:51 schrieb Xing Zheng:
-> we need to support rk3036 soc platform via upstream, there are
-> 3 primary parts for the initial release of minimum system: dts,
-> pinctrl, and clock tree for rk3036, and additional, add a rtc
-> hym8563 patch to fix initial invaild, we can use these startup
-> and run to init processs.
-> 
-> Thanks.
-> 
-> changed in v2:
-> - based on v1, add clock controller documentation
-> - enable timer5 startup
-> - add smp for cpu1
-> - initial set time for rtc-hym8563
-> 
-> changes since v1:
-> - add dts, pinctrl and clock tree for rk3036 soc platform
-> 
-> The patchset (9):
-> 9) rtc: hym8563: make sure hym8563 can be normal work
-> 8) ARM: rockchip: add support smp for rk3036
-> 7) rockchip: make sure timer5 is enabled on rk3036 platforms
-> 6) pinctrl: rockchip: add support for the rk3036
-> 5) dt-bindings: add documentation of rk3036 clock controller
-> 4) clk: rockchip: add new clock type and controller for rk3036
-> 3) clk: rockchip: add clock controller for rk3036
-> 2) clk: rockchip: add dt-binding header for rk3036
-> 1) ARM: dts: rockchip: add core rk3036 dts
-> 
-> 
-> Changes in v2:
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> 
-> Xing Zheng (9):
->   ARM: dts: rockchip: add core rk3036 dts
->   clk: rockchip: add dt-binding header for rk3036
->   clk: rockchip: add clock controller for rk3036
->   clk: rockchip: add new clock type and controller for rk3036
->   dt-bindings: add documentation of rk3036 clock controller
->   pinctrl: rockchip: add support for the rk3036
->   rockchip: make sure timer5 is enabled on rk3036 platforms
->   ARM: rockchip: add support smp for rk3036
->   rtc: hym8563: make sure hym8563 can be normal work
+The Tegra HDA controller driver committed in v3.16 causes deadlocks when
+loaded as a module. The reason is that the driver core will lock the HDA
+controller device upon calling its probe callback and the probe callback
+then goes on to create child devices for detected codecs and loads their
+modules via a request_module() call. This is problematic because the new
+driver will immediately be bound to the device, which will in turn cause
+the parent of the codec device (the HDA controller device) to be locked
+again, causing a deadlock.
 
-am I missing some patches? I only got patches 1-4.
+This problem seems to have been present since the modularization of the
+HD-audio driver in commit 1289e9e8b42f ("ALSA: hda - Modularize HD-audio
+driver"). On Intel platforms this has been worked around by splitting up
+the probe sequence into a synchronous and an asynchronous part where the
+request_module() calls are asynchronous and hence avoid the deadlock.
 
-Anyway, you should reorder a bit
+An alternative proposal is provided in this series of patches. Rather
+than relying on explicit request_module() calls to load kernel modules
+for HDA codec drivers, this implements a uevent callback for the HDA bus
+to advertises the MODALIAS information to the userspace helper.
 
-- whatever other patches are necessary before
-- dt-bindings: add documentation of rk3036 clock controller
-- clk: rockchip: add dt-binding header for rk3036
-- clk: rockchip: add new pll type for rk3036
--  clk: rockchip: add clock controller for rk3036
-- ARM: dts: rockchip: add core rk3036 dts
+Effectively this results in the same modules being loaded, but it uses
+the more canonical infrastructure to perform this. Deferring the module
+loading to userspace removes the need for the explicit request_module()
+calls and works around the recursive locking issue because both drivers
+will be bound from separate contexts.
 
-The dts patch for example depends on the clock-header, so it really should 
-come after its addition.
+Thierry
 
+Thierry Reding (3):
+  ALSA: hda/hdmi - Add missing MODALIAS information
+  ALSA: hda - Advertise MODALIAS in uevent
+  ALSA: hda: Do not rely on explicit module loading
 
-Heiko
+ sound/hda/hda_bus_type.c   | 12 +++++++
+ sound/pci/hda/hda_bind.c   | 80 ----------------------------------------------
+ sound/pci/hda/patch_hdmi.c |  3 ++
+ 3 files changed, 15 insertions(+), 80 deletions(-)
 
-> 
->  .../bindings/clock/rockchip,rk3036-cru.txt         |   60 +++
->  .../bindings/pinctrl/rockchip,pinctrl.txt          |    1 +
->  arch/arm/boot/dts/Makefile                         |    1 +
->  arch/arm/boot/dts/rk3036-sdk.dts                   |   62 +++
->  arch/arm/boot/dts/rk3036.dtsi                      |  381 +++++++++++++++
->  arch/arm/mach-rockchip/platsmp.c                   |  121 +++++
->  arch/arm/mach-rockchip/rockchip.c                  |   22 +
->  drivers/clk/rockchip/Makefile                      |    1 +
->  drivers/clk/rockchip/clk-pll.c                     |  262 +++++++++-
->  drivers/clk/rockchip/clk-rk3036.c                  |  504
-> ++++++++++++++++++++ drivers/clk/rockchip/clk.h                         |  
-> 30 ++
->  drivers/pinctrl/pinctrl-rockchip.c                 |   17 +
->  drivers/rtc/rtc-hym8563.c                          |   93 ++++
->  include/dt-bindings/clock/rk3036-cru.h             |  198 ++++++++
->  14 files changed, 1752 insertions(+), 1 deletion(-)
->  create mode 100644
-> Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt create mode
-> 100644 arch/arm/boot/dts/rk3036-sdk.dts
->  create mode 100644 arch/arm/boot/dts/rk3036.dtsi
->  create mode 100644 drivers/clk/rockchip/clk-rk3036.c
->  create mode 100644 include/dt-bindings/clock/rk3036-cru.h
+-- 
+2.5.0
