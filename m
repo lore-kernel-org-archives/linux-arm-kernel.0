@@ -1,40 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 17 Sep 2015 19:57:48 -0300
-Subject: i.MX27 device tree
-In-Reply-To: <55FB2AC4.4070907@phoenixsoftware.it>
-References: <55FB2AC4.4070907@phoenixsoftware.it>
-Message-ID: <CAOMZO5BNQ3NyywH6YGydYZbZsfWhG_8RqbESibUxTPMY_7hvdA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 17 Sep 2015 16:02:41 -0700
+Subject: mvneta: SGMII fixed-link not so fixed
+In-Reply-To: <20150917.151247.2129216999071943354.davem@davemloft.net>
+References: <20150914103207.GH21084@n2100.arm.linux.org.uk>
+ <55F6AA25.2070603@list.ru> <20150914114209.GL21084@n2100.arm.linux.org.uk>
+ <20150917.151247.2129216999071943354.davem@davemloft.net>
+Message-ID: <55FB4691.1060802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 6:04 PM, Pierluigi Passaro
-<pierluigi.passaro@phoenixsoftware.it> wrote:
-> Hi all,
-> I do need to test latest 4.1 kernel on i.MX27 PDK, but I'm not able to find
-> any bootloader providinfg dts support.
->
-> Could you give any suggestion?
+On 17/09/15 15:12, David Miller wrote:
+> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Date: Mon, 14 Sep 2015 12:42:09 +0100
+> 
+>> Thanks, I think that will solve it.  I have to wonder why that patch
+>> (f8af8e6eb9509 in mainline) didn't made it into v4.2 though, as it's
+>> billed as a regression that occurred in the previous merge window, and
+>> given that it was sent in July, and we're now in September.  As it
+>> wasn't in v4.2, it looks like it should be a stable candidate.
+> 
+> The series had a whole bunch of non bug fixes in it and we were in
+> the final phases of 4.2, in which case I defer to applying patches
+> to net-next only unless I'm told otherwise.
 
-You can use Redboot to boot a mainline kernel on mx27pdk.
+To your defense, Staas and I kept arguing for a while, slowing the
+entire process down until we agreed on a proper solution, the submission
+was targeting your 'net' tree, but I did not realize until now that
+these got applied to 'net-next'.
 
-make imx_v4_v5_defconfig
-make menuconfig
+> 
+> It's up the the patch/series author to let me know that an important
+> regression fix is hidden in there, but they should have submitted
+> it seperately from the rest in that kind of situation anyways.
+> 
+>> David, any objections to having the stable guys pick this regression
+>> fix up, if not already done so?
+> 
+> More than this patch is needed, the one before it (3/4) instantiates
+> the necessary property in the DT, for example.
+> 
+> I can queue up the whole series for -stable if you want.
 
-Boot options--->
+I think this would be a good thing, mvneta-based platforms are fairly
+popular.
 
-then select:
-
-[*] Use appended device tree blob to zImage (EXPERIMENTAL)
-[*]   Supplement the appended DTB with traditional ATAG information
-
-Build the kernel: make
-Build the dtb: make imx27-pdk.dtb
-
-Append the dtb to the kernel:
-cat arch/arm/boot/zImage arch/arm/boot/dtb/imx27_pdk.dtb > zImage_combined
-
-Rename zImage_combined to zImage and then boot it as it were a normal zImage.
-
-Regards,
-
-Fabio Estevam
+Thank you!
+-- 
+Florian
