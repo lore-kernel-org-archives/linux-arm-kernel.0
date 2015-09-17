@@ -1,103 +1,120 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 17 Sep 2015 23:10:41 +0800
-Subject: [linux-sunxi] Re: [PATCH 2/2] ASoC: sunxi: add support for the
- on-chip codec on early Allwinner SoCs
-In-Reply-To: <20150917133135.GE4684@lukather>
-References: <1442064384-23379-1-git-send-email-maxime.ripard@free-electrons.com>
- <1442064384-23379-3-git-send-email-maxime.ripard@free-electrons.com>
- <20150916191612.GM12027@sirena.org.uk> <20150917133135.GE4684@lukather>
-Message-ID: <CAGb2v67D30+_itOAyWqGzychxeM_d7rF6TTu1_WBYuFPfFEk1g@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 17 Sep 2015 16:28:11 +0100
+Subject: [RFC PATCH v2 3/7] arm64: alternative: Apply alternatives early
+ in boot process
+In-Reply-To: <20150917140126.GE25634@arm.com>
+References: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
+ <1442237181-17064-4-git-send-email-daniel.thompson@linaro.org>
+ <20150916130549.GJ28771@arm.com> <55F98FF0.7030605@linaro.org>
+ <20150916162452.GN28771@arm.com> <55FABF64.3080404@linaro.org>
+ <20150917140126.GE25634@arm.com>
+Message-ID: <55FADC0B.9080200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 9:31 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Mark,
->
-> On Wed, Sep 16, 2015 at 08:16:12PM +0100, Mark Brown wrote:
->> On Sat, Sep 12, 2015 at 03:26:24PM +0200, Maxime Ripard wrote:
+On 17/09/15 15:01, Will Deacon wrote:
+> On Thu, Sep 17, 2015 at 02:25:56PM +0100, Daniel Thompson wrote:
+>> On 16/09/15 17:24, Will Deacon wrote:
+>>> On Wed, Sep 16, 2015 at 04:51:12PM +0100, Daniel Thompson wrote:
+>>>> On 16/09/15 14:05, Will Deacon wrote:
+>>>>> On Mon, Sep 14, 2015 at 02:26:17PM +0100, Daniel Thompson wrote:
+>>>>>>     /*
+>>>>>> + * This is called very early in the boot process (directly after we run
+>>>>>> + * a feature detect on the boot CPU). No need to worry about other CPUs
+>>>>>> + * here.
+>>>>>> + */
+>>>>>> +void apply_alternatives_early(void)
+>>>>>> +{
+>>>>>> +	struct alt_region region = {
+>>>>>> +		.begin	= __alt_instructions,
+>>>>>> +		.end	= __alt_instructions_end,
+>>>>>> +	};
+>>>>>> +
+>>>>>> +	__apply_alternatives(&region);
+>>>>>> +}
+>>>>>
+>>>>> How do you choose which alternatives are applied early and which are
+>>>>> applied later? AFAICT, this just applies everything before we've
+>>>>> established the capabilities of the CPUs in the system, which could cause
+>>>>> problems for big/little SoCs.
+>>>>
+>>>> They are applied twice. This relies for correctness on the fact that
+>>>> cpufeatures can be set but not unset.
+>>>>
+>>>> In other words the boot CPU does a feature detect and, as a result, a
+>>>> subset of the required alternatives will be applied. However after this
+>>>> the other CPUs will boot and the the remaining alternatives applied as
+>>>> before.
+>>>>
+>>>> The current implementation is inefficient (because it will redundantly
+>>>> patch the same code twice) but I don't think it is broken.
+>>>
+>>> What about a big/little system where we boot on the big cores and only
+>>> they support LSE atomics?
 >>
->> This looks pretty good, there's a few minor things below but I'll apply
->> anyway - please send followup patches fixing these.
->
-> Sure, I will. Thanks!
->
+>> Hmmnn... I don't think this patch will impact that.
 >>
->> > +   if (clk_set_rate(scodec->clk_module, clk_freq))
->> > +           return -EINVAL;
+>> Once something in the boot sequence calls cpus_set_cap() then if there
+>> is a corresponding alternative then it is *going* to be applied isn't
+>> it? The patch only means that some of the alternatives will be applied
+>> early. Once the boot is complete the patched .text should be the same
+>> with and without the patch.
 >>
->> Better to pass back the error code here rather than silently discard it
->> (it might have more information).
+>> Have I overlooked some code in the current kernel that prevents a system
+>> with mis-matched LSE support from applying the alternatives?
 >
-> Yep.
+> Sorry, I'm thinking slightly ahead of myself, but the series from Suzuki
+> creates a shadow "safe" view of the ID registers in the system,
+> corresponding to the intersection of CPU features:
 >
->>
->> > +static struct snd_soc_dai_driver sun4i_codec_dai = {
->> > +   .name   = "Codec",
->> > +   .ops    = &sun4i_codec_dai_ops,
->> > +   .playback = {
->> > +           .stream_name    = "Codec Playback",
->> > +           .channels_min   = 1,
->> > +           .channels_max   = 2,
->> > +           .rate_min       = 8000,
->> > +           .rate_max       = 192000,
->> > +           .rates          = SNDRV_PCM_RATE_8000_48000 |
->> > +                             SNDRV_PCM_RATE_96000 |
->> > +                             SNDRV_PCM_RATE_192000 |
->> > +                             SNDRV_PCM_RATE_KNOT,
->>
->> No need to specify both explicit rates and _KNOT, _KNOT covers
->> everything.
+>    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/370386.html
 >
-> Ack.
->
->> > +           .formats        = SNDRV_PCM_FMTBIT_S16_LE |
->> > +                             SNDRV_PCM_FMTBIT_S32_LE,
->> > +           .sig_bits       = 24,
->>
->> So presumably also S24_LE (ie, 24 bits packed into a 32 bit word)?
->
-> Hmm, probably yes, I'll test that.
+> In this case, it is necessary to inspect all of the possible CPUs before
+> we can apply the patching, but as I say above, I'm prepared to make an
+> exception for NMI because I don't think we can assume a safe value anyway
+> for a system with mismatched GIC CPU interfaces. I just don't want to
+> drag all of the alternatives patching earlier as well.
 
-IIRC when Emilio first wrote the driver, we tried 24 bit and no sound
-came out. Turns out it's an alignment issue. The codec's FIFO register
-is 32 bits wide, and takes the higher 24 bits as input when set to 24
-bit mode. The internal FIFO is only 24 bits wide. A20 user manual P174
-describes how the bits are copied.
+Thanks. I'll take a close look at this patch set and work out how to 
+cooperate with it.
 
-So for 24 bit audio, you would actually send it 32 bit audio samples,
-and let it truncate or drop the least significant 8 bits. This is why
-we have SNDRV_PCM_FMTBIT_S32_LE with .sig_bits = 24.
+However I would like, if I can, to persuade you that we are making an 
+exception ARM64_HAS_SYSREG_GIC_CPUIF rather than specifically for things 
+that are NMI related. AFAIK all ARMv8 cores have a GIC_CPUIF and the 
+system either has a GICv3+ or it doesn't so it shouldn't matter what 
+core you check the feature on; it is in the nature of the feature we are 
+detecting that it is safe to patch early.
 
-I don't know if this is just a workaround, but a few other drivers do
-this as well, for example twl3040 and omap-mcpdm.
+To some extent this is quibbling about semantics but:
+
+1. Treating this as a general case will put us in a good position if we
+    ever have to deal with an errata that cannot wait until the system
+    has nearly finished booting.
+
+2. It makes the resulting code very simple because we can just have a
+    bitmask indicating which cpufeatures we need should apply early and
+    which we apply late. That in turn means we don't have to
+    differentiate NMI alternatives from other alternatives (thus avoiding
+    a bunch of new alternative macros).
+
+I'm not seeking any kind binding agreement from you before you see the 
+patch but if you *know* right now that you would nack something that 
+follows the above thinking then please let me know so I don't waste time 
+writing it ;-) . If you're on the fence I'll happily write the patch and 
+you can see what I think then.
 
 
-Regards
-ChenYu
-
->> > +   /* Enable the bus clock */
->> > +   if (clk_prepare_enable(scodec->clk_apb)) {
->> > +           dev_err(&pdev->dev, "Failed to enable the APB clock\n");
->> > +           return -EINVAL;
->> > +   }
+>>> We also need to think about how an incoming NMI interacts with
+>>> concurrent patching of later features. I suspect we want to set the I
+>>> bit, like you do for WFI, unless you can guarantee that no patched
+>>> sequences run in NMI context.
 >>
->> Ideally we'd have runtime power management to disable the clocks when
->> idle.
+>> Good point. I'll fix this in the next respin.
 >
-> We don't really have any kind of power management support currently,
-> but adding runtime pm everywhere is definitely on the todo list. It
-> might not happen before a while though.
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> Great, thanks. It probably also means that the NMI code needs
+> __kprobes/__notrace annotations for similar reasons.
+
+Oops. That I really should have thought about already (but I didn't).
+
+
+Daniel.
