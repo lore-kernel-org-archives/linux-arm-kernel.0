@@ -1,42 +1,42 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 17 Sep 2015 15:29:08 -0700
-Subject: [PATCH/RESEND] amba: Support clk parents and rates assigned in DT
-Message-ID: <1442528948-29565-1-git-send-email-sboyd@codeaurora.org>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Thu, 17 Sep 2015 15:41:31 -0700
+Subject: [PATCH 0/3] PCI: Add support for Cavium ThunderX RC and on-SoC
+ devices.
+Message-ID: <1442529694-1792-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the call to of_clk_set_defaults() into the amba probe path so
-that devices on the amba bus can use the assigned rates and
-parents feature of the common clock framework.
+From: David Daney <david.daney@cavium.com>
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/amba/bus.c | 5 +++++
- 1 file changed, 5 insertions(+)
+The Cavium ThunderX arm64 based SoC needs a little bit of special
+handling for both its PCIe Root Complexes as well as on-SoC devices
+(which all appear as PCIe devices).
 
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index f0099360039e..350ed93d4281 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -19,6 +19,7 @@
- #include <linux/amba/bus.h>
- #include <linux/sizes.h>
- #include <linux/limits.h>
-+#include <linux/clk/clk-conf.h>
- 
- #include <asm/irq.h>
- 
-@@ -237,6 +238,10 @@ static int amba_probe(struct device *dev)
- 	int ret;
- 
- 	do {
-+		ret = of_clk_set_defaults(dev->of_node, false);
-+		if (ret < 0)
-+			break;
-+
- 		ret = dev_pm_domain_attach(dev, true);
- 		if (ret == -EPROBE_DEFER)
- 			break;
+1/3 - Small change to allow SRIOV BARs to be given fixed addresses in
+      the header fixup.
+
+2/3 - Add quirks to support fixed BAR addresses for all on-SoC devices,
+      including SRIOV BARs in the NIC.
+
+3/3 - Add config spaces accessors to pci-host-generic driver for ThunderX RC.
+
+This patch set depends on:
+
+https://lkml.org/lkml/2015/9/17/799
+
+David Daney (3):
+  PCI: Allow quirks to override SRIOV BARs.
+  PCI: Add quirks for devices found on Cavium ThunderX SoCs.
+  PCI: generic: Add support for Cavium ThunderX PCIe root complexes.
+
+ .../devicetree/bindings/pci/host-generic-pci.txt   |  8 +-
+ drivers/pci/host/Kconfig                           |  6 ++
+ drivers/pci/host/Makefile                          |  1 +
+ drivers/pci/host/pci-host-generic.c                | 29 +++++++
+ drivers/pci/host/quirks-thunder.c                  | 95 ++++++++++++++++++++++
+ drivers/pci/iov.c                                  |  9 +-
+ 6 files changed, 143 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/pci/host/quirks-thunder.c
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
