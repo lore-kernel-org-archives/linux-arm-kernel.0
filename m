@@ -1,51 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Sep 2015 17:59:35 +0900
-Subject: [PATCH 19/21] ARM: shmobile: Kconfig: remove unused SHMOBILE_TIMER_HZ
- section
-In-Reply-To: <cover.1442478814.git.horms+renesas@verge.net.au>
-References: <cover.1442478814.git.horms+renesas@verge.net.au>
-Message-ID: <7463c876331d01aafb420f3637c2f69409eb0447.1442478814.git.horms+renesas@verge.net.au>
+Date: Thu, 17 Sep 2015 17:59:53 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.4
+Message-ID: <cover.1442479800.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Obsoleted by removal of legacy platforms.
+Please consider these Renesas ARM based SoC defconfig updates for v4.4.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Kconfig | 20 --------------------
- 1 file changed, 20 deletions(-)
+This is a minor cleanup of defconfigs after reshuffling to
+remove legacy board code.
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 7f2e05304d3d..88734a5e10ca 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -98,23 +98,3 @@ config ARCH_SH73A0
- 
- comment "Renesas ARM SoCs System Configuration"
- endif
--
--if ARCH_SHMOBILE
--
--menu "Timer and clock configuration"
--
--config SHMOBILE_TIMER_HZ
--	int "Kernel HZ (jiffies per second)"
--	range 32 1024
--	default "128"
--	help
--	  Allows the configuration of the timer frequency. It is customary
--	  to have the timer interrupt run at 1000 Hz or 100 Hz, but in the
--	  case of low timer frequencies other values may be more suitable.
--	  Renesas ARM SoC systems using a 32768 Hz RCLK for clock events may
--	  want to select a HZ value such as 128 that can evenly divide RCLK.
--	  A HZ value that does not divide evenly may cause timer drift.
--
--endmenu
--
--endif
--- 
-2.1.4
+
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.4
+
+for you to fetch changes up to 0a8b0695f4c490c349ee12956d6946576c44a419:
+
+  ARM: multi_v7_defconfig: Remove Marzen (2015-09-14 10:12:59 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Defconfig Updates for v4.4
+
+* Remove now non-existent MACH_MARZEN from defconfigs
+
+----------------------------------------------------------------
+Magnus Damm (1):
+      ARM: shmobile: Remove Marzen from shmobile_defconfig
+
+Simon Horman (1):
+      ARM: multi_v7_defconfig: Remove Marzen
+
+ arch/arm/configs/multi_v7_defconfig | 1 -
+ arch/arm/configs/shmobile_defconfig | 1 -
+ 2 files changed, 2 deletions(-)
