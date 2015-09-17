@@ -1,26 +1,32 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 17 Sep 2015 11:52:02 -0400 (EDT)
-Subject: [PATCH v5 01/23] driver core: Add pre_probe callback to bus_type
-In-Reply-To: <1442494637-3674-2-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <Pine.LNX.4.44L0.1509171150410.1270-100000@iolanthe.rowland.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 17 Sep 2015 16:53:08 +0100
+Subject: [PATCH] iommu/io-pgtable-arm: Don't use dma_to_phys()
+In-Reply-To: <20150917145216.GJ25634@arm.com>
+References: <1c591836f1ec6e676a8889cdccd042650eadb73b.1442499554.git.robin.murphy@arm.com>
+ <20150917145216.GJ25634@arm.com>
+Message-ID: <55FAE1E4.4060009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Sep 2015, Tomeu Vizoso wrote:
+On 17/09/15 15:52, Will Deacon wrote:
+[...]
+>> -static dma_addr_t __arm_lpae_dma_addr(struct device *dev, void *pages)
+>> -{
+>> -	return phys_to_dma(dev, virt_to_phys(pages));
+>> -}
+>
+> Can we keep this helper kicking around, at least to contain the ugliness
+> of the virt_to_phys + cast?
 
-> Some buses (eg. AMBA) need access to some HW resources (it may need a
-> clock to be enabled so a device ID can be read) before a device can be
-> matched to a driver.
-> 
-> The pre_probe callback allows the device-driver core to request the bus
-> to perform this initialization and can defer the probe if any of the
-> resources needed are missing.
-> 
-> This gives us more flexibility when setting the order in which devices
-> are probed because the resources needed to get the matching information
-> don't need to be available by the time that the bus devices are
-> registered.
+Can do for the sync and unmap cases - the alloc_pages one needs to avoid 
+truncation in the comparison if dma_addr_t and phys_addr_t are different 
+sizes, so can't safely cast one to the other either way. I can at least 
+get rid of the u64 casts there though, as they seem superfluous after a 
+bit of experimentation and another read of the good old "Usual 
+arithmetic conversions". I'll fix up and repost.
 
-Can't the subsystem do this itself in its matching routine?
+Robin.
 
-Alan Stern
+>
+> Will
+>
