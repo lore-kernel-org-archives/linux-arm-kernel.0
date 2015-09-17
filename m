@@ -1,75 +1,48 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Thu, 17 Sep 2015 13:19:23 +0800
-Subject: [RFC PATCH v4 1/4] genirq: introduce CONFIG_GENERIC_IRQ_MIGRATION
-In-Reply-To: <1442467166-1460-1-git-send-email-yangyingliang@huawei.com>
-References: <1442467166-1460-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <1442467166-1460-2-git-send-email-yangyingliang@huawei.com>
+From: wei@redhat.com (Wei Huang)
+Date: Thu, 17 Sep 2015 00:56:54 -0500
+Subject: [PATCH v2 00/22] KVM: ARM64: Add guest PMU support
+In-Reply-To: <55FA1832.3040008@linaro.org>
+References: <1441961715-11688-1-git-send-email-zhaoshenglong@huawei.com>
+ <55F9D9FC.6010905@redhat.com> <55FA1832.3040008@linaro.org>
+Message-ID: <55FA5626.7040105@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a more general config for compile kernel/irq/migration.c.
-Move the CONFIG_GENERIC_PENDING_IRQ into migration.c. So we can
-move other migration interrupts code into migration.c without
-select CONFIG_GENERIC_PENDING_IRQ.
 
-Cc: Jiang Liu <jiang.liu@linux.intel.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
----
- kernel/irq/Kconfig     | 5 +++++
- kernel/irq/Makefile    | 2 +-
- kernel/irq/migration.c | 2 ++
- 3 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/kernel/irq/Kconfig b/kernel/irq/Kconfig
-index 9a76e3b..1ac0647 100644
---- a/kernel/irq/Kconfig
-+++ b/kernel/irq/Kconfig
-@@ -29,6 +29,11 @@ config GENERIC_IRQ_LEGACY_ALLOC_HWIRQ
- # Support for delayed migration from interrupt context
- config GENERIC_PENDING_IRQ
- 	bool
-+	select GENERIC_IRQ_MIGRATION
-+
-+# Support for generic irq migration
-+config GENERIC_IRQ_MIGRATION
-+	bool
- 
- # Alpha specific irq affinity mechanism
- config AUTO_IRQ_AFFINITY
-diff --git a/kernel/irq/Makefile b/kernel/irq/Makefile
-index d121235..bdd31b7 100644
---- a/kernel/irq/Makefile
-+++ b/kernel/irq/Makefile
-@@ -4,6 +4,6 @@ obj-$(CONFIG_GENERIC_IRQ_CHIP) += generic-chip.o
- obj-$(CONFIG_GENERIC_IRQ_PROBE) += autoprobe.o
- obj-$(CONFIG_IRQ_DOMAIN) += irqdomain.o
- obj-$(CONFIG_PROC_FS) += proc.o
--obj-$(CONFIG_GENERIC_PENDING_IRQ) += migration.o
-+obj-$(CONFIG_GENERIC_IRQ_MIGRATION) += migration.o
- obj-$(CONFIG_PM_SLEEP) += pm.o
- obj-$(CONFIG_GENERIC_MSI_IRQ) += msi.o
-diff --git a/kernel/irq/migration.c b/kernel/irq/migration.c
-index 37ddb7b..1ff2b77 100644
---- a/kernel/irq/migration.c
-+++ b/kernel/irq/migration.c
-@@ -4,6 +4,7 @@
- 
- #include "internals.h"
- 
-+#ifdef CONFIG_GENERIC_PENDING_IRQ
- void irq_move_masked_irq(struct irq_data *idata)
- {
- 	struct irq_desc *desc = irq_data_to_desc(idata);
-@@ -77,3 +78,4 @@ void irq_move_irq(struct irq_data *idata)
- 	if (!masked)
- 		idata->chip->irq_unmask(idata);
- }
-+#endif
--- 
-2.5.0
+On 09/16/2015 08:32 PM, Shannon Zhao wrote:
+> Hi Wei,
+> 
+> On 2015/9/17 5:07, Wei Huang wrote:
+>> I am testing this series. 
+> Thanks for your time and help.
+> 
+>> The first question is: do you plan to add ACPI
+>> support in QEMU?
+
+I saw "KVM_{SET/GET}_DEVICE_ATTR failed: Invalid argument" while using
+your QEMU tree (PMU_v2 branch). A quick debugging:
+
+(1) dmesg on host kernel didn't show any vPMU initialization errors. So
+I suspect the problem is related to QEMU.
+(2) Commit 58771bc2a78 worked fine. So probably the problem was
+introduced by new PMU code.
+
+Have you seen it before?
+
+Thanks,
+-Wei
+
+> To the completeness, this should be added. Maybe this could be added at
+> v3. But I have a look at the kernel PMU driver, it doesn't support
+> probing through ACPI, although there are some patches[1] out-of-tree.
+> 
+>> My in-house kernel uses ACPI for device probing. I had
+>> to force "acpi=off" when I test this patch series.
+> Guest kernel only boots with ACPI when you add "acpi=force". No need to
+> add "acpi=off".
+> 
+> Thanks,
+> 
+> [1] http://marc.info/?l=linaro-acpi&m=137949337925645&w=2
+> 
