@@ -1,70 +1,70 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Thu, 17 Sep 2015 18:34:20 +0800
-Subject: [PATCH v2 6/9] pinctrl: rockchip: add support for the rk3036
+Date: Thu, 17 Sep 2015 18:37:24 +0800
+Subject: [PATCH v2 7/9] rockchip: make sure timer5 is enabled on rk3036
+ platforms
 In-Reply-To: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
 References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1442486060-1770-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1442486244-1833-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new type for rk3036 and many parts of pinctrl rk3036 are similar
-with rk2928's.
+The timer5 supplies the architected timer and thus as has to run when
+the system clocksource and clockevents drivers are registered.
 
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 ---
 
 Changes in v2: None
 
- .../bindings/pinctrl/rockchip,pinctrl.txt          |    1 +
- drivers/pinctrl/pinctrl-rockchip.c                 |   17 +++++++++++++++++
- 2 files changed, 18 insertions(+)
+ arch/arm/mach-rockchip/rockchip.c |   22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-index 391ef4b..c73f2bb 100644
---- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-@@ -22,6 +22,7 @@ Required properties for iomux controller:
-   - compatible: one of "rockchip,rk2928-pinctrl", "rockchip,rk3066a-pinctrl"
- 		       "rockchip,rk3066b-pinctrl", "rockchip,rk3188-pinctrl"
- 		       "rockchip,rk3288-pinctrl", "rockchip,rk3368-pinctrl"
-+		       "rockchip,rk3036-pinctrl"
-   - rockchip,grf: phandle referencing a syscon providing the
- 	 "general register files"
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index b6cf3b4..937047f 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -32,6 +32,8 @@
+ #define RK3288_GRF_SOC_CON0 0x244
+ #define RK3288_TIMER6_7_PHYS 0xff810000
  
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index c5246c0..9c49510 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -2089,6 +2089,21 @@ static struct rockchip_pin_ctrl rk2928_pin_ctrl = {
- 		.pull_calc_reg		= rk2928_calc_pull_reg_and_bit,
- };
++#define RK3036_TIMER5_PHYS 0x200440a0
++
+ static void __init rockchip_timer_init(void)
+ {
+ 	if (of_machine_is_compatible("rockchip,rk3288")) {
+@@ -64,6 +66,25 @@ static void __init rockchip_timer_init(void)
+ 			regmap_write(grf, RK3288_GRF_SOC_CON0, 0x10000000);
+ 		else
+ 			pr_err("rockchip: could not get grf syscon\n");
++	} else if (of_machine_is_compatible("rockchip,rk3036")) {
++		void __iomem *reg_base;
++
++		/*
++		 * Most/all uboot versions for rk3036 don't enable timer5
++		 * which is needed for the architected timer to work.
++		 * So make sure it is running during early boot.
++		 */
++		reg_base = ioremap(RK3036_TIMER5_PHYS, SZ_16K);
++		if (reg_base) {
++			writel(0, reg_base + 0x10);
++			writel(0xffffffff, reg_base);
++			writel(0xffffffff, reg_base + 0x04);
++			writel(1, reg_base + 0x10);
++			dsb();
++			iounmap(reg_base);
++		} else {
++			pr_err("rockchip: could not map timer5 registers\n");
++		}
+ 	}
  
-+static struct rockchip_pin_bank rk3036_pin_banks[] = {
-+	PIN_BANK(0, 32, "gpio0"),
-+	PIN_BANK(1, 32, "gpio1"),
-+	PIN_BANK(2, 32, "gpio2"),
-+};
-+
-+static struct rockchip_pin_ctrl rk3036_pin_ctrl = {
-+		.pin_banks		= rk3036_pin_banks,
-+		.nr_banks		= ARRAY_SIZE(rk3036_pin_banks),
-+		.label			= "RK3036-GPIO",
-+		.type			= RK2928,
-+		.grf_mux_offset		= 0xa8,
-+		.pull_calc_reg		= rk2928_calc_pull_reg_and_bit,
-+};
-+
- static struct rockchip_pin_bank rk3066a_pin_banks[] = {
- 	PIN_BANK(0, 32, "gpio0"),
- 	PIN_BANK(1, 32, "gpio1"),
-@@ -2207,6 +2222,8 @@ static struct rockchip_pin_ctrl rk3368_pin_ctrl = {
- static const struct of_device_id rockchip_pinctrl_dt_match[] = {
- 	{ .compatible = "rockchip,rk2928-pinctrl",
- 		.data = (void *)&rk2928_pin_ctrl },
-+	{ .compatible = "rockchip,rk3036-pinctrl",
-+		.data = (void *)&rk3036_pin_ctrl },
- 	{ .compatible = "rockchip,rk3066a-pinctrl",
- 		.data = (void *)&rk3066a_pin_ctrl },
- 	{ .compatible = "rockchip,rk3066b-pinctrl",
+ 	of_clk_init(NULL);
+@@ -79,6 +100,7 @@ static void __init rockchip_dt_init(void)
+ 
+ static const char * const rockchip_board_dt_compat[] = {
+ 	"rockchip,rk2928",
++	"rockchip,rk3036",
+ 	"rockchip,rk3066a",
+ 	"rockchip,rk3066b",
+ 	"rockchip,rk3188",
 -- 
 1.7.9.5
