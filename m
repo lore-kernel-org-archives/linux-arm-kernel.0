@@ -1,29 +1,34 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 17 Sep 2015 11:47:00 +0200
-Subject: [RESEND PATCH 0/2] ST PLL fixes for 4.3-rc2
-In-Reply-To: <20150916223051.GO23081@codeaurora.org>
-References: <1442389379-9298-1-git-send-email-gabriel.fernandez@linaro.org>
- <20150916223051.GO23081@codeaurora.org>
-Message-ID: <55FA8C14.3020000@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 17 Sep 2015 11:50:27 +0200
+Subject: [PATCH] ARM: ux500: modify initial levelshifter status
+Message-ID: <1442483427-10500-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+commit 1d8aca9df612f5751892fb2642d72536f2f48fd0
+"ARM: ux500: fix MMC/SD card regression"
+fixed broken the level shifter: it should be default ON
+but became default OFF.
 
+Fixes: 1d8aca9df612 "ARM: ux500: fix MMC/SD card regression"
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-hrefv60plus.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On 09/17/2015 12:30 AM, Stephen Boyd wrote:
-> On 09/16, Gabriel Fernandez wrote:
->> This patch set fixes a kernel crash :
-> [..]
->> This kernel crash is due to a broken compatibility with this commit:
->> commit 5eb26c605909 ("ARM: STi: DT: Rename st_pll3200c32_407_c0_x into st_pll3200c32_cx_x")
-> It isn't clear who's supposed to apply this because the To: list
-> is huge. Did you want to take this through arm-soc? If so, feel
-> free to take my acked-by on the second patch. The first patch
-> doesn't even apply to clk tree because the patch introducing the
-> typo didn't go through our tree.
-Indeed Stephen, I see it went through my tree (STi DT).
-So the first patch should be taken through arm-soc.
-The second patch, should be taken through yours I think.
-
-Regards,
-Maxime
+diff --git a/arch/arm/boot/dts/ste-hrefv60plus.dtsi b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
+index 810cda743b6d..9c2387b34d0c 100644
+--- a/arch/arm/boot/dts/ste-hrefv60plus.dtsi
++++ b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
+@@ -56,7 +56,7 @@
+ 					/* VMMCI level-shifter enable */
+ 					default_hrefv60_cfg2 {
+ 						pins = "GPIO169_D22";
+-						ste,config = <&gpio_out_lo>;
++						ste,config = <&gpio_out_hi>;
+ 					};
+ 					/* VMMCI level-shifter voltage select */
+ 					default_hrefv60_cfg3 {
+-- 
+2.4.3
