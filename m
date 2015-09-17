@@ -1,38 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Sep 2015 17:33:17 +0100
-Subject: Recent GIC v1 patch
-In-Reply-To: <55FAE26A.9040609@free.fr>
-References: <55FAE26A.9040609@free.fr>
-Message-ID: <55FAEB4D.30306@arm.com>
+From: luis@debethencourt.com (Luis de Bethencourt)
+Date: Thu, 17 Sep 2015 18:36:11 +0200
+Subject: [PATCH 3/4] i2c: rk3x: Fix module autoload for OF platform driver
+Message-ID: <20150917163611.GA26214@goodgumbo.baconseed.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mason,
+This platform driver has a OF device ID table but the OF module
+alias information is not created so module autoloading won't work.
 
-On 17/09/15 16:55, Mason wrote:
-> Hello Thomas, Marc,
-> 
-> Mans pointed me to a recent patch of yours.
-> irqchip/gic: Use IRQD_FORWARDED_TO_VCPU flag
-> Get rid of the handler_data abuse.
-> 
-> I'm using a Cortex A9 based SoC. The platform's interrupt
-> controller is cascaded into the GIC. I've been trying to
-> get this to work for two weeks with no success.
-> 
-> Details can be found here:
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/440327
-> 
-> Do you think your patch my help with my situation?
+Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
+---
+ drivers/i2c/busses/i2c-rk3x.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Not sure. A GICv1 shouldn't use EOImode==1 at all, so I don't quite see
-how you end-up there. Also, you seem to be using 4.2, and this code only
-landed during the 4.3 merge window.
-
-> Do you have any idea what might causing the problem?
-
-Not without more information, I'm afraid.
-
-	M.
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index 72e97e30..c1935eb 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -858,6 +858,7 @@ static const struct of_device_id rk3x_i2c_match[] = {
+ 	{ .compatible = "rockchip,rk3288-i2c", .data = (void *)&soc_data[2] },
+ 	{},
+ };
++MODULE_DEVICE_TABLE(of, rk3x_i2c_match);
+ 
+ static int rk3x_i2c_probe(struct platform_device *pdev)
+ {
 -- 
-Jazz is not dead. It just smells funny...
+2.4.6
