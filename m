@@ -1,76 +1,85 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 17 Sep 2015 10:04:56 +0200
-Subject: [PATCH v8 1/3] can: Allwinner A10/A20 CAN Controller support -
- Devicetree bindings
-In-Reply-To: <1442402482-7118-2-git-send-email-info@gerhard-bertelsmann.de>
-References: <1442402482-7118-1-git-send-email-info@gerhard-bertelsmann.de>
- <1442402482-7118-2-git-send-email-info@gerhard-bertelsmann.de>
-Message-ID: <55FA7428.4030801@pengutronix.de>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 17 Sep 2015 16:07:44 +0800
+Subject: [PATCH v2] arm: add cpu_idle tracepoints to arch_cpu_idle
+In-Reply-To: <1442424760-4104-1-git-send-email-jszhang@marvell.com>
+References: <1442424760-4104-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20150917160744.52400e0e@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2015 01:21 PM, Gerhard Bertelsmann wrote:
-> Devicetree bindings for Allwinner A10/A20 CAN
+Dear all,
+
+On Thu, 17 Sep 2015 01:32:40 +0800
+Jisheng Zhang <jszhang@marvell.com> wrote:
+
+> Currently, if cpuidle is disabled or not supported, powertop reports
+> zero wakeups and zero events. This is due to the cpu_idle tracepoints
+> are missing.
 > 
-> Signed-off-by: Gerhard Bertelsmann <info@gerhard-bertelsmann.de>
+> This patch is to make cpu_idle tracepoints always available even if
+> cpuidle is disabled or not supported.
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
+>  Since v1:
+>    - ignore arm_pm_idle.
+
+Something related: let's have a look at arch/arm/mach-omap2/pm34xx.c
+the omap3_pm_idle(void) function, it uses trace_cpu_idle(), should we
+use the _rcuidle version as below:
+
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 87b98bf9..b3bc972 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -301,11 +301,11 @@ static void omap3_pm_idle(void)
+ 	if (omap_irq_pending())
+ 		return;
+ 
+-	trace_cpu_idle(1, smp_processor_id());
++	trace_cpu_rcuidle(1, smp_processor_id());
+ 
+ 	omap_sram_idle();
+ 
+-	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
++	trace_cpu_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+ }
+ 
+ #ifdef CONFIG_SUSPEND
+
+
+
+>  arch/arm/kernel/process.c | 11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
 > 
->  .../devicetree/bindings/net/can/sun4i_can.txt      |  38 +
->  1 files changed, 389 insertions(+)
-> 
-> 
-> diff --git a/Documentation/devicetree/bindings/net/can/sun4i_can.txt b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
-> new file mode 100644
-> index 0000000..cd0f50c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/can/sun4i_can.txt
-> @@ -0,0 +1,38 @@
-> +Allwinner A10/A20 CAN controller Device Tree Bindings
-> +-----------------------------------------------------
-> +
-> +Required properties:
-> +- compatible: "allwinner,sun4i-a10-can"
-> +- reg: physical base address and size of the Allwinner A10/A20 CAN register map.
-> +- interrupts: interrupt specifier for the sole interrupt.
-> +- clock: phandle and clock specifier.
-> +
-> +
-> +Example
-> +-------
-> +
-> +SoC common .dtsi file:
-> +
-> +	can0_pins_a: can0 at 0 {
-> +		allwinner,pins = "PH20","PH21";
-> +		allwinner,function = "can";
-> +		allwinner,drive = <0>;
-> +		allwinner,pull = <0>;
-> +	};
-> +...
-> +	can0: can at 01c2bc00 {
-> +		compatible = "allwinner,sun4i-a10-can";
-> +		reg = <0x01c2bc00 0x400>;
-> +		interrupts = <0 26 4>;
-> +		clocks = <&apb1_gates 4>;
-> +		status = "disabled";
-> +	};
-
-What about adding this snippet to SoC where the CAN core is available?
-Maxime, what's the policy on sinxi? If you give me an Ack I'd like to
-take the series via linux-can-next (and to net-next) upstream.
-
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150917/b503fac9/attachment.sig>
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index 7a7c4ce..83d2dc5 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/random.h>
+>  #include <linux/hw_breakpoint.h>
+>  #include <linux/leds.h>
+> +#include <trace/events/power.h>
+>  
+>  #include <asm/processor.h>
+>  #include <asm/thread_notify.h>
+> @@ -66,11 +67,15 @@ void (*arm_pm_idle)(void);
+>  
+>  void arch_cpu_idle(void)
+>  {
+> -	if (arm_pm_idle)
+> +	if (arm_pm_idle) {
+>  		arm_pm_idle();
+> -	else
+> +		local_irq_enable();
+> +	} else {
+> +		trace_cpu_idle_rcuidle(1, smp_processor_id());
+>  		cpu_do_idle();
+> -	local_irq_enable();
+> +		local_irq_enable();
+> +		trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+> +	}
+>  }
+>  
+>  void arch_cpu_idle_prepare(void)
