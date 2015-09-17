@@ -1,49 +1,137 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 17 Sep 2015 12:00:03 +0200
-Subject: [PATCH 0/3] ALSA: hda - Avoid potential deadlock
-Message-ID: <1442484006-9614-1-git-send-email-thierry.reding@gmail.com>
+Date: Thu, 17 Sep 2015 12:00:06 +0200
+Subject: [PATCH 3/3] ALSA: hda: Do not rely on explicit module loading
+In-Reply-To: <1442484006-9614-1-git-send-email-thierry.reding@gmail.com>
+References: <1442484006-9614-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1442484006-9614-4-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-The Tegra HDA controller driver committed in v3.16 causes deadlocks when
-loaded as a module. The reason is that the driver core will lock the HDA
-controller device upon calling its probe callback and the probe callback
-then goes on to create child devices for detected codecs and loads their
-modules via a request_module() call. This is problematic because the new
-driver will immediately be bound to the device, which will in turn cause
-the parent of the codec device (the HDA controller device) to be locked
-again, causing a deadlock.
+With MODALIAS information being properly exported to userspace helpers,
+there is no need to explicitly request modules. Upon registration of new
+codec devices, userspace will know which kernel module to load.
 
-This problem seems to have been present since the modularization of the
-HD-audio driver in commit 1289e9e8b42f ("ALSA: hda - Modularize HD-audio
-driver"). On Intel platforms this has been worked around by splitting up
-the probe sequence into a synchronous and an asynchronous part where the
-request_module() calls are asynchronous and hence avoid the deadlock.
+This removes request_module() from the HDA controller's ->probe() path.
+Recursively loading a module this way causes a deadlock in the driver
+core because the HDA controller is locked as part of its own probe but
+probing its children (the HDA codec devices) will attempt to lock them
+again. In the past this has been worked around by splitting the probe
+into synchronous and asynchronous parts, where the request_module() is
+executed from a workqueue to avoid the deadlock.
 
-An alternative proposal is provided in this series of patches. Rather
-than relying on explicit request_module() calls to load kernel modules
-for HDA codec drivers, this implements a uevent callback for the HDA bus
-to advertises the MODALIAS information to the userspace helper.
+Since all the information necessary to let userspace load the proper
+kernel modules is now exported, there is no need for such workarounds
+anymore.
 
-Effectively this results in the same modules being loaded, but it uses
-the more canonical infrastructure to perform this. Deferring the module
-loading to userspace removes the need for the explicit request_module()
-calls and works around the recursive locking issue because both drivers
-will be bound from separate contexts.
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ sound/pci/hda/hda_bind.c | 80 ------------------------------------------------
+ 1 file changed, 80 deletions(-)
 
-Thierry
-
-Thierry Reding (3):
-  ALSA: hda/hdmi - Add missing MODALIAS information
-  ALSA: hda - Advertise MODALIAS in uevent
-  ALSA: hda: Do not rely on explicit module loading
-
- sound/hda/hda_bus_type.c   | 12 +++++++
- sound/pci/hda/hda_bind.c   | 80 ----------------------------------------------
- sound/pci/hda/patch_hdmi.c |  3 ++
- 3 files changed, 15 insertions(+), 80 deletions(-)
-
+diff --git a/sound/pci/hda/hda_bind.c b/sound/pci/hda/hda_bind.c
+index d5ac25cc7fee..bbc7e2081b0d 100644
+--- a/sound/pci/hda/hda_bind.c
++++ b/sound/pci/hda/hda_bind.c
+@@ -146,72 +146,6 @@ void hda_codec_driver_unregister(struct hda_codec_driver *drv)
+ }
+ EXPORT_SYMBOL_GPL(hda_codec_driver_unregister);
+ 
+-static inline bool codec_probed(struct hda_codec *codec)
+-{
+-	return device_attach(hda_codec_dev(codec)) > 0 && codec->preset;
+-}
+-
+-/* try to auto-load and bind the codec module */
+-static void codec_bind_module(struct hda_codec *codec)
+-{
+-#ifdef MODULE
+-	request_module("snd-hda-codec-id:%08x", codec->core.vendor_id);
+-	if (codec_probed(codec))
+-		return;
+-	request_module("snd-hda-codec-id:%04x*",
+-		       (codec->core.vendor_id >> 16) & 0xffff);
+-	if (codec_probed(codec))
+-		return;
+-#endif
+-}
+-
+-#if IS_ENABLED(CONFIG_SND_HDA_CODEC_HDMI)
+-/* if all audio out widgets are digital, let's assume the codec as a HDMI/DP */
+-static bool is_likely_hdmi_codec(struct hda_codec *codec)
+-{
+-	hda_nid_t nid;
+-
+-	for_each_hda_codec_node(nid, codec) {
+-		unsigned int wcaps = get_wcaps(codec, nid);
+-		switch (get_wcaps_type(wcaps)) {
+-		case AC_WID_AUD_IN:
+-			return false; /* HDMI parser supports only HDMI out */
+-		case AC_WID_AUD_OUT:
+-			if (!(wcaps & AC_WCAP_DIGITAL))
+-				return false;
+-			break;
+-		}
+-	}
+-	return true;
+-}
+-#else
+-/* no HDMI codec parser support */
+-#define is_likely_hdmi_codec(codec)	false
+-#endif /* CONFIG_SND_HDA_CODEC_HDMI */
+-
+-static int codec_bind_generic(struct hda_codec *codec)
+-{
+-	if (codec->probe_id)
+-		return -ENODEV;
+-
+-	if (is_likely_hdmi_codec(codec)) {
+-		codec->probe_id = HDA_CODEC_ID_GENERIC_HDMI;
+-#if IS_MODULE(CONFIG_SND_HDA_CODEC_HDMI)
+-		request_module("snd-hda-codec-hdmi");
+-#endif
+-		if (codec_probed(codec))
+-			return 0;
+-	}
+-
+-	codec->probe_id = HDA_CODEC_ID_GENERIC;
+-#if IS_MODULE(CONFIG_SND_HDA_GENERIC)
+-	request_module("snd-hda-codec-generic");
+-#endif
+-	if (codec_probed(codec))
+-		return 0;
+-	return -ENODEV;
+-}
+-
+ #if IS_ENABLED(CONFIG_SND_HDA_GENERIC)
+ #define is_generic_config(codec) \
+ 	(codec->modelname && !strcmp(codec->modelname, "generic"))
+@@ -241,25 +175,11 @@ int snd_hda_codec_configure(struct hda_codec *codec)
+ 	if (err < 0)
+ 		return err;
+ 
+-	if (!codec->preset)
+-		codec_bind_module(codec);
+-	if (!codec->preset) {
+-		err = codec_bind_generic(codec);
+-		if (err < 0) {
+-			codec_err(codec, "Unable to bind the codec\n");
+-			goto error;
+-		}
+-	}
+-
+ 	/* audio codec should override the mixer name */
+ 	if (codec->core.afg || !*codec->card->mixername)
+ 		snprintf(codec->card->mixername,
+ 			 sizeof(codec->card->mixername), "%s %s",
+ 			 codec->core.vendor_name, codec->core.chip_name);
+ 	return 0;
+-
+- error:
+-	snd_hdac_device_unregister(&codec->core);
+-	return err;
+ }
+ EXPORT_SYMBOL_GPL(snd_hda_codec_configure);
 -- 
 2.5.0
