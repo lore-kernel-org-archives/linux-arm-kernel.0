@@ -1,32 +1,22 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Thu, 17 Sep 2015 13:29:39 -0700
-Subject: [PATCH v8 1/3] usb: make xhci platform driver use 64 bit or 32
- bit DMA
-In-Reply-To: <6744567.5puXIbHVfS@wuerfel>
-References: <cover.1442513540.git.dhdang@apm.com>
- <41fbbb49c112705a8c14a342e98bd557c15c8f0c.1442513540.git.dhdang@apm.com>
- <6744567.5puXIbHVfS@wuerfel>
-Message-ID: <CADaLND=XynHAMxiCpvZhH7MyY+NrY3QW7JUiTarp_FgVpAHjJw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 17 Sep 2015 22:52:10 +0200
+Subject: [PATCH 4/4] i2c: stu300: Fix module autoload for OF platform
+ driver
+In-Reply-To: <20150917163647.GA26265@goodgumbo.baconseed.org>
+References: <20150917163647.GA26265@goodgumbo.baconseed.org>
+Message-ID: <CACRpkdb6NxPq07L_L9g_7mOX9c9LREM4o9nPUdbXTDid6S0PNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 12:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 17 September 2015 11:19:46 Duc Dang wrote:
->> The xhci platform driver needs to work on systems that
->> either only support 64-bit DMA or only support 32-bit DMA.
->> Attempt to set a coherent dma mask for 64-bit DMA, and
->> attempt again with 32-bit DMA if that fails.
->>
->> [dhdang: regenerate the patch over v4.3-rc1 and address new comments]
->> Signed-off-by: Mark Langsdorf <mlangsdo@redhat.com>
->> Tested-by: Mark Salter <msalter@redhat.com>
->> Signed-off-by: Duc Dang <dhdang@apm.com>
->>
+On Thu, Sep 17, 2015 at 6:36 PM, Luis de Bethencourt
+<luis@debethencourt.com> wrote:
+
+> This platform driver has a OF device ID table but the OF module
+> alias information is not created so module autoloading won't work.
 >
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
 
-Thanks, Arnd.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
--- 
-Regards,
-Duc Dang.
+Yours,
+Linus Walleij
