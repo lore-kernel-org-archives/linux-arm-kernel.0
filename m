@@ -1,44 +1,38 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Thu, 17 Sep 2015 16:58:01 -0700
-Subject: [PATCH 3/4] ARM: dts: Enable NAND support on bcm911360_entphn
-In-Reply-To: <1442534282-21356-1-git-send-email-rjui@broadcom.com>
-References: <1442534282-21356-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1442534282-21356-4-git-send-email-rjui@broadcom.com>
+Date: Thu, 17 Sep 2015 16:57:58 -0700
+Subject: [PATCH 0/4] Broadcom Cygnus device tree changes
+Message-ID: <1442534282-21356-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables NAND support on Broadcom Cygnus form factor board
-(bcm911360_entphn)
+This patch series cleans up the Broadcom Cygnus device tree files and makes it
+more consistent with the rest of Broadcom iProc device tree files. This patch
+series also enables various peripherals on Cygnus boards. They include:
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- arch/arm/boot/dts/bcm911360_entphn.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+bcm11360_entphn:
+NAND
 
-diff --git a/arch/arm/boot/dts/bcm911360_entphn.dts b/arch/arm/boot/dts/bcm911360_entphn.dts
-index f791a3b..8b3800f 100644
---- a/arch/arm/boot/dts/bcm911360_entphn.dts
-+++ b/arch/arm/boot/dts/bcm911360_entphn.dts
-@@ -60,3 +60,19 @@
- &uart3 {
- 	status = "okay";
- };
-+
-+&nand {
-+	nandcs at 1 {
-+		compatible = "brcm,nandcs";
-+		reg = <0>;
-+		nand-on-flash-bbt;
-+
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		nand-ecc-strength = <24>;
-+		nand-ecc-step-size = <1024>;
-+
-+		brcm,nand-oob-sector-size = <27>;
-+	};
-+};
+bcm958300k:
+touchscreen
+
+bcm958305k:
+I2C, PCIe, NAND, touchscreen
+
+Code is based on v4.3-rc1 and is available on GITHUB:
+https://github.com/Broadcom/cygnus-linux/tree/cygnus-dt-v1
+
+Ray Jui (4):
+  ARM: dts: clean up Cygnus DT files
+  ARM: dts: Enable various peripherals on bcm958305k
+  ARM: dts: Enable NAND support on bcm911360_entphn
+  ARM: dts: enable touchscreen support on Cygnus
+
+ arch/arm/boot/dts/bcm-cygnus.dtsi      | 337 +++++++++++++++++----------------
+ arch/arm/boot/dts/bcm911360_entphn.dts |  28 ++-
+ arch/arm/boot/dts/bcm911360k.dts       |  10 +-
+ arch/arm/boot/dts/bcm958300k.dts       |  45 ++---
+ arch/arm/boot/dts/bcm958305k.dts       |  41 +++-
+ 5 files changed, 257 insertions(+), 204 deletions(-)
+
 -- 
 1.9.1
