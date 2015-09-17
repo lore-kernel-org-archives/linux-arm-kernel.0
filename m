@@ -1,28 +1,53 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 17 Sep 2015 16:29:20 +0200 (CEST)
-Subject: [PATCH 2/2] ARM: irqchip: mxs: add Alpascale ASM9260 support
-In-Reply-To: <55FABD51.80305@rempel-privat.de>
-References: <201411281509.19170.arnd@arndb.de>
- <1417193454-31417-1-git-send-email-linux@rempel-privat.de>
- <1417193454-31417-3-git-send-email-linux@rempel-privat.de>
- <55FABD51.80305@rempel-privat.de>
-Message-ID: <alpine.DEB.2.11.1509171626030.3951@nanos>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Sep 2015 15:46:04 +0100
+Subject: [PATCH 1/8] KVM: arm64: add workaround for Cortex-A57 erratum #852523
+In-Reply-To: <1442501171-24484-1-git-send-email-marc.zyngier@arm.com>
+References: <1442501171-24484-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1442501171-24484-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Sep 2015, Oleksij Rempel wrote:
-> ping,
-> 
-> looks like this patches are lost.
+From: Will Deacon <will.deacon@arm.com>
 
-I said that a hundred times before. The proper mailinglist for
-drivers/irqchip patches is lkml. See MAINTAINERS.
+When restoring the system register state for an AArch32 guest at EL2,
+writes to DACR32_EL2 may not be correctly synchronised by Cortex-A57,
+which can lead to the guest effectively running with junk in the DACR
+and running into unexpected domain faults.
 
-That's where my filters run and I'm not going to collect stuff which
-comes in via some random other mailinglist.
+This patch works around the issue by re-ordering our restoration of the
+AArch32 register aliases so that they happen before the AArch64 system
+registers. Ensuring that the registers are restored in this order
+guarantees that they will be correctly synchronised by the core.
 
-Care to resend?
+Cc: <stable@vger.kernel.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/hyp.S | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Thanks,
-
-	tglx
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 8188f6a..39aa322 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -745,6 +745,9 @@ ENTRY(__kvm_vcpu_run)
+ 	// Guest context
+ 	add	x2, x0, #VCPU_CONTEXT
+ 
++	// We must restore the 32-bit state before the sysregs, thanks
++	// to Cortex-A57 erratum #852523.
++	restore_guest_32bit_state
+ 	bl __restore_sysregs
+ 
+ 	skip_debug_state x3, 1f
+@@ -752,7 +755,6 @@ ENTRY(__kvm_vcpu_run)
+ 	kern_hyp_va x3
+ 	bl	__restore_debug
+ 1:
+-	restore_guest_32bit_state
+ 	restore_guest_regs
+ 
+ 	// That's it, no more messing around.
+-- 
+2.1.4
