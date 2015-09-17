@@ -1,29 +1,44 @@
-From: nicoleotsuka@gmail.com (Nicolin Chen)
-Date: Thu, 17 Sep 2015 11:10:44 -0700
-Subject: [PATCH v2] audio: sai: Add Power Management support
-In-Reply-To: <20150917113123.GD12027@sirena.org.uk>
-References: <1442221404-35240-1-git-send-email-b18965@freescale.com>
- <20150917065732.GB54360@Asurada-CZ80>
- <BN3PR0301MB0867DCDF1F7F6391A94121B2FE5A0@BN3PR0301MB0867.namprd03.prod.outlook.com>
- <20150917113123.GD12027@sirena.org.uk>
-Message-ID: <20150917181043.GA3593@Asurada-CZ80>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Thu, 17 Sep 2015 20:12:31 +0200
+Subject: [PATCH v8 0/4] can: Allwinner A10/A20 CAN Controller support
+ - Summary
+In-Reply-To: <20150917175444.GJ4684@lukather>
+References: <1442402482-7118-1-git-send-email-info@gerhard-bertelsmann.de>
+ <20150917175444.GJ4684@lukather>
+Message-ID: <55FB028F.7070206@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 12:31:23PM +0100, Mark Brown wrote:
-> On Thu, Sep 17, 2015 at 09:53:57AM +0000, Huan Wang wrote:
-> > > On Mon, Sep 14, 2015 at 05:03:24PM +0800, Alison Wang wrote:
-> 
-> > > Just to remind that there was a similar patch in review that I just
-> > > acked. Please send your improvements as an incremental patch after that
-> > > one gets applied.
-> 
-> > [Alison Wang] Ok, I missed that patch.
-> 
-> Unless that patch has already been applied I'm not sure what it is but I
-> don't seem to have anything pending in my inbox.
 
-Zidan can later re-send his patch with my ack to the maillist.
 
-Thanks
-Nicolin
+On 17.09.2015 19:54, Maxime Ripard wrote:
+> On Wed, Sep 16, 2015 at 01:21:18PM +0200, Gerhard Bertelsmann wrote:
+>> Hi,
+>>
+>> please find attached the next version of my patch set. I have
+>> taken all remarks from Maxime Ripard into the new version
+>>
+>> Please review, test and report bugs if exists.
+>>
+>> The patchset applies to all recent Kernel versions (4.x, next etc.).
+>>
+>> [PATCH v8 1/4] Device Tree Binding Documentation
+>> [PATCH v8 2/4] Defconfig multi_v7
+>> [PATCH v8 3/4] Defconfig sunxi
+>> [PATCH v8 4/4] Kernel Module
+>
+> Applied 3 and 4.
+
+Applied to what tree?
+
+That's not the friendly way when Marc asks you about the documentation about 
+the device tree (patch 1) and you commit the CAN driver and the sunxi 
+defconfig (patch 3 & 4) that he mainly reviewed to whatever tree.
+
+New CAN drivers go via can-next and net-next into mainline.
+
+So please answer Marcs question and let him queue up the CAN driver via 
+can-next himself.
+
+Thanks,
+Oliver
