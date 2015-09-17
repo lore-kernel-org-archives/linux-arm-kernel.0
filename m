@@ -1,49 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Sep 2015 17:44:38 +0100
-Subject: [RFC PATCH v4 2/4] genirq: add move_irqs() for cpu hotplug
-In-Reply-To: <1442467166-1460-3-git-send-email-yangyingliang@huawei.com>
-References: <1442467166-1460-1-git-send-email-yangyingliang@huawei.com>
- <1442467166-1460-3-git-send-email-yangyingliang@huawei.com>
-Message-ID: <55FAEDF6.6060000@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 17 Sep 2015 18:53:15 +0200
+Subject: Recent GIC v1 patch
+In-Reply-To: <yw1xmvwlt48g.fsf@unicorn.mansr.com>
+References: <55FAE26A.9040609@free.fr> <yw1xmvwlt48g.fsf@unicorn.mansr.com>
+Message-ID: <55FAEFFB.9000905@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/09/15 06:19, Yang Yingliang wrote:
-> Add move_irqs() into kernel/irq/migration.c.
-> So we can use it to migrate interrupts, when
-> cpu is offline.
+On 17/09/2015 18:11, M?ns Rullg?rd wrote:
+
+> Mason writes:
 > 
-> Cc: Jiang Liu <jiang.liu@linux.intel.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
-> ---
->  include/linux/irq.h    |  4 +++
->  kernel/irq/migration.c | 66 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 70 insertions(+)
+>> Hello Thomas, Marc,
+>>
+>> Mans pointed me to a recent patch of yours.
+>> irqchip/gic: Use IRQD_FORWARDED_TO_VCPU flag
+>> Get rid of the handler_data abuse.
+>>
+>> I'm using a Cortex A9 based SoC. The platform's interrupt
+>> controller is cascaded into the GIC. I've been trying to
+>> get this to work for two weeks with no success.
+>>
+>> Details can be found here:
+>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/440327
+>>
+>> Do you think your patch my help with my situation?
 > 
-> diff --git a/include/linux/irq.h b/include/linux/irq.h
-> index 6f8b340..64e3a02 100644
-> --- a/include/linux/irq.h
-> +++ b/include/linux/irq.h
-> @@ -446,6 +446,10 @@ static inline void irq_move_irq(struct irq_data *data) { }
->  static inline void irq_move_masked_irq(struct irq_data *data) { }
->  #endif
->  
-> +#if defined(CONFIG_SMP) && defined(CONFIG_GENERIC_IRQ_MIGRATION) && defined(CONFIG_HOTPLUG_CPU)
-> +void move_irqs(void);
-> +#endif
-> +
+> Just try it and we'll know soon enough.
 
-I don't think having this prototype guarded by this #if is very useful.
-You can probably leave it standalone.
+I'll do that first thing tomorrow, but I wanted to bootstrap
+the process, in case someone in a different time zone could
+provide some insight.
 
-Thanks,
+By the way, am I using a unique setup?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Platform intc -> GICv1 -> Cortex A9
+
+Must be quite common, I don't see why I would hit a rare
+bug with a common setup...
+
+Regards.
