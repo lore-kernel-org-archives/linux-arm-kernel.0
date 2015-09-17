@@ -1,31 +1,40 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 18 Sep 2015 00:42:40 +0200
-Subject: [PATCH v2] ARM: dts: rockchip: Add dtb for the Radxa Rock 2
- Square board
-In-Reply-To: <1442300242-510-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1442300242-510-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <2262570.nZrIWP6lhh@diego>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 17 Sep 2015 19:57:48 -0300
+Subject: i.MX27 device tree
+In-Reply-To: <55FB2AC4.4070907@phoenixsoftware.it>
+References: <55FB2AC4.4070907@phoenixsoftware.it>
+Message-ID: <CAOMZO5BNQ3NyywH6YGydYZbZsfWhG_8RqbESibUxTPMY_7hvdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sjoerd,
+On Thu, Sep 17, 2015 at 6:04 PM, Pierluigi Passaro
+<pierluigi.passaro@phoenixsoftware.it> wrote:
+> Hi all,
+> I do need to test latest 4.1 kernel on i.MX27 PDK, but I'm not able to find
+> any bootloader providinfg dts support.
+>
+> Could you give any suggestion?
 
-Am Dienstag, 15. September 2015, 08:57:21 schrieb Sjoerd Simons:
-> The Radxa Rock 2 Square board is a combination of the Radxa Rock 2 SoM
-> with the Square baseboard. Add a dtsi for the SoM which can be included
-> into the dts for the various baseboards (e.g. full and square) and a dts
-> for the square board.
-> 
-> Currently supported are serial console, wired networking, hdmi output,
-> eMMC and SD storage and USB.
-> 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+You can use Redboot to boot a mainline kernel on mx27pdk.
 
-applied to my dts32 branch for 4.4 with the following small changes:
+make imx_v4_v5_defconfig
+make menuconfig
 
-- &vop{b/l}(_mmu) nodes only in the som.dtsi
-  -> removed duplicates
-- moved &tsadc and &wdt to alphabetical order
+Boot options--->
 
+then select:
 
-Heiko
+[*] Use appended device tree blob to zImage (EXPERIMENTAL)
+[*]   Supplement the appended DTB with traditional ATAG information
+
+Build the kernel: make
+Build the dtb: make imx27-pdk.dtb
+
+Append the dtb to the kernel:
+cat arch/arm/boot/zImage arch/arm/boot/dtb/imx27_pdk.dtb > zImage_combined
+
+Rename zImage_combined to zImage and then boot it as it were a normal zImage.
+
+Regards,
+
+Fabio Estevam
