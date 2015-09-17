@@ -1,62 +1,32 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 17 Sep 2015 13:17:35 +0200
-Subject: [PATCH 2/3] arm64: KVM: Disable virtual timer even if the guest
- is not using it
-In-Reply-To: <1442419087-24648-3-git-send-email-marc.zyngier@arm.com>
-References: <1442419087-24648-1-git-send-email-marc.zyngier@arm.com>
- <1442419087-24648-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150917111735.GA19365@cbox>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 17 Sep 2015 12:17:36 +0100
+Subject: [PATCH v2] arm64: Introduce IRQ stack
+In-Reply-To: <1442155337-7020-1-git-send-email-jungseoklee85@gmail.com>
+References: <1442155337-7020-1-git-send-email-jungseoklee85@gmail.com>
+Message-ID: <20150917111735.GN25444@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 04:58:06PM +0100, Marc Zyngier wrote:
-> When running a guest with the architected timer disabled (with QEMU and
-> the kernel_irqchip=off option, for example), it is important to make
-> sure the timer gets turned off. Otherwise, the guest may try to
-> enable it anyway, leading to a screaming HW interrupt.
+On Sun, Sep 13, 2015 at 02:42:17PM +0000, Jungseok Lee wrote:
+> Currently, kernel context and interrupts are handled using a single
+> kernel stack navigated by sp_el1. This forces many systems to use
+> 16KB stack, not 8KB one. Low memory platforms naturally suffer from
+> memory pressure accompanied by performance degradation.
 > 
-> The fix is to unconditionally turn off the virtual timer on guest
-> exit.
+> This patch addresses the issue as introducing a separate percpu IRQ
+> stack to handle both hard and soft interrupts with two ground rules:
 > 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/hyp.S | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>   - Utilize sp_el0 in EL1 context, which is not used currently
+>   - Do not complicate current_thread_info calculation
 > 
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index 6addf97..38f5434 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -570,8 +570,6 @@ alternative_endif
+> It is a core concept to trace struct thread_info using sp_el0 instead
+> of sp_el1. This approach helps arm64 align with other architectures
+> regarding object_is_on_stack() without additional complexity.
 
-The context confuses me; did you happen to base this on your VHE
-patches?
+I'm still trying to understand how this patch works. I initially thought
+that we would set SPSel = 0 while in kernel thread mode to make use of
+SP_EL0 but I can't find any such code. Do you still use SP_EL1 all the
+time and SP_EL0 just for temporary saving the thread stack?
 
->  	mrs	x3, cntv_ctl_el0
->  	and	x3, x3, #3
->  	str	w3, [x0, #VCPU_TIMER_CNTV_CTL]
-> -	bic	x3, x3, #1		// Clear Enable
-> -	msr	cntv_ctl_el0, x3
->  
->  	isb
->  
-> @@ -579,6 +577,8 @@ alternative_endif
->  	str	x3, [x0, #VCPU_TIMER_CNTV_CVAL]
->  
->  1:
-> +	msr	cntv_ctl_el0, xzr
-> +
-
-We could have a comment here, but ok.
-
->  	// Allow physical timer/counter access for the host
->  	mrs	x2, cnthctl_el2
->  	orr	x2, x2, #3
-> -- 
-> 2.1.4
-> 
-
-Otherwise:
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+-- 
+Catalin
