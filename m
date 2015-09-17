@@ -1,41 +1,29 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 17 Sep 2015 14:45:56 +0100
-Subject: [PATCH v2 6/7] ARM: STi: STiH407: Enable the 2 HW Random Number
- Generators for STiH4{07, 10}
+Date: Thu, 17 Sep 2015 14:45:57 +0100
+Subject: [PATCH v2 7/7] MAINTAINERS: Add ST's Random Number Generator to the
+ ST entry
 In-Reply-To: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
 References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1442497557-9271-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1442497557-9271-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih407-family.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 838b812..9452b42 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -565,5 +565,19 @@
- 						  <&phy_port2 PHY_TYPE_USB3>;
- 			};
- 		};
-+
-+		rng10: rng at 08a89000 {
-+			compatible      = "st,rng";
-+			reg		= <0x08a89000 0x1000>;
-+			clocks          = <&clk_sysin>;
-+			status		= "okay";
-+		};
-+
-+		rng11: rng at 08a8a000 {
-+			compatible      = "st,rng";
-+			reg		= <0x08a8a000 0x1000>;
-+			clocks          = <&clk_sysin>;
-+			status		= "okay";
-+		};
- 	};
- };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index fd60784..b084d69 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1502,6 +1502,7 @@ W:	http://www.stlinux.com
+ S:	Maintained
+ F:	arch/arm/mach-sti/
+ F:	arch/arm/boot/dts/sti*
++F:	drivers/char/hw_random/st-rng.c
+ F:	drivers/clocksource/arm_global_timer.c
+ F:	drivers/i2c/busses/i2c-st.c
+ F:	drivers/media/rc/st_rc.c
 -- 
 1.9.1
