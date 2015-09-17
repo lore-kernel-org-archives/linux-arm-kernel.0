@@ -1,74 +1,97 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Thu, 17 Sep 2015 10:38:19 +0800
-Subject: [PATCH v3 3/6] iommu: add ARM short descriptor page table
- allocator.
-In-Reply-To: <20150916125535.GI28771@arm.com>
-References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
- <1437037475-9065-4-git-send-email-yong.wu@mediatek.com>
- <20150721171101.GN31095@arm.com> <1442233500.19588.35.camel@mhfsdcap03>
- <20150916125535.GI28771@arm.com>
-Message-ID: <1442457499.8145.23.camel@mhfsdcap03>
+From: xerofoify@gmail.com (nick)
+Date: Wed, 16 Sep 2015 22:48:07 -0400
+Subject: [PATCH] mach-s3c64xx:Fix error handling for certain calls to
+ s3c_gpio_cfgpin_range in the file dev-audio.c
+In-Reply-To: <55FA1FEE.5070506@samsung.com>
+References: <1442454673-26752-1-git-send-email-xerofoify@gmail.com>
+ <55FA1FEE.5070506@samsung.com>
+Message-ID: <55FA29E7.1070902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-09-16 at 13:55 +0100, Will Deacon wrote:
-> Hello Yong,
-> 
-> On Mon, Sep 14, 2015 at 01:25:00PM +0100, Yong Wu wrote:
-> > On Tue, 2015-07-21 at 18:11 +0100, Will Deacon wrote:
-> > > > +       ret = _arm_short_map(data, iova, paddr, pgdprot, pteprot, large);
-> > > > +
-> > > > +       tlb->tlb_add_flush(iova, size, true, data->iop.cookie);
-> > > > +       tlb->tlb_sync(data->iop.cookie);
-> > > 
-> > > In _arm_short_map, it looks like you can only go from invalid -> valid,
-> > > so why do you need to flush the TLB here?
-> > 
-> > Hi Will,
-> >    Here is about flush-tlb after map iova, I have deleted it in v4
-> > following this suggestion. But We meet a problem about it.
-> 
-> Ok.
-> 
-> > Take a example with JPEG. the test steps is:
-> > a).JPEG HW decode a picture with the source iova,like 0xfd780000.
-> > b).JPEG HW decode done, It will unmap the iova(write 0 in pagetable and
-> > flush tlb).
-> > c).JPEG HW decode the second picture, whose source iova is also
-> > 0xfd780000.
-> >    Then our HW maybe fail due to it will auto prefetch, It may prefecth
-> > between the step b) and c). then the HW may fetch the pagetable content
-> > which has been unmapped in step b). then the HW will get the iova's
-> > physical address is 0, It will translation fault!
-> 
-> Oh no! So-called "negative caching" is certainly prohibited by the ARM
-> architecture, but if you've built it then we can probably work around it
-> as an additional quirk. I assume the prefetcher stops prefetching when
-> it sees an invalid descriptor?
 
-Yes, If it's a invalid descriptor, the HW will stop prefetch.
 
+On 2015-09-16 10:05 PM, Krzysztof Kozlowski wrote:
+> On 17.09.2015 10:51, Nicholas Krause wrote:
+>> This fixes error handling for calls to the function
+>> s3c_gpio_cfgpin_range in the file dev-audio.c that
+>> assume calls to this particular function always run
+>> successfully to properly check now if these calls
+>> fail by returning a error code and if so return it
+>> directly to the call of these functions in order for
+>> the caller to be able to handle these failed calls in
+>> its own error path(s).
+>>
+>> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+>> ---
+>>  arch/arm/mach-s3c64xx/dev-audio.c | 12 +++++++-----
+>>  1 file changed, 7 insertions(+), 5 deletions(-)
 > 
-> >     So I think our HW need flush-tlb after map iova. Could we add a
-> > QUIRK like "IO_PGTABLE_QUIRK_AUTO_PREFETCH_ENABLE" for it?
-> > If it's not allowed, we will have to add this in our internal function
-> > mtk_iommu_map of mtk_iommu.c.
+> I am assuming (from the past events) that you did not test the patch and
+> how returning the error condition affects rest of the code. In the same
+> time you ignored my request to mark such patches with Request-For-Test.
 > 
-> Actually, this type of quirk is ringing bells with me (I think another
-> IOMMU needed something similar in the past), so maybe just add
-> IO_PGTABLE_QUIRK_TLBI_ON_MAP?
-
-Thanks. I will add it like:
-//=====================
-ret = _arm_short_map(data, iova, paddr, pgdprot, pteprot, large);
-
-if (data->iop.cfg.quirk & IO_PGTABLE_QUIRK_TLBI_ON_MAP) {
-	tlb->tlb_add_flush(iova, size, true, data->iop.cookie);
-	tlb->tlb_sync(data->iop.cookie);
-}
-//======================
-It will flush-tlb every time after map-iova. then the HW will fetch the
-new PA from the dram.
-
+I will resend with a better commit message but testing is really difficult 
+as that would require me to have a device for all the drivers I am currently
+writing for. However I will be glad to put a Request-For-Test and a better 
+commit message in a v2 to show I didn't write this blindly.
+Sorry,
+Nick
+> Please send it after testing.
 > 
-> Will
+> Commit message is hard to understand, please re-phrase so it would be
+> easily to find how this affects upper layers.
+> 
+> As you are banned on LKML, the patch needs thorough testing and review
+> before applying.
+> 
+> Best regards,
+> Krzysztof
+> 
+>>
+>> diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
+>> index ff780a8..81fabdb 100644
+>> --- a/arch/arm/mach-s3c64xx/dev-audio.c
+>> +++ b/arch/arm/mach-s3c64xx/dev-audio.c
+>> @@ -27,6 +27,7 @@
+>>  static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+>>  {
+>>  	unsigned int base;
+>> +	int ret;
+>>  
+>>  	switch (pdev->id) {
+>>  	case 0:
+>> @@ -47,9 +48,9 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+>>  		return -EINVAL;
+>>  	}
+>>  
+>> -	s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+>> -
+>> -	return 0;
+>> +	ret = s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+>> +
+>> +	return ret;
+>>  }
+>>  
+>>  static struct resource s3c64xx_iis0_resource[] = {
+>> @@ -122,6 +123,7 @@ EXPORT_SYMBOL(s3c64xx_device_iisv4);
+>>  static int s3c64xx_pcm_cfg_gpio(struct platform_device *pdev)
+>>  {
+>>  	unsigned int base;
+>> +	int ret;
+>>  
+>>  	switch (pdev->id) {
+>>  	case 0:
+>> @@ -136,8 +138,8 @@ static int s3c64xx_pcm_cfg_gpio(struct platform_device *pdev)
+>>  		return -EINVAL;
+>>  	}
+>>  
+>> -	s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(2));
+>> -	return 0;
+>> +	ret = s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(2));
+>> +	return ret;
+>>  }
+>>  
+>>  static struct resource s3c64xx_pcm0_resource[] = {
+>>
+> 
