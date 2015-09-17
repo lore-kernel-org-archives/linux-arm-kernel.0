@@ -1,60 +1,99 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Thu, 17 Sep 2015 22:22:26 +0900
-Subject: [PATCH v2] arm64: Introduce IRQ stack
-In-Reply-To: <3C2C78B3-4669-4DBA-98DC-362EB762FD9C@gmail.com>
-References: <1442155337-7020-1-git-send-email-jungseoklee85@gmail.com>
- <20150917111735.GN25444@e104818-lin.cambridge.arm.com>
- <3C2C78B3-4669-4DBA-98DC-362EB762FD9C@gmail.com>
-Message-ID: <CFF333D1-E771-4C50-902A-444DAE76C163@gmail.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 17 Sep 2015 14:57:15 +0200
+Subject: [PATCH v5 21/23] driver core: Allow deferring probes until late init
+In-Reply-To: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1442494637-3674-22-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sep 17, 2015, at 10:17 PM, Jungseok Lee wrote:
-> On Sep 17, 2015, at 8:17 PM, Catalin Marinas wrote:
-> 
-> Hi Catalin,
-> 
->> On Sun, Sep 13, 2015 at 02:42:17PM +0000, Jungseok Lee wrote:
->>> Currently, kernel context and interrupts are handled using a single
->>> kernel stack navigated by sp_el1. This forces many systems to use
->>> 16KB stack, not 8KB one. Low memory platforms naturally suffer from
->>> memory pressure accompanied by performance degradation.
->>> 
->>> This patch addresses the issue as introducing a separate percpu IRQ
->>> stack to handle both hard and soft interrupts with two ground rules:
->>> 
->>> - Utilize sp_el0 in EL1 context, which is not used currently
->>> - Do not complicate current_thread_info calculation
->>> 
->>> It is a core concept to trace struct thread_info using sp_el0 instead
->>> of sp_el1. This approach helps arm64 align with other architectures
->>> regarding object_is_on_stack() without additional complexity.
->> 
->> I'm still trying to understand how this patch works. I initially thought
->> that we would set SPSel = 0 while in kernel thread mode to make use of
->> SP_EL0 but I can't find any such code. Do you still use SP_EL1 all the
->> time and SP_EL0 just for temporary saving the thread stack?
-> 
-> Exactly.
-> 
-> My first approach was to set SPSel = 0 and implement EL1t Sync and IRQ.
-> This idea originally comes from your comment [1]. A kernel thread could
-> be handled easily and neatly, but it complicated current_thread_info
-> calculation due to a user process.
-> 
-> Let's assume that a kernel thread uses SP_EL0 by default. When an interrupt
-> comes in, a core jumps to EL1t IRQ. In case of a user process, a CPU goes
-> into EL1h IRQ when an interrupt raises. To handle this scenario correctly,
-> SPSel or spsr_el1 should be referenced. This reaches to quite big overhead
-> in current_thread_info function.
+Add a field to struct device that instructs the device-driver core to
+defer the probe of this device until the late_initcall level.
 
-This statement is described incorrectly. In case of user process, a CPU goes
-into EL0 IRQ. Under this context, another interrupt could come in. At this
-time, a core jumps to EL1h IRQ.
+By letting all built-in drivers to register before starting to probe, we
+can avoid any deferred probes by probing dependencies on demand.
 
-My original intention is to describe this situation.
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-Sorry for confusion.
+---
 
-Best Regards
-Jungseok Lee
+Changes in v5: None
+Changes in v4:
+- Add Kconfig DELAY_DEVICE_PROBES to allow disabling delayed probing in
+  machines with initcalls that depend on devices probing at a given time.
+
+Changes in v3: None
+Changes in v2: None
+
+ drivers/base/Kconfig   | 18 ++++++++++++++++++
+ drivers/base/dd.c      |  7 +++++++
+ include/linux/device.h |  2 ++
+ 3 files changed, 27 insertions(+)
+
+diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+index 98504ec99c7d..44b5d33b1f49 100644
+--- a/drivers/base/Kconfig
++++ b/drivers/base/Kconfig
+@@ -324,4 +324,22 @@ config CMA_ALIGNMENT
+ 
+ endif
+ 
++config DELAY_DEVICE_PROBES
++	bool "Allow delaying the probe of some devices"
++	default y
++	help
++	  Devices can be matched to a driver and probed from the moment they
++	  are registered, but early during boot their probes are likely to be
++	  deferred because some dependency isn't available yet because most
++	  drivers haven't been registered yet.
++
++	  Enabling this option allows the device registration code to delay the
++	  probing of a specific device until device_initcall_sync, when all
++	  built-in drivers have been registered already.
++
++	  In some platforms there may be implicit assumptions about when some
++	  devices are probed, so enabling this option could cause problems there.
++
++	  If unsure, say Y here.
++
+ endmenu
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index 5caa8478404d..300c59562fc9 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -417,6 +417,13 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
+ 	if (!device_is_registered(dev))
+ 		return -ENODEV;
+ 
++#if IS_ENABLED(CONFIG_DELAY_DEVICE_PROBES)
++	if (!driver_deferred_probe_enable && dev->probe_late) {
++		driver_deferred_probe_add(dev);
++		return 0;
++	}
++#endif
++
+ 	pr_debug("bus: '%s': %s: matched device %s with driver %s\n",
+ 		 drv->bus->name, __func__, dev_name(dev), drv->name);
+ 
+diff --git a/include/linux/device.h b/include/linux/device.h
+index d8be07bc9c3f..fe5c50ffd7d3 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -748,6 +748,7 @@ struct device_dma_parameters {
+  *
+  * @offline_disabled: If set, the device is permanently online.
+  * @offline:	Set after successful invocation of bus type's .offline().
++ * @probe_late:	If set, device will be probed in the late initcall level.
+  *
+  * At the lowest level, every device in a Linux system is represented by an
+  * instance of struct device. The device structure contains the information
+@@ -832,6 +833,7 @@ struct device {
+ 
+ 	bool			offline_disabled:1;
+ 	bool			offline:1;
++	bool			probe_late:1;
+ };
+ 
+ static inline struct device *kobj_to_dev(struct kobject *kobj)
+-- 
+2.4.3
