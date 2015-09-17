@@ -1,262 +1,113 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Thu, 17 Sep 2015 11:00:58 -0700
-Subject: [PATCH 1/2] Docs: dt: Add PCI MSI map bindings
+Date: Thu, 17 Sep 2015 11:00:59 -0700
+Subject: [PATCH 2/2] irqchip/gicv3-its: Handle OF device tree "msi-map"
+ properties.
 In-Reply-To: <1442512859-31633-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1442512859-31633-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1442512859-31633-2-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1442512859-31633-3-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+From: David Daney <david.daney@cavium.com>
 
-Currently msi-parent is used by a few bindings to describe the
-relationship between a PCI root complex and a single MSI controller, but
-this property does not have a generic binding document.
+Search up the device hierarchy to find devices with a "msi-map"
+property, if found apply the mapping to the GIC device id.
 
-Additionally, msi-parent is insufficient to describe more complex
-relationships between MSI controllers and devices under a root complex,
-where devices may be able to target multiple MSI controllers, or where
-MSI controllers use (non-probeable) sideband information to distinguish
-devices.
-
-This patch adds a generic binding for mapping PCI devices to MSI
-controllers. This document covers msi-parent, and a new msi-map property
-(specific to PCI*) which may be used to map devices (identified by their
-Requester ID) to sideband data for each MSI controller that they may
-target.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- Documentation/devicetree/bindings/pci/pci-msi.txt | 220 ++++++++++++++++++++++
- 1 file changed, 220 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/pci-msi.txt
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c | 73 ++++++++++++++++++++++++++++++++
+ 1 file changed, 73 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/pci-msi.txt b/Documentation/devicetree/bindings/pci/pci-msi.txt
-new file mode 100644
-index 0000000..9b3cc81
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/pci-msi.txt
-@@ -0,0 +1,220 @@
-+This document describes the generic device tree binding for describing the
-+relationship between PCI devices and MSI controllers.
+diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+index cf351c6..aa61cef 100644
+--- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
++++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+@@ -73,6 +73,8 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
+ 	struct pci_dev *pdev;
+ 	struct its_pci_alias dev_alias;
+ 	struct msi_domain_info *msi_info;
++	struct device *parent_dev;
++	struct device_node *msi_controller_node = NULL;
+ 
+ 	if (!dev_is_pci(dev))
+ 		return -EINVAL;
+@@ -84,6 +86,77 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
+ 	dev_alias.count = nvec;
+ 
+ 	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
++	/*
++	 * Walk up the device parent links looking for one with a
++	 * "msi-map" property.
++	 */
++	for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent) {
++		u32 msi_mask, masked_devid;
++		u32 rid_base, msi_base, rid_len, phandle;
++		int msi_map_len;
++		const __be32 *msi_map;
++		bool matched;
 +
-+Each PCI device under a root complex is uniquely identified by its Requester ID
-+(AKA RID). A Requester ID is a triplet of a Bus number, Device number, and
-+Function number.
++		if (!parent_dev->of_node)
++			continue;
 +
-+For the purpose of this document, when treated as a numeric value, a RID is
-+formatted such that:
++		msi_map = of_get_property(parent_dev->of_node,
++					  "msi-map", &msi_map_len);
++		if (!msi_map)
++			continue;
 +
-+* Bits [15:8] are the Bus number.
-+* Bits [7:3] are the Device number.
-+* Bits [2:0] are the Function number.
-+* Any other bits required for padding must be zero.
-+
-+MSIs may be distinguished in part through the use of sideband data accompanying
-+writes. In the case of PCI devices, this sideband data may be derived from the
-+Requester ID. A mechanism is required to associate a device with both the MSI
-+controllers it can address, and the sideband data that will be associated with
-+its writes to those controllers.
-+
-+For generic MSI bindings, see
-+Documentation/devicetree/bindings/interrupt-controller/msi.txt.
-+
-+
-+PCI root complex
-+================
-+
-+Optional properties
-+-------------------
-+
-+- msi-map: Maps a Requester ID to an MSI controller and associated
-+  msi-specifier data. The property is an arbitrary number of tuples of
-+  (rid-base,msi-controller,msi-base,length), where:
-+
-+  * rid-base is a single cell describing the first RID matched by the entry.
-+
-+  * msi-controller is a single phandle to an MSI controller
-+
-+  * msi-base is an msi-specifier describing the msi-specifier produced for the
-+    first RID matched by the entry.
-+
-+  * length is a single cell describing how many consecutive RIDs are matched
-+    following the rid-base.
-+
-+  Any RID r in the interval [rid-base, rid-base + length) is associated with
-+  the listed msi-controller, with the msi-specifier (r - rid-base + msi-base).
-+
-+- msi-map-mask: A mask to be applied to each Requester ID prior to being mapped
-+  to an msi-specifier per the msi-map property.
-+
-+- msi-parent: Describes the MSI parent of the root complex itself. Where
-+  the root complex and MSI controller do not pass sideband data with MSI
-+  writes, this property may be used to describe the MSI controller(s)
-+  used by PCI devices under the root complex, if defined as such in the
-+  binding for the root complex.
-+
-+
-+Example (1)
-+===========
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	msi: msi-controller at a {
-+		reg = <0xa 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
-+	};
-+
-+	pci: pci at f {
-+		reg = <0xf 0x1>;
-+		compatible = "vendor,pcie-root-complex";
-+		device_type = "pci";
++		/* The default is to select all bits. */
++		msi_mask = 0xffffffff;
 +
 +		/*
-+		 * The sideband data provided to the MSI controller is
-+		 * the RID, identity-mapped.
++		 * Can be overridden by "msi-mask" property.  If
++		 * of_property_read_u32() fails, the default is
++		 * used.
 +		 */
-+		msi-map = <0x0 &msi_a 0x0 0x10000>,
-+	};
-+};
++		of_property_read_u32(parent_dev->of_node,
++				     "msi-mask", &msi_mask);
 +
++		masked_devid = msi_mask & dev_alias.dev_id;
++		matched = false;
++		while (msi_map_len >= 4 * sizeof(__be32)) {
++			rid_base = be32_to_cpup(msi_map + 0);
++			phandle = be32_to_cpup(msi_map + 1);
++			msi_base = be32_to_cpup(msi_map + 2);
++			rid_len = be32_to_cpup(msi_map + 3);
 +
-+Example (2)
-+===========
++			if (masked_devid < rid_base ||
++			    masked_devid >= rid_base + rid_len) {
++				msi_map_len -= 4 * sizeof(__be32);
++				msi_map += 4;
++				continue;
++			}
++			matched = true;
++			break;
++		}
++		if (!matched) {
++			dev_err(dev,
++				"No match in \"msi-map\" of %s for dev_id: %x\n",
++				dev_name(parent_dev), dev_alias.dev_id);
++			break;
++		}
 +
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	msi: msi-controller at a {
-+		reg = <0xa 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
-+	};
-+
-+	pci: pci at f {
-+		reg = <0xf 0x1>;
-+		compatible = "vendor,pcie-root-complex";
-+		device_type = "pci";
-+
-+		/*
-+		 * The sideband data provided to the MSI controller is
-+		 * the RID, masked to only the device and function bits.
-+		 */
-+		msi-map = <0x0 &msi_a 0x0 0x100>,
-+		msi-map-mask = <0xff>
-+	};
-+};
-+
-+
-+Example (3)
-+===========
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	msi: msi-controller at a {
-+		reg = <0xa 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
-+	};
-+
-+	pci: pci at f {
-+		reg = <0xf 0x1>;
-+		compatible = "vendor,pcie-root-complex";
-+		device_type = "pci";
-+
-+		/*
-+		 * The sideband data provided to the MSI controller is
-+		 * the RID, but the high bit of the bus number is
-+		 * ignored.
-+		 */
-+		msi-map = <0x0000 &msi 0x0000 0x8000>,
-+			  <0x8000 &msi 0x0000 0x8000>;
-+	};
-+};
-+
-+
-+Example (4)
-+===========
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	msi: msi-controller at a {
-+		reg = <0xa 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
-+	};
-+
-+	pci: pci at f {
-+		reg = <0xf 0x1>;
-+		compatible = "vendor,pcie-root-complex";
-+		device_type = "pci";
-+
-+		/*
-+		 * The sideband data provided to the MSI controller is
-+		 * the RID, but the high bit of the bus number is
-+		 * negated.
-+		 */
-+		msi-map = <0x0000 &msi 0x8000 0x8000>,
-+			  <0x8000 &msi 0x0000 0x8000>;
-+	};
-+};
-+
-+
-+Example (5)
-+===========
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	msi_a: msi-controller at a {
-+		reg = <0xa 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
-+	};
-+
-+	msi_b: msi-controller at b {
-+		reg = <0xb 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
-+	};
-+
-+	msi_c: msi-controller at c {
-+		reg = <0xc 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
-+	};
-+
-+	pci: pci at c {
-+		reg = <0xf 0x1>;
-+		compatible = "vendor,pcie-root-complex";
-+		device_type = "pci";
-+
-+		/*
-+		 * The sideband data provided to MSI controller a is the
-+		 * RID, but the high bit of the bus number is negated.
-+		 * The sideband data provided to MSI controller b is the
-+		 * RID, identity-mapped.
-+		 * MSI controller c is not addressable.
-+		 */
-+		msi-map = <0x0000 &msi_a 0x8000 0x08000>,
-+			  <0x8000 &msi_a 0x0000 0x08000>,
-+			  <0x0000 &msi_b 0x0000 0x10000>;
-+	};
-+};
++		msi_controller_node = of_find_node_by_phandle(phandle);
++		if (domain->of_node != msi_controller_node) {
++			dev_err(dev,
++				"ERROR: msi-map mismatch \"%s\" vs. \"%s\"\n",
++				domain->of_node->full_name,
++				msi_controller_node ? NULL : msi_controller_node->full_name);
++			break;
++		}
++		dev_dbg(dev,
++			"msi-map at: %s, len: %d, using mask %08x, rid: %08x, msi: %08x, rid_len: %08x, dev_id: %08x\n",
++			dev_name(parent_dev), msi_map_len, msi_mask, rid_base,
++			msi_base, rid_len, dev_alias.dev_id);
++		dev_alias.dev_id = masked_devid + msi_base;
++		dev_dbg(dev, "New dev_id: %08x\n", dev_alias.dev_id);
++		break;
++	}
++	of_node_put(msi_controller_node);
+ 
+ 	/* ITS specific DeviceID, as the core ITS ignores dev. */
+ 	info->scratchpad[0].ul = dev_alias.dev_id;
 -- 
 1.9.1
