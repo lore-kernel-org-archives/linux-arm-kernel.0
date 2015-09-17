@@ -1,93 +1,66 @@
-From: xerofoify@gmail.com (nick)
-Date: Thu, 17 Sep 2015 06:52:22 -0400
-Subject: [PATCH RFT] mach-s3c64xx:Fix error handling for certain calls to
- s3c_gpio_cfgpin_range in the file dev-audio.c
-In-Reply-To: <20150917102319.GL21084@n2100.arm.linux.org.uk>
-References: <1442458835-25520-1-git-send-email-xerofoify@gmail.com>
- <20150917102319.GL21084@n2100.arm.linux.org.uk>
-Message-ID: <55FA9B66.6020000@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 17 Sep 2015 12:57:53 +0200
+Subject: [PATCH 1/3] clocksource: rockchip: Make the driver more
+ readability and compatible
+In-Reply-To: <alpine.DEB.2.11.1509171217080.3951@nanos>
+References: <1442476272-31723-1-git-send-email-wxt@rock-chips.com>
+ <1442476272-31723-2-git-send-email-wxt@rock-chips.com>
+ <55FA83D5.9010504@linaro.org> <55FA87AA.4040807@gmail.com>
+ <55FA9099.7000903@linaro.org> <alpine.DEB.2.11.1509171217080.3951@nanos>
+Message-ID: <55FA9CB1.8010402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/17/2015 12:19 PM, Thomas Gleixner wrote:
+> On Thu, 17 Sep 2015, Daniel Lezcano wrote:
+>> On 09/17/2015 11:28 AM, Caesar Wang wrote:
+>>>> I think the NO_IRQ definition is missing for ARM64.
+>>>
+>>> Yep, Maybe better to compatible if we don't use the 'NO_IRQ',
+>>
+>> Hmm, after digging into drivers/of/irq.c and kernel/irq/irqdomain.c
+>>
+>> when there is an error it returns zero. So NO_IRQ and -1 are not correct and
+>> on the other side zero can be a valid irq. That sounds a little bit fuzzy to
+>> me.
+>
+> IRQ0 is invalid for historical reasons. End of story.
 
+Hi Thomas,
 
-On 2015-09-17 06:23 AM, Russell King - ARM Linux wrote:
-> On Wed, Sep 16, 2015 at 11:00:35PM -0400, Nicholas Krause wrote:
->> diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
->> index ff780a8..81fabdb 100644
->> --- a/arch/arm/mach-s3c64xx/dev-audio.c
->> +++ b/arch/arm/mach-s3c64xx/dev-audio.c
->> @@ -27,6 +27,7 @@
->>  static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
->>  {
->>  	unsigned int base;
->> +	int ret;
->>  
->>  	switch (pdev->id) {
->>  	case 0:
->> @@ -47,9 +48,9 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
->>  		return -EINVAL;
->>  	}
->>  
->> -	s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
->> -
->> -	return 0;
->> +	ret = s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
->> +
->> +	return ret;
-> 
-> Let's look at the code:
-> 
->         case 2:
->                 s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5));
->                 s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5));
->                 s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5));
->                 s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));
->                 return 0;
->         default:
->                 printk(KERN_DEBUG "Invalid I2S Controller number: %d\n",
->                         pdev->id);
->                 return -EINVAL;
->         }
-> 
->         s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
-> 
->         return 0;
-> 
-> and you're changing it to:
-> 
->         case 2:
->                 s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5));
->                 s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5));
->                 s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5));
->                 s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));
->                 return 0;
->         default:
->                 printk(KERN_DEBUG "Invalid I2S Controller number: %d\n",
->                         pdev->id);
->                 return -EINVAL;
->         }
-> 
->         ret = s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
-> 
->         return ret;
-> 
-> What about all the previous calls to s3c_gpio_cfgpin_range() and
-> s3c_gpio_cfgpin() ?  Can't they fail as well?
-> 
-> However, _maybe_ the original authors idea was "I don't care if these
-> calls fail, it's safer to continue if they do" and your changes actually
-> result in breakage.
-> 
-I considered that maybe I was a little too hasty when reading this function
-definition and came  to the wrong conclusion when writing this patch :(.
-> Maybe the better solution would be to add WARN_ON() around each of these.
-> 
-WARN_ON around these is better as they cannot fail or the gpio configuration
-for this board will not function properly making part of this board no longer
-usable until a reboot or hard restart.
-Nick
-> There's a lot of questions here, none of them are a trivial case of "lets
-> generate a patch to just do some random change to the code and hope it's
-> right."
-> 
+there is one thing I don't understand.
+
+If the IRQ0 is invalid, irq_of_parse_and_map returning zero means an 
+error and from what you said it is ok.
+
+But I see the NO_IRQ on ARM is (-1) and the drivers are checking with 
+NO_IRQ the return code of irq_of_parse_and_map. So if there is an error, 
+that won't be detected.
+
+For this specific use case above, shall irq_of_parse_and_map returns 
+NO_IRQ or the caller checks against zero ?
+
+Beside that, some drivers are internally defining NO_IRQ:
+drivers/scsi/NCR5380.h
+drivers/ata/sata_dwc_460ex.c
+drivers/input/touchscreen/ucb1400_ts.c
+drivers/mmc/host/of_mmc_spi.c
+drivers/rtc/rtc-m48t59.c
+drivers/scsi/NCR5380.h
+
+I don't know the historical changes and the subtleties of the irq 
+subsystem (I guess it is considerably complicated by each architecture 
+specific bits and the drivers supported on different architectures)
+
+If you have the time, can you give some clarification ?
+
+Thanks
+
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
