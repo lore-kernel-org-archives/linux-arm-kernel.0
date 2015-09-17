@@ -1,69 +1,88 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 17 Sep 2015 11:17:04 +0100
-Subject: [PATCH] arm64: expose kernel page size in Image header flags
-In-Reply-To: <1442482345-7679-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1442482345-7679-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150917101704.GA12808@leverpostej>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Thu, 17 Sep 2015 18:19:28 +0800
+Subject: [PATCH 1/3] clocksource: rockchip: Make the driver more
+ readability and compatible
+In-Reply-To: <55FA9099.7000903@linaro.org>
+References: <1442476272-31723-1-git-send-email-wxt@rock-chips.com>
+ <1442476272-31723-2-git-send-email-wxt@rock-chips.com>
+ <55FA83D5.9010504@linaro.org> <55FA87AA.4040807@gmail.com>
+ <55FA9099.7000903@linaro.org>
+Message-ID: <55FA93B0.40504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 10:32:25AM +0100, Ard Biesheuvel wrote:
-> In order for a bootloader to be able to decide whether a certain
-> arm64 kernel image is compatible with the hardware it is running
-> on, it needs to be able to find out for which page size the kernel
-> was built. This is necessary, since the architecture does not
-> mandate support for all page sizes it defines, and the kernel cannot
-> boot to a state where it can print a diagnostic if it was built for
-> a page size that is not supported by the hardware.
-> 
-> So assign two bits in the flags field of the Image header, and set
-> them according to the build time page size. For backward compatibility,
-> retain the 0b00 value as 'unspecified'.
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-This looks sane to me.
 
-FWIW: Acked-by: Mark Rutland <mark.rutland@arm.com>
+? 2015?09?17? 18:06, Daniel Lezcano ??:
+> On 09/17/2015 11:28 AM, Caesar Wang wrote:
+>> Hi Daniel,
+>>
+>>
+>> ? 2015?09?17? 17:11, Daniel Lezcano ??:
+>>>
+>>> Hi Caesar,
+>>>
+>>>
+>>> On 09/17/2015 09:51 AM, Caesar Wang wrote:
+>>>> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
+>>>> There are some failure with build up on timer driver for rockchip.
+>>>>
+>>>> logs:
+>>>> ...
+>>>> drivers/clocksource/rockchip_timer.c:156:13: error: 'NO_IRQ' 
+>>>> undeclared
+>>>
+>>> I think the NO_IRQ definition is missing for ARM64.
+>>
+>> Yep, Maybe better to compatible if we don't use the 'NO_IRQ',
+>
+> Hmm, after digging into drivers/of/irq.c and kernel/irq/irqdomain.c
+>
+> when there is an error it returns zero. So NO_IRQ and -1 are not 
+> correct and on the other side zero can be a valid irq. That sounds a 
+> little bit fuzzy to me.
 
-Thanks,
-Mark.
+I believe the 'NO_IRQ' is better select if 'NO_IRQ' is defined on ARM64 
+platform.
 
-> ---
->  Documentation/arm64/booting.txt | 3 ++-
->  arch/arm64/kernel/image.h       | 4 +++-
->  2 files changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> index 1690350f16e7..46056e7d766e 100644
-> --- a/Documentation/arm64/booting.txt
-> +++ b/Documentation/arm64/booting.txt
-> @@ -104,7 +104,8 @@ Header notes:
->  - The flags field (introduced in v3.17) is a little-endian 64-bit field
->    composed as follows:
->    Bit 0: 	Kernel endianness.  1 if BE, 0 if LE.
-> -  Bits 1-63:	Reserved.
-> +  Bits 1-2:	Kernel page size.   0=unspecified, 1=4K, 2=16K, 3=64K
-> +  Bits 3-63:	Reserved.
->  
->  - When image_size is zero, a bootloader should attempt to keep as much
->    memory as possible free for use by the kernel immediately after the
-> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
-> index 8fae0756e175..5def289bda84 100644
-> --- a/arch/arm64/kernel/image.h
-> +++ b/arch/arm64/kernel/image.h
-> @@ -47,7 +47,9 @@
->  #define __HEAD_FLAG_BE	0
->  #endif
->  
-> -#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0)
-> +#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
-> +
-> +#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0) | (__HEAD_FLAG_PAGE_SIZE << 1)
->  
->  /*
->   * These will output as part of the Image header, which should be little-endian
+     irq = irq_of_parse_and_map(np, 0);
+
+     if (irq  == NO_IRQ)
+...
+Also, that's ok if we instead of the 'irq < 0'  or  '!irq' , right?
+
+
+
+
+
+
+>
+>>>> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand 
+>>>> 1 --
+>>>> `dsb`
+>>>> ...
+>>>>
+>>>> The problem was different semantics of dsb on btw arm32 and arm64,
+>>>> Here we can convert the dsb with insteading of dsb(sy).
+>>>
+>>> What happens to ARM32 then ?
+>>>
+>>
+>> The dsb() is ok for ARM32, the ARM32/64 are OK if we can convert the
+>> dsb() to dsb(sy).
+>> I believe all drivers with 'dsb()' have same issue on ARM64 platform.
+>>
+>>>> Meanwhile, I change a bit to make the code more readability for driver
+>>>> when I check the code style.
+>>>>
+>>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>>>
+>>>
+>>
+>>
+>
+>
+>
 > -- 
-> 1.9.1
-> 
+> Thanks,
+> Caesar
