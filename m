@@ -1,42 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Thu, 17 Sep 2015 17:59:53 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.4
-Message-ID: <cover.1442479800.git.horms+renesas@verge.net.au>
+Subject: [PATCH 1/2] ARM: shmobile: Remove Marzen from shmobile_defconfig
+In-Reply-To: <cover.1442479800.git.horms+renesas@verge.net.au>
+References: <cover.1442479800.git.horms+renesas@verge.net.au>
+Message-ID: <ea3e4a2b3945f62457fa377c2bd0f49c32192194.1442479800.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Magnus Damm <damm+renesas@opensource.se>
 
-Please consider these Renesas ARM based SoC defconfig updates for v4.4.
+Kill of the defconfig bits now when the marzen-reference board code is gone.
 
-This is a minor cleanup of defconfigs after reshuffling to
-remove legacy board code.
-
-
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.4
-
-for you to fetch changes up to 0a8b0695f4c490c349ee12956d6946576c44a419:
-
-  ARM: multi_v7_defconfig: Remove Marzen (2015-09-14 10:12:59 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Defconfig Updates for v4.4
-
-* Remove now non-existent MACH_MARZEN from defconfigs
-
-----------------------------------------------------------------
-Magnus Damm (1):
-      ARM: shmobile: Remove Marzen from shmobile_defconfig
-
-Simon Horman (1):
-      ARM: multi_v7_defconfig: Remove Marzen
-
- arch/arm/configs/multi_v7_defconfig | 1 -
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/configs/shmobile_defconfig | 1 -
- 2 files changed, 2 deletions(-)
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 89bf31ccfbfa..0bdeb4925be4 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -21,7 +21,6 @@ CONFIG_ARCH_R8A7791=y
+ CONFIG_ARCH_R8A7793=y
+ CONFIG_ARCH_R8A7794=y
+ CONFIG_ARCH_SH73A0=y
+-CONFIG_MACH_MARZEN=y
+ CONFIG_CPU_BPREDICT_DISABLE=y
+ CONFIG_PL310_ERRATA_588369=y
+ CONFIG_ARM_ERRATA_754322=y
+-- 
+2.1.4
