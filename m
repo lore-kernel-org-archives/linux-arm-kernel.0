@@ -1,584 +1,346 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 17 Sep 2015 11:18:53 +0200
-Subject: [PATCH v2 1/9] ARM: dts: rockchip: add core rk3036 dts
-In-Reply-To: <1442478540-15068-2-git-send-email-zhengxing@rock-chips.com>
-References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
- <1442478540-15068-2-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <3497055.MjziMiDfL7@diego>
+From: Minghuan.Lian@freescale.com (Minghuan Lian)
+Date: Thu, 17 Sep 2015 17:13:39 +0800
+Subject: [PATCH v2] PCI: layerscape: Add PCIe support for LS1043a and LS2080a
+Message-ID: <1442481219-28299-1-git-send-email-Minghuan.Lian@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 17. September 2015, 16:28:52 schrieb Xing Zheng:
-> Initial release for rk3036, node definitions rk3036 sdk board.
-> 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> ---
-> 
-> Changes in v2: None
-> 
->  arch/arm/boot/dts/Makefile       |    1 +
->  arch/arm/boot/dts/rk3036-sdk.dts |   62 +++++++
->  arch/arm/boot/dts/rk3036.dtsi    |  381
-> ++++++++++++++++++++++++++++++++++++++ 3 files changed, 444 insertions(+)
->  create mode 100644 arch/arm/boot/dts/rk3036-sdk.dts
->  create mode 100644 arch/arm/boot/dts/rk3036.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index d39ce4b..48260c4 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -502,6 +502,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
->  	rk3066a-bqcurie2.dtb \
->  	rk3066a-marsboard.dtb \
->  	rk3066a-rayeager.dtb \
-> +	rk3036-sdk.dtb \
+The patch adds PCIe support for LS1043a and LS2080a.
 
-ordering ... please put the rk3036 above rk3066 boards
+Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+---
+This patch is based on v4.3-rc1 and [PATCH v9 0/6]
+PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05
+patchset from Zhou Wang.
 
+change log
+v2:
+1. rename ls2085a to ls2080a
+2. Add ls_pcie_msi_host_init()
 
->  	rk3188-radxarock.dtb \
->  	rk3288-evb-act8846.dtb \
->  	rk3288-evb-rk808.dtb \
-> diff --git a/arch/arm/boot/dts/rk3036-sdk.dts
-> b/arch/arm/boot/dts/rk3036-sdk.dts new file mode 100644
-> index 0000000..9187f93
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/rk3036-sdk.dts
+ drivers/pci/host/Kconfig          |   2 +-
+ drivers/pci/host/pci-layerscape.c | 227 ++++++++++++++++++++++++++------------
+ 2 files changed, 157 insertions(+), 72 deletions(-)
 
-or "rk3036-evb.dts"? What is the actual board named?
-
-> @@ -0,0 +1,62 @@
-> +/*
-> + * Copyright (c)  2015 Xing Zheng <zhengxing@rock-chips.com>
-
-this probably wants a Rockchip copyright notice?
-
-
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *  Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "rk3036.dtsi"
-> +
-> +/ {
-> +	model = "SDK-RK3036";
-> +	compatible = "sdk,sdk-rk3036", "rockchip,rk3036";
-
-	model = "Rockchip RK3036-SDK";
-	compatible = "rockchip,rk3036-sdk", "rockchip,rk3036";
-
-or
-
-	model = "Rockchip RK3036 Evaluation board";
-	compatible = "rockchip,rk3036-evb", "rockchip,rk3036";
-
-depending on what the real board is labeled
-
-
-> +};
-> +
-> +&i2c1 {
-> +	status = "okay";
-> +
-> +        hym8563: hym8563 at 51 {
-> +		compatible = "haoyu,hym8563";
-> +		reg = <0x51>;
-> +		#clock-cells = <0>;
-> +		clock-frequency = <32768>;
-> +		clock-output-names = "xin32k";
-> +	};
-> +};
-> \ No newline at end of file
-
-missing newline as stated above
-
-
-> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-> new file mode 100644
-> index 0000000..b7459c0
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/rk3036.dtsi
-> @@ -0,0 +1,381 @@
-> +/*
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/pinctrl/rockchip.h>
-> +#include <dt-bindings/clock/rk3036-cru.h>
-> +#include "skeleton.dtsi"
-
-in general, please sort nodes by register address, so for example
-
-	interrupt-controller at 10139000
-should be before
-	clock-controller at 20000000
-
-same for all other nodes
-
-> +
-> +/ {
-> +	compatible = "rockchip,rk3036";
-> +
-> +	interrupt-parent = <&gic>;
-> +
-> +	aliases {
-> +		i2c1 = &i2c1;
-> +		serial0 = &uart0;
-> +		serial1 = &uart1;
-> +		serial2 = &uart2;
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x60000000 0x40000000>;
-
-ordering is possible ... to ease readability I try to keep this as
-
-compatible = ...
-reg = ...
-[other properties sorted alphabetically]
-status = ...
-
-> +	};
-> +
-> +        arm-pmu {
-> +                compatible = "arm,cortex-a7-pmu";
-> +                interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
-> +                             <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-> +                interrupt-affinity = <&cpu0>, <&cpu1>;
-> +        };
-
-tabs, not spaces please
-
-
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		enable-method = "rockchip,rk3036-smp";
-
-this enable method is not yet defined, please don't add it until actual smp is 
-accepted
-
-
-> +
-> +		cpu0: cpu at f00 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a7";
-> +			reg = <0xf00>;
-> +			operating-points = <
-> +				/* KHz    uV */
-> +				 816000 1000000
-> +			>;
-> +			#cooling-cells = <2>; /* min followed by max */
-
-again, not yet defined thermal handling, so the #cooling-cells should stay out 
-for now
-
-
-> +			clock-latency = <40000>;
-> +			clocks = <&cru ARMCLK>;
-> +			resets = <&cru SRST_CORE0>;
-> +		};
-> +		cpu1: cpu at f01 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a7";
-> +			reg = <0xf01>;
-> +			resets = <&cru SRST_CORE1>;
-> +		};
-> +	};
-> +
-> +	amba {
-> +		compatible = "arm,amba-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +                pdma: pdma at 20078000 {
-> +                        compatible = "arm,pl330", "arm,primecell";
-> +                        reg = <0x20078000 0x4000>;
-> +                        interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-> +                                     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-> +                        #dma-cells = <1>;
-> +                        clocks = <&cru ACLK_DMAC2>;
-> +                        clock-names = "apb_pclk";
-> +                };
-
-again tabs please
-
-> +	};
-> +
-> +	xin24m: oscillator {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <24000000>;
-> +		clock-output-names = "xin24m";
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv7-timer";
-> +		arm,cpu-registers-not-fw-configured;
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | 
-IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>, +	
-		 
->    <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>, +			    
-> <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> +		clock-frequency = <24000000>;
-> +	};
-> +
-> +	cru: clock-controller at 20000000 {
-> +		compatible = "rockchip,rk3036-cru";
-> +		reg = <0x20000000 0x1000>;
-> +		rockchip,grf = <&grf>;
-> +		#clock-cells = <1>;
-> +		#reset-cells = <1>;
-> +		assigned-clocks = <&cru PLL_GPLL>;
-> +		assigned-clock-rates = <594000000>;
-> +	};
-> +
-> +	uart0: serial at 20060000 {
-> +		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
-> +		reg = <0x20060000 0x100>;
-> +		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-> +		reg-shift = <2>;
-> +		reg-io-width = <4>;
-> +		clock-frequency = <24000000>;
-> +		clocks = <&cru SCLK_UART0>, <&cru PCLK_UART0>;
-> +		clock-names = "baudclk", "apb_pclk";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
-
-status = "disabled" and then in the board.dts a
-
-&uart0 {
-	status = "okay";
-};
-
-not everybody will want to use uart0 ... same is true for the other two uarts.
-
-
-> +	};
-> +
-> +	uart1: serial at 20064000 {
-> +		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
-> +		reg = <0x20064000 0x100>;
-> +		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-> +		reg-shift = <2>;
-> +		reg-io-width = <4>;
-> +		clock-frequency = <24000000>;
-> +		clocks = <&cru SCLK_UART1>, <&cru PCLK_UART1>;
-> +		clock-names = "baudclk", "apb_pclk";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&uart1_xfer>;
-> +	};
-> +
-> +	uart2: serial at 20068000 {
-> +		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
-> +		reg = <0x20068000 0x100>;
-> +		interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-> +		reg-shift = <2>;
-> +		reg-io-width = <4>;
-> +		clock-frequency = <24000000>;
-> +		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
-> +		clock-names = "baudclk", "apb_pclk";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&uart2_xfer>;
-> +	};
-> +
-> +	pwm0: pwm at 20050000 {
-> +		compatible = "rockchip,rk2928-pwm";
-
-		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
-
-rk2928-pwm matches now, but if we find issues we can simply create the rk3036-
-pwm in the driver without needing to change the dts
-
-> +		reg = <0x20050000 0x10>;
-> +		#pwm-cells = <3>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pwm0_pin>;
-> +		clocks = <&cru PCLK_PWM>;
-> +		clock-names = "pwm";
-> +		status = "disabled";
-> +	};
-> +
-> +	pwm1: pwm at 20050010 {
-> +		compatible = "rockchip,rk2928-pwm";
-> +		reg = <0x20050010 0x10>;
-> +		#pwm-cells = <3>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pwm1_pin>;
-> +		clocks = <&cru PCLK_PWM>;
-> +		clock-names = "pwm";
-> +		status = "disabled";
-> +	};
-> +
-> +	pwm2: pwm at 20050020 {
-> +		compatible = "rockchip,rk2928-pwm";
-> +		reg = <0x20050020 0x10>;
-> +		#pwm-cells = <3>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pwm2_pin>;
-> +		clocks = <&cru PCLK_PWM>;
-> +		clock-names = "pwm";
-> +		status = "disabled";
-> +	};
-> +
-> +	pwm3: pwm at 20050030 {
-> +		compatible = "rockchip,rk2928-pwm";
-> +		reg = <0x20050030 0x10>;
-> +		#pwm-cells = <2>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pwm3_pin>;
-> +		clocks = <&cru PCLK_PWM>;
-> +		clock-names = "pwm";
-> +		status = "disabled";
-> +	};
-> +
-> +	sram: sram at 10080000 {
-> +		compatible = "rockchip,rk3036-smp-sram", "mmio-sram";
-> +		reg = <0x10080000 0x2000>;
-> +	};
-> +
-> +	gic: interrupt-controller at 10139000 {
-> +		compatible = "arm,gic-400";
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		#address-cells = <0>;
-> +
-> +		reg = <0x10139000 0x1000>,
-> +		      <0x1013a000 0x1000>,
-> +		      <0x1013c000 0x2000>,
-> +		      <0x1013e000 0x2000>;
-> +		interrupts = <GIC_PPI 9 0xf04>;
-> +	};
-> +
-> +	grf: syscon at 20008000 {
-> +		compatible = "rockchip,rk3036-grf", "syscon";
-> +		reg = <0x20008000 0x1000>;
-> +	};
-> +
-> +	pinctrl: pinctrl {
-> +		compatible = "rockchip,rk3036-pinctrl";
-> +		rockchip,grf = <&grf>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		gpio0: gpio0 at 2007c000 {
-> +			compatible = "rockchip,gpio-bank";
-> +			reg = <0x2007c000 0x100>;
-> +			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&cru PCLK_GPIO0>;
-> +
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +		};
-> +
-> +		gpio1: gpio1 at 20080000 {
-> +			compatible = "rockchip,gpio-bank";
-> +			reg = <0x20080000 0x100>;
-> +			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&cru PCLK_GPIO1>;
-> +
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +		};
-> +
-> +		gpio2: gpio2 at 20084000 {
-> +			compatible = "rockchip,gpio-bank";
-> +			reg = <0x20084000 0x100>;
-> +			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&cru PCLK_GPIO2>;
-> +
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +		};
-> +
-> +		pcfg_pull_up: pcfg-pull-up {
-> +			bias-pull-up;
-> +		};
-> +
-> +		pcfg_pull_down: pcfg-pull-down {
-> +			bias-pull-down;
-> +		};
-> +
-> +		pcfg_pull_none: pcfg-pull-none {
-> +			bias-disable;
-> +		};
-> +
-> +		uart0 {
-> +			uart0_xfer: uart0-xfer {
-> +				rockchip,pins = <0 16 RK_FUNC_1 &pcfg_pull_none>,
-
-pcfg_pull_up for the rx-pin?
-
-> +						<0 17 RK_FUNC_1 &pcfg_pull_none>;
-> +			};
-> +
-> +			uart0_cts: uart0-cts {
-> +				rockchip,pins = <0 18 RK_FUNC_1 &pcfg_pull_none>;
-> +			};
-
-pcfg_pull_up again?
-see ARM: dts: rockchip: pull up cts lines on rk3288 
-(https://lkml.org/lkml/2015/9/2/612) for comparison
-
-
-> +
-> +			uart0_rts: uart0-rts {
-> +				rockchip,pins = <0 19 RK_FUNC_1 &pcfg_pull_none>;
-> +			};
-> +		};
-> +
-> +		uart1 {
-> +			uart1_xfer: uart1-xfer {
-> +				rockchip,pins = <2 22 RK_FUNC_1 &pcfg_pull_none>,
-> +						<2 23 RK_FUNC_1 &pcfg_pull_none>;
-> +			};
-> +			/* no rts / cts for uart1 */
-> +		};
-> +
-> +                uart2 {
-> +                        uart2_xfer: uart2-xfer {
-> +                                rockchip,pins = <1 18 RK_FUNC_2
-> &pcfg_pull_none>, +                                                <1 19
-> RK_FUNC_2 &pcfg_pull_none>; +                        };
-> +                        /* no rts / cts for uart2 */
-> +                };
-
-tabs please
-
-> +
-> +		pwm0 {
-> +			pwm0_pin: pwm0-pin {
-> +				rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
-> +			};
-> +		};
-> +
-> +		pwm1 {
-> +			pwm1_pin: pwm1-pin {
-> +				rockchip,pins = <0 1 RK_FUNC_2 &pcfg_pull_none>;
-> +			};
-> +		};
-> +
-> +		pwm2 {
-> +			pwm2_pin: pwm2-pin {
-> +				rockchip,pins = <0 1 2 &pcfg_pull_none>;
-> +			};
-> +		};
-> +
-> +		pwm3 {
-> +			pwm3_pin: pwm3-pin {
-> +				rockchip,pins = <0 27 1 &pcfg_pull_none>;
-> +			};
-> +		};
-> +
-> +		i2c1 {
-> +			i2c1_xfer: i2c1-xfer {
-> +				rockchip,pins = <0 2 RK_FUNC_1 &pcfg_pull_none>,
-> +						<0 3 RK_FUNC_1 &pcfg_pull_none>;
-> +			};
-> +		};
-> +	};
-> +
-> +	i2c1: i2c at 20056000 {
-> +		compatible = "rockchip,rk3288-i2c";
-> +		reg = <0x20056000 0x1000>;
-> +		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		clock-names = "i2c";
-> +		clocks = <&cru PCLK_I2C1>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&i2c1_xfer>;
-> +		status = "disabled";
-> +	};
-> +};
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index ae873be..38fe8a8 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -105,7 +105,7 @@ config PCI_XGENE_MSI
+ 
+ config PCI_LAYERSCAPE
+ 	bool "Freescale Layerscape PCIe controller"
+-	depends on OF && ARM
++	depends on OF && (ARM || ARM64)
+ 	select PCIE_DW
+ 	select MFD_SYSCON
+ 	help
+diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+index b2328ea1..cdb8737 100644
+--- a/drivers/pci/host/pci-layerscape.c
++++ b/drivers/pci/host/pci-layerscape.c
+@@ -11,7 +11,6 @@
+  */
+ 
+ #include <linux/kernel.h>
+-#include <linux/delay.h>
+ #include <linux/interrupt.h>
+ #include <linux/module.h>
+ #include <linux/of_pci.h>
+@@ -32,27 +31,68 @@
+ #define LTSSM_STATE_MASK	0x3f
+ #define LTSSM_PCIE_L0		0x11 /* L0 state */
+ 
+-/* Symbol Timer Register and Filter Mask Register 1 */
+-#define PCIE_STRFMR1 0x71c
++/* PEX Internal Configuration Registers */
++#define PCIE_STRFMR1		0x71c /* Symbol Timer & Filter Mask Register1 */
++#define PCIE_DBI_RO_WR_EN	0x8bc /* DBI Read-Only Write Enable Register */
++
++/* PEX LUT registers */
++#define PCIE_LUT_DBG		0x7FC /* PEX LUT Debug Register */
++
++struct ls_pcie_drvdata {
++	u32 lut_offset;
++	u32 ltssm_shift;
++	struct pcie_host_ops *ops;
++};
+ 
+ struct ls_pcie {
+-	struct list_head node;
+-	struct device *dev;
+-	struct pci_bus *bus;
+-	void __iomem *dbi;
+-	struct regmap *scfg;
+ 	struct pcie_port pp;
++	const struct ls_pcie_drvdata *drvdata;
++	void __iomem *regs;
++	void __iomem *lut;
++	struct regmap *scfg;
+ 	int index;
+-	int msi_irq;
+ };
+ 
+ #define to_ls_pcie(x)	container_of(x, struct ls_pcie, pp)
+ 
+-static int ls_pcie_link_up(struct pcie_port *pp)
++static bool ls_pcie_is_bridge(struct ls_pcie *pcie)
++{
++	u32 header_type;
++
++	header_type = ioread32(pcie->regs + (PCI_HEADER_TYPE & ~0x3));
++	header_type = (header_type >> (8 * (PCI_HEADER_TYPE & 0x3))) & 0x7f;
++
++	return header_type == PCI_HEADER_TYPE_BRIDGE;
++}
++
++/* Clean multi-function bit */
++static void ls_pcie_clean_multifunction(struct ls_pcie *pcie)
++{
++	u32 val;
++
++	val = ioread32(pcie->regs + (PCI_HEADER_TYPE & ~0x3));
++	val &= ~(1 << 23);
++	iowrite32(val, pcie->regs + (PCI_HEADER_TYPE & ~0x3));
++}
++
++/* Fix class value */
++static void ls_pcie_fix_class(struct ls_pcie *pcie)
++{
++	u32 val;
++
++	val = ioread32(pcie->regs + PCI_CLASS_REVISION);
++	val = (val & 0x0000ffff) | (PCI_CLASS_BRIDGE_PCI << 16);
++	iowrite32(val, pcie->regs + PCI_CLASS_REVISION);
++}
++
++static int ls1021_pcie_link_up(struct pcie_port *pp)
+ {
+ 	u32 state;
+ 	struct ls_pcie *pcie = to_ls_pcie(pp);
+ 
++	if (!pcie->scfg)
++		return 0;
++
+ 	regmap_read(pcie->scfg, SCFG_PEXMSCPORTSR(pcie->index), &state);
+ 	state = (state >> LTSSM_STATE_SHIFT) & LTSSM_STATE_MASK;
+ 
+@@ -62,110 +102,155 @@ static int ls_pcie_link_up(struct pcie_port *pp)
+ 	return 1;
+ }
+ 
+-static int ls_pcie_establish_link(struct pcie_port *pp)
++static void ls1021_pcie_host_init(struct pcie_port *pp)
+ {
+-	unsigned int retries;
++	struct ls_pcie *pcie = to_ls_pcie(pp);
++	u32 val, index[2];
+ 
+-	for (retries = 0; retries < 200; retries++) {
+-		if (dw_pcie_link_up(pp))
+-			return 0;
+-		usleep_range(100, 1000);
++	pcie->scfg = syscon_regmap_lookup_by_phandle(pp->dev->of_node,
++						     "fsl,pcie-scfg");
++	if (IS_ERR(pcie->scfg)) {
++		dev_err(pp->dev, "No syscfg phandle specified\n");
++		pcie->scfg = NULL;
++		return;
++	}
++
++	if (of_property_read_u32_array(pp->dev->of_node,
++				       "fsl,pcie-scfg", index, 2)) {
++		pcie->scfg = NULL;
++		return;
+ 	}
++	pcie->index = index[1];
+ 
+-	dev_err(pp->dev, "phy link never came up\n");
+-	return -EINVAL;
++	/*
++	 * LS1021A Workaround for internal TKT228622
++	 * to fix the INTx hang issue
++	 */
++	val = ioread32(pcie->regs + PCIE_STRFMR1);
++	val &= 0xffff;
++	iowrite32(val, pcie->regs + PCIE_STRFMR1);
++}
++
++static int ls_pcie_link_up(struct pcie_port *pp)
++{
++	struct ls_pcie *pcie = to_ls_pcie(pp);
++	u32 state;
++
++	state = (ioread32(pcie->lut + PCIE_LUT_DBG) >>
++		 pcie->drvdata->ltssm_shift) &
++		 LTSSM_STATE_MASK;
++
++	if (state < LTSSM_PCIE_L0)
++		return 0;
++
++	return 1;
+ }
+ 
+ static void ls_pcie_host_init(struct pcie_port *pp)
+ {
+ 	struct ls_pcie *pcie = to_ls_pcie(pp);
+-	u32 val;
+ 
+-	dw_pcie_setup_rc(pp);
+-	ls_pcie_establish_link(pp);
++	iowrite32(1, pcie->regs + PCIE_DBI_RO_WR_EN);
++	ls_pcie_fix_class(pcie);
++	ls_pcie_clean_multifunction(pcie);
++	iowrite32(0, pcie->regs + PCIE_DBI_RO_WR_EN);
++}
+ 
+-	/*
+-	 * LS1021A Workaround for internal TKT228622
+-	 * to fix the INTx hang issue
+-	 */
+-	val = ioread32(pcie->dbi + PCIE_STRFMR1);
+-	val &= 0xffff;
+-	iowrite32(val, pcie->dbi + PCIE_STRFMR1);
++static int ls_pcie_msi_host_init(struct pcie_port *pp,
++				 struct msi_controller *chip)
++{
++	struct device_node *msi_node;
++	struct device_node *np = pp->dev->of_node;
++
++	msi_node = of_parse_phandle(np, "msi-parent", 0);
++	if (!msi_node) {
++		dev_err(pp->dev, "failed to find msi-parent\n");
++		return -EINVAL;
++	}
++
++	return 0;
+ }
+ 
++static struct pcie_host_ops ls1021_pcie_host_ops = {
++	.link_up = ls1021_pcie_link_up,
++	.host_init = ls1021_pcie_host_init,
++	.msi_host_init = ls_pcie_msi_host_init,
++};
++
+ static struct pcie_host_ops ls_pcie_host_ops = {
+ 	.link_up = ls_pcie_link_up,
+ 	.host_init = ls_pcie_host_init,
++	.msi_host_init = ls_pcie_msi_host_init,
+ };
+ 
+-static int ls_add_pcie_port(struct ls_pcie *pcie)
+-{
+-	struct pcie_port *pp;
+-	int ret;
++static struct ls_pcie_drvdata ls1021_drvdata = {
++	.ops = &ls1021_pcie_host_ops,
++};
+ 
+-	pp = &pcie->pp;
+-	pp->dev = pcie->dev;
+-	pp->dbi_base = pcie->dbi;
+-	pp->root_bus_nr = -1;
+-	pp->ops = &ls_pcie_host_ops;
++static struct ls_pcie_drvdata ls1043_drvdata = {
++	.lut_offset = 0x10000,
++	.ltssm_shift = 24,
++	.ops = &ls_pcie_host_ops,
++};
+ 
+-	ret = dw_pcie_host_init(pp);
+-	if (ret) {
+-		dev_err(pp->dev, "failed to initialize host\n");
+-		return ret;
+-	}
++static struct ls_pcie_drvdata ls2080_drvdata = {
++	.lut_offset = 0x80000,
++	.ltssm_shift = 0,
++	.ops = &ls_pcie_host_ops,
++};
+ 
+-	return 0;
+-}
++static const struct of_device_id ls_pcie_of_match[] = {
++	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata },
++	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata },
++	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
+ 
+ static int __init ls_pcie_probe(struct platform_device *pdev)
+ {
++	const struct of_device_id *match;
+ 	struct ls_pcie *pcie;
+-	struct resource *dbi_base;
+-	u32 index[2];
++	struct pcie_port *pp;
++	struct resource *res;
+ 	int ret;
+ 
++	match = of_match_device(ls_pcie_of_match, &pdev->dev);
++	if (!match)
++		return -ENODEV;
++
+ 	pcie = devm_kzalloc(&pdev->dev, sizeof(*pcie), GFP_KERNEL);
+ 	if (!pcie)
+ 		return -ENOMEM;
+ 
+-	pcie->dev = &pdev->dev;
+-
+-	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
+-	pcie->dbi = devm_ioremap_resource(&pdev->dev, dbi_base);
+-	if (IS_ERR(pcie->dbi)) {
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
++	pcie->regs = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(pcie->regs)) {
+ 		dev_err(&pdev->dev, "missing *regs* space\n");
+-		return PTR_ERR(pcie->dbi);
++		return PTR_ERR(pcie->regs);
+ 	}
+ 
+-	pcie->scfg = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+-						     "fsl,pcie-scfg");
+-	if (IS_ERR(pcie->scfg)) {
+-		dev_err(&pdev->dev, "No syscfg phandle specified\n");
+-		return PTR_ERR(pcie->scfg);
+-	}
++	pcie->drvdata = match->data;
++	pcie->lut = pcie->regs + pcie->drvdata->lut_offset;
++	pp = &pcie->pp;
++	pp->dev = &pdev->dev;
++	pp->dbi_base = pcie->regs;
++	pp->ops = pcie->drvdata->ops;
+ 
+-	ret = of_property_read_u32_array(pdev->dev.of_node,
+-					 "fsl,pcie-scfg", index, 2);
+-	if (ret)
+-		return ret;
+-	pcie->index = index[1];
++	if (!ls_pcie_is_bridge(pcie))
++		return -ENODEV;
+ 
+-	ret = ls_add_pcie_port(pcie);
+-	if (ret < 0)
++	ret = dw_pcie_host_init(pp);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to initialize host\n");
+ 		return ret;
++	}
+ 
+ 	platform_set_drvdata(pdev, pcie);
+ 
+ 	return 0;
+ }
+ 
+-static const struct of_device_id ls_pcie_of_match[] = {
+-	{ .compatible = "fsl,ls1021a-pcie" },
+-	{ },
+-};
+-MODULE_DEVICE_TABLE(of, ls_pcie_of_match);
+-
+ static struct platform_driver ls_pcie_driver = {
+ 	.driver = {
+ 		.name = "layerscape-pcie",
+-- 
+1.9.1
