@@ -1,120 +1,28 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 17 Sep 2015 16:24:01 +0200
-Subject: [PATCH] arm64: errata: add module build workaround for erratum
- #843419
-In-Reply-To: <1442402197-20306-1-git-send-email-will.deacon@arm.com>
-References: <1442402197-20306-1-git-send-email-will.deacon@arm.com>
-Message-ID: <CAKv+Gu-o6=1NQzCoLd_+Y196X+BVN6u1E6Gd39BKJJqXc5BO4w@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 17 Sep 2015 16:29:20 +0200 (CEST)
+Subject: [PATCH 2/2] ARM: irqchip: mxs: add Alpascale ASM9260 support
+In-Reply-To: <55FABD51.80305@rempel-privat.de>
+References: <201411281509.19170.arnd@arndb.de>
+ <1417193454-31417-1-git-send-email-linux@rempel-privat.de>
+ <1417193454-31417-3-git-send-email-linux@rempel-privat.de>
+ <55FABD51.80305@rempel-privat.de>
+Message-ID: <alpine.DEB.2.11.1509171626030.3951@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Thu, 17 Sep 2015, Oleksij Rempel wrote:
+> ping,
+> 
+> looks like this patches are lost.
 
-On 16 September 2015 at 13:16, Will Deacon <will.deacon@arm.com> wrote:
-> Cortex-A53 processors <= r0p4 are affected by erratum #843419 which can
-> lead to a memory access using an incorrect address in certain sequences
-> headed by an ADRP instruction.
->
-> There is a linker fix to generate veneers for ADRP instructions, but
-> this doesn't work for kernel modules which are built as unlinked ELF
-> objects.
->
+I said that a hundred times before. The proper mailinglist for
+drivers/irqchip patches is lkml. See MAINTAINERS.
 
-Considering that the kernel is built without -fpic but still appears
-at a different offset when the MMU is off, those veneers had better be
-position independent.
+That's where my filters run and I'm not going to collect stuff which
+comes in via some random other mailinglist.
 
-> This patch adds a new config option for the erratum which, when enabled,
-> builds kernel modules with the mcmodel=large flag. This uses absolute
-> addressing for all kernel symbols, thereby removing the use of ADRP as
-> a PC-relative form of addressing. The ADRP relocs are removed from the
-> module loader so that we fail to load any potentially affected modules.
->
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/Kconfig         | 16 ++++++++++++++++
->  arch/arm64/Makefile        |  4 ++++
->  arch/arm64/kernel/module.c |  2 ++
->  3 files changed, 22 insertions(+)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 7d95663c0160..11ff4d57c92a 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -331,6 +331,22 @@ config ARM64_ERRATUM_845719
->
->           If unsure, say Y.
->
-> +config ARM64_ERRATUM_843419
-> +       bool "Cortex-A53: 843419: A load or store might access an incorrect address"
-> +       depends on MODULES
-> +       default y
-> +       help
-> +         This option builds kernel modules using the large memory model in
-> +         order to avoid the use of the ADRP instruction, which can cause
-> +         a subsequent memory access to use an incorrect address on Cortex-A53
-> +         parts up to r0p4.
-> +
-> +         Note that the kernel itself must be linked with a version of ld
-> +         which fixes potentially affected ADRP instructions through the
-> +         use of veneers.
-> +
-> +         If unsure, say Y.
-> +
->  endmenu
->
->
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index 15ff5b4156fd..f9914d7c1bb0 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -41,6 +41,10 @@ endif
->
->  CHECKFLAGS     += -D__aarch64__
->
-> +ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
-> +CFLAGS_MODULE  += -mcmodel=large
-> +endif
-> +
+Care to resend?
 
-Ouch.
+Thanks,
 
-Couldn't we handle this at runtime? According to the erratum, the
-problem only occurs when the adrp is in either of the last two
-instruction slots of a 4 KB page, and we could easily turn adrp
-instructions into adr if the symbol is within 1 MB of the place (which
-would typically cover all internal references in the module), and emit
-a veneer otherwise?
-
-I'm happy to hack something up
-
->  # Default value
->  head-y         := arch/arm64/kernel/head.o
->
-> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-> index 67bf4107f6ef..876eb8df50bf 100644
-> --- a/arch/arm64/kernel/module.c
-> +++ b/arch/arm64/kernel/module.c
-> @@ -332,12 +332,14 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
->                         ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 0, 21,
->                                              AARCH64_INSN_IMM_ADR);
->                         break;
-> +#ifndef CONFIG_ARM64_ERRATUM_843419
->                 case R_AARCH64_ADR_PREL_PG_HI21_NC:
->                         overflow_check = false;
->                 case R_AARCH64_ADR_PREL_PG_HI21:
->                         ovf = reloc_insn_imm(RELOC_OP_PAGE, loc, val, 12, 21,
->                                              AARCH64_INSN_IMM_ADR);
->                         break;
-> +#endif
->                 case R_AARCH64_ADD_ABS_LO12_NC:
->                 case R_AARCH64_LDST8_ABS_LO12_NC:
->                         overflow_check = false;
-> --
-> 2.1.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	tglx
