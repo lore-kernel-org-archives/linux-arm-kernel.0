@@ -1,34 +1,74 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Sep 2015 17:59:33 +0900
-Subject: [PATCH 17/21] MAINTAINERS: remove references to dropped marzen and
- bockw defconfigs
-In-Reply-To: <cover.1442478814.git.horms+renesas@verge.net.au>
-References: <cover.1442478814.git.horms+renesas@verge.net.au>
-Message-ID: <8d4f9480f6e7882acf4c320833457f879d2bbd10.1442478814.git.horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 17 Sep 2015 17:53:14 +0900
+Subject: [PATCH v4 15/16] clk: shmobile: mstp: Consider "zb_clk" suitable
+ for power management
+In-Reply-To: <20150917084446.GA8197@verge.net.au>
+References: <1438691297-29235-1-git-send-email-geert+renesas@glider.be>
+ <1438691297-29235-16-git-send-email-geert+renesas@glider.be>
+ <20150917084446.GA8197@verge.net.au>
+Message-ID: <20150917085314.GA29509@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+On Thu, Sep 17, 2015 at 05:45:18PM +0900, Simon Horman wrote:
+> Hi Mike, Hi Stephen,
+> 
+> On Tue, Aug 04, 2015 at 02:28:16PM +0200, Geert Uytterhoeven wrote:
+> > Currently the CPG/MSTP Clock Domain code looks for MSTP clocks to power
+> > manage a device.
+> > 
+> > Unfortunately, on R-Mobile APE6 (r8a73a4) and SH-Mobile AG5 (sh73a0),
+> > the Bus State Controller (BSC) is not power-managed by an MSTP clock,
+> > but by a plain CPG clock (zb_clk).  Add a special case to handle this,
+> > so the clock is properly managed, and devices connected to the BSC work
+> > as expected.
+> > 
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> 
+> for one reason or another I seem to have this patch queued up in
+> my renesas tree for v4.4, without any Acks.
+> 
+> I think it would be best if one of you took the patch instead.
+> Though I'm also happy to take it with Acks.
+> 
+> Let me know how you would like to proceed.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Acked-by: by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- MAINTAINERS | 2 --
- 1 file changed, 2 deletions(-)
+Sorry to revise the above, I should have checked more closely
+before I sent my previous email. I now see that I have an SoC patch
+that depends on this one. So if possible I'd like to take this one
+through my tree with an Ack or two.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7ba7ab749c85..803c91ed3eec 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1485,8 +1485,6 @@ F:	arch/arm/boot/dts/emev2*
- F:	arch/arm/boot/dts/r7s*
- F:	arch/arm/boot/dts/r8a*
- F:	arch/arm/boot/dts/sh*
--F:	arch/arm/configs/bockw_defconfig
--F:	arch/arm/configs/marzen_defconfig
- F:	arch/arm/configs/shmobile_defconfig
- F:	arch/arm/include/debug/renesas-scif.S
- F:	arch/arm/mach-shmobile/
--- 
-2.1.4
+Thanks in advance!
+
+> > ---
+> > v4:
+> >   - Add Reviewed-by,
+> > 
+> > v3:
+> >   - Use "CPG/MSTP Clock Domain" instead of "CPG Clock Domain",
+> > 
+> > v2:
+> >   - New.
+> > ---
+> >  drivers/clk/shmobile/clk-mstp.c | 4 ++++
+> >  1 file changed, 4 insertions(+)
+> > 
+> > diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
+> > index b1df7b2f1e970adb..a117c3f0f257b5e1 100644
+> > --- a/drivers/clk/shmobile/clk-mstp.c
+> > +++ b/drivers/clk/shmobile/clk-mstp.c
+> > @@ -259,6 +259,10 @@ int cpg_mstp_attach_dev(struct generic_pm_domain *domain, struct device *dev)
+> >  					    "renesas,cpg-mstp-clocks"))
+> >  			goto found;
+> >  
+> > +		/* BSC on r8a73a4/sh73a0 uses zb_clk instead of an mstp clock*/
+> > +		if (!strcmp(clkspec.np->name, "zb_clk"))
+> > +			goto found;
+> > +
+> >  		of_node_put(clkspec.np);
+> >  		i++;
+> >  	}
+> > -- 
+> > 1.9.1
+> > 
