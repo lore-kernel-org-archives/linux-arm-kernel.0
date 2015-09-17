@@ -1,72 +1,109 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 17 Sep 2015 09:59:49 -0500
-Subject: [PATCH v4 0/4] PCI: st: provide support for dw pcie
-In-Reply-To: <1440678857-27118-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1440678857-27118-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <20150917145949.GF25767@google.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 17 Sep 2015 17:02:31 +0200
+Subject: [PATCH 5/8] arm64: KVM: Disable virtual timer even if the guest
+ is not using it
+In-Reply-To: <1442501171-24484-6-git-send-email-marc.zyngier@arm.com>
+References: <1442501171-24484-1-git-send-email-marc.zyngier@arm.com>
+ <1442501171-24484-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55FAD607.9040305@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
 
-On Thu, Aug 27, 2015 at 02:34:13PM +0200, Gabriel Fernandez wrote:
-> 
-> This patchset is based on v4.2-rc1 and is based on 
-> [PATCH v8 0/6] PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05
-> patchset from Zhou Wang.
-> 
-> Changes in v4:
->  - Remove pci: designware: remove my pci_common_init_dev() patch and
-> 	use [PATCH v8 3/6] PCI: designware: Add ARM64 support instead.
-> 	This patch is a good solution for me to disable IO support.
->  - add __init to st_pcie_probe() and use module_init() instead
-> 	device_initcall() to prevent the probe function from being
-> 	deferred and to prevent module unloading.
-> 
-> Changes in v3:
->  - Remove power management functions (was not fully tested)
->  - Remove configuration space range from dt binding
->  - Remove pci_common_init_dev() call in pcie-designware.c to avoid 
->    default IO space declaration. 
-> 
-> Changes in v2:
->  - comestic corrections in device tree binding
->  - add pci-st.c into MAINTAINERS
->  - remove st_pcie_ops structure to avoid another level of indirection
->  - remove nasty busy-loop
->  - remove useless test using virt_to_phys()
->  - move disable io support into dw-pcie driver
-> 
-> I don't change the st_pcie_abort_handler() function because abort handling
-> is masked during boot.
-> 
-> 
-> This patch-set introduces a STMicroelectronics PCIe controller.
-> It's based on designware PCIe driver.
-> 
-> Gabriel Fernandez (4):
->   ARM: STi: Kconfig update for PCIe support
->   PCI: st: Add Device Tree bindings for sti pcie
->   PCI: st: Provide support for the sti PCIe controller
->   MAINTAINERS: Add pci-st.c to ARCH/STI architecture
 
-Rob had some questions, so I'm waiting for an update that responds to
-those.  When you post that, can you also squash the last two patches
-together?
-
-Thanks,
-  Bjorn
-
->  Documentation/devicetree/bindings/pci/st-pcie.txt |  53 ++
->  MAINTAINERS                                       |   1 +
->  arch/arm/mach-sti/Kconfig                         |   2 +
->  drivers/pci/host/Kconfig                          |   9 +
->  drivers/pci/host/Makefile                         |   1 +
->  drivers/pci/host/pci-st.c                         | 583 ++++++++++++++++++++++
->  6 files changed, 649 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
->  create mode 100644 drivers/pci/host/pci-st.c
+On 17/09/2015 16:46, Marc Zyngier wrote:
+> When running a guest with the architected timer disabled (with QEMU and
+> the kernel_irqchip=off option, for example), it is important to make
+> sure the timer gets turned off. Otherwise, the guest may try to
+> enable it anyway, leading to a screaming HW interrupt.
 > 
-> -- 
-> 1.9.1
+> The fix is to unconditionally turn off the virtual timer on guest
+> exit.
 > 
+> Cc: stable at vger.kernel.org
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp.S | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index 39aa322..60a83e2 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -562,8 +562,6 @@
+>  	mrs	x3, cntv_ctl_el0
+>  	and	x3, x3, #3
+>  	str	w3, [x0, #VCPU_TIMER_CNTV_CTL]
+> -	bic	x3, x3, #1		// Clear Enable
+> -	msr	cntv_ctl_el0, x3
+>  
+>  	isb
+>  
+> @@ -571,6 +569,9 @@
+>  	str	x3, [x0, #VCPU_TIMER_CNTV_CVAL]
+>  
+>  1:
+> +	// Disable the virtual timer
+> +	msr	cntv_ctl_el0, xzr
+> +
+>  	// Allow physical timer/counter access for the host
+>  	mrs	x2, cnthctl_el2
+>  	orr	x2, x2, #3
+> 
+
+It looks like here in restore_timer_state:
+
+        ldr     w2, [x0, #VCPU_TIMER_CNTV_CTL]
+        and     x2, x2, #3
+        msr     cntv_ctl_el0, x2
+
+the "and" would be unnecessary if kvm_arm_timer_set_reg remembered to 
+do it.  Something like this, which would also make the code more 
+consistent between arm and arm64...
+
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 702740d37465..93e322b4d242 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -514,6 +514,7 @@ ARM_BE8(rev	r6, r6  )
+ 	beq	1f
+ 
+ 	mrc	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
++	and	r2, r2, #3
+ 	str	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
+ 	bic	r2, #1			@ Clear ENABLE
+ 	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
+@@ -566,7 +567,6 @@ ARM_BE8(rev	r6, r6  )
+ 	isb
+ 
+ 	ldr	r2, [vcpu, #VCPU_TIMER_CNTV_CTL]
+-	and	r2, r2, #3
+ 	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
+ 1:
+ .endm
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 10915aaf0b01..bfcd3f3a947b 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -887,7 +887,6 @@ alternative_endif
+ 	isb
+ 
+ 	ldr	w2, [x0, #VCPU_TIMER_CNTV_CTL]
+-	and	x2, x2, #3
+ 	msr	cntv_ctl_el0, x2
+ 1:
+ .endm
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 98c95f2fcba4..9b03c9f5abbf 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -218,7 +218,7 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+ 
+ 	switch (regid) {
+ 	case KVM_REG_ARM_TIMER_CTL:
+-		timer->cntv_ctl = value;
++		timer->cntv_ctl = value & (ARCH_TIMER_CTRL_IT_MASK | ARCH_TIMER_CTRL_ENABLE);
+ 		break;
+ 	case KVM_REG_ARM_TIMER_CNT:
+ 		vcpu->kvm->arch.timer.cntvoff = kvm_phys_timer_read() - value;
