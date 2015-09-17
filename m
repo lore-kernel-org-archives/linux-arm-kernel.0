@@ -1,93 +1,86 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Thu, 17 Sep 2015 10:13:21 -0700
-Subject: [PATCH 2/6] PCI: generic: Only fixup irqs for bus we are creating.
-In-Reply-To: <20150916103232.GB17510@red-moon>
-References: <1442013719-5001-1-git-send-email-ddaney.cavm@gmail.com>
- <1442013719-5001-3-git-send-email-ddaney.cavm@gmail.com>
- <20150915173654.GJ31157@arm.com> <55F85A24.2010600@caviumnetworks.com>
- <20150916103232.GB17510@red-moon>
-Message-ID: <55FAF4B1.1070109@caviumnetworks.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Sep 2015 18:17:37 +0100
+Subject: [PATCH v4 0/4] PCI: arm64/powerpc: Fix parsing of linux,
+ pci-probe-only
+In-Reply-To: <20150917153009.GH25767@google.com>
+References: <1441385411-7624-1-git-send-email-marc.zyngier@arm.com>
+ <20150917153009.GH25767@google.com>
+Message-ID: <55FAF5B1.1030401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2015 03:32 AM, Lorenzo Pieralisi wrote:
-> On Tue, Sep 15, 2015 at 06:49:24PM +0100, David Daney wrote:
->> On 09/15/2015 10:36 AM, Will Deacon wrote:
->>> Hi David,
->>>
->>> On Sat, Sep 12, 2015 at 12:21:55AM +0100, David Daney wrote:
->>>> From: David Daney <david.daney@cavium.com>
->>>>
->>>> Use pci_walk_bus() to restrict the fixup irq actions to only the bus
->>>> being created.
->>>>
->>>> If we create multiple buses with pci-host-generic, or there are buses
->>>> created by other drivers, we don't want to call pci_fixup_irqs() which
->>>> operates on all devices, not just the devices on the bus being added.
->>>> The consequence is that either the fixups are done more than once, or
->>>> in some cases incorrect fixups could be applied.
->>>>
->>>> Signed-off-by: David Daney <david.daney@cavium.com>
->>>> ---
->>>>    drivers/pci/host/pci-host-generic.c | 8 +++++++-
->>>>    1 file changed, 7 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
->>>> index 265dd25..a0fb241 100644
->>>> --- a/drivers/pci/host/pci-host-generic.c
->>>> +++ b/drivers/pci/host/pci-host-generic.c
->>>> @@ -205,6 +205,12 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->>>>    	return 0;
->>>>    }
->>>>
->>>> +static int gen_pci_fixup_irq_cb(struct pci_dev *dev, void *arg)
->>>> +{
->>>> +	pdev_fixup_irq(dev, pci_common_swizzle, of_irq_parse_and_map_pci);
->>>> +	return 0;
->>>> +}
->>>> +
->>>>    static int gen_pci_probe(struct platform_device *pdev)
->>>>    {
->>>>    	int err;
->>>> @@ -262,7 +268,7 @@ static int gen_pci_probe(struct platform_device *pdev)
->>>>    		return -ENODEV;
->>>>    	}
->>>>
->>>> -	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
->>>> +	pci_walk_bus(bus, gen_pci_fixup_irq_cb, NULL);
->>>
->>> Any chance we could put something in the core PCI code for this? I think
->>> any host controller wanting to work with arm64 is potentially going to
->>> run into the same problem.
+On 17/09/15 16:30, Bjorn Helgaas wrote:
+> On Fri, Sep 04, 2015 at 05:50:07PM +0100, Marc Zyngier wrote:
+>> The pci-host-generic driver parses the linux,pci-probe-only property,
+>> and assumes that it will have a boolean parameter.
 >>
->> Good idea.
+>> Turns out that the Seattle DTS file has a naked "linux,pci-probe-only"
+>> property, which leads to the driver dereferencing some unsuspecting
+>> memory location. Nothing really bad happens (we end up reading some
+>> other bit of DT, fortunately), but that not a reason to keep it this
+>> way. Turns out that the Pseries code (where this code was lifted from)
+>> may suffer from the same issue.
 >>
->> I will move the walking code into setup-irq.c (the current home of
->> pci_fixup_irqs()), and make it part of patch 1/6.
->
-> For arm64 we could even compile out pci_fixup_irqs() since the IRQ mapping
-> is done in pcibios_add_device() through DT, I agree on CONFIG_ARM this
-> needs fixing though, so yes, make it common code and patch all host
-> controllers that make use of pci_fixup_irqs() since that's a common
-> issue as far as I can see (ARM pcibios works around it by having a
-> IRQ mapping function per bus and it provides an API to initialize
-> multiple host controllers at once and fixing up IRQs before devices
-> are added, still, for host controllers that do not use that
-> functionality - eg drivers/pci/host/pcie-designware.c - if there are
-> multiple host controllers instances we run into the same problem).
+>> The first patch introduces a common (and fixed) version of that check
+>> that can be used by drivers and architectures that require it. The two
+>> following patches change the pci-host-generic driver and the powerpc
+>> code to use it.
+>>
+>> Finally, the bad property is removed from the Seatle DTS, because it
+>> is simply not necessary (it actually prevents me from using SR-IOV,
+>> which otherwise runs fine without the probe-only thing).
+>>
+>> This has been tested on the offending Seattle board.
+>>
+>> * From v3:
+>>   - Restrict the property lookup to /chosen (Rob)
+>>   - Acked-by on patch #4 from Suravee
+>>   - I swear this is the last time I rework these patches! ;-)
+>>
+>> * From v2:
+>>   - Use of_property_read_u32 to safely read the property (Rob)
+>>   - Add a log message to indicate when we enable probe-only
+>>     (probably quite useful for debugging)
+>>
+>> * From v1:
+>>   - Consolidate the parsing in of_pci.c (Bjorn)
+>>
+>> Marc Zyngier (4):
+>>   of/pci: Add of_pci_check_probe_only to parse "linux,pci-probe-only"
+>>   PCI: pci-host-generic: Fix lookup of linux,pci-probe-only property
+>>   powerpc: PCI: Fix lookup of linux,pci-probe-only property
+>>   arm64: dts: Drop linux,pci-probe-only from the Seattle DTS
+>>
+>>  arch/arm64/boot/dts/amd/amd-overdrive.dts |  1 -
+>>  arch/powerpc/platforms/pseries/setup.c    | 14 ++------------
+>>  drivers/of/of_pci.c                       | 28 ++++++++++++++++++++++++++++
+>>  drivers/pci/host/pci-host-generic.c       |  9 +--------
+>>  include/linux/of_pci.h                    |  3 +++
+>>  5 files changed, 34 insertions(+), 21 deletions(-)
+> 
+> Applied with the comment tweak and acks to pci/host-generic for v4.4,
+> thanks!
 
-Patching up other PCI bus drivers would be deferred to a different patch 
-set, as I have no way to test it.
+Turns out that the 01.org infrastructure has picked up on a compilation
+bug with randconfig. The following patch seems to fix it and should be
+applied on the first patch:
 
->
-> Side note: do you have any PCI host controller where mapping IRQs through
-> of_irq_parse_and_map_pci() does not work ? If yes, why ?
->
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 485d625..2da5abc 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -6,6 +6,8 @@
+ #include <linux/of_pci.h>
+ #include <linux/slab.h>
+ 
++#include <asm-generic/pci-bridge.h>
++
+ static inline int __of_pci_pci_compare(struct device_node *node,
+ 				       unsigned int data)
+ {
 
-The of_irq_parse_and_map_pci() call in arch/arm64/kernel/pci.c 
-(pcibios_add_device) seems to work for me.
+Sorry for the annoyance.
 
-I did send a patch recently to make it quite emitting erroneous error 
-messages for PCI devices that have no irq pin.
-
-David Daney
+	M.
+-- 
+Jazz is not dead. It just smells funny...
