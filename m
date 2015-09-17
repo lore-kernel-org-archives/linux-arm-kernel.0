@@ -1,67 +1,93 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 17 Sep 2015 12:51:07 +0200
-Subject: [RFC PATCH] arm64/efi: isolate EFI stub from the kernel proper
-In-Reply-To: <CAKv+Gu8j1APZkGnFhZArNAtoyYOokP2bgemYH5n7Pn8jQ1b1XA@mail.gmail.com>
-References: <1442311903-19213-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150915144629.GG31157@arm.com>
- <CAKv+Gu8j1APZkGnFhZArNAtoyYOokP2bgemYH5n7Pn8jQ1b1XA@mail.gmail.com>
-Message-ID: <CAKv+Gu_KuOxA+EMSV0YcQR9rmO+R=-y9tivweNym3o+E4DrnHQ@mail.gmail.com>
+From: xerofoify@gmail.com (nick)
+Date: Thu, 17 Sep 2015 06:52:22 -0400
+Subject: [PATCH RFT] mach-s3c64xx:Fix error handling for certain calls to
+ s3c_gpio_cfgpin_range in the file dev-audio.c
+In-Reply-To: <20150917102319.GL21084@n2100.arm.linux.org.uk>
+References: <1442458835-25520-1-git-send-email-xerofoify@gmail.com>
+ <20150917102319.GL21084@n2100.arm.linux.org.uk>
+Message-ID: <55FA9B66.6020000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 September 2015 at 17:24, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 15 September 2015 at 16:46, Will Deacon <will.deacon@arm.com> wrote:
->> On Tue, Sep 15, 2015 at 11:11:43AM +0100, Ard Biesheuvel wrote:
->>> Since arm64 does not use a builtin decompressor, the EFI stub is built
->>> into the kernel proper. So far, this has been working fine, but actually,
->>> since the stub is in fact a PE/COFF relocatable binary that is executed
->>> at an unknown offset in the 1:1 mapping provided by the UEFI firmware, we
->>> should not be seamlessly sharing code with the kernel proper, which is a
->>> position dependent executable linked at a high virtual offset.
->>>
->>> So instead, separate the contents of libstub and its dependencies, by
->>> putting them into their own namespace by prefixing all of its symbols
->>> with __efistub. This way, we have tight control over what parts of the
->>> kernel proper are referenced by the stub.
->>
->> Could we add an __efistub annotation to spit out warnings if the stub
->> calls into unexpected kernel code, like we do for __init/__ref?
->>
->
-> Currently, it will break the build rather than warn if you use a
-> disallowed symbol, which I think is not unreasonable.
->
-> But I suppose that the objcopy step in this patch could rename the
-> sections to .efistub.xxx sections, which would allow us to reuse some
-> of the section mismatch code.
-> However, this would involve marking things like the generic string and
-> memcpy routines __efistub as well, which I think may be too much.
-> Also, note that the logic is inverted here: with __init, we disallow
-> normal code to call __init functions, but with __efistub, it will be
-> the other way around, which may be more difficult to accomplish
-> (Rutland and I did discuss this option when we talked about this over
-> IRC)
->
 
-OK, I have given this a go, and as it turns out, it implies that we go
-and mark generic pieces of lib/ as __section(.text.efistubok) in order
-for modpost.c to accept it. Tweaking modpost.c itself seems quite
-doable, since the logic is fairly flexible and can easily be augmented
-to complain about unauthorized references from the stub to the kernel
-proper.
 
-So what we could do is fold libfdt and lib/sort.c (which are the
-primary generic dependencies) into the stub, but we would still need
-to retain the symbol prefixing bit to prevent the stub's symbols from
-clashing with the ones from the kernel proper. And with the symbol
-prefixing in place, we have something that is even stronger than
-section mismatch, which is to error out on undefined references rather
-than warn about section mismatches.
-
-I think the current approach is better, but only if we agree that we
-should do something in the first place. (Currently, there are no known
-issues, just the awareness that things are not quite as tidy as they
-should be)
-
--- 
-Ard.
+On 2015-09-17 06:23 AM, Russell King - ARM Linux wrote:
+> On Wed, Sep 16, 2015 at 11:00:35PM -0400, Nicholas Krause wrote:
+>> diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
+>> index ff780a8..81fabdb 100644
+>> --- a/arch/arm/mach-s3c64xx/dev-audio.c
+>> +++ b/arch/arm/mach-s3c64xx/dev-audio.c
+>> @@ -27,6 +27,7 @@
+>>  static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+>>  {
+>>  	unsigned int base;
+>> +	int ret;
+>>  
+>>  	switch (pdev->id) {
+>>  	case 0:
+>> @@ -47,9 +48,9 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+>>  		return -EINVAL;
+>>  	}
+>>  
+>> -	s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+>> -
+>> -	return 0;
+>> +	ret = s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+>> +
+>> +	return ret;
+> 
+> Let's look at the code:
+> 
+>         case 2:
+>                 s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5));
+>                 s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5));
+>                 s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5));
+>                 s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));
+>                 return 0;
+>         default:
+>                 printk(KERN_DEBUG "Invalid I2S Controller number: %d\n",
+>                         pdev->id);
+>                 return -EINVAL;
+>         }
+> 
+>         s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+> 
+>         return 0;
+> 
+> and you're changing it to:
+> 
+>         case 2:
+>                 s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5));
+>                 s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5));
+>                 s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5));
+>                 s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));
+>                 return 0;
+>         default:
+>                 printk(KERN_DEBUG "Invalid I2S Controller number: %d\n",
+>                         pdev->id);
+>                 return -EINVAL;
+>         }
+> 
+>         ret = s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+> 
+>         return ret;
+> 
+> What about all the previous calls to s3c_gpio_cfgpin_range() and
+> s3c_gpio_cfgpin() ?  Can't they fail as well?
+> 
+> However, _maybe_ the original authors idea was "I don't care if these
+> calls fail, it's safer to continue if they do" and your changes actually
+> result in breakage.
+> 
+I considered that maybe I was a little too hasty when reading this function
+definition and came  to the wrong conclusion when writing this patch :(.
+> Maybe the better solution would be to add WARN_ON() around each of these.
+> 
+WARN_ON around these is better as they cannot fail or the gpio configuration
+for this board will not function properly making part of this board no longer
+usable until a reboot or hard restart.
+Nick
+> There's a lot of questions here, none of them are a trivial case of "lets
+> generate a patch to just do some random change to the code and hope it's
+> right."
+> 
