@@ -1,49 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Sep 2015 09:47:15 +0900
-Subject: [PATCH 13/19] ARM: shmobile: lager: use CCF for audio clock
+Date: Fri, 18 Sep 2015 09:47:19 +0900
+Subject: [PATCH 17/19] ARM: shmobile: r8a7790: lager: add pinmux for iic0
 In-Reply-To: <cover.1442536920.git.horms+renesas@verge.net.au>
 References: <cover.1442536920.git.horms+renesas@verge.net.au>
-Message-ID: <6bc651afec2dba4d3e40901a2c5cfc88ad35d97a.1442536920.git.horms+renesas@verge.net.au>
+Message-ID: <535118cac9e0705bf58de0604060f644bee7472d.1442536920.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Wolfram Sang <wsa@sang-engineering.com>
 
-Because of historical reason, audio clock didn't use CCF.
-Let's use it now.
+It seems we used to rely on the default pinmux setting of this HW, but
+currently we need to explicitly set the pinmux to access this bus. It is
+better style, too.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7790-lager.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 37dec5269491..6f5d7f50d5ca 100644
+index 6f5d7f50d5ca..c553abd711ee 100644
 --- a/arch/arm/boot/dts/r8a7790-lager.dts
 +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -174,6 +174,13 @@
- 			  1800000 0>;
+@@ -342,6 +342,11 @@
+ 		renesas,function = "msiof1";
  	};
  
-+	audio_clock: clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <11289600>;
-+		clock-output-names = "audio_clock";
++	iic0_pins: iic0 {
++		renesas,groups = "iic0";
++		renesas,function = "iic0";
 +	};
 +
- 	rsnd_ak4643: sound {
- 		compatible = "simple-audio-card";
+ 	iic1_pins: iic1 {
+ 		renesas,groups = "iic1";
+ 		renesas,function = "iic1";
+@@ -517,6 +522,8 @@
  
-@@ -187,7 +194,7 @@
+ &iic0	{
+ 	status = "okay";
++	pinctrl-0 = <&iic0_pins>;
++	pinctrl-names = "default";
+ };
  
- 		sndcodec: simple-audio-card,codec {
- 			sound-dai = <&ak4643>;
--			system-clock-frequency = <11289600>;
-+			clocks = <&audio_clock>;
- 		};
- 	};
- 
+ &iic1	{
 -- 
 2.1.4
