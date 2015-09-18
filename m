@@ -1,37 +1,24 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 18 Sep 2015 09:16:31 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.4
-In-Reply-To: <cover.1442536920.git.horms+renesas@verge.net.au>
-References: <cover.1442536920.git.horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdX41ggvKAKrp3s++UMYidhXuASoMP3xzdtnxjoL=0jpSA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Sep 2015 09:19:46 +0200
+Subject: [PATCH 2/3] PCI: Add quirks for devices found on Cavium ThunderX
+ SoCs.
+In-Reply-To: <1442529694-1792-3-git-send-email-ddaney.cavm@gmail.com>
+References: <1442529694-1792-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442529694-1792-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <3066583.BWDZlYWxXU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Thursday 17 September 2015 15:41:33 David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> The on-chip devices all have fixed bars.  So, fix them up.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> 
 
-On Fri, Sep 18, 2015 at 2:47 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Renesas ARM Based SoC DT Updates for v4.4
->
-> * Add missing CPG/MSTP Clock Domain for sound on r8a779[01] SoCs
+You should be able to just mark the BARs as fixed in DT and not need
+this hack. If that doesn't work with current kernels, it would be
+better to fix the kernel to respect the flags.
 
->       ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain for sound
->       ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain for sound
-
-These two should actually go in in v4.3, as they're bugfixes for commits that
-are in v4.3-rc1. That can be done in parallel, though.
-
-Sound will stop working in mainline as soon as commit cbc41d0a761bffb3
-("drivers: sh: Disable PM runtime for multi-platform ARM with genpd") in
-sh-drivers-for-v4.3 enters mainline.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
