@@ -1,84 +1,83 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 18 Sep 2015 09:21:22 +0900
-Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
-In-Reply-To: <55EA2D8D.90004@cogentembedded.com>
-References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
- <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
- <20150812012652.GH15957@verge.net.au>
- <55D790A5.1050008@cogentembedded.com>
- <55D7A3A1.9020009@cogentembedded.com>
- <20150902022936.GA18115@verge.net.au>
- <55EA2D8D.90004@cogentembedded.com>
-Message-ID: <20150918002122.GC12858@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 18 Sep 2015 09:47:03 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.4
+Message-ID: <cover.1442536920.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 05, 2015 at 02:47:25AM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 09/02/2015 05:29 AM, Simon Horman wrote:
-> 
-> >>>>>Define the SILK board dependent part of the SDHI1 (connected to micro-SD slot)
-> >>>>>device nodes along with the necessary voltage regulators.
-> >>>>>
-> >>>>>Based on the original patch by Vladimir Barinov
-> >>>>><vladimir.barinov@cogentembedded.com>.
-> >>>>>
-> >>>>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >>>>>
-> >>>>>---
-> >>>>>This patch is against 'renesas-devel-20150810-v4.2-rc6' tag of Simon Horman's
-> >>>>>'renesas.git' repo plus the R8A7794/SILK QSPI patches just re-posted. It needs
-> >>>>>the R8A7794 GPIO patches in order to compile.
-> >>>>>
-> >>>>>Changes in version 2:
-> >>>>>- removed not working SDHI0 stuff, renamed the patch;
-> >>>>>- replaced SDHI1's "wp-gpios" property with "disable-wp".
-> >>>>
-> >>>>I am wondering if you could explain the motivation for the "disable-wp"
-> >>>>update
-> >>>
-> >>>    Please see the comment in mmc_sd_get_ro().
-> >>>
-> >>>>and weather it is appropriate for other r8a779* dts files.
-> >>>
-> >>>    In case of micro-SD slots, yes.
-> >>
-> >>    The MMC binding document says it should only be specified if the
-> >>controller has WP detection logic. We, so far, seem to have been replying on
-> >>the GPIOs despite this logic is present (according to the R-Car gen2 SDHI
-> >>manuals I have). The driver will first call mmc_gpio_get_ro() and when that
-> >>fails due to "wp-gpios" not being specified, it proceeds to reading the
-> >>register but that is forbidden by TMIO_MMC_WRPROTECT_DISABLE flag set for
-> >>the R-Car gen1/2 chips, so 0 is always returned from tmio_mmc_get_ro().
-> >>There seems to be no point in going that far (and doing the runtime PM
-> >>dances) --
-> 
->    Alternatively, the driver could be fixed to check the flag before the RPM
-> call unlike what it does now.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-If the driver can be updated to do the right thing then that seems
-preferable to me. If so would it be the case that the presence of the
-"disable-wp" property would not have any run-time effect?
-> 
-> >>and MMC_CAP2_NO_WRITE_PROTECT (set when "disable-wp" is specified) prohibits
-> >>doing that...
-> >
-> >That sounds reasonable to me.
-> 
->    I'm still wondering why TMIO_MMC_WRPROTECT_DISABLE is set for the R-Car
-> SoCs. Morimoto-san, any comments? Your change logs are too terse. :-)
+Please consider these Renesas ARM based SoC DT updates for v4.4.
 
-I will follow up on this.
+This pull request is based on
+"Renesas ARM Based SoC Cleanup for v4.4, tagged as renesas-cleanup-for-v4.4,
+which I have also sent a pull-request for.
 
-> >Some more questions from my side:
-> 
-> >* What is the status of this patch
-> 
->    Tested, working.
-> 
-> >* Can you prepare patches for r8a779* dts files for micro-SD slots?
-> 
->    Ugh, I probably can but won't promise anything.
 
-Likewise, ugh.
+The following changes since commit 04418c23a9411b85b8789eab5f4397bcbd62b7b4:
+
+  ARM: shmobile: Remove legacy clock support leftovers (2015-09-14 10:06:56 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.4
+
+for you to fetch changes up to 2529493c288c109cf734235d1eb3de1b23d9bcef:
+
+  ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain for sound (2015-09-14 10:25:58 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Updates for v4.4
+
+* Add missing CPG/MSTP Clock Domain for sound on r8a779[01] SoCs
+* Tidy up SCI resource region on r8a779[018] SoCs
+* Add pinmux for iic0 on Lager board
+* Use CCF for audio clock on Lager and Koelsch boards
+* Use serial0 and 1 as serial ports on Marzen board
+* Use adxl345-specific compatible property for KZM9G board
+* Document compat string for Silk board
+* Enable GPIO, I2C, QSPI and VIN support on r8a7794/Silk
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      ARM: shmobile: kzm9g dts: Use adxl345-specific compatible property
+      ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain for sound
+      ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain for sound
+
+Kuninori Morimoto (5):
+      ARM: shmobile: koelsch: use CCF for audio clock
+      ARM: shmobile: lager: use CCF for audio clock
+      ARM: shmobile: r8a7790: tidyup SSI resource region
+      ARM: shmobile: r8a7791: tidyup SSI resource region
+      ARM: shmobile: r8a7778: tidyup SSI resource region
+
+Magnus Damm (1):
+      ARM: shmobile: marzen: Board specific serial port order
+
+Sergei Shtylyov (8):
+      ARM: shmobile: r8a7794: add GPIO clocks
+      ARM: shmobile: r8a7794: add GPIO DT support
+      ARM: shmobile: r8a7794: add QSPI DT support
+      ARM: shmobile: silk: add QSPI DT support
+      ARM: shmobile: r8a7794: add I2C DT support
+      ARM: shmobile: silk: add I2C1 DT support
+      ARM: shmobile: r8a7794: add VIN DT support
+      ARM: shmobile: silk: add VIN0/ADV7180 DT support
+
+Simon Horman (1):
+      ARM: shmobile: Add silk device tree bindings documentation
+
+Wolfram Sang (1):
+      ARM: shmobile: r8a7790: lager: add pinmux for iic0
+
+ Documentation/devicetree/bindings/arm/shmobile.txt |   2 +
+ arch/arm/boot/dts/r8a7778.dtsi                     |   2 +-
+ arch/arm/boot/dts/r8a7779-marzen.dts               |   6 +-
+ arch/arm/boot/dts/r8a7790-lager.dts                |  16 +-
+ arch/arm/boot/dts/r8a7790.dtsi                     |   3 +-
+ arch/arm/boot/dts/r8a7791-koelsch.dts              |   9 +-
+ arch/arm/boot/dts/r8a7791.dtsi                     |   3 +-
+ arch/arm/boot/dts/r8a7794-silk.dts                 |  88 ++++++++
+ arch/arm/boot/dts/r8a7794.dtsi                     | 224 ++++++++++++++++++++-
+ arch/arm/boot/dts/sh73a0-kzm9g.dts                 |   2 +-
+ 10 files changed, 338 insertions(+), 17 deletions(-)
