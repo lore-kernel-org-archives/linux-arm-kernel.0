@@ -1,33 +1,50 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 18 Sep 2015 23:11:38 +0800
-Subject: [PATCH v2 0/7] hwrng: Add support for STMicroelectronics' RNG IP
-In-Reply-To: <CAF2Aj3h7Jy=tpYdZTdbxAJwa=147_hAu3reOFrbEh=JdrMFWLQ@mail.gmail.com>
-References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
- <20150918140756.GK9249@gondor.apana.org.au>
- <CAF2Aj3h7Jy=tpYdZTdbxAJwa=147_hAu3reOFrbEh=JdrMFWLQ@mail.gmail.com>
-Message-ID: <20150918151137.GA10763@gondor.apana.org.au>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 18 Sep 2015 16:18:18 +0100
+Subject: [PATCH] iommu/arm-smmu: Use correct address mask for CMD_TLBI_S2_IPA
+Message-ID: <1442589498-31355-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 03:53:50PM +0100, Lee Jones wrote:
-> On 18 September 2015 at 15:07, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> > On Thu, Sep 17, 2015 at 02:45:50PM +0100, Lee Jones wrote:
-> >> v1 => v2:
-> >>  - New patch: Also fixing /dev/hw_random => /dev/hwrng in Kconfig
-> >>  - Fix 2099 => 2009 typo in commit log
-> >>  - Fix 'number of random numbers sourced' return value
-> >>  - Treat devm_clk_get()'s return value correctly
-> >>  - Check return value of clk_prepare_enable()
-> >>  - Use sysfs_streq() instead of manually stripping '\n' from sysfs
-> >
-> > All applied.  Thanks.
-> 
-> Just to be clear.  Which patches have you applied?
+Stage-2 TLBI by IPA takes a 48-bit address field, as opposed to the
+64-bit field used by the VA-based invalidation commands.
 
-All of your patches.
+This patch re-jigs the SMMUv3 command construction code so that the
+address field is correctly masked.
 
-Cheers,
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index a24f359fa0d0..286e890e7d64 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -343,7 +343,8 @@
+ #define CMDQ_TLBI_0_VMID_SHIFT		32
+ #define CMDQ_TLBI_0_ASID_SHIFT		48
+ #define CMDQ_TLBI_1_LEAF		(1UL << 0)
+-#define CMDQ_TLBI_1_ADDR_MASK		~0xfffUL
++#define CMDQ_TLBI_1_VA_MASK		~0xfffUL
++#define CMDQ_TLBI_1_IPA_MASK		0xfffffffff000UL
+ 
+ #define CMDQ_PRI_0_SSID_SHIFT		12
+ #define CMDQ_PRI_0_SSID_MASK		0xfffffUL
+@@ -771,11 +772,13 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
+ 		break;
+ 	case CMDQ_OP_TLBI_NH_VA:
+ 		cmd[0] |= (u64)ent->tlbi.asid << CMDQ_TLBI_0_ASID_SHIFT;
+-		/* Fallthrough */
++		cmd[1] |= ent->tlbi.leaf ? CMDQ_TLBI_1_LEAF : 0;
++		cmd[1] |= ent->tlbi.addr & CMDQ_TLBI_1_VA_MASK;
++		break;
+ 	case CMDQ_OP_TLBI_S2_IPA:
+ 		cmd[0] |= (u64)ent->tlbi.vmid << CMDQ_TLBI_0_VMID_SHIFT;
+ 		cmd[1] |= ent->tlbi.leaf ? CMDQ_TLBI_1_LEAF : 0;
+-		cmd[1] |= ent->tlbi.addr & CMDQ_TLBI_1_ADDR_MASK;
++		cmd[1] |= ent->tlbi.addr & CMDQ_TLBI_1_IPA_MASK;
+ 		break;
+ 	case CMDQ_OP_TLBI_NH_ASID:
+ 		cmd[0] |= (u64)ent->tlbi.asid << CMDQ_TLBI_0_ASID_SHIFT;
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.1.4
