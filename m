@@ -1,148 +1,133 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 18 Sep 2015 10:26:27 -0600
-Subject: [RFC PATCH 13/20] coresight: etm-perf: new PMU driver for ETM tracers
-In-Reply-To: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1442593594-10665-14-git-send-email-mathieu.poirier@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Sep 2015 09:29:05 -0700
+Subject: [PATCH 2/2] ARM: dts: Fix WLAN regression on omap5-uevm
+In-Reply-To: <1442593745-16725-1-git-send-email-tony@atomide.com>
+References: <1442593745-16725-1-git-send-email-tony@atomide.com>
+Message-ID: <1442593745-16725-3-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Perf is a well known and used tool for performance monitoring
-and much more. A such it is an ideal condaditate for integration
-with coresight based HW tracing.
+Commit 99f84cae43df ("ARM: dts: add wl12xx/wl18xx bindings") added
+device tree bindings for the TI WLAN SDIO on many omap variants.
 
-This patch introduce a minimal PMU that represent a coresight
-tracer to the Perf core.
+I recall wondering how come omap5-uevm did not have the WLAN
+added and this issue has been bugging me for a while now, and
+I finally tracked it down to a bad pinmux regression, and a missing
+deferred probe handling for the 32k clock from palmas that's
+requested by twl6040.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Basically 392adaf796b9 ("ARM: dts: omap5-evm: Add mcspi data")
+added pin muxing for mcspi4 that conflicts with the onboard
+WLAN. While the omap5-uevm docs say the WLAN is not populated,
+this was probably only the case for initial prototypes. Both
+omap5-uevm boards I have have WLAN populated.
+
+Let's fix the regression and add the WLAN configuration as
+done for the other boards in 99f84cae43df ("ARM: dts: add
+wl12xx/wl18xx bindings").
+
+Note that without a related deferred probe fix for twl6040,
+the 32k clock is not initialized if palmas-clk is a module
+and twl6040 is built-in. And we should probably also request
+the 32k clock from palmas directly for MMC3 eventually, but
+that's another patch not related to this regression.
+
+Let's also use the generic "non-removable" instead of the
+legacy "ti,non-removable" property while at it.
+
+Fixes: 392adaf796b9 ("ARM: dts: omap5-evm: Add mcspi data")
+Cc: Benoit Cousson <bcousson@baylibre.com>
+Cc: Dr. H. Nikolaus Schaller <hns@goldelico.com>
+Cc: Grazvydas Ignotas <notasas@gmail.com>
+Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Cc: Sourav Poddar <sourav.poddar@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- MAINTAINERS                                      |  1 +
- drivers/hwtracing/coresight/Makefile             |  2 +-
- drivers/hwtracing/coresight/coresight-etm-perf.c | 65 ++++++++++++++++++++++++
- include/linux/coresight-pmu.h                    | 18 +++++++
- 4 files changed, 85 insertions(+), 1 deletion(-)
- create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.c
- create mode 100644 include/linux/coresight-pmu.h
+ arch/arm/boot/dts/omap5-uevm.dts | 51 +++++++++++++++++++++++++++++++---------
+ 1 file changed, 40 insertions(+), 11 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7ba7ab749c85..b462a90a256d 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -989,6 +989,7 @@ ARM/CORESIGHT FRAMEWORK AND DRIVERS
- M:	Mathieu Poirier <mathieu.poirier@linaro.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
-+F:	include/linux/coresight*
- F:	drivers/hwtracing/coresight/*
- F:	Documentation/trace/coresight.txt
- F:	Documentation/devicetree/bindings/arm/coresight.txt
-diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
-index 99f8e5f6256e..2ab2627060a4 100644
---- a/drivers/hwtracing/coresight/Makefile
-+++ b/drivers/hwtracing/coresight/Makefile
-@@ -1,7 +1,7 @@
- #
- # Makefile for CoreSight drivers.
- #
--obj-$(CONFIG_CORESIGHT) += coresight.o
-+obj-$(CONFIG_CORESIGHT) += coresight.o coresight-etm-perf.o
- obj-$(CONFIG_OF) += of_coresight.o
- obj-$(CONFIG_CORESIGHT_LINK_AND_SINK_TMC) += coresight-tmc.o
- obj-$(CONFIG_CORESIGHT_SINK_TPIU) += coresight-tpiu.o
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-new file mode 100644
-index 000000000000..759b8d69b4e6
---- /dev/null
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -0,0 +1,65 @@
-+/*
-+ * Copyright(C) 2015 Linaro Limited. All rights reserved.
-+ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -31,6 +31,18 @@
+ 		regulator-max-microvolt = <3000000>;
+ 	};
+ 
++	vmmcsdio_fixed: fixedregulator-mmcsdio {
++		compatible = "regulator-fixed";
++		regulator-name = "vmmcsdio_fixed";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&gpio5 12 GPIO_ACTIVE_HIGH>;	/* gpio140 WLAN_EN */
++		enable-active-high;
++		startup-delay-us = <70000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&wlan_pins>;
++	};
 +
-+#include <linux/module.h>
-+#include <linux/types.h>
-+#include <linux/slab.h>
-+#include <linux/device.h>
-+#include <linux/perf_event.h>
-+#include <linux/mm.h>
-+#include <linux/list.h>
+ 	/* HS USB Host PHY on PORT 2 */
+ 	hsusb2_phy: hsusb2_phy {
+ 		compatible = "usb-nop-xceiv";
+@@ -197,12 +209,20 @@
+ 		>;
+ 	};
+ 
+-	mcspi4_pins: pinmux_mcspi4_pins {
++	mmc3_pins: pinmux_mmc3_pins {
+ 		pinctrl-single,pins = <
+-			0x164 (PIN_INPUT | MUX_MODE1)		/*  mcspi4_clk */
+-			0x168 (PIN_INPUT | MUX_MODE1)		/*  mcspi4_simo */
+-			0x16a (PIN_INPUT | MUX_MODE1)		/*  mcspi4_somi */
+-			0x16c (PIN_INPUT | MUX_MODE1)		/*  mcspi4_cs0 */
++			OMAP5_IOPAD(0x01a4, PIN_INPUT_PULLUP | MUX_MODE0) /* wlsdio_clk */
++			OMAP5_IOPAD(0x01a6, PIN_INPUT_PULLUP | MUX_MODE0) /* wlsdio_cmd */
++			OMAP5_IOPAD(0x01a8, PIN_INPUT_PULLUP | MUX_MODE0) /* wlsdio_data0 */
++			OMAP5_IOPAD(0x01aa, PIN_INPUT_PULLUP | MUX_MODE0) /* wlsdio_data1 */
++			OMAP5_IOPAD(0x01ac, PIN_INPUT_PULLUP | MUX_MODE0) /* wlsdio_data2 */
++			OMAP5_IOPAD(0x01ae, PIN_INPUT_PULLUP | MUX_MODE0) /* wlsdio_data3 */
++		>;
++	};
 +
-+#include <linux/coresight.h>
-+#include <linux/coresight-pmu.h>
++	wlan_pins: pinmux_wlan_pins {
++		pinctrl-single,pins = <
++			OMAP5_IOPAD(0x1bc, PIN_OUTPUT | MUX_MODE6) /* mcspi1_clk.gpio5_140 */
+ 		>;
+ 	};
+ 
+@@ -290,8 +310,22 @@
+ };
+ 
+ &mmc3 {
++	vmmc-supply = <&vmmcsdio_fixed>;
+ 	bus-width = <4>;
+-	ti,non-removable;
++	non-removable;
++	cap-power-off-card;
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc3_pins>;
 +
-+#include "coresight-priv.h"
-+
-+static struct pmu etm_pmu;
-+
-+/* ETMCR is 'config' */
-+PMU_FORMAT_ATTR(cycacc,		"config:12");
-+PMU_FORMAT_ATTR(timestamp,	"config:28");
-+
-+static struct attribute *etm_config_formats_attr[] = {
-+	&format_attr_cycacc.attr,
-+	&format_attr_timestamp.attr,
-+	NULL,
-+};
-+
-+static struct attribute_group etm_pmu_format_group = {
-+	.name   = "format",
-+	.attrs  = etm_config_formats_attr,
-+};
-+
-+static const struct attribute_group *etm_pmu_attr_groups[] = {
-+	&etm_pmu_format_group,
-+	NULL,
-+};
-+
-+static void etm_event_read(struct perf_event *event) {}
-+
-+static int __init etm_perf_init(void)
-+{
-+	etm_pmu.capabilities	= PERF_PMU_CAP_EXCLUSIVE;
-+
-+	etm_pmu.attr_groups	= etm_pmu_attr_groups;
-+	etm_pmu.task_ctx_nr	= perf_sw_context;
-+	etm_pmu.read		= etm_event_read;
-+
-+	return perf_pmu_register(&etm_pmu, CORESIGHT_ETM_PMU_NAME, -1);
-+}
-+module_init(etm_perf_init);
-diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
-new file mode 100644
-index 000000000000..261361060f0b
---- /dev/null
-+++ b/include/linux/coresight-pmu.h
-@@ -0,0 +1,18 @@
-+/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef _LINUX_CORESIGHT_PMU_H
-+#define _LINUX_CORESIGHT_PMU_H
-+
-+#define CORESIGHT_ETM_PMU_NAME	"cs_etm"
-+
-+#endif
++	#address-cells = <1>;
++	#size-cells = <0>;
++	wlcore: wlcore at 2 {
++		compatible = "ti,wl1271";
++		reg = <2>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <14 IRQ_TYPE_LEVEL_HIGH>;	/* gpio 14 */
++		ref-clock-frequency = <26000000>;
++	};
+ };
+ 
+ &mmc4 {
+@@ -598,11 +632,6 @@
+ 	pinctrl-0 = <&mcspi3_pins>;
+ };
+ 
+-&mcspi4 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mcspi4_pins>;
+-};
+-
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins>;
 -- 
-1.9.1
+2.1.4
