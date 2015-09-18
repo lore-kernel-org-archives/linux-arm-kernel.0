@@ -1,49 +1,33 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 18 Sep 2015 14:44:32 +0300
-Subject: [PATCH v2 04/23] ARM: davinci/common: Convert edma driver to
- handle one eDMA instance per driver
-In-Reply-To: <1441974442-8233-5-git-send-email-peter.ujfalusi@ti.com>
-References: <1441974442-8233-1-git-send-email-peter.ujfalusi@ti.com>
- <1441974442-8233-5-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <55FBF920.2090204@ti.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Fri, 18 Sep 2015 17:40:30 +0530
+Subject: [PATCH 1/5] spi: introduce mmap read support for spi flash devices
+In-Reply-To: <20150916105647.GK11268@sirena.org.uk>
+References: <1441355402-6837-1-git-send-email-vigneshr@ti.com>
+ <1441355402-6837-2-git-send-email-vigneshr@ti.com>
+ <20150914183744.GF12027@sirena.org.uk> <55F93F89.7060708@ti.com>
+ <20150916105647.GK11268@sirena.org.uk>
+Message-ID: <55FBFF36.8050905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2015 03:27 PM, Peter Ujfalusi wrote:
-> +	if (irq >= 0) {
-> +		irq_name = devm_kasprintf(dev, GFP_KERNEL, "%s_ccint\n",
 
-The '\n' should not be in the format string.
 
-> +					  dev_name(dev));
-> +		ret = devm_request_irq(dev, irq, dma_irq_handler, 0, irq_name,
-> +				       cc);
-> +		if (ret) {
-> +			dev_err(dev, "CCINT (%d) failed --> %d\n", irq, ret);
-> +			return ret;
->  		}
-> +	}
->  
-> -		for (i = 0; i < edma_cc[j]->num_channels; i++)
-> -			map_dmach_queue(j, i, info[j]->default_queue);
-> +	irq = platform_get_irq_byname(pdev, "edma3_ccerrint");
-> +	if (irq < 0 && node)
-> +		irq = irq_of_parse_and_map(node, 2);
-> +
-> +	if (irq >= 0) {
-> +		irq_name = devm_kasprintf(dev, GFP_KERNEL,
-> +					  "%s_ccerrint\n",
+On 09/16/2015 04:26 PM, Mark Brown wrote:
+> On Wed, Sep 16, 2015 at 03:38:09PM +0530, Vignesh R wrote:
+> 
+>> But, I didn't get how to integrate with existing message queue. Memory
+>> mapped read by-passes message queue of SPI core. Could you please
+>> explain a bit more on integrating with message queue? Did you mean
+>> locking the existing message queue when memory mapped read is being
+>> requested?
+> 
+> Yes, and also making sure that we don't everything gets processed in
+> order so memory mapped requests come after any commands needed to set
+> them up and don't starve other work.
+> 
 
-Same here.
-
-> +					  dev_name(dev));
-> +		ret = devm_request_irq(dev, irq, dma_ccerr_handler, 0, irq_name,
-> +				       cc);
-> +		if (ret) {
-> +			dev_err(dev, "CCERRINT (%d) failed --> %d\n", irq, ret);
-> +			return ret;
-> +		}
-> +	}
+Ok, thanks for the clarification!
 
 -- 
-P?ter
+Regards
+Vignesh
