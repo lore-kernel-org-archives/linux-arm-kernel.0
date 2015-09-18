@@ -1,73 +1,41 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 18 Sep 2015 09:17:45 +0100
-Subject: [PATCH] arm64: expose kernel page size in Image header flags
-In-Reply-To: <1442482345-7679-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1442482345-7679-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <55FBC8A9.8090402@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 18 Sep 2015 17:19:36 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.4
+In-Reply-To: <CAMuHMdX_kgj4c4J4rZUySfJmcV0t2xUBizhp102Xx-k1yn2jQQ@mail.gmail.com>
+References: <cover.1442536920.git.horms+renesas@verge.net.au>
+ <CAMuHMdX41ggvKAKrp3s++UMYidhXuASoMP3xzdtnxjoL=0jpSA@mail.gmail.com>
+ <1484890.bItsbzvneZ@wuerfel>
+ <CAMuHMdX_kgj4c4J4rZUySfJmcV0t2xUBizhp102Xx-k1yn2jQQ@mail.gmail.com>
+Message-ID: <20150918081935.GA20840@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/09/15 10:32, Ard Biesheuvel wrote:
-> In order for a bootloader to be able to decide whether a certain
-> arm64 kernel image is compatible with the hardware it is running
-> on, it needs to be able to find out for which page size the kernel
-> was built. This is necessary, since the architecture does not
-> mandate support for all page sizes it defines, and the kernel cannot
-> boot to a state where it can print a diagnostic if it was built for
-> a page size that is not supported by the hardware.
->
-> So assign two bits in the flags field of the Image header, and set
-> them according to the build time page size. For backward compatibility,
-> retain the 0b00 value as 'unspecified'.
->
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Fri, Sep 18, 2015 at 09:29:58AM +0200, Geert Uytterhoeven wrote:
+> Hi Arnd,
+> 
+> On Fri, Sep 18, 2015 at 9:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 18 September 2015 09:16:31 Geert Uytterhoeven wrote:
+> >> On Fri, Sep 18, 2015 at 2:47 AM, Simon Horman
+> >> <horms+renesas@verge.net.au> wrote:
+> >> > Renesas ARM Based SoC DT Updates for v4.4
+> >> >
+> >> > * Add missing CPG/MSTP Clock Domain for sound on r8a779[01] SoCs
+> >>
+> >> >       ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain for sound
+> >> >       ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain for sound
+> >>
+> >> These two should actually go in in v4.3, as they're bugfixes for commits that
+> >> are in v4.3-rc1. That can be done in parallel, though.
+> >>
+> >> Sound will stop working in mainline as soon as commit cbc41d0a761bffb3
+> >> ("drivers: sh: Disable PM runtime for multi-platform ARM with genpd") in
+> >> sh-drivers-for-v4.3 enters mainline.
+> >
+> > The commits are on the top of the branch, so we could just remove them
+> > here and apply them to the fixes branch if you like.
+> 
+> That sounds fine to me, thanks!
+> 
+> Simon, is that OK for you?
 
-Ard,
-
-I picked this patch based on the our initial discussion on 16K page size
-series, and added it to the V2 of the series.
-
-	https://lkml.org/lkml/2015/9/15/716
-
-
-> ---
->   Documentation/arm64/booting.txt | 3 ++-
->   arch/arm64/kernel/image.h       | 4 +++-
->   2 files changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> index 1690350f16e7..46056e7d766e 100644
-> --- a/Documentation/arm64/booting.txt
-> +++ b/Documentation/arm64/booting.txt
-> @@ -104,7 +104,8 @@ Header notes:
->   - The flags field (introduced in v3.17) is a little-endian 64-bit field
->     composed as follows:
->     Bit 0: 	Kernel endianness.  1 if BE, 0 if LE.
-> -  Bits 1-63:	Reserved.
-> +  Bits 1-2:	Kernel page size.   0=unspecified, 1=4K, 2=16K, 3=64K
-> +  Bits 3-63:	Reserved.
->
->   - When image_size is zero, a bootloader should attempt to keep as much
->     memory as possible free for use by the kernel immediately after the
-> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
-> index 8fae0756e175..5def289bda84 100644
-> --- a/arch/arm64/kernel/image.h
-> +++ b/arch/arm64/kernel/image.h
-> @@ -47,7 +47,9 @@
->   #define __HEAD_FLAG_BE	0
->   #endif
->
-> -#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0)
-> +#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
-> +
-> +#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0) | (__HEAD_FLAG_PAGE_SIZE << 1)
->
-
-FWIW,
-
-	Tested-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-
-
-Thanks
-Suzuki
+Yes, perfectly fine.
