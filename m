@@ -1,44 +1,27 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 18 Sep 2015 12:19:19 -0700
-Subject: [PATCH 0/3] Add __ioread32_copy() and use it
-In-Reply-To: <20150916025546.GE1747@two.firstfloor.org>
-References: <1442346089-32077-1-git-send-email-sboyd@codeaurora.org>
- <20150915155815.5a41a8dc537610ab44d8d3dc@linux-foundation.org>
- <20150916023219.GD1747@two.firstfloor.org>
- <20150915195031.0a1756a2.akpm@linux-foundation.org>
- <20150916025546.GE1747@two.firstfloor.org>
-Message-ID: <20150918121919.fa20552946703ae772d636e9@linux-foundation.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 18 Sep 2015 12:22:56 -0700
+Subject: [PATCH v2 2/3] soc: brcmstb: Add Bus Interface Unit control setup
+In-Reply-To: <1442340900-15320-3-git-send-email-f.fainelli@gmail.com>
+References: <1442340900-15320-1-git-send-email-f.fainelli@gmail.com>
+ <1442340900-15320-3-git-send-email-f.fainelli@gmail.com>
+Message-ID: <55FC6490.7000204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Sep 2015 04:55:46 +0200 Andi Kleen <andi@firstfloor.org> wrote:
-
-> > Under what circumstances will the compiler (or linker?) do this? 
+On 15/09/15 11:14, Florian Fainelli wrote:
+> Broadcom STB SoCs (brcmstb) require an early setup of their Bus
+> Interface Unit control register, this needs to happen before SMP is
+> brought up because it affects how the CPU complex will be interfaced to
+> the memory controller.
 > 
-> Compiler.
+> Add support code which properly initializes the BIU registers based on
+> whether "brcm,write-pairing" is present in Device Tree, and take care of
+> saving and restoring credit register settings during system-wide
+> suspend/resume operations.
 > 
-> > LTO enabled?
-> 
-> Yes it's for LTO.  The optimization allows the compiler to drop unused
-> functions, which is very popular with users (a lot use it to get smaller
-> kernel images)
-> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Does this look truthful and complete?
-
-
---- a/include/linux/compiler-gcc.h~a
-+++ a/include/linux/compiler-gcc.h
-@@ -205,7 +205,10 @@
- 
- #if GCC_VERSION >= 40600
- /*
-- * Tell the optimizer that something else uses this function or variable.
-+ * When used with Link Time Optimization, gcc can optimize away C functions or
-+ * variables which are referenced only from assembly code.  __visible tells the
-+ * optimizer that something else uses this function or variable, thus preventing
-+ * this.
-  */
- #define __visible	__attribute__((externally_visible))
- #endif
-_
+Applied to soc/next with Gregory's tag and the revised function
+prototype returning void.
+-- 
+Florian
