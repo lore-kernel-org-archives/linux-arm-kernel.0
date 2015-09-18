@@ -1,48 +1,64 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 18 Sep 2015 13:16:34 -0500
-Subject: [PATCH 5/5] ARM: dts: beagle-x15: Enable the system mailboxes 5 and 6
+Date: Fri, 18 Sep 2015 13:16:30 -0500
+Subject: [PATCH 1/5] ARM: dts: DRA74x: Add IPC sub-mailbox nodes for all IPUs
+ & DSPs
 In-Reply-To: <1442600194-62520-1-git-send-email-s-anna@ti.com>
 References: <1442600194-62520-1-git-send-email-s-anna@ti.com>
-Message-ID: <1442600194-62520-6-git-send-email-s-anna@ti.com>
+Message-ID: <1442600194-62520-2-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the System Mailboxes 5 and 6 and the corresponding child
-sub-mailbox (IPC 3.x) nodes for the Beagle X15 EVM boards. This
-is needed to enable communication with the respective remote
-processors IPU1, IPU2, DSP1 and DSP2 from the MPU.
+Add the sub-mailbox nodes that are used to communicate between
+MPU and the remote processors IPU1, IPU2, DSP1 and DSP2.
+
+The sub-mailbox nodes utilize the System Mailbox instances 5 and 6.
+These sub-mailbox nodes are added to match the hard-coded mailbox
+configuration used within the TI IPC 3.x software package. The
+Dual-Cortex M4 IPU1 and IPU2 processor sub-systems are assumed to
+be running in SMP-mode, and hence only a single sub-mailbox node
+is added for each.
+
+All these sub-mailbox nodes are left in disabled state, and should
+be enabled (and modified if needed) as per the individual product
+configuration in the corresponding board dts files.
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/boot/dts/am57xx-beagle-x15.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/dra74x.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index 3a05b94f59ed..4a13419ab025 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -696,3 +696,23 @@
- &pcie1 {
- 	gpios = <&gpio2 8 GPIO_ACTIVE_LOW>;
+diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
+index feea98e0a4b5..33d11c2c8af3 100644
+--- a/arch/arm/boot/dts/dra74x.dtsi
++++ b/arch/arm/boot/dts/dra74x.dtsi
+@@ -93,3 +93,29 @@
+ 		 <&dss_video2_clk>;
+ 	clock-names = "fck", "video1_clk", "video2_clk";
  };
 +
 +&mailbox5 {
-+	status = "okay";
 +	mbox_ipu1_ipc3x: mbox_ipu1_ipc3x {
-+		status = "okay";
++		ti,mbox-tx = <6 2 2>;
++		ti,mbox-rx = <4 2 2>;
++		status = "disabled";
 +	};
 +	mbox_dsp1_ipc3x: mbox_dsp1_ipc3x {
-+		status = "okay";
++		ti,mbox-tx = <5 2 2>;
++		ti,mbox-rx = <1 2 2>;
++		status = "disabled";
 +	};
 +};
 +
 +&mailbox6 {
-+	status = "okay";
 +	mbox_ipu2_ipc3x: mbox_ipu2_ipc3x {
-+		status = "okay";
++		ti,mbox-tx = <6 2 2>;
++		ti,mbox-rx = <4 2 2>;
++		status = "disabled";
 +	};
 +	mbox_dsp2_ipc3x: mbox_dsp2_ipc3x {
-+		status = "okay";
++		ti,mbox-tx = <5 2 2>;
++		ti,mbox-rx = <1 2 2>;
++		status = "disabled";
 +	};
 +};
 -- 
