@@ -1,132 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Sep 2015 13:13:12 +0100
-Subject: mvneta: SGMII fixed-link not so fixed
-In-Reply-To: <55FBF59E.3010205@list.ru>
-References: <20150914103207.GH21084@n2100.arm.linux.org.uk>
- <55F6AA25.2070603@list.ru>
- <20150914114209.GL21084@n2100.arm.linux.org.uk>
- <20150917.151247.2129216999071943354.davem@davemloft.net>
- <20150917231422.GY21084@n2100.arm.linux.org.uk>
- <55FBF59E.3010205@list.ru>
-Message-ID: <20150918121311.GD21084@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 18 Sep 2015 14:19:05 +0200
+Subject: [PATCH 0/5] ARM: sunxi: Introduce CHIP support
+In-Reply-To: <2353279.QTDzFUHVnF@wuerfel>
+References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
+ <2353279.QTDzFUHVnF@wuerfel>
+Message-ID: <20150918121905.GO4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 02:29:34PM +0300, Stas Sergeev wrote:
-> 18.09.2015 02:14, Russell King - ARM Linux ?????:
-> >  _But_ using the in-band status
-> >    property fundamentally requires this for mvneta to behave correctly:
+Hi Arnd,
+
+On Fri, Sep 18, 2015 at 11:02:33AM +0200, Arnd Bergmann wrote:
+> On Friday 18 September 2015 10:48:45 Maxime Ripard wrote:
 > > 
-> > 		phy-mode = "sgmii";
-> > 		managed = "in-band-status";
-> > 		fixed-link {
-> > 		};
+> > Here is a serie introducing the support for the Allwinner R8 and the
+> > Nextthing's CHIP.
 > > 
-> >    with _no_ phy node.
-> I don't understand this one.
-> At least for me it works without empty fixed-link.
-> There may be some bug.
+> > Support is almost complete for the CHIP itself, the only missing part
+> > for now is the WiFi chip that needs to be powered through two combined
+> > regulators (AXP209's LDO3 and LDO4). The audio codec is also missing
+> > since it's not already enabled in the DT.
+> > 
+> > Both these features will be addressed eventually.
+> > 
+> > Let me know what you think,
+> 
+> Very nice!
+> 
+> When you get to the WiFi support, please loop in Ulf and me to the Cc list.
 
-        if (cause_rx_tx & MVNETA_MISCINTR_INTR_MASK) {
-                u32 cause_misc = mvreg_read(pp, MVNETA_INTR_MISC_CAUSE);
+Ack.
 
-                mvreg_write(pp, MVNETA_INTR_MISC_CAUSE, 0);
-                if (pp->use_inband_status && (cause_misc &
-                                (MVNETA_CAUSE_PHY_STATUS_CHANGE |
-                                 MVNETA_CAUSE_LINK_CHANGE |
-                                 MVNETA_CAUSE_PSC_SYNC_CHANGE))) {
-                        mvneta_fixed_link_update(pp, pp->phy_dev);
-                }
+> IIRC there were some open questions about how we should handle SDIO wifi
+> controllers with special requirements like this, both in general and
+> in particular with this driver.
 
-pp->use_inband_status is set when managed = "in-band-status" is set.
-We detect changes in the in-band status, and call mvneta_fixed_link_update():
+There's actually two issues that are pretty orthogonal:
 
-mvneta_fixed_link_update() reads the status, and communicates that into
-the fixed-link phy:
+  * the fact that the regulator to power the wifi chip needs to be
+    enabled before it enumerates and the driver is probed. The MMC
+    pwrseq stuff seems to fix that, even if it doesn't really fit in
+    the usual DT model.
 
-        u32 gmac_stat = mvreg_read(pp, MVNETA_GMAC_STATUS);
+  * The fact that that regulator on this board is actually two
+    regulators in parallel that needs to be controlled in parallel
+    too. Here, it will probably require a new regulator driver to
+    combine two regulators into one.
 
-	... code setting status.* values from gmac_stat ...
-        changed.link = 1;
-        changed.speed = 1;
-        changed.duplex = 1;
-	fixed_phy_update_state(phy, &status, &changed);
-
-fixed_phy_update_state() then looks up the phy in its list, comparing only
-the address:
-
-        if (!phydev || !phydev->bus)
-                return -EINVAL;
-
-        list_for_each_entry(fp, &fmb->phys, node) {
-                if (fp->addr == phydev->addr) {
-
-updating fp->* with the new state, calling fixed_phy_update_regs().  This
-updates the fixed-link phy emulated registers, and phylib then notices
-the change in link status, and notifies the netdevice attached to the
-PHY it found of the change.
-
-Now, one of two things happens as a result of this:
-
-1. If pp->phy_dev is a fixed-link phy, this finds the correct fixed-link
-   phy to update its "fixed-link" properties, and the "not so fixed" phy
-   changes its parameters according to the new status.
-
-2. If pp->phy_dev is a MDIO phy which matches the address of a fixed-link
-   phy, the fixed-link phy state is updated with the new parameters, and
-   some other net device in the system changes link state - the settings
-   are not communicated back to the mvneta instance which changed link
-   state.
-
-3. If pp->phy_dev is a MDIO phy but does not match a fixed-link phy,
-   nothing happens and fixed_phy_update_state() returns -ENOENT.  Again,
-   the settings are not communicated back to the mvneta instance which
-   changed link state.
-
-Now, a fixed-link phy is only created in mvneta when there is no MDIO phy
-specified, but when there is a fixed-link specification in DT:
-
-        phy_node = of_parse_phandle(dn, "phy", 0);
-        if (!phy_node) {
-                if (!of_phy_is_fixed_link(dn)) {
-                        dev_err(&pdev->dev, "no PHY specified\n");
-                        err = -ENODEV;
-                        goto err_free_irq;
-                }
-
-                err = of_phy_register_fixed_link(dn);
-                if (err < 0) {
-                        dev_err(&pdev->dev, "cannot register fixed PHY\n");
-                        goto err_free_irq;
-                }
-
-If there's neither a MDIO PHY nor a fixed-link, then the network driver
-fails to initialise the device.
-
-> > What I don't know is how many generations of the mvneta hardware have
-> > support for both serdes modes, but what I'm basically saying is that
-> > the solution we now have seems to be somewhat lacking - maybe it should
-> > have been "auto", "in-band-sgmii" and "in-band-1000base-x" with the
-> > ability to add additional modes later.
->
-> Well, you need to be quick with such a change, esp now when the patch
-> was queued to -stable.
-> What alternatives do we have here?
-> Will the following work too?
->  		phy-mode = "1000base-x";
->  		managed = "in-band-status";
-
-There's no chance of being "quick" here - the issues are complex and not
-trivial to solve in a day - I've already spent all week thinking about
-the issues here, and I'm only _just_ starting to come up with a potential
-solution this morning, though I haven't yet assessed whether it'll be
-feasible.
-
-The problem I have with the above is that it fixes the phy mode to either
-SGMII or 1000base-X, whereas what we need for the SFP case is to have the
-down-link object tell the MAC driver whether it wants SGMII or 1000base-X
-mode.
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150918/a88edb14/attachment-0001.sig>
