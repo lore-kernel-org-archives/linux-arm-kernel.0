@@ -1,66 +1,94 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Sep 2015 21:45:50 +0200
-Subject: [PATCH 2/3] PCI: Add quirks for devices found on Cavium ThunderX
- SoCs.
-In-Reply-To: <55FC4330.10302@caviumnetworks.com>
-References: <1442529694-1792-1-git-send-email-ddaney.cavm@gmail.com>
- <3066583.BWDZlYWxXU@wuerfel> <55FC4330.10302@caviumnetworks.com>
-Message-ID: <2512701.zkjk3n3AQS@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 18 Sep 2015 21:53:00 +0200
+Subject: [PATCH 2/3] ARM: dts: sun5i: Add sun5i-q8-common.dtsi
+In-Reply-To: <55F19C43.2000601@redhat.com>
+References: <1441464953-26351-1-git-send-email-hdegoede@redhat.com>
+ <1441464953-26351-2-git-send-email-hdegoede@redhat.com>
+ <20150908143320.GB31584@lukather> <55EF529B.80401@redhat.com>
+ <20150909140156.GC9885@lukather> <55F19C43.2000601@redhat.com>
+Message-ID: <20150918195300.GX4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 September 2015 10:00:32 David Daney wrote:
-> On 09/18/2015 12:19 AM, Arnd Bergmann wrote:
-> > On Thursday 17 September 2015 15:41:33 David Daney wrote:
-> >> From: David Daney <david.daney@cavium.com>
+On Thu, Sep 10, 2015 at 05:05:39PM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 09-09-15 16:01, Maxime Ripard wrote:
+> >On Tue, Sep 08, 2015 at 11:26:51PM +0200, Hans de Goede wrote:
+> >>Hi,
 > >>
-> >> The on-chip devices all have fixed bars.  So, fix them up.
+> >>On 09/08/2015 04:33 PM, Maxime Ripard wrote:
+> >>>On Sat, Sep 05, 2015 at 04:55:52PM +0200, Hans de Goede wrote:
+> >>>>This is the sun5i / a13 version of sun8i-q8-common.dtsi for use in dts
+> >>>>files for a13 q8 based tablets. Compared to sun8i this uses uart1 for the
+> >>>>serial console, and PG0 for card-detect for mmc0.
+> >>>>
+> >>>>This also adds pmic and otg support, which both use the same config on
+> >>>>all known q8 a13 devices. This is not present in sun5i-q8-common.dtsi
+> >>>>because pmic / otg support for sun8i has not yet been merged.
+> >>>>
+> >>>>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>>
+> >>>Are we going to have any user but the one you posted in the patch 3
+> >>>planned?
 > >>
-> >> Signed-off-by: David Daney <david.daney@cavium.com>
+> >>Depends on what I can get my hands on / what is in the post atm.
 > >>
+> >>One difference in fex files of different 18 variants is how the usb wifi is
+> >>powered, either via a gpio or via ldo3. Also there are differences in which
+> >>accelerometer is used, so eventually I expect there to be several users
+> >>of this dtsi.
 > >
-> > You should be able to just mark the BARs as fixed in DT
+> >But no difference in the SoC used (A13 vs A10s)?
+> >
+> >I'm not sure having 18 DTs for a single board name is going to be
+> >really helpful.
 > 
-> In the case of ACPI, there is no DT.  So we would need a different 
-> solution for ACPI.  What would you recommend for ACPI?
-
-I would expect that this does not matter at all on ACPI, because
-the devices that need it are not hot-plugged, and all boot-time
-devices are probed by the firmware: the ACPI PCI implementation
-does not reassign any BARs, except for the hotplug case.
-
-> Also, can you point me to the OF device tree specification where it 
-> tells how to specify PCI BAR addresses, I would especially be interested 
-> in knowing how to specify fixed SRIOV BAR addresses in the device tree.
-
-This is the 'n' bit mentioned sections 2.1.3 and 2.2.1.1 of the
-PCI binding. When it is set, the OS is not supposed to try to
-reassign the BAR even on machines that otherwise do a complete
-rescan.
-
-The PCI binding traditionally requires you to list all PCI devices
-in DT, Linux as an extension (for the flattened DT format) allows
-leaving out the devices, but in this case you probably need to
-list every device that has a fixed BAR.
-
-> Yes, it is a bit of a hack.  That is why I put it in its own file, and 
-> only try to hack up PCI devices that exactly match the vendor and device 
-> ids that need fixing.
+> Sorry I meant to write q8 not 18 :)
 > 
-> IMHO, putting infrastructure into drivers/pci/probe.c, et al. to handle 
-> this would be much more intrusive.
+> >It would be something to be supported by some quirks
+> >mechanism, instead of having to require the user to pick the right one.
+> 
+> Agreed, which is why I added a generic sun5i-a13-q8-tablet.dts, which
+> can then later be extended with quirks and such to get all the different
+> variants supported. Which I guess means that the contents of
+> sun5i-q8-common.dtsi can be folded into sun5i-a13-q8-tablet.dts, otoh
+> we may have some special cases which do require a separate dts and
+> having sun5i-q8-common.dtsi follows the same scheme as used for the
+> a23 / a33 tablets. In the future we should probably also add
+> sun8i-a23-q8-tablet.dts and sun8i-a33-q8-tablet.dts files and make
+> the existing ones just empty files with a single #include for
+> compatibility.
+> 
+> If possible I would like to at least have you queue up the default
+> sun5i-a13-q8-tablet.dts so that we've a dts file for a13 based tablets
+> which at least gets the basics going.
+> 
+> Either in its current form, or with it and sun5i-q8-common.dtsi
+> squashed together. If you want a squashed version let me know and
+> I'll do a resend.
+> 
+> Are you coming to ELCE ? I think the both of us should go to:
+> 
+> http://lceeu2015.sched.org/event/999c45c7fe78824a88269f35539c7e5c#.VfGcCLPYqlM
+> 
+> (Device Tree NG BoF) and try to hash out a solution for this there,
+> the quirks / variants stuff sounds good, but I wonder how far along
+> that is ?
 
-My guess is that it's already there, but even if it's not, this is a
-generic well-defined case that has a standardized binding, and we should
-implement that.
+I will be to the technical showcase, but we can always discuss with
+Pantelis a bit later :)
 
-> For the record:  The PCI Enhanced Allocation (EA) capability (approved 
-> by PCI SIG on 23 October 2014) is the proper way to handle this going 
-> forward.  However, this is not yet implemented in the SoCs that this 
-> patch addresses.  Our plan is to implement the EA capability in the core 
-> PCI code, so that we do not need to keep adding devices to this fixup code.
+Maxime
 
-Good, but still this should only be required for the embedded case where
-you don't have a firmware to probe the bus.
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150918/a4d774dd/attachment.sig>
