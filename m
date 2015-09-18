@@ -1,34 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Sep 2015 23:30:05 +0200
-Subject: [PATCH v2 4/9] ARM: dts: Put Cygnus core components under core bus
-In-Reply-To: <1442611454-16331-5-git-send-email-rjui@broadcom.com>
+Date: Fri, 18 Sep 2015 23:34:30 +0200
+Subject: [PATCH v2 5/9] ARM: dts: Move all Cygnus peripherals into soc bus
+In-Reply-To: <1442611454-16331-6-git-send-email-rjui@broadcom.com>
 References: <1442611454-16331-1-git-send-email-rjui@broadcom.com>
- <1442611454-16331-5-git-send-email-rjui@broadcom.com>
-Message-ID: <1472876.fGCm1r9KFG@wuerfel>
+ <1442611454-16331-6-git-send-email-rjui@broadcom.com>
+Message-ID: <1929872.EmD9YkfFuv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 September 2015 14:24:09 Ray Jui wrote:
-> 
-> +       core {
+On Friday 18 September 2015 14:24:10 Ray Jui wrote:
+> +       soc {
 > +               compatible = "simple-bus";
 > +               ranges;
 > +               #address-cells = <1>;
 > +               #size-cells = <1>;
-> +
-> +               timer at 19020200 {
-> +                       compatible = "arm,cortex-a9-global-timer";
-> +                       reg = <0x19020200 0x100>;
-> +                       interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&periph_clk>;
-> +               };
-> +
-> +               gic: interrupt-controller at 19021000 {
+
+> +               pinctrl: pinctrl at 0301d0c8 {
 > 
 
-Could it be that all 'core' components are in the 0x19xxxxxx address range?
-If so, please set up an appropriate ranges property for the bus. Also
-add the address field for the bus according to which addresses are routed
-to it.
+Similarly to the core bus, this seems to have address ranges 0x03xxxxxx and
+0x18xxxxxx on it, so put those into the ranges.
+
+It probably also makes sense to name the bus according to what kind of
+bus (axi, ahb, plb, ...) is used here. If the soc has nested buses
+(e.g. an ahb connected to an axi bus,) then model both of them in the DT.
 
 	Arnd
