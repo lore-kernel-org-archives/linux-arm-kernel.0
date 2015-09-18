@@ -1,29 +1,20 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Fri, 18 Sep 2015 14:09:00 -0700
-Subject: [PATCH] arm64: debug: Fix typo in debug-monitors.c
-Message-ID: <1442610540-8393-1-git-send-email-yang.shi@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Sep 2015 23:28:28 +0200
+Subject: [PATCH v2 3/9] ARM: dts: Remove unused PCI I/O resource in Cygnus
+In-Reply-To: <1442611454-16331-4-git-send-email-rjui@broadcom.com>
+References: <1442611454-16331-1-git-send-email-rjui@broadcom.com>
+ <1442611454-16331-4-git-send-email-rjui@broadcom.com>
+Message-ID: <4598126.bTshpfCuvX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix handers to handlers.
+On Friday 18 September 2015 14:24:08 Ray Jui wrote:
+> Remove unused PCI I/O resource in bcm-cygnus.dtsi
+> 
+> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> 
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
- arch/arm64/kernel/debug-monitors.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Why? How do you know that nobody ever plugs in a card with I/O ports?
 
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index cebf786..8eef30f 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -201,7 +201,7 @@ void unregister_step_hook(struct step_hook *hook)
- }
- 
- /*
-- * Call registered single step handers
-+ * Call registered single step handlers
-  * There is no Syndrome info to check for determining the handler.
-  * So we call all the registered handlers, until the right handler is
-  * found which returns zero.
--- 
-2.0.2
+	Arnd
