@@ -1,61 +1,56 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Fri, 18 Sep 2015 15:10:11 +0200
-Subject: [PATCH v4 1/3] leds: netxbig: add device tree binding
-In-Reply-To: <55FBEC38.6020209@samsung.com>
-References: <1442505571-9744-1-git-send-email-simon.guinot@sequanux.org>
- <1442505571-9744-2-git-send-email-simon.guinot@sequanux.org>
- <55FBD679.2020402@samsung.com>
- <20150918103006.GM7306@kw.sim.vm.gnt>
- <55FBEC38.6020209@samsung.com>
-Message-ID: <20150918131011.GN7306@kw.sim.vm.gnt>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Fri, 18 Sep 2015 22:02:50 +0900
+Subject: [PATCH v2] arm64: Introduce IRQ stack
+In-Reply-To: <20150917170705.GQ25444@e104818-lin.cambridge.arm.com>
+References: <1442155337-7020-1-git-send-email-jungseoklee85@gmail.com>
+ <20150916112520.GH28771@arm.com> <55FA9708.5070200@arm.com>
+ <8C4599C6-E5F8-4527-AAFF-9FEF295526BB@gmail.com>
+ <20150917170705.GQ25444@e104818-lin.cambridge.arm.com>
+Message-ID: <669F484A-EB71-4D14-B09F-4AD341631EF2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 12:49:28PM +0200, Jacek Anaszewski wrote:
-> >>
-> >>Moreover, if you switched to using devm* prefixed version of
-> >>gpio_request_one and led_classdev_reqister, you could simplify
-> >>the error paths in the driver.
-> >
-> >Yes, I have a pending patch for this conversion. But since it is not
-> >really related with the subject of this patch series (add DT support),
-> >I was planning to send it next.
-> >
-> >Do you want me to include this patch into this series.
+On Sep 18, 2015, at 2:07 AM, Catalin Marinas wrote:
+> On Thu, Sep 17, 2015 at 09:36:04PM +0900, Jungseok Lee wrote:
+>> On Sep 17, 2015, at 7:33 PM, James Morse wrote:
+>>> On 16/09/15 12:25, Will Deacon wrote:
+>>>> On Sun, Sep 13, 2015 at 03:42:17PM +0100, Jungseok Lee wrote:
+>>>>> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+>>>>> index dcd06d1..44839c0 100644
+>>>>> --- a/arch/arm64/include/asm/thread_info.h
+>>>>> +++ b/arch/arm64/include/asm/thread_info.h
+>>>>> @@ -73,8 +73,11 @@ static inline struct thread_info *current_thread_info(void) __attribute_const__;
+>>>>> 
+>>>>> static inline struct thread_info *current_thread_info(void)
+>>>>> {
+>>>>> -	return (struct thread_info *)
+>>>>> -		(current_stack_pointer & ~(THREAD_SIZE - 1));
+>>>>> +	unsigned long sp_el0;
+>>>>> +
+>>>>> +	asm volatile("mrs %0, sp_el0" : "=r" (sp_el0));
+>>>>> +
+>>>>> +	return (struct thread_info *)(sp_el0 & ~(THREAD_SIZE - 1));
+>>>> 
+>>>> This looks like it will generate worse code than our current implementation,
+>>>> thanks to the asm volatile. Maybe just add something like a global
+>>>> current_stack_pointer_el0?
+> [...]
+>> --- a/arch/arm64/include/asm/thread_info.h
+>> +++ b/arch/arm64/include/asm/thread_info.h
+>> @@ -77,7 +77,7 @@ static inline struct thread_info *current_thread_info(void)
+>> 
+>> 	asm volatile("mrs %0, sp_el0" : "=r" (sp_el0));
+>> 
+>> -	return (struct thread_info *)(sp_el0 & ~(THREAD_SIZE - 1));
+>> +	return (struct thread_info *)sp_el0;
+>> }
 > 
-> Why not, if you have it ready to go. If it needs some polishing,
-> we can live with what we have now.
+> This makes sense, since we just use sp_el0 as a scratch register, store
+> the current thread_info address directly. But, as James mentioned, I
+> don't think you need asm volatile, just asm (it has a small impact in my
+> tests).
 
-No, the patch is ready. I'll add it.
+I will squash this change into the original one without volatile.
 
-> >>>+static const struct of_device_id of_netxbig_leds_match[] = {
-> >>>+	{ .compatible = "lacie,netxbig-leds", },
-> >>>+	{},
-> >>>+};
-> >>>+#else
-> >>>+static int netxbig_leds_get_of_pdata(struct device *dev,
-> >>>+				     struct netxbig_led_platform_data *pdata)
-> >>
-> >>s/static int/static inline int/
-> >
-> >Is that not already the case with modern compiler ?
-> 
-> Could you elaborate on this?
-
-There is not much to say. netxbig_leds_get_of_pdata is a single line of
-code. I am not a gcc expert but I am quite confident that this function
-will be inlined anyway (given the optimisation level used to compile the
-Linux kernel). That's it.
-
-But there is nothing wrong by adding "inline" neither.
-
-Thanks,
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150918/0ce39947/attachment.sig>
+Best Regards
+Jungseok Lee
