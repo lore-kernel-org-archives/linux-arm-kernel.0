@@ -1,35 +1,35 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 18 Sep 2015 13:14:57 +0900
-Subject: [PATCH v2 1/3] ARM: uniphier: add outer cache support
-In-Reply-To: <1442211992-13177-2-git-send-email-yamada.masahiro@socionext.com>
+Date: Fri, 18 Sep 2015 13:15:40 +0900
+Subject: [PATCH v2 0/3] ARM: uniphier: add outer cache support and rework
+ SMP operations
+In-Reply-To: <1442211992-13177-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1442211992-13177-1-git-send-email-yamada.masahiro@socionext.com>
- <1442211992-13177-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNAQv2igf1XWeBp2FntvyfDieOFUmxovx5NMSmRB8Doramw@mail.gmail.com>
+Message-ID: <CAK7LNAQP=nf+XRQoJoP6NSd1KZoHoZJMiWf7-pfTJVKSZy3UEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2015-09-14 15:26 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-
-> diff --git a/arch/arm/mach-uniphier/uniphier.c b/arch/arm/mach-uniphier/uniphier.c
-> index 9be10ef..26042e3 100644
-> --- a/arch/arm/mach-uniphier/uniphier.c
-> +++ b/arch/arm/mach-uniphier/uniphier.c
-> @@ -12,6 +12,10 @@
->   * GNU General Public License for more details.
->   */
+> Hi Olof,
 >
-> +#define pr_fmt(fmt)            "uniphier: " fmt
-> +
-> +#include <linux/of_platform.h>
-> +#include <asm/hardware/cache-uniphier.h>
->  #include <asm/mach/arch.h>
+> Now Linux 4.3-rc1 is out, so I am back to this.
 >
->  static const char * const uniphier_dt_compat[] __initconst = {
+> 1/3: add outer cache support
+> 2/3: rework SMP operations
+> 3/3: add device tree nodes
+>
+> Because 2/3 highly depends on 1/3, I hope whole of this series
+> is applied through ARM-SOC tree.
+>
+>
+> Changes in v2:
+>   - Use pr_fmt() to have pr_<level> are automatically prefixed
+>   - Re-design to initialize the outer cache earlier in init_IRQ()
+>   - Require DT properties such as "cacne-unified", "cache-size",
+>     "cache-sets", "cache-size", "cache-line-size".
+>   - Follow "next-level-cache" property to search further outer caches
+>
 
-
-
-This change is unnecessary.   I will fix it in v3.
-
+This series will be replaced with v3.
 
 
 
