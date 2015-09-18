@@ -1,80 +1,41 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 18 Sep 2015 16:09:22 +0200
-Subject: [PATCH] ARM: at91/dt: ov2640: add hsync/vsync-active property
-In-Reply-To: <1442575702-22315-1-git-send-email-josh.wu@atmel.com>
-References: <1442575702-22315-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <55FC1B12.8000703@atmel.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 18 Sep 2015 15:10:08 +0100
+Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
+In-Reply-To: <55F6B8CC.5090406@citrix.com>
+References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+ <55F68BC9.6020509@citrix.com> <55F6A437.3040403@citrix.com>
+ <55F6A9DB.8040503@citrix.com> <55F6ADAE.1010609@citrix.com>
+ <55F6B8CC.5090406@citrix.com>
+Message-ID: <55FC1B40.9000401@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 18/09/2015 13:28, Josh Wu a ?crit :
-> On at91sam9x5ek/at91sam9m10g45ek/sama5d3xek boards, we use the parallel
-> connection for ov2640. So we must set the hsync/vsync property (1 means
-> active high).
-> Otherwise, the connection would be seen as BT.656 or BT.1120.
+Hi Roger,
+
+On 14/09/15 13:08, Roger Pau Monn? wrote:
+> Well, absolute numbers together with the standard deviation are IMHO the
+> best way to provide those figures (ie: see ministat(1) output for
+> example), but percentages should also be fine.
 > 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> I'm just interested in knowing the performance difference between having
+> this patches applied or not when using 4KB pages on the frontend and the
+> backend.
 
-Hi Josh,
+I did some benchmark:
+	DOM0: 1 VCPU, 4G of RAM based on 4.3-rc1 without this series
+	GUEST: 4 VPUs, 4G of RAM, second disk associate to a nullbk device
 
-Does this patch apply because of the new enhancement that you had
-proposed in "media: atmel-isi: parse the DT parameters for
-vsync/hsync/pixclock polarity" or does it apply even before?
-Is it a fix that applies to older kernels?
+I used fio with the following options
 
-So, should I wait for the enhancements to enter media git tree or can I
-take them anyway?
+42sh> fio --name=test --ioengine=libaio --rw=read --numjobs=8 \
+--iodepth=32 --time_based=1 --runtime=30 --bs=4KB \
+--filename=/dev/xvdb--direct=1 --group_reporting=1 --iodepth_batch=16
 
-Bye,
+The guest is also based on 4.3-rc1 with and without the series.
 
-> ---
-> 
->  arch/arm/boot/dts/at91sam9m10g45ek.dts | 2 ++
->  arch/arm/boot/dts/at91sam9x5ek.dtsi    | 2 ++
->  arch/arm/boot/dts/sama5d3xmb.dtsi      | 2 ++
->  3 files changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> index d1ae60a..9d16ef8 100644
-> --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> @@ -198,6 +198,8 @@
->  					isi_0: endpoint {
->  						remote-endpoint = <&ov2640_0>;
->  						bus-width = <8>;
-> +						vsync-active = <1>;
-> +						hsync-active = <1>;
->  					};
->  				};
->  			};
-> diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> index d237c46..479f200 100644
-> --- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> @@ -66,6 +66,8 @@
->  					isi_0: endpoint at 0 {
->  						remote-endpoint = <&ov2640_0>;
->  						bus-width = <8>;
-> +						vsync-active = <1>;
-> +						hsync-active = <1>;
->  					};
->  				};
->  			};
-> diff --git a/arch/arm/boot/dts/sama5d3xmb.dtsi b/arch/arm/boot/dts/sama5d3xmb.dtsi
-> index 83bee7a..8901042 100644
-> --- a/arch/arm/boot/dts/sama5d3xmb.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3xmb.dtsi
-> @@ -87,6 +87,8 @@
->  					isi_0: endpoint {
->  						remote-endpoint = <&ov2640_0>;
->  						bus-width = <8>;
-> +						vsync-active = <1>;
-> +						hsync-active = <1>;
->  					};
->  				};
->  			};
-> 
+The overhead with my series is about 0.56%.
 
+Regards,
 
 -- 
-Nicolas Ferre
+Julien Grall
