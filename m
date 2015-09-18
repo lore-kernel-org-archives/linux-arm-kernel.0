@@ -1,194 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 18 Sep 2015 17:40:00 +0200
-Subject: [PATCH v1 2/2] arm64: errata: add module load workaround for erratum
- #843419
-In-Reply-To: <1442590800-14645-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1442590800-14645-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1442590800-14645-3-git-send-email-ard.biesheuvel@linaro.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 18 Sep 2015 17:31:37 +0200
+Subject: [PATCH V6 0/3] nvmem: add ocotp support for i.MX23 and i.MX28
+In-Reply-To: <1439418116-1833-1-git-send-email-stefan.wahren@i2se.com>
+References: <1439418116-1833-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <55FC2E59.5030504@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to work around Cortex-A53 erratum #843419, this patch updates
-the module loading logic to either change potentially problematic adrp
-instructions into adr instructions (if the symbol turns out to be in
-range), or emit a veneer that is guaranteed to be at an offset that does
-not trigger the issue.
+Hi Greg,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Kconfig                   | 21 ++++++++++++
- arch/arm64/include/asm/mod_veneers.h | 20 ++++++++++++
- arch/arm64/kernel/mod_veneers.c      | 33 +++++++++++++++++++
- arch/arm64/kernel/module.c           | 34 ++++++++++++++++++++
- 4 files changed, 108 insertions(+)
+Am 13.08.2015 um 00:21 schrieb Stefan Wahren:
+> This patch series brings read-only support for the On-Chip OTP cells
+> in the i.MX23 and i.MX28 processor.
+>
+> changes in V6:
+> - add COMPILE_TEST to dependancy
+> - remove unnecessary headers
+> - enable clock during read operation
+> - fix module license
+>
+> changes in V5:
+> - rebase to char-misc-next
+> - add nvmem prefix to module name
+> - set status in dtsi files
+>
+> changes in V4:
+> - rename fsl_ocotp.c to mxs-ocotp.c
+> - adapt driver to use NVMEM framework V7
+> - take care of hbus clock
+> - increase too small timeout
+> - implement a wait function
+> - use defines from stmp_device.h
+> - remove owner init
+> - more code cleanup
+>
+> changes in V3:
+> - drop write support
+> - take care of i.MX23 which has less registers
+> - drop unnecessary header file
+> - move static variables into driver data
+> - add devicetree probing
+> - fix missing bank closing in error case
+> - use kobj from platform device for sysfs
+> - add SYSFS to Kconfig
+> - add binding file
+> - code cleanup
+>
+> Stefan Wahren (3):
+>   DT: nvmem: add binding for mxs-ocotp
+>   nvmem: add driver for ocotp in i.MX23 and i.MX28
+>   ARM: mxs: enable ocotp for i.MX23 and i.MX28
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b591aac06fed..0f9e1d1235cb 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -337,6 +337,27 @@ endmenu
- config ARM64_MOD_VENEERS
- 	bool
- 
-+config ARM64_ERRATUM_843419
-+	bool "Cortex-A53: 843419: A load or store might access an incorrect address"
-+	depends on MODULES
-+	select ARM64_MOD_VENEERS
-+	default y
-+	help
-+	  This option applies special relocation logic when loading kernel
-+	  modules to prevent ADRP instructions from appearing in either of the
-+	  last two instruction slots in a 4 KB page. This can cause a subsequent
-+	  memory access to use an incorrect address on Cortex-A53 parts up to
-+	  r0p4. If such an instruction is subject to relocation, we either
-+	  change the ADRP instruction into an ADR instruction (if the symbol it
-+	  refers to is within 1 MB), or else we replace it by a call to a veneer
-+	  which executes the same instruction at a safe offset before branching
-+	  back past the original location.
-+
-+	  Note that the kernel itself must be linked with a version of ld which
-+	  fixes potentially affected ADRP instructions at build time.
-+
-+	  If unsure, say Y.
-+
- choice
- 	prompt "Page size"
- 	default ARM64_4K_PAGES
-diff --git a/arch/arm64/include/asm/mod_veneers.h b/arch/arm64/include/asm/mod_veneers.h
-new file mode 100644
-index 000000000000..3cf36ce91549
---- /dev/null
-+++ b/arch/arm64/include/asm/mod_veneers.h
-@@ -0,0 +1,20 @@
-+
-+#include <linux/types.h>
-+
-+struct veneer_erratum_843419 {
-+	u32	adrp;
-+	u32	branch;
-+};
-+
-+static inline bool erratum_843419_affects_adrp_insn(void *addr)
-+{
-+	/*
-+	 * The workaround for erratum 843419 only needs to be
-+	 * applied if the adrp instruction appears in either of
-+	 * the last two instruction slots in the 4 KB page.
-+	 */
-+	return ((u64)addr % SZ_4K) >= (SZ_4K - 8);
-+}
-+
-+void *emit_erratum_843419_veneer(struct module *mod, u32 *insn,
-+				 Elf64_Shdr *sechdrs);
-diff --git a/arch/arm64/kernel/mod_veneers.c b/arch/arm64/kernel/mod_veneers.c
-index 9649c4f305bd..7da300e59749 100644
---- a/arch/arm64/kernel/mod_veneers.c
-+++ b/arch/arm64/kernel/mod_veneers.c
-@@ -10,6 +10,8 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- 
-+#include <asm/mod_veneers.h>
-+
- static bool in_init(const struct module *mod, u64 addr)
- {
- 	return addr - (u64)mod->module_init < mod->init_size;
-@@ -32,6 +34,31 @@ static void *alloc_veneer(struct module *mod, u64 loc, int size,
- 	return ret;
- }
- 
-+#ifdef CONFIG_ARM64_ERRATUM_843419
-+void *emit_erratum_843419_veneer(struct module *mod, u32 *insn,
-+				 Elf64_Shdr *sechdrs)
-+{
-+	struct veneer_erratum_843419 *veneer;
-+
-+	veneer = alloc_veneer(mod, (u64)insn, 2 * sizeof(*veneer), sechdrs);
-+	if (erratum_843419_affects_adrp_insn(&veneer->adrp))
-+		/*
-+		 * We allocated a veneer that is susceptible to the same problem
-+		 * as the original location. We allocated twice the space, so
-+		 * just advance to the next slot.
-+		 */
-+		veneer++;
-+
-+	veneer->adrp = *insn;
-+	veneer->branch = aarch64_insn_gen_branch_imm(
-+				(unsigned long)&veneer->branch,
-+				(unsigned long)(insn + 1),
-+				AARCH64_INSN_BRANCH_NOLINK);
-+
-+	return veneer;
-+}
-+#endif
-+
- /* estimate the maximum size of the veneer for this relocation */
- static unsigned long get_veneers_size(Elf64_Addr base, const Elf64_Rela *rel,
- 				      int num)
-@@ -41,6 +68,12 @@ static unsigned long get_veneers_size(Elf64_Addr base, const Elf64_Rela *rel,
- 
- 	for (i = 0; i < num; i++)
- 		switch (ELF64_R_TYPE(rel[i].r_info)) {
-+		case R_AARCH64_ADR_PREL_PG_HI21_NC:
-+		case R_AARCH64_ADR_PREL_PG_HI21:
-+#ifdef CONFIG_ARM64_ERRATUM_843419
-+			ret += 2 * sizeof(struct veneer_erratum_843419);
-+#endif
-+			break;
- 		}
- 	return ret;
- }
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index 67bf4107f6ef..5d46f63c0111 100644
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -27,6 +27,7 @@
- #include <linux/vmalloc.h>
- #include <asm/alternative.h>
- #include <asm/insn.h>
-+#include <asm/mod_veneers.h>
- #include <asm/sections.h>
- 
- #define	AARCH64_INSN_IMM_MOVNZ		AARCH64_INSN_IMM_MAX
-@@ -335,6 +336,39 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
- 		case R_AARCH64_ADR_PREL_PG_HI21_NC:
- 			overflow_check = false;
- 		case R_AARCH64_ADR_PREL_PG_HI21:
-+#ifdef CONFIG_ARM64_ERRATUM_843419
-+			/*
-+			 * TODO check for presence of affected A53 cores
-+			 */
-+			if (erratum_843419_affects_adrp_insn(loc)) {
-+				struct veneer_erratum_843419 *v;
-+
-+				/*
-+				 * This adrp instruction appears at an offset
-+				 * that may be problematic on older Cortex-A53
-+				 * cores. So first, try to convert it into a
-+				 * simple adr instruction.
-+				 */
-+				ovf = reloc_insn_imm(RELOC_OP_PREL, loc,
-+						     val & ~(SZ_4K - 1), 0, 21,
-+						     AARCH64_INSN_IMM_ADR);
-+				if (ovf == 0) {
-+					/* success! convert adrp -> adr */
-+					*(u32 *)loc &= 0x7fffffff;
-+					break;
-+				}
-+
-+				/* symbol out of range for adr -> emit veneer */
-+				v = emit_erratum_843419_veneer(me, loc,
-+							       sechdrs);
-+				*(u32 *)loc = aarch64_insn_gen_branch_imm(
-+						(unsigned long)loc,
-+						(unsigned long)v,
-+						AARCH64_INSN_BRANCH_NOLINK);
-+				loc = &v->adrp;
-+				/* fall through */
-+			}
-+#endif
- 			ovf = reloc_insn_imm(RELOC_OP_PAGE, loc, val, 12, 21,
- 					     AARCH64_INSN_IMM_ADR);
- 			break;
--- 
-1.9.1
+the merge window is closed and patch #3 has been applied by Shawn.
+
+Is it possible for you to apply the rest of this series to char-misc-next?
+
+Kind regards
+Stefan
