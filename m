@@ -1,28 +1,43 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sat, 19 Sep 2015 07:12:13 +0800
-Subject: [PATCH v2 0/7] hwrng: Add support for STMicroelectronics' RNG IP
-In-Reply-To: <20150918155112.GE3218@x1>
-References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
- <20150918140756.GK9249@gondor.apana.org.au>
- <CAF2Aj3h7Jy=tpYdZTdbxAJwa=147_hAu3reOFrbEh=JdrMFWLQ@mail.gmail.com>
- <20150918151137.GA10763@gondor.apana.org.au>
- <20150918155112.GE3218@x1>
-Message-ID: <20150918231213.GA14278@gondor.apana.org.au>
+From: cengelma@gmx.at (Christian Engelmayer)
+Date: Sat, 19 Sep 2015 01:57:37 +0200
+Subject: [PATCH] [media] c8sectpfe: Fix uninitialized return in
+ load_c8sectpfe_fw_step1()
+Message-ID: <1442620657-31671-1-git-send-email-cengelma@gmx.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 04:51:12PM +0100, Lee Jones wrote:
->
-> I think it's okay for you to take all but patch 6.
-> 
-> Patch 6 is an ARM patch and needs to go into ARM SoC via
-> STMicroelectronics STi tree.
+In case of failure loading the firmware, function
+load_c8sectpfe_fw_step1() uses the uninitialized variable ret as return
+value instead of the retrieved error value. Make sure the result is
+deterministic. Detected by Coverity CID 1324230.
 
-In future please don't send me patches that you don't want me to
-merge in the series.
+Signed-off-by: Christian Engelmayer <cengelma@gmx.at>
+---
+Compile tested only. Applies against linux-next.
+---
+ drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Cheers,
+diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+index 486aef50d99b..16aa494f22be 100644
+--- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
++++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+@@ -1192,7 +1192,6 @@ err:
+ 
+ static int load_c8sectpfe_fw_step1(struct c8sectpfei *fei)
+ {
+-	int ret;
+ 	int err;
+ 
+ 	dev_info(fei->dev, "Loading firmware: %s\n", FIRMWARE_MEMDMA);
+@@ -1207,7 +1206,7 @@ static int load_c8sectpfe_fw_step1(struct c8sectpfei *fei)
+ 	if (err) {
+ 		dev_err(fei->dev, "request_firmware_nowait err: %d.\n", err);
+ 		complete_all(&fei->fw_ack);
+-		return ret;
++		return err;
+ 	}
+ 
+ 	return 0;
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.9.1
