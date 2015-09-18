@@ -1,95 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Sep 2015 09:14:59 +0100
-Subject: mvneta: SGMII fixed-link not so fixed
-In-Reply-To: <55FB4E8C.6050307@gmail.com>
-References: <20150914103207.GH21084@n2100.arm.linux.org.uk>
- <55F6AA25.2070603@list.ru>
- <20150914114209.GL21084@n2100.arm.linux.org.uk>
- <20150917.151247.2129216999071943354.davem@davemloft.net>
- <20150917231422.GY21084@n2100.arm.linux.org.uk>
- <55FB4E8C.6050307@gmail.com>
-Message-ID: <20150918081459.GZ21084@n2100.arm.linux.org.uk>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Fri, 18 Sep 2015 09:17:45 +0100
+Subject: [PATCH] arm64: expose kernel page size in Image header flags
+In-Reply-To: <1442482345-7679-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1442482345-7679-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <55FBC8A9.8090402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 04:36:44PM -0700, Florian Fainelli wrote:
-> On 17/09/15 16:14, Russell King - ARM Linux wrote:
-> 
-> [snip]
-> 
-> >    with _no_ phy node.
-> > 
-> > 4. Going back to the SFP problem, the link is only up when the SFP
-> >    module pins indicate that there's no transmitter fault, no loss of
-> >    signal _and_ the PCS layer at the MAC indicates that it has completed
-> >    negotiation.  This pretty much rules out trying to emulate a SFP cage
-> >    as a software-based PHY.  I've code right now doing exactly that, and
-> >    it results in netif_carrier_on() being called far too early.
-> 
-> Andrew recently added support for having the fixed PHY emulated PHY poll
-> a GPIO to determine link status. If this information comes differently
-> (e.g: via MMIO/MAC registers) in your case, I guess we could either
-> extend the fixed PHY to support that scheme, or just open-code the
-> carrier state change in the mvneta driver.
+On 17/09/15 10:32, Ard Biesheuvel wrote:
+> In order for a bootloader to be able to decide whether a certain
+> arm64 kernel image is compatible with the hardware it is running
+> on, it needs to be able to find out for which page size the kernel
+> was built. This is necessary, since the architecture does not
+> mandate support for all page sizes it defines, and the kernel cannot
+> boot to a state where it can print a diagnostic if it was built for
+> a page size that is not supported by the hardware.
+>
+> So assign two bits in the flags field of the Image header, and set
+> them according to the build time page size. For backward compatibility,
+> retain the 0b00 value as 'unspecified'.
+>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-It's not that simple.  The "is the carrier up" is the logical and of:
-- no TX fault (at SFP level)
-- no RX loss (at SFP level)
-- Serdes says link is up (at MAC level)
+Ard,
 
-If TX fault is asserted, then there is error recovery that can be done,
-so it's not as simple as the MAC monitoring that GPIO - unless we want
-to do what's already been done in other MAC drivers, and integrate the
-SFP driver logic into the MAC driver rather than doing the same thing
-and having it as a library.
+I picked this patch based on the our initial discussion on 16K page size
+series, and added it to the V2 of the series.
 
-> This is a fair conclusion, the PHY library is really designed to support
-> well 10/100/1000 PHYs, anything else, including 10Gbits PHY are not that
-> well supported. Anything that is not MDIO is not that well supported,
-> and the fixed PHY has its limitations.
-> 
-> It is unclear to me how much of the PHY library: state machine, link
-> management, device abstraction, and ethtool interface is going to be
-> useful if you have a SFP instead of a MDIO-connected PHY.
+	https://lkml.org/lkml/2015/9/15/716
 
-Well, it gets even _more_ fun when you consider these, which are all
-a very real possibility thanks to the hardware designs out there:
 
-MAC ---SGMII---> Phy ---> Copper
-MAC ---1000baseX---> Phy ---> 1000baseT Copper
-MAC ---SGMII---> SFP ---> Phy ---> Copper
-MAC ---SGMII---> SFP ---> Phy ---> Optical
-MAC ---1000baseX---> SFP ---> Optical
+> ---
+>   Documentation/arm64/booting.txt | 3 ++-
+>   arch/arm64/kernel/image.h       | 4 +++-
+>   2 files changed, 5 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+> index 1690350f16e7..46056e7d766e 100644
+> --- a/Documentation/arm64/booting.txt
+> +++ b/Documentation/arm64/booting.txt
+> @@ -104,7 +104,8 @@ Header notes:
+>   - The flags field (introduced in v3.17) is a little-endian 64-bit field
+>     composed as follows:
+>     Bit 0: 	Kernel endianness.  1 if BE, 0 if LE.
+> -  Bits 1-63:	Reserved.
+> +  Bits 1-2:	Kernel page size.   0=unspecified, 1=4K, 2=16K, 3=64K
+> +  Bits 3-63:	Reserved.
+>
+>   - When image_size is zero, a bootloader should attempt to keep as much
+>     memory as possible free for use by the kernel immediately after the
+> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+> index 8fae0756e175..5def289bda84 100644
+> --- a/arch/arm64/kernel/image.h
+> +++ b/arch/arm64/kernel/image.h
+> @@ -47,7 +47,9 @@
+>   #define __HEAD_FLAG_BE	0
+>   #endif
+>
+> -#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0)
+> +#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
+> +
+> +#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0) | (__HEAD_FLAG_PAGE_SIZE << 1)
+>
 
-                    .---1000base-X---> SFP ---> Optical
-MAC ---SGMII---> Phy
-                    `---> Copper
+FWIW,
 
-                    .---SGMII---> SFP ---> Phy ---> Optical
-MAC ---SGMII---> Phy
-                    `---> Copper
+	Tested-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 
-                    .---1000base-X---> SFP ---> Phy ---> 1000baseT Copper
-MAC ---SGMII---> Phy
-                    `---> Copper
 
-                    .---SGMII---> SFP ---> Phy ---> Copper
-MAC ---SGMII---> Phy
-                    `---> Copper
-
-and when you realise that you can talk to all the PHYs in those trees.
-In the last four cases, the first level phy decides between the copper
-connection and the "other" connection based on programmable priority.
-
-At the moment, I only have two optical SFP modules, which fall into
-the 5th setup above - you can't use SGMII with "dumb" optical modules
-as SGMII's control word is an instruction from the PHY to the MAC
-about the link properties, it isn't any sort of negotiation.
-
-What I'm worried about is having to redo the DT properties, and if
-the change makes it into stable trees, then we have to support the
-existing design as well as whatever solution to this problem.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks
+Suzuki
