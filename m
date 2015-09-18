@@ -1,89 +1,37 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Sep 2015 10:48:47 +0200
-Subject: [PATCH 2/5] ARM: sun5i: Add R8 DTSI
+Date: Fri, 18 Sep 2015 10:48:49 +0200
+Subject: [PATCH 4/5] ARM: sun5i: dt: Add UART3 CTS and RTS pins
 In-Reply-To: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1442566130-3497-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1442566130-3497-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The R8 is very close to the A13, but it still has a few differences,
-notably a composite output, which the A13 lacks.
-
-Add a DTSI based on the A13's to hold those differences.
+Add a separate pinctrl node for the UART3 CTS and RTS pins shared between
+the A10s and A13.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-r8.dtsi | 61 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun5i-r8.dtsi
+ arch/arm/boot/dts/sun5i.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-r8.dtsi b/arch/arm/boot/dts/sun5i-r8.dtsi
-new file mode 100644
-index 000000000000..c9ed854687ca
---- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-r8.dtsi
-@@ -0,0 +1,61 @@
-+/*
-+ * Copyright 2015 Free Electrons
-+ * Copyright 2015 NextThing Co
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 433c83a321ca..7d355e52efe2 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -536,6 +536,13 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
 +
-+#include "skeleton.dtsi"
-+
-+#include "sun5i-a13.dtsi"
-+
-+/ {
-+	chosen {
-+		framebuffer at 1 {
-+			compatible = "allwinner,simple-framebuffer",
-+				     "simple-framebuffer";
-+			allwinner,pipeline = "de_be0-lcd0-tve0";
-+			clocks = <&pll5 1>, <&ahb_gates 34>, <&ahb_gates 36>,
-+				 <&ahb_gates 44>;
-+			status = "disabled";
-+		}; 
-+	};
-+};
++			uart3_pins_cts_rts_a: uart3-cts-rts at 0 {
++				allwinner,pins = "PG11", "PG12";
++				allwinner,function = "uart3";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
+ 		};
+ 
+ 		timer at 01c20c00 {
 -- 
 2.5.1
