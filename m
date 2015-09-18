@@ -1,27 +1,21 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 18 Sep 2015 12:22:56 -0700
-Subject: [PATCH v2 2/3] soc: brcmstb: Add Bus Interface Unit control setup
-In-Reply-To: <1442340900-15320-3-git-send-email-f.fainelli@gmail.com>
+Date: Fri, 18 Sep 2015 12:23:12 -0700
+Subject: [PATCH v2 3/3] ARM: brcmstb: Setup BIU control registers during
+ boot
+In-Reply-To: <1442340900-15320-4-git-send-email-f.fainelli@gmail.com>
 References: <1442340900-15320-1-git-send-email-f.fainelli@gmail.com>
- <1442340900-15320-3-git-send-email-f.fainelli@gmail.com>
-Message-ID: <55FC6490.7000204@gmail.com>
+ <1442340900-15320-4-git-send-email-f.fainelli@gmail.com>
+Message-ID: <55FC64A0.3050700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/15 11:14, Florian Fainelli wrote:
-> Broadcom STB SoCs (brcmstb) require an early setup of their Bus
-> Interface Unit control register, this needs to happen before SMP is
-> brought up because it affects how the CPU complex will be interfaced to
-> the memory controller.
-> 
-> Add support code which properly initializes the BIU registers based on
-> whether "brcm,write-pairing" is present in Device Tree, and take care of
-> saving and restoring credit register settings during system-wide
-> suspend/resume operations.
+On 15/09/15 11:15, Florian Fainelli wrote:
+> Call brcmstb_biuctrl_init() in brcmstb's init_irq machine descriptor
+> callback since we need to setup the Bus Interface Unit before SMP in
+> particular, but we also need to be able to remap registers.
 > 
 > Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Applied to soc/next with Gregory's tag and the revised function
-prototype returning void.
+Applied to soc/next.
 -- 
 Florian
