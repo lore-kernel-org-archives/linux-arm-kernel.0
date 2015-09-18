@@ -1,35 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Sep 2015 13:29:37 +0100
-Subject: [PATCH v2] iommu/io-pgtable-arm: Don't use dma_to_phys()
-In-Reply-To: <55FBEFBA.6000606@arm.com>
-References: <59f4ebbf06e75a6176a366495211afd16d0048a3.1442507940.git.robin.murphy@arm.com>
- <1442566550.8145.156.camel@mhfsdcap03> <55FBEFBA.6000606@arm.com>
-Message-ID: <20150918122937.GE21084@n2100.arm.linux.org.uk>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 18 Sep 2015 13:29:31 +0100
+Subject: [PATCH 00/14] ARM: dts: apq8064 dt cleanups and additions
+Message-ID: <1442579371-19822-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 12:04:26PM +0100, Robin Murphy wrote:
-> Specifically, the problem case for that is when phys_addr_t is 64-bit but
-> dma_addr_t is 32-bit. The cast in __arm_lpae_dma_addr is necessary to avoid
-> a truncation warning when we make the DMA API calls, but we actually need
-> the opposite in the comparison here - comparing the different types directly
-> allows integer promotion to kick in appropriately so we don't lose the top
-> half of the larger address. Otherwise, you'd never spot the difference
-> between, say, your original page at 0x88c0000000 and a bounce-buffered copy
-> that happened to end up mapped to 0xc0000000.
+Hi Andy, 
 
-Hmm.  Thinking about this, I think we ought to add to arch/arm/mm/Kconfig:
+Here are few cleanup and additions to the existing APQ8064 device tree.
 
- config ARCH_PHYS_ADDR_T_64BIT
- 	def_bool ARM_LPAE
- 
- config ARCH_DMA_ADDR_T_64BIT
- 	bool
-+	select ARCH_PHYS_ADDR_T_64BIT
+Some of the patches are to do with princtrl cleanup which was always not
+in the right place and some of the pinctrls were missing.
+Other set of patches is to do with adding more devices like rtc rng
+and pwr key for pmic 8921.
+Last set of patches are related to pwrseq and SD card detect taking Stephens
+comments into consideration.
 
-I seem to remember that you're quite right that dma_addr_t <= phys_addr_t
-but dma_addr_t must never be bigger than phys_addr_t.
+Am resending John Stultz patch which was forgotten in the mailing list.
+
+I have tested these patches on IFC6410.
+
+Thanks,
+srini
+
+John Stultz (1):
+  devicetree: Add hardware rng entry to qcom-apq8064.dtsi
+
+Srinivas Kandagatla (13):
+  ARM: dts: apq8064: remove redundant i2c pinctrl properties
+  ARM: dts: ifc6410: remove unnecessary eeprom label
+  ARM: dts: qs600: remove unnecessary eeprom label
+  ARM: dts: apq8064: add pm8921 rtc
+  ARM: dts: apq8064: add pm8921 pwrkey support
+  ARM: dts: apq8064: Prefix the gsbi6 uart pins correctly
+  ARM: dts: apq8064: add missing gsbi7 uart pinctrl
+  ARM: dts: ifc6410: Add missing pinctrl to gsbi7 uart
+  ARM: dts: qs600: Add missing pinctrl property for gsbi7 uart
+  ARM: dts: ifc6410: Add pwrseq support for WLAN
+  ARM: dts: qs600: add pwrseq support to WLAN
+  ARM: dts: apq8064-ifc6410: add notify led support.
+  ARM: dts: qs600: Add SD card detect support.
+
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 48 ++++++++++++++++++++---
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts  | 60 +++++++++++++++++++++++++----
+ arch/arm/boot/dts/qcom-apq8064.dtsi         | 50 +++++++++++++++++++++++-
+ 3 files changed, 144 insertions(+), 14 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
