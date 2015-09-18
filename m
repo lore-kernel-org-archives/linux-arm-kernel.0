@@ -1,52 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Sep 2015 09:51:09 -0700
-Subject: [PATCH 2/2] ARM: dts: Fix WLAN regression on omap5-uevm
-In-Reply-To: <CAOCHtYh3pDg6_mdX71G=L5Vz-mOmBnerwR5pjumq5jYQ-tN5Pw@mail.gmail.com>
-References: <1442593745-16725-1-git-send-email-tony@atomide.com>
- <1442593745-16725-3-git-send-email-tony@atomide.com>
- <CAOCHtYh3pDg6_mdX71G=L5Vz-mOmBnerwR5pjumq5jYQ-tN5Pw@mail.gmail.com>
-Message-ID: <20150918165109.GB8020@atomide.com>
+From: luis@debethencourt.com (Luis de Bethencourt)
+Date: Fri, 18 Sep 2015 18:52:58 +0200
+Subject: [PATCH] PM / AVS: rockchip-io: Fix module autoload for OF platform
+ driver
+Message-ID: <20150918165258.GA27398@goodgumbo.baconseed.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Robert Nelson <robertcnelson@gmail.com> [150918 09:45]:
-> On Fri, Sep 18, 2015 at 11:29 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > Commit 99f84cae43df ("ARM: dts: add wl12xx/wl18xx bindings") added
-> > device tree bindings for the TI WLAN SDIO on many omap variants.
-> >
-> > I recall wondering how come omap5-uevm did not have the WLAN
-> > added and this issue has been bugging me for a while now, and
-> > I finally tracked it down to a bad pinmux regression, and a missing
-> > deferred probe handling for the 32k clock from palmas that's
-> > requested by twl6040.
-> >
-> > Basically 392adaf796b9 ("ARM: dts: omap5-evm: Add mcspi data")
-> > added pin muxing for mcspi4 that conflicts with the onboard
-> > WLAN. While the omap5-uevm docs say the WLAN is not populated,
-> > this was probably only the case for initial prototypes. Both
-> > omap5-uevm boards I have have WLAN populated.
-> 
-> Production boards from svtronics don't populate the wlan..
-> 
-> http://www.svtronics.com/EVM/OMAP5432/5432
-> 
-> quote: "WiFi not available on this model"
-> 
-> They have an option to order a version with a "COM8Q" connector to add wlan...
+This platform driver has a OF device ID table but the OF module
+alias information is not created so module autoloading won't work.
 
-Oh OK interesting.
+Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
+---
 
-> http://www.svtronics.com/EVM/OMAP5432/5432C
-> 
-> http://www.svtronics.com/EVM/OMAP5432/COM8Q
-> 
-> I'm not sure who to bug from that era, but the wlan populated devices
-> might have been prototype only.
+Hello,
 
-Hmm OK. Well as it's a SDIO card, it seems safe to add for now.
-We may want to have a minimal separate dts file if the wiring is
-different with the COM8Q card.
+This patch adds the missing MODULE_DEVICE_TABLE() for OF to export
+that information so modules have the correct aliases built-in and
+autoloading works correctly.
 
-Regards,
+A longer explanation by Javier Canillas can be found here:
+https://lkml.org/lkml/2015/7/30/519
 
-Tony
+Thanks,
+Luis
+
+ drivers/power/avs/rockchip-io-domain.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
+index 2e30002..8099456 100644
+--- a/drivers/power/avs/rockchip-io-domain.c
++++ b/drivers/power/avs/rockchip-io-domain.c
+@@ -271,6 +271,7 @@ static const struct of_device_id rockchip_iodomain_match[] = {
+ 	},
+ 	{ /* sentinel */ },
+ };
++MODULE_DEVICE_TABLE(of, rockchip_iodomain_match);
+ 
+ static int rockchip_iodomain_probe(struct platform_device *pdev)
+ {
+-- 
+2.4.6
