@@ -1,72 +1,38 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 18 Sep 2015 15:35:39 +0800
-Subject: [PATCH 4/4] ARM: dts: sun8i: Add pwm-backlight device for A23/A33 Q8
- format tablets
+Date: Fri, 18 Sep 2015 15:35:36 +0800
+Subject: [PATCH 1/4] ARM: dts: sun8i: Add PWM controller node for A23/A33
 In-Reply-To: <1442561739-6824-1-git-send-email-wens@csie.org>
 References: <1442561739-6824-1-git-send-email-wens@csie.org>
-Message-ID: <1442561739-6824-5-git-send-email-wens@csie.org>
+Message-ID: <1442561739-6824-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LCD backlight on the A23/A33 Q8 format tablets is enabled
-with a GPIO controlled regulator, and brightness controlled with
-the SoC's PWM controller.
-
-The backlight is powered from the AXP223 PMIC's DC1SW output,
-which is not supported yet. A proper bootloader is required
-to enable it.
-
-The brightness levels are arbitrary. The FEX files do not have
-such information. As such, actual brightness levels may differ
-from device to device.
+A23/A33 have a PWM controller that is compatible to the one on the A20.
+Add a device node for it.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-q8-common.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index 4c2d0b459d6f..8a56ff567911 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-@@ -41,11 +41,24 @@
-  */
- #include "sunxi-q8-common.dtsi"
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 27a925ec17d2..e7054304018a 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -466,6 +466,14 @@
+ 			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
  
-+#include <dt-bindings/pwm/pwm.h>
++		pwm: pwm at 01c21400 {
++			compatible = "allwinner,sun7i-a20-pwm";
++			reg = <0x01c21400 0xc>;
++			clocks = <&osc24M>;
++			#pwm-cells = <3>;
++			status = "disabled";
++		};
 +
- / {
- 	aliases {
- 		serial0 = &r_uart;
- 	};
- 
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&bl_en_pin_q8>;
-+		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
-+		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
-+		default-brightness-level = <8>;
-+		enable-gpios = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH6 */
-+		/* backlight is powered by AXP223 DC1SW */
-+	};
-+
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-@@ -62,6 +75,13 @@
- };
- 
- &pio {
-+	bl_en_pin_q8: bl_en_pin at 0 {
-+		allwinner,pins = "PH6";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
- 	mmc0_cd_pin_q8: mmc0_cd_pin at 0 {
- 		allwinner,pins = "PB4";
- 		allwinner,function = "gpio_in";
+ 		lradc: lradc at 01c22800 {
+ 			compatible = "allwinner,sun4i-a10-lradc-keys";
+ 			reg = <0x01c22800 0x100>;
 -- 
 2.5.1
