@@ -1,40 +1,52 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 18 Sep 2015 16:32:18 +0200
-Subject: [PATCH] MAINTAINERS: explicitly add Atmel SAMA5
-In-Reply-To: <1441211061-11872-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1441211061-11872-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <55FC2072.20900@atmel.com>
+Date: Fri, 18 Sep 2015 16:34:34 +0200
+Subject: [PATCH] spi: atmel: remove warning when !CONFIG_PM_SLEEP
+In-Reply-To: <1441873192-18511-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1441873192-18511-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <55FC20FA.1000405@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/09/2015 18:24, Alexandre Belloni a ?crit :
-> Atmel SAMA5 SoCs are also supported through mach-at91.
+Le 10/09/2015 10:19, Alexandre Belloni a ?crit :
+> When CONFIG_PM is defined but not CONFIG_PM_SLEEP (this happens when
+> CONFIG_SUSPEND is not defined), there is the following warning:
+> 
+> drivers/spi/spi-atmel.c:1723:12: warning: ?atmel_spi_suspend? defined but not used [-Wunused-function]
+> drivers/spi/spi-atmel.c:1741:12: warning: ?atmel_spi_resume? defined but not used [-Wunused-function]
+> 
+> Enclose both atmel_spi_suspend and atmel_spi_resume in #ifdef
+> CONFIG_PM_SLEEP/#endif to solve that.
 > 
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Absolutely:
+No problem on my side:
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks.
 
 
 > ---
->  MAINTAINERS | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/spi/spi-atmel.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index b60e2b2369d2..e8a40437727c 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -891,7 +891,7 @@ M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
->  S:	Maintained
->  F:	arch/arm/mach-alpine/
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index bf9ed380bb1c..63318e2afba1 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -1720,6 +1720,7 @@ static int atmel_spi_runtime_resume(struct device *dev)
+>  	return clk_prepare_enable(as->clk);
+>  }
 >  
-> -ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
-> +ARM/ATMEL AT91RM9200, AT91SAM9 AND SAMA5 SOC SUPPORT
->  M:	Nicolas Ferre <nicolas.ferre@atmel.com>
->  M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
->  M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> +#ifdef CONFIG_PM_SLEEP
+>  static int atmel_spi_suspend(struct device *dev)
+>  {
+>  	struct spi_master *master = dev_get_drvdata(dev);
+> @@ -1756,6 +1757,7 @@ static int atmel_spi_resume(struct device *dev)
+>  
+>  	return ret;
+>  }
+> +#endif
+>  
+>  static const struct dev_pm_ops atmel_spi_pm_ops = {
+>  	SET_SYSTEM_SLEEP_PM_OPS(atmel_spi_suspend, atmel_spi_resume)
 > 
 
 
