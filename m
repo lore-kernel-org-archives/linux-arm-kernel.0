@@ -1,38 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Sep 2015 09:47:21 +0900
-Subject: [PATCH 19/19] ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain
- for sound
+Date: Fri, 18 Sep 2015 09:47:15 +0900
+Subject: [PATCH 13/19] ARM: shmobile: lager: use CCF for audio clock
 In-Reply-To: <cover.1442536920.git.horms+renesas@verge.net.au>
 References: <cover.1442536920.git.horms+renesas@verge.net.au>
-Message-ID: <2529493c288c109cf734235d1eb3de1b23d9bcef.1442536920.git.horms+renesas@verge.net.au>
+Message-ID: <6bc651afec2dba4d3e40901a2c5cfc88ad35d97a.1442536920.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-797a0626e08c ("ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain")
-added CPG/MSTP clock-cells domain support, but it was missing sound
-support. This patch adds it.
+Because of historical reason, audio clock didn't use CCF.
+Let's use it now.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-[horms: updated commit id referred to in changelog]
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/r8a7790-lager.dts | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 3b8e26dde36d..328f48bd15e7 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1677,6 +1677,7 @@
- 				"mix.0", "mix.1",
- 				"dvc.0", "dvc.1",
- 				"clk_a", "clk_b", "clk_c", "clk_i";
-+		power-domains = <&cpg_clocks>;
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 37dec5269491..6f5d7f50d5ca 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -174,6 +174,13 @@
+ 			  1800000 0>;
+ 	};
  
- 		status = "disabled";
++	audio_clock: clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <11289600>;
++		clock-output-names = "audio_clock";
++	};
++
+ 	rsnd_ak4643: sound {
+ 		compatible = "simple-audio-card";
+ 
+@@ -187,7 +194,7 @@
+ 
+ 		sndcodec: simple-audio-card,codec {
+ 			sound-dai = <&ak4643>;
+-			system-clock-frequency = <11289600>;
++			clocks = <&audio_clock>;
+ 		};
+ 	};
  
 -- 
 2.1.4
