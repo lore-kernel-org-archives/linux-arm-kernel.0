@@ -1,49 +1,50 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 18 Sep 2015 13:32:18 +0100
-Subject: [PATCH 14/14] ARM: dts: qs600: Add SD card detect support.
-In-Reply-To: <1442579371-19822-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1442579371-19822-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1442579538-20525-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 18 Sep 2015 13:40:27 +0100
+Subject: Recent GIC v1 patch
+In-Reply-To: <55FAFD3E.7010006@arm.com> (Marc Zyngier's message of "Thu, 17
+ Sep 2015 18:49:50 +0100")
+References: <55FAE26A.9040609@free.fr> <55FAEB4D.30306@arm.com>
+ <55FAF6E1.7020107@free.fr> <55FAFD3E.7010006@arm.com>
+Message-ID: <yw1xio77uchw.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds SD card detect support.
+Marc Zyngier <marc.zyngier@arm.com> writes:
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+> On 17/09/15 18:22, Mason wrote:
+>> On 17/09/2015 18:33, Marc Zyngier wrote:
+>>> Hi Mason,
+>>>
+>>> On 17/09/15 16:55, Mason wrote:
+>>>> Hello Thomas, Marc,
+>>>>
+>>>> Mans pointed me to a recent patch of yours.
+>>>> irqchip/gic: Use IRQD_FORWARDED_TO_VCPU flag
+>>>> Get rid of the handler_data abuse.
+>>>>
+>>>> I'm using a Cortex A9 based SoC. The platform's interrupt
+>>>> controller is cascaded into the GIC. I've been trying to
+>>>> get this to work for two weeks with no success.
+>>>>
+>>>> Details can be found here:
+>>>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/440327
+>>>>
+>>>> Do you think your patch my help with my situation?
+>>>
+>>> Not sure. A GICv1 shouldn't use EOImode==1 at all, so I don't quite see
+>>> how you end-up there. Also, you seem to be using 4.2, and this code only
+>>> landed during the 4.3 merge window.
+>> 
+>> Sorry for being unclear. I'm having problems /without/ the patch,
+>> and Mans suggested I try the patch.
+>
+> But that patch will only apply if you run 4.3, because it fixes an issue
+> in another patch that only exists in 4.3.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-index cc9d942..03784f1 100644
---- a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-@@ -29,6 +29,16 @@
- 	};
- 
- 	soc {
-+		pinctrl at 800000 {
-+			card_detect: card_detect {
-+				mux {
-+					pins = "gpio26";
-+					function = "gpio";
-+					bias-disable;
-+				};
-+			};
-+		};
-+
- 		rpm at 108000 {
- 			regulators {
- 				vin_lvs1_3_6-supply = <&pm8921_s4>;
-@@ -197,6 +207,9 @@
- 			sdcc3: sdcc at 12180000 {
- 				status = "okay";
- 				vmmc-supply = <&v3p3_fixed>;
-+				pinctrl-names	= "default";
-+				pinctrl-0	= <&card_detect>;
-+				cd-gpios	= <&tlmm_pinmux 26 GPIO_ACTIVE_LOW>;
- 			};
- 			/* WLAN */
- 			sdcc4: sdcc at 121c0000 {
+OK, forget I said anything then.  I just saw someone mention it in
+connection with a BCM chip and thought it might be related without
+digging deeper.  Nobody is paying me to do that.
+
 -- 
-1.9.1
+M?ns Rullg?rd
+mans at mansr.com
