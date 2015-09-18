@@ -1,97 +1,29 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 18 Sep 2015 11:44:45 +0200 (CEST)
-Subject: [PATCH v3] media: atmel-isi: parse the DT parameters for
- vsync/hsync/pixclock polarity
-In-Reply-To: <55FBD76C.1040303@atmel.com>
-References: <1438681069-16981-1-git-send-email-josh.wu@atmel.com>
- <3317317.RTpCstaHHn@avalon> <55FBD76C.1040303@atmel.com>
-Message-ID: <Pine.LNX.4.64.1509181144170.15589@axis700.grange>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 18 Sep 2015 11:38:38 +0200
+Subject: [PATCH] ARM: pxa: add wm9713 codec
+In-Reply-To: <55FBCF05.2090707@compulab.co.il> (Igor Grinberg's message of
+ "Fri, 18 Sep 2015 11:44:53 +0300")
+References: <1442432561-32722-1-git-send-email-robert.jarzmik@free.fr>
+ <55FBCF05.2090707@compulab.co.il>
+Message-ID: <87wpvoqd7l.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Igor Grinberg <grinberg@compulab.co.il> writes:
 
-Patch handling is on my todo for the coming weekend...
+> Hi Robert,
+>
+> On 09/16/15 22:42, Robert Jarzmik wrote:
+>> The mioa701 is using the wm9713 for audio, battery and touchscreen. Add
+>> the missing audio part, which disappeared.
+>> 
+>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>
+> The subject is a bit misleading..
+> I think it is worth specifying mioa701 in subject..
+Absolutely, it is even a requirement to have "ARM: pxa: mioa701: " as a prefix.
 
-Thanks
-Guennadi
+Thanks for catching this.
 
-On Fri, 18 Sep 2015, Nicolas Ferre wrote:
-
-> Le 04/08/2015 13:22, Laurent Pinchart a ?crit :
-> > Hi Josh,
-> > 
-> > Thank you for the patch.
-> > 
-> > On Tuesday 04 August 2015 17:37:49 Josh Wu wrote:
-> >> This patch will get the DT parameters of vsync/hsync/pixclock polarity, and
-> >> pass to driver.
-> >>
-> >> Also add a debug information for test purpose.
-> >>
-> >> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> > 
-> > Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> 
-> Guennadi, Mauro,
-> 
-> I don't see this patch in Linux-next and I'm not so used to
-> http://git.linuxtv.org but didn't find it either.
-> 
-> Well in fact it's just a lengthy version of "ping" ;-)
-> 
-> Bye,
-> 
-> >> ---
-> >>
-> >> Changes in v3:
-> >> - add embedded sync dt property support.
-> >>
-> >> Changes in v2:
-> >> - rewrite the debug message and add pix clock polarity setup thanks to
-> >>   Laurent.
-> >> - update the commit log.
-> >>
-> >>  drivers/media/platform/soc_camera/atmel-isi.c | 15 +++++++++++++++
-> >>  1 file changed, 15 insertions(+)
-> >>
-> >> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
-> >> b/drivers/media/platform/soc_camera/atmel-isi.c index fead841..4efc939
-> >> 100644
-> >> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> >> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> >> @@ -1061,6 +1061,11 @@ static int isi_camera_set_bus_param(struct
-> >> soc_camera_device *icd) if (common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
-> >>  		cfg1 |= ISI_CFG1_PIXCLK_POL_ACTIVE_FALLING;
-> >>
-> >> +	dev_dbg(icd->parent, "vsync active %s, hsync active %s, sampling on pix
-> >> clock %s edge\n", +		common_flags & V4L2_MBUS_VSYNC_ACTIVE_LOW ? "low" :
-> >> "high",
-> >> +		common_flags & V4L2_MBUS_HSYNC_ACTIVE_LOW ? "low" : "high",
-> >> +		common_flags & V4L2_MBUS_PCLK_SAMPLE_FALLING ? "falling" : "rising");
-> >> +
-> >>  	if (isi->pdata.has_emb_sync)
-> >>  		cfg1 |= ISI_CFG1_EMB_SYNC;
-> >>  	if (isi->pdata.full_mode)
-> >> @@ -1148,6 +1153,16 @@ static int atmel_isi_parse_dt(struct atmel_isi *isi,
-> >>  		return -EINVAL;
-> >>  	}
-> >>
-> >> +	if (ep.bus.parallel.flags & V4L2_MBUS_HSYNC_ACTIVE_LOW)
-> >> +		isi->pdata.hsync_act_low = true;
-> >> +	if (ep.bus.parallel.flags & V4L2_MBUS_VSYNC_ACTIVE_LOW)
-> >> +		isi->pdata.vsync_act_low = true;
-> >> +	if (ep.bus.parallel.flags & V4L2_MBUS_PCLK_SAMPLE_FALLING)
-> >> +		isi->pdata.pclk_act_falling = true;
-> >> +
-> >> +	if (ep.bus_type == V4L2_MBUS_BT656)
-> >> +		isi->pdata.has_emb_sync = true;
-> >> +
-> >>  	return 0;
-> >>  }
-> > 
-> 
-> 
-> -- 
-> Nicolas Ferre
-> 
+-- 
+Robert
