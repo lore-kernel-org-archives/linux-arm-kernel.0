@@ -1,95 +1,75 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 18 Sep 2015 10:09:35 +0100
-Subject: [PATCH] iommu-common: fix return type of iommu_tbl_range_alloc()
-In-Reply-To: <55FBD36C.5070301@arm.com>
-References: <55FBD36C.5070301@arm.com>
-Message-ID: <1442567375-6963-1-git-send-email-andre.przywara@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Sep 2015 10:08:17 +0100
+Subject: [PATCH 1/3] clocksource: rockchip: Make the driver more
+ readability and compatible
+In-Reply-To: <55FBC36C.2090801@linaro.org>
+References: <1442476272-31723-1-git-send-email-wxt@rock-chips.com>
+ <1442476272-31723-2-git-send-email-wxt@rock-chips.com>
+ <55FA83D5.9010504@linaro.org> <55FA87AA.4040807@gmail.com>
+ <55FA9099.7000903@linaro.org> <55FA93B0.40504@gmail.com>
+ <55FBC36C.2090801@linaro.org>
+Message-ID: <20150918090817.GA21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Though iommu_tbl_range_alloc() is only used by Sparc code, the
-function itself lives in lib/iommu-common.c and is thus included in
-other architecture's code as well.
-When compiled on a 32-bit architecture using 64-bit DMA addresses
-(ARM with LPAE), there is a compiler warning about a type mismatch
-between dma_addr_t and the return type of this function:
+On Fri, Sep 18, 2015 at 09:55:24AM +0200, Daniel Lezcano wrote:
+> On 09/17/2015 12:19 PM, Caesar Wang wrote:
+> >
+> >
+> >? 2015?09?17? 18:06, Daniel Lezcano ??:
+> >>On 09/17/2015 11:28 AM, Caesar Wang wrote:
+> >>>Hi Daniel,
+> >>>
+> >>>
+> >>>? 2015?09?17? 17:11, Daniel Lezcano ??:
+> >>>>
+> >>>>Hi Caesar,
+> >>>>
+> >>>>
+> >>>>On 09/17/2015 09:51 AM, Caesar Wang wrote:
+> >>>>>Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
+> >>>>>There are some failure with build up on timer driver for rockchip.
+> >>>>>
+> >>>>>logs:
+> >>>>>...
+> >>>>>drivers/clocksource/rockchip_timer.c:156:13: error: 'NO_IRQ'
+> >>>>>undeclared
+> >>>>
+> >>>>I think the NO_IRQ definition is missing for ARM64.
+> >>>
+> >>>Yep, Maybe better to compatible if we don't use the 'NO_IRQ',
+> >>
+> >>Hmm, after digging into drivers/of/irq.c and kernel/irq/irqdomain.c
+> >>
+> >>when there is an error it returns zero. So NO_IRQ and -1 are not
+> >>correct and on the other side zero can be a valid irq. That sounds a
+> >>little bit fuzzy to me.
+> >
+> >I believe the 'NO_IRQ' is better select if 'NO_IRQ' is defined on ARM64
+> >platform.
+> >
+> >     irq = irq_of_parse_and_map(np, 0);
+> >
+> >     if (irq  == NO_IRQ)
+> >...
+> >Also, that's ok if we instead of the 'irq < 0'  or  '!irq' , right?
+> 
+> 
+> Hi Caesar,
+> 
+> so regarding Thomas and Russel answers, let's replace NO_IRQ by '!irq'.
+                                ^
 
-In file included from /src/linux/include/linux/dma-mapping.h:86:0,
-                 from /src/linux/lib/iommu-common.c:11:
-/src/linux/lib/iommu-common.c: In function 'iommu_tbl_range_alloc':
-/src/linux/arch/arm/include/asm/dma-mapping.h:16:24: warning: large integer implicitly truncated to unsigned type [-Woverflow]
- #define DMA_ERROR_CODE (~(dma_addr_t)0x0)
-                        ^
-/src/linux/lib/iommu-common.c:127:10: note: in expansion of macro
-'DMA_ERROR_CODE'
-   return DMA_ERROR_CODE;
+Definitely in this case.  irq_create_of_mapping() and therefore
+irq_of_parse_and_map() both return _zero_ when they fail, not whatever
+happens to be NO_IRQ on a particular architecture.  New code should
+_never_ be making any use of NO_IRQ.
 
-If I am not mistaken, dma_addr_t on both Sparc variants is always
-32-bit, so we don't need necessarily to adjust the callers, just the
-function itself.
-This still isn't right (since now the types in the caller mismatch,
-though in a different way the compiler does not complain about), but
-works as a fix for the 4.3 release. I couldn't spot any warnings on
-the architectures I managed to compile.
+That's why I said:
 
-Compile tested on Sparc, Sparc64, PowerPC64, ARM, ARM64, x86.
+"Modern drivers should _all_ be using !irq to detect invalid IRQs, and not
+using NO_IRQ."
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- include/linux/iommu-common.h | 12 ++++++------
- lib/iommu-common.c           | 15 ++++++++-------
- 2 files changed, 14 insertions(+), 13 deletions(-)
-
-diff --git a/include/linux/iommu-common.h b/include/linux/iommu-common.h
-index bbced83..fdff585 100644
---- a/include/linux/iommu-common.h
-+++ b/include/linux/iommu-common.h
-@@ -37,12 +37,12 @@ extern void iommu_tbl_pool_init(struct iommu_map_table *iommu,
- 				bool large_pool, u32 npools,
- 				bool skip_span_boundary_check);
- 
--extern unsigned long iommu_tbl_range_alloc(struct device *dev,
--					   struct iommu_map_table *iommu,
--					   unsigned long npages,
--					   unsigned long *handle,
--					   unsigned long mask,
--					   unsigned int align_order);
-+extern dma_addr_t iommu_tbl_range_alloc(struct device *dev,
-+					struct iommu_map_table *iommu,
-+					unsigned long npages,
-+					unsigned long *handle,
-+					unsigned long mask,
-+					unsigned int align_order);
- 
- extern void iommu_tbl_range_free(struct iommu_map_table *iommu,
- 				 u64 dma_addr, unsigned long npages,
-diff --git a/lib/iommu-common.c b/lib/iommu-common.c
-index ff19f66..6f0324e 100644
---- a/lib/iommu-common.c
-+++ b/lib/iommu-common.c
-@@ -99,15 +99,16 @@ void iommu_tbl_pool_init(struct iommu_map_table *iommu,
- }
- EXPORT_SYMBOL(iommu_tbl_pool_init);
- 
--unsigned long iommu_tbl_range_alloc(struct device *dev,
--				struct iommu_map_table *iommu,
--				unsigned long npages,
--				unsigned long *handle,
--				unsigned long mask,
--				unsigned int align_order)
-+dma_addr_t iommu_tbl_range_alloc(struct device *dev,
-+				 struct iommu_map_table *iommu,
-+				 unsigned long npages,
-+				 unsigned long *handle,
-+				 unsigned long mask,
-+				 unsigned int align_order)
- {
- 	unsigned int pool_hash = __this_cpu_read(iommu_hash_common);
--	unsigned long n, end, start, limit, boundary_size;
-+	dma_addr_t n;
-+	unsigned long end, start, limit, boundary_size;
- 	struct iommu_pool *pool;
- 	int pass = 0;
- 	unsigned int pool_nr;
 -- 
-2.5.1
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
