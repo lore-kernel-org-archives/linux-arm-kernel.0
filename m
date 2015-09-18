@@ -1,102 +1,71 @@
-From: aalonso@freescale.com (Adrian Alonso)
-Date: Fri, 18 Sep 2015 11:29:58 -0500
-Subject: [PATCH v4 8/8] pinctrl: freescale: imx: imx7d iomuxc-lpsr devicetree
- bindings
-In-Reply-To: <1442593798-11501-1-git-send-email-aalonso@freescale.com>
-References: <1442593798-11501-1-git-send-email-aalonso@freescale.com>
-Message-ID: <1442593798-11501-8-git-send-email-aalonso@freescale.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 18 Sep 2015 11:40:02 -0500
+Subject: [PATCH 1/2] mfd: twl6040: Fix deferred probe handling for clk32k
+In-Reply-To: <1442593745-16725-2-git-send-email-tony@atomide.com>
+References: <1442593745-16725-1-git-send-email-tony@atomide.com>
+ <1442593745-16725-2-git-send-email-tony@atomide.com>
+Message-ID: <20150918163949.GA6549@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add iomuxc-lpsr devicetree bindings documentation
-Provide documentation context as well an example on
-pheriperals that could use pad from either iomuxc controller
-supported by iMX7D SoC
+On Fri, Sep 18, 2015 at 09:29:04AM -0700, Tony Lindgren wrote:
+> Commit 68bab8662f49 ("mfd: twl6040: Optional clk32k clock handling")
+> added clock handling for the 32k clock from palmas-clk. However, that
+> patch did not consider a typical situation where twl6040 is built-in,
+> and palmas-clk is a loadable module like we have in omap2plus_defconfig.
+> 
+> If palmas-clk is not loaded before twl6040 probes, we will get a
+> "clk32k is not handled" warning during booting. This means that any
+> drivers relying on this clock will mysteriously fail, including
+> omap5-uevm WLAN and audio.
+> 
+> Note that for WLAN, we probably should also eventually get
+> the clk32kgaudio for MMC3 directly as that's shared between
+> audio and WLAN SDIO at least for omap5-uevm. It seems the
+> WLAN chip cannot get it as otherwise MMC3 won't get properly
+> probed.
+> 
+> Fixes: 68bab8662f49 ("mfd: twl6040: Optional clk32k clock handling")
+> Cc: Benoit Cousson <bcousson@baylibre.com>
+> Cc: Dr. H. Nikolaus Schaller <hns@goldelico.com>
+> Cc: Grazvydas Ignotas <notasas@gmail.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Sourav Poddar <sourav.poddar@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Signed-off-by: Adrian Alonso <aalonso@freescale.com>
----
-Changes for V2: New patch on imx7d iomuxc-lpsr patch series
-Changes for V3: Add shared input select register notes
-Changes for V4: Resend
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
- .../bindings/pinctrl/fsl,imx7d-pinctrl.txt         | 57 ++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
+> ---
+>  drivers/mfd/twl6040.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> --- a/drivers/mfd/twl6040.c
+> +++ b/drivers/mfd/twl6040.c
+> @@ -647,6 +647,8 @@ static int twl6040_probe(struct i2c_client *client,
+>  
+>  	twl6040->clk32k = devm_clk_get(&client->dev, "clk32k");
+>  	if (IS_ERR(twl6040->clk32k)) {
+> +		if (PTR_ERR(twl6040->clk32k) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+>  		dev_info(&client->dev, "clk32k is not handled\n");
+>  		twl6040->clk32k = NULL;
+>  	}
+> -- 
+> 2.1.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
-index 8bbf25d..19697bd 100644
---- a/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
-@@ -1,10 +1,33 @@
- * Freescale i.MX7 Dual IOMUX Controller
- 
-+iMX7D supports two iomuxc controllers, fsl,imx7d-iomuxc controller is similar
-+as previous iMX SoC generation and fsl,imx7d-iomuxc-lpsr which provides low
-+power state rentetion capabilities on gpios that are part of iomuxc-lpsr
-+(GPIO1_IO7..GPIO1_IO0). While iomuxc-lpsr provides its own set of registers for
-+mux and pad control settings it shares the input select register from iomuxc
-+for daisy chain settings, the input-sel phandle and SHARE_INPUT_SELECT_REG flag
-+extends fsl,imx-pinctrl driver to support iomuxc-lpsr controller.
-+
-+iomuxc_lpsr: iomuxc-lpsr at 302c0000 {
-+	compatible = "fsl,imx7d-iomuxc-lpsr";
-+	reg = <0x302c0000 0x10000>;
-+	input-sel = <&iomuxc>;
-+};
-+
-+iomuxc: iomuxc at 30330000 {
-+	compatible = "fsl,imx7d-iomuxc";
-+	reg = <0x30330000 0x10000>;
-+};
-+
-+Pheriparials using pads from iomuxc-lpsr support low state retention power
-+state, under LPSR mode GPIO's state of pads are retain.
-+
- Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
- and usage.
- 
- Required properties:
- - compatible: "fsl,imx7d-iomuxc"
-+- compatible: "fsl,imx7d-iomuxc-lpsr"
- - fsl,pins: each entry consists of 6 integers and represents the mux and config
-   setting for one pin.  The first 5 integers <mux_reg conf_reg input_reg mux_val
-   input_val> are specified using a PIN_FUNC_ID macro, which can be found in
-@@ -25,3 +48,37 @@ PAD_CTL_DSE_X1                  (0 << 0)
- PAD_CTL_DSE_X2                  (1 << 0)
- PAD_CTL_DSE_X3                  (2 << 0)
- PAD_CTL_DSE_X4                  (3 << 0)
-+
-+Examples:
-+While iomuxc-lpsr is intended to be used by dedicated peripherals to take
-+advantages of LPSR power mode, is also possible that an IP to use pads from
-+any of the iomux controllers. For example the I2C1 IP can use SCL pad from
-+iomuxc-lpsr controller and SDA pad from iomuxc controller as:
-+
-+i2c1: i2c@30a20000 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1_1 &pinctrl_i2c1_2>;
-+	status = "okay";
-+};
-+
-+iomuxc-lpsr at 302c0000 {
-+	compatible = "fsl,imx7d-iomuxc-lpsr";
-+	reg = <0x302c0000 0x10000>;
-+
-+	pinctrl_i2c1_1: i2c1grp-1 {
-+		fsl,pins = <
-+			MX7D_PAD_GPIO1_IO04__I2C1_SCL 0x4000007f
-+		>;
-+	};
-+};
-+
-+iomuxc at 30330000 {
-+	compatible = "fsl,imx7d-iomuxc";
-+	reg = <0x30330000 0x10000>;
-+
-+	pinctrl_i2c1_2: i2c1grp-2 {
-+		fsl,pins = <
-+			MX7D_PAD_I2C1_SCL__I2C1_SCL 0x4000007f
-+		>;
-+	};
-+};
 -- 
-2.1.4
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150918/f0cc02d5/attachment.sig>
