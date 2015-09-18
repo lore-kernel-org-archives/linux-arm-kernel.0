@@ -1,46 +1,50 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Thu, 17 Sep 2015 18:20:36 -0700
-Subject: [PATCH 1/4] ARM: dts: clean up Cygnus DT files
-In-Reply-To: <55FB65E0.50407@gmail.com>
-References: <1442534282-21356-1-git-send-email-rjui@broadcom.com>
- <1442534282-21356-2-git-send-email-rjui@broadcom.com>
- <55FB65E0.50407@gmail.com>
-Message-ID: <55FB66E4.8010006@broadcom.com>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Fri, 18 Sep 2015 03:21:10 +0200
+Subject: [PATCH v3 25/26] ARM: pxa: magician: Add missing regulator for PWM
+ backlight
+In-Reply-To: <cover.1442462898.git.petr.cvek@tul.cz>
+References: <cover.1442462898.git.petr.cvek@tul.cz>
+Message-ID: <55FB6706.5030700@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a fake regulator, which is required for the correct initialization
+of the PWM backlight driver.
 
+Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+---
+ arch/arm/mach-pxa/magician.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-On 9/17/2015 6:16 PM, Florian Fainelli wrote:
-> On 17/09/15 16:57, Ray Jui wrote:
->> This patch cleans up Cygnus DT files and makes the format consistent
->> with the rest of Broadcom iProc based SoCs.
->>
->> Changes include:
->>     - Put core components into "core" node of type "simple-bus"
->>     - Put all other peripherals into "soc" node of type "simple-bus"
->>     - Move aliases into bcm-cygnus.dtsi to avoid duplications in all dts
->>       files
->>     - Ordered all device nodes under buses based on their base register
->>       addresses
->>     - Remove unused PCI I/O resource
->>     - Use label instead of full path to reference device nodes in dts
->>       files
-> 
-> I am fine with the changes per-se, but the review is made largely more
-> difficult because you mix multiple changes at the same time, this really
-> ought to be separate patches to ease the review process. Sorry for not
-> picking that up earlier.
-
-Sure! I'll break them up into individual patches as follows:
-- Put core components into "core" node of type "simple-bus"
-- Put all other peripherals into "soc" node of type "simple-bus"
-- Move aliases into bcm-cygnus.dtsi to avoid duplications in all dts files
-- Ordered all device nodes under buses based on their base register
-addresses
-- Remove unused PCI I/O resources
-- Use label instead of full path to reference device nodes in dts files
-
-Thanks!
-
-Ray
+diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
+index 67969b1..c43e587 100644
+--- a/arch/arm/mach-pxa/magician.c
++++ b/arch/arm/mach-pxa/magician.c
+@@ -425,6 +425,15 @@ static struct pxafb_mach_info samsung_info = {
+  * Backlight
+  */
+ 
++ /*
++ * fixed regulator for pwm_backlight
++ */
++
++static struct regulator_consumer_supply pwm_backlight_supply[] = {
++	REGULATOR_SUPPLY("power", "pwm_backlight"),
++};
++
++
+ static struct gpio magician_bl_gpios[] = {
+ 	{ EGPIO_MAGICIAN_BL_POWER,	GPIOF_DIR_OUT, "Backlight power" },
+ 	{ EGPIO_MAGICIAN_BL_POWER2,	GPIOF_DIR_OUT, "Backlight power 2" },
+@@ -1125,6 +1134,9 @@ static void __init magician_init(void)
+ 	spi_register_board_info(ARRAY_AND_SIZE(ads7846_spi_board_info));
+ 
+ 	pxa_set_camera_info(&magician_pxacamera_pdata);
++
++	regulator_register_always_on(0, "power", pwm_backlight_supply,
++		ARRAY_SIZE(pwm_backlight_supply), 5000000);
+ }
+ 
+ MACHINE_START(MAGICIAN, "HTC Magician")
+-- 
+1.7.12.1
