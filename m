@@ -1,51 +1,48 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 18 Sep 2015 23:04:54 +0200
-Subject: [RESEND PATCH] spi: mediatek: fix wrong error return value on
- probe
-In-Reply-To: <1442321205-30869-1-git-send-email-javier@osg.samsung.com>
-References: <1442321205-30869-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <2905291.oz4bWkMeg3@ubix>
+From: rjui@broadcom.com (Ray Jui)
+Date: Fri, 18 Sep 2015 14:24:05 -0700
+Subject: [PATCH v2 0/9] Broadcom Cygnus device tree changes
+Message-ID: <1442611454-16331-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 15, 2015 02:46:45 PM Javier Martinez Canillas wrote:
-> Commit adcbcfea15d62 ("spi: mediatek: fix spi clock usage error")
-> added a new sel_clk but introduced bugs in the error paths since
-> the wrong struct clk pointers are passed to PTR_ERR().
-> 
-> Fixes: adcbcfea15d62 ("spi: mediatek: fix spi clock usage error")
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
+This patch series cleans up the Broadcom Cygnus device tree files and makes it
+more consistent with the rest of Broadcom iProc device tree files. This patch
+series also enables various peripherals on Cygnus boards. They include:
 
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+bcm11360_entphn:
+NAND
 
-> ---
-> Patch based on git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git
-> branch fix/mediatek but also applies cleanly to branch for-linus.
-> 
-> It's the exact same patch than before so I don't know what went wrong.
-> 
->  drivers/spi/spi-mt65xx.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-> index 6fbb5e5132b0..e9839a4e0175 100644
-> --- a/drivers/spi/spi-mt65xx.c
-> +++ b/drivers/spi/spi-mt65xx.c
-> @@ -585,14 +585,14 @@ static int mtk_spi_probe(struct platform_device *pdev)
-> 
->  	mdata->sel_clk = devm_clk_get(&pdev->dev, "sel-clk");
->  	if (IS_ERR(mdata->sel_clk)) {
-> -		ret = PTR_ERR(mdata->spi_clk);
-> +		ret = PTR_ERR(mdata->sel_clk);
->  		dev_err(&pdev->dev, "failed to get sel-clk: %d\n", ret);
->  		goto err_put_master;
->  	}
-> 
->  	mdata->spi_clk = devm_clk_get(&pdev->dev, "spi-clk");
->  	if (IS_ERR(mdata->spi_clk)) {
-> -		ret = PTR_ERR(mdata->parent_clk);
-> +		ret = PTR_ERR(mdata->spi_clk);
->  		dev_err(&pdev->dev, "failed to get spi-clk: %d\n", ret);
->  		goto err_put_master;
->  	}
+bcm958300k:
+touchscreen
+
+bcm958305k:
+I2C, PCIe, NAND, touchscreen
+
+Code is based on v4.3-rc1 and is available on GITHUB:
+https://github.com/Broadcom/cygnus-linux/tree/cygnus-dt-v2
+
+Chages from V1:
+- Break the major clean up change into separate patches
+
+Ray Jui (9):
+  ARM: dts: consolidate aliases for Cygnus dt files
+  ARM: dts: Use label for device nodes in Cygnus dts
+  ARM: dts: Remove unused PCI I/O resource in Cygnus
+  ARM: dts: Put Cygnus core components under core bus
+  ARM: dts: Move all Cygnus peripherals into soc bus
+  ARM: dts: Reorder Cygnus peripherals
+  ARM: dts: Enable various peripherals on bcm958305k
+  ARM: dts: Enable NAND support on bcm911360_entphn
+  ARM: dts: enable touchscreen support on Cygnus
+
+ arch/arm/boot/dts/bcm-cygnus.dtsi      | 337 +++++++++++++++++----------------
+ arch/arm/boot/dts/bcm911360_entphn.dts |  28 ++-
+ arch/arm/boot/dts/bcm911360k.dts       |  10 +-
+ arch/arm/boot/dts/bcm958300k.dts       |  45 ++---
+ arch/arm/boot/dts/bcm958305k.dts       |  41 +++-
+ arch/arm/boot/dts/bcm9hmidc.dtsi       |  42 ++++
+ 6 files changed, 299 insertions(+), 204 deletions(-)
+ create mode 100644 arch/arm/boot/dts/bcm9hmidc.dtsi
+
+-- 
+1.9.1
