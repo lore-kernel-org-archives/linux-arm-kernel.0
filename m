@@ -1,49 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Sep 2015 09:47:14 +0900
-Subject: [PATCH 12/19] ARM: shmobile: koelsch: use CCF for audio clock
+Date: Fri, 18 Sep 2015 09:47:21 +0900
+Subject: [PATCH 19/19] ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain
+ for sound
 In-Reply-To: <cover.1442536920.git.horms+renesas@verge.net.au>
 References: <cover.1442536920.git.horms+renesas@verge.net.au>
-Message-ID: <c19c84ff3ab1280894bb2cdd99027f751922e2ba.1442536920.git.horms+renesas@verge.net.au>
+Message-ID: <2529493c288c109cf734235d1eb3de1b23d9bcef.1442536920.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Because of historical reason, audio clock didn't use CCF.
-Let's use it now.
+797a0626e08c ("ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain")
+added CPG/MSTP clock-cells domain support, but it was missing sound
+support. This patch adds it.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+[horms: updated commit id referred to in changelog]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index dc158845afdc..fc44ea361a4b 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -242,6 +242,13 @@
- 			  1800000 0>;
- 	};
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 3b8e26dde36d..328f48bd15e7 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1677,6 +1677,7 @@
+ 				"mix.0", "mix.1",
+ 				"dvc.0", "dvc.1",
+ 				"clk_a", "clk_b", "clk_c", "clk_i";
++		power-domains = <&cpg_clocks>;
  
-+	audio_clock: clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <11289600>;
-+		clock-output-names = "audio_clock";
-+	};
-+
- 	rsnd_ak4643: sound {
- 		compatible = "simple-audio-card";
- 
-@@ -255,7 +262,7 @@
- 
- 		sndcodec: simple-audio-card,codec {
- 			sound-dai = <&ak4643>;
--			system-clock-frequency = <11289600>;
-+			clocks = <&audio_clock>;
- 		};
- 	};
+ 		status = "disabled";
  
 -- 
 2.1.4
