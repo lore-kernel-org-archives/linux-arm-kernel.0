@@ -1,30 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Sep 2015 18:02:26 +0100
-Subject: possible reason: unannotated irqs-off
-In-Reply-To: <55FC3587.7010601@ti.com>
-References: <55FC3587.7010601@ti.com>
-Message-ID: <20150918170226.GK21084@n2100.arm.linux.org.uk>
+From: luis@debethencourt.com (Luis de Bethencourt)
+Date: Fri, 18 Sep 2015 19:09:51 +0200
+Subject: [PATCH 3/3] regulator: vexpress: Fix module autoload for OF platform
+ driver
+Message-ID: <20150918170951.GA28327@goodgumbo.baconseed.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 12:02:15PM -0400, Murali Karicheri wrote:
-> While chasing a fix for a deadlock in netcp driver with debug options
-> enabled, i bumped on another warning shown below.. Looks like I need to
-> enable CONFIG_IRQSOFF_TRACER as well to get rid of this. Have anyone seen
-> this? My google search showed me some connection with this option and I
-> enabled it as well and I don't see the warning anymore. Any idea if this is
-> a false alarm or a real bug? Looks like I need to enable
-> CONFIG_IRQSOFF_TRACER as well. If so, I can send a patch. Either way let me
-> know.
+This platform driver has a OF device ID table but the OF module
+alias information is not created so module autoloading won't work.
 
-Do you have this commit applied?
+Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
+---
+ drivers/regulator/vexpress.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-commit 3302caddf10ad50710dbb7a94ccbdb3ad5bf1412
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Thu Aug 20 16:13:37 2015 +0100
-
-    ARM: entry: efficiency cleanups
-
+diff --git a/drivers/regulator/vexpress.c b/drivers/regulator/vexpress.c
+index bed9d3e..c810cbb 100644
+--- a/drivers/regulator/vexpress.c
++++ b/drivers/regulator/vexpress.c
+@@ -103,6 +103,7 @@ static const struct of_device_id vexpress_regulator_of_match[] = {
+ 	{ .compatible = "arm,vexpress-volt", },
+ 	{ }
+ };
++MODULE_DEVICE_TABLE(of, vexpress_regulator_of_match);
+ 
+ static struct platform_driver vexpress_regulator_driver = {
+ 	.probe = vexpress_regulator_probe,
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.4.6
