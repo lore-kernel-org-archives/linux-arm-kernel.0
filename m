@@ -1,41 +1,62 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri, 18 Sep 2015 16:56:32 +0200
-Subject: [PATCH v5 01/23] driver core: Add pre_probe callback to bus_type
-In-Reply-To: <Pine.LNX.4.44L0.1509171150410.1270-100000@iolanthe.rowland.org>
-References: <1442494637-3674-2-git-send-email-tomeu.vizoso@collabora.com>
- <Pine.LNX.4.44L0.1509171150410.1270-100000@iolanthe.rowland.org>
-Message-ID: <CAAObsKADuTjSUZbVJj5g3Ead-Zb87JEqRzvgh9DW1my4Bdh33Q@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 18 Sep 2015 16:58:28 +0200
+Subject: [PATCH] usb: gadget: atmel_usba_udc: add ep capabilities support on
+ device tree binding
+In-Reply-To: <20150918142716.GB3126@saruman.tx.rr.com>
+References: <20150918142716.GB3126@saruman.tx.rr.com>
+Message-ID: <1442588308-10201-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 September 2015 at 17:52, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Thu, 17 Sep 2015, Tomeu Vizoso wrote:
->
->> Some buses (eg. AMBA) need access to some HW resources (it may need a
->> clock to be enabled so a device ID can be read) before a device can be
->> matched to a driver.
->>
->> The pre_probe callback allows the device-driver core to request the bus
->> to perform this initialization and can defer the probe if any of the
->> resources needed are missing.
->>
->> This gives us more flexibility when setting the order in which devices
->> are probed because the resources needed to get the matching information
->> don't need to be available by the time that the bus devices are
->> registered.
->
-> Can't the subsystem do this itself in its matching routine?
+From: Sylvain Rochet <sylvain.rochet@finsecur.com>
 
-That seems to work, thanks for the idea!
+The recently added endpoint capabilities flags verification breaks Atmel
+USBA because the endpoint configuration was only added when the driver
+is bound using the legacy pdata interface.
 
-Regards,
+Convert endpoint configuration to new capabilities model when driver is
+bound to a device tree as well.
 
-Tomeu
+Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+Fixes: 47bef3865115 ("usb: gadget: atmel_usba_udc: add ep capabilities support")
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Felipe,
 
-> Alan Stern
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+As you've just requested, here is the same patch sent to linux-usb ml. I had
+added the "Fixes" and my SoB tags.
+
+For the record:
+It is considered as a fix for 4.3. Can you please queue it for the "4.3-rc"
+phase?
+
+Bye,
+
+
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 3dfada8d6061..f0f2b066ac08 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -2002,6 +2002,17 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+ 		ep->udc = udc;
+ 		INIT_LIST_HEAD(&ep->queue);
+ 
++		if (ep->index == 0) {
++			ep->ep.caps.type_control = true;
++		} else {
++			ep->ep.caps.type_iso = ep->can_isoc;
++			ep->ep.caps.type_bulk = true;
++			ep->ep.caps.type_int = true;
++		}
++
++		ep->ep.caps.dir_in = true;
++		ep->ep.caps.dir_out = true;
++
+ 		if (i)
+ 			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
+ 
+-- 
+2.1.3
