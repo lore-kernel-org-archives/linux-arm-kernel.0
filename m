@@ -1,42 +1,39 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 18 Sep 2015 09:27:16 -0500
-Subject: [PATCH linux-next] usb: gadget: atmel_usba_udc: add ep
- capabilities support on device tree binding
-In-Reply-To: <55FC1E0F.4070807@atmel.com>
-References: <1441657171-15362-1-git-send-email-sylvain.rochet@finsecur.com>
- <55FC1E0F.4070807@atmel.com>
-Message-ID: <20150918142716.GB3126@saruman.tx.rr.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Fri, 18 Sep 2015 16:29:34 +0200
+Subject: [PATCH 1/4] s5p-jpeg: generalize clocks handling
+In-Reply-To: <1442586060-23657-2-git-send-email-andrzej.p@samsung.com>
+References: <1442586060-23657-1-git-send-email-andrzej.p@samsung.com>
+ <1442586060-23657-2-git-send-email-andrzej.p@samsung.com>
+Message-ID: <55FC1FCE.1010208@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 04:22:07PM +0200, Nicolas Ferre wrote:
-> Le 07/09/2015 22:19, Sylvain Rochet a ?crit :
-> > The recently added endpoint capabilities flags verification breaks Atmel
-> > USBA because the endpoint configuration was only added when the driver
-> > is bound using the legacy pdata interface.
-> > 
-> > Convert endpoint configuration to new capabilities model when driver is
-> > bound to a device tree as well.
-> > 
-> > Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> With this additional tag:
-> Fixes: 47bef3865115 ("usb: gadget: atmel_usba_udc: add ep capabilities support")
-> 
-> Felipe, Greg,
-> 
-> It is considered as a fix for 4.3. Can you please queue it for the "4.3-rc" phase?
+Hi Andrzej, Marek,
 
-sure thing, just, please, resend with linux-usb in Cc :-)
+On 09/18/2015 04:20 PM, Andrzej Pietrasiewicz wrote:
+> From: Marek Szyprowski <m.szyprowski@samsung.com>
+>
+> Allow jpeg codec variants declare clocks they need.
+> Before this patch is applied jpeg-core gets jpeg->sclk
+> "speculatively": if it is not there, we assume no problem.
+>
+> This patch eliminates this by explicitly declaring
+> what clocks are needed for each variant.
+>
+> This is a preparation for adding Exynos 5433 variant support, which
+> needs 4 clocks of names not compatible with any previous version of
+> jpeg hw module.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> [Rebase and commit message]
+> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> ---
+>   drivers/media/platform/s5p-jpeg/jpeg-core.c | 66 ++++++++++++++---------------
+>   drivers/media/platform/s5p-jpeg/jpeg-core.h | 10 +++--
+>   2 files changed, 37 insertions(+), 39 deletions(-)
+
+Reviewed-by: Jacek Anaszewski <j.anaszewski@samsung.com>
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150918/3995791a/attachment.sig>
+Best Regards,
+Jacek Anaszewski
