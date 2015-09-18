@@ -1,118 +1,171 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 18 Sep 2015 10:26:19 -0600
-Subject: [RFC PATCH 05/20] coresight: etm3x: adapting default tracer setting
- for perf
+Date: Fri, 18 Sep 2015 10:26:23 -0600
+Subject: [RFC PATCH 09/20] coresight: etb10: implementing buffer update API
 In-Reply-To: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1442593594-10665-6-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1442593594-10665-10-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The perf command line tool has options to trace in kernel or
-user space mode.  As such configuring tracers to trace the
-entire address range, leaving to the perf mechanic the task
-of collecting traces in accordance with the requested mode.
+Implementing buffer API to update the location of the ETB
+internal ring buffer once a trace session has ended.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm.h   |  2 ++
- drivers/hwtracing/coresight/coresight-etm3x.c | 36 +++++++++++----------------
- 2 files changed, 17 insertions(+), 21 deletions(-)
+ drivers/hwtracing/coresight/coresight-etb10.c | 113 ++++++++++++++++++++++++++
+ include/linux/coresight.h                     |   3 +
+ 2 files changed, 116 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-index b4481eb29304..b149a565bc32 100644
---- a/drivers/hwtracing/coresight/coresight-etm.h
-+++ b/drivers/hwtracing/coresight/coresight-etm.h
-@@ -165,6 +165,7 @@
-  * @startstop_ctrl: setting for register ETMTSSCR.
-  * @enable_event: setting for register ETMTEEVR.
-  * @enable_ctrl1: setting for register ETMTECR1.
-+ * @enable_ctrl2: setting for register ETMTECR2.
-  * @fifofull_level: setting for register ETMFFLR.
-  * @addr_idx:	index for the address comparator selection.
-  * @addr_val:	value for address comparator register.
-@@ -219,6 +220,7 @@ struct etm_drvdata {
- 	u32				startstop_ctrl;
- 	u32				enable_event;
- 	u32				enable_ctrl1;
-+	u32				enable_ctrl2;
- 	u32				fifofull_level;
- 	u8				addr_idx;
- 	u32				addr_val[ETM_MAX_ADDR_CMP];
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 3cdf0bcddb41..c6880c1ade55 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -220,6 +220,17 @@ static void etm_set_default(struct etm_drvdata *drvdata)
- 	int i;
- 
- 	drvdata->trigger_event = ETM_DEFAULT_EVENT_VAL;
-+	/*
-+	 * Taken verbatim from the TRM:
-+	 *
-+	 * To trace all memory:
-+	 *  set bit [24] in register 0x009, the ETMTECR1, to 1
-+	 *  set all other bits in register 0x009, the ETMTECR1, to 0
-+	 *  set all bits in register 0x007, the ETMTECR2, to 0
-+	 *  set register 0x008, the ETMTEEVR, to 0x6F (TRUE).
-+	 */
-+	drvdata->enable_ctrl1 = BIT(24);
-+	drvdata->enable_ctrl2 = 0x0;
- 	drvdata->enable_event = ETM_HARD_WIRE_RES_A;
- 
- 	drvdata->seq_12_event = ETM_DEFAULT_EVENT_VAL;
-@@ -1881,7 +1892,7 @@ static void etm_init_arch_data(void *info)
- 	CS_LOCK(drvdata->base);
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 3239036f4609..043e504837d3 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -346,12 +346,125 @@ static void etb_unset_buffer(struct coresight_device *csdev,
+ 				    local_xchg(&buf->lost, 0));
  }
  
--static void etm_init_default_data(struct etm_drvdata *drvdata)
-+static void etm_init_trace_id(struct etm_drvdata *drvdata)
- {
- 	/*
- 	 * A trace ID of value 0 is invalid, so let's start at some
-@@ -1889,13 +1900,6 @@ static void etm_init_default_data(struct etm_drvdata *drvdata)
- 	 */
- 	static int etm3x_traceid = 0x10;
- 
--	u32 flags = (1 << 0 | /* instruction execute*/
--		     3 << 3 | /* ARM instruction */
--		     0 << 5 | /* No data value comparison */
--		     0 << 7 | /* No exact mach */
--		     0 << 8 | /* Ignore context ID */
--		     0 << 10); /* Security ignored */
--
- 	/*
- 	 * Initial configuration only - guarantees sources handled by
- 	 * this driver have a unique ID@startup time but not between
-@@ -1903,18 +1907,6 @@ static void etm_init_default_data(struct etm_drvdata *drvdata)
- 	 * framework.
- 	 */
- 	drvdata->traceid = etm3x_traceid++;
--	drvdata->ctrl = (ETMCR_CYC_ACC | ETMCR_TIMESTAMP_EN);
--	drvdata->enable_ctrl1 = ETMTECR1_ADDR_COMP_1;
--	if (drvdata->nr_addr_cmp >= 2) {
--		drvdata->addr_val[0] = (u32) _stext;
--		drvdata->addr_val[1] = (u32) _etext;
--		drvdata->addr_acctype[0] = flags;
--		drvdata->addr_acctype[1] = flags;
--		drvdata->addr_type[0] = ETM_ADDR_TYPE_RANGE;
--		drvdata->addr_type[1] = ETM_ADDR_TYPE_RANGE;
--	}
--
--	etm_set_default(drvdata);
- }
- 
- static int etm_probe(struct amba_device *adev, const struct amba_id *id)
-@@ -1985,7 +1977,9 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
- 		ret = -EINVAL;
- 		goto err_arch_supported;
- 	}
--	etm_init_default_data(drvdata);
++static void etb_update_buffer(struct coresight_device *csdev,
++			      struct perf_output_handle *handle)
++{
++	int i, cur;
++	u8 *buf_ptr;
++	u32 read_ptr, write_ptr, start;
++	u32 status, read_data, words;
++	unsigned long flags, offset;
++	struct cs_buffers *buf = perf_get_aux(handle);
++	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 +
-+	etm_init_trace_id(drvdata);
-+	etm_set_default(drvdata);
++	if (!buf)
++		return;
++
++	spin_lock_irqsave(&drvdata->spinlock, flags);
++	if (!drvdata->enable)
++		goto out;
++
++	etb_disable_hw(drvdata);
++	CS_UNLOCK(drvdata->base);
++
++	read_ptr = readl_relaxed(drvdata->base + ETB_RAM_READ_POINTER);
++	write_ptr = readl_relaxed(drvdata->base + ETB_RAM_WRITE_POINTER);
++
++	/*
++	 * Entries should be aligned to the frame size.  If they are not
++	 * go back to the last alignement point to give decoding tools a
++	 * chance to fix things.
++	 */
++	if (write_ptr % ETB_FRAME_SIZE_WORDS) {
++		dev_err(drvdata->dev,
++			"write_ptr: %lu not aligned to formatter frame size\n",
++			(unsigned long)write_ptr);
++
++		write_ptr &= ~ETB_FRAME_SIZE_WORDS;
++		local_inc(&buf->lost);
++	}
++
++	/*
++	 * Get a hold of the status register and see if a wrap around
++	 * has occurred.  If so adjust things accordingly.  Otherwise
++	 * start at the beginning and go until the write pointer has
++	 * been reached.
++	 */
++	status = readl_relaxed(drvdata->base + ETB_STATUS_REG);
++	if (status & ETB_STATUS_RAM_FULL) {
++		local_inc(&buf->lost);
++		words = drvdata->buffer_depth;
++		start = write_ptr;
++	} else {
++		words = write_ptr - read_ptr;
++		start = 0;
++	}
++
++	/*
++	 * Make sure we don't overwrite data that hasn't been consumed yet.
++	 * It is entirely possible that the HW buffer has more data than the
++	 * ring buffer can currently handle.  If so adjust the start address
++	 * to take only the last traces.
++	 *
++	 * Since metrics related to ETBs is in words, multiply by the
++	 * amount of byte per word to have the right units.
++	 */
++	if (words * ETB_FRAME_SIZE_WORDS > handle->size) {
++		unsigned int capacity = drvdata->buffer_depth;
++
++		/* make sure new sizes are still multiples the frame size */
++		words = handle->size / ETB_FRAME_SIZE_WORDS;
++		/* advance the start pointer to get the latest trace data */
++		start += capacity - words;
++		/* wrap around if we've reach the end of the HW buffer */
++		start &= capacity - 1;
++		/* let the decoder know we've skipped ahead */
++		local_inc(&buf->lost);
++	}
++
++	/* finally tell HW where we want to start reading from */
++	writel_relaxed(start, drvdata->base + ETB_RAM_READ_POINTER);
++
++	cur = buf->cur;
++	offset = buf->offset;
++	for (i = 0; i < words; i++) {
++		buf_ptr = buf->addr[cur] + offset;
++		read_data = readl_relaxed(drvdata->base +
++					  ETB_RAM_READ_DATA_REG);
++		*buf_ptr++ = read_data >> 0;
++		*buf_ptr++ = read_data >> 8;
++		*buf_ptr++ = read_data >> 16;
++		*buf_ptr++ = read_data >> 24;
++
++		offset += 4;
++		if (offset >= PAGE_SIZE) {
++			offset = 0;
++			cur++;
++			/* wrap around at the end of the buffer */
++			cur &= buf->nr_pages - 1;
++		}
++	}
++
++	/* reset ETB buffer for next run */
++	writel_relaxed(0x0, drvdata->base + ETB_RAM_READ_POINTER);
++	writel_relaxed(0x0, drvdata->base + ETB_RAM_WRITE_POINTER);
++
++	/* update ring buffer information */
++	local_add(words * ETB_FRAME_SIZE_WORDS, &buf->data_size);
++
++	CS_LOCK(drvdata->base);
++	etb_enable_hw(drvdata);
++out:
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++}
++
+ static const struct coresight_ops_sink etb_sink_ops = {
+ 	.enable		= etb_enable,
+ 	.disable	= etb_disable,
+ 	.setup_aux	= etb_setup_aux,
+ 	.set_buffer	= etb_set_buffer,
+ 	.unset_buffer	= etb_unset_buffer,
++	.update_buffer	= etb_update_buffer,
+ };
  
- 	desc->type = CORESIGHT_DEV_TYPE_SOURCE;
- 	desc->subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_PROC;
+ static const struct coresight_ops etb_cs_ops = {
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index 25bdce345ec3..48c3b9df0ae0 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -187,6 +187,7 @@ struct coresight_device {
+  * @enable:	enables the sink.
+  * @disable:	disables the sink.
+  * @setup_aux:	initialises perf's ring buffer for trace collection.
++ * @update_buffer: update buffer pointers after a trace session.
+  * @set_buffer:	initialises buffer mechanic before a trace session.
+  * @unset_buffer: finalises buffer mechanic after a trace session.
+  */
+@@ -195,6 +196,8 @@ struct coresight_ops_sink {
+ 	void (*disable)(struct coresight_device *csdev);
+ 	void *(*setup_aux)(struct coresight_device *csdev, int cpu,
+ 			   void **pages, int nr_pages, bool overwrite);
++	void (*update_buffer)(struct coresight_device *csdev,
++			      struct perf_output_handle *handle);
+ 	int (*set_buffer)(struct coresight_device *csdev,
+ 			  struct perf_event *event,
+ 			  struct perf_output_handle *handle);
 -- 
 1.9.1
