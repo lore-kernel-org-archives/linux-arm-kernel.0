@@ -1,43 +1,52 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 18 Sep 2015 16:51:11 +0800
-Subject: [PATCH v1 3/3] arm64: dts: rockchip: Add the needed timer for RK3368
- SoC
-In-Reply-To: <1442566271-10695-1-git-send-email-wxt@rock-chips.com>
-References: <1442566271-10695-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1442566271-10695-4-git-send-email-wxt@rock-chips.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 18 Sep 2015 10:03:40 +0100
+Subject: [PATCH] iommu-common: only compile lib/iommu_common.c for Sparc64
+In-Reply-To: <20150917.113806.1491126940106627619.davem@davemloft.net>
+References: <1442479227-18320-1-git-send-email-andre.przywara@arm.com>
+ <20150917.113806.1491126940106627619.davem@davemloft.net>
+Message-ID: <55FBD36C.5070301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a need of a broadcast timer in this case to ensure proper
-wakeup when the cpus are in sleep mode and a timer expires.
+Hi David,
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
+On 17/09/15 19:38, David Miller wrote:
+> From: Andre Przywara <andre.przywara@arm.com>
+> Date: Thu, 17 Sep 2015 09:40:27 +0100
+> 
+>> It seems the types used in this file are not really correct, but a
+>> fix isn't trivial.  So for the time being restrict this code to be
+>> compiled only when we actually need it.  Compile tested on Sparc,
+>> Sparc64, PPC64, ARM, ARM64, x86.
+> 
+> The whole reason this code gets compiled unconditionally is to
+> ensure it's portability so that other platforms can use it at
+> some point.
+> 
+> So I would ask that, instead of sweeping it under the rug, you
+> help work on fixing the problem you've uncovered.
 
-Changes in v1:
-- As the Heiko comments, add the "rockchip,rk3368-timer" for timer.
-  Although the 'rockchip,rk3288-timer' is working for RK3368, need to add the
-  'rockchip,rk3368-timer' for the rk3368-spec timer in the future.
+OK, I understand that. To be honest I tried that: changing the return
+type of iommu_tbl_range_alloc() to dma_addr_t and taking it from there.
+This resulted in quite some changes in the callers in arch/sparc, which
+scared me a bit because I don't have a clue about the Sparc IOMMU and I
+cannot test it seriously.
+Also I deemed it not appropriate still for the 4.3 release, which was
+what my patch was aiming at (because it is a 4.3 merging window regression).
 
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+So I have a simpler version of the proper fix mentioned above, which
+simply changes the return type of iommu_tbl_range_alloc() and pushes
+this warning away, though this still isn't right and just papers over
+the issue, I think. (Sending that out in a minute in a separate mail for
+reference).
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index a712bea..c4b3870 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -214,6 +214,12 @@
- 			(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
- 	};
- 
-+	timer at ff810000 {
-+		compatible = "rockchip,rk3368-timer", "rockchip,rk3288-timer";
-+		reg = <0x0 0xff810000 0x0 0x20>;
-+		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
- 	xin24m: oscillator {
- 		compatible = "fixed-clock";
- 		clock-frequency = <24000000>;
--- 
-1.9.1
+So what is your hunch on that? Shall we go with a dual approach: Fixing
+the compiler warning with either the simple return type change or the
+Kconfig approach now for 4.3 and revert that after the actual culprit
+gets fixed later?
+
+Or do you know of a simpler way to fixing it properly which could make
+it still into 4.3?
+
+Cheers,
+Andre.
