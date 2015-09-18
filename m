@@ -1,60 +1,61 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 18 Sep 2015 16:22:07 +0200
-Subject: [PATCH linux-next] usb: gadget: atmel_usba_udc: add ep
- capabilities support on device tree binding
-In-Reply-To: <1441657171-15362-1-git-send-email-sylvain.rochet@finsecur.com>
-References: <1441657171-15362-1-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <55FC1E0F.4070807@atmel.com>
+Date: Fri, 18 Sep 2015 16:23:47 +0200
+Subject: [PATCH] tty/serial: at91: move ATMEL_MAX_UART
+In-Reply-To: <1441877343-20248-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1441877343-20248-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <55FC1E73.8020101@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 07/09/2015 22:19, Sylvain Rochet a ?crit :
-> The recently added endpoint capabilities flags verification breaks Atmel
-> USBA because the endpoint configuration was only added when the driver
-> is bound using the legacy pdata interface.
+Le 10/09/2015 11:29, Alexandre Belloni a ?crit :
+> Move ATMEL_MAX_UART from platform_data/atmel.h to atmel_serial.c as this is
+> the only file using it and it is common practise from tty/serial drivers to
+> define it directly in the driver file.
 > 
-> Convert endpoint configuration to new capabilities model when driver is
-> bound to a device tree as well.
-> 
-> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
+Okay:
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-With this additional tag:
-Fixes: 47bef3865115 ("usb: gadget: atmel_usba_udc: add ep capabilities support")
-
-Felipe, Greg,
-
-It is considered as a fix for 4.3. Can you please queue it for the "4.3-rc" phase?
-
-Thanks, bye.
-
 > ---
->  drivers/usb/gadget/udc/atmel_usba_udc.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
+>  drivers/tty/serial/atmel_serial.c   | 6 ++++++
+>  include/linux/platform_data/atmel.h | 6 ------
+>  2 files changed, 6 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> index 2cbbb46..c2ea5e1 100644
-> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> @@ -2002,6 +2002,17 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
->  		ep->udc = udc;
->  		INIT_LIST_HEAD(&ep->queue);
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 5ca5cf3e9359..98c84038518e 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -112,6 +112,12 @@ struct atmel_uart_char {
+>  #define ATMEL_SERIAL_RINGSIZE 1024
 >  
-> +		if (ep->index == 0) {
-> +			ep->ep.caps.type_control = true;
-> +		} else {
-> +			ep->ep.caps.type_iso = ep->can_isoc;
-> +			ep->ep.caps.type_bulk = true;
-> +			ep->ep.caps.type_int = true;
-> +		}
+>  /*
+> + * at91: 6 USARTs and one DBGU port (SAM9260)
+> + * avr32: 4
+> + */
+> +#define ATMEL_MAX_UART		7
 > +
-> +		ep->ep.caps.dir_in = true;
-> +		ep->ep.caps.dir_out = true;
-> +
->  		if (i)
->  			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
+> +/*
+>   * We wrap our port structure around the generic uart_port.
+>   */
+>  struct atmel_uart_port {
+> diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
+> index 527a85c61924..c4bc90bfebe0 100644
+> --- a/include/linux/platform_data/atmel.h
+> +++ b/include/linux/platform_data/atmel.h
+> @@ -19,12 +19,6 @@
+>  #include <linux/serial.h>
+>  #include <linux/platform_data/macb.h>
 >  
+> -/*
+> - * at91: 6 USARTs and one DBGU port (SAM9260)
+> - * avr32: 4
+> - */
+> -#define ATMEL_MAX_UART	7
+> -
+>   /* USB Device */
+>  struct at91_udc_data {
+>  	int	vbus_pin;		/* high == host powering us */
 > 
 
 
