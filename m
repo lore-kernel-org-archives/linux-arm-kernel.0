@@ -1,98 +1,54 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 18 Sep 2015 11:26:08 -0400
-Subject: [PATCH] arm64: dmi: initialize DMI earlier in boot
-In-Reply-To: <20150918143124.GA31683@leverpostej>
-References: <1442585666-14093-1-git-send-email-msalter@redhat.com>
- <20150918143124.GA31683@leverpostej>
-Message-ID: <1442589968.28550.18.camel@redhat.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 18 Sep 2015 11:29:48 -0400
+Subject: [linux-sunxi] [PATCH 1/4] ARM: dts: sun8i: Add PWM controller
+ node for A23/A33
+In-Reply-To: <1442561739-6824-2-git-send-email-wens@csie.org>
+References: <1442561739-6824-1-git-send-email-wens@csie.org>
+ <1442561739-6824-2-git-send-email-wens@csie.org>
+Message-ID: <55FC2DEC.7080104@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-09-18 at 15:31 +0100, Mark Rutland wrote:
-> On Fri, Sep 18, 2015 at 03:14:26PM +0100, Mark Salter wrote:
-> > Currently, DMI initialization takes place in a core initcall. This
-> > limits how early in boot the kernel can make DMI-based decisions
-> > about firmware/hardware quirks. This patch moves DMI initialization
-> > to setup_arch() so that DMI info is available before initcalls run.
-> 
-> Which firmware/hardware quirks in particular necessitate moving this?
+Hi,
 
-The thing that prompted it for me was my testing of Lorenzo's parking
-protocol patch. I have a platform which has a quirky implementation of
-that and which has modified firmware to implement it according to the
-latest spec. So I need to tell the difference before secondary cores
-were brought up. This doesn't really effect upstream in that there is
-no need for backwards compatibility because there is no upstream
-parking protocol support currently. But it seemed reasonable to post
-this patch anyway since having DMI available earlier adds a little
-more utility, generally.
+Good stuff, thanks for working on this.
 
-> > ---
-> >  arch/arm64/include/asm/dmi.h | 19 ++++++++++++++++---
-> >  arch/arm64/kernel/efi.c      | 15 ---------------
-> >  arch/arm64/kernel/setup.c    |  5 +++++
-> >  3 files changed, 21 insertions(+), 18 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
-> > index 69d37d8..e6389fd 100644
-> > --- a/arch/arm64/include/asm/dmi.h
-> > +++ b/arch/arm64/include/asm/dmi.h
-> > @@ -16,16 +16,29 @@
-> >  
-> >  #include <linux/io.h>
-> >  #include <linux/slab.h>
-> > +#include <linux/memblock.h>
-> 
-> Nit: please keep includes ordered (given they were already).
+On 09/18/2015 03:35 AM, Chen-Yu Tsai wrote:
+> A23/A33 have a PWM controller that is compatible to the one on the A20.
+> Add a device node for it.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Alphabetically? (some maintainers like them ordered by name length :)
+Looks good to me:
 
-> 
-> [...]
-> 
-> > @@ -413,20 +412,6 @@ static int __init arm64_enable_runtime_services(void)
-> >  }
-> >  early_initcall(arm64_enable_runtime_services);
-> >  
-> > -static int __init arm64_dmi_init(void)
-> > -{
-> > -	/*
-> > -	 * On arm64, DMI depends on UEFI, and dmi_scan_machine() needs to
-> > -	 * be called early because dmi_id_init(), which is an arch_initcall
-> > -	 * itself, depends on dmi_scan_machine() having been called already.
-> > -	 */
-> > -	dmi_scan_machine();
-> > -	if (dmi_available)
-> > -		dmi_set_dump_stack_arch_desc();
-> > -	return 0;
-> > -}
-> > -core_initcall(arm64_dmi_init);
-> > -
-> >  static void efi_set_pgd(struct mm_struct *mm)
-> >  {
-> >  	if (mm == &init_mm)
-> > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> > index dc9eb5f..200c2e9 100644
-> > --- a/arch/arm64/kernel/setup.c
-> > +++ b/arch/arm64/kernel/setup.c
-> > @@ -46,6 +46,7 @@
-> >  #include <linux/efi.h>
-> >  #include <linux/personality.h>
-> >  #include <linux/psci.h>
-> > +#include <linux/dmi.h>
-> >  
-> >  #include <asm/acpi.h>
-> >  #include <asm/fixmap.h>
-> > @@ -436,6 +437,10 @@ void __init setup_arch(char **cmdline_p)
-> >  	relocate_initrd();
-> >  	request_standard_resources();
-> >  
-> > +	dmi_scan_machine();
-> > +	if (dmi_available)
-> > +		dmi_set_dump_stack_arch_desc();
-> 
-> We should have a comment as to why this needs to happen so early (much
-> like we used to).
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 
-The original comment was about why it should be core_initcall rather than
-some other initcall, which is why I dropped it altogether.
+Regards,
+
+Hans
+
+
+> ---
+>   arch/arm/boot/dts/sun8i-a23-a33.dtsi | 8 ++++++++
+>   1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> index 27a925ec17d2..e7054304018a 100644
+> --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> @@ -466,6 +466,14 @@
+>   			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+>   		};
+>
+> +		pwm: pwm at 01c21400 {
+> +			compatible = "allwinner,sun7i-a20-pwm";
+> +			reg = <0x01c21400 0xc>;
+> +			clocks = <&osc24M>;
+> +			#pwm-cells = <3>;
+> +			status = "disabled";
+> +		};
+> +
+>   		lradc: lradc at 01c22800 {
+>   			compatible = "allwinner,sun4i-a10-lradc-keys";
+>   			reg = <0x01c22800 0x100>;
+>
