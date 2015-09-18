@@ -1,31 +1,25 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Fri, 18 Sep 2015 03:20:50 +0200
-Subject: [PATCH v3 24/26] ARM: pxa: magician: Add debug message for backlight
- brightness function
-In-Reply-To: <cover.1442462898.git.petr.cvek@tul.cz>
-References: <cover.1442462898.git.petr.cvek@tul.cz>
-Message-ID: <55FB66F2.6010701@tul.cz>
+From: agross@codeaurora.org (Andy Gross)
+Date: Thu, 17 Sep 2015 21:44:01 -0500
+Subject: [PATCH v4] qcom: ipq4019: Add basic board/dts support for
+ IPQ4019 SoC
+In-Reply-To: <20150827053138.GA24234@codeaurora.org>
+References: <20150827053138.GA24234@codeaurora.org>
+Message-ID: <20150918024401.GA21736@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a debug message for the backlight brightness function.
+On Thu, Aug 27, 2015 at 11:01:38AM +0530, Varadarajan Narayanan wrote:
+> Add initial dts files and SoC support for IPQ4019
+> 
+> Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+> ---
 
-Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
----
- arch/arm/mach-pxa/magician.c | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index 386e6f0..67969b1 100644
---- a/arch/arm/mach-pxa/magician.c
-+++ b/arch/arm/mach-pxa/magician.c
-@@ -437,6 +437,7 @@ static int magician_backlight_init(struct device *dev)
- 
- static int magician_backlight_notify(struct device *dev, int brightness)
- {
-+	pr_debug("Brightness = %i\n", brightness);
- 	gpio_set_value(EGPIO_MAGICIAN_BL_POWER, brightness);
- 	if (brightness >= 200) {
- 		gpio_set_value(EGPIO_MAGICIAN_BL_POWER2, 1);
+Aside from the incorrect copyright date (which i will fix), this is fine.
+
+I'll apply this.
+
 -- 
-1.7.12.1
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
