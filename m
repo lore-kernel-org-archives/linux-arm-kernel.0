@@ -1,48 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 18 Sep 2015 09:29:58 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.4
-In-Reply-To: <1484890.bItsbzvneZ@wuerfel>
-References: <cover.1442536920.git.horms+renesas@verge.net.au>
- <CAMuHMdX41ggvKAKrp3s++UMYidhXuASoMP3xzdtnxjoL=0jpSA@mail.gmail.com>
- <1484890.bItsbzvneZ@wuerfel>
-Message-ID: <CAMuHMdX_kgj4c4J4rZUySfJmcV0t2xUBizhp102Xx-k1yn2jQQ@mail.gmail.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 18 Sep 2015 09:31:26 +0200
+Subject: [RESEND PATCH 0/2] ST PLL fixes for 4.3-rc2
+In-Reply-To: <20150917181449.GR23081@codeaurora.org>
+References: <1442389379-9298-1-git-send-email-gabriel.fernandez@linaro.org>
+ <20150916223051.GO23081@codeaurora.org> <55FA8C14.3020000@st.com>
+ <20150917181449.GR23081@codeaurora.org>
+Message-ID: <55FBBDCE.8070905@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
 
-On Fri, Sep 18, 2015 at 9:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 18 September 2015 09:16:31 Geert Uytterhoeven wrote:
->> On Fri, Sep 18, 2015 at 2:47 AM, Simon Horman
->> <horms+renesas@verge.net.au> wrote:
->> > Renesas ARM Based SoC DT Updates for v4.4
->> >
->> > * Add missing CPG/MSTP Clock Domain for sound on r8a779[01] SoCs
+
+On 09/17/2015 08:14 PM, Stephen Boyd wrote:
+> On 09/17, Maxime Coquelin wrote:
 >>
->> >       ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain for sound
->> >       ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain for sound
+>> On 09/17/2015 12:30 AM, Stephen Boyd wrote:
+>>> On 09/16, Gabriel Fernandez wrote:
+>>>> This patch set fixes a kernel crash :
+>>> [..]
+>>>> This kernel crash is due to a broken compatibility with this commit:
+>>>> commit 5eb26c605909 ("ARM: STi: DT: Rename st_pll3200c32_407_c0_x into st_pll3200c32_cx_x")
+>>> It isn't clear who's supposed to apply this because the To: list
+>>> is huge. Did you want to take this through arm-soc? If so, feel
+>>> free to take my acked-by on the second patch. The first patch
+>>> doesn't even apply to clk tree because the patch introducing the
+>>> typo didn't go through our tree.
+>> Indeed Stephen, I see it went through my tree (STi DT).
+>> So the first patch should be taken through arm-soc.
+>> The second patch, should be taken through yours I think.
 >>
->> These two should actually go in in v4.3, as they're bugfixes for commits that
->> are in v4.3-rc1. That can be done in parallel, though.
->>
->> Sound will stop working in mainline as soon as commit cbc41d0a761bffb3
->> ("drivers: sh: Disable PM runtime for multi-platform ARM with genpd") in
->> sh-drivers-for-v4.3 enters mainline.
->
-> The commits are on the top of the branch, so we could just remove them
-> here and apply them to the fixes branch if you like.
+> Ok. That probably breaks bisectability, but if you're not
+> worried, I'm not worried.
+I'm not worried about bisectability indeed, as the first patch is just 
+typo fixes in DT Bindings documentation.
 
-That sounds fine to me, thanks!
-
-Simon, is that OK for you?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards,
+Maxime
