@@ -1,30 +1,62 @@
-From: luis@debethencourt.com (Luis de Bethencourt)
-Date: Fri, 18 Sep 2015 20:22:26 +0200
-Subject: [PATCH 4/4] usb: host: uhci-platform: Fix module autoload for OF
- platform driver
-Message-ID: <20150918182226.GA31658@goodgumbo.baconseed.org>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Fri, 18 Sep 2015 13:39:17 -0500
+Subject: [PATCH 2/2] ARM: dts: Fix WLAN regression on omap5-uevm
+In-Reply-To: <20150918165109.GB8020@atomide.com>
+References: <1442593745-16725-1-git-send-email-tony@atomide.com>
+ <1442593745-16725-3-git-send-email-tony@atomide.com>
+ <CAOCHtYh3pDg6_mdX71G=L5Vz-mOmBnerwR5pjumq5jYQ-tN5Pw@mail.gmail.com>
+ <20150918165109.GB8020@atomide.com>
+Message-ID: <CAOCHtYisPQ2g0GCD4NF7m14TchfaZ+k3UedPoaA0Rjtpo9ug+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This platform driver has a OF device ID table but the OF module
-alias information is not created so module autoloading won't work.
+On Fri, Sep 18, 2015 at 11:51 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Robert Nelson <robertcnelson@gmail.com> [150918 09:45]:
+>> On Fri, Sep 18, 2015 at 11:29 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> > Commit 99f84cae43df ("ARM: dts: add wl12xx/wl18xx bindings") added
+>> > device tree bindings for the TI WLAN SDIO on many omap variants.
+>> >
+>> > I recall wondering how come omap5-uevm did not have the WLAN
+>> > added and this issue has been bugging me for a while now, and
+>> > I finally tracked it down to a bad pinmux regression, and a missing
+>> > deferred probe handling for the 32k clock from palmas that's
+>> > requested by twl6040.
+>> >
+>> > Basically 392adaf796b9 ("ARM: dts: omap5-evm: Add mcspi data")
+>> > added pin muxing for mcspi4 that conflicts with the onboard
+>> > WLAN. While the omap5-uevm docs say the WLAN is not populated,
+>> > this was probably only the case for initial prototypes. Both
+>> > omap5-uevm boards I have have WLAN populated.
+>>
+>> Production boards from svtronics don't populate the wlan..
+>>
+>> http://www.svtronics.com/EVM/OMAP5432/5432
+>>
+>> quote: "WiFi not available on this model"
 
-Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
----
- drivers/usb/host/uhci-platform.c | 1 +
- 1 file changed, 1 insertion(+)
+Okay, got an email back from svtronics, there was a special omap5_uevm
++ wlan order option for production units.
 
-diff --git a/drivers/usb/host/uhci-platform.c b/drivers/usb/host/uhci-platform.c
-index 3a3e3ee..32a6f3d 100644
---- a/drivers/usb/host/uhci-platform.c
-+++ b/drivers/usb/host/uhci-platform.c
-@@ -140,6 +140,7 @@ static const struct of_device_id platform_uhci_ids[] = {
- 	{ .compatible = "platform-uhci", },
- 	{}
- };
-+MODULE_DEVICE_TABLE(of, platform_uhci_ids);
- 
- static struct platform_driver uhci_platform_driver = {
- 	.probe		= uhci_hcd_platform_probe,
+>>
+>> They have an option to order a version with a "COM8Q" connector to add wlan...
+>
+> Oh OK interesting.
+>
+>> http://www.svtronics.com/EVM/OMAP5432/5432C
+>>
+>> http://www.svtronics.com/EVM/OMAP5432/COM8Q
+>>
+>> I'm not sure who to bug from that era, but the wlan populated devices
+>> might have been prototype only.
+>
+> Hmm OK. Well as it's a SDIO card, it seems safe to add for now.
+> We may want to have a minimal separate dts file if the wiring is
+> different with the COM8Q card.
+
+Well we can take care of that as an device tree overlay. ;)
+
+Regards,
+
 -- 
-2.4.6
+Robert Nelson
+https://rcn-ee.com/
