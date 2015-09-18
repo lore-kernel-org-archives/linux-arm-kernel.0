@@ -1,118 +1,77 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 18 Sep 2015 10:26:31 -0600
-Subject: [RFC PATCH 17/20] coresight: etm-perf: adding symbolic link for CPUs
+Date: Fri, 18 Sep 2015 10:26:33 -0600
+Subject: [RFC PATCH 19/20] coresight: etm3x: implementing perf's user/kernel
+ mode
 In-Reply-To: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1442593594-10665-18-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1442593594-10665-20-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Other than probing each device entry under /sys/bus/coresight/devices/,
-there is no way for user space to know which CPU is associated to which
-tracer.  But knowing those association is important to discover tracer
-specifics and configuration options.
-
-As such introducing a symbolic link under
-/sys/bus/event_source/devices/cs_etm/cpuX that reference the coresight
-device a CPU is associated with.
+Configure tracers in accordance with the specification conveyed
+by the perf cmd line tool.  For example if only user space is
+requested, configure the address range comparator with the kerne's
+address range and set the 'exclude' bit, which will result in
+tracing everything except the kernel.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm-perf.c | 22 +++++++++++++++++++
- drivers/hwtracing/coresight/coresight-etm-perf.h | 27 ++++++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-etm3x.c    |  6 ++++++
- 3 files changed, 55 insertions(+)
- create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.h
+ drivers/hwtracing/coresight/coresight-etm3x.c | 36 +++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index edacf4b1d0bc..de0198e72603 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -341,6 +341,28 @@ static int etm_event_add(struct perf_event *event, int mode)
- 	return 0;
- }
- 
-+int etm_perf_symlink(struct coresight_device *csdev, bool link)
-+{
-+	char entry[sizeof("cpu9999999")];
-+	int ret = 0, cpu = source_ops(csdev)->cpu_id(csdev);
-+	struct device *pmu_dev = etm_pmu.dev;
-+	struct device *cs_dev = &csdev->dev;
-+
-+	sprintf(entry, "cpu%d", cpu);
-+
-+	if (link) {
-+		ret = sysfs_create_link(&pmu_dev->kobj, &cs_dev->kobj, entry);
-+		if (ret)
-+			return ret;
-+		per_cpu(csdev_src, cpu) = csdev;
-+	} else {
-+		sysfs_remove_link(&pmu_dev->kobj, entry);
-+		per_cpu(csdev_src, cpu) = NULL;
-+	}
-+
-+	return 0;
-+}
-+
- static int __init etm_perf_init(void)
- {
- 	etm_pmu.capabilities	= PERF_PMU_CAP_EXCLUSIVE;
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.h b/drivers/hwtracing/coresight/coresight-etm-perf.h
-new file mode 100644
-index 000000000000..4dd900f2362a
---- /dev/null
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.h
-@@ -0,0 +1,27 @@
-+/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef _CORESIGHT_ETM_PERF_H
-+#define _CORESIGHT_ETM_PERF_H
-+
-+struct coresight_device;
-+
-+#ifdef CONFIG_CORESIGHT
-+int etm_perf_symlink(struct coresight_device *csdev, bool link);
-+
-+#else
-+static inline int etm_perf_symlink(struct coresight_device *csdev, bool link)
-+{ return -EINVAL; }
-+
-+#endif /* CONFIG_CORESIGHT */
-+
-+#endif
 diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index a4c158df0fef..6a44ea330a4a 100644
+index 077b49714259..2f818dbde099 100644
 --- a/drivers/hwtracing/coresight/coresight-etm3x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -34,6 +34,7 @@
- #include <asm/sections.h>
+@@ -320,6 +320,41 @@ static int etm_parse_event_config(struct etm_drvdata *drvdata,
+ {
+ 	u64 config = event->attr.config;
  
- #include "coresight-etm.h"
-+#include "coresight-etm-perf.h"
- 
- static int boot_enable;
- module_param_named(boot_enable, boot_enable, int, S_IRUGO);
-@@ -1995,6 +1996,11 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
- 		goto err_arch_supported;
- 	}
- 
-+	if (etm_perf_symlink(drvdata->csdev, true)) {
-+		ret = -EPROBE_DEFER;
-+		goto err_arch_supported;
++	if (event->attr.exclude_kernel || event->attr.exclude_user) {
++		u32 event_encoding;
++		u32 flags = (1 << 0 | /* instruction execute*/
++			     3 << 3 | /* ARM instruction */
++			     0 << 5 | /* No data value comparison */
++			     0 << 7 | /* No exact mach */
++			     0 << 8 | /* Ignore context ID */
++			     0 << 10); /* Security ignored */
++
++		/* Bit 0 is address range comparator 1 */
++		drvdata->enable_ctrl1 = ETMTECR1_ADDR_COMP_1;
++
++		/* Bit 24 controls whether the address range should be
++		 * included or excluded.
++		 */
++		if (event->attr.exclude_kernel)
++			drvdata->enable_ctrl1 |= BIT(24);
++
++		/* No need to worry about single address comparators */
++		drvdata->enable_ctrl2 = 0x0;
++
++		drvdata->addr_val[0] = (u32) _stext;
++		drvdata->addr_val[1] = (u32) _etext;
++		drvdata->addr_acctype[0] = flags;
++		drvdata->addr_acctype[1] = flags;
++		drvdata->addr_type[0] = ETM_ADDR_TYPE_RANGE;
++		drvdata->addr_type[1] = ETM_ADDR_TYPE_RANGE;
++
++		event_encoding = 0x00 << 14 | /* Boolean function select A */
++				 0x01 << 4  | /* Addr range comparator 0-7 */
++				 0x00 << 0;   /* Addr range comparator 1 */
++
++		drvdata->enable_event = event_encoding;
 +	}
 +
- 	pm_runtime_put(&adev->dev);
- 	dev_info(dev, "%s initialized\n", (char *)id->data);
- 
+ 	/*
+ 	 * At this time only cycle accurate and timestamp options are
+ 	 * available.  As such clear everything else that may have been
+@@ -362,6 +397,7 @@ static void etm_configure_cpu(void *info)
+ 	etm_writel(drvdata, drvdata->startstop_ctrl, ETMTSSCR);
+ 	etm_writel(drvdata, drvdata->enable_event, ETMTEEVR);
+ 	etm_writel(drvdata, drvdata->enable_ctrl1, ETMTECR1);
++	etm_writel(drvdata, drvdata->enable_ctrl2, ETMTECR2);
+ 	etm_writel(drvdata, drvdata->fifofull_level, ETMFFLR);
+ 	for (i = 0; i < drvdata->nr_addr_cmp; i++) {
+ 		etm_writel(drvdata, drvdata->addr_val[i], ETMACVRn(i));
 -- 
 1.9.1
