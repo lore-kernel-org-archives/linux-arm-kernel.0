@@ -1,50 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Sep 2015 16:18:18 +0100
-Subject: [PATCH] iommu/arm-smmu: Use correct address mask for CMD_TLBI_S2_IPA
-Message-ID: <1442589498-31355-1-git-send-email-will.deacon@arm.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 18 Sep 2015 16:19:57 +0100
+Subject: Recent GIC v1 patch
+In-Reply-To: <20150918151418.4c0ed401@arm.com> (Marc Zyngier's message of
+ "Fri, 18 Sep 2015 15:14:18 +0100")
+References: <55FAE26A.9040609@free.fr> <55FAEB4D.30306@arm.com>
+ <55FAF6E1.7020107@free.fr> <55FAFD3E.7010006@arm.com>
+ <55FBD6F4.8030905@free.fr> <20150918120851.6f9fb306@arm.com>
+ <yw1xbnczub0y.fsf@unicorn.mansr.com> <55FC18A4.2080205@free.fr>
+ <20150918151418.4c0ed401@arm.com>
+Message-ID: <yw1x7fnnu542.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stage-2 TLBI by IPA takes a 48-bit address field, as opposed to the
-64-bit field used by the VA-based invalidation commands.
+Marc Zyngier <marc.zyngier@arm.com> writes:
 
-This patch re-jigs the SMMUv3 command construction code so that the
-address field is correctly masked.
+> On Fri, 18 Sep 2015 15:59:00 +0200
+> Mason <slash.tmp@free.fr> wrote:
+>
+>> On 18/09/2015 15:12, M?ns Rullg?rd wrote:
+>> 
+>> > Marc Zyngier wrote:
+>> > 
+>> >> No idea so far. The only thing I can immediately spot is a missing pair
+>> >> of chained_irq_{enter,exit} in tangox_irq_handler, but I can't imagine
+>> >> this having a terminal effect on the system.
+>> > 
+>> > Fixed in the tangox tree on github.
+>> 
+>> Oh boy! Oh boy! Oh boy!
+>> 
+>> That did the trick. Just when I was about to give up...
+>> 
+>> Marc, I'm sending you an e-hug. Mans, you have my eternal gratitude.
+>
+> Thanks, but I prefer cheese! ;-)
+>
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+Smelly cheese?
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index a24f359fa0d0..286e890e7d64 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -343,7 +343,8 @@
- #define CMDQ_TLBI_0_VMID_SHIFT		32
- #define CMDQ_TLBI_0_ASID_SHIFT		48
- #define CMDQ_TLBI_1_LEAF		(1UL << 0)
--#define CMDQ_TLBI_1_ADDR_MASK		~0xfffUL
-+#define CMDQ_TLBI_1_VA_MASK		~0xfffUL
-+#define CMDQ_TLBI_1_IPA_MASK		0xfffffffff000UL
- 
- #define CMDQ_PRI_0_SSID_SHIFT		12
- #define CMDQ_PRI_0_SSID_MASK		0xfffffUL
-@@ -771,11 +772,13 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
- 		break;
- 	case CMDQ_OP_TLBI_NH_VA:
- 		cmd[0] |= (u64)ent->tlbi.asid << CMDQ_TLBI_0_ASID_SHIFT;
--		/* Fallthrough */
-+		cmd[1] |= ent->tlbi.leaf ? CMDQ_TLBI_1_LEAF : 0;
-+		cmd[1] |= ent->tlbi.addr & CMDQ_TLBI_1_VA_MASK;
-+		break;
- 	case CMDQ_OP_TLBI_S2_IPA:
- 		cmd[0] |= (u64)ent->tlbi.vmid << CMDQ_TLBI_0_VMID_SHIFT;
- 		cmd[1] |= ent->tlbi.leaf ? CMDQ_TLBI_1_LEAF : 0;
--		cmd[1] |= ent->tlbi.addr & CMDQ_TLBI_1_ADDR_MASK;
-+		cmd[1] |= ent->tlbi.addr & CMDQ_TLBI_1_IPA_MASK;
- 		break;
- 	case CMDQ_OP_TLBI_NH_ASID:
- 		cmd[0] |= (u64)ent->tlbi.asid << CMDQ_TLBI_0_ASID_SHIFT;
 -- 
-2.1.4
+M?ns Rullg?rd
+mans at mansr.com
