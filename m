@@ -1,74 +1,105 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 18 Sep 2015 13:37:33 +0900
-Subject: [PATCH v3 2/3] ARM: uniphier: rework SMP operations to use trampoline
- code
+Date: Fri, 18 Sep 2015 13:37:32 +0900
+Subject: [PATCH v3 1/3] ARM: uniphier: add outer cache support
 In-Reply-To: <1442551054-2116-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1442551054-2116-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1442551054-2116-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1442551054-2116-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The complexity of the boot sequence of UniPhier SoC family is
-a PITA due to the following hardware limitations:
-
-[1] No dedicated on-chip SRAM
-SoCs in general have small SRAM, on which a tiny firmware or a boot
-loader can run before SDRAM is initialized.  As UniPhier SoCs do not
-have any dedicated SRAM accessible from CPUs, the locked outer cache
-is used instead.  Due to the ARM specification, to have access to
-the outer cache, the MMU must be enabled.  This is done for all CPU
-cores by the program hard-wired in the boot ROM.  The boot ROM code
-loads a small amount of program (this is usually SPL of U-Boot) from
-a non-volatile device onto the locked outer cache, and the primary
-CPU jumps to it.  The secondary CPUs stay in the boot ROM until they
-are kicked by the primary CPU.
-
-[2] CPUs can not directly jump to SDRAM address space
-As mentioned above, the MMU is enable for all the CPUs with the page
-table hard-wired in the boot ROM.  Unfortunately, the page table only
-has minimal sets of valid sections; all the sections of SDRAM address
-space are zero-filled.  That means all the CPUs, including secondary
-ones, can not jump directly to SDRAM address space.  So, the primary
-CPU must bring up secondary CPUs to accessible address mapped onto
-the outer cache, then again kick them to SDRAM address space.
-
-Before this commit, this complex task was done with help of a boot
-loader (U-Boot); U-Boot SPL brings up the secondary CPUs to the entry
-of U-Boot SPL and they stay there until they are kicked by Linux.
-This is not nice because a boot loader must put the secondary CPUs
-into a certain state expected by the kernel.  It makes difficult to
-port another boot loader because the boot loader and the kernel must
-work in sync to wake up the secondary CPUs.
-
-This commit reworks the SMP operations so that they do not rely on
-particular boot loader implementation; the SMP operations (platsmp.c)
-put trampoline code (headsmp.S) on a locked way of the outer cache.
-The secondary CPUs jump from the boot ROM to secondary_entry via the
-trampoline code.  The boot loader no longer needs to take care of SMP.
+This commit adds support for UniPhier outer cache controller.
+All the UniPhier SoCs are equipped with the L2 cache, while the L3
+cache is currently only integrated on PH1-Pro5 SoC.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/mach-uniphier/Makefile  |   2 +-
- arch/arm/mach-uniphier/headsmp.S |  43 +++++++++
- arch/arm/mach-uniphier/platsmp.c | 185 ++++++++++++++++++++++++++++++++-------
- 3 files changed, 199 insertions(+), 31 deletions(-)
- create mode 100644 arch/arm/mach-uniphier/headsmp.S
+ .../bindings/arm/uniphier/cache-uniphier.txt       |  48 ++
+ MAINTAINERS                                        |   2 +
+ arch/arm/include/asm/hardware/cache-uniphier.h     |  46 ++
+ arch/arm/kernel/irq.c                              |   3 +
+ arch/arm/mm/Kconfig                                |  10 +
+ arch/arm/mm/Makefile                               |   1 +
+ arch/arm/mm/cache-uniphier.c                       | 544 +++++++++++++++++++++
+ 7 files changed, 654 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt
+ create mode 100644 arch/arm/include/asm/hardware/cache-uniphier.h
+ create mode 100644 arch/arm/mm/cache-uniphier.c
 
-diff --git a/arch/arm/mach-uniphier/Makefile b/arch/arm/mach-uniphier/Makefile
-index 60bd226..1233f9b 100644
---- a/arch/arm/mach-uniphier/Makefile
-+++ b/arch/arm/mach-uniphier/Makefile
-@@ -1,2 +1,2 @@
- obj-y			:= uniphier.o
--obj-$(CONFIG_SMP)	+= platsmp.o
-+obj-$(CONFIG_SMP)	+= platsmp.o headsmp.o
-diff --git a/arch/arm/mach-uniphier/headsmp.S b/arch/arm/mach-uniphier/headsmp.S
+diff --git a/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt b/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt
 new file mode 100644
-index 0000000..c819dff
+index 0000000..ce6eddd
 --- /dev/null
-+++ b/arch/arm/mach-uniphier/headsmp.S
-@@ -0,0 +1,43 @@
++++ b/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt
+@@ -0,0 +1,48 @@
++UniPhier outer cache controller
++
++UniPhier SoCs are integrated with a full-custom outer cache controller system.
++All of them have a level 2 cache controller, and some have a level 3 cache
++controller as well.
++
++Required properties:
++- compatible: should be "socionext,uniphier-system-cache"
++- reg: offsets and lengths of the register sets for the device.  It should
++  contain 3 regions: control register, revision register, operation register,
++  in this order.
++- cache-unified: specifies the cache is a unified cache.
++- cache-size: specifies the size in bytes of the cache
++- cache-sets: specifies the number of associativity sets of the cache
++- cache-line-size: specifies the line size in bytes
++- cache-level: specifies the level in the cache hierarchy.  The value should
++  be 2 for L2 cache, 3 for L3 cache, etc.
++
++Optional properties:
++- next-level-cache: phandle to the next level cache if present.  The next level
++  cache should be also compatible with "socionext,uniphier-system-cache".
++
++The L2 cache must exist to use the L3 cache; the cache hierarchy must be
++indicated correctly with "next-level-cache" properties.
++
++Example:
++	l2: l2-cache at 500c0000 {
++		compatible = "socionext,uniphier-system-cache";
++		reg = <0x500c0000 0x2000>, <0x503c0100 0x8>,
++		      <0x506c0000 0x400>;
++		cache-unified;
++		cache-size = <0x200000>;
++		cache-sets = <512>;
++		cache-line-size = <128>;
++		cache-level = <2>;
++		next-level-cache = <&l3>;
++	};
++
++	l3: l3-cache at 500c8000 {
++		compatible = "socionext,uniphier-system-cache";
++		reg = <0x500c8000 0x2000>, <0x503c8100 0x8>,
++		      <0x506c8000 0x400>;
++		cache-unified;
++		cache-size = <0x400000>;
++		cache-sets = <512>;
++		cache-line-size = <256>;
++		cache-level = <3>;
++	};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7ba7ab7..e9c5dd9 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1600,7 +1600,9 @@ M:	Masahiro Yamada <yamada.masahiro@socionext.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/boot/dts/uniphier*
++F:	arch/arm/include/asm/hardware/cache-uniphier.h
+ F:	arch/arm/mach-uniphier/
++F:	arch/arm/mm/cache-uniphier.c
+ F:	drivers/pinctrl/uniphier/
+ F:	drivers/tty/serial/8250/8250_uniphier.c
+ N:	uniphier
+diff --git a/arch/arm/include/asm/hardware/cache-uniphier.h b/arch/arm/include/asm/hardware/cache-uniphier.h
+new file mode 100644
+index 0000000..102e3fb
+--- /dev/null
++++ b/arch/arm/include/asm/hardware/cache-uniphier.h
+@@ -0,0 +1,46 @@
 +/*
 + * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
 + *
@@ -83,267 +114,638 @@ index 0000000..c819dff
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <asm/cp15.h>
++#ifndef __CACHE_UNIPHIER_H
++#define __CACHE_UNIPHIER_H
 +
-+ENTRY(uniphier_smp_trampoline)
-+ARM_BE8(setend	be)			@ ensure we are in BE8 mode
-+	mrc	p15, 0, r0, c0, c0, 5	@ MPIDR (Multiprocessor Affinity Reg)
-+	and  	r2, r0, #0x3		@ CPU ID
-+	ldr	r1, uniphier_smp_trampoline_jump
-+	ldr	r3, uniphier_smp_trampoline_poll_addr
-+	mrc	p15, 0, r0, c1, c0, 0	@ SCTLR (System Control Register)
-+	orr	r0, r0, #CR_I		@ Enable ICache
-+	bic	r0, r0, #(CR_C | CR_M)	@ Disable MMU and Dcache
-+	mcr	p15, 0, r0, c1, c0, 0
-+	b	1f			@ cache the following 5 instructions
-+0:	wfe
-+1:	ldr	r0, [r3]
-+	cmp	r0, r2
-+	bxeq	r1			@ branch to secondary_startup
-+	b	0b
-+	.globl	uniphier_smp_trampoline_jump
-+uniphier_smp_trampoline_jump:
-+	.word	0			@ set virt_to_phys(secondary_startup)
-+	.globl	uniphier_smp_trampoline_poll_addr
-+uniphier_smp_trampoline_poll_addr:
-+	.word	0			@ set CPU ID to be kicked to this reg
-+	.globl	uniphier_smp_trampoline_end
-+uniphier_smp_trampoline_end:
-+ENDPROC(uniphier_smp_trampoline)
-diff --git a/arch/arm/mach-uniphier/platsmp.c b/arch/arm/mach-uniphier/platsmp.c
-index 4b784f7..f057766 100644
---- a/arch/arm/mach-uniphier/platsmp.c
-+++ b/arch/arm/mach-uniphier/platsmp.c
-@@ -12,73 +12,198 @@
-  * GNU General Public License for more details.
-  */
++#include <linux/types.h>
++
++#ifdef CONFIG_CACHE_UNIPHIER
++int uniphier_cache_init(void);
++int uniphier_cache_l2_is_enabled(void);
++void uniphier_cache_l2_touch_range(unsigned long start, unsigned long end);
++void uniphier_cache_l2_set_locked_ways(u32 way_mask);
++#else
++static inline int uniphier_cache_init(void)
++{
++	return -ENODEV;
++}
++
++static inline int uniphier_cache_l2_is_enabled(void)
++{
++	return 0;
++}
++
++static inline void uniphier_cache_l2_touch_range(unsigned long start,
++						 unsigned long end)
++{
++}
++
++static inline void uniphier_cache_l2_set_locked_ways(u32 way_mask)
++{
++}
++#endif
++
++#endif /* __CACHE_UNIPHIER_H */
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 5ff4826..1e8c747 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -39,6 +39,7 @@
+ #include <linux/export.h>
  
--#include <linux/sizes.h>
--#include <linux/compiler.h>
+ #include <asm/hardware/cache-l2x0.h>
++#include <asm/hardware/cache-uniphier.h>
+ #include <asm/outercache.h>
+ #include <asm/exception.h>
+ #include <asm/mach/arch.h>
+@@ -117,6 +118,8 @@ void __init init_IRQ(void)
+ 		if (ret)
+ 			pr_err("L2C: failed to init: %d\n", ret);
+ 	}
++
++	uniphier_cache_init();
+ }
+ 
+ #ifdef CONFIG_MULTI_IRQ_HANDLER
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index df7537f..a2e74b2 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -986,6 +986,16 @@ config CACHE_TAUROS2
+ 	  This option enables the Tauros2 L2 cache controller (as
+ 	  found on PJ1/PJ4).
+ 
++config CACHE_UNIPHIER
++	bool "Enable the UniPhier outer cache controller"
++	depends on ARCH_UNIPHIER
++	default y
++	select OUTER_CACHE
++	select OUTER_CACHE_SYNC
++	help
++	  This option enables the UniPhier outer cache (system cache)
++	  controller.
++
+ config CACHE_XSC3L2
+ 	bool "Enable the L2 cache on XScale3"
+ 	depends on CPU_XSC3
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index 57c8df5..7f76d96 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -103,3 +103,4 @@ obj-$(CONFIG_CACHE_FEROCEON_L2)	+= cache-feroceon-l2.o
+ obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o l2c-l2x0-resume.o
+ obj-$(CONFIG_CACHE_XSC3L2)	+= cache-xsc3l2.o
+ obj-$(CONFIG_CACHE_TAUROS2)	+= cache-tauros2.o
++obj-$(CONFIG_CACHE_UNIPHIER)	+= cache-uniphier.o
+diff --git a/arch/arm/mm/cache-uniphier.c b/arch/arm/mm/cache-uniphier.c
+new file mode 100644
+index 0000000..66139a9
+--- /dev/null
++++ b/arch/arm/mm/cache-uniphier.c
+@@ -0,0 +1,544 @@
++/*
++ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
 +#define pr_fmt(fmt)		"uniphier: " fmt
 +
- #include <linux/init.h>
- #include <linux/io.h>
--#include <linux/regmap.h>
--#include <linux/mfd/syscon.h>
-+#include <linux/ioport.h>
-+#include <linux/of.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/log2.h>
 +#include <linux/of_address.h>
-+#include <linux/sizes.h>
-+#include <asm/cacheflush.h>
++#include <linux/slab.h>
 +#include <asm/hardware/cache-uniphier.h>
-+#include <asm/pgtable.h>
- #include <asm/smp.h>
- #include <asm/smp_scu.h>
- 
--static struct regmap *sbcm_regmap;
-+/*
-+ * The secondary CPUs check this register from the boot ROM for the jump
-+ * destination.  After that, it can be reused as a scratch register.
++#include <asm/outercache.h>
++
++/* control registers */
++#define UNIPHIER_SSCC		0x0	/* Control Register */
++#define    UNIPHIER_SSCC_BST			BIT(20)	/* UCWG burst read */
++#define    UNIPHIER_SSCC_ACT			BIT(19)	/* Inst-Data separate */
++#define    UNIPHIER_SSCC_WTG			BIT(18)	/* WT gathering on */
++#define    UNIPHIER_SSCC_PRD			BIT(17)	/* enable pre-fetch */
++#define    UNIPHIER_SSCC_ON			BIT(0)	/* enable cache */
++#define UNIPHIER_SSCLPDAWCR	0x30	/* Unified/Data Active Way Control */
++#define UNIPHIER_SSCLPIAWCR	0x34	/* Instruction Active Way Control */
++
++/* revision registers */
++#define UNIPHIER_SSCID		0x0	/* ID Register */
++
++/* operation registers */
++#define UNIPHIER_SSCOPE		0x244	/* Cache Operation Primitive Entry */
++#define    UNIPHIER_SSCOPE_CM_INV		0x0	/* invalidate */
++#define    UNIPHIER_SSCOPE_CM_CLEAN		0x1	/* clean */
++#define    UNIPHIER_SSCOPE_CM_FLUSH		0x2	/* flush */
++#define    UNIPHIER_SSCOPE_CM_SYNC		0x8	/* sync (drain bufs) */
++#define    UNIPHIER_SSCOPE_CM_FLUSH_PREFETCH	0x9	/* flush p-fetch buf */
++#define UNIPHIER_SSCOQM		0x248	/* Cache Operation Queue Mode */
++#define    UNIPHIER_SSCOQM_TID_MASK		(0x3 << 21)
++#define    UNIPHIER_SSCOQM_TID_LRU_DATA		(0x0 << 21)
++#define    UNIPHIER_SSCOQM_TID_LRU_INST		(0x1 << 21)
++#define    UNIPHIER_SSCOQM_TID_WAY		(0x2 << 21)
++#define    UNIPHIER_SSCOQM_S_MASK		(0x3 << 17)
++#define    UNIPHIER_SSCOQM_S_RANGE		(0x0 << 17)
++#define    UNIPHIER_SSCOQM_S_ALL		(0x1 << 17)
++#define    UNIPHIER_SSCOQM_S_WAY		(0x2 << 17)
++#define    UNIPHIER_SSCOQM_CE			BIT(15)	/* notify completion */
++#define    UNIPHIER_SSCOQM_CM_INV		0x0	/* invalidate */
++#define    UNIPHIER_SSCOQM_CM_CLEAN		0x1	/* clean */
++#define    UNIPHIER_SSCOQM_CM_FLUSH		0x2	/* flush */
++#define    UNIPHIER_SSCOQM_CM_PREFETCH		0x3	/* prefetch to cache */
++#define    UNIPHIER_SSCOQM_CM_PREFETCH_BUF	0x4	/* prefetch to pf-buf */
++#define    UNIPHIER_SSCOQM_CM_TOUCH		0x5	/* touch */
++#define    UNIPHIER_SSCOQM_CM_TOUCH_ZERO	0x6	/* touch to zero */
++#define    UNIPHIER_SSCOQM_CM_TOUCH_DIRTY	0x7	/* touch with dirty */
++#define UNIPHIER_SSCOQAD	0x24c	/* Cache Operation Queue Address */
++#define UNIPHIER_SSCOQSZ	0x250	/* Cache Operation Queue Size */
++#define UNIPHIER_SSCOQMASK	0x254	/* Cache Operation Queue Address Mask */
++#define UNIPHIER_SSCOQWN	0x258	/* Cache Operation Queue Way Number */
++#define UNIPHIER_SSCOPPQSEF	0x25c	/* Cache Operation Queue Set Complete*/
++#define    UNIPHIER_SSCOPPQSEF_FE		BIT(1)
++#define    UNIPHIER_SSCOPPQSEF_OE		BIT(0)
++#define UNIPHIER_SSCOLPQS	0x260	/* Cache Operation Queue Status */
++#define    UNIPHIER_SSCOLPQS_EF			BIT(2)
++#define    UNIPHIER_SSCOLPQS_EST		BIT(1)
++#define    UNIPHIER_SSCOLPQS_QST		BIT(0)
++
++/* Is the touch/pre-fetch destination specified by ways? */
++#define UNIPHIER_SSCOQM_TID_IS_WAY(op) \
++		((op & UNIPHIER_SSCOQM_TID_MASK) == UNIPHIER_SSCOQM_TID_WAY)
++/* Is the operation region specified by address range? */
++#define UNIPHIER_SSCOQM_S_IS_RANGE(op) \
++		((op & UNIPHIER_SSCOQM_S_MASK) == UNIPHIER_SSCOQM_S_RANGE)
++
++/**
++ * uniphier_cache_data - UniPhier outer cache specific data
++ *
++ * @ctrl_base: virtual base address of control registers
++ * @rev_base: virtual base address of revision registers
++ * @op_base: virtual base address of operation registers
++ * @way_present_mask: each bit specifies if the way is present
++ * @way_locked_mask: each bit specifies if the way is locked
++ * @nsets: number of associativity sets
++ * @line_size: line size in bytes
++ * @range_op_max_size: max size that can be handled by a single range operation
++ * @list: list node to include this level in the whole cache hierarchy
 + */
-+#define UNIPHIER_SBC_ROM_BOOT_RSV2	0x1208
- 
--static void __init uniphier_smp_prepare_cpus(unsigned int max_cpus)
-+static void __iomem *uniphier_smp_rom_boot_rsv2;
-+static unsigned int uniphier_smp_max_cpus;
-+
-+extern char uniphier_smp_trampoline;
-+extern char uniphier_smp_trampoline_jump;
-+extern char uniphier_smp_trampoline_poll_addr;
-+extern char uniphier_smp_trampoline_end;
++struct uniphier_cache_data {
++	void __iomem *ctrl_base;
++	void __iomem *rev_base;
++	void __iomem *op_base;
++	u32 way_present_mask;
++	u32 way_locked_mask;
++	u32 nsets;
++	u32 line_size;
++	u32 range_op_max_size;
++	struct list_head list;
++};
 +
 +/*
-+ * Copy trampoline code to the tail of the 1st section of the page table used
-+ * in the boot ROM.  This area is directly accessible by the secondary CPUs
-+ * for all the UniPhier SoCs.
++ * List of the whole outer cache hierarchy.  This list is only modified during
++ * the early boot stage, so no mutex is taken for the access to the list.
 + */
-+static const phys_addr_t uniphier_smp_trampoline_dest_end = SECTION_SIZE;
-+static phys_addr_t uniphier_smp_trampoline_dest;
++static LIST_HEAD(uniphier_cache_list);
 +
-+static int __init uniphier_smp_copy_trampoline(phys_addr_t poll_addr)
- {
--	static cpumask_t only_cpu_0 = { CPU_BITS_CPU0 };
--	unsigned long scu_base_phys = 0;
--	void __iomem *scu_base;
-+	size_t trmp_size;
-+	static void __iomem *trmp_base;
- 
--	sbcm_regmap = syscon_regmap_lookup_by_compatible(
--			"socionext,uniphier-system-bus-controller-misc");
--	if (IS_ERR(sbcm_regmap)) {
--		pr_err("failed to regmap system-bus-controller-misc\n");
--		goto err;
-+	if (!uniphier_cache_l2_is_enabled()) {
-+		pr_warn("outer cache is needed for SMP, but not enabled\n");
-+		return -ENODEV;
- 	}
- 
-+	uniphier_cache_l2_set_locked_ways(1);
-+
-+	outer_flush_all();
-+
-+	trmp_size = &uniphier_smp_trampoline_end - &uniphier_smp_trampoline;
-+	uniphier_smp_trampoline_dest = uniphier_smp_trampoline_dest_end -
-+								trmp_size;
-+
-+	uniphier_cache_l2_touch_range(uniphier_smp_trampoline_dest,
-+				      uniphier_smp_trampoline_dest_end);
-+
-+	trmp_base = ioremap_cache(uniphier_smp_trampoline_dest, trmp_size);
-+	if (!trmp_base) {
-+		pr_err("failed to map trampoline destination area\n");
-+		return -ENOMEM;
-+	}
-+
-+	memcpy(trmp_base, &uniphier_smp_trampoline, trmp_size);
-+
-+	writel(virt_to_phys(secondary_startup),
-+	       trmp_base + (&uniphier_smp_trampoline_jump -
-+			    &uniphier_smp_trampoline));
-+
-+	writel(poll_addr, trmp_base + (&uniphier_smp_trampoline_poll_addr -
-+				       &uniphier_smp_trampoline));
-+
-+	flush_cache_all();	/* flush out trampoline code to outer cache */
-+
-+	iounmap(trmp_base);
-+
-+	return 0;
++/**
++ * __uniphier_cache_sync - perform a sync point for a particular cache level
++ *
++ * @data: cache controller specific data
++ */
++static void __uniphier_cache_sync(struct uniphier_cache_data *data)
++{
++	/* This sequence need not be atomic.  Do not disable IRQ. */
++	writel_relaxed(UNIPHIER_SSCOPE_CM_SYNC,
++		       data->op_base + UNIPHIER_SSCOPE);
++	/* need a read back to confirm */
++	readl_relaxed(data->op_base + UNIPHIER_SSCOPE);
 +}
 +
-+static int __init uniphier_smp_prepare_trampoline(unsigned int max_cpus)
++/**
++ * __uniphier_cache_maint_common - run a queue operation for a particular level
++ *
++ * @data: cache controller specific data
++ * @start: start address of range operation (don't care for "all" operation)
++ * @size: data size of range operation (don't care for "all" operation)
++ * @operation: flags to specify the desired cache operation
++ */
++static void __uniphier_cache_maint_common(struct uniphier_cache_data *data,
++					  unsigned long start,
++					  unsigned long size,
++					  u32 operation)
 +{
-+	struct device_node *np;
-+	struct resource res;
-+	phys_addr_t rom_rsv2_phys;
-+	int ret;
++	unsigned long flags;
 +
-+	np = of_find_compatible_node(NULL, NULL,
-+				"socionext,uniphier-system-bus-controller");
-+	ret = of_address_to_resource(np, 1, &res);
++	/*
++	 * The IRQ must be disable during this sequence because the accessor
++	 * holds the access right of the operation queue registers.  The IRQ
++	 * should be restored after releasing the register access right.
++	 */
++	local_irq_save(flags);
++
++	/* clear the complete notification flag */
++	writel_relaxed(UNIPHIER_SSCOLPQS_EF, data->op_base + UNIPHIER_SSCOLPQS);
++
++	/*
++	 * We do not need a spin lock here because the hardware guarantees
++	 * this sequence is atomic, i.e. the write access is arbitrated
++	 * and only the winner's write accesses take effect.
++	 * After register settings, we need to check the UNIPHIER_SSCOPPQSEF to
++	 * see if we won the arbitration or not.
++	 * If the command was not successfully set, just try again.
++	 */
++	do {
++		/* set cache operation */
++		writel_relaxed(UNIPHIER_SSCOQM_CE | operation,
++			       data->op_base + UNIPHIER_SSCOQM);
++
++		/* set address range if needed */
++		if (likely(UNIPHIER_SSCOQM_S_IS_RANGE(operation))) {
++			writel_relaxed(start, data->op_base + UNIPHIER_SSCOQAD);
++			writel_relaxed(size, data->op_base + UNIPHIER_SSCOQSZ);
++		}
++
++		/* set target ways if needed */
++		if (unlikely(UNIPHIER_SSCOQM_TID_IS_WAY(operation)))
++			writel_relaxed(data->way_locked_mask,
++				       data->op_base + UNIPHIER_SSCOQWN);
++	} while (unlikely(readl_relaxed(data->op_base + UNIPHIER_SSCOPPQSEF) &
++			  (UNIPHIER_SSCOPPQSEF_FE | UNIPHIER_SSCOPPQSEF_OE)));
++
++	/* wait until the operation is completed */
++	while (likely(readl_relaxed(data->op_base + UNIPHIER_SSCOLPQS) !=
++		      UNIPHIER_SSCOLPQS_EF))
++		cpu_relax();
++
++	local_irq_restore(flags);
++}
++
++static void __uniphier_cache_maint_all(struct uniphier_cache_data *data,
++				       u32 operation)
++{
++	__uniphier_cache_maint_common(data, 0, 0,
++				      UNIPHIER_SSCOQM_S_ALL | operation);
++
++	__uniphier_cache_sync(data);
++}
++
++static void __uniphier_cache_maint_range(struct uniphier_cache_data *data,
++					 unsigned long start, unsigned long end,
++					 u32 operation)
++{
++	unsigned long size;
++
++	/*
++	 * If the start address is not aligned,
++	 * perform a cache operation for the first cache-line
++	 */
++	start = start & ~(data->line_size - 1);
++
++	size = end - start;
++
++	if (unlikely(size >= (unsigned long)(-data->line_size))) {
++		/* this means cache operation for all range */
++		__uniphier_cache_maint_all(data, operation);
++		return;
++	}
++
++	/*
++	 * If the end address is not aligned,
++	 * perform a cache operation for the last cache-line
++	 */
++	size = ALIGN(size, data->line_size);
++
++	while (size) {
++		unsigned long chunk_size = min_t(unsigned long, size,
++						 data->range_op_max_size);
++
++		__uniphier_cache_maint_common(data, start, chunk_size,
++					UNIPHIER_SSCOQM_S_RANGE | operation);
++
++		start += chunk_size;
++		size -= chunk_size;
++	}
++
++	__uniphier_cache_sync(data);
++}
++
++static void __uniphier_cache_enable(struct uniphier_cache_data *data, bool on)
++{
++	u32 val = 0;
++
++	if (on)
++		val = UNIPHIER_SSCC_WTG | UNIPHIER_SSCC_PRD | UNIPHIER_SSCC_ON;
++
++	writel_relaxed(val, data->ctrl_base + UNIPHIER_SSCC);
++}
++
++static void __uniphier_cache_set_locked_ways(struct uniphier_cache_data *data,
++					     u32 way_mask)
++{
++	data->way_locked_mask = way_mask & data->way_present_mask;
++
++	writel_relaxed(~data->way_locked_mask & data->way_present_mask,
++		       data->ctrl_base + UNIPHIER_SSCLPDAWCR);
++}
++
++static void uniphier_cache_maint_range(unsigned long start, unsigned long end,
++				       u32 operation)
++{
++	struct uniphier_cache_data *data;
++
++	list_for_each_entry(data, &uniphier_cache_list, list)
++		__uniphier_cache_maint_range(data, start, end, operation);
++}
++
++static void uniphier_cache_maint_all(u32 operation)
++{
++	struct uniphier_cache_data *data;
++
++	list_for_each_entry(data, &uniphier_cache_list, list)
++		__uniphier_cache_maint_all(data, operation);
++}
++
++static void uniphier_cache_inv_range(unsigned long start, unsigned long end)
++{
++	uniphier_cache_maint_range(start, end, UNIPHIER_SSCOQM_CM_INV);
++}
++
++static void uniphier_cache_clean_range(unsigned long start, unsigned long end)
++{
++	uniphier_cache_maint_range(start, end, UNIPHIER_SSCOQM_CM_CLEAN);
++}
++
++static void uniphier_cache_flush_range(unsigned long start, unsigned long end)
++{
++	uniphier_cache_maint_range(start, end, UNIPHIER_SSCOQM_CM_FLUSH);
++}
++
++static void __init uniphier_cache_inv_all(void)
++{
++	uniphier_cache_maint_all(UNIPHIER_SSCOQM_CM_INV);
++}
++
++static void uniphier_cache_flush_all(void)
++{
++	uniphier_cache_maint_all(UNIPHIER_SSCOQM_CM_FLUSH);
++}
++
++static void uniphier_cache_disable(void)
++{
++	struct uniphier_cache_data *data;
++
++	list_for_each_entry_reverse(data, &uniphier_cache_list, list)
++		__uniphier_cache_enable(data, false);
++
++	uniphier_cache_flush_all();
++}
++
++static void __init uniphier_cache_enable(void)
++{
++	struct uniphier_cache_data *data;
++
++	uniphier_cache_inv_all();
++
++	list_for_each_entry(data, &uniphier_cache_list, list) {
++		__uniphier_cache_enable(data, true);
++		__uniphier_cache_set_locked_ways(data, 0);
++	}
++}
++
++static void uniphier_cache_sync(void)
++{
++	struct uniphier_cache_data *data;
++
++	list_for_each_entry(data, &uniphier_cache_list, list)
++		__uniphier_cache_sync(data);
++}
++
++int __init uniphier_cache_l2_is_enabled(void)
++{
++	struct uniphier_cache_data *data;
++
++	data = list_first_entry_or_null(&uniphier_cache_list,
++					struct uniphier_cache_data, list);
++	if (!data)
++		return 0;
++
++	return !!(readl_relaxed(data->ctrl_base + UNIPHIER_SSCC) &
++		  UNIPHIER_SSCC_ON);
++}
++
++void __init uniphier_cache_l2_touch_range(unsigned long start,
++					  unsigned long end)
++{
++	struct uniphier_cache_data *data;
++
++	data = list_first_entry_or_null(&uniphier_cache_list,
++					struct uniphier_cache_data, list);
++	if (data)
++		__uniphier_cache_maint_range(data, start, end,
++					     UNIPHIER_SSCOQM_TID_WAY |
++					     UNIPHIER_SSCOQM_CM_TOUCH);
++}
++
++void __init uniphier_cache_l2_set_locked_ways(u32 way_mask)
++{
++	struct uniphier_cache_data *data;
++
++	data = list_first_entry_or_null(&uniphier_cache_list,
++					struct uniphier_cache_data, list);
++	if (data)
++		__uniphier_cache_set_locked_ways(data, way_mask);
++}
++
++static const struct of_device_id uniphier_cache_match[] __initconst = {
++	{
++		.compatible = "socionext,uniphier-system-cache",
++	},
++	{ /* sentinel */ }
++};
++
++static struct device_node * __init uniphier_cache_get_next_level_node(
++							struct device_node *np)
++{
++	u32 phandle;
++
++	if (of_property_read_u32(np, "next-level-cache", &phandle))
++		return NULL;
++
++	return of_find_node_by_phandle(phandle);
++}
++
++static int __init __uniphier_cache_init(struct device_node *np,
++					unsigned int *cache_level)
++{
++	struct uniphier_cache_data *data;
++	u32 level, cache_size;
++	struct device_node *next_np;
++	int ret = 0;
++
++	if (!of_match_node(uniphier_cache_match, np)) {
++		pr_err("L%d: not compatible with uniphier cache\n",
++		       *cache_level);
++		return -EINVAL;
++	}
++
++	if (of_property_read_u32(np, "cache-level", &level)) {
++		pr_err("L%d: cache-level is not specified\n", *cache_level);
++		return -EINVAL;
++	}
++
++	if (level != *cache_level) {
++		pr_err("L%d: cache-level is unexpected value %d\n",
++		       *cache_level, level);
++		return -EINVAL;
++	}
++
++	if (!of_property_read_bool(np, "cache-unified")) {
++		pr_err("L%d: cache-unified is not specified\n", *cache_level);
++		return -EINVAL;
++	}
++
++	data = kzalloc(sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	if (of_property_read_u32(np, "cache-line-size", &data->line_size) ||
++	    !is_power_of_2(data->line_size)) {
++		pr_err("L%d: cache-line-size is unspecified or invalid\n",
++		       *cache_level);
++		ret = -EINVAL;
++		goto err;
++	}
++
++	if (of_property_read_u32(np, "cache-sets", &data->nsets) ||
++	    !is_power_of_2(data->nsets)) {
++		pr_err("L%d: cache-sets is unspecified or invalid\n",
++		       *cache_level);
++		ret = -EINVAL;
++		goto err;
++	}
++
++	if (of_property_read_u32(np, "cache-size", &cache_size) ||
++	    cache_size == 0 || cache_size % (data->nsets * data->line_size)) {
++		pr_err("L%d: cache-size is unspecified or invalid\n",
++		       *cache_level);
++		ret = -EINVAL;
++		goto err;
++	}
++
++	data->way_present_mask =
++		((u32)1 << cache_size / data->nsets / data->line_size) - 1;
++
++	data->ctrl_base = of_iomap(np, 0);
++	if (!data->ctrl_base) {
++		pr_err("L%d: failed to map control register\n", *cache_level);
++		ret = -ENOMEM;
++		goto err;
++	}
++
++	data->rev_base = of_iomap(np, 1);
++	if (!data->rev_base) {
++		pr_err("L%d: failed to map revision register\n", *cache_level);
++		ret = -ENOMEM;
++		goto err;
++	}
++
++	data->op_base = of_iomap(np, 2);
++	if (!data->op_base) {
++		pr_err("L%d: failed to map operation register\n", *cache_level);
++		ret = -ENOMEM;
++		goto err;
++	}
++
++	if (*cache_level == 2) {
++		u32 revision = readl(data->rev_base + UNIPHIER_SSCID);
++		/*
++		 * The size of range operation is limited to (1 << 22) or less
++		 * for PH-sLD8 or older SoCs.
++		 */
++		if (revision <= 0x16)
++			data->range_op_max_size = (u32)1 << 22;
++	}
++
++	data->range_op_max_size -= data->line_size;
++
++	INIT_LIST_HEAD(&data->list);
++	list_add_tail(&data->list, &uniphier_cache_list); /* no mutex */
++
++	/*
++	 * OK, this level has been successfully initialized.  Look for the next
++	 * level cache.  Do not roll back even if the initialization of the
++	 * next level cache fails because we want to continue with available
++	 * cache levels.
++	 */
++	next_np = uniphier_cache_get_next_level_node(np);
++	if (next_np) {
++		(*cache_level)++;
++		ret = __uniphier_cache_init(next_np, cache_level);
++	}
++	of_node_put(next_np);
++
++	return ret;
++err:
++	iounmap(data->op_base);
++	iounmap(data->rev_base);
++	iounmap(data->ctrl_base);
++	kfree(data);
++
++	return ret;
++}
++
++int __init uniphier_cache_init(void)
++{
++	struct device_node *np = NULL;
++	unsigned int cache_level;
++	int ret = 0;
++
++	/* look for level 2 cache */
++	while ((np = of_find_matching_node(np, uniphier_cache_match)))
++		if (!of_property_read_u32(np, "cache-level", &cache_level) &&
++		    cache_level == 2)
++			break;
++
++	if (!np)
++		return -ENODEV;
++
++	ret = __uniphier_cache_init(np, &cache_level);
++	of_node_put(np);
++
 +	if (ret) {
-+		pr_err("failed to get resource of system-bus-controller\n");
-+		return ret;
++		/*
++		 * Error out iif L2 initialization fails.  Continue with any
++		 * error on L3 or outer because they are optional.
++		 */
++		if (cache_level == 2) {
++			pr_err("failed to initialize L2 cache\n");
++			return ret;
++		}
++
++		cache_level--;
++		ret = 0;
 +	}
 +
-+	rom_rsv2_phys = res.start + UNIPHIER_SBC_ROM_BOOT_RSV2;
++	outer_cache.inv_range = uniphier_cache_inv_range;
++	outer_cache.clean_range = uniphier_cache_clean_range;
++	outer_cache.flush_range = uniphier_cache_flush_range;
++	outer_cache.flush_all = uniphier_cache_flush_all;
++	outer_cache.disable = uniphier_cache_disable;
++	outer_cache.sync = uniphier_cache_sync;
 +
-+	ret = uniphier_smp_copy_trampoline(rom_rsv2_phys);
-+	if (ret)
-+		return ret;
++	uniphier_cache_enable();
 +
-+	uniphier_smp_rom_boot_rsv2 = ioremap(rom_rsv2_phys, sizeof(SZ_4));
-+	if (!uniphier_smp_rom_boot_rsv2) {
-+		pr_err("failed to map ROM_BOOT_RSV2 register\n");
-+		return -ENOMEM;
-+	}
++	pr_info("enabled outer cache (cache level: %d)\n", cache_level);
 +
-+	writel(uniphier_smp_trampoline_dest, uniphier_smp_rom_boot_rsv2);
-+	asm("sev"); /* Bring up all secondary CPUs to the trampoline code */
-+
-+	uniphier_smp_max_cpus = max_cpus;	/* save for later use */
-+
-+	return 0;
++	return ret;
 +}
-+
-+static void __init uniphier_smp_unprepare_trampoline(void)
-+{
-+	iounmap(uniphier_smp_rom_boot_rsv2);
-+
-+	if (uniphier_smp_trampoline_dest)
-+		outer_inv_range(uniphier_smp_trampoline_dest,
-+				uniphier_smp_trampoline_dest_end);
-+
-+	uniphier_cache_l2_set_locked_ways(0);
-+}
-+
-+static int __init uniphier_smp_enable_scu(void)
-+{
-+	unsigned long scu_base_phys = 0;
-+	void __iomem *scu_base;
-+
- 	if (scu_a9_has_base())
- 		scu_base_phys = scu_a9_get_base();
- 
- 	if (!scu_base_phys) {
- 		pr_err("failed to get scu base\n");
--		goto err;
-+		return -ENODEV;
- 	}
- 
- 	scu_base = ioremap(scu_base_phys, SZ_128);
- 	if (!scu_base) {
--		pr_err("failed to remap scu base (0x%08lx)\n", scu_base_phys);
--		goto err;
-+		pr_err("failed to map scu base\n");
-+		return -ENOMEM;
- 	}
- 
- 	scu_enable(scu_base);
- 	iounmap(scu_base);
- 
-+	return 0;
-+}
-+
-+static void __init uniphier_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	static cpumask_t only_cpu_0 = { CPU_BITS_CPU0 };
-+	int ret;
-+
-+	ret = uniphier_smp_prepare_trampoline(max_cpus);
-+	if (ret)
-+		goto err;
-+
-+	ret = uniphier_smp_enable_scu();
-+	if (ret)
-+		goto err;
-+
- 	return;
- err:
- 	pr_warn("disabling SMP\n");
- 	init_cpu_present(&only_cpu_0);
--	sbcm_regmap = NULL;
-+	uniphier_smp_unprepare_trampoline();
- }
- 
--static int uniphier_boot_secondary(unsigned int cpu,
--				   struct task_struct *idle)
-+static int __init uniphier_smp_boot_secondary(unsigned int cpu,
-+					      struct task_struct *idle)
- {
--	int ret;
-+	if (WARN_ON_ONCE(!uniphier_smp_rom_boot_rsv2))
-+		return -EFAULT;
- 
--	if (!sbcm_regmap)
--		return -ENODEV;
-+	writel(cpu, uniphier_smp_rom_boot_rsv2);
-+	readl(uniphier_smp_rom_boot_rsv2); /* relax */
- 
--	ret = regmap_write(sbcm_regmap, 0x1208,
--			   virt_to_phys(secondary_startup));
--	if (!ret)
--		asm("sev"); /* wake up secondary CPU */
-+	asm("sev"); /* wake up secondary CPUs sleeping in the trampoline */
-+
-+	if (cpu == uniphier_smp_max_cpus - 1) {
-+		/* clean up resources if this is the last CPU */
-+		uniphier_smp_unprepare_trampoline();
-+	}
- 
--	return ret;
-+	return 0;
- }
- 
--struct smp_operations uniphier_smp_ops __initdata = {
-+static struct smp_operations uniphier_smp_ops __initdata = {
- 	.smp_prepare_cpus	= uniphier_smp_prepare_cpus,
--	.smp_boot_secondary	= uniphier_boot_secondary,
-+	.smp_boot_secondary	= uniphier_smp_boot_secondary,
- };
- CPU_METHOD_OF_DECLARE(uniphier_smp, "socionext,uniphier-smp",
- 		      &uniphier_smp_ops);
 -- 
 1.9.1
