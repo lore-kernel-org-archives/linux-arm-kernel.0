@@ -1,124 +1,223 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 18 Sep 2015 10:26:21 -0600
-Subject: [RFC PATCH 07/20] coresight: etb10: implementing the setup_aux() API
+Date: Fri, 18 Sep 2015 10:26:28 -0600
+Subject: [RFC PATCH 14/20] coresight: etm-perf: implementing 'event_init()' API
 In-Reply-To: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1442593594-10665-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1442593594-10665-15-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding an ETB10 specific auxiliary area setup operation to be
-used by the perf framework when events are initialised.
+Enhancing skeleton PMU with event initialisation.
 
-Part of this operation involves modeling the mmap'ed area based
-on the specific ways a sink buffer gathers information.
+The function makes sure tracers aren't already enabled
+before going through with the powe up and configuration
+sequences.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 55 +++++++++++++++++++++++++++
- include/linux/coresight.h                     |  3 ++
- 2 files changed, 58 insertions(+)
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 176 +++++++++++++++++++++++
+ 1 file changed, 176 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 77d0f9c1118d..ca2fbf65a454 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -27,6 +27,9 @@
- #include <linux/coresight.h>
- #include <linux/amba/bus.h>
- #include <linux/clk.h>
-+#include <linux/mm.h>
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index 759b8d69b4e6..a21171a3e929 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -30,6 +30,9 @@
+ 
+ static struct pmu etm_pmu;
+ 
++static DEFINE_PER_CPU(struct coresight_device *, csdev_src);
++static DEFINE_PER_CPU(struct coresight_device *, csdev_sink);
 +
-+#include <asm/local.h>
+ /* ETMCR is 'config' */
+ PMU_FORMAT_ATTR(cycacc,		"config:12");
+ PMU_FORMAT_ATTR(timestamp,	"config:28");
+@@ -52,6 +55,178 @@ static const struct attribute_group *etm_pmu_attr_groups[] = {
  
- #include "coresight-priv.h"
+ static void etm_event_read(struct perf_event *event) {}
  
-@@ -64,6 +67,32 @@
- #define ETB_FRAME_SIZE_WORDS	4
- 
- /**
-+ * struct cs_buffer - keep track of a recording session' specifics
-+ * @cur:	index of the current buffer
-+ * @nr_pages:	max number of pages granted to us
-+ * @nr_bufs:	number of clustered pages
-+ * @offset:	offset within the current buffer
-+ * @size:	how much space we have for this run
-+ * @data_size:	how much we collected in this run
-+ * @head:	head of the ring buffer
-+ * @lost:	other than zero if we had a HW buffer wrap around
-+ * @snapshot:	is this run in snapshot mode
-+ * @addr:	virtual address this buffer starts at
-+ */
-+struct cs_buffers {
-+	unsigned int		cur;
-+	unsigned int		nr_pages;
-+	unsigned int		nr_bufs;
-+	unsigned long		offset;
-+	unsigned long		size;
-+	local_t			data_size;
-+	local_t			head;
-+	local_t			lost;
-+	bool			snapshot;
-+	void			*addr[0];
-+};
-+
-+/**
-  * struct etb_drvdata - specifics associated to an ETB component
-  * @base:	memory mapped base address for this component.
-  * @dev:	the device entity associated to this component.
-@@ -252,9 +281,35 @@ static void etb_disable(struct coresight_device *csdev)
- 	dev_info(drvdata->dev, "ETB disabled\n");
- }
- 
-+static void *etb_setup_aux(struct coresight_device *csdev, int cpu,
-+			   void **pages, int nr_pages, bool overwrite)
++static int etm_event_power_single_source(int source, bool power)
 +{
-+	int node, pg;
-+	struct cs_buffers *buf;
++	int ret = 0;
++	LIST_HEAD(path);
++	LIST_HEAD(sinks);
++	struct coresight_device *csdev;
 +
-+	if (cpu == -1)
-+		cpu = smp_processor_id();
-+	node = cpu_to_node(cpu);
++	csdev = per_cpu(csdev_src, source);
 +
-+	buf = kzalloc_node(offsetof(struct cs_buffers, addr[nr_pages]),
-+			   GFP_KERNEL, node);
-+	if (!buf)
-+		return NULL;
++	if (!csdev)
++		return -EINVAL;
 +
-+	buf->snapshot = overwrite;
-+	buf->nr_pages = nr_pages;
++	if (csdev->type != CORESIGHT_DEV_TYPE_SOURCE)
++		return -EINVAL;
 +
-+	/* Record information about buffers */
-+	for (pg = 0; pg < buf->nr_pages; pg++)
-+		buf->addr[pg] = pages[pg];
++	if (power) {
++		ret = source_ops(csdev)->poweron(csdev);
++		if (ret)
++			goto out;
 +
-+	return buf;
++		ret = coresight_build_paths(csdev, &path, &sinks, true);
++		if (ret) {
++			dev_dbg(&csdev->dev, "creating path(s) failed\n");
++			source_ops(csdev)->poweroff(csdev);
++		}
++
++		/* Everything is good, record first enabled sink buffer */
++		per_cpu(csdev_sink, source) =
++			list_first_entry(&sinks,
++					 struct coresight_device, sinks);
++	} else {
++		source_ops(csdev)->poweroff(csdev);
++		ret = coresight_build_paths(csdev, &path, NULL, false);
++		if (ret)
++			dev_dbg(&csdev->dev, "releasing path(s) failed\n");
++	}
++
++out:
++	return ret;
 +}
 +
- static const struct coresight_ops_sink etb_sink_ops = {
- 	.enable		= etb_enable,
- 	.disable	= etb_disable,
-+	.setup_aux	= etb_setup_aux,
- };
++static int etm_event_power_sources(int source, bool power)
++{
++	int cpu, ret;
++
++	if (source < -1 || source >= nr_cpu_ids)
++		return -EINVAL;
++
++	/* source == -1 is for all CPUs. */
++	if (source != -1) {
++		/* power up/down one source */
++		ret = etm_event_power_single_source(source, power);
++		goto out;
++	}
++
++	/* same process as above, but for all CPUs */
++	for_each_online_cpu(cpu) {
++		ret = etm_event_power_single_source(cpu, power);
++		if (ret)
++			break;
++	}
++
++out:
++	return ret;
++}
++
++static int etm_event_config_single_source(int source)
++{
++	struct coresight_device *csdev;
++
++	csdev = per_cpu(csdev_src, source);
++
++	if (!csdev)
++		return -EINVAL;
++
++	if (csdev->type != CORESIGHT_DEV_TYPE_SOURCE)
++		return -EINVAL;
++
++	return source_ops(csdev)->configure(csdev);
++}
++
++static int etm_event_config_sources(int source)
++{
++	int cpu, ret;
++
++	if (source < -1 || source >= nr_cpu_ids)
++		return -EINVAL;
++
++	/* source == -1 is for all CPUs. */
++	if (source != -1) {
++		/* configure one source */
++		ret = etm_event_config_single_source(source);
++		goto out;
++	}
++
++	/* same process as above, but for all CPUs */
++	for_each_online_cpu(cpu) {
++		ret = etm_event_config_single_source(cpu);
++		if (ret)
++			goto reset;
++	}
++
++out:
++	return ret;
++reset:
++	for_each_online_cpu(cpu)
++		etm_event_power_sources(cpu, false);
++	goto out;
++}
++
++static bool etm_event_source_single_enabled(int source)
++{
++	struct coresight_device *csdev = per_cpu(csdev_src, source);
++
++	if (!csdev)
++		return true;
++
++	return source_ops(csdev)->is_enabled(csdev);
++}
++
++static bool etm_event_source_enabled(int source)
++{
++	int cpu;
++
++	if (source != -1)
++		return etm_event_source_single_enabled(source);
++
++	for_each_online_cpu(cpu) {
++		if (etm_event_source_single_enabled(cpu))
++			return true;
++	}
++
++	return false;
++}
++
++static void etm_event_destroy(struct perf_event *event)
++{
++	/* switching off the source will also tear down the path */
++	etm_event_power_sources(event->cpu, false);
++}
++
++static int etm_event_init(struct perf_event *event)
++{
++	int ret;
++
++	if (event->attr.type != etm_pmu.type)
++		return -ENOENT;
++
++	if (event->cpu >= nr_cpu_ids)
++		return -EINVAL;
++
++	/* only one session at a time */
++	if (etm_event_source_enabled(event->cpu))
++		return -EBUSY;
++
++	/*
++	 * Make sure CPUs don't disappear between the
++	 * power up sequence and configuration.
++	 */
++	get_online_cpus();
++	ret = etm_event_power_sources(event->cpu, true);
++	if (ret)
++		goto out;
++
++	ret = etm_event_config_sources(event->cpu);
++
++	event->destroy = etm_event_destroy;
++out:
++	put_online_cpus();
++	return ret;
++}
++
+ static int __init etm_perf_init(void)
+ {
+ 	etm_pmu.capabilities	= PERF_PMU_CAP_EXCLUSIVE;
+@@ -59,6 +234,7 @@ static int __init etm_perf_init(void)
+ 	etm_pmu.attr_groups	= etm_pmu_attr_groups;
+ 	etm_pmu.task_ctx_nr	= perf_sw_context;
+ 	etm_pmu.read		= etm_event_read;
++	etm_pmu.event_init	= etm_event_init;
  
- static const struct coresight_ops etb_cs_ops = {
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index 9fe2ccf1cc36..71cc23709422 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -185,10 +185,13 @@ struct coresight_device {
-  * Operations available for sinks
-  * @enable:	enables the sink.
-  * @disable:	disables the sink.
-+ * @setup_aux:	initialises perf's ring buffer for trace collection.
-  */
- struct coresight_ops_sink {
- 	int (*enable)(struct coresight_device *csdev);
- 	void (*disable)(struct coresight_device *csdev);
-+	void *(*setup_aux)(struct coresight_device *csdev, int cpu,
-+			   void **pages, int nr_pages, bool overwrite);
- };
- 
- /**
+ 	return perf_pmu_register(&etm_pmu, CORESIGHT_ETM_PMU_NAME, -1);
+ }
 -- 
 1.9.1
