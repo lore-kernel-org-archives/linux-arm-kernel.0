@@ -1,46 +1,32 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Fri, 18 Sep 2015 14:57:15 -0700
-Subject: [PATCH v2 4/9] ARM: dts: Put Cygnus core components under core bus
-In-Reply-To: <1472876.fGCm1r9KFG@wuerfel>
-References: <1442611454-16331-1-git-send-email-rjui@broadcom.com>
- <1442611454-16331-5-git-send-email-rjui@broadcom.com>
- <1472876.fGCm1r9KFG@wuerfel>
-Message-ID: <55FC88BB.2000608@broadcom.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 19 Sep 2015 00:08:59 +0200
+Subject: [PATCH 2/2] ARM: at91: at91sam9n12ek/dts: fix the led labels name
+In-Reply-To: <55FC15B9.9070407@atmel.com>
+References: <27620a5315a0fd314e21eac4afbfe87f1350b099.1441897573.git.nicolas.ferre@atmel.com>
+ <fca26d7ecb73e9691da4ee85e7e5bd8462638752.1441897573.git.nicolas.ferre@atmel.com>
+ <20150910152415.GN3237@piout.net> <55FC15B9.9070407@atmel.com>
+Message-ID: <20150918220859.GJ4287@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 9/18/2015 2:30 PM, Arnd Bergmann wrote:
-> On Friday 18 September 2015 14:24:09 Ray Jui wrote:
->>
->> +       core {
->> +               compatible = "simple-bus";
->> +               ranges;
->> +               #address-cells = <1>;
->> +               #size-cells = <1>;
->> +
->> +               timer at 19020200 {
->> +                       compatible = "arm,cortex-a9-global-timer";
->> +                       reg = <0x19020200 0x100>;
->> +                       interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
->> +                       clocks = <&periph_clk>;
->> +               };
->> +
->> +               gic: interrupt-controller at 19021000 {
->>
+On 18/09/2015 at 15:46:33 +0200, Nicolas Ferre wrote :
+> > The only concern being that this renaming will break userspace software
+> > assuming the LEDs are wrongly named. Is there anything that has been
+> > released by atmel that uses the wrong names (and my guess is yess and
+> > that is why there are named as such) and do you care about it?
 > 
-> Could it be that all 'core' components are in the 0x19xxxxxx address range?
-> If so, please set up an appropriate ranges property for the bus. Also
-> add the address field for the bus according to which addresses are routed
-> to it.
-> 
-> 	Arnd
+> My guess is that the label was wrongly named from the beginning and no
+> board revision had the "d6" nor "d7" names.
+> It makes sense to rename them for the evaluation kit...
 > 
 
-Yes all 'core' components are in the 0x19xxxxx address range for Cygnus.
-It's fine and makes sense to set up proper ranges for this bus. But I
-might have some issues with the 'soc' components and the 'soc' bus,
-which I'll explain and discuss on the next email.
+Yeah, I'm fine with the change. I was simply warning that it may break
+some demos Atmel distributed before (but I didn't ever seen or used
+those anyway so I may be wrong).
 
-Ray
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
