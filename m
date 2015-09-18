@@ -1,46 +1,43 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 18 Sep 2015 16:19:57 +0100
-Subject: Recent GIC v1 patch
-In-Reply-To: <20150918151418.4c0ed401@arm.com> (Marc Zyngier's message of
- "Fri, 18 Sep 2015 15:14:18 +0100")
-References: <55FAE26A.9040609@free.fr> <55FAEB4D.30306@arm.com>
- <55FAF6E1.7020107@free.fr> <55FAFD3E.7010006@arm.com>
- <55FBD6F4.8030905@free.fr> <20150918120851.6f9fb306@arm.com>
- <yw1xbnczub0y.fsf@unicorn.mansr.com> <55FC18A4.2080205@free.fr>
- <20150918151418.4c0ed401@arm.com>
-Message-ID: <yw1x7fnnu542.fsf@unicorn.mansr.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Sep 2015 16:20:51 +0100
+Subject: [PATCH 0/7] Phy and mdiobus fixes
+In-Reply-To: <20150918150128.GV2722@xsjsorenbubuntu>
+References: <20150918094625.GB21084@n2100.arm.linux.org.uk>
+ <20150918095600.GC21084@n2100.arm.linux.org.uk>
+ <20150918150128.GV2722@xsjsorenbubuntu>
+Message-ID: <20150918152050.GI21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Zyngier <marc.zyngier@arm.com> writes:
+On Fri, Sep 18, 2015 at 08:01:28AM -0700, S?ren Brinkmann wrote:
+> Hi Russell,
+> 
+> On Fri, 2015-09-18 at 10:56AM +0100, Russell King - ARM Linux wrote:
+> > Sorry guys, some of you will get the patches twice, as S?ren's name
+> > in the header caused vger to reject all the patches.
+> 
+> That is the first time I hear about an issue like that. I've been
+> receiving patches fine thus far and nobody reported any rejections (by
+> vger) to me. Is it some bounce on Xilinx/my side or is vger suddenly
+> rejecting non-ascii chars or is something in the mail processing chain
+> not properly encoding those chars?
+> Please, let me know if I can help with the problem.
 
-> On Fri, 18 Sep 2015 15:59:00 +0200
-> Mason <slash.tmp@free.fr> wrote:
->
->> On 18/09/2015 15:12, M?ns Rullg?rd wrote:
->> 
->> > Marc Zyngier wrote:
->> > 
->> >> No idea so far. The only thing I can immediately spot is a missing pair
->> >> of chained_irq_{enter,exit} in tangox_irq_handler, but I can't imagine
->> >> this having a terminal effect on the system.
->> > 
->> > Fixed in the tangox tree on github.
->> 
->> Oh boy! Oh boy! Oh boy!
->> 
->> That did the trick. Just when I was about to give up...
->> 
->> Marc, I'm sending you an e-hug. Mans, you have my eternal gratitude.
->
-> Thanks, but I prefer cheese! ;-)
->
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny.
+It's to do with how I generate the patch set and submit it to my MTA.
+The result is that the header fields contain an ?.  Almost all MTAs
+accept this despite it being questionable, but zmailer is extra fussy
+and rejects this - and rejected the messages to lkml, netdev, etc.
 
-Smelly cheese?
+Normally, the MUA would encode "S?ren Brinkmann" in a header into a
+7-bit ascii representation as "=?utf-8?B?U8O2cmVu?= Brinkmann".
+
+It's one of the many issues of not using a MUA to send out patches.
+
+It's also worth noting that git-send-email misses out mime headers
+(or used to - which is why I have my own scripts for doing this)
+which technically makes the bodies it mails out in violation of the
+RFCs.
 
 -- 
-M?ns Rullg?rd
-mans at mansr.com
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
