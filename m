@@ -1,41 +1,29 @@
 From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Fri, 18 Sep 2015 09:13:01 +0800
-Subject: [RFC PATCH v4 2/4] genirq: add move_irqs() for cpu hotplug
-In-Reply-To: <20150917220944.GX21084@n2100.arm.linux.org.uk>
+Date: Fri, 18 Sep 2015 09:14:26 +0800
+Subject: [RFC PATCH v4 0/4] arm/arm64: fix a migrating irq bug when
+ hotplug cpu
+In-Reply-To: <alpine.DEB.2.11.1509180009250.3951@nanos>
 References: <1442467166-1460-1-git-send-email-yangyingliang@huawei.com>
- <1442467166-1460-3-git-send-email-yangyingliang@huawei.com>
- <55FAEDF6.6060000@arm.com> <alpine.DEB.2.11.1509172355260.3951@nanos>
- <20150917220944.GX21084@n2100.arm.linux.org.uk>
-Message-ID: <55FB651D.5080101@huawei.com>
+ <alpine.DEB.2.11.1509180009250.3951@nanos>
+Message-ID: <55FB6572.6000008@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2015/9/18 6:09, Russell King - ARM Linux wrote:
-> On Fri, Sep 18, 2015 at 12:04:06AM +0200, Thomas Gleixner wrote:
->> On Thu, 17 Sep 2015, Marc Zyngier wrote:
->>> I don't think having this prototype guarded by this #if is very useful.
->>> You can probably leave it standalone.
->>
->> Yes, there is no point if the function name is unique. Though
->> move_irqs() is rather undescriptive. irq_break_affinities() might
->> describe it quite well, but feel free to come up with soemthing better.
+On 2015/9/18 6:10, Thomas Gleixner wrote:
+> On Thu, 17 Sep 2015, Yang Yingliang wrote:
 >
-> I don't think "irq_break_affinities" is anywhere near a good name - it's
-> not about always breaking affinities (moving an IRQ off one CPU onto
-> another within the current affinity setting does not break the affinity.)
+> Can you please Cc the relevant people on the cover letter as well next
+> time?
 >
-> irq_migrate_all()
+> Thanks,
 >
-> irq_migrate_all_off_this_cpu()
+> 	tglx
 >
-> irq_this_cpu_hotunplug()
->
-> irq_cpu_hotunplug()
 >
 
-irq_migrate_all_off_this_cpu() describe it well, I will choose it.
+OK, I will add Cc next time.
 
 Thanks,
 Yang
