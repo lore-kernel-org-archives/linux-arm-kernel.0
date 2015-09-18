@@ -1,13 +1,13 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 18 Sep 2015 13:31:19 +0100
-Subject: [PATCH 05/14] ARM: dts: apq8064: add pm8921 rtc
+Date: Fri, 18 Sep 2015 13:31:25 +0100
+Subject: [PATCH 06/14] ARM: dts: apq8064: add pm8921 pwrkey support
 In-Reply-To: <1442579371-19822-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1442579371-19822-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1442579479-20144-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1442579485-20187-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds rtc node for pmic8921.
+This patch adds support to pm8921 power button.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
@@ -15,21 +15,21 @@ Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
  1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index d973832..1d4fa2b 100644
+index 1d4fa2b..4a2f159 100644
 --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
 +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -372,6 +372,14 @@
- 					<136 1>, <137 1>, <138 1>, <139 1>;
+@@ -380,6 +380,14 @@
+ 					allow-set-time;
  				};
  
-+				rtc at 11d {
-+					compatible = "qcom,pm8921-rtc";
++				pwrkey at 1c {
++					compatible = "qcom,pm8921-pwrkey";
++					reg = <0x1c>;
 +					interrupt-parent = <&pmicintc>;
-+					interrupts = <39 1>;
-+					reg = <0x11d>;
-+					allow-set-time;
++					interrupts = <50 1>, <51 1>;
++					debounce = <15625>;
++					pull-up;
 +				};
-+
  			};
  		};
  
