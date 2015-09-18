@@ -1,68 +1,55 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 18 Sep 2015 16:40:31 +0200
-Subject: [PATCH] usb: gadget: at91_udc: move at91_udc_data in at91_udc.h
-In-Reply-To: <1439217979-15642-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1439217979-15642-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <55FC225F.2080207@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 18 Sep 2015 15:42:04 +0100
+Subject: [PATCH] iommu/arm-smmu: Ensure IAS is set correctly for
+ AArch32-capable SMMUs
+Message-ID: <1442587324-16335-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 10/08/2015 16:46, Alexandre Belloni a ?crit :
-> struct at91_udc_data is now only used inside the driver, move it to its
-> include.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+AArch32-capable SMMU implementations have a minimum IAS of 40 bits, so
+ensure that is reflected in the stage-2 page table configuration.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-Thanks.
-
-> ---
->  drivers/usb/gadget/udc/at91_udc.h   | 8 ++++++++
->  include/linux/platform_data/atmel.h | 9 ---------
->  2 files changed, 8 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/usb/gadget/udc/at91_udc.h b/drivers/usb/gadget/udc/at91_udc.h
-> index 2679c8b217cc..0a433e6b346b 100644
-> --- a/drivers/usb/gadget/udc/at91_udc.h
-> +++ b/drivers/usb/gadget/udc/at91_udc.h
-> @@ -112,6 +112,14 @@ struct at91_udc_caps {
->  	void (*pullup)(struct at91_udc *udc, int is_on);
->  };
->  
-> +struct at91_udc_data {
-> +	int	vbus_pin;		/* high == host powering us */
-> +	u8	vbus_active_low;	/* vbus polarity */
-> +	u8	vbus_polled;		/* Use polling, not interrupt */
-> +	int	pullup_pin;		/* active == D+ pulled up */
-> +	u8	pullup_active_low;	/* true == pullup_pin is active low */
-> +};
-> +
->  /*
->   * driver is non-SMP, and just blocks IRQs whenever it needs
->   * access protection for chip registers or driver state
-> diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
-> index 4b452c6a2f7b..2d67e466c51b 100644
-> --- a/include/linux/platform_data/atmel.h
-> +++ b/include/linux/platform_data/atmel.h
-> @@ -25,15 +25,6 @@
->   */
->  #define ATMEL_MAX_UART	7
->  
-> - /* USB Device */
-> -struct at91_udc_data {
-> -	int	vbus_pin;		/* high == host powering us */
-> -	u8	vbus_active_low;	/* vbus polarity */
-> -	u8	vbus_polled;		/* Use polling, not interrupt */
-> -	int	pullup_pin;		/* active == D+ pulled up */
-> -	u8	pullup_active_low;	/* true == pullup_pin is active low */
-> -};
-> -
->   /* Compact Flash */
->  struct at91_cf_data {
->  	int	irq_pin;		/* I/O IRQ */
-> 
-
-
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index dafaf59dc3b8..a24f359fa0d0 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -56,6 +56,7 @@
+ #define IDR0_TTF_SHIFT			2
+ #define IDR0_TTF_MASK			0x3
+ #define IDR0_TTF_AARCH64		(2 << IDR0_TTF_SHIFT)
++#define IDR0_TTF_AARCH32_64		(3 << IDR0_TTF_SHIFT)
+ #define IDR0_S1P			(1 << 1)
+ #define IDR0_S2P			(1 << 0)
+ 
+@@ -2460,7 +2461,13 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
+ 	}
+ 
+ 	/* We only support the AArch64 table format@present */
+-	if ((reg & IDR0_TTF_MASK << IDR0_TTF_SHIFT) < IDR0_TTF_AARCH64) {
++	switch (reg & IDR0_TTF_MASK << IDR0_TTF_SHIFT) {
++	case IDR0_TTF_AARCH32_64:
++		smmu->ias = 40;
++		/* Fallthrough */
++	case IDR0_TTF_AARCH64:
++		break;
++	default:
+ 		dev_err(smmu->dev, "AArch64 table format not supported!\n");
+ 		return -ENXIO;
+ 	}
+@@ -2541,8 +2548,7 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
+ 		dev_warn(smmu->dev,
+ 			 "failed to set DMA mask for table walker\n");
+ 
+-	if (!smmu->ias)
+-		smmu->ias = smmu->oas;
++	smmu->ias = max(smmu->ias, smmu->oas);
+ 
+ 	dev_info(smmu->dev, "ias %lu-bit, oas %lu-bit (features 0x%08x)\n",
+ 		 smmu->ias, smmu->oas, smmu->features);
 -- 
-Nicolas Ferre
+2.1.4
