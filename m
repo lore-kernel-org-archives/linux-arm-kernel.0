@@ -1,66 +1,165 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Sep 2015 15:55:38 +0200
-Subject: [PATCH 0/5] ARM: sunxi: Introduce CHIP support
-In-Reply-To: <13485899.XsimukeSAF@wuerfel>
-References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
- <2353279.QTDzFUHVnF@wuerfel> <20150918121905.GO4684@lukather>
- <13485899.XsimukeSAF@wuerfel>
-Message-ID: <20150918135538.GS4684@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Sep 2015 14:57:46 +0100
+Subject: mvneta: SGMII fixed-link not so fixed
+In-Reply-To: <55FC151F.6040708@list.ru>
+References: <20150914103207.GH21084@n2100.arm.linux.org.uk>
+ <55F6AA25.2070603@list.ru>
+ <20150914114209.GL21084@n2100.arm.linux.org.uk>
+ <20150917.151247.2129216999071943354.davem@davemloft.net>
+ <20150917231422.GY21084@n2100.arm.linux.org.uk>
+ <55FBF59E.3010205@list.ru>
+ <20150918121311.GD21084@n2100.arm.linux.org.uk>
+ <55FC070A.6020707@list.ru>
+ <20150918131257.GF21084@n2100.arm.linux.org.uk>
+ <55FC151F.6040708@list.ru>
+Message-ID: <20150918135746.GG21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 03:18:57PM +0200, Arnd Bergmann wrote:
-> On Friday 18 September 2015 14:19:05 Maxime Ripard wrote:
+On Fri, Sep 18, 2015 at 04:43:59PM +0300, Stas Sergeev wrote:
+> 18.09.2015 16:12, Russell King - ARM Linux ?????:
+> > On Fri, Sep 18, 2015 at 03:43:54PM +0300, Stas Sergeev wrote:
+> >> 18.09.2015 15:13, Russell King - ARM Linux ?????:
+> >>> On Fri, Sep 18, 2015 at 02:29:34PM +0300, Stas Sergeev wrote:
+> >>>> 18.09.2015 02:14, Russell King - ARM Linux ?????:
+> >>>>>  _But_ using the in-band status
+> >>>>>    property fundamentally requires this for mvneta to behave correctly:
+> >>>>>
+> >>>>> 		phy-mode = "sgmii";
+> >>>>> 		managed = "in-band-status";
+> >>>>> 		fixed-link {
+> >>>>> 		};
+> >>>>>
+> >>>>>    with _no_ phy node.
+> >>>> I don't understand this one.
+> >>>> At least for me it works without empty fixed-link.
+> >>>> There may be some bug.
+> >>>
+> >>>         if (cause_rx_tx & MVNETA_MISCINTR_INTR_MASK) {
+> >>>                 u32 cause_misc = mvreg_read(pp, MVNETA_INTR_MISC_CAUSE);
+> >>>
+> >>>                 mvreg_write(pp, MVNETA_INTR_MISC_CAUSE, 0);
+> >>>                 if (pp->use_inband_status && (cause_misc &
+> >>>                                 (MVNETA_CAUSE_PHY_STATUS_CHANGE |
+> >>>                                  MVNETA_CAUSE_LINK_CHANGE |
+> >>>                                  MVNETA_CAUSE_PSC_SYNC_CHANGE))) {
+> >>>                         mvneta_fixed_link_update(pp, pp->phy_dev);
+> >>>                 }
+> >>>
+> >>> pp->use_inband_status is set when managed = "in-band-status" is set.
+> >>> We detect changes in the in-band status, and call mvneta_fixed_link_update():
+> >>>
+> >>> mvneta_fixed_link_update() reads the status, and communicates that into
+> >>> the fixed-link phy:
+> >>>
+> >>>         u32 gmac_stat = mvreg_read(pp, MVNETA_GMAC_STATUS);
+> >>>
+> >>> 	... code setting status.* values from gmac_stat ...
+> >>>         changed.link = 1;
+> >>>         changed.speed = 1;
+> >>>         changed.duplex = 1;
+> >>> 	fixed_phy_update_state(phy, &status, &changed);
+> >>>
+> >>> fixed_phy_update_state() then looks up the phy in its list, comparing only
+> >>> the address:
+> >>>
+> >>>         if (!phydev || !phydev->bus)
+> >>>                 return -EINVAL;
+> >>>
+> >>>         list_for_each_entry(fp, &fmb->phys, node) {
+> >>>                 if (fp->addr == phydev->addr) {
+> >>>
+> >>> updating fp->* with the new state, calling fixed_phy_update_regs().  This
+> >>> updates the fixed-link phy emulated registers, and phylib then notices
+> >>> the change in link status, and notifies the netdevice attached to the
+> >>> PHY it found of the change.
+> >>>
+> >>> Now, one of two things happens as a result of this:
+> >>>
+> >>> 1. If pp->phy_dev is a fixed-link phy, this finds the correct fixed-link
+> >>>    phy to update its "fixed-link" properties, and the "not so fixed" phy
+> >>>    changes its parameters according to the new status.
+> >>>
+> >>> 2. If pp->phy_dev is a MDIO phy which matches the address of a fixed-link
+> >>>    phy,
+> >> Doesn't the above loop iterates only "fixed_mdio_bus platform_fmb"?
+> >> I don't think MDIO PHYs can appear there. If they can - the bug is
+> >> very nasty. Have you seen exactly when/why that happens?
 > > 
-> > There's actually two issues that are pretty orthogonal:
+> > I think I explained it fully - please follow the code paths I've detailed
+> > above.
+> I try. What I don't understand is why both PHYs get the
+> same address on the "Fixed MDIO bus".
+
+They aren't both on the fixed MDIO bus - that's the whole point I'm
+making.  They get the same phydev->addr but on _different_ buses.
+
+> > Specifically, look at this code:
 > > 
-> >   * the fact that the regulator to power the wifi chip needs to be
-> >     enabled before it enumerates and the driver is probed. The MMC
-> >     pwrseq stuff seems to fix that, even if it doesn't really fit in
-> >     the usual DT model.
-> 
-> Ok. If there is anything missing in the pwrseq implementation or
-> binding at the moment, you'll have to work with Ulf to get it to
-> drive your hardware then.
+> >          if (!phydev || !phydev->bus)
+> >                  return -EINVAL;
+> > 
+> >          list_for_each_entry(fp, &fmb->phys, node) {
+> >                  if (fp->addr == phydev->addr) {
 
-Yep.
+Look at this closely - at what point is there any validation that "phydev"
+is actually a fixed-link phy?  There is no validation done.  The only
+criteria there are:
+- phydev is not NULL
+- phydev->bus is not NULL (which is true of any registered phy)
+- phydev->addr matches _any_ fixed-link phy.
 
-> >   * The fact that that regulator on this board is actually two
-> >     regulators in parallel that needs to be controlled in parallel
-> >     too. Here, it will probably require a new regulator driver to
-> >     combine two regulators into one.
-> 
-> I don't yet understand what it means to control them in parallel.
-> Do you mean the hardware uses two outputs to support a higher
-> current than you could do with one?
+I've already sent a patch earlier today to address this issue.
 
-Yes.
+If you place a WARN_ON(fp->phydev != phydev) then that'll show you
+when it incorrectly matches.
 
-> How critical is the timing? Would it be enough if the mmc
-> code knew how to set more than one regulator and do them
-> one at a time?
+> > Consider what the effect is if you have a MDIO phy at address 0 on eth0
+> > which has in-band-status enabled.
+> So as I understand, you have MDIO phy with DT looking like this:
+> ethernet at 70000 {
+>   status = "okay";
+>   phy-mode = "sgmii";
+>   managed = "in-band-status";
+> }
+> W/O either "phy" of "fixed-link" nodes. Correct?
+> mvneta calls of_phy_register_fixed_link(dn) on it after not
+> finding the "phy" node. And it will do the same with the second
+> non-MDIO phy. What I don't see is how do they get the same addr
+> on the same bus, could you please clarify that a bit?
 
-I don't think it's critical as in both should happen exactly at the
-same time (but I've not really tried it either, so I'm not 100% sure).
+		mdio at 72004 {
+			phy_dedicated: ethernet-phy at 0 {
+				reg = <0>;
+			};
+		};
 
-And I don't think it's something the MMC core should deal with. The
-device itself has a single pin to provide its power, it's the board
-that is wired that way. The way I was seeing it was more that I needed
-to create a regulator driver that would take two inputs, that the mmc
-core would use. Last time I discussed it with Mark (Brown), it semes
-like he was open to the idea, so I just need to find some time to do
-just that.
+		eth1: ethernet at 30000 {
+			phy = <&phy_dedicated>;
+			phy-mode = "sgmii";
+			managed = "in-band-status";
+		};
 
-Maxime
+		eth0: ethernet at 70000 {
+			phy-mode = "sgmii";
+			fixed-link {
+				speed = 1000;
+				full-duplex;
+			};
+		};
+
+Bring eth0 up first, everything works.  Then, bring eth1 up, and eth0
+goes down.
+
+This happens because when eth1 is brought up, eth1's mvneta calls into
+fixed_phy_update_state() with a pointer to the "phy_dedicated" PHY at
+address 0.  fixed_phy_update_state() scans the fixed-link phys for one
+at address 0, and finds the fixed-link phy associated with eth0.
+This causes the fixed link code to change the settings for eth0.
+
+As I have already shown in my previous setup diagrams, it is _entirely_
+reasonable to use in-band status with SGMII with a phy attached.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150918/cf968413/attachment-0001.sig>
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
