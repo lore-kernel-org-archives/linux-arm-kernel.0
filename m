@@ -1,95 +1,126 @@
-From: Dongsheng.Wang@freescale.com (Wang Dongsheng)
-Date: Fri, 18 Sep 2015 02:37:15 +0000
-Subject: [PATCH] arm/ls1021a: Add Sleep feature for ls1021
-In-Reply-To: <20150917123155.GC12808@leverpostej>
-References: <1441877796-32232-1-git-send-email-dongsheng.wang@freescale.com>
- <20150910095920.GB29293@leverpostej>
- <SN1PR0301MB161620AA4926EEF6541D901E9D500@SN1PR0301MB1616.namprd03.prod.outlook.com>
- <20150917123155.GC12808@leverpostej>
-Message-ID: <SN1PR0301MB1616F01085CC4549FFE3A1469D590@SN1PR0301MB1616.namprd03.prod.outlook.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 18 Sep 2015 11:56:03 +0900
+Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
+In-Reply-To: <20150918002122.GC12858@verge.net.au>
+References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+ <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
+ <20150812012652.GH15957@verge.net.au>
+ <55D790A5.1050008@cogentembedded.com>
+ <55D7A3A1.9020009@cogentembedded.com>
+ <20150902022936.GA18115@verge.net.au>
+ <55EA2D8D.90004@cogentembedded.com>
+ <20150918002122.GC12858@verge.net.au>
+Message-ID: <CANqRtoSRZo_J1kV0EkYdVzg9YRJ5=Ha3eQRVPKeq9M=kAPLwpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Simon,
 
-> -----Original Message-----
-> From: Mark Rutland [mailto:mark.rutland at arm.com]
-> Sent: Thursday, September 17, 2015 8:32 PM
-> To: Wang Dongsheng-B40534
-> Cc: shawnguo at kernel.org; Catalin Marinas; Wang Huan-B18965; Zhao Chenhui-B35336;
-> Jin Zhengxiong-R64188; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; lorenzo.pieralisi at arm.com; sudeep.holla at arm.com
-> Subject: Re: [PATCH] arm/ls1021a: Add Sleep feature for ls1021
-> 
-> On Fri, Sep 11, 2015 at 04:53:04AM +0100, Wang Dongsheng wrote:
-> > Hi Mark,
-> 
-> Hi,
-> 
-> > > > > diff --git a/arch/arm/mach-imx/pm-ls1.c
-> > > > > b/arch/arm/mach-imx/pm-ls1.c new file mode 100644 index
-> > > > > 0000000..f80b24d
-> > > > > --- /dev/null
-> > > > > +++ b/arch/arm/mach-imx/pm-ls1.c
-> > > > > @@ -0,0 +1,222 @@
-> > > > > +/*
-> > > > > + * Support Power Management Control for LS1
-> > > > > + *
-> > > > > + * Copyright 2015 Freescale Semiconductor Inc.
-> > > > > + *
-> > > > > + * This program is free software; you can redistribute	it and/or
-> modify it
-> > > > > + * under  the terms of	the GNU General	 Public License as
-> > > published by
-> > > > the
-> > > > > + * Free Software Foundation;  either version 2 of the  License,
-> > > > > +or (at your
-> > > > > + * option) any later version.
-> > > > > + */
-> > > > > +
-> > > > > +#include <linux/io.h>
-> > > > > +#include <linux/kernel.h>
-> > > > > +#include <linux/of_platform.h>
-> > > > > +#include <linux/of_address.h>
-> > > > > +#include <linux/psci.h>
-> > > > > +#include <linux/suspend.h>
-> > > > > +
-> > > > > +#include <uapi/linux/psci.h>
-> > > > > +
-> > > > > +#include <asm/cacheflush.h>
-> > > > > +#include <asm/psci.h>
-> > > >
-> > > > NAK.
-> > > >
-> > > > No new platform code should be calling the PSCI functions
-> > > > directly; you should not need to include these files in platform code.
-> > >
-> > > PSCI 1.0 define SYSTEM_SUSPEND, and 0.2 and 0.1 not support this feature.
-> > >
-> > > I will drop psci-cpu_suspend to implement SYSTEM SUSPEND, and
-> > > implement system suspend in platform code.
-> >
-> > Now 0.1 and 0.2 not support SYSTEM SUSPEND, means if do system suspend
-> > we still need to use platform_suspend_ops to implement system suspend
-> > in platform code and cannot use PSCI interface to do it?
-> 
-> As PSCI_SYSTEM_SUSPEND was introduced in PSCI 1.0, you would need a PSCI
-> 1.0 implementation in order to use PSCI_SYSTEM_SUSPEND. Is there anything
-> preventing implementing PSCI 1.0?
-> 
-> > How about PSCI 1.0 support, could you share some information about it?
-> 
-> Lorenzo has implemented basic PSCI 1.0 support [1,2], and Sudeep has been
-> working on SYSTEM_SUSPEND [3], though I'm not immediately aware of the state of
-> the world there.
-> 
-> Do you have any specific questions?
-> 
+On Fri, Sep 18, 2015 at 9:21 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Sat, Sep 05, 2015 at 02:47:25AM +0300, Sergei Shtylyov wrote:
+>> Hello.
+>>
+>> On 09/02/2015 05:29 AM, Simon Horman wrote:
+>>
+>> >>>>>Define the SILK board dependent part of the SDHI1 (connected to micro-SD slot)
+>> >>>>>device nodes along with the necessary voltage regulators.
+>> >>>>>
+>> >>>>>Based on the original patch by Vladimir Barinov
+>> >>>>><vladimir.barinov@cogentembedded.com>.
+>> >>>>>
+>> >>>>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> >>>>>
+>> >>>>>---
+>> >>>>>This patch is against 'renesas-devel-20150810-v4.2-rc6' tag of Simon Horman's
+>> >>>>>'renesas.git' repo plus the R8A7794/SILK QSPI patches just re-posted. It needs
+>> >>>>>the R8A7794 GPIO patches in order to compile.
+>> >>>>>
+>> >>>>>Changes in version 2:
+>> >>>>>- removed not working SDHI0 stuff, renamed the patch;
+>> >>>>>- replaced SDHI1's "wp-gpios" property with "disable-wp".
+>> >>>>
+>> >>>>I am wondering if you could explain the motivation for the "disable-wp"
+>> >>>>update
+>> >>>
+>> >>>    Please see the comment in mmc_sd_get_ro().
+>> >>>
+>> >>>>and weather it is appropriate for other r8a779* dts files.
+>> >>>
+>> >>>    In case of micro-SD slots, yes.
+>> >>
+>> >>    The MMC binding document says it should only be specified if the
+>> >>controller has WP detection logic. We, so far, seem to have been replying on
+>> >>the GPIOs despite this logic is present (according to the R-Car gen2 SDHI
+>> >>manuals I have). The driver will first call mmc_gpio_get_ro() and when that
+>> >>fails due to "wp-gpios" not being specified, it proceeds to reading the
+>> >>register but that is forbidden by TMIO_MMC_WRPROTECT_DISABLE flag set for
+>> >>the R-Car gen1/2 chips, so 0 is always returned from tmio_mmc_get_ro().
+>> >>There seems to be no point in going that far (and doing the runtime PM
+>> >>dances) --
+>>
+>>    Alternatively, the driver could be fixed to check the flag before the RPM
+>> call unlike what it does now.
+>
+> If the driver can be updated to do the right thing then that seems
+> preferable to me. If so would it be the case that the presence of the
+> "disable-wp" property would not have any run-time effect?
+>>
+>> >>and MMC_CAP2_NO_WRITE_PROTECT (set when "disable-wp" is specified) prohibits
+>> >>doing that...
+>> >
+>> >That sounds reasonable to me.
+>>
+>>    I'm still wondering why TMIO_MMC_WRPROTECT_DISABLE is set for the R-Car
+>> SoCs. Morimoto-san, any comments? Your change logs are too terse. :-)
+>
+> I will follow up on this.
 
-There is no problem, I just want to use V1.0 to support our platform SYSTEM_SUSPEND,
-but 1.0 implementation is not in v4.3-rc1, so abandon this.
+I'd like to help you to clarify whatever issues you are having, but I
+don't have anyhardware access or schematics for the Silk board.
 
-Thanks for your help.
+So here is some generic information. In general with SD/MMC I can
+imagine a couple of different types of devices.
 
-Regards,
--Dongsheng
+1) Hotpluggable SD socket (with write protect)
+2) Hotpluggable micro-SD socket (no write protect)
+3) On-board SD/MMC/SDIO (no hotplug, no write protect)
+
+Which type of device that happens to be used on a particular board is
+a board specific property. So on one board SDHI1 may be micro-SD but
+on a different board SDHI1 may be a soldered-on eMMC or a SDIO module
+(case 3). The same SoC DTSI will contain on-chip information for SDHI1
+while the board specific DTS may contain optional information about WP
+and CD signals.
+
+On R-Car Gen2 we default to assume case 3 above which means no WP and
+CD signals. If a regular SD socket is used then the board specific
+file needs to point out CD and WP signals. For micro-SD sockets there
+is no WP signal so in such case only the CD pin is needed.
+
+HIstorically with SDHI the availability of CD and WP signals vary
+wildly depending on SoC and SDHI instance. Also, with power domains
+and Runtime PM we would like to be able to power off the power domain
+for the SDHI device and still be able to wake up, so assigning CD and
+WP as GPIO signals will not only allow board-specific stuff to be
+cleanly separated from the on-chip SDHI DTSI, it also allows for
+easier review and better power management.
+
+Now what is the issue that you guys are having?
+
+>> >Some more questions from my side:
+>>
+>> >* What is the status of this patch
+>>
+>>    Tested, working.
+>>
+>> >* Can you prepare patches for r8a779* dts files for micro-SD slots?
+>>
+>>    Ugh, I probably can but won't promise anything.
+>
+> Likewise, ugh.
+
+What needs to be updated for R-Car Gen1 again?
+
+Thanks,
+
+/ magnus
