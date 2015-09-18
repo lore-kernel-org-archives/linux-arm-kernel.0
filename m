@@ -1,66 +1,45 @@
-From: stsp@list.ru (Stas Sergeev)
-Date: Fri, 18 Sep 2015 22:38:55 +0300
-Subject: mvneta: SGMII fixed-link not so fixed
-In-Reply-To: <55FC4A42.905@gmail.com>
-References: <20150917231422.GY21084@n2100.arm.linux.org.uk>
- <55FBF59E.3010205@list.ru> <20150918121311.GD21084@n2100.arm.linux.org.uk>
- <55FC070A.6020707@list.ru> <20150918131257.GF21084@n2100.arm.linux.org.uk>
- <55FC151F.6040708@list.ru> <20150918135746.GG21084@n2100.arm.linux.org.uk>
- <55FC2387.9080304@list.ru> <20150918154339.GJ21084@n2100.arm.linux.org.uk>
- <55FC35F9.9040403@list.ru> <20150918172222.GL21084@n2100.arm.linux.org.uk>
- <55FC4A42.905@gmail.com>
-Message-ID: <55FC684F.2060808@list.ru>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 18 Sep 2015 21:41:03 +0200
+Subject: [PATCH 3/3] ARM: dts: sun5i: Add dts file for q8 formfactor a13
+ based tablets
+In-Reply-To: <1441464953-26351-3-git-send-email-hdegoede@redhat.com>
+References: <1441464953-26351-1-git-send-email-hdegoede@redhat.com>
+ <1441464953-26351-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150918194103.GW4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-18.09.2015 20:30, Florian Fainelli ?????:
-> On 18/09/15 10:22, Russell King - ARM Linux wrote:
->> On Fri, Sep 18, 2015 at 07:04:09PM +0300, Stas Sergeev wrote:
->>> 18.09.2015 18:43, Russell King - ARM Linux ?????:
->>>> On Fri, Sep 18, 2015 at 05:45:27PM +0300, Stas Sergeev wrote:
->>>>> AFAICS if it has use_inband_status==true,
->>>>> then it went through of_phy_register_fixed_link(dn),
->>>> That's totally incorrect.  The test for setting use_inband_status in
->>>> mvneta is:
->>>>
->>>>          err = of_property_read_string(dn, "managed", &managed);
->>>>          pp->use_inband_status = (err == 0 &&
->>>>                                   strcmp(managed, "in-band-status") == 0);
->>> Arrrr! I was looking at the branch without the last
->>> patch applied, so it occurred to me as
->>>
->>> 	pp->use_inband_status = (phy_mode == PHY_INTERFACE_MODE_SGMII) &&
->>> 		fixed_phy;
->>>
->>> Sorry for that.
->> Yay :)
->>
->>> So we seem to indeed have a nasty regression with the patch
->>> that just went to stable. :( Great news.
->> Yes.
->>
->>> Thanks for you time.
->>>
->>> I still have problems with this part though:
->>>> If there's neither a MDIO PHY nor a fixed-link, then the network driver
->>>> fails to initialise the device.
->>> I think I am looking into the right source this time, seems like
->>> if we don't have both but still have managed="in-band-status", that
->>> should go the fixed-link path and still work... no?
->> If we have no fixed-link and no phy, then you're correct.
->>
->> However, I really don't like the idea of abusing "fixed-link" as a
->> method to generate an ethtool/miitool/miidiag compatible output for
->> this, but I'm willing to let that pass for the moment. :)
-> It is not just for that, you get all the goodies from the PHY library
-> without modifying your Ethernet MAC driver specifically for it:
-> phy_connect, adjust_link and phy_ethtool_{set,get}.
-But you still need to modify the MAC driver, and in a bit
-nasty way. Eg when you want the AN to work right, you
-need to do of_phy_find_device() and feed the current AN
-settings to fixed-phy manually, or, after phy_connect(), you'll
-run with wrong link state for some time (and there is still
-a bit of race anyway, as the link state could change between
-of_phy_find_device() and phy_connect()).
-So I am not sure what would the best API look like, but
-my overall impression was it is currently not the one.
+On Sat, Sep 05, 2015 at 04:55:53PM +0200, Hans de Goede wrote:
+> This commits adds a generic dts file for q8 formfactor a13 based tablets.
+> 
+> The tablets ship in many variants, with the difference mainly being the
+> touchscreen controller / accelerometer / wifi chip used.
+> 
+> The wifi is USB based, and thus not listed in devicetree.
+> 
+> The touchscreen controller / accelerometer may turn out to be a problem
+> once we add support for those. We can either do something with devicetree
+> overlays, or add sun5i-a13-<touchscreen>-<accelerometer>.dts files. The
+> latter is what the android mod community is doing with firmware images.
+> 
+> This dts was tested with an a13 q8 tablet with a pcb labelled: "94V-0",
+> silead gsl1680 touchscreen controller and a mc32x0 accelerometer.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+
+Fixed the conflicts and applied. Please post the patches on top of the
+current sunxi/for-next branch.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150918/65c184bd/attachment.sig>
