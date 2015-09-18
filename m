@@ -1,751 +1,97 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 18 Sep 2015 13:37:32 +0900
-Subject: [PATCH v3 1/3] ARM: uniphier: add outer cache support
-In-Reply-To: <1442551054-2116-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1442551054-2116-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1442551054-2116-2-git-send-email-yamada.masahiro@socionext.com>
+From: jonathan@jonmasters.org (Jon Masters)
+Date: Thu, 17 Sep 2015 22:11:46 -0700
+Subject: [RFC PATCH v2 0/7] Pseudo-NMI for arm64 using ICC_PMR_EL1 (GICv3)
+In-Reply-To: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
+References: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <32CDD1A8-EF10-4F6B-86B6-64981874361A@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds support for UniPhier outer cache controller.
-All the UniPhier SoCs are equipped with the L2 cache, while the L3
-cache is currently only integrated on PH1-Pro5 SoC.
+(Apologies for top posting)
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+I think there is a need to connect a few dots on this next week during Connect. Some other conversations have discussed alternative implementations elsewhere. I will assist.
 
- .../bindings/arm/uniphier/cache-uniphier.txt       |  48 ++
- MAINTAINERS                                        |   2 +
- arch/arm/include/asm/hardware/cache-uniphier.h     |  46 ++
- arch/arm/kernel/irq.c                              |   3 +
- arch/arm/mm/Kconfig                                |  10 +
- arch/arm/mm/Makefile                               |   1 +
- arch/arm/mm/cache-uniphier.c                       | 544 +++++++++++++++++++++
- 7 files changed, 654 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt
- create mode 100644 arch/arm/include/asm/hardware/cache-uniphier.h
- create mode 100644 arch/arm/mm/cache-uniphier.c
-
-diff --git a/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt b/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt
-new file mode 100644
-index 0000000..ce6eddd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/uniphier/cache-uniphier.txt
-@@ -0,0 +1,48 @@
-+UniPhier outer cache controller
-+
-+UniPhier SoCs are integrated with a full-custom outer cache controller system.
-+All of them have a level 2 cache controller, and some have a level 3 cache
-+controller as well.
-+
-+Required properties:
-+- compatible: should be "socionext,uniphier-system-cache"
-+- reg: offsets and lengths of the register sets for the device.  It should
-+  contain 3 regions: control register, revision register, operation register,
-+  in this order.
-+- cache-unified: specifies the cache is a unified cache.
-+- cache-size: specifies the size in bytes of the cache
-+- cache-sets: specifies the number of associativity sets of the cache
-+- cache-line-size: specifies the line size in bytes
-+- cache-level: specifies the level in the cache hierarchy.  The value should
-+  be 2 for L2 cache, 3 for L3 cache, etc.
-+
-+Optional properties:
-+- next-level-cache: phandle to the next level cache if present.  The next level
-+  cache should be also compatible with "socionext,uniphier-system-cache".
-+
-+The L2 cache must exist to use the L3 cache; the cache hierarchy must be
-+indicated correctly with "next-level-cache" properties.
-+
-+Example:
-+	l2: l2-cache at 500c0000 {
-+		compatible = "socionext,uniphier-system-cache";
-+		reg = <0x500c0000 0x2000>, <0x503c0100 0x8>,
-+		      <0x506c0000 0x400>;
-+		cache-unified;
-+		cache-size = <0x200000>;
-+		cache-sets = <512>;
-+		cache-line-size = <128>;
-+		cache-level = <2>;
-+		next-level-cache = <&l3>;
-+	};
-+
-+	l3: l3-cache at 500c8000 {
-+		compatible = "socionext,uniphier-system-cache";
-+		reg = <0x500c8000 0x2000>, <0x503c8100 0x8>,
-+		      <0x506c8000 0x400>;
-+		cache-unified;
-+		cache-size = <0x400000>;
-+		cache-sets = <512>;
-+		cache-line-size = <256>;
-+		cache-level = <3>;
-+	};
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7ba7ab7..e9c5dd9 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1600,7 +1600,9 @@ M:	Masahiro Yamada <yamada.masahiro@socionext.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/boot/dts/uniphier*
-+F:	arch/arm/include/asm/hardware/cache-uniphier.h
- F:	arch/arm/mach-uniphier/
-+F:	arch/arm/mm/cache-uniphier.c
- F:	drivers/pinctrl/uniphier/
- F:	drivers/tty/serial/8250/8250_uniphier.c
- N:	uniphier
-diff --git a/arch/arm/include/asm/hardware/cache-uniphier.h b/arch/arm/include/asm/hardware/cache-uniphier.h
-new file mode 100644
-index 0000000..102e3fb
---- /dev/null
-+++ b/arch/arm/include/asm/hardware/cache-uniphier.h
-@@ -0,0 +1,46 @@
-+/*
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __CACHE_UNIPHIER_H
-+#define __CACHE_UNIPHIER_H
-+
-+#include <linux/types.h>
-+
-+#ifdef CONFIG_CACHE_UNIPHIER
-+int uniphier_cache_init(void);
-+int uniphier_cache_l2_is_enabled(void);
-+void uniphier_cache_l2_touch_range(unsigned long start, unsigned long end);
-+void uniphier_cache_l2_set_locked_ways(u32 way_mask);
-+#else
-+static inline int uniphier_cache_init(void)
-+{
-+	return -ENODEV;
-+}
-+
-+static inline int uniphier_cache_l2_is_enabled(void)
-+{
-+	return 0;
-+}
-+
-+static inline void uniphier_cache_l2_touch_range(unsigned long start,
-+						 unsigned long end)
-+{
-+}
-+
-+static inline void uniphier_cache_l2_set_locked_ways(u32 way_mask)
-+{
-+}
-+#endif
-+
-+#endif /* __CACHE_UNIPHIER_H */
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 5ff4826..1e8c747 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -39,6 +39,7 @@
- #include <linux/export.h>
- 
- #include <asm/hardware/cache-l2x0.h>
-+#include <asm/hardware/cache-uniphier.h>
- #include <asm/outercache.h>
- #include <asm/exception.h>
- #include <asm/mach/arch.h>
-@@ -117,6 +118,8 @@ void __init init_IRQ(void)
- 		if (ret)
- 			pr_err("L2C: failed to init: %d\n", ret);
- 	}
-+
-+	uniphier_cache_init();
- }
- 
- #ifdef CONFIG_MULTI_IRQ_HANDLER
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index df7537f..a2e74b2 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -986,6 +986,16 @@ config CACHE_TAUROS2
- 	  This option enables the Tauros2 L2 cache controller (as
- 	  found on PJ1/PJ4).
- 
-+config CACHE_UNIPHIER
-+	bool "Enable the UniPhier outer cache controller"
-+	depends on ARCH_UNIPHIER
-+	default y
-+	select OUTER_CACHE
-+	select OUTER_CACHE_SYNC
-+	help
-+	  This option enables the UniPhier outer cache (system cache)
-+	  controller.
-+
- config CACHE_XSC3L2
- 	bool "Enable the L2 cache on XScale3"
- 	depends on CPU_XSC3
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-index 57c8df5..7f76d96 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -103,3 +103,4 @@ obj-$(CONFIG_CACHE_FEROCEON_L2)	+= cache-feroceon-l2.o
- obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o l2c-l2x0-resume.o
- obj-$(CONFIG_CACHE_XSC3L2)	+= cache-xsc3l2.o
- obj-$(CONFIG_CACHE_TAUROS2)	+= cache-tauros2.o
-+obj-$(CONFIG_CACHE_UNIPHIER)	+= cache-uniphier.o
-diff --git a/arch/arm/mm/cache-uniphier.c b/arch/arm/mm/cache-uniphier.c
-new file mode 100644
-index 0000000..66139a9
---- /dev/null
-+++ b/arch/arm/mm/cache-uniphier.c
-@@ -0,0 +1,544 @@
-+/*
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#define pr_fmt(fmt)		"uniphier: " fmt
-+
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/log2.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <asm/hardware/cache-uniphier.h>
-+#include <asm/outercache.h>
-+
-+/* control registers */
-+#define UNIPHIER_SSCC		0x0	/* Control Register */
-+#define    UNIPHIER_SSCC_BST			BIT(20)	/* UCWG burst read */
-+#define    UNIPHIER_SSCC_ACT			BIT(19)	/* Inst-Data separate */
-+#define    UNIPHIER_SSCC_WTG			BIT(18)	/* WT gathering on */
-+#define    UNIPHIER_SSCC_PRD			BIT(17)	/* enable pre-fetch */
-+#define    UNIPHIER_SSCC_ON			BIT(0)	/* enable cache */
-+#define UNIPHIER_SSCLPDAWCR	0x30	/* Unified/Data Active Way Control */
-+#define UNIPHIER_SSCLPIAWCR	0x34	/* Instruction Active Way Control */
-+
-+/* revision registers */
-+#define UNIPHIER_SSCID		0x0	/* ID Register */
-+
-+/* operation registers */
-+#define UNIPHIER_SSCOPE		0x244	/* Cache Operation Primitive Entry */
-+#define    UNIPHIER_SSCOPE_CM_INV		0x0	/* invalidate */
-+#define    UNIPHIER_SSCOPE_CM_CLEAN		0x1	/* clean */
-+#define    UNIPHIER_SSCOPE_CM_FLUSH		0x2	/* flush */
-+#define    UNIPHIER_SSCOPE_CM_SYNC		0x8	/* sync (drain bufs) */
-+#define    UNIPHIER_SSCOPE_CM_FLUSH_PREFETCH	0x9	/* flush p-fetch buf */
-+#define UNIPHIER_SSCOQM		0x248	/* Cache Operation Queue Mode */
-+#define    UNIPHIER_SSCOQM_TID_MASK		(0x3 << 21)
-+#define    UNIPHIER_SSCOQM_TID_LRU_DATA		(0x0 << 21)
-+#define    UNIPHIER_SSCOQM_TID_LRU_INST		(0x1 << 21)
-+#define    UNIPHIER_SSCOQM_TID_WAY		(0x2 << 21)
-+#define    UNIPHIER_SSCOQM_S_MASK		(0x3 << 17)
-+#define    UNIPHIER_SSCOQM_S_RANGE		(0x0 << 17)
-+#define    UNIPHIER_SSCOQM_S_ALL		(0x1 << 17)
-+#define    UNIPHIER_SSCOQM_S_WAY		(0x2 << 17)
-+#define    UNIPHIER_SSCOQM_CE			BIT(15)	/* notify completion */
-+#define    UNIPHIER_SSCOQM_CM_INV		0x0	/* invalidate */
-+#define    UNIPHIER_SSCOQM_CM_CLEAN		0x1	/* clean */
-+#define    UNIPHIER_SSCOQM_CM_FLUSH		0x2	/* flush */
-+#define    UNIPHIER_SSCOQM_CM_PREFETCH		0x3	/* prefetch to cache */
-+#define    UNIPHIER_SSCOQM_CM_PREFETCH_BUF	0x4	/* prefetch to pf-buf */
-+#define    UNIPHIER_SSCOQM_CM_TOUCH		0x5	/* touch */
-+#define    UNIPHIER_SSCOQM_CM_TOUCH_ZERO	0x6	/* touch to zero */
-+#define    UNIPHIER_SSCOQM_CM_TOUCH_DIRTY	0x7	/* touch with dirty */
-+#define UNIPHIER_SSCOQAD	0x24c	/* Cache Operation Queue Address */
-+#define UNIPHIER_SSCOQSZ	0x250	/* Cache Operation Queue Size */
-+#define UNIPHIER_SSCOQMASK	0x254	/* Cache Operation Queue Address Mask */
-+#define UNIPHIER_SSCOQWN	0x258	/* Cache Operation Queue Way Number */
-+#define UNIPHIER_SSCOPPQSEF	0x25c	/* Cache Operation Queue Set Complete*/
-+#define    UNIPHIER_SSCOPPQSEF_FE		BIT(1)
-+#define    UNIPHIER_SSCOPPQSEF_OE		BIT(0)
-+#define UNIPHIER_SSCOLPQS	0x260	/* Cache Operation Queue Status */
-+#define    UNIPHIER_SSCOLPQS_EF			BIT(2)
-+#define    UNIPHIER_SSCOLPQS_EST		BIT(1)
-+#define    UNIPHIER_SSCOLPQS_QST		BIT(0)
-+
-+/* Is the touch/pre-fetch destination specified by ways? */
-+#define UNIPHIER_SSCOQM_TID_IS_WAY(op) \
-+		((op & UNIPHIER_SSCOQM_TID_MASK) == UNIPHIER_SSCOQM_TID_WAY)
-+/* Is the operation region specified by address range? */
-+#define UNIPHIER_SSCOQM_S_IS_RANGE(op) \
-+		((op & UNIPHIER_SSCOQM_S_MASK) == UNIPHIER_SSCOQM_S_RANGE)
-+
-+/**
-+ * uniphier_cache_data - UniPhier outer cache specific data
-+ *
-+ * @ctrl_base: virtual base address of control registers
-+ * @rev_base: virtual base address of revision registers
-+ * @op_base: virtual base address of operation registers
-+ * @way_present_mask: each bit specifies if the way is present
-+ * @way_locked_mask: each bit specifies if the way is locked
-+ * @nsets: number of associativity sets
-+ * @line_size: line size in bytes
-+ * @range_op_max_size: max size that can be handled by a single range operation
-+ * @list: list node to include this level in the whole cache hierarchy
-+ */
-+struct uniphier_cache_data {
-+	void __iomem *ctrl_base;
-+	void __iomem *rev_base;
-+	void __iomem *op_base;
-+	u32 way_present_mask;
-+	u32 way_locked_mask;
-+	u32 nsets;
-+	u32 line_size;
-+	u32 range_op_max_size;
-+	struct list_head list;
-+};
-+
-+/*
-+ * List of the whole outer cache hierarchy.  This list is only modified during
-+ * the early boot stage, so no mutex is taken for the access to the list.
-+ */
-+static LIST_HEAD(uniphier_cache_list);
-+
-+/**
-+ * __uniphier_cache_sync - perform a sync point for a particular cache level
-+ *
-+ * @data: cache controller specific data
-+ */
-+static void __uniphier_cache_sync(struct uniphier_cache_data *data)
-+{
-+	/* This sequence need not be atomic.  Do not disable IRQ. */
-+	writel_relaxed(UNIPHIER_SSCOPE_CM_SYNC,
-+		       data->op_base + UNIPHIER_SSCOPE);
-+	/* need a read back to confirm */
-+	readl_relaxed(data->op_base + UNIPHIER_SSCOPE);
-+}
-+
-+/**
-+ * __uniphier_cache_maint_common - run a queue operation for a particular level
-+ *
-+ * @data: cache controller specific data
-+ * @start: start address of range operation (don't care for "all" operation)
-+ * @size: data size of range operation (don't care for "all" operation)
-+ * @operation: flags to specify the desired cache operation
-+ */
-+static void __uniphier_cache_maint_common(struct uniphier_cache_data *data,
-+					  unsigned long start,
-+					  unsigned long size,
-+					  u32 operation)
-+{
-+	unsigned long flags;
-+
-+	/*
-+	 * The IRQ must be disable during this sequence because the accessor
-+	 * holds the access right of the operation queue registers.  The IRQ
-+	 * should be restored after releasing the register access right.
-+	 */
-+	local_irq_save(flags);
-+
-+	/* clear the complete notification flag */
-+	writel_relaxed(UNIPHIER_SSCOLPQS_EF, data->op_base + UNIPHIER_SSCOLPQS);
-+
-+	/*
-+	 * We do not need a spin lock here because the hardware guarantees
-+	 * this sequence is atomic, i.e. the write access is arbitrated
-+	 * and only the winner's write accesses take effect.
-+	 * After register settings, we need to check the UNIPHIER_SSCOPPQSEF to
-+	 * see if we won the arbitration or not.
-+	 * If the command was not successfully set, just try again.
-+	 */
-+	do {
-+		/* set cache operation */
-+		writel_relaxed(UNIPHIER_SSCOQM_CE | operation,
-+			       data->op_base + UNIPHIER_SSCOQM);
-+
-+		/* set address range if needed */
-+		if (likely(UNIPHIER_SSCOQM_S_IS_RANGE(operation))) {
-+			writel_relaxed(start, data->op_base + UNIPHIER_SSCOQAD);
-+			writel_relaxed(size, data->op_base + UNIPHIER_SSCOQSZ);
-+		}
-+
-+		/* set target ways if needed */
-+		if (unlikely(UNIPHIER_SSCOQM_TID_IS_WAY(operation)))
-+			writel_relaxed(data->way_locked_mask,
-+				       data->op_base + UNIPHIER_SSCOQWN);
-+	} while (unlikely(readl_relaxed(data->op_base + UNIPHIER_SSCOPPQSEF) &
-+			  (UNIPHIER_SSCOPPQSEF_FE | UNIPHIER_SSCOPPQSEF_OE)));
-+
-+	/* wait until the operation is completed */
-+	while (likely(readl_relaxed(data->op_base + UNIPHIER_SSCOLPQS) !=
-+		      UNIPHIER_SSCOLPQS_EF))
-+		cpu_relax();
-+
-+	local_irq_restore(flags);
-+}
-+
-+static void __uniphier_cache_maint_all(struct uniphier_cache_data *data,
-+				       u32 operation)
-+{
-+	__uniphier_cache_maint_common(data, 0, 0,
-+				      UNIPHIER_SSCOQM_S_ALL | operation);
-+
-+	__uniphier_cache_sync(data);
-+}
-+
-+static void __uniphier_cache_maint_range(struct uniphier_cache_data *data,
-+					 unsigned long start, unsigned long end,
-+					 u32 operation)
-+{
-+	unsigned long size;
-+
-+	/*
-+	 * If the start address is not aligned,
-+	 * perform a cache operation for the first cache-line
-+	 */
-+	start = start & ~(data->line_size - 1);
-+
-+	size = end - start;
-+
-+	if (unlikely(size >= (unsigned long)(-data->line_size))) {
-+		/* this means cache operation for all range */
-+		__uniphier_cache_maint_all(data, operation);
-+		return;
-+	}
-+
-+	/*
-+	 * If the end address is not aligned,
-+	 * perform a cache operation for the last cache-line
-+	 */
-+	size = ALIGN(size, data->line_size);
-+
-+	while (size) {
-+		unsigned long chunk_size = min_t(unsigned long, size,
-+						 data->range_op_max_size);
-+
-+		__uniphier_cache_maint_common(data, start, chunk_size,
-+					UNIPHIER_SSCOQM_S_RANGE | operation);
-+
-+		start += chunk_size;
-+		size -= chunk_size;
-+	}
-+
-+	__uniphier_cache_sync(data);
-+}
-+
-+static void __uniphier_cache_enable(struct uniphier_cache_data *data, bool on)
-+{
-+	u32 val = 0;
-+
-+	if (on)
-+		val = UNIPHIER_SSCC_WTG | UNIPHIER_SSCC_PRD | UNIPHIER_SSCC_ON;
-+
-+	writel_relaxed(val, data->ctrl_base + UNIPHIER_SSCC);
-+}
-+
-+static void __uniphier_cache_set_locked_ways(struct uniphier_cache_data *data,
-+					     u32 way_mask)
-+{
-+	data->way_locked_mask = way_mask & data->way_present_mask;
-+
-+	writel_relaxed(~data->way_locked_mask & data->way_present_mask,
-+		       data->ctrl_base + UNIPHIER_SSCLPDAWCR);
-+}
-+
-+static void uniphier_cache_maint_range(unsigned long start, unsigned long end,
-+				       u32 operation)
-+{
-+	struct uniphier_cache_data *data;
-+
-+	list_for_each_entry(data, &uniphier_cache_list, list)
-+		__uniphier_cache_maint_range(data, start, end, operation);
-+}
-+
-+static void uniphier_cache_maint_all(u32 operation)
-+{
-+	struct uniphier_cache_data *data;
-+
-+	list_for_each_entry(data, &uniphier_cache_list, list)
-+		__uniphier_cache_maint_all(data, operation);
-+}
-+
-+static void uniphier_cache_inv_range(unsigned long start, unsigned long end)
-+{
-+	uniphier_cache_maint_range(start, end, UNIPHIER_SSCOQM_CM_INV);
-+}
-+
-+static void uniphier_cache_clean_range(unsigned long start, unsigned long end)
-+{
-+	uniphier_cache_maint_range(start, end, UNIPHIER_SSCOQM_CM_CLEAN);
-+}
-+
-+static void uniphier_cache_flush_range(unsigned long start, unsigned long end)
-+{
-+	uniphier_cache_maint_range(start, end, UNIPHIER_SSCOQM_CM_FLUSH);
-+}
-+
-+static void __init uniphier_cache_inv_all(void)
-+{
-+	uniphier_cache_maint_all(UNIPHIER_SSCOQM_CM_INV);
-+}
-+
-+static void uniphier_cache_flush_all(void)
-+{
-+	uniphier_cache_maint_all(UNIPHIER_SSCOQM_CM_FLUSH);
-+}
-+
-+static void uniphier_cache_disable(void)
-+{
-+	struct uniphier_cache_data *data;
-+
-+	list_for_each_entry_reverse(data, &uniphier_cache_list, list)
-+		__uniphier_cache_enable(data, false);
-+
-+	uniphier_cache_flush_all();
-+}
-+
-+static void __init uniphier_cache_enable(void)
-+{
-+	struct uniphier_cache_data *data;
-+
-+	uniphier_cache_inv_all();
-+
-+	list_for_each_entry(data, &uniphier_cache_list, list) {
-+		__uniphier_cache_enable(data, true);
-+		__uniphier_cache_set_locked_ways(data, 0);
-+	}
-+}
-+
-+static void uniphier_cache_sync(void)
-+{
-+	struct uniphier_cache_data *data;
-+
-+	list_for_each_entry(data, &uniphier_cache_list, list)
-+		__uniphier_cache_sync(data);
-+}
-+
-+int __init uniphier_cache_l2_is_enabled(void)
-+{
-+	struct uniphier_cache_data *data;
-+
-+	data = list_first_entry_or_null(&uniphier_cache_list,
-+					struct uniphier_cache_data, list);
-+	if (!data)
-+		return 0;
-+
-+	return !!(readl_relaxed(data->ctrl_base + UNIPHIER_SSCC) &
-+		  UNIPHIER_SSCC_ON);
-+}
-+
-+void __init uniphier_cache_l2_touch_range(unsigned long start,
-+					  unsigned long end)
-+{
-+	struct uniphier_cache_data *data;
-+
-+	data = list_first_entry_or_null(&uniphier_cache_list,
-+					struct uniphier_cache_data, list);
-+	if (data)
-+		__uniphier_cache_maint_range(data, start, end,
-+					     UNIPHIER_SSCOQM_TID_WAY |
-+					     UNIPHIER_SSCOQM_CM_TOUCH);
-+}
-+
-+void __init uniphier_cache_l2_set_locked_ways(u32 way_mask)
-+{
-+	struct uniphier_cache_data *data;
-+
-+	data = list_first_entry_or_null(&uniphier_cache_list,
-+					struct uniphier_cache_data, list);
-+	if (data)
-+		__uniphier_cache_set_locked_ways(data, way_mask);
-+}
-+
-+static const struct of_device_id uniphier_cache_match[] __initconst = {
-+	{
-+		.compatible = "socionext,uniphier-system-cache",
-+	},
-+	{ /* sentinel */ }
-+};
-+
-+static struct device_node * __init uniphier_cache_get_next_level_node(
-+							struct device_node *np)
-+{
-+	u32 phandle;
-+
-+	if (of_property_read_u32(np, "next-level-cache", &phandle))
-+		return NULL;
-+
-+	return of_find_node_by_phandle(phandle);
-+}
-+
-+static int __init __uniphier_cache_init(struct device_node *np,
-+					unsigned int *cache_level)
-+{
-+	struct uniphier_cache_data *data;
-+	u32 level, cache_size;
-+	struct device_node *next_np;
-+	int ret = 0;
-+
-+	if (!of_match_node(uniphier_cache_match, np)) {
-+		pr_err("L%d: not compatible with uniphier cache\n",
-+		       *cache_level);
-+		return -EINVAL;
-+	}
-+
-+	if (of_property_read_u32(np, "cache-level", &level)) {
-+		pr_err("L%d: cache-level is not specified\n", *cache_level);
-+		return -EINVAL;
-+	}
-+
-+	if (level != *cache_level) {
-+		pr_err("L%d: cache-level is unexpected value %d\n",
-+		       *cache_level, level);
-+		return -EINVAL;
-+	}
-+
-+	if (!of_property_read_bool(np, "cache-unified")) {
-+		pr_err("L%d: cache-unified is not specified\n", *cache_level);
-+		return -EINVAL;
-+	}
-+
-+	data = kzalloc(sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	if (of_property_read_u32(np, "cache-line-size", &data->line_size) ||
-+	    !is_power_of_2(data->line_size)) {
-+		pr_err("L%d: cache-line-size is unspecified or invalid\n",
-+		       *cache_level);
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
-+	if (of_property_read_u32(np, "cache-sets", &data->nsets) ||
-+	    !is_power_of_2(data->nsets)) {
-+		pr_err("L%d: cache-sets is unspecified or invalid\n",
-+		       *cache_level);
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
-+	if (of_property_read_u32(np, "cache-size", &cache_size) ||
-+	    cache_size == 0 || cache_size % (data->nsets * data->line_size)) {
-+		pr_err("L%d: cache-size is unspecified or invalid\n",
-+		       *cache_level);
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
-+	data->way_present_mask =
-+		((u32)1 << cache_size / data->nsets / data->line_size) - 1;
-+
-+	data->ctrl_base = of_iomap(np, 0);
-+	if (!data->ctrl_base) {
-+		pr_err("L%d: failed to map control register\n", *cache_level);
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	data->rev_base = of_iomap(np, 1);
-+	if (!data->rev_base) {
-+		pr_err("L%d: failed to map revision register\n", *cache_level);
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	data->op_base = of_iomap(np, 2);
-+	if (!data->op_base) {
-+		pr_err("L%d: failed to map operation register\n", *cache_level);
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	if (*cache_level == 2) {
-+		u32 revision = readl(data->rev_base + UNIPHIER_SSCID);
-+		/*
-+		 * The size of range operation is limited to (1 << 22) or less
-+		 * for PH-sLD8 or older SoCs.
-+		 */
-+		if (revision <= 0x16)
-+			data->range_op_max_size = (u32)1 << 22;
-+	}
-+
-+	data->range_op_max_size -= data->line_size;
-+
-+	INIT_LIST_HEAD(&data->list);
-+	list_add_tail(&data->list, &uniphier_cache_list); /* no mutex */
-+
-+	/*
-+	 * OK, this level has been successfully initialized.  Look for the next
-+	 * level cache.  Do not roll back even if the initialization of the
-+	 * next level cache fails because we want to continue with available
-+	 * cache levels.
-+	 */
-+	next_np = uniphier_cache_get_next_level_node(np);
-+	if (next_np) {
-+		(*cache_level)++;
-+		ret = __uniphier_cache_init(next_np, cache_level);
-+	}
-+	of_node_put(next_np);
-+
-+	return ret;
-+err:
-+	iounmap(data->op_base);
-+	iounmap(data->rev_base);
-+	iounmap(data->ctrl_base);
-+	kfree(data);
-+
-+	return ret;
-+}
-+
-+int __init uniphier_cache_init(void)
-+{
-+	struct device_node *np = NULL;
-+	unsigned int cache_level;
-+	int ret = 0;
-+
-+	/* look for level 2 cache */
-+	while ((np = of_find_matching_node(np, uniphier_cache_match)))
-+		if (!of_property_read_u32(np, "cache-level", &cache_level) &&
-+		    cache_level == 2)
-+			break;
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	ret = __uniphier_cache_init(np, &cache_level);
-+	of_node_put(np);
-+
-+	if (ret) {
-+		/*
-+		 * Error out iif L2 initialization fails.  Continue with any
-+		 * error on L3 or outer because they are optional.
-+		 */
-+		if (cache_level == 2) {
-+			pr_err("failed to initialize L2 cache\n");
-+			return ret;
-+		}
-+
-+		cache_level--;
-+		ret = 0;
-+	}
-+
-+	outer_cache.inv_range = uniphier_cache_inv_range;
-+	outer_cache.clean_range = uniphier_cache_clean_range;
-+	outer_cache.flush_range = uniphier_cache_flush_range;
-+	outer_cache.flush_all = uniphier_cache_flush_all;
-+	outer_cache.disable = uniphier_cache_disable;
-+	outer_cache.sync = uniphier_cache_sync;
-+
-+	uniphier_cache_enable();
-+
-+	pr_info("enabled outer cache (cache level: %d)\n", cache_level);
-+
-+	return ret;
-+}
 -- 
-1.9.1
+Computer Architect | Sent from my 64-bit #ARM Powered phone
+
+> On Sep 14, 2015, at 06:26, Daniel Thompson <daniel.thompson@linaro.org> wrote:
+> 
+> This patchset provides a pseudo-NMI for arm64 kernels by reimplementing
+> the irqflags macros to modify the GIC PMR (the priority mask register is
+> accessible as a system register on GICv3 and later) rather than the
+> PSR. The patchset includes an implementation of
+> arch_trigger_all_cpu_backtrace() for arm64 allowing the new code to be
+> exercised.
+> 
+> The code works-for-me (tm) and is much more "real" than the last time I
+> shared these patches. However there remain a couple of limitations and
+> caveats:
+> 
+> 1. Requires GICv3+ hardware to be effective. The alternatives runtime
+>    patching system is employed so systems with earlier GIC architectures
+>    are still bootable but will not benefit from NMI simulation.
+> 
+> 2. Currently hardcoded to use ICC_PMR_EL1. Extra work might be needed
+>    on the alternatives system so we can peacefully coexist with ARMv8.1
+>    KVM support (when kernel will be running at EL2).
+> 
+> 3. FVP needs a bit of hacking to be able to run <SysRq-L> from an ISR.
+>    That's a shame because <SysRq-L> is a great way to observe an NMI
+>    preempting an IRQ handler. Testers are welcome to ping me offline
+>    and I can share the hacks (and DTs) I have been using to test with.
+> 
+> 4. Testing for non regression on a GICv2 system will require this patch
+>    to avoid crashes during <SysRq-L>:
+>    http://article.gmane.org/gmane.linux.kernel/2037558
+> 
+> v2:
+> 
+> * Removed the isb instructions. The PMR is self-synchronizing so
+>   these are not needed (Dave Martin)
+> 
+> * Use alternative runtime patching to allow the same kernel binary
+>   to boot systems with and without GICv3+ (Dave Martin).
+> 
+> * Added code to properly distinguish between NMI and normal IRQ and to
+>   call into NMI handling code where needed.
+> 
+> * Replaced the IPI backtrace logic with a newer version (from Russell
+>   King).
+> 
+> 
+> Daniel Thompson (7):
+>  irqchip: gic-v3: Reset BPR during initialization
+>  arm64: Add support for on-demand backtrace of other CPUs
+>  arm64: alternative: Apply alternatives early in boot process
+>  arm64: irqflags: Reorder the fiq & async macros
+>  arm64: irqflags: Use ICC sysregs to implement IRQ masking
+>  arm64: Implement IPI_CPU_BACKTRACE using pseudo-NMIs
+>  arm64: irqflags: Automatically identify I bit mis-management
+> 
+> arch/arm64/Kconfig                   |  15 ++++
+> arch/arm64/include/asm/alternative.h |   1 +
+> arch/arm64/include/asm/assembler.h   |  56 ++++++++++++-
+> arch/arm64/include/asm/hardirq.h     |   2 +-
+> arch/arm64/include/asm/irq.h         |   3 +
+> arch/arm64/include/asm/irqflags.h    | 154 +++++++++++++++++++++++++++++++++--
+> arch/arm64/include/asm/ptrace.h      |  18 ++++
+> arch/arm64/include/asm/smp.h         |   2 +
+> arch/arm64/kernel/alternative.c      |  15 ++++
+> arch/arm64/kernel/entry.S            | 149 +++++++++++++++++++++++++++------
+> arch/arm64/kernel/head.S             |  35 ++++++++
+> arch/arm64/kernel/setup.c            |  13 +++
+> arch/arm64/kernel/smp.c              |  44 ++++++++++
+> arch/arm64/mm/proc.S                 |  23 ++++++
+> drivers/irqchip/irq-gic-v3.c         | 117 +++++++++++++++++++++++++-
+> include/linux/irqchip/arm-gic-v3.h   |  10 +++
+> include/linux/irqchip/arm-gic.h      |   2 +-
+> lib/nmi_backtrace.c                  |   8 +-
+> 18 files changed, 629 insertions(+), 38 deletions(-)
+> 
+> --
+> 2.4.3
+> 
+> _______________________________________________
+> linaro-kernel mailing list
+> linaro-kernel at lists.linaro.org
+> https://lists.linaro.org/mailman/listinfo/linaro-kernel
