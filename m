@@ -1,33 +1,54 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 18 Sep 2015 08:46:14 +0100
-Subject: [PATCH] arm/ls1021a: Add Sleep feature for ls1021
-In-Reply-To: <SN1PR0301MB1616F01085CC4549FFE3A1469D590@SN1PR0301MB1616.namprd03.prod.outlook.com>
-References: <1441877796-32232-1-git-send-email-dongsheng.wang@freescale.com>
- <20150910095920.GB29293@leverpostej>
- <SN1PR0301MB161620AA4926EEF6541D901E9D500@SN1PR0301MB1616.namprd03.prod.outlook.com>
- <20150917123155.GC12808@leverpostej>
- <SN1PR0301MB1616F01085CC4549FFE3A1469D590@SN1PR0301MB1616.namprd03.prod.outlook.com>
-Message-ID: <20150918074614.GA876@red-moon>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Fri, 18 Sep 2015 07:38:13 +0000
+Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
+In-Reply-To: <20150917103414.GN21084@n2100.arm.linux.org.uk>
+References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
+ <20150917103414.GN21084@n2100.arm.linux.org.uk>
+Message-ID: <BN3PR0301MB08674C65714A9423E39E1F10FE590@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 03:37:15AM +0100, Wang Dongsheng wrote:
-
-[...]
-
-> > > How about PSCI 1.0 support, could you share some information about it?
-> > 
-> > Lorenzo has implemented basic PSCI 1.0 support [1,2], and Sudeep has been
-> > working on SYSTEM_SUSPEND [3], though I'm not immediately aware of the state of
-> > the world there.
-> > 
-> > Do you have any specific questions?
-> > 
+> On Thu, Sep 17, 2015 at 05:03:34PM +0800, Alison Wang wrote:
+> > Add Freescale LS1021A initial defconfig file.
+> > The LS1021A SoC is a dual-core Cortex-A7 based processor.
+> >
+> > LS1021A has some special configurations against imx_v6_v7_defconfig
+> > and multi_v7_defconfig, such as CONFIG_ARM_LPAE, CONFIG_ARM_PSCI...
+> > LPAE needs to be supported to access memory beyond the 4GB limit for
+> > LS1021A. PSCI needs to be supported for LS1021A too. But
+> > CONFIG_ARM_LPAE and CONFIG_ARM_PSCI are disabled in
+> > imx_v6_v7_defconfig and multi_v7_defconfig, so a separate LS1021A
+> defconfig is needed.
 > 
-> There is no problem, I just want to use V1.0 to support our platform SYSTEM_SUSPEND,
-> but 1.0 implementation is not in v4.3-rc1, so abandon this.
+> Sounds like a need for multi_v7_lpae_defconfig rather than creating a
+> new load of platform specific defconfigs.
+> 
+[Alison Wang] Thanks for your reply. I agreed with you about creating
+a new multi_v7_lpae_defconfig. In multi_v7_lpae_defconfig, I need to add
+the following CONFIG_XX to support LS1021A based on multi_v7_defconfig.
 
-It will be in v4.4, so you can drop this patch then.
+CONFIG_ARM_LPAE=y
+CONFIG_VMSPLIT_2G=y
+CONFIG_BLK_DEV_RAM=y
+CONFIG_BLK_DEV_RAM_SIZE=256000
+CONFIG_GIANFAR=y
+CONFIG_REALTEK_PHY=y
+CONFIG_I2C_IMX=y
+CONFIG_SPI_FSL_DSPI=y
+CONFIG_IMX2_WDT=y
+CONFIG_REGULATOR_DEBUG=y
+CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
+CONFIG_SOUND=y
+CONFIG_SND=y
+CONFIG_SND_SOC=y
+CONFIG_SND_SOC_FSL_SAI=y
+CONFIG_SND_SOC_SGTL5000=y
+CONFIG_SND_SIMPLE_CARD=y
+CONFIG_FSL_EDMA=y
+CONFIG_CLK_QORIQ=y
 
-Thanks,
-Lorenzo
+What's your suggestion? If it's ok, I will send a patch about multi_v7_lpae_defconfig.
+
+
+Best Regards,
+Alison Wang
