@@ -1,24 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Sep 2015 15:58:31 +0200
-Subject: [PATCH 0/5] ARM: sunxi: Introduce CHIP support
-In-Reply-To: <20150918135538.GS4684@lukather>
-References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
- <13485899.XsimukeSAF@wuerfel> <20150918135538.GS4684@lukather>
-Message-ID: <29444326.E66iiSTYyO@wuerfel>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 18 Sep 2015 15:59:00 +0200
+Subject: Recent GIC v1 patch
+In-Reply-To: <yw1xbnczub0y.fsf@unicorn.mansr.com>
+References: <55FAE26A.9040609@free.fr> <55FAEB4D.30306@arm.com>
+ <55FAF6E1.7020107@free.fr> <55FAFD3E.7010006@arm.com>
+ <55FBD6F4.8030905@free.fr> <20150918120851.6f9fb306@arm.com>
+ <yw1xbnczub0y.fsf@unicorn.mansr.com>
+Message-ID: <55FC18A4.2080205@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 September 2015 15:55:38 Maxime Ripard wrote:
-> 
-> And I don't think it's something the MMC core should deal with. The
-> device itself has a single pin to provide its power, it's the board
-> that is wired that way. The way I was seeing it was more that I needed
-> to create a regulator driver that would take two inputs, that the mmc
-> core would use. Last time I discussed it with Mark (Brown), it semes
-> like he was open to the idea, so I just need to find some time to do
-> just that.
-> 
+On 18/09/2015 15:12, M?ns Rullg?rd wrote:
 
-Ok, fair enough.
+> Marc Zyngier wrote:
+> 
+>> No idea so far. The only thing I can immediately spot is a missing pair
+>> of chained_irq_{enter,exit} in tangox_irq_handler, but I can't imagine
+>> this having a terminal effect on the system.
+> 
+> Fixed in the tangox tree on github.
 
-	Arnd
+Oh boy! Oh boy! Oh boy!
+
+That did the trick. Just when I was about to give up...
+
+Marc, I'm sending you an e-hug. Mans, you have my eternal gratitude.
+
+Regards.
