@@ -1,66 +1,41 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 18 Sep 2015 11:58:56 +0100
-Subject: [PATCH v13 4/5] uart: pl011: Improve LCRH register access decision
-In-Reply-To: <1438328959-16177-5-git-send-email-jun.nie@linaro.org>
-References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
- <1438328959-16177-5-git-send-email-jun.nie@linaro.org>
-Message-ID: <55FBEE70.9090004@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 18 Sep 2015 12:04:26 +0100
+Subject: [PATCH v2] iommu/io-pgtable-arm: Don't use dma_to_phys()
+In-Reply-To: <1442566550.8145.156.camel@mhfsdcap03>
+References: <59f4ebbf06e75a6176a366495211afd16d0048a3.1442507940.git.robin.murphy@arm.com>
+ <1442566550.8145.156.camel@mhfsdcap03>
+Message-ID: <55FBEFBA.6000606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jun,
+On 18/09/15 09:55, Yong Wu wrote:
+> On Thu, 2015-09-17 at 17:42 +0100, Robin Murphy wrote:
+[...]
+>> the appropriate course of action. Further care (and ugliness) is also
+>> necessary in the comparison to avoid truncation if phys_addr_t and
+>> dma_addr_t differ in size.
+[...]
+>>   		/*
+>>   		 * We depend on the IOMMU being able to work with any physical
+>> -		 * address directly, so if the DMA layer suggests it can't by
+>> -		 * giving us back some translation, that bodes very badly...
+>> +		 * address directly, so if the DMA layer suggests otherwise by
+>> +		 * translating or truncating them, that bodes very badly...
+>>   		 */
+>> -		if (dma != __arm_lpae_dma_addr(dev, pages))
+>> +		if (dma != virt_to_phys(pages))
+>
+> Could I ask why not use __arm_lpae_dma_addr(pages) here?
+> dma is dma_addr_t.
 
-On 31/07/15 08:49, Jun Nie wrote:
-> Improve LCRH register access decision as ARM PL011 lcrh
-> register serve as both TX and RX, while other SOC may
-> implement TX and RX function with separated register.
-> 
-> Signed-off-by: Jun Nie <jun.nie@linaro.org>
-> ---
->  drivers/tty/serial/amba-pl011.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index e1f3bd5..017443d 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -249,6 +249,11 @@ struct uart_amba_port {
->  #endif
->  };
->  
-> +static bool is_implemented(struct uart_amba_port *uap, unsigned int reg)
-> +{
-> +	return uap->reg_lut[reg] != (u16)~0;
-> +}
-> +
+Specifically, the problem case for that is when phys_addr_t is 64-bit 
+but dma_addr_t is 32-bit. The cast in __arm_lpae_dma_addr is necessary 
+to avoid a truncation warning when we make the DMA API calls, but we 
+actually need the opposite in the comparison here - comparing the 
+different types directly allows integer promotion to kick in 
+appropriately so we don't lose the top half of the larger address. 
+Otherwise, you'd never spot the difference between, say, your original 
+page at 0x88c0000000 and a bounce-buffered copy that happened to end up 
+mapped to 0xc0000000.
 
-Just a nit: is_implemented sounds a bit too generic for me, could this
-be more specific like reg_is_implemented or the like?
-
-Other than that the patch looks good to me.
-
-Cheers,
-Andre.
-
->  static unsigned int pl011_readw(struct uart_amba_port *uap, int index)
->  {
->  	WARN_ON(index > REG_NR);
-> @@ -1649,7 +1654,7 @@ static int pl011_hwinit(struct uart_port *port)
->  static void pl011_write_lcr_h(struct uart_amba_port *uap, unsigned int lcr_h)
->  {
->  	pl011_writew(uap, lcr_h, uap->lcrh_rx);
-> -	if (uap->lcrh_rx != uap->lcrh_tx) {
-> +	if (is_implemented(uap, REG_ST_LCRH_RX)) {
->  		int i;
->  		/*
->  		 * Wait 10 PCLKs before writing LCRH_TX register,
-> @@ -1784,7 +1789,7 @@ static void pl011_disable_uart(struct uart_amba_port *uap)
->  	 * disable break condition and fifos
->  	 */
->  	pl011_shutdown_channel(uap, uap->lcrh_rx);
-> -	if (uap->lcrh_rx != uap->lcrh_tx)
-> +	if (is_implemented(uap, REG_ST_LCRH_RX))
->  		pl011_shutdown_channel(uap, uap->lcrh_tx);
->  }
->  
-> 
+Robin.
