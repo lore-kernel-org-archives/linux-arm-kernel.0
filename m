@@ -1,43 +1,50 @@
-From: luis@debethencourt.com (Luis de Bethencourt)
-Date: Fri, 18 Sep 2015 18:52:58 +0200
-Subject: [PATCH] PM / AVS: rockchip-io: Fix module autoload for OF platform
- driver
-Message-ID: <20150918165258.GA27398@goodgumbo.baconseed.org>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Fri, 18 Sep 2015 10:00:32 -0700
+Subject: [PATCH 2/3] PCI: Add quirks for devices found on Cavium ThunderX
+ SoCs.
+In-Reply-To: <3066583.BWDZlYWxXU@wuerfel>
+References: <1442529694-1792-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442529694-1792-3-git-send-email-ddaney.cavm@gmail.com>
+ <3066583.BWDZlYWxXU@wuerfel>
+Message-ID: <55FC4330.10302@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This platform driver has a OF device ID table but the OF module
-alias information is not created so module autoloading won't work.
+On 09/18/2015 12:19 AM, Arnd Bergmann wrote:
+> On Thursday 17 September 2015 15:41:33 David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> The on-chip devices all have fixed bars.  So, fix them up.
+>>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>>
+>
+> You should be able to just mark the BARs as fixed in DT
 
-Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
----
+In the case of ACPI, there is no DT.  So we would need a different 
+solution for ACPI.  What would you recommend for ACPI?
 
-Hello,
-
-This patch adds the missing MODULE_DEVICE_TABLE() for OF to export
-that information so modules have the correct aliases built-in and
-autoloading works correctly.
-
-A longer explanation by Javier Canillas can be found here:
-https://lkml.org/lkml/2015/7/30/519
+Also, can you point me to the OF device tree specification where it 
+tells how to specify PCI BAR addresses, I would especially be interested 
+in knowing how to specify fixed SRIOV BAR addresses in the device tree.
 
 Thanks,
-Luis
+David Daney
 
- drivers/power/avs/rockchip-io-domain.c | 1 +
- 1 file changed, 1 insertion(+)
+> and not need
+> this hack.
 
-diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
-index 2e30002..8099456 100644
---- a/drivers/power/avs/rockchip-io-domain.c
-+++ b/drivers/power/avs/rockchip-io-domain.c
-@@ -271,6 +271,7 @@ static const struct of_device_id rockchip_iodomain_match[] = {
- 	},
- 	{ /* sentinel */ },
- };
-+MODULE_DEVICE_TABLE(of, rockchip_iodomain_match);
- 
- static int rockchip_iodomain_probe(struct platform_device *pdev)
- {
--- 
-2.4.6
+Yes, it is a bit of a hack.  That is why I put it in its own file, and 
+only try to hack up PCI devices that exactly match the vendor and device 
+ids that need fixing.
+
+IMHO, putting infrastructure into drivers/pci/probe.c, et al. to handle 
+this would be much more intrusive.
+
+For the record:  The PCI Enhanced Allocation (EA) capability (approved 
+by PCI SIG on 23 October 2014) is the proper way to handle this going 
+forward.  However, this is not yet implemented in the SoCs that this 
+patch addresses.  Our plan is to implement the EA capability in the core 
+PCI code, so that we do not need to keep adding devices to this fixup code.
+
+David Daney
