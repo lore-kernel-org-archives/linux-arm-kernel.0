@@ -1,104 +1,66 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 18 Sep 2015 21:52:48 +0800
-Subject: [PATCH v2 5/8] pinctrl: freescale: imx: add ZERO_OFFSET_VALID flag
-In-Reply-To: <BN3PR03MB1509E4893244D963FDA21707A8530@BN3PR03MB1509.namprd03.prod.outlook.com>
-References: <1441147753-13239-1-git-send-email-aalonso@freescale.com>
- <1441147753-13239-5-git-send-email-aalonso@freescale.com>
- <20150907012831.GE30746@tiger>
- <BN3PR03MB1509E4893244D963FDA21707A8530@BN3PR03MB1509.namprd03.prod.outlook.com>
-Message-ID: <20150918135248.GB3770@tiger>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 18 Sep 2015 15:55:38 +0200
+Subject: [PATCH 0/5] ARM: sunxi: Introduce CHIP support
+In-Reply-To: <13485899.XsimukeSAF@wuerfel>
+References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
+ <2353279.QTDzFUHVnF@wuerfel> <20150918121905.GO4684@lukather>
+ <13485899.XsimukeSAF@wuerfel>
+Message-ID: <20150918135538.GS4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 08, 2015 at 04:05:32PM +0000, Alonso Adrian wrote:
-> Hi Shawn,
+On Fri, Sep 18, 2015 at 03:18:57PM +0200, Arnd Bergmann wrote:
+> On Friday 18 September 2015 14:19:05 Maxime Ripard wrote:
+> > 
+> > There's actually two issues that are pretty orthogonal:
+> > 
+> >   * the fact that the regulator to power the wifi chip needs to be
+> >     enabled before it enumerates and the driver is probed. The MMC
+> >     pwrseq stuff seems to fix that, even if it doesn't really fit in
+> >     the usual DT model.
 > 
-> See comments below
+> Ok. If there is anything missing in the pwrseq implementation or
+> binding at the moment, you'll have to work with Ulf to get it to
+> drive your hardware then.
 
-Please use bottom posting, not top posting.
+Yep.
 
-...
+> >   * The fact that that regulator on this board is actually two
+> >     regulators in parallel that needs to be controlled in parallel
+> >     too. Here, it will probably require a new regulator driver to
+> >     combine two regulators into one.
+> 
+> I don't yet understand what it means to control them in parallel.
+> Do you mean the hardware uses two outputs to support a higher
+> current than you could do with one?
 
-> > @@ -536,21 +536,29 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
-> >               return -ENOMEM;
-> >
-> >       for (i = 0; i < grp->npins; i++) {
-> > -             u32 mux_reg = be32_to_cpu(*list++);
-> > +             u32 mux_reg;
-> >               u32 conf_reg;
-> >               unsigned int pin_id;
-> >               struct imx_pin_reg *pin_reg;
-> >               struct imx_pin *pin = &grp->pins[i];
-> >
-> > +             mux_reg = be32_to_cpu(*list++);
-> > +             if (!(info->flags & ZERO_OFFSET_VALID) && !mux_reg)
-> > +                     mux_reg = -1;
-> > +
-> >               if (info->flags & SHARE_MUX_CONF_REG) {
-> >                       conf_reg = mux_reg;
-> >               } else {
-> >                       conf_reg = be32_to_cpu(*list++);
-> > -                     if (!conf_reg)
-> > +                     if (!(info->flags & ZERO_OFFSET_VALID) && !conf_reg)
-> >                               conf_reg = -1;
-> >               }
-> >
-> [Adrian] The below assignment is the important thing that this patch does,
-> it allows the pad_id to be zero and match the pad id's according to the mux_reg offset.
-> > -             pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
-> > +             if (info->flags & ZERO_OFFSET_VALID)
-> > +                     pin_id = mux_reg / 4;
-> > +             else
-> > +                     pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
-> > +
+Yes.
 
-Ah, yes.  So the only code change we need is just the line below, right?
+> How critical is the timing? Would it be enough if the mmc
+> code knew how to set more than one regulator and do them
+> one at a time?
 
-	pin_id = (mux_reg != -1) ? mux_reg / 4 : conf_reg / 4;
+I don't think it's critical as in both should happen exactly at the
+same time (but I've not really tried it either, so I'm not 100% sure).
 
-Shawn
+And I don't think it's something the MMC core should deal with. The
+device itself has a single pin to provide its power, it's the board
+that is wired that way. The way I was seeing it was more that I needed
+to create a regulator driver that would take two inputs, that the mmc
+core would use. Last time I discussed it with Mark (Brown), it semes
+like he was open to the idea, so I just need to find some time to do
+just that.
 
-> >               pin_reg = &info->pin_regs[pin_id];
-> >               pin->pin = pin_id;
-> >               grp->pin_ids[i] = pin_id;
-> > @@ -684,7 +692,7 @@ int imx_pinctrl_probe(struct platform_device *pdev,
-> >  {
-> >       struct imx_pinctrl *ipctl;
-> >       struct resource *res;
-> > -     int ret, i;
-> > +     int ret;
-> >
-> >       if (!info || !info->pins || !info->npins) {
-> >               dev_err(&pdev->dev, "wrong pinctrl info\n");
-> > @@ -702,11 +710,6 @@ int imx_pinctrl_probe(struct platform_device *pdev,
-> >       if (!info->pin_regs)
-> >               return -ENOMEM;
-> >
-> > -     for (i = 0; i < info->npins; i++) {
-> > -             info->pin_regs[i].mux_reg = -1;
-> > -             info->pin_regs[i].conf_reg = -1;
-> > -     }
-> > -
-> >       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >       ipctl->base = devm_ioremap_resource(&pdev->dev, res);
-> >       if (IS_ERR(ipctl->base))
-> > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h b/drivers/pinctrl/freescale/pinctrl-imx.h
-> > index 26f8f1c..67c07c2 100644
-> > --- a/drivers/pinctrl/freescale/pinctrl-imx.h
-> > +++ b/drivers/pinctrl/freescale/pinctrl-imx.h
-> > @@ -85,6 +85,7 @@ struct imx_pinctrl_soc_info {
-> >  };
-> >
-> >  #define SHARE_MUX_CONF_REG   0x1
-> > +#define ZERO_OFFSET_VALID    0x2
-> >
-> >  #define NO_MUX               0x0
-> >  #define NO_PAD               0x0
-> > --
-> > 2.1.4
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150918/cf968413/attachment-0001.sig>
