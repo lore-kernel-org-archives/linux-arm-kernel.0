@@ -1,64 +1,115 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 18 Sep 2015 17:47:44 +0800
-Subject: [PATCH 1/5] ARM: sunxi: Add R8 support
-In-Reply-To: <1442566130-3497-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
- <1442566130-3497-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v65hHJDS6-Sz5Hi4a_F_cHTdBkFUzRR3a0JSE43AbDYmcw@mail.gmail.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 18 Sep 2015 10:47:29 +0100
+Subject: [PATCH 4/7] of_mdio: fix MDIO phy device refcounting
+In-Reply-To: <20150918094625.GB21084@n2100.arm.linux.org.uk>
+References: <20150918094625.GB21084@n2100.arm.linux.org.uk>
+Message-ID: <E1ZcsGP-0000uX-Rc@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 4:48 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The R8 is a new Allwinner SoC based on the A13. While both are very
-> similar, there's still a few differences. Introduce a new compatible to
-> deal with them.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/mach-sunxi/sunxi.c   | 3 ++-
->  drivers/clk/sunxi/clk-sunxi.c | 1 +
->  2 files changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index 65bab2876343..8583a9ca86bd 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -26,10 +26,11 @@ static const char * const sunxi_board_dt_compat[] = {
->         "allwinner,sun4i-a10",
->         "allwinner,sun5i-a10s",
->         "allwinner,sun5i-a13",
-> +       "allwinner,sun5i-r8",
->         NULL,
->  };
->
-> -DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
-> +DT_MACHINE_START(SUNXI_DT, "Allwinner sun4i/sun5i Families")
+bus_find_device() is defined as:
 
-Nit: might want to mention the rename.
+ * This is similar to the bus_for_each_dev() function above, but it
+ * returns a reference to a device that is 'found' for later use, as
+ * determined by the @match callback.
 
->         .dt_compat      = sunxi_board_dt_compat,
->         .init_late      = sunxi_dt_cpufreq_init,
->  MACHINE_END
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 413070d07b3f..9c79af0c03b2 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -1196,6 +1196,7 @@ static void __init sun5i_init_clocks(struct device_node *node)
->  }
->  CLK_OF_DECLARE(sun5i_a10s_clk_init, "allwinner,sun5i-a10s", sun5i_init_clocks);
->  CLK_OF_DECLARE(sun5i_a13_clk_init, "allwinner,sun5i-a13", sun5i_init_clocks);
-> +CLK_OF_DECLARE(sun5i_r8_clk_init, "allwinner,sun5i-r8", sun5i_init_clocks);
->  CLK_OF_DECLARE(sun7i_a20_clk_init, "allwinner,sun7i-a20", sun5i_init_clocks);
->
->  static const char *sun6i_critical_clocks[] __initdata = {
-> --
-> 2.5.1
->
+and it does indeed return a reference-counted pointer to the device:
 
-What about Documentation/devicetree/bindings/arm/sunxi.txt and
-Documentation/arm/sunxi/README?
+        while ((dev = next_device(&i)))
+                if (match(dev, data) && get_device(dev))
+                                        ^^^^^^^^^^^^^^^
+                        break;
+        klist_iter_exit(&i);
+        return dev;
 
+What that means is that when we're done with the struct device, we must
+drop that reference.  Neither of_phy_connect() nor of_phy_attach() did
+this when phy_connect_direct() or phy_attach_direct() failed.
 
-Thanks
-ChenYu
+With our previous patch, phy_connect_direct() and phy_attach_direct()
+take a new refcount on the phy device when successful, so we can drop
+our local reference immediatley after these functions, whether or not
+they succeeded.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/of/of_mdio.c | 27 +++++++++++++++++++++++----
+ 1 file changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
+index 1350fa25cdb0..a87a868fed64 100644
+--- a/drivers/of/of_mdio.c
++++ b/drivers/of/of_mdio.c
+@@ -197,7 +197,8 @@ static int of_phy_match(struct device *dev, void *phy_np)
+  * of_phy_find_device - Give a PHY node, find the phy_device
+  * @phy_np: Pointer to the phy's device tree node
+  *
+- * Returns a pointer to the phy_device.
++ * If successful, returns a pointer to the phy_device with the embedded
++ * struct device refcount incremented by one, or NULL on failure.
+  */
+ struct phy_device *of_phy_find_device(struct device_node *phy_np)
+ {
+@@ -217,7 +218,9 @@ EXPORT_SYMBOL(of_phy_find_device);
+  * @hndlr: Link state callback for the network device
+  * @iface: PHY data interface type
+  *
+- * Returns a pointer to the phy_device if successful.  NULL otherwise
++ * If successful, returns a pointer to the phy_device with the embedded
++ * struct device refcount incremented by one, or NULL on failure. The
++ * refcount must be dropped by calling phy_disconnect() or phy_detach().
+  */
+ struct phy_device *of_phy_connect(struct net_device *dev,
+ 				  struct device_node *phy_np,
+@@ -225,13 +228,19 @@ struct phy_device *of_phy_connect(struct net_device *dev,
+ 				  phy_interface_t iface)
+ {
+ 	struct phy_device *phy = of_phy_find_device(phy_np);
++	int ret;
+ 
+ 	if (!phy)
+ 		return NULL;
+ 
+ 	phy->dev_flags = flags;
+ 
+-	return phy_connect_direct(dev, phy, hndlr, iface) ? NULL : phy;
++	ret = phy_connect_direct(dev, phy, hndlr, iface);
++
++	/* refcount is held by phy_connect_direct() on success */
++	put_device(&phy->dev);
++
++	return ret ? NULL : phy;
+ }
+ EXPORT_SYMBOL(of_phy_connect);
+ 
+@@ -241,17 +250,27 @@ EXPORT_SYMBOL(of_phy_connect);
+  * @phy_np: Node pointer for the PHY
+  * @flags: flags to pass to the PHY
+  * @iface: PHY data interface type
++ *
++ * If successful, returns a pointer to the phy_device with the embedded
++ * struct device refcount incremented by one, or NULL on failure. The
++ * refcount must be dropped by calling phy_disconnect() or phy_detach().
+  */
+ struct phy_device *of_phy_attach(struct net_device *dev,
+ 				 struct device_node *phy_np, u32 flags,
+ 				 phy_interface_t iface)
+ {
+ 	struct phy_device *phy = of_phy_find_device(phy_np);
++	int ret;
+ 
+ 	if (!phy)
+ 		return NULL;
+ 
+-	return phy_attach_direct(dev, phy, flags, iface) ? NULL : phy;
++	ret = phy_attach_direct(dev, phy, flags, iface);
++
++	/* refcount is held by phy_attach_direct() on success */
++	put_device(&phy->dev);
++
++	return ret ? NULL : phy;
+ }
+ EXPORT_SYMBOL(of_phy_attach);
+ 
+-- 
+2.1.0
