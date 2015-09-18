@@ -1,59 +1,79 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 18 Sep 2015 17:31:37 +0200
-Subject: [PATCH V6 0/3] nvmem: add ocotp support for i.MX23 and i.MX28
-In-Reply-To: <1439418116-1833-1-git-send-email-stefan.wahren@i2se.com>
-References: <1439418116-1833-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <55FC2E59.5030504@i2se.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 18 Sep 2015 17:40:32 +0200
+Subject: [PATCH] crypto: marvell: properly handle
+ CRYPTO_TFM_REQ_MAY_BACKLOG-flagged requests
+In-Reply-To: <1442589936-18042-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1442589936-18042-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150918174032.7bbd2b2a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hi Thomas,
 
-Am 13.08.2015 um 00:21 schrieb Stefan Wahren:
-> This patch series brings read-only support for the On-Chip OTP cells
-> in the i.MX23 and i.MX28 processor.
->
-> changes in V6:
-> - add COMPILE_TEST to dependancy
-> - remove unnecessary headers
-> - enable clock during read operation
-> - fix module license
->
-> changes in V5:
-> - rebase to char-misc-next
-> - add nvmem prefix to module name
-> - set status in dtsi files
->
-> changes in V4:
-> - rename fsl_ocotp.c to mxs-ocotp.c
-> - adapt driver to use NVMEM framework V7
-> - take care of hbus clock
-> - increase too small timeout
-> - implement a wait function
-> - use defines from stmp_device.h
-> - remove owner init
-> - more code cleanup
->
-> changes in V3:
-> - drop write support
-> - take care of i.MX23 which has less registers
-> - drop unnecessary header file
-> - move static variables into driver data
-> - add devicetree probing
-> - fix missing bank closing in error case
-> - use kobj from platform device for sysfs
-> - add SYSFS to Kconfig
-> - add binding file
-> - code cleanup
->
-> Stefan Wahren (3):
->   DT: nvmem: add binding for mxs-ocotp
->   nvmem: add driver for ocotp in i.MX23 and i.MX28
->   ARM: mxs: enable ocotp for i.MX23 and i.MX28
+On Fri, 18 Sep 2015 17:25:36 +0200
+Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-the merge window is closed and patch #3 has been applied by Shawn.
+> The mv_cesa_queue_req() function calls crypto_enqueue_request() to
+> enqueue a request. In the normal case (i.e the queue isn't full), this
+> function returns -EINPROGRESS. The current Marvell CESA crypto driver
+> takes this into account and cleans up the request only if an error
+> occured, i.e if the return value is not -EINPROGRESS.
+> 
+> Unfortunately this causes problems with
+> CRYPTO_TFM_REQ_MAY_BACKLOG-flagged requests. When such a request is
+> passed to crypto_enqueue_request() and the queue is full,
+> crypto_enqueue_request() will return -EBUSY, but will keep the request
+> enqueued nonetheless. This situation was not properly handled by the
+> Marvell CESA driver, which was anyway cleaning up the request in such
+> a situation. When later on the request was taken out of the backlog
+> and actually processed, a kernel crash occured due to the internal
+> driver data structures for this structure having been cleaned up.
+> 
+> To avoid this situation, this commit adds a
+> mv_cesa_req_needs_cleanup() helper function which indicates if the
+> request needs to be cleaned up or not after a call to
+> crypto_enqueue_request(). This helper allows to do the cleanup only in
+> the appropriate cases, and all call sites of mv_cesa_queue_req() are
+> fixed to use this new helper function.
+> 
+> Reported-by: Vincent Donnefort <vdonnefort@gmail.com>
+> Fixes: db509a45339fd ("crypto: marvell/cesa - add TDMA support")
+> Cc: <stable@vger.kernel.org> # v4.2+
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Is it possible for you to apply the rest of this series to char-misc-next?
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Kind regards
-Stefan
+> ---
+>  drivers/crypto/marvell/cesa.h   | 27 +++++++++++++++++++++++++++
+>  drivers/crypto/marvell/cipher.c |  7 +++----
+>  drivers/crypto/marvell/hash.c   |  8 +++-----
+>  3 files changed, 33 insertions(+), 9 deletions(-)
+> 
+
+[...]
+
+>  
+>  static inline void mv_cesa_req_dma_iter_init(struct mv_cesa_dma_iter *iter,
+> diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
+> index 0745cf3..3df2f4e 100644
+> --- a/drivers/crypto/marvell/cipher.c
+> +++ b/drivers/crypto/marvell/cipher.c
+> @@ -189,7 +189,6 @@ static inline void mv_cesa_ablkcipher_prepare(struct crypto_async_request *req,
+>  {
+>  	struct ablkcipher_request *ablkreq = ablkcipher_request_cast(req);
+>  	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(ablkreq);
+> -
+
+Nitpick, but you're removing an empty line, and this doesn't seem
+related to the bug itself.
+
+Anyway, Thanks for fixing that.
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
