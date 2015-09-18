@@ -1,38 +1,35 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Fri, 18 Sep 2015 10:22:24 -0700
-Subject: [PATCH 1/1] PCI/MSI: X-Gene: Remove msi_controller assignment in
- X-Gene PCIe driver
-In-Reply-To: <20150918095956.2e27c93c@arm.com>
-References: <1442449900-30842-1-git-send-email-dhdang@apm.com>
- <20150918095956.2e27c93c@arm.com>
-Message-ID: <CADaLND=-YW_Y=tmwJWUQqqbD2_UL7KHQh-fK-9BkBp-43SqXvw@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 18 Sep 2015 18:28:24 +0100
+Subject: [PATCH] iommu-common: only compile lib/iommu_common.c for Sparc64
+In-Reply-To: <20150918.100952.975850165461332930.davem@davemloft.net>
+References: <1442479227-18320-1-git-send-email-andre.przywara@arm.com>
+ <20150917.113806.1491126940106627619.davem@davemloft.net>
+ <55FBD36C.5070301@arm.com>
+ <20150918.100952.975850165461332930.davem@davemloft.net>
+Message-ID: <55FC49B8.3020100@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 1:59 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Wed, 16 Sep 2015 17:31:40 -0700
-> Duc Dang <dhdang@apm.com> wrote:
->
->> With commit 8d63bc7beaee ("PCI/MSI: pci-xgene-msi: Get rid of
->> struct msi_controller"), it is no longer required to assign
->> msi_controller for X-Gene PCIe host bridge to support MSI. This
->> patch removes this unnecessary code and also helps avoid a warning
->> message ("failed to enable MSI") during boot.
->>
->> Signed-off-by: Duc Dang <dhdang@apm.com>
->> Cc: Tanmay Inamdar <tinamdar@apm.com>
->
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Hi David,
 
-Thanks, Marc.
+On 18/09/15 18:09, David Miller wrote:
+> From: Andre Przywara <andre.przywara@arm.com>
+> Date: Fri, 18 Sep 2015 10:03:40 +0100
+> 
+>> Or do you know of a simpler way to fixing it properly which could make
+>> it still into 4.3?
+> 
+> All I worry about is that if you take it out of the build, doing
+> the proper fix will suddenly become very low priority and be
+> forgotten about completely.
+> 
+> Whereas if it actually blocks the build for someone, it's a high
+> priority issue to address.
 
->
->         M.
-> --
-> Jazz is not dead. It just smells funny.
+I see. What about if I provide the two patches at the same time? An easy
+fix for 4.3 and the proper fix for 4.4? You can then even choose to take
+the proper fix for 4.3 if it's reasonably low risk.
+I will try sending something on Monday.
 
-
-
--- 
-Regards,
-Duc Dang.
+Cheers,
+Andre.
