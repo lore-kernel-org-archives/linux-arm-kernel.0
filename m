@@ -1,23 +1,80 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 18 Sep 2015 22:07:56 +0800
-Subject: [PATCH v2 0/7] hwrng: Add support for STMicroelectronics' RNG IP
-In-Reply-To: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
-References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150918140756.GK9249@gondor.apana.org.au>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 18 Sep 2015 16:09:22 +0200
+Subject: [PATCH] ARM: at91/dt: ov2640: add hsync/vsync-active property
+In-Reply-To: <1442575702-22315-1-git-send-email-josh.wu@atmel.com>
+References: <1442575702-22315-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <55FC1B12.8000703@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 02:45:50PM +0100, Lee Jones wrote:
-> v1 => v2:
->  - New patch: Also fixing /dev/hw_random => /dev/hwrng in Kconfig
->  - Fix 2099 => 2009 typo in commit log
->  - Fix 'number of random numbers sourced' return value
->  - Treat devm_clk_get()'s return value correctly
->  - Check return value of clk_prepare_enable()
->  - Use sysfs_streq() instead of manually stripping '\n' from sysfs
+Le 18/09/2015 13:28, Josh Wu a ?crit :
+> On at91sam9x5ek/at91sam9m10g45ek/sama5d3xek boards, we use the parallel
+> connection for ov2640. So we must set the hsync/vsync property (1 means
+> active high).
+> Otherwise, the connection would be seen as BT.656 or BT.1120.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-All applied.  Thanks.
+Hi Josh,
+
+Does this patch apply because of the new enhancement that you had
+proposed in "media: atmel-isi: parse the DT parameters for
+vsync/hsync/pixclock polarity" or does it apply even before?
+Is it a fix that applies to older kernels?
+
+So, should I wait for the enhancements to enter media git tree or can I
+take them anyway?
+
+Bye,
+
+> ---
+> 
+>  arch/arm/boot/dts/at91sam9m10g45ek.dts | 2 ++
+>  arch/arm/boot/dts/at91sam9x5ek.dtsi    | 2 ++
+>  arch/arm/boot/dts/sama5d3xmb.dtsi      | 2 ++
+>  3 files changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> index d1ae60a..9d16ef8 100644
+> --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> @@ -198,6 +198,8 @@
+>  					isi_0: endpoint {
+>  						remote-endpoint = <&ov2640_0>;
+>  						bus-width = <8>;
+> +						vsync-active = <1>;
+> +						hsync-active = <1>;
+>  					};
+>  				};
+>  			};
+> diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+> index d237c46..479f200 100644
+> --- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+> @@ -66,6 +66,8 @@
+>  					isi_0: endpoint at 0 {
+>  						remote-endpoint = <&ov2640_0>;
+>  						bus-width = <8>;
+> +						vsync-active = <1>;
+> +						hsync-active = <1>;
+>  					};
+>  				};
+>  			};
+> diff --git a/arch/arm/boot/dts/sama5d3xmb.dtsi b/arch/arm/boot/dts/sama5d3xmb.dtsi
+> index 83bee7a..8901042 100644
+> --- a/arch/arm/boot/dts/sama5d3xmb.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3xmb.dtsi
+> @@ -87,6 +87,8 @@
+>  					isi_0: endpoint {
+>  						remote-endpoint = <&ov2640_0>;
+>  						bus-width = <8>;
+> +						vsync-active = <1>;
+> +						hsync-active = <1>;
+>  					};
+>  				};
+>  			};
+> 
+
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Nicolas Ferre
