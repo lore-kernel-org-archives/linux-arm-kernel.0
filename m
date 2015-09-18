@@ -1,29 +1,83 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 18 Sep 2015 11:38:38 +0200
-Subject: [PATCH] ARM: pxa: add wm9713 codec
-In-Reply-To: <55FBCF05.2090707@compulab.co.il> (Igor Grinberg's message of
- "Fri, 18 Sep 2015 11:44:53 +0300")
-References: <1442432561-32722-1-git-send-email-robert.jarzmik@free.fr>
- <55FBCF05.2090707@compulab.co.il>
-Message-ID: <87wpvoqd7l.fsf@belgarion.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Sep 2015 10:46:25 +0100
+Subject: [PATCH 0/7] Phy and mdiobus fixes
+Message-ID: <20150918094625.GB21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Igor Grinberg <grinberg@compulab.co.il> writes:
+Hi,
 
-> Hi Robert,
->
-> On 09/16/15 22:42, Robert Jarzmik wrote:
->> The mioa701 is using the wm9713 for audio, battery and touchscreen. Add
->> the missing audio part, which disappeared.
->> 
->> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> The subject is a bit misleading..
-> I think it is worth specifying mioa701 in subject..
-Absolutely, it is even a requirement to have "ARM: pxa: mioa701: " as a prefix.
+While looking at the phy code, I identified a number of weaknesses
+where refcounting on device structures was being leaked, where
+modules could be removed while in-use, and where the fixed-phy could
+end up having unintended consequences caused by incorrect calls to
+fixed_phy_update_state().
 
-Thanks for catching this.
+This patch series resolves those issues, some of which were discovered
+with testing on an Armada 388 board.  Not all patches are fully tested,
+particularly the one which touches several network drivers.
+
+When resolving the struct device refcounting problems, several different
+solutions were considered before settling on the implementation here -
+one of the considerations was to avoid touching many network drivers.
+The solution here is:
+
+	phy_attach*() - takes a refcount
+	phy_detach*() - drops the phy_attach refcount
+
+Provided drivers always attach and detach their phys, which they should
+already be doing, this should change nothing, even if they leak a refcount.
+
+	of_phy_find_device() and of_* functions which use that take
+	a refcount.  Arrange for this refcount to be dropped once
+	the phy is attached.
+
+This is the reason why the previous change is important - we can't drop
+this refcount taken by of_phy_find_device() until something else holds
+a reference on the device.  This resolves the leaked refcount caused by
+using of_phy_connect() or of_phy_attach().
+
+Even without the above changes, these drivers are leaking by calling
+of_phy_find_device().  These drivers are addressed by adding the
+appropriate release of that refcount.
+
+The mdiobus code also suffered from the same kind of leak, but thankfully
+this only happened in one place - the mdio-mux code.
+
+I also found that the try_module_get() in the phy layer code was utterly
+useless: phydev->dev.driver was guaranteed to always be NULL, so
+try_module_get() was always being called with a NULL argument.  I proved
+this with my SFP code, which declares its own MDIO bus - the module use
+count was never incremented irrespective of how I set the MDIO bus up.
+This allowed the MDIO bus code to be removed from the kernel while there
+were still PHYs attached to it.
+
+One other bug was discovered: while using in-band-status with mvneta, it
+was found that if a real phy is attached with in-band-status enabled,
+and another ethernet interface is using the fixed-phy infrastructure, the
+interface using the fixed-phy infrastructure is configured according to
+the other interface using the in-band-status - which is caused by the
+fixed-phy code not verifying that the phy_device passed in is actually
+a fixed-phy device, rather than a real MDIO phy.
+
+Lastly, having mdio_bus reversing phy_device_register() internals seems
+like a layering violation - it's trivial to move that code to the phy
+device layer.
+
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    | 23 ++++++---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 19 +++++++
+ drivers/net/ethernet/freescale/gianfar.c          |  6 ++-
+ drivers/net/ethernet/freescale/ucc_geth.c         |  8 ++-
+ drivers/net/ethernet/marvell/mvneta.c             |  2 +
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c     |  2 +
+ drivers/net/phy/fixed_phy.c                       |  2 +-
+ drivers/net/phy/mdio-mux.c                        | 19 ++++---
+ drivers/net/phy/mdio_bus.c                        | 24 ++++++---
+ drivers/net/phy/phy_device.c                      | 62 ++++++++++++++++++-----
+ drivers/of/of_mdio.c                              | 27 ++++++++--
+ include/linux/phy.h                               |  6 ++-
+ 12 files changed, 156 insertions(+), 44 deletions(-)
 
 -- 
-Robert
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
