@@ -1,93 +1,104 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 18 Sep 2015 21:47:39 +0800
-Subject: [PATCH 3/3] arm64: dts: add dts file for Marvell Berlin4CT STB board
-In-Reply-To: <1442584059-7319-1-git-send-email-jszhang@marvell.com>
-References: <1442584059-7319-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1442584059-7319-4-git-send-email-jszhang@marvell.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 18 Sep 2015 21:52:48 +0800
+Subject: [PATCH v2 5/8] pinctrl: freescale: imx: add ZERO_OFFSET_VALID flag
+In-Reply-To: <BN3PR03MB1509E4893244D963FDA21707A8530@BN3PR03MB1509.namprd03.prod.outlook.com>
+References: <1441147753-13239-1-git-send-email-aalonso@freescale.com>
+ <1441147753-13239-5-git-send-email-aalonso@freescale.com>
+ <20150907012831.GE30746@tiger>
+ <BN3PR03MB1509E4893244D963FDA21707A8530@BN3PR03MB1509.namprd03.prod.outlook.com>
+Message-ID: <20150918135248.GB3770@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds dts for the Berlin4CT STB reference board which is also
-based on the Berlin4CT SoC. The Berlin4CT DMP board will be deprecated as
-time goes.
+On Tue, Sep 08, 2015 at 04:05:32PM +0000, Alonso Adrian wrote:
+> Hi Shawn,
+> 
+> See comments below
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm64/boot/dts/marvell/berlin4ct-stb.dts | 66 +++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
- create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
+Please use bottom posting, not top posting.
 
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts b/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
-new file mode 100644
-index 0000000..348c37e
---- /dev/null
-+++ b/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
-@@ -0,0 +1,66 @@
-+/*
-+ * Copyright (C) 2015 Marvell Technology Group Ltd.
-+ *
-+ * Author: Jisheng Zhang <jszhang@marvell.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "berlin4ct.dtsi"
-+
-+/ {
-+	model = "Marvell BG4CT STB board";
-+	compatible = "marvell,berlin4ct-stb", "marvell,berlin4ct", "marvell,berlin";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		/* the first 16MB is for firmwares' usage */
-+		reg = <0 0x01000000 0 0x7f000000>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
--- 
-2.5.1
+...
+
+> > @@ -536,21 +536,29 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
+> >               return -ENOMEM;
+> >
+> >       for (i = 0; i < grp->npins; i++) {
+> > -             u32 mux_reg = be32_to_cpu(*list++);
+> > +             u32 mux_reg;
+> >               u32 conf_reg;
+> >               unsigned int pin_id;
+> >               struct imx_pin_reg *pin_reg;
+> >               struct imx_pin *pin = &grp->pins[i];
+> >
+> > +             mux_reg = be32_to_cpu(*list++);
+> > +             if (!(info->flags & ZERO_OFFSET_VALID) && !mux_reg)
+> > +                     mux_reg = -1;
+> > +
+> >               if (info->flags & SHARE_MUX_CONF_REG) {
+> >                       conf_reg = mux_reg;
+> >               } else {
+> >                       conf_reg = be32_to_cpu(*list++);
+> > -                     if (!conf_reg)
+> > +                     if (!(info->flags & ZERO_OFFSET_VALID) && !conf_reg)
+> >                               conf_reg = -1;
+> >               }
+> >
+> [Adrian] The below assignment is the important thing that this patch does,
+> it allows the pad_id to be zero and match the pad id's according to the mux_reg offset.
+> > -             pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
+> > +             if (info->flags & ZERO_OFFSET_VALID)
+> > +                     pin_id = mux_reg / 4;
+> > +             else
+> > +                     pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
+> > +
+
+Ah, yes.  So the only code change we need is just the line below, right?
+
+	pin_id = (mux_reg != -1) ? mux_reg / 4 : conf_reg / 4;
+
+Shawn
+
+> >               pin_reg = &info->pin_regs[pin_id];
+> >               pin->pin = pin_id;
+> >               grp->pin_ids[i] = pin_id;
+> > @@ -684,7 +692,7 @@ int imx_pinctrl_probe(struct platform_device *pdev,
+> >  {
+> >       struct imx_pinctrl *ipctl;
+> >       struct resource *res;
+> > -     int ret, i;
+> > +     int ret;
+> >
+> >       if (!info || !info->pins || !info->npins) {
+> >               dev_err(&pdev->dev, "wrong pinctrl info\n");
+> > @@ -702,11 +710,6 @@ int imx_pinctrl_probe(struct platform_device *pdev,
+> >       if (!info->pin_regs)
+> >               return -ENOMEM;
+> >
+> > -     for (i = 0; i < info->npins; i++) {
+> > -             info->pin_regs[i].mux_reg = -1;
+> > -             info->pin_regs[i].conf_reg = -1;
+> > -     }
+> > -
+> >       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >       ipctl->base = devm_ioremap_resource(&pdev->dev, res);
+> >       if (IS_ERR(ipctl->base))
+> > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h b/drivers/pinctrl/freescale/pinctrl-imx.h
+> > index 26f8f1c..67c07c2 100644
+> > --- a/drivers/pinctrl/freescale/pinctrl-imx.h
+> > +++ b/drivers/pinctrl/freescale/pinctrl-imx.h
+> > @@ -85,6 +85,7 @@ struct imx_pinctrl_soc_info {
+> >  };
+> >
+> >  #define SHARE_MUX_CONF_REG   0x1
+> > +#define ZERO_OFFSET_VALID    0x2
+> >
+> >  #define NO_MUX               0x0
+> >  #define NO_PAD               0x0
+> > --
+> > 2.1.4
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
