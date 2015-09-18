@@ -1,37 +1,37 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 18 Sep 2015 15:35:38 +0800
-Subject: [PATCH 3/4] ARM: dts: sun8i: Enable PWM controller on A23/A33 Q8
+Date: Fri, 18 Sep 2015 15:35:35 +0800
+Subject: [PATCH 0/4] ARM: dts: sun8i: Add pwm-backlight device for A23/A33 Q8
  format tablets
-In-Reply-To: <1442561739-6824-1-git-send-email-wens@csie.org>
-References: <1442561739-6824-1-git-send-email-wens@csie.org>
-Message-ID: <1442561739-6824-4-git-send-email-wens@csie.org>
+Message-ID: <1442561739-6824-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A23/A33 based Q8 format tablets use channel 0 of the PWM controller for
-backlight dimming.
+Hi Maxime,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-q8-common.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+This series adds support for the PWM controlled backlight on the
+A23/A33 Q8 tablets. The A23/A33 SoCs have the same PWM controller
+as the A20, and the tablets use it to dim the LCD backlight.
 
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index 6f8a8bb4e9bb..4c2d0b459d6f 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-@@ -70,6 +70,12 @@
- 	};
- };
- 
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_pins>;
-+	status = "okay";
-+};
-+
- &r_uart {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&r_uart_pins_a>;
+The patches are pretty self-explaining.
+
+Hans, could you test this on your TZX 723Q4? It's FEX file uses
+a lower PWM frequency.
+
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (4):
+  ARM: dts: sun8i: Add PWM controller node for A23/A33
+  ARM: dts: sun8i: Add PWM channel 0 pinmux setting for A23/A33
+  ARM: dts: sun8i: Enable PWM controller on A23/A33 Q8 format tablets
+  ARM: dts: sun8i: Add pwm-backlight device for A23/A33 Q8 format
+    tablets
+
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi   | 15 +++++++++++++++
+ arch/arm/boot/dts/sun8i-q8-common.dtsi | 26 ++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
+
 -- 
 2.5.1
