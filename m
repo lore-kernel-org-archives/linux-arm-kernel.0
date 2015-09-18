@@ -1,50 +1,33 @@
-From: xerofoify@gmail.com (Nicholas Krause)
-Date: Thu, 17 Sep 2015 20:54:34 -0400
-Subject: [PATCH RESEND] mach:-s3c64xx:Cause kernel oops with WARN_ON if calls
- for setting up gpio fail in s3c64xx_i2s_cfg_gpio
-Message-ID: <1442537674-26953-1-git-send-email-xerofoify@gmail.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 17 Sep 2015 18:05:15 -0700
+Subject: [PATCH 0/2] KVM/arm: add fp/simd lazy switch support
+Message-ID: <1442538317-13618-1-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the function s3c64xx_i2c_cfg_gpio to cause a kernel oopes
-if the call to either s3c_gpio_cfgpin_range or s3c_gpio_cfgpin fail
-as we cannot continue to run on a board using this gpio setup if
-the configuration for the board fails when the gpio configuration
-of the board is being reconfigured in the function in
-s3c64xx_i2s_cfg_gpio.
+These patches enable armv7 fp/simd lazy switch. On guest entry fp/simd
+access trap is set, and on guest first access fp/simd registers are switched -
+host saved, guest restored. CPU continues with guest fp/simd content until
+vcpu_put where guest is saved and host is restored. 
 
-Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
----
- arch/arm/mach-s3c64xx/dev-audio.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Running floating point workload illustrates reduction of fp/simd context 
+switches the amount depends on the load. For a light load with with FP 
+application running only 2% of all exits result in calls to lazy switch.
 
-diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
-index ff780a8..5e7538b 100644
---- a/arch/arm/mach-s3c64xx/dev-audio.c
-+++ b/arch/arm/mach-s3c64xx/dev-audio.c
-@@ -36,10 +36,10 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
- 		base = S3C64XX_GPE(0);
- 		break;
- 	case 2:
--		s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5));
--		s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5));
--		s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5));
--		s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));
-+		WARN_ON(s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5)));
-+		WARN_ON(s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5)));
-+		WARN_ON(s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5)));
-+		WARN_ON(s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));)
- 		return 0;
- 	default:
- 		printk(KERN_DEBUG "Invalid I2S Controller number: %d\n",
-@@ -47,7 +47,7 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
-+	WARN_ON(s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3)));
- 
- 	return 0;
- }
+arm64 version is in test and appears to work fine, remaining work is
+boot arm32 guest on arm64 and verify operation. Initial intent was to post
+all patches at once, but arm64 version will be posted soon.
+
+Mario Smarduch (2):
+  add hooks for armv7 vfp/simd lazy switch support
+  enable armv7 vfp/simd lazy switch
+
+ arch/arm/include/asm/kvm_asm.h  |  1 +
+ arch/arm/include/asm/kvm_host.h |  3 +++
+ arch/arm/kernel/asm-offsets.c   |  1 +
+ arch/arm/kvm/arm.c              | 17 +++++++++++++++++
+ arch/arm/kvm/interrupts.S       | 40 +++++++++++++++++++++++++++++-----------
+ 5 files changed, 51 insertions(+), 11 deletions(-)
+
 -- 
-2.1.4
+1.9.1
