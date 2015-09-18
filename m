@@ -1,30 +1,23 @@
-From: luis@debethencourt.com (Luis de Bethencourt)
-Date: Fri, 18 Sep 2015 19:09:51 +0200
-Subject: [PATCH 3/3] regulator: vexpress: Fix module autoload for OF platform
- driver
-Message-ID: <20150918170951.GA28327@goodgumbo.baconseed.org>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 18 Sep 2015 10:09:52 -0700 (PDT)
+Subject: [PATCH] iommu-common: only compile lib/iommu_common.c for Sparc64
+In-Reply-To: <55FBD36C.5070301@arm.com>
+References: <1442479227-18320-1-git-send-email-andre.przywara@arm.com>
+ <20150917.113806.1491126940106627619.davem@davemloft.net>
+ <55FBD36C.5070301@arm.com>
+Message-ID: <20150918.100952.975850165461332930.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This platform driver has a OF device ID table but the OF module
-alias information is not created so module autoloading won't work.
+From: Andre Przywara <andre.przywara@arm.com>
+Date: Fri, 18 Sep 2015 10:03:40 +0100
 
-Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
----
- drivers/regulator/vexpress.c | 1 +
- 1 file changed, 1 insertion(+)
+> Or do you know of a simpler way to fixing it properly which could make
+> it still into 4.3?
 
-diff --git a/drivers/regulator/vexpress.c b/drivers/regulator/vexpress.c
-index bed9d3e..c810cbb 100644
---- a/drivers/regulator/vexpress.c
-+++ b/drivers/regulator/vexpress.c
-@@ -103,6 +103,7 @@ static const struct of_device_id vexpress_regulator_of_match[] = {
- 	{ .compatible = "arm,vexpress-volt", },
- 	{ }
- };
-+MODULE_DEVICE_TABLE(of, vexpress_regulator_of_match);
- 
- static struct platform_driver vexpress_regulator_driver = {
- 	.probe = vexpress_regulator_probe,
--- 
-2.4.6
+All I worry about is that if you take it out of the build, doing
+the proper fix will suddenly become very low priority and be
+forgotten about completely.
+
+Whereas if it actually blocks the build for someone, it's a high
+priority issue to address.
