@@ -1,303 +1,161 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Sep 2015 10:48:50 +0200
-Subject: [PATCH 5/5] ARM: sun5i: Add C.H.I.P DTS
-In-Reply-To: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1442566130-3497-6-git-send-email-maxime.ripard@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 Sep 2015 09:51:09 +0100
+Subject: [PATCH 2/2] irqchip/gicv3-its:  Handle OF device tree "msi-map"
+ properties.
+In-Reply-To: <1442512859-31633-3-git-send-email-ddaney.cavm@gmail.com>
+References: <1442512859-31633-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442512859-31633-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150918095109.144c22ed@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The C.H.I.P. is a small SBC with an Allwinner R8, 8GB of NAND, 512MB of
-RAM, USB host and OTG, a wifi / bluetooth combo chip, an audio/video jack
-and two connectors to plug additional boards on top of it.
+On Thu, 17 Sep 2015 11:00:59 -0700
+David Daney <ddaney.cavm@gmail.com> wrote:
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/Makefile          |   3 +-
- arch/arm/boot/dts/sun5i-r8-chip.dts | 261 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 263 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun5i-r8-chip.dts
+Hi David,
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b276174b670a..7efd37b907f1 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -599,7 +599,8 @@ dtb-$(CONFIG_MACH_SUN5I) += \
- 	sun5i-a13-inet-98v-rev2.dtb \
- 	sun5i-a13-olinuxino.dtb \
- 	sun5i-a13-olinuxino-micro.dtb \
--	sun5i-a13-utoo-p66.dtb
-+	sun5i-a13-utoo-p66.dtb \
-+	sun5i-r8-chip.dtb
- dtb-$(CONFIG_MACH_SUN6I) += \
- 	sun6i-a31-app4-evb1.dtb \
- 	sun6i-a31-colombus.dtb \
-diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
-new file mode 100644
-index 000000000000..6cb3c4f1cd61
---- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
-@@ -0,0 +1,261 @@
-+/*
-+ * Copyright 2015 Free Electrons
-+ * Copyright 2015 NextThing Co
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun5i-a13.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+/ {
-+	model = "NextThing C.H.I.P.";
-+	compatible = "nextthing,chip", "allwinner,sun5i-r8";
-+
-+	aliases {
-+		i2c0 = &i2c0;
-+		i2c1 = &i2c1;
-+		i2c2 = &i2c2;
-+		serial0 = &uart1;
-+		serial1 = &uart3;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	dram_vcc: dram_vcc {
-+		compatible = "regulator-fixed";
-+		regulator-name = "dram-vcc";
-+		regulator-min-microvolt = <1600000>;
-+		regulator-max-microvolt = <1600000>;
-+		vin-supply = <&ipsout>;
-+		regulator-always-on;
-+	};
-+
-+	ipsout: ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+
-+	usb0_vbus: usb0_vbus {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&chip_vbus_pin>;
-+
-+		regulator-name = "vbus-usb0";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		vin-supply = <&vcc_5v0>;
-+		gpio = <&pio 1 10 GPIO_ACTIVE_HIGH>; /* PB10 */
-+		enable-active-high;
-+	};
-+
-+	vcc_3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		vin-supply = <&ipsout>;
-+		regulator-always-on;
-+	};
-+
-+	vcc_5v0: vcc5v0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc-5v0";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		vin-supply = <&ipsout>;
-+		regulator-always-on;
-+	};
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		reg = <0x34>;
-+
-+		/*
-+		 * The interrupt is routed through the "External Fast
-+                 * Interrupt Request" pin (ball G13 of the module)
-+                 * directly to the main interrupt controller, without
-+                 * any other controller interfering.
-+		 */
-+		interrupts = <0>;
-+	};
-+};
-+
-+#include "axp209.dtsi"
-+
-+/*
-+ * i2c1 is routed to the external pins and doesn't have any device
-+ * attached to it on the C.H.I.P itself.
-+ */
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+
-+	xio: gpio at 38 {
-+		compatible = "nxp,pcf8574a";
-+		reg = <0x38>;
-+
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		interrupt-parent = <&pio>;
-+		interrupts = <6 0 IRQ_TYPE_EDGE_FALLING>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>;
-+	vmmc-supply = <&vcc_3v3>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&otg_sram {
-+	status = "okay";
-+};
-+
-+&pio {
-+	chip_vbus_pin: chip_vbus_pin at 0 {
-+	        allwinner,pins = "PB10";
-+	        allwinner,function = "gpio_out";
-+	        allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+	        allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	chip_id_det_pin: chip_id_det_pin at 0 {
-+	        allwinner,pins = "PG2";
-+	        allwinner,function = "gpio_in";
-+	        allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+	        allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&reg_dcdc2 {
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "cpuvdd";
-+	regulator-always-on;
-+};
-+
-+&reg_dcdc3 {
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1300000>;
-+	regulator-name = "corevdd";
-+	regulator-always-on;
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "rtcvdd";
-+};
-+
-+&reg_ldo2 {
-+	regulator-min-microvolt = <2700000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "avcc";
-+	regulator-always-on;
-+};
-+
-+&reg_ldo5 {
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-name = "vcc-1v8";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins_b>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins_a>,
-+		    <&uart3_pins_cts_rts_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&chip_id_det_pin>;
-+	status = "okay";
-+
-+	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
-+
-+	usb0_vbus-supply = <&usb0_vbus>;
-+	usb1_vbus-supply = <&vcc_5v0>;
-+};
+> From: David Daney <david.daney@cavium.com>
+> 
+> Search up the device hierarchy to find devices with a "msi-map"
+> property, if found apply the mapping to the GIC device id.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its-pci-msi.c | 73 ++++++++++++++++++++++++++++++++
+>  1 file changed, 73 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> index cf351c6..aa61cef 100644
+> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> @@ -73,6 +73,8 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
+>  	struct pci_dev *pdev;
+>  	struct its_pci_alias dev_alias;
+>  	struct msi_domain_info *msi_info;
+> +	struct device *parent_dev;
+> +	struct device_node *msi_controller_node = NULL;
+>  
+>  	if (!dev_is_pci(dev))
+>  		return -EINVAL;
+> @@ -84,6 +86,77 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
+>  	dev_alias.count = nvec;
+>  
+>  	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
+> +	/*
+> +	 * Walk up the device parent links looking for one with a
+> +	 * "msi-map" property.
+> +	 */
+
+My first objection is the location of this parsing. It shouldn't be
+driver specific, but instead be part of the generic OF handling
+(nothing in these properties is GICv3 specific, even if the ITS is the
+only user so far).
+
+> +	for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent) {
+
+Is there a limit how far we should go up the parent chain to find a
+msi-map? My hunch is that you should stop at the first device that does
+have an of_node, as it is the one that should contain the msi-map
+property.
+
+> +		u32 msi_mask, masked_devid;
+> +		u32 rid_base, msi_base, rid_len, phandle;
+> +		int msi_map_len;
+> +		const __be32 *msi_map;
+> +		bool matched;
+> +
+> +		if (!parent_dev->of_node)
+> +			continue;
+> +
+> +		msi_map = of_get_property(parent_dev->of_node,
+> +					  "msi-map", &msi_map_len);
+> +		if (!msi_map)
+> +			continue;
+
+At this point, you know you do have a msi-map, and anything below this
+point won't result in another iteration - they can be taken out of the
+loop, avoiding most of your break statements.
+
+> +
+> +		/* The default is to select all bits. */
+> +		msi_mask = 0xffffffff;
+> +
+> +		/*
+> +		 * Can be overridden by "msi-mask" property.  If
+> +		 * of_property_read_u32() fails, the default is
+> +		 * used.
+> +		 */
+> +		of_property_read_u32(parent_dev->of_node,
+> +				     "msi-mask", &msi_mask);
+
+This should be "msi-map-mask", if I read Mark's binding correctly.
+
+> +
+> +		masked_devid = msi_mask & dev_alias.dev_id;
+> +		matched = false;
+> +		while (msi_map_len >= 4 * sizeof(__be32)) {
+> +			rid_base = be32_to_cpup(msi_map + 0);
+> +			phandle = be32_to_cpup(msi_map + 1);
+> +			msi_base = be32_to_cpup(msi_map + 2);
+> +			rid_len = be32_to_cpup(msi_map + 3);
+
+Ouch. I wonder if that kind of thing should deserve a generic helper.
+of_property_read_u32_array_from_index()? Rob, what do you think?
+
+Also, worth checking that msi_map_len is multiple of 4 (and shout if
+it isn't).
+
+> +
+> +			if (masked_devid < rid_base ||
+> +			    masked_devid >= rid_base + rid_len) {
+> +				msi_map_len -= 4 * sizeof(__be32);
+> +				msi_map += 4;
+> +				continue;
+> +			}
+> +			matched = true;
+> +			break;
+> +		}
+> +		if (!matched) {
+> +			dev_err(dev,
+> +				"No match in \"msi-map\" of %s for dev_id: %x\n",
+> +				dev_name(parent_dev), dev_alias.dev_id);
+
+It would probably be useful to also print the node containing the
+msi-map property, as this is likely to be the source of the problem.
+
+> +			break;
+> +		}
+> +
+> +		msi_controller_node = of_find_node_by_phandle(phandle);
+> +		if (domain->of_node != msi_controller_node) {
+> +			dev_err(dev,
+> +				"ERROR: msi-map mismatch \"%s\" vs. \"%s\"\n",
+> +				domain->of_node->full_name,
+> +				msi_controller_node ? NULL : msi_controller_node->full_name);
+
+Why is that an error? a RC can be configured to master multiple
+MSI-controllers, and the kernel picks one of them for a given device.
+This is illustrated by "Example (5)" in the binding, where a device can
+master two MSI controllers.
+
+> +			break;
+> +		}
+> +		dev_dbg(dev,
+> +			"msi-map at: %s, len: %d, using mask %08x, rid: %08x, msi: %08x, rid_len: %08x, dev_id: %08x\n",
+> +			dev_name(parent_dev), msi_map_len, msi_mask, rid_base,
+> +			msi_base, rid_len, dev_alias.dev_id);
+> +		dev_alias.dev_id = masked_devid + msi_base;
+> +		dev_dbg(dev, "New dev_id: %08x\n", dev_alias.dev_id);
+> +		break;
+> +	}
+> +	of_node_put(msi_controller_node);
+>  
+>  	/* ITS specific DeviceID, as the core ITS ignores dev. */
+>  	info->scratchpad[0].ul = dev_alias.dev_id;
+
+
+Thanks,
+
+	M.
 -- 
-2.5.1
+Jazz is not dead. It just smells funny.
