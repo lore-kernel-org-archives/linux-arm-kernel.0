@@ -1,56 +1,25 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Fri, 18 Sep 2015 15:02:23 +0800
-Subject: [PATCH 6/7] arm64: Make the kernel page dump utility aware of
- the CONT bit
-In-Reply-To: <1442430186-9083-7-git-send-email-jeremy.linton@arm.com>
-References: <1442430186-9083-1-git-send-email-jeremy.linton@arm.com>
- <1442430186-9083-7-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20150918070223.GA30505@free64-pc.asiapac.arm.com>
+From: julien.boibessot@free.fr (Julien Boibessot)
+Date: Fri, 18 Sep 2015 09:11:04 +0200
+Subject: i.MX27 device tree
+In-Reply-To: <55FB2AC4.4070907@phoenixsoftware.it>
+References: <55FB2AC4.4070907@phoenixsoftware.it>
+Message-ID: <55FBB908.5080707@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 02:03:05PM -0500, Jeremy Linton wrote:
-Hi Jeremy,
-> The kernel page dump utility needs to be aware of the CONT bit before
-> it will break up pages ranges for display.
-> 
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  arch/arm64/mm/dump.c | 18 +++++++++++++++++-
->  1 file changed, 17 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> index f3d6221..5a22a11 100644
-> --- a/arch/arm64/mm/dump.c
-> +++ b/arch/arm64/mm/dump.c
-> @@ -67,6 +67,12 @@ static struct addr_marker address_markers[] = {
->  	{ -1,			NULL },
->  };
->  
-> +/*
-> + * The page dumper groups page table entries of the same type into a single
-> + * description. It uses pg_state to track the range information while
-> + * iterating over the pte entries. When the continuity is broken it then
-> + * dumps out a description of the range.
-> + */
->  struct pg_state {
->  	struct seq_file *seq;
->  	const struct addr_marker *marker;
-> @@ -114,6 +120,16 @@ static const struct prot_bits pte_bits[] = {
->  		.set	= "NG",
->  		.clear	= "  ",
->  	}, {
-> +		.mask	= PTE_CONT,
-> +		.val	= PTE_CONT,
-> +		.set	= "CON",
-> +		.clear	= "   ",
-> +	}, {
-> +		.mask	= PTE_TABLE_BIT,
-> +		.val	= PTE_TABLE_BIT,
-> +		.set	= "   ",
-> +		.clear	= "BLK",
-Please update the commit message, since your patch also add the TABLE_BIT, not
-only the CONT bit.
+Hello Pierluigi,
 
-thanks
-Huang Shijie
+On 17/09/2015 23:04, Pierluigi Passaro wrote:
+> Hi all,
+> I do need to test latest 4.1 kernel on i.MX27 PDK, but I'm not able to
+> find any bootloader providinfg dts support.
+>
+> Could you give any suggestion?
+
+U-Boot is working fine for us on our i.MX27 modules when running vanilla
+kernel with DT.
+Configs and DTS can be find on our forge:
+http://sourceforge.net/projects/armadeus/
+
+Best regards,
+Julien
