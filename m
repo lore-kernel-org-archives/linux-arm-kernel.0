@@ -1,85 +1,55 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 18 Sep 2015 11:36:56 +0200
-Subject: [PATCH] arm64: expose kernel page size in Image header flags
-In-Reply-To: <55FBC8A9.8090402@arm.com>
-References: <1442482345-7679-1-git-send-email-ard.biesheuvel@linaro.org>
- <55FBC8A9.8090402@arm.com>
-Message-ID: <CAKv+Gu8vy7b4tVdvYBcp5ys1w0voKNHzDHuBr59C749Xr05Rpg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 18 Sep 2015 17:36:48 +0800
+Subject: [PATCH 5/6] ARM: dts: sun6i: Add support for Sinlinx A31s SDK
+ board
+In-Reply-To: <20150916062058.GQ4684@lukather>
+References: <1440755679-8266-1-git-send-email-wens@csie.org>
+ <1440755679-8266-6-git-send-email-wens@csie.org>
+ <20150828123443.GM29389@lukather>
+ <CAGb2v64LF39Cj-KWQ5xLF_Pt3yATmzDJMa6XDaizectNRDping@mail.gmail.com>
+ <20150916062058.GQ4684@lukather>
+Message-ID: <CAGb2v67tqKS6TGux1wFHxtv0U_DQa5=x0iYL-yh4J+UUA2ggvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 September 2015 at 10:17, Suzuki K. Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 17/09/15 10:32, Ard Biesheuvel wrote:
+On Wed, Sep 16, 2015 at 2:20 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, Sep 14, 2015 at 03:24:47PM +0800, Chen-Yu Tsai wrote:
+>> On Fri, Aug 28, 2015 at 8:34 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > On Fri, Aug 28, 2015 at 05:54:38PM +0800, Chen-Yu Tsai wrote:
+>> >> The Sinlinx A31s SDK is a A31s based module/baseboard development kit.
+>> >>
+>> >> The core module has the SoC, PMIC, DRAM, eMMC and supporting components.
+>> >> There are also pads for UART0, JTAG and I2S.
+>> >
+>> > Can you use that core module without that baseboard?
 >>
->> In order for a bootloader to be able to decide whether a certain
->> arm64 kernel image is compatible with the hardware it is running
->> on, it needs to be able to find out for which page size the kernel
->> was built. This is necessary, since the architecture does not
->> mandate support for all page sizes it defines, and the kernel cannot
->> boot to a state where it can print a diagnostic if it was built for
->> a page size that is not supported by the hardware.
+>> You could just solder 5v, gnd, and uart, and it should work.
+>> Not that I actually tried it.
 >>
->> So assign two bits in the flags field of the Image header, and set
->> them according to the build time page size. For backward compatibility,
->> retain the 0b00 value as 'unspecified'.
+>> >> The baseboard has 100 Mbps Ethernet, 5x USB 2.0 host ports via a USB 2.0
+>> >> hub chip, MMC, HDMI, SPDIF, CIR, audio jacks, 2 tablet-like volume
+>> >> buttons, RS232 style UART and USB OTG (though VBUS is not connected).
+>> >> Various headers are available for other addon modules, such as SDIO
+>> >> WiFi, LCD display, camera sensor, UARTs, I2C, SPI and GPIOs.
+>> >
+>> > Can the baseboard be used with our core modules?
 >>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> Doubtful. The baseboard is more like a demonstration platform for the
+>> core board.
+>>
+>> What do you suggest?
 >
->
-> Ard,
->
-> I picked this patch based on the our initial discussion on 16K page size
-> series, and added it to the V2 of the series.
->
->         https://lkml.org/lkml/2015/9/15/716
->
+> Nothing then, I was just trying to understand the possible
+> combinations, but it looks like there's none :)
 
-Ah, I missed that, sorry.
+OK then. I'll fix up the gpu regulator stuff, and resend the series sans
+the primo81 patch after the axp221 supply renaming patches are merged.
 
-I don't care which version makes it eventually,
+The primo81 LCD and backlight need some more work. No PWM and SSD2825
+MIPI bridge support in the kernel yet.
 
->
->
->> ---
->>   Documentation/arm64/booting.txt | 3 ++-
->>   arch/arm64/kernel/image.h       | 4 +++-
->>   2 files changed, 5 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/arm64/booting.txt
->> b/Documentation/arm64/booting.txt
->> index 1690350f16e7..46056e7d766e 100644
->> --- a/Documentation/arm64/booting.txt
->> +++ b/Documentation/arm64/booting.txt
->> @@ -104,7 +104,8 @@ Header notes:
->>   - The flags field (introduced in v3.17) is a little-endian 64-bit field
->>     composed as follows:
->>     Bit 0:      Kernel endianness.  1 if BE, 0 if LE.
->> -  Bits 1-63:   Reserved.
->> +  Bits 1-2:    Kernel page size.   0=unspecified, 1=4K, 2=16K, 3=64K
->> +  Bits 3-63:   Reserved.
->>
->>   - When image_size is zero, a bootloader should attempt to keep as much
->>     memory as possible free for use by the kernel immediately after the
->> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
->> index 8fae0756e175..5def289bda84 100644
->> --- a/arch/arm64/kernel/image.h
->> +++ b/arch/arm64/kernel/image.h
->> @@ -47,7 +47,9 @@
->>   #define __HEAD_FLAG_BE        0
->>   #endif
->>
->> -#define __HEAD_FLAGS   (__HEAD_FLAG_BE << 0)
->> +#define __HEAD_FLAG_PAGE_SIZE ((PAGE_SHIFT - 10) / 2)
->> +
->> +#define __HEAD_FLAGS   (__HEAD_FLAG_BE << 0) | (__HEAD_FLAG_PAGE_SIZE <<
->> 1)
->>
->
-> FWIW,
->
->         Tested-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
->
 
-Thank you,
-Ard.
+Regards,
+ChenYu
