@@ -1,223 +1,118 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 18 Sep 2015 10:26:28 -0600
-Subject: [RFC PATCH 14/20] coresight: etm-perf: implementing 'event_init()' API
+Date: Fri, 18 Sep 2015 10:26:31 -0600
+Subject: [RFC PATCH 17/20] coresight: etm-perf: adding symbolic link for CPUs
 In-Reply-To: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1442593594-10665-15-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1442593594-10665-18-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enhancing skeleton PMU with event initialisation.
+Other than probing each device entry under /sys/bus/coresight/devices/,
+there is no way for user space to know which CPU is associated to which
+tracer.  But knowing those association is important to discover tracer
+specifics and configuration options.
 
-The function makes sure tracers aren't already enabled
-before going through with the powe up and configuration
-sequences.
+As such introducing a symbolic link under
+/sys/bus/event_source/devices/cs_etm/cpuX that reference the coresight
+device a CPU is associated with.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm-perf.c | 176 +++++++++++++++++++++++
- 1 file changed, 176 insertions(+)
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 22 +++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm-perf.h | 27 ++++++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm3x.c    |  6 ++++++
+ 3 files changed, 55 insertions(+)
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.h
 
 diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 759b8d69b4e6..a21171a3e929 100644
+index edacf4b1d0bc..de0198e72603 100644
 --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
 +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -30,6 +30,9 @@
+@@ -341,6 +341,28 @@ static int etm_event_add(struct perf_event *event, int mode)
+ 	return 0;
+ }
  
- static struct pmu etm_pmu;
- 
-+static DEFINE_PER_CPU(struct coresight_device *, csdev_src);
-+static DEFINE_PER_CPU(struct coresight_device *, csdev_sink);
-+
- /* ETMCR is 'config' */
- PMU_FORMAT_ATTR(cycacc,		"config:12");
- PMU_FORMAT_ATTR(timestamp,	"config:28");
-@@ -52,6 +55,178 @@ static const struct attribute_group *etm_pmu_attr_groups[] = {
- 
- static void etm_event_read(struct perf_event *event) {}
- 
-+static int etm_event_power_single_source(int source, bool power)
++int etm_perf_symlink(struct coresight_device *csdev, bool link)
 +{
-+	int ret = 0;
-+	LIST_HEAD(path);
-+	LIST_HEAD(sinks);
-+	struct coresight_device *csdev;
++	char entry[sizeof("cpu9999999")];
++	int ret = 0, cpu = source_ops(csdev)->cpu_id(csdev);
++	struct device *pmu_dev = etm_pmu.dev;
++	struct device *cs_dev = &csdev->dev;
 +
-+	csdev = per_cpu(csdev_src, source);
++	sprintf(entry, "cpu%d", cpu);
 +
-+	if (!csdev)
-+		return -EINVAL;
-+
-+	if (csdev->type != CORESIGHT_DEV_TYPE_SOURCE)
-+		return -EINVAL;
-+
-+	if (power) {
-+		ret = source_ops(csdev)->poweron(csdev);
++	if (link) {
++		ret = sysfs_create_link(&pmu_dev->kobj, &cs_dev->kobj, entry);
 +		if (ret)
-+			goto out;
-+
-+		ret = coresight_build_paths(csdev, &path, &sinks, true);
-+		if (ret) {
-+			dev_dbg(&csdev->dev, "creating path(s) failed\n");
-+			source_ops(csdev)->poweroff(csdev);
-+		}
-+
-+		/* Everything is good, record first enabled sink buffer */
-+		per_cpu(csdev_sink, source) =
-+			list_first_entry(&sinks,
-+					 struct coresight_device, sinks);
++			return ret;
++		per_cpu(csdev_src, cpu) = csdev;
 +	} else {
-+		source_ops(csdev)->poweroff(csdev);
-+		ret = coresight_build_paths(csdev, &path, NULL, false);
-+		if (ret)
-+			dev_dbg(&csdev->dev, "releasing path(s) failed\n");
++		sysfs_remove_link(&pmu_dev->kobj, entry);
++		per_cpu(csdev_src, cpu) = NULL;
 +	}
 +
-+out:
-+	return ret;
-+}
-+
-+static int etm_event_power_sources(int source, bool power)
-+{
-+	int cpu, ret;
-+
-+	if (source < -1 || source >= nr_cpu_ids)
-+		return -EINVAL;
-+
-+	/* source == -1 is for all CPUs. */
-+	if (source != -1) {
-+		/* power up/down one source */
-+		ret = etm_event_power_single_source(source, power);
-+		goto out;
-+	}
-+
-+	/* same process as above, but for all CPUs */
-+	for_each_online_cpu(cpu) {
-+		ret = etm_event_power_single_source(cpu, power);
-+		if (ret)
-+			break;
-+	}
-+
-+out:
-+	return ret;
-+}
-+
-+static int etm_event_config_single_source(int source)
-+{
-+	struct coresight_device *csdev;
-+
-+	csdev = per_cpu(csdev_src, source);
-+
-+	if (!csdev)
-+		return -EINVAL;
-+
-+	if (csdev->type != CORESIGHT_DEV_TYPE_SOURCE)
-+		return -EINVAL;
-+
-+	return source_ops(csdev)->configure(csdev);
-+}
-+
-+static int etm_event_config_sources(int source)
-+{
-+	int cpu, ret;
-+
-+	if (source < -1 || source >= nr_cpu_ids)
-+		return -EINVAL;
-+
-+	/* source == -1 is for all CPUs. */
-+	if (source != -1) {
-+		/* configure one source */
-+		ret = etm_event_config_single_source(source);
-+		goto out;
-+	}
-+
-+	/* same process as above, but for all CPUs */
-+	for_each_online_cpu(cpu) {
-+		ret = etm_event_config_single_source(cpu);
-+		if (ret)
-+			goto reset;
-+	}
-+
-+out:
-+	return ret;
-+reset:
-+	for_each_online_cpu(cpu)
-+		etm_event_power_sources(cpu, false);
-+	goto out;
-+}
-+
-+static bool etm_event_source_single_enabled(int source)
-+{
-+	struct coresight_device *csdev = per_cpu(csdev_src, source);
-+
-+	if (!csdev)
-+		return true;
-+
-+	return source_ops(csdev)->is_enabled(csdev);
-+}
-+
-+static bool etm_event_source_enabled(int source)
-+{
-+	int cpu;
-+
-+	if (source != -1)
-+		return etm_event_source_single_enabled(source);
-+
-+	for_each_online_cpu(cpu) {
-+		if (etm_event_source_single_enabled(cpu))
-+			return true;
-+	}
-+
-+	return false;
-+}
-+
-+static void etm_event_destroy(struct perf_event *event)
-+{
-+	/* switching off the source will also tear down the path */
-+	etm_event_power_sources(event->cpu, false);
-+}
-+
-+static int etm_event_init(struct perf_event *event)
-+{
-+	int ret;
-+
-+	if (event->attr.type != etm_pmu.type)
-+		return -ENOENT;
-+
-+	if (event->cpu >= nr_cpu_ids)
-+		return -EINVAL;
-+
-+	/* only one session at a time */
-+	if (etm_event_source_enabled(event->cpu))
-+		return -EBUSY;
-+
-+	/*
-+	 * Make sure CPUs don't disappear between the
-+	 * power up sequence and configuration.
-+	 */
-+	get_online_cpus();
-+	ret = etm_event_power_sources(event->cpu, true);
-+	if (ret)
-+		goto out;
-+
-+	ret = etm_event_config_sources(event->cpu);
-+
-+	event->destroy = etm_event_destroy;
-+out:
-+	put_online_cpus();
-+	return ret;
++	return 0;
 +}
 +
  static int __init etm_perf_init(void)
  {
  	etm_pmu.capabilities	= PERF_PMU_CAP_EXCLUSIVE;
-@@ -59,6 +234,7 @@ static int __init etm_perf_init(void)
- 	etm_pmu.attr_groups	= etm_pmu_attr_groups;
- 	etm_pmu.task_ctx_nr	= perf_sw_context;
- 	etm_pmu.read		= etm_event_read;
-+	etm_pmu.event_init	= etm_event_init;
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.h b/drivers/hwtracing/coresight/coresight-etm-perf.h
+new file mode 100644
+index 000000000000..4dd900f2362a
+--- /dev/null
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.h
+@@ -0,0 +1,27 @@
++/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _CORESIGHT_ETM_PERF_H
++#define _CORESIGHT_ETM_PERF_H
++
++struct coresight_device;
++
++#ifdef CONFIG_CORESIGHT
++int etm_perf_symlink(struct coresight_device *csdev, bool link);
++
++#else
++static inline int etm_perf_symlink(struct coresight_device *csdev, bool link)
++{ return -EINVAL; }
++
++#endif /* CONFIG_CORESIGHT */
++
++#endif
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index a4c158df0fef..6a44ea330a4a 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -34,6 +34,7 @@
+ #include <asm/sections.h>
  
- 	return perf_pmu_register(&etm_pmu, CORESIGHT_ETM_PMU_NAME, -1);
- }
+ #include "coresight-etm.h"
++#include "coresight-etm-perf.h"
+ 
+ static int boot_enable;
+ module_param_named(boot_enable, boot_enable, int, S_IRUGO);
+@@ -1995,6 +1996,11 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto err_arch_supported;
+ 	}
+ 
++	if (etm_perf_symlink(drvdata->csdev, true)) {
++		ret = -EPROBE_DEFER;
++		goto err_arch_supported;
++	}
++
+ 	pm_runtime_put(&adev->dev);
+ 	dev_info(dev, "%s initialized\n", (char *)id->data);
+ 
 -- 
 1.9.1
