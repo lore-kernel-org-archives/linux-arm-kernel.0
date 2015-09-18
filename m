@@ -1,33 +1,59 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 17 Sep 2015 18:05:15 -0700
-Subject: [PATCH 0/2] KVM/arm: add fp/simd lazy switch support
-Message-ID: <1442538317-13618-1-git-send-email-m.smarduch@samsung.com>
+Date: Thu, 17 Sep 2015 18:05:16 -0700
+Subject: [PATCH 1/2] KVM/arm: add hooks for armv7 fp/simd lazy switch support
+In-Reply-To: <1442538317-13618-1-git-send-email-m.smarduch@samsung.com>
+References: <1442538317-13618-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1442538317-13618-2-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches enable armv7 fp/simd lazy switch. On guest entry fp/simd
-access trap is set, and on guest first access fp/simd registers are switched -
-host saved, guest restored. CPU continues with guest fp/simd content until
-vcpu_put where guest is saved and host is restored. 
+Basic hooks are added to support fp/simd lazy switch. A vcpu flag to track 
+fp/simd state, offset into the vcpu structure and switch prototype function.
 
-Running floating point workload illustrates reduction of fp/simd context 
-switches the amount depends on the load. For a light load with with FP 
-application running only 2% of all exits result in calls to lazy switch.
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+---
+ arch/arm/include/asm/kvm_asm.h  | 1 +
+ arch/arm/include/asm/kvm_host.h | 3 +++
+ arch/arm/kernel/asm-offsets.c   | 1 +
+ 3 files changed, 5 insertions(+)
 
-arm64 version is in test and appears to work fine, remaining work is
-boot arm32 guest on arm64 and verify operation. Initial intent was to post
-all patches at once, but arm64 version will be posted soon.
-
-Mario Smarduch (2):
-  add hooks for armv7 vfp/simd lazy switch support
-  enable armv7 vfp/simd lazy switch
-
- arch/arm/include/asm/kvm_asm.h  |  1 +
- arch/arm/include/asm/kvm_host.h |  3 +++
- arch/arm/kernel/asm-offsets.c   |  1 +
- arch/arm/kvm/arm.c              | 17 +++++++++++++++++
- arch/arm/kvm/interrupts.S       | 40 +++++++++++++++++++++++++++++-----------
- 5 files changed, 51 insertions(+), 11 deletions(-)
-
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 194c91b..4b45d79 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -97,6 +97,7 @@ extern char __kvm_hyp_code_end[];
+ extern void __kvm_flush_vm_context(void);
+ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+ extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
++extern void __kvm_restore_host_vfp_state(struct kvm_vcpu *vcpu);
+ 
+ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ #endif
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index dcba0fa..4858f6c 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -111,6 +111,9 @@ struct kvm_vcpu_arch {
+ 	/* Interrupt related fields */
+ 	u32 irq_lines;		/* IRQ and FIQ levels */
+ 
++	/* Track fp/simd lazy switch */
++	u32 vfp_lazy;
++
+ 	/* Exception Information */
+ 	struct kvm_vcpu_fault_info fault;
+ 
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index 871b826..4a80802f 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -191,6 +191,7 @@ int main(void)
+   DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.fault.hpfar));
+   DEFINE(VCPU_HYP_PC,		offsetof(struct kvm_vcpu, arch.fault.hyp_pc));
+   DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
++  DEFINE(VCPU_VFP_LAZY,		offsetof(struct kvm_vcpu, arch.vfp_lazy));
+   DEFINE(VGIC_V2_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_hcr));
+   DEFINE(VGIC_V2_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_vmcr));
+   DEFINE(VGIC_V2_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_misr));
 -- 
 1.9.1
