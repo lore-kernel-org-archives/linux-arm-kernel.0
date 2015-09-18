@@ -1,62 +1,44 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Fri, 18 Sep 2015 13:39:17 -0500
-Subject: [PATCH 2/2] ARM: dts: Fix WLAN regression on omap5-uevm
-In-Reply-To: <20150918165109.GB8020@atomide.com>
-References: <1442593745-16725-1-git-send-email-tony@atomide.com>
- <1442593745-16725-3-git-send-email-tony@atomide.com>
- <CAOCHtYh3pDg6_mdX71G=L5Vz-mOmBnerwR5pjumq5jYQ-tN5Pw@mail.gmail.com>
- <20150918165109.GB8020@atomide.com>
-Message-ID: <CAOCHtYisPQ2g0GCD4NF7m14TchfaZ+k3UedPoaA0Rjtpo9ug+g@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 18 Sep 2015 12:19:19 -0700
+Subject: [PATCH 0/3] Add __ioread32_copy() and use it
+In-Reply-To: <20150916025546.GE1747@two.firstfloor.org>
+References: <1442346089-32077-1-git-send-email-sboyd@codeaurora.org>
+ <20150915155815.5a41a8dc537610ab44d8d3dc@linux-foundation.org>
+ <20150916023219.GD1747@two.firstfloor.org>
+ <20150915195031.0a1756a2.akpm@linux-foundation.org>
+ <20150916025546.GE1747@two.firstfloor.org>
+Message-ID: <20150918121919.fa20552946703ae772d636e9@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 11:51 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Robert Nelson <robertcnelson@gmail.com> [150918 09:45]:
->> On Fri, Sep 18, 2015 at 11:29 AM, Tony Lindgren <tony@atomide.com> wrote:
->> > Commit 99f84cae43df ("ARM: dts: add wl12xx/wl18xx bindings") added
->> > device tree bindings for the TI WLAN SDIO on many omap variants.
->> >
->> > I recall wondering how come omap5-uevm did not have the WLAN
->> > added and this issue has been bugging me for a while now, and
->> > I finally tracked it down to a bad pinmux regression, and a missing
->> > deferred probe handling for the 32k clock from palmas that's
->> > requested by twl6040.
->> >
->> > Basically 392adaf796b9 ("ARM: dts: omap5-evm: Add mcspi data")
->> > added pin muxing for mcspi4 that conflicts with the onboard
->> > WLAN. While the omap5-uevm docs say the WLAN is not populated,
->> > this was probably only the case for initial prototypes. Both
->> > omap5-uevm boards I have have WLAN populated.
->>
->> Production boards from svtronics don't populate the wlan..
->>
->> http://www.svtronics.com/EVM/OMAP5432/5432
->>
->> quote: "WiFi not available on this model"
+On Wed, 16 Sep 2015 04:55:46 +0200 Andi Kleen <andi@firstfloor.org> wrote:
 
-Okay, got an email back from svtronics, there was a special omap5_uevm
-+ wlan order option for production units.
+> > Under what circumstances will the compiler (or linker?) do this? 
+> 
+> Compiler.
+> 
+> > LTO enabled?
+> 
+> Yes it's for LTO.  The optimization allows the compiler to drop unused
+> functions, which is very popular with users (a lot use it to get smaller
+> kernel images)
+> 
 
->>
->> They have an option to order a version with a "COM8Q" connector to add wlan...
->
-> Oh OK interesting.
->
->> http://www.svtronics.com/EVM/OMAP5432/5432C
->>
->> http://www.svtronics.com/EVM/OMAP5432/COM8Q
->>
->> I'm not sure who to bug from that era, but the wlan populated devices
->> might have been prototype only.
->
-> Hmm OK. Well as it's a SDIO card, it seems safe to add for now.
-> We may want to have a minimal separate dts file if the wiring is
-> different with the COM8Q card.
+Does this look truthful and complete?
 
-Well we can take care of that as an device tree overlay. ;)
 
-Regards,
-
--- 
-Robert Nelson
-https://rcn-ee.com/
+--- a/include/linux/compiler-gcc.h~a
++++ a/include/linux/compiler-gcc.h
+@@ -205,7 +205,10 @@
+ 
+ #if GCC_VERSION >= 40600
+ /*
+- * Tell the optimizer that something else uses this function or variable.
++ * When used with Link Time Optimization, gcc can optimize away C functions or
++ * variables which are referenced only from assembly code.  __visible tells the
++ * optimizer that something else uses this function or variable, thus preventing
++ * this.
+  */
+ #define __visible	__attribute__((externally_visible))
+ #endif
+_
