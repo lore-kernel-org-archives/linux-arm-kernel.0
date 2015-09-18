@@ -1,41 +1,36 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 18 Sep 2015 15:10:08 +0100
-Subject: [PATCH v4 00/20] xen/arm64: Add support for 64KB page in Linux
-In-Reply-To: <55F6B8CC.5090406@citrix.com>
-References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
- <55F68BC9.6020509@citrix.com> <55F6A437.3040403@citrix.com>
- <55F6A9DB.8040503@citrix.com> <55F6ADAE.1010609@citrix.com>
- <55F6B8CC.5090406@citrix.com>
-Message-ID: <55FC1B40.9000401@citrix.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 Sep 2015 15:14:18 +0100
+Subject: Recent GIC v1 patch
+In-Reply-To: <55FC18A4.2080205@free.fr>
+References: <55FAE26A.9040609@free.fr> <55FAEB4D.30306@arm.com>
+ <55FAF6E1.7020107@free.fr> <55FAFD3E.7010006@arm.com>
+ <55FBD6F4.8030905@free.fr> <20150918120851.6f9fb306@arm.com>
+ <yw1xbnczub0y.fsf@unicorn.mansr.com> <55FC18A4.2080205@free.fr>
+Message-ID: <20150918151418.4c0ed401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+On Fri, 18 Sep 2015 15:59:00 +0200
+Mason <slash.tmp@free.fr> wrote:
 
-On 14/09/15 13:08, Roger Pau Monn? wrote:
-> Well, absolute numbers together with the standard deviation are IMHO the
-> best way to provide those figures (ie: see ministat(1) output for
-> example), but percentages should also be fine.
+> On 18/09/2015 15:12, M?ns Rullg?rd wrote:
 > 
-> I'm just interested in knowing the performance difference between having
-> this patches applied or not when using 4KB pages on the frontend and the
-> backend.
+> > Marc Zyngier wrote:
+> > 
+> >> No idea so far. The only thing I can immediately spot is a missing pair
+> >> of chained_irq_{enter,exit} in tangox_irq_handler, but I can't imagine
+> >> this having a terminal effect on the system.
+> > 
+> > Fixed in the tangox tree on github.
+> 
+> Oh boy! Oh boy! Oh boy!
+> 
+> That did the trick. Just when I was about to give up...
+> 
+> Marc, I'm sending you an e-hug. Mans, you have my eternal gratitude.
 
-I did some benchmark:
-	DOM0: 1 VCPU, 4G of RAM based on 4.3-rc1 without this series
-	GUEST: 4 VPUs, 4G of RAM, second disk associate to a nullbk device
+Thanks, but I prefer cheese! ;-)
 
-I used fio with the following options
-
-42sh> fio --name=test --ioengine=libaio --rw=read --numjobs=8 \
---iodepth=32 --time_based=1 --runtime=30 --bs=4KB \
---filename=/dev/xvdb--direct=1 --group_reporting=1 --iodepth_batch=16
-
-The guest is also based on 4.3-rc1 with and without the series.
-
-The overhead with my series is about 0.56%.
-
-Regards,
-
+	M.
 -- 
-Julien Grall
+Jazz is not dead. It just smells funny.
