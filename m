@@ -1,47 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 Sep 2015 17:23:41 +0100
-Subject: [PATCH v2 4/7] hwrng: st: Provide DT bindings for ST's Random
- Number Generator
-In-Reply-To: <55FC3A11.6080209@codeaurora.org>
-References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
- <1442497557-9271-5-git-send-email-lee.jones@linaro.org>
- <55FC3A11.6080209@codeaurora.org>
-Message-ID: <CAF2Aj3gBn=PLB=4NvnZwbdtzkYT6QcPPrk3NCNz1+Cx9ZBWr1w@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 19 Sep 2015 00:25:20 +0800
+Subject: [linux-sunxi] [PATCH 3/4] ARM: dts: sun8i: Enable PWM controller
+ on A23/A33 Q8 format tablets
+In-Reply-To: <55FC2E95.7040006@redhat.com>
+References: <1442561739-6824-1-git-send-email-wens@csie.org>
+ <1442561739-6824-4-git-send-email-wens@csie.org> <55FC2E95.7040006@redhat.com>
+Message-ID: <CAGb2v65kEqxiWLz_faQzMWFP0nHY_tv-aJCZGNQJjYFbGEn8rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 September 2015 at 17:21, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 09/17/2015 06:45 AM, Lee Jones wrote:
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/rng/st,rng.txt | 15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/rng/st,rng.txt
->>
->> diff --git a/Documentation/devicetree/bindings/rng/st,rng.txt b/Documentation/devicetree/bindings/rng/st,rng.txt
->> new file mode 100644
->> index 0000000..dbc64e6
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/rng/st,rng.txt
->> @@ -0,0 +1,15 @@
->> +STMicroelectronics HW Random Number Generator
->> +----------------------------------------------
->> +
->> +Required parameters:
->> +compatible   : Should be "st,rng"
->> +reg          : Base address and size of IP's register map.
->> +clocks               : Phandle to device's clock (See: ../clocks/clock-bindings.txt)
->> +
->> +Example:
->> +
->> +rng at 0xfee80000 {
+On Fri, Sep 18, 2015 at 11:32 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
 >
-> Drop the 0x part please.
+> On 09/18/2015 03:35 AM, Chen-Yu Tsai wrote:
+>>
+>> A23/A33 based Q8 format tablets use channel 0 of the PWM controller for
+>> backlight dimming.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>   arch/arm/boot/dts/sun8i-q8-common.dtsi | 6 ++++++
+>>   1 file changed, 6 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi
+>> b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+>> index 6f8a8bb4e9bb..4c2d0b459d6f 100644
+>> --- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+>> @@ -70,6 +70,12 @@
+>>         };
+>>   };
+>>
+>> +&pwm {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&pwm0_pins>;
+>> +       status = "okay";
+>> +};
+>> +
+>>   &r_uart {
+>>         pinctrl-names = "default";
+>>         pinctrl-0 = <&r_uart_pins_a>;
+>>
+>
+> I've a feeling this should be in sunxi-q8-common.dtsi not
+> sun8i-q8-common.dtsi, which requires adding a pwm
+> node to sun5i.dtsi I'll look into this.
 
-Good spot.  Will fix as a subsequent patch.
+It probably should. IIRC sun5i PWM has only one channel as opposed to
+2 on A10/A20.
 
--- 
-Lee Jones
-Linaro ST Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+
+ChenYu
