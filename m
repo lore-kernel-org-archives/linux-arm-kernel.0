@@ -1,141 +1,242 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 18 Sep 2015 16:48:43 +0200
-Subject: [PATCH] ARM: at91: debug: use DEBUG_UART_PHYS
-In-Reply-To: <1439028671-22131-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1439028671-22131-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <55FC244B.106@atmel.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 18 Sep 2015 08:49:22 -0600
+Subject: [PATCH] coresight: etm3x: breaking down sysFS status interface
+Message-ID: <1442587762-1880-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/08/2015 12:11, Alexandre Belloni a ?crit :
-> Instead of having to add a new configuration option each time support for
-> new SoC is added, use CONFIG_DEBUG_UART_PHYS. For now,
-> CONFIG_DEBUG_UART_VIRT is automatically computed.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/Kconfig.debug        | 41 ++++++++++++++++-------------------------
->  arch/arm/include/debug/at91.S | 18 ++++--------------
->  2 files changed, 20 insertions(+), 39 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 946c8c0fa1fb..3ba23d0f5c55 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -123,29 +123,23 @@ choice
->  		    0x80020000      | 0xf0020000     | UART8
->  		    0x80024000      | 0xf0024000     | UART9
->  
-> -	config AT91_DEBUG_LL_DBGU0
-> -		bool "Kernel low-level debugging on rm9200, 9260/9g20, 9261/9g10, 9rl, 9x5, 9n12"
-> -		select DEBUG_AT91_UART
-> +	config DEBUG_AT91_UART
-> +		bool "Kernel low-level debugging on Atmel SoCs"
->  		depends on ARCH_AT91
-> -		depends on SOC_AT91RM9200 || SOC_AT91SAM9
-> +		help
-> +		  Say Y here if you want the debug print routines to direct
-> +		  their output to the serial port on atmel devices.
->  
-> -	config AT91_DEBUG_LL_DBGU1
-> -		bool "Kernel low-level debugging on 9263, 9g45 and sama5d3"
-> -		select DEBUG_AT91_UART
-> -		depends on ARCH_AT91
-> -		depends on SOC_AT91SAM9 || SOC_SAMA5
-> +		  SOC                  DEBUG_UART_PHYS   DEBUG_UART_VIRT  PORT
-> +		  rm9200, 9260/9g20,   0xfffff200        0xfefff200       DBGU
-> +		  9261/9g10, 9rl
-> +		  9263, 9g45, sama5d3  0xffffee00        0xfeffee00       DBGU
-> +		  sama5d4              0xfc00c000        0xfb00c000       USART3
-> +		  sama5d4              0xfc069000        0xfb069000       DBGU
+SysFS rules stipulate that only one value can be conveyed per
+file.  As such splitting the "status" interface in individual files.
 
-This last one must be sama5d3, mustn't it?
+This is also be useful for user space application - that way they can
+probe each file individually rather than having to parse a list of entries.
 
-Otherwise I'm okay:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ .../ABI/testing/sysfs-bus-coresight-devices-etm3x  |  77 ++++++++++++++--
+ drivers/hwtracing/coresight/coresight-etm3x.c      | 100 +++++++++++----------
+ 2 files changed, 121 insertions(+), 56 deletions(-)
 
-> +		  sama5d2              0xf8020000        0xf7020000       UART1
->  
-> -	config AT91_DEBUG_LL_DBGU2
-> -		bool "Kernel low-level debugging on sama5d4"
-> -		select DEBUG_AT91_UART
-> -		depends on ARCH_AT91
-> -		depends on SOC_SAMA5
-> -
-> -	config AT91_DEBUG_LL_DBGU3
-> -		bool "Kernel low-level debugging on sama5d2"
-> -		select DEBUG_AT91_UART
-> -		depends on ARCH_AT91
-> -		depends on SOC_SAMA5
-> +		  Please adjust DEBUG_UART_PHYS configuration options based on
-> +		  your needs.
->  
->  	config DEBUG_BCM2835
->  		bool "Kernel low-level debugging on BCM2835 PL011 UART"
-> @@ -1242,10 +1236,6 @@ choice
->  
->  endchoice
->  
-> -config DEBUG_AT91_UART
-> -	bool
-> -	depends on ARCH_AT91
-> -
->  config DEBUG_EXYNOS_UART
->  	bool
->  
-> @@ -1476,7 +1466,8 @@ config DEBUG_UART_PHYS
->  		DEBUG_RMOBILE_SCIFA0 || DEBUG_RMOBILE_SCIFA1 || \
->  		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
->  		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART || \
-> -		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0
-> +		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0 || \
-> +		DEBUG_AT91_UART
->  
->  config DEBUG_UART_VIRT
->  	hex "Virtual base address of debug UART"
-> diff --git a/arch/arm/include/debug/at91.S b/arch/arm/include/debug/at91.S
-> index 2556a8801c8c..43243be94cfc 100644
-> --- a/arch/arm/include/debug/at91.S
-> +++ b/arch/arm/include/debug/at91.S
-> @@ -9,32 +9,22 @@
->   *
->  */
->  
-> -#if defined(CONFIG_AT91_DEBUG_LL_DBGU0)
-> -#define AT91_DBGU 0xfffff200 /* AT91_BASE_DBGU0 */
-> -#elif defined(CONFIG_AT91_DEBUG_LL_DBGU1)
-> -#define AT91_DBGU 0xffffee00 /* AT91_BASE_DBGU1 */
-> -#elif defined(CONFIG_AT91_DEBUG_LL_DBGU2)
-> -/* On sama5d4, use USART3 as low level serial console */
-> -#define AT91_DBGU 0xfc00c000 /* SAMA5D4_BASE_USART3 */
-> -#else
-> -/* On sama5d2, use UART1 as low level serial console */
-> -#define AT91_DBGU 0xf8020000
-> -#endif
-> -
->  #ifdef CONFIG_MMU
->  #define AT91_IO_P2V(x) ((x) - 0x01000000)
->  #else
->  #define AT91_IO_P2V(x) (x)
->  #endif
->  
-> +#define CONFIG_DEBUG_UART_VIRT AT91_IO_P2V(CONFIG_DEBUG_UART_PHYS)
-> +
->  #define AT91_DBGU_SR		(0x14)	/* Status Register */
->  #define AT91_DBGU_THR		(0x1c)	/* Transmitter Holding Register */
->  #define AT91_DBGU_TXRDY		(1 << 1)	/* Transmitter Ready */
->  #define AT91_DBGU_TXEMPTY	(1 << 9)	/* Transmitter Empty */
->  
->  	.macro	addruart, rp, rv, tmp
-> -	ldr	\rp, =AT91_DBGU				@ System peripherals (phys address)
-> -	ldr	\rv, =AT91_IO_P2V(AT91_DBGU)		@ System peripherals (virt address)
-> +	ldr	\rp, =CONFIG_DEBUG_UART_PHYS		@ System peripherals (phys address)
-> +	ldr	\rv, =CONFIG_DEBUG_UART_VIRT		@ System peripherals (virt address)
->  	.endm
->  
->  	.macro	senduart,rd,rx
-> 
-
-
+diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm3x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm3x
+index d72ca1736ba4..67e3557bc4bf 100644
+--- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm3x
++++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm3x
+@@ -8,13 +8,6 @@ Description:	(RW) Enable/disable tracing on this specific trace entiry.
+ 		of coresight components linking the source to the sink is
+ 		configured and managed automatically by the coresight framework.
+ 
+-What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/status
+-Date:		November 2014
+-KernelVersion:	3.19
+-Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
+-Description:	(R) List various control and status registers.  The specific
+-		layout and content is driver specific.
+-
+ What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/addr_idx
+ Date:		November 2014
+ KernelVersion:	3.19
+@@ -251,3 +244,73 @@ Date:		November 2014
+ KernelVersion:	3.19
+ Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
+ Description: 	(RW) Define the event that controls the trigger.
++
++What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/mgmt/etmccr
++Date:		September 2015
++KernelVersion:	4.4
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description: 	(RO) Print the content of the ETM Configuration Code register
++		(0x004).  The value is read directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/mgmt/etmccer
++Date:		September 2015
++KernelVersion:	4.4
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description: 	(RO) Print the content of the ETM Configuration Code Extension
++		register (0x1e8).  The value is read directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/mgmt/etmscr
++Date:		September 2015
++KernelVersion:	4.4
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description: 	(RO) Print the content of the ETM System Configuration
++		register (0x014).  The value is read directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/mgmt/etmidr
++Date:		September 2015
++KernelVersion:	4.4
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description: 	(RO) Print the content of the ETM ID register (0x1e4).  The
++		value is read directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/mgmt/etmcr
++Date:		September 2015
++KernelVersion:	4.4
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description: 	(RO) Print the content of the ETM Main Control register (0x000).
++		The value is read directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/mgmt/etmtraceidr
++Date:		September 2015
++KernelVersion:	4.4
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description: 	(RO) Print the content of the ETM Trace ID register (0x200).
++		The value is read directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/mgmt/etmteevr
++Date:		September 2015
++KernelVersion:	4.4
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description: 	(RO) Print the content of the ETM Trace Enable Event register
++		(0x020). The value is read directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/mgmt/etmtsscr
++Date:		September 2015
++KernelVersion:	4.4
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description: 	(RO) Print the content of the ETM Trace Start/Stop Conrol
++		register (0x018). The value is read directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/mgmt/etmtecr1
++Date:		September 2015
++KernelVersion:	4.4
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description: 	(RO) Print the content of the ETM Enable Conrol #1
++		register (0x024). The value is read directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.[etm|ptm]/mgmt/etmtecr2
++Date:		September 2015
++KernelVersion:	4.4
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description: 	(RO) Print the content of the ETM Enable Conrol #2
++		register (0x01c). The value is read directly from the HW.
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index 4797f56e7f13..87374b3388ad 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -313,14 +313,6 @@ static void etm_enable_hw(void *info)
+ 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
+ }
+ 
+-static int etm_trace_id_simple(struct etm_drvdata *drvdata)
+-{
+-	if (!drvdata->enable)
+-		return drvdata->traceid;
+-
+-	return (etm_readl(drvdata, ETMTRACEIDR) & ETM_TRACEID_MASK);
+-}
+-
+ static int etm_trace_id(struct coresight_device *csdev)
+ {
+ 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+@@ -1506,45 +1498,6 @@ static ssize_t timestamp_event_store(struct device *dev,
+ }
+ static DEVICE_ATTR_RW(timestamp_event);
+ 
+-static ssize_t status_show(struct device *dev,
+-			   struct device_attribute *attr, char *buf)
+-{
+-	int ret;
+-	unsigned long flags;
+-	struct etm_drvdata *drvdata = dev_get_drvdata(dev->parent);
+-
+-	pm_runtime_get_sync(drvdata->dev);
+-	spin_lock_irqsave(&drvdata->spinlock, flags);
+-
+-	CS_UNLOCK(drvdata->base);
+-	ret = sprintf(buf,
+-		      "ETMCCR: 0x%08x\n"
+-		      "ETMCCER: 0x%08x\n"
+-		      "ETMSCR: 0x%08x\n"
+-		      "ETMIDR: 0x%08x\n"
+-		      "ETMCR: 0x%08x\n"
+-		      "ETMTRACEIDR: 0x%08x\n"
+-		      "Enable event: 0x%08x\n"
+-		      "Enable start/stop: 0x%08x\n"
+-		      "Enable control: CR1 0x%08x CR2 0x%08x\n"
+-		      "CPU affinity: %d\n",
+-		      drvdata->etmccr, drvdata->etmccer,
+-		      etm_readl(drvdata, ETMSCR), etm_readl(drvdata, ETMIDR),
+-		      etm_readl(drvdata, ETMCR), etm_trace_id_simple(drvdata),
+-		      etm_readl(drvdata, ETMTEEVR),
+-		      etm_readl(drvdata, ETMTSSCR),
+-		      etm_readl(drvdata, ETMTECR1),
+-		      etm_readl(drvdata, ETMTECR2),
+-		      drvdata->cpu);
+-	CS_LOCK(drvdata->base);
+-
+-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+-	pm_runtime_put(drvdata->dev);
+-
+-	return ret;
+-}
+-static DEVICE_ATTR_RO(status);
+-
+ static ssize_t cpu_show(struct device *dev,
+ 			struct device_attribute *attr, char *buf)
+ {
+@@ -1631,12 +1584,61 @@ static struct attribute *coresight_etm_attrs[] = {
+ 	&dev_attr_ctxid_mask.attr,
+ 	&dev_attr_sync_freq.attr,
+ 	&dev_attr_timestamp_event.attr,
+-	&dev_attr_status.attr,
+ 	&dev_attr_traceid.attr,
+ 	&dev_attr_cpu.attr,
+ 	NULL,
+ };
+-ATTRIBUTE_GROUPS(coresight_etm);
++
++#define coresight_simple_func(name, offset)                             \
++static ssize_t name##_show(struct device *_dev,                         \
++			   struct device_attribute *attr, char *buf)    \
++{                                                                       \
++	struct etm_drvdata *drvdata = dev_get_drvdata(_dev->parent);    \
++	return scnprintf(buf, PAGE_SIZE, "0x%x\n",                      \
++			 readl_relaxed(drvdata->base + offset));        \
++}                                                                       \
++DEVICE_ATTR_RO(name)
++
++coresight_simple_func(etmccr, ETMCCR);
++coresight_simple_func(etmccer, ETMCCER);
++coresight_simple_func(etmscr, ETMSCR);
++coresight_simple_func(etmidr, ETMIDR);
++coresight_simple_func(etmcr, ETMCR);
++coresight_simple_func(etmtraceidr, ETMTRACEIDR);
++coresight_simple_func(etmteevr, ETMTEEVR);
++coresight_simple_func(etmtssvr, ETMTSSCR);
++coresight_simple_func(etmtecr1, ETMTECR1);
++coresight_simple_func(etmtecr2, ETMTECR2);
++
++static struct attribute *coresight_etm_mgmt_attrs[] = {
++	&dev_attr_etmccr.attr,
++	&dev_attr_etmccer.attr,
++	&dev_attr_etmscr.attr,
++	&dev_attr_etmidr.attr,
++	&dev_attr_etmcr.attr,
++	&dev_attr_etmtraceidr.attr,
++	&dev_attr_etmteevr.attr,
++	&dev_attr_etmtssvr.attr,
++	&dev_attr_etmtecr1.attr,
++	&dev_attr_etmtecr2.attr,
++	NULL,
++};
++
++static const struct attribute_group coresight_etm_group = {
++	.attrs = coresight_etm_attrs,
++};
++
++
++static const struct attribute_group coresight_etm_mgmt_group = {
++	.attrs = coresight_etm_mgmt_attrs,
++	.name = "mgmt",
++};
++
++static const struct attribute_group *coresight_etm_groups[] = {
++	&coresight_etm_group,
++	&coresight_etm_mgmt_group,
++	NULL,
++};
+ 
+ static int etm_cpu_callback(struct notifier_block *nfb, unsigned long action,
+ 			    void *hcpu)
 -- 
-Nicolas Ferre
+1.9.1
