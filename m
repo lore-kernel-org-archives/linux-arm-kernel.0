@@ -1,67 +1,51 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Thu, 17 Sep 2015 16:58:02 -0700
-Subject: [PATCH 4/4] ARM: dts: enable touchscreen support on Cygnus
-In-Reply-To: <1442534282-21356-1-git-send-email-rjui@broadcom.com>
-References: <1442534282-21356-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1442534282-21356-5-git-send-email-rjui@broadcom.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 18 Sep 2015 09:12:23 +0900
+Subject: [PATCH v4 15/16] clk: shmobile: mstp: Consider "zb_clk" suitable
+ for power management
+In-Reply-To: <20150917222454.GW23081@codeaurora.org>
+References: <1438691297-29235-1-git-send-email-geert+renesas@glider.be>
+ <1438691297-29235-16-git-send-email-geert+renesas@glider.be>
+ <20150917084446.GA8197@verge.net.au>
+ <20150917085314.GA29509@verge.net.au>
+ <20150917222454.GW23081@codeaurora.org>
+Message-ID: <20150918001220.GB12858@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables touchscreen support on bcm958300k and bcm958305k.
-Touchscreen is connected to these boards through the bcm9hmidc daughter
-card
+On Thu, Sep 17, 2015 at 03:24:54PM -0700, Stephen Boyd wrote:
+> On 09/17, Simon Horman wrote:
+> > On Thu, Sep 17, 2015 at 05:45:18PM +0900, Simon Horman wrote:
+> > > Hi Mike, Hi Stephen,
+> > > 
+> > > On Tue, Aug 04, 2015 at 02:28:16PM +0200, Geert Uytterhoeven wrote:
+> > > > Currently the CPG/MSTP Clock Domain code looks for MSTP clocks to power
+> > > > manage a device.
+> > > > 
+> > > > Unfortunately, on R-Mobile APE6 (r8a73a4) and SH-Mobile AG5 (sh73a0),
+> > > > the Bus State Controller (BSC) is not power-managed by an MSTP clock,
+> > > > but by a plain CPG clock (zb_clk).  Add a special case to handle this,
+> > > > so the clock is properly managed, and devices connected to the BSC work
+> > > > as expected.
+> > > > 
+> > > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > > Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > > 
+> > > for one reason or another I seem to have this patch queued up in
+> > > my renesas tree for v4.4, without any Acks.
+> > > 
+> > > I think it would be best if one of you took the patch instead.
+> > > Though I'm also happy to take it with Acks.
+> > > 
+> > > Let me know how you would like to proceed.
+> > 
+> > Sorry to revise the above, I should have checked more closely
+> > before I sent my previous email. I now see that I have an SoC patch
+> > that depends on this one. So if possible I'd like to take this one
+> > through my tree with an Ack or two.
+> > 
+> 
+> Sure.
+> 
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Vikram Prakash <vikramp@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- arch/arm/boot/dts/bcm-cygnus.dtsi | 9 +++++++++
- arch/arm/boot/dts/bcm958300k.dts  | 1 +
- arch/arm/boot/dts/bcm958305k.dts  | 1 +
- 3 files changed, 11 insertions(+)
-
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 1f56b18..d898838 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -256,5 +256,14 @@
- 			interrupt-controller;
- 			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
- 		};
-+
-+		touchscreen: tsc at 180a6000 {
-+			compatible = "brcm,iproc-touchscreen";
-+			reg = <0x180a6000 0x40>;
-+			clocks = <&asiu_clks BCM_CYGNUS_ASIU_ADC_CLK>;
-+			clock-names = "tsc_clk";
-+			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/bcm958300k.dts b/arch/arm/boot/dts/bcm958300k.dts
-index d8dc9f0..2e31581 100644
---- a/arch/arm/boot/dts/bcm958300k.dts
-+++ b/arch/arm/boot/dts/bcm958300k.dts
-@@ -33,6 +33,7 @@
- /dts-v1/;
- 
- #include "bcm-cygnus.dtsi"
-+#include "bcm9hmidc.dtsi"
- 
- / {
- 	model = "Cygnus SVK (BCM958300K)";
-diff --git a/arch/arm/boot/dts/bcm958305k.dts b/arch/arm/boot/dts/bcm958305k.dts
-index 9863a19..288a637 100644
---- a/arch/arm/boot/dts/bcm958305k.dts
-+++ b/arch/arm/boot/dts/bcm958305k.dts
-@@ -33,6 +33,7 @@
- /dts-v1/;
- 
- #include "bcm-cygnus.dtsi"
-+#include "bcm9hmidc.dtsi"
- 
- / {
- 	model = "Cygnus Wireless Audio (BCM958305K)";
--- 
-1.9.1
+Thanks, much appreciated.
