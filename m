@@ -1,36 +1,114 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Sep 2015 15:14:18 +0100
-Subject: Recent GIC v1 patch
-In-Reply-To: <55FC18A4.2080205@free.fr>
-References: <55FAE26A.9040609@free.fr> <55FAEB4D.30306@arm.com>
- <55FAF6E1.7020107@free.fr> <55FAFD3E.7010006@arm.com>
- <55FBD6F4.8030905@free.fr> <20150918120851.6f9fb306@arm.com>
- <yw1xbnczub0y.fsf@unicorn.mansr.com> <55FC18A4.2080205@free.fr>
-Message-ID: <20150918151418.4c0ed401@arm.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 18 Sep 2015 10:14:26 -0400
+Subject: [PATCH] arm64: dmi: initialize DMI earlier in boot
+Message-ID: <1442585666-14093-1-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Sep 2015 15:59:00 +0200
-Mason <slash.tmp@free.fr> wrote:
+Currently, DMI initialization takes place in a core initcall. This
+limits how early in boot the kernel can make DMI-based decisions
+about firmware/hardware quirks. This patch moves DMI initialization
+to setup_arch() so that DMI info is available before initcalls run.
 
-> On 18/09/2015 15:12, M?ns Rullg?rd wrote:
-> 
-> > Marc Zyngier wrote:
-> > 
-> >> No idea so far. The only thing I can immediately spot is a missing pair
-> >> of chained_irq_{enter,exit} in tangox_irq_handler, but I can't imagine
-> >> this having a terminal effect on the system.
-> > 
-> > Fixed in the tangox tree on github.
-> 
-> Oh boy! Oh boy! Oh boy!
-> 
-> That did the trick. Just when I was about to give up...
-> 
-> Marc, I'm sending you an e-hug. Mans, you have my eternal gratitude.
+Signed-off-by: Mark Salter <msalter@redhat.com>
+---
+ arch/arm64/include/asm/dmi.h | 19 ++++++++++++++++---
+ arch/arm64/kernel/efi.c      | 15 ---------------
+ arch/arm64/kernel/setup.c    |  5 +++++
+ 3 files changed, 21 insertions(+), 18 deletions(-)
 
-Thanks, but I prefer cheese! ;-)
-
-	M.
+diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
+index 69d37d8..e6389fd 100644
+--- a/arch/arm64/include/asm/dmi.h
++++ b/arch/arm64/include/asm/dmi.h
+@@ -16,16 +16,29 @@
+ 
+ #include <linux/io.h>
+ #include <linux/slab.h>
++#include <linux/memblock.h>
+ 
+ /*
+  * According to section 2.3.6 of the UEFI spec, the firmware should not
+  * request a virtual mapping for configuration tables such as SMBIOS.
+  * This means we have to map them before use.
+  */
+-#define dmi_early_remap(x, l)		ioremap_cache(x, l)
+-#define dmi_early_unmap(x, l)		iounmap(x)
++static inline __init void __iomem *dmi_early_remap(resource_size_t addr,
++						   unsigned long size)
++{
++	return (__force void __iomem *)early_memremap(addr, size);
++}
++
++#define dmi_early_unmap(x, l)		early_memunmap((__force void *)(x), l)
+ #define dmi_remap(x, l)			ioremap_cache(x, l)
+ #define dmi_unmap(x)			iounmap(x)
+-#define dmi_alloc(l)			kzalloc(l, GFP_KERNEL)
++
++static inline __init void *dmi_alloc(size_t len)
++{
++	void *ptr = __va(memblock_alloc(len, sizeof(long)));
++
++	memset(ptr, 0, len);
++	return ptr;
++}
+ 
+ #endif
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 7939667..b9e6afb 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -12,7 +12,6 @@
+  */
+ 
+ #include <linux/atomic.h>
+-#include <linux/dmi.h>
+ #include <linux/efi.h>
+ #include <linux/export.h>
+ #include <linux/memblock.h>
+@@ -413,20 +412,6 @@ static int __init arm64_enable_runtime_services(void)
+ }
+ early_initcall(arm64_enable_runtime_services);
+ 
+-static int __init arm64_dmi_init(void)
+-{
+-	/*
+-	 * On arm64, DMI depends on UEFI, and dmi_scan_machine() needs to
+-	 * be called early because dmi_id_init(), which is an arch_initcall
+-	 * itself, depends on dmi_scan_machine() having been called already.
+-	 */
+-	dmi_scan_machine();
+-	if (dmi_available)
+-		dmi_set_dump_stack_arch_desc();
+-	return 0;
+-}
+-core_initcall(arm64_dmi_init);
+-
+ static void efi_set_pgd(struct mm_struct *mm)
+ {
+ 	if (mm == &init_mm)
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index dc9eb5f..200c2e9 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -46,6 +46,7 @@
+ #include <linux/efi.h>
+ #include <linux/personality.h>
+ #include <linux/psci.h>
++#include <linux/dmi.h>
+ 
+ #include <asm/acpi.h>
+ #include <asm/fixmap.h>
+@@ -436,6 +437,10 @@ void __init setup_arch(char **cmdline_p)
+ 	relocate_initrd();
+ 	request_standard_resources();
+ 
++	dmi_scan_machine();
++	if (dmi_available)
++		dmi_set_dump_stack_arch_desc();
++
+ 	early_ioremap_reset();
+ 
+ 	if (acpi_disabled) {
 -- 
-Jazz is not dead. It just smells funny.
+1.8.3.1
