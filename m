@@ -1,34 +1,28 @@
-From: cengelma@gmx.at (Christian Engelmayer)
-Date: Sat, 19 Sep 2015 00:33:07 +0200
-Subject: [PATCH] [media] c8sectpfe: Fix uninitialized variable in
- load_slim_core_fw()
-Message-ID: <1442615587-22260-1-git-send-email-cengelma@gmx.at>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sat, 19 Sep 2015 07:12:13 +0800
+Subject: [PATCH v2 0/7] hwrng: Add support for STMicroelectronics' RNG IP
+In-Reply-To: <20150918155112.GE3218@x1>
+References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
+ <20150918140756.GK9249@gondor.apana.org.au>
+ <CAF2Aj3h7Jy=tpYdZTdbxAJwa=147_hAu3reOFrbEh=JdrMFWLQ@mail.gmail.com>
+ <20150918151137.GA10763@gondor.apana.org.au>
+ <20150918155112.GE3218@x1>
+Message-ID: <20150918231213.GA14278@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Variable err in function load_slim_core_fw() is used without initializer.
-Make sure that the result is deterministic. Detected by Coverity CID
-1324265.
+On Fri, Sep 18, 2015 at 04:51:12PM +0100, Lee Jones wrote:
+>
+> I think it's okay for you to take all but patch 6.
+> 
+> Patch 6 is an ARM patch and needs to go into ARM SoC via
+> STMicroelectronics STi tree.
 
-Signed-off-by: Christian Engelmayer <cengelma@gmx.at>
----
-Compile tested only. Applies against linux-next.
----
- drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+In future please don't send me patches that you don't want me to
+merge in the series.
 
-diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-index 486aef50d99b..cd146464a80c 100644
---- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-+++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-@@ -1106,7 +1106,7 @@ static int load_slim_core_fw(const struct firmware *fw, void *context)
- 	phdr = (Elf32_Phdr *)(fw->data + ehdr->e_phoff);
- 
- 	/* go through the available ELF segments */
--	for (i = 0; i < ehdr->e_phnum && !err; i++, phdr++) {
-+	for (i = 0, err = 0; i < ehdr->e_phnum && !err; i++, phdr++) {
- 
- 		/* Only consider LOAD segments */
- 		if (phdr->p_type != PT_LOAD)
+Cheers,
 -- 
-1.9.1
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
