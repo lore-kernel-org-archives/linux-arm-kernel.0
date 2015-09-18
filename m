@@ -1,32 +1,67 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 19 Sep 2015 00:08:59 +0200
-Subject: [PATCH 2/2] ARM: at91: at91sam9n12ek/dts: fix the led labels name
-In-Reply-To: <55FC15B9.9070407@atmel.com>
-References: <27620a5315a0fd314e21eac4afbfe87f1350b099.1441897573.git.nicolas.ferre@atmel.com>
- <fca26d7ecb73e9691da4ee85e7e5bd8462638752.1441897573.git.nicolas.ferre@atmel.com>
- <20150910152415.GN3237@piout.net> <55FC15B9.9070407@atmel.com>
-Message-ID: <20150918220859.GJ4287@piout.net>
+From: rjui@broadcom.com (Ray Jui)
+Date: Fri, 18 Sep 2015 15:11:27 -0700
+Subject: [PATCH v2 5/9] ARM: dts: Move all Cygnus peripherals into soc bus
+In-Reply-To: <1929872.EmD9YkfFuv@wuerfel>
+References: <1442611454-16331-1-git-send-email-rjui@broadcom.com>
+ <1442611454-16331-6-git-send-email-rjui@broadcom.com>
+ <1929872.EmD9YkfFuv@wuerfel>
+Message-ID: <55FC8C0F.9020308@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 18/09/2015 at 15:46:33 +0200, Nicolas Ferre wrote :
-> > The only concern being that this renaming will break userspace software
-> > assuming the LEDs are wrongly named. Is there anything that has been
-> > released by atmel that uses the wrong names (and my guess is yess and
-> > that is why there are named as such) and do you care about it?
+
+On 9/18/2015 2:34 PM, Arnd Bergmann wrote:
+> On Friday 18 September 2015 14:24:10 Ray Jui wrote:
+>> +       soc {
+>> +               compatible = "simple-bus";
+>> +               ranges;
+>> +               #address-cells = <1>;
+>> +               #size-cells = <1>;
 > 
-> My guess is that the label was wrongly named from the beginning and no
-> board revision had the "d6" nor "d7" names.
-> It makes sense to rename them for the evaluation kit...
+>> +               pinctrl: pinctrl at 0301d0c8 {
+>>
+> 
+> Similarly to the core bus, this seems to have address ranges 0x03xxxxxx and
+> 0x18xxxxxx on it, so put those into the ranges.
+>
+
+Okay we have an issue here. For whatever reason, the Cygnus ASIC team
+decided to put registers for the same block in random locations. We see
+similar issues in all of our other iProc based SoCs. We have
+communicated this to our ASIC team, and hopefully they can revert the
+trend for the next SoC.
+
+For example, the gpio_ccm has registers in the following regions:
+
+gpio_ccm: gpio at 1800a000 {
+    compatible = "brcm,cygnus-ccm-gpio";
+    reg = <0x1800a000 0x50>,
+          <0x0301d164 0x20>;
+
+NAND is worse, it has registers in 3 different separate regions:
+
+nand: nand at 18046000 {
+    compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1",
+                 "brcm,brcmnand";
+    reg = <0x18046000 0x600>, <0xf8105408 0x600>,
+          <0x18046f00 0x20>;
+
+As you can see, this makes it impossible to define a proper address
+range for the bus; therefore, I'll have to keep the ranges undefined and
+a simple 1:1 mapping under this bus.
+
+> It probably also makes sense to name the bus according to what kind of
+> bus (axi, ahb, plb, ...) is used here. If the soc has nested buses
+> (e.g. an ahb connected to an axi bus,) then model both of them in the DT.
+
+Based on the block diagram from the ASIC team, it looks like all of them
+are connected to one major AXI fabric. I can rename the bus to AXI.
+
+> 
+> 	Arnd
 > 
 
-Yeah, I'm fine with the change. I was simply warning that it may break
-some demos Atmel distributed before (but I didn't ever seen or used
-those anyway so I may be wrong).
+Thanks,
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Ray
