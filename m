@@ -1,121 +1,148 @@
-From: aalonso@freescale.com (Alonso Adrian)
-Date: Fri, 18 Sep 2015 16:27:37 +0000
-Subject: [PATCH v2 5/8] pinctrl: freescale: imx: add ZERO_OFFSET_VALID flag
-In-Reply-To: <20150918135248.GB3770@tiger>
-References: <1441147753-13239-1-git-send-email-aalonso@freescale.com>
- <1441147753-13239-5-git-send-email-aalonso@freescale.com>
- <20150907012831.GE30746@tiger>
- <BN3PR03MB1509E4893244D963FDA21707A8530@BN3PR03MB1509.namprd03.prod.outlook.com>
- <20150918135248.GB3770@tiger>
-Message-ID: <CY1PR03MB15206FAAB4656A6E207FD4E2A8590@CY1PR03MB1520.namprd03.prod.outlook.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 18 Sep 2015 10:26:32 -0600
+Subject: [RFC PATCH 18/20] coresight: etm3x: pushing down perf configuration
+ to tracer
+In-Reply-To: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1442593594-10665-19-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Friday, September 18, 2015 8:53 AM
-> To: Alonso Lazcano Adrian-B38018 <aalonso@freescale.com>
-> Cc: linux-arm-kernel at lists.infradead.org; shawn.guo at linaro.org;
-> linus.walleij at linaro.org; lznuaa at gmail.com; devicetree at vger.kernel.org; Li
-> Frank-B20596 <Frank.Li@freescale.com>; Garg Nitin-B37173
-> <nitin.garg@freescale.com>; Huang Yongcai-B20788
-> <Anson.Huang@freescale.com>; linux-gpio at vger.kernel.org;
-> robh+dt at kernel.org; Gong Yibin-B38343 <yibin.gong@freescale.com>
-> Subject: Re: [PATCH v2 5/8] pinctrl: freescale: imx: add ZERO_OFFSET_VALID
-> flag
-> 
-> On Tue, Sep 08, 2015 at 04:05:32PM +0000, Alonso Adrian wrote:
-> > Hi Shawn,
-> >
-> > See comments below
-> 
-> Please use bottom posting, not top posting.
-> 
-> ...
-> 
-> > > @@ -536,21 +536,29 @@ static int imx_pinctrl_parse_groups(struct
-> device_node *np,
-> > >               return -ENOMEM;
-> > >
-> > >       for (i = 0; i < grp->npins; i++) {
-> > > -             u32 mux_reg = be32_to_cpu(*list++);
-> > > +             u32 mux_reg;
-> > >               u32 conf_reg;
-> > >               unsigned int pin_id;
-> > >               struct imx_pin_reg *pin_reg;
-> > >               struct imx_pin *pin = &grp->pins[i];
-> > >
-> > > +             mux_reg = be32_to_cpu(*list++);
-> > > +             if (!(info->flags & ZERO_OFFSET_VALID) && !mux_reg)
-> > > +                     mux_reg = -1;
-> > > +
-> > >               if (info->flags & SHARE_MUX_CONF_REG) {
-> > >                       conf_reg = mux_reg;
-> > >               } else {
-> > >                       conf_reg = be32_to_cpu(*list++);
-> > > -                     if (!conf_reg)
-> > > +                     if (!(info->flags & ZERO_OFFSET_VALID) &&
-> > > + !conf_reg)
-> > >                               conf_reg = -1;
-> > >               }
-> > >
-> > [Adrian] The below assignment is the important thing that this patch
-> > does, it allows the pad_id to be zero and match the pad id's according to the
-> mux_reg offset.
-> > > -             pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
-> > > +             if (info->flags & ZERO_OFFSET_VALID)
-> > > +                     pin_id = mux_reg / 4;
-> > > +             else
-> > > +                     pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
-> > > +
-> 
-> Ah, yes.  So the only code change we need is just the line below, right?
-> 
-> 	pin_id = (mux_reg != -1) ? mux_reg / 4 : conf_reg / 4;
-> 
-> Shawn
-[Adrian] Yes that will work, let me resend a new patch series with this change, Thanks.
-> 
-> > >               pin_reg = &info->pin_regs[pin_id];
-> > >               pin->pin = pin_id;
-> > >               grp->pin_ids[i] = pin_id; @@ -684,7 +692,7 @@ int
-> > > imx_pinctrl_probe(struct platform_device *pdev,  {
-> > >       struct imx_pinctrl *ipctl;
-> > >       struct resource *res;
-> > > -     int ret, i;
-> > > +     int ret;
-> > >
-> > >       if (!info || !info->pins || !info->npins) {
-> > >               dev_err(&pdev->dev, "wrong pinctrl info\n"); @@
-> > > -702,11 +710,6 @@ int imx_pinctrl_probe(struct platform_device *pdev,
-> > >       if (!info->pin_regs)
-> > >               return -ENOMEM;
-> > >
-> > > -     for (i = 0; i < info->npins; i++) {
-> > > -             info->pin_regs[i].mux_reg = -1;
-> > > -             info->pin_regs[i].conf_reg = -1;
-> > > -     }
-> > > -
-> > >       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > >       ipctl->base = devm_ioremap_resource(&pdev->dev, res);
-> > >       if (IS_ERR(ipctl->base))
-> > > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h
-> > > b/drivers/pinctrl/freescale/pinctrl-imx.h
-> > > index 26f8f1c..67c07c2 100644
-> > > --- a/drivers/pinctrl/freescale/pinctrl-imx.h
-> > > +++ b/drivers/pinctrl/freescale/pinctrl-imx.h
-> > > @@ -85,6 +85,7 @@ struct imx_pinctrl_soc_info {  };
-> > >
-> > >  #define SHARE_MUX_CONF_REG   0x1
-> > > +#define ZERO_OFFSET_VALID    0x2
-> > >
-> > >  #define NO_MUX               0x0
-> > >  #define NO_PAD               0x0
-> > > --
-> > > 2.1.4
-> > >
-> > >
-> > > _______________________________________________
-> > > linux-arm-kernel mailing list
-> > > linux-arm-kernel at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The perf command line tool supports configuration for cycle
+accurate and timestamps.  Configuration for those field is
+found in the 'config' field of the event configuration
+attributes.
+
+Since the bit fields were organised to match,
+the only thing that is needed is to make sure no extra
+fields were set.
+
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 12 +++++------
+ drivers/hwtracing/coresight/coresight-etm3x.c    | 27 +++++++++++++++++++++++-
+ include/linux/coresight.h                        |  3 ++-
+ 3 files changed, 34 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index de0198e72603..a662842f3327 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -122,7 +122,7 @@ out:
+ 	return ret;
+ }
+ 
+-static int etm_event_config_single_source(int source)
++static int etm_event_config_single_source(int source, struct perf_event *event)
+ {
+ 	struct coresight_device *csdev;
+ 
+@@ -134,10 +134,10 @@ static int etm_event_config_single_source(int source)
+ 	if (csdev->type != CORESIGHT_DEV_TYPE_SOURCE)
+ 		return -EINVAL;
+ 
+-	return source_ops(csdev)->configure(csdev);
++	return source_ops(csdev)->configure(csdev, event);
+ }
+ 
+-static int etm_event_config_sources(int source)
++static int etm_event_config_sources(int source, struct perf_event *event)
+ {
+ 	int cpu, ret;
+ 
+@@ -147,13 +147,13 @@ static int etm_event_config_sources(int source)
+ 	/* source == -1 is for all CPUs. */
+ 	if (source != -1) {
+ 		/* configure one source */
+-		ret = etm_event_config_single_source(source);
++		ret = etm_event_config_single_source(source, event);
+ 		goto out;
+ 	}
+ 
+ 	/* same process as above, but for all CPUs */
+ 	for_each_online_cpu(cpu) {
+-		ret = etm_event_config_single_source(cpu);
++		ret = etm_event_config_single_source(cpu, event);
+ 		if (ret)
+ 			goto reset;
+ 	}
+@@ -220,7 +220,7 @@ static int etm_event_init(struct perf_event *event)
+ 	if (ret)
+ 		goto out;
+ 
+-	ret = etm_event_config_sources(event->cpu);
++	ret = etm_event_config_sources(event->cpu, event);
+ 
+ 	event->destroy = etm_event_destroy;
+ out:
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index 6a44ea330a4a..077b49714259 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -313,6 +313,25 @@ static void etm_power_down(struct coresight_device *csdev)
+ 	pm_runtime_put(csdev->dev.parent);
+ }
+ 
++#define ETM3X_SUPPORTED_OPTIONS (ETMCR_CYC_ACC | ETMCR_TIMESTAMP_EN)
++
++static int etm_parse_event_config(struct etm_drvdata *drvdata,
++				  struct perf_event *event)
++{
++	u64 config = event->attr.config;
++
++	/*
++	 * At this time only cycle accurate and timestamp options are
++	 * available.  As such clear everything else that may have been
++	 * configured and set the ETM control register based on what was
++	 * requested.
++	 */
++	config &= ETM3X_SUPPORTED_OPTIONS;
++	drvdata->ctrl = config;
++
++	return 0;
++}
++
+ /**
+  * etm_configure_cpu - configure ETM registers
+  * @csdev - the etm that needs to be configure.
+@@ -334,6 +353,8 @@ static void etm_configure_cpu(void *info)
+ 	etm_set_prog(drvdata);
+ 
+ 	etmcr = etm_readl(drvdata, ETMCR);
++	/* Clear setting from a previous run if need be */
++	etmcr &= ~ETM3X_SUPPORTED_OPTIONS;
+ 	etmcr |= drvdata->port_size;
+ 	etmcr |= ETMCR_ETM_EN;
+ 	etm_writel(drvdata, drvdata->ctrl | etmcr, ETMCR);
+@@ -379,10 +400,14 @@ static void etm_configure_cpu(void *info)
+ 	CS_LOCK(drvdata->base);
+ }
+ 
+-static int etm_configure(struct coresight_device *csdev)
++static int etm_configure(struct coresight_device *csdev,
++			 struct perf_event *event)
+ {
+ 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 
++	if (etm_parse_event_config(drvdata, event))
++		return -EINVAL;
++
+ 	return smp_call_function_single(drvdata->cpu,
+ 					etm_configure_cpu, csdev, 1);
+ }
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index da76b2951f10..e1a14c84082f 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -237,7 +237,8 @@ struct coresight_ops_source {
+ 	int (*cpu_id)(struct coresight_device *csdev);
+ 	int (*trace_id)(struct coresight_device *csdev);
+ 	bool (*is_enabled)(struct coresight_device *csdev);
+-	int (*configure)(struct coresight_device *csdev);
++	int (*configure)(struct coresight_device *csdev,
++			 struct perf_event *event);
+ 	int (*trace_enable)(struct coresight_device *csdev, bool enable);
+ 	int (*enable)(struct coresight_device *csdev);
+ 	void (*disable)(struct coresight_device *csdev);
+-- 
+1.9.1
