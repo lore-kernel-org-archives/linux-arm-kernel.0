@@ -1,36 +1,43 @@
 From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Fri, 18 Sep 2015 16:29:34 +0200
-Subject: [PATCH 1/4] s5p-jpeg: generalize clocks handling
-In-Reply-To: <1442586060-23657-2-git-send-email-andrzej.p@samsung.com>
+Date: Fri, 18 Sep 2015 16:30:08 +0200
+Subject: [PATCH 2/4] s5p-jpeg: add support for 5433
+In-Reply-To: <1442586060-23657-3-git-send-email-andrzej.p@samsung.com>
 References: <1442586060-23657-1-git-send-email-andrzej.p@samsung.com>
- <1442586060-23657-2-git-send-email-andrzej.p@samsung.com>
-Message-ID: <55FC1FCE.1010208@samsung.com>
+ <1442586060-23657-3-git-send-email-andrzej.p@samsung.com>
+Message-ID: <55FC1FF0.7080506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrzej, Marek,
+Hi Andrzej,
 
 On 09/18/2015 04:20 PM, Andrzej Pietrasiewicz wrote:
-> From: Marek Szyprowski <m.szyprowski@samsung.com>
+> JPEG IP found in Exynos5433 is similar to what is in Exynos4, but
+> there are some subtle differences which this patch takes into account.
 >
-> Allow jpeg codec variants declare clocks they need.
-> Before this patch is applied jpeg-core gets jpeg->sclk
-> "speculatively": if it is not there, we assume no problem.
+> The most important difference is in what is processed by the JPEG IP and
+> what has to be provided to it. In case of 5433 the IP does not parse
+> Huffman and quantisation tables, so this has to be performed with the CPU
+> and the majority of the code in this patch does that.
 >
-> This patch eliminates this by explicitly declaring
-> what clocks are needed for each variant.
+> A small but important difference is in what address is passed to the JPEG
+> IP. In case of 5433 it is the SOS (start of scan) position, which is
+> natural, because the headers must be parsed elsewhere.
 >
-> This is a preparation for adding Exynos 5433 variant support, which
-> needs 4 clocks of names not compatible with any previous version of
-> jpeg hw module.
+> There is also a difference in how the hardware is put to work in
+> device_run.
 >
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> [Rebase and commit message]
+> Data structures are extended as appropriate to accommodate the above
+> changes.
+>
 > Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
 > ---
->   drivers/media/platform/s5p-jpeg/jpeg-core.c | 66 ++++++++++++++---------------
->   drivers/media/platform/s5p-jpeg/jpeg-core.h | 10 +++--
->   2 files changed, 37 insertions(+), 39 deletions(-)
+>   .../bindings/media/exynos-jpeg-codec.txt           |   3 +-
+>   drivers/media/platform/s5p-jpeg/jpeg-core.c        | 378 +++++++++++++++++++--
+>   drivers/media/platform/s5p-jpeg/jpeg-core.h        |  31 ++
+>   drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c  |  80 ++++-
+>   drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.h  |  11 +-
+>   drivers/media/platform/s5p-jpeg/jpeg-regs.h        |  85 +++--
+>   6 files changed, 522 insertions(+), 66 deletions(-)
 
 Reviewed-by: Jacek Anaszewski <j.anaszewski@samsung.com>
 
