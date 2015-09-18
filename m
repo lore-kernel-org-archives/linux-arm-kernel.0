@@ -1,52 +1,112 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Sep 2015 14:19:05 +0200
-Subject: [PATCH 0/5] ARM: sunxi: Introduce CHIP support
-In-Reply-To: <2353279.QTDzFUHVnF@wuerfel>
+Date: Fri, 18 Sep 2015 14:19:26 +0200
+Subject: [PATCH 2/5] ARM: sun5i: Add R8 DTSI
+In-Reply-To: <CAGb2v64Zx-H5L456ybjEFz-sPDy_xhO=Lxua6CFj9Dg+6y=vqQ@mail.gmail.com>
 References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
- <2353279.QTDzFUHVnF@wuerfel>
-Message-ID: <20150918121905.GO4684@lukather>
+ <1442566130-3497-3-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v64Zx-H5L456ybjEFz-sPDy_xhO=Lxua6CFj9Dg+6y=vqQ@mail.gmail.com>
+Message-ID: <20150918121926.GP4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Fri, Sep 18, 2015 at 11:02:33AM +0200, Arnd Bergmann wrote:
-> On Friday 18 September 2015 10:48:45 Maxime Ripard wrote:
-> > 
-> > Here is a serie introducing the support for the Allwinner R8 and the
-> > Nextthing's CHIP.
-> > 
-> > Support is almost complete for the CHIP itself, the only missing part
-> > for now is the WiFi chip that needs to be powered through two combined
-> > regulators (AXP209's LDO3 and LDO4). The audio codec is also missing
-> > since it's not already enabled in the DT.
-> > 
-> > Both these features will be addressed eventually.
-> > 
-> > Let me know what you think,
+On Fri, Sep 18, 2015 at 05:41:47PM +0800, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> Very nice!
+> On Fri, Sep 18, 2015 at 4:48 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The R8 is very close to the A13, but it still has a few differences,
+> > notably a composite output, which the A13 lacks.
+> >
+> > Add a DTSI based on the A13's to hold those differences.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/sun5i-r8.dtsi | 61 +++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 61 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/sun5i-r8.dtsi
+> >
+> > diff --git a/arch/arm/boot/dts/sun5i-r8.dtsi b/arch/arm/boot/dts/sun5i-r8.dtsi
+> > new file mode 100644
+> > index 000000000000..c9ed854687ca
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/sun5i-r8.dtsi
+> > @@ -0,0 +1,61 @@
+> > +/*
+> > + * Copyright 2015 Free Electrons
+> > + * Copyright 2015 NextThing Co
+> > + *
+> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> > + *
+> > + * This file is dual-licensed: you can use it either under the terms
+> > + * of the GPL or the X11 license, at your option. Note that this dual
+> > + * licensing only applies to this file, and not this project as a
+> > + * whole.
+> > + *
+> > + *  a) This file is free software; you can redistribute it and/or
+> > + *     modify it under the terms of the GNU General Public License as
+> > + *     published by the Free Software Foundation; either version 2 of the
+> > + *     License, or (at your option) any later version.
+> > + *
+> > + *     This file is distributed in the hope that it will be useful,
+> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + *     GNU General Public License for more details.
+> > + *
+> > + * Or, alternatively,
+> > + *
+> > + *  b) Permission is hereby granted, free of charge, to any person
+> > + *     obtaining a copy of this software and associated documentation
+> > + *     files (the "Software"), to deal in the Software without
+> > + *     restriction, including without limitation the rights to use,
+> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> > + *     sell copies of the Software, and to permit persons to whom the
+> > + *     Software is furnished to do so, subject to the following
+> > + *     conditions:
+> > + *
+> > + *     The above copyright notice and this permission notice shall be
+> > + *     included in all copies or substantial portions of the Software.
+> > + *
+> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> > + *     OTHER DEALINGS IN THE SOFTWARE.
+> > + */
+> > +
+> > +#include "skeleton.dtsi"
 > 
-> When you get to the WiFi support, please loop in Ulf and me to the Cc list.
+> This is already included by sun5i.dtsi, which is included by
+> sun5i-a13.dtsi.
 
-Ack.
+Ah, yes.
 
-> IIRC there were some open questions about how we should handle SDIO wifi
-> controllers with special requirements like this, both in general and
-> in particular with this driver.
+> > +
+> > +#include "sun5i-a13.dtsi"
+> > +
+> > +/ {
+> > +       chosen {
+> > +               framebuffer at 1 {
+> > +                       compatible = "allwinner,simple-framebuffer",
+> > +                                    "simple-framebuffer";
+> > +                       allwinner,pipeline = "de_be0-lcd0-tve0";
+> > +                       clocks = <&pll5 1>, <&ahb_gates 34>, <&ahb_gates 36>,
+> > +                                <&ahb_gates 44>;
+> > +                       status = "disabled";
+> > +               };
+> > +       };
+> > +};
+> > --
+> > 2.5.1
+> >
+> 
+> The rest looks good.
+> 
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-There's actually two issues that are pretty orthogonal:
-
-  * the fact that the regulator to power the wifi chip needs to be
-    enabled before it enumerates and the driver is probed. The MMC
-    pwrseq stuff seems to fix that, even if it doesn't really fit in
-    the usual DT model.
-
-  * The fact that that regulator on this board is actually two
-    regulators in parallel that needs to be controlled in parallel
-    too. Here, it will probably require a new regulator driver to
-    combine two regulators into one.
-
+Thanks!
 Maxime
 
 -- 
@@ -59,4 +119,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150918/a88edb14/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150918/0dbfe589/attachment.sig>
