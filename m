@@ -1,55 +1,176 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Sep 2015 15:42:04 +0100
-Subject: [PATCH] iommu/arm-smmu: Ensure IAS is set correctly for
- AArch32-capable SMMUs
-Message-ID: <1442587324-16335-1-git-send-email-will.deacon@arm.com>
+From: stsp@list.ru (Stas Sergeev)
+Date: Fri, 18 Sep 2015 17:45:27 +0300
+Subject: mvneta: SGMII fixed-link not so fixed
+In-Reply-To: <20150918135746.GG21084@n2100.arm.linux.org.uk>
+References: <20150914103207.GH21084@n2100.arm.linux.org.uk>
+ <55F6AA25.2070603@list.ru> <20150914114209.GL21084@n2100.arm.linux.org.uk>
+ <20150917.151247.2129216999071943354.davem@davemloft.net>
+ <20150917231422.GY21084@n2100.arm.linux.org.uk> <55FBF59E.3010205@list.ru>
+ <20150918121311.GD21084@n2100.arm.linux.org.uk> <55FC070A.6020707@list.ru>
+ <20150918131257.GF21084@n2100.arm.linux.org.uk> <55FC151F.6040708@list.ru>
+ <20150918135746.GG21084@n2100.arm.linux.org.uk>
+Message-ID: <55FC2387.9080304@list.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AArch32-capable SMMU implementations have a minimum IAS of 40 bits, so
-ensure that is reflected in the stage-2 page table configuration.
+18.09.2015 16:57, Russell King - ARM Linux ?????:
+> On Fri, Sep 18, 2015 at 04:43:59PM +0300, Stas Sergeev wrote:
+>> 18.09.2015 16:12, Russell King - ARM Linux ?????:
+>>> On Fri, Sep 18, 2015 at 03:43:54PM +0300, Stas Sergeev wrote:
+>>>> 18.09.2015 15:13, Russell King - ARM Linux ?????:
+>>>>> On Fri, Sep 18, 2015 at 02:29:34PM +0300, Stas Sergeev wrote:
+>>>>>> 18.09.2015 02:14, Russell King - ARM Linux ?????:
+>>>>>>>  _But_ using the in-band status
+>>>>>>>    property fundamentally requires this for mvneta to behave correctly:
+>>>>>>>
+>>>>>>> 		phy-mode = "sgmii";
+>>>>>>> 		managed = "in-band-status";
+>>>>>>> 		fixed-link {
+>>>>>>> 		};
+>>>>>>>
+>>>>>>>    with _no_ phy node.
+>>>>>> I don't understand this one.
+>>>>>> At least for me it works without empty fixed-link.
+>>>>>> There may be some bug.
+>>>>>
+>>>>>         if (cause_rx_tx & MVNETA_MISCINTR_INTR_MASK) {
+>>>>>                 u32 cause_misc = mvreg_read(pp, MVNETA_INTR_MISC_CAUSE);
+>>>>>
+>>>>>                 mvreg_write(pp, MVNETA_INTR_MISC_CAUSE, 0);
+>>>>>                 if (pp->use_inband_status && (cause_misc &
+>>>>>                                 (MVNETA_CAUSE_PHY_STATUS_CHANGE |
+>>>>>                                  MVNETA_CAUSE_LINK_CHANGE |
+>>>>>                                  MVNETA_CAUSE_PSC_SYNC_CHANGE))) {
+>>>>>                         mvneta_fixed_link_update(pp, pp->phy_dev);
+>>>>>                 }
+>>>>>
+>>>>> pp->use_inband_status is set when managed = "in-band-status" is set.
+>>>>> We detect changes in the in-band status, and call mvneta_fixed_link_update():
+>>>>>
+>>>>> mvneta_fixed_link_update() reads the status, and communicates that into
+>>>>> the fixed-link phy:
+>>>>>
+>>>>>         u32 gmac_stat = mvreg_read(pp, MVNETA_GMAC_STATUS);
+>>>>>
+>>>>> 	... code setting status.* values from gmac_stat ...
+>>>>>         changed.link = 1;
+>>>>>         changed.speed = 1;
+>>>>>         changed.duplex = 1;
+>>>>> 	fixed_phy_update_state(phy, &status, &changed);
+>>>>>
+>>>>> fixed_phy_update_state() then looks up the phy in its list, comparing only
+>>>>> the address:
+>>>>>
+>>>>>         if (!phydev || !phydev->bus)
+>>>>>                 return -EINVAL;
+>>>>>
+>>>>>         list_for_each_entry(fp, &fmb->phys, node) {
+>>>>>                 if (fp->addr == phydev->addr) {
+>>>>>
+>>>>> updating fp->* with the new state, calling fixed_phy_update_regs().  This
+>>>>> updates the fixed-link phy emulated registers, and phylib then notices
+>>>>> the change in link status, and notifies the netdevice attached to the
+>>>>> PHY it found of the change.
+>>>>>
+>>>>> Now, one of two things happens as a result of this:
+>>>>>
+>>>>> 1. If pp->phy_dev is a fixed-link phy, this finds the correct fixed-link
+>>>>>    phy to update its "fixed-link" properties, and the "not so fixed" phy
+>>>>>    changes its parameters according to the new status.
+>>>>>
+>>>>> 2. If pp->phy_dev is a MDIO phy which matches the address of a fixed-link
+>>>>>    phy,
+>>>> Doesn't the above loop iterates only "fixed_mdio_bus platform_fmb"?
+>>>> I don't think MDIO PHYs can appear there. If they can - the bug is
+>>>> very nasty. Have you seen exactly when/why that happens?
+>>>
+>>> I think I explained it fully - please follow the code paths I've detailed
+>>> above.
+>> I try. What I don't understand is why both PHYs get the
+>> same address on the "Fixed MDIO bus".
+> 
+> They aren't both on the fixed MDIO bus - that's the whole point I'm
+> making.  They get the same phydev->addr but on _different_ buses.
+So you have an MDIO phy for which mvneta seems to have
+use_inband_status==true, correct? AFAICS if it has use_inband_status==true,
+then it went through of_phy_register_fixed_link(dn), which, in case
+of managed="in-band-status", was created by fixed_phy_register(), in
+which case it should be on the "fixed MDIO bus". So if they are on a
+_different_ buses, then I would expect for the MDIO phy to have
+use_inband_status==false.
+You described the update status path very precisely in your prev mail,
+but this doesn't help because what I don't understand is the particular
+_setup_ path that leads to use_inband_status==true yet the phy is not
+on the fmb.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index dafaf59dc3b8..a24f359fa0d0 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -56,6 +56,7 @@
- #define IDR0_TTF_SHIFT			2
- #define IDR0_TTF_MASK			0x3
- #define IDR0_TTF_AARCH64		(2 << IDR0_TTF_SHIFT)
-+#define IDR0_TTF_AARCH32_64		(3 << IDR0_TTF_SHIFT)
- #define IDR0_S1P			(1 << 1)
- #define IDR0_S2P			(1 << 0)
- 
-@@ -2460,7 +2461,13 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
- 	}
- 
- 	/* We only support the AArch64 table format@present */
--	if ((reg & IDR0_TTF_MASK << IDR0_TTF_SHIFT) < IDR0_TTF_AARCH64) {
-+	switch (reg & IDR0_TTF_MASK << IDR0_TTF_SHIFT) {
-+	case IDR0_TTF_AARCH32_64:
-+		smmu->ias = 40;
-+		/* Fallthrough */
-+	case IDR0_TTF_AARCH64:
-+		break;
-+	default:
- 		dev_err(smmu->dev, "AArch64 table format not supported!\n");
- 		return -ENXIO;
- 	}
-@@ -2541,8 +2548,7 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
- 		dev_warn(smmu->dev,
- 			 "failed to set DMA mask for table walker\n");
- 
--	if (!smmu->ias)
--		smmu->ias = smmu->oas;
-+	smmu->ias = max(smmu->ias, smmu->oas);
- 
- 	dev_info(smmu->dev, "ias %lu-bit, oas %lu-bit (features 0x%08x)\n",
- 		 smmu->ias, smmu->oas, smmu->features);
--- 
-2.1.4
+>>> Specifically, look at this code:
+>>>
+>>>          if (!phydev || !phydev->bus)
+>>>                  return -EINVAL;
+>>>
+>>>          list_for_each_entry(fp, &fmb->phys, node) {
+>>>                  if (fp->addr == phydev->addr) {
+> 
+> Look at this closely - at what point is there any validation that "phydev"
+> is actually a fixed-link phy?  There is no validation done.  The only
+> criteria there are:
+> - phydev is not NULL
+> - phydev->bus is not NULL (which is true of any registered phy)
+> - phydev->addr matches _any_ fixed-link phy.
+> 
+> I've already sent a patch earlier today to address this issue.
+> 
+> If you place a WARN_ON(fp->phydev != phydev) then that'll show you
+> when it incorrectly matches.
+Yes, I realize if the MDIO phy is passed there, then all you say
+will happen. That's pretty trivial and doesn't need any explanations.
+But how was that phydev created, not with fixed_phy_register() I suppose?
+Then it should have use_inband_status==false, right?
+
+>>> Consider what the effect is if you have a MDIO phy at address 0 on eth0
+>>> which has in-band-status enabled.
+>> So as I understand, you have MDIO phy with DT looking like this:
+>> ethernet at 70000 {
+>>   status = "okay";
+>>   phy-mode = "sgmii";
+>>   managed = "in-band-status";
+>> }
+>> W/O either "phy" of "fixed-link" nodes. Correct?
+>> mvneta calls of_phy_register_fixed_link(dn) on it after not
+>> finding the "phy" node. And it will do the same with the second
+>> non-MDIO phy. What I don't see is how do they get the same addr
+>> on the same bus, could you please clarify that a bit?
+> 
+> 		mdio at 72004 {
+> 			phy_dedicated: ethernet-phy at 0 {
+> 				reg = <0>;
+> 			};
+> 		};
+> 
+> 		eth1: ethernet at 30000 {
+> 			phy = <&phy_dedicated>;
+> 			phy-mode = "sgmii";
+> 			managed = "in-band-status";
+> 		};
+> 
+> 		eth0: ethernet at 70000 {
+> 			phy-mode = "sgmii";
+> 			fixed-link {
+> 				speed = 1000;
+> 				full-duplex;
+> 			};
+> 		};
+> 
+> Bring eth0 up first, everything works.  Then, bring eth1 up, and eth0
+> goes down.
+I don't have an MDIO phy here, but I'll make an attempt to replicate
+this setup.
+
+
+> This happens because when eth1 is brought up, eth1's mvneta calls into
+> fixed_phy_update_state() with a pointer to the "phy_dedicated" PHY at
+> address 0.  fixed_phy_update_state() scans the fixed-link phys for one
+> at address 0, and finds the fixed-link phy associated with eth0.
+Unfortunately this is not what needs to be explained.
+I am confused about the setup path, not update path.
