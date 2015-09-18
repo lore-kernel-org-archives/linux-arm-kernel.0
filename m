@@ -1,100 +1,29 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Fri, 18 Sep 2015 14:24:11 -0700
-Subject: [PATCH v2 6/9] ARM: dts: Reorder Cygnus peripherals
-In-Reply-To: <1442611454-16331-1-git-send-email-rjui@broadcom.com>
-References: <1442611454-16331-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1442611454-16331-7-git-send-email-rjui@broadcom.com>
+From: yang.shi@linaro.org (Yang Shi)
+Date: Fri, 18 Sep 2015 14:09:00 -0700
+Subject: [PATCH] arm64: debug: Fix typo in debug-monitors.c
+Message-ID: <1442610540-8393-1-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reorder all Cygnus peripherals based on base register addresses in
-bcm-cygnus.dtsi
+Fix handers to handlers.
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
 ---
- arch/arm/boot/dts/bcm-cygnus.dtsi | 56 +++++++++++++++++++--------------------
- 1 file changed, 28 insertions(+), 28 deletions(-)
+ arch/arm64/kernel/debug-monitors.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 3d29b77..dfa9a3c 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -108,26 +108,14 @@
- 			gpio-controller;
- 		};
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index cebf786..8eef30f 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -201,7 +201,7 @@ void unregister_step_hook(struct step_hook *hook)
+ }
  
--		gpio_ccm: gpio at 1800a000 {
--			compatible = "brcm,cygnus-ccm-gpio";
--			reg = <0x1800a000 0x50>,
--			      <0x0301d164 0x20>;
--			#gpio-cells = <2>;
--			gpio-controller;
--			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
--			interrupt-controller;
--		};
--
--		gpio_asiu: gpio at 180a5000 {
--			compatible = "brcm,cygnus-asiu-gpio";
--			reg = <0x180a5000 0x668>;
--			#gpio-cells = <2>;
--			gpio-controller;
--
--			pinmux = <&pinctrl>;
--
--			interrupt-controller;
--			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-+		i2c0: i2c at 18008000 {
-+			compatible = "brcm,cygnus-iproc-i2c", "brcm,iproc-i2c";
-+			reg = <0x18008000 0x100>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
- 		};
- 
- 		wdt0: wdt at 18009000 {
-@@ -138,14 +126,14 @@
- 			clock-names = "apb_pclk";
- 		};
- 
--		i2c0: i2c at 18008000 {
--			compatible = "brcm,cygnus-iproc-i2c", "brcm,iproc-i2c";
--			reg = <0x18008000 0x100>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
--			clock-frequency = <100000>;
--			status = "disabled";
-+		gpio_ccm: gpio at 1800a000 {
-+			compatible = "brcm,cygnus-ccm-gpio";
-+			reg = <0x1800a000 0x50>,
-+			      <0x0301d164 0x20>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-controller;
- 		};
- 
- 		i2c1: i2c at 1800b000 {
-@@ -255,5 +243,17 @@
- 
- 			brcm,nand-has-wp;
- 		};
-+
-+		gpio_asiu: gpio at 180a5000 {
-+			compatible = "brcm,cygnus-asiu-gpio";
-+			reg = <0x180a5000 0x668>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+
-+			pinmux = <&pinctrl>;
-+
-+			interrupt-controller;
-+			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-+		};
- 	};
- };
+ /*
+- * Call registered single step handers
++ * Call registered single step handlers
+  * There is no Syndrome info to check for determining the handler.
+  * So we call all the registered handlers, until the right handler is
+  * found which returns zero.
 -- 
-1.9.1
+2.0.2
