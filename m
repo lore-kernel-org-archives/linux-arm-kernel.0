@@ -1,34 +1,97 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 18 Sep 2015 10:47:40 +0100
-Subject: [PATCH 6/7] phy: fixed-phy: properly validate phy in
- fixed_phy_update_state()
+Date: Fri, 18 Sep 2015 10:54:55 +0100
+Subject: [PATCH 1/7] phy: fix of_mdio_find_bus() device refcount leak
 In-Reply-To: <20150918094625.GB21084@n2100.arm.linux.org.uk>
 References: <20150918094625.GB21084@n2100.arm.linux.org.uk>
-Message-ID: <E1ZcsGa-0000uk-Az@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZcsNb-0001Bf-U5@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Validate that the phy_device passed into fixed_phy_update_state() is a
-fixed-phy device before walking the list of phys for a fixed phy at the
-same address.
+of_mdio_find_bus() leaks a struct device refcount, caused by using
+class_find_device() and not realising that the device reference has
+its refcount incremented:
+
+ * Note, you will need to drop the reference with put_device() after use.
+...
+        while ((dev = class_dev_iter_next(&iter))) {
+                if (match(dev, data)) {
+                        get_device(dev);
+                        break;
+                }
+
+Update the comment, and arrange for the only user of this function
+to drop this refcount when disposing of a reference to it.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/phy/fixed_phy.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/phy/mdio-mux.c | 19 +++++++++++++------
+ drivers/net/phy/mdio_bus.c |  4 +++-
+ 2 files changed, 16 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/net/phy/fixed_phy.c b/drivers/net/phy/fixed_phy.c
-index fb1299c6326e..e23bf5b90e17 100644
---- a/drivers/net/phy/fixed_phy.c
-+++ b/drivers/net/phy/fixed_phy.c
-@@ -220,7 +220,7 @@ int fixed_phy_update_state(struct phy_device *phydev,
- 	struct fixed_mdio_bus *fmb = &platform_fmb;
- 	struct fixed_phy *fp;
+diff --git a/drivers/net/phy/mdio-mux.c b/drivers/net/phy/mdio-mux.c
+index 4d4d25efc1e1..280c7c311f72 100644
+--- a/drivers/net/phy/mdio-mux.c
++++ b/drivers/net/phy/mdio-mux.c
+@@ -113,18 +113,18 @@ int mdio_mux_init(struct device *dev,
+ 	if (!parent_bus_node)
+ 		return -ENODEV;
  
--	if (!phydev || !phydev->bus)
-+	if (!phydev || phydev->bus != fmb->mii_bus)
- 		return -EINVAL;
+-	parent_bus = of_mdio_find_bus(parent_bus_node);
+-	if (parent_bus == NULL) {
+-		ret_val = -EPROBE_DEFER;
+-		goto err_parent_bus;
+-	}
+-
+ 	pb = devm_kzalloc(dev, sizeof(*pb), GFP_KERNEL);
+ 	if (pb == NULL) {
+ 		ret_val = -ENOMEM;
+ 		goto err_parent_bus;
+ 	}
  
- 	list_for_each_entry(fp, &fmb->phys, node) {
++	parent_bus = of_mdio_find_bus(parent_bus_node);
++	if (parent_bus == NULL) {
++		ret_val = -EPROBE_DEFER;
++		goto err_parent_bus;
++	}
++
+ 	pb->switch_data = data;
+ 	pb->switch_fn = switch_fn;
+ 	pb->current_child = -1;
+@@ -173,6 +173,10 @@ int mdio_mux_init(struct device *dev,
+ 		dev_info(dev, "Version " DRV_VERSION "\n");
+ 		return 0;
+ 	}
++
++	/* balance the reference of_mdio_find_bus() took */
++	put_device(&pb->mii_bus->dev);
++
+ err_parent_bus:
+ 	of_node_put(parent_bus_node);
+ 	return ret_val;
+@@ -189,6 +193,9 @@ void mdio_mux_uninit(void *mux_handle)
+ 		mdiobus_free(cb->mii_bus);
+ 		cb = cb->next;
+ 	}
++
++	/* balance the reference of_mdio_find_bus() in mdio_mux_init() took */
++	put_device(&pb->mii_bus->dev);
+ }
+ EXPORT_SYMBOL_GPL(mdio_mux_uninit);
+ 
+diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
+index 02a4615b65f8..67553e13bd36 100644
+--- a/drivers/net/phy/mdio_bus.c
++++ b/drivers/net/phy/mdio_bus.c
+@@ -167,7 +167,9 @@ static int of_mdio_bus_match(struct device *dev, const void *mdio_bus_np)
+  * of_mdio_find_bus - Given an mii_bus node, find the mii_bus.
+  * @mdio_bus_np: Pointer to the mii_bus.
+  *
+- * Returns a pointer to the mii_bus, or NULL if none found.
++ * Returns a reference to the mii_bus, or NULL if none found.  The
++ * embedded struct device will have its reference count incremented,
++ * and this must be put once the bus is finished with.
+  *
+  * Because the association of a device_node and mii_bus is made via
+  * of_mdiobus_register(), the mii_bus cannot be found before it is
 -- 
 2.1.0
