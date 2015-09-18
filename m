@@ -1,15 +1,15 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Sep 2015 09:47:05 +0900
-Subject: [PATCH 03/19] ARM: shmobile: r8a7794: add GPIO DT support
+Date: Fri, 18 Sep 2015 09:47:06 +0900
+Subject: [PATCH 04/19] ARM: shmobile: r8a7794: add QSPI DT support
 In-Reply-To: <cover.1442536920.git.horms+renesas@verge.net.au>
 References: <cover.1442536920.git.horms+renesas@verge.net.au>
-Message-ID: <e8f5de3bea9e01fd1390d64bc915a11df919b3fe.1442536920.git.horms+renesas@verge.net.au>
+Message-ID: <740b4a9f07fe73b5ccd2bc3dc365dc359e1a332d.1442536920.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Describe GPIO[0-6] controllers in the R8A7794 device tree.
+Define the generic R8A7794 part of the QSPI device node.
 
 Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
 
@@ -17,110 +17,44 @@ Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 91 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 91 insertions(+)
+ arch/arm/boot/dts/r8a7794.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index b6db773b9e55..e9fab31e0709 100644
+index e9fab31e0709..e0f32ede2181 100644
 --- a/arch/arm/boot/dts/r8a7794.dtsi
 +++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -50,6 +50,97 @@
- 		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+@@ -19,6 +19,10 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 
++	aliases {
++		spi0 = &qspi;
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -537,6 +541,20 @@
+ 		status = "disabled";
  	};
  
-+	gpio0: gpio at e6050000 {
-+		compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-+		reg = <0 0xe6050000 0 0x50>;
-+		interrupts = <0 4 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 0 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		clocks = <&mstp9_clks R8A7794_CLK_GPIO0>;
++	qspi: spi at e6b10000 {
++		compatible = "renesas,qspi-r8a7794", "renesas,qspi";
++		reg = <0 0xe6b10000 0 0x2c>;
++		interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R8A7794_CLK_QSPI_MOD>;
++		dmas = <&dmac0 0x17>, <&dmac0 0x18>;
++		dma-names = "tx", "rx";
 +		power-domains = <&cpg_clocks>;
++		num-cs = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
 +	};
 +
-+	gpio1: gpio at e6051000 {
-+		compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-+		reg = <0 0xe6051000 0 0x50>;
-+		interrupts = <0 5 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 32 26>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		clocks = <&mstp9_clks R8A7794_CLK_GPIO1>;
-+		power-domains = <&cpg_clocks>;
-+	};
-+
-+	gpio2: gpio at e6052000 {
-+		compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-+		reg = <0 0xe6052000 0 0x50>;
-+		interrupts = <0 6 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 64 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		clocks = <&mstp9_clks R8A7794_CLK_GPIO2>;
-+		power-domains = <&cpg_clocks>;
-+	};
-+
-+	gpio3: gpio at e6053000 {
-+		compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-+		reg = <0 0xe6053000 0 0x50>;
-+		interrupts = <0 7 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 96 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		clocks = <&mstp9_clks R8A7794_CLK_GPIO3>;
-+		power-domains = <&cpg_clocks>;
-+	};
-+
-+	gpio4: gpio at e6054000 {
-+		compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-+		reg = <0 0xe6054000 0 0x50>;
-+		interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 128 32>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		clocks = <&mstp9_clks R8A7794_CLK_GPIO4>;
-+		power-domains = <&cpg_clocks>;
-+	};
-+
-+	gpio5: gpio at e6055000 {
-+		compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-+		reg = <0 0xe6055000 0 0x50>;
-+		interrupts = <0 9 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 160 28>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		clocks = <&mstp9_clks R8A7794_CLK_GPIO5>;
-+		power-domains = <&cpg_clocks>;
-+	};
-+
-+	gpio6: gpio at e6055400 {
-+		compatible = "renesas,gpio-r8a7794", "renesas,gpio-rcar";
-+		reg = <0 0xe6055400 0 0x50>;
-+		interrupts = <0 10 IRQ_TYPE_LEVEL_HIGH>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 192 26>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		clocks = <&mstp9_clks R8A7794_CLK_GPIO6>;
-+		power-domains = <&cpg_clocks>;
-+	};
-+
- 	cmt0: timer at ffca0000 {
- 		compatible = "renesas,cmt-48-gen2";
- 		reg = <0 0xffca0000 0 0x1004>;
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
 -- 
 2.1.4
