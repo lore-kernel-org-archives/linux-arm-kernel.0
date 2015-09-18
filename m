@@ -1,42 +1,56 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Sep 2015 10:48:45 +0200
-Subject: [PATCH 0/5] ARM: sunxi: Introduce CHIP support
-Message-ID: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 18 Sep 2015 10:48:48 +0200
+Subject: [PATCH 3/5] ARM: sun5i: dt: Move uart3 pinctrl node to common DTSI
+In-Reply-To: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1442566130-3497-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The uart3 pins are shared between the A10s and A13, move the pinctrl node
+to the common DTSI to avoid duplication.
 
-Here is a serie introducing the support for the Allwinner R8 and the
-Nextthing's CHIP.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 7 -------
+ arch/arm/boot/dts/sun5i.dtsi      | 7 +++++++
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-Support is almost complete for the CHIP itself, the only missing part
-for now is the WiFi chip that needs to be powered through two combined
-regulators (AXP209's LDO3 and LDO4). The audio codec is also missing
-since it's not already enabled in the DT.
-
-Both these features will be addressed eventually.
-
-Let me know what you think,
-Maxime
-
-Maxime Ripard (5):
-  ARM: sunxi: Add R8 support
-  ARM: sun5i: Add R8 DTSI
-  ARM: sun5i: dt: Move uart3 pinctrl node to common DTSI
-  ARM: sun5i: dt: Add UART3 CTS and RTS pins
-  ARM: sun5i: Add C.H.I.P DTS
-
- arch/arm/boot/dts/Makefile          |   3 +-
- arch/arm/boot/dts/sun5i-a10s.dtsi   |   7 -
- arch/arm/boot/dts/sun5i-r8-chip.dts | 261 ++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/sun5i-r8.dtsi     |  61 +++++++++
- arch/arm/boot/dts/sun5i.dtsi        |  14 ++
- arch/arm/mach-sunxi/sunxi.c         |   3 +-
- drivers/clk/sunxi/clk-sunxi.c       |   1 +
- 7 files changed, 341 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun5i-r8-chip.dts
- create mode 100644 arch/arm/boot/dts/sun5i-r8.dtsi
-
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index 0fdabe8eb9e8..2ebd32f5bc6e 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -204,13 +204,6 @@
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
+ 
+-	uart3_pins_a: uart3 at 0 {
+-		allwinner,pins = "PG9", "PG10";
+-		allwinner,function = "uart3";
+-		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-	};
+-
+ 	emac_pins_a: emac0 at 0 {
+ 		allwinner,pins = "PA0", "PA1", "PA2",
+ 				"PA3", "PA4", "PA5", "PA6",
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 78b993abbaa3..433c83a321ca 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -529,6 +529,13 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ 			};
++
++			uart3_pins_a: uart3 at 0 {
++				allwinner,pins = "PG9", "PG10";
++				allwinner,function = "uart3";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
+ 		};
+ 
+ 		timer at 01c20c00 {
 -- 
 2.5.1
