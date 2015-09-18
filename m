@@ -1,27 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Sep 2015 09:59:56 +0100
-Subject: [PATCH 1/1] PCI/MSI: X-Gene: Remove msi_controller assignment
- in X-Gene PCIe driver
-In-Reply-To: <1442449900-30842-1-git-send-email-dhdang@apm.com>
-References: <1442449900-30842-1-git-send-email-dhdang@apm.com>
-Message-ID: <20150918095956.2e27c93c@arm.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri, 18 Sep 2015 16:51:11 +0800
+Subject: [PATCH v1 3/3] arm64: dts: rockchip: Add the needed timer for RK3368
+ SoC
+In-Reply-To: <1442566271-10695-1-git-send-email-wxt@rock-chips.com>
+References: <1442566271-10695-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1442566271-10695-4-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Sep 2015 17:31:40 -0700
-Duc Dang <dhdang@apm.com> wrote:
+There is a need of a broadcast timer in this case to ensure proper
+wakeup when the cpus are in sleep mode and a timer expires.
 
-> With commit 8d63bc7beaee ("PCI/MSI: pci-xgene-msi: Get rid of
-> struct msi_controller"), it is no longer required to assign
-> msi_controller for X-Gene PCIe host bridge to support MSI. This
-> patch removes this unnecessary code and also helps avoid a warning
-> message ("failed to enable MSI") during boot.
-> 
-> Signed-off-by: Duc Dang <dhdang@apm.com>
-> Cc: Tanmay Inamdar <tinamdar@apm.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+---
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Changes in v1:
+- As the Heiko comments, add the "rockchip,rk3368-timer" for timer.
+  Although the 'rockchip,rk3288-timer' is working for RK3368, need to add the
+  'rockchip,rk3368-timer' for the rk3368-spec timer in the future.
 
-	M.
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index a712bea..c4b3870 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -214,6 +214,12 @@
+ 			(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
+ 	};
+ 
++	timer at ff810000 {
++		compatible = "rockchip,rk3368-timer", "rockchip,rk3288-timer";
++		reg = <0x0 0xff810000 0x0 0x20>;
++		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
+ 	xin24m: oscillator {
+ 		compatible = "fixed-clock";
+ 		clock-frequency = <24000000>;
 -- 
-Jazz is not dead. It just smells funny.
+1.9.1
