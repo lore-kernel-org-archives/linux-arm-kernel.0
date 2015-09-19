@@ -1,72 +1,40 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Sat, 19 Sep 2015 17:44:37 +0900
-Subject: [PATCH v2] arm64: Introduce IRQ stack
-In-Reply-To: <20150918153150.GB24449@e104818-lin.cambridge.arm.com>
-References: <1442155337-7020-1-git-send-email-jungseoklee85@gmail.com>
- <20150917111735.GN25444@e104818-lin.cambridge.arm.com>
- <3C2C78B3-4669-4DBA-98DC-362EB762FD9C@gmail.com>
- <CFF333D1-E771-4C50-902A-444DAE76C163@gmail.com>
- <20150917162110.GO25444@e104818-lin.cambridge.arm.com>
- <6A6F7BF2-D75E-4D8D-B0F7-45294C4C4426@gmail.com>
- <20150918150302.GA24449@e104818-lin.cambridge.arm.com>
- <20150918153150.GB24449@e104818-lin.cambridge.arm.com>
-Message-ID: <FE4C26C5-C759-4924-96A5-9D5F6A78CD74@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Sat, 19 Sep 2015 10:21:45 +0100
+Subject: [PATCH v2 0/7] hwrng: Add support for STMicroelectronics' RNG IP
+In-Reply-To: <20150918231213.GA14278@gondor.apana.org.au>
+References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
+ <20150918140756.GK9249@gondor.apana.org.au>
+ <CAF2Aj3h7Jy=tpYdZTdbxAJwa=147_hAu3reOFrbEh=JdrMFWLQ@mail.gmail.com>
+ <20150918151137.GA10763@gondor.apana.org.au>
+ <20150918155112.GE3218@x1>
+ <20150918231213.GA14278@gondor.apana.org.au>
+Message-ID: <20150919092145.GG3218@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sep 19, 2015, at 12:31 AM, Catalin Marinas wrote:
-> On Fri, Sep 18, 2015 at 04:03:02PM +0100, Catalin Marinas wrote:
->> On Fri, Sep 18, 2015 at 09:57:56PM +0900, Jungseok Lee wrote:
->>> On Sep 18, 2015, at 1:21 AM, Catalin Marinas wrote:
->>>> So, without any better suggestion for current_thread_info(), I'm giving
->>>> up the idea of using SPSel == 0 in the kernel. I'll look at your patch
->>>> in more detail. BTW, I don't think we need the any count for the irq
->>>> stack as we don't re-enter the same IRQ stack.
->>> 
->>> Another interrupt could come in since IRQ is enabled when handling softirq
->>> according to the following information which are self-evident.
->>> 
->>> (Am I missing something?)
->> 
->> No. I had the wrong impression that we switch to the softirqd stack for
->> softirqs but you are right, if we run them on the same stack the IRQs
->> are enabled and they can be re-entered before we return from this
->> exception handler.
->> 
->> I've seen other architectures implementing a dedicated softirq stack but
->> for now we should just re-use the current IRQ stack.
->> 
->>> In my first approach using SPSel = 0, current_thread_info function was inefficient
->>> in order to handle this case correctly.
->> 
->> I agree. And we don't have any other scratch register left as we use
->> tpidr_el1 for per-cpu areas.
->> 
->>> BTW, in this context, it is only meaningful to decide whether a current interrupt
->>> is re-enterrant or not. Its actual value is not important, but I could not figure
->>> out a better implementation than this one yet. Any suggestions are welcome!
->> 
->> James' idea of checking the lower SP bits instead of a count may work.
+On Sat, 19 Sep 2015, Herbert Xu wrote:
+> On Fri, Sep 18, 2015 at 04:51:12PM +0100, Lee Jones wrote:
+> >
+> > I think it's okay for you to take all but patch 6.
+> > 
+> > Patch 6 is an ARM patch and needs to go into ARM SoC via
+> > STMicroelectronics STi tree.
 > 
-> Another thought (it seems that x86 does something similar): we know the
-> IRQ stack is not re-entered until interrupts are enabled in
-> __do_softirq. If we enable __ARCH_HAS_DO_SOFTIRQ, we can implement an
-> arm64-specific do_softirq_own_stack() which increments a counter before
-> calling __do_softirq. The difference from your patch is that
-> irq_stack_entry only reads such counter, doesn't need to write it.
-> 
-> Yet another idea is to reserve some space in the lower address part of
-> the stack with a "stack type" information. It still requires another
-> read, so I think the x86 approach is probably better.
+> In future please don't send me patches that you don't want me to
+> merge in the series.
 
-I've realized both hardirq and softirq should be handled on a separate stack
-in order to reduce kernel stack size, which is a principal objective of this
-patch. (If I'm not missing something) It is not possible to get a big win
-with implementing do_softirq_own_stack() since hardirq is handled using a task
-stack. This prevents a size of kernel stack from being decreased.
+That's not how it works.  It's helpful, more often than not, to submit
+the entire set to each maintainer concerned so they can keep up with
+the general conversation.  By only sending specific patches to
+maintainers you essentially blinker them to the bigger picture.
 
-However, it would be meaningful to separate hard IRQ stack and soft IRQ one
-as the next step.
+As a maintainer you should _know_ that you can't apply patches from
+other subsystems without appropriate Acks.  I'm sure you'd take
+exception to another maintainer who started accepting patches for
+subsystems you are responsible for.  This works both ways.
 
-Best Regards
-Jungseok Lee
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
