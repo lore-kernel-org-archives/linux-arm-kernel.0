@@ -1,63 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 19 Sep 2015 15:52:35 -0700
-Subject: [PATCH 2/2] ARM: dts: Fix WLAN regression on omap5-uevm
-In-Reply-To: <CANOLnOP-WNcnDfQSDuHC_SN5vL8uNMWaeV3zNU7tcqNjGodURA@mail.gmail.com>
-References: <1442593745-16725-1-git-send-email-tony@atomide.com>
- <1442593745-16725-3-git-send-email-tony@atomide.com>
- <CAOCHtYh3pDg6_mdX71G=L5Vz-mOmBnerwR5pjumq5jYQ-tN5Pw@mail.gmail.com>
- <20150918165109.GB8020@atomide.com>
- <CAOCHtYisPQ2g0GCD4NF7m14TchfaZ+k3UedPoaA0Rjtpo9ug+g@mail.gmail.com>
- <CANOLnOP-WNcnDfQSDuHC_SN5vL8uNMWaeV3zNU7tcqNjGodURA@mail.gmail.com>
-Message-ID: <20150919225235.GA23801@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 19 Sep 2015 09:57:13 -0700
+Subject: [PATCH v2 1/5] regulator: smd: Add floor and corner operations
+In-Reply-To: <1442623929-4507-2-git-send-email-sboyd@codeaurora.org>
+References: <1442623929-4507-1-git-send-email-sboyd@codeaurora.org>
+ <1442623929-4507-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150919165712.GH30445@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grazvydas Ignotas <notasas@gmail.com> [150919 14:16]:
-> On Fri, Sep 18, 2015 at 9:39 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
-> > On Fri, Sep 18, 2015 at 11:51 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >> * Robert Nelson <robertcnelson@gmail.com> [150918 09:45]:
-> >>> On Fri, Sep 18, 2015 at 11:29 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >>> > Commit 99f84cae43df ("ARM: dts: add wl12xx/wl18xx bindings") added
-> >>> > device tree bindings for the TI WLAN SDIO on many omap variants.
-> >>> >
-> >>> > I recall wondering how come omap5-uevm did not have the WLAN
-> >>> > added and this issue has been bugging me for a while now, and
-> >>> > I finally tracked it down to a bad pinmux regression, and a missing
-> >>> > deferred probe handling for the 32k clock from palmas that's
-> >>> > requested by twl6040.
-> >>> >
-> >>> > Basically 392adaf796b9 ("ARM: dts: omap5-evm: Add mcspi data")
-> >>> > added pin muxing for mcspi4 that conflicts with the onboard
-> >>> > WLAN. While the omap5-uevm docs say the WLAN is not populated,
-> >>> > this was probably only the case for initial prototypes. Both
-> >>> > omap5-uevm boards I have have WLAN populated.
-> >>>
-> >>> Production boards from svtronics don't populate the wlan..
-> >>>
-> >>> http://www.svtronics.com/EVM/OMAP5432/5432
-> >>>
-> >>> quote: "WiFi not available on this model"
-> >
-> > Okay, got an email back from svtronics, there was a special omap5_uevm
-> > + wlan order option for production units.
-> 
-> The boards we bought came without wlan, so that seems to be the
-> "default" configuration.
-> 
-> I vote for using separate DT overlay for the wlan version to avoid
-> unnecessary probing. OTOH the pins are not exposed on expansion
-> connectors and should not conflict with custom peripherals, so no
-> strong opinion here.
+On Fri, Sep 18, 2015 at 05:52:05PM -0700, Stephen Boyd wrote:
 
-Good to hear those pins are not rerouted. But considering we
-already have mmc3 defined in omap5-uevm.. And the SDIO bus
-is meant to be probed.. And the boards have WLAN connectors but
-unpopulated.. I'd say it's safe to have it mapped in the dts :)
+> +EXPORT_SYMBOL(qcom_rpm_set_floor);
 
-BTW, I have a few patches coming for omap5-board-common.dtsi
-and basic igepv5 support pending some more testing. That makes
-it easy to add omap5-uevm related variants easily.
-
-Regards,
-
-Tony
+The entire regulator API is EXPORT_SYMBOL_GPL(), adding plain
+EXPORT_SYMBOL() exports is not good.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150919/ed392835/attachment.sig>
