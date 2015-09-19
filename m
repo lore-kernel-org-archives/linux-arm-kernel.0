@@ -1,50 +1,69 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Sun, 20 Sep 2015 00:12:13 +0300
-Subject: [PATCH 2/2] ARM: dts: Fix WLAN regression on omap5-uevm
-In-Reply-To: <CAOCHtYisPQ2g0GCD4NF7m14TchfaZ+k3UedPoaA0Rjtpo9ug+g@mail.gmail.com>
-References: <1442593745-16725-1-git-send-email-tony@atomide.com>
- <1442593745-16725-3-git-send-email-tony@atomide.com>
- <CAOCHtYh3pDg6_mdX71G=L5Vz-mOmBnerwR5pjumq5jYQ-tN5Pw@mail.gmail.com>
- <20150918165109.GB8020@atomide.com>
- <CAOCHtYisPQ2g0GCD4NF7m14TchfaZ+k3UedPoaA0Rjtpo9ug+g@mail.gmail.com>
-Message-ID: <CANOLnOP-WNcnDfQSDuHC_SN5vL8uNMWaeV3zNU7tcqNjGodURA@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 19 Sep 2015 17:39:23 -0400
+Subject: [linux-sunxi] [PATCH 3/4] ARM: dts: sun8i: Enable PWM controller
+ on A23/A33 Q8 format tablets
+In-Reply-To: <CAGb2v65kEqxiWLz_faQzMWFP0nHY_tv-aJCZGNQJjYFbGEn8rQ@mail.gmail.com>
+References: <1442561739-6824-1-git-send-email-wens@csie.org>
+ <1442561739-6824-4-git-send-email-wens@csie.org>
+ <55FC2E95.7040006@redhat.com>
+ <CAGb2v65kEqxiWLz_faQzMWFP0nHY_tv-aJCZGNQJjYFbGEn8rQ@mail.gmail.com>
+Message-ID: <55FDD60B.7080204@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 9:39 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
-> On Fri, Sep 18, 2015 at 11:51 AM, Tony Lindgren <tony@atomide.com> wrote:
->> * Robert Nelson <robertcnelson@gmail.com> [150918 09:45]:
->>> On Fri, Sep 18, 2015 at 11:29 AM, Tony Lindgren <tony@atomide.com> wrote:
->>> > Commit 99f84cae43df ("ARM: dts: add wl12xx/wl18xx bindings") added
->>> > device tree bindings for the TI WLAN SDIO on many omap variants.
->>> >
->>> > I recall wondering how come omap5-uevm did not have the WLAN
->>> > added and this issue has been bugging me for a while now, and
->>> > I finally tracked it down to a bad pinmux regression, and a missing
->>> > deferred probe handling for the 32k clock from palmas that's
->>> > requested by twl6040.
->>> >
->>> > Basically 392adaf796b9 ("ARM: dts: omap5-evm: Add mcspi data")
->>> > added pin muxing for mcspi4 that conflicts with the onboard
->>> > WLAN. While the omap5-uevm docs say the WLAN is not populated,
->>> > this was probably only the case for initial prototypes. Both
->>> > omap5-uevm boards I have have WLAN populated.
+Hi,
+
+On 09/18/2015 12:25 PM, Chen-Yu Tsai wrote:
+> On Fri, Sep 18, 2015 at 11:32 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
+>>
+>> On 09/18/2015 03:35 AM, Chen-Yu Tsai wrote:
 >>>
->>> Production boards from svtronics don't populate the wlan..
+>>> A23/A33 based Q8 format tablets use channel 0 of the PWM controller for
+>>> backlight dimming.
 >>>
->>> http://www.svtronics.com/EVM/OMAP5432/5432
+>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>> ---
+>>>    arch/arm/boot/dts/sun8i-q8-common.dtsi | 6 ++++++
+>>>    1 file changed, 6 insertions(+)
 >>>
->>> quote: "WiFi not available on this model"
+>>> diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi
+>>> b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+>>> index 6f8a8bb4e9bb..4c2d0b459d6f 100644
+>>> --- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
+>>> +++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+>>> @@ -70,6 +70,12 @@
+>>>          };
+>>>    };
+>>>
+>>> +&pwm {
+>>> +       pinctrl-names = "default";
+>>> +       pinctrl-0 = <&pwm0_pins>;
+>>> +       status = "okay";
+>>> +};
+>>> +
+>>>    &r_uart {
+>>>          pinctrl-names = "default";
+>>>          pinctrl-0 = <&r_uart_pins_a>;
+>>>
+>>
+>> I've a feeling this should be in sunxi-q8-common.dtsi not
+>> sun8i-q8-common.dtsi, which requires adding a pwm
+>> node to sun5i.dtsi I'll look into this.
 >
-> Okay, got an email back from svtronics, there was a special omap5_uevm
-> + wlan order option for production units.
+> It probably should.
 
-The boards we bought came without wlan, so that seems to be the
-"default" configuration.
+Which means the name of the pinctrl node should be the same
+on both, hence my request to rename that. Anyways Maxime
+has already merged that now, I'll workaround it and / or
+do a followup patch.
 
-I vote for using separate DT overlay for the wlan version to avoid
-unnecessary probing. OTOH the pins are not exposed on expansion
-connectors and should not conflict with custom peripherals, so no
-strong opinion here.
+> IIRC sun5i PWM has only one channel as opposed to
+> 2 on A10/A20.
 
-Gra?vydas
+Nope sun5i has 2 channels, but the second channel is
+only routed to the outside on A10s, not on A13.
+
+Regards,
+
+Hans
