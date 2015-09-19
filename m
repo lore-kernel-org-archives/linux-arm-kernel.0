@@ -1,75 +1,64 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Fri, 18 Sep 2015 18:00:28 -0700
-Subject: [PATCH 2/3] PCI: Add quirks for devices found on Cavium ThunderX
- SoCs.
-In-Reply-To: <2512701.zkjk3n3AQS@wuerfel>
-References: <1442529694-1792-1-git-send-email-ddaney.cavm@gmail.com>
- <3066583.BWDZlYWxXU@wuerfel> <55FC4330.10302@caviumnetworks.com>
- <2512701.zkjk3n3AQS@wuerfel>
-Message-ID: <55FCB3AC.8080709@caviumnetworks.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 19 Sep 2015 09:12:48 +0800
+Subject: [PATCH v8 2/2] ARM: imx: support suspend states on imx7D
+In-Reply-To: <CY1PR0301MB0843D4E46210525521F9453483590@CY1PR0301MB0843.namprd03.prod.outlook.com>
+References: <1438378439-11569-1-git-send-email-shenwei.wang@freescale.com>
+ <1438378439-11569-3-git-send-email-shenwei.wang@freescale.com>
+ <20150907151106.GA30723@tiger>
+ <CY1PR0301MB084344B059A4178B09E949DF83530@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <20150918141524.GC3770@tiger>
+ <CY1PR0301MB0843D4E46210525521F9453483590@CY1PR0301MB0843.namprd03.prod.outlook.com>
+Message-ID: <20150919011247.GD3770@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2015 12:45 PM, Arnd Bergmann wrote:
-> On Friday 18 September 2015 10:00:32 David Daney wrote:
->> On 09/18/2015 12:19 AM, Arnd Bergmann wrote:
->>> On Thursday 17 September 2015 15:41:33 David Daney wrote:
->>>> From: David Daney <david.daney@cavium.com>
->>>>
->>>> The on-chip devices all have fixed bars.  So, fix them up.
->>>>
->>>> Signed-off-by: David Daney <david.daney@cavium.com>
->>>>
->>>
->>> You should be able to just mark the BARs as fixed in DT
+On Fri, Sep 18, 2015 at 02:38:39PM +0000, Shenwei Wang wrote:
+> 
+> 
+> > -----Original Message-----
+> > From: Shawn Guo [mailto:shawnguo at kernel.org]
+> > Sent: 2015?9?18? 9:15
+> > To: Wang Shenwei-B38339
+> > Cc: jason at lakedaemon.net; Huang Yongcai-B20788;
+> > linux-kernel at vger.kernel.org; kernel at pengutronix.de; Sudeep Holla;
+> > tglx at linutronix.de; shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH v8 2/2] ARM: imx: support suspend states on imx7D
+> > 
+> > On Tue, Sep 08, 2015 at 03:01:07PM +0000, Shenwei Wang wrote:
+> > > > >  arch/arm/mach-imx/Kconfig        |   1 +
+> > > > >  arch/arm/mach-imx/Makefile       |   2 +
+> > > > >  arch/arm/mach-imx/common.h       |   4 +
+> > > > >  arch/arm/mach-imx/pm-imx7.c      | 917
+> > > > +++++++++++++++++++++++++++++++++++++++
+> > > > >  arch/arm/mach-imx/suspend-imx7.S | 529 ++++++++++++++++++++++
+> > > > >  5 files changed, 1453 insertions(+)
+> > > >
+> > > > 1453 lines addition to kernel only for i.MX7D suspend support.  Yes,
+> > > > this is the way we support suspend on i.MX6, but that's enough, and
+> > > > we have to stop this somewhere.  I would ask you to take Sudeep's
+> > > > comment and adopt PSCI for i.MX7D power management.
+> > >
+> > > According to PSCI spec, a supervisory software must be implemented
+> > > under either
+> > > HVC(EL2) or SMC(EL3) privilege level. I agree that, with this idea, we
+> > > could finally move these 1453 lines of codes from kernel into a
+> > > platform specific firmware. The problem is we don't have the firmware
+> > > so far, and we haven't even had a plan to enable the hypervisor or
+> > > secure software on this platform. Because low power consumption is the
+> > > key feature of this i.MX7D platform, please continue to consider the current
+> > implementation and get this feature supported first.
+> > 
+> > Can't U-Boot be considered as a firmware to implement PSCI?  I have seen an
+> > initial ARMv7 PSCI core support for U-Boot added by Marc Zyngier.
+> 
+> The current PSCI support in uboot is not complete. It can now support cpuidle, shutdown, 
+> and reset. But to support system suspend, there would be a lot more tasks. For example,
+> even the current wakeup source management codes will have to move into the firmware 
+> too. It is not a short time task. Please continue to consider this platform dependent implementation
+> first, meanwhile, we will start to migrate the solution to PSCI. However it will take some time.
 
-I think we can switch to PCI_PROBE_ONLY, and have all non-fixed BAR 
-devices configured by firmware.  This may significantly simplify any 
-quirks required in the kernel.
+I have zero interest to maintain this pile of code in the mainline
+kernel.  Take it as a motivation to move to PSCI soon, or you maintain
+it on your own as a out-of-tree patch for whatever long time you like.
 
-
->>
->> In the case of ACPI, there is no DT.  So we would need a different
->> solution for ACPI.  What would you recommend for ACPI?
->
-> I would expect that this does not matter at all on ACPI, because
-> the devices that need it are not hot-plugged, and all boot-time
-> devices are probed by the firmware: the ACPI PCI implementation
-> does not reassign any BARs, except for the hotplug case.
->
->> Also, can you point me to the OF device tree specification where it
->> tells how to specify PCI BAR addresses, I would especially be interested
->> in knowing how to specify fixed SRIOV BAR addresses in the device tree.
->
-> This is the 'n' bit mentioned sections 2.1.3 and 2.2.1.1 of the
-> PCI binding. When it is set, the OS is not supposed to try to
-> reassign the BAR even on machines that otherwise do a complete
-> rescan.
->
-> The PCI binding traditionally requires you to list all PCI devices
-> in DT, Linux as an extension (for the flattened DT format) allows
-> leaving out the devices, but in this case you probably need to
-> list every device that has a fixed BAR.
->
->> Yes, it is a bit of a hack.  That is why I put it in its own file, and
->> only try to hack up PCI devices that exactly match the vendor and device
->> ids that need fixing.
->>
->> IMHO, putting infrastructure into drivers/pci/probe.c, et al. to handle
->> this would be much more intrusive.
->
-> My guess is that it's already there, but even if it's not, this is a
-> generic well-defined case that has a standardized binding, and we should
-> implement that.
->
->> For the record:  The PCI Enhanced Allocation (EA) capability (approved
->> by PCI SIG on 23 October 2014) is the proper way to handle this going
->> forward.  However, this is not yet implemented in the SoCs that this
->> patch addresses.  Our plan is to implement the EA capability in the core
->> PCI code, so that we do not need to keep adding devices to this fixup code.
->
-> Good, but still this should only be required for the embedded case where
-> you don't have a firmware to probe the bus.
->
-> 	Arnd
->
+Shawn
