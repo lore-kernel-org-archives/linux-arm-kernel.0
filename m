@@ -1,60 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Sat, 19 Sep 2015 10:57:58 +0100
-Subject: [PATCH 1/2] mfd: twl6040: Fix deferred probe handling for clk32k
-In-Reply-To: <1442593745-16725-2-git-send-email-tony@atomide.com>
-References: <1442593745-16725-1-git-send-email-tony@atomide.com>
- <1442593745-16725-2-git-send-email-tony@atomide.com>
-Message-ID: <20150919095758.GH3218@x1>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Sat, 19 Sep 2015 18:02:35 +0800
+Subject: [PATCH 4/5] pinctrl: dt-binding: document berlin4ct SoC
+In-Reply-To: <1442656956-5740-1-git-send-email-jszhang@marvell.com>
+References: <1442656956-5740-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1442656956-5740-5-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Sep 2015, Tony Lindgren wrote:
+Add berlin4ct to existing berlin pinctrl device tree binding.
 
-> Commit 68bab8662f49 ("mfd: twl6040: Optional clk32k clock handling")
-> added clock handling for the 32k clock from palmas-clk. However, that
-> patch did not consider a typical situation where twl6040 is built-in,
-> and palmas-clk is a loadable module like we have in omap2plus_defconfig.
-> 
-> If palmas-clk is not loaded before twl6040 probes, we will get a
-> "clk32k is not handled" warning during booting. This means that any
-> drivers relying on this clock will mysteriously fail, including
-> omap5-uevm WLAN and audio.
-> 
-> Note that for WLAN, we probably should also eventually get
-> the clk32kgaudio for MMC3 directly as that's shared between
-> audio and WLAN SDIO at least for omap5-uevm. It seems the
-> WLAN chip cannot get it as otherwise MMC3 won't get properly
-> probed.
-> 
-> Fixes: 68bab8662f49 ("mfd: twl6040: Optional clk32k clock handling")
-> Cc: Benoit Cousson <bcousson@baylibre.com>
-> Cc: Dr. H. Nikolaus Schaller <hns@goldelico.com>
-> Cc: Grazvydas Ignotas <notasas@gmail.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Sourav Poddar <sourav.poddar@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  drivers/mfd/twl6040.c | 2 ++
->  1 file changed, 2 insertions(+)
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Applied, thanks.
-
-> --- a/drivers/mfd/twl6040.c
-> +++ b/drivers/mfd/twl6040.c
-> @@ -647,6 +647,8 @@ static int twl6040_probe(struct i2c_client *client,
->  
->  	twl6040->clk32k = devm_clk_get(&client->dev, "clk32k");
->  	if (IS_ERR(twl6040->clk32k)) {
-> +		if (PTR_ERR(twl6040->clk32k) == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
->  		dev_info(&client->dev, "clk32k is not handled\n");
->  		twl6040->clk32k = NULL;
->  	}
-
+diff --git a/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
+index a8bb5e2..0580860 100644
+--- a/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
+@@ -20,7 +20,10 @@ Required properties:
+ 	"marvell,berlin2cd-soc-pinctrl",
+ 	"marvell,berlin2cd-system-pinctrl",
+ 	"marvell,berlin2q-soc-pinctrl",
+-	"marvell,berlin2q-system-pinctrl"
++	"marvell,berlin2q-system-pinctrl",
++	"marvell,berlin4ct-avio-pinctrl",
++	"marvell,berlin4ct-sm-pinctrl",
++	"marvell,berlin4ct-soc-pinctrl"
+ 
+ Required subnode-properties:
+ - groups: a list of strings describing the group names.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.5.1
