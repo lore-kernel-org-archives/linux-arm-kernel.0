@@ -1,43 +1,53 @@
-From: cengelma@gmx.at (Christian Engelmayer)
-Date: Sat, 19 Sep 2015 01:57:37 +0200
-Subject: [PATCH] [media] c8sectpfe: Fix uninitialized return in
- load_c8sectpfe_fw_step1()
-Message-ID: <1442620657-31671-1-git-send-email-cengelma@gmx.at>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 18 Sep 2015 17:52:04 -0700
+Subject: [PATCH v2 0/5] Support CPR on MSM8916
+Message-ID: <1442623929-4507-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of failure loading the firmware, function
-load_c8sectpfe_fw_step1() uses the uninitialized variable ret as return
-value instead of the retrieved error value. Make sure the result is
-deterministic. Detected by Coverity CID 1324230.
+This patch series adds support for CPR on MSM8916. The first
+patch exposes a corner voting API to the CPR driver so that we can
+change the corner for the MX regulator. If possible I would
+like to make this patch prettier, but I don't have any great
+ideas right now. The next patch adds support to adjust voltages in the OPP
+layer, and then hooks that up to cpufreq-dt so that we can adjust
+the voltage in response to what CPR tells us to do. I've also thrown
+in a patch to make RCU lockdep warnings go away, but I'm not sure if it's
+right. There's still work to do.
 
-Signed-off-by: Christian Engelmayer <cengelma@gmx.at>
----
-Compile tested only. Applies against linux-next.
----
- drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+The final patch adds the CPR driver. This still has some rough edges. With
+the OPPv2 bindings I'm thinking of moving the frequency tables into DT
+and adding a custom vendor property to describe which fuse corner to use for
+each frequency.
 
-diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-index 486aef50d99b..16aa494f22be 100644
---- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-+++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-@@ -1192,7 +1192,6 @@ err:
- 
- static int load_c8sectpfe_fw_step1(struct c8sectpfei *fei)
- {
--	int ret;
- 	int err;
- 
- 	dev_info(fei->dev, "Loading firmware: %s\n", FIRMWARE_MEMDMA);
-@@ -1207,7 +1206,7 @@ static int load_c8sectpfe_fw_step1(struct c8sectpfei *fei)
- 	if (err) {
- 		dev_err(fei->dev, "request_firmware_nowait err: %d.\n", err);
- 		complete_all(&fei->fw_ack);
--		return ret;
-+		return err;
- 	}
- 
- 	return 0;
+Once you have these patches in place along with a CPU clock driver you
+can eanble enable cpufreq-dt and add the cpufreq-dt device (maybe the
+CPR driver should add the cpufreq-dt device?) and you'll see interrupts
+for CPR and OPP voltage adjustments triggering CPUfreq to modify voltages.
+
+Andy Gross (1):
+  regulator: smd: Add floor and corner operations
+
+Stephen Boyd (4):
+  PM / OPP: Support adjusting OPP voltages at runtime
+  OPP: Allow notifiers to call dev_pm_opp_get_{voltage,freq} RCU-free
+  cpufreq-dt: Handle OPP voltage adjust events
+  power: avs: Add support for CPR (Core Power Reduction)
+
+ .../devicetree/bindings/power/avs/qcom,cpr.txt     |  125 ++
+ drivers/base/power/opp.c                           |   96 +-
+ drivers/cpufreq/cpufreq-dt.c                       |   63 +-
+ drivers/power/avs/Kconfig                          |   15 +
+ drivers/power/avs/Makefile                         |    1 +
+ drivers/power/avs/qcom-cpr.c                       | 1999 ++++++++++++++++++++
+ drivers/regulator/qcom_smd-regulator.c             |   52 +
+ include/linux/pm_opp.h                             |   11 +
+ include/linux/regulator/qcom_smd-regulator.h       |   30 +
+ 9 files changed, 2378 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/avs/qcom,cpr.txt
+ create mode 100644 drivers/power/avs/qcom-cpr.c
+ create mode 100644 include/linux/regulator/qcom_smd-regulator.h
+
 -- 
-1.9.1
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
