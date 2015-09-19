@@ -1,9 +1,9 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 18 Sep 2015 17:52:06 -0700
-Subject: [PATCH v2 2/5] PM / OPP: Support adjusting OPP voltages at runtime
+Date: Fri, 18 Sep 2015 17:52:08 -0700
+Subject: [PATCH v2 4/5] cpufreq-dt: Handle OPP voltage adjust events
 In-Reply-To: <1442623929-4507-1-git-send-email-sboyd@codeaurora.org>
 References: <1442623929-4507-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1442623929-4507-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1442623929-4507-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,145 +12,173 @@ employed to optimize the operating voltage of a device. At a
 given frequency, the hardware monitors dynamic factors and either
 makes a suggestion for how much to adjust a voltage for the
 current frequency, or it automatically adjusts the voltage
-without software intervention. Add an API to the OPP library for
-the former case, so that AVS type devices can update the voltages
-for an OPP when the hardware determines the voltage should
-change. The assumption is that drivers like CPUfreq or devfreq
-will register for the OPP notifiers and adjust the voltage
-according to suggestions that AVS makes.
+without software intervention.
 
-Cc: Nishanth Menon <nm@ti.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+In the former case, an AVS driver will call
+dev_pm_opp_modify_voltage() and update the voltage for the
+particular OPP the CPUs are using. Add an OPP notifier to
+cpufreq-dt so that we can adjust the voltage of the CPU when AVS
+updates the OPP.
+
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/base/power/opp.c | 77 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/pm_opp.h   | 11 +++++++
- 2 files changed, 88 insertions(+)
+ drivers/cpufreq/cpufreq-dt.c | 63 +++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 57 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-index 28cd75c535b0..35b66c46dcb7 100644
---- a/drivers/base/power/opp.c
-+++ b/drivers/base/power/opp.c
-@@ -1136,6 +1136,83 @@ unlock:
- }
- 
- /**
-+ * dev_pm_opp_adjust_voltage() - helper to change the voltage of an OPP
-+ * @dev:		device for which we do this operation
-+ * @freq:		OPP frequency to adjust voltage of
-+ * @u_volt:		new OPP voltage
-+ *
-+ * Change the voltage of an OPP with an RCU operation.
-+ *
-+ * Return: -EINVAL for bad pointers, -ENOMEM if no memory available for the
-+ * copy operation, returns 0 if no modifcation was done OR modification was
-+ * successful.
-+ *
-+ * Locking: The internal device_opp and opp structures are RCU protected.
-+ * Hence this function internally uses RCU updater strategy with mutex locks to
-+ * keep the integrity of the internal data structures. Callers should ensure
-+ * that this function is *NOT* called under RCU protection or in contexts where
-+ * mutex locking or synchronize_rcu() blocking calls cannot be used.
-+ */
-+int dev_pm_opp_adjust_voltage(struct device *dev, unsigned long freq,
-+			      unsigned long u_volt)
-+{
-+	struct device_opp *dev_opp;
-+	struct dev_pm_opp *new_opp, *tmp_opp, *opp = ERR_PTR(-ENODEV);
-+	int r = 0;
-+
-+	/* keep the node allocated */
-+	new_opp = kmalloc(sizeof(*new_opp), GFP_KERNEL);
-+	if (!new_opp)
-+		return -ENOMEM;
-+
-+	mutex_lock(&dev_opp_list_lock);
-+
-+	/* Find the device_opp */
-+	dev_opp = _find_device_opp(dev);
-+	if (IS_ERR(dev_opp)) {
-+		r = PTR_ERR(dev_opp);
-+		dev_warn(dev, "%s: Device OPP not found (%d)\n", __func__, r);
-+		goto unlock;
-+	}
-+
-+	/* Do we have the frequency? */
-+	list_for_each_entry(tmp_opp, &dev_opp->opp_list, node) {
-+		if (tmp_opp->rate == freq) {
-+			opp = tmp_opp;
-+			break;
-+		}
-+	}
-+	if (IS_ERR(opp)) {
-+		r = PTR_ERR(opp);
-+		goto unlock;
-+	}
-+
-+	/* Is update really needed? */
-+	if (opp->u_volt == u_volt)
-+		goto unlock;
-+	/* copy the old data over */
-+	*new_opp = *opp;
-+
-+	/* plug in new node */
-+	new_opp->u_volt = u_volt;
-+
-+	list_replace_rcu(&opp->node, &new_opp->node);
-+	mutex_unlock(&dev_opp_list_lock);
-+	call_srcu(&dev_opp->srcu_head.srcu, &opp->rcu_head, _kfree_opp_rcu);
-+
-+	/* Notify the change of the OPP */
-+	srcu_notifier_call_chain(&dev_opp->srcu_head, OPP_EVENT_ADJUST_VOLTAGE,
-+				 new_opp);
-+
-+	return 0;
-+
-+unlock:
-+	mutex_unlock(&dev_opp_list_lock);
-+	kfree(new_opp);
-+	return r;
-+}
-+
-+/**
-  * dev_pm_opp_enable() - Enable a specific OPP
-  * @dev:	device for which we do this operation
-  * @freq:	OPP frequency to enable
-diff --git a/include/linux/pm_opp.h b/include/linux/pm_opp.h
-index e817722ee3f0..f7a4a2245f53 100644
---- a/include/linux/pm_opp.h
-+++ b/include/linux/pm_opp.h
-@@ -22,6 +22,7 @@ struct device;
- 
- enum dev_pm_opp_event {
- 	OPP_EVENT_ADD, OPP_EVENT_REMOVE, OPP_EVENT_ENABLE, OPP_EVENT_DISABLE,
-+	OPP_EVENT_ADJUST_VOLTAGE,
+diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+index 7c0d70e2a861..1bf3ae4d4ee1 100644
+--- a/drivers/cpufreq/cpufreq-dt.c
++++ b/drivers/cpufreq/cpufreq-dt.c
+@@ -34,6 +34,9 @@ struct private_data {
+ 	struct regulator *cpu_reg;
+ 	struct thermal_cooling_device *cdev;
+ 	unsigned int voltage_tolerance; /* in percentage */
++	struct notifier_block opp_nb;
++	struct mutex lock;
++	unsigned long opp_freq;
  };
  
- #if defined(CONFIG_PM_OPP)
-@@ -50,6 +51,9 @@ int dev_pm_opp_add(struct device *dev, unsigned long freq,
- 		   unsigned long u_volt);
- void dev_pm_opp_remove(struct device *dev, unsigned long freq);
+ static struct freq_attr *cpufreq_dt_attr[] = {
+@@ -42,6 +45,33 @@ static struct freq_attr *cpufreq_dt_attr[] = {
+ 	NULL,
+ };
  
-+int dev_pm_opp_adjust_voltage(struct device *dev, unsigned long freq,
-+			      unsigned long u_volt);
-+
- int dev_pm_opp_enable(struct device *dev, unsigned long freq);
- 
- int dev_pm_opp_disable(struct device *dev, unsigned long freq);
-@@ -114,6 +118,13 @@ static inline void dev_pm_opp_remove(struct device *dev, unsigned long freq)
- {
- }
- 
-+static inline int
-+dev_pm_opp_adjust_voltage(struct device *dev, unsigned long freq,
-+			  unsigned long u_volt)
++static int opp_notifier(struct notifier_block *nb, unsigned long event,
++			void *data)
 +{
-+	return 0;
++	struct dev_pm_opp *opp = data;
++	struct private_data *priv = container_of(nb, struct private_data,
++						 opp_nb);
++	struct device *cpu_dev = priv->cpu_dev;
++	struct regulator *cpu_reg = priv->cpu_reg;
++	unsigned long volt, tol, freq;
++	int ret = 0;
++
++	if (event == OPP_EVENT_ADJUST_VOLTAGE) {
++		volt = dev_pm_opp_get_voltage(opp);
++		freq = dev_pm_opp_get_freq(opp);
++		tol = volt * priv->voltage_tolerance / 100;
++
++		mutex_lock(&priv->lock);
++		if (freq == priv->opp_freq)
++			ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
++		mutex_unlock(&priv->lock);
++		if (ret)
++			dev_err(cpu_dev, "failed to scale voltage: %d\n", ret);
++	}
++
++	return notifier_from_errno(ret);
 +}
 +
- static inline int dev_pm_opp_enable(struct device *dev, unsigned long freq)
+ static int set_target(struct cpufreq_policy *policy, unsigned int index)
  {
- 	return 0;
+ 	struct dev_pm_opp *opp;
+@@ -53,6 +83,7 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+ 	unsigned long volt = 0, volt_old = 0, tol = 0;
+ 	unsigned int old_freq, new_freq;
+ 	long freq_Hz, freq_exact;
++	unsigned long opp_freq = 0;
+ 	int ret;
+ 
+ 	freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
+@@ -63,8 +94,8 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+ 	new_freq = freq_Hz / 1000;
+ 	old_freq = clk_get_rate(cpu_clk) / 1000;
+ 
++	mutex_lock(&priv->lock);
+ 	if (!IS_ERR(cpu_reg)) {
+-		unsigned long opp_freq;
+ 
+ 		rcu_read_lock();
+ 		opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_Hz);
+@@ -72,7 +103,8 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+ 			rcu_read_unlock();
+ 			dev_err(cpu_dev, "failed to find OPP for %ld\n",
+ 				freq_Hz);
+-			return PTR_ERR(opp);
++			ret = PTR_ERR(opp);
++			goto out;
+ 		}
+ 		volt = dev_pm_opp_get_voltage(opp);
+ 		opp_freq = dev_pm_opp_get_freq(opp);
+@@ -93,7 +125,7 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+ 		if (ret) {
+ 			dev_err(cpu_dev, "failed to scale voltage up: %d\n",
+ 				ret);
+-			return ret;
++			goto out;
+ 		}
+ 	}
+ 
+@@ -102,7 +134,7 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+ 		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
+ 		if (!IS_ERR(cpu_reg) && volt_old > 0)
+ 			regulator_set_voltage_tol(cpu_reg, volt_old, tol);
+-		return ret;
++		goto out;
+ 	}
+ 
+ 	/* scaling down?  scale voltage after frequency */
+@@ -112,9 +144,12 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+ 			dev_err(cpu_dev, "failed to scale voltage down: %d\n",
+ 				ret);
+ 			clk_set_rate(cpu_clk, old_freq * 1000);
++			goto out;
+ 		}
+ 	}
+-
++	priv->opp_freq = opp_freq;
++out:
++	mutex_unlock(&priv->lock);
+ 	return ret;
+ }
+ 
+@@ -201,6 +236,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 	unsigned int transition_latency;
+ 	bool need_update = false;
+ 	int ret;
++	struct srcu_notifier_head *opp_srcu_head;
+ 
+ 	ret = allocate_resources(policy->cpu, &cpu_dev, &cpu_reg, &cpu_clk);
+ 	if (ret) {
+@@ -277,6 +313,19 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 		goto out_free_opp;
+ 	}
+ 
++	mutex_init(&priv->lock);
++
++	opp_srcu_head = dev_pm_opp_get_notifier(cpu_dev);
++	if (IS_ERR(opp_srcu_head)) {
++		ret = PTR_ERR(opp_srcu_head);
++		goto out_free_priv;
++	}
++
++	priv->opp_nb.notifier_call = opp_notifier;
++	ret = srcu_notifier_chain_register(opp_srcu_head, &priv->opp_nb);
++	if (ret)
++		goto out_free_priv;
++
+ 	of_property_read_u32(np, "voltage-tolerance", &priv->voltage_tolerance);
+ 
+ 	if (!transition_latency)
+@@ -326,7 +375,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
+ 	if (ret) {
+ 		pr_err("failed to init cpufreq table: %d\n", ret);
+-		goto out_free_priv;
++		goto out_unregister_nb;
+ 	}
+ 
+ 	priv->cpu_dev = cpu_dev;
+@@ -365,6 +414,8 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 
+ out_free_cpufreq_table:
+ 	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
++out_unregister_nb:
++	srcu_notifier_chain_unregister(opp_srcu_head, &priv->opp_nb);
+ out_free_priv:
+ 	kfree(priv);
+ out_free_opp:
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
