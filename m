@@ -1,34 +1,31 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Sat, 19 Sep 2015 18:02:35 +0800
-Subject: [PATCH 4/5] pinctrl: dt-binding: document berlin4ct SoC
+Date: Sat, 19 Sep 2015 18:02:34 +0800
+Subject: [PATCH 3/5] arm64: berlin: add the pinctrl dependency for Marvell
+ Berlin SoCs
 In-Reply-To: <1442656956-5740-1-git-send-email-jszhang@marvell.com>
 References: <1442656956-5740-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1442656956-5740-5-git-send-email-jszhang@marvell.com>
+Message-ID: <1442656956-5740-4-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add berlin4ct to existing berlin pinctrl device tree binding.
+This is to add the pinctrl dependency for Marvell Berlin SoCs.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
-index a8bb5e2..0580860 100644
---- a/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
-@@ -20,7 +20,10 @@ Required properties:
- 	"marvell,berlin2cd-soc-pinctrl",
- 	"marvell,berlin2cd-system-pinctrl",
- 	"marvell,berlin2q-soc-pinctrl",
--	"marvell,berlin2q-system-pinctrl"
-+	"marvell,berlin2q-system-pinctrl",
-+	"marvell,berlin4ct-avio-pinctrl",
-+	"marvell,berlin4ct-sm-pinctrl",
-+	"marvell,berlin4ct-soc-pinctrl"
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index c6e2c75..3d17ee2 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -9,6 +9,7 @@ config ARCH_BERLIN
+ 	bool "Marvell Berlin SoC Family"
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select DW_APB_ICTL
++	select PINCTRL
+ 	help
+ 	  This enables support for Marvell Berlin SoC Family
  
- Required subnode-properties:
- - groups: a list of strings describing the group names.
 -- 
 2.5.1
