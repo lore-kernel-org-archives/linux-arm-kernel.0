@@ -1,47 +1,19 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 20 Sep 2015 08:30:51 -0400
-Subject: [PATCH 5/5] ARM: dts: sun5i: Add backlight node to
- sun5i-q8-common.dtsi
-In-Reply-To: <1442752251-20744-1-git-send-email-hdegoede@redhat.com>
-References: <1442752251-20744-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1442752251-20744-6-git-send-email-hdegoede@redhat.com>
+Date: Sun, 20 Sep 2015 08:34:53 -0400
+Subject: [PATCH resend] extcon: Fix attached value returned by
+ is_extcon_changed
+Message-ID: <1442752494-22244-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All A13 based q8 formfactor tablets use the same backlight setup, add
-a backlight devicetree node for controlling the backlight on these devices.
+Hi MyungJoo,
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun5i-q8-common.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Here is a resend of a bug-fix I send a while back, you said you would
+merge this for v4.3-rc1, but I'm not seeing it there.
 
-diff --git a/arch/arm/boot/dts/sun5i-q8-common.dtsi b/arch/arm/boot/dts/sun5i-q8-common.dtsi
-index 0641d68..76a5204 100644
---- a/arch/arm/boot/dts/sun5i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun5i-q8-common.dtsi
-@@ -41,11 +41,22 @@
-  */
- #include "sunxi-q8-common.dtsi"
- 
-+#include <dt-bindings/pwm/pwm.h>
-+
- / {
- 	aliases {
- 		serial0 = &uart1;
- 	};
- 
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
-+		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
-+		default-brightness-level = <8>;
-+		/* TODO: backlight uses axp gpio1 as enable pin */
-+		/* TODO: backlight is powered by AXP209 DCDC1SW */
-+	};
-+
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
--- 
-2.4.3
+Can you please get this merged into 4.3, without this fix the sunxi
+usb otg controller support which got merged in 4.3 will not work properly.
+
+Regards,
+
+Hans
