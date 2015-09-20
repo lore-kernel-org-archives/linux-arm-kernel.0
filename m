@@ -1,60 +1,93 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Sun, 20 Sep 2015 05:17:22 +0100
-Subject: [PATCH 1/3] mfd: axp20x: Rename supply names for AXP221 DC1SW
- and DC5LDO regulators
-In-Reply-To: <1442372732-27434-2-git-send-email-wens@csie.org>
-References: <1442372732-27434-1-git-send-email-wens@csie.org>
- <1442372732-27434-2-git-send-email-wens@csie.org>
-Message-ID: <20150920041722.GI3039@x1>
+Date: Sun, 20 Sep 2015 05:19:12 +0100
+Subject: [PATCH linux-next v9 0/3] mfd: flexcom: add a driver for Flexcom
+In-Reply-To: <cover.1441118159.git.cyrille.pitchen@atmel.com>
+References: <cover.1441118159.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150920041912.GS3039@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Sep 2015, Chen-Yu Tsai wrote:
+Patch set description?
 
-> The DC1SW and DC5LDO regulators in the AXP221 are internally chained
-> to DCDC1 and DCDC5, hence the names. The original bindings used the
-> parent regulator names for the supply regulator property. This causes
-> some confusion when we actually use it in the dts:
-> 
-> 	axp221 {
-> 		/* self supplying? */
-> 		dcdc1-supply = <&dcdc1>;
-> 		dcdc5-supply = <&dcdc5>;
-> 
-> 		dcdc1: dcdc1 {
-> 			...
-> 		};
-> 
-> 		dcdc5: dcdc5 {
-> 			...
-> 		};
-> 	};
-> 
-> Change them to the downstream regulator names, or "dc1sw" and "dc5ldo"
-> respectively.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+Once Rob is satisfied, please re-submit this set with Nicolas' Acks
+and I will re-review.
 
-Applied, thanks.
-
-> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> index 41811223e5be..8e79252b1e7c 100644
-> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -60,8 +60,8 @@ DCDC2		: DC-DC buck	: vin2-supply
->  DCDC3		: DC-DC	buck	: vin3-supply
->  DCDC4		: DC-DC	buck	: vin4-supply
->  DCDC5		: DC-DC	buck	: vin5-supply
-> -DC1SW		: On/Off Switch	: dcdc1-supply		: DCDC1 secondary output
-> -DC5LDO		: LDO		: dcdc5-supply		: input from DCDC5
-> +DC1SW		: On/Off Switch	: dc1sw-supply		: DCDC1 secondary output
-> +DC5LDO		: LDO		: dc5ldo-supply		: input from DCDC5
->  ALDO1		: LDO		: aldoin-supply		: shared supply
->  ALDO2		: LDO		: aldoin-supply		: shared supply
->  ALDO3		: LDO		: aldoin-supply		: shared supply
+> ChangeLog
+> 
+> v9:
+> - go back to v5 (use the new "atmel,flexcom-mode" DT property).
+> - fix the name of the spi node in the DT example: from spi at f8034400 to
+>   spi at 400
+> - align the fields of the struct platform_driver atmel_flexcom_driver as
+>   suggested by Lee Jones.
+> 
+> v8:
+> - fix the name of the spi node in the DT example: from spi at f8034400 to
+>   spi at 2,0
+> - use the return code of op_property_read_u32_index() instead of -EINVAL
+>   to report error.
+> - add Acked-by from Nicolas Ferre
+> 
+> v7:
+> - read the operating mode from the very first u32 of the reg property from
+>   the first available child node (should be unique).
+> - update the DT bindings documentation accordingly.
+> 
+> v6:
+> - select the operating mode according to the "compatible" DT property of
+>   the first available child node (should be unique).
+> - remove the "atmel,flexcom-mode" DT property so the need of a header file
+>   defining macros for the possible values of this deprecated property.
+> 
+> v5:
+> - create a header file containing macros used by DT bindings
+> - use numeric constants instead of strings to select the Flexcom mode
+> - change the license to "GPL v2"
+> - update the DT binding documentation to make it more readable and add
+>   references to USART, SPI and I2C DT binding documentations. remove the
+>   useless label in the Example section.
+> - change the register prefix from FX_ to FLEX_ to match the Flexcom
+>   programmer datasheet.
+> - rename some variables to make them more understandable.
+> 
+> v4:
+> - check clk_prepare_enable() return code in atmel_flexcom_probe()
+> - add a commit message to the DT binding patch
+> 
+> v3:
+> - remove MODULE_ALIAS()
+> - add Acked-by from Boris Brezillon and Alexandre Belloni
+> 
+> v2:
+> - enhance the documentation of DT bindings and change the way the "ranges"
+>   property is used.
+> - replace __raw_readl() and __raw_writel() by readl() and writel().
+> - change the module license to "GPL" for v2 or later
+> - print the selected flexcom mode after the hardware version
+> 
+> v1:
+> This series of patches a support to the Atmel Flexcom, a wrapper which
+> integrates an USART, a SPI controller and a TWI controller. Only one
+> peripheral can be used at a time. The active function is selected though
+> the Flexcom Mode Register.
+> 
+> Cyrille Pitchen (3):
+>   mfd: atmel-flexcom: create include file with macros used by DT
+>     bindings
+>   mfd: devicetree: add bindings for Atmel Flexcom
+>   mfd: atmel-flexcom: add a driver for Atmel Flexible Serial
+>     Communication Unit
+> 
+>  .../devicetree/bindings/mfd/atmel-flexcom.txt      |  67 +++++++++++++
+>  drivers/mfd/Kconfig                                |  11 +++
+>  drivers/mfd/Makefile                               |   1 +
+>  drivers/mfd/atmel-flexcom.c                        | 104 +++++++++++++++++++++
+>  include/dt-bindings/mfd/atmel-flexcom.h            |  16 ++++
+>  5 files changed, 199 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+>  create mode 100644 drivers/mfd/atmel-flexcom.c
+>  create mode 100644 include/dt-bindings/mfd/atmel-flexcom.h
+> 
 
 -- 
 Lee Jones
