@@ -1,38 +1,26 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 20 Sep 2015 08:30:50 -0400
-Subject: [PATCH 4/5] ARM: dts: sun8i: Add pwm-backlight device for A23/A33 Q8
- format tablets
+Date: Sun, 20 Sep 2015 08:30:51 -0400
+Subject: [PATCH 5/5] ARM: dts: sun5i: Add backlight node to
+ sun5i-q8-common.dtsi
 In-Reply-To: <1442752251-20744-1-git-send-email-hdegoede@redhat.com>
 References: <1442752251-20744-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1442752251-20744-5-git-send-email-hdegoede@redhat.com>
+Message-ID: <1442752251-20744-6-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen-Yu Tsai <wens@csie.org>
+All A13 based q8 formfactor tablets use the same backlight setup, add
+a backlight devicetree node for controlling the backlight on these devices.
 
-The LCD backlight on the A23/A33 Q8 format tablets is enabled
-with a GPIO controlled regulator, and brightness controlled with
-the SoC's PWM controller.
-
-The backlight is powered from the AXP223 PMIC's DC1SW output,
-which is not supported yet. A proper bootloader is required
-to enable it.
-
-The brightness levels are arbitrary. The FEX files do not have
-such information. As such, actual brightness levels may differ
-from device to device.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun8i-q8-common.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/sun5i-q8-common.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index 6f8a8bb..f342736 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-@@ -41,11 +41,24 @@
+diff --git a/arch/arm/boot/dts/sun5i-q8-common.dtsi b/arch/arm/boot/dts/sun5i-q8-common.dtsi
+index 0641d68..76a5204 100644
+--- a/arch/arm/boot/dts/sun5i-q8-common.dtsi
++++ b/arch/arm/boot/dts/sun5i-q8-common.dtsi
+@@ -41,11 +41,22 @@
   */
  #include "sunxi-q8-common.dtsi"
  
@@ -40,36 +28,20 @@ index 6f8a8bb..f342736 100644
 +
  / {
  	aliases {
- 		serial0 = &r_uart;
+ 		serial0 = &uart1;
  	};
  
 +	backlight: backlight {
 +		compatible = "pwm-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&bl_en_pin_q8>;
 +		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
 +		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
 +		default-brightness-level = <8>;
-+		enable-gpios = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH6 */
-+		/* backlight is powered by AXP223 DC1SW */
++		/* TODO: backlight uses axp gpio1 as enable pin */
++		/* TODO: backlight is powered by AXP209 DCDC1SW */
 +	};
 +
  	chosen {
  		stdout-path = "serial0:115200n8";
  	};
-@@ -62,6 +75,13 @@
- };
- 
- &pio {
-+	bl_en_pin_q8: bl_en_pin at 0 {
-+		allwinner,pins = "PH6";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
- 	mmc0_cd_pin_q8: mmc0_cd_pin at 0 {
- 		allwinner,pins = "PB4";
- 		allwinner,function = "gpio_in";
 -- 
 2.4.3
