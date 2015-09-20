@@ -1,35 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 20 Sep 2015 18:49:37 +0200
-Subject: [PATCH] pinctrl: sun5i: Fix a10s pwm1 pinctrl mapping
-In-Reply-To: <1442699804-15526-1-git-send-email-hdegoede@redhat.com>
-References: <1442699804-15526-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150920164937.GH4684@lukather>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 20 Sep 2015 20:04:01 +0200
+Subject: [PATCH RESEND 1/2] arm: berlin: use non-self-cleared reset
+ register to reset cpu
+In-Reply-To: <1442213265-1002-2-git-send-email-jszhang@marvell.com>
+References: <1442213265-1002-1-git-send-email-jszhang@marvell.com>
+ <1442213265-1002-2-git-send-email-jszhang@marvell.com>
+Message-ID: <55FEF511.2050600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 19, 2015 at 05:56:44PM -0400, Hans de Goede wrote:
-> The comment for PG14 mux setting 3 already correctly states that this
-> muxes PG13 to pwm1, but the text ascociated with it said uart3, fix this.
-> 
-> Note that we use "pwm" rather then "pwm1" to be consistent with pwm0
-> where the mux setting is also simply called "pwm" and to be consistent
-> with sun4i/sun7i which do the same.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On 14.09.2015 08:47, Jisheng Zhang wrote:
+> In Berlin SoCs, there are two kinds of cpu reset control registers: the
+> first one's corresponding bits will be self-cleared after some cycles,
+> while the second one's bits won't. Previously the first kind of reset
+> control register is used, this patch uses the second kind one to prepare
+> for the next hotplug commit.
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>   arch/arm/mach-berlin/platsmp.c | 4 +++-
+>   1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
+> index 34a3753..bde327b 100644
+> --- a/arch/arm/mach-berlin/platsmp.c
+> +++ b/arch/arm/mach-berlin/platsmp.c
+> @@ -17,7 +17,7 @@
+>   #include <asm/smp_plat.h>
+>   #include <asm/smp_scu.h>
+>
+> -#define CPU_RESET		0x00
+> +#define CPU_RESET		0x20
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Jisheng,
 
-Thanks!
-Maxime
+I am fine with the patch itself, except that I'd like to rather
+rename the 0x00-register to CPU_RESET_SC with a comment about
+the self-clearing nature. The 0x20-register would then be named
+CPU_RESET_NON_SC and used the way you propose.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150920/68a7caf5/attachment.sig>
+Are you fine with me naming the registers accordingly while
+applying the patches?
+
+Sebastian
+
+>   #define RESET_VECT		0x00
+>   #define SW_RESET_ADDR		0x94
+> @@ -31,6 +31,8 @@ static inline void berlin_perform_reset_cpu(unsigned int cpu)
+>   	u32 val;
+>
+>   	val = readl(cpu_ctrl + CPU_RESET);
+> +	val &= ~BIT(cpu_logical_map(cpu));
+> +	writel(val, cpu_ctrl + CPU_RESET);
+>   	val |= BIT(cpu_logical_map(cpu));
+>   	writel(val, cpu_ctrl + CPU_RESET);
+>   }
+>
