@@ -1,28 +1,63 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Sat, 19 Sep 2015 21:52:18 -0500
-Subject: [PATCH 00/14] ARM: dts: apq8064 dt cleanups and additions
-In-Reply-To: <1442579371-19822-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1442579371-19822-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150920025218.GA24949@qualcomm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Sun, 20 Sep 2015 05:17:22 +0100
+Subject: [PATCH 1/3] mfd: axp20x: Rename supply names for AXP221 DC1SW
+ and DC5LDO regulators
+In-Reply-To: <1442372732-27434-2-git-send-email-wens@csie.org>
+References: <1442372732-27434-1-git-send-email-wens@csie.org>
+ <1442372732-27434-2-git-send-email-wens@csie.org>
+Message-ID: <20150920041722.GI3039@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 01:29:31PM +0100, Srinivas Kandagatla wrote:
-> Hi Andy, 
-> 
-> Here are few cleanup and additions to the existing APQ8064 device tree.
-> 
-> Some of the patches are to do with princtrl cleanup which was always not
-> in the right place and some of the pinctrls were missing.
-> Other set of patches is to do with adding more devices like rtc rng
-> and pwr key for pmic 8921.
-> Last set of patches are related to pwrseq and SD card detect taking Stephens
-> comments into consideration.
+On Wed, 16 Sep 2015, Chen-Yu Tsai wrote:
 
-These all look fine.  I tested in ifc6410 as well.  I'll test on qs600 to be
-sure.
+> The DC1SW and DC5LDO regulators in the AXP221 are internally chained
+> to DCDC1 and DCDC5, hence the names. The original bindings used the
+> parent regulator names for the supply regulator property. This causes
+> some confusion when we actually use it in the dts:
+> 
+> 	axp221 {
+> 		/* self supplying? */
+> 		dcdc1-supply = <&dcdc1>;
+> 		dcdc5-supply = <&dcdc5>;
+> 
+> 		dcdc1: dcdc1 {
+> 			...
+> 		};
+> 
+> 		dcdc5: dcdc5 {
+> 			...
+> 		};
+> 	};
+> 
+> Change them to the downstream regulator names, or "dc1sw" and "dc5ldo"
+> respectively.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/axp20x.txt | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+
+Applied, thanks.
+
+> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> index 41811223e5be..8e79252b1e7c 100644
+> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
+> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> @@ -60,8 +60,8 @@ DCDC2		: DC-DC buck	: vin2-supply
+>  DCDC3		: DC-DC	buck	: vin3-supply
+>  DCDC4		: DC-DC	buck	: vin4-supply
+>  DCDC5		: DC-DC	buck	: vin5-supply
+> -DC1SW		: On/Off Switch	: dcdc1-supply		: DCDC1 secondary output
+> -DC5LDO		: LDO		: dcdc5-supply		: input from DCDC5
+> +DC1SW		: On/Off Switch	: dc1sw-supply		: DCDC1 secondary output
+> +DC5LDO		: LDO		: dc5ldo-supply		: input from DCDC5
+>  ALDO1		: LDO		: aldoin-supply		: shared supply
+>  ALDO2		: LDO		: aldoin-supply		: shared supply
+>  ALDO3		: LDO		: aldoin-supply		: shared supply
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
