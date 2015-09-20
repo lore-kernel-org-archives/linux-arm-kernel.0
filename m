@@ -1,95 +1,41 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 20 Sep 2015 21:38:00 +0200
-Subject: [PATCH 5/5] arm64: dts: berlin4ct: add the pinctrl node and muxing
- setup for uart0
-In-Reply-To: <1442656956-5740-6-git-send-email-jszhang@marvell.com>
-References: <1442656956-5740-1-git-send-email-jszhang@marvell.com>
- <1442656956-5740-6-git-send-email-jszhang@marvell.com>
-Message-ID: <55FF0B18.5060505@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 20 Sep 2015 21:32:42 +0100
+Subject: [PATCH v5 07/23] regulator: core: Remove regulator_list
+In-Reply-To: <20150919150129.GR12027@sirena.org.uk>
+References: <1442494637-3674-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1442494637-3674-8-git-send-email-tomeu.vizoso@collabora.com>
+ <20150919150129.GR12027@sirena.org.uk>
+Message-ID: <20150920203242.GM21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.09.2015 12:02, Jisheng Zhang wrote:
-> Add the avio, soc, sm pinctrl nodes for Marvell berlin4ct SoC. This
-> patch also adds urt0 txd and rxd muxing setup in the dtsi because uart0
-> always use them to work, no other possibilities.
+On Sat, Sep 19, 2015 at 08:01:29AM -0700, Mark Brown wrote:
+> On Thu, Sep 17, 2015 at 02:57:01PM +0200, Tomeu Vizoso wrote:
+> > As we are already registering a device with regulator_class for each
+> > regulator device, regulator_list is redundant and can be replaced with
+> > calls to class_find_device() and class_for_each_device().
+> 
+> This appears to leak references to the struct devices returned by
+> class_find_device() - it takes a reference before it returns so any
+> device found using class_find_device() needs to be released with
+> put_device() and I don't see any new put_device() calls in here.
 
-Please split the patch into two:
-one adding the pinctrl nodes and
-one adding the default pinmux to uart0 node.
+When I've been fiding exactly that kind of bug in the PHY code, I've
+been adding comments to the docbook function header detailing the
+requirement to balance the reference.  IMHO, this is a good idea,
+because the more places that get it with these APIs, the more likely
+people are to potentially read it.
 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->   arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 27 +++++++++++++++++++++++++++
->   1 file changed, 27 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> index a3b5f1d..4566e4e 100644
-> --- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> @@ -225,6 +225,16 @@
->   			};
->   		};
->
-> +		soc_pinctrl: pinctrl at ea8000 {
-> +			compatible = "marvell,berlin4ct-soc-pinctrl";
-> +			reg = <0xea8000 0x14>;
-> +		};
-> +
-> +		avio_pinctrl: pinctrl at ea8400 {
-> +			compatible = "marvell,berlin4ct-avio-pinctrl";
-> +			reg = <0xea8400 8>;
+The comment I've been putting in the phy code is:
 
-s/8/0x8/
+ * If successful, returns a pointer to the phy_device with the embedded
+ * struct device refcount incremented by one, or NULL on failure. The
+ * refcount must be dropped by calling phy_disconnect() or phy_detach().
 
-> +		};
-> +
->   		apb at fc0000 {
->   			compatible = "simple-bus";
->   			#address-cells = <1>;
-> @@ -278,6 +288,23 @@
->   				clocks = <&osc>;
->   				reg-shift = <2>;
->   				status = "disabled";
-> +				pinctrl-0 = <&urt0_txd_pmux>, <&urt0_rxd_pmux>;
-> +				pinctrl-names = "default", "default";
+which even goes as far as telling people how they should be dropping
+the reference.  So there should be no excuse (ignorance is not an
+excuse for this!)
 
-pinctrl-names = "default", "default"; refers to pinctrl-0 and pinctrl-1
-respectively. There is no pinctrl-1, so please remove the second
-pinctrl-names element.
-
-> +			};
-> +		};
-> +
-> +		sm_pinctrl: pinctrl at fe2200 {
-> +			compatible = "marvell,berlin4ct-sm-pinctrl";
-> +			reg = <0xfe2200 0xc>;
-> +
-> +			urt0_txd_pmux: urt0_txd-pmux {
-> +				groups = "SM_URT0_TXD";
-> +				function = "sm_urt0_txd";
-> +			};
-> +
-> +			urt0_rxd_pmux: urt0_rxd-pmux {
-> +				groups = "SM_URT0_RXD";
-> +				function = "sm_urt0_rxd";
-
-If you change the driver to generic function names ("uart0") this
-boils down to a single
-
-uart0_pmux: uart0-pmux {
-	groups = "SM_UART0_TXD", "SM_UART0_RXD";
-	function = "uart0";
-};
-
-pinmux node and the reference in uart0 node to
-
-pinctrl-0 = <&uart0_pmux>;
-pinctrl-names = "default";
-
-Sebastian
-
->   			};
->   		};
->   	};
->
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
