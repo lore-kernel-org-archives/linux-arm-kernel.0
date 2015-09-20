@@ -1,40 +1,28 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sun, 20 Sep 2015 09:23:48 +0800
-Subject: [PATCH v2 0/7] hwrng: Add support for STMicroelectronics' RNG IP
-In-Reply-To: <20150919092145.GG3218@x1>
-References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
- <20150918140756.GK9249@gondor.apana.org.au>
- <CAF2Aj3h7Jy=tpYdZTdbxAJwa=147_hAu3reOFrbEh=JdrMFWLQ@mail.gmail.com>
- <20150918151137.GA10763@gondor.apana.org.au>
- <20150918155112.GE3218@x1>
- <20150918231213.GA14278@gondor.apana.org.au>
- <20150919092145.GG3218@x1>
-Message-ID: <20150920012347.GA21913@gondor.apana.org.au>
+From: agross@codeaurora.org (Andy Gross)
+Date: Sat, 19 Sep 2015 21:52:18 -0500
+Subject: [PATCH 00/14] ARM: dts: apq8064 dt cleanups and additions
+In-Reply-To: <1442579371-19822-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1442579371-19822-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150920025218.GA24949@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 19, 2015 at 10:21:45AM +0100, Lee Jones wrote:
->
-> That's not how it works.  It's helpful, more often than not, to submit
-> the entire set to each maintainer concerned so they can keep up with
-> the general conversation.  By only sending specific patches to
-> maintainers you essentially blinker them to the bigger picture.
+On Fri, Sep 18, 2015 at 01:29:31PM +0100, Srinivas Kandagatla wrote:
+> Hi Andy, 
 > 
-> As a maintainer you should _know_ that you can't apply patches from
-> other subsystems without appropriate Acks.  I'm sure you'd take
-> exception to another maintainer who started accepting patches for
-> subsystems you are responsible for.  This works both ways.
+> Here are few cleanup and additions to the existing APQ8064 device tree.
+> 
+> Some of the patches are to do with princtrl cleanup which was always not
+> in the right place and some of the pinctrls were missing.
+> Other set of patches is to do with adding more devices like rtc rng
+> and pwr key for pmic 8921.
+> Last set of patches are related to pwrseq and SD card detect taking Stephens
+> comments into consideration.
 
-No you are mistaken.  You should only put patches which have
-dependencies on each other in a series.  If the patches can be
-applied independently of each other there is no need to have
-them in a single series.
+These all look fine.  I tested in ifc6410 as well.  I'll test on qs600 to be
+sure.
 
-Obviously if they can go into different trees then they cannot
-have dependencies.
-
-Cheers,
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
