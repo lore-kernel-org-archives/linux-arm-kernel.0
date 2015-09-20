@@ -1,20 +1,65 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 20 Sep 2015 08:39:31 -0400
-Subject: [PATCH v4 resend 0/2] power: Add an axp20x-usb-power driver
-Message-ID: <1442752773-22635-1-git-send-email-hdegoede@redhat.com>
+Date: Sun, 20 Sep 2015 08:39:32 -0400
+Subject: [PATCH v4 resend 1/2] ARM: dts: Add binding documentation for AXP20x
+ pmic usb power supply
+In-Reply-To: <1442752773-22635-1-git-send-email-hdegoede@redhat.com>
+References: <1442752773-22635-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1442752773-22635-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add binding documentation for the usb power supply part of the AXP20x pmic.
 
-This is a resend of v4 of the axp20x-usb-power power-supply driver,
-after v4 there have been no further comments, so I assume that this
-version is ready for merging, yet for some reason it has not been
-merged yet.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-Split out into a separate patch from the actual driver commit
+Changes in v4:
+-s/usb_power_supply/usb-power-supply/ in the dts example code
+---
+ .../bindings/power_supply/axp20x_usb_power.txt     | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
 
-Can we please get this driver merged (preferably into 4.3, but if
-not at least lets get it into next / 4.4 asap).
-
-Regards,
-
-Hans
+diff --git a/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt b/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
+new file mode 100644
+index 0000000..862f4a4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
+@@ -0,0 +1,34 @@
++AXP20x USB power supply
++
++Required Properties:
++-compatible: "x-powers,axp202-usb-power-supply"
++
++This node is a subnode of the axp20x PMIC.
++
++Example:
++
++axp209: pmic at 34 {
++	compatible = "x-powers,axp209";
++	reg = <0x34>;
++	interrupt-parent = <&nmi_intc>;
++	interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	interrupt-controller;
++	#interrupt-cells = <1>;
++
++	regulators {
++		x-powers,dcdc-freq = <1500>;
++
++		vdd_cpu: dcdc2 {
++			regulator-always-on;
++			regulator-min-microvolt = <1000000>;
++			regulator-max-microvolt = <1450000>;
++			regulator-name = "vdd-cpu";
++		};
++
++		...
++	};
++
++	usb-power-supply: usb-power-supply {
++		compatible = "x-powers,axp202-usb-power-supply";
++	};
++};
+-- 
+2.4.3
