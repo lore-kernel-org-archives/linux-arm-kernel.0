@@ -1,20 +1,20 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 22 Sep 2015 00:30:37 +0200
-Subject: [PATCH v3 00/12] pwm: add support for atomic update
-In-Reply-To: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <5055506.IbQp3pDAJn@diego>
+From: scottwood@freescale.com (Scott Wood)
+Date: Mon, 21 Sep 2015 18:13:45 -0500
+Subject: [PATCH 6/6] dts/ls1043a: add LS1043ARDB board support
+In-Reply-To: <1442838158-2964-7-git-send-email-B48286@freescale.com>
+References: <1442838158-2964-1-git-send-email-B48286@freescale.com>
+ <1442838158-2964-7-git-send-email-B48286@freescale.com>
+Message-ID: <1442877225.19102.207.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Mon, 2015-09-21 at 20:22 +0800, Zhiqiang Hou wrote:
 
-Am Montag, 21. September 2015, 11:33:17 schrieb Boris Brezillon:
-> This series adds support for atomic PWM update, or IOW, the capability
-> to update all the parameters of a PWM device (enabled/disabled, period,
-> duty and polarity) in one go.
+> +             cpld: board-control at 2,0 {
+> +                     compatible = "fsl,ls1043ardb-cpld", "simple-bus";
+> +                     reg = <0x2 0x0 0x0000100>;
+> +             };
 
-I gave this v3 a spin on a rk3288-veyron device with the pwm-regulator 
-supplying vdd_logic. Looks really nice and runs fine, so the series
+Again, why "simple-bus"?
 
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+-Scott
