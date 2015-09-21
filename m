@@ -1,36 +1,58 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 21 Sep 2015 13:43:52 -0700
-Subject: [PATCH v4] mtd: nand: sunxi: fix OOB handling in ->write_xxx()
- functions
-In-Reply-To: <20150914170204.GL11487@google.com>
-References: <1442220063-7520-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150914170204.GL11487@google.com>
-Message-ID: <20150921204352.GA31505@google.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 21 Sep 2015 22:41:23 +0200
+Subject: pwm-bl: regression on all pxa platforms
+Message-ID: <87vbb3pkss.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 10:02:04AM -0700, Brian Norris wrote:
-> On Mon, Sep 14, 2015 at 10:41:03AM +0200, Boris Brezillon wrote:
-> > The USER_DATA register cannot be accessed using byte accessors on A13
-> > SoCs, thus triggering a bug when using memcpy_toio on this register.
-> > Declare an helper macros to convert an OOB buffer into a suitable
-> > USER_DATA value and vice-versa.
-> > 
-> > This patch also fixes an error in the oob_required logic (some OOB data
-> > are not written even if the user required it) by removing the
-> > oob_required condition, which is perfectly valid since the core already
-> > fill ->oob_poi with FFs when oob_required is false.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Cc: <stable@vger.kernel.org> # 3.19+
-> > Fixes: 1fef62c1423b ("mtd: nand: add sunxi NAND flash controller support")
-> > 
-> > ---
-> > Changes since v3:
-> > - drop the NFC_USER_DATA_TO_BUF() macro
-> 
-> I don't have any real objections to this version, and I think some IRC
-> discussion helped clear up a few questions. I'll take this for 4.3 soon,
-> unless I see any objections.
+Hi Thierry,
 
-Pushed to linux-mtd.git.
+Since a bit of time, the PWM backlight based pxa platforms are broken.
+All of these platforms rely on a registering such as the one in [1].
+
+At least I think the commit 68feaca0b13e ("backlight: pwm: Handle EPROBE_DEFER
+while requesting the PWM") breaks my platforms because :
+ (a) no pwm table is added (legacy platforms)
+ (b) in this case, in pwm_get(), pmw_lookup_list is empty, and therefore chosen
+      == NULL, and therefore pwm_get() returns NULL, and pwm_get() return
+      -EPROBE_DEFER
+ (c) as a consequence, this code is unreachable in pwm_bl.c :
+	if (IS_ERR(pb->pwm)) {
+		ret = PTR_ERR(pb->pwm);
+		dev_info(&pdev->dev, "%s:%d(): %d\n", __func__, __LINE__, ret);
+		if (ret == -EPROBE_DEFER)
+			goto err_alloc;
+
+		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
+		pb->legacy = true;
+		pb->pwm = pwm_request(data->pwm_id, "pwm-backlight");
+
+Could you either revert 68feaca0b13e or find a better solution to repair the
+legacy platorms please ?
+
+Cheers.
+
+-- 
+Robert
+
+[1] Backlight registration
+static struct platform_pwm_backlight_data cm_x300_backlight_data = {
+	.pwm_id		= 2,
+	.max_brightness	= 100,
+	.dft_brightness	= 100,
+	.pwm_period_ns	= 10000,
+	.enable_gpio	= -1,
+};
+
+static struct platform_device cm_x300_backlight_device = {
+	.name		= "pwm-backlight",
+	.dev		= {
+		.parent = &pxa27x_device_pwm0.dev,
+		.platform_data	= &cm_x300_backlight_data,
+	},
+};
+
+static void cm_x300_init_bl(void)
+{
+	platform_device_register(&cm_x300_backlight_device);
+}
