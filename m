@@ -1,43 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Sep 2015 06:59:56 -0700
-Subject: [PATCH 1/2] mfd: twl6040: Fix deferred probe handling for clk32k
-In-Reply-To: <55FFD422.2080506@ti.com>
-References: <1442593745-16725-1-git-send-email-tony@atomide.com>
- <1442593745-16725-2-git-send-email-tony@atomide.com>
- <55FFD422.2080506@ti.com>
-Message-ID: <20150921135956.GB23801@atomide.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Mon, 21 Sep 2015 17:00:33 +0300
+Subject: [PATCH v3 2/2] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
+ support
+In-Reply-To: <20150916221819.GJ21084@n2100.arm.linux.org.uk>
+References: <1440970470-7155-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <CAD=FV=XZ4cY4o-=vL79GDE4m57B+Rw_Yr_QwtB6T7DbQNzmU0Q@mail.gmail.com>
+ <55F9D7F0.4070402@mentor.com>
+ <CAD=FV=Vk+qziHohVL_Zaag0qqh_R6DnA1s-ppVFC=cBccAn4EA@mail.gmail.com>
+ <20150916221819.GJ21084@n2100.arm.linux.org.uk>
+Message-ID: <56000D81.9080509@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [150921 02:59]:
-> On 09/18/2015 07:29 PM, Tony Lindgren wrote:
-> > Commit 68bab8662f49 ("mfd: twl6040: Optional clk32k clock handling")
-> > added clock handling for the 32k clock from palmas-clk. However, that
-> > patch did not consider a typical situation where twl6040 is built-in,
-> > and palmas-clk is a loadable module like we have in omap2plus_defconfig.
-> > 
-> > If palmas-clk is not loaded before twl6040 probes, we will get a
-> > "clk32k is not handled" warning during booting. This means that any
-> > drivers relying on this clock will mysteriously fail, including
-> > omap5-uevm WLAN and audio.
-> > 
-> > Note that for WLAN, we probably should also eventually get
-> > the clk32kgaudio for MMC3 directly as that's shared between
-> > audio and WLAN SDIO at least for omap5-uevm. It seems the
-> > WLAN chip cannot get it as otherwise MMC3 won't get properly
-> > probed.
+On 17.09.2015 01:18, Russell King - ARM Linux wrote:
+> On Wed, Sep 16, 2015 at 02:56:57PM -0700, Doug Anderson wrote:
+>> Yes, I'd expect 100kHz and 400kHz.
+>>
+>> I agree that 50ms is non-trivial, but it's also not something you're
+>> doing lots of.  I'd expect that the EDID is read over this channel at
+>> cable plugin time and then not used much after that.  Adding an extra
+>> 40ms (10ms vs 50ms) before we can access the TV doesn't seem terrible
+>> for compatibility.
+>>
+>> Doing a quick scan for what others in mainline do:
+>>
+>> A few can be found with:
+>>
+>> $ git grep -A3 hdmiddc | grep clock-freq
+>> arch/arm/boot/dts/stihxxx-b2120.dtsi-
+>> clock-frequency = <100000>;
+>> arch/arm/boot/dts/tegra30-apalis.dtsi-          clock-frequency = <100000>;
+>> arch/arm/boot/dts/tegra30-beaver.dts-           clock-frequency = <100000>;
+>> arch/arm/boot/dts/tegra30-colibri.dtsi-         clock-frequency = <100000>;
 > 
-> While this is going to 'fix' the WLAN because currently the twl6040 is powered
-> on all the time (32k clock is enabled). My plan is to finally implement the
-> power state handling for the twl6040, which means that w/o audio activity the
-> twl6040 will be turned off. This will imply that any clock which is only used
-> by twl6040 will be off as well.
-> The proper solution would be to add clock handling to the WLAN driver stack.
+> This is a sure way to propagate a bug.
+> 
+> I said in a previous email that you need to check the HDMI and CEA
+> specs.  I've done this, and HDMI 1.3a specifies a maximum SCL clock
+> rate of 100kHz.
+> 
+> So that's settled then.  100kHz is must be.  Using 400kHz is out of
+> specification.
+> 
 
-Yes the place to request this clock is using pwrseq_simple.c for MMC3.
-It seems there are some issues with deferred probe handling there too
-though.
+FYI I've managed to measure SCL on iMX6, fast mode stands for 333KHz and
+standard mode stands for 100KHz, therefore I'll set the latter mode.
 
-Regards,
-
-Tony
+--
+With best wishes,
+Vladimir
