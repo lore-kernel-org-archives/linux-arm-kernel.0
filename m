@@ -1,59 +1,37 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Mon, 21 Sep 2015 08:41:33 -0300
-Subject: [PATCH 4/4] ARM64: dts: exynos5433: add jpeg node
-In-Reply-To: <55FFD4FF.6090306@samsung.com>
-References: <1442586060-23657-1-git-send-email-andrzej.p@samsung.com>
- <1442586060-23657-5-git-send-email-andrzej.p@samsung.com>
- <55FFD2D2.1010508@xs4all.nl> <55FFD4FF.6090306@samsung.com>
-Message-ID: <20150921084133.175b1bda@recife.lan>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 21 Sep 2015 20:06:11 +0800
+Subject: [PATCH 2/5] pinctrl: berlin: add the berlin4ct pinctrl driver
+In-Reply-To: <55FF09D5.6090707@gmail.com>
+References: <1442656956-5740-1-git-send-email-jszhang@marvell.com>
+ <1442656956-5740-3-git-send-email-jszhang@marvell.com>
+ <55FF09D5.6090707@gmail.com>
+Message-ID: <20150921200611.5e55e9d5@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, 21 Sep 2015 11:59:27 +0200
-Andrzej Pietrasiewicz <andrzej.p@samsung.com> escreveu:
+Dear Sebastian,
 
-> Hi Hans,
+On Sun, 20 Sep 2015 21:32:37 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+
+> > +	BERLIN_PINCTRL_GROUP("SM_TDO", 0x0, 0x3, 0x12,
+> > +			BERLIN_PINCTRL_FUNCTION(0x0, "sm_tdo"),
+> > +			BERLIN_PINCTRL_FUNCTION(0x1, "sm_gpio2")),
+> > +	BERLIN_PINCTRL_GROUP("SM_URT0_TXD", 0x0, 0x3, 0x15,
+> > +			BERLIN_PINCTRL_FUNCTION(0x0, "sm_urt0_txd"),  
 > 
-> W dniu 21.09.2015 o 11:50, Hans Verkuil pisze:
-> > On 18-09-15 16:21, Andrzej Pietrasiewicz wrote:
-> >> From: Marek Szyprowski <m.szyprowski@samsung.com>
-> >>
-> >> Add Exynos 5433 jpeg h/w codec node.
-> >>
-> >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> >> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> >> ---
-> >>   arch/arm64/boot/dts/exynos/exynos5433.dtsi | 21 +++++++++++++++++++++
-> >>   1 file changed, 21 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> >
-> > This dtsi file doesn't exist in the media-git tree. What is the story here?
-> >
-> > Should this go through a different subsystem?
-> >
-> > I think the media subsystem can take patches 1-3 and whoever does DT patches can
-> > take this patch, right?
-> >
-> 
-> The cover letter explains that the series is rebased onto Mauro's
-> master with Kukjin's branch merged. The latter does contain
-> the exynos5433.dtsi. That said, yes, taking patches 1-3 in
-> media subsystem and leaving DT patch to someone else is the
-> way to go.
+> Please avoid abbreviating acronyms even more, we can afford the
+> few extra bytes.
 
-I'm ok with such strategy, provided that the new driver builds fine with
-COMPILE_TEST without the need of the dtsi patch.
+In the 2nd version, I kept using HW names, for example:
 
-Please also notice that, if the driver uses MC, it has to wait for
-the MC next gen support to be merged, and may need to be rebased, due
-to a few changes at the MC internal APIs: one function got renamed
-(the function that create links between two pads) and we're now using
-lists for links (that will only affect the driver if it has its own
-graph traversal routines).
+1. "urt0" as the function name,
 
-Btw, I just got a Samsung TM1 device, with seems to be using an arm64
-SoC. Is this driver providing support for its camera?
+2. "SM_URT0_TXD" as the pin name (group name)
 
-Regards,
-Mauro.
+to keep sync with HW, especially the pin names are the same as HW's, because
+that's what HW doc, sch, etc. call them. IMHO, using a different name with HW
+is not a good idea, what do you think?
+
+Thanks,
+Jisheng
