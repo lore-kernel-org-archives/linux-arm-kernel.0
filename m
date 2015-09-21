@@ -1,73 +1,144 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 21 Sep 2015 11:33:22 +0200
-Subject: [PATCH v3 05/12] pwm: declare a default PWM state
+Date: Mon, 21 Sep 2015 11:33:26 +0200
+Subject: [PATCH v3 09/12] pwm: rockchip: add initial state retrieval
 In-Reply-To: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1442828009-6241-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1442828009-6241-10-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare the addition of the PWM initial state retrieval by adding a default
-state where all the parameters retrieved from DT, platform data or
-statically forced by the hardware will be stored.
-Once done we will be able to store the initial state in the ->state field
-without risking to loose the default parameters.
-
-Update the pwm_set/get_default_xxx helpers accordingly.
+Implement the ->reset_state() function to expose initial state.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- include/linux/pwm.h | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ drivers/pwm/pwm-rockchip.c | 66 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 66 insertions(+)
 
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 433a097..f8cc460 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -101,6 +101,7 @@ struct pwm_state {
-  * @chip: PWM chip providing this PWM device
-  * @chip_data: chip-private data associated with the PWM device
-  * @state: curent PWM channel state
-+ * @default_state: default PWM channel state
-  */
- struct pwm_device {
- 	const char *label;
-@@ -111,6 +112,7 @@ struct pwm_device {
- 	void *chip_data;
+diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
+index 7d9cc90..6eab25c 100644
+--- a/drivers/pwm/pwm-rockchip.c
++++ b/drivers/pwm/pwm-rockchip.c
+@@ -51,6 +51,7 @@ struct rockchip_pwm_data {
  
- 	struct pwm_state state;
-+	struct pwm_state default_state;
+ 	void (*set_enable)(struct pwm_chip *chip,
+ 			   struct pwm_device *pwm, bool enable);
++	void (*reset_state)(struct pwm_chip *chip, struct pwm_device *pwm);
  };
  
- static inline bool pwm_is_enabled(const struct pwm_device *pwm)
-@@ -127,7 +129,8 @@ static inline void pwm_set_period(struct pwm_device *pwm, unsigned int period)
- static inline void pwm_set_default_period(struct pwm_device *pwm,
- 					  unsigned int period)
- {
--	pwm_set_period(pwm, period);
-+	if (pwm)
-+		pwm->default_state.period = period;
+ static inline struct rockchip_pwm_chip *to_rockchip_pwm_chip(struct pwm_chip *c)
+@@ -75,6 +76,18 @@ static void rockchip_pwm_set_enable_v1(struct pwm_chip *chip,
+ 	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
  }
  
- static inline unsigned int pwm_get_period(const struct pwm_device *pwm)
-@@ -137,7 +140,7 @@ static inline unsigned int pwm_get_period(const struct pwm_device *pwm)
- 
- static inline unsigned int pwm_get_default_period(const struct pwm_device *pwm)
++static void rockchip_pwm_reset_state_v1(struct pwm_chip *chip,
++					struct pwm_device *pwm)
++{
++	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
++	u32 enable_conf = PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN;
++	u32 val;
++
++	val = readl(pc->base + pc->data->regs.ctrl);
++	if ((val & enable_conf) == enable_conf)
++		pwm->state.enabled = true;
++}
++
+ static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip,
+ 				       struct pwm_device *pwm, bool enable)
  {
--	return pwm_get_period(pwm);
-+	return pwm ? pwm->default_state.period : 0;
+@@ -98,6 +111,54 @@ static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip,
+ 	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
  }
  
- static inline void pwm_set_duty_cycle(struct pwm_device *pwm, unsigned int duty)
-@@ -159,7 +162,8 @@ int pwm_set_polarity(struct pwm_device *pwm, enum pwm_polarity polarity);
- static inline void pwm_set_default_polarity(struct pwm_device *pwm,
- 					    enum pwm_polarity polarity)
++static void rockchip_pwm_reset_state_v2(struct pwm_chip *chip,
++					struct pwm_device *pwm)
++{
++	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
++	u32 enable_conf = PWM_OUTPUT_LEFT | PWM_LP_DISABLE | PWM_ENABLE |
++			  PWM_CONTINUOUS;
++	u32 val;
++
++	val = readl(pc->base + pc->data->regs.ctrl);
++	if ((val & enable_conf) != enable_conf)
++		return;
++
++	pwm->state.enabled = true;
++
++	if (!(val & PWM_DUTY_POSITIVE))
++		pwm->state.polarity = PWM_POLARITY_INVERSED;
++}
++
++static void rockchip_pwm_reset_state(struct pwm_chip *chip,
++				     struct pwm_device *pwm)
++{
++	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
++	unsigned long clk_rate;
++	u64 tmp;
++	int ret;
++
++	ret = clk_enable(pc->clk);
++	if (ret)
++		return;
++
++	clk_rate = clk_get_rate(pc->clk);
++
++	tmp = readl(pc->base + pc->data->regs.period);
++	tmp *= pc->data->prescaler * NSEC_PER_SEC;
++	do_div(tmp, clk_rate);
++	pwm->state.period = tmp;
++
++	tmp = readl(pc->base + pc->data->regs.duty);
++	tmp *= pc->data->prescaler * NSEC_PER_SEC;
++	do_div(tmp, clk_rate);
++	pwm->state.duty_cycle = tmp;
++
++	pc->data->reset_state(chip, chip->pwms);
++
++	if (!pwm_is_enabled(pwm))
++		clk_disable(pc->clk);
++}
++
+ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 			       int duty_ns, int period_ns)
  {
--	pwm_set_polarity(pwm, polarity);
-+	if (pwm)
-+		pwm->default_state.polarity = polarity;
+@@ -171,6 +232,7 @@ static void rockchip_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
  }
  
- static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
+ static const struct pwm_ops rockchip_pwm_ops_v1 = {
++	.reset_state = rockchip_pwm_reset_state,
+ 	.config = rockchip_pwm_config,
+ 	.enable = rockchip_pwm_enable,
+ 	.disable = rockchip_pwm_disable,
+@@ -178,6 +240,7 @@ static const struct pwm_ops rockchip_pwm_ops_v1 = {
+ };
+ 
+ static const struct pwm_ops rockchip_pwm_ops_v2 = {
++	.reset_state = rockchip_pwm_reset_state,
+ 	.config = rockchip_pwm_config,
+ 	.set_polarity = rockchip_pwm_set_polarity,
+ 	.enable = rockchip_pwm_enable,
+@@ -195,6 +258,7 @@ static const struct rockchip_pwm_data pwm_data_v1 = {
+ 	.prescaler = 2,
+ 	.ops = &rockchip_pwm_ops_v1,
+ 	.set_enable = rockchip_pwm_set_enable_v1,
++	.reset_state = rockchip_pwm_reset_state_v1,
+ };
+ 
+ static const struct rockchip_pwm_data pwm_data_v2 = {
+@@ -207,6 +271,7 @@ static const struct rockchip_pwm_data pwm_data_v2 = {
+ 	.prescaler = 1,
+ 	.ops = &rockchip_pwm_ops_v2,
+ 	.set_enable = rockchip_pwm_set_enable_v2,
++	.reset_state = rockchip_pwm_reset_state_v2,
+ };
+ 
+ static const struct rockchip_pwm_data pwm_data_vop = {
+@@ -219,6 +284,7 @@ static const struct rockchip_pwm_data pwm_data_vop = {
+ 	.prescaler = 1,
+ 	.ops = &rockchip_pwm_ops_v2,
+ 	.set_enable = rockchip_pwm_set_enable_v2,
++	.reset_state = rockchip_pwm_reset_state_v2,
+ };
+ 
+ static const struct of_device_id rockchip_pwm_dt_ids[] = {
 -- 
 1.9.1
