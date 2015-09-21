@@ -1,57 +1,81 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Sep 2015 20:32:07 +0100
-Subject: [PATCH 1/7] phy: fix of_mdio_find_bus() device refcount leak
-In-Reply-To: <20150921.120159.326170798236851436.davem@davemloft.net>
-References: <20150918094625.GB21084@n2100.arm.linux.org.uk>
- <E1ZcsNb-0001Bf-U5@rmk-PC.arm.linux.org.uk>
- <20150921.120159.326170798236851436.davem@davemloft.net>
-Message-ID: <20150921193206.GU21084@n2100.arm.linux.org.uk>
+Date: Mon, 21 Sep 2015 20:38:22 +0100
+Subject: [PATCH v3 1/3] ARM: uniphier: add outer cache support
+In-Reply-To: <1442551054-2116-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1442551054-2116-1-git-send-email-yamada.masahiro@socionext.com>
+ <1442551054-2116-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20150921193822.GV21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 21, 2015 at 12:01:59PM -0700, David Miller wrote:
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> Date: Fri, 18 Sep 2015 10:54:55 +0100
-> 
-> > Update the comment, and arrange for the only user of this function
-> > to drop this refcount when disposing of a reference to it.
-> 
-> mdio_mux is not the only user of of_mdio_find_bus(), DSA uses it as
-> well.
-> 
-> So if anything this commit message is inaccurate.
+On Fri, Sep 18, 2015 at 01:37:32PM +0900, Masahiro Yamada wrote:
+> +/**
+> + * __uniphier_cache_maint_common - run a queue operation for a particular level
+> + *
+> + * @data: cache controller specific data
+> + * @start: start address of range operation (don't care for "all" operation)
+> + * @size: data size of range operation (don't care for "all" operation)
+> + * @operation: flags to specify the desired cache operation
+> + */
+> +static void __uniphier_cache_maint_common(struct uniphier_cache_data *data,
+> +					  unsigned long start,
+> +					  unsigned long size,
+> +					  u32 operation)
+> +{
+> +	unsigned long flags;
+> +
+> +	/*
+> +	 * The IRQ must be disable during this sequence because the accessor
+> +	 * holds the access right of the operation queue registers.  The IRQ
+> +	 * should be restored after releasing the register access right.
+> +	 */
+> +	local_irq_save(flags);
+> +
+> +	/* clear the complete notification flag */
+> +	writel_relaxed(UNIPHIER_SSCOLPQS_EF, data->op_base + UNIPHIER_SSCOLPQS);
+> +
+> +	/*
+> +	 * We do not need a spin lock here because the hardware guarantees
+> +	 * this sequence is atomic, i.e. the write access is arbitrated
+> +	 * and only the winner's write accesses take effect.
+> +	 * After register settings, we need to check the UNIPHIER_SSCOPPQSEF to
+> +	 * see if we won the arbitration or not.
+> +	 * If the command was not successfully set, just try again.
+> +	 */
+> +	do {
+> +		/* set cache operation */
+> +		writel_relaxed(UNIPHIER_SSCOQM_CE | operation,
+> +			       data->op_base + UNIPHIER_SSCOQM);
+> +
+> +		/* set address range if needed */
+> +		if (likely(UNIPHIER_SSCOQM_S_IS_RANGE(operation))) {
+> +			writel_relaxed(start, data->op_base + UNIPHIER_SSCOQAD);
+> +			writel_relaxed(size, data->op_base + UNIPHIER_SSCOQSZ);
+> +		}
+> +
+> +		/* set target ways if needed */
+> +		if (unlikely(UNIPHIER_SSCOQM_TID_IS_WAY(operation)))
+> +			writel_relaxed(data->way_locked_mask,
+> +				       data->op_base + UNIPHIER_SSCOQWN);
+> +	} while (unlikely(readl_relaxed(data->op_base + UNIPHIER_SSCOPPQSEF) &
+> +			  (UNIPHIER_SSCOPPQSEF_FE | UNIPHIER_SSCOPPQSEF_OE)));
+> +
+> +	/* wait until the operation is completed */
+> +	while (likely(readl_relaxed(data->op_base + UNIPHIER_SSCOLPQS) !=
+> +		      UNIPHIER_SSCOLPQS_EF))
+> +		cpu_relax();
+> +
+> +	local_irq_restore(flags);
 
-Yes, I missed that as it wasn't under drivers/net.  It doesn't change
-the validity of this patch, the existing code is wrong and I'm not
-introducing anything that makes the code any more wrong than it is.
+I'm concerned about this.  We've had caches like this (ARM L220) which
+require only one operation to be performed at a time.  In a SMP system,
+that requires a spinlock to prevent one CPU triggering a L2 maintanence
+operation while another CPU tries to operate on the L2 cache.
 
-I'll fix the commit message, and I'll fix the DSA code too but in a
-separate patch.  Thanks for pointing it out.
-
-> I also wonder about this refcounting scheme.
-
-It's the standard driver model refcounting rules that we've lived with
-for about a decade, ever since the driver model was introduced by
-Patrick Mochel.
-
-> If you are going to drop the inner device reference, then we take the
-> mdio bus returned from of_mdio_find_bus() what holds onto it and keeps
-> it from disappearing on us?
-> 
-> Don't we have to hold onto some reference count of some kind here?
-
-In the case of the mdio mux code, I'm dropping the reference when
-either (a) we've encountered an error during initialisation and we're
-cleaning up, or (b) when the mdio mux code is being torn down after
-the mdiomux bus has been unregistered and freed.  In both cases, we're
-done with the mdio bus that was returned from of_mdio_find_bus().
-
-In case (a), the devres code will release the kmalloc'd memory when
-mdio_mux_gpio_probe() or mdio_mux_mmioreg_probe() propagates the error
-out of their probe() function.
-
-I'm not sure why you think anything is wrong here - maybe it's the odd
-code structure to the success path at the bottom of mdio_mux_init()?
+>From the overall series diffstat, I see that you are adding SMP support
+too.  So I have to ask the obvious question: if you need to disable
+local IRQs around the L2 cache operations, what happens if two CPUs
+both try to perform a L2 cache operation concurrently?
 
 -- 
 FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
