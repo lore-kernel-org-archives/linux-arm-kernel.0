@@ -1,52 +1,110 @@
 From: emilio.lopez@collabora.co.uk (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Mon, 21 Sep 2015 10:38:19 -0300
-Subject: [PATCH v3 0/4] platform/chrome: vboot context support
-Message-ID: <1442842703-5309-1-git-send-email-emilio.lopez@collabora.co.uk>
+Date: Mon, 21 Sep 2015 10:38:20 -0300
+Subject: [PATCH 1/4] sysfs: Support is_visible() on binary attributes
+In-Reply-To: <1442842703-5309-1-git-send-email-emilio.lopez@collabora.co.uk>
+References: <1442842703-5309-1-git-send-email-emilio.lopez@collabora.co.uk>
+Message-ID: <1442842703-5309-2-git-send-email-emilio.lopez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+According to the sysfs header file:
 
-This series adds support for reading and writing the verified boot context
-nvram space on the EC using the cros_ec sysfs interface.
+    "The returned value will replace static permissions defined in
+     struct attribute or struct bin_attribute."
 
-The first patch improves is_visible() functionality, making it work
-for binary attributes as well as normal ones. This is needed so the
-sysfs group can be hidden when the EC doesn't offer any space for
-the context.
+but this isn't the case, as is_visible is only called on struct attribute
+only. This patch introduces a new is_bin_visible() function to implement
+the same functionality for binary attributes, and updates documentation
+accordingly.
 
-The second patch documents the property used in the binding documents.
-This used to live in the next patch on the previous versions of this series.
+Note that to keep functionality and code similar to that of normal
+attributes, the mode is now checked as well to ensure it contains only
+read/write permissions or SYSFS_PREALLOC.
 
-The third patch is the actual code implementing the interface to read
-and write the context data.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
+---
 
-The fourth patch adds the DT properties on peach boards which, judging by
-the vendor tree, use the EC to store the verified boot context.
+Changes from v1:
+ - Don't overload is_visible, introduce is_bin_visible instead as
+   discussed on the list.
 
-The series was tested on a peach pi and was found to work OK there. As
-always, all comments and further tests are welcome :)
+Changes from v2:
+ - Note change in mode checking on the commit log
+ - Add Guenter's reviewed-by
 
-Cheers!
-Emilio
+ fs/sysfs/group.c      | 17 +++++++++++++++--
+ include/linux/sysfs.h | 18 ++++++++++++++----
+ 2 files changed, 29 insertions(+), 6 deletions(-)
 
-Emilio L?pez (4):
-  sysfs: Support is_visible() on binary attributes
-  Documentation: bindings: mfd: cros ec: document vbc EC property
-  platform/chrome: Support reading/writing the vboot context
-  ARM: dts: Enable EC vboot context support on Peach boards
-
- Documentation/devicetree/bindings/mfd/cros-ec.txt |   4 +
- arch/arm/boot/dts/exynos5420-peach-pit.dts        |   1 +
- arch/arm/boot/dts/exynos5800-peach-pi.dts         |   1 +
- drivers/platform/chrome/Makefile                  |   3 +-
- drivers/platform/chrome/cros_ec_dev.c             |   1 +
- drivers/platform/chrome/cros_ec_vbc.c             | 137 ++++++++++++++++++++++
- fs/sysfs/group.c                                  |  17 ++-
- include/linux/mfd/cros_ec.h                       |   1 +
- include/linux/sysfs.h                             |  18 ++-
- 9 files changed, 176 insertions(+), 7 deletions(-)
- create mode 100644 drivers/platform/chrome/cros_ec_vbc.c
-
+diff --git a/fs/sysfs/group.c b/fs/sysfs/group.c
+index 39a0199..51b56e6 100644
+--- a/fs/sysfs/group.c
++++ b/fs/sysfs/group.c
+@@ -73,13 +73,26 @@ static int create_files(struct kernfs_node *parent, struct kobject *kobj,
+ 	}
+ 
+ 	if (grp->bin_attrs) {
+-		for (bin_attr = grp->bin_attrs; *bin_attr; bin_attr++) {
++		for (i = 0, bin_attr = grp->bin_attrs; *bin_attr; i++, bin_attr++) {
++			umode_t mode = (*bin_attr)->attr.mode;
++
+ 			if (update)
+ 				kernfs_remove_by_name(parent,
+ 						(*bin_attr)->attr.name);
++			if (grp->is_bin_visible) {
++				mode = grp->is_bin_visible(kobj, *bin_attr, i);
++				if (!mode)
++					continue;
++			}
++
++			WARN(mode & ~(SYSFS_PREALLOC | 0664),
++			     "Attribute %s: Invalid permissions 0%o\n",
++			     (*bin_attr)->attr.name, mode);
++
++			mode &= SYSFS_PREALLOC | 0664;
+ 			error = sysfs_add_file_mode_ns(parent,
+ 					&(*bin_attr)->attr, true,
+-					(*bin_attr)->attr.mode, NULL);
++					mode, NULL);
+ 			if (error)
+ 				break;
+ 		}
+diff --git a/include/linux/sysfs.h b/include/linux/sysfs.h
+index 9f65758..2f66050 100644
+--- a/include/linux/sysfs.h
++++ b/include/linux/sysfs.h
+@@ -64,10 +64,18 @@ do {							\
+  *		a new subdirectory with this name.
+  * @is_visible:	Optional: Function to return permissions associated with an
+  *		attribute of the group. Will be called repeatedly for each
+- *		attribute in the group. Only read/write permissions as well as
+- *		SYSFS_PREALLOC are accepted. Must return 0 if an attribute is
+- *		not visible. The returned value will replace static permissions
+- *		defined in struct attribute or struct bin_attribute.
++ *		non-binary attribute in the group. Only read/write
++ *		permissions as well as SYSFS_PREALLOC are accepted. Must
++ *		return 0 if an attribute is not visible. The returned value
++ *		will replace static permissions defined in struct attribute.
++ * @is_bin_visible:
++ *		Optional: Function to return permissions associated with a
++ *		binary attribute of the group. Will be called repeatedly
++ *		for each binary attribute in the group. Only read/write
++ *		permissions as well as SYSFS_PREALLOC are accepted. Must
++ *		return 0 if a binary attribute is not visible. The returned
++ *		value will replace static permissions defined in
++ *		struct bin_attribute.
+  * @attrs:	Pointer to NULL terminated list of attributes.
+  * @bin_attrs:	Pointer to NULL terminated list of binary attributes.
+  *		Either attrs or bin_attrs or both must be provided.
+@@ -76,6 +84,8 @@ struct attribute_group {
+ 	const char		*name;
+ 	umode_t			(*is_visible)(struct kobject *,
+ 					      struct attribute *, int);
++	umode_t			(*is_bin_visible)(struct kobject *,
++						  struct bin_attribute *, int);
+ 	struct attribute	**attrs;
+ 	struct bin_attribute	**bin_attrs;
+ };
 -- 
 2.1.4
