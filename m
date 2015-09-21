@@ -1,162 +1,89 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 21 Sep 2015 10:08:51 -0700
-Subject: [PATCH 2/5] thermal: rockchip: Support the RK3368 SoCs in
- thermal driver
-In-Reply-To: <1442808971-2619-3-git-send-email-wxt@rock-chips.com>
-References: <1442808971-2619-1-git-send-email-wxt@rock-chips.com>
- <1442808971-2619-3-git-send-email-wxt@rock-chips.com>
-Message-ID: <20150921170851.GH17389@dtor-ws>
+From: Sunil.Goutham@caviumnetworks.com (Goutham, Sunil)
+Date: Mon, 21 Sep 2015 17:08:24 +0000
+Subject: net: thunderx: Support for upto 96 queues for a VF
+In-Reply-To: <20150921163118.GG5648@mwanda>
+References: <20150921163118.GG5648@mwanda>
+Message-ID: <CY1PR0701MB16613A356BAAB39BB3593F7893460@CY1PR0701MB1661.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+Hi Dan,
 
-On Mon, Sep 21, 2015 at 12:16:08PM +0800, Caesar Wang wrote:
-> The RK3368 SoCs support to 2 channel TS-ADC, the temperature criteria
-> of each channel can be configurable.
-> 
-> The system has two Temperature Sensors, channel 0 is for CPU,
-> and channel 1 is for GPU.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
-> 
->  drivers/thermal/rockchip_thermal.c | 201 ++++++++++++++++++++++++++++++++-----
->  1 file changed, 176 insertions(+), 25 deletions(-)
-> 
-> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-> index 4d5b7d4..16d2476 100644
-> --- a/drivers/thermal/rockchip_thermal.c
-> +++ b/drivers/thermal/rockchip_thermal.c
-> @@ -1,6 +1,9 @@
->  /*
->   * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
->   *
-> + * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
-> + * Caesar Wang <wxt@rock-chips.com>
-> + *
->   * This program is free software; you can redistribute it and/or modify it
->   * under the terms and conditions of the GNU General Public License,
->   * version 2, as published by the Free Software Foundation.
-> @@ -43,16 +46,11 @@ enum tshut_polarity {
->  	TSHUT_HIGH_ACTIVE,
->  };
->  
-> -/**
-> - * The system has three Temperature Sensors.  channel 0 is reserved,
-> - * channel 1 is for CPU, and channel 2 is for GPU.
-> - */
-> -enum sensor_id {
-> -	SENSOR_CPU = 1,
-> -	SENSOR_GPU,
-> -};
-> -
->  struct rockchip_tsadc_chip {
-> +	/* The sensor id of chip correspond to the ADC channel */
-> +	int cpu_id;
-> +	int gpu_id;
-> +
->  	/* The hardware-controlled tshut property */
->  	long tshut_temp;
->  	enum tshut_mode tshut_mode;
-> @@ -72,10 +70,11 @@ struct rockchip_tsadc_chip {
->  struct rockchip_thermal_sensor {
->  	struct rockchip_thermal_data *thermal;
->  	struct thermal_zone_device *tzd;
-> -	enum sensor_id id;
-> +	int id;
->  };
->  
-> -#define NUM_SENSORS	2 /* Ignore unused sensor 0 */
-> +/* Two sensors: CPU and GPU */
-> +#define NUM_SENSORS	2
->  
->  struct rockchip_thermal_data {
->  	const struct rockchip_tsadc_chip *chip;
-> @@ -94,7 +93,7 @@ struct rockchip_thermal_data {
->  	enum tshut_polarity tshut_polarity;
->  };
->  
-> -/* TSADC V2 Sensor info define: */
-> +/* TSADC Sensor info define: */
->  #define TSADCV2_AUTO_CON			0x04
->  #define TSADCV2_INT_EN				0x08
->  #define TSADCV2_INT_PD				0x0c
-> @@ -116,6 +115,8 @@ struct rockchip_thermal_data {
->  #define TSADCV2_INT_PD_CLEAR_MASK		~BIT(8)
->  
->  #define TSADCV2_DATA_MASK			0xfff
-> +#define TSADCV3_DATA_MASK			0x3ff
-> +
->  #define TSADCV2_HIGHT_INT_DEBOUNCE_COUNT	4
->  #define TSADCV2_HIGHT_TSHUT_DEBOUNCE_COUNT	4
->  #define TSADCV2_AUTO_PERIOD_TIME		250 /* msec */
-> @@ -164,6 +165,45 @@ static const struct tsadc_table v2_code_table[] = {
->  	{3421, 125000},
->  };
->  
-> +static const struct tsadc_table v3_code_table[] = {
-> +	{0, -40000},
-> +	{106, -40000},
-> +	{108, -35000},
-> +	{110, -30000},
-> +	{112, -25000},
-> +	{114, -20000},
-> +	{116, -15000},
-> +	{118, -10000},
-> +	{120, -5000},
-> +	{122, 0},
-> +	{124, 5000},
-> +	{126, 10000},
-> +	{128, 15000},
-> +	{130, 20000},
-> +	{132, 25000},
-> +	{134, 30000},
-> +	{136, 35000},
-> +	{138, 40000},
-> +	{140, 45000},
-> +	{142, 50000},
-> +	{144, 55000},
-> +	{146, 60000},
-> +	{148, 65000},
-> +	{150, 70000},
-> +	{152, 75000},
-> +	{154, 80000},
-> +	{156, 85000},
-> +	{158, 90000},
-> +	{160, 95000},
-> +	{162, 100000},
-> +	{163, 105000},
-> +	{165, 110000},
-> +	{167, 115000},
-> +	{169, 120000},
-> +	{171, 125000},
-> +	{TSADCV3_DATA_MASK, 125000},
-> +};
-> +
->  static u32 rk_tsadcv2_temp_to_code(long temp)
->  {
->  	int high, low, mid;
-> @@ -227,16 +267,83 @@ static int rk_tsadcv2_code_to_temp(u32 code, int *temp)
->  	return 0;
->  }
->  
-> +static u32 rk_tsadcv3_temp_to_code(long temp)
-> +{
-> +	int high, low, mid;
-> +
-> +	low = 0;
-> +	high = ARRAY_SIZE(v3_code_table) - 1;
-> +	mid = (high + low) / 2;
-> +
-> +	if (temp < v3_code_table[low].temp || temp > v3_code_table[high].temp)
-> +		return 0;
+Thanks for pointing out.
 
-How is this different from v2 conversion except for the table being
-used? I think you should be able to reuse the conversion routines if you
-pass the conversion table in as a parameter.
+Here we are trying to combine multiple SRIOV VF's resources into one
+so that one user visible interface can have upto 96 queues which otherwise
+is limited to 8 queues. The main VF is considered as primary VF and other's
+are secondary VFs.
 
-Thanks.
+'nic->sqs_count' of a primary VF holds the number of secondary VF's resources
+that it should request PF to allocate. This is initialized equal to number of
+CPUs online at the time of driver probe. Hence 'nic->sqs_count' is non-zero
+for primary VF.
 
--- 
-Dmitry
+Also please see inline.
+
+Thanks,
+Sunil.
+
+________________________________________
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Sent: Monday, September 21, 2015 10:01 PM
+To: sgoutham at cavium.com
+Cc: linux-arm-kernel at lists.infradead.org
+Subject: re: net: thunderx: Support for upto 96 queues for a VF
+
+Hello Sunil Goutham,
+
+The patch 92dc87697e6a: "net: thunderx: Support for upto 96 queues
+for a VF" from Aug 30, 2015, leads to the following static checker
+warning:
+
+        drivers/net/ethernet/cavium/thunder/nicvf_main.c:398 nicvf_request_sqs()
+        warn: we tested 'nic->sqs_count' before and it was 'true'
+
+drivers/net/ethernet/cavium/thunder/nicvf_main.c
+   376  /* Request PF to allocate additional Qsets */
+   377  static void nicvf_request_sqs(struct nicvf *nic)
+   378  {
+   379          union nic_mbx mbx = {};
+   380          int sqs;
+   381          int sqs_count = nic->sqs_count;
+   382          int rx_queues = 0, tx_queues = 0;
+   383
+   384          /* Only primary VF should request */
+   385          if (nic->sqs_mode ||  !nic->sqs_count)
+                                      ^^^^^^^^^^^^^^^
+Check.
+
+   386                  return;
+   387
+   388          mbx.sqs_alloc.msg = NIC_MBOX_MSG_ALLOC_SQS;
+   389          mbx.sqs_alloc.vf_id = nic->vf_id;
+   390          mbx.sqs_alloc.qs_count = nic->sqs_count;
+   391          if (nicvf_send_msg_to_pf(nic, &mbx)) {
+   392                  /* No response from PF */
+   393                  nic->sqs_count = 0;
+   394                  return;
+
+Set and return.
+Sunil>> Here VF is sending a mailbox message to PF for requesting sqs_count
+number of resources. For all messages sent by VF, PF acknowledges with an 
+ack or a proper reply. If this is not received by VF, it considers the message is lost and sets sqs_count to zero.
+Yes, 'return' is not needed here since it's checked below anyway.
+
+   395          }
+   396
+   397          /* Return if no Secondary Qsets available */
+   398          if (!nic->sqs_count)
+   399                  return;
+
+This seems like dead code.
+Sunil>> Here there is no issue with mailbox messages but PF sent a reply
+to VF that it couldn't allocate any additional resources. sqs_count is set to zero
+at VF's mailbox response handling code. Hence this is not a dead code. 
+
+   400
+
+regards,
+dan carpenter
