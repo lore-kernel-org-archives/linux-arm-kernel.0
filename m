@@ -1,42 +1,43 @@
-From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
-Date: Mon, 21 Sep 2015 11:59:27 +0200
-Subject: [PATCH 4/4] ARM64: dts: exynos5433: add jpeg node
-In-Reply-To: <55FFD2D2.1010508@xs4all.nl>
-References: <1442586060-23657-1-git-send-email-andrzej.p@samsung.com>
- <1442586060-23657-5-git-send-email-andrzej.p@samsung.com>
- <55FFD2D2.1010508@xs4all.nl>
-Message-ID: <55FFD4FF.6090306@samsung.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 21 Sep 2015 18:04:20 +0800
+Subject: [PATCH v2 6/6] arm64: dts: berlin4ct: add default pinmux for uart0
+In-Reply-To: <1442829860-4647-1-git-send-email-jszhang@marvell.com>
+References: <1442829860-4647-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1442829860-4647-7-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Add urt0 txd and rxd muxing setup in the dtsi because uart0 always uses
+them to work, no other possibilities.
 
-W dniu 21.09.2015 o 11:50, Hans Verkuil pisze:
-> On 18-09-15 16:21, Andrzej Pietrasiewicz wrote:
->> From: Marek Szyprowski <m.szyprowski@samsung.com>
->>
->> Add Exynos 5433 jpeg h/w codec node.
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
->> ---
->>   arch/arm64/boot/dts/exynos/exynos5433.dtsi | 21 +++++++++++++++++++++
->>   1 file changed, 21 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->
-> This dtsi file doesn't exist in the media-git tree. What is the story here?
->
-> Should this go through a different subsystem?
->
-> I think the media subsystem can take patches 1-3 and whoever does DT patches can
-> take this patch, right?
->
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-The cover letter explains that the series is rebased onto Mauro's
-master with Kukjin's branch merged. The latter does contain
-the exynos5433.dtsi. That said, yes, taking patches 1-3 in
-media subsystem and leaving DT patch to someone else is the
-way to go.
-
-Andrzej
+diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+index c374f1d..e9409ec 100644
+--- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
++++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+@@ -288,12 +288,19 @@
+ 				clocks = <&osc>;
+ 				reg-shift = <2>;
+ 				status = "disabled";
++				pinctrl-0 = <&urt0_pmux>;
++				pinctrl-names = "default";
+ 			};
+ 		};
+ 
+ 		sm_pinctrl: pinctrl at fe2200 {
+ 			compatible = "marvell,berlin4ct-sm-pinctrl";
+ 			reg = <0xfe2200 0xc>;
++
++			urt0_pmux: urt0-pmux {
++				groups = "SM_URT0_TXD", "SM_URT0_RXD";
++				function = "urt0";
++			};
+ 		};
+ 	};
+ };
+-- 
+2.5.3
