@@ -1,69 +1,28 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 21 Sep 2015 10:10:28 -0500
-Subject: [PATCH v4 resend 1/2] ARM: dts: Add binding documentation for
- AXP20x pmic usb power supply
-In-Reply-To: <1442752773-22635-2-git-send-email-hdegoede@redhat.com>
-References: <1442752773-22635-1-git-send-email-hdegoede@redhat.com>
- <1442752773-22635-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <56001DE4.6060901@kernel.org>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 21 Sep 2015 12:01:59 -0700 (PDT)
+Subject: [PATCH 1/7] phy: fix of_mdio_find_bus() device refcount leak
+In-Reply-To: <E1ZcsNb-0001Bf-U5@rmk-PC.arm.linux.org.uk>
+References: <20150918094625.GB21084@n2100.arm.linux.org.uk>
+ <E1ZcsNb-0001Bf-U5@rmk-PC.arm.linux.org.uk>
+Message-ID: <20150921.120159.326170798236851436.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2015 07:39 AM, Hans de Goede wrote:
-> Add binding documentation for the usb power supply part of the AXP20x pmic.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+From: Russell King <rmk+kernel@arm.linux.org.uk>
+Date: Fri, 18 Sep 2015 10:54:55 +0100
 
-Acked-by: Rob Herring <robh@kernel.org>
+> Update the comment, and arrange for the only user of this function
+> to drop this refcount when disposing of a reference to it.
 
-> ---
-> Changes in v2:
-> -Split out into a separate patch from the actual driver commit
-> Changes in v4:
-> -s/usb_power_supply/usb-power-supply/ in the dts example code
-> ---
->  .../bindings/power_supply/axp20x_usb_power.txt     | 34 ++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt b/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
-> new file mode 100644
-> index 0000000..862f4a4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
-> @@ -0,0 +1,34 @@
-> +AXP20x USB power supply
-> +
-> +Required Properties:
-> +-compatible: "x-powers,axp202-usb-power-supply"
-> +
-> +This node is a subnode of the axp20x PMIC.
-> +
-> +Example:
-> +
-> +axp209: pmic at 34 {
-> +	compatible = "x-powers,axp209";
-> +	reg = <0x34>;
-> +	interrupt-parent = <&nmi_intc>;
-> +	interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> +	interrupt-controller;
-> +	#interrupt-cells = <1>;
-> +
-> +	regulators {
-> +		x-powers,dcdc-freq = <1500>;
-> +
-> +		vdd_cpu: dcdc2 {
-> +			regulator-always-on;
-> +			regulator-min-microvolt = <1000000>;
-> +			regulator-max-microvolt = <1450000>;
-> +			regulator-name = "vdd-cpu";
-> +		};
-> +
-> +		...
-> +	};
-> +
-> +	usb-power-supply: usb-power-supply {
-> +		compatible = "x-powers,axp202-usb-power-supply";
-> +	};
-> +};
-> 
+mdio_mux is not the only user of of_mdio_find_bus(), DSA uses it as
+well.
+
+So if anything this commit message is inaccurate.
+
+I also wonder about this refcounting scheme.
+
+If you are going to drop the inner device reference, then we take the
+mdio bus returned from of_mdio_find_bus() what holds onto it and keeps
+it from disappearing on us?
+
+Don't we have to hold onto some reference count of some kind here?
