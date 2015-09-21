@@ -1,57 +1,82 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 21 Sep 2015 09:31:03 +0300
-Subject: [PATCH 14/14] ARM: dts: qs600: Add SD card detect support.
-In-Reply-To: <1442579538-20525-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1442579371-19822-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1442579538-20525-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <55FFA427.1020001@compulab.co.il>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 21 Sep 2015 08:33:23 +0200
+Subject: [Patch V5] i2c: imx: implement bus recovery
+In-Reply-To: <CY1PR0301MB0858E1C589215DBAFBE9E35ECF460@CY1PR0301MB0858.namprd03.prod.outlook.com>
+References: <1441968155-10918-1-git-send-email-b54642@freescale.com>
+ <20150918075457.GT5327@pengutronix.de>
+ <CY1PR0301MB0858E1C589215DBAFBE9E35ECF460@CY1PR0301MB0858.namprd03.prod.outlook.com>
+Message-ID: <20150921063323.GA754@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/15 15:32, Srinivas Kandagatla wrote:
-> This patch adds SD card detect support.
-> 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Hello,
 
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
-
-> ---
->  arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-> index cc9d942..03784f1 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-> +++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-> @@ -29,6 +29,16 @@
->  	};
+On Mon, Sep 21, 2015 at 04:29:20AM +0000, Gao Pandy wrote:
+> > On Fri, Sep 11, 2015 at 06:42:34PM +0800, Gao Pan wrote:
+> > > V5:
+> > >  -introduce a dedicated gpio state for bus recovery.
+> > >  -assign adapter.bus_recovery_info after the two gpios were aquired
+> > >   successfully.
+> > 
+> > You also do this if the gpios were not acquired successfully.
 >  
->  	soc {
-> +		pinctrl at 800000 {
-> +			card_detect: card_detect {
-> +				mux {
-> +					pins = "gpio26";
-> +					function = "gpio";
-> +					bias-disable;
-> +				};
-> +			};
-> +		};
-> +
->  		rpm at 108000 {
->  			regulators {
->  				vin_lvs1_3_6-supply = <&pm8921_s4>;
-> @@ -197,6 +207,9 @@
->  			sdcc3: sdcc at 12180000 {
->  				status = "okay";
->  				vmmc-supply = <&v3p3_fixed>;
-> +				pinctrl-names	= "default";
-> +				pinctrl-0	= <&card_detect>;
-> +				cd-gpios	= <&tlmm_pinmux 26 GPIO_ACTIVE_LOW>;
->  			};
->  			/* WLAN */
->  			sdcc4: sdcc at 121c0000 {
+> Thanks. If the gpios are not acquired successfully, the context goes
+> to label clk_disable. So the assignment is skipped.
+> Please see the following code.
 > 
+>       ......
+>   
+> 	if (IS_ERR(i2c_imx->pins.sda)) {
+> 		ret = PTR_ERR(i2c_imx->pins.sda);
+> 		goto clk_disable;
+> 	}
+> 	if (IS_ERR(i2c_imx->pins.scl)) {
+> 		ret = PTR_ERR(i2c_imx->pins.scl);
+> 		goto clk_disable;
+> 	}
+> 	
+> 	i2c_imx->adapter.bus_recovery_info = &i2c_imx_bus_recovery_info;
+> 
+> 	......
+
+Right, if devm_gpiod_get_optional returns an error probing fails and
+everything is right. If however devm_gpiod_get_optional returns NULL
+(i.e. the dt doesn't contain an scl-gpios property) you happily use them
+even though gpio_set_value are stubs in this case.
+ 
+> > IMHO pinctrl_lookup_state returning an error is enough to not try a
+> > recovery.
+>  
+> Thanks, you are right. How about the following logic.
+> 
+> 	if (!(IS_ERR(i2c_imx->pinctrl_pins_default)) && !(IS_ERR(i2c_imx->pinctrl_pins_gpio))) {
+
+After the ! you don't need a (, but apart from this the logic is fine.
+
+>                 i2c_imx->pins.sda =
+>                         devm_gpiod_get_optional(&pdev->dev, "sda-gpios", GPIOD_IN);
+>                 i2c_imx->pins.scl =
+>                         devm_gpiod_get_optional(&pdev->dev, "scl-gpios", GPIOD_IN);
+> 
+>                 if (IS_ERR(i2c_imx->pins.sda)) {
+>                         ret = PTR_ERR(i2c_imx->pins.sda);
+>                         goto clk_disable;
+>                 }
+> 
+>                 if (IS_ERR(i2c_imx->pins.scl)) {
+>                         ret = PTR_ERR(i2c_imx->pins.scl);
+>                         goto clk_disable;
+>                 }
+
+As said above, here you need an
+
+		if (i2c_imx->pins.scl && i2c_imx->pins.sda)
+>                 i2c_imx->adapter.bus_recovery_info = &i2c_imx_bus_recovery_info;
+> 	} 
+
+Best regards
+Uwe
 
 -- 
-Regards,
-Igor.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
