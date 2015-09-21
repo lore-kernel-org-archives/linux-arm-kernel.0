@@ -1,137 +1,46 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 21 Sep 2015 16:02:44 +0200
-Subject: [PATCH v6 04/22] of: add function to allow probing a device from a OF
- node
+Date: Mon, 21 Sep 2015 16:02:45 +0200
+Subject: [PATCH v6 05/22] gpio: Probe GPIO drivers on demand
 In-Reply-To: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1442844182-27787-5-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1442844182-27787-6-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Walks the OF tree up and finds the closest ancestor that has a struct
-device associated with it, probing it if isn't bound to a driver yet.
+When looking up a gpiochip through its firmware node, probe it if it
+hasn't already.
 
-The above should ensure that the dependency represented by the passed OF
-node is available, because probing a device should cause its descendants
-to be probed as well (when they get registered).
-
-Subsystems can use this when looking up resources for drivers, to reduce
-the chances of deferred probes because of the probing order of devices.
+The goal is to reduce deferred probes to a minimum, as it makes it very
+cumbersome to find out why a device failed to probe, and can introduce
+very big delays in when a critical device is probed.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
 
-Changes in v5:
-- Move the assignment to device_node->device for AMBA devices to another
-  commit.
-- Hold a reference to the struct device while it's in use in
-  of_device_probe().
 
-Changes in v4:
-- Rename of_platform_probe to of_device_probe
-- Use device_node.device instead of device_node.platform_dev
+ drivers/gpio/gpiolib-of.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Changes in v3:
-- Set and use device_node.platform_dev instead of reversing the logic to
-  find the platform device that encloses a device node.
-- Drop the fwnode API to probe firmware nodes and add OF-only API for
-  now. I think this same scheme could be used for machines with ACPI,
-  but I haven't been able to find one that had to defer its probes because
-  of the device probe order.
-
- drivers/of/device.c       | 61 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_device.h |  3 +++
- 2 files changed, 64 insertions(+)
-
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 8b91ea241b10..836be71fc90e 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -286,3 +286,64 @@ int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env)
+diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+index fa6e3c8823d6..9a439dab7a87 100644
+--- a/drivers/gpio/gpiolib-of.c
++++ b/drivers/gpio/gpiolib-of.c
+@@ -19,6 +19,7 @@
+ #include <linux/gpio/consumer.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/of_gpio.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/slab.h>
+@@ -95,6 +96,8 @@ struct gpio_desc *of_get_named_gpiod_flags(struct device_node *np,
+ 		return ERR_PTR(ret);
+ 	}
  
- 	return 0;
- }
++	of_device_probe(gg_data.gpiospec.np);
 +
-+/**
-+ * of_device_probe() - Probe device associated with OF node
-+ * @np: node to probe
-+ *
-+ * Probe the device associated with the passed device node.
-+ */
-+void of_device_probe(struct device_node *np)
-+{
-+	struct device_node *target;
-+	struct device *dev = NULL;
-+
-+	if (!of_root || !of_node_check_flag(of_root, OF_POPULATED_BUS))
-+		return;
-+
-+	if (!np)
-+		return;
-+
-+	of_node_get(np);
-+
-+	/* Find the closest ancestor that has a device associated */
-+	for (target = np;
-+	     !of_node_is_root(target);
-+	     target = of_get_next_parent(target))
-+		if (get_device(target->device)) {
-+			dev = target->device;
-+			break;
-+		}
-+
-+	of_node_put(target);
-+
-+	if (!dev) {
-+		pr_warn("Couldn't find a device for node '%s'\n",
-+			of_node_full_name(np));
-+		return;
-+	}
-+
-+	/*
-+	 * Device is bound or is being probed right now. If we have bad luck
-+	 * and the dependency isn't ready when it's needed, deferred probe
-+	 * will save us.
-+	 */
-+	if (dev->driver)
-+		goto out;
-+
-+	/*
-+	 * Probing a device should cause its descendants to be probed as
-+	 * well, which includes the passed device node.
-+	 */
-+	if (device_attach(dev) != 1)
-+		/*
-+		 * This cannot be a warning for now because clock nodes have a
-+		 * compatible string but the clock framework doesn't follow
-+		 * the device/driver model yet.
-+		 */
-+		dev_dbg(dev, "Probe failed for %s\n", of_node_full_name(np));
-+
-+out:
-+	put_device(dev);
-+}
-+EXPORT_SYMBOL_GPL(of_device_probe);
-diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-index cc7dd687a89d..da8d489e73ad 100644
---- a/include/linux/of_device.h
-+++ b/include/linux/of_device.h
-@@ -40,6 +40,7 @@ extern ssize_t of_device_get_modalias(struct device *dev,
+ 	gpiochip_find(&gg_data, of_gpiochip_find_and_xlate);
  
- extern void of_device_uevent(struct device *dev, struct kobj_uevent_env *env);
- extern int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env);
-+extern void of_device_probe(struct device_node *np);
- 
- static inline void of_device_node_put(struct device *dev)
- {
-@@ -84,6 +85,8 @@ static inline int of_device_uevent_modalias(struct device *dev,
- 	return -ENODEV;
- }
- 
-+static inline void of_device_probe(struct device_node *np) { }
-+
- static inline void of_device_node_put(struct device *dev) { }
- 
- static inline const struct of_device_id *__of_match_device(
+ 	of_node_put(gg_data.gpiospec.np);
 -- 
 2.4.3
