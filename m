@@ -1,14 +1,14 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 21 Sep 2015 16:02:49 +0200
-Subject: [PATCH v6 09/22] drm: Probe panels on demand
+Date: Mon, 21 Sep 2015 16:02:51 +0200
+Subject: [PATCH v6 11/22] i2c: core: Probe i2c adapters and devices on demand
 In-Reply-To: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1442844182-27787-10-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1442844182-27787-12-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When looking up a panel through its OF node, probe it if it hasn't
-already.
+When looking up an i2c adapter or device through its OF node, probe it
+if it hasn't already.
 
 The goal is to reduce deferred probes to a minimum, as it makes it very
 cumbersome to find out why a device failed to probe, and can introduce
@@ -18,29 +18,30 @@ Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
 
 
- drivers/gpu/drm/drm_panel.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/i2c/i2c-core.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/gpu/drm/drm_panel.c b/drivers/gpu/drm/drm_panel.c
-index 2ef988e037b7..ad79a7b9c74d 100644
---- a/drivers/gpu/drm/drm_panel.c
-+++ b/drivers/gpu/drm/drm_panel.c
-@@ -23,6 +23,7 @@
+diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+index 5f89f1e3c2f2..02da3acbbd35 100644
+--- a/drivers/i2c/i2c-core.c
++++ b/drivers/i2c/i2c-core.c
+@@ -1413,6 +1413,8 @@ struct i2c_client *of_find_i2c_device_by_node(struct device_node *node)
+ 	struct device *dev;
+ 	struct i2c_client *client;
  
- #include <linux/err.h>
- #include <linux/module.h>
-+#include <linux/of_device.h>
- 
- #include <drm/drm_crtc.h>
- #include <drm/drm_panel.h>
-@@ -80,6 +81,8 @@ struct drm_panel *of_drm_find_panel(struct device_node *np)
- {
- 	struct drm_panel *panel;
- 
-+	of_device_probe(np);
++	of_device_probe(node);
 +
- 	mutex_lock(&panel_lock);
+ 	dev = bus_find_device(&i2c_bus_type, NULL, node, of_dev_node_match);
+ 	if (!dev)
+ 		return NULL;
+@@ -1431,6 +1433,8 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
+ 	struct device *dev;
+ 	struct i2c_adapter *adapter;
  
- 	list_for_each_entry(panel, &panel_list, list) {
++	of_device_probe(node);
++
+ 	dev = bus_find_device(&i2c_bus_type, NULL, node, of_dev_node_match);
+ 	if (!dev)
+ 		return NULL;
 -- 
 2.4.3
