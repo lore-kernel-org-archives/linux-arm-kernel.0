@@ -1,27 +1,44 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 21 Sep 2015 08:01:02 -0700
-Subject: [PATCH v3 2/4] Documentation: bindings: mfd: cros ec: document
- vbc EC property
-In-Reply-To: <1442842703-5309-3-git-send-email-emilio.lopez@collabora.co.uk>
-References: <1442842703-5309-1-git-send-email-emilio.lopez@collabora.co.uk>
- <1442842703-5309-3-git-send-email-emilio.lopez@collabora.co.uk>
-Message-ID: <CABxcv=nDbraTFed65qhr-P+Sopz32YW3ut_S11DWR+nJgiSFgw@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 21 Sep 2015 08:04:29 -0700
+Subject: [PATCH 2/6] watchdog: Add support for Freescale Layerscape
+ platforms
+In-Reply-To: <1442838158-2964-3-git-send-email-B48286@freescale.com>
+References: <1442838158-2964-1-git-send-email-B48286@freescale.com>
+ <1442838158-2964-3-git-send-email-B48286@freescale.com>
+Message-ID: <56001C7D.4050408@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Emilio,
-
-On Mon, Sep 21, 2015 at 6:38 AM, Emilio L?pez
-<emilio.lopez@collabora.co.uk> wrote:
-> Some EC implementations include a small nvram space used to store
-> verified boot context data. This boolean property lets us indicate
-> whether this space is available or not on a specific EC implementation.
+On 09/21/2015 05:22 AM, Zhiqiang Hou wrote:
+> From: Shaohui Xie <Shaohui.Xie@freescale.com>
 >
-> Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
+> Modify watchdog/Kconfig file to support Layerscape platforms.
+>
+"Enable IMX2+ watchdog for Layerscape platforms" would be a better
+description.
 
-Looks good to me.
+Nitpick, so
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Acked-by: Guenter Roeck <linux@roeck-us.net>
 
-Best regards,
-Javier
+> Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
+> Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
+> Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+> ---
+>   drivers/watchdog/Kconfig | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index c68edc1..2862219 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -446,7 +446,7 @@ config MAX63XX_WATCHDOG
+>
+>   config IMX2_WDT
+>   	tristate "IMX2+ Watchdog"
+> -	depends on ARCH_MXC
+> +	depends on ARCH_MXC || ARCH_LAYERSCAPE
+>   	select REGMAP_MMIO
+>   	select WATCHDOG_CORE
+>   	help
+>
