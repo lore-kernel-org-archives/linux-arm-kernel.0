@@ -1,42 +1,73 @@
-From: dhowells@redhat.com (David Howells)
-Date: Mon, 21 Sep 2015 14:42:25 +0100
-Subject: [PATCH 00/38] Fixes related to incorrect usage of unsigned types
-In-Reply-To: <1442842450-29769-1-git-send-email-a.hajda@samsung.com>
-References: <1442842450-29769-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <17571.1442842945@warthog.procyon.org.uk>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 21 Sep 2015 15:46:04 +0200
+Subject: [PATCH 1/3] irqchip: atmel-aic5: fix bug with mask/unmask
+Message-ID: <1442843173-2390-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrzej Hajda <a.hajda@samsung.com> wrote:
+When masking/unmasking interrupts, mask_cache is updated and used later
+for suspend/resume. Unfortunately, it always was the mask_cache
+associated with the first irq chip which was updated. So when performing
+resume, only irqs 0-31 could be enabled and maybe not the good ones!
 
-> Semantic patch finds comparisons of types:
->     unsigned < 0
->     unsigned >= 0
-> The former is always false, the latter is always true.
-> Such comparisons are useless, so theoretically they could be
-> safely removed, but their presence quite often indicates bugs.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Fixes: b1479ebb7720 ("irqchip: atmel-aic: Add atmel AIC/AIC5 drivers")
+Cc: stable at vger.kernel.org #3.18
+---
 
-Or someone has left them in because they don't matter and there's the
-possibility that the type being tested might be or become signed under some
-circumstances.  If the comparison is useless, I'd expect the compiler to just
-discard it - for such cases your patch is pointless.
+Sasha,
 
-If I have, for example:
+This fix won't apply without conflicts because of irq_reg_writel changes. I
+can provide you a fix for 3.18 if you need.
 
-	unsigned x;
+Regards
 
-	if (x == 0 || x > 27)
-		give_a_range_error();
+Ludovic
 
-I will write this as:
 
-	unsigned x;
+ drivers/irqchip/irq-atmel-aic5.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-	if (x <= 0 || x > 27)
-		give_a_range_error();
-
-because it that gives a way to handle x being changed to signed at some point
-in the future for no cost.  In which case, your changing the <= to an ==
-"because the < part of the case is useless" is arguably wrong.
-
-David
+diff --git a/drivers/irqchip/irq-atmel-aic5.c b/drivers/irqchip/irq-atmel-aic5.c
+index 9da9942..6c5fd25 100644
+--- a/drivers/irqchip/irq-atmel-aic5.c
++++ b/drivers/irqchip/irq-atmel-aic5.c
+@@ -88,28 +88,30 @@ static void aic5_mask(struct irq_data *d)
+ {
+ 	struct irq_domain *domain = d->domain;
+ 	struct irq_domain_chip_generic *dgc = domain->gc;
+-	struct irq_chip_generic *gc = dgc->gc[0];
++	struct irq_chip_generic *bgc = dgc->gc[0];
++	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+ 
+ 	/* Disable interrupt on AIC5 */
+-	irq_gc_lock(gc);
++	irq_gc_lock(bgc);
+ 	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
+ 	irq_reg_writel(gc, 1, AT91_AIC5_IDCR);
+ 	gc->mask_cache &= ~d->mask;
+-	irq_gc_unlock(gc);
++	irq_gc_unlock(bgc);
+ }
+ 
+ static void aic5_unmask(struct irq_data *d)
+ {
+ 	struct irq_domain *domain = d->domain;
+ 	struct irq_domain_chip_generic *dgc = domain->gc;
+-	struct irq_chip_generic *gc = dgc->gc[0];
++	struct irq_chip_generic *bgc = dgc->gc[0];
++	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+ 
+ 	/* Enable interrupt on AIC5 */
+-	irq_gc_lock(gc);
++	irq_gc_lock(bgc);
+ 	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
+ 	irq_reg_writel(gc, 1, AT91_AIC5_IECR);
+ 	gc->mask_cache |= d->mask;
+-	irq_gc_unlock(gc);
++	irq_gc_unlock(bgc);
+ }
+ 
+ static int aic5_retrigger(struct irq_data *d)
+-- 
+2.5.0
