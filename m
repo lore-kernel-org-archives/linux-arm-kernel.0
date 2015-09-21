@@ -1,53 +1,75 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 21 Sep 2015 18:54:02 +0200
-Subject: [PATCH v4 6/8] clk: imx5: retain early UART clocks during kernel init
-In-Reply-To: <1442854444-4460-1-git-send-email-l.stach@pengutronix.de>
-References: <1442854444-4460-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1442854444-4460-7-git-send-email-l.stach@pengutronix.de>
+Date: Mon, 21 Sep 2015 18:53:56 +0200
+Subject: [PATCH v4 0/8] i.MX early debug UART clock fixes
+Message-ID: <1442854444-4460-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure to keep UART clocks enabled during kernel init if
-earlyprintk or earlycon are active.
+This series fixes a long standing interaction issue between the
+kernels early debug facilities and the i.MX clock drivers.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
+Both earlyprintk and earlycon rely on the bootloader setup clocks
+for the UARTs to be retained during kernel init. As those clocks are
+only enabled in hardware, but not referenced in software they (or even
+their parent clocks) may get disabled as a result of other clocks being
+en-/disabled during boot.
+
+This results in missing messages from the early debug console until the
+regular system console takes over, or even worse system hangs in response
+to unclocked register accesses. This renders those debugging facilities a
+lot less useful.
+
+The fix implemented here is to check if any of this early debugging is
+enabled and keep the UART clocks referenced and enabled in that case.
+The clocks will then only be disabled at the end of kernel init, at which
+point the real console should have taken over and the early outputs being
+disabled.
+
+I've runtime tested this on i.MX6Q and i.MX53, other platforms are only
+compile tested. This is mostly a mechanical change, but still I would
+appreciate some testing.
+
+Changes since v1:
+- reworked logic to require significantly less code in the individual
+  clock drivers
+
+Changes since v2:
+- fix checkpatch warning about initdata annotation placement
+- make code a bit more compact in the for(...) loops
+  (since 2 people already commented about this I made up my mind)
+- change code style in driver as requested by Shawn
+- add more const correctness
+  (note that this triggers a false positive checkpatch error in the first patch)
+
+Changes since v3:
+- make sure to only execute late_initcall code if init functions have been called
+  (fixes OOPS on others SoCs in multiplatform config)
+
+Regards,
+Lucas
+
+Lucas Stach (8):
+  clk: imx: add common logic to detect early UART usage
+  clk: imx25: retain early UART clocks during kernel init
+  clk: imx27: retain early UART clocks during kernel init
+  clk: imx31: retain early UART clocks during kernel init
+  clk: imx35: retain early UART clocks during kernel init
+  clk: imx5: retain early UART clocks during kernel init
+  clk: imx6: retain early UART clocks during kernel init
+  clk: imx7d: retain early UART clocks during kernel init
+
+ drivers/clk/imx/clk-imx25.c       | 12 ++++++++++++
+ drivers/clk/imx/clk-imx27.c       | 13 +++++++++++++
+ drivers/clk/imx/clk-imx31.c       | 12 ++++++++++++
+ drivers/clk/imx/clk-imx35.c       | 10 ++++++++++
  drivers/clk/imx/clk-imx51-imx53.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/clk/imx/clk-imx6q.c       |  8 ++++++++
+ drivers/clk/imx/clk-imx6sl.c      |  8 ++++++++
+ drivers/clk/imx/clk-imx6sx.c      |  8 ++++++++
+ drivers/clk/imx/clk-imx7d.c       | 13 +++++++++++++
+ drivers/clk/imx/clk.c             | 38 ++++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk.h             |  1 +
+ 11 files changed, 139 insertions(+)
 
-diff --git a/drivers/clk/imx/clk-imx51-imx53.c b/drivers/clk/imx/clk-imx51-imx53.c
-index a7e4f394be0d..c6770348d2ab 100644
---- a/drivers/clk/imx/clk-imx51-imx53.c
-+++ b/drivers/clk/imx/clk-imx51-imx53.c
-@@ -130,6 +130,20 @@ static const char *cpu_podf_sels[] = { "pll1_sw", "step_sel" };
- static struct clk *clk[IMX5_CLK_END];
- static struct clk_onecell_data clk_data;
- 
-+static struct clk ** const uart_clks[] __initconst = {
-+	&clk[IMX5_CLK_UART1_IPG_GATE],
-+	&clk[IMX5_CLK_UART1_PER_GATE],
-+	&clk[IMX5_CLK_UART2_IPG_GATE],
-+	&clk[IMX5_CLK_UART2_PER_GATE],
-+	&clk[IMX5_CLK_UART3_IPG_GATE],
-+	&clk[IMX5_CLK_UART3_PER_GATE],
-+	&clk[IMX5_CLK_UART4_IPG_GATE],
-+	&clk[IMX5_CLK_UART4_PER_GATE],
-+	&clk[IMX5_CLK_UART5_IPG_GATE],
-+	&clk[IMX5_CLK_UART5_PER_GATE],
-+	NULL
-+};
-+
- static void __init mx5_clocks_common_init(void __iomem *ccm_base)
- {
- 	clk[IMX5_CLK_DUMMY]		= imx_clk_fixed("dummy", 0);
-@@ -310,6 +324,8 @@ static void __init mx5_clocks_common_init(void __iomem *ccm_base)
- 	clk_prepare_enable(clk[IMX5_CLK_TMAX1]);
- 	clk_prepare_enable(clk[IMX5_CLK_TMAX2]); /* esdhc2, fec */
- 	clk_prepare_enable(clk[IMX5_CLK_TMAX3]); /* esdhc1, esdhc4 */
-+
-+	imx_register_uart_clocks(uart_clks);
- }
- 
- static void __init mx50_clocks_init(struct device_node *np)
 -- 
 2.5.1
