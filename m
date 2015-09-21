@@ -1,45 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Sep 2015 00:20:27 +0100
-Subject: [PATCH 17/17] mfd : ab8500/db8500: fix the abuse of
- IRQF_NO_SUSPEND
-In-Reply-To: <1442850433-5903-18-git-send-email-sudeep.holla@arm.com>
-References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
- <1442850433-5903-18-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20150921232027.GD11284@x1>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 21 Sep 2015 16:28:48 -0700
+Subject: [PATCH v2 2/3] gpiolib: gpiod_hog remove separate name argument
+In-Reply-To: <1440920686-6892-3-git-send-email-mpa@pengutronix.de>
+References: <1440920686-6892-1-git-send-email-mpa@pengutronix.de>
+ <1440920686-6892-3-git-send-email-mpa@pengutronix.de>
+Message-ID: <CACRpkdZrXEXtkPpgtrcjqP5jD+M0UOj5Wj69o4zYJQKihsY6Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Sep 2015, Sudeep Holla wrote:
+On Sun, Aug 30, 2015 at 12:44 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
 
-> The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
-> be left enabled so as to allow them to work as expected during the
-> suspend-resume cycle, but doesn't guarantee that it will wake the system
-> from a suspended state, enable_irq_wake is recommended to be used for
-> the wakeup.
-> 
-> This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
-> enable_irq_wake instead.
-> 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/mfd/ab8500-core.c        | 11 +++++++++--
->  drivers/mfd/ab8500-debugfs.c     |  2 +-
->  drivers/mfd/ab8500-gpadc.c       | 15 +++++++++++----
->  drivers/mfd/db8500-prcmu.c       | 24 +++++++++++++++++-------
->  drivers/power/ab8500_btemp.c     |  6 ++++--
->  drivers/power/ab8500_charger.c   |  6 ++++--
->  drivers/power/ab8500_fg.c        |  9 ++++++---
->  drivers/thermal/db8500_thermal.c |  5 ++---
->  drivers/usb/phy/phy-ab8500-usb.c | 10 ++++++----
->  9 files changed, 60 insertions(+), 28 deletions(-)
+> The gpio name is now stored in the gpio descriptor, so we can simply use
+> that instead of an argument to the function.
+>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-Is there a reason for bundling the changes in all of these subsystems
-together into a single patch?
+Several problems with this patch:
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+- Does not apply to v4.3-rc1
+- Fixed that but noted that it just alters the call to gpiod_hog()
+  in of_gpiochip_scan_hogs(), there is a local const char *name that
+  should be removed too.
+- Looking at of_get_gpio_hog() it is unclear to me that .name
+  is set in the gpio_desc as desired. Please check this.
+
+  Crucial code looks like this:
+
+    if (name && of_property_read_string(np, "line-name", name))
+        *name = np->name;
+
+  i.e. is the line-name really propagated to gpiod->name?
+  Are you sure you have tested this with a DTS using line-name
+  and verified that it propagates properly?
+
+Yours,
+Linus Walleij
