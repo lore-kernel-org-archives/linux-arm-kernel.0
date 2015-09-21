@@ -1,14 +1,14 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 21 Sep 2015 16:02:59 +0200
-Subject: [PATCH v6 19/22] power-supply: Probe power supplies on demand
+Date: Mon, 21 Sep 2015 16:02:55 +0200
+Subject: [PATCH v6 15/22] clk: Probe clk providers on demand
 In-Reply-To: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1442844182-27787-20-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1442844182-27787-16-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When looking up a power supply through its OF node, probe it if it
-hasn't already.
+When looking up a clock through its OF node, probe it if it hasn't
+already.
 
 The goal is to reduce deferred probes to a minimum, as it makes it very
 cumbersome to find out why a device failed to probe, and can introduce
@@ -18,29 +18,29 @@ Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
 
 
- drivers/power/power_supply_core.c | 3 +++
+ drivers/clk/clk.c | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
-index 456987c88baa..80bc89f4ae89 100644
---- a/drivers/power/power_supply_core.c
-+++ b/drivers/power/power_supply_core.c
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index b005f666e3a1..8986c9d876a4 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
 @@ -19,6 +19,7 @@
- #include <linux/err.h>
- #include <linux/power_supply.h>
- #include <linux/thermal.h>
+ #include <linux/list.h>
+ #include <linux/slab.h>
+ #include <linux/of.h>
 +#include <linux/of_device.h>
- #include "power_supply.h"
+ #include <linux/device.h>
+ #include <linux/init.h>
+ #include <linux/sched.h>
+@@ -3005,6 +3006,8 @@ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
+ 	if (!clkspec)
+ 		return ERR_PTR(-EINVAL);
  
- /* exported for the APM Power driver, APM emulation */
-@@ -206,6 +207,8 @@ static int power_supply_find_supply_from_node(struct device_node *supply_node)
- {
- 	int error;
- 
-+	of_device_probe(supply_node);
++	of_device_probe(clkspec->np);
 +
- 	/*
- 	 * class_for_each_device() either returns its own errors or values
- 	 * returned by __power_supply_find_supply_from_node().
+ 	/* Check if we have such a provider in our array */
+ 	mutex_lock(&of_clk_mutex);
+ 	list_for_each_entry(provider, &of_clk_providers, link) {
 -- 
 2.4.3
