@@ -1,49 +1,67 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 21 Sep 2015 18:54:00 +0200
-Subject: [PATCH v4 4/8] clk: imx31: retain early UART clocks during kernel init
-In-Reply-To: <1442854444-4460-1-git-send-email-l.stach@pengutronix.de>
-References: <1442854444-4460-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1442854444-4460-5-git-send-email-l.stach@pengutronix.de>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 21 Sep 2015 18:00:33 +0100
+Subject: [PATCH] arm: wire up userfaultfd and membarrier syscalls
+Message-ID: <1442854833-10592-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure to keep UART clocks enabled during kernel init if
-earlyprintk or earlycon are active.
+Add the syscall numbers to the ARM syscall table. Both have
+been briefly tested using the provided selftests from the tools
+directory.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- drivers/clk/imx/clk-imx31.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Hi Russell,
 
-diff --git a/drivers/clk/imx/clk-imx31.c b/drivers/clk/imx/clk-imx31.c
-index 1f8383475bb3..5520e20eaceb 100644
---- a/drivers/clk/imx/clk-imx31.c
-+++ b/drivers/clk/imx/clk-imx31.c
-@@ -62,6 +62,16 @@ enum mx31_clks {
- static struct clk *clk[clk_max];
- static struct clk_onecell_data clk_data;
+I saw that Thierry sent something similar beginning of August already
+(which is now outdated), is there any issue with enabling syscalls?
+
+Cheers,
+Andre.
+
+ arch/arm/include/asm/unistd.h      | 2 +-
+ arch/arm/include/uapi/asm/unistd.h | 2 ++
+ arch/arm/kernel/calls.S            | 2 ++
+ 3 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
+index 32640c4..7cba573 100644
+--- a/arch/arm/include/asm/unistd.h
++++ b/arch/arm/include/asm/unistd.h
+@@ -19,7 +19,7 @@
+  * This may need to be greater than __NR_last_syscall+1 in order to
+  * account for the padding in the syscall table
+  */
+-#define __NR_syscalls  (388)
++#define __NR_syscalls  (392)
  
-+static struct clk ** const uart_clks[] __initconst = {
-+	&clk[ipg],
-+	&clk[uart1_gate],
-+	&clk[uart2_gate],
-+	&clk[uart3_gate],
-+	&clk[uart4_gate],
-+	&clk[uart5_gate],
-+	NULL
-+};
-+
- int __init mx31_clocks_init(unsigned long fref)
- {
- 	void __iomem *base;
-@@ -200,6 +210,8 @@ int __init mx31_clocks_init(unsigned long fref)
- 	mx31_revision();
- 	clk_disable_unprepare(clk[iim_gate]);
+ /*
+  * *NOTE*: This is a ghost syscall private to the kernel.  Only the
+diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
+index 0c3f5a0..7a2a32a 100644
+--- a/arch/arm/include/uapi/asm/unistd.h
++++ b/arch/arm/include/uapi/asm/unistd.h
+@@ -414,6 +414,8 @@
+ #define __NR_memfd_create		(__NR_SYSCALL_BASE+385)
+ #define __NR_bpf			(__NR_SYSCALL_BASE+386)
+ #define __NR_execveat			(__NR_SYSCALL_BASE+387)
++#define __NR_userfaultfd		(__NR_SYSCALL_BASE+388)
++#define __NR_membarrier			(__NR_SYSCALL_BASE+389)
  
-+	imx_register_uart_clocks(uart_clks);
-+
- 	mxc_timer_init(MX31_GPT1_BASE_ADDR, MX31_INT_GPT, GPT_TYPE_IMX31);
- 
- 	return 0;
+ /*
+  * The following SWIs are ARM private.
+diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+index 05745eb..fde6c88 100644
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -397,6 +397,8 @@
+ /* 385 */	CALL(sys_memfd_create)
+ 		CALL(sys_bpf)
+ 		CALL(sys_execveat)
++		CALL(sys_userfaultfd)
++		CALL(sys_membarrier)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
 -- 
 2.5.1
