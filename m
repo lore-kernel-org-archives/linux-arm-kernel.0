@@ -1,37 +1,58 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 21 Sep 2015 11:03:18 +0200
-Subject: [PATCH v2] ARM: pxa: ssp: Fix build error by removing originally
- incorrect DT binding
-In-Reply-To: <55FFB643.1080208@linux.intel.com> (Jarkko Nikula's message of
- "Mon, 21 Sep 2015 10:48:19 +0300")
-References: <1441610581-11434-1-git-send-email-jarkko.nikula@linux.intel.com>
- <87zj0rsqhe.fsf@belgarion.home> <55FFB643.1080208@linux.intel.com>
-Message-ID: <87fv28qh49.fsf@belgarion.home>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Mon, 21 Sep 2015 11:10:56 +0200
+Subject: [PATCH v4 1/3] leds: netxbig: add device tree binding
+In-Reply-To: <20150918131011.GN7306@kw.sim.vm.gnt>
+References: <1442505571-9744-1-git-send-email-simon.guinot@sequanux.org>
+ <1442505571-9744-2-git-send-email-simon.guinot@sequanux.org>
+ <55FBD679.2020402@samsung.com> <20150918103006.GM7306@kw.sim.vm.gnt>
+ <55FBEC38.6020209@samsung.com> <20150918131011.GN7306@kw.sim.vm.gnt>
+Message-ID: <55FFC9A0.1020608@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jarkko Nikula <jarkko.nikula@linux.intel.com> writes:
-
-> Hi
+On 09/18/2015 03:10 PM, Simon Guinot wrote:
+> On Fri, Sep 18, 2015 at 12:49:28PM +0200, Jacek Anaszewski wrote:
+>>>>
+>>>> Moreover, if you switched to using devm* prefixed version of
+>>>> gpio_request_one and led_classdev_reqister, you could simplify
+>>>> the error paths in the driver.
+>>>
+>>> Yes, I have a pending patch for this conversion. But since it is not
+>>> really related with the subject of this patch series (add DT support),
+>>> I was planning to send it next.
+>>>
+>>> Do you want me to include this patch into this series.
+>>
+>> Why not, if you have it ready to go. If it needs some polishing,
+>> we can live with what we have now.
 >
-> On 09/12/2015 04:43 PM, Robert Jarzmik wrote:
->> Jarkko Nikula <jarkko.nikula@linux.intel.com> writes:
+> No, the patch is ready. I'll add it.
+>
+>>>>> +static const struct of_device_id of_netxbig_leds_match[] = {
+>>>>> +	{ .compatible = "lacie,netxbig-leds", },
+>>>>> +	{},
+>>>>> +};
+>>>>> +#else
+>>>>> +static int netxbig_leds_get_of_pdata(struct device *dev,
+>>>>> +				     struct netxbig_led_platform_data *pdata)
+>>>>
+>>>> s/static int/static inline int/
+>>>
+>>> Is that not already the case with modern compiler ?
 >>
->>> Commit 03fbf488cece ("spi: pxa2xx: Differentiate Intel LPSS types") caused
->>> build error here because it removed the type LPSS_SSP and I didn't notice
->>> the type was used here too.
->> Queued into pxa/fixes, thanks.
->>
-> Gentle reminder, is this going to 4.3-rc3?
-It is going into v4.3.
+>> Could you elaborate on this?
+>
+> There is not much to say. netxbig_leds_get_of_pdata is a single line of
+> code. I am not a gcc expert but I am quite confident that this function
+> will be inlined anyway (given the optimisation level used to compile the
+> Linux kernel). That's it.
+>
+> But there is nothing wrong by adding "inline" neither.
 
-Now knowing if it is v4.3-rc3 is another story, as currently the pxa platform is
-broken because of a dmaengine regression. And if the necessary fix is not
-applied through dmaengine tree (by lack of time from Vinod), I'll want to carry
-it through my tree, which is the reason why I have not made the pull request
-yet.
+Right. All the more, this is a common pattern for no-ops, also in *.c
+files.
 
-Cheers.
 
 -- 
-Robert
+Best Regards,
+Jacek Anaszewski
