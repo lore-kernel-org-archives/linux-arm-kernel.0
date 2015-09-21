@@ -1,99 +1,56 @@
-From: gaopan@freescale.com (Gao Pandy)
-Date: Mon, 21 Sep 2015 08:13:37 +0000
-Subject: [Patch V5] i2c: imx: implement bus recovery
-In-Reply-To: <20150921063323.GA754@pengutronix.de>
-References: <1441968155-10918-1-git-send-email-b54642@freescale.com>
- <20150918075457.GT5327@pengutronix.de>
- <CY1PR0301MB0858E1C589215DBAFBE9E35ECF460@CY1PR0301MB0858.namprd03.prod.outlook.com>
- <20150921063323.GA754@pengutronix.de>
-Message-ID: <CY1PR0301MB085882BC97E7AA60F2BA7F0ECF460@CY1PR0301MB0858.namprd03.prod.outlook.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 21 Sep 2015 10:14:39 +0200
+Subject: [PATCH v6 2/5] Documentation: bindings: document the Berlin PWM
+ driver
+In-Reply-To: <1442484788-15482-3-git-send-email-antoine.tenart@free-electrons.com>
+References: <1442484788-15482-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1442484788-15482-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20150921081439.GD19865@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Uwe Kleine-K?nig <mailto:u.kleine-koenig@pengutronix.de> Sent: Monday, September 21, 2015 2:33 PM
-> To: Gao Pan-B54642
-> Cc: Li Frank-B20596; wsa at the-dreams.de; linux-i2c at vger.kernel.org;
-> kernel at pengutronix.de; Duan Fugang-B38611; shawnguo at kernel.org; linux-
-> arm-kernel at lists.infradead.org
-> Subject: Re: [Patch V5] i2c: imx: implement bus recovery
+On Thu, Sep 17, 2015 at 12:13:05PM +0200, Antoine Tenart wrote:
+> Following the addition of a Berlin PWM driver, this patch adds the
+> corresponding documentation.
 > 
-> Hello,
-> 
-> On Mon, Sep 21, 2015 at 04:29:20AM +0000, Gao Pandy wrote:
-> > > On Fri, Sep 11, 2015 at 06:42:34PM +0800, Gao Pan wrote:
-> > > > V5:
-> > > >  -introduce a dedicated gpio state for bus recovery.
-> > > >  -assign adapter.bus_recovery_info after the two gpios were aquired
-> > > >   successfully.
-> > >
-> > > You also do this if the gpios were not acquired successfully.
-> >
-> > Thanks. If the gpios are not acquired successfully, the context goes
-> > to label clk_disable. So the assignment is skipped.
-> > Please see the following code.
-> >
-> >       ......
-> >
-> > 	if (IS_ERR(i2c_imx->pins.sda)) {
-> > 		ret = PTR_ERR(i2c_imx->pins.sda);
-> > 		goto clk_disable;
-> > 	}
-> > 	if (IS_ERR(i2c_imx->pins.scl)) {
-> > 		ret = PTR_ERR(i2c_imx->pins.scl);
-> > 		goto clk_disable;
-> > 	}
-> >
-> > 	i2c_imx->adapter.bus_recovery_info = &i2c_imx_bus_recovery_info;
-> >
-> > 	......
-> 
-> Right, if devm_gpiod_get_optional returns an error probing fails and
-> everything is right. If however devm_gpiod_get_optional returns NULL (i.e.
-> the dt doesn't contain an scl-gpios property) you happily use them even
-> though gpio_set_value are stubs in this case.
- 
-Thanks, you are right.
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/pwm/pwm-berlin.txt | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-berlin.txt
 
-> > > IMHO pinctrl_lookup_state returning an error is enough to not try a
-> > > recovery.
-> >
-> > Thanks, you are right. How about the following logic.
-> >
-> > 	if (!(IS_ERR(i2c_imx->pinctrl_pins_default)) &&
-> > !(IS_ERR(i2c_imx->pinctrl_pins_gpio))) {
-> 
-> After the ! you don't need a (, but apart from this the logic is fine.
-> 
-> >                 i2c_imx->pins.sda =
-> >                         devm_gpiod_get_optional(&pdev->dev, "sda-gpios",
-> GPIOD_IN);
-> >                 i2c_imx->pins.scl =
-> >                         devm_gpiod_get_optional(&pdev->dev,
-> > "scl-gpios", GPIOD_IN);
-> >
-> >                 if (IS_ERR(i2c_imx->pins.sda)) {
-> >                         ret = PTR_ERR(i2c_imx->pins.sda);
-> >                         goto clk_disable;
-> >                 }
-> >
-> >                 if (IS_ERR(i2c_imx->pins.scl)) {
-> >                         ret = PTR_ERR(i2c_imx->pins.scl);
-> >                         goto clk_disable;
-> >                 }
-> 
-> As said above, here you need an
-> 
-> 		if (i2c_imx->pins.scl && i2c_imx->pins.sda)
-> >                 i2c_imx->adapter.bus_recovery_info =
-> &i2c_imx_bus_recovery_info;
-> > 	}
- 
-Thank you very much, will fix it in next version.
+That's the wrong way around. You define the binding, get concensus that
+it's okay and then implement the binding in the driver. Of course you'd
+always provide both the binding and an implementation in the same patch
+series for convenience, but that doesn't change the logical ordering.
 
-> Best regards
-> Uwe
-> 
-> --
-> Pengutronix e.K.                           | Uwe Kleine-K?nig
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-berlin.txt b/Documentation/devicetree/bindings/pwm/pwm-berlin.txt
+> new file mode 100644
+> index 000000000000..8f9bc11f8c4c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-berlin.txt
+> @@ -0,0 +1,19 @@
+> +Berlin PWM controller
+> +
+> +PWM IP found in Marvell Berlin SoCs.
+
+This isn't a proper sentence and doesn't add much useful information. If
+you want to say anything here, provide details about the PWM controller.
+
+> +
+> +Required properties:
+> +- compatible: should be "marvell,berlin-pwm"
+> +- reg: physical base address and length of the controller's registers
+> +- clocks: phandle to the input clock
+
+You should think about adding a clock-names property here as well.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150921/3c1d9ad9/attachment.sig>
