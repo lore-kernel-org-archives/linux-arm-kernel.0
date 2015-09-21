@@ -1,72 +1,116 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 21 Sep 2015 10:18:25 +0800
-Subject: [PATCH RESEND 1/2] arm: berlin: use non-self-cleared reset
- register to reset cpu
-In-Reply-To: <55FEF511.2050600@gmail.com>
-References: <1442213265-1002-1-git-send-email-jszhang@marvell.com>
- <1442213265-1002-2-git-send-email-jszhang@marvell.com>
- <55FEF511.2050600@gmail.com>
-Message-ID: <20150921101825.099b304f@xhacker>
+Date: Mon, 21 Sep 2015 10:19:37 +0800
+Subject: [PATCH 3/3] arm64: dts: add dts file for Marvell Berlin4CT STB
+ board
+In-Reply-To: <55FF03AB.4000209@gmail.com>
+References: <1442584059-7319-1-git-send-email-jszhang@marvell.com>
+ <1442584059-7319-4-git-send-email-jszhang@marvell.com>
+ <55FF03AB.4000209@gmail.com>
+Message-ID: <20150921101937.0e47d0d8@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian,
-
-On Sun, 20 Sep 2015 20:04:01 +0200
+On Sun, 20 Sep 2015 21:06:19 +0200
 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-> On 14.09.2015 08:47, Jisheng Zhang wrote:
-> > In Berlin SoCs, there are two kinds of cpu reset control registers: the
-> > first one's corresponding bits will be self-cleared after some cycles,
-> > while the second one's bits won't. Previously the first kind of reset
-> > control register is used, this patch uses the second kind one to prepare
-> > for the next hotplug commit.
+> On 18.09.2015 15:47, Jisheng Zhang wrote:
+> > This patch adds dts for the Berlin4CT STB reference board which is also
+> > based on the Berlin4CT SoC. The Berlin4CT DMP board will be deprecated as
+> > time goes.
 > >
 > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > > ---
-> >   arch/arm/mach-berlin/platsmp.c | 4 +++-
-> >   1 file changed, 3 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
-> > index 34a3753..bde327b 100644
-> > --- a/arch/arm/mach-berlin/platsmp.c
-> > +++ b/arch/arm/mach-berlin/platsmp.c
-> > @@ -17,7 +17,7 @@
-> >   #include <asm/smp_plat.h>
-> >   #include <asm/smp_scu.h>
-> >
-> > -#define CPU_RESET		0x00
-> > +#define CPU_RESET		0x20
+> >   arch/arm64/boot/dts/marvell/berlin4ct-stb.dts | 66 +++++++++++++++++++++++++++
 > 
-> Jisheng,
-> 
-> I am fine with the patch itself, except that I'd like to rather
-> rename the 0x00-register to CPU_RESET_SC with a comment about
-> the self-clearing nature. The 0x20-register would then be named
-> CPU_RESET_NON_SC and used the way you propose.
+> This is missing the corresponding Makefile change to add the
+> board to the default dtb build list.
 
-Good idea. And such comment would let people understand why do we change
-as that.
+oops, sorry, I missed it.
 
 > 
-> Are you fine with me naming the registers accordingly while
-> applying the patches?
+> I've fixed it up and
+> 
+> Applied the two dts patches to berlin64/dt
 
-Sure, I'm fine. Thank you very much.
+Thanks a lot ;)
 
 > 
 > Sebastian
 > 
-> >   #define RESET_VECT		0x00
-> >   #define SW_RESET_ADDR		0x94
-> > @@ -31,6 +31,8 @@ static inline void berlin_perform_reset_cpu(unsigned int cpu)
-> >   	u32 val;
+> >   1 file changed, 66 insertions(+)
+> >   create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
 > >
-> >   	val = readl(cpu_ctrl + CPU_RESET);
-> > +	val &= ~BIT(cpu_logical_map(cpu));
-> > +	writel(val, cpu_ctrl + CPU_RESET);
-> >   	val |= BIT(cpu_logical_map(cpu));
-> >   	writel(val, cpu_ctrl + CPU_RESET);
-> >   }
+> > diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts b/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
+> > new file mode 100644
+> > index 0000000..348c37e
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
+> > @@ -0,0 +1,66 @@
+> > +/*
+> > + * Copyright (C) 2015 Marvell Technology Group Ltd.
+> > + *
+> > + * Author: Jisheng Zhang <jszhang@marvell.com>
+> > + *
+> > + * This file is dual-licensed: you can use it either under the terms
+> > + * of the GPLv2 or the X11 license, at your option. Note that this dual
+> > + * licensing only applies to this file, and not this project as a
+> > + * whole.
+> > + *
+> > + *  a) This library is free software; you can redistribute it and/or
+> > + *     modify it under the terms of the GNU General Public License as
+> > + *     published by the Free Software Foundation; either version 2 of the
+> > + *     License, or (at your option) any later version.
+> > + *
+> > + *     This library is distributed in the hope that it will be useful,
+> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + *     GNU General Public License for more details.
+> > + *
+> > + * Or, alternatively,
+> > + *
+> > + *  b) Permission is hereby granted, free of charge, to any person
+> > + *     obtaining a copy of this software and associated documentation
+> > + *     files (the "Software"), to deal in the Software without
+> > + *     restriction, including without limitation the rights to use,
+> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> > + *     sell copies of the Software, and to permit persons to whom the
+> > + *     Software is furnished to do so, subject to the following
+> > + *     conditions:
+> > + *
+> > + *     The above copyright notice and this permission notice shall be
+> > + *     included in all copies or substantial portions of the Software.
+> > + *
+> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> > + *     OTHER DEALINGS IN THE SOFTWARE.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +
+> > +#include "berlin4ct.dtsi"
+> > +
+> > +/ {
+> > +	model = "Marvell BG4CT STB board";
+> > +	compatible = "marvell,berlin4ct-stb", "marvell,berlin4ct", "marvell,berlin";
+> > +
+> > +	chosen {
+> > +		stdout-path = "serial0:115200n8";
+> > +	};
+> > +
+> > +	memory {
+> > +		device_type = "memory";
+> > +		/* the first 16MB is for firmwares' usage */
+> > +		reg = <0 0x01000000 0 0x7f000000>;
+> > +	};
+> > +};
+> > +
+> > +&uart0 {
+> > +	status = "okay";
+> > +};
 > >
 > 
