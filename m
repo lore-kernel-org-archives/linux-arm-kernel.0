@@ -1,53 +1,59 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 21 Sep 2015 13:29:35 +0200
-Subject: [PATCH resend] extcon: Fix attached value returned by
- is_extcon_changed
-In-Reply-To: <55FF5F2F.9010504@samsung.com>
-References: <1442752494-22244-1-git-send-email-hdegoede@redhat.com>
- <1442752494-22244-2-git-send-email-hdegoede@redhat.com>
- <55FF5F2F.9010504@samsung.com>
-Message-ID: <55FFEA1F.7050500@redhat.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Mon, 21 Sep 2015 08:41:33 -0300
+Subject: [PATCH 4/4] ARM64: dts: exynos5433: add jpeg node
+In-Reply-To: <55FFD4FF.6090306@samsung.com>
+References: <1442586060-23657-1-git-send-email-andrzej.p@samsung.com>
+ <1442586060-23657-5-git-send-email-andrzej.p@samsung.com>
+ <55FFD2D2.1010508@xs4all.nl> <55FFD4FF.6090306@samsung.com>
+Message-ID: <20150921084133.175b1bda@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Em Mon, 21 Sep 2015 11:59:27 +0200
+Andrzej Pietrasiewicz <andrzej.p@samsung.com> escreveu:
 
-On 21-09-15 03:36, Chanwoo Choi wrote:
-> On 2015? 09? 20? 21:34, Hans de Goede wrote:
->> is_extcon_changed should only check the idx-th bit of new, not
->> the entirety of new when setting attached.
->>
->> This fixes extcon sending notifications that a cable was inserted when
->> it gets removed while another cable is still connected.
->>
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   drivers/extcon/extcon.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/extcon/extcon.c b/drivers/extcon/extcon.c
->> index a07addd..8dd0af1 100644
->> --- a/drivers/extcon/extcon.c
->> +++ b/drivers/extcon/extcon.c
->> @@ -159,7 +159,7 @@ static int find_cable_index_by_name(struct extcon_dev *edev, const char *name)
->>   static bool is_extcon_changed(u32 prev, u32 new, int idx, bool *attached)
->>   {
->>   	if (((prev >> idx) & 0x1) != ((new >> idx) & 0x1)) {
->> -		*attached = new ? true : false;
->> +		*attached = ((new >> idx) & 0x1) ? true : false;
->>   		return true;
->>   	}
->>
->>
->
-> This patch was already applied[1].
-> [1] https://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/log/?h=extcon-next
+> Hi Hans,
+> 
+> W dniu 21.09.2015 o 11:50, Hans Verkuil pisze:
+> > On 18-09-15 16:21, Andrzej Pietrasiewicz wrote:
+> >> From: Marek Szyprowski <m.szyprowski@samsung.com>
+> >>
+> >> Add Exynos 5433 jpeg h/w codec node.
+> >>
+> >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> >> ---
+> >>   arch/arm64/boot/dts/exynos/exynos5433.dtsi | 21 +++++++++++++++++++++
+> >>   1 file changed, 21 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+> >
+> > This dtsi file doesn't exist in the media-git tree. What is the story here?
+> >
+> > Should this go through a different subsystem?
+> >
+> > I think the media subsystem can take patches 1-3 and whoever does DT patches can
+> > take this patch, right?
+> >
+> 
+> The cover letter explains that the series is rebased onto Mauro's
+> master with Kukjin's branch merged. The latter does contain
+> the exynos5433.dtsi. That said, yes, taking patches 1-3 in
+> media subsystem and leaving DT patch to someone else is the
+> way to go.
 
-Yet it is not in 4.3-rc1, applying the patch to your tree is not useful
-unless you also send a pull-req to get the changes in your tree actually
-merged ...
+I'm ok with such strategy, provided that the new driver builds fine with
+COMPILE_TEST without the need of the dtsi patch.
+
+Please also notice that, if the driver uses MC, it has to wait for
+the MC next gen support to be merged, and may need to be rebased, due
+to a few changes at the MC internal APIs: one function got renamed
+(the function that create links between two pads) and we're now using
+lists for links (that will only affect the driver if it has its own
+graph traversal routines).
+
+Btw, I just got a Samsung TM1 device, with seems to be using an arm64
+SoC. Is this driver providing support for its camera?
 
 Regards,
-
-Hans
+Mauro.
