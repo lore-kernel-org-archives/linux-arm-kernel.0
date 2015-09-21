@@ -1,116 +1,109 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Sep 2015 07:10:18 -0700
-Subject: [PATCH 2/2] ARM: dts: Fix WLAN regression on omap5-uevm
-In-Reply-To: <CABxcv=nUuqHSJmP=z3X7F=ukeaFi+9cYTYW-wRwuv+mA8Jw2HQ@mail.gmail.com>
-References: <1442593745-16725-1-git-send-email-tony@atomide.com>
- <1442593745-16725-3-git-send-email-tony@atomide.com>
- <CABxcv=mGNmoVu3TDvd1888TiJ_vg0FJF6qz0p4XTu5T776sJ2Q@mail.gmail.com>
- <20150918174836.GG8020@atomide.com>
- <20150918202718.GH8020@atomide.com>
- <CABxcv=nUuqHSJmP=z3X7F=ukeaFi+9cYTYW-wRwuv+mA8Jw2HQ@mail.gmail.com>
-Message-ID: <20150921141018.GC23801@atomide.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 21 Sep 2015 16:20:17 +0200
+Subject: [PATCH] ARM: at91/dt: ov2640: add hsync/vsync-active property
+In-Reply-To: <55FF5B34.8040500@atmel.com>
+References: <1442575702-22315-1-git-send-email-josh.wu@atmel.com>
+ <55FC1B12.8000703@atmel.com> <55FF5B34.8040500@atmel.com>
+Message-ID: <56001221.6020604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier@dowhile0.org> [150921 02:17]:
-> [adding Ulf and Tomeu to cc list]
+Le 21/09/2015 03:19, Josh Wu a ?crit :
+> Hi, Nicolas
 > 
-> On Fri, Sep 18, 2015 at 10:27 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Tony Lindgren <tony@atomide.com> [150918 10:54]:
-> >> * Javier Martinez Canillas <javier@dowhile0.org> [150918 10:39]:
-> >> > Hello Tony,
-> >> >
-> >> > [snip]
-> >> >
-> >> > >
-> >> > > +       vmmcsdio_fixed: fixedregulator-mmcsdio {
-> >> > > +               compatible = "regulator-fixed";
-> >> > > +               regulator-name = "vmmcsdio_fixed";
-> >> > > +               regulator-min-microvolt = <1800000>;
-> >> > > +               regulator-max-microvolt = <1800000>;
-> >> > > +               gpio = <&gpio5 12 GPIO_ACTIVE_HIGH>;    /* gpio140 WLAN_EN */
-> >> >
-> >> > I know that other OMAP boards use a fake fixed regulator to toggle the
-> >> > WiFi enable pin but now the MMC subsystem has proper support for power
-> >> > sequence providers so that should be used instead. For simple uses
-> >> > like this, Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-> >> > should be enough.
-> >>
-> >> Hmm OK great, I'll take a look. Looks like that might also provide a
-> >> nice solution for handling the 32k clock from palmas to the wl12xx.
-> >
-> > It seems it's not quite working yet.. It seems pwrseq_simple.c can't
-> > deal with delay on a power pin. It might be best to treat those using
-> > the regulator framework because of the refcounting and start-up delay.
+> On 9/18/2015 10:09 PM, Nicolas Ferre wrote:
+>> Le 18/09/2015 13:28, Josh Wu a ?crit :
+>>> On at91sam9x5ek/at91sam9m10g45ek/sama5d3xek boards, we use the parallel
+>>> connection for ov2640. So we must set the hsync/vsync property (1 means
+>>> active high).
+>>> Otherwise, the connection would be seen as BT.656 or BT.1120.
+>>>
+>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> Hi Josh,
+>>
+>> Does this patch apply because of the new enhancement that you had
+>> proposed in "media: atmel-isi: parse the DT parameters for
+>> vsync/hsync/pixclock polarity" or does it apply even before?
+>> Is it a fix that applies to older kernels?
+> It's is a fix, according to the dt binding of video interface.
+> So it should be applied before:
 > 
-> Yes, pwrseq_simple does not support delaying a power pin. IIRC Tomeu
-> wanted to add a delay for power / reset pins at some point but then
-> the SDIO device he wanted to power up didn't need it so he dropped
-> that change at the end. I may be missremembering though.
->
-> > I don't think also having regulator handling in pwrseq_simple.c
-> > conflicts with the MMC regulators as they can be separate?
-> >
+> "media: atmel-isi: parse the DT parameters for
+> vsync/hsync/pixclock polarity".
 > 
-> The original "mmc: add support for power-on sequencing through DT" [0]
-> patch from Olof that added just properties to the MMC controller slot
-> dev node had a "card-external-vcc-supply" for SDIO devices that needed
-> an external supply separate to vqmmc and vmmc supplies. The
-> pwrseq_simple does not support having an input supply regulator right
-> now but one can be added if that is needed.
-
-Yes I think adding support for regulators to pwerseq_simple would
-solve the issues for power line for start-up latency and usecount for
-shared resources.
-
-> > Also not related to wl12xx, the power pin on mwifiex_sdio 8787 wlan
-> > must be asserted low while reset is asserted and must stay low for
-> > 300ms after power pin has deasserted. Again using a regulator there
-> > for the power pin might make more sense.
-> >
 > 
-> Interesting, I've a patch queued on my tree to convert pwrseq_simple
-> to use the GPIO descriptors array API since all the code do now is to
-> set GPIO levels high or low for all the pins at the same time. But for
-> such a fine grained timing control as you said, I wonder if we should
-> just keep the code as it is now. Even when is open coding what
-> gpiod_{get,set,put}_array already do, it may make sense if we add
-> assert and deassert delay time for each pin.
-
-Well the power pin typically has a latency because of a regulator
-somewhere.. And it needs to disabled for PM when not used.. And
-it may be shared.. So rather than reinvent the roundish thingy
-again, I suggest we just let a regulator handle that.
-
-A reset pin just needs to be toggled, but may have a dependency
-to the power pin like in the 8787 case.
-
-> Or maybe such a HW should have its own power sequence provider instead
-> of making pwrseq_simple more and more complex?
+> it has no impact in older kernel as the driver doesn't parse that 
+> property yet.
 > 
-> > Then getting the 32k clock from palmas is not working either, it
-> > seems some better deferred probe handling is needed there if
-> > omap_hsmmc is built-in and palmas-clk is a loadable module.
-> >
+>>
+>> So, should I wait for the enhancements to enter media git tree or can I
+>> take them anyway?
 > 
-> IIUC from another email, you already solved this.
+> yes, you can take it without waiting for the media tree. Thanks.
 
-That deferred probe fix did not solve this one, need to debug further.
+Fair enough.
 
-> > I think for the fix I'll stick with regulator fixed, let's update
-> > it later on unless you have better suggestions.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks for the information. Bye,
+
+> Best Regards,
+> Josh Wu
 > 
-> Yes, I didn't want to block your fixed regulator approach. I was just
-> pointing out that the MMC infrastructure already has support for power
-> sequence providers but if what is there doesn't fit your use case, I
-> agree that we can go with the regulator fixed for now and then change
-> it later.
+>>
+>> Bye,
+>>
+>>> ---
+>>>
+>>>   arch/arm/boot/dts/at91sam9m10g45ek.dts | 2 ++
+>>>   arch/arm/boot/dts/at91sam9x5ek.dtsi    | 2 ++
+>>>   arch/arm/boot/dts/sama5d3xmb.dtsi      | 2 ++
+>>>   3 files changed, 6 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+>>> index d1ae60a..9d16ef8 100644
+>>> --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
+>>> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+>>> @@ -198,6 +198,8 @@
+>>>   					isi_0: endpoint {
+>>>   						remote-endpoint = <&ov2640_0>;
+>>>   						bus-width = <8>;
+>>> +						vsync-active = <1>;
+>>> +						hsync-active = <1>;
+>>>   					};
+>>>   				};
+>>>   			};
+>>> diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+>>> index d237c46..479f200 100644
+>>> --- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+>>> @@ -66,6 +66,8 @@
+>>>   					isi_0: endpoint at 0 {
+>>>   						remote-endpoint = <&ov2640_0>;
+>>>   						bus-width = <8>;
+>>> +						vsync-active = <1>;
+>>> +						hsync-active = <1>;
+>>>   					};
+>>>   				};
+>>>   			};
+>>> diff --git a/arch/arm/boot/dts/sama5d3xmb.dtsi b/arch/arm/boot/dts/sama5d3xmb.dtsi
+>>> index 83bee7a..8901042 100644
+>>> --- a/arch/arm/boot/dts/sama5d3xmb.dtsi
+>>> +++ b/arch/arm/boot/dts/sama5d3xmb.dtsi
+>>> @@ -87,6 +87,8 @@
+>>>   					isi_0: endpoint {
+>>>   						remote-endpoint = <&ov2640_0>;
+>>>   						bus-width = <8>;
+>>> +						vsync-active = <1>;
+>>> +						hsync-active = <1>;
+>>>   					};
+>>>   				};
+>>>   			};
+>>>
+>>
+> 
+> 
 
-OK yeah let's fix the issues in the pwrseq so we can finally have
-resets working for 8787 too :)
 
-Regards,
-
-Tony
-
-> [0]: http://patchwork.ozlabs.org/patch/312444/
+-- 
+Nicolas Ferre
