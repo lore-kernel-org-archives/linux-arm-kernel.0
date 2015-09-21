@@ -1,26 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 21 Sep 2015 14:13:32 -0700
-Subject: [PATCH v3 11/12] regulator: pwm: implement ->enable(),
- ->disable() and ->is_enabled methods
-In-Reply-To: <1442828009-6241-12-git-send-email-boris.brezillon@free-electrons.com>
-References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1442828009-6241-12-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150921211332.GG30445@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 22 Sep 2015 00:20:27 +0100
+Subject: [PATCH 17/17] mfd : ab8500/db8500: fix the abuse of
+ IRQF_NO_SUSPEND
+In-Reply-To: <1442850433-5903-18-git-send-email-sudeep.holla@arm.com>
+References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
+ <1442850433-5903-18-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20150921232027.GD11284@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 21, 2015 at 11:33:28AM +0200, Boris Brezillon wrote:
+On Mon, 21 Sep 2015, Sudeep Holla wrote:
 
-> Implement the ->enable(), ->disable() and ->is_enabled methods and remove
-> the PWM call in ->set_voltage_sel().
+> The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
+> be left enabled so as to allow them to work as expected during the
+> suspend-resume cycle, but doesn't guarantee that it will wake the system
+> from a suspended state, enable_irq_wake is recommended to be used for
+> the wakeup.
+> 
+> This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
+> enable_irq_wake instead.
+> 
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/mfd/ab8500-core.c        | 11 +++++++++--
+>  drivers/mfd/ab8500-debugfs.c     |  2 +-
+>  drivers/mfd/ab8500-gpadc.c       | 15 +++++++++++----
+>  drivers/mfd/db8500-prcmu.c       | 24 +++++++++++++++++-------
+>  drivers/power/ab8500_btemp.c     |  6 ++++--
+>  drivers/power/ab8500_charger.c   |  6 ++++--
+>  drivers/power/ab8500_fg.c        |  9 ++++++---
+>  drivers/thermal/db8500_thermal.c |  5 ++---
+>  drivers/usb/phy/phy-ab8500-usb.c | 10 ++++++----
+>  9 files changed, 60 insertions(+), 28 deletions(-)
 
-I'll apply this so it definitely makes it into mainline, I'm happy to
-provide a tag for this so it can be merged into the PWM tree if the rest
-of the series is ready.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150921/ef277e6f/attachment.sig>
+Is there a reason for bundling the changes in all of these subsystems
+together into a single patch?
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
