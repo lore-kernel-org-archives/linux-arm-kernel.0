@@ -1,102 +1,164 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 21 Sep 2015 11:13:39 +0200
-Subject: [PATCH 2/2] ARM: dts: Fix WLAN regression on omap5-uevm
-In-Reply-To: <20150918202718.GH8020@atomide.com>
-References: <1442593745-16725-1-git-send-email-tony@atomide.com>
- <1442593745-16725-3-git-send-email-tony@atomide.com>
- <CABxcv=mGNmoVu3TDvd1888TiJ_vg0FJF6qz0p4XTu5T776sJ2Q@mail.gmail.com>
- <20150918174836.GG8020@atomide.com>
- <20150918202718.GH8020@atomide.com>
-Message-ID: <CABxcv=nUuqHSJmP=z3X7F=ukeaFi+9cYTYW-wRwuv+mA8Jw2HQ@mail.gmail.com>
+From: vdonnefort@gmail.com (Vincent Donnefort)
+Date: Mon, 21 Sep 2015 11:15:38 +0200
+Subject: [PATCH] crypto: marvell: properly handle
+ CRYPTO_TFM_REQ_MAY_BACKLOG-flagged requests
+In-Reply-To: <1442589936-18042-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1442589936-18042-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150921091537.GA7584@ns3274321.ip-5-39-88.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding Ulf and Tomeu to cc list]
+Hi Thomas,
 
-On Fri, Sep 18, 2015 at 10:27 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Tony Lindgren <tony@atomide.com> [150918 10:54]:
->> * Javier Martinez Canillas <javier@dowhile0.org> [150918 10:39]:
->> > Hello Tony,
->> >
->> > [snip]
->> >
->> > >
->> > > +       vmmcsdio_fixed: fixedregulator-mmcsdio {
->> > > +               compatible = "regulator-fixed";
->> > > +               regulator-name = "vmmcsdio_fixed";
->> > > +               regulator-min-microvolt = <1800000>;
->> > > +               regulator-max-microvolt = <1800000>;
->> > > +               gpio = <&gpio5 12 GPIO_ACTIVE_HIGH>;    /* gpio140 WLAN_EN */
->> >
->> > I know that other OMAP boards use a fake fixed regulator to toggle the
->> > WiFi enable pin but now the MMC subsystem has proper support for power
->> > sequence providers so that should be used instead. For simple uses
->> > like this, Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
->> > should be enough.
->>
->> Hmm OK great, I'll take a look. Looks like that might also provide a
->> nice solution for handling the 32k clock from palmas to the wl12xx.
->
-> It seems it's not quite working yet.. It seems pwrseq_simple.c can't
-> deal with delay on a power pin. It might be best to treat those using
-> the regulator framework because of the refcounting and start-up delay.
+Your patch fixes the problem on my side.
 
-Yes, pwrseq_simple does not support delaying a power pin. IIRC Tomeu
-wanted to add a delay for power / reset pins at some point but then
-the SDIO device he wanted to power up didn't need it so he dropped
-that change at the end. I may be missremembering though.
+Tested-by: Vincent Donnefort <vdonnefort@gmail.com>
 
-> I don't think also having regulator handling in pwrseq_simple.c
-> conflicts with the MMC regulators as they can be separate?
->
-
-The original "mmc: add support for power-on sequencing through DT" [0]
-patch from Olof that added just properties to the MMC controller slot
-dev node had a "card-external-vcc-supply" for SDIO devices that needed
-an external supply separate to vqmmc and vmmc supplies. The
-pwrseq_simple does not support having an input supply regulator right
-now but one can be added if that is needed.
-
-> Also not related to wl12xx, the power pin on mwifiex_sdio 8787 wlan
-> must be asserted low while reset is asserted and must stay low for
-> 300ms after power pin has deasserted. Again using a regulator there
-> for the power pin might make more sense.
->
-
-Interesting, I've a patch queued on my tree to convert pwrseq_simple
-to use the GPIO descriptors array API since all the code do now is to
-set GPIO levels high or low for all the pins at the same time. But for
-such a fine grained timing control as you said, I wonder if we should
-just keep the code as it is now. Even when is open coding what
-gpiod_{get,set,put}_array already do, it may make sense if we add
-assert and deassert delay time for each pin.
-
-Or maybe such a HW should have its own power sequence provider instead
-of making pwrseq_simple more and more complex?
-
-> Then getting the 32k clock from palmas is not working either, it
-> seems some better deferred probe handling is needed there if
-> omap_hsmmc is built-in and palmas-clk is a loadable module.
->
-
-IIUC from another email, you already solved this.
-
-> I think for the fix I'll stick with regulator fixed, let's update
-> it later on unless you have better suggestions.
->
-
-Yes, I didn't want to block your fixed regulator approach. I was just
-pointing out that the MMC infrastructure already has support for power
-sequence providers but if what is there doesn't fit your use case, I
-agree that we can go with the regulator fixed for now and then change
-it later.
-
->
-> Cheers,
->
-> Tony
-
-[0]: http://patchwork.ozlabs.org/patch/312444/
-
-Best regards,
-Javier
+On Fri, Sep 18, 2015 at 05:25:36PM +0200, Thomas Petazzoni wrote:
+> The mv_cesa_queue_req() function calls crypto_enqueue_request() to
+> enqueue a request. In the normal case (i.e the queue isn't full), this
+> function returns -EINPROGRESS. The current Marvell CESA crypto driver
+> takes this into account and cleans up the request only if an error
+> occured, i.e if the return value is not -EINPROGRESS.
+> 
+> Unfortunately this causes problems with
+> CRYPTO_TFM_REQ_MAY_BACKLOG-flagged requests. When such a request is
+> passed to crypto_enqueue_request() and the queue is full,
+> crypto_enqueue_request() will return -EBUSY, but will keep the request
+> enqueued nonetheless. This situation was not properly handled by the
+> Marvell CESA driver, which was anyway cleaning up the request in such
+> a situation. When later on the request was taken out of the backlog
+> and actually processed, a kernel crash occured due to the internal
+> driver data structures for this structure having been cleaned up.
+> 
+> To avoid this situation, this commit adds a
+> mv_cesa_req_needs_cleanup() helper function which indicates if the
+> request needs to be cleaned up or not after a call to
+> crypto_enqueue_request(). This helper allows to do the cleanup only in
+> the appropriate cases, and all call sites of mv_cesa_queue_req() are
+> fixed to use this new helper function.
+> 
+> Reported-by: Vincent Donnefort <vdonnefort@gmail.com>
+> Fixes: db509a45339fd ("crypto: marvell/cesa - add TDMA support")
+> Cc: <stable@vger.kernel.org> # v4.2+
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/crypto/marvell/cesa.h   | 27 +++++++++++++++++++++++++++
+>  drivers/crypto/marvell/cipher.c |  7 +++----
+>  drivers/crypto/marvell/hash.c   |  8 +++-----
+>  3 files changed, 33 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/crypto/marvell/cesa.h b/drivers/crypto/marvell/cesa.h
+> index b60698b..bc2a55b 100644
+> --- a/drivers/crypto/marvell/cesa.h
+> +++ b/drivers/crypto/marvell/cesa.h
+> @@ -687,6 +687,33 @@ static inline u32 mv_cesa_get_int_mask(struct mv_cesa_engine *engine)
+>  
+>  int mv_cesa_queue_req(struct crypto_async_request *req);
+>  
+> +/*
+> + * Helper function that indicates whether a crypto request needs to be
+> + * cleaned up or not after being enqueued using mv_cesa_queue_req().
+> + */
+> +static inline int mv_cesa_req_needs_cleanup(struct crypto_async_request *req,
+> +					    int ret)
+> +{
+> +	/*
+> +	 * The queue still had some space, the request was queued
+> +	 * normally, so there's no need to clean it up.
+> +	 */
+> +	if (ret == -EINPROGRESS)
+> +		return false;
+> +
+> +	/*
+> +	 * The queue had not space left, but since the request is
+> +	 * flagged with CRYPTO_TFM_REQ_MAY_BACKLOG, it was added to
+> +	 * the backlog and will be processed later. There's no need to
+> +	 * clean it up.
+> +	 */
+> +	if (ret == -EBUSY && req->flags & CRYPTO_TFM_REQ_MAY_BACKLOG)
+> +		return false;
+> +
+> +	/* Request wasn't queued, we need to clean it up */
+> +	return true;
+> +}
+> +
+>  /* TDMA functions */
+>  
+>  static inline void mv_cesa_req_dma_iter_init(struct mv_cesa_dma_iter *iter,
+> diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
+> index 0745cf3..3df2f4e 100644
+> --- a/drivers/crypto/marvell/cipher.c
+> +++ b/drivers/crypto/marvell/cipher.c
+> @@ -189,7 +189,6 @@ static inline void mv_cesa_ablkcipher_prepare(struct crypto_async_request *req,
+>  {
+>  	struct ablkcipher_request *ablkreq = ablkcipher_request_cast(req);
+>  	struct mv_cesa_ablkcipher_req *creq = ablkcipher_request_ctx(ablkreq);
+> -
+>  	creq->req.base.engine = engine;
+>  
+>  	if (creq->req.base.type == CESA_DMA_REQ)
+> @@ -431,7 +430,7 @@ static int mv_cesa_des_op(struct ablkcipher_request *req,
+>  		return ret;
+>  
+>  	ret = mv_cesa_queue_req(&req->base);
+> -	if (ret && ret != -EINPROGRESS)
+> +	if (mv_cesa_req_needs_cleanup(&req->base, ret))
+>  		mv_cesa_ablkcipher_cleanup(req);
+>  
+>  	return ret;
+> @@ -551,7 +550,7 @@ static int mv_cesa_des3_op(struct ablkcipher_request *req,
+>  		return ret;
+>  
+>  	ret = mv_cesa_queue_req(&req->base);
+> -	if (ret && ret != -EINPROGRESS)
+> +	if (mv_cesa_req_needs_cleanup(&req->base, ret))
+>  		mv_cesa_ablkcipher_cleanup(req);
+>  
+>  	return ret;
+> @@ -693,7 +692,7 @@ static int mv_cesa_aes_op(struct ablkcipher_request *req,
+>  		return ret;
+>  
+>  	ret = mv_cesa_queue_req(&req->base);
+> -	if (ret && ret != -EINPROGRESS)
+> +	if (mv_cesa_req_needs_cleanup(&req->base, ret))
+>  		mv_cesa_ablkcipher_cleanup(req);
+>  
+>  	return ret;
+> diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
+> index ae9272e..e8d0d71 100644
+> --- a/drivers/crypto/marvell/hash.c
+> +++ b/drivers/crypto/marvell/hash.c
+> @@ -739,10 +739,8 @@ static int mv_cesa_ahash_update(struct ahash_request *req)
+>  		return 0;
+>  
+>  	ret = mv_cesa_queue_req(&req->base);
+> -	if (ret && ret != -EINPROGRESS) {
+> +	if (mv_cesa_req_needs_cleanup(&req->base, ret))
+>  		mv_cesa_ahash_cleanup(req);
+> -		return ret;
+> -	}
+>  
+>  	return ret;
+>  }
+> @@ -766,7 +764,7 @@ static int mv_cesa_ahash_final(struct ahash_request *req)
+>  		return 0;
+>  
+>  	ret = mv_cesa_queue_req(&req->base);
+> -	if (ret && ret != -EINPROGRESS)
+> +	if (mv_cesa_req_needs_cleanup(&req->base, ret))
+>  		mv_cesa_ahash_cleanup(req);
+>  
+>  	return ret;
+> @@ -791,7 +789,7 @@ static int mv_cesa_ahash_finup(struct ahash_request *req)
+>  		return 0;
+>  
+>  	ret = mv_cesa_queue_req(&req->base);
+> -	if (ret && ret != -EINPROGRESS)
+> +	if (mv_cesa_req_needs_cleanup(&req->base, ret))
+>  		mv_cesa_ahash_cleanup(req);
+>  
+>  	return ret;
+> -- 
+> 2.5.2
+> 
