@@ -1,79 +1,75 @@
 From: rric@kernel.org (Robert Richter)
-Date: Mon, 21 Sep 2015 22:58:33 +0200
-Subject: [PATCH v5 0/6] irqchip,
- gicv3: Updates and Cavium ThunderX errata workarounds
-Message-ID: <1442869119-1814-1-git-send-email-rric@kernel.org>
+Date: Mon, 21 Sep 2015 22:58:34 +0200
+Subject: [PATCH v5 1/6] irqchip,
+ gicv3-its: Add range check for number of allocated pages
+In-Reply-To: <1442869119-1814-1-git-send-email-rric@kernel.org>
+References: <1442869119-1814-1-git-send-email-rric@kernel.org>
+Message-ID: <1442869119-1814-2-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Robert Richter <rrichter@cavium.com>
 
-This patch series adds gicv3 updates and workarounds for HW errata in
-Cavium's ThunderX GICV3.
+The number of pages for the its table may exceed the maximum of 256.
+Adding a range check and limitting the number to its maximum.
 
-The patches has been rebased onto 4.3-rc1. Note that there are two
-important fixes. See below for all changes.
+Based on a patch from Tirumalesh Chalamarla <tchalamarla@cavium.com>.
 
-The first one is an unchanged resubmission of a patch from a gicv3
-series I sent a while ago.
+Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c   | 11 ++++++++++-
+ include/linux/irqchip/arm-gic-v3.h |  1 +
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-The next patches implement the workarounds for ThunderX's gicv3. Patch
-#2 implements the cpu workaround for gicv3 on ThunderX. Patch #3 is a
-prerequisit for patch #5. Patch #4 adds generic code to parse the hw
-revision provided by an IIDR. This patch is used for the implementa-
-tion of the actual gicv3-its workaround in #5. Patch #6 updates to the
-new jump label API.
-
-All current review comments addressed so far with v5
-
-v5:
- * fixed calling gic_read_iar_cavium_thunderx() if jump label is
-   enabled
- * fix table size wrongly allocating only 4MB
- * made is_cavium_thunderx static
- * removed ARCH_THUNDER dependency for Cavium errata options to
-   make it available for generic kernels
- * renamed caps names to quirk
- * introduced CAVIUM_ERRATUM_22375 config option
- * introduced ITS_FLAGS_WORKAROUND_CAVIUM_22375
- * added config descriptions
- * update to new jump label API
-
-v4:
- * simplify code to only use cpus_have_cap() in gicv3_enable_quirks()
- * only enable hw detection for its in its_enable_quirks()
- * removed gicv3_check_capabilities()
- * drop special cpu capability for zero
-
-v3:
- * use arm64 errata framework for midr check
- * fix mixup of errata to be dependend from midr/iidr
-
-v2:
- * Workaround for 23154:
-   * implement code in a single asm() to keep instruction sequence
-   * added comment to the code that explains the erratum
-   * apply workaround also if running as guest, thus check MIDR
- * adding MIDR check
-
-Robert Richter (6):
-  irqchip, gicv3-its: Add range check for number of allocated pages
-  irqchip, gicv3: Workaround for Cavium ThunderX erratum 23154
-  irqchip, gicv3-its: Read typer register outside the loop
-  irqchip, gicv3-its: Add HW revision detection and configuration
-  irqchip, gicv3-its: Workaround for Cavium ThunderX errata 22375, 24313
-  irqchip, gicv3-its: Use new jump label API
-
- arch/arm64/Kconfig                  | 27 +++++++++++++++
- arch/arm64/include/asm/cpufeature.h |  3 +-
- arch/arm64/include/asm/cputype.h    | 17 ++++++----
- arch/arm64/kernel/cpu_errata.c      |  9 +++++
- drivers/irqchip/irq-gic-common.c    | 11 +++++++
- drivers/irqchip/irq-gic-common.h    |  9 +++++
- drivers/irqchip/irq-gic-v3-its.c    | 65 +++++++++++++++++++++++++++++++++----
- drivers/irqchip/irq-gic-v3.c        | 42 +++++++++++++++++++++++-
- include/linux/irqchip/arm-gic-v3.h  |  1 +
- 9 files changed, 169 insertions(+), 15 deletions(-)
-
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 26b55c53755f..0636cb33aeea 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -822,6 +822,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
+ 		int order = get_order(psz);
+ 		int alloc_size;
++		int alloc_pages;
+ 		u64 tmp;
+ 		void *base;
+ 
+@@ -856,6 +857,14 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 		}
+ 
+ 		alloc_size = (1 << order) * PAGE_SIZE;
++		alloc_pages = (alloc_size / psz);
++		if (alloc_pages > GITS_BASER_PAGES_MAX) {
++			alloc_pages = GITS_BASER_PAGES_MAX;
++			order = get_order(GITS_BASER_PAGES_MAX * psz);
++			pr_warn("%s: Device Table too large, reduce its page order to %u (%u pages)\n",
++				node_name, order, alloc_pages);
++		}
++
+ 		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+ 		if (!base) {
+ 			err = -ENOMEM;
+@@ -884,7 +893,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 			break;
+ 		}
+ 
+-		val |= (alloc_size / psz) - 1;
++		val |= alloc_pages - 1;
+ 
+ 		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
+ 		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 9eeeb9589acf..c0c8a2ef9d90 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -231,6 +231,7 @@
+ #define GITS_BASER_PAGE_SIZE_16K	(1UL << GITS_BASER_PAGE_SIZE_SHIFT)
+ #define GITS_BASER_PAGE_SIZE_64K	(2UL << GITS_BASER_PAGE_SIZE_SHIFT)
+ #define GITS_BASER_PAGE_SIZE_MASK	(3UL << GITS_BASER_PAGE_SIZE_SHIFT)
++#define GITS_BASER_PAGES_MAX		256
+ 
+ #define GITS_BASER_TYPE_NONE		0
+ #define GITS_BASER_TYPE_DEVICE		1
 -- 
 2.1.1
