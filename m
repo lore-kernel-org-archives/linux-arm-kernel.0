@@ -1,38 +1,96 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 21 Sep 2015 20:45:03 +0530
-Subject: [PATCH v2] ARM: pxa: ssp: Fix build error by removing originally
- incorrect DT binding
-In-Reply-To: <87fv28qh49.fsf@belgarion.home>
-References: <1441610581-11434-1-git-send-email-jarkko.nikula@linux.intel.com>
- <87zj0rsqhe.fsf@belgarion.home> <55FFB643.1080208@linux.intel.com>
- <87fv28qh49.fsf@belgarion.home>
-Message-ID: <20150921151503.GK2381@localhost>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Mon, 21 Sep 2015 16:37:57 +0100
+Subject: [PATCH 1/2] arm64: fpsimd: Fix FPSIMD corruption in rt_sigreturn
+ with CONFIG_PREEMPT
+In-Reply-To: <20150915143952.GE31157@arm.com>
+References: <1442316997-32282-1-git-send-email-will.deacon@arm.com>
+ <CAKv+Gu8Yt0T6AF7MmOtpPpk8VcDBVraSNMbgm03dW5BR1QMqsA@mail.gmail.com>
+ <20150915143952.GE31157@arm.com>
+Message-ID: <20150921153756.GM27273@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 21, 2015 at 11:03:18AM +0200, Robert Jarzmik wrote:
-> Jarkko Nikula <jarkko.nikula@linux.intel.com> writes:
+On Tue, Sep 15, 2015 at 03:39:53PM +0100, Will Deacon wrote:
+> On Tue, Sep 15, 2015 at 01:11:10PM +0100, Ard Biesheuvel wrote:
+> > Hi Will,
 > 
-> > Hi
-> >
-> > On 09/12/2015 04:43 PM, Robert Jarzmik wrote:
-> >> Jarkko Nikula <jarkko.nikula@linux.intel.com> writes:
-> >>
-> >>> Commit 03fbf488cece ("spi: pxa2xx: Differentiate Intel LPSS types") caused
-> >>> build error here because it removed the type LPSS_SSP and I didn't notice
-> >>> the type was used here too.
-> >> Queued into pxa/fixes, thanks.
-> >>
-> > Gentle reminder, is this going to 4.3-rc3?
-> It is going into v4.3.
+> Hi Ard,
 > 
-> Now knowing if it is v4.3-rc3 is another story, as currently the pxa platform is
-> broken because of a dmaengine regression. And if the necessary fix is not
-> applied through dmaengine tree (by lack of time from Vinod), I'll want to carry
-> it through my tree, which is the reason why I have not made the pull request
-> yet.
+> Thanks for having a look.
+> 
+> > On 15 September 2015 at 13:36, Will Deacon <will.deacon@arm.com> wrote:
+> > > From: Dave P Martin <Dave.Martin@arm.com>
+> > >
+> > > The arm64 context switch implementation uses a flag
+> > > TIF_FOREIGN_FPSTATE to track whether the hardware FPSIMD regs are
+> > > out of sync with the logical state of current's registers.
+> > >
+> > > During sigreturn, the registers and task_struct are temporarily out
+> > > of sync, between writing the task_struct and loading its contents
+> > > back into the FPSIMD registers -- however, TIF_FOREIGN_FPSTATE is
+> > > not set.  This can cause the context switch code to discard some or
+> > > all of the restored FPSIMD state if preemption occurs during the
+> > > critical region of rt_sigreturn.
+> > >
+> > > This patch sets TIF_FOREIGN_FPSTATE before transferring the
+> > > sigframe's saved registers back to the task_struct, so that the
+> > > task_struct data will take precedence over the hardware registers
+> > > if a context switch occurs before everything is back in sync.
+> > >
+> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > > [will: removed preempt_{enable,disable} calls, added compat version]
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > >  arch/arm64/kernel/signal.c   | 3 +++
+> > >  arch/arm64/kernel/signal32.c | 2 ++
+> > >  2 files changed, 5 insertions(+)
+> > >
+> > > diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> > > index e18c48cb6db1..6d50d839b6e9 100644
+> > > --- a/arch/arm64/kernel/signal.c
+> > > +++ b/arch/arm64/kernel/signal.c
+> > > @@ -79,6 +79,9 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
+> > >         if (magic != FPSIMD_MAGIC || size != sizeof(struct fpsimd_context))
+> > >                 return -EINVAL;
+> > >
+> > > +       /* Ensure we don't reload stale data from the hardware registers */
+> > > +       set_ti_thread_flag(current_thread_info(), TIF_FOREIGN_FPSTATE);
+> > > +
+> > >         /* copy the FP and status/control registers */
+> > >         err = __copy_from_user(fpsimd.vregs, ctx->vregs,
+> > >                                sizeof(fpsimd.vregs));
+> > 
+> > I am not following something here. If the task gets preempted before
+> > the call to fpsimd_update_current_state(), it will proceed to
+> > overwrite the registers with whatever is on the stack in fpsimd after
+> > being scheduled back in, and everything should work fine, right?.
+> 
+> You're completely right, sorry for wasting your time. Dave and I have
+> been working on the fpsimd code recently and have another patch that
+> restores the state directly into the current thread to avoid the stack
+> entirely. *That* is what caused this problem, and I incorrectly
+> identified this as a fix for mainline (it's extremely similar to
+> 2af276dfb172 ("ARM: 7306/1: vfp: flush thread hwstate before restoring
+> context from sigframe"), which continues to haunt me).
 
-Which ones are required for fixing, I will priortize those...
+Urg, looks like I confused myself here.  Ard's assessment looks correct.
 
--- 
-~Vinod
+Not staging the data via the stack seemed a harmless change which I
+thought was an improvement, since at half a K the amount of data is non-
+trivial.
+
+I'll go back and make some measurements to see whether getting rid
+of the extra copy is really worth it.  I think reading straight into
+the task_struct with __get_user() can work, but it looks like I'll
+need to fiddle with the preemption region, or otherwise handle the
+ensuing race...
+
+> Anyway, that also explains why we hadn't seen any problems in our
+> previous testing! The second patch (compat big-endian fix) still stands,
+> however.
+
+I misidentified the problem as being independent of my hacks --
+apologies for the confusion there.
+
+Cheers
+---Dave
