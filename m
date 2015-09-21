@@ -1,38 +1,102 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 21 Sep 2015 11:06:32 +0200
-Subject: [PATCH] dmaengine: pxa_dma: fix initial list move
-Message-ID: <1442826392-9082-1-git-send-email-robert.jarzmik@free.fr>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 21 Sep 2015 11:13:39 +0200
+Subject: [PATCH 2/2] ARM: dts: Fix WLAN regression on omap5-uevm
+In-Reply-To: <20150918202718.GH8020@atomide.com>
+References: <1442593745-16725-1-git-send-email-tony@atomide.com>
+ <1442593745-16725-3-git-send-email-tony@atomide.com>
+ <CABxcv=mGNmoVu3TDvd1888TiJ_vg0FJF6qz0p4XTu5T776sJ2Q@mail.gmail.com>
+ <20150918174836.GG8020@atomide.com>
+ <20150918202718.GH8020@atomide.com>
+Message-ID: <CABxcv=nUuqHSJmP=z3X7F=ukeaFi+9cYTYW-wRwuv+mA8Jw2HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the commit to have an allocated list of virtual descriptors was
-reverted, the pxa_dma driver is broken, as it assumes the descriptor is
-placed on the allocated list upon allocation.
+[adding Ulf and Tomeu to cc list]
 
-Fix the issue in pxa_dma by making an allocated virtual descriptor a
-singleton.
+On Fri, Sep 18, 2015 at 10:27 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Tony Lindgren <tony@atomide.com> [150918 10:54]:
+>> * Javier Martinez Canillas <javier@dowhile0.org> [150918 10:39]:
+>> > Hello Tony,
+>> >
+>> > [snip]
+>> >
+>> > >
+>> > > +       vmmcsdio_fixed: fixedregulator-mmcsdio {
+>> > > +               compatible = "regulator-fixed";
+>> > > +               regulator-name = "vmmcsdio_fixed";
+>> > > +               regulator-min-microvolt = <1800000>;
+>> > > +               regulator-max-microvolt = <1800000>;
+>> > > +               gpio = <&gpio5 12 GPIO_ACTIVE_HIGH>;    /* gpio140 WLAN_EN */
+>> >
+>> > I know that other OMAP boards use a fake fixed regulator to toggle the
+>> > WiFi enable pin but now the MMC subsystem has proper support for power
+>> > sequence providers so that should be used instead. For simple uses
+>> > like this, Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+>> > should be enough.
+>>
+>> Hmm OK great, I'll take a look. Looks like that might also provide a
+>> nice solution for handling the 32k clock from palmas to the wl12xx.
+>
+> It seems it's not quite working yet.. It seems pwrseq_simple.c can't
+> deal with delay on a power pin. It might be best to treat those using
+> the regulator framework because of the refcounting and start-up delay.
 
-Fixes: 8c8fe97b2b8a ("Revert "dmaengine: virt-dma: don't always free descriptor upon completion"")
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-Vinod, this is my fallback plan as I'm getting no answer on
-https://lkml.org/lkml/2015/9/6/112. If I get no answer before v4.3-rc3,
-I'll put that into the pxa tree.
----
- drivers/dma/pxa_dma.c | 1 +
- 1 file changed, 1 insertion(+)
+Yes, pwrseq_simple does not support delaying a power pin. IIRC Tomeu
+wanted to add a delay for power / reset pins at some point but then
+the SDIO device he wanted to power up didn't need it so he dropped
+that change at the end. I may be missremembering though.
 
-diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
-index 9d3458e2a366..53c05ca514f1 100644
---- a/drivers/dma/pxa_dma.c
-+++ b/drivers/dma/pxa_dma.c
-@@ -891,6 +891,7 @@ pxad_tx_prep(struct virt_dma_chan *vc, struct virt_dma_desc *vd,
- 	struct dma_async_tx_descriptor *tx;
- 	struct pxad_chan *chan = container_of(vc, struct pxad_chan, vc);
- 
-+	INIT_LIST_HEAD(&vd->node);
- 	tx = vchan_tx_prep(vc, vd, tx_flags);
- 	tx->tx_submit = pxad_tx_submit;
- 	dev_dbg(&chan->vc.chan.dev->device,
--- 
-2.1.4
+> I don't think also having regulator handling in pwrseq_simple.c
+> conflicts with the MMC regulators as they can be separate?
+>
+
+The original "mmc: add support for power-on sequencing through DT" [0]
+patch from Olof that added just properties to the MMC controller slot
+dev node had a "card-external-vcc-supply" for SDIO devices that needed
+an external supply separate to vqmmc and vmmc supplies. The
+pwrseq_simple does not support having an input supply regulator right
+now but one can be added if that is needed.
+
+> Also not related to wl12xx, the power pin on mwifiex_sdio 8787 wlan
+> must be asserted low while reset is asserted and must stay low for
+> 300ms after power pin has deasserted. Again using a regulator there
+> for the power pin might make more sense.
+>
+
+Interesting, I've a patch queued on my tree to convert pwrseq_simple
+to use the GPIO descriptors array API since all the code do now is to
+set GPIO levels high or low for all the pins at the same time. But for
+such a fine grained timing control as you said, I wonder if we should
+just keep the code as it is now. Even when is open coding what
+gpiod_{get,set,put}_array already do, it may make sense if we add
+assert and deassert delay time for each pin.
+
+Or maybe such a HW should have its own power sequence provider instead
+of making pwrseq_simple more and more complex?
+
+> Then getting the 32k clock from palmas is not working either, it
+> seems some better deferred probe handling is needed there if
+> omap_hsmmc is built-in and palmas-clk is a loadable module.
+>
+
+IIUC from another email, you already solved this.
+
+> I think for the fix I'll stick with regulator fixed, let's update
+> it later on unless you have better suggestions.
+>
+
+Yes, I didn't want to block your fixed regulator approach. I was just
+pointing out that the MMC infrastructure already has support for power
+sequence providers but if what is there doesn't fit your use case, I
+agree that we can go with the regulator fixed for now and then change
+it later.
+
+>
+> Cheers,
+>
+> Tony
+
+[0]: http://patchwork.ozlabs.org/patch/312444/
+
+Best regards,
+Javier
