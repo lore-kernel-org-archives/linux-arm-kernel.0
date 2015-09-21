@@ -1,137 +1,162 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 21 Sep 2015 18:07:56 +0100
-Subject: [PATCH 2/2] irqchip/gicv3-its:  Handle OF device tree "msi-map"
- properties.
-In-Reply-To: <560031E7.1060307@caviumnetworks.com>
-References: <1442512859-31633-1-git-send-email-ddaney.cavm@gmail.com>
- <1442512859-31633-3-git-send-email-ddaney.cavm@gmail.com>
- <20150918095109.144c22ed@arm.com>
- <55FC4FBA.1010306@caviumnetworks.com>
- <20150921165814.01967eaf@arm.com>
- <560031E7.1060307@caviumnetworks.com>
-Message-ID: <20150921180756.13f505f3@arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 21 Sep 2015 10:08:51 -0700
+Subject: [PATCH 2/5] thermal: rockchip: Support the RK3368 SoCs in
+ thermal driver
+In-Reply-To: <1442808971-2619-3-git-send-email-wxt@rock-chips.com>
+References: <1442808971-2619-1-git-send-email-wxt@rock-chips.com>
+ <1442808971-2619-3-git-send-email-wxt@rock-chips.com>
+Message-ID: <20150921170851.GH17389@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Sep 2015 09:35:51 -0700
-David Daney <ddaney@caviumnetworks.com> wrote:
+Hi Caesar,
 
-> On 09/21/2015 08:58 AM, Marc Zyngier wrote:
-> > On Fri, 18 Sep 2015 10:54:02 -0700
-> > David Daney <ddaney@caviumnetworks.com> wrote:
-> >
-> >> On 09/18/2015 01:51 AM, Marc Zyngier wrote:
-> >>> On Thu, 17 Sep 2015 11:00:59 -0700
-> >>> David Daney <ddaney.cavm@gmail.com> wrote:
-> >>>
-> >>> Hi David,
-> >>>
-> >>>> From: David Daney <david.daney@cavium.com>
-> >>>>
-> >>>> Search up the device hierarchy to find devices with a "msi-map"
-> >>>> property, if found apply the mapping to the GIC device id.
-> >>>>
-> >>>> Signed-off-by: David Daney <david.daney@cavium.com>
-> >>>> ---
-> >>>>    drivers/irqchip/irq-gic-v3-its-pci-msi.c | 73 ++++++++++++++++++++++++++++++++
-> >>>>    1 file changed, 73 insertions(+)
-> >>>>
-> >>>> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> >>>> index cf351c6..aa61cef 100644
-> >>>> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> >>>> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> >>>> @@ -73,6 +73,8 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
-> >>>>    	struct pci_dev *pdev;
-> >>>>    	struct its_pci_alias dev_alias;
-> >>>>    	struct msi_domain_info *msi_info;
-> >>>> +	struct device *parent_dev;
-> >>>> +	struct device_node *msi_controller_node = NULL;
-> >>>>
-> >>>>    	if (!dev_is_pci(dev))
-> >>>>    		return -EINVAL;
-> >>>> @@ -84,6 +86,77 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
-> >>>>    	dev_alias.count = nvec;
-> >>>>
-> >>>>    	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
-> >>>> +	/*
-> >>>> +	 * Walk up the device parent links looking for one with a
-> >>>> +	 * "msi-map" property.
-> >>>> +	 */
-> >>>
-> >>> My first objection is the location of this parsing. It shouldn't be
-> >>> driver specific, but instead be part of the generic OF handling
-> >>> (nothing in these properties is GICv3 specific, even if the ITS is the
-> >>> only user so far).
-> >>
-> >> OK, I agree that this should eventually end up in generic OF handling
-> >> code.  I just wanted to get something out to initiate discussion.
-> >>
-> >> The next patch revision will move this to a more generic home.
-> >>
-> >>>
-> >>>> +	for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent) {
-> >>>
-> >>> Is there a limit how far we should go up the parent chain to find a
-> >>> msi-map? My hunch is that you should stop at the first device that does
-> >>> have an of_node, as it is the one that should contain the msi-map
-> >>> property.
-> >>
-> >> I think there is the possibility of finding something like a bridge that
-> >> has an of_node, but does not have the "msi-map" property.  I currently
-> >> have exactly this configuration, as some of the on-SoC devices sit
-> >> behind a bridge, but need an of_node to obtain unprobable properties and
-> >> children (the MDIO bus devices are like this).
-> >>
-> >> So if we want to abort the walk early, we should at least go up until we
-> >> find "msi-map" in the of_node.
-> >
-> > I don't really see a case where we would traverse a series of nodes
-> > where the msi-map property wouldn't be in the first node. Could you
-> > please give me an example?
-> >
+On Mon, Sep 21, 2015 at 12:16:08PM +0800, Caesar Wang wrote:
+> The RK3368 SoCs support to 2 channel TS-ADC, the temperature criteria
+> of each channel can be configurable.
 > 
-> OK, how about this:
-
-[...]
-
-> The "msi-map" is specified in the PICe host controller node, but there
-> is a bridge between the device generating interrupts "bgx0" and the
-> host controller.
-
-OK, I can now see why you're doing that, thanks.
-
-
-> >> The PCI host may have many MSI controllers, but I think a given PCI
-> >> device will have only one (based on bus:devfn) that is looked up in the map.
-> >
-> > A PCI device will only be configured to talk to a single MSI
-> > controller, but here you stop parsing the msi-map on the first match,
-> > and assume that you must have found the right MSI controller:
-> >
-> > I think this should read:
-> >
-> > +			if (masked_devid < rid_base ||
-> > +			    masked_devid >= rid_base + rid_len ||
-> > 			    domain->of_node != of_find_node_by_phandle(phandle)) {
-> > +				msi_map_len -= 4 * sizeof(__be32);
-> > +				msi_map += 4;
-> > +				continue;
-> > +			}
-> > +			matched = true;
-> > +			break;
-> >
+> The system has two Temperature Sensors, channel 0 is for CPU,
+> and channel 1 is for GPU.
 > 
-> Good, I will incorporate that too.
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> ---
 > 
-> In practice, I don't know if we would ever find a system with multiple 
-> "msi-map" on a path from the device to the root, but we should probably 
-> attempt to handle it "just in case".
+>  drivers/thermal/rockchip_thermal.c | 201 ++++++++++++++++++++++++++++++++-----
+>  1 file changed, 176 insertions(+), 25 deletions(-)
+> 
+> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+> index 4d5b7d4..16d2476 100644
+> --- a/drivers/thermal/rockchip_thermal.c
+> +++ b/drivers/thermal/rockchip_thermal.c
+> @@ -1,6 +1,9 @@
+>  /*
+>   * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
+>   *
+> + * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
+> + * Caesar Wang <wxt@rock-chips.com>
+> + *
+>   * This program is free software; you can redistribute it and/or modify it
+>   * under the terms and conditions of the GNU General Public License,
+>   * version 2, as published by the Free Software Foundation.
+> @@ -43,16 +46,11 @@ enum tshut_polarity {
+>  	TSHUT_HIGH_ACTIVE,
+>  };
+>  
+> -/**
+> - * The system has three Temperature Sensors.  channel 0 is reserved,
+> - * channel 1 is for CPU, and channel 2 is for GPU.
+> - */
+> -enum sensor_id {
+> -	SENSOR_CPU = 1,
+> -	SENSOR_GPU,
+> -};
+> -
+>  struct rockchip_tsadc_chip {
+> +	/* The sensor id of chip correspond to the ADC channel */
+> +	int cpu_id;
+> +	int gpu_id;
+> +
+>  	/* The hardware-controlled tshut property */
+>  	long tshut_temp;
+>  	enum tshut_mode tshut_mode;
+> @@ -72,10 +70,11 @@ struct rockchip_tsadc_chip {
+>  struct rockchip_thermal_sensor {
+>  	struct rockchip_thermal_data *thermal;
+>  	struct thermal_zone_device *tzd;
+> -	enum sensor_id id;
+> +	int id;
+>  };
+>  
+> -#define NUM_SENSORS	2 /* Ignore unused sensor 0 */
+> +/* Two sensors: CPU and GPU */
+> +#define NUM_SENSORS	2
+>  
+>  struct rockchip_thermal_data {
+>  	const struct rockchip_tsadc_chip *chip;
+> @@ -94,7 +93,7 @@ struct rockchip_thermal_data {
+>  	enum tshut_polarity tshut_polarity;
+>  };
+>  
+> -/* TSADC V2 Sensor info define: */
+> +/* TSADC Sensor info define: */
+>  #define TSADCV2_AUTO_CON			0x04
+>  #define TSADCV2_INT_EN				0x08
+>  #define TSADCV2_INT_PD				0x0c
+> @@ -116,6 +115,8 @@ struct rockchip_thermal_data {
+>  #define TSADCV2_INT_PD_CLEAR_MASK		~BIT(8)
+>  
+>  #define TSADCV2_DATA_MASK			0xfff
+> +#define TSADCV3_DATA_MASK			0x3ff
+> +
+>  #define TSADCV2_HIGHT_INT_DEBOUNCE_COUNT	4
+>  #define TSADCV2_HIGHT_TSHUT_DEBOUNCE_COUNT	4
+>  #define TSADCV2_AUTO_PERIOD_TIME		250 /* msec */
+> @@ -164,6 +165,45 @@ static const struct tsadc_table v2_code_table[] = {
+>  	{3421, 125000},
+>  };
+>  
+> +static const struct tsadc_table v3_code_table[] = {
+> +	{0, -40000},
+> +	{106, -40000},
+> +	{108, -35000},
+> +	{110, -30000},
+> +	{112, -25000},
+> +	{114, -20000},
+> +	{116, -15000},
+> +	{118, -10000},
+> +	{120, -5000},
+> +	{122, 0},
+> +	{124, 5000},
+> +	{126, 10000},
+> +	{128, 15000},
+> +	{130, 20000},
+> +	{132, 25000},
+> +	{134, 30000},
+> +	{136, 35000},
+> +	{138, 40000},
+> +	{140, 45000},
+> +	{142, 50000},
+> +	{144, 55000},
+> +	{146, 60000},
+> +	{148, 65000},
+> +	{150, 70000},
+> +	{152, 75000},
+> +	{154, 80000},
+> +	{156, 85000},
+> +	{158, 90000},
+> +	{160, 95000},
+> +	{162, 100000},
+> +	{163, 105000},
+> +	{165, 110000},
+> +	{167, 115000},
+> +	{169, 120000},
+> +	{171, 125000},
+> +	{TSADCV3_DATA_MASK, 125000},
+> +};
+> +
+>  static u32 rk_tsadcv2_temp_to_code(long temp)
+>  {
+>  	int high, low, mid;
+> @@ -227,16 +267,83 @@ static int rk_tsadcv2_code_to_temp(u32 code, int *temp)
+>  	return 0;
+>  }
+>  
+> +static u32 rk_tsadcv3_temp_to_code(long temp)
+> +{
+> +	int high, low, mid;
+> +
+> +	low = 0;
+> +	high = ARRAY_SIZE(v3_code_table) - 1;
+> +	mid = (high + low) / 2;
+> +
+> +	if (temp < v3_code_table[low].temp || temp > v3_code_table[high].temp)
+> +		return 0;
 
-There are systems in the wild with exactly that kind of topology, and
-I'd like to support them out of the box.
+How is this different from v2 conversion except for the table being
+used? I think you should be able to reuse the conversion routines if you
+pass the conversion table in as a parameter.
 
-Thanks,
+Thanks.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+Dmitry
