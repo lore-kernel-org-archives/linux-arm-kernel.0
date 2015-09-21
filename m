@@ -1,56 +1,82 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 21 Sep 2015 16:47:06 +0100
-Subject: [PATCH 10/17] tty/serial: st-asc: drop the use of IRQF_NO_SUSPEND
+Date: Mon, 21 Sep 2015 16:47:08 +0100
+Subject: [PATCH 12/17] ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
 In-Reply-To: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
 References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1442850433-5903-11-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1442850433-5903-13-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These drivers doesn't claim the serial device to be wakeup source. Even
-if it is, it needs to use enable_irq_wake or other related PM wakeup
-APIs to enable it.
+The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
+be left enabled so as to allow them to work as expected during the
+suspend-resume cycle, but doesn't guarantee that it will wake the system
+from a suspended state, enable_irq_wake is recommended to be used for
+the wakeup.
 
-This patch removes yet another misuse of IRQF_NO_SUSPEND.
+This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
+enable_irq_wake instead.
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-Cc: Maxime Coquelin <maxime.coquelin@st.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: linux-omap at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: kernel at stlinux.com
-Cc: linux-serial at vger.kernel.org
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/tty/serial/st-asc.c      | 2 +-
- drivers/tty/serial/stm32-usart.c | 3 +--
- 2 files changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/mux.c    | 4 ++--
+ arch/arm/mach-omap2/pm34xx.c | 9 ++++-----
+ 2 files changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-index d625664ce1b5..2d78cb3627ae 100644
---- a/drivers/tty/serial/st-asc.c
-+++ b/drivers/tty/serial/st-asc.c
-@@ -430,7 +430,7 @@ static void asc_break_ctl(struct uart_port *port, int break_state)
-  */
- static int asc_startup(struct uart_port *port)
- {
--	if (request_irq(port->irq, asc_interrupt, IRQF_NO_SUSPEND,
-+	if (request_irq(port->irq, asc_interrupt, 0,
- 			asc_port_name(port), port)) {
- 		dev_err(port->dev, "cannot allocate irq.\n");
- 		return -ENODEV;
-diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
-index e3de9c6d2226..f89d1f79be18 100644
---- a/drivers/tty/serial/stm32-usart.c
-+++ b/drivers/tty/serial/stm32-usart.c
-@@ -322,8 +322,7 @@ static int stm32_startup(struct uart_port *port)
- 	u32 val;
- 	int ret;
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 176eef6ef338..12012bef8e63 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -810,13 +810,13 @@ int __init omap_mux_late_init(void)
+ 		return 0;
  
--	ret = request_irq(port->irq, stm32_interrupt, IRQF_NO_SUSPEND,
--			  name, port);
-+	ret = request_irq(port->irq, stm32_interrupt, 0, name, port);
+ 	ret = request_irq(omap_prcm_event_to_irq("io"),
+-		omap_hwmod_mux_handle_irq, IRQF_SHARED | IRQF_NO_SUSPEND,
++		omap_hwmod_mux_handle_irq, IRQF_SHARED,
+ 			"hwmod_io", omap_mux_late_init);
+ 
  	if (ret)
- 		return ret;
+ 		pr_warn("mux: Failed to setup hwmod io irq %d\n", ret);
  
+-	return 0;
++	return enable_irq_wake(omap_prcm_event_to_irq("io"));
+ }
+ 
+ static void __init omap_mux_package_fixup(struct omap_mux *p,
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 87b98bf92366..4b7ac7cd633a 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -472,23 +472,22 @@ int __init omap3_pm_init(void)
+ 	prcm_setup_regs();
+ 
+ 	ret = request_irq(omap_prcm_event_to_irq("wkup"),
+-		_prcm_int_handle_wakeup, IRQF_NO_SUSPEND, "pm_wkup", NULL);
++		_prcm_int_handle_wakeup, 0, "pm_wkup", NULL);
+ 
+ 	if (ret) {
+ 		pr_err("pm: Failed to request pm_wkup irq\n");
+ 		goto err1;
+ 	}
++	enable_irq_wake(omap_prcm_event_to_irq("wkup"));
+ 
+ 	/* IO interrupt is shared with mux code */
+ 	ret = request_irq(omap_prcm_event_to_irq("io"),
+-		_prcm_int_handle_io, IRQF_SHARED | IRQF_NO_SUSPEND, "pm_io",
+-		omap3_pm_init);
+-	enable_irq(omap_prcm_event_to_irq("io"));
+-
++		_prcm_int_handle_io, IRQF_SHARED, "pm_io", omap3_pm_init);
+ 	if (ret) {
+ 		pr_err("pm: Failed to request pm_io irq\n");
+ 		goto err2;
+ 	}
++	enable_irq_wake(omap_prcm_event_to_irq("io"));
+ 
+ 	ret = pwrdm_for_each(pwrdms_setup, NULL);
+ 	if (ret) {
 -- 
 1.9.1
