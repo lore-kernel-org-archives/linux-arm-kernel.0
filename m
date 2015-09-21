@@ -1,44 +1,44 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 21 Sep 2015 08:04:29 -0700
-Subject: [PATCH 2/6] watchdog: Add support for Freescale Layerscape
- platforms
-In-Reply-To: <1442838158-2964-3-git-send-email-B48286@freescale.com>
-References: <1442838158-2964-1-git-send-email-B48286@freescale.com>
- <1442838158-2964-3-git-send-email-B48286@freescale.com>
-Message-ID: <56001C7D.4050408@roeck-us.net>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 21 Sep 2015 23:04:32 +0800
+Subject: [PATCH] crypto: marvell: properly handle
+ CRYPTO_TFM_REQ_MAY_BACKLOG-flagged requests
+In-Reply-To: <1442589936-18042-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1442589936-18042-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150921150431.GA2703@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2015 05:22 AM, Zhiqiang Hou wrote:
-> From: Shaohui Xie <Shaohui.Xie@freescale.com>
->
-> Modify watchdog/Kconfig file to support Layerscape platforms.
->
-"Enable IMX2+ watchdog for Layerscape platforms" would be a better
-description.
+On Fri, Sep 18, 2015 at 05:25:36PM +0200, Thomas Petazzoni wrote:
+> The mv_cesa_queue_req() function calls crypto_enqueue_request() to
+> enqueue a request. In the normal case (i.e the queue isn't full), this
+> function returns -EINPROGRESS. The current Marvell CESA crypto driver
+> takes this into account and cleans up the request only if an error
+> occured, i.e if the return value is not -EINPROGRESS.
+> 
+> Unfortunately this causes problems with
+> CRYPTO_TFM_REQ_MAY_BACKLOG-flagged requests. When such a request is
+> passed to crypto_enqueue_request() and the queue is full,
+> crypto_enqueue_request() will return -EBUSY, but will keep the request
+> enqueued nonetheless. This situation was not properly handled by the
+> Marvell CESA driver, which was anyway cleaning up the request in such
+> a situation. When later on the request was taken out of the backlog
+> and actually processed, a kernel crash occured due to the internal
+> driver data structures for this structure having been cleaned up.
+> 
+> To avoid this situation, this commit adds a
+> mv_cesa_req_needs_cleanup() helper function which indicates if the
+> request needs to be cleaned up or not after a call to
+> crypto_enqueue_request(). This helper allows to do the cleanup only in
+> the appropriate cases, and all call sites of mv_cesa_queue_req() are
+> fixed to use this new helper function.
+> 
+> Reported-by: Vincent Donnefort <vdonnefort@gmail.com>
+> Fixes: db509a45339fd ("crypto: marvell/cesa - add TDMA support")
+> Cc: <stable@vger.kernel.org> # v4.2+
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Nitpick, so
-
-Acked-by: Guenter Roeck <linux@roeck-us.net>
-
-> Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
-> Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
-> Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
-> ---
->   drivers/watchdog/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index c68edc1..2862219 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -446,7 +446,7 @@ config MAX63XX_WATCHDOG
->
->   config IMX2_WDT
->   	tristate "IMX2+ Watchdog"
-> -	depends on ARCH_MXC
-> +	depends on ARCH_MXC || ARCH_LAYERSCAPE
->   	select REGMAP_MMIO
->   	select WATCHDOG_CORE
->   	help
->
+Applied to crypto.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
