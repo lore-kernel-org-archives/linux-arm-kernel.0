@@ -1,39 +1,39 @@
-From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
-Date: Mon, 21 Sep 2015 10:48:19 +0300
-Subject: [PATCH v2] ARM: pxa: ssp: Fix build error by removing originally
- incorrect DT binding
-In-Reply-To: <87zj0rsqhe.fsf@belgarion.home>
-References: <1441610581-11434-1-git-send-email-jarkko.nikula@linux.intel.com>
- <87zj0rsqhe.fsf@belgarion.home>
-Message-ID: <55FFB643.1080208@linux.intel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 21 Sep 2015 10:09:52 +0200
+Subject: [PATCH v6 1/5] pwm: add the Berlin pwm controller driver
+In-Reply-To: <55FEF75C.4090802@gmail.com>
+References: <1442484788-15482-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1442484788-15482-2-git-send-email-antoine.tenart@free-electrons.com>
+ <55FEF75C.4090802@gmail.com>
+Message-ID: <20150921080952.GC19865@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Sun, Sep 20, 2015 at 08:13:48PM +0200, Sebastian Hesselbarth wrote:
+> On 17.09.2015 12:13, Antoine Tenart wrote:
+> >Add a PWM controller driver for the Marvell Berlin SoCs. This PWM
+> >controller has 4 channels.
+> >
+> >Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> >Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> 
+> Thierry,
+> 
+> if you are also fine with the driver, please let me know if you want
+> me to take the driver through berlin-tree or if you are taking it.
+> 
+> I am taking the binding docs and dts changes anyway.
 
-On 09/12/2015 04:43 PM, Robert Jarzmik wrote:
-> Jarkko Nikula <jarkko.nikula@linux.intel.com> writes:
->
->> Commit 03fbf488cece ("spi: pxa2xx: Differentiate Intel LPSS types") caused
->> build error here because it removed the type LPSS_SSP and I didn't notice
->> the type was used here too.
->>
->> I believe commit a6e56c28a178 ("ARM: pxa: ssp: add DT bindings") added it
->> accidentally by copying all enum pxa_ssp_type types from
->> include/linux/pxa2xx_ssp.h even LPSS_SSP was for Intel LPSS SPI devices.
->>
->> Fix the build error by removing this incorrect binding.
->>
->> Fixes: 03fbf488cece ("spi: pxa2xx: Differentiate Intel LPSS types")
->> Signed-off-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
->> Reported-by: Axel Lin <axel.lin@ingics.com>
->> Cc: <stable@vger.kernel.org> # 4.2
->> ---
->> v2: Added Fixes tag suggested by Robert Jarzmik
->
-> Queued into pxa/fixes, thanks.
->
-Gentle reminder, is this going to 4.3-rc3?
+Sorry but no. The binding documentation needs to go into the same tree
+as the driver because they need to be kept in sync. We can't have DT
+binding documentation go into platform trees if the driver implementing
+the binding hasn't been merged.
 
--- 
-Jarkko
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150921/a3a64cbc/attachment-0001.sig>
