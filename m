@@ -1,43 +1,56 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 21 Sep 2015 11:33:21 +0200
-Subject: [PATCH v3 04/12] backlight: pwm_bl: remove useless call to
- pwm_set_period
+Date: Mon, 21 Sep 2015 11:33:23 +0200
+Subject: [PATCH v3 06/12] pwm: add the PWM initial state retrieval infra
 In-Reply-To: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1442828009-6241-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1442828009-6241-7-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM period will be set when calling pwm_config. Remove this useless
-call to pwm_set_period, which might mess up with the initial PWM state
-once we have added proper support for PWM init state retrieval.
+Add a ->reset_state() function to the pwm_ops struct to let PWM drivers
+initialize the PWM state attached to a PWM device.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/video/backlight/pwm_bl.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/pwm/core.c  | 3 +++
+ include/linux/pwm.h | 4 ++++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index ae498c1..71944f8 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -293,12 +293,14 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	 * period, parsed from the DT, in the PWM device. For the non-DT case,
- 	 * set the period from platform data if it has not already been set
- 	 * via the PWM lookup table.
-+	 * FIXME: This assignment should be dropped as soon as all the boards
-+	 * have moved to the PWM lookup table approach. The same goes for the
-+	 * pb->period field which should be replaced by
-+	 * pwm_get_default_period() calls.
- 	 */
- 	pb->period = pwm_get_default_period(pb->pwm);
--	if (!pb->period && (data->pwm_period_ns > 0)) {
-+	if (!pb->period && (data->pwm_period_ns > 0))
- 		pb->period = data->pwm_period_ns;
--		pwm_set_period(pb->pwm, data->pwm_period_ns);
--	}
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 963238c3..60ad758 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -270,6 +270,9 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
+ 		pwm->hwpwm = i;
+ 		pwm_set_default_polarity(pwm, polarity);
  
- 	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
++		if (chip->ops->reset_state)
++			chip->ops->reset_state(chip, pwm);
++
+ 		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
+ 	}
  
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index f8cc460..cddb12b 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -179,6 +179,9 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
+  * @set_polarity: configure the polarity of this PWM
+  * @enable: enable PWM output toggling
+  * @disable: disable PWM output toggling
++ * @reset_state: reset the current PWM state (pwm->state) to the actual
++ *		 hardware state. This function is only called once per
++ *		 PWM device when the PWM chip is registered.
+  * @dbg_show: optional routine to show contents in debugfs
+  * @owner: helps prevent removal of modules exporting active PWMs
+  */
+@@ -191,6 +194,7 @@ struct pwm_ops {
+ 			    enum pwm_polarity polarity);
+ 	int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
+ 	void (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
++	void (*reset_state)(struct pwm_chip *chip, struct pwm_device *pwm);
+ #ifdef CONFIG_DEBUG_FS
+ 	void (*dbg_show)(struct pwm_chip *chip, struct seq_file *s);
+ #endif
 -- 
 1.9.1
