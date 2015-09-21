@@ -1,52 +1,81 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 21 Sep 2015 16:03:01 +0200
-Subject: [PATCH v6 21/22] driver core: Start processing deferred probes earlier
+Date: Mon, 21 Sep 2015 16:03:02 +0200
+Subject: [PATCH v6 22/22] of/platform: Defer probes of registered devices
 In-Reply-To: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1442844182-27787-22-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1442844182-27787-23-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some initcalls in the late level assume that some devices will have
-already probed without explicitly checking for that.
+Instead of trying to match and probe platform and AMBA devices right
+after each is registered, delay their probes until device_initcall_sync.
 
-After the recent move to defer most device probes when they are
-registered, pressure increased in the late initcall level.
+This means that devices will start probing once all built-in drivers
+have registered, and after all platform and AMBA devices from the DT
+have been registered already.
 
-By starting the processing of the deferred queue in device_initcall_sync
-we increase the chances that the initcalls mentioned before will find
-the devices they depend on to have already probed.
+This allows us to prevent deferred probes by probing dependencies on
+demand.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
 
 Changes in v4:
-- Start processing deferred probes in device_initcall_sync
+- Also defer probes of AMBA devices registered from the DT as they can
+  also request resources.
 
- drivers/base/dd.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/of/platform.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 269ea76c1a4f..f0ef9233fcd6 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -176,7 +176,7 @@ static void driver_deferred_probe_trigger(void)
-  *
-  * We don't want to get in the way when the bulk of drivers are getting probed.
-  * Instead, this initcall makes sure that deferred probing is delayed until
-- * late_initcall time.
-+ * device_initcall_sync time.
-  */
- static int deferred_probe_initcall(void)
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 408d89f1d124..7b33e0369374 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -164,7 +164,8 @@ static struct platform_device *of_platform_device_create_pdata(
+ 					struct device_node *np,
+ 					const char *bus_id,
+ 					void *platform_data,
+-					struct device *parent)
++					struct device *parent,
++					bool probe_late)
  {
-@@ -190,7 +190,7 @@ static int deferred_probe_initcall(void)
- 	flush_workqueue(deferred_wq);
- 	return 0;
- }
--late_initcall(deferred_probe_initcall);
-+device_initcall_sync(deferred_probe_initcall);
+ 	struct platform_device *dev;
  
- static void driver_bound(struct device *dev)
+@@ -178,6 +179,7 @@ static struct platform_device *of_platform_device_create_pdata(
+ 
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
++	dev->dev.probe_late = probe_late;
+ 	of_dma_configure(&dev->dev, dev->dev.of_node);
+ 	of_msi_configure(&dev->dev, dev->dev.of_node);
+ 
+@@ -209,7 +211,8 @@ struct platform_device *of_platform_device_create(struct device_node *np,
+ 					    const char *bus_id,
+ 					    struct device *parent)
  {
+-	return of_platform_device_create_pdata(np, bus_id, NULL, parent);
++	return of_platform_device_create_pdata(np, bus_id, NULL, parent,
++					       false);
+ }
+ EXPORT_SYMBOL(of_platform_device_create);
+ 
+@@ -240,6 +243,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+ 	dev->dev.of_node = of_node_get(node);
+ 	dev->dev.parent = parent ? : &platform_bus;
+ 	dev->dev.platform_data = platform_data;
++	dev->dev.probe_late = true;
+ 	if (bus_id)
+ 		dev_set_name(&dev->dev, "%s", bus_id);
+ 	else
+@@ -358,7 +362,8 @@ static int of_platform_bus_create(struct device_node *bus,
+ 		return 0;
+ 	}
+ 
+-	dev = of_platform_device_create_pdata(bus, bus_id, platform_data, parent);
++	dev = of_platform_device_create_pdata(bus, bus_id, platform_data,
++					      parent, true);
+ 	if (!dev || !of_match_node(matches, bus))
+ 		return 0;
+ 
 -- 
 2.4.3
