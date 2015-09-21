@@ -1,66 +1,66 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 21 Sep 2015 11:50:10 +0200
-Subject: [PATCH 4/4] ARM64: dts: exynos5433: add jpeg node
-In-Reply-To: <1442586060-23657-5-git-send-email-andrzej.p@samsung.com>
-References: <1442586060-23657-1-git-send-email-andrzej.p@samsung.com>
- <1442586060-23657-5-git-send-email-andrzej.p@samsung.com>
-Message-ID: <55FFD2D2.1010508@xs4all.nl>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 21 Sep 2015 12:55:46 +0300
+Subject: [PATCH 1/2] mfd: twl6040: Fix deferred probe handling for clk32k
+In-Reply-To: <1442593745-16725-2-git-send-email-tony@atomide.com>
+References: <1442593745-16725-1-git-send-email-tony@atomide.com>
+ <1442593745-16725-2-git-send-email-tony@atomide.com>
+Message-ID: <55FFD422.2080506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18-09-15 16:21, Andrzej Pietrasiewicz wrote:
-> From: Marek Szyprowski <m.szyprowski@samsung.com>
+On 09/18/2015 07:29 PM, Tony Lindgren wrote:
+> Commit 68bab8662f49 ("mfd: twl6040: Optional clk32k clock handling")
+> added clock handling for the 32k clock from palmas-clk. However, that
+> patch did not consider a typical situation where twl6040 is built-in,
+> and palmas-clk is a loadable module like we have in omap2plus_defconfig.
 > 
-> Add Exynos 5433 jpeg h/w codec node.
+> If palmas-clk is not loaded before twl6040 probes, we will get a
+> "clk32k is not handled" warning during booting. This means that any
+> drivers relying on this clock will mysteriously fail, including
+> omap5-uevm WLAN and audio.
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> Note that for WLAN, we probably should also eventually get
+> the clk32kgaudio for MMC3 directly as that's shared between
+> audio and WLAN SDIO at least for omap5-uevm. It seems the
+> WLAN chip cannot get it as otherwise MMC3 won't get properly
+> probed.
+
+While this is going to 'fix' the WLAN because currently the twl6040 is powered
+on all the time (32k clock is enabled). My plan is to finally implement the
+power state handling for the twl6040, which means that w/o audio activity the
+twl6040 will be turned off. This will imply that any clock which is only used
+by twl6040 will be off as well.
+The proper solution would be to add clock handling to the WLAN driver stack.
+
+Otherwise:
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+
+> Fixes: 68bab8662f49 ("mfd: twl6040: Optional clk32k clock handling")
+> Cc: Benoit Cousson <bcousson@baylibre.com>
+> Cc: Dr. H. Nikolaus Schaller <hns@goldelico.com>
+> Cc: Grazvydas Ignotas <notasas@gmail.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Sourav Poddar <sourav.poddar@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 > ---
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
+>  drivers/mfd/twl6040.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-
-This dtsi file doesn't exist in the media-git tree. What is the story here?
-
-Should this go through a different subsystem?
-
-I think the media subsystem can take patches 1-3 and whoever does DT patches can
-take this patch, right?
-
-Regards,
-
-	Hans
-
-> index 59e21b6..5cb489f 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-> @@ -916,6 +916,27 @@
->  			io-channel-ranges;
->  			status = "disabled";
->  		};
-> +		jpeg: jpeg at 15020000 {
-> +			compatible = "samsung,exynos5433-jpeg";
-> +			reg = <0x15020000 0x10000>;
-> +			interrupts = <0 411 0>;
-> +			clock-names = "pclk",
-> +				      "aclk",
-> +				      "aclk_xiu",
-> +				      "sclk";
-> +			clocks = <&cmu_mscl CLK_PCLK_JPEG>,
-> +				 <&cmu_mscl CLK_ACLK_JPEG>,
-> +				 <&cmu_mscl CLK_ACLK_XIU_MSCLX>,
-> +				 <&cmu_mscl CLK_SCLK_JPEG>;
-> +			assigned-clocks = <&cmu_mscl CLK_MOUT_ACLK_MSCL_400_USER>,
-> +					  <&cmu_mscl CLK_MOUT_SCLK_JPEG_USER>,
-> +					  <&cmu_mscl CLK_MOUT_SCLK_JPEG>,
-> +					  <&cmu_top CLK_MOUT_SCLK_JPEG_A>;
-> +			assigned-clock-parents = <&cmu_top CLK_ACLK_MSCL_400>,
-> +						 <&cmu_top CLK_SCLK_JPEG_MSCL>,
-> +						 <&cmu_mscl CLK_MOUT_SCLK_JPEG_USER>,
-> +						 <&cmu_top CLK_MOUT_BUS_PLL_USER>;
-> +		};
->  	};
+> --- a/drivers/mfd/twl6040.c
+> +++ b/drivers/mfd/twl6040.c
+> @@ -647,6 +647,8 @@ static int twl6040_probe(struct i2c_client *client,
 >  
->  	timer {
+>  	twl6040->clk32k = devm_clk_get(&client->dev, "clk32k");
+>  	if (IS_ERR(twl6040->clk32k)) {
+> +		if (PTR_ERR(twl6040->clk32k) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+>  		dev_info(&client->dev, "clk32k is not handled\n");
+>  		twl6040->clk32k = NULL;
+>  	}
 > 
+
+
+-- 
+P?ter
