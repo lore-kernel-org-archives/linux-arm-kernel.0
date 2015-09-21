@@ -1,50 +1,72 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Mon, 21 Sep 2015 10:13:07 +0800
-Subject: [PATCH v7 6/6] MAINTAINERS: Add Altera PCIe and MSI drivers maintainer
-In-Reply-To: <1442801587-3812-1-git-send-email-lftan@altera.com>
-References: <1442801587-3812-1-git-send-email-lftan@altera.com>
-Message-ID: <1442801587-3812-7-git-send-email-lftan@altera.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 21 Sep 2015 10:18:25 +0800
+Subject: [PATCH RESEND 1/2] arm: berlin: use non-self-cleared reset
+ register to reset cpu
+In-Reply-To: <55FEF511.2050600@gmail.com>
+References: <1442213265-1002-1-git-send-email-jszhang@marvell.com>
+ <1442213265-1002-2-git-send-email-jszhang@marvell.com>
+ <55FEF511.2050600@gmail.com>
+Message-ID: <20150921101825.099b304f@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ley Foon Tan <lftan@altera.com>
----
- MAINTAINERS | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Dear Sebastian,
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7ba7ab7..eeb9ec9 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7938,6 +7938,14 @@ F:	include/linux/pci*
- F:	arch/x86/pci/
- F:	arch/x86/kernel/quirks.c
- 
-+PCI DRIVER FOR ALTERA PCIE IP
-+M:	Ley Foon Tan <lftan@altera.com>
-+L:	rfi at lists.rocketboards.org (moderated for non-subscribers)
-+L:	linux-pci at vger.kernel.org
-+S:	Supported
-+F:	Documentation/devicetree/bindings/pci/altera-pcie.txt
-+F:	drivers/pci/host/pcie-altera.c
-+
- PCI DRIVER FOR ARM VERSATILE PLATFORM
- M:	Rob Herring <robh@kernel.org>
- L:	linux-pci at vger.kernel.org
-@@ -8039,6 +8047,14 @@ L:	linux-pci at vger.kernel.org
- S:	Maintained
- F:	drivers/pci/host/*spear*
- 
-+PCI MSI DRIVER FOR ALTERA MSI IP
-+M:	Ley Foon Tan <lftan@altera.com>
-+L:	rfi at lists.rocketboards.org (moderated for non-subscribers)
-+L:	linux-pci at vger.kernel.org
-+S:	Supported
-+F:	Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-+F:	drivers/pci/host/pcie-altera-msi.c
-+
- PCI MSI DRIVER FOR APPLIEDMICRO XGENE
- M:	Duc Dang <dhdang@apm.com>
- L:	linux-pci at vger.kernel.org
--- 
-1.8.2.1
+On Sun, 20 Sep 2015 20:04:01 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+
+> On 14.09.2015 08:47, Jisheng Zhang wrote:
+> > In Berlin SoCs, there are two kinds of cpu reset control registers: the
+> > first one's corresponding bits will be self-cleared after some cycles,
+> > while the second one's bits won't. Previously the first kind of reset
+> > control register is used, this patch uses the second kind one to prepare
+> > for the next hotplug commit.
+> >
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >   arch/arm/mach-berlin/platsmp.c | 4 +++-
+> >   1 file changed, 3 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
+> > index 34a3753..bde327b 100644
+> > --- a/arch/arm/mach-berlin/platsmp.c
+> > +++ b/arch/arm/mach-berlin/platsmp.c
+> > @@ -17,7 +17,7 @@
+> >   #include <asm/smp_plat.h>
+> >   #include <asm/smp_scu.h>
+> >
+> > -#define CPU_RESET		0x00
+> > +#define CPU_RESET		0x20
+> 
+> Jisheng,
+> 
+> I am fine with the patch itself, except that I'd like to rather
+> rename the 0x00-register to CPU_RESET_SC with a comment about
+> the self-clearing nature. The 0x20-register would then be named
+> CPU_RESET_NON_SC and used the way you propose.
+
+Good idea. And such comment would let people understand why do we change
+as that.
+
+> 
+> Are you fine with me naming the registers accordingly while
+> applying the patches?
+
+Sure, I'm fine. Thank you very much.
+
+> 
+> Sebastian
+> 
+> >   #define RESET_VECT		0x00
+> >   #define SW_RESET_ADDR		0x94
+> > @@ -31,6 +31,8 @@ static inline void berlin_perform_reset_cpu(unsigned int cpu)
+> >   	u32 val;
+> >
+> >   	val = readl(cpu_ctrl + CPU_RESET);
+> > +	val &= ~BIT(cpu_logical_map(cpu));
+> > +	writel(val, cpu_ctrl + CPU_RESET);
+> >   	val |= BIT(cpu_logical_map(cpu));
+> >   	writel(val, cpu_ctrl + CPU_RESET);
+> >   }
+> >
+> 
