@@ -1,133 +1,93 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 21 Sep 2015 11:33:19 +0200
-Subject: [PATCH v3 02/12] pwm: define a new pwm_state struct
+Date: Mon, 21 Sep 2015 11:33:20 +0200
+Subject: [PATCH v3 03/12] pwm: move the enabled/disabled info to pwm_state
+ struct
 In-Reply-To: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1442828009-6241-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1442828009-6241-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM state, represented by its period, duty_cycle and polarity,
-is currently directly stored in the PWM device.
-Declare a pwm_state structure embedding those field so that we can later
-use this struct to atomically update all the PWM parameters at once.
+Prepare the transition to PWM atomic update by moving the enabled/disabled
+state into the pwm_state struct. This way we can easily update the whole
+PWM state by copying the new state in the ->state field.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/pwm/core.c  |  6 +++---
- include/linux/pwm.h | 30 +++++++++++++++++++-----------
- 2 files changed, 22 insertions(+), 14 deletions(-)
+ drivers/pwm/core.c  | 15 ++++++++++++---
+ include/linux/pwm.h |  7 ++++---
+ 2 files changed, 16 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 732375d..09037de 100644
+index 09037de..963238c3 100644
 --- a/drivers/pwm/core.c
 +++ b/drivers/pwm/core.c
-@@ -446,8 +446,8 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- 	if (err)
- 		return err;
+@@ -494,8 +494,15 @@ EXPORT_SYMBOL_GPL(pwm_set_polarity);
+  */
+ int pwm_enable(struct pwm_device *pwm)
+ {
+-	if (pwm && !test_and_set_bit(PWMF_ENABLED, &pwm->flags))
+-		return pwm->chip->ops->enable(pwm->chip, pwm);
++	if (pwm && !pwm_is_enabled(pwm)) {
++		int err;
++
++		err = pwm->chip->ops->enable(pwm->chip, pwm);
++		if (!err)
++			pwm->state.enabled = true;
++
++		return err;
++	}
  
--	pwm->duty_cycle = duty_ns;
--	pwm->period = period_ns;
-+	pwm->state.duty_cycle = duty_ns;
-+	pwm->state.period = period_ns;
- 
- 	return 0;
+ 	return pwm ? 0 : -EINVAL;
  }
-@@ -480,7 +480,7 @@ int pwm_set_polarity(struct pwm_device *pwm, enum pwm_polarity polarity)
- 	if (err)
- 		return err;
- 
--	pwm->polarity = polarity;
-+	pwm->state.polarity = polarity;
- 
- 	return 0;
+@@ -507,8 +514,10 @@ EXPORT_SYMBOL_GPL(pwm_enable);
+  */
+ void pwm_disable(struct pwm_device *pwm)
+ {
+-	if (pwm && test_and_clear_bit(PWMF_ENABLED, &pwm->flags))
++	if (pwm && pwm_is_enabled(pwm)) {
+ 		pwm->chip->ops->disable(pwm->chip, pwm);
++		pwm->state.enabled = false;
++	}
  }
+ EXPORT_SYMBOL_GPL(pwm_disable);
+ 
 diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 31239a9..e0e0ed8 100644
+index e0e0ed8..433a097 100644
 --- a/include/linux/pwm.h
 +++ b/include/linux/pwm.h
-@@ -79,6 +79,18 @@ enum {
- 	PWMF_EXPORTED = 1 << 2,
+@@ -75,8 +75,7 @@ enum pwm_polarity {
+ 
+ enum {
+ 	PWMF_REQUESTED = 1 << 0,
+-	PWMF_ENABLED = 1 << 1,
+-	PWMF_EXPORTED = 1 << 2,
++	PWMF_EXPORTED = 1 << 1,
  };
- 
-+/*
-+ * struct pwm_state - state of a PWM channel
-+ * @period: PWM period (in nanoseconds)
-+ * @duty_cycle: PWM duty cycle (in nanoseconds)
-+ * @polarity: PWM polarity
-+ */
-+struct pwm_state {
-+	unsigned int period;
-+	unsigned int duty_cycle;
-+	enum pwm_polarity polarity;
-+};
-+
- /**
-  * struct pwm_device - PWM channel object
-  * @label: name of the PWM device
-@@ -87,9 +99,7 @@ enum {
-  * @pwm: global index of the PWM device
-  * @chip: PWM chip providing this PWM device
-  * @chip_data: chip-private data associated with the PWM device
-- * @period: period of the PWM signal (in nanoseconds)
-- * @duty_cycle: duty cycle of the PWM signal (in nanoseconds)
-- * @polarity: polarity of the PWM signal
-+ * @state: curent PWM channel state
-  */
- struct pwm_device {
- 	const char *label;
-@@ -99,9 +109,7 @@ struct pwm_device {
- 	struct pwm_chip *chip;
- 	void *chip_data;
- 
--	unsigned int period;
--	unsigned int duty_cycle;
--	enum pwm_polarity polarity;
-+	struct pwm_state state;
- };
- 
- static inline bool pwm_is_enabled(const struct pwm_device *pwm)
-@@ -112,7 +120,7 @@ static inline bool pwm_is_enabled(const struct pwm_device *pwm)
- static inline void pwm_set_period(struct pwm_device *pwm, unsigned int period)
- {
- 	if (pwm)
--		pwm->period = period;
-+		pwm->state.period = period;
- }
- 
- static inline void pwm_set_default_period(struct pwm_device *pwm,
-@@ -123,7 +131,7 @@ static inline void pwm_set_default_period(struct pwm_device *pwm,
- 
- static inline unsigned int pwm_get_period(const struct pwm_device *pwm)
- {
--	return pwm ? pwm->period : 0;
-+	return pwm ? pwm->state.period : 0;
- }
- 
- static inline unsigned int pwm_get_default_period(const struct pwm_device *pwm)
-@@ -134,12 +142,12 @@ static inline unsigned int pwm_get_default_period(const struct pwm_device *pwm)
- static inline void pwm_set_duty_cycle(struct pwm_device *pwm, unsigned int duty)
- {
- 	if (pwm)
--		pwm->duty_cycle = duty;
-+		pwm->state.duty_cycle = duty;
- }
- 
- static inline unsigned int pwm_get_duty_cycle(const struct pwm_device *pwm)
- {
--	return pwm ? pwm->duty_cycle : 0;
-+	return pwm ? pwm->state.duty_cycle : 0;
- }
  
  /*
-@@ -155,7 +163,7 @@ static inline void pwm_set_default_polarity(struct pwm_device *pwm,
- 
- static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
- {
--	return pwm ? pwm->polarity : PWM_POLARITY_NORMAL;
-+	return pwm ? pwm->state.polarity : PWM_POLARITY_NORMAL;
- }
+@@ -84,11 +83,13 @@ enum {
+  * @period: PWM period (in nanoseconds)
+  * @duty_cycle: PWM duty cycle (in nanoseconds)
+  * @polarity: PWM polarity
++ * @enabled: PWM enabled status
+  */
+ struct pwm_state {
+ 	unsigned int period;
+ 	unsigned int duty_cycle;
+ 	enum pwm_polarity polarity;
++	bool enabled;
+ };
  
  /**
+@@ -114,7 +115,7 @@ struct pwm_device {
+ 
+ static inline bool pwm_is_enabled(const struct pwm_device *pwm)
+ {
+-	return test_bit(PWMF_ENABLED, &pwm->flags);
++	return pwm->state.enabled;
+ }
+ 
+ static inline void pwm_set_period(struct pwm_device *pwm, unsigned int period)
 -- 
 1.9.1
