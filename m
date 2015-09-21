@@ -1,32 +1,22 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon, 21 Sep 2015 14:36:40 -0700
-Subject: ARM64 readahead: fault retry breaks mmap file read random
- detection
-In-Reply-To: <20150921210938.GC7356@arm.com>
-References: <1442868028-27055-1-git-send-email-salyzyn@android.com>
- <20150921210938.GC7356@arm.com>
-Message-ID: <56007868.8050605@android.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 21 Sep 2015 14:41:37 -0700
+Subject: [PATCH v2 1/3] gpio: Use __gpiod_request directly
+In-Reply-To: <1440920686-6892-2-git-send-email-mpa@pengutronix.de>
+References: <1440920686-6892-1-git-send-email-mpa@pengutronix.de>
+ <1440920686-6892-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <CACRpkdbSMZxBafCnZ5VYd+k=_4gVob6Xu1kOdvhuO0GyV1M+dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2015 02:09 PM, Will Deacon wrote:
-> On Mon, Sep 21, 2015 at 09:39:50PM +0100, Mark Salyzyn wrote:
->> Description from commit 45cac65b0fcd
->>      ("readahead: fault retry breaks mmap file read random detection")
->> . . .
->> Yup, arm64 needs this too! Random read improves by 250%, sequential
->> read improves by 40%, and random write by 400% to an eMMC device with
->> dm crypto wrapped around it.
-> Thanks for this. This must've gone in whilst we were developing the initial
-> version of the arm64 port and has since gone unnoticed.
->
-> I'll queue it on the arm64 fixes branch and send a pull request after
-> some testing.
->
-> Will
+On Sun, Aug 30, 2015 at 12:44 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
 
-As noted, this fix may need to be propagated to all the arch-specific 
-code, I was not in a position to check this out on arm (32 bit) and the 
-benchmarking code I used did not immediately port to 32-bit.
+> There is no reason to find out chip and hwnum to use to request a gpio
+> and get another gpio descriptor. We already have the descriptor we want
+> to use so we can directly use it.
+>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-Sincerely -- Mark Salyzyn
+Patch applied with Uwe's ACK.
+
+Yours,
+Linus Walleij
