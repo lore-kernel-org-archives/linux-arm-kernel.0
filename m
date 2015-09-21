@@ -1,27 +1,48 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 21 Sep 2015 14:28:23 +0200
-Subject: [PATCH 4/4] ARM64: dts: exynos5433: add jpeg node
-In-Reply-To: <20150921084133.175b1bda@recife.lan>
-References: <1442586060-23657-1-git-send-email-andrzej.p@samsung.com>
- <1442586060-23657-5-git-send-email-andrzej.p@samsung.com>
- <55FFD2D2.1010508@xs4all.nl> <55FFD4FF.6090306@samsung.com>
- <20150921084133.175b1bda@recife.lan>
-Message-ID: <55FFF7E7.2050609@samsung.com>
+From: tiffany.lin@mediatek.com (Tiffany Lin)
+Date: Mon, 21 Sep 2015 20:26:11 +0800
+Subject: [RESEND PATCH] media: vb2: Fix vb2_dc_prepare do not correct sync
+ data to device
+Message-ID: <1442838371-21484-1-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+vb2_dc_prepare use the number of SG entries dma_map_sg_attrs return.
+But in dma_sync_sg_for_device, it use lengths of each SG entries
+before dma_map_sg_attrs. dma_map_sg_attrs will concatenate
+SGs until dma length > dma seg bundary. sgt->nents will less than
+sgt->orig_nents. Using SG entries after dma_map_sg_attrs
+in vb2_dc_prepare will make some SGs are not sync to device.
+After add DMA_ATTR_SKIP_CPU_SYNC in vb2_dc_get_userptr to remove
+sync data to device twice. Device randomly get incorrect data because
+some SGs are not sync to device. Change to use number of SG entries
+before dma_map_sg_attrs in vb2_dc_prepare to prevent this issue.
 
-On 21/09/15 13:41, Mauro Carvalho Chehab wrote:
-> Btw, I just got a Samsung TM1 device, with seems to be using an arm64
-> SoC. Is this driver providing support for its camera?
+Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+---
+ drivers/media/v4l2-core/videobuf2-dma-contig.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-The TM1 device (Z3) is based on a Qualcomm 64-bit SoC. The $subject
-patch adds support for a standalone JPEG codec IP block of Samsung
-Exynos5433 SoC, which can be found for instance in Galaxy Note4.
-Perhaps someone else can provide more details regarding the TM1's camera
-status.
-
+diff --git a/drivers/media/v4l2-core/videobuf2-dma-contig.c b/drivers/media/v4l2-core/videobuf2-dma-contig.c
+index 2397ceb..c5d00bd 100644
+--- a/drivers/media/v4l2-core/videobuf2-dma-contig.c
++++ b/drivers/media/v4l2-core/videobuf2-dma-contig.c
+@@ -100,7 +100,7 @@ static void vb2_dc_prepare(void *buf_priv)
+ 	if (!sgt || buf->db_attach)
+ 		return;
+ 
+-	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir);
++	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
+ }
+ 
+ static void vb2_dc_finish(void *buf_priv)
+@@ -112,7 +112,7 @@ static void vb2_dc_finish(void *buf_priv)
+ 	if (!sgt || buf->db_attach)
+ 		return;
+ 
+-	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir);
++	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
+ }
+ 
+ /*********************************************/
 -- 
-Regards,
-Sylwester
+1.8.1.1.dirty
