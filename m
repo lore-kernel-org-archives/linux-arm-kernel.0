@@ -1,50 +1,37 @@
-From: rric@kernel.org (Robert Richter)
-Date: Mon, 21 Sep 2015 22:58:39 +0200
-Subject: [PATCH v5 6/6] irqchip, gicv3-its: Use new jump label API
-In-Reply-To: <1442869119-1814-1-git-send-email-rric@kernel.org>
-References: <1442869119-1814-1-git-send-email-rric@kernel.org>
-Message-ID: <1442869119-1814-7-git-send-email-rric@kernel.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 21 Sep 2015 23:05:06 +0200
+Subject: [PATCH v6 1/5] pwm: add the Berlin pwm controller driver
+In-Reply-To: <20150921080952.GC19865@ulmo.nvidia.com>
+References: <1442484788-15482-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1442484788-15482-2-git-send-email-antoine.tenart@free-electrons.com>
+ <55FEF75C.4090802@gmail.com> <20150921080952.GC19865@ulmo.nvidia.com>
+Message-ID: <56007102.4030204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robert Richter <rrichter@cavium.com>
+On 21.09.2015 10:09, Thierry Reding wrote:
+> On Sun, Sep 20, 2015 at 08:13:48PM +0200, Sebastian Hesselbarth wrote:
+>> On 17.09.2015 12:13, Antoine Tenart wrote:
+>>> Add a PWM controller driver for the Marvell Berlin SoCs. This PWM
+>>> controller has 4 channels.
+>>>
+>>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+>>> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>
+>> Thierry,
+>>
+>> if you are also fine with the driver, please let me know if you want
+>> me to take the driver through berlin-tree or if you are taking it.
+>>
+>> I am taking the binding docs and dts changes anyway.
+>
+> Sorry but no. The binding documentation needs to go into the same tree
+> as the driver because they need to be kept in sync. We can't have DT
+> binding documentation go into platform trees if the driver implementing
+> the binding hasn't been merged.
 
-Use newly introduced jump label API.
+Ok, sometimes sub-maintainers do not want to care about the DT stuff,
+so I offered to take them. I am very fine with keeping binding and
+driver together.
 
-Make this a separate patch for easier backporting to older kernels of
-the errata patch set.
-
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- drivers/irqchip/irq-gic-v3.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 5899e471df4c..8954763ef08a 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -144,11 +144,11 @@ static u64 gic_read_iar_cavium_thunderx(void)
- 	return irqstat;
- }
- 
--static struct static_key is_cavium_thunderx = STATIC_KEY_INIT_FALSE;
-+static DEFINE_STATIC_KEY_FALSE(is_cavium_thunderx);
- 
- static u64 __maybe_unused gic_read_iar(void)
- {
--	if (static_key_false(&is_cavium_thunderx))
-+	if (static_branch_unlikely(&is_cavium_thunderx))
- 		return gic_read_iar_cavium_thunderx();
- 	else
- 		return gic_read_iar_common();
-@@ -874,7 +874,7 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
- static void gicv3_enable_quirks(void)
- {
- 	if (cpus_have_cap(ARM64_WORKAROUND_CAVIUM_23154))
--		static_key_slow_inc(&is_cavium_thunderx);
-+		static_branch_enable(&is_cavium_thunderx);
- }
- 
- static int __init gic_of_init(struct device_node *node, struct device_node *parent)
--- 
-2.1.1
+Sebastian
