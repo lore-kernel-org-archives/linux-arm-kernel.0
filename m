@@ -1,56 +1,73 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 21 Sep 2015 11:33:23 +0200
-Subject: [PATCH v3 06/12] pwm: add the PWM initial state retrieval infra
+Date: Mon, 21 Sep 2015 11:33:22 +0200
+Subject: [PATCH v3 05/12] pwm: declare a default PWM state
 In-Reply-To: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1442828009-6241-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1442828009-6241-6-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a ->reset_state() function to the pwm_ops struct to let PWM drivers
-initialize the PWM state attached to a PWM device.
+Prepare the addition of the PWM initial state retrieval by adding a default
+state where all the parameters retrieved from DT, platform data or
+statically forced by the hardware will be stored.
+Once done we will be able to store the initial state in the ->state field
+without risking to loose the default parameters.
+
+Update the pwm_set/get_default_xxx helpers accordingly.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/pwm/core.c  | 3 +++
- include/linux/pwm.h | 4 ++++
- 2 files changed, 7 insertions(+)
+ include/linux/pwm.h | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 963238c3..60ad758 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -270,6 +270,9 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
- 		pwm->hwpwm = i;
- 		pwm_set_default_polarity(pwm, polarity);
- 
-+		if (chip->ops->reset_state)
-+			chip->ops->reset_state(chip, pwm);
-+
- 		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
- 	}
- 
 diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index f8cc460..cddb12b 100644
+index 433a097..f8cc460 100644
 --- a/include/linux/pwm.h
 +++ b/include/linux/pwm.h
-@@ -179,6 +179,9 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
-  * @set_polarity: configure the polarity of this PWM
-  * @enable: enable PWM output toggling
-  * @disable: disable PWM output toggling
-+ * @reset_state: reset the current PWM state (pwm->state) to the actual
-+ *		 hardware state. This function is only called once per
-+ *		 PWM device when the PWM chip is registered.
-  * @dbg_show: optional routine to show contents in debugfs
-  * @owner: helps prevent removal of modules exporting active PWMs
+@@ -101,6 +101,7 @@ struct pwm_state {
+  * @chip: PWM chip providing this PWM device
+  * @chip_data: chip-private data associated with the PWM device
+  * @state: curent PWM channel state
++ * @default_state: default PWM channel state
   */
-@@ -191,6 +194,7 @@ struct pwm_ops {
- 			    enum pwm_polarity polarity);
- 	int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
- 	void (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
-+	void (*reset_state)(struct pwm_chip *chip, struct pwm_device *pwm);
- #ifdef CONFIG_DEBUG_FS
- 	void (*dbg_show)(struct pwm_chip *chip, struct seq_file *s);
- #endif
+ struct pwm_device {
+ 	const char *label;
+@@ -111,6 +112,7 @@ struct pwm_device {
+ 	void *chip_data;
+ 
+ 	struct pwm_state state;
++	struct pwm_state default_state;
+ };
+ 
+ static inline bool pwm_is_enabled(const struct pwm_device *pwm)
+@@ -127,7 +129,8 @@ static inline void pwm_set_period(struct pwm_device *pwm, unsigned int period)
+ static inline void pwm_set_default_period(struct pwm_device *pwm,
+ 					  unsigned int period)
+ {
+-	pwm_set_period(pwm, period);
++	if (pwm)
++		pwm->default_state.period = period;
+ }
+ 
+ static inline unsigned int pwm_get_period(const struct pwm_device *pwm)
+@@ -137,7 +140,7 @@ static inline unsigned int pwm_get_period(const struct pwm_device *pwm)
+ 
+ static inline unsigned int pwm_get_default_period(const struct pwm_device *pwm)
+ {
+-	return pwm_get_period(pwm);
++	return pwm ? pwm->default_state.period : 0;
+ }
+ 
+ static inline void pwm_set_duty_cycle(struct pwm_device *pwm, unsigned int duty)
+@@ -159,7 +162,8 @@ int pwm_set_polarity(struct pwm_device *pwm, enum pwm_polarity polarity);
+ static inline void pwm_set_default_polarity(struct pwm_device *pwm,
+ 					    enum pwm_polarity polarity)
+ {
+-	pwm_set_polarity(pwm, polarity);
++	if (pwm)
++		pwm->default_state.polarity = polarity;
+ }
+ 
+ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
 -- 
 1.9.1
