@@ -1,89 +1,118 @@
-From: Sunil.Goutham@caviumnetworks.com (Goutham, Sunil)
-Date: Mon, 21 Sep 2015 17:08:24 +0000
-Subject: net: thunderx: Support for upto 96 queues for a VF
-In-Reply-To: <20150921163118.GG5648@mwanda>
-References: <20150921163118.GG5648@mwanda>
-Message-ID: <CY1PR0701MB16613A356BAAB39BB3593F7893460@CY1PR0701MB1661.namprd07.prod.outlook.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 21 Sep 2015 18:17:09 +0100
+Subject: [PATCH] sparc(64)/iommu: fixup iommu_tbl_range_alloc() types
+In-Reply-To: <55FC49B8.3020100@arm.com>
+References: <55FC49B8.3020100@arm.com>
+Message-ID: <1442855829-11245-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
+With DMA_ERROR_CODE now being dma_addr_t in most architectures, it
+turned out that iommu_tbl_range_alloc (defined in lib/iommu-common.c)
+is actually using a wrong return type.
+This was easily fixed in a previous patch, but now the types in the
+callers do not match anymore.
+This patch fixes the obvious mismatches to allow sane comparisons with
+the error return value.
+Compile-tested on sparc, sparc64, x86, ARM, arm64.
 
-Thanks for pointing out.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+Hi David,
 
-Here we are trying to combine multiple SRIOV VF's resources into one
-so that one user visible interface can have upto 96 queues which otherwise
-is limited to 8 queues. The main VF is considered as primary VF and other's
-are secondary VFs.
+as promised my first naive try on fixing the callers of
+iommu_tbl_range_alloc() as well. This goes on top of the return type
+fix I sent on Friday.
+Please let me know if that makes sense or whether I am looking in the
+totally wrong direction.
 
-'nic->sqs_count' of a primary VF holds the number of secondary VF's resources
-that it should request PF to allocate. This is initialized equal to number of
-CPUs online at the time of driver probe. Hence 'nic->sqs_count' is non-zero
-for primary VF.
+Cheers,
+Andre.
+ arch/sparc/kernel/iommu.c     | 5 +++--
+ arch/sparc/kernel/ldc.c       | 5 +++--
+ arch/sparc/kernel/pci_sun4v.c | 7 ++++---
+ 3 files changed, 10 insertions(+), 7 deletions(-)
 
-Also please see inline.
-
-Thanks,
-Sunil.
-
-________________________________________
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Sent: Monday, September 21, 2015 10:01 PM
-To: sgoutham at cavium.com
-Cc: linux-arm-kernel at lists.infradead.org
-Subject: re: net: thunderx: Support for upto 96 queues for a VF
-
-Hello Sunil Goutham,
-
-The patch 92dc87697e6a: "net: thunderx: Support for upto 96 queues
-for a VF" from Aug 30, 2015, leads to the following static checker
-warning:
-
-        drivers/net/ethernet/cavium/thunder/nicvf_main.c:398 nicvf_request_sqs()
-        warn: we tested 'nic->sqs_count' before and it was 'true'
-
-drivers/net/ethernet/cavium/thunder/nicvf_main.c
-   376  /* Request PF to allocate additional Qsets */
-   377  static void nicvf_request_sqs(struct nicvf *nic)
-   378  {
-   379          union nic_mbx mbx = {};
-   380          int sqs;
-   381          int sqs_count = nic->sqs_count;
-   382          int rx_queues = 0, tx_queues = 0;
-   383
-   384          /* Only primary VF should request */
-   385          if (nic->sqs_mode ||  !nic->sqs_count)
-                                      ^^^^^^^^^^^^^^^
-Check.
-
-   386                  return;
-   387
-   388          mbx.sqs_alloc.msg = NIC_MBOX_MSG_ALLOC_SQS;
-   389          mbx.sqs_alloc.vf_id = nic->vf_id;
-   390          mbx.sqs_alloc.qs_count = nic->sqs_count;
-   391          if (nicvf_send_msg_to_pf(nic, &mbx)) {
-   392                  /* No response from PF */
-   393                  nic->sqs_count = 0;
-   394                  return;
-
-Set and return.
-Sunil>> Here VF is sending a mailbox message to PF for requesting sqs_count
-number of resources. For all messages sent by VF, PF acknowledges with an 
-ack or a proper reply. If this is not received by VF, it considers the message is lost and sets sqs_count to zero.
-Yes, 'return' is not needed here since it's checked below anyway.
-
-   395          }
-   396
-   397          /* Return if no Secondary Qsets available */
-   398          if (!nic->sqs_count)
-   399                  return;
-
-This seems like dead code.
-Sunil>> Here there is no issue with mailbox messages but PF sent a reply
-to VF that it couldn't allocate any additional resources. sqs_count is set to zero
-at VF's mailbox response handling code. Hence this is not a dead code. 
-
-   400
-
-regards,
-dan carpenter
+diff --git a/arch/sparc/kernel/iommu.c b/arch/sparc/kernel/iommu.c
+index 5320689..7d04a87 100644
+--- a/arch/sparc/kernel/iommu.c
++++ b/arch/sparc/kernel/iommu.c
+@@ -157,7 +157,7 @@ static inline iopte_t *alloc_npages(struct device *dev,
+ 				    struct iommu *iommu,
+ 				    unsigned long npages)
+ {
+-	unsigned long entry;
++	dma_addr_t entry;
+ 
+ 	entry = iommu_tbl_range_alloc(dev, &iommu->tbl, npages, NULL,
+ 				      (unsigned long)(-1), 0);
+@@ -476,7 +476,8 @@ static int dma_4u_map_sg(struct device *dev, struct scatterlist *sglist,
+ 				  IO_PAGE_SIZE) >> IO_PAGE_SHIFT;
+ 	base_shift = iommu->tbl.table_map_base >> IO_PAGE_SHIFT;
+ 	for_each_sg(sglist, s, nelems, i) {
+-		unsigned long paddr, npages, entry, out_entry = 0, slen;
++		unsigned long paddr, npages, slen;
++		dma_addr_t entry, out_entry = 0;
+ 		iopte_t *base;
+ 
+ 		slen = s->length;
+diff --git a/arch/sparc/kernel/ldc.c b/arch/sparc/kernel/ldc.c
+index 1ae5eb1..41e79cb 100644
+--- a/arch/sparc/kernel/ldc.c
++++ b/arch/sparc/kernel/ldc.c
+@@ -10,6 +10,7 @@
+ #include <linux/delay.h>
+ #include <linux/errno.h>
+ #include <linux/string.h>
++#include <linux/dma-mapping.h>
+ #include <linux/scatterlist.h>
+ #include <linux/interrupt.h>
+ #include <linux/list.h>
+@@ -1949,11 +1950,11 @@ static u64 make_cookie(u64 index, u64 pgsz_code, u64 page_offset)
+ static struct ldc_mtable_entry *alloc_npages(struct ldc_iommu *iommu,
+ 					     unsigned long npages)
+ {
+-	long entry;
++	dma_addr_t entry;
+ 
+ 	entry = iommu_tbl_range_alloc(NULL, &iommu->iommu_map_table,
+ 				      npages, NULL, (unsigned long)-1, 0);
+-	if (unlikely(entry < 0))
++	if (unlikely(entry == DMA_ERROR_CODE))
+ 		return NULL;
+ 
+ 	return iommu->page_table + entry;
+diff --git a/arch/sparc/kernel/pci_sun4v.c b/arch/sparc/kernel/pci_sun4v.c
+index d2fe57d..f86902f 100644
+--- a/arch/sparc/kernel/pci_sun4v.c
++++ b/arch/sparc/kernel/pci_sun4v.c
+@@ -136,7 +136,7 @@ static void *dma_4v_alloc_coherent(struct device *dev, size_t size,
+ 	struct iommu *iommu;
+ 	struct page *page;
+ 	void *ret;
+-	long entry;
++	dma_addr_t entry;
+ 	int nid;
+ 
+ 	size = IO_PAGE_ALIGN(size);
+@@ -242,7 +242,7 @@ static dma_addr_t dma_4v_map_page(struct device *dev, struct page *page,
+ 	unsigned long i, base_paddr;
+ 	u32 bus_addr, ret;
+ 	unsigned long prot;
+-	long entry;
++	dma_addr_t entry;
+ 
+ 	iommu = dev->archdata.iommu;
+ 
+@@ -361,7 +361,8 @@ static int dma_4v_map_sg(struct device *dev, struct scatterlist *sglist,
+ 				  IO_PAGE_SIZE) >> IO_PAGE_SHIFT;
+ 	base_shift = iommu->tbl.table_map_base >> IO_PAGE_SHIFT;
+ 	for_each_sg(sglist, s, nelems, i) {
+-		unsigned long paddr, npages, entry, out_entry = 0, slen;
++		unsigned long paddr, npages, slen;
++		dma_addr_t entry, out_entry = 0;
+ 
+ 		slen = s->length;
+ 		/* Sanity check */
+-- 
+2.5.1
