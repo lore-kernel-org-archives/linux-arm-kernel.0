@@ -1,207 +1,436 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Mon, 21 Sep 2015 09:35:51 -0700
-Subject: [PATCH 2/2] irqchip/gicv3-its:  Handle OF device tree "msi-map"
- properties.
-In-Reply-To: <20150921165814.01967eaf@arm.com>
-References: <1442512859-31633-1-git-send-email-ddaney.cavm@gmail.com>
- <1442512859-31633-3-git-send-email-ddaney.cavm@gmail.com>
- <20150918095109.144c22ed@arm.com> <55FC4FBA.1010306@caviumnetworks.com>
- <20150921165814.01967eaf@arm.com>
-Message-ID: <560031E7.1060307@caviumnetworks.com>
+From: dwoods@ezchip.com (David Woods)
+Date: Mon, 21 Sep 2015 12:44:45 -0400
+Subject: [PATCH] arm64: Add support for PTE contiguous bit.
+In-Reply-To: <CAPvkgC1JYZRc5BEXFxmR927r1asLYZw=oAMyUDcGPAOfC2Yy-A@mail.gmail.com>
+References: <1442340117-3964-1-git-send-email-dwoods@ezchip.com>
+ <CAPvkgC1JYZRc5BEXFxmR927r1asLYZw=oAMyUDcGPAOfC2Yy-A@mail.gmail.com>
+Message-ID: <560033FD.9000109@ezchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2015 08:58 AM, Marc Zyngier wrote:
-> On Fri, 18 Sep 2015 10:54:02 -0700
-> David Daney <ddaney@caviumnetworks.com> wrote:
->
->> On 09/18/2015 01:51 AM, Marc Zyngier wrote:
->>> On Thu, 17 Sep 2015 11:00:59 -0700
->>> David Daney <ddaney.cavm@gmail.com> wrote:
->>>
->>> Hi David,
->>>
->>>> From: David Daney <david.daney@cavium.com>
->>>>
->>>> Search up the device hierarchy to find devices with a "msi-map"
->>>> property, if found apply the mapping to the GIC device id.
->>>>
->>>> Signed-off-by: David Daney <david.daney@cavium.com>
->>>> ---
->>>>    drivers/irqchip/irq-gic-v3-its-pci-msi.c | 73 ++++++++++++++++++++++++++++++++
->>>>    1 file changed, 73 insertions(+)
->>>>
->>>> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
->>>> index cf351c6..aa61cef 100644
->>>> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
->>>> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
->>>> @@ -73,6 +73,8 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
->>>>    	struct pci_dev *pdev;
->>>>    	struct its_pci_alias dev_alias;
->>>>    	struct msi_domain_info *msi_info;
->>>> +	struct device *parent_dev;
->>>> +	struct device_node *msi_controller_node = NULL;
->>>>
->>>>    	if (!dev_is_pci(dev))
->>>>    		return -EINVAL;
->>>> @@ -84,6 +86,77 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
->>>>    	dev_alias.count = nvec;
->>>>
->>>>    	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
->>>> +	/*
->>>> +	 * Walk up the device parent links looking for one with a
->>>> +	 * "msi-map" property.
->>>> +	 */
->>>
->>> My first objection is the location of this parsing. It shouldn't be
->>> driver specific, but instead be part of the generic OF handling
->>> (nothing in these properties is GICv3 specific, even if the ITS is the
->>> only user so far).
+
+Steve,
+
+Thanks for your review and comments.  I take your points about the 16k 
+granule - it's helpful to know that support is in the works. However, 
+I'm not sure I agree with your reading of section 4.4.2. It's clear that 
+for 16k granules, the number of contiguous pages is different for the 
+PTE and PMD levels.  But I don't see anywhere it says that for 4K and 
+64K that the contig bit is not supported at the PMD level - just that 
+the number of contiguous pages is the same at each level.
+
+I tried using the tarmac trace module of the ARM simulator to support 
+this idea by turning on MMU tracing.  Using 4k granule, I created 64k 
+and 32m pages and touched each location in the page.  In both cases, the 
+trace recorded just one TLB fill (rather than the 16 you'd expect if the 
+contiguous bit were being ignored) and it indicated the expected page size.
+
+1817498494 clk cpu2 TLB FILL cpu2.S1TLB 64K 0x2000000000_NS vmid=0, nG 
+asid=303:0x08fa360000_NS Normal InnerShareable 
+Inner=WriteBackWriteAllocate Outer=WriteBackWriteAllocate xn=0 pxn=1 
+ContiguousHint=1
+
+1263366314 clk cpu2 TLB FILL cpu2.UTLB 32M 0x2000000000_NS vmid=0, nG 
+asid=300:0x08f6000000_NS Normal InnerShareable 
+Inner=WriteBackWriteAllocate Outer=WriteBackWriteAllocate xn=0 pxn=1 
+ContiguousHint=1
+
+I'll try this with a 64k granule next.  I'm not sure what will happen 
+with 16G pages since we are using an A53 model which I don't think 
+supports such large pages.
+
+-Dave
+
+On 09/16/2015 04:46 AM, Steve Capper wrote:
+> On 15 September 2015 at 19:01, David Woods <dwoods@ezchip.com> wrote:
+>> The arm64 MMU supports a Contiguous bit which is a hint that the TTE
+>> is one of a set of contiguous entries which can be cached in a single
+>> TLB entry.  Supporting this bit adds new intermediate huge page sizes.
 >>
->> OK, I agree that this should eventually end up in generic OF handling
->> code.  I just wanted to get something out to initiate discussion.
+>> The set of huge page sizes available depends on the base page size.
+>> Without using contiguous pages the huge page sizes are as follows.
 >>
->> The next patch revision will move this to a more generic home.
+>>   4KB:   2MB  1GB
+>> 64KB: 512MB  4TB
+> We just have 512MB for a 64KB granule.
+> As per [1] D4.2.6 - "The VMSAv8-64 translation table format" page D4-1668.
+>
+>> With 4KB pages, the contiguous bit groups together sets of 16 pages
+>> and with 64KB pages it groups sets of 32 pages.  This enables two new
+>> huge page sizes in each case, so that the full set of available sizes
+>> is as follows.
 >>
->>>
->>>> +	for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent) {
->>>
->>> Is there a limit how far we should go up the parent chain to find a
->>> msi-map? My hunch is that you should stop at the first device that does
->>> have an of_node, as it is the one that should contain the msi-map
->>> property.
+>>   4KB:  64KB   2MB  32MB  1GB
+>> 64KB:   2MB 512MB  16GB  4TB
 >>
->> I think there is the possibility of finding something like a bridge that
->> has an of_node, but does not have the "msi-map" property.  I currently
->> have exactly this configuration, as some of the on-SoC devices sit
->> behind a bridge, but need an of_node to obtain unprobable properties and
->> children (the MDIO bus devices are like this).
+>> If the base page size is set to 64KB then 2MB pages are enabled by
+>> default.  It is possible in the future to make 2MB the default huge
+>> page size for both 4KB and 64KB pages.
 >>
->> So if we want to abort the walk early, we should at least go up until we
->> find "msi-map" in the of_node.
+> Hi David,
+> Thanks for posting this, and apologies in advance for talking about
+> the ARM ARM[1]...
 >
-> I don't really see a case where we would traverse a series of nodes
-> where the msi-map property wouldn't be in the first node. Could you
-> please give me an example?
+> D4.4.2 "Other fields in the VMSAv8-64 translation table format
+> descriptors" (page D4-1715)
+> Only gives examples of the contiguous bit being used for level 3
+> descriptors (i.e. PTEs) when running with a 4KB and 64KB granule.
 >
-
-OK, how about this:
-
-	pcie0: pcie0 at 8480,00000000 {
-		compatible = "pci-host-ecam-generic";
-		device_type = "pci";
-		msi-parent = <&its>;
-		msi-map = <0 &its 0x80000 0x10000>;
-		bus-range = <0 255>;
-		#size-cells = <2>;
-		#address-cells = <3>;
-		#stream-id-cells = <1>;
-		reg = <0x8480 0x00000000 0 0x10000000>;	 /* Configuration space */
-		ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x070 
-0x00000000>, /* mem ranges */
-			 <0x03000000 0x87e0 0x00000000 0x87e0 0x00000000 0x020 0x00000000>;
-
-		/* Other devices that use MSI, like USB xHCI, are here
-		on the same bus as the bridge.  They have no firmware
-		node as sufficient information can be probed as part
-		of normal PCI probing. */
-
-		mrml-bridge0 at 1,0 {
-			compatible = "cavium,thunder-8890-mrml-bridge";
-			#size-cells = <2>;
-			#address-cells = <3>;
-			ranges = <0x03000000 0x87e0 0x00000000 0x03000000 0x87e0 0x00000000 
-0x10 0x00000000>;
-			reg = <0x0800 0 0 0 0>; /* DEVFN = 0x08 (1:0) */
-
-			mdio-nexus at 1,3 {
-				compatible = "cavium,thunder-8890-mdio-nexus";
-				#address-cells = <2>;
-				#size-cells = <2>;
-				reg = <0x0b00 0 0 0 0>; /* DEVFN = 0x0b (1:3) */
-				assigned-addresses = <0x03000000 0x87e0 0x05000000 0x0 0x800000>;
-				ranges = <0x87e0 0x05000000 0x03000000 0x87e0 0x05000000 0x0 0x800000>;
-
-				mdio0 at 87e0,05003800 {
-					compatible = "cavium,thunder-8890-mdio";
-					#address-cells = <1>;
-					#size-cells = <0>;
-					reg = <0x87e0 0x05003800 0x0 0x30>;
-
-					sgmii00: sgmii00 {
-						reg = <0> ;
-						compatible = "marvell,88e1240", "ethernet-phy-ieee802.3-c22";
-					};
-				};
-			};
-			bgx0 {
-				#address-cells = <1>;
-				#size-cells = <0>;
-				reg = <0x8000 0 0 0 0>; /* DEVFN = 0x80 (16:0) */
-				sgmii00 {
-					reg = <0>;
-					phy-handle = <&sgmii00>;
-				};
-
-			};
-
-		};
-
-
-The "msi-map" is specified in the PICe host controller node, but there
-is a bridge between the device generating interrupts "bgx0" and the
-host controller.
-
-
-> [...]
+> With a 16KB granule we *can* have a contiguous bit being used by level
+> 2 descriptors (i.e. PMDs), so the pmd_contig logic could perhaps be
+> used in combination with Suzuki's 16KB PAGE_SIZE series at:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/370117.html
 >
->>>> +		msi_controller_node = of_find_node_by_phandle(phandle);
->>>> +		if (domain->of_node != msi_controller_node) {
->>>> +			dev_err(dev,
->>>> +				"ERROR: msi-map mismatch \"%s\" vs. \"%s\"\n",
->>>> +				domain->of_node->full_name,
->>>> +				msi_controller_node ? NULL : msi_controller_node->full_name);
->>>
->>> Why is that an error? a RC can be configured to master multiple
->>> MSI-controllers,
+> I will read through the rest of the patch and post more feedback
+>
+> Cheers,
+> --
+> Steve
+>
+> [1] - http://infocenter.arm.com/help/topic/com.arm.doc.ddi0487a.g/index.html
+>
+>
+>
+>
+>> Signed-off-by: David Woods <dwoods@ezchip.com>
+>> Reviewed-by: Chris Metcalf <cmetcalf@ezchip.com>
+>> ---
+>>   arch/arm64/Kconfig                     |   3 -
+>>   arch/arm64/include/asm/hugetlb.h       |   4 +
+>>   arch/arm64/include/asm/pgtable-hwdef.h |  15 +++
+>>   arch/arm64/include/asm/pgtable.h       |  30 +++++-
+>>   arch/arm64/mm/hugetlbpage.c            | 165 ++++++++++++++++++++++++++++++++-
+>>   5 files changed, 210 insertions(+), 7 deletions(-)
 >>
->> Something has already associated the PCI device with this
->> MSI-controller.  Therefore I think the reference in the map must refer
->> to this ITS MSI-controller instance.
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 7d95663..8310e38 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -447,9 +447,6 @@ config HW_PERF_EVENTS
+>>   config SYS_SUPPORTS_HUGETLBFS
+>>          def_bool y
 >>
+>> -config ARCH_WANT_GENERAL_HUGETLB
+>> -       def_bool y
+>> -
+>>   config ARCH_WANT_HUGE_PMD_SHARE
+>>          def_bool y if !ARM64_64K_PAGES
 >>
->>> and the kernel picks one of them for a given device.
->>> This is illustrated by "Example (5)" in the binding, where a device can
->>> master two MSI controllers.
+>> diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
+>> index bb4052e..e5af553 100644
+>> --- a/arch/arm64/include/asm/hugetlb.h
+>> +++ b/arch/arm64/include/asm/hugetlb.h
+>> @@ -97,4 +97,8 @@ static inline void arch_clear_hugepage_flags(struct page *page)
+>>          clear_bit(PG_dcache_clean, &page->flags);
+>>   }
 >>
->> The PCI host may have many MSI controllers, but I think a given PCI
->> device will have only one (based on bus:devfn) that is looked up in the map.
->
-> A PCI device will only be configured to talk to a single MSI
-> controller, but here you stop parsing the msi-map on the first match,
-> and assume that you must have found the right MSI controller:
->
-> I think this should read:
->
-> +			if (masked_devid < rid_base ||
-> +			    masked_devid >= rid_base + rid_len ||
-> 			    domain->of_node != of_find_node_by_phandle(phandle)) {
-> +				msi_map_len -= 4 * sizeof(__be32);
-> +				msi_map += 4;
-> +				continue;
-> +			}
-> +			matched = true;
-> +			break;
->
-
-Good, I will incorporate that too.
-
-In practice, I don't know if we would ever find a system with multiple 
-"msi-map" on a path from the device to the root, but we should probably 
-attempt to handle it "just in case".
-
-
-> Thanks,
->
-> 	M.
->
+>> +extern pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
+>> +                               struct page *page, int writable);
+>> +#define arch_make_huge_pte arch_make_huge_pte
+>> +
+>>   #endif /* __ASM_HUGETLB_H */
+>> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+>> index 24154b0..da73243 100644
+>> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+>> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+>> @@ -55,6 +55,19 @@
+>>   #define SECTION_MASK           (~(SECTION_SIZE-1))
+>>
+>>   /*
+>> + * Contiguous large page definitions.
+>> + */
+>> +#ifdef CONFIG_ARM64_64K_PAGES
+>> +#define        CONTIG_SHIFT            5
+>> +#define CONTIG_PAGES           32
+>> +#else
+>> +#define        CONTIG_SHIFT            4
+>> +#define CONTIG_PAGES           16
+>> +#endif
+>> +#define        CONTIG_PTE_SIZE         (CONTIG_PAGES * PAGE_SIZE)
+>> +#define        CONTIG_PTE_MASK         (~(CONTIG_PTE_SIZE - 1))
+>> +
+>> +/*
+>>    * Hardware page table definitions.
+>>    *
+>>    * Level 1 descriptor (PUD).
+>> @@ -83,6 +96,7 @@
+>>   #define PMD_SECT_S             (_AT(pmdval_t, 3) << 8)
+>>   #define PMD_SECT_AF            (_AT(pmdval_t, 1) << 10)
+>>   #define PMD_SECT_NG            (_AT(pmdval_t, 1) << 11)
+>> +#define PMD_SECT_CONTIG                (_AT(pmdval_t, 1) << 52)
+>>   #define PMD_SECT_PXN           (_AT(pmdval_t, 1) << 53)
+>>   #define PMD_SECT_UXN           (_AT(pmdval_t, 1) << 54)
+>>
+>> @@ -105,6 +119,7 @@
+>>   #define PTE_AF                 (_AT(pteval_t, 1) << 10)        /* Access Flag */
+>>   #define PTE_NG                 (_AT(pteval_t, 1) << 11)        /* nG */
+>>   #define PTE_DBM                        (_AT(pteval_t, 1) << 51)        /* Dirty Bit Management */
+>> +#define PTE_CONTIG             (_AT(pteval_t, 1) << 52)        /* Contiguous */
+>>   #define PTE_PXN                        (_AT(pteval_t, 1) << 53)        /* Privileged XN */
+>>   #define PTE_UXN                        (_AT(pteval_t, 1) << 54)        /* User XN */
+>>
+>> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+>> index 6900b2d9..df5ec64 100644
+>> --- a/arch/arm64/include/asm/pgtable.h
+>> +++ b/arch/arm64/include/asm/pgtable.h
+>> @@ -144,6 +144,7 @@ extern struct page *empty_zero_page;
+>>   #define pte_special(pte)       (!!(pte_val(pte) & PTE_SPECIAL))
+>>   #define pte_write(pte)         (!!(pte_val(pte) & PTE_WRITE))
+>>   #define pte_exec(pte)          (!(pte_val(pte) & PTE_UXN))
+>> +#define pte_contig(pte)                (!!(pte_val(pte) & PTE_CONTIG))
+>>
+>>   #ifdef CONFIG_ARM64_HW_AFDBM
+>>   #define pte_hw_dirty(pte)      (!(pte_val(pte) & PTE_RDONLY))
+>> @@ -206,6 +207,9 @@ static inline pte_t pte_mkspecial(pte_t pte)
+>>          return set_pte_bit(pte, __pgprot(PTE_SPECIAL));
+>>   }
+>>
+>> +extern pte_t pte_mkcontig(pte_t pte);
+>> +extern pmd_t pmd_mkcontig(pmd_t pmd);
+>> +
+>>   static inline void set_pte(pte_t *ptep, pte_t pte)
+>>   {
+>>          *ptep = pte;
+>> @@ -275,7 +279,7 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+>>   /*
+>>    * Hugetlb definitions.
+>>    */
+>> -#define HUGE_MAX_HSTATE                2
+>> +#define HUGE_MAX_HSTATE                ((2 * CONFIG_PGTABLE_LEVELS) - 1)
+>>   #define HPAGE_SHIFT            PMD_SHIFT
+>>   #define HPAGE_SIZE             (_AC(1, UL) << HPAGE_SHIFT)
+>>   #define HPAGE_MASK             (~(HPAGE_SIZE - 1))
+>> @@ -372,7 +376,8 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+>>   #define pmd_none(pmd)          (!pmd_val(pmd))
+>>   #define pmd_present(pmd)       (pmd_val(pmd))
+>>
+>> -#define pmd_bad(pmd)           (!(pmd_val(pmd) & 2))
+>> +#define pmd_bad(pmd)           (!(pmd_val(pmd) & \
+>> +                                  (PMD_TABLE_BIT | PMD_SECT_CONTIG)))
+>>
+>>   #define pmd_table(pmd)         ((pmd_val(pmd) & PMD_TYPE_MASK) == \
+>>                                   PMD_TYPE_TABLE)
+>> @@ -500,7 +505,8 @@ static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
+>>   static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+>>   {
+>>          const pteval_t mask = PTE_USER | PTE_PXN | PTE_UXN | PTE_RDONLY |
+>> -                             PTE_PROT_NONE | PTE_WRITE | PTE_TYPE_MASK;
+>> +                             PTE_PROT_NONE | PTE_WRITE | PTE_TYPE_MASK |
+>> +                             PTE_CONTIG;
+>>          /* preserve the hardware dirty information */
+>>          if (pte_hw_dirty(pte))
+>>                  newprot |= PTE_DIRTY;
+>> @@ -513,6 +519,24 @@ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
+>>          return pte_pmd(pte_modify(pmd_pte(pmd), newprot));
+>>   }
+>>
+>> +static inline pte_t pte_modify_pfn(pte_t pte, unsigned long newpfn)
+>> +{
+>> +       const pteval_t mask = PHYS_MASK & PAGE_MASK;
+>> +
+>> +       pte_val(pte) = pfn_pte(newpfn, (pte_val(pte) & ~mask));
+>> +       return pte;
+>> +}
+>> +
+>> +#if CONFIG_PGTABLE_LEVELS > 2
+>> +static inline pmd_t pmd_modify_pfn(pmd_t pmd, unsigned long newpfn)
+>> +{
+>> +       const pmdval_t mask = PHYS_MASK & PAGE_MASK;
+>> +
+>> +       pmd = pfn_pmd(newpfn, (pmd_val(pmd) & ~mask));
+>> +       return pmd;
+>> +}
+>> +#endif
+>> +
+>>   #ifdef CONFIG_ARM64_HW_AFDBM
+>>   /*
+>>    * Atomic pte/pmd modifications.
+>> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+>> index 383b03f..f5bbbbc 100644
+>> --- a/arch/arm64/mm/hugetlbpage.c
+>> +++ b/arch/arm64/mm/hugetlbpage.c
+>> @@ -41,6 +41,155 @@ int pud_huge(pud_t pud)
+>>   #endif
+>>   }
+>>
+>> +pte_t *huge_pte_alloc(struct mm_struct *mm,
+>> +                       unsigned long addr, unsigned long sz)
+>> +{
+>> +       pgd_t *pgd;
+>> +       pud_t *pud;
+>> +       pte_t *pte = NULL;
+>> +       int i;
+>> +
+>> +       pgd = pgd_offset(mm, addr);
+>> +       pud = pud_alloc(mm, pgd, addr);
+>> +       if (pud) {
+>> +               if (sz == PUD_SIZE) {
+>> +                       pte = (pte_t *)pud;
+>> +               } else if (sz == PMD_SIZE) {
+>> +#ifdef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
+>> +                       if (pud_none(*pud))
+>> +                               pte = huge_pmd_share(mm, addr, pud);
+>> +                       else
+>> +#endif
+>> +                               pte = (pte_t *)pmd_alloc(mm, pud, addr);
+>> +               } else if (sz == (PAGE_SIZE * CONTIG_PAGES)) {
+>> +                       pmd_t *pmd = pmd_alloc(mm, pud, addr);
+>> +
+>> +                       WARN_ON(addr & (sz - 1));
+>> +                       pte = pte_alloc_map(mm, NULL, pmd, addr);
+>> +                       if (pte_present(*pte)) {
+>> +                               unsigned long pfn;
+>> +                               *pte = pte_mkcontig(*pte);
+>> +                               pfn = pte_pfn(*pte);
+>> +                               for (i = 0; i < CONTIG_PAGES; i++) {
+>> +                                       set_pte(&pte[i],
+>> +                                               pte_modify_pfn(*pte, pfn + i));
+>> +                               }
+>> +                       }
+>> +#if CONFIG_PGTABLE_LEVELS > 2
+>> +               } else if (sz == (PMD_SIZE * CONTIG_PAGES)) {
+>> +                       pmd_t *pmd;
+>> +
+>> +                       pmd = pmd_alloc(mm, pud, addr);
+>> +                       WARN_ON(addr & (sz - 1));
+>> +                       if (pmd && pmd_present(*pmd)) {
+>> +                               unsigned long pfn;
+>> +                               pmd_t pmdval;
+>> +
+>> +                               pmdval = *pmd = pmd_mkcontig(*pmd);
+>> +                               pfn = pmd_pfn(*pmd);
+>> +                               for (i = 0; i < CONTIG_PAGES; i++) {
+>> +                                       unsigned long newpfn = pfn +
+>> +                                               (i << (PMD_SHIFT - PAGE_SHIFT));
+>> +                                       if (!pmd_present(pmd[i]))
+>> +                                               atomic_long_inc(&mm->nr_ptes);
+>> +                                       set_pmd(&pmd[i],
+>> +                                               pmd_modify_pfn(pmdval, newpfn));
+>> +                               }
+>> +                       }
+>> +                       return pmd;
+>> +#endif
+>> +               }
+>> +       }
+>> +
+>> +       return pte;
+>> +}
+>> +
+>> +pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
+>> +{
+>> +       pgd_t *pgd;
+>> +       pud_t *pud;
+>> +       pmd_t *pmd = NULL;
+>> +       pte_t *pte = NULL;
+>> +
+>> +       pgd = pgd_offset(mm, addr);
+>> +       if (pgd_present(*pgd)) {
+>> +               pud = pud_offset(pgd, addr);
+>> +               if (pud_present(*pud)) {
+>> +                       if (pud_huge(*pud))
+>> +                               return (pte_t *)pud;
+>> +                       pmd = pmd_offset(pud, addr);
+>> +                       if (pmd_present(*pmd)) {
+>> +                               if (pmd_huge(*pmd))
+>> +                                       return (pte_t *)pmd;
+>> +                               pte = pte_offset_kernel(pmd, addr);
+>> +                               if (pte_present(*pte) && pte_contig(*pte)) {
+>> +                                       pte = pte_offset_kernel(
+>> +                                               pmd, (addr & CONTIG_PTE_MASK));
+>> +                                       return pte;
+>> +                               }
+>> +                       }
+>> +               }
+>> +       }
+>> +       return (pte_t *) NULL;
+>> +}
+>> +
+>> +pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
+>> +                        struct page *page, int writable)
+>> +{
+>> +       size_t pagesize = huge_page_size(hstate_vma(vma));
+>> +       pte_t nent = {0};
+>> +
+>> +       if (pagesize == PUD_SIZE || pagesize == PMD_SIZE)
+>> +               nent = entry;
+>> +       else if (pagesize == (PAGE_SIZE * CONTIG_PAGES))
+>> +               nent = pte_mkcontig(entry);
+>> +#if CONFIG_PGTABLE_LEVELS > 2
+>> +       else if (pagesize == (PMD_SIZE * CONTIG_PAGES) ||
+>> +                pagesize == (PUD_SIZE * CONTIG_PAGES))
+>> +               nent = pmd_mkcontig(entry);
+>> +#endif
+>> +       else {
+>> +               pr_warn("%s: unrecognized huge page size 0x%lx\n",
+>> +                      __func__, pagesize);
+>> +       }
+>> +       return nent;
+>> +}
+>> +
+>> +pte_t pte_mkcontig(pte_t pte)
+>> +{
+>> +       pte = set_pte_bit(pte, __pgprot(PTE_CONTIG));
+>> +       pte = set_pte_bit(pte, __pgprot(PTE_TYPE_PAGE));
+>> +       return pte;
+>> +}
+>> +
+>> +pmd_t pmd_mkcontig(pmd_t pmd)
+>> +{
+>> +       pmd = __pmd(pmd_val(pmd) | PMD_SECT_CONTIG);
+>> +       return pmd;
+>> +}
+>> +
+>> +struct page *follow_huge_pmd(struct mm_struct *mm, unsigned long address,
+>> +               pmd_t *pmd, int write)
+>> +{
+>> +       struct page *page;
+>> +
+>> +       page = pte_page(*(pte_t *)pmd);
+>> +       if (page)
+>> +               page += ((address & ~PMD_MASK) >> PAGE_SHIFT);
+>> +       return page;
+>> +}
+>> +
+>> +struct page *follow_huge_pud(struct mm_struct *mm, unsigned long address,
+>> +               pud_t *pud, int write)
+>> +{
+>> +       struct page *page;
+>> +
+>> +       page = pte_page(*(pte_t *)pud);
+>> +       if (page)
+>> +               page += ((address & ~PUD_MASK) >> PAGE_SHIFT);
+>> +       return page;
+>> +}
+>> +
+>>   static __init int setup_hugepagesz(char *opt)
+>>   {
+>>          unsigned long ps = memparse(opt, &opt);
+>> @@ -48,10 +197,24 @@ static __init int setup_hugepagesz(char *opt)
+>>                  hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
+>>          } else if (ps == PUD_SIZE) {
+>>                  hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
+>> +       } else if (ps == (PAGE_SIZE * CONTIG_PAGES)) {
+>> +               hugetlb_add_hstate(CONTIG_SHIFT);
+>> +       } else if (ps == (PMD_SIZE * CONTIG_PAGES)) {
+>> +               hugetlb_add_hstate((PMD_SHIFT + CONTIG_SHIFT) - PAGE_SHIFT);
+>>          } else {
+>> -               pr_err("hugepagesz: Unsupported page size %lu M\n", ps >> 20);
+>> +               pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
+>>                  return 0;
+>>          }
+>>          return 1;
+>>   }
+>>   __setup("hugepagesz=", setup_hugepagesz);
+>> +
+>> +#ifdef CONFIG_ARM64_64K_PAGES
+>> +static __init int add_default_hugepagesz(void)
+>> +{
+>> +       if (size_to_hstate(CONTIG_PAGES * PAGE_SIZE) == NULL)
+>> +               hugetlb_add_hstate(CONTIG_SHIFT);
+>> +       return 0;
+>> +}
+>> +arch_initcall(add_default_hugepagesz);
+>> +#endif
+>> --
+>> 2.1.2
+>>
