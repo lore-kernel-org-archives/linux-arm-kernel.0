@@ -1,82 +1,80 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 21 Sep 2015 16:47:08 +0100
-Subject: [PATCH 12/17] ARM: OMAP2+: remove misuse of IRQF_NO_SUSPEND flag
+Date: Mon, 21 Sep 2015 16:47:10 +0100
+Subject: [PATCH 14/17] media: st-rc: remove misuse of IRQF_NO_SUSPEND flag
 In-Reply-To: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
 References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1442850433-5903-13-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1442850433-5903-15-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
-be left enabled so as to allow them to work as expected during the
-suspend-resume cycle, but doesn't guarantee that it will wake the system
-from a suspended state, enable_irq_wake is recommended to be used for
-the wakeup.
+The device is set as wakeup capable using proper wakeup API but the
+driver misuses IRQF_NO_SUSPEND to set the interrupt as wakeup source
+which is incorrect.
 
 This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
 enable_irq_wake instead.
 
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: linux-omap at vger.kernel.org
+Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+Cc: Maxime Coquelin <maxime.coquelin@st.com>
+Cc: Patrice Chotard <patrice.chotard@st.com>
+Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: kernel at stlinux.com
+Cc: linux-media at vger.kernel.org
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm/mach-omap2/mux.c    | 4 ++--
- arch/arm/mach-omap2/pm34xx.c | 9 ++++-----
- 2 files changed, 6 insertions(+), 7 deletions(-)
+ drivers/media/rc/st_rc.c | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index 176eef6ef338..12012bef8e63 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -810,13 +810,13 @@ int __init omap_mux_late_init(void)
- 		return 0;
+diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
+index 37d040158dff..1fa0c9d1c508 100644
+--- a/drivers/media/rc/st_rc.c
++++ b/drivers/media/rc/st_rc.c
+@@ -16,6 +16,7 @@
+ #include <linux/reset.h>
+ #include <media/rc-core.h>
+ #include <linux/pinctrl/consumer.h>
++#include <linux/pm_wakeirq.h>
  
- 	ret = request_irq(omap_prcm_event_to_irq("io"),
--		omap_hwmod_mux_handle_irq, IRQF_SHARED | IRQF_NO_SUSPEND,
-+		omap_hwmod_mux_handle_irq, IRQF_SHARED,
- 			"hwmod_io", omap_mux_late_init);
+ struct st_rc_device {
+ 	struct device			*dev;
+@@ -190,6 +191,9 @@ static void st_rc_hardware_init(struct st_rc_device *dev)
+ static int st_rc_remove(struct platform_device *pdev)
+ {
+ 	struct st_rc_device *rc_dev = platform_get_drvdata(pdev);
++
++	dev_pm_clear_wake_irq(&pdev->dev);
++	device_init_wakeup(&pdev->dev, false);
+ 	clk_disable_unprepare(rc_dev->sys_clock);
+ 	rc_unregister_device(rc_dev->rdev);
+ 	return 0;
+@@ -298,22 +302,22 @@ static int st_rc_probe(struct platform_device *pdev)
+ 	rdev->map_name = RC_MAP_LIRC;
+ 	rdev->input_name = "ST Remote Control Receiver";
  
- 	if (ret)
- 		pr_warn("mux: Failed to setup hwmod io irq %d\n", ret);
- 
--	return 0;
-+	return enable_irq_wake(omap_prcm_event_to_irq("io"));
- }
- 
- static void __init omap_mux_package_fixup(struct omap_mux *p,
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 87b98bf92366..4b7ac7cd633a 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -472,23 +472,22 @@ int __init omap3_pm_init(void)
- 	prcm_setup_regs();
- 
- 	ret = request_irq(omap_prcm_event_to_irq("wkup"),
--		_prcm_int_handle_wakeup, IRQF_NO_SUSPEND, "pm_wkup", NULL);
-+		_prcm_int_handle_wakeup, 0, "pm_wkup", NULL);
- 
- 	if (ret) {
- 		pr_err("pm: Failed to request pm_wkup irq\n");
- 		goto err1;
- 	}
-+	enable_irq_wake(omap_prcm_event_to_irq("wkup"));
- 
- 	/* IO interrupt is shared with mux code */
- 	ret = request_irq(omap_prcm_event_to_irq("io"),
--		_prcm_int_handle_io, IRQF_SHARED | IRQF_NO_SUSPEND, "pm_io",
--		omap3_pm_init);
--	enable_irq(omap_prcm_event_to_irq("io"));
+-	/* enable wake via this device */
+-	device_set_wakeup_capable(dev, true);
+-	device_set_wakeup_enable(dev, true);
 -
-+		_prcm_int_handle_io, IRQF_SHARED, "pm_io", omap3_pm_init);
- 	if (ret) {
- 		pr_err("pm: Failed to request pm_io irq\n");
- 		goto err2;
- 	}
-+	enable_irq_wake(omap_prcm_event_to_irq("io"));
+ 	ret = rc_register_device(rdev);
+ 	if (ret < 0)
+ 		goto clkerr;
  
- 	ret = pwrdm_for_each(pwrdms_setup, NULL);
- 	if (ret) {
+ 	rc_dev->rdev = rdev;
+ 	if (devm_request_irq(dev, rc_dev->irq, st_rc_rx_interrupt,
+-			IRQF_NO_SUSPEND, IR_ST_NAME, rc_dev) < 0) {
++			     0, IR_ST_NAME, rc_dev) < 0) {
+ 		dev_err(dev, "IRQ %d register failed\n", rc_dev->irq);
+ 		ret = -EINVAL;
+ 		goto rcerr;
+ 	}
+ 
++	/* enable wake via this device */
++	device_init_wakeup(dev, true);
++	dev_pm_set_wake_irq(dev, rc_dev->irq);
++
+ 	/**
+ 	 * for LIRC_MODE_MODE2 or LIRC_MODE_PULSE or LIRC_MODE_RAW
+ 	 * lircd expects a long space first before a signal train to sync.
 -- 
 1.9.1
