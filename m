@@ -1,30 +1,33 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Mon, 21 Sep 2015 10:17:23 -0700
-Subject: [PATCH v9] dmaengine: Add Xilinx AXI Direct Memory Access Engine
- driver support
-In-Reply-To: <55E00050.2020709@xilinx.com>
-References: <1440432666-10310-1-git-send-email-appanad@xilinx.com>
- <CAAtXAHccn5UjCg9Qr1Li1c9LfsBXrgF=gpMqJ6stGOaWL0u_-g@mail.gmail.com>
- <55E00050.2020709@xilinx.com>
-Message-ID: <CAAtXAHc_wfuzW=ERRqvjcd_Ow5e2RrEcDkiYRuotzCRhq+oUYQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Sep 2015 18:17:16 +0100
+Subject: [PATCH] arm: wire up userfaultfd and membarrier syscalls
+In-Reply-To: <1442854833-10592-1-git-send-email-andre.przywara@arm.com>
+References: <1442854833-10592-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150921171715.GR21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kedar,
+On Mon, Sep 21, 2015 at 06:00:33PM +0100, Andre Przywara wrote:
+> Add the syscall numbers to the ARM syscall table. Both have
+> been briefly tested using the provided selftests from the tools
+> directory.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Hi Russell,
+> 
+> I saw that Thierry sent something similar beginning of August already
+> (which is now outdated), is there any issue with enabling syscalls?
 
-I finally got around to test your stuff on hardware. Sorry it took me so long.
+The only issue there is is that this was mentioned last week, and I
+replied about it last week.
 
-[    5.486709] dma1chan0-dma1c: terminating after 5 tests, 0 failures (status 0)
+I already have a patch pending for it, but I've been unable to merge
+it into mainline as my tree became somewhat messy due to the fixes
+missing -rc1 - which meant that my fixes branch was not recent enough
+to take that patch.  Now that those fixes are in, I can now start
+sorting my tree out, as I'd normally do after -rc1.
 
-So it looks like it's working. You can already add a
-
-Tested-by: Moritz Fischer <moritz.fischer@ettus.com>
-
-for the driver.
-
-I'll take a closer look at the code this week now that I have a known
-good bit file.
-
-Thanks,
-
-Moritz
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
