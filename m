@@ -1,131 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 Sep 2015 15:41:20 +0100
-Subject: [PATCH v4 2/2] dt-binding:Documents of the mbigen bindings
-In-Reply-To: <56013D0A.4000403@huawei.com>
-References: <1439952920-2296-1-git-send-email-majun258@huawei.com>
- <1439952920-2296-3-git-send-email-majun258@huawei.com>
- <20150921190915.1a551e16@arm.com> <56013D0A.4000403@huawei.com>
-Message-ID: <20150922154120.18634b41@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 22 Sep 2015 16:44:01 +0200
+Subject: [PATCH 4/5] ARM: dts: sun8i: Add pwm-backlight device for
+ A23/A33 Q8 format tablets
+In-Reply-To: <1442752251-20744-5-git-send-email-hdegoede@redhat.com>
+References: <1442752251-20744-1-git-send-email-hdegoede@redhat.com>
+ <1442752251-20744-5-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150922144401.GE4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Sep 2015 19:35:38 +0800
-"majun (F)" <majun258@huawei.com> wrote:
+On Sun, Sep 20, 2015 at 08:30:50AM -0400, Hans de Goede wrote:
+> From: Chen-Yu Tsai <wens@csie.org>
+> 
+> The LCD backlight on the A23/A33 Q8 format tablets is enabled
+> with a GPIO controlled regulator, and brightness controlled with
+> the SoC's PWM controller.
+> 
+> The backlight is powered from the AXP223 PMIC's DC1SW output,
+> which is not supported yet. A proper bootloader is required
+> to enable it.
+> 
+> The brightness levels are arbitrary. The FEX files do not have
+> such information. As such, actual brightness levels may differ
+> from device to device.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-> Hi Marc:
-> 
-> ? 2015/9/22 2:09, Marc Zyngier ??:
-> > On Wed, 19 Aug 2015 03:55:20 +0100
-> > MaJun <majun258@huawei.com> wrote:
-> > 
-> [...]
-> >> +These nodes must have the following properties:
-> >> +- msi-parent: This property has two cells.
-> >> +	The 1st cell specifies the ITS this device connected.
-> >> +	The 2nd cell specifies the device id.
-> >> +- nr-interrupts:Specifies the total number of interrupt this device has.
-> >> +- mbigen_node: Specifies the information of mbigen nodes this device
-> >> +  connected.Some devices with many interrupts maybe connects with several
-> >> +  mbigen nodes.
-> >> +
-> >> +Examples:
-> >> +
-> >> +		mbigen_dsa: interrupt-controller at c0080000 {
-> >> +			compatible = "hisilicon,mbigen-v2";
-> >> +			interrupt-controller;
-> >> +			#interrupt-cells = <5>;
-> >> +			#mbigen-node-cells = <3>;
-> >> +			reg = <0xc0080000 0x10000>;
-> >> +
-> >> +			mbigen_device_01 {
-> >> +				msi-parent = <&its 0x40b1c>;
-> >> +				nr-interrupts = <9>;
-> >> +				mbigen_node = <1 2 0>,
-> >> +							<3 2 4>,
-> >> +							<4 5 0>;
-> >> +			}
-> >> +
-> >> +			mbigen_device_02 {
-> >> +				msi-parent = <&its 0x40b1d>;
-> >> +				nr-interrupts = <3>;
-> >> +				mbigen_node = <6 3 0>;
-> >> +				interrupt-controller;
-> >> +			}
-> >> +		};
-> >> +
-> >> +Device connect to mbigen required properties:
-> >> +----------------------------------------------------
-> >> +-interrupt-parent: Specifies the mbigen node which device connected.
-> >> +-interrupts:specifies the interrupt source.The first cell is hwirq num, the
-> >> +  second number is trigger type.
-> >> +
-> >> +Examples:
-> >> +	smmu_dsa {
-> >> +		compatible = "arm,smmu-v3";
-> >> +		reg = <0x0 0xc0040000 0x0 0x20000>;
-> >> +		interrupt-parent  = <&mbigen_dsa>;
-> >> +		interrupts = <0x40b20 6 78 1>,
-> >> +				<0x40b20 6 79 1>,
-> >> +				<0x40b20 6 80 1>;
-> >> +	};
-> >> +
-> > 
-> > I find the current split very confusing. In your example, the interrupt
-> > controller is the mbigen block, which forces you to encode the DevID as
-> > part of the interrupt specifier. This doesn't feel like an ideal
-> > design, because you end up duplicating the DevID information at both
-> > the "client" device and the mbi_device.
-> > 
-> > I'd be more inclined to have the mbi_device itself be the interrupt
-> > controller for the client device. This would eliminate information
-> > duplication, and reflect the hardware (or what I understand of the
-> > hardware) a bit more.
-> 
-> Do you mean make the dts likes below?
-> 
-> 
-> 		mbigen_dsa: interrupt-controller at c0080000 {
-> 			compatible = "hisilicon,mbigen-v2";
-> 			interrupt-controller;
-> 			#interrupt-cells = <5>;
+Applied, thanks!
 
-These two statements shouldn't be here...
+Maxime
 
-> 			#mbigen-node-cells = <3>;
-> 			reg = <0xc0080000 0x10000>;
-> 			
-> 			mbigen_client_device1 {
-> 				msi-parent = <&its 0x40b1c>;
-> 				nr-interrupts = <9>;
-> 				interrupt-controller;
-
-This is where #interrupt-cells should be.
-
-> 			}
-> 
-> 			mbigen_client_device2{
-> 				msi-parent = <&its 0x40b1d>;
-> 				nr-interrupts = <3>;
-> 				interrupt-controller;
-> 			}
-> 		};
-> 
-> 
-> 	client_device1 {
-> 		compatible = "arm,smmu-v3";
-> 		reg = <0x0 0xc0040000 0x0 0x20000>;
-> 		interrupt-parent  = <&mbigen_client_device1>;
-> 		interrupts = <pin_offset 78 1>,
-> 				<pin_offset 79 1>,
-> 				<pin_offset 80 1>;
-> 	};
-> 
-> 
-
-But otherwise, this looks better.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/44c0da5a/attachment.sig>
