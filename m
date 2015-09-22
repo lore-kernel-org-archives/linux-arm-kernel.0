@@ -1,75 +1,99 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 22 Sep 2015 16:19:00 -0700
-Subject: [PATCH v2 4/9] clk: rockchip: add new clock type and controller
- for rk3036
-In-Reply-To: <2850967.rjRj3AZerS@diego>
-References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
- <1442478540-15068-5-git-send-email-zhengxing@rock-chips.com>
- <20150922224125.GK23081@codeaurora.org> <2850967.rjRj3AZerS@diego>
-Message-ID: <20150922231900.GL23081@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 23 Sep 2015 02:19:19 +0300
+Subject: [PATCH v2] ARM: shmobile: silk: add SDHI1 DT support
+In-Reply-To: <CANqRtoSRZo_J1kV0EkYdVzg9YRJ5=Ha3eQRVPKeq9M=kAPLwpA@mail.gmail.com>
+References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+ <2757472.iuyUyRzJ3z@wasted.cogentembedded.com>
+ <20150812012652.GH15957@verge.net.au> <55D790A5.1050008@cogentembedded.com>
+ <55D7A3A1.9020009@cogentembedded.com> <20150902022936.GA18115@verge.net.au>
+ <55EA2D8D.90004@cogentembedded.com> <20150918002122.GC12858@verge.net.au>
+ <CANqRtoSRZo_J1kV0EkYdVzg9YRJ5=Ha3eQRVPKeq9M=kAPLwpA@mail.gmail.com>
+Message-ID: <5601E1F7.1060907@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23, Heiko St?bner wrote:
-> Hi Stephen,
-> 
-> Am Dienstag, 22. September 2015, 15:41:25 schrieb Stephen Boyd:
-> > On 09/17, Xing Zheng wrote:
-> > > +
-> > > +static void rockchip_rk3036_pll_init(struct clk_hw *hw)
-> > 
-> > init ops are "discouraged". Could we do this through assigned
-> > rates instead?
-> 
-> really? According to Mike that was a valid use-case when we looked for an 
-> initial place for that on the rk3288 :-) .
+Hello.
 
-A comment in clk.c indicates init ops are discouraged. Maybe this
-is a valid use-case on other platforms so it was allowed, but
-pretty much every time we see a new init op we have to think
-about it and justify it. Hooray!
+On 09/18/2015 05:56 AM, Magnus Damm wrote:
 
-> 
-> 
-> > > +{
-> > > +	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
-> > > +	const struct rockchip_pll_rate_table *rate;
-> > > +	unsigned int fbdiv, postdiv1, refdiv, postdiv2, dsmpd, frac;
-> > > +	unsigned long drate;
-> > > +	u32 pllcon;
-> > > +
-> > > +	if (!(pll->flags & ROCKCHIP_PLL_SYNC_RATE))
-> > > +		return;
-> > 
-> > I don't understand what this one does though. This check isn't in
-> > the set rate ops.
-> 
-> And it shouldn't be :-)
-> 
-> The issue this whole thing is trying to solve is aligning the pll settings 
-> which what we have in the rate table, not what the bootloader set.
-> 
-> For example the bootloader could set up a pll at 594MHz with one set of 
-> parameters and after some time - when you don't want to exchange bootloaders 
-> on shipping devices anymore - it comes to light that a different set of 
-> parameters for the same frequency produces for example a more stable hdmi 
-> signal [I think that was the main reason for the initial change].
-> 
-> So we're not changing the frequency x -> y, which could be easily done [and is 
-> done already] via assigned-rates, but instead
-> 	x {params a,b,c} -> x {params d,e,f}
-> so the rate itself stays the same, only the frequency generation is adapted.
+>>>>>>>> Define the SILK board dependent part of the SDHI1 (connected to micro-SD slot)
+>>>>>>>> device nodes along with the necessary voltage regulators.
+>>>>>>>>
+>>>>>>>> Based on the original patch by Vladimir Barinov
+>>>>>>>> <vladimir.barinov@cogentembedded.com>.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>>>>>>
+>>>>>>>> ---
+>>>>>>>> This patch is against 'renesas-devel-20150810-v4.2-rc6' tag of Simon Horman's
+>>>>>>>> 'renesas.git' repo plus the R8A7794/SILK QSPI patches just re-posted. It needs
+>>>>>>>> the R8A7794 GPIO patches in order to compile.
+>>>>>>>>
+>>>>>>>> Changes in version 2:
+>>>>>>>> - removed not working SDHI0 stuff, renamed the patch;
+>>>>>>>> - replaced SDHI1's "wp-gpios" property with "disable-wp".
+>>>>>>>
+>>>>>>> I am wondering if you could explain the motivation for the "disable-wp"
+>>>>>>> update
+>>>>>>
+>>>>>>     Please see the comment in mmc_sd_get_ro().
+>>>>>>
+>>>>>>> and weather it is appropriate for other r8a779* dts files.
+>>>>>>
+>>>>>>     In case of micro-SD slots, yes.
+>>>>>
+>>>>>     The MMC binding document says it should only be specified if the
+>>>>> controller has WP detection logic. We, so far, seem to have been replying on
+>>>>> the GPIOs despite this logic is present (according to the R-Car gen2 SDHI
+>>>>> manuals I have). The driver will first call mmc_gpio_get_ro() and when that
+>>>>> fails due to "wp-gpios" not being specified, it proceeds to reading the
+>>>>> register but that is forbidden by TMIO_MMC_WRPROTECT_DISABLE flag set for
+>>>>> the R-Car gen1/2 chips, so 0 is always returned from tmio_mmc_get_ro().
+>>>>> There seems to be no point in going that far (and doing the runtime PM
+>>>>> dances) --
+>>>
+>>>     Alternatively, the driver could be fixed to check the flag before the RPM
+>>> call unlike what it does now.
+>>
+>> If the driver can be updated to do the right thing then that seems
+>> preferable to me. If so would it be the case that the presence of the
+>> "disable-wp" property would not have any run-time effect?
+>>>
+>>>>> and MMC_CAP2_NO_WRITE_PROTECT (set when "disable-wp" is specified) prohibits
+>>>>> doing that...
+>>>>
+>>>> That sounds reasonable to me.
+>>>
+>>>     I'm still wondering why TMIO_MMC_WRPROTECT_DISABLE is set for the R-Car
+>>> SoCs. Morimoto-san, any comments? Your change logs are too terse. :-)
+>>
+>> I will follow up on this.
 
-Ok. It would be nice if this sort of information was made into a
-comment and put in the code. Or at least the commit text for the
-change.
+[...]
+> Now what is the issue that you guys are having?
 
-And is there any reason that we need to get the parent clock and
-parent rate to align the PLL settings? It would be nice if we
-avoided using clk_* APIs in here, by extracting the pll set rate
-code into another function that we can call from init to make the
-values the same without all the fallback to old rates, etc.
+    My main issue is that I don't understand why checking the write protect 
+bit is always prohibited for the R-Car SoCs (by setting 
+TMIO_MMC_WRPROTECT_DISABLE), i.e. it can only be read via GPIO (though that 
+GPIO is just an alias of the WP signal).
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>>>> Some more questions from my side:
+>>>
+>>>> * What is the status of this patch
+>>>
+>>>     Tested, working.
+>>>
+>>>> * Can you prepare patches for r8a779* dts files for micro-SD slots?
+>>>
+>>>     Ugh, I probably can but won't promise anything.
+>>
+>> Likewise, ugh.
+
+> What needs to be updated for R-Car Gen1 again?
+
+    We haven't reached the agreement about the need for update yet.
+
+> Thanks,
+> / magnus
+
+MBR, Sergei
