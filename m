@@ -1,80 +1,97 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 22 Sep 2015 16:37:17 +0100
-Subject: [RESEND PATCH] media: vb2: Fix vb2_dc_prepare do not correct sync
- data to device
-In-Reply-To: <56000293.9000802@xs4all.nl>
-References: <1442838371-21484-1-git-send-email-tiffany.lin@mediatek.com>
- <56000293.9000802@xs4all.nl>
-Message-ID: <560175AD.2010401@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 22 Sep 2015 16:39:31 +0100
+Subject: [PATCH 2/3] PCI: Add quirks for devices found on Cavium ThunderX
+ SoCs.
+In-Reply-To: <2512701.zkjk3n3AQS@wuerfel>
+References: <1442529694-1792-1-git-send-email-ddaney.cavm@gmail.com>
+ <3066583.BWDZlYWxXU@wuerfel> <55FC4330.10302@caviumnetworks.com>
+ <2512701.zkjk3n3AQS@wuerfel>
+Message-ID: <20150922153931.GD17444@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On Fri, Sep 18, 2015 at 08:45:50PM +0100, Arnd Bergmann wrote:
+> On Friday 18 September 2015 10:00:32 David Daney wrote:
+> > On 09/18/2015 12:19 AM, Arnd Bergmann wrote:
+> > > On Thursday 17 September 2015 15:41:33 David Daney wrote:
+> > >> From: David Daney <david.daney@cavium.com>
+> > >>
+> > >> The on-chip devices all have fixed bars.  So, fix them up.
+> > >>
+> > >> Signed-off-by: David Daney <david.daney@cavium.com>
+> > >>
+> > >
+> > > You should be able to just mark the BARs as fixed in DT
+> > 
+> > In the case of ACPI, there is no DT.  So we would need a different 
+> > solution for ACPI.  What would you recommend for ACPI?
+> 
+> I would expect that this does not matter at all on ACPI, because
+> the devices that need it are not hot-plugged, and all boot-time
+> devices are probed by the firmware: the ACPI PCI implementation
+> does not reassign any BARs, except for the hotplug case.
 
-On 21/09/15 14:13, Hans Verkuil wrote:
-> Hi Tiffany!
->
-> On 21-09-15 14:26, Tiffany Lin wrote:
->> vb2_dc_prepare use the number of SG entries dma_map_sg_attrs return.
->> But in dma_sync_sg_for_device, it use lengths of each SG entries
->> before dma_map_sg_attrs. dma_map_sg_attrs will concatenate
->> SGs until dma length > dma seg bundary. sgt->nents will less than
->> sgt->orig_nents. Using SG entries after dma_map_sg_attrs
->> in vb2_dc_prepare will make some SGs are not sync to device.
->> After add DMA_ATTR_SKIP_CPU_SYNC in vb2_dc_get_userptr to remove
->> sync data to device twice. Device randomly get incorrect data because
->> some SGs are not sync to device. Change to use number of SG entries
->> before dma_map_sg_attrs in vb2_dc_prepare to prevent this issue.
->>
->> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
->> ---
->>   drivers/media/v4l2-core/videobuf2-dma-contig.c | 4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/media/v4l2-core/videobuf2-dma-contig.c b/drivers/media/v4l2-core/videobuf2-dma-contig.c
->> index 2397ceb..c5d00bd 100644
->> --- a/drivers/media/v4l2-core/videobuf2-dma-contig.c
->> +++ b/drivers/media/v4l2-core/videobuf2-dma-contig.c
->> @@ -100,7 +100,7 @@ static void vb2_dc_prepare(void *buf_priv)
->>   	if (!sgt || buf->db_attach)
->>   		return;
->>
->> -	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir);
->> +	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
->>   }
->>
->>   static void vb2_dc_finish(void *buf_priv)
->> @@ -112,7 +112,7 @@ static void vb2_dc_finish(void *buf_priv)
->>   	if (!sgt || buf->db_attach)
->>   		return;
->>
->> -	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir);
->> +	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
->>   }
->
-> I don't really understand it. I am assuming that this happens on an arm and that
-> the dma_map_sg_attrs and dma_sync_sg_* functions used are arm_iommu_map_sg() and
-> arm_iommu_sync_sg_* as implemented in arch/arm/mm/dma-mapping.c.
->
-> Now, as I understand it (and my understanding may very well be flawed!) the map_sg
-> function concatenates SG entries if possible, so it may return fewer entries. But
-> the dma_sync_sg functions use those updated SG entries, so the full buffer should
-> be covered by this. Using orig_nents will actually sync parts of the buffer twice!
-> The first nents entries already cover the full buffer so any remaining entries up
-> to orig_nents will just duplicate parts of the buffer.
+What do you mean by "the ACPI PCI implementation does not reassign
+any BARs" ? Do you mean on x86 ? The resource assignment is part
+of the resource survey on x86, where all resources that can be claimed
+are claimed, but still, some of them may be still reassigned IIUC.
 
-As Documentation/DMA-API.txt says, the parameters to dma_sync_sg_* must 
-be the same as those originally passed into dma_map_sg. The segments are 
-only merged *from the point of view of the device*: if I have a 
-scatterlist of two discontiguous 4K segments, I can remap them with an 
-IOMMU so the device sees them as a single 8K buffer, and tell it as 
-such. If on the other hand I want to do maintenance from the CPU side 
-(i.e. any DMA API call), then those DMA addresses mean nothing and I can 
-only operate on the CPU addresses of the underlying pages, which are 
-still very much discontiguous in the linear map; ergo I still need to 
-iterate over the original entries.
+On arm64 we do not carry out any resource survey at present, but
+if we do (and we should), it will have to work for both DT and ACPI
+systems.
 
-Whilst I can't claim much familiarity with v4l itself, from a brief look 
-over the existing code this patch does look to be doing the right thing.
+> > Also, can you point me to the OF device tree specification where it 
+> > tells how to specify PCI BAR addresses, I would especially be interested 
+> > in knowing how to specify fixed SRIOV BAR addresses in the device tree.
+> 
+> This is the 'n' bit mentioned sections 2.1.3 and 2.2.1.1 of the
+> PCI binding. When it is set, the OS is not supposed to try to
+> reassign the BAR even on machines that otherwise do a complete
+> rescan.
 
-Robin.
+I do not see any code in the kernel taking care of that bit and
+if I am not mistaken the code that allows creating pci devices
+exists in PowerPC arch code (arch/powerpc/kernel/pci_of_scan.c) and
+should be moved out of there for the other arches to use it.
+
+Or maybe we can use DT just to fix-up the resource flags (ie
+every PCI device will have its own of_node set if it is present
+in the DT, we can use it to fixup its resources and related flags,
+pcibios_add_device() ?).
+
+> The PCI binding traditionally requires you to list all PCI devices
+> in DT, Linux as an extension (for the flattened DT format) allows
+> leaving out the devices, but in this case you probably need to
+> list every device that has a fixed BAR.
+> 
+> > Yes, it is a bit of a hack.  That is why I put it in its own file, and 
+> > only try to hack up PCI devices that exactly match the vendor and device 
+> > ids that need fixing.
+> > 
+> > IMHO, putting infrastructure into drivers/pci/probe.c, et al. to handle 
+> > this would be much more intrusive.
+> 
+> My guess is that it's already there, but even if it's not, this is a
+> generic well-defined case that has a standardized binding, and we should
+> implement that.
+
+See above.
+
+Thanks,
+Lorenzo
+
+> > Forthe record:  The PCI Enhanced Allocation (EA) capability (approved 
+> > by PCI SIG on 23 October 2014) is the proper way to handle this going 
+> > forward.  However, this is not yet implemented in the SoCs that this 
+> > patch addresses.  Our plan is to implement the EA capability in the core 
+> > PCI code, so that we do not need to keep adding devices to this fixup code.
+> 
+> Good, but still this should only be required for the embedded case where
+> you don't have a firmware to probe the bus.
+> 
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
