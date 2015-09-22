@@ -1,36 +1,31 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 22 Sep 2015 14:03:14 +0800
-Subject: [PATCH v2 00/10] USB: chipidea misc patches
-In-Reply-To: <20150805140813.GO12927@tiger>
-References: <1438577238-10153-1-git-send-email-peter.chen@freescale.com>
- <20150805140813.GO12927@tiger>
-Message-ID: <20150922060313.GC20558@shlinux2>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 22 Sep 2015 09:21:10 +0200
+Subject: [PATCH v6 07/22] regulator: core: Remove regulator_list
+In-Reply-To: <20150921193803.GB30445@sirena.org.uk>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1442844182-27787-8-git-send-email-tomeu.vizoso@collabora.com>
+ <20150921193803.GB30445@sirena.org.uk>
+Message-ID: <CAAObsKBuJMnoXY5gmshF3JQvD5j18UhxC0yuoZqR2x+LGmRGxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 05, 2015 at 10:08:14PM +0800, Shawn Guo wrote:
-> On Mon, Aug 03, 2015 at 12:47:08PM +0800, Peter Chen wrote:
-> > Hi all,
-> > 
-> > In this series, I add several new interfaces for chipidea driver,
-> > they are mainly for system configuration adjustment. The USB
-> > performance may be improved with these configuration changing,
-> > but each vendor driver owner needs to consult with your IC
-> > owner which configuration parameters are suitable for your system
-> > before changing it, and only change it if necessary.
-> > 
-> > The other changes are for imx, it shows how imx uses these interfaces.
-> > Shawn, the patch [5/10] and [9/10] are dts changes, help to review it
-> > please.
-> 
-> Ping me, after driver and bindings are accepted.  Then I will pick up
-> the dts changes.
-> 
+On 21 September 2015 at 21:38, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, Sep 21, 2015 at 04:02:47PM +0200, Tomeu Vizoso wrote:
+>> As we are already registering a device with regulator_class for each
+>> regulator device, regulator_list is redundant and can be replaced with
+>> calls to class_find_device() and class_for_each_device().
+>
+> I've done an initial review of this and will push it to git so it can go
+> into the various test systems.  It's on a branch by itself so if there's
+> issues it's easy to back out, either from testing or from review from me
+> or others.  If we get to the point of merging the whole series then I'll
+> tag the code for cross merging.
+>
+> Thanks a lot for working on this, this is something I'd started looking
+> at myself and it's a lot easier to just review code from someone else!
 
-Shawn, The driver and bingings have been accepted.
-And I send v2 changes for you, which apply changes for imx6ul.
+Thanks for your patience, will keep an eye on possible regressions.
 
--- 
+Regards,
 
-Best Regards,
-Peter Chen
+Tomeu
