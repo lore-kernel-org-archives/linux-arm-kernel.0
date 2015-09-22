@@ -1,56 +1,47 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 22 Sep 2015 17:51:15 +0100
-Subject: [PATCH] generic syscalls: wire up userfaultfd syscall
-In-Reply-To: <20150922155251.GJ7356@arm.com>
-References: <1442919139-18027-1-git-send-email-andre.przywara@arm.com>
- <20150922155251.GJ7356@arm.com>
-Message-ID: <56018703.2090303@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 22 Sep 2015 17:51:45 +0100
+Subject: [PATCH v5 4/6] irqchip, gicv3-its: Add HW revision detection
+ and configuration
+In-Reply-To: <1442869119-1814-5-git-send-email-rric@kernel.org>
+References: <1442869119-1814-1-git-send-email-rric@kernel.org>
+ <1442869119-1814-5-git-send-email-rric@kernel.org>
+Message-ID: <20150922175145.72f5a589@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/09/15 16:52, Will Deacon wrote:
-> On Tue, Sep 22, 2015 at 11:52:19AM +0100, Andre Przywara wrote:
->> Enable the new userfaultfd syscall in the generic syscall table.
->> Briefly tested on arm64 with the selftest from the tools directory.
+On Mon, 21 Sep 2015 22:58:37 +0200
+Robert Richter <rric@kernel.org> wrote:
+
+> From: Robert Richter <rrichter@cavium.com>
 > 
-> Can you update the selftest too, please? Last time I looked at that it had
-> typo for the powerpc check and looked pretty unloved...
-
-I actually sent two patches doing that 10 minutes before that one, but I
-forgot to CC: you on this:
-
-https://lkml.org/lkml/2015/9/22/176
-
-Feel free to chime into the discussion ;-)
-
-Cheers,
-Andre.
-
-> Will
+> Some GIC revisions require an individual configuration to esp. add
+> workarounds for HW bugs. This patch implements generic code to parse
+> the hw revision provided by an IIDR register value and runs specific
+> code if hw matches. A function is added that reads the IIDR registers
+> for ITS (GITS_IIDR) and then goes through a list of init functions to
+> be called for specific versions. Same could be done for GICV3
+> (GICD_IIDR), but there are no users yet for it.
 > 
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  include/uapi/asm-generic/unistd.h | 4 +++-
->>  1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
->> index 8da542a..82c91bc 100644
->> --- a/include/uapi/asm-generic/unistd.h
->> +++ b/include/uapi/asm-generic/unistd.h
->> @@ -711,9 +711,11 @@ __SYSCALL(__NR_bpf, sys_bpf)
->>  __SC_COMP(__NR_execveat, sys_execveat, compat_sys_execveat)
->>  #define __NR_membarrier 282
->>  __SYSCALL(__NR_membarrier, sys_membarrier)
->> +#define __NR_userfaultfd 283
->> +__SYSCALL(__NR_userfaultfd, sys_userfaultfd)
->>  
->>  #undef __NR_syscalls
->> -#define __NR_syscalls 283
->> +#define __NR_syscalls 284
->>  
->>  /*
->>   * All syscalls below here should go away really,
->> -- 
->> 2.5.1
->>
+> The patch is needed to implement workarounds for HW errata in Cavium's
+> ThunderX GICV3 ITS.
 > 
+> v5:
+>  * renamed caps names to quirk
+> 
+> v4:
+>  * only enable hw detection for its in its_enable_quirks()
+>  * removed gicv3_check_capabilities()
+> 
+> v3:
+>  * use arm64 errata framework for midr check
+> 
+> v2:
+>  * adding MIDR check
+> 
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
