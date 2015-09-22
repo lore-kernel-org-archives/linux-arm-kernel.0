@@ -1,31 +1,115 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 22 Sep 2015 09:18:32 -0700
-Subject: master build: 1 failures 68 warnings (v4.3-rc2-16-gac2fc4b)
-In-Reply-To: <E1ZeICY-00014h-E8@optimist>
-References: <E1ZeICY-00014h-E8@optimist>
-Message-ID: <20150922161832.GH30445@sirena.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 22 Sep 2015 17:18:23 +0100
+Subject: [PATCH 5/9] of_mdio: fix MDIO phy device refcounting
+In-Reply-To: <20150922161710.GA21084@n2100.arm.linux.org.uk>
+References: <20150922161710.GA21084@n2100.arm.linux.org.uk>
+Message-ID: <E1ZeQGt-0006Xl-Cf@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 08:41:25AM +0100, Build bot for Mark Brown wrote:
+bus_find_device() is defined as:
 
-Mainline is still failing to build an arm64 allmodconfig due to:
+ * This is similar to the bus_for_each_dev() function above, but it
+ * returns a reference to a device that is 'found' for later use, as
+ * determined by the @match callback.
 
-> 	arm64-allmodconfig
-> ../drivers/firmware/qcom_scm-32.c:196:4: error: expected string literal before '__asmeq'
-> ../drivers/firmware/qcom_scm-32.c:221:2: error: implicit declaration of function 'secure_flush_area' [-Werror=implicit-function-declaration]
-> ../drivers/firmware/qcom_scm-32.c:239:2: error: implicit declaration of function 'outer_inv_range' [-Werror=implicit-function-declaration]
-> ../drivers/firmware/qcom_scm-32.c:331:4: error: expected string literal before '__asmeq'
-> ../drivers/firmware/qcom_scm-32.c:361:4: error: expected string literal before '__asmeq'
+and it does indeed return a reference-counted pointer to the device:
 
-which has been the case since before -rc1.  There was a patch posted for
-this by Andy Gross (firmware: qcom: scm: Add function stubs for ARM64)
-which got positively reviewed - where are we with getting that merged
-into mainline?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/53da9808/attachment.sig>
+        while ((dev = next_device(&i)))
+                if (match(dev, data) && get_device(dev))
+                                        ^^^^^^^^^^^^^^^
+                        break;
+        klist_iter_exit(&i);
+        return dev;
+
+What that means is that when we're done with the struct device, we must
+drop that reference.  Neither of_phy_connect() nor of_phy_attach() did
+this when phy_connect_direct() or phy_attach_direct() failed.
+
+With our previous patch, phy_connect_direct() and phy_attach_direct()
+take a new refcount on the phy device when successful, so we can drop
+our local reference immediatley after these functions, whether or not
+they succeeded.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/of/of_mdio.c | 27 +++++++++++++++++++++++----
+ 1 file changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
+index 1350fa25cdb0..a87a868fed64 100644
+--- a/drivers/of/of_mdio.c
++++ b/drivers/of/of_mdio.c
+@@ -197,7 +197,8 @@ static int of_phy_match(struct device *dev, void *phy_np)
+  * of_phy_find_device - Give a PHY node, find the phy_device
+  * @phy_np: Pointer to the phy's device tree node
+  *
+- * Returns a pointer to the phy_device.
++ * If successful, returns a pointer to the phy_device with the embedded
++ * struct device refcount incremented by one, or NULL on failure.
+  */
+ struct phy_device *of_phy_find_device(struct device_node *phy_np)
+ {
+@@ -217,7 +218,9 @@ EXPORT_SYMBOL(of_phy_find_device);
+  * @hndlr: Link state callback for the network device
+  * @iface: PHY data interface type
+  *
+- * Returns a pointer to the phy_device if successful.  NULL otherwise
++ * If successful, returns a pointer to the phy_device with the embedded
++ * struct device refcount incremented by one, or NULL on failure. The
++ * refcount must be dropped by calling phy_disconnect() or phy_detach().
+  */
+ struct phy_device *of_phy_connect(struct net_device *dev,
+ 				  struct device_node *phy_np,
+@@ -225,13 +228,19 @@ struct phy_device *of_phy_connect(struct net_device *dev,
+ 				  phy_interface_t iface)
+ {
+ 	struct phy_device *phy = of_phy_find_device(phy_np);
++	int ret;
+ 
+ 	if (!phy)
+ 		return NULL;
+ 
+ 	phy->dev_flags = flags;
+ 
+-	return phy_connect_direct(dev, phy, hndlr, iface) ? NULL : phy;
++	ret = phy_connect_direct(dev, phy, hndlr, iface);
++
++	/* refcount is held by phy_connect_direct() on success */
++	put_device(&phy->dev);
++
++	return ret ? NULL : phy;
+ }
+ EXPORT_SYMBOL(of_phy_connect);
+ 
+@@ -241,17 +250,27 @@ EXPORT_SYMBOL(of_phy_connect);
+  * @phy_np: Node pointer for the PHY
+  * @flags: flags to pass to the PHY
+  * @iface: PHY data interface type
++ *
++ * If successful, returns a pointer to the phy_device with the embedded
++ * struct device refcount incremented by one, or NULL on failure. The
++ * refcount must be dropped by calling phy_disconnect() or phy_detach().
+  */
+ struct phy_device *of_phy_attach(struct net_device *dev,
+ 				 struct device_node *phy_np, u32 flags,
+ 				 phy_interface_t iface)
+ {
+ 	struct phy_device *phy = of_phy_find_device(phy_np);
++	int ret;
+ 
+ 	if (!phy)
+ 		return NULL;
+ 
+-	return phy_attach_direct(dev, phy, flags, iface) ? NULL : phy;
++	ret = phy_attach_direct(dev, phy, flags, iface);
++
++	/* refcount is held by phy_attach_direct() on success */
++	put_device(&phy->dev);
++
++	return ret ? NULL : phy;
+ }
+ EXPORT_SYMBOL(of_phy_attach);
+ 
+-- 
+2.1.0
