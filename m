@@ -1,37 +1,64 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 22 Sep 2015 14:00:44 +0800
-Subject: [PATCH] mmc: mediatek: Add MMC_CAP_RUNTIME_RESUME support
-Message-ID: <1442901644-7587-1-git-send-email-chaotian.jing@mediatek.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Tue, 22 Sep 2015 08:36:22 +0200
+Subject: [PATCH v3 01/12] pwm: introduce default period and polarity
+ concepts
+In-Reply-To: <1442828009-6241-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1442828009-6241-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <5600F6E6.8050406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MMC_CAP_RUNTIME_RESUME support to save resume time
-Drop unnecessary SDC_ARG write
+Hi Boris,
 
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
----
- drivers/mmc/host/mtk-sd.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 09/21/2015 11:33 AM, Boris Brezillon wrote:
+> When requested by a user, the PWM is assigned a default period and polarity
+> extracted from the DT, the platform data or statically set by the driver.
+> Those default values are currently stored in the period and polarity
+> fields of the pwm_device struct, but they will be stored somewhere else
+> once we have introduced the architecture allowing for hardware state
+> retrieval.
+>
+> The pwm_set_default_polarity and pwm_set_default_period should only be
+> used by PWM drivers or the PWM core infrastructure to specify the
+> default period and polarity values.
+>
+> PWM users might call the pwm_get_default_period to query the default
+> period value. There is currently no helper to query the default
+> polarity, but it might be added later on if there is a need for it.
+>
+> This patch also modifies all the places where the default helpers should
+> be used in place of the standard ones.
+>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>   drivers/leds/leds-pwm.c              |  2 +-
+>   drivers/pwm/core.c                   | 14 +++++++-------
+>   drivers/pwm/pwm-pxa.c                |  2 +-
+>   drivers/pwm/pwm-sun4i.c              |  3 ++-
+>   drivers/regulator/pwm-regulator.c    |  4 ++--
+>   drivers/video/backlight/lm3630a_bl.c |  4 ++--
+>   drivers/video/backlight/pwm_bl.c     |  2 +-
+>   drivers/video/fbdev/ssd1307fb.c      |  2 +-
+>   include/linux/pwm.h                  | 17 +++++++++++++++++
+>   9 files changed, 34 insertions(+), 16 deletions(-)
+>
+> diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
+> index 1d07e3e..2c564d1 100644
+> --- a/drivers/leds/leds-pwm.c
+> +++ b/drivers/leds/leds-pwm.c
+> @@ -125,7 +125,7 @@ static int led_pwm_add(struct device *dev, struct led_pwm_priv *priv,
+>   	if (led_data->can_sleep)
+>   		INIT_WORK(&led_data->work, led_pwm_work);
+>
+> -	led_data->period = pwm_get_period(led_data->pwm);
+> +	led_data->period = pwm_get_default_period(led_data->pwm);
+>   	if (!led_data->period && (led->pwm_period_ns > 0))
+>   		led_data->period = led->pwm_period_ns;
+>
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 7153500..b2e89d3 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -729,7 +729,6 @@ static bool msdc_cmd_done(struct msdc_host *host, int events,
- 			MSDC_INTEN_RSPCRCERR | MSDC_INTEN_CMDTMO |
- 			MSDC_INTEN_ACMDRDY | MSDC_INTEN_ACMDCRCERR |
- 			MSDC_INTEN_ACMDTMO);
--	writel(cmd->arg, host->base + SDC_ARG);
- 
- 	if (cmd->flags & MMC_RSP_PRESENT) {
- 		if (cmd->flags & MMC_RSP_136) {
-@@ -1302,6 +1301,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
- 	mmc->f_min = host->src_clk_freq / (4 * 255);
- 
- 	mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
-+	mmc->caps |= MMC_CAP_RUNTIME_RESUME;
- 	/* MMC core transfer sizes tunable parameters */
- 	mmc->max_segs = MAX_BD_NUM;
- 	mmc->max_seg_size = BDMA_DESC_BUFLEN;
+Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
+
 -- 
-1.8.1.1.dirty
+Best Regards,
+Jacek Anaszewski
