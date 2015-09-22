@@ -1,117 +1,54 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 22 Sep 2015 11:08:38 -0500
-Subject: [PATCH 3/3] ARM: dts: keystone: Update SoC specific compatible flags
-In-Reply-To: <1442938118-4718-1-git-send-email-nm@ti.com>
-References: <1442938118-4718-1-git-send-email-nm@ti.com>
-Message-ID: <1442938118-4718-4-git-send-email-nm@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Sep 2015 17:24:51 +0100
+Subject: Steps to submit a new arch/arm port
+In-Reply-To: <56017D04.5010909@free.fr>
+References: <56001B78.2090001@free.fr>
+ <20150921161341.GP21084@n2100.arm.linux.org.uk>
+ <56017D04.5010909@free.fr>
+Message-ID: <20150922162451.GB21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the compatible flags to allow specific SoC identification.
+On Tue, Sep 22, 2015 at 06:08:36PM +0200, Mason wrote:
+> On 21/09/2015 18:13, Russell King - ARM Linux wrote:
+> > On Mon, Sep 21, 2015 at 05:00:08PM +0200, Mason wrote:
+> >> 1) Linux kernel runs in non-secure world. The port used to tweak
+> >> L2 cache configuration via custom SMC calls to the OS running in
+> >> secure world. I've removed that for now.
+> >> Is there a standard solution these days?
+> > 
+> > While some configuration can be done by the boot loader (and it's
+> > preferable for that to happen) not all of it can be.  In particular,
+> > the kernel _must_ have the ability to enable and disable the L2
+> > cache, and the kernel must not be called with the L2 cache left
+> > enabled by the boot loader.
+> > 
+> > That requires that the L2 control register is writable in some way
+> > from the non-secure world.
+> 
+> There is no agreed-upon method to do that?
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/boot/dts/k2e-evm.dts   | 2 +-
- arch/arm/boot/dts/k2e.dtsi      | 3 +++
- arch/arm/boot/dts/k2hk-evm.dts  | 2 +-
- arch/arm/boot/dts/k2hk.dtsi     | 3 +++
- arch/arm/boot/dts/k2l-evm.dts   | 2 +-
- arch/arm/boot/dts/k2l.dtsi      | 3 +++
- arch/arm/boot/dts/keystone.dtsi | 1 +
- 7 files changed, 13 insertions(+), 3 deletions(-)
+Yes there is - there's two solutions, depending on how your secure
+firmware operates.  Firstly, you need to make sure that .l2c_aux_mask
+or .l2c_aux_val are non-zero in your machine record - preferably the
+mask as all-ones and the val as all-zeros.  Then, either:
 
-diff --git a/arch/arm/boot/dts/k2e-evm.dts b/arch/arm/boot/dts/k2e-evm.dts
-index 50c83c21d911..b7e99807f5c2 100644
---- a/arch/arm/boot/dts/k2e-evm.dts
-+++ b/arch/arm/boot/dts/k2e-evm.dts
-@@ -13,7 +13,7 @@
- #include "k2e.dtsi"
- 
- / {
--	compatible =  "ti,k2e-evm","ti,keystone";
-+	compatible = "ti,k2e-evm", "ti,k2e", "ti,keystone";
- 	model = "Texas Instruments Keystone 2 Edison EVM";
- 
- 	soc {
-diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
-index 675fb8e492c6..1097dada56d2 100644
---- a/arch/arm/boot/dts/k2e.dtsi
-+++ b/arch/arm/boot/dts/k2e.dtsi
-@@ -9,6 +9,9 @@
-  */
- 
- / {
-+	compatible = "ti,k2e", "ti,keystone";
-+	model = "Texas Instruments Keystone 2 Edison SoC";
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
-index 660ebf58d547..8161bf53271b 100644
---- a/arch/arm/boot/dts/k2hk-evm.dts
-+++ b/arch/arm/boot/dts/k2hk-evm.dts
-@@ -13,7 +13,7 @@
- #include "k2hk.dtsi"
- 
- / {
--	compatible =  "ti,k2hk-evm","ti,keystone";
-+	compatible =  "ti,k2hk-evm", "ti,k2hk", "ti,keystone";
- 	model = "Texas Instruments Keystone 2 Kepler/Hawking EVM";
- 
- 	soc {
-diff --git a/arch/arm/boot/dts/k2hk.dtsi b/arch/arm/boot/dts/k2hk.dtsi
-index d0810a5f2968..ada4c7ac96e7 100644
---- a/arch/arm/boot/dts/k2hk.dtsi
-+++ b/arch/arm/boot/dts/k2hk.dtsi
-@@ -9,6 +9,9 @@
-  */
- 
- / {
-+	compatible = "ti,k2hk", "ti,keystone";
-+	model = "Texas Instruments Keystone 2 Kepler/Hawking SoC";
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/k2l-evm.dts b/arch/arm/boot/dts/k2l-evm.dts
-index 9a69a6b55374..00861244d788 100644
---- a/arch/arm/boot/dts/k2l-evm.dts
-+++ b/arch/arm/boot/dts/k2l-evm.dts
-@@ -13,7 +13,7 @@
- #include "k2l.dtsi"
- 
- / {
--	compatible =  "ti,k2l-evm","ti,keystone";
-+	compatible = "ti,k2l-evm", "ti,k2l", "ti,keystone";
- 	model = "Texas Instruments Keystone 2 Lamarr EVM";
- 
- 	soc {
-diff --git a/arch/arm/boot/dts/k2l.dtsi b/arch/arm/boot/dts/k2l.dtsi
-index 49fd414f680c..4446da72b0ae 100644
---- a/arch/arm/boot/dts/k2l.dtsi
-+++ b/arch/arm/boot/dts/k2l.dtsi
-@@ -9,6 +9,9 @@
-  */
- 
- / {
-+	compatible = "ti,k2l", "ti,keystone";
-+	model = "Texas Instruments Keystone 2 Lamarr SoC";
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index 72816d65f7ec..ff91f703d371 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -12,6 +12,7 @@
- #include "skeleton.dtsi"
- 
- / {
-+	compatible = "ti,keystone";
- 	model = "Texas Instruments Keystone 2 SoC";
- 	#address-cells = <2>;
- 	#size-cells = <2>;
+1. Set .l2c_write_sec in your machine record to point to a function which
+   knows how to write to the secure-only L2 cache registers - suitable if
+   your firmware has a "write this secure-only L2 register".  See
+   arch/arm/mach-omap2/board-generic.c or arch/arm/mach-highbank/highbank.c.
+
+2. Set outer_cache.configure to a function which configures the secure-only
+   registers in one go - suitable if your firmware can only program multiple
+   L2 cache registers together.  See arch/arm/mach-exynos/firmware.c.
+
+> Is there an easy way to determine how many arch/arm platforms are running
+> Linux in non-secure mode? (And thus need to interact with "firmware" or
+> trustzone OS for things like L2 cache handling, and secondary core boot-up.)
+
+Not really.  You can only guess based on grep results - as I've done in
+providing the examples above.
+
 -- 
-2.1.4
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
