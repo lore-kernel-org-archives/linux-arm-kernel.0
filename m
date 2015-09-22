@@ -1,40 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Sep 2015 19:52:30 +0100
-Subject: [PATCH 3/3] PCI: generic: Add support for Cavium ThunderX PCIe
- root complexes.
-In-Reply-To: <1442529694-1792-4-git-send-email-ddaney.cavm@gmail.com>
-References: <1442529694-1792-1-git-send-email-ddaney.cavm@gmail.com>
- <1442529694-1792-4-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20150922185230.GR7356@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 22 Sep 2015 20:54:19 +0200 (CEST)
+Subject: [RFC PATCH v5 2/4] genirq: add irq_migrate_all_off_this_cpu()
+ for cpu hotplug
+In-Reply-To: <1442631959-10228-3-git-send-email-yangyingliang@huawei.com>
+References: <1442631959-10228-1-git-send-email-yangyingliang@huawei.com>
+ <1442631959-10228-3-git-send-email-yangyingliang@huawei.com>
+Message-ID: <alpine.DEB.2.11.1509222050300.5606@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 11:41:34PM +0100, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> The config space for external PCIe root complexes on some Cavium
-> ThunderX SoCs is very similar to CAM and ECAM, but differs in the
-> shift values that have to be applied to the bus and devfn numbers to
-> compose that address window offset.  These root complexes also have
-> the interesting property that there is no root bridge, so the standard
-> manner of limiting scanning to only the first device doesn't work.  We
-> can use the standard pci-host-generic driver if we make a minor
-> addition to handle these differences, so we...
-> 
-> Add a mapping function for ThunderX PCIe root complexes with a bus
-> shift of 24 and devfn shift of 16.  Ignore accesses for devices other
-> than the first device on the primary bus.
-> 
-> Document the whole thing in devicetree/bindings/pci/host-generic-pci.txt
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  .../devicetree/bindings/pci/host-generic-pci.txt   |  8 +++---
->  drivers/pci/host/pci-host-generic.c                | 29 ++++++++++++++++++++++
->  2 files changed, 34 insertions(+), 3 deletions(-)
+On Sat, 19 Sep 2015, Yang Yingliang wrote:
 
-Thanks, this looks better now:
+> Add irq_migrate_all_off_this_cpu() into kernel/irq/migration.c.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+This doesn't make any sense at all. 
 
-Will
+You just reuse the existing file to stick your new code into it
+without reusing a single bit in that file. Aside of that it's
+unconditionally compiled, which means all existing users of
+CONFIG_GENERIC_PENDING_IRQ are burdened with pointless code.
+
+The right thing to do is:
+
+Add that code to a new file: kernel/irq/cpuhotplug.c and make that
+depend on CONFIG_GENERIC_IRQ_MIGRATION.
+
+Thanks,
+
+	tglx
