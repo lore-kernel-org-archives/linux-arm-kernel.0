@@ -1,37 +1,35 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 22 Sep 2015 18:08:36 +0200
-Subject: Steps to submit a new arch/arm port
-In-Reply-To: <20150921161341.GP21084@n2100.arm.linux.org.uk>
-References: <56001B78.2090001@free.fr>
- <20150921161341.GP21084@n2100.arm.linux.org.uk>
-Message-ID: <56017D04.5010909@free.fr>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 22 Sep 2015 11:08:35 -0500
+Subject: [PATCH 0/3] ARM: dts/keystone: Introduce SoC specific compatible
+ matches
+Message-ID: <1442938118-4718-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/09/2015 18:13, Russell King - ARM Linux wrote:
-> On Mon, Sep 21, 2015 at 05:00:08PM +0200, Mason wrote:
->> 1) Linux kernel runs in non-secure world. The port used to tweak
->> L2 cache configuration via custom SMC calls to the OS running in
->> secure world. I've removed that for now.
->> Is there a standard solution these days?
-> 
-> While some configuration can be done by the boot loader (and it's
-> preferable for that to happen) not all of it can be.  In particular,
-> the kernel _must_ have the ability to enable and disable the L2
-> cache, and the kernel must not be called with the L2 cache left
-> enabled by the boot loader.
-> 
-> That requires that the L2 control register is writable in some way
-> from the non-secure world.
+Hi,
+Here is a series that introduces keystone SoC specific compatible flags
 
-There is no agreed-upon method to do that?
+Series based on v4.3-rc1.
 
-<grepping around for l2x0_init, outer_cache>
+Test log(merge on master): http://paste.ubuntu.org.cn/3462285 (note
+netcp seems to freezeup after a while into boot. debug not complete on
+that yet - boots fine with a minimal system..)
 
-What about Samsung's arch/arm/include/asm/firmware.h ?
+Nishanth Menon (3):
+  Documentation: dt: keystone: provide SoC specific compatible flags
+  ARM: keystone: Update compatible to have SoC specific matches
+  ARM: dts: keystone: Update SoC specific compatible flags
 
-Is there an easy way to determine how many arch/arm platforms are running
-Linux in non-secure mode? (And thus need to interact with "firmware" or
-trustzone OS for things like L2 cache handling, and secondary core boot-up.)
+ .../devicetree/bindings/arm/keystone/keystone.txt    | 20 +++++++++++++++++---
+ arch/arm/boot/dts/k2e-evm.dts                        |  2 +-
+ arch/arm/boot/dts/k2e.dtsi                           |  3 +++
+ arch/arm/boot/dts/k2hk-evm.dts                       |  2 +-
+ arch/arm/boot/dts/k2hk.dtsi                          |  3 +++
+ arch/arm/boot/dts/k2l-evm.dts                        |  2 +-
+ arch/arm/boot/dts/k2l.dtsi                           |  3 +++
+ arch/arm/boot/dts/keystone.dtsi                      |  1 +
+ arch/arm/mach-keystone/keystone.c                    |  3 +++
+ 9 files changed, 33 insertions(+), 6 deletions(-)
 
-Regards.
+-- 
+2.1.4
