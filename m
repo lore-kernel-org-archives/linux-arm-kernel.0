@@ -1,32 +1,50 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 22 Sep 2015 09:50:41 -0700
-Subject: [PATCH v2 2/5] PM / OPP: Support adjusting OPP voltages at runtime
-In-Reply-To: <1442623929-4507-3-git-send-email-sboyd@codeaurora.org>
-References: <1442623929-4507-1-git-send-email-sboyd@codeaurora.org>
- <1442623929-4507-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150922165041.GG24314@linux>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 22 Sep 2015 17:50:40 +0100
+Subject: [PATCH v5 2/6] irqchip, gicv3: Workaround for Cavium ThunderX
+ erratum 23154
+In-Reply-To: <1442869119-1814-3-git-send-email-rric@kernel.org>
+References: <1442869119-1814-1-git-send-email-rric@kernel.org>
+ <1442869119-1814-3-git-send-email-rric@kernel.org>
+Message-ID: <20150922175040.7288b247@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18-09-15, 17:52, Stephen Boyd wrote:
->  /**
-> + * dev_pm_opp_adjust_voltage() - helper to change the voltage of an OPP
-> + * @dev:		device for which we do this operation
-> + * @freq:		OPP frequency to adjust voltage of
-> + * @u_volt:		new OPP voltage
-> + *
-> + * Change the voltage of an OPP with an RCU operation.
-> + *
-> + * Return: -EINVAL for bad pointers, -ENOMEM if no memory available for the
-> + * copy operation, returns 0 if no modifcation was done OR modification was
+On Mon, 21 Sep 2015 22:58:35 +0200
+Robert Richter <rric@kernel.org> wrote:
 
-                                      modification
+> From: Robert Richter <rrichter@cavium.com>
+> 
+> This patch implements Cavium ThunderX erratum 23154.
+> 
+> The gicv3 of ThunderX requires a modified version for reading the IAR
+> status to ensure data synchronization. Since this is in the fast-path
+> and called with each interrupt, runtime patching is used using jump
+> label patching for smallest overhead (no-op). This is the same
+> technique as used for tracepoints.
+> 
+> v5:
+>  * fixed calling gic_read_iar_cavium_thunderx() if jump label is
+>    enabled
+>  * made is_cavium_thunderx static
+>  * removed ARCH_THUNDER dependency for Cavium errata options to
+>    make it available for generic kernels
+> 
+> v4:
+>  * simplify code to only use cpus_have_cap() in gicv3_enable_quirks()
+> 
+> v3:
+>  * fix erratum to be dependend from midr
+>  * use arm64 errata framework
+> 
+> v2:
+>  * implement code in a single asm() to keep instruction sequence
+>  * added comment to the code that explains the erratum
+>  * apply workaround also if running as guest, thus check MIDR
+> 
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
 
-> + * successful.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Otherwise,
-
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-
+	M.
 -- 
-viresh
+Jazz is not dead. It just smells funny.
