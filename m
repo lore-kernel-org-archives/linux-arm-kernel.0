@@ -1,39 +1,103 @@
-From: B48286@freescale.com (Hou Zhiqiang)
-Date: Tue, 22 Sep 2015 09:51:57 +0000
-Subject: [PATCH 6/6] dts/ls1043a: add LS1043ARDB board support
-In-Reply-To: <1442877225.19102.207.camel@freescale.com>
-References: <1442838158-2964-1-git-send-email-B48286@freescale.com>
- <1442838158-2964-7-git-send-email-B48286@freescale.com>
- <1442877225.19102.207.camel@freescale.com>
-Message-ID: <CY1PR0301MB0780643BCCE3A5C6BAEA22218B450@CY1PR0301MB0780.namprd03.prod.outlook.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 22 Sep 2015 12:54:11 +0300
+Subject: [PATCH v3 00/24] dmaengine/ARM: Merge the edma drivers into one
+Message-ID: <1442915675-7121-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Scott,
+Hi,
 
-> -----Original Message-----
-> From: Wood Scott-B07421
-> Sent: 2015?9?22? 7:14
-> To: Hou Zhiqiang-B48286
-> Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
-> will.deacon at arm.com; linux-i2c at vger.kernel.org; linux-
-> watchdog at vger.kernel.org; linux-doc at vger.kernel.org; linux-
-> clk at vger.kernel.org; wsa at the-dreams.de; wim at iguana.be; corbet at lwn.net;
-> mturquette at baylibre.com; sboyd at codeaurora.org; Hu Mingkai-B21284; Xie
-> Shaohui-B21989; Song Wenbin-B53747; Sharma Bhupesh-B45370; Li Yang-Leo-
-> R58472
-> Subject: Re: [PATCH 6/6] dts/ls1043a: add LS1043ARDB board support
-> 
-> On Mon, 2015-09-21 at 20:22 +0800, Zhiqiang Hou wrote:
-> 
-> > +             cpld: board-control at 2,0 {
-> > +                     compatible = "fsl,ls1043ardb-cpld", "simple-bus";
-> > +                     reg = <0x2 0x0 0x0000100>;
-> > +             };
-> 
-> Again, why "simple-bus"?
+Changes since v2:
+- devm_kasprintf format string fixed
+- Additional patch to enable dynamic paRAM slot usage when the channel mapping
+  is supported by the eDMA module.
+  On am335x we have 256 paRAM slots and 64 DMA channels, this means that we had
+  64 slots 'locked away' all the time. The dynamic paRAM slot logic will allow
+  us to use all 256 slots freely for any purpose.
 
-Thanks and will remove it in v2.
+Changes since v1:
+- Convert edma platform device registration to use platform_device_register_full
+- Moved the PM callback also to the dmaengine driver - missed in v1
+- Commit message added to:
+  ARM/dmaengine: edma: Remove limitation on the number of eDMA controllers
+- New patch which reads the flag for the channel mapping support in one place
 
-Thanks,
-Zhiqiang
+Cover letter:
+
+with this series the edma two driver setup will be changed to have only one
+driver to support eDMA3. The legacy edma interface will be removed and eDMA can
+only be used via dmaengine API from this point on.
+In order to do the merge the following improvements has been done:
+- One driver instance per eDMA:
+ - Any number of eDMA instances are supported (both legacy and DT boot)
+- Not relying on global variables, arrays, etc
+- Code simplification and optimizations in several places
+
+This change will also help us to do bigger changes in the eDMA driver since,
+since now we have only one driver to work with.
+
+The series has been tested on:
+da850-evm (OMAP-L138)
+- with legacy and DT boot (both eDMA0 and eDMA1 is enabled)
+- In code swapping the eDMA instances in legacy mode to make sure the second
+  instance is handled correctly.
+
+am335x-evmsk
+- DT boot
+
+I think this series could go via the dmaengine tree. Changes are trivial under
+arch/arm/
+
+Regards,
+Peter
+---
+Peter Ujfalusi (24):
+  ARM: common: edma: Fix channel parameter for irq callbacks
+  ARM: common: edma: Remove unused functions
+  dmaengine: edma: Simplify and optimize the edma_execute path
+  ARM: davinci/common: Convert edma driver to handle one eDMA instance
+    per driver
+  ARM/dmaengine: edma: Move of_dma_controller_register to the dmaengine
+    driver
+  ARM: common: edma: Internal API to use pointer to 'struct edma'
+  ARM/dmaengine: edma: Public API to use private struct pointer
+  ARM/dmaengine: edma: Remove limitation on the number of eDMA
+    controllers
+  ARM: davinci: Use platform_device_register_full() to create pdev for
+    eDMA
+  ARM: davinci: Add set dma_mask to eDMA devices
+  dmaengine: edma: Allocate memory dynamically for bitmaps and
+    structures
+  dmaengine: edma: Parameter alignment and long line fixes
+  dmaengine: edma: Use devm_kcalloc when possible
+  dmaengine: edma: Cleanup regarding the use of dev around the code
+  dmaengine: edma: Use dev_dbg instead pr_debug
+  dmaengine: edma: Use the edma_write_slot instead open coded
+    memcpy_toio
+  dmaengine: edma: Print warning when linking slots from different eDMA
+  dmaengine: edma: Consolidate the comments for functions
+  dmaengine: edma: Simplify the interrupt handling
+  dmaengine: edma: Move the pending error check into helper function
+  dmaengine: edma: Simplify and optimize ccerr interrupt handler
+  dmaengine: edma: Read channel mapping support only once from HW
+  dmaengine: edma: Rename bitfields for slot and channel usage tracking
+  dmaengine: edma: Dynamic paRAM slot handling if HW supports it
+
+ arch/arm/Kconfig                      |    1 -
+ arch/arm/common/Kconfig               |    3 -
+ arch/arm/common/Makefile              |    1 -
+ arch/arm/common/edma.c                | 1876 ---------------------------------
+ arch/arm/mach-davinci/devices-da8xx.c |  122 +--
+ arch/arm/mach-davinci/dm355.c         |   40 +-
+ arch/arm/mach-davinci/dm365.c         |   25 +-
+ arch/arm/mach-davinci/dm644x.c        |   40 +-
+ arch/arm/mach-davinci/dm646x.c        |   44 +-
+ arch/arm/mach-omap2/Kconfig           |    1 -
+ drivers/dma/Kconfig                   |    1 -
+ drivers/dma/edma.c                    | 1569 ++++++++++++++++++++++++---
+ include/linux/platform_data/edma.h    |  101 --
+ 13 files changed, 1523 insertions(+), 2301 deletions(-)
+ delete mode 100644 arch/arm/common/edma.c
+
+-- 
+2.5.2
