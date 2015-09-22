@@ -1,75 +1,139 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 22 Sep 2015 13:55:58 +0200
-Subject: [PATCH 1/3] irqchip: atmel-aic5: fix bug with mask/unmask
-In-Reply-To: <alpine.DEB.2.11.1509221226090.5606@nanos>
-References: <1442843173-2390-1-git-send-email-ludovic.desroches@atmel.com>
- <alpine.DEB.2.11.1509221226090.5606@nanos>
-Message-ID: <20150922135558.7be8ac1c@bbrezillon>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Tue, 22 Sep 2015 15:07:24 +0300
+Subject: [RESEND PATCH] media: vb2: Fix vb2_dc_prepare do not correct
+ sync data to device
+In-Reply-To: <1442917165.20006.30.camel@mtksdaap41>
+References: <1442838371-21484-1-git-send-email-tiffany.lin@mediatek.com>
+ <56000293.9000802@xs4all.nl> <1442917165.20006.30.camel@mtksdaap41>
+Message-ID: <20150922120724.GQ3175@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Tiffany,
 
-On Tue, 22 Sep 2015 12:27:08 +0200 (CEST)
-Thomas Gleixner <tglx@linutronix.de> wrote:
-
-> On Mon, 21 Sep 2015, Ludovic Desroches wrote:
-> > diff --git a/drivers/irqchip/irq-atmel-aic5.c b/drivers/irqchip/irq-atmel-aic5.c
-> > index 9da9942..6c5fd25 100644
-> > --- a/drivers/irqchip/irq-atmel-aic5.c
-> > +++ b/drivers/irqchip/irq-atmel-aic5.c
-> > @@ -88,28 +88,30 @@ static void aic5_mask(struct irq_data *d)
-> >  {
-> >  	struct irq_domain *domain = d->domain;
-> >  	struct irq_domain_chip_generic *dgc = domain->gc;
-> > -	struct irq_chip_generic *gc = dgc->gc[0];
-> > +	struct irq_chip_generic *bgc = dgc->gc[0];
-> > +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> >  
-> >  	/* Disable interrupt on AIC5 */
-> > -	irq_gc_lock(gc);
-> > +	irq_gc_lock(bgc);
+On Tue, Sep 22, 2015 at 06:19:25PM +0800, tiffany lin wrote:
+> Hi Hans,
 > 
-> Why is this locking dgc->gc[0] and fiddling with some other generic
-> chip?
-
-Actually, we always access the same set of registers for all irqs of the
-domain, and thus need to take the same lock (I chose the one contained
-in the first generic irqchip, but I guess it could work with the others
-too, as long as we always take the same one) before accessing them
-because the configuration is done in two steps:
-
-1/ specify the irq line you want to configure
-2/ set the new configuration
-
-Regarding register accesses, all generic chips are configured to
-point to the same registers, so accessing them from the 'base' generic
-chip or from the generic chip attached to the irq_data struct is the
-same, though I agree that using bgc would add some consistency to the
-implementation.
-
-This leaves the mask_cache value, which should be updated on the generic
-chip attached to the irq_data (but since the lock is global to the
-whole domain, it should work fine).
-
-Please let us know if you see other problems, or have a better
-solution to fix the bug.
-
-Best Regards,
-
-Boris
-
+> On Mon, 2015-09-21 at 15:13 +0200, Hans Verkuil wrote:
+> > Hi Tiffany!
+> > 
+> > On 21-09-15 14:26, Tiffany Lin wrote:
+> > > vb2_dc_prepare use the number of SG entries dma_map_sg_attrs return.
+> > > But in dma_sync_sg_for_device, it use lengths of each SG entries
+> > > before dma_map_sg_attrs. dma_map_sg_attrs will concatenate
+> > > SGs until dma length > dma seg bundary. sgt->nents will less than
+> > > sgt->orig_nents. Using SG entries after dma_map_sg_attrs
+> > > in vb2_dc_prepare will make some SGs are not sync to device.
+> > > After add DMA_ATTR_SKIP_CPU_SYNC in vb2_dc_get_userptr to remove
+> > > sync data to device twice. Device randomly get incorrect data because
+> > > some SGs are not sync to device. Change to use number of SG entries
+> > > before dma_map_sg_attrs in vb2_dc_prepare to prevent this issue.
+> > > 
+> > > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> > > ---
+> > >  drivers/media/v4l2-core/videobuf2-dma-contig.c | 4 ++--
+> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/drivers/media/v4l2-core/videobuf2-dma-contig.c b/drivers/media/v4l2-core/videobuf2-dma-contig.c
+> > > index 2397ceb..c5d00bd 100644
+> > > --- a/drivers/media/v4l2-core/videobuf2-dma-contig.c
+> > > +++ b/drivers/media/v4l2-core/videobuf2-dma-contig.c
+> > > @@ -100,7 +100,7 @@ static void vb2_dc_prepare(void *buf_priv)
+> > >  	if (!sgt || buf->db_attach)
+> > >  		return;
+> > >  
+> > > -	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir);
+> > > +	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
+> > >  }
+> > >  
+> > >  static void vb2_dc_finish(void *buf_priv)
+> > > @@ -112,7 +112,7 @@ static void vb2_dc_finish(void *buf_priv)
+> > >  	if (!sgt || buf->db_attach)
+> > >  		return;
+> > >  
+> > > -	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir);
+> > > +	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
+> > >  }
+> > 
+> > I don't really understand it. I am assuming that this happens on an arm and that
+> > the dma_map_sg_attrs and dma_sync_sg_* functions used are arm_iommu_map_sg() and
+> > arm_iommu_sync_sg_* as implemented in arch/arm/mm/dma-mapping.c.
+> > 
 > 
-> >  	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
-> >  	irq_reg_writel(gc, 1, AT91_AIC5_IDCR);
+> We are using __iommu_* implemented in "arch/arm64/mm/dma-mapping.c" in
+> review patch
+> http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013898.html
+> Without patch "[media] vb2: use dma_map_sg_attrs to prevent unnecessary
+> sync", vb2 will sync data to device twice.
+> One is from "dma_map_sg" in "vb2_dc_get_userptr", the other is from
+> "dma_sync_sg_for_device" in "vb2_dc_prepare". dma_map_sg use orig_nents,
+> and dma_sync_sg_for_device use nents."
 > 
-> Thanks,
+> We do not run in 32bits mode, but check "arm_dma_sync_sg_for_device" in
+> "arch/arm/mm/dma-mapping.c", 
+> ops->sync_single_for_device(dev, sg_dma_address(s), s->length, dir);
+> It looks like has same issue.
 > 
-> 	tglx
+> > Now, as I understand it (and my understanding may very well be flawed!) the map_sg
+> > function concatenates SG entries if possible, so it may return fewer entries. But
+> > the dma_sync_sg functions use those updated SG entries, so the full buffer should
+> > be covered by this. Using orig_nents will actually sync parts of the buffer twice!
+> > The first nents entries already cover the full buffer so any remaining entries up
+> > to orig_nents will just duplicate parts of the buffer.
+> > 
+> I found that in __iommu_sync_sg_for_device, it use sg->length , do not
+> cover full buffer.
+> By adding log in " __iommu_sync_sg_for_device" without patch "[media]
+> vb2: use dma_map_sg_attrs to prevent unnecessary sync", we could see
+> total synced size are different between called from dma_map_sg and
+> dma_sync_sg_for_device.
 
+I had the same question Hans did, but I still fail to understand where in
+the code things are going wrong the way you described at the moment ---
+after dma_map_sg() there are nents entries in the scatterlist. But.
+sg_dma_len() should be used instead of the length field to get the size of
+the entry. If something is wrong, then it's this AFAICT.
 
+Could you try whether changing this fixes it?
+
+> __iommu_sync_sg_for_device called from dma_sync_sg_for_device got
+> updated SG entries number but it use un-updated sg length.
+> After using "DMA_ATTR_SKIP_CPU_SYNC" to skip sync in vb2_dc_get_userptr,
+> we got some part of the buffer not sync.
+> 
+> > So this patch makes no sense in the current code.
+> > 
+> > If I understand your log text correctly this patch goes on top of Sakari Ailus' vb2
+> > sync patch series. So if it wasn't needed before, but it is needed after his patch
+> > series, then the problem is in that patch series.
+> > 
+> This patch goes on top of these two patchs
+> https://www.mail-archive.com/linux-media%40vger.kernel.org/msg82143.html
+
+This patch has been merged long time ago.
+
+> http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013898.html
+> 
+> 
+> > In any case, I need some help understanding this patch.
+> > 
+> > And *if* this patch is correct, then the same thing should likely be done for
+> > videobuf2-dma-sg.c.
+> > 
+> Yes, if this patch correct, same thing should be done for
+> videobuf2-dma-sg.c
+> > Regards,
+> > 
+> > 	Hans
+> > 
+> > >  
+> > >  /*********************************************/
+> > > 
+> 
+> 
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
