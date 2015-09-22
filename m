@@ -1,155 +1,214 @@
-From: tiffany.lin@mediatek.com (tiffany lin)
-Date: Tue, 22 Sep 2015 21:35:59 +0800
-Subject: [RESEND PATCH] media: vb2: Fix vb2_dc_prepare do not correct
- sync data to device
-In-Reply-To: <20150922120724.GQ3175@valkosipuli.retiisi.org.uk>
-References: <1442838371-21484-1-git-send-email-tiffany.lin@mediatek.com>
- <56000293.9000802@xs4all.nl> <1442917165.20006.30.camel@mtksdaap41>
- <20150922120724.GQ3175@valkosipuli.retiisi.org.uk>
-Message-ID: <1442928959.20006.40.camel@mtksdaap41>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Sep 2015 12:20:10 +0100
+Subject: DSA: phy polling
+In-Reply-To: <20150922021426.GE20288@lunn.ch>
+References: <20150914104254.GI21084@n2100.arm.linux.org.uk>
+ <20150922021426.GE20288@lunn.ch>
+Message-ID: <20150922112009.GX21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+On Tue, Sep 22, 2015 at 04:14:26AM +0200, Andrew Lunn wrote:
+> On Mon, Sep 14, 2015 at 11:42:54AM +0100, Russell King - ARM Linux wrote:
+> > Andrew,
+> > 
+> > I think you're the current maintainer of the Marvell DSA code, as being
+> > the most recent author of changes to it. :)
+> 
+> Hi Russell
+> 
+> Sorry for the slow reply, i've been on vacation.
+> 
+> Humm, i suppose i might be the defacto Maintainer for Marvell parts,
+> but i've no NDA with Marvell, so no access to the data sheets etc.
 
-On Tue, 2015-09-22 at 15:07 +0300, Sakari Ailus wrote:
-> Hi Tiffany,
-> 
-> On Tue, Sep 22, 2015 at 06:19:25PM +0800, tiffany lin wrote:
-> > Hi Hans,
-> > 
-> > On Mon, 2015-09-21 at 15:13 +0200, Hans Verkuil wrote:
-> > > Hi Tiffany!
-> > > 
-> > > On 21-09-15 14:26, Tiffany Lin wrote:
-> > > > vb2_dc_prepare use the number of SG entries dma_map_sg_attrs return.
-> > > > But in dma_sync_sg_for_device, it use lengths of each SG entries
-> > > > before dma_map_sg_attrs. dma_map_sg_attrs will concatenate
-> > > > SGs until dma length > dma seg bundary. sgt->nents will less than
-> > > > sgt->orig_nents. Using SG entries after dma_map_sg_attrs
-> > > > in vb2_dc_prepare will make some SGs are not sync to device.
-> > > > After add DMA_ATTR_SKIP_CPU_SYNC in vb2_dc_get_userptr to remove
-> > > > sync data to device twice. Device randomly get incorrect data because
-> > > > some SGs are not sync to device. Change to use number of SG entries
-> > > > before dma_map_sg_attrs in vb2_dc_prepare to prevent this issue.
-> > > > 
-> > > > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
-> > > > ---
-> > > >  drivers/media/v4l2-core/videobuf2-dma-contig.c | 4 ++--
-> > > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/media/v4l2-core/videobuf2-dma-contig.c b/drivers/media/v4l2-core/videobuf2-dma-contig.c
-> > > > index 2397ceb..c5d00bd 100644
-> > > > --- a/drivers/media/v4l2-core/videobuf2-dma-contig.c
-> > > > +++ b/drivers/media/v4l2-core/videobuf2-dma-contig.c
-> > > > @@ -100,7 +100,7 @@ static void vb2_dc_prepare(void *buf_priv)
-> > > >  	if (!sgt || buf->db_attach)
-> > > >  		return;
-> > > >  
-> > > > -	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir);
-> > > > +	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
-> > > >  }
-> > > >  
-> > > >  static void vb2_dc_finish(void *buf_priv)
-> > > > @@ -112,7 +112,7 @@ static void vb2_dc_finish(void *buf_priv)
-> > > >  	if (!sgt || buf->db_attach)
-> > > >  		return;
-> > > >  
-> > > > -	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir);
-> > > > +	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
-> > > >  }
-> > > 
-> > > I don't really understand it. I am assuming that this happens on an arm and that
-> > > the dma_map_sg_attrs and dma_sync_sg_* functions used are arm_iommu_map_sg() and
-> > > arm_iommu_sync_sg_* as implemented in arch/arm/mm/dma-mapping.c.
-> > > 
-> > 
-> > We are using __iommu_* implemented in "arch/arm64/mm/dma-mapping.c" in
-> > review patch
-> > http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013898.html
-> > Without patch "[media] vb2: use dma_map_sg_attrs to prevent unnecessary
-> > sync", vb2 will sync data to device twice.
-> > One is from "dma_map_sg" in "vb2_dc_get_userptr", the other is from
-> > "dma_sync_sg_for_device" in "vb2_dc_prepare". dma_map_sg use orig_nents,
-> > and dma_sync_sg_for_device use nents."
-> > 
-> > We do not run in 32bits mode, but check "arm_dma_sync_sg_for_device" in
-> > "arch/arm/mm/dma-mapping.c", 
-> > ops->sync_single_for_device(dev, sg_dma_address(s), s->length, dir);
-> > It looks like has same issue.
-> > 
-> > > Now, as I understand it (and my understanding may very well be flawed!) the map_sg
-> > > function concatenates SG entries if possible, so it may return fewer entries. But
-> > > the dma_sync_sg functions use those updated SG entries, so the full buffer should
-> > > be covered by this. Using orig_nents will actually sync parts of the buffer twice!
-> > > The first nents entries already cover the full buffer so any remaining entries up
-> > > to orig_nents will just duplicate parts of the buffer.
-> > > 
-> > I found that in __iommu_sync_sg_for_device, it use sg->length , do not
-> > cover full buffer.
-> > By adding log in " __iommu_sync_sg_for_device" without patch "[media]
-> > vb2: use dma_map_sg_attrs to prevent unnecessary sync", we could see
-> > total synced size are different between called from dma_map_sg and
-> > dma_sync_sg_for_device.
-> 
-> I had the same question Hans did, but I still fail to understand where in
-> the code things are going wrong the way you described at the moment ---
-> after dma_map_sg() there are nents entries in the scatterlist. But.
-> sg_dma_len() should be used instead of the length field to get the size of
-> the entry. If something is wrong, then it's this AFAICT.
-> 
-> Could you try whether changing this fixes it?
-> 
-Do you mean try to change to use sg_dma_len in
-__iommu_sync_sg_for_device?
+Like the rest of us :(
 
-I tried to change using sg_dam_len() in __iommu_sync_sg_for_device
-	for_each_sg(sgl, sg, nelems, i) {
-		//__dma_map_area(sg_virt(sg), sg->length, dir);
-		__dma_map_area(sg_virt(sg), sg_dma_len(sg), dir);
-	}
-
-I still see the issue. Probably there are some other issue in
-iommu_dma_map_sg.
-
-The __iommu_sync_sg_for_device could be called before and after
-iommu_dma_map_sg called.
-I am not sure whether there is any side effect change it to
-sg_dma_len(sg)
-
-> > __iommu_sync_sg_for_device called from dma_sync_sg_for_device got
-> > updated SG entries number but it use un-updated sg length.
-> > After using "DMA_ATTR_SKIP_CPU_SYNC" to skip sync in vb2_dc_get_userptr,
-> > we got some part of the buffer not sync.
-> > 
-> > > So this patch makes no sense in the current code.
-> > > 
-> > > If I understand your log text correctly this patch goes on top of Sakari Ailus' vb2
-> > > sync patch series. So if it wasn't needed before, but it is needed after his patch
-> > > series, then the problem is in that patch series.
-> > > 
-> > This patch goes on top of these two patchs
-> > https://www.mail-archive.com/linux-media%40vger.kernel.org/msg82143.html
+> > I've noticed in my testing that the Marvell DSA code seems to poll the
+> > internal phy link status in mv88e6xxx_poll_link(), and set the network
+> > device carrier status according to the results.
 > 
-> This patch has been merged long time ago.
-> 
-> > http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013898.html
-> > 
-> > 
-> > > In any case, I need some help understanding this patch.
-> > > 
-> > > And *if* this patch is correct, then the same thing should likely be done for
-> > > videobuf2-dma-sg.c.
-> > > 
-> > Yes, if this patch correct, same thing should be done for
-> > videobuf2-dma-sg.c
-> > > Regards,
-> > > 
-> > > 	Hans
-> > > 
-> > > >  
-> > > >  /*********************************************/
-> > > > 
-> > 
-> > 
-> 
+> Peter Korsgaard comment might be correct, the switch needs to know
+> what the PHY has negotiated. Hence the use of the PPU. There are also
+> comments in the code that the PPU is needed for indirect access to the
+> PHY.
+
+I'm not changing the PPU at all - all I'm doing is to remove the extra
+layer of software polling which partially duplicates what the phy layer
+is already doing with its own polling.
+
+The poll_link code is reading the port PCS control register and the
+port status register, and using that to (a) control the netdev carrier
+state, and (b) printing the link state.
+
+Meanwhile, the PHY layer is polling the PHY that we created for the
+port, decoding its registers, and controlling the same netdev carrier
+state, parsing the standard MII register set to get the speed, duplex
+and other parameters, and dsa_slave_adjust_link() is the printing the
+new link state.  This then goes on to program the switch port via
+mv88e6xxx_adjust_link() if necessary.
+
+So, it's the PHY layer which is doing all the real work, the poll_link
+code is just a duplication.
+
+My current patch for this looks like this, and it's what I'm running
+against the 88E6176 switch.  Link state is detected via the phy layer
+and everything appears to work fine.
+
+I think mv88e6060_poll_link() in drivers/net/dsa/mv88e6060.c can go the
+same way too (it seems to be mostly the same as the code below, except
+it doesn't support gigabit).  That would mean there's no users of the
+.poll_link method in drivers/net/dsa - and that probably means the link
+polling code in net/dsa can also be removed.
+
+ drivers/net/dsa/mv88e6123_61_65.c |  1 -
+ drivers/net/dsa/mv88e6131.c       |  1 -
+ drivers/net/dsa/mv88e6171.c       |  1 -
+ drivers/net/dsa/mv88e6352.c       |  1 -
+ drivers/net/dsa/mv88e6xxx.c       | 67 ---------------------------------------
+ drivers/net/dsa/mv88e6xxx.h       |  1 -
+ 6 files changed, 72 deletions(-)
+
+diff --git a/drivers/net/dsa/mv88e6123_61_65.c b/drivers/net/dsa/mv88e6123_61_65.c
+index 3de2a6d73fdc..4bcfd683bbea 100644
+--- a/drivers/net/dsa/mv88e6123_61_65.c
++++ b/drivers/net/dsa/mv88e6123_61_65.c
+@@ -125,7 +125,6 @@ struct dsa_switch_driver mv88e6123_61_65_switch_driver = {
+ 	.set_addr		= mv88e6xxx_set_addr_indirect,
+ 	.phy_read		= mv88e6xxx_phy_read,
+ 	.phy_write		= mv88e6xxx_phy_write,
+-	.poll_link		= mv88e6xxx_poll_link,
+ 	.get_strings		= mv88e6xxx_get_strings,
+ 	.get_ethtool_stats	= mv88e6xxx_get_ethtool_stats,
+ 	.get_sset_count		= mv88e6xxx_get_sset_count,
+diff --git a/drivers/net/dsa/mv88e6131.c b/drivers/net/dsa/mv88e6131.c
+index 3e8386529965..c73121c8f155 100644
+--- a/drivers/net/dsa/mv88e6131.c
++++ b/drivers/net/dsa/mv88e6131.c
+@@ -178,7 +178,6 @@ struct dsa_switch_driver mv88e6131_switch_driver = {
+ 	.set_addr		= mv88e6xxx_set_addr_direct,
+ 	.phy_read		= mv88e6131_phy_read,
+ 	.phy_write		= mv88e6131_phy_write,
+-	.poll_link		= mv88e6xxx_poll_link,
+ 	.get_strings		= mv88e6xxx_get_strings,
+ 	.get_ethtool_stats	= mv88e6xxx_get_ethtool_stats,
+ 	.get_sset_count		= mv88e6xxx_get_sset_count,
+diff --git a/drivers/net/dsa/mv88e6171.c b/drivers/net/dsa/mv88e6171.c
+index c2daaf087761..c95cfab56a4f 100644
+--- a/drivers/net/dsa/mv88e6171.c
++++ b/drivers/net/dsa/mv88e6171.c
+@@ -104,7 +104,6 @@ struct dsa_switch_driver mv88e6171_switch_driver = {
+ 	.set_addr		= mv88e6xxx_set_addr_indirect,
+ 	.phy_read		= mv88e6xxx_phy_read_indirect,
+ 	.phy_write		= mv88e6xxx_phy_write_indirect,
+-	.poll_link		= mv88e6xxx_poll_link,
+ 	.get_strings		= mv88e6xxx_get_strings,
+ 	.get_ethtool_stats	= mv88e6xxx_get_ethtool_stats,
+ 	.get_sset_count		= mv88e6xxx_get_sset_count,
+diff --git a/drivers/net/dsa/mv88e6352.c b/drivers/net/dsa/mv88e6352.c
+index 1f5129c105fb..37367060676f 100644
+--- a/drivers/net/dsa/mv88e6352.c
++++ b/drivers/net/dsa/mv88e6352.c
+@@ -324,7 +324,6 @@ struct dsa_switch_driver mv88e6352_switch_driver = {
+ 	.set_addr		= mv88e6xxx_set_addr_indirect,
+ 	.phy_read		= mv88e6xxx_phy_read_indirect,
+ 	.phy_write		= mv88e6xxx_phy_write_indirect,
+-	.poll_link		= mv88e6xxx_poll_link,
+ 	.get_strings		= mv88e6xxx_get_strings,
+ 	.get_ethtool_stats	= mv88e6xxx_get_ethtool_stats,
+ 	.get_sset_count		= mv88e6xxx_get_sset_count,
+diff --git a/drivers/net/dsa/mv88e6xxx.c b/drivers/net/dsa/mv88e6xxx.c
+index f8baa897d1a0..c6683f65b125 100644
+--- a/drivers/net/dsa/mv88e6xxx.c
++++ b/drivers/net/dsa/mv88e6xxx.c
+@@ -388,73 +388,6 @@ int mv88e6xxx_phy_write_ppu(struct dsa_switch *ds, int addr,
+ }
+ #endif
+ 
+-void mv88e6xxx_poll_link(struct dsa_switch *ds)
+-{
+-	int i;
+-
+-	for (i = 0; i < DSA_MAX_PORTS; i++) {
+-		struct net_device *dev;
+-		int uninitialized_var(port_status);
+-		int pcs_ctrl;
+-		int link;
+-		int speed;
+-		int duplex;
+-		int fc;
+-
+-		dev = ds->ports[i];
+-		if (dev == NULL)
+-			continue;
+-
+-		pcs_ctrl = mv88e6xxx_reg_read(ds, REG_PORT(i), PORT_PCS_CTRL);
+-		if (pcs_ctrl < 0 || pcs_ctrl & PORT_PCS_CTRL_FORCE_LINK)
+-			continue;
+-
+-		link = 0;
+-		if (dev->flags & IFF_UP) {
+-			port_status = mv88e6xxx_reg_read(ds, REG_PORT(i),
+-							 PORT_STATUS);
+-			if (port_status < 0)
+-				continue;
+-
+-			link = !!(port_status & PORT_STATUS_LINK);
+-		}
+-
+-		if (!link) {
+-			if (netif_carrier_ok(dev)) {
+-				netdev_info(dev, "link down\n");
+-				netif_carrier_off(dev);
+-			}
+-			continue;
+-		}
+-
+-		switch (port_status & PORT_STATUS_SPEED_MASK) {
+-		case PORT_STATUS_SPEED_10:
+-			speed = 10;
+-			break;
+-		case PORT_STATUS_SPEED_100:
+-			speed = 100;
+-			break;
+-		case PORT_STATUS_SPEED_1000:
+-			speed = 1000;
+-			break;
+-		default:
+-			speed = -1;
+-			break;
+-		}
+-		duplex = (port_status & PORT_STATUS_DUPLEX) ? 1 : 0;
+-		fc = (port_status & PORT_STATUS_PAUSE_EN) ? 1 : 0;
+-
+-		if (!netif_carrier_ok(dev)) {
+-			netdev_info(dev,
+-				    "link up, %d Mb/s, %s duplex, flow control %sabled\n",
+-				    speed,
+-				    duplex ? "full" : "half",
+-				    fc ? "en" : "dis");
+-			netif_carrier_on(dev);
+-		}
+-	}
+-}
+-
+ static bool mv88e6xxx_6065_family(struct dsa_switch *ds)
+ {
+ 	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
+diff --git a/drivers/net/dsa/mv88e6xxx.h b/drivers/net/dsa/mv88e6xxx.h
+index 9b6f3d9d5ae1..d94a4e134ee2 100644
+--- a/drivers/net/dsa/mv88e6xxx.h
++++ b/drivers/net/dsa/mv88e6xxx.h
+@@ -442,7 +442,6 @@ void mv88e6xxx_ppu_state_init(struct dsa_switch *ds);
+ int mv88e6xxx_phy_read_ppu(struct dsa_switch *ds, int addr, int regnum);
+ int mv88e6xxx_phy_write_ppu(struct dsa_switch *ds, int addr,
+ 			    int regnum, u16 val);
+-void mv88e6xxx_poll_link(struct dsa_switch *ds);
+ void mv88e6xxx_get_strings(struct dsa_switch *ds, int port, uint8_t *data);
+ void mv88e6xxx_get_ethtool_stats(struct dsa_switch *ds, int port,
+ 				 uint64_t *data);
+
+
+-- 
+FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
+according to speedtest.net.
