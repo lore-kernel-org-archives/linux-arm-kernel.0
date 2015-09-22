@@ -1,133 +1,110 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 22 Sep 2015 16:00:53 +0200
-Subject: [PATCH v1 1/3] clocksource: rockchip: Make the driver more
- readability and compatible
-In-Reply-To: <1442566271-10695-2-git-send-email-wxt@rock-chips.com>
-References: <1442566271-10695-1-git-send-email-wxt@rock-chips.com>
- <1442566271-10695-2-git-send-email-wxt@rock-chips.com>
-Message-ID: <5455510.kk9S3OIaU9@diego>
+From: plaes@plaes.org (Priit Laes)
+Date: Tue, 22 Sep 2015 16:26:57 +0300
+Subject: [linux-sunxi] [PATCH 0/2] ASoC: Add support for the Allwinner
+ A10 codec
+In-Reply-To: <1442064384-23379-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1442064384-23379-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1442928417.6509.12.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+On Sat, 2015-09-12 at 15:26 +0200, Maxime Ripard wrote:
+> Hi everyone,
+> 
+> This patch set adds the support for what Allwinner calls the codec on
+> their SoCs.
+> 
+> This codec is actually a combination of a codec and DAI, tied
+> together
+> in a single memory-mapped IP. It is completely standalone, and
+> outputs
+> directly the analog signal.
+> 
+> While it supports both playback and capture, the capture is not
+> implemented in this patch, and will be posted eventually as a
+> separate
+> one.
+> 
+> This set, in order to be functional, has a dependency on the audio
+> clocks patch set posted separately. However, it doesn't needs this to
+> compile properly, so I guess it can be merged without really caring
+> for the merging status of the clock patches.
 
-Am Freitag, 18. September 2015, 16:51:09 schrieb Caesar Wang:
-> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
-> There are some failure with build up on timer driver for rockchip.
-> 
-> logs:
-> ...
-> drivers/clocksource/rockchip_timer.c:156:13: error: 'NO_IRQ' undeclared
-> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand 1 --
-> `dsb`
-> ...
-> 
-> The problem was different semantics of dsb on btw arm32 and arm64,
-> Here we can convert the dsb with insteading of dsb(sy).
-> 
-> NO_IRQ definition is missing for ARM64, since NO_IRQ being -1 is a
-> legacy thing for ARM - all ARM drivers are supposed to be converted to
-> use <= 0 or == 0 to detect invalid IRQs, and _eventually_ once all users
-> are gone, NO_IRQ deleted. Modern drivers should _all_ be using !irq to
-> detect invalid IRQs, and not using NO_IRQ.
-> 
-> Meanwhile, I change a bit to make the code more readability for driver
-> when I check the code style.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
-> 
-> Changes in v1:
-> - As Russell, Thomas, Daniel comments, let's replace NO_IRQ by '!irq'.
-> 
->  drivers/clocksource/rockchip_timer.c | 29 +++++++++++++++--------------
->  1 file changed, 15 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/clocksource/rockchip_timer.c
-> b/drivers/clocksource/rockchip_timer.c index bb2c2b0..e1af449 100644
-> --- a/drivers/clocksource/rockchip_timer.c
-> +++ b/drivers/clocksource/rockchip_timer.c
-> @@ -17,16 +17,16 @@
-> 
->  #define TIMER_NAME "rk_timer"
-> 
-> -#define TIMER_LOAD_COUNT0 0x00
-> -#define TIMER_LOAD_COUNT1 0x04
-> -#define TIMER_CONTROL_REG 0x10
-> -#define TIMER_INT_STATUS 0x18
-> +#define TIMER_LOAD_COUNT0	0x00
-> +#define TIMER_LOAD_COUNT1	0x04
-> +#define TIMER_CONTROL_REG	0x10
-> +#define TIMER_INT_STATUS	0x18
-> 
-> -#define TIMER_DISABLE 0x0
-> -#define TIMER_ENABLE 0x1
-> -#define TIMER_MODE_FREE_RUNNING (0 << 1)
-> -#define TIMER_MODE_USER_DEFINED_COUNT (1 << 1)
-> -#define TIMER_INT_UNMASK (1 << 2)
-> +#define TIMER_DISABLE			(0 << 0)
-> +#define TIMER_ENABLE			(1 << 0)
-> +#define TIMER_MODE_FREE_RUNNING		(0 << 1)
-> +#define TIMER_MODE_USER_DEFINED_COUNT	(1 << 1)
-> +#define TIMER_INT_UNMASK		(1 << 2)
+It works on Gemei G9 tablet which has also extra chip that
+automatically switches output over from internal speakers to headphones
+when connector is inserted.
 
-not sure how Daniel sees this, but those could count as "unrelated change", as 
-they have nothing to do with the arm64 build-fixes.
+Now I noticed some weird things:
+
+When I have all the switches as ON in alsamixer, and I start disabling
+them, I get following weird results.
+
+Left Mixer Left - LML
+Right Mixer Left - LMR
+Right Mixer Right - RMR
+
+Very faint output:
+LML - ON
+RML - Mute
+RMR - ON
+
+Output works fully:
+LML - Mute
+RML - Mute
+RMR - Mute
+
+When I Mute Pre-Amplifier and fiddle any of LML, RML or RMR, the output
+stays mute even after setting Pre-Amplifier Mute back on:
+
+1. All switches on
+2. Mute pre-amplifier
+3. Mute RMR
+4. Pre-Amilifier Mute Off
+.. Music stays off
+5. Toggle Pre-Amplifier twice - output turns on
 
 
-> 
->  struct bc_timer {
->  	struct clock_event_device ce;
-> @@ -49,14 +49,14 @@ static inline void __iomem *rk_base(struct
-> clock_event_device *ce) static inline void rk_timer_disable(struct
-> clock_event_device *ce) {
->  	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
-> -	dsb();
-> +	dsb(sy);
->  }
-> 
->  static inline void rk_timer_enable(struct clock_event_device *ce, u32
-> flags) {
->  	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
->  		       rk_base(ce) + TIMER_CONTROL_REG);
-> -	dsb();
-> +	dsb(sy);
->  }
-> 
->  static void rk_timer_update_counter(unsigned long cycles,
-> @@ -64,13 +64,13 @@ static void rk_timer_update_counter(unsigned long
-> cycles, {
->  	writel_relaxed(cycles, rk_base(ce) + TIMER_LOAD_COUNT0);
->  	writel_relaxed(0, rk_base(ce) + TIMER_LOAD_COUNT1);
-> -	dsb();
-> +	dsb(sy);
->  }
-> 
->  static void rk_timer_interrupt_clear(struct clock_event_device *ce)
->  {
->  	writel_relaxed(1, rk_base(ce) + TIMER_INT_STATUS);
-> -	dsb();
-> +	dsb(sy);
->  }
-> 
->  static inline int rk_timer_set_next_event(unsigned long cycles,
-> @@ -148,7 +148,7 @@ static void __init rk_timer_init(struct device_node *np)
-> bc_timer.freq = clk_get_rate(timer_clk);
-> 
->  	irq = irq_of_parse_and_map(np, 0);
-> -	if (irq == NO_IRQ) {
-> +	if (!irq) {
->  		pr_err("Failed to map interrupts for '%s'\n", TIMER_NAME);
->  		return;
->  	}
-> @@ -173,4 +173,5 @@ static void __init rk_timer_init(struct device_node *np)
-> 
->  	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
->  }
-> +
-
-unnecessary addition of a blank line (same reasons as above)
->  CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
+And also following in dmesg:
+sun4i-codec 1c22c00.codec: Codec <-> 1c22c00.codec mapping ok
+sun4i-codec 1c22c00.codec: ASoC: no sink widget found for Headphone Jack
+sun4i-codec 1c22c00.codec: ASoC: Failed to add route HP Left -> direct -> Headphone Jack
+sun4i-codec 1c22c00.codec: ASoC: no sink widget found for Headphone Jack
+sun4i-codec 1c22c00.codec: ASoC: Failed to add route HP Right -> direct -> Headphone Jack
 
 
-Heiko
+With following patch to DTS:
+
++&codec {
++???????routing = "Headphone Jack", "HP Left",
++?????????????????????????"Headphone Jack", "HP Right";
++???????status = "okay";
++};
+
+> 
+> Let me know what you think,
+> Maxime
+> 
+> Emilio L?pez (1):
+> ? ASoC: sunxi: add support for the on-chip codec on early Allwinner
+> SoCs
+> 
+> Maxime Ripard (1):
+> ? Documentation: bindings: Add the Allwinner A10 codec bindings
+> 
+> ?.../devicetree/bindings/sound/sun4i-codec.txt??????|??33 +
+> ?sound/soc/Kconfig??????????????????????????????????|???1 +
+> ?sound/soc/Makefile?????????????????????????????????|???1 +
+> ?sound/soc/sunxi/Kconfig????????????????????????????|??11 +
+> ?sound/soc/sunxi/Makefile???????????????????????????|???2 +
+> ?sound/soc/sunxi/sun4i-codec.c??????????????????????| 720
+> +++++++++++++++++++++
+> ?6 files changed, 767 insertions(+)
+> ?create mode 100644 Documentation/devicetree/bindings/sound/sun4i-
+> codec.txt
+> ?create mode 100644 sound/soc/sunxi/Kconfig
+> ?create mode 100644 sound/soc/sunxi/Makefile
+> ?create mode 100644 sound/soc/sunxi/sun4i-codec.c
+> 
+> -- 
+> 2.5.1
+> 
