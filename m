@@ -1,41 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 22 Sep 2015 16:04:24 +0200
-Subject: [linux-sunxi] Re: [PATCH 5/5] ARM: sun5i: Add C.H.I.P DTS
-In-Reply-To: <56015146.2070509@redhat.com>
-References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
- <1442566130-3497-6-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v64E-gQu1U_qi2fTWiCmfgMdMR4X6yLUerV21d3E1uQ1cw@mail.gmail.com>
- <20150922124708.GZ4684@lukather>
- <CAGb2v662+mhFgv1DXz5muA+xGE99R1DVKOxtVPvJmc+tRFPXzQ@mail.gmail.com>
- <56015146.2070509@redhat.com>
-Message-ID: <20150922140424.GA4684@lukather>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 22 Sep 2015 16:07:03 +0200
+Subject: [PATCH 1/3] irqchip: atmel-aic5: fix bug with mask/unmask
+In-Reply-To: <alpine.DEB.2.11.1509221549420.5606@nanos>
+References: <1442843173-2390-1-git-send-email-ludovic.desroches@atmel.com>
+ <alpine.DEB.2.11.1509221226090.5606@nanos>
+ <20150922135558.7be8ac1c@bbrezillon>
+ <alpine.DEB.2.11.1509221549420.5606@nanos>
+Message-ID: <20150922140703.GC28781@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 03:01:58PM +0200, Hans de Goede wrote:
-> >In short, this is not about "power supply" but VBUS detection. IIRC,
-> >if no VBUS detection method is provided, the phy driver just waits a
-> >period of time after an ID pin change and then considers VBUS invalid.
+On Tue, Sep 22, 2015 at 03:50:30PM +0200, Thomas Gleixner wrote:
+> On Tue, 22 Sep 2015, Boris Brezillon wrote:
+> > On Tue, 22 Sep 2015 12:27:08 +0200 (CEST)
+> > Thomas Gleixner <tglx@linutronix.de> wrote:
+> > > Why is this locking dgc->gc[0] and fiddling with some other generic
+> > > chip?
+> > 
+> > Actually, we always access the same set of registers for all irqs of the
+> > domain, and thus need to take the same lock (I chose the one contained
+> > in the first generic irqchip, but I guess it could work with the others
+> > too, as long as we always take the same one) before accessing them
+> > because the configuration is done in two steps:
+> > 
+> > 1/ specify the irq line you want to configure
+> > 2/ set the new configuration
+> > 
+> > Regarding register accesses, all generic chips are configured to
+> > point to the same registers, so accessing them from the 'base' generic
+> > chip or from the generic chip attached to the irq_data struct is the
+> > same, though I agree that using bgc would add some consistency to the
+> > implementation.
 > 
-> Right, but that is a hack for boards with no / broken vbus detection
-> (or vbus control), we really want to use vbus-det where available,
-> so I agree that a TODO comment here would be good.
+> Fair enough. It just deserves a comment for the casual reader.
+> 
 
-What's so special in our SoCs that makes that we can't just rely on
-the ID pin ? (which seems to be working just fine here)
+Thanks for the addition of the comment.
 
-Other SoCs don't need to rely on such a hack as well.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/3ce03884/attachment.sig>
+Ludovic
