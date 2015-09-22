@@ -1,45 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Sep 2015 11:47:55 +0100
-Subject: [PATCH] arm: wire up userfaultfd and membarrier syscalls
-In-Reply-To: <56013154.1010401@arm.com>
-References: <1442854833-10592-1-git-send-email-andre.przywara@arm.com>
- <20150921171715.GR21084@n2100.arm.linux.org.uk>
- <56013154.1010401@arm.com>
-Message-ID: <20150922104755.GW21084@n2100.arm.linux.org.uk>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 22 Sep 2015 11:52:19 +0100
+Subject: [PATCH] generic syscalls: wire up userfaultfd syscall
+Message-ID: <1442919139-18027-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 11:45:40AM +0100, Andre Przywara wrote:
-> Hi Russell,
-> 
-> On 21/09/15 18:17, Russell King - ARM Linux wrote:
-> > On Mon, Sep 21, 2015 at 06:00:33PM +0100, Andre Przywara wrote:
-> >> Add the syscall numbers to the ARM syscall table. Both have
-> >> been briefly tested using the provided selftests from the tools
-> >> directory.
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >> Hi Russell,
-> >>
-> >> I saw that Thierry sent something similar beginning of August already
-> >> (which is now outdated), is there any issue with enabling syscalls?
-> > 
-> > The only issue there is is that this was mentioned last week, and I
-> > replied about it last week.
-> 
-> I missed that because I only looked in the ARM kernel ML, sorry about that.
-> 
-> > I already have a patch pending for it, but I've been unable to merge
-> > it into mainline as my tree became somewhat messy due to the fixes
-> > missing -rc1 - which meant that my fixes branch was not recent enough
-> > to take that patch.  Now that those fixes are in, I can now start
-> > sorting my tree out, as I'd normally do after -rc1.
-> 
-> Fair enough and sorry for the noise.
+Enable the new userfaultfd syscall in the generic syscall table.
+Briefly tested on arm64 with the selftest from the tools directory.
 
-It should be in tonights linux-next.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ include/uapi/asm-generic/unistd.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
+diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+index 8da542a..82c91bc 100644
+--- a/include/uapi/asm-generic/unistd.h
++++ b/include/uapi/asm-generic/unistd.h
+@@ -711,9 +711,11 @@ __SYSCALL(__NR_bpf, sys_bpf)
+ __SC_COMP(__NR_execveat, sys_execveat, compat_sys_execveat)
+ #define __NR_membarrier 282
+ __SYSCALL(__NR_membarrier, sys_membarrier)
++#define __NR_userfaultfd 283
++__SYSCALL(__NR_userfaultfd, sys_userfaultfd)
+ 
+ #undef __NR_syscalls
+-#define __NR_syscalls 283
++#define __NR_syscalls 284
+ 
+ /*
+  * All syscalls below here should go away really,
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.5.1
