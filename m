@@ -1,37 +1,18 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 22 Sep 2015 04:14:26 +0200
-Subject: DSA: phy polling
-In-Reply-To: <20150914104254.GI21084@n2100.arm.linux.org.uk>
-References: <20150914104254.GI21084@n2100.arm.linux.org.uk>
-Message-ID: <20150922021426.GE20288@lunn.ch>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 21 Sep 2015 19:25:02 -0700
+Subject: [PATCH v6 1/4] dt/bindings: bcm2835: spi: add bindings for the
+ bcm2835 auxiliary spi devices
+In-Reply-To: <1441970527-2403-2-git-send-email-kernel@martin.sperl.org>
+References: <1441970527-2403-1-git-send-email-kernel@martin.sperl.org>
+ <1441970527-2403-2-git-send-email-kernel@martin.sperl.org>
+Message-ID: <5600BBFE.6090104@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 11:42:54AM +0100, Russell King - ARM Linux wrote:
-> Andrew,
+On 09/11/2015 04:22 AM, kernel at martin.sperl.org wrote:
+> From: Martin Sperl <kernel@martin.sperl.org>
 > 
-> I think you're the current maintainer of the Marvell DSA code, as being
-> the most recent author of changes to it. :)
+> This defines the spi1 and spi2 devices in the device-tree.
 
-Hi Russell
-
-Sorry for the slow reply, i've been on vacation.
-
-Humm, i suppose i might be the defacto Maintainer for Marvell parts,
-but i've no NDA with Marvell, so no access to the data sheets etc.
- 
-> I've noticed in my testing that the Marvell DSA code seems to poll the
-> internal phy link status in mv88e6xxx_poll_link(), and set the network
-> device carrier status according to the results.
-
-Peter Korsgaard comment might be correct, the switch needs to know
-what the PHY has negotiated. Hence the use of the PPU. There are also
-comments in the code that the PPU is needed for indirect access to the
-PHY.
-
-So we probably need to keep the PPU, but disable it from changing the
-networks stacks idea of the link state, etc.
-
-I will add this to my TODO list to play with it.
-
-  Andrew
+Patches 1, 3, 4,
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
