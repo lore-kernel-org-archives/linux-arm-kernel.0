@@ -1,69 +1,68 @@
-From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
-Date: Tue, 22 Sep 2015 19:04:56 +0000
-Subject: [PATCH 4/6] arm64/ls1043a: add DTS for Freescale LS1043A SoC
-In-Reply-To: <DM2PR0301MB07342356008C1A50AB26FEFFBA450@DM2PR0301MB0734.namprd03.prod.outlook.com>
-References: <1442838158-2964-1-git-send-email-B48286@freescale.com>
- <1442838158-2964-5-git-send-email-B48286@freescale.com>
- <20150922012403.GA1535@svinekod>
- <CY1PR0301MB078008B10188504C951076498B450@CY1PR0301MB0780.namprd03.prod.outlook.com>
- <DM2PR0301MB07342356008C1A50AB26FEFFBA450@DM2PR0301MB0734.namprd03.prod.outlook.com>
-Message-ID: <BY1PR0301MB1303F9A6F3B00F91C7B18C0682450@BY1PR0301MB1303.namprd03.prod.outlook.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 22 Sep 2015 20:06:01 +0100
+Subject: [PATCH] arm/dma-mapping: Clarify arm_*_sync_sg_* usage
+Message-ID: <e8d48fcd1f09604fcb21e3912979a001fdb5709a.1442948705.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The comments on the arm_iommu_sync_sg_* functions are misleading, and
+do not hold up to scrutiny against the DMA API documentation. Since
+cache maintenance is performed on the CPU addresses of the original
+list, not the virtual DMA entries filled in by arm_iommu_map_sg,
+passing in fewer than the original number of entries can only result
+in the corresponding subset of the buffer being flushed/invalidated
+while the rest is skipped, which is almost certainly not what the
+caller desires.
 
+Fix all the relevant comments to say the correct thing; no functional
+difference for arm_dma_sync_sg*, as the current implementation of
+arm_dma_map_sg always returns the same number of entries as passed in
+if it succeeds.
 
-> -----Original Message-----
-> From: Li Yang-Leo-R58472
-> Sent: Tuesday, September 22, 2015 10:53 PM
-> To: Hou Zhiqiang-B48286; Mark Rutland; marc.zyngier at arm.com
-> Cc: linux-arm-kernel at lists.infradead.org; Catalin Marinas; Will Deacon;
-> linux-i2c at vger.kernel.org; linux-watchdog at vger.kernel.org; linux-
-> doc at vger.kernel.org; linux-clk at vger.kernel.org; Xie Shaohui-B21989;
-> corbet at lwn.net; Sharma Bhupesh-B45370; mturquette at baylibre.com; wsa at the-
-> dreams.de; sboyd at codeaurora.org; wim at iguana.be; Song Wenbin-B53747; Wood
-> Scott-B07421; Hu Mingkai-B21284
-> Subject: RE: [PATCH 4/6] arm64/ls1043a: add DTS for Freescale LS1043A SoC
-> 
-> > >
-> > > Hi,
-> > >
-> > > > +/memreserve/ 0x80000000 0x00010000;
-> > >
-> > > Why is this necessary?
-> >
-> > This memory region is pre-reserved for the spin-table/psci, although
-> > didn't add Enable method of secondary cores.
-> 
-> Can this be reserved by bootloader?
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ arch/arm/mm/dma-mapping.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-No need to reserve this for PSCI based secondary bootup.
-
-> >
-> > > If this is necessary, please add a comment stating what this is for.
-> > >
-> > > > +               cpu at 3 {
-> > > > +                       device_type = "cpu";
-> > > > +                       compatible = "arm,cortex-a53";
-> > > > +                       reg = <0x0 0x3>;
-> > > > +                       clocks = <&clockgen 1 0>;
-> > > > +               };
-> > >
-> > > Missing enable-method properties on all the secondary CPUs.
-> > >
-> >
-> > There are two methods (spin-table and psci) to bring up secondary
-> > cores, which one do you think is better?
-> 
-> Do we have the PSCI support ready in both UEFI and u-boot?  If not, we
-> should use spin-table for now.
-
-UEFI has been using PSCI with Arm Trusted Firmware (ATF) since some time. U-boot can also work with ATF seamlessly.
-
-Spin-table method is deprecated and newer patches should support PSCI. If not, all intelligence should be left to the
-Bootloader and the Linux DTS should not mention the 'enable-method' and the 'memreserve' regions. 
-
-For details please see the LS2085A Freescale DTS already present in mainline kernel.
-
-Regards,
-Bhupesh
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index e626043..ea14f17 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -958,7 +958,7 @@ void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+  * arm_dma_sync_sg_for_cpu
+  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+  * @sg: list of buffers
+- * @nents: number of buffers to map (returned from dma_map_sg)
++ * @nents: number of buffers to map (same as was passed to dma_map_sg)
+  * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+  */
+ void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+@@ -977,7 +977,7 @@ void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+  * arm_dma_sync_sg_for_device
+  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+  * @sg: list of buffers
+- * @nents: number of buffers to map (returned from dma_map_sg)
++ * @nents: number of buffers to map (same as was passed to dma_map_sg)
+  * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+  */
+ void arm_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+@@ -1672,7 +1672,7 @@ void arm_iommu_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+  * arm_iommu_sync_sg_for_cpu
+  * @dev: valid struct device pointer
+  * @sg: list of buffers
+- * @nents: number of buffers to map (returned from dma_map_sg)
++ * @nents: number of buffers to map (same as was passed to dma_map_sg)
+  * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+  */
+ void arm_iommu_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+@@ -1690,7 +1690,7 @@ void arm_iommu_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+  * arm_iommu_sync_sg_for_device
+  * @dev: valid struct device pointer
+  * @sg: list of buffers
+- * @nents: number of buffers to map (returned from dma_map_sg)
++ * @nents: number of buffers to map (same as was passed to dma_map_sg)
+  * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+  */
+ void arm_iommu_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+-- 
+1.9.1
