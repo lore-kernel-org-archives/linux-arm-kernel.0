@@ -1,37 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 Sep 2015 19:50:37 +0100
-Subject: [RFC PATCH v5 4/4] arm: fix a migrating irq bug when hotplug cpu
-In-Reply-To: <1442631959-10228-5-git-send-email-yangyingliang@huawei.com>
-References: <1442631959-10228-1-git-send-email-yangyingliang@huawei.com>
- <1442631959-10228-5-git-send-email-yangyingliang@huawei.com>
-Message-ID: <20150922195037.472b404c@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Sep 2015 19:52:30 +0100
+Subject: [PATCH 3/3] PCI: generic: Add support for Cavium ThunderX PCIe
+ root complexes.
+In-Reply-To: <1442529694-1792-4-git-send-email-ddaney.cavm@gmail.com>
+References: <1442529694-1792-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442529694-1792-4-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150922185230.GR7356@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 19 Sep 2015 11:05:59 +0800
-Yang Yingliang <yangyingliang@huawei.com> wrote:
-
-> When cpu is disabled, all irqs will be migratged to another cpu.
-> In some cases, a new affinity is different, it needed to be coppied
-> to irq's affinity. But if the type of irq is LPI, it's affinity will
-> not be coppied because of irq_set_affinity's return value. Fix it by
-> using irq_do_set_affinity.
+On Thu, Sep 17, 2015 at 11:41:34PM +0100, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
 > 
-> And migrating interrupts is a core code matter, so use the generic
-> function irq_migrate_all_off_this_cpu() to migrate interrupts in
-> kernel/irq/migration.c.
+> The config space for external PCIe root complexes on some Cavium
+> ThunderX SoCs is very similar to CAM and ECAM, but differs in the
+> shift values that have to be applied to the bus and devfn numbers to
+> compose that address window offset.  These root complexes also have
+> the interesting property that there is no root bridge, so the standard
+> manner of limiting scanning to only the first device doesn't work.  We
+> can use the standard pci-host-generic driver if we make a minor
+> addition to handle these differences, so we...
 > 
-> Cc: Jiang Liu <jiang.liu@linux.intel.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+> Add a mapping function for ThunderX PCIe root complexes with a bus
+> shift of 24 and devfn shift of 16.  Ignore accesses for devices other
+> than the first device on the primary bus.
+> 
+> Document the whole thing in devicetree/bindings/pci/host-generic-pci.txt
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  .../devicetree/bindings/pci/host-generic-pci.txt   |  8 +++---
+>  drivers/pci/host/pci-host-generic.c                | 29 ++++++++++++++++++++++
+>  2 files changed, 34 insertions(+), 3 deletions(-)
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Thanks, this looks better now:
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
