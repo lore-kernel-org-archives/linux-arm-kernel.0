@@ -1,131 +1,188 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 22 Sep 2015 10:32:36 -0700
-Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
-In-Reply-To: <55F162FD.4050401@ti.com>
-References: <Pine.LNX.4.44L0.1509051133100.30865-100000@netrider.rowland.org>
- <2657565.lxWtPmdjyp@vostro.rjw.lan> <55ED9328.2010501@ti.com>
- <2355864.I8qZFusWfm@vostro.rjw.lan> <55EE9AA1.8020200@ti.com>
- <7h613kmuuv.fsf@deeprootsystems.com> <55F162FD.4050401@ti.com>
-Message-ID: <20150922173236.GB19183@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 22 Sep 2015 10:36:34 -0700
+Subject: [PATCH v2 4/5] cpufreq-dt: Handle OPP voltage adjust events
+In-Reply-To: <1442623929-4507-5-git-send-email-sboyd@codeaurora.org>
+References: <1442623929-4507-1-git-send-email-sboyd@codeaurora.org>
+ <1442623929-4507-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150922173612.GI24314@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 10 2015 at 04:01 -0700, Grygorii Strashko wrote:
->On 09/09/2015 01:03 AM, Kevin Hilman wrote:
->> Grygorii Strashko <grygorii.strashko@ti.com> writes:
->>
->>> On 09/07/2015 11:42 PM, Rafael J. Wysocki wrote:
->>>> On Monday, September 07, 2015 04:37:44 PM Grygorii Strashko wrote:
->>>>> On 09/07/2015 04:04 PM, Rafael J. Wysocki wrote:
->>>>>> On Saturday, September 05, 2015 11:39:20 AM Alan Stern wrote:
->>>>>>> On Sat, 5 Sep 2015, Grygorii Strashko wrote:
->>>>>>>
->>>>>>>> On 09/04/2015 09:45 PM, Alan Stern wrote:
->>>>>>>>> On Fri, 4 Sep 2015, Grygorii Strashko wrote:
->>>>>>>>>
->>>>>>>>>> There is one "small" problem with such approach :(
->>>>>>>>>>
->>>>>>>>>> - It's incompatible with -RT kernel, because PM runtime can't be used
->>>>>>>>>> in atomic context on -RT.
->>>>>>>>>
->>>>>>>>> Can you explain this more fully?  Why can't runtime PM be used in
->>>>>>>>> atomic context in the -rt kernels?
->>>>>>>>>
->>>>>>>>
->>>>>>>> See:
->>>>>>>>     http://lwn.net/Articles/146861/
->>>>>>>>     https://rt.wiki.kernel.org/index.php/Frequently_Asked_Questions#How_does_the_CONFIG_PREEMPT_RT_patch_work.3F
->>>>>>>>
->>>>>>>> spinlock_t
->>>>>>>>        Critical sections are preemptible. The _irq operations (e.g., spin_lock_irqsave())
->>>>>>>>     do -not- disable hardware interrupts. Priority inheritance is used to prevent priority
->>>>>>>>     inversion. An underlying rt_mutex is used to implement spinlock_t in PREEMPT_RT.
->>>>>>>>
->>>>>>>> As result, have to do things like:
->>>>>>>> https://lkml.org/lkml/2015/8/18/161
->>>>>>>> https://lkml.org/lkml/2015/8/18/162
->>>>>>>>
->>>>>>>> Sorry for brief reply - Friday/Sat night :)
->>>>>>>
->>>>>>> I see.  Although we normally think of interrupt contexts as being
->>>>>>> atomic, in an -rt kernel this isn't true any more because things like
->>>>>>> spin_lock_irq don't actually disable interrupts.
->>>>>>>
->>>>>>> Therefore it would be correct to say that in -rt kernels, runtime PM
->>>>>>> can be used in interrupt context (if the device is marked as irq-safe),
->>>>>>> but not in atomic context.  Right?
->>>>>>
->>>>>> Right.
->>>>>>
->>>>>> Whatever is suitable for interrupt context in the mainline, will be suitable
->>>>>> for that in -rt kernels too.
->>>>>
->>>>> Not exactly true :(, since spinlock is converted to [rt_] mutex.
->>>>> Usually, this difference can't be seen because on -RT kernel all or
->>>>> mostly all HW IRQ handlers will be forced to be threaded.
->>>>
->>>> Exactly.  And that's what I'm talking about.
->>>>
->>>>> For the cases, where such automatic conversion is not working,
->>>>> (like chained irq handlers or HW-handler+Threaded handler) the code
->>>>> has to be carefully patched to work properly as for non-RT as for -RT.
->>>>
->>>> Right.
->>>>
->>>>> Also, this triggers some -RT incompatibility issues, like with PM runtime or
->>>>
->>>> That I'm not sure about.  Why would runtime PM cause problems with -RT (apart
->>>> from attempts to use it from the idle loop, but that's not happening in the
->>>> mainline anyway)?
->>>
->>>
->>> I have to be more specific - sorry. "irq_safe" mode of PM runtime is incompatible with -RT.
->>>
->>> Here is an example:
->>> - HW IRQ handler in TI OMAP GPIO driver is implemented as chained IRQ handler and
->>>    contains pm_runtime_get_sync()/pm_runtime_put(). This works properly with vanilla kernel
->>>    because OMAP GPIO devices marked as irq_safe.
->>>    Chained IRQ handlers can't be forced threaded and PM runtime APIs trigger
->>>   "sleeping function called from invalid context" issues there, so corresponding code has to be reworked.
->>
->> Isn't that why those are being converted to raw_*[1] ?
->>
->> Kevin
->>
->> [1] http://marc.info/?l=linux-omap&m=143749603401221&w=2
->>
->
->That's way I've tried to convert those to generic IRQ handler [2] :),
->so on -RT it will be forced threaded.
->
->raw_* is different kind of problem in gpio-omap - IRQ controllers
->have to use raw_* inside irq_chip callbacks, because IRQ core guards those
->callbacks using raw_* locks.
->.irq_bus_lock()/irq_bus_sync_unlock() callbacks can be used [3]
->for any kind of operations which require non-atomic context.
->
-Talking to John Stultz at Linaro Connect: Is cpuidle relevant in
--RT kernel? I dont know much about -RT. I thought this might be point
-that we should consider.
+On 18-09-15, 17:52, Stephen Boyd wrote:
+> On some SoCs the Adaptive Voltage Scaling (AVS) technique is
+> employed to optimize the operating voltage of a device. At a
+> given frequency, the hardware monitors dynamic factors and either
+> makes a suggestion for how much to adjust a voltage for the
+> current frequency, or it automatically adjusts the voltage
+> without software intervention.
+> 
+> In the former case, an AVS driver will call
+> dev_pm_opp_modify_voltage() and update the voltage for the
+> particular OPP the CPUs are using. Add an OPP notifier to
+> cpufreq-dt so that we can adjust the voltage of the CPU when AVS
+> updates the OPP.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/cpufreq/cpufreq-dt.c | 63 +++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 57 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+> index 7c0d70e2a861..1bf3ae4d4ee1 100644
+> --- a/drivers/cpufreq/cpufreq-dt.c
+> +++ b/drivers/cpufreq/cpufreq-dt.c
+> @@ -34,6 +34,9 @@ struct private_data {
+>  	struct regulator *cpu_reg;
+>  	struct thermal_cooling_device *cdev;
+>  	unsigned int voltage_tolerance; /* in percentage */
+> +	struct notifier_block opp_nb;
+> +	struct mutex lock;
+> +	unsigned long opp_freq;
+>  };
+>  
+>  static struct freq_attr *cpufreq_dt_attr[] = {
+> @@ -42,6 +45,33 @@ static struct freq_attr *cpufreq_dt_attr[] = {
+>  	NULL,
+>  };
+>  
+> +static int opp_notifier(struct notifier_block *nb, unsigned long event,
+> +			void *data)
+> +{
+> +	struct dev_pm_opp *opp = data;
+> +	struct private_data *priv = container_of(nb, struct private_data,
+> +						 opp_nb);
+> +	struct device *cpu_dev = priv->cpu_dev;
+> +	struct regulator *cpu_reg = priv->cpu_reg;
+> +	unsigned long volt, tol, freq;
+> +	int ret = 0;
+> +
+> +	if (event == OPP_EVENT_ADJUST_VOLTAGE) {
+> +		volt = dev_pm_opp_get_voltage(opp);
+> +		freq = dev_pm_opp_get_freq(opp);
+> +		tol = volt * priv->voltage_tolerance / 100;
+> +
+> +		mutex_lock(&priv->lock);
+> +		if (freq == priv->opp_freq)
+> +			ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
+> +		mutex_unlock(&priv->lock);
+> +		if (ret)
+> +			dev_err(cpu_dev, "failed to scale voltage: %d\n", ret);
+> +	}
+> +
+> +	return notifier_from_errno(ret);
+> +}
+> +
+>  static int set_target(struct cpufreq_policy *policy, unsigned int index)
+>  {
+>  	struct dev_pm_opp *opp;
+> @@ -53,6 +83,7 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+>  	unsigned long volt = 0, volt_old = 0, tol = 0;
+>  	unsigned int old_freq, new_freq;
+>  	long freq_Hz, freq_exact;
+> +	unsigned long opp_freq = 0;
+>  	int ret;
+>  
+>  	freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
+> @@ -63,8 +94,8 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+>  	new_freq = freq_Hz / 1000;
+>  	old_freq = clk_get_rate(cpu_clk) / 1000;
+>  
+> +	mutex_lock(&priv->lock);
+>  	if (!IS_ERR(cpu_reg)) {
+> -		unsigned long opp_freq;
+>  
+>  		rcu_read_lock();
+>  		opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_Hz);
+> @@ -72,7 +103,8 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+>  			rcu_read_unlock();
+>  			dev_err(cpu_dev, "failed to find OPP for %ld\n",
+>  				freq_Hz);
+> -			return PTR_ERR(opp);
+> +			ret = PTR_ERR(opp);
+> +			goto out;
+>  		}
+>  		volt = dev_pm_opp_get_voltage(opp);
+>  		opp_freq = dev_pm_opp_get_freq(opp);
+> @@ -93,7 +125,7 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+>  		if (ret) {
+>  			dev_err(cpu_dev, "failed to scale voltage up: %d\n",
+>  				ret);
+> -			return ret;
+> +			goto out;
+>  		}
+>  	}
+>  
+> @@ -102,7 +134,7 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+>  		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
+>  		if (!IS_ERR(cpu_reg) && volt_old > 0)
+>  			regulator_set_voltage_tol(cpu_reg, volt_old, tol);
+> -		return ret;
+> +		goto out;
+>  	}
+>  
+>  	/* scaling down?  scale voltage after frequency */
+> @@ -112,9 +144,12 @@ static int set_target(struct cpufreq_policy *policy, unsigned int index)
+>  			dev_err(cpu_dev, "failed to scale voltage down: %d\n",
+>  				ret);
+>  			clk_set_rate(cpu_clk, old_freq * 1000);
+> +			goto out;
+>  		}
+>  	}
+> -
+> +	priv->opp_freq = opp_freq;
+> +out:
+> +	mutex_unlock(&priv->lock);
+>  	return ret;
+>  }
+>  
+> @@ -201,6 +236,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>  	unsigned int transition_latency;
+>  	bool need_update = false;
+>  	int ret;
+> +	struct srcu_notifier_head *opp_srcu_head;
+>  
+>  	ret = allocate_resources(policy->cpu, &cpu_dev, &cpu_reg, &cpu_clk);
+>  	if (ret) {
+> @@ -277,6 +313,19 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>  		goto out_free_opp;
+>  	}
+>  
+> +	mutex_init(&priv->lock);
+> +
+> +	opp_srcu_head = dev_pm_opp_get_notifier(cpu_dev);
+> +	if (IS_ERR(opp_srcu_head)) {
+> +		ret = PTR_ERR(opp_srcu_head);
+> +		goto out_free_priv;
+> +	}
+> +
+> +	priv->opp_nb.notifier_call = opp_notifier;
+> +	ret = srcu_notifier_chain_register(opp_srcu_head, &priv->opp_nb);
+> +	if (ret)
+> +		goto out_free_priv;
+> +
+>  	of_property_read_u32(np, "voltage-tolerance", &priv->voltage_tolerance);
+>  
+>  	if (!transition_latency)
+> @@ -326,7 +375,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>  	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
+>  	if (ret) {
+>  		pr_err("failed to init cpufreq table: %d\n", ret);
+> -		goto out_free_priv;
+> +		goto out_unregister_nb;
+>  	}
+>  
+>  	priv->cpu_dev = cpu_dev;
+> @@ -365,6 +414,8 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>  
+>  out_free_cpufreq_table:
+>  	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
+> +out_unregister_nb:
+> +	srcu_notifier_chain_unregister(opp_srcu_head, &priv->opp_nb);
+>  out_free_priv:
+>  	kfree(priv);
+>  out_free_opp:
 
-As it stands today, on a 800 Mhz ARM quad core, I am seeing a latency of
-50-70 usec for the additional runtime PM in the cpuidle. Ofcourse, there
-is a definite need to optimize and there are opportunities to do that.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Since each CPU does its own runtime PM, we could probably avoid any kind
-of locks in the runtime PM. But locks in genpd may be unavoidable. Will
-look more into that.
-
-Thanks,
-Lina
-
->[2] https://lkml.org/lkml/2015/8/18/162
->gpio: omap: convert to use generic irq handler
->[3] https://lkml.org/lkml/2015/8/18/161
->gpio: omap: move pm runtime in irq_chip.irq_bus_lock/sync_unlock
->
->
->
->-- 
->regards,
->-grygorii
+-- 
+viresh
