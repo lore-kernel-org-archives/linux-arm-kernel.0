@@ -1,40 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Sep 2015 17:29:47 +0100
-Subject: Steps to submit a new arch/arm port
-In-Reply-To: <5601799C.20701@free.fr>
-References: <56001B78.2090001@free.fr> <2206647.QPrIpE2UC0@wuerfel>
- <56016780.5080104@free.fr> <144297172.JfjI0hNJ9J@wuerfel>
- <5601799C.20701@free.fr>
-Message-ID: <20150922162947.GC21084@n2100.arm.linux.org.uk>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 22 Sep 2015 18:34:05 +0200
+Subject: [PATCH v4 1/4] edac: Export edac_debugfs
+In-Reply-To: <1439534769-22811-2-git-send-email-lho@apm.com>
+References: <1439534769-22811-1-git-send-email-lho@apm.com>
+ <1439534769-22811-2-git-send-email-lho@apm.com>
+Message-ID: <20150922163405.GC3437@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 05:54:04PM +0200, Mason wrote:
-> On 22/09/2015 16:51, Arnd Bergmann wrote:
-> > On Tuesday 22 September 2015 16:36:48 Mason wrote:
-> >> On 21/09/2015 17:49, Arnd Bergmann wrote:
-> >> +config ARM_L1_CACHE_SHIFT
-> >> +	int
-> >> +	default 5
-> > 
-> > This conflicts with the other definition of the same symbol.
-> 
-> I asked about this a long time ago. Maybe I didn't understand
-> Russell's answer?
-> 
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/402968
-> 
-> How do I force ARM_L1_CACHE_SHIFT to 5 for my platform?
-> It saves ~6% of the .data section size.
-> (Not worth it?)
+On Fri, Aug 14, 2015 at 12:46:06AM -0600, Loc Ho wrote:
+> This patch exports and expose the edac_debugfs file node. This allows
+> EDAC driver to create debugfs node under the EDAC debugfs node.
 
-It's really not worth the complexity in Kconfig to make it work - we
-would need some way to detect a configuration where _only_ your
-platform is enabled, and the statement for that is likely to be very
-big, and very difficult to maintain into the future.
+...
 
-Sorry.
+> -#ifdef CONFIG_EDAC_DEBUG
+> -static struct dentry *edac_debugfs;
+> +struct dentry *edac_debugfs;
+> +EXPORT_SYMBOL_GPL(edac_debugfs);
+
+Hmm, so Arnd was right about this being the wrong direction we're
+chasing. We should rather be exporting a bunch of EDAC debugfs wrappers
+which EDAC drivers can call instead of exposing edac_debugfs itself.
+
+And this is much better and the right(tm) approach IMO. So I went
+and hacked it in, it builds on those !x86 targets (as far as my
+cross-compilers are concerned, build succeeds :-)).
+
+So here it is as a follow-up to this message.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
