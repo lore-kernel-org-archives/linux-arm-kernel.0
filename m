@@ -1,124 +1,97 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 22 Sep 2015 17:18:38 +0100
-Subject: [PATCH 8/9] phy: add phy_device_remove()
+Date: Tue, 22 Sep 2015 17:18:02 +0100
+Subject: [PATCH 1/9] phy: fix of_mdio_find_bus() device refcount leak
 In-Reply-To: <20150922161710.GA21084@n2100.arm.linux.org.uk>
 References: <20150922161710.GA21084@n2100.arm.linux.org.uk>
-Message-ID: <E1ZeQH8-0006Y4-QC@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZeQGY-0006UR-Mo@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a phy_device_remove() function to complement phy_device_register(),
-which undoes the effects of phy_device_register() by removing the phy
-device from visibility, but not freeing it.
+of_mdio_find_bus() leaks a struct device refcount, caused by using
+class_find_device() and not realising that the device reference has
+its refcount incremented:
 
-This allows these details to be moved out of the mdio bus code into
-the phy code where this action belongs.
+ * Note, you will need to drop the reference with put_device() after use.
+...
+        while ((dev = class_dev_iter_next(&iter))) {
+                if (match(dev, data)) {
+                        get_device(dev);
+                        break;
+                }
+
+Update the comment, and arrange for the phy code to drop this refcount
+when disposing of a reference to it.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/ethernet/freescale/gianfar.c |  5 +++--
- drivers/net/phy/mdio_bus.c               | 15 ++++++++++-----
- drivers/net/phy/phy_device.c             | 18 ++++++++++++++++++
- include/linux/phy.h                      |  1 +
- 4 files changed, 32 insertions(+), 7 deletions(-)
+ drivers/net/phy/mdio-mux.c | 19 +++++++++++++------
+ drivers/net/phy/mdio_bus.c |  4 +++-
+ 2 files changed, 16 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/gianfar.c b/drivers/net/ethernet/freescale/gianfar.c
-index 65a16086faec..903211df3288 100644
---- a/drivers/net/ethernet/freescale/gianfar.c
-+++ b/drivers/net/ethernet/freescale/gianfar.c
-@@ -1702,7 +1702,6 @@ static void gfar_configure_serdes(struct net_device *dev)
- 	tbiphy = of_phy_find_device(priv->tbi_node);
- 	if (!tbiphy) {
- 		dev_err(&dev->dev, "error: Could not get TBI device\n");
--		put_device(&tbiphy->dev);
- 		return;
+diff --git a/drivers/net/phy/mdio-mux.c b/drivers/net/phy/mdio-mux.c
+index 4d4d25efc1e1..280c7c311f72 100644
+--- a/drivers/net/phy/mdio-mux.c
++++ b/drivers/net/phy/mdio-mux.c
+@@ -113,18 +113,18 @@ int mdio_mux_init(struct device *dev,
+ 	if (!parent_bus_node)
+ 		return -ENODEV;
+ 
+-	parent_bus = of_mdio_find_bus(parent_bus_node);
+-	if (parent_bus == NULL) {
+-		ret_val = -EPROBE_DEFER;
+-		goto err_parent_bus;
+-	}
+-
+ 	pb = devm_kzalloc(dev, sizeof(*pb), GFP_KERNEL);
+ 	if (pb == NULL) {
+ 		ret_val = -ENOMEM;
+ 		goto err_parent_bus;
  	}
  
-@@ -1711,8 +1710,10 @@ static void gfar_configure_serdes(struct net_device *dev)
- 	 * everything for us?  Resetting it takes the link down and requires
- 	 * several seconds for it to come back.
- 	 */
--	if (phy_read(tbiphy, MII_BMSR) & BMSR_LSTATUS)
-+	if (phy_read(tbiphy, MII_BMSR) & BMSR_LSTATUS) {
-+		put_device(&tbiphy->dev);
- 		return;
++	parent_bus = of_mdio_find_bus(parent_bus_node);
++	if (parent_bus == NULL) {
++		ret_val = -EPROBE_DEFER;
++		goto err_parent_bus;
 +	}
++
+ 	pb->switch_data = data;
+ 	pb->switch_fn = switch_fn;
+ 	pb->current_child = -1;
+@@ -173,6 +173,10 @@ int mdio_mux_init(struct device *dev,
+ 		dev_info(dev, "Version " DRV_VERSION "\n");
+ 		return 0;
+ 	}
++
++	/* balance the reference of_mdio_find_bus() took */
++	put_device(&pb->mii_bus->dev);
++
+ err_parent_bus:
+ 	of_node_put(parent_bus_node);
+ 	return ret_val;
+@@ -189,6 +193,9 @@ void mdio_mux_uninit(void *mux_handle)
+ 		mdiobus_free(cb->mii_bus);
+ 		cb = cb->next;
+ 	}
++
++	/* balance the reference of_mdio_find_bus() in mdio_mux_init() took */
++	put_device(&pb->mii_bus->dev);
+ }
+ EXPORT_SYMBOL_GPL(mdio_mux_uninit);
  
- 	/* Single clk mode, mii mode off(for serdes communication) */
- 	phy_write(tbiphy, MII_TBICON, TBICON_CLK_SELECT);
 diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
-index 992406624b7c..c340e412b38f 100644
+index 02a4615b65f8..67553e13bd36 100644
 --- a/drivers/net/phy/mdio_bus.c
 +++ b/drivers/net/phy/mdio_bus.c
-@@ -291,8 +291,11 @@ int __mdiobus_register(struct mii_bus *bus, struct module *owner)
- 
- error:
- 	while (--i >= 0) {
--		if (bus->phy_map[i])
--			device_unregister(&bus->phy_map[i]->dev);
-+		struct phy_device *phydev = bus->phy_map[i];
-+		if (phydev) {
-+			phy_device_remove(phydev);
-+			phy_device_free(phydev);
-+		}
- 	}
- 	device_del(&bus->dev);
- 	return err;
-@@ -307,9 +310,11 @@ void mdiobus_unregister(struct mii_bus *bus)
- 	bus->state = MDIOBUS_UNREGISTERED;
- 
- 	for (i = 0; i < PHY_MAX_ADDR; i++) {
--		if (bus->phy_map[i])
--			device_unregister(&bus->phy_map[i]->dev);
--		bus->phy_map[i] = NULL;
-+		struct phy_device *phydev = bus->phy_map[i];
-+		if (phydev) {
-+			phy_device_remove(phydev);
-+			phy_device_free(phydev);
-+		}
- 	}
- 	device_del(&bus->dev);
- }
-diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
-index 97a4f52addac..f761288abe66 100644
---- a/drivers/net/phy/phy_device.c
-+++ b/drivers/net/phy/phy_device.c
-@@ -384,6 +384,24 @@ int phy_device_register(struct phy_device *phydev)
- EXPORT_SYMBOL(phy_device_register);
- 
- /**
-+ * phy_device_remove - Remove a previously registered phy device from the MDIO bus
-+ * @phydev: phy_device structure to remove
-+ *
-+ * This doesn't free the phy_device itself, it merely reverses the effects
-+ * of phy_device_register(). Use phy_device_free() to free the device
-+ * after calling this function.
-+ */
-+void phy_device_remove(struct phy_device *phydev)
-+{
-+	struct mii_bus *bus = phydev->bus;
-+	int addr = phydev->addr;
-+
-+	device_del(&phydev->dev);
-+	bus->phy_map[addr] = NULL;
-+}
-+EXPORT_SYMBOL(phy_device_remove);
-+
-+/**
-  * phy_find_first - finds the first PHY device on the bus
-  * @bus: the target MII bus
-  */
-diff --git a/include/linux/phy.h b/include/linux/phy.h
-index 11bce44f6d65..4a4e3a092337 100644
---- a/include/linux/phy.h
-+++ b/include/linux/phy.h
-@@ -745,6 +745,7 @@ struct phy_device *phy_device_create(struct mii_bus *bus, int addr, int phy_id,
- 				     struct phy_c45_device_ids *c45_ids);
- struct phy_device *get_phy_device(struct mii_bus *bus, int addr, bool is_c45);
- int phy_device_register(struct phy_device *phy);
-+void phy_device_remove(struct phy_device *phydev);
- int phy_init_hw(struct phy_device *phydev);
- int phy_suspend(struct phy_device *phydev);
- int phy_resume(struct phy_device *phydev);
+@@ -167,7 +167,9 @@ static int of_mdio_bus_match(struct device *dev, const void *mdio_bus_np)
+  * of_mdio_find_bus - Given an mii_bus node, find the mii_bus.
+  * @mdio_bus_np: Pointer to the mii_bus.
+  *
+- * Returns a pointer to the mii_bus, or NULL if none found.
++ * Returns a reference to the mii_bus, or NULL if none found.  The
++ * embedded struct device will have its reference count incremented,
++ * and this must be put once the bus is finished with.
+  *
+  * Because the association of a device_node and mii_bus is made via
+  * of_mdiobus_register(), the mii_bus cannot be found before it is
 -- 
 2.1.0
