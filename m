@@ -1,131 +1,309 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 22 Sep 2015 09:13:45 -0700
-Subject: [PATCH 3/3] PCI: generic: Add support for Cavium ThunderX PCIe
- root complexes.
-In-Reply-To: <20150922160549.GE17444@red-moon>
-References: <1442529694-1792-1-git-send-email-ddaney.cavm@gmail.com>
- <1442529694-1792-4-git-send-email-ddaney.cavm@gmail.com>
- <20150922160549.GE17444@red-moon>
-Message-ID: <56017E39.8060606@caviumnetworks.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 23 Sep 2015 00:15:27 +0800
+Subject: [PATCH 3/4] ARM: dts: sun8i: Add Allwinner A83T dtsi
+In-Reply-To: <20150922155450.GL4684@lukather>
+References: <1442936337-3104-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1442936337-3104-4-git-send-email-vishnupatekar0510@gmail.com>
+ <20150922155450.GL4684@lukather>
+Message-ID: <CAGb2v65fTvNvJthLK5c=4ZEviSuCF-fDdje59O6vjbL16cnzdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2015 09:05 AM, Lorenzo Pieralisi wrote:
-> On Thu, Sep 17, 2015 at 11:41:34PM +0100, David Daney wrote:
->> From: David Daney <david.daney@cavium.com>
+On Tue, Sep 22, 2015 at 11:54 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Sep 22, 2015 at 11:38:56PM +0800, Vishnu Patekar wrote:
+>> Allwinner A83T is new octa-core cortex-a7 SOC.
+>> This adds the basic dtsi, the clocks differs from
+>> earlier sun8i SOCs.
 >>
->> The config space for external PCIe root complexes on some Cavium
->> ThunderX SoCs is very similar to CAM and ECAM, but differs in the
->> shift values that have to be applied to the bus and devfn numbers to
->> compose that address window offset.  These root complexes also have
->> the interesting property that there is no root bridge, so the standard
->> manner of limiting scanning to only the first device doesn't work.  We
->> can use the standard pci-host-generic driver if we make a minor
->> addition to handle these differences, so we...
->>
->> Add a mapping function for ThunderX PCIe root complexes with a bus
->> shift of 24 and devfn shift of 16.  Ignore accesses for devices other
->> than the first device on the primary bus.
->>
->> Document the whole thing in devicetree/bindings/pci/host-generic-pci.txt
->>
->> Signed-off-by: David Daney <david.daney@cavium.com>
+>> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 >> ---
->>   .../devicetree/bindings/pci/host-generic-pci.txt   |  8 +++---
->>   drivers/pci/host/pci-host-generic.c                | 29 ++++++++++++++++++++++
->>   2 files changed, 34 insertions(+), 3 deletions(-)
+>>  arch/arm/boot/dts/sun8i-a83t.dtsi | 243 ++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 243 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/sun8i-a83t.dtsi
 >>
->> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
->> index 105a968..a5aed0f 100644
->> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
->> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
->> @@ -14,9 +14,11 @@ tree bindings communicated in pci.txt:
->>
->>   Properties of the host controller node:
->>
->> -- compatible     : Must be "pci-host-cam-generic" or "pci-host-ecam-generic"
->> -                   depending on the layout of configuration space (CAM vs
->> -                   ECAM respectively).
->> +- compatible     : One of the following with bus:devfn:reg mapped to the
->> +                   PCI config space address window in the bit positions shown:
->> +                   "pci-host-cam-generic" -- 'CAM'  bits 16:8:0
->> +                   "pci-host-ecam-generic" -- 'ECAM'  bits 20:12:0
->> +                   "cavium,pci-host-thunder-pem" --  bits 24:16:0
->
-> To me that's ECAM left shifted by 4. Is not it just a matter of defining
-> config space base address (ie reg property) differently ?
-
-No.
-
-That's like saying ECAM is just CAM shifted by 4, can't we just specify 
-the "reg" differently.
-
-The "reg" property describes the base of the config space access window. 
-  CAM/ECAM/cavium,pci-host-thunder-pem describe how to generate offsets 
-from that base, The offset calculation requires information that is not 
-present in the "reg" property, it is enumerated in the various 
-"compatible" values listed above.
-
-David Daney
-
->
-> Lorenzo
->
->>
->>   - device_type    : Must be "pci".
->>
->> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
->> index e364232..e1d8d5b 100644
->> --- a/drivers/pci/host/pci-host-generic.c
->> +++ b/drivers/pci/host/pci-host-generic.c
->> @@ -91,6 +91,32 @@ static struct gen_pci_cfg_bus_ops gen_pci_cfg_ecam_bus_ops = {
->>   	}
->>   };
->>
->> +static void __iomem *gen_pci_map_cfg_bus_thunder_pem(struct pci_bus *bus,
->> +						     unsigned int devfn,
->> +						     int where)
->> +{
->> +	struct gen_pci *pci = bus->sysdata;
->> +	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
+>> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> new file mode 100644
+>> index 0000000..f6ddd9c
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> @@ -0,0 +1,243 @@
+>> +/*
+>> + * Copyright 2015 Vishnu Patekar
+>> + *
+>> + * Vishnu Patekar <vishnupatekar0510@gmail.com>
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This file is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of the
+>> + *     License, or (at your option) any later version.
+>> + *
+>> + *     This file is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + * Or, alternatively,
+>> + *
+>> + *  b) Permission is hereby granted, free of charge, to any person
+>> + *     obtaining a copy of this software and associated documentation
+>> + *     files (the "Software"), to deal in the Software without
+>> + *     restriction, including without limitation the rights to use,
+>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> + *     sell copies of the Software, and to permit persons to whom the
+>> + *     Software is furnished to do so, subject to the following
+>> + *     conditions:
+>> + *
+>> + *     The above copyright notice and this permission notice shall be
+>> + *     included in all copies or substantial portions of the Software.
+>> + *
+>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> + *     OTHER DEALINGS IN THE SOFTWARE.
 >> +
->> +	/*
->> +	 * Thunder PEM is a PCIe RC, but without a root bridge.  On
->> +	 * the primary bus, ignore accesses for devices other than
->> +	 * the first device.
->> +	 */
->> +	if (idx == 0 && (devfn & ~7u))
->> +		return NULL;
->> +	return pci->cfg.win[idx] + ((devfn << 16) | where);
->> +}
+>> + */
 >> +
->> +static struct gen_pci_cfg_bus_ops gen_pci_cfg_thunder_pem_bus_ops = {
->> +	.bus_shift	= 24,
->> +	.ops		= {
->> +		.map_bus	= gen_pci_map_cfg_bus_thunder_pem,
->> +		.read		= pci_generic_config_read,
->> +		.write		= pci_generic_config_write,
->> +	}
+>> +#include "skeleton.dtsi"
+>> +
+>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +
+>> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+>> +
+>> +/ {
+>> +     interrupt-parent = <&gic>;
+>> +
+>> +     chosen {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <1>;
+>> +             ranges;
+>> +     };
+>> +
+>> +     cpus {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +
+>> +             cpu at 0 {
+>> +                     compatible = "arm,cortex-a7";
+>> +                     device_type = "cpu";
+>> +                     reg = <0>;
+>> +             };
+>> +
+>> +             cpu at 1 {
+>> +                     compatible = "arm,cortex-a7";
+>> +                     device_type = "cpu";
+>> +                     reg = <1>;
+>> +             };
+>> +
+>> +             cpu at 2 {
+>> +                     compatible = "arm,cortex-a7";
+>> +                     device_type = "cpu";
+>> +                     reg = <2>;
+>> +             };
+>> +
+>> +             cpu at 3 {
+>> +                     compatible = "arm,cortex-a7";
+>> +                     device_type = "cpu";
+>> +                     reg = <3>;
+>> +             };
+>> +             cpu at 4 {
+>> +                     compatible = "arm,cortex-a7";
+>> +                     device_type = "cpu";
+>> +                     reg = <4>;
+
+These don't look right. See Documentation/devicetree/bindings/arm/cpus.txt
+Cluster 1 would be 0x100 ~ 0x103.
+
+>> +             };
+>> +
+>> +             cpu at 5 {
+>> +                     compatible = "arm,cortex-a7";
+>> +                     device_type = "cpu";
+>> +                     reg = <5>;
+>> +             };
+>> +             cpu at 6 {
+>> +                     compatible = "arm,cortex-a7";
+>> +                     device_type = "cpu";
+>> +                     reg = <6>;
+>> +             };
+>> +
+>> +             cpu at 7 {
+>> +                     compatible = "arm,cortex-a7";
+>> +                     device_type = "cpu";
+>> +                     reg = <7>;
+>> +             };
+>> +     };
+>> +
+>> +     memory {
+>> +             reg = <0x40000000 0x80000000>;
+>> +     };
+>> +
+>> +     timer {
+>> +             compatible = "arm,armv7-timer";
+>> +             interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> +                          <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> +                          <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> +                          <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+>> +             clock-frequency = <24000000>;
+>> +             arm,cpu-registers-not-fw-configured;
+>> +     };
+>> +
+>> +     clocks {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <1>;
+>> +             ranges;
+>> +
+>> +             osc24M: osc24M_clk {
+>> +                     #clock-cells = <0>;
+>> +                     compatible = "fixed-clock";
+>> +                     clock-frequency = <24000000>;
+>> +                     clock-output-names = "osc24M";
+>> +             };
+>> +
+>> +             osc32k: osc32k_clk {
+>> +                     #clock-cells = <0>;
+>> +                     compatible = "fixed-clock";
+>> +                     clock-frequency = <32768>;
+>> +                     clock-output-names = "osc32k";
+>> +             };
+>> +     };
+>> +
+>> +     soc at 01c00000 {
+>> +             compatible = "simple-bus";
+>> +             #address-cells = <1>;
+>> +             #size-cells = <1>;
+>> +             ranges;
+>> +
+>> +             pio: pinctrl at 01c20800 {
+>> +                     compatible = "allwinner,sun8i-a83t-pinctrl";
+>> +                     interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+>> +                     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
+>> +                     <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     /* compatible gets set in SoC specific dtsi file */
+>
+> Which DTSI?
+>
+>> +                     reg = <0x01c20800 0x400>;
+>> +                     /* interrupts get set in SoC specific dtsi file */
+>
+> Ditto
+>
+>> +                     clocks = <&osc24M>;
+>> +                     gpio-controller;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <3>;
+>> +                     #gpio-cells = <3>;
+>> +
+>> +                     uart0_pins_a: uart0 at 0 {
+>> +                             allwinner,pins = "PF2", "PF4";
+>> +                             allwinner,function = "uart0";
+>> +                             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +                     };
+
+Could you use PB9 & PB10 for uart0 pins, and not the PF ones?
+
+http://linux-sunxi.org/User:Simos/H8HomletProtoV20_A83T shows
+they are available on the headers, and I tested them before.
+
+Thanks!
+ChenYu
+
+>> +
+>> +                     mmc0_pins_a: mmc0 at 0 {
+>> +                             allwinner,pins = "PF0", "PF1", "PF2",
+>> +                                              "PF3", "PF4", "PF5";
+>> +                             allwinner,function = "mmc0";
+>> +                             allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+>> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +                     };
+>> +
+>> +                     mmc1_pins_a: mmc1 at 0 {
+>> +                             allwinner,pins = "PG0", "PG1", "PG2",
+>> +                                              "PG3", "PG4", "PG5";
+>> +                             allwinner,function = "mmc1";
+>> +                             allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+>> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +                     };
+>> +
+>> +                     mmc2_8bit_pins: mmc2_8bit {
+>> +                             allwinner,pins = "PC5", "PC6", "PC8",
+>> +                                              "PC9", "PC10", "PC11",
+>> +                                              "PC12", "PC13", "PC14",
+>> +                                              "PC15";
+
+Would we also want PC16 (SDC2_RST)?
+
+>> +                             allwinner,function = "mmc2";
+>> +                             allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+>> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +                     };
+>> +
+>> +                     i2c0_pins_a: i2c0 at 0 {
+>> +                             allwinner,pins = "PH0", "PH1";
+>> +                             allwinner,function = "i2c0";
+>> +                             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +                     };
+>> +
+>> +                     i2c1_pins_a: i2c1 at 0 {
+>> +                             allwinner,pins = "PH2", "PH3";
+>> +                             allwinner,function = "i2c1";
+>> +                             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +                     };
+>> +
+>> +                     i2c2_pins_a: i2c2 at 0 {
+>> +                             allwinner,pins = "PH4", "PH5";
+>> +                             allwinner,function = "i2c2";
+>> +                             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +                     };
+>
+> Please order those by alphabetical order.
+>
+>> +             };
+>> +
+>> +             uart0: serial at 01c28000 {
+>> +                     compatible = "snps,dw-apb-uart";
+>> +                     reg = <0x01c28000 0x400>;
+>> +                     interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     reg-shift = <2>;
+>> +                     reg-io-width = <4>;
+>> +                     clocks = <&osc24M>;
+>> +                     status = "disabled";
+>> +             };
+>> +
+>> +             gic: interrupt-controller at 01c81000 {
+>> +                     compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+>> +                     reg = <0x01c81000 0x1000>,
+>> +                           <0x01c82000 0x1000>,
+>> +                           <0x01c84000 0x2000>,
+>> +                           <0x01c86000 0x2000>;
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <3>;
+>> +                     interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+>> +             };
+>> +
+>> +     };
 >> +};
->> +
->>   static const struct of_device_id gen_pci_of_match[] = {
->>   	{ .compatible = "pci-host-cam-generic",
->>   	  .data = &gen_pci_cfg_cam_bus_ops },
->> @@ -98,6 +124,9 @@ static const struct of_device_id gen_pci_of_match[] = {
->>   	{ .compatible = "pci-host-ecam-generic",
->>   	  .data = &gen_pci_cfg_ecam_bus_ops },
->>
->> +	{ .compatible = "cavium,pci-host-thunder-pem",
->> +	  .data = &gen_pci_cfg_thunder_pem_bus_ops },
->> +
->>   	{ },
->>   };
->>   MODULE_DEVICE_TABLE(of, gen_pci_of_match);
 >> --
 >> 1.9.1
 >>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
