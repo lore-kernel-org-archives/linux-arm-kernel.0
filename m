@@ -1,24 +1,23 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 21 Sep 2015 17:01:45 -0700
-Subject: [PATCH linux-next 1/4] mtd: spi-nor: remove unused
- read_xfer/write_xfer hooks
-In-Reply-To: <201509190508.55496.marex@denx.de>
-References: <cover.1442590224.git.cyrille.pitchen@atmel.com>
- <719ad7cc8bf6df151dd799cd4f13292fd9471079.1442590224.git.cyrille.pitchen@atmel.com>
- <201509190508.55496.marex@denx.de>
-Message-ID: <20150922000145.GJ31505@google.com>
+Date: Mon, 21 Sep 2015 17:15:28 -0700
+Subject: [PATCH] mtd: nand: sunxi: fix sunxi_nand_chips_cleanup()
+In-Reply-To: <1442160883-29011-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1442160883-29011-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150922001528.GL31505@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 19, 2015 at 05:08:55AM +0200, Marek Vasut wrote:
-> On Friday, September 18, 2015 at 05:49:25 PM, Cyrille Pitchen wrote:
-> > struct spi_nor_xfer_cfg and read_xfer/write_xfer hooks were never used by
-> > any driver. Do some cleanup by removing them.
-> > 
-> > Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> 
-> Right, if this will ever be needed, it can be re-added.
-> 
-> Reviewed-by: Marek Vasut <marex@denx.de>
+On Sun, Sep 13, 2015 at 06:14:43PM +0200, Boris Brezillon wrote:
+> The sunxi_nand_chips_cleanup() function is missing a call to list_del()
+> which generates a double free error.
 
-Applied this patch to l2-mtd.git. Thanks.
+And if you could manage to get past that...an infinite loop, no?
+
+> Reported-by: Priit Laes <plaes@plaes.org>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Cc: <stable@vger.kernel.org> # 3.19+
+> Fixes: 1fef62c1423b ("mtd: nand: add sunxi NAND flash controller support")
+
+Applied to linux-mtd.git, as this is a -stable fix.
+
+Brian
