@@ -1,62 +1,69 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Tue, 22 Sep 2015 11:13:29 +0200
-Subject: [PATCH 00/38] Fixes related to incorrect usage of unsigned types
-In-Reply-To: <17571.1442842945@warthog.procyon.org.uk>
-References: <1442842450-29769-1-git-send-email-a.hajda@samsung.com>
- <17571.1442842945@warthog.procyon.org.uk>
-Message-ID: <56011BB9.5030004@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 22 Sep 2015 11:20:06 +0200
+Subject: [PATCH v2 03/10] ARM: marvell/dt: add crypto related nodes to armada
+ 370 dtsi
+In-Reply-To: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1442913606-12732-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2015 03:42 PM, David Howells wrote:
-> Andrzej Hajda <a.hajda-Sze3O3UU22JBDgjK7y7TUQ@public.gmane.org> wrote:
-> 
->> Semantic patch finds comparisons of types:
->>     unsigned < 0
->>     unsigned >= 0
->> The former is always false, the latter is always true.
->> Such comparisons are useless, so theoretically they could be
->> safely removed, but their presence quite often indicates bugs.
-> 
-> Or someone has left them in because they don't matter and there's the
-> possibility that the type being tested might be or become signed under some
-> circumstances.  If the comparison is useless, I'd expect the compiler to just
-> discard it - for such cases your patch is pointless.
-> 
-> If I have, for example:
-> 
-> 	unsigned x;
-> 
-> 	if (x == 0 || x > 27)
-> 		give_a_range_error();
-> 
-> I will write this as:
-> 
-> 	unsigned x;
-> 
-> 	if (x <= 0 || x > 27)
-> 		give_a_range_error();
-> 
-> because it that gives a way to handle x being changed to signed at some point
-> in the future for no cost.  In which case, your changing the <= to an ==
-> "because the < part of the case is useless" is arguably wrong.
+From: Arnaud Ebalard <arno@natisbad.org>
 
-This is why I have not checked for such cases - I have skipped checks of type
-	unsigned <= 0
-exactly for the reasons above.
+Add crypto related nodes in armada-370.dtsi.
 
-However I have left two other checks as they seems to me more suspicious - they
-are always true or false. But as Dmitry and Andrew pointed out Linus have quite
-strong opinion against removing range checks in such cases as he finds it
-clearer. I think it applies to patches 29-36. I am not sure about patches 26-28,37.
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
 
-Regards
-Andrzej
+Changes since v1:
+- add a comment explaining why we reserve 32 bytes in the crypto SRAM
 
-> 
-> David
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-wireless" in
-> the body of a message to majordomo-u79uwXL29TY76Z2rM5mHXA at public.gmane.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+ arch/arm/boot/dts/armada-370.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 53a1a5a..1652b59 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -319,6 +319,38 @@
+ 			ethernet at 74000 {
+ 				compatible = "marvell,armada-370-neta";
+ 			};
++
++			crypto at 90000 {
++				compatible = "marvell,armada-370-crypto";
++				reg = <0x90000 0x10000>;
++				reg-names = "regs";
++				interrupts = <48>;
++				clocks = <&gateclk 23>;
++				clock-names = "cesa0";
++				marvell,crypto-srams = <&crypto_sram>;
++				marvell,crypto-sram-size = <0x7e0>;
++			};
++		};
++
++		crypto_sram: sa-sram {
++			compatible = "mmio-sram";
++			reg = <MBUS_ID(0x09, 0x01) 0 0x800>;
++			reg-names = "sram";
++			clocks = <&gateclk 23>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 MBUS_ID(0x09, 0x01) 0 0x800>;
++
++			/*
++			 * The Armada 370 has an erratum preventing the use of
++			 * the standard workflow for CPU idle support (relying
++			 * on the BootROM code to enter/exit idle state).
++			 * Reserve some amount of the crypto SRAM to put the
++			 * cpuidle workaround.
++			 */
++			idle-sram at 0 {
++				reg = <0x0 0x20>;
++			};
+ 		};
+ 	};
+ };
+-- 
+1.9.1
