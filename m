@@ -1,200 +1,127 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 22 Sep 2015 22:12:34 +0800
-Subject: [PATCH 3/5] clk: berlin: add clk support for berlin4ct
+Date: Tue, 22 Sep 2015 22:12:35 +0800
+Subject: [PATCH 4/5] dt-bindings: add binding for marvell berlin4ct SoC
 In-Reply-To: <1442931156-5877-1-git-send-email-jszhang@marvell.com>
 References: <1442931156-5877-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1442931156-5877-4-git-send-email-jszhang@marvell.com>
+Message-ID: <1442931156-5877-5-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch supports the gate-clk and berlin-clk in berlin4ct SoC.
+This adds a dt-binding include for Marvell berlin4ct clock IDs.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/clk/berlin/Makefile        |   2 +-
- drivers/clk/berlin/clk-berlin4ct.c | 164 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 165 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/berlin/clk-berlin4ct.c
+ .../bindings/clock/marvell,berlin4ct.txt           | 38 +++++++++++++++
+ include/dt-bindings/clock/berlin4ct.h              | 56 ++++++++++++++++++++++
+ 2 files changed, 94 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/marvell,berlin4ct.txt
+ create mode 100644 include/dt-bindings/clock/berlin4ct.h
 
-diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
-index 741ba22..fe29dd3 100644
---- a/drivers/clk/berlin/Makefile
-+++ b/drivers/clk/berlin/Makefile
-@@ -1,4 +1,4 @@
--obj-y += pll.o clk.o berlin2-avpll.o berlin2-pll.o berlin2-div.o
-+obj-y += pll.o clk.o clk-berlin4ct.o berlin2-avpll.o berlin2-pll.o berlin2-div.o
- obj-$(CONFIG_MACH_BERLIN_BG2)	+= bg2.o
- obj-$(CONFIG_MACH_BERLIN_BG2CD)	+= bg2.o
- obj-$(CONFIG_MACH_BERLIN_BG2Q)	+= bg2q.o
-diff --git a/drivers/clk/berlin/clk-berlin4ct.c b/drivers/clk/berlin/clk-berlin4ct.c
+diff --git a/Documentation/devicetree/bindings/clock/marvell,berlin4ct.txt b/Documentation/devicetree/bindings/clock/marvell,berlin4ct.txt
 new file mode 100644
-index 0000000..b9d4a9b
+index 0000000..a489473
 --- /dev/null
-+++ b/drivers/clk/berlin/clk-berlin4ct.c
-@@ -0,0 +1,164 @@
++++ b/Documentation/devicetree/bindings/clock/marvell,berlin4ct.txt
+@@ -0,0 +1,38 @@
++* Marvell berlin4ct Clock Controllers
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++The berlin4ct clock subsystem generates and supplies clock to various
++controllers within the berlin4ct SoC. The berlin4ct contains 3 clock controller
++blocks: pll, gateclk, berlin-clk.
++
++Required Properties:
++
++- compatible: should be one of the following.
++  - "marvell,berlin-pll" - pll compatible
++  - "marvell,berlin4ct-clk" - berlin clk compatible
++  - "marvell,berlin4ct-gateclk" - gateclk compatible
++- reg: physical base address of the clock controller and length of memory mapped
++  region. For pll, the second reg defines the bypass register base address and
++  length of memory mapped region.
++- #clock-cells: for pll should 0, for gateclk and berlin clk should be 1.
++- #bypass-shift: the bypass bit in bypass register.
++
++Example:
++
++syspll: syspll {
++	compatible = "marvell,berlin-pll";
++	reg = <0xea0200 0x14>, <0xea0710 4>;
++	#clock-cells = <0>;
++	clocks = <&osc>;
++	bypass-shift = /bits/ 8 <0>;
++};
++
++clk: clk {
++	compatible = "marvell,berlin4ct-clk";
++	reg = <0xea0720 0x144>;
++	#clock-cells = <1>;
++	clocks = <&syspll>;
++};
+diff --git a/include/dt-bindings/clock/berlin4ct.h b/include/dt-bindings/clock/berlin4ct.h
+new file mode 100644
+index 0000000..f742f6b
+--- /dev/null
++++ b/include/dt-bindings/clock/berlin4ct.h
+@@ -0,0 +1,56 @@
 +/*
-+ * Copyright (c) 2015 Marvell Technology Group Ltd.
-+ *
-+ * Author: Jisheng Zhang <jszhang@marvell.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ * Berlin2 BG2Q clock tree IDs
 + */
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
 +
-+#include "clk.h"
++/* GATE CLK */
++#define GATECLK_TSPSYS		0
++#define GATECLK_USB0CORE	1
++#define GATECLK_ZSPSYS		2
++#define GATECLK_SDIOSYS		3
++#define GATECLK_ETHCORE		4
++#define GATECLK_PCIE0SYS	5
++#define GATECLK_SATA0CORE	6
++#define GATECLK_NFCSYS		7
++#define GATECLK_EMMCSYS		8
++#define GATECLK_IHB0SYS		9
 +
-+#define CLK_SOURCE_MAX	5
-+
-+static struct clk_onecell_data gateclk_data;
-+static struct clk_onecell_data clk_data;
-+
-+static DEFINE_SPINLOCK(lock);
-+
-+static const struct gateclk_desc berlin4ct_gates[] __initconst = {
-+	{ "tspsysclk",		"perifsysclk",	0 },
-+	{ "usb0coreclk",	"perifsysclk",	1 },
-+	{ "zspsysclk",		"perifsysclk",	2 },
-+	{ "sdiosysclk",		"perifsysclk",	3 },
-+	{ "ethcoreclk",		"perifsysclk",	4 },
-+	{ "pcie0sys",		"perifsysclk",	6 },
-+	{ "sata0core",		"perifsysclk",	7 },
-+	{ "nfcsysclk",		"perifsysclk",	8 },
-+	{ "emmcsysclk",		"perifsysclk",	9 },
-+	{ "ihb0sysclk",		"perifsysclk",	10 },
-+};
-+
-+static const struct clk_desc berlin4ct_descs[] __initconst = {
-+	{ "cpufastrefclk",	0x0 },
-+	{ "memfastrefclk",	0x4 },
-+	{ "cfgclk",		0x20,	CLK_IGNORE_UNUSED },
-+	{ "perifsysclk",	0x24,	CLK_IGNORE_UNUSED },
-+	{ "hbclk",		0x28 },
-+	{ "atbclk",		0x2c },
-+	{ "decoderclk",		0x40 },
-+	{ "decoderm3clk",	0x44 },
-+	{ "decoderpcubeclk",	0x48 },
-+	{ "encoderclk",		0x4c },
-+	{ "ovpcoreclk",		0x50 },
-+	{ "gfx2dcoreclk",	0x60 },
-+	{ "gfx3dcoreclk",	0x64 },
-+	{ "gfx3dshclk",		0x68 },
-+	{ "gfx3dsysclk",	0x6c },
-+	{ "gfx2dsysclk",	0x70 },
-+	{ "aviosysclk",		0x80 },
-+	{ "vppsysclk",		0x84 },
-+	{ "eddcclk",		0x88 },
-+	{ "aviobiuclk",		0x8c },
-+	{ "zspclk",		0xa0 },
-+	{ "tspclk",		0xc0 },
-+	{ "tsprefclk",		0xc4 },
-+	{ "ndsclk",		0xc8 },
-+	{ "nocsclk",		0xcc },
-+	{ "apbcoreclk",		0xd0,	CLK_IGNORE_UNUSED },
-+	{ "emmcclk",		0xe0 },
-+	{ "sd0clk",		0xe4 },
-+	{ "sd1clk",		0xe8 },
-+	{ "dllmstrefclk",	0xec },
-+	{ "gethrgmiiclk",	0xf0 },
-+	{ "gethrgmiisysclk",	0xf4 },
-+	{ "usim0clk",		0x100 },
-+	{ "pcietestclk",	0x110 },
-+	{ "usb2testclk",	0x120 },
-+	{ "usb3testclk",	0x124 },
-+	{ "usb3coreclk",	0x128 },
-+	{ "nfceccclk",		0x130 },
-+	{ "bcmclk",		0x140 },
-+};
-+
-+static void __init berlin4ct_gateclk_setup(struct device_node *np)
-+{
-+	int i, n, ret;
-+	void __iomem *base;
-+	struct clk **clks;
-+
-+	base = of_iomap(np, 0);
-+	if (WARN_ON(!base))
-+		return;
-+
-+	n = ARRAY_SIZE(berlin4ct_gates);
-+	clks = kzalloc(n * sizeof(struct clk *), GFP_KERNEL);
-+	if (WARN_ON(!clks))
-+		return;
-+
-+	for (i = 0; i < n; i++) {
-+		clks[i] = clk_register_gate(NULL, berlin4ct_gates[i].name,
-+				berlin4ct_gates[i].parent_name,
-+				berlin4ct_gates[i].flags, base,
-+				berlin4ct_gates[i].bit_idx, 0, &lock);
-+		WARN_ON(IS_ERR(clks[i]));
-+	}
-+
-+	gateclk_data.clks = clks;
-+	gateclk_data.clk_num = i;
-+
-+	ret = of_clk_add_provider(np, of_clk_src_onecell_get,
-+				  &gateclk_data);
-+	if (WARN_ON(ret))
-+		return;
-+
-+}
-+CLK_OF_DECLARE(berlin4ct_gateclk, "marvell,berlin4ct-gateclk",
-+	       berlin4ct_gateclk_setup);
-+
-+static void __init berlin4ct_clk_setup(struct device_node *np)
-+{
-+	int i, n, ret, num_parents;
-+	void __iomem *base;
-+	struct clk **clks;
-+	const char *parent_names[CLK_SOURCE_MAX];
-+
-+	num_parents = of_clk_get_parent_count(np);
-+	if (num_parents <= 0 || num_parents > CLK_SOURCE_MAX)
-+		return;
-+
-+	of_clk_parent_fill(np, parent_names, num_parents);
-+
-+	base = of_iomap(np, 0);
-+	if (WARN_ON(!base))
-+		return;
-+
-+	n = ARRAY_SIZE(berlin4ct_descs);
-+	clks = kzalloc(n * sizeof(struct clk *), GFP_KERNEL);
-+	if (WARN_ON(!clks))
-+		return;
-+
-+	for (i = 0; i < n; i++) {
-+		clks[i] = berlin_clk_register(berlin4ct_descs[i].name,
-+				num_parents, parent_names,
-+				berlin4ct_descs[i].flags,
-+				base + berlin4ct_descs[i].offset);
-+		WARN_ON(IS_ERR(clks[i]));
-+	}
-+
-+	clk_data.clks = clks;
-+	clk_data.clk_num = i;
-+
-+	ret = of_clk_add_provider(np, of_clk_src_onecell_get,
-+				  &clk_data);
-+	if (WARN_ON(ret))
-+		return;
-+
-+}
-+CLK_OF_DECLARE(berlin4ct_clk, "marvell,berlin4ct-clk",
-+	       berlin4ct_clk_setup);
++/* BERLIN CLK */
++#define CLK_CPUFASTREF		0
++#define CLK_MEMFASTREF		1
++#define CLK_CFG			2
++#define CLK_PERIFSYS		3
++#define CLK_HB			4
++#define CLK_ATB			5
++#define CLK_DECODER		6
++#define CLK_DECODERM3		7
++#define CLK_DECODERPCUBE	8
++#define CLK_ENCODER		9
++#define CLK_OVPCORE		10
++#define CLK_GFX2DCORE		11
++#define CLK_GFX3DCORE		12
++#define CLK_GFX3DSH		13
++#define CLK_GFX3DSYS		14
++#define CLK_GFX2DSYS		15
++#define CLK_AVIOSYS		16
++#define CLK_VPPSYS		17
++#define CLK_EDDC		18
++#define CLK_AVIOBIU		19
++#define CLK_ZSP			20
++#define CLK_TSP			21
++#define CLK_TSPREF		22
++#define CLK_NDS			23
++#define CLK_NOCS		24
++#define CLK_APBCORE		25
++#define CLK_EMMC		26
++#define CLK_SD0			27
++#define CLK_SD1			28
++#define CLK_DLLMSTREF		29
++#define CLK_GETHRGMII		30
++#define CLK_GETHRGMIISYS	31
++#define CLK_USIM0		32
++#define CLK_PCIETEST		33
++#define CLK_USB2TEST		34
++#define CLK_USB3TEST		35
++#define CLK_USB3CORE		36
++#define CLK_NFCECC		37
++#define CLK_BCM			38
 -- 
 2.5.3
