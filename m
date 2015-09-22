@@ -1,82 +1,29 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 22 Sep 2015 23:47:40 +0800
-Subject: [PATCH 1/4] ARM: sunxi: Introduce Allwinner for A83T support
-In-Reply-To: <1442936337-3104-2-git-send-email-vishnupatekar0510@gmail.com>
-References: <1442936337-3104-1-git-send-email-vishnupatekar0510@gmail.com>
- <1442936337-3104-2-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <CAGb2v665FhnSoWYGJn+Tf79F7pZitYBrEOmAts4nVoUWb-uBqg@mail.gmail.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 22 Sep 2015 16:48:09 +0100
+Subject: Steps to submit a new arch/arm port
+In-Reply-To: <56016780.5080104@free.fr> (Mason's message of "Tue, 22 Sep 2015
+ 16:36:48 +0200")
+References: <56001B78.2090001@free.fr> <2206647.QPrIpE2UC0@wuerfel>
+ <56016780.5080104@free.fr>
+Message-ID: <yw1xvbb2qwue.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 11:38 PM, Vishnu Patekar
-<vishnupatekar0510@gmail.com> wrote:
-> Allwinner A83T is octa-core cortex-a7 based SoC.
-> It's clock control unit and prcm, pinmux are different from previous sun8i
-> series.
-> Its processor cores are arragned in two clusters 4 cores each,
-> similar to A80.
+Mason <slash.tmp@free.fr> writes:
+
+>> - the clock support should probably go to drivers/clk, unless this is
+>>   a clocksource driver, which should go to drivers/clocksource. Add a
+>>   DT binding spec. If you lack DT support, don't bother sending it,
+>>   but send the rest anyway.
 >
-> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
-> ---
->  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->  arch/arm/mach-sunxi/sunxi.c                     | 1 +
->  drivers/clk/sunxi/clk-sunxi.c                   | 6 ++++++
->  3 files changed, 8 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-> index 67da205..cf5ed27 100644
-> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> @@ -11,4 +11,5 @@ using one of the following compatible strings:
->    allwinner,sun8i-a23
->    allwinner,sun8i-a33
->    allwinner,sun8i-h3
-> +  allwinner,sun8i-a83t
+> I'll take a look at Mans' DT clock code, but I want to simplify it.
 
-Alphabetic order please.
+I wrote the clock driver using some incomplete documentation for 865x,
+additional details gleaned from ancient vendor kernel source, plus trial
+and error on an 8643 chip.  If I could have done it any simpler, I would
+have.  I don't have any information on the 87xx series, so it's possible
+the clock tree is completely different there.
 
->    allwinner,sun9i-a80
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index 65bab28..b04aefa 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -69,6 +69,7 @@ static const char * const sun8i_board_dt_compat[] = {
->         "allwinner,sun8i-a23",
->         "allwinner,sun8i-a33",
->         "allwinner,sun8i-h3",
-> +       "allwinner,sun8i-a83t",
-
-Same here.
-
->         NULL,
->  };
->
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 413070d..f216d5d 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -1212,6 +1212,12 @@ CLK_OF_DECLARE(sun6i_a31s_clk_init, "allwinner,sun6i-a31s", sun6i_init_clocks);
->  CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
->  CLK_OF_DECLARE(sun8i_a33_clk_init, "allwinner,sun8i-a33", sun6i_init_clocks);
->
-> +static void __init sun8ia83t_init_clocks(struct device_node *node)
-> +{
-> +       sunxi_init_clocks(NULL, 0);
-> +}
-> +CLK_OF_DECLARE(sun9i_a83t_clk_init, "allwinner,sun8i-a83t", sun8ia83t_init_clocks);
-
-sun8i? Missing underscore too.
-
-I think you should add this once you actually have clock support.
-Otherwise this call basically does nothing.
-
-> +
->  static void __init sun9i_init_clocks(struct device_node *node)
->  {
->         sunxi_init_clocks(NULL, 0);
-
-On the side, I will send patches to remove sun9i_init_clocks.
-
-
-Regards
-ChenYu
+-- 
+M?ns Rullg?rd
+mans at mansr.com
