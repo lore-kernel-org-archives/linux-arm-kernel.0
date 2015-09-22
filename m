@@ -1,31 +1,23 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 22 Sep 2015 20:57:52 +0530
-Subject: [PATCH] ARM: davinci: clock: Correct return values for API
- functions
-In-Reply-To: <1442222979-9703-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1442222979-9703-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <56017378.5060503@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 22 Sep 2015 17:30:23 +0200
+Subject: [PATCH 0/3] mmc: Wait for card_busy before starting sdio requests
+Message-ID: <1442935826-16758-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 September 2015 02:59 PM, Peter Ujfalusi wrote:
-> Fix the values returned by the publicly used functions.
-> These function should return 0 when they are called with clk == NULL in
-> similar manner as the clock API does to avoid different behavior in drivers
-> used by daVinci and other architectures.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Hi Ulf,
 
-> ---
-> Hi Sekhar,
-> 
-> This issue is visible when using generic drivers like ASoC simnple card for
-> audio support.
-> They rely on the fact that these functions will not return with error in case
-> of clk == NULL.
+Here is a non RFC version of my patch-set to wait for card_busy before
+starting sdio requests. It is the same as the RFC version of the set,
+but this time it has been tested no hardware which actually needs this
+and I can confirm now that this fixes wifi on that hardware.
 
-Looks good. Will queue for v4.4. Some of the information below the tear
-line could go into the commit text too, I think.
+This patch-set should also allow removing this dw_mmc specific fix:
 
-Thanks,
-Sekhar
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/mmc/host/dw_mmc.c?id=0bdbd0e88cf6b603a2196418672715b0890fb040
+
+As this patch-set fixes this problem in a generic manner.
+
+Regards,
+
+Hans
