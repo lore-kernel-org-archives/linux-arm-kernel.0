@@ -1,34 +1,57 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 22 Sep 2015 22:53:14 +0200 (CEST)
-Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU
- hotplug
-In-Reply-To: <20150922173236.GB19183@linaro.org>
-References: <Pine.LNX.4.44L0.1509051133100.30865-100000@netrider.rowland.org>
- <2657565.lxWtPmdjyp@vostro.rjw.lan> <55ED9328.2010501@ti.com>
- <2355864.I8qZFusWfm@vostro.rjw.lan> <55EE9AA1.8020200@ti.com>
- <7h613kmuuv.fsf@deeprootsystems.com> <55F162FD.4050401@ti.com>
- <20150922173236.GB19183@linaro.org>
-Message-ID: <alpine.DEB.2.11.1509222251070.5606@nanos>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 22 Sep 2015 22:03:22 +0100
+Subject: [PATCH 17/17] mfd : ab8500/db8500: fix the abuse of
+ IRQF_NO_SUSPEND
+In-Reply-To: <560127BE.9030604@arm.com>
+References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
+ <1442850433-5903-18-git-send-email-sudeep.holla@arm.com>
+ <20150921232027.GD11284@x1> <560127BE.9030604@arm.com>
+Message-ID: <20150922210322.GA3442@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Sep 2015, Lina Iyer wrote:
-> Talking to John Stultz at Linaro Connect: Is cpuidle relevant in
-> -RT kernel? I dont know much about -RT. I thought this might be point
-> that we should consider.
+On Tue, 22 Sep 2015, Sudeep Holla wrote:
+> On 22/09/15 00:20, Lee Jones wrote:
+> >On Mon, 21 Sep 2015, Sudeep Holla wrote:
+> >
+> >>The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
+> >>be left enabled so as to allow them to work as expected during the
+> >>suspend-resume cycle, but doesn't guarantee that it will wake the system
+> >>from a suspended state, enable_irq_wake is recommended to be used for
+> >>the wakeup.
+> >>
+> >>This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
+> >>enable_irq_wake instead.
+> >>
+> >>Cc: Linus Walleij <linus.walleij@linaro.org>
+> >>Cc: linux-arm-kernel at lists.infradead.org
+> >>Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> >>---
+> >>  drivers/mfd/ab8500-core.c        | 11 +++++++++--
+> >>  drivers/mfd/ab8500-debugfs.c     |  2 +-
+> >>  drivers/mfd/ab8500-gpadc.c       | 15 +++++++++++----
+> >>  drivers/mfd/db8500-prcmu.c       | 24 +++++++++++++++++-------
+> >>  drivers/power/ab8500_btemp.c     |  6 ++++--
+> >>  drivers/power/ab8500_charger.c   |  6 ++++--
+> >>  drivers/power/ab8500_fg.c        |  9 ++++++---
+> >>  drivers/thermal/db8500_thermal.c |  5 ++---
+> >>  drivers/usb/phy/phy-ab8500-usb.c | 10 ++++++----
+> >>  9 files changed, 60 insertions(+), 28 deletions(-)
+> >
+> >Is there a reason for bundling the changes in all of these subsystems
+> >together into a single patch?
+> >
+> 
+> No, I understand this needs to be split. Since I was not 100% confident
+> about this change, I wanted LinusW to review and provide feedback and
+> gets things working before I can split this changes. I must have added
+> RFC, but usually it gets ignored :)
 
-There are definitely RT systems out there where power consumption is a
-concern.
- 
-> As it stands today, on a 800 Mhz ARM quad core, I am seeing a latency of
-> 50-70 usec for the additional runtime PM in the cpuidle. Ofcourse, there
-> is a definite need to optimize and there are opportunities to do that.
+Best if Linus reviews the correct patch-set.  Please split and
+resubmit.
 
-RT is not about being fast. RT is about being deterministic. So if a
-power sensitive RT system can afford the extra latencies induced by PM
-it will tolerate them. Of course, optimizing that is not a bad thing
-at all :)
- 
-Thanks,
-
-	tglx
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
