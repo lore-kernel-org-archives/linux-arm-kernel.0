@@ -1,57 +1,67 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Sep 2015 22:03:22 +0100
-Subject: [PATCH 17/17] mfd : ab8500/db8500: fix the abuse of
- IRQF_NO_SUSPEND
-In-Reply-To: <560127BE.9030604@arm.com>
-References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
- <1442850433-5903-18-git-send-email-sudeep.holla@arm.com>
- <20150921232027.GD11284@x1> <560127BE.9030604@arm.com>
-Message-ID: <20150922210322.GA3442@x1>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Wed, 23 Sep 2015 00:10:15 +0300
+Subject: [RESEND PATCH] media: vb2: Fix vb2_dc_prepare do not correct
+ sync data to device
+In-Reply-To: <1442838371-21484-1-git-send-email-tiffany.lin@mediatek.com>
+References: <1442838371-21484-1-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <20150922211015.GT3175@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Sep 2015, Sudeep Holla wrote:
-> On 22/09/15 00:20, Lee Jones wrote:
-> >On Mon, 21 Sep 2015, Sudeep Holla wrote:
-> >
-> >>The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
-> >>be left enabled so as to allow them to work as expected during the
-> >>suspend-resume cycle, but doesn't guarantee that it will wake the system
-> >>from a suspended state, enable_irq_wake is recommended to be used for
-> >>the wakeup.
-> >>
-> >>This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
-> >>enable_irq_wake instead.
-> >>
-> >>Cc: Linus Walleij <linus.walleij@linaro.org>
-> >>Cc: linux-arm-kernel at lists.infradead.org
-> >>Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> >>---
-> >>  drivers/mfd/ab8500-core.c        | 11 +++++++++--
-> >>  drivers/mfd/ab8500-debugfs.c     |  2 +-
-> >>  drivers/mfd/ab8500-gpadc.c       | 15 +++++++++++----
-> >>  drivers/mfd/db8500-prcmu.c       | 24 +++++++++++++++++-------
-> >>  drivers/power/ab8500_btemp.c     |  6 ++++--
-> >>  drivers/power/ab8500_charger.c   |  6 ++++--
-> >>  drivers/power/ab8500_fg.c        |  9 ++++++---
-> >>  drivers/thermal/db8500_thermal.c |  5 ++---
-> >>  drivers/usb/phy/phy-ab8500-usb.c | 10 ++++++----
-> >>  9 files changed, 60 insertions(+), 28 deletions(-)
-> >
-> >Is there a reason for bundling the changes in all of these subsystems
-> >together into a single patch?
-> >
-> 
-> No, I understand this needs to be split. Since I was not 100% confident
-> about this change, I wanted LinusW to review and provide feedback and
-> gets things working before I can split this changes. I must have added
-> RFC, but usually it gets ignored :)
+Hi Tiffany,
 
-Best if Linus reviews the correct patch-set.  Please split and
-resubmit.
+(Robin and Hans cc'd.)
+
+On Mon, Sep 21, 2015 at 08:26:11PM +0800, Tiffany Lin wrote:
+> vb2_dc_prepare use the number of SG entries dma_map_sg_attrs return.
+> But in dma_sync_sg_for_device, it use lengths of each SG entries
+> before dma_map_sg_attrs. dma_map_sg_attrs will concatenate
+> SGs until dma length > dma seg bundary. sgt->nents will less than
+> sgt->orig_nents. Using SG entries after dma_map_sg_attrs
+> in vb2_dc_prepare will make some SGs are not sync to device.
+> After add DMA_ATTR_SKIP_CPU_SYNC in vb2_dc_get_userptr to remove
+> sync data to device twice. Device randomly get incorrect data because
+> some SGs are not sync to device. Change to use number of SG entries
+> before dma_map_sg_attrs in vb2_dc_prepare to prevent this issue.
+> 
+> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> ---
+>  drivers/media/v4l2-core/videobuf2-dma-contig.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/media/v4l2-core/videobuf2-dma-contig.c b/drivers/media/v4l2-core/videobuf2-dma-contig.c
+> index 2397ceb..c5d00bd 100644
+> --- a/drivers/media/v4l2-core/videobuf2-dma-contig.c
+> +++ b/drivers/media/v4l2-core/videobuf2-dma-contig.c
+> @@ -100,7 +100,7 @@ static void vb2_dc_prepare(void *buf_priv)
+>  	if (!sgt || buf->db_attach)
+>  		return;
+>  
+> -	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir);
+> +	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
+>  }
+>  
+>  static void vb2_dc_finish(void *buf_priv)
+> @@ -112,7 +112,7 @@ static void vb2_dc_finish(void *buf_priv)
+>  	if (!sgt || buf->db_attach)
+>  		return;
+>  
+> -	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir);
+> +	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
+>  }
+>  
+>  /*********************************************/
+
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+
+Could you post a similar patch for videobuf2-dma-sg as well, please? This
+should probably go to stable (since when?).
+
+videobuf-dma-sg appears to be broken, too, but the fix is more changes
+than one or two lines.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
