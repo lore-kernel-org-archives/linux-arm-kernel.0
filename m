@@ -1,206 +1,301 @@
 From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 22 Sep 2015 10:24:08 +0200
-Subject: [PATCH v5 4/4] leds: netxbig: convert to use the devm_ functions
+Date: Tue, 22 Sep 2015 10:24:07 +0200
+Subject: [PATCH v5 3/4] ARM: mvebu: remove static LED setup for netxbig boards
 In-Reply-To: <1442910248-11380-1-git-send-email-simon.guinot@sequanux.org>
 References: <1442910248-11380-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1442910248-11380-5-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <1442910248-11380-4-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch converts the leds-netxbig driver to use the devres functions
-devm_gpio_request_one() and devm_led_classdev_register(). This allows to
-simplify the code a bit.
+Since DT support is now available for the LEDs found on the LaCie
+netxbig boards (Kirkwood-based), then the old-fashion netxbig board
+setup file is no longer needed. This patch removes this file.
 
 Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/leds/leds-netxbig.c | 108 ++++++++++++--------------------------------
- 1 file changed, 28 insertions(+), 80 deletions(-)
+ arch/arm/mach-mvebu/Kconfig    |   7 --
+ arch/arm/mach-mvebu/Makefile   |   1 -
+ arch/arm/mach-mvebu/board.h    |  21 -----
+ arch/arm/mach-mvebu/kirkwood.c |   4 -
+ arch/arm/mach-mvebu/netxbig.c  | 191 -----------------------------------------
+ 5 files changed, 224 deletions(-)
+ delete mode 100644 arch/arm/mach-mvebu/board.h
+ delete mode 100644 arch/arm/mach-mvebu/netxbig.c
 
-diff --git a/drivers/leds/leds-netxbig.c b/drivers/leds/leds-netxbig.c
-index 19dac94b0364..3a982b99f738 100644
---- a/drivers/leds/leds-netxbig.c
-+++ b/drivers/leds/leds-netxbig.c
-@@ -71,7 +71,8 @@ static void gpio_ext_set_value(struct netxbig_gpio_ext *gpio_ext,
- 	spin_unlock_irqrestore(&gpio_ext_lock, flags);
+Changes for v4:
+- Add some Acked-by.
+
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 97473168d6b6..5453f901099b 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -116,11 +116,4 @@ config MACH_KIRKWOOD
+ 	  Say 'Y' here if you want your kernel to support boards based
+ 	  on the Marvell Kirkwood device tree.
+ 
+-config MACH_NETXBIG
+-	bool "LaCie 2Big and 5Big Network v2"
+-	depends on MACH_KIRKWOOD
+-	help
+-	  Say 'Y' here if you want your kernel to support the
+-	  LaCie 2Big and 5Big Network v2
+-
+ endif
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index b4f01497ce0b..ecf9e0c3b107 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -13,4 +13,3 @@ endif
+ 
+ obj-$(CONFIG_MACH_DOVE)		 += dove.o
+ obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
+-obj-$(CONFIG_MACH_NETXBIG)	 += netxbig.o
+diff --git a/arch/arm/mach-mvebu/board.h b/arch/arm/mach-mvebu/board.h
+deleted file mode 100644
+index 98e32cc2ef3d..000000000000
+--- a/arch/arm/mach-mvebu/board.h
++++ /dev/null
+@@ -1,21 +0,0 @@
+-/*
+- * Board functions for Marvell System On Chip
+- *
+- * Copyright (C) 2014
+- *
+- * Andrew Lunn <andrew@lunn.ch>
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#ifndef __ARCH_MVEBU_BOARD_H
+-#define __ARCH_MVEBU_BOARD_H
+-
+-#ifdef CONFIG_MACH_NETXBIG
+-void netxbig_init(void);
+-#else
+-static inline void netxbig_init(void) {};
+-#endif
+-#endif
+diff --git a/arch/arm/mach-mvebu/kirkwood.c b/arch/arm/mach-mvebu/kirkwood.c
+index 925f75f54268..f9d8e1ea7183 100644
+--- a/arch/arm/mach-mvebu/kirkwood.c
++++ b/arch/arm/mach-mvebu/kirkwood.c
+@@ -25,7 +25,6 @@
+ #include "kirkwood.h"
+ #include "kirkwood-pm.h"
+ #include "common.h"
+-#include "board.h"
+ 
+ static struct resource kirkwood_cpufreq_resources[] = {
+ 	[0] = {
+@@ -180,9 +179,6 @@ static void __init kirkwood_dt_init(void)
+ 	kirkwood_pm_init();
+ 	kirkwood_dt_eth_fixup();
+ 
+-	if (of_machine_is_compatible("lacie,netxbig"))
+-		netxbig_init();
+-
+ 	of_platform_populate(NULL, of_default_bus_match_table, auxdata, NULL);
  }
  
--static int gpio_ext_init(struct netxbig_gpio_ext *gpio_ext)
-+static int gpio_ext_init(struct platform_device *pdev,
-+			 struct netxbig_gpio_ext *gpio_ext)
- {
- 	int err;
- 	int i;
-@@ -81,46 +82,28 @@ static int gpio_ext_init(struct netxbig_gpio_ext *gpio_ext)
- 
- 	/* Configure address GPIOs. */
- 	for (i = 0; i < gpio_ext->num_addr; i++) {
--		err = gpio_request_one(gpio_ext->addr[i], GPIOF_OUT_INIT_LOW,
--				       "GPIO extension addr");
-+		err = devm_gpio_request_one(&pdev->dev, gpio_ext->addr[i],
-+					    GPIOF_OUT_INIT_LOW,
-+					    "GPIO extension addr");
- 		if (err)
--			goto err_free_addr;
-+			return err;
- 	}
- 	/* Configure data GPIOs. */
- 	for (i = 0; i < gpio_ext->num_data; i++) {
--		err = gpio_request_one(gpio_ext->data[i], GPIOF_OUT_INIT_LOW,
--				   "GPIO extension data");
-+		err = devm_gpio_request_one(&pdev->dev, gpio_ext->data[i],
-+					    GPIOF_OUT_INIT_LOW,
-+					    "GPIO extension data");
- 		if (err)
--			goto err_free_data;
-+			return err;
- 	}
- 	/* Configure "enable select" GPIO. */
--	err = gpio_request_one(gpio_ext->enable, GPIOF_OUT_INIT_LOW,
--			       "GPIO extension enable");
-+	err = devm_gpio_request_one(&pdev->dev, gpio_ext->enable,
-+				    GPIOF_OUT_INIT_LOW,
-+				    "GPIO extension enable");
- 	if (err)
--		goto err_free_data;
-+		return err;
- 
- 	return 0;
+diff --git a/arch/arm/mach-mvebu/netxbig.c b/arch/arm/mach-mvebu/netxbig.c
+deleted file mode 100644
+index 94b11b6585a4..000000000000
+--- a/arch/arm/mach-mvebu/netxbig.c
++++ /dev/null
+@@ -1,191 +0,0 @@
+-/*
+- * arch/arm/mach-mvbu/board-netxbig.c
+- *
+- * LaCie 2Big and 5Big Network v2 board setup
+- *
+- * Copyright (C) 2010 Simon Guinot <sguinot@lacie.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
 -
--err_free_data:
--	for (i = i - 1; i >= 0; i--)
--		gpio_free(gpio_ext->data[i]);
--	i = gpio_ext->num_addr;
--err_free_addr:
--	for (i = i - 1; i >= 0; i--)
--		gpio_free(gpio_ext->addr[i]);
+-#include <linux/kernel.h>
+-#include <linux/of.h>
+-#include <linux/platform_device.h>
+-#include <linux/platform_data/leds-kirkwood-netxbig.h>
+-#include "common.h"
 -
--	return err;
--}
+-/*****************************************************************************
+- * GPIO extension LEDs
+- ****************************************************************************/
 -
--static void gpio_ext_free(struct netxbig_gpio_ext *gpio_ext)
--{
--	int i;
+-/*
+- * The LEDs are controlled by a CPLD and can be configured through a GPIO
+- * extension bus:
+- *
+- * - address register : bit [0-2] -> GPIO [47-49]
+- * - data register    : bit [0-2] -> GPIO [44-46]
+- * - enable register  : GPIO 29
+- */
 -
--	gpio_free(gpio_ext->enable);
--	for (i = gpio_ext->num_addr - 1; i >= 0; i--)
--		gpio_free(gpio_ext->addr[i]);
--	for (i = gpio_ext->num_data - 1; i >= 0; i--)
--		gpio_free(gpio_ext->data[i]);
- }
- 
- /*
-@@ -141,11 +124,6 @@ struct netxbig_led_data {
- 	spinlock_t		lock;
- };
- 
--struct netxbig_led_priv {
--	struct netxbig_led_platform_data *pdata;
--	struct netxbig_led_data leds_data[];
+-static int netxbig_v2_gpio_ext_addr[] = { 47, 48, 49 };
+-static int netxbig_v2_gpio_ext_data[] = { 44, 45, 46 };
+-
+-static struct netxbig_gpio_ext netxbig_v2_gpio_ext = {
+-	.addr		= netxbig_v2_gpio_ext_addr,
+-	.num_addr	= ARRAY_SIZE(netxbig_v2_gpio_ext_addr),
+-	.data		= netxbig_v2_gpio_ext_data,
+-	.num_data	= ARRAY_SIZE(netxbig_v2_gpio_ext_data),
+-	.enable		= 29,
 -};
 -
- static int netxbig_led_get_timer_mode(enum netxbig_led_mode *mode,
- 				      unsigned long delay_on,
- 				      unsigned long delay_off,
-@@ -305,18 +283,11 @@ static struct attribute *netxbig_led_attrs[] = {
- };
- ATTRIBUTE_GROUPS(netxbig_led);
- 
--static void delete_netxbig_led(struct netxbig_led_data *led_dat)
+-/*
+- * Address register selection:
+- *
+- * addr | register
+- * ----------------------------
+- *   0  | front LED
+- *   1  | front LED brightness
+- *   2  | SATA LED brightness
+- *   3  | SATA0 LED
+- *   4  | SATA1 LED
+- *   5  | SATA2 LED
+- *   6  | SATA3 LED
+- *   7  | SATA4 LED
+- *
+- * Data register configuration:
+- *
+- * data | LED brightness
+- * -------------------------------------------------
+- *   0  | min (off)
+- *   -  | -
+- *   7  | max
+- *
+- * data | front LED mode
+- * -------------------------------------------------
+- *   0  | fix off
+- *   1  | fix blue on
+- *   2  | fix red on
+- *   3  | blink blue on=1 sec and blue off=1 sec
+- *   4  | blink red on=1 sec and red off=1 sec
+- *   5  | blink blue on=2.5 sec and red on=0.5 sec
+- *   6  | blink blue on=1 sec and red on=1 sec
+- *   7  | blink blue on=0.5 sec and blue off=2.5 sec
+- *
+- * data | SATA LED mode
+- * -------------------------------------------------
+- *   0  | fix off
+- *   1  | SATA activity blink
+- *   2  | fix red on
+- *   3  | blink blue on=1 sec and blue off=1 sec
+- *   4  | blink red on=1 sec and red off=1 sec
+- *   5  | blink blue on=2.5 sec and red on=0.5 sec
+- *   6  | blink blue on=1 sec and red on=1 sec
+- *   7  | fix blue on
+- */
+-
+-static int netxbig_v2_red_mled[NETXBIG_LED_MODE_NUM] = {
+-	[NETXBIG_LED_OFF]	= 0,
+-	[NETXBIG_LED_ON]	= 2,
+-	[NETXBIG_LED_SATA]	= NETXBIG_LED_INVALID_MODE,
+-	[NETXBIG_LED_TIMER1]	= 4,
+-	[NETXBIG_LED_TIMER2]	= NETXBIG_LED_INVALID_MODE,
+-};
+-
+-static int netxbig_v2_blue_pwr_mled[NETXBIG_LED_MODE_NUM] = {
+-	[NETXBIG_LED_OFF]	= 0,
+-	[NETXBIG_LED_ON]	= 1,
+-	[NETXBIG_LED_SATA]	= NETXBIG_LED_INVALID_MODE,
+-	[NETXBIG_LED_TIMER1]	= 3,
+-	[NETXBIG_LED_TIMER2]	= 7,
+-};
+-
+-static int netxbig_v2_blue_sata_mled[NETXBIG_LED_MODE_NUM] = {
+-	[NETXBIG_LED_OFF]	= 0,
+-	[NETXBIG_LED_ON]	= 7,
+-	[NETXBIG_LED_SATA]	= 1,
+-	[NETXBIG_LED_TIMER1]	= 3,
+-	[NETXBIG_LED_TIMER2]	= NETXBIG_LED_INVALID_MODE,
+-};
+-
+-static struct netxbig_led_timer netxbig_v2_led_timer[] = {
+-	[0] = {
+-		.delay_on	= 500,
+-		.delay_off	= 500,
+-		.mode		= NETXBIG_LED_TIMER1,
+-	},
+-	[1] = {
+-		.delay_on	= 500,
+-		.delay_off	= 1000,
+-		.mode		= NETXBIG_LED_TIMER2,
+-	},
+-};
+-
+-#define NETXBIG_LED(_name, maddr, mval, baddr)			\
+-	{ .name		= _name,				\
+-	  .mode_addr	= maddr,				\
+-	  .mode_val	= mval,					\
+-	  .bright_addr	= baddr }
+-
+-static struct netxbig_led net2big_v2_leds_ctrl[] = {
+-	NETXBIG_LED("net2big-v2:blue:power", 0, netxbig_v2_blue_pwr_mled,  1),
+-	NETXBIG_LED("net2big-v2:red:power",  0, netxbig_v2_red_mled,       1),
+-	NETXBIG_LED("net2big-v2:blue:sata0", 3, netxbig_v2_blue_sata_mled, 2),
+-	NETXBIG_LED("net2big-v2:red:sata0",  3, netxbig_v2_red_mled,       2),
+-	NETXBIG_LED("net2big-v2:blue:sata1", 4, netxbig_v2_blue_sata_mled, 2),
+-	NETXBIG_LED("net2big-v2:red:sata1",  4, netxbig_v2_red_mled,       2),
+-};
+-
+-static struct netxbig_led_platform_data net2big_v2_leds_data = {
+-	.gpio_ext	= &netxbig_v2_gpio_ext,
+-	.timer		= netxbig_v2_led_timer,
+-	.num_timer	= ARRAY_SIZE(netxbig_v2_led_timer),
+-	.leds		= net2big_v2_leds_ctrl,
+-	.num_leds	= ARRAY_SIZE(net2big_v2_leds_ctrl),
+-};
+-
+-static struct netxbig_led net5big_v2_leds_ctrl[] = {
+-	NETXBIG_LED("net5big-v2:blue:power", 0, netxbig_v2_blue_pwr_mled,  1),
+-	NETXBIG_LED("net5big-v2:red:power",  0, netxbig_v2_red_mled,       1),
+-	NETXBIG_LED("net5big-v2:blue:sata0", 3, netxbig_v2_blue_sata_mled, 2),
+-	NETXBIG_LED("net5big-v2:red:sata0",  3, netxbig_v2_red_mled,       2),
+-	NETXBIG_LED("net5big-v2:blue:sata1", 4, netxbig_v2_blue_sata_mled, 2),
+-	NETXBIG_LED("net5big-v2:red:sata1",  4, netxbig_v2_red_mled,       2),
+-	NETXBIG_LED("net5big-v2:blue:sata2", 5, netxbig_v2_blue_sata_mled, 2),
+-	NETXBIG_LED("net5big-v2:red:sata2",  5, netxbig_v2_red_mled,       2),
+-	NETXBIG_LED("net5big-v2:blue:sata3", 6, netxbig_v2_blue_sata_mled, 2),
+-	NETXBIG_LED("net5big-v2:red:sata3",  6, netxbig_v2_red_mled,       2),
+-	NETXBIG_LED("net5big-v2:blue:sata4", 7, netxbig_v2_blue_sata_mled, 2),
+-	NETXBIG_LED("net5big-v2:red:sata4",  7, netxbig_v2_red_mled,       2),
+-};
+-
+-static struct netxbig_led_platform_data net5big_v2_leds_data = {
+-	.gpio_ext	= &netxbig_v2_gpio_ext,
+-	.timer		= netxbig_v2_led_timer,
+-	.num_timer	= ARRAY_SIZE(netxbig_v2_led_timer),
+-	.leds		= net5big_v2_leds_ctrl,
+-	.num_leds	= ARRAY_SIZE(net5big_v2_leds_ctrl),
+-};
+-
+-static struct platform_device netxbig_v2_leds = {
+-	.name		= "leds-netxbig",
+-	.id		= -1,
+-	.dev		= {
+-		.platform_data	= &net2big_v2_leds_data,
+-	},
+-};
+-
+-void __init netxbig_init(void)
 -{
--	led_classdev_unregister(&led_dat->cdev);
+-
+-	if (of_machine_is_compatible("lacie,net5big_v2"))
+-		netxbig_v2_leds.dev.platform_data = &net5big_v2_leds_data;
+-	platform_device_register(&netxbig_v2_leds);
 -}
--
--static int create_netxbig_led(struct platform_device *pdev, int led,
--			      struct netxbig_led_priv *priv)
-+static int create_netxbig_led(struct platform_device *pdev,
-+			      struct netxbig_led_platform_data *pdata,
-+			      struct netxbig_led_data *led_dat,
-+			      const struct netxbig_led *template)
- {
--	struct netxbig_led_platform_data *pdata = priv->pdata;
--	struct netxbig_led_data *led_dat = &priv->leds_data[led];
--	const struct netxbig_led *template = &priv->pdata->leds[led];
--
- 	spin_lock_init(&led_dat->lock);
- 	led_dat->gpio_ext = pdata->gpio_ext;
- 	led_dat->cdev.name = template->name;
-@@ -349,7 +320,7 @@ static int create_netxbig_led(struct platform_device *pdev, int led,
- 	if (led_dat->mode_val[NETXBIG_LED_SATA] != NETXBIG_LED_INVALID_MODE)
- 		led_dat->cdev.groups = netxbig_led_groups;
- 
--	return led_classdev_register(&pdev->dev, &led_dat->cdev);
-+	return devm_led_classdev_register(&pdev->dev, &led_dat->cdev);
- }
- 
- #ifdef CONFIG_OF_GPIO
-@@ -564,7 +535,7 @@ netxbig_leds_get_of_pdata(struct device *dev,
- static int netxbig_led_probe(struct platform_device *pdev)
- {
- 	struct netxbig_led_platform_data *pdata = dev_get_platdata(&pdev->dev);
--	struct netxbig_led_priv *priv;
-+	struct netxbig_led_data *leds_data;
- 	int i;
- 	int ret;
- 
-@@ -577,51 +548,28 @@ static int netxbig_led_probe(struct platform_device *pdev)
- 			return ret;
- 	}
- 
--	priv = devm_kzalloc(&pdev->dev, sizeof(*priv) +
--			    pdata->num_leds * sizeof(struct netxbig_led_data),
--			    GFP_KERNEL);
--	if (!priv)
-+	leds_data = devm_kzalloc(&pdev->dev,
-+				 pdata->num_leds * sizeof(*leds_data),
-+				 GFP_KERNEL);
-+	if (!leds_data)
- 		return -ENOMEM;
--	priv->pdata = pdata;
- 
--	ret = gpio_ext_init(pdata->gpio_ext);
-+	ret = gpio_ext_init(pdev, pdata->gpio_ext);
- 	if (ret < 0)
- 		return ret;
- 
- 	for (i = 0; i < pdata->num_leds; i++) {
--		ret = create_netxbig_led(pdev, i, priv);
-+		ret = create_netxbig_led(pdev, pdata,
-+					 &leds_data[i], &pdata->leds[i]);
- 		if (ret < 0)
--			goto err_free_leds;
-+			return ret;
- 	}
--	platform_set_drvdata(pdev, priv);
--
--	return 0;
--
--err_free_leds:
--	for (i = i - 1; i >= 0; i--)
--		delete_netxbig_led(&priv->leds_data[i]);
--
--	gpio_ext_free(pdata->gpio_ext);
--	return ret;
--}
--
--static int netxbig_led_remove(struct platform_device *pdev)
--{
--	struct netxbig_led_priv *priv = platform_get_drvdata(pdev);
--	struct netxbig_led_platform_data *pdata = priv->pdata;
--	int i;
--
--	for (i = 0; i < pdata->num_leds; i++)
--		delete_netxbig_led(&priv->leds_data[i]);
--
--	gpio_ext_free(pdata->gpio_ext);
- 
- 	return 0;
- }
- 
- static struct platform_driver netxbig_led_driver = {
- 	.probe		= netxbig_led_probe,
--	.remove		= netxbig_led_remove,
- 	.driver		= {
- 		.name		= "leds-netxbig",
- 		.of_match_table	= of_match_ptr(of_netxbig_leds_match),
 -- 
 2.1.4
