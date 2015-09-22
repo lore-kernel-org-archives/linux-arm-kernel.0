@@ -1,142 +1,76 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 22 Sep 2015 13:14:31 +0800
-Subject: [PATCH 2/5] media: atmel-isi: prepare for the support of preview path
+Date: Tue, 22 Sep 2015 13:14:32 +0800
+Subject: [PATCH 3/5] media: atmel-isi: add code to setup correct resolution
+ for preview path
 In-Reply-To: <1442898875-7147-1-git-send-email-josh.wu@atmel.com>
 References: <1442898875-7147-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1442898875-7147-3-git-send-email-josh.wu@atmel.com>
+Message-ID: <1442898875-7147-4-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Atmel ISI support a preview path which can output RGB data.
+Not like codec path, preview path can do downsampling, so we should setup
+a extra preview width, height for it.
 
-So this patch introduces a bool variable to choose which path is
-enabled currently. And also we need setup corresponding path registers.
-
-By default the preview path is disabled. We only use Codec path.
+This patch add preview resolution setup without down sampling. So currently
+preview path will output same size as sensor output size.
 
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
 
- drivers/media/platform/soc_camera/atmel-isi.c | 72 ++++++++++++++++++---------
- 1 file changed, 49 insertions(+), 23 deletions(-)
+ drivers/media/platform/soc_camera/atmel-isi.c | 12 +++++++++++-
+ drivers/media/platform/soc_camera/atmel-isi.h | 10 ++++++++++
+ 2 files changed, 21 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-index df64294..e6f4ade 100644
+index e6f4ade..bbf6449 100644
 --- a/drivers/media/platform/soc_camera/atmel-isi.c
 +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-@@ -79,6 +79,7 @@ struct atmel_isi {
- 	dma_addr_t			fb_descriptors_phys;
- 	struct				list_head dma_desc_head;
- 	struct isi_dma_desc		dma_desc[MAX_BUFFER_NUM];
-+	bool				enable_preview_path;
+@@ -135,7 +135,7 @@ static u32 setup_cfg2_yuv_swap(struct atmel_isi *isi,
+ static void configure_geometry(struct atmel_isi *isi, u32 width,
+ 		u32 height, const struct soc_camera_format_xlate *xlate)
+ {
+-	u32 cfg2;
++	u32 cfg2, psize;
  
- 	struct completion		complete;
- 	/* ISI peripherial clock */
-@@ -199,11 +200,19 @@ static irqreturn_t atmel_isi_handle_streaming(struct atmel_isi *isi)
- 		/* start next dma frame. */
- 		isi->active = list_entry(isi->video_buffer_list.next,
- 					struct frame_buffer, list);
--		isi_writel(isi, ISI_DMA_C_DSCR,
--			(u32)isi->active->p_dma_desc->fbd_phys);
--		isi_writel(isi, ISI_DMA_C_CTRL,
--			ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
--		isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_C_CH);
-+		if (!isi->enable_preview_path) {
-+			isi_writel(isi, ISI_DMA_C_DSCR,
-+				(u32)isi->active->p_dma_desc->fbd_phys);
-+			isi_writel(isi, ISI_DMA_C_CTRL,
-+				ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
-+			isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_C_CH);
-+		} else {
-+			isi_writel(isi, ISI_DMA_P_DSCR,
-+				(u32)isi->active->p_dma_desc->fbd_phys);
-+			isi_writel(isi, ISI_DMA_P_CTRL,
-+				ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
-+			isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_P_CH);
-+		}
- 	}
- 	return IRQ_HANDLED;
- }
-@@ -230,7 +239,8 @@ static irqreturn_t isi_interrupt(int irq, void *dev_id)
- 		isi_writel(isi, ISI_INTDIS, ISI_CTRL_DIS);
- 		ret = IRQ_HANDLED;
- 	} else {
--		if (likely(pending & ISI_SR_CXFR_DONE))
-+		if (likely(pending & ISI_SR_CXFR_DONE) ||
-+				likely(pending & ISI_SR_PXFR_DONE))
- 			ret = atmel_isi_handle_streaming(isi);
- 	}
- 
-@@ -372,21 +382,35 @@ static void start_dma(struct atmel_isi *isi, struct frame_buffer *buffer)
- 			ISI_SR_CXFR_DONE | ISI_SR_PXFR_DONE);
- 
- 	/* Check if already in a frame */
--	if (isi_readl(isi, ISI_STATUS) & ISI_CTRL_CDC) {
--		dev_err(isi->soc_host.icd->parent, "Already in frame handling.\n");
--		return;
--	}
-+	if (!isi->enable_preview_path) {
-+		if (isi_readl(isi, ISI_STATUS) & ISI_CTRL_CDC) {
-+			dev_err(isi->soc_host.icd->parent, "Already in frame handling.\n");
-+			return;
-+		}
- 
--	isi_writel(isi, ISI_DMA_C_DSCR, (u32)buffer->p_dma_desc->fbd_phys);
--	isi_writel(isi, ISI_DMA_C_CTRL, ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
--	isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_C_CH);
-+		isi_writel(isi, ISI_DMA_C_DSCR,
-+				(u32)buffer->p_dma_desc->fbd_phys);
-+		isi_writel(isi, ISI_DMA_C_CTRL,
-+				ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
-+		isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_C_CH);
-+	} else {
-+		isi_writel(isi, ISI_DMA_P_DSCR,
-+				(u32)buffer->p_dma_desc->fbd_phys);
-+		isi_writel(isi, ISI_DMA_P_CTRL,
-+				ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
-+		isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_P_CH);
-+	}
- 
- 	cfg1 &= ~ISI_CFG1_FRATE_DIV_MASK;
- 	/* Enable linked list */
- 	cfg1 |= isi->pdata.frate | ISI_CFG1_DISCR;
- 
--	/* Enable codec path and ISI */
--	ctrl = ISI_CTRL_CDC | ISI_CTRL_EN;
-+	/* Enable ISI */
-+	ctrl = ISI_CTRL_EN;
+ 	/* According to sensor's output format to set cfg2 */
+ 	switch (xlate->code) {
+@@ -163,6 +163,16 @@ static void configure_geometry(struct atmel_isi *isi, u32 width,
+ 	cfg2 |= ((height - 1) << ISI_CFG2_IM_VSIZE_OFFSET)
+ 			& ISI_CFG2_IM_VSIZE_MASK;
+ 	isi_writel(isi, ISI_CFG2, cfg2);
 +
-+	if (!isi->enable_preview_path)
-+		ctrl |= ISI_CTRL_CDC;
++	/* No down sampling, preview size equal to sensor output size */
++	psize = ((width - 1) << ISI_PSIZE_PREV_HSIZE_OFFSET) &
++		ISI_PSIZE_PREV_HSIZE_MASK;
++	psize |= ((height - 1) << ISI_PSIZE_PREV_VSIZE_OFFSET) &
++		ISI_PSIZE_PREV_VSIZE_MASK;
++	isi_writel(isi, ISI_PSIZE, psize);
++	isi_writel(isi, ISI_PDECF, ISI_PDECF_NO_SAMPLING);
 +
- 	isi_writel(isi, ISI_CTRL, ctrl);
- 	isi_writel(isi, ISI_CFG1, cfg1);
++	return;
  }
-@@ -462,15 +486,17 @@ static void stop_streaming(struct vb2_queue *vq)
- 	}
- 	spin_unlock_irq(&isi->lock);
  
--	timeout = jiffies + FRAME_INTERVAL_MILLI_SEC * HZ;
--	/* Wait until the end of the current frame. */
--	while ((isi_readl(isi, ISI_STATUS) & ISI_CTRL_CDC) &&
--			time_before(jiffies, timeout))
--		msleep(1);
-+	if (!isi->enable_preview_path) {
-+		timeout = jiffies + FRAME_INTERVAL_MILLI_SEC * HZ;
-+		/* Wait until the end of the current frame. */
-+		while ((isi_readl(isi, ISI_STATUS) & ISI_CTRL_CDC) &&
-+				time_before(jiffies, timeout))
-+			msleep(1);
+ static bool is_supported(struct soc_camera_device *icd,
+diff --git a/drivers/media/platform/soc_camera/atmel-isi.h b/drivers/media/platform/soc_camera/atmel-isi.h
+index 5acc771..0acb32a 100644
+--- a/drivers/media/platform/soc_camera/atmel-isi.h
++++ b/drivers/media/platform/soc_camera/atmel-isi.h
+@@ -79,6 +79,16 @@
+ #define ISI_CFG2_IM_VSIZE_MASK		(0x7FF << ISI_CFG2_IM_VSIZE_OFFSET)
+ #define ISI_CFG2_IM_HSIZE_MASK		(0x7FF << ISI_CFG2_IM_HSIZE_OFFSET)
  
--	if (time_after(jiffies, timeout))
--		dev_err(icd->parent,
--			"Timeout waiting for finishing codec request\n");
-+		if (time_after(jiffies, timeout))
-+			dev_err(icd->parent,
-+				"Timeout waiting for finishing codec request\n");
-+	}
- 
- 	/* Disable interrupts */
- 	isi_writel(isi, ISI_INTDIS,
++/* Bitfields in PSIZE */
++#define ISI_PSIZE_PREV_VSIZE_OFFSET	0
++#define ISI_PSIZE_PREV_HSIZE_OFFSET	16
++#define ISI_PSIZE_PREV_VSIZE_MASK	(0x3FF << ISI_PSIZE_PREV_VSIZE_OFFSET)
++#define ISI_PSIZE_PREV_HSIZE_MASK	(0x3FF << ISI_PSIZE_PREV_HSIZE_OFFSET)
++
++/* Bitfields in PDECF */
++#define ISI_PDECF_DEC_FACTOR_MASK	(0xFF << 0)
++#define	ISI_PDECF_NO_SAMPLING		(16)
++
+ /* Bitfields in CTRL */
+ /* Also using in SR(ISI_V2) */
+ #define ISI_CTRL_EN				(1 << 0)
 -- 
 1.9.1
