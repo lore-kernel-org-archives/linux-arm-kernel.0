@@ -1,46 +1,56 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 22 Sep 2015 15:36:03 +0200
-Subject: [PATCH 4/6] ARM: dts: sun7i: Enable USB DRC on the Orange pi
+Date: Tue, 22 Sep 2015 15:36:04 +0200
+Subject: [PATCH 5/6] ARM: dts: sun7i: Enable USB DRC on Wexler TAB7200
 In-Reply-To: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
 References: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1442928966-6418-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1442928966-6418-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Reinder de Haan <patchesrdh@mveas.com>
+From: Aleksei Mamlin <mamlinav@gmail.com>
 
-Add usb otg support for Orange pi, based on Orange pi mini.
+Enable the otg/drc usb controller on the Wexler TAB7200 tablet.
 
-Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
+Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun7i-a20-orangepi.dts | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts | 33 +++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-orangepi.dts b/arch/arm/boot/dts/sun7i-a20-orangepi.dts
-index 55a06ce..71125bf 100644
---- a/arch/arm/boot/dts/sun7i-a20-orangepi.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-orangepi.dts
-@@ -141,7 +141,18 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
+index 83c6d3f..78239ad 100644
+--- a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
++++ b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
+@@ -86,6 +86,8 @@
+ 	};
+ };
+ 
++#include "axp209.dtsi"
++
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins_a>;
+@@ -135,7 +137,18 @@
  	status = "okay";
  };
  
+-#include "axp209.dtsi"
 +&otg_sram {
 +	status = "okay";
 +};
 +
- &pio {
++&pio {
 +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
 +		allwinner,pins = "PH4";
 +		allwinner,function = "gpio_in";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
 +	};
-+
- 	mmc0_cd_pin_orangepi: mmc0_cd_pin at 0 {
- 		allwinner,pins = "PH10";
- 		allwinner,function = "gpio_in";
-@@ -203,6 +214,10 @@
++};
+ 
+ &reg_dcdc2 {
+ 	regulator-always-on;
+@@ -162,6 +175,10 @@
  	regulator-name = "avcc";
  };
  
@@ -49,9 +59,9 @@ index 55a06ce..71125bf 100644
 +};
 +
  &reg_usb1_vbus {
- 	pinctrl-0 = <&usb1_vbus_pin_bananapro>;
- 	gpio = <&pio 7 26 GPIO_ACTIVE_HIGH>; /* PH26 */
-@@ -221,7 +236,21 @@
+ 	status = "okay";
+ };
+@@ -176,7 +193,21 @@
  	status = "okay";
  };
  
