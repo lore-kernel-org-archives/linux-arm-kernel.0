@@ -1,47 +1,61 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 22 Sep 2015 17:30:25 +0200
-Subject: [PATCH 2/3] mmc: Wait for card_busy before starting sdio requests
+Date: Tue, 22 Sep 2015 17:30:26 +0200
+Subject: [PATCH 3/3] mmc: sunxi: Add card busy detection
 In-Reply-To: <1442935826-16758-1-git-send-email-hdegoede@redhat.com>
 References: <1442935826-16758-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1442935826-16758-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1442935826-16758-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some sdio wifi chips will not work properly if we try to start new
-sdio-rw requests while the device is signalling that it is busy.
+Some sdio wifi modules have not been working reliable with the sunxi-mmc
+host code. This turns out to be caused by starting new io-rw commands while
+the card signals that it is still busy processing a previous command.
 
+This commit adds card-busy detection to the sunxi-mmc driver which together
+with recent core changes to check card-busy before starting io-rw commands
+fixes the wifi reliability issues on the Cubietruck and other sunxi boards
+using sdio wifi.
+
+Reported-by: Eugene K <sigintmailru@gmail.com>
+Suggested-by: Eugene K <sigintmailru@gmail.com>
+Cc: Eugene K <sigintmailru@gmail.com>
+Cc: Arend van Spriel <arend@broadcom.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/mmc/core/core.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Changes in v2:
+-Properly accredit Eugene K for coming up with the fix for this
+Changes in v3:
+-Add card-busy detection and let the core decide when to actually use
+ card-busy the added detection
+---
+ drivers/mmc/host/sunxi-mmc.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 0520064..ced66b8 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -204,6 +204,23 @@ static void __mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
- 		return;
- 	}
- 
-+	/*
-+	 * For sdio rw commands we must wait for card busy otherwise some
-+	 * sdio devices won't work properly.
-+	 */
-+	if (mmc_is_io_op(mrq->cmd->opcode) && host->ops->card_busy) {
-+		int tries = 500; /* Wait aprox 500ms at maximum */
-+
-+		while (host->ops->card_busy(host) && --tries)
-+			mmc_delay(1);
-+
-+		if (tries == 0) {
-+			mrq->cmd->error = -EBUSY;
-+			mmc_request_done(host, mrq);
-+			return;
-+		}
-+	}
-+
- 	host->ops->request(host, mrq);
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index a7b7a67..e6226cd 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -868,6 +868,13 @@ static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
+ 	spin_unlock_irqrestore(&host->lock, iflags);
  }
  
++static int sunxi_mmc_card_busy(struct mmc_host *mmc)
++{
++	struct sunxi_mmc_host *host = mmc_priv(mmc);
++
++	return !!(mmc_readl(host, REG_STAS) & SDXC_CARD_DATA_BUSY);
++}
++
+ static const struct of_device_id sunxi_mmc_of_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-mmc", },
+ 	{ .compatible = "allwinner,sun5i-a13-mmc", },
+@@ -882,6 +889,7 @@ static struct mmc_host_ops sunxi_mmc_ops = {
+ 	.get_cd		 = mmc_gpio_get_cd,
+ 	.enable_sdio_irq = sunxi_mmc_enable_sdio_irq,
+ 	.hw_reset	 = sunxi_mmc_hw_reset,
++	.card_busy	 = sunxi_mmc_card_busy,
+ };
+ 
+ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
 -- 
 2.4.3
