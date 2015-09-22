@@ -1,34 +1,77 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 22 Sep 2015 17:18:33 +0100
-Subject: [PATCH 7/9] phy: fixed-phy: properly validate phy in
- fixed_phy_update_state()
+Date: Tue, 22 Sep 2015 17:18:43 +0100
+Subject: [PATCH 9/9] net: fix net_device refcounting
 In-Reply-To: <20150922161710.GA21084@n2100.arm.linux.org.uk>
 References: <20150922161710.GA21084@n2100.arm.linux.org.uk>
-Message-ID: <E1ZeQH3-0006Xy-MI@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZeQHD-0006YA-W4@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Validate that the phy_device passed into fixed_phy_update_state() is a
-fixed-phy device before walking the list of phys for a fixed phy at the
-same address.
+of_find_net_device_by_node() uses class_find_device() internally to
+lookup the corresponding network device.  class_find_device() returns
+a reference to the embedded struct device, with its refcount
+incremented.
+
+Add a comment to the definition in net/core/net-sysfs.c indicating the
+need to drop this refcount, and fix the DSA code to drop this refcount
+when the OF-generated platform data is cleaned up and freed.  Also
+arrange for the ref to be dropped when handling errors.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/phy/fixed_phy.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ net/core/net-sysfs.c | 9 +++++++++
+ net/dsa/dsa.c        | 5 ++++-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/net/phy/fixed_phy.c b/drivers/net/phy/fixed_phy.c
-index fb1299c6326e..e23bf5b90e17 100644
---- a/drivers/net/phy/fixed_phy.c
-+++ b/drivers/net/phy/fixed_phy.c
-@@ -220,7 +220,7 @@ int fixed_phy_update_state(struct phy_device *phydev,
- 	struct fixed_mdio_bus *fmb = &platform_fmb;
- 	struct fixed_phy *fp;
+diff --git a/net/core/net-sysfs.c b/net/core/net-sysfs.c
+index b279077c3089..805a95a48107 100644
+--- a/net/core/net-sysfs.c
++++ b/net/core/net-sysfs.c
+@@ -1481,6 +1481,15 @@ static int of_dev_node_match(struct device *dev, const void *data)
+ 	return ret == 0 ? dev->of_node == data : ret;
+ }
  
--	if (!phydev || !phydev->bus)
-+	if (!phydev || phydev->bus != fmb->mii_bus)
- 		return -EINVAL;
++/*
++ * of_find_net_device_by_node - lookup the net device for the device node
++ * @np: OF device node
++ *
++ * Looks up the net_device structure corresponding with the device node.
++ * If successful, returns a pointer to the net_device with the embedded
++ * struct device refcount incremented by one, or NULL on failure. The
++ * refcount must be dropped when done with the net_device.
++ */
+ struct net_device *of_find_net_device_by_node(struct device_node *np)
+ {
+ 	struct device *dev;
+diff --git a/net/dsa/dsa.c b/net/dsa/dsa.c
+index bf4ba15fb780..c59fa5d9c22c 100644
+--- a/net/dsa/dsa.c
++++ b/net/dsa/dsa.c
+@@ -679,7 +679,7 @@ static int dsa_of_probe(struct device *dev)
+ 	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
+ 	if (!pd) {
+ 		ret = -ENOMEM;
+-		goto out_put_mdio;
++		goto out_put_ethernet;
+ 	}
  
- 	list_for_each_entry(fp, &fmb->phys, node) {
+ 	dev->platform_data = pd;
+@@ -773,6 +773,8 @@ static int dsa_of_probe(struct device *dev)
+ out_free:
+ 	kfree(pd);
+ 	dev->platform_data = NULL;
++out_put_ethernet:
++	put_device(&ethernet_dev->dev);
+ out_put_mdio:
+ 	put_device(&mdio_bus->dev);
+ 	return ret;
+@@ -786,6 +788,7 @@ static void dsa_of_remove(struct device *dev)
+ 		return;
+ 
+ 	dsa_of_free_platform_data(pd);
++	put_device(&pd->of_netdev->dev);
+ 	kfree(pd);
+ }
+ #else
 -- 
 2.1.0
