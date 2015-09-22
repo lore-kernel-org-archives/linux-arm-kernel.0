@@ -1,29 +1,30 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 22 Sep 2015 19:52:27 +0200
-Subject: [PATCH v4 1/4] edac: Export edac_debugfs
-In-Reply-To: <CAPw-ZTnMfvAtoXz_dHsLnwEm4N63Tdb+4c7NE+oLw28v+ozd7g@mail.gmail.com>
-References: <1439534769-22811-1-git-send-email-lho@apm.com>
- <1439534769-22811-2-git-send-email-lho@apm.com>
- <20150922163405.GC3437@pd.tnic>
- <CAPw-ZTnMfvAtoXz_dHsLnwEm4N63Tdb+4c7NE+oLw28v+ozd7g@mail.gmail.com>
-Message-ID: <20150922175227.GA3568@pd.tnic>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 22 Sep 2015 18:52:12 +0100
+Subject: [PATCH 0/4] of: Handle multi-parent version of msi-parent
+Message-ID: <1442944336-11754-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 10:46:07AM -0700, Loc Ho wrote:
-> Let's me sync and give it a try. Do you see any other issue besides this?
+Now that we have a useable and documented version of msi-parent that
+can deal with multiple parenting, we can properly handle it in the
+kernel. This leads to a new OF helper, some rework in the PCI and
+platform layers, as well as a last patch for the ITS driver, which is
+the only thing in the kernel requirering this functionality so far.
 
-I replied to each message separately but they were all small nitpicks
-only.
+Patches on top of 4.3-rc2.
 
-Btw, I have the debugfs pile here if you want to base your stuff ontop:
+Marc Zyngier (4):
+  of: Add of_parse_phandle_with_opt_args() helper function
+  of: irq: Add support for the new definition of "msi-parent"
+  PCI/MSI: Add support for the new definition of "msi-parent"
+  irqchip/gic-v3-its: Parse new version of msi-parent property
 
-git://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git#edac-debugfs
-
-Thanks.
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c | 18 ++++++--
+ drivers/of/base.c                             | 64 ++++++++++++++++++++++++++-
+ drivers/of/irq.c                              | 26 +++++++----
+ drivers/pci/of.c                              | 25 ++++++++---
+ include/linux/of.h                            |  3 ++
+ 5 files changed, 115 insertions(+), 21 deletions(-)
 
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
+2.1.4
