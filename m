@@ -1,42 +1,50 @@
-From: rric@kernel.org (Robert Richter)
-Date: Tue, 22 Sep 2015 19:59:48 +0200
-Subject: [PATCH] arm64: Increase the max granular size
-Message-ID: <1442944788-17254-1-git-send-email-rric@kernel.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 22 Sep 2015 19:09:32 +0100
+Subject: [PATCH v5 0/6] irqchip, gicv3: Updates and Cavium ThunderX
+ errata workarounds
+In-Reply-To: <20150922175701.65ee4437@arm.com>
+References: <1442869119-1814-1-git-send-email-rric@kernel.org>
+ <20150922175701.65ee4437@arm.com>
+Message-ID: <20150922190932.4391652a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+On Tue, 22 Sep 2015 17:57:01 +0100
+Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-Increase the standard cacheline size to avoid having locks in the same
-cacheline.
+[Duh. Now with Will and Catalin on CC]
 
-Cavium's ThunderX core implements cache lines of 128 byte size. With
-current granulare size of 64 bytes (L1_CACHE_SHIFT=6) two locks could
-share the same cache line leading a performance degradation.
-Increasing the size fixes that.
+> On Mon, 21 Sep 2015 22:58:33 +0200
+> Robert Richter <rric@kernel.org> wrote:
+> 
+> > From: Robert Richter <rrichter@cavium.com>
+> > 
+> > This patch series adds gicv3 updates and workarounds for HW errata in
+> > Cavium's ThunderX GICV3.
+> > 
+> > The patches has been rebased onto 4.3-rc1. Note that there are two
+> > important fixes. See below for all changes.
+> > 
+> > The first one is an unchanged resubmission of a patch from a gicv3
+> > series I sent a while ago.
+> > 
+> > The next patches implement the workarounds for ThunderX's gicv3. Patch
+> > #2 implements the cpu workaround for gicv3 on ThunderX. Patch #3 is a
+> > prerequisit for patch #5. Patch #4 adds generic code to parse the hw
+> > revision provided by an IIDR. This patch is used for the implementa-
+> > tion of the actual gicv3-its workaround in #5. Patch #6 updates to the
+> > new jump label API.
+> > 
+> > All current review comments addressed so far with v5
+> 
+> Catalin, Will: assuming you don't have any objection to this series,
+> how do you want to deal with patch 2?
+> 
+> Thanks,
+> 
+> 	M.
 
-Increasing the size has no negative impact to cache invalidation on
-systems with a smaller cache line. There is an impact on memory usage,
-but that's not too important for arm64 use cases.
 
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- arch/arm64/include/asm/cache.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
-index bde449936e2f..5082b30bc2c0 100644
---- a/arch/arm64/include/asm/cache.h
-+++ b/arch/arm64/include/asm/cache.h
-@@ -18,7 +18,7 @@
- 
- #include <asm/cachetype.h>
- 
--#define L1_CACHE_SHIFT		6
-+#define L1_CACHE_SHIFT		7
- #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
- 
- /*
 -- 
-2.1.1
+Jazz is not dead. It just smells funny.
