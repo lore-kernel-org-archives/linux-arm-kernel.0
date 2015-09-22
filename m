@@ -1,297 +1,334 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 22 Sep 2015 17:54:50 +0200
-Subject: [PATCH 3/4] ARM: dts: sun8i: Add Allwinner A83T dtsi
-In-Reply-To: <1442936337-3104-4-git-send-email-vishnupatekar0510@gmail.com>
-References: <1442936337-3104-1-git-send-email-vishnupatekar0510@gmail.com>
- <1442936337-3104-4-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <20150922155450.GL4684@lukather>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 22 Sep 2015 17:57:52 +0200
+Subject: [PATCH v2] power: reset: at91-shdwc: add new shutdown controller
+ driver
+In-Reply-To: <20150922135925.GI23334@earth>
+References: <20150922135925.GI23334@earth>
+Message-ID: <1442937472-5481-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 11:38:56PM +0800, Vishnu Patekar wrote:
-> Allwinner A83T is new octa-core cortex-a7 SOC.
-> This adds the basic dtsi, the clocks differs from
-> earlier sun8i SOCs.
-> 
-> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-a83t.dtsi | 243 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 243 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun8i-a83t.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> new file mode 100644
-> index 0000000..f6ddd9c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> @@ -0,0 +1,243 @@
-> +/*
-> + * Copyright 2015 Vishnu Patekar
-> + *
-> + * Vishnu Patekar <vishnupatekar0510@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> +
-> + */
-> +
-> +#include "skeleton.dtsi"
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
-> +
-> +/ {
-> +	interrupt-parent = <&gic>;
-> +
-> +	chosen {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			compatible = "arm,cortex-a7";
-> +			device_type = "cpu";
-> +			reg = <0>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			compatible = "arm,cortex-a7";
-> +			device_type = "cpu";
-> +			reg = <1>;
-> +		};
-> +
-> +		cpu at 2 {
-> +			compatible = "arm,cortex-a7";
-> +			device_type = "cpu";
-> +			reg = <2>;
-> +		};
-> +
-> +		cpu at 3 {
-> +			compatible = "arm,cortex-a7";
-> +			device_type = "cpu";
-> +			reg = <3>;
-> +		};
-> +		cpu at 4 {
-> +			compatible = "arm,cortex-a7";
-> +			device_type = "cpu";
-> +			reg = <4>;
-> +		};
-> +
-> +		cpu at 5 {
-> +			compatible = "arm,cortex-a7";
-> +			device_type = "cpu";
-> +			reg = <5>;
-> +		};
-> +		cpu at 6 {
-> +			compatible = "arm,cortex-a7";
-> +			device_type = "cpu";
-> +			reg = <6>;
-> +		};
-> +
-> +		cpu at 7 {
-> +			compatible = "arm,cortex-a7";
-> +			device_type = "cpu";
-> +			reg = <7>;
-> +		};
-> +	};
-> +
-> +	memory {
-> +		reg = <0x40000000 0x80000000>;
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv7-timer";
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-> +		clock-frequency = <24000000>;
-> +		arm,cpu-registers-not-fw-configured;
-> +	};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		osc24M: osc24M_clk {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <24000000>;
-> +			clock-output-names = "osc24M";
-> +		};
-> +
-> +		osc32k: osc32k_clk {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <32768>;
-> +			clock-output-names = "osc32k";
-> +		};
-> +	};
-> +
-> +	soc at 01c00000 {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		pio: pinctrl at 01c20800 {
-> +			compatible = "allwinner,sun8i-a83t-pinctrl";
-> +			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
-> +			<GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
-> +			<GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
-> +			/* compatible gets set in SoC specific dtsi file */
+Sama5d2 SoC has a completely new shutdown controller with new features and
+register layout. It thus makes sense to add a new driver for this new
+peripheral.
 
-Which DTSI?
+This driver is Device Tree only and handles events from the wake-up pin and
+the RTC.
+As the register layout may change in the future, so some values are encoded
+in a configuration structure.
 
-> +			reg = <0x01c20800 0x400>;
-> +			/* interrupts get set in SoC specific dtsi file */
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
 
-Ditto
+Changes in v2:
+- add MODULE_DEVICE_TABLE as advised by Sebastian Reichel
+- review indentation and braces to correct errors pointed out by checkpatch
 
-> +			clocks = <&osc24M>;
-> +			gpio-controller;
-> +			interrupt-controller;
-> +			#interrupt-cells = <3>;
-> +			#gpio-cells = <3>;
-> +
-> +			uart0_pins_a: uart0 at 0 {
-> +				allwinner,pins = "PF2", "PF4";
-> +				allwinner,function = "uart0";
-> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
-> +
-> +			mmc0_pins_a: mmc0 at 0 {
-> +				allwinner,pins = "PF0", "PF1", "PF2",
-> +						 "PF3", "PF4", "PF5";
-> +				allwinner,function = "mmc0";
-> +				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
-> +
-> +			mmc1_pins_a: mmc1 at 0 {
-> +				allwinner,pins = "PG0", "PG1", "PG2",
-> +						 "PG3", "PG4", "PG5";
-> +				allwinner,function = "mmc1";
-> +				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
-> +
-> +			mmc2_8bit_pins: mmc2_8bit {
-> +				allwinner,pins = "PC5", "PC6", "PC8",
-> +						 "PC9", "PC10", "PC11",
-> +						 "PC12", "PC13", "PC14",
-> +						 "PC15";
-> +				allwinner,function = "mmc2";
-> +				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
-> +
-> +			i2c0_pins_a: i2c0 at 0 {
-> +				allwinner,pins = "PH0", "PH1";
-> +				allwinner,function = "i2c0";
-> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
-> +
-> +			i2c1_pins_a: i2c1 at 0 {
-> +				allwinner,pins = "PH2", "PH3";
-> +				allwinner,function = "i2c1";
-> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
-> +
-> +			i2c2_pins_a: i2c2 at 0 {
-> +				allwinner,pins = "PH4", "PH5";
-> +				allwinner,function = "i2c2";
-> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
+ drivers/power/reset/Kconfig      |   8 ++
+ drivers/power/reset/Makefile     |   1 +
+ drivers/power/reset/at91-shdwc.c | 263 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 272 insertions(+)
+ create mode 100644 drivers/power/reset/at91-shdwc.c
 
-Please order those by alphabetical order.
-
-> +		};
-> +
-> +		uart0: serial at 01c28000 {
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x01c28000 0x400>;
-> +			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&osc24M>;
-> +			status = "disabled";
-> +		};
-> +
-> +		gic: interrupt-controller at 01c81000 {
-> +			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
-> +			reg = <0x01c81000 0x1000>,
-> +			      <0x01c82000 0x1000>,
-> +			      <0x01c84000 0x2000>,
-> +			      <0x01c86000 0x2000>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <3>;
-> +			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> +		};
-> +
-> +	};
-> +};
-> -- 
-> 1.9.1
-> 
-
-Thanks!
-Maxime
-
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index 5a0189bf19bb..7f52bc938795 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -30,6 +30,14 @@ config POWER_RESET_AT91_RESET
+ 	  This driver supports restart for Atmel AT91SAM9 and SAMA5
+ 	  SoCs
+ 
++config POWER_RESET_AT91_SHDWC
++	bool "Atmel AT91 shutdown controller driver"
++	depends on ARCH_AT91
++	default SOC_SAMA5
++	help
++	  This driver supports poweroff for some Atmel SAMA5 SoCs. It is
++	  present for example on SAMA5D2 SoC.
++
+ config POWER_RESET_AXXIA
+ 	bool "LSI Axxia reset driver"
+ 	depends on ARCH_AXXIA
+diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+index 096fa67047f6..6b9020ed3fb7 100644
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@ -1,6 +1,7 @@
+ obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
+ obj-$(CONFIG_POWER_RESET_AT91_POWEROFF) += at91-poweroff.o
+ obj-$(CONFIG_POWER_RESET_AT91_RESET) += at91-reset.o
++obj-$(CONFIG_POWER_RESET_AT91_SHDWC) += at91-shdwc.o
+ obj-$(CONFIG_POWER_RESET_AXXIA) += axxia-reset.o
+ obj-$(CONFIG_POWER_RESET_BRCMSTB) += brcmstb-reboot.o
+ obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
+diff --git a/drivers/power/reset/at91-shdwc.c b/drivers/power/reset/at91-shdwc.c
+new file mode 100644
+index 000000000000..433824375243
+--- /dev/null
++++ b/drivers/power/reset/at91-shdwc.c
+@@ -0,0 +1,263 @@
++/*
++ * Atmel Shutdown Controller (SHDWC) driver
++ *
++ * Copyright (C) 2015 Atmel Corporation,
++ *                    Nicolas Ferre <nicolas.ferre@atmel.com>
++ *
++ * Evolved from driver at91-poweroff.c.
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * TODO:
++ * - addition to status of other wake-up inputs [1 - 15]
++ * - Analog Comparator wake-up alarm
++ * - Serial RX wake-up alarm
++ * - low power debouncer
++ */
++
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++
++#define SLOW_CLOCK_FREQ	32768
++
++#define AT91_SHDW_CR	0x00		/* Shut Down Control Register */
++#define AT91_SHDW_SHDW		BIT(0)			/* Shut Down command */
++#define AT91_SHDW_KEY		(0xa5 << 24)		/* KEY Password */
++
++#define AT91_SHDW_MR	0x04		/* Shut Down Mode Register */
++#define AT91_SHDW_WKUPDBC_SHIFT	24
++#define AT91_SHDW_WKUPDBC_MASK	GENMASK(31, 16)
++#define AT91_SHDW_WKUPDBC(x)	(((x) << AT91_SHDW_WKUPDBC_SHIFT) \
++						& AT91_SHDW_WKUPDBC_MASK)
++
++#define AT91_SHDW_SR	0x08		/* Shut Down Status Register */
++#define AT91_SHDW_WKUPIS_SHIFT	16
++#define AT91_SHDW_WKUPIS_MASK	GENMASK(31, 16)
++#define AT91_SHDW_WKUPIS(x)	((1 << (x)) << AT91_SHDW_WKUPIS_SHIFT \
++						& AT91_SHDW_WKUPIS_MASK)
++
++#define AT91_SHDW_WUIR	0x0c		/* Shutdown Wake-up Inputs Register */
++#define AT91_SHDW_WKUPEN_MASK	GENMASK(15, 0)
++#define AT91_SHDW_WKUPEN(x)	((1 << (x)) & AT91_SHDW_WKUPEN_MASK)
++#define AT91_SHDW_WKUPT_SHIFT	16
++#define AT91_SHDW_WKUPT_MASK	GENMASK(31, 16)
++#define AT91_SHDW_WKUPT(x)	((1 << (x)) << AT91_SHDW_WKUPT_SHIFT \
++						& AT91_SHDW_WKUPT_MASK)
++
++#define SHDW_WK_PIN(reg, cfg)	((reg) & AT91_SHDW_WKUPIS((cfg)->wkup_pin_input))
++#define SHDW_RTCWK(reg, cfg)	(((reg) >> ((cfg)->sr_rtcwk_shift)) & 0x1)
++#define SHDW_RTCWKEN(cfg)	(1 << ((cfg)->mr_rtcwk_shift))
++
++#define DBC_PERIOD_US(x)	DIV_ROUND_UP_ULL((1000000 * (x)), \
++							SLOW_CLOCK_FREQ)
++
++struct shdwc_config {
++	u8 wkup_pin_input;
++	u8 mr_rtcwk_shift;
++	u8 sr_rtcwk_shift;
++};
++
++struct shdwc {
++	struct shdwc_config *cfg;
++	void __iomem *at91_shdwc_base;
++};
++
++/*
++ * Hold configuration here, cannot be more than one instance of the driver
++ * since pm_power_off itself is global.
++ */
++static struct shdwc *at91_shdwc;
++
++static const unsigned long long sdwc_dbc_period[] = {
++	0, 3, 32, 512, 4096, 32768,
++};
++
++static void __init at91_wakeup_status(struct platform_device *pdev)
++{
++	struct shdwc *shdw = platform_get_drvdata(pdev);
++	u32 reg;
++	char *reason = "unknown";
++
++	reg = readl(shdw->at91_shdwc_base + AT91_SHDW_SR);
++
++	dev_dbg(&pdev->dev, "%s: status = %#x\n", __func__, reg);
++
++	/* Simple power-on, just bail out */
++	if (!reg)
++		return;
++
++	if (SHDW_WK_PIN(reg, shdw->cfg))
++		reason = "WKUP pin";
++	else if (SHDW_RTCWK(reg, shdw->cfg))
++		reason = "RTC";
++
++	pr_info("AT91: Wake-Up source: %s\n", reason);
++}
++
++static void at91_poweroff(void)
++{
++	BUG_ON(!at91_shdwc);
++
++	writel(AT91_SHDW_KEY | AT91_SHDW_SHDW,
++			at91_shdwc->at91_shdwc_base + AT91_SHDW_CR);
++}
++
++static u32 at91_shdwc_debouncer_value(struct platform_device *pdev,
++				      u32 in_period_us)
++{
++	int i;
++	int max_idx = ARRAY_SIZE(sdwc_dbc_period) - 1;
++	unsigned long long period_us;
++	unsigned long long max_period_us = DBC_PERIOD_US(sdwc_dbc_period[max_idx]);
++
++	if (in_period_us > max_period_us) {
++		dev_warn(&pdev->dev,
++			 "debouncer period %u too big, reduced to %llu us\n",
++			 in_period_us, max_period_us);
++		return max_idx;
++	}
++
++	for (i = max_idx - 1; i > 0; i--) {
++		period_us = DBC_PERIOD_US(sdwc_dbc_period[i]);
++		dev_dbg(&pdev->dev, "%s: ref[%d] = %llu\n",
++						__func__, i, period_us);
++		if (in_period_us > period_us)
++			break;
++	}
++
++	return i + 1;
++}
++
++static u32 at91_shdwc_get_wakeup_input(struct platform_device *pdev,
++				       struct device_node *np)
++{
++	struct device_node *cnp;
++	const char *pm;
++	u32 wk_input_mask;
++	u32 wuir = 0;
++	u32 wk_input;
++
++	for_each_child_of_node(np, cnp) {
++		if (of_property_read_u32(cnp, "reg", &wk_input)) {
++			dev_warn(&pdev->dev, "reg property is missing for %s\n",
++				 cnp->full_name);
++			continue;
++		}
++
++		wk_input_mask = 1 << wk_input;
++		if (!(wk_input_mask & AT91_SHDW_WKUPEN_MASK)) {
++			dev_warn(&pdev->dev,
++				 "wake-up input %d out of bounds ignore\n",
++				 wk_input);
++			continue;
++		}
++		wuir |= wk_input_mask;
++
++		if (!of_property_read_string(cnp, "atmel,wakeup-type", &pm)) {
++			if (!strcasecmp(pm, "high"))
++				/*
++				 * only add a type if "high" is specified. Low
++				 * is the default.
++				 */
++				wuir |= AT91_SHDW_WKUPT(wk_input);
++		}
++		dev_dbg(&pdev->dev, "%s: (child %d) wuir = %#x\n",
++						__func__, wk_input, wuir);
++	}
++
++	return wuir;
++}
++
++static void at91_shdwc_dt_configure(struct platform_device *pdev)
++{
++	struct shdwc *shdw = platform_get_drvdata(pdev);
++	struct device_node *np = pdev->dev.of_node;
++	u32 mode = 0, tmp, input;
++
++	if (!np) {
++		dev_err(&pdev->dev, "device node not found\n");
++		return;
++	}
++
++	if (!of_property_read_u32(np, "atmel,shdwc-debouncer", &tmp))
++		mode |= AT91_SHDW_WKUPDBC(at91_shdwc_debouncer_value(pdev, tmp));
++
++	if (of_property_read_bool(np, "atmel,wakeup-rtc-timer"))
++		mode |= SHDW_RTCWKEN(shdw->cfg);
++
++	dev_dbg(&pdev->dev, "%s: mode = %#x\n", __func__, mode);
++	writel(mode, shdw->at91_shdwc_base + AT91_SHDW_MR);
++
++	input = at91_shdwc_get_wakeup_input(pdev, np);
++	writel(input, shdw->at91_shdwc_base + AT91_SHDW_WUIR);
++}
++
++static const struct shdwc_config sama5d2_shdwc_config = {
++	.wkup_pin_input = 0,
++	.mr_rtcwk_shift = 17,
++	.sr_rtcwk_shift = 5,
++};
++
++static const struct of_device_id at91_shdwc_of_match[] = {
++	{
++		.compatible = "atmel,sama5d2-shdwc",
++		.data = &sama5d2_shdwc_config,
++	}, {
++		/*sentinel*/
++	}
++};
++MODULE_DEVICE_TABLE(of, at91_shdwc_of_match);
++
++static int at91_shdwc_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	const struct of_device_id *match;
++
++	if (!pdev->dev.of_node)
++		return -ENODEV;
++
++	at91_shdwc = devm_kzalloc(&pdev->dev, sizeof(*at91_shdwc), GFP_KERNEL);
++	if (!at91_shdwc)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, at91_shdwc);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	at91_shdwc->at91_shdwc_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(at91_shdwc->at91_shdwc_base)) {
++		dev_err(&pdev->dev, "Could not map reset controller address\n");
++		return PTR_ERR(at91_shdwc->at91_shdwc_base);
++	}
++
++	match = of_match_node(at91_shdwc_of_match, pdev->dev.of_node);
++	if (match != NULL)
++		at91_shdwc->cfg = (struct shdwc_config *)(match->data);
++	else
++		return -ENODATA;
++
++	at91_wakeup_status(pdev);
++
++	at91_shdwc_dt_configure(pdev);
++
++	pm_power_off = at91_poweroff;
++
++	return 0;
++}
++
++static struct platform_driver at91_shdwc_driver = {
++	.probe = at91_shdwc_probe,
++	.driver = {
++		.name = "at91-shdwc",
++		.of_match_table = at91_shdwc_of_match,
++	},
++};
++module_platform_driver(at91_shdwc_driver);
++
++MODULE_AUTHOR("Nicolas Ferre <nicolas.ferre@atmel.com>");
++MODULE_DESCRIPTION("Atmel shutdown controller driver");
++MODULE_LICENSE("GPL v2");
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/c9207b63/attachment-0001.sig>
+2.1.3
