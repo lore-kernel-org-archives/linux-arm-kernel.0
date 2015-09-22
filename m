@@ -1,45 +1,78 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 22 Sep 2015 16:28:48 +0200
-Subject: [PATCH 1/5] ARM: dts: sun5i: Add PWM controller node for A13/A10s
-In-Reply-To: <1442752251-20744-2-git-send-email-hdegoede@redhat.com>
-References: <1442752251-20744-1-git-send-email-hdegoede@redhat.com>
- <1442752251-20744-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150922142848.GC4684@lukather>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 22 Sep 2015 17:29:00 +0300
+Subject: [RFC PATCH 14/20] coresight: etm-perf: implementing
+ 'event_init()' API
+In-Reply-To: <1442593594-10665-15-git-send-email-mathieu.poirier@linaro.org>
+References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
+ <1442593594-10665-15-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <87eghq4jf7.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 20, 2015 at 08:30:47AM -0400, Hans de Goede wrote:
-> The sun5i die has a PWM controller that is compatible to the one on the A20.
-> Add a device node for it.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sun5i.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-> index 78b993a..5e036a4 100644
-> --- a/arch/arm/boot/dts/sun5i.dtsi
-> +++ b/arch/arm/boot/dts/sun5i.dtsi
-> @@ -543,6 +543,14 @@
->  			reg = <0x01c20c90 0x10>;
->  		};
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+
+> +static void etm_event_destroy(struct perf_event *event)
+> +{
+> +	/* switching off the source will also tear down the path */
+> +	etm_event_power_sources(event->cpu, false);
+> +}
+> +
+> +static int etm_event_init(struct perf_event *event)
+> +{
+> +	int ret;
+> +
+> +	if (event->attr.type != etm_pmu.type)
+> +		return -ENOENT;
+> +
+> +	if (event->cpu >= nr_cpu_ids)
+> +		return -EINVAL;
+> +
+> +	/* only one session at a time */
+> +	if (etm_event_source_enabled(event->cpu))
+> +		return -EBUSY;
+
+Why is this the case? If you were to configure the event in pmu::add()
+and deconfigure it in pmu::del(), like you already do with the buffer
+part, you could handle as many sessions as you want.
+
+> +
+> +	/*
+> +	 * Make sure CPUs don't disappear between the
+> +	 * power up sequence and configuration.
+> +	 */
+> +	get_online_cpus();
+> +	ret = etm_event_power_sources(event->cpu, true);
+> +	if (ret)
+> +		goto out;
+> +
+> +	ret = etm_event_config_sources(event->cpu);
+
+This can be done in pmu::add(), if you can call directly into
+etm_configure_cpu() or etm_config_enable() so that there's no cross-cpu
+calling in between.
+
+> +
+> +	event->destroy = etm_event_destroy;
+> +out:
+> +	put_online_cpus();
+> +	return ret;
+> +}
+> +
+>  static int __init etm_perf_init(void)
+>  {
+>  	etm_pmu.capabilities	= PERF_PMU_CAP_EXCLUSIVE;
+> @@ -59,6 +234,7 @@ static int __init etm_perf_init(void)
+>  	etm_pmu.attr_groups	= etm_pmu_attr_groups;
+>  	etm_pmu.task_ctx_nr	= perf_sw_context;
+>  	etm_pmu.read		= etm_event_read;
+> +	etm_pmu.event_init	= etm_event_init;
 >  
-> +		pwm: pwm at 01c20e00 {
-> +			compatible = "allwinner,sun7i-a20-pwm";
+>  	return perf_pmu_register(&etm_pmu, CORESIGHT_ETM_PMU_NAME, -1);
+>  }
 
-Is it? IIRC, it has a single channel, while the A20 has two.
+One general comment -- it would be slightly easier at least for me if
+all the pmu related bits were in one patch.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/25c630ac/attachment.sig>
+Thanks,
+--
+Alex
