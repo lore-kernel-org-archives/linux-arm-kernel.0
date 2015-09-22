@@ -1,38 +1,29 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 22 Sep 2015 10:46:43 -0700
-Subject: [PATCH v2 2/5] PM / OPP: Support adjusting OPP voltages at runtime
-In-Reply-To: <20150922165041.GG24314@linux>
-References: <1442623929-4507-1-git-send-email-sboyd@codeaurora.org>
- <1442623929-4507-3-git-send-email-sboyd@codeaurora.org>
- <20150922165041.GG24314@linux>
-Message-ID: <20150922174643.GJ23081@codeaurora.org>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 22 Sep 2015 19:52:27 +0200
+Subject: [PATCH v4 1/4] edac: Export edac_debugfs
+In-Reply-To: <CAPw-ZTnMfvAtoXz_dHsLnwEm4N63Tdb+4c7NE+oLw28v+ozd7g@mail.gmail.com>
+References: <1439534769-22811-1-git-send-email-lho@apm.com>
+ <1439534769-22811-2-git-send-email-lho@apm.com>
+ <20150922163405.GC3437@pd.tnic>
+ <CAPw-ZTnMfvAtoXz_dHsLnwEm4N63Tdb+4c7NE+oLw28v+ozd7g@mail.gmail.com>
+Message-ID: <20150922175227.GA3568@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22, Viresh Kumar wrote:
-> On 18-09-15, 17:52, Stephen Boyd wrote:
-> >  /**
-> > + * dev_pm_opp_adjust_voltage() - helper to change the voltage of an OPP
-> > + * @dev:		device for which we do this operation
-> > + * @freq:		OPP frequency to adjust voltage of
-> > + * @u_volt:		new OPP voltage
-> > + *
-> > + * Change the voltage of an OPP with an RCU operation.
-> > + *
-> > + * Return: -EINVAL for bad pointers, -ENOMEM if no memory available for the
-> > + * copy operation, returns 0 if no modifcation was done OR modification was
-> 
->                                       modification
-> 
-> > + * successful.
-> 
-> Otherwise,
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> 
+On Tue, Sep 22, 2015 at 10:46:07AM -0700, Loc Ho wrote:
+> Let's me sync and give it a try. Do you see any other issue besides this?
 
-This typo is all over the file! I'll send a patch for that too.
+I replied to each message separately but they were all small nitpicks
+only.
+
+Btw, I have the debugfs pile here if you want to base your stuff ontop:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git#edac-debugfs
+
+Thanks.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
