@@ -1,165 +1,115 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 22 Sep 2015 18:00:53 +0200
-Subject: [PATCH 4/4] ARM: dts: sun8i: Add A83T HomletV2 Board by Allwinner
-In-Reply-To: <1442936337-3104-5-git-send-email-vishnupatekar0510@gmail.com>
-References: <1442936337-3104-1-git-send-email-vishnupatekar0510@gmail.com>
- <1442936337-3104-5-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <20150922160053.GM4684@lukather>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 22 Sep 2015 17:05:49 +0100
+Subject: [PATCH 3/3] PCI: generic: Add support for Cavium ThunderX PCIe
+ root complexes.
+In-Reply-To: <1442529694-1792-4-git-send-email-ddaney.cavm@gmail.com>
+References: <1442529694-1792-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442529694-1792-4-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150922160549.GE17444@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 11:38:57PM +0800, Vishnu Patekar wrote:
-> H8Homlet Proto v2.0 Board is A83T Dev Board by Allwinner.
-> It has UART, ethernet, USB, HDMI, etc ports on it.
+On Thu, Sep 17, 2015 at 11:41:34PM +0100, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
 > 
-> It's name is confusing, Its A83T board however,"H8_HOMLET_PROTO_V2"
-> printed on board.
+> The config space for external PCIe root complexes on some Cavium
+> ThunderX SoCs is very similar to CAM and ECAM, but differs in the
+> shift values that have to be applied to the bus and devfn numbers to
+> compose that address window offset.  These root complexes also have
+> the interesting property that there is no root bridge, so the standard
+> manner of limiting scanning to only the first device doesn't work.  We
+> can use the standard pci-host-generic driver if we make a minor
+> addition to handle these differences, so we...
 > 
-> A83T patches are tested on this board.
-> It has UART, ethernet, USB, HDMI, etc ports on it.
+> Add a mapping function for ThunderX PCIe root complexes with a bus
+> shift of 24 and devfn shift of 16.  Ignore accesses for devices other
+> than the first device on the primary bus.
 > 
-> For FEL mode it needs USB A-A(Male) cable. I used uart0 which
-> is multiplexed to microsd pins PF2 and PF4.
-
-Is there no other UART on the device?
-
+> Document the whole thing in devicetree/bindings/pci/host-generic-pci.txt
 > 
-> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+> Signed-off-by: David Daney <david.daney@cavium.com>
 > ---
->  arch/arm/boot/dts/Makefile                         |  5 +-
->  .../boot/dts/sun8i-a83t-allwinner-homlet-v20.dts   | 69 ++++++++++++++++++++++
->  2 files changed, 72 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/boot/dts/sun8i-a83t-allwinner-homlet-v20.dts
+>  .../devicetree/bindings/pci/host-generic-pci.txt   |  8 +++---
+>  drivers/pci/host/pci-host-generic.c                | 29 ++++++++++++++++++++++
+>  2 files changed, 34 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index b276174..9585a58 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -634,7 +634,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
->  	sun8i-a33-ga10h-v1.1.dtb \
->  	sun8i-a33-ippo-q8h-v1.2.dtb \
->  	sun8i-a33-q8-tzx-723q4.dtb \
-> -	sun8i-a33-sinlinx-sina33.dtb
-> +	sun8i-a33-sinlinx-sina33.dtb \
-> +	sun8i-a83t-allwinner-homlet-v20.dtb
+> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> index 105a968..a5aed0f 100644
+> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> @@ -14,9 +14,11 @@ tree bindings communicated in pci.txt:
+>  
+>  Properties of the host controller node:
+>  
+> -- compatible     : Must be "pci-host-cam-generic" or "pci-host-ecam-generic"
+> -                   depending on the layout of configuration space (CAM vs
+> -                   ECAM respectively).
+> +- compatible     : One of the following with bus:devfn:reg mapped to the
+> +                   PCI config space address window in the bit positions shown:
+> +                   "pci-host-cam-generic" -- 'CAM'  bits 16:8:0
+> +                   "pci-host-ecam-generic" -- 'ECAM'  bits 20:12:0
+> +                   "cavium,pci-host-thunder-pem" --  bits 24:16:0
 
-we probably want to mention the h8 in here too, and the v2 is enough.
+To me that's ECAM left shifted by 4. Is not it just a matter of defining
+config space base address (ie reg property) differently ?
 
->  dtb-$(CONFIG_MACH_SUN9I) += \
->  	sun9i-a80-optimus.dtb \
->  	sun9i-a80-cubieboard4.dtb
-> @@ -679,7 +680,7 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
->  	uniphier-ph1-ld6b-ref.dtb \
->  	uniphier-ph1-pro4-ref.dtb \
->  	uniphier-ph1-sld3-ref.dtb \
-> -	uniphier-ph1-sld8-ref.dtb 
-> +	uniphier-ph1-sld8-ref.dtb
+Lorenzo
 
-Uh ?
-
->  dtb-$(CONFIG_ARCH_VERSATILE) += \
->  	versatile-ab.dtb \
->  	versatile-pb.dtb
-> diff --git a/arch/arm/boot/dts/sun8i-a83t-allwinner-homlet-v20.dts b/arch/arm/boot/dts/sun8i-a83t-allwinner-homlet-v20.dts
-> new file mode 100644
-> index 0000000..bbc2ab9
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun8i-a83t-allwinner-homlet-v20.dts
-> @@ -0,0 +1,69 @@
-> +/*
-> + * Copyright 2015 Vishnu Patekar
-> + * Vishnu Patekar <vishnupatekar0510@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
+>  
+>  - device_type    : Must be "pci".
+>  
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index e364232..e1d8d5b 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -91,6 +91,32 @@ static struct gen_pci_cfg_bus_ops gen_pci_cfg_ecam_bus_ops = {
+>  	}
+>  };
+>  
+> +static void __iomem *gen_pci_map_cfg_bus_thunder_pem(struct pci_bus *bus,
+> +						     unsigned int devfn,
+> +						     int where)
+> +{
+> +	struct gen_pci *pci = bus->sysdata;
+> +	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
 > +
-> +/dts-v1/;
-> +#include "sun8i-a83t.dtsi"
+> +	/*
+> +	 * Thunder PEM is a PCIe RC, but without a root bridge.  On
+> +	 * the primary bus, ignore accesses for devices other than
+> +	 * the first device.
+> +	 */
+> +	if (idx == 0 && (devfn & ~7u))
+> +		return NULL;
+> +	return pci->cfg.win[idx] + ((devfn << 16) | where);
+> +}
 > +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
-
-Do you need those headers?
-
-> +
-> +/ {
-> +	model = "Allwinner A83T H8Homlet Proto Dev Board v2.0";
-> +	compatible = "allwinner,homletv2", "allwinner,sun8i-a83t";
-
-                                ^ Please add a dash here
-
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +		bootargs = "earlyprintk console=ttyS0,115200";
-
-console is useless here, and please remove earlyprintk. It will make
-your kernel crash if the image is configured for another SoC.
-
-> +	};
+> +static struct gen_pci_cfg_bus_ops gen_pci_cfg_thunder_pem_bus_ops = {
+> +	.bus_shift	= 24,
+> +	.ops		= {
+> +		.map_bus	= gen_pci_map_cfg_bus_thunder_pem,
+> +		.read		= pci_generic_config_read,
+> +		.write		= pci_generic_config_write,
+> +	}
 > +};
 > +
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_pins_a>;
-> +	status = "okay";
-> +};
+>  static const struct of_device_id gen_pci_of_match[] = {
+>  	{ .compatible = "pci-host-cam-generic",
+>  	  .data = &gen_pci_cfg_cam_bus_ops },
+> @@ -98,6 +124,9 @@ static const struct of_device_id gen_pci_of_match[] = {
+>  	{ .compatible = "pci-host-ecam-generic",
+>  	  .data = &gen_pci_cfg_ecam_bus_ops },
+>  
+> +	{ .compatible = "cavium,pci-host-thunder-pem",
+> +	  .data = &gen_pci_cfg_thunder_pem_bus_ops },
+> +
+>  	{ },
+>  };
+>  MODULE_DEVICE_TABLE(of, gen_pci_of_match);
 > -- 
 > 1.9.1
 > 
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/dd88d029/attachment.sig>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
