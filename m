@@ -1,24 +1,24 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 22 Sep 2015 15:36:01 +0200
-Subject: [PATCH 2/6] ARM: dts: sun7i: Enable USB DRC on Bananapi
+Date: Tue, 22 Sep 2015 15:36:02 +0200
+Subject: [PATCH 3/6] ARM: dts: sun7i: Enable USB DRC on orangepi-mini
 In-Reply-To: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
 References: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1442928966-6418-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1442928966-6418-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the otg/drc usb controller on the Bananapi.
+Enable the otg/drc usb controller on the orangepi-mini.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun7i-a20-bananapi.dts | 29 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts | 29 +++++++++++++++++++++++++++
  1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-index 74382f3..61436ad 100644
---- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-@@ -159,7 +159,18 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts b/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts
+index 73cd81ee..4f65664 100644
+--- a/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts
++++ b/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts
+@@ -156,7 +156,18 @@
  	status = "okay";
  };
  
@@ -34,10 +34,10 @@ index 74382f3..61436ad 100644
 +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
 +	};
 +
- 	mmc0_cd_pin_bananapi: mmc0_cd_pin at 0 {
+ 	mmc0_cd_pin_orangepi: mmc0_cd_pin at 0 {
  		allwinner,pins = "PH10";
  		allwinner,function = "gpio_in";
-@@ -209,6 +220,10 @@
+@@ -225,6 +236,10 @@
  	regulator-name = "avcc";
  };
  
@@ -46,8 +46,8 @@ index 74382f3..61436ad 100644
 +};
 +
  &reg_usb1_vbus {
- 	status = "okay";
- };
+ 	pinctrl-0 = <&usb1_vbus_pin_bananapro>;
+ 	gpio = <&pio 7 26 GPIO_ACTIVE_HIGH>; /* PH26 */
 @@ -243,7 +258,21 @@
  	status = "okay";
  };
