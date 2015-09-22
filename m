@@ -1,43 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Sep 2015 16:52:52 +0100
-Subject: [PATCH] generic syscalls: wire up userfaultfd syscall
-In-Reply-To: <1442919139-18027-1-git-send-email-andre.przywara@arm.com>
-References: <1442919139-18027-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20150922155251.GJ7356@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 22 Sep 2015 17:51:52 +0200
+Subject: [PATCH 1/4] ARM: sunxi: Introduce Allwinner for A83T support
+In-Reply-To: <1442936337-3104-2-git-send-email-vishnupatekar0510@gmail.com>
+References: <1442936337-3104-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1442936337-3104-2-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <20150922155152.GJ4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 11:52:19AM +0100, Andre Przywara wrote:
-> Enable the new userfaultfd syscall in the generic syscall table.
-> Briefly tested on arm64 with the selftest from the tools directory.
+Hi,
 
-Can you update the selftest too, please? Last time I looked at that it had
-typo for the powerpc check and looked pretty unloved...
-
-Will
-
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+On Tue, Sep 22, 2015 at 11:38:54PM +0800, Vishnu Patekar wrote:
+> Allwinner A83T is octa-core cortex-a7 based SoC.
+> It's clock control unit and prcm, pinmux are different from previous sun8i
+> series.
+> Its processor cores are arragned in two clusters 4 cores each,
+> similar to A80.
+> 
+> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 > ---
->  include/uapi/asm-generic/unistd.h | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+>  arch/arm/mach-sunxi/sunxi.c                     | 1 +
+>  drivers/clk/sunxi/clk-sunxi.c                   | 6 ++++++
+>  3 files changed, 8 insertions(+)
 > 
-> diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
-> index 8da542a..82c91bc 100644
-> --- a/include/uapi/asm-generic/unistd.h
-> +++ b/include/uapi/asm-generic/unistd.h
-> @@ -711,9 +711,11 @@ __SYSCALL(__NR_bpf, sys_bpf)
->  __SC_COMP(__NR_execveat, sys_execveat, compat_sys_execveat)
->  #define __NR_membarrier 282
->  __SYSCALL(__NR_membarrier, sys_membarrier)
-> +#define __NR_userfaultfd 283
-> +__SYSCALL(__NR_userfaultfd, sys_userfaultfd)
+> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+> index 67da205..cf5ed27 100644
+> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+> @@ -11,4 +11,5 @@ using one of the following compatible strings:
+>    allwinner,sun8i-a23
+>    allwinner,sun8i-a33
+>    allwinner,sun8i-h3
+> +  allwinner,sun8i-a83t
+>    allwinner,sun9i-a80
+> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> index 65bab28..b04aefa 100644
+> --- a/arch/arm/mach-sunxi/sunxi.c
+> +++ b/arch/arm/mach-sunxi/sunxi.c
+> @@ -69,6 +69,7 @@ static const char * const sun8i_board_dt_compat[] = {
+>  	"allwinner,sun8i-a23",
+>  	"allwinner,sun8i-a33",
+>  	"allwinner,sun8i-h3",
+> +	"allwinner,sun8i-a83t",
+>  	NULL,
+>  };
 >  
->  #undef __NR_syscalls
-> -#define __NR_syscalls 283
-> +#define __NR_syscalls 284
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 413070d..f216d5d 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -1212,6 +1212,12 @@ CLK_OF_DECLARE(sun6i_a31s_clk_init, "allwinner,sun6i-a31s", sun6i_init_clocks);
+>  CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
+>  CLK_OF_DECLARE(sun8i_a33_clk_init, "allwinner,sun8i-a33", sun6i_init_clocks);
 >  
->  /*
->   * All syscalls below here should go away really,
-> -- 
-> 2.5.1
-> 
+> +static void __init sun8ia83t_init_clocks(struct device_node *node)
+
+Having an underscore between sun8i and a83t would be great :)
+
+> +{
+> +	sunxi_init_clocks(NULL, 0);
+> +}
+> +CLK_OF_DECLARE(sun9i_a83t_clk_init, "allwinner,sun8i-a83t", sun8ia83t_init_clocks);
+
+                  ^ Is this a sun9i or sun8i SoC ?
+
+Is the list of protected clocks always going to be empty, or will you
+add some new clocks in that list in the future?
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/ecdd8627/attachment-0001.sig>
