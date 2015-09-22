@@ -1,81 +1,41 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 22 Sep 2015 16:49:12 -0700
-Subject: [PATCH v3 1/6] PCI: Add pci_bus_fixup_irqs().
+Date: Tue, 22 Sep 2015 16:49:16 -0700
+Subject: [PATCH v3 5/6] PCI: generic: Pass proper starting bus number to
+ pci_scan_root_bus().
 In-Reply-To: <1442965757-12925-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1442965757-12925-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1442965757-12925-2-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1442965757-12925-6-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-pci_bus_fixup_irqs() works like pci_fixup_irqs(), except it only does
-the fixups for devices on the specified bus.
+If the bus is being configured with a bus-range that does not start at
+zero, pass that starting bus number to pci_scan_root_bus().  Passing
+the incorrect value of zero causes attempted config accesses outside
+of the supported range, which cascades to an OOPs spew and eventual
+kernel panic.
 
-Follow-on patch will use the new function.
-
+Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
-No change from v2.
+No change from v1 or v2.
 
-This patch didn't exist in v1 of the set.
+ drivers/pci/host/pci-host-generic.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/pci/setup-irq.c | 30 ++++++++++++++++++++++++++++++
- include/linux/pci.h     |  4 ++++
- 2 files changed, 34 insertions(+)
-
-diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
-index 95c225b..189ad17 100644
---- a/drivers/pci/setup-irq.c
-+++ b/drivers/pci/setup-irq.c
-@@ -66,3 +66,33 @@ void pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
- 		pdev_fixup_irq(dev, swizzle, map_irq);
- }
- EXPORT_SYMBOL_GPL(pci_fixup_irqs);
-+
-+struct pci_bus_fixup_cb_info {
-+	u8 (*swizzle)(struct pci_dev *, u8 *);
-+	int (*map_irq)(const struct pci_dev *, u8, u8);
-+};
-+
-+static int pci_bus_fixup_irq_cb(struct pci_dev *dev, void *arg)
-+{
-+	struct pci_bus_fixup_cb_info *info = arg;
-+
-+	pdev_fixup_irq(dev, info->swizzle, info->map_irq);
-+	return 0;
-+}
-+
-+/*
-+ * Fixup the irqs only for devices on the given bus using supplied
-+ * swizzle and map_irq function pointers
-+ */
-+void pci_bus_fixup_irqs(struct pci_bus *bus,
-+			u8 (*swizzle)(struct pci_dev *, u8 *),
-+			int (*map_irq)(const struct pci_dev *, u8, u8))
-+{
-+	struct pci_bus_fixup_cb_info info;
-+
-+	info.swizzle = swizzle;
-+	info.map_irq = map_irq;
-+	pci_walk_bus(bus, pci_bus_fixup_irq_cb, &info);
-+
-+}
-+EXPORT_SYMBOL_GPL(pci_bus_fixup_irqs);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index e90eb22..b505b50 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1120,6 +1120,10 @@ void pdev_enable_device(struct pci_dev *);
- int pci_enable_resources(struct pci_dev *, int mask);
- void pci_fixup_irqs(u8 (*)(struct pci_dev *, u8 *),
- 		    int (*)(const struct pci_dev *, u8, u8));
-+void pci_bus_fixup_irqs(struct pci_bus *,
-+			u8 (*)(struct pci_dev *, u8 *),
-+			int (*)(const struct pci_dev *, u8, u8));
-+
- #define HAVE_PCI_REQ_REGIONS	2
- int __must_check pci_request_regions(struct pci_dev *, const char *);
- int __must_check pci_request_regions_exclusive(struct pci_dev *, const char *);
+diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+index 0a9c453..e364232 100644
+--- a/drivers/pci/host/pci-host-generic.c
++++ b/drivers/pci/host/pci-host-generic.c
+@@ -259,7 +259,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+ 	if (!pci_has_flag(PCI_PROBE_ONLY))
+ 		pci_add_flags(PCI_REASSIGN_ALL_RSRC | PCI_REASSIGN_ALL_BUS);
+ 
+-	bus = pci_scan_root_bus(dev, 0,
++	bus = pci_scan_root_bus(dev, pci->cfg.bus_range->start,
+ 				&pci->cfg.ops.ops, pci, &pci->resources);
+ 	if (!bus) {
+ 		dev_err(dev, "Scanning rootbus failed");
 -- 
 1.9.1
