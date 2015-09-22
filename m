@@ -1,25 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 22 Sep 2015 09:24:17 -0700
-Subject: next-20150922 build: 1 failures 346 warnings (next-20150922)
-In-Reply-To: <E1ZeORj-0001FG-G8@optimist>
-References: <E1ZeORj-0001FG-G8@optimist>
-Message-ID: <20150922162417.GI30445@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Sep 2015 17:26:34 +0100
+Subject: [PATCH v2] iommu/io-pgtable-arm: Don't use dma_to_phys()
+In-Reply-To: <56018074.2010104@arm.com>
+References: <59f4ebbf06e75a6176a366495211afd16d0048a3.1442507940.git.robin.murphy@arm.com>
+ <1442566550.8145.156.camel@mhfsdcap03> <55FBEFBA.6000606@arm.com>
+ <1442928308.17514.3.camel@mhfsdcap03> <56018074.2010104@arm.com>
+Message-ID: <20150922162633.GL7356@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 03:21:29PM +0100, Build bot for Mark Brown wrote:
+On Tue, Sep 22, 2015 at 05:23:16PM +0100, Robin Murphy wrote:
+> On 22/09/15 14:25, Yong Wu wrote:
+> [...]
+> > About here:
+> >> @@ -629,6 +626,11 @@ arm_lpae_alloc_pgtable(struct io_pgtable_cfg
+> > *cfg)
+> >>        if (cfg->oas > ARM_LPAE_MAX_ADDR_BITS)
+> >>                return NULL;
+> >>   
+> >> +     if (cfg->iommu_dev->dma_pfn_offset) {
+> > 
+> > Do we need change to :
+> > 	if (!selftest_running && cfg->iommu_dev->dma_pfn_offset) {
+> > 
+> > cfg->iommu_dev will be null while self test.
+> 
+> Urgh, you're absolutely right. Must have been one of those days when I
+> had loads of noisy debug in there and turned the self-tests off :(
+> 
+> Will; since the branch hasn't gone anywhere yet, are you OK to take the below?
 
-Today's -next fails to build an arm allmodconfig due to:
+Yeah, no problem. I'll fold it in when I get a chance.
 
-> 	arm-allmodconfig
-> ../drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c:315:3: error: implicit declaration of function 'readq' [-Werror=implicit-function-declaration]
-
-due to 511e6bc071db148 (net: add Hisilicon Network Subsystem DSAF
-support) in the networking tree.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/c08fd949/attachment.sig>
+Will
