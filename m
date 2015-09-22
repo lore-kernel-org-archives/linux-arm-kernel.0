@@ -1,20 +1,25 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 Sep 2015 19:49:04 +0100
-Subject: [RFC PATCH v5 1/4] genirq: introduce CONFIG_GENERIC_IRQ_MIGRATION
-In-Reply-To: <1442631959-10228-2-git-send-email-yangyingliang@huawei.com>
+Date: Tue, 22 Sep 2015 19:50:37 +0100
+Subject: [RFC PATCH v5 4/4] arm: fix a migrating irq bug when hotplug cpu
+In-Reply-To: <1442631959-10228-5-git-send-email-yangyingliang@huawei.com>
 References: <1442631959-10228-1-git-send-email-yangyingliang@huawei.com>
- <1442631959-10228-2-git-send-email-yangyingliang@huawei.com>
-Message-ID: <20150922194904.613cfc15@arm.com>
+ <1442631959-10228-5-git-send-email-yangyingliang@huawei.com>
+Message-ID: <20150922195037.472b404c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 19 Sep 2015 11:05:56 +0800
+On Sat, 19 Sep 2015 11:05:59 +0800
 Yang Yingliang <yangyingliang@huawei.com> wrote:
 
-> Introduce a more general config for compile kernel/irq/migration.c.
-> Move the CONFIG_GENERIC_PENDING_IRQ into migration.c. So we can
-> move other migration interrupts code into migration.c without
-> select CONFIG_GENERIC_PENDING_IRQ.
+> When cpu is disabled, all irqs will be migratged to another cpu.
+> In some cases, a new affinity is different, it needed to be coppied
+> to irq's affinity. But if the type of irq is LPI, it's affinity will
+> not be coppied because of irq_set_affinity's return value. Fix it by
+> using irq_do_set_affinity.
+> 
+> And migrating interrupts is a core code matter, so use the generic
+> function irq_migrate_all_off_this_cpu() to migrate interrupts in
+> kernel/irq/migration.c.
 > 
 > Cc: Jiang Liu <jiang.liu@linux.intel.com>
 > Cc: Thomas Gleixner <tglx@linutronix.de>
