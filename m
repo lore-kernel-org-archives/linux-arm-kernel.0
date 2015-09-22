@@ -1,44 +1,131 @@
-From: LeoLi@freescale.com (Li Leo)
-Date: Tue, 22 Sep 2015 17:23:14 +0000
-Subject: [PATCH 4/6] arm64/ls1043a: add DTS for Freescale LS1043A SoC
-In-Reply-To: <CY1PR0301MB078008B10188504C951076498B450@CY1PR0301MB0780.namprd03.prod.outlook.com>
-References: <1442838158-2964-1-git-send-email-B48286@freescale.com>
- <1442838158-2964-5-git-send-email-B48286@freescale.com>
- <20150922012403.GA1535@svinekod>
- <CY1PR0301MB078008B10188504C951076498B450@CY1PR0301MB0780.namprd03.prod.outlook.com>
-Message-ID: <DM2PR0301MB07342356008C1A50AB26FEFFBA450@DM2PR0301MB0734.namprd03.prod.outlook.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Tue, 22 Sep 2015 10:32:36 -0700
+Subject: [PATCH v2 7/7] ARM: smp: Add runtime PM support for CPU hotplug
+In-Reply-To: <55F162FD.4050401@ti.com>
+References: <Pine.LNX.4.44L0.1509051133100.30865-100000@netrider.rowland.org>
+ <2657565.lxWtPmdjyp@vostro.rjw.lan> <55ED9328.2010501@ti.com>
+ <2355864.I8qZFusWfm@vostro.rjw.lan> <55EE9AA1.8020200@ti.com>
+ <7h613kmuuv.fsf@deeprootsystems.com> <55F162FD.4050401@ti.com>
+Message-ID: <20150922173236.GB19183@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >
-> > Hi,
-> >
-> > > +/memreserve/ 0x80000000 0x00010000;
-> >
-> > Why is this necessary?
-> 
-> This memory region is pre-reserved for the spin-table/psci, although didn't add
-> Enable method of secondary cores.
+On Thu, Sep 10 2015 at 04:01 -0700, Grygorii Strashko wrote:
+>On 09/09/2015 01:03 AM, Kevin Hilman wrote:
+>> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+>>
+>>> On 09/07/2015 11:42 PM, Rafael J. Wysocki wrote:
+>>>> On Monday, September 07, 2015 04:37:44 PM Grygorii Strashko wrote:
+>>>>> On 09/07/2015 04:04 PM, Rafael J. Wysocki wrote:
+>>>>>> On Saturday, September 05, 2015 11:39:20 AM Alan Stern wrote:
+>>>>>>> On Sat, 5 Sep 2015, Grygorii Strashko wrote:
+>>>>>>>
+>>>>>>>> On 09/04/2015 09:45 PM, Alan Stern wrote:
+>>>>>>>>> On Fri, 4 Sep 2015, Grygorii Strashko wrote:
+>>>>>>>>>
+>>>>>>>>>> There is one "small" problem with such approach :(
+>>>>>>>>>>
+>>>>>>>>>> - It's incompatible with -RT kernel, because PM runtime can't be used
+>>>>>>>>>> in atomic context on -RT.
+>>>>>>>>>
+>>>>>>>>> Can you explain this more fully?  Why can't runtime PM be used in
+>>>>>>>>> atomic context in the -rt kernels?
+>>>>>>>>>
+>>>>>>>>
+>>>>>>>> See:
+>>>>>>>>     http://lwn.net/Articles/146861/
+>>>>>>>>     https://rt.wiki.kernel.org/index.php/Frequently_Asked_Questions#How_does_the_CONFIG_PREEMPT_RT_patch_work.3F
+>>>>>>>>
+>>>>>>>> spinlock_t
+>>>>>>>>        Critical sections are preemptible. The _irq operations (e.g., spin_lock_irqsave())
+>>>>>>>>     do -not- disable hardware interrupts. Priority inheritance is used to prevent priority
+>>>>>>>>     inversion. An underlying rt_mutex is used to implement spinlock_t in PREEMPT_RT.
+>>>>>>>>
+>>>>>>>> As result, have to do things like:
+>>>>>>>> https://lkml.org/lkml/2015/8/18/161
+>>>>>>>> https://lkml.org/lkml/2015/8/18/162
+>>>>>>>>
+>>>>>>>> Sorry for brief reply - Friday/Sat night :)
+>>>>>>>
+>>>>>>> I see.  Although we normally think of interrupt contexts as being
+>>>>>>> atomic, in an -rt kernel this isn't true any more because things like
+>>>>>>> spin_lock_irq don't actually disable interrupts.
+>>>>>>>
+>>>>>>> Therefore it would be correct to say that in -rt kernels, runtime PM
+>>>>>>> can be used in interrupt context (if the device is marked as irq-safe),
+>>>>>>> but not in atomic context.  Right?
+>>>>>>
+>>>>>> Right.
+>>>>>>
+>>>>>> Whatever is suitable for interrupt context in the mainline, will be suitable
+>>>>>> for that in -rt kernels too.
+>>>>>
+>>>>> Not exactly true :(, since spinlock is converted to [rt_] mutex.
+>>>>> Usually, this difference can't be seen because on -RT kernel all or
+>>>>> mostly all HW IRQ handlers will be forced to be threaded.
+>>>>
+>>>> Exactly.  And that's what I'm talking about.
+>>>>
+>>>>> For the cases, where such automatic conversion is not working,
+>>>>> (like chained irq handlers or HW-handler+Threaded handler) the code
+>>>>> has to be carefully patched to work properly as for non-RT as for -RT.
+>>>>
+>>>> Right.
+>>>>
+>>>>> Also, this triggers some -RT incompatibility issues, like with PM runtime or
+>>>>
+>>>> That I'm not sure about.  Why would runtime PM cause problems with -RT (apart
+>>>> from attempts to use it from the idle loop, but that's not happening in the
+>>>> mainline anyway)?
+>>>
+>>>
+>>> I have to be more specific - sorry. "irq_safe" mode of PM runtime is incompatible with -RT.
+>>>
+>>> Here is an example:
+>>> - HW IRQ handler in TI OMAP GPIO driver is implemented as chained IRQ handler and
+>>>    contains pm_runtime_get_sync()/pm_runtime_put(). This works properly with vanilla kernel
+>>>    because OMAP GPIO devices marked as irq_safe.
+>>>    Chained IRQ handlers can't be forced threaded and PM runtime APIs trigger
+>>>   "sleeping function called from invalid context" issues there, so corresponding code has to be reworked.
+>>
+>> Isn't that why those are being converted to raw_*[1] ?
+>>
+>> Kevin
+>>
+>> [1] http://marc.info/?l=linux-omap&m=143749603401221&w=2
+>>
+>
+>That's way I've tried to convert those to generic IRQ handler [2] :),
+>so on -RT it will be forced threaded.
+>
+>raw_* is different kind of problem in gpio-omap - IRQ controllers
+>have to use raw_* inside irq_chip callbacks, because IRQ core guards those
+>callbacks using raw_* locks.
+>.irq_bus_lock()/irq_bus_sync_unlock() callbacks can be used [3]
+>for any kind of operations which require non-atomic context.
+>
+Talking to John Stultz at Linaro Connect: Is cpuidle relevant in
+-RT kernel? I dont know much about -RT. I thought this might be point
+that we should consider.
 
-Can this be reserved by bootloader?
+As it stands today, on a 800 Mhz ARM quad core, I am seeing a latency of
+50-70 usec for the additional runtime PM in the cpuidle. Ofcourse, there
+is a definite need to optimize and there are opportunities to do that.
 
-> 
-> > If this is necessary, please add a comment stating what this is for.
-> >
-> > > +               cpu at 3 {
-> > > +                       device_type = "cpu";
-> > > +                       compatible = "arm,cortex-a53";
-> > > +                       reg = <0x0 0x3>;
-> > > +                       clocks = <&clockgen 1 0>;
-> > > +               };
-> >
-> > Missing enable-method properties on all the secondary CPUs.
-> >
-> 
-> There are two methods (spin-table and psci) to bring up secondary cores, which
-> one do you think is better?
+Since each CPU does its own runtime PM, we could probably avoid any kind
+of locks in the runtime PM. But locks in genpd may be unavoidable. Will
+look more into that.
 
-Do we have the PSCI support ready in both UEFI and u-boot?  If not, we should use spin-table for now.
+Thanks,
+Lina
 
-Regards,
-Leo
+>[2] https://lkml.org/lkml/2015/8/18/162
+>gpio: omap: convert to use generic irq handler
+>[3] https://lkml.org/lkml/2015/8/18/161
+>gpio: omap: move pm runtime in irq_chip.irq_bus_lock/sync_unlock
+>
+>
+>
+>-- 
+>regards,
+>-grygorii
