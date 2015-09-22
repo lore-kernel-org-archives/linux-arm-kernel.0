@@ -1,49 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Sep 2015 19:34:07 +0100
-Subject: [RFC PATCH v5 0/4] arm/arm64: fix a migrating irq bug when
- hotplug cpu
-In-Reply-To: <1442631959-10228-1-git-send-email-yangyingliang@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 22 Sep 2015 19:44:56 +0100
+Subject: [RFC PATCH v5 3/4] arm64: fix a migrating irq bug when hotplug cpu
+In-Reply-To: <1442631959-10228-4-git-send-email-yangyingliang@huawei.com>
 References: <1442631959-10228-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <20150922183407.GP7356@arm.com>
+ <1442631959-10228-4-git-send-email-yangyingliang@huawei.com>
+Message-ID: <20150922194456.6b7e65ca@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 19, 2015 at 04:05:55AM +0100, Yang Yingliang wrote:
-> ----
-> Changes in v5:
->  - remove the macro that guard move_irqs()
->  - use name irq_migrate_all_off_this_cpu instead of move_irqs
-> 
-> Changes in v4:
->  - select GENERIC_IRQ_MIGRATION when config GENERIC_IRQ_MIGRATION is enabled
->  - add move_irqs() into kerne/irq/migration.c for cpu hotplug
->  - use move_irqs() to migrate interrupts on arm/arm64 when cpu is going to down
->  - split bugfix patch into seperate patches for arm and arm64
-> 
-> Changes in v3:
->  - introduce config GENERIC_IRQ_MIGRATION for compiling migration.c
->  - rename migrate_irqs in arch/ia64/kernel/irq.c to avoid compiling error
-> 
-> Changes in v2:
->  - use the exiting helper to set IRQD_MOVE_PCNTXT flag
->  - use for_each_active_irq() instead of for_each_irq_desc()
->  - add some warn messages when affinity is null or do set affinity failed
-> ----
-> 
-> Hi All,
-> 
-> There is a bug:
-> 
+On Sat, 19 Sep 2015 11:05:58 +0800
+Yang Yingliang <yangyingliang@huawei.com> wrote:
+
 > When cpu is disabled, all irqs will be migratged to another cpu.
 > In some cases, a new affinity is different, it needed to be coppied
 > to irq's affinity. But if the type of irq is LPI, it's affinity will
-> not be coppied because of irq_set_affinity's return value.
+> not be coppied because of irq_set_affinity's return value. Fix it by
+> using irq_do_set_affinity.
 
-This series looks good to me:
+Nit: This hasn't much to do with LPIs proper, but with the fact that
+the architecture code only has a partial knowledge of the possible
+affinity setting return values.
 
-  Reviewed-by: Will Deacon <will.deacon@arm.com>
+> And migrating interrupts is a core code matter, so use the generic
+> function irq_migrate_all_off_this_cpu() to migrate interrupts in
+> kernel/irq/migration.c.
+> 
+> Cc: Jiang Liu <jiang.liu@linux.intel.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
 
-Marc: once you're happy with the irq/core changes, feel free to include
-the arm64 patch in your tree.
+Otherwise Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny.
