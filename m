@@ -1,65 +1,52 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 22 Sep 2015 12:54:33 +0300
-Subject: [PATCH v3 22/24] dmaengine: edma: Read channel mapping support only
- once from HW
-In-Reply-To: <1442915675-7121-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1442915675-7121-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1442915675-7121-23-git-send-email-peter.ujfalusi@ti.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 22 Sep 2015 11:04:46 +0100
+Subject: [PATCH 17/17] mfd : ab8500/db8500: fix the abuse of
+ IRQF_NO_SUSPEND
+In-Reply-To: <20150921232027.GD11284@x1>
+References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
+ <1442850433-5903-18-git-send-email-sudeep.holla@arm.com>
+ <20150921232027.GD11284@x1>
+Message-ID: <560127BE.9030604@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of directly reading it from CCCFG register take the information out
-once when we set up the configuration from the HW.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- drivers/dma/edma.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index c8350248c0c6..a818d2bf8709 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -223,6 +223,7 @@ struct edma_cc {
- 	unsigned			num_region;
- 	unsigned			num_slots;
- 	unsigned			num_tc;
-+	bool				chmap_exist;
- 	enum dma_event_q 		default_queue;
- 
- 	bool				unused_chan_list_done;
-@@ -1904,11 +1905,14 @@ static int edma_setup_from_hw(struct device *dev, struct edma_soc_info *pdata,
- 	value = GET_NUM_EVQUE(cccfg);
- 	ecc->num_tc = value + 1;
- 
-+	ecc->chmap_exist = (cccfg & CHMAP_EXIST) ? true : false;
-+
- 	dev_dbg(dev, "eDMA3 CC HW configuration (cccfg: 0x%08x):\n", cccfg);
- 	dev_dbg(dev, "num_region: %u\n", ecc->num_region);
- 	dev_dbg(dev, "num_channels: %u\n", ecc->num_channels);
- 	dev_dbg(dev, "num_slots: %u\n", ecc->num_slots);
- 	dev_dbg(dev, "num_tc: %u\n", ecc->num_tc);
-+	dev_dbg(dev, "chmap_exist: %s\n", ecc->chmap_exist ? "yes" : "no");
- 
- 	/* Nothing need to be done if queue priority is provided */
- 	if (pdata->queue_priority_mapping)
-@@ -2197,7 +2201,7 @@ static int edma_probe(struct platform_device *pdev)
- 					      queue_priority_mapping[i][1]);
- 
- 	/* Map the channel to param entry if channel mapping logic exist */
--	if (edma_read(ecc, EDMA_CCCFG) & CHMAP_EXIST)
-+	if (ecc->chmap_exist)
- 		edma_direct_dmach_to_param_mapping(ecc);
- 
- 	for (i = 0; i < ecc->num_region; i++) {
-@@ -2267,7 +2271,7 @@ static int edma_pm_resume(struct device *dev)
- 					      queue_priority_mapping[i][1]);
- 
- 	/* Map the channel to param entry if channel mapping logic */
--	if (edma_read(ecc, EDMA_CCCFG) & CHMAP_EXIST)
-+	if (ecc->chmap_exist)
- 		edma_direct_dmach_to_param_mapping(ecc);
- 
- 	for (i = 0; i < ecc->num_channels; i++) {
--- 
-2.5.2
+On 22/09/15 00:20, Lee Jones wrote:
+> On Mon, 21 Sep 2015, Sudeep Holla wrote:
+>
+>> The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
+>> be left enabled so as to allow them to work as expected during the
+>> suspend-resume cycle, but doesn't guarantee that it will wake the system
+>> from a suspended state, enable_irq_wake is recommended to be used for
+>> the wakeup.
+>>
+>> This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
+>> enable_irq_wake instead.
+>>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>   drivers/mfd/ab8500-core.c        | 11 +++++++++--
+>>   drivers/mfd/ab8500-debugfs.c     |  2 +-
+>>   drivers/mfd/ab8500-gpadc.c       | 15 +++++++++++----
+>>   drivers/mfd/db8500-prcmu.c       | 24 +++++++++++++++++-------
+>>   drivers/power/ab8500_btemp.c     |  6 ++++--
+>>   drivers/power/ab8500_charger.c   |  6 ++++--
+>>   drivers/power/ab8500_fg.c        |  9 ++++++---
+>>   drivers/thermal/db8500_thermal.c |  5 ++---
+>>   drivers/usb/phy/phy-ab8500-usb.c | 10 ++++++----
+>>   9 files changed, 60 insertions(+), 28 deletions(-)
+>
+> Is there a reason for bundling the changes in all of these subsystems
+> together into a single patch?
+>
+
+No, I understand this needs to be split. Since I was not 100% confident
+about this change, I wanted LinusW to review and provide feedback and
+gets things working before I can split this changes. I must have added
+RFC, but usually it gets ignored :)
+
+Regards,
+Sudeep
