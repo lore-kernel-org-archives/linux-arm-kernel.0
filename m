@@ -1,64 +1,80 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Tue, 22 Sep 2015 08:36:22 +0200
-Subject: [PATCH v3 01/12] pwm: introduce default period and polarity
- concepts
-In-Reply-To: <1442828009-6241-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1442828009-6241-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <5600F6E6.8050406@samsung.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 22 Sep 2015 08:45:51 +0200
+Subject: [PATCH v6 03/22] of/platform: Point to struct device from device
+ node
+In-Reply-To: <CAL_JsqK5CH+a-xQYcocqPb0XqV3F1shC48YQxsTFf9sXjx_xHQ@mail.gmail.com>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1442844182-27787-4-git-send-email-tomeu.vizoso@collabora.com>
+ <CAL_JsqK5CH+a-xQYcocqPb0XqV3F1shC48YQxsTFf9sXjx_xHQ@mail.gmail.com>
+Message-ID: <CAAObsKA85fbnt5ENM8_rfpoNV777ySRe=weWYBgy8tLPxu5jZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On 22 September 2015 at 02:39, Rob Herring <robh@kernel.org> wrote:
+> On Mon, Sep 21, 2015 at 9:02 AM, Tomeu Vizoso
+> <tomeu.vizoso@collabora.com> wrote:
+>> When adding platform and AMBA devices, set the device node's device
+>> member to point to it.
+>>
+>> This speeds lookups considerably and is safe because we only create one
+>> of these devices for any given device node.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> ---
+>>
+>> Changes in v5:
+>> - Set the pointer to struct device also for AMBA devices
+>> - Unset the pointer to struct device when the platform device is about
+>>   to be unregistered
+>> - Increase the reference count of the device before returning from
+>>   of_find_device_by_node()
+>>
+>>  drivers/of/platform.c | 19 ++++++++++---------
+>>  include/linux/of.h    |  1 +
+>>  2 files changed, 11 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+>> index 1001efaedcb8..408d89f1d124 100644
+>> --- a/drivers/of/platform.c
+>> +++ b/drivers/of/platform.c
+>> @@ -32,11 +32,6 @@ const struct of_device_id of_default_bus_match_table[] = {
+>>         {} /* Empty terminated list */
+>>  };
+>>
+>> -static int of_dev_node_match(struct device *dev, void *data)
+>> -{
+>> -       return dev->of_node == data;
+>> -}
+>> -
+>>  /**
+>>   * of_find_device_by_node - Find the platform_device associated with a node
+>>   * @np: Pointer to device tree node
+>> @@ -45,10 +40,10 @@ static int of_dev_node_match(struct device *dev, void *data)
+>>   */
+>>  struct platform_device *of_find_device_by_node(struct device_node *np)
+>>  {
+>> -       struct device *dev;
+>> -
+>> -       dev = bus_find_device(&platform_bus_type, NULL, np, of_dev_node_match);
+>> -       return dev ? to_platform_device(dev) : NULL;
+>> +       if (np->device && np->device->bus == &platform_bus_type &&
+>> +           get_device(np->device))
+>
+> Where do we drop the reference incremented by get_device?
+>
+> However, bus_find_device also took a reference I think, so you aren't
+> really changing behavior.
 
-On 09/21/2015 11:33 AM, Boris Brezillon wrote:
-> When requested by a user, the PWM is assigned a default period and polarity
-> extracted from the DT, the platform data or statically set by the driver.
-> Those default values are currently stored in the period and polarity
-> fields of the pwm_device struct, but they will be stored somewhere else
-> once we have introduced the architecture allowing for hardware state
-> retrieval.
->
-> The pwm_set_default_polarity and pwm_set_default_period should only be
-> used by PWM drivers or the PWM core infrastructure to specify the
-> default period and polarity values.
->
-> PWM users might call the pwm_get_default_period to query the default
-> period value. There is currently no helper to query the default
-> polarity, but it might be added later on if there is a need for it.
->
-> This patch also modifies all the places where the default helpers should
-> be used in place of the standard ones.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->   drivers/leds/leds-pwm.c              |  2 +-
->   drivers/pwm/core.c                   | 14 +++++++-------
->   drivers/pwm/pwm-pxa.c                |  2 +-
->   drivers/pwm/pwm-sun4i.c              |  3 ++-
->   drivers/regulator/pwm-regulator.c    |  4 ++--
->   drivers/video/backlight/lm3630a_bl.c |  4 ++--
->   drivers/video/backlight/pwm_bl.c     |  2 +-
->   drivers/video/fbdev/ssd1307fb.c      |  2 +-
->   include/linux/pwm.h                  | 17 +++++++++++++++++
->   9 files changed, 34 insertions(+), 16 deletions(-)
->
-> diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
-> index 1d07e3e..2c564d1 100644
-> --- a/drivers/leds/leds-pwm.c
-> +++ b/drivers/leds/leds-pwm.c
-> @@ -125,7 +125,7 @@ static int led_pwm_add(struct device *dev, struct led_pwm_priv *priv,
->   	if (led_data->can_sleep)
->   		INIT_WORK(&led_data->work, led_pwm_work);
->
-> -	led_data->period = pwm_get_period(led_data->pwm);
-> +	led_data->period = pwm_get_default_period(led_data->pwm);
->   	if (!led_data->period && (led->pwm_period_ns > 0))
->   		led_data->period = led->pwm_period_ns;
->
+Yeah, Intel's 0day build bot warned of the missing get_device() when
+running the OF unittests.
 
-Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
+Regards,
 
--- 
-Best Regards,
-Jacek Anaszewski
+Tomeu
+
+> Rob
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
