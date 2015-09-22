@@ -1,30 +1,24 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 22 Sep 2015 18:38:24 +0200
-Subject: [PATCH v4 2/4] Documentation: Update the APM X-Gene SoC EDAC DTS
- binding for L3/SoC subnodes
-In-Reply-To: <1439534769-22811-3-git-send-email-lho@apm.com>
-References: <1439534769-22811-1-git-send-email-lho@apm.com>
- <1439534769-22811-2-git-send-email-lho@apm.com>
- <1439534769-22811-3-git-send-email-lho@apm.com>
-Message-ID: <20150922163823.GD3437@pd.tnic>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 22 Sep 2015 09:39:46 -0700
+Subject: [PATCH v2 1/5] regulator: smd: Add floor and corner operations
+In-Reply-To: <20150919165712.GH30445@sirena.org.uk>
+References: <1442623929-4507-1-git-send-email-sboyd@codeaurora.org>
+ <1442623929-4507-2-git-send-email-sboyd@codeaurora.org>
+ <20150919165712.GH30445@sirena.org.uk>
+Message-ID: <20150922163946.GG23081@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 14, 2015 at 12:46:07AM -0600, Loc Ho wrote:
-> This patch updates documentation for the APM X-Gene SoC EDAC DTS binding
-
-No need to start the commit message with "This patch" - we know it is
-this patch. :)
-
-> for L3/SoC subnodes.
+On 09/19, Mark Brown wrote:
+> On Fri, Sep 18, 2015 at 05:52:05PM -0700, Stephen Boyd wrote:
 > 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> ---
->  .../devicetree/bindings/edac/apm-xgene-edac.txt    |   23 ++++++++++++++++++++
->  1 files changed, 23 insertions(+), 0 deletions(-)
+> > +EXPORT_SYMBOL(qcom_rpm_set_floor);
+> 
+> The entire regulator API is EXPORT_SYMBOL_GPL(), adding plain
+> EXPORT_SYMBOL() exports is not good.
+
+That's fine. I can make it GPL.
 
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
