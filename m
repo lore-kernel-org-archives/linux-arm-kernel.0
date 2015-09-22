@@ -1,69 +1,69 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 22 Sep 2015 10:30:42 +0200
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
-In-Reply-To: <CAGS+omCFD1omrRA7xR6ADYOHyGDp8=Lh4JF-S9ikN9rKNyeDOQ@mail.gmail.com>
-References: <1441006446-4558-1-git-send-email-s.hauer@pengutronix.de>
- <1441006446-4558-3-git-send-email-s.hauer@pengutronix.de>
- <CAGS+omCHAGrRPwM8Wghver+o5ky3MG2+JJqKiwWzHtDTQkaD4g@mail.gmail.com>
- <CAGS+omCFD1omrRA7xR6ADYOHyGDp8=Lh4JF-S9ikN9rKNyeDOQ@mail.gmail.com>
-Message-ID: <20150922083042.GK7858@pengutronix.de>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 22 Sep 2015 10:58:51 +0200
+Subject: [PATCH v2 0/3] Add support for the Armada-370-based Seagate NAS
+In-Reply-To: <1442008373-19184-1-git-send-email-simon.guinot@sequanux.org>
+References: <1442008373-19184-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20150922085851.GT7306@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 03:30:47PM +0800, Daniel Kurtz wrote:
-> On Mon, Sep 14, 2015 at 3:32 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> >
-> > Hi Sascha,
-> >
-> > On Mon, Aug 31, 2015 at 3:34 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > > This adds support for the Mediatek thermal controller found on MT8173
-> > > and likely other SoCs.
-> > > The controller is a bit special. It does not have its own ADC, instead
-> > > it controls the on-SoC AUXADC via AHB bus accesses. For this reason
-> > > we need the physical address of the AUXADC. Also it controls a mux
-> > > using AHB bus accesses, so we need the APMIXEDSYS physical address aswell.
-> > >
-> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> >
-> > [snip...]
-> >
-> > > +static int mtk_read_temp(void *data, long *temp)
-> > > +{
-> > > +       struct mtk_thermal_bank *bank = data;
-> > > +
-> > > +       mtk_thermal_get_bank(bank);
-> > > +
-> > > +       *temp = mtk_thermal_bank_temperature(bank);
-> > > +
-> > > +       mtk_thermal_put_bank(bank);
-> > > +
-> > > +       return 0;
-> > > +}
-> > > +
-> > > +static const struct thermal_zone_of_device_ops mtk_thermal_ops = {
-> > > +       .get_temp = mtk_read_temp,
-> >
-> > On v4.3-rc1, this now causes a compile warning, since the prototype
-> > for get_temp was changed to:
-> >
-> >        int (*get_temp)(void *, int *);
-> >
-> > by:
-> > commit 17e8351a77397e8a83727eb17e3a3e9b8ab5257a
-> >     thermal: consistently use int for temperatures
+On Fri, Sep 11, 2015 at 11:52:50PM +0200, Simon Guinot wrote:
+> Hi,
 > 
-> It is actually a little worse than a warning.  This actually causes a
-> crash on boot.
-> Sascha, can you send out a rebased patch set on v4.3-rc1?
+> This patch series adds support for the Seagate machines based on the
+> Armada-370 Marvell SoC. This includes the Personal Cloud 1 and 2-Bay
+> and the Seagate NAS 2 and 4-Bay.
+> 
+> Changes for v2:
+> - Rename DTS files using the products names.
+> - Update model and compatible properties as well.
+> - Add some informations allowing to identify the devices in the commit
+>   message and in the DTS files headers.
+> - Remove duplicated rtc alias in armada-370-seagate-nas-xbay.dtsi.
 
-Yes, I'll send out a new version tomorrow. I am currently quite busy
-with another project.
+Hi Jason, Andrew, Gregory, and Sebastian,
 
-Sascha
+Please, consider merging this patch series.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+
+Simon
+
+> Simon Guinot (2):
+>   ARM: mvebu: add DT support for Seagate Personal Cloud
+>   ARM: mvebu: enable options for Seagate NAS in mvebu_v7_defconfig
+> 
+> Vincent Donnefort (1):
+>   ARM: mvebu: add DT support for Seagate NAS 2 and 4-Bay
+> 
+>  arch/arm/boot/dts/Makefile                         |   4 +
+>  arch/arm/boot/dts/armada-370-seagate-nas-2bay.dts  |  36 ++++
+>  arch/arm/boot/dts/armada-370-seagate-nas-4bay.dts  | 133 ++++++++++++
+>  arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi | 231 +++++++++++++++++++++
+>  .../armada-370-seagate-personnal-cloud-2bay.dts    |  51 +++++
+>  .../dts/armada-370-seagate-personnal-cloud.dts     |  37 ++++
+>  .../dts/armada-370-seagate-personnal-cloud.dtsi    | 174 ++++++++++++++++
+>  arch/arm/configs/mvebu_v7_defconfig                |   9 +-
+>  8 files changed, 674 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/armada-370-seagate-nas-2bay.dts
+>  create mode 100644 arch/arm/boot/dts/armada-370-seagate-nas-4bay.dts
+>  create mode 100644 arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi
+>  create mode 100644 arch/arm/boot/dts/armada-370-seagate-personnal-cloud-2bay.dts
+>  create mode 100644 arch/arm/boot/dts/armada-370-seagate-personnal-cloud.dts
+>  create mode 100644 arch/arm/boot/dts/armada-370-seagate-personnal-cloud.dtsi
+> 
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/87140c0e/attachment.sig>
