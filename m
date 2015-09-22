@@ -1,36 +1,42 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 22 Sep 2015 17:13:35 +0200
-Subject: [PATCH v3 0/5] power/reset: at91: cleanups and slow clock
-In-Reply-To: <1439284370-13803-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1439284370-13803-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150922151335.GA2533@earth>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 22 Sep 2015 17:09:52 +0200
+Subject: [PATCH v2 1/3] ARM: mvebu: add DT support for Seagate NAS 2 and
+ 4-Bay
+In-Reply-To: <1442008373-19184-2-git-send-email-simon.guinot@sequanux.org>
+References: <1442008373-19184-1-git-send-email-simon.guinot@sequanux.org>
+ <1442008373-19184-2-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20150922150952.GB16194@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Sep 11, 2015 at 11:52:51PM +0200, Simon Guinot wrote:
+> From: Vincent Donnefort <vdonnefort@gmail.com>
+> 
+> This patch adds DT support for the Seagate NAS 2 and 4-Bay.
+> 
+> Here are some informations allowing to identify these devices:
+> 
+> Product name                 | Seagate NAS 2-Bay | Seagate NAS 4-Bay
+> Code name (board/PCB)        | Dart 2-Bay        | Dart 4-Bay
+> Model name (case sticker)    | SRPD20            | SRPD40
+> Material desc (product spec) | STCTxxxxxxx       | STCUxxxxxxx
 
-On Tue, Aug 11, 2015 at 11:12:45AM +0200, Alexandre Belloni wrote:
-> As discussed this series is now removing non DT initialization, allowing to
-> compile the drivers as modules and finally adding slow clock support to the
-> drivers.
->
-> [...]
->
->   power/reset: at91-reset: remove useless at91_reset_platform_probe()
->   power/reset: at91-reset: allow compiling as a module
->   power/reset: at91-reset: get and use slow clock
->   power/reset: at91-poweroff: allow compiling as a module
->   power/reset: at91-poweroff: get and use slow clock
+Hi Simon
 
-Thanks, queued for 4.4. You may want to add another patch adding
+Thanks for adding this information.
 
-MODULE_DEVICE_TABLE(of, xxx_of_match);
+> +	gpio-fan {
+> +		compatible = "gpio-fan";
+> +		gpios = <&gpio2 0 0
+> +			 &gpio2 1 0>;
+> +	};
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/444bb3a7/attachment.sig>
+Minor nit-pick
+
+GPIO_ACTIVE_HIGH could be used here. Other than that:
+
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+for the whole series.
+
+	  Andrew
