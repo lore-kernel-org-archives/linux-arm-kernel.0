@@ -1,131 +1,69 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 22 Sep 2015 10:27:51 +0200
-Subject: [PATCH 3/3] irqchip: atmel-aic5: simplify base chip selection
-In-Reply-To: <1442843173-2390-3-git-send-email-ludovic.desroches@atmel.com>
-References: <1442843173-2390-1-git-send-email-ludovic.desroches@atmel.com>
- <1442843173-2390-3-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <56011107.3050705@atmel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 22 Sep 2015 10:30:42 +0200
+Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
+In-Reply-To: <CAGS+omCFD1omrRA7xR6ADYOHyGDp8=Lh4JF-S9ikN9rKNyeDOQ@mail.gmail.com>
+References: <1441006446-4558-1-git-send-email-s.hauer@pengutronix.de>
+ <1441006446-4558-3-git-send-email-s.hauer@pengutronix.de>
+ <CAGS+omCHAGrRPwM8Wghver+o5ky3MG2+JJqKiwWzHtDTQkaD4g@mail.gmail.com>
+ <CAGS+omCFD1omrRA7xR6ADYOHyGDp8=Lh4JF-S9ikN9rKNyeDOQ@mail.gmail.com>
+Message-ID: <20150922083042.GK7858@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 21/09/2015 15:46, Ludovic Desroches a ?crit :
-> Use irq_get_domain_generic_chip() to select the base chip.
+On Tue, Sep 22, 2015 at 03:30:47PM +0800, Daniel Kurtz wrote:
+> On Mon, Sep 14, 2015 at 3:32 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
+> >
+> > Hi Sascha,
+> >
+> > On Mon, Aug 31, 2015 at 3:34 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > > This adds support for the Mediatek thermal controller found on MT8173
+> > > and likely other SoCs.
+> > > The controller is a bit special. It does not have its own ADC, instead
+> > > it controls the on-SoC AUXADC via AHB bus accesses. For this reason
+> > > we need the physical address of the AUXADC. Also it controls a mux
+> > > using AHB bus accesses, so we need the APMIXEDSYS physical address aswell.
+> > >
+> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> >
+> > [snip...]
+> >
+> > > +static int mtk_read_temp(void *data, long *temp)
+> > > +{
+> > > +       struct mtk_thermal_bank *bank = data;
+> > > +
+> > > +       mtk_thermal_get_bank(bank);
+> > > +
+> > > +       *temp = mtk_thermal_bank_temperature(bank);
+> > > +
+> > > +       mtk_thermal_put_bank(bank);
+> > > +
+> > > +       return 0;
+> > > +}
+> > > +
+> > > +static const struct thermal_zone_of_device_ops mtk_thermal_ops = {
+> > > +       .get_temp = mtk_read_temp,
+> >
+> > On v4.3-rc1, this now causes a compile warning, since the prototype
+> > for get_temp was changed to:
+> >
+> >        int (*get_temp)(void *, int *);
+> >
+> > by:
+> > commit 17e8351a77397e8a83727eb17e3a3e9b8ab5257a
+> >     thermal: consistently use int for temperatures
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> It is actually a little worse than a warning.  This actually causes a
+> crash on boot.
+> Sascha, can you send out a rebased patch set on v4.3-rc1?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Yes, I'll send out a new version tomorrow. I am currently quite busy
+with another project.
 
-> ---
->  drivers/irqchip/irq-atmel-aic5.c | 28 ++++++++++------------------
->  1 file changed, 10 insertions(+), 18 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-atmel-aic5.c b/drivers/irqchip/irq-atmel-aic5.c
-> index abff79e..7264ec7 100644
-> --- a/drivers/irqchip/irq-atmel-aic5.c
-> +++ b/drivers/irqchip/irq-atmel-aic5.c
-> @@ -70,8 +70,7 @@ static struct irq_domain *aic5_domain;
->  static asmlinkage void __exception_irq_entry
->  aic5_handle(struct pt_regs *regs)
->  {
-> -	struct irq_domain_chip_generic *dgc = aic5_domain->gc;
-> -	struct irq_chip_generic *bgc = dgc->gc[0];
-> +	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(aic5_domain, 0);
->  	u32 irqnr;
->  	u32 irqstat;
->  
-> @@ -87,8 +86,7 @@ aic5_handle(struct pt_regs *regs)
->  static void aic5_mask(struct irq_data *d)
->  {
->  	struct irq_domain *domain = d->domain;
-> -	struct irq_domain_chip_generic *dgc = domain->gc;
-> -	struct irq_chip_generic *bgc = dgc->gc[0];
-> +	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
->  	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->  
->  	/* Disable interrupt on AIC5 */
-> @@ -102,8 +100,7 @@ static void aic5_mask(struct irq_data *d)
->  static void aic5_unmask(struct irq_data *d)
->  {
->  	struct irq_domain *domain = d->domain;
-> -	struct irq_domain_chip_generic *dgc = domain->gc;
-> -	struct irq_chip_generic *bgc = dgc->gc[0];
-> +	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
->  	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->  
->  	/* Enable interrupt on AIC5 */
-> @@ -117,8 +114,7 @@ static void aic5_unmask(struct irq_data *d)
->  static int aic5_retrigger(struct irq_data *d)
->  {
->  	struct irq_domain *domain = d->domain;
-> -	struct irq_domain_chip_generic *dgc = domain->gc;
-> -	struct irq_chip_generic *bgc = dgc->gc[0];
-> +	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
->  
->  	/* Enable interrupt on AIC5 */
->  	irq_gc_lock(bgc);
-> @@ -132,8 +128,7 @@ static int aic5_retrigger(struct irq_data *d)
->  static int aic5_set_type(struct irq_data *d, unsigned type)
->  {
->  	struct irq_domain *domain = d->domain;
-> -	struct irq_domain_chip_generic *dgc = domain->gc;
-> -	struct irq_chip_generic *bgc = dgc->gc[0];
-> +	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
->  	unsigned int smr;
->  	int ret;
->  
-> @@ -153,7 +148,7 @@ static void aic5_suspend(struct irq_data *d)
->  {
->  	struct irq_domain *domain = d->domain;
->  	struct irq_domain_chip_generic *dgc = domain->gc;
-> -	struct irq_chip_generic *bgc = dgc->gc[0];
-> +	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
->  	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->  	int i;
->  	u32 mask;
-> @@ -177,7 +172,7 @@ static void aic5_resume(struct irq_data *d)
->  {
->  	struct irq_domain *domain = d->domain;
->  	struct irq_domain_chip_generic *dgc = domain->gc;
-> -	struct irq_chip_generic *bgc = dgc->gc[0];
-> +	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
->  	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->  	int i;
->  	u32 mask;
-> @@ -201,7 +196,7 @@ static void aic5_pm_shutdown(struct irq_data *d)
->  {
->  	struct irq_domain *domain = d->domain;
->  	struct irq_domain_chip_generic *dgc = domain->gc;
-> -	struct irq_chip_generic *bgc = dgc->gc[0];
-> +	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(domain, 0);
->  	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->  	int i;
->  
-> @@ -256,12 +251,11 @@ static int aic5_irq_domain_xlate(struct irq_domain *d,
->  				 irq_hw_number_t *out_hwirq,
->  				 unsigned int *out_type)
->  {
-> -	struct irq_domain_chip_generic *dgc = d->gc;
-> -	struct irq_chip_generic *bgc;
-> +	struct irq_chip_generic *bgc = irq_get_domain_generic_chip(d, 0);
->  	unsigned smr;
->  	int ret;
->  
-> -	if (!dgc)
-> +	if (!bgc)
->  		return -EINVAL;
->  
->  	ret = aic_common_irq_domain_xlate(d, ctrlr, intspec, intsize,
-> @@ -269,8 +263,6 @@ static int aic5_irq_domain_xlate(struct irq_domain *d,
->  	if (ret)
->  		return ret;
->  
-> -	bgc = dgc->gc[0];
-> -
->  	irq_gc_lock(bgc);
->  	irq_reg_writel(bgc, *out_hwirq, AT91_AIC5_SSR);
->  	smr = irq_reg_readl(bgc, AT91_AIC5_SMR);
-> 
-
+Sascha
 
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
