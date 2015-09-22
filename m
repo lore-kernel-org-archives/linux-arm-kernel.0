@@ -1,61 +1,56 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 22 Sep 2015 17:30:26 +0200
-Subject: [PATCH 3/3] mmc: sunxi: Add card busy detection
-In-Reply-To: <1442935826-16758-1-git-send-email-hdegoede@redhat.com>
-References: <1442935826-16758-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1442935826-16758-4-git-send-email-hdegoede@redhat.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 22 Sep 2015 10:34:56 -0500
+Subject: [PATCH v2 5/8] soc: qcom: smd: Remove use of VLAIS
+In-Reply-To: <20150922011651.GQ13472@usrtlx11787.corpusers.net>
+References: <1441234011-4259-1-git-send-email-sboyd@codeaurora.org>
+ <1441234011-4259-6-git-send-email-sboyd@codeaurora.org>
+ <20150922011651.GQ13472@usrtlx11787.corpusers.net>
+Message-ID: <20150922153456.GA28017@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some sdio wifi modules have not been working reliable with the sunxi-mmc
-host code. This turns out to be caused by starting new io-rw commands while
-the card signals that it is still busy processing a previous command.
+On Mon, Sep 21, 2015 at 06:16:51PM -0700, Bjorn Andersson wrote:
+> On Wed 02 Sep 15:46 PDT 2015, Stephen Boyd wrote:
+> 
+> > Usage of VLAIS prevents clang from compiling this file, and it
+> > also opens us to the possibility of allocating a large structure
+> > on the stack to the point that we blow past the limit of the
+> > kernel stack. Remove the VLAIS and allocate a structure on the
+> > heap with kmalloc so that we're safer and more clang friendly.
+> > 
+> [..]
+> > diff --git a/drivers/soc/qcom/smd-rpm.c b/drivers/soc/qcom/smd-rpm.c
+> [..]
+> >  	struct {
+> >  		struct qcom_rpm_header hdr;
+> >  		struct qcom_rpm_request req;
+> > -		u8 payload[count];
+> > -	} pkt;
+> > +		u8 payload[];
+> > +	} *pkt;
+> > +	size_t size = sizeof(*pkt) + count;
+> >  
+> [..]
+> >  
+> > -	ret = qcom_smd_send(rpm->rpm_channel, &pkt, sizeof(pkt));
+> > +	ret = qcom_smd_send(rpm->rpm_channel, pkt, sizeof(*pkt));
+> 
+> It would be good if we actually include the request in the packet and
+> not just the headers :)
+> 
+> s/sizeof(*pkt)/size/
+> 
+> Sorry for not spotting this before, made my device not boot now that it
+> showed up in linux-next. And oddly the 8974 RPM seems to just ack the
+> messages, without any indication of the request being truncated...
+> 
+> 
+> @Andy, I presume this is only on your -next, can you update the commit?
+> Or do you want a patch for it?
 
-This commit adds card-busy detection to the sunxi-mmc driver which together
-with recent core changes to check card-busy before starting io-rw commands
-fixes the wifi reliability issues on the Cubietruck and other sunxi boards
-using sdio wifi.
+I can fix it up.
 
-Reported-by: Eugene K <sigintmailru@gmail.com>
-Suggested-by: Eugene K <sigintmailru@gmail.com>
-Cc: Eugene K <sigintmailru@gmail.com>
-Cc: Arend van Spriel <arend@broadcom.com>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--Properly accredit Eugene K for coming up with the fix for this
-Changes in v3:
--Add card-busy detection and let the core decide when to actually use
- card-busy the added detection
----
- drivers/mmc/host/sunxi-mmc.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index a7b7a67..e6226cd 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -868,6 +868,13 @@ static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
- 	spin_unlock_irqrestore(&host->lock, iflags);
- }
- 
-+static int sunxi_mmc_card_busy(struct mmc_host *mmc)
-+{
-+	struct sunxi_mmc_host *host = mmc_priv(mmc);
-+
-+	return !!(mmc_readl(host, REG_STAS) & SDXC_CARD_DATA_BUSY);
-+}
-+
- static const struct of_device_id sunxi_mmc_of_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-mmc", },
- 	{ .compatible = "allwinner,sun5i-a13-mmc", },
-@@ -882,6 +889,7 @@ static struct mmc_host_ops sunxi_mmc_ops = {
- 	.get_cd		 = mmc_gpio_get_cd,
- 	.enable_sdio_irq = sunxi_mmc_enable_sdio_irq,
- 	.hw_reset	 = sunxi_mmc_hw_reset,
-+	.card_busy	 = sunxi_mmc_card_busy,
- };
- 
- static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
 -- 
-2.4.3
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
