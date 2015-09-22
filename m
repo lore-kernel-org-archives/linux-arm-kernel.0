@@ -1,24 +1,27 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 22 Sep 2015 15:36:02 +0200
-Subject: [PATCH 3/6] ARM: dts: sun7i: Enable USB DRC on orangepi-mini
+Date: Tue, 22 Sep 2015 15:36:03 +0200
+Subject: [PATCH 4/6] ARM: dts: sun7i: Enable USB DRC on the Orange pi
 In-Reply-To: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
 References: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1442928966-6418-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1442928966-6418-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the otg/drc usb controller on the orangepi-mini.
+From: Reinder de Haan <patchesrdh@mveas.com>
 
+Add usb otg support for Orange pi, based on Orange pi mini.
+
+Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts | 29 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-orangepi.dts | 29 +++++++++++++++++++++++++++++
  1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts b/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts
-index 73cd81ee..4f65664 100644
---- a/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts
-@@ -156,7 +156,18 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20-orangepi.dts b/arch/arm/boot/dts/sun7i-a20-orangepi.dts
+index 55a06ce..71125bf 100644
+--- a/arch/arm/boot/dts/sun7i-a20-orangepi.dts
++++ b/arch/arm/boot/dts/sun7i-a20-orangepi.dts
+@@ -141,7 +141,18 @@
  	status = "okay";
  };
  
@@ -37,7 +40,7 @@ index 73cd81ee..4f65664 100644
  	mmc0_cd_pin_orangepi: mmc0_cd_pin at 0 {
  		allwinner,pins = "PH10";
  		allwinner,function = "gpio_in";
-@@ -225,6 +236,10 @@
+@@ -203,6 +214,10 @@
  	regulator-name = "avcc";
  };
  
@@ -48,7 +51,7 @@ index 73cd81ee..4f65664 100644
  &reg_usb1_vbus {
  	pinctrl-0 = <&usb1_vbus_pin_bananapro>;
  	gpio = <&pio 7 26 GPIO_ACTIVE_HIGH>; /* PH26 */
-@@ -243,7 +258,21 @@
+@@ -221,7 +236,21 @@
  	status = "okay";
  };
  
