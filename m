@@ -1,68 +1,42 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Tue, 22 Sep 2015 21:25:08 +0800
-Subject: [PATCH v2] iommu/io-pgtable-arm: Don't use dma_to_phys()
-In-Reply-To: <55FBEFBA.6000606@arm.com>
-References: <59f4ebbf06e75a6176a366495211afd16d0048a3.1442507940.git.robin.murphy@arm.com>
- <1442566550.8145.156.camel@mhfsdcap03> <55FBEFBA.6000606@arm.com>
-Message-ID: <1442928308.17514.3.camel@mhfsdcap03>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 22 Sep 2015 15:29:42 +0200
+Subject: [PATCH v4 resend 0/2] power: Add an axp20x-usb-power driver
+In-Reply-To: <20150922131231.GB23334@earth>
+References: <1442752773-22635-1-git-send-email-hdegoede@redhat.com>
+ <20150922131231.GB23334@earth>
+Message-ID: <560157C6.2080102@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-09-18 at 12:04 +0100, Robin Murphy wrote:
-> On 18/09/15 09:55, Yong Wu wrote:
-> > On Thu, 2015-09-17 at 17:42 +0100, Robin Murphy wrote:
-> [...]
-> >> the appropriate course of action. Further care (and ugliness) is also
-> >> necessary in the comparison to avoid truncation if phys_addr_t and
-> >> dma_addr_t differ in size.
-> [...]
-> >>   		/*
-> >>   		 * We depend on the IOMMU being able to work with any physical
-> >> -		 * address directly, so if the DMA layer suggests it can't by
-> >> -		 * giving us back some translation, that bodes very badly...
-> >> +		 * address directly, so if the DMA layer suggests otherwise by
-> >> +		 * translating or truncating them, that bodes very badly...
-> >>   		 */
-> >> -		if (dma != __arm_lpae_dma_addr(dev, pages))
-> >> +		if (dma != virt_to_phys(pages))
-> >
-> > Could I ask why not use __arm_lpae_dma_addr(pages) here?
-> > dma is dma_addr_t.
-> 
-> Specifically, the problem case for that is when phys_addr_t is 64-bit 
-> but dma_addr_t is 32-bit. The cast in __arm_lpae_dma_addr is necessary 
-> to avoid a truncation warning when we make the DMA API calls, but we 
-> actually need the opposite in the comparison here - comparing the 
-> different types directly allows integer promotion to kick in 
-> appropriately so we don't lose the top half of the larger address. 
-> Otherwise, you'd never spot the difference between, say, your original 
-> page at 0x88c0000000 and a bounce-buffered copy that happened to end up 
-> mapped to 0xc0000000.
+Hi,
 
-Thanks.
+On 22-09-15 15:12, Sebastian Reichel wrote:
+> Hi,
+>
+> On Sun, Sep 20, 2015 at 08:39:31AM -0400, Hans de Goede wrote:
+>> This is a resend of v4 of the axp20x-usb-power power-supply driver,
+>> after v4 there have been no further comments, so I assume that this
+>> version is ready for merging, yet for some reason it has not been
+>> merged yet.
+>
+> My fault. I did not have enough time before my vacation.
 
-About here:
-> @@ -629,6 +626,11 @@ arm_lpae_alloc_pgtable(struct io_pgtable_cfg
-*cfg)
->       if (cfg->oas > ARM_LPAE_MAX_ADDR_BITS)
->               return NULL;
->  
-> +     if (cfg->iommu_dev->dma_pfn_offset) {
+No problem, I was just making sure this did not fall through
+the cracks.
 
-Do we need change to :
-	if (!selftest_running && cfg->iommu_dev->dma_pfn_offset) {
+>> Can we please get this driver merged (preferably into 4.3,
+>
+> It's obviously too late now.
 
-cfg->iommu_dev will be null while self test.
+Ok.
 
-> +             dev_err(cfg->iommu_dev, "Cannot accommodate DMA offset
-for IOMMU page tables\n");
-> +             return NULL;
-> +     }
-> +
->       data = kmalloc(sizeof(*data), GFP_KERNEL);
->       if (!data)
->               return NULL;
+>> but if not at least lets get it into next / 4.4 asap).
+>
+> I already merged this into my (local) dev branch last week. I
+> just pushed it out, so it should appear in next tomorrow.
 
-> 
-> Robin.
-> 
+Great, thanks!
+
+Regards,
+
+Hans
