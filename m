@@ -1,36 +1,130 @@
-From: amstan@chromium.org (Alexandru M Stan)
-Date: Tue, 22 Sep 2015 13:10:51 -0700
-Subject: [PATCH] usb: dwc2: Fix NULL qh in dwc2_queue_transaction
-In-Reply-To: <1442952651-4341-1-git-send-email-amstan@chromium.org>
-References: <1442952651-4341-1-git-send-email-amstan@chromium.org>
-Message-ID: <1442952651-4341-2-git-send-email-amstan@chromium.org>
+From: marek@goldelico.com (Marek Belisko)
+Date: Tue, 22 Sep 2015 22:19:29 +0200
+Subject: [PATCH v2 1/3] drivers: power: twl4030_charger: fix link problems
+ when building as module
+Message-ID: <1442953171-19718-1-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a usb device disconnects in a certain way, dwc2_queue_transaction
-still gets called after dwc2_hcd_cleanup_channels.
+If either twl4030_charger or twl4030_madc is configured as MODULE,
+we get build (link) errors.
 
-dwc2_hcd_cleanup_channels does "channel->qh = NULL;" but
-dwc2_queue_transaction still wants to dereference qh.
-This adds a check for a null qh.
+To solve, the direct call of twl4030_get_madc_conversion() is replaced
+by a call to iio_read_channel_processed().
 
-Signed-off-by: Alexandru M Stan <amstan@chromium.org>
+Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+Signed-off-by: Marek Belisko <marek@goldelico.com>
 ---
- drivers/usb/dwc2/hcd.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+changes from V1: added missing iio_channel_release + document and add new DT bindings
 
-diff --git a/drivers/usb/dwc2/hcd.c b/drivers/usb/dwc2/hcd.c
-index f845c41..d745128 100644
---- a/drivers/usb/dwc2/hcd.c
-+++ b/drivers/usb/dwc2/hcd.c
-@@ -1004,7 +1004,7 @@ static int dwc2_queue_transaction(struct dwc2_hsotg *hsotg,
- {
- 	int retval = 0;
+ drivers/power/twl4030_charger.c | 36 ++++++++++++++++++++++++++++--------
+ 1 file changed, 28 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/power/twl4030_charger.c b/drivers/power/twl4030_charger.c
+index f4f2c1f..5e68be4 100644
+--- a/drivers/power/twl4030_charger.c
++++ b/drivers/power/twl4030_charger.c
+@@ -22,7 +22,7 @@
+ #include <linux/power_supply.h>
+ #include <linux/notifier.h>
+ #include <linux/usb/otg.h>
+-#include <linux/i2c/twl4030-madc.h>
++#include <linux/iio/consumer.h>
  
--	if (hsotg->core_params->dma_enable > 0) {
-+	if (hsotg->core_params->dma_enable > 0 && chan->qh) {
- 		if (hsotg->core_params->dma_desc_enable > 0) {
- 			if (!chan->xfer_started ||
- 			    chan->ep_type == USB_ENDPOINT_XFER_ISOC) {
+ #define TWL4030_BCIMDEN		0x00
+ #define TWL4030_BCIMDKEY	0x01
+@@ -96,12 +96,17 @@
+  * If AC (Accessory Charger) voltage exceeds 4.5V (MADC 11)
+  * then AC is available.
+  */
+-static inline int ac_available(void)
++static inline int ac_available(struct iio_channel *channel_vac)
+ {
+-	return twl4030_get_madc_conversion(11) > 4500;
++	int val, err;
++
++	err = iio_read_channel_processed(channel_vac, &val);
++	if (err < 0)
++		return 0;
++	return val > 4500;
+ }
+ #else
+-static inline int ac_available(void)
++static inline int ac_available(struct iio_channel *channel_vac)
+ {
+ 	return 0;
+ }
+@@ -128,6 +133,7 @@ struct twl4030_bci {
+ 	 */
+ 	unsigned int		ichg_eoc, ichg_lo, ichg_hi;
+ 	unsigned int		usb_cur, ac_cur;
++	struct iio_channel	*channel_vac;
+ 	bool			ac_is_active;
+ 	int			usb_mode, ac_mode; /* charging mode requested */
+ #define	CHARGE_OFF	0
+@@ -278,7 +284,7 @@ static int twl4030_charger_update_current(struct twl4030_bci *bci)
+ 	 * If AC (Accessory Charger) voltage exceeds 4.5V (MADC 11)
+ 	 * and AC is enabled, set current for 'ac'
+ 	 */
+-	if (ac_available()) {
++	if (ac_available(bci->channel_vac)) {
+ 		cur = bci->ac_cur;
+ 		bci->ac_is_active = true;
+ 	} else {
+@@ -1048,6 +1054,12 @@ static int twl4030_bci_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	bci->channel_vac = iio_channel_get(&pdev->dev, "vac");
++	if (IS_ERR(bci->channel_vac)) {
++		dev_err(&pdev->dev, "could not request vac iio channel");
++		return PTR_ERR(bci->channel_vac);
++	}
++
+ 	INIT_WORK(&bci->work, twl4030_bci_usb_work);
+ 	INIT_DELAYED_WORK(&bci->current_worker, twl4030_current_worker);
+ 
+@@ -1061,8 +1073,10 @@ static int twl4030_bci_probe(struct platform_device *pdev)
+ 			bci->transceiver = devm_usb_get_phy_by_node(
+ 				bci->dev, phynode, &bci->usb_nb);
+ 			if (IS_ERR(bci->transceiver) &&
+-			    PTR_ERR(bci->transceiver) == -EPROBE_DEFER)
+-				return -EPROBE_DEFER;
++			    PTR_ERR(bci->transceiver) == -EPROBE_DEFER) {
++				ret = -EPROBE_DEFER;
++				goto fail;
++			}
+ 		}
+ 	}
+ 
+@@ -1073,7 +1087,7 @@ static int twl4030_bci_probe(struct platform_device *pdev)
+ 			       TWL4030_INTERRUPTS_BCIIMR1A);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "failed to unmask interrupts: %d\n", ret);
+-		return ret;
++		goto fail;
+ 	}
+ 
+ 	reg = ~(u32)(TWL4030_VBATOV | TWL4030_VBUSOV | TWL4030_ACCHGOV);
+@@ -1106,6 +1120,10 @@ static int twl4030_bci_probe(struct platform_device *pdev)
+ 		twl4030_charger_enable_backup(0, 0);
+ 
+ 	return 0;
++fail:
++	iio_channel_release(bci->channel_vac);
++
++	return ret;
+ }
+ 
+ static int __exit twl4030_bci_remove(struct platform_device *pdev)
+@@ -1116,6 +1134,8 @@ static int __exit twl4030_bci_remove(struct platform_device *pdev)
+ 	twl4030_charger_enable_usb(bci, false);
+ 	twl4030_charger_enable_backup(0, 0);
+ 
++	iio_channel_release(bci->channel_vac);
++
+ 	device_remove_file(&bci->usb->dev, &dev_attr_max_current);
+ 	device_remove_file(&bci->usb->dev, &dev_attr_mode);
+ 	device_remove_file(&bci->ac->dev, &dev_attr_max_current);
 -- 
-2.6.0.rc0.131.gf624c3d
+1.9.1
