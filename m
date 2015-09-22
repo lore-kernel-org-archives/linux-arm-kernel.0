@@ -1,22 +1,40 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 22 Sep 2015 12:37:03 +0200 (CEST)
-Subject: [tip:irq/urgent] irqchip/atmel-aic5: Use proper mask cache in
- mask/unmask()
-In-Reply-To: <tip-478cc7b33413a4ad50852239d931d55e622f1cde@git.kernel.org>
-References: <1442843173-2390-1-git-send-email-ludovic.desroches@atmel.com>
- <tip-478cc7b33413a4ad50852239d931d55e622f1cde@git.kernel.org>
-Message-ID: <alpine.DEB.2.11.1509221236220.5606@nanos>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 22 Sep 2015 11:45:40 +0100
+Subject: [PATCH] arm: wire up userfaultfd and membarrier syscalls
+In-Reply-To: <20150921171715.GR21084@n2100.arm.linux.org.uk>
+References: <1442854833-10592-1-git-send-email-andre.przywara@arm.com>
+ <20150921171715.GR21084@n2100.arm.linux.org.uk>
+Message-ID: <56013154.1010401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Sep 2015, tip-bot for Ludovic Desroches wrote:
+Hi Russell,
 
-> Commit-ID:  478cc7b33413a4ad50852239d931d55e622f1cde
-> Gitweb:     http://git.kernel.org/tip/478cc7b33413a4ad50852239d931d55e622f1cde
+On 21/09/15 18:17, Russell King - ARM Linux wrote:
+> On Mon, Sep 21, 2015 at 06:00:33PM +0100, Andre Przywara wrote:
+>> Add the syscall numbers to the ARM syscall table. Both have
+>> been briefly tested using the provided selftests from the tools
+>> directory.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>> Hi Russell,
+>>
+>> I saw that Thierry sent something similar beginning of August already
+>> (which is now outdated), is there any issue with enabling syscalls?
+> 
+> The only issue there is is that this was mentioned last week, and I
+> replied about it last week.
 
-FYI, I zapped that commit again after noticing that locking
-strangeness.
+I missed that because I only looked in the ARM kernel ML, sorry about that.
 
-Thanks,
+> I already have a patch pending for it, but I've been unable to merge
+> it into mainline as my tree became somewhat messy due to the fixes
+> missing -rc1 - which meant that my fixes branch was not recent enough
+> to take that patch.  Now that those fixes are in, I can now start
+> sorting my tree out, as I'd normally do after -rc1.
 
-	tglx
+Fair enough and sorry for the noise.
+
+Cheers,
+Andre
