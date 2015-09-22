@@ -1,78 +1,35 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 22 Sep 2015 15:34:31 +0200
-Subject: [linux-sunxi] Re: [PATCH 5/5] ARM: sun5i: Add C.H.I.P DTS
-In-Reply-To: <56015146.2070509@redhat.com>
-References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
- <1442566130-3497-6-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v64E-gQu1U_qi2fTWiCmfgMdMR4X6yLUerV21d3E1uQ1cw@mail.gmail.com>
- <20150922124708.GZ4684@lukather>
- <CAGb2v662+mhFgv1DXz5muA+xGE99R1DVKOxtVPvJmc+tRFPXzQ@mail.gmail.com>
- <56015146.2070509@redhat.com>
-Message-ID: <560158E7.1070102@redhat.com>
+Date: Tue, 22 Sep 2015 15:36:00 +0200
+Subject: [PATCH 1/6] ARM: dts: axp209: Add usb_power_supply child node to the
+ ax209 node
+Message-ID: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add a node representing the usb power supply part of the axp209 pmic, note
+that the usb power supply and the (to be added later) ac power supply will
+each have their own child-node, so that they can be separately specified
+as power-supply for other nodes using a power-supply property with a
+phandle pointing to the right axp209 child-node.
 
-On 22-09-15 15:01, Hans de Goede wrote:
-> Hi,
->
-> On 22-09-15 14:57, Chen-Yu Tsai wrote:
->> On Tue, Sep 22, 2015 at 8:47 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->
-> <snip>
->
->>>>> +&usb_otg {
->>>>> +       dr_mode = "otg";
->>>>> +       status = "okay";
->>>>> +};
->>>>> +
->>>>> +&usbphy {
->>>>> +       pinctrl-names = "default";
->>>>> +       pinctrl-0 = <&chip_id_det_pin>;
->>>>> +       status = "okay";
->>>>> +
->>>>> +       usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
->>>>
->>>> Better leave a comment here saying VBUS detection requires AXP209
->>>> usb-power-supply support.
->>>
->>> Does it? It can be powered by a battery, with or without VBUS, and
->>> that wouldn't be tied to the fact that the power-supply is USB or
->>> something else.
->>
->> The AXP209 VBUS / USB power-supply also doubles for VBUS detection,
->> which on most boards is done using a separate GPIO pin. Hans posted
->> support for the AXP20X power-supply driver, and support in the usb
->> phy driver using it for VBUS detection.
->
-> Ack.
->
->> In short, this is not about "power supply" but VBUS detection. IIRC,
->> if no VBUS detection method is provided, the phy driver just waits a
->> period of time after an ID pin change and then considers VBUS invalid.
->
-> Right, but that is a hack for boards with no / broken vbus detection
-> (or vbus control), we really want to use vbus-det where available,
-> so I agree that a TODO comment here would be good.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/axp209.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-The axp209 usb-power-supply has just been merged into
-linux-power-supply/next so even better we can simply update axp209.dtsi
-with the node, and add do the right thing in the CHIP dts right away.
-
-I'll send out all the dts patches which I've had queued up waiting
-for this driver to get merged, including the axp209.dtsi changes.
-
-Regards,
-
-Hans
-
-
-
-
-
->
-> Regards,
->
-> Hans
+diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
+index 24c935c..051ab3b 100644
+--- a/arch/arm/boot/dts/axp209.dtsi
++++ b/arch/arm/boot/dts/axp209.dtsi
+@@ -89,4 +89,9 @@
+ 			regulator-name = "ldo5";
+ 		};
+ 	};
++
++	usb_power_supply: usb_power_supply {
++		compatible = "x-powers,axp202-usb-power-supply";
++		status = "disabled";
++	};
+ };
+-- 
+2.4.3
