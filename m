@@ -1,64 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 Sep 2015 20:41:34 +0100
-Subject: [PATCH v5 0/6] irqchip, gicv3: Updates and Cavium ThunderX
- errata workarounds
-In-Reply-To: <20150922182726.GN7356@arm.com>
-References: <1442869119-1814-1-git-send-email-rric@kernel.org>
- <20150922175701.65ee4437@arm.com> <20150922190932.4391652a@arm.com>
- <20150922182726.GN7356@arm.com>
-Message-ID: <20150922204134.7491db93@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 22 Sep 2015 12:46:54 -0700
+Subject: [PATCH v3 5/5] cpufreq: qoriq: Don't look at clock
+ implementation details
+In-Reply-To: <1442723397-26329-6-git-send-email-scottwood@freescale.com>
+References: <1442723397-26329-1-git-send-email-scottwood@freescale.com>
+ <1442723397-26329-6-git-send-email-scottwood@freescale.com>
+Message-ID: <20150922194654.GJ24314@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Sep 2015 19:27:26 +0100
-Will Deacon <will.deacon@arm.com> wrote:
-
-> On Tue, Sep 22, 2015 at 07:09:32PM +0100, Marc Zyngier wrote:
-> > On Tue, 22 Sep 2015 17:57:01 +0100
-> > Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > 
-> > [Duh. Now with Will and Catalin on CC]
-> > 
-> > > On Mon, 21 Sep 2015 22:58:33 +0200
-> > > Robert Richter <rric@kernel.org> wrote:
-> > > 
-> > > > From: Robert Richter <rrichter@cavium.com>
-> > > > 
-> > > > This patch series adds gicv3 updates and workarounds for HW errata in
-> > > > Cavium's ThunderX GICV3.
-> > > > 
-> > > > The patches has been rebased onto 4.3-rc1. Note that there are two
-> > > > important fixes. See below for all changes.
-> > > > 
-> > > > The first one is an unchanged resubmission of a patch from a gicv3
-> > > > series I sent a while ago.
-> > > > 
-> > > > The next patches implement the workarounds for ThunderX's gicv3. Patch
-> > > > #2 implements the cpu workaround for gicv3 on ThunderX. Patch #3 is a
-> > > > prerequisit for patch #5. Patch #4 adds generic code to parse the hw
-> > > > revision provided by an IIDR. This patch is used for the implementa-
-> > > > tion of the actual gicv3-its workaround in #5. Patch #6 updates to the
-> > > > new jump label API.
-> > > > 
-> > > > All current review comments addressed so far with v5
-> > > 
-> > > Catalin, Will: assuming you don't have any objection to this series,
-> > > how do you want to deal with patch 2?
+On 19-09-15, 23:29, Scott Wood wrote:
+> Get the CPU clock's potential parent clocks from the clock interface
+> itself, rather than manually parsing the clocks property to find a
+> phandle, looking at the clock-names property of that, and assuming that
+> those are valid parent clocks for the cpu clock.
 > 
-> What are the actual dependencies here? AFAICT, the series is addressing
-> multiple errata, so would it be possible to make the arm64 bits somewhat
-> independent from the gic parts?
+> This is necessary now that the clocks are generated based on the clock
+> driver's knowledge of the chip rather than a fragile device-tree
+> description of the mux options.
+> 
+> We can now rely on the clock driver to ensure that the mux only exposes
+> options that are valid.  The cpufreq driver was currently being overly
+> conservative in some cases -- for example, the "min_cpufreq =
+> get_bus_freq()" restriction only applies to chips with erratum
+> A-004510, and whether the freq_mask used on p5020 is needed depends on
+> the actual frequencies of the PLLs (FWIW, p5040 has a similar
+> limitation but its .freq_mask was zero) -- and the frequency mask
+> mechanism made assumptions about particular parent clock indices that
+> are no longer valid.
+> 
+> Signed-off-by: Scott Wood <scottwood@freescale.com>
+> ---
+> v3: was patch 1/5 and patch 4/5, plus blacklist e6500 and changes
+> to clk api usage
+> 
+>  drivers/cpufreq/qoriq-cpufreq.c | 137 ++++++++++++----------------------------
+>  1 file changed, 40 insertions(+), 97 deletions(-)
 
-Patch 2 could be split into an arm64-specific part and a gic part, with
-a bit of #ifdef-ery in gicv3_enable_quirks().
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-> Also, I assume this is targetting 4.4?
-
-Up to you, really. It is not a regression, but it would still be nice
-to have 4.3 working reliably on this HW.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+viresh
