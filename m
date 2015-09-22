@@ -1,68 +1,151 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 22 Sep 2015 09:12:42 +0200
-Subject: [PATCH resend] extcon: Fix attached value returned by
- is_extcon_changed
-In-Reply-To: <5600B290.9090502@samsung.com>
-References: <1442752494-22244-1-git-send-email-hdegoede@redhat.com>
- <1442752494-22244-2-git-send-email-hdegoede@redhat.com>
- <55FF5F2F.9010504@samsung.com> <55FFEA1F.7050500@redhat.com>
- <5600B290.9090502@samsung.com>
-Message-ID: <5600FF6A.7060305@redhat.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 22 Sep 2015 14:00:01 +0800
+Subject: [PATCH v2 2/2] ARM: imx6: change default burst size for USB
+In-Reply-To: <1442901601-13738-1-git-send-email-peter.chen@freescale.com>
+References: <1442901601-13738-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <1442901601-13738-2-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+It can improve the USB performance when choosing larger
+burst size at some systems (bus size is larger), there is
+no side effect if this burst size is larger than bus size.
 
-On 22-09-15 03:44, Chanwoo Choi wrote:
-> Hi,
->
-> On 2015? 09? 21? 20:29, Hans de Goede wrote:
->> Hi,
->>
->> On 21-09-15 03:36, Chanwoo Choi wrote:
->>> On 2015? 09? 20? 21:34, Hans de Goede wrote:
->>>> is_extcon_changed should only check the idx-th bit of new, not
->>>> the entirety of new when setting attached.
->>>>
->>>> This fixes extcon sending notifications that a cable was inserted when
->>>> it gets removed while another cable is still connected.
->>>>
->>>> Cc: stable at vger.kernel.org
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>> ---
->>>>    drivers/extcon/extcon.c | 2 +-
->>>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/extcon/extcon.c b/drivers/extcon/extcon.c
->>>> index a07addd..8dd0af1 100644
->>>> --- a/drivers/extcon/extcon.c
->>>> +++ b/drivers/extcon/extcon.c
->>>> @@ -159,7 +159,7 @@ static int find_cable_index_by_name(struct extcon_dev *edev, const char *name)
->>>>    static bool is_extcon_changed(u32 prev, u32 new, int idx, bool *attached)
->>>>    {
->>>>        if (((prev >> idx) & 0x1) != ((new >> idx) & 0x1)) {
->>>> -        *attached = new ? true : false;
->>>> +        *attached = ((new >> idx) & 0x1) ? true : false;
->>>>            return true;
->>>>        }
->>>>
->>>>
->>>
->>> This patch was already applied[1].
->>> [1] https://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/log/?h=extcon-next
->>
->> Yet it is not in 4.3-rc1, applying the patch to your tree is not useful
->> unless you also send a pull-req to get the changes in your tree actually
->> merged ...
->
-> No. It is useful step. It is first step to send pull-request for including the main tree.
-> I'll send pull-request before releasing official version.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
 
-This patch fixes a bug in the extcon core, thus affecting ALL extcon users, the patch
-is trivial, so IMHO this patch should have been part of a pull-req already, adn should
-be Cc: stable at vger.kernel.org. When you do you plan to submit a pullreq with this
-patch ?
+Changes for v2:
+- Applies changes for imx6ul
 
-Regards,
+ arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++++++
+ arch/arm/boot/dts/imx6sl.dtsi  | 6 ++++++
+ arch/arm/boot/dts/imx6sx.dtsi  | 6 ++++++
+ arch/arm/boot/dts/imx6ul.dtsi  | 4 ++++
+ 4 files changed, 24 insertions(+)
 
-Hans
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 3d04a17..92c5cc0 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -907,6 +907,8 @@
+ 				fsl,usbphy = <&usbphy1>;
+ 				fsl,usbmisc = <&usbmisc 0>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -919,6 +921,8 @@
+ 				fsl,usbmisc = <&usbmisc 1>;
+ 				dr_mode = "host";
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -930,6 +934,8 @@
+ 				fsl,usbmisc = <&usbmisc 2>;
+ 				dr_mode = "host";
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -941,6 +947,8 @@
+ 				fsl,usbmisc = <&usbmisc 3>;
+ 				dr_mode = "host";
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 057b1d4..2c0faeb 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -690,6 +690,8 @@
+ 				fsl,usbphy = <&usbphy1>;
+ 				fsl,usbmisc = <&usbmisc 0>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -701,6 +703,8 @@
+ 				fsl,usbphy = <&usbphy2>;
+ 				fsl,usbmisc = <&usbmisc 1>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -712,6 +716,8 @@
+ 				fsl,usbmisc = <&usbmisc 2>;
+ 				dr_mode = "host";
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 70a7c4f..01191c0 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -784,6 +784,8 @@
+ 				fsl,usbmisc = <&usbmisc 0>;
+ 				fsl,anatop = <&anatop>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -795,6 +797,8 @@
+ 				fsl,usbphy = <&usbphy2>;
+ 				fsl,usbmisc = <&usbmisc 1>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -808,6 +812,8 @@
+ 				fsl,anatop = <&anatop>;
+ 				dr_mode = "host";
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 654009f..28dcd68 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -536,6 +536,8 @@
+ 				fsl,usbmisc = <&usbmisc 0>;
+ 				fsl,anatop = <&anatop>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -547,6 +549,8 @@
+ 				fsl,usbphy = <&usbphy2>;
+ 				fsl,usbmisc = <&usbmisc 1>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+-- 
+1.9.1
