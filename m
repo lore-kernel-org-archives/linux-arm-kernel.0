@@ -1,56 +1,62 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 22 Sep 2015 17:23:16 +0100
-Subject: [PATCH v2] iommu/io-pgtable-arm: Don't use dma_to_phys()
-In-Reply-To: <1442928308.17514.3.camel@mhfsdcap03>
-References: <59f4ebbf06e75a6176a366495211afd16d0048a3.1442507940.git.robin.murphy@arm.com>
- <1442566550.8145.156.camel@mhfsdcap03> <55FBEFBA.6000606@arm.com>
- <1442928308.17514.3.camel@mhfsdcap03>
-Message-ID: <56018074.2010104@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 22 Sep 2015 11:08:36 -0500
+Subject: [PATCH 1/3] Documentation: dt: keystone: provide SoC specific
+ compatible flags
+In-Reply-To: <1442938118-4718-1-git-send-email-nm@ti.com>
+References: <1442938118-4718-1-git-send-email-nm@ti.com>
+Message-ID: <1442938118-4718-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/09/15 14:25, Yong Wu wrote:
-[...]
-> About here:
->> @@ -629,6 +626,11 @@ arm_lpae_alloc_pgtable(struct io_pgtable_cfg
-> *cfg)
->>        if (cfg->oas > ARM_LPAE_MAX_ADDR_BITS)
->>                return NULL;
->>   
->> +     if (cfg->iommu_dev->dma_pfn_offset) {
-> 
-> Do we need change to :
-> 	if (!selftest_running && cfg->iommu_dev->dma_pfn_offset) {
-> 
-> cfg->iommu_dev will be null while self test.
+Keystone2 devices are used on more platforms than just Texas
+Instruments reference evaluation platforms called EVMs. Providing a
+generic compatible "ti,keystone" is not sufficient to differentiate
+various SoC definitions possible on various platforms. So, provide
+compatible matches for each SoC family by itself.
 
-Urgh, you're absolutely right. Must have been one of those days when I
-had loads of noisy debug in there and turned the self-tests off :(
+This allows SoC specific logic to be run time handled based on
+of_machine_is_compatible("ti,k2hk") or as needed for the dependent
+processor instead of needing to use board dependent compatibles that
+are needed now.
 
-Will; since the branch hasn't gone anywhere yet, are you OK to take the below?
-
-Robin.
-
------>8-----
-From: Robin Murphy <robin.murphy@arm.com>
-Date: Tue, 22 Sep 2015 14:52:27 +0100
-Subject: [PATCH] fixup! iommu/io-pgtable-arm: Don't use dma_to_phys()
-
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- drivers/iommu/io-pgtable-arm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../devicetree/bindings/arm/keystone/keystone.txt    | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 1f08ce7..2ba2323 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -628,7 +628,7 @@ arm_lpae_alloc_pgtable(struct io_pgtable_cfg *cfg)
-        if (cfg->oas > ARM_LPAE_MAX_ADDR_BITS)
-                return NULL;
+diff --git a/Documentation/devicetree/bindings/arm/keystone/keystone.txt b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+index 59d7a46f85eb..800d2d02e27b 100644
+--- a/Documentation/devicetree/bindings/arm/keystone/keystone.txt
++++ b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+@@ -9,12 +9,26 @@ Required properties:
+    the form "ti,keystone-*". Generic devices like gic, arch_timers, ns16550
+    type UART should use the specified compatible for those devices.
  
--       if (cfg->iommu_dev->dma_pfn_offset) {
-+       if (!selftest_running && cfg->iommu_dev->dma_pfn_offset) {
-                dev_err(cfg->iommu_dev, "Cannot accommodate DMA offset for IOMMU page tables\n");
-                return NULL;
-        }
++SoC families:
++
++- Keystone 2 generic SoC:
++   compatible = "ti,keystone"
++
++SoCs:
++
++- Keystone 2 Hawking/Kepler
++   compatible = ti,k2hk", "ti,keystone"
++- Keystone 2 Lamarr
++   compatible = ti,k2l", "ti,keystone"
++- Keystone 2 Edison
++   compatible = ti,k2e", "ti,keystone"
++
+ Boards:
+ -  Keystone 2 Hawking/Kepler EVM
+-   compatible = "ti,k2hk-evm","ti,keystone"
++   compatible = "ti,k2hk-evm", "ti,k2hk", "ti,keystone"
+ 
+ -  Keystone 2 Lamarr EVM
+-   compatible = "ti,k2l-evm","ti,keystone"
++   compatible = "ti,k2l-evm", "ti, k2l", "ti,keystone"
+ 
+ -  Keystone 2 Edison EVM
+-   compatible = "ti,k2e-evm","ti,keystone"
++   compatible = "ti,k2e-evm", "ti,k2e", "ti,keystone"
+-- 
+2.1.4
