@@ -1,47 +1,81 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 22 Sep 2015 16:49:11 -0700
-Subject: [PATCH v3 0/6] PCI: generic: Misc. bug fixes/enhancements
-Message-ID: <1442965757-12925-1-git-send-email-ddaney.cavm@gmail.com>
+Date: Tue, 22 Sep 2015 16:49:12 -0700
+Subject: [PATCH v3 1/6] PCI: Add pci_bus_fixup_irqs().
+In-Reply-To: <1442965757-12925-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1442965757-12925-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1442965757-12925-2-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-While using the pci-host-generic driver to add PCI support for the
-Cavium ThunderX processors, several bugs were discovered.  This patch
-set fixes the bugs, a follow-on set will add the ThunderX support.
+pci_bus_fixup_irqs() works like pci_fixup_irqs(), except it only does
+the fixups for devices on the specified bus.
 
-Changes from v2:
+Follow-on patch will use the new function.
 
-  - Added " PCI: generic: Claim device resources if PCI_PROBE_ONLY"
+Signed-off-by: David Daney <david.daney@cavium.com>
+---
+No change from v2.
 
-Changes from v1:
+This patch didn't exist in v1 of the set.
 
-  - "PCI: generic: Allow bus default MSI controller to be specified."
-    patch was dropped as it is no longer necessary.
+ drivers/pci/setup-irq.c | 30 ++++++++++++++++++++++++++++++
+ include/linux/pci.h     |  4 ++++
+ 2 files changed, 34 insertions(+)
 
-  - "PCI: Make global and export pdev_fixup_irq()." and "PCI: generic:
-    Only fixup irqs for bus we are creating." were rewritten to move
-    the support into a somewhat more generic form in setup-irq.c.
-
-  - Add some clarifying text to host-generic-pci.txt
-
-  - Add some Acked-by:
-
-
-David Daney (6):
-  PCI: Add pci_bus_fixup_irqs().
-  PCI: generic: Only fixup irqs for bus we are creating.
-  PCI: generic: Quit clobbering our pci_ops.
-  PCI: generic: Correct, and avoid overflow, in bus_max calculation.
-  PCI: generic: Pass proper starting bus number to pci_scan_root_bus().
-  PCI: generic: Claim device resources if PCI_PROBE_ONLY
-
- .../devicetree/bindings/pci/host-generic-pci.txt   |  4 +-
- drivers/pci/host/pci-host-generic.c                | 59 +++++++++++++++-------
- drivers/pci/setup-irq.c                            | 30 +++++++++++
- include/linux/pci.h                                |  4 ++
- 4 files changed, 79 insertions(+), 18 deletions(-)
-
+diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
+index 95c225b..189ad17 100644
+--- a/drivers/pci/setup-irq.c
++++ b/drivers/pci/setup-irq.c
+@@ -66,3 +66,33 @@ void pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
+ 		pdev_fixup_irq(dev, swizzle, map_irq);
+ }
+ EXPORT_SYMBOL_GPL(pci_fixup_irqs);
++
++struct pci_bus_fixup_cb_info {
++	u8 (*swizzle)(struct pci_dev *, u8 *);
++	int (*map_irq)(const struct pci_dev *, u8, u8);
++};
++
++static int pci_bus_fixup_irq_cb(struct pci_dev *dev, void *arg)
++{
++	struct pci_bus_fixup_cb_info *info = arg;
++
++	pdev_fixup_irq(dev, info->swizzle, info->map_irq);
++	return 0;
++}
++
++/*
++ * Fixup the irqs only for devices on the given bus using supplied
++ * swizzle and map_irq function pointers
++ */
++void pci_bus_fixup_irqs(struct pci_bus *bus,
++			u8 (*swizzle)(struct pci_dev *, u8 *),
++			int (*map_irq)(const struct pci_dev *, u8, u8))
++{
++	struct pci_bus_fixup_cb_info info;
++
++	info.swizzle = swizzle;
++	info.map_irq = map_irq;
++	pci_walk_bus(bus, pci_bus_fixup_irq_cb, &info);
++
++}
++EXPORT_SYMBOL_GPL(pci_bus_fixup_irqs);
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index e90eb22..b505b50 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1120,6 +1120,10 @@ void pdev_enable_device(struct pci_dev *);
+ int pci_enable_resources(struct pci_dev *, int mask);
+ void pci_fixup_irqs(u8 (*)(struct pci_dev *, u8 *),
+ 		    int (*)(const struct pci_dev *, u8, u8));
++void pci_bus_fixup_irqs(struct pci_bus *,
++			u8 (*)(struct pci_dev *, u8 *),
++			int (*)(const struct pci_dev *, u8, u8));
++
+ #define HAVE_PCI_REQ_REGIONS	2
+ int __must_check pci_request_regions(struct pci_dev *, const char *);
+ int __must_check pci_request_regions_exclusive(struct pci_dev *, const char *);
 -- 
 1.9.1
