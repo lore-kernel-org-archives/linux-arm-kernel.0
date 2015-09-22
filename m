@@ -1,34 +1,34 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 22 Sep 2015 11:52:19 +0100
-Subject: [PATCH] generic syscalls: wire up userfaultfd syscall
-Message-ID: <1442919139-18027-1-git-send-email-andre.przywara@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 22 Sep 2015 12:59:00 +0200 (CEST)
+Subject: [PATCH v3] arm: Fix backtrace generation when IPI is masked
+In-Reply-To: <1442328005-13661-1-git-send-email-daniel.thompson@linaro.org>
+References: <1442222294-2756-1-git-send-email-daniel.thompson@linaro.org>
+ <1442328005-13661-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <alpine.DEB.2.11.1509221258330.5606@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the new userfaultfd syscall in the generic syscall table.
-Briefly tested on arm64 with the selftest from the tools directory.
+On Tue, 15 Sep 2015, Daniel Thompson wrote:
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- include/uapi/asm-generic/unistd.h | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+> Currently on ARM when <SysRq-L> is triggered from an interrupt handler
+> (e.g. a SysRq issued using UART or kbd) the main CPU will wedge for ten
+> seconds with interrupts masked before issuing a backtrace for every CPU
+> except itself.
+> 
+> The new backtrace code introduced by commit 96f0e00378d4 ("ARM: add
+> basic support for on-demand backtrace of other CPUs") does not work
+> correctly when run from an interrupt handler because IPI_CPU_BACKTRACE
+> is used to generate the backtrace on all CPUs but cannot preempt the
+> current calling context.
+> 
+> This can be fixed by detecting that the calling context cannot be
+> preempted and issuing the backtrace directly in this case. Issuing
+> directly leaves us without any pt_regs to pass to nmi_cpu_backtrace()
+> so we also modify the generic code to call dump_stack() when its
+> argument is NULL.
+> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 
-diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
-index 8da542a..82c91bc 100644
---- a/include/uapi/asm-generic/unistd.h
-+++ b/include/uapi/asm-generic/unistd.h
-@@ -711,9 +711,11 @@ __SYSCALL(__NR_bpf, sys_bpf)
- __SC_COMP(__NR_execveat, sys_execveat, compat_sys_execveat)
- #define __NR_membarrier 282
- __SYSCALL(__NR_membarrier, sys_membarrier)
-+#define __NR_userfaultfd 283
-+__SYSCALL(__NR_userfaultfd, sys_userfaultfd)
- 
- #undef __NR_syscalls
--#define __NR_syscalls 283
-+#define __NR_syscalls 284
- 
- /*
-  * All syscalls below here should go away really,
--- 
-2.5.1
+For the genric part.
+
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
