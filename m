@@ -1,34 +1,43 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 21 Sep 2015 19:05:08 -0700
-Subject: [PATCH v2 4/4] ARM: bcm2835: Switch to using the new clock driver
- support.
-In-Reply-To: <1441922305-2298-4-git-send-email-eric@anholt.net>
-References: <1441922305-2298-1-git-send-email-eric@anholt.net>
- <1441922305-2298-4-git-send-email-eric@anholt.net>
-Message-ID: <5600B754.8000802@wwwdotorg.org>
+Date: Mon, 21 Sep 2015 19:11:38 -0700
+Subject: [PATCH 2/3] clk: bcm2835: Add a driver for the auxiliary
+ peripheral clock gates.
+In-Reply-To: <1441923750-19404-3-git-send-email-eric@anholt.net>
+References: <1441923750-19404-1-git-send-email-eric@anholt.net>
+ <1441923750-19404-3-git-send-email-eric@anholt.net>
+Message-ID: <5600B8DA.4030406@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2015 02:58 PM, Eric Anholt wrote:
-> This will give us the ability to set the pixel and HDMI state machine
-> clocks for the VC4 KMS driver, change the CPU frequency, and
-> potentially gate clocks in the future (once we also write a power
-> domain driver).  It also gives the uart an explicit clock reference,
-> so that we don't need to change the physical addresses of the old
-> fixed clk_bcm2835.c clocks for Raspberry Pi 2 port.
-> 
-> Two clocks get their frequencies updated as a result of this.  One is
-> uart's apb_pclk, which was previously accidentally grabbing the fixed
-> uart0_pclk due to the apb_pclk not having clk_register_clkdev()
-> called.  The uart doesn't seem to do anything with apb_pclk other than
-> make sure it's on, so that appears safe (also, as far as I can see,
-> the apb clock is actually the same as the VPU clock).  The other is
-> EMMC, which according to the docs was supposed to be in the 50-100Mhz
-> range, but it turns out the firmware needed to change to running it at
-> the 250Mhz core clock speed to avoid a bug in clock domain crossing.
-> 
-> Additionally, anything using BCM2835_CLOCK_VPU will now have a correct
-> clock rate if the user configures the boot-time core clock speed using
-> config.txt.
+On 09/10/2015 03:22 PM, Eric Anholt wrote:
+> There are a pair of SPI masters and a mini UART that were last minute
+> additions.  As a result, they didn't get integrated in the same way as
+> the other gates off of the VPU clock in CPRMAN.
 
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> diff --git a/drivers/clk/bcm/clk-bcm2835-aux.c b/drivers/clk/bcm/clk-bcm2835-aux.c
+
+> +static int bcm2835_aux_clk_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct clk_onecell_data *onecell;
+> +	const char *parent;
+> +	struct clk *parent_clk;
+> +	void __iomem *reg;
+> +
+> +	parent_clk = of_clk_get(dev->of_node, 0);
+> +	if (IS_ERR(parent_clk))
+> +		return PTR_ERR(parent_clk);
+> +	parent = __clk_get_name(parent_clk);
+
+I think all the comments I made on probe() for the main bcm2835 clock
+driver likely apply here too.
+
+Also, is it "legal" for clock drivers to use __clk_get_name()? I thought
+that was a clock core internal function, but may be wrong. I would have
+expected to be able to pass a clock object when registering clocks
+rather than a clock name, but oh well.
+
+BTW, I like how this series shows how useful it is for someone with full
+knowledge of the HW to come up with the DT bindings for a HW module;
+once you know how the HW is actually designed, the correct binding ends
+up being a lot easier to come up with, rather than guessing:-)
