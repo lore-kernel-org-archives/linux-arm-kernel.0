@@ -1,50 +1,36 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 22 Sep 2015 14:07:20 +0100
-Subject: [PATCH 3/3] regulator: vexpress: Fix module autoload for OF
- platform driver
-In-Reply-To: <20150918170951.GA28327@goodgumbo.baconseed.org>
-References: <20150918170951.GA28327@goodgumbo.baconseed.org>
-Message-ID: <20150922130720.GA31314@e106497-lin.cambridge.arm.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 22 Sep 2015 15:12:31 +0200
+Subject: [PATCH v4 resend 0/2] power: Add an axp20x-usb-power driver
+In-Reply-To: <1442752773-22635-1-git-send-email-hdegoede@redhat.com>
+References: <1442752773-22635-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150922131231.GB23334@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 06:09:51PM +0100, Luis de Bethencourt wrote:
-> This platform driver has a OF device ID table but the OF module
-> alias information is not created so module autoloading won't work.
-> 
-> Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
+Hi,
 
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+On Sun, Sep 20, 2015 at 08:39:31AM -0400, Hans de Goede wrote:
+> This is a resend of v4 of the axp20x-usb-power power-supply driver,
+> after v4 there have been no further comments, so I assume that this
+> version is ready for merging, yet for some reason it has not been
+> merged yet.
 
-Thanks,
-Liviu
+My fault. I did not have enough time before my vacation.
 
-> ---
->  drivers/regulator/vexpress.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/regulator/vexpress.c b/drivers/regulator/vexpress.c
-> index bed9d3e..c810cbb 100644
-> --- a/drivers/regulator/vexpress.c
-> +++ b/drivers/regulator/vexpress.c
-> @@ -103,6 +103,7 @@ static const struct of_device_id vexpress_regulator_of_match[] = {
->  	{ .compatible = "arm,vexpress-volt", },
->  	{ }
->  };
-> +MODULE_DEVICE_TABLE(of, vexpress_regulator_of_match);
->  
->  static struct platform_driver vexpress_regulator_driver = {
->  	.probe = vexpress_regulator_probe,
-> -- 
-> 2.4.6
-> 
+> Can we please get this driver merged (preferably into 4.3,
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+It's obviously too late now.
+
+> but if not at least lets get it into next / 4.4 asap).
+
+I already merged this into my (local) dev branch last week. I
+just pushed it out, so it should appear in next tomorrow.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/bdb81ddb/attachment-0001.sig>
