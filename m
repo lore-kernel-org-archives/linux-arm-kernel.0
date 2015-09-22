@@ -1,39 +1,173 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Tue, 22 Sep 2015 07:15:00 -0700
-Subject: ARM64 readahead: fault retry breaks mmap file read random
- detection
-In-Reply-To: <20150921235120.GI7356@arm.com>
-References: <1442868028-27055-1-git-send-email-salyzyn@android.com>
- <20150921210938.GC7356@arm.com> <56007868.8050605@android.com>
- <20150921235120.GI7356@arm.com>
-Message-ID: <56016264.50509@android.com>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Tue, 22 Sep 2015 22:15:17 +0800
+Subject: [PATCH v1 1/3] clocksource: rockchip: Make the driver more
+ readability and compatible
+In-Reply-To: <5455510.kk9S3OIaU9@diego>
+References: <1442566271-10695-1-git-send-email-wxt@rock-chips.com>
+ <1442566271-10695-2-git-send-email-wxt@rock-chips.com>
+ <5455510.kk9S3OIaU9@diego>
+Message-ID: <56016275.4080704@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2015 04:51 PM, Will Deacon wrote:
-> On Mon, Sep 21, 2015 at 10:36:40PM +0100, Mark Salyzyn wrote:
->> On 09/21/2015 02:09 PM, Will Deacon wrote:
->>> On Mon, Sep 21, 2015 at 09:39:50PM +0100, Mark Salyzyn wrote:
->>>> Description from commit 45cac65b0fcd
->>>>       ("readahead: fault retry breaks mmap file read random detection")
->>>> . . .
->>>> Yup, arm64 needs this too! Random read improves by 250%, sequential
->>>> read improves by 40%, and random write by 400% to an eMMC device with
->>>> dm crypto wrapped around it.
->>> Thanks for this. This must've gone in whilst we were developing the initial
->>> version of the arm64 port and has since gone unnoticed.
->>>
->>> I'll queue it on the arm64 fixes branch and send a pull request after
->>> some testing.
->>>
->> As noted, this fix may need to be propagated to all the arch-specific
->> code, I was not in a position to check this out on arm (32 bit) and the
->> benchmarking code I used did not immediately port to 32-bit.
-> You lost me; which arch-specific code are you referring to? The original
-> patch (in mainline) touches a whole bunch of architectures.
->
-> Will
-I see I am mistaken, arm64 was the _only_ one I see that is missing ... 
-<grin>
+Hi  Heiko,
 
-Sincerely -- Mark Salyzyn
+? 2015?09?22? 22:00, Heiko St?bner ??:
+> Hi Caesar,
+>
+> Am Freitag, 18. September 2015, 16:51:09 schrieb Caesar Wang:
+>> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
+>> There are some failure with build up on timer driver for rockchip.
+>>
+>> logs:
+>> ...
+>> drivers/clocksource/rockchip_timer.c:156:13: error: 'NO_IRQ' undeclared
+>> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand 1 --
+>> `dsb`
+>> ...
+>>
+>> The problem was different semantics of dsb on btw arm32 and arm64,
+>> Here we can convert the dsb with insteading of dsb(sy).
+>>
+>> NO_IRQ definition is missing for ARM64, since NO_IRQ being -1 is a
+>> legacy thing for ARM - all ARM drivers are supposed to be converted to
+>> use <= 0 or == 0 to detect invalid IRQs, and _eventually_ once all users
+>> are gone, NO_IRQ deleted. Modern drivers should _all_ be using !irq to
+>> detect invalid IRQs, and not using NO_IRQ.
+>>
+>> Meanwhile, I change a bit to make the code more readability for driver
+>> when I check the code style.
+>>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>> ---
+>>
+>> Changes in v1:
+>> - As Russell, Thomas, Daniel comments, let's replace NO_IRQ by '!irq'.
+>>
+>>   drivers/clocksource/rockchip_timer.c | 29 +++++++++++++++--------------
+>>   1 file changed, 15 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/rockchip_timer.c
+>> b/drivers/clocksource/rockchip_timer.c index bb2c2b0..e1af449 100644
+>> --- a/drivers/clocksource/rockchip_timer.c
+>> +++ b/drivers/clocksource/rockchip_timer.c
+>> @@ -17,16 +17,16 @@
+>>
+>>   #define TIMER_NAME "rk_timer"
+>>
+>> -#define TIMER_LOAD_COUNT0 0x00
+>> -#define TIMER_LOAD_COUNT1 0x04
+>> -#define TIMER_CONTROL_REG 0x10
+>> -#define TIMER_INT_STATUS 0x18
+>> +#define TIMER_LOAD_COUNT0	0x00
+>> +#define TIMER_LOAD_COUNT1	0x04
+>> +#define TIMER_CONTROL_REG	0x10
+>> +#define TIMER_INT_STATUS	0x18
+>>
+>> -#define TIMER_DISABLE 0x0
+>> -#define TIMER_ENABLE 0x1
+>> -#define TIMER_MODE_FREE_RUNNING (0 << 1)
+>> -#define TIMER_MODE_USER_DEFINED_COUNT (1 << 1)
+>> -#define TIMER_INT_UNMASK (1 << 2)
+>> +#define TIMER_DISABLE			(0 << 0)
+>> +#define TIMER_ENABLE			(1 << 0)
+>> +#define TIMER_MODE_FREE_RUNNING		(0 << 1)
+>> +#define TIMER_MODE_USER_DEFINED_COUNT	(1 << 1)
+>> +#define TIMER_INT_UNMASK		(1 << 2)
+> not sure how Daniel sees this, but those could count as "unrelated change", as
+> they have nothing to do with the arm64 build-fixes.
+
+Yep, it's no related to the arm64 uild fixes.
+I only make the code more readability for driver.
+
+>
+>>   struct bc_timer {
+>>   	struct clock_event_device ce;
+>> @@ -49,14 +49,14 @@ static inline void __iomem *rk_base(struct
+>> clock_event_device *ce) static inline void rk_timer_disable(struct
+>> clock_event_device *ce) {
+>>   	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
+>> -	dsb();
+>> +	dsb(sy);
+>>   }
+>>
+>>   static inline void rk_timer_enable(struct clock_event_device *ce, u32
+>> flags) {
+>>   	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+>>   		       rk_base(ce) + TIMER_CONTROL_REG);
+>> -	dsb();
+>> +	dsb(sy);
+>>   }
+>>
+>>   static void rk_timer_update_counter(unsigned long cycles,
+>> @@ -64,13 +64,13 @@ static void rk_timer_update_counter(unsigned long
+>> cycles, {
+>>   	writel_relaxed(cycles, rk_base(ce) + TIMER_LOAD_COUNT0);
+>>   	writel_relaxed(0, rk_base(ce) + TIMER_LOAD_COUNT1);
+>> -	dsb();
+>> +	dsb(sy);
+>>   }
+>>
+>>   static void rk_timer_interrupt_clear(struct clock_event_device *ce)
+>>   {
+>>   	writel_relaxed(1, rk_base(ce) + TIMER_INT_STATUS);
+>> -	dsb();
+>> +	dsb(sy);
+>>   }
+>>
+>>   static inline int rk_timer_set_next_event(unsigned long cycles,
+>> @@ -148,7 +148,7 @@ static void __init rk_timer_init(struct device_node *np)
+>> bc_timer.freq = clk_get_rate(timer_clk);
+>>
+>>   	irq = irq_of_parse_and_map(np, 0);
+>> -	if (irq == NO_IRQ) {
+>> +	if (!irq) {
+>>   		pr_err("Failed to map interrupts for '%s'\n", TIMER_NAME);
+>>   		return;
+>>   	}
+>> @@ -173,4 +173,5 @@ static void __init rk_timer_init(struct device_node *np)
+>>
+>>   	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
+>>   }
+>> +
+> unnecessary addition of a blank line (same reasons as above)
+
+It's the same reason with the above.
+
+CHECK: Please use a blank line after function/struct/union/enum declarations
+#176: FILE: rockchip_timer.c:176:
++}
++CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
+
+I know, we can ignore the above warning.
+That's a bit better, I thnik.
+
+
+>>   CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
+>
+> Heiko
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+
+
+-- 
+**************************************************************************************
+???    Caesar Wang
+Product R&D Dept.III
+Fuzhou Rockchip Electronics Co.Ltd
+Addr?  NO.18 Building, A District, Fuzhou Software Park,Gulou District,Fuzhou, Fujian,China(Fuzhou Headquarters)
+               21F,Malata Building,Kejizhongyi Avenue,Nanshan District,Shenzhen  (Shenzhen Office)
+Tel?+86-591-83991906/07 - 8221
+Mobile:+86 15059456742
+E-mail : wxt at rock-chips.com
+***************************************************************************************
+***************************************************************************************
+IMPORTANT NOTICE: This email is from Fuzhou Rockchip Electronics Co., Ltd .The contents of this email and any attachments may
+contain information that is privileged, confidential and/or exempt from disclosure under applicable law and relevant NDA.
+If you are not the intended recipient, you are hereby notified that any disclosure, copying, distribution, or use of the
+information is STRICTLY PROHIBITED. Please immediately contact the sender as soon as possible and destroy the material
+in its entirety in any format. Thank you.
+***************************************************************************************
