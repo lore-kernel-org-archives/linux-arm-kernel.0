@@ -1,29 +1,19 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 Sep 2015 19:44:56 +0100
-Subject: [RFC PATCH v5 3/4] arm64: fix a migrating irq bug when hotplug cpu
-In-Reply-To: <1442631959-10228-4-git-send-email-yangyingliang@huawei.com>
+Date: Tue, 22 Sep 2015 19:48:27 +0100
+Subject: [RFC PATCH v5 2/4] genirq: add irq_migrate_all_off_this_cpu()
+ for cpu hotplug
+In-Reply-To: <1442631959-10228-3-git-send-email-yangyingliang@huawei.com>
 References: <1442631959-10228-1-git-send-email-yangyingliang@huawei.com>
- <1442631959-10228-4-git-send-email-yangyingliang@huawei.com>
-Message-ID: <20150922194456.6b7e65ca@arm.com>
+ <1442631959-10228-3-git-send-email-yangyingliang@huawei.com>
+Message-ID: <20150922194827.6c7deee4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 19 Sep 2015 11:05:58 +0800
+On Sat, 19 Sep 2015 11:05:57 +0800
 Yang Yingliang <yangyingliang@huawei.com> wrote:
 
-> When cpu is disabled, all irqs will be migratged to another cpu.
-> In some cases, a new affinity is different, it needed to be coppied
-> to irq's affinity. But if the type of irq is LPI, it's affinity will
-> not be coppied because of irq_set_affinity's return value. Fix it by
-> using irq_do_set_affinity.
-
-Nit: This hasn't much to do with LPIs proper, but with the fact that
-the architecture code only has a partial knowledge of the possible
-affinity setting return values.
-
-> And migrating interrupts is a core code matter, so use the generic
-> function irq_migrate_all_off_this_cpu() to migrate interrupts in
-> kernel/irq/migration.c.
+> Add irq_migrate_all_off_this_cpu() into kernel/irq/migration.c.
+> So we can use it to migrate interrupts, when cpu is offline.
 > 
 > Cc: Jiang Liu <jiang.liu@linux.intel.com>
 > Cc: Thomas Gleixner <tglx@linutronix.de>
@@ -34,7 +24,7 @@ affinity setting return values.
 > Cc: Hanjun Guo <hanjun.guo@linaro.org>
 > Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
 
-Otherwise Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
 	M.
 -- 
