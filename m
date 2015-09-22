@@ -1,151 +1,94 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 22 Sep 2015 15:43:19 +0800
-Subject: [PATCH v5 07/17] ARM: dts: exynos/dp: remove some properties that
- deprecated by analogix_dp driver
-In-Reply-To: <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
-References: <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1442907799-6266-1-git-send-email-ykk@rock-chips.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 22 Sep 2015 09:45:43 +0200
+Subject: [PATCH 1/3] irqchip: atmel-aic5: fix bug with mask/unmask
+In-Reply-To: <1442843173-2390-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1442843173-2390-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20150922094543.17286b98@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After exynos_dp have been split the common IP code into analogix_dp driver,
-the analogix_dp driver have deprecated some Samsung platform properties which
-could be dynamically parsed from EDID/MODE/DPCD message, so this is an update
-for Exynos DTS file for dp-controller.
+Hi Ludovic,
 
-Beside the backward compatibility is fully preserved, so there are no
-bisectability break that make this change in a separate patch.
+On Mon, 21 Sep 2015 15:46:04 +0200
+Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
-Changes in v5:
-- Correct the misspell in commit message. (Krzysztof)
+> When masking/unmasking interrupts, mask_cache is updated and used later
+> for suspend/resume. Unfortunately, it always was the mask_cache
+> associated with the first irq chip which was updated. So when performing
+> resume, only irqs 0-31 could be enabled and maybe not the good ones!
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Fixes: b1479ebb7720 ("irqchip: atmel-aic: Add atmel AIC/AIC5 drivers")
+> Cc: stable at vger.kernel.org #3.18
 
-Changes in v4:
-- Separate all DTS changes to a separate patch. (Krzysztof)
+To the whole series
 
-Changes in v3: None
-Changes in v2: None
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
- arch/arm/boot/dts/exynos5250-arndale.dts   | 2 --
- arch/arm/boot/dts/exynos5250-smdk5250.dts  | 2 --
- arch/arm/boot/dts/exynos5250-snow.dts      | 4 +---
- arch/arm/boot/dts/exynos5250-spring.dts    | 4 +---
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 4 +---
- arch/arm/boot/dts/exynos5420-smdk5420.dts  | 2 --
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 4 +---
- 7 files changed, 4 insertions(+), 18 deletions(-)
+Thanks,
 
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index db3f65f..4636862 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -124,8 +124,6 @@
- &dp {
- 	status = "okay";
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <4>;
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index c625e71..cd424d6 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -80,8 +80,6 @@
- 
- &dp {
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <4>;
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index 0720caa..242b621 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -244,12 +244,10 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&dp_hpd>;
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <2>;
--	samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
-+	hpd-gpios = <&gpx0 7 GPIO_ACTIVE_HIGH>;
- 
- 	ports {
- 		port at 0 {
-diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
-index c1edd6d..91881d7 100644
---- a/arch/arm/boot/dts/exynos5250-spring.dts
-+++ b/arch/arm/boot/dts/exynos5250-spring.dts
-@@ -74,12 +74,10 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&dp_hpd_gpio>;
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <1>;
--	samsung,hpd-gpio = <&gpc3 0 GPIO_ACTIVE_HIGH>;
-+	hpd-gpios = <&gpc3 0 GPIO_ACTIVE_HIGH>;
- };
- 
- &ehci {
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 8f4d76c..7433683 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -148,12 +148,10 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&dp_hpd_gpio>;
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x06>;
- 	samsung,lane-count = <2>;
--	samsung,hpd-gpio = <&gpx2 6 0>;
-+	hpd-gpio = <&gpx2 6 0>;
- 
- 	ports {
- 		port at 0 {
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index 98871f9..b3df3c1 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -92,8 +92,6 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&dp_hpd>;
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <4>;
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 7d5b386..b89bff5 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -142,12 +142,10 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&dp_hpd_gpio>;
- 	samsung,color-space = <0>;
--	samsung,dynamic-range = <0>;
--	samsung,ycbcr-coeff = <0>;
- 	samsung,color-depth = <1>;
- 	samsung,link-rate = <0x0a>;
- 	samsung,lane-count = <2>;
--	samsung,hpd-gpio = <&gpx2 6 0>;
-+	hpd-gpios = <&gpx2 6 0>;
- 	panel = <&panel>;
- };
- 
+Boris
+
+> ---
+> 
+> Sasha,
+> 
+> This fix won't apply without conflicts because of irq_reg_writel changes. I
+> can provide you a fix for 3.18 if you need.
+> 
+> Regards
+> 
+> Ludovic
+> 
+> 
+>  drivers/irqchip/irq-atmel-aic5.c | 14 ++++++++------
+>  1 file changed, 8 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-atmel-aic5.c b/drivers/irqchip/irq-atmel-aic5.c
+> index 9da9942..6c5fd25 100644
+> --- a/drivers/irqchip/irq-atmel-aic5.c
+> +++ b/drivers/irqchip/irq-atmel-aic5.c
+> @@ -88,28 +88,30 @@ static void aic5_mask(struct irq_data *d)
+>  {
+>  	struct irq_domain *domain = d->domain;
+>  	struct irq_domain_chip_generic *dgc = domain->gc;
+> -	struct irq_chip_generic *gc = dgc->gc[0];
+> +	struct irq_chip_generic *bgc = dgc->gc[0];
+> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+>  
+>  	/* Disable interrupt on AIC5 */
+> -	irq_gc_lock(gc);
+> +	irq_gc_lock(bgc);
+>  	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
+>  	irq_reg_writel(gc, 1, AT91_AIC5_IDCR);
+>  	gc->mask_cache &= ~d->mask;
+> -	irq_gc_unlock(gc);
+> +	irq_gc_unlock(bgc);
+>  }
+>  
+>  static void aic5_unmask(struct irq_data *d)
+>  {
+>  	struct irq_domain *domain = d->domain;
+>  	struct irq_domain_chip_generic *dgc = domain->gc;
+> -	struct irq_chip_generic *gc = dgc->gc[0];
+> +	struct irq_chip_generic *bgc = dgc->gc[0];
+> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+>  
+>  	/* Enable interrupt on AIC5 */
+> -	irq_gc_lock(gc);
+> +	irq_gc_lock(bgc);
+>  	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
+>  	irq_reg_writel(gc, 1, AT91_AIC5_IECR);
+>  	gc->mask_cache |= d->mask;
+> -	irq_gc_unlock(gc);
+> +	irq_gc_unlock(bgc);
+>  }
+>  
+>  static int aic5_retrigger(struct irq_data *d)
+
+
+
 -- 
-1.9.1
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
