@@ -1,138 +1,41 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 22 Sep 2015 09:56:52 -0700
-Subject: [PATCH 3/3] PCI: generic: Add support for Cavium ThunderX PCIe
- root complexes.
-In-Reply-To: <20150922164012.GA3692@red-moon>
-References: <1442529694-1792-1-git-send-email-ddaney.cavm@gmail.com>
- <1442529694-1792-4-git-send-email-ddaney.cavm@gmail.com>
- <20150922160549.GE17444@red-moon> <56017E39.8060606@caviumnetworks.com>
- <20150922164012.GA3692@red-moon>
-Message-ID: <56018854.1030106@caviumnetworks.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 22 Sep 2015 17:57:01 +0100
+Subject: [PATCH v5 0/6] irqchip, gicv3: Updates and Cavium ThunderX
+ errata workarounds
+In-Reply-To: <1442869119-1814-1-git-send-email-rric@kernel.org>
+References: <1442869119-1814-1-git-send-email-rric@kernel.org>
+Message-ID: <20150922175701.65ee4437@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2015 09:40 AM, Lorenzo Pieralisi wrote:
-> On Tue, Sep 22, 2015 at 05:13:45PM +0100, David Daney wrote:
->> On 09/22/2015 09:05 AM, Lorenzo Pieralisi wrote:
->>> On Thu, Sep 17, 2015 at 11:41:34PM +0100, David Daney wrote:
->
-> [...]
->
->>>>    Properties of the host controller node:
->>>>
->>>> -- compatible     : Must be "pci-host-cam-generic" or "pci-host-ecam-generic"
->>>> -                   depending on the layout of configuration space (CAM vs
->>>> -                   ECAM respectively).
->>>> +- compatible     : One of the following with bus:devfn:reg mapped to the
->>>> +                   PCI config space address window in the bit positions shown:
->>>> +                   "pci-host-cam-generic" -- 'CAM'  bits 16:8:0
->>>> +                   "pci-host-ecam-generic" -- 'ECAM'  bits 20:12:0
->>>> +                   "cavium,pci-host-thunder-pem" --  bits 24:16:0
->>>
->>> To me that's ECAM left shifted by 4. Is not it just a matter of defining
->>> config space base address (ie reg property) differently ?
->>
->> No.
->>
->> That's like saying ECAM is just CAM shifted by 4, can't we just specify
->> the "reg" differently.
->
-> Ok, sorry I was not clear, apologies. I meant to ask if it is something
-> that can be configured in your platform and apparently it is not,
+On Mon, 21 Sep 2015 22:58:33 +0200
+Robert Richter <rric@kernel.org> wrote:
 
-No, the hardware cannot be adjusted.
+> From: Robert Richter <rrichter@cavium.com>
+> 
+> This patch series adds gicv3 updates and workarounds for HW errata in
+> Cavium's ThunderX GICV3.
+> 
+> The patches has been rebased onto 4.3-rc1. Note that there are two
+> important fixes. See below for all changes.
+> 
+> The first one is an unchanged resubmission of a patch from a gicv3
+> series I sent a while ago.
+> 
+> The next patches implement the workarounds for ThunderX's gicv3. Patch
+> #2 implements the cpu workaround for gicv3 on ThunderX. Patch #3 is a
+> prerequisit for patch #5. Patch #4 adds generic code to parse the hw
+> revision provided by an IIDR. This patch is used for the implementa-
+> tion of the actual gicv3-its workaround in #5. Patch #6 updates to the
+> new jump label API.
+> 
+> All current review comments addressed so far with v5
 
-> I worded it wrongly.
+Catalin, Will: assuming you don't have any objection to this series,
+how do you want to deal with patch 2?
 
-OK, I guess I also misunderstood what you were suggesting.
+Thanks,
 
->
->> The "reg" property describes the base of the config space access window.
->>    CAM/ECAM/cavium,pci-host-thunder-pem describe how to generate offsets
->> from that base, The offset calculation requires information that is not
->> present in the "reg" property, it is enumerated in the various
->> "compatible" values listed above.
->
-> Agreed, this also forces you to map in more virtual address space for
-> a given bus, right ?
-
-Yes.  It takes a full 32-bits of address space to have access to all PCI 
-buses on the root complex.
-
-> I am also a bit worried about how we can make this
-> work with ACPI, where MCFG accessors take the bus and devfn shifts for
-> granted (ie ECAM specs), so I asked.
-
-If ACPI is not flexible enough to describe actual hardware, it will 
-either have to be enhanced, or not used.
-
-
->
-> Thanks,
-> Lorenzo
->
->>
->> David Daney
->>
->>>
->>> Lorenzo
->>>
->>>>
->>>>    - device_type    : Must be "pci".
->>>>
->>>> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
->>>> index e364232..e1d8d5b 100644
->>>> --- a/drivers/pci/host/pci-host-generic.c
->>>> +++ b/drivers/pci/host/pci-host-generic.c
->>>> @@ -91,6 +91,32 @@ static struct gen_pci_cfg_bus_ops gen_pci_cfg_ecam_bus_ops = {
->>>>    	}
->>>>    };
->>>>
->>>> +static void __iomem *gen_pci_map_cfg_bus_thunder_pem(struct pci_bus *bus,
->>>> +						     unsigned int devfn,
->>>> +						     int where)
->>>> +{
->>>> +	struct gen_pci *pci = bus->sysdata;
->>>> +	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
->>>> +
->>>> +	/*
->>>> +	 * Thunder PEM is a PCIe RC, but without a root bridge.  On
->>>> +	 * the primary bus, ignore accesses for devices other than
->>>> +	 * the first device.
->>>> +	 */
->>>> +	if (idx == 0 && (devfn & ~7u))
->>>> +		return NULL;
->>>> +	return pci->cfg.win[idx] + ((devfn << 16) | where);
->>>> +}
->>>> +
->>>> +static struct gen_pci_cfg_bus_ops gen_pci_cfg_thunder_pem_bus_ops = {
->>>> +	.bus_shift	= 24,
->>>> +	.ops		= {
->>>> +		.map_bus	= gen_pci_map_cfg_bus_thunder_pem,
->>>> +		.read		= pci_generic_config_read,
->>>> +		.write		= pci_generic_config_write,
->>>> +	}
->>>> +};
->>>> +
->>>>    static const struct of_device_id gen_pci_of_match[] = {
->>>>    	{ .compatible = "pci-host-cam-generic",
->>>>    	  .data = &gen_pci_cfg_cam_bus_ops },
->>>> @@ -98,6 +124,9 @@ static const struct of_device_id gen_pci_of_match[] = {
->>>>    	{ .compatible = "pci-host-ecam-generic",
->>>>    	  .data = &gen_pci_cfg_ecam_bus_ops },
->>>>
->>>> +	{ .compatible = "cavium,pci-host-thunder-pem",
->>>> +	  .data = &gen_pci_cfg_thunder_pem_bus_ops },
->>>> +
->>>>    	{ },
->>>>    };
->>>>    MODULE_DEVICE_TABLE(of, gen_pci_of_match);
->>>> --
->>>> 1.9.1
->>>>
->>>> --
->>>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>>
->>
+	M.
+-- 
+Jazz is not dead. It just smells funny.
