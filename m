@@ -1,110 +1,41 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Tue, 22 Sep 2015 16:26:57 +0300
-Subject: [linux-sunxi] [PATCH 0/2] ASoC: Add support for the Allwinner
- A10 codec
-In-Reply-To: <1442064384-23379-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1442064384-23379-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1442928417.6509.12.camel@plaes.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 22 Sep 2015 16:04:24 +0200
+Subject: [linux-sunxi] Re: [PATCH 5/5] ARM: sun5i: Add C.H.I.P DTS
+In-Reply-To: <56015146.2070509@redhat.com>
+References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1442566130-3497-6-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v64E-gQu1U_qi2fTWiCmfgMdMR4X6yLUerV21d3E1uQ1cw@mail.gmail.com>
+ <20150922124708.GZ4684@lukather>
+ <CAGb2v662+mhFgv1DXz5muA+xGE99R1DVKOxtVPvJmc+tRFPXzQ@mail.gmail.com>
+ <56015146.2070509@redhat.com>
+Message-ID: <20150922140424.GA4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2015-09-12 at 15:26 +0200, Maxime Ripard wrote:
-> Hi everyone,
+On Tue, Sep 22, 2015 at 03:01:58PM +0200, Hans de Goede wrote:
+> >In short, this is not about "power supply" but VBUS detection. IIRC,
+> >if no VBUS detection method is provided, the phy driver just waits a
+> >period of time after an ID pin change and then considers VBUS invalid.
 > 
-> This patch set adds the support for what Allwinner calls the codec on
-> their SoCs.
-> 
-> This codec is actually a combination of a codec and DAI, tied
-> together
-> in a single memory-mapped IP. It is completely standalone, and
-> outputs
-> directly the analog signal.
-> 
-> While it supports both playback and capture, the capture is not
-> implemented in this patch, and will be posted eventually as a
-> separate
-> one.
-> 
-> This set, in order to be functional, has a dependency on the audio
-> clocks patch set posted separately. However, it doesn't needs this to
-> compile properly, so I guess it can be merged without really caring
-> for the merging status of the clock patches.
+> Right, but that is a hack for boards with no / broken vbus detection
+> (or vbus control), we really want to use vbus-det where available,
+> so I agree that a TODO comment here would be good.
 
-It works on Gemei G9 tablet which has also extra chip that
-automatically switches output over from internal speakers to headphones
-when connector is inserted.
+What's so special in our SoCs that makes that we can't just rely on
+the ID pin ? (which seems to be working just fine here)
 
-Now I noticed some weird things:
+Other SoCs don't need to rely on such a hack as well.
 
-When I have all the switches as ON in alsamixer, and I start disabling
-them, I get following weird results.
+Maxime
 
-Left Mixer Left - LML
-Right Mixer Left - LMR
-Right Mixer Right - RMR
-
-Very faint output:
-LML - ON
-RML - Mute
-RMR - ON
-
-Output works fully:
-LML - Mute
-RML - Mute
-RMR - Mute
-
-When I Mute Pre-Amplifier and fiddle any of LML, RML or RMR, the output
-stays mute even after setting Pre-Amplifier Mute back on:
-
-1. All switches on
-2. Mute pre-amplifier
-3. Mute RMR
-4. Pre-Amilifier Mute Off
-.. Music stays off
-5. Toggle Pre-Amplifier twice - output turns on
-
-
-And also following in dmesg:
-sun4i-codec 1c22c00.codec: Codec <-> 1c22c00.codec mapping ok
-sun4i-codec 1c22c00.codec: ASoC: no sink widget found for Headphone Jack
-sun4i-codec 1c22c00.codec: ASoC: Failed to add route HP Left -> direct -> Headphone Jack
-sun4i-codec 1c22c00.codec: ASoC: no sink widget found for Headphone Jack
-sun4i-codec 1c22c00.codec: ASoC: Failed to add route HP Right -> direct -> Headphone Jack
-
-
-With following patch to DTS:
-
-+&codec {
-+???????routing = "Headphone Jack", "HP Left",
-+?????????????????????????"Headphone Jack", "HP Right";
-+???????status = "okay";
-+};
-
-> 
-> Let me know what you think,
-> Maxime
-> 
-> Emilio L?pez (1):
-> ? ASoC: sunxi: add support for the on-chip codec on early Allwinner
-> SoCs
-> 
-> Maxime Ripard (1):
-> ? Documentation: bindings: Add the Allwinner A10 codec bindings
-> 
-> ?.../devicetree/bindings/sound/sun4i-codec.txt??????|??33 +
-> ?sound/soc/Kconfig??????????????????????????????????|???1 +
-> ?sound/soc/Makefile?????????????????????????????????|???1 +
-> ?sound/soc/sunxi/Kconfig????????????????????????????|??11 +
-> ?sound/soc/sunxi/Makefile???????????????????????????|???2 +
-> ?sound/soc/sunxi/sun4i-codec.c??????????????????????| 720
-> +++++++++++++++++++++
-> ?6 files changed, 767 insertions(+)
-> ?create mode 100644 Documentation/devicetree/bindings/sound/sun4i-
-> codec.txt
-> ?create mode 100644 sound/soc/sunxi/Kconfig
-> ?create mode 100644 sound/soc/sunxi/Makefile
-> ?create mode 100644 sound/soc/sunxi/sun4i-codec.c
-> 
-> -- 
-> 2.5.1
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/3ce03884/attachment.sig>
