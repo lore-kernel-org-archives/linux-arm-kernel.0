@@ -1,30 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Sep 2015 19:29:02 +0100
-Subject: [PATCH] arm64: Increase the max granular size
-In-Reply-To: <1442944788-17254-1-git-send-email-rric@kernel.org>
-References: <1442944788-17254-1-git-send-email-rric@kernel.org>
-Message-ID: <20150922182902.GO7356@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 22 Sep 2015 19:33:20 +0100
+Subject: [PATCH v7 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <1442801587-3812-4-git-send-email-lftan@altera.com>
+References: <1442801587-3812-1-git-send-email-lftan@altera.com>
+ <1442801587-3812-4-git-send-email-lftan@altera.com>
+Message-ID: <20150922193320.37997c15@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 06:59:48PM +0100, Robert Richter wrote:
-> From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+On Mon, 21 Sep 2015 10:13:04 +0800
+Ley Foon Tan <lftan@altera.com> wrote:
+
+> This patch adds the Altera PCIe host controller driver.
 > 
-> Increase the standard cacheline size to avoid having locks in the same
-> cacheline.
+> Signed-off-by: Ley Foon Tan <lftan@altera.com>
+> ---
+>  drivers/pci/host/Kconfig       |   8 +
+>  drivers/pci/host/Makefile      |   1 +
+>  drivers/pci/host/pcie-altera.c | 591 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 600 insertions(+)
+>  create mode 100644 drivers/pci/host/pcie-altera.c
 > 
-> Cavium's ThunderX core implements cache lines of 128 byte size. With
-> current granulare size of 64 bytes (L1_CACHE_SHIFT=6) two locks could
-> share the same cache line leading a performance degradation.
-> Increasing the size fixes that.
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index d5e58ba..df9ed4f 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -145,4 +145,12 @@ config PCIE_IPROC_BCMA
+>  	  Say Y here if you want to use the Broadcom iProc PCIe controller
+>  	  through the BCMA bus interface
+>  
+> +config PCIE_ALTERA
+> +	tristate "Altera PCIe controller"
+> +	depends on ARCH_SOCFPGA || NIOS2
+> +	select PCI_DOMAINS
+> +	help
+> +	  Say Y here if you want to enable PCIe controller support for Altera
+> +	  SoCFPGA family of SoCs.
+> +
 
-Do you have an example of that happening?
+Is there anything in this driver that is actually specific to any of
+these two platforms/architectures? I'd don't think we should restrict
+if we can avoid it (hint: the companion MSI driver is not restricted to
+any architecture).
 
-> Increasing the size has no negative impact to cache invalidation on
-> systems with a smaller cache line. There is an impact on memory usage,
-> but that's not too important for arm64 use cases.
+Thanks,
 
-Do you have any before/after numbers to show the impact of this change
-on other supported SoCs?
-
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny.
