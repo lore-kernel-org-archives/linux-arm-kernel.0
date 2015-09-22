@@ -1,102 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 21 Sep 2015 17:21:27 -0700
-Subject: [PATCH v3 5/6] arm64/efi: ignore DT memory nodes instead of removing
- them
-In-Reply-To: <1442881288-13962-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1442881288-13962-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1442881288-13962-6-git-send-email-ard.biesheuvel@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 21 Sep 2015 19:39:18 -0500
+Subject: [PATCH v6 03/22] of/platform: Point to struct device from device
+ node
+In-Reply-To: <1442844182-27787-4-git-send-email-tomeu.vizoso@collabora.com>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1442844182-27787-4-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CAL_JsqK5CH+a-xQYcocqPb0XqV3F1shC48YQxsTFf9sXjx_xHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two problems with the UEFI stub DT memory node removal
-routine:
-- it deletes nodes as it traverses the tree, which happens to work
-  but is not supported, as deletion invalidates the node iterator;
-- deleting memory nodes entirely may discard annotations in the form
-  of additional properties on the nodes.
+On Mon, Sep 21, 2015 at 9:02 AM, Tomeu Vizoso
+<tomeu.vizoso@collabora.com> wrote:
+> When adding platform and AMBA devices, set the device node's device
+> member to point to it.
+>
+> This speeds lookups considerably and is safe because we only create one
+> of these devices for any given device node.
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> ---
+>
+> Changes in v5:
+> - Set the pointer to struct device also for AMBA devices
+> - Unset the pointer to struct device when the platform device is about
+>   to be unregistered
+> - Increase the reference count of the device before returning from
+>   of_find_device_by_node()
+>
+>  drivers/of/platform.c | 19 ++++++++++---------
+>  include/linux/of.h    |  1 +
+>  2 files changed, 11 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 1001efaedcb8..408d89f1d124 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -32,11 +32,6 @@ const struct of_device_id of_default_bus_match_table[] = {
+>         {} /* Empty terminated list */
+>  };
+>
+> -static int of_dev_node_match(struct device *dev, void *data)
+> -{
+> -       return dev->of_node == data;
+> -}
+> -
+>  /**
+>   * of_find_device_by_node - Find the platform_device associated with a node
+>   * @np: Pointer to device tree node
+> @@ -45,10 +40,10 @@ static int of_dev_node_match(struct device *dev, void *data)
+>   */
+>  struct platform_device *of_find_device_by_node(struct device_node *np)
+>  {
+> -       struct device *dev;
+> -
+> -       dev = bus_find_device(&platform_bus_type, NULL, np, of_dev_node_match);
+> -       return dev ? to_platform_device(dev) : NULL;
+> +       if (np->device && np->device->bus == &platform_bus_type &&
+> +           get_device(np->device))
 
-Now that the UEFI initialization has moved to an earlier stage, we can
-actually just ignore any memblocks that are installed after we have
-processed the UEFI memory map. This way, it is no longer necessary to
-remove the nodes, so we can remove that logic from the stub as well.
+Where do we drop the reference incremented by get_device?
 
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/efi.c            |  2 +-
- arch/arm64/mm/init.c               |  6 ++++-
- drivers/firmware/efi/libstub/fdt.c | 24 +-------------------
- 3 files changed, 7 insertions(+), 25 deletions(-)
+However, bus_find_device also took a reference I think, so you aren't
+really changing behavior.
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index a9e63122e32d..1baa75a0df20 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -181,7 +181,7 @@ static __init void reserve_regions(void)
- 		size = npages << PAGE_SHIFT;
- 
- 		if (is_normal_ram(md))
--			early_init_dt_add_memory_arch(paddr, size);
-+			early_init_dt_add_memory(paddr, size);
- 
- 		if (is_reserve_region(md)) {
- 			memblock_reserve(paddr, size);
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index d88e83ebf60d..d8ce7f51dba1 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -377,5 +377,9 @@ __setup("keepinitrd", keepinitrd_setup);
- 
- void __init early_init_dt_add_memory_arch(u64 base, u64 size)
- {
--	early_init_dt_add_memory(base, size);
-+	/*
-+	 * Ignore DT memory nodes if we are booting via UEFI.
-+	 */
-+	if (!efi_enabled(EFI_MEMMAP))
-+		early_init_dt_add_memory(base, size);
- }
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index ef5d764e2a27..343e7992bd8f 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 			unsigned long map_size, unsigned long desc_size,
- 			u32 desc_ver)
- {
--	int node, prev, num_rsv;
-+	int node, num_rsv;
- 	int status;
- 	u32 fdt_val32;
- 	u64 fdt_val64;
-@@ -54,28 +54,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 		goto fdt_set_fail;
- 
- 	/*
--	 * Delete any memory nodes present. We must delete nodes which
--	 * early_init_dt_scan_memory may try to use.
--	 */
--	prev = 0;
--	for (;;) {
--		const char *type;
--		int len;
--
--		node = fdt_next_node(fdt, prev, NULL);
--		if (node < 0)
--			break;
--
--		type = fdt_getprop(fdt, node, "device_type", &len);
--		if (type && strncmp(type, "memory", len) == 0) {
--			fdt_del_node(fdt, node);
--			continue;
--		}
--
--		prev = node;
--	}
--
--	/*
- 	 * Delete all memory reserve map entries. When booting via UEFI,
- 	 * kernel will use the UEFI memory map to find reserved regions.
- 	 */
--- 
-1.9.1
+Rob
