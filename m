@@ -1,42 +1,43 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Tue, 22 Sep 2015 08:51:40 -0700
-Subject: [PATCH] MAINTAINERS: Add keystone device tree and defconfig to
- list
-In-Reply-To: <1442936378-7538-1-git-send-email-nm@ti.com>
-References: <1442936378-7538-1-git-send-email-nm@ti.com>
-Message-ID: <5601790C.9080703@oracle.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Sep 2015 16:52:52 +0100
+Subject: [PATCH] generic syscalls: wire up userfaultfd syscall
+In-Reply-To: <1442919139-18027-1-git-send-email-andre.przywara@arm.com>
+References: <1442919139-18027-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150922155251.GJ7356@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/22/15 8:39 AM, Nishanth Menon wrote:
-> Keystone2 architecture files also include defconfig and devicetree
-> files which need maintainer to pick up and send for merge. Include the
-> same in the MAINTAINERS file so that we know where what needs to go.
->
-Well this is I guess assumed responsibility and I have been taking
-care of those patches.
+On Tue, Sep 22, 2015 at 11:52:19AM +0100, Andre Przywara wrote:
+> Enable the new userfaultfd syscall in the generic syscall table.
+> Briefly tested on arm64 with the selftest from the tools directory.
 
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+Can you update the selftest too, please? Last time I looked at that it had
+typo for the powerpc check and looked pretty unloved...
+
+Will
+
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->   MAINTAINERS | 3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 7ba7ab749c85..5a06d3e26c80 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1187,6 +1187,9 @@ ARM/TEXAS INSTRUMENT KEYSTONE ARCHITECTURE
->   M:	Santosh Shilimkar <ssantosh@kernel.org>
->   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->   S:	Maintained
-> +F:	arch/arm/boot/dts/k2*
-> +F:	arch/arm/boot/dts/keystone*
-> +F:	arch/arm/configs/keystone_defconfig
->   F:	arch/arm/mach-keystone/
->   T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
->
-No harm in adding explicitly if it helps. :-)
-
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+>  include/uapi/asm-generic/unistd.h | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+> index 8da542a..82c91bc 100644
+> --- a/include/uapi/asm-generic/unistd.h
+> +++ b/include/uapi/asm-generic/unistd.h
+> @@ -711,9 +711,11 @@ __SYSCALL(__NR_bpf, sys_bpf)
+>  __SC_COMP(__NR_execveat, sys_execveat, compat_sys_execveat)
+>  #define __NR_membarrier 282
+>  __SYSCALL(__NR_membarrier, sys_membarrier)
+> +#define __NR_userfaultfd 283
+> +__SYSCALL(__NR_userfaultfd, sys_userfaultfd)
+>  
+>  #undef __NR_syscalls
+> -#define __NR_syscalls 283
+> +#define __NR_syscalls 284
+>  
+>  /*
+>   * All syscalls below here should go away really,
+> -- 
+> 2.5.1
+> 
