@@ -1,52 +1,116 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 22 Sep 2015 11:04:46 +0100
-Subject: [PATCH 17/17] mfd : ab8500/db8500: fix the abuse of
- IRQF_NO_SUSPEND
-In-Reply-To: <20150921232027.GD11284@x1>
-References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
- <1442850433-5903-18-git-send-email-sudeep.holla@arm.com>
- <20150921232027.GD11284@x1>
-Message-ID: <560127BE.9030604@arm.com>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Tue, 22 Sep 2015 18:19:25 +0800
+Subject: [RESEND PATCH] media: vb2: Fix vb2_dc_prepare do not correct
+ sync data to device
+In-Reply-To: <56000293.9000802@xs4all.nl>
+References: <1442838371-21484-1-git-send-email-tiffany.lin@mediatek.com>
+ <56000293.9000802@xs4all.nl>
+Message-ID: <1442917165.20006.30.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Hans,
+
+On Mon, 2015-09-21 at 15:13 +0200, Hans Verkuil wrote:
+> Hi Tiffany!
+> 
+> On 21-09-15 14:26, Tiffany Lin wrote:
+> > vb2_dc_prepare use the number of SG entries dma_map_sg_attrs return.
+> > But in dma_sync_sg_for_device, it use lengths of each SG entries
+> > before dma_map_sg_attrs. dma_map_sg_attrs will concatenate
+> > SGs until dma length > dma seg bundary. sgt->nents will less than
+> > sgt->orig_nents. Using SG entries after dma_map_sg_attrs
+> > in vb2_dc_prepare will make some SGs are not sync to device.
+> > After add DMA_ATTR_SKIP_CPU_SYNC in vb2_dc_get_userptr to remove
+> > sync data to device twice. Device randomly get incorrect data because
+> > some SGs are not sync to device. Change to use number of SG entries
+> > before dma_map_sg_attrs in vb2_dc_prepare to prevent this issue.
+> > 
+> > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> > ---
+> >  drivers/media/v4l2-core/videobuf2-dma-contig.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/media/v4l2-core/videobuf2-dma-contig.c b/drivers/media/v4l2-core/videobuf2-dma-contig.c
+> > index 2397ceb..c5d00bd 100644
+> > --- a/drivers/media/v4l2-core/videobuf2-dma-contig.c
+> > +++ b/drivers/media/v4l2-core/videobuf2-dma-contig.c
+> > @@ -100,7 +100,7 @@ static void vb2_dc_prepare(void *buf_priv)
+> >  	if (!sgt || buf->db_attach)
+> >  		return;
+> >  
+> > -	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir);
+> > +	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
+> >  }
+> >  
+> >  static void vb2_dc_finish(void *buf_priv)
+> > @@ -112,7 +112,7 @@ static void vb2_dc_finish(void *buf_priv)
+> >  	if (!sgt || buf->db_attach)
+> >  		return;
+> >  
+> > -	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir);
+> > +	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->orig_nents, buf->dma_dir);
+> >  }
+> 
+> I don't really understand it. I am assuming that this happens on an arm and that
+> the dma_map_sg_attrs and dma_sync_sg_* functions used are arm_iommu_map_sg() and
+> arm_iommu_sync_sg_* as implemented in arch/arm/mm/dma-mapping.c.
+> 
+
+We are using __iommu_* implemented in "arch/arm64/mm/dma-mapping.c" in
+review patch
+http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013898.html
+Without patch "[media] vb2: use dma_map_sg_attrs to prevent unnecessary
+sync", vb2 will sync data to device twice.
+One is from "dma_map_sg" in "vb2_dc_get_userptr", the other is from
+"dma_sync_sg_for_device" in "vb2_dc_prepare". dma_map_sg use orig_nents,
+and dma_sync_sg_for_device use nents."
+
+We do not run in 32bits mode, but check "arm_dma_sync_sg_for_device" in
+"arch/arm/mm/dma-mapping.c", 
+ops->sync_single_for_device(dev, sg_dma_address(s), s->length, dir);
+It looks like has same issue.
+
+> Now, as I understand it (and my understanding may very well be flawed!) the map_sg
+> function concatenates SG entries if possible, so it may return fewer entries. But
+> the dma_sync_sg functions use those updated SG entries, so the full buffer should
+> be covered by this. Using orig_nents will actually sync parts of the buffer twice!
+> The first nents entries already cover the full buffer so any remaining entries up
+> to orig_nents will just duplicate parts of the buffer.
+> 
+I found that in __iommu_sync_sg_for_device, it use sg->length , do not
+cover full buffer.
+By adding log in " __iommu_sync_sg_for_device" without patch "[media]
+vb2: use dma_map_sg_attrs to prevent unnecessary sync", we could see
+total synced size are different between called from dma_map_sg and
+dma_sync_sg_for_device.
+__iommu_sync_sg_for_device called from dma_sync_sg_for_device got
+updated SG entries number but it use un-updated sg length.
+After using "DMA_ATTR_SKIP_CPU_SYNC" to skip sync in vb2_dc_get_userptr,
+we got some part of the buffer not sync.
+
+> So this patch makes no sense in the current code.
+> 
+> If I understand your log text correctly this patch goes on top of Sakari Ailus' vb2
+> sync patch series. So if it wasn't needed before, but it is needed after his patch
+> series, then the problem is in that patch series.
+> 
+This patch goes on top of these two patchs
+https://www.mail-archive.com/linux-media%40vger.kernel.org/msg82143.html
+http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013898.html
 
 
-On 22/09/15 00:20, Lee Jones wrote:
-> On Mon, 21 Sep 2015, Sudeep Holla wrote:
->
->> The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
->> be left enabled so as to allow them to work as expected during the
->> suspend-resume cycle, but doesn't guarantee that it will wake the system
->> from a suspended state, enable_irq_wake is recommended to be used for
->> the wakeup.
->>
->> This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
->> enable_irq_wake instead.
->>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>   drivers/mfd/ab8500-core.c        | 11 +++++++++--
->>   drivers/mfd/ab8500-debugfs.c     |  2 +-
->>   drivers/mfd/ab8500-gpadc.c       | 15 +++++++++++----
->>   drivers/mfd/db8500-prcmu.c       | 24 +++++++++++++++++-------
->>   drivers/power/ab8500_btemp.c     |  6 ++++--
->>   drivers/power/ab8500_charger.c   |  6 ++++--
->>   drivers/power/ab8500_fg.c        |  9 ++++++---
->>   drivers/thermal/db8500_thermal.c |  5 ++---
->>   drivers/usb/phy/phy-ab8500-usb.c | 10 ++++++----
->>   9 files changed, 60 insertions(+), 28 deletions(-)
->
-> Is there a reason for bundling the changes in all of these subsystems
-> together into a single patch?
->
-
-No, I understand this needs to be split. Since I was not 100% confident
-about this change, I wanted LinusW to review and provide feedback and
-gets things working before I can split this changes. I must have added
-RFC, but usually it gets ignored :)
-
-Regards,
-Sudeep
+> In any case, I need some help understanding this patch.
+> 
+> And *if* this patch is correct, then the same thing should likely be done for
+> videobuf2-dma-sg.c.
+> 
+Yes, if this patch correct, same thing should be done for
+videobuf2-dma-sg.c
+> Regards,
+> 
+> 	Hans
+> 
+> >  
+> >  /*********************************************/
+> > 
