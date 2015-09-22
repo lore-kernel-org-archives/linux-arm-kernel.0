@@ -1,45 +1,133 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 22 Sep 2015 15:59:25 +0200
-Subject: [PATCH 3/3] power: reset: at91-shdwc: add new shutdown
- controller driver
-In-Reply-To: <2e870dbb4c7728ad416360ff20b22c1a97ba88d9.1441881064.git.nicolas.ferre@atmel.com>
-References: <bc6fb78ccf190a6e24f69d70036bc3cd3ec42673.1441881064.git.nicolas.ferre@atmel.com>
- <2e870dbb4c7728ad416360ff20b22c1a97ba88d9.1441881064.git.nicolas.ferre@atmel.com>
-Message-ID: <20150922135925.GI23334@earth>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 22 Sep 2015 16:00:53 +0200
+Subject: [PATCH v1 1/3] clocksource: rockchip: Make the driver more
+ readability and compatible
+In-Reply-To: <1442566271-10695-2-git-send-email-wxt@rock-chips.com>
+References: <1442566271-10695-1-git-send-email-wxt@rock-chips.com>
+ <1442566271-10695-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <5455510.kk9S3OIaU9@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Caesar,
 
-On Thu, Sep 10, 2015 at 12:39:18PM +0200, Nicolas Ferre wrote:
-> Sama5d2 SoC has a completely new shutdown controller with new
-> features and register layout. It thus makes sense to add a new
-> driver for this new peripheral.
+Am Freitag, 18. September 2015, 16:51:09 schrieb Caesar Wang:
+> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
+> There are some failure with build up on timer driver for rockchip.
 > 
-> This driver is Device Tree only and handles events from the
-> wake-up pin and the RTC. As the register layout may change in the
-> future, so some values are encoded in a configuration structure.
->
-> [...]
->
-> +static struct of_device_id at91_shdwc_of_match[] = {
-> +	{
-> +		.compatible = "atmel,sama5d2-shdwc",
-> +                .data = &sama5d2_shdwc_config,
-> +	}, {
-> +		/*sentinel*/
-> +	}
-> +};
+> logs:
+> ...
+> drivers/clocksource/rockchip_timer.c:156:13: error: 'NO_IRQ' undeclared
+> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand 1 --
+> `dsb`
+> ...
+> 
+> The problem was different semantics of dsb on btw arm32 and arm64,
+> Here we can convert the dsb with insteading of dsb(sy).
+> 
+> NO_IRQ definition is missing for ARM64, since NO_IRQ being -1 is a
+> legacy thing for ARM - all ARM drivers are supposed to be converted to
+> use <= 0 or == 0 to detect invalid IRQs, and _eventually_ once all users
+> are gone, NO_IRQ deleted. Modern drivers should _all_ be using !irq to
+> detect invalid IRQs, and not using NO_IRQ.
+> 
+> Meanwhile, I change a bit to make the code more readability for driver
+> when I check the code style.
+> 
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> ---
+> 
+> Changes in v1:
+> - As Russell, Thomas, Daniel comments, let's replace NO_IRQ by '!irq'.
+> 
+>  drivers/clocksource/rockchip_timer.c | 29 +++++++++++++++--------------
+>  1 file changed, 15 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/clocksource/rockchip_timer.c
+> b/drivers/clocksource/rockchip_timer.c index bb2c2b0..e1af449 100644
+> --- a/drivers/clocksource/rockchip_timer.c
+> +++ b/drivers/clocksource/rockchip_timer.c
+> @@ -17,16 +17,16 @@
+> 
+>  #define TIMER_NAME "rk_timer"
+> 
+> -#define TIMER_LOAD_COUNT0 0x00
+> -#define TIMER_LOAD_COUNT1 0x04
+> -#define TIMER_CONTROL_REG 0x10
+> -#define TIMER_INT_STATUS 0x18
+> +#define TIMER_LOAD_COUNT0	0x00
+> +#define TIMER_LOAD_COUNT1	0x04
+> +#define TIMER_CONTROL_REG	0x10
+> +#define TIMER_INT_STATUS	0x18
+> 
+> -#define TIMER_DISABLE 0x0
+> -#define TIMER_ENABLE 0x1
+> -#define TIMER_MODE_FREE_RUNNING (0 << 1)
+> -#define TIMER_MODE_USER_DEFINED_COUNT (1 << 1)
+> -#define TIMER_INT_UNMASK (1 << 2)
+> +#define TIMER_DISABLE			(0 << 0)
+> +#define TIMER_ENABLE			(1 << 0)
+> +#define TIMER_MODE_FREE_RUNNING		(0 << 1)
+> +#define TIMER_MODE_USER_DEFINED_COUNT	(1 << 1)
+> +#define TIMER_INT_UNMASK		(1 << 2)
 
-please add:
+not sure how Daniel sees this, but those could count as "unrelated change", as 
+they have nothing to do with the arm64 build-fixes.
 
-MODULE_DEVICE_TABLE(of, at91_shdwc_of_match);
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/8899835b/attachment.sig>
+> 
+>  struct bc_timer {
+>  	struct clock_event_device ce;
+> @@ -49,14 +49,14 @@ static inline void __iomem *rk_base(struct
+> clock_event_device *ce) static inline void rk_timer_disable(struct
+> clock_event_device *ce) {
+>  	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
+> -	dsb();
+> +	dsb(sy);
+>  }
+> 
+>  static inline void rk_timer_enable(struct clock_event_device *ce, u32
+> flags) {
+>  	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+>  		       rk_base(ce) + TIMER_CONTROL_REG);
+> -	dsb();
+> +	dsb(sy);
+>  }
+> 
+>  static void rk_timer_update_counter(unsigned long cycles,
+> @@ -64,13 +64,13 @@ static void rk_timer_update_counter(unsigned long
+> cycles, {
+>  	writel_relaxed(cycles, rk_base(ce) + TIMER_LOAD_COUNT0);
+>  	writel_relaxed(0, rk_base(ce) + TIMER_LOAD_COUNT1);
+> -	dsb();
+> +	dsb(sy);
+>  }
+> 
+>  static void rk_timer_interrupt_clear(struct clock_event_device *ce)
+>  {
+>  	writel_relaxed(1, rk_base(ce) + TIMER_INT_STATUS);
+> -	dsb();
+> +	dsb(sy);
+>  }
+> 
+>  static inline int rk_timer_set_next_event(unsigned long cycles,
+> @@ -148,7 +148,7 @@ static void __init rk_timer_init(struct device_node *np)
+> bc_timer.freq = clk_get_rate(timer_clk);
+> 
+>  	irq = irq_of_parse_and_map(np, 0);
+> -	if (irq == NO_IRQ) {
+> +	if (!irq) {
+>  		pr_err("Failed to map interrupts for '%s'\n", TIMER_NAME);
+>  		return;
+>  	}
+> @@ -173,4 +173,5 @@ static void __init rk_timer_init(struct device_node *np)
+> 
+>  	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
+>  }
+> +
+
+unnecessary addition of a blank line (same reasons as above)
+>  CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
+
+
+Heiko
