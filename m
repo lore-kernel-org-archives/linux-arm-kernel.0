@@ -1,81 +1,45 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 22 Sep 2015 22:12:36 +0800
-Subject: [PATCH 5/5] arm64: dts: berlin4ct: add pll and clock nodes
-In-Reply-To: <1442931156-5877-1-git-send-email-jszhang@marvell.com>
-References: <1442931156-5877-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1442931156-5877-6-git-send-email-jszhang@marvell.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 22 Sep 2015 16:28:48 +0200
+Subject: [PATCH 1/5] ARM: dts: sun5i: Add PWM controller node for A13/A10s
+In-Reply-To: <1442752251-20744-2-git-send-email-hdegoede@redhat.com>
+References: <1442752251-20744-1-git-send-email-hdegoede@redhat.com>
+ <1442752251-20744-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150922142848.GC4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add syspll, mempll, cpupll, gate-clk and berlin-clk nodes.
+On Sun, Sep 20, 2015 at 08:30:47AM -0400, Hans de Goede wrote:
+> The sun5i die has a PWM controller that is compatible to the one on the A20.
+> Add a device node for it.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/boot/dts/sun5i.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+> index 78b993a..5e036a4 100644
+> --- a/arch/arm/boot/dts/sun5i.dtsi
+> +++ b/arch/arm/boot/dts/sun5i.dtsi
+> @@ -543,6 +543,14 @@
+>  			reg = <0x01c20c90 0x10>;
+>  		};
+>  
+> +		pwm: pwm at 01c20e00 {
+> +			compatible = "allwinner,sun7i-a20-pwm";
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 38 ++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+Is it? IIRC, it has a single channel, while the A20 has two.
 
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-index e9409ec..92a1cf2 100644
---- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-+++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-@@ -42,6 +42,7 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
-+#include <dt-bindings/clock/berlin4ct.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- / {
-@@ -135,6 +136,22 @@
- 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 		};
- 
-+		cpupll: cpupll {
-+			compatible = "marvell,berlin-pll";
-+			reg = <0x922000 0x14>, <0xea0710 4>;
-+			#clock-cells = <0>;
-+			clocks = <&osc>, <&clk CLK_CPUFASTREF>;
-+			bypass-shift = /bits/ 8 <2>;
-+		};
-+
-+		mempll: mempll {
-+			compatible = "marvell,berlin-pll";
-+			reg = <0x940034 0x14>, <0xea0710 4>;
-+			#clock-cells = <0>;
-+			clocks = <&osc>, <&clk CLK_MEMFASTREF>;
-+			bypass-shift = /bits/ 8 <1>;
-+		};
-+
- 		apb at e80000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -225,6 +242,27 @@
- 			};
- 		};
- 
-+		syspll: syspll {
-+			compatible = "marvell,berlin-pll";
-+			reg = <0xea0200 0x14>, <0xea0710 4>;
-+			#clock-cells = <0>;
-+			clocks = <&osc>;
-+			bypass-shift = /bits/ 8 <0>;
-+		};
-+
-+		gateclk: gateclk {
-+			compatible = "marvell,berlin4ct-gateclk";
-+			reg = <0xea0700 4>;
-+			#clock-cells = <1>;
-+		};
-+
-+		clk: clk {
-+			compatible = "marvell,berlin4ct-clk";
-+			reg = <0xea0720 0x144>;
-+			#clock-cells = <1>;
-+			clocks = <&syspll>;
-+		};
-+
- 		soc_pinctrl: pinctrl at ea8000 {
- 			compatible = "marvell,berlin4ct-soc-pinctrl";
- 			reg = <0xea8000 0x14>;
+Maxime
+
 -- 
-2.5.3
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/25c630ac/attachment.sig>
