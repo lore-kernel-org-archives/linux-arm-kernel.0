@@ -1,43 +1,47 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 22 Sep 2015 12:46:54 -0700
-Subject: [PATCH v3 5/5] cpufreq: qoriq: Don't look at clock
- implementation details
-In-Reply-To: <1442723397-26329-6-git-send-email-scottwood@freescale.com>
-References: <1442723397-26329-1-git-send-email-scottwood@freescale.com>
- <1442723397-26329-6-git-send-email-scottwood@freescale.com>
-Message-ID: <20150922194654.GJ24314@linux>
+From: amstan@chromium.org (Alexandru M Stan)
+Date: Tue, 22 Sep 2015 13:10:50 -0700
+Subject: [PATCH 0/1] usb: dwc2: Fix NULL qh in dwc2_queue_transaction
+Message-ID: <1442952651-4341-1-git-send-email-amstan@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-09-15, 23:29, Scott Wood wrote:
-> Get the CPU clock's potential parent clocks from the clock interface
-> itself, rather than manually parsing the clocks property to find a
-> phandle, looking at the clock-names property of that, and assuming that
-> those are valid parent clocks for the cpu clock.
-> 
-> This is necessary now that the clocks are generated based on the clock
-> driver's knowledge of the chip rather than a fragile device-tree
-> description of the mux options.
-> 
-> We can now rely on the clock driver to ensure that the mux only exposes
-> options that are valid.  The cpufreq driver was currently being overly
-> conservative in some cases -- for example, the "min_cpufreq =
-> get_bus_freq()" restriction only applies to chips with erratum
-> A-004510, and whether the freq_mask used on p5020 is needed depends on
-> the actual frequencies of the PLLs (FWIW, p5040 has a similar
-> limitation but its .freq_mask was zero) -- and the frequency mask
-> mechanism made assumptions about particular parent clock indices that
-> are no longer valid.
-> 
-> Signed-off-by: Scott Wood <scottwood@freescale.com>
-> ---
-> v3: was patch 1/5 and patch 4/5, plus blacklist e6500 and changes
-> to clk api usage
-> 
->  drivers/cpufreq/qoriq-cpufreq.c | 137 ++++++++++++----------------------------
->  1 file changed, 40 insertions(+), 97 deletions(-)
+I have a weird usb device which doesn't a normal connector, so there's
+no guarantee that the pins will get removed in the correct order (data
+pins first, then ground and vcc). I wouldn't be mad if there was a
+weird error or something at connect/disconnect, but in this case I can
+actually get a kernel panic.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Part of the panic text:
+[  143.654956] [<c044e818>] (dwc2_queue_transaction) from [<c044f3b4>] (dwc2_hcd_queue_transactions+0x24c/0x31c)
+[  143.664868] [<c044f3b4>] (dwc2_hcd_queue_transactions) from [<c044f4dc>] (_dwc2_hcd_clear_tt_buffer_complete+0x58/0x68)
+[  143.675648] [<c044f4dc>] (_dwc2_hcd_clear_tt_buffer_complete) from [<c04347ec>] (hub_tt_work+0x130/0x164)
+[  143.685214] [<c04347ec>] (hub_tt_work) from [<c013768c>] (process_one_work+0x258/0x3c0)
+[  143.693217] [<c013768c>] (process_one_work) from [<c0138848>] (worker_thread+0x234/0x38c)
+[  143.701394] [<c0138848>] (worker_thread) from [<c013e3dc>] (kthread+0xe4/0xfc)
+[  143.708618] [<c013e3dc>] (kthread) from [<c0106278>] (ret_from_fork+0x14/0x20)
+
+I traced it down to a dereference of qh(chan->qh->ping_state) in
+dwc2_queue_transaction.
+
+At usb device disconnect, dwc2_hcd_cleanup_channels gets called,
+which sets qh to NULL, but dwc2_queue_transaction still manages to
+get called after that.
+
+I can reproduce this in an isolated manner on my rk3288 board
+with an FTDI/prolific device, having the usb pins easily
+disconnectable(independently), then playing with the vcc pin while
+leaving the data lines connected.
+
+While my patch is probably not a proper fix for this issue, it's pretty
+harmless where it is (and it's consistent with other checks in there).
+I also hope this opens up discussions on this issue.
+
+
+Alexandru M Stan (1):
+  usb: dwc2: Fix NULL qh in dwc2_queue_transaction
+
+ drivers/usb/dwc2/hcd.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 -- 
-viresh
+2.6.0.rc0.131.gf624c3d
