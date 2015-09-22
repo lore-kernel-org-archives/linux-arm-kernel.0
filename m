@@ -1,52 +1,159 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 21 Sep 2015 18:16:51 -0700
-Subject: [PATCH v2 5/8] soc: qcom: smd: Remove use of VLAIS
-In-Reply-To: <1441234011-4259-6-git-send-email-sboyd@codeaurora.org>
-References: <1441234011-4259-1-git-send-email-sboyd@codeaurora.org>
- <1441234011-4259-6-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150922011651.GQ13472@usrtlx11787.corpusers.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 22 Sep 2015 02:24:03 +0100
+Subject: [PATCH 4/6] arm64/ls1043a: add DTS for Freescale LS1043A SoC
+In-Reply-To: <1442838158-2964-5-git-send-email-B48286@freescale.com>
+References: <1442838158-2964-1-git-send-email-B48286@freescale.com>
+ <1442838158-2964-5-git-send-email-B48286@freescale.com>
+Message-ID: <20150922012403.GA1535@svinekod>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 02 Sep 15:46 PDT 2015, Stephen Boyd wrote:
+Hi,
 
-> Usage of VLAIS prevents clang from compiling this file, and it
-> also opens us to the possibility of allocating a large structure
-> on the stack to the point that we blow past the limit of the
-> kernel stack. Remove the VLAIS and allocate a structure on the
-> heap with kmalloc so that we're safer and more clang friendly.
-> 
-[..]
-> diff --git a/drivers/soc/qcom/smd-rpm.c b/drivers/soc/qcom/smd-rpm.c
-[..]
->  	struct {
->  		struct qcom_rpm_header hdr;
->  		struct qcom_rpm_request req;
-> -		u8 payload[count];
-> -	} pkt;
-> +		u8 payload[];
-> +	} *pkt;
-> +	size_t size = sizeof(*pkt) + count;
->  
-[..]
->  
-> -	ret = qcom_smd_send(rpm->rpm_channel, &pkt, sizeof(pkt));
-> +	ret = qcom_smd_send(rpm->rpm_channel, pkt, sizeof(*pkt));
+> +/memreserve/ 0x80000000 0x00010000;
 
-It would be good if we actually include the request in the packet and
-not just the headers :)
+Why is this necessary?
 
-s/sizeof(*pkt)/size/
+If this is necessary, please add a comment stating what this is for.
 
-Sorry for not spotting this before, made my device not boot now that it
-showed up in linux-next. And oddly the 8974 RPM seems to just ack the
-messages, without any indication of the request being truncated...
+> +               cpu at 3 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53";
+> +                       reg = <0x0 0x3>;
+> +                       clocks = <&clockgen 1 0>;
+> +               };
 
+Missing enable-method properties on all the secondary CPUs.
 
-@Andy, I presume this is only on your -next, can you update the commit?
-Or do you want a patch for it?
+[...]
 
-With this tiny change what we have on next-20150921 seems to work fine.
+> +       gic: interrupt-controller at 1400000 {
+> +               compatible = "arm,gic-400";
+> +               #interrupt-cells = <3>;
+> +               interrupt-controller;
+> +               reg = <0x0 0x1401000 0 0x1000>, /* GICD */
+> +                     <0x0 0x1402000 0 0x1000>, /* GICC */
+> +                     <0x0 0x1404000 0 0x2000>, /* GICH */
+> +                     <0x0 0x1406000 0 0x2000>; /* GICV */
+> +               interrupts = <1 9 0xf08>;
+> +       };
 
-Regards,
-Bjorn
+These sizes don't look right.
+
+To the best of my knowledge, GICC (and GICV) should be 0x2000 in size, while
+GICD and GICH should be 0x1000.
+
+[...]
+
+> +       ifc: ifc at 1530000 {
+> +               compatible = "fsl,ifc", "simple-bus";
+> +               reg = <0x0 0x1530000 0x0 0x10000>;
+> +               interrupts = <0 43 0x4>;
+> +       };
+
+Why simple-bus?
+
+> +       clockgen: clocking at 1ee1000 {
+> +               compatible = "fsl,ls1043a-clockgen";
+> +               reg = <0x0 0x1ee1000 0x0 0x1000>;
+> +               #clock-cells = <2>;
+> +               clocks = <&sysclk>;
+> +               sysclk: sysclk {
+> +                       compatible = "fixed-clock";
+> +                       #clock-cells = <0>;
+> +                       clock-frequency = <100000000>;
+> +                       clock-output-names = "sysclk";
+> +               };
+> +       };
+
+Why does this fixed clock live under the clockgen? It should live directly
+under the root node.
+
+[...]
+
+> +       pcie at 3400000 {
+> +               compatible = "fsl,ls1043a-pcie", "snps,dw-pcie";
+> +               reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
+> +                      0x40 0x00000000 0x0 0x00002000>; /* configuration space */
+> +               reg-names = "regs", "config";
+> +               interrupts = <0 118 0x4>, /* controller interrupt */
+> +                            <0 117 0x4>; /* PME interrupt */
+> +               interrupt-names = "intr", "pme";
+> +               #address-cells = <3>;
+> +               #size-cells = <2>;
+> +               device_type = "pci";
+> +               num-lanes = <4>;
+> +               bus-range = <0x0 0xff>;
+> +               ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
+> +                         0x82000000 0x0 0x40000000 0x40 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+> +               msi-parent = <&msi1>;
+> +               #interrupt-cells = <1>;
+> +               interrupt-map-mask = <0 0 0 7>;
+> +               interrupt-map = <0000 0 0 1 &gic 0 110 0x4>,
+> +                               <0000 0 0 2 &gic 0 111 0x4>,
+> +                               <0000 0 0 3 &gic 0 112 0x4>,
+> +                               <0000 0 0 4 &gic 0 113 0x4>;
+> +       };
+> +
+> +       pcie at 3500000 {
+> +               compatible = "fsl,ls1043a-pcie", "snps,dw-pcie";
+> +               reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
+> +                      0x48 0x00000000 0x0 0x00002000>; /* configuration space */
+> +               reg-names = "regs", "config";
+> +               interrupts = <0 128 0x4>,
+> +                            <0 127 0x4>;
+> +               interrupt-names = "intr", "pme";
+> +               #address-cells = <3>;
+> +               #size-cells = <2>;
+> +               device_type = "pci";
+> +               num-lanes = <2>;
+> +               bus-range = <0x0 0xff>;
+> +               ranges = <0x81000000 0x0 0x00000000 0x48 0x00010000 0x0 0x00010000   /* downstream I/O */
+> +                         0x82000000 0x0 0x40000000 0x48 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+> +               msi-parent = <&msi2>;
+> +               #interrupt-cells = <1>;
+> +               interrupt-map-mask = <0 0 0 7>;
+> +               interrupt-map = <0000 0 0 1 &gic 0 120  0x4>,
+> +                               <0000 0 0 2 &gic 0 121 0x4>,
+> +                               <0000 0 0 3 &gic 0 122 0x4>,
+> +                               <0000 0 0 4 &gic 0 123 0x4>;
+> +       };
+> +
+> +       pcie at 3600000 {
+> +               compatible = "fsl,ls1043a-pcie", "snps,dw-pcie";
+> +               reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
+> +                      0x50 0x00000000 0x0 0x00002000>; /* configuration space */
+> +               reg-names = "regs", "config";
+> +               interrupts = <0 162 0x4>,
+> +                            <0 161 0x4>;
+> +               interrupt-names = "intr", "pme";
+> +               #address-cells = <3>;
+> +               #size-cells = <2>;
+> +               device_type = "pci";
+> +               num-lanes = <2>;
+> +               bus-range = <0x0 0xff>;
+> +               ranges = <0x81000000 0x0 0x00000000 0x50 0x00010000 0x0 0x00010000   /* downstream I/O */
+> +                         0x82000000 0x0 0x40000000 0x50 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+> +               msi-parent = <&msi3>;
+> +               #interrupt-cells = <1>;
+> +               interrupt-map-mask = <0 0 0 7>;
+> +               interrupt-map = <0000 0 0 1 &gic 0 154 0x4>,
+> +                               <0000 0 0 2 &gic 0 155 0x4>,
+> +                               <0000 0 0 3 &gic 0 156 0x4>,
+> +                               <0000 0 0 4 &gic 0 157 0x4>;
+> +       };
+
+You wait ages for a bus, then three show up at once...
+
+> +
+> +       memory at 80000000 {
+> +               device_type = "memory";
+> +               reg = <0x0 0x80000000 0 0x80000000>;
+> +                     /* DRAM space 1 - 2 GB DRAM */
+
+I don't understand the comment. This describes 2GB at 2GB.
+
+Does the bootloader overwrite this?
+
+Thanks,
+Mark.
