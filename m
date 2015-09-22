@@ -1,36 +1,28 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 22 Sep 2015 15:12:31 +0200
-Subject: [PATCH v4 resend 0/2] power: Add an axp20x-usb-power driver
-In-Reply-To: <1442752773-22635-1-git-send-email-hdegoede@redhat.com>
-References: <1442752773-22635-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150922131231.GB23334@earth>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 22 Sep 2015 15:23:56 +0200
+Subject: [PATCH v3 0/4] input: gpio_keys_polled: Add support for abs/rel axis
+Message-ID: <1442928240-2452-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Dmitry,
 
-On Sun, Sep 20, 2015 at 08:39:31AM -0400, Hans de Goede wrote:
-> This is a resend of v4 of the axp20x-usb-power power-supply driver,
-> after v4 there have been no further comments, so I assume that this
-> version is ready for merging, yet for some reason it has not been
-> merged yet.
+This patch-series really is 2 related series:
 
-My fault. I did not have enough time before my vacation.
+Patch 1 + 2:
 
-> Can we please get this driver merged (preferably into 4.3,
+Support for abs/rel axis in gpio_keys_polled, the dt-bindings patch is
+updated, the actual implementation is the same as the v2 version.
 
-It's obviously too late now.
+Patch 3 + 4:
 
-> but if not at least lets get it into next / 4.4 asap).
+Add a single header with key / btn / axis defines to be shared by input.h
+and the dt-bindings headers, as requested by you. The first patch introduces
+a new header for this, the second patch makes dt-bindings/input/input.h
+use this new header. The second patch has been Acked by the devicetree
+maintainer, and since it depends on the first one I believe that it is
+best if this patch gets merged via your tree too.
 
-I already merged this into my (local) dev branch last week. I
-just pushed it out, so it should appear in next tomorrow.
+Regards,
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150922/bdb81ddb/attachment-0001.sig>
+Hans
