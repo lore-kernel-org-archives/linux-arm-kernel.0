@@ -1,334 +1,55 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 22 Sep 2015 17:57:52 +0200
-Subject: [PATCH v2] power: reset: at91-shdwc: add new shutdown controller
- driver
-In-Reply-To: <20150922135925.GI23334@earth>
-References: <20150922135925.GI23334@earth>
-Message-ID: <1442937472-5481-1-git-send-email-nicolas.ferre@atmel.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 22 Sep 2015 11:01:09 -0500
+Subject: [PATCH] MAINTAINERS: Add keystone device tree and defconfig to
+ list
+In-Reply-To: <5601790C.9080703@oracle.com>
+References: <1442936378-7538-1-git-send-email-nm@ti.com>
+ <5601790C.9080703@oracle.com>
+Message-ID: <56017B45.9050304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sama5d2 SoC has a completely new shutdown controller with new features and
-register layout. It thus makes sense to add a new driver for this new
-peripheral.
+On 09/22/2015 10:51 AM, santosh.shilimkar at oracle.com wrote:
+> On 9/22/15 8:39 AM, Nishanth Menon wrote:
+>> Keystone2 architecture files also include defconfig and devicetree
+>> files which need maintainer to pick up and send for merge. Include the
+>> same in the MAINTAINERS file so that we know where what needs to go.
+>>
+> Well this is I guess assumed responsibility and I have been taking
+> care of those patches.
 
-This driver is Device Tree only and handles events from the wake-up pin and
-the RTC.
-As the register layout may change in the future, so some values are encoded
-in a configuration structure.
+Yes, indeed.. Thanks for doing the same :)
+> 
+>> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
+>>   MAINTAINERS | 3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 7ba7ab749c85..5a06d3e26c80 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -1187,6 +1187,9 @@ ARM/TEXAS INSTRUMENT KEYSTONE ARCHITECTURE
+>>   M:    Santosh Shilimkar <ssantosh@kernel.org>
+>>   L:    linux-arm-kernel at lists.infradead.org (moderated for
+>> non-subscribers)
+>>   S:    Maintained
+>> +F:    arch/arm/boot/dts/k2*
+>> +F:    arch/arm/boot/dts/keystone*
+>> +F:    arch/arm/configs/keystone_defconfig
+>>   F:    arch/arm/mach-keystone/
+>>   T:    git
+>> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+>>
+> No harm in adding explicitly if it helps. :-)
+> 
+> Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+> 
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
+Thanks.
 
-Changes in v2:
-- add MODULE_DEVICE_TABLE as advised by Sebastian Reichel
-- review indentation and braces to correct errors pointed out by checkpatch
-
- drivers/power/reset/Kconfig      |   8 ++
- drivers/power/reset/Makefile     |   1 +
- drivers/power/reset/at91-shdwc.c | 263 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 272 insertions(+)
- create mode 100644 drivers/power/reset/at91-shdwc.c
-
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index 5a0189bf19bb..7f52bc938795 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -30,6 +30,14 @@ config POWER_RESET_AT91_RESET
- 	  This driver supports restart for Atmel AT91SAM9 and SAMA5
- 	  SoCs
- 
-+config POWER_RESET_AT91_SHDWC
-+	bool "Atmel AT91 shutdown controller driver"
-+	depends on ARCH_AT91
-+	default SOC_SAMA5
-+	help
-+	  This driver supports poweroff for some Atmel SAMA5 SoCs. It is
-+	  present for example on SAMA5D2 SoC.
-+
- config POWER_RESET_AXXIA
- 	bool "LSI Axxia reset driver"
- 	depends on ARCH_AXXIA
-diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index 096fa67047f6..6b9020ed3fb7 100644
---- a/drivers/power/reset/Makefile
-+++ b/drivers/power/reset/Makefile
-@@ -1,6 +1,7 @@
- obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
- obj-$(CONFIG_POWER_RESET_AT91_POWEROFF) += at91-poweroff.o
- obj-$(CONFIG_POWER_RESET_AT91_RESET) += at91-reset.o
-+obj-$(CONFIG_POWER_RESET_AT91_SHDWC) += at91-shdwc.o
- obj-$(CONFIG_POWER_RESET_AXXIA) += axxia-reset.o
- obj-$(CONFIG_POWER_RESET_BRCMSTB) += brcmstb-reboot.o
- obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
-diff --git a/drivers/power/reset/at91-shdwc.c b/drivers/power/reset/at91-shdwc.c
-new file mode 100644
-index 000000000000..433824375243
---- /dev/null
-+++ b/drivers/power/reset/at91-shdwc.c
-@@ -0,0 +1,263 @@
-+/*
-+ * Atmel Shutdown Controller (SHDWC) driver
-+ *
-+ * Copyright (C) 2015 Atmel Corporation,
-+ *                    Nicolas Ferre <nicolas.ferre@atmel.com>
-+ *
-+ * Evolved from driver at91-poweroff.c.
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * TODO:
-+ * - addition to status of other wake-up inputs [1 - 15]
-+ * - Analog Comparator wake-up alarm
-+ * - Serial RX wake-up alarm
-+ * - low power debouncer
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/printk.h>
-+
-+#define SLOW_CLOCK_FREQ	32768
-+
-+#define AT91_SHDW_CR	0x00		/* Shut Down Control Register */
-+#define AT91_SHDW_SHDW		BIT(0)			/* Shut Down command */
-+#define AT91_SHDW_KEY		(0xa5 << 24)		/* KEY Password */
-+
-+#define AT91_SHDW_MR	0x04		/* Shut Down Mode Register */
-+#define AT91_SHDW_WKUPDBC_SHIFT	24
-+#define AT91_SHDW_WKUPDBC_MASK	GENMASK(31, 16)
-+#define AT91_SHDW_WKUPDBC(x)	(((x) << AT91_SHDW_WKUPDBC_SHIFT) \
-+						& AT91_SHDW_WKUPDBC_MASK)
-+
-+#define AT91_SHDW_SR	0x08		/* Shut Down Status Register */
-+#define AT91_SHDW_WKUPIS_SHIFT	16
-+#define AT91_SHDW_WKUPIS_MASK	GENMASK(31, 16)
-+#define AT91_SHDW_WKUPIS(x)	((1 << (x)) << AT91_SHDW_WKUPIS_SHIFT \
-+						& AT91_SHDW_WKUPIS_MASK)
-+
-+#define AT91_SHDW_WUIR	0x0c		/* Shutdown Wake-up Inputs Register */
-+#define AT91_SHDW_WKUPEN_MASK	GENMASK(15, 0)
-+#define AT91_SHDW_WKUPEN(x)	((1 << (x)) & AT91_SHDW_WKUPEN_MASK)
-+#define AT91_SHDW_WKUPT_SHIFT	16
-+#define AT91_SHDW_WKUPT_MASK	GENMASK(31, 16)
-+#define AT91_SHDW_WKUPT(x)	((1 << (x)) << AT91_SHDW_WKUPT_SHIFT \
-+						& AT91_SHDW_WKUPT_MASK)
-+
-+#define SHDW_WK_PIN(reg, cfg)	((reg) & AT91_SHDW_WKUPIS((cfg)->wkup_pin_input))
-+#define SHDW_RTCWK(reg, cfg)	(((reg) >> ((cfg)->sr_rtcwk_shift)) & 0x1)
-+#define SHDW_RTCWKEN(cfg)	(1 << ((cfg)->mr_rtcwk_shift))
-+
-+#define DBC_PERIOD_US(x)	DIV_ROUND_UP_ULL((1000000 * (x)), \
-+							SLOW_CLOCK_FREQ)
-+
-+struct shdwc_config {
-+	u8 wkup_pin_input;
-+	u8 mr_rtcwk_shift;
-+	u8 sr_rtcwk_shift;
-+};
-+
-+struct shdwc {
-+	struct shdwc_config *cfg;
-+	void __iomem *at91_shdwc_base;
-+};
-+
-+/*
-+ * Hold configuration here, cannot be more than one instance of the driver
-+ * since pm_power_off itself is global.
-+ */
-+static struct shdwc *at91_shdwc;
-+
-+static const unsigned long long sdwc_dbc_period[] = {
-+	0, 3, 32, 512, 4096, 32768,
-+};
-+
-+static void __init at91_wakeup_status(struct platform_device *pdev)
-+{
-+	struct shdwc *shdw = platform_get_drvdata(pdev);
-+	u32 reg;
-+	char *reason = "unknown";
-+
-+	reg = readl(shdw->at91_shdwc_base + AT91_SHDW_SR);
-+
-+	dev_dbg(&pdev->dev, "%s: status = %#x\n", __func__, reg);
-+
-+	/* Simple power-on, just bail out */
-+	if (!reg)
-+		return;
-+
-+	if (SHDW_WK_PIN(reg, shdw->cfg))
-+		reason = "WKUP pin";
-+	else if (SHDW_RTCWK(reg, shdw->cfg))
-+		reason = "RTC";
-+
-+	pr_info("AT91: Wake-Up source: %s\n", reason);
-+}
-+
-+static void at91_poweroff(void)
-+{
-+	BUG_ON(!at91_shdwc);
-+
-+	writel(AT91_SHDW_KEY | AT91_SHDW_SHDW,
-+			at91_shdwc->at91_shdwc_base + AT91_SHDW_CR);
-+}
-+
-+static u32 at91_shdwc_debouncer_value(struct platform_device *pdev,
-+				      u32 in_period_us)
-+{
-+	int i;
-+	int max_idx = ARRAY_SIZE(sdwc_dbc_period) - 1;
-+	unsigned long long period_us;
-+	unsigned long long max_period_us = DBC_PERIOD_US(sdwc_dbc_period[max_idx]);
-+
-+	if (in_period_us > max_period_us) {
-+		dev_warn(&pdev->dev,
-+			 "debouncer period %u too big, reduced to %llu us\n",
-+			 in_period_us, max_period_us);
-+		return max_idx;
-+	}
-+
-+	for (i = max_idx - 1; i > 0; i--) {
-+		period_us = DBC_PERIOD_US(sdwc_dbc_period[i]);
-+		dev_dbg(&pdev->dev, "%s: ref[%d] = %llu\n",
-+						__func__, i, period_us);
-+		if (in_period_us > period_us)
-+			break;
-+	}
-+
-+	return i + 1;
-+}
-+
-+static u32 at91_shdwc_get_wakeup_input(struct platform_device *pdev,
-+				       struct device_node *np)
-+{
-+	struct device_node *cnp;
-+	const char *pm;
-+	u32 wk_input_mask;
-+	u32 wuir = 0;
-+	u32 wk_input;
-+
-+	for_each_child_of_node(np, cnp) {
-+		if (of_property_read_u32(cnp, "reg", &wk_input)) {
-+			dev_warn(&pdev->dev, "reg property is missing for %s\n",
-+				 cnp->full_name);
-+			continue;
-+		}
-+
-+		wk_input_mask = 1 << wk_input;
-+		if (!(wk_input_mask & AT91_SHDW_WKUPEN_MASK)) {
-+			dev_warn(&pdev->dev,
-+				 "wake-up input %d out of bounds ignore\n",
-+				 wk_input);
-+			continue;
-+		}
-+		wuir |= wk_input_mask;
-+
-+		if (!of_property_read_string(cnp, "atmel,wakeup-type", &pm)) {
-+			if (!strcasecmp(pm, "high"))
-+				/*
-+				 * only add a type if "high" is specified. Low
-+				 * is the default.
-+				 */
-+				wuir |= AT91_SHDW_WKUPT(wk_input);
-+		}
-+		dev_dbg(&pdev->dev, "%s: (child %d) wuir = %#x\n",
-+						__func__, wk_input, wuir);
-+	}
-+
-+	return wuir;
-+}
-+
-+static void at91_shdwc_dt_configure(struct platform_device *pdev)
-+{
-+	struct shdwc *shdw = platform_get_drvdata(pdev);
-+	struct device_node *np = pdev->dev.of_node;
-+	u32 mode = 0, tmp, input;
-+
-+	if (!np) {
-+		dev_err(&pdev->dev, "device node not found\n");
-+		return;
-+	}
-+
-+	if (!of_property_read_u32(np, "atmel,shdwc-debouncer", &tmp))
-+		mode |= AT91_SHDW_WKUPDBC(at91_shdwc_debouncer_value(pdev, tmp));
-+
-+	if (of_property_read_bool(np, "atmel,wakeup-rtc-timer"))
-+		mode |= SHDW_RTCWKEN(shdw->cfg);
-+
-+	dev_dbg(&pdev->dev, "%s: mode = %#x\n", __func__, mode);
-+	writel(mode, shdw->at91_shdwc_base + AT91_SHDW_MR);
-+
-+	input = at91_shdwc_get_wakeup_input(pdev, np);
-+	writel(input, shdw->at91_shdwc_base + AT91_SHDW_WUIR);
-+}
-+
-+static const struct shdwc_config sama5d2_shdwc_config = {
-+	.wkup_pin_input = 0,
-+	.mr_rtcwk_shift = 17,
-+	.sr_rtcwk_shift = 5,
-+};
-+
-+static const struct of_device_id at91_shdwc_of_match[] = {
-+	{
-+		.compatible = "atmel,sama5d2-shdwc",
-+		.data = &sama5d2_shdwc_config,
-+	}, {
-+		/*sentinel*/
-+	}
-+};
-+MODULE_DEVICE_TABLE(of, at91_shdwc_of_match);
-+
-+static int at91_shdwc_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	const struct of_device_id *match;
-+
-+	if (!pdev->dev.of_node)
-+		return -ENODEV;
-+
-+	at91_shdwc = devm_kzalloc(&pdev->dev, sizeof(*at91_shdwc), GFP_KERNEL);
-+	if (!at91_shdwc)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, at91_shdwc);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	at91_shdwc->at91_shdwc_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(at91_shdwc->at91_shdwc_base)) {
-+		dev_err(&pdev->dev, "Could not map reset controller address\n");
-+		return PTR_ERR(at91_shdwc->at91_shdwc_base);
-+	}
-+
-+	match = of_match_node(at91_shdwc_of_match, pdev->dev.of_node);
-+	if (match != NULL)
-+		at91_shdwc->cfg = (struct shdwc_config *)(match->data);
-+	else
-+		return -ENODATA;
-+
-+	at91_wakeup_status(pdev);
-+
-+	at91_shdwc_dt_configure(pdev);
-+
-+	pm_power_off = at91_poweroff;
-+
-+	return 0;
-+}
-+
-+static struct platform_driver at91_shdwc_driver = {
-+	.probe = at91_shdwc_probe,
-+	.driver = {
-+		.name = "at91-shdwc",
-+		.of_match_table = at91_shdwc_of_match,
-+	},
-+};
-+module_platform_driver(at91_shdwc_driver);
-+
-+MODULE_AUTHOR("Nicolas Ferre <nicolas.ferre@atmel.com>");
-+MODULE_DESCRIPTION("Atmel shutdown controller driver");
-+MODULE_LICENSE("GPL v2");
 -- 
-2.1.3
+Regards,
+Nishanth Menon
