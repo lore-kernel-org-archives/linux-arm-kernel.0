@@ -1,50 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 Sep 2015 19:33:20 +0100
-Subject: [PATCH v7 3/6] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <1442801587-3812-4-git-send-email-lftan@altera.com>
-References: <1442801587-3812-1-git-send-email-lftan@altera.com>
- <1442801587-3812-4-git-send-email-lftan@altera.com>
-Message-ID: <20150922193320.37997c15@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Sep 2015 19:34:07 +0100
+Subject: [RFC PATCH v5 0/4] arm/arm64: fix a migrating irq bug when
+ hotplug cpu
+In-Reply-To: <1442631959-10228-1-git-send-email-yangyingliang@huawei.com>
+References: <1442631959-10228-1-git-send-email-yangyingliang@huawei.com>
+Message-ID: <20150922183407.GP7356@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Sep 2015 10:13:04 +0800
-Ley Foon Tan <lftan@altera.com> wrote:
-
-> This patch adds the Altera PCIe host controller driver.
+On Sat, Sep 19, 2015 at 04:05:55AM +0100, Yang Yingliang wrote:
+> ----
+> Changes in v5:
+>  - remove the macro that guard move_irqs()
+>  - use name irq_migrate_all_off_this_cpu instead of move_irqs
 > 
-> Signed-off-by: Ley Foon Tan <lftan@altera.com>
-> ---
->  drivers/pci/host/Kconfig       |   8 +
->  drivers/pci/host/Makefile      |   1 +
->  drivers/pci/host/pcie-altera.c | 591 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 600 insertions(+)
->  create mode 100644 drivers/pci/host/pcie-altera.c
+> Changes in v4:
+>  - select GENERIC_IRQ_MIGRATION when config GENERIC_IRQ_MIGRATION is enabled
+>  - add move_irqs() into kerne/irq/migration.c for cpu hotplug
+>  - use move_irqs() to migrate interrupts on arm/arm64 when cpu is going to down
+>  - split bugfix patch into seperate patches for arm and arm64
 > 
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index d5e58ba..df9ed4f 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -145,4 +145,12 @@ config PCIE_IPROC_BCMA
->  	  Say Y here if you want to use the Broadcom iProc PCIe controller
->  	  through the BCMA bus interface
->  
-> +config PCIE_ALTERA
-> +	tristate "Altera PCIe controller"
-> +	depends on ARCH_SOCFPGA || NIOS2
-> +	select PCI_DOMAINS
-> +	help
-> +	  Say Y here if you want to enable PCIe controller support for Altera
-> +	  SoCFPGA family of SoCs.
-> +
+> Changes in v3:
+>  - introduce config GENERIC_IRQ_MIGRATION for compiling migration.c
+>  - rename migrate_irqs in arch/ia64/kernel/irq.c to avoid compiling error
+> 
+> Changes in v2:
+>  - use the exiting helper to set IRQD_MOVE_PCNTXT flag
+>  - use for_each_active_irq() instead of for_each_irq_desc()
+>  - add some warn messages when affinity is null or do set affinity failed
+> ----
+> 
+> Hi All,
+> 
+> There is a bug:
+> 
+> When cpu is disabled, all irqs will be migratged to another cpu.
+> In some cases, a new affinity is different, it needed to be coppied
+> to irq's affinity. But if the type of irq is LPI, it's affinity will
+> not be coppied because of irq_set_affinity's return value.
 
-Is there anything in this driver that is actually specific to any of
-these two platforms/architectures? I'd don't think we should restrict
-if we can avoid it (hint: the companion MSI driver is not restricted to
-any architecture).
+This series looks good to me:
 
-Thanks,
+  Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Marc: once you're happy with the irq/core changes, feel free to include
+the arm64 patch in your tree.
+
+Will
