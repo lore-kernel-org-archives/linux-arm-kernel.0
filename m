@@ -1,25 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 21 Sep 2015 19:19:47 -0700
-Subject: [PATCH 3/3] ARM: bcm2835: Add the auxiliary clocks to the device
- tree.
-In-Reply-To: <1441923750-19404-4-git-send-email-eric@anholt.net>
-References: <1441923750-19404-1-git-send-email-eric@anholt.net>
- <1441923750-19404-4-git-send-email-eric@anholt.net>
-Message-ID: <5600BAC3.70506@wwwdotorg.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 22 Sep 2015 04:14:26 +0200
+Subject: DSA: phy polling
+In-Reply-To: <20150914104254.GI21084@n2100.arm.linux.org.uk>
+References: <20150914104254.GI21084@n2100.arm.linux.org.uk>
+Message-ID: <20150922021426.GE20288@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2015 03:22 PM, Eric Anholt wrote:
-> These will be used for enabling UART1, SPI1, and SPI2.
+On Mon, Sep 14, 2015 at 11:42:54AM +0100, Russell King - ARM Linux wrote:
+> Andrew,
+> 
+> I think you're the current maintainer of the Marvell DSA code, as being
+> the most recent author of changes to it. :)
 
-> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+Hi Russell
 
-> +		aux_clocks: aux-clocks at 0x7e215004 {
-> +			compatible = "brcm,bcm2835-aux-clock";
-> +			#clock-cells = <1>;
-> +			reg = <0x7e215004 0x4>;
+Sorry for the slow reply, i've been on vacation.
 
-Actually, I take back the ack on this patch. This HW module has two
-registers. The reg property should include both of those registers so
-that if SW needs to start using the other register at some time in the
-future, the entire set of registers is already represented in DT.
+Humm, i suppose i might be the defacto Maintainer for Marvell parts,
+but i've no NDA with Marvell, so no access to the data sheets etc.
+ 
+> I've noticed in my testing that the Marvell DSA code seems to poll the
+> internal phy link status in mv88e6xxx_poll_link(), and set the network
+> device carrier status according to the results.
+
+Peter Korsgaard comment might be correct, the switch needs to know
+what the PHY has negotiated. Hence the use of the PPU. There are also
+comments in the code that the PPU is needed for indirect access to the
+PHY.
+
+So we probably need to keep the PPU, but disable it from changing the
+networks stacks idea of the link state, etc.
+
+I will add this to my TODO list to play with it.
+
+  Andrew
