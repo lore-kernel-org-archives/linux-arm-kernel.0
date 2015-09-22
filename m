@@ -1,309 +1,94 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 23 Sep 2015 00:15:27 +0800
-Subject: [PATCH 3/4] ARM: dts: sun8i: Add Allwinner A83T dtsi
-In-Reply-To: <20150922155450.GL4684@lukather>
-References: <1442936337-3104-1-git-send-email-vishnupatekar0510@gmail.com>
- <1442936337-3104-4-git-send-email-vishnupatekar0510@gmail.com>
- <20150922155450.GL4684@lukather>
-Message-ID: <CAGb2v65fTvNvJthLK5c=4ZEviSuCF-fDdje59O6vjbL16cnzdw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Sep 2015 17:17:10 +0100
+Subject: [PATCH v2 0/9] Phy, mdiobus, and netdev struct device fixes
+Message-ID: <20150922161710.GA21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 11:54 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Sep 22, 2015 at 11:38:56PM +0800, Vishnu Patekar wrote:
->> Allwinner A83T is new octa-core cortex-a7 SOC.
->> This adds the basic dtsi, the clocks differs from
->> earlier sun8i SOCs.
->>
->> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
->> ---
->>  arch/arm/boot/dts/sun8i-a83t.dtsi | 243 ++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 243 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/sun8i-a83t.dtsi
->>
->> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
->> new file mode 100644
->> index 0000000..f6ddd9c
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
->> @@ -0,0 +1,243 @@
->> +/*
->> + * Copyright 2015 Vishnu Patekar
->> + *
->> + * Vishnu Patekar <vishnupatekar0510@gmail.com>
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> +
->> + */
->> +
->> +#include "skeleton.dtsi"
->> +
->> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->> +
->> +#include <dt-bindings/pinctrl/sun4i-a10.h>
->> +
->> +/ {
->> +     interrupt-parent = <&gic>;
->> +
->> +     chosen {
->> +             #address-cells = <1>;
->> +             #size-cells = <1>;
->> +             ranges;
->> +     };
->> +
->> +     cpus {
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +
->> +             cpu at 0 {
->> +                     compatible = "arm,cortex-a7";
->> +                     device_type = "cpu";
->> +                     reg = <0>;
->> +             };
->> +
->> +             cpu at 1 {
->> +                     compatible = "arm,cortex-a7";
->> +                     device_type = "cpu";
->> +                     reg = <1>;
->> +             };
->> +
->> +             cpu at 2 {
->> +                     compatible = "arm,cortex-a7";
->> +                     device_type = "cpu";
->> +                     reg = <2>;
->> +             };
->> +
->> +             cpu at 3 {
->> +                     compatible = "arm,cortex-a7";
->> +                     device_type = "cpu";
->> +                     reg = <3>;
->> +             };
->> +             cpu at 4 {
->> +                     compatible = "arm,cortex-a7";
->> +                     device_type = "cpu";
->> +                     reg = <4>;
+This is the second version of the series, with the comments David had
+on the first patch fixed up.  Original series description with updated
+diffstat below.
 
-These don't look right. See Documentation/devicetree/bindings/arm/cpus.txt
-Cluster 1 would be 0x100 ~ 0x103.
+While looking at the DSA code, I noticed we have a
+of_find_net_device_by_node(), and it looks like users of that are
+similarly buggy - it looks like net/dsa/dsa.c is the only user.  Fix
+that too.
 
->> +             };
->> +
->> +             cpu at 5 {
->> +                     compatible = "arm,cortex-a7";
->> +                     device_type = "cpu";
->> +                     reg = <5>;
->> +             };
->> +             cpu at 6 {
->> +                     compatible = "arm,cortex-a7";
->> +                     device_type = "cpu";
->> +                     reg = <6>;
->> +             };
->> +
->> +             cpu at 7 {
->> +                     compatible = "arm,cortex-a7";
->> +                     device_type = "cpu";
->> +                     reg = <7>;
->> +             };
->> +     };
->> +
->> +     memory {
->> +             reg = <0x40000000 0x80000000>;
->> +     };
->> +
->> +     timer {
->> +             compatible = "arm,armv7-timer";
->> +             interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
->> +                          <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
->> +                          <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
->> +                          <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
->> +             clock-frequency = <24000000>;
->> +             arm,cpu-registers-not-fw-configured;
->> +     };
->> +
->> +     clocks {
->> +             #address-cells = <1>;
->> +             #size-cells = <1>;
->> +             ranges;
->> +
->> +             osc24M: osc24M_clk {
->> +                     #clock-cells = <0>;
->> +                     compatible = "fixed-clock";
->> +                     clock-frequency = <24000000>;
->> +                     clock-output-names = "osc24M";
->> +             };
->> +
->> +             osc32k: osc32k_clk {
->> +                     #clock-cells = <0>;
->> +                     compatible = "fixed-clock";
->> +                     clock-frequency = <32768>;
->> +                     clock-output-names = "osc32k";
->> +             };
->> +     };
->> +
->> +     soc at 01c00000 {
->> +             compatible = "simple-bus";
->> +             #address-cells = <1>;
->> +             #size-cells = <1>;
->> +             ranges;
->> +
->> +             pio: pinctrl at 01c20800 {
->> +                     compatible = "allwinner,sun8i-a83t-pinctrl";
->> +                     interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
->> +                     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
->> +                     <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
->> +                     /* compatible gets set in SoC specific dtsi file */
->
-> Which DTSI?
->
->> +                     reg = <0x01c20800 0x400>;
->> +                     /* interrupts get set in SoC specific dtsi file */
->
-> Ditto
->
->> +                     clocks = <&osc24M>;
->> +                     gpio-controller;
->> +                     interrupt-controller;
->> +                     #interrupt-cells = <3>;
->> +                     #gpio-cells = <3>;
->> +
->> +                     uart0_pins_a: uart0 at 0 {
->> +                             allwinner,pins = "PF2", "PF4";
->> +                             allwinner,function = "uart0";
->> +                             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> +                     };
+Hi,
 
-Could you use PB9 & PB10 for uart0 pins, and not the PF ones?
+While looking at the phy code, I identified a number of weaknesses
+where refcounting on device structures was being leaked, where
+modules could be removed while in-use, and where the fixed-phy could
+end up having unintended consequences caused by incorrect calls to
+fixed_phy_update_state().
 
-http://linux-sunxi.org/User:Simos/H8HomletProtoV20_A83T shows
-they are available on the headers, and I tested them before.
+This patch series resolves those issues, some of which were discovered
+with testing on an Armada 388 board.  Not all patches are fully tested,
+particularly the one which touches several network drivers.
 
-Thanks!
-ChenYu
+When resolving the struct device refcounting problems, several different
+solutions were considered before settling on the implementation here -
+one of the considerations was to avoid touching many network drivers.
+The solution here is:
 
->> +
->> +                     mmc0_pins_a: mmc0 at 0 {
->> +                             allwinner,pins = "PF0", "PF1", "PF2",
->> +                                              "PF3", "PF4", "PF5";
->> +                             allwinner,function = "mmc0";
->> +                             allwinner,drive = <SUN4I_PINCTRL_30_MA>;
->> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> +                     };
->> +
->> +                     mmc1_pins_a: mmc1 at 0 {
->> +                             allwinner,pins = "PG0", "PG1", "PG2",
->> +                                              "PG3", "PG4", "PG5";
->> +                             allwinner,function = "mmc1";
->> +                             allwinner,drive = <SUN4I_PINCTRL_30_MA>;
->> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> +                     };
->> +
->> +                     mmc2_8bit_pins: mmc2_8bit {
->> +                             allwinner,pins = "PC5", "PC6", "PC8",
->> +                                              "PC9", "PC10", "PC11",
->> +                                              "PC12", "PC13", "PC14",
->> +                                              "PC15";
+	phy_attach*() - takes a refcount
+	phy_detach*() - drops the phy_attach refcount
 
-Would we also want PC16 (SDC2_RST)?
+Provided drivers always attach and detach their phys, which they should
+already be doing, this should change nothing, even if they leak a refcount.
 
->> +                             allwinner,function = "mmc2";
->> +                             allwinner,drive = <SUN4I_PINCTRL_30_MA>;
->> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> +                     };
->> +
->> +                     i2c0_pins_a: i2c0 at 0 {
->> +                             allwinner,pins = "PH0", "PH1";
->> +                             allwinner,function = "i2c0";
->> +                             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> +                     };
->> +
->> +                     i2c1_pins_a: i2c1 at 0 {
->> +                             allwinner,pins = "PH2", "PH3";
->> +                             allwinner,function = "i2c1";
->> +                             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> +                     };
->> +
->> +                     i2c2_pins_a: i2c2 at 0 {
->> +                             allwinner,pins = "PH4", "PH5";
->> +                             allwinner,function = "i2c2";
->> +                             allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> +                             allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> +                     };
->
-> Please order those by alphabetical order.
->
->> +             };
->> +
->> +             uart0: serial at 01c28000 {
->> +                     compatible = "snps,dw-apb-uart";
->> +                     reg = <0x01c28000 0x400>;
->> +                     interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
->> +                     reg-shift = <2>;
->> +                     reg-io-width = <4>;
->> +                     clocks = <&osc24M>;
->> +                     status = "disabled";
->> +             };
->> +
->> +             gic: interrupt-controller at 01c81000 {
->> +                     compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
->> +                     reg = <0x01c81000 0x1000>,
->> +                           <0x01c82000 0x1000>,
->> +                           <0x01c84000 0x2000>,
->> +                           <0x01c86000 0x2000>;
->> +                     interrupt-controller;
->> +                     #interrupt-cells = <3>;
->> +                     interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->> +             };
->> +
->> +     };
->> +};
->> --
->> 1.9.1
->>
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+	of_phy_find_device() and of_* functions which use that take
+	a refcount.  Arrange for this refcount to be dropped once
+	the phy is attached.
+
+This is the reason why the previous change is important - we can't drop
+this refcount taken by of_phy_find_device() until something else holds
+a reference on the device.  This resolves the leaked refcount caused by
+using of_phy_connect() or of_phy_attach().
+
+Even without the above changes, these drivers are leaking by calling
+of_phy_find_device().  These drivers are addressed by adding the
+appropriate release of that refcount.
+
+The mdiobus code also suffered from the same kind of leak, but thankfully
+this only happened in one place - the mdio-mux code.
+
+I also found that the try_module_get() in the phy layer code was utterly
+useless: phydev->dev.driver was guaranteed to always be NULL, so
+try_module_get() was always being called with a NULL argument.  I proved
+this with my SFP code, which declares its own MDIO bus - the module use
+count was never incremented irrespective of how I set the MDIO bus up.
+This allowed the MDIO bus code to be removed from the kernel while there
+were still PHYs attached to it.
+
+One other bug was discovered: while using in-band-status with mvneta, it
+was found that if a real phy is attached with in-band-status enabled,
+and another ethernet interface is using the fixed-phy infrastructure, the
+interface using the fixed-phy infrastructure is configured according to
+the other interface using the in-band-status - which is caused by the
+fixed-phy code not verifying that the phy_device passed in is actually
+a fixed-phy device, rather than a real MDIO phy.
+
+Lastly, having mdio_bus reversing phy_device_register() internals seems
+like a layering violation - it's trivial to move that code to the phy
+device layer.
+
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    | 23 ++++++---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 19 +++++++
+ drivers/net/ethernet/freescale/gianfar.c          |  6 ++-
+ drivers/net/ethernet/freescale/ucc_geth.c         |  8 ++-
+ drivers/net/ethernet/marvell/mvneta.c             |  2 +
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c     |  2 +
+ drivers/net/phy/fixed_phy.c                       |  2 +-
+ drivers/net/phy/mdio-mux.c                        | 19 ++++---
+ drivers/net/phy/mdio_bus.c                        | 24 ++++++---
+ drivers/net/phy/phy_device.c                      | 62 ++++++++++++++++++-----
+ drivers/of/of_mdio.c                              | 27 ++++++++--
+ include/linux/phy.h                               |  6 ++-
+ net/core/net-sysfs.c                              |  9 ++++
+ net/dsa/dsa.c                                     | 41 ++++++++++++---
+ 14 files changed, 199 insertions(+), 51 deletions(-)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
