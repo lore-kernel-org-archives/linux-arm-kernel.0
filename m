@@ -1,128 +1,150 @@
-From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Tue, 22 Sep 2015 23:38:57 +0800
-Subject: [PATCH 4/4] ARM: dts: sun8i: Add A83T HomletV2 Board by Allwinner
-In-Reply-To: <1442936337-3104-1-git-send-email-vishnupatekar0510@gmail.com>
-References: <1442936337-3104-1-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <1442936337-3104-5-git-send-email-vishnupatekar0510@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 22 Sep 2015 10:42:25 -0500
+Subject: [PATCH 1/2] ARM: configs: keystone: sync to savedefconfig
+In-Reply-To: <1442936546-8295-1-git-send-email-nm@ti.com>
+References: <1442936546-8295-1-git-send-email-nm@ti.com>
+Message-ID: <1442936546-8295-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H8Homlet Proto v2.0 Board is A83T Dev Board by Allwinner.
-It has UART, ethernet, USB, HDMI, etc ports on it.
+Sync up the defconfig to savedefconfig output. easier to integrate
+deltas as a result.
 
-It's name is confusing, Its A83T board however,"H8_HOMLET_PROTO_V2"
-printed on board.
-
-A83T patches are tested on this board.
-It has UART, ethernet, USB, HDMI, etc ports on it.
-
-For FEL mode it needs USB A-A(Male) cable. I used uart0 which
-is multiplexed to microsd pins PF2 and PF4.
-
-Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/boot/dts/Makefile                         |  5 +-
- .../boot/dts/sun8i-a83t-allwinner-homlet-v20.dts   | 69 ++++++++++++++++++++++
- 2 files changed, 72 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun8i-a83t-allwinner-homlet-v20.dts
+ arch/arm/configs/keystone_defconfig | 45 +++++++++++++++----------------------
+ 1 file changed, 18 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b276174..9585a58 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -634,7 +634,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a33-ga10h-v1.1.dtb \
- 	sun8i-a33-ippo-q8h-v1.2.dtb \
- 	sun8i-a33-q8-tzx-723q4.dtb \
--	sun8i-a33-sinlinx-sina33.dtb
-+	sun8i-a33-sinlinx-sina33.dtb \
-+	sun8i-a83t-allwinner-homlet-v20.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-@@ -679,7 +680,7 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
- 	uniphier-ph1-ld6b-ref.dtb \
- 	uniphier-ph1-pro4-ref.dtb \
- 	uniphier-ph1-sld3-ref.dtb \
--	uniphier-ph1-sld8-ref.dtb 
-+	uniphier-ph1-sld8-ref.dtb
- dtb-$(CONFIG_ARCH_VERSATILE) += \
- 	versatile-ab.dtb \
- 	versatile-pb.dtb
-diff --git a/arch/arm/boot/dts/sun8i-a83t-allwinner-homlet-v20.dts b/arch/arm/boot/dts/sun8i-a83t-allwinner-homlet-v20.dts
-new file mode 100644
-index 0000000..bbc2ab9
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-a83t-allwinner-homlet-v20.dts
-@@ -0,0 +1,69 @@
-+/*
-+ * Copyright 2015 Vishnu Patekar
-+ * Vishnu Patekar <vishnupatekar0510@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-a83t.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Allwinner A83T H8Homlet Proto Dev Board v2.0";
-+	compatible = "allwinner,homletv2", "allwinner,sun8i-a83t";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+		bootargs = "earlyprintk console=ttyS0,115200";
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
+diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+index 95ce1284bd42..a7ec63ee058d 100644
+--- a/arch/arm/configs/keystone_defconfig
++++ b/arch/arm/configs/keystone_defconfig
+@@ -27,6 +27,7 @@ CONFIG_SMP=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
++CONFIG_CMA=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ # CONFIG_SUSPEND is not set
+@@ -57,7 +58,6 @@ CONFIG_IP_MROUTE_MULTIPLE_TABLES=y
+ CONFIG_IP_PIMSM_V2=y
+ CONFIG_INET_AH=y
+ CONFIG_INET_IPCOMP=y
+-CONFIG_IPV6=y
+ CONFIG_INET6_XFRM_MODE_TRANSPORT=m
+ CONFIG_INET6_XFRM_MODE_TUNNEL=m
+ CONFIG_INET6_XFRM_MODE_BEET=m
+@@ -93,7 +93,6 @@ CONFIG_IP_NF_MATCH_ECN=y
+ CONFIG_IP_NF_MATCH_TTL=y
+ CONFIG_IP_NF_FILTER=y
+ CONFIG_IP_NF_TARGET_REJECT=y
+-CONFIG_IP_NF_TARGET_ULOG=y
+ CONFIG_IP_NF_MANGLE=y
+ CONFIG_IP_NF_TARGET_CLUSTERIP=y
+ CONFIG_IP_NF_TARGET_ECN=y
+@@ -106,7 +105,7 @@ CONFIG_IP6_NF_IPTABLES=m
+ CONFIG_IP_SCTP=y
+ CONFIG_VLAN_8021Q=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-CONFIG_CMA=y
++CONFIG_DEVTMPFS=y
+ CONFIG_DMA_CMA=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+@@ -117,7 +116,6 @@ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_DAVINCI=y
+ CONFIG_MTD_SPI_NOR=y
+ CONFIG_MTD_UBI=y
+-CONFIG_PROC_DEVICETREE=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_EEPROM_AT24=y
+ CONFIG_SCSI=y
+@@ -125,7 +123,7 @@ CONFIG_BLK_DEV_SD=y
+ CONFIG_NETDEVICES=y
+ CONFIG_TI_KEYSTONE_NETCP=y
+ CONFIG_TI_KEYSTONE_NETCP_ETHSS=y
+-CONFIG_PHYLIB=y
++CONFIG_MARVELL_PHY=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+@@ -137,12 +135,15 @@ CONFIG_I2C_DAVINCI=y
+ CONFIG_SPI=y
+ CONFIG_SPI_DAVINCI=y
+ CONFIG_SPI_SPIDEV=y
+-# CONFIG_HWMON is not set
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_GPIO_DAVINCI=y
++CONFIG_GPIO_SYSCON=y
+ CONFIG_POWER_SUPPLY=y
+ CONFIG_POWER_RESET=y
+ CONFIG_POWER_RESET_KEYSTONE=y
++# CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+-CONFIG_WATCHDOG_CORE=y
+ CONFIG_DAVINCI_WATCHDOG=y
+ CONFIG_USB=y
+ CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+@@ -150,9 +151,15 @@ CONFIG_USB_MON=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_DWC3=y
+-CONFIG_USB_DWC3_DEBUG=y
+-CONFIG_USB_DWC3_VERBOSE=y
+ CONFIG_KEYSTONE_USB_PHY=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_ONESHOT=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_BACKLIGHT=y
++CONFIG_LEDS_TRIGGER_GPIO=y
+ CONFIG_DMADEVICES=y
+ CONFIG_TI_EDMA=y
+ CONFIG_SOC_TI=y
+@@ -160,6 +167,7 @@ CONFIG_KEYSTONE_NAVIGATOR_QMSS=y
+ CONFIG_KEYSTONE_NAVIGATOR_DMA=y
+ CONFIG_MEMORY=y
+ CONFIG_TI_AEMIF=y
++CONFIG_KEYSTONE_IRQ=y
+ CONFIG_EXT4_FS=y
+ CONFIG_EXT4_FS_POSIX_ACL=y
+ CONFIG_MSDOS_FS=y
+@@ -179,11 +187,10 @@ CONFIG_NFSD_V3_ACL=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_PRINTK_TIME=y
+-CONFIG_DEBUG_SHIRQ=y
+ CONFIG_DEBUG_INFO=y
++CONFIG_DEBUG_SHIRQ=y
+ CONFIG_DEBUG_USER=y
+ CONFIG_CRYPTO_USER=y
+-CONFIG_CRYPTO_NULL=y
+ CONFIG_CRYPTO_AUTHENC=y
+ CONFIG_CRYPTO_CBC=y
+ CONFIG_CRYPTO_CTR=y
+@@ -192,19 +199,3 @@ CONFIG_CRYPTO_DES=y
+ CONFIG_CRYPTO_ANSI_CPRNG=y
+ CONFIG_CRYPTO_USER_API_HASH=y
+ CONFIG_CRYPTO_USER_API_SKCIPHER=y
+-CONFIG_GPIOLIB=y
+-CONFIG_GPIO_SYSFS=y
+-CONFIG_GPIO_DAVINCI=y
+-CONFIG_LEDS_CLASS=y
+-CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_GPIO=y
+-CONFIG_LEDS_TRIGGERS=y
+-CONFIG_LEDS_TRIGGER_ONESHOT=y
+-CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+-CONFIG_LEDS_TRIGGER_BACKLIGHT=y
+-CONFIG_LEDS_TRIGGER_GPIO=y
+-CONFIG_KEYSTONE_IRQ=y
+-CONFIG_GPIO_SYSCON=y
+-CONFIG_TI_DAVINCI_MDIO=y
+-CONFIG_MARVELL_PHY=y
+-CONFIG_DEVTMPFS=y
 -- 
-1.9.1
+2.1.4
