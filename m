@@ -1,67 +1,74 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 24 Sep 2015 00:05:19 +0800
-Subject: [PATCH v4 3/5] ARM: dts: sun8i: Add Reduced Serial Bus controller
- device node to A23/A33 dtsi
-In-Reply-To: <1443024323-9115-1-git-send-email-wens@csie.org>
-References: <1443024323-9115-1-git-send-email-wens@csie.org>
-Message-ID: <1443024323-9115-4-git-send-email-wens@csie.org>
+Date: Thu, 24 Sep 2015 00:05:16 +0800
+Subject: [PATCH v4 0/5] ARM: sunxi: Add Reduced Serial Bus support
+Message-ID: <1443024323-9115-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a device node for the Reduced Serial Bus (RSB)
-controller and the defacto pinmux setting to the A23/A33 dtsi.
+Hi everyone,
 
-Since there is only one possible pinmux setting for RSB, just
-set it in the dtsi.
+This is my fourth attempt at adding support for Allwinner's Reduced
+Serial Bus (RSB), which is used to communicate with PMICs and other
+peripherals on their newer SoCs, such as the A23/A33/A80.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
+RSB is a simplified two wire interface using push-pull outputs,
+supporting multiple slaves, address and data parity checks, and
+clock speeds up to 20 MHz. The bus only supports simple register
+read/writes, with possible register sizes of 8/16/32 bits. Access
+sizes not matching the slave device register sizes result in NACKs
+or errors. 32 bit registers in devices have yet to be seen.
 
-Changes since v3:
+Previous attempts to add support through the I2C subsystem have
+been rejected, as the bus line protocol is too different to even
+consider. The latest attempt to add a common bus driver was also
+rejected as this is sunxi only.
 
-  - Changed #address-cells to 1
+This version adds a platform driver for the RSB controller under
+drivers/soc/sunxi, which adds a custom driver type and bus type
+for slave drivers to use. Custom regmap support is also merged
+into the controller driver. Currently the driver only exports 2
+symbols: sunxi_rsb_driver_register() & devm_regmap_init_sunxi_rsb().
 
----
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+Patch 1 adds the DT bindings for Allwinner RSB controller.
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 04bccad977ee..828aaf52c342 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -651,6 +651,13 @@
- 			#size-cells = <0>;
- 			#gpio-cells = <3>;
- 
-+			r_rsb_pins: r_rsb {
-+				allwinner,pins = "PL0", "PL1";
-+				allwinner,function = "s_rsb";
-+				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+			};
-+
- 			r_uart_pins_a: r_uart at 0 {
- 				allwinner,pins = "PL2", "PL3";
- 				allwinner,function = "s_uart";
-@@ -658,5 +665,19 @@
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 		};
-+
-+		r_rsb: rsb at 01f03400 {
-+			compatible = "allwinner,sun8i-a23-rsb";
-+			reg = <0x01f03400 0x400>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&apb0_gates 3>;
-+			clock-frequency = <3000000>;
-+			resets = <&apb0_rst 3>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&r_rsb_pins>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
- 	};
- };
+Patch 2 adds the driver itself.
+
+Patch 3 adds the RSB nodes for A23/A33 dtsi.
+
+Patch 5 & 5 enable the RSB controller on the boards I have.
+
+Still to come are axp20x driver support for the RSB based AXP223.
+The complete series can be found at:
+
+    https://github.com/wens/linux/tree/sunxi-rsb-v4
+
+This is now sunxi specific, so if everything works out, it should
+all go through Maxime's tree?
+
+
+Regards,
+ChenYu
+
+Chen-Yu Tsai (5):
+  soc: sunxi: Add Allwinner Reduced Serial Bus (RSB) controller bindings
+  soc: sunxi: Add driver for Allwinner Reduced Serial Bus
+  ARM: dts: sun8i: Add Reduced Serial Bus controller device node to
+    A23/A33 dtsi
+  ARM: dts: sun8i: ippo-q8h-v5: Enable Reduced Serial Bus controller
+  ARM: dts: sun8i: sinlinx-sina33: Enable Reduced Serial Bus controller
+
+ .../devicetree/bindings/soc/sunxi/rsb.txt          |  47 ++
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi               |  21 +
+ arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts        |   4 +
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |   4 +
+ drivers/soc/sunxi/Kconfig                          |  10 +
+ drivers/soc/sunxi/Makefile                         |   1 +
+ drivers/soc/sunxi/sunxi_rsb.c                      | 786 +++++++++++++++++++++
+ include/linux/soc/sunxi/sunxi_rsb.h                |  89 +++
+ 8 files changed, 962 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/sunxi/rsb.txt
+ create mode 100644 drivers/soc/sunxi/sunxi_rsb.c
+ create mode 100644 include/linux/soc/sunxi/sunxi_rsb.h
+
 -- 
 2.5.3
