@@ -1,48 +1,48 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 23 Sep 2015 10:47:12 +0200
-Subject: [linux-sunxi] [PATCH 2/6] ARM: dts: sun7i: Enable USB DRC on
- Bananapi
-In-Reply-To: <87io718so8.fsf@karme.de>
-References: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
- <1442928966-6418-2-git-send-email-hdegoede@redhat.com>
- <87io718so8.fsf@karme.de>
-Message-ID: <56026710.9090103@redhat.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 23 Sep 2015 10:49:25 +0200
+Subject: Steps to submit a new arch/arm port
+In-Reply-To: <20150922162947.GC21084@n2100.arm.linux.org.uk>
+References: <56001B78.2090001@free.fr> <2206647.QPrIpE2UC0@wuerfel>
+ <56016780.5080104@free.fr> <144297172.JfjI0hNJ9J@wuerfel>
+ <5601799C.20701@free.fr> <20150922162947.GC21084@n2100.arm.linux.org.uk>
+Message-ID: <56026795.3090403@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 22/09/2015 18:29, Russell King - ARM Linux wrote:
+> On Tue, Sep 22, 2015 at 05:54:04PM +0200, Mason wrote:
+>> On 22/09/2015 16:51, Arnd Bergmann wrote:
+>>> On Tuesday 22 September 2015 16:36:48 Mason wrote:
+>>>> On 21/09/2015 17:49, Arnd Bergmann wrote:
+>>>> +config ARM_L1_CACHE_SHIFT
+>>>> +	int
+>>>> +	default 5
+>>>
+>>> This conflicts with the other definition of the same symbol.
+>>
+>> I asked about this a long time ago. Maybe I didn't understand
+>> Russell's answer?
+>>
+>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/402968
+>>
+>> How do I force ARM_L1_CACHE_SHIFT to 5 for my platform?
+>> It saves ~6% of the .data section size.
+>> (Not worth it?)
+> 
+> It's really not worth the complexity in Kconfig to make it work - we
+> would need some way to detect a configuration where _only_ your
+> platform is enabled, and the statement for that is likely to be very
+> big, and very difficult to maintain into the future.
 
-On 23-09-15 10:07, Jens Thiele wrote:
-> Hans de Goede <hdegoede@redhat.com> writes:
->
->> Enable the otg/drc usb controller on the Bananapi.
->
-> would something similar apply to the a20 olimex olinuxino micro/lime2
-> boards?
+Doh! I keep missing the ramifications of the ARCH_MULTIPLATFORM setting.
 
-a20 olimex olinuxino micro already has this in 4.3-rc1, see:
+How about overriding ARM_L1_CACHE_SHIFT *ONLY* when not building an
+ARCH_MULTIPLATFORM kernel?
 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+In my platform Kconfig, something along the lines of
 
-a20 olimex olinuxino lime2 support is pending:
+config ARM_L1_CACHE_SHIFT
+	int
+	default 5 if !ARCH_MULTIPLATFORM
 
-https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?h=sunxi/dt-for-4.4&id=9ff5052f7561068207c2b0e7590ad8ca5765f2cc
-
-Regards,
-
-Hans
-
-
->
-> is there some documentation how to port devicetree improvements/new
-> features to all boards or to at least help with that? i think you did
-> some workshop like that?
->
-> i think i have seen other features being added only to some boards?
-> pwm backlight?
-> audio output?
-> but my understanding of all of this is really very limited.
->
-> thanks,
-> Jens
->
+Regards.
