@@ -1,48 +1,28 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 23 Sep 2015 09:55:21 +0800
-Subject: [PATCH 0/5] Add Marvell berlin4ct clk support
-In-Reply-To: <1442931156-5877-1-git-send-email-jszhang@marvell.com>
-References: <1442931156-5877-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20150923095521.1ccea0de@xhacker>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 23 Sep 2015 10:44:11 +0800
+Subject: [PATCH v2 1/2] ARM: dts: imx7d: Add USB support
+In-Reply-To: <20150923004145.GC3529@tiger>
+References: <1441677432-3376-1-git-send-email-festevam@gmail.com>
+ <20150923004145.GC3529@tiger>
+Message-ID: <20150923024408.GA10160@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ CLK maintainers
+On Tue, Sep 22, 2015 at 05:41:45PM -0700, Shawn Guo wrote:
+> On Mon, Sep 07, 2015 at 10:57:11PM -0300, Fabio Estevam wrote:
+> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > Add USB OTG and Host support.
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Applied both, with assuming that property phy-clkgate-delay-us has been
+> accepted.
+> 
 
-sorry, yesterday I pressed ENTER quickly before --to list is completed
+Yes, I have accepted that.
 
-On Tue, 22 Sep 2015 22:12:31 +0800
-Jisheng Zhang <jszhang@marvell.com> wrote:
+-- 
 
-> Add berlin4ct clk driver. The berlin4ct SoC contains:
-> 
-> two kinds of PLL: normal PLL and AVPLL. The normal PLL support is done.
-> The AVPLL support is in TODO list.
-> 
-> two kinds of clk: normal clk and gate clk. The normal clk supports changing
-> divider, selecting clock source, disabling/enabling etc. The gate clk only
-> supports disabling/enabling. Both are supported in this series.
-> 
-> Jisheng Zhang (5):
->   clk: berlin: add common pll driver
->   clk: berlin: add common clk driver for newer SoCs
->   clk: berlin: add clk support for berlin4ct
->   dt-bindings: add binding for marvell berlin4ct SoC
->   arm64: dts: berlin4ct: add pll and clock nodes
-> 
->  .../bindings/clock/marvell,berlin4ct.txt           |  38 +++++
->  arch/arm64/boot/dts/marvell/berlin4ct.dtsi         |  38 +++++
->  drivers/clk/berlin/Makefile                        |   2 +-
->  drivers/clk/berlin/clk-berlin4ct.c                 | 164 +++++++++++++++++++++
->  drivers/clk/berlin/clk.c                           | 147 ++++++++++++++++++
->  drivers/clk/berlin/clk.h                           |  38 +++++
->  drivers/clk/berlin/pll.c                           | 119 +++++++++++++++
->  include/dt-bindings/clock/berlin4ct.h              |  56 +++++++
->  8 files changed, 601 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/marvell,berlin4ct.txt
->  create mode 100644 drivers/clk/berlin/clk-berlin4ct.c
->  create mode 100644 drivers/clk/berlin/clk.c
->  create mode 100644 drivers/clk/berlin/clk.h
->  create mode 100644 drivers/clk/berlin/pll.c
->  create mode 100644 include/dt-bindings/clock/berlin4ct.h
-> 
+Best Regards,
+Peter Chen
