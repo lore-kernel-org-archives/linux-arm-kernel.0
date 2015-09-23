@@ -1,172 +1,39 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 23 Sep 2015 12:07:22 -0500
-Subject: [PATCH v2 2/3] of/irq: Add new function of_msi_map_rid()
-In-Reply-To: <1442966406-13198-3-git-send-email-ddaney.cavm@gmail.com>
-References: <1442966406-13198-1-git-send-email-ddaney.cavm@gmail.com>
- <1442966406-13198-3-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <CAL_JsqKh0BaEOnjJYiDSa_unwm0MFqw+_wMEM+LOkvADSkfTkQ@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Wed, 23 Sep 2015 18:08:34 +0100
+Subject: [PATCH 00/22] arm64: Consolidate CPU feature handling
+In-Reply-To: <5602D53F.1030104@arm.com>
+References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
+ <20150923155655.GK6281@e103592.cambridge.arm.com>
+ <5602CC12.3040209@arm.com> <5602D53F.1030104@arm.com>
+Message-ID: <20150923170833.GQ27273@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 7:00 PM, David Daney <ddaney.cavm@gmail.com> wrote:
-> From: David Daney <david.daney@cavium.com>
->
-> The device tree property "msi-map" specifies how to create the PCI
-> requester id used in some MSI controllers.  Add a new function
-> of_msi_map_rid() that finds the msi-map property and applies its
-> translation to a given requester id.
->
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  drivers/of/irq.c       | 86 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_irq.h |  7 ++++
->  2 files changed, 93 insertions(+)
->
-> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-> index 55317fa..3f64d2e 100644
-> --- a/drivers/of/irq.c
-> +++ b/drivers/of/irq.c
-> @@ -598,3 +598,89 @@ void of_msi_configure(struct device *dev, struct device_node *np)
->                 d = irq_find_host(msi_np);
->         dev_set_msi_domain(dev, d);
->  }
-> +
-> +/**
-> + * of_msi_map_rid - Map a MSI requester ID for a device.
-> + * @dev: device for which the mapping is to be done.
-> + * @msi_np: device node of the expected msi controller.
-> + * @rid_in: unmapped MSI requester ID for the device.
-> + *
-> + * Walk up the device hierarchy looking for devices with a "msi-map"
-> + * property.  If found, apply the mapping to @rid_in.
-> + *
-> + * Returns the mapped MSI requester ID.
-> + */
-> +u32 of_msi_map_rid(struct device *dev, struct device_node *msi_np, u32 rid_in)
+On Wed, Sep 23, 2015 at 05:37:19PM +0100, Suzuki K. Poulose wrote:
+> On 23/09/15 16:58, Suzuki K. Poulose wrote:
+> > On 23/09/15 16:56, Dave P Martin wrote:
+> >> On Wed, Sep 16, 2015 at 03:20:58PM +0100, Suzuki K. Poulose wrote:
+> >>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+> >>>
+> >>> This is an updated reincarnation of my "arm64: Expose CPU feature registers"
+> >>> series [1], which does much more.
+> >>
+> >> [...]
+> >>
+> >> Do you get whitespace errors for some patches in this series?
+> >>
+> >> git am complains for several of the patches, but it's possibly my mail
+> >> chewed them up.
+> >>
+> >> If the errors are real, please fix ;)
+> >>
+> >
+> > Thanks for reporting, let me take a look.
+> 
+> The problems were with my patches. I have fixed them locally, will send it
+> along in the next version. Thanks again for spotting.
 
-Generally, the OF API does not use struct device except for what is in
-of/device.c. I'm guessing you need it here because you have devices
-without DT nodes?
+Ah, OK.
 
-We may want to handle this more like NUMA node IDs where we populate
-data in struct device at creation time and looking at struct device
-parents is independent of DT. How would this information be retrieved
-with ACPI?
-
-> +{
-> +       struct device *parent_dev;
-> +       struct device_node *msi_controller_node;
-> +       const __be32 *msi_map;
-
-> +       u32 map_mask, masked_rid;
-> +       u32 rid_base, msi_base, rid_len, phandle;
-
-One line please.
-
-> +       int msi_map_len;
-> +       bool matched;
-> +       u32 rid_out = rid_in;
-> +
-> +       /*
-> +        * Walk up the device parent links looking for one with a
-> +        * "msi-map" property.
-> +        */
-> +       msi_map = NULL;
-
-init in the declaration.
-
-> +       for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent) {
-> +               if (!parent_dev->of_node)
-> +                       continue;
-> +
-> +               msi_map = of_get_property(parent_dev->of_node,
-> +                                         "msi-map", &msi_map_len);
-> +               if (!msi_map)
-> +                       continue;
-> +
-> +               if (msi_map_len % (4 * sizeof(__be32))) {
-> +                       dev_err(parent_dev, "Error: Bad msi-map length: %d\n",
-> +                               msi_map_len);
-> +                       goto out;
-
-Just return here.
-
-> +               }
-> +               /* We have a good parent_dev and msi_map, let's use them. */
-> +               break;
-> +       }
-> +       if (!msi_map)
-> +               goto out;
-
-Just return here.
-
-> +
-> +       /* The default is to select all bits. */
-> +       map_mask = 0xffffffff;
-> +
-> +       /*
-> +        * Can be overridden by "msi-map-mask" property.  If
-> +        * of_property_read_u32() fails, the default is used.
-> +        */
-> +       of_property_read_u32(parent_dev->of_node, "msi-map-mask", &map_mask);
-> +
-> +       masked_rid = map_mask & rid_in;
-> +       matched = false;
-> +       while (!matched && msi_map_len >= 4 * sizeof(__be32)) {
-> +               rid_base = be32_to_cpup(msi_map + 0);
-> +               phandle = be32_to_cpup(msi_map + 1);
-> +               msi_base = be32_to_cpup(msi_map + 2);
-> +               rid_len = be32_to_cpup(msi_map + 3);
-> +
-> +               msi_controller_node = of_find_node_by_phandle(phandle);
-> +
-> +               matched = masked_rid >= rid_base &&
-> +                       masked_rid < rid_base + rid_len &&
-> +                       msi_np == msi_controller_node;
-> +
-> +               of_node_put(msi_controller_node);
-> +               msi_map_len -= 4 * sizeof(__be32);
-> +               msi_map += 4;
-> +       }
-> +       if (!matched)
-> +               goto out;
-
-Just return here.
-
-> +
-> +       rid_out = masked_rid + msi_base;
-> +       dev_dbg(dev,
-> +               "msi-map at: %s, using mask %08x, rid-base: %08x, msi-base: %08x, length: %08x, rid: %08x -> %08x\n",
-> +               dev_name(parent_dev), map_mask, rid_base, msi_base,
-> +               rid_len, rid_in, rid_out);
-> +out:
-> +       return rid_out;
-> +}
-> diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
-> index 4bcbd58..8cd9334 100644
-> --- a/include/linux/of_irq.h
-> +++ b/include/linux/of_irq.h
-> @@ -75,6 +75,7 @@ static inline int of_irq_to_resource_table(struct device_node *dev,
->  extern unsigned int irq_of_parse_and_map(struct device_node *node, int index);
->  extern struct device_node *of_irq_find_parent(struct device_node *child);
->  extern void of_msi_configure(struct device *dev, struct device_node *np);
-> +u32 of_msi_map_rid(struct device *dev, struct device_node *msi_np, u32 rid_in);
->
->  #else /* !CONFIG_OF */
->  static inline unsigned int irq_of_parse_and_map(struct device_node *dev,
-> @@ -87,6 +88,12 @@ static inline void *of_irq_find_parent(struct device_node *child)
->  {
->         return NULL;
->  }
-> +
-> +static inline u32 of_msi_map_rid(struct device *dev,
-> +                                struct device_node *msi_np, u32 rid_in)
-> +{
-> +       return rid_in;
-> +}
->  #endif /* !CONFIG_OF */
->
->  #endif /* __OF_IRQ_H */
-> --
-> 1.9.1
->
+Thanks
+---Dave
