@@ -1,77 +1,37 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 23 Sep 2015 17:39:16 +0300
-Subject: [PATCH 2/4] of: irq: Add support for the new definition of
- "msi-parent"
-In-Reply-To: <1442944336-11754-3-git-send-email-marc.zyngier@arm.com>
-References: <1442944336-11754-1-git-send-email-marc.zyngier@arm.com>
- <1442944336-11754-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <5602B994.9080409@cogentembedded.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 23 Sep 2015 16:44:13 +0200
+Subject: [PATCH v2 5/7] ARM: at91/defconfig: sama5: add PIO4 controller
+ support
+In-Reply-To: <CACRpkdY0iV+_xyfBSuUPuaRuZLfYYtpLHp5W7a-EYxxKrfEcVA@mail.gmail.com>
+References: <1442417823-15850-1-git-send-email-ludovic.desroches@atmel.com>
+ <1442417823-15850-6-git-send-email-ludovic.desroches@atmel.com>
+ <CACRpkdY0iV+_xyfBSuUPuaRuZLfYYtpLHp5W7a-EYxxKrfEcVA@mail.gmail.com>
+Message-ID: <5602BABD.7060308@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Le 21/09/2015 20:25, Linus Walleij a ?crit :
+> On Wed, Sep 16, 2015 at 8:37 AM, Ludovic Desroches
+> <ludovic.desroches@atmel.com> wrote:
+> 
+>> SAMA5D2 chip family has a new PIO controller.
+>>
+>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Please merge this through Nicolas' AT91 tree.
 
-On 9/22/2015 8:52 PM, Marc Zyngier wrote:
+Added in the at91-4.4-defconfig branch.
 
-> Since 126b16e2ad98 ("Docs: dt: add generic MSI bindings"),
-> the definition of "msi-parent" has evolved, while maintaining
-> some degree of compatibility. It can now express multiple MSI
-> controllers as parents, as well as some sideband data being
-> communicated to the controller.
->
-> This patch revamps the parsing of the property, iterating over
-> the multiple parents until a suitable irqdomain is found.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   drivers/of/irq.c | 26 +++++++++++++++++---------
->   1 file changed, 17 insertions(+), 9 deletions(-)
+Thanks.
 
-    Small stylistic nit below...
+Paul,
 
-> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-> index 55317fa..c9637cf 100644
-> --- a/drivers/of/irq.c
-> +++ b/drivers/of/irq.c
-> @@ -586,15 +586,23 @@ err:
->    */
->   void of_msi_configure(struct device *dev, struct device_node *np)
->   {
-> -	struct device_node *msi_np;
-> -	struct irq_domain *d;
-> +	struct of_phandle_args args;
-> +	int index = 0;
->
-> -	msi_np = of_parse_phandle(np, "msi-parent", 0);
-> -	if (!msi_np)
-> -		return;
-> +	while (!of_parse_phandle_with_opt_args(np, "msi-parent", "#msi-cells",
-> +					       index, &args)) {
-> +		struct irq_domain *d;
->
-> -	d = irq_find_matching_host(msi_np, DOMAIN_BUS_PLATFORM_MSI);
-> -	if (!d)
-> -		d = irq_find_host(msi_np);
-> -	dev_set_msi_domain(dev, d);
-> +		d = irq_find_matching_host(args.np, DOMAIN_BUS_PLATFORM_MSI);
-> +		if (!d)
+This symbol will appear in Linus W.'s tree and is selected in mine. So
+you may find that the symbol appear unused before the two trees are
+merged in Linux-next or mainline.
 
-		if (!d) {
-
-> +			d = irq_find_host(args.np);
-> +
-> +		if (d) {
-
-		} else {
-
-> +			dev_set_msi_domain(dev, d);
-> +			return;
-> +		}
-> +
-> +		of_node_put(args.np);
-> +		index++;
-> +	}
->   }
->
-
-MBR, Sergei
+Bye,
+-- 
+Nicolas Ferre
