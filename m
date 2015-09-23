@@ -1,48 +1,27 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 23 Sep 2015 07:25:11 +0100
-Subject: [RESEND PATCHv3] arm64: dts: Add base stratix 10 dtsi
-In-Reply-To: <CADhT+wccWpy9VhZv=yWRiA4tf1SO_1-EAu6_cc+UkPJOWX0Bpw@mail.gmail.com>
-References: <1442353625-4552-1-git-send-email-dinguyen@opensource.altera.com>
- <20150923055450.GA4883@svinekod>
- <CADhT+wccWpy9VhZv=yWRiA4tf1SO_1-EAu6_cc+UkPJOWX0Bpw@mail.gmail.com>
-Message-ID: <20150923062511.GA5517@svinekod>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 23 Sep 2015 16:24:17 -0700 (PDT)
+Subject: [PATCH v2 0/9] Phy, mdiobus, and netdev struct device fixes
+In-Reply-To: <20150922161710.GA21084@n2100.arm.linux.org.uk>
+References: <20150922161710.GA21084@n2100.arm.linux.org.uk>
+Message-ID: <20150923.162417.814596822188458346.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 11:43:25PM +0100, Dinh Nguyen wrote:
-> On Wed, Sep 23, 2015 at 12:54 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> +/ {
-> >> +     compatible = "altr,socfpga-stratix10";
-> >> +     #address-cells = <2>;
-> >> +     #size-cells = <2>;
-> >
-> > [...]
-> >
-> >> +     soc {
-> >> +             #address-cells = <1>;
-> >> +             #size-cells = <1>;
-> >> +             compatible = "simple-bus";
-> >> +             device_type = "soc";
-> >> +             interrupt-parent = <&intc>;
-> >
-> > As far as I am aware, this requires a (non-empty) ranges property, given the
-> > parent node has {address,size}-cells = <2>.
-> >
-> > Does the kernel not complain currently?
-> >
-> 
-> I do not see any complaints without ranges here, but with ranges, I get:
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Date: Tue, 22 Sep 2015 17:17:10 +0100
 
-I'm surprised (and a little worried) that we don't warn in the absence of
-ranges when #{address,size}-cells changes. That doesn't feel right.
+> This is the second version of the series, with the comments David had
+> on the first patch fixed up.  Original series description with updated
+> diffstat below.
 
-> DTC     arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dtb
-> Warning (ranges_format): /soc has empty "ranges" property but its
-> #address-cells (1) differs from / (2)
-> Warning (ranges_format): /soc has empty "ranges" property but its
-> #size-cells (1) differs from / (2)
+This needs some build fixes:
 
-As I mentioned, the ranges proeprty should be non-empty.
-
-Thanks,
-Mark.
+drivers/net/ethernet/apm/xgene/xgene_enet_hw.c: In function ?xgene_enet_phy_connect?:
+drivers/net/ethernet/apm/xgene/xgene_enet_hw.c:694:20: error: too few arguments to function ?of_phy_connect?
+   pdata->phy_dev = of_phy_connect(ndev, phy_np,
+                    ^
+In file included from drivers/net/ethernet/apm/xgene/xgene_enet_main.h:31:0,
+                 from drivers/net/ethernet/apm/xgene/xgene_enet_hw.c:22:
+include/linux/of_mdio.h:18:27: note: declared here
+ extern struct phy_device *of_phy_connect(struct net_device *dev,
+                           ^
