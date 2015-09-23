@@ -1,68 +1,41 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 23 Sep 2015 18:17:53 +0100
-Subject: [PATCH 6/6] pci: mvebu: use port->name rather than "PCIe%d.%d"
+Date: Wed, 23 Sep 2015 18:17:26 +0100
+Subject: [PATCH 1/6] pci: mvebu: provide a compliant PCI configuration space
 In-Reply-To: <20150923171706.GL21084@n2100.arm.linux.org.uk>
 References: <20150923171706.GL21084@n2100.arm.linux.org.uk>
-Message-ID: <E1Zeng1-0004dT-KL@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Zenfa-0004cy-WE@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the port->name string which we previously formatted when referring
-to the name of a port, rather than manually creating the port name each
-time.
+PCI requires reads to reserved or unimplemented configuration space to
+return zero and complete normally.  However, the root port software
+implementation was returning 0xfffffff and PCIBIOS_BAD_REGISTER_NUMBER.
+Fix this.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/pci/host/pci-mvebu.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ drivers/pci/host/pci-mvebu.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 8c715444b722..19144ed7bdad 100644
+index 67ec5e1c99db..b6a096bc9422 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -1006,8 +1006,8 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 		ret = mvebu_get_tgt_attr(np, port->devfn, IORESOURCE_MEM,
- 					 &port->mem_target, &port->mem_attr);
- 		if (ret < 0) {
--			dev_err(&pdev->dev, "PCIe%d.%d: cannot get tgt/attr for mem window\n",
--				port->port, port->lane);
-+			dev_err(&pdev->dev, "%s: cannot get tgt/attr for mem window\n",
-+				port->name);
- 			continue;
- 		}
+@@ -515,8 +515,13 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
+ 		break;
  
-@@ -1025,8 +1025,8 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 			u32 reset_udelay = 20000;
+ 	default:
+-		*value = 0xffffffff;
+-		return PCIBIOS_BAD_REGISTER_NUMBER;
++		/*
++		 * PCI defines configuration read accesses to reserved or
++		 * unimplemented registers to read as zero and complete
++		 * normally.
++		 */
++		*value = 0;
++		return PCIBIOS_SUCCESSFUL;
+ 	}
  
- 			port->reset_active_low = flags & OF_GPIO_ACTIVE_LOW;
--			port->reset_name = kasprintf(GFP_KERNEL,
--				     "pcie%d.%d-reset", port->port, port->lane);
-+			port->reset_name = kasprintf(GFP_KERNEL, "%s-reset",
-+						     port->name);
- 			of_property_read_u32(child, "reset-delay-us",
- 					     &reset_udelay);
- 
-@@ -1045,8 +1045,8 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 
- 		port->clk = of_clk_get_by_name(child, NULL);
- 		if (IS_ERR(port->clk)) {
--			dev_err(&pdev->dev, "PCIe%d.%d: cannot get clock\n",
--			       port->port, port->lane);
-+			dev_err(&pdev->dev, "%s: cannot get clock\n",
-+				port->name);
- 			continue;
- 		}
- 
-@@ -1056,8 +1056,8 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 
- 		port->base = mvebu_pcie_map_registers(pdev, child, port);
- 		if (IS_ERR(port->base)) {
--			dev_err(&pdev->dev, "PCIe%d.%d: cannot map registers\n",
--				port->port, port->lane);
-+			dev_err(&pdev->dev, "%s: cannot map registers\n",
-+				port->name);
- 			port->base = NULL;
- 			clk_disable_unprepare(port->clk);
- 			continue;
+ 	if (size == 2)
 -- 
 2.1.0
