@@ -1,10 +1,10 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 22 Sep 2015 17:58:18 -0700
+Date: Tue, 22 Sep 2015 18:06:08 -0700
 Subject: [PATCH v2 1/2] ARM: imx35: Do not call mxc_timer_init twice when
  booting with DT
 In-Reply-To: <1441791315-25390-1-git-send-email-alexander.stein@systec-electronic.com>
 References: <1441791315-25390-1-git-send-email-alexander.stein@systec-electronic.com>
-Message-ID: <20150923005817.GE3529@tiger>
+Message-ID: <20150923010608.GF3529@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,5 +18,12 @@ On Wed, Sep 09, 2015 at 11:35:14AM +0200, Alexander Stein wrote:
 > ---
 > Change in v2:
 > * Fix typo
+> 
+>  drivers/clk/imx/clk-imx35.c | 49 +++++++++++++++++++++++++--------------------
+>  1 file changed, 27 insertions(+), 22 deletions(-)
 
-Applied this one, thanks.
+Forgot mentioning that patches touching drivers/clk/ should be prefixed
+with 'clk: ...' in subject.  I changed the subject of the patch to
+'clk: imx35: ...' when applying.
+
+Shawn
