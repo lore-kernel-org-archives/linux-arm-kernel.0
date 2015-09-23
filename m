@@ -1,63 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Sep 2015 11:34:03 +0200
-Subject: Steps to submit a new arch/arm port
-In-Reply-To: <56027049.7010504@free.fr>
-References: <56001B78.2090001@free.fr> <3168184.5li5Yj9y1C@wuerfel>
- <56027049.7010504@free.fr>
-Message-ID: <2002438.fvrDoNMsZn@wuerfel>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Wed, 23 Sep 2015 11:38:24 +0200
+Subject: [PATCH] arm: dma-mapping: add cast to DMA_ERROR_CODE
+In-Reply-To: <1439653971-867-1-git-send-email-dirk.behme@gmail.com>
+References: <1439653971-867-1-git-send-email-dirk.behme@gmail.com>
+Message-ID: <56027310.3010603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 September 2015 11:26:33 Mason wrote:
-> On 22/09/2015 21:15, Arnd Bergmann wrote:
-> > On Tuesday 22 September 2015 17:54:04 Mason wrote:
-> >> On 22/09/2015 16:51, Arnd Bergmann wrote:
-> >>> On Tuesday 22 September 2015 16:36:48 Mason wrote:
-> >>>
-> >>>> arch/arm/mach-tangox/Kconfig
-> >>>> +if ARCH_TANGOX
-> >>>> +
-> >>>> +config UNCOMPRESS_INCLUDE
-> >>>> +	string
-> >>>> +	default "debug/uncompress.h"
-> >>>
-> >>> Better do this like everyone else.
-> >>
-> >> Do you mean I should provide an empty mach/uncompress.h ?
-> > 
-> > No, add a debug/*.S file for your uart and do the configuration in
-> > arch/arm/Kconfig.debug.
-> > 
-> > The UNCOMPRESS_INCLUDE symbol is defined in arch/arm/Kconfig.debug,
-> > and you should not duplicate that.
-> 
-> config UNCOMPRESS_INCLUDE
-> 	string
-> 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
-> 					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M || \
-> 					ARCH_SHMOBILE_LEGACY
-> 	default "mach/uncompress.h"
-> 
-> 
-> I'm going for the smallest possible port, I don't have a debug/tango.S
-> I didn't define DEBUG_UNCOMPRESS in my .config, and I just wanted to
-> get this NOP definition from debug/uncompress.h
-> 
-> 	static inline void putc(int c) {}
-> 
-> Are you saying I cannot do it like that?
-> 
-> If ARCH_MULTIPLATFORM is defined, then debug/uncompress.h will be
-> included, just like I want.
-> 
-> If ARCH_MULTIPLATFORM is not defined, can I do this in my port:
-> 
-> config UNCOMPRESS_INCLUDE
-> 	string
-> 	default "debug/uncompress.h" if !ARCH_MULTIPLATFORM
-> 
-> or add my platform to the list on arch/arm/Kconfig.debug?
+On 15.08.2015 17:52, Dirk Behme wrote:
+> Fix the compiler warning
+>
+> ./arch/arm/include/asm/dma-mapping.h: In function ?dma_mapping_error?:
+> ./arch/arm/include/asm/dma-mapping.h:176:18: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
+>    return dma_addr == DMA_ERROR_CODE;
+>                    ^
+>
+> we get building the kernel with W=1.
+>
+> This is done the same way we have already in the arm64 version.
+>
+> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
+> ---
+>   arch/arm/include/asm/dma-mapping.h | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index b52101d..68e41e8 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -14,7 +14,7 @@
+>   #include <xen/xen.h>
+>   #include <asm/xen/hypervisor.h>
+>
+> -#define DMA_ERROR_CODE	(~0)
+> +#define DMA_ERROR_CODE	(~(dma_addr_t)0)
+>   extern struct dma_map_ops arm_dma_ops;
+>   extern struct dma_map_ops arm_coherent_dma_ops;
 
-Just use ARCH_MULTIPLATFORM.
 
-	Arnd
+I've put this as 8420/1 into the patch system:
+
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8420/1
+
+Any comments on this?
+
+Best regards
+
+Dirk
