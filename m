@@ -1,34 +1,41 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 23 Sep 2015 17:37:19 +0100
-Subject: [PATCH 00/22] arm64: Consolidate CPU feature handling
-In-Reply-To: <5602CC12.3040209@arm.com>
-References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
- <20150923155655.GK6281@e103592.cambridge.arm.com> <5602CC12.3040209@arm.com>
-Message-ID: <5602D53F.1030104@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 23 Sep 2015 17:37:48 +0100
+Subject: [PATCH v2 1/3] Docs: dt: Add PCI MSI map bindings
+In-Reply-To: <1442966406-13198-2-git-send-email-ddaney.cavm@gmail.com>
+References: <1442966406-13198-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442966406-13198-2-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150923173748.0c684c6a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/09/15 16:58, Suzuki K. Poulose wrote:
-> On 23/09/15 16:56, Dave P Martin wrote:
->> On Wed, Sep 16, 2015 at 03:20:58PM +0100, Suzuki K. Poulose wrote:
->>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->>>
->>> This is an updated reincarnation of my "arm64: Expose CPU feature registers"
->>> series [1], which does much more.
->>
->> [...]
->>
->> Do you get whitespace errors for some patches in this series?
->>
->> git am complains for several of the patches, but it's possibly my mail
->> chewed them up.
->>
->> If the errors are real, please fix ;)
->>
->
-> Thanks for reporting, let me take a look.
+On Tue, 22 Sep 2015 17:00:04 -0700
+David Daney <ddaney.cavm@gmail.com> wrote:
 
-The problems were with my patches. I have fixed them locally, will send it
-along in the next version. Thanks again for spotting.
+> From: Mark Rutland <mark.rutland@arm.com>
+> 
+> Currently msi-parent is used by a few bindings to describe the
+> relationship between a PCI root complex and a single MSI controller, but
+> this property does not have a generic binding document.
+> 
+> Additionally, msi-parent is insufficient to describe more complex
+> relationships between MSI controllers and devices under a root complex,
+> where devices may be able to target multiple MSI controllers, or where
+> MSI controllers use (non-probeable) sideband information to distinguish
+> devices.
+> 
+> This patch adds a generic binding for mapping PCI devices to MSI
+> controllers. This document covers msi-parent, and a new msi-map property
+> (specific to PCI*) which may be used to map devices (identified by their
+> Requester ID) to sideband data for each MSI controller that they may
+> target.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: David Daney <david.daney@cavium.com>
 
-Suzuki
+I thought I had done it already, but nevertheless:
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
