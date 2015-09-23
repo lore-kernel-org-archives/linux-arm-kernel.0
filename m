@@ -1,265 +1,40 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Wed, 23 Sep 2015 20:47:50 +0200
-Subject: [linux-sunxi][PATCH v3] ARM: sun7i: dt: Add new Olimex A20 EVB device
-Message-ID: <1443034070-642-1-git-send-email-codekipper@gmail.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Wed, 23 Sep 2015 11:48:18 -0700
+Subject: [PATCH] arm64/pci: Add quirks for Cavium Thunder PCI bridges.
+In-Reply-To: <20150923184005.GX7356@arm.com>
+References: <1442966996-13419-1-git-send-email-ddaney.cavm@gmail.com>
+ <20150923184005.GX7356@arm.com>
+Message-ID: <5602F3F2.2050100@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+On 09/23/2015 11:40 AM, Will Deacon wrote:
+> On Wed, Sep 23, 2015 at 01:09:56AM +0100, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> The Cavium ThunderX SoC needs a PCI quirk for its on-chip bridges.
+>> Since it is arm64, create a new quirks.c file there to contain arm64
+>> related quirks.  Add the ThunderX bridge quirk, gated by a new config
+>> variable, so that it can be disabled for kernels that aren't expected
+>> to be used on ThunderX.
+>>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   arch/arm64/Kconfig         | 11 +++++++++++
+>>   arch/arm64/kernel/Makefile |  2 +-
+>>   arch/arm64/kernel/quirks.c | 36 ++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 48 insertions(+), 1 deletion(-)
+>>   create mode 100644 arch/arm64/kernel/quirks.c
+>
+> Why does this have to live in the arch/arm64/ directory? The quirks have
+> nothing to do with the architecture code.
+>
 
-The A20-SOM-EVB is a reference design of a 2-layer board for the
-A20-SOM.
-It expands the features of A20-SOM by adding VGA connector, HDMI
-connector, audio In/Out, LCD connector, 2 Mpix camera, gigabit
-Ethernet, SATA, USB-OTG and 2 USB hosts.
+It doesn't have to live there.  It is something that will never be used 
+for any other architecture.  So I thought we could do like 
+arch/x86/kernel/quirks.c
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
-Changes since v2:
-- changed dcdc2 to have max voltage of 1.4V
-Changes since v1:
-- renamed dts from sun7i-a20-olinuxino-evb to sun7i-a20-olimex-som-evb
-- added "axp209 dtsi"
-- change regulator settings
----
- arch/arm/boot/dts/Makefile                     |   1 +
- arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 216 +++++++++++++++++++++++++
- 2 files changed, 217 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+I could move it to drivers/pci/quirks.c if people think that is a much 
+better place for it.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 359dcb5..8419a3e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -617,6 +617,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-i12-tvbox.dtb \
- 	sun7i-a20-m3.dtb \
- 	sun7i-a20-mk808c.dtb \
-+	sun7i-a20-olimex-som-evb.dtb \
- 	sun7i-a20-olinuxino-lime.dtb \
- 	sun7i-a20-olinuxino-lime2.dtb \
- 	sun7i-a20-olinuxino-micro.dtb \
-diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-new file mode 100644
-index 0000000..41b4b4a
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-@@ -0,0 +1,216 @@
-+/*
-+ * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun7i-a20.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Olimex A20-Olimex-SOM-EVB";
-+	compatible = "olimex,a20-olimex-som-evb", "allwinner,sun7i-a20";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_olimex_som_evb>;
-+
-+		green {
-+			label = "a20-olimex-som-evb:green:usr";
-+			gpios = <&pio 7 2 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+	};
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+};
-+
-+&ahci {
-+	target-supply = <&reg_ahci_5v>;
-+	status = "okay";
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_rgmii_a>;
-+	phy = <&phy1>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	ahci_pwr_pin_olimex_som_evb: ahci_pwr_pin at 1 {
-+		allwinner,pins = "PC3";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	led_pins_olimex_som_evb: led_pins at 0 {
-+		allwinner,pins = "PH2";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&reg_ahci_5v {
-+	pinctrl-0 = <&ahci_pwr_pin_olimex_som_evb>;
-+	gpio = <&pio 2 3 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+#include "axp209.dtsi"
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_usb0_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb1_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
--- 
-2.4.6
+David Daney
