@@ -1,61 +1,32 @@
-From: Songjun.Wu@atmel.com (Wu, Songjun)
-Date: Thu, 24 Sep 2015 06:09:03 +0000
-Subject: [PATCH v2 0/2] ASoC: atmel-classd: add driver for Atmel CLASSD
-In-Reply-To: <1443073660-18042-1-git-send-email-songjun.wu@atmel.com>
-References: <1443073660-18042-1-git-send-email-songjun.wu@atmel.com>
-Message-ID: <C4F955F831DF1E468ED7696A73DB93A15550BCDE@penmbx01>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Wed, 23 Sep 2015 11:19:32 -0700
+Subject: [PATCH 1/3] Documentation: dt: keystone: provide SoC specific
+ compatible flags
+In-Reply-To: <1442938118-4718-2-git-send-email-nm@ti.com>
+References: <1442938118-4718-1-git-send-email-nm@ti.com>
+ <1442938118-4718-2-git-send-email-nm@ti.com>
+Message-ID: <5602ED34.9010108@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Nishant,
 
-Sorry, I send this patch twice.
-Please ignore this email.
+On 9/22/2015 9:08 AM, Nishanth Menon wrote:
+> Keystone2 devices are used on more platforms than just Texas
+> Instruments reference evaluation platforms called EVMs. Providing a
+> generic compatible "ti,keystone" is not sufficient to differentiate
+> various SoC definitions possible on various platforms. So, provide
+> compatible matches for each SoC family by itself.
+>
+> This allows SoC specific logic to be run time handled based on
+> of_machine_is_compatible("ti,k2hk") or as needed for the dependent
+> processor instead of needing to use board dependent compatibles that
+> are needed now.
+>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+You need to expand that 'not sufficient' for me. Unless there is
+genuine case to support this, I would want to avoid this churn.
 
------Original Message-----
-From: Songjun Wu [mailto:songjun.wu at atmel.com] 
-Sent: Thursday, September 24, 2015 13:48
-To: linux-arm-kernel at lists.infradead.org
-Cc: Wu, Songjun <Songjun.Wu@atmel.com>
-Subject: [PATCH v2 0/2] ASoC: atmel-classd: add driver for Atmel CLASSD
-
-The Audio Class D Amplifier driver includes two parts.
-1) Driver code to implement the Audio Class D Amplifier function.
-2) Device tree binding document, it describes how to add the Audio
-   Class D Amplifier in device tree.
-
-Changes in v2:
-- Change the "Mono", "Swap" and "Deemphasis" controls to
-  "Mono Switch", "Swap Switch" and "Deemphasis Switch".
-- Merge "EQ Bass", "EQ Medium" and "EQ Treble" controls
-  into one "EQ" control.
-- Change the "single-ended" and "differential" to
-  "Single ended", "Differential".
-- Merge separate left and right controls into one single
-  stereo control.
-- Add a warning if the user trys to specify an invalid
-  value in function "atmel_classd_codec_probe".
-- Use the "dev_get_regmap()" in function
-  "atmel_classd_codec_get_remap".
-- Check for errors when invoking the "clk_prepare_enable".
-- Remove the "dev_info" in function "atmel_classd_probe".
-- Add some code to create a sound card in function
-  "atmel_classd_probe".
-- Remove the DT node "Sound" and the related code.
-- Delete the device node "Sound".
-
-Songjun Wu (2):
-  ASoC: atmel-classd: add the Audio Class D Amplifier
-  ASoC: atmel-classd: DT binding for Class D audio amplifier driver
-
- .../devicetree/bindings/sound/atmel-classd.txt     |   52 ++
- sound/soc/atmel/Kconfig                            |    9 +
- sound/soc/atmel/Makefile                           |    2 +
- sound/soc/atmel/atmel-classd.c                     |  680 ++++++++++++++++++++
- sound/soc/atmel/atmel-classd.h                     |  120 ++++
- 5 files changed, 863 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/atmel-classd.txt
- create mode 100644 sound/soc/atmel/atmel-classd.c  create mode 100644 sound/soc/atmel/atmel-classd.h
-
---
-1.7.9.5
+Regards,
+Santosh
