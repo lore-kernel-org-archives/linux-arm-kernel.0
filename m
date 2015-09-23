@@ -1,106 +1,43 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 23 Sep 2015 18:55:04 +0100
-Subject: [PATCH v4 07/11] KVM: arm/arm64: vgic: Allow HW interrupts to be
- queued to a guest
-In-Reply-To: <1438962347-17541-8-git-send-email-marc.zyngier@arm.com>
-References: <1438962347-17541-1-git-send-email-marc.zyngier@arm.com>
- <1438962347-17541-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <5602E778.3080004@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 23 Sep 2015 09:45:32 -0700
+Subject: [PATCH v4 2/5] soc: sunxi: Add driver for Allwinner Reduced
+ Serial Bus
+In-Reply-To: <1443024323-9115-3-git-send-email-wens@csie.org>
+References: <1443024323-9115-1-git-send-email-wens@csie.org>
+ <1443024323-9115-3-git-send-email-wens@csie.org>
+Message-ID: <20150923164532.GT30445@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Marc,
+On Thu, Sep 24, 2015 at 12:05:18AM +0800, Chen-Yu Tsai wrote:
 
-I know that this patch is already merged, but ....
-
-On 07/08/15 16:45, Marc Zyngier wrote:
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 51c9900..9d009d2 100644
-...
-> @@ -1364,6 +1397,39 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->  	return level_pending;
->  }
->  
-> +/*
-> + * Save the physical active state, and reset it to inactive.
-> + *
-> + * Return 1 if HW interrupt went from active to inactive, and 0 otherwise.
-> + */
-> +static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
+> +static int sunxi_rsb_device_probe(struct device *dev)
 > +{
-> +	struct irq_phys_map *map;
+> +	const struct sunxi_rsb_driver *drv = to_sunxi_rsb_driver(dev->driver);
+> +	struct sunxi_rsb_device *rdev = to_sunxi_rsb_device(dev);
 > +	int ret;
 > +
-> +	if (!(vlr.state & LR_HW))
+> +	if (dev->bus != &sunxi_rsb_bus)
 > +		return 0;
-> +
-> +	map = vgic_irq_map_search(vcpu, vlr.irq);
-> +	BUG_ON(!map || !map->active);
-> +
-> +	ret = irq_get_irqchip_state(map->irq,
-> +				    IRQCHIP_STATE_ACTIVE,
-> +				    &map->active);
-> +
-> +	WARN_ON(ret);
-> +
-> +	if (map->active) {
-> +		ret = irq_set_irqchip_state(map->irq,
-> +					    IRQCHIP_STATE_ACTIVE,
-> +					    false);
-> +		WARN_ON(ret);
-> +		return 0;
-> +	}
-> +
-> +	return 1;
-> +}
-> +
->  /* Sync back the VGIC state after a guest run */
->  static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
->  {
-> @@ -1378,14 +1444,31 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
->  	elrsr = vgic_get_elrsr(vcpu);
->  	elrsr_ptr = u64_to_bitmask(&elrsr);
->  
-> -	/* Clear mappings for empty LRs */
-> -	for_each_set_bit(lr, elrsr_ptr, vgic->nr_lr) {
-> +	/* Deal with HW interrupts, and clear mappings for empty LRs */
-> +	for (lr = 0; lr < vgic->nr_lr; lr++) {
->  		struct vgic_lr vlr;
->  
-> -		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
-> +		if (!test_bit(lr, vgic_cpu->lr_used))
->  			continue;
->  
->  		vlr = vgic_get_lr(vcpu, lr);
-> +		if (vgic_sync_hwirq(vcpu, vlr)) {
-> +			/*
-> +			 * So this is a HW interrupt that the guest
-> +			 * EOI-ed. Clean the LR state and allow the
-> +			 * interrupt to be sampled again.
-> +			 */
-> +			vlr.state = 0;
-> +			vlr.hwirq = 0;
-> +			vgic_set_lr(vcpu, lr, vlr);
-> +			vgic_irq_clear_queued(vcpu, vlr.irq);
 
-Isn't this line altering common VGIC state without holding the lock?
-Eric removed the coarse dist->lock around the whole
-__kvm_vgic_sync_hwstate() function, we take it now in
-vgic_process_maintenance(), but don't hold it here AFAICT.
-As long as we are only dealing with private timer IRQs this is probably
-not a problem, but the IRQ number could be a SPI as well, right?
+That's a bit worrying...  why might this get called for something other
+than a rsb device?
 
-Cheers,
-Andre.
+> +struct regmap *devm_regmap_init_sunxi_rsb(struct sunxi_rsb_device *rdev,
+> +					  const struct regmap_config *config);
 
-> +			set_bit(lr, elrsr_ptr);
-> +		}
-> +
-> +		if (!test_bit(lr, elrsr_ptr))
-> +			continue;
-> +
-> +		clear_bit(lr, vgic_cpu->lr_used);
->  
->  		BUG_ON(vlr.irq >= dist->nr_irqs);
->  		vgic_cpu->vgic_irq_lr_map[vlr.irq] = LR_EMPTY;
-> 
+This should work most of the time but you might want to take a look at
+the changes introduced in 3cfe7a74d42b (regmap: Use different lockdep
+class for each regmap init call) and follow a similar pattern for RSB to
+avoid spurious lockdep warnings in some configurations - see the commit
+log for that change for a full explanation.
+
+Otherwise the regmap bit of this looks good, I'll try to have another
+look through at the rest of the code later.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150923/eee05b69/attachment.sig>
