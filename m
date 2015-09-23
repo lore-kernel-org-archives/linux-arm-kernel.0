@@ -1,28 +1,280 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 23 Sep 2015 10:44:11 +0800
-Subject: [PATCH v2 1/2] ARM: dts: imx7d: Add USB support
-In-Reply-To: <20150923004145.GC3529@tiger>
-References: <1441677432-3376-1-git-send-email-festevam@gmail.com>
- <20150923004145.GC3529@tiger>
-Message-ID: <20150923024408.GA10160@shlinux2>
+From: Dongsheng.Wang@freescale.com (Wang Dongsheng)
+Date: Wed, 23 Sep 2015 02:45:51 +0000
+Subject: [PATCH v2] arm/ls1021a: Add Sleep feature for ls1021
+In-Reply-To: <1442308030-21231-1-git-send-email-dongsheng.wang@freescale.com>
+References: <1442308030-21231-1-git-send-email-dongsheng.wang@freescale.com>
+Message-ID: <SN1PR0301MB1616EDC1438FC06D76C44F619D440@SN1PR0301MB1616.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 05:41:45PM -0700, Shawn Guo wrote:
-> On Mon, Sep 07, 2015 at 10:57:11PM -0300, Fabio Estevam wrote:
-> > From: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > Add USB OTG and Host support.
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Hi all,
+
+Any feedback about this patch?
+
+Regards,
+-Dongsheng
+
+> -----Original Message-----
+> From: Dongsheng Wang [mailto:dongsheng.wang at freescale.com]
+> Sent: Tuesday, September 15, 2015 5:07 PM
+> To: shawnguo at kernel.org
+> Cc: mark.rutland at arm.com; Wang Huan-B18965; Jin Zhengxiong-R64188; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Wang Dongsheng-B40534;
+> Zhao Chenhui-B35336
+> Subject: [PATCH v2] arm/ls1021a: Add Sleep feature for ls1021
 > 
-> Applied both, with assuming that property phy-clkgate-delay-us has been
-> accepted.
+> From: Wang Dongsheng <dongsheng.wang@freescale.com>
 > 
-
-Yes, I have accepted that.
-
--- 
-
-Best Regards,
-Peter Chen
+> Add system STANDBY implement for ls1021 platform.
+> 
+> Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
+> Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+> ---
+> *v2*:
+> - Remove PSCI code. Just implement STANDBY in platform code.
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index fb689d8..d7a2d1d 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -90,6 +90,7 @@ ifeq ($(CONFIG_SUSPEND),y)
+>  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+>  obj-$(CONFIG_SOC_IMX6) += suspend-imx6.o
+>  obj-$(CONFIG_SOC_IMX53) += suspend-imx53.o
+> +obj-$(CONFIG_SOC_LS1021A) += pm-ls1.o
+>  endif
+>  obj-$(CONFIG_SOC_IMX6) += pm-imx6.o
+> 
+> diff --git a/arch/arm/mach-imx/pm-ls1.c b/arch/arm/mach-imx/pm-ls1.c
+> new file mode 100644
+> index 0000000..90775cf
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/pm-ls1.c
+> @@ -0,0 +1,225 @@
+> +/*
+> + * Support Power Management Control for LS1
+> + *
+> + * Copyright 2015 Freescale Semiconductor Inc.
+> + *
+> + * This program is free software; you can redistribute	it and/or modify it
+> + * under  the terms of	the GNU General	 Public License as published by
+> the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_address.h>
+> +#include <linux/suspend.h>
+> +
+> +#include <asm/cacheflush.h>
+> +#include <asm/suspend.h>
+> +
+> +#define FSL_SLEEP			0x1
+> +#define FSL_DEEP_SLEEP			0x2
+> +
+> +#define CCSR_SCFG_CLUSTERPMCR		0x904
+> +#define CCSR_SCFG_CLUSTERPMCR_WFIL2EN	0x80000000
+> +#define CCSR_SCFG_CLUSTERPM_ENABLE	1
+> +#define CCSR_SCFG_CLUSTERPM_DISABLE	0
+> +
+> +#define CCSR_RCPM_POWMGTCSR		0x130
+> +#define CCSR_RCPM_POWMGTCSR_LPM20_REQ	0x00100000
+> +#define CCSR_RCPM_IPPDEXPCR0		0x140
+> +#define CCSR_RCPM_IPPDEXPCR1		0x144
+> +#define CCSR_RCPM_IPPDEXPCR1_OCRAM1	0x10000000
+> +
+> +#define SLEEP_ARRAY_SIZE		3
+> +
+> +static u32 ippdexpcr0, ippdexpcr1;
+> +
+> +struct ls1_pm_baseaddr {
+> +	void __iomem *rcpm;
+> +	void __iomem *scfg;
+> +};
+> +
+> +static struct ls1_pm_baseaddr ls1_pm_base;
+> +
+> +static inline void ls1_clrsetbits_be32(void __iomem *addr, u32 clear, u32 set)
+> +{
+> +	u32 val;
+> +
+> +	val = ioread32be(addr);
+> +	val = (val & ~clear) | set;
+> +	iowrite32be(val, addr);
+> +}
+> +
+> +static int ls1_pm_iomap(suspend_state_t state)
+> +{
+> +	struct device_node *np;
+> +	void *base;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-scfg");
+> +	if (!np) {
+> +		pr_err("Missing SCFG node in the device tree\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	base = of_iomap(np, 0);
+> +	of_node_put(np);
+> +	if (!base) {
+> +		pr_err("Couldn't map SCFG registers\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ls1_pm_base.scfg = base;
+> +
+> +	return 0;
+> +}
+> +
+> +static void ls1_pm_uniomap(suspend_state_t state)
+> +{
+> +	iounmap(ls1_pm_base.scfg);
+> +}
+> +
+> +/* set IP powerdown exception, make them work during sleep/deep sleep */
+> +static void ls1_set_powerdown(void)
+> +{
+> +	iowrite32be(ippdexpcr0, ls1_pm_base.rcpm + CCSR_RCPM_IPPDEXPCR0);
+> +	iowrite32be(ippdexpcr1,	ls1_pm_base.rcpm + CCSR_RCPM_IPPDEXPCR1);
+> +}
+> +
+> +static void ls1_set_power_except(struct device *dev, int on)
+> +{
+> +	int ret;
+> +	u32 value[SLEEP_ARRAY_SIZE];
+> +
+> +	/*
+> +	 * Get the values in the "rcpm-wakeup" property. There are three values.
+> +	 * The first points to the RCPM node, the second is the value of
+> +	 * the ippdexpcr0 register, and the third is the value of
+> +	 * the ippdexpcr1 register.
+> +	 */
+> +	ret = of_property_read_u32_array(dev->of_node, "rcpm-wakeup",
+> +					 value, SLEEP_ARRAY_SIZE);
+> +	if (ret) {
+> +		dev_err(dev, "%s: Can not find the \"sleep\" property.\n",
+> +			__func__);
+> +		return;
+> +	}
+> +
+> +	ippdexpcr0 |= value[1];
+> +	ippdexpcr1 |= value[2];
+> +
+> +	pr_debug("%s: set %s as a wakeup source", __func__,
+> +		 dev->of_node->full_name);
+> +}
+> +
+> +static void ls1_set_wakeup_device(struct device *dev, void *enable)
+> +{
+> +	/* set each device which can act as wakeup source */
+> +	if (device_may_wakeup(dev))
+> +		ls1_set_power_except(dev, *((int *)enable));
+> +}
+> +
+> +/* enable cluster to enter the PCL10 state */
+> +static void ls1_set_clusterpm(int enable)
+> +{
+> +	u32 val = 0;
+> +
+> +	if (enable)
+> +		val = CCSR_SCFG_CLUSTERPMCR_WFIL2EN;
+> +
+> +	iowrite32be(val, ls1_pm_base.scfg + CCSR_SCFG_CLUSTERPMCR);
+> +}
+> +
+> +static int ls1_suspend_enter(suspend_state_t state)
+> +{
+> +	int ret = 0;
+> +
+> +	ls1_set_powerdown();
+> +	ls1_set_clusterpm(CCSR_SCFG_CLUSTERPM_ENABLE);
+> +
+> +	switch (state) {
+> +	case PM_SUSPEND_STANDBY:
+> +		flush_cache_louis();
+> +		ls1_clrsetbits_be32(ls1_pm_base.rcpm + CCSR_RCPM_POWMGTCSR,
+> +				    CCSR_RCPM_POWMGTCSR_LPM20_REQ,
+> +				    CCSR_RCPM_POWMGTCSR_LPM20_REQ);
+> +		cpu_do_idle();
+> +		break;
+> +	case PM_SUSPEND_MEM:
+> +	default:
+> +		ret = -EINVAL;
+> +		break;
+> +	}
+> +
+> +	ls1_set_clusterpm(CCSR_SCFG_CLUSTERPM_DISABLE);
+> +
+> +	return ret;
+> +}
+> +
+> +static int ls1_suspend_valid(suspend_state_t state)
+> +{
+> +	if (state == PM_SUSPEND_STANDBY)
+> +		return 1;
+> +
+> +	return 0;
+> +}
+> +
+> +static int ls1_suspend_begin(suspend_state_t state)
+> +{
+> +	int res = -EINVAL;
+> +
+> +	ippdexpcr0 = 0;
+> +	ippdexpcr1 = 0;
+> +
+> +	if (state == PM_SUSPEND_STANDBY)
+> +		res = ls1_pm_iomap(state);
+> +
+> +	if (!res)
+> +		dpm_for_each_dev(NULL, ls1_set_wakeup_device);
+> +
+> +	return res;
+> +}
+> +
+> +static void ls1_suspend_end(void)
+> +{
+> +	ls1_pm_uniomap(PM_SUSPEND_STANDBY);
+> +}
+> +
+> +static const struct platform_suspend_ops ls1_suspend_ops = {
+> +	.valid = ls1_suspend_valid,
+> +	.enter = ls1_suspend_enter,
+> +	.begin = ls1_suspend_begin,
+> +	.end = ls1_suspend_end,
+> +};
+> +
+> +static const struct of_device_id rcpm_matches[] = {
+> +	{
+> +		.compatible = "fsl,ls1021a-rcpm",
+> +	},
+> +	{}
+> +};
+> +
+> +static int __init ls1_pm_init(void)
+> +{
+> +	const struct of_device_id *match;
+> +	struct device_node *np;
+> +
+> +	np = of_find_matching_node_and_match(NULL, rcpm_matches, &match);
+> +	if (!np) {
+> +		pr_err("%s: can't find the rcpm node.\n", __func__);
+> +		return -EINVAL;
+> +	}
+> +
+> +	ls1_pm_base.rcpm = of_iomap(np, 0);
+> +	of_node_put(np);
+> +	if (!ls1_pm_base.rcpm)
+> +		return -ENOMEM;
+> +
+> +	suspend_set_ops(&ls1_suspend_ops);
+> +
+> +	pr_info("Freescale Power Management Control Registered\n");
+> +
+> +	return 0;
+> +}
+> +arch_initcall(ls1_pm_init);
+> --
+> 2.1.0.27.g96db324
