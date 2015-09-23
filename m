@@ -1,46 +1,68 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 23 Sep 2015 11:53:19 -0500
-Subject: [Patch v2 00/10] Add RPM/SMD Support for QCOM platforms
-Message-ID: <1443027209-19444-1-git-send-email-agross@codeaurora.org>
+Date: Wed, 23 Sep 2015 11:53:26 -0500
+Subject: [Patch v2 07/10] arm: dts: Add APQ8084 SMEM nodes
+In-Reply-To: <1443027209-19444-1-git-send-email-agross@codeaurora.org>
+References: <1443027209-19444-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1443027209-19444-8-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set cleans up the documentation that is currently in place for the
-SMD, SMD-RPM, and SMD-RPM regulators.  In addition, this patch set adds support
-for the PM8916 found on MSM8916 platforms and the PMA8084 found on APQ8084
-platforms.
-                                                                                                                               
-All of the relevant DTS information is fleshed out for the regulators and their
-dependencies for all of the platforms which support SMD-RPM regulators.
+This patch adds all the required nodes to support SMEM on APQ8084
 
-Changes since v1:
-  - Fixed various review comments
-  - Removed MSM8974 patches as there was already an outstanding patch
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ arch/arm/boot/dts/qcom-apq8084.dtsi |   31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-Andy Gross (10):
-  soc: qcom: documentation: Update SMD/RPM Docs
-  soc: qcom: smd-rpm: Add existing platform support
-  arm64: dts: qcom: Add MSM8916 SMEM nodes
-  arm64: dts: qcom: Add RPM/SMD support on MSM8916
-  arm64: dts: Add PM8916 support on MSM8916
-  regulators: qcom-smd: Add PM8916 support
-  arm: dts: Add APQ8084 SMEM nodes
-  arm: dts: Add RPM/SMD support on APQ8084
-  arm: dts: Add support for PMA8084 on APQ8084
-  regulator: qcom-smd: Add support for PMA8084
-
- .../devicetree/bindings/soc/qcom,smd-rpm.txt       |  117 --------------
- .../bindings/soc/qcom/qcom,smd-rpm-regulator.txt   |  156 +++++++++++++++++++
- .../devicetree/bindings/soc/qcom/qcom,smd-rpm.txt  |   57 +++++++
- arch/arm/boot/dts/qcom-apq8084.dtsi                |  103 +++++++++++++
- arch/arm64/boot/dts/qcom/msm8916.dtsi              |   84 +++++++++++
- drivers/regulator/qcom_smd-regulator.c             |  159 ++++++++++++++++++++
- drivers/soc/qcom/smd-rpm.c                         |    2 +
- 7 files changed, 561 insertions(+), 117 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/soc/qcom,smd-rpm.txt
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
-
+diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+index 0554fbd..76be0ba 100644
+--- a/arch/arm/boot/dts/qcom-apq8084.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+@@ -10,6 +10,17 @@
+ 	compatible = "qcom,apq8084";
+ 	interrupt-parent = <&intc>;
+ 
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		smem_mem: smem_region at fa00000 {
++			reg = <0xfa00000 0x200000>;
++			no-map;
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -224,6 +235,26 @@
+ 			reg = <0xfc400000 0x4000>;
+ 		};
+ 
++		tcsr_mutex_regs: syscon at fd484000 {
++			compatible = "syscon";
++			reg = <0xfd484000 0x2000>;
++		};
++
++		tcsr_mutex: hwlock {
++			compatible = "qcom,tcsr-mutex";
++			syscon = <&tcsr_mutex_regs 0 0x80>;
++			#hwlock-cells = <1>;
++		};
++
++		smem {
++			compatible = "qcom,smem";
++			reg = <0xfc428000 0x4000>;
++			reg-names = "aux-mem1";
++
++			memory-region = <&smem_mem>;
++			hwlocks = <&tcsr_mutex 3>;
++		};
++
+ 		tlmm: pinctrl at fd510000 {
+ 			compatible = "qcom,apq8084-pinctrl";
+ 			reg = <0xfd510000 0x4000>;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
