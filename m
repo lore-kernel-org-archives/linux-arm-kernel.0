@@ -1,19 +1,30 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 23 Sep 2015 10:59:04 -0700
-Subject: [PATCH] ARM: OMAP2+: PM: Denote the cpuidle tracepoints as
- _rcuidle()
-In-Reply-To: <1442554881-706-1-git-send-email-jszhang@marvell.com> (Jisheng
- Zhang's message of "Fri, 18 Sep 2015 13:41:21 +0800")
-References: <1442554881-706-1-git-send-email-jszhang@marvell.com>
-Message-ID: <7hfv25dnkn.fsf@deeprootsystems.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Sep 2015 18:59:40 +0100
+Subject: [PATCH v2 2/5] PCI: generic: Only fixup irqs for bus we are
+ creating.
+In-Reply-To: <1442527332-1174-3-git-send-email-ddaney.cavm@gmail.com>
+References: <1442527332-1174-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442527332-1174-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150923175940.GU7356@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jisheng Zhang <jszhang@marvell.com> writes:
+On Thu, Sep 17, 2015 at 11:02:09PM +0100, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> If we create multiple buses with pci-host-generic, or there are buses
+> created by other drivers, we don't want to call pci_fixup_irqs() which
+> operates on all devices, not just the devices on the bus being added.
+> The consequence is that either the fixups are done more than once, or
+> in some cases incorrect fixups could be applied.
+> 
+> Call pci_bus_fixup_irqs() instead of pci_fixup_irqs().
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+> Changes from v1: Moved most of the code to pci_bus_fixup_irqs(),
+> making this patch very simple.
 
-> The cpuidle tracepoints are called within a rcu_idle_exit() section, and
-> must be denoted with the _rcuidle() version of the tracepoint.
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
- 
-Acked-by: Kevin Hilman <khilman@linaro.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
