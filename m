@@ -1,61 +1,77 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 23 Sep 2015 11:21:56 -0700
-Subject: [PATCH v2 4/5] PCI: generic: Correct, and avoid overflow, in
- bus_max calculation.
-In-Reply-To: <20150923180157.GV7356@arm.com>
-References: <1442527332-1174-1-git-send-email-ddaney.cavm@gmail.com>
- <1442527332-1174-5-git-send-email-ddaney.cavm@gmail.com>
- <20150923180157.GV7356@arm.com>
-Message-ID: <5602EDC4.3040603@caviumnetworks.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Wed, 23 Sep 2015 21:31:12 +0300
+Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
+In-Reply-To: <1443015463-23639-3-git-send-email-s.hauer@pengutronix.de>
+References: <1443015463-23639-1-git-send-email-s.hauer@pengutronix.de>
+ <1443015463-23639-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <5602EFF0.8040207@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2015 11:01 AM, Will Deacon wrote:
-> On Thu, Sep 17, 2015 at 11:02:11PM +0100, David Daney wrote:
-[...]
->
->>   Properties of the /chosen node:
->> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
->> index 77cf4bd..0a9c453 100644
->> --- a/drivers/pci/host/pci-host-generic.c
->> +++ b/drivers/pci/host/pci-host-generic.c
->> @@ -164,7 +164,7 @@ out_release_res:
->>   static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->>   {
->>   	int err;
->> -	u8 bus_max;
->> +	int bus_max;
->>   	resource_size_t busn;
->>   	struct resource *bus_range;
->>   	struct device *dev = pci->host.dev.parent;
->> @@ -177,8 +177,9 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->>   	}
->>
->>   	/* Limit the bus-range to fit within reg */
->> -	bus_max = pci->cfg.bus_range->start +
->> -		  (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
->> +	bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
->> +	if (bus_max > 255)
->> +		bus_max = 255;
->
-> I still don't understand the need for this part. If the cfg space is bigger
-> than bus_max, isn't that simply an invalid resource? Given that the resource
-> could be broken in other ways too, this check feels more like a specific
-> workaround rather than generally useful code.
+Hi Sascha,
 
-Imagine...
+On 23.09.2015 16:37, Sascha Hauer wrote:
+> This adds support for the Mediatek thermal controller found on MT8173
+> and likely other SoCs.
+> The controller is a bit special. It does not have its own ADC, instead
+> it controls the on-SoC AUXADC via AHB bus accesses. For this reason
+> we need the physical address of the AUXADC. Also it controls a mux
+> using AHB bus accesses, so we need the APMIXEDSYS physical address aswell.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> ---
+>  drivers/thermal/Kconfig       |   8 +
+>  drivers/thermal/Makefile      |   1 +
+>  drivers/thermal/mtk_thermal.c | 537 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 546 insertions(+)
+>  create mode 100644 drivers/thermal/mtk_thermal.c
+> 
 
-   bus-range [0x80 .. 0xff], this requires a cfg.res that will cover the 
-entire range of 0..0xff.
+[snip]
 
-   according to the calculations above, (resource_size(&pci->cfg.res) >> 
-pci->cfg.ops.bus_shift) - 1 will have a value of 0xff, so...
+> +
+> +	auxadc = of_parse_phandle(np, "mediatek,auxadc", 0);
+> +	if (!auxadc) {
+> +		dev_err(&pdev->dev, "missing auxadc node\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	auxadc_phys_base = of_get_phys_base(auxadc);
 
-   bus_max = 0x80 + 0xff -> OVERFLOW of u8!
+in case of OF_DYNAMIC enabled of_parse_phandle() requires of_node_put(),
+which is fine to place right here.
 
-That is not useful.  bus_max should represent the largest bus number 
-that can be covered by cfg.res.  That is what my patch is attempting to 
-accomplish.  Calculate the largest bus number that can be accommodated 
-by cfg.res, and then clamp it to 0xff.
+> +	if (auxadc_phys_base == OF_BAD_ADDR) {
+> +		dev_err(&pdev->dev, "Can't get auxadc phys address\n");
+> +		return -EINVAL;
+> +	}
+> +
 
-David Daney.
+[snip]
+
+> +
+> +	/*
+> +	 * These calibration values should finally be provided by the
+> +	 * firmware or fuses. For now use default values.
+> +	 */
+> +	mt->calib_slope = -123;
+> +	mt->calib_offset = 465124;
+> +
+> +	for (i = 0; i < MT8173_NUM_ZONES; i++)
+> +		mtk_thermal_init_bank(mt, i, apmixed_phys_base, auxadc_phys_base);
+> +
+> +	platform_set_drvdata(pdev, mt);
+> +
+> +	for (i = 0; i < MT8173_NUM_ZONES; i++) {
+> +		struct mtk_thermal_bank *bank = &mt->banks[i];
+> +
+> +		bank->tzd = thermal_zone_of_sensor_register(&pdev->dev, i, bank,
+> +				&mtk_thermal_ops);
+
+I would propose to add return value checks here, otherwise there might
+be an oops in mtk_thermal_remove(), if something goes wrong.
+
+--
+With best wishes,
+Vladimir
