@@ -1,22 +1,24 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 22 Sep 2015 17:25:53 -0700
-Subject: [PATCH v3 0/4] Add fec1 and fec2 support for i.MX7d sdb board
-In-Reply-To: <1441594502-19236-1-git-send-email-b38611@freescale.com>
-References: <1441594502-19236-1-git-send-email-b38611@freescale.com>
-Message-ID: <20150923002553.GA3529@tiger>
+Date: Tue, 22 Sep 2015 17:31:14 -0700
+Subject: [PATCH v10 1/4] clk: clk-vf610: Add clock for Vybrid OCOTP
+ controller
+In-Reply-To: <ca85ab571ba312ea75a4d33543e5dbb8745e7190.1441609625.git.maitysanchayan@gmail.com>
+References: <cover.1441609625.git.maitysanchayan@gmail.com>
+ <ca85ab571ba312ea75a4d33543e5dbb8745e7190.1441609625.git.maitysanchayan@gmail.com>
+Message-ID: <20150923003114.GB3529@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 07, 2015 at 10:54:58AM +0800, Fugang Duan wrote:
-> Fugang Duan (4):
->   ARM: imx7d: add imx7d iomux-gpr field define
->   ARM: imx: add enet init for i.MX7D platform
->   ARM: dts: imx7d: add fec1 and fec2 support for i.MX7d soc
+On Mon, Sep 07, 2015 at 01:51:35PM +0530, Sanchayan Maity wrote:
+> Add clock support for Vybrid On-Chip One Time Programmable
+> (OCOTP) controller.
+> 
+> While the OCOTP block does not require explicit clock gating,
+> for programming the OCOTP timing register the clock rate of
+> ipg clock is required for timing calculations related to fuse
+> and shadow register read sequence. We explicitly specify the
+> ipg clock for OCOTP as a result.
+> 
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 
-Applied above 3.
-
->   ARM: dts: imx7d-sdb: add fec1 and fec2 support
-
-Will apply this one after the prerequisite is applied.
-
-Shawn
+Applied this one, thanks.
