@@ -1,71 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 23 Sep 2015 19:18:34 +0100
-Subject: [PATCH v2 3/3] irqchip/gicv3-its:  Handle OF device tree
- "msi-map" properties.
-In-Reply-To: <20150923175259.GT7356@arm.com>
-References: <1442966406-13198-1-git-send-email-ddaney.cavm@gmail.com>
- <1442966406-13198-4-git-send-email-ddaney.cavm@gmail.com>
- <20150923180100.03844936@arm.com>
- <5602DC97.1040505@caviumnetworks.com>
- <20150923175259.GT7356@arm.com>
-Message-ID: <20150923191834.1764ca02@arm.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Wed, 23 Sep 2015 11:21:56 -0700
+Subject: [PATCH v2 4/5] PCI: generic: Correct, and avoid overflow, in
+ bus_max calculation.
+In-Reply-To: <20150923180157.GV7356@arm.com>
+References: <1442527332-1174-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442527332-1174-5-git-send-email-ddaney.cavm@gmail.com>
+ <20150923180157.GV7356@arm.com>
+Message-ID: <5602EDC4.3040603@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Sep 2015 18:52:59 +0100
-Will Deacon <will.deacon@arm.com> wrote:
+On 09/23/2015 11:01 AM, Will Deacon wrote:
+> On Thu, Sep 17, 2015 at 11:02:11PM +0100, David Daney wrote:
+[...]
+>
+>>   Properties of the /chosen node:
+>> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+>> index 77cf4bd..0a9c453 100644
+>> --- a/drivers/pci/host/pci-host-generic.c
+>> +++ b/drivers/pci/host/pci-host-generic.c
+>> @@ -164,7 +164,7 @@ out_release_res:
+>>   static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>>   {
+>>   	int err;
+>> -	u8 bus_max;
+>> +	int bus_max;
+>>   	resource_size_t busn;
+>>   	struct resource *bus_range;
+>>   	struct device *dev = pci->host.dev.parent;
+>> @@ -177,8 +177,9 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>>   	}
+>>
+>>   	/* Limit the bus-range to fit within reg */
+>> -	bus_max = pci->cfg.bus_range->start +
+>> -		  (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
+>> +	bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
+>> +	if (bus_max > 255)
+>> +		bus_max = 255;
+>
+> I still don't understand the need for this part. If the cfg space is bigger
+> than bus_max, isn't that simply an invalid resource? Given that the resource
+> could be broken in other ways too, this check feels more like a specific
+> workaround rather than generally useful code.
 
-> On Wed, Sep 23, 2015 at 06:08:39PM +0100, David Daney wrote:
-> > On 09/23/2015 10:01 AM, Marc Zyngier wrote:
-> > > On Tue, 22 Sep 2015 17:00:06 -0700
-> > > David Daney <ddaney.cavm@gmail.com> wrote:
-> > >
-> > >> From: David Daney <david.daney@cavium.com>
-> > >>
-> > >> Call of_msi_map_rid() to handle mapping of the requester id.
-> > >>
-> > >> Signed-off-by: David Daney <david.daney@cavium.com>
-> > >> ---
-> > >>   drivers/irqchip/irq-gic-v3-its-pci-msi.c | 3 ++-
-> > >>   1 file changed, 2 insertions(+), 1 deletion(-)
-> > >>
-> > >> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> > >> index cf351c6..8b1c938 100644
-> > >> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> > >> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> > >> @@ -86,7 +86,8 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
-> > >>   	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
-> > >>
-> > >>   	/* ITS specific DeviceID, as the core ITS ignores dev. */
-> > >> -	info->scratchpad[0].ul = dev_alias.dev_id;
-> > >> +	info->scratchpad[0].ul = of_msi_map_rid(dev, domain->of_node,
-> > >> +						dev_alias.dev_id);
-> > >>
-> > >>   	return msi_info->ops->msi_prepare(domain->parent,
-> > >>   					  dev, dev_alias.count, info);
-> > >
-> > > I really wonder if that shouldn't be part of the pci_for_each_dma_alias
-> > > call. It would make a lot more sense for this functionality to be an
-> > > integral part of the core code, and would probably make the integration
-> > > of _IORT (which has the exact same requirements) a bit easier.
-> > >
-> > > Thoughts?
-> > >
-> > 
-> > I am a proponent of pushing things like this as far into the core code 
-> > as possible.  So, from that point of view, I think it would probably be 
-> > a good idea.
-> > 
-> > I can prepare a patch that does that, but it would also be nice hear 
-> > from other maintainers and get their thoughts on this.
-> 
-> Hmm, we use pci_for_each_dma_alias in the SMMU drivers to get the SID,
-> so I'm not sure that using the MSI mapping is necessarily the right thing
-> to do there. Maybe we should instead have dma_alias_to_msi_id helpers or
-> something?
+Imagine...
 
-Yes, that's probably a sensible solution.
+   bus-range [0x80 .. 0xff], this requires a cfg.res that will cover the 
+entire range of 0..0xff.
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+   according to the calculations above, (resource_size(&pci->cfg.res) >> 
+pci->cfg.ops.bus_shift) - 1 will have a value of 0xff, so...
+
+   bus_max = 0x80 + 0xff -> OVERFLOW of u8!
+
+That is not useful.  bus_max should represent the largest bus number 
+that can be covered by cfg.res.  That is what my patch is attempting to 
+accomplish.  Calculate the largest bus number that can be accommodated 
+by cfg.res, and then clamp it to 0xff.
+
+David Daney.
