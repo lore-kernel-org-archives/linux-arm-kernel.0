@@ -1,81 +1,60 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 23 Sep 2015 13:14:54 -0500
-Subject: [Patch v2 06/10] regulators: qcom-smd: Add PM8916 support
-In-Reply-To: <20150923172358.GE24668@usrtlx11787.corpusers.net>
+Date: Wed, 23 Sep 2015 13:15:15 -0500
+Subject: [Patch v2 02/10] soc: qcom: smd-rpm: Add existing platform support
+In-Reply-To: <20150923171840.GD24668@usrtlx11787.corpusers.net>
 References: <1443027209-19444-1-git-send-email-agross@codeaurora.org>
- <1443027209-19444-7-git-send-email-agross@codeaurora.org>
- <20150923172358.GE24668@usrtlx11787.corpusers.net>
-Message-ID: <20150923181454.GA24756@qualcomm.com>
+ <1443027209-19444-3-git-send-email-agross@codeaurora.org>
+ <20150923171840.GD24668@usrtlx11787.corpusers.net>
+Message-ID: <20150923181515.GB24756@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 10:23:58AM -0700, Bjorn Andersson wrote:
+On Wed, Sep 23, 2015 at 10:18:40AM -0700, Bjorn Andersson wrote:
 > On Wed 23 Sep 09:53 PDT 2015, Andy Gross wrote:
 > 
-> > This patch adds support and documentation for the PM8916 regulators
-> > found on MSM8916 platforms.
+> > This patch adds support for all current Qualcomm platforms which utilize
+> > RPM over SMD.  This includes both MSM8916 and APQ8084.
 > > 
 > > Signed-off-by: Andy Gross <agross@codeaurora.org>
 > > ---
-> >  .../bindings/soc/qcom/qcom,smd-rpm-regulator.txt   |   18 ++++++
-> >  drivers/regulator/qcom_smd-regulator.c             |   64 ++++++++++++++++++++
-> >  2 files changed, 82 insertions(+)
+> >  .../devicetree/bindings/soc/qcom/qcom,smd-rpm.txt  |    2 ++
+> >  drivers/soc/qcom/smd-rpm.c                         |    2 ++
+> >  2 files changed, 4 insertions(+)
 > > 
-> > diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
-> > index 7084474..05dfc1a 100644
-> > --- a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
-> > +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
-> > @@ -18,6 +18,7 @@ Regulator nodes are identified by their compatible:
+> > diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
+> > index 3710dd5..7d05246 100644
+> > --- a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
+> > +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
+> > @@ -20,6 +20,8 @@ resources.
+> >  	Value type: <string>
 > >  	Definition: must be one of:
-> >  		    "qcom,rpm-pm8841-regulators"
-> >  		    "qcom,rpm-pm8941-regulators"
-> > +		    "qcom,rpm-pm8916-regulators"
-> 
-> Alphabetical please
-> 
+> >  		    "qcom,rpm-msm8974"
+> > +		    "qcom,rpm-msm8916"
+> > +		    "qcom,rpm-apq8084"
 > >  
-> >  - vdd_s1-supply:
-> >  - vdd_s2-supply:
-> > @@ -50,6 +51,19 @@ Regulator nodes are identified by their compatible:
-> >  	Definition: reference to regulator supplying the input pin, as
-> >  		    described in the data sheet
+> >  - qcom,smd-channels:
+> >  	Usage: required
+> > diff --git a/drivers/soc/qcom/smd-rpm.c b/drivers/soc/qcom/smd-rpm.c
+> > index 1392ccf..455083c 100644
+> > --- a/drivers/soc/qcom/smd-rpm.c
+> > +++ b/drivers/soc/qcom/smd-rpm.c
+> > @@ -212,6 +212,8 @@ static void qcom_smd_rpm_remove(struct qcom_smd_device *sdev)
 > >  
-> > +- vdd_s1-supply:
-> > +- vdd_s2-supply:
-> > +- vdd_s3-supply:
-> > +- vdd_s4-supply:
-> > +- vdd_l1_l2_l3-supply
-> > +- vdd_l4_l5_l6-supply
-> > +- vdd_l7-supply
-> 
-> End these with ':' as well
-> 
-> > +- vdd_l8_l9_l10_l11_l12_l13_l14_l15_l16_l17_l18-supply:
-> > +	Usage: optional (pm8916 only)
-> > +	Value type: <phandle>
-> > +	Definition: reference to regulator supplying the input pin, as
-> > +		    described in the data sheet
-> > +
-> [..]
-> > diff --git a/drivers/regulator/qcom_smd-regulator.c b/drivers/regulator/qcom_smd-regulator.c
-> [..]
-> >  static const struct of_device_id rpm_of_match[] = {
-> > +	{ .compatible = "qcom,rpm-pm8916-regulators", .data = &rpm_pm8916_regulators },
-> 
-> pm8916 > pm8841
-> 
-> >  	{ .compatible = "qcom,rpm-pm8841-regulators", .data = &rpm_pm8841_regulators },
-> >  	{ .compatible = "qcom,rpm-pm8941-regulators", .data = &rpm_pm8941_regulators },
+> >  static const struct of_device_id qcom_smd_rpm_of_match[] = {
+> >  	{ .compatible = "qcom,rpm-msm8974" },
+> > +	{ .compatible = "qcom,rpm-msm8916" },
+> > +	{ .compatible = "qcom,rpm-apq8084" },
 > >  	{}
 > 
-> With these nits:
+> This is now how the alphabet works, please update the order and add:
 > 
-> Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 > 
 > Regards,
 > Bjorn
 
-I'll fixup this when I apply it.  Thanks!
+I'll fixup before applying.  Thanks!
+
 
 -- 
 Qualcomm Innovation Center, Inc.
