@@ -1,53 +1,48 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 23 Sep 2015 17:59:23 -0500
-Subject: [PATCH v2 1/7] of/fdt: make memblock minimum physical address
- arch configurable
-In-Reply-To: <1442968663-31843-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1442968663-31843-1-git-send-email-ard.biesheuvel@linaro.org>
- <1442968663-31843-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAL_JsqJM=hUc5gnZrRO8GoyhE4mh24QtStSAoa5KwV_vYSpRJg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 23 Sep 2015 07:25:11 +0100
+Subject: [RESEND PATCHv3] arm64: dts: Add base stratix 10 dtsi
+In-Reply-To: <CADhT+wccWpy9VhZv=yWRiA4tf1SO_1-EAu6_cc+UkPJOWX0Bpw@mail.gmail.com>
+References: <1442353625-4552-1-git-send-email-dinguyen@opensource.altera.com>
+ <20150923055450.GA4883@svinekod>
+ <CADhT+wccWpy9VhZv=yWRiA4tf1SO_1-EAu6_cc+UkPJOWX0Bpw@mail.gmail.com>
+Message-ID: <20150923062511.GA5517@svinekod>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 7:37 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> By default, early_init_dt_add_memory_arch() ignores memory below
-> the base of the kernel image since it won't be addressable via the
-> linear mapping. However, this is not appropriate anymore once we
-> decouple the kernel text mapping from the linear mapping, so archs
-> may want to drop the low limit entirely. So allow the minimum to be
-> overridden by setting MIN_MEMBLOCK_ADDR.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Wed, Sep 23, 2015 at 11:43:25PM +0100, Dinh Nguyen wrote:
+> On Wed, Sep 23, 2015 at 12:54 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> +/ {
+> >> +     compatible = "altr,socfpga-stratix10";
+> >> +     #address-cells = <2>;
+> >> +     #size-cells = <2>;
+> >
+> > [...]
+> >
+> >> +     soc {
+> >> +             #address-cells = <1>;
+> >> +             #size-cells = <1>;
+> >> +             compatible = "simple-bus";
+> >> +             device_type = "soc";
+> >> +             interrupt-parent = <&intc>;
+> >
+> > As far as I am aware, this requires a (non-empty) ranges property, given the
+> > parent node has {address,size}-cells = <2>.
+> >
+> > Does the kernel not complain currently?
+> >
+> 
+> I do not see any complaints without ranges here, but with ranges, I get:
 
-Acked-by: Rob Herring <robh@kernel.org>
+I'm surprised (and a little worried) that we don't warn in the absence of
+ranges when #{address,size}-cells changes. That doesn't feel right.
 
-> ---
->  drivers/of/fdt.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index 6e82bc42373b..5e7ef800a816 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -967,13 +967,16 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
->  }
->
->  #ifdef CONFIG_HAVE_MEMBLOCK
-> +#ifndef MIN_MEMBLOCK_ADDR
-> +#define MIN_MEMBLOCK_ADDR      __pa(PAGE_OFFSET)
-> +#endif
->  #ifndef MAX_MEMBLOCK_ADDR
->  #define MAX_MEMBLOCK_ADDR      ((phys_addr_t)~0)
->  #endif
->
->  void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
->  {
-> -       const u64 phys_offset = __pa(PAGE_OFFSET);
-> +       const u64 phys_offset = MIN_MEMBLOCK_ADDR;
->
->         if (!PAGE_ALIGNED(base)) {
->                 if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
-> --
-> 1.9.1
->
+> DTC     arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dtb
+> Warning (ranges_format): /soc has empty "ranges" property but its
+> #address-cells (1) differs from / (2)
+> Warning (ranges_format): /soc has empty "ranges" property but its
+> #size-cells (1) differs from / (2)
+
+As I mentioned, the ranges proeprty should be non-empty.
+
+Thanks,
+Mark.
