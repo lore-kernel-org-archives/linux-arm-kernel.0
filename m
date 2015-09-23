@@ -1,110 +1,223 @@
 From: erin.lo@mediatek.com (erin.lo at mediatek.com)
-Date: Wed, 23 Sep 2015 16:56:09 +0800
-Subject: [PATCH 1/2] Document: DT: Add bindings for mediatek MT2701 SoC
- Platform
+Date: Wed, 23 Sep 2015 16:56:10 +0800
+Subject: [PATCH 2/2] ARM: dts: mediatek: add MT2701 basic support
 In-Reply-To: <1442998570-54031-1-git-send-email-erin.lo@mediatek.com>
 References: <1442998570-54031-1-git-send-email-erin.lo@mediatek.com>
-Message-ID: <1442998570-54031-2-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1442998570-54031-3-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Erin Lo <erin.lo@mediatek.com>
 
-This adds a DT binding documentation for the MT2701 SoC from Mediatek.
+This adds basic chip support for Mediatek 2701.
 
 Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 ---
- Documentation/devicetree/bindings/arm/mediatek.txt                 | 4 ++++
- Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt | 1 +
- Documentation/devicetree/bindings/serial/mtk-uart.txt              | 5 +++--
- Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt     | 5 +++--
- Documentation/devicetree/bindings/watchdog/mtk-wdt.txt             | 6 +++++-
- 5 files changed, 16 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/Makefile       |   1 +
+ arch/arm/boot/dts/mt2701-evb.dts |  29 ++++++++
+ arch/arm/boot/dts/mt2701.dtsi    | 146 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 176 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mt2701-evb.dts
+ create mode 100644 arch/arm/boot/dts/mt2701.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-index 618a919..54f43bc 100644
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-@@ -6,6 +6,7 @@ following property:
- Required root node property:
- 
- compatible: Must contain one of
-+   "mediatek,mt2701"
-    "mediatek,mt6580"
-    "mediatek,mt6589"
-    "mediatek,mt6592"
-@@ -17,6 +18,9 @@ compatible: Must contain one of
- 
- Supported boards:
- 
-+- Evaluation board for MT2701:
-+    Required root node properties:
-+      - compatible = "mediatek,mt2701-evb", "mediatek,mt2701";
- - Evaluation board for MT6580:
-     Required root node properties:
-       - compatible = "mediatek,mt6580-evbp1", "mediatek,mt6580";
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-index afef6a8..de969ea 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,sysirq.txt
-@@ -14,6 +14,7 @@ Required properties:
- 	"mediatek,mt6582-sysirq"
- 	"mediatek,mt6580-sysirq"
- 	"mediatek,mt6577-sysirq"
-+        "mediatek,mt2701-sysirq"
- - interrupt-controller : Identifies the node as an interrupt controller
- - #interrupt-cells : Use the same format as specified by GIC in
-   Documentation/devicetree/bindings/arm/gic.txt
-diff --git a/Documentation/devicetree/bindings/serial/mtk-uart.txt b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-index 2d47add..f5effb7 100644
---- a/Documentation/devicetree/bindings/serial/mtk-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/mtk-uart.txt
-@@ -9,8 +9,9 @@ Required properties:
-   * "mediatek,mt6589-uart" for MT6589 compatible UARTS
-   * "mediatek,mt6582-uart" for MT6582 compatible UARTS
-   * "mediatek,mt6580-uart" for MT6580 compatible UARTS
--  * "mediatek,mt6577-uart" for all compatible UARTS (MT8173, MT6795,
--        MT6589, MT6582, MT6580, MT6577)
-+  * "mediatek,mt6577-uart" for all compatible UARTS (MT8173, MT6589, MT6582,
-+	MT6580, MT6577, MT2701)
-+  * "mediatek,mt2701-uart" for MT2701 compatible UARTS
- 
- - reg: The base address of the UART register bank.
- 
-diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-index 53a3029..e47979f 100644
---- a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-@@ -3,10 +3,11 @@ Mediatek MT6577, MT6572 and MT6589 Timers
- 
- Required properties:
- - compatible should contain:
-+	* "mediatek,mt6589-timer" for MT2701 compatible timers
- 	* "mediatek,mt6589-timer" for MT6589 compatible timers
- 	* "mediatek,mt6580-timer" for MT6580 compatible timers
--	* "mediatek,mt6577-timer" for all compatible timers (MT6589, MT6580,
--		MT6577)
-+	* "mediatek,mt6577-timer" for all compatible timers (MT2701, MT6589,
-+		MT6580, MT6577)
- - reg: Should contain location and length for timers register.
- - clocks: Clocks driving the timer hardware. This list should include two
- 	clocks. The order is system clock and as second clock the RTC clock.
-diff --git a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-index af9eb5b..6a00939 100644
---- a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
-@@ -2,7 +2,11 @@ Mediatek SoCs Watchdog timer
- 
- Required properties:
- 
--- compatible : should be "mediatek,mt6589-wdt"
-+- compatible should contain:
-+	* "mediatek,mt2701-wdt" for MT2701 compatible watchdog timers
-+	* "mediatek,mt6589-wdt" for all compatible watchdog timers (MT2701,
-+		MT6589)
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 233159d..aec787e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -732,6 +732,7 @@ dtb-$(CONFIG_MACH_DOVE) += \
+ 	dove-dove-db.dtb \
+ 	dove-sbc-a510.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += \
++	mt2701-evb.dtb \
+ 	mt6580-evbp1.dtb \
+ 	mt6589-aquaris5.dtb \
+ 	mt6592-evb.dtb \
+diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
+new file mode 100644
+index 0000000..082ca88
+--- /dev/null
++++ b/arch/arm/boot/dts/mt2701-evb.dts
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (c) 2015 MediaTek Inc.
++ * Author: Erin Lo <erin.lo@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
- - reg : Specifies base physical address and size of the registers.
- 
- Example:
++/dts-v1/;
++#include "mt2701.dtsi"
++
++/ {
++	model = "MediaTek MT2701 evaluation board";
++	compatible = "mediatek,mt2701-evb", "mediatek,mt2701";
++
++	memory {
++		reg = <0 0x80000000 0 0x40000000>;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+new file mode 100644
+index 0000000..69f240f
+--- /dev/null
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -0,0 +1,146 @@
++/*
++ * Copyright (c) 2015 MediaTek Inc.
++ * Author: Erin.Lo <erin.lo@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include "skeleton64.dtsi"
++
++/ {
++	compatible = "mediatek,mt2701";
++	interrupt-parent = <&sysirq>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x0>;
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x1>;
++		};
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x2>;
++		};
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x3>;
++		};
++	};
++
++	system_clk: dummy13m {
++		compatible = "fixed-clock";
++		clock-frequency = <13000000>;
++		#clock-cells = <0>;
++	};
++
++	rtc_clk: dummy32k {
++		compatible = "fixed-clock";
++		clock-frequency = <32000>;
++		#clock-cells = <0>;
++	};
++
++	uart_clk: dummy26m {
++		compatible = "fixed-clock";
++		clock-frequency = <26000000>;
++		#clock-cells = <0>;
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupt-parent = <&gic>;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++	};
++
++	watchdog: watchdog at 10007000 {
++		compatible = "mediatek,mt2701-wdt",
++			     "mediatek,mt6589-wdt";
++		reg = <0 0x10007000 0 0x100>;
++	};
++
++	timer: timer at 10008000 {
++		compatible = "mediatek,mt2701-timer",
++			     "mediatek,mt6577-timer";
++		reg = <0x10008000 0x80>;
++		interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&system_clk>, <&rtc_clk>;
++		clock-names = "system-clk", "rtc-clk";
++	};
++
++	sysirq: interrupt-controller at 10200100 {
++		compatible = "mediatek,mt2701-sysirq",
++			     "mediatek,mt6577-sysirq";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&gic>;
++		reg = <0 0x10200100 0 0x1c>;
++	};
++
++	gic: interrupt-controller at 10211000 {
++		compatible = "arm,cortex-a7-gic";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&gic>;
++		reg = <0 0x10211000 0 0x1000>,
++		      <0 0x10212000 0 0x1000>,
++		      <0 0x10214000 0 0x2000>,
++		      <0 0x10216000 0 0x2000>;
++	};
++
++	uart0: serial at 11002000 {
++		compatible = "mediatek,mt2701-uart",
++			     "mediatek,mt6577-uart";
++		reg = <0 0x11002000 0 0x400>;
++		interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&uart_clk>;
++		status = "disabled";
++	};
++
++	uart1: serial at 11003000 {
++		compatible = "mediatek,mt2701-uart",
++			     "mediatek,mt6577-uart";
++		reg = <0 0x11003000 0 0x400>;
++		interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&uart_clk>;
++		status = "disabled";
++	};
++
++	uart2: serial at 11004000 {
++		compatible = "mediatek,mt2701-uart",
++			     "mediatek,mt6577-uart";
++		reg = <0 0x11004000 0 0x400>;
++		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&uart_clk>;
++		status = "disabled";
++	};
++
++	uart3: serial at 11005000 {
++		compatible = "mediatek,mt2701-uart",
++			     "mediatek,mt6577-uart";
++		reg = <0 0x11005000 0 0x400>;
++		interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&uart_clk>;
++		status = "disabled";
++	};
++};
 -- 
 1.8.1.1.dirty
