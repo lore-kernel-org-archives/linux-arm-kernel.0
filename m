@@ -1,40 +1,57 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Wed, 23 Sep 2015 17:43:25 -0500
-Subject: [RESEND PATCHv3] arm64: dts: Add base stratix 10 dtsi
-In-Reply-To: <20150923055450.GA4883@svinekod>
-References: <1442353625-4552-1-git-send-email-dinguyen@opensource.altera.com>
- <20150923055450.GA4883@svinekod>
-Message-ID: <CADhT+wccWpy9VhZv=yWRiA4tf1SO_1-EAu6_cc+UkPJOWX0Bpw@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 23 Sep 2015 11:53:23 -0500
+Subject: [Patch v2 04/10] arm64: dts: qcom: Add RPM/SMD support on MSM8916
+In-Reply-To: <1443027209-19444-1-git-send-email-agross@codeaurora.org>
+References: <1443027209-19444-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1443027209-19444-5-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 12:54 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> +/ {
->> +     compatible = "altr,socfpga-stratix10";
->> +     #address-cells = <2>;
->> +     #size-cells = <2>;
->
-> [...]
->
->> +     soc {
->> +             #address-cells = <1>;
->> +             #size-cells = <1>;
->> +             compatible = "simple-bus";
->> +             device_type = "soc";
->> +             interrupt-parent = <&intc>;
->
-> As far as I am aware, this requires a (non-empty) ranges property, given the
-> parent node has {address,size}-cells = <2>.
->
-> Does the kernel not complain currently?
->
+Add support for the SMD and RPM devices found on MSM8916 platforms.
 
-I do not see any complaints without ranges here, but with ranges, I get:
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ arch/arm64/boot/dts/qcom/msm8916.dtsi |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-DTC     arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dtb
-Warning (ranges_format): /soc has empty "ranges" property but its
-#address-cells (1) differs from / (2)
-Warning (ranges_format): /soc has empty "ranges" property but its
-#size-cells (1) differs from / (2)
-
-Dinh
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index d321266..27d3e90 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -138,6 +138,11 @@
+ 			hwlocks = <&tcsr_mutex 3>;
+ 		};
+ 
++		apcs: syscon at b011000 {
++			compatible = "syscon";
++			reg = <0x0b011000 0x1000>;
++		};
++
+ 		blsp1_uart2: serial at 78b0000 {
+ 			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+ 			reg = <0x78b0000 0x200>;
+@@ -427,6 +432,21 @@
+ 			#interrupt-cells = <4>;
+ 		};
+ 	};
++
++	smd {
++		compatible = "qcom,smd";
++
++		rpm {
++			interrupts = <GIC_SPI 168 IRQ_TYPE_EDGE_RISING>;
++			qcom,ipc = <&apcs 8 0>;
++			qcom,smd-edge = <15>;
++
++			rpm_requests {
++				compatible = "qcom,rpm-msm8916";
++				qcom,smd-channels = "rpm_requests";
++			};
++		};
++	};
+ };
+ 
+ #include "msm8916-pins.dtsi"
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
