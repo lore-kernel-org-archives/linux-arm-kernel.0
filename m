@@ -1,67 +1,35 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 23 Sep 2015 14:15:09 -0500
-Subject: [PATCH 1/3] Documentation: dt: keystone: provide SoC specific
- compatible flags
-In-Reply-To: <5602E9F3.7020102@ti.com>
-References: <1442938118-4718-1-git-send-email-nm@ti.com>
- <1442938118-4718-2-git-send-email-nm@ti.com> <5602E9F3.7020102@ti.com>
-Message-ID: <5602FA3D.9050702@ti.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Wed, 23 Sep 2015 15:38:20 +0800
+Subject: [RFC 0/5] console/acpi: add DBG2 and SPCR console configuration
+In-Reply-To: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
+References: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <CACVXFVPEJb-RXLgU0V+HduoENquUs3oDGWsUtCvH+TOSRMYiUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2015 01:05 PM, Murali Karicheri wrote:
-> On 09/22/2015 12:08 PM, Nishanth Menon wrote:
-[...]
+Hi Leif,
 
->> diff --git
->> a/Documentation/devicetree/bindings/arm/keystone/keystone.txt
->> b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
->> index 59d7a46f85eb..800d2d02e27b 100644
->> --- a/Documentation/devicetree/bindings/arm/keystone/keystone.txt
->> +++ b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
->> @@ -9,12 +9,26 @@ Required properties:
->>      the form "ti,keystone-*". Generic devices like gic, arch_timers,
->> ns16550
->>      type UART should use the specified compatible for those devices.
->>
->> +SoC families:
->> +
->> +- Keystone 2 generic SoC:
->> +   compatible = "ti,keystone"
->> +
->> +SoCs:
->> +
->> +- Keystone 2 Hawking/Kepler
->> +   compatible = ti,k2hk", "ti,keystone"
->> +- Keystone 2 Lamarr
->> +   compatible = ti,k2l", "ti,keystone"
->> +- Keystone 2 Edison
->> +   compatible = ti,k2e", "ti,keystone"
->> +
->>   Boards:
->>   -  Keystone 2 Hawking/Kepler EVM
->> -   compatible = "ti,k2hk-evm","ti,keystone"
->> +   compatible = "ti,k2hk-evm", "ti,k2hk", "ti,keystone"
->>
->>   -  Keystone 2 Lamarr EVM
->> -   compatible = "ti,k2l-evm","ti,keystone"
->> +   compatible = "ti,k2l-evm", "ti, k2l", "ti,keystone"
->>
->>   -  Keystone 2 Edison EVM
->> -   compatible = "ti,k2e-evm","ti,keystone"
->> +   compatible = "ti,k2e-evm", "ti,k2e", "ti,keystone"
->>
-> DTS takes care of the difference in the hardware and If there SoC
-> specific customization required outside this, then it is best to include
-> this as part of that change. In the past, I believe we didn't do it due
-> to the same reason as above.
 
-Right now, they all claim to be the same keystone SoC -> which is
-inaccurate at the very least, and downright wrong IMHO since k2e/hk and
-l are different SoCs - even though they belong to keystone family, they
-are as similar as OMAP4 is to OMAP5 is to DRA7. This is similar to how
-various other SoCs distinguish between SoCs as well.
+On Tue, Sep 8, 2015 at 8:43 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> Support for configuring bootconsole and console via the ACPI tables
+> DBG2 (Debug Port Table 2) [1] and SPCR (Serial Port Console Redirection
+> Table) [2], defined by Microsoft, has been discussed on and off over the
+> years.
+>
+> [1] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639131(v=vs.85).aspx
+> [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+>
+> Licensing concerns have prevented this happening in the past, but as of
+> 10 August 2015, these tables have both been released also under OWF 1.0
+> (http://www.openwebfoundation.org/legal/the-owf-1-0-agreements/owfa-1-0)
+> which is think is noncontroversially GPL-compatible?
+>
+> This set is a first attempt at implementing this.
 
--- 
-Regards,
-Nishanth Menon
+>From distribution view, the patchset looks very useful.
+
+I have one simple question, are there other candidates for conveying this kind
+of information like what DBG2/SPCR does? Or are DBG2 and SPCR the
+offical speficiations to do such things in ARM server industry?
+
+Thanks,
