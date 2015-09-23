@@ -1,82 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Sep 2015 19:01:57 +0100
-Subject: [PATCH v2 4/5] PCI: generic: Correct, and avoid overflow, in
- bus_max calculation.
-In-Reply-To: <1442527332-1174-5-git-send-email-ddaney.cavm@gmail.com>
-References: <1442527332-1174-1-git-send-email-ddaney.cavm@gmail.com>
- <1442527332-1174-5-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20150923180157.GV7356@arm.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Wed, 23 Sep 2015 20:04:52 +0200
+Subject: [linux-sunxi][alsa-devel][PATCH 1/3] dt-bindings: add sunxi SPDIF
+ transceiver bindings
+In-Reply-To: <1443031494-32469-1-git-send-email-codekipper@gmail.com>
+References: <1443031494-32469-1-git-send-email-codekipper@gmail.com>
+Message-ID: <1443031494-32469-2-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 11:02:11PM +0100, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> There are two problems with the bus_max calculation:
-> 
-> 1) The u8 data type can overflow for large config space windows.
-> 
-> 2) The calculation is incorrect for a bus range that doesn't start at
->    zero.
-> 
-> Since the configuration space is relative to bus zero, make bus_max
-> just be the size of the config window scaled by bus_shift.  Then clamp
-> it to a maximum of 255, per PCI.  Use a data type of int to avoid
-> overflow problems.
-> 
-> Update host-generic-pci.txt to clarify the semantics of the "reg"
-> property with respect to non-zero starting bus numbers.
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
-> Change from v1: Added text to host-generic-pci.txt
-> 
->  Documentation/devicetree/bindings/pci/host-generic-pci.txt | 4 +++-
->  drivers/pci/host/pci-host-generic.c                        | 7 ++++---
->  2 files changed, 7 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> index cf3e205..105a968 100644
-> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> @@ -34,7 +34,9 @@ Properties of the host controller node:
->  - #size-cells    : Must be 2.
->  
->  - reg            : The Configuration Space base address and size, as accessed
-> -                   from the parent bus.
-> +                   from the parent bus.  The base address corresponds to
-> +                   bus zero, even though the "bus-range" property may specify
-> +                   a different starting bus number.
+From: Marcus Cooper <codekipper@gmail.com>
 
-That's a useful clarification, thanks.
+Add devicetree bindings for the SPDIF transceiver found on
+found on Allwinners A10, A20 and A31 SoCs.
 
->  Properties of the /chosen node:
-> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> index 77cf4bd..0a9c453 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -164,7 +164,7 @@ out_release_res:
->  static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->  {
->  	int err;
-> -	u8 bus_max;
-> +	int bus_max;
->  	resource_size_t busn;
->  	struct resource *bus_range;
->  	struct device *dev = pci->host.dev.parent;
-> @@ -177,8 +177,9 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
->  	}
->  
->  	/* Limit the bus-range to fit within reg */
-> -	bus_max = pci->cfg.bus_range->start +
-> -		  (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
-> +	bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
-> +	if (bus_max > 255)
-> +		bus_max = 255;
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+ .../devicetree/bindings/sound/sunxi,spdif.txt      | 49 ++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/sunxi,spdif.txt
 
-I still don't understand the need for this part. If the cfg space is bigger
-than bus_max, isn't that simply an invalid resource? Given that the resource
-could be broken in other ways too, this check feels more like a specific
-workaround rather than generally useful code.
-
-Will
+diff --git a/Documentation/devicetree/bindings/sound/sunxi,spdif.txt b/Documentation/devicetree/bindings/sound/sunxi,spdif.txt
+new file mode 100644
+index 0000000..1868722
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/sunxi,spdif.txt
+@@ -0,0 +1,49 @@
++Allwinner Sony/Philips Digital Interface Format (S/PDIF) Controller
++
++The Allwinner S/PDIF audio block is a transceiver that allows the
++processor to receive and transmit digital audio via an coaxial cable or
++a fibre cable.
++
++Required properties:
++
++  - compatible		: should be one of the following:
++    - "allwinner,sun4i-a10-spdif": for the Allwinner A10 SoC
++    - "allwinner,sun7i-a20-spdif": for the Allwinner A20 SoC
++    - "allwinner,sun6i-a31-spdif": for the Allwinner A31 SoC
++
++  - reg			: Offset and length of the register set for the device.
++
++  - interrupts		: Contains the spdif interrupt.
++
++  - dmas		: Generic dma devicetree binding as described in
++			  Documentation/devicetree/bindings/dma/dma.txt.
++
++  - dma-names		: Two dmas have to be defined, "tx" and "rx".
++
++  - clocks		: Contains an entry for each entry in clock-names.
++
++  - clock-names		: Includes the following entries:
++	"apb"		  clock for the spdif bus.
++	"audio"		  clock from the audio pll.
++	"spdif"		  clock for spdif controller.
++
++Optional:
++
++  - spdif-in		: Enable block for capturing an SPDIF signal.
++
++  - spdif-out		: Enable block for transmitting an SPDIF signal.
++
++Example:
++
++spdif: spdif at 01c21000 {
++	compatible = "allwinner,sun4i-a10-spdif";
++	reg = <0x01c21000 0x40>;
++	interrupts = <13>;
++	clocks = <&apb0_gates 1>, <&pll2 0>, <&spdif_clk>;
++	clock-names = "apb", "audio", "spdif";
++	dmas = <&dma 0 2>, <&dma 0 2>;
++	dma-names = "rx", "tx";
++	spdif-in = "disabled";
++	spdif-out = "okay";
++	status = "okay";
++};
+-- 
+2.5.3
