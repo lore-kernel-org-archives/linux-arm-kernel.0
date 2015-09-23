@@ -1,99 +1,67 @@
-From: majun258@huawei.com (majun (F))
-Date: Wed, 23 Sep 2015 15:24:46 +0800
-Subject: [PATCH v4 2/2] dt-binding:Documents of the mbigen bindings
-In-Reply-To: <20150922154120.18634b41@arm.com>
-References: <1439952920-2296-1-git-send-email-majun258@huawei.com>
- <1439952920-2296-3-git-send-email-majun258@huawei.com>
- <20150921190915.1a551e16@arm.com> <56013D0A.4000403@huawei.com>
- <20150922154120.18634b41@arm.com>
-Message-ID: <560253BE.8030505@huawei.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 23 Sep 2015 15:45:06 +0200
+Subject: [PATCH v2] soc: mediatek: Move the initial setting of pmic wrap
+ interrupt before requesting irq.
+In-Reply-To: <1441976720-43568-1-git-send-email-henryc.chen@mediatek.com>
+References: <1441976720-43568-1-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <20150923134506.GA7825@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Sep 11, 2015 at 09:05:20PM +0800, Henry Chen wrote:
+> The watchdog may not be initialized by the bootloader, even if the rest
+> of the pwrap is. Move the watchdog initialization out of pwrap_init() to
+> make sure the watchdog is always initialized and not only when the pwrap
+> is uninitialized.
+> 
+> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
 
-? 2015/9/22 22:41, Marc Zyngier ??:
-> On Tue, 22 Sep 2015 19:35:38 +0800
-> "majun (F)" <majun258@huawei.com> wrote:
+> ---
+> Chandes since v1:
+> Modify the commit log and code comments to make it easy to understand 
+> the issue and solution.
+> ---
+>  drivers/soc/mediatek/mtk-pmic-wrap.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
 > 
-[...]
->>>> +Examples:
->>>> +	smmu_dsa {
->>>> +		compatible = "arm,smmu-v3";
->>>> +		reg = <0x0 0xc0040000 0x0 0x20000>;
->>>> +		interrupt-parent  = <&mbigen_dsa>;
->>>> +		interrupts = <0x40b20 6 78 1>,
->>>> +				<0x40b20 6 79 1>,
->>>> +				<0x40b20 6 80 1>;
->>>> +	};
->>>> +
->>>
->>> I find the current split very confusing. In your example, the interrupt
->>> controller is the mbigen block, which forces you to encode the DevID as
->>> part of the interrupt specifier. This doesn't feel like an ideal
->>> design, because you end up duplicating the DevID information at both
->>> the "client" device and the mbi_device.
->>>
->>> I'd be more inclined to have the mbi_device itself be the interrupt
->>> controller for the client device. This would eliminate information
->>> duplication, and reflect the hardware (or what I understand of the
->>> hardware) a bit more.
->>
->> Do you mean make the dts likes below?
->>
->>
->> 		mbigen_dsa: interrupt-controller at c0080000 {
->> 			compatible = "hisilicon,mbigen-v2";
->> 			interrupt-controller;
->> 			#interrupt-cells = <5>;
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index f432291..1a49b09 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -725,10 +725,6 @@ static int pwrap_init(struct pmic_wrapper *wrp)
+>  	pwrap_writel(wrp, 0x1, PWRAP_WACS2_EN);
+>  	pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
+>  	pwrap_writel(wrp, 0xff, PWRAP_STAUPD_GRPEN);
+> -	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
+> -	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
+> -	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
+> -	pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
+>  
+>  	if (pwrap_is_mt8135(wrp)) {
+>  		/* enable pwrap events and pwrap bridge in AP side */
+> @@ -896,6 +892,12 @@ static int pwrap_probe(struct platform_device *pdev)
+>  		return -ENODEV;
+>  	}
+>  
+> +	/* Initialize watchdog, may not be done by the bootloader */
+> +	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
+> +	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
+> +	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
+> +	pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
+> +
+>  	irq = platform_get_irq(pdev, 0);
+>  	ret = devm_request_irq(wrp->dev, irq, pwrap_interrupt, IRQF_TRIGGER_HIGH,
+>  			"mt-pmic-pwrap", wrp);
+> -- 
+> 1.8.1.1.dirty
 > 
-> These two statements shouldn't be here...
+> 
 
-According to you suggest that irq chip should be probed with IRQCHIP_DECLARE(),
-I think the compatible string also should be moved into mbigen_clinet_device node.
-
-And, changing mbigen driver likes below:
-
-IRQCHIP_DECLARE(hisi_mbigen, "hisilicon,mbigen-v2", mbigen_of_init);
-
-Thanks!
-Ma Jun
-
-> 
->> 			#mbigen-node-cells = <3>;
->> 			reg = <0xc0080000 0x10000>;
->> 			
->> 			mbigen_client_device1 {
->> 				msi-parent = <&its 0x40b1c>;
->> 				nr-interrupts = <9>;
->> 				interrupt-controller;
-> 
-> This is where #interrupt-cells should be.
-> 
->> 			}
->>
->> 			mbigen_client_device2{
->> 				msi-parent = <&its 0x40b1d>;
->> 				nr-interrupts = <3>;
->> 				interrupt-controller;
->> 			}
->> 		};
->>
->>
->> 	client_device1 {
->> 		compatible = "arm,smmu-v3";
->> 		reg = <0x0 0xc0040000 0x0 0x20000>;
->> 		interrupt-parent  = <&mbigen_client_device1>;
->> 		interrupts = <pin_offset 78 1>,
->> 				<pin_offset 79 1>,
->> 				<pin_offset 80 1>;
->> 	};
->>
->>
-> 
-> But otherwise, this looks better.
-> 
-> Thanks,
-> 
-> 	M.
-> 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
