@@ -1,86 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Sep 2015 21:35:26 +0200
-Subject: [PATCH v3 4/6] PCI: generic: Correct, and avoid overflow,
- in bus_max calculation.
-In-Reply-To: <5602CA55.10604@caviumnetworks.com>
-References: <1442965757-12925-1-git-send-email-ddaney.cavm@gmail.com>
- <1496061.0ds89jTH75@wuerfel> <5602CA55.10604@caviumnetworks.com>
-Message-ID: <1589576.R6XolM4Vbv@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Sep 2015 20:35:45 +0100
+Subject: [PATCH v2 4/5] PCI: generic: Correct, and avoid overflow, in
+ bus_max calculation.
+In-Reply-To: <3751968.n8LRgots8n@wuerfel>
+References: <1442527332-1174-1-git-send-email-ddaney.cavm@gmail.com>
+ <20150923180157.GV7356@arm.com>
+ <5602EDC4.3040603@caviumnetworks.com> <3751968.n8LRgots8n@wuerfel>
+Message-ID: <20150923193545.GZ7356@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 September 2015 08:50:45 David Daney wrote:
-> On 09/23/2015 01:01 AM, Arnd Bergmann wrote:
-> > On Tuesday 22 September 2015 16:49:15 David Daney wrote:
-> >> From: David Daney <david.daney@cavium.com>
-> >> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> >> index cf3e205..105a968 100644
-> >> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> >> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> >> @@ -34,7 +34,9 @@ Properties of the host controller node:
-> >>   - #size-cells    : Must be 2.
-> >>
-> >>   - reg            : The Configuration Space base address and size, as accessed
-> >> -                   from the parent bus.
-> >> +                   from the parent bus.  The base address corresponds to
-> >> +                   bus zero, even though the "bus-range" property may specify
-> >> +                   a different starting bus number.
-> >
-> > This sounds like very unusual behavior. If you have a system with faked
-> > bus numbers where the registers only physically exist for a subset of the
-> > buses, this requires defining a reg property that contains MMIO space
-> > which is outside of the device and potentially contains other devices.
+On Wed, Sep 23, 2015 at 08:27:41PM +0100, Arnd Bergmann wrote:
+> On Wednesday 23 September 2015 11:21:56 David Daney wrote:
+> > >>
+> > >>      /* Limit the bus-range to fit within reg */
+> > >> -    bus_max = pci->cfg.bus_range->start +
+> > >> -              (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
+> > >> +    bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
+> > >> +    if (bus_max > 255)
+> > >> +            bus_max = 255;
+> > >
+> > > I still don't understand the need for this part. If the cfg space is bigger
+> > > than bus_max, isn't that simply an invalid resource? Given that the resource
+> > > could be broken in other ways too, this check feels more like a specific
+> > > workaround rather than generally useful code.
+> > 
+> > Imagine...
+> > 
+> >    bus-range [0x80 .. 0xff], this requires a cfg.res that will cover the 
+> > entire range of 0..0xff.
+> > 
+> >    according to the calculations above, (resource_size(&pci->cfg.res) >> 
+> > pci->cfg.ops.bus_shift) - 1 will have a value of 0xff, so...
 > 
-> The pci-host-generic driver only maps the ranges that correspond to the 
-> "bus-range" buses, so mapping of illegal address ranges should not be a 
-> problem.
-
-There is still a problem with what the driver is allowed to map,
-the current behavior is just an implementation detail that should
-not mean the binding can rely on that.
-
-We do the per-bus mapping because the vmalloc space on 32-bit systems
-is very limited. A driver for a purely 64-bit OS could simplify this
-by just mapping the entire 'reg' property as most drivers do, and
-then use the device as an offset into that.
-
-> > What would break if we instead defined it the expected way and only
-> > list the registers for the bus numbers in the "bus-range" property?
+> Extending the computation to 32 bit seems fine, but I'd rather warn loudly
+> if the bus range does not fit within the registers.
 > 
-> I'm not sure if we have the luxury of being able to change the 
-> definition, although the existing code only works with a starting bus 
-> number of zero.  From this we might conclude that non-zero starting bus 
-> numbers cannot exist in the wild, so changing the the definition of 
-> "reg" so that it starts at the starting bus number might be possible.
->
-> My reading of:
-> 
-> http://www.o3one.org/hwdocs/openfirmware/pci_supplement_2_1.pdf
-> 
-> Section 3.1.1, does not preclude your interpretation.  Although that is 
-> for PCI-PCI bridges, and not this pci-host-generic root complex.
-> 
-> If we really want to go with a different definition of what the "reg" 
-> property means, then actual code has to change, and we risk breaking 
-> something.
+> Also note that the computation is already correct with my interpretation
+> of the reg property.
 
-My understanding is that the code has to change anyway in one place
-or another. The change you did in this patch is not needed then, but
-you say that something else has to change. Is this the only change
-we'd need?
+>From what Lorenzo was saying, ACPI shares the interpretation that David is
+implementing here and, given that the DT version seems to be subjective,
+aligning this reg property with MMCFG seems to make sense.
 
-diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-index 265dd25169bf..d8a5c0047155 100644
---- a/drivers/pci/host/pci-host-generic.c
-+++ b/drivers/pci/host/pci-host-generic.c
-@@ -196,7 +196,7 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
- 		u32 sz = 1 << pci->cfg.ops->bus_shift;
- 
- 		pci->cfg.win[idx] = devm_ioremap(dev,
--						 pci->cfg.res.start + busn * sz,
-+						 pci->cfg.res.start + idx * sz,
- 						 sz);
- 		if (!pci->cfg.win[idx])
- 			return -ENOMEM;
-
-	Arnd
+Will
