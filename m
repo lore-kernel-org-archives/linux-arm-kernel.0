@@ -1,31 +1,35 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Wed, 23 Sep 2015 22:03:32 +0100
-Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
-In-Reply-To: <560310EA.2070805@intel.com>
-References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
- <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
- <1443033714.74600.18.camel@infradead.org> <560310EA.2070805@intel.com>
-Message-ID: <1443042212.74600.30.camel@infradead.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Sep 2015 14:06:41 -0700
+Subject: [PATCH 2/2] ARM: dts: Fix WLAN regression on omap5-uevm
+In-Reply-To: <20150921141018.GC23801@atomide.com>
+References: <1442593745-16725-1-git-send-email-tony@atomide.com>
+ <1442593745-16725-3-git-send-email-tony@atomide.com>
+ <CABxcv=mGNmoVu3TDvd1888TiJ_vg0FJF6qz0p4XTu5T776sJ2Q@mail.gmail.com>
+ <20150918174836.GG8020@atomide.com>
+ <20150918202718.GH8020@atomide.com>
+ <CABxcv=nUuqHSJmP=z3X7F=ukeaFi+9cYTYW-wRwuv+mA8Jw2HQ@mail.gmail.com>
+ <20150921141018.GC23801@atomide.com>
+Message-ID: <20150923210641.GM23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-09-23 at 22:51 +0200, Rafael J. Wysocki wrote:
+* Tony Lindgren <tony@atomide.com> [150921 07:16]:
+> * Javier Martinez Canillas <javier@dowhile0.org> [150921 02:17]:
+> > > Then getting the 32k clock from palmas is not working either, it
+> > > seems some better deferred probe handling is needed there if
+> > > omap_hsmmc is built-in and palmas-clk is a loadable module.
+> > >
+> > 
+> > IIUC from another email, you already solved this.
 > 
-> But if the device ID is assigned already, why would it hurt to 
-> actually use it?
+> That deferred probe fix did not solve this one, need to debug further.
 
-It doesn't hurt at all, as long as we understand that there was no need
-to assign it a device ID at all, at least for Linux's benefit. And as
-long as it doesn't set a precedent that makes other people think they
-need to do so.
+FYI, found the MMC pwrseq clock issue, I had a typo in my dts
+file with "ext_clk" instead of "ext_clock" :)
 
--- 
-dwmw2
+Will send v2 of $subject patch after some more testing using
+both a GPIO regulator-fixed and mmc pwrseq for the clock.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5691 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150923/39f45f7d/attachment.bin>
+Regards,
+
+Tony
