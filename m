@@ -1,145 +1,103 @@
-From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Wed, 23 Sep 2015 17:07:28 +0200
-Subject: [PATCH] mxc_nand: fix copy_spare
-Message-ID: <1443020848-28813-1-git-send-email-eric@eukrea.com>
+From: anurag.kumar.vulisha@xilinx.com (Anurag Kumar Vulisha)
+Date: Wed, 23 Sep 2015 15:12:36 +0000
+Subject: [PATCH v2] dmaengine: vdma: Add 64 bit addressing support to
+ the driver
+In-Reply-To: <20150921155712.GN2381@localhost>
+References: <1440690558-39822-1-git-send-email-anuragku@xilinx.com>
+ <20150921155712.GN2381@localhost>
+Message-ID: <3802E9A6666DF54886E2B9CBF743BA9801C08CA1@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-it was broken by 35d5d20efad8a04c8c002c7f31241dff973977a6
-"mtd: mxc_nand: cleanup copy_spare function"
+Hi Vinod,
 
-else we get the following error :
-[   22.709507] ubi0: attaching mtd3
-[   23.613470] ubi0: scanning is finished
-[   23.617278] ubi0: empty MTD device detected
-[   23.623219] Unhandled fault: imprecise external abort (0x1c06) at 0x9e62f0ec
-[   23.630291] pgd = 9df80000
-[   23.633005] [9e62f0ec] *pgd=8e60041e(bad)
-[   23.637064] Internal error: : 1c06 [#1] SMP ARM
-[   23.641605] Modules linked in:
-[   23.644687] CPU: 0 PID: 99 Comm: ubiattach Not tainted 4.2.0-dirty #22
-[   23.651222] Hardware name: Freescale i.MX53 (Device Tree Support)
-[   23.657322] task: 9e687300 ti: 9dcfc000 task.ti: 9dcfc000
-[   23.662744] PC is at memcpy16_toio+0x4c/0x74
-[   23.667026] LR is at mxc_nand_command+0x484/0x640
-[   23.671739] pc : [<803f9c08>]    lr : [<803faeb0>]    psr: 60000013
-[   23.671739] sp : 9dcfdb10  ip : 9e62f0ea  fp : 9dcfdb1c
-[   23.683222] r10: a09c1000  r9 : 0000001a  r8 : ffffffff
-[   23.688453] r7 : ffffffff  r6 : 9e674810  r5 : 9e674810  r4 : 000000b6
-[   23.694985] r3 : a09c16a4  r2 : a09c16a4  r1 : a09c16a4  r0 : 0000ffff
-[   23.701521] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-[   23.708662] Control: 10c5387d  Table: 8df80019  DAC: 00000015
-[   23.714413] Process ubiattach (pid: 99, stack limit = 0x9dcfc210)
-[   23.720514] Stack: (0x9dcfdb10 to 0x9dcfe000)
-[   23.724881] db00:                                     9dcfdb6c 9dcfdb20 803faeb0 803f9bc8
-[   23.733069] db20: 803f227c 803f9b74 ffffffff 9e674810 9e674810 9e674810 00000040 9e62f010
-[   23.741255] db40: 803faa2c 9e674b40 9e674810 803faa2c 00000400 803faa2c 00000000 9df42800
-[   23.749441] db60: 9dcfdb9c 9dcfdb70 803f2024 803faa38 9e4201cc 00000000 803f0a78 9e674b40
-[   23.757627] db80: 803f1f80 9e674810 00000400 00000400 9dcfdc14 9dcfdba0 803f3bd8 803f1f8c
-[   23.765814] dba0: 9e4201cc 00000000 00000580 00000000 00000000 800718c0 0000007f 00001000
-[   23.774000] dbc0: 9df42800 000000e0 00000000 00000000 9e4201cc 00000000 00000000 00000000
-[   23.782186] dbe0: 00000580 00000580 00000000 9e674810 9dcfdc20 9dcfdce8 9df42800 00580000
-[   23.790372] dc00: 00000000 00000400 9dcfdc6c 9dcfdc18 803f3f94 803f39a4 9dcfdc20 00000000
-[   23.798558] dc20: 00000000 00000400 00000000 00000000 00000000 00000000 9df42800 00000000
-[   23.806744] dc40: 9dcfdd0c 00580000 00000000 00000400 00000000 9df42800 9dee1000 9d802000
-[   23.814930] dc60: 9dcfdc94 9dcfdc70 803eb63c 803f3f38 00000400 9dcfdce8 9df42800 dead4ead
-[   23.823116] dc80: 803eb5f4 00000000 9dcfdcc4 9dcfdc98 803e82ac 803eb600 00000400 9dcfdce8
-[   23.831301] dca0: 9df42800 00000400 9dee0000 00000000 00000400 00000000 9dcfdd1c 9dcfdcc8
-[   23.839488] dcc0: 80406048 803e8230 00000400 9dcfdce8 9df42800 9dcfdc78 00000008 00000000
-[   23.847673] dce0: 00000000 00000000 00000000 00000004 00000000 9df42800 9dee0000 00000000
-[   23.855859] dd00: 9d802030 00000000 9dc8b214 9d802000 9dcfdd44 9dcfdd20 804066cc 80405f50
-[   23.864047] dd20: 00000400 9dc8b200 9d802030 9df42800 9dee0000 9dc8b200 9dcfdd84 9dcfdd48
-[   23.872233] dd40: 8040a544 804065ac 9e401c80 000080d0 9dcfdd84 00000001 800fc828 9df42400
-[   23.880418] dd60: 00000000 00000080 9dc8b200 9dc8b200 9dc8b200 9dee0000 9dcfdddc 9dcfdd88
-[   23.888605] dd80: 803fb560 8040a440 9dcfddc4 9dcfdd98 800f1428 9dee1000 a0acf000 00000000
-[   23.896792] dda0: 00000000 ffffffff 00000006 00000000 9dee0000 9dee0000 00005600 00000080
-[   23.904979] ddc0: 9dc8b200 a0acf000 9dc8b200 8112514c 9dcfde24 9dcfdde0 803fc08c 803fb4f0
-[   23.913165] dde0: 9e401c80 00000013 9dcfde04 9dcfddf8 8006bbf8 8006ba00 9dcfde24 00000000
-[   23.921351] de00: 9dee0000 00000065 9dee0000 00000001 9dc8b200 8112514c 9dcfde84 9dcfde28
-[   23.929538] de20: 8040afa0 803fb948 ffffffff 00000000 9dc8b214 9dcfde40 800f1428 800f11dc
-[   23.937724] de40: 9dc8b21c 9dc8b20c 9dc8b204 9dee1000 9dc8b214 8069bb60 fffff000 fffff000
-[   23.945911] de60: 9e7b5400 00000000 9dee0000 9dee1000 00001000 9e7b5400 9dcfdecc 9dcfde88
-[   23.954097] de80: 803ff1bc 8040a630 9dcfdea4 9dcfde98 00000800 00000800 9dcfdecc 9dcfdea8
-[   23.962284] dea0: 803e8f6c 00000000 7e87ab70 9e7b5400 80113e30 00000003 9dcfc000 00000000
-[   23.970470] dec0: 9dcfdf04 9dcfded0 804008cc 803feb98 ffffffff 00000003 00000000 00000000
-[   23.978656] dee0: 00000000 00000000 9e7cb000 9dc193e0 7e87ab70 9dd92140 9dcfdf7c 9dcfdf08
-[   23.986842] df00: 80113b5c 8040080c 800fbed8 8006bbf0 9e7cb000 00000003 9e7cb000 9dd92140
-[   23.995029] df20: 9dc193e0 9dd92148 9dcfdf4c 9dcfdf38 8011022c 800fbe78 8000f9cc 9e687300
-[   24.003216] df40: 9dcfdf6c 9dcfdf50 8011f798 8007ffe8 7e87ab70 9dd92140 00000003 9dd92140
-[   24.011402] df60: 40186f40 7e87ab70 9dcfc000 00000000 9dcfdfa4 9dcfdf80 80113e30 8011373c
-[   24.019588] df80: 7e87ab70 7e87ab70 7e87aea9 00000036 8000fb84 9dcfc000 00000000 9dcfdfa8
-[   24.027775] dfa0: 8000f9a0 80113e00 7e87ab70 7e87ab70 00000003 40186f40 7e87ab70 00000000
-[   24.035962] dfc0: 7e87ab70 7e87ab70 7e87aea9 00000036 00000000 00000000 76fd1f70 00000000
-[   24.044148] dfe0: 76f80f8c 7e87ab28 00009810 76f80fc4 60000010 00000003 00000000 00000000
-[   24.052328] Backtrace:
-[   24.054806] [<803f9bbc>] (memcpy16_toio) from [<803faeb0>] (mxc_nand_command+0x484/0x640)
-[   24.062996] [<803faa2c>] (mxc_nand_command) from [<803f2024>] (nand_write_page+0xa4/0x154)
-[   24.071264]  r10:9df42800 r9:00000000 r8:803faa2c r7:00000400 r6:803faa2c r5:9e674810
-[   24.079180]  r4:9e674b40
-[   24.081738] [<803f1f80>] (nand_write_page) from [<803f3bd8>] (nand_do_write_ops+0x240/0x444)
-[   24.090180]  r8:00000400 r7:00000400 r6:9e674810 r5:803f1f80 r4:9e674b40
-[   24.096970] [<803f3998>] (nand_do_write_ops) from [<803f3f94>] (nand_write+0x68/0x88)
-[   24.104804]  r10:00000400 r9:00000000 r8:00580000 r7:9df42800 r6:9dcfdce8 r5:9dcfdc20
-[   24.112719]  r4:9e674810
-[   24.115287] [<803f3f2c>] (nand_write) from [<803eb63c>] (part_write+0x48/0x50)
-[   24.122514]  r10:9d802000 r9:9dee1000 r8:9df42800 r7:00000000 r6:00000400 r5:00000000
-[   24.130429]  r4:00580000
-[   24.132989] [<803eb5f4>] (part_write) from [<803e82ac>] (mtd_write+0x88/0xa0)
-[   24.140129]  r5:00000000 r4:803eb5f4
-[   24.143748] [<803e8224>] (mtd_write) from [<80406048>] (ubi_io_write+0x104/0x65c)
-[   24.151235]  r7:00000000 r6:00000400 r5:00000000 r4:9dee0000
-[   24.156968] [<80405f44>] (ubi_io_write) from [<804066cc>] (ubi_io_write_ec_hdr+0x12c/0x190)
-[   24.165323]  r10:9d802000 r9:9dc8b214 r8:00000000 r7:9d802030 r6:00000000 r5:9dee0000
-[   24.173239]  r4:9df42800
-[   24.175798] [<804065a0>] (ubi_io_write_ec_hdr) from [<8040a544>] (ubi_early_get_peb+0x110/0x1f0)
-[   24.184587]  r6:9dc8b200 r5:9dee0000 r4:9df42800
-[   24.189262] [<8040a434>] (ubi_early_get_peb) from [<803fb560>] (create_vtbl+0x7c/0x238)
-[   24.197271]  r10:9dee0000 r9:9dc8b200 r8:9dc8b200 r7:9dc8b200 r6:00000080 r5:00000000
-[   24.205187]  r4:9df42400
-[   24.207746] [<803fb4e4>] (create_vtbl) from [<803fc08c>] (ubi_read_volume_table+0x750/0xa64)
-[   24.216187]  r10:8112514c r9:9dc8b200 r8:a0acf000 r7:9dc8b200 r6:00000080 r5:00005600
-[   24.224103]  r4:9dee0000
-[   24.226662] [<803fb93c>] (ubi_read_volume_table) from [<8040afa0>] (ubi_attach+0x97c/0x152c)
-[   24.235103]  r10:8112514c r9:9dc8b200 r8:00000001 r7:9dee0000 r6:00000065 r5:9dee0000
-[   24.243018]  r4:00000000
-[   24.245579] [<8040a624>] (ubi_attach) from [<803ff1bc>] (ubi_attach_mtd_dev+0x630/0xbac)
-[   24.253673]  r10:9e7b5400 r9:00001000 r8:9dee1000 r7:9dee0000 r6:00000000 r5:9e7b5400
-[   24.261588]  r4:fffff000
-[   24.264148] [<803feb8c>] (ubi_attach_mtd_dev) from [<804008cc>] (ctrl_cdev_ioctl+0xcc/0x1cc)
-[   24.272589]  r10:00000000 r9:9dcfc000 r8:00000003 r7:80113e30 r6:9e7b5400 r5:7e87ab70
-[   24.280505]  r4:00000000
-[   24.283070] [<80400800>] (ctrl_cdev_ioctl) from [<80113b5c>] (do_vfs_ioctl+0x42c/0x6c4)
-[   24.291077]  r6:9dd92140 r5:7e87ab70 r4:9dc193e0
-[   24.295753] [<80113730>] (do_vfs_ioctl) from [<80113e30>] (SyS_ioctl+0x3c/0x64)
-[   24.303066]  r10:00000000 r9:9dcfc000 r8:7e87ab70 r7:40186f40 r6:9dd92140 r5:00000003
-[   24.310981]  r4:9dd92140
-[   24.313549] [<80113df4>] (SyS_ioctl) from [<8000f9a0>] (ret_fast_syscall+0x0/0x54)
-[   24.321123]  r9:9dcfc000 r8:8000fb84 r7:00000036 r6:7e87aea9 r5:7e87ab70 r4:7e87ab70
-[   24.328957] Code: e1c300b0 e1510002 e1a03001 1afffff9 (e89da800)
-[   24.335066] ---[ end trace ab1cb17887f21bbb ]---
-[   24.340249] Unhandled fault: imprecise external abort (0x1c06) at 0x7ee8bcf0
-[   24.347310] pgd = 9df3c000
-[   24.350023] [7ee8bcf0] *pgd=8dcbf831, *pte=8eb3334f, *ppte=8eb3383f
-Segmentation fault
+Thanks for reviewing the patch
 
-Signed-off-by: Eric B?nard <eric@eukrea.com>
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/mtd/nand/mxc_nand.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> -----Original Message-----
+> From: Vinod Koul [mailto:vinod.koul at intel.com]
+> Sent: Monday, September 21, 2015 9:27 PM
+> To: Anurag Kumar Vulisha
+> Cc: Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala; Michal
+> Simek; Soren Brinkmann; Dan Williams; afaerber at suse.de; Maxime Ripard;
+> Laurent Pinchart; Appana Durga Kedareswara Rao; Anirudha Sarangi; Srikanth
+> Vemula; devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; dmaengine at vger.kernel.org; Anurag Kumar
+> Vulisha
+> Subject: Re: [PATCH v2] dmaengine: vdma: Add 64 bit addressing support to
+> the driver
+>
+> On Thu, Aug 27, 2015 at 09:19:18PM +0530, Anurag Kumar Vulisha wrote:
+> > This VDMA  is a soft ip, which can be programmed to support
+> > 32 bit addressing or greater than 32 bit addressing.
+> >
+> > When the VDMA ip is configured for 32 bit address space the transfer
+> > start address is specified by a single register.
+>
+> would be good to specfiy which one
+>
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 2426db8..f04445b 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -879,7 +879,7 @@ static void copy_spare(struct mtd_info *mtd, bool bfrom)
- 				      oob_chunk_size);
- 
- 		/* the last chunk */
--		memcpy16_toio(&s[oob_chunk_size * sparebuf_size],
-+		memcpy16_toio(&s[i * sparebuf_size],
- 			      &d[i * oob_chunk_size],
- 			      host->used_oobsize - i * oob_chunk_size);
- 	}
--- 
-2.4.3
+Will change  this in v3
+
+> > When the  VDMA core is configured for an address space greater than 32
+> > then each start address is specified by a combination of two
+> > registers. The first register specifies the LSB 32 bits of address,
+> > while the next register specifies the MSB 32 bits of address.For
+> > example,5Ch will specify the LSB 32 bits while 60h will specify the
+> > MSB 32 bits of the first start address.So we need to program two
+> > registers at a time.
+>
+> can we have spaces after full stops and commas!
+>
+
+Will take care of this in v3 patch.
+
+> > +/* Since vdma driver is trying to write to a register offset which is
+> > +not a
+> > + * multiple of 64 bits(ex : 0x5c), we are writing as two separate 32
+> > +bits
+> > + * instead of a single 64 bit register write.
+> > + */
+>
+> This is not kernel style for multi-lines, pls refer to
+> Documentation/CodingStyle
+>
+
+Will address this in v3 patch
+
+> > +
+> > +static inline void vdma_desc_write_64(struct xilinx_vdma_chan *chan,
+> u32 reg,
+> > +                            u32 value_lsb, u32 value_msb)
+> > +{
+> > +   /* Write the lsb 32 bits*/
+> > +   writel(value_lsb, chan->xdev->regs + chan->desc_offset + reg);
+> > +
+> > +   /* Write the msb 32 bits */
+> > +   writel(value_msb, chan->xdev->regs + chan->desc_offset + reg + 4);
+>
+> why not writeq
+
+We are trying to write at a register address(ex:0x5c) which is not aligned on 8 bytes  boundary.So if I try to use 64 bit write on it,unalignment  fault is getting  generated.To avoid that we are using two separate 32  bit writes.
+We had this discussion in previous versions of this patch with Laurent Pinchart .I have also added this exaplanation in the comments above this function.
+
+>
+> > +   err = of_property_read_u32(node, "xlnx,addrwidth", &addr_width);
+> > +
+> > +   if (err < 0) {
+> > +           /* Setting addr_width property to default 32 bits */
+> > +           addr_width = 32;
+> > +   }
+>
+> braces for a single line statement! Also space is redandant before if condition
+>
+
+Will take care of this in v3 patch
+
+Thanks,
+Anurag Kumar V
+
+> --
+> ~Vinod
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
