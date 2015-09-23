@@ -1,55 +1,42 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Wed, 23 Sep 2015 10:38:31 +0300
-Subject: [PATCH v2 1/4] ARM: dts: sun4i: gemei-g9: Add accelerometer (bma250)
- IRQ
-In-Reply-To: <1442993914-20295-1-git-send-email-plaes@plaes.org>
-References: <1442993914-20295-1-git-send-email-plaes@plaes.org>
-Message-ID: <1442993914-20295-2-git-send-email-plaes@plaes.org>
+From: jy0922.shim@samsung.com (Joonyoung Shim)
+Date: Wed, 23 Sep 2015 16:41:55 +0900
+Subject: [PATCH v2] ARM: dts: exynos5420: fix wrong clock binding for
+ sysmmu_fimd1_1
+Message-ID: <1442994115-20167-1-git-send-email-jy0922.shim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add IRQ configuration for bma250 accelerometer.
+The sysmmu_fimd1_1 should bind the clock CLK_SMMU_FIMD1M1, not the clock
+CLK_SMMU_FIMD1M0. CLK_SMMU_FIMD1M0 is a clock for the sysmmu_fimd1_0.
 
-Signed-off-by: Priit Laes <plaes@plaes.org>
+This wrong clock binding causes the problem that is blocked in iommu_map
+function when IOMMU is enabled and exynos-drm driver tries to allocate
+buffer via DMA mapping API on Odroid-XU3 board.
+
+Fixes: b70045167815 ("ARM: dts: add sysmmu nodes for exynos5420")
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Cc: <stable@vger.kernel.org> # v4.2
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+Changes for v2:
+- Update the commit message
+- Add Fixes: and Reviewed-by: tags
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-index 570754d..3f0aeb8 100644
---- a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-@@ -47,6 +47,7 @@
- #include "sunxi-common-regulators.dtsi"
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
- 	model = "Gemei G9 Tablet";
-@@ -64,7 +65,7 @@
- /*
-  * TODO:
-  *   2x cameras via CSI
-- *   bma250 IRQs
-+ *   audio
-  *   AXP battery management
-  *   NAND
-  *   OTG
-@@ -103,12 +104,8 @@
- 	bma250 at 18 {
- 		compatible = "bosch,bma250";
- 		reg = <0x18>;
--
--		/*
--		 * TODO: interrupt pins:
--		 * int1 - PH00
--		 * int2 - PI10
--		 */
-+		interrupt-parent = <&pio>;
-+		interrupts = <7 0 IRQ_TYPE_EDGE_RISING>; /* PH00 / EINT0 */
+ arch/arm/boot/dts/exynos5420.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index df9aee9..1b3d6c7 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -1117,7 +1117,7 @@
+ 		interrupt-parent = <&combiner>;
+ 		interrupts = <3 0>;
+ 		clock-names = "sysmmu", "master";
+-		clocks = <&clock CLK_SMMU_FIMD1M0>, <&clock CLK_FIMD1>;
++		clocks = <&clock CLK_SMMU_FIMD1M1>, <&clock CLK_FIMD1>;
+ 		power-domains = <&disp_pd>;
+ 		#iommu-cells = <0>;
  	};
- };
- 
 -- 
-2.5.3
+1.9.1
