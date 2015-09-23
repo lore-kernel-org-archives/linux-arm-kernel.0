@@ -1,145 +1,83 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 23 Sep 2015 23:50:24 +0200
-Subject: [PATCH] mmc: sunxi: Fix clk-delay settings
-In-Reply-To: <1443038808-10965-1-git-send-email-hdegoede@redhat.com>
-References: <1443038808-10965-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAPDyKFpOFLgAAH5cVo-v+atfXYz=H7vxLH-BEzCA_i1Cu6wTFg@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 23 Sep 2015 13:14:54 -0500
+Subject: [Patch v2 06/10] regulators: qcom-smd: Add PM8916 support
+In-Reply-To: <20150923172358.GE24668@usrtlx11787.corpusers.net>
+References: <1443027209-19444-1-git-send-email-agross@codeaurora.org>
+ <1443027209-19444-7-git-send-email-agross@codeaurora.org>
+ <20150923172358.GE24668@usrtlx11787.corpusers.net>
+Message-ID: <20150923181454.GA24756@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 September 2015 at 22:06, Hans de Goede <hdegoede@redhat.com> wrote:
-> In recent allwinner kernel sources the mmc clk-delay settings have been
-> slightly tweaked, and for sun9i they are completely different then what
-> we are using.
->
-> This commit brings us in sync with what allwinner does, fixing problems
-> accessing sdcards on some A33 devices (and likely others).
->
-> For pre sun9i hardware this makes the following changes:
-> -At 400Khz change the sample delay from 7 to 0 (introduced in A31 sdk)
-> -At 50 Mhz change the sample delay from 5 to 4 (introduced in A23 sdk)
->
-> This also drops the clk-delay calculation for clocks > 50 MHz, we do
-> not need this as we've: mmc->f_max = 50000000, and the delays in the
-> old code were not correct (at 100 MHz the delay must be a multiple of 60,
-> at 200 MHz a multiple of 120).
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On Wed, Sep 23, 2015 at 10:23:58AM -0700, Bjorn Andersson wrote:
+> On Wed 23 Sep 09:53 PDT 2015, Andy Gross wrote:
+> 
+> > This patch adds support and documentation for the PM8916 regulators
+> > found on MSM8916 platforms.
+> > 
+> > Signed-off-by: Andy Gross <agross@codeaurora.org>
+> > ---
+> >  .../bindings/soc/qcom/qcom,smd-rpm-regulator.txt   |   18 ++++++
+> >  drivers/regulator/qcom_smd-regulator.c             |   64 ++++++++++++++++++++
+> >  2 files changed, 82 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
+> > index 7084474..05dfc1a 100644
+> > --- a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
+> > +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
+> > @@ -18,6 +18,7 @@ Regulator nodes are identified by their compatible:
+> >  	Definition: must be one of:
+> >  		    "qcom,rpm-pm8841-regulators"
+> >  		    "qcom,rpm-pm8941-regulators"
+> > +		    "qcom,rpm-pm8916-regulators"
+> 
+> Alphabetical please
+> 
+> >  
+> >  - vdd_s1-supply:
+> >  - vdd_s2-supply:
+> > @@ -50,6 +51,19 @@ Regulator nodes are identified by their compatible:
+> >  	Definition: reference to regulator supplying the input pin, as
+> >  		    described in the data sheet
+> >  
+> > +- vdd_s1-supply:
+> > +- vdd_s2-supply:
+> > +- vdd_s3-supply:
+> > +- vdd_s4-supply:
+> > +- vdd_l1_l2_l3-supply
+> > +- vdd_l4_l5_l6-supply
+> > +- vdd_l7-supply
+> 
+> End these with ':' as well
+> 
+> > +- vdd_l8_l9_l10_l11_l12_l13_l14_l15_l16_l17_l18-supply:
+> > +	Usage: optional (pm8916 only)
+> > +	Value type: <phandle>
+> > +	Definition: reference to regulator supplying the input pin, as
+> > +		    described in the data sheet
+> > +
+> [..]
+> > diff --git a/drivers/regulator/qcom_smd-regulator.c b/drivers/regulator/qcom_smd-regulator.c
+> [..]
+> >  static const struct of_device_id rpm_of_match[] = {
+> > +	{ .compatible = "qcom,rpm-pm8916-regulators", .data = &rpm_pm8916_regulators },
+> 
+> pm8916 > pm8841
+> 
+> >  	{ .compatible = "qcom,rpm-pm8841-regulators", .data = &rpm_pm8841_regulators },
+> >  	{ .compatible = "qcom,rpm-pm8941-regulators", .data = &rpm_pm8941_regulators },
+> >  	{}
+> 
+> With these nits:
+> 
+> Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> 
+> Regards,
+> Bjorn
 
-I assume you want me to take this as a fix? If so, can we point to
-what commit it fixes?
+I'll fixup this when I apply it.  Thanks!
 
-Kind regards
-Uffe
-
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 53 ++++++++++++++++++++++++++++++++------------
->  1 file changed, 39 insertions(+), 14 deletions(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index e6226cd..83de82b 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -210,6 +210,16 @@
->  #define SDXC_IDMAC_DES0_CES    BIT(30) /* card error summary */
->  #define SDXC_IDMAC_DES0_OWN    BIT(31) /* 1-idma owns it, 0-host owns it */
->
-> +#define SDXC_CLK_400K          0
-> +#define SDXC_CLK_25M           1
-> +#define SDXC_CLK_50M           2
-> +#define SDXC_CLK_50M_DDR       3
-> +
-> +struct sunxi_mmc_clk_delay {
-> +       u32 output;
-> +       u32 sample;
-> +};
-> +
->  struct sunxi_idma_des {
->         u32     config;
->         u32     buf_size;
-> @@ -229,6 +239,7 @@ struct sunxi_mmc_host {
->         struct clk      *clk_mmc;
->         struct clk      *clk_sample;
->         struct clk      *clk_output;
-> +       const struct sunxi_mmc_clk_delay *clk_delays;
->
->         /* irq */
->         spinlock_t      lock;
-> @@ -654,25 +665,19 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->
->         /* determine delays */
->         if (rate <= 400000) {
-> -               oclk_dly = 180;
-> -               sclk_dly = 42;
-> +               oclk_dly = host->clk_delays[SDXC_CLK_400K].output;
-> +               sclk_dly = host->clk_delays[SDXC_CLK_400K].sample;
->         } else if (rate <= 25000000) {
-> -               oclk_dly = 180;
-> -               sclk_dly = 75;
-> +               oclk_dly = host->clk_delays[SDXC_CLK_25M].output;
-> +               sclk_dly = host->clk_delays[SDXC_CLK_25M].sample;
->         } else if (rate <= 50000000) {
->                 if (ios->timing == MMC_TIMING_UHS_DDR50) {
-> -                       oclk_dly = 60;
-> -                       sclk_dly = 120;
-> +                       oclk_dly = host->clk_delays[SDXC_CLK_50M_DDR].output;
-> +                       sclk_dly = host->clk_delays[SDXC_CLK_50M_DDR].sample;
->                 } else {
-> -                       oclk_dly = 90;
-> -                       sclk_dly = 150;
-> +                       oclk_dly = host->clk_delays[SDXC_CLK_50M].output;
-> +                       sclk_dly = host->clk_delays[SDXC_CLK_50M].sample;
->                 }
-> -       } else if (rate <= 100000000) {
-> -               oclk_dly = 6;
-> -               sclk_dly = 24;
-> -       } else if (rate <= 200000000) {
-> -               oclk_dly = 3;
-> -               sclk_dly = 12;
->         } else {
->                 return -EINVAL;
->         }
-> @@ -878,6 +883,7 @@ static int sunxi_mmc_card_busy(struct mmc_host *mmc)
->  static const struct of_device_id sunxi_mmc_of_match[] = {
->         { .compatible = "allwinner,sun4i-a10-mmc", },
->         { .compatible = "allwinner,sun5i-a13-mmc", },
-> +       { .compatible = "allwinner,sun9i-a80-mmc", },
->         { /* sentinel */ }
->  };
->  MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
-> @@ -892,6 +898,20 @@ static struct mmc_host_ops sunxi_mmc_ops = {
->         .card_busy       = sunxi_mmc_card_busy,
->  };
->
-> +static const struct sunxi_mmc_clk_delay sunxi_mmc_clk_delays[] = {
-> +       [SDXC_CLK_400K]         = { .output = 180, .sample = 180 },
-> +       [SDXC_CLK_25M]          = { .output = 180, .sample =  75 },
-> +       [SDXC_CLK_50M]          = { .output =  90, .sample = 120 },
-> +       [SDXC_CLK_50M_DDR]      = { .output =  60, .sample = 120 },
-> +};
-> +
-> +static const struct sunxi_mmc_clk_delay sun9i_mmc_clk_delays[] = {
-> +       [SDXC_CLK_400K]         = { .output = 180, .sample = 180 },
-> +       [SDXC_CLK_25M]          = { .output = 180, .sample =  75 },
-> +       [SDXC_CLK_50M]          = { .output = 150, .sample = 120 },
-> +       [SDXC_CLK_50M_DDR]      = { .output =  90, .sample = 120 },
-> +};
-> +
->  static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->                                       struct platform_device *pdev)
->  {
-> @@ -903,6 +923,11 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->         else
->                 host->idma_des_size_bits = 16;
->
-> +       if (of_device_is_compatible(np, "allwinner,sun9i-a80-mmc"))
-> +               host->clk_delays = sun9i_mmc_clk_delays;
-> +       else
-> +               host->clk_delays = sunxi_mmc_clk_delays;
-> +
->         ret = mmc_regulator_get_supply(host->mmc);
->         if (ret) {
->                 if (ret != -EPROBE_DEFER)
-> --
-> 2.5.0
->
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
