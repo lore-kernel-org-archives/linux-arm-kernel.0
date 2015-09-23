@@ -1,42 +1,32 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Wed, 23 Sep 2015 16:41:55 +0900
-Subject: [PATCH v2] ARM: dts: exynos5420: fix wrong clock binding for
- sysmmu_fimd1_1
-Message-ID: <1442994115-20167-1-git-send-email-jy0922.shim@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Sep 2015 09:51 +0200
+Subject: [PATCH] arm64/pci: Add quirks for Cavium Thunder PCI bridges.
+In-Reply-To: <1442966996-13419-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1442966996-13419-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1675889.xYIhzenZEC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sysmmu_fimd1_1 should bind the clock CLK_SMMU_FIMD1M1, not the clock
-CLK_SMMU_FIMD1M0. CLK_SMMU_FIMD1M0 is a clock for the sysmmu_fimd1_0.
+On Tuesday 22 September 2015 17:09:56 David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> The Cavium ThunderX SoC needs a PCI quirk for its on-chip bridges.
+> Since it is arm64, create a new quirks.c file there to contain arm64
+> related quirks.  Add the ThunderX bridge quirk, gated by a new config
+> variable, so that it can be disabled for kernels that aren't expected
+> to be used on ThunderX.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  arch/arm64/Kconfig         | 11 +++++++++++
+>  arch/arm64/kernel/Makefile |  2 +-
+>  arch/arm64/kernel/quirks.c | 36 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 48 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/kernel/quirks.c
+> 
 
-This wrong clock binding causes the problem that is blocked in iommu_map
-function when IOMMU is enabled and exynos-drm driver tries to allocate
-buffer via DMA mapping API on Odroid-XU3 board.
+Looks reasonable to me. Just one question: Is the same bridge used
+on MIPS machines? If so, maybe it should be moved to drivers/pci/quirks.c
+instead for better reuse.
 
-Fixes: b70045167815 ("ARM: dts: add sysmmu nodes for exynos5420")
-Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-Cc: <stable@vger.kernel.org> # v4.2
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
-Changes for v2:
-- Update the commit message
-- Add Fixes: and Reviewed-by: tags
-
- arch/arm/boot/dts/exynos5420.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index df9aee9..1b3d6c7 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -1117,7 +1117,7 @@
- 		interrupt-parent = <&combiner>;
- 		interrupts = <3 0>;
- 		clock-names = "sysmmu", "master";
--		clocks = <&clock CLK_SMMU_FIMD1M0>, <&clock CLK_FIMD1>;
-+		clocks = <&clock CLK_SMMU_FIMD1M1>, <&clock CLK_FIMD1>;
- 		power-domains = <&disp_pd>;
- 		#iommu-cells = <0>;
- 	};
--- 
-1.9.1
+	Arnd
