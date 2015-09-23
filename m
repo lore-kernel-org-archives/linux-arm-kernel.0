@@ -1,26 +1,63 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Wed, 23 Sep 2015 14:50:05 +0100
-Subject: [PATCH v3] arm64/efi: don't pad between EFI_MEMORY_RUNTIME regions
-In-Reply-To: <CAKv+Gu914YCoEvs9QkS619+gPW3qv1UTXqjmBhLPuH6ZCdmEqA@mail.gmail.com>
-References: <1441782414-16284-1-git-send-email-ard.biesheuvel@linaro.org>
- <1441899699-14893-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150910160809.GM29293@leverpostej>
- <CAKv+Gu914YCoEvs9QkS619+gPW3qv1UTXqjmBhLPuH6ZCdmEqA@mail.gmail.com>
-Message-ID: <20150923135005.GD2867@codeblueprint.co.uk>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Wed, 23 Sep 2015 11:25:56 +0800
+Subject: [PATCH v9 3/6] PCI: designware: Add ARM64 support
+In-Reply-To: <CAHM4w1mabn8SiE_oqWBbr1chrQTUPiUhc8fCsxJ0t=AyOZOadA@mail.gmail.com>
+References: <1442321361-174300-1-git-send-email-wangzhou1@hisilicon.com>
+ <1442321361-174300-4-git-send-email-wangzhou1@hisilicon.com>
+ <5600C285.5090603@hisilicon.com>
+ <CAHM4w1mabn8SiE_oqWBbr1chrQTUPiUhc8fCsxJ0t=AyOZOadA@mail.gmail.com>
+Message-ID: <56021BC4.9030000@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Sep, at 06:10:57PM, Ard Biesheuvel wrote:
+On 2015/9/23 1:05, Pratyush Anand wrote:
+> Hi Zhou,
 > 
-> Thanks Mark.
+> On Tue, Sep 22, 2015 at 8:22 AM, Zhou Wang <wangzhou1@hisilicon.com> wrote:
+>> On 2015/9/15 20:49, Zhou Wang wrote:
+>>> This patch tries to unify ARM32 and ARM64 PCIe in designware driver. Delete
+>>> function dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
+>>> move related operations to dw_pcie_host_init.
+>>>
+>>> This patch also try to use of_pci_get_host_bridge_resources for ARM32 and ARM64
+>>> according to the suggestion for Gabriele[1]
+>>>
+>>> This patch reverts commit f4c55c5a3f7f ("PCI: designware: Program ATU with
+>>> untranslated address") based on 1/6 in this series. we delete *_mod_base in
+>>> pcie-designware. This was discussed in [2]
+>>>
+>>> I have compiled the driver with multi_v7_defconfig. However, I don't have
+>>> ARM32 PCIe related board to do test. It will be appreciated if someone could
+>>> help to test it.
+>>>
+>>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+>>> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>> Tested-by: James Morse <james.morse@arm.com>
+>>> Tested-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>> Tested-by: Minghuan Lian <Minghuan.Lian@freescale.com>
 > 
-> @Matt: could you please drop the version you have queued, and take
-> this one instead?
-> Also, this patch will not apply to anything before v4.0 so could you
-> please include that in the cc:stable tag?
+> Sorry for delayed response. Since I moved from ST, I do not have any
+> test board having designware PCIe controller :(, and also I do
+> designware work only in my hobby time,  so it took time to understand
+> few modifications. Anyway, all modifications looks fine to me. So,
+> 
+> Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
 
-Sorry for the delay. I've queued up this version with all tags and
-I'll send an urgent pull request this week. Thanks everyone.
+Hi Pratyush,
 
--- 
-Matt Fleming, Intel Open Source Technology Center
+Many thanks for your reviewing :)
+
+Best Regards,
+Zhou
+
+> 
+> PS: Does someone know about a economical test board from any vendor
+> with designware PCIe IP?
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> .
+> 
