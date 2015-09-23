@@ -1,115 +1,112 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Wed, 23 Sep 2015 13:07:13 +0300
-Subject: [RESEND PATCH] media: vb2: Fix vb2_dc_prepare do not correct
- sync data to device
-In-Reply-To: <6A2D1ECE-40A4-441C-910B-6EEB3D99D8FA@xs4all.nl>
-References: <1442838371-21484-1-git-send-email-tiffany.lin@mediatek.com>
- <20150922211015.GT3175@valkosipuli.retiisi.org.uk>
- <6A2D1ECE-40A4-441C-910B-6EEB3D99D8FA@xs4all.nl>
-Message-ID: <20150923100712.GU3175@valkosipuli.retiisi.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 23 Sep 2015 12:29:36 +0200
+Subject: [PATCH linux-next v9 0/3] mfd: flexcom: add a driver for Flexcom
+In-Reply-To: <20150920041912.GS3039@x1>
+References: <cover.1441118159.git.cyrille.pitchen@atmel.com>
+ <20150920041912.GS3039@x1>
+Message-ID: <56027F10.1060804@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Le 20/09/2015 06:19, Lee Jones a ?crit :
+> Patch set description?
 
-On Wed, Sep 23, 2015 at 10:40:56AM +0200, Hans Verkuil wrote:
-> Resent, hopefully without html this time.
+Cyrille actually placed it as the v1 changelog below...
+
+> Once Rob is satisfied, please re-submit this set with Nicolas' Acks
+
+I think that Rob was okay with the DT binding: "A few comments, but in
+general looks fine." and it may not be important to tack Rob for
+addition of his formal tag...
+
+Or maybe this message can act as a "ping" for Rob...
+
+> and I will re-review.
+
+We wait one or two days before Cyrille re-send the series. We are
+looking forward to using this driver in Linux-next soon.
+
+Bye,
+
+
+>> ChangeLog
+>>
+>> v9:
+>> - go back to v5 (use the new "atmel,flexcom-mode" DT property).
+>> - fix the name of the spi node in the DT example: from spi at f8034400 to
+>>   spi at 400
+>> - align the fields of the struct platform_driver atmel_flexcom_driver as
+>>   suggested by Lee Jones.
+>>
+>> v8:
+>> - fix the name of the spi node in the DT example: from spi at f8034400 to
+>>   spi at 2,0
+>> - use the return code of op_property_read_u32_index() instead of -EINVAL
+>>   to report error.
+>> - add Acked-by from Nicolas Ferre
+>>
+>> v7:
+>> - read the operating mode from the very first u32 of the reg property from
+>>   the first available child node (should be unique).
+>> - update the DT bindings documentation accordingly.
+>>
+>> v6:
+>> - select the operating mode according to the "compatible" DT property of
+>>   the first available child node (should be unique).
+>> - remove the "atmel,flexcom-mode" DT property so the need of a header file
+>>   defining macros for the possible values of this deprecated property.
+>>
+>> v5:
+>> - create a header file containing macros used by DT bindings
+>> - use numeric constants instead of strings to select the Flexcom mode
+>> - change the license to "GPL v2"
+>> - update the DT binding documentation to make it more readable and add
+>>   references to USART, SPI and I2C DT binding documentations. remove the
+>>   useless label in the Example section.
+>> - change the register prefix from FX_ to FLEX_ to match the Flexcom
+>>   programmer datasheet.
+>> - rename some variables to make them more understandable.
+>>
+>> v4:
+>> - check clk_prepare_enable() return code in atmel_flexcom_probe()
+>> - add a commit message to the DT binding patch
+>>
+>> v3:
+>> - remove MODULE_ALIAS()
+>> - add Acked-by from Boris Brezillon and Alexandre Belloni
+>>
+>> v2:
+>> - enhance the documentation of DT bindings and change the way the "ranges"
+>>   property is used.
+>> - replace __raw_readl() and __raw_writel() by readl() and writel().
+>> - change the module license to "GPL" for v2 or later
+>> - print the selected flexcom mode after the hardware version
+>>
+>> v1:
+>> This series of patches a support to the Atmel Flexcom, a wrapper which
+>> integrates an USART, a SPI controller and a TWI controller. Only one
+>> peripheral can be used at a time. The active function is selected though
+>> the Flexcom Mode Register.
+>>
+>> Cyrille Pitchen (3):
+>>   mfd: atmel-flexcom: create include file with macros used by DT
+>>     bindings
+>>   mfd: devicetree: add bindings for Atmel Flexcom
+>>   mfd: atmel-flexcom: add a driver for Atmel Flexible Serial
+>>     Communication Unit
+>>
+>>  .../devicetree/bindings/mfd/atmel-flexcom.txt      |  67 +++++++++++++
+>>  drivers/mfd/Kconfig                                |  11 +++
+>>  drivers/mfd/Makefile                               |   1 +
+>>  drivers/mfd/atmel-flexcom.c                        | 104 +++++++++++++++++++++
+>>  include/dt-bindings/mfd/atmel-flexcom.h            |  16 ++++
+>>  5 files changed, 199 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+>>  create mode 100644 drivers/mfd/atmel-flexcom.c
+>>  create mode 100644 include/dt-bindings/mfd/atmel-flexcom.h
+>>
 > 
-> On September 22, 2015 11:10:15 PM GMT+02:00, Sakari Ailus <sakari.ailus@iki.fi> wrote:
-> >Hi Tiffany,
-> >
-> >(Robin and Hans cc'd.)
-> >
-> >On Mon, Sep 21, 2015 at 08:26:11PM +0800, Tiffany Lin wrote:
-> >> vb2_dc_prepare use the number of SG entries dma_map_sg_attrs return.
-> >> But in dma_sync_sg_for_device, it use lengths of each SG entries
-> >> before dma_map_sg_attrs. dma_map_sg_attrs will concatenate
-> >> SGs until dma length > dma seg bundary. sgt->nents will less than
-> >> sgt->orig_nents. Using SG entries after dma_map_sg_attrs
-> >> in vb2_dc_prepare will make some SGs are not sync to device.
-> >> After add DMA_ATTR_SKIP_CPU_SYNC in vb2_dc_get_userptr to remove
-> >> sync data to device twice. Device randomly get incorrect data because
-> >> some SGs are not sync to device. Change to use number of SG entries
-> >> before dma_map_sg_attrs in vb2_dc_prepare to prevent this issue.
-> >> 
-> >> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
-> >> ---
-> >>  drivers/media/v4l2-core/videobuf2-dma-contig.c | 4 ++--
-> >>  1 file changed, 2 insertions(+), 2 deletions(-)
-> >> 
-> >> diff --git a/drivers/media/v4l2-core/videobuf2-dma-contig.c
-> >b/drivers/media/v4l2-core/videobuf2-dma-contig.c
-> >> index 2397ceb..c5d00bd 100644
-> >> --- a/drivers/media/v4l2-core/videobuf2-dma-contig.c
-> >> +++ b/drivers/media/v4l2-core/videobuf2-dma-contig.c
-> >> @@ -100,7 +100,7 @@ static void vb2_dc_prepare(void *buf_priv)
-> >>  	if (!sgt || buf->db_attach)
-> >>  		return;
-> >>  
-> >> -	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->nents,
-> >buf->dma_dir);
-> >> +	dma_sync_sg_for_device(buf->dev, sgt->sgl, sgt->orig_nents,
-> >buf->dma_dir);
-> >>  }
-> >>  
-> >>  static void vb2_dc_finish(void *buf_priv)
-> >> @@ -112,7 +112,7 @@ static void vb2_dc_finish(void *buf_priv)
-> >>  	if (!sgt || buf->db_attach)
-> >>  		return;
-> >>  
-> >> -	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->nents, buf->dma_dir);
-> >> +	dma_sync_sg_for_cpu(buf->dev, sgt->sgl, sgt->orig_nents,
-> >buf->dma_dir);
-> >>  }
-> >>  
-> >>  /*********************************************/
-> >
-> >Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> >
-> >Could you post a similar patch for videobuf2-dma-sg as well, please?
-> >This
-> >should probably go to stable (since when?).
-> >
-> >videobuf-dma-sg appears to be broken, too, but the fix is more changes
-> >than one or two lines.
-> >
-> >-- 
-> >Kind regards,
-> >
-> >Sakari Ailus
-> >e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
-> 
-> Sakari, can you take a careful look at the vb2 code? If I remember
-> correctly, the nents field receives the result of the map_sg function. I
-> have no idea if that's correct.
 
-As far as I can tell, it is. According to a comment in the definition of
-struct sg_table in include/linux/scatterlist.h, this is the number of
-*mapped* entries in the table. Although a number of drivers construct the
-table by themselves use nents only, __sg_alloc_table() assigns the same
-number to both. The videobuf2 bug appears to be one of its kind --- I
-checked the other users of struct sg_table for the purpose.
-drivers/spi/spi.c has the same pattern except that it does not involve
-syncing the cache.
-
-There could be other users of dma_map_sg() that get this wrong though.
-
-Perhaps the comment on the sg_table shouldn't be added to the documentation
-as most of the users appear to be using it differently, even if it appears
-to be in a conflict with the intended usage.
-
-As far as I understand, what we need a similar fix for dma-sg allocator.
-
-> 
-> BTW, don't spend too much time on vb1, nobody cares about that old
-> framework, and vb1 drivers are rarely used on arm platforms.
-
-In that case the wrong number of sglist entries is also passed to
-dma_unmap_sg(). Although in most cases it still works. I think the BTTV
-driver is using it, for instance.
 
 -- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Nicolas Ferre
