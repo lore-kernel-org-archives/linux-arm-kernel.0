@@ -1,30 +1,40 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 23 Sep 2015 16:58:10 +0100
-Subject: [PATCH 00/22] arm64: Consolidate CPU feature handling
-In-Reply-To: <20150923155655.GK6281@e103592.cambridge.arm.com>
-References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
- <20150923155655.GK6281@e103592.cambridge.arm.com>
-Message-ID: <5602CC12.3040209@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 24 Sep 2015 00:05:20 +0800
+Subject: [PATCH v4 4/5] ARM: dts: sun8i: ippo-q8h-v5: Enable Reduced Serial
+ Bus controller
+In-Reply-To: <1443024323-9115-1-git-send-email-wens@csie.org>
+References: <1443024323-9115-1-git-send-email-wens@csie.org>
+Message-ID: <1443024323-9115-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/09/15 16:56, Dave P Martin wrote:
-> On Wed, Sep 16, 2015 at 03:20:58PM +0100, Suzuki K. Poulose wrote:
->> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->>
->> This is an updated reincarnation of my "arm64: Expose CPU feature registers"
->> series [1], which does much more.
->
-> [...]
->
-> Do you get whitespace errors for some patches in this series?
->
-> git am complains for several of the patches, but it's possibly my mail
-> chewed them up.
->
-> If the errors are real, please fix ;)
->
+The Reduced Serial Bus controller is used to talk to the onboard PMIC.
 
-Thanks for reporting, let me take a look.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-Suzuki
+Changes since v3:
+
+None
+
+---
+ arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+index 4f47fd654eea..af87e4922e44 100644
+--- a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
++++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+@@ -58,6 +58,10 @@
+ 	status = "failed";
+ };
+ 
++&r_rsb {
++	status = "okay";
++};
++
+ /*
+  * FIXME for now we only support host mode and rely on u-boot to have
+  * turned on Vbus which is controlled by the axp223 pmic on the board.
+-- 
+2.5.3
