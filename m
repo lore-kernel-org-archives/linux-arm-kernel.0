@@ -1,56 +1,83 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 23 Sep 2015 11:53:27 -0500
-Subject: [Patch v2 08/10] arm: dts: Add RPM/SMD support on APQ8084
+Date: Wed, 23 Sep 2015 11:53:28 -0500
+Subject: [Patch v2 09/10] arm: dts: Add support for PMA8084 on APQ8084
 In-Reply-To: <1443027209-19444-1-git-send-email-agross@codeaurora.org>
 References: <1443027209-19444-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1443027209-19444-9-git-send-email-agross@codeaurora.org>
+Message-ID: <1443027209-19444-10-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for RPM and SMD nodes that are present on APQ8084
+This patch adds support for the PMA8084 regulators found on APQ8084
 platforms.
 
 Signed-off-by: Andy Gross <agross@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-apq8084.dtsi |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/qcom-apq8084.dtsi |   52 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
 diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 76be0ba..d1c76e58 100644
+index d1c76e58..05553d5 100644
 --- a/arch/arm/boot/dts/qcom-apq8084.dtsi
 +++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -114,6 +114,11 @@
- 			      <0xf9002000 0x1000>;
- 		};
- 
-+		apcs: syscon at f9011000 {
-+			compatible = "syscon";
-+			reg = <0xf9011000 0x1000>;
-+		};
+@@ -329,6 +329,58 @@
+ 			rpm_requests {
+ 				compatible = "qcom,rpm-apq8084";
+ 				qcom,smd-channels = "rpm_requests";
 +
- 		timer at f9020000 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-@@ -312,4 +317,19 @@
- 			#interrupt-cells = <4>;
++				pma8084-regulators {
++					compatible = "qcom,rpm-pma8084-regulators";
++
++					pma8084_s1: s1 {};
++					pma8084_s2: s2 {};
++					pma8084_s3: s3 {};
++					pma8084_s4: s4 {};
++					pma8084_s5: s5 {};
++					pma8084_s6: s6 {};
++					pma8084_s7: s7 {};
++					pma8084_s8: s8 {};
++					pma8084_s9: s9 {};
++					pma8084_s10: s10 {};
++					pma8084_s11: s11 {};
++					pma8084_s12: s12 {};
++
++					pma8084_l1: l1 {};
++					pma8084_l2: l2 {};
++					pma8084_l3: l3 {};
++					pma8084_l4: l4 {};
++					pma8084_l5: l5 {};
++					pma8084_l6: l6 {};
++					pma8084_l7: l7 {};
++					pma8084_l8: l8 {};
++					pma8084_l9: l9 {};
++					pma8084_l10: l10 {};
++					pma8084_l11: l11 {};
++					pma8084_l12: l12 {};
++					pma8084_l13: l13 {};
++					pma8084_l14: l14 {};
++					pma8084_l15: l15 {};
++					pma8084_l16: l16 {};
++					pma8084_l17: l17 {};
++					pma8084_l18: l18 {};
++					pma8084_l19: l19 {};
++					pma8084_l20: l20 {};
++					pma8084_l21: l21 {};
++					pma8084_l22: l22 {};
++					pma8084_l23: l23 {};
++					pma8084_l24: l24 {};
++					pma8084_l25: l25 {};
++					pma8084_l26: l26 {};
++					pma8084_l27: l27 {};
++
++					pma8084_lvs1: lvs1 {};
++					pma8084_lvs2: lvs2 {};
++					pma8084_lvs3: lvs3 {};
++					pma8084_lvs4: lvs4 {};
++
++					pma8084_5vs1: 5vs1 {};
++				};
+ 			};
  		};
  	};
-+
-+	smd {
-+		compatible = "qcom,smd";
-+
-+		rpm {
-+			interrupts = <0 168 1>;
-+			qcom,ipc = <&apcs 8 0>;
-+			qcom,smd-edge = <15>;
-+
-+			rpm_requests {
-+				compatible = "qcom,rpm-apq8084";
-+				qcom,smd-channels = "rpm_requests";
-+			};
-+		};
-+	};
- };
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
