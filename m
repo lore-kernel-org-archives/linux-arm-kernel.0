@@ -1,46 +1,82 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 23 Sep 2015 11:01:34 -0700
-Subject: [PATCH 0/3] ALSA: hda - Avoid potential deadlock
-In-Reply-To: <1442484006-9614-1-git-send-email-thierry.reding@gmail.com>
- (Thierry Reding's message of "Thu, 17 Sep 2015 12:00:03 +0200")
-References: <1442484006-9614-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <7ha8sddngh.fsf@deeprootsystems.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Sep 2015 19:01:57 +0100
+Subject: [PATCH v2 4/5] PCI: generic: Correct, and avoid overflow, in
+ bus_max calculation.
+In-Reply-To: <1442527332-1174-5-git-send-email-ddaney.cavm@gmail.com>
+References: <1442527332-1174-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442527332-1174-5-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150923180157.GV7356@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding <thierry.reding@gmail.com> writes:
+On Thu, Sep 17, 2015 at 11:02:11PM +0100, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> There are two problems with the bus_max calculation:
+> 
+> 1) The u8 data type can overflow for large config space windows.
+> 
+> 2) The calculation is incorrect for a bus range that doesn't start at
+>    zero.
+> 
+> Since the configuration space is relative to bus zero, make bus_max
+> just be the size of the config window scaled by bus_shift.  Then clamp
+> it to a maximum of 255, per PCI.  Use a data type of int to avoid
+> overflow problems.
+> 
+> Update host-generic-pci.txt to clarify the semantics of the "reg"
+> property with respect to non-zero starting bus numbers.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+> Change from v1: Added text to host-generic-pci.txt
+> 
+>  Documentation/devicetree/bindings/pci/host-generic-pci.txt | 4 +++-
+>  drivers/pci/host/pci-host-generic.c                        | 7 ++++---
+>  2 files changed, 7 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> index cf3e205..105a968 100644
+> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> @@ -34,7 +34,9 @@ Properties of the host controller node:
+>  - #size-cells    : Must be 2.
+>  
+>  - reg            : The Configuration Space base address and size, as accessed
+> -                   from the parent bus.
+> +                   from the parent bus.  The base address corresponds to
+> +                   bus zero, even though the "bus-range" property may specify
+> +                   a different starting bus number.
 
-> From: Thierry Reding <treding@nvidia.com>
->
-> The Tegra HDA controller driver committed in v3.16 causes deadlocks when
-> loaded as a module. The reason is that the driver core will lock the HDA
-> controller device upon calling its probe callback and the probe callback
-> then goes on to create child devices for detected codecs and loads their
-> modules via a request_module() call. This is problematic because the new
-> driver will immediately be bound to the device, which will in turn cause
-> the parent of the codec device (the HDA controller device) to be locked
-> again, causing a deadlock.
->
-> This problem seems to have been present since the modularization of the
-> HD-audio driver in commit 1289e9e8b42f ("ALSA: hda - Modularize HD-audio
-> driver"). On Intel platforms this has been worked around by splitting up
-> the probe sequence into a synchronous and an asynchronous part where the
-> request_module() calls are asynchronous and hence avoid the deadlock.
->
-> An alternative proposal is provided in this series of patches. Rather
-> than relying on explicit request_module() calls to load kernel modules
-> for HDA codec drivers, this implements a uevent callback for the HDA bus
-> to advertises the MODALIAS information to the userspace helper.
->
-> Effectively this results in the same modules being loaded, but it uses
-> the more canonical infrastructure to perform this. Deferring the module
-> loading to userspace removes the need for the explicit request_module()
-> calls and works around the recursive locking issue because both drivers
-> will be bound from separate contexts.
+That's a useful clarification, thanks.
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+>  Properties of the /chosen node:
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 77cf4bd..0a9c453 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -164,7 +164,7 @@ out_release_res:
+>  static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>  {
+>  	int err;
+> -	u8 bus_max;
+> +	int bus_max;
+>  	resource_size_t busn;
+>  	struct resource *bus_range;
+>  	struct device *dev = pci->host.dev.parent;
+> @@ -177,8 +177,9 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>  	}
+>  
+>  	/* Limit the bus-range to fit within reg */
+> -	bus_max = pci->cfg.bus_range->start +
+> -		  (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
+> +	bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
+> +	if (bus_max > 255)
+> +		bus_max = 255;
 
-FWIW, I tested this on top of next-20150923, and it solves the boot
-problem I'm seeing on tegra124-jetson-tk1 with module loading.
+I still don't understand the need for this part. If the cfg space is bigger
+than bus_max, isn't that simply an invalid resource? Given that the resource
+could be broken in other ways too, this check feels more like a specific
+workaround rather than generally useful code.
 
-Kevin
+Will
