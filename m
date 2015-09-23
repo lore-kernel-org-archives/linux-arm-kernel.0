@@ -1,81 +1,61 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 23 Sep 2015 11:39:16 +0200
-Subject: [PATCH] net: sun4i-emac: Properly free resources on probe failure and
- remove
-Message-ID: <1443001156-20333-1-git-send-email-hdegoede@redhat.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 23 Sep 2015 10:44:07 +0100
+Subject: [PATCH 17/17] mfd : ab8500/db8500: fix the abuse of
+ IRQF_NO_SUSPEND
+In-Reply-To: <20150922210322.GA3442@x1>
+References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
+ <1442850433-5903-18-git-send-email-sudeep.holla@arm.com>
+ <20150921232027.GD11284@x1> <560127BE.9030604@arm.com>
+ <20150922210322.GA3442@x1>
+Message-ID: <56027467.1020803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix sun4i-emac not releasing the following resources:
--iomapped memory not released on probe-failure nor on remove
--clock not getting disabled on probe-failure nor on remove
--sram not being released on remove
 
-And while at it also add error checking to the clk_prepare_enable call
-done on probe.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/net/ethernet/allwinner/sun4i-emac.c | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
+On 22/09/15 22:03, Lee Jones wrote:
+> On Tue, 22 Sep 2015, Sudeep Holla wrote:
+>> On 22/09/15 00:20, Lee Jones wrote:
+>>> On Mon, 21 Sep 2015, Sudeep Holla wrote:
+>>>
+>>>> The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
+>>>> be left enabled so as to allow them to work as expected during the
+>>>> suspend-resume cycle, but doesn't guarantee that it will wake the system
+>>> >from a suspended state, enable_irq_wake is recommended to be used for
+>>>> the wakeup.
+>>>>
+>>>> This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
+>>>> enable_irq_wake instead.
+>>>>
+>>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>> ---
+>>>>   drivers/mfd/ab8500-core.c        | 11 +++++++++--
+>>>>   drivers/mfd/ab8500-debugfs.c     |  2 +-
+>>>>   drivers/mfd/ab8500-gpadc.c       | 15 +++++++++++----
+>>>>   drivers/mfd/db8500-prcmu.c       | 24 +++++++++++++++++-------
+>>>>   drivers/power/ab8500_btemp.c     |  6 ++++--
+>>>>   drivers/power/ab8500_charger.c   |  6 ++++--
+>>>>   drivers/power/ab8500_fg.c        |  9 ++++++---
+>>>>   drivers/thermal/db8500_thermal.c |  5 ++---
+>>>>   drivers/usb/phy/phy-ab8500-usb.c | 10 ++++++----
+>>>>   9 files changed, 60 insertions(+), 28 deletions(-)
+>>>
+>>> Is there a reason for bundling the changes in all of these subsystems
+>>> together into a single patch?
+>>>
+>>
+>> No, I understand this needs to be split. Since I was not 100% confident
+>> about this change, I wanted LinusW to review and provide feedback and
+>> gets things working before I can split this changes. I must have added
+>> RFC, but usually it gets ignored :)
+>
+> Best if Linus reviews the correct patch-set.  Please split and
+> resubmit.
+>
+Sure, but would like to get some feedback before I proceed just to
+ensure my understanding is correct.
 
-diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
-index 48ce83e..8d50314 100644
---- a/drivers/net/ethernet/allwinner/sun4i-emac.c
-+++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
-@@ -847,21 +847,25 @@ static int emac_probe(struct platform_device *pdev)
- 	if (ndev->irq == -ENXIO) {
- 		netdev_err(ndev, "No irq resource\n");
- 		ret = ndev->irq;
--		goto out;
-+		goto out_iounmap;
- 	}
- 
- 	db->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(db->clk)) {
- 		ret = PTR_ERR(db->clk);
--		goto out;
-+		goto out_iounmap;
- 	}
- 
--	clk_prepare_enable(db->clk);
-+	ret = clk_prepare_enable(db->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Error couldn't enable clock (%d)\n", ret);
-+		goto out_iounmap;
-+	}
- 
- 	ret = sunxi_sram_claim(&pdev->dev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Error couldn't map SRAM to device\n");
--		goto out;
-+		goto out_clk_disable_unprepare;
- 	}
- 
- 	db->phy_node = of_parse_phandle(np, "phy", 0);
-@@ -910,6 +914,10 @@ static int emac_probe(struct platform_device *pdev)
- 
- out_release_sram:
- 	sunxi_sram_release(&pdev->dev);
-+out_clk_disable_unprepare:
-+	clk_disable_unprepare(db->clk);
-+out_iounmap:
-+	iounmap(db->membase);
- out:
- 	dev_err(db->dev, "not found (%d).\n", ret);
- 
-@@ -921,8 +929,12 @@ out:
- static int emac_remove(struct platform_device *pdev)
- {
- 	struct net_device *ndev = platform_get_drvdata(pdev);
-+	struct emac_board_info *db = netdev_priv(ndev);
- 
- 	unregister_netdev(ndev);
-+	sunxi_sram_release(&pdev->dev);
-+	clk_disable_unprepare(db->clk);
-+	iounmap(db->membase);
- 	free_netdev(ndev);
- 
- 	dev_dbg(&pdev->dev, "released and freed device\n");
--- 
-2.5.0
+Regards,
+Sudeep
