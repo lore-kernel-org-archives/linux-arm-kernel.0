@@ -1,74 +1,36 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Wed, 23 Sep 2015 10:23:58 -0700
-Subject: [Patch v2 06/10] regulators: qcom-smd: Add PM8916 support
-In-Reply-To: <1443027209-19444-7-git-send-email-agross@codeaurora.org>
-References: <1443027209-19444-1-git-send-email-agross@codeaurora.org>
- <1443027209-19444-7-git-send-email-agross@codeaurora.org>
-Message-ID: <20150923172358.GE24668@usrtlx11787.corpusers.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Sep 2015 10:25:19 -0700
+Subject: [PATCH v3 10/24] ARM: davinci: Add set dma_mask to eDMA devices
+In-Reply-To: <1442915675-7121-11-git-send-email-peter.ujfalusi@ti.com>
+References: <1442915675-7121-1-git-send-email-peter.ujfalusi@ti.com>
+ <1442915675-7121-11-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20150923172518.GH23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 23 Sep 09:53 PDT 2015, Andy Gross wrote:
-
-> This patch adds support and documentation for the PM8916 regulators
-> found on MSM8916 platforms.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [150922 03:01]:
+> The upcoming change to merge the arch/arm/common/edma.c into
+> drivers/dma/edma.c will need this change when booting daVinci devices in
+> no DT mode.
 > 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > ---
->  .../bindings/soc/qcom/qcom,smd-rpm-regulator.txt   |   18 ++++++
->  drivers/regulator/qcom_smd-regulator.c             |   64 ++++++++++++++++++++
->  2 files changed, 82 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
-> index 7084474..05dfc1a 100644
-> --- a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
-> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm-regulator.txt
-> @@ -18,6 +18,7 @@ Regulator nodes are identified by their compatible:
->  	Definition: must be one of:
->  		    "qcom,rpm-pm8841-regulators"
->  		    "qcom,rpm-pm8941-regulators"
-> +		    "qcom,rpm-pm8916-regulators"
+>  arch/arm/Kconfig                      |    1 -
+>  arch/arm/common/Kconfig               |    3 -
+>  arch/arm/common/Makefile              |    1 -
+>  arch/arm/common/edma.c                | 1431 --------------------------------
+>  arch/arm/mach-davinci/devices-da8xx.c |    2 +
+>  arch/arm/mach-davinci/dm355.c         |    1 +
+>  arch/arm/mach-davinci/dm644x.c        |    1 +
+>  arch/arm/mach-davinci/dm646x.c        |    1 +
+>  arch/arm/mach-omap2/Kconfig           |    1 -
+>  drivers/dma/Kconfig                   |    1 -
+>  drivers/dma/edma.c                    | 1447 +++++++++++++++++++++++++++++++--
+>  include/linux/platform_data/edma.h    |   74 --
+>  12 files changed, 1394 insertions(+), 1570 deletions(-)
+>  delete mode 100644 arch/arm/common/edma.c
 
-Alphabetical please
+Hmm I think I already acked the mach-omap2/Kconfig change,
+but if not, here you are:
 
->  
->  - vdd_s1-supply:
->  - vdd_s2-supply:
-> @@ -50,6 +51,19 @@ Regulator nodes are identified by their compatible:
->  	Definition: reference to regulator supplying the input pin, as
->  		    described in the data sheet
->  
-> +- vdd_s1-supply:
-> +- vdd_s2-supply:
-> +- vdd_s3-supply:
-> +- vdd_s4-supply:
-> +- vdd_l1_l2_l3-supply
-> +- vdd_l4_l5_l6-supply
-> +- vdd_l7-supply
-
-End these with ':' as well
-
-> +- vdd_l8_l9_l10_l11_l12_l13_l14_l15_l16_l17_l18-supply:
-> +	Usage: optional (pm8916 only)
-> +	Value type: <phandle>
-> +	Definition: reference to regulator supplying the input pin, as
-> +		    described in the data sheet
-> +
-[..]
-> diff --git a/drivers/regulator/qcom_smd-regulator.c b/drivers/regulator/qcom_smd-regulator.c
-[..]
->  static const struct of_device_id rpm_of_match[] = {
-> +	{ .compatible = "qcom,rpm-pm8916-regulators", .data = &rpm_pm8916_regulators },
-
-pm8916 > pm8841
-
->  	{ .compatible = "qcom,rpm-pm8841-regulators", .data = &rpm_pm8841_regulators },
->  	{ .compatible = "qcom,rpm-pm8941-regulators", .data = &rpm_pm8941_regulators },
->  	{}
-
-With these nits:
-
-Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-
-Regards,
-Bjorn
+Acked-by: Tony Lindgren <tony@atomide.com>
