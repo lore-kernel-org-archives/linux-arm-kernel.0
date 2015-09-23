@@ -1,62 +1,86 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 23 Sep 2015 13:15:15 -0500
-Subject: [Patch v2 02/10] soc: qcom: smd-rpm: Add existing platform support
-In-Reply-To: <20150923171840.GD24668@usrtlx11787.corpusers.net>
-References: <1443027209-19444-1-git-send-email-agross@codeaurora.org>
- <1443027209-19444-3-git-send-email-agross@codeaurora.org>
- <20150923171840.GD24668@usrtlx11787.corpusers.net>
-Message-ID: <20150923181515.GB24756@qualcomm.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 23 Sep 2015 14:55:34 -0700
+Subject: [PATCH v2 5/9] ARM: dts: Move all Cygnus peripherals into soc bus
+In-Reply-To: <1969821.ZhaOpCV2D1@wuerfel>
+References: <1442611454-16331-1-git-send-email-rjui@broadcom.com>
+ <1929872.EmD9YkfFuv@wuerfel> <55FC8C0F.9020308@broadcom.com>
+ <1969821.ZhaOpCV2D1@wuerfel>
+Message-ID: <56031FD6.3070306@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 10:18:40AM -0700, Bjorn Andersson wrote:
-> On Wed 23 Sep 09:53 PDT 2015, Andy Gross wrote:
-> 
-> > This patch adds support for all current Qualcomm platforms which utilize
-> > RPM over SMD.  This includes both MSM8916 and APQ8084.
-> > 
-> > Signed-off-by: Andy Gross <agross@codeaurora.org>
-> > ---
-> >  .../devicetree/bindings/soc/qcom/qcom,smd-rpm.txt  |    2 ++
-> >  drivers/soc/qcom/smd-rpm.c                         |    2 ++
-> >  2 files changed, 4 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
-> > index 3710dd5..7d05246 100644
-> > --- a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
-> > +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
-> > @@ -20,6 +20,8 @@ resources.
-> >  	Value type: <string>
-> >  	Definition: must be one of:
-> >  		    "qcom,rpm-msm8974"
-> > +		    "qcom,rpm-msm8916"
-> > +		    "qcom,rpm-apq8084"
-> >  
-> >  - qcom,smd-channels:
-> >  	Usage: required
-> > diff --git a/drivers/soc/qcom/smd-rpm.c b/drivers/soc/qcom/smd-rpm.c
-> > index 1392ccf..455083c 100644
-> > --- a/drivers/soc/qcom/smd-rpm.c
-> > +++ b/drivers/soc/qcom/smd-rpm.c
-> > @@ -212,6 +212,8 @@ static void qcom_smd_rpm_remove(struct qcom_smd_device *sdev)
-> >  
-> >  static const struct of_device_id qcom_smd_rpm_of_match[] = {
-> >  	{ .compatible = "qcom,rpm-msm8974" },
-> > +	{ .compatible = "qcom,rpm-msm8916" },
-> > +	{ .compatible = "qcom,rpm-apq8084" },
-> >  	{}
-> 
-> This is now how the alphabet works, please update the order and add:
-> 
-> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> 
-> Regards,
-> Bjorn
-
-I'll fixup before applying.  Thanks!
 
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+On 9/23/2015 2:29 PM, Arnd Bergmann wrote:
+> On Friday 18 September 2015 15:11:27 Ray Jui wrote:
+>> On 9/18/2015 2:34 PM, Arnd Bergmann wrote:
+>>> On Friday 18 September 2015 14:24:10 Ray Jui wrote:
+>>>> +       soc {
+>>>> +               compatible = "simple-bus";
+>>>> +               ranges;
+>>>> +               #address-cells = <1>;
+>>>> +               #size-cells = <1>;
+>>>
+>>>> +               pinctrl: pinctrl at 0301d0c8 {
+>>>>
+>>>
+>>> Similarly to the core bus, this seems to have address ranges 0x03xxxxxx and
+>>> 0x18xxxxxx on it, so put those into the ranges.
+>>>
+>>
+>> Okay we have an issue here. For whatever reason, the Cygnus ASIC team
+>> decided to put registers for the same block in random locations. We see
+>> similar issues in all of our other iProc based SoCs. We have
+>> communicated this to our ASIC team, and hopefully they can revert the
+>> trend for the next SoC.
+>>
+>> For example, the gpio_ccm has registers in the following regions:
+>>
+>> gpio_ccm: gpio at 1800a000 {
+>>     compatible = "brcm,cygnus-ccm-gpio";
+>>     reg = <0x1800a000 0x50>,
+>>           <0x0301d164 0x20>;
+>>
+>> NAND is worse, it has registers in 3 different separate regions:
+>>
+>> nand: nand at 18046000 {
+>>     compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1",
+>>                  "brcm,brcmnand";
+>>     reg = <0x18046000 0x600>, <0xf8105408 0x600>,
+>>           <0x18046f00 0x20>;
+>>
+>> As you can see, this makes it impossible to define a proper address
+>> range for the bus; therefore, I'll have to keep the ranges undefined and
+>> a simple 1:1 mapping under this bus.
+> 
+> Hmm, you could still try to list them as non-overlapping with other
+> buses on the root node like
+> 
+> 	ranges = <0x03000000 0x03000000 0x01000000>,
+> 		 <0x18000000 0x18000000 0x01000000>,
+> 		 <0xf8000000 0xf8000000 0x01000000>;
+> 
+> which clarifies how the bus is wired up in hardware.
+> 
+> Alternatively, you could make a more elaborate mapping, if there
+> are in fact multiple hardware ranges, like
+> 
+> 	#address-cells = <2>; # space:offset
+> 	ranges = <1 0  0x03000000 0x01000000>,
+> 		 <2 0  0x18000000 0x01000000>,
+> 		 <3 0  0xf8000000 0x01000000>;
+> 
+> It really depends on what the hardware designers were thinking. If
+> the AXI bus actually decodes the entire 32-bit address range and devices
+> are just located at random addresses in there, your current scheme is
+> probably closest to reality.
+> 
+
+I see. Let me talk to our ASIC team to get this clarified. If in the end
+the AXI bus decodes the entire 32-bit address space, no change will be
+made. Otherwise, I'll submit another patch to list the actual address
+space that the AXI bus decodes.
+
+Thanks for the review. It's very helpful!
+
+Ray
