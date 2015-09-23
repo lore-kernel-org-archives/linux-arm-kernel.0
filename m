@@ -1,52 +1,63 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Wed, 23 Sep 2015 17:33:09 +0800
-Subject: [PATCH v7 3/6] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <20150922193320.37997c15@arm.com>
-References: <1442801587-3812-1-git-send-email-lftan@altera.com>
- <1442801587-3812-4-git-send-email-lftan@altera.com>
- <20150922193320.37997c15@arm.com>
-Message-ID: <CAFiDJ5-JTmU39wZ7A+h3X37zj8M09+6mmUxK=J2DOaD9VzPC5w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Sep 2015 11:34:03 +0200
+Subject: Steps to submit a new arch/arm port
+In-Reply-To: <56027049.7010504@free.fr>
+References: <56001B78.2090001@free.fr> <3168184.5li5Yj9y1C@wuerfel>
+ <56027049.7010504@free.fr>
+Message-ID: <2002438.fvrDoNMsZn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 2:33 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Mon, 21 Sep 2015 10:13:04 +0800
-> Ley Foon Tan <lftan@altera.com> wrote:
->
->> This patch adds the Altera PCIe host controller driver.
->>
->> Signed-off-by: Ley Foon Tan <lftan@altera.com>
->> ---
->>  drivers/pci/host/Kconfig       |   8 +
->>  drivers/pci/host/Makefile      |   1 +
->>  drivers/pci/host/pcie-altera.c | 591 +++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 600 insertions(+)
->>  create mode 100644 drivers/pci/host/pcie-altera.c
->>
->> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
->> index d5e58ba..df9ed4f 100644
->> --- a/drivers/pci/host/Kconfig
->> +++ b/drivers/pci/host/Kconfig
->> @@ -145,4 +145,12 @@ config PCIE_IPROC_BCMA
->>         Say Y here if you want to use the Broadcom iProc PCIe controller
->>         through the BCMA bus interface
->>
->> +config PCIE_ALTERA
->> +     tristate "Altera PCIe controller"
->> +     depends on ARCH_SOCFPGA || NIOS2
->> +     select PCI_DOMAINS
->> +     help
->> +       Say Y here if you want to enable PCIe controller support for Altera
->> +       SoCFPGA family of SoCs.
->> +
->
-> Is there anything in this driver that is actually specific to any of
-> these two platforms/architectures? I'd don't think we should restrict
-> if we can avoid it (hint: the companion MSI driver is not restricted to
-> any architecture).
-No specific dependency on these 2 architectures. Then I will remove this.
+On Wednesday 23 September 2015 11:26:33 Mason wrote:
+> On 22/09/2015 21:15, Arnd Bergmann wrote:
+> > On Tuesday 22 September 2015 17:54:04 Mason wrote:
+> >> On 22/09/2015 16:51, Arnd Bergmann wrote:
+> >>> On Tuesday 22 September 2015 16:36:48 Mason wrote:
+> >>>
+> >>>> arch/arm/mach-tangox/Kconfig
+> >>>> +if ARCH_TANGOX
+> >>>> +
+> >>>> +config UNCOMPRESS_INCLUDE
+> >>>> +	string
+> >>>> +	default "debug/uncompress.h"
+> >>>
+> >>> Better do this like everyone else.
+> >>
+> >> Do you mean I should provide an empty mach/uncompress.h ?
+> > 
+> > No, add a debug/*.S file for your uart and do the configuration in
+> > arch/arm/Kconfig.debug.
+> > 
+> > The UNCOMPRESS_INCLUDE symbol is defined in arch/arm/Kconfig.debug,
+> > and you should not duplicate that.
+> 
+> config UNCOMPRESS_INCLUDE
+> 	string
+> 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
+> 					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M || \
+> 					ARCH_SHMOBILE_LEGACY
+> 	default "mach/uncompress.h"
+> 
+> 
+> I'm going for the smallest possible port, I don't have a debug/tango.S
+> I didn't define DEBUG_UNCOMPRESS in my .config, and I just wanted to
+> get this NOP definition from debug/uncompress.h
+> 
+> 	static inline void putc(int c) {}
+> 
+> Are you saying I cannot do it like that?
+> 
+> If ARCH_MULTIPLATFORM is defined, then debug/uncompress.h will be
+> included, just like I want.
+> 
+> If ARCH_MULTIPLATFORM is not defined, can I do this in my port:
+> 
+> config UNCOMPRESS_INCLUDE
+> 	string
+> 	default "debug/uncompress.h" if !ARCH_MULTIPLATFORM
+> 
+> or add my platform to the list on arch/arm/Kconfig.debug?
 
-Thanks.
+Just use ARCH_MULTIPLATFORM.
 
-Regards
-Ley Foon
+	Arnd
