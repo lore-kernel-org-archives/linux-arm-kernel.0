@@ -1,29 +1,104 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 22 Sep 2015 18:06:08 -0700
-Subject: [PATCH v2 1/2] ARM: imx35: Do not call mxc_timer_init twice when
- booting with DT
-In-Reply-To: <1441791315-25390-1-git-send-email-alexander.stein@systec-electronic.com>
-References: <1441791315-25390-1-git-send-email-alexander.stein@systec-electronic.com>
-Message-ID: <20150923010608.GF3529@tiger>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 22 Sep 2015 18:20:29 -0700
+Subject: [PATCH 1/2] arm64: fpsimd: Fix FPSIMD corruption in rt_sigreturn
+ with CONFIG_PREEMPT
+In-Reply-To: <20150921153756.GM27273@e103592.cambridge.arm.com>
+References: <1442316997-32282-1-git-send-email-will.deacon@arm.com>
+ <CAKv+Gu8Yt0T6AF7MmOtpPpk8VcDBVraSNMbgm03dW5BR1QMqsA@mail.gmail.com>
+ <20150915143952.GE31157@arm.com>
+ <20150921153756.GM27273@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu8H=0+1Q134cnrNHZF07zpJ2Qk=KNYaJuTHqo-d36fjKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 09, 2015 at 11:35:14AM +0200, Alexander Stein wrote:
-> mxc_timer_init must not be called from within mx35_clocks_init_dt. It will
-> eventually be called by imx31_timer_init_dt
-> (drivers/clocksource/timer-imx-gpt.c).
-> This arranges the initialization code similar to clk-imx27.c
-> 
-> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-> ---
-> Change in v2:
-> * Fix typo
-> 
->  drivers/clk/imx/clk-imx35.c | 49 +++++++++++++++++++++++++--------------------
->  1 file changed, 27 insertions(+), 22 deletions(-)
+On 21 September 2015 at 08:37, Dave P Martin <Dave.Martin@arm.com> wrote:
+> On Tue, Sep 15, 2015 at 03:39:53PM +0100, Will Deacon wrote:
+>> On Tue, Sep 15, 2015 at 01:11:10PM +0100, Ard Biesheuvel wrote:
+>> > Hi Will,
+>>
+>> Hi Ard,
+>>
+>> Thanks for having a look.
+>>
+>> > On 15 September 2015 at 13:36, Will Deacon <will.deacon@arm.com> wrote:
+>> > > From: Dave P Martin <Dave.Martin@arm.com>
+>> > >
+>> > > The arm64 context switch implementation uses a flag
+>> > > TIF_FOREIGN_FPSTATE to track whether the hardware FPSIMD regs are
+>> > > out of sync with the logical state of current's registers.
+>> > >
+>> > > During sigreturn, the registers and task_struct are temporarily out
+>> > > of sync, between writing the task_struct and loading its contents
+>> > > back into the FPSIMD registers -- however, TIF_FOREIGN_FPSTATE is
+>> > > not set.  This can cause the context switch code to discard some or
+>> > > all of the restored FPSIMD state if preemption occurs during the
+>> > > critical region of rt_sigreturn.
+>> > >
+>> > > This patch sets TIF_FOREIGN_FPSTATE before transferring the
+>> > > sigframe's saved registers back to the task_struct, so that the
+>> > > task_struct data will take precedence over the hardware registers
+>> > > if a context switch occurs before everything is back in sync.
+>> > >
+>> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>> > > [will: removed preempt_{enable,disable} calls, added compat version]
+>> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> > > ---
+>> > >  arch/arm64/kernel/signal.c   | 3 +++
+>> > >  arch/arm64/kernel/signal32.c | 2 ++
+>> > >  2 files changed, 5 insertions(+)
+>> > >
+>> > > diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+>> > > index e18c48cb6db1..6d50d839b6e9 100644
+>> > > --- a/arch/arm64/kernel/signal.c
+>> > > +++ b/arch/arm64/kernel/signal.c
+>> > > @@ -79,6 +79,9 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
+>> > >         if (magic != FPSIMD_MAGIC || size != sizeof(struct fpsimd_context))
+>> > >                 return -EINVAL;
+>> > >
+>> > > +       /* Ensure we don't reload stale data from the hardware registers */
+>> > > +       set_ti_thread_flag(current_thread_info(), TIF_FOREIGN_FPSTATE);
+>> > > +
+>> > >         /* copy the FP and status/control registers */
+>> > >         err = __copy_from_user(fpsimd.vregs, ctx->vregs,
+>> > >                                sizeof(fpsimd.vregs));
+>> >
+>> > I am not following something here. If the task gets preempted before
+>> > the call to fpsimd_update_current_state(), it will proceed to
+>> > overwrite the registers with whatever is on the stack in fpsimd after
+>> > being scheduled back in, and everything should work fine, right?.
+>>
+>> You're completely right, sorry for wasting your time. Dave and I have
+>> been working on the fpsimd code recently and have another patch that
+>> restores the state directly into the current thread to avoid the stack
+>> entirely. *That* is what caused this problem, and I incorrectly
+>> identified this as a fix for mainline (it's extremely similar to
+>> 2af276dfb172 ("ARM: 7306/1: vfp: flush thread hwstate before restoring
+>> context from sigframe"), which continues to haunt me).
+>
+> Urg, looks like I confused myself here.  Ard's assessment looks correct.
+>
+> Not staging the data via the stack seemed a harmless change which I
+> thought was an improvement, since at half a K the amount of data is non-
+> trivial.
+>
+> I'll go back and make some measurements to see whether getting rid
+> of the extra copy is really worth it.  I think reading straight into
+> the task_struct with __get_user() can work, but it looks like I'll
+> need to fiddle with the preemption region, or otherwise handle the
+> ensuing race...
+>
 
-Forgot mentioning that patches touching drivers/clk/ should be prefixed
-with 'clk: ...' in subject.  I changed the subject of the patch to
-'clk: imx35: ...' when applying.
+Indeed. I think you will need something like fpsimd_load_state_user
+which runs with preemption disabled and restarts if it is interrupted.
 
-Shawn
+>> Anyway, that also explains why we hadn't seen any problems in our
+>> previous testing! The second patch (compat big-endian fix) still stands,
+>> however.
+>
+> I misidentified the problem as being independent of my hacks --
+> apologies for the confusion there.
+>
+
+No worries.
+
+Ard.
