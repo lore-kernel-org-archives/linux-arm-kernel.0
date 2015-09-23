@@ -1,21 +1,26 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Sep 2015 11:07:16 -0700
-Subject: Plan for the PBIAS regulator fix?
-Message-ID: <20150923180716.GK23801@atomide.com>
+Date: Wed, 23 Sep 2015 11:08:15 -0700
+Subject: [PATCH] ARM: OMAP2+: PM: Denote the cpuidle tracepoints as
+ _rcuidle()
+In-Reply-To: <7hfv25dnkn.fsf@deeprootsystems.com>
+References: <1442554881-706-1-git-send-email-jszhang@marvell.com>
+ <7hfv25dnkn.fsf@deeprootsystems.com>
+Message-ID: <20150923180814.GL23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+* Kevin Hilman <khilman@kernel.org> [150923 11:03]:
+> Jisheng Zhang <jszhang@marvell.com> writes:
+> 
+> > The cpuidle tracepoints are called within a rcu_idle_exit() section, and
+> > must be denoted with the _rcuidle() version of the tracepoint.
+> >
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+>  
+> Acked-by: Kevin Hilman <khilman@linaro.org>
 
-Got any estimate on when you might be sending out the pull request
-for the pending regulator fixes for the -rc cycle? Or are you OK
-for me to consider commit b9c93646fd5c immutable and use it as
-a base for a fixes branch for the related dts change?
-
-Commit b9c93646fd5c ("regulator: pbias: program pbias register
-offset in pbias driver") is on -rc1 and would not merge other
-regulator fixes upstream even if it got merged with dts changes
-before your other regulator fixes.
+Hmm is this needed as a fix for the -rc cycle or can this wait
+for v4.4?
 
 Regards,
 
