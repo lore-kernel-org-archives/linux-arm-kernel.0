@@ -1,8 +1,10 @@
 From: tklauser@distanz.ch (Tobias Klauser)
-Date: Tue, 22 Sep 2015 13:45:57 +0200
-Subject: [PATCH] net: axinet: Use of_property_read_u32 instead of open-coding
- it
-Message-ID: <1442922357-18815-1-git-send-email-tklauser@distanz.ch>
+Date: Wed, 23 Sep 2015 09:20:55 +0200
+Subject: [PATCH v2] net: axinet: Use of_property_read_u32 instead of
+ open-coding it
+In-Reply-To: <1442922357-18815-1-git-send-email-tklauser@distanz.ch>
+References: <1442922357-18815-1-git-send-email-tklauser@distanz.ch>
+Message-ID: <1442992855-6164-1-git-send-email-tklauser@distanz.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,7 +12,10 @@ Use of_property_read_u32 instead of of_get_property with return value
 checks and endianness conversion.
 
 Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+Reviewed-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 ---
+v2: Resending with Cc to netdev
+
  drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c | 5 +----
  1 file changed, 1 insertion(+), 4 deletions(-)
 
