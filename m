@@ -1,46 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Sep 2015 20:35:45 +0100
-Subject: [PATCH v2 4/5] PCI: generic: Correct, and avoid overflow, in
- bus_max calculation.
-In-Reply-To: <3751968.n8LRgots8n@wuerfel>
-References: <1442527332-1174-1-git-send-email-ddaney.cavm@gmail.com>
- <20150923180157.GV7356@arm.com>
- <5602EDC4.3040603@caviumnetworks.com> <3751968.n8LRgots8n@wuerfel>
-Message-ID: <20150923193545.GZ7356@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Sep 2015 21:36:42 +0200
+Subject: [PATCH] arm64/pci: Add quirks for Cavium Thunder PCI bridges.
+In-Reply-To: <5602CCA4.8070606@caviumnetworks.com>
+References: <1442966996-13419-1-git-send-email-ddaney.cavm@gmail.com>
+ <1675889.xYIhzenZEC@wuerfel> <5602CCA4.8070606@caviumnetworks.com>
+Message-ID: <29453556.BCB7AZ5P6c@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 08:27:41PM +0100, Arnd Bergmann wrote:
-> On Wednesday 23 September 2015 11:21:56 David Daney wrote:
-> > >>
-> > >>      /* Limit the bus-range to fit within reg */
-> > >> -    bus_max = pci->cfg.bus_range->start +
-> > >> -              (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
-> > >> +    bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
-> > >> +    if (bus_max > 255)
-> > >> +            bus_max = 255;
-> > >
-> > > I still don't understand the need for this part. If the cfg space is bigger
-> > > than bus_max, isn't that simply an invalid resource? Given that the resource
-> > > could be broken in other ways too, this check feels more like a specific
-> > > workaround rather than generally useful code.
-> > 
-> > Imagine...
-> > 
-> >    bus-range [0x80 .. 0xff], this requires a cfg.res that will cover the 
-> > entire range of 0..0xff.
-> > 
-> >    according to the calculations above, (resource_size(&pci->cfg.res) >> 
-> > pci->cfg.ops.bus_shift) - 1 will have a value of 0xff, so...
+On Wednesday 23 September 2015 09:00:36 David Daney wrote:
+> On 09/23/2015 12:51 AM, Arnd Bergmann wrote:
+> > On Tuesday 22 September 2015 17:09:56 David Daney wrote:
+> >> From: David Daney <david.daney@cavium.com>
+> >>
+> >> The Cavium ThunderX SoC needs a PCI quirk for its on-chip bridges.
+> >> Since it is arm64, create a new quirks.c file there to contain arm64
+> >> related quirks.  Add the ThunderX bridge quirk, gated by a new config
+> >> variable, so that it can be disabled for kernels that aren't expected
+> >> to be used on ThunderX.
+> >>
+> >> Signed-off-by: David Daney <david.daney@cavium.com>
+> >> ---
+> >>   arch/arm64/Kconfig         | 11 +++++++++++
+> >>   arch/arm64/kernel/Makefile |  2 +-
+> >>   arch/arm64/kernel/quirks.c | 36 ++++++++++++++++++++++++++++++++++++
+> >>   3 files changed, 48 insertions(+), 1 deletion(-)
+> >>   create mode 100644 arch/arm64/kernel/quirks.c
+> >>
+> >
+> > Looks reasonable to me. Just one question: Is the same bridge used
+> > on MIPS machines?
 > 
-> Extending the computation to 32 bit seems fine, but I'd rather warn loudly
-> if the bus range does not fit within the registers.
+> No.  The MIPS64 based OCTEON family of SoCs does not contain 
+> PCI-buses/config-space/bridges for on-chip hardware blocks.  The on-chip 
+> blocks in OCTEON are all platform devices.  So, ...
 > 
-> Also note that the computation is already correct with my interpretation
-> of the reg property.
+> > If so, maybe it should be moved to drivers/pci/quirks.c
+> > instead for better reuse.
+> 
+> The quirk is specific to some arm64 based SoCs, thus my idea to have 
+> arch specific quirks.
 
->From what Lorenzo was saying, ACPI shares the interpretation that David is
-implementing here and, given that the DT version seems to be subjective,
-aligning this reg property with MMCFG seems to make sense.
+Ok.
 
-Will
+	Arnd
