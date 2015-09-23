@@ -1,39 +1,58 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Wed, 23 Sep 2015 18:08:34 +0100
-Subject: [PATCH 00/22] arm64: Consolidate CPU feature handling
-In-Reply-To: <5602D53F.1030104@arm.com>
-References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
- <20150923155655.GK6281@e103592.cambridge.arm.com>
- <5602CC12.3040209@arm.com> <5602D53F.1030104@arm.com>
-Message-ID: <20150923170833.GQ27273@e103592.cambridge.arm.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Wed, 23 Sep 2015 10:08:39 -0700
+Subject: [PATCH v2 3/3] irqchip/gicv3-its: Handle OF device tree "msi-map"
+ properties.
+In-Reply-To: <20150923180100.03844936@arm.com>
+References: <1442966406-13198-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442966406-13198-4-git-send-email-ddaney.cavm@gmail.com>
+ <20150923180100.03844936@arm.com>
+Message-ID: <5602DC97.1040505@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 05:37:19PM +0100, Suzuki K. Poulose wrote:
-> On 23/09/15 16:58, Suzuki K. Poulose wrote:
-> > On 23/09/15 16:56, Dave P Martin wrote:
-> >> On Wed, Sep 16, 2015 at 03:20:58PM +0100, Suzuki K. Poulose wrote:
-> >>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
-> >>>
-> >>> This is an updated reincarnation of my "arm64: Expose CPU feature registers"
-> >>> series [1], which does much more.
-> >>
-> >> [...]
-> >>
-> >> Do you get whitespace errors for some patches in this series?
-> >>
-> >> git am complains for several of the patches, but it's possibly my mail
-> >> chewed them up.
-> >>
-> >> If the errors are real, please fix ;)
-> >>
-> >
-> > Thanks for reporting, let me take a look.
-> 
-> The problems were with my patches. I have fixed them locally, will send it
-> along in the next version. Thanks again for spotting.
+On 09/23/2015 10:01 AM, Marc Zyngier wrote:
+> On Tue, 22 Sep 2015 17:00:06 -0700
+> David Daney <ddaney.cavm@gmail.com> wrote:
+>
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> Call of_msi_map_rid() to handle mapping of the requester id.
+>>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   drivers/irqchip/irq-gic-v3-its-pci-msi.c | 3 ++-
+>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>> index cf351c6..8b1c938 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>> @@ -86,7 +86,8 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
+>>   	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
+>>
+>>   	/* ITS specific DeviceID, as the core ITS ignores dev. */
+>> -	info->scratchpad[0].ul = dev_alias.dev_id;
+>> +	info->scratchpad[0].ul = of_msi_map_rid(dev, domain->of_node,
+>> +						dev_alias.dev_id);
+>>
+>>   	return msi_info->ops->msi_prepare(domain->parent,
+>>   					  dev, dev_alias.count, info);
+>
+> I really wonder if that shouldn't be part of the pci_for_each_dma_alias
+> call. It would make a lot more sense for this functionality to be an
+> integral part of the core code, and would probably make the integration
+> of _IORT (which has the exact same requirements) a bit easier.
+>
+> Thoughts?
+>
 
-Ah, OK.
+I am a proponent of pushing things like this as far into the core code 
+as possible.  So, from that point of view, I think it would probably be 
+a good idea.
 
-Thanks
----Dave
+I can prepare a patch that does that, but it would also be nice hear 
+from other maintainers and get their thoughts on this.
+
+
+> 	M.
+>
