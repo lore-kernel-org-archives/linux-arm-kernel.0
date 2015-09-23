@@ -1,83 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Sep 2015 23:29:30 +0200
-Subject: [PATCH v2 5/9] ARM: dts: Move all Cygnus peripherals into soc bus
-In-Reply-To: <55FC8C0F.9020308@broadcom.com>
+Date: Wed, 23 Sep 2015 23:31:12 +0200
+Subject: [PATCH v2 1/9] ARM: dts: consolidate aliases for Cygnus dt files
+In-Reply-To: <55FC85D6.7050506@broadcom.com>
 References: <1442611454-16331-1-git-send-email-rjui@broadcom.com>
- <1929872.EmD9YkfFuv@wuerfel> <55FC8C0F.9020308@broadcom.com>
-Message-ID: <1969821.ZhaOpCV2D1@wuerfel>
+ <25764744.UdkoAR05y0@wuerfel> <55FC85D6.7050506@broadcom.com>
+Message-ID: <20046098.CeNft0Jl1D@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 September 2015 15:11:27 Ray Jui wrote:
-> On 9/18/2015 2:34 PM, Arnd Bergmann wrote:
-> > On Friday 18 September 2015 14:24:10 Ray Jui wrote:
-> >> +       soc {
-> >> +               compatible = "simple-bus";
-> >> +               ranges;
-> >> +               #address-cells = <1>;
-> >> +               #size-cells = <1>;
+On Friday 18 September 2015 14:44:54 Ray Jui wrote:
+> On 9/18/2015 2:27 PM, Arnd Bergmann wrote:
+> > On Friday 18 September 2015 14:24:06 Ray Jui wrote:
 > > 
-> >> +               pinctrl: pinctrl at 0301d0c8 {
-> >>
+> > The SoC has at least four uarts according to this, so it seems unlikely that
+> > each board really only uses only the fourth one of them and labels it '0'
+> > on the board. As soon as you get one board that has more than one uart wired
+> > up, you would need to undo this.
 > > 
-> > Similarly to the core bus, this seems to have address ranges 0x03xxxxxx and
-> > 0x18xxxxxx on it, so put those into the ranges.
-> >
 > 
-> Okay we have an issue here. For whatever reason, the Cygnus ASIC team
-> decided to put registers for the same block in random locations. We see
-> similar issues in all of our other iProc based SoCs. We have
-> communicated this to our ASIC team, and hopefully they can revert the
-> trend for the next SoC.
+> I think Scott might have explained this in the past. uart3 is going to
+> be used on all Cygnus boards (including all future boards) because the
+> bootrom was designed to use uart3 as console and that won't change.
 > 
-> For example, the gpio_ccm has registers in the following regions:
-> 
-> gpio_ccm: gpio at 1800a000 {
->     compatible = "brcm,cygnus-ccm-gpio";
->     reg = <0x1800a000 0x50>,
->           <0x0301d164 0x20>;
-> 
-> NAND is worse, it has registers in 3 different separate regions:
-> 
-> nand: nand at 18046000 {
->     compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1",
->                  "brcm,brcmnand";
->     reg = <0x18046000 0x600>, <0xf8105408 0x600>,
->           <0x18046f00 0x20>;
-> 
-> As you can see, this makes it impossible to define a proper address
-> range for the bus; therefore, I'll have to keep the ranges undefined and
-> a simple 1:1 mapping under this bus.
+> Let me know if you still think I need to move this back to the dts.
 
-Hmm, you could still try to list them as non-overlapping with other
-buses on the root node like
+I would still like to see them stay in the .dts file, if only for
+consistency with other platforms. 
 
-	ranges = <0x03000000 0x03000000 0x01000000>,
-		 <0x18000000 0x18000000 0x01000000>,
-		 <0xf8000000 0xf8000000 0x01000000>;
-
-which clarifies how the bus is wired up in hardware.
-
-Alternatively, you could make a more elaborate mapping, if there
-are in fact multiple hardware ranges, like
-
-	#address-cells = <2>; # space:offset
-	ranges = <1 0  0x03000000 0x01000000>,
-		 <2 0  0x18000000 0x01000000>,
-		 <3 0  0xf8000000 0x01000000>;
-
-It really depends on what the hardware designers were thinking. If
-the AXI bus actually decodes the entire 32-bit address range and devices
-are just located at random addresses in there, your current scheme is
-probably closest to reality.
-
-> > It probably also makes sense to name the bus according to what kind of
-> > bus (axi, ahb, plb, ...) is used here. If the soc has nested buses
-> > (e.g. an ahb connected to an axi bus,) then model both of them in the DT.
-> 
-> Based on the block diagram from the ASIC team, it looks like all of them
-> are connected to one major AXI fabric. I can rename the bus to AXI.
-
-Ok.
+Also, even if you can guarantee that uart3 is always used for the
+console, that doesn't prevent board designers from adding more than
+one uart, right?
 
 	Arnd
