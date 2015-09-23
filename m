@@ -1,37 +1,38 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 23 Sep 2015 16:44:13 +0200
-Subject: [PATCH v2 5/7] ARM: at91/defconfig: sama5: add PIO4 controller
- support
-In-Reply-To: <CACRpkdY0iV+_xyfBSuUPuaRuZLfYYtpLHp5W7a-EYxxKrfEcVA@mail.gmail.com>
+Date: Wed, 23 Sep 2015 16:46:31 +0200
+Subject: [PATCH v2 0/7] New Atmel PIO4 pinctrl/gpio driver
+In-Reply-To: <CACRpkdYLbifY9VJK0FFf7xXdMJWstdGP=h5ApBMRyRXZHPDUaw@mail.gmail.com>
 References: <1442417823-15850-1-git-send-email-ludovic.desroches@atmel.com>
- <1442417823-15850-6-git-send-email-ludovic.desroches@atmel.com>
- <CACRpkdY0iV+_xyfBSuUPuaRuZLfYYtpLHp5W7a-EYxxKrfEcVA@mail.gmail.com>
-Message-ID: <5602BABD.7060308@atmel.com>
+ <CACRpkdYLbifY9VJK0FFf7xXdMJWstdGP=h5ApBMRyRXZHPDUaw@mail.gmail.com>
+Message-ID: <5602BB47.4040401@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 21/09/2015 20:25, Linus Walleij a ?crit :
-> On Wed, Sep 16, 2015 at 8:37 AM, Ludovic Desroches
+Le 21/09/2015 20:50, Linus Walleij a ?crit :
+> On Wed, Sep 16, 2015 at 8:36 AM, Ludovic Desroches
 > <ludovic.desroches@atmel.com> wrote:
 > 
->> SAMA5D2 chip family has a new PIO controller.
+>> The Atmel PIO4 controller has been introduced with SAMA5D2 chip family. This
+>> drivers manages both pinmux/pinconf and gpio stuff. It is inspired by Mediatek
+>> pinctrl driver.
 >>
->> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>> Changes from v1:
+>> - remove some unneeded gpio specific ops (gpio_request, gpio_free,
+>>   gpio_request_enable, gpio_disable_free and gpio_set_direction).
+>> - code styling fixes.
+>> - add sama5d2 pin description and device pin muxing.
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Please merge this through Nicolas' AT91 tree.
+> Looks Good To Me, and has Sascha's ACKs, so merged patches
+> 1, 2, 3, 4 to the pinctrl tree. Please merge the AT91 DT things into
+> the AT91 tree.
 
-Added in the at91-4.4-defconfig branch.
+Great!
 
-Thanks.
+So patch 5 is included in at91-4.4-defconfig branch.
+patches 6 and 7 queued in at91-4.4-dt branch.
+They are included in at91-next that is merged in linux-next and will
+both take the arm-soc path later in the cycle.
 
-Paul,
-
-This symbol will appear in Linus W.'s tree and is selected in mine. So
-you may find that the symbol appear unused before the two trees are
-merged in Linux-next or mainline.
-
-Bye,
+Thanks, bye,
 -- 
 Nicolas Ferre
