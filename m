@@ -1,40 +1,79 @@
-From: graeme.gregory@linaro.org (G Gregory)
-Date: Wed, 23 Sep 2015 16:45:35 +0100
-Subject: [RFC 0/5] console/acpi: add DBG2 and SPCR console configuration
-In-Reply-To: <CACVXFVPEJb-RXLgU0V+HduoENquUs3oDGWsUtCvH+TOSRMYiUg@mail.gmail.com>
-References: <1441716217-23786-1-git-send-email-leif.lindholm@linaro.org>
- <CACVXFVPEJb-RXLgU0V+HduoENquUs3oDGWsUtCvH+TOSRMYiUg@mail.gmail.com>
-Message-ID: <20150923154535.GB2431@xora-yoga13-vm.xora.org.uk>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Wed, 23 Sep 2015 08:50:45 -0700
+Subject: [PATCH v3 4/6] PCI: generic: Correct, and avoid overflow, in
+ bus_max calculation.
+In-Reply-To: <1496061.0ds89jTH75@wuerfel>
+References: <1442965757-12925-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442965757-12925-5-git-send-email-ddaney.cavm@gmail.com>
+ <1496061.0ds89jTH75@wuerfel>
+Message-ID: <5602CA55.10604@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 03:38:20PM +0800, Ming Lei wrote:
-> Hi Leif,
-> 
-> 
-> On Tue, Sep 8, 2015 at 8:43 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> > Support for configuring bootconsole and console via the ACPI tables
-> > DBG2 (Debug Port Table 2) [1] and SPCR (Serial Port Console Redirection
-> > Table) [2], defined by Microsoft, has been discussed on and off over the
-> > years.
-> >
-> > [1] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639131(v=vs.85).aspx
-> > [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
-> >
-> > Licensing concerns have prevented this happening in the past, but as of
-> > 10 August 2015, these tables have both been released also under OWF 1.0
-> > (http://www.openwebfoundation.org/legal/the-owf-1-0-agreements/owfa-1-0)
-> > which is think is noncontroversially GPL-compatible?
-> >
-> > This set is a first attempt at implementing this.
-> 
-> From distribution view, the patchset looks very useful.
-> 
-> I have one simple question, are there other candidates for conveying this kind
-> of information like what DBG2/SPCR does? Or are DBG2 and SPCR the
-> offical speficiations to do such things in ARM server industry?
-> 
+On 09/23/2015 01:01 AM, Arnd Bergmann wrote:
+> On Tuesday 22 September 2015 16:49:15 David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> There are two problems with the bus_max calculation:
+>>
+>> 1) The u8 data type can overflow for large config space windows.
+>>
+>> 2) The calculation is incorrect for a bus range that doesn't start at
+>>     zero.
+>>
+>> Since the configuration space is relative to bus zero, make bus_max
+>> just be the size of the config window scaled by bus_shift.  Then clamp
+>> it to a maximum of 255, per PCI.  Use a data type of int to avoid
+>> overflow problems.
+>>
+>> Update host-generic-pci.txt to clarify the semantics of the "reg"
+>> property with respect to non-zero starting bus numbers.
+>>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>
+> Not sure about this one
+>
+>> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+>> index cf3e205..105a968 100644
+>> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+>> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+>> @@ -34,7 +34,9 @@ Properties of the host controller node:
+>>   - #size-cells    : Must be 2.
+>>
+>>   - reg            : The Configuration Space base address and size, as accessed
+>> -                   from the parent bus.
+>> +                   from the parent bus.  The base address corresponds to
+>> +                   bus zero, even though the "bus-range" property may specify
+>> +                   a different starting bus number.
+>
+> This sounds like very unusual behavior. If you have a system with faked
+> bus numbers where the registers only physically exist for a subset of the
+> buses, this requires defining a reg property that contains MMIO space
+> which is outside of the device and potentially contains other devices.
 
-They are mandated in the SBBR spec
+The pci-host-generic driver only maps the ranges that correspond to the 
+"bus-range" buses, so mapping of illegal address ranges should not be a 
+problem.
 
-Graeme
+>
+> What would break if we instead defined it the expected way and only
+> list the registers for the bus numbers in the "bus-range" property?
+
+I'm not sure if we have the luxury of being able to change the 
+definition, although the existing code only works with a starting bus 
+number of zero.  From this we might conclude that non-zero starting bus 
+numbers cannot exist in the wild, so changing the the definition of 
+"reg" so that it starts at the starting bus number might be possible.
+
+My reading of:
+
+http://www.o3one.org/hwdocs/openfirmware/pci_supplement_2_1.pdf
+
+Section 3.1.1, does not preclude your interpretation.  Although that is 
+for PCI-PCI bridges, and not this pci-host-generic root complex.
+
+If we really want to go with a different definition of what the "reg" 
+property means, then actual code has to change, and we risk breaking 
+something.
+
+David Daney
