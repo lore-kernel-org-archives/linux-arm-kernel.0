@@ -1,31 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Sep 2015 22:45:28 +0200
-Subject: [PATCH v2 4/5] PCI: generic: Correct, and avoid overflow,
- in bus_max calculation.
-In-Reply-To: <1707525.QvfFzUYq4E@wuerfel>
-References: <1442527332-1174-1-git-send-email-ddaney.cavm@gmail.com>
- <20150923193545.GZ7356@arm.com> <1707525.QvfFzUYq4E@wuerfel>
-Message-ID: <2795004.Hn5xt30nZN@wuerfel>
+From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
+Date: Wed, 23 Sep 2015 22:51:54 +0200
+Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
+In-Reply-To: <1443033714.74600.18.camel@infradead.org>
+References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
+ <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
+ <1443033714.74600.18.camel@infradead.org>
+Message-ID: <560310EA.2070805@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 September 2015 21:39:27 Arnd Bergmann wrote:
-> On Wednesday 23 September 2015 20:35:45 Will Deacon wrote:
-> > 
-> > From what Lorenzo was saying, ACPI shares the interpretation that David is
-> > implementing here and, given that the DT version seems to be subjective,
-> > aligning this reg property with MMCFG seems to make sense.
-> 
-> We should then make it very clear in the binding that the driver
-> is not allowed to actually map the registers for the buses outside
-> of the bus-range, as that is highly unusual.
+On 9/23/2015 8:41 PM, David Woodhouse wrote:
+> On Wed, 2015-08-12 at 17:06 -0500, Jeremy Linton wrote:
+>>   
+>> +static const struct acpi_device_id smsc911x_acpi_match[] = {
+>> +       { "ARMH9118", 0 },
+>> +       { }
+>> +};
+>> +MODULE_DEVICE_TABLE(acpi, smsc911x_acpi_match);
+>> +
+>>   static struct platform_driver smsc911x_driver = {
+>>          .probe = smsc911x_drv_probe,
+>>          .remove = smsc911x_drv_remove,
+>> @@ -2661,6 +2656,7 @@ static struct platform_driver smsc911x_driver =
+>> {
+>>                  .name   = SMSC_CHIPNAME,
+>>                  .pm     = SMSC911X_PM_OPS,
+>>                  .of_match_table = of_match_ptr(smsc911x_dt_ids),
+>> +               .acpi_match_table = ACPI_PTR(smsc911x_acpi_match),
+>>          },
+>>   };
+> Hm, surely you shouldn't need this part? If the ACPI device has a HID
+> of PRP0001, and an appropriate "compatible" property, then it ought to
+> be loaded anyway. If that doesn't work, we should fix that.
 
-One more point here: I think ACPI does something different here,
-it lists the base address of mmconfig space of the the PCI domain
-that the host bridge belongs to. In contrast, in DT the 'reg'
-property is defined as the registers belonging to the host bridge
-itself, and the DT does not say anything about domains at all
-(aside from the linux,pci-domain property that is not mandatory
-and a Linux-specific extension).
+But if the device ID is assigned already, why would it hurt to actually 
+use it?
 
-	Arnd
+Thanks,
+Rafael
