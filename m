@@ -1,53 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 23 Sep 2015 18:46:24 +0100
-Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
-In-Reply-To: <F58048940DF89C44BFA5A966565B5D23EBA361B927@SPOCK.usa.Arm.com>
-References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
- <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
- <55F059F9.3080200@arm.com>
- <F58048940DF89C44BFA5A966565B5D23EBA361B927@SPOCK.usa.Arm.com>
-Message-ID: <20150923184624.5b255764@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Sep 2015 18:52:59 +0100
+Subject: [PATCH v2 3/3] irqchip/gicv3-its:  Handle OF device tree
+ "msi-map" properties.
+In-Reply-To: <5602DC97.1040505@caviumnetworks.com>
+References: <1442966406-13198-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442966406-13198-4-git-send-email-ddaney.cavm@gmail.com>
+ <20150923180100.03844936@arm.com>
+ <5602DC97.1040505@caviumnetworks.com>
+Message-ID: <20150923175259.GT7356@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Sep 2015 17:22:49 +0000
-Jeremy Linton <Jeremy.Linton@arm.com> wrote:
-
-Hi Jeremy,
-
-> Marc,
+On Wed, Sep 23, 2015 at 06:08:39PM +0100, David Daney wrote:
+> On 09/23/2015 10:01 AM, Marc Zyngier wrote:
+> > On Tue, 22 Sep 2015 17:00:06 -0700
+> > David Daney <ddaney.cavm@gmail.com> wrote:
+> >
+> >> From: David Daney <david.daney@cavium.com>
+> >>
+> >> Call of_msi_map_rid() to handle mapping of the requester id.
+> >>
+> >> Signed-off-by: David Daney <david.daney@cavium.com>
+> >> ---
+> >>   drivers/irqchip/irq-gic-v3-its-pci-msi.c | 3 ++-
+> >>   1 file changed, 2 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> >> index cf351c6..8b1c938 100644
+> >> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> >> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> >> @@ -86,7 +86,8 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
+> >>   	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
+> >>
+> >>   	/* ITS specific DeviceID, as the core ITS ignores dev. */
+> >> -	info->scratchpad[0].ul = dev_alias.dev_id;
+> >> +	info->scratchpad[0].ul = of_msi_map_rid(dev, domain->of_node,
+> >> +						dev_alias.dev_id);
+> >>
+> >>   	return msi_info->ops->msi_prepare(domain->parent,
+> >>   					  dev, dev_alias.count, info);
+> >
+> > I really wonder if that shouldn't be part of the pci_for_each_dma_alias
+> > call. It would make a lot more sense for this functionality to be an
+> > integral part of the core code, and would probably make the integration
+> > of _IORT (which has the exact same requirements) a bit easier.
+> >
+> > Thoughts?
+> >
 > 
-> |FWIW, mainline booting with this patch on Juno r1 with ACPI enabled dies a
-> |horrible death:
+> I am a proponent of pushing things like this as far into the core code 
+> as possible.  So, from that point of view, I think it would probably be 
+> a good idea.
 > 
-> Sorry about the delay, I didn't see this message.
-> 
-> <trimmed>
-> 
-> |How did you get this to work? Firmware release?
-> 
-> Yes, it's a firmware problem with the ACPI tables. It is likely you
-> need _DSD changes for the SMSC. If your trying to run juno with ACPI
-> there are a few other ACPI table changes you will need beyond what
-> was in the last linaro release. I wanted to just provide a direct
-> link to the correct firmware in this response, but it seems the
-> required version is sort of up in the air at the moment. Be assured I
-> will really push on this next week, and will provide a follow up here.
+> I can prepare a patch that does that, but it would also be nice hear 
+> from other maintainers and get their thoughts on this.
 
-Good. Please keep me posted on this. I understand this is still a work
-in progress, and it would be good to document what is the expected
-baseline for this to work correctly.
+Hmm, we use pci_for_each_dma_alias in the SMMU drivers to get the SID,
+so I'm not sure that using the MSI mapping is necessarily the right thing
+to do there. Maybe we should instead have dma_alias_to_msi_id helpers or
+something?
 
-> Originally, the lack of DSD wasn't a problem, but as this patch
-> evolved  the fact that it consolidates a number of configuration code
-> paths balancing that got tricky, and ACPI machines with "bad" tables
-> were the victims (rather than breaking something I can't control).
-> 
-> In the meantime, if this is blocking anyone I can provide
-> instructions on how to update the required ACPI tables.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Will
