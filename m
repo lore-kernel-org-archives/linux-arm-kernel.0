@@ -1,112 +1,64 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 23 Sep 2015 12:29:36 +0200
-Subject: [PATCH linux-next v9 0/3] mfd: flexcom: add a driver for Flexcom
-In-Reply-To: <20150920041912.GS3039@x1>
-References: <cover.1441118159.git.cyrille.pitchen@atmel.com>
- <20150920041912.GS3039@x1>
-Message-ID: <56027F10.1060804@atmel.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 23 Sep 2015 12:05:09 +0100
+Subject: [PATCH 1/2] arm64: fpsimd: Fix FPSIMD corruption in rt_sigreturn
+ with CONFIG_PREEMPT
+In-Reply-To: <CAKv+Gu8H=0+1Q134cnrNHZF07zpJ2Qk=KNYaJuTHqo-d36fjKA@mail.gmail.com>
+References: <1442316997-32282-1-git-send-email-will.deacon@arm.com>
+ <CAKv+Gu8Yt0T6AF7MmOtpPpk8VcDBVraSNMbgm03dW5BR1QMqsA@mail.gmail.com>
+ <20150915143952.GE31157@arm.com>
+ <20150921153756.GM27273@e103592.cambridge.arm.com>
+ <CAKv+Gu8H=0+1Q134cnrNHZF07zpJ2Qk=KNYaJuTHqo-d36fjKA@mail.gmail.com>
+Message-ID: <20150923110509.GJ6281@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 20/09/2015 06:19, Lee Jones a ?crit :
-> Patch set description?
+On Tue, Sep 22, 2015 at 06:20:29PM -0700, Ard Biesheuvel wrote:
+> On 21 September 2015 at 08:37, Dave P Martin <Dave.Martin@arm.com> wrote:
+> > On Tue, Sep 15, 2015 at 03:39:53PM +0100, Will Deacon wrote:
+> >> On Tue, Sep 15, 2015 at 01:11:10PM +0100, Ard Biesheuvel wrote:
 
-Cyrille actually placed it as the v1 changelog below...
+[...]
 
-> Once Rob is satisfied, please re-submit this set with Nicolas' Acks
+> >> > On 15 September 2015 at 13:36, Will Deacon <will.deacon@arm.com> wrote:
+> >> > > From: Dave P Martin <Dave.Martin@arm.com>
+> >> > >
+> >> > > The arm64 context switch implementation uses a flag
+> >> > > TIF_FOREIGN_FPSTATE to track whether the hardware FPSIMD regs are
+> >> > > out of sync with the logical state of current's registers.
+> >> > >
+> >> > > During sigreturn, the registers and task_struct are temporarily out
+> >> > > of sync, between writing the task_struct and loading its contents
+> >> > > back into the FPSIMD registers -- however, TIF_FOREIGN_FPSTATE is
+> >> > > not set.  This can cause the context switch code to discard some or
+> >> > > all of the restored FPSIMD state if preemption occurs during the
+> >> > > critical region of rt_sigreturn.
 
-I think that Rob was okay with the DT binding: "A few comments, but in
-general looks fine." and it may not be important to tack Rob for
-addition of his formal tag...
+[...]
 
-Or maybe this message can act as a "ping" for Rob...
+> >> > I am not following something here. If the task gets preempted before
+> >> > the call to fpsimd_update_current_state(), it will proceed to
+> >> > overwrite the registers with whatever is on the stack in fpsimd after
+> >> > being scheduled back in, and everything should work fine, right?.
 
-> and I will re-review.
+[...]
 
-We wait one or two days before Cyrille re-send the series. We are
-looking forward to using this driver in Linux-next soon.
-
-Bye,
-
-
->> ChangeLog
->>
->> v9:
->> - go back to v5 (use the new "atmel,flexcom-mode" DT property).
->> - fix the name of the spi node in the DT example: from spi at f8034400 to
->>   spi at 400
->> - align the fields of the struct platform_driver atmel_flexcom_driver as
->>   suggested by Lee Jones.
->>
->> v8:
->> - fix the name of the spi node in the DT example: from spi at f8034400 to
->>   spi at 2,0
->> - use the return code of op_property_read_u32_index() instead of -EINVAL
->>   to report error.
->> - add Acked-by from Nicolas Ferre
->>
->> v7:
->> - read the operating mode from the very first u32 of the reg property from
->>   the first available child node (should be unique).
->> - update the DT bindings documentation accordingly.
->>
->> v6:
->> - select the operating mode according to the "compatible" DT property of
->>   the first available child node (should be unique).
->> - remove the "atmel,flexcom-mode" DT property so the need of a header file
->>   defining macros for the possible values of this deprecated property.
->>
->> v5:
->> - create a header file containing macros used by DT bindings
->> - use numeric constants instead of strings to select the Flexcom mode
->> - change the license to "GPL v2"
->> - update the DT binding documentation to make it more readable and add
->>   references to USART, SPI and I2C DT binding documentations. remove the
->>   useless label in the Example section.
->> - change the register prefix from FX_ to FLEX_ to match the Flexcom
->>   programmer datasheet.
->> - rename some variables to make them more understandable.
->>
->> v4:
->> - check clk_prepare_enable() return code in atmel_flexcom_probe()
->> - add a commit message to the DT binding patch
->>
->> v3:
->> - remove MODULE_ALIAS()
->> - add Acked-by from Boris Brezillon and Alexandre Belloni
->>
->> v2:
->> - enhance the documentation of DT bindings and change the way the "ranges"
->>   property is used.
->> - replace __raw_readl() and __raw_writel() by readl() and writel().
->> - change the module license to "GPL" for v2 or later
->> - print the selected flexcom mode after the hardware version
->>
->> v1:
->> This series of patches a support to the Atmel Flexcom, a wrapper which
->> integrates an USART, a SPI controller and a TWI controller. Only one
->> peripheral can be used at a time. The active function is selected though
->> the Flexcom Mode Register.
->>
->> Cyrille Pitchen (3):
->>   mfd: atmel-flexcom: create include file with macros used by DT
->>     bindings
->>   mfd: devicetree: add bindings for Atmel Flexcom
->>   mfd: atmel-flexcom: add a driver for Atmel Flexible Serial
->>     Communication Unit
->>
->>  .../devicetree/bindings/mfd/atmel-flexcom.txt      |  67 +++++++++++++
->>  drivers/mfd/Kconfig                                |  11 +++
->>  drivers/mfd/Makefile                               |   1 +
->>  drivers/mfd/atmel-flexcom.c                        | 104 +++++++++++++++++++++
->>  include/dt-bindings/mfd/atmel-flexcom.h            |  16 ++++
->>  5 files changed, 199 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
->>  create mode 100644 drivers/mfd/atmel-flexcom.c
->>  create mode 100644 include/dt-bindings/mfd/atmel-flexcom.h
->>
+> > Urg, looks like I confused myself here.  Ard's assessment looks correct.
+> >
+> > Not staging the data via the stack seemed a harmless change which I
+> > thought was an improvement, since at half a K the amount of data is non-
+> > trivial.
+> >
+> > I'll go back and make some measurements to see whether getting rid
+> > of the extra copy is really worth it.  I think reading straight into
+> > the task_struct with __get_user() can work, but it looks like I'll
+> > need to fiddle with the preemption region, or otherwise handle the
+> > ensuing race...
+> >
 > 
+> Indeed. I think you will need something like fpsimd_load_state_user
+> which runs with preemption disabled and restarts if it is interrupted.
 
+Yep -- I'll take another look at it, and scratch my head some more.
 
--- 
-Nicolas Ferre
+Cheers
+---Dave
