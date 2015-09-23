@@ -1,35 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Sep 2015 14:06:41 -0700
-Subject: [PATCH 2/2] ARM: dts: Fix WLAN regression on omap5-uevm
-In-Reply-To: <20150921141018.GC23801@atomide.com>
-References: <1442593745-16725-1-git-send-email-tony@atomide.com>
- <1442593745-16725-3-git-send-email-tony@atomide.com>
- <CABxcv=mGNmoVu3TDvd1888TiJ_vg0FJF6qz0p4XTu5T776sJ2Q@mail.gmail.com>
- <20150918174836.GG8020@atomide.com>
- <20150918202718.GH8020@atomide.com>
- <CABxcv=nUuqHSJmP=z3X7F=ukeaFi+9cYTYW-wRwuv+mA8Jw2HQ@mail.gmail.com>
- <20150921141018.GC23801@atomide.com>
-Message-ID: <20150923210641.GM23801@atomide.com>
+From: tklauser@distanz.ch (Tobias Klauser)
+Date: Wed, 23 Sep 2015 09:20:02 +0200
+Subject: [PATCH v2] net: ll_temac: Use of_property_read_u32 instead of
+ open-coding it
+In-Reply-To: <1442922117-18420-1-git-send-email-tklauser@distanz.ch>
+References: <1442922117-18420-1-git-send-email-tklauser@distanz.ch>
+Message-ID: <1442992802-6112-1-git-send-email-tklauser@distanz.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150921 07:16]:
-> * Javier Martinez Canillas <javier@dowhile0.org> [150921 02:17]:
-> > > Then getting the 32k clock from palmas is not working either, it
-> > > seems some better deferred probe handling is needed there if
-> > > omap_hsmmc is built-in and palmas-clk is a loadable module.
-> > >
-> > 
-> > IIUC from another email, you already solved this.
-> 
-> That deferred probe fix did not solve this one, need to debug further.
+Use of_property_read_u32 to read the "clock-frequency" property instead
+of using of_get_property with return value checks.
 
-FYI, found the MMC pwrseq clock issue, I had a typo in my dts
-file with "ext_clk" instead of "ext_clock" :)
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+Reviewed-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+---
+v2: Resending with Cc to netdev
 
-Will send v2 of $subject patch after some more testing using
-both a GPIO regulator-fixed and mmc pwrseq for the clock.
+ drivers/net/ethernet/xilinx/ll_temac_mdio.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/drivers/net/ethernet/xilinx/ll_temac_mdio.c b/drivers/net/ethernet/xilinx/ll_temac_mdio.c
+index 8cf9d4f..415de1e 100644
+--- a/drivers/net/ethernet/xilinx/ll_temac_mdio.c
++++ b/drivers/net/ethernet/xilinx/ll_temac_mdio.c
+@@ -59,16 +59,15 @@ static int temac_mdio_write(struct mii_bus *bus, int phy_id, int reg, u16 val)
+ int temac_mdio_setup(struct temac_local *lp, struct device_node *np)
+ {
+ 	struct mii_bus *bus;
+-	const u32 *bus_hz;
++	u32 bus_hz;
+ 	int clk_div;
+-	int rc, size;
++	int rc;
+ 	struct resource res;
+ 
+ 	/* Calculate a reasonable divisor for the clock rate */
+ 	clk_div = 0x3f; /* worst-case default setting */
+-	bus_hz = of_get_property(np, "clock-frequency", &size);
+-	if (bus_hz && size >= sizeof(*bus_hz)) {
+-		clk_div = (*bus_hz) / (2500 * 1000 * 2) - 1;
++	if (of_property_read_u32(np, "clock-frequency", &bus_hz) == 0) {
++		clk_div = bus_hz / (2500 * 1000 * 2) - 1;
+ 		if (clk_div < 1)
+ 			clk_div = 1;
+ 		if (clk_div > 0x3f)
+-- 
+2.5.0
