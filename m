@@ -1,36 +1,90 @@
-From: Jeremy.Linton@arm.com (Jeremy Linton)
-Date: Wed, 23 Sep 2015 10:22:49 -0700
-Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
-In-Reply-To: <55F059F9.3080200@arm.com>
-References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
- <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
- <55F059F9.3080200@arm.com>
-Message-ID: <F58048940DF89C44BFA5A966565B5D23EBA361B927@SPOCK.usa.Arm.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 22 Sep 2015 19:14:53 -0500
+Subject: [PATCH v3 2/3] Documentation: dt: add bindings for TI Wakeup M3 IPC
+ device
+In-Reply-To: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
+References: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <1442967294-23837-3-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+Add the device tree bindings document for the TI Wakeup M3 IPC
+device on AM33xx and AM43xx SoCs. These devices are used by the
+TI wkup_m3_ipc driver, and contain the registers upon which the
+IPC protocol to communicate with the Wakeup M3 processor is
+implemented.
 
-|FWIW, mainline booting with this patch on Juno r1 with ACPI enabled dies a
-|horrible death:
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+v2->v3: Unchanged.
 
-Sorry about the delay, I didn't see this message.
+ .../devicetree/bindings/soc/ti/wkup_m3_ipc.txt     | 57 ++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
 
-<trimmed>
-
-|How did you get this to work? Firmware release?
-
-Yes, it's a firmware problem with the ACPI tables. It is likely you need _DSD changes for the SMSC. If your trying to run juno with ACPI there are a few other ACPI table changes you will need beyond what was in the last linaro release. I wanted to just provide a direct link to the correct firmware in this response, but it seems the required version is sort of up in the air at the moment. Be assured I will really push on this next week, and will provide a follow up here.
-
-Originally, the lack of DSD wasn't a problem, but as this patch evolved  the fact that it consolidates a number of configuration code paths balancing that got tricky, and ACPI machines with "bad" tables were the victims (rather than breaking something I can't control).
-
-In the meantime, if this is blocking anyone I can provide instructions on how to update the required ACPI tables.
-
-Thanks,
-
-
-
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
-
-ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
-ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
+diff --git a/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
+new file mode 100644
+index 0000000..4015504
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
+@@ -0,0 +1,57 @@
++Wakeup M3 IPC Driver
++=====================
++
++The TI AM33xx and AM43xx family of devices use a small Cortex M3 co-processor
++(commonly referred to as Wakeup M3 or CM3) to help with various low power tasks
++that cannot be controlled from the MPU, like suspend/resume and certain deep
++C-states for CPU Idle. Once the wkup_m3_ipc driver uses the wkup_m3_rproc driver
++to boot the wkup_m3, it handles communication with the CM3 using IPC registers
++present in the SoC's control module and a mailbox. The wkup_m3_ipc exposes an
++API to allow the SoC PM code to execute specific PM tasks.
++
++Wkup M3 Device Node:
++====================
++A wkup_m3_ipc device node is used to represent the IPC registers within an
++SoC.
++
++Required properties:
++--------------------
++- compatible:		Should be,
++				"ti,am3352-wkup-m3-ipc" for AM33xx SoCs
++				"ti,am4372-wkup-m3-ipc" for AM43xx SoCs
++- reg:			Contains the IPC register address space to communicate
++			with the Wakeup M3 processor
++- interrupts:		Contains the interrupt information for the wkup_m3
++			interrupt that signals the MPU.
++- ti,rproc:		phandle to the wkup_m3 rproc node so the IPC driver
++			can boot it.
++- mboxes:		phandles used by IPC framework to get correct mbox
++			channel for communication. Must point to appropriate
++			mbox_wkupm3 child node.
++
++Example:
++--------
++/* AM33xx */
++	l4_wkup: l4_wkup at 44c00000 {
++		...
++
++		scm: scm at 210000 {
++			compatible = "ti,am3-scm", "simple-bus";
++			reg = <0x210000 0x2000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x210000 0x2000>;
++
++			...
++
++			wkup_m3_ipc: wkup_m3_ipc at 1324 {
++				compatible = "ti,am3352-wkup-m3-ipc";
++				reg = <0x1324 0x24>;
++				interrupts = <78>;
++				ti,rproc = <&wkup_m3>;
++				mboxes = <&mailbox &mbox_wkupm3>;
++			};
++
++			...
++		};
++	};
+-- 
+2.4.6
