@@ -1,67 +1,26 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 23 Sep 2015 15:45:06 +0200
-Subject: [PATCH v2] soc: mediatek: Move the initial setting of pmic wrap
- interrupt before requesting irq.
-In-Reply-To: <1441976720-43568-1-git-send-email-henryc.chen@mediatek.com>
-References: <1441976720-43568-1-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <20150923134506.GA7825@pengutronix.de>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Wed, 23 Sep 2015 14:50:05 +0100
+Subject: [PATCH v3] arm64/efi: don't pad between EFI_MEMORY_RUNTIME regions
+In-Reply-To: <CAKv+Gu914YCoEvs9QkS619+gPW3qv1UTXqjmBhLPuH6ZCdmEqA@mail.gmail.com>
+References: <1441782414-16284-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1441899699-14893-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150910160809.GM29293@leverpostej>
+ <CAKv+Gu914YCoEvs9QkS619+gPW3qv1UTXqjmBhLPuH6ZCdmEqA@mail.gmail.com>
+Message-ID: <20150923135005.GD2867@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 11, 2015 at 09:05:20PM +0800, Henry Chen wrote:
-> The watchdog may not be initialized by the bootloader, even if the rest
-> of the pwrap is. Move the watchdog initialization out of pwrap_init() to
-> make sure the watchdog is always initialized and not only when the pwrap
-> is uninitialized.
+On Thu, 10 Sep, at 06:10:57PM, Ard Biesheuvel wrote:
 > 
-> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+> Thanks Mark.
+> 
+> @Matt: could you please drop the version you have queued, and take
+> this one instead?
+> Also, this patch will not apply to anything before v4.0 so could you
+> please include that in the cc:stable tag?
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-
-> ---
-> Chandes since v1:
-> Modify the commit log and code comments to make it easy to understand 
-> the issue and solution.
-> ---
->  drivers/soc/mediatek/mtk-pmic-wrap.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index f432291..1a49b09 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -725,10 +725,6 @@ static int pwrap_init(struct pmic_wrapper *wrp)
->  	pwrap_writel(wrp, 0x1, PWRAP_WACS2_EN);
->  	pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
->  	pwrap_writel(wrp, 0xff, PWRAP_STAUPD_GRPEN);
-> -	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
-> -	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
-> -	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
-> -	pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
->  
->  	if (pwrap_is_mt8135(wrp)) {
->  		/* enable pwrap events and pwrap bridge in AP side */
-> @@ -896,6 +892,12 @@ static int pwrap_probe(struct platform_device *pdev)
->  		return -ENODEV;
->  	}
->  
-> +	/* Initialize watchdog, may not be done by the bootloader */
-> +	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
-> +	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
-> +	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
-> +	pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
-> +
->  	irq = platform_get_irq(pdev, 0);
->  	ret = devm_request_irq(wrp->dev, irq, pwrap_interrupt, IRQF_TRIGGER_HIGH,
->  			"mt-pmic-pwrap", wrp);
-> -- 
-> 1.8.1.1.dirty
-> 
-> 
+Sorry for the delay. I've queued up this version with all tags and
+I'll send an urgent pull request this week. Thanks everyone.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Matt Fleming, Intel Open Source Technology Center
