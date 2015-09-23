@@ -1,93 +1,55 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 23 Sep 2015 21:37:28 +0200
-Subject: [PATCH 2/3] ARM: dts: stih407/410: Tidy up display nodes
-In-Reply-To: <1443037049-6167-1-git-send-email-maxime.coquelin@st.com>
-References: <1443037049-6167-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <1443037049-6167-3-git-send-email-maxime.coquelin@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Sep 2015 21:39:27 +0200
+Subject: [PATCH v2 4/5] PCI: generic: Correct, and avoid overflow,
+ in bus_max calculation.
+In-Reply-To: <20150923193545.GZ7356@arm.com>
+References: <1442527332-1174-1-git-send-email-ddaney.cavm@gmail.com>
+ <3751968.n8LRgots8n@wuerfel> <20150923193545.GZ7356@arm.com>
+Message-ID: <1707525.QvfFzUYq4E@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display nodes are common to both STiH407 and STiH410, move them to the
-family file.
+On Wednesday 23 September 2015 20:35:45 Will Deacon wrote:
+> On Wed, Sep 23, 2015 at 08:27:41PM +0100, Arnd Bergmann wrote:
+> > On Wednesday 23 September 2015 11:21:56 David Daney wrote:
+> > > >>
+> > > >>      /* Limit the bus-range to fit within reg */
+> > > >> -    bus_max = pci->cfg.bus_range->start +
+> > > >> -              (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
+> > > >> +    bus_max = (resource_size(&pci->cfg.res) >> pci->cfg.ops.bus_shift) - 1;
+> > > >> +    if (bus_max > 255)
+> > > >> +            bus_max = 255;
+> > > >
+> > > > I still don't understand the need for this part. If the cfg space is bigger
+> > > > than bus_max, isn't that simply an invalid resource? Given that the resource
+> > > > could be broken in other ways too, this check feels more like a specific
+> > > > workaround rather than generally useful code.
+> > > 
+> > > Imagine...
+> > > 
+> > >    bus-range [0x80 .. 0xff], this requires a cfg.res that will cover the 
+> > > entire range of 0..0xff.
+> > > 
+> > >    according to the calculations above, (resource_size(&pci->cfg.res) >> 
+> > > pci->cfg.ops.bus_shift) - 1 will have a value of 0xff, so...
+> > 
+> > Extending the computation to 32 bit seems fine, but I'd rather warn loudly
+> > if the bus range does not fit within the registers.
+> > 
+> > Also note that the computation is already correct with my interpretation
+> > of the reg property.
+> 
+> From what Lorenzo was saying, ACPI shares the interpretation that David is
+> implementing here and, given that the DT version seems to be subjective,
+> aligning this reg property with MMCFG seems to make sense.
 
-Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
----
- arch/arm/boot/dts/stih407-family.dtsi | 13 +++++++++++++
- arch/arm/boot/dts/stih407.dtsi        | 13 -------------
- arch/arm/boot/dts/stih410.dtsi        | 13 -------------
- 3 files changed, 13 insertions(+), 26 deletions(-)
+We should then make it very clear in the binding that the driver
+is not allowed to actually map the registers for the buses outside
+of the bus-range, as that is highly unusual.
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 9975e8f..5b454d9 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -152,6 +152,19 @@
- 					<ST_IRQ_SYSCFG_DISABLED>;
- 		};
- 
-+		/* Display */
-+		vtg_main: sti-vtg-main at 8d02800 {
-+			compatible = "st,vtg";
-+			reg = <0x8d02800 0x200>;
-+			interrupts = <GIC_SPI 108 IRQ_TYPE_NONE>;
-+		};
-+
-+		vtg_aux: sti-vtg-aux at 8d00200 {
-+			compatible = "st,vtg";
-+			reg = <0x8d00200 0x100>;
-+			interrupts = <GIC_SPI 109 IRQ_TYPE_NONE>;
-+		};
-+
- 		serial at 9830000 {
- 			compatible = "st,asc";
- 			reg = <0x9830000 0x2c>;
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-index 3efa3b2..98c3468 100644
---- a/arch/arm/boot/dts/stih407.dtsi
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -10,19 +10,6 @@
- #include "stih407-family.dtsi"
- / {
- 	soc {
--		/* Display */
--		vtg_main: sti-vtg-main at 8d02800 {
--			compatible = "st,vtg";
--			reg = <0x8d02800 0x200>;
--			interrupts = <GIC_SPI 108 IRQ_TYPE_NONE>;
--		};
--
--		vtg_aux: sti-vtg-aux at 8d00200 {
--			compatible = "st,vtg";
--			reg = <0x8d00200 0x100>;
--			interrupts = <GIC_SPI 109 IRQ_TYPE_NONE>;
--		};
--
- 		sti-display-subsystem {
- 			compatible = "st,sti-display-subsystem";
- 			#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
-index 6f40bc9..23f4a48 100644
---- a/arch/arm/boot/dts/stih410.dtsi
-+++ b/arch/arm/boot/dts/stih410.dtsi
-@@ -85,19 +85,6 @@
- 			phy-names = "usb";
- 		};
- 
--		/* Display */
--		vtg_main: sti-vtg-main at 8d02800 {
--			compatible = "st,vtg";
--			reg = <0x8d02800 0x200>;
--			interrupts = <GIC_SPI 108 IRQ_TYPE_NONE>;
--		};
--
--		vtg_aux: sti-vtg-aux at 8d00200 {
--			compatible = "st,vtg";
--			reg = <0x8d00200 0x100>;
--			interrupts = <GIC_SPI 109 IRQ_TYPE_NONE>;
--		};
--
- 		sti-display-subsystem {
- 			compatible = "st,sti-display-subsystem";
- 			#address-cells = <1>;
--- 
-1.9.1
+We would also need a special exception for this if we ever get to
+implement the DT source checker that we have been talking about for
+years, as the reg property might then overlap with a property from
+another device.
+
+	Arnd
