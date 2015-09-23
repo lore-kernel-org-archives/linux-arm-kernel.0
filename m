@@ -1,74 +1,220 @@
 From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 23 Sep 2015 21:37:27 +0200
-Subject: [PATCH 1/3] ARM: dts: stih407: Enable PWM nodes only board level
-In-Reply-To: <1443037049-6167-1-git-send-email-maxime.coquelin@st.com>
-References: <1443037049-6167-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <1443037049-6167-2-git-send-email-maxime.coquelin@st.com>
+Date: Wed, 23 Sep 2015 21:48:03 +0200
+Subject: [PATCH] drm: sti: adapt DT to fix probe/bind issues in DRM driver
+Message-ID: <1443037683-6621-1-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM may not be used on some boards, so enable them only the board file.
+From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 
+STI drm drivers probe and bind using component framework was incorrect.
+In addition to drivers fix DT update is needed to make all sub-components
+become childs of sti-display-subsystem.
+
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- arch/arm/boot/dts/stih407-family.dtsi | 6 ++++--
- arch/arm/boot/dts/stihxxx-b2120.dtsi  | 8 ++++++++
- 2 files changed, 12 insertions(+), 2 deletions(-)
+Hi Arnd, Olof & Kevin,
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index ae05277..9975e8f 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -585,7 +585,6 @@
- 		/* COMMS PWM Module */
- 		pwm0: pwm at 9810000 {
- 			compatible	= "st,sti-pwm";
--			status		= "okay";
- 			#pwm-cells	= <2>;
- 			reg		= <0x9810000 0x68>;
- 			pinctrl-names	= "default";
-@@ -593,12 +592,13 @@
- 			clock-names	= "pwm";
- 			clocks		= <&clk_sysin>;
- 			st,pwm-num-chan = <1>;
+This patch has its driver counterpart merged in v4.3-rc1.
+As missing in v4.3, the display is now broken on STiH07 and STiH410 platforms.
+
+I have only this single patch for v4.3-rc fixes, so can you pick it directly,
+or I should send a pull-request anyway?
+
+Thanks,
+Maxime
+
+---
+ arch/arm/boot/dts/stih407.dtsi | 82 +++++++++++++++++++++---------------------
+ arch/arm/boot/dts/stih410.dtsi | 82 +++++++++++++++++++++---------------------
+ 2 files changed, 80 insertions(+), 84 deletions(-)
+
+diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+index 3efa3b2..6b914e4 100644
+--- a/arch/arm/boot/dts/stih407.dtsi
++++ b/arch/arm/boot/dts/stih407.dtsi
+@@ -103,48 +103,46 @@
+ 							 <&clk_s_d0_quadfs 0>,
+ 							 <&clk_s_d2_quadfs 0>,
+ 							 <&clk_s_d2_quadfs 0>;
+-				ranges;
+-
+-				sti-hdmi at 8d04000 {
+-					compatible = "st,stih407-hdmi";
+-					reg = <0x8d04000 0x1000>;
+-					reg-names = "hdmi-reg";
+-					interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
+-					interrupt-names	= "irq";
+-					clock-names = "pix",
+-						      "tmds",
+-						      "phy",
+-						      "audio",
+-						      "main_parent",
+-						      "aux_parent";
+-
+-					clocks = <&clk_s_d2_flexgen CLK_PIX_HDMI>,
+-						 <&clk_s_d2_flexgen CLK_TMDS_HDMI>,
+-						 <&clk_s_d2_flexgen CLK_REF_HDMIPHY>,
+-						 <&clk_s_d0_flexgen CLK_PCM_0>,
+-						 <&clk_s_d2_quadfs 0>,
+-						 <&clk_s_d2_quadfs 1>;
+-
+-					hdmi,hpd-gpio = <&pio5 3>;
+-					reset-names = "hdmi";
+-					resets = <&softreset STIH407_HDMI_TX_PHY_SOFTRESET>;
+-					ddc = <&hdmiddc>;
+-
+-				};
+-
+-				sti-hda at 8d02000 {
+-					compatible = "st,stih407-hda";
+-					reg = <0x8d02000 0x400>, <0x92b0120 0x4>;
+-					reg-names = "hda-reg", "video-dacs-ctrl";
+-					clock-names = "pix",
+-						      "hddac",
+-						      "main_parent",
+-						      "aux_parent";
+-					clocks = <&clk_s_d2_flexgen CLK_PIX_HDDAC>,
+-						 <&clk_s_d2_flexgen CLK_HDDAC>,
+-						 <&clk_s_d2_quadfs 0>,
+-						 <&clk_s_d2_quadfs 1>;
+-				};
++			};
 +
-+			status		= "disabled";
- 		};
- 
- 		/* SBC PWM Module */
- 		pwm1: pwm at 9510000 {
- 			compatible	= "st,sti-pwm";
--			status		= "okay";
- 			#pwm-cells	= <2>;
- 			reg		= <0x9510000 0x68>;
- 			pinctrl-names	= "default";
-@@ -609,6 +609,8 @@
- 			clock-names	= "pwm";
- 			clocks		= <&clk_sysin>;
- 			st,pwm-num-chan = <4>;
++			sti-hdmi at 8d04000 {
++				compatible = "st,stih407-hdmi";
++				reg = <0x8d04000 0x1000>;
++				reg-names = "hdmi-reg";
++				interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
++				interrupt-names	= "irq";
++				clock-names = "pix",
++					      "tmds",
++					      "phy",
++					      "audio",
++					      "main_parent",
++					      "aux_parent";
 +
-+			status		= "disabled";
++				clocks = <&clk_s_d2_flexgen CLK_PIX_HDMI>,
++					 <&clk_s_d2_flexgen CLK_TMDS_HDMI>,
++					 <&clk_s_d2_flexgen CLK_REF_HDMIPHY>,
++					 <&clk_s_d0_flexgen CLK_PCM_0>,
++					 <&clk_s_d2_quadfs 0>,
++					 <&clk_s_d2_quadfs 1>;
++
++				hdmi,hpd-gpio = <&pio5 3>;
++				reset-names = "hdmi";
++				resets = <&softreset STIH407_HDMI_TX_PHY_SOFTRESET>;
++				ddc = <&hdmiddc>;
++			};
++
++			sti-hda at 8d02000 {
++				compatible = "st,stih407-hda";
++				reg = <0x8d02000 0x400>, <0x92b0120 0x4>;
++				reg-names = "hda-reg", "video-dacs-ctrl";
++				clock-names = "pix",
++					      "hddac",
++					      "main_parent",
++					      "aux_parent";
++				clocks = <&clk_s_d2_flexgen CLK_PIX_HDDAC>,
++					 <&clk_s_d2_flexgen CLK_HDDAC>,
++					 <&clk_s_d2_quadfs 0>,
++					 <&clk_s_d2_quadfs 1>;
+ 			};
  		};
  	};
- };
-diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-index f589fe4..ab029f7 100644
---- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-+++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-@@ -27,6 +27,14 @@
+diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+index 6f40bc9..8c6e61a 100644
+--- a/arch/arm/boot/dts/stih410.dtsi
++++ b/arch/arm/boot/dts/stih410.dtsi
+@@ -178,48 +178,46 @@
+ 							 <&clk_s_d0_quadfs 0>,
+ 							 <&clk_s_d2_quadfs 0>,
+ 							 <&clk_s_d2_quadfs 0>;
+-				ranges;
+-
+-				sti-hdmi at 8d04000 {
+-					compatible = "st,stih407-hdmi";
+-					reg = <0x8d04000 0x1000>;
+-					reg-names = "hdmi-reg";
+-					interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
+-					interrupt-names	= "irq";
+-					clock-names = "pix",
+-						      "tmds",
+-						      "phy",
+-						      "audio",
+-						      "main_parent",
+-						      "aux_parent";
+-
+-					clocks = <&clk_s_d2_flexgen CLK_PIX_HDMI>,
+-						 <&clk_s_d2_flexgen CLK_TMDS_HDMI>,
+-						 <&clk_s_d2_flexgen CLK_REF_HDMIPHY>,
+-						 <&clk_s_d0_flexgen CLK_PCM_0>,
+-						 <&clk_s_d2_quadfs 0>,
+-						 <&clk_s_d2_quadfs 1>;
+-
+-					hdmi,hpd-gpio = <&pio5 3>;
+-					reset-names = "hdmi";
+-					resets = <&softreset STIH407_HDMI_TX_PHY_SOFTRESET>;
+-					ddc = <&hdmiddc>;
+-
+-				};
+-
+-				sti-hda at 8d02000 {
+-					compatible = "st,stih407-hda";
+-					reg = <0x8d02000 0x400>, <0x92b0120 0x4>;
+-					reg-names = "hda-reg", "video-dacs-ctrl";
+-					clock-names = "pix",
+-						      "hddac",
+-						      "main_parent",
+-						      "aux_parent";
+-					clocks = <&clk_s_d2_flexgen CLK_PIX_HDDAC>,
+-						 <&clk_s_d2_flexgen CLK_HDDAC>,
+-						 <&clk_s_d2_quadfs 0>,
+-						 <&clk_s_d2_quadfs 1>;
+-				};
++			};
++
++			sti-hdmi at 8d04000 {
++				compatible = "st,stih407-hdmi";
++				reg = <0x8d04000 0x1000>;
++				reg-names = "hdmi-reg";
++				interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
++				interrupt-names	= "irq";
++				clock-names = "pix",
++					      "tmds",
++					      "phy",
++					      "audio",
++					      "main_parent",
++					      "aux_parent";
++
++				clocks = <&clk_s_d2_flexgen CLK_PIX_HDMI>,
++					 <&clk_s_d2_flexgen CLK_TMDS_HDMI>,
++					 <&clk_s_d2_flexgen CLK_REF_HDMIPHY>,
++					 <&clk_s_d0_flexgen CLK_PCM_0>,
++					 <&clk_s_d2_quadfs 0>,
++					 <&clk_s_d2_quadfs 1>;
++
++				hdmi,hpd-gpio = <&pio5 3>;
++				reset-names = "hdmi";
++				resets = <&softreset STIH407_HDMI_TX_PHY_SOFTRESET>;
++				ddc = <&hdmiddc>;
++			};
++
++			sti-hda at 8d02000 {
++				compatible = "st,stih407-hda";
++				reg = <0x8d02000 0x400>, <0x92b0120 0x4>;
++				reg-names = "hda-reg", "video-dacs-ctrl";
++				clock-names = "pix",
++					      "hddac",
++					      "main_parent",
++					      "aux_parent";
++				clocks = <&clk_s_d2_flexgen CLK_PIX_HDDAC>,
++					 <&clk_s_d2_flexgen CLK_HDDAC>,
++					 <&clk_s_d2_quadfs 0>,
++					 <&clk_s_d2_quadfs 1>;
  			};
  		};
  
-+		pwm0: pwm at 9810000 {
-+			status = "okay";
-+		};
-+
-+		pwm1: pwm at 9510000 {
-+			status = "okay";
-+		};
-+
- 		i2c at 9842000 {
- 			status = "okay";
- 		};
 -- 
 1.9.1
