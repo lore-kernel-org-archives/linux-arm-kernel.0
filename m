@@ -1,60 +1,44 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 23 Sep 2015 11:26:33 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Sep 2015 10:26:50 +0100
 Subject: Steps to submit a new arch/arm port
-In-Reply-To: <3168184.5li5Yj9y1C@wuerfel>
-References: <56001B78.2090001@free.fr> <144297172.JfjI0hNJ9J@wuerfel>
- <5601799C.20701@free.fr> <3168184.5li5Yj9y1C@wuerfel>
-Message-ID: <56027049.7010504@free.fr>
+In-Reply-To: <56026F0B.2000701@free.fr>
+References: <56001B78.2090001@free.fr> <2206647.QPrIpE2UC0@wuerfel>
+ <56016780.5080104@free.fr> <144297172.JfjI0hNJ9J@wuerfel>
+ <5601799C.20701@free.fr>
+ <20150922162947.GC21084@n2100.arm.linux.org.uk>
+ <56026795.3090403@free.fr>
+ <20150923091342.GH21084@n2100.arm.linux.org.uk>
+ <56026F0B.2000701@free.fr>
+Message-ID: <20150923092650.GJ21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/09/2015 21:15, Arnd Bergmann wrote:
-> On Tuesday 22 September 2015 17:54:04 Mason wrote:
->> On 22/09/2015 16:51, Arnd Bergmann wrote:
->>> On Tuesday 22 September 2015 16:36:48 Mason wrote:
->>>
->>>> arch/arm/mach-tangox/Kconfig
->>>> +if ARCH_TANGOX
->>>> +
->>>> +config UNCOMPRESS_INCLUDE
->>>> +	string
->>>> +	default "debug/uncompress.h"
->>>
->>> Better do this like everyone else.
->>
->> Do you mean I should provide an empty mach/uncompress.h ?
+On Wed, Sep 23, 2015 at 11:21:15AM +0200, Mason wrote:
+> On 23/09/2015 11:13, Russell King - ARM Linux wrote:
+> > On Wed, Sep 23, 2015 at 10:49:25AM +0200, Mason wrote:
+> >> In my platform Kconfig, something along the lines of
+> >>
+> >> config ARM_L1_CACHE_SHIFT
+> >> 	int
+> >> 	default 5 if !ARCH_MULTIPLATFORM
+> > 
+> > How would that be useful to you?  Arnd is saying that you will always
+> > need ARCH_MULTIPLATFORM selected to build your platform.
+> > 
+> > This symbol doesn't automatically turn off just because you only have
+> > one platform enabled.
 > 
-> No, add a debug/*.S file for your uart and do the configuration in
-> arch/arm/Kconfig.debug.
+> I must be missing the big picture for ARCH_MULTIPLATFORM.
 > 
-> The UNCOMPRESS_INCLUDE symbol is defined in arch/arm/Kconfig.debug,
-> and you should not duplicate that.
+> I thought modern ports /had/ to support it, but that it could
+> be disabled locally to build a single platform kernel?
 
-config UNCOMPRESS_INCLUDE
-	string
-	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
-					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M || \
-					ARCH_SHMOBILE_LEGACY
-	default "mach/uncompress.h"
+ARCH_MULTIPLATFORM is purely a Kconfig construct to allow separation of
+platforms which support being built together, and those which don't.
+It provides a certain basic level of support when enabled (such as DT,
+CCF, etc.)  It remains enabled even if you only want to build for one
+platform in the multi-platform group.
 
-
-I'm going for the smallest possible port, I don't have a debug/tango.S
-I didn't define DEBUG_UNCOMPRESS in my .config, and I just wanted to
-get this NOP definition from debug/uncompress.h
-
-	static inline void putc(int c) {}
-
-Are you saying I cannot do it like that?
-
-If ARCH_MULTIPLATFORM is defined, then debug/uncompress.h will be
-included, just like I want.
-
-If ARCH_MULTIPLATFORM is not defined, can I do this in my port:
-
-config UNCOMPRESS_INCLUDE
-	string
-	default "debug/uncompress.h" if !ARCH_MULTIPLATFORM
-
-or add my platform to the list on arch/arm/Kconfig.debug?
-
-Regards.
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
