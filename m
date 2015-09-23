@@ -1,49 +1,81 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Wed, 23 Sep 2015 11:38:24 +0200
-Subject: [PATCH] arm: dma-mapping: add cast to DMA_ERROR_CODE
-In-Reply-To: <1439653971-867-1-git-send-email-dirk.behme@gmail.com>
-References: <1439653971-867-1-git-send-email-dirk.behme@gmail.com>
-Message-ID: <56027310.3010603@gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 23 Sep 2015 11:39:16 +0200
+Subject: [PATCH] net: sun4i-emac: Properly free resources on probe failure and
+ remove
+Message-ID: <1443001156-20333-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.08.2015 17:52, Dirk Behme wrote:
-> Fix the compiler warning
->
-> ./arch/arm/include/asm/dma-mapping.h: In function ?dma_mapping_error?:
-> ./arch/arm/include/asm/dma-mapping.h:176:18: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
->    return dma_addr == DMA_ERROR_CODE;
->                    ^
->
-> we get building the kernel with W=1.
->
-> This is done the same way we have already in the arm64 version.
->
-> Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
-> ---
->   arch/arm/include/asm/dma-mapping.h | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index b52101d..68e41e8 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -14,7 +14,7 @@
->   #include <xen/xen.h>
->   #include <asm/xen/hypervisor.h>
->
-> -#define DMA_ERROR_CODE	(~0)
-> +#define DMA_ERROR_CODE	(~(dma_addr_t)0)
->   extern struct dma_map_ops arm_dma_ops;
->   extern struct dma_map_ops arm_coherent_dma_ops;
+Fix sun4i-emac not releasing the following resources:
+-iomapped memory not released on probe-failure nor on remove
+-clock not getting disabled on probe-failure nor on remove
+-sram not being released on remove
 
+And while at it also add error checking to the clk_prepare_enable call
+done on probe.
 
-I've put this as 8420/1 into the patch system:
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/net/ethernet/allwinner/sun4i-emac.c | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8420/1
-
-Any comments on this?
-
-Best regards
-
-Dirk
+diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
+index 48ce83e..8d50314 100644
+--- a/drivers/net/ethernet/allwinner/sun4i-emac.c
++++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
+@@ -847,21 +847,25 @@ static int emac_probe(struct platform_device *pdev)
+ 	if (ndev->irq == -ENXIO) {
+ 		netdev_err(ndev, "No irq resource\n");
+ 		ret = ndev->irq;
+-		goto out;
++		goto out_iounmap;
+ 	}
+ 
+ 	db->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(db->clk)) {
+ 		ret = PTR_ERR(db->clk);
+-		goto out;
++		goto out_iounmap;
+ 	}
+ 
+-	clk_prepare_enable(db->clk);
++	ret = clk_prepare_enable(db->clk);
++	if (ret) {
++		dev_err(&pdev->dev, "Error couldn't enable clock (%d)\n", ret);
++		goto out_iounmap;
++	}
+ 
+ 	ret = sunxi_sram_claim(&pdev->dev);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Error couldn't map SRAM to device\n");
+-		goto out;
++		goto out_clk_disable_unprepare;
+ 	}
+ 
+ 	db->phy_node = of_parse_phandle(np, "phy", 0);
+@@ -910,6 +914,10 @@ static int emac_probe(struct platform_device *pdev)
+ 
+ out_release_sram:
+ 	sunxi_sram_release(&pdev->dev);
++out_clk_disable_unprepare:
++	clk_disable_unprepare(db->clk);
++out_iounmap:
++	iounmap(db->membase);
+ out:
+ 	dev_err(db->dev, "not found (%d).\n", ret);
+ 
+@@ -921,8 +929,12 @@ out:
+ static int emac_remove(struct platform_device *pdev)
+ {
+ 	struct net_device *ndev = platform_get_drvdata(pdev);
++	struct emac_board_info *db = netdev_priv(ndev);
+ 
+ 	unregister_netdev(ndev);
++	sunxi_sram_release(&pdev->dev);
++	clk_disable_unprepare(db->clk);
++	iounmap(db->membase);
+ 	free_netdev(ndev);
+ 
+ 	dev_dbg(&pdev->dev, "released and freed device\n");
+-- 
+2.5.0
