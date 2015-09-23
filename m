@@ -1,52 +1,52 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Wed, 23 Sep 2015 10:18:40 -0700
-Subject: [Patch v2 02/10] soc: qcom: smd-rpm: Add existing platform support
-In-Reply-To: <1443027209-19444-3-git-send-email-agross@codeaurora.org>
-References: <1443027209-19444-1-git-send-email-agross@codeaurora.org>
- <1443027209-19444-3-git-send-email-agross@codeaurora.org>
-Message-ID: <20150923171840.GD24668@usrtlx11787.corpusers.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Sep 2015 18:17:07 +0100
+Subject: [PATCH 0/6] mvebu PCI fixes and cleanups
+Message-ID: <20150923171706.GL21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 23 Sep 09:53 PDT 2015, Andy Gross wrote:
+This small series contains a number of fixes and cleanups to the
+mvebu PCI host code.
 
-> This patch adds support for all current Qualcomm platforms which utilize
-> RPM over SMD.  This includes both MSM8916 and APQ8084.
-> 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> ---
->  .../devicetree/bindings/soc/qcom/qcom,smd-rpm.txt  |    2 ++
->  drivers/soc/qcom/smd-rpm.c                         |    2 ++
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
-> index 3710dd5..7d05246 100644
-> --- a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
-> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
-> @@ -20,6 +20,8 @@ resources.
->  	Value type: <string>
->  	Definition: must be one of:
->  		    "qcom,rpm-msm8974"
-> +		    "qcom,rpm-msm8916"
-> +		    "qcom,rpm-apq8084"
->  
->  - qcom,smd-channels:
->  	Usage: required
-> diff --git a/drivers/soc/qcom/smd-rpm.c b/drivers/soc/qcom/smd-rpm.c
-> index 1392ccf..455083c 100644
-> --- a/drivers/soc/qcom/smd-rpm.c
-> +++ b/drivers/soc/qcom/smd-rpm.c
-> @@ -212,6 +212,8 @@ static void qcom_smd_rpm_remove(struct qcom_smd_device *sdev)
->  
->  static const struct of_device_id qcom_smd_rpm_of_match[] = {
->  	{ .compatible = "qcom,rpm-msm8974" },
-> +	{ .compatible = "qcom,rpm-msm8916" },
-> +	{ .compatible = "qcom,rpm-apq8084" },
->  	{}
+The first patch makes the PCIe host controller more conformant with the
+requirements of the PCI specification, which requires where a device is
+present, unused PCI configuration space returns zero.  This patch
+ensures that is the case.
 
-This is now how the alphabet works, please update the order and add:
+The second patch fixes the very broken idea that it's somehow legal to
+read-modify-write the PCI configuration space using 32-bit accessors,
+even when accessing a smaller register.  There are _multiple_ registers
+in PCI space where bits are defined to be "RW1C" - which means "read,
+write 1 to clear".  Registers include the PCI status register, and all
+PCIe status registers.  Hardware which does not support generating 16-bit
+and 8-bit configuration cycles is essentially broken and non-conformant.
+Luckily, that is not true of Armada hardware.  This patch fixes it.
+Tested on Armada 388.
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+These two patches should be considered as fixes.  I don't see a need for
+them to be backported to stable kernels as there is no serious breakage
+resulting from them with the driver in its current state.  The remainder
+are cleanups.
 
-Regards,
-Bjorn
+Patch 3 gets rid of the open coded "of_get_available_child_count()"
+implementation.
+
+Patch 4 uses for_each_available_child_of_node(), rather than
+for_each_child_of_node() and checking whether of_device_is_available()
+returns true.  for_each_available_child_of_node() is meant for this.
+
+Patch 5 makes the warning message for the lack of the "marvell,pcie-port"
+property more useful, by printing the DT path of the offending node
+rather than the wooly "PCIe DT node".
+
+Lastly, patch 6 converts all the "PCIe%d.%d" and "pcie%d.%d" with the
+port name string, which is a pre-prepared string of that format.  This
+means we end up with a consistent name for the port being used everywhere
+which is good for user experience.
+
+ drivers/pci/host/pci-mvebu.c | 87 ++++++++++++++++++++++++--------------------
+ 1 file changed, 47 insertions(+), 40 deletions(-)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
