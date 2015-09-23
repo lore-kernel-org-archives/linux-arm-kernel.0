@@ -1,33 +1,55 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Sep 2015 09:51:30 +0200
-Subject: [PATCH v2] PCI: generic: Add support for Cavium ThunderX PCIe
- root complexes.
-In-Reply-To: <1442967415-13595-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1442967415-13595-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1524364.fcqUh1gtkt@wuerfel>
+Date: Wed, 23 Sep 2015 10:01:01 +0200
+Subject: [PATCH v3 4/6] PCI: generic: Correct, and avoid overflow,
+ in bus_max calculation.
+In-Reply-To: <1442965757-12925-5-git-send-email-ddaney.cavm@gmail.com>
+References: <1442965757-12925-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442965757-12925-5-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1496061.0ds89jTH75@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 September 2015 17:16:55 David Daney wrote:
+On Tuesday 22 September 2015 16:49:15 David Daney wrote:
 > From: David Daney <david.daney@cavium.com>
 > 
-> The config space for external PCIe root complexes on some Cavium
-> ThunderX SoCs is very similar to CAM and ECAM, but differs in the
-> shift values that have to be applied to the bus and devfn numbers to
-> compose that address window offset.  These root complexes also have
-> the interesting property that there is no root bridge, so the standard
-> manner of limiting scanning to only the first device doesn't work.  We
-> can use the standard pci-host-generic driver if we make a minor
-> addition to handle these differences, so we...
+> There are two problems with the bus_max calculation:
 > 
-> Add a mapping function for ThunderX PCIe root complexes with a bus
-> shift of 24 and devfn shift of 16.  Ignore accesses for devices other
-> than the first device on the primary bus.
+> 1) The u8 data type can overflow for large config space windows.
 > 
-> Document the whole thing in devicetree/bindings/pci/host-generic-pci.txt
+> 2) The calculation is incorrect for a bus range that doesn't start at
+>    zero.
+> 
+> Since the configuration space is relative to bus zero, make bus_max
+> just be the size of the config window scaled by bus_shift.  Then clamp
+> it to a maximum of 255, per PCI.  Use a data type of int to avoid
+> overflow problems.
+> 
+> Update host-generic-pci.txt to clarify the semantics of the "reg"
+> property with respect to non-zero starting bus numbers.
 > 
 > Signed-off-by: David Daney <david.daney@cavium.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> 
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Not sure about this one
+
+> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> index cf3e205..105a968 100644
+> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> @@ -34,7 +34,9 @@ Properties of the host controller node:
+>  - #size-cells    : Must be 2.
+>  
+>  - reg            : The Configuration Space base address and size, as accessed
+> -                   from the parent bus.
+> +                   from the parent bus.  The base address corresponds to
+> +                   bus zero, even though the "bus-range" property may specify
+> +                   a different starting bus number.
+
+This sounds like very unusual behavior. If you have a system with faked
+bus numbers where the registers only physically exist for a subset of the
+buses, this requires defining a reg property that contains MMIO space
+which is outside of the device and potentially contains other devices.
+
+What would break if we instead defined it the expected way and only
+list the registers for the bus numbers in the "bus-range" property?
+
+	Arnd
