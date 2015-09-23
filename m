@@ -1,34 +1,81 @@
-From: karme@karme.de (Jens Thiele)
-Date: Wed, 23 Sep 2015 10:07:51 +0200
-Subject: [linux-sunxi] [PATCH 2/6] ARM: dts: sun7i: Enable USB DRC on
- Bananapi
-In-Reply-To: <1442928966-6418-2-git-send-email-hdegoede@redhat.com> (Hans de
- Goede's message of "Tue, 22 Sep 2015 15:36:01 +0200")
-References: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
- <1442928966-6418-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <87io718so8.fsf@karme.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Sep 2015 10:21:10 +0200
+Subject: [PATCH v3 3/6] PCI: generic: Quit clobbering our pci_ops.
+In-Reply-To: <1442965757-12925-4-git-send-email-ddaney.cavm@gmail.com>
+References: <1442965757-12925-1-git-send-email-ddaney.cavm@gmail.com>
+ <1442965757-12925-4-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1729894.341fjYUAKl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hans de Goede <hdegoede@redhat.com> writes:
+On Tuesday 22 September 2015 16:49:14 David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> The pci-host-generic driver keeps a global struct pci_ops which it
+> then patches with the .map_bus method appropriate for the bus device.
+> A problem arises when the driver is used for two different types of
+> bus devices, the .map_bus method for the last device probed clobbers
+> the method for all previous devices.  The result, only the last bus
+> device probed has the proper .map_bus, and the others fail.
+> 
+> Move the struct pci_ops into the bus specific structure, and
+> initialize it when the bus device is probed.  Keep a copy of the
+> gen_pci_cfg_bus_ops structure, instead of a pointer to a global copy,
 
-> Enable the otg/drc usb controller on the Bananapi.
+This is a very useful change.
 
-would something similar apply to the a20 olimex olinuxino micro/lime2
-boards?
+> to future proof against the addition of bus specific elements to
+> struct pci_ops.
 
-is there some documentation how to port devicetree improvements/new
-features to all boards or to at least help with that? i think you did
-some workshop like that?
+but I don't like this part. We should just not have bus specific
+elements in pci_ops. We don't really have that here either, except
+that the gen_pci driver had a hack for reusing the same operations
+for things that are actually different.
 
-i think i have seen other features being added only to some boards?
-pwm backlight?
-audio output?
-but my understanding of all of this is really very limited.
+It's an established practice that anything named '*_operations' is
+meant to be constant and ideally defined as 'static const ... *_ops;'
+in the driver. We could try to enforce this better by marking
+bus->ops as 'const' and changing all the instances of this structure
+accordingly.
 
-thanks,
-Jens
+> @@ -65,7 +65,11 @@ static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
+>  
+>  static struct gen_pci_cfg_bus_ops gen_pci_cfg_cam_bus_ops = {
+>  	.bus_shift	= 16,
+> -	.map_bus	= gen_pci_map_cfg_bus_cam,
+> +	.ops		= {
+> +		.map_bus	= gen_pci_map_cfg_bus_cam,
+> +		.read		= pci_generic_config_read,
+> +		.write		= pci_generic_config_write,
+> +	}
+>  };
 
--- 
-Prisirah - Building digital photo frames for family and friends using
-open-source hardware. http://karme.de/prisirah/
+So this is good. We could in theory unify the map_bus functions
+like this now:
+
+static void __iomem *gen_pci_map_cfg_bus(struct pci_bus *bus,
+                                         unsigned int devfn,
+                                         int where)
+{
+        struct gen_pci *pci = bus->sysdata;
+	struct gen_pci_cfg_bus_ops *ops;
+        resource_size_t idx;
+
+	ops = container_of(bus->ops, struct gen_pci_cfg_bus_ops, ops);
+	idx = bus->number - pci->cfg.bus_range->start;
+
+        return pci->cfg.win[idx] + ((devfn << ops->dev_shift) | where);
+}
+
+Not sure if that improves clarity or not, up to Will.
+
+> @@ -234,8 +237,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	of_id = of_match_node(gen_pci_of_match, np);
+> -	pci->cfg.ops = of_id->data;
+> +	pci->cfg.ops = *(struct gen_pci_cfg_bus_ops *)of_id->data;
+
+This is the part that grabbed my attention, we should not do it like this.
+
+	Arnd
