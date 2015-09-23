@@ -1,30 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Sep 2015 18:59:40 +0100
-Subject: [PATCH v2 2/5] PCI: generic: Only fixup irqs for bus we are
- creating.
-In-Reply-To: <1442527332-1174-3-git-send-email-ddaney.cavm@gmail.com>
-References: <1442527332-1174-1-git-send-email-ddaney.cavm@gmail.com>
- <1442527332-1174-3-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20150923175940.GU7356@arm.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 23 Sep 2015 11:01:34 -0700
+Subject: [PATCH 0/3] ALSA: hda - Avoid potential deadlock
+In-Reply-To: <1442484006-9614-1-git-send-email-thierry.reding@gmail.com>
+ (Thierry Reding's message of "Thu, 17 Sep 2015 12:00:03 +0200")
+References: <1442484006-9614-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <7ha8sddngh.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 11:02:09PM +0100, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> If we create multiple buses with pci-host-generic, or there are buses
-> created by other drivers, we don't want to call pci_fixup_irqs() which
-> operates on all devices, not just the devices on the bus being added.
-> The consequence is that either the fixups are done more than once, or
-> in some cases incorrect fixups could be applied.
-> 
-> Call pci_bus_fixup_irqs() instead of pci_fixup_irqs().
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
-> Changes from v1: Moved most of the code to pci_bus_fixup_irqs(),
-> making this patch very simple.
+Thierry Reding <thierry.reding@gmail.com> writes:
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+> From: Thierry Reding <treding@nvidia.com>
+>
+> The Tegra HDA controller driver committed in v3.16 causes deadlocks when
+> loaded as a module. The reason is that the driver core will lock the HDA
+> controller device upon calling its probe callback and the probe callback
+> then goes on to create child devices for detected codecs and loads their
+> modules via a request_module() call. This is problematic because the new
+> driver will immediately be bound to the device, which will in turn cause
+> the parent of the codec device (the HDA controller device) to be locked
+> again, causing a deadlock.
+>
+> This problem seems to have been present since the modularization of the
+> HD-audio driver in commit 1289e9e8b42f ("ALSA: hda - Modularize HD-audio
+> driver"). On Intel platforms this has been worked around by splitting up
+> the probe sequence into a synchronous and an asynchronous part where the
+> request_module() calls are asynchronous and hence avoid the deadlock.
+>
+> An alternative proposal is provided in this series of patches. Rather
+> than relying on explicit request_module() calls to load kernel modules
+> for HDA codec drivers, this implements a uevent callback for the HDA bus
+> to advertises the MODALIAS information to the userspace helper.
+>
+> Effectively this results in the same modules being loaded, but it uses
+> the more canonical infrastructure to perform this. Deferring the module
+> loading to userspace removes the need for the explicit request_module()
+> calls and works around the recursive locking issue because both drivers
+> will be bound from separate contexts.
 
-Will
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+FWIW, I tested this on top of next-20150923, and it solves the boot
+problem I'm seeing on tegra124-jetson-tk1 with module loading.
+
+Kevin
