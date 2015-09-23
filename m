@@ -1,62 +1,57 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 23 Sep 2015 12:02:15 +0200
-Subject: [PATCH v4 1/8] clk: imx: add common logic to detect early UART
- usage
-In-Reply-To: <CAOMZO5CDnRjxzcnxCDgXKN5SVkCxGqR5dMaectdPvVzpsb9=bQ@mail.gmail.com>
-References: <1442854444-4460-1-git-send-email-l.stach@pengutronix.de>
- <1442854444-4460-2-git-send-email-l.stach@pengutronix.de>
- <CAOMZO5CDnRjxzcnxCDgXKN5SVkCxGqR5dMaectdPvVzpsb9=bQ@mail.gmail.com>
-Message-ID: <1443002535.25479.6.camel@pengutronix.de>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Wed, 23 Sep 2015 18:03:19 +0800
+Subject: [PATCH] ASoC: mediatek: Increase periods_min in capture
+In-Reply-To: <1442213477-63721-1-git-send-email-koro.chen@mediatek.com>
+References: <1442213477-63721-1-git-send-email-koro.chen@mediatek.com>
+Message-ID: <1443002599.22786.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 21.09.2015, 14:56 -0300 schrieb Fabio Estevam:
-> On Mon, Sep 21, 2015 at 1:53 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> > Both earlycon and eralyprintk depend on the bootloader setup UART
-> 
-> s/eralyprintk/earlyprintk
-> 
-> > clocks being retained. This patch adds the common logic to detect such
-> > situations and make the information available to the clock drivers, as
-> > well as adding the facilities to disable those clocks at the end of
-> > the kernel init.
-> 
-> > +void __init imx_register_uart_clocks(struct clk ** const clks[])
-> > +{
-> > +       if (imx_keep_uart_clocks) {
-> > +               int i;
-> > +
-> > +               imx_uart_clocks = clks;
-> > +               for (i = 0; imx_uart_clocks[i]; i++)
-> > +                       clk_prepare_enable(*imx_uart_clocks[i]);
-> 
-> It would be better to check the return value from clk_prepare_enable()
-> and propagate it in the case of error.
-> 
-I don't see any value of that. We certainly don't want to abort probing
-of the clock driver just because keeping the debug UART clocks enabled
-did not work. Everything in this series is about improving the debug
-experience, so I'm not a fan of adding code that makes it more likely to
-break (possibly unrelated) things.
+Any suggestion for this patch?
 
-> > +
-> > +static int __init imx_clk_disable_uart(void)
-> > +{
-> > +       if (imx_keep_uart_clocks && imx_uart_clocks) {
-> > +               int i;
-> > +
-> > +               for (i = 0; imx_uart_clocks[i]; i++)
-> > +                       clk_disable_unprepare(*imx_uart_clocks[i]);
-> > +       }
-> > +
-> > +       return 0;
+On Mon, 2015-09-14 at 14:51 +0800, Koro Chen wrote:
+> In capture, there is chance that hw_ptr reported at IRQ is
+> a little smaller than period_size due to internal AFE buffer.
+> In the case of ping-pong buffer:
 > 
-> This function could be made 'void' instead.
-
-This is an initcall, which have a fixed function prototype.
-
-Regards,
-Lucas
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+> |xxxxxxxxxxxxxxxxxxxxxxxxxxxx--|-----------------------------|
+>                             hw_ptr < period_size
+> 
+> This available buffer will not be read since its size is smaller than
+> avail_min (which is period_size by default), and read thread continues
+> to sleep. If the next hw_ptr is just a little larger than buffer_size,
+> overrun occurs. One more period can hold the possible unread buffer.
+> 
+> Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+> ---
+>  sound/soc/mediatek/mtk-afe-pcm.c |   17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
+> index d190fe0..f5baf3c 100644
+> --- a/sound/soc/mediatek/mtk-afe-pcm.c
+> +++ b/sound/soc/mediatek/mtk-afe-pcm.c
+> @@ -549,6 +549,23 @@ static int mtk_afe_dais_startup(struct snd_pcm_substream *substream,
+>  	memif->substream = substream;
+>  
+>  	snd_soc_set_runtime_hwparams(substream, &mtk_afe_hardware);
+> +
+> +	/*
+> +	 * Capture cannot use ping-pong buffer since hw_ptr at IRQ may be
+> +	 * smaller than period_size due to AFE's internal buffer.
+> +	 * This easily leads to overrun when avail_min is period_size.
+> +	 * One more period can hold the possible unread buffer.
+> +	 */
+> +	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+> +		ret = snd_pcm_hw_constraint_minmax(runtime,
+> +						   SNDRV_PCM_HW_PARAM_PERIODS,
+> +						   3,
+> +						   mtk_afe_hardware.periods_max);
+> +		if (ret < 0) {
+> +			dev_err(afe->dev, "hw_constraint_minmax failed\n");
+> +			return ret;
+> +		}
+> +	}
+>  	ret = snd_pcm_hw_constraint_integer(runtime,
+>  					    SNDRV_PCM_HW_PARAM_PERIODS);
+>  	if (ret < 0)
