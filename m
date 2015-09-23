@@ -1,40 +1,32 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 23 Sep 2015 11:48:18 -0700
-Subject: [PATCH] arm64/pci: Add quirks for Cavium Thunder PCI bridges.
-In-Reply-To: <20150923184005.GX7356@arm.com>
-References: <1442966996-13419-1-git-send-email-ddaney.cavm@gmail.com>
- <20150923184005.GX7356@arm.com>
-Message-ID: <5602F3F2.2050100@caviumnetworks.com>
+From: fkan@apm.com (Feng Kan)
+Date: Wed, 23 Sep 2015 11:55:37 -0700
+Subject: [PATCH V5 0/2] copy to/in/from user optimization
+Message-ID: <1443034539-1848-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2015 11:40 AM, Will Deacon wrote:
-> On Wed, Sep 23, 2015 at 01:09:56AM +0100, David Daney wrote:
->> From: David Daney <david.daney@cavium.com>
->>
->> The Cavium ThunderX SoC needs a PCI quirk for its on-chip bridges.
->> Since it is arm64, create a new quirks.c file there to contain arm64
->> related quirks.  Add the ThunderX bridge quirk, gated by a new config
->> variable, so that it can be disabled for kernels that aren't expected
->> to be used on ThunderX.
->>
->> Signed-off-by: David Daney <david.daney@cavium.com>
->> ---
->>   arch/arm64/Kconfig         | 11 +++++++++++
->>   arch/arm64/kernel/Makefile |  2 +-
->>   arch/arm64/kernel/quirks.c | 36 ++++++++++++++++++++++++++++++++++++
->>   3 files changed, 48 insertions(+), 1 deletion(-)
->>   create mode 100644 arch/arm64/kernel/quirks.c
->
-> Why does this have to live in the arch/arm64/ directory? The quirks have
-> nothing to do with the architecture code.
->
+This coverts all copy in/from/to user file to use the copy template file.
+The copy template file is based on the memcpy.S. The first patch converts
+the memcpy to use the copy template as well. Overnight trinity test and
+10G iperf was used to test correctness and performance. Noticeable
+iperf improvement (~30%) on the receive side.
 
-It doesn't have to live there.  It is something that will never be used 
-for any other architecture.  So I thought we could do like 
-arch/x86/kernel/quirks.c
+V5 Changes:
+   1. Switch patch ordering.
+   2. Simplify assembly code and use fixed large tags in marco
+   3. Fixed indentation issue.
 
-I could move it to drivers/pci/quirks.c if people think that is a much 
-better place for it.
+Feng Kan (2):
+  arm64: Change memcpy in kernel to use the copy template file
+  arm64: copy_to-from-in_user optimization using copy template
 
-David Daney
+ arch/arm64/lib/copy_from_user.S |  78 +++++++++-------
+ arch/arm64/lib/copy_in_user.S   |  67 ++++++++------
+ arch/arm64/lib/copy_template.S  | 195 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/lib/copy_to_user.S   |  67 ++++++++------
+ arch/arm64/lib/memcpy.S         | 179 ++++++------------------------------
+ 5 files changed, 341 insertions(+), 245 deletions(-)
+ create mode 100644 arch/arm64/lib/copy_template.S
+
+-- 
+1.9.1
