@@ -1,39 +1,34 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 23 Sep 2015 10:02:14 +0200 (CEST)
-Subject: [RFC PATCH v5 2/4] genirq: add irq_migrate_all_off_this_cpu()
- for cpu hotplug
-In-Reply-To: <56022780.1030308@huawei.com>
-References: <1442631959-10228-1-git-send-email-yangyingliang@huawei.com>
- <1442631959-10228-3-git-send-email-yangyingliang@huawei.com>
- <alpine.DEB.2.11.1509222050300.5606@nanos> <56022780.1030308@huawei.com>
-Message-ID: <alpine.DEB.2.11.1509231001340.4371@nanos>
+From: karme@karme.de (Jens Thiele)
+Date: Wed, 23 Sep 2015 10:07:51 +0200
+Subject: [linux-sunxi] [PATCH 2/6] ARM: dts: sun7i: Enable USB DRC on
+ Bananapi
+In-Reply-To: <1442928966-6418-2-git-send-email-hdegoede@redhat.com> (Hans de
+ Goede's message of "Tue, 22 Sep 2015 15:36:01 +0200")
+References: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
+ <1442928966-6418-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <87io718so8.fsf@karme.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Sep 2015, Yang Yingliang wrote:
-> On 2015/9/23 2:54, Thomas Gleixner wrote:
-> > On Sat, 19 Sep 2015, Yang Yingliang wrote:
-> > 
-> > > Add irq_migrate_all_off_this_cpu() into kernel/irq/migration.c.
-> > 
-> > This doesn't make any sense at all.
-> > 
-> > You just reuse the existing file to stick your new code into it
-> > without reusing a single bit in that file. Aside of that it's
-> > unconditionally compiled, which means all existing users of
-> > CONFIG_GENERIC_PENDING_IRQ are burdened with pointless code.
-> > 
-> > The right thing to do is:
-> > 
-> > Add that code to a new file: kernel/irq/cpuhotplug.c and make that
-> > depend on CONFIG_GENERIC_IRQ_MIGRATION.
-> 
-> How about add #ifdef CONFIG_CPU_HOTPLUG around new code
-> in kernel/irq/migration.c ?
+Hans de Goede <hdegoede@redhat.com> writes:
 
-What's the point? Just to have useless churn and ifdeffery in that
-file for nothing?
+> Enable the otg/drc usb controller on the Bananapi.
 
-Thanks,
+would something similar apply to the a20 olimex olinuxino micro/lime2
+boards?
 
-	tglx
+is there some documentation how to port devicetree improvements/new
+features to all boards or to at least help with that? i think you did
+some workshop like that?
+
+i think i have seen other features being added only to some boards?
+pwm backlight?
+audio output?
+but my understanding of all of this is really very limited.
+
+thanks,
+Jens
+
+-- 
+Prisirah - Building digital photo frames for family and friends using
+open-source hardware. http://karme.de/prisirah/
