@@ -1,39 +1,40 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 23 Sep 2015 14:21:16 -0500
-Subject: [PATCH 2/6] arm64: Convert hcalls to use HVC immediate value
-In-Reply-To: <f1d72f4782ef5185626a012872f9ebefe057c7e8.1426793116.git.geoff@infradead.org>
-References: <cover.1426793116.git.geoff@infradead.org>
- <f1d72f4782ef5185626a012872f9ebefe057c7e8.1426793116.git.geoff@infradead.org>
-Message-ID: <CAOZdJXUNhGk59vEnAhXBUun2ieiuUfYH=GKmeB4-wK=azv5HBw@mail.gmail.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Wed, 23 Sep 2015 17:43:25 -0500
+Subject: [RESEND PATCHv3] arm64: dts: Add base stratix 10 dtsi
+In-Reply-To: <20150923055450.GA4883@svinekod>
+References: <1442353625-4552-1-git-send-email-dinguyen@opensource.altera.com>
+ <20150923055450.GA4883@svinekod>
+Message-ID: <CADhT+wccWpy9VhZv=yWRiA4tf1SO_1-EAu6_cc+UkPJOWX0Bpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 3:35 PM, Geoff Levand <geoff@infradead.org> wrote:
-> The existing arm64 hcall implementations are limited in that they only allow
-> for two distinct hcalls; with the x0 register either zero or not zero.  Also,
-> the API of the hyp-stub exception vector routines and the KVM exception vector
-> routines differ; hyp-stub uses a non-zero value in x0 to implement
-> __hyp_set_vectors, whereas KVM uses it to implement kvm_call_hyp.
+On Wed, Sep 23, 2015 at 12:54 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> +/ {
+>> +     compatible = "altr,socfpga-stratix10";
+>> +     #address-cells = <2>;
+>> +     #size-cells = <2>;
 >
-> To allow for additional hcalls to be defined and to make the arm64 hcall API
-> more consistent across exception vector routines, change the hcall
-> implementations to use the 16 bit immediate value of the HVC instruction to
-> specify the hcall type.
+> [...]
 >
-> Define three new preprocessor macros HVC_CALL_HYP, HVC_GET_VECTORS, and
-> HVC_SET_VECTORS to be used as hcall type specifiers and convert the
-> existing __hyp_get_vectors(), __hyp_set_vectors() and kvm_call_hyp() routines
-> to use these new macros when executing an HVC call.  Also, change the
-> corresponding hyp-stub and KVM el1_sync exception vector routines to use these
-> new macros.
+>> +     soc {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <1>;
+>> +             compatible = "simple-bus";
+>> +             device_type = "soc";
+>> +             interrupt-parent = <&intc>;
 >
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> As far as I am aware, this requires a (non-empty) ranges property, given the
+> parent node has {address,size}-cells = <2>.
+>
+> Does the kernel not complain currently?
+>
 
-What is the status of this patch?  I see it's not in 4.2.  I ask
-because this patch might be breaking our 4.2-based kernel, and I'm
-just wondering if it's still applicable.
+I do not see any complaints without ranges here, but with ranges, I get:
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+DTC     arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dtb
+Warning (ranges_format): /soc has empty "ranges" property but its
+#address-cells (1) differs from / (2)
+Warning (ranges_format): /soc has empty "ranges" property but its
+#size-cells (1) differs from / (2)
+
+Dinh
