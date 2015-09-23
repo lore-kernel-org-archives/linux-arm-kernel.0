@@ -1,30 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Sep 2015 19:40:05 +0100
-Subject: [PATCH] arm64/pci: Add quirks for Cavium Thunder PCI bridges.
-In-Reply-To: <1442966996-13419-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1442966996-13419-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20150923184005.GX7356@arm.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Wed, 23 Sep 2015 20:41:15 +0200
+Subject: [linux-sunxi][alsa-devel][PATCH 0/3]Add SPDIF support for
+ Allwinner SoCs
+In-Reply-To: <1443031494-32469-1-git-send-email-codekipper@gmail.com>
+References: <1443031494-32469-1-git-send-email-codekipper@gmail.com>
+Message-ID: <CAEKpxB=9nX6W7xpuQN5naqkkyEG-tkttfmFfs1JNgvpz=_UpEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 01:09:56AM +0100, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> The Cavium ThunderX SoC needs a PCI quirk for its on-chip bridges.
-> Since it is arm64, create a new quirks.c file there to contain arm64
-> related quirks.  Add the ThunderX bridge quirk, gated by a new config
-> variable, so that it can be disabled for kernels that aren't expected
-> to be used on ThunderX.
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  arch/arm64/Kconfig         | 11 +++++++++++
->  arch/arm64/kernel/Makefile |  2 +-
->  arch/arm64/kernel/quirks.c | 36 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 48 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/kernel/quirks.c
+Hi All,
+I'm getting a "fatal: 'send-email'" response with the last patch(even
+though the dry run of the patch series worked) and I've not been able
+to work around it. I'll post it as soon as I can work out what the
+issue is,
+BR,
+CK
 
-Why does this have to live in the arch/arm64/ directory? The quirks have
-nothing to do with the architecture code.
-
-Will
+On 23 September 2015 at 20:04,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+>
+> This patch set adds support for the Allwinner SPDIF transceiver as present
+> on the A10, A20 and A31 SoC boards.
+>
+> For now just the SPDIF transmitter has been tested on a Mele A2000.
+>
+> In order for this patch set to be functional we require audio clock patches
+> which will be delivered separately. For those that are interested I've pushed
+> the patches here with all the required changes to get SPDIF audio out of the
+> device.
+>
+> https://github.com/codekipper/linux-sunxi/commits/spdif_delivery
+>
+> Thanks in advance,
+> CK
+>
+> Marcus Cooper (3):
+>   dt-bindings: add sunxi SPDIF transceiver bindings
+>   dt-binding: Add sunxi SPDIF machine driver
+>   ASOC: sunxi: Add support for the spdif block
+>
+>  .../devicetree/bindings/sound/sunxi,spdif.txt      |  49 ++
+>  .../bindings/sound/sunxi-audio-spdif.txt           |  36 +
+>  sound/soc/sunxi/Kconfig                            |  10 +
+>  sound/soc/sunxi/Makefile                           |   4 +
+>  sound/soc/sunxi/sunxi-machine-spdif.c              | 110 +++
+>  sound/soc/sunxi/sunxi-spdif.c                      | 801 +++++++++++++++++++++
+>  6 files changed, 1010 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/sunxi,spdif.txt
+>  create mode 100644 Documentation/devicetree/bindings/sound/sunxi-audio-spdif.txt
+>  create mode 100644 sound/soc/sunxi/sunxi-machine-spdif.c
+>  create mode 100644 sound/soc/sunxi/sunxi-spdif.c
+>
+> --
+> 2.5.3
+>
