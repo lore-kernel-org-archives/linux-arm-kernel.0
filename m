@@ -1,33 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 23 Sep 2015 06:54:50 +0100
-Subject: [RESEND PATCHv3] arm64: dts: Add base stratix 10 dtsi
-In-Reply-To: <1442353625-4552-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1442353625-4552-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <20150923055450.GA4883@svinekod>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 23 Sep 2015 23:42:42 +0200
+Subject: [PATCH] mmc: mediatek: Add MMC_CAP_RUNTIME_RESUME support
+In-Reply-To: <1442901644-7587-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1442901644-7587-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAPDyKFo6heebOuQeodYNFcurr21SdQ-_m-9FvnpobZsZ8-mLAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +/ {
-> +	compatible = "altr,socfpga-stratix10";
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
+On 22 September 2015 at 08:00, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> Add MMC_CAP_RUNTIME_RESUME support to save resume time
+> Drop unnecessary SDC_ARG write
+>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 
-[...]
+Thanks, applied for next!
 
-> +	soc {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "simple-bus";
-> +		device_type = "soc";
-> +		interrupt-parent = <&intc>;
+Kind regards
+Uffe
 
-As far as I am aware, this requires a (non-empty) ranges property, given the
-parent node has {address,size}-cells = <2>.
-
-Does the kernel not complain currently?
-
-Otherwise this looks OK to me. Please fix the rangers property and ask for this
-to be taken via arm-soc. I note neither Arnd nor Olof are on Cc currently.
-
-Thanks,
-Mark.
+> ---
+>  drivers/mmc/host/mtk-sd.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> index 7153500..b2e89d3 100644
+> --- a/drivers/mmc/host/mtk-sd.c
+> +++ b/drivers/mmc/host/mtk-sd.c
+> @@ -729,7 +729,6 @@ static bool msdc_cmd_done(struct msdc_host *host, int events,
+>                         MSDC_INTEN_RSPCRCERR | MSDC_INTEN_CMDTMO |
+>                         MSDC_INTEN_ACMDRDY | MSDC_INTEN_ACMDCRCERR |
+>                         MSDC_INTEN_ACMDTMO);
+> -       writel(cmd->arg, host->base + SDC_ARG);
+>
+>         if (cmd->flags & MMC_RSP_PRESENT) {
+>                 if (cmd->flags & MMC_RSP_136) {
+> @@ -1302,6 +1301,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
+>         mmc->f_min = host->src_clk_freq / (4 * 255);
+>
+>         mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
+> +       mmc->caps |= MMC_CAP_RUNTIME_RESUME;
+>         /* MMC core transfer sizes tunable parameters */
+>         mmc->max_segs = MAX_BD_NUM;
+>         mmc->max_seg_size = BDMA_DESC_BUFLEN;
+> --
+> 1.8.1.1.dirty
+>
