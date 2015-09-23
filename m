@@ -1,32 +1,36 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Wed, 23 Sep 2015 15:48:26 +0900
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 23 Sep 2015 09:19:04 +0200
 Subject: [PATCH] ARM: dts: exynos5420: fix wrong clock binding for
  sysmmu_fimd1_1
-Message-ID: <1442990906-16411-1-git-send-email-jy0922.shim@samsung.com>
+In-Reply-To: <1442990906-16411-1-git-send-email-jy0922.shim@samsung.com>
+References: <1442990906-16411-1-git-send-email-jy0922.shim@samsung.com>
+Message-ID: <56025268.6040405@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sysmmu_fimd1_1 should bind the clock CLK_SMMU_FIMD1M1, not the clock
-CLK_SMMU_FIMD1M0. CLK_SMMU_FIMD1M0 is a clock for the sysmmu_fimd1_0.
+Hello Joonyoung,
 
-Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-Cc: <stable@vger.kernel.org> # v4.2
----
- arch/arm/boot/dts/exynos5420.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 09/23/2015 08:48 AM, Joonyoung Shim wrote:
+> The sysmmu_fimd1_1 should bind the clock CLK_SMMU_FIMD1M1, not the clock
+> CLK_SMMU_FIMD1M0. CLK_SMMU_FIMD1M0 is a clock for the sysmmu_fimd1_0.
+> 
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index df9aee9..1b3d6c7 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -1117,7 +1117,7 @@
- 		interrupt-parent = <&combiner>;
- 		interrupts = <3 0>;
- 		clock-names = "sysmmu", "master";
--		clocks = <&clock CLK_SMMU_FIMD1M0>, <&clock CLK_FIMD1>;
-+		clocks = <&clock CLK_SMMU_FIMD1M1>, <&clock CLK_FIMD1>;
- 		power-domains = <&disp_pd>;
- 		#iommu-cells = <0>;
- 	};
+Can you please mention in the commit message if this patch is solving an
+issue on a given machine or if it is just for the sake of correctness.
+
+Git blame shows that this was added by commit b70045167815 ("ARM: dts: add
+sysmmu nodes for exynos5420") so please add a Fixes: tag.
+
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> Cc: <stable@vger.kernel.org> # v4.2
+> ---
+
+Patch looks good to me.
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-1.9.1
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
