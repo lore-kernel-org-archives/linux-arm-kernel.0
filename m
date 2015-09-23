@@ -1,68 +1,25 @@
-From: B48286@freescale.com (Hou Zhiqiang)
-Date: Wed, 23 Sep 2015 03:05:20 +0000
-Subject: [PATCH 4/6] arm64/ls1043a: add DTS for Freescale LS1043A SoC
-In-Reply-To: <DM2PR0301MB07342356008C1A50AB26FEFFBA450@DM2PR0301MB0734.namprd03.prod.outlook.com>
-References: <1442838158-2964-1-git-send-email-B48286@freescale.com>
- <1442838158-2964-5-git-send-email-B48286@freescale.com>
- <20150922012403.GA1535@svinekod>
- <CY1PR0301MB078008B10188504C951076498B450@CY1PR0301MB0780.namprd03.prod.outlook.com>
- <DM2PR0301MB07342356008C1A50AB26FEFFBA450@DM2PR0301MB0734.namprd03.prod.outlook.com>
-Message-ID: <CY1PR0301MB07805FA01ACAF84648C806138B440@CY1PR0301MB0780.namprd03.prod.outlook.com>
+From: sugar.zhang@rock-chips.com (Sugar Zhang)
+Date: Wed, 23 Sep 2015 11:41:21 +0800
+Subject: [PATCH 0/2] ASoC: rockchip: i2s: add 8 channels capture and lrck-mode
+Message-ID: <1442979683-9441-1-git-send-email-sugar.zhang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Support max 8 channels capture.
+support lrck clk mode configuration, there are 3 modes:
 
+ - txrx: lrck_tx and lrck_rx are different.
+ - tx_share: lrck_tx is shared with lrck_rx.
+ - rx_share: lrck_rx is shared with lrck_tx.
 
-> -----Original Message-----
-> From: Li Yang-Leo-R58472
-> Sent: 2015?9?23? 1:23
-> To: Hou Zhiqiang-B48286; Mark Rutland; marc.zyngier at arm.com
-> Cc: linux-arm-kernel at lists.infradead.org; Catalin Marinas; Will Deacon;
-> linux-i2c at vger.kernel.org; linux-watchdog at vger.kernel.org; linux-
-> doc at vger.kernel.org; linux-clk at vger.kernel.org; Xie Shaohui-B21989;
-> corbet at lwn.net; Sharma Bhupesh-B45370; mturquette at baylibre.com; wsa at the-
-> dreams.de; sboyd at codeaurora.org; wim at iguana.be; Song Wenbin-B53747; Wood
-> Scott-B07421; Hu Mingkai-B21284
-> Subject: RE: [PATCH 4/6] arm64/ls1043a: add DTS for Freescale LS1043A SoC
-> 
-> > >
-> > > Hi,
-> > >
-> > > > +/memreserve/ 0x80000000 0x00010000;
-> > >
-> > > Why is this necessary?
-> >
-> > This memory region is pre-reserved for the spin-table/psci, although
-> > didn't add Enable method of secondary cores.
-> 
-> Can this be reserved by bootloader?
+Sugar Zhang (2):
+  ASoC: rockchip: i2s: add 8 channels capture and lrck-mode support
+  Documentation: DT bindings: rockchip-i2s: add capture and lrck-mode
 
-Yes, the memory for psci was reserved by u-boot code. But due to spin-table
-need the release address, is it better adding the /memreserve/ in dts file?
-Or add it by bootloader and fix the release address accordingly?
+ .../devicetree/bindings/sound/rockchip-i2s.txt     |  5 +++
+ sound/soc/rockchip/rockchip_i2s.c                  | 48 +++++++++++++++++++++-
+ sound/soc/rockchip/rockchip_i2s.h                  | 23 +++++++++++
+ 3 files changed, 74 insertions(+), 2 deletions(-)
 
-> 
-> >
-> > > If this is necessary, please add a comment stating what this is for.
-> > >
-> > > > +               cpu at 3 {
-> > > > +                       device_type = "cpu";
-> > > > +                       compatible = "arm,cortex-a53";
-> > > > +                       reg = <0x0 0x3>;
-> > > > +                       clocks = <&clockgen 1 0>;
-> > > > +               };
-> > >
-> > > Missing enable-method properties on all the secondary CPUs.
-> > >
-> >
-> > There are two methods (spin-table and psci) to bring up secondary
-> > cores, which one do you think is better?
-> 
-> Do we have the PSCI support ready in both UEFI and u-boot?  If not, we
-> should use spin-table for now.
->
-
-our internal u-boot supports PSCI but opensource doesn't support it for ARMv8.
-
-Thanks,
-Zhiqiang
+-- 
+2.3.6
