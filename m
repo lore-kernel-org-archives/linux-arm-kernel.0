@@ -1,16 +1,27 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 23 Sep 2015 05:17:47 -0700
-Subject: [PATCH] ARM: ls1021a: Add dma-coherent property for eTSEC nodes
-In-Reply-To: <1442213128-39279-1-git-send-email-b18965@freescale.com>
-References: <1442213128-39279-1-git-send-email-b18965@freescale.com>
-Message-ID: <20150923121747.GH3529@tiger>
+Date: Wed, 23 Sep 2015 05:19:49 -0700
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Remove CONFIG_VMSPLIT_2G
+In-Reply-To: <1442252529-13595-1-git-send-email-fabio.estevam@freescale.com>
+References: <1442252529-13595-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20150923121949.GI3529@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 14, 2015 at 02:45:28PM +0800, Alison Wang wrote:
-> This patch adds dma-coherent property for eTSEC nodes, so
-> coherent DMA operations are supported.
+On Mon, Sep 14, 2015 at 02:42:09PM -0300, Fabio Estevam wrote:
+> CONFIG_VMSPLIT_2G was added to mx5_defconfig by commit 06965c39b4c639
+> ("ARM i.MX5: update defconfig") to fix an issue where mx53 was not
+> detecting the full 1GiB memory range.
 > 
-> Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> However, as explained by Russell King [1] the correct fix is to select
+> CONFIG_HIGHMEM.
+> 
+> imx_v6_v7_deconfig inherited such option from mx5_defconfig.
+> 
+> As imx_v6_v7_deconfig has CONFIG_HIGHMEM=y, we should no longer
+> select such non-standard CONFIG_VMSPLIT_2G option.
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg137839.html
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
 Applied, thanks.
