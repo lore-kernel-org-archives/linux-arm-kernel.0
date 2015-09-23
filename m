@@ -1,61 +1,70 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 23 Sep 2015 10:44:07 +0100
-Subject: [PATCH 17/17] mfd : ab8500/db8500: fix the abuse of
- IRQF_NO_SUSPEND
-In-Reply-To: <20150922210322.GA3442@x1>
-References: <1442850433-5903-1-git-send-email-sudeep.holla@arm.com>
- <1442850433-5903-18-git-send-email-sudeep.holla@arm.com>
- <20150921232027.GD11284@x1> <560127BE.9030604@arm.com>
- <20150922210322.GA3442@x1>
-Message-ID: <56027467.1020803@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Sep 2015 10:51:52 +0100
+Subject: [PATCH] arm: dma-mapping: add cast to DMA_ERROR_CODE
+In-Reply-To: <56027310.3010603@gmail.com>
+References: <1439653971-867-1-git-send-email-dirk.behme@gmail.com>
+ <56027310.3010603@gmail.com>
+Message-ID: <20150923095152.GK21084@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Sep 23, 2015 at 11:38:24AM +0200, Dirk Behme wrote:
+> On 15.08.2015 17:52, Dirk Behme wrote:
+> >Fix the compiler warning
+> >
+> >./arch/arm/include/asm/dma-mapping.h: In function ?dma_mapping_error?:
+> >./arch/arm/include/asm/dma-mapping.h:176:18: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
+> >   return dma_addr == DMA_ERROR_CODE;
+> >                   ^
+> >
+> >we get building the kernel with W=1.
+> >
+> >This is done the same way we have already in the arm64 version.
+> >
+> >Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
+> >---
+> >  arch/arm/include/asm/dma-mapping.h | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> >diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> >index b52101d..68e41e8 100644
+> >--- a/arch/arm/include/asm/dma-mapping.h
+> >+++ b/arch/arm/include/asm/dma-mapping.h
+> >@@ -14,7 +14,7 @@
+> >  #include <xen/xen.h>
+> >  #include <asm/xen/hypervisor.h>
+> >
+> >-#define DMA_ERROR_CODE	(~0)
+> >+#define DMA_ERROR_CODE	(~(dma_addr_t)0)
+> >  extern struct dma_map_ops arm_dma_ops;
+> >  extern struct dma_map_ops arm_coherent_dma_ops;
+> 
+> 
+> I've put this as 8420/1 into the patch system:
+> 
+> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8420/1
+> 
+> Any comments on this?
 
+The reason your patch didn't get applied is because of:
 
-On 22/09/15 22:03, Lee Jones wrote:
-> On Tue, 22 Sep 2015, Sudeep Holla wrote:
->> On 22/09/15 00:20, Lee Jones wrote:
->>> On Mon, 21 Sep 2015, Sudeep Holla wrote:
->>>
->>>> The IRQF_NO_SUSPEND flag is used to identify the interrupts that should
->>>> be left enabled so as to allow them to work as expected during the
->>>> suspend-resume cycle, but doesn't guarantee that it will wake the system
->>> >from a suspended state, enable_irq_wake is recommended to be used for
->>>> the wakeup.
->>>>
->>>> This patch removes the use of IRQF_NO_SUSPEND flags replacing it with
->>>> enable_irq_wake instead.
->>>>
->>>> Cc: Linus Walleij <linus.walleij@linaro.org>
->>>> Cc: linux-arm-kernel at lists.infradead.org
->>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>>> ---
->>>>   drivers/mfd/ab8500-core.c        | 11 +++++++++--
->>>>   drivers/mfd/ab8500-debugfs.c     |  2 +-
->>>>   drivers/mfd/ab8500-gpadc.c       | 15 +++++++++++----
->>>>   drivers/mfd/db8500-prcmu.c       | 24 +++++++++++++++++-------
->>>>   drivers/power/ab8500_btemp.c     |  6 ++++--
->>>>   drivers/power/ab8500_charger.c   |  6 ++++--
->>>>   drivers/power/ab8500_fg.c        |  9 ++++++---
->>>>   drivers/thermal/db8500_thermal.c |  5 ++---
->>>>   drivers/usb/phy/phy-ab8500-usb.c | 10 ++++++----
->>>>   9 files changed, 60 insertions(+), 28 deletions(-)
->>>
->>> Is there a reason for bundling the changes in all of these subsystems
->>> together into a single patch?
->>>
->>
->> No, I understand this needs to be split. Since I was not 100% confident
->> about this change, I wanted LinusW to review and provide feedback and
->> gets things working before I can split this changes. I must have added
->> RFC, but usually it gets ignored :)
->
-> Best if Linus reviews the correct patch-set.  Please split and
-> resubmit.
->
-Sure, but would like to get some feedback before I proceed just to
-ensure my understanding is correct.
+commit 96231b2686b53f71838a335bdc404cb5285d1a01
+Author: Marek Szyprowski <m.szyprowski@samsung.com>
+Date:   Tue Aug 18 09:14:15 2015 +0100
 
-Regards,
-Sudeep
+    ARM: 8419/1: dma-mapping: harmonize definition of DMA_ERROR_CODE
+
+    All architectures except arm that define DMA_ERROR_CODE are casting it
+    to (dma_addr_t) - as it is always compared to dma_addr_t in arm as well
+    this could be harmonized.
+
+    Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+    Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+which does exactly the same thing as your patch, and first appeared
+in June.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
