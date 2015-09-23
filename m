@@ -1,63 +1,106 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Sep 2015 18:52:59 +0100
-Subject: [PATCH v2 3/3] irqchip/gicv3-its:  Handle OF device tree
- "msi-map" properties.
-In-Reply-To: <5602DC97.1040505@caviumnetworks.com>
-References: <1442966406-13198-1-git-send-email-ddaney.cavm@gmail.com>
- <1442966406-13198-4-git-send-email-ddaney.cavm@gmail.com>
- <20150923180100.03844936@arm.com>
- <5602DC97.1040505@caviumnetworks.com>
-Message-ID: <20150923175259.GT7356@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 23 Sep 2015 18:55:04 +0100
+Subject: [PATCH v4 07/11] KVM: arm/arm64: vgic: Allow HW interrupts to be
+ queued to a guest
+In-Reply-To: <1438962347-17541-8-git-send-email-marc.zyngier@arm.com>
+References: <1438962347-17541-1-git-send-email-marc.zyngier@arm.com>
+ <1438962347-17541-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <5602E778.3080004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 06:08:39PM +0100, David Daney wrote:
-> On 09/23/2015 10:01 AM, Marc Zyngier wrote:
-> > On Tue, 22 Sep 2015 17:00:06 -0700
-> > David Daney <ddaney.cavm@gmail.com> wrote:
-> >
-> >> From: David Daney <david.daney@cavium.com>
-> >>
-> >> Call of_msi_map_rid() to handle mapping of the requester id.
-> >>
-> >> Signed-off-by: David Daney <david.daney@cavium.com>
-> >> ---
-> >>   drivers/irqchip/irq-gic-v3-its-pci-msi.c | 3 ++-
-> >>   1 file changed, 2 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> >> index cf351c6..8b1c938 100644
-> >> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> >> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-> >> @@ -86,7 +86,8 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
-> >>   	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
-> >>
-> >>   	/* ITS specific DeviceID, as the core ITS ignores dev. */
-> >> -	info->scratchpad[0].ul = dev_alias.dev_id;
-> >> +	info->scratchpad[0].ul = of_msi_map_rid(dev, domain->of_node,
-> >> +						dev_alias.dev_id);
-> >>
-> >>   	return msi_info->ops->msi_prepare(domain->parent,
-> >>   					  dev, dev_alias.count, info);
-> >
-> > I really wonder if that shouldn't be part of the pci_for_each_dma_alias
-> > call. It would make a lot more sense for this functionality to be an
-> > integral part of the core code, and would probably make the integration
-> > of _IORT (which has the exact same requirements) a bit easier.
-> >
-> > Thoughts?
-> >
-> 
-> I am a proponent of pushing things like this as far into the core code 
-> as possible.  So, from that point of view, I think it would probably be 
-> a good idea.
-> 
-> I can prepare a patch that does that, but it would also be nice hear 
-> from other maintainers and get their thoughts on this.
+Salut Marc,
 
-Hmm, we use pci_for_each_dma_alias in the SMMU drivers to get the SID,
-so I'm not sure that using the MSI mapping is necessarily the right thing
-to do there. Maybe we should instead have dma_alias_to_msi_id helpers or
-something?
+I know that this patch is already merged, but ....
 
-Will
+On 07/08/15 16:45, Marc Zyngier wrote:
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 51c9900..9d009d2 100644
+...
+> @@ -1364,6 +1397,39 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+>  	return level_pending;
+>  }
+>  
+> +/*
+> + * Save the physical active state, and reset it to inactive.
+> + *
+> + * Return 1 if HW interrupt went from active to inactive, and 0 otherwise.
+> + */
+> +static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
+> +{
+> +	struct irq_phys_map *map;
+> +	int ret;
+> +
+> +	if (!(vlr.state & LR_HW))
+> +		return 0;
+> +
+> +	map = vgic_irq_map_search(vcpu, vlr.irq);
+> +	BUG_ON(!map || !map->active);
+> +
+> +	ret = irq_get_irqchip_state(map->irq,
+> +				    IRQCHIP_STATE_ACTIVE,
+> +				    &map->active);
+> +
+> +	WARN_ON(ret);
+> +
+> +	if (map->active) {
+> +		ret = irq_set_irqchip_state(map->irq,
+> +					    IRQCHIP_STATE_ACTIVE,
+> +					    false);
+> +		WARN_ON(ret);
+> +		return 0;
+> +	}
+> +
+> +	return 1;
+> +}
+> +
+>  /* Sync back the VGIC state after a guest run */
+>  static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+>  {
+> @@ -1378,14 +1444,31 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+>  	elrsr = vgic_get_elrsr(vcpu);
+>  	elrsr_ptr = u64_to_bitmask(&elrsr);
+>  
+> -	/* Clear mappings for empty LRs */
+> -	for_each_set_bit(lr, elrsr_ptr, vgic->nr_lr) {
+> +	/* Deal with HW interrupts, and clear mappings for empty LRs */
+> +	for (lr = 0; lr < vgic->nr_lr; lr++) {
+>  		struct vgic_lr vlr;
+>  
+> -		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
+> +		if (!test_bit(lr, vgic_cpu->lr_used))
+>  			continue;
+>  
+>  		vlr = vgic_get_lr(vcpu, lr);
+> +		if (vgic_sync_hwirq(vcpu, vlr)) {
+> +			/*
+> +			 * So this is a HW interrupt that the guest
+> +			 * EOI-ed. Clean the LR state and allow the
+> +			 * interrupt to be sampled again.
+> +			 */
+> +			vlr.state = 0;
+> +			vlr.hwirq = 0;
+> +			vgic_set_lr(vcpu, lr, vlr);
+> +			vgic_irq_clear_queued(vcpu, vlr.irq);
+
+Isn't this line altering common VGIC state without holding the lock?
+Eric removed the coarse dist->lock around the whole
+__kvm_vgic_sync_hwstate() function, we take it now in
+vgic_process_maintenance(), but don't hold it here AFAICT.
+As long as we are only dealing with private timer IRQs this is probably
+not a problem, but the IRQ number could be a SPI as well, right?
+
+Cheers,
+Andre.
+
+> +			set_bit(lr, elrsr_ptr);
+> +		}
+> +
+> +		if (!test_bit(lr, elrsr_ptr))
+> +			continue;
+> +
+> +		clear_bit(lr, vgic_cpu->lr_used);
+>  
+>  		BUG_ON(vlr.irq >= dist->nr_irqs);
+>  		vgic_cpu->vgic_irq_lr_map[vlr.irq] = LR_EMPTY;
+> 
