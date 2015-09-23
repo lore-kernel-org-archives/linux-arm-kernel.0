@@ -1,60 +1,87 @@
-From: dingtianhong@huawei.com (Dingtianhong)
-Date: Tue, 22 Sep 2015 18:08:29 +0000
-Subject: =?gb2312?B?tPC4tDogW1JGQyBQQVRDSCB2MiAwLzddIFBzZXVkby1OTUkgZm9yIGFybTY0?=
- =?gb2312?B?IHVzaW5nIElDQ19QTVJfRUwxIChHSUN2Myk=?=
-In-Reply-To: <55FBF42B.2090806@linaro.org>
-References: <1442237181-17064-1-git-send-email-daniel.thompson@linaro.org>
- <32CDD1A8-EF10-4F6B-86B6-64981874361A@jonmasters.org>,
- <55FBF42B.2090806@linaro.org>
-Message-ID: <DCFA7C6322CB9F469EBAE61213CF16B04C133777@SZXEMA512-MBX.china.huawei.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 23 Sep 2015 15:37:41 +0200
+Subject: [PATCH 1/3] dt-bindings: thermal: Add binding document for Mediatek
+ thermal controller
+In-Reply-To: <1443015463-23639-1-git-send-email-s.hauer@pengutronix.de>
+References: <1443015463-23639-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1443015463-23639-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This adds the device tree binding documentation for the mediatek thermal
+controller found on Mediatek MT8173 and other SoCs.
 
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+---
+ .../bindings/thermal/mediatek-thermal.txt          | 38 ++++++++++++++++++++++
+ include/dt-bindings/thermal/mt8173.h               | 13 ++++++++
+ 2 files changed, 51 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+ create mode 100644 include/dt-bindings/thermal/mt8173.h
 
-________________________________________
-???: linux-arm-kernel [linux-arm-kernel-bounces at lists.infradead.org] ?? Daniel Thompson [daniel.thompson at linaro.org]
-????: 2015?9?18? 19:23
-???: Jon Masters
-??: linaro-kernel at lists.linaro.org; patches at linaro.org; Marc Zyngier; Catalin Marinas; linux-kernel at vger.kernel.org; Andrew Thoelke; Dave Martin; linux-arm-kernel at lists.infradead.org
-??: Re: [RFC PATCH v2 0/7] Pseudo-NMI for arm64 using ICC_PMR_EL1 (GICv3)
-
-On 18/09/15 06:11, Jon Masters wrote:
->> On Sep 14, 2015, at 06:26, Daniel Thompson <daniel.thompson@linaro.org> wrote:
->> This patchset provides a pseudo-NMI for arm64 kernels by reimplementing
->> the irqflags macros to modify the GIC PMR (the priority mask register is
->> accessible as a system register on GICv3 and later) rather than the
->> PSR. The patchset includes an implementation of
->> arch_trigger_all_cpu_backtrace() for arm64 allowing the new code to be
->> exercised.
->
-> I think there is a need to connect a few dots on this next week
-> during Connect. Some other conversations have discussed alternative
-> implementations elsewhere. I will assist.
-
-Fine by me.
-
-I'd be very happy to talk about alternative approaches. In the past I've
-had long conversations about trapping to ARM TF as a means to simulate
-NMI. I haven't written any code to move in this direction but I still
-think of it as being the future-areas-of-interest pile.
-
-That said, whenever I search for (what I think are) sensible keywords
-for this subject I generally only find my own work! I may be selecting a
-rather blinkered set of keywords when I search but nevertheless it does
-mean I will probably have to rely on you to make introductions!
-
-
-Hi Daniel:
-
-I have checked that trapping to ARM TF could work well for aarch64 as NMI, and maybe we could discussion about it. :)
-
-Ding
-
-
-Daniel.
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+new file mode 100644
+index 0000000..1697375
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+@@ -0,0 +1,38 @@
++* Mediatek Thermal
++
++This describes the device tree binding for the Mediatek thermal controller
++which measures the on-SoC temperatures. This device does not have its own ADC,
++instead it directly controls the AUXADC via AHB bus accesses. For this reason
++this device needs phandles to the AUXADC. Also it controls a mux in the
++apmixedsys register space via AHB bus accesses, so a phandle to the APMIXEDSYS
++is also needed.
++
++Required properties:
++- compatible: "mediatek,mt8173-thermal"
++- reg: Address range of the thermal controller
++- interrupts: IRQ for the thermal controller
++- clocks, clock-names: Clocks needed for the thermal controller. required
++                       clocks are:
++		       "therm":	 Main clock needed for register access
++		       "auxadc": The AUXADC clock
++- resets: Reference to the reset controller controlling the thermal controller.
++- mediatek,auxadc: A phandle to the AUXADC which the thermal controller uses
++- mediatek,apmixedsys: A phandle to the APMIXEDSYS controller.
++- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description. See
++			  include/dt-bindings/thermal/mt8173.h for valid sensor
++			  numbers.
++
++Example:
++
++	thermal: thermal at 1100b000 {
++		#thermal-sensor-cells = <1>;
++		compatible = "mediatek,mt8173-thermal";
++		reg = <0 0x1100b000 0 0x1000>;
++		interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
++		clock-names = "therm", "auxadc";
++		resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
++		reset-names = "therm";
++		mediatek,auxadc = <&auxadc>;
++		mediatek,apmixedsys = <&apmixedsys>;
++	};
+diff --git a/include/dt-bindings/thermal/mt8173.h b/include/dt-bindings/thermal/mt8173.h
+new file mode 100644
+index 0000000..692e74c
+--- /dev/null
++++ b/include/dt-bindings/thermal/mt8173.h
+@@ -0,0 +1,13 @@
++/*
++ * This header provides constants for mediatek,mt8173-thermal
++ */
++
++#ifndef _DT_BINDINGS_THERMAL_MEDIATEK_MT8173_H
++#define _DT_BINDINGS_THERMAL_MEDIATEK_MT8173_H
++
++#define MT8173_THERMAL_ZONE_CA53	0
++#define MT8173_THERMAL_ZONE_CA57	1
++#define MT8173_THERMAL_ZONE_GPU		2
++#define MT8173_THERMAL_ZONE_CORE	3
++
++#endif /* _DT_BINDINGS_THERMAL_MEDIATEK_MT8173_H */
+-- 
+2.5.1
