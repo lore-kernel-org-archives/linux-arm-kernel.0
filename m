@@ -1,97 +1,74 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 24 Sep 2015 14:30:20 +0900
-Subject: [PATCH] ARM: shmobile: R-Mobile: Use CPG/MSTP Clock Domain
- attach/detach helpers
-In-Reply-To: <cover.1443072491.git.horms+renesas@verge.net.au>
-References: <cover.1443072491.git.horms+renesas@verge.net.au>
-Message-ID: <8b98d74780ab70147d40400c36059c16c1aea4da.1443072491.git.horms+renesas@verge.net.au>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 23 Sep 2015 21:37:27 +0200
+Subject: [PATCH 1/3] ARM: dts: stih407: Enable PWM nodes only board level
+In-Reply-To: <1443037049-6167-1-git-send-email-maxime.coquelin@st.com>
+References: <1443037049-6167-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <1443037049-6167-2-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+The PWM may not be used on some boards, so enable them only the board file.
 
-The R-Mobile PM Domain driver manages both power domains and a clock
-domain.
-
-The clock domain part is very similar to the CPG/MSTP Clock Domain,
-which is used on shmobile SoCs without device power domains, except for
-the way how clocks suitable for power management are selected:
-  - The former uses the first clock tied to the device through the NULL
-    con_id, which is a relic from the legacy pm_clk_notifier-based
-    method in drivers/sh/pm_runtime.c,
-  - The latter looks for suitable clocks in DT, which is more
-    future-proof.
-
-All platforms using this driver are now supported in DT-based ARM
-multi-platform builds only, hence switch to using the CPG/MSTP Clock
-Domain helpers.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
 ---
- arch/arm/mach-shmobile/pm-rmobile.c | 35 +++--------------------------------
- 1 file changed, 3 insertions(+), 32 deletions(-)
+ arch/arm/boot/dts/stih407-family.dtsi | 6 ++++--
+ arch/arm/boot/dts/stihxxx-b2120.dtsi  | 8 ++++++++
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index a5b96b990aea..89068c8ec50f 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.c
-+++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -12,6 +12,7 @@
-  * License.  See the file "COPYING" in the main directory of this archive
-  * for more details.
-  */
-+#include <linux/clk/shmobile.h>
- #include <linux/console.h>
- #include <linux/delay.h>
- #include <linux/of.h>
-@@ -124,36 +125,6 @@ static bool rmobile_pd_active_wakeup(struct device *dev)
- 	return true;
- }
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index ae05277..9975e8f 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -585,7 +585,6 @@
+ 		/* COMMS PWM Module */
+ 		pwm0: pwm at 9810000 {
+ 			compatible	= "st,sti-pwm";
+-			status		= "okay";
+ 			#pwm-cells	= <2>;
+ 			reg		= <0x9810000 0x68>;
+ 			pinctrl-names	= "default";
+@@ -593,12 +592,13 @@
+ 			clock-names	= "pwm";
+ 			clocks		= <&clk_sysin>;
+ 			st,pwm-num-chan = <1>;
++
++			status		= "disabled";
+ 		};
  
--static int rmobile_pd_attach_dev(struct generic_pm_domain *domain,
--				 struct device *dev)
--{
--	int error;
--
--	error = pm_clk_create(dev);
--	if (error) {
--		dev_err(dev, "pm_clk_create failed %d\n", error);
--		return error;
--	}
--
--	error = pm_clk_add(dev, NULL);
--	if (error) {
--		dev_err(dev, "pm_clk_add failed %d\n", error);
--		goto fail;
--	}
--
--	return 0;
--
--fail:
--	pm_clk_destroy(dev);
--	return error;
--}
--
--static void rmobile_pd_detach_dev(struct generic_pm_domain *domain,
--				  struct device *dev)
--{
--	pm_clk_destroy(dev);
--}
--
- static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- {
- 	struct generic_pm_domain *genpd = &rmobile_pd->genpd;
-@@ -164,8 +135,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
- 	genpd->power_off		= rmobile_pd_power_down;
- 	genpd->power_on			= rmobile_pd_power_up;
--	genpd->attach_dev		= rmobile_pd_attach_dev;
--	genpd->detach_dev		= rmobile_pd_detach_dev;
-+	genpd->attach_dev		= cpg_mstp_attach_dev;
-+	genpd->detach_dev		= cpg_mstp_detach_dev;
- 	__rmobile_pd_power_up(rmobile_pd, false);
- }
+ 		/* SBC PWM Module */
+ 		pwm1: pwm at 9510000 {
+ 			compatible	= "st,sti-pwm";
+-			status		= "okay";
+ 			#pwm-cells	= <2>;
+ 			reg		= <0x9510000 0x68>;
+ 			pinctrl-names	= "default";
+@@ -609,6 +609,8 @@
+ 			clock-names	= "pwm";
+ 			clocks		= <&clk_sysin>;
+ 			st,pwm-num-chan = <4>;
++
++			status		= "disabled";
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+index f589fe4..ab029f7 100644
+--- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
++++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+@@ -27,6 +27,14 @@
+ 			};
+ 		};
  
++		pwm0: pwm at 9810000 {
++			status = "okay";
++		};
++
++		pwm1: pwm at 9510000 {
++			status = "okay";
++		};
++
+ 		i2c at 9842000 {
+ 			status = "okay";
+ 		};
 -- 
-2.1.4
+1.9.1
