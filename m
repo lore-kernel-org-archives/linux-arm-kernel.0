@@ -1,47 +1,30 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 23 Sep 2015 23:42:42 +0200
-Subject: [PATCH] mmc: mediatek: Add MMC_CAP_RUNTIME_RESUME support
-In-Reply-To: <1442901644-7587-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1442901644-7587-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFo6heebOuQeodYNFcurr21SdQ-_m-9FvnpobZsZ8-mLAQ@mail.gmail.com>
+Date: Wed, 23 Sep 2015 23:43:24 +0200
+Subject: [PATCH 0/3] mmc: Wait for card_busy before starting sdio requests
+In-Reply-To: <1442935826-16758-1-git-send-email-hdegoede@redhat.com>
+References: <1442935826-16758-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAPDyKFqvnVTL0pDLc8S1Ssqmy5WXR9+=uCWq8ONmgrYU=Zzoow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 September 2015 at 08:00, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> Add MMC_CAP_RUNTIME_RESUME support to save resume time
-> Drop unnecessary SDC_ARG write
+On 22 September 2015 at 17:30, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi Ulf,
 >
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> Here is a non RFC version of my patch-set to wait for card_busy before
+> starting sdio requests. It is the same as the RFC version of the set,
+> but this time it has been tested no hardware which actually needs this
+> and I can confirm now that this fixes wifi on that hardware.
 
-Thanks, applied for next!
+Great! Thanks, applied for next!
+
+>
+> This patch-set should also allow removing this dw_mmc specific fix:
+>
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/mmc/host/dw_mmc.c?id=0bdbd0e88cf6b603a2196418672715b0890fb040
+>
+> As this patch-set fixes this problem in a generic manner.
+
+Care to send a patch to remove the above hack/fix?
 
 Kind regards
 Uffe
-
-> ---
->  drivers/mmc/host/mtk-sd.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index 7153500..b2e89d3 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -729,7 +729,6 @@ static bool msdc_cmd_done(struct msdc_host *host, int events,
->                         MSDC_INTEN_RSPCRCERR | MSDC_INTEN_CMDTMO |
->                         MSDC_INTEN_ACMDRDY | MSDC_INTEN_ACMDCRCERR |
->                         MSDC_INTEN_ACMDTMO);
-> -       writel(cmd->arg, host->base + SDC_ARG);
->
->         if (cmd->flags & MMC_RSP_PRESENT) {
->                 if (cmd->flags & MMC_RSP_136) {
-> @@ -1302,6 +1301,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
->         mmc->f_min = host->src_clk_freq / (4 * 255);
->
->         mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
-> +       mmc->caps |= MMC_CAP_RUNTIME_RESUME;
->         /* MMC core transfer sizes tunable parameters */
->         mmc->max_segs = MAX_BD_NUM;
->         mmc->max_seg_size = BDMA_DESC_BUFLEN;
-> --
-> 1.8.1.1.dirty
->
