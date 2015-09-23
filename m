@@ -1,27 +1,30 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 23 Sep 2015 16:24:17 -0700 (PDT)
-Subject: [PATCH v2 0/9] Phy, mdiobus, and netdev struct device fixes
-In-Reply-To: <20150922161710.GA21084@n2100.arm.linux.org.uk>
-References: <20150922161710.GA21084@n2100.arm.linux.org.uk>
-Message-ID: <20150923.162417.814596822188458346.davem@davemloft.net>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Thu, 24 Sep 2015 09:42:33 +1000
+Subject: [linux-sunxi] [PATCH v2 2/4] ARM: dts: sun4i: gemei-g9: Convert
+ to use axp209 regulator nodes
+In-Reply-To: <1442993914-20295-3-git-send-email-plaes@plaes.org>
+References: <1442993914-20295-1-git-send-email-plaes@plaes.org>
+ <1442993914-20295-3-git-send-email-plaes@plaes.org>
+Message-ID: <CAGRGNgVLV_hSSTEPuC2_ga6H=wHNFuOktvCE2Mvk_txg8zCLgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Date: Tue, 22 Sep 2015 17:17:10 +0100
+Hi Priit,
 
-> This is the second version of the series, with the comments David had
-> on the first patch fixed up.  Original series description with updated
-> diffstat below.
+On Wed, Sep 23, 2015 at 5:38 PM, Priit Laes <plaes@plaes.org> wrote:
+> Add regulator nodes for axp209 by including the axp209 dtsi.
+>
+> Changes in v2:
+>  - Add the ohci0 node.
 
-This needs some build fixes:
+Firstly, changelog stuff like this should be below the --- under your SOB.
 
-drivers/net/ethernet/apm/xgene/xgene_enet_hw.c: In function ?xgene_enet_phy_connect?:
-drivers/net/ethernet/apm/xgene/xgene_enet_hw.c:694:20: error: too few arguments to function ?of_phy_connect?
-   pdata->phy_dev = of_phy_connect(ndev, phy_np,
-                    ^
-In file included from drivers/net/ethernet/apm/xgene/xgene_enet_main.h:31:0,
-                 from drivers/net/ethernet/apm/xgene/xgene_enet_hw.c:22:
-include/linux/of_mdio.h:18:27: note: declared here
- extern struct phy_device *of_phy_connect(struct net_device *dev,
-                           ^
+Also, shouldn't enabling the ohci0 node be a separate patch?
+
+Thanks,
+
+-- 
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
