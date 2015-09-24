@@ -1,46 +1,39 @@
 From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Thu, 24 Sep 2015 13:39:17 +0200
-Subject: [PATCH v2 3/5] ARM: multi_v7_defconfig: Enable Rockchip display
- support
+Date: Thu, 24 Sep 2015 13:39:18 +0200
+Subject: [PATCH v2 4/5] ARM: multi_v7_defconfig: Enable the Rockchip USB 2.0
+ phy
 In-Reply-To: <1443094759-28531-1-git-send-email-sjoerd.simons@collabora.co.uk>
 References: <1443094759-28531-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <1443094759-28531-4-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <1443094759-28531-5-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable options needed for HDMI out on rockchip: DRM driver, Rockchip
-DesignWare HDMI glue and the rockchip IOMMU (dependency of the DRM
-driver).
+Most Rockchip SoCs have a DesignWare HS OTG USB 2.0 controller, enable
+the driver for the Rockchip USB 2.0 PHY to make that functional.
 
 Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
 ---
 
-Changes in v2: None
+Changes in v2:
+- Only enable the USB 2 phy, not the controller as that came in through
+  another tree
+- Enable USB 2.0 phy as a module as the controller is a module as well
 
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 3938f54..660e72a 100644
+index 660e72a..2ce0d63 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -457,6 +457,8 @@ CONFIG_DRM_EXYNOS=m
- CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_FIMD=y
- CONFIG_DRM_EXYNOS_HDMI=y
-+CONFIG_DRM_ROCKCHIP=m
-+CONFIG_ROCKCHIP_DW_HDMI=m
- CONFIG_DRM_RCAR_DU=m
- CONFIG_DRM_TEGRA=y
- CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
-@@ -634,6 +636,7 @@ CONFIG_APQ_MMCC_8084=y
- CONFIG_MSM_GCC_8660=y
- CONFIG_MSM_MMCC_8960=y
- CONFIG_MSM_MMCC_8974=y
-+CONFIG_ROCKCHIP_IOMMU=y
- CONFIG_TEGRA_IOMMU_GART=y
- CONFIG_TEGRA_IOMMU_SMMU=y
- CONFIG_PM_DEVFREQ=y
+@@ -662,6 +662,7 @@ CONFIG_PHY_HIX5HD2_SATA=y
+ CONFIG_PWM_STI=m
+ CONFIG_OMAP_USB2=y
+ CONFIG_TI_PIPE3=y
++CONFIG_PHY_ROCKCHIP_USB=m
+ CONFIG_PHY_MIPHY28LP=y
+ CONFIG_PHY_MIPHY365X=y
+ CONFIG_PHY_RCAR_GEN2=m
 -- 
 2.5.3
