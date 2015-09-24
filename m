@@ -1,19 +1,21 @@
 From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Thu, 24 Sep 2015 18:52:37 +0800
+Date: Thu, 24 Sep 2015 18:55:03 +0800
 Subject: [PATCH 1/4] ARM: sunxi: Introduce Allwinner for A83T support
-In-Reply-To: <CAGb2v665FhnSoWYGJn+Tf79F7pZitYBrEOmAts4nVoUWb-uBqg@mail.gmail.com>
+In-Reply-To: <20150922155152.GJ4684@lukather>
 References: <1442936337-3104-1-git-send-email-vishnupatekar0510@gmail.com>
  <1442936337-3104-2-git-send-email-vishnupatekar0510@gmail.com>
- <CAGb2v665FhnSoWYGJn+Tf79F7pZitYBrEOmAts4nVoUWb-uBqg@mail.gmail.com>
-Message-ID: <CAEzqOZv_L3A7kpKqNQnHjL6Wb1Lzw6dSU4Qy52yJVf2h1QmcLA@mail.gmail.com>
+ <20150922155152.GJ4684@lukather>
+Message-ID: <CAEzqOZvz4AHmmaoh3qe_AMJg2ON-fzG_1XixM861rJPoap5CdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Tue, Sep 22, 2015 at 11:47 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Tue, Sep 22, 2015 at 11:38 PM, Vishnu Patekar
-> <vishnupatekar0510@gmail.com> wrote:
+On Tue, Sep 22, 2015 at 11:51 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Tue, Sep 22, 2015 at 11:38:54PM +0800, Vishnu Patekar wrote:
 >> Allwinner A83T is octa-core cortex-a7 based SoC.
 >> It's clock control unit and prcm, pinmux are different from previous sun8i
 >> series.
@@ -36,24 +38,17 @@ On Tue, Sep 22, 2015 at 11:47 PM, Chen-Yu Tsai <wens@csie.org> wrote:
 >>    allwinner,sun8i-a33
 >>    allwinner,sun8i-h3
 >> +  allwinner,sun8i-a83t
->
-> Alphabetic order please.
-Okie, I'll correct.
->
 >>    allwinner,sun9i-a80
 >> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
 >> index 65bab28..b04aefa 100644
 >> --- a/arch/arm/mach-sunxi/sunxi.c
 >> +++ b/arch/arm/mach-sunxi/sunxi.c
 >> @@ -69,6 +69,7 @@ static const char * const sun8i_board_dt_compat[] = {
->>         "allwinner,sun8i-a23",
->>         "allwinner,sun8i-a33",
->>         "allwinner,sun8i-h3",
->> +       "allwinner,sun8i-a83t",
->
-> Same here.
->
->>         NULL,
+>>       "allwinner,sun8i-a23",
+>>       "allwinner,sun8i-a33",
+>>       "allwinner,sun8i-h3",
+>> +     "allwinner,sun8i-a83t",
+>>       NULL,
 >>  };
 >>
 >> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
@@ -65,25 +60,26 @@ Okie, I'll correct.
 >>  CLK_OF_DECLARE(sun8i_a33_clk_init, "allwinner,sun8i-a33", sun6i_init_clocks);
 >>
 >> +static void __init sun8ia83t_init_clocks(struct device_node *node)
+>
+> Having an underscore between sun8i and a83t would be great :)
+>
 >> +{
->> +       sunxi_init_clocks(NULL, 0);
+>> +     sunxi_init_clocks(NULL, 0);
 >> +}
 >> +CLK_OF_DECLARE(sun9i_a83t_clk_init, "allwinner,sun8i-a83t", sun8ia83t_init_clocks);
 >
-> sun8i? Missing underscore too.
-Sorry, yes, sun8i. will add _.
+>                   ^ Is this a sun9i or sun8i SoC ?
+It's sun8i, sorry.
 >
-> I think you should add this once you actually have clock support.
-> Otherwise this call basically does nothing.
+> Is the list of protected clocks always going to be empty, or will you
+> add some new clocks in that list in the future?
+Yes, I'll add new clocks as time permits.
 >
->> +
->>  static void __init sun9i_init_clocks(struct device_node *node)
->>  {
->>         sunxi_init_clocks(NULL, 0);
+> Thanks!
+> Maxime
 >
-> On the side, I will send patches to remove sun9i_init_clocks.
->
->
-> Regards
-> ChenYu
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
 Thanks for review.
