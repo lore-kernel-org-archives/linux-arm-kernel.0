@@ -1,111 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Sep 2015 20:17:54 +0100
-Subject: [PATCH v3 0/9] Phy, mdiobus, and netdev struct device fixes
-Message-ID: <20150924191754.GC21513@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 24 Sep 2015 16:18:12 -0300
+Subject: [PATCH] ARM: dts: imx7d: Fix UART2 base address
+Message-ID: <1443122292-29385-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-The third version of this series fixes the build error which David
-identified, and drops the broken changes for the Cavium Thunger BGX
-ethernet driver as this driver requires some complex changes to
-resolve the leakage - and this is best done by people who can test
-the driver.
+The UART2 memory space starts at address 0x30890000 (UART2_URXD).
 
-Compared to v2, the only patch which has changed is patch 6
-  "net: fix phy refcounting in a bunch of drivers"
+Fix it so that UART2 can be used.
 
-I _think_ I've been able to build-test all the drivers touched by
-that patch to some degree now, though several of them needed the
-Kconfig hacked to allow it (not all had || COMPILE_TEST clause on
-their dependencies.)
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx7d.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Previous cover letters below:
-
-This is the second version of the series, with the comments David had
-on the first patch fixed up.  Original series description with updated
-diffstat below.
-
-While looking at the DSA code, I noticed we have a
-of_find_net_device_by_node(), and it looks like users of that are
-similarly buggy - it looks like net/dsa/dsa.c is the only user.  Fix
-that too.
-
-Hi,
-
-While looking at the phy code, I identified a number of weaknesses
-where refcounting on device structures was being leaked, where
-modules could be removed while in-use, and where the fixed-phy could
-end up having unintended consequences caused by incorrect calls to
-fixed_phy_update_state().
-
-This patch series resolves those issues, some of which were discovered
-with testing on an Armada 388 board.  Not all patches are fully tested,
-particularly the one which touches several network drivers.
-
-When resolving the struct device refcounting problems, several different
-solutions were considered before settling on the implementation here -
-one of the considerations was to avoid touching many network drivers.
-The solution here is:
-
-	phy_attach*() - takes a refcount
-	phy_detach*() - drops the phy_attach refcount
-
-Provided drivers always attach and detach their phys, which they should
-already be doing, this should change nothing, even if they leak a refcount.
-
-	of_phy_find_device() and of_* functions which use that take
-	a refcount.  Arrange for this refcount to be dropped once
-	the phy is attached.
-
-This is the reason why the previous change is important - we can't drop
-this refcount taken by of_phy_find_device() until something else holds
-a reference on the device.  This resolves the leaked refcount caused by
-using of_phy_connect() or of_phy_attach().
-
-Even without the above changes, these drivers are leaking by calling
-of_phy_find_device().  These drivers are addressed by adding the
-appropriate release of that refcount.
-
-The mdiobus code also suffered from the same kind of leak, but thankfully
-this only happened in one place - the mdio-mux code.
-
-I also found that the try_module_get() in the phy layer code was utterly
-useless: phydev->dev.driver was guaranteed to always be NULL, so
-try_module_get() was always being called with a NULL argument.  I proved
-this with my SFP code, which declares its own MDIO bus - the module use
-count was never incremented irrespective of how I set the MDIO bus up.
-This allowed the MDIO bus code to be removed from the kernel while there
-were still PHYs attached to it.
-
-One other bug was discovered: while using in-band-status with mvneta, it
-was found that if a real phy is attached with in-band-status enabled,
-and another ethernet interface is using the fixed-phy infrastructure, the
-interface using the fixed-phy infrastructure is configured according to
-the other interface using the in-band-status - which is caused by the
-fixed-phy code not verifying that the phy_device passed in is actually
-a fixed-phy device, rather than a real MDIO phy.
-
-Lastly, having mdio_bus reversing phy_device_register() internals seems
-like a layering violation - it's trivial to move that code to the phy
-device layer.
-
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c | 24 ++++++----
- drivers/net/ethernet/freescale/gianfar.c       |  6 ++-
- drivers/net/ethernet/freescale/ucc_geth.c      |  8 +++-
- drivers/net/ethernet/marvell/mvneta.c          |  2 +
- drivers/net/ethernet/xilinx/xilinx_emaclite.c  |  2 +
- drivers/net/phy/fixed_phy.c                    |  2 +-
- drivers/net/phy/mdio-mux.c                     | 19 +++++---
- drivers/net/phy/mdio_bus.c                     | 24 ++++++----
- drivers/net/phy/phy_device.c                   | 62 ++++++++++++++++++++------
- drivers/of/of_mdio.c                           | 27 +++++++++--
- include/linux/phy.h                            |  6 ++-
- net/core/net-sysfs.c                           |  9 ++++
- net/dsa/dsa.c                                  | 41 ++++++++++++++---
- 13 files changed, 181 insertions(+), 51 deletions(-)
-
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index 15c2193..9569d0a 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -640,10 +640,10 @@
+ 				status = "disabled";
+ 			};
+ 
+-			uart2: serial at 30870000 {
++			uart2: serial at 30890000 {
+ 				compatible = "fsl,imx7d-uart",
+ 					     "fsl,imx6q-uart";
+-				reg = <0x30870000 0x10000>;
++				reg = <0x30890000 0x10000>;
+ 				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX7D_UART2_ROOT_CLK>,
+ 					<&clks IMX7D_UART2_ROOT_CLK>;
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
