@@ -1,40 +1,62 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 24 Sep 2015 23:57:31 +0200
-Subject: [PATCH v3 0/9] Phy, mdiobus, and netdev struct device fixes
-In-Reply-To: <20150924191754.GC21513@n2100.arm.linux.org.uk>
-References: <20150924191754.GC21513@n2100.arm.linux.org.uk>
-Message-ID: <20150924215731.GE20825@lunn.ch>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 25 Sep 2015 00:10:16 +0200
+Subject: [PATCH v2 2/5] ARM: multi_v7_defconfig: Enable common regulators
+ for rockchip boards
+In-Reply-To: <1443094759-28531-3-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1443094759-28531-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1443094759-28531-3-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <5471789.IH6TzhIBOd@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-...
+Am Donnerstag, 24. September 2015, 13:39:16 schrieb Sjoerd Simons:
+> Rockchip boards seem to have two common regulator setups. Various board
+> used the Active Semi act8846 often in combination with Silergy syr82x
 
-> While looking at the DSA code, I noticed we have a
-> of_find_net_device_by_node(), and it looks like users of that are
-> similarly buggy - it looks like net/dsa/dsa.c is the only user.  Fix
-> that too.
+For people just skimming over these patches, the syr82x are siblings to the 
+fan53555 - same register interface and all, thus that option gets enabled.
 
-...
- 
-> The mdiobus code also suffered from the same kind of leak, but thankfully
-> this only happened in one place - the mdio-mux code.
 
-Hi Russell
-
-I tested both of these with my board. It is a Freescale Vybrid, using
-the FEC ethernet driver, and i have three switches attached, using
-mdio-mux to give three mdio busses.
-
-No obvious regressions, my board boots, the switches are all present
-and correct. I built the FEC driver as a module, and it won't unload:
-
- kernel:unregister_netdevice: waiting for eth1 to become free. Usage count = 1
-unregister_netdevice: waiting for eth1 to become free. Usage count = 1
-
-i assume because DSA holds a reference. I've not tried a fully module
-build, DSA has issues with that.
-
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-
-Thanks
-	Andrew
+> regulators (e.g. Radxa Rock Pro/Rock 2, Firefly, and Netxeon R89 etc),
+> while others use regulator part of the Rockchip RK808 chip (e.g. the
+> various Veyron based chromebooks, Chipspark Popmetal etc)
+> 
+> Enable all these regulators.
+> 
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> 
+> ---
+> 
+> Changes in v2:
+> - Enable all common rockchip regulators, not just ACT8846
+> 
+>  arch/arm/configs/multi_v7_defconfig | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig
+> b/arch/arm/configs/multi_v7_defconfig index 170f18e..3938f54 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -394,6 +394,7 @@ CONFIG_MFD_MAX14577=y
+>  CONFIG_MFD_MAX77686=y
+>  CONFIG_MFD_MAX77693=y
+>  CONFIG_MFD_MAX8907=y
+> +CONFIG_MFD_RK808=y
+>  CONFIG_MFD_SEC_CORE=y
+>  CONFIG_MFD_STMPE=y
+>  CONFIG_MFD_PALMAS=y
+> @@ -401,11 +402,14 @@ CONFIG_MFD_TPS65090=y
+>  CONFIG_MFD_TPS6586X=y
+>  CONFIG_MFD_TPS65910=y
+>  CONFIG_REGULATOR_AB8500=y
+> +CONFIG_REGULATOR_ACT8865=y
+>  CONFIG_REGULATOR_AS3711=y
+>  CONFIG_REGULATOR_AS3722=y
+>  CONFIG_REGULATOR_AXP20X=y
+>  CONFIG_REGULATOR_BCM590XX=y
+>  CONFIG_REGULATOR_DA9210=y
+> +CONFIG_REGULATOR_FAN53555=y
+> +CONFIG_REGULATOR_RK808=y
+>  CONFIG_REGULATOR_GPIO=y
+>  CONFIG_MFD_SYSCON=y
+>  CONFIG_POWER_RESET_SYSCON=y
