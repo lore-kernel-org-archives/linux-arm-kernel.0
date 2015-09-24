@@ -1,56 +1,16 @@
 From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Thu, 24 Sep 2015 17:32:12 +0800
-Subject: [RFC PATCH v6 0/3] arm/arm64: fix a migrating irq bug when hotplug cpu
-Message-ID: <1443087135-17044-1-git-send-email-yangyingliang@huawei.com>
+Date: Thu, 24 Sep 2015 17:32:13 +0800
+Subject: [RFC PATCH v6 1/3] genirq: introduce CONFIG_GENERIC_IRQ_MIGRATION and
+ kernel/irq/cpuhotplug.c
+In-Reply-To: <1443087135-17044-1-git-send-email-yangyingliang@huawei.com>
+References: <1443087135-17044-1-git-send-email-yangyingliang@huawei.com>
+Message-ID: <1443087135-17044-2-git-send-email-yangyingliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-----
-Changes in v6:
- - Don't touch the existing file kernel/irq/migration.c and add
-   migrating interrupts code to a new file kernel/irq/cpuhotplug.c
-   suggested by Thomas.
- - Change some comments in patch #2 and #3.
-
-Changes in v5:
- - remove the macro that guard move_irqs()
- - use name irq_migrate_all_off_this_cpu instead of move_irqs
-
-Changes in v4:
- - select GENERIC_IRQ_MIGRATION when config GENERIC_IRQ_MIGRATION is enabled
- - add move_irqs() into kerne/irq/migration.c for cpu hotplug
- - use move_irqs() to migrate interrupts on arm/arm64 when cpu is going to down
- - split bugfix patch into seperate patches for arm and arm64
-
-Changes in v3:
- - introduce config GENERIC_IRQ_MIGRATION for compiling migration.c
- - rename migrate_irqs in arch/ia64/kernel/irq.c to avoid compiling error
-
-Changes in v2:
- - use the exiting helper to set IRQD_MOVE_PCNTXT flag
- - use for_each_active_irq() instead of for_each_irq_desc()
- - add some warn messages when affinity is null or do set affinity failed
-----
-
-Hi All,
-
-There is a bug:
-
-When cpu is disabled, all irqs will be migratged to another cpu.
-In some cases, a new affinity is different, it needed to be coppied
-to irq's affinity. But if the type of irq is LPI, it's affinity will
-not be coppied because of irq_set_affinity's return value.
-
-
-
-As Marc and Will suggested, I refactor the arm/arm64 migrating interrupts
-code and fix the migrating irq bug before cpu is offline.
-
-I'm trying let the core code do the migrating interrupts matter. Add the migrating code
-to a new file kernel/irq/cpuhotplug.c and make it depend on GENERIC_IRQ_MIGRATION. Fix
-the bug by using irq_do_set_affinity. And use the new code to migrate interrupts before
-cpu is offline on arm and arm64.
-
+Add migrating interrupts code to a new file kernel/irq/cpuhotplug.c and
+make it depends on CONFIG_GENERIC_IRQ_MIGRATION. So we can use it to migrate
+interrupts, before cpu is offline.
 
 Cc: Jiang Liu <jiang.liu@linux.intel.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
@@ -59,27 +19,127 @@ Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
 Cc: Hanjun Guo <hanjun.guo@linaro.org>
-
-Yang Yingliang (3):
-  genirq: introduce CONFIG_GENERIC_IRQ_MIGRATION and
-    kernel/irq/cpuhotplug.c
-  arm64: fix a migrating irq bug when hotplug cpu
-  arm: fix a migrating irq bug when hotplug cpu
-
- arch/arm/Kconfig             |  1 +
- arch/arm/include/asm/irq.h   |  1 -
- arch/arm/kernel/irq.c        | 62 ----------------------------------------
- arch/arm/kernel/smp.c        |  2 +-
- arch/arm64/Kconfig           |  1 +
- arch/arm64/include/asm/irq.h |  1 -
- arch/arm64/kernel/irq.c      | 62 ----------------------------------------
- arch/arm64/kernel/smp.c      |  2 +-
- include/linux/irq.h          |  2 ++
- kernel/irq/Kconfig           |  4 +++
- kernel/irq/Makefile          |  1 +
- kernel/irq/cpuhotplug.c      | 68 ++++++++++++++++++++++++++++++++++++++++++++
- 12 files changed, 79 insertions(+), 128 deletions(-)
+Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+---
+ include/linux/irq.h     |  2 ++
+ kernel/irq/Kconfig      |  4 +++
+ kernel/irq/Makefile     |  1 +
+ kernel/irq/cpuhotplug.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 75 insertions(+)
  create mode 100644 kernel/irq/cpuhotplug.c
 
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index 11bf092..45cc729 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -452,6 +452,8 @@ extern int irq_set_affinity_locked(struct irq_data *data,
+ 				   const struct cpumask *cpumask, bool force);
+ extern int irq_set_vcpu_affinity(unsigned int irq, void *vcpu_info);
+ 
++extern void irq_migrate_all_off_this_cpu(void);
++
+ #if defined(CONFIG_SMP) && defined(CONFIG_GENERIC_PENDING_IRQ)
+ void irq_move_irq(struct irq_data *data);
+ void irq_move_masked_irq(struct irq_data *data);
+diff --git a/kernel/irq/Kconfig b/kernel/irq/Kconfig
+index 9a76e3b..3b48dab 100644
+--- a/kernel/irq/Kconfig
++++ b/kernel/irq/Kconfig
+@@ -30,6 +30,10 @@ config GENERIC_IRQ_LEGACY_ALLOC_HWIRQ
+ config GENERIC_PENDING_IRQ
+ 	bool
+ 
++# Support for generic irq migrating off cpu before the cpu is offline.
++config GENERIC_IRQ_MIGRATION
++	bool
++
+ # Alpha specific irq affinity mechanism
+ config AUTO_IRQ_AFFINITY
+        bool
+diff --git a/kernel/irq/Makefile b/kernel/irq/Makefile
+index d121235..2fc9cbd 100644
+--- a/kernel/irq/Makefile
++++ b/kernel/irq/Makefile
+@@ -5,5 +5,6 @@ obj-$(CONFIG_GENERIC_IRQ_PROBE) += autoprobe.o
+ obj-$(CONFIG_IRQ_DOMAIN) += irqdomain.o
+ obj-$(CONFIG_PROC_FS) += proc.o
+ obj-$(CONFIG_GENERIC_PENDING_IRQ) += migration.o
++obj-$(CONFIG_GENERIC_IRQ_MIGRATION) += cpuhotplug.o
+ obj-$(CONFIG_PM_SLEEP) += pm.o
+ obj-$(CONFIG_GENERIC_MSI_IRQ) += msi.o
+diff --git a/kernel/irq/cpuhotplug.c b/kernel/irq/cpuhotplug.c
+new file mode 100644
+index 0000000..8f2e9c0
+--- /dev/null
++++ b/kernel/irq/cpuhotplug.c
+@@ -0,0 +1,68 @@
++#include <linux/irq.h>
++#include <linux/interrupt.h>
++#include <linux/ratelimit.h>
++
++#include "internals.h"
++
++static bool migrate_one_irq(struct irq_desc *desc)
++{
++	struct irq_data *d = irq_desc_get_irq_data(desc);
++	const struct cpumask *affinity = d->common->affinity;
++	struct irq_chip *c;
++	bool ret = false;
++
++	/*
++	 * If this is a per-CPU interrupt, or the affinity does not
++	 * include this CPU, then we have nothing to do.
++	 */
++	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
++		return false;
++
++	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
++		affinity = cpu_online_mask;
++		ret = true;
++	}
++
++	c = irq_data_get_irq_chip(d);
++	if (!c->irq_set_affinity) {
++		pr_warn_ratelimited("IRQ%u: unable to set affinity\n", d->irq);
++	} else {
++		int r = irq_do_set_affinity(d, affinity, false);
++		if (r)
++			pr_warn_ratelimited("IRQ%u: set affinity failed(%d).\n", d->irq, r);
++	}
++
++	return ret;
++}
++
++/*
++ * The current CPU has been marked offline.  Migrate IRQs off this CPU.
++ * If the affinity settings do not allow other CPUs, force them onto any
++ * available CPU.
++ *
++ * Note: we must iterate over all IRQs, whether they have an attached
++ * action structure or not, as we need to get chained interrupts too.
++ */
++void irq_migrate_all_off_this_cpu(void)
++{
++	unsigned int irq;
++	struct irq_desc *desc;
++	unsigned long flags;
++
++	local_irq_save(flags);
++
++	for_each_active_irq(irq) {
++		bool affinity_broken;
++
++		desc = irq_to_desc(irq);
++		raw_spin_lock(&desc->lock);
++		affinity_broken = migrate_one_irq(desc);
++		raw_spin_unlock(&desc->lock);
++
++		if (affinity_broken)
++			pr_warn_ratelimited("IRQ%u no longer affine to CPU%u\n",
++					    irq, smp_processor_id());
++	}
++
++	local_irq_restore(flags);
++}
 -- 
 2.5.0
