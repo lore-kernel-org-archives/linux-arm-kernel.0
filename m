@@ -1,93 +1,92 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 24 Sep 2015 10:29:47 -0700
-Subject: [linux-sunxi][alsa-devel][PATCH 3/3] ASOC: sunxi: Add support
- for the spdif block
-In-Reply-To: <1443105005-4083-1-git-send-email-codekipper@gmail.com>
-References: <1443105005-4083-1-git-send-email-codekipper@gmail.com>
-Message-ID: <20150924172947.GA30445@sirena.org.uk>
+From: drew.richardson@arm.com (Drew Richardson)
+Date: Thu, 24 Sep 2015 10:31:23 -0700
+Subject: [PATCH] arm: perf: Add event descriptions
+In-Reply-To: <20150817214035.GA25775@dreric01-gentoo.localdomain>
+References: <20150804001522.GA13214@dreric01-gentoo.localdomain>
+ <20150817205809.GA16506@dreric01-gentoo.localdomain>
+ <20150826165148.GF30466@arm.com>
+ <20150817214035.GA25775@dreric01-gentoo.localdomain>
+Message-ID: <20150924173122.GA32516@dreric01-gentoo.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 04:30:05PM +0200, codekipper at gmail.com wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
+On Mon, Aug 17, 2015 at 10:40:35PM +0100, Drew Richardson wrote:
+> On Wed, Aug 26, 2015 at 05:51:49PM +0100, Will Deacon wrote:
+> > On Mon, Aug 17, 2015 at 09:58:09PM +0100, Drew Richardson wrote:
+> > > On Tue, Aug 04, 2015 at 01:15:23AM +0100, Drew Richardson wrote:
+> > > > Add additional information about hardware events to make counters self
+> > > > describing. This makes the hardware PMUs easier to use as perf list
+> > > > contains the possible events instead of users having to refer to
+> > > > documentation like the ARM TRMs. This could also allow tools like
+> > > > oprofile to support PMUs without requiring an update.
+> > > > 
+> > > > Signed-off-by: Drew Richardson <drew.richardson@arm.com>
+> > > > ---
+> > > >  arch/arm/kernel/perf_event.c    |   1 +
+> > > >  arch/arm/kernel/perf_event_v7.c | 617 ++++++++++++++++++++++++++++++++++++++++
+> > > >  2 files changed, 618 insertions(+)
+> > > 
+> > > Any concerns with merging this?
+> > 
+> > We should revisit this after the merge window (since the ARM perf code is
+> > moving out to drivers/)
 > 
-> The sun4i, sun6i and sun7i SoC families have an SPDIF
-> block which is capable of playback and capture.
+> Not a problem
+> 
+> > but I do have reservations about putting all these
+> > strings into the kernel. Why can't we put this into something like libpfm
+> > instead?
+> > 
+> > Will
+> > 
+> 
+> My intent is to make it easier for people to use hardware counters on
+> ARM, particularly with new CPUs. Currently, the developer of the tool
+> needs to extract the event information from the ARM TRMs, add it to
+> their tool and make a new release. This work is done by multiple
+> tools, for example for the Cortex-A15:
+> 
+> http://sourceforge.net/p/perfmon2/libpfm4/ci/master/tree/lib/events/arm_cortex_a15_events.h
+> http://sourceforge.net/p/oprofile/oprofile/ci/master/tree/events/arm/armv7-ca15/events
+> https://github.com/ARM-software/gator/blob/master/daemon/events-Cortex-A15.xml
+> 
+> There are likely more tools, these are the ones I could easily
+> find. Note that the new ARM Cortex-A72 isn't supported by most of
+> them. And the perf command line tool doesn't have any of this.
+> 
+> Once the tool supports the new CPUs events the user needs to make sure
+> they're running a recent version of the tool that contains these
+> events for their new ARM CPU. Technically the user could add the event
+> information themselves and upstream the change, but not all users will
+> do this.
+> 
+> So my suggestion to solve the problem is that the kernel can have the
+> list of events as proposed in the patch. This is already done for some
+> PMUs like arm-ccn and arm-cci. If the tool doesn't support the
+> particular CPU, they can fall back to the event list provided by the
+> kernel. There will be some information missing like user-friendly
+> descriptions of the events, but it's hopefully enough that users can
+> do what they need to do and update their tool at a later time.
+> 
+> I'd be glad to wrap this all in a config option so users can disable
+> it to reduce bloat. Perhaps there is some other central location
+> outside the kernel that could store this information?
+> 
+> Thanks,
+> 
+> Drew
 
-I'm not seeing patches 1 or 2 - what's the story here, are there
-dependencies?  Please use subject lines matching the style for the
-subsystem and also don't fill your subject lines with noisy tags beyond
-"[PATCH n/x]", when I look at this in my mail client what I see is:
+Will,
 
-->  432   C 09/24 codekipper at gmai ( 27K) [linux-sunxi][alsa-devel][PATCH 3/3] AS
+Have you had a chance to review this again? I also noticed that my x86
+machines have something similar, although not as few events as I'm
+proposing to add.
 
->  sound/soc/sunxi/Kconfig               |  10 +
->  sound/soc/sunxi/Makefile              |   4 +
->  sound/soc/sunxi/sunxi-machine-spdif.c | 110 +++++
->  sound/soc/sunxi/sunxi-spdif.c         | 801 ++++++++++++++++++++++++++++++++++
+$ ls /sys/bus/event_source/devices/cpu/events/
+cycles-ct  el-capacity  el-start    tx-abort     tx-conflict
+cycles-t   el-commit    mem-loads   tx-capacity  tx-start
+el-abort   el-conflict  mem-stores  tx-commit
 
-The machine driver and controller driver should be submitted as separate
-patches for ease of review.  Is there a strong reason for not using
-simple-card?
+Thanks,
 
-> +void sunxi_snd_txctrl(struct snd_pcm_substream *substream,
-> +					struct sunxi_spdif_dev *host, int on)
-> +{
-> +	u32 tmp;
-
-There's no meaningful sharing between the enable and disable paths and
-only one place either is called, it's better to just inline this into
-the callers.
-
-> +	if (!cpu_dai->active) {
-> +		ret = clk_prepare_enable(host->clk);
-> +		if (ret)
-> +			return ret;
-> +	}
-
-Can you move the clock enables to runtime PM and let the core do runtime
-PM for you?
-
-> +static int sunxi_spdif_set_clkdiv(struct snd_soc_dai *cpu_dai,
-> +						unsigned int rate, int div)
-> +{
-> +	struct sunxi_spdif_dev *host = snd_soc_dai_get_drvdata(cpu_dai);
-> +	int sample_freq, original_sample_freq;
-
-Why are you implementing a set_clkdiv() operation - is the driver not
-capable of working out its internal clocking automaticallly?
-
-> +static int sunxi_spdif_hw_params(struct snd_pcm_substream *substream,
-> +					struct snd_pcm_hw_params *params,
-> +					struct snd_soc_dai *cpu_dai)
-> +{
-
-> +	ret = snd_soc_dai_set_fmt(cpu_dai, fmt);
-> +	if (ret < 0)
-> +		return ret;
-
-This looks very broken - what is this doing and why?
-
-> +static struct snd_soc_dai_driver sunxi_spdif_dai = {
-> +	.playback = {
-> +		.channels_min = 2,
-> +		.channels_max = 2,
-> +		.rates = SUNXI_RATES,
-
-There was code in the driver to handle mono signals but this says only
-stereo is supported?
-
-> +	if (clk_prepare_enable(host->apb_clk)) {
-> +		dev_err(&pdev->dev, "try to enable apb_spdif_clk failed\n");
-> +		return -EINVAL;
-> +	}
-
-Don't ignore the error code you got from the API, print it and pass it
-back.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150924/5d16fb8a/attachment.sig>
+Drew
