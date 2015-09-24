@@ -1,22 +1,30 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 25 Sep 2015 00:13:29 +0200
-Subject: [PATCH v2 0/5] ARM: multi_v7_defconfig: Improve rockchip support
-In-Reply-To: <1443094759-28531-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1443094759-28531-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <3696254.URXbzz0NG2@diego>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 24 Sep 2015 15:15:54 -0700 (PDT)
+Subject: [PATCH v3 0/9] Phy, mdiobus, and netdev struct device fixes
+In-Reply-To: <20150924215731.GE20825@lunn.ch>
+References: <20150924191754.GC21513@n2100.arm.linux.org.uk>
+ <20150924215731.GE20825@lunn.ch>
+Message-ID: <20150924.151554.619662567057050978.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 24. September 2015, 13:39:14 schrieb Sjoerd Simons:
-> Enable options to provide more complete support for Rockchip boards
-> including: support for the common PMICs, common RTC chips, I2C, SPI,
-> PMW, Thermal driver, HDMI video output and USB 2.
+From: Andrew Lunn <andrew@lunn.ch>
+Date: Thu, 24 Sep 2015 23:57:31 +0200
 
-As these patches are supposed to go through arm-soc directly and options 
-getting enabled + the whole what gets set as built-in vs. module looks sane to 
-me, I'll just provide for the whole series a:
+> I built the FEC driver as a module, and it won't unload:
+> 
+>  kernel:unregister_netdevice: waiting for eth1 to become free. Usage count = 1
+> unregister_netdevice: waiting for eth1 to become free. Usage count = 1
+> 
+> i assume because DSA holds a reference. I've not tried a fully module
+> build, DSA has issues with that.
+> 
+> Tested-by: Andrew Lunn <andrew@lunn.ch>
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+So, is this a regression?
 
+Please don't provide a "Tested-by: " tag is you encounter a new
+problem which could have been introduced by the changes in question.
+That _REALLY_ screws everything up for me.
 
-Heiko
+Thank.
