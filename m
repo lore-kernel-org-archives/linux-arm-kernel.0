@@ -1,16 +1,19 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 24 Sep 2015 05:30:39 -0700
-Subject: [PATCH v3 4/4] ARM: dts: imx7d-sdb: add fec1 and fec2 support
-In-Reply-To: <1441594502-19236-5-git-send-email-b38611@freescale.com>
-References: <1441594502-19236-1-git-send-email-b38611@freescale.com>
- <1441594502-19236-5-git-send-email-b38611@freescale.com>
-Message-ID: <20150924123038.GR3529@tiger>
+Date: Thu, 24 Sep 2015 05:31:08 -0700
+Subject: [PATCH v4 2/8] ARM: imx: imx7d-pinfunc: add gpio1 pad iomux
+ settings
+In-Reply-To: <1442593798-11501-2-git-send-email-aalonso@freescale.com>
+References: <1442593798-11501-1-git-send-email-aalonso@freescale.com>
+ <1442593798-11501-2-git-send-email-aalonso@freescale.com>
+Message-ID: <20150924123107.GS3529@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 07, 2015 at 10:55:02AM +0800, Fugang Duan wrote:
-> Enable fec1 and fec2 for i.MX7d-sdb board.
+On Fri, Sep 18, 2015 at 11:29:52AM -0500, Adrian Alonso wrote:
+> - Add imx7 SoC GPIO1 pad iomuxc settings
+>   <mux_reg conf_reg input_reg mux_mode input_val>
+> - Fix UART input select daisy chain setting values
 > 
-> Signed-off-by: Fugang Duan <B38611@freescale.com>
+> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 
-Applied, thanks.
+Applied this one, thanks.
