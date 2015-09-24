@@ -1,48 +1,48 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 24 Sep 2015 14:18:49 -0500
-Subject: [Patch v3 00/10] Add RPM/SMD Support for QCOM platforms
-Message-ID: <1443122339-13917-1-git-send-email-agross@codeaurora.org>
+Date: Thu, 24 Sep 2015 14:18:51 -0500
+Subject: [Patch v3 02/10] soc: qcom: smd-rpm: Add existing platform support
+In-Reply-To: <1443122339-13917-1-git-send-email-agross@codeaurora.org>
+References: <1443122339-13917-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1443122339-13917-3-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set cleans up the documentation that is currently in place for the
-SMD, SMD-RPM, and SMD-RPM regulators.  In addition, this patch set adds support
-for the PM8916 found on MSM8916 platforms and the PMA8084 found on APQ8084
-platforms.
-                                                                                                          
-All of the relevant DTS information is fleshed out for the regulators and their
-dependencies for all of the platforms which support SMD-RPM regulators.
+This patch adds support for all current Qualcomm platforms which utilize
+RPM over SMD.  This includes both MSM8916 and APQ8084.
 
-Changes since v2:
-  - Fixed some missed review comments
-  - Corrected the SMD RPM example binding indentation
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ .../devicetree/bindings/soc/qcom/qcom,smd-rpm.txt  |    2 ++
+ drivers/soc/qcom/smd-rpm.c                         |    2 ++
+ 2 files changed, 4 insertions(+)
 
-Changes since v1:
-  - Fixed various review comments
-  - Removed MSM8974 patches as there was already an outstanding patch
-
-Andy Gross (10):
-  soc: qcom: documentation: Update SMD/RPM Docs
-  soc: qcom: smd-rpm: Add existing platform support
-  arm64: dts: qcom: Add MSM8916 SMEM nodes
-  arm64: dts: qcom: Add RPM/SMD support on MSM8916
-  arm64: dts: Add PM8916 support on MSM8916
-  regulators: qcom-smd: Add PM8916 support
-  arm: dts: Add APQ8084 SMEM nodes
-  arm: dts: Add RPM/SMD support on APQ8084
-  arm: dts: Add support for PMA8084 on APQ8084
-  regulator: qcom-smd: Add support for PMA8084
-
- .../qcom,smd-rpm-regulator.txt}                    |   83 +++++++---
- .../devicetree/bindings/soc/qcom/qcom,smd-rpm.txt  |   59 ++++++++
- arch/arm/boot/dts/qcom-apq8084.dtsi                |  103 +++++++++++++
- arch/arm64/boot/dts/qcom/msm8916.dtsi              |   84 +++++++++++
- drivers/regulator/qcom_smd-regulator.c             |  159 ++++++++++++++++++++
- drivers/soc/qcom/smd-rpm.c                         |    2 +
- 6 files changed, 468 insertions(+), 22 deletions(-)
- rename Documentation/devicetree/bindings/soc/{qcom,smd-rpm.txt => qcom/qcom,smd-rpm-regulator.txt} (54%)
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
-
+diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
+index 003bedd..18d4d04 100644
+--- a/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
++++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
+@@ -19,6 +19,8 @@ resources.
+ 	Usage: required
+ 	Value type: <string>
+ 	Definition: must be one of:
++		    "qcom,rpm-apq8084"
++		    "qcom,rpm-msm8916"
+ 		    "qcom,rpm-msm8974"
+ 
+ - qcom,smd-channels:
+diff --git a/drivers/soc/qcom/smd-rpm.c b/drivers/soc/qcom/smd-rpm.c
+index 1392ccf..e8450f3 100644
+--- a/drivers/soc/qcom/smd-rpm.c
++++ b/drivers/soc/qcom/smd-rpm.c
+@@ -211,6 +211,8 @@ static void qcom_smd_rpm_remove(struct qcom_smd_device *sdev)
+ }
+ 
+ static const struct of_device_id qcom_smd_rpm_of_match[] = {
++	{ .compatible = "qcom,rpm-apq8084" },
++	{ .compatible = "qcom,rpm-msm8916" },
+ 	{ .compatible = "qcom,rpm-msm8974" },
+ 	{}
+ };
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
