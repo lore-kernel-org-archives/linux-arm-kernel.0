@@ -1,18 +1,71 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 24 Sep 2015 14:18:19 +0300
-Subject: [PATCH v2 00/15] KVM: arm64: GICv3 ITS emulation
-In-Reply-To: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
-References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <168d01d0f6ba$b83a1ab0$28ae5010$@samsung.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 24 Sep 2015 13:25:12 +0200
+Subject: [PATCH v5 2/4] edac: Add L3 EDAC support to the APM X-Gene SoC
+ EDAC driver
+In-Reply-To: <1443055261-8613-3-git-send-email-lho@apm.com>
+References: <1443055261-8613-1-git-send-email-lho@apm.com>
+ <1443055261-8613-3-git-send-email-lho@apm.com>
+Message-ID: <20150924112512.GB3774@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello Andre and others!
+On Wed, Sep 23, 2015 at 05:40:59PM -0700, Loc Ho wrote:
+> Add EDAC support for the L3 component.
+> 
+> Signed-off-by: Loc Ho <lho@apm.com>
+> ---
+>  drivers/edac/xgene_edac.c |  669 ++++++++++++++++++++++++++++++++-------------
+>  1 files changed, 474 insertions(+), 195 deletions(-)
 
- How are things going? I see the last message in thread something like 1 month old, then silence...
- Our project relies on this feature, any assistance needed?
+...
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+> @@ -878,25 +869,16 @@ static const struct file_operations xgene_edac_pmd_debug_inject_fops[] = {
+>  	{ }
+>  };
+> 
+> -static void xgene_edac_pmd_create_debugfs_nodes(
+> -	struct edac_device_ctl_info *edac_dev)
+> +static void
+> +xgene_edac_pmd_create_debugfs_nodes(struct edac_device_ctl_info *edac_dev)
+>  {
+>  	struct xgene_edac_pmd_ctx *ctx = edac_dev->pvt_info;
+>  	struct dentry *dbgfs_dir;
+> -	char name[30];
+> +	char name[10];
+
+So somehow we don't seem to understand each other. This char name[10] on
+the stack thing has a bunch of problems:
+
+1. It is on the stack so it contains random garbage.
+
+> 
+> -	if (!IS_ENABLED(CONFIG_EDAC_DEBUG))
+> +	if (!IS_ENABLED(CONFIG_EDAC_DEBUG) || !ctx->edac->dfs)
+>  		return;
+> 
+> -	/*
+> -	 * Todo: Switch to common EDAC debug file system for edac device
+> -	 *       when available.
+> -	 */
+> -	if (!ctx->edac->dfs) {
+> -		ctx->edac->dfs = edac_debugfs_create_dir(edac_dev->dev->kobj.name);
+> -		if (!ctx->edac->dfs)
+> -			return;
+> -	}
+>  	sprintf(name, "PMD%d", ctx->pmd);
+
+2. You're sprintf-ing into it without checking its length. This can
+possibly write past the end if %d is big enough. I know, I know, %d
+is only small numbers but that assurance not good enough. You need
+snprintf() and check the ctx->pmd width for sane numbers only anyway.
+
+And debugfs goes and does strlen() on it which could lead to all kinds
+of funky stuff later.
+
+Please fix that in all its occurrences in this patchset.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
