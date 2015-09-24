@@ -1,37 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Sep 2015 09:34:22 +0200
-Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
-In-Reply-To: <BN3PR0301MB0867F84A6740335770B16977FE430@BN3PR0301MB0867.namprd03.prod.outlook.com>
-References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
- <CAOMZO5BUvq3LydjL7cR2hAWFFUB+Cvwi+yEN5A9uG=uWEDepiA@mail.gmail.com>
- <BN3PR0301MB0867F84A6740335770B16977FE430@BN3PR0301MB0867.namprd03.prod.outlook.com>
-Message-ID: <16038044.0DCMVgq8H3@wuerfel>
+From: mamlinav@gmail.com (Aleksei Mamlin)
+Date: Thu, 24 Sep 2015 10:33:46 +0300
+Subject: [PATCH] ARM: dts: sun4i: Enable USB DRC on the Marsboard A10
+Message-ID: <1443080026-4011-1-git-send-email-mamlinav@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 September 2015 07:27:10 Huan Wang wrote:
-> > On Fri, Sep 18, 2015 at 4:38 AM, Huan Wang <alison.wang@freescale.com>
-> > wrote:
-> > 
-> > > [Alison Wang] Thanks for your reply. I agreed with you about creating
-> > > a new multi_v7_lpae_defconfig. In multi_v7_lpae_defconfig, I need to
-> > > add the following CONFIG_XX to support LS1021A based on
-> > multi_v7_defconfig.
-> > >
-> > > CONFIG_ARM_LPAE=y
-> > > CONFIG_VMSPLIT_2G=y
-> > 
-> > Is CONFIG_VMSPLIT_2G=y really needed?
-> [Alison Wang] I tried to remove CONFIG_VMSPLIT_2G and used the default CONFIG_VMSPLIT_3G,
-> but kernel could not boot up. It hangs at " Starting kernel ... ".
-> 
-> Any suggestion? Thanks.
+Enable the otg/drc usb controller on the Marsboard A10.
+Similar to Cubieboard, the 5V of the otg is directly connected to the
+general 5V, so we only use the id pin.
 
-Try enabling DEBUG_LL for your platform to get some debug output, if  you
-still don't get any helpful messages, try also inserting 
+Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
+---
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-	printascii(__func__);
-
-statements in the early boot process to see how far you get before the hang.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/sun4i-a10-marsboard.dts b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+index 02158bc..9a012db 100644
+--- a/arch/arm/boot/dts/sun4i-a10-marsboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+@@ -154,6 +154,10 @@
+ 	status = "okay";
+ };
+ 
++&otg_sram {
++	status = "okay";
++};
++
+ &pio {
+ 	led_pins_marsboard: led_pins at 0 {
+ 		allwinner,pins = "PB5", "PB6", "PB7", "PB8";
+@@ -161,6 +165,13 @@
+ 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
++
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PH4";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
+ };
+ 
+ &reg_usb1_vbus {
+@@ -184,7 +195,15 @@
+ 	status = "okay";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
+ &usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>;
++	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	usb2_vbus-supply = <&reg_usb2_vbus>;
+ 	status = "okay";
+-- 
+2.4.9
