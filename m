@@ -1,565 +1,219 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Thu, 24 Sep 2015 10:18:40 +0800
-Subject: [PATCH v2 1/9] ARM: dts: rockchip: add core rk3036 dts
-In-Reply-To: <3497055.MjziMiDfL7@diego>
-References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
- <1442478540-15068-2-git-send-email-zhengxing@rock-chips.com>
- <3497055.MjziMiDfL7@diego>
-Message-ID: <56035D80.9080308@rock-chips.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Thu, 24 Sep 2015 10:27:50 +0800
+Subject: [PATCH 2/5] thermal: rockchip: Support the RK3368 SoCs in thermal
+ driver
+In-Reply-To: <20150921170851.GH17389@dtor-ws>
+References: <1442808971-2619-1-git-send-email-wxt@rock-chips.com>
+ <1442808971-2619-3-git-send-email-wxt@rock-chips.com>
+ <20150921170851.GH17389@dtor-ws>
+Message-ID: <56035FA6.4060306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?09?17? 17:18, Heiko St?bner wrote:
-> Am Donnerstag, 17. September 2015, 16:28:52 schrieb Xing Zheng:
->> Initial release for rk3036, node definitions rk3036 sdk board.
+Hi Dmitry,
+
+? 2015?09?22? 01:08, Dmitry Torokhov ??:
+> Hi Caesar,
+>
+> On Mon, Sep 21, 2015 at 12:16:08PM +0800, Caesar Wang wrote:
+>> The RK3368 SoCs support to 2 channel TS-ADC, the temperature criteria
+>> of each channel can be configurable.
 >>
->> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
+>> The system has two Temperature Sensors, channel 0 is for CPU,
+>> and channel 1 is for GPU.
+>>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 >> ---
 >>
->> Changes in v2: None
+>>   drivers/thermal/rockchip_thermal.c | 201 ++++++++++++++++++++++++++++++++-----
+>>   1 file changed, 176 insertions(+), 25 deletions(-)
 >>
->>   arch/arm/boot/dts/Makefile       |    1 +
->>   arch/arm/boot/dts/rk3036-sdk.dts |   62 +++++++
->>   arch/arm/boot/dts/rk3036.dtsi    |  381
->> ++++++++++++++++++++++++++++++++++++++ 3 files changed, 444 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/rk3036-sdk.dts
->>   create mode 100644 arch/arm/boot/dts/rk3036.dtsi
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index d39ce4b..48260c4 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -502,6 +502,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
->>   	rk3066a-bqcurie2.dtb \
->>   	rk3066a-marsboard.dtb \
->>   	rk3066a-rayeager.dtb \
->> +	rk3036-sdk.dtb \
-> ordering ... please put the rk3036 above rk3066 boards
-Done.
->
->>   	rk3188-radxarock.dtb \
->>   	rk3288-evb-act8846.dtb \
->>   	rk3288-evb-rk808.dtb \
->> diff --git a/arch/arm/boot/dts/rk3036-sdk.dts
->> b/arch/arm/boot/dts/rk3036-sdk.dts new file mode 100644
->> index 0000000..9187f93
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/rk3036-sdk.dts
-> or "rk3036-evb.dts"? What is the actual board named?
-Done, use rk3036-evb.dts
->> @@ -0,0 +1,62 @@
->> +/*
->> + * Copyright (c)  2015 Xing Zheng<zhengxing@rock-chips.com>
-> this probably wants a Rockchip copyright notice?
-Yes, remove this notice.
+>> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+>> index 4d5b7d4..16d2476 100644
+>> --- a/drivers/thermal/rockchip_thermal.c
+>> +++ b/drivers/thermal/rockchip_thermal.c
+>> @@ -1,6 +1,9 @@
+>>   /*
+>>    * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
+>>    *
+>> + * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
+>> + * Caesar Wang <wxt@rock-chips.com>
 >> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + *  Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
+>>    * This program is free software; you can redistribute it and/or modify it
+>>    * under the terms and conditions of the GNU General Public License,
+>>    * version 2, as published by the Free Software Foundation.
+>> @@ -43,16 +46,11 @@ enum tshut_polarity {
+>>   	TSHUT_HIGH_ACTIVE,
+>>   };
+>>   
+>> -/**
+>> - * The system has three Temperature Sensors.  channel 0 is reserved,
+>> - * channel 1 is for CPU, and channel 2 is for GPU.
+>> - */
+>> -enum sensor_id {
+>> -	SENSOR_CPU = 1,
+>> -	SENSOR_GPU,
+>> -};
+>> -
+>>   struct rockchip_tsadc_chip {
+>> +	/* The sensor id of chip correspond to the ADC channel */
+>> +	int cpu_id;
+>> +	int gpu_id;
 >> +
->> +/dts-v1/;
+>>   	/* The hardware-controlled tshut property */
+>>   	long tshut_temp;
+>>   	enum tshut_mode tshut_mode;
+>> @@ -72,10 +70,11 @@ struct rockchip_tsadc_chip {
+>>   struct rockchip_thermal_sensor {
+>>   	struct rockchip_thermal_data *thermal;
+>>   	struct thermal_zone_device *tzd;
+>> -	enum sensor_id id;
+>> +	int id;
+>>   };
+>>   
+>> -#define NUM_SENSORS	2 /* Ignore unused sensor 0 */
+>> +/* Two sensors: CPU and GPU */
+>> +#define NUM_SENSORS	2
+>>   
+>>   struct rockchip_thermal_data {
+>>   	const struct rockchip_tsadc_chip *chip;
+>> @@ -94,7 +93,7 @@ struct rockchip_thermal_data {
+>>   	enum tshut_polarity tshut_polarity;
+>>   };
+>>   
+>> -/* TSADC V2 Sensor info define: */
+>> +/* TSADC Sensor info define: */
+>>   #define TSADCV2_AUTO_CON			0x04
+>>   #define TSADCV2_INT_EN				0x08
+>>   #define TSADCV2_INT_PD				0x0c
+>> @@ -116,6 +115,8 @@ struct rockchip_thermal_data {
+>>   #define TSADCV2_INT_PD_CLEAR_MASK		~BIT(8)
+>>   
+>>   #define TSADCV2_DATA_MASK			0xfff
+>> +#define TSADCV3_DATA_MASK			0x3ff
 >> +
->> +#include "rk3036.dtsi"
->> +
->> +/ {
->> +	model = "SDK-RK3036";
->> +	compatible = "sdk,sdk-rk3036", "rockchip,rk3036";
-> 	model = "Rockchip RK3036-SDK";
-> 	compatible = "rockchip,rk3036-sdk", "rockchip,rk3036";
->
-> or
->
-> 	model = "Rockchip RK3036 Evaluation board";
-> 	compatible = "rockchip,rk3036-evb", "rockchip,rk3036";
->
-> depending on what the real board is labeled
-Done.
+>>   #define TSADCV2_HIGHT_INT_DEBOUNCE_COUNT	4
+>>   #define TSADCV2_HIGHT_TSHUT_DEBOUNCE_COUNT	4
+>>   #define TSADCV2_AUTO_PERIOD_TIME		250 /* msec */
+>> @@ -164,6 +165,45 @@ static const struct tsadc_table v2_code_table[] = {
+>>   	{3421, 125000},
+>>   };
+>>   
+>> +static const struct tsadc_table v3_code_table[] = {
+>> +	{0, -40000},
+>> +	{106, -40000},
+>> +	{108, -35000},
+>> +	{110, -30000},
+>> +	{112, -25000},
+>> +	{114, -20000},
+>> +	{116, -15000},
+>> +	{118, -10000},
+>> +	{120, -5000},
+>> +	{122, 0},
+>> +	{124, 5000},
+>> +	{126, 10000},
+>> +	{128, 15000},
+>> +	{130, 20000},
+>> +	{132, 25000},
+>> +	{134, 30000},
+>> +	{136, 35000},
+>> +	{138, 40000},
+>> +	{140, 45000},
+>> +	{142, 50000},
+>> +	{144, 55000},
+>> +	{146, 60000},
+>> +	{148, 65000},
+>> +	{150, 70000},
+>> +	{152, 75000},
+>> +	{154, 80000},
+>> +	{156, 85000},
+>> +	{158, 90000},
+>> +	{160, 95000},
+>> +	{162, 100000},
+>> +	{163, 105000},
+>> +	{165, 110000},
+>> +	{167, 115000},
+>> +	{169, 120000},
+>> +	{171, 125000},
+>> +	{TSADCV3_DATA_MASK, 125000},
 >> +};
 >> +
->> +&i2c1 {
->> +	status = "okay";
+>>   static u32 rk_tsadcv2_temp_to_code(long temp)
+>>   {
+>>   	int high, low, mid;
+>> @@ -227,16 +267,83 @@ static int rk_tsadcv2_code_to_temp(u32 code, int *temp)
+>>   	return 0;
+>>   }
+>>   
+>> +static u32 rk_tsadcv3_temp_to_code(long temp)
+>> +{
+>> +	int high, low, mid;
 >> +
->> +        hym8563: hym8563 at 51 {
->> +		compatible = "haoyu,hym8563";
->> +		reg =<0x51>;
->> +		#clock-cells =<0>;
->> +		clock-frequency =<32768>;
->> +		clock-output-names = "xin32k";
->> +	};
->> +};
->> \ No newline at end of file
-> missing newline as stated above
-Done.
->> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
->> new file mode 100644
->> index 0000000..b7459c0
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/rk3036.dtsi
->> @@ -0,0 +1,381 @@
->> +/*
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
+>> +	low = 0;
+>> +	high = ARRAY_SIZE(v3_code_table) - 1;
+>> +	mid = (high + low) / 2;
 >> +
->> +#include<dt-bindings/gpio/gpio.h>
->> +#include<dt-bindings/interrupt-controller/irq.h>
->> +#include<dt-bindings/interrupt-controller/arm-gic.h>
->> +#include<dt-bindings/pinctrl/rockchip.h>
->> +#include<dt-bindings/clock/rk3036-cru.h>
->> +#include "skeleton.dtsi"
-> in general, please sort nodes by register address, so for example
+>> +	if (temp < v3_code_table[low].temp || temp > v3_code_table[high].temp)
+>> +		return 0;
+> How is this different from v2 conversion except for the table being
+> used? I think you should be able to reuse the conversion routines if you
+> pass the conversion table in as a parameter.
+
+The table_v3 is same with the table_v2 but the anolog data of ADC.
+
+Do you want to reuse the conversion routines,?  I know the conversion 
+routines is same in
+rk_tsadcv3_temp_to_code() if we have many socs maybe the ADC analog data 
+are different.
+
+Says:
+
+rk_tsadcv3_temp_to_code(temp, xxx)
+
+{
+     ...
+
+yyyy =  rk_tsadcv2_temp_to_code(temp)
+
+...
+}
+...
+
+
+I guess you want to independent the adc value,after all the temperature 
+points are same.
+
+Says: maybe i will better likely on this.
+
+//3066/3188
+.....
+
+//3288
+
+static const struct tsadc_table v2_code_table[] = {
+	{0,3800,3792,3783, 3774,3765, 3756,3747,......
+},
+
+
+//3368
+
+static const struct tsadc_table v3_code_table[] = {
+	{0,106,108,110,112,114,......
+},
+
+//next socs
+
+  ....
+
+Dmitry, I know you don't mean that.:-)
+
+I'm no sure if this way will better for the thermal driver.
+
+
+> Thanks.
 >
-> 	interrupt-controller at 10139000
-> should be before
-> 	clock-controller at 20000000
->
-> same for all other nodes
-Done.
->> +
->> +/ {
->> +	compatible = "rockchip,rk3036";
->> +
->> +	interrupt-parent =<&gic>;
->> +
->> +	aliases {
->> +		i2c1 =&i2c1;
->> +		serial0 =&uart0;
->> +		serial1 =&uart1;
->> +		serial2 =&uart2;
->> +	};
->> +
->> +	memory {
->> +		device_type = "memory";
->> +		reg =<0x60000000 0x40000000>;
-> ordering is possible ... to ease readability I try to keep this as
->
-> compatible = ...
-> reg = ...
-> [other properties sorted alphabetically]
-> status = ...
-Done.
->> +	};
->> +
->> +        arm-pmu {
->> +                compatible = "arm,cortex-a7-pmu";
->> +                interrupts =<GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
->> +<GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
->> +                interrupt-affinity =<&cpu0>,<&cpu1>;
->> +        };
-> tabs, not spaces please
-Done.
->> +
->> +	cpus {
->> +		#address-cells =<1>;
->> +		#size-cells =<0>;
->> +		enable-method = "rockchip,rk3036-smp";
-> this enable method is not yet defined, please don't add it until actual smp is
-> accepted
-Done, removed it on this patch.
->> +
->> +		cpu0: cpu at f00 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a7";
->> +			reg =<0xf00>;
->> +			operating-points =<
->> +				/* KHz    uV */
->> +				 816000 1000000
->> +			>;
->> +			#cooling-cells =<2>; /* min followed by max */
-> again, not yet defined thermal handling, so the #cooling-cells should stay out
-> for now
-Done, removed it.
->> +			clock-latency =<40000>;
->> +			clocks =<&cru ARMCLK>;
->> +			resets =<&cru SRST_CORE0>;
->> +		};
->> +		cpu1: cpu at f01 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a7";
->> +			reg =<0xf01>;
->> +			resets =<&cru SRST_CORE1>;
->> +		};
->> +	};
->> +
->> +	amba {
->> +		compatible = "arm,amba-bus";
->> +		#address-cells =<1>;
->> +		#size-cells =<1>;
->> +		ranges;
->> +
->> +                pdma: pdma at 20078000 {
->> +                        compatible = "arm,pl330", "arm,primecell";
->> +                        reg =<0x20078000 0x4000>;
->> +                        interrupts =<GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
->> +<GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
->> +                        #dma-cells =<1>;
->> +                        clocks =<&cru ACLK_DMAC2>;
->> +                        clock-names = "apb_pclk";
->> +                };
-> again tabs please
-Done.
->> +	};
->> +
->> +	xin24m: oscillator {
->> +		compatible = "fixed-clock";
->> +		clock-frequency =<24000000>;
->> +		clock-output-names = "xin24m";
->> +		#clock-cells =<0>;
->> +	};
->> +
->> +	timer {
->> +		compatible = "arm,armv7-timer";
->> +		arm,cpu-registers-not-fw-configured;
->> +		interrupts =<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
-> IRQ_TYPE_LEVEL_HIGH)>,
->> +			<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>, +	
-> 		
->>     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>, +			
->> <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->> +		clock-frequency =<24000000>;
->> +	};
->> +
->> +	cru: clock-controller at 20000000 {
->> +		compatible = "rockchip,rk3036-cru";
->> +		reg =<0x20000000 0x1000>;
->> +		rockchip,grf =<&grf>;
->> +		#clock-cells =<1>;
->> +		#reset-cells =<1>;
->> +		assigned-clocks =<&cru PLL_GPLL>;
->> +		assigned-clock-rates =<594000000>;
->> +	};
->> +
->> +	uart0: serial at 20060000 {
->> +		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
->> +		reg =<0x20060000 0x100>;
->> +		interrupts =<GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
->> +		reg-shift =<2>;
->> +		reg-io-width =<4>;
->> +		clock-frequency =<24000000>;
->> +		clocks =<&cru SCLK_UART0>,<&cru PCLK_UART0>;
->> +		clock-names = "baudclk", "apb_pclk";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 =<&uart0_xfer&uart0_cts&uart0_rts>;
-> status = "disabled" and then in the board.dts a
->
-> &uart0 {
-> 	status = "okay";
-> };
->
-> not everybody will want to use uart0 ... same is true for the other two uarts.
-Done.
->> +	};
->> +
->> +	uart1: serial at 20064000 {
->> +		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
->> +		reg =<0x20064000 0x100>;
->> +		interrupts =<GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
->> +		reg-shift =<2>;
->> +		reg-io-width =<4>;
->> +		clock-frequency =<24000000>;
->> +		clocks =<&cru SCLK_UART1>,<&cru PCLK_UART1>;
->> +		clock-names = "baudclk", "apb_pclk";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 =<&uart1_xfer>;
->> +	};
->> +
->> +	uart2: serial at 20068000 {
->> +		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
->> +		reg =<0x20068000 0x100>;
->> +		interrupts =<GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
->> +		reg-shift =<2>;
->> +		reg-io-width =<4>;
->> +		clock-frequency =<24000000>;
->> +		clocks =<&cru SCLK_UART2>,<&cru PCLK_UART2>;
->> +		clock-names = "baudclk", "apb_pclk";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 =<&uart2_xfer>;
->> +	};
->> +
->> +	pwm0: pwm at 20050000 {
->> +		compatible = "rockchip,rk2928-pwm";
-> 		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
->
-> rk2928-pwm matches now, but if we find issues we can simply create the rk3036-
-> pwm in the driver without needing to change the dts
-Done.
->> +		reg =<0x20050000 0x10>;
->> +		#pwm-cells =<3>;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 =<&pwm0_pin>;
->> +		clocks =<&cru PCLK_PWM>;
->> +		clock-names = "pwm";
->> +		status = "disabled";
->> +	};
->> +
->> +	pwm1: pwm at 20050010 {
->> +		compatible = "rockchip,rk2928-pwm";
->> +		reg =<0x20050010 0x10>;
->> +		#pwm-cells =<3>;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 =<&pwm1_pin>;
->> +		clocks =<&cru PCLK_PWM>;
->> +		clock-names = "pwm";
->> +		status = "disabled";
->> +	};
->> +
->> +	pwm2: pwm at 20050020 {
->> +		compatible = "rockchip,rk2928-pwm";
->> +		reg =<0x20050020 0x10>;
->> +		#pwm-cells =<3>;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 =<&pwm2_pin>;
->> +		clocks =<&cru PCLK_PWM>;
->> +		clock-names = "pwm";
->> +		status = "disabled";
->> +	};
->> +
->> +	pwm3: pwm at 20050030 {
->> +		compatible = "rockchip,rk2928-pwm";
->> +		reg =<0x20050030 0x10>;
->> +		#pwm-cells =<2>;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 =<&pwm3_pin>;
->> +		clocks =<&cru PCLK_PWM>;
->> +		clock-names = "pwm";
->> +		status = "disabled";
->> +	};
->> +
->> +	sram: sram at 10080000 {
->> +		compatible = "rockchip,rk3036-smp-sram", "mmio-sram";
->> +		reg =<0x10080000 0x2000>;
->> +	};
->> +
->> +	gic: interrupt-controller at 10139000 {
->> +		compatible = "arm,gic-400";
->> +		interrupt-controller;
->> +		#interrupt-cells =<3>;
->> +		#address-cells =<0>;
->> +
->> +		reg =<0x10139000 0x1000>,
->> +		<0x1013a000 0x1000>,
->> +		<0x1013c000 0x2000>,
->> +		<0x1013e000 0x2000>;
->> +		interrupts =<GIC_PPI 9 0xf04>;
->> +	};
->> +
->> +	grf: syscon at 20008000 {
->> +		compatible = "rockchip,rk3036-grf", "syscon";
->> +		reg =<0x20008000 0x1000>;
->> +	};
->> +
->> +	pinctrl: pinctrl {
->> +		compatible = "rockchip,rk3036-pinctrl";
->> +		rockchip,grf =<&grf>;
->> +		#address-cells =<1>;
->> +		#size-cells =<1>;
->> +		ranges;
->> +
->> +		gpio0: gpio0 at 2007c000 {
->> +			compatible = "rockchip,gpio-bank";
->> +			reg =<0x2007c000 0x100>;
->> +			interrupts =<GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks =<&cru PCLK_GPIO0>;
->> +
->> +			gpio-controller;
->> +			#gpio-cells =<2>;
->> +
->> +			interrupt-controller;
->> +			#interrupt-cells =<2>;
->> +		};
->> +
->> +		gpio1: gpio1 at 20080000 {
->> +			compatible = "rockchip,gpio-bank";
->> +			reg =<0x20080000 0x100>;
->> +			interrupts =<GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks =<&cru PCLK_GPIO1>;
->> +
->> +			gpio-controller;
->> +			#gpio-cells =<2>;
->> +
->> +			interrupt-controller;
->> +			#interrupt-cells =<2>;
->> +		};
->> +
->> +		gpio2: gpio2 at 20084000 {
->> +			compatible = "rockchip,gpio-bank";
->> +			reg =<0x20084000 0x100>;
->> +			interrupts =<GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
->> +			clocks =<&cru PCLK_GPIO2>;
->> +
->> +			gpio-controller;
->> +			#gpio-cells =<2>;
->> +
->> +			interrupt-controller;
->> +			#interrupt-cells =<2>;
->> +		};
->> +
->> +		pcfg_pull_up: pcfg-pull-up {
->> +			bias-pull-up;
->> +		};
->> +
->> +		pcfg_pull_down: pcfg-pull-down {
->> +			bias-pull-down;
->> +		};
->> +
->> +		pcfg_pull_none: pcfg-pull-none {
->> +			bias-disable;
->> +		};
->> +
->> +		uart0 {
->> +			uart0_xfer: uart0-xfer {
->> +				rockchip,pins =<0 16 RK_FUNC_1&pcfg_pull_none>,
-> pcfg_pull_up for the rx-pin?
-Done
->> +						<0 17 RK_FUNC_1&pcfg_pull_none>;
->> +			};
->> +
->> +			uart0_cts: uart0-cts {
->> +				rockchip,pins =<0 18 RK_FUNC_1&pcfg_pull_none>;
->> +			};
-> pcfg_pull_up again?
-> see ARM: dts: rockchip: pull up cts lines on rk3288
-> (https://lkml.org/lkml/2015/9/2/612) for comparison
-Yes, they should be pull up.
->
->> +
->> +			uart0_rts: uart0-rts {
->> +				rockchip,pins =<0 19 RK_FUNC_1&pcfg_pull_none>;
->> +			};
->> +		};
->> +
->> +		uart1 {
->> +			uart1_xfer: uart1-xfer {
->> +				rockchip,pins =<2 22 RK_FUNC_1&pcfg_pull_none>,
->> +						<2 23 RK_FUNC_1&pcfg_pull_none>;
->> +			};
->> +			/* no rts / cts for uart1 */
->> +		};
->> +
->> +                uart2 {
->> +                        uart2_xfer: uart2-xfer {
->> +                                rockchip,pins =<1 18 RK_FUNC_2
->> &pcfg_pull_none>, +<1 19
->> RK_FUNC_2&pcfg_pull_none>; +                        };
->> +                        /* no rts / cts for uart2 */
->> +                };
-> tabs please
-Sorry, done.
->> +
->> +		pwm0 {
->> +			pwm0_pin: pwm0-pin {
->> +				rockchip,pins =<0 0 RK_FUNC_2&pcfg_pull_none>;
->> +			};
->> +		};
->> +
->> +		pwm1 {
->> +			pwm1_pin: pwm1-pin {
->> +				rockchip,pins =<0 1 RK_FUNC_2&pcfg_pull_none>;
->> +			};
->> +		};
->> +
->> +		pwm2 {
->> +			pwm2_pin: pwm2-pin {
->> +				rockchip,pins =<0 1 2&pcfg_pull_none>;
->> +			};
->> +		};
->> +
->> +		pwm3 {
->> +			pwm3_pin: pwm3-pin {
->> +				rockchip,pins =<0 27 1&pcfg_pull_none>;
->> +			};
->> +		};
->> +
->> +		i2c1 {
->> +			i2c1_xfer: i2c1-xfer {
->> +				rockchip,pins =<0 2 RK_FUNC_1&pcfg_pull_none>,
->> +						<0 3 RK_FUNC_1&pcfg_pull_none>;
->> +			};
->> +		};
->> +	};
->> +
->> +	i2c1: i2c at 20056000 {
->> +		compatible = "rockchip,rk3288-i2c";
->> +		reg =<0x20056000 0x1000>;
->> +		interrupts =<GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
->> +		#address-cells =<1>;
->> +		#size-cells =<0>;
->> +		clock-names = "i2c";
->> +		clocks =<&cru PCLK_I2C1>;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 =<&i2c1_xfer>;
->> +		status = "disabled";
->> +	};
->> +};
->
-Thanks.
+
+
+-- 
+Thanks,
+Caesar
