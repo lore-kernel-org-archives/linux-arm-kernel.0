@@ -1,109 +1,111 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 24 Sep 2015 13:01:47 +0300
-Subject: [PATCH v4 00/25] dmaengine/ARM: Merge the edma drivers into one
-Message-ID: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Thu, 24 Sep 2015 13:01:52 +0300
+Subject: [PATCH v4 05/25] ARM/dmaengine: edma: Move of_dma_controller_register
+ to the dmaengine driver
+In-Reply-To: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1443088932-21731-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+If the of_dma_controller is registered in the non dmaengine driver we could
+have race condition:
+the of_dma_controller has been registered, but the dmaengine driver is not
+yet probed. Drivers requesting DMA channels during this window will fail
+since we do not yet have dmaengine drivers registered.
 
-Changes since v3:
-- Separated the two (patch 10/11 in v2 patch 10 in v3) patch which got squashed
-  by accident for v3
-- Added Tony's Acked-by to patch 11 (for mach-oamp2 part)
-
-Changes since v2:
-- devm_kasprintf format string fixed
-- Additional patch to enable dynamic paRAM slot usage when the channel mapping
-  is supported by the eDMA module.
-  On am335x we have 256 paRAM slots and 64 DMA channels, this means that we had
-  64 slots 'locked away' all the time. The dynamic paRAM slot logic will allow
-  us to use all 256 slots freely for any purpose.
-
-Changes since v1:
-- Convert edma platform device registration to use platform_device_register_full
-- Moved the PM callback also to the dmaengine driver - missed in v1
-- Commit message added to:
-  ARM/dmaengine: edma: Remove limitation on the number of eDMA controllers
-- New patch which reads the flag for the channel mapping support in one place
-
-Cover letter:
-
-with this series the edma two driver setup will be changed to have only one
-driver to support eDMA3. The legacy edma interface will be removed and eDMA can
-only be used via dmaengine API from this point on.
-In order to do the merge the following improvements has been done:
-- One driver instance per eDMA:
- - Any number of eDMA instances are supported (both legacy and DT boot)
-- Not relying on global variables, arrays, etc
-- Code simplification and optimizations in several places
-
-This change will also help us to do bigger changes in the eDMA driver since,
-since now we have only one driver to work with.
-
-The series has been tested on:
-da850-evm (OMAP-L138)
-- with legacy and DT boot (both eDMA0 and eDMA1 is enabled)
-- In code swapping the eDMA instances in legacy mode to make sure the second
-  instance is handled correctly.
-
-am335x-evmsk
-- DT boot
-
-I think this series could go via the dmaengine tree. Changes are trivial under
-arch/arm/
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Peter Ujfalusi (25):
-  ARM: common: edma: Fix channel parameter for irq callbacks
-  ARM: common: edma: Remove unused functions
-  dmaengine: edma: Simplify and optimize the edma_execute path
-  ARM: davinci/common: Convert edma driver to handle one eDMA instance
-    per driver
-  ARM/dmaengine: edma: Move of_dma_controller_register to the dmaengine
-    driver
-  ARM: common: edma: Internal API to use pointer to 'struct edma'
-  ARM/dmaengine: edma: Public API to use private struct pointer
-  ARM/dmaengine: edma: Remove limitation on the number of eDMA
-    controllers
-  ARM: davinci: Use platform_device_register_full() to create pdev for
-    eDMA
-  ARM: davinci: Add dma_mask to eDMA devices
-  ARM/dmaengine: edma: Merge the two drivers under drivers/dma/
-  dmaengine: edma: Allocate memory dynamically for bitmaps and
-    structures
-  dmaengine: edma: Parameter alignment and long line fixes
-  dmaengine: edma: Use devm_kcalloc when possible
-  dmaengine: edma: Cleanup regarding the use of dev around the code
-  dmaengine: edma: Use dev_dbg instead pr_debug
-  dmaengine: edma: Use the edma_write_slot instead open coded
-    memcpy_toio
-  dmaengine: edma: Print warning when linking slots from different eDMA
-  dmaengine: edma: Consolidate the comments for functions
-  dmaengine: edma: Simplify the interrupt handling
-  dmaengine: edma: Move the pending error check into helper function
-  dmaengine: edma: Simplify and optimize ccerr interrupt handler
-  dmaengine: edma: Read channel mapping support only once from HW
-  dmaengine: edma: Rename bitfields for slot and channel usage tracking
-  dmaengine: edma: Dynamic paRAM slot handling if HW supports it
+ arch/arm/common/edma.c | 10 ----------
+ drivers/dma/edma.c     | 16 ++++++++++++++++
+ 2 files changed, 16 insertions(+), 10 deletions(-)
 
- arch/arm/Kconfig                      |    1 -
- arch/arm/common/Kconfig               |    3 -
- arch/arm/common/Makefile              |    1 -
- arch/arm/common/edma.c                | 1876 ---------------------------------
- arch/arm/mach-davinci/devices-da8xx.c |  122 +--
- arch/arm/mach-davinci/dm355.c         |   40 +-
- arch/arm/mach-davinci/dm365.c         |   25 +-
- arch/arm/mach-davinci/dm644x.c        |   40 +-
- arch/arm/mach-davinci/dm646x.c        |   44 +-
- arch/arm/mach-omap2/Kconfig           |    1 -
- drivers/dma/Kconfig                   |    1 -
- drivers/dma/edma.c                    | 1569 ++++++++++++++++++++++++---
- include/linux/platform_data/edma.h    |  101 --
- 13 files changed, 1523 insertions(+), 2301 deletions(-)
- delete mode 100644 arch/arm/common/edma.c
-
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 7c2fe527e53b..d82fceda13a3 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -29,7 +29,6 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/of_address.h>
+ #include <linux/of_device.h>
+-#include <linux/of_dma.h>
+ #include <linux/of_irq.h>
+ #include <linux/pm_runtime.h>
+ 
+@@ -1191,10 +1190,6 @@ static int edma_of_parse_dt(struct device *dev,
+ 	return ret;
+ }
+ 
+-static struct of_dma_filter_info edma_filter_info = {
+-	.filter_fn = edma_filter_fn,
+-};
+-
+ static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev,
+ 						      struct device_node *node)
+ {
+@@ -1209,11 +1204,6 @@ static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev,
+ 	if (ret)
+ 		return ERR_PTR(ret);
+ 
+-	dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
+-	dma_cap_set(DMA_CYCLIC, edma_filter_info.dma_cap);
+-	of_dma_controller_register(dev->of_node, of_dma_simple_xlate,
+-				   &edma_filter_info);
+-
+ 	return info;
+ }
+ #else
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 19fa49d6f555..fcb4680efed7 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -25,6 +25,7 @@
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+ #include <linux/of.h>
++#include <linux/of_dma.h>
+ 
+ #include <linux/platform_data/edma.h>
+ 
+@@ -987,9 +988,14 @@ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
+ 	INIT_LIST_HEAD(&dma->channels);
+ }
+ 
++static struct of_dma_filter_info edma_filter_info = {
++	.filter_fn = edma_filter_fn,
++};
++
+ static int edma_probe(struct platform_device *pdev)
+ {
+ 	struct edma_cc *ecc;
++	struct device_node *parent_node = pdev->dev.parent->of_node;
+ 	int ret;
+ 
+ 	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+@@ -1024,6 +1030,13 @@ static int edma_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, ecc);
+ 
++	if (parent_node) {
++		dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
++		dma_cap_set(DMA_CYCLIC, edma_filter_info.dma_cap);
++		of_dma_controller_register(parent_node, of_dma_simple_xlate,
++					   &edma_filter_info);
++	}
++
+ 	dev_info(&pdev->dev, "TI EDMA DMA engine driver\n");
+ 
+ 	return 0;
+@@ -1037,7 +1050,10 @@ static int edma_remove(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct edma_cc *ecc = dev_get_drvdata(dev);
++	struct device_node *parent_node = pdev->dev.parent->of_node;
+ 
++	if (parent_node)
++		of_dma_controller_free(parent_node);
+ 	dma_async_device_unregister(&ecc->dma_slave);
+ 	edma_free_slot(ecc->dummy_slot);
+ 
 -- 
 2.5.2
