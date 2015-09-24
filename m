@@ -1,74 +1,48 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 24 Sep 2015 14:18:52 -0500
-Subject: [Patch v3 03/10] arm64: dts: qcom: Add MSM8916 SMEM nodes
-In-Reply-To: <1443122339-13917-1-git-send-email-agross@codeaurora.org>
-References: <1443122339-13917-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1443122339-13917-4-git-send-email-agross@codeaurora.org>
+Date: Thu, 24 Sep 2015 14:18:49 -0500
+Subject: [Patch v3 00/10] Add RPM/SMD Support for QCOM platforms
+Message-ID: <1443122339-13917-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the nodes necessary to support the SMEM driver on MSM8916
+This patch set cleans up the documentation that is currently in place for the
+SMD, SMD-RPM, and SMD-RPM regulators.  In addition, this patch set adds support
+for the PM8916 found on MSM8916 platforms and the PMA8084 found on APQ8084
 platforms.
+                                                                                                          
+All of the relevant DTS information is fleshed out for the regulators and their
+dependencies for all of the platforms which support SMD-RPM regulators.
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi |   36 +++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+Changes since v2:
+  - Fixed some missed review comments
+  - Corrected the SMD RPM example binding indentation
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 5911de0..d321266 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -37,6 +37,22 @@
- 		reg = <0 0 0 0>;
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		reserve_aligned at 86000000 {
-+			reg = <0x0 0x86000000 0x0 0x0300000>;
-+			no-map;
-+		};
-+
-+		smem_mem: smem_region at 86300000 {
-+			reg = <0x0 0x86300000 0x0 0x0100000>;
-+			no-map;
-+		};
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -102,6 +118,26 @@
- 			reg = <0x1800000 0x80000>;
- 		};
- 
-+		tcsr_mutex_regs: syscon at 1905000 {
-+			compatible = "syscon";
-+			reg = <0x1905000 0x20000>;
-+		};
-+
-+		tcsr_mutex: hwlock {
-+			compatible = "qcom,tcsr-mutex";
-+			syscon = <&tcsr_mutex_regs 0 0x1000>;
-+			#hwlock-cells = <1>;
-+		};
-+
-+		smem {
-+			compatible = "qcom,smem";
-+			reg = <0x60000 0x8000>;
-+			reg-names = "aux-mem1";
-+
-+			memory-region = <&smem_mem>;
-+			hwlocks = <&tcsr_mutex 3>;
-+		};
-+
- 		blsp1_uart2: serial at 78b0000 {
- 			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
- 			reg = <0x78b0000 0x200>;
+Changes since v1:
+  - Fixed various review comments
+  - Removed MSM8974 patches as there was already an outstanding patch
+
+Andy Gross (10):
+  soc: qcom: documentation: Update SMD/RPM Docs
+  soc: qcom: smd-rpm: Add existing platform support
+  arm64: dts: qcom: Add MSM8916 SMEM nodes
+  arm64: dts: qcom: Add RPM/SMD support on MSM8916
+  arm64: dts: Add PM8916 support on MSM8916
+  regulators: qcom-smd: Add PM8916 support
+  arm: dts: Add APQ8084 SMEM nodes
+  arm: dts: Add RPM/SMD support on APQ8084
+  arm: dts: Add support for PMA8084 on APQ8084
+  regulator: qcom-smd: Add support for PMA8084
+
+ .../qcom,smd-rpm-regulator.txt}                    |   83 +++++++---
+ .../devicetree/bindings/soc/qcom/qcom,smd-rpm.txt  |   59 ++++++++
+ arch/arm/boot/dts/qcom-apq8084.dtsi                |  103 +++++++++++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |   84 +++++++++++
+ drivers/regulator/qcom_smd-regulator.c             |  159 ++++++++++++++++++++
+ drivers/soc/qcom/smd-rpm.c                         |    2 +
+ 6 files changed, 468 insertions(+), 22 deletions(-)
+ rename Documentation/devicetree/bindings/soc/{qcom,smd-rpm.txt => qcom/qcom,smd-rpm-regulator.txt} (54%)
+ create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.txt
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
