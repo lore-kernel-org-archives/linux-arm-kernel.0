@@ -1,57 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 Sep 2015 16:03:28 -0700
-Subject: [PATCH] gpio: vf610: handle level IRQ's properly
-In-Reply-To: <99db8c092e8b54d485e88887630d51c0@agner.ch>
-References: <1440197802-29720-1-git-send-email-stefan@agner.ch>
- <CACRpkdYqU_yvZE4WS2jBDOhemPy7dcHeOoj_dG61hCL8ugTMYg@mail.gmail.com>
- <99db8c092e8b54d485e88887630d51c0@agner.ch>
-Message-ID: <CACRpkdYmaOQ-N4yGXo3_95dTVhF6FC0C9O2w+811=xLTO7gm0g@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 24 Sep 2015 18:11:35 -0500
+Subject: [PATCH v5 02/11] drivers: PL011: refactor pl011_startup()
+In-Reply-To: <1432225584-4655-3-git-send-email-andre.przywara@arm.com>
+References: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
+ <1432225584-4655-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <CAOZdJXVxDjkoCJsqE6zH_UEQcxp9T2fY1YTfV7zvWjXwwbziEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 26, 2015 at 10:11 AM, Stefan Agner <stefan@agner.ch> wrote:
-> On 2015-08-26 05:47, Linus Walleij wrote:
->> On Sat, Aug 22, 2015 at 12:56 AM, Stefan Agner <stefan@agner.ch> wrote:
->>
->>> The GPIO IRQ controller is able to generate level triggered
->>> interrupts, however, these were handled by handle_simple_irq so far
->>> which did not take care of IRQ masking. This lead to "nobody cared
->>> (try booting with the "irqpoll" option)" stack traces.
->>>
->>> Use the generic interrupt handlers depending on the IRQ type.
->>>
->>> Signed-off-by: Stefan Agner <stefan@agner.ch>
->>
->> Patch applied.
->
-> Thx
->
->
->> Hm, this looks like a problem that could exist in a few more
->> GPIO drivers. Can you look around and see if there is something
->> immediately suspicious in drivers/gpio?
->
-> Just looked a bit around. There are some which use handle_simple_irq but
-> also run their handler in threaded/one-shot handler. I guess in that
-> case it is fine to use the simple_irq handler.
->
-> However, those GPIO drivers look suspicious:
->
-> gpio-altera.c: Uses handle_simple_irq, supports edge and level
-> gpio-bcm-kona.c: Uses handle_simple_irq, supports only edge
-> gpio-grgpio.c: Uses handle_simple_irq, supports edge and level
-> gpio-intel-mid.c: Uses handle_simple_irq, supports only edge
-> gpio-lynxpoint.c: Uses handle_simple_irq, supports edge and level
-> gpio-ml-ioh.c: Uses handle_simple_irq, supports edge and level
-> gpio-pl061.c: Uses handle_simple_irq, supports edge and level
-> gpio-rcar.c: Uses handle_level_irq, supports edge and level
-> gpio-timberdale.c: Uses handle_simple_irq, supports edge and level
+On Thu, May 21, 2015 at 11:26 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> +static void pl011_enable_interrupts(struct uart_amba_port *uap)
+> +{
+> +       spin_lock_irq(&uap->port.lock);
+> +
+> +       /* Clear out any spuriously appearing RX interrupts */
+> +       writew(UART011_RTIS | UART011_RXIS,
+> +              uap->port.membase + UART011_ICR);
+> +       uap->im = UART011_RTIM;
+> +       if (!pl011_dma_rx_running(uap))
+> +               uap->im |= UART011_RXIM;
+> +       writew(uap->im, uap->port.membase + UART011_IMSC);
+> +       spin_unlock_irq(&uap->port.lock);
+> +}
 
-Thanks!
+Shouldn't this function be using spin_lock_irqsave() and
+spin_unlock_irqrestore()?  If interrupts are generally disabled before
+calling this function, then they will be enabled by the
+spin_unlock_irq() call, and I don't think we want that.  This function
+is only supposed to enable pl011 interrupts, not all interrupts.
 
-I'm gonna look at pl061 myself, for the rest I ping the maintainers,
-(To-line) I suspect a lot of them have never really been tested with
-level IRQs because most just use edge IRQs.
-
-Yours,
-Linus Walleij
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
