@@ -1,78 +1,50 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 24 Sep 2015 16:23:30 -0700
-Subject: [RFC PATCH] arm64/efi: remove /chosen/linux,
- uefi-stub-kern-ver DT property
-In-Reply-To: <20150924231309.GA1650@svinekod>
-References: <1443131190-17790-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150924231309.GA1650@svinekod>
-Message-ID: <CAKv+Gu9kR+xph2PFN0XFVAx0XjHNLZ5U=wKWN8SLk6bc3=PmFw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 Sep 2015 00:33:03 +0100
+Subject: [PATCH v3 0/9] Phy, mdiobus, and netdev struct device fixes
+In-Reply-To: <20150924225033.GI20825@lunn.ch>
+References: <20150924191754.GC21513@n2100.arm.linux.org.uk>
+ <20150924215731.GE20825@lunn.ch>
+ <20150924221541.GF21513@n2100.arm.linux.org.uk>
+ <20150924225033.GI20825@lunn.ch>
+Message-ID: <20150924233303.GJ21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 September 2015 at 16:13, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Ard,
->
-> On Thu, Sep 24, 2015 at 10:46:30PM +0100, Ard Biesheuvel wrote:
->> With the stub to kernel interface being promoted to a proper interface
->> so that other agents than the stub can boot the kernel proper in EFI
->> mode, we can remove the linux,uefi-stub-kern-ver field, considering
->> that its original purpose was to prevent this from happening in the
->> first place.
->
-> I'm not oppposed to this, but this change needs to be folded together with the
-> other documentation updates necessary for this to become a stable ABI, as
-> discussed in the other thread [1].
->
+On Fri, Sep 25, 2015 at 12:50:33AM +0200, Andrew Lunn wrote:
+> > Thanks for testing.  Please could you confirm whether the same behaviour
+> > is observed without the patches, just to make absolutely sure that isn't
+> > a regression.
+> 
+> So i tested this now.
+> 
+> I have two FEC interfaces. One i my main access interface, and the
+> second is used by DSA to access switches. With your patches, the
+> module Used by count is equal to the number of interfaces which are
+> up.
+> 
+> Without your patches, the count is always 0.
 
-Yes, you are quite right (and apologies to Stefano and Shannon for not
-cc'ing them on this patch)
+That will be as a result of the MDIO bus module refcounting patch -
+"phy: fix mdiobus module safety".  The code prior to that patch was
+totally useless and ineffectual - it might as well not even have
+been present, because it would never have any effect.  bus_module
+would always be NULL in phy_attach_direct().
 
-It would be good to remove this /before/ promoting any of this to stable ABI.
+While my change makes the code start to work as originally intended,
+it's still unsafe: there's nothing to stop you manually unbinding the
+driver providing the MDIO bus from the struct device.  The driver
+will then free the resources it claimed in its probe function, which
+may include the MMIO mapping for the MDIO bus accessor functions.
+
+If the accessors are then called, despite keeping the mdio bus, phy,
+etc data structures properly refcounted, the kernel will oops when
+the (many) MDIO bus drivers hit the free'd MMIO mapping.  This is,
+unfortunately, just another pre-existing bug in this code.
+
+To stop that, we need some way to say "this MDIO bus has been removed,
+prevent further access" and that needs to be done in a race free way.
+Right now, that doesn't exist.
 
 -- 
-Ard.
-
-
-
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/369001.html
->
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  Documentation/arm/uefi.txt         | 2 --
->>  drivers/firmware/efi/libstub/fdt.c | 9 ---------
->>  2 files changed, 11 deletions(-)
->>
->> diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
->> index 7b3fdfe0f7ba..6543a0adea8a 100644
->> --- a/Documentation/arm/uefi.txt
->> +++ b/Documentation/arm/uefi.txt
->> @@ -58,5 +58,3 @@ linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
->>  --------------------------------------------------------------------------------
->>  linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
->>  --------------------------------------------------------------------------------
->> -linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
->> ---------------------------------------------------------------------------------
->> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
->> index a7e87cd582f2..60a11551fc15 100644
->> --- a/drivers/firmware/efi/libstub/fdt.c
->> +++ b/drivers/firmware/efi/libstub/fdt.c
->> @@ -116,15 +116,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->>       if (status)
->>               goto fdt_set_fail;
->>
->> -     /*
->> -      * Add kernel version banner so stub/kernel match can be
->> -      * verified.
->> -      */
->> -     status = fdt_setprop_string(fdt, node, "linux,uefi-stub-kern-ver",
->> -                          linux_banner);
->> -     if (status)
->> -             goto fdt_set_fail;
->> -
->>       return EFI_SUCCESS;
->>
->>  fdt_set_fail:
->> --
->> 1.9.1
->>
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
