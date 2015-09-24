@@ -1,52 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 24 Sep 2015 14:46:30 -0700
-Subject: [RFC PATCH] arm64/efi: remove /chosen/linux,
- uefi-stub-kern-ver DT property
-Message-ID: <1443131190-17790-1-git-send-email-ard.biesheuvel@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 Sep 2015 14:50:16 -0700
+Subject: [PATCH v3 3/9] gpiolib: Use GPIO name from names array for gpio
+ descriptor
+In-Reply-To: <20150923220237.GC19608@localhost>
+References: <1439561466-14350-1-git-send-email-mpa@pengutronix.de>
+ <1439561466-14350-4-git-send-email-mpa@pengutronix.de>
+ <20150923220237.GC19608@localhost>
+Message-ID: <CACRpkdbUevNvOQta=VDnQh7z8Z6hK4CbskixN+VtRQpwEYboCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the stub to kernel interface being promoted to a proper interface
-so that other agents than the stub can boot the kernel proper in EFI
-mode, we can remove the linux,uefi-stub-kern-ver field, considering
-that its original purpose was to prevent this from happening in the
-first place.
+On Wed, Sep 23, 2015 at 3:02 PM, Johan Hovold <johan@kernel.org> wrote:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- Documentation/arm/uefi.txt         | 2 --
- drivers/firmware/efi/libstub/fdt.c | 9 ---------
- 2 files changed, 11 deletions(-)
+> Before figuring out what a sane userspace interface should look like we
+> should not make ABI changes that we need to support indefinitely. The
+> legacy sysfs interface should instead be frozen.
+>
+> Exposing a name attribute for a not-necessarily globally unique name
+> could perhaps be ok, but by enforcing uniqueness at this point we will
+> then need to come up with another mechanism for naming gpios on dynamic
+> buses (while maintaining this one indefinitely in parallel).
+>
+> Linus, please consider dropping these changes for now.
 
-diff --git a/Documentation/arm/uefi.txt b/Documentation/arm/uefi.txt
-index 7b3fdfe0f7ba..6543a0adea8a 100644
---- a/Documentation/arm/uefi.txt
-+++ b/Documentation/arm/uefi.txt
-@@ -58,5 +58,3 @@ linux,uefi-mmap-desc-size | 32-bit | Size in bytes of each entry in the UEFI
- --------------------------------------------------------------------------------
- linux,uefi-mmap-desc-ver  | 32-bit | Version of the mmap descriptor format.
- --------------------------------------------------------------------------------
--linux,uefi-stub-kern-ver  | string | Copy of linux_banner from build.
----------------------------------------------------------------------------------
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index a7e87cd582f2..60a11551fc15 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -116,15 +116,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 	if (status)
- 		goto fdt_set_fail;
- 
--	/*
--	 * Add kernel version banner so stub/kernel match can be
--	 * verified.
--	 */
--	status = fdt_setprop_string(fdt, node, "linux,uefi-stub-kern-ver",
--			     linux_banner);
--	if (status)
--		goto fdt_set_fail;
--
- 	return EFI_SUCCESS;
- 
- fdt_set_fail:
--- 
-1.9.1
+I rounded off the series after moving the name attribute to the descriptor
+before doing any ABI changes, as it seems we need to discuss this.
+
+This patch concludes that part of the series, sent a separate patch
+concluding this first half of the series.
+
+Yours,
+Linus Walleij
