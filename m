@@ -1,47 +1,97 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Thu, 24 Sep 2015 14:30:20 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.4
-Message-ID: <cover.1443072491.git.horms+renesas@verge.net.au>
+Subject: [PATCH] ARM: shmobile: R-Mobile: Use CPG/MSTP Clock Domain
+ attach/detach helpers
+In-Reply-To: <cover.1443072491.git.horms+renesas@verge.net.au>
+References: <cover.1443072491.git.horms+renesas@verge.net.au>
+Message-ID: <8b98d74780ab70147d40400c36059c16c1aea4da.1443072491.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC updates for v4.4.
+The R-Mobile PM Domain driver manages both power domains and a clock
+domain.
 
-This pull request is based "Renesas ARM Based SoC Clk Updates for v4.4",
-tagged as clk-for-v4.4, which I have also sent a pull-request for.
+The clock domain part is very similar to the CPG/MSTP Clock Domain,
+which is used on shmobile SoCs without device power domains, except for
+the way how clocks suitable for power management are selected:
+  - The former uses the first clock tied to the device through the NULL
+    con_id, which is a relic from the legacy pm_clk_notifier-based
+    method in drivers/sh/pm_runtime.c,
+  - The latter looks for suitable clocks in DT, which is more
+    future-proof.
 
+All platforms using this driver are now supported in DT-based ARM
+multi-platform builds only, hence switch to using the CPG/MSTP Clock
+Domain helpers.
 
-The following changes since commit e233d74c30f48108b7affb4e76bfc8f3c76b68ce:
-
-  clk: shmobile: mstp: Consider "zb_clk" suitable for power management (2015-09-18 09:11:37 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.4
-
-for you to fetch changes up to 8b98d74780ab70147d40400c36059c16c1aea4da:
-
-  ARM: shmobile: R-Mobile: Use CPG/MSTP Clock Domain attach/detach helpers (2015-09-18 09:12:51 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Updates for v4.4
-
-* ARM: shmobile: R-Mobile: Use CPG/MSTP Clock Domain attach/detach helpers
-
-  This part of a multi-stage effort by Geert Uytterhoeven to add:
-
-  "Clock Domain support to the Clock Pulse Generator (CPG) Module Stop
-   (MSTP) Clocks driver using the generic PM Domain, to be used on shmobile
-   SoCs without device power domains (R-Car Gen1 and Gen2, RZ).  This allows
-   to power-manage the module clocks of SoC devices that are part of the
-   CPG/MSTP Clock Domain using Runtime PM, or for system suspend/resume,
-   similar to SoCs with device power domains (SH-Mobile and R-Mobile)."
-
-----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      ARM: shmobile: R-Mobile: Use CPG/MSTP Clock Domain attach/detach helpers
-
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/pm-rmobile.c | 35 +++--------------------------------
  1 file changed, 3 insertions(+), 32 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+index a5b96b990aea..89068c8ec50f 100644
+--- a/arch/arm/mach-shmobile/pm-rmobile.c
++++ b/arch/arm/mach-shmobile/pm-rmobile.c
+@@ -12,6 +12,7 @@
+  * License.  See the file "COPYING" in the main directory of this archive
+  * for more details.
+  */
++#include <linux/clk/shmobile.h>
+ #include <linux/console.h>
+ #include <linux/delay.h>
+ #include <linux/of.h>
+@@ -124,36 +125,6 @@ static bool rmobile_pd_active_wakeup(struct device *dev)
+ 	return true;
+ }
+ 
+-static int rmobile_pd_attach_dev(struct generic_pm_domain *domain,
+-				 struct device *dev)
+-{
+-	int error;
+-
+-	error = pm_clk_create(dev);
+-	if (error) {
+-		dev_err(dev, "pm_clk_create failed %d\n", error);
+-		return error;
+-	}
+-
+-	error = pm_clk_add(dev, NULL);
+-	if (error) {
+-		dev_err(dev, "pm_clk_add failed %d\n", error);
+-		goto fail;
+-	}
+-
+-	return 0;
+-
+-fail:
+-	pm_clk_destroy(dev);
+-	return error;
+-}
+-
+-static void rmobile_pd_detach_dev(struct generic_pm_domain *domain,
+-				  struct device *dev)
+-{
+-	pm_clk_destroy(dev);
+-}
+-
+ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+ {
+ 	struct generic_pm_domain *genpd = &rmobile_pd->genpd;
+@@ -164,8 +135,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+ 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
+ 	genpd->power_off		= rmobile_pd_power_down;
+ 	genpd->power_on			= rmobile_pd_power_up;
+-	genpd->attach_dev		= rmobile_pd_attach_dev;
+-	genpd->detach_dev		= rmobile_pd_detach_dev;
++	genpd->attach_dev		= cpg_mstp_attach_dev;
++	genpd->detach_dev		= cpg_mstp_detach_dev;
+ 	__rmobile_pd_power_up(rmobile_pd, false);
+ }
+ 
+-- 
+2.1.4
