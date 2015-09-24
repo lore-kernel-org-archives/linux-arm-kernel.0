@@ -1,67 +1,66 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 24 Sep 2015 23:38:55 +0800
-Subject: [PATCH v4 0/5] Add SMP bringup support for mt65xx socs
-Message-ID: <1443109140-5406-1-git-send-email-yingjoe.chen@mediatek.com>
+Date: Thu, 24 Sep 2015 23:38:56 +0800
+Subject: [PATCH v4 1/5] ARM: mediatek: enable gpt6 on boot up to make arch
+ timer working
+In-Reply-To: <1443109140-5406-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1443109140-5406-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1443109140-5406-2-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add SMP brinup support for MediaTek SoCs. This is v4 and
-is based on v4.3-rc1.
+From: Matthias Brugger <matthias.bgg@gmail.com>
 
-There are similar but different SMP bringup up methods on MediaTek
-mt65xx and mt81xx. On MT8135 & MT8127, system boots with a trustzone
-firmware. Others, like MT6589, doesn't have trustzone, and run kernel
-directly in secure world.
+We enable GTP6 which ungates the arch timer clock.
+In the future this should be done in the bootloader.
 
-Patch 1 enable arch timer support.
-Patch 2,3 add support for cpu enable-method "mediatek,mt6589-smp" and
-"mediatek,mt81xx-tz-smp", which support Mediatek SMP bringup for non-TZ
-and TZ platform.
-Patch 4,5 finally enable SMP bringup for mt8135 and mt8127.
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+---
+ arch/arm/mach-mediatek/mediatek.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-Changes in v4:
-- rebase to v4.3-rc1
-- Reserve trustzone bootinfo memory area in device tree.
-
-Changes in v3:
-- v3 in [1]
-- The first 2 patches in v2 are merged in v4.2-rc1.
-- Patch 3~4 in v2 are moved to another series [2]
-- platsmp.c changes based on Stephen's suggestion
-- Change cpu enable-method name to "mediatek,mt6589-smp"
-
-Changes in v2:
-- Fix boot issue for THUMB2 kernel.
-- Not enable GPT_CLK_EVT when setup to fix GPT spurious interrupt issue
-- Change platsmp.c according to Matthias' suggestion
-http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000714.html
-
-v1:
-http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000528.html
-
-[1]
-http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001570.html
-
-[2]
-http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001544.html
-
-Matthias Brugger (1):
-  ARM: mediatek: enable gpt6 on boot up to make arch timer working
-
-Yingjoe Chen (4):
-  devicetree: bindings: add new SMP enable method Mediatek SoC
-  ARM: mediatek: add smp bringup code
-  ARM: dts: mt8135: enable basic SMP bringup for mt8135
-  ARM: dts: mt8127: enable basic SMP bringup for mt8127
-
- Documentation/devicetree/bindings/arm/cpus.txt |   2 +
- arch/arm/boot/dts/mt8127.dtsi                  |  27 +++++
- arch/arm/boot/dts/mt8135.dtsi                  |  27 +++++
- arch/arm/mach-mediatek/Makefile                |   3 +
- arch/arm/mach-mediatek/mediatek.c              |  27 +++++
- arch/arm/mach-mediatek/platsmp.c               | 141 +++++++++++++++++++++++++
- 6 files changed, 227 insertions(+)
- create mode 100644 arch/arm/mach-mediatek/platsmp.c
-
+diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+index a954900..19dc738 100644
+--- a/arch/arm/mach-mediatek/mediatek.c
++++ b/arch/arm/mach-mediatek/mediatek.c
+@@ -16,6 +16,32 @@
+  */
+ #include <linux/init.h>
+ #include <asm/mach/arch.h>
++#include <linux/of.h>
++#include <linux/clk-provider.h>
++#include <linux/clocksource.h>
++
++
++#define GPT6_CON_MT65xx 0x10008060
++#define GPT_ENABLE      0x31
++
++static void __init mediatek_timer_init(void)
++{
++	void __iomem *gpt_base;
++
++	if (of_machine_is_compatible("mediatek,mt6589") ||
++	    of_machine_is_compatible("mediatek,mt8135") ||
++	    of_machine_is_compatible("mediatek,mt8127")) {
++		/* turn on GPT6 which ungates arch timer clocks */
++		gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
++
++		/* enable clock and set to free-run */
++		writel(GPT_ENABLE, gpt_base);
++		iounmap(gpt_base);
++	}
++
++	of_clk_init(NULL);
++	clocksource_of_init();
++};
+ 
+ static const char * const mediatek_board_dt_compat[] = {
+ 	"mediatek,mt6589",
+@@ -27,4 +53,5 @@ static const char * const mediatek_board_dt_compat[] = {
+ 
+ DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
+ 	.dt_compat	= mediatek_board_dt_compat,
++	.init_time	= mediatek_timer_init,
+ MACHINE_END
 -- 
 1.9.1
