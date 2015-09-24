@@ -1,84 +1,116 @@
 From: aalonso@freescale.com (Adrian Alonso)
-Date: Thu, 24 Sep 2015 15:54:02 -0500
-Subject: [PATCH v5 6/7] pinctrl: freescale: imx7d: support iomux lpsr
- controller
+Date: Thu, 24 Sep 2015 15:54:03 -0500
+Subject: [PATCH v5 7/7] pinctrl: freescale: imx: imx7d iomuxc-lpsr devicetree
+ bindings
 In-Reply-To: <1443128043-21063-1-git-send-email-aalonso@freescale.com>
 References: <1443128043-21063-1-git-send-email-aalonso@freescale.com>
-Message-ID: <1443128043-21063-6-git-send-email-aalonso@freescale.com>
+Message-ID: <1443128043-21063-7-git-send-email-aalonso@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iMX7D has two iomuxc controllers, iomuxc controller similar as
-previous iMX SoC generation and iomuxc-lpsr which provides low
-power state rentetion capabilities on gpios that are part of
-iomuxc-lpsr
-
-Add iomuxc-lpsr gpio group id's
+Add iomuxc-lpsr devicetree bindings documentation
+Provide documentation context as well an example on
+pheriperals that could use pad from either iomuxc controller
+supported by iMX7D SoC
 
 Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 ---
-Changes for V2: Add imx7d_lpsr_pads enums
-Changes for V3: Resend
+Changes for V2: New patch on imx7d iomuxc-lpsr patch series
+Changes for V3: Add shared input select register notes
 Changes for V4: Resend
-Changes for V5: Remove flags SHARE_INPUT_SELECT_REG and
- ZERO_OFFSET_VALID.
+Changes for V5:
+- Fix spell error
+- Remove references of SHARE_INPUT_SELECT_REG flag
 
- drivers/pinctrl/freescale/pinctrl-imx7d.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ .../bindings/pinctrl/fsl,imx7d-pinctrl.txt         | 63 +++++++++++++++++++++-
+ 1 file changed, 62 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx7d.c b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-index 1fa7530..e901907 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx7d.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-@@ -174,6 +174,17 @@ enum imx7d_pads {
- 	MX7D_PAD_ENET1_COL = 154,
- };
+diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
+index 8bbf25d..aae069f 100644
+--- a/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
+@@ -1,16 +1,42 @@
+ * Freescale i.MX7 Dual IOMUX Controller
  
-+enum imx7d_lpsr_pads {
-+	MX7D_PAD_GPIO1_IO00 = 0,
-+	MX7D_PAD_GPIO1_IO01 = 1,
-+	MX7D_PAD_GPIO1_IO02 = 2,
-+	MX7D_PAD_GPIO1_IO03 = 3,
-+	MX7D_PAD_GPIO1_IO04 = 4,
-+	MX7D_PAD_GPIO1_IO05 = 5,
-+	MX7D_PAD_GPIO1_IO06 = 6,
-+	MX7D_PAD_GPIO1_IO07 = 7,
++iMX7D supports two iomuxc controllers, fsl,imx7d-iomuxc controller is similar
++as previous iMX SoC generation and fsl,imx7d-iomuxc-lpsr which provides low
++power state retention capabilities on gpios that are part of iomuxc-lpsr
++(GPIO1_IO7..GPIO1_IO0). While iomuxc-lpsr provides its own set of registers for
++mux and pad control settings, it shares the input select register from main
++iomuxc controller for daisy chain settings, the fsl,input-sel property extends
++fsl,imx-pinctrl driver to support iomuxc-lpsr controller.
++
++iomuxc_lpsr: iomuxc-lpsr at 302c0000 {
++	compatible = "fsl,imx7d-iomuxc-lpsr";
++	reg = <0x302c0000 0x10000>;
++	fsl,input-sel = <&iomuxc>;
 +};
 +
- /* Pad names for the pinmux subsystem */
- static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
- 	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE0),
-@@ -333,13 +344,31 @@ static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
- 	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_COL),
- };
- 
-+/* Pad names for the pinmux subsystem */
-+static const struct pinctrl_pin_desc imx7d_lpsr_pinctrl_pads[] = {
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO00),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO01),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO02),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO03),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO04),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO05),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO06),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO07),
++iomuxc: iomuxc at 30330000 {
++	compatible = "fsl,imx7d-iomuxc";
++	reg = <0x30330000 0x10000>;
 +};
 +
- static struct imx_pinctrl_soc_info imx7d_pinctrl_info = {
- 	.pins = imx7d_pinctrl_pads,
- 	.npins = ARRAY_SIZE(imx7d_pinctrl_pads),
- };
++Pheriparials using pads from iomuxc-lpsr support low state retention power
++state, under LPSR mode GPIO's state of pads are retain.
++
+ Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
+ and usage.
  
-+static struct imx_pinctrl_soc_info imx7d_lpsr_pinctrl_info = {
-+	.pins = imx7d_lpsr_pinctrl_pads,
-+	.npins = ARRAY_SIZE(imx7d_lpsr_pinctrl_pads),
+ Required properties:
+-- compatible: "fsl,imx7d-iomuxc"
++- compatible: "fsl,imx7d-iomuxc" for main IOMUXC controller, or
++  "fsl,imx7d-iomuxc-lpsr" for Low Power State Retention IOMUXC controller.
+ - fsl,pins: each entry consists of 6 integers and represents the mux and config
+   setting for one pin.  The first 5 integers <mux_reg conf_reg input_reg mux_val
+   input_val> are specified using a PIN_FUNC_ID macro, which can be found in
+   imx7d-pinfunc.h under device tree source folder.  The last integer CONFIG is
+   the pad setting value like pull-up on this pin.  Please refer to i.MX7 Dual
+   Reference Manual for detailed CONFIG settings.
++- fsl,input-sel: required property for iomuxc-lpsr controller, this property is
++  a phandle for main iomuxc controller which shares the input select register for
++  daisy chain settings.
+ 
+ CONFIG bits definition:
+ PAD_CTL_PUS_100K_DOWN           (0 << 5)
+@@ -25,3 +51,38 @@ PAD_CTL_DSE_X1                  (0 << 0)
+ PAD_CTL_DSE_X2                  (1 << 0)
+ PAD_CTL_DSE_X3                  (2 << 0)
+ PAD_CTL_DSE_X4                  (3 << 0)
++
++Examples:
++While iomuxc-lpsr is intended to be used by dedicated peripherals to take
++advantages of LPSR power mode, is also possible that an IP to use pads from
++any of the iomux controllers. For example the I2C1 IP can use SCL pad from
++iomuxc-lpsr controller and SDA pad from iomuxc controller as:
++
++i2c1: i2c@30a20000 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1_1 &pinctrl_i2c1_2>;
++	status = "okay";
 +};
 +
- static struct of_device_id imx7d_pinctrl_of_match[] = {
- 	{ .compatible = "fsl,imx7d-iomuxc", .data = &imx7d_pinctrl_info, },
-+	{ .compatible = "fsl,imx7d-iomuxc-lpsr", .data = &imx7d_lpsr_pinctrl_info },
- 	{ /* sentinel */ }
- };
- 
++iomuxc-lpsr at 302c0000 {
++	compatible = "fsl,imx7d-iomuxc-lpsr";
++	reg = <0x302c0000 0x10000>;
++	fsl,input-sel = <&iomuxc>;
++
++	pinctrl_i2c1_1: i2c1grp-1 {
++		fsl,pins = <
++			MX7D_PAD_GPIO1_IO04__I2C1_SCL 0x4000007f
++		>;
++	};
++};
++
++iomuxc at 30330000 {
++	compatible = "fsl,imx7d-iomuxc";
++	reg = <0x30330000 0x10000>;
++
++	pinctrl_i2c1_2: i2c1grp-2 {
++		fsl,pins = <
++			MX7D_PAD_I2C1_SCL__I2C1_SCL 0x4000007f
++		>;
++	};
++};
 -- 
 2.1.4
