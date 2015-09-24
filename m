@@ -1,55 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 Sep 2015 00:12:21 +0100
-Subject: [PATCH v3 0/9] Phy, mdiobus, and netdev struct device fixes
-In-Reply-To: <20150924.155137.1429397912516096627.davem@davemloft.net>
-References: <20150924215731.GE20825@lunn.ch>
- <20150924.151554.619662567057050978.davem@davemloft.net>
- <20150924222654.GG20825@lunn.ch>
- <20150924.155137.1429397912516096627.davem@davemloft.net>
-Message-ID: <20150924231221.GI21513@n2100.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 24 Sep 2015 16:19:21 -0700
+Subject: [PATCH v2 0/7] arm64: relax Image placement rules
+In-Reply-To: <CAKv+Gu_YKo+c2rTzxMhjtfQzwix7d=Z33ej7omaJVz620U2efA@mail.gmail.com>
+References: <1442968663-31843-1-git-send-email-ard.biesheuvel@linaro.org>
+ <560426BF.4030300@arm.com>
+ <CAKv+Gu_YKo+c2rTzxMhjtfQzwix7d=Z33ej7omaJVz620U2efA@mail.gmail.com>
+Message-ID: <CAKv+Gu-WGSaGA+4OJcNOct+sdBHsO8yKOc50t3jmB86xonWQ=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 03:51:37PM -0700, David Miller wrote:
-> From: Andrew Lunn <andrew@lunn.ch>
-> Date: Fri, 25 Sep 2015 00:26:54 +0200
-> 
-> > On Thu, Sep 24, 2015 at 03:15:54PM -0700, David Miller wrote:
-> >> From: Andrew Lunn <andrew@lunn.ch>
-> >> Date: Thu, 24 Sep 2015 23:57:31 +0200
-> >> 
-> >> > I built the FEC driver as a module, and it won't unload:
-> >> > 
-> >> >  kernel:unregister_netdevice: waiting for eth1 to become free. Usage count = 1
-> >> > unregister_netdevice: waiting for eth1 to become free. Usage count = 1
-> >> > 
-> >> > i assume because DSA holds a reference. I've not tried a fully module
-> >> > build, DSA has issues with that.
-> >> > 
-> >> > Tested-by: Andrew Lunn <andrew@lunn.ch>
-> >> 
-> >> So, is this a regression?
-> > 
-> > Sorry, worded that badly. Since DSA is still active, it should not be
-> > possible to unload the FEC driver. DSA should have a reference to it,
-> > and mdio-mux also should have a reference to the mdio bus of the FEC
-> > driver.
-> > 
-> > As Russell requested, i will re-test without his patches, just to make
-> > sure.
-> 
-> Something needs to hold into the underlying device refcount of a DSA
-> blob so that an unload can't even be attempted in that state.
+On 24 September 2015 at 09:38, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 24 September 2015 at 09:37, Suzuki K. Poulose <Suzuki.Poulose@arm.com> wrote:
+>> On 23/09/15 01:37, Ard Biesheuvel wrote:
+>>>
+>>> This is a followup to the "arm64: update/clarify/relax Image and FDT
+>>> placement
+>>> rules" series I sent a while ago:
+>>> (http://article.gmane.org/gmane.linux.ports.arm.kernel/407148)
+>>>
+>>> This has now been split in two series: this second series deals with the
+>>> physical and virtual placement of the kernel Image.
+>>>
+>>> This series updates the mapping of the kernel Image and the linear mapping
+>>> of
+>>> system memory to allow more freedom in the choice of placement without
+>>> affecting
+>>> the accessibility of system RAM below the kernel Image, and the mapping
+>>> efficiency (i.e., memory can always be mapped in 512 MB or 1 GB blocks).
+>>>
+>>
+>> Ard,
+>>
+>> I gave your series a quick run and dumping the kernel page tables(with
+>> CONFIG_ARM64_PTDUMP)
+>> I find this problem :
+>>
+>> ...
+>>
+>> ---[ Kernel Mapping ]---
+>> 0xffffffbffc000000-0xffffffbffc600000           6M     RW x  SHD AF
+>> MEM/NORMAL    *****
+>> 0xffffffbffc600000-0xffffffbffc7f5000        2004K     RW x  SHD AF    UXN
+>> MEM/NORMAL
+>> 0xffffffbffc7f5000-0xffffffbffc875000         512K     RW NX SHD AF    UXN
+>> MEM/NORMAL
+>> 0xffffffbffc875000-0xffffffbffca00000        1580K     RW x  SHD AF    UXN
+>> MEM/NORMAL
+>> ---[ Linear Mapping ]---
+>> 0xffffffc000000000-0xffffffc040000000           1G     RW NX SHD AF    UXN
+>> MEM/NORMAL
+>>
+>>
+>> Note that the first mapping in the kernel doesn't have UXN set, which is a
+>> regression.
+>> I haven't started digging into it yet, but I thought I will point it out
+>> here, in case you
+>> already fixed it.
+>>
+>
+> Ok, thanks for pointing that out. I will look into it.
+>
 
-Holding a reference on a struct device does _not_ stop the device
-being unbound or the module driving it being removed.  It merely
-stops the struct device from being freed before all references have
-been dropped.
+Turns out that, since the kernel mapping is not overwritten by the
+linear mapping, it retains the original permissions assigned in
+head.S. So this is enough to fix it
 
-Devices are always free to be unbound from their bound drivers
-irrespective of the struct device refcount.  Even taking a reference
-on the module (via try_module_get()) does not stop this.
+"""
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 2df4a55f00d4..fcd250cff4bf 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -62,8 +62,8 @@
+ /*
+  * Initial memory map attributes.
+  */
+-#define PTE_FLAGS      PTE_TYPE_PAGE | PTE_AF | PTE_SHARED
+-#define PMD_FLAGS      PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S
++#define PTE_FLAGS      PTE_TYPE_PAGE | PTE_AF | PTE_SHARED | PTE_UXN
++#define PMD_FLAGS      PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S | PMD_SECT_UXN
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define MM_MMUFLAGS    PTE_ATTRINDX(MT_NORMAL) | PTE_FLAGS
+"""
+
+
+>> Note: I see that you have used CONFIG_ARM64_64K_PAGES to handle
+>> section/table mapping
+>> (which I have tried to cleanup in 16K page size series and which is not
+>> merged yet).
+>> We should be careful when we merge our patches, as we could miss such new
+>> cases.
+>>
+>
+> I was aware of this, and I think it makes sense to the 16 KB pages to
+> be merged first, and then I will rebase these patches on top of it.
+>
+
+Do you have a git tree with the latest version?
