@@ -1,63 +1,45 @@
-From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Thu, 24 Sep 2015 10:33:46 +0300
-Subject: [PATCH] ARM: dts: sun4i: Enable USB DRC on the Marsboard A10
-Message-ID: <1443080026-4011-1-git-send-email-mamlinav@gmail.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Thu, 24 Sep 2015 09:16:19 +0100
+Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
+In-Reply-To: <56033C10.2040708@linaro.org>
+References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
+ <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
+ <1443033714.74600.18.camel@infradead.org> <560310EA.2070805@intel.com>
+ <1443042212.74600.30.camel@infradead.org> <56033C10.2040708@linaro.org>
+Message-ID: <1443082579.74600.48.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the otg/drc usb controller on the Marsboard A10.
-Similar to Cubieboard, the 5V of the otg is directly connected to the
-general 5V, so we only use the id pin.
+On Wed, 2015-09-23 at 16:56 -0700, Hanjun Guo wrote:
+> 
+> It really depends on the people who writing the ASL code (DSDT),
+> I'm not sure if Windows will use _DSD and how to use it, but
+> firmware guys may just use the device ID to make the firmware
+> to be usable both by Linux and Windows, and that's reasonable
+> I think.
 
-Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
----
- arch/arm/boot/dts/sun4i-a10-marsboard.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+And the ideal way to do that is to add a _CID of "PRP0001" and a
+compatible string, and then Linux doesn't need to care about the
+special new HID that you've added purely to pander to the limitations
+of Windows.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-marsboard.dts b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
-index 02158bc..9a012db 100644
---- a/arch/arm/boot/dts/sun4i-a10-marsboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
-@@ -154,6 +154,10 @@
- 	status = "okay";
- };
- 
-+&otg_sram {
-+	status = "okay";
-+};
-+
- &pio {
- 	led_pins_marsboard: led_pins at 0 {
- 		allwinner,pins = "PB5", "PB6", "PB7", "PB8";
-@@ -161,6 +165,13 @@
- 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
-+
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PH4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
- };
- 
- &reg_usb1_vbus {
-@@ -184,7 +195,15 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>;
-+	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	usb2_vbus-supply = <&reg_usb2_vbus>;
- 	status = "okay";
+That way, once drivers are converted from the legacy of-property APIs
+to the new device-property APIs, there should be *nothing* required to
+make device drivers work under ACPI. That was kind of the point.
+
+If people want to add HIDs, fine. But let's not go down a path which
+*requires* modifying drivers.
+
+(I'm planning to try to learn Coccinelle and do a bombing run convertin
+to the new API some time soon, FWIW).
+
 -- 
-2.4.9
+dwmw2
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5691 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150924/287573da/attachment.bin>
