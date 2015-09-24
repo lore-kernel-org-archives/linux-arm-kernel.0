@@ -1,166 +1,132 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 24 Sep 2015 17:26:55 +0300
-Subject: [PATCH 14/17] ARM: OMAP2: hwmod: AMx3xx: remove redundant reset info
+Date: Thu, 24 Sep 2015 17:26:58 +0300
+Subject: [PATCH 17/17] ARM: OMAP2+: PRM: remove redundant system reset code
 In-Reply-To: <1443104818-993-1-git-send-email-t-kristo@ti.com>
 References: <1443104818-993-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1443104818-993-15-git-send-email-t-kristo@ti.com>
+Message-ID: <1443104818-993-18-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AMx3xx reset info is now parsed from DT, so the data under hwmod
-database can be removed.
+This is now handled via the reset controller and the provided information
+from DT, so the legacy support code is no longer needed. OMAP3 version
+shall be removed once OMAP3 is also DT only.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |   30 --------------------
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    8 ------
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |    8 ------
- 3 files changed, 46 deletions(-)
+ arch/arm/mach-omap2/prm2xxx.c     |   15 ---------------
+ arch/arm/mach-omap2/prm33xx.c     |   18 ------------------
+ arch/arm/mach-omap2/prm44xx.c     |    1 -
+ arch/arm/mach-omap2/prminst44xx.c |   20 --------------------
+ 4 files changed, 54 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-index 907a452b..7405e78 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-@@ -27,8 +27,6 @@
- #include "common.h"
- 
- #define CLKCTRL(oh, clkctrl) ((oh).prcm.omap4.clkctrl_offs = (clkctrl))
--#define RSTCTRL(oh, rstctrl) ((oh).prcm.omap4.rstctrl_offs = (rstctrl))
--#define RSTST(oh, rstst) ((oh).prcm.omap4.rstst_offs = (rstst))
- 
- /*
-  * 'l3' class
-@@ -143,10 +141,6 @@ static struct omap_hwmod_class am33xx_pruss_hwmod_class = {
- 	.name	= "pruss",
- };
- 
--static struct omap_hwmod_rst_info am33xx_pruss_resets[] = {
--	{ .name = "pruss", .rst_shift = 1 },
--};
--
- /* pru-icss */
- /* Pseudo hwmod for reset control purpose only */
- struct omap_hwmod am33xx_pruss_hwmod = {
-@@ -159,8 +153,6 @@ struct omap_hwmod am33xx_pruss_hwmod = {
- 			.modulemode	= MODULEMODE_SWCTRL,
- 		},
- 	},
--	.rst_lines	= am33xx_pruss_resets,
--	.rst_lines_cnt	= ARRAY_SIZE(am33xx_pruss_resets),
- };
- 
- /* gfx */
-@@ -169,10 +161,6 @@ static struct omap_hwmod_class am33xx_gfx_hwmod_class = {
- 	.name	= "gfx",
- };
- 
--static struct omap_hwmod_rst_info am33xx_gfx_resets[] = {
--	{ .name = "gfx", .rst_shift = 0, .st_shift = 0},
--};
--
- struct omap_hwmod am33xx_gfx_hwmod = {
- 	.name		= "gfx",
- 	.class		= &am33xx_gfx_hwmod_class,
-@@ -183,8 +171,6 @@ struct omap_hwmod am33xx_gfx_hwmod = {
- 			.modulemode	= MODULEMODE_SWCTRL,
- 		},
- 	},
--	.rst_lines	= am33xx_gfx_resets,
--	.rst_lines_cnt	= ARRAY_SIZE(am33xx_gfx_resets),
- };
- 
- /*
-@@ -1397,17 +1383,9 @@ static void omap_hwmod_am33xx_clkctrl(void)
- 	CLKCTRL(am33xx_aes0_hwmod , AM33XX_CM_PER_AES0_CLKCTRL_OFFSET);
+diff --git a/arch/arm/mach-omap2/prm2xxx.c b/arch/arm/mach-omap2/prm2xxx.c
+index 752018ce..70f711b 100644
+--- a/arch/arm/mach-omap2/prm2xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx.c
+@@ -101,20 +101,6 @@ static int omap2xxx_pwrst_to_common_pwrst(u8 omap2xxx_pwrst)
  }
  
--static void omap_hwmod_am33xx_rst(void)
+ /**
+- * omap2xxx_prm_dpll_reset - use DPLL reset to reboot the OMAP SoC
+- *
+- * Set the DPLL reset bit, which should reboot the SoC.  This is the
+- * recommended way to restart the SoC.  No return value.
+- */
+-static void omap2xxx_prm_dpll_reset(void)
 -{
--	RSTCTRL(am33xx_pruss_hwmod, AM33XX_RM_PER_RSTCTRL_OFFSET);
--	RSTCTRL(am33xx_gfx_hwmod, AM33XX_RM_GFX_RSTCTRL_OFFSET);
--	RSTST(am33xx_gfx_hwmod, AM33XX_RM_GFX_RSTST_OFFSET);
+-	omap2_prm_set_mod_reg_bits(OMAP_RST_DPLL3_MASK, WKUP_MOD,
+-				   OMAP2_RM_RSTCTRL);
+-	/* OCP barrier */
+-	omap2_prm_read_mod_reg(WKUP_MOD, OMAP2_RM_RSTCTRL);
 -}
 -
- void omap_hwmod_am33xx_reg(void)
- {
- 	omap_hwmod_am33xx_clkctrl();
--	omap_hwmod_am33xx_rst();
+-/**
+  * omap2xxx_prm_clear_mod_irqs - clear wakeup status bits for a module
+  * @module: PRM module to clear wakeups from
+  * @regs: register offset to clear
+@@ -216,7 +202,6 @@ static struct prm_ll_data omap2xxx_prm_ll_data = {
+ 	.assert_hardreset = &omap2_prm_assert_hardreset,
+ 	.deassert_hardreset = &omap2_prm_deassert_hardreset,
+ 	.is_hardreset_asserted = &omap2_prm_is_hardreset_asserted,
+-	.reset_system = &omap2xxx_prm_dpll_reset,
+ 	.clear_mod_irqs = &omap2xxx_prm_clear_mod_irqs,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+index dcb5001..12b15a2 100644
+--- a/arch/arm/mach-omap2/prm33xx.c
++++ b/arch/arm/mach-omap2/prm33xx.c
+@@ -336,23 +336,6 @@ static int am33xx_check_vcvp(void)
+ 	return 0;
  }
  
- static void omap_hwmod_am43xx_clkctrl(void)
-@@ -1470,15 +1448,7 @@ static void omap_hwmod_am43xx_clkctrl(void)
- 	CLKCTRL(am33xx_aes0_hwmod , AM43XX_CM_PER_AES0_CLKCTRL_OFFSET);
- }
- 
--static void omap_hwmod_am43xx_rst(void)
+-/**
+- * am33xx_prm_global_warm_sw_reset - reboot the device via warm reset
+- *
+- * Immediately reboots the device through warm reset.
+- */
+-static void am33xx_prm_global_warm_sw_reset(void)
 -{
--	RSTCTRL(am33xx_pruss_hwmod, AM43XX_RM_PER_RSTCTRL_OFFSET);
--	RSTCTRL(am33xx_gfx_hwmod, AM43XX_RM_GFX_RSTCTRL_OFFSET);
--	RSTST(am33xx_gfx_hwmod, AM43XX_RM_GFX_RSTST_OFFSET);
+-	am33xx_prm_rmw_reg_bits(AM33XX_RST_GLOBAL_WARM_SW_MASK,
+-				AM33XX_RST_GLOBAL_WARM_SW_MASK,
+-				AM33XX_PRM_DEVICE_MOD,
+-				AM33XX_PRM_RSTCTRL_OFFSET);
+-
+-	/* OCP barrier */
+-	(void)am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
+-				  AM33XX_PRM_RSTCTRL_OFFSET);
 -}
 -
- void omap_hwmod_am43xx_reg(void)
- {
- 	omap_hwmod_am43xx_clkctrl();
--	omap_hwmod_am43xx_rst();
+ struct pwrdm_ops am33xx_pwrdm_operations = {
+ 	.pwrdm_set_next_pwrst		= am33xx_pwrdm_set_next_pwrst,
+ 	.pwrdm_read_next_pwrst		= am33xx_pwrdm_read_next_pwrst,
+@@ -375,7 +358,6 @@ static struct prm_ll_data am33xx_prm_ll_data = {
+ 	.assert_hardreset		= am33xx_prm_assert_hardreset,
+ 	.deassert_hardreset		= am33xx_prm_deassert_hardreset,
+ 	.is_hardreset_asserted		= am33xx_prm_is_hardreset_asserted,
+-	.reset_system			= am33xx_prm_global_warm_sw_reset,
+ };
+ 
+ int __init am33xx_prm_init(const struct omap_prcm_init_data *data)
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index 3076800..76d7e30 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -702,7 +702,6 @@ static struct prm_ll_data omap44xx_prm_ll_data = {
+ 	.assert_hardreset	= omap4_prminst_assert_hardreset,
+ 	.deassert_hardreset	= omap4_prminst_deassert_hardreset,
+ 	.is_hardreset_asserted	= omap4_prminst_is_hardreset_asserted,
+-	.reset_system		= omap4_prminst_global_warm_sw_reset,
+ 	.vp_check_txdone	= omap4_prm_vp_check_txdone,
+ 	.vp_clear_txdone	= omap4_prm_vp_clear_txdone,
+ };
+diff --git a/arch/arm/mach-omap2/prminst44xx.c b/arch/arm/mach-omap2/prminst44xx.c
+index d0b15db..ffed63f 100644
+--- a/arch/arm/mach-omap2/prminst44xx.c
++++ b/arch/arm/mach-omap2/prminst44xx.c
+@@ -174,23 +174,3 @@ int omap4_prminst_deassert_hardreset(u8 shift, u8 st_shift, u8 part, s16 inst,
+ 
+ 	return (c == MAX_MODULE_HARDRESET_WAIT) ? -EBUSY : 0;
  }
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index cc0791d..e4fc8b3 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -64,10 +64,6 @@ static struct omap_hwmod am33xx_l4_hs_hwmod = {
- 	},
- };
- 
--static struct omap_hwmod_rst_info am33xx_wkup_m3_resets[] = {
--	{ .name = "wkup_m3", .rst_shift = 3, .st_shift = 5 },
--};
 -
- /* wkup_m3  */
- static struct omap_hwmod am33xx_wkup_m3_hwmod = {
- 	.name		= "wkup_m3",
-@@ -79,13 +75,9 @@ static struct omap_hwmod am33xx_wkup_m3_hwmod = {
- 	.prcm		= {
- 		.omap4	= {
- 			.clkctrl_offs	= AM33XX_CM_WKUP_WKUP_M3_CLKCTRL_OFFSET,
--			.rstctrl_offs	= AM33XX_RM_WKUP_RSTCTRL_OFFSET,
--			.rstst_offs	= AM33XX_RM_WKUP_RSTST_OFFSET,
- 			.modulemode	= MODULEMODE_SWCTRL,
- 		},
- 	},
--	.rst_lines	= am33xx_wkup_m3_resets,
--	.rst_lines_cnt	= ARRAY_SIZE(am33xx_wkup_m3_resets),
- };
- 
- /*
-diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-index e97a894..d486c42 100644
---- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-@@ -52,10 +52,6 @@ static struct omap_hwmod am43xx_l4_hs_hwmod = {
- 	},
- };
- 
--static struct omap_hwmod_rst_info am33xx_wkup_m3_resets[] = {
--	{ .name = "wkup_m3", .rst_shift = 3, .st_shift = 5 },
--};
 -
- static struct omap_hwmod am43xx_wkup_m3_hwmod = {
- 	.name		= "wkup_m3",
- 	.class		= &am33xx_wkup_m3_hwmod_class,
-@@ -66,13 +62,9 @@ static struct omap_hwmod am43xx_wkup_m3_hwmod = {
- 	.prcm		= {
- 		.omap4	= {
- 			.clkctrl_offs	= AM43XX_CM_WKUP_WKUP_M3_CLKCTRL_OFFSET,
--			.rstctrl_offs	= AM43XX_RM_WKUP_RSTCTRL_OFFSET,
--			.rstst_offs	= AM43XX_RM_WKUP_RSTST_OFFSET,
- 			.modulemode	= MODULEMODE_SWCTRL,
- 		},
- 	},
--	.rst_lines	= am33xx_wkup_m3_resets,
--	.rst_lines_cnt	= ARRAY_SIZE(am33xx_wkup_m3_resets),
- };
- 
- static struct omap_hwmod am43xx_control_hwmod = {
+-void omap4_prminst_global_warm_sw_reset(void)
+-{
+-	u32 v;
+-	s32 inst = omap4_prmst_get_prm_dev_inst();
+-
+-	if (inst == PRM_INSTANCE_UNKNOWN)
+-		return;
+-
+-	v = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION, inst,
+-					OMAP4_PRM_RSTCTRL_OFFSET);
+-	v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
+-	omap4_prminst_write_inst_reg(v, OMAP4430_PRM_PARTITION,
+-				 inst, OMAP4_PRM_RSTCTRL_OFFSET);
+-
+-	/* OCP barrier */
+-	v = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
+-				    inst, OMAP4_PRM_RSTCTRL_OFFSET);
+-}
 -- 
 1.7.9.5
