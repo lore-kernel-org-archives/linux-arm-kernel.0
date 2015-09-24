@@ -1,39 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 24 Sep 2015 16:30:09 +0200
-Subject: [PATCH 2/6] pci: mvebu: generate proper configuration access
- cycles
-In-Reply-To: <E1Zenfg-0004d5-Dg@rmk-PC.arm.linux.org.uk>
-References: <20150923171706.GL21084@n2100.arm.linux.org.uk>
- <E1Zenfg-0004d5-Dg@rmk-PC.arm.linux.org.uk>
-Message-ID: <20150924143009.GA20029@lunn.ch>
+From: peda@lysator.liu.se (Peter Rosin)
+Date: Thu, 24 Sep 2015 16:44:15 +0200
+Subject: [PATCH] ARM: at91/dt: pullup dbgu rx instead of tx
+Message-ID: <1443105855-15738-1-git-send-email-peda@lysator.liu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 06:17:32PM +0100, Russell King wrote:
-> The idea that you can arbitarily read 32-bits from PCI configuration
-> space, modify a sub-field (like the command register) and write it
-> back without consequence is deeply flawed.
-> 
-> Status registers (such as the status register, PCIe device status
-> register, etc) contain status bits which are read, write-one-to-clear.
-> 
-> What this means is that reading 32-bits from the command register,
-> modifying the command register, and then writing it back has the effect
-> of clearing any status bits that were indicating at that time.  Same for
-> the PCIe device control register clearing bits in the PCIe device status
-> register.
-> 
-> Since the Armada chips support byte, 16-bit and 32-bit accesses to the
-> registers (unless otherwise stated) and the PCI configuration data
-> register does not specify otherwise, it seems logical that the chip can
-> indeed generate the proper configuration access cycles down to byte
-> level.
-> 
-> Testing with an ASM1062 PCIe to SATA mini-PCIe card on Armada 388.
-> PCIe capability at 0x80, DevCtl at 0x88, DevSta at 0x8a.
+From: Peter Rosin <peda@axentia.se>
 
-The Armada 388 is a pretty new SoC. It would be good to test this on a
-much older device as well, e.g. Kirkwood. I will add it to my TODO
-list, but it anybody else gets there first, please let me know.
+It seems pointless to pullup the tx line, but there is value in pulling
+up the rx line.
 
-      Andrew
+Cc: stable at vger.kernel.org
+Signed-off-by: Peter Rosin <peda@axentia.se>
+---
+ arch/arm/boot/dts/sama5d3.dtsi |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index 9e2444b07bce..304a40c5552a 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -545,8 +545,8 @@
+ 				dbgu {
+ 					pinctrl_dbgu: dbgu-0 {
+ 						atmel,pins =
+-							<AT91_PIOB 30 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB30 periph A */
+-							 AT91_PIOB 31 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;	/* PB31 periph A with pullup */
++							<AT91_PIOB 30 AT91_PERIPH_A AT91_PINCTRL_PULL_UP	/* PB30 periph A with pullup */
++							 AT91_PIOB 31 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB31 periph A */
+ 					};
+ 				};
+ 
+-- 
+1.7.10.4
