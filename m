@@ -1,89 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Sep 2015 23:53:36 +0100
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <56047E77.5030301@ti.com>
-References: <20150924090048.GA21626@n2100.arm.linux.org.uk>
- <56047E77.5030301@ti.com>
-Message-ID: <20150924225336.GH21513@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 25 Sep 2015 00:50:33 +0200
+Subject: [PATCH v3 0/9] Phy, mdiobus, and netdev struct device fixes
+In-Reply-To: <20150924221541.GF21513@n2100.arm.linux.org.uk>
+References: <20150924191754.GC21513@n2100.arm.linux.org.uk>
+ <20150924215731.GE20825@lunn.ch>
+ <20150924221541.GF21513@n2100.arm.linux.org.uk>
+Message-ID: <20150924225033.GI20825@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 03:51:35PM -0700, Grygorii Strashko wrote:
-> Hi Russell,
-> 
-> +Cc: Lokesh
-> 
-> On 09/24/2015 02:00 AM, Russell King - ARM Linux wrote:
-> > Nightly testing has revealed that both the OMAP3430 LDP and the OMAP4430
-> > SDP fail to boot due to lack of working MMC.  Both platforms fail to
-> > find their rootfs, which is on a SD card.
-> > 
-> > The breakage occurred somewhere between trees of September 9th (commit
-> > 4e4adb2f4628) and September 12th (commit b0a1ea51bda4), so during the
-> > merge window.
-> > 
-> > Diffing those two trees show no changes to OMAP platform code, but
-> > substantial changes in the MMC code:
-> > 
-> 
-> [...]
-> 
-> > 
-> > So this probably results from the MMC update during the merge window:
-> > 
-> > 85579ad7f1df Merge tag 'mmc-v4.3' of git://git.linaro.org/people/ulf.hansson/mmc
-> > 
-> > The OMAP4430 reports this during it's boot log:
-> > 
-> > mmc0: new high speed MMC card at address 0001
-> > mmcblk0: mmc0:0001 SEM08G 7.39 GiB
-> > mmcblk0boot0: mmc0:0001 SEM08G partition 1 1.00 MiB
-> > mmcblk0boot1: mmc0:0001 SEM08G partition 2 1.00 MiB
-> > ...
-> > VFS: Cannot open root device "mmcblk0p2" or unknown-block(179,2): error -6
-> > b300         7757824 mmcblk0  driver: mmcblk
-> > b310            1024 mmcblk0boot1  (driver?)
-> > b308            1024 mmcblk0boot0  (driver?)
-> > Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(179,2)
-> > 
-> > whereas previous kernels reported:
-> > 
-> > mmc0: host does not support reading read-only switch, assuming write-enable
-> > mmc0: new high speed SD card at address 0002
-> > mmcblk0: mmc0:0002 00000 971 MiB
-> >   mmcblk0: p1 p2
-> > Waiting 2 sec before mounting root device...
-> > mmc1: new high speed MMC card at address 0001
-> > mmcblk1: mmc1:0001 SEM08G 7.39 GiB
-> > mmcblk1boot0: mmc1:0001 SEM08G partition 1 1.00 MiB
-> > mmcblk1boot1: mmc1:0001 SEM08G partition 2 1.00 MiB
-> > ...
-> > VFS: Mounted root (ext3 filesystem) on device 179:2.
-> > 
-> > OMAP3430 only reports:
-> > 
-> > VFS: Cannot open root device "mmcblk0p2" or unknown-block(0,0): error -6
-> > 
-> > where previous kernels reported:
-> > 
-> > mmc0: host does not support reading read-only switch, assuming write-enable
-> > mmc0: new high speed SD card at address 0002
-> > mmcblk0: mmc0:0002 00000 971 MiB
-> >   mmcblk0: p1 p2
-> > ...
-> > VFS: Mounted root (ext2 filesystem) on device 179:2.
-> > 
-> 
-> It looks like mmcX enumeration problem, which is not new, I think :(
-> Most probably with the last DT+code changes probing of MMC which handles SD
-> is deferred and as result it will get different ID.
-> 
-> I think Lokesh can comment more on this as he fixed it by switching uboot to 
-> UUIDs instead of partition names.
+> Thanks for testing.  Please could you confirm whether the same behaviour
+> is observed without the patches, just to make absolutely sure that isn't
+> a regression.
 
-No, that's not the problem.  The SD card is simply _not_ detected in
-both cases.
+So i tested this now.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I have two FEC interfaces. One i my main access interface, and the
+second is used by DSA to access switches. With your patches, the
+module Used by count is equal to the number of interfaces which are
+up.
+
+Without your patches, the count is always 0.
+
+When i try to remove the fec module, without your patches, but DSA
+still using the interface, i get the same
+
+ kernel:unregister_netdevice: waiting for eth1 to become free. Usage count = 1
+
+as with your patch. So this is not a regression.
+
+   Andrew
