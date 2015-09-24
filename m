@@ -1,51 +1,78 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 24 Sep 2015 12:56:47 +0300
-Subject: [PATCH v3 10/24] ARM: davinci: Add set dma_mask to eDMA devices
-In-Reply-To: <20150923172518.GH23801@atomide.com>
-References: <1442915675-7121-1-git-send-email-peter.ujfalusi@ti.com>
- <1442915675-7121-11-git-send-email-peter.ujfalusi@ti.com>
- <20150923172518.GH23801@atomide.com>
-Message-ID: <5603C8DF.7000505@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 24 Sep 2015 12:02:31 +0200
+Subject: [linux-sunxi] [PATCH] ARM: dts: sun4i: Enable USB DRC on the
+ Marsboard A10
+In-Reply-To: <1443080026-4011-1-git-send-email-mamlinav@gmail.com>
+References: <1443080026-4011-1-git-send-email-mamlinav@gmail.com>
+Message-ID: <5603CA37.8000604@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2015 08:25 PM, Tony Lindgren wrote:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [150922 03:01]:
->> The upcoming change to merge the arch/arm/common/edma.c into
->> drivers/dma/edma.c will need this change when booting daVinci devices in
->> no DT mode.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->>  arch/arm/Kconfig                      |    1 -
->>  arch/arm/common/Kconfig               |    3 -
->>  arch/arm/common/Makefile              |    1 -
->>  arch/arm/common/edma.c                | 1431 --------------------------------
->>  arch/arm/mach-davinci/devices-da8xx.c |    2 +
->>  arch/arm/mach-davinci/dm355.c         |    1 +
->>  arch/arm/mach-davinci/dm644x.c        |    1 +
->>  arch/arm/mach-davinci/dm646x.c        |    1 +
->>  arch/arm/mach-omap2/Kconfig           |    1 -
->>  drivers/dma/Kconfig                   |    1 -
->>  drivers/dma/edma.c                    | 1447 +++++++++++++++++++++++++++++++--
->>  include/linux/platform_data/edma.h    |   74 --
->>  12 files changed, 1394 insertions(+), 1570 deletions(-)
->>  delete mode 100644 arch/arm/common/edma.c
-> 
-> Hmm I think I already acked the mach-omap2/Kconfig change,
-> but if not, here you are:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+Hi,
 
-Yes, sorry that I have failed to add it.
-But for some reason two patch got squashed here which I don't really
-understand since between v2-v3 I have not touched these commits.
-This patch actually was:
-[PATCH v2 10/23] ARM: davinci: Add set dma_mask to eDMA devices
-[PATCH v2 11/23] ARM/dmaengine: edma: Merge the two drivers under
-drivers/dmaengine
+On 24-09-15 09:33, Aleksei Mamlin wrote:
+> Enable the otg/drc usb controller on the Marsboard A10.
+> Similar to Cubieboard, the 5V of the otg is directly connected to the
+> general 5V, so we only use the id pin.
+>
+> Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
 
-I'm going to send v4 in couple of minutes
+Thanks patch looks good to me:
 
--- 
-P?ter
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+
+Regards,
+
+Hans
+
+
+> ---
+>   arch/arm/boot/dts/sun4i-a10-marsboard.dts | 19 +++++++++++++++++++
+>   1 file changed, 19 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun4i-a10-marsboard.dts b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+> index 02158bc..9a012db 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+> @@ -154,6 +154,10 @@
+>   	status = "okay";
+>   };
+>
+> +&otg_sram {
+> +	status = "okay";
+> +};
+> +
+>   &pio {
+>   	led_pins_marsboard: led_pins at 0 {
+>   		allwinner,pins = "PB5", "PB6", "PB7", "PB8";
+> @@ -161,6 +165,13 @@
+>   		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>   		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>   	};
+> +
+> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+> +		allwinner,pins = "PH4";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +	};
+>   };
+>
+>   &reg_usb1_vbus {
+> @@ -184,7 +195,15 @@
+>   	status = "okay";
+>   };
+>
+> +&usb_otg {
+> +	dr_mode = "otg";
+> +	status = "okay";
+> +};
+> +
+>   &usbphy {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&usb0_id_detect_pin>;
+> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+>   	usb1_vbus-supply = <&reg_usb1_vbus>;
+>   	usb2_vbus-supply = <&reg_usb2_vbus>;
+>   	status = "okay";
+>
