@@ -1,47 +1,47 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 24 Sep 2015 14:08:46 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.4
-In-Reply-To: <20150918081935.GA20840@verge.net.au>
-References: <cover.1442536920.git.horms+renesas@verge.net.au>
- <CAMuHMdX41ggvKAKrp3s++UMYidhXuASoMP3xzdtnxjoL=0jpSA@mail.gmail.com>
- <1484890.bItsbzvneZ@wuerfel>
- <CAMuHMdX_kgj4c4J4rZUySfJmcV0t2xUBizhp102Xx-k1yn2jQQ@mail.gmail.com>
- <20150918081935.GA20840@verge.net.au>
-Message-ID: <20150924050843.GA3822@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 24 Sep 2015 14:29:59 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Clk Updates for v4.4
+Message-ID: <cover.1443072085.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On Fri, Sep 18, 2015 at 05:19:36PM +0900, Simon Horman wrote:
-> On Fri, Sep 18, 2015 at 09:29:58AM +0200, Geert Uytterhoeven wrote:
-> > Hi Arnd,
-> > 
-> > On Fri, Sep 18, 2015 at 9:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Friday 18 September 2015 09:16:31 Geert Uytterhoeven wrote:
-> > >> On Fri, Sep 18, 2015 at 2:47 AM, Simon Horman
-> > >> <horms+renesas@verge.net.au> wrote:
-> > >> > Renesas ARM Based SoC DT Updates for v4.4
-> > >> >
-> > >> > * Add missing CPG/MSTP Clock Domain for sound on r8a779[01] SoCs
-> > >>
-> > >> >       ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain for sound
-> > >> >       ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain for sound
-> > >>
-> > >> These two should actually go in in v4.3, as they're bugfixes for commits that
-> > >> are in v4.3-rc1. That can be done in parallel, though.
-> > >>
-> > >> Sound will stop working in mainline as soon as commit cbc41d0a761bffb3
-> > >> ("drivers: sh: Disable PM runtime for multi-platform ARM with genpd") in
-> > >> sh-drivers-for-v4.3 enters mainline.
-> > >
-> > > The commits are on the top of the branch, so we could just remove them
-> > > here and apply them to the fixes branch if you like.
-> > 
-> > That sounds fine to me, thanks!
-> > 
-> > Simon, is that OK for you?
-> 
-> Yes, perfectly fine.
+Please consider these Renesas ARM based SoC clk updates for v4.4.
 
-I am wondering if you need anything from me at this point.
+The patch was acked by Stephen earlier this month
+https://lkml.org/lkml/2015/9/17/822
+
+
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clk-for-v4.4
+
+for you to fetch changes up to e233d74c30f48108b7affb4e76bfc8f3c76b68ce:
+
+  clk: shmobile: mstp: Consider "zb_clk" suitable for power management (2015-09-18 09:11:37 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Clk Updates for v4.4
+
+* Consider "zb_clk" suitable for power management
+
+  This part of a multi-stage effort by Geert Uytterhoeven to add:
+
+  "Clock Domain support to the Clock Pulse Generator (CPG) Module Stop
+   (MSTP) Clocks driver using the generic PM Domain, to be used on shmobile
+   SoCs without device power domains (R-Car Gen1 and Gen2, RZ).  This allows
+   to power-manage the module clocks of SoC devices that are part of the
+   CPG/MSTP Clock Domain using Runtime PM, or for system suspend/resume,
+   similar to SoCs with device power domains (SH-Mobile and R-Mobile)."
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      clk: shmobile: mstp: Consider "zb_clk" suitable for power management
+
+ drivers/clk/shmobile/clk-mstp.c | 4 ++++
+ 1 file changed, 4 insertions(+)
