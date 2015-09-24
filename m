@@ -1,47 +1,92 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Sep 2015 23:15:41 +0100
-Subject: [PATCH v3 0/9] Phy, mdiobus, and netdev struct device fixes
-In-Reply-To: <20150924215731.GE20825@lunn.ch>
-References: <20150924191754.GC21513@n2100.arm.linux.org.uk>
- <20150924215731.GE20825@lunn.ch>
-Message-ID: <20150924221541.GF21513@n2100.arm.linux.org.uk>
+From: rjui@broadcom.com (Ray Jui)
+Date: Thu, 24 Sep 2015 15:21:23 -0700
+Subject: [PATCH] ARM: dts: move aliases back to .dts in Cygnus
+Message-ID: <1443133283-29025-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 11:57:31PM +0200, Andrew Lunn wrote:
-> Hi Russell
-> 
-> I tested both of these with my board. It is a Freescale Vybrid, using
-> the FEC ethernet driver, and i have three switches attached, using
-> mdio-mux to give three mdio busses.
-> 
-> No obvious regressions, my board boots, the switches are all present
-> and correct. I built the FEC driver as a module, and it won't unload:
-> 
->  kernel:unregister_netdevice: waiting for eth1 to become free. Usage count = 1
-> unregister_netdevice: waiting for eth1 to become free. Usage count = 1
-> 
-> i assume because DSA holds a reference. I've not tried a fully module
-> build, DSA has issues with that.
-> 
-> Tested-by: Andrew Lunn <andrew@lunn.ch>
+Move aliases from bcm-cygnus.dtsi back to individual .dts files. Also
+clean up the chosen node to have the stdout-path using the proper alias
 
-Thanks for testing.  Please could you confirm whether the same behaviour
-is observed without the patches, just to make absolutely sure that isn't
-a regression.
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+---
+ arch/arm/boot/dts/bcm-cygnus.dtsi | 4 ----
+ arch/arm/boot/dts/bcm911360k.dts  | 7 +++++--
+ arch/arm/boot/dts/bcm958300k.dts  | 7 +++++--
+ arch/arm/boot/dts/bcm958305k.dts  | 7 +++++--
+ 4 files changed, 15 insertions(+), 10 deletions(-)
 
-However, I think you are correct - I'm unable to locate where in the
-DSA code:
-- dst->master_dev's dev_hold() is undone (hence a reference left)
-- dst is freed - dsa_probe() allocates it using kzalloc(), but
-  dsa_remove() and it's children don't free this structure.
-
-There's no notifier which detects whether the underlying device has
-gone away - it registers a netdev notifier (dsa_slave_netdevice_event)
-but this only deals with slave devices, not the master device.
-
-Thanks.
-
+diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+index b5f9f34..2778533 100644
+--- a/arch/arm/boot/dts/bcm-cygnus.dtsi
++++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+@@ -41,10 +41,6 @@
+ 	model = "Broadcom Cygnus SoC";
+ 	interrupt-parent = <&gic>;
+ 
+-	aliases {
+-		serial0 = &uart3;
+-	};
+-
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/bcm911360k.dts b/arch/arm/boot/dts/bcm911360k.dts
+index 814011c..091c73a 100644
+--- a/arch/arm/boot/dts/bcm911360k.dts
++++ b/arch/arm/boot/dts/bcm911360k.dts
+@@ -38,9 +38,12 @@
+ 	model = "Cygnus SVK (BCM911360K)";
+ 	compatible = "brcm,bcm11360", "brcm,cygnus";
+ 
++	aliases {
++		serial0 = &uart3;
++	};
++
+ 	chosen {
+-		stdout-path = &uart3;
+-		bootargs = "console=ttyS0,115200";
++		stdout-path = "serial0:115200n8";
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/bcm958300k.dts b/arch/arm/boot/dts/bcm958300k.dts
+index 2e31581..b4a1392 100644
+--- a/arch/arm/boot/dts/bcm958300k.dts
++++ b/arch/arm/boot/dts/bcm958300k.dts
+@@ -39,9 +39,12 @@
+ 	model = "Cygnus SVK (BCM958300K)";
+ 	compatible = "brcm,bcm58300", "brcm,cygnus";
+ 
++	aliases {
++		serial0 = &uart3;
++	};
++
+ 	chosen {
+-		stdout-path = &uart3;
+-		bootargs = "console=ttyS0,115200";
++		stdout-path = "serial0:115200n8";
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/bcm958305k.dts b/arch/arm/boot/dts/bcm958305k.dts
+index 288a637..3378683 100644
+--- a/arch/arm/boot/dts/bcm958305k.dts
++++ b/arch/arm/boot/dts/bcm958305k.dts
+@@ -39,9 +39,12 @@
+ 	model = "Cygnus Wireless Audio (BCM958305K)";
+ 	compatible = "brcm,bcm58305", "brcm,cygnus";
+ 
++	aliases {
++		serial0 = &uart3;
++	};
++
+ 	chosen {
+-		stdout-path = &uart3;
+-		bootargs = "console=ttyS0,115200";
++		stdout-path = "serial0:115200n8";
+ 	};
+ };
+ 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
