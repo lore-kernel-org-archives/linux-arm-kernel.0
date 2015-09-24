@@ -1,39 +1,125 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Sep 2015 08:57:42 +0200
-Subject: [PATCH v4 1/5] soc: sunxi: Add Allwinner Reduced Serial Bus
- (RSB) controller bindings
-In-Reply-To: <1443024323-9115-2-git-send-email-wens@csie.org>
-References: <1443024323-9115-1-git-send-email-wens@csie.org>
- <1443024323-9115-2-git-send-email-wens@csie.org>
-Message-ID: <20150924065742.GN4684@lukather>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Thu, 24 Sep 2015 08:58:04 +0200
+Subject: [STLinux Kernel] [PATCH 3/3] ARM: dts: stih410: Enable USB2.0 and
+ related PHY nodes at board level
+In-Reply-To: <1443037049-6167-4-git-send-email-maxime.coquelin@st.com>
+References: <1443037049-6167-1-git-send-email-maxime.coquelin@st.com>
+ <1443037049-6167-4-git-send-email-maxime.coquelin@st.com>
+Message-ID: <56039EFC.9010405@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 12:05:17AM +0800, Chen-Yu Tsai wrote:
-> Reduced Serial Bus is a proprietary 2-line push-pull serial bus supporting
-> multiple slave devices. It was developed by Allwinner, Inc. and used by
-> Allwinner and X-Powers, Inc. for their line of PMICs and other peripheral
-> ICs.
-> 
-> Recent Allwinner SoCs, starting with the A23, have an RSB controller. This
-> is used to talk to the PMIC, and later with the A80 and A83 platform, the
-> audio codec IC.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Hi Max
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On 09/23/2015 09:37 PM, Maxime Coquelin wrote:
+> A borad might not expose the USB2.0 ports, so disable them by default in SoC
 
-Thanks!
-Maxime
+typo borad
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150924/92234b63/attachment.sig>
+Otherwise, for the series
+
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
+
+Patrice
+
+
+> file, and enable them in b2120 board.
+>
+> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+> ---
+>   arch/arm/boot/dts/stih410-b2120.dts | 24 ++++++++++++++++++++++++
+>   arch/arm/boot/dts/stih410.dtsi      | 12 ++++++++++++
+>   2 files changed, 36 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/stih410-b2120.dts b/arch/arm/boot/dts/stih410-b2120.dts
+> index 16f02c5..8af1e73 100644
+> --- a/arch/arm/boot/dts/stih410-b2120.dts
+> +++ b/arch/arm/boot/dts/stih410-b2120.dts
+> @@ -35,5 +35,29 @@
+>   			sd-uhs-sdr104;
+>   			sd-uhs-ddr50;
+>   		};
+> +
+> +		usb2_picophy1: phy2 {
+> +			status = "okay";
+> +		};
+> +
+> +		usb2_picophy2: phy3 {
+> +			status = "okay";
+> +		};
+> +
+> +		ohci0: usb at 9a03c00 {
+> +			status = "okay";
+> +		};
+> +
+> +		ehci0: usb at 9a03e00 {
+> +			status = "okay";
+> +		};
+> +
+> +		ohci1: usb at 9a83c00 {
+> +			status = "okay";
+> +		};
+> +
+> +		ehci1: usb at 9a83e00 {
+> +			status = "okay";
+> +		};
+>   	};
+>   };
+> diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+> index 23f4a48..e3150e3 100644
+> --- a/arch/arm/boot/dts/stih410.dtsi
+> +++ b/arch/arm/boot/dts/stih410.dtsi
+> @@ -22,6 +22,8 @@
+>   			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
+>   				 <&picophyreset STIH407_PICOPHY0_RESET>;
+>   			reset-names = "global", "port";
+> +
+> +			status = "disabled";
+>   		};
+>   
+>   		usb2_picophy2: phy3 {
+> @@ -31,6 +33,8 @@
+>   			resets = <&softreset STIH407_PICOPHY_SOFTRESET>,
+>   				 <&picophyreset STIH407_PICOPHY1_RESET>;
+>   			reset-names = "global", "port";
+> +
+> +			status = "disabled";
+>   		};
+>   
+>   		ohci0: usb at 9a03c00 {
+> @@ -43,6 +47,8 @@
+>   			reset-names = "power", "softreset";
+>   			phys = <&usb2_picophy1>;
+>   			phy-names = "usb";
+> +
+> +			status = "disabled";
+>   		};
+>   
+>   		ehci0: usb at 9a03e00 {
+> @@ -57,6 +63,8 @@
+>   			reset-names = "power", "softreset";
+>   			phys = <&usb2_picophy1>;
+>   			phy-names = "usb";
+> +
+> +			status = "disabled";
+>   		};
+>   
+>   		ohci1: usb at 9a83c00 {
+> @@ -69,6 +77,8 @@
+>   			reset-names = "power", "softreset";
+>   			phys = <&usb2_picophy2>;
+>   			phy-names = "usb";
+> +
+> +			status = "disabled";
+>   		};
+>   
+>   		ehci1: usb at 9a83e00 {
+> @@ -83,6 +93,8 @@
+>   			reset-names = "power", "softreset";
+>   			phys = <&usb2_picophy2>;
+>   			phy-names = "usb";
+> +
+> +			status = "disabled";
+>   		};
+>   
+>   		sti-display-subsystem {
