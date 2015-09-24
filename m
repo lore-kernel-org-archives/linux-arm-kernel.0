@@ -1,53 +1,46 @@
 From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Thu, 24 Sep 2015 13:39:14 +0200
-Subject: [PATCH v2 0/5] ARM: multi_v7_defconfig: Improve rockchip support
-Message-ID: <1443094759-28531-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Date: Thu, 24 Sep 2015 13:39:17 +0200
+Subject: [PATCH v2 3/5] ARM: multi_v7_defconfig: Enable Rockchip display
+ support
+In-Reply-To: <1443094759-28531-1-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1443094759-28531-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <1443094759-28531-4-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Enable options needed for HDMI out on rockchip: DRM driver, Rockchip
+DesignWare HDMI glue and the rockchip IOMMU (dependency of the DRM
+driver).
 
-Enable options to provide more complete support for Rockchip boards
-including: support for the common PMICs, common RTC chips, I2C, SPI,
-PMW, Thermal driver, HDMI video output and USB 2.
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-In response to V1 there was some direct and indirect discussion about
-what policy to use for deciding what to build as a module versus what to
-build in. Unfortunately there doesn't seem to be any consensus in this
-regard, so for this series i've stuck to the following guideline for doing
-things as builtin:
-* If it's needed for booting without an initramfs to an NFS root
-  filesystem.
-* It's needed to prevent potential damage to the SoC
+Changes in v2: None
 
-This results in building in various regulators (required by the
-network driver), I2C bus (to control said regulators) and the thermal
-driver (to prevent thermal damage). While everything else is a module.
+ arch/arm/configs/multi_v7_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Fwiw, I really don't have a strong opinion myself on whether this is a
-better guideline then "Built-in only the bare minimum, people can use an
-initramfs to load modules as needed" which e.g. Thierry has been
-advocating. However it would be nice if we could get some common
-guideline from e.g. the arm-soc maintainers as the typical "module or
-not" discussion that tends to happen gets rather boring rather quickly:)
-
-
-Changes in v2:
-- Enable all common rockchip regulators, not just ACT8846
-- Only enable the USB 2 phy, not the controller as that came in through
-  another tree
-- Enable USB 2.0 phy as a module as the controller is a module as well
-- New patch, enable common RTC drivers
-
-Sjoerd Simons (5):
-  ARM: multi_v7_defconfig: Enable common Rockchip devices/busses
-  ARM: multi_v7_defconfig: Enable common regulators for rockchip boards
-  ARM: multi_v7_defconfig: Enable Rockchip display support
-  ARM: multi_v7_defconfig: Enable the Rockchip USB 2.0 phy
-  ARM: multi_v7_defconfig: Support RTC devices commonly used on Rockchip
-    boards
-
- arch/arm/configs/multi_v7_defconfig | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 3938f54..660e72a 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -457,6 +457,8 @@ CONFIG_DRM_EXYNOS=m
+ CONFIG_DRM_EXYNOS_DSI=y
+ CONFIG_DRM_EXYNOS_FIMD=y
+ CONFIG_DRM_EXYNOS_HDMI=y
++CONFIG_DRM_ROCKCHIP=m
++CONFIG_ROCKCHIP_DW_HDMI=m
+ CONFIG_DRM_RCAR_DU=m
+ CONFIG_DRM_TEGRA=y
+ CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
+@@ -634,6 +636,7 @@ CONFIG_APQ_MMCC_8084=y
+ CONFIG_MSM_GCC_8660=y
+ CONFIG_MSM_MMCC_8960=y
+ CONFIG_MSM_MMCC_8974=y
++CONFIG_ROCKCHIP_IOMMU=y
+ CONFIG_TEGRA_IOMMU_GART=y
+ CONFIG_TEGRA_IOMMU_SMMU=y
+ CONFIG_PM_DEVFREQ=y
 -- 
 2.5.3
