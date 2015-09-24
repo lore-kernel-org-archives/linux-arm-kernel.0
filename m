@@ -1,82 +1,99 @@
-From: songjun.wu@atmel.com (Songjun Wu)
-Date: Thu, 24 Sep 2015 13:47:40 +0800
-Subject: [PATCH v2 2/2] ASoC: atmel-classd: DT binding for Class D audio
- amplifier driver
-In-Reply-To: <1443073660-18042-1-git-send-email-songjun.wu@atmel.com>
-References: <1443073660-18042-1-git-send-email-songjun.wu@atmel.com>
-Message-ID: <1443073660-18042-3-git-send-email-songjun.wu@atmel.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 23 Sep 2015 22:54:40 -0700
+Subject: [PATCH v2 5/9] ARM: dts: Move all Cygnus peripherals into soc bus
+In-Reply-To: <56031FD6.3070306@broadcom.com>
+References: <1442611454-16331-1-git-send-email-rjui@broadcom.com>
+ <1929872.EmD9YkfFuv@wuerfel> <55FC8C0F.9020308@broadcom.com>
+ <1969821.ZhaOpCV2D1@wuerfel> <56031FD6.3070306@broadcom.com>
+Message-ID: <56039020.4060300@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT binding documentation for this new ASoC driver.
 
-Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
----
 
-Changes in v2:
-- Delete the device node "Sound".
+On 9/23/2015 2:55 PM, Ray Jui wrote:
+> 
+> 
+> On 9/23/2015 2:29 PM, Arnd Bergmann wrote:
+>> On Friday 18 September 2015 15:11:27 Ray Jui wrote:
+>>> On 9/18/2015 2:34 PM, Arnd Bergmann wrote:
+>>>> On Friday 18 September 2015 14:24:10 Ray Jui wrote:
+>>>>> +       soc {
+>>>>> +               compatible = "simple-bus";
+>>>>> +               ranges;
+>>>>> +               #address-cells = <1>;
+>>>>> +               #size-cells = <1>;
+>>>>
+>>>>> +               pinctrl: pinctrl at 0301d0c8 {
+>>>>>
+>>>>
+>>>> Similarly to the core bus, this seems to have address ranges 0x03xxxxxx and
+>>>> 0x18xxxxxx on it, so put those into the ranges.
+>>>>
+>>>
+>>> Okay we have an issue here. For whatever reason, the Cygnus ASIC team
+>>> decided to put registers for the same block in random locations. We see
+>>> similar issues in all of our other iProc based SoCs. We have
+>>> communicated this to our ASIC team, and hopefully they can revert the
+>>> trend for the next SoC.
+>>>
+>>> For example, the gpio_ccm has registers in the following regions:
+>>>
+>>> gpio_ccm: gpio at 1800a000 {
+>>>     compatible = "brcm,cygnus-ccm-gpio";
+>>>     reg = <0x1800a000 0x50>,
+>>>           <0x0301d164 0x20>;
+>>>
+>>> NAND is worse, it has registers in 3 different separate regions:
+>>>
+>>> nand: nand at 18046000 {
+>>>     compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1",
+>>>                  "brcm,brcmnand";
+>>>     reg = <0x18046000 0x600>, <0xf8105408 0x600>,
+>>>           <0x18046f00 0x20>;
+>>>
+>>> As you can see, this makes it impossible to define a proper address
+>>> range for the bus; therefore, I'll have to keep the ranges undefined and
+>>> a simple 1:1 mapping under this bus.
+>>
+>> Hmm, you could still try to list them as non-overlapping with other
+>> buses on the root node like
+>>
+>> 	ranges = <0x03000000 0x03000000 0x01000000>,
+>> 		 <0x18000000 0x18000000 0x01000000>,
+>> 		 <0xf8000000 0xf8000000 0x01000000>;
+>>
+>> which clarifies how the bus is wired up in hardware.
+>>
+>> Alternatively, you could make a more elaborate mapping, if there
+>> are in fact multiple hardware ranges, like
+>>
+>> 	#address-cells = <2>; # space:offset
+>> 	ranges = <1 0  0x03000000 0x01000000>,
+>> 		 <2 0  0x18000000 0x01000000>,
+>> 		 <3 0  0xf8000000 0x01000000>;
+>>
+>> It really depends on what the hardware designers were thinking. If
+>> the AXI bus actually decodes the entire 32-bit address range and devices
+>> are just located at random addresses in there, your current scheme is
+>> probably closest to reality.
+>>
+> 
+> I see. Let me talk to our ASIC team to get this clarified. If in the end
+> the AXI bus decodes the entire 32-bit address space, no change will be
+> made. Otherwise, I'll submit another patch to list the actual address
+> space that the AXI bus decodes.
+> 
+> Thanks for the review. It's very helpful!
+> 
+> Ray
+> 
 
- .../devicetree/bindings/sound/atmel-classd.txt     |   52 ++++++++++++++++++++
- 1 file changed, 52 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/atmel-classd.txt
+I just got feedback from our ASIC team. The NIC-301 is the main AXI
+fabric that decodes the entire 32-bit address space on Cygnus.
 
-diff --git a/Documentation/devicetree/bindings/sound/atmel-classd.txt b/Documentation/devicetree/bindings/sound/atmel-classd.txt
-new file mode 100644
-index 0000000..0018451
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/atmel-classd.txt
-@@ -0,0 +1,52 @@
-+* Atmel ClassD driver under ALSA SoC architecture
-+
-+Required properties:
-+- compatible
-+	Should be "atmel,sama5d2-classd".
-+- reg
-+	Should contain ClassD registers location and length.
-+- interrupts
-+	Should contain the IRQ line for the ClassD.
-+- dmas
-+	One DMA specifiers as described in atmel-dma.txt and dma.txt files.
-+- dma-names
-+	Must be "tx".
-+- clock-names
-+	Tuple listing input clock names.
-+	Required elements: "pclk", "gclk" and "aclk".
-+- clocks
-+	Please refer to clock-bindings.txt.
-+
-+Optional properties:
-+- pinctrl-names, pinctrl-0
-+	Please refer to pinctrl-bindings.txt.
-+- atmel,model
-+	The user-visible name of this sound complex.
-+	The default value is "CLASSD".
-+- atmel,pwm-type
-+	PWM modulation type, "single" or "diff".
-+	The default value is "single".
-+- atmel,non-overlap-time
-+	Set non-overlapping time, the unit is nanosecond(ns).
-+	There are four values,
-+	<5>, <10>, <15>, <20>, the default value is <10>.
-+	Non-overlapping will be disabled if not specified.
-+
-+Example:
-+classd: classd at fc048000 {
-+		compatible = "atmel,sama5d2-classd";
-+		reg = <0xfc048000 0x100>;
-+		interrupts = <59 IRQ_TYPE_LEVEL_HIGH 7>;
-+		dmas = <&dma0
-+			(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+			| AT91_XDMAC_DT_PERID(47))>;
-+		dma-names = "tx";
-+		clocks = <&classd_clk>, <&classd_gclk>, <&audio_pll_pmc>;
-+		clock-names = "pclk", "gclk", "aclk";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_classd_default>;
-+		atmel,model = "classd @ SAMA5D2-Xplained";
-+		atmel,pwm-type = "diff";
-+		atmel,non-overlap-time = <10>;
-+};
--- 
-1.7.9.5
+I'll keep this as it is for now.
+
+Thanks,
+
+Ray
