@@ -1,122 +1,61 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 24 Sep 2015 17:21:34 -0500
-Subject: [PATCH RESEND v3 5/9] of_mdio: fix MDIO phy device refcounting
-In-Reply-To: <E1ZfCJR-0004Rk-8M@rmk-PC.arm.linux.org.uk>
-References: <20150922161710.GA21084@n2100.arm.linux.org.uk>
- <E1ZfCJR-0004Rk-8M@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAL_JsqKhALmq-YyUZYKVzUpUW3oLeMN0edk6uDGhzHt7Qqe+iA@mail.gmail.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Thu, 24 Sep 2015 15:23:48 -0700
+Subject: [PATCH v2 1/9] ARM: dts: consolidate aliases for Cygnus dt files
+In-Reply-To: <56031E42.5010601@gmail.com>
+References: <1442611454-16331-1-git-send-email-rjui@broadcom.com>
+ <25764744.UdkoAR05y0@wuerfel> <55FC85D6.7050506@broadcom.com>
+ <20046098.CeNft0Jl1D@wuerfel> <56031DAF.5070503@broadcom.com>
+ <56031E42.5010601@gmail.com>
+Message-ID: <560477F4.5060508@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 2:36 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> bus_find_device() is defined as:
->
->  * This is similar to the bus_for_each_dev() function above, but it
->  * returns a reference to a device that is 'found' for later use, as
->  * determined by the @match callback.
->
-> and it does indeed return a reference-counted pointer to the device:
->
->         while ((dev = next_device(&i)))
->                 if (match(dev, data) && get_device(dev))
->                                         ^^^^^^^^^^^^^^^
->                         break;
->         klist_iter_exit(&i);
->         return dev;
->
-> What that means is that when we're done with the struct device, we must
-> drop that reference.  Neither of_phy_connect() nor of_phy_attach() did
-> this when phy_connect_direct() or phy_attach_direct() failed.
->
-> With our previous patch, phy_connect_direct() and phy_attach_direct()
-> take a new refcount on the phy device when successful, so we can drop
-> our local reference immediatley after these functions, whether or not
-> they succeeded.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Acked-by: Rob Herring <robh@kernel.org>
 
-> ---
->  drivers/of/of_mdio.c | 27 +++++++++++++++++++++++----
->  1 file changed, 23 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/of/of_mdio.c b/drivers/of/of_mdio.c
-> index 1350fa25cdb0..a87a868fed64 100644
-> --- a/drivers/of/of_mdio.c
-> +++ b/drivers/of/of_mdio.c
-> @@ -197,7 +197,8 @@ static int of_phy_match(struct device *dev, void *phy_np)
->   * of_phy_find_device - Give a PHY node, find the phy_device
->   * @phy_np: Pointer to the phy's device tree node
->   *
-> - * Returns a pointer to the phy_device.
-> + * If successful, returns a pointer to the phy_device with the embedded
-> + * struct device refcount incremented by one, or NULL on failure.
->   */
->  struct phy_device *of_phy_find_device(struct device_node *phy_np)
->  {
-> @@ -217,7 +218,9 @@ EXPORT_SYMBOL(of_phy_find_device);
->   * @hndlr: Link state callback for the network device
->   * @iface: PHY data interface type
->   *
-> - * Returns a pointer to the phy_device if successful.  NULL otherwise
-> + * If successful, returns a pointer to the phy_device with the embedded
-> + * struct device refcount incremented by one, or NULL on failure. The
-> + * refcount must be dropped by calling phy_disconnect() or phy_detach().
->   */
->  struct phy_device *of_phy_connect(struct net_device *dev,
->                                   struct device_node *phy_np,
-> @@ -225,13 +228,19 @@ struct phy_device *of_phy_connect(struct net_device *dev,
->                                   phy_interface_t iface)
->  {
->         struct phy_device *phy = of_phy_find_device(phy_np);
-> +       int ret;
->
->         if (!phy)
->                 return NULL;
->
->         phy->dev_flags = flags;
->
-> -       return phy_connect_direct(dev, phy, hndlr, iface) ? NULL : phy;
-> +       ret = phy_connect_direct(dev, phy, hndlr, iface);
-> +
-> +       /* refcount is held by phy_connect_direct() on success */
-> +       put_device(&phy->dev);
-> +
-> +       return ret ? NULL : phy;
->  }
->  EXPORT_SYMBOL(of_phy_connect);
->
-> @@ -241,17 +250,27 @@ EXPORT_SYMBOL(of_phy_connect);
->   * @phy_np: Node pointer for the PHY
->   * @flags: flags to pass to the PHY
->   * @iface: PHY data interface type
-> + *
-> + * If successful, returns a pointer to the phy_device with the embedded
-> + * struct device refcount incremented by one, or NULL on failure. The
-> + * refcount must be dropped by calling phy_disconnect() or phy_detach().
->   */
->  struct phy_device *of_phy_attach(struct net_device *dev,
->                                  struct device_node *phy_np, u32 flags,
->                                  phy_interface_t iface)
->  {
->         struct phy_device *phy = of_phy_find_device(phy_np);
-> +       int ret;
->
->         if (!phy)
->                 return NULL;
->
-> -       return phy_attach_direct(dev, phy, flags, iface) ? NULL : phy;
-> +       ret = phy_attach_direct(dev, phy, flags, iface);
-> +
-> +       /* refcount is held by phy_attach_direct() on success */
-> +       put_device(&phy->dev);
-> +
-> +       return ret ? NULL : phy;
->  }
->  EXPORT_SYMBOL(of_phy_attach);
->
-> --
-> 2.1.0
->
+On 9/23/2015 2:48 PM, Florian Fainelli wrote:
+> On 23/09/15 14:46, Ray Jui wrote:
+>>
+>>
+>> On 9/23/2015 2:31 PM, Arnd Bergmann wrote:
+>>> On Friday 18 September 2015 14:44:54 Ray Jui wrote:
+>>>> On 9/18/2015 2:27 PM, Arnd Bergmann wrote:
+>>>>> On Friday 18 September 2015 14:24:06 Ray Jui wrote:
+>>>>>
+>>>>> The SoC has at least four uarts according to this, so it seems unlikely that
+>>>>> each board really only uses only the fourth one of them and labels it '0'
+>>>>> on the board. As soon as you get one board that has more than one uart wired
+>>>>> up, you would need to undo this.
+>>>>>
+>>>>
+>>>> I think Scott might have explained this in the past. uart3 is going to
+>>>> be used on all Cygnus boards (including all future boards) because the
+>>>> bootrom was designed to use uart3 as console and that won't change.
+>>>>
+>>>> Let me know if you still think I need to move this back to the dts.
+>>>
+>>> I would still like to see them stay in the .dts file, if only for
+>>> consistency with other platforms. 
+>>>
+>>> Also, even if you can guarantee that uart3 is always used for the
+>>> console, that doesn't prevent board designers from adding more than
+>>> one uart, right?
+>>>
+>>> 	Arnd
+>>>
+>>
+>> Okay. Given that this patch series has been merged by Florian, I'll
+>> submit another patch to move it back to .dts files.
+> 
+> You could send me either a replacement patch series (all 9), or an
+> individual patch to replace a previous version (e.g; replace v2 with a
+> v3), or an incremental one, whatever works for you.
+> 
+> Thanks!
+> 
+
+Hi Florian, I just sent you an incremental patch to move the alias back
+to .dts files.
+
+Thanks,
+
+Ray
