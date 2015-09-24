@@ -1,88 +1,88 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 24 Sep 2015 09:04:14 -0700
-Subject: [PATCH 0/3] mmc: Wait for card_busy before starting sdio requests
-In-Reply-To: <5603C020.80603@redhat.com>
-References: <1442935826-16758-1-git-send-email-hdegoede@redhat.com>
- <CAPDyKFqvnVTL0pDLc8S1Ssqmy5WXR9+=uCWq8ONmgrYU=Zzoow@mail.gmail.com>
- <5603C020.80603@redhat.com>
-Message-ID: <CAD=FV=UacwyVcX+ZwCJ+iuhTGyr8ktOw7EiMxng8G1EmwXomJQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 24 Sep 2015 11:18:01 -0500
+Subject: [RFC PATCH 1/2] usb: doc: Add bindings for ULPI platform driver
+In-Reply-To: <F1B223389110CE49B4CF055ABA2E5D3D78C9BCBF@XAP-PVEXMBX02.xlnx.xilinx.com>
+References: <1443012841-13673-1-git-send-email-sbhatta@xilinx.com>
+ <20150924091034.GB27847@shlinux2>
+ <F1B223389110CE49B4CF055ABA2E5D3D78C9BCBF@XAP-PVEXMBX02.xlnx.xilinx.com>
+Message-ID: <CAL_JsqK-aAY+DAwt0YH-mbBo+a9c7WPrBwJJoy3=FkT6ZX2A5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Sep 24, 2015 at 2:19 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
+On Thu, Sep 24, 2015 at 4:26 AM, Subbaraya Sundeep Bhatta
+<subbaraya.sundeep.bhatta@xilinx.com> wrote:
+> Hi Peter,
 >
-> On 23-09-15 23:43, Ulf Hansson wrote:
+>> -----Original Message-----
+>> From: Peter Chen [mailto:peter.chen at freescale.com]
+>> Sent: Thursday, September 24, 2015 2:41 PM
+>> To: Subbaraya Sundeep Bhatta
+>> Cc: balbi at ti.com; devicetree at vger.kernel.org; kishon at ti.com;
+>> gregkh at linuxfoundation.org; linux-usb at vger.kernel.org; linux-
+>> kernel at vger.kernel.org; Punnaiah Choudary Kalluri; Subbaraya Sundeep Bhatta;
+>> linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [RFC PATCH 1/2] usb: doc: Add bindings for ULPI platform driver
 >>
->> On 22 September 2015 at 17:30, Hans de Goede <hdegoede@redhat.com> wrote:
->>>
->>> Hi Ulf,
->>>
->>> Here is a non RFC version of my patch-set to wait for card_busy before
->>> starting sdio requests. It is the same as the RFC version of the set,
->>> but this time it has been tested no hardware which actually needs this
->>> and I can confirm now that this fixes wifi on that hardware.
+>> On Wed, Sep 23, 2015 at 06:24:01PM +0530, Subbaraya Sundeep Bhatta
+>> wrote:
+>> > This patch adds binding doc info for generic ULPI PHYs platform
+>> > driver.
+>> >
+>> > Signed-off-by: Subbaraya Sundeep Bhatta <sbhatta@xilinx.com>
+>> > ---
+>> >  .../devicetree/bindings/usb/ulpi-platform-phy.txt  |   34
+>> ++++++++++++++++++++
+>> >  1 files changed, 34 insertions(+), 0 deletions(-)  create mode 100644
+>> > Documentation/devicetree/bindings/usb/ulpi-platform-phy.txt
+>> >
+>> > diff --git
+>> > a/Documentation/devicetree/bindings/usb/ulpi-platform-phy.txt
+>> > b/Documentation/devicetree/bindings/usb/ulpi-platform-phy.txt
+>> > new file mode 100644
+>> > index 0000000..7b8cbb4
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/usb/ulpi-platform-phy.txt
+>> > @@ -0,0 +1,34 @@
+>> > +Platform driver for generic ULPI PHYs
+>> > +
+>> > +Required properties:
+>> > +- compatible               : Should be "ulpi-phy"
+>> > +- reg                      : Physical base address and size of the USB
+>> > +                     controller registers map to which this PHY
+>> > +                     is connected.
+>> > +- view-port                : Should contain viewport register offset of the
+>> > +                     USB controller to which this PHY is connected Optional
+>> > +properties:
+>> > +- drv-vbus         : required if turning VBUS on/off has to be driven
+>> > +                     by writing to PHY. This feature depends on board
+>> > +                     design.
+>> > +
+>> > +Example:
+>> > +Below example shows the PHY binding for Chipidea USB controller which
+>> > +has ulpi viewport register at 0x0170
+>> > +
+>> > +           usb_phy0: phy0 {
+>> > +                   compatible = "ulpi-phy";
+>> > +                   reg = <0xe0002000 0x1000>;
+>> > +                   view-port = <0x0170>;
+>> > +                   drv-vbus;
+>> > +           };
+>> > +
+>> > +           usb0: usb at e0002000 {
+>> > +                        compatible = "chipidea,usb2";
+>> > +                        interrupt-parent = <&intc>;
+>> > +                        interrupts = <0 21 4>;
+>> > +                        reg = <0xe0002000 0x1000>;
 >>
->>
->> Great! Thanks, applied for next!
+>> Although just call devm_ioremap twice for the same register region does not
+>> cause any errors, I am not sure if it will has other potential problems. Cc: arm
+>> list.
 >
->
-> Great, thanks, I guess it is too late for this to go as a fix into
-> 4.3-rcX (no worries if it is) ?
->
->>> This patch-set should also allow removing this dw_mmc specific fix:
->>>
->>>
->>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/mmc/host/dw_mmc.c?id=0bdbd0e88cf6b603a2196418672715b0890fb040
->>>
->>> As this patch-set fixes this problem in a generic manner.
->>
->>
->> Care to send a patch to remove the above hack/fix?
->
->
-> I do not have any hardware to test this.
->
-> I've added Doug the original author of that patch to the Cc.
->
-> Dough, can you test if with the patch set from this mail thread
-> (merged into mmc/next) this patch:
->
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/mmc/host/dw_mmc.c?id=0bdbd0e88cf6b603a2196418672715b0890fb040
->
-> Is still necessary ? Since this patch-set fixes the same issue
-> in the mmc core I believe that this commit can be reverted now.
+> Yes Peter I was also in doubt to call devm_ioremap twice for same register region.
+> devm_ioremap_resource complained hence modified to devm_ioremap. Thanks for
+> adding arm-list.
 
-I'll try to find some time in the next few days to test, but I'm not
-terribly hopeful we can just revert the patch because:
+Don't put overlapping resources in the DT. Having 2 drivers accessing
+the same registers is not a clean or safe design.
 
-1. Only one of the two callers of dw_mci_wait_while_busy() is handled
-by your patch.  mci_send_cmd() is used internally in dw_mmc to throw
-something in the CMD register without going through the normal MMC
-path.  This is used exclusively to update the clock registers in
-dw_mmc.  I'm pretty sure this needs the wait, too.  It's always seemed
-weird / awkward to me that you need to use the CMD register to update
-clock settings in dw_mmc, but c'est la vie.
-
-2. If I remember correctly, we ran into other instances where non-SDIO
-cards needed the busy check.  It wasn't terribly common, but I think I
-ran into this when stress testing, but only on a few cards.  The patch
-referenced here only seems to check for SDIO commands.  As I
-understand it, to be correct, it should check for all data commands
-(other than stop or voltage change commands).  The Designware Databook
-makes no reference to only needing the wait for SDIO commands.
-
-
-...of course, it's always possible that some of the things I saw above
-will no longer happen with all the other fixes we've done in the
-meantime (turning on voltages at the right time, adding the right
-delays, etc).
-
-
-Note that I've hardly looked at sdhci at all, but on SDHCI is this
-handled by the "SDHCI_DATA_INHIBIT" bits?
-
-
--Doug
+Rob
