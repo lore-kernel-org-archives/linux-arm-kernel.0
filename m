@@ -1,37 +1,62 @@
-From: tanxiaojun@huawei.com (Tan Xiaojun)
-Date: Thu, 24 Sep 2015 11:27:47 +0800
-Subject: [PATCH RESEND] CMA: fix CONFIG_CMA_SIZE_MBYTES overflow in 64bit
-Message-ID: <1443065267-97873-1-git-send-email-tanxiaojun@huawei.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Thu, 24 Sep 2015 11:31:58 +0800
+Subject: [PATCH v2 3/9] clk: rockchip: add clock controller for rk3036
+In-Reply-To: <5603683F.4020302@rock-chips.com>
+References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
+ <1442478540-15068-4-git-send-email-zhengxing@rock-chips.com>
+ <1775899.zcIuq65f1o@diego> <5603683F.4020302@rock-chips.com>
+Message-ID: <56036EAE.9040201@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In 64bit system, if you set CONFIG_CMA_SIZE_MBYTES>=2048, it will
-overflow and size_bytes will be a big wrong number.
+On 2015?09?24? 11:04, Xing Zheng wrote:
+>>>
+>>>   #define RK3066_PLL_RATE(_rate, _nr, _nf, _no)    \
+>>> @@ -95,12 +106,31 @@ enum rockchip_pll_type {
+>>>       .nb = _nb,                        \
+>>>   }
+>>>
+>>> +#define RK3036_PLL_RATE(_rate, _refdiv, _fbdiv, _postdiv1,    \
+>>> +            _postdiv2, _dsmpd, _frac)        \
+>>> +{                                \
+>>> +    .rate    = _rate##U,                    \
+>>> +    .fbdiv = _fbdiv,                    \
+>>> +    .postdiv1 = _postdiv1,                    \
+>>> +    .refdiv = _refdiv,                    \
+>>> +    .postdiv2 = _postdiv2,                    \
+>>> +    .dsmpd = _dsmpd,                    \
+>>> +    .frac = _frac,                        \
+>>> +}
+>>> +
+>>>   struct rockchip_pll_rate_table {
+>>>       unsigned long rate;
+>>>       unsigned int nr;
+>>>       unsigned int nf;
+>>>       unsigned int no;
+>>>       unsigned int nb;
+>>> +    /* for RK3036 */
+>>> +    unsigned int fbdiv;
+>>> +    unsigned int postdiv1;
+>>> +    unsigned int refdiv;
+>>> +    unsigned int postdiv2;
+>>> +    unsigned int dsmpd;
+>>> +    unsigned int frac;
+>> same for these 2 ... should be part of the pll addition itself
+>   };
+> Done.
+>
+Sorry, I have one question:
+The "struct rockchip_pll_rate_table" is called in "rockchip/clk-pll.c" 
+on many functions, I think I could add a struct like:
+struct rk3036_pll_rate_table {
+     unsigned int fbdiv;
+     unsigned int postdiv1;
+     unsigned int refdiv;
+     unsigned int postdiv2;
+     unsigned int dsmpd;
+     unsigned int frac;
+};
+but, it will add many redundancy codes in "rockchip/clk-pll.c" just for 
+call "struct rk3036_pll_rate_table".
 
-Set CONFIG_CMA_SIZE_MBYTES=2048 and you will get an info below
-during system boot:
-
-*********
-cma: Failed to reserve 17592186042368 MiB
-*********
-
-Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
----
- drivers/base/dma-contiguous.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-index 950fff9..426ba27 100644
---- a/drivers/base/dma-contiguous.c
-+++ b/drivers/base/dma-contiguous.c
-@@ -46,7 +46,7 @@ struct cma *dma_contiguous_default_area;
-  * Users, who want to set the size of global CMA area for their system
-  * should use cma= kernel parameter.
-  */
--static const phys_addr_t size_bytes = CMA_SIZE_MBYTES * SZ_1M;
-+static const phys_addr_t size_bytes = (phys_addr_t)CMA_SIZE_MBYTES * SZ_1M;
- static phys_addr_t size_cmdline = -1;
- static phys_addr_t base_cmdline;
- static phys_addr_t limit_cmdline;
--- 
-1.7.9.5
+Thanks.
