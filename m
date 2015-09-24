@@ -1,48 +1,90 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 24 Sep 2015 22:39:25 +0200
-Subject: [PATCH v2 1/3] drivers: power: twl4030_charger: fix link
- problems when building as module
-In-Reply-To: <CAAfyv36mr67fUJKbe1F_rdxRjtvR8M+da0rYCtVTxDgyhKLvSQ@mail.gmail.com>
-References: <1442953171-19718-1-git-send-email-marek@goldelico.com>
- <20150922212900.GB15646@earth>
- <CAAfyv36mr67fUJKbe1F_rdxRjtvR8M+da0rYCtVTxDgyhKLvSQ@mail.gmail.com>
-Message-ID: <20150924203924.GD3125@earth>
+From: aalonso@freescale.com (Adrian Alonso)
+Date: Thu, 24 Sep 2015 15:53:57 -0500
+Subject: [PATCH v5 1/7] pinctrl: freescale: imx: fix system crash if enable
+ two pinctl instances
+Message-ID: <1443128043-21063-1-git-send-email-aalonso@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Robin Gong <b38343@freescale.com>
 
-On Thu, Sep 24, 2015 at 09:09:15PM +0200, Belisko Marek wrote:
-> On Tue, Sep 22, 2015 at 11:29 PM, Sebastian Reichel <sre@kernel.org> wrote:
-> > On Tue, Sep 22, 2015 at 10:19:29PM +0200, Marek Belisko wrote:
-> >> If either twl4030_charger or twl4030_madc is configured as MODULE,
-> >> we get build (link) errors.
-> >>
-> >> To solve, the direct call of twl4030_get_madc_conversion() is replaced
-> >> by a call to iio_read_channel_processed().
-> >>
-> >> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
-> >> Signed-off-by: Marek Belisko <marek@goldelico.com>
-> >> ---
-> >> changes from V1: added missing iio_channel_release + document and add new DT bindings
-> >
-> > That was fast :) Patchset looks fine to me except for one last
-> > thing: Let's make the iio-channel optional, so that old DT blobs
-> > are still supported. Also the IS_REACHABLE(CONFIG_TWL4030_MADC)
-> > check can be removed, it should no longer be needed with
-> > iio_read_channel_processed().
-> OK I updated driver code to pass when 'vac' property isn't found in
-> DT. Should I mark it also
-> in DT bindings or keep it as it was in v2? Thanks.
+Fix system chrash caused by groups whose number is smaller than the number
+of groups of the last pinctl instance which is not initialized.
 
-Move it from "Required properties:" to "Optional properties:". Maybe
-stating, that the feature does not work, if it's not provided.
+iMX7D supports two iomux controllers (iomuxc-lpsr and iomuxc) on probing
+the second instance (iomuxc) the chrash below occurs.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150924/b27d4d9b/attachment.sig>
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.2.0-next-20150901-00006-gebfa43c (aalonso at bluefly)
+[    0.000000] CPU: ARMv7 Processor [410fc075] revision 5 (ARMv7)
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasin instruction cache
+[    0.000000] Machine model: Freescale i.MX7 SabreSD Board
+[    0.661012] [<802a6cb0>] (strcmp) from [<802cc80c>] (imx_dt_node_to_map+0x58/0x208)
+[    0.668879] [<802cc80c>] (imx_dt_node_to_map) from [<802cbe24>] (pinctrl_dt_to_map+0x174/0x2b0)
+[    0.677654] [<802cbe24>] (pinctrl_dt_to_map) from [<802c8f18>] (pinctrl_get+0x100/0x424)
+[    0.685878] [<802c8f18>] (pinctrl_get) from [<802c9510>] (pinctrl_register+0x26c/0x480)
+[    0.694104] [<802c9510>] (pinctrl_register) from [<802ccf3c>] (imx_pinctrl_probe+0x580/0x6e8)
+[    0.702706] [<802ccf3c>] (imx_pinctrl_probe) from [<80351b58>] (platform_drv_probe+0x44/0xa4)
+[    0.711455] [<80351b58>] (platform_drv_probe) from [<803503ec>] (driver_probe_device+0x174/0x2b4)
+[    0.720405] [<803503ec>] (driver_probe_device) from [<803505fc>] (__driver_attach+0x8c/0x90)
+[    0.728982] [<803505fc>] (__driver_attach) from [<8034e930>] (bus_for_each_dev+0x6c/0xa0)
+[    0.737381] [<8034e930>] (bus_for_each_dev) from [<8034fb88>] (bus_add_driver+0x148/0x1f0)
+[    0.745804] [<8034fb88>] (bus_add_driver) from [<80350c00>] (driver_register+0x78/0xf8)
+[    0.753880] [<80350c00>] (driver_register) from [<800097d0>] (do_one_initcall+0x8c/0x1d4)
+[    0.762282] [<800097d0>] (do_one_initcall) from [<80987dac>] (kernel_init_freeable+0x144/0x1e4)
+[    0.771061] [<80987dac>] (kernel_init_freeable) from [<806d9c7c>] (kernel_init+0x8/0xe8)
+[    0.779285] [<806d9c7c>] (kernel_init) from [<8000f628>] (ret_from_fork+0x14/0x2c)
+[    0.786981] Code: e3520000 e5e32001 1afffffb e12fff1e (e4d03001)
+
+Signed-off-by: Robin Gong <b38343@freescale.com>
+Signed-off-by: Adrian Alonso <aalonso@freescale.com>
+---
+Chages for V2:
+- Reorder patch series
+- Add platform boot up information on kernel error
+- Move gpr_index to imx_pinctrl_soc_info
+Changes for V3:
+- Rename grp_index to group_index
+Changes for V4: Resend
+Changes for V5: Resend
+
+ drivers/pinctrl/freescale/pinctrl-imx.c | 3 +--
+ drivers/pinctrl/freescale/pinctrl-imx.h | 1 +
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+index d7b98ba..b9c6deb 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+@@ -580,7 +580,6 @@ static int imx_pinctrl_parse_functions(struct device_node *np,
+ 	struct device_node *child;
+ 	struct imx_pmx_func *func;
+ 	struct imx_pin_group *grp;
+-	static u32 grp_index;
+ 	u32 i = 0;
+ 
+ 	dev_dbg(info->dev, "parse function(%d): %s\n", index, np->name);
+@@ -599,7 +598,7 @@ static int imx_pinctrl_parse_functions(struct device_node *np,
+ 
+ 	for_each_child_of_node(np, child) {
+ 		func->groups[i] = child->name;
+-		grp = &info->groups[grp_index++];
++		grp = &info->groups[info->group_index++];
+ 		imx_pinctrl_parse_groups(child, grp, info, i++);
+ 	}
+ 
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h b/drivers/pinctrl/freescale/pinctrl-imx.h
+index 49e55d3..2a5fe72 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.h
++++ b/drivers/pinctrl/freescale/pinctrl-imx.h
+@@ -78,6 +78,7 @@ struct imx_pinctrl_soc_info {
+ 	struct imx_pin_reg *pin_regs;
+ 	struct imx_pin_group *groups;
+ 	unsigned int ngroups;
++	unsigned int group_index;
+ 	struct imx_pmx_func *functions;
+ 	unsigned int nfunctions;
+ 	unsigned int flags;
+-- 
+2.1.4
