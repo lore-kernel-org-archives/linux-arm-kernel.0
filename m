@@ -1,151 +1,114 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 24 Sep 2015 20:18:48 +0100
-Subject: [PATCH 6/9] net: fix phy refcounting in a bunch of drivers
-In-Reply-To: <20150924191754.GC21513@n2100.arm.linux.org.uk>
-References: <20150924191754.GC21513@n2100.arm.linux.org.uk>
-Message-ID: <E1ZfC2a-00036A-0o@rmk-PC.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 24 Sep 2015 20:30:06 +0100
+Subject: [PATCH v4 1/2] Add the driver of mbigen interrupt controller
+In-Reply-To: <560253C2.60609@huawei.com>
+References: <1439952920-2296-1-git-send-email-majun258@huawei.com>
+ <1439952920-2296-2-git-send-email-majun258@huawei.com>
+ <20150921225324.5568f673@arm.com> <560253C2.60609@huawei.com>
+Message-ID: <20150924203006.4bb162aa@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_phy_find_device() increments the phy struct device refcount, which
-we need to properly balance.  Add code to network drivers using this
-function to ensure that the struct device refcount is correctly
-balanced.
+On Wed, 23 Sep 2015 15:24:50 +0800
+"majun (F)" <majun258@huawei.com> wrote:
 
-For xgene, looking back in the history, we should be able to use
-of_phy_connect() with a zero flags argument for the DT case as this is
-how the driver used to operate prior to de7b5b3d790a ("net: eth: xgene:
-change APM X-Gene SoC platform ethernet to support ACPI").
+[...]
 
-This leaves the Cavium Thunder BGX unfixed; fixing this driver is a
-complicated task, one which the maintainers need to be involved with.
+> >> +static int mbigen_device_init(struct mbigen_chip *chip,
+> >> +                       struct device_node *node)
+> >> +{
+> >> +       struct mbigen_device *mgn_dev;
+> >> +       struct device_node *msi_np;
+> >> +       struct irq_domain *msi_domain;
+> >> +       struct msi_desc *desc;
+> >> +       struct mbigen_irq_data *mgn_irq_data;
+> >> +       u32 nvec, dev_id;
+> >> +       int ret;
+> >> +
+> >> +       of_property_read_u32(node, "nr-interrupts", &nvec);
+> >> +       if (!nvec)
+> >> +               return -EINVAL;
+> >> +
+> >> +       ret = of_property_read_u32_index(node, "msi-parent", 1, &dev_id);
+> >> +       if (ret)
+> >> +               return -EINVAL;
+> >> +
+> >> +       msi_np = of_parse_phandle(node, "msi-parent", 0);
+> >> +       if (!msi_np) {
+> >> +               pr_err("%s- no msi node found: %s\n", __func__,
+> >> +                       node->full_name);
+> >> +               return -ENXIO;
+> >> +       }
+> >> +
+> >> +       msi_domain = irq_find_matching_host(msi_np, DOMAIN_BUS_PLATFORM_MSI);
+> >> +       if (!msi_domain) {
+> >> +               pr_err("MBIGEN: no platform-msi domain for %s\n",
+> >> +                       msi_np->full_name);
+> >> +               return -ENXIO;
+> >> +       }
+> > 
+> > There shouldn't be any need for all this msi-parent handling if you
+> > correctly created the platform-devices for the mbigen devices. I've
+> > gone though quite some effort to make sure none of that was necessary,
+> 
+> Do you mean I should use the of_msi_configure() function at here,
+> or
+> msi-parent should be handled during initial when this function be
+> called in function of_platform_device_create_pdata() ?
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c | 24 ++++++++++++++++--------
- drivers/net/ethernet/freescale/gianfar.c       |  3 +++
- drivers/net/ethernet/freescale/ucc_geth.c      |  8 +++++++-
- drivers/net/ethernet/marvell/mvneta.c          |  2 ++
- drivers/net/ethernet/xilinx/xilinx_emaclite.c  |  2 ++
- 5 files changed, 30 insertions(+), 9 deletions(-)
+The second option. I understand this is a bit complicated because your
+node is both an interrupt controller and an MSI client.
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-index cfa37041ab71..c4bb8027b3fb 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-@@ -689,16 +689,24 @@ static int xgene_enet_phy_connect(struct net_device *ndev)
- 			netdev_dbg(ndev, "No phy-handle found in DT\n");
- 			return -ENODEV;
- 		}
--		pdata->phy_dev = of_phy_find_device(phy_np);
--	}
- 
--	phy_dev = pdata->phy_dev;
-+		phy_dev = of_phy_connect(ndev, phy_np, &xgene_enet_adjust_link,
-+					 0, pdata->phy_mode);
-+		if (!phy_dev) {
-+			netdev_err(ndev, "Could not connect to PHY\n");
-+			return -ENODEV;
-+		}
-+
-+		pdata->phy_dev = phy_dev;
-+	} else {
-+		phy_dev = pdata->phy_dev;
- 
--	if (!phy_dev ||
--	    phy_connect_direct(ndev, phy_dev, &xgene_enet_adjust_link,
--			       pdata->phy_mode)) {
--		netdev_err(ndev, "Could not connect to PHY\n");
--		return  -ENODEV;
-+		if (!phy_dev ||
-+		    phy_connect_direct(ndev, phy_dev, &xgene_enet_adjust_link,
-+				       pdata->phy_mode)) {
-+			netdev_err(ndev, "Could not connect to PHY\n");
-+			return  -ENODEV;
-+		}
- 	}
- 
- 	pdata->phy_speed = SPEED_UNKNOWN;
-diff --git a/drivers/net/ethernet/freescale/gianfar.c b/drivers/net/ethernet/freescale/gianfar.c
-index 4b69d061d90f..65a16086faec 100644
---- a/drivers/net/ethernet/freescale/gianfar.c
-+++ b/drivers/net/ethernet/freescale/gianfar.c
-@@ -1702,6 +1702,7 @@ static void gfar_configure_serdes(struct net_device *dev)
- 	tbiphy = of_phy_find_device(priv->tbi_node);
- 	if (!tbiphy) {
- 		dev_err(&dev->dev, "error: Could not get TBI device\n");
-+		put_device(&tbiphy->dev);
- 		return;
- 	}
- 
-@@ -1723,6 +1724,8 @@ static void gfar_configure_serdes(struct net_device *dev)
- 	phy_write(tbiphy, MII_BMCR,
- 		  BMCR_ANENABLE | BMCR_ANRESTART | BMCR_FULLDPLX |
- 		  BMCR_SPEED1000);
-+
-+	put_device(&tbiphy->dev);
- }
- 
- static int __gfar_is_rx_idle(struct gfar_private *priv)
-diff --git a/drivers/net/ethernet/freescale/ucc_geth.c b/drivers/net/ethernet/freescale/ucc_geth.c
-index 4dd40e057f40..650f7888e32b 100644
---- a/drivers/net/ethernet/freescale/ucc_geth.c
-+++ b/drivers/net/ethernet/freescale/ucc_geth.c
-@@ -1384,6 +1384,8 @@ static int adjust_enet_interface(struct ucc_geth_private *ugeth)
- 		value = phy_read(tbiphy, ENET_TBI_MII_CR);
- 		value &= ~0x1000;	/* Turn off autonegotiation */
- 		phy_write(tbiphy, ENET_TBI_MII_CR, value);
-+
-+		put_device(&tbiphy->dev);
- 	}
- 
- 	init_check_frame_length_mode(ug_info->lengthCheckRx, &ug_regs->maccfg2);
-@@ -1702,8 +1704,10 @@ static void uec_configure_serdes(struct net_device *dev)
- 	 * everything for us?  Resetting it takes the link down and requires
- 	 * several seconds for it to come back.
- 	 */
--	if (phy_read(tbiphy, ENET_TBI_MII_SR) & TBISR_LSTATUS)
-+	if (phy_read(tbiphy, ENET_TBI_MII_SR) & TBISR_LSTATUS) {
-+		put_device(&tbiphy->dev);
- 		return;
-+	}
- 
- 	/* Single clk mode, mii mode off(for serdes communication) */
- 	phy_write(tbiphy, ENET_TBI_MII_ANA, TBIANA_SETTINGS);
-@@ -1711,6 +1715,8 @@ static void uec_configure_serdes(struct net_device *dev)
- 	phy_write(tbiphy, ENET_TBI_MII_TBICON, TBICON_CLK_SELECT);
- 
- 	phy_write(tbiphy, ENET_TBI_MII_CR, TBICR_SETTINGS);
-+
-+	put_device(&tbiphy->dev);
- }
- 
- /* Configure the PHY for dev.
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index fe2299ac4f5c..0dce037a2682 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -3173,6 +3173,8 @@ static int mvneta_probe(struct platform_device *pdev)
- 		struct phy_device *phy = of_phy_find_device(dn);
- 
- 		mvneta_fixed_link_update(pp, phy);
-+
-+		put_device(&phy->dev);
- 	}
- 
- 	return 0;
-diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index 6008eee01a33..cf468c87ce57 100644
---- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -828,6 +828,8 @@ static int xemaclite_mdio_setup(struct net_local *lp, struct device *dev)
- 		if (!phydev)
- 			dev_info(dev,
- 				 "MDIO of the phy is not registered yet\n");
-+		else
-+			put_device(&phydev->dev);
- 		return 0;
- 	}
- 
+You need a platform device to represent the MSI client and use this
+to get the MSI setup to be done automatically by the core code.
+of_platform_populate() should normally solve this neatly. On top of
+that, you need to use the normal irqchip infrastructure to probe the
+irqchip side of the node.
+
+[...]
+
+> >> +static int __init mbigen_init(void)
+> >> +{
+> >> +       struct device_node *np;
+> >> +
+> >> +       for (np = of_find_matching_node(NULL, mbigen_chip_id); np;
+> >> +            np = of_find_matching_node(np, mbigen_chip_id)) {
+> >> +               mbigen_of_init(np);
+> >> +       }
+> >> +
+> >> +       return 0;
+> >> +}
+> >> +
+> >> +core_initcall(mbigen_init);
+> > 
+> > That's the wrong thing to do. The interrupt controller should be
+> > probed with IRQCHIP_DECLARE(). Yes, this creates a dependency
+> > problem between the MSI layer and the irqchip layer, but that
+> > should be easy (-ish) to solve.
+> 
+> Based on our discusstion about DTS,I will change the code likes below:
+> IRQCHIP_DECLARE(hisi_mbigen, "hisilicon,mbigen-v2", mbigen_of_init);
+> 
+> Mbigen device is initialized as a interrupt controller.
+> 
+> But I still can't call platform_msi_domain_alloc_irqs()
+> to apply the msi irqs.
+> 
+> It think this is what you said "dependency problem between
+>  the MSI layer and the irqchip layer" , am i right ?
+> 
+> Do you have any idea about this problem?
+
+You need to have multiple phases for initializing this beast:
+- IRQCHIP_DECLARE() to create the irqchips, allocate the domains and
+  the main data structures,
+- platform device probing of the top-level device to do some HW probing
+  and to kick of_platform_populate on the subnodes,
+- Handle the the subnode probing, allocate the MSIs, and finish the
+  initialization of the irqchip how that you have all the information.
+
+Thanks,
+
+	M.
 -- 
-2.1.0
+Jazz is not dead. It just smells funny.
