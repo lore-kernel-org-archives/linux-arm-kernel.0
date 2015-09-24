@@ -1,48 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 24 Sep 2015 18:21:55 +0100
-Subject: [PATCH v3 2/4] Documentation: bindings: mfd: cros ec: document
- vbc EC property
-In-Reply-To: <1442842703-5309-3-git-send-email-emilio.lopez@collabora.co.uk>
-References: <1442842703-5309-1-git-send-email-emilio.lopez@collabora.co.uk>
- <1442842703-5309-3-git-send-email-emilio.lopez@collabora.co.uk>
-Message-ID: <20150924172155.GC27197@x1>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 24 Sep 2015 19:22:41 +0200
+Subject: [PATCH] ARM: dts: sun8i-a33: Add security system crypto engine
+ clock and device nodes
+In-Reply-To: <1442982879-6823-1-git-send-email-wens@csie.org>
+References: <1442982879-6823-1-git-send-email-wens@csie.org>
+Message-ID: <20150924172241.GU4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Sep 2015, Emilio L?pez wrote:
-
-> Some EC implementations include a small nvram space used to store
-> verified boot context data. This boolean property lets us indicate
-> whether this space is available or not on a specific EC implementation.
+1;3803;0c
+On Wed, Sep 23, 2015 at 12:34:39PM +0800, Chen-Yu Tsai wrote:
+> A33 has the same "Security System" crypto engine as A10/A20, but with a
+> separate reset control.
 > 
-> Signed-off-by: Emilio L?pez <emilio.lopez@collabora.co.uk>
-> ---
-> 
-> Patch is new in v3, split from 3/4
-> 
->  Documentation/devicetree/bindings/mfd/cros-ec.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Applied, thanks.
+Applied, thanks!
 
-> diff --git a/Documentation/devicetree/bindings/mfd/cros-ec.txt b/Documentation/devicetree/bindings/mfd/cros-ec.txt
-> index 1777916..136e0c2 100644
-> --- a/Documentation/devicetree/bindings/mfd/cros-ec.txt
-> +++ b/Documentation/devicetree/bindings/mfd/cros-ec.txt
-> @@ -34,6 +34,10 @@ Required properties (LPC):
->  - compatible: "google,cros-ec-lpc"
->  - reg: List of (IO address, size) pairs defining the interface uses
->  
-> +Optional properties (all):
-> +- google,has-vbc-nvram: Some implementations of the EC include a small
-> +  nvram space used to store verified boot context data. This boolean flag
-> +  is used to specify whether this nvram is present or not.
->  
->  Example for I2C:
->  
+Maxime
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150924/69968290/attachment.sig>
