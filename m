@@ -1,50 +1,41 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 24 Sep 2015 17:37:19 +0100
-Subject: [PATCH v2 0/7] arm64: relax Image placement rules
-In-Reply-To: <1442968663-31843-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1442968663-31843-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <560426BF.4030300@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 24 Sep 2015 09:37:14 -0700
+Subject: [PATCH 0/2] arm64: EFI stub isolation
+Message-ID: <1443112636-19573-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/09/15 01:37, Ard Biesheuvel wrote:
-> This is a followup to the "arm64: update/clarify/relax Image and FDT placement
-> rules" series I sent a while ago:
-> (http://article.gmane.org/gmane.linux.ports.arm.kernel/407148)
->
-> This has now been split in two series: this second series deals with the
-> physical and virtual placement of the kernel Image.
->
-> This series updates the mapping of the kernel Image and the linear mapping of
-> system memory to allow more freedom in the choice of placement without affecting
-> the accessibility of system RAM below the kernel Image, and the mapping
-> efficiency (i.e., memory can always be mapped in 512 MB or 1 GB blocks).
->
+We need to ensure that the EFI stub only uses parts of the kernel proper
+that are safe to use when the kernel virtual mapping is not active yet.
 
-Ard,
+So move all C code dependencies to the libstub, and do a verification pass
+to ensure that no absolute relocations are used.
 
-I gave your series a quick run and dumping the kernel page tables(with CONFIG_ARM64_PTDUMP)
-I find this problem :
+On the arm64 side, annotate all the stub's dependencies as safe for PI
+(position independent).
 
-...
+Ard Biesheuvel (2):
+  arm64: use ENDPIPROC() to annotate position independent assembler
+    routines
+  arm64/efi: isolate EFI stub from the kernel proper
 
----[ Kernel Mapping ]---
-0xffffffbffc000000-0xffffffbffc600000           6M     RW x  SHD AF    MEM/NORMAL    *****
-0xffffffbffc600000-0xffffffbffc7f5000        2004K     RW x  SHD AF    UXN MEM/NORMAL
-0xffffffbffc7f5000-0xffffffbffc875000         512K     RW NX SHD AF    UXN MEM/NORMAL
-0xffffffbffc875000-0xffffffbffca00000        1580K     RW x  SHD AF    UXN MEM/NORMAL
----[ Linear Mapping ]---
-0xffffffc000000000-0xffffffc040000000           1G     RW NX SHD AF    UXN MEM/NORMAL
+ arch/arm64/include/asm/assembler.h    |  8 +++
+ arch/arm64/kernel/Makefile            | 12 ++++-
+ arch/arm64/kernel/efi-entry.S         | 10 ++--
+ arch/arm64/kernel/head.S              | 14 ++---
+ arch/arm64/kernel/image.h             | 27 ++++++++++
+ arch/arm64/lib/memchr.S               |  2 +-
+ arch/arm64/lib/memcmp.S               |  2 +-
+ arch/arm64/lib/memcpy.S               |  2 +-
+ arch/arm64/lib/memmove.S              |  2 +-
+ arch/arm64/lib/memset.S               |  2 +-
+ arch/arm64/lib/strlen.S               |  2 +-
+ arch/arm64/lib/strncmp.S              |  2 +-
+ arch/arm64/mm/cache.S                 | 10 ++--
+ drivers/firmware/efi/libstub/Makefile | 31 +++++++++--
+ drivers/firmware/efi/libstub/string.c | 55 ++++++++++++++++++++
+ 15 files changed, 152 insertions(+), 29 deletions(-)
+ create mode 100644 drivers/firmware/efi/libstub/string.c
 
-
-Note that the first mapping in the kernel doesn't have UXN set, which is a regression.
-I haven't started digging into it yet, but I thought I will point it out here, in case you
-already fixed it.
-
-Note: I see that you have used CONFIG_ARM64_64K_PAGES to handle section/table mapping
-(which I have tried to cleanup in 16K page size series and which is not merged yet).
-We should be careful when we merge our patches, as we could miss such new cases.
-
-
-Thanks
-Suzuki
+-- 
+1.9.1
