@@ -1,68 +1,151 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 24 Sep 2015 14:18:56 -0500
-Subject: [Patch v3 07/10] arm: dts: Add APQ8084 SMEM nodes
-In-Reply-To: <1443122339-13917-1-git-send-email-agross@codeaurora.org>
-References: <1443122339-13917-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1443122339-13917-8-git-send-email-agross@codeaurora.org>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 24 Sep 2015 20:18:48 +0100
+Subject: [PATCH 6/9] net: fix phy refcounting in a bunch of drivers
+In-Reply-To: <20150924191754.GC21513@n2100.arm.linux.org.uk>
+References: <20150924191754.GC21513@n2100.arm.linux.org.uk>
+Message-ID: <E1ZfC2a-00036A-0o@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds all the required nodes to support SMEM on APQ8084
+of_phy_find_device() increments the phy struct device refcount, which
+we need to properly balance.  Add code to network drivers using this
+function to ensure that the struct device refcount is correctly
+balanced.
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
+For xgene, looking back in the history, we should be able to use
+of_phy_connect() with a zero flags argument for the DT case as this is
+how the driver used to operate prior to de7b5b3d790a ("net: eth: xgene:
+change APM X-Gene SoC platform ethernet to support ACPI").
+
+This leaves the Cavium Thunder BGX unfixed; fixing this driver is a
+complicated task, one which the maintainers need to be involved with.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/qcom-apq8084.dtsi |   31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c | 24 ++++++++++++++++--------
+ drivers/net/ethernet/freescale/gianfar.c       |  3 +++
+ drivers/net/ethernet/freescale/ucc_geth.c      |  8 +++++++-
+ drivers/net/ethernet/marvell/mvneta.c          |  2 ++
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c  |  2 ++
+ 5 files changed, 30 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 0554fbd..76be0ba 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -10,6 +10,17 @@
- 	compatible = "qcom,apq8084";
- 	interrupt-parent = <&intc>;
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+index cfa37041ab71..c4bb8027b3fb 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+@@ -689,16 +689,24 @@ static int xgene_enet_phy_connect(struct net_device *ndev)
+ 			netdev_dbg(ndev, "No phy-handle found in DT\n");
+ 			return -ENODEV;
+ 		}
+-		pdata->phy_dev = of_phy_find_device(phy_np);
+-	}
  
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
+-	phy_dev = pdata->phy_dev;
++		phy_dev = of_phy_connect(ndev, phy_np, &xgene_enet_adjust_link,
++					 0, pdata->phy_mode);
++		if (!phy_dev) {
++			netdev_err(ndev, "Could not connect to PHY\n");
++			return -ENODEV;
++		}
 +
-+		smem_mem: smem_region at fa00000 {
-+			reg = <0xfa00000 0x200000>;
-+			no-map;
-+		};
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -224,6 +235,26 @@
- 			reg = <0xfc400000 0x4000>;
- 		};
++		pdata->phy_dev = phy_dev;
++	} else {
++		phy_dev = pdata->phy_dev;
  
-+		tcsr_mutex_regs: syscon at fd484000 {
-+			compatible = "syscon";
-+			reg = <0xfd484000 0x2000>;
-+		};
+-	if (!phy_dev ||
+-	    phy_connect_direct(ndev, phy_dev, &xgene_enet_adjust_link,
+-			       pdata->phy_mode)) {
+-		netdev_err(ndev, "Could not connect to PHY\n");
+-		return  -ENODEV;
++		if (!phy_dev ||
++		    phy_connect_direct(ndev, phy_dev, &xgene_enet_adjust_link,
++				       pdata->phy_mode)) {
++			netdev_err(ndev, "Could not connect to PHY\n");
++			return  -ENODEV;
++		}
+ 	}
+ 
+ 	pdata->phy_speed = SPEED_UNKNOWN;
+diff --git a/drivers/net/ethernet/freescale/gianfar.c b/drivers/net/ethernet/freescale/gianfar.c
+index 4b69d061d90f..65a16086faec 100644
+--- a/drivers/net/ethernet/freescale/gianfar.c
++++ b/drivers/net/ethernet/freescale/gianfar.c
+@@ -1702,6 +1702,7 @@ static void gfar_configure_serdes(struct net_device *dev)
+ 	tbiphy = of_phy_find_device(priv->tbi_node);
+ 	if (!tbiphy) {
+ 		dev_err(&dev->dev, "error: Could not get TBI device\n");
++		put_device(&tbiphy->dev);
+ 		return;
+ 	}
+ 
+@@ -1723,6 +1724,8 @@ static void gfar_configure_serdes(struct net_device *dev)
+ 	phy_write(tbiphy, MII_BMCR,
+ 		  BMCR_ANENABLE | BMCR_ANRESTART | BMCR_FULLDPLX |
+ 		  BMCR_SPEED1000);
 +
-+		tcsr_mutex: hwlock {
-+			compatible = "qcom,tcsr-mutex";
-+			syscon = <&tcsr_mutex_regs 0 0x80>;
-+			#hwlock-cells = <1>;
-+		};
++	put_device(&tbiphy->dev);
+ }
+ 
+ static int __gfar_is_rx_idle(struct gfar_private *priv)
+diff --git a/drivers/net/ethernet/freescale/ucc_geth.c b/drivers/net/ethernet/freescale/ucc_geth.c
+index 4dd40e057f40..650f7888e32b 100644
+--- a/drivers/net/ethernet/freescale/ucc_geth.c
++++ b/drivers/net/ethernet/freescale/ucc_geth.c
+@@ -1384,6 +1384,8 @@ static int adjust_enet_interface(struct ucc_geth_private *ugeth)
+ 		value = phy_read(tbiphy, ENET_TBI_MII_CR);
+ 		value &= ~0x1000;	/* Turn off autonegotiation */
+ 		phy_write(tbiphy, ENET_TBI_MII_CR, value);
 +
-+		smem {
-+			compatible = "qcom,smem";
-+			reg = <0xfc428000 0x4000>;
-+			reg-names = "aux-mem1";
++		put_device(&tbiphy->dev);
+ 	}
+ 
+ 	init_check_frame_length_mode(ug_info->lengthCheckRx, &ug_regs->maccfg2);
+@@ -1702,8 +1704,10 @@ static void uec_configure_serdes(struct net_device *dev)
+ 	 * everything for us?  Resetting it takes the link down and requires
+ 	 * several seconds for it to come back.
+ 	 */
+-	if (phy_read(tbiphy, ENET_TBI_MII_SR) & TBISR_LSTATUS)
++	if (phy_read(tbiphy, ENET_TBI_MII_SR) & TBISR_LSTATUS) {
++		put_device(&tbiphy->dev);
+ 		return;
++	}
+ 
+ 	/* Single clk mode, mii mode off(for serdes communication) */
+ 	phy_write(tbiphy, ENET_TBI_MII_ANA, TBIANA_SETTINGS);
+@@ -1711,6 +1715,8 @@ static void uec_configure_serdes(struct net_device *dev)
+ 	phy_write(tbiphy, ENET_TBI_MII_TBICON, TBICON_CLK_SELECT);
+ 
+ 	phy_write(tbiphy, ENET_TBI_MII_CR, TBICR_SETTINGS);
 +
-+			memory-region = <&smem_mem>;
-+			hwlocks = <&tcsr_mutex 3>;
-+		};
++	put_device(&tbiphy->dev);
+ }
+ 
+ /* Configure the PHY for dev.
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index fe2299ac4f5c..0dce037a2682 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -3173,6 +3173,8 @@ static int mvneta_probe(struct platform_device *pdev)
+ 		struct phy_device *phy = of_phy_find_device(dn);
+ 
+ 		mvneta_fixed_link_update(pp, phy);
 +
- 		tlmm: pinctrl at fd510000 {
- 			compatible = "qcom,apq8084-pinctrl";
- 			reg = <0xfd510000 0x4000>;
++		put_device(&phy->dev);
+ 	}
+ 
+ 	return 0;
+diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+index 6008eee01a33..cf468c87ce57 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
++++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+@@ -828,6 +828,8 @@ static int xemaclite_mdio_setup(struct net_local *lp, struct device *dev)
+ 		if (!phydev)
+ 			dev_info(dev,
+ 				 "MDIO of the phy is not registered yet\n");
++		else
++			put_device(&phydev->dev);
+ 		return 0;
+ 	}
+ 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+2.1.0
