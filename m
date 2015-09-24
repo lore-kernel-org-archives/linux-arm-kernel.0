@@ -1,19 +1,30 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 24 Sep 2015 05:05:12 -0700
-Subject: [PATCH] arm/dts: Add node for ina220 on LS1021ATWR
-In-Reply-To: <1442391643-37883-1-git-send-email-yao.yuan@freescale.com>
-References: <1442391643-37883-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <20150924120511.GN3529@tiger>
+Date: Thu, 24 Sep 2015 05:17:38 -0700
+Subject: [PATCH v2] clk:mxs: Fix bug on frequency divider
+In-Reply-To: <55FBBB6D.4010805@i2se.com>
+References: <55BBB1AC.6070102@codeaurora.org>
+ <1441010707-17178-1-git-send-email-victorien.vedrine@ophrys.net>
+ <55FBBB6D.4010805@i2se.com>
+Message-ID: <20150924121738.GP3529@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 04:20:43PM +0800, Yuan Yao wrote:
-> The INA220 monitors both shunt drop and supply voltage.
+On Fri, Sep 18, 2015 at 09:21:17AM +0200, Stefan Wahren wrote:
+> +Shawn's new address
+> +linux-arm-kernel
 > 
-> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> > On drivers/clk/mxs/clk-frac.c, the function clk_frac_round_rate returned a bad
+> > result. The division before multiplication computes a wrong value ; the
+> > calculation is inverted to fix the problem. The second issue is that the exact
+> > rate have decimals and they are truncate. The consequence is that the function
+> > clk_frac_set_rate (which use the result of clk_frac_round_rate) computes a
+> > wrong value for the register (the rate generated can be closer to the desired
+> > rate). The correction is : if there is decimal to the result, it is rounded to
+> > the next larger integer.
+> > On drivers/clk/mxs/clk-frac.c, the function clk_frac_recalc_rate returned
+> > a bad result. The multiplication is made before the division to compute a
+> > correct value.
+> >
+> > Signed-off-by: Victorien Vedrine <victorien.vedrine@ophrys.net>
 
-For sake of consistency, the subject prefix of dts patches that I
-collect should be like "ARM: dts: ...".  I changed prefix and applied
-patch.
-
-Shawn
+Acked-by: Shawn Guo <shawnguo@kernel.org>
