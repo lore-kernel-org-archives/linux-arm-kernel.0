@@ -1,71 +1,25 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 24 Sep 2015 13:25:12 +0200
-Subject: [PATCH v5 2/4] edac: Add L3 EDAC support to the APM X-Gene SoC
- EDAC driver
-In-Reply-To: <1443055261-8613-3-git-send-email-lho@apm.com>
-References: <1443055261-8613-1-git-send-email-lho@apm.com>
- <1443055261-8613-3-git-send-email-lho@apm.com>
-Message-ID: <20150924112512.GB3774@pd.tnic>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 24 Sep 2015 14:33:19 +0300
+Subject: [PATCH 1/3] arm/arm64: KVM: vgic: Check for !irqchip_in_kernel()
+ when mapping resources
+In-Reply-To: <1442419087-24648-2-git-send-email-marc.zyngier@arm.com>
+References: <1442419087-24648-1-git-send-email-marc.zyngier@arm.com>
+ <1442419087-24648-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <169201d0f6bc$d03df3f0$70b9dbd0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 05:40:59PM -0700, Loc Ho wrote:
-> Add EDAC support for the L3 component.
-> 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> ---
->  drivers/edac/xgene_edac.c |  669 ++++++++++++++++++++++++++++++++-------------
->  1 files changed, 474 insertions(+), 195 deletions(-)
+ Hello!
 
-...
+> Until b26e5fdac43c ("arm/arm64: KVM: introduce per-VM ops"),
+> kvm_vgic_map_resources() used to include a check on irqchip_in_kernel(),
+> and vgic_v2_map_resources() still has it.
 
-> @@ -878,25 +869,16 @@ static const struct file_operations xgene_edac_pmd_debug_inject_fops[] = {
->  	{ }
->  };
-> 
-> -static void xgene_edac_pmd_create_debugfs_nodes(
-> -	struct edac_device_ctl_info *edac_dev)
-> +static void
-> +xgene_edac_pmd_create_debugfs_nodes(struct edac_device_ctl_info *edac_dev)
->  {
->  	struct xgene_edac_pmd_ctx *ctx = edac_dev->pvt_info;
->  	struct dentry *dbgfs_dir;
-> -	char name[30];
-> +	char name[10];
+ I'm back from vacation and very glad to see myself being useful :)
+ What's with the rest of that patch set? Does it need rebase or what ?
+ By the way, after this is applied, we can drop useless check inside vgic_v2_map_resources(). 
 
-So somehow we don't seem to understand each other. This char name[10] on
-the stack thing has a bunch of problems:
-
-1. It is on the stack so it contains random garbage.
-
-> 
-> -	if (!IS_ENABLED(CONFIG_EDAC_DEBUG))
-> +	if (!IS_ENABLED(CONFIG_EDAC_DEBUG) || !ctx->edac->dfs)
->  		return;
-> 
-> -	/*
-> -	 * Todo: Switch to common EDAC debug file system for edac device
-> -	 *       when available.
-> -	 */
-> -	if (!ctx->edac->dfs) {
-> -		ctx->edac->dfs = edac_debugfs_create_dir(edac_dev->dev->kobj.name);
-> -		if (!ctx->edac->dfs)
-> -			return;
-> -	}
->  	sprintf(name, "PMD%d", ctx->pmd);
-
-2. You're sprintf-ing into it without checking its length. This can
-possibly write past the end if %d is big enough. I know, I know, %d
-is only small numbers but that assurance not good enough. You need
-snprintf() and check the ctx->pmd width for sane numbers only anyway.
-
-And debugfs goes and does strlen() on it which could lead to all kinds
-of funky stuff later.
-
-Please fix that in all its occurrences in this patchset.
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
