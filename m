@@ -1,33 +1,37 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 24 Sep 2015 11:18:54 +0800
-Subject: [PATCH] ARM: OMAP2+: PM: Denote the cpuidle tracepoints as
- _rcuidle()
-In-Reply-To: <20150923180814.GL23801@atomide.com>
-References: <1442554881-706-1-git-send-email-jszhang@marvell.com>
- <7hfv25dnkn.fsf@deeprootsystems.com>	<20150923180814.GL23801@atomide.com>
-Message-ID: <20150924111854.43429ca2@xhacker>
+From: tanxiaojun@huawei.com (Tan Xiaojun)
+Date: Thu, 24 Sep 2015 11:27:47 +0800
+Subject: [PATCH RESEND] CMA: fix CONFIG_CMA_SIZE_MBYTES overflow in 64bit
+Message-ID: <1443065267-97873-1-git-send-email-tanxiaojun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Tony,
+In 64bit system, if you set CONFIG_CMA_SIZE_MBYTES>=2048, it will
+overflow and size_bytes will be a big wrong number.
 
-On Wed, 23 Sep 2015 11:08:15 -0700
-Tony Lindgren <tony@atomide.com> wrote:
+Set CONFIG_CMA_SIZE_MBYTES=2048 and you will get an info below
+during system boot:
 
-> * Kevin Hilman <khilman@kernel.org> [150923 11:03]:
-> > Jisheng Zhang <jszhang@marvell.com> writes:
-> > 
-> > > The cpuidle tracepoints are called within a rcu_idle_exit() section, and
-> > > must be denoted with the _rcuidle() version of the tracepoint.
-> > >
-> > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> >  
-> > Acked-by: Kevin Hilman <khilman@linaro.org>
-> 
-> Hmm is this needed as a fix for the -rc cycle or can this wait
-> for v4.4?
+*********
+cma: Failed to reserve 17592186042368 MiB
+*********
 
-IMHO, this is a fix. But it can wait for v4.4 merge window.
+Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
+---
+ drivers/base/dma-contiguous.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Jisheng
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index 950fff9..426ba27 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -46,7 +46,7 @@ struct cma *dma_contiguous_default_area;
+  * Users, who want to set the size of global CMA area for their system
+  * should use cma= kernel parameter.
+  */
+-static const phys_addr_t size_bytes = CMA_SIZE_MBYTES * SZ_1M;
++static const phys_addr_t size_bytes = (phys_addr_t)CMA_SIZE_MBYTES * SZ_1M;
+ static phys_addr_t size_cmdline = -1;
+ static phys_addr_t base_cmdline;
+ static phys_addr_t limit_cmdline;
+-- 
+1.7.9.5
