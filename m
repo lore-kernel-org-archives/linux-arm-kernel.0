@@ -1,161 +1,51 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 24 Sep 2015 11:52:36 +0200
-Subject: [linux-sunxi] Re: [PATCH] mmc: sunxi: Fix clk-delay settings
-In-Reply-To: <CAPDyKFpOFLgAAH5cVo-v+atfXYz=H7vxLH-BEzCA_i1Cu6wTFg@mail.gmail.com>
-References: <1443038808-10965-1-git-send-email-hdegoede@redhat.com>
- <CAPDyKFpOFLgAAH5cVo-v+atfXYz=H7vxLH-BEzCA_i1Cu6wTFg@mail.gmail.com>
-Message-ID: <5603C7E4.5050806@redhat.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 24 Sep 2015 12:56:47 +0300
+Subject: [PATCH v3 10/24] ARM: davinci: Add set dma_mask to eDMA devices
+In-Reply-To: <20150923172518.GH23801@atomide.com>
+References: <1442915675-7121-1-git-send-email-peter.ujfalusi@ti.com>
+ <1442915675-7121-11-git-send-email-peter.ujfalusi@ti.com>
+ <20150923172518.GH23801@atomide.com>
+Message-ID: <5603C8DF.7000505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 23-09-15 23:50, Ulf Hansson wrote:
-> On 23 September 2015 at 22:06, Hans de Goede <hdegoede@redhat.com> wrote:
->> In recent allwinner kernel sources the mmc clk-delay settings have been
->> slightly tweaked, and for sun9i they are completely different then what
->> we are using.
+On 09/23/2015 08:25 PM, Tony Lindgren wrote:
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [150922 03:01]:
+>> The upcoming change to merge the arch/arm/common/edma.c into
+>> drivers/dma/edma.c will need this change when booting daVinci devices in
+>> no DT mode.
 >>
->> This commit brings us in sync with what allwinner does, fixing problems
->> accessing sdcards on some A33 devices (and likely others).
->>
->> For pre sun9i hardware this makes the following changes:
->> -At 400Khz change the sample delay from 7 to 0 (introduced in A31 sdk)
->> -At 50 Mhz change the sample delay from 5 to 4 (introduced in A23 sdk)
->>
->> This also drops the clk-delay calculation for clocks > 50 MHz, we do
->> not need this as we've: mmc->f_max = 50000000, and the delays in the
->> old code were not correct (at 100 MHz the delay must be a multiple of 60,
->> at 200 MHz a multiple of 120).
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->
-> I assume you want me to take this as a fix?
-
-With that you mean take it into 4.3-rcX ? Yes please.
-
-> If so, can we point to what commit it fixes?
-
-Erm, the clk-sample settings this adjusts have been there more or less
-unchanged since the driver was introduced, and were taken directly from
-the allwinner A10 kernel source / SDK.
-
-This just syncs them with improvements done to the settings in later
-allwinner SDK-s, improvements which I found when I could not get multiple
-cards to work on certain A33 based tablets.
-
-Regards,
-
-Hans
-
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 >> ---
->>   drivers/mmc/host/sunxi-mmc.c | 53 ++++++++++++++++++++++++++++++++------------
->>   1 file changed, 39 insertions(+), 14 deletions(-)
->>
->> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
->> index e6226cd..83de82b 100644
->> --- a/drivers/mmc/host/sunxi-mmc.c
->> +++ b/drivers/mmc/host/sunxi-mmc.c
->> @@ -210,6 +210,16 @@
->>   #define SDXC_IDMAC_DES0_CES    BIT(30) /* card error summary */
->>   #define SDXC_IDMAC_DES0_OWN    BIT(31) /* 1-idma owns it, 0-host owns it */
->>
->> +#define SDXC_CLK_400K          0
->> +#define SDXC_CLK_25M           1
->> +#define SDXC_CLK_50M           2
->> +#define SDXC_CLK_50M_DDR       3
->> +
->> +struct sunxi_mmc_clk_delay {
->> +       u32 output;
->> +       u32 sample;
->> +};
->> +
->>   struct sunxi_idma_des {
->>          u32     config;
->>          u32     buf_size;
->> @@ -229,6 +239,7 @@ struct sunxi_mmc_host {
->>          struct clk      *clk_mmc;
->>          struct clk      *clk_sample;
->>          struct clk      *clk_output;
->> +       const struct sunxi_mmc_clk_delay *clk_delays;
->>
->>          /* irq */
->>          spinlock_t      lock;
->> @@ -654,25 +665,19 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->>
->>          /* determine delays */
->>          if (rate <= 400000) {
->> -               oclk_dly = 180;
->> -               sclk_dly = 42;
->> +               oclk_dly = host->clk_delays[SDXC_CLK_400K].output;
->> +               sclk_dly = host->clk_delays[SDXC_CLK_400K].sample;
->>          } else if (rate <= 25000000) {
->> -               oclk_dly = 180;
->> -               sclk_dly = 75;
->> +               oclk_dly = host->clk_delays[SDXC_CLK_25M].output;
->> +               sclk_dly = host->clk_delays[SDXC_CLK_25M].sample;
->>          } else if (rate <= 50000000) {
->>                  if (ios->timing == MMC_TIMING_UHS_DDR50) {
->> -                       oclk_dly = 60;
->> -                       sclk_dly = 120;
->> +                       oclk_dly = host->clk_delays[SDXC_CLK_50M_DDR].output;
->> +                       sclk_dly = host->clk_delays[SDXC_CLK_50M_DDR].sample;
->>                  } else {
->> -                       oclk_dly = 90;
->> -                       sclk_dly = 150;
->> +                       oclk_dly = host->clk_delays[SDXC_CLK_50M].output;
->> +                       sclk_dly = host->clk_delays[SDXC_CLK_50M].sample;
->>                  }
->> -       } else if (rate <= 100000000) {
->> -               oclk_dly = 6;
->> -               sclk_dly = 24;
->> -       } else if (rate <= 200000000) {
->> -               oclk_dly = 3;
->> -               sclk_dly = 12;
->>          } else {
->>                  return -EINVAL;
->>          }
->> @@ -878,6 +883,7 @@ static int sunxi_mmc_card_busy(struct mmc_host *mmc)
->>   static const struct of_device_id sunxi_mmc_of_match[] = {
->>          { .compatible = "allwinner,sun4i-a10-mmc", },
->>          { .compatible = "allwinner,sun5i-a13-mmc", },
->> +       { .compatible = "allwinner,sun9i-a80-mmc", },
->>          { /* sentinel */ }
->>   };
->>   MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
->> @@ -892,6 +898,20 @@ static struct mmc_host_ops sunxi_mmc_ops = {
->>          .card_busy       = sunxi_mmc_card_busy,
->>   };
->>
->> +static const struct sunxi_mmc_clk_delay sunxi_mmc_clk_delays[] = {
->> +       [SDXC_CLK_400K]         = { .output = 180, .sample = 180 },
->> +       [SDXC_CLK_25M]          = { .output = 180, .sample =  75 },
->> +       [SDXC_CLK_50M]          = { .output =  90, .sample = 120 },
->> +       [SDXC_CLK_50M_DDR]      = { .output =  60, .sample = 120 },
->> +};
->> +
->> +static const struct sunxi_mmc_clk_delay sun9i_mmc_clk_delays[] = {
->> +       [SDXC_CLK_400K]         = { .output = 180, .sample = 180 },
->> +       [SDXC_CLK_25M]          = { .output = 180, .sample =  75 },
->> +       [SDXC_CLK_50M]          = { .output = 150, .sample = 120 },
->> +       [SDXC_CLK_50M_DDR]      = { .output =  90, .sample = 120 },
->> +};
->> +
->>   static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->>                                        struct platform_device *pdev)
->>   {
->> @@ -903,6 +923,11 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->>          else
->>                  host->idma_des_size_bits = 16;
->>
->> +       if (of_device_is_compatible(np, "allwinner,sun9i-a80-mmc"))
->> +               host->clk_delays = sun9i_mmc_clk_delays;
->> +       else
->> +               host->clk_delays = sunxi_mmc_clk_delays;
->> +
->>          ret = mmc_regulator_get_supply(host->mmc);
->>          if (ret) {
->>                  if (ret != -EPROBE_DEFER)
->> --
->> 2.5.0
->>
+>>  arch/arm/Kconfig                      |    1 -
+>>  arch/arm/common/Kconfig               |    3 -
+>>  arch/arm/common/Makefile              |    1 -
+>>  arch/arm/common/edma.c                | 1431 --------------------------------
+>>  arch/arm/mach-davinci/devices-da8xx.c |    2 +
+>>  arch/arm/mach-davinci/dm355.c         |    1 +
+>>  arch/arm/mach-davinci/dm644x.c        |    1 +
+>>  arch/arm/mach-davinci/dm646x.c        |    1 +
+>>  arch/arm/mach-omap2/Kconfig           |    1 -
+>>  drivers/dma/Kconfig                   |    1 -
+>>  drivers/dma/edma.c                    | 1447 +++++++++++++++++++++++++++++++--
+>>  include/linux/platform_data/edma.h    |   74 --
+>>  12 files changed, 1394 insertions(+), 1570 deletions(-)
+>>  delete mode 100644 arch/arm/common/edma.c
+> 
+> Hmm I think I already acked the mach-omap2/Kconfig change,
+> but if not, here you are:
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
+
+Yes, sorry that I have failed to add it.
+But for some reason two patch got squashed here which I don't really
+understand since between v2-v3 I have not touched these commits.
+This patch actually was:
+[PATCH v2 10/23] ARM: davinci: Add set dma_mask to eDMA devices
+[PATCH v2 11/23] ARM/dmaengine: edma: Merge the two drivers under
+drivers/dmaengine
+
+I'm going to send v4 in couple of minutes
+
+-- 
+P?ter
