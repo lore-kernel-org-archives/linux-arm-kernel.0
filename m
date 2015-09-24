@@ -1,32 +1,57 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 25 Sep 2015 00:50:33 +0200
-Subject: [PATCH v3 0/9] Phy, mdiobus, and netdev struct device fixes
-In-Reply-To: <20150924221541.GF21513@n2100.arm.linux.org.uk>
-References: <20150924191754.GC21513@n2100.arm.linux.org.uk>
- <20150924215731.GE20825@lunn.ch>
- <20150924221541.GF21513@n2100.arm.linux.org.uk>
-Message-ID: <20150924225033.GI20825@lunn.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 Sep 2015 16:03:28 -0700
+Subject: [PATCH] gpio: vf610: handle level IRQ's properly
+In-Reply-To: <99db8c092e8b54d485e88887630d51c0@agner.ch>
+References: <1440197802-29720-1-git-send-email-stefan@agner.ch>
+ <CACRpkdYqU_yvZE4WS2jBDOhemPy7dcHeOoj_dG61hCL8ugTMYg@mail.gmail.com>
+ <99db8c092e8b54d485e88887630d51c0@agner.ch>
+Message-ID: <CACRpkdYmaOQ-N4yGXo3_95dTVhF6FC0C9O2w+811=xLTO7gm0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Thanks for testing.  Please could you confirm whether the same behaviour
-> is observed without the patches, just to make absolutely sure that isn't
-> a regression.
+On Wed, Aug 26, 2015 at 10:11 AM, Stefan Agner <stefan@agner.ch> wrote:
+> On 2015-08-26 05:47, Linus Walleij wrote:
+>> On Sat, Aug 22, 2015 at 12:56 AM, Stefan Agner <stefan@agner.ch> wrote:
+>>
+>>> The GPIO IRQ controller is able to generate level triggered
+>>> interrupts, however, these were handled by handle_simple_irq so far
+>>> which did not take care of IRQ masking. This lead to "nobody cared
+>>> (try booting with the "irqpoll" option)" stack traces.
+>>>
+>>> Use the generic interrupt handlers depending on the IRQ type.
+>>>
+>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>
+>> Patch applied.
+>
+> Thx
+>
+>
+>> Hm, this looks like a problem that could exist in a few more
+>> GPIO drivers. Can you look around and see if there is something
+>> immediately suspicious in drivers/gpio?
+>
+> Just looked a bit around. There are some which use handle_simple_irq but
+> also run their handler in threaded/one-shot handler. I guess in that
+> case it is fine to use the simple_irq handler.
+>
+> However, those GPIO drivers look suspicious:
+>
+> gpio-altera.c: Uses handle_simple_irq, supports edge and level
+> gpio-bcm-kona.c: Uses handle_simple_irq, supports only edge
+> gpio-grgpio.c: Uses handle_simple_irq, supports edge and level
+> gpio-intel-mid.c: Uses handle_simple_irq, supports only edge
+> gpio-lynxpoint.c: Uses handle_simple_irq, supports edge and level
+> gpio-ml-ioh.c: Uses handle_simple_irq, supports edge and level
+> gpio-pl061.c: Uses handle_simple_irq, supports edge and level
+> gpio-rcar.c: Uses handle_level_irq, supports edge and level
+> gpio-timberdale.c: Uses handle_simple_irq, supports edge and level
 
-So i tested this now.
+Thanks!
 
-I have two FEC interfaces. One i my main access interface, and the
-second is used by DSA to access switches. With your patches, the
-module Used by count is equal to the number of interfaces which are
-up.
+I'm gonna look at pl061 myself, for the rest I ping the maintainers,
+(To-line) I suspect a lot of them have never really been tested with
+level IRQs because most just use edge IRQs.
 
-Without your patches, the count is always 0.
-
-When i try to remove the fec module, without your patches, but DSA
-still using the interface, i get the same
-
- kernel:unregister_netdevice: waiting for eth1 to become free. Usage count = 1
-
-as with your patch. So this is not a regression.
-
-   Andrew
+Yours,
+Linus Walleij
