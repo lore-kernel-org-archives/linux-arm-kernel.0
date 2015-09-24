@@ -1,32 +1,125 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 24 Sep 2015 19:31:42 +0200
-Subject: [PATCH] ASoC: mediatek: Increase periods_min in capture
-In-Reply-To: <20150924171153.GW30445@sirena.org.uk>
-References: <1442213477-63721-1-git-send-email-koro.chen@mediatek.com>
- <1443002599.22786.2.camel@mtksdaap41>
- <20150923161253.GN30445@sirena.org.uk>
- <1443058789.22786.11.camel@mtksdaap41>
- <20150924171153.GW30445@sirena.org.uk>
-Message-ID: <20150924173142.GC7858@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 24 Sep 2015 18:37:16 +0100
+Subject: [PATCH linux-next v9 0/3] mfd: flexcom: add a driver for Flexcom
+In-Reply-To: <56027F10.1060804@atmel.com>
+References: <cover.1441118159.git.cyrille.pitchen@atmel.com>
+ <20150920041912.GS3039@x1> <56027F10.1060804@atmel.com>
+Message-ID: <20150924173716.GE27197@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 10:11:53AM -0700, Mark Brown wrote:
-> On Thu, Sep 24, 2015 at 09:39:49AM +0800, Koro Chen wrote:
+On Wed, 23 Sep 2015, Nicolas Ferre wrote:
+> Le 20/09/2015 06:19, Lee Jones a ?crit :
+> > Patch set description?
 > 
-> > OK thank you, now I see the patch is already in the tree, but I am sure
-> > I didn't get the mail titled "Applied xxx to the asoc tree", so I didn't
-> > know the patch status. Maybe something was wrong with the mail system?
+> Cyrille actually placed it as the v1 changelog below...
+
+I see it now, but that's not a very intuitive way of representing the
+set description.  Please use the normal format with the description at
+the top.  Normally all I care about is the description and the latest
+changes (although please keep in the previous changelogs, as they can
+also prove useful).
+
+> > Once Rob is satisfied, please re-submit this set with Nicolas' Acks
 > 
-> Possibly your mail system flagged it as spam?
+> I think that Rob was okay with the DT binding: "A few comments, but in
+> general looks fine." and it may not be important to tack Rob for
+> addition of his formal tag...
+> 
+> Or maybe this message can act as a "ping" for Rob...
 
-I didn't receive it either and it doesn't seem to be in the archives.
+I'm not asking for that, although it's never UNwanted.  I'm asking for
+the discussion between the submitter and other interested parties to
+play out, then adapt and re-submit accordingly.  I receive far too
+many submissions to keep track of all of the discussions.
 
-Sascha
-
+> > and I will re-review.
+> 
+> We wait one or two days before Cyrille re-send the series. We are
+> looking forward to using this driver in Linux-next soon.
+> 
+> >> ChangeLog
+> >>
+> >> v9:
+> >> - go back to v5 (use the new "atmel,flexcom-mode" DT property).
+> >> - fix the name of the spi node in the DT example: from spi at f8034400 to
+> >>   spi at 400
+> >> - align the fields of the struct platform_driver atmel_flexcom_driver as
+> >>   suggested by Lee Jones.
+> >>
+> >> v8:
+> >> - fix the name of the spi node in the DT example: from spi at f8034400 to
+> >>   spi at 2,0
+> >> - use the return code of op_property_read_u32_index() instead of -EINVAL
+> >>   to report error.
+> >> - add Acked-by from Nicolas Ferre
+> >>
+> >> v7:
+> >> - read the operating mode from the very first u32 of the reg property from
+> >>   the first available child node (should be unique).
+> >> - update the DT bindings documentation accordingly.
+> >>
+> >> v6:
+> >> - select the operating mode according to the "compatible" DT property of
+> >>   the first available child node (should be unique).
+> >> - remove the "atmel,flexcom-mode" DT property so the need of a header file
+> >>   defining macros for the possible values of this deprecated property.
+> >>
+> >> v5:
+> >> - create a header file containing macros used by DT bindings
+> >> - use numeric constants instead of strings to select the Flexcom mode
+> >> - change the license to "GPL v2"
+> >> - update the DT binding documentation to make it more readable and add
+> >>   references to USART, SPI and I2C DT binding documentations. remove the
+> >>   useless label in the Example section.
+> >> - change the register prefix from FX_ to FLEX_ to match the Flexcom
+> >>   programmer datasheet.
+> >> - rename some variables to make them more understandable.
+> >>
+> >> v4:
+> >> - check clk_prepare_enable() return code in atmel_flexcom_probe()
+> >> - add a commit message to the DT binding patch
+> >>
+> >> v3:
+> >> - remove MODULE_ALIAS()
+> >> - add Acked-by from Boris Brezillon and Alexandre Belloni
+> >>
+> >> v2:
+> >> - enhance the documentation of DT bindings and change the way the "ranges"
+> >>   property is used.
+> >> - replace __raw_readl() and __raw_writel() by readl() and writel().
+> >> - change the module license to "GPL" for v2 or later
+> >> - print the selected flexcom mode after the hardware version
+> >>
+> >> v1:
+> >> This series of patches a support to the Atmel Flexcom, a wrapper which
+> >> integrates an USART, a SPI controller and a TWI controller. Only one
+> >> peripheral can be used at a time. The active function is selected though
+> >> the Flexcom Mode Register.
+> >>
+> >> Cyrille Pitchen (3):
+> >>   mfd: atmel-flexcom: create include file with macros used by DT
+> >>     bindings
+> >>   mfd: devicetree: add bindings for Atmel Flexcom
+> >>   mfd: atmel-flexcom: add a driver for Atmel Flexible Serial
+> >>     Communication Unit
+> >>
+> >>  .../devicetree/bindings/mfd/atmel-flexcom.txt      |  67 +++++++++++++
+> >>  drivers/mfd/Kconfig                                |  11 +++
+> >>  drivers/mfd/Makefile                               |   1 +
+> >>  drivers/mfd/atmel-flexcom.c                        | 104 +++++++++++++++++++++
+> >>  include/dt-bindings/mfd/atmel-flexcom.h            |  16 ++++
+> >>  5 files changed, 199 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+> >>  create mode 100644 drivers/mfd/atmel-flexcom.c
+> >>  create mode 100644 include/dt-bindings/mfd/atmel-flexcom.h
+> >>
+> > 
+> 
+> 
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
