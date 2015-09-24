@@ -1,74 +1,39 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 24 Sep 2015 23:39:00 +0800
-Subject: [PATCH v4 5/5] ARM: dts: mt8127: enable basic SMP bringup for mt8127
-In-Reply-To: <1443109140-5406-1-git-send-email-yingjoe.chen@mediatek.com>
-References: <1443109140-5406-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1443109140-5406-6-git-send-email-yingjoe.chen@mediatek.com>
+Date: Thu, 24 Sep 2015 23:44:58 +0800
+Subject: [PATCH v3 0/5] Add SMP bringup support for mt65xx socs
+In-Reply-To: <1438944618.14580.5.camel@mtksdaap41>
+References: <1436851111-2369-1-git-send-email-yingjoe.chen@mediatek.com>
+ <4831607.pyCH8elj8i@ubix> <20150805223115.GD7557@n2100.arm.linux.org.uk>
+ <1438944618.14580.5.camel@mtksdaap41>
+Message-ID: <1443109498.14481.5.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add arch timer node to enable arch-timer support. MT8127 firmware
-doesn't correctly setup arch-timer frequency and CNTVOFF, add
-properties to workaround this.
+On Fri, 2015-08-07 at 18:50 +0800, Yingjoe Chen wrote:
+> On Wed, 2015-08-05 at 23:31 +0100, Russell King - ARM Linux wrote:
+> > The problem is that this patch series uses memblock_reserve() way after
+> > the memory has been transitioned out of memblock's control, so actually
+> > this has no effect.
+> > 
+> > I've seen a number of patches doing this.  I'm not sure what's soo friggin
+> > hard for people to understand: memblock is about the EARLY stages of
+> > getting the system up and running.  Once the memory has been handed
+> > over to the kernel's memory management, memblock MUST NOT BE USED to
+> > reserve memory.
+> > 
+> > There is one place, and one place only in the ARM kernel where
+> > memblock_reserve() is possible, and that's in the ->reserve machine
+> > callback.  NOWHERE ELSE is permissible.
+> 
+> 
+> It seems we can write memory-reserve node in device tree to do this as
+> well. Do you prefer us to reserve memblock in reserve callback or using
+> device tree?
 
-This also set cpu enable-method to enable SMP.
+After consideration, I decide to reserve this memory in device tree. The
+memory is already used by trustzone, we should reserved them even when
+we don't run SMP. I just sent out a new series, please help to review
+them.
+Thanks
 
-Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
----
- arch/arm/boot/dts/mt8127.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/arch/arm/boot/dts/mt8127.dtsi b/arch/arm/boot/dts/mt8127.dtsi
-index ca3402e..50652fd 100644
---- a/arch/arm/boot/dts/mt8127.dtsi
-+++ b/arch/arm/boot/dts/mt8127.dtsi
-@@ -23,6 +23,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "mediatek,mt81xx-tz-smp";
- 
- 		cpu at 0 {
- 			device_type = "cpu";
-@@ -47,6 +48,17 @@
- 
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		trustzone-bootinfo: trustzone-bootinfo at 80002000 {
-+			compatible = "mediatek,trustzone-bootinfo";
-+			reg = <0 0x80002000 0 0x1000>;
-+		};
-+	};
-+
- 	clocks {
- 		#address-cells = <2>;
- 		#size-cells = <2>;
-@@ -72,6 +84,21 @@
-                 };
- 	};
- 
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
-+					  IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) |
-+					  IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) |
-+					  IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) |
-+					  IRQ_TYPE_LEVEL_LOW)>;
-+		clock-frequency = <13000000>;
-+		arm,cpu-registers-not-fw-configured;
-+	};
-+
- 	soc {
- 		#address-cells = <2>;
- 		#size-cells = <2>;
--- 
-1.9.1
+Joe.C
