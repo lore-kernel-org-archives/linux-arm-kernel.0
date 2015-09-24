@@ -1,149 +1,48 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Thu, 24 Sep 2015 17:32:14 +0800
-Subject: [RFC PATCH v6 2/3] arm64: fix a migrating irq bug when hotplug cpu
-In-Reply-To: <1443087135-17044-1-git-send-email-yangyingliang@huawei.com>
-References: <1443087135-17044-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <1443087135-17044-3-git-send-email-yangyingliang@huawei.com>
+From: huangdaode@hisilicon.com (huangdaode)
+Date: Thu, 24 Sep 2015 17:54:09 +0800
+Subject: [PATCH net-next] net: Fix Hisilicon Network Subsystem Support
+ Compilation
+Message-ID: <1443088449-147241-1-git-send-email-huangdaode@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When cpu is disabled, all irqs will be migratged to another cpu.
-In some cases, a new affinity is different, the old affinity need
-to be updated and if irq_set_affinity's return value is IRQ_SET_MASK_OK_DONE,
-the old affinity can not be updated. Fix it by using irq_do_set_affinity.
+This patch fixes the compilation error with arm allmodconfig, this error
+generated due to unavailability of readq on 32-bit platform which was
+found during net-next daily compilation
 
-And migrating interrupts is a core code matter, so use the generic
-function irq_migrate_all_off_this_cpu() to migrate interrupts in
-kernel/irq/migration.c.
-
-Cc: Jiang Liu <jiang.liu@linux.intel.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+Signed-off-by: huangdaode <huangdaode@hisilicon.com>
+Singed-off-by: yankejian <yankejian@huawei.com>
 ---
- arch/arm64/Kconfig           |  1 +
- arch/arm64/include/asm/irq.h |  1 -
- arch/arm64/kernel/irq.c      | 62 --------------------------------------------
- arch/arm64/kernel/smp.c      |  2 +-
- 4 files changed, 2 insertions(+), 64 deletions(-)
+ drivers/net/ethernet/hisilicon/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 07d1811..279d71c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -427,6 +427,7 @@ config NR_CPUS
+diff --git a/drivers/net/ethernet/hisilicon/Kconfig b/drivers/net/ethernet/hisilicon/Kconfig
+index 165b5a8..04d5f8f 100644
+--- a/drivers/net/ethernet/hisilicon/Kconfig
++++ b/drivers/net/ethernet/hisilicon/Kconfig
+@@ -41,6 +41,7 @@ config HNS_MDIO
  
- config HOTPLUG_CPU
- 	bool "Support for hot-pluggable CPUs"
-+	select GENERIC_IRQ_MIGRATION
- 	help
- 	  Say Y here to experiment with turning CPUs off and on.  CPUs
- 	  can be controlled through /sys/devices/system/cpu.
-diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-index bbb251b..0916929 100644
---- a/arch/arm64/include/asm/irq.h
-+++ b/arch/arm64/include/asm/irq.h
-@@ -7,7 +7,6 @@
- 
- struct pt_regs;
- 
--extern void migrate_irqs(void);
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- 
- static inline void acpi_irq_init(void)
-diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-index 11dc3fd..9f17ec0 100644
---- a/arch/arm64/kernel/irq.c
-+++ b/arch/arm64/kernel/irq.c
-@@ -27,7 +27,6 @@
- #include <linux/init.h>
- #include <linux/irqchip.h>
- #include <linux/seq_file.h>
--#include <linux/ratelimit.h>
- 
- unsigned long irq_err_count;
- 
-@@ -54,64 +53,3 @@ void __init init_IRQ(void)
- 	if (!handle_arch_irq)
- 		panic("No interrupt controller found.");
- }
--
--#ifdef CONFIG_HOTPLUG_CPU
--static bool migrate_one_irq(struct irq_desc *desc)
--{
--	struct irq_data *d = irq_desc_get_irq_data(desc);
--	const struct cpumask *affinity = irq_data_get_affinity_mask(d);
--	struct irq_chip *c;
--	bool ret = false;
--
--	/*
--	 * If this is a per-CPU interrupt, or the affinity does not
--	 * include this CPU, then we have nothing to do.
--	 */
--	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
--		return false;
--
--	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
--		affinity = cpu_online_mask;
--		ret = true;
--	}
--
--	c = irq_data_get_irq_chip(d);
--	if (!c->irq_set_affinity)
--		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
--	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
--		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
--
--	return ret;
--}
--
--/*
-- * The current CPU has been marked offline.  Migrate IRQs off this CPU.
-- * If the affinity settings do not allow other CPUs, force them onto any
-- * available CPU.
-- *
-- * Note: we must iterate over all IRQs, whether they have an attached
-- * action structure or not, as we need to get chained interrupts too.
-- */
--void migrate_irqs(void)
--{
--	unsigned int i;
--	struct irq_desc *desc;
--	unsigned long flags;
--
--	local_irq_save(flags);
--
--	for_each_irq_desc(i, desc) {
--		bool affinity_broken;
--
--		raw_spin_lock(&desc->lock);
--		affinity_broken = migrate_one_irq(desc);
--		raw_spin_unlock(&desc->lock);
--
--		if (affinity_broken)
--			pr_warn_ratelimited("IRQ%u no longer affine to CPU%u\n",
--					    i, smp_processor_id());
--	}
--
--	local_irq_restore(flags);
--}
--#endif /* CONFIG_HOTPLUG_CPU */
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index dbdaacd..ee5cafa 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -232,7 +232,7 @@ int __cpu_disable(void)
- 	/*
- 	 * OK - migrate IRQs away from this CPU
- 	 */
--	migrate_irqs();
-+	irq_migrate_all_off_this_cpu();
- 
- 	/*
- 	 * Remove this CPU from the vm mask set of all processes.
+ config HNS
+ 	tristate "Hisilicon Network Subsystem Support (Framework)"
++	depends on ARM64
+ 	---help---
+ 	  This selects the framework support for Hisilicon Network Subsystem. It
+ 	  is needed by any driver which provides HNS acceleration engine or make
+@@ -50,6 +51,7 @@ config HNS_DSAF
+ 	tristate "Hisilicon HNS DSAF device Support"
+ 	select HNS
+ 	select HNS_MDIO
++	depends on ARM64
+ 	---help---
+ 	  This selects the DSAF (Distributed System Area Frabric) network
+ 	  acceleration engine support. The engine is used in Hisilicon hip05,
+@@ -59,6 +61,7 @@ config HNS_ENET
+ 	tristate "Hisilicon HNS Ethernet Device Support"
+ 	select PHYLIB
+ 	select HNS
++	depends on ARM64
+ 	---help---
+ 	  This selects the general ethernet driver for HNS.  This module make
+ 	  use of any HNS AE driver, such as HNS_DSAF
 -- 
-2.5.0
+1.9.1
