@@ -1,37 +1,92 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Sep 2015 10:46:59 +0200
-Subject: [PATCH] net: sun4i-emac: Properly free resources on probe
- failure and remove
-In-Reply-To: <1443001156-20333-1-git-send-email-hdegoede@redhat.com>
-References: <1443001156-20333-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150924084659.GP4684@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Sep 2015 10:00:48 +0100
+Subject: All OMAP platforms: MMC is broken
+Message-ID: <20150924090048.GA21626@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 11:39:16AM +0200, Hans de Goede wrote:
-> Fix sun4i-emac not releasing the following resources:
-> -iomapped memory not released on probe-failure nor on remove
-> -clock not getting disabled on probe-failure nor on remove
-> -sram not being released on remove
-> 
-> And while at it also add error checking to the clk_prepare_enable call
-> done on probe.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Nightly testing has revealed that both the OMAP3430 LDP and the OMAP4430
+SDP fail to boot due to lack of working MMC.  Both platforms fail to
+find their rootfs, which is on a SD card.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+The breakage occurred somewhere between trees of September 9th (commit
+4e4adb2f4628) and September 12th (commit b0a1ea51bda4), so during the
+merge window.
 
-Thanks!
-Maxime
+Diffing those two trees show no changes to OMAP platform code, but
+substantial changes in the MMC code:
+
+ drivers/mmc/card/block.c                           |    17 +
+ drivers/mmc/core/core.c                            |    46 +-
+ drivers/mmc/core/host.c                            |    42 +-
+ drivers/mmc/host/Kconfig                           |     8 +
+ drivers/mmc/host/Makefile                          |     1 +
+ drivers/mmc/host/android-goldfish.c                |     2 +-
+ drivers/mmc/host/atmel-mci.c                       |     1 -
+ drivers/mmc/host/dw_mmc-rockchip.c                 |     3 +
+ drivers/mmc/host/dw_mmc.c                          |   284 +-
+ drivers/mmc/host/omap.c                            |     9 +-
+ drivers/mmc/host/omap_hsmmc.c                      |   347 +-
+ drivers/mmc/host/pxamci.c                          |   200 +-
+ drivers/mmc/host/sdhci-esdhc-imx.c                 |   114 +-
+ drivers/mmc/host/sdhci-esdhc.h                     |     3 +-
+ drivers/mmc/host/sdhci-msm.c                       |     5 +
+ drivers/mmc/host/sdhci-of-arasan.c                 |     4 +
+ drivers/mmc/host/sdhci-of-at91.c                   |   191 +
+ drivers/mmc/host/sdhci-of-esdhc.c                  |     6 +
+ drivers/mmc/host/sdhci-pci.c                       |     1 +
+ drivers/mmc/host/sdhci-sirf.c                      |     4 +-
+ drivers/mmc/host/sdhci.c                           |   123 +-
+ drivers/mmc/host/sdhci.h                           |    10 +-
+ drivers/mmc/host/sh_mmcif.c                        |     2 +
+ drivers/mmc/host/sunxi-mmc.c                       |     2 +-
+ drivers/mmc/host/tmio_mmc_pio.c                    |     6 +-
+ drivers/mmc/host/usdhi6rol0.c                      |    15 +-
+
+So this probably results from the MMC update during the merge window:
+
+85579ad7f1df Merge tag 'mmc-v4.3' of git://git.linaro.org/people/ulf.hansson/mmc
+
+The OMAP4430 reports this during it's boot log:
+
+mmc0: new high speed MMC card at address 0001
+mmcblk0: mmc0:0001 SEM08G 7.39 GiB
+mmcblk0boot0: mmc0:0001 SEM08G partition 1 1.00 MiB
+mmcblk0boot1: mmc0:0001 SEM08G partition 2 1.00 MiB
+...
+VFS: Cannot open root device "mmcblk0p2" or unknown-block(179,2): error -6
+b300         7757824 mmcblk0  driver: mmcblk
+b310            1024 mmcblk0boot1  (driver?)
+b308            1024 mmcblk0boot0  (driver?)
+Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(179,2)
+
+whereas previous kernels reported:
+
+mmc0: host does not support reading read-only switch, assuming write-enable
+mmc0: new high speed SD card at address 0002
+mmcblk0: mmc0:0002 00000 971 MiB
+ mmcblk0: p1 p2
+Waiting 2 sec before mounting root device...
+mmc1: new high speed MMC card at address 0001
+mmcblk1: mmc1:0001 SEM08G 7.39 GiB
+mmcblk1boot0: mmc1:0001 SEM08G partition 1 1.00 MiB
+mmcblk1boot1: mmc1:0001 SEM08G partition 2 1.00 MiB
+...
+VFS: Mounted root (ext3 filesystem) on device 179:2.
+
+OMAP3430 only reports:
+
+VFS: Cannot open root device "mmcblk0p2" or unknown-block(0,0): error -6
+
+where previous kernels reported:
+
+mmc0: host does not support reading read-only switch, assuming write-enable
+mmc0: new high speed SD card at address 0002
+mmcblk0: mmc0:0002 00000 971 MiB
+ mmcblk0: p1 p2
+...
+VFS: Mounted root (ext2 filesystem) on device 179:2.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150924/33153924/attachment-0001.sig>
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
