@@ -1,28 +1,33 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 24 Sep 2015 10:52:24 -0700 (PDT)
-Subject: [PATCH net-next] net: Fix Hisilicon Network Subsystem Support
- Compilation
-In-Reply-To: <1443088449-147241-1-git-send-email-huangdaode@hisilicon.com>
-References: <1443088449-147241-1-git-send-email-huangdaode@hisilicon.com>
-Message-ID: <20150924.105224.795981964968343044.davem@davemloft.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 Sep 2015 10:52:55 -0700
+Subject: [PATCH v2 2/3] gpiolib: gpiod_hog remove separate name argument
+In-Reply-To: <20150924063931.GS32203@pengutronix.de>
+References: <1440920686-6892-1-git-send-email-mpa@pengutronix.de>
+ <1440920686-6892-3-git-send-email-mpa@pengutronix.de>
+ <CACRpkdZrXEXtkPpgtrcjqP5jD+M0UOj5Wj69o4zYJQKihsY6Xg@mail.gmail.com>
+ <20150924063931.GS32203@pengutronix.de>
+Message-ID: <CACRpkdb4EoA_oBSF46eYAZ-fbTEqaf=Q+wsGyKyrQZ9KB2B7cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: huangdaode <huangdaode@hisilicon.com>
-Date: Thu, 24 Sep 2015 17:54:09 +0800
+On Wed, Sep 23, 2015 at 11:39 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
 
-> This patch fixes the compilation error with arm allmodconfig, this error
-> generated due to unavailability of readq on 32-bit platform which was
-> found during net-next daily compilation
-> 
-> Signed-off-by: huangdaode <huangdaode@hisilicon.com>
-> Singed-off-by: yankejian <yankejian@huawei.com>
+>> - Fixed that but noted that it just alters the call to gpiod_hog()
+>>   in of_gpiochip_scan_hogs(), there is a local const char *name that
+>>   should be removed too.
+>
+> The local const char *name is temporarily used in
+> of_gpiochip_scan_hogs() to get the name from DT and assign it to the
+> descriptor:
+>         desc = of_parse_own_gpio(np, &name, &lflags, &dflags);
+>         ...
+>         else
+>                 desc->name = name;
 
-This is not necessaily the right fix, sorry.
+OK the problem is that this series is dependent on the
+named GPIOs series. I want this series to stand alone,
+because this series is not as controversial, and I want to
+merge these initvals first.
 
-I'd rather this driver be available to compile on as many
-configurations as possible, to increase build coverage.
-
-There is a standard way to make readq available on 32-bit platforms
-and I want you to do research into how that works and how you can thus
-make your driver build even on 32-bit targets.
+Yours,
+Linus Walleij
