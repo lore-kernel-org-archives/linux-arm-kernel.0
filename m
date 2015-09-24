@@ -1,186 +1,89 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 24 Sep 2015 12:50:10 +0200
-Subject: [PATCH 0/3] ALSA: hda - Avoid potential deadlock
-In-Reply-To: <s5hio705epm.wl-tiwai@suse.de>
-References: <1442484006-9614-1-git-send-email-thierry.reding@gmail.com>
- <s5hfv258q33.wl-tiwai@suse.de> <s5hio705epm.wl-tiwai@suse.de>
-Message-ID: <20150924105010.GA6906@ulmo.nvidia.com>
+From: vishnupatekar0510@gmail.com (Vishnu Patekar)
+Date: Thu, 24 Sep 2015 18:52:37 +0800
+Subject: [PATCH 1/4] ARM: sunxi: Introduce Allwinner for A83T support
+In-Reply-To: <CAGb2v665FhnSoWYGJn+Tf79F7pZitYBrEOmAts4nVoUWb-uBqg@mail.gmail.com>
+References: <1442936337-3104-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1442936337-3104-2-git-send-email-vishnupatekar0510@gmail.com>
+ <CAGb2v665FhnSoWYGJn+Tf79F7pZitYBrEOmAts4nVoUWb-uBqg@mail.gmail.com>
+Message-ID: <CAEzqOZv_L3A7kpKqNQnHjL6Wb1Lzw6dSU4Qy52yJVf2h1QmcLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 11:49:57AM +0200, Takashi Iwai wrote:
-> On Wed, 23 Sep 2015 11:03:44 +0200,
-> Takashi Iwai wrote:
-> > 
-> > On Thu, 17 Sep 2015 12:00:03 +0200,
-> > Thierry Reding wrote:
-> > > 
-> > > From: Thierry Reding <treding@nvidia.com>
-> > > 
-> > > The Tegra HDA controller driver committed in v3.16 causes deadlocks when
-> > > loaded as a module. The reason is that the driver core will lock the HDA
-> > > controller device upon calling its probe callback and the probe callback
-> > > then goes on to create child devices for detected codecs and loads their
-> > > modules via a request_module() call. This is problematic because the new
-> > > driver will immediately be bound to the device, which will in turn cause
-> > > the parent of the codec device (the HDA controller device) to be locked
-> > > again, causing a deadlock.
-> > > 
-> > > This problem seems to have been present since the modularization of the
-> > > HD-audio driver in commit 1289e9e8b42f ("ALSA: hda - Modularize HD-audio
-> > > driver"). On Intel platforms this has been worked around by splitting up
-> > > the probe sequence into a synchronous and an asynchronous part where the
-> > > request_module() calls are asynchronous and hence avoid the deadlock.
-> > > 
-> > > An alternative proposal is provided in this series of patches. Rather
-> > > than relying on explicit request_module() calls to load kernel modules
-> > > for HDA codec drivers, this implements a uevent callback for the HDA bus
-> > > to advertises the MODALIAS information to the userspace helper.
-> > > 
-> > > Effectively this results in the same modules being loaded, but it uses
-> > > the more canonical infrastructure to perform this. Deferring the module
-> > > loading to userspace removes the need for the explicit request_module()
-> > > calls and works around the recursive locking issue because both drivers
-> > > will be bound from separate contexts.
-> > 
-> > While this looks definitely like the right direction to go, I'm afraid
-> > that this will give a few major regressions.  First off, there is no
-> > way to bind with the generic codec driver.  There are two generic
-> > drivers, one for HDMI/DP and one for normal audio.  Binding to them is
-> > judged by parsing the codec widgets whether they are digital-only.
-> > So, either user-space or kernel needs to parse the codec widgets
-> > beforehand.  If we rip off all binding magic as in your patch, this
-> > has to be done by udev.  With the sysfs stuff, now it should be
-> > possible, but this would break the existing system.
-> > 
-> > Another possible regression is the matching with the vendor-only
-> > alias.  Maybe the current wildcard works, but we need to double
-> > check.
-> > 
-> > So, unless these are addressed, I think we need another quick band-aid
-> > over snd-hda-tegra just doing the async probe like snd-hda-intel.
-> 
-> Does the patch below work?  I only did a quick compile test.
-> 
-> 
-> thanks,
-> 
-> Takashi
-> 
-> -- 8< --
-> From: Takashi Iwai <tiwai@suse.de>
-> Subject: [PATCH] ALSA: hda/tegra - async probe for avoiding module loading
->  deadlock
-> 
-> The Tegra HD-audio controller driver causes deadlocks when loaded as a
-> module since the driver invokes request_module() at binding with the
-> codec driver.  This patch works around it by deferring the probe in a
-> work like Intel HD-audio controller driver does.  Although hovering
-> the codec probe stuff into udev would be a better solution, it may
-> cause other regressions, so let's try this band-aid fix until the more
-> proper solution gets landed.
-> 
-> Reported-by: Thierry Reding <treding@nvidia.com>
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Takashi Iwai <tiwai@suse.de>
-> ---
->  sound/pci/hda/hda_tegra.c | 30 +++++++++++++++++++++++++-----
->  1 file changed, 25 insertions(+), 5 deletions(-)
+Hello,
 
-Yes, that fixes the hang that I was seeing:
-
-Tested-by: Thierry Reding <treding@nvidia.com>
-
-As a matter of fact this resembles a patch that Jon had worked on to
-solve this. I'm slightly concerned that merging a band-aid like this
-is going to remove any incentive to fix this properly, though.
-
-Thierry
-
-> diff --git a/sound/pci/hda/hda_tegra.c b/sound/pci/hda/hda_tegra.c
-> index 477742cb70a2..58c0aad37284 100644
-> --- a/sound/pci/hda/hda_tegra.c
-> +++ b/sound/pci/hda/hda_tegra.c
-> @@ -73,6 +73,7 @@ struct hda_tegra {
->  	struct clk *hda2codec_2x_clk;
->  	struct clk *hda2hdmi_clk;
->  	void __iomem *regs;
-> +	struct work_struct probe_work;
->  };
->  
->  #ifdef CONFIG_PM
-> @@ -294,7 +295,9 @@ static int hda_tegra_dev_disconnect(struct snd_device *device)
->  static int hda_tegra_dev_free(struct snd_device *device)
->  {
->  	struct azx *chip = device->device_data;
-> +	struct hda_tegra *hda = container_of(chip, struct hda_tegra, chip);
->  
-> +	cancel_work_sync(&hda->probe_work);
->  	if (azx_bus(chip)->chip_init) {
->  		azx_stop_all_streams(chip);
->  		azx_stop_chip(chip);
-> @@ -426,6 +429,9 @@ static int hda_tegra_first_init(struct azx *chip, struct platform_device *pdev)
->  /*
->   * constructor
->   */
-> +
-> +static void hda_tegra_probe_work(struct work_struct *work);
-> +
->  static int hda_tegra_create(struct snd_card *card,
->  			    unsigned int driver_caps,
->  			    struct hda_tegra *hda)
-> @@ -452,6 +458,8 @@ static int hda_tegra_create(struct snd_card *card,
->  	chip->single_cmd = false;
->  	chip->snoop = true;
->  
-> +	INIT_WORK(&hda->probe_work, hda_tegra_probe_work);
-> +
->  	err = azx_bus_init(chip, NULL, &hda_tegra_io_ops);
->  	if (err < 0)
->  		return err;
-> @@ -499,6 +507,21 @@ static int hda_tegra_probe(struct platform_device *pdev)
->  	card->private_data = chip;
->  
->  	dev_set_drvdata(&pdev->dev, card);
-> +	schedule_work(&hda->probe_work);
-> +
-> +	return 0;
-> +
-> +out_free:
-> +	snd_card_free(card);
-> +	return err;
-> +}
-> +
-> +static void hda_tegra_probe_work(struct work_struct *work)
-> +{
-> +	struct hda_tegra *hda = container_of(work, struct hda_tegra, probe_work);
-> +	struct azx *chip = &hda->chip;
-> +	struct platform_device *pdev = to_platform_device(hda->dev);
-> +	int err;
->  
->  	err = hda_tegra_first_init(chip, pdev);
->  	if (err < 0)
-> @@ -520,11 +543,8 @@ static int hda_tegra_probe(struct platform_device *pdev)
->  	chip->running = 1;
->  	snd_hda_set_power_save(&chip->bus, power_save * 1000);
->  
-> -	return 0;
-> -
-> -out_free:
-> -	snd_card_free(card);
-> -	return err;
-> + out_free:
-> +	return; /* no error return from async probe */
->  }
->  
->  static int hda_tegra_remove(struct platform_device *pdev)
-> -- 
-> 2.5.1
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150924/9c349733/attachment-0001.sig>
+On Tue, Sep 22, 2015 at 11:47 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Tue, Sep 22, 2015 at 11:38 PM, Vishnu Patekar
+> <vishnupatekar0510@gmail.com> wrote:
+>> Allwinner A83T is octa-core cortex-a7 based SoC.
+>> It's clock control unit and prcm, pinmux are different from previous sun8i
+>> series.
+>> Its processor cores are arragned in two clusters 4 cores each,
+>> similar to A80.
+>>
+>> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+>>  arch/arm/mach-sunxi/sunxi.c                     | 1 +
+>>  drivers/clk/sunxi/clk-sunxi.c                   | 6 ++++++
+>>  3 files changed, 8 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+>> index 67da205..cf5ed27 100644
+>> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+>> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+>> @@ -11,4 +11,5 @@ using one of the following compatible strings:
+>>    allwinner,sun8i-a23
+>>    allwinner,sun8i-a33
+>>    allwinner,sun8i-h3
+>> +  allwinner,sun8i-a83t
+>
+> Alphabetic order please.
+Okie, I'll correct.
+>
+>>    allwinner,sun9i-a80
+>> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+>> index 65bab28..b04aefa 100644
+>> --- a/arch/arm/mach-sunxi/sunxi.c
+>> +++ b/arch/arm/mach-sunxi/sunxi.c
+>> @@ -69,6 +69,7 @@ static const char * const sun8i_board_dt_compat[] = {
+>>         "allwinner,sun8i-a23",
+>>         "allwinner,sun8i-a33",
+>>         "allwinner,sun8i-h3",
+>> +       "allwinner,sun8i-a83t",
+>
+> Same here.
+>
+>>         NULL,
+>>  };
+>>
+>> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+>> index 413070d..f216d5d 100644
+>> --- a/drivers/clk/sunxi/clk-sunxi.c
+>> +++ b/drivers/clk/sunxi/clk-sunxi.c
+>> @@ -1212,6 +1212,12 @@ CLK_OF_DECLARE(sun6i_a31s_clk_init, "allwinner,sun6i-a31s", sun6i_init_clocks);
+>>  CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
+>>  CLK_OF_DECLARE(sun8i_a33_clk_init, "allwinner,sun8i-a33", sun6i_init_clocks);
+>>
+>> +static void __init sun8ia83t_init_clocks(struct device_node *node)
+>> +{
+>> +       sunxi_init_clocks(NULL, 0);
+>> +}
+>> +CLK_OF_DECLARE(sun9i_a83t_clk_init, "allwinner,sun8i-a83t", sun8ia83t_init_clocks);
+>
+> sun8i? Missing underscore too.
+Sorry, yes, sun8i. will add _.
+>
+> I think you should add this once you actually have clock support.
+> Otherwise this call basically does nothing.
+>
+>> +
+>>  static void __init sun9i_init_clocks(struct device_node *node)
+>>  {
+>>         sunxi_init_clocks(NULL, 0);
+>
+> On the side, I will send patches to remove sun9i_init_clocks.
+>
+>
+> Regards
+> ChenYu
+Thanks for review.
