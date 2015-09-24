@@ -1,33 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 Sep 2015 14:50:16 -0700
-Subject: [PATCH v3 3/9] gpiolib: Use GPIO name from names array for gpio
- descriptor
-In-Reply-To: <20150923220237.GC19608@localhost>
-References: <1439561466-14350-1-git-send-email-mpa@pengutronix.de>
- <1439561466-14350-4-git-send-email-mpa@pengutronix.de>
- <20150923220237.GC19608@localhost>
-Message-ID: <CACRpkdbUevNvOQta=VDnQh7z8Z6hK4CbskixN+VtRQpwEYboCg@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 24 Sep 2015 23:57:31 +0200
+Subject: [PATCH v3 0/9] Phy, mdiobus, and netdev struct device fixes
+In-Reply-To: <20150924191754.GC21513@n2100.arm.linux.org.uk>
+References: <20150924191754.GC21513@n2100.arm.linux.org.uk>
+Message-ID: <20150924215731.GE20825@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 3:02 PM, Johan Hovold <johan@kernel.org> wrote:
+...
 
-> Before figuring out what a sane userspace interface should look like we
-> should not make ABI changes that we need to support indefinitely. The
-> legacy sysfs interface should instead be frozen.
->
-> Exposing a name attribute for a not-necessarily globally unique name
-> could perhaps be ok, but by enforcing uniqueness at this point we will
-> then need to come up with another mechanism for naming gpios on dynamic
-> buses (while maintaining this one indefinitely in parallel).
->
-> Linus, please consider dropping these changes for now.
+> While looking at the DSA code, I noticed we have a
+> of_find_net_device_by_node(), and it looks like users of that are
+> similarly buggy - it looks like net/dsa/dsa.c is the only user.  Fix
+> that too.
 
-I rounded off the series after moving the name attribute to the descriptor
-before doing any ABI changes, as it seems we need to discuss this.
+...
+ 
+> The mdiobus code also suffered from the same kind of leak, but thankfully
+> this only happened in one place - the mdio-mux code.
 
-This patch concludes that part of the series, sent a separate patch
-concluding this first half of the series.
+Hi Russell
 
-Yours,
-Linus Walleij
+I tested both of these with my board. It is a Freescale Vybrid, using
+the FEC ethernet driver, and i have three switches attached, using
+mdio-mux to give three mdio busses.
+
+No obvious regressions, my board boots, the switches are all present
+and correct. I built the FEC driver as a module, and it won't unload:
+
+ kernel:unregister_netdevice: waiting for eth1 to become free. Usage count = 1
+unregister_netdevice: waiting for eth1 to become free. Usage count = 1
+
+i assume because DSA holds a reference. I've not tried a fully module
+build, DSA has issues with that.
+
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+
+Thanks
+	Andrew
