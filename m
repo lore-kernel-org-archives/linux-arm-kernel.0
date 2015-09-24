@@ -1,36 +1,68 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 25 Sep 2015 00:26:54 +0200
-Subject: [PATCH v3 0/9] Phy, mdiobus, and netdev struct device fixes
-In-Reply-To: <20150924.151554.619662567057050978.davem@davemloft.net>
-References: <20150924191754.GC21513@n2100.arm.linux.org.uk>
- <20150924215731.GE20825@lunn.ch>
- <20150924.151554.619662567057050978.davem@davemloft.net>
-Message-ID: <20150924222654.GG20825@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Sep 2015 23:43:05 +0100
+Subject: [PATCH 2/6] pci: mvebu: generate proper configuration access
+ cycles
+In-Reply-To: <20150924222322.GF20825@lunn.ch>
+References: <20150923171706.GL21084@n2100.arm.linux.org.uk>
+ <E1Zenfg-0004d5-Dg@rmk-PC.arm.linux.org.uk>
+ <20150924222322.GF20825@lunn.ch>
+Message-ID: <20150924224305.GG21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 03:15:54PM -0700, David Miller wrote:
-> From: Andrew Lunn <andrew@lunn.ch>
-> Date: Thu, 24 Sep 2015 23:57:31 +0200
+On Fri, Sep 25, 2015 at 12:23:22AM +0200, Andrew Lunn wrote:
+> > Testing with an ASM1062 PCIe to SATA mini-PCIe card on Armada 388.
+> > PCIe capability at 0x80, DevCtl at 0x88, DevSta at 0x8a.
+
+>From this, the PCIe DevCtl register is at an offset of 8 bytes from the
+start of the PCIe capability.
+
+>         Capabilities: [e0] Express (v1) Legacy Endpoint, MSI 00
+
+which, here, starts at 0xe0.  So...
+
+>                 DevCap: MaxPayload 128 bytes, PhantFunc 0, Latency L0s unlimited, L1 unlimited
+>                         ExtTag- AttnBtn- AttnInd- PwrInd- RBE+ FLReset-
+>                 DevCtl: Report errors: Correctable- Non-Fatal- Fatal- Unsupported-
+>                         RlxdOrd- ExtTag- PhantFunc- AuxPwr- NoSnoop-
+>                         MaxPayload 128 bytes, MaxReadReq 512 bytes
+
+This register is at 0xe8, and:
+
+>                 DevSta: CorrErr- UncorrErr- FatalErr- UnsuppReq- AuxPwr+ TransPend-
+
+is at 0xea.
+
+> root at dir665:~# setpci -s 1:0.0 0x88.l
+> 00000000
 > 
-> > I built the FEC driver as a module, and it won't unload:
-> > 
-> >  kernel:unregister_netdevice: waiting for eth1 to become free. Usage count = 1
-> > unregister_netdevice: waiting for eth1 to become free. Usage count = 1
-> > 
-> > i assume because DSA holds a reference. I've not tried a fully module
-> > build, DSA has issues with that.
-> > 
-> > Tested-by: Andrew Lunn <andrew@lunn.ch>
+> Nothing there, so your test does not work directly.
+
+As is expected, because PCI configuration addresses between 0x40..0xff
+are freely assignable by the vendor to place whatever they want in that
+space - and the capabilities form a linked list.
+
+> I tried
 > 
-> So, is this a regression?
+> root at dir665:~# setpci -s 1:0.0 0xe8.l
+> 00102000
+> root at dir665:~# setpci -s 1:0.0 0xe8.w=0x2000
+> root at dir665:~# setpci -s 1:0.0 0xe8.l
+> 00102000
+> 
+> but that is not producing the FAIL you had.
 
-Sorry, worded that badly. Since DSA is still active, it should not be
-possible to unload the FEC driver. DSA should have a reference to it,
-and mdio-mux also should have a reference to the mdio bus of the FEC
-driver.
+The only bit you have set in your DevSta register is:
 
-As Russell requested, i will re-test without his patches, just to make
-sure.
+#define  PCI_EXP_DEVSTA_AUXPD   0x0010  /* AUX Power Detected */
 
-	Andrew
+which is not a RW1C bit.
+
+I don't know why I get the CorrErr bit set here, but it being set is
+very useful to test for correct behaviour.  I don't yet know how to
+cause PCIe errors, I just know that I end up with that bit set each
+time I reboot the board I have here.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
