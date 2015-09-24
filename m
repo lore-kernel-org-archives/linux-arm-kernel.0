@@ -1,30 +1,49 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 24 Sep 2015 05:17:38 -0700
-Subject: [PATCH v2] clk:mxs: Fix bug on frequency divider
-In-Reply-To: <55FBBB6D.4010805@i2se.com>
-References: <55BBB1AC.6070102@codeaurora.org>
- <1441010707-17178-1-git-send-email-victorien.vedrine@ophrys.net>
- <55FBBB6D.4010805@i2se.com>
-Message-ID: <20150924121738.GP3529@tiger>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Thu, 24 Sep 2015 12:19:33 +0000
+Subject: [PATCH v6 1/2] dmaengine: Add Xilinx Central DMA DT Binding
+ Documentation
+In-Reply-To: <1986807.ieBkZICvCQ@wuerfel>
+References: <1441629188-17601-1-git-send-email-appanad@xilinx.com>
+ <1986807.ieBkZICvCQ@wuerfel>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A4E7DD4@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 09:21:17AM +0200, Stefan Wahren wrote:
-> +Shawn's new address
-> +linux-arm-kernel
+Hi Arnd,
+	
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Monday, September 07, 2015 6:26 PM
+> To: Appana Durga Kedareswara Rao
+> Cc: robh+dt at kernel.org; vinod.koul at intel.com; Anirudha Sarangi;
+> pawel.moll at arm.com; mark.rutland at arm.com; ijc+devicetree at hellion.org.uk;
+> galak at codeaurora.org; Michal Simek; Soren Brinkmann; Appana Durga
+> Kedareswara Rao; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH v6 1/2] dmaengine: Add Xilinx Central DMA DT Binding
+> Documentation
 > 
-> > On drivers/clk/mxs/clk-frac.c, the function clk_frac_round_rate returned a bad
-> > result. The division before multiplication computes a wrong value ; the
-> > calculation is inverted to fix the problem. The second issue is that the exact
-> > rate have decimals and they are truncate. The consequence is that the function
-> > clk_frac_set_rate (which use the result of clk_frac_round_rate) computes a
-> > wrong value for the register (the rate generated can be closer to the desired
-> > rate). The correction is : if there is decimal to the result, it is rounded to
-> > the next larger integer.
-> > On drivers/clk/mxs/clk-frac.c, the function clk_frac_recalc_rate returned
-> > a bad result. The multiplication is made before the division to compute a
-> > correct value.
+> On Monday 07 September 2015 18:03:08 Kedareswara rao Appana wrote:
+> > +- dma-channel child node: Should have only one channel
 > >
-> > Signed-off-by: Victorien Vedrine <victorien.vedrine@ophrys.net>
+> 
+> What is the point of the child node if there is only one instance?
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+Sorry for the delay in reply I was on leave for the last couple weeks.
+
+There are few reasons for these:
+---> We (Xilinx) have 3 different DMA's and in order to make consistency b/w the three dma's used the child node concepts so that users can easily compare the drivers
+---> It is a soft IP so features like (multiple channels, cyclic dma mode) may added in nearby future so for future driver changes it will be straight forward. 
+
+Please let me know if it is wrong will fix it and will send the next version of the path.
+
+Regards,
+Kedar.
+
+> 
+> Could you just fold this into the main node instead?
+> 
+> (Sorry jumping in here without looking at the previous versions, I just returned to
+> work from my parental leave).
+> 
+> 	Arnd
