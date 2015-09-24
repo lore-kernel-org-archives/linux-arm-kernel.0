@@ -1,219 +1,489 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Thu, 24 Sep 2015 10:27:50 +0800
-Subject: [PATCH 2/5] thermal: rockchip: Support the RK3368 SoCs in thermal
- driver
-In-Reply-To: <20150921170851.GH17389@dtor-ws>
-References: <1442808971-2619-1-git-send-email-wxt@rock-chips.com>
- <1442808971-2619-3-git-send-email-wxt@rock-chips.com>
- <20150921170851.GH17389@dtor-ws>
-Message-ID: <56035FA6.4060306@gmail.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Wed, 23 Sep 2015 21:31:16 -0500
+Subject: [PATCHv4] arm64: dts: Add base stratix 10 dtsi
+Message-ID: <1443061876-21808-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-? 2015?09?22? 01:08, Dmitry Torokhov ??:
-> Hi Caesar,
->
-> On Mon, Sep 21, 2015 at 12:16:08PM +0800, Caesar Wang wrote:
->> The RK3368 SoCs support to 2 channel TS-ADC, the temperature criteria
->> of each channel can be configurable.
->>
->> The system has two Temperature Sensors, channel 0 is for CPU,
->> and channel 1 is for GPU.
->>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> ---
->>
->>   drivers/thermal/rockchip_thermal.c | 201 ++++++++++++++++++++++++++++++++-----
->>   1 file changed, 176 insertions(+), 25 deletions(-)
->>
->> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
->> index 4d5b7d4..16d2476 100644
->> --- a/drivers/thermal/rockchip_thermal.c
->> +++ b/drivers/thermal/rockchip_thermal.c
->> @@ -1,6 +1,9 @@
->>   /*
->>    * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
->>    *
->> + * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
->> + * Caesar Wang <wxt@rock-chips.com>
->> + *
->>    * This program is free software; you can redistribute it and/or modify it
->>    * under the terms and conditions of the GNU General Public License,
->>    * version 2, as published by the Free Software Foundation.
->> @@ -43,16 +46,11 @@ enum tshut_polarity {
->>   	TSHUT_HIGH_ACTIVE,
->>   };
->>   
->> -/**
->> - * The system has three Temperature Sensors.  channel 0 is reserved,
->> - * channel 1 is for CPU, and channel 2 is for GPU.
->> - */
->> -enum sensor_id {
->> -	SENSOR_CPU = 1,
->> -	SENSOR_GPU,
->> -};
->> -
->>   struct rockchip_tsadc_chip {
->> +	/* The sensor id of chip correspond to the ADC channel */
->> +	int cpu_id;
->> +	int gpu_id;
->> +
->>   	/* The hardware-controlled tshut property */
->>   	long tshut_temp;
->>   	enum tshut_mode tshut_mode;
->> @@ -72,10 +70,11 @@ struct rockchip_tsadc_chip {
->>   struct rockchip_thermal_sensor {
->>   	struct rockchip_thermal_data *thermal;
->>   	struct thermal_zone_device *tzd;
->> -	enum sensor_id id;
->> +	int id;
->>   };
->>   
->> -#define NUM_SENSORS	2 /* Ignore unused sensor 0 */
->> +/* Two sensors: CPU and GPU */
->> +#define NUM_SENSORS	2
->>   
->>   struct rockchip_thermal_data {
->>   	const struct rockchip_tsadc_chip *chip;
->> @@ -94,7 +93,7 @@ struct rockchip_thermal_data {
->>   	enum tshut_polarity tshut_polarity;
->>   };
->>   
->> -/* TSADC V2 Sensor info define: */
->> +/* TSADC Sensor info define: */
->>   #define TSADCV2_AUTO_CON			0x04
->>   #define TSADCV2_INT_EN				0x08
->>   #define TSADCV2_INT_PD				0x0c
->> @@ -116,6 +115,8 @@ struct rockchip_thermal_data {
->>   #define TSADCV2_INT_PD_CLEAR_MASK		~BIT(8)
->>   
->>   #define TSADCV2_DATA_MASK			0xfff
->> +#define TSADCV3_DATA_MASK			0x3ff
->> +
->>   #define TSADCV2_HIGHT_INT_DEBOUNCE_COUNT	4
->>   #define TSADCV2_HIGHT_TSHUT_DEBOUNCE_COUNT	4
->>   #define TSADCV2_AUTO_PERIOD_TIME		250 /* msec */
->> @@ -164,6 +165,45 @@ static const struct tsadc_table v2_code_table[] = {
->>   	{3421, 125000},
->>   };
->>   
->> +static const struct tsadc_table v3_code_table[] = {
->> +	{0, -40000},
->> +	{106, -40000},
->> +	{108, -35000},
->> +	{110, -30000},
->> +	{112, -25000},
->> +	{114, -20000},
->> +	{116, -15000},
->> +	{118, -10000},
->> +	{120, -5000},
->> +	{122, 0},
->> +	{124, 5000},
->> +	{126, 10000},
->> +	{128, 15000},
->> +	{130, 20000},
->> +	{132, 25000},
->> +	{134, 30000},
->> +	{136, 35000},
->> +	{138, 40000},
->> +	{140, 45000},
->> +	{142, 50000},
->> +	{144, 55000},
->> +	{146, 60000},
->> +	{148, 65000},
->> +	{150, 70000},
->> +	{152, 75000},
->> +	{154, 80000},
->> +	{156, 85000},
->> +	{158, 90000},
->> +	{160, 95000},
->> +	{162, 100000},
->> +	{163, 105000},
->> +	{165, 110000},
->> +	{167, 115000},
->> +	{169, 120000},
->> +	{171, 125000},
->> +	{TSADCV3_DATA_MASK, 125000},
->> +};
->> +
->>   static u32 rk_tsadcv2_temp_to_code(long temp)
->>   {
->>   	int high, low, mid;
->> @@ -227,16 +267,83 @@ static int rk_tsadcv2_code_to_temp(u32 code, int *temp)
->>   	return 0;
->>   }
->>   
->> +static u32 rk_tsadcv3_temp_to_code(long temp)
->> +{
->> +	int high, low, mid;
->> +
->> +	low = 0;
->> +	high = ARRAY_SIZE(v3_code_table) - 1;
->> +	mid = (high + low) / 2;
->> +
->> +	if (temp < v3_code_table[low].temp || temp > v3_code_table[high].temp)
->> +		return 0;
-> How is this different from v2 conversion except for the table being
-> used? I think you should be able to reuse the conversion routines if you
-> pass the conversion table in as a parameter.
+Add the base DTS for Altera's SoCFPGA Stratix 10 platform.
 
-The table_v3 is same with the table_v2 but the anolog data of ADC.
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+v4: Add a non-zero ranges property for /soc node
+v3: change #address-cells and #size-cells to <2>
+    change the GIC address to 0xfffc1000
+    update the GIC virtual CPU reg length to 0x2000
+v2: use interrupt-affinity for pmu node
+---
+ arch/arm64/Kconfig.platforms                       |   5 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/altera/Makefile                |   5 +
+ arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 358 +++++++++++++++++++++
+ .../boot/dts/altera/socfpga_stratix10_socdk.dts    |  39 +++
+ arch/arm64/configs/defconfig                       |   1 +
+ 6 files changed, 409 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/altera/Makefile
+ create mode 100644 arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+ create mode 100644 arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
 
-Do you want to reuse the conversion routines,?  I know the conversion 
-routines is same in
-rk_tsadcv3_temp_to_code() if we have many socs maybe the ADC analog data 
-are different.
-
-Says:
-
-rk_tsadcv3_temp_to_code(temp, xxx)
-
-{
-     ...
-
-yyyy =  rk_tsadcv2_temp_to_code(temp)
-
-...
-}
-...
-
-
-I guess you want to independent the adc value,after all the temperature 
-points are same.
-
-Says: maybe i will better likely on this.
-
-//3066/3188
-.....
-
-//3288
-
-static const struct tsadc_table v2_code_table[] = {
-	{0,3800,3792,3783, 3774,3765, 3756,3747,......
-},
-
-
-//3368
-
-static const struct tsadc_table v3_code_table[] = {
-	{0,106,108,110,112,114,......
-},
-
-//next socs
-
-  ....
-
-Dmitry, I know you don't mean that.:-)
-
-I'm no sure if this way will better for the thermal driver.
-
-
-> Thanks.
->
-
-
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 23800a1..36303c8 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -66,6 +66,11 @@ config ARCH_SEATTLE
+ 	help
+ 	  This enables support for AMD Seattle SOC Family
+ 
++config ARCH_STRATIX10
++	bool "Altera's Stratix 10 SoCFPGA Family"
++	help
++	  This enables support for Altera's Stratix 10 SoCFPGA Family.
++
+ config ARCH_TEGRA
+ 	bool "NVIDIA Tegra SoC Family"
+ 	select ARCH_HAS_RESET_CONTROLLER
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index d9f8833..f585606 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -1,3 +1,4 @@
++dts-dirs += altera
+ dts-dirs += amd
+ dts-dirs += apm
+ dts-dirs += arm
+diff --git a/arch/arm64/boot/dts/altera/Makefile b/arch/arm64/boot/dts/altera/Makefile
+new file mode 100644
+index 0000000..d7a6416
+--- /dev/null
++++ b/arch/arm64/boot/dts/altera/Makefile
+@@ -0,0 +1,5 @@
++dtb-$(CONFIG_ARCH_STRATIX10) += socfpga_stratix10_socdk.dtb
++
++always		:= $(dtb-y)
++subdir-y	:= $(dts-dirs)
++clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+new file mode 100644
+index 0000000..445aa67
+--- /dev/null
++++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+@@ -0,0 +1,358 @@
++/*
++ * Copyright Altera Corporation (C) 2015. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/dts-v1/;
++
++/ {
++	compatible = "altr,socfpga-stratix10";
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			enable-method = "psci";
++			reg = <0x0>;
++		};
++
++		cpu1: cpu at 1 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			enable-method = "psci";
++			reg = <0x1>;
++		};
++
++		cpu2: cpu at 2 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			enable-method = "psci";
++			reg = <0x2>;
++		};
++
++		cpu3: cpu at 3 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			enable-method = "psci";
++			reg = <0x3>;
++		};
++	};
++
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <0 120 8>,
++			     <0 121 8>,
++			     <0 122 8>,
++			     <0 123 8>;
++		interrupt-affinity = <&cpu0>,
++				     <&cpu1>,
++				     <&cpu2>,
++				     <&cpu3>;
++	};
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	intc: intc at fffc1000 {
++		compatible = "arm,gic-400", "arm,cortex-a15-gic";
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		reg = <0x0 0xfffc1000 0x1000>,
++		      <0x0 0xfffc2000 0x2000>,
++		      <0x0 0xfffc4000 0x2000>,
++		      <0x0 0xfffc6000 0x2000>;
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		device_type = "soc";
++		interrupt-parent = <&intc>;
++		ranges = <0 0 0 0xffffffff>;
++
++		clkmgr at ffd1000 {
++			compatible = "altr,clk-mgr";
++			reg = <0xffd10000 0x1000>;
++		};
++
++		gmac0: ethernet at ff800000 {
++			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.74a", "snps,dwmac";
++			reg = <0xff800000 0x2000>;
++			interrupts = <0 90 4>;
++			interrupt-names = "macirq";
++			mac-address = [00 00 00 00 00 00];
++			status = "disabled";
++		};
++
++		gmac1: ethernet at ff802000 {
++			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.74a", "snps,dwmac";
++			reg = <0xff802000 0x2000>;
++			interrupts = <0 91 4>;
++			interrupt-names = "macirq";
++			mac-address = [00 00 00 00 00 00];
++			status = "disabled";
++		};
++
++		gmac2: ethernet at ff804000 {
++			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.74a", "snps,dwmac";
++			reg = <0xff804000 0x2000>;
++			interrupts = <0 92 4>;
++			interrupt-names = "macirq";
++			mac-address = [00 00 00 00 00 00];
++			status = "disabled";
++		};
++
++		gpio0: gpio at ffc03200 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "snps,dw-apb-gpio";
++			reg = <0xffc03200 0x100>;
++			status = "disabled";
++
++			porta: gpio-controller at 0 {
++				compatible = "snps,dw-apb-gpio-port";
++				gpio-controller;
++				#gpio-cells = <2>;
++				snps,nr-gpios = <24>;
++				reg = <0>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				interrupts = <0 110 4>;
++			};
++		};
++
++		gpio1: gpio at ffc03300 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "snps,dw-apb-gpio";
++			reg = <0xffc03300 0x100>;
++			status = "disabled";
++
++			portb: gpio-controller at 0 {
++				compatible = "snps,dw-apb-gpio-port";
++				gpio-controller;
++				#gpio-cells = <2>;
++				snps,nr-gpios = <24>;
++				reg = <0>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				interrupts = <0 110 4>;
++			};
++		};
++
++		i2c0: i2c at ffc02800 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "snps,designware-i2c";
++			reg = <0xffc02800 0x100>;
++			interrupts = <0 103 4>;
++			status = "disabled";
++		};
++
++		i2c1: i2c at ffc02900 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "snps,designware-i2c";
++			reg = <0xffc02900 0x100>;
++			interrupts = <0 104 4>;
++			status = "disabled";
++		};
++
++		i2c2: i2c at ffc02a00 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "snps,designware-i2c";
++			reg = <0xffc02a00 0x100>;
++			interrupts = <0 105 4>;
++			status = "disabled";
++		};
++
++		i2c3: i2c at ffc02b00 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "snps,designware-i2c";
++			reg = <0xffc02b00 0x100>;
++			interrupts = <0 106 4>;
++			status = "disabled";
++		};
++
++		i2c4: i2c at ffc02c00 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "snps,designware-i2c";
++			reg = <0xffc02c00 0x100>;
++			interrupts = <0 107 4>;
++			status = "disabled";
++		};
++
++		mmc: dwmmc0 at ff808000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "altr,socfpga-dw-mshc";
++			reg = <0xff808000 0x1000>;
++			interrupts = <0 96 4>;
++			fifo-depth = <0x400>;
++			status = "disabled";
++		};
++
++		ocram: sram at ffe00000 {
++			compatible = "mmio-sram";
++			reg = <0xffe00000 0x100000>;
++		};
++
++		rst: rstmgr at ffd11000 {
++			#reset-cells = <1>;
++			compatible = "altr,rst-mgr";
++			reg = <0xffd11000 0x1000>;
++		};
++
++		spi0: spi at ffda4000 {
++			compatible = "snps,dw-apb-ssi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0xffda4000 0x1000>;
++			interrupts = <0 101 4>;
++			num-chipselect = <4>;
++			bus-num = <0>;
++			status = "disabled";
++		};
++
++		spi1: spi at ffda5000 {
++			compatible = "snps,dw-apb-ssi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0xffda5000 0x1000>;
++			interrupts = <0 102 4>;
++			num-chipselect = <4>;
++			bus-num = <0>;
++			status = "disabled";
++		};
++
++		sysmgr: sysmgr at ffd12000 {
++			compatible = "altr,sys-mgr", "syscon";
++			reg = <0xffd12000 0x1000>;
++		};
++
++		/* Local timer */
++		timer {
++			compatible = "arm,armv8-timer";
++			interrupts = <1 13 0xf01>,
++				     <1 14 0xf01>,
++				     <1 11 0xf01>,
++				     <1 10 0xf01>;
++		};
++
++		timer0: timer0 at ffc03000 {
++			compatible = "snps,dw-apb-timer";
++			interrupts = <0 113 4>;
++			reg = <0xffc03000 0x100>;
++		};
++
++		timer1: timer1 at ffc03100 {
++			compatible = "snps,dw-apb-timer";
++			interrupts = <0 114 4>;
++			reg = <0xffc03100 0x100>;
++		};
++
++		timer2: timer2 at ffd00000 {
++			compatible = "snps,dw-apb-timer";
++			interrupts = <0 115 4>;
++			reg = <0xffd00000 0x100>;
++		};
++
++		timer3: timer3 at ffd00100 {
++			compatible = "snps,dw-apb-timer";
++			interrupts = <0 116 4>;
++			reg = <0xffd00100 0x100>;
++		};
++
++		uart0: serial0 at ffc02000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0xffc02000 0x100>;
++			interrupts = <0 108 4>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			status = "disabled";
++		};
++
++		uart1: serial1 at ffc02100 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0xffc02100 0x100>;
++			interrupts = <0 109 4>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			status = "disabled";
++		};
++
++		usbphy0: usbphy at 0 {
++			#phy-cells = <0>;
++			compatible = "usb-nop-xceiv";
++			status = "okay";
++		};
++
++		usb0: usb at ffb00000 {
++			compatible = "snps,dwc2";
++			reg = <0xffb00000 0x40000>;
++			interrupts = <0 93 4>;
++			phys = <&usbphy0>;
++			phy-names = "usb2-phy";
++			status = "disabled";
++		};
++
++		usb1: usb at ffb40000 {
++			compatible = "snps,dwc2";
++			reg = <0xffb40000 0x40000>;
++			interrupts = <0 94 4>;
++			phys = <&usbphy0>;
++			phy-names = "usb2-phy";
++			status = "disabled";
++		};
++
++		watchdog0: watchdog at ffd00200 {
++			compatible = "snps,dw-wdt";
++			reg = <0xffd00200 0x100>;
++			interrupts = <0 117 4>;
++			status = "disabled";
++		};
++
++		watchdog1: watchdog at ffd00300 {
++			compatible = "snps,dw-wdt";
++			reg = <0xffd00300 0x100>;
++			interrupts = <0 118 4>;
++			status = "disabled";
++		};
++
++		watchdog2: watchdog at ffd00400 {
++			compatible = "snps,dw-wdt";
++			reg = <0xffd00400 0x100>;
++			interrupts = <0 125 4>;
++			status = "disabled";
++		};
++
++		watchdog3: watchdog at ffd00500 {
++			compatible = "snps,dw-wdt";
++			reg = <0xffd00500 0x100>;
++			interrupts = <0 126 4>;
++			status = "disabled";
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+new file mode 100644
+index 0000000..41ea2db
+--- /dev/null
++++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+@@ -0,0 +1,39 @@
++/*
++ * Copyright Altera Corporation (C) 2015. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/include/ "socfpga_stratix10.dtsi"
++
++/ {
++	model = "SoCFPGA Stratix 10 SoCDK";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		device_type = "memory";
++		/* We expect the bootloader to fill in the reg */
++		reg = <0 0 0 0>;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 34d71dd..7f78e18 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -39,6 +39,7 @@ CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_MEDIATEK=y
+ CONFIG_ARCH_ROCKCHIP=y
+ CONFIG_ARCH_SEATTLE=y
++CONFIG_ARCH_STRATIX10=y
+ CONFIG_ARCH_TEGRA=y
+ CONFIG_ARCH_TEGRA_132_SOC=y
+ CONFIG_ARCH_QCOM=y
 -- 
-Thanks,
-Caesar
+2.4.5
