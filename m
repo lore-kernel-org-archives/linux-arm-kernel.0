@@ -1,58 +1,32 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 24 Sep 2015 09:23:40 +0200
-Subject: [PATCH v3 7/9] gpiolib-sysfs: Add gpio name parsing for sysfs
- export
-In-Reply-To: <CACRpkdYb3i-Bb75bn--r2ack_wiSMFFq1msFkxx5o4UVht6WWw@mail.gmail.com>
-References: <1439561466-14350-1-git-send-email-mpa@pengutronix.de>
- <1439561466-14350-8-git-send-email-mpa@pengutronix.de>
- <CACRpkdYb3i-Bb75bn--r2ack_wiSMFFq1msFkxx5o4UVht6WWw@mail.gmail.com>
-Message-ID: <20150924072340.GX32203@pengutronix.de>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Thu, 24 Sep 2015 07:27:10 +0000
+Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
+In-Reply-To: <CAOMZO5BUvq3LydjL7cR2hAWFFUB+Cvwi+yEN5A9uG=uWEDepiA@mail.gmail.com>
+References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
+ <20150917103414.GN21084@n2100.arm.linux.org.uk>
+ <BN3PR0301MB08674C65714A9423E39E1F10FE590@BN3PR0301MB0867.namprd03.prod.outlook.com>
+ <CAOMZO5BUvq3LydjL7cR2hAWFFUB+Cvwi+yEN5A9uG=uWEDepiA@mail.gmail.com>
+Message-ID: <BN3PR0301MB0867F84A6740335770B16977FE430@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 21, 2015 at 06:09:15PM -0700, Linus Walleij wrote:
-> On Fri, Aug 14, 2015 at 7:11 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> On Fri, Sep 18, 2015 at 4:38 AM, Huan Wang <alison.wang@freescale.com>
+> wrote:
 > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > [Alison Wang] Thanks for your reply. I agreed with you about creating
+> > a new multi_v7_lpae_defconfig. In multi_v7_lpae_defconfig, I need to
+> > add the following CONFIG_XX to support LS1021A based on
+> multi_v7_defconfig.
+> >
+> > CONFIG_ARM_LPAE=y
+> > CONFIG_VMSPLIT_2G=y
 > 
-> This has too terse commit description. I don't understand the patch or
-> what it is supposed to do.
+> Is CONFIG_VMSPLIT_2G=y really needed?
+[Alison Wang] I tried to remove CONFIG_VMSPLIT_2G and used the default CONFIG_VMSPLIT_3G,
+but kernel could not boot up. It hangs at " Starting kernel ... ".
 
-Sorry, indeed, this requires a commit description. I would add something
-like this:
-
-In '/sys/class/gpio/' GPIOs can be exported by using their GPIO number.
-If the exported GPIO has a name, it will show up as a new directory in
-'/sys/class/gpio/<GPIO_NAME>'. It is somehow inconsistent to use a
-number for exporting and the name for accessing the GPIO.
-
-This patch adds the possibility to use the GPIO name to export it. This
-introduces a consistent behaviour for exporting and accessing a GPIO
-from userspace.
-
-The mechanism of parsing the GPIO name is a fallback mechanism. This
-ensures backwards compatibility of the gpio interface. If the string
-passed to '/sys/class/gpio/export' can not be parsed as number, it tries
-to match a GPIO name. The same behaviour is implemented for the
-'unexport' file.
-
-The implementation uses the previously defined gpio_name_to_desc().
+Any suggestion? Thanks.
 
 
-
-Thanks,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150924/591166c9/attachment-0001.sig>
+Best Regards,
+Alison Wang
