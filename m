@@ -1,49 +1,47 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 24 Sep 2015 11:19:28 +0200
-Subject: [PATCH 0/3] mmc: Wait for card_busy before starting sdio requests
-In-Reply-To: <CAPDyKFqvnVTL0pDLc8S1Ssqmy5WXR9+=uCWq8ONmgrYU=Zzoow@mail.gmail.com>
-References: <1442935826-16758-1-git-send-email-hdegoede@redhat.com>
- <CAPDyKFqvnVTL0pDLc8S1Ssqmy5WXR9+=uCWq8ONmgrYU=Zzoow@mail.gmail.com>
-Message-ID: <5603C020.80603@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 24 Sep 2015 10:20:42 +0100
+Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
+In-Reply-To: <5602E7EF.5010904@arm.com>
+References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
+ <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
+ <55F059F9.3080200@arm.com>
+ <F58048940DF89C44BFA5A966565B5D23EBA361B927@SPOCK.usa.Arm.com>
+ <5602E7EF.5010904@arm.com>
+Message-ID: <20150924092042.GF13823@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Sep 23, 2015 at 06:57:03PM +0100, Sudeep Holla wrote:
+> On 23/09/15 18:22, Jeremy Linton wrote:
+> >|FWIW, mainline booting with this patch on Juno r1 with ACPI enabled
+> >dies a |horrible death:
+> >
+> >Sorry about the delay, I didn't see this message.
+> >
+> ><trimmed>
+> >
+> >|How did you get this to work? Firmware release?
+> >
+> >Yes, it's a firmware problem with the ACPI tables. It is likely you
+> >need _DSD changes for the SMSC. If your trying to run juno with ACPI
+> >there are a few other ACPI table changes you will need beyond what
+> >was in the last linaro release. I wanted to just provide a direct
+> >link to the correct firmware in this response, but it seems the
+> >required version is sort of up in the air at the moment. Be assured I
+> >will really push on this next week, and will provide a follow up
+> >here.
+> >
+> >Originally, the lack of DSD wasn't a problem, but as this patch
+> >evolved  the fact that it consolidates a number of configuration code
+> >paths balancing that got tricky, and ACPI machines with "bad" tables
+> >were the victims (rather than breaking something I can't control).
+> 
+> Even now absence of _DSD *should* continue to be just fine. We can
+> bailout without initializing the device. Pulling the entire kernel down
+> just because of an incomplete device entry make no sense IMO.
 
-On 23-09-15 23:43, Ulf Hansson wrote:
-> On 22 September 2015 at 17:30, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi Ulf,
->>
->> Here is a non RFC version of my patch-set to wait for card_busy before
->> starting sdio requests. It is the same as the RFC version of the set,
->> but this time it has been tested no hardware which actually needs this
->> and I can confirm now that this fixes wifi on that hardware.
->
-> Great! Thanks, applied for next!
+I agree. IMO, that's a regression since a working kernel on Juno (albeit
+without networking) now dies unless you also upgrade the firmware.
 
-Great, thanks, I guess it is too late for this to go as a fix into
-4.3-rcX (no worries if it is) ?
-
->> This patch-set should also allow removing this dw_mmc specific fix:
->>
->> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/mmc/host/dw_mmc.c?id=0bdbd0e88cf6b603a2196418672715b0890fb040
->>
->> As this patch-set fixes this problem in a generic manner.
->
-> Care to send a patch to remove the above hack/fix?
-
-I do not have any hardware to test this.
-
-I've added Doug the original author of that patch to the Cc.
-
-Dough, can you test if with the patch set from this mail thread
-(merged into mmc/next) this patch:
-
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/mmc/host/dw_mmc.c?id=0bdbd0e88cf6b603a2196418672715b0890fb040
-
-Is still necessary ? Since this patch-set fixes the same issue
-in the mmc core I believe that this commit can be reverted now.
-
-Thanks & Regards,
-
-Hans
+-- 
+Catalin
