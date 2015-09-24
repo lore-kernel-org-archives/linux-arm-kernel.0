@@ -1,57 +1,30 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Thu, 24 Sep 2015 13:39:16 +0200
-Subject: [PATCH v2 2/5] ARM: multi_v7_defconfig: Enable common regulators for
- rockchip boards
-In-Reply-To: <1443094759-28531-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1443094759-28531-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <1443094759-28531-3-git-send-email-sjoerd.simons@collabora.co.uk>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 24 Sep 2015 04:40:27 -0700
+Subject: [PATCH v2] arm/ls1021a: Add Sleep feature for ls1021
+In-Reply-To: <SN1PR0301MB1616B7458FB787A75DADC9369D430@SN1PR0301MB1616.namprd03.prod.outlook.com>
+References: <1442308030-21231-1-git-send-email-dongsheng.wang@freescale.com>
+ <20150923151333.GJ3529@tiger>
+ <SN1PR0301MB1616B7458FB787A75DADC9369D430@SN1PR0301MB1616.namprd03.prod.outlook.com>
+Message-ID: <20150924114026.GL3529@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rockchip boards seem to have two common regulator setups. Various board
-used the Active Semi act8846 often in combination with Silergy syr82x
-regulators (e.g. Radxa Rock Pro/Rock 2, Firefly, and Netxeon R89 etc),
-while others use regulator part of the Rockchip RK808 chip (e.g. the
-various Veyron based chromebooks, Chipspark Popmetal etc)
+On Thu, Sep 24, 2015 at 09:28:31AM +0000, Wang Dongsheng wrote:
+> > > Add system STANDBY implement for ls1021 platform.
+> > >
+> > > Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
+> > > Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+> > > ---
+> > > *v2*:
+> > > - Remove PSCI code. Just implement STANDBY in platform code.
+> > 
+> > Why stepping back?  We are encouraged to move to PSCI, aren't we?
+> > 
+> 
+> As Lorenzo said, PSCI v1.0 support will be in kernel v4.4. So I remove
+> psci for this patch.
 
-Enable all these regulators.
+v4.4 is not far away, and we should probably wait instead of pushing
+the code that needs to be revised quite soon.
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-
----
-
-Changes in v2:
-- Enable all common rockchip regulators, not just ACT8846
-
- arch/arm/configs/multi_v7_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 170f18e..3938f54 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -394,6 +394,7 @@ CONFIG_MFD_MAX14577=y
- CONFIG_MFD_MAX77686=y
- CONFIG_MFD_MAX77693=y
- CONFIG_MFD_MAX8907=y
-+CONFIG_MFD_RK808=y
- CONFIG_MFD_SEC_CORE=y
- CONFIG_MFD_STMPE=y
- CONFIG_MFD_PALMAS=y
-@@ -401,11 +402,14 @@ CONFIG_MFD_TPS65090=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_MFD_TPS65910=y
- CONFIG_REGULATOR_AB8500=y
-+CONFIG_REGULATOR_ACT8865=y
- CONFIG_REGULATOR_AS3711=y
- CONFIG_REGULATOR_AS3722=y
- CONFIG_REGULATOR_AXP20X=y
- CONFIG_REGULATOR_BCM590XX=y
- CONFIG_REGULATOR_DA9210=y
-+CONFIG_REGULATOR_FAN53555=y
-+CONFIG_REGULATOR_RK808=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_MFD_SYSCON=y
- CONFIG_POWER_RESET_SYSCON=y
--- 
-2.5.3
+Shawn
