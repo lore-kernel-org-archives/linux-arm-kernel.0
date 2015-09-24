@@ -1,84 +1,105 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 24 Sep 2015 13:02:03 +0300
-Subject: [PATCH v4 16/25] dmaengine: edma: Use dev_dbg instead pr_debug
+Date: Thu, 24 Sep 2015 13:02:02 +0300
+Subject: [PATCH v4 15/25] dmaengine: edma: Cleanup regarding the use of dev
+ around the code
 In-Reply-To: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1443088932-21731-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1443088932-21731-17-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1443088932-21731-16-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have access to dev, so it is better to use the dev_dbg for debug prints.
+Be consistent and do not mix the use of dev, &pdev->dev, etc in the
+functions.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/edma.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ drivers/dma/edma.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 2332142c36db..fe8cde21b497 100644
+index f5010c8f6273..2332142c36db 100644
 --- a/drivers/dma/edma.c
 +++ b/drivers/dma/edma.c
-@@ -655,14 +655,14 @@ static int edma_start(struct edma_cc *ecc, unsigned channel)
+@@ -1177,7 +1177,7 @@ static void edma_execute(struct edma_chan *echan)
+ 		j = i + edesc->processed;
+ 		edma_write_slot(ecc, echan->slot[i], &edesc->pset[j].param);
+ 		edesc->sg_len += edesc->pset[j].len;
+-		dev_vdbg(echan->vchan.chan.device->dev,
++		dev_vdbg(dev,
+ 			"\n pset[%d]:\n"
+ 			"  chnum\t%d\n"
+ 			"  slot\t%d\n"
+@@ -1828,7 +1828,6 @@ err_no_chan:
+ static void edma_free_chan_resources(struct dma_chan *chan)
+ {
+ 	struct edma_chan *echan = to_edma_chan(chan);
+-	struct device *dev = chan->device->dev;
+ 	int i;
  
- 		/* EDMA channels without event association */
- 		if (test_bit(channel, ecc->edma_unused)) {
--			pr_debug("EDMA: ESR%d %08x\n", j,
--				 edma_shadow0_read_array(ecc, SH_ESR, j));
-+			dev_dbg(ecc->dev, "ESR%d %08x\n", j,
-+				edma_shadow0_read_array(ecc, SH_ESR, j));
- 			edma_shadow0_write_array(ecc, SH_ESR, j, mask);
- 			return 0;
- 		}
- 
- 		/* EDMA channel with event association */
--		pr_debug("EDMA: ER%d %08x\n", j,
-+		dev_dbg(ecc->dev, "ER%d %08x\n", j,
- 			edma_shadow0_read_array(ecc, SH_ER, j));
- 		/* Clear any pending event or error */
- 		edma_write_array(ecc, EDMA_ECR, j, mask);
-@@ -670,8 +670,8 @@ static int edma_start(struct edma_cc *ecc, unsigned channel)
- 		/* Clear any SER */
- 		edma_shadow0_write_array(ecc, SH_SECR, j, mask);
- 		edma_shadow0_write_array(ecc, SH_EESR, j, mask);
--		pr_debug("EDMA: EER%d %08x\n", j,
--			 edma_shadow0_read_array(ecc, SH_EER, j));
-+		dev_dbg(ecc->dev, "EER%d %08x\n", j,
-+			edma_shadow0_read_array(ecc, SH_EER, j));
- 		return 0;
+ 	/* Terminate transfers */
+@@ -1850,7 +1849,7 @@ static void edma_free_chan_resources(struct dma_chan *chan)
+ 		echan->alloced = false;
  	}
  
-@@ -709,8 +709,8 @@ static void edma_stop(struct edma_cc *ecc, unsigned channel)
- 		/* clear possibly pending completion interrupt */
- 		edma_shadow0_write_array(ecc, SH_ICR, j, mask);
- 
--		pr_debug("EDMA: EER%d %08x\n", j,
--			 edma_shadow0_read_array(ecc, SH_EER, j));
-+		dev_dbg(ecc->dev, "EER%d %08x\n", j,
-+			edma_shadow0_read_array(ecc, SH_EER, j));
- 
- 		/* REVISIT:  consider guarding against inappropriate event
- 		 * chaining by overwriting with dummy_paramset.
-@@ -779,8 +779,8 @@ static int edma_trigger_channel(struct edma_cc *ecc, unsigned channel)
- 
- 	edma_shadow0_write_array(ecc, SH_ESR, (channel >> 5), mask);
- 
--	pr_debug("EDMA: ESR%d %08x\n", (channel >> 5),
--		 edma_shadow0_read_array(ecc, SH_ESR, (channel >> 5)));
-+	dev_dbg(ecc->dev, "ESR%d %08x\n", (channel >> 5),
-+		edma_shadow0_read_array(ecc, SH_ESR, (channel >> 5)));
- 	return 0;
+-	dev_dbg(dev, "freeing channel for %u\n", echan->ch_num);
++	dev_dbg(chan->device->dev, "freeing channel for %u\n", echan->ch_num);
  }
  
-@@ -810,8 +810,8 @@ static void edma_clean_channel(struct edma_cc *ecc, unsigned channel)
- 		int j = (channel >> 5);
- 		unsigned int mask = BIT(channel & 0x1f);
+ /* Send pending descriptor to hardware */
+@@ -2174,13 +2173,13 @@ static int edma_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
  
--		pr_debug("EDMA: EMR%d %08x\n", j,
--			 edma_read_array(ecc, EDMA_EMR, j));
-+		dev_dbg(ecc->dev, "EMR%d %08x\n", j,
-+			edma_read_array(ecc, EDMA_EMR, j));
- 		edma_shadow0_write_array(ecc, SH_ECR, j, mask);
- 		/* Clear the corresponding EMR bits */
- 		edma_write_array(ecc, EDMA_EMCR, j, mask);
+-	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
++	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
+ 	if (ret)
+ 		return ret;
+ 
+-	ecc = devm_kzalloc(&pdev->dev, sizeof(*ecc), GFP_KERNEL);
++	ecc = devm_kzalloc(dev, sizeof(*ecc), GFP_KERNEL);
+ 	if (!ecc) {
+-		dev_err(&pdev->dev, "Can't allocate controller\n");
++		dev_err(dev, "Can't allocate controller\n");
+ 		return -ENOMEM;
+ 	}
+ 
+@@ -2324,7 +2323,7 @@ static int edma_probe(struct platform_device *pdev)
+ 
+ 	ecc->dummy_slot = edma_alloc_slot(ecc, EDMA_SLOT_ANY);
+ 	if (ecc->dummy_slot < 0) {
+-		dev_err(&pdev->dev, "Can't allocate PaRAM dummy slot\n");
++		dev_err(dev, "Can't allocate PaRAM dummy slot\n");
+ 		return ecc->dummy_slot;
+ 	}
+ 
+@@ -2333,7 +2332,7 @@ static int edma_probe(struct platform_device *pdev)
+ 	dma_cap_set(DMA_CYCLIC, ecc->dma_slave.cap_mask);
+ 	dma_cap_set(DMA_MEMCPY, ecc->dma_slave.cap_mask);
+ 
+-	edma_dma_init(ecc, &ecc->dma_slave, &pdev->dev);
++	edma_dma_init(ecc, &ecc->dma_slave, dev);
+ 
+ 	edma_chan_init(ecc, &ecc->dma_slave, ecc->slave_chans);
+ 
+@@ -2345,7 +2344,7 @@ static int edma_probe(struct platform_device *pdev)
+ 		of_dma_controller_register(node, of_dma_xlate_by_chan_id,
+ 					   &ecc->dma_slave);
+ 
+-	dev_info(&pdev->dev, "TI EDMA DMA engine driver\n");
++	dev_info(dev, "TI EDMA DMA engine driver\n");
+ 
+ 	return 0;
+ 
+@@ -2359,8 +2358,8 @@ static int edma_remove(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct edma_cc *ecc = dev_get_drvdata(dev);
+ 
+-	if (pdev->dev.of_node)
+-		of_dma_controller_free(pdev->dev.of_node);
++	if (dev->of_node)
++		of_dma_controller_free(dev->of_node);
+ 	dma_async_device_unregister(&ecc->dma_slave);
+ 	edma_free_slot(ecc, ecc->dummy_slot);
+ 
 -- 
 2.5.2
