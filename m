@@ -1,51 +1,37 @@
-From: dongsheng.wang@freescale.com (Dongsheng Wang)
-Date: Thu, 24 Sep 2015 16:29:14 +0800
-Subject: [PATCH v3 2/2] arm/layerscape: add RCPM device tree support for
- ls1021a.
-In-Reply-To: <1443083354-37369-1-git-send-email-dongsheng.wang@freescale.com>
-References: <1443083354-37369-1-git-send-email-dongsheng.wang@freescale.com>
-Message-ID: <1443083354-37369-2-git-send-email-dongsheng.wang@freescale.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 24 Sep 2015 10:46:59 +0200
+Subject: [PATCH] net: sun4i-emac: Properly free resources on probe
+ failure and remove
+In-Reply-To: <1443001156-20333-1-git-send-email-hdegoede@redhat.com>
+References: <1443001156-20333-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150924084659.GP4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wang Dongsheng <dongsheng.wang@freescale.com>
+On Wed, Sep 23, 2015 at 11:39:16AM +0200, Hans de Goede wrote:
+> Fix sun4i-emac not releasing the following resources:
+> -iomapped memory not released on probe-failure nor on remove
+> -clock not getting disabled on probe-failure nor on remove
+> -sram not being released on remove
+> 
+> And while at it also add error checking to the clk_prepare_enable call
+> done on probe.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
----
-*v3*: Add "fsl,#rcpm-wakeup-cells" for rcpm node.
-*v2*: No changes.
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 973a496..ac5f9a2 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -139,6 +139,7 @@
- 			sdhci,auto-cmd12;
- 			big-endian;
- 			bus-width = <4>;
-+			rcpm-wakeup = <&rcpm 0x00000080 0x0>;
- 			status = "disabled";
- 		};
- 
-@@ -186,6 +187,12 @@
- 			};
- 		};
- 
-+		rcpm: rcpm at 1ee2000 {
-+			compatible = "fsl,ls1021a-rcpm", "fsl,qoriq-rcpm-2.1";
-+			reg = <0x0 0x1ee2000 0x0 0x10000>;
-+			fsl,#rcpm-wakeup-cells = <3>;
-+		};
-+
- 		dspi0: dspi at 2100000 {
- 			compatible = "fsl,ls1021a-v1.0-dspi";
- 			#address-cells = <1>;
-@@ -287,6 +294,7 @@
- 			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&sysclk>;
- 			clock-names = "ipg";
-+			rcpm-wakeup = <&rcpm 0x0 0x40000000>;
- 			status = "disabled";
- 		};
- 
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks!
+Maxime
+
 -- 
-2.1.0.27.g96db324
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150924/33153924/attachment-0001.sig>
