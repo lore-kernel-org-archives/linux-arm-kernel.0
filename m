@@ -1,149 +1,88 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Thu, 24 Sep 2015 17:32:15 +0800
-Subject: [RFC PATCH v6 3/3] arm: fix a migrating irq bug when hotplug cpu
-In-Reply-To: <1443087135-17044-1-git-send-email-yangyingliang@huawei.com>
-References: <1443087135-17044-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <1443087135-17044-4-git-send-email-yangyingliang@huawei.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 24 Sep 2015 11:35:55 +0200
+Subject: [PATCH linux-next v10 0/3] mfd: flexcom: add a driver for Flexcom
+Message-ID: <cover.1443087121.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When cpu is disabled, all irqs will be migratged to another cpu.
-In some cases, a new affinity is different, the old affinity need
-to be updated and if irq_set_affinity's return value is IRQ_SET_MASK_OK_DONE,
-the old affinity can not be updated. Fix it by using irq_do_set_affinity.
+This series of patches a support to the Atmel Flexcom, a wrapper which
+integrates an USART, a SPI controller and a TWI controller. Only one
+peripheral can be used at a time. The active function is selected though
+the Flexcom Mode Register
 
-And migrating interrupts is a core code matter, so use the generic
-function irq_migrate_all_off_this_cpu() to migrate interrupts in
-kernel/irq/migration.c.
 
-Cc: Jiang Liu <jiang.liu@linux.intel.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
----
- arch/arm/Kconfig           |  1 +
- arch/arm/include/asm/irq.h |  1 -
- arch/arm/kernel/irq.c      | 62 ----------------------------------------------
- arch/arm/kernel/smp.c      |  2 +-
- 4 files changed, 2 insertions(+), 64 deletions(-)
+ChangeLog
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 72ad724..bffba78 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1492,6 +1492,7 @@ config NR_CPUS
- config HOTPLUG_CPU
- 	bool "Support for hot-pluggable CPUs"
- 	depends on SMP
-+	select GENERIC_IRQ_MIGRATION
- 	help
- 	  Say Y here to experiment with turning CPUs off and on.  CPUs
- 	  can be controlled through /sys/devices/system/cpu.
-diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-index be1d07d..882bf98 100644
---- a/arch/arm/include/asm/irq.h
-+++ b/arch/arm/include/asm/irq.h
-@@ -24,7 +24,6 @@
- #ifndef __ASSEMBLY__
- struct irqaction;
- struct pt_regs;
--extern void migrate_irqs(void);
- 
- extern void asm_do_IRQ(unsigned int, struct pt_regs *);
- void handle_IRQ(unsigned int, struct pt_regs *);
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 2766183..85299b7 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -31,7 +31,6 @@
- #include <linux/smp.h>
- #include <linux/init.h>
- #include <linux/seq_file.h>
--#include <linux/ratelimit.h>
- #include <linux/errno.h>
- #include <linux/list.h>
- #include <linux/kallsyms.h>
-@@ -116,64 +115,3 @@ int __init arch_probe_nr_irqs(void)
- 	return nr_irqs;
- }
- #endif
--
--#ifdef CONFIG_HOTPLUG_CPU
--static bool migrate_one_irq(struct irq_desc *desc)
--{
--	struct irq_data *d = irq_desc_get_irq_data(desc);
--	const struct cpumask *affinity = irq_data_get_affinity_mask(d);
--	struct irq_chip *c;
--	bool ret = false;
--
--	/*
--	 * If this is a per-CPU interrupt, or the affinity does not
--	 * include this CPU, then we have nothing to do.
--	 */
--	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
--		return false;
--
--	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
--		affinity = cpu_online_mask;
--		ret = true;
--	}
--
--	c = irq_data_get_irq_chip(d);
--	if (!c->irq_set_affinity)
--		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
--	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
--		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
--
--	return ret;
--}
--
--/*
-- * The current CPU has been marked offline.  Migrate IRQs off this CPU.
-- * If the affinity settings do not allow other CPUs, force them onto any
-- * available CPU.
-- *
-- * Note: we must iterate over all IRQs, whether they have an attached
-- * action structure or not, as we need to get chained interrupts too.
-- */
--void migrate_irqs(void)
--{
--	unsigned int i;
--	struct irq_desc *desc;
--	unsigned long flags;
--
--	local_irq_save(flags);
--
--	for_each_irq_desc(i, desc) {
--		bool affinity_broken;
--
--		raw_spin_lock(&desc->lock);
--		affinity_broken = migrate_one_irq(desc);
--		raw_spin_unlock(&desc->lock);
--
--		if (affinity_broken)
--			pr_warn_ratelimited("IRQ%u no longer affine to CPU%u\n",
--				i, smp_processor_id());
--	}
--
--	local_irq_restore(flags);
--}
--#endif /* CONFIG_HOTPLUG_CPU */
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 48185a7..fc26384 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -218,7 +218,7 @@ int __cpu_disable(void)
- 	/*
- 	 * OK - migrate IRQs away from this CPU
- 	 */
--	migrate_irqs();
-+	irq_migrate_all_off_this_cpu();
- 
- 	/*
- 	 * Flush user cache and TLB mappings, and then remove this CPU
+v10:
+- add Acked-by from Nicolas Ferre
+
+v9:
+- go back to v5 (use the new "atmel,flexcom-mode" DT property).
+- fix the name of the spi node in the DT example: from spi at f8034400 to
+  spi at 400
+- align the fields of the struct platform_driver atmel_flexcom_driver as
+  suggested by Lee Jones.
+
+v8:
+- fix the name of the spi node in the DT example: from spi at f8034400 to
+  spi at 2,0
+- use the return code of op_property_read_u32_index() instead of -EINVAL
+  to report error.
+- add Acked-by from Nicolas Ferre
+
+v7:
+- read the operating mode from the very first u32 of the reg property from
+  the first available child node (should be unique).
+- update the DT bindings documentation accordingly.
+
+v6:
+- select the operating mode according to the "compatible" DT property of
+  the first available child node (should be unique).
+- remove the "atmel,flexcom-mode" DT property so the need of a header file
+  defining macros for the possible values of this deprecated property.
+
+v5:
+- create a header file containing macros used by DT bindings
+- use numeric constants instead of strings to select the Flexcom mode
+- change the license to "GPL v2"
+- update the DT binding documentation to make it more readable and add
+  references to USART, SPI and I2C DT binding documentations. remove the
+  useless label in the Example section.
+- change the register prefix from FX_ to FLEX_ to match the Flexcom
+  programmer datasheet.
+- rename some variables to make them more understandable.
+
+v4:
+- check clk_prepare_enable() return code in atmel_flexcom_probe()
+- add a commit message to the DT binding patch
+
+v3:
+- remove MODULE_ALIAS()
+- add Acked-by from Boris Brezillon and Alexandre Belloni
+
+v2:
+- enhance the documentation of DT bindings and change the way the "ranges"
+  property is used.
+- replace __raw_readl() and __raw_writel() by readl() and writel().
+- change the module license to "GPL" for v2 or later
+- print the selected flexcom mode after the hardware version
+
+Cyrille Pitchen (3):
+  mfd: atmel-flexcom: create include file with macros used by DT
+    bindings
+  mfd: devicetree: add bindings for Atmel Flexcom
+  mfd: atmel-flexcom: add a driver for Atmel Flexible Serial
+    Communication Unit
+
+ .../devicetree/bindings/mfd/atmel-flexcom.txt      |  67 +++++++++++++
+ drivers/mfd/Kconfig                                |  11 +++
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/atmel-flexcom.c                        | 104 +++++++++++++++++++++
+ include/dt-bindings/mfd/atmel-flexcom.h            |  16 ++++
+ 5 files changed, 199 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+ create mode 100644 drivers/mfd/atmel-flexcom.c
+ create mode 100644 include/dt-bindings/mfd/atmel-flexcom.h
+
 -- 
-2.5.0
+1.8.2.2
