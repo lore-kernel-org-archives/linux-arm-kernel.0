@@ -1,29 +1,140 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 25 Sep 2015 14:44:38 -0700
-Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
- 'global_lock'
-In-Reply-To: <2524822.pQu4UKMrlb@vostro.rjw.lan>
-References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- <4357538.Wlf88yQie6@vostro.rjw.lan>
- <CAKohpok2Z2m7GZt1GzZzofeHEioF=XJEq8YVgtY=VtS9tmpb_Q@mail.gmail.com>
- <2524822.pQu4UKMrlb@vostro.rjw.lan>
-Message-ID: <20150925214438.GH5951@linux>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 25 Sep 2015 14:53:13 -0700
+Subject: [PATCH v2 0/7] arm64: relax Image placement rules
+In-Reply-To: <5605095A.10707@arm.com>
+References: <1442968663-31843-1-git-send-email-ard.biesheuvel@linaro.org>
+ <560426BF.4030300@arm.com>
+ <CAKv+Gu_YKo+c2rTzxMhjtfQzwix7d=Z33ej7omaJVz620U2efA@mail.gmail.com>
+ <CAKv+Gu-WGSaGA+4OJcNOct+sdBHsO8yKOc50t3jmB86xonWQ=g@mail.gmail.com>
+ <5605095A.10707@arm.com>
+Message-ID: <CAKv+Gu_fxPFAy24McGLaxwLDmA3rVK-Pzy7w9ALpcCxH+dxZHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25-09-15, 22:58, Rafael J. Wysocki wrote:
-> Say you have three adjacent fields in a structure, x, y, z, each one byte long.
-> Initially, all of them are equal to 0.
-> 
-> CPU A writes 1 to x and CPU B writes 2 to y at the same time.
-> 
-> What's the result?
+On 25 September 2015 at 01:44, Suzuki K. Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 25/09/15 00:19, Ard Biesheuvel wrote:
+>>
+>> On 24 September 2015 at 09:38, Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> wrote:
+>>>
+>>> On 24 September 2015 at 09:37, Suzuki K. Poulose <Suzuki.Poulose@arm.com>
+>>> wrote:
+>>>>
+>>>> On 23/09/15 01:37, Ard Biesheuvel wrote:
+>
+>
+>
+>>>>
+>>>> Ard,
+>>>>
+>>>> I gave your series a quick run and dumping the kernel page tables(with
+>>>> CONFIG_ARM64_PTDUMP)
+>>>> I find this problem :
+>>>>
+>>>> ...
+>>>>
+>>>> ---[ Kernel Mapping ]---
+>>>> 0xffffffbffc000000-0xffffffbffc600000           6M     RW x  SHD AF
+>>>> MEM/NORMAL    *****
+>>>> 0xffffffbffc600000-0xffffffbffc7f5000        2004K     RW x  SHD AF
+>>>> UXN
+>>>> MEM/NORMAL
+>>>> 0xffffffbffc7f5000-0xffffffbffc875000         512K     RW NX SHD AF
+>>>> UXN
+>>>> MEM/NORMAL
+>>>> 0xffffffbffc875000-0xffffffbffca00000        1580K     RW x  SHD AF
+>>>> UXN
+>>>> MEM/NORMAL
+>>>> ---[ Linear Mapping ]---
+>>>> 0xffffffc000000000-0xffffffc040000000           1G     RW NX SHD AF
+>>>> UXN
+>>>> MEM/NORMAL
+>>>>
+>>>>
+>>>> Note that the first mapping in the kernel doesn't have UXN set, which is
+>>>> a
+>>>> regression.
+>>>> I haven't started digging into it yet, but I thought I will point it out
+>>>> here, in case you
+>>>> already fixed it.
+>>>>
+>>>
+>>> Ok, thanks for pointing that out. I will look into it.
+>>>
+>>
+>> Turns out that, since the kernel mapping is not overwritten by the
+>> linear mapping, it retains the original permissions assigned in
+>> head.S. So this is enough to fix it
+>>
+>> """
+>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>> index 2df4a55f00d4..fcd250cff4bf 100644
+>> --- a/arch/arm64/kernel/head.S
+>> +++ b/arch/arm64/kernel/head.S
+>> @@ -62,8 +62,8 @@
+>>   /*
+>>    * Initial memory map attributes.
+>>    */
+>> -#define PTE_FLAGS      PTE_TYPE_PAGE | PTE_AF | PTE_SHARED
+>> -#define PMD_FLAGS      PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S
+>> +#define PTE_FLAGS      PTE_TYPE_PAGE | PTE_AF | PTE_SHARED | PTE_UXN
+>> +#define PMD_FLAGS      PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S |
+>> PMD_SECT_UXN
+>>
+>>   #ifdef CONFIG_ARM64_64K_PAGES
+>>   #define MM_MMUFLAGS    PTE_ATTRINDX(MT_NORMAL) | PTE_FLAGS
+>> """
+>>
+>
+> Yes, that fixes it. With that I get :
+>
+> ---[ Kernel Mapping ]---
+> 0xffffffbffc000000-0xffffffbffc600000           6M     RW x  SHD AF    UXN
+> MEM/NORMAL
+> 0xffffffbffc600000-0xffffffbffc7f5000        2004K     RW x  SHD AF    UXN
+> MEM/NORMAL
+> 0xffffffbffc7f5000-0xffffffbffc875000         512K     RW NX SHD AF    UXN
+> MEM/NORMAL
+> 0xffffffbffc875000-0xffffffbffca00000        1580K     RW x  SHD AF    UXN
+> MEM/NORMAL
+> ---[ Linear Mapping ]---
+> 0xffffffc000000000-0xffffffc080000000           2G     RW NX SHD AF    UXN
+> MEM/NORMAL
+> 0xffffffc800000000-0xffffffc880000000           2G     RW NX SHD AF    UXN
+> MEM/NORMAL
+>
 
-But then two CPUs can update the same variable as well, and we must
-have proper locking in place to fix that.
+Thanks.
 
-Anyway, that problem isn't here for sure as its between two
-unsigned-longs. So, should I just move it to bool and resend ?
+Can I take that as a Tested-by ? :-)
+
+>
+>
+>>
+>>>> Note: I see that you have used CONFIG_ARM64_64K_PAGES to handle
+>>>> section/table mapping
+>>>> (which I have tried to cleanup in 16K page size series and which is not
+>>>> merged yet).
+>>>> We should be careful when we merge our patches, as we could miss such
+>>>> new
+>>>> cases.
+>>>>
+>>>
+>>> I was aware of this, and I think it makes sense to the 16 KB pages to
+>>> be merged first, and then I will rebase these patches on top of it.
+>>>
+>>
+>> Do you have a git tree with the latest version?
+>>
+>
+> Yes, it is available here :
+>
+> git://linux-arm.org/linux-skp.git  16k/v2-4.3-rc1
+>
+
+I rebased it, and the required changes are only minor.
+
+I will post the rebased version once your changes have been merged.
 
 -- 
-viresh
+Ard.
