@@ -1,43 +1,55 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 26 Sep 2015 00:03:26 +0200
-Subject: [PATCH v2 0/5] Support CPR on MSM8916
-In-Reply-To: <1442623929-4507-1-git-send-email-sboyd@codeaurora.org>
-References: <1442623929-4507-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <7646588.WPLWGVmoNH@vostro.rjw.lan>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 25 Sep 2015 23:41:13 +0200
+Subject: [PATCH v3 0/4] KVM: arm/arm64: guest synchronous halt/resume
+Message-ID: <1443217277-13173-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 18, 2015 05:52:04 PM Stephen Boyd wrote:
-> This patch series adds support for CPR on MSM8916. The first
-> patch exposes a corner voting API to the CPR driver so that we can
-> change the corner for the MX regulator. If possible I would
-> like to make this patch prettier, but I don't have any great
-> ideas right now. The next patch adds support to adjust voltages in the OPP
-> layer, and then hooks that up to cpufreq-dt so that we can adjust
-> the voltage in response to what CPR tells us to do. I've also thrown
-> in a patch to make RCU lockdep warnings go away, but I'm not sure if it's
-> right. There's still work to do.
-> 
-> The final patch adds the CPR driver. This still has some rough edges. With
-> the OPPv2 bindings I'm thinking of moving the frequency tables into DT
-> and adding a custom vendor property to describe which fuse corner to use for
-> each frequency.
-> 
-> Once you have these patches in place along with a CPU clock driver you
-> can eanble enable cpufreq-dt and add the cpufreq-dt device (maybe the
-> CPR driver should add the cpufreq-dt device?) and you'll see interrupts
-> for CPR and OPP voltage adjustments triggering CPUfreq to modify voltages.
-> 
-> Andy Gross (1):
->   regulator: smd: Add floor and corner operations
-> 
-> Stephen Boyd (4):
->   PM / OPP: Support adjusting OPP voltages at runtime
->   OPP: Allow notifiers to call dev_pm_opp_get_{voltage,freq} RCU-free
->   cpufreq-dt: Handle OPP voltage adjust events
->   power: avs: Add support for CPR (Core Power Reduction)
+This series introduces the capability to synchronously exit the guest
+and prevent it from being re-entered. This modality will be used by
+IRQ forwarding series when changing the state of the IRQ.
 
->From the responses so far I gather there will be a v3?
+Former pause flag used when starting the vcpu in KVM_ARM_VCPU_POWER_OFF
+state, in PSCI calls and in KVM_SET_MP_STATE ioctl is renamed into
+power_off. A new pause flag is introduced. Both now are checked in
+kvm_arch_vcpu_runnable and in the VCPU_RUN critical section, before
+entering the vcpu.
 
-Thanks,
-Rafael
+Best Regards
+
+Eric
+
+History:
+v2 -> v3:
+- unified the comment associated to the pause flag
+- correct commit message of "KVM: arm/arm64: check power_off in
+  critical section before VCPU run"
+- add Christoffer R-b on whole series
+
+v1 -> v2:
+- check pause, power_off and in kvm_arch_vcpu_runnable
+- check power_off in vcpu_run critcal section before guest entry
+- correct compil issue in first patch reported by Andrew
+- rename vcpu_pause into vcpu_sleep
+
+RFC -> PATCH v1:
+- originally part of [RFC 00/17] ARM IRQ forward control based on IRQ
+  bypass manager (https://lkml.org/lkml/2015/7/2/268) and isolated in
+  this series.
+- added __maybe_unused following Marc's advice
+
+
+Eric Auger (4):
+  KVM: arm/arm64: rename pause into power_off
+  KVM: arm/arm64: check power_off in kvm_arch_vcpu_runnable
+  KVM: arm/arm64: check power_off in critical section before VCPU run
+  KVM: arm/arm64: implement kvm_arm_[halt,resume]_guest
+
+ arch/arm/include/asm/kvm_host.h   |  5 +++-
+ arch/arm/kvm/arm.c                | 53 ++++++++++++++++++++++++++++++---------
+ arch/arm/kvm/psci.c               | 10 ++++----
+ arch/arm64/include/asm/kvm_host.h |  5 +++-
+ 4 files changed, 54 insertions(+), 19 deletions(-)
+
+-- 
+1.9.1
