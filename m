@@ -1,25 +1,27 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 25 Sep 2015 11:52:56 -0700
-Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
- 'global_lock'
-In-Reply-To: <1443206945.2161.9.camel@sipsolutions.net>
-References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- <1443202945.2161.8.camel@sipsolutions.net>
- <20150925184741.GF5951@linux>
- <1443206945.2161.9.camel@sipsolutions.net>
-Message-ID: <20150925185256.GG5951@linux>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 25 Sep 2015 11:54:35 -0700
+Subject: [PATCH 09/14] ARM: dts: ifc6410: Add missing pinctrl to gsbi7 uart
+In-Reply-To: <1442579507-20314-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1442579371-19822-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1442579507-20314-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <CAMAWPa_7U-PBwsngU+qc5SAt4HcCvPwUGvGY9nPUu+pZtPA7Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25-09-15, 20:49, Johannes Berg wrote:
-> Ok, then, but that means Rafael is completely wrong ...
-> debugfs_create_bool() takes a *pointer* and it needs to be long-lived,
-> it can't be on the stack. You also don't get a call when it changes.
+Hi Srini,
 
-Ahh, ofcourse. My bad as well...
+On Fri, Sep 18, 2015 at 5:31 AM, Srinivas Kandagatla
+<srinivas.kandagatla@linaro.org> wrote:
+> This patch adds missing 2pin uart pinctrl property to gsbi7 uart on
+> IFC6410.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-I think we can change structure definition but will wait for Rafael's
-comment before that.
+kernelci.org found some new boot failures in -next on 8064[1].  I
+bisected it down to this patch, which landed in linux next in the form
+of commit d3a578ed4310 ARM: dts: ifc6410: Add missing pinctrl to gsbi7
+uart.
 
--- 
-viresh
+Kevin
+
+[1] http://kernelci.org/boot/qcom-apq8064-ifc6410/job/next/kernel/next-20150925/defconfig/multi_v7_defconfig/lab/lab-khilman/?_id=5605083c59b51466d26c3250
