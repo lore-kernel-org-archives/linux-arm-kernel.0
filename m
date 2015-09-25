@@ -1,49 +1,42 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Fri, 25 Sep 2015 08:18:07 -0700
-Subject: [PATCH 1/3] Documentation: dt: keystone: provide SoC specific
- compatible flags
-In-Reply-To: <56055F1F.4060401@ti.com>
-References: <1442938118-4718-1-git-send-email-nm@ti.com>
- <1442938118-4718-2-git-send-email-nm@ti.com> <5602ED34.9010108@oracle.com>
- <56040323.1080409@ti.com> <560406C2.6090200@ti.com> <56041CA4.40208@ti.com>
- <56055F1F.4060401@ti.com>
-Message-ID: <560565AF.2010701@oracle.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 25 Sep 2015 16:21:48 +0100
+Subject: [PATCH v5 02/11] drivers: PL011: refactor pl011_startup()
+In-Reply-To: <CAOZdJXVxDjkoCJsqE6zH_UEQcxp9T2fY1YTfV7zvWjXwwbziEw@mail.gmail.com>
+References: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
+ <1432225584-4655-3-git-send-email-andre.przywara@arm.com>
+ <CAOZdJXVxDjkoCJsqE6zH_UEQcxp9T2fY1YTfV7zvWjXwwbziEw@mail.gmail.com>
+Message-ID: <5605668C.5020407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/25/2015 7:50 AM, Nishanth Menon wrote:
-> On 09/24/2015 10:54 AM, Murali Karicheri wrote:
-> [...]
->> ti,omap3 is the family of omap3 devices similar to keystone. ti,omap3450
->> is required if there is an exceptional treatment required for ti,omap3450.
->>
->> In keystone case so far there is no case of exceptional treatment
->> required in the code for a specific SoC. So a generic name, ti,keystone
->> is used. When exceptional treatment is needed in the future, for example
->> k2hk Soc, we should introduce SoC specific string in the following order.
->
-> Did you do a grep on the code to see?
-> $ git grep ti,omap3 arch/arm/mach-omap2/
->             arch/arm/mach-omap2/board-generic.c:    "ti,omap3430",
-> arch/arm/mach-omap2/board-generic.c:    "ti,omap3",
-> arch/arm/mach-omap2/board-generic.c:    "ti,omap36xx",
-> arch/arm/mach-omap2/board-generic.c:    "ti,omap3-beagle",
->
-> This is the same as keystone's device support. even though only 36xx was
-> needed, we introduced other SoC specific compatibility match.
->
->> "ti,k2hk-evm", "ti,k2hk", "ti,keystone"
->>
->> So unless there is an exception, there is no need for a SoC specific
->> string in the compatibility string list. So this can be added later if
->> there is need for exceptional treatment. Did I get it wrong?
->>
->
-> I see both your views seem to be "if we dont need a compatible" dont add
-> it. My view was based on "be accurate in the hardware description"
->
-> OK - i will probably agree on the topic. But, how about userspace
-> needing to know which SoC they are on, without needing to depend on
-> board->soc mapping? How do we help resolve that?
->
-Why the user space should care about exact SOC ?
+Hi Timur,
+
+On 25/09/15 00:11, Timur Tabi wrote:
+> On Thu, May 21, 2015 at 11:26 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+>> +static void pl011_enable_interrupts(struct uart_amba_port *uap)
+>> +{
+>> +       spin_lock_irq(&uap->port.lock);
+>> +
+>> +       /* Clear out any spuriously appearing RX interrupts */
+>> +       writew(UART011_RTIS | UART011_RXIS,
+>> +              uap->port.membase + UART011_ICR);
+>> +       uap->im = UART011_RTIM;
+>> +       if (!pl011_dma_rx_running(uap))
+>> +               uap->im |= UART011_RXIM;
+>> +       writew(uap->im, uap->port.membase + UART011_IMSC);
+>> +       spin_unlock_irq(&uap->port.lock);
+>> +}
+> 
+> Shouldn't this function be using spin_lock_irqsave() and
+> spin_unlock_irqrestore()?  If interrupts are generally disabled before
+> calling this function, then they will be enabled by the
+> spin_unlock_irq() call, and I don't think we want that.  This function
+> is only supposed to enable pl011 interrupts, not all interrupts.
+
+Are you seeing an actual issue with this? Does changing it fix anything?
+Looking at the history I see that these locks predate git history.
+If I get this correctly, going from spin_{un,}lock_irq to the _irqsave
+variants should always be safe, but I'd like to hear more opinions on this.
+
+Cheers,
+Andre.
