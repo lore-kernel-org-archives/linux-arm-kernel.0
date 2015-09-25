@@ -1,44 +1,68 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Fri, 25 Sep 2015 09:15:21 -0700
-Subject: [PATCH 1/3] Documentation: dt: keystone: provide SoC specific
- compatible flags
-In-Reply-To: <56056FD9.5060000@ti.com>
-References: <1442938118-4718-1-git-send-email-nm@ti.com>
- <1442938118-4718-2-git-send-email-nm@ti.com> <5602ED34.9010108@oracle.com>
- <56040323.1080409@ti.com> <560406C2.6090200@ti.com> <56041CA4.40208@ti.com>
- <56055F1F.4060401@ti.com> <560565AF.2010701@oracle.com>
- <56056FD9.5060000@ti.com>
-Message-ID: <56057319.9080104@oracle.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 25 Sep 2015 17:19:24 +0100
+Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
+ ECAM) and ACPI code out of arch/x86/ directory
+In-Reply-To: <56057001.9000101@linaro.org>
+References: <5570447D.3020705@linaro.org> <557504A2.3060203@linaro.org>
+ <20150608151443.GA16151@red-moon> <55E4340D.6050004@linaro.org>
+ <55ED6010.3020406@linaro.org> <20150908150727.GF29293@red-moon>
+ <55F0388B.1090607@linaro.org> <20150911112018.GA13033@red-moon>
+ <55F6DFF6.4010807@linaro.org> <56057001.9000101@linaro.org>
+Message-ID: <20150925161924.GA2271@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-9/25/2015 9:01 AM, Nishanth Menon wrote:
-> On 09/25/2015 10:18 AM, santosh shilimkar wrote:
->> On 9/25/2015 7:50 AM, Nishanth Menon wrote:
-> [...]
->>> But, how about userspace
->>> needing to know which SoC they are on, without needing to depend on
->>> board->soc mapping? How do we help resolve that?
->>>
->> Why the user space should care about exact SOC ?
->
-> examples vary - trivial one is: debug tools like omapconf[1] or testing
-> tools like opentest[2] need some standard way to ensure Linux kernel is
-> functional - trusting the least set of parameters is usually what we
-> would prefer. while building a generic distro such as debian or yocto,
-> one prefers NOT to need to do a package build per SoC/perboard - that
-> never scales. instead, you'd like the same application run on different
-> systems dynamically.
->
-I guessed omapconf example is coming though Keystone has no such tool
-yet ;-). Opentest shouldn't need that info either.
+On Fri, Sep 25, 2015 at 05:02:09PM +0100, Tomasz Nowicki wrote:
 
-I do agree that having a soc along with board is useful in
-longer run to accommodation more boards and variants.
-And only on that merit, I am willing to take these patches.
+[...]
 
-Please refresh the series commit messages based on the
-discussion so far and repost. Will pick it up then.
+> > My concerns/ideas related to raw accessors for ARM64, please correct me
+> > at any point.
+> >
+> > ACPI spec - chapter: 19.5.96 OperationRegion (Declare Operation Region)
+> > defines PCI_Config as one of region types. Every time ASL opcode
+> > operates on corresponding PCI config space region, ASL interpreter is
+> > dispatching address space to our raw accessors, please see
+> > acpi_ex_pci_config_space_handler, acpi_ev_pci_config_region_setup calls.
+> > What is more important, such operations may happen after (yes after) bus
+> > enumeration, but always raw accessors are called at the end with the
+> > {segment, bus, dev, fn} tuple.
+> >
+> > Giving above, here are some ideas:
+> > 1. We force somehow vendors to avoid operations on PCI config regions in
+> > ASL code. PCI config region definitions still fall into Hardware Reduced
+> > profile, so new ACPICA special subset for ARM64 is need. Then raw ACPI
+> > accessors can be empty (and overridden by x86).
+> > 2. We provide raw accessors which translate {segment, bus, dev, fn}
+> > tuple to Linux generic accessors (this can be considered only if PCI
+> > config accesses happened after bus enumeration for HR profile, thus
+> > tuple to bus structure map is possible).
+> > 4. We rely on the generic MCFG based raw read and writes.
+> 
+> I will appreciate your opinion on above ideas.
 
-Regards,
-Santosh
+Well, (1) does not seem allowed by the ACPI specification, the only
+way we can detect that is by leaving the raw accessors empty for
+now and see how things will turn out on ARM64, in the meantime
+I will start a thread on ASWG to check how that's used on x86, I
+do not have any machine to test this and grokking ACPICA is not
+trivial, there is lots of history there and it is hard to fathom.
+
+(2) is tempting but I am not sure it works all the time (I still
+think that's a quirk of ACPI specs, namely that some OperationRegion
+should always be available to ASL, maybe that's just an unused ACPI
+spec quirk).
+
+If I read you series correctly (4) can be implemented easily if and
+when we deem the raw accessors necessary, on top of the MCFG layer,
+by making the MCFG raw accessors the default instead of leaving them
+empty.
+
+I pulled your branch and started testing it on AMD Seattle, next week
+we should try to get this done.
+
+I think you should target option (1) and in the meantime we should
+reach a conclusion on the raw accessors usage on ARM64.
+
+Thanks,
+Lorenzo
