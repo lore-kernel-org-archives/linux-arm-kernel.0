@@ -1,52 +1,74 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 25 Sep 2015 15:37:33 +0100
-Subject: [PATCH v4 5/5] arm64: dts: Add sensor node to Juno dt
-In-Reply-To: <20150924163658.GH2368@e106497-lin.cambridge.arm.com> (Liviu
- Dudau's message of "Thu, 24 Sep 2015 17:36:58 +0100")
-References: <1442335861-7282-1-git-send-email-punit.agrawal@arm.com>
- <1442335861-7282-6-git-send-email-punit.agrawal@arm.com>
- <20150924163658.GH2368@e106497-lin.cambridge.arm.com>
-Message-ID: <9hhd1x6bm4y.fsf@e105922-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 25 Sep 2015 07:40:35 -0700
+Subject: [GIT PULL] omap fixes for most mmc regressions and few other fixes
+Message-ID: <20150925144034.GR23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Liviu Dudau <Liviu.Dudau@arm.com> writes:
+The following changes since commit 7168e947291f0ead07e5638b4599fb7845288b69:
 
-> On Tue, Sep 15, 2015 at 05:51:01PM +0100, Punit Agrawal wrote:
->> The SCP firmware on Juno provides access to SoC sensors via the
->> SCPI. Add the sensor nodes to the device tree to enable this support.
->> 
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Liviu Dudau <liviu.dudau@arm.com>
->
-> Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+  Merge branch 'fixes-rc1' into omap-for-v4.3/fixes (2015-09-14 13:42:11 -0700)
 
-Thanks Liviu!
+are available in the git repository at:
 
->
->> Cc: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  arch/arm64/boot/dts/arm/juno-base.dtsi | 5 +++++
->>  1 file changed, 5 insertions(+)
->> 
->> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
->> index c624208..dd5158e 100644
->> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
->> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
->> @@ -96,6 +96,11 @@
->>  				clock-output-names = "pxlclk0", "pxlclk1";
->>  			};
->>  		};
->> +
->> +		scpi_sensors0: sensors {
->> +			compatible = "arm,scpi-sensors";
->> +			#thermal-sensor-cells = <1>;
->> +		};
->>  	};
->>  
->>  	/include/ "juno-clocks.dtsi"
->> -- 
->> 2.5.1
->> 
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/fixes-rc2
+
+for you to fetch changes up to 9a5e3f27d1b8ca349b79e8b5fe1874eeeedb6f45:
+
+  ARM: dts: fix omap2+ address translation for pbias (2015-09-24 16:28:32 -0700)
+
+----------------------------------------------------------------
+Fixes for omaps for v4.3-rc cycle:
+
+- Two more patches to fix most of the MMC regressions with the
+  PBIAS regulator changes. At least two MMC driver related issues
+  still seems to remain for omap3 legacy booting and omap4 duovero.
+  Note that the dts changes depend on a recent regulator fix, and
+  are based on the regulator commit now in mainline kernel
+
+- Enable autoidle for am43xx clocks to prevent clocks from staying
+  always on
+
+- Fix i2c5 pinctrl offsets for omap5-uevm
+
+- Enable PCA953X as that's needed for HDMI to work on omap5
+
+- Update phy supplies for beagle x15 beta board
+
+- Use palmas-usb for on beagle x15 to start using the related
+  driver that recently got merged
+-
+
+----------------------------------------------------------------
+Dave Gerlach (1):
+      ARM: OMAP2+: AM43XX: Enable autoidle for clks in am43xx_init_late
+
+Grazvydas Ignotas (2):
+      ARM: dts: omap5-uevm.dts: fix i2c5 pinctrl offsets
+      ARM: omap2plus_defconfig: enable GPIO_PCA953X
+
+Kishon Vijay Abraham I (2):
+      regulator: pbias: program pbias register offset in pbias driver
+      ARM: dts: fix omap2+ address translation for pbias
+
+Nishanth Menon (1):
+      ARM: dts: am57xx-beagle-x15: Update Phy supplies
+
+Roger Quadros (1):
+      ARM: dts: am57xx-beagle-x15: use palmas-usb for USB2
+
+Tony Lindgren (1):
+      Merge commit 'b8c93646fd5c' into omap-for-v4.3/fixes
+
+ .../bindings/regulator/pbias-regulator.txt         |  7 ++-
+ arch/arm/boot/dts/am57xx-beagle-x15.dts            | 42 ++++++++++------
+ arch/arm/boot/dts/dra7.dtsi                        |  1 +
+ arch/arm/boot/dts/omap2430.dtsi                    |  1 +
+ arch/arm/boot/dts/omap3.dtsi                       | 25 +++++-----
+ arch/arm/boot/dts/omap4.dtsi                       |  1 +
+ arch/arm/boot/dts/omap5-uevm.dts                   |  4 +-
+ arch/arm/boot/dts/omap5.dtsi                       |  1 +
+ arch/arm/configs/omap2plus_defconfig               |  1 +
+ arch/arm/mach-omap2/io.c                           |  1 +
+ drivers/regulator/pbias-regulator.c                | 56 +++++++++++++++++++---
+ 11 files changed, 104 insertions(+), 36 deletions(-)
