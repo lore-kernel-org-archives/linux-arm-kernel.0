@@ -1,41 +1,46 @@
-From: aalonso@freescale.com (Adrian Alonso)
-Date: Fri, 25 Sep 2015 16:05:57 -0500
-Subject: [PATCH v6 1/6] ARM: dts: imx: imx7d add iomuxc lpsr device node
-Message-ID: <1443215162-13716-1-git-send-email-aalonso@freescale.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 25 Sep 2015 23:42:34 +0200
+Subject: [PATCH v3 5/5] cpufreq: qoriq: Don't look at clock implementation
+ details
+In-Reply-To: <20150922194654.GJ24314@linux>
+References: <1442723397-26329-1-git-send-email-scottwood@freescale.com>
+ <1442723397-26329-6-git-send-email-scottwood@freescale.com>
+ <20150922194654.GJ24314@linux>
+Message-ID: <3374654.Hks5DeSGVV@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree node to support iomuxc-lpsr controller, fsl,iput-sel
-phandle allows to get input select register base address which is
-shared from main iomuxc controller.
+On Tuesday, September 22, 2015 12:46:54 PM Viresh Kumar wrote:
+> On 19-09-15, 23:29, Scott Wood wrote:
+> > Get the CPU clock's potential parent clocks from the clock interface
+> > itself, rather than manually parsing the clocks property to find a
+> > phandle, looking at the clock-names property of that, and assuming that
+> > those are valid parent clocks for the cpu clock.
+> > 
+> > This is necessary now that the clocks are generated based on the clock
+> > driver's knowledge of the chip rather than a fragile device-tree
+> > description of the mux options.
+> > 
+> > We can now rely on the clock driver to ensure that the mux only exposes
+> > options that are valid.  The cpufreq driver was currently being overly
+> > conservative in some cases -- for example, the "min_cpufreq =
+> > get_bus_freq()" restriction only applies to chips with erratum
+> > A-004510, and whether the freq_mask used on p5020 is needed depends on
+> > the actual frequencies of the PLLs (FWIW, p5040 has a similar
+> > limitation but its .freq_mask was zero) -- and the frequency mask
+> > mechanism made assumptions about particular parent clock indices that
+> > are no longer valid.
+> > 
+> > Signed-off-by: Scott Wood <scottwood@freescale.com>
+> > ---
+> > v3: was patch 1/5 and patch 4/5, plus blacklist e6500 and changes
+> > to clk api usage
+> > 
+> >  drivers/cpufreq/qoriq-cpufreq.c | 137 ++++++++++++----------------------------
+> >  1 file changed, 40 insertions(+), 97 deletions(-)
+> 
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Signed-off-by: Adrian Alonso <aalonso@freescale.com>
----
-Changes for V2: Resend
-Changes for V3: Add phandle to get input select register base address
-Changes for V4: Resend
-Changes for V5: Rename property to fsl,input-sel
-Changes for V6: Resend
+I'm wondering who's supposed to be merging this set?
 
- arch/arm/boot/dts/imx7d.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index 15c2193..92ef0a9 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -446,6 +446,12 @@
- 				status = "disabled";
- 			};
- 
-+			iomuxc_lpsr: iomuxc-lpsr at 302c0000 {
-+				compatible = "fsl,imx7d-iomuxc-lpsr";
-+				reg = <0x302c0000 0x10000>;
-+				fsl,input-sel = <&iomuxc>;
-+			};
-+
- 			gpt1: gpt at 302d0000 {
- 				compatible = "fsl,imx7d-gpt", "fsl,imx6sx-gpt";
- 				reg = <0x302d0000 0x10000>;
--- 
-2.1.4
+Rafael
