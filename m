@@ -1,25 +1,28 @@
-From: johannes@sipsolutions.net (Johannes Berg)
-Date: Fri, 25 Sep 2015 19:42:25 +0200
-Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
- 'global_lock'
-In-Reply-To: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- (sfid-20150925_184230_610012_AD3DF607)
-References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- (sfid-20150925_184230_610012_AD3DF607)
-Message-ID: <1443202945.2161.8.camel@sipsolutions.net>
+From: lho@apm.com (Loc Ho)
+Date: Fri, 25 Sep 2015 10:52:23 -0700
+Subject: [PATCH] edac: xgene: Fix possible sprintf overflow issue
+In-Reply-To: <20150925134551.GE3568@pd.tnic>
+References: <1443116287-11752-1-git-send-email-lho@apm.com>
+ <20150925134551.GE3568@pd.tnic>
+Message-ID: <CAPw-ZTmYEx9o39Xr_4wyQd_ZNhpQv6fmjsbmzw7J27+i2nADqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-09-25 at 09:41 -0700, Viresh Kumar wrote:
+Hi,
 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
-> V3->V4:
-> - Create a local variable instead of changing type of global_lock
->   (Rafael)
+>
+> All 5 applied.
+>
+> I've merged the last hunk changing xgene_edac_l3_create_debugfs_nodes
+> into the second patch which adds the L3 support.
 
-Err, surely that wasn't what Rafael meant, since it's clearly
-impossible to use a pointer to the stack, assign to it once, and the
-expect anything to wkr at all ...
 
-johannes
+Thanks you... Next I would like to get the ACPI APEI supported. But
+unlike x86 which as NMI interface, APM hardware don't support this NMI
+interface. In order to make this works, we need an method to trigger
+the OS to indicate that the APEI table is available. For this, we are
+thinking about writing an separate APEI driver that wires up the IRQ
+to trigger the OS. Before we get going with this, I would like to run
+by you to see if you have any suggestion?
+
+-Loc
