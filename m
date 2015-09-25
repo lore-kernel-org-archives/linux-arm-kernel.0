@@ -1,54 +1,38 @@
-From: a0131933@ti.com (Lokesh Vutla)
-Date: Fri, 25 Sep 2015 18:27:23 +0530
-Subject: [PATCH 07/17] ARM: dts: am4372: add reset data
-In-Reply-To: <1443104818-993-8-git-send-email-t-kristo@ti.com>
-References: <1443104818-993-1-git-send-email-t-kristo@ti.com>
- <1443104818-993-8-git-send-email-t-kristo@ti.com>
-Message-ID: <560544B3.3090805@ti.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Fri, 25 Sep 2015 14:05:52 +0100
+Subject: [PATCH 07/22] arm64: Keep track of CPU feature registers
+In-Reply-To: <20150925113808.GL6281@e103592.cambridge.arm.com>
+References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
+ <1442413280-31885-8-git-send-email-suzuki.poulose@arm.com>
+ <20150925113808.GL6281@e103592.cambridge.arm.com>
+Message-ID: <560546B0.7070909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+On 25/09/15 12:38, Dave P Martin wrote:
+> On Wed, Sep 16, 2015 at 03:21:05PM +0100, Suzuki K. Poulose wrote:
+>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>>
+>> This patch adds an infrastructure to keep track of the CPU feature
+>> registers on the system. For each register, the infrastructure keeps
+>> track of the system wide safe value of the feature bits. Also, tracks
+>> the which fields of a register should be matched strictly across all
+>> the CPUs on the system for the SANITY check infrastructure.
+>>
+>> The feature bits are classified as one of SCALAR_MIN, SCALAR_MAX and DISCRETE
+>> depending on the implication of the possible values. This information
+>> is used to decide the safe value for a feature.
+>>
+>> SCALAR_MIN - The smaller value is safer
+>> SCALAR_MAX - The bigger value is safer
+>> DISCRETE - We can't decide between the two, so a predefined safe_value is used.
+>
+> Can documentation of the meanings of these be added somewhere in the
+> relevant header or in Documentation?
 
-On Thursday 24 September 2015 07:56 PM, Tero Kristo wrote:
-> Add reset data for pruss, gfx, wkup-m3 and system reset.
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  arch/arm/boot/dts/am4372.dtsi |   24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index 0447c04a..fcc8d31 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -116,12 +116,15 @@
->  				reg-names = "umem", "dmem";
->  				ti,hwmods = "wkup_m3";
->  				ti,pm-firmware = "am335x-pm-firmware.elf";
-> +				reset-names = "wkup_m3";
-> +				resets = <&prcm 0x2000 0x10 3 0x14 5>;
->  			};
->  
->  			prcm: prcm at 1f0000 {
->  				compatible = "ti,am4-prcm";
->  				reg = <0x1f0000 0x11000>;
->  				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-> +				#reset-cells = <5>;
->  
->  				prcm_clocks: clocks {
->  					#address-cells = <1>;
-> @@ -130,6 +133,12 @@
->  
->  				prcm_clockdomains: clockdomains {
->  				};
-> +
-> +				system_reset: system_reset {
-> +					compatible = "ti,system-reset";
-> +					reset-names = "system";
-> +					reset-cells = <&prcm 0x4000 0 0 4 0>;
-This should be resets instead of reset-cells.
-With this change, reboot is functional on AM437x GP evm.
+Sure. They were part of the initial draft and eventually lost them over the
+reworks. I will add them back, since there is wider use of the information
+across the system, from what I started with(i.e, Userspace visibility).
 
-Thanks and regards,
-Lokesh
+Cheers
+Suzuki
