@@ -1,64 +1,98 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 25 Sep 2015 15:52:30 +0100
-Subject: [PATCH v1 0/8] xen/arm: vgic: Support 32-bit access for 64-bit
- register
-In-Reply-To: <1443192667-16112-1-git-send-email-julien.grall@citrix.com>
-References: <1443192667-16112-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <56055FAE.70704@citrix.com>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Fri, 25 Sep 2015 10:10:31 -0500
+Subject: [PATCH] ARM: dts: Add am335x-bonegreen
+Message-ID: <1443193831-5693-1-git-send-email-robertcnelson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please ignore this version, I've sent it to the wrong mailing list.
+SeeedStudio BeagleBone Green (BBG) is clone of the BeagleBone Black (BBB) minus
+the HDMI port and addition of two Grove connectors (i2c2 and usart2).
 
-Sorry for the noise.
+This board can be identified by the 1A value after A335BNLT (BBB) in the at24 eeprom:
+1A: [aa 55 33 ee 41 33 33 35  42 4e 4c 54 1a 00 00 00 |.U3.A335BNLT....|]
 
-On 25/09/15 15:50, Julien Grall wrote:
-> Hi all,
-> 
-> This series aims to fix the 32-bit access on 64-bit register. Some guest
-> OS such as FreeBSD and Linux (only in the ITS) use 32-bit access and will
-> crash at boot time.
-> 
-> I took the opportunity to go further and optimize the way Xen is storing
-> registers such as GICD_IPRIORITYR, GICD_ITARGETR and GICD_IROUTER.
-> 
-> Major changes in v2:
->     - Use the helpers in GICv2
->     - Optimize the assembly input for vgic_regN_* helpers on arm32
->     - Add support for sign-extension generically
->     - Store GICD_{IPRIORITYR, ITARGETSR, IROUTER} in a better way
-> 
-> For all the changes see in each patch.
-> 
-> A branch has been pushed based on the lastest staging:
-> 
-> git://xenbits.xen.org/people/julieng/xen-unstable.git branch gicv3-32bit-v1
-> 
-> Sincerely yours,
-> 
-> Julien Grall (8):
->   xen/arm: io: remove mmio_check_t typedef
->   xen/arm: io: Extend write/read handler to pass the register in
->     parameter
->   xen/arm: Support sign-extension for every read access
->   xen/arm: vgic: ctlr stores a 32-bit hardware register so use uint32_t
->   xen/arm: vgic: Optimize the way to store GICD_IPRIORITYR in the rank
->   xen/arm: vgic: Optimize the way to store the target vCPU in the rank
->   xen/arm: vgic: Introduce helpers to read/write/clear/set vGIC register
->     ...
->   xen/arm: vgic-v3: Support 32-bit access for 64-bit registers
-> 
->  xen/arch/arm/io.c            |  42 +++++-
->  xen/arch/arm/vgic-v2.c       | 295 +++++++++++++++++++++---------------
->  xen/arch/arm/vgic-v3.c       | 352 +++++++++++++++++++++++++------------------
->  xen/arch/arm/vgic.c          |  72 ++++++++-
->  xen/arch/arm/vuart.c         |  16 +-
->  xen/include/asm-arm/domain.h |   2 +-
->  xen/include/asm-arm/mmio.h   |   5 +-
->  xen/include/asm-arm/vgic.h   | 148 +++++++++++++++---
->  8 files changed, 617 insertions(+), 315 deletions(-)
-> 
+http://beagleboard.org/green
+http://www.seeedstudio.com/wiki/Beaglebone_green
 
+Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+CC: Tony Lindgren <tony@atomide.com>
+CC: Jason Kridner <jkridner@gmail.com>
+---
+ arch/arm/boot/dts/Makefile             |  1 +
+ arch/arm/boot/dts/am335x-bonegreen.dts | 53 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 54 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am335x-bonegreen.dts
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 233159d..e45d771 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -446,6 +446,7 @@ dtb-$(CONFIG_SOC_AM33XX) += \
+ 	am335x-base0033.dtb \
+ 	am335x-bone.dtb \
+ 	am335x-boneblack.dtb \
++	am335x-bonegreen.dtb \
+ 	am335x-sl50.dtb \
+ 	am335x-evm.dtb \
+ 	am335x-evmsk.dtb \
+diff --git a/arch/arm/boot/dts/am335x-bonegreen.dts b/arch/arm/boot/dts/am335x-bonegreen.dts
+new file mode 100644
+index 0000000..0f65bda
+--- /dev/null
++++ b/arch/arm/boot/dts/am335x-bonegreen.dts
+@@ -0,0 +1,53 @@
++/*
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++
++#include "am33xx.dtsi"
++#include "am335x-bone-common.dtsi"
++
++/ {
++	model = "TI AM335x BeagleBone Green";
++	compatible = "ti,am335x-bone-green", "ti,am335x-bone-black", "ti,am335x-bone", "ti,am33xx";
++};
++
++&ldo3_reg {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-always-on;
++};
++
++&mmc1 {
++	vmmc-supply = <&vmmcsd_fixed>;
++};
++
++&mmc2 {
++	vmmc-supply = <&vmmcsd_fixed>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&emmc_pins>;
++	bus-width = <8>;
++	status = "okay";
++};
++
++&am33xx_pinmux {
++	uart2_pins: uart2_pins {
++		pinctrl-single,pins = <
++			0x150 (PIN_INPUT | MUX_MODE1)	/* spi0_sclk.uart2_rxd */
++			0x154 (PIN_OUTPUT | MUX_MODE1)	/* spi0_d0.uart2_txd */
++		>;
++	};
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins>;
++	status = "okay";
++};
++
++&rtc {
++	system-power-controller;
++};
 -- 
-Julien Grall
+2.5.3
