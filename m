@@ -1,30 +1,59 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 25 Sep 2015 07:21:27 +0530
-Subject: [PATCH] dmaengine: pxa_dma: fix initial list move
-In-Reply-To: <87mvwbppxn.fsf@belgarion.home>
-References: <1442826392-9082-1-git-send-email-robert.jarzmik@free.fr>
- <20150924172808.GE2381@localhost> <87mvwbppxn.fsf@belgarion.home>
-Message-ID: <20150925015127.GF2381@localhost>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 25 Sep 2015 11:12:13 +0900
+Subject: [PATCH 0/3] i2c: uniphier: add two I2C controller drivers for
+ UniPhier SoC platform
+In-Reply-To: <1438243942-26401-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1438243942-26401-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAQgcphEQA27Z4+rDiJZ1wZ7-FLDhx3hVz+bVcTstdgQXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 09:39:32PM +0200, Robert Jarzmik wrote:
-> Vinod Koul <vinod.koul@intel.com> writes:
-> 
-> > On Mon, Sep 21, 2015 at 11:06:32AM +0200, Robert Jarzmik wrote:
-> >> Since the commit to have an allocated list of virtual descriptors was
-> >> reverted, the pxa_dma driver is broken, as it assumes the descriptor is
-> >> placed on the allocated list upon allocation.
-> >> 
-> >> Fix the issue in pxa_dma by making an allocated virtual descriptor a
-> >> singleton.
-> >
-> > This seems okay, simpler and safer. Do you want me to apply this instead
-> > while detailed approach can be reviewed and discussed
-> Yes, please. Having the guarantee this gets into the next or next after next -rc
-> will enable me to do my pull request, and repair pxa.
+Hi Wolfram,
 
-Applied, thanks
+
+Could you have some time for reviewing this series?
+Perhaps, after ELCE?
+
+
+2015-07-30 17:12 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+>
+> This series adds two I2C controller drivers.
+> (they are completely different IPs.)
+>
+> The first one is a very simple FIFO-less I2C controller,
+> which is used on some older UniPhier SoCs.
+>
+> The other one is higher-performance I2C controller with TX/RX FIFO,
+> used on newer UniPhier SoCs.
+>
+>
+>
+> Masahiro Yamada (3):
+>   i2c: uniphier: add UniPhier FIFO-less I2C driver
+>   i2c: uniphier_f: add UniPhier FIFO-builtin I2C driver
+>   i2c: uniphier: add bindings for UniPhier I2C controllers
+>
+>  .../devicetree/bindings/i2c/i2c-uniphier.txt       |  46 ++
+>  drivers/i2c/busses/Kconfig                         |  16 +
+>  drivers/i2c/busses/Makefile                        |   2 +
+>  drivers/i2c/busses/i2c-uniphier-f.c                | 589 +++++++++++++++++++++
+>  drivers/i2c/busses/i2c-uniphier.c                  | 446 ++++++++++++++++
+>  5 files changed, 1099 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-uniphier.txt
+>  create mode 100644 drivers/i2c/busses/i2c-uniphier-f.c
+>  create mode 100644 drivers/i2c/busses/i2c-uniphier.c
+>
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
 
 -- 
-~Vinod
+Best Regards
+Masahiro Yamada
