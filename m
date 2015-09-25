@@ -1,31 +1,28 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 25 Sep 2015 22:22:33 +0200
+Date: Fri, 25 Sep 2015 22:26:22 +0200
 Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
  'global_lock'
-In-Reply-To: <1460975.zriLPuubXp@vostro.rjw.lan>
+In-Reply-To: <20150925185256.GG5951@linux>
 References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- <1460975.zriLPuubXp@vostro.rjw.lan>
-Message-ID: <16046206.NvsuxYn5NN@vostro.rjw.lan>
+ <1443206945.2161.9.camel@sipsolutions.net> <20150925185256.GG5951@linux>
+Message-ID: <4331507.W3ZDWldbWu@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 25, 2015 10:18:13 PM Rafael J. Wysocki wrote:
-> On Friday, September 25, 2015 09:41:37 AM Viresh Kumar wrote:
-> > global_lock is defined as an unsigned long and accessing only its lower
-> > 32 bits from sysfs is incorrect, as we need to consider other 32 bits
-> > for big endian 64 bit systems. There are no such platforms yet, but the
-> > code needs to be robust for such a case.
-> > 
-> > Fix that by passing a local variable to debugfs_create_bool() and
-> > assigning its value to global_lock later.
-> > 
-> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+On Friday, September 25, 2015 11:52:56 AM Viresh Kumar wrote:
+> On 25-09-15, 20:49, Johannes Berg wrote:
+> > Ok, then, but that means Rafael is completely wrong ...
+> > debugfs_create_bool() takes a *pointer* and it needs to be long-lived,
+> > it can't be on the stack. You also don't get a call when it changes.
 > 
-> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> 
-> Greg, please take this one if the [2/2] looks good to you.
+> Ahh, ofcourse. My bad as well...
 
-Ouch, turns out it was a bad idea.  Please scratch that.
+Well, sorry about the wrong suggestion.
+
+> I think we can change structure definition but will wait for Rafael's
+> comment before that.
+
+OK, change the structure then.
 
 Thanks,
 Rafael
