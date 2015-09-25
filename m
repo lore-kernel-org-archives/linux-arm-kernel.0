@@ -1,51 +1,62 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 25 Sep 2015 17:25:12 +0200
-Subject: [GIT PULL] pxa fixes for v4.3
-Message-ID: <87bncqo71j.fsf@belgarion.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 Sep 2015 16:30:35 +0100
+Subject: [PATCH v5 02/11] drivers: PL011: refactor pl011_startup()
+In-Reply-To: <5605668C.5020407@arm.com>
+References: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
+ <1432225584-4655-3-git-send-email-andre.przywara@arm.com>
+ <CAOZdJXVxDjkoCJsqE6zH_UEQcxp9T2fY1YTfV7zvWjXwwbziEw@mail.gmail.com>
+ <5605668C.5020407@arm.com>
+Message-ID: <20150925153035.GP21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd, Kevin, Olof,
+On Fri, Sep 25, 2015 at 04:21:48PM +0100, Andre Przywara wrote:
+> Hi Timur,
+> 
+> On 25/09/15 00:11, Timur Tabi wrote:
+> > On Thu, May 21, 2015 at 11:26 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> >> +static void pl011_enable_interrupts(struct uart_amba_port *uap)
+> >> +{
+> >> +       spin_lock_irq(&uap->port.lock);
+> >> +
+> >> +       /* Clear out any spuriously appearing RX interrupts */
+> >> +       writew(UART011_RTIS | UART011_RXIS,
+> >> +              uap->port.membase + UART011_ICR);
+> >> +       uap->im = UART011_RTIM;
+> >> +       if (!pl011_dma_rx_running(uap))
+> >> +               uap->im |= UART011_RXIM;
+> >> +       writew(uap->im, uap->port.membase + UART011_IMSC);
+> >> +       spin_unlock_irq(&uap->port.lock);
+> >> +}
+> > 
+> > Shouldn't this function be using spin_lock_irqsave() and
+> > spin_unlock_irqrestore()?  If interrupts are generally disabled before
+> > calling this function, then they will be enabled by the
+> > spin_unlock_irq() call, and I don't think we want that.  This function
+> > is only supposed to enable pl011 interrupts, not all interrupts.
+> 
+> Are you seeing an actual issue with this? Does changing it fix anything?
+> Looking at the history I see that these locks predate git history.
+> If I get this correctly, going from spin_{un,}lock_irq to the _irqsave
+> variants should always be safe, but I'd like to hear more opinions on this.
 
-Please consider this pull request for pxa fixes for 4.3, made of 3 small
-regression fixes.
+If code is only called from process sleepable context, then using the
+_irq variants is a sane thing to do, and avoids the extra work to
+read and store the interrupt state prior to the protected code.
+Currently that's true in mainline.
 
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+I'd encourage people not to jump on the "you're using _irq variants,
+the code must be bad!" wagon, and instead spend time reading the code
+and checking whether it's safe.
 
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+If the code path is suitable for a mutex, it's suitable for _irq()
+variants too: you're not allowed to sleep with IRQs disabled.
 
-are available in the git repository at:
-
-  https://github.com/rjarzmik/linux.git tags/pxa-fixes-v4.3
-
-for you to fetch changes up to 385877c01361401113c101ef5a80a9f0998e072b:
-
-  ARM: pxa: balloon3: Fix build error (2015-09-16 21:24:58 +0200)
-
-----------------------------------------------------------------
-ARM: pxa: fixes for v4.3
-
-These fixes are mainly regression fixes triggered by irq changes,
-common clock framework introduction and sound side-effect of
-other platforms.
-
-----------------------------------------------------------------
-Axel Lin (1):
-      ARM: pxa: balloon3: Fix build error
-
-Jarkko Nikula (1):
-      ARM: pxa: ssp: Fix build error by removing originally incorrect DT binding
-
-Robert Jarzmik (1):
-      ARM: pxa: fix DFI bus lockups on startup
-
- arch/arm/mach-pxa/balloon3.c              |  2 +-
- arch/arm/mach-pxa/include/mach/addr-map.h |  7 +++++++
- arch/arm/mach-pxa/pxa3xx.c                | 21 ++++++++++++++++++++-
- arch/arm/plat-pxa/ssp.c                   |  1 -
- 4 files changed, 28 insertions(+), 3 deletions(-)
-
-Cheers.
+If you want to have some runtime validation, add WARN_ON(!irqs_disabled());
+before it, but I'd recommend against littering mainline with that.
+Arguably, it's something that the _irq() variants should do, and I
+think it's been proposed in the past, but rejected.  I forget why.
 
 -- 
-Robert
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
