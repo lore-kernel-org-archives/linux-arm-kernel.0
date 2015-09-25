@@ -1,26 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 Sep 2015 13:06:03 +0100
-Subject: Steps to submit a new arch/arm port
-In-Reply-To: <56051393.2080709@free.fr>
-References: <56001B78.2090001@free.fr> <2206647.QPrIpE2UC0@wuerfel>
- <56051393.2080709@free.fr>
-Message-ID: <20150925120602.GL21513@n2100.arm.linux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 25 Sep 2015 13:15:42 +0100
+Subject: [PATCH 0/4] Assorted DMA mapping tweaks
+Message-ID: <cover.1443178314.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 25, 2015 at 11:27:47AM +0200, Mason wrote:
-> On an unrelated topic, someone wrote
-> select CPU_USE_DOMAINS if MMU
-> in my platform Kconfig.
+Hi Andrew,
 
-No platform config should *ever* touch that symbol.
+This is a miscellany of fixes and tweaks to the common DMA mapping code
+which I've been collecting. They don't strictly depend on each other,
+but I figure I may as well send them all together for the sake of
+explaining them in one place:
 
-> Is this an obsolete feature that I should remove?
+#1 is a straightforward and hopefully obvious bugfix.
+#2 has been posted before but I subsequently forgot to follow up on it.
+   It's still possible to hit this at least on arm64 systems, with the
+   SWIOTLB/pl330 combination blowing up just running dmatest.
+#3 follows on from a recent discussion about dma_sync_sg[0]; there's
+   already a related patch in -next from Sakari clarifying the docs.
+#4 seemed worth posting now that the recent rework means it no longer
+   has to be a sprawling touch-all-the-architectures patch for something
+   so small.
 
-It's not obsolete as such - but it's something that no ARMv6 or ARMv7
-CPU should ever see set, and certainly something that platforms have
-no business what so ever mucking around with.
+Thanks,
+Robin.
+
+[0]:http://thread.gmane.org/gmane.linux.kernel/2043117
+
+Robin Murphy (4):
+  dmapool: Fix overflow condition in pool_find_page
+  dma-mapping: Tidy up dma_parms default handling
+  dma-debug: Check nents in dma_sync_sg*
+  dma-debug: Allow poisoning nonzero allocations
+
+ include/asm-generic/dma-mapping-common.h |  2 +-
+ include/linux/dma-debug.h                |  6 ++++--
+ include/linux/dma-mapping.h              | 17 ++++++++++-------
+ include/linux/poison.h                   |  3 +++
+ lib/Kconfig.debug                        | 10 ++++++++++
+ lib/dma-debug.c                          | 14 +++++++++++++-
+ mm/dmapool.c                             |  2 +-
+ 7 files changed, 42 insertions(+), 12 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
