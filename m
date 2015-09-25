@@ -1,62 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 Sep 2015 16:30:35 +0100
-Subject: [PATCH v5 02/11] drivers: PL011: refactor pl011_startup()
-In-Reply-To: <5605668C.5020407@arm.com>
-References: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
- <1432225584-4655-3-git-send-email-andre.przywara@arm.com>
- <CAOZdJXVxDjkoCJsqE6zH_UEQcxp9T2fY1YTfV7zvWjXwwbziEw@mail.gmail.com>
- <5605668C.5020407@arm.com>
-Message-ID: <20150925153035.GP21513@n2100.arm.linux.org.uk>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 25 Sep 2015 17:33:13 +0200
+Subject: Steps to submit a new arch/arm port
+In-Reply-To: <56056836.4060307@free.fr>
+References: <56001B78.2090001@free.fr> <2210529.vnGEGUl8Dr@wuerfel>
+ <56054DA8.4050903@free.fr> <7559792.th4E1kM5gi@wuerfel>
+ <56056836.4060307@free.fr>
+Message-ID: <56056939.5090409@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 25, 2015 at 04:21:48PM +0100, Andre Przywara wrote:
-> Hi Timur,
-> 
-> On 25/09/15 00:11, Timur Tabi wrote:
-> > On Thu, May 21, 2015 at 11:26 AM, Andre Przywara <andre.przywara@arm.com> wrote:
-> >> +static void pl011_enable_interrupts(struct uart_amba_port *uap)
-> >> +{
-> >> +       spin_lock_irq(&uap->port.lock);
-> >> +
-> >> +       /* Clear out any spuriously appearing RX interrupts */
-> >> +       writew(UART011_RTIS | UART011_RXIS,
-> >> +              uap->port.membase + UART011_ICR);
-> >> +       uap->im = UART011_RTIM;
-> >> +       if (!pl011_dma_rx_running(uap))
-> >> +               uap->im |= UART011_RXIM;
-> >> +       writew(uap->im, uap->port.membase + UART011_IMSC);
-> >> +       spin_unlock_irq(&uap->port.lock);
-> >> +}
-> > 
-> > Shouldn't this function be using spin_lock_irqsave() and
-> > spin_unlock_irqrestore()?  If interrupts are generally disabled before
-> > calling this function, then they will be enabled by the
-> > spin_unlock_irq() call, and I don't think we want that.  This function
-> > is only supposed to enable pl011 interrupts, not all interrupts.
-> 
-> Are you seeing an actual issue with this? Does changing it fix anything?
-> Looking at the history I see that these locks predate git history.
-> If I get this correctly, going from spin_{un,}lock_irq to the _irqsave
-> variants should always be safe, but I'd like to hear more opinions on this.
+On 25/09/2015 17:28, Mason wrote:
 
-If code is only called from process sleepable context, then using the
-_irq variants is a sane thing to do, and avoids the extra work to
-read and store the interrupt state prior to the protected code.
-Currently that's true in mainline.
+> About NEON. I had 'select VFP' but I see that CPU_V7 enables VFPv3 and VFP.
+> Isn't NEON required to support user-space programs using NEON instructions?
+> arch/arm/kernel/entry-armv.S
 
-I'd encourage people not to jump on the "you're using _irq variants,
-the code must be bad!" wagon, and instead spend time reading the code
-and checking whether it's safe.
+I'm taking cues from exynos and omap2, are these good references?
 
-If the code path is suitable for a mutex, it's suitable for _irq()
-variants too: you're not allowed to sleep with IRQs disabled.
+config ARCH_OMAP2PLUS_TYPICAL (default y) selects NEON if CPU_V7.
+Can I do something similar? (My platform is only CPU_V7.)
 
-If you want to have some runtime validation, add WARN_ON(!irqs_disabled());
-before it, but I'd recommend against littering mainline with that.
-Arguably, it's something that the _irq() variants should do, and I
-think it's been proposed in the past, but rejected.  I forget why.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards.
