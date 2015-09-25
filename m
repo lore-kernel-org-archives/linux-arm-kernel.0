@@ -1,89 +1,96 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 26 Sep 2015 01:29:43 +0200
-Subject: [PATCH v4 0/5] Provide better MADT subtable sanity checks
-In-Reply-To: <1442446005-19799-1-git-send-email-al.stone@linaro.org>
-References: <1442446005-19799-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1883446.cx2ktyZcIz@vostro.rjw.lan>
+Date: Sat, 26 Sep 2015 01:45:42 +0200
+Subject: [PATCH v2 0/5] ACPI probing infrastructure
+In-Reply-To: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
+References: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1698028.ftHN1K8oZa@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 16, 2015 05:26:40 PM Al Stone wrote:
-> Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
-> check on the various subtables that are defined for the MADT.  The check
-> compares the size of the subtable data structure as defined by ACPICA to
-> the length entry in the subtable.  If they are not the same, the assumption
-> is that the subtable is incorrect.
+On Sunday, September 13, 2015 03:02:18 PM Marc Zyngier wrote:
+> IRQ controllers and timers are the two types of device the kernel
+> requires before being able to use the device driver model.
 > 
-> Over time, the ACPI spec has allowed for MADT subtables where this can
-> never be true (the local SAPIC subtable, for example).  Or, more recently,
-> the spec has accumulated some minor flaws where there are three possible 
-> sizes for a subtable, all of which are valid, but only for specific versions
-> of the spec (the GICC subtable).  In both cases, BAD_MADT_ENTRY reports these
-> subtables as bad when they are not.  In order to retain some sanity check
-> on the MADT subtables, we now have to special case these subtables.  Of
-> necessity, these special cases have ended up in arch-dependent code (arm64)
-> or an arch has simply decided to forgo the check (ia64).
+> The Device Tree infrastructure makes it very easy to make these
+> discoverable by the rest of the kernel. For example, each interrupt
+> controller driver has at least one entry like this:
 > 
-> This patch set replaces the BAD_MADT_ENTRY macro with a function called
-> bad_madt_entry().  This function uses a data set of details about the
-> subtables to provide more sanity checking than before:
+> IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
 > 
-> 	-- is the subtable legal for the version given in the FADT?
+> which says: if you find a node having "arm,gic-400" as a compatible
+> string in the device tree, then call gic_of_init with this node as a
+> parameter. The probing itself is done by the OF layer when the
+> architecture code calls of_irq_init() (usually via irqchip_init).
 > 
-> 	-- is the subtable legal for the revision of the MADT in use?
+> This has a number of benefits:
 > 
-> 	-- is the subtable of the proper length (including checking
-> 	   on the one variable length subtable that is currently ignored),
-> 	   given the FADT version and the MADT revision?
+> - The irqchip code is self-contained. No architecture specific entry
+> point, no exposed symbols. Just a standard interface.
 > 
-> Further, this patch set adds in the call to bad_madt_entry() from the 
-> acpi_table_parse_madt() function, allowing it to be used consistently
-> by all architectures, for all subtables, and removing the need for each
-> of the subtable traversal callback functions to use BAD_MADT_ENTRY.
+> - The low-level architecture code doesn't have to know about which
+> interrupt controller is present. It just calls into the firmware
+> interface (of_irq_init) which is going to sort things out.
 > 
-> In theory, as the ACPI specification changes, we would only have to add
-> additional information to the data set describing the MADT subtables in
-> order to continue providing sanity checks, even when new subtables are
-> added.
+> Similar infrastructure is provided for the timers/clock sources. Note
+> that this is not a replacement for the device model, but acts as a
+> probing infrastructure for things that are required too early for the
+> device infrastructure to be available.
 > 
-> These patches have been tested on an APM Mustang (arm64) and are known to
-> work there.  They have also been cross-compiled for x86 and ia64 with no
-> known failures.
+> What I'm aiming for is to introduce the same level of abstraction for
+> ACPI, or at least for the few bits that are required before a full blown
+> ACPI/device model can be used. For this, I introduce something vaguely
+> similar:
 > 
-> Changes for v4:
->    -- Remove extraneous white space change (Graeme Gregory)
->    -- acpi_parse_entries() changes also needed a check to make sure that
->       only MADT entries used bad_madt_entry() (Sudeep Holla)
->    -- inadvertent use of 01day build noted that bad_madt_entry() can be
->       static, so added it (Sudeep Holla, Fengguang Wu)
+> IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
+> 		     gic_validate_dist, ACPI_MADT_GIC_VERSION_V2,
+> 		     gic_v2_acpi_init);
 > 
-> Changes for v3:
->    -- Reviewed-and-tested-by from Sudeep Holla for arm64 parts
->    -- Clearer language in error messages (Graeme Gregory, Timur Tabi)
->    -- Double checked that inserting call to bad_madt_entry() into the
->       function acpi_parse_entries() does not impact current behavior
->       (Sudeep Holla)
->    
-> Changes for v2:
->    -- Acked-by on 2/5 from Marc Zyngier and Catalin Marinas for ARM
->    -- Correct faulty end of loop test found by Timur Tabi
+> which says: if you find a ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR entry in
+> MADT (implied by the macro), and that entry is of type
+> ACPI_MADT_GIC_VERSION_V2 (as checked by gic_validate_dist), then call
+> gic_v2_acpi_init with the entry as a parameter. A bit more convoluted,
+> but still without any special entry point.
 > 
+> The various interrupt controller drivers can then implement the above,
+> and the arch code can use a firmware-specific call to get the probing
+> done, still oblivious to what interrupt controller is being used. It
+> also makes the adaptation of a DT driver to ACPI easier.
 > 
-> Al Stone (5):
->   ACPI: add in a bad_madt_entry() function to eventually replace the
->     macro
->   ACPI / ARM64: remove usage of BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
->   ACPI / IA64: remove usage of BAD_MADT_ENTRY
->   ACPI / X86: remove usage of BAD_MADT_ENTRY
->   ACPI: remove definition of BAD_MADT_ENTRY macro
+> It turns out that providing such a probing infrastructure is rather
+> easy, and provides a much deserved cleanup in both the arch code, the
+> GIC driver, and the architected timer driver.
+> 
+> I'm sure there is some more code to be deleted, and one can only
+> wonder why this wasn't done before the arm64 code was initially merged
+> (the diffstat says it all...).
+> 
+> Patches are against v4.3-rc1, and a branch is available at
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git acpi/device-probing-v2
+> 
+> * From the initial version:
+>   - Make the infrastructure more DT like by providing an
+>     acpi_probe_entry array per "device type" (one for irqchips, one
+>     for clocksources). This means that entries can depend on any ACPI
+>     static table.
+>   - Use some cpp magic to reduce the amount of code added to an
+>     absolute minimum.
+>   - Rebased on v4.3-rc1
+> 
+> Marc Zyngier (5):
+>   acpi: Add basic device probing infrastructure
+>   irqchip/acpi: Add probing infrastructure for ACPI-based irqchips
+>   irqchip/gic: Convert the GIC driver to ACPI probing
+>   clocksource/acpi: Add probing infrastructure for ACPI-based
+>     clocksources
+>   clocksource/arm_arch_timer: Convert to ACPI probing
 
-I've queued this up for v4.4, but I had to rebase it on top of some previous
-changes in my linux-next branch.
+I'm generally fine with this (modulo a couple of super-minor nits in the
+first patch), but it needs ACKs from Thomas for the irqchip-related and
+clocksource-related patches.
 
-Can you please look at my bleeding-edge branch and see if the result of the
-rebase is as intended?  In particular, I'm not sure if we really need to return
--EINVAL from acpi_parse_entries_array() when we find a bad MADT entry or it
-will be sufficient to simply go to the next entry in that case?
+Plus [3/5] needs to be rebased on top of the Al's patches removing BAD_MADT_ENTRY
+(currently in my bleeding-edge branch).
 
 Thanks,
 Rafael
