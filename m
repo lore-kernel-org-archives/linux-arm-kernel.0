@@ -1,38 +1,42 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 25 Sep 2015 14:05:52 +0100
-Subject: [PATCH 07/22] arm64: Keep track of CPU feature registers
-In-Reply-To: <20150925113808.GL6281@e103592.cambridge.arm.com>
-References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
- <1442413280-31885-8-git-send-email-suzuki.poulose@arm.com>
- <20150925113808.GL6281@e103592.cambridge.arm.com>
-Message-ID: <560546B0.7070909@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 25 Sep 2015 15:06:32 +0200
+Subject: Steps to submit a new arch/arm port
+In-Reply-To: <144297172.JfjI0hNJ9J@wuerfel>
+References: <56001B78.2090001@free.fr> <2206647.QPrIpE2UC0@wuerfel>
+ <56016780.5080104@free.fr> <144297172.JfjI0hNJ9J@wuerfel>
+Message-ID: <560546D8.1010407@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/09/15 12:38, Dave P Martin wrote:
-> On Wed, Sep 16, 2015 at 03:21:05PM +0100, Suzuki K. Poulose wrote:
->> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->>
->> This patch adds an infrastructure to keep track of the CPU feature
->> registers on the system. For each register, the infrastructure keeps
->> track of the system wide safe value of the feature bits. Also, tracks
->> the which fields of a register should be matched strictly across all
->> the CPUs on the system for the SANITY check infrastructure.
->>
->> The feature bits are classified as one of SCALAR_MIN, SCALAR_MAX and DISCRETE
->> depending on the implication of the possible values. This information
->> is used to decide the safe value for a feature.
->>
->> SCALAR_MIN - The smaller value is safer
->> SCALAR_MAX - The bigger value is safer
->> DISCRETE - We can't decide between the two, so a predefined safe_value is used.
->
-> Can documentation of the meanings of these be added somewhere in the
-> relevant header or in Documentation?
+On 22/09/2015 16:51, Arnd Bergmann wrote:
 
-Sure. They were part of the initial draft and eventually lost them over the
-reworks. I will add them back, since there is wider use of the information
-across the system, from what I started with(i.e, Userspace visibility).
+> Move this to the platform Kconfig file. Also, drop all the
+> 'select' statements that are implied by ARCH_MULTIPLATFORM
+> and ARCH_MULTI_V7
 
-Cheers
-Suzuki
+I've trimmed my platform Kconfig down to:
+
+config ARCH_TANGO4
+	bool "Sigma Designs Tango4 (SMP87xx)"
+	default y
+	select ARCH_HAS_HOLES_MEMORYMODEL
+	select ARM_ERRATA_754322
+	select ARM_ERRATA_764369
+	select ARM_GIC
+	select CACHE_L2X0
+	select CLKSRC_MMIO
+	select GENERIC_IRQ_CHIP
+	select HAVE_ARM_SCU
+	select HAVE_ARM_TWD
+	select NEON
+	select SMP
+
+
+Didn't find much documentation on ARCH_HAS_HOLES_MEMORYMODEL.
+What is it used for?
+
+http://cateee.net/lkddb/web-lkddb/ARCH_HAS_HOLES_MEMORYMODEL.html
+
+Is it OK to select CACHE_L2X0, NEON, and SMP?
+
+Regards.
