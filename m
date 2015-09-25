@@ -1,86 +1,41 @@
 From: aalonso@freescale.com (Adrian Alonso)
-Date: Fri, 25 Sep 2015 16:06:01 -0500
-Subject: [PATCH v6 5/6] pinctrl: freescale: imx7d: support iomux lpsr
- controller
-In-Reply-To: <1443215162-13716-1-git-send-email-aalonso@freescale.com>
-References: <1443215162-13716-1-git-send-email-aalonso@freescale.com>
-Message-ID: <1443215162-13716-5-git-send-email-aalonso@freescale.com>
+Date: Fri, 25 Sep 2015 16:05:57 -0500
+Subject: [PATCH v6 1/6] ARM: dts: imx: imx7d add iomuxc lpsr device node
+Message-ID: <1443215162-13716-1-git-send-email-aalonso@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iMX7D has two iomuxc controllers, iomuxc controller similar as
-previous iMX SoC generation and iomuxc-lpsr which provides low
-power state rentetion capabilities on gpios that are part of
-iomuxc-lpsr
-
-Add iomuxc-lpsr gpio group id's
+Add device tree node to support iomuxc-lpsr controller, fsl,iput-sel
+phandle allows to get input select register base address which is
+shared from main iomuxc controller.
 
 Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 ---
-Changes for V2: Add imx7d_lpsr_pads enums
-Changes for V3: Resend
+Changes for V2: Resend
+Changes for V3: Add phandle to get input select register base address
 Changes for V4: Resend
-Changes for V5: Remove flags SHARE_INPUT_SELECT_REG and 
- ZERO_OFFSET_VALID.
-Changes for V6: Restore ZERO_OFFSET_VALID flag.
+Changes for V5: Rename property to fsl,input-sel
+Changes for V6: Resend
 
- drivers/pinctrl/freescale/pinctrl-imx7d.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/imx7d.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx7d.c b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-index 1fa7530..16dc925 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx7d.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-@@ -174,6 +174,17 @@ enum imx7d_pads {
- 	MX7D_PAD_ENET1_COL = 154,
- };
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index 15c2193..92ef0a9 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -446,6 +446,12 @@
+ 				status = "disabled";
+ 			};
  
-+enum imx7d_lpsr_pads {
-+	MX7D_PAD_GPIO1_IO00 = 0,
-+	MX7D_PAD_GPIO1_IO01 = 1,
-+	MX7D_PAD_GPIO1_IO02 = 2,
-+	MX7D_PAD_GPIO1_IO03 = 3,
-+	MX7D_PAD_GPIO1_IO04 = 4,
-+	MX7D_PAD_GPIO1_IO05 = 5,
-+	MX7D_PAD_GPIO1_IO06 = 6,
-+	MX7D_PAD_GPIO1_IO07 = 7,
-+};
++			iomuxc_lpsr: iomuxc-lpsr at 302c0000 {
++				compatible = "fsl,imx7d-iomuxc-lpsr";
++				reg = <0x302c0000 0x10000>;
++				fsl,input-sel = <&iomuxc>;
++			};
 +
- /* Pad names for the pinmux subsystem */
- static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
- 	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE0),
-@@ -333,13 +344,32 @@ static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
- 	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_COL),
- };
- 
-+/* Pad names for the pinmux subsystem */
-+static const struct pinctrl_pin_desc imx7d_lpsr_pinctrl_pads[] = {
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO00),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO01),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO02),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO03),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO04),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO05),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO06),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO07),
-+};
-+
- static struct imx_pinctrl_soc_info imx7d_pinctrl_info = {
- 	.pins = imx7d_pinctrl_pads,
- 	.npins = ARRAY_SIZE(imx7d_pinctrl_pads),
- };
- 
-+static struct imx_pinctrl_soc_info imx7d_lpsr_pinctrl_info = {
-+	.pins = imx7d_lpsr_pinctrl_pads,
-+	.npins = ARRAY_SIZE(imx7d_lpsr_pinctrl_pads),
-+	.flags = ZERO_OFFSET_VALID,
-+};
-+
- static struct of_device_id imx7d_pinctrl_of_match[] = {
- 	{ .compatible = "fsl,imx7d-iomuxc", .data = &imx7d_pinctrl_info, },
-+	{ .compatible = "fsl,imx7d-iomuxc-lpsr", .data = &imx7d_lpsr_pinctrl_info },
- 	{ /* sentinel */ }
- };
- 
+ 			gpt1: gpt at 302d0000 {
+ 				compatible = "fsl,imx7d-gpt", "fsl,imx6sx-gpt";
+ 				reg = <0x302d0000 0x10000>;
 -- 
 2.1.4
