@@ -1,54 +1,167 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 25 Sep 2015 11:46:44 +0200
-Subject: Steps to submit a new arch/arm port
-In-Reply-To: <56051393.2080709@free.fr>
-References: <56001B78.2090001@free.fr> <2206647.QPrIpE2UC0@wuerfel>
- <56051393.2080709@free.fr>
-Message-ID: <CABxcv=kVMqwAaP5HYF31ZcmTDsuCMziZdwZTee51noeHMqse3g@mail.gmail.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 25 Sep 2015 18:58:18 +0900
+Subject: [PATCH 0/3] mmc: Wait for card_busy before starting sdio requests
+In-Reply-To: <560516CC.9020404@redhat.com>
+References: <1442935826-16758-1-git-send-email-hdegoede@redhat.com>
+ <CAPDyKFqvnVTL0pDLc8S1Ssqmy5WXR9+=uCWq8ONmgrYU=Zzoow@mail.gmail.com>
+ <5603C020.80603@redhat.com>
+ <CAD=FV=UacwyVcX+ZwCJ+iuhTGyr8ktOw7EiMxng8G1EmwXomJQ@mail.gmail.com>
+ <5604FD94.4020808@redhat.com> <560515D5.3070707@samsung.com>
+ <560516CC.9020404@redhat.com>
+Message-ID: <56051ABA.2050105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mason,
+On 09/25/2015 06:41 PM, Hans de Goede wrote:
+> Hi,
+> 
+> On 25-09-15 11:37, Jaehoon Chung wrote:
+>> Hi, Hans.
+>>
+>> On 09/25/2015 04:53 PM, Hans de Goede wrote:
+>>> Hi,
+>>>
+>>> On 24-09-15 18:04, Doug Anderson wrote:
+>>>> Hi,
+>>>>
+>>>> On Thu, Sep 24, 2015 at 2:19 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On 23-09-15 23:43, Ulf Hansson wrote:
+>>>>>>
+>>>>>> On 22 September 2015 at 17:30, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>>>>
+>>>>>>> Hi Ulf,
+>>>>>>>
+>>>>>>> Here is a non RFC version of my patch-set to wait for card_busy before
+>>>>>>> starting sdio requests. It is the same as the RFC version of the set,
+>>>>>>> but this time it has been tested no hardware which actually needs this
+>>>>>>> and I can confirm now that this fixes wifi on that hardware.
+>>>>>>
+>>>>>>
+>>>>>> Great! Thanks, applied for next!
+>>>>>
+>>>>>
+>>>>> Great, thanks, I guess it is too late for this to go as a fix into
+>>>>> 4.3-rcX (no worries if it is) ?
+>>>>>
+>>>>>>> This patch-set should also allow removing this dw_mmc specific fix:
+>>>>>>>
+>>>>>>>
+>>>>>>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/mmc/host/dw_mmc.c?id=0bdbd0e88cf6b603a2196418672715b0890fb040
+>>>>>>>
+>>>>>>> As this patch-set fixes this problem in a generic manner.
+>>>>>>
+>>>>>>
+>>>>>> Care to send a patch to remove the above hack/fix?
+>>>>>
+>>>>>
+>>>>> I do not have any hardware to test this.
+>>>>>
+>>>>> I've added Doug the original author of that patch to the Cc.
+>>>>>
+>>>>> Dough, can you test if with the patch set from this mail thread
+>>>>> (merged into mmc/next) this patch:
+>>>>>
+>>>>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/mmc/host/dw_mmc.c?id=0bdbd0e88cf6b603a2196418672715b0890fb040
+>>>>>
+>>>>> Is still necessary ? Since this patch-set fixes the same issue
+>>>>> in the mmc core I believe that this commit can be reverted now.
+>>>>
+>>>> I'll try to find some time in the next few days to test, but I'm not
+>>>> terribly hopeful we can just revert the patch because:
+>>>>
+>>>> 1. Only one of the two callers of dw_mci_wait_while_busy() is handled
+>>>> by your patch.  mci_send_cmd() is used internally in dw_mmc to throw
+>>>> something in the CMD register without going through the normal MMC
+>>>> path.  This is used exclusively to update the clock registers in
+>>>> dw_mmc.  I'm pretty sure this needs the wait, too.  It's always seemed
+>>>> weird / awkward to me that you need to use the CMD register to update
+>>>> clock settings in dw_mmc, but c'est la vie.
+>>>
+>>> I would not expect the card to signal busy when trying to change clocks
+>>> though, so I do not think this will really be a problem.
+>>
+>> No. It shouldn't be occurred any problem.
+>> But according to designware TRM, it needs to check whether card is busy or not, before updating clock.
+>> I think even if problem will not occur, it doesn't mean this code is useless.
+>>
+>>>
+>>>> 2. If I remember correctly, we ran into other instances where non-SDIO
+>>>> cards needed the busy check.  It wasn't terribly common, but I think I
+>>>> ran into this when stress testing, but only on a few cards.
+>>>
+>>> Hmm, that would be a problem yes.
+>>>
+>>>> The patch referenced here only seems to check for SDIO commands.  As I
+>>>> understand it, to be correct, it should check for all data commands
+>>>> (other than stop or voltage change commands).
+>>>
+>>> But that is not what the patch does, it actually waits for all commands,
+>>> including non data commands. An earlier attempt of mine to fix the sdio
+>>> wifi issues with the sunxi driver copied your approach, and I actually
+>>> got reports of regressions with using normal micro-sd memory cards
+>>> from several people testing that patch.
+>>
+>> I can't see any problem reported at mailing list.
+>> Could you share more information what regressions issue?
+> 
+> IIRC people where hitting the timeout in the code to wait for the card-busy.
+> 
+> Now that I think about this, this may have been caused by waiting
+> for card-busy while sending a stop.
 
-On Fri, Sep 25, 2015 at 11:27 AM, Mason <slash.tmp@free.fr> wrote:
-> On 21/09/2015 17:49, Arnd Bergmann wrote:
->
->> - Makefile.boot should not be needed
->
-> $ cat arch/arm/mach-tangox/Makefile.boot
->   zreladdr-y            += 0x80008000
-> params_phys-y           := 0x80000100
-> initrd_phys-y           := 0x80800000
->
-> I see that defining ARCH_MULTIPLATFORM selects AUTO_ZRELADDR
-> Is that what is supposed to make Makefile.boot not required?
->
-> If I remove Makefile.boot altogether, 'make uImage' fails with
->
->   Kernel: arch/arm/boot/Image is ready
->   Kernel: arch/arm/boot/Image is ready
->   Kernel: arch/arm/boot/zImage is ready
->   Kernel: arch/arm/boot/Image is ready
->   Kernel: arch/arm/boot/zImage is ready
-> multiple (or no) load addresses:
-> This is incompatible with uImages
-> Specify LOADADDR on the commandline to build an uImage
-> make[1]: *** [arch/arm/boot/uImage] Error 1
-> make: *** [uImage] Error 2
->
+I understood what problem you said.
+Well, but i don't accept your opinion yet.
+Is that case reproduced with dwmmc controller? otherwise...sunxi driver?
+(It seems that you mentioned the case of sunxi driver.)
 
-As the comment say, for multi platforms kernel you need to specify the
-load adddress in the command line to build a uImage:
+Best Regards,
+Jaehoon Chung
 
-$ make uImage LOADADDR=0x80008000
-
-Or you can build a zImage and then create the uImage by using the mkimage tool:
-
-$ mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e
-0x80008000 -n Linux -d arch/arm/boot/zImage uImage
-
-Alternatively, you can use a u-boot that has CONFIG_CMD_BOOTZ enabled
-and use bootz to boot a zImage instead of bootm that expects a uImage.
-
-Best regards,
-Javier
+> 
+> Regards,
+> 
+> Hans
+> 
+> 
+> 
+>>
+>> Best Regards,
+>> Jaehoon Chung
+>>
+>>>
+>>> And if you're right that we should wait for all data commands, then
+>>> I wonder if this is a designware thing (I believe the allwinner
+>>> mmc controller is designware derived) or a generic mmc / sdio thing ?
+>>>
+>>>> The Designware Databook
+>>>> makes no reference to only needing the wait for SDIO commands.
+>>>
+>>> Yet your commit message references problems with sdio wifi cards, and
+>>> on sunxi we've only been seeing this problem with sdio wifi cards / sdio
+>>> commands.
+>>>
+>>>> ...of course, it's always possible that some of the things I saw above
+>>>> will no longer happen with all the other fixes we've done in the
+>>>> meantime (turning on voltages at the right time, adding the right
+>>>> delays, etc).
+>>>>
+>>>>
+>>>> Note that I've hardly looked at sdhci at all, but on SDHCI is this
+>>>> handled by the "SDHCI_DATA_INHIBIT" bits?
+>>>
+>>> Regards,
+>>>
+>>> Hans
+>>> -- 
+>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+>>
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
