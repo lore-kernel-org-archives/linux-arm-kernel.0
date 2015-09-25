@@ -1,96 +1,36 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 26 Sep 2015 01:45:42 +0200
-Subject: [PATCH v2 0/5] ACPI probing infrastructure
-In-Reply-To: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
-References: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1698028.ftHN1K8oZa@vostro.rjw.lan>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Sat, 26 Sep 2015 01:19:04 +0200
+Subject: [PATCH] drm: sti: adapt DT to fix probe/bind issues in DRM driver
+In-Reply-To: <20150924235017.GB26500@localhost>
+References: <1443037683-6621-1-git-send-email-maxime.coquelin@st.com>
+ <20150924235017.GB26500@localhost>
+Message-ID: <5605D668.1020404@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, September 13, 2015 03:02:18 PM Marc Zyngier wrote:
-> IRQ controllers and timers are the two types of device the kernel
-> requires before being able to use the device driver model.
-> 
-> The Device Tree infrastructure makes it very easy to make these
-> discoverable by the rest of the kernel. For example, each interrupt
-> controller driver has at least one entry like this:
-> 
-> IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
-> 
-> which says: if you find a node having "arm,gic-400" as a compatible
-> string in the device tree, then call gic_of_init with this node as a
-> parameter. The probing itself is done by the OF layer when the
-> architecture code calls of_irq_init() (usually via irqchip_init).
-> 
-> This has a number of benefits:
-> 
-> - The irqchip code is self-contained. No architecture specific entry
-> point, no exposed symbols. Just a standard interface.
-> 
-> - The low-level architecture code doesn't have to know about which
-> interrupt controller is present. It just calls into the firmware
-> interface (of_irq_init) which is going to sort things out.
-> 
-> Similar infrastructure is provided for the timers/clock sources. Note
-> that this is not a replacement for the device model, but acts as a
-> probing infrastructure for things that are required too early for the
-> device infrastructure to be available.
-> 
-> What I'm aiming for is to introduce the same level of abstraction for
-> ACPI, or at least for the few bits that are required before a full blown
-> ACPI/device model can be used. For this, I introduce something vaguely
-> similar:
-> 
-> IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
-> 		     gic_validate_dist, ACPI_MADT_GIC_VERSION_V2,
-> 		     gic_v2_acpi_init);
-> 
-> which says: if you find a ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR entry in
-> MADT (implied by the macro), and that entry is of type
-> ACPI_MADT_GIC_VERSION_V2 (as checked by gic_validate_dist), then call
-> gic_v2_acpi_init with the entry as a parameter. A bit more convoluted,
-> but still without any special entry point.
-> 
-> The various interrupt controller drivers can then implement the above,
-> and the arch code can use a firmware-specific call to get the probing
-> done, still oblivious to what interrupt controller is being used. It
-> also makes the adaptation of a DT driver to ACPI easier.
-> 
-> It turns out that providing such a probing infrastructure is rather
-> easy, and provides a much deserved cleanup in both the arch code, the
-> GIC driver, and the architected timer driver.
-> 
-> I'm sure there is some more code to be deleted, and one can only
-> wonder why this wasn't done before the arm64 code was initially merged
-> (the diffstat says it all...).
-> 
-> Patches are against v4.3-rc1, and a branch is available at
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git acpi/device-probing-v2
-> 
-> * From the initial version:
->   - Make the infrastructure more DT like by providing an
->     acpi_probe_entry array per "device type" (one for irqchips, one
->     for clocksources). This means that entries can depend on any ACPI
->     static table.
->   - Use some cpp magic to reduce the amount of code added to an
->     absolute minimum.
->   - Rebased on v4.3-rc1
-> 
-> Marc Zyngier (5):
->   acpi: Add basic device probing infrastructure
->   irqchip/acpi: Add probing infrastructure for ACPI-based irqchips
->   irqchip/gic: Convert the GIC driver to ACPI probing
->   clocksource/acpi: Add probing infrastructure for ACPI-based
->     clocksources
->   clocksource/arm_arch_timer: Convert to ACPI probing
 
-I'm generally fine with this (modulo a couple of super-minor nits in the
-first patch), but it needs ACKs from Thomas for the irqchip-related and
-clocksource-related patches.
 
-Plus [3/5] needs to be rebased on top of the Al's patches removing BAD_MADT_ENTRY
-(currently in my bleeding-edge branch).
+On 09/25/2015 01:50 AM, Olof Johansson wrote:
+> On Wed, Sep 23, 2015 at 09:48:03PM +0200, Maxime Coquelin wrote:
+>> From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>>
+>> STI drm drivers probe and bind using component framework was incorrect.
+>> In addition to drivers fix DT update is needed to make all sub-components
+>> become childs of sti-display-subsystem.
+>>
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
+>> ---
+>> Hi Arnd, Olof & Kevin,
+>>
+>> This patch has its driver counterpart merged in v4.3-rc1.
+>> As missing in v4.3, the display is now broken on STiH07 and STiH410 platforms.
+>>
+>> I have only this single patch for v4.3-rc fixes, so can you pick it directly,
+>> or I should send a pull-request anyway?
+> Applied directly, since I had to fixup the patch subject. Thanks!
 
-Thanks,
-Rafael
+Thanks Olof for fixing the title, I missed it during the review.
+
+Regards,
+Maxime
