@@ -1,32 +1,55 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri, 25 Sep 2015 20:35:34 +0300
-Subject: [PATCH 5/5] ARM: dts: WM8750: fix cpu compatible value
-In-Reply-To: <1443202506-13732-1-git-send-email-vz@mleia.com>
-References: <1443202506-13732-1-git-send-email-vz@mleia.com>
-Message-ID: <1443202534-13816-5-git-send-email-vz@mleia.com>
+From: menon.nishanth@gmail.com (Nishanth Menon)
+Date: Fri, 25 Sep 2015 12:38:39 -0500
+Subject: [PATCH 1/3] Documentation: dt: keystone: provide SoC specific
+ compatible flags
+In-Reply-To: <56057319.9080104@oracle.com>
+References: <1442938118-4718-1-git-send-email-nm@ti.com>
+ <1442938118-4718-2-git-send-email-nm@ti.com> <5602ED34.9010108@oracle.com>
+ <56040323.1080409@ti.com> <560406C2.6090200@ti.com> <56041CA4.40208@ti.com>
+ <56055F1F.4060401@ti.com> <560565AF.2010701@oracle.com>
+ <56056FD9.5060000@ti.com> <56057319.9080104@oracle.com>
+Message-ID: <5605869F.9080906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change corrects cpu compatible property to a defined one,
-see Documentation/devicetree/bindings/arm/cpus.txt
+On 09/25/2015 11:15 AM, santosh shilimkar wrote:
+> 9/25/2015 9:01 AM, Nishanth Menon wrote:
+>> On 09/25/2015 10:18 AM, santosh shilimkar wrote:
+>>> On 9/25/2015 7:50 AM, Nishanth Menon wrote:
+>> [...]
+>>>> But, how about userspace
+>>>> needing to know which SoC they are on, without needing to depend on
+>>>> board->soc mapping? How do we help resolve that?
+>>>>
+>>> Why the user space should care about exact SOC ?
+>>
+>> examples vary - trivial one is: debug tools like omapconf[1] or testing
+>> tools like opentest[2] need some standard way to ensure Linux kernel is
+>> functional - trusting the least set of parameters is usually what we
+>> would prefer. while building a generic distro such as debian or yocto,
+>> one prefers NOT to need to do a package build per SoC/perboard - that
+>> never scales. instead, you'd like the same application run on different
+>> systems dynamically.
+>>
+> I guessed omapconf example is coming though Keystone has no such tool
 
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
----
- arch/arm/boot/dts/wm8750.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+:) That is true - as of now. maynot be the case for future.
 
-diff --git a/arch/arm/boot/dts/wm8750.dtsi b/arch/arm/boot/dts/wm8750.dtsi
-index 557a9c2a..46d076d 100644
---- a/arch/arm/boot/dts/wm8750.dtsi
-+++ b/arch/arm/boot/dts/wm8750.dtsi
-@@ -17,7 +17,7 @@
- 
- 		cpu {
- 			device_type = "cpu";
--			compatible = "arm,arm1176ej-s";
-+			compatible = "arm,arm1176jzf";
- 		};
- 	};
- 
+> yet ;-). Opentest shouldn't need that info either.
+
+we did debate this on opentest, but we could not implement anything
+since we did not have a consistent solution yet.
+
+> I do agree that having a soc along with board is useful in
+> longer run to accommodation more boards and variants.
+> And only on that merit, I am willing to take these patches.
+> 
+> Please refresh the series commit messages based on the
+> discussion so far and repost. Will pick it up then.
+> 
+Thanks. I will do so (probably early next week)..
+
+
 -- 
-2.1.4
+Regards,
+Nishanth Menon
