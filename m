@@ -1,44 +1,89 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Sat, 26 Sep 2015 00:19:56 +0200
-Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
- 'global_lock'
-In-Reply-To: <20150925214438.GH5951@linux>
-References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- <4357538.Wlf88yQie6@vostro.rjw.lan>
- <CAKohpok2Z2m7GZt1GzZzofeHEioF=XJEq8YVgtY=VtS9tmpb_Q@mail.gmail.com>
- <2524822.pQu4UKMrlb@vostro.rjw.lan> <20150925214438.GH5951@linux>
-Message-ID: <CAJZ5v0i+xJ4U13vCVsvXc7S8wP0AokbmNXPidBkDwbjXMM8fCw@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 26 Sep 2015 01:29:43 +0200
+Subject: [PATCH v4 0/5] Provide better MADT subtable sanity checks
+In-Reply-To: <1442446005-19799-1-git-send-email-al.stone@linaro.org>
+References: <1442446005-19799-1-git-send-email-al.stone@linaro.org>
+Message-ID: <1883446.cx2ktyZcIz@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 25, 2015 at 11:44 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 25-09-15, 22:58, Rafael J. Wysocki wrote:
->> Say you have three adjacent fields in a structure, x, y, z, each one byte long.
->> Initially, all of them are equal to 0.
->>
->> CPU A writes 1 to x and CPU B writes 2 to y at the same time.
->>
->> What's the result?
->
-> But then two CPUs can update the same variable as well, and we must
-> have proper locking in place to fix that.
+On Wednesday, September 16, 2015 05:26:40 PM Al Stone wrote:
+> Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
+> check on the various subtables that are defined for the MADT.  The check
+> compares the size of the subtable data structure as defined by ACPICA to
+> the length entry in the subtable.  If they are not the same, the assumption
+> is that the subtable is incorrect.
+> 
+> Over time, the ACPI spec has allowed for MADT subtables where this can
+> never be true (the local SAPIC subtable, for example).  Or, more recently,
+> the spec has accumulated some minor flaws where there are three possible 
+> sizes for a subtable, all of which are valid, but only for specific versions
+> of the spec (the GICC subtable).  In both cases, BAD_MADT_ENTRY reports these
+> subtables as bad when they are not.  In order to retain some sanity check
+> on the MADT subtables, we now have to special case these subtables.  Of
+> necessity, these special cases have ended up in arch-dependent code (arm64)
+> or an arch has simply decided to forgo the check (ia64).
+> 
+> This patch set replaces the BAD_MADT_ENTRY macro with a function called
+> bad_madt_entry().  This function uses a data set of details about the
+> subtables to provide more sanity checking than before:
+> 
+> 	-- is the subtable legal for the version given in the FADT?
+> 
+> 	-- is the subtable legal for the revision of the MADT in use?
+> 
+> 	-- is the subtable of the proper length (including checking
+> 	   on the one variable length subtable that is currently ignored),
+> 	   given the FADT version and the MADT revision?
+> 
+> Further, this patch set adds in the call to bad_madt_entry() from the 
+> acpi_table_parse_madt() function, allowing it to be used consistently
+> by all architectures, for all subtables, and removing the need for each
+> of the subtable traversal callback functions to use BAD_MADT_ENTRY.
+> 
+> In theory, as the ACPI specification changes, we would only have to add
+> additional information to the data set describing the MADT subtables in
+> order to continue providing sanity checks, even when new subtables are
+> added.
+> 
+> These patches have been tested on an APM Mustang (arm64) and are known to
+> work there.  They have also been cross-compiled for x86 and ia64 with no
+> known failures.
+> 
+> Changes for v4:
+>    -- Remove extraneous white space change (Graeme Gregory)
+>    -- acpi_parse_entries() changes also needed a check to make sure that
+>       only MADT entries used bad_madt_entry() (Sudeep Holla)
+>    -- inadvertent use of 01day build noted that bad_madt_entry() can be
+>       static, so added it (Sudeep Holla, Fengguang Wu)
+> 
+> Changes for v3:
+>    -- Reviewed-and-tested-by from Sudeep Holla for arm64 parts
+>    -- Clearer language in error messages (Graeme Gregory, Timur Tabi)
+>    -- Double checked that inserting call to bad_madt_entry() into the
+>       function acpi_parse_entries() does not impact current behavior
+>       (Sudeep Holla)
+>    
+> Changes for v2:
+>    -- Acked-by on 2/5 from Marc Zyngier and Catalin Marinas for ARM
+>    -- Correct faulty end of loop test found by Timur Tabi
+> 
+> 
+> Al Stone (5):
+>   ACPI: add in a bad_madt_entry() function to eventually replace the
+>     macro
+>   ACPI / ARM64: remove usage of BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
+>   ACPI / IA64: remove usage of BAD_MADT_ENTRY
+>   ACPI / X86: remove usage of BAD_MADT_ENTRY
+>   ACPI: remove definition of BAD_MADT_ENTRY macro
 
-Right.
+I've queued this up for v4.4, but I had to rebase it on top of some previous
+changes in my linux-next branch.
 
-So if you allow something like debugfs to update your structure, how
-do you make sure there is the proper locking?
-
-Is that not a problem in all of the places modified by the [2/2]?
-
-How can the future users of the API know what to do to avoid potential
-problems with it?
-
->
-> Anyway, that problem isn't here for sure as its between two
-> unsigned-longs. So, should I just move it to bool and resend ?
-
-I guess it might be more convenient to fold this into the other patch,
-because we seem to be splitting hairs here.
+Can you please look at my bleeding-edge branch and see if the result of the
+rebase is as intended?  In particular, I'm not sure if we really need to return
+-EINVAL from acpi_parse_entries_array() when we find a bad MADT entry or it
+will be sufficient to simply go to the next entry in that case?
 
 Thanks,
 Rafael
