@@ -1,101 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Sep 2015 16:11:59 +0200
-Subject: Steps to submit a new arch/arm port
-In-Reply-To: <56054DA8.4050903@free.fr>
-References: <56001B78.2090001@free.fr> <2210529.vnGEGUl8Dr@wuerfel>
- <56054DA8.4050903@free.fr>
-Message-ID: <7559792.th4E1kM5gi@wuerfel>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 25 Sep 2015 15:37:33 +0100
+Subject: [PATCH v4 5/5] arm64: dts: Add sensor node to Juno dt
+In-Reply-To: <20150924163658.GH2368@e106497-lin.cambridge.arm.com> (Liviu
+ Dudau's message of "Thu, 24 Sep 2015 17:36:58 +0100")
+References: <1442335861-7282-1-git-send-email-punit.agrawal@arm.com>
+ <1442335861-7282-6-git-send-email-punit.agrawal@arm.com>
+ <20150924163658.GH2368@e106497-lin.cambridge.arm.com>
+Message-ID: <9hhd1x6bm4y.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 September 2015 15:35:36 Mason wrote:
-> On 25/09/2015 15:17, Arnd Bergmann wrote:
-> > On Friday 25 September 2015 15:06:32 Mason wrote:
-> >> On 22/09/2015 16:51, Arnd Bergmann wrote:
-> >>
-> >>> Move this to the platform Kconfig file. Also, drop all the
-> >>> 'select' statements that are implied by ARCH_MULTIPLATFORM
-> >>> and ARCH_MULTI_V7
-> >>
-> >> I've trimmed my platform Kconfig down to:
-> >>
-> >> config ARCH_TANGO4
-> >>         bool "Sigma Designs Tango4 (SMP87xx)"
-> >>         default y
-> > 
-> > drop the default
-> > 
-> > add
-> > 	depends on CPU_MULTI_V7
-> 
-> I've done this higher up.
-> 
-> menuconfig ARCH_TANGOX
-> 	bool "Sigma Designs Tango" if ARCH_MULTI_V7
-> 	help
-> 	  something useful
-> 
-> if ARCH_TANGOX
-> config ARCH_TANGO4
-> ...
-> endif
-> 
-> So 'default y' enables ARCH_TANGO4 only if ARCH_TANGOX is selected,
-> right?
+Liviu Dudau <Liviu.Dudau@arm.com> writes:
 
-You should really only have one of the two.
+> On Tue, Sep 15, 2015 at 05:51:01PM +0100, Punit Agrawal wrote:
+>> The SCP firmware on Juno provides access to SoC sensors via the
+>> SCPI. Add the sensor nodes to the device tree to enable this support.
+>> 
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Liviu Dudau <liviu.dudau@arm.com>
+>
+> Acked-by: Liviu Dudau <liviu.dudau@arm.com>
 
-> >>         select ARCH_HAS_HOLES_MEMORYMODEL
-> >>         select ARM_ERRATA_754322
-> >>         select ARM_ERRATA_764369
-> > 
-> > 	add 'if SMP'
-> > 
-> >>         select ARM_GIC
-> >>         select CACHE_L2X0
-> > 
-> > remove CACHE_L2X0, we want to be able to turn this off.
-> 
-> Some people run with L2 disabled? That's a strange thing to do.
+Thanks Liviu!
 
-I can help for testing. Most importantly, we currently allow that
-configuration today, and it's not up to you to forbid other platforms
-from doing it.
-
-If you can prove that we never need to disable that option, send
-another patch to make it unconditional.
-
-> >>         select CLKSRC_MMIO
-> >>         select GENERIC_IRQ_CHIP
-> >>         select HAVE_ARM_SCU
-> >>         select HAVE_ARM_TWD
-> > 
-> > 	'if SMP'
-> > 
-> >>         select NEON
-> >>         select SMP
-> > 
-> > These should be user-selectable as well, so drop the 'select'
-> > and make sure the kernel builds with them turned off.
-> 
-> It will build, but it won't run! My port uses the TWD for clockevents,
-> and smp_twd.c is only compiled if HAVE_ARM_TWD. So I must set SMP.
-
-I think this has come up before and should be fixed. Could you
-send a patch that allows using TWD in uniprocessor configurations?
-
-> >> Didn't find much documentation on ARCH_HAS_HOLES_MEMORYMODEL.
-> >> What is it used for?
-> > 
-> > You need this if the RAM is not physically contiguous, e.g. 256MB at one
-> > address and another 256MB somewhere else.
-> > 
-> >> Is it OK to select CACHE_L2X0, NEON, and SMP?
-> > 
-> > no
-> 
-> Then I have a major problem... my port requires SMP.
-
-That would be very unusual.
-
-	Arnd
+>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  arch/arm64/boot/dts/arm/juno-base.dtsi | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>> 
+>> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+>> index c624208..dd5158e 100644
+>> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+>> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+>> @@ -96,6 +96,11 @@
+>>  				clock-output-names = "pxlclk0", "pxlclk1";
+>>  			};
+>>  		};
+>> +
+>> +		scpi_sensors0: sensors {
+>> +			compatible = "arm,scpi-sensors";
+>> +			#thermal-sensor-cells = <1>;
+>> +		};
+>>  	};
+>>  
+>>  	/include/ "juno-clocks.dtsi"
+>> -- 
+>> 2.5.1
+>> 
