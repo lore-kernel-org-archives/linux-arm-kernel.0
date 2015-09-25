@@ -1,46 +1,102 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 25 Sep 2015 12:09:50 -0700
-Subject: [PATCH v5 1/7] pinctrl: freescale: imx: fix system crash if
- enable two pinctl instances
-In-Reply-To: <1443128043-21063-1-git-send-email-aalonso@freescale.com>
+From: aalonso@freescale.com (Alonso Adrian)
+Date: Fri, 25 Sep 2015 19:16:49 +0000
+Subject: [PATCH v5 4/7] pinctrl: freescale: imx: allow mux_reg offset zero
+In-Reply-To: <20150925190725.GX3529@tiger>
 References: <1443128043-21063-1-git-send-email-aalonso@freescale.com>
-Message-ID: <20150925190949.GY3529@tiger>
+ <1443128043-21063-4-git-send-email-aalonso@freescale.com>
+ <20150925104726.GJ11805@pengutronix.de> <20150925190725.GX3529@tiger>
+Message-ID: <BN3PR03MB150994443644800594BE9BA2A8420@BN3PR03MB1509.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 03:53:57PM -0500, Adrian Alonso wrote:
-> From: Robin Gong <b38343@freescale.com>
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Friday, September 25, 2015 2:07 PM
+> To: Markus Pargmann <mpa@pengutronix.de>
+> Cc: Alonso Lazcano Adrian-B38018 <aalonso@freescale.com>; linux-arm-
+> kernel at lists.infradead.org; shawn.guo at linaro.org; linus.walleij at linaro.org;
+> lznuaa at gmail.com; devicetree at vger.kernel.org; Li Frank-B20596
+> <Frank.Li@freescale.com>; Garg Nitin-B37173 <nitin.garg@freescale.com>;
+> Huang Yongcai-B20788 <Anson.Huang@freescale.com>; linux-
+> gpio at vger.kernel.org; robh+dt at kernel.org; kernel at pengutronix.de; Gong
+> Yibin-B38343 <yibin.gong@freescale.com>
+> Subject: Re: [PATCH v5 4/7] pinctrl: freescale: imx: allow mux_reg offset zero
 > 
-> Fix system chrash caused by groups whose number is smaller than the number
-> of groups of the last pinctl instance which is not initialized.
+> On Fri, Sep 25, 2015 at 12:47:26PM +0200, Markus Pargmann wrote:
+> > On Thu, Sep 24, 2015 at 03:54:00PM -0500, Adrian Alonso wrote:
+> > > Allow mux_reg offset zero to be a valid pin_id, on imx7d mux_conf
+> > > reg offset is zero for iomuxc-lspr controller
+> > >
+> > > Signed-off-by: Adrian Alonso <aalonso@freescale.com>
+> > > ---
+> > > Changes for V2: Resend
+> > > Changes for V3: Resend
+> > > Changes for V4: Simplify pin_id assigment when ZERO_OFFSET_VALID is
+> > > set Changes for V5:
+> > > - Drop patch pinctrl: freescale: imx: add ZERO_OFFSET_VALID flag
+> > > - Allow mux_reg ZERO OFFSET as pin_id
+> > >
+> > >  drivers/pinctrl/freescale/pinctrl-imx.c | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > >
+> > > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c
+> > > b/drivers/pinctrl/freescale/pinctrl-imx.c
+> > > index b9c6deb..23348d8 100644
+> > > --- a/drivers/pinctrl/freescale/pinctrl-imx.c
+> > > +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+> > > @@ -550,7 +550,7 @@ static int imx_pinctrl_parse_groups(struct
+> device_node *np,
+> > >  				conf_reg = -1;
+> > >  		}
+> > >
+> > > -		pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
+> > > +		pin_id = (mux_reg != -1) ? mux_reg / 4 : conf_reg / 4;
+> >
+> > This will break compatibility with imx35 and imx25 pinctrl drivers.
+> > They have definitions where mux_reg can be 0x0. See imx35-pinfunc.h
+> > and
+> > imx25-pinfunc.h:
+> >
+> > 	git grep -E "0x0+ 0x.* 0x.* 0x.* 0x.*"
+> >
+> > This mux_reg behaviour was not described in the DT binding
+> > documentation. But it is used by some platforms. So even if you change
+> > the pincfunc headers to use "-1", it would break devicetrees compiled
+> > with earlier kernel versions.
 > 
-> iMX7D supports two iomux controllers (iomuxc-lpsr and iomuxc) on probing
-> the second instance (iomuxc) the chrash below occurs.
+> Ah, sorry, I'm screwed on the previous review.  So we still need the flag
+> ZERO_OFFSET_VALID to convert invalid 0 mux_reg to -1.
 > 
-> Uncompressing Linux... done, booting the kernel.
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Linux version 4.2.0-next-20150901-00006-gebfa43c (aalonso at bluefly)
-> [    0.000000] CPU: ARMv7 Processor [410fc075] revision 5 (ARMv7)
-> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasin instruction cache
-> [    0.000000] Machine model: Freescale i.MX7 SabreSD Board
-> [    0.661012] [<802a6cb0>] (strcmp) from [<802cc80c>] (imx_dt_node_to_map+0x58/0x208)
-> [    0.668879] [<802cc80c>] (imx_dt_node_to_map) from [<802cbe24>] (pinctrl_dt_to_map+0x174/0x2b0)
-> [    0.677654] [<802cbe24>] (pinctrl_dt_to_map) from [<802c8f18>] (pinctrl_get+0x100/0x424)
-> [    0.685878] [<802c8f18>] (pinctrl_get) from [<802c9510>] (pinctrl_register+0x26c/0x480)
-> [    0.694104] [<802c9510>] (pinctrl_register) from [<802ccf3c>] (imx_pinctrl_probe+0x580/0x6e8)
-> [    0.702706] [<802ccf3c>] (imx_pinctrl_probe) from [<80351b58>] (platform_drv_probe+0x44/0xa4)
-> [    0.711455] [<80351b58>] (platform_drv_probe) from [<803503ec>] (driver_probe_device+0x174/0x2b4)
-> [    0.720405] [<803503ec>] (driver_probe_device) from [<803505fc>] (__driver_attach+0x8c/0x90)
-> [    0.728982] [<803505fc>] (__driver_attach) from [<8034e930>] (bus_for_each_dev+0x6c/0xa0)
-> [    0.737381] [<8034e930>] (bus_for_each_dev) from [<8034fb88>] (bus_add_driver+0x148/0x1f0)
-> [    0.745804] [<8034fb88>] (bus_add_driver) from [<80350c00>] (driver_register+0x78/0xf8)
-> [    0.753880] [<80350c00>] (driver_register) from [<800097d0>] (do_one_initcall+0x8c/0x1d4)
-> [    0.762282] [<800097d0>] (do_one_initcall) from [<80987dac>] (kernel_init_freeable+0x144/0x1e4)
-> [    0.771061] [<80987dac>] (kernel_init_freeable) from [<806d9c7c>] (kernel_init+0x8/0xe8)
-> [    0.779285] [<806d9c7c>] (kernel_init) from [<8000f628>] (ret_from_fork+0x14/0x2c)
-> [    0.786981] Code: e3520000 e5e32001 1afffffb e12fff1e (e4d03001)
+> @Adrian,
 > 
-> Signed-off-by: Robin Gong <b38343@freescale.com>
-> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
-
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+> Will the following change just work for you?
+@Shawn, yes the change will work, do you want me to prepare a new patch series?
+> 
+> Shawn
+> 
+> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c
+> b/drivers/pinctrl/freescale/pinctrl-imx.c
+> index d7b98ba36825..ae801ba7e226 100644
+> --- a/drivers/pinctrl/freescale/pinctrl-imx.c
+> +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+> @@ -542,6 +542,9 @@ static int imx_pinctrl_parse_groups(struct device_node
+> *np,
+>                 struct imx_pin_reg *pin_reg;
+>                 struct imx_pin *pin = &grp->pins[i];
+> 
+> +               if (!(info->flags & ZERO_OFFSET_VALID) && !mux_reg)
+> +                       mux_reg = -1;
+> +
+>                 if (info->flags & SHARE_MUX_CONF_REG) {
+>                         conf_reg = mux_reg;
+>                 } else {
+> @@ -550,7 +553,7 @@ static int imx_pinctrl_parse_groups(struct device_node
+> *np,
+>                                 conf_reg = -1;
+>                 }
+> 
+> -               pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
+> +               pin_id = (mux_reg != -1) ? mux_reg / 4 : conf_reg / 4;
+>                 pin_reg = &info->pin_regs[pin_id];
+>                 pin->pin = pin_id;
+>                 grp->pin_ids[i] = pin_id;
