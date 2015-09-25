@@ -1,145 +1,164 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 25 Sep 2015 11:14:09 +0200
-Subject: [PATCH] pinctrl: at91-pio4: add PM stuff
-Message-ID: <1443172449-19915-1-git-send-email-ludovic.desroches@atmel.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Fri, 25 Sep 2015 11:15:24 +0200
+Subject: [PATCH v6 1/5] pwm: add the Berlin pwm controller driver
+In-Reply-To: <20150921084008.GE19865@ulmo.nvidia.com>
+References: <1442484788-15482-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1442484788-15482-2-git-send-email-antoine.tenart@free-electrons.com>
+ <20150921084008.GE19865@ulmo.nvidia.com>
+Message-ID: <20150925091524.GB19573@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow GPIOs to be configured as wakeup sources. When going to suspend,
-disable all GPIO irqs excepting the one configured as wakeup sources.
+On Mon, Sep 21, 2015 at 10:40:08AM +0200, Thierry Reding wrote:
+> On Thu, Sep 17, 2015 at 12:13:04PM +0200, Antoine Tenart wrote:
+> > +
+> > +#define BERLIN_PWM_EN			0x0
+> > +#define BERLIN_PWM_CONTROL		0x4
+> > +#define BERLIN_PWM_DUTY			0x8
+> > +#define BERLIN_PWM_TCNT			0xc
+> > +
+> > +#define BERLIN_PWM_ENABLE		BIT(0)
+> > +#define BERLIN_PWM_INVERT_POLARITY	BIT(3)
+> > +#define BERLIN_PWM_PRESCALE_MASK	0x7
+> > +#define BERLIN_PWM_PRESCALE_MAX		4096
+> > +#define BERLIN_PWM_MAX_TCNT		65535
+> 
+> It'd be nice to see some sort of connection between the register
+> definitions and which fields belong to them.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/pinctrl/pinctrl-at91-pio4.c | 76 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
+Something like:
 
-diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-index 6aff632..5e2189f 100644
---- a/drivers/pinctrl/pinctrl-at91-pio4.c
-+++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-@@ -16,6 +16,7 @@
- 
- #include <linux/clk.h>
- #include <linux/gpio.h>
-+#include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/of.h>
-@@ -122,6 +123,8 @@ struct atmel_pioctrl {
- 	struct gpio_chip	*gpio_chip;
- 	struct irq_domain	*irq_domain;
- 	int			*irqs;
-+	unsigned		*pm_wakeup_sources;
-+	unsigned		*pm_suspend_backup;
- 	struct device		*dev;
- 	struct device_node	*node;
- };
-@@ -214,12 +217,35 @@ static void atmel_gpio_irq_unmask(struct irq_data *d)
- 			 BIT(pin->line));
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+
-+static int atmel_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
-+{
-+	struct atmel_pioctrl *atmel_pioctrl = irq_data_get_irq_chip_data(d);
-+	int bank = ATMEL_PIO_BANK(d->hwirq);
-+	int line = ATMEL_PIO_LINE(d->hwirq);
-+
-+	/* The gpio controller has one interrupt line per bank. */
-+	irq_set_irq_wake(atmel_pioctrl->irqs[bank], on);
-+
-+	if (on)
-+		atmel_pioctrl->pm_wakeup_sources[bank] |= BIT(line);
-+	else
-+		atmel_pioctrl->pm_wakeup_sources[bank] &= ~(BIT(line));
-+
-+	return 0;
-+}
-+#else
-+#define atmel_gpio_irq_set_wake NULL
-+#endif /* CONFIG_PM_SLEEP */
-+
- static struct irq_chip atmel_gpio_irq_chip = {
- 	.name		= "GPIO",
- 	.irq_ack	= atmel_gpio_irq_ack,
- 	.irq_mask	= atmel_gpio_irq_mask,
- 	.irq_unmask	= atmel_gpio_irq_unmask,
- 	.irq_set_type	= atmel_gpio_irq_set_type,
-+	.irq_set_wake	= atmel_gpio_irq_set_wake,
- };
- 
- static void atmel_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-@@ -792,6 +818,43 @@ static struct pinctrl_desc atmel_pinctrl_desc = {
- 	.pmxops		= &atmel_pmxops,
- };
- 
-+static int atmel_pctrl_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
-+	int i;
-+
-+	/*
-+	 * For each bank, save IMR to restore it later and disable all GPIO
-+	 * interrupts excepting the ones marked as wakeup sources.
-+	 */
-+	for (i = 0; i < atmel_pioctrl->nbanks; i++) {
-+		atmel_pioctrl->pm_suspend_backup[i] =
-+			atmel_gpio_read(atmel_pioctrl, i, ATMEL_PIO_IMR);
-+		atmel_gpio_write(atmel_pioctrl, i, ATMEL_PIO_IDR,
-+				 ~atmel_pioctrl->pm_wakeup_sources[i]);
-+	}
-+
-+	return 0;
-+}
-+
-+static int atmel_pctrl_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
-+	int i;
-+
-+	for (i = 0; i < atmel_pioctrl->nbanks; i++)
-+		atmel_gpio_write(atmel_pioctrl, i, ATMEL_PIO_IER,
-+				 atmel_pioctrl->pm_suspend_backup[i]);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops atmel_pctrl_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(atmel_pctrl_suspend, atmel_pctrl_resume)
-+};
-+
- /*
-  * The number of banks can be different from a SoC to another one.
-  * We can have up to 16 banks.
-@@ -908,6 +971,18 @@ static int atmel_pinctrl_probe(struct platform_device *pdev)
- 	atmel_pioctrl->gpio_chip->dev = dev;
- 	atmel_pioctrl->gpio_chip->names = atmel_pioctrl->group_names;
- 
-+	atmel_pioctrl->pm_wakeup_sources = devm_kzalloc(dev,
-+			sizeof(*atmel_pioctrl->pm_wakeup_sources)
-+			* atmel_pioctrl->nbanks, GFP_KERNEL);
-+	if (!atmel_pioctrl->pm_wakeup_sources)
-+		return -ENOMEM;
-+
-+	atmel_pioctrl->pm_suspend_backup = devm_kzalloc(dev,
-+			sizeof(*atmel_pioctrl->pm_suspend_backup)
-+			* atmel_pioctrl->nbanks, GFP_KERNEL);
-+	if (!atmel_pioctrl->pm_suspend_backup)
-+		return -ENOMEM;
-+
- 	atmel_pioctrl->irqs = devm_kzalloc(dev, sizeof(*atmel_pioctrl->irqs)
- 			* atmel_pioctrl->nbanks, GFP_KERNEL);
- 	if (!atmel_pioctrl->irqs)
-@@ -1006,6 +1081,7 @@ static struct platform_driver atmel_pinctrl_driver = {
- 	.driver = {
- 		.name = "pinctrl-at91-pio4",
- 		.of_match_table = atmel_pctrl_of_match,
-+		.pm = &atmel_pctrl_pm_ops,
- 	},
- 	.probe = atmel_pinctrl_probe,
- 	.remove = atmel_pinctrl_remove,
+#define BERLIN_PWM_EN		0x0
+#define  BERLIN_PWM_ENABLE	BIT(0)
+#define BERLIN_PWM_CONTROL	0x4
+...
+
+> > +struct berlin_pwm_chip {
+> > +	struct pwm_chip chip;
+> > +	struct clk *clk;
+> > +	void __iomem *base;
+> > +	spinlock_t lock;
+> 
+> I don't think that lock is necessary here. You have per-channel
+> registers and each channel can only be used by one consumer at a time
+> anyway.
+
+Sure. I'll make some tests and remove the lock if possible.
+
+> > +#define to_berlin_pwm_chip(chip)	\
+> > +	container_of((chip), struct berlin_pwm_chip, chip)
+> > +
+> > +#define berlin_pwm_readl(chip, channel, offset)		\
+> > +	readl_relaxed((chip)->base + (channel) * 0x10 + offset)
+> > +#define berlin_pwm_writel(val, chip, channel, offset)	\
+> > +	writel_relaxed(val, (chip)->base + (channel) * 0x10 + offset)
+> 
+> These should be static inline functions. Also I think for
+> berlin_pwm_writel() val should come after chip and channel to preserve a
+> more natural ordering of parameters.
+
+What's the benefit of using static inline functions here?
+
+I'm not convinced having val after chip and channel is more natural, but
+this is not a big matter. I'll update.
+
+> > +
+> > +/* prescaler table: {1, 4, 8, 16, 64, 256, 1024, 4096} */
+> > +static const u32 prescaler_diff_table[] = {
+> > +	1, 4, 2, 2, 4, 4, 4, 4,
+> > +};
+> 
+> I don't see any relationship between these values and the prescaler
+> table given in the comment. Please expand the comment to explain the
+> connection.
+> 
+> After reading the remainder of the code, I see that the values in this
+> table are the multiplication factors for each of the prescalers. It
+> shouldn't be necessary to read the code to find out, so please clarify
+> in the comment (and perhaps rename the table to something more related
+> to its purpose, such as prescale_factors).
+
+Will do.
+
+> Perhaps an even more easily digestible alternative would be to make this
+> a list of prescaler values and then use the values directly to compute
+> the number of cycles rather than iteratively dividing and needing this
+> unintuitive mapping.
+
+Would something like the following be better?
+
+"""
+static const prescaler_table = {1, 4, 8, 16, 64, 256, 1024, 4096};
+unsigned int prescale;
+u64 tmp;
+
+for (prescale = 0; prescale < ARRAY_SIZE(prescaler_table); prescale++) {
+	tmp = cycles;
+	do_div(tmp, prescaler_table[prescale]);
+
+	if (tmp <= BERLIN_PWM_MAX_TCNT)
+		break;
+}
+
+if (tmp > BERLIN_PWM_MAX_TCNT)
+	return -ERANGE;
+
+cycles = tmp;
+"""
+
+I personally prefer the prescale factors implementation, but I admit
+this is maybe more readable.
+
+> > +
+> > +	while (cycles > BERLIN_PWM_MAX_TCNT)
+> > +		do_div(cycles, prescaler_diff_table[++prescale]);
+> 
+> Don't you need to make sure that prescale doesn't exceed the table size?
+
+Sure.
+
+> > +
+> > +	ret = pwmchip_add(&pwm->chip);
+> > +	if (ret < 0) {
+> > +		clk_disable_unprepare(pwm->clk);
+> 
+> Why not enable the clock until after successful registration? It doesn't
+> seem like you need access before that. Doing so would introduce a subtle
+> race condition between adding the chip (and hence exposing it via sysfs)
+> and enabling the clock, so perhaps an even better approach would be to
+> add more fine-grained clock management by enabling or disabling it only
+> when necessary (clock enables are reference counted, so ->request() and
+> ->free() would probably work fine in this case).
+> 
+> This isn't a real objection, though. If you prefer to keep things simple
+> the current code is fine with me.
+
+That was the idea. We may update this latter.
+
+> > +static int berlin_pwm_remove(struct platform_device *pdev)
+> > +{
+> > +	struct berlin_pwm_chip *pwm = platform_get_drvdata(pdev);
+> > +	int ret;
+> > +
+> > +	ret = pwmchip_remove(&pwm->chip);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	clk_disable_unprepare(pwm->clk);
+> 
+> You might want to disable the clock regardless. The driver will be
+> unloaded regardless of whether pwmchip_remove() returns failure or
+> not. The above would leak a clock enable, which may not be what you
+> want.
+
+Yes, I'll call clk_disable_unprepare() regardless of what pwmchip_remove()
+returns.
+
+Thanks for the review!
+
+Antoine
+
 -- 
-2.5.0
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
