@@ -1,108 +1,145 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 25 Sep 2015 09:44:10 +0100
-Subject: [PATCH v2 0/7] arm64: relax Image placement rules
-In-Reply-To: <CAKv+Gu-WGSaGA+4OJcNOct+sdBHsO8yKOc50t3jmB86xonWQ=g@mail.gmail.com>
-References: <1442968663-31843-1-git-send-email-ard.biesheuvel@linaro.org>	<560426BF.4030300@arm.com>	<CAKv+Gu_YKo+c2rTzxMhjtfQzwix7d=Z33ej7omaJVz620U2efA@mail.gmail.com>
- <CAKv+Gu-WGSaGA+4OJcNOct+sdBHsO8yKOc50t3jmB86xonWQ=g@mail.gmail.com>
-Message-ID: <5605095A.10707@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 25 Sep 2015 11:14:09 +0200
+Subject: [PATCH] pinctrl: at91-pio4: add PM stuff
+Message-ID: <1443172449-19915-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/09/15 00:19, Ard Biesheuvel wrote:
-> On 24 September 2015 at 09:38, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> On 24 September 2015 at 09:37, Suzuki K. Poulose <Suzuki.Poulose@arm.com> wrote:
->>> On 23/09/15 01:37, Ard Biesheuvel wrote:
+Allow GPIOs to be configured as wakeup sources. When going to suspend,
+disable all GPIO irqs excepting the one configured as wakeup sources.
 
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/pinctrl/pinctrl-at91-pio4.c | 76 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
 
->>>
->>> Ard,
->>>
->>> I gave your series a quick run and dumping the kernel page tables(with
->>> CONFIG_ARM64_PTDUMP)
->>> I find this problem :
->>>
->>> ...
->>>
->>> ---[ Kernel Mapping ]---
->>> 0xffffffbffc000000-0xffffffbffc600000           6M     RW x  SHD AF
->>> MEM/NORMAL    *****
->>> 0xffffffbffc600000-0xffffffbffc7f5000        2004K     RW x  SHD AF    UXN
->>> MEM/NORMAL
->>> 0xffffffbffc7f5000-0xffffffbffc875000         512K     RW NX SHD AF    UXN
->>> MEM/NORMAL
->>> 0xffffffbffc875000-0xffffffbffca00000        1580K     RW x  SHD AF    UXN
->>> MEM/NORMAL
->>> ---[ Linear Mapping ]---
->>> 0xffffffc000000000-0xffffffc040000000           1G     RW NX SHD AF    UXN
->>> MEM/NORMAL
->>>
->>>
->>> Note that the first mapping in the kernel doesn't have UXN set, which is a
->>> regression.
->>> I haven't started digging into it yet, but I thought I will point it out
->>> here, in case you
->>> already fixed it.
->>>
->>
->> Ok, thanks for pointing that out. I will look into it.
->>
->
-> Turns out that, since the kernel mapping is not overwritten by the
-> linear mapping, it retains the original permissions assigned in
-> head.S. So this is enough to fix it
->
-> """
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 2df4a55f00d4..fcd250cff4bf 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -62,8 +62,8 @@
->   /*
->    * Initial memory map attributes.
->    */
-> -#define PTE_FLAGS      PTE_TYPE_PAGE | PTE_AF | PTE_SHARED
-> -#define PMD_FLAGS      PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S
-> +#define PTE_FLAGS      PTE_TYPE_PAGE | PTE_AF | PTE_SHARED | PTE_UXN
-> +#define PMD_FLAGS      PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S | PMD_SECT_UXN
->
->   #ifdef CONFIG_ARM64_64K_PAGES
->   #define MM_MMUFLAGS    PTE_ATTRINDX(MT_NORMAL) | PTE_FLAGS
-> """
->
-
-Yes, that fixes it. With that I get :
-
----[ Kernel Mapping ]---
-0xffffffbffc000000-0xffffffbffc600000           6M     RW x  SHD AF    UXN MEM/NORMAL
-0xffffffbffc600000-0xffffffbffc7f5000        2004K     RW x  SHD AF    UXN MEM/NORMAL
-0xffffffbffc7f5000-0xffffffbffc875000         512K     RW NX SHD AF    UXN MEM/NORMAL
-0xffffffbffc875000-0xffffffbffca00000        1580K     RW x  SHD AF    UXN MEM/NORMAL
----[ Linear Mapping ]---
-0xffffffc000000000-0xffffffc080000000           2G     RW NX SHD AF    UXN MEM/NORMAL
-0xffffffc800000000-0xffffffc880000000           2G     RW NX SHD AF    UXN MEM/NORMAL
-
-
-
->
->>> Note: I see that you have used CONFIG_ARM64_64K_PAGES to handle
->>> section/table mapping
->>> (which I have tried to cleanup in 16K page size series and which is not
->>> merged yet).
->>> We should be careful when we merge our patches, as we could miss such new
->>> cases.
->>>
->>
->> I was aware of this, and I think it makes sense to the 16 KB pages to
->> be merged first, and then I will rebase these patches on top of it.
->>
->
-> Do you have a git tree with the latest version?
->
-
-Yes, it is available here :
-
-git://linux-arm.org/linux-skp.git  16k/v2-4.3-rc1
-
-
-Thanks
-Suzuki
+diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+index 6aff632..5e2189f 100644
+--- a/drivers/pinctrl/pinctrl-at91-pio4.c
++++ b/drivers/pinctrl/pinctrl-at91-pio4.c
+@@ -16,6 +16,7 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/gpio.h>
++#include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+@@ -122,6 +123,8 @@ struct atmel_pioctrl {
+ 	struct gpio_chip	*gpio_chip;
+ 	struct irq_domain	*irq_domain;
+ 	int			*irqs;
++	unsigned		*pm_wakeup_sources;
++	unsigned		*pm_suspend_backup;
+ 	struct device		*dev;
+ 	struct device_node	*node;
+ };
+@@ -214,12 +217,35 @@ static void atmel_gpio_irq_unmask(struct irq_data *d)
+ 			 BIT(pin->line));
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++
++static int atmel_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
++{
++	struct atmel_pioctrl *atmel_pioctrl = irq_data_get_irq_chip_data(d);
++	int bank = ATMEL_PIO_BANK(d->hwirq);
++	int line = ATMEL_PIO_LINE(d->hwirq);
++
++	/* The gpio controller has one interrupt line per bank. */
++	irq_set_irq_wake(atmel_pioctrl->irqs[bank], on);
++
++	if (on)
++		atmel_pioctrl->pm_wakeup_sources[bank] |= BIT(line);
++	else
++		atmel_pioctrl->pm_wakeup_sources[bank] &= ~(BIT(line));
++
++	return 0;
++}
++#else
++#define atmel_gpio_irq_set_wake NULL
++#endif /* CONFIG_PM_SLEEP */
++
+ static struct irq_chip atmel_gpio_irq_chip = {
+ 	.name		= "GPIO",
+ 	.irq_ack	= atmel_gpio_irq_ack,
+ 	.irq_mask	= atmel_gpio_irq_mask,
+ 	.irq_unmask	= atmel_gpio_irq_unmask,
+ 	.irq_set_type	= atmel_gpio_irq_set_type,
++	.irq_set_wake	= atmel_gpio_irq_set_wake,
+ };
+ 
+ static void atmel_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+@@ -792,6 +818,43 @@ static struct pinctrl_desc atmel_pinctrl_desc = {
+ 	.pmxops		= &atmel_pmxops,
+ };
+ 
++static int atmel_pctrl_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
++	int i;
++
++	/*
++	 * For each bank, save IMR to restore it later and disable all GPIO
++	 * interrupts excepting the ones marked as wakeup sources.
++	 */
++	for (i = 0; i < atmel_pioctrl->nbanks; i++) {
++		atmel_pioctrl->pm_suspend_backup[i] =
++			atmel_gpio_read(atmel_pioctrl, i, ATMEL_PIO_IMR);
++		atmel_gpio_write(atmel_pioctrl, i, ATMEL_PIO_IDR,
++				 ~atmel_pioctrl->pm_wakeup_sources[i]);
++	}
++
++	return 0;
++}
++
++static int atmel_pctrl_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
++	int i;
++
++	for (i = 0; i < atmel_pioctrl->nbanks; i++)
++		atmel_gpio_write(atmel_pioctrl, i, ATMEL_PIO_IER,
++				 atmel_pioctrl->pm_suspend_backup[i]);
++
++	return 0;
++}
++
++static const struct dev_pm_ops atmel_pctrl_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(atmel_pctrl_suspend, atmel_pctrl_resume)
++};
++
+ /*
+  * The number of banks can be different from a SoC to another one.
+  * We can have up to 16 banks.
+@@ -908,6 +971,18 @@ static int atmel_pinctrl_probe(struct platform_device *pdev)
+ 	atmel_pioctrl->gpio_chip->dev = dev;
+ 	atmel_pioctrl->gpio_chip->names = atmel_pioctrl->group_names;
+ 
++	atmel_pioctrl->pm_wakeup_sources = devm_kzalloc(dev,
++			sizeof(*atmel_pioctrl->pm_wakeup_sources)
++			* atmel_pioctrl->nbanks, GFP_KERNEL);
++	if (!atmel_pioctrl->pm_wakeup_sources)
++		return -ENOMEM;
++
++	atmel_pioctrl->pm_suspend_backup = devm_kzalloc(dev,
++			sizeof(*atmel_pioctrl->pm_suspend_backup)
++			* atmel_pioctrl->nbanks, GFP_KERNEL);
++	if (!atmel_pioctrl->pm_suspend_backup)
++		return -ENOMEM;
++
+ 	atmel_pioctrl->irqs = devm_kzalloc(dev, sizeof(*atmel_pioctrl->irqs)
+ 			* atmel_pioctrl->nbanks, GFP_KERNEL);
+ 	if (!atmel_pioctrl->irqs)
+@@ -1006,6 +1081,7 @@ static struct platform_driver atmel_pinctrl_driver = {
+ 	.driver = {
+ 		.name = "pinctrl-at91-pio4",
+ 		.of_match_table = atmel_pctrl_of_match,
++		.pm = &atmel_pctrl_pm_ops,
+ 	},
+ 	.probe = atmel_pinctrl_probe,
+ 	.remove = atmel_pinctrl_remove,
+-- 
+2.5.0
