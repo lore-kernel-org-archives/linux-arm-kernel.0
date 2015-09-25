@@ -1,42 +1,26 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 25 Sep 2015 22:58:42 +0200
-Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
- 'global_lock'
-In-Reply-To: <CAKohpok2Z2m7GZt1GzZzofeHEioF=XJEq8YVgtY=VtS9tmpb_Q@mail.gmail.com>
-References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- <4357538.Wlf88yQie6@vostro.rjw.lan>
- <CAKohpok2Z2m7GZt1GzZzofeHEioF=XJEq8YVgtY=VtS9tmpb_Q@mail.gmail.com>
-Message-ID: <2524822.pQu4UKMrlb@vostro.rjw.lan>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 25 Sep 2015 13:59:02 -0700
+Subject: [PATCH v5 4/7] pinctrl: freescale: imx: allow mux_reg offset zero
+In-Reply-To: <BN3PR03MB150994443644800594BE9BA2A8420@BN3PR03MB1509.namprd03.prod.outlook.com>
+References: <1443128043-21063-1-git-send-email-aalonso@freescale.com>
+ <1443128043-21063-4-git-send-email-aalonso@freescale.com>
+ <20150925104726.GJ11805@pengutronix.de>
+ <20150925190725.GX3529@tiger>
+ <BN3PR03MB150994443644800594BE9BA2A8420@BN3PR03MB1509.namprd03.prod.outlook.com>
+Message-ID: <20150925205902.GZ3529@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 25, 2015 01:25:49 PM Viresh Kumar wrote:
-> On 25 September 2015 at 13:33, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > You're going to change that into bool in the next patch, right?
-> 
-> Yeah.
-> 
-> > So what if bool is a byte and the field is not word-aligned
-> 
-> Its between two 'unsigned long' variables today, and the struct isn't packed.
-> So, it will be aligned, isn't it?
-> 
-> > and changing
-> > that byte requires a read-modify-write.  How do we ensure that things remain
-> > consistent in that case?
-> 
-> I didn't understood why a read-modify-write is special here? That's
-> what will happen
-> to most of the non-word-sized fields anyway?
-> 
-> Probably I didn't understood what you meant..
+On Fri, Sep 25, 2015 at 07:16:49PM +0000, Alonso Adrian wrote:
+> > Ah, sorry, I'm screwed on the previous review.  So we still need the flag
+> > ZERO_OFFSET_VALID to convert invalid 0 mux_reg to -1.
+> > 
+> > @Adrian,
+> > 
+> > Will the following change just work for you?
+> @Shawn, yes the change will work, do you want me to prepare a new patch series?
 
-Say you have three adjacent fields in a structure, x, y, z, each one byte long.
-Initially, all of them are equal to 0.
+Most of the patches in this series will go to Linus.  So that's his
+call, but I suggest you resend.
 
-CPU A writes 1 to x and CPU B writes 2 to y at the same time.
-
-What's the result?
-
-Thanks,
-Rafael
+Shawn
