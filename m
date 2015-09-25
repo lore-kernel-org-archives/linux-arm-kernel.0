@@ -1,167 +1,282 @@
-From: huangdaode@hisilicon.com (huangdaode)
-Date: Fri, 25 Sep 2015 16:28:43 +0800
-Subject: [PATCH net-next v2] net: Fix Hisilicon Network Subsystem Support
- Compilation
-Message-ID: <1443169723-54668-1-git-send-email-huangdaode@hisilicon.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 25 Sep 2015 10:26:13 +0200
+Subject: [PATCH] soc: mediatek: Fix random hang up issue while kernel init
+In-Reply-To: <1443162717-64831-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1443162717-64831-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1443169573.3135.9.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the compilation error with arm allmodconfig, this error
-generated due to unavailability of readq() on 32-bit platform which was
-found during net-next daily compilation. In the same time, fix all the
-hns drivers compilation warnings.
+Am Freitag, den 25.09.2015, 14:31 +0800 schrieb James Liao:
+> In kernel late init, it turns off all unused clocks, which
+> needs to access subsystem registers such as VENC and VENC_LT.
+> 
+> Accessing MT8173 VENC registers needs two top clocks, mm_sel and
+> venc_sel. Accessing VENC_LT registers needs mm_sel and venclt_sel.
+> So we need to keep these clocks on before accessing their registers.
+> 
+> This patch keeps venc_sel / venclt_sel clock on when
+> VENC / VENC_LT's power is on, to prevent system hang up while
+> accessing its registeres.
+> 
+This changes the binding of an existing driver, so it needs some more
+consideration. Are VENC_SEL and VENC_LT_SEL really direct clock inputs
+to the VENC module, or are they some kind of parent clock for one of the
+existing clocks used by the old VENC binding?
 
-Sgned-off-by: huangdaode <huangdaode@hisilicon.com>
-Signed-off-by: zhaungyuzeng <Yisen.zhuang@huawei.com>
-Signed-off-by: kenneth Lee <liguozhu@hisilicon.com>
-Signed-off-by: yankejian <yankejian@huawei.com>
----
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c   |  2 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h  |  4 ++--
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c   | 10 ++++++++--
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h   |  2 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c |  1 +
- drivers/net/ethernet/hisilicon/hns/hns_enet.c       | 17 -----------------
- 6 files changed, 13 insertions(+), 23 deletions(-)
+If they are direct clock inputs to the VENC module, changing the binding
+might be still ok at that point, as there shouldn't be many users of
+that yet. But then we at least need a corresponding change to the
+binding documentation.
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
-index a8bd27b..95bf42a 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
-@@ -86,7 +86,7 @@ int hns_mac_get_sfp_prsnt(struct hns_mac_cb *mac_cb, int *sfp_prsnt)
- 	if (!mac_cb->cpld_vaddr)
- 		return -ENODEV;
- 
--	*sfp_prsnt = !dsaf_read_b((u64)mac_cb->cpld_vaddr
-+	*sfp_prsnt = !dsaf_read_b((u8 *)mac_cb->cpld_vaddr
- 					+ MAC_SFP_PORT_OFFSET);
- 
- 	return 0;
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
-index e0417c0..315b07e 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
-@@ -43,7 +43,7 @@ struct hns_mac_cb;
- #define DSAF_DUMP_REGS_NUM 504
- #define DSAF_STATIC_NUM 28
- 
--#define DSAF_STATS_READ(p, offset) (*((u64 *)((u64)(p) + (offset))))
-+#define DSAF_STATS_READ(p, offset) (*((u64 *)((u8 *)(p) + (offset))))
- 
- enum hal_dsaf_mode {
- 	HRD_DSAF_NO_DSAF_MODE	= 0x0,
-@@ -302,7 +302,7 @@ struct dsaf_device {
- 
- static inline void *hns_dsaf_dev_priv(const struct dsaf_device *dsaf_dev)
- {
--	return (void *)((u64)dsaf_dev + sizeof(*dsaf_dev));
-+	return (void *)((u8 *)dsaf_dev + sizeof(*dsaf_dev));
- }
- 
- struct dsaf_drv_tbl_tcam_key {
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c
-index 50f3427..1e10f65 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c
-@@ -191,9 +191,12 @@ static void hns_rcb_ring_init(struct ring_pair_cb *ring_pair, int ring_type)
- 	if (ring_type == RX_RING) {
- 		dsaf_write_dev(q, RCB_RING_RX_RING_BASEADDR_L_REG,
- 			       (u32)dma);
-+#ifdef CONFIG_64BIT
- 		dsaf_write_dev(q, RCB_RING_RX_RING_BASEADDR_H_REG,
- 			       (u32)(dma >> 32));
--
-+#else
-+		dsaf_write_dev(q, RCB_RING_RX_RING_BASEADDR_H_REG, 0);
-+#endif
- 		dsaf_write_dev(q, RCB_RING_RX_RING_BD_LEN_REG,
- 			       bd_size_type);
- 		dsaf_write_dev(q, RCB_RING_RX_RING_BD_NUM_REG,
-@@ -203,9 +206,12 @@ static void hns_rcb_ring_init(struct ring_pair_cb *ring_pair, int ring_type)
- 	} else {
- 		dsaf_write_dev(q, RCB_RING_TX_RING_BASEADDR_L_REG,
- 			       (u32)dma);
-+#ifdef CONFIG_64BIT
- 		dsaf_write_dev(q, RCB_RING_TX_RING_BASEADDR_H_REG,
- 			       (u32)(dma >> 32));
--
-+#else
-+		dsaf_write_dev(q, RCB_RING_TX_RING_BASEADDR_H_REG, 0);
-+#endif
- 		dsaf_write_dev(q, RCB_RING_TX_RING_BD_LEN_REG,
- 			       bd_size_type);
- 		dsaf_write_dev(q, RCB_RING_TX_RING_BD_NUM_REG,
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-index 6fc58ba..b475e1b 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-@@ -967,6 +967,6 @@ static inline u32 dsaf_get_reg_field(void *base, u32 reg, u32 mask, u32 shift)
- 	readb((__iomem unsigned char *)(addr))
- 
- #define hns_mac_reg_read64(drv, offset) \
--	readq((__iomem void *)(((u64)(drv)->io_base + 0xc00 + (offset))))
-+	readq((__iomem void *)(((u8 *)(drv)->io_base + 0xc00 + (offset))))
- 
- #endif	/* _DSAF_REG_H */
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c
-index fe7fa1d..dab5ecf 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_xgmac.c
-@@ -7,6 +7,7 @@
-  * (at your option) any later version.
-  */
- 
-+#include <asm-generic/io-64-nonatomic-hi-lo.h>
- #include <linux/of_mdio.h>
- #include "hns_dsaf_main.h"
- #include "hns_dsaf_mac.h"
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-index 0713ced..ce7f2e0 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-@@ -31,8 +31,6 @@
- #define NIC_TX_CLEAN_MAX_NUM 256
- #define NIC_RX_CLEAN_MAX_NUM 64
- 
--#define RCB_ERR_PRINT_CYCLE 1000
--
- #define RCB_IRQ_NOT_INITED 0
- #define RCB_IRQ_INITED 1
- 
-@@ -434,21 +432,12 @@ out_bnum_err:
- 
- 	if (unlikely((!desc->rx.pkt_len) ||
- 		     hnae_get_bit(bnum_flag, HNS_RXD_DROP_B))) {
--		if (!(ring->stats.err_pkt_len % RCB_ERR_PRINT_CYCLE))
--			netdev_dbg(ndev,
--				   "pkt_len(%u),drop(%u),%#llx,%#llx\n",
--				   le16_to_cpu(desc->rx.pkt_len),
--				   hnae_get_bit(bnum_flag, HNS_RXD_DROP_B),
--				   ((u64 *)desc)[0], ((u64 *)desc)[1]);
- 		ring->stats.err_pkt_len++;
- 		dev_kfree_skb_any(skb);
- 		return -EFAULT;
- 	}
- 
- 	if (unlikely(hnae_get_bit(bnum_flag, HNS_RXD_L2E_B))) {
--		if (!(ring->stats.l2_err % RCB_ERR_PRINT_CYCLE))
--			netdev_dbg(ndev, "L2 check err,%#llx,%#llx\n",
--				   ((u64 *)desc)[0], ((u64 *)desc)[1]);
- 		ring->stats.l2_err++;
- 		dev_kfree_skb_any(skb);
- 		return -EFAULT;
-@@ -459,12 +448,6 @@ out_bnum_err:
- 
- 	if (unlikely(hnae_get_bit(bnum_flag, HNS_RXD_L3E_B) ||
- 		     hnae_get_bit(bnum_flag, HNS_RXD_L4E_B))) {
--		if (!(ring->stats.l3l4_csum_err % RCB_ERR_PRINT_CYCLE))
--			netdev_dbg(ndev,
--				   "check err(%#x),%#llx,%#llx\n",
--				   hnae_get_bit(bnum_flag, HNS_RXD_L3E_B) |
--				   hnae_get_bit(bnum_flag, HNS_RXD_L4E_B),
--				   ((u64 *)desc)[0], ((u64 *)desc)[1]);
- 		ring->stats.l3l4_csum_err++;
- 		return 0;
- 	}
+Regards,
+Lucas
+
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> ---
+> 
+> This patch is based on v4.3-rc2, to fix system hanging up issue
+> while disabling unused clocks.
+> 
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi |  6 ++-
+>  drivers/soc/mediatek/mtk-scpsys.c        | 67 +++++++++++++++++++++-----------
+>  2 files changed, 48 insertions(+), 25 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index d18ee42..188917f 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -227,8 +227,10 @@
+>  			#power-domain-cells = <1>;
+>  			reg = <0 0x10006000 0 0x1000>;
+>  			clocks = <&clk26m>,
+> -				 <&topckgen CLK_TOP_MM_SEL>;
+> -			clock-names = "mfg", "mm";
+> +				 <&topckgen CLK_TOP_MM_SEL>,
+> +				 <&topckgen CLK_TOP_VENC_SEL>,
+> +				 <&topckgen CLK_TOP_VENC_LT_SEL>;
+> +			clock-names = "mfg", "mm", "venc", "venc_lt";
+>  			infracfg = <&infracfg>;
+>  		};
+>  
+> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> index 164a7d8..06032ba 100644
+> --- a/drivers/soc/mediatek/mtk-scpsys.c
+> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> @@ -54,12 +54,16 @@
+>  #define PWR_STATUS_USB			BIT(25)
+>  
+>  enum clk_id {
+> +	MT8173_CLK_NONE,
+>  	MT8173_CLK_MM,
+>  	MT8173_CLK_MFG,
+> -	MT8173_CLK_NONE,
+> -	MT8173_CLK_MAX = MT8173_CLK_NONE,
+> +	MT8173_CLK_VENC,
+> +	MT8173_CLK_VENC_LT,
+> +	MT8173_CLK_MAX,
+>  };
+>  
+> +#define MAX_CLKS	2
+> +
+>  struct scp_domain_data {
+>  	const char *name;
+>  	u32 sta_mask;
+> @@ -67,7 +71,7 @@ struct scp_domain_data {
+>  	u32 sram_pdn_bits;
+>  	u32 sram_pdn_ack_bits;
+>  	u32 bus_prot_mask;
+> -	enum clk_id clk_id;
+> +	enum clk_id clk_id[MAX_CLKS];
+>  };
+>  
+>  static const struct scp_domain_data scp_domain_data[] __initconst = {
+> @@ -77,7 +81,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+>  		.ctl_offs = SPM_VDE_PWR_CON,
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(12, 12),
+> -		.clk_id = MT8173_CLK_MM,
+> +		.clk_id = {MT8173_CLK_MM},
+>  	},
+>  	[MT8173_POWER_DOMAIN_VENC] = {
+>  		.name = "venc",
+> @@ -85,7 +89,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+>  		.ctl_offs = SPM_VEN_PWR_CON,
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+> -		.clk_id = MT8173_CLK_MM,
+> +		.clk_id = {MT8173_CLK_MM, MT8173_CLK_VENC},
+>  	},
+>  	[MT8173_POWER_DOMAIN_ISP] = {
+>  		.name = "isp",
+> @@ -93,7 +97,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+>  		.ctl_offs = SPM_ISP_PWR_CON,
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(13, 12),
+> -		.clk_id = MT8173_CLK_MM,
+> +		.clk_id = {MT8173_CLK_MM},
+>  	},
+>  	[MT8173_POWER_DOMAIN_MM] = {
+>  		.name = "mm",
+> @@ -101,7 +105,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+>  		.ctl_offs = SPM_DIS_PWR_CON,
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(12, 12),
+> -		.clk_id = MT8173_CLK_MM,
+> +		.clk_id = {MT8173_CLK_MM},
+>  		.bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MM_M0 |
+>  			MT8173_TOP_AXI_PROT_EN_MM_M1,
+>  	},
+> @@ -111,7 +115,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+>  		.ctl_offs = SPM_VEN2_PWR_CON,
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+> -		.clk_id = MT8173_CLK_MM,
+> +		.clk_id = {MT8173_CLK_MM, MT8173_CLK_VENC_LT},
+>  	},
+>  	[MT8173_POWER_DOMAIN_AUDIO] = {
+>  		.name = "audio",
+> @@ -119,7 +123,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+>  		.ctl_offs = SPM_AUDIO_PWR_CON,
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+> -		.clk_id = MT8173_CLK_NONE,
+> +		.clk_id = {MT8173_CLK_NONE},
+>  	},
+>  	[MT8173_POWER_DOMAIN_USB] = {
+>  		.name = "usb",
+> @@ -127,7 +131,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+>  		.ctl_offs = SPM_USB_PWR_CON,
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(15, 12),
+> -		.clk_id = MT8173_CLK_NONE,
+> +		.clk_id = {MT8173_CLK_NONE},
+>  	},
+>  	[MT8173_POWER_DOMAIN_MFG_ASYNC] = {
+>  		.name = "mfg_async",
+> @@ -135,7 +139,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+>  		.ctl_offs = SPM_MFG_ASYNC_PWR_CON,
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = 0,
+> -		.clk_id = MT8173_CLK_MFG,
+> +		.clk_id = {MT8173_CLK_MFG},
+>  	},
+>  	[MT8173_POWER_DOMAIN_MFG_2D] = {
+>  		.name = "mfg_2d",
+> @@ -143,7 +147,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+>  		.ctl_offs = SPM_MFG_2D_PWR_CON,
+>  		.sram_pdn_bits = GENMASK(11, 8),
+>  		.sram_pdn_ack_bits = GENMASK(13, 12),
+> -		.clk_id = MT8173_CLK_NONE,
+> +		.clk_id = {MT8173_CLK_NONE},
+>  	},
+>  	[MT8173_POWER_DOMAIN_MFG] = {
+>  		.name = "mfg",
+> @@ -151,7 +155,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+>  		.ctl_offs = SPM_MFG_PWR_CON,
+>  		.sram_pdn_bits = GENMASK(13, 8),
+>  		.sram_pdn_ack_bits = GENMASK(21, 16),
+> -		.clk_id = MT8173_CLK_NONE,
+> +		.clk_id = {MT8173_CLK_NONE},
+>  		.bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MFG_S |
+>  			MT8173_TOP_AXI_PROT_EN_MFG_M0 |
+>  			MT8173_TOP_AXI_PROT_EN_MFG_M1 |
+> @@ -166,7 +170,7 @@ struct scp;
+>  struct scp_domain {
+>  	struct generic_pm_domain genpd;
+>  	struct scp *scp;
+> -	struct clk *clk;
+> +	struct clk *clk[MAX_CLKS];
+>  	u32 sta_mask;
+>  	void __iomem *ctl_addr;
+>  	u32 sram_pdn_bits;
+> @@ -212,11 +216,16 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
+>  	u32 sram_pdn_ack = scpd->sram_pdn_ack_bits;
+>  	u32 val;
+>  	int ret;
+> +	int i;
+> +
+> +	for (i = 0; i < MAX_CLKS && scpd->clk[i]; i++) {
+> +		ret = clk_prepare_enable(scpd->clk[i]);
+> +		if (ret) {
+> +			for (--i; i >= 0; i--)
+> +				clk_disable_unprepare(scpd->clk[i]);
+>  
+> -	if (scpd->clk) {
+> -		ret = clk_prepare_enable(scpd->clk);
+> -		if (ret)
+>  			goto err_clk;
+> +		}
+>  	}
+>  
+>  	val = readl(ctl_addr);
+> @@ -282,7 +291,10 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
+>  	return 0;
+>  
+>  err_pwr_ack:
+> -	clk_disable_unprepare(scpd->clk);
+> +	for (i = MAX_CLKS - 1; i >= 0; i--) {
+> +		if (scpd->clk[i])
+> +			clk_disable_unprepare(scpd->clk[i]);
+> +	}
+>  err_clk:
+>  	dev_err(scp->dev, "Failed to power on domain %s\n", genpd->name);
+>  
+> @@ -299,6 +311,7 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
+>  	u32 pdn_ack = scpd->sram_pdn_ack_bits;
+>  	u32 val;
+>  	int ret;
+> +	int i;
+>  
+>  	if (scpd->bus_prot_mask) {
+>  		ret = mtk_infracfg_set_bus_protection(scp->infracfg,
+> @@ -360,8 +373,8 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
+>  			expired = true;
+>  	}
+>  
+> -	if (scpd->clk)
+> -		clk_disable_unprepare(scpd->clk);
+> +	for (i = 0; i < MAX_CLKS && scpd->clk[i]; i++)
+> +		clk_disable_unprepare(scpd->clk[i]);
+>  
+>  	return 0;
+>  
+> @@ -375,7 +388,7 @@ static int __init scpsys_probe(struct platform_device *pdev)
+>  {
+>  	struct genpd_onecell_data *pd_data;
+>  	struct resource *res;
+> -	int i, ret;
+> +	int i, j, ret;
+>  	struct scp *scp;
+>  	struct clk *clk[MT8173_CLK_MAX];
+>  
+> @@ -405,6 +418,14 @@ static int __init scpsys_probe(struct platform_device *pdev)
+>  	if (IS_ERR(clk[MT8173_CLK_MFG]))
+>  		return PTR_ERR(clk[MT8173_CLK_MFG]);
+>  
+> +	clk[MT8173_CLK_VENC] = devm_clk_get(&pdev->dev, "venc");
+> +	if (IS_ERR(clk[MT8173_CLK_VENC]))
+> +		return PTR_ERR(clk[MT8173_CLK_VENC]);
+> +
+> +	clk[MT8173_CLK_VENC_LT] = devm_clk_get(&pdev->dev, "venc_lt");
+> +	if (IS_ERR(clk[MT8173_CLK_VENC_LT]))
+> +		return PTR_ERR(clk[MT8173_CLK_VENC_LT]);
+> +
+>  	scp->infracfg = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+>  			"infracfg");
+>  	if (IS_ERR(scp->infracfg)) {
+> @@ -428,8 +449,8 @@ static int __init scpsys_probe(struct platform_device *pdev)
+>  		scpd->sram_pdn_bits = data->sram_pdn_bits;
+>  		scpd->sram_pdn_ack_bits = data->sram_pdn_ack_bits;
+>  		scpd->bus_prot_mask = data->bus_prot_mask;
+> -		if (data->clk_id != MT8173_CLK_NONE)
+> -			scpd->clk = clk[data->clk_id];
+> +		for (j = 0; j < MAX_CLKS && data->clk_id[j]; j++)
+> +			scpd->clk[j] = clk[data->clk_id[j]];
+>  
+>  		genpd->name = data->name;
+>  		genpd->power_off = scpsys_power_off;
+
 -- 
-1.9.1
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
