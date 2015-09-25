@@ -1,49 +1,55 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 25 Sep 2015 09:50:07 -0500
-Subject: [PATCH 1/3] Documentation: dt: keystone: provide SoC specific
- compatible flags
-In-Reply-To: <56041CA4.40208@ti.com>
-References: <1442938118-4718-1-git-send-email-nm@ti.com>
- <1442938118-4718-2-git-send-email-nm@ti.com> <5602ED34.9010108@oracle.com>
- <56040323.1080409@ti.com> <560406C2.6090200@ti.com> <56041CA4.40208@ti.com>
-Message-ID: <56055F1F.4060401@ti.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 25 Sep 2015 15:50:59 +0100
+Subject: [PATCH v1 0/8] xen/arm: vgic: Support 32-bit access for 64-bit
+ register
+Message-ID: <1443192667-16112-1-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2015 10:54 AM, Murali Karicheri wrote:
-[...]
-> ti,omap3 is the family of omap3 devices similar to keystone. ti,omap3450
-> is required if there is an exceptional treatment required for ti,omap3450.
-> 
-> In keystone case so far there is no case of exceptional treatment
-> required in the code for a specific SoC. So a generic name, ti,keystone
-> is used. When exceptional treatment is needed in the future, for example
-> k2hk Soc, we should introduce SoC specific string in the following order.
+Hi all,
 
-Did you do a grep on the code to see?
-$ git grep ti,omap3 arch/arm/mach-omap2/
-           arch/arm/mach-omap2/board-generic.c:    "ti,omap3430",
-arch/arm/mach-omap2/board-generic.c:    "ti,omap3",
-arch/arm/mach-omap2/board-generic.c:    "ti,omap36xx",
-arch/arm/mach-omap2/board-generic.c:    "ti,omap3-beagle",
+This series aims to fix the 32-bit access on 64-bit register. Some guest
+OS such as FreeBSD and Linux (only in the ITS) use 32-bit access and will
+crash at boot time.
 
-This is the same as keystone's device support. even though only 36xx was
-needed, we introduced other SoC specific compatibility match.
+I took the opportunity to go further and optimize the way Xen is storing
+registers such as GICD_IPRIORITYR, GICD_ITARGETR and GICD_IROUTER.
 
-> "ti,k2hk-evm", "ti,k2hk", "ti,keystone"
-> 
-> So unless there is an exception, there is no need for a SoC specific
-> string in the compatibility string list. So this can be added later if
-> there is need for exceptional treatment. Did I get it wrong?
-> 
+Major changes in v2:
+    - Use the helpers in GICv2
+    - Optimize the assembly input for vgic_regN_* helpers on arm32
+    - Add support for sign-extension generically
+    - Store GICD_{IPRIORITYR, ITARGETSR, IROUTER} in a better way
 
-I see both your views seem to be "if we dont need a compatible" dont add
-it. My view was based on "be accurate in the hardware description"
+For all the changes see in each patch.
 
-OK - i will probably agree on the topic. But, how about userspace
-needing to know which SoC they are on, without needing to depend on
-board->soc mapping? How do we help resolve that?
+A branch has been pushed based on the lastest staging:
+
+git://xenbits.xen.org/people/julieng/xen-unstable.git branch gicv3-32bit-v1
+
+Sincerely yours,
+
+Julien Grall (8):
+  xen/arm: io: remove mmio_check_t typedef
+  xen/arm: io: Extend write/read handler to pass the register in
+    parameter
+  xen/arm: Support sign-extension for every read access
+  xen/arm: vgic: ctlr stores a 32-bit hardware register so use uint32_t
+  xen/arm: vgic: Optimize the way to store GICD_IPRIORITYR in the rank
+  xen/arm: vgic: Optimize the way to store the target vCPU in the rank
+  xen/arm: vgic: Introduce helpers to read/write/clear/set vGIC register
+    ...
+  xen/arm: vgic-v3: Support 32-bit access for 64-bit registers
+
+ xen/arch/arm/io.c            |  42 +++++-
+ xen/arch/arm/vgic-v2.c       | 295 +++++++++++++++++++++---------------
+ xen/arch/arm/vgic-v3.c       | 352 +++++++++++++++++++++++++------------------
+ xen/arch/arm/vgic.c          |  72 ++++++++-
+ xen/arch/arm/vuart.c         |  16 +-
+ xen/include/asm-arm/domain.h |   2 +-
+ xen/include/asm-arm/mmio.h   |   5 +-
+ xen/include/asm-arm/vgic.h   | 148 +++++++++++++++---
+ 8 files changed, 617 insertions(+), 315 deletions(-)
 
 -- 
-Regards,
-Nishanth Menon
+2.1.4
