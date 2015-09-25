@@ -1,266 +1,132 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 25 Sep 2015 15:51:04 +0100
-Subject: [PATCH v1 5/8] xen/arm: vgic: Optimize the way to store
- GICD_IPRIORITYR in the rank
+Date: Fri, 25 Sep 2015 15:51:07 +0100
+Subject: [PATCH v1 8/8] xen/arm: vgic-v3: Support 32-bit access for 64-bit
+ registers
 In-Reply-To: <1443192667-16112-1-git-send-email-julien.grall@citrix.com>
 References: <1443192667-16112-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1443192667-16112-6-git-send-email-julien.grall@citrix.com>
+Message-ID: <1443192667-16112-9-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Xen is currently directly storing the value of register GICD_IPRIORITYR
-in the rank. This makes emulation of the register access very simple
-but makes the code to get the priority for a given IRQ more complex.
+Based on 8.1.3 (IHI 0069A), unless stated otherwise, the 64-bit registers
+supports both 32-bit and 64-bits access.
 
-While the priority of an IRQ is retrieved everytime an IRQ is injected
-to the guest, the access to register occurs less often.
+All the registers we properly emulate (i.e not RAZ/WI) supports 32-bit access.
 
-So the data structure should be optimized for the most common case
-rather than the inverse.
-
-This patch introduces the usage of an array to store the priority for
-every interrupt in the rank. This will make the code to get the priority
-very quick. The emulation code will now have to generate the GICD_PRIORITYR
-register for read access and split it to store in a convenient way.
+For RAZ/WI, it's also seems to be the case but I'm not 100% sure. Anyway,
+emulating 32-bit access for them doesn't hurt. Note that we would need
+some extra care when they will be implemented (for instance GICR_PROPBASER).
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
 ---
+    This is technically fixing boot of FreeBSD ARM64 guest with GICv3.
 
-The real reason is I'd like to drop vgic_byte_* helpers in favors of more
-generic access helper. Although it would make the code to retrieve the
-priority more complex. So reworking the way to get the priority was the
-best solution.
+    AFAICT, Linux is not using 32-bit access in the GICv3 code expect
+    for the ITS (which we don't support yet).
+
+    So this patch is a good candiate for Xen 4.6. Although this patch is
+    heavily depend on previous patches. It may be possible to shuffle
+    and move the "opmitization" patches towards the end. I haven't yet
+    done that because I feel this series makes more sense in the current
+    order.
+
+    Also, I haven't move vgic_reg64_check_access in vgic.h because there
+    is no usage in this series outside of vgic-v3.c and the helpers is
+    GICv3 oriented.
 
     Changes in v2:
-        - Patch added
+        - Support 32bit access on the most significant word of
+        GICR_TYPER
 ---
- xen/arch/arm/vgic-v2.c     | 24 ++++++++++++++----------
- xen/arch/arm/vgic-v3.c     | 27 ++++++++++++++++-----------
- xen/arch/arm/vgic.c        | 46 ++++++++++++++++++++++++++++++++++++++++++++++
- xen/include/asm-arm/vgic.h | 18 +++++++++++++++++-
- 4 files changed, 93 insertions(+), 22 deletions(-)
+ xen/arch/arm/vgic-v3.c | 24 +++++++++++++++++-------
+ 1 file changed, 17 insertions(+), 7 deletions(-)
 
-diff --git a/xen/arch/arm/vgic-v2.c b/xen/arch/arm/vgic-v2.c
-index 47f9da9..23d1982 100644
---- a/xen/arch/arm/vgic-v2.c
-+++ b/xen/arch/arm/vgic-v2.c
-@@ -139,8 +139,8 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
-         if ( rank == NULL) goto read_as_zero;
- 
-         vgic_lock_rank(v, rank, flags);
--        *r = rank->ipriority[REG_RANK_INDEX(8, gicd_reg - GICD_IPRIORITYR,
--                                            DABT_WORD)];
-+        /* Recreate the IPRIORITYR register */
-+        *r = vgic_generate_ipriorityr(rank, gicd_reg - GICD_IPRIORITYR);
-         if ( dabt.size == DABT_BYTE )
-             *r = vgic_byte_read(*r, gicd_reg);
-         vgic_unlock_rank(v, rank, flags);
-@@ -400,18 +400,25 @@ static int vgic_v2_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
-     }
- 
-     case GICD_IPRIORITYR ... GICD_IPRIORITYRN:
-+    {
-+        uint32_t ipriorityr;
-+
-         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
-         rank = vgic_rank_offset(v, 8, gicd_reg - GICD_IPRIORITYR, DABT_WORD);
-         if ( rank == NULL) goto write_ignore;
-         vgic_lock_rank(v, rank, flags);
-         if ( dabt.size == DABT_WORD )
--            rank->ipriority[REG_RANK_INDEX(8, gicd_reg - GICD_IPRIORITYR,
--                                           DABT_WORD)] = r;
-+            ipriorityr = r;
-         else
--            vgic_byte_write(&rank->ipriority[REG_RANK_INDEX(8,
--                        gicd_reg - GICD_IPRIORITYR, DABT_WORD)], r, gicd_reg);
-+        {
-+            ipriorityr = vgic_generate_ipriorityr(rank,
-+                                                  gicd_reg - GICD_IPRIORITYR);
-+            vgic_byte_write(&ipriorityr, r, gicd_reg);
-+        }
-+        vgic_store_ipriorityr(rank, gicd_reg - GICD_IPRIORITYR, ipriorityr);
-         vgic_unlock_rank(v, rank, flags);
-         return 1;
-+    }
- 
-     case GICD_ICFGR: /* SGIs */
-         goto write_ignore_32;
-@@ -516,14 +523,11 @@ static struct vcpu *vgic_v2_get_target_vcpu(struct vcpu *v, unsigned int irq)
- 
- static int vgic_v2_get_irq_priority(struct vcpu *v, unsigned int irq)
- {
--    int priority;
-     struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
- 
-     ASSERT(spin_is_locked(&rank->lock));
--    priority = vgic_byte_read(rank->ipriority[REG_RANK_INDEX(8,
--                                              irq, DABT_WORD)], irq & 0x3);
- 
--    return priority;
-+    return rank->priority[irq & INTERRUPT_RANK_MASK];
- }
- 
- static int vgic_v2_vcpu_init(struct vcpu *v)
 diff --git a/xen/arch/arm/vgic-v3.c b/xen/arch/arm/vgic-v3.c
-index c013200..2787507 100644
+index 8da695f..46b5ad8 100644
 --- a/xen/arch/arm/vgic-v3.c
 +++ b/xen/arch/arm/vgic-v3.c
-@@ -333,8 +333,8 @@ static int __vgic_v3_distr_common_mmio_read(const char *name, struct vcpu *v,
-         if ( rank == NULL ) goto read_as_zero;
- 
-         vgic_lock_rank(v, rank, flags);
--        *r = rank->ipriority[REG_RANK_INDEX(8, reg - GICD_IPRIORITYR,
--                                            DABT_WORD)];
-+        /* Recreate the IPRIORITYR register */
-+        *r = vgic_generate_ipriorityr(rank, reg - GICD_IPRIORITYR);
-         if ( dabt.size == DABT_BYTE )
-             *r = vgic_byte_read(*r, reg);
-         vgic_unlock_rank(v, rank, flags);
-@@ -430,18 +430,26 @@ static int __vgic_v3_distr_common_mmio_write(const char *name, struct vcpu *v,
-         return 0;
- 
-     case GICD_IPRIORITYR ... GICD_IPRIORITYRN:
-+    {
-+        uint32_t ipriorityr;
-+
-         if ( dabt.size != DABT_BYTE && dabt.size != DABT_WORD ) goto bad_width;
-         rank = vgic_rank_offset(v, 8, reg - GICD_IPRIORITYR, DABT_WORD);
--        if ( rank == NULL ) goto write_ignore;
-+        if ( rank == NULL) goto write_ignore;
-+
-         vgic_lock_rank(v, rank, flags);
-         if ( dabt.size == DABT_WORD )
--            rank->ipriority[REG_RANK_INDEX(8, reg - GICD_IPRIORITYR,
--                                           DABT_WORD)] = r;
-+            ipriorityr = r;
-         else
--            vgic_byte_write(&rank->ipriority[REG_RANK_INDEX(8,
--                       reg - GICD_IPRIORITYR, DABT_WORD)], r, reg);
-+        {
-+            ipriorityr = vgic_generate_ipriorityr(rank, reg - GICD_IPRIORITYR);
-+            vgic_byte_write(&ipriorityr, r, reg);
-+        }
-+        vgic_store_ipriorityr(rank, reg - GICD_IPRIORITYR, ipriorityr);
-         vgic_unlock_rank(v, rank, flags);
-         return 1;
-+    }
-+
-     case GICD_ICFGR: /* Restricted to configure SGIs */
-         goto write_ignore_32;
-     case GICD_ICFGR + 4 ... GICD_ICFGRN: /* PPI + SPIs */
-@@ -1057,14 +1065,11 @@ static const struct mmio_handler_ops vgic_distr_mmio_handler = {
- 
- static int vgic_v3_get_irq_priority(struct vcpu *v, unsigned int irq)
- {
--    int priority;
-     struct vgic_irq_rank *rank = vgic_rank_irq(v, irq);
- 
-     ASSERT(spin_is_locked(&rank->lock));
--    priority = vgic_byte_read(rank->ipriority[REG_RANK_INDEX(8,
--                                              irq, DABT_WORD)], irq & 0x3);
- 
--    return priority;
-+    return rank->priority[irq & INTERRUPT_RANK_MASK];
+@@ -162,6 +162,15 @@ static struct vcpu *vgic_v3_get_target_vcpu(struct vcpu *v, unsigned int irq)
+     return v->domain->vcpu[rank->vcpu[irq & INTERRUPT_RANK_MASK]];
  }
  
- static int vgic_v3_vcpu_init(struct vcpu *v)
-diff --git a/xen/arch/arm/vgic.c b/xen/arch/arm/vgic.c
-index a6835a8..50ad360 100644
---- a/xen/arch/arm/vgic.c
-+++ b/xen/arch/arm/vgic.c
-@@ -61,6 +61,52 @@ struct vgic_irq_rank *vgic_rank_irq(struct vcpu *v, unsigned int irq)
-     return vgic_get_rank(v, rank);
- }
- 
-+#define NR_PRIORITY_PER_REG 4U
-+#define NR_BIT_PER_PRIORITY 8U
-+
-+/*
-+ * Generate the associated IPRIORITYR register based on an offset in the rank.
-+ * Note the offset will be round down to match a real HW register.
-+ */
-+uint32_t vgic_generate_ipriorityr(struct vgic_irq_rank *rank,
-+                                  unsigned int offset)
++static inline bool vgic_reg64_check_access(struct hsr_dabt dabt)
 +{
-+    uint32_t reg = 0;
-+    unsigned int i;
-+
-+    ASSERT(spin_is_locked(&rank->lock));
-+
-+    offset &= INTERRUPT_RANK_MASK;
-+    offset &= ~(NR_PRIORITY_PER_REG - 1);
-+
-+    for ( i = 0; i < NR_PRIORITY_PER_REG; i++, offset++ )
-+        reg |= rank->priority[offset] << (i * NR_BIT_PER_PRIORITY);
-+
-+    return reg;
-+}
-+
-+/*
-+ * Store a IPRIORITYR register in a convenient way.
-+ * Note the offset will be round down to match a real HW register.
-+ */
-+void vgic_store_ipriorityr(struct vgic_irq_rank *rank,
-+                           unsigned int offset,
-+                           uint32_t reg)
-+{
-+    unsigned int i;
-+
-+    ASSERT(spin_is_locked(&rank->lock));
-+
-+    offset &= INTERRUPT_RANK_MASK;
-+    offset &= ~(NR_PRIORITY_PER_REG - 1);
-+
-+    for ( i = 0; i < NR_PRIORITY_PER_REG; i++, offset++ )
-+    {
-+        rank->priority[offset] = reg & ((1 << NR_BIT_PER_PRIORITY) - 1);
-+        reg >>= NR_BIT_PER_PRIORITY;
-+    }
-+}
-+
- static void vgic_init_pending_irq(struct pending_irq *p, unsigned int virq)
- {
-     INIT_LIST_HEAD(&p->inflight);
-diff --git a/xen/include/asm-arm/vgic.h b/xen/include/asm-arm/vgic.h
-index 354c0d4..ce9970e 100644
---- a/xen/include/asm-arm/vgic.h
-+++ b/xen/include/asm-arm/vgic.h
-@@ -82,12 +82,21 @@ struct pending_irq
-     struct list_head lr_queue;
- };
- 
-+#define NR_INTERRUPT_PER_RANK   32
-+#define INTERRUPT_RANK_MASK (NR_INTERRUPT_PER_RANK - 1)
-+
- /* Represents state corresponding to a block of 32 interrupts */
- struct vgic_irq_rank {
-     spinlock_t lock; /* Covers access to all other members of this struct */
-     uint32_t ienable;
-     uint32_t icfg[2];
--    uint32_t ipriority[8];
-+
 +    /*
-+     * It's more convenient to store one priority per interrupt than
-+     * the register IPRIORITYR itself
++     * 64 bits registers can be accessible using 32-bit and 64-bit unless
++     * stated otherwise (See 8.1.3 ARM IHI 0069A).
 +     */
-+    uint8_t priority[32];
++    return ( dabt.size == DABT_DOUBLE_WORD || dabt.size == DABT_WORD );
++}
 +
-     union {
-         struct {
-             uint32_t itargets[8];
-@@ -244,6 +253,13 @@ void vgic_v3_setup_hw(paddr_t dbase,
-                       uint32_t rdist_stride);
- #endif
+ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
+                                          uint32_t gicr_reg,
+                                          register_t *r)
+@@ -178,10 +187,11 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
+         *r = vgic_reg32_read(GICV3_GICR_IIDR_VAL, info);
+         return 1;
+     case GICR_TYPER:
++    case GICR_TYPER + 4:
+     {
+         uint64_t typer, aff;
  
-+/* Helpers to handle the GICD_IPRIORITY register */
-+uint32_t vgic_generate_ipriorityr(struct vgic_irq_rank *rank,
-+                                  unsigned int offset);
-+void vgic_store_ipriorityr(struct vgic_irq_rank *rank,
-+                           unsigned int offset,
-+                           uint32_t reg);
-+
- #endif /* __ASM_ARM_VGIC_H__ */
+-        if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
++        if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
+         /* TBD: Update processor id in [23:8] when ITS support is added */
+         aff = (MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 3) << 56 |
+                MPIDR_AFFINITY_LEVEL(v->arch.vmpidr, 2) << 48 |
+@@ -267,7 +277,7 @@ bad_width:
+     return 0;
  
- /*
+ read_as_zero_64:
+-    if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
++    if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
+     *r = 0;
+     return 1;
+ 
+@@ -343,7 +353,7 @@ bad_width:
+     return 0;
+ 
+ write_ignore_64:
+-    if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
++    if ( vgic_reg64_check_access(dabt) ) goto bad_width;
+     return 1;
+ 
+ write_ignore_32:
+@@ -833,7 +843,7 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
+     {
+         uint64_t irouter;
+ 
+-        if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
++        if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
+         rank = vgic_rank_offset(v, 64, gicd_reg - GICD_IROUTER,
+                                 DABT_DOUBLE_WORD);
+         if ( rank == NULL ) goto read_as_zero;
+@@ -908,7 +918,7 @@ bad_width:
+     return 0;
+ 
+ read_as_zero_64:
+-    if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
++    if ( vgic_reg64_check_access(dabt) ) goto bad_width;
+     *r = 0;
+     return 1;
+ 
+@@ -994,7 +1004,7 @@ static int vgic_v3_distr_mmio_write(struct vcpu *v, mmio_info_t *info,
+     {
+         uint64_t irouter;
+ 
+-        if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
++        if ( !vgic_reg64_check_access(dabt) ) goto bad_width;
+         rank = vgic_rank_offset(v, 64, gicd_reg - GICD_IROUTER,
+                                 DABT_DOUBLE_WORD);
+         if ( rank == NULL ) goto write_ignore;
+@@ -1053,7 +1063,7 @@ write_ignore_32:
+     return 1;
+ 
+ write_ignore_64:
+-    if ( dabt.size != DABT_DOUBLE_WORD ) goto bad_width;
++    if ( vgic_reg64_check_access(dabt) ) goto bad_width;
+     return 1;
+ 
+ write_ignore:
 -- 
 2.1.4
