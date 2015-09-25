@@ -1,125 +1,108 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Fri, 25 Sep 2015 18:02:09 +0200
-Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
- ECAM) and ACPI code out of arch/x86/ directory
-In-Reply-To: <55F6DFF6.4010807@linaro.org>
-References: <20150602133215.GC23650@red-moon> <55701A31.808@linaro.org>
- <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
- <557504A2.3060203@linaro.org> <20150608151443.GA16151@red-moon>
- <55E4340D.6050004@linaro.org> <55ED6010.3020406@linaro.org>
- <20150908150727.GF29293@red-moon> <55F0388B.1090607@linaro.org>
- <20150911112018.GA13033@red-moon> <55F6DFF6.4010807@linaro.org>
-Message-ID: <56057001.9000101@linaro.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 25 Sep 2015 11:03:25 -0500
+Subject: [PATCH] ARM: dts: Add am335x-bonegreen
+In-Reply-To: <1443193831-5693-1-git-send-email-robertcnelson@gmail.com>
+References: <1443193831-5693-1-git-send-email-robertcnelson@gmail.com>
+Message-ID: <5605704D.5000404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On 09/25/2015 10:10 AM, Robert Nelson wrote:
+> SeeedStudio BeagleBone Green (BBG) is clone of the BeagleBone Black (BBB) minus
+> the HDMI port and addition of two Grove connectors (i2c2 and usart2).
+> 
+> This board can be identified by the 1A value after A335BNLT (BBB) in the at24 eeprom:
+> 1A: [aa 55 33 ee 41 33 33 35  42 4e 4c 54 1a 00 00 00 |.U3.A335BNLT....|]
+> 
+> http://beagleboard.org/green
+> http://www.seeedstudio.com/wiki/Beaglebone_green
+> 
+> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+> CC: Tony Lindgren <tony@atomide.com>
+> CC: Jason Kridner <jkridner@gmail.com>
+> ---
+>  arch/arm/boot/dts/Makefile             |  1 +
+>  arch/arm/boot/dts/am335x-bonegreen.dts | 53 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 54 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/am335x-bonegreen.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 233159d..e45d771 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -446,6 +446,7 @@ dtb-$(CONFIG_SOC_AM33XX) += \
+>  	am335x-base0033.dtb \
+>  	am335x-bone.dtb \
+>  	am335x-boneblack.dtb \
+> +	am335x-bonegreen.dtb \
+>  	am335x-sl50.dtb \
+>  	am335x-evm.dtb \
+>  	am335x-evmsk.dtb \
+> diff --git a/arch/arm/boot/dts/am335x-bonegreen.dts b/arch/arm/boot/dts/am335x-bonegreen.dts
+> new file mode 100644
+> index 0000000..0f65bda
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am335x-bonegreen.dts
+> @@ -0,0 +1,53 @@
+> +/*
+> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +/dts-v1/;
+> +
+> +#include "am33xx.dtsi"
+> +#include "am335x-bone-common.dtsi"
+> +
+> +/ {
+> +	model = "TI AM335x BeagleBone Green";
+> +	compatible = "ti,am335x-bone-green", "ti,am335x-bone-black", "ti,am335x-bone", "ti,am33xx";
+> +};
+> +
+> +&ldo3_reg {
+> +	regulator-min-microvolt = <1800000>;
+> +	regulator-max-microvolt = <1800000>;
+> +	regulator-always-on;
+> +};
+> +
+> +&mmc1 {
+> +	vmmc-supply = <&vmmcsd_fixed>;
+> +};
+> +
+> +&mmc2 {
+> +	vmmc-supply = <&vmmcsd_fixed>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&emmc_pins>;
+> +	bus-width = <8>;
+> +	status = "okay";
+> +};
+> +
+> +&am33xx_pinmux {
+> +	uart2_pins: uart2_pins {
+> +		pinctrl-single,pins = <
+> +			0x150 (PIN_INPUT | MUX_MODE1)	/* spi0_sclk.uart2_rxd */
+> +			0x154 (PIN_OUTPUT | MUX_MODE1)	/* spi0_d0.uart2_txd */
+> +		>;
+> +	};
+> +};
+> +
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart2_pins>;
+> +	status = "okay";
+> +};
+> +
+> +&rtc {
+> +	system-power-controller;
+> +};
+> 
 
-On 09/14/2015 04:55 PM, Tomasz Nowicki wrote:
-> On 11.09.2015 13:20, Lorenzo Pieralisi wrote:
->> On Wed, Sep 09, 2015 at 02:47:55PM +0100, Tomasz Nowicki wrote:
->>
->> [...]
->>
->>>> I think (but I am happy to be corrected) that the map_bus() hook
->>>> (ie that's why struct pci_bus is required in eg
->>>> pci_generic_config_write)
->>>> is there to ensure that when the generic accessors are called
->>>> a) we have a valid bus b) the host controllers implementing it
->>>> has been initialized.
->>>>
->>>> I had another look and I noticed you are trying to solve multiple
->>>> things at once:
->>>>
->>>> 1) ACPICA seems to need PCI config space on bus 0 to be working
->>>>      before PCI enumerates (ie before we have a root bus), we need to
->>>>      countercheck on that, but you can't use the generic PCI accessors
->>>>      for that reasons (ie root bus might not be available, you do not
->>>>      have a pci_bus struct)
->>>> 2) the raw_pci_read/write require _generic_ mmio back-ends, since AMD
->>>>      can't cope with standard x86 read/write{b,w,l}
->>>>
->>>> Overall, it seems to me that we can avoid code duplication by
->>>> shuffling your code a bit.
->>>>
->>>> You could modify the generic accessors in drivers/pci/access.c to
->>>> use your mmio back-end instead of using plain read/write{b,w,l}
->>>> functions (we should check if RobH is ok with that there can be
->>>> reasons that prevent this from happening). This would solve the
->>>> AMD mmio issue.
->>>>
->>>> By factoring out the code that actually carries out the reads
->>>> and writes in the accessors basically you decouple the functions
->>>> requiring the struct pci_bus from the ones that does not require it
->>>> (ie raw_pci_{read/write}.
->>>>
->>>> The generic MMIO layer belongs in the drivers/pci/access.c file, it has
->>>> nothing to do with ECAM.
->>>>
->>>> The mmcfg interface should probably live in pci-acpi.c, I do not think
->>>> you need an extra file in there but that's a detail.
->>>>
->>>> Basically the generic accessors would become something like eg:
->>>>
->>>> int pci_generic_config_write(struct pci_bus *bus, unsigned int devfn,
->>>>                             int where, int size, u32 val)
->>>> {
->>>>        void __iomem *addr;
->>>>
->>>>        addr = bus->ops->map_bus(bus, devfn, where);
->>>>        if (!addr)
->>>>                return PCIBIOS_DEVICE_NOT_FOUND;
->>>>
->>>>        pci_mmio_write(size, addr + where, value);
->>>>
->>>>        return PCIBIOS_SUCCESSFUL;
->>>> }
->>>>
->>>> With that in place using raw_pci_write/read or the generic accessors
->>>> becomes almost identical, with code requiring the pci_bus to be
->>>> created using the generic accessors and ACPICA using the raw version.
->>>>
->>>> I might be missing something, so apologies if that's the case.
->>>>
->>>
->>> Actually, I think you showed me the right direction :) Here are some
->>> conclusions/comments/concerns. Please correct me if I am wrong:
->>>
->>> 1. We need raw_pci_write/read accessors (based on ECAM) for ARM64 too
->>> but only up to the point where buses are enumerated. From that point on,
->>> we should reuse generic accessors from access.c file, right?
->>
->> Well, I still have not figured out whether on arm64 the raw accessors
->> required by ACPICA make sense.
->>
->> So either arm64 relies on the generic MCFG based raw read and writes
->> or we define the global raw read and writes as empty (ie x86 overrides
->> them anyway).
->>
->
-> My concerns/ideas related to raw accessors for ARM64, please correct me
-> at any point.
->
-> ACPI spec - chapter: 19.5.96 OperationRegion (Declare Operation Region)
-> defines PCI_Config as one of region types. Every time ASL opcode
-> operates on corresponding PCI config space region, ASL interpreter is
-> dispatching address space to our raw accessors, please see
-> acpi_ex_pci_config_space_handler, acpi_ev_pci_config_region_setup calls.
-> What is more important, such operations may happen after (yes after) bus
-> enumeration, but always raw accessors are called at the end with the
-> {segment, bus, dev, fn} tuple.
->
-> Giving above, here are some ideas:
-> 1. We force somehow vendors to avoid operations on PCI config regions in
-> ASL code. PCI config region definitions still fall into Hardware Reduced
-> profile, so new ACPICA special subset for ARM64 is need. Then raw ACPI
-> accessors can be empty (and overridden by x86).
-> 2. We provide raw accessors which translate {segment, bus, dev, fn}
-> tuple to Linux generic accessors (this can be considered only if PCI
-> config accesses happened after bus enumeration for HR profile, thus
-> tuple to bus structure map is possible).
-> 4. We rely on the generic MCFG based raw read and writes.
 
-I will appreciate your opinion on above ideas.
+Would still work when https://patchwork.kernel.org/patch/6394821/ gets in?
 
-Tomasz
+
+-- 
+Regards,
+Nishanth Menon
