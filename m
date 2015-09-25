@@ -1,34 +1,29 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 25 Sep 2015 12:38:10 +0100
-Subject: [PATCH 07/22] arm64: Keep track of CPU feature registers
-In-Reply-To: <1442413280-31885-8-git-send-email-suzuki.poulose@arm.com>
-References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
- <1442413280-31885-8-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20150925113808.GL6281@e103592.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Sep 2015 13:56:50 +0200
+Subject: Steps to submit a new arch/arm port
+In-Reply-To: <56051393.2080709@free.fr>
+References: <56001B78.2090001@free.fr> <2206647.QPrIpE2UC0@wuerfel>
+ <56051393.2080709@free.fr>
+Message-ID: <4499716.JusW7FEoAA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 03:21:05PM +0100, Suzuki K. Poulose wrote:
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+On Friday 25 September 2015 11:27:47 Mason wrote:
+> I see that defining ARCH_MULTIPLATFORM selects AUTO_ZRELADDR
+> Is that what is supposed to make Makefile.boot not required?
 > 
-> This patch adds an infrastructure to keep track of the CPU feature
-> registers on the system. For each register, the infrastructure keeps
-> track of the system wide safe value of the feature bits. Also, tracks
-> the which fields of a register should be matched strictly across all
-> the CPUs on the system for the SANITY check infrastructure.
-> 
-> The feature bits are classified as one of SCALAR_MIN, SCALAR_MAX and DISCRETE
-> depending on the implication of the possible values. This information
-> is used to decide the safe value for a feature.
-> 
-> SCALAR_MIN - The smaller value is safer
-> SCALAR_MAX - The bigger value is safer
-> DISCRETE - We can't decide between the two, so a predefined safe_value is used.
 
-Can documentation of the meanings of these be added somewhere in the
-relevant header or in Documentation?
+Javier explained this.
 
-Cheers
----Dave
+> On an unrelated topic, someone wrote
+> select CPU_USE_DOMAINS if MMU
+> in my platform Kconfig. But looking at arm/mm/Kconfig,
+> it looks like it is not set for other V7 platforms.
+> Is this an obsolete feature that I should remove?
 
-[...]
+Domains are useful in principle, but we stopped using them for
+v6 and v7 CPUs as of 247055aa21ffef1 ("ARM: 6384/1: Remove the
+domain switching on ARMv6k/v7 CPUs") and the select needs to
+be removed from your platform.
+
+	Arnd
