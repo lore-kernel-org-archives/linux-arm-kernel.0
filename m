@@ -1,102 +1,68 @@
-From: aalonso@freescale.com (Alonso Adrian)
-Date: Fri, 25 Sep 2015 19:16:49 +0000
-Subject: [PATCH v5 4/7] pinctrl: freescale: imx: allow mux_reg offset zero
-In-Reply-To: <20150925190725.GX3529@tiger>
-References: <1443128043-21063-1-git-send-email-aalonso@freescale.com>
- <1443128043-21063-4-git-send-email-aalonso@freescale.com>
- <20150925104726.GJ11805@pengutronix.de> <20150925190725.GX3529@tiger>
-Message-ID: <BN3PR03MB150994443644800594BE9BA2A8420@BN3PR03MB1509.namprd03.prod.outlook.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 25 Sep 2015 22:18:13 +0200
+Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
+ 'global_lock'
+In-Reply-To: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
+References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
+Message-ID: <1460975.zriLPuubXp@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Friday, September 25, 2015 2:07 PM
-> To: Markus Pargmann <mpa@pengutronix.de>
-> Cc: Alonso Lazcano Adrian-B38018 <aalonso@freescale.com>; linux-arm-
-> kernel at lists.infradead.org; shawn.guo at linaro.org; linus.walleij at linaro.org;
-> lznuaa at gmail.com; devicetree at vger.kernel.org; Li Frank-B20596
-> <Frank.Li@freescale.com>; Garg Nitin-B37173 <nitin.garg@freescale.com>;
-> Huang Yongcai-B20788 <Anson.Huang@freescale.com>; linux-
-> gpio at vger.kernel.org; robh+dt at kernel.org; kernel at pengutronix.de; Gong
-> Yibin-B38343 <yibin.gong@freescale.com>
-> Subject: Re: [PATCH v5 4/7] pinctrl: freescale: imx: allow mux_reg offset zero
+On Friday, September 25, 2015 09:41:37 AM Viresh Kumar wrote:
+> global_lock is defined as an unsigned long and accessing only its lower
+> 32 bits from sysfs is incorrect, as we need to consider other 32 bits
+> for big endian 64 bit systems. There are no such platforms yet, but the
+> code needs to be robust for such a case.
 > 
-> On Fri, Sep 25, 2015 at 12:47:26PM +0200, Markus Pargmann wrote:
-> > On Thu, Sep 24, 2015 at 03:54:00PM -0500, Adrian Alonso wrote:
-> > > Allow mux_reg offset zero to be a valid pin_id, on imx7d mux_conf
-> > > reg offset is zero for iomuxc-lspr controller
-> > >
-> > > Signed-off-by: Adrian Alonso <aalonso@freescale.com>
-> > > ---
-> > > Changes for V2: Resend
-> > > Changes for V3: Resend
-> > > Changes for V4: Simplify pin_id assigment when ZERO_OFFSET_VALID is
-> > > set Changes for V5:
-> > > - Drop patch pinctrl: freescale: imx: add ZERO_OFFSET_VALID flag
-> > > - Allow mux_reg ZERO OFFSET as pin_id
-> > >
-> > >  drivers/pinctrl/freescale/pinctrl-imx.c | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > >
-> > > diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c
-> > > b/drivers/pinctrl/freescale/pinctrl-imx.c
-> > > index b9c6deb..23348d8 100644
-> > > --- a/drivers/pinctrl/freescale/pinctrl-imx.c
-> > > +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-> > > @@ -550,7 +550,7 @@ static int imx_pinctrl_parse_groups(struct
-> device_node *np,
-> > >  				conf_reg = -1;
-> > >  		}
-> > >
-> > > -		pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
-> > > +		pin_id = (mux_reg != -1) ? mux_reg / 4 : conf_reg / 4;
-> >
-> > This will break compatibility with imx35 and imx25 pinctrl drivers.
-> > They have definitions where mux_reg can be 0x0. See imx35-pinfunc.h
-> > and
-> > imx25-pinfunc.h:
-> >
-> > 	git grep -E "0x0+ 0x.* 0x.* 0x.* 0x.*"
-> >
-> > This mux_reg behaviour was not described in the DT binding
-> > documentation. But it is used by some platforms. So even if you change
-> > the pincfunc headers to use "-1", it would break devicetrees compiled
-> > with earlier kernel versions.
+> Fix that by passing a local variable to debugfs_create_bool() and
+> assigning its value to global_lock later.
 > 
-> Ah, sorry, I'm screwed on the previous review.  So we still need the flag
-> ZERO_OFFSET_VALID to convert invalid 0 mux_reg to -1.
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+
+Greg, please take this one if the [2/2] looks good to you.
+
+> ---
+> V3->V4:
+> - Create a local variable instead of changing type of global_lock
+>   (Rafael)
+> - Drop the stable tag
+> - BCC'd a lot of people (rather than cc'ing them) to make sure
+>   - the series reaches them
+>   - mailing lists do not block the patchset due to long cc list
+>   - and we don't spam the BCC'd people for every reply
+> ---
+>  drivers/acpi/ec_sys.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 > 
-> @Adrian,
-> 
-> Will the following change just work for you?
-@Shawn, yes the change will work, do you want me to prepare a new patch series?
-> 
-> Shawn
-> 
-> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c
-> b/drivers/pinctrl/freescale/pinctrl-imx.c
-> index d7b98ba36825..ae801ba7e226 100644
-> --- a/drivers/pinctrl/freescale/pinctrl-imx.c
-> +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-> @@ -542,6 +542,9 @@ static int imx_pinctrl_parse_groups(struct device_node
-> *np,
->                 struct imx_pin_reg *pin_reg;
->                 struct imx_pin *pin = &grp->pins[i];
-> 
-> +               if (!(info->flags & ZERO_OFFSET_VALID) && !mux_reg)
-> +                       mux_reg = -1;
+> diff --git a/drivers/acpi/ec_sys.c b/drivers/acpi/ec_sys.c
+> index b4c216bab22b..b44b91331a56 100644
+> --- a/drivers/acpi/ec_sys.c
+> +++ b/drivers/acpi/ec_sys.c
+> @@ -110,6 +110,7 @@ static int acpi_ec_add_debugfs(struct acpi_ec *ec, unsigned int ec_device_count)
+>  	struct dentry *dev_dir;
+>  	char name[64];
+>  	umode_t mode = 0400;
+> +	u32 val;
+>  
+>  	if (ec_device_count == 0) {
+>  		acpi_ec_debugfs_dir = debugfs_create_dir("ec", NULL);
+> @@ -127,10 +128,11 @@ static int acpi_ec_add_debugfs(struct acpi_ec *ec, unsigned int ec_device_count)
+>  
+>  	if (!debugfs_create_x32("gpe", 0444, dev_dir, (u32 *)&first_ec->gpe))
+>  		goto error;
+> -	if (!debugfs_create_bool("use_global_lock", 0444, dev_dir,
+> -				 (u32 *)&first_ec->global_lock))
+> +	if (!debugfs_create_bool("use_global_lock", 0444, dev_dir, &val))
+>  		goto error;
+>  
+> +	first_ec->global_lock = val;
 > +
->                 if (info->flags & SHARE_MUX_CONF_REG) {
->                         conf_reg = mux_reg;
->                 } else {
-> @@ -550,7 +553,7 @@ static int imx_pinctrl_parse_groups(struct device_node
-> *np,
->                                 conf_reg = -1;
->                 }
+>  	if (write_support)
+>  		mode = 0600;
+>  	if (!debugfs_create_file("io", mode, dev_dir, ec, &acpi_ec_io_ops))
 > 
-> -               pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
-> +               pin_id = (mux_reg != -1) ? mux_reg / 4 : conf_reg / 4;
->                 pin_reg = &info->pin_regs[pin_id];
->                 pin->pin = pin_id;
->                 grp->pin_ids[i] = pin_id;
+
+Thanks,
+Rafael
