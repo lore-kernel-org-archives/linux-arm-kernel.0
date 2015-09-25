@@ -1,230 +1,121 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 25 Sep 2015 18:09:38 +0200
-Subject: [PATCH v2 7/7] net: mvneta: Statically assign queues to CPUs
-In-Reply-To: <1443197378-30717-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1443197378-30717-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1443197378-30717-8-git-send-email-gregory.clement@free-electrons.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 25 Sep 2015 09:14:17 -0700
+Subject: [PATCH 0/3] mmc: Wait for card_busy before starting sdio requests
+In-Reply-To: <5604FD94.4020808@redhat.com>
+References: <1442935826-16758-1-git-send-email-hdegoede@redhat.com>
+ <CAPDyKFqvnVTL0pDLc8S1Ssqmy5WXR9+=uCWq8ONmgrYU=Zzoow@mail.gmail.com>
+ <5603C020.80603@redhat.com>
+ <CAD=FV=UacwyVcX+ZwCJ+iuhTGyr8ktOw7EiMxng8G1EmwXomJQ@mail.gmail.com>
+ <5604FD94.4020808@redhat.com>
+Message-ID: <CAD=FV=VVu5V77K073JAy884GZUAgeNUFmsJU4d-k4GGoW_6Tkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi,
 
-Since the switch to per-CPU interrupts, we lost the ability to set which
-CPU was going to receive our RX interrupt, which was now only the CPU on
-which the mvneta_open function was run.
+I think Jaehoon has already responded to much of this, but...
 
-We can now assign our queues to their respective CPUs, and make sure only
-this CPU is going to handle our traffic.
+On Fri, Sep 25, 2015 at 12:53 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> 1. Only one of the two callers of dw_mci_wait_while_busy() is handled
+>> by your patch.  mci_send_cmd() is used internally in dw_mmc to throw
+>> something in the CMD register without going through the normal MMC
+>> path.  This is used exclusively to update the clock registers in
+>> dw_mmc.  I'm pretty sure this needs the wait, too.  It's always seemed
+>> weird / awkward to me that you need to use the CMD register to update
+>> clock settings in dw_mmc, but c'est la vie.
+>
+>
+> I would not expect the card to signal busy when trying to change clocks
+> though, so I do not think this will really be a problem.
 
-This also paves the road to be able to change that at runtime, and later on
-to support RSS.
+I just can't quite remember what problem I was seeing.  Let's see...
+I'll comment out that and see if I can find any errors.
 
-[gregory.clement at free-electrons.com]: hardened the CPU hotplug support.
+OK, I commented it out and ran a bit of stress testing for the 4
+devices / 4 cards sitting at my desk.  I saw no issues.  I also ran
+some of the MMC tests that have caused me problems in the past and saw
+no problems.  I also looked back at
+<https://chromium-review.googlesource.com/#/c/244850/> where this
+landed in our tree and I see that my comment is:
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvneta.c | 143 +++++++++++++++++++++++++++++++++-
- 1 file changed, 142 insertions(+), 1 deletion(-)
+> Actually, while this works I may need to extend it to also be used for mci_send_cmd().
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 401d018a96b8..a16da728e549 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -32,6 +32,7 @@
- #include <linux/of_address.h>
- #include <linux/phy.h>
- #include <linux/clk.h>
-+#include <linux/cpu.h>
- 
- /* Registers */
- #define MVNETA_RXQ_CONFIG_REG(q)                (0x1400 + ((q) << 2))
-@@ -306,6 +307,7 @@ struct mvneta_port {
- 	struct mvneta_rx_queue *rxqs;
- 	struct mvneta_tx_queue *txqs;
- 	struct net_device *dev;
-+	struct notifier_block cpu_notifier;
- 
- 	/* Core clock */
- 	struct clk *clk;
-@@ -2055,7 +2057,6 @@ static irqreturn_t mvneta_isr(int irq, void *dev_id)
- 	struct mvneta_pcpu_port *port = (struct mvneta_pcpu_port *)dev_id;
- 
- 	disable_percpu_irq(port->pp->dev->irq);
--
- 	napi_schedule(&port->napi);
- 
- 	return IRQ_HANDLED;
-@@ -2656,6 +2657,125 @@ static void mvneta_mdio_remove(struct mvneta_port *pp)
- 	pp->phy_dev = NULL;
- }
- 
-+static void mvneta_percpu_enable(void *arg)
-+{
-+	struct mvneta_port *pp = arg;
-+
-+	enable_percpu_irq(pp->dev->irq, IRQ_TYPE_NONE);
-+}
-+
-+static void mvneta_percpu_disable(void *arg)
-+{
-+	struct mvneta_port *pp = arg;
-+
-+	disable_percpu_irq(pp->dev->irq);
-+}
-+
-+static void mvneta_percpu_elect(struct mvneta_port *pp)
-+{
-+	int online_cpu_idx, cpu, i = 0;
-+
-+	online_cpu_idx = rxq_def % num_online_cpus();
-+
-+	for_each_online_cpu(cpu) {
-+		if (i == online_cpu_idx)
-+			/* Enable per-CPU interrupt on the one CPU we
-+			 * just elected
-+			 */
-+			smp_call_function_single(cpu, mvneta_percpu_enable,
-+						pp, true);
-+		else
-+			/* Disable per-CPU interrupt on all the other CPU */
-+			smp_call_function_single(cpu, mvneta_percpu_disable,
-+						pp, true);
-+		i++;
-+	}
-+};
-+
-+static int mvneta_percpu_notifier(struct notifier_block *nfb,
-+				  unsigned long action, void *hcpu)
-+{
-+	struct mvneta_port *pp = container_of(nfb, struct mvneta_port,
-+					      cpu_notifier);
-+	int cpu = (unsigned long)hcpu, other_cpu;
-+	struct mvneta_pcpu_port *port = per_cpu_ptr(pp->ports, cpu);
-+
-+	switch (action) {
-+	case CPU_ONLINE:
-+	case CPU_ONLINE_FROZEN:
-+		netif_tx_stop_all_queues(pp->dev);
-+
-+		/* We have to synchronise on tha napi of each CPU
-+		 * except the one just being waked up
-+		 */
-+		for_each_online_cpu(other_cpu) {
-+			if (other_cpu != cpu) {
-+				struct mvneta_pcpu_port *other_port =
-+					per_cpu_ptr(pp->ports, other_cpu);
-+
-+				napi_synchronize(&other_port->napi);
-+			}
-+		}
-+
-+		/* Mask all ethernet port interrupts */
-+		mvreg_write(pp, MVNETA_INTR_NEW_MASK, 0);
-+		mvreg_write(pp, MVNETA_INTR_OLD_MASK, 0);
-+		mvreg_write(pp, MVNETA_INTR_MISC_MASK, 0);
-+		napi_enable(&port->napi);
-+
-+		/* Enable per-CPU interrupt on the one CPU we care
-+		 * about.
-+		 */
-+		mvneta_percpu_elect(pp);
-+
-+		/* Unmask all ethernet port interrupts */
-+		mvreg_write(pp, MVNETA_INTR_NEW_MASK,
-+			MVNETA_RX_INTR_MASK(rxq_number) |
-+			MVNETA_TX_INTR_MASK(txq_number) |
-+			MVNETA_MISCINTR_INTR_MASK);
-+		mvreg_write(pp, MVNETA_INTR_MISC_MASK,
-+			MVNETA_CAUSE_PHY_STATUS_CHANGE |
-+			MVNETA_CAUSE_LINK_CHANGE |
-+			MVNETA_CAUSE_PSC_SYNC_CHANGE);
-+		netif_tx_start_all_queues(pp->dev);
-+		break;
-+	case CPU_DOWN_PREPARE:
-+	case CPU_DOWN_PREPARE_FROZEN:
-+		netif_tx_stop_all_queues(pp->dev);
-+		/* Mask all ethernet port interrupts */
-+		mvreg_write(pp, MVNETA_INTR_NEW_MASK, 0);
-+		mvreg_write(pp, MVNETA_INTR_OLD_MASK, 0);
-+		mvreg_write(pp, MVNETA_INTR_MISC_MASK, 0);
-+
-+		napi_synchronize(&port->napi);
-+		napi_disable(&port->napi);
-+		/* Disable per-CPU interrupts on the CPU that is
-+		 * brought down.
-+		 */
-+		smp_call_function_single(cpu, mvneta_percpu_disable,
-+					 pp, true);
-+
-+		break;
-+	case CPU_DEAD:
-+	case CPU_DEAD_FROZEN:
-+		/* Check if a new CPU must be elected now this on is down */
-+		mvneta_percpu_elect(pp);
-+		/* Unmask all ethernet port interrupts */
-+		mvreg_write(pp, MVNETA_INTR_NEW_MASK,
-+			MVNETA_RX_INTR_MASK(rxq_number) |
-+			MVNETA_TX_INTR_MASK(txq_number) |
-+			MVNETA_MISCINTR_INTR_MASK);
-+		mvreg_write(pp, MVNETA_INTR_MISC_MASK,
-+			MVNETA_CAUSE_PHY_STATUS_CHANGE |
-+			MVNETA_CAUSE_LINK_CHANGE |
-+			MVNETA_CAUSE_PSC_SYNC_CHANGE);
-+		netif_tx_start_all_queues(pp->dev);
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
- static int mvneta_open(struct net_device *dev)
- {
- 	struct mvneta_port *pp = netdev_priv(dev);
-@@ -2681,6 +2801,22 @@ static int mvneta_open(struct net_device *dev)
- 		goto err_cleanup_txqs;
- 	}
- 
-+	/* Even though the documentation says that request_percpu_irq
-+	 * doesn't enable the interrupts automatically, it actually
-+	 * does so on the local CPU.
-+	 *
-+	 * Make sure it's disabled.
-+	 */
-+	mvneta_percpu_disable(pp);
-+
-+	/* Elect a CPU to handle our RX queue interrupt */
-+	mvneta_percpu_elect(pp);
-+
-+	/* Register a CPU notifier to handle the case where our CPU
-+	 * might be taken offline.
-+	 */
-+	register_cpu_notifier(&pp->cpu_notifier);
-+
- 	/* In default link is down */
- 	netif_carrier_off(pp->dev);
- 
-@@ -2707,9 +2843,13 @@ err_cleanup_rxqs:
- static int mvneta_stop(struct net_device *dev)
- {
- 	struct mvneta_port *pp = netdev_priv(dev);
-+	int cpu;
- 
- 	mvneta_stop_dev(pp);
- 	mvneta_mdio_remove(pp);
-+	unregister_cpu_notifier(&pp->cpu_notifier);
-+	for_each_present_cpu(cpu)
-+		smp_call_function_single(cpu, mvneta_percpu_disable, pp, true);
- 	free_percpu_irq(dev->irq, pp->ports);
- 	mvneta_cleanup_rxqs(pp);
- 	mvneta_cleanup_txqs(pp);
-@@ -3049,6 +3189,7 @@ static int mvneta_probe(struct platform_device *pdev)
- 	err = of_property_read_string(dn, "managed", &managed);
- 	pp->use_inband_status = (err == 0 &&
- 				 strcmp(managed, "in-band-status") == 0);
-+	pp->cpu_notifier.notifier_call = mvneta_percpu_notifier;
- 
- 	pp->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(pp->clk)) {
--- 
-2.1.0
+That indicates no problems on my end without the check before updating
+clocks.  ...but, oh, I see why this is.  It was even posted upstream!
+:)
+
+https://patchwork.kernel.org/patch/5858221/
+
+I said:
+
+> Sorry for the quick spin.  After I posted this I re-read all the
+> messages and it looks like Addy has an actual SD card (not SDIO) that
+> is also asserting busy.  He's seeing it assert busy around the clock
+> update.
+
+ ...so I guess the answer here is that I personally haven't seen any
+problems, but adding this check in mci_send_cmd() shouldn't hurt,
+should be safe, and might avoid some problems.  Note that it's
+possible that Addy was seeing some other bug somewhere that simply
+resulted in the "busy" line being asserted, but technically the
+Designware databook recommends waiting for "not busy" before updating
+clocks IIRC.
+
+
+>> 2. If I remember correctly, we ran into other instances where non-SDIO
+>> cards needed the busy check.  It wasn't terribly common, but I think I
+>> ran into this when stress testing, but only on a few cards.
+>
+>
+> Hmm, that would be a problem yes.
+
+So perhaps it would be good to update your patch to check for all data commands?
+
+
+>> The patch referenced here only seems to check for SDIO commands.  As I
+>> understand it, to be correct, it should check for all data commands
+>> (other than stop or voltage change commands).
+>
+>
+> But that is not what the patch does, it actually waits for all commands,
+> including non data commands. An earlier attempt of mine to fix the sdio
+> wifi issues with the sunxi driver copied your approach, and I actually
+> got reports of regressions with using normal micro-sd memory cards
+> from several people testing that patch.
+
+You're saying that my patch waits for all commands including non-data
+commands.  I'm pretty sure that's not true.  It relies on a whole
+bunch of other logic in dw_mmc that figures out that we have a data
+command (and that logic also looks for stop commands).  Specifically
+my patches keys off SDMMC_CMD_PRV_DAT_WAIT.  Looking how that gets set
+in dw_mci_prepare_command():
+* We don't set it for the various "stop" commands
+* Else we set it for all commands with cmd->data, except "send status"
+
+
+> And if you're right that we should wait for all data commands, then
+> I wonder if this is a designware thing (I believe the allwinner
+> mmc controller is designware derived) or a generic mmc / sdio thing ?
+
+It seems hard to believe it would be Designware specific.  If I
+understand correctly, "busy" is signaled by the card holding the data
+lines low.  ...so if a normal SD card was really asserting busy then
+you'd better not send a command.
+
+
+>> The Designware Databook
+>> makes no reference to only needing the wait for SDIO commands.
+>
+>
+> Yet your commit message references problems with sdio wifi cards, and
+> on sunxi we've only been seeing this problem with sdio wifi cards / sdio
+> commands.
+
+Yup.  Though I did some amount in parallel, I definitely focused on
+SDIO problems first before focusing on UHS SD cards.  ...so my primary
+focus was on SDIO here but I tried to code it in a generic way so it
+would be useful for all data commands (since it seemed like it could
+technically affect them).
+
+
+-Doug
