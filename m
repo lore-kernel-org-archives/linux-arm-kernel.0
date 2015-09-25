@@ -1,18 +1,121 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 24 Sep 2015 18:30:48 -0700
-Subject: [PATCH] ARM: dts: move aliases back to .dts in Cygnus
-In-Reply-To: <1443133283-29025-1-git-send-email-rjui@broadcom.com>
-References: <1443133283-29025-1-git-send-email-rjui@broadcom.com>
-Message-ID: <5604A3C8.3020105@gmail.com>
+Date: Thu, 24 Sep 2015 18:39:56 -0700
+Subject: [PATCH v3 0/9] Phy, mdiobus, and netdev struct device fixes
+In-Reply-To: <20150924191754.GC21513@n2100.arm.linux.org.uk>
+References: <20150924191754.GC21513@n2100.arm.linux.org.uk>
+Message-ID: <5604A5EC.7060401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/09/15 15:21, Ray Jui wrote:
-> Move aliases from bcm-cygnus.dtsi back to individual .dts files. Also
-> clean up the chosen node to have the stdout-path using the proper alias
+On 24/09/15 12:17, Russell King - ARM Linux wrote:
+> Hi,
 > 
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> The third version of this series fixes the build error which David
+> identified, and drops the broken changes for the Cavium Thunger BGX
+> ethernet driver as this driver requires some complex changes to
+> resolve the leakage - and this is best done by people who can test
+> the driver.
+> 
+> Compared to v2, the only patch which has changed is patch 6
+>   "net: fix phy refcounting in a bunch of drivers"
+> 
+> I _think_ I've been able to build-test all the drivers touched by
+> that patch to some degree now, though several of them needed the
+> Kconfig hacked to allow it (not all had || COMPILE_TEST clause on
+> their dependencies.)
 
-Applied to devicetree/next, thanks!
+Tested-by: Florian Fainelli <f.fainelli@gmail.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+
+Thanks for fixing that.
+
+> 
+> Previous cover letters below:
+> 
+> This is the second version of the series, with the comments David had
+> on the first patch fixed up.  Original series description with updated
+> diffstat below.
+> 
+> While looking at the DSA code, I noticed we have a
+> of_find_net_device_by_node(), and it looks like users of that are
+> similarly buggy - it looks like net/dsa/dsa.c is the only user.  Fix
+> that too.
+> 
+> Hi,
+> 
+> While looking at the phy code, I identified a number of weaknesses
+> where refcounting on device structures was being leaked, where
+> modules could be removed while in-use, and where the fixed-phy could
+> end up having unintended consequences caused by incorrect calls to
+> fixed_phy_update_state().
+> 
+> This patch series resolves those issues, some of which were discovered
+> with testing on an Armada 388 board.  Not all patches are fully tested,
+> particularly the one which touches several network drivers.
+> 
+> When resolving the struct device refcounting problems, several different
+> solutions were considered before settling on the implementation here -
+> one of the considerations was to avoid touching many network drivers.
+> The solution here is:
+> 
+> 	phy_attach*() - takes a refcount
+> 	phy_detach*() - drops the phy_attach refcount
+> 
+> Provided drivers always attach and detach their phys, which they should
+> already be doing, this should change nothing, even if they leak a refcount.
+> 
+> 	of_phy_find_device() and of_* functions which use that take
+> 	a refcount.  Arrange for this refcount to be dropped once
+> 	the phy is attached.
+> 
+> This is the reason why the previous change is important - we can't drop
+> this refcount taken by of_phy_find_device() until something else holds
+> a reference on the device.  This resolves the leaked refcount caused by
+> using of_phy_connect() or of_phy_attach().
+> 
+> Even without the above changes, these drivers are leaking by calling
+> of_phy_find_device().  These drivers are addressed by adding the
+> appropriate release of that refcount.
+> 
+> The mdiobus code also suffered from the same kind of leak, but thankfully
+> this only happened in one place - the mdio-mux code.
+> 
+> I also found that the try_module_get() in the phy layer code was utterly
+> useless: phydev->dev.driver was guaranteed to always be NULL, so
+> try_module_get() was always being called with a NULL argument.  I proved
+> this with my SFP code, which declares its own MDIO bus - the module use
+> count was never incremented irrespective of how I set the MDIO bus up.
+> This allowed the MDIO bus code to be removed from the kernel while there
+> were still PHYs attached to it.
+> 
+> One other bug was discovered: while using in-band-status with mvneta, it
+> was found that if a real phy is attached with in-band-status enabled,
+> and another ethernet interface is using the fixed-phy infrastructure, the
+> interface using the fixed-phy infrastructure is configured according to
+> the other interface using the in-band-status - which is caused by the
+> fixed-phy code not verifying that the phy_device passed in is actually
+> a fixed-phy device, rather than a real MDIO phy.
+> 
+> Lastly, having mdio_bus reversing phy_device_register() internals seems
+> like a layering violation - it's trivial to move that code to the phy
+> device layer.
+> 
+>  drivers/net/ethernet/apm/xgene/xgene_enet_hw.c | 24 ++++++----
+>  drivers/net/ethernet/freescale/gianfar.c       |  6 ++-
+>  drivers/net/ethernet/freescale/ucc_geth.c      |  8 +++-
+>  drivers/net/ethernet/marvell/mvneta.c          |  2 +
+>  drivers/net/ethernet/xilinx/xilinx_emaclite.c  |  2 +
+>  drivers/net/phy/fixed_phy.c                    |  2 +-
+>  drivers/net/phy/mdio-mux.c                     | 19 +++++---
+>  drivers/net/phy/mdio_bus.c                     | 24 ++++++----
+>  drivers/net/phy/phy_device.c                   | 62 ++++++++++++++++++++------
+>  drivers/of/of_mdio.c                           | 27 +++++++++--
+>  include/linux/phy.h                            |  6 ++-
+>  net/core/net-sysfs.c                           |  9 ++++
+>  net/dsa/dsa.c                                  | 41 ++++++++++++++---
+>  13 files changed, 181 insertions(+), 51 deletions(-)
+> 
+
+
 -- 
 Florian
