@@ -1,46 +1,77 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 25 Sep 2015 13:15:42 +0100
-Subject: [PATCH 0/4] Assorted DMA mapping tweaks
-Message-ID: <cover.1443178314.git.robin.murphy@arm.com>
+Date: Fri, 25 Sep 2015 13:15:44 +0100
+Subject: [PATCH 2/4] dma-mapping: Tidy up dma_parms default handling
+In-Reply-To: <cover.1443178314.git.robin.murphy@arm.com>
+References: <cover.1443178314.git.robin.murphy@arm.com>
+Message-ID: <003734bc1b15a4dd4f4fc1a32109f448509ed846.1443178314.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Many DMA controllers and other devices set max_segment_size to
+indicate their scatter-gather capability, but have no interest in
+segment_boundary_mask. However, the existence of a dma_parms structure
+precludes the use of any default value, leaving them as zeros (assuming
+a properly kzalloc'ed structure). If a well-behaved IOMMU (or SWIOTLB)
+then tries to respect this by ensuring a mapped segment does not cross
+a zero-byte boundary, hilarity ensues.
 
-This is a miscellany of fixes and tweaks to the common DMA mapping code
-which I've been collecting. They don't strictly depend on each other,
-but I figure I may as well send them all together for the sake of
-explaining them in one place:
+Since zero is a nonsensical value for either parameter, treat it as an
+indicator for "default", as might be expected. In the process, clean up
+a bit by replacing the bare constants with slightly more meaningful
+macros and removing the superfluous "else" statements.
 
-#1 is a straightforward and hopefully obvious bugfix.
-#2 has been posted before but I subsequently forgot to follow up on it.
-   It's still possible to hit this at least on arm64 systems, with the
-   SWIOTLB/pl330 combination blowing up just running dmatest.
-#3 follows on from a recent discussion about dma_sync_sg[0]; there's
-   already a related patch in -next from Sakari clarifying the docs.
-#4 seemed worth posting now that the recent rework means it no longer
-   has to be a sprawling touch-all-the-architectures patch for something
-   so small.
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Reviewed-by: Sumit Semwal <sumit.semwal@linaro.org>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ include/linux/dma-mapping.h | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
 
-Thanks,
-Robin.
-
-[0]:http://thread.gmane.org/gmane.linux.kernel/2043117
-
-Robin Murphy (4):
-  dmapool: Fix overflow condition in pool_find_page
-  dma-mapping: Tidy up dma_parms default handling
-  dma-debug: Check nents in dma_sync_sg*
-  dma-debug: Allow poisoning nonzero allocations
-
- include/asm-generic/dma-mapping-common.h |  2 +-
- include/linux/dma-debug.h                |  6 ++++--
- include/linux/dma-mapping.h              | 17 ++++++++++-------
- include/linux/poison.h                   |  3 +++
- lib/Kconfig.debug                        | 10 ++++++++++
- lib/dma-debug.c                          | 14 +++++++++++++-
- mm/dmapool.c                             |  2 +-
- 7 files changed, 42 insertions(+), 12 deletions(-)
-
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index ac07ff0..ac9af22 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -145,7 +145,9 @@ static inline void arch_teardown_dma_ops(struct device *dev) { }
+ 
+ static inline unsigned int dma_get_max_seg_size(struct device *dev)
+ {
+-	return dev->dma_parms ? dev->dma_parms->max_segment_size : 65536;
++	if (dev->dma_parms && dev->dma_parms->max_segment_size)
++		return dev->dma_parms->max_segment_size;
++	return SZ_64K;
+ }
+ 
+ static inline unsigned int dma_set_max_seg_size(struct device *dev,
+@@ -154,14 +156,15 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
+ 	if (dev->dma_parms) {
+ 		dev->dma_parms->max_segment_size = size;
+ 		return 0;
+-	} else
+-		return -EIO;
++	}
++	return -EIO;
+ }
+ 
+ static inline unsigned long dma_get_seg_boundary(struct device *dev)
+ {
+-	return dev->dma_parms ?
+-		dev->dma_parms->segment_boundary_mask : 0xffffffff;
++	if (dev->dma_parms && dev->dma_parms->segment_boundary_mask)
++		return dev->dma_parms->segment_boundary_mask;
++	return DMA_BIT_MASK(32);
+ }
+ 
+ static inline int dma_set_seg_boundary(struct device *dev, unsigned long mask)
+@@ -169,8 +172,8 @@ static inline int dma_set_seg_boundary(struct device *dev, unsigned long mask)
+ 	if (dev->dma_parms) {
+ 		dev->dma_parms->segment_boundary_mask = mask;
+ 		return 0;
+-	} else
+-		return -EIO;
++	}
++	return -EIO;
+ }
+ 
+ #ifndef dma_max_pfn
 -- 
 1.9.1
