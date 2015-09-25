@@ -1,29 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 25 Sep 2015 09:50:34 -0700
-Subject: [PATCH v5 1/7] pinctrl: freescale: imx: fix system crash if
- enable two pinctl instances
-In-Reply-To: <1443128043-21063-1-git-send-email-aalonso@freescale.com>
-References: <1443128043-21063-1-git-send-email-aalonso@freescale.com>
-Message-ID: <CACRpkdaW+_K=nsP+PFu7o0HZaR++xs2iQ+WcJwx23=_mon-AMw@mail.gmail.com>
+Date: Fri, 25 Sep 2015 10:01:24 -0700
+Subject: [PATCH v4 05/22] gpio: Probe GPIO drivers on demand
+In-Reply-To: <1441628627-5143-6-git-send-email-tomeu.vizoso@collabora.com>
+References: <1441628627-5143-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1441628627-5143-6-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CACRpkdZssaXik5XWZLoFXZWKWMsVWppOO85Q9QaXyHiaLUMWAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 24, 2015 at 1:53 PM, Adrian Alonso <aalonso@freescale.com> wrote:
+On Mon, Sep 7, 2015 at 5:23 AM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
 
-> From: Robin Gong <b38343@freescale.com>
+> When looking up a gpiochip through its firmware node, probe it if it
+> hasn't already.
 >
-> Fix system chrash caused by groups whose number is smaller than the number
-> of groups of the last pinctl instance which is not initialized.
+> The goal is to reduce deferred probes to a minimum, as it makes it very
+> cumbersome to find out why a device failed to probe, and can introduce
+> very big delays in when a critical device is probed.
 >
-> iMX7D supports two iomux controllers (iomuxc-lpsr and iomuxc) on probing
-> the second instance (iomuxc) the chrash below occurs.
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> ---
+>
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
 
-Looks like this is not a regression so should not be applied separately
-for fixes?
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-I am waiting for one of the Freescale maintainers to review this, Markus
-is raising issues with the DT handling and so the SoC maintainers need
-to be involved in this: Shawn and/or Sascha.
+That is if the whole thing goes in as-is for the GPIO parts.
 
 Yours,
 Linus Walleij
