@@ -1,54 +1,139 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Fri, 25 Sep 2015 08:47:29 +0800
-Subject: [PATCH RESEND] phy: sun4i-usb: Use devm_gpiod_get_optional for
- optional GPIOs
-Message-ID: <1443142049.13662.1.camel@ingics.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 24 Sep 2015 18:10:17 -0700
+Subject: [PATCH v2] ARM: dts: <omap2/omap4/omap5/dra7>>: fix address
+ translation for pbias
+In-Reply-To: <1441368504-21304-1-git-send-email-kishon@ti.com>
+References: <1441368504-21304-1-git-send-email-kishon@ti.com>
+Message-ID: <20150925011017.GO23801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both data->id_det_gpio and data->vbus_det_gpio are optional, so use
-devm_gpiod_get_optional for them.
+* Kishon Vijay Abraham I <kishon@ti.com> [150904 05:12]:
+> "ARM: dts: <omap2/omap4/omap5/dra7>: add minimal l4 bus
+> layout with control module support" moved pbias_regulator dt node
+> from being a child node of ocp to be the child node of
+> 'syscon'. Since 'syscon' doesn't have the 'ranges' property,
+> address translation fails while trying to convert the address
+> to resource. Fix it here by populating 'ranges' property in
+> syscon dt node.
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
----
-This patch was sent on https://lkml.org/lkml/2015/8/21/177
+I'm applying the following version of this with omap3 device
+tree booting fixed for MMC.
 
- drivers/phy/phy-sun4i-usb.c | 22 +++++++++-------------
- 1 file changed, 9 insertions(+), 13 deletions(-)
+Regards,
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index 731b395..b12964b 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -551,19 +551,15 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 	if (IS_ERR(data->base))
- 		return PTR_ERR(data->base);
+Tony
+
+8<-----------------------From 9a5e3f27d1b8ca349b79e8b5fe1874eeeedb6f45 Mon Sep 17 00:00:00 2001
+From: Kishon Vijay Abraham I <kishon@ti.com>
+Date: Fri, 4 Sep 2015 17:38:24 +0530
+Subject: [PATCH] ARM: dts: fix omap2+ address translation for pbias
+
+"ARM: dts: <omap2/omap4/omap5/dra7>: add minimal l4 bus
+layout with control module support" moved pbias_regulator dt node
+from being a child node of ocp to be the child node of
+'syscon'. Since 'syscon' doesn't have the 'ranges' property,
+address translation fails while trying to convert the address
+to resource. Fix it here by populating 'ranges' property in
+syscon dt node.
+
+Fixes: 72b10ac00eb1 ("ARM: dts: omap24xx: add minimal l4 bus
+layout with control module support")
+
+Fixes: 7415b0b4c645 ("ARM: dts: omap4: add minimal l4 bus layout
+with control module support")
+
+Fixes: ed8509edddeb ("ARM: dts: omap5: add minimal l4 bus
+layout with control module support")
+
+Fixes: d919501feffa ("ARM: dts: dra7: add minimal l4 bus
+layout with control module support")
+
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+[tony at atomide.com: fixed omap3 pbias to work]
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -120,6 +120,7 @@
+ 					reg = <0x0 0x1400>;
+ 					#address-cells = <1>;
+ 					#size-cells = <1>;
++					ranges = <0 0x0 0x1400>;
  
--	data->id_det_gpio = devm_gpiod_get(dev, "usb0_id_det", GPIOD_IN);
--	if (IS_ERR(data->id_det_gpio)) {
--		if (PTR_ERR(data->id_det_gpio) == -EPROBE_DEFER)
--			return -EPROBE_DEFER;
--		data->id_det_gpio = NULL;
--	}
--
--	data->vbus_det_gpio = devm_gpiod_get(dev, "usb0_vbus_det", GPIOD_IN);
--	if (IS_ERR(data->vbus_det_gpio)) {
--		if (PTR_ERR(data->vbus_det_gpio) == -EPROBE_DEFER)
--			return -EPROBE_DEFER;
--		data->vbus_det_gpio = NULL;
--	}
-+	data->id_det_gpio = devm_gpiod_get_optional(dev, "usb0_id_det",
-+						    GPIOD_IN);
-+	if (IS_ERR(data->id_det_gpio))
-+		return PTR_ERR(data->id_det_gpio);
+ 					pbias_regulator: pbias_regulator {
+ 						compatible = "ti,pbias-dra7", "ti,pbias-omap";
+--- a/arch/arm/boot/dts/omap2430.dtsi
++++ b/arch/arm/boot/dts/omap2430.dtsi
+@@ -56,6 +56,7 @@
+ 					reg = <0x270 0x240>;
+ 					#address-cells = <1>;
+ 					#size-cells = <1>;
++					ranges = <0 0x270 0x240>;
+ 
+ 					scm_clocks: clocks {
+ 						#address-cells = <1>;
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -113,10 +113,22 @@
+ 				};
+ 
+ 				scm_conf: scm_conf at 270 {
+-					compatible = "syscon";
++					compatible = "syscon", "simple-bus";
+ 					reg = <0x270 0x330>;
+ 					#address-cells = <1>;
+ 					#size-cells = <1>;
++					ranges = <0 0x270 0x330>;
 +
-+	data->vbus_det_gpio = devm_gpiod_get_optional(dev, "usb0_vbus_det",
-+						      GPIOD_IN);
-+	if (IS_ERR(data->vbus_det_gpio))
-+		return PTR_ERR(data->vbus_det_gpio);
++					pbias_regulator: pbias_regulator {
++						compatible = "ti,pbias-omap3", "ti,pbias-omap";
++						reg = <0x2b0 0x4>;
++						syscon = <&scm_conf>;
++						pbias_mmc_reg: pbias_mmc_omap2430 {
++							regulator-name = "pbias_mmc_omap2430";
++							regulator-min-microvolt = <1800000>;
++							regulator-max-microvolt = <3000000>;
++						};
++					};
  
- 	if (of_find_property(np, "usb0_vbus_power-supply", NULL)) {
- 		data->vbus_power_supply = devm_power_supply_get_by_phandle(dev,
--- 
-2.1.0
+ 					scm_clocks: clocks {
+ 						#address-cells = <1>;
+@@ -202,17 +214,6 @@
+ 			dma-requests = <96>;
+ 		};
+ 
+-		pbias_regulator: pbias_regulator {
+-			compatible = "ti,pbias-omap3", "ti,pbias-omap";
+-			reg = <0x2b0 0x4>;
+-			syscon = <&scm_conf>;
+-			pbias_mmc_reg: pbias_mmc_omap2430 {
+-				regulator-name = "pbias_mmc_omap2430";
+-				regulator-min-microvolt = <1800000>;
+-				regulator-max-microvolt = <3000000>;
+-			};
+-		};
+-
+ 		gpio1: gpio at 48310000 {
+ 			compatible = "ti,omap3-gpio";
+ 			reg = <0x48310000 0x200>;
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -196,6 +196,7 @@
+ 					reg = <0x5a0 0x170>;
+ 					#address-cells = <1>;
+ 					#size-cells = <1>;
++					ranges = <0 0x5a0 0x170>;
+ 
+ 					pbias_regulator: pbias_regulator {
+ 						compatible = "ti,pbias-omap4", "ti,pbias-omap";
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -185,6 +185,7 @@
+ 					reg = <0x5a0 0xec>;
+ 					#address-cells = <1>;
+ 					#size-cells = <1>;
++					ranges = <0 0x5a0 0xec>;
+ 
+ 					pbias_regulator: pbias_regulator {
+ 						compatible = "ti,pbias-omap5", "ti,pbias-omap";
