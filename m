@@ -1,20 +1,29 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Sep 2015 08:33:00 +0200
-Subject: [PATCH v2 1/4] ARM: dts: sun4i: gemei-g9: Add accelerometer
- (bma250) IRQ
-In-Reply-To: <1442993914-20295-2-git-send-email-plaes@plaes.org>
+Date: Fri, 25 Sep 2015 08:33:37 +0200
+Subject: [linux-sunxi] [PATCH v2 2/4] ARM: dts: sun4i: gemei-g9: Convert
+ to use axp209 regulator nodes
+In-Reply-To: <CAGRGNgVLV_hSSTEPuC2_ga6H=wHNFuOktvCE2Mvk_txg8zCLgQ@mail.gmail.com>
 References: <1442993914-20295-1-git-send-email-plaes@plaes.org>
- <1442993914-20295-2-git-send-email-plaes@plaes.org>
-Message-ID: <20150925063300.GX4684@lukather>
+ <1442993914-20295-3-git-send-email-plaes@plaes.org>
+ <CAGRGNgVLV_hSSTEPuC2_ga6H=wHNFuOktvCE2Mvk_txg8zCLgQ@mail.gmail.com>
+Message-ID: <20150925063337.GY4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 10:38:31AM +0300, Priit Laes wrote:
-> Add IRQ configuration for bma250 accelerometer.
+On Thu, Sep 24, 2015 at 09:42:33AM +1000, Julian Calaby wrote:
+> Hi Priit,
 > 
-> Signed-off-by: Priit Laes <plaes@plaes.org>
+> On Wed, Sep 23, 2015 at 5:38 PM, Priit Laes <plaes@plaes.org> wrote:
+> > Add regulator nodes for axp209 by including the axp209 dtsi.
+> >
+> > Changes in v2:
+> >  - Add the ohci0 node.
+> 
+> Firstly, changelog stuff like this should be below the --- under your SOB.
+> 
+> Also, shouldn't enabling the ohci0 node be a separate patch?
 
-Applied, thanks!
+It should.
 
 Maxime
 
@@ -28,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150925/16f3831e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150925/7f56394c/attachment.sig>
