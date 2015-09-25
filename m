@@ -1,26 +1,34 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri, 25 Sep 2015 20:35:06 +0300
-Subject: [PATCH 0/5] ARM: dts: fix cpu compatible values
-Message-ID: <1443202506-13732-1-git-send-email-vz@mleia.com>
+Date: Fri, 25 Sep 2015 20:35:30 +0300
+Subject: [PATCH 1/5] ARM: dts: i.MX31: fix cpu compatible value
+In-Reply-To: <1443202506-13732-1-git-send-email-vz@mleia.com>
+References: <1443202506-13732-1-git-send-email-vz@mleia.com>
+Message-ID: <1443202534-13816-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The changeset corrects severeal cpu compatible properties
-to defined ones in Documentation/devicetree/bindings/arm/cpus.txt
+The change corrects cpu compatible property to a defined one,
+see Documentation/devicetree/bindings/arm/cpus.txt
 
-Vladimir Zapolskiy (5):
-  ARM: dts: i.MX31: fix cpu compatible value
-  ARM: dts: i.MX35: fix cpu compatible value
-  ARM: dts: S3C2416: fix cpu compatible value
-  ARM: dts: TI-Nspire: fix cpu compatible value
-  ARM: dts: WM8750: fix cpu compatible value
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx31.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/boot/dts/imx31.dtsi   | 2 +-
- arch/arm/boot/dts/imx35.dtsi   | 2 +-
- arch/arm/boot/dts/nspire.dtsi  | 2 +-
- arch/arm/boot/dts/s3c2416.dtsi | 2 +-
- arch/arm/boot/dts/wm8750.dtsi  | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm/boot/dts/imx31.dtsi b/arch/arm/boot/dts/imx31.dtsi
+index c34f825..5fdb222 100644
+--- a/arch/arm/boot/dts/imx31.dtsi
++++ b/arch/arm/boot/dts/imx31.dtsi
+@@ -25,7 +25,7 @@
+ 		#size-cells = <0>;
+ 
+ 		cpu {
+-			compatible = "arm,arm1136";
++			compatible = "arm,arm1136jf-s";
+ 			device_type = "cpu";
+ 		};
+ 	};
 -- 
 2.1.4
