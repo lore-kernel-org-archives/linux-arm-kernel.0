@@ -1,74 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 25 Sep 2015 07:40:35 -0700
-Subject: [GIT PULL] omap fixes for most mmc regressions and few other fixes
-Message-ID: <20150925144034.GR23801@atomide.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Fri, 25 Sep 2015 16:45:16 +0200
+Subject: [PATCH] arm64: Increase the max granular size
+In-Reply-To: <20150922182902.GO7356@arm.com>
+References: <1442944788-17254-1-git-send-email-rric@kernel.org>
+ <20150922182902.GO7356@arm.com>
+Message-ID: <20150925144516.GM1820@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7168e947291f0ead07e5638b4599fb7845288b69:
+Will,
 
-  Merge branch 'fixes-rc1' into omap-for-v4.3/fixes (2015-09-14 13:42:11 -0700)
+On 22.09.15 19:29:02, Will Deacon wrote:
+> On Tue, Sep 22, 2015 at 06:59:48PM +0100, Robert Richter wrote:
+> > From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+> > 
+> > Increase the standard cacheline size to avoid having locks in the same
+> > cacheline.
+> > 
+> > Cavium's ThunderX core implements cache lines of 128 byte size. With
+> > current granulare size of 64 bytes (L1_CACHE_SHIFT=6) two locks could
+> > share the same cache line leading a performance degradation.
+> > Increasing the size fixes that.
+> 
+> Do you have an example of that happening?
 
-are available in the git repository at:
+I did some 'poor man's kernel build all modules benchmarking' and
+could not find significant performance improvements so far (second
+part with the patch reverted):
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/fixes-rc2
+ build-allmodules-4.2.0-01404-g5818d6e89783.log:real       7m10.490s
+ build-allmodules-4.2.0-01404-g5818d6e89783.log:real       6m59.747s
+ build-allmodules-4.2.0-01404-g5818d6e89783.log:real       6m59.264s
+ build-allmodules-4.2.0-01404-g5818d6e89783.log:real       7m0.435s
+ build-allmodules-4.2.0-01404-g5818d6e89783.log:real       6m59.569s
+ build-allmodules-4.2.0-01404-g5818d6e89783.log:real       6m59.274s
+ build-allmodules-4.2.0-01404-g5818d6e89783.log:real       7m0.507s
+ build-allmodules-4.2.0-01404-g5818d6e89783.log:real       7m1.551s
+ build-allmodules-4.2.0-01404-g5818d6e89783.log:real       6m59.073s
+ build-allmodules-4.2.0-01404-g5818d6e89783.log:real       7m1.738s
 
-for you to fetch changes up to 9a5e3f27d1b8ca349b79e8b5fe1874eeeedb6f45:
+ build-allmodules-4.2.0-01406-g638c69fddc40.log:real       7m10.644s
+ build-allmodules-4.2.0-01406-g638c69fddc40.log:real       6m59.814s
+ build-allmodules-4.2.0-01406-g638c69fddc40.log:real       7m0.315s
+ build-allmodules-4.2.0-01406-g638c69fddc40.log:real       6m59.610s
+ build-allmodules-4.2.0-01406-g638c69fddc40.log:real       6m59.885s
+ build-allmodules-4.2.0-01406-g638c69fddc40.log:real       6m59.281s
+ build-allmodules-4.2.0-01406-g638c69fddc40.log:real       7m0.869s
+ build-allmodules-4.2.0-01406-g638c69fddc40.log:real       7m0.953s
+ build-allmodules-4.2.0-01406-g638c69fddc40.log:real       7m0.787s
+ build-allmodules-4.2.0-01406-g638c69fddc40.log:real       7m0.656s
 
-  ARM: dts: fix omap2+ address translation for pbias (2015-09-24 16:28:32 -0700)
+I will check what kind of workloads this patch was written for.
+Tirumalesh, any idea?
 
-----------------------------------------------------------------
-Fixes for omaps for v4.3-rc cycle:
+Thanks,
 
-- Two more patches to fix most of the MMC regressions with the
-  PBIAS regulator changes. At least two MMC driver related issues
-  still seems to remain for omap3 legacy booting and omap4 duovero.
-  Note that the dts changes depend on a recent regulator fix, and
-  are based on the regulator commit now in mainline kernel
+-Robert
 
-- Enable autoidle for am43xx clocks to prevent clocks from staying
-  always on
-
-- Fix i2c5 pinctrl offsets for omap5-uevm
-
-- Enable PCA953X as that's needed for HDMI to work on omap5
-
-- Update phy supplies for beagle x15 beta board
-
-- Use palmas-usb for on beagle x15 to start using the related
-  driver that recently got merged
--
-
-----------------------------------------------------------------
-Dave Gerlach (1):
-      ARM: OMAP2+: AM43XX: Enable autoidle for clks in am43xx_init_late
-
-Grazvydas Ignotas (2):
-      ARM: dts: omap5-uevm.dts: fix i2c5 pinctrl offsets
-      ARM: omap2plus_defconfig: enable GPIO_PCA953X
-
-Kishon Vijay Abraham I (2):
-      regulator: pbias: program pbias register offset in pbias driver
-      ARM: dts: fix omap2+ address translation for pbias
-
-Nishanth Menon (1):
-      ARM: dts: am57xx-beagle-x15: Update Phy supplies
-
-Roger Quadros (1):
-      ARM: dts: am57xx-beagle-x15: use palmas-usb for USB2
-
-Tony Lindgren (1):
-      Merge commit 'b8c93646fd5c' into omap-for-v4.3/fixes
-
- .../bindings/regulator/pbias-regulator.txt         |  7 ++-
- arch/arm/boot/dts/am57xx-beagle-x15.dts            | 42 ++++++++++------
- arch/arm/boot/dts/dra7.dtsi                        |  1 +
- arch/arm/boot/dts/omap2430.dtsi                    |  1 +
- arch/arm/boot/dts/omap3.dtsi                       | 25 +++++-----
- arch/arm/boot/dts/omap4.dtsi                       |  1 +
- arch/arm/boot/dts/omap5-uevm.dts                   |  4 +-
- arch/arm/boot/dts/omap5.dtsi                       |  1 +
- arch/arm/configs/omap2plus_defconfig               |  1 +
- arch/arm/mach-omap2/io.c                           |  1 +
- drivers/regulator/pbias-regulator.c                | 56 +++++++++++++++++++---
- 11 files changed, 104 insertions(+), 36 deletions(-)
+> 
+> > Increasing the size has no negative impact to cache invalidation on
+> > systems with a smaller cache line. There is an impact on memory usage,
+> > but that's not too important for arm64 use cases.
+> 
+> Do you have any before/after numbers to show the impact of this change
+> on other supported SoCs?
