@@ -1,31 +1,34 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Sat, 26 Sep 2015 10:38:47 +0200
-Subject: [PATCH] edac: xgene: Fix possible sprintf overflow issue
-In-Reply-To: <CAPw-ZTmYEx9o39Xr_4wyQd_ZNhpQv6fmjsbmzw7J27+i2nADqQ@mail.gmail.com>
-References: <1443116287-11752-1-git-send-email-lho@apm.com>
- <20150925134551.GE3568@pd.tnic>
- <CAPw-ZTmYEx9o39Xr_4wyQd_ZNhpQv6fmjsbmzw7J27+i2nADqQ@mail.gmail.com>
-Message-ID: <20150926083847.GA19534@pd.tnic>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 26 Sep 2015 10:38:35 +0100
+Subject: [PATCH v4 3/5] ARM: mediatek: add smp bringup code
+In-Reply-To: <1443109140-5406-4-git-send-email-yingjoe.chen@mediatek.com>
+References: <1443109140-5406-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1443109140-5406-4-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <20150926093835.GA20255@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 25, 2015 at 10:52:23AM -0700, Loc Ho wrote:
-> Thanks you... Next I would like to get the ACPI APEI supported. But
-> unlike x86 which as NMI interface, APM hardware don't support this NMI
-> interface. In order to make this works, we need an method to trigger
-> the OS to indicate that the APEI table is available. For this, we are
-> thinking about writing an separate APEI driver that wires up the IRQ
-> to trigger the OS. Before we get going with this, I would like to run
-> by you to see if you have any suggestion?
+On Thu, Sep 24, 2015 at 11:38:58PM +0800, Yingjoe Chen wrote:
+> +struct mtk_smp_boot_info {
+> +	unsigned long smp_base;
+...
+> +static const struct mtk_smp_boot_info mtk_mt8135_tz_boot = {
+> +	0x80002000, 0x3fc,
+...
+> +static const struct mtk_smp_boot_info mtk_mt6589_boot = {
+> +	0x10002000, 0x34,
+...
+> +	if (trustzone) {
+> +		/* smp_base(trustzone-bootinfo) is reserved by device tree */
+> +		mtk_smp_base = phys_to_virt(mtk_smp_info->smp_base);
 
-Well, AFAIR, there are efforts going on already for this on ARM64:
+I can't say whether this is correct or not, as we've got rid of most of
+the information that would allow me to make that decision.
 
-https://lkml.kernel.org/r/1439555753-11974-1-git-send-email-fu.wei at linaro.org
-
-Maybe test those first and possibly extend...
+The address passed to phys_to_virt() _must_ be one which is mapped by
+the kernel as lowmem.  I've no idea if the above would fall into that
+category though.
 
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
