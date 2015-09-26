@@ -1,22 +1,50 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 26 Sep 2015 21:29:47 +0200
-Subject: [PATCH v2] ARM: pxa: mioa701: add wm9713 codec
-In-Reply-To: <1442594412-19467-1-git-send-email-robert.jarzmik@free.fr>
- (Robert Jarzmik's message of "Fri, 18 Sep 2015 18:40:12 +0200")
-References: <1442594412-19467-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <87mvw9f07o.fsf@belgarion.home>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Sat, 26 Sep 2015 12:52:08 -0700
+Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
+ 'global_lock'
+In-Reply-To: <2524822.pQu4UKMrlb@vostro.rjw.lan>
+References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
+ <4357538.Wlf88yQie6@vostro.rjw.lan>
+ <CAKohpok2Z2m7GZt1GzZzofeHEioF=XJEq8YVgtY=VtS9tmpb_Q@mail.gmail.com>
+ <2524822.pQu4UKMrlb@vostro.rjw.lan>
+Message-ID: <1443297128.2181.11.camel@HansenPartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+On Fri, 2015-09-25 at 22:58 +0200, Rafael J. Wysocki wrote:
+> On Friday, September 25, 2015 01:25:49 PM Viresh Kumar wrote:
+> > On 25 September 2015 at 13:33, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > > You're going to change that into bool in the next patch, right?
+> > 
+> > Yeah.
+> > 
+> > > So what if bool is a byte and the field is not word-aligned
+> > 
+> > Its between two 'unsigned long' variables today, and the struct isn't packed.
+> > So, it will be aligned, isn't it?
+> > 
+> > > and changing
+> > > that byte requires a read-modify-write.  How do we ensure that things remain
+> > > consistent in that case?
+> > 
+> > I didn't understood why a read-modify-write is special here? That's
+> > what will happen
+> > to most of the non-word-sized fields anyway?
+> > 
+> > Probably I didn't understood what you meant..
+> 
+> Say you have three adjacent fields in a structure, x, y, z, each one byte long.
+> Initially, all of them are equal to 0.
+> 
+> CPU A writes 1 to x and CPU B writes 2 to y at the same time.
+> 
+> What's the result?
 
-> The mioa701 is using the wm9713 for audio, battery and touchscreen. Add
-> the missing audio part, which disappeared.
->
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
-> Since v1: Igor's catch of subject prefix issue
-Queued in pxa/for-next.
+I think every CPU's  cache architecure guarantees adjacent store
+integrity, even in the face of SMP, so it's x==1 and y==2.  If you're
+thinking of old alpha SMP system where the lowest store width is 32 bits
+and thus you have to do RMW to update a byte, this was usually fixed by
+padding (assuming the structure is not packed).  However, it was such a
+problem that even the later alpha chips had byte extensions.
 
---
-Robert
+James
