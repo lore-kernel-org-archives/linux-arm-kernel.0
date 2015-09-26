@@ -1,79 +1,206 @@
 From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Sat, 26 Sep 2015 23:02:33 +0200
-Subject: [PATCH v6 0/5] Add DT support for netxbig LEDs
-Message-ID: <1443301358-2131-1-git-send-email-simon.guinot@sequanux.org>
+Date: Sat, 26 Sep 2015 23:02:37 +0200
+Subject: [PATCH v6 4/5] leds: netxbig: convert to use the devm_ functions
+In-Reply-To: <1443301358-2131-1-git-send-email-simon.guinot@sequanux.org>
+References: <1443301358-2131-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <1443301358-2131-5-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch converts the leds-netxbig driver to use the devres functions
+devm_gpio_request_one() and devm_led_classdev_register(). This allows to
+simplify the code a bit.
 
-This patch series adds DT support for the LEDs found on the
-Kirkwood-based LaCie boards 2Big and 5Big Network v2.
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+---
+ drivers/leds/leds-netxbig.c | 108 ++++++++++++--------------------------------
+ 1 file changed, 28 insertions(+), 80 deletions(-)
 
-Changes for v2:
-- Check timer mode value retrieved from DT.
-- In netxbig_leds_get_of_pdata, don't use unsigned long variables to get
-  timer delay values from DT with function of_property_read_u32_index.
-  Instead, use a temporary u32 variable. This allows to silence a static
-  checker warning.
-- Make timer property optional in the binding documentation. It is now
-  aligned with the driver code.
-
-Changes for v3:
-- Fix pointer usage with the temporary u32 variable while calling
-  of_property_read_u32_index.
-
-Changes for v4:
-- In DT binding document netxbig-gpio-ext.txt, detail byte order for
-  registers and latch mechanism for "enable-gpio".
-- In leds-netxbig.c, add some error messages.
-- In leds-netxbig.c, fix some "sizeof" style issues.
-- In leds-netxbig.c, in netxbig_leds_get_of_pdata(), move the
-  of_property_read_string() calls after the error-prone checks.
-- Add some Acked-by.
-
-Changes for v5:
-- Rename DT property "bright-max" into the more common "max-brightness".
-- Make use of the "max-brightness" DT property. Instead of counting the
-  data pins of the GPIO extension bus, use "max-brightness" to get the
-  maximum brightness level.
-- Add a patch to convert the leds-netxbig driver to the devm_ functions.
-
-Changes for v6:
-- Add a patch to set led_classdev max_brightness in the leds-netxbig
-  driver.
-- Decrement the current child node refcount with of_node_put() when an
-  error happens while iterating with for_each_child_of_node().
-
-Thanks,
-
-Simon
-
-Simon Guinot (5):
-  leds: netxbig: add device tree binding
-  ARM: Kirkwood: add LED DT entries for netxbig boards
-  ARM: mvebu: remove static LED setup for netxbig boards
-  leds: netxbig: convert to use the devm_ functions
-  leds: netxbig: set led_classdev max_brightness
-
- .../devicetree/bindings/gpio/netxbig-gpio-ext.txt  |  22 ++
- .../devicetree/bindings/leds/leds-netxbig.txt      |  92 ++++++
- arch/arm/boot/dts/kirkwood-net5big.dts             |  60 ++++
- arch/arm/boot/dts/kirkwood-netxbig.dtsi            |  80 +++++
- arch/arm/mach-mvebu/Kconfig                        |   7 -
- arch/arm/mach-mvebu/Makefile                       |   1 -
- arch/arm/mach-mvebu/board.h                        |  21 --
- arch/arm/mach-mvebu/kirkwood.c                     |   4 -
- arch/arm/mach-mvebu/netxbig.c                      | 191 ------------
- drivers/leds/leds-netxbig.c                        | 336 ++++++++++++++++-----
- include/dt-bindings/leds/leds-netxbig.h            |  18 ++
- .../linux/platform_data/leds-kirkwood-netxbig.h    |   1 +
- 12 files changed, 531 insertions(+), 302 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/netxbig-gpio-ext.txt
- create mode 100644 Documentation/devicetree/bindings/leds/leds-netxbig.txt
- delete mode 100644 arch/arm/mach-mvebu/board.h
- delete mode 100644 arch/arm/mach-mvebu/netxbig.c
- create mode 100644 include/dt-bindings/leds/leds-netxbig.h
-
+diff --git a/drivers/leds/leds-netxbig.c b/drivers/leds/leds-netxbig.c
+index e1f3c2632278..b166fd9f4186 100644
+--- a/drivers/leds/leds-netxbig.c
++++ b/drivers/leds/leds-netxbig.c
+@@ -71,7 +71,8 @@ static void gpio_ext_set_value(struct netxbig_gpio_ext *gpio_ext,
+ 	spin_unlock_irqrestore(&gpio_ext_lock, flags);
+ }
+ 
+-static int gpio_ext_init(struct netxbig_gpio_ext *gpio_ext)
++static int gpio_ext_init(struct platform_device *pdev,
++			 struct netxbig_gpio_ext *gpio_ext)
+ {
+ 	int err;
+ 	int i;
+@@ -81,46 +82,28 @@ static int gpio_ext_init(struct netxbig_gpio_ext *gpio_ext)
+ 
+ 	/* Configure address GPIOs. */
+ 	for (i = 0; i < gpio_ext->num_addr; i++) {
+-		err = gpio_request_one(gpio_ext->addr[i], GPIOF_OUT_INIT_LOW,
+-				       "GPIO extension addr");
++		err = devm_gpio_request_one(&pdev->dev, gpio_ext->addr[i],
++					    GPIOF_OUT_INIT_LOW,
++					    "GPIO extension addr");
+ 		if (err)
+-			goto err_free_addr;
++			return err;
+ 	}
+ 	/* Configure data GPIOs. */
+ 	for (i = 0; i < gpio_ext->num_data; i++) {
+-		err = gpio_request_one(gpio_ext->data[i], GPIOF_OUT_INIT_LOW,
+-				   "GPIO extension data");
++		err = devm_gpio_request_one(&pdev->dev, gpio_ext->data[i],
++					    GPIOF_OUT_INIT_LOW,
++					    "GPIO extension data");
+ 		if (err)
+-			goto err_free_data;
++			return err;
+ 	}
+ 	/* Configure "enable select" GPIO. */
+-	err = gpio_request_one(gpio_ext->enable, GPIOF_OUT_INIT_LOW,
+-			       "GPIO extension enable");
++	err = devm_gpio_request_one(&pdev->dev, gpio_ext->enable,
++				    GPIOF_OUT_INIT_LOW,
++				    "GPIO extension enable");
+ 	if (err)
+-		goto err_free_data;
++		return err;
+ 
+ 	return 0;
+-
+-err_free_data:
+-	for (i = i - 1; i >= 0; i--)
+-		gpio_free(gpio_ext->data[i]);
+-	i = gpio_ext->num_addr;
+-err_free_addr:
+-	for (i = i - 1; i >= 0; i--)
+-		gpio_free(gpio_ext->addr[i]);
+-
+-	return err;
+-}
+-
+-static void gpio_ext_free(struct netxbig_gpio_ext *gpio_ext)
+-{
+-	int i;
+-
+-	gpio_free(gpio_ext->enable);
+-	for (i = gpio_ext->num_addr - 1; i >= 0; i--)
+-		gpio_free(gpio_ext->addr[i]);
+-	for (i = gpio_ext->num_data - 1; i >= 0; i--)
+-		gpio_free(gpio_ext->data[i]);
+ }
+ 
+ /*
+@@ -141,11 +124,6 @@ struct netxbig_led_data {
+ 	spinlock_t		lock;
+ };
+ 
+-struct netxbig_led_priv {
+-	struct netxbig_led_platform_data *pdata;
+-	struct netxbig_led_data leds_data[];
+-};
+-
+ static int netxbig_led_get_timer_mode(enum netxbig_led_mode *mode,
+ 				      unsigned long delay_on,
+ 				      unsigned long delay_off,
+@@ -305,18 +283,11 @@ static struct attribute *netxbig_led_attrs[] = {
+ };
+ ATTRIBUTE_GROUPS(netxbig_led);
+ 
+-static void delete_netxbig_led(struct netxbig_led_data *led_dat)
+-{
+-	led_classdev_unregister(&led_dat->cdev);
+-}
+-
+-static int create_netxbig_led(struct platform_device *pdev, int led,
+-			      struct netxbig_led_priv *priv)
++static int create_netxbig_led(struct platform_device *pdev,
++			      struct netxbig_led_platform_data *pdata,
++			      struct netxbig_led_data *led_dat,
++			      const struct netxbig_led *template)
+ {
+-	struct netxbig_led_platform_data *pdata = priv->pdata;
+-	struct netxbig_led_data *led_dat = &priv->leds_data[led];
+-	const struct netxbig_led *template = &priv->pdata->leds[led];
+-
+ 	spin_lock_init(&led_dat->lock);
+ 	led_dat->gpio_ext = pdata->gpio_ext;
+ 	led_dat->cdev.name = template->name;
+@@ -349,7 +320,7 @@ static int create_netxbig_led(struct platform_device *pdev, int led,
+ 	if (led_dat->mode_val[NETXBIG_LED_SATA] != NETXBIG_LED_INVALID_MODE)
+ 		led_dat->cdev.groups = netxbig_led_groups;
+ 
+-	return led_classdev_register(&pdev->dev, &led_dat->cdev);
++	return devm_led_classdev_register(&pdev->dev, &led_dat->cdev);
+ }
+ 
+ #ifdef CONFIG_OF_GPIO
+@@ -579,7 +550,7 @@ netxbig_leds_get_of_pdata(struct device *dev,
+ static int netxbig_led_probe(struct platform_device *pdev)
+ {
+ 	struct netxbig_led_platform_data *pdata = dev_get_platdata(&pdev->dev);
+-	struct netxbig_led_priv *priv;
++	struct netxbig_led_data *leds_data;
+ 	int i;
+ 	int ret;
+ 
+@@ -592,51 +563,28 @@ static int netxbig_led_probe(struct platform_device *pdev)
+ 			return ret;
+ 	}
+ 
+-	priv = devm_kzalloc(&pdev->dev, sizeof(*priv) +
+-			    pdata->num_leds * sizeof(struct netxbig_led_data),
+-			    GFP_KERNEL);
+-	if (!priv)
++	leds_data = devm_kzalloc(&pdev->dev,
++				 pdata->num_leds * sizeof(*leds_data),
++				 GFP_KERNEL);
++	if (!leds_data)
+ 		return -ENOMEM;
+-	priv->pdata = pdata;
+ 
+-	ret = gpio_ext_init(pdata->gpio_ext);
++	ret = gpio_ext_init(pdev, pdata->gpio_ext);
+ 	if (ret < 0)
+ 		return ret;
+ 
+ 	for (i = 0; i < pdata->num_leds; i++) {
+-		ret = create_netxbig_led(pdev, i, priv);
++		ret = create_netxbig_led(pdev, pdata,
++					 &leds_data[i], &pdata->leds[i]);
+ 		if (ret < 0)
+-			goto err_free_leds;
++			return ret;
+ 	}
+-	platform_set_drvdata(pdev, priv);
+-
+-	return 0;
+-
+-err_free_leds:
+-	for (i = i - 1; i >= 0; i--)
+-		delete_netxbig_led(&priv->leds_data[i]);
+-
+-	gpio_ext_free(pdata->gpio_ext);
+-	return ret;
+-}
+-
+-static int netxbig_led_remove(struct platform_device *pdev)
+-{
+-	struct netxbig_led_priv *priv = platform_get_drvdata(pdev);
+-	struct netxbig_led_platform_data *pdata = priv->pdata;
+-	int i;
+-
+-	for (i = 0; i < pdata->num_leds; i++)
+-		delete_netxbig_led(&priv->leds_data[i]);
+-
+-	gpio_ext_free(pdata->gpio_ext);
+ 
+ 	return 0;
+ }
+ 
+ static struct platform_driver netxbig_led_driver = {
+ 	.probe		= netxbig_led_probe,
+-	.remove		= netxbig_led_remove,
+ 	.driver		= {
+ 		.name		= "leds-netxbig",
+ 		.of_match_table	= of_match_ptr(of_netxbig_leds_match),
 -- 
 2.1.4
