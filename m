@@ -1,59 +1,36 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 25 Sep 2015 21:54:36 -0500
-Subject: All OMAP platforms: MMC is broken
-In-Reply-To: <20150925011334.GP23801@atomide.com>
-References: <20150924090048.GA21626@n2100.arm.linux.org.uk>
- <20150924233756.GN23801@atomide.com> <20150925011334.GP23801@atomide.com>
-Message-ID: <560608EC.4020208@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 25 Sep 2015 21:42:56 -0700 (PDT)
+Subject: [PATCH net-next v3] net: Fix Hisilicon Network Subsystem
+ Support Compilation
+In-Reply-To: <1443169790-54861-1-git-send-email-huangdaode@hisilicon.com>
+References: <1443169790-54861-1-git-send-email-huangdaode@hisilicon.com>
+Message-ID: <20150925.214256.1901015223799070196.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2015 08:13 PM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [150924 16:42]:
->> * Russell King - ARM Linux <linux@arm.linux.org.uk> [150924 02:04]:
->>> Nightly testing has revealed that both the OMAP3430 LDP and the OMAP4430
->>> SDP fail to boot due to lack of working MMC.  Both platforms fail to
->>> find their rootfs, which is on a SD card.
->>>
->>> The breakage occurred somewhere between trees of September 9th (commit
->>> 4e4adb2f4628) and September 12th (commit b0a1ea51bda4), so during the
->>> merge window.
->>
->> Yes sorry things got messed up in multiple ways :( I've summarized
->> the mess here earlier:
->>
->> http://article.gmane.org/gmane.linux.kernel.mmc/33911
->>
->> And today commit b9c93646fd5c ("regulator: pbias: program pbias register
->> offset in pbias driver") hit mainline so I'll send a pull request for
->> the related dts change.
-> 
-> Kishon, while testing I noticed there are still at least two
-> issues remaining that seem to need fixing in the MMC driver:
-> 
-> 1. The legacy booting without device tree does not probe MMC at
->    all on omap3
-> 
-> 2. I'm getting the regulator warning on omap4 duovero
-> 
-> Anyways, I'm sending a pull request for the fixes so far as that
-> gets MMC working again for most platforms.
-> 
-> Regards,
-> 
-With 0925, i think the patches got merged. here is my testing status on
-the boards I have access to:
+From: huangdaode <huangdaode@hisilicon.com>
+Date: Fri, 25 Sep 2015 16:29:50 +0800
 
-https://github.com/nmenon/kernel-test-logs/tree/next-20150925
+> @@ -191,9 +191,12 @@ static void hns_rcb_ring_init(struct ring_pair_cb *ring_pair, int ring_type)
+>  	if (ring_type == RX_RING) {
+>  		dsaf_write_dev(q, RCB_RING_RX_RING_BASEADDR_L_REG,
+>  			       (u32)dma);
+> +#ifdef CONFIG_64BIT
+>  		dsaf_write_dev(q, RCB_RING_RX_RING_BASEADDR_H_REG,
+>  			       (u32)(dma >> 32));
+> -
+> +#else
+> +		dsaf_write_dev(q, RCB_RING_RX_RING_BASEADDR_H_REG, 0);
+> +#endif
+>  		dsaf_write_dev(q, RCB_RING_RX_RING_BD_LEN_REG,
+>  			       bd_size_type);
+>  		dsaf_write_dev(q, RCB_RING_RX_RING_BD_NUM_REG,
 
-Looks like with omap2plus_defconfig, at least
-https://github.com/nmenon/kernel-test-logs/blob/next-20150925/omap2plus_defconfig/am335x-evm.txt
-somethign is broken there - dunno what yet.
+CONFIG_64BIT doesn't tell you if _DMA_ addresses are 64-bit or not.
 
-There are a few more farm related failures in various locations, but not
-too interesting.
+Furthermore there is a portable way to shift a 32-bit value down
+32-bits whilst avoiding warnings.
 
+	(x >> 31) >> 1
 
--- 
-Regards,
-Nishanth Menon
+So you should definitely use that instead of the CONFIG_64BIT test.
