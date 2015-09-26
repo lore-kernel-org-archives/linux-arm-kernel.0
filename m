@@ -1,51 +1,124 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 26 Sep 2015 17:14:11 -0300
-Subject: [PATCH] Revert "serial: imx: remove unbalanced clk_prepare"
-In-Reply-To: <1439912592-14779-1-git-send-email-fabio.estevam@freescale.com>
-References: <1439912592-14779-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <CAOMZO5D3KESbzcsWdf49FQh871aOU4NVkepADFDxNCJfnQ3KyQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 26 Sep 2015 13:54:59 -0700
+Subject: [PATCH 4.2 047/134] pinctrl: at91: fix null pointer dereference
+In-Reply-To: <20150926205311.819185658@linuxfoundation.org>
+References: <20150926205311.819185658@linuxfoundation.org>
+Message-ID: <20150926205314.630382053@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+4.2-stable review patch.  If anyone has any objections, please let me know.
 
-On Tue, Aug 18, 2015 at 12:43 PM, Fabio Estevam
-<fabio.estevam@freescale.com> wrote:
-> This reverts commit 9e7b399d6528eac33a6fbfceb2b92af209c3454d.
->
-> Commit ("9e7b399d6528ea") causes the following warning and sometimes
-> also hangs the system:
->
-> ------------[ cut here ]------------
->  WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:868 mutex_trylock+0x20c/0x22c()
->  DEBUG_LOCKS_WARN_ON(in_interrupt())
->  Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.2.0-rc7-next-20150818-00001-g14418a6 #4
-> Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
-> Backtrace:
-> [<80012f08>] (dump_backtrace) from [<800130a4>] (show_stack+0x18/0x1c)
-> r6:00000364 r5:00000000 r4:00000000 r3:00000000
-> [<8001308c>] (show_stack) from [<807902b8>] (dump_stack+0x88/0xa4)
-> [<80790230>] (dump_stack) from [<8002a604>] (warn_slowpath_common+0x80/0xbc)
-> r5:807945c4 r4:80ab3b50
-> [<8002a584>] (warn_slowpath_common) from [<8002a6e4>] (warn_slowpath_fmt+0x38/0x40)
-> r8:00000000 r7:8131100c r6:8054c3cc r5:8131300c r4:80b0a570
-> [<8002a6b0>] (warn_slowpath_fmt) from [<807945c4>] (mutex_trylock+0x20c/0x22c)
-> r3:8095d0d8 r2:8095ab28
-> [<807943b8>] (mutex_trylock) from [<8054c3cc>] (clk_prepare_lock+0x14/0xf4)
-> r7:8131100c r6:be3f0c80 r5:00000037 r4:be3f0c80
-> [<8054c3b8>] (clk_prepare_lock) from [<8054dbfc>] (clk_prepare+0x18/0x30)
-> r5:00000037 r4:be3f0c80
-> [<8054dbe4>] (clk_prepare) from [<8036a600>] (imx_console_write+0x30/0x244)
-> r4:812d0bc8 r3:8132b9a4
->
-> To reproduce the problem we only need to let the board idle for something
-> like 30 seconds.
->
-> Tested on a imx6q-sabresd.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+------------------
 
-Could you please consider applying this one for 4.3-rc?
+From: David Dueck <davidcdueck@googlemail.com>
 
-Thanks
+commit 1ab36387ea4face01aac3560b396b1e2ce07c4ff upstream.
+
+Not all gpio banks are necessarily enabled, in the current code this can
+lead to null pointer dereferences.
+
+[   51.130000] Unable to handle kernel NULL pointer dereference at virtual address 00000058
+[   51.130000] pgd = dee04000
+[   51.130000] [00000058] *pgd=3f66d831, *pte=00000000, *ppte=00000000
+[   51.140000] Internal error: Oops: 17 [#1] ARM
+[   51.140000] Modules linked in:
+[   51.140000] CPU: 0 PID: 1664 Comm: cat Not tainted 4.1.1+ #6
+[   51.140000] Hardware name: Atmel SAMA5
+[   51.140000] task: df6dd880 ti: dec60000 task.ti: dec60000
+[   51.140000] PC is at at91_pinconf_get+0xb4/0x200
+[   51.140000] LR is at at91_pinconf_get+0xb4/0x200
+[   51.140000] pc : [<c01e71a0>]    lr : [<c01e71a0>]    psr: 600f0013
+sp : dec61e48  ip : 600f0013  fp : df522538
+[   51.140000] r10: df52250c  r9 : 00000058  r8 : 00000068
+[   51.140000] r7 : 00000000  r6 : df53c910  r5 : 00000000  r4 : dec61e7c
+[   51.140000] r3 : 00000000  r2 : c06746d4  r1 : 00000000  r0 : 00000003
+[   51.140000] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+[   51.140000] Control: 10c53c7d  Table: 3ee04059  DAC: 00000015
+[   51.140000] Process cat (pid: 1664, stack limit = 0xdec60208)
+[   51.140000] Stack: (0xdec61e48 to 0xdec62000)
+[   51.140000] 1e40:                   00000358 00000000 df522500 ded15f80 c05a9d08 ded15f80
+[   51.140000] 1e60: 0000048c 00000061 df522500 ded15f80 c05a9d08 c01e7304 ded15f80 00000000
+[   51.140000] 1e80: c01e6008 00000060 0000048c c01e6034 c01e5f6c ded15f80 dec61ec0 00000000
+[   51.140000] 1ea0: 00020000 ded6f280 dec61f80 00000001 00000001 c00ae0b8 b6e80000 ded15fb0
+[   51.140000] 1ec0: 00000000 00000000 df4bc974 00000055 00000800 ded6f280 b6e80000 ded6f280
+[   51.140000] 1ee0: ded6f280 00020000 b6e80000 00000000 00020000 c0090dec c0671e1c dec61fb0
+[   51.140000] 1f00: b6f8b510 00000001 00004201 c000924c 00000000 00000003 00000003 00000000
+[   51.140000] 1f20: df4bc940 00022000 00000022 c066e188 b6e7f000 c00836f4 000b6e7f ded6f280
+[   51.140000] 1f40: ded6f280 b6e80000 dec61f80 ded6f280 00020000 c0091508 00000000 00000003
+[   51.140000] 1f60: 00022000 00000000 00000000 ded6f280 ded6f280 00020000 b6e80000 c0091d9c
+[   51.140000] 1f80: 00000000 00000000 ffffffff 00020000 00020000 b6e80000 00000003 c000f124
+[   51.140000] 1fa0: dec60000 c000efa0 00020000 00020000 00000003 b6e80000 00020000 000271c4
+[   51.140000] 1fc0: 00020000 00020000 b6e80000 00000003 7fffe000 00000000 00000000 00020000
+[   51.140000] 1fe0: 00000000 bef50b64 00013835 b6f29c76 400f0030 00000003 00000000 00000000
+[   51.140000] [<c01e71a0>] (at91_pinconf_get) from [<c01e7304>] (at91_pinconf_dbg_show+0x18/0x2c0)
+[   51.140000] [<c01e7304>] (at91_pinconf_dbg_show) from [<c01e6034>] (pinconf_pins_show+0xc8/0xf8)
+[   51.140000] [<c01e6034>] (pinconf_pins_show) from [<c00ae0b8>] (seq_read+0x1a0/0x464)
+[   51.140000] [<c00ae0b8>] (seq_read) from [<c0090dec>] (__vfs_read+0x20/0xd0)
+[   51.140000] [<c0090dec>] (__vfs_read) from [<c0091508>] (vfs_read+0x7c/0x108)
+[   51.140000] [<c0091508>] (vfs_read) from [<c0091d9c>] (SyS_read+0x40/0x94)
+[   51.140000] [<c0091d9c>] (SyS_read) from [<c000efa0>] (ret_fast_syscall+0x0/0x3c)
+[   51.140000] Code: eb010ec2 e30a0d08 e34c005a eb0ae5a7 (e5993000)
+[   51.150000] ---[ end trace fb3c370da3ea4794 ]---
+
+Fixes: a0b957f306fa ("pinctrl: at91: allow to have disabled gpio bank")
+Signed-off-by: David Dueck <davidcdueck@googlemail.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ drivers/pinctrl/pinctrl-at91.c |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -320,6 +320,9 @@ static const struct pinctrl_ops at91_pct
+ static void __iomem *pin_to_controller(struct at91_pinctrl *info,
+ 				 unsigned int bank)
+ {
++	if (!gpio_chips[bank])
++		return NULL;
++
+ 	return gpio_chips[bank]->regbase;
+ }
+ 
+@@ -729,6 +732,10 @@ static int at91_pmx_set(struct pinctrl_d
+ 		pin = &pins_conf[i];
+ 		at91_pin_dbg(info->dev, pin);
+ 		pio = pin_to_controller(info, pin->bank);
++
++		if (!pio)
++			continue;
++
+ 		mask = pin_to_mask(pin->pin);
+ 		at91_mux_disable_interrupt(pio, mask);
+ 		switch (pin->mux) {
+@@ -848,6 +855,10 @@ static int at91_pinconf_get(struct pinct
+ 	*config = 0;
+ 	dev_dbg(info->dev, "%s:%d, pin_id=%d", __func__, __LINE__, pin_id);
+ 	pio = pin_to_controller(info, pin_to_bank(pin_id));
++
++	if (!pio)
++		return -EINVAL;
++
+ 	pin = pin_id % MAX_NB_GPIO_PER_BANK;
+ 
+ 	if (at91_mux_get_multidrive(pio, pin))
+@@ -889,6 +900,10 @@ static int at91_pinconf_set(struct pinct
+ 			"%s:%d, pin_id=%d, config=0x%lx",
+ 			__func__, __LINE__, pin_id, config);
+ 		pio = pin_to_controller(info, pin_to_bank(pin_id));
++
++		if (!pio)
++			return -EINVAL;
++
+ 		pin = pin_id % MAX_NB_GPIO_PER_BANK;
+ 		mask = pin_to_mask(pin);
+ 
