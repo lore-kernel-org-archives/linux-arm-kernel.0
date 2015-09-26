@@ -1,57 +1,204 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 25 Sep 2015 17:44:12 -0700
-Subject: [PATCH v6 6/6] pinctrl: freescale: imx: imx7d iomuxc-lpsr
- devicetree bindings
-In-Reply-To: <1443215162-13716-6-git-send-email-aalonso@freescale.com>
-References: <1443215162-13716-1-git-send-email-aalonso@freescale.com>
- <1443215162-13716-6-git-send-email-aalonso@freescale.com>
-Message-ID: <20150926004411.GE3529@tiger>
+From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
+Date: Sat, 26 Sep 2015 04:16:31 +0200
+Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
+In-Reply-To: <20150925152848.GQ13823@e104818-lin.cambridge.arm.com>
+References: <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
+ <1443033714.74600.18.camel@infradead.org> <560310EA.2070805@intel.com>
+ <1443042212.74600.30.camel@infradead.org> <56033C10.2040708@linaro.org>
+ <1443082579.74600.48.camel@infradead.org>
+ <20150924103152.GG13823@e104818-lin.cambridge.arm.com>
+ <1443095558.74600.84.camel@infradead.org>
+ <20150924151546.GJ13823@e104818-lin.cambridge.arm.com>
+ <1443118238.74600.117.camel@infradead.org>
+ <20150925152848.GQ13823@e104818-lin.cambridge.arm.com>
+Message-ID: <5605FFFF.2010307@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 25, 2015 at 04:06:02PM -0500, Adrian Alonso wrote:
-> +Examples:
-> +While iomuxc-lpsr is intended to be used by dedicated peripherals to take
-> +advantages of LPSR power mode, is also possible that an IP to use pads from
-> +any of the iomux controllers. For example the I2C1 IP can use SCL pad from
-> +iomuxc-lpsr controller and SDA pad from iomuxc controller as:
-> +
-> +i2c1: i2c at 30a20000 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c1_1 &pinctrl_i2c1_2>;
-> +	status = "okay";
-> +};
-> +
-> +iomuxc-lpsr at 302c0000 {
-> +	compatible = "fsl,imx7d-iomuxc-lpsr";
-> +	reg = <0x302c0000 0x10000>;
-> +	fsl,input-sel = <&iomuxc>;
-> +
-> +	pinctrl_i2c1_1: i2c1grp-1 {
-> +		fsl,pins = <
-> +			MX7D_PAD_GPIO1_IO04__I2C1_SCL 0x4000007f
-> +		>;
-> +	};
-> +};
-> +
-> +iomuxc at 30330000 {
-> +	compatible = "fsl,imx7d-iomuxc";
-> +	reg = <0x30330000 0x10000>;
-> +
-> +	pinctrl_i2c1_2: i2c1grp-2 {
-> +		fsl,pins = <
-> +			MX7D_PAD_I2C1_SCL__I2C1_SCL 0x4000007f
+On 9/25/2015 5:28 PM, Catalin Marinas wrote:
+> On Thu, Sep 24, 2015 at 07:10:38PM +0100, David Woodhouse wrote:
+>> On Thu, 2015-09-24 at 16:15 +0100, Catalin Marinas wrote:
+>>> With "PRP0001", they can skip the _DSD properties review process (not
+>>> that they bother much currently) as long as the existing DT support
+>>> covers their needs.
+>> So no change there then. I take it the smsc911x bindings didn't go
+>> through this mythical _DSD properties review process either, right?
+> Right. And that's another reason I disagree with this patchset (I don't
+> always agree with everything that's coming out of ARM Ltd ;)).
+>
+> Now, in Jeremy's defence, this _DSD process looks quite mythical indeed.
+> We had an ARM firmware ecosystem meeting earlier this year where we
+> agreed to set up such process (at least for the ARM world):
+>
+> https://wiki.linaro.org/LEG/Engineering/Kernel/ACPI/CoreUpstreamNotes
+>
+> I can see some form of a process here:
+>
+> http://www.uefi.org/sites/default/files/resources/web-page-v2.pdf
 
-I thought you have fixed this, as I have pointed it out during the last
-review.  The example doesn't make sense.  There is no reason you need to
-have two pads on the same function I2C1_SCL.  One of them should be
-I2C1_SDA.
+That was just an attempt and the final one will most likely be different.
 
-Shawn
+> But, at least to me, it's not clear how you submit properties to such
+> registry, what's the review process, who are the reviewers. I know there
+> was a mailing list set up but I don't see it listed above.
 
-> +		>;
-> +	};
-> +};
-> -- 
-> 2.1.4
-> 
+For the record, this is under discussion right now.
+
+Also for the record, I'm not speaking for Intel.  All of my comments 
+here are based on my personal opinions.
+
+>>>   However, we don't want to emulate DT in ACPI but > first try the
+>>> established ACPI methods and only use _DSD where these are
+>>> insufficient. Automatically converting existing drivers and encouraging
+>>> people to use "PRP0001" does not provide them with any incentive to try
+>>> harder and learn the "ACPI way".
+>> But again, we're *not* looking at a simplistic transliteration of
+>> properties.
+> I know you and I don't look at it this way but, based on historical
+> evidence, I'm sure that some ARM vendors will try to do exactly this
+> (and be able to claim "ACPI support" when they were happily using DT).
+>
+>>>> In some ways, your proposal would be actively *counterproductive*. You
+>>>> say you want to train people *not* to keep patching the kernel. But
+>>>> where they *could* have just used PRP0001 and used a pre-existing
+>>>> kernel, you then tell them "oh, but now you need to patch the kernel
+>>>> because we want you to make up a new HID and not be compatible with
+>>>> what already exists."
+>>> I gave an example above with the clocks but let's take a simpler,
+>>> device-specific property like "smsc,irq-active-high". Is this documented
+>>> anywhere apart from the kernel driver and the in-kernel DT smsc911x.txt?
+>>> No. Are other non-Linux OS vendors going to look in the kernel source
+>>> tree to implement support in their drivers? I doubt it and we could end
+>>> up with two different paths in firmware for handling the same device.
+>>> ACPI probably never was truly OS agnostic but with "PRP0001" we don't
+>>> even try.
+>> Where is the documentation for the INT_CFG_IRQ_POL_ bit in the INT_CFG
+>> register, that it controls? The documentation on the bindings really
+>> ought to live near that, in an ideal world.
+> If not there, at least in some common place like this:
+>
+> http://www.uefi.org/sites/default/files/resources/nic-request-v2.pdf
+>
+> And they could be specific to a newly allocated HID (like we do with DT
+> for a newly allocated "compatible" string).
+>
+>> But that's still a non-sequitur in the context of this particular
+>> discussion. The patch that was posted *already* keeps that very same
+>> (optional) smsc,irq-active-high property.
+>>
+>> Again, it isn't relevant to the question of whether the driver is
+>> matched via PRP0001 or a newly-allocated HID.
+>>
+>> The driver, as the patch was posted, *does* have the same set of
+>> properties with the same meanings ? because anything else would be
+>> insane.
+> Having the same set of properties makes sense. But not documenting them
+> outside of Documentation/devicetree/bindings/ doesn't look right to me,
+> from an OS-agnostic ACPI perspective.
+
+They are documented in the code too through the requirements that the 
+existing drivers have.
+
+If I have a piece of hardware and a driver for it, it really shouldn't 
+matter whether I use a DT or ACPI in my platform.  The driver should 
+just work in both cases.  It doesn't have to work in exactly the same 
+way, but it should work.  That's not the case today, sadly.
+
+> Let's take it the other way. A new driver is being submitted to Linux
+> (or another OS) with support for ACPI (only). The developers may find it
+> easier to use PRP0001 with their own _DSD invention. Do we ask the
+> developers to submit DT bindings even if they don't immediately target
+> DT (even harder if Linux is not the first target)? Or we skip this
+> properties review and documenting process altogether? At least with DT,
+> we usually see the bindings and kernel code together and have a chance
+> to NAK. For _DSD we need something outside the Linux kernel community.
+>
+> But I agree with your statement above, it's not relevant whether a new
+> _HID is used or PRP0001 + "compatible" when we don't even control which
+> _DSD properties are added.
+>
+> As I said previously, disabling PRP0001 on ARM is more of a weak method
+> of keeping track of which drivers are used with ACPI. My concern (and it
+> won't go away) is a thoughtless migration of existing DT drivers and ARM
+> SoCs to ACPI. PRP0001 makes it easier though it's _DSD actually
+> facilitating this.
+
+Even if they tried to do that, infrastructure is missing for things like 
+regulators etc (because the frameworks there use of_ helpers directly 
+IIRC and I'm not aware of any plans to change that) and on the other 
+hand GPIO already depends on _CRS being used in accordance with ACPI 
+anyway (even if _DSD properties are used), so I'd say this would be 
+practically difficult rather.
+
+IOW, using _DSD properties for individual devices/drivers is easy. Doing 
+the same thing for the whole system, not so much.
+
+>>> Apart from a _DSD properties review process, what we need is (main) OS
+>>> vendors enforcing it, possibly with stricter ACPI test suite. Disabling
+>>> PRP0001 for ARM wouldn't solve the problem but at least it would make
+>>> people think about what _DSD properties they need registered for their
+>>> device (or I'm over optimistic and I should just stop caring ;)).
+>> I'm all for requiring pre-existing DT bindings to be "vetted" by the
+>> nascent _DSD review process, before their use with PRP0001 can be
+>> 'blessed'.
+> If we want something enforced here, we need a better methodology than
+> keeping track of which patches are submitted (and this would involve OS
+> vendors support since in many cases their kernels are seen as the
+> "canonical" implementation).
+>
+>> But in a world where people *are* going to go off and do their own
+>> insane thing, we really might as well let them use the *same* thing
+>> that we already had ? in as many cases as possible ? rather than
+>> actually *making* them come up with a new insane thing all of their
+>> very own.
+> This only works as long as they target an existing driver with prior DT
+> support (usually with reviewed bindings).
+
+Exactly.
+
+And this is what we (David and me at least) want to be possible.  It 
+would be a failure if people had to write separate drivers for 
+ACPI-based and DT-based platforms to handle the same hardware, at least 
+at the leaf driver level.
+
+> If they have a new driver and
+> only ACPI in mind, I'm pretty sure we'll end up with new insane things.
+
+We will.  With or without _DSD and all.  That had happened way before 
+_DSD was introduced.
+
+And by the way, demonizing _DSD doesn't help you at all, because there 
+was the *much* *worse* thing called _DSM way before and it allowed of 
+the same things as _DSD does and more.  And it still is there and it 
+very well may be used to feed an entire DT in binary format to the 
+kernel when no one is looking.
+
+So this is all about tradeoffs.  If you don't give people enough rope to 
+do something, they'll find another way and you may hate that one, but 
+then it'll be too late.
+
+> That's why we need some form of _DSD properties review and "compatible"
+> is one such property.
+>
+
+Yes, we need and want to set up a process for registering _DSD 
+properties.  That turns out a bit more complicated than we thought it 
+would be, though.
+
+No, that won't prevent people from doing insane things with properties 
+(or similar) they never register and they support in their 
+out-of-the-tree drivers they never attempt to mainline.  But let's be 
+honest that this can happen with DT just as well.
+
+And it seems to me that we're spending more time on doing politics than 
+on solving technical problems which should really be our focus IMO.
+
+And the underlying technical problem to me is what I said before: Device 
+drivers should work regardless of what way the configuration information 
+is provided to the kernel.  Indeed, they shouldn't even have to care 
+about that.
+
+Do you agree with that?
+
+Thanks,
+Rafael
