@@ -1,37 +1,51 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Sat, 26 Sep 2015 16:43:27 -0700
-Subject: [PATCH v2 0/2] KVM/arm: enhance arvm7 vfp/simd lazy switch support
-Message-ID: <1443311009-4811-1-git-send-email-m.smarduch@samsung.com>
+Date: Sat, 26 Sep 2015 16:43:28 -0700
+Subject: [PATCH v2 1/2] KVM/arm: add hooks for armv7 fp/simd lazy switch
+ support
+In-Reply-To: <1443311009-4811-1-git-send-email-m.smarduch@samsung.com>
+References: <1443311009-4811-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1443311009-4811-2-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current lazy vfp/simd implementation switches hardware context only on 
-guest access and again on exit to host, otherwise hardware context is
-skipped.
+This patch adds vcpu fields to track lazy state, save host FPEXC, and 
+offsets to fields.
 
-This patch set builds on that functionality and executes a hardware context 
-switch only when  vCPU is scheduled out or returns to user space.
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+---
+ arch/arm/include/asm/kvm_host.h | 6 ++++++
+ arch/arm/kernel/asm-offsets.c   | 2 ++
+ 2 files changed, 8 insertions(+)
 
-Patches were tested on FVP sw platform. FP crunching applications summing up 
-values, with outcome compared to known result were executed on several guests, 
-and host. 
-
-Changes since v1->v2:
-* Fixed vfp/simd trap configuration to enable trace trapping
-* Removed set_hcptr branch label
-* Fixed handling of FPEXC to restore guest and host versions on vcpu_put
-
-Mario Smarduch (2):
-  add hooks for armv7 fp/simd lazy switch support
-  enable armv7 fp/simd lazy switch
-
- arch/arm/include/asm/kvm_asm.h  |  1 +
- arch/arm/include/asm/kvm_host.h |  6 +++++
- arch/arm/kernel/asm-offsets.c   |  2 ++
- arch/arm/kvm/arm.c              | 17 ++++++++++++
- arch/arm/kvm/interrupts.S       | 60 ++++++++++++++++++++++++++++++-----------
- arch/arm/kvm/interrupts_head.S  | 12 ++++++---
- 6 files changed, 79 insertions(+), 19 deletions(-)
-
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index dcba0fa..194a8ef 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -111,6 +111,12 @@ struct kvm_vcpu_arch {
+ 	/* Interrupt related fields */
+ 	u32 irq_lines;		/* IRQ and FIQ levels */
+ 
++	/* Track fp/simd lazy switch state */
++	u32 vfp_lazy;
++
++	/* Save host FPEXC register to restore on vcpu put */
++	u32 saved_fpexc;
++
+ 	/* Exception Information */
+ 	struct kvm_vcpu_fault_info fault;
+ 
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index 871b826..e1c3a41 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -186,6 +186,8 @@ int main(void)
+   DEFINE(VCPU_CPSR,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_cpsr));
+   DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
+   DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
++  DEFINE(VCPU_VFP_LAZY,		offsetof(struct kvm_vcpu, arch.vfp_lazy));
++  DEFINE(VCPU_VFP_FPEXC,	offsetof(struct kvm_vcpu, arch.saved_fpexc));
+   DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
+   DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.fault.hxfar));
+   DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.fault.hpfar));
 -- 
 1.9.1
