@@ -1,36 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 26 Sep 2015 21:33:56 +0200
-Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
- 'global_lock'
-In-Reply-To: <CAKohpok0A3JRhVCabscfJGuhJerWmypsQnwdqJcmvBBWdpvPwQ@mail.gmail.com>
-References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- <CAJZ5v0i+xJ4U13vCVsvXc7S8wP0AokbmNXPidBkDwbjXMM8fCw@mail.gmail.com>
- <CAKohpok0A3JRhVCabscfJGuhJerWmypsQnwdqJcmvBBWdpvPwQ@mail.gmail.com>
-Message-ID: <1540878.9slRi6Q7xb@wuerfel>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 26 Sep 2015 21:29:47 +0200
+Subject: [PATCH v2] ARM: pxa: mioa701: add wm9713 codec
+In-Reply-To: <1442594412-19467-1-git-send-email-robert.jarzmik@free.fr>
+ (Robert Jarzmik's message of "Fri, 18 Sep 2015 18:40:12 +0200")
+References: <1442594412-19467-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <87mvw9f07o.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 26 September 2015 11:40:00 Viresh Kumar wrote:
-> On 25 September 2015 at 15:19, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> > So if you allow something like debugfs to update your structure, how
-> > do you make sure there is the proper locking?
-> 
-> Not really sure at all.. Isn't there some debugfs locking that will
-> jump in, to avoid updation of fields to the same device?
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-No, if you need any locking to access variable, you cannot use the
-simple debugfs helpers but have to provide your own functions.
+> The mioa701 is using the wm9713 for audio, battery and touchscreen. Add
+> the missing audio part, which disappeared.
+>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+> Since v1: Igor's catch of subject prefix issue
+Queued in pxa/for-next.
 
-> >> Anyway, that problem isn't here for sure as its between two
-> >> unsigned-longs. So, should I just move it to bool and resend ?
-> >
-> > I guess it might be more convenient to fold this into the other patch,
-> > because we seem to be splitting hairs here.
-> 
-> I can and that's what I did. But then Arnd asked me to separate it
-> out. I can fold it back if that's what you want.
-
-It still makes sense to keep it separate I think, the patch is clearly
-different from the other parts.
-
-	Arnd
+--
+Robert
