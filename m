@@ -1,86 +1,37 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sat, 26 Sep 2015 18:53:47 -0400
-Subject: [PATCH v2 0/5] drivers/tty: make more bool drivers explicitly
- non-modular
-In-Reply-To: <1440020889-12120-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1440020889-12120-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <20150926225347.GC1279@windriver.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Sat, 26 Sep 2015 16:43:27 -0700
+Subject: [PATCH v2 0/2] KVM/arm: enhance arvm7 vfp/simd lazy switch support
+Message-ID: <1443311009-4811-1-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[[PATCH v2 0/5] drivers/tty: make more bool drivers explicitly non-modular] On 19/08/2015 (Wed 17:48) Paul Gortmaker wrote:
+Current lazy vfp/simd implementation switches hardware context only on 
+guest access and again on exit to host, otherwise hardware context is
+skipped.
 
-> [v2: drop dead module code removal from 8250_lpc18xx.c ; instead convert it
->  from bool to tristate ; also add ack to hvc_console commit.]
-> 
-> This second set of patches to drivers/tty steps outside of the serial
-> dir, and an improved auditing finds two more serial drivers pretending
-> to be modular that really are not.
+This patch set builds on that functionality and executes a hardware context 
+switch only when  vCPU is scheduled out or returns to user space.
 
-Hi Greg -- wondering if this is still in your to-do queue.  I see the
-patches to drivers/char that I sent about the same time made it onto
-your char-testing branch but not these onto tty-testing.
+Patches were tested on FVP sw platform. FP crunching applications summing up 
+values, with outcome compared to known result were executed on several guests, 
+and host. 
 
-The reason I ask is that I've about a 1/2 dozen more similar patches
-that showed up once I started auditing non-x86 code.  I don't want to
-re-spam you with these along with the new ones, if these are still in
-your backlog for processing.
+Changes since v1->v2:
+* Fixed vfp/simd trap configuration to enable trace trapping
+* Removed set_hcptr branch label
+* Fixed handling of FPEXC to restore guest and host versions on vcpu_put
 
-Thanks,
-Paul.
---
+Mario Smarduch (2):
+  add hooks for armv7 fp/simd lazy switch support
+  enable armv7 fp/simd lazy switch
 
-> 
-> The reasoning for doing this is the same as the first set[1] of patches
-> and is largely copied below:
-> 
->   In the previous merge window, we made changes to allow better
->   delineation between modular and non-modular code in commit
->   0fd972a7d91d6e15393c449492a04d94c0b89351 ("module: relocate module_init
->   from init.h to module.h").  This allows us to now ensure module code
->   looks modular and non-modular code does not accidentally look modular
->   without suffering build breakage.
->   
->   Here we target code that is, by nature of their Kconfig settings, only
->   available to be built-in, but implicitly presenting itself as being
->   possibly modular by way of using modular headers, macros, and functions.
->   
->   The goal here is to remove that illusion of modularity from these
->   drivers, but in a way that leaves the actual runtime unchanged.
->   In doing so, we remove code that has never been tested and adds
->   no value to the tree.  And we begin the process of expecting a
->   level of consistency between the Kconfig of a driver and the code
->   that the driver uses.
->   
-> Build tested for allyesconfig on x86_64, and ARM for lpc81xx, and powerpc
-> for hvc_console and mpsc, layered onto tty/tty-next as a baseline.
-> 
-> Paul.
-> 
-> [1] https://lkml.kernel.org/r/1437530538-5078-1-git-send-email-paul.gortmaker at windriver.com
-> --
-> 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Jiri Slaby <jslaby@suse.com>
-> Cc: Joachim Eastwood <manabian@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-serial at vger.kernel.org
-> 
-> Paul Gortmaker (5):
->   drivers/tty: make pty.c slightly more explicitly non-modular
->   drivers/tty: make sysrq.c slightly more explicitly non-modular
->   drivers/tty: make hvc_console.c explicitly non-modular
->   drivers/tty: make serial/mpsc.c driver explicitly non-modular
->   drivers/tty: make serial 8250_lpc18xx.c Kconfig a tristate
-> 
->  drivers/tty/hvc/hvc_console.c   | 18 +-----------------
->  drivers/tty/pty.c               |  7 +++++--
->  drivers/tty/serial/8250/Kconfig |  2 +-
->  drivers/tty/serial/mpsc.c       | 36 +++---------------------------------
->  drivers/tty/sysrq.c             |  6 +++++-
->  5 files changed, 15 insertions(+), 54 deletions(-)
-> 
-> -- 
-> 2.5.0
-> 
+ arch/arm/include/asm/kvm_asm.h  |  1 +
+ arch/arm/include/asm/kvm_host.h |  6 +++++
+ arch/arm/kernel/asm-offsets.c   |  2 ++
+ arch/arm/kvm/arm.c              | 17 ++++++++++++
+ arch/arm/kvm/interrupts.S       | 60 ++++++++++++++++++++++++++++++-----------
+ arch/arm/kvm/interrupts_head.S  | 12 ++++++---
+ 6 files changed, 79 insertions(+), 19 deletions(-)
+
+-- 
+1.9.1
