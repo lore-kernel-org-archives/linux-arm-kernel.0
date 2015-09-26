@@ -1,121 +1,109 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 25 Sep 2015 22:55:06 -0500
-Subject: [PATCH v7 5/6] Documentation: dt-bindings: pci: altera pcie
- device tree binding
-In-Reply-To: <1442801587-3812-6-git-send-email-lftan@altera.com>
-References: <1442801587-3812-1-git-send-email-lftan@altera.com>
- <1442801587-3812-6-git-send-email-lftan@altera.com>
-Message-ID: <5606171A.5000609@kernel.org>
+Date: Sat, 26 Sep 2015 13:15:54 -0500
+Subject: [PATCH v6 20/22] driver core: Allow deferring probes until late
+ init
+In-Reply-To: <1442844182-27787-21-git-send-email-tomeu.vizoso@collabora.com>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1442844182-27787-21-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <5606E0DA.2040900@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2015 09:13 PM, Ley Foon Tan wrote:
-> This patch adds the bindings for Altera PCIe host controller driver and
-> Altera PCIe MSI driver.
+On 09/21/2015 09:03 AM, Tomeu Vizoso wrote:
+> Add a field to struct device that instructs the device-driver core to
+> defer the probe of this device until the late_initcall level.
+
+This is true until the next patch with moves deferred probe processing
+to device_initcall_sync. So disabling this option alone won't totally
+revert to current behaviour. I guess patch 21 could be reverted if
+necessary.
+
 > 
-> Signed-off-by: Ley Foon Tan <lftan@altera.com>
+> By letting all built-in drivers to register before starting to probe, we
+> can avoid any deferred probes by probing dependencies on demand.
+> 
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> 
 > ---
->  .../devicetree/bindings/pci/altera-pcie-msi.txt    | 28 +++++++++++++
->  .../devicetree/bindings/pci/altera-pcie.txt        | 49 ++++++++++++++++++++++
->  2 files changed, 77 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
->  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-> new file mode 100644
-> index 0000000..53ad2388
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-> @@ -0,0 +1,28 @@
-> +* Altera PCIe MSI controller
-> +
-> +Required properties:
-> +- compatible:	should contain "altr,msi-1.0"
-> +- reg:		specifies the physical base address of the controller and
-> +		the length of the memory mapped region.
-> +- reg-names:	must include the following entries:
-> +		"csr": CSR registers
-> +		"vector_slave": vectors slave port region
-> +- interrupt-parent:	interrupt source phandle.
-> +- interrupts:	specifies the interrupt source of the parent interrupt
-> +		controller. The format of the interrupt specifier depends on the
-> +		parent interrupt controller.
-> +- num-vectors:	number of vectors, range 1 to 32.
-> +- msi-controller:	indicates that this is MSI controller node
-> +
-> +
-> +Example
-> +msi0: msi at 0xFF200000 {
-> +	compatible = "altr,msi-1.0";
-> +	reg = <0xFF200000 0x00000010
-> +		0xFF200010 0x00000080>;
-> +	reg-names = "csr", "vector_slave";
-> +	interrupt-parent = <&hps_0_arm_gic_0>;
-> +	interrupts = <0 42 4>;
-> +	msi-controller = <1>;
+> Changes in v4:
+> - Add Kconfig DELAY_DEVICE_PROBES to allow disabling delayed probing in
+>   machines with initcalls that depend on devices probing at a given time.
+> 
+>  drivers/base/Kconfig   | 18 ++++++++++++++++++
+>  drivers/base/dd.c      |  7 +++++++
+>  include/linux/device.h |  2 ++
+>  3 files changed, 27 insertions(+)
+> 
+> diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+> index 98504ec99c7d..44b5d33b1f49 100644
+> --- a/drivers/base/Kconfig
+> +++ b/drivers/base/Kconfig
+> @@ -324,4 +324,22 @@ config CMA_ALIGNMENT
+>  
+>  endif
+>  
+> +config DELAY_DEVICE_PROBES
+> +	bool "Allow delaying the probe of some devices"
 
-This should not have a value.
+I'd like to hide visibility of this behind EXPERT.
 
-> +	num-vectors = <32>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/pci/altera-pcie.txt b/Documentation/devicetree/bindings/pci/altera-pcie.txt
-> new file mode 100644
-> index 0000000..4440db1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/altera-pcie.txt
-> @@ -0,0 +1,49 @@
-> +* Altera PCIe controller
+> +	default y
+> +	help
+> +	  Devices can be matched to a driver and probed from the moment they
+> +	  are registered, but early during boot their probes are likely to be
+> +	  deferred because some dependency isn't available yet because most
+> +	  drivers haven't been registered yet.
 > +
-> +Required properties:
-> +- compatible :	should contain "altr,pcie-root-port-1.0"
-> +- reg:		a list of physical base address and length for TXS and CRA.
-> +- reg-names:	must include the following entries:
-> +		"Txs" or "txs": TX slave port region
-> +		"Cra" or "cra": Control register access region
-
-Why both cases? Can we please just have one (or none is better IMO).
-
-txs contains the config space?
-
-> +- interrupt-parent:	interrupt source phandle.
-> +- interrupts:	specifies the interrupt source of the parent interrupt controller.
-> +		The format of the interrupt specifier depends on the parent interrupt
-> +		controller.
-> +- device_type:	must be "pci"
-> +- #address-cells:	set to <3>
-> +- #size-cells:	set to <2>
-> +- #interrupt-cells:	set to <1>
-> +- ranges:		describes the translation of addresses for root ports and standard
-> +		PCI regions.
-> +- interrupt-map-mask and interrupt-map: standard PCI properties to define the
-> +		mapping of the PCIe interface to interrupt numbers.
+> +	  Enabling this option allows the device registration code to delay the
+> +	  probing of a specific device until device_initcall_sync, when all
+> +	  built-in drivers have been registered already.
 > +
-> +Optional properties:
-> +- msi-parent:	Link to the hardware entity that serves as the MSI controller for this PCIe
-> +		controller.
-> +- bus-range:	PCI bus numbers covered
+> +	  In some platforms there may be implicit assumptions about when some
+> +	  devices are probed, so enabling this option could cause problems there.
 > +
-> +Example
-> +	pcie_0: pcie at 0xc00000000 {
-> +		compatible = "altr,pcie-root-port-1.0";
-> +		reg = <0xc0000000 0x20000000>,
-> +			<0xff220000 0x00004000>;
-> +		reg-names = "Txs", "Cra";
-> +		interrupt-parent = <&hps_0_arm_gic_0>;
-> +		interrupts = <0 40 4>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		bus-range = <0x0 0xFF>;
-> +		device_type = "pci";
-> +		msi-parent = <&msi_to_gic_gen_0>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		interrupt-map-mask = <0 0 0 7>;
-> +		interrupt-map = <0 0 0 1 &pcie_0 1>,
-> +			            <0 0 0 2 &pcie_0 2>,
-> +			            <0 0 0 3 &pcie_0 3>,
-> +			            <0 0 0 4 &pcie_0 4>;
-> +		ranges = <0x82000000 0x00000000 0x00000000 0xc0000000 0x00000000 0x10000000
-> +			    0x82000000 0x00000000 0x10000000 0xd0000000 0x00000000 0x10000000>;
-> +	};
+> +	  If unsure, say Y here.
+> +
+>  endmenu
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index 7dc04ee81c8b..269ea76c1a4f 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -417,6 +417,13 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
+>  	if (!device_is_registered(dev))
+>  		return -ENODEV;
+>  
+> +#if IS_ENABLED(CONFIG_DELAY_DEVICE_PROBES)
+
+This can be moved to the if.
+
+> +	if (!driver_deferred_probe_enable && dev->probe_late) {
+> +		driver_deferred_probe_add(dev);
+> +		return 0;
+> +	}
+> +#endif
+> +
+>  	pr_debug("bus: '%s': %s: matched device %s with driver %s\n",
+>  		 drv->bus->name, __func__, dev_name(dev), drv->name);
+>  
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index 8e7b806f0744..e64f4c7e243d 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -744,6 +744,7 @@ struct device_dma_parameters {
+>   *
+>   * @offline_disabled: If set, the device is permanently online.
+>   * @offline:	Set after successful invocation of bus type's .offline().
+> + * @probe_late:	If set, device will be probed in the late initcall level.
+>   *
+>   * At the lowest level, every device in a Linux system is represented by an
+>   * instance of struct device. The device structure contains the information
+> @@ -828,6 +829,7 @@ struct device {
+>  
+>  	bool			offline_disabled:1;
+>  	bool			offline:1;
+> +	bool			probe_late:1;
+>  };
+>  
+>  static inline struct device *kobj_to_dev(struct kobject *kobj)
 > 
