@@ -1,37 +1,35 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 26 Sep 2015 21:21:12 +0800
-Subject: [PATCH] regulator: axp20x: Fix enable bit indexes for DCDC4 and DCDC5
-Message-ID: <1443273672-25803-1-git-send-email-wens@csie.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 26 Sep 2015 16:47:07 +0200
+Subject: [PATCH v3 14/26] ARM: pxa: magician: Fix platform data for both
+ PXA27x I2C controllers
+In-Reply-To: <55FA48BD.4050900@tul.cz> (Petr Cvek's message of "Thu, 17 Sep
+ 2015 06:59:41 +0200")
+References: <cover.1442462898.git.petr.cvek@tul.cz> <55FA48BD.4050900@tul.cz>
+Message-ID: <87bncpkzkk.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The enable bit indexes for DCDC4 and DCDC5 regulators are off by 1.
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-We haven't run into any problems with this since either the regulators
-aren't defined in the DT and aren't used, or all the DCDC regulators
-have the "always-on" property set, as they are almost always used
-for system critical loads.
+> This patch changes fast_mode settings for the normal and power I2C
+> controller on the HTC Magician machine.
+>
+> Connected device on the Power I2C:
+> - MAX1587A: working in the fast mode
+>
+> Connected devices on the Normal I2C:
+> - UDA1380: working in the fast mode
+> - OV9640: bus became stuck in the fast mode
+>
+> The OV9640 is not using a standard I2C protocol, but an SCCB variant. Maybe
+> it is not fully compatible in the fast mode. Therefore fast mode for normal
+> I2C is disabled. If you not using the OV9640 then you can enable the fast
+> mode for the UDA1380.
+>
+> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+Waiting for a week for Philipp's ack and queuing it after.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/regulator/axp20x-regulator.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Cheers.
 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 01bf3476a791..a9567af7cec0 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -192,9 +192,9 @@ static const struct regulator_desc axp22x_regulators[] = {
- 	AXP_DESC(AXP22X, DCDC3, "dcdc3", "vin3", 600, 1860, 20,
- 		 AXP22X_DCDC3_V_OUT, 0x3f, AXP22X_PWR_OUT_CTRL1, BIT(3)),
- 	AXP_DESC(AXP22X, DCDC4, "dcdc4", "vin4", 600, 1540, 20,
--		 AXP22X_DCDC4_V_OUT, 0x3f, AXP22X_PWR_OUT_CTRL1, BIT(3)),
-+		 AXP22X_DCDC4_V_OUT, 0x3f, AXP22X_PWR_OUT_CTRL1, BIT(4)),
- 	AXP_DESC(AXP22X, DCDC5, "dcdc5", "vin5", 1000, 2550, 50,
--		 AXP22X_DCDC5_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(4)),
-+		 AXP22X_DCDC5_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(5)),
- 	/* secondary switchable output of DCDC1 */
- 	AXP_DESC_SW(AXP22X, DC1SW, "dc1sw", "dcdc1", 1600, 3400, 100,
- 		    AXP22X_DCDC1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(7)),
--- 
-2.5.3
+--
+Robert
