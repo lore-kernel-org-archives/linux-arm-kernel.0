@@ -1,45 +1,42 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 26 Sep 2015 11:40:00 -0700
-Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
- 'global_lock'
-In-Reply-To: <CAJZ5v0i+xJ4U13vCVsvXc7S8wP0AokbmNXPidBkDwbjXMM8fCw@mail.gmail.com>
-References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- <4357538.Wlf88yQie6@vostro.rjw.lan>
- <CAKohpok2Z2m7GZt1GzZzofeHEioF=XJEq8YVgtY=VtS9tmpb_Q@mail.gmail.com>
- <2524822.pQu4UKMrlb@vostro.rjw.lan> <20150925214438.GH5951@linux>
- <CAJZ5v0i+xJ4U13vCVsvXc7S8wP0AokbmNXPidBkDwbjXMM8fCw@mail.gmail.com>
-Message-ID: <CAKohpok0A3JRhVCabscfJGuhJerWmypsQnwdqJcmvBBWdpvPwQ@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 26 Sep 2015 20:40:26 +0200
+Subject: pwm-bl: regression on all pxa platforms
+In-Reply-To: <87vbb3pkss.fsf@belgarion.home> (Robert Jarzmik's message of
+ "Mon, 21 Sep 2015 22:41:23 +0200")
+References: <87vbb3pkss.fsf@belgarion.home>
+Message-ID: <87vbaxf2hx.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 September 2015 at 15:19, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> So if you allow something like debugfs to update your structure, how
-> do you make sure there is the proper locking?
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-Not really sure at all.. Isn't there some debugfs locking that will
-jump in, to avoid updation of fields to the same device?
-
-> Is that not a problem in all of the places modified by the [2/2]?
-
-Right, but its not new AFAICT.
-
-We already have u32 fields in those structs and on 64 bit machines
-we have the same read-update-write problems for two consecutive
-u32's. Right?
-
-> How can the future users of the API know what to do to avoid potential
-> problems with it?
-
-No idea really :)
-
->> Anyway, that problem isn't here for sure as its between two
->> unsigned-longs. So, should I just move it to bool and resend ?
+> Hi Thierry,
 >
-> I guess it might be more convenient to fold this into the other patch,
-> because we seem to be splitting hairs here.
+> Since a bit of time, the PWM backlight based pxa platforms are broken.
+> All of these platforms rely on a registering such as the one in [1].
+>
+> At least I think the commit 68feaca0b13e ("backlight: pwm: Handle EPROBE_DEFER
+> while requesting the PWM") breaks my platforms because :
+>  (a) no pwm table is added (legacy platforms)
+>  (b) in this case, in pwm_get(), pmw_lookup_list is empty, and therefore chosen
+>       == NULL, and therefore pwm_get() returns NULL, and pwm_get() return
+>       -EPROBE_DEFER
+>  (c) as a consequence, this code is unreachable in pwm_bl.c :
+> 	if (IS_ERR(pb->pwm)) {
+> 		ret = PTR_ERR(pb->pwm);
+> 		dev_info(&pdev->dev, "%s:%d(): %d\n", __func__, __LINE__, ret);
+> 		if (ret == -EPROBE_DEFER)
+> 			goto err_alloc;
+>
+> 		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
+> 		pb->legacy = true;
+> 		pb->pwm = pwm_request(data->pwm_id, "pwm-backlight");
+>
+> Could you either revert 68feaca0b13e or find a better solution to repair the
+> legacy platorms please ?
+Ok, no answer, so I'll post the revert.
 
-I can and that's what I did. But then Arnd asked me to separate it
-out. I can fold it back if that's what you want.
+Cheers.
 
---
-viresh
+-- 
+Robert
