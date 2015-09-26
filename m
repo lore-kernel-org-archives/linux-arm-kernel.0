@@ -1,37 +1,19 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Fri, 25 Sep 2015 17:12:05 -0700
-Subject: [PATCH] iommu/arm-smmu: Only return IRQ_NONE if FSR is not set
-Message-ID: <1443226325-28456-1-git-send-email-mitchelh@codeaurora.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 25 Sep 2015 17:28:49 -0700
+Subject: [PATCH v6 1/6] ARM: dts: imx: imx7d add iomuxc lpsr device node
+In-Reply-To: <1443215162-13716-1-git-send-email-aalonso@freescale.com>
+References: <1443215162-13716-1-git-send-email-aalonso@freescale.com>
+Message-ID: <20150926002848.GA3529@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we return IRQ_NONE from the context fault handler if the FSR
-doesn't actually have the fault bit set (some sort of miswired
-interrupt?) or if the client doesn't register an IOMMU fault handler.
-However, registering a client fault handler is optional, so telling the
-interrupt framework that the interrupt wasn't for this device if the
-client doesn't register a handler isn't exactly accurate.  Fix this by
-returning IRQ_HANDLED even if the client doesn't register a handler.
+On Fri, Sep 25, 2015 at 04:05:57PM -0500, Adrian Alonso wrote:
+> Add device tree node to support iomuxc-lpsr controller, fsl,iput-sel
+> phandle allows to get input select register base address which is
+> shared from main iomuxc controller.
+> 
+> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
----
- drivers/iommu/arm-smmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+For the series,
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 48a39dfa9777..95560d447a54 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -653,7 +653,7 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
- 		dev_err_ratelimited(smmu->dev,
- 		    "Unhandled context fault: iova=0x%08lx, fsynr=0x%x, cb=%d\n",
- 		    iova, fsynr, cfg->cbndx);
--		ret = IRQ_NONE;
-+		ret = IRQ_HANDLED;
- 		resume = RESUME_TERMINATE;
- 	}
- 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Acked-by: Shawn Guo <shawnguo@kernel.org>
