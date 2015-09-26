@@ -1,47 +1,37 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 25 Sep 2015 18:34:02 -0500
-Subject: [PATCH 1/1] PCI/MSI: X-Gene: Remove msi_controller assignment in
- X-Gene PCIe driver
-In-Reply-To: <20150918095956.2e27c93c@arm.com>
-References: <1442449900-30842-1-git-send-email-dhdang@apm.com>
- <20150918095956.2e27c93c@arm.com>
-Message-ID: <20150925233402.GA23134@localhost>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Fri, 25 Sep 2015 17:12:05 -0700
+Subject: [PATCH] iommu/arm-smmu: Only return IRQ_NONE if FSR is not set
+Message-ID: <1443226325-28456-1-git-send-email-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 18, 2015 at 09:59:56AM +0100, Marc Zyngier wrote:
-> On Wed, 16 Sep 2015 17:31:40 -0700
-> Duc Dang <dhdang@apm.com> wrote:
-> 
-> > With commit 8d63bc7beaee ("PCI/MSI: pci-xgene-msi: Get rid of
-> > struct msi_controller"), it is no longer required to assign
-> > msi_controller for X-Gene PCIe host bridge to support MSI. This
-> > patch removes this unnecessary code and also helps avoid a warning
-> > message ("failed to enable MSI") during boot.
-> > 
-> > Signed-off-by: Duc Dang <dhdang@apm.com>
-> > Cc: Tanmay Inamdar <tinamdar@apm.com>
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Currently we return IRQ_NONE from the context fault handler if the FSR
+doesn't actually have the fault bit set (some sort of miswired
+interrupt?) or if the client doesn't register an IOMMU fault handler.
+However, registering a client fault handler is optional, so telling the
+interrupt framework that the interrupt wasn't for this device if the
+client doesn't register a handler isn't exactly accurate.  Fix this by
+returning IRQ_HANDLED even if the client doesn't register a handler.
 
-I lost the original mail from Duc, but I applied this to pci/host-xgene for
-v4.4 with this changelog:
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+---
+ drivers/iommu/arm-smmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-commit 00b9b91cb330e70b6bc571a9aa7175b4590ca452
-Author: Duc Dang <dhdang@apm.com>
-Date:   Wed Sep 16 17:31:40 2015 -0700
-
-    PCI/MSI: xgene: Remove msi_controller assignment
-    
-    After 8d63bc7beaee ("PCI/MSI: pci-xgene-msi: Get rid of struct
-    msi_controller"), it is no longer required to assign msi_controller for
-    X-Gene PCIe host bridge to support MSI.
-    
-    Remove this unnecessary code.  This also avoids a warning message ("failed
-    to enable MSI") during boot.
-    
-    [bhelgaas: changelog]
-    Signed-off-by: Duc Dang <dhdang@apm.com>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-    Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-    Cc: Tanmay Inamdar <tinamdar@apm.com>
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 48a39dfa9777..95560d447a54 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -653,7 +653,7 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
+ 		dev_err_ratelimited(smmu->dev,
+ 		    "Unhandled context fault: iova=0x%08lx, fsynr=0x%x, cb=%d\n",
+ 		    iova, fsynr, cfg->cbndx);
+-		ret = IRQ_NONE;
++		ret = IRQ_HANDLED;
+ 		resume = RESUME_TERMINATE;
+ 	}
+ 
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
