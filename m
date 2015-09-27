@@ -1,62 +1,58 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 27 Sep 2015 16:00:06 +0200
-Subject: [PATCH 1/2] arm64: mediatek: enable MTK_TIMER
-In-Reply-To: <1442370091.14347.10.camel@mtksdaap41>
-References: <1442369095-1094-1-git-send-email-yingjoe.chen@mediatek.com>
- <1442370091.14347.10.camel@mtksdaap41>
-Message-ID: <5607F666.5010506@gmail.com>
+Date: Sun, 27 Sep 2015 16:23:23 +0200
+Subject: [PATCH] arm64: dts: mediatek: mt8173 PSCI-1.0 support
+In-Reply-To: <1440727919-34719-1-git-send-email-fan.chen@mediatek.com>
+References: <1440727919-34719-1-git-send-email-fan.chen@mediatek.com>
+Message-ID: <5607FBDB.2070201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 16/09/15 04:21, Yingjoe Chen wrote:
-> On Wed, 2015-09-16 at 10:04 +0800, Yingjoe Chen wrote:
->> Enable MTK_TIMER for MediaTek plaform, which will be used as
->> schedule clock.
+On 28/08/15 04:11, fan.chen at mediatek.com wrote:
+> From: Fan Chen <fan.chen@mediatek.com>
 >
-> Sorry, sending this series too early without cover letter and removing
-> Change-Id. Here's the cover letter:
+> This patch adds psci comatible properties to support all mandatory
+> functions of PSCI-1.0, PSCI-0.2 and PSCI-0.1, and system suspend
+> can be supported in PSCI-1.0.
 >
+> Signed-off-by: Fan Chen <fan.chen@mediatek.com>
+> ---
+> Because PSCI-1.0 patches hadn't landed on mainline, this patch is
+> based on three patch sets below:
+> [0] http://www.spinics.net/lists/arm-kernel/msg425793.html
+>      PSCI: system suspend support
+> [1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git
+>      psci/unification
+> [2] http://www.spinics.net/lists/devicetree/msg82017.html
+>      [PATCH 0/6] drivers: firmware: psci: add basic v1.0 support
 >
-> This is actually v3 of "add GPT timer support for mt8173" series. This
-> is based on v4.3-rc1 + clockevents-4.4[1] and James's mediatek-clk
-> tree[2].
+> Before they are merged in, this patch still works fine with psci-0.2
+> support in current mainline.
+> ---
+>   arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> Changes compare to previous version[3]:
-> - the first two mtk_timer related changes are removed because they are
-> replaced/accepted in clockevents tree.
-> - Remove 'add 13mhz clock for MT8173' because it is accepted in
-> mediatek-clk tree.
-> - Kconfig.platforms path change.
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index d18ee42..b9b4205 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -95,7 +95,7 @@
+>   	};
 >
-> So we only have 2 patches left here.
-> Matthias, can you take these and help to remove the Change-Id?
+>   	psci {
+> -		compatible = "arm,psci";
+> +		compatible = "arm,psci-1.0", "arm,psci-0.2", "arm,psci";
 
-Yes I can take this two patches, but I don't see the mediatek-clk tree 
-accepted by the maintainers yet. As far as I can see, without the 13 MHz 
-clock [1], the sched clock won't work.
+As this binding is not yet upstream, I prefer not to take the patch. 
+Most probably the binding will have the name you indicated, but as DTS 
+bindings are representing an external API, we should be really careful 
+in changing them.
 
-[1] 
-https://github.com/jamesjjliao/linux/commit/add5e89d657fa6c0e5a517890f996c796b768064
+Cheers,
+Matthias
 
->
->
-> Daniel Kurtz (1):
->    arm64: dts: mt8173: add timer node
->
-> Yingjoe Chen (1):
->    arm64: mediatek: enable MTK_TIMER
->
->
->
-> [1]
-> https://git.linaro.org/people/daniel.lezcano/linux.git clockevents/4.4
-> [2]
-> http://lists.infradead.org/pipermail/linux-mediatek/2015-August/002069.html
-> [3]
-> http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001544.html
->
->
->
+>   		method = "smc";
+>   		cpu_suspend   = <0x84000001>;
+>   		cpu_off	      = <0x84000002>;
 >
