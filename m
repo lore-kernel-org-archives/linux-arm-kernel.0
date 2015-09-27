@@ -1,97 +1,208 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 27 Sep 2015 15:19:00 +0200
-Subject: [PATCH v3] soc: mediatek: add scpsys support active_wakeup
-In-Reply-To: <1440573281-28952-1-git-send-email-eddie.huang@mediatek.com>
-References: <1440573281-28952-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <5607ECC4.3030902@gmail.com>
+Date: Sun, 27 Sep 2015 15:39:11 +0200
+Subject: [PATCH] ARM: dts: mt8135-evbp1: remove regulator-compatible usage
+In-Reply-To: <1443188795-14435-1-git-send-email-javier@osg.samsung.com>
+References: <1443188795-14435-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <5607F17F.8000805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 26/08/15 09:14, Eddie Huang wrote:
-> Register gpd_dev_ops.active_wakeup function to support keep power
-> during suspend state. And add flag to each power domain to
-> decide whether keep power during suspend or not.
+On 25/09/15 15:46, Javier Martinez Canillas wrote:
+> The regulator-compatible property from the regulator DT binding was
+> deprecated and the correct approach is to use the node's name.
 >
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> This patch has no functional changes since the values of the node's
+> name and the regulator-compatible match for all the regulators.
 >
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
 Applied, thanks.
 
+>
 > ---
-> Change in v3:
-> Remove check dev->power_domain NULL or ERR. This will not happen
-> when call scpsys_active_wakeup function
 >
-> Change in v2:
-> Drop .active_wakeup = false lines in scp_domain_data[] array
-> ---
->   drivers/soc/mediatek/mtk-scpsys.c | 16 ++++++++++++++++
->   1 file changed, 16 insertions(+)
+>   arch/arm/boot/dts/mt8135-evbp1.dts | 23 -----------------------
+>   1 file changed, 23 deletions(-)
 >
-> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> index 43a79ed..3a00975 100644
-> --- a/drivers/soc/mediatek/mtk-scpsys.c
-> +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> @@ -67,6 +67,7 @@ struct scp_domain_data {
->   	u32 sram_pdn_ack_bits;
->   	u32 bus_prot_mask;
->   	enum clk_id clk_id;
-> +	bool active_wakeup;
->   };
+> diff --git a/arch/arm/boot/dts/mt8135-evbp1.dts b/arch/arm/boot/dts/mt8135-evbp1.dts
+> index 357a91fc2d1d..460db6d05952 100644
+> --- a/arch/arm/boot/dts/mt8135-evbp1.dts
+> +++ b/arch/arm/boot/dts/mt8135-evbp1.dts
+> @@ -32,7 +32,6 @@
+>   			compatible = "mediatek,mt6397-regulator";
 >
->   static const struct scp_domain_data scp_domain_data[] __initconst = {
-> @@ -127,6 +128,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
->   		.sram_pdn_bits = GENMASK(11, 8),
->   		.sram_pdn_ack_bits = GENMASK(15, 12),
->   		.clk_id = MT8173_CLK_NONE,
-> +		.active_wakeup = true,
->   	},
->   	[MT8173_POWER_DOMAIN_MFG_ASYNC] = {
->   		.name = "mfg_async",
-> @@ -171,6 +173,7 @@ struct scp_domain {
->   	u32 sram_pdn_bits;
->   	u32 sram_pdn_ack_bits;
->   	u32 bus_prot_mask;
-> +	bool active_wakeup;
->   };
+>   			mt6397_vpca15_reg: buck_vpca15 {
+> -				regulator-compatible = "buck_vpca15";
+>   				regulator-name = "vpca15";
+>   				regulator-min-microvolt = < 850000>;
+>   				regulator-max-microvolt = <1350000>;
+> @@ -41,7 +40,6 @@
+>   			};
 >
->   struct scp {
-> @@ -370,6 +373,17 @@ out:
->   	return ret;
->   }
+>   			mt6397_vpca7_reg: buck_vpca7 {
+> -				regulator-compatible = "buck_vpca7";
+>   				regulator-name = "vpca7";
+>   				regulator-min-microvolt = < 850000>;
+>   				regulator-max-microvolt = <1350000>;
+> @@ -50,7 +48,6 @@
+>   			};
 >
-> +static bool scpsys_active_wakeup(struct device *dev)
-> +{
-> +	struct generic_pm_domain *genpd;
-> +	struct scp_domain *scpd;
-> +
-> +	genpd = pd_to_genpd(dev->pm_domain);
-> +	scpd = container_of(genpd, struct scp_domain, genpd);
-> +
-> +	return scpd->active_wakeup;
-> +}
-> +
->   static int __init scpsys_probe(struct platform_device *pdev)
->   {
->   	struct genpd_onecell_data *pd_data;
-> @@ -427,12 +441,14 @@ static int __init scpsys_probe(struct platform_device *pdev)
->   		scpd->sram_pdn_bits = data->sram_pdn_bits;
->   		scpd->sram_pdn_ack_bits = data->sram_pdn_ack_bits;
->   		scpd->bus_prot_mask = data->bus_prot_mask;
-> +		scpd->active_wakeup = data->active_wakeup;
->   		if (data->clk_id != MT8173_CLK_NONE)
->   			scpd->clk = clk[data->clk_id];
+>   			mt6397_vsramca15_reg: buck_vsramca15 {
+> -				regulator-compatible = "buck_vsramca15";
+>   				regulator-name = "vsramca15";
+>   				regulator-min-microvolt = < 850000>;
+>   				regulator-max-microvolt = <1350000>;
+> @@ -59,7 +56,6 @@
+>   			};
 >
->   		genpd->name = data->name;
->   		genpd->power_off = scpsys_power_off;
->   		genpd->power_on = scpsys_power_on;
-> +		genpd->dev_ops.active_wakeup = scpsys_active_wakeup;
+>   			mt6397_vsramca7_reg: buck_vsramca7 {
+> -				regulator-compatible = "buck_vsramca7";
+>   				regulator-name = "vsramca7";
+>   				regulator-min-microvolt = < 850000>;
+>   				regulator-max-microvolt = <1350000>;
+> @@ -68,7 +64,6 @@
+>   			};
 >
->   		/*
->   		 * Initially turn on all domains to make the domains usable
+>   			mt6397_vcore_reg: buck_vcore {
+> -				regulator-compatible = "buck_vcore";
+>   				regulator-name = "vcore";
+>   				regulator-min-microvolt = < 850000>;
+>   				regulator-max-microvolt = <1350000>;
+> @@ -77,7 +72,6 @@
+>   			};
+>
+>   			mt6397_vgpu_reg: buck_vgpu {
+> -				regulator-compatible = "buck_vgpu";
+>   				regulator-name = "vgpu";
+>   				regulator-min-microvolt = < 700000>;
+>   				regulator-max-microvolt = <1350000>;
+> @@ -86,7 +80,6 @@
+>   			};
+>
+>   			mt6397_vdrm_reg: buck_vdrm {
+> -				regulator-compatible = "buck_vdrm";
+>   				regulator-name = "vdrm";
+>   				regulator-min-microvolt = <1200000>;
+>   				regulator-max-microvolt = <1400000>;
+> @@ -95,7 +88,6 @@
+>   			};
+>
+>   			mt6397_vio18_reg: buck_vio18 {
+> -				regulator-compatible = "buck_vio18";
+>   				regulator-name = "vio18";
+>   				regulator-min-microvolt = <1620000>;
+>   				regulator-max-microvolt = <1980000>;
+> @@ -104,19 +96,16 @@
+>   			};
+>
+>   			mt6397_vtcxo_reg: ldo_vtcxo {
+> -				regulator-compatible = "ldo_vtcxo";
+>   				regulator-name = "vtcxo";
+>   				regulator-always-on;
+>   			};
+>
+>   			mt6397_va28_reg: ldo_va28 {
+> -				regulator-compatible = "ldo_va28";
+>   				regulator-name = "va28";
+>   				regulator-always-on;
+>   			};
+>
+>   			mt6397_vcama_reg: ldo_vcama {
+> -				regulator-compatible = "ldo_vcama";
+>   				regulator-name = "vcama";
+>   				regulator-min-microvolt = <1500000>;
+>   				regulator-max-microvolt = <2800000>;
+> @@ -124,18 +113,15 @@
+>   			};
+>
+>   			mt6397_vio28_reg: ldo_vio28 {
+> -				regulator-compatible = "ldo_vio28";
+>   				regulator-name = "vio28";
+>   				regulator-always-on;
+>   			};
+>
+>   			mt6397_vusb_reg: ldo_vusb {
+> -				regulator-compatible = "ldo_vusb";
+>   				regulator-name = "vusb";
+>   			};
+>
+>   			mt6397_vmc_reg: ldo_vmc {
+> -				regulator-compatible = "ldo_vmc";
+>   				regulator-name = "vmc";
+>   				regulator-min-microvolt = <1800000>;
+>   				regulator-max-microvolt = <3300000>;
+> @@ -143,7 +129,6 @@
+>   			};
+>
+>   			mt6397_vmch_reg: ldo_vmch {
+> -				regulator-compatible = "ldo_vmch";
+>   				regulator-name = "vmch";
+>   				regulator-min-microvolt = <3000000>;
+>   				regulator-max-microvolt = <3300000>;
+> @@ -151,7 +136,6 @@
+>   			};
+>
+>   			mt6397_vemc_3v3_reg: ldo_vemc3v3 {
+> -				regulator-compatible = "ldo_vemc3v3";
+>   				regulator-name = "vemc_3v3";
+>   				regulator-min-microvolt = <3000000>;
+>   				regulator-max-microvolt = <3300000>;
+> @@ -159,7 +143,6 @@
+>   			};
+>
+>   			mt6397_vgp1_reg: ldo_vgp1 {
+> -				regulator-compatible = "ldo_vgp1";
+>   				regulator-name = "vcamd";
+>   				regulator-min-microvolt = <1220000>;
+>   				regulator-max-microvolt = <3300000>;
+> @@ -167,7 +150,6 @@
+>   			};
+>
+>   			mt6397_vgp2_reg: ldo_vgp2 {
+> -				regulator-compatible = "ldo_vgp2";
+>   				regulator-name = "vcamio";
+>   				regulator-min-microvolt = <1000000>;
+>   				regulator-max-microvolt = <3300000>;
+> @@ -175,7 +157,6 @@
+>   			};
+>
+>   			mt6397_vgp3_reg: ldo_vgp3 {
+> -				regulator-compatible = "ldo_vgp3";
+>   				regulator-name = "vcamaf";
+>   				regulator-min-microvolt = <1200000>;
+>   				regulator-max-microvolt = <3300000>;
+> @@ -183,7 +164,6 @@
+>   			};
+>
+>   			mt6397_vgp4_reg: ldo_vgp4 {
+> -				regulator-compatible = "ldo_vgp4";
+>   				regulator-name = "vgp4";
+>   				regulator-min-microvolt = <1200000>;
+>   				regulator-max-microvolt = <3300000>;
+> @@ -191,7 +171,6 @@
+>   			};
+>
+>   			mt6397_vgp5_reg: ldo_vgp5 {
+> -				regulator-compatible = "ldo_vgp5";
+>   				regulator-name = "vgp5";
+>   				regulator-min-microvolt = <1200000>;
+>   				regulator-max-microvolt = <3000000>;
+> @@ -199,7 +178,6 @@
+>   			};
+>
+>   			mt6397_vgp6_reg: ldo_vgp6 {
+> -				regulator-compatible = "ldo_vgp6";
+>   				regulator-name = "vgp6";
+>   				regulator-min-microvolt = <1200000>;
+>   				regulator-max-microvolt = <3300000>;
+> @@ -207,7 +185,6 @@
+>   			};
+>
+>   			mt6397_vibr_reg: ldo_vibr {
+> -				regulator-compatible = "ldo_vibr";
+>   				regulator-name = "vibr";
+>   				regulator-min-microvolt = <1300000>;
+>   				regulator-max-microvolt = <3300000>;
 >
