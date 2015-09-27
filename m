@@ -1,37 +1,24 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sun, 27 Sep 2015 12:42:24 -0700
-Subject: [PATCH v2 0/5] drivers/tty: make more bool drivers explicitly
- non-modular
-In-Reply-To: <20150926225347.GC1279@windriver.com>
-References: <1440020889-12120-1-git-send-email-paul.gortmaker@windriver.com>
- <20150926225347.GC1279@windriver.com>
-Message-ID: <20150927194224.GA1055@kroah.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Sun, 27 Sep 2015 23:45:48 +0100
+Subject: [STLinux Kernel] [PATCH 0/3] ARM: dts: Various STi DT clean-ups
+In-Reply-To: <1443037049-6167-1-git-send-email-maxime.coquelin@st.com>
+References: <1443037049-6167-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <20150927224548.GA18435@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 26, 2015 at 06:53:47PM -0400, Paul Gortmaker wrote:
-> [[PATCH v2 0/5] drivers/tty: make more bool drivers explicitly non-modular] On 19/08/2015 (Wed 17:48) Paul Gortmaker wrote:
-> 
-> > [v2: drop dead module code removal from 8250_lpc18xx.c ; instead convert it
-> >  from bool to tristate ; also add ack to hvc_console commit.]
-> > 
-> > This second set of patches to drivers/tty steps outside of the serial
-> > dir, and an improved auditing finds two more serial drivers pretending
-> > to be modular that really are not.
-> 
-> Hi Greg -- wondering if this is still in your to-do queue.  I see the
-> patches to drivers/char that I sent about the same time made it onto
-> your char-testing branch but not these onto tty-testing.
+Hi Maxime,
 
-Yes, they are in my queue, haven't caught up with tty patches yet :(
+On Wed, 23 Sep 2015, Maxime Coquelin wrote:
 
-> The reason I ask is that I've about a 1/2 dozen more similar patches
-> that showed up once I started auditing non-x86 code.  I don't want to
-> re-spam you with these along with the new ones, if these are still in
-> your backlog for processing.
+> This series cleans the STi407 family DTs, by factorizing common nodes between
+> STiH407 and STiH410, and also by only enabling PWM and USB nodes at board
+> level, as they could not be exposed on some boards.
 
-I can handle resends and other patches just fine, send away!
+For the series: -
 
-thanks,
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
 
-greg k-h
+regards,
+
+Peter.
