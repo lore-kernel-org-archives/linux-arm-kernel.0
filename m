@@ -1,254 +1,132 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Sun, 27 Sep 2015 08:16:42 +0200
-Subject: [PATCH v4] ARM: sun7i: dt: Add new Olimex A20 EVB device
-Message-ID: <1443334602-1236-1-git-send-email-codekipper@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 27 Sep 2015 07:02:26 +0000 (UTC)
+Subject: [PATCH 01/11 RESEND] ARM: OMAP: DRA7: hwmod: Add data for McASP3
+In-Reply-To: <1442326206-30192-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1442326206-30192-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <alpine.DEB.2.02.1509270631440.7947@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+Hi P?ter,
 
-The A20-SOM-EVB is a reference design of a 2-layer board for the
-A20-SOM.
-It expands the features of A20-SOM by adding VGA connector, HDMI
-connector, audio In/Out, LCD connector, 2 Mpix camera, gigabit
-Ethernet, SATA, USB-OTG and 2 USB hosts.
+a few comments:
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
-Changes since v3:
-- removed i2c1 as it's not used
-- removed axp_ipsout regulator
-Changes since v2:
-- changed dcdc2 to have max voltage of 1.4V
-Changes since v1:
-- renamed dts from sun7i-a20-olinuxino-evb to sun7i-a20-olimex-som-evb
-- added "axp209 dtsi"
-- change regulator settings
----
- arch/arm/boot/dts/Makefile                     |   1 +
- arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 202 +++++++++++++++++++++++++
- 2 files changed, 203 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+On Tue, 15 Sep 2015, Peter Ujfalusi wrote:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 1c5f225..0e87a54 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -618,6 +618,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-i12-tvbox.dtb \
- 	sun7i-a20-m3.dtb \
- 	sun7i-a20-mk808c.dtb \
-+	sun7i-a20-olimex-som-evb.dtb \
- 	sun7i-a20-olinuxino-lime.dtb \
- 	sun7i-a20-olinuxino-lime2.dtb \
- 	sun7i-a20-olinuxino-micro.dtb \
-diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-new file mode 100644
-index 0000000..3317c22
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-@@ -0,0 +1,202 @@
-+/*
-+ * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun7i-a20.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Olimex A20-Olimex-SOM-EVB";
-+	compatible = "olimex,a20-olimex-som-evb", "allwinner,sun7i-a20";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_olimex_som_evb>;
-+
-+		green {
-+			label = "a20-olimex-som-evb:green:usr";
-+			gpios = <&pio 7 2 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+	};
-+};
-+
-+&ahci {
-+	target-supply = <&reg_ahci_5v>;
-+	status = "okay";
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_rgmii_a>;
-+	phy = <&phy1>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	ahci_pwr_pin_olimex_som_evb: ahci_pwr_pin at 1 {
-+		allwinner,pins = "PC3";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	led_pins_olimex_som_evb: led_pins at 0 {
-+		allwinner,pins = "PH2";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&reg_ahci_5v {
-+	pinctrl-0 = <&ahci_pwr_pin_olimex_som_evb>;
-+	gpio = <&pio 2 3 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+#include "axp209.dtsi"
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_usb0_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb1_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
--- 
-2.5.3
+> McASP3 is used by default on DRA7x based boards for audio.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+> Hi Paul,
+> 
+> this patch is part of my earlier series and as Tony suggested I'll resend the
+> hwmod patch for you to review since I missed you from the TO in the series.
+> 
+> The original series:
+> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg119319.html
+> 
+> Regards,
+> Peter
+> 
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 41 +++++++++++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index 562247bced49..c38b7fa30c27 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -1298,6 +1298,38 @@ static struct omap_hwmod dra7xx_mcspi4_hwmod = {
+>  };
+>  
+>  /*
+> + * 'mcasp' class
+> + *
+> + */
+> +static struct omap_hwmod_class_sysconfig dra7xx_mcasp_sysc = {
+> +	.sysc_offs	= 0x0004,
+> +	.sysc_flags	= SYSC_HAS_SIDLEMODE,
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+> +	.sysc_fields	= &omap_hwmod_sysc_type3,
+> +};
+> +
+> +static struct omap_hwmod_class dra7xx_mcasp_hwmod_class = {
+> +	.name	= "mcasp",
+> +	.sysc	= &dra7xx_mcasp_sysc,
+> +};
+> +
+> +/* mcasp3 */
+> +static struct omap_hwmod dra7xx_mcasp3_hwmod = {
+> +	.name		= "mcasp3",
+> +	.class		= &dra7xx_mcasp_hwmod_class,
+> +	.clkdm_name	= "l4per2_clkdm",
+> +	.main_clk	= "mcasp3_ahclkx_mux",
+
+I'd expect this clock to be something derived from mcasp3_aux_gfclk, 
+according to Table 24-408 "Clocks and Resets" of SPRUHZ6.  Could you 
+please doublecheck this?
+
+> +	.flags		= HWMOD_SWSUP_SIDLE,
+
+Is this needed?  If it is, please add a brief comment describing the issue 
+or bug that it's working around.
+
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = DRA7XX_CM_L4PER2_MCASP3_CLKCTRL_OFFSET,
+> +			.context_offs = DRA7XX_RM_L4PER2_MCASP3_CONTEXT_OFFSET,
+> +			.modulemode   = MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +};
+> +
+> +/*
+>   * 'mmc' class
+>   *
+>   */
+> @@ -2566,6 +2598,14 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__hdmi = {
+>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +/* l4_per2 -> mcasp3 */
+> +static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp3 = {
+> +	.master		= &dra7xx_l4_per2_hwmod,
+> +	.slave		= &dra7xx_mcasp3_hwmod,
+
+So this is the low-speed control/register access port, where the MPU 
+writes to the McASP3 config registers...
+
+> +	.clk		= "l3_iclk_div",
+
+... and thus this interface clock doesn't look right for this port, since 
+it's most likely generated from the L4PER2, where this port is connected.  
+So it should probably be "l4_iclk_div".
+ 
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+
+There's another struct omap_hwmod_ocp_if record missing: the high-speed 
+bus-master port that the McASP3 uses to DMA audio data.  This port should 
+most likely be clocked with "l3_iclk_div" per Table 24-408 "Clocks and 
+Resets".  This port is also where the registers described in Table 24-555 
+"MCASP_DAT Register Summary 3" L3_MAIN column are exposed.  You've got 
+that address map range blocked out in your DT data reg property, and 
+associated with this device, right? 0x46000000?
+
+> +
+>  static struct omap_hwmod_addr_space dra7xx_elm_addrs[] = {
+>  	{
+>  		.pa_start	= 0x48078000,
+> @@ -3338,6 +3378,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>  	&dra7xx_l4_wkup__dcan1,
+>  	&dra7xx_l4_per2__dcan2,
+>  	&dra7xx_l4_per2__cpgmac0,
+> +	&dra7xx_l4_per2__mcasp3,
+>  	&dra7xx_gmac__mdio,
+>  	&dra7xx_l4_cfg__dma_system,
+>  	&dra7xx_l3_main_1__dss,
+> -- 
+> 2.5.0
+> 
+
+
+- Paul
