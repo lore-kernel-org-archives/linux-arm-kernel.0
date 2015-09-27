@@ -1,52 +1,41 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 27 Sep 2015 16:09:25 +0200
+Date: Sun, 27 Sep 2015 16:10:48 +0200
 Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
  'global_lock'
-In-Reply-To: <1443297128.2181.11.camel@HansenPartnership.com>
+In-Reply-To: <1540878.9slRi6Q7xb@wuerfel>
 References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- <2524822.pQu4UKMrlb@vostro.rjw.lan>
- <1443297128.2181.11.camel@HansenPartnership.com>
-Message-ID: <3461169.v5xKdGLGjP@vostro.rjw.lan>
+ <CAKohpok0A3JRhVCabscfJGuhJerWmypsQnwdqJcmvBBWdpvPwQ@mail.gmail.com>
+ <1540878.9slRi6Q7xb@wuerfel>
+Message-ID: <1578470.DLzaBp4j3T@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, September 26, 2015 12:52:08 PM James Bottomley wrote:
-> On Fri, 2015-09-25 at 22:58 +0200, Rafael J. Wysocki wrote:
-> > On Friday, September 25, 2015 01:25:49 PM Viresh Kumar wrote:
-> > > On 25 September 2015 at 13:33, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > > > You're going to change that into bool in the next patch, right?
-> > > 
-> > > Yeah.
-> > > 
-> > > > So what if bool is a byte and the field is not word-aligned
-> > > 
-> > > Its between two 'unsigned long' variables today, and the struct isn't packed.
-> > > So, it will be aligned, isn't it?
-> > > 
-> > > > and changing
-> > > > that byte requires a read-modify-write.  How do we ensure that things remain
-> > > > consistent in that case?
-> > > 
-> > > I didn't understood why a read-modify-write is special here? That's
-> > > what will happen
-> > > to most of the non-word-sized fields anyway?
-> > > 
-> > > Probably I didn't understood what you meant..
+On Saturday, September 26, 2015 09:33:56 PM Arnd Bergmann wrote:
+> On Saturday 26 September 2015 11:40:00 Viresh Kumar wrote:
+> > On 25 September 2015 at 15:19, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> > > So if you allow something like debugfs to update your structure, how
+> > > do you make sure there is the proper locking?
 > > 
-> > Say you have three adjacent fields in a structure, x, y, z, each one byte long.
-> > Initially, all of them are equal to 0.
-> > 
-> > CPU A writes 1 to x and CPU B writes 2 to y at the same time.
-> > 
-> > What's the result?
+> > Not really sure at all.. Isn't there some debugfs locking that will
+> > jump in, to avoid updation of fields to the same device?
 > 
-> I think every CPU's  cache architecure guarantees adjacent store
-> integrity, even in the face of SMP, so it's x==1 and y==2.  If you're
-> thinking of old alpha SMP system where the lowest store width is 32 bits
-> and thus you have to do RMW to update a byte, this was usually fixed by
-> padding (assuming the structure is not packed).  However, it was such a
-> problem that even the later alpha chips had byte extensions.
+> No, if you need any locking to access variable, you cannot use the
+> simple debugfs helpers but have to provide your own functions.
+> 
+> > >> Anyway, that problem isn't here for sure as its between two
+> > >> unsigned-longs. So, should I just move it to bool and resend ?
+> > >
+> > > I guess it might be more convenient to fold this into the other patch,
+> > > because we seem to be splitting hairs here.
+> > 
+> > I can and that's what I did. But then Arnd asked me to separate it
+> > out. I can fold it back if that's what you want.
+> 
+> It still makes sense to keep it separate I think, the patch is clearly
+> different from the other parts.
 
-OK, thanks!
+I just don't see much point in going from unsigned long to u32 and then
+from 32 to bool if we can go directly to bool in one go.
 
+Thanks,
 Rafael
