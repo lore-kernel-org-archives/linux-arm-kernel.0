@@ -1,162 +1,254 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 26 Sep 2015 22:50:25 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 4.3-rc
-Message-ID: <20150927055025.GA5534@localhost>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Sun, 27 Sep 2015 08:16:42 +0200
+Subject: [PATCH v4] ARM: sun7i: dt: Add new Olimex A20 EVB device
+Message-ID: <1443334602-1236-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+From: Marcus Cooper <codekipper@gmail.com>
 
-Our first batch of fixes this merge window. Nothing really concerning,
-and diffstat is a bit inflated due to some DT contents moving around on
-STi platforms.
+The A20-SOM-EVB is a reference design of a 2-layer board for the
+A20-SOM.
+It expands the features of A20-SOM by adding VGA connector, HDMI
+connector, audio In/Out, LCD connector, 2 Mpix camera, gigabit
+Ethernet, SATA, USB-OTG and 2 USB hosts.
 
-Please merge!
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+Changes since v3:
+- removed i2c1 as it's not used
+- removed axp_ipsout regulator
+Changes since v2:
+- changed dcdc2 to have max voltage of 1.4V
+Changes since v1:
+- renamed dts from sun7i-a20-olinuxino-evb to sun7i-a20-olimex-som-evb
+- added "axp209 dtsi"
+- change regulator settings
+---
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 202 +++++++++++++++++++++++++
+ 2 files changed, 203 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
 
-
-Thanks,
-
--Olof
-
-
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
-
-for you to fetch changes up to e46fc90ec2612ef7578c6e3e28ad477a116e24da:
-
-  Merge tag 'pxa-fixes-v4.3' of https://github.com/rjarzmik/linux into fixes (2015-09-26 22:23:26 -0700)
-
-----------------------------------------------------------------
-ARM: SoC fixes for v4.3-rc
-
-Our first real batch of fixes this release cycle. There's a collection of
-them here:
-
-- A fixup for a build breakage that hits on arm64 allmodconfig in QCOM SCM
-  firmware drivers
-- MMC fixes for OMAP that had quite a bit of breakage this merge window.
-- Misc build/warning fixes on PXA and OMAP
-- A couple of minor fixes for Beagleboard X15 which is now starting to see
-  a few more users in the wild
-
-----------------------------------------------------------------
-Andy Gross (1):
-      firmware: qcom: scm: Add function stubs for ARM64
-
-Axel Lin (1):
-      ARM: pxa: balloon3: Fix build error
-
-Benjamin Gaignard (1):
-      ARM: sti: dt: adapt DT to fix probe/bind issues in DRM driver
-
-Carl Frederik Werner (1):
-      ARM: dts: omap3-beagle: make i2c3, ddc and tfp410 gpio work again
-
-Dave Gerlach (1):
-      ARM: OMAP2+: AM43XX: Enable autoidle for clks in am43xx_init_late
-
-Douglas Anderson (1):
-      ARM: dts: Add ddc i2c reference to veyron
-
-Frans Klaver (1):
-      ARM: OMAP3: vc: fix 'or' always true warning
-
-Grazvydas Ignotas (2):
-      ARM: dts: omap5-uevm.dts: fix i2c5 pinctrl offsets
-      ARM: omap2plus_defconfig: enable GPIO_PCA953X
-
-Grygorii Strashko (1):
-      ARM: OMAP2+: omap-device: fix race deferred probe of omap_hsmmc vs omap_device_late_init
-
-Jarkko Nikula (1):
-      ARM: pxa: ssp: Fix build error by removing originally incorrect DT binding
-
-Javier Martinez Canillas (1):
-      ARM: dts: omap3-igep: Move eth IRQ pinmux to IGEPv2 common dtsi
-
-Kevin Hilman (1):
-      Merge tag 'omap-for-v4.3/fixes-rc1' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-
-Kishon Vijay Abraham I (4):
-      ARM: dts: am57xx-beagle-x15: Fix regulator populated in MMC1 dt node
-      ARM: dts: Use ti,pbias compatible string for pbias
-      ARM: omap2plus_defconfig: make PCF857x built-in
-      ARM: dts: fix omap2+ address translation for pbias
-
-Nicolas Chauvet (1):
-      ARM: dts: Fixup model name for HP t410 dts
-
-Nishanth Menon (6):
-      ARM: dts: am57xx-beagle-x15: Add wakeup irq for mcp79410
-      ARM: OMAP4+: PM: erratum is used by OMAP5 and DRA7 as well
-      ARM: OMAP2+: board-generic: Remove stale of_irq macros
-      ARM: DRA7: Select missing options for SoC only build
-      ARM: OMAP5: Cleanup options for SoC only build
-      ARM: dts: am57xx-beagle-x15: Update Phy supplies
-
-Olof Johansson (4):
-      Merge tag 'qcom-fixes-for-4.3-rc1' of git://codeaurora.org/quic/kernel/agross-msm into fixes
-      Merge tag 'v4.3-rockchip32-dtsfixes1' of git://git.kernel.org/.../mmind/linux-rockchip into fixes
-      Merge tag 'omap-for-v4.3/fixes-rc2' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'pxa-fixes-v4.3' of https://github.com/rjarzmik/linux into fixes
-
-Robert Jarzmik (1):
-      ARM: pxa: fix DFI bus lockups on startup
-
-Roger Quadros (1):
-      ARM: dts: am57xx-beagle-x15: use palmas-usb for USB2
-
-Teresa Remmet (1):
-      ARM: dts: am335x-phycore-som: Fix mpu voltage
-
-Tony Lindgren (5):
-      ARM: OMAP2+: Fix booting if no timer parent clock is available
-      ARM: omap2plus_defconfig: Enable MUSB DMA support
-      ARM: dts: Fix dm814x control base to properly initialize Ethernet PHY
-      Merge branch 'fixes-rc1' into omap-for-v4.3/fixes
-      Merge commit 'b8c93646fd5c' into omap-for-v4.3/fixes
-
-Vishal Mahaveer (2):
-      ARM: DRA752: Add ID detect for ES2.0
-      ARM: dts: DRA7: fix a typo in ethernet
-
- arch/arm/boot/dts/am335x-phycore-som.dtsi    |  4 +-
- arch/arm/boot/dts/am57xx-beagle-x15.dts      | 46 ++++++++++------
- arch/arm/boot/dts/dm8148-evm.dts             |  4 +-
- arch/arm/boot/dts/dm8148-t410.dts            |  6 +-
- arch/arm/boot/dts/dm814x.dtsi                |  8 +--
- arch/arm/boot/dts/dra7.dtsi                  |  5 +-
- arch/arm/boot/dts/omap2430.dtsi              |  3 +-
- arch/arm/boot/dts/omap3-beagle.dts           |  2 +-
- arch/arm/boot/dts/omap3-igep.dtsi            |  6 --
- arch/arm/boot/dts/omap3-igep0020-common.dtsi |  6 ++
- arch/arm/boot/dts/omap3.dtsi                 | 25 +++++----
- arch/arm/boot/dts/omap4.dtsi                 |  3 +-
- arch/arm/boot/dts/omap5-uevm.dts             |  4 +-
- arch/arm/boot/dts/omap5.dtsi                 |  3 +-
- arch/arm/boot/dts/rk3288-veyron.dtsi         |  1 +
- arch/arm/boot/dts/stih407.dtsi               | 82 ++++++++++++++--------------
- arch/arm/boot/dts/stih410.dtsi               | 82 ++++++++++++++--------------
- arch/arm/configs/omap2plus_defconfig         |  5 +-
- arch/arm/mach-omap2/Kconfig                  |  6 +-
- arch/arm/mach-omap2/board-generic.c          |  7 ---
- arch/arm/mach-omap2/id.c                     |  8 ++-
- arch/arm/mach-omap2/io.c                     |  1 +
- arch/arm/mach-omap2/omap_device.c            |  3 +-
- arch/arm/mach-omap2/pm.h                     |  3 +-
- arch/arm/mach-omap2/soc.h                    |  2 +
- arch/arm/mach-omap2/timer.c                  |  8 +--
- arch/arm/mach-omap2/vc.c                     |  2 +-
- arch/arm/mach-pxa/balloon3.c                 |  2 +-
- arch/arm/mach-pxa/include/mach/addr-map.h    |  7 +++
- arch/arm/mach-pxa/pxa3xx.c                   | 21 ++++++-
- arch/arm/plat-pxa/ssp.c                      |  1 -
- drivers/firmware/Kconfig                     |  8 +++
- drivers/firmware/Makefile                    |  3 +-
- drivers/firmware/qcom_scm-64.c               | 63 +++++++++++++++++++++
- 34 files changed, 278 insertions(+), 162 deletions(-)
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 1c5f225..0e87a54 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -618,6 +618,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-i12-tvbox.dtb \
+ 	sun7i-a20-m3.dtb \
+ 	sun7i-a20-mk808c.dtb \
++	sun7i-a20-olimex-som-evb.dtb \
+ 	sun7i-a20-olinuxino-lime.dtb \
+ 	sun7i-a20-olinuxino-lime2.dtb \
+ 	sun7i-a20-olinuxino-micro.dtb \
+diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+new file mode 100644
+index 0000000..3317c22
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+@@ -0,0 +1,202 @@
++/*
++ * Copyright 2015 - Marcus Cooper <codekipper@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun7i-a20.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "Olimex A20-Olimex-SOM-EVB";
++	compatible = "olimex,a20-olimex-som-evb", "allwinner,sun7i-a20";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_olimex_som_evb>;
++
++		green {
++			label = "a20-olimex-som-evb:green:usr";
++			gpios = <&pio 7 2 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++	};
++};
++
++&ahci {
++	target-supply = <&reg_ahci_5v>;
++	status = "okay";
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&gmac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gmac_pins_rgmii_a>;
++	phy = <&phy1>;
++	phy-mode = "rgmii";
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp209: pmic at 34 {
++		reg = <0x34>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&pio {
++	ahci_pwr_pin_olimex_som_evb: ahci_pwr_pin at 1 {
++		allwinner,pins = "PC3";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	led_pins_olimex_som_evb: led_pins at 0 {
++		allwinner,pins = "PH2";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&reg_ahci_5v {
++	pinctrl-0 = <&ahci_pwr_pin_olimex_som_evb>;
++	gpio = <&pio 2 3 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
++#include "axp209.dtsi"
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
++&reg_usb0_vbus {
++	status = "okay";
++};
++
++&reg_usb1_vbus {
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
+-- 
+2.5.3
