@@ -1,95 +1,97 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 27 Sep 2015 15:05:42 +0200
-Subject: [PATCH v7] arm64: dts: Add spi bus dts
-In-Reply-To: <CANMq1KBhg4j15=ik7F2MwgmyAQZgSz3QYWLivOhd8ZFuDfjHGA@mail.gmail.com>
-References: <1441028659-19068-1-git-send-email-leilk.liu@mediatek.com>
- <CANMq1KBhg4j15=ik7F2MwgmyAQZgSz3QYWLivOhd8ZFuDfjHGA@mail.gmail.com>
-Message-ID: <5607E9A6.2080502@gmail.com>
+Date: Sun, 27 Sep 2015 15:19:00 +0200
+Subject: [PATCH v3] soc: mediatek: add scpsys support active_wakeup
+In-Reply-To: <1440573281-28952-1-git-send-email-eddie.huang@mediatek.com>
+References: <1440573281-28952-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <5607ECC4.3030902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 08/09/15 10:59, Nicolas Boichat wrote:
-> On Mon, Aug 31, 2015 at 9:44 PM, Leilk Liu <leilk.liu@mediatek.com> wrote:
->> This patch adds MT8173 spi bus controllers into device tree.
+On 26/08/15 09:14, Eddie Huang wrote:
+> Register gpd_dev_ops.active_wakeup function to support keep power
+> during suspend state. And add flag to each power domain to
+> decide whether keep power during suspend or not.
 >
-> The corresponding SPI driver has already been merged in
-> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git .
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 >
->> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
->
-> Reviewed-and-Tested-by: Nicolas Boichat <drinkcat@chromium.org>
 
 Applied, thanks.
 
+> ---
+> Change in v3:
+> Remove check dev->power_domain NULL or ERR. This will not happen
+> when call scpsys_active_wakeup function
 >
->> ---
->> Change in this patch:
->> 1. fix spi clock flow usage error.
->> ---
->>   arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++++++++++++++
->>   arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 13 +++++++++++++
->>   2 files changed, 31 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->> index 4be66ca..811cb76 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->> @@ -387,6 +387,24 @@
->>          };
->>   };
->>
->> +&pio {
->> +       spi_pins_a: spi0 {
->> +               pins_spi {
->> +                       pinmux = <MT8173_PIN_69_SPI_CK__FUNC_SPI_CK_0_>,
->> +                               <MT8173_PIN_70_SPI_MI__FUNC_SPI_MI_0_>,
->> +                               <MT8173_PIN_71_SPI_MO__FUNC_SPI_MO_0_>,
->> +                               <MT8173_PIN_72_SPI_CS__FUNC_SPI_CS_0_>;
->> +               };
->> +       };
->> +};
->> +
->> +&spi {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&spi_pins_a>;
->> +       mediatek,pad-select = <0>;
->> +       status = "okay";
->> +};
->> +
->>   &uart0 {
->>          status = "okay";
->>   };
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> index d18ee42..fcb4860 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> @@ -365,6 +365,19 @@
->>                          status = "disabled";
->>                  };
->>
->> +               spi: spi at 1100a000 {
->> +                       compatible = "mediatek,mt8173-spi";
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +                       reg = <0 0x1100a000 0 0x1000>;
->> +                       interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&topckgen CLK_TOP_SYSPLL3_D2>,
->> +                                <&topckgen CLK_TOP_SPI_SEL>,
->> +                                <&pericfg CLK_PERI_SPI0>;
->> +                       clock-names = "parent-clk", "sel-clk", "spi-clk";
->> +                       status = "disabled";
->> +               };
->> +
->>                  i2c3: i2c3 at 11010000 {
->>                          compatible = "mediatek,mt8173-i2c";
->>                          reg = <0 0x11010000 0 0x70>,
->> --
->> 1.8.1.1.dirty
->>
->>
->> _______________________________________________
->> Linux-mediatek mailing list
->> Linux-mediatek at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> Change in v2:
+> Drop .active_wakeup = false lines in scp_domain_data[] array
+> ---
+>   drivers/soc/mediatek/mtk-scpsys.c | 16 ++++++++++++++++
+>   1 file changed, 16 insertions(+)
+>
+> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> index 43a79ed..3a00975 100644
+> --- a/drivers/soc/mediatek/mtk-scpsys.c
+> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> @@ -67,6 +67,7 @@ struct scp_domain_data {
+>   	u32 sram_pdn_ack_bits;
+>   	u32 bus_prot_mask;
+>   	enum clk_id clk_id;
+> +	bool active_wakeup;
+>   };
+>
+>   static const struct scp_domain_data scp_domain_data[] __initconst = {
+> @@ -127,6 +128,7 @@ static const struct scp_domain_data scp_domain_data[] __initconst = {
+>   		.sram_pdn_bits = GENMASK(11, 8),
+>   		.sram_pdn_ack_bits = GENMASK(15, 12),
+>   		.clk_id = MT8173_CLK_NONE,
+> +		.active_wakeup = true,
+>   	},
+>   	[MT8173_POWER_DOMAIN_MFG_ASYNC] = {
+>   		.name = "mfg_async",
+> @@ -171,6 +173,7 @@ struct scp_domain {
+>   	u32 sram_pdn_bits;
+>   	u32 sram_pdn_ack_bits;
+>   	u32 bus_prot_mask;
+> +	bool active_wakeup;
+>   };
+>
+>   struct scp {
+> @@ -370,6 +373,17 @@ out:
+>   	return ret;
+>   }
+>
+> +static bool scpsys_active_wakeup(struct device *dev)
+> +{
+> +	struct generic_pm_domain *genpd;
+> +	struct scp_domain *scpd;
+> +
+> +	genpd = pd_to_genpd(dev->pm_domain);
+> +	scpd = container_of(genpd, struct scp_domain, genpd);
+> +
+> +	return scpd->active_wakeup;
+> +}
+> +
+>   static int __init scpsys_probe(struct platform_device *pdev)
+>   {
+>   	struct genpd_onecell_data *pd_data;
+> @@ -427,12 +441,14 @@ static int __init scpsys_probe(struct platform_device *pdev)
+>   		scpd->sram_pdn_bits = data->sram_pdn_bits;
+>   		scpd->sram_pdn_ack_bits = data->sram_pdn_ack_bits;
+>   		scpd->bus_prot_mask = data->bus_prot_mask;
+> +		scpd->active_wakeup = data->active_wakeup;
+>   		if (data->clk_id != MT8173_CLK_NONE)
+>   			scpd->clk = clk[data->clk_id];
+>
+>   		genpd->name = data->name;
+>   		genpd->power_off = scpsys_power_off;
+>   		genpd->power_on = scpsys_power_on;
+> +		genpd->dev_ops.active_wakeup = scpsys_active_wakeup;
+>
+>   		/*
+>   		 * Initially turn on all domains to make the domains usable
+>
