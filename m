@@ -1,65 +1,66 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 27 Sep 2015 15:00:57 +0200
-Subject: [PATCH] arm64: mt8173.dtsi: correct i2c node names
-In-Reply-To: <CAGS+omCzycc+RFeDftooDcj_f9M4SXhoO79u8m9e=ZiL1QV1tA@mail.gmail.com>
-References: <1442367325-55819-1-git-send-email-yingjoe.chen@mediatek.com>
- <CAGS+omCzycc+RFeDftooDcj_f9M4SXhoO79u8m9e=ZiL1QV1tA@mail.gmail.com>
-Message-ID: <5607E889.2060501@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 27 Sep 2015 16:02:40 +0300
+Subject: [PATCH 2/4] of: irq: Add support for the new definition of
+ "msi-parent"
+In-Reply-To: <alpine.DEB.2.11.1509271226340.4500@nanos>
+References: <1442944336-11754-1-git-send-email-marc.zyngier@arm.com>
+ <1442944336-11754-3-git-send-email-marc.zyngier@arm.com>
+ <5602B994.9080409@cogentembedded.com>
+ <alpine.DEB.2.11.1509271226340.4500@nanos>
+Message-ID: <5607E8F0.6070106@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello.
 
+On 9/27/2015 1:29 PM, Thomas Gleixner wrote:
 
-On 16/09/15 15:34, Daniel Kurtz wrote:
-> On Wed, Sep 16, 2015 at 9:35 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
->> Node name in device tree should describe general class of the
->> device. Correct incorrect i2c node names.
+>>> -	d = irq_find_matching_host(msi_np, DOMAIN_BUS_PLATFORM_MSI);
+>>> -	if (!d)
+>>> -		d = irq_find_host(msi_np);
+>>> -	dev_set_msi_domain(dev, d);
+>>> +		d = irq_find_matching_host(args.np, DOMAIN_BUS_PLATFORM_MSI);
+>>> +		if (!d)
 >>
->> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+>> 		if (!d) {
+>>
+>>> +			d = irq_find_host(args.np);
+>>> +
+>>> +		if (d) {
+>>
+>> 		} else {
+>>
+>>> +			dev_set_msi_domain(dev, d);
+>>> +			return;
+>>> +		}
 >
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> Errm, no. How is that equivalent?
 >
+> Marc:
+>
+>        d = foo();
+>        if (!d)
+>        	 d = bar();
+>        if (d) {
+>           bla(d);
+> 	 return;
+>        }
+>
+> Yours:
+>
+>        d = foo();
+>        if (!d) {
+>        	 d = bar();
+>        } else {
+>           bla(d);
+> 	 return;
+>        }
+>
+> Hmm?
 
-Applied, thanks.
+    Ah, sorry, didn't notice the kind of assignment in the first branch. :-<
 
->> ---
->> This is based on v4.3-rc1.
->> All the other i2c node names are correct.
->> ---
->>   arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 +++---
->>   1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> index d18ee42..7f360b7 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> @@ -365,7 +365,7 @@
->>                          status = "disabled";
->>                  };
->>
->> -               i2c3: i2c3 at 11010000 {
->> +               i2c3: i2c at 11010000 {
->>                          compatible = "mediatek,mt8173-i2c";
->>                          reg = <0 0x11010000 0 0x70>,
->>                                <0 0x11000280 0 0x80>;
->> @@ -381,7 +381,7 @@
->>                          status = "disabled";
->>                  };
->>
->> -               i2c4: i2c4 at 11011000 {
->> +               i2c4: i2c at 11011000 {
->>                          compatible = "mediatek,mt8173-i2c";
->>                          reg = <0 0x11011000 0 0x70>,
->>                                <0 0x11000300 0 0x80>;
->> @@ -397,7 +397,7 @@
->>                          status = "disabled";
->>                  };
->>
->> -               i2c6: i2c6 at 11013000 {
->> +               i2c6: i2c at 11013000 {
->>                          compatible = "mediatek,mt8173-i2c";
->>                          reg = <0 0x11013000 0 0x70>,
->>                                <0 0x11000080 0 0x80>;
->> --
->> 1.9.1
->>
+> Thanks,
+> 	tglx
+
+MBR, Sergei
