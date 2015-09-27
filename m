@@ -1,41 +1,48 @@
-From: huangdaode@hisilicon.com (huangdaode)
-Date: Sun, 27 Sep 2015 15:19:09 +0800
-Subject: [PATCH net-next v3] net: Fix Hisilicon Network Subsystem Support
- Compilation
-In-Reply-To: <20150925.214256.1901015223799070196.davem@davemloft.net>
-References: <1443169790-54861-1-git-send-email-huangdaode@hisilicon.com>
- <20150925.214256.1901015223799070196.davem@davemloft.net>
-Message-ID: <5607986D.7050700@hisilicon.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 27 Sep 2015 16:49:15 +0900
+Subject: Debug UART for arm64 ?
+In-Reply-To: <20150926070216.GA14835@leoy-linaro>
+References: <CAK7LNAQcBeQfRFf25HYOnN60rnb4uU=d=Ogas+-b1TCRMAxMJA@mail.gmail.com>
+ <20150926070216.GA14835@leoy-linaro>
+Message-ID: <CAK7LNARJOt+H+QkbCRtJg859u9JCRecWwmt5_yGS+UmqGiGhjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/9/26 12:42, David Miller wrote:
-> From: huangdaode <huangdaode@hisilicon.com>
-> Date: Fri, 25 Sep 2015 16:29:50 +0800
->
->> @@ -191,9 +191,12 @@ static void hns_rcb_ring_init(struct ring_pair_cb *ring_pair, int ring_type)
->>   	if (ring_type == RX_RING) {
->>   		dsaf_write_dev(q, RCB_RING_RX_RING_BASEADDR_L_REG,
->>   			       (u32)dma);
->> +#ifdef CONFIG_64BIT
->>   		dsaf_write_dev(q, RCB_RING_RX_RING_BASEADDR_H_REG,
->>   			       (u32)(dma >> 32));
->> -
->> +#else
->> +		dsaf_write_dev(q, RCB_RING_RX_RING_BASEADDR_H_REG, 0);
->> +#endif
->>   		dsaf_write_dev(q, RCB_RING_RX_RING_BD_LEN_REG,
->>   			       bd_size_type);
->>   		dsaf_write_dev(q, RCB_RING_RX_RING_BD_NUM_REG,
-> CONFIG_64BIT doesn't tell you if _DMA_ addresses are 64-bit or not.
->
-> Furthermore there is a portable way to shift a 32-bit value down
-> 32-bits whilst avoiding warnings.
->
-> 	(x >> 31) >> 1
->
-> So you should definitely use that instead of the CONFIG_64BIT test.
->
-> .
+Hi Leo,
 
-agreed.
+
+2015-09-26 16:02 GMT+09:00 Leo Yan <leo.yan@linaro.org>:
+> Hi,
+>
+> On Sat, Sep 26, 2015 at 03:24:35PM +0900, Masahiro Yamada wrote:
+>> Forgive me if I am asking a silly question.
+>>
+>>
+>> I will have to port ARM64 Linux on our new SoC.
+>> This is my first work on ARM64 Linux,
+>> so I have no experience with it yet.
+>>
+>> When I worked on ARM32 Linux porting for the first time,
+>> lowlevel-debug UART (CONFIG_DEBUG_LL) was very useful for me.
+>>
+>> With my quick search under arch/arm64/ directory,
+>> I could not find an equivalent one for ARM64.
+>>
+>>
+>> Is debug UART available for ARM64?
+>> Or, is there any other recommended easy-to-use debug facility
+>> when something like a JTAG-debugger is unavailable.
+>
+> drivers/tty/serial/earlycon.c is like what you are looking for.
+
+
+I will try this.
+
+Thanks!
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
