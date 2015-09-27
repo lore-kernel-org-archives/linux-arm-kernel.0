@@ -1,69 +1,65 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 27 Sep 2015 13:56:52 +0200
-Subject: [PATCH v2] soc: mediatek: Move the initial setting of pmic wrap
- interrupt before requesting irq.
-In-Reply-To: <20150923134506.GA7825@pengutronix.de>
-References: <1441976720-43568-1-git-send-email-henryc.chen@mediatek.com>
- <20150923134506.GA7825@pengutronix.de>
-Message-ID: <5607D984.50203@gmail.com>
+Date: Sun, 27 Sep 2015 15:00:57 +0200
+Subject: [PATCH] arm64: mt8173.dtsi: correct i2c node names
+In-Reply-To: <CAGS+omCzycc+RFeDftooDcj_f9M4SXhoO79u8m9e=ZiL1QV1tA@mail.gmail.com>
+References: <1442367325-55819-1-git-send-email-yingjoe.chen@mediatek.com>
+ <CAGS+omCzycc+RFeDftooDcj_f9M4SXhoO79u8m9e=ZiL1QV1tA@mail.gmail.com>
+Message-ID: <5607E889.2060501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 23/09/15 15:45, Sascha Hauer wrote:
-> On Fri, Sep 11, 2015 at 09:05:20PM +0800, Henry Chen wrote:
->> The watchdog may not be initialized by the bootloader, even if the rest
->> of the pwrap is. Move the watchdog initialization out of pwrap_init() to
->> make sure the watchdog is always initialized and not only when the pwrap
->> is uninitialized.
+On 16/09/15 15:34, Daniel Kurtz wrote:
+> On Wed, Sep 16, 2015 at 9:35 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+>> Node name in device tree should describe general class of the
+>> device. Correct incorrect i2c node names.
 >>
->> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+>> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 >
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+>
 
 Applied, thanks.
 
->
->
 >> ---
->> Chandes since v1:
->> Modify the commit log and code comments to make it easy to understand
->> the issue and solution.
+>> This is based on v4.3-rc1.
+>> All the other i2c node names are correct.
 >> ---
->>   drivers/soc/mediatek/mtk-pmic-wrap.c | 10 ++++++----
->>   1 file changed, 6 insertions(+), 4 deletions(-)
+>>   arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 +++---
+>>   1 file changed, 3 insertions(+), 3 deletions(-)
 >>
->> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
->> index f432291..1a49b09 100644
->> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
->> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
->> @@ -725,10 +725,6 @@ static int pwrap_init(struct pmic_wrapper *wrp)
->>   	pwrap_writel(wrp, 0x1, PWRAP_WACS2_EN);
->>   	pwrap_writel(wrp, 0x5, PWRAP_STAUPD_PRD);
->>   	pwrap_writel(wrp, 0xff, PWRAP_STAUPD_GRPEN);
->> -	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
->> -	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
->> -	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
->> -	pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> index d18ee42..7f360b7 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> @@ -365,7 +365,7 @@
+>>                          status = "disabled";
+>>                  };
 >>
->>   	if (pwrap_is_mt8135(wrp)) {
->>   		/* enable pwrap events and pwrap bridge in AP side */
->> @@ -896,6 +892,12 @@ static int pwrap_probe(struct platform_device *pdev)
->>   		return -ENODEV;
->>   	}
+>> -               i2c3: i2c3 at 11010000 {
+>> +               i2c3: i2c at 11010000 {
+>>                          compatible = "mediatek,mt8173-i2c";
+>>                          reg = <0 0x11010000 0 0x70>,
+>>                                <0 0x11000280 0 0x80>;
+>> @@ -381,7 +381,7 @@
+>>                          status = "disabled";
+>>                  };
 >>
->> +	/* Initialize watchdog, may not be done by the bootloader */
->> +	pwrap_writel(wrp, 0xf, PWRAP_WDT_UNIT);
->> +	pwrap_writel(wrp, 0xffffffff, PWRAP_WDT_SRC_EN);
->> +	pwrap_writel(wrp, 0x1, PWRAP_TIMER_EN);
->> +	pwrap_writel(wrp, ~((1 << 31) | (1 << 1)), PWRAP_INT_EN);
->> +
->>   	irq = platform_get_irq(pdev, 0);
->>   	ret = devm_request_irq(wrp->dev, irq, pwrap_interrupt, IRQF_TRIGGER_HIGH,
->>   			"mt-pmic-pwrap", wrp);
+>> -               i2c4: i2c4 at 11011000 {
+>> +               i2c4: i2c at 11011000 {
+>>                          compatible = "mediatek,mt8173-i2c";
+>>                          reg = <0 0x11011000 0 0x70>,
+>>                                <0 0x11000300 0 0x80>;
+>> @@ -397,7 +397,7 @@
+>>                          status = "disabled";
+>>                  };
+>>
+>> -               i2c6: i2c6 at 11013000 {
+>> +               i2c6: i2c at 11013000 {
+>>                          compatible = "mediatek,mt8173-i2c";
+>>                          reg = <0 0x11013000 0 0x70>,
+>>                                <0 0x11000080 0 0x80>;
 >> --
->> 1.8.1.1.dirty
+>> 1.9.1
 >>
->>
->
