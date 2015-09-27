@@ -1,70 +1,62 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Sun, 27 Sep 2015 15:48:24 +0200
-Subject: [PATCH V5 1/2] ACPI / EC: Fix broken 64bit big-endian users of
- 'global_lock'
-In-Reply-To: <8d3d3428c3a36f821e4c3d8563d094ca4b4763fd.1443304934.git.viresh.kumar@linaro.org>
-References: <8d3d3428c3a36f821e4c3d8563d094ca4b4763fd.1443304934.git.viresh.kumar@linaro.org>
-Message-ID: <CAJZ5v0imYBPVNfVjkgX1r8a1x6QbY4LtRcS7BNsGzg5=yuPRfA@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sun, 27 Sep 2015 16:00:06 +0200
+Subject: [PATCH 1/2] arm64: mediatek: enable MTK_TIMER
+In-Reply-To: <1442370091.14347.10.camel@mtksdaap41>
+References: <1442369095-1094-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1442370091.14347.10.camel@mtksdaap41>
+Message-ID: <5607F666.5010506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 27, 2015 at 12:04 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> global_lock is defined as an unsigned long and accessing only its lower
-> 32 bits from sysfs is incorrect, as we need to consider other 32 bits
-> for big endian 64-bit systems. There are no such platforms yet, but the
-> code needs to be robust for such a case.
->
-> Fix that by changing type of 'global_lock' to u32.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-Greg, please take this one along with the [2/2] if that one looks good to you.
+On 16/09/15 04:21, Yingjoe Chen wrote:
+> On Wed, 2015-09-16 at 10:04 +0800, Yingjoe Chen wrote:
+>> Enable MTK_TIMER for MediaTek plaform, which will be used as
+>> schedule clock.
+>
+> Sorry, sending this series too early without cover letter and removing
+> Change-Id. Here's the cover letter:
+>
+>
+> This is actually v3 of "add GPT timer support for mt8173" series. This
+> is based on v4.3-rc1 + clockevents-4.4[1] and James's mediatek-clk
+> tree[2].
+>
+> Changes compare to previous version[3]:
+> - the first two mtk_timer related changes are removed because they are
+> replaced/accepted in clockevents tree.
+> - Remove 'add 13mhz clock for MT8173' because it is accepted in
+> mediatek-clk tree.
+> - Kconfig.platforms path change.
+>
+> So we only have 2 patches left here.
+> Matthias, can you take these and help to remove the Change-Id?
 
-> ---
-> BCC'd a lot of people (rather than cc'ing them) to make sure
-> - the series reaches them
-> - mailing lists do not block the patchset due to long cc list
-> - and we don't spam the BCC'd people for every reply
+Yes I can take this two patches, but I don't see the mediatek-clk tree 
+accepted by the maintainers yet. As far as I can see, without the 13 MHz 
+clock [1], the sched clock won't work.
+
+[1] 
+https://github.com/jamesjjliao/linux/commit/add5e89d657fa6c0e5a517890f996c796b768064
+
 >
-> V4->V5:
-> - Switch back to the original solution of making global_lock u32.
-> ---
->  drivers/acpi/ec_sys.c   | 2 +-
->  drivers/acpi/internal.h | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
 >
-> diff --git a/drivers/acpi/ec_sys.c b/drivers/acpi/ec_sys.c
-> index b4c216bab22b..bea8e425a8de 100644
-> --- a/drivers/acpi/ec_sys.c
-> +++ b/drivers/acpi/ec_sys.c
-> @@ -128,7 +128,7 @@ static int acpi_ec_add_debugfs(struct acpi_ec *ec, unsigned int ec_device_count)
->         if (!debugfs_create_x32("gpe", 0444, dev_dir, (u32 *)&first_ec->gpe))
->                 goto error;
->         if (!debugfs_create_bool("use_global_lock", 0444, dev_dir,
-> -                                (u32 *)&first_ec->global_lock))
-> +                                &first_ec->global_lock))
->                 goto error;
+> Daniel Kurtz (1):
+>    arm64: dts: mt8173: add timer node
 >
->         if (write_support)
-> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
-> index 9e426210c2a8..9db196de003c 100644
-> --- a/drivers/acpi/internal.h
-> +++ b/drivers/acpi/internal.h
-> @@ -138,7 +138,7 @@ struct acpi_ec {
->         unsigned long gpe;
->         unsigned long command_addr;
->         unsigned long data_addr;
-> -       unsigned long global_lock;
-> +       u32 global_lock;
->         unsigned long flags;
->         unsigned long reference_count;
->         struct mutex mutex;
-> --
-> 2.4.0
+> Yingjoe Chen (1):
+>    arm64: mediatek: enable MTK_TIMER
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
+> [1]
+> https://git.linaro.org/people/daniel.lezcano/linux.git clockevents/4.4
+> [2]
+> http://lists.infradead.org/pipermail/linux-mediatek/2015-August/002069.html
+> [3]
+> http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001544.html
+>
+>
+>
+>
