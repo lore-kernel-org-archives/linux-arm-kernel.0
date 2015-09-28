@@ -1,87 +1,192 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 28 Sep 2015 13:50:33 +0200
-Subject: [PATCH v6 5/5] leds: netxbig: set led_classdev max_brightness
-In-Reply-To: <5609133A.3050802@samsung.com>
-References: <1443301358-2131-1-git-send-email-simon.guinot@sequanux.org>
- <1443301358-2131-6-git-send-email-simon.guinot@sequanux.org>
- <5608F41B.4020307@samsung.com>
- <20150928091956.GY7306@kw.sim.vm.gnt>
- <5609133A.3050802@samsung.com>
-Message-ID: <20150928115033.GZ7306@kw.sim.vm.gnt>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Mon, 28 Sep 2015 19:50:00 +0800
+Subject: [PATCH v2 8/9] ARM: rockchip: add support smp for rk3036
+In-Reply-To: <22222181.r5MSqEbWpB@diego>
+References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
+ <1442486286-1873-1-git-send-email-zhengxing@rock-chips.com>
+ <22222181.r5MSqEbWpB@diego>
+Message-ID: <56092968.1040001@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2015 at 12:15:22PM +0200, Jacek Anaszewski wrote:
-> On 09/28/2015 11:19 AM, Simon Guinot wrote:
-> >On Mon, Sep 28, 2015 at 10:02:35AM +0200, Jacek Anaszewski wrote:
-> >>Hi Simon,
-> >
-> >Hi Jacek,
-> >
-> >>
-> >>Does your device support reading the brightness currently set?
-> >
-> >No it don't.
-> >
-> >>If so, it would be good to implement brightness_get op, because
-> >>AFAIR you mentioned that the firmware you are working with sets
-> >>always maximum brightness value. Having the op implemented would
-> >>allow to find this out.
-> >
-> >I don't understand how this can help. I mean, the only issue is that at
-> >startup the initial LED state is unknown. And the software brightness
-> >value could be false. But once the LED is configured, the brightness
-> >values for software and hardware are synchronized. The brightness value
-> >is stored/cached in led_classdev and it can be retrieved by the user via
-> >sysfs...
-> >
-> >For my own knowledge, is there some interest in having brightness_get(),
-> >aside of guessing the LED initial state ?
-> 
-> Some LED controllers can adjust brightness in case battery voltage level
-> falls below some threshold.
+On 2015?09?18? 04:15, Heiko St?bner wrote:
+> Am Donnerstag, 17. September 2015, 18:38:06 schrieb Xing Zheng:
+>> The rk3036 is dual-core soc, we can use this patch to enable cpu1
+>> enter boot secondary, and hotplug(online/offline).
+>>
+>> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
+>> ---
+>>
+>> Changes in v2: None
+>>
+>>   arch/arm/mach-rockchip/platsmp.c |  121
+>> ++++++++++++++++++++++++++++++++++++++ 1 file changed, 121 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-rockchip/platsmp.c
+>> b/arch/arm/mach-rockchip/platsmp.c index 3e7a4b7..14218eb 100644
+>> --- a/arch/arm/mach-rockchip/platsmp.c
+>> +++ b/arch/arm/mach-rockchip/platsmp.c
+>> @@ -34,6 +34,8 @@
+>>
+>>   static void __iomem *scu_base_addr;
+>>   static void __iomem *sram_base_addr;
+>> +static void __iomem *cru_base_addr;
+>> +
+>>   static int ncores;
+>>
+>>   #define PMU_PWRDN_CON		0x08
+>> @@ -41,6 +43,8 @@ static int ncores;
+>>
+>>   #define PMU_PWRDN_SCU		4
+>>
+>> +#define RK3036_SOFTRST_CON(x)	((x) * 0x4 + 0x110)
+>> +
+>>   static struct regmap *pmu;
+>>
+>>   static int pmu_power_domain_is_on(int pd)
+>> @@ -184,6 +188,7 @@ static int __init rockchip_smp_prepare_sram(struct
+>> device_node *node) }
+>>
+>>   	rsize = resource_size(&res);
+>> +
+>>   	if (rsize<  trampoline_sz) {
+>>   		pr_err("%s: reserved block with size 0x%x is to small for trampoline
+> size
+>> 0x%x\n", __func__, rsize, trampoline_sz);
+>> @@ -350,3 +355,119 @@ static struct smp_operations rockchip_smp_ops
+>> __initdata = { };
+>>
+>>   CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp",
+>> &rockchip_smp_ops); +
+>> +/* for rk3036 */
+>> +
+>> +static int rk3036_set_power_domain(int pd, bool on)
+>> +{
+>> +	/* there are 2cpus on rk3036 soc, we just need to be care cpu1 */
+>> +	if (pd != 1)
+>> +		return 0;
+>> +
+>> +	if (on)
+>> +		writel_relaxed(0x20000, cru_base_addr + RK3036_SOFTRST_CON(0));
+>> +	else
+>> +		writel_relaxed(0x20002, cru_base_addr + RK3036_SOFTRST_CON(0));
+> this is definitly the wrong way. The reset handling is the same as on the
+> rk3288 - so you can use the regular reset mechanism like the other socs and
+> should definitly _never_ write to the cru directly.
+>
+> The only visible difference is that you cannot control the power-domains of
+> the cpu cores. Its sibling the rk3128 seems to have controllable power domains
+> again.
+>
+> I'm still pondering how to make this future proof...
+>
+>
+> Heiko
+OK, I tried add the regular reset mechanism like the rk3288.
+Yes, then, there are something need to continue to improve.
 
-OK, thanks for the explanation.
-
-> 
-> >What does the embedded firmware is writing 255 or 0 into the brightness
-> >sysfs attribute. The max_brightness value is ignored. After this patch,
-> >writing 255 and 0 still allows to configure the LED in the same way:
-> >maximum brightness or off. Thus, I believe there is no compatibility
-> >issue.
-> 
-> LED core always assures that brightness value passed to brightness_set
-> op does not exceed max_brightness value. So, now after executing
-> "echo 255 > brightness", LED core will adjust it to max_brightness
-> (e.g. 7) before passing to brightness_set.
-> 
-> In the message [1], you mentioned that "LEDs are only enabled at their
-> maximum level", so IIUC following is possible:
-> 
-> #echo 3 > "brightness"
-> 
-> firmware sets brightness to max_brightness from DT (e.g. 7), but
-> 
-> #cat brightness
-> #3
-> 
-> Is it true?
-
-Oh no sorry, it is a misunderstanding. By "LEDs are only enabled at
-their maximum level", I was meaning "LEDs are only enabled at their
-maximum level by the LaCie stock firmware". The firmware don't make
-use of the different hardware brightness levels available. But the
-feature works perfectly. If you write 3 into sysfs "brightness", then
-you get the third brightness level.
-
-OK, I understand you remark now. Sorry for not being very clear in a
-first place.
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150928/fb5c942d/attachment.sig>
+Thanks.
+>
+>> +
+>> +	dsb();
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static void __init rk3036_smp_prepare_cpus(unsigned int max_cpus)
+>> +{
+>> +	struct device_node *node;
+>> +	unsigned int l2ctlr;
+>> +	unsigned int i, cpu;
+>> +
+>> +	/* get cru_base_addr */
+>> +	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3036-cru");
+>> +	if (!node) {
+>> +		pr_err("%s: could not find cru dt node\n", __func__);
+>> +		return;
+>> +	}
+>> +
+>> +	cru_base_addr = of_iomap(node, 0);
+>> +	if (!cru_base_addr) {
+>> +		pr_err("%s: could not map cru registers\n", __func__);
+>> +		return;
+>> +	}
+>> +
+>> +	/* get sram_base_addr */
+>> +	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3036-smp-sram");
+>> +	if (!node) {
+>> +		pr_err("%s: could not find sram dt node\n", __func__);
+>> +		return;
+>> +	}
+>> +
+>> +	sram_base_addr = of_iomap(node, 0);
+>> +	if (!sram_base_addr) {
+>> +		pr_err("%s: could not map sram registers\n", __func__);
+>> +		return;
+>> +	}
+>> +
+>> +	/* get ncores */
+>> +	asm ("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
+>> +	ncores = ((l2ctlr>>  24)&  0x3) + 1;
+>> +	cpu = MPIDR_AFFINITY_LEVEL(read_cpuid_mpidr(), 0);
+>> +
+>> +	/* Make sure that all cores except the first are really off */
+>> +	for (i = 1; i<  ncores; i++)
+>> +		rk3036_set_power_domain(0 + i, false);
+>> +}
+>> +
+>> +static int rk3036_boot_secondary(unsigned int cpu, struct task_struct
+>> *idle) +{
+>> +	if (cpu>= ncores) {
+>> +		pr_err("%s: cpu %d outside maximum number of cpus %d\n",
+>> +			__func__, cpu, ncores);
+>> +		return -ENXIO;
+>> +	}
+>> +
+>> +	/* start the core */
+>> +	rk3036_set_power_domain(0 + cpu, true);
+>> +
+>> +	/*
+>> +	 * We need to wait a moment after soft reset CPUx on rk3036,
+>> +	 * otherwise, CPUx will startup failed.
+>> +	 */
+>> +	udelay(10);
+>> +	writel(virt_to_phys(secondary_startup), sram_base_addr + 8);
+>> +	writel(0xDEADBEAF, sram_base_addr + 4);
+>> +	dsb_sev();
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +#ifdef CONFIG_HOTPLUG_CPU
+>> +static int rk3066_cpu_kill(unsigned int cpu)
+>> +{
+>> +	/*
+>> +	 * We need a delay here to ensure that the dying CPU can finish
+>> +	 * executing v7_coherency_exit() and reach the WFI/WFE state
+>> +	 * prior to having the power domain disabled.
+>> +	 */
+>> +	mdelay(1);
+>> +
+>> +	rk3036_set_power_domain(0 + cpu, false);
+>> +
+>> +	return 1;
+>> +}
+>> +
+>> +static void rk3066_cpu_die(unsigned int cpu)
+>> +{
+>> +	v7_exit_coherency_flush(louis);
+>> +	while (1)
+>> +		cpu_do_idle();
+>> +}
+>> +#endif
+>> +
+>> +static struct smp_operations rk3036_smp_ops __initdata = {
+>> +	.smp_prepare_cpus	= rk3036_smp_prepare_cpus,
+>> +	.smp_boot_secondary	= rk3036_boot_secondary,
+>> +#ifdef CONFIG_HOTPLUG_CPU
+>> +	.cpu_kill		= rk3066_cpu_kill,
+>> +	.cpu_die		= rk3066_cpu_die,
+>> +#endif
+>> +};
+>> +CPU_METHOD_OF_DECLARE(rk3036_smp, "rockchip,rk3036-smp",&rk3036_smp_ops);
