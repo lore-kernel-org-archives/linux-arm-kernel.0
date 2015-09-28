@@ -1,592 +1,362 @@
-From: bhupesh.linux@gmail.com (Bhupesh SHARMA)
-Date: Mon, 28 Sep 2015 15:33:21 +0530
-Subject: [PATCH v2 07/10] dts/ls2085a: Update DTSI to add support of
- various peripherals
-In-Reply-To: <CAL_Jsq+9izV8vkrF1tK96M-VRGTMJ+GN5o=RsnCBDcnh-at5kA@mail.gmail.com>
-References: <1441350322-4671-1-git-send-email-bhupesh.sharma@freescale.com>
- <CAL_Jsq+9izV8vkrF1tK96M-VRGTMJ+GN5o=RsnCBDcnh-at5kA@mail.gmail.com>
-Message-ID: <CAFTCetQ1EE332AnihKFw_Emf7_E4=OcVg2sRDoq3R-siyDZgKg@mail.gmail.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Mon, 28 Sep 2015 15:40:52 +0530
+Subject: [PATCH] ARM: dts: exynos4412-trats2: remove regulator-compatible
+ usage
+In-Reply-To: <1443188657-13501-1-git-send-email-javier@osg.samsung.com>
+References: <1443188657-13501-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <CANAwSgS4uyXYTPWJTkiZ2fQkwXNF+P7Ziuoy6o6jXyEmTw6Ovg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Javier,
 
-On Sat, Sep 5, 2015 at 2:45 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On Fri, Sep 4, 2015 at 2:05 AM, Bhupesh Sharma
-> <bhupesh.sharma@freescale.com> wrote:
->> This patch updates the LS2085a DTSI (DTS Include) file to add
->> support for various peripherals supported by FSL LS2085a SoC, for e.g.:
->>         - USB 3.0 Host
->>         - PMU
->>         - CCN-504
->>         - Watchdog
->>         - SATA
->>         - SPI
->>         - PCIe
->>         - etc.
->>
->> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
->> Signed-off-by: Jaiprakash Singh <b44839@freescale.com>
->> Signed-off-by: Alison Wang <alison.wang@freescale.com>
->> Signed-off-by: Liu Gang <Gang.Liu@freescale.com>
->> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
->> Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
->> Signed-off-by: Nikhil Badola <nikhil.badola@freescale.com>
->> Signed-off-by: Yangbo Lu <yangbo.lu@freescale.com>
->> Signed-off-by: Scott Wood <scottwood@freescale.com>
->> ---
->>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |  469 +++++++++++++++++++++++-
->>  1 file changed, 459 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
->> index 333d942..5fee0a7 100644
->> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
->> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-
-[snip..]
-
->> +
->>         gic: interrupt-controller at 6000000 {
+On 25 September 2015 at 19:14, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> The regulator-compatible property from the regulator DT binding was
+> deprecated and the correct approach is to use the node's name.
 >
-> This should be under a bus node.
-
-Ok.
-
->>                 compatible = "arm,gic-v3";
->>                 reg = <0x0 0x06000000 0 0x10000>, /* GIC Dist */
->> -                     <0x0 0x06100000 0 0x100000>; /* GICR (RD_base + SGI_base) */
->> +                     <0x0 0x06100000 0 0x100000>, /* GICR (RD_base + SGI_base) */
->> +                     <0x0 0x0c0c0000 0 0x2000>, /* GICC */
->> +                     <0x0 0x0c0d0000 0 0x1000>, /* GICH */
->> +                     <0x0 0x0c0e0000 0 0x20000>; /* GICV */
->>                 #interrupt-cells = <3>;
->> +               #address-cells = <2>;
->> +               #size-cells = <2>;
->> +               ranges;
->>                 interrupt-controller;
->>                 interrupts = <1 9 0x4>;
->> +
->> +               its: gic-its at 6020000 {
->> +                       compatible = "arm,gic-v3-its";
->> +                       msi-controller;
->> +                       reg = <0x0 0x6020000 0 0x20000>;
->> +               };
->> +       };
->> +
->> +       clockgen: clocking at 1300000 {
+> This patch has no functional changes but by not using a deprecated
+> property, new DTS based on this one will not carry the same issue.
 >
-> This should be under a bus node.
-
-Ok.
-
->> +               compatible = "fsl,ls2080a-clockgen";
->> +               reg = <0 0x1300000 0 0xa0000>;
->> +               #clock-cells = <2>;
->> +               clocks = <&sysclk>;
->> +
->> +               sysclk: sysclk {
->> +                       compatible = "fixed-clock";
->> +                       #clock-cells = <0>;
->> +                       clock-frequency = <100000000>;
->> +                       clock-output-names = "sysclk";
->> +               };
->>         };
->>
->>         timer {
->> @@ -139,25 +173,440 @@
->>                              <1 10 0x8>; /* Hypervisor PPI, active-low */
->>         };
->>
->> +       amba {
->> +               compatible = "arm,amba-bus";
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 >
-> Use simple-bus. "arm,amba-bus" is meaningless.
-
-Not sure I understand your comment here. Without this
-compatible in place I cannot see the 'drivers/amba/bus.c'
-amba_match() function getting called which in turn will call the
-amba_lookup() function,
-thus invoking the probe function of the sp805_wdt driver.
-
-Here is the comment on top of struct amba_bustype:
-
-188 /*
-189  * Primecells are part of the Advanced Microcontroller Bus Architecture,
-190  * so we call the bus "amba".
-191  */
-
-Reference: http://lxr.free-electrons.com/source/drivers/amba/bus.c#L188
-
-So, this should be  "arm,amba-bus", as used in other DTS as well like
-ARM versatile
-DTS:
-
-  90         amba {
- 91                 compatible = "arm,amba-bus";
- 92                 #address-cells = <1>;
- 93                 #size-cells = <1>;
- 94                 ranges;
-
-Reference: http://lxr.free-electrons.com/source/arch/arm/boot/dts/versatile-ab.dts#L90
-
->> +               #address-cells = <2>;
->> +               #size-cells = <2>;
->> +               ranges;
->> +
->> +               cluster1_core0_watchdog: wdt at c000000 {
->> +                       compatible = "arm,primecell";
->> +                       reg = <0x0 0xc000000 0x0 0x1000>;
->> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
->> +                       clocks = <&clockgen 4 3>;
->> +                       clock-names = "apb_pclk";
->> +               };
->> +
->> +               cluster1_core1_watchdog: wdt at c010000 {
->> +                       compatible = "arm,primecell";
->> +                       reg = <0x0 0xc010000 0x0 0x1000>;
->> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
->> +                       clocks = <&clockgen 4 3>;
->> +                       clock-names = "apb_pclk";
->> +               };
->> +
->> +               cluster2_core0_watchdog: wdt at c100000 {
->> +                       compatible = "arm,primecell";
->> +                       reg = <0x0 0xc100000 0x0 0x1000>;
->> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
->> +                       clocks = <&clockgen 4 3>;
->> +                       clock-names = "apb_pclk";
->> +               };
->> +
->> +               cluster2_core1_watchdog: wdt at c110000 {
->> +                       compatible = "arm,primecell";
->> +                       reg = <0x0 0xc110000 0x0 0x1000>;
->> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
->> +                       clocks = <&clockgen 4 3>;
->> +                       clock-names = "apb_pclk";
->> +               };
->> +
->> +               cluster3_core0_watchdog: wdt at c200000 {
->> +                       compatible = "arm,primecell";
->> +                       reg = <0x0 0xc200000 0x0 0x1000>;
->> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
->> +                       clocks = <&clockgen 4 3>;
->> +                       clock-names = "apb_pclk";
->> +               };
->> +
->> +               cluster3_core1_watchdog: wdt at c210000 {
->> +                       compatible = "arm,primecell";
->> +                       reg = <0x0 0xc210000 0x0 0x1000>;
->> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
->> +                       clocks = <&clockgen 4 3>;
->> +                       clock-names = "apb_pclk";
->> +               };
->> +
->> +               cluster4_core0_watchdog: wdt at c300000 {
->> +                       compatible = "arm,primecell";
->> +                       reg = <0x0 0xc300000 0x0 0x1000>;
->> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
->> +                       clocks = <&clockgen 4 3>;
->> +                       clock-names = "apb_pclk";
->> +               };
->> +
->> +               cluster4_core1_watchdog: wdt at c310000 {
->> +                       compatible = "arm,primecell";
->> +                       reg = <0x0 0xc310000 0x0 0x1000>;
->> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
->> +                       clocks = <&clockgen 4 3>;
->> +                       clock-names = "apb_pclk";
->> +               };
->> +       };
->> +
->>         serial0: serial at 21c0500 {
+> ---
 >
-> This too should be moved under a bus node.
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 105 +++++++++++---------------------
+>  1 file changed, 35 insertions(+), 70 deletions(-)
 >
->>                 device_type = "serial";
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index 2a1ebb76ebe0..9ee55119e7d2 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -564,16 +564,14 @@
+>                 #clock-cells = <1>;
 >
-> You should drop this.
-
-Ok.
-
->>                 compatible = "fsl,ns16550", "ns16550a";
->>                 reg = <0x0 0x21c0500 0x0 0x100>;
->> -               clock-frequency = <0>;  /* Updated by bootloader */
->> -               interrupts = <0 32 0x1>; /* edge triggered */
->> +               clocks = <&clockgen 4 3>;
->> +               interrupts = <0 32 0x4>; /* Level high type */
->>         };
->>
->>         serial1: serial at 21c0600 {
->>                 device_type = "serial";
->>                 compatible = "fsl,ns16550", "ns16550a";
->>                 reg = <0x0 0x21c0600 0x0 0x100>;
->> -               clock-frequency = <0>;  /* Updated by bootloader */
->> -               interrupts = <0 32 0x1>; /* edge triggered */
->> +               clocks = <&clockgen 4 3>;
->> +               interrupts = <0 32 0x4>; /* Level high type */
->>         };
->>
->>         fsl_mc: fsl-mc at 80c000000 {
->>                 compatible = "fsl,qoriq-mc";
->> +               #stream-id-cells = <2>;
->>                 reg = <0x00000008 0x0c000000 0 0x40>,    /* MC portal base */
->>                       <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
->> +               lpi-parent = <&its>;
->> +       };
->> +
->> +       smmu: iommu at 5000000 {
->> +               compatible = "arm,mmu-500";
->> +               reg = <0 0x5000000 0 0x800000>;
->> +               #global-interrupts = <12>;
->> +               interrupts = <0 13 4>, /* global secure fault */
->> +                            <0 14 4>, /* combined secure interrupt */
->> +                            <0 15 4>, /* global non-secure fault */
->> +                            <0 16 4>, /* combined non-secure interrupt */
->> +                       /* performance counter interrupts 0-7 */
->> +                            <0 211 4>,
->> +                            <0 212 4>,
->> +                            <0 213 4>,
->> +                            <0 214 4>,
->> +                            <0 215 4>,
->> +                            <0 216 4>,
->> +                            <0 217 4>,
->> +                            <0 218 4>,
->> +                       /* per context interrupt, 64 interrupts */
->> +                            <0 146 4>,
->> +                            <0 147 4>,
->> +                            <0 148 4>,
->> +                            <0 149 4>,
->> +                            <0 150 4>,
->> +                            <0 151 4>,
->> +                            <0 152 4>,
->> +                            <0 153 4>,
->> +                            <0 154 4>,
->> +                            <0 155 4>,
->> +                            <0 156 4>,
->> +                            <0 157 4>,
->> +                            <0 158 4>,
->> +                            <0 159 4>,
->> +                            <0 160 4>,
->> +                            <0 161 4>,
->> +                            <0 162 4>,
->> +                            <0 163 4>,
->> +                            <0 164 4>,
->> +                            <0 165 4>,
->> +                            <0 166 4>,
->> +                            <0 167 4>,
->> +                            <0 168 4>,
->> +                            <0 169 4>,
->> +                            <0 170 4>,
->> +                            <0 171 4>,
->> +                            <0 172 4>,
->> +                            <0 173 4>,
->> +                            <0 174 4>,
->> +                            <0 175 4>,
->> +                            <0 176 4>,
->> +                            <0 177 4>,
->> +                            <0 178 4>,
->> +                            <0 179 4>,
->> +                            <0 180 4>,
->> +                            <0 181 4>,
->> +                            <0 182 4>,
->> +                            <0 183 4>,
->> +                            <0 184 4>,
->> +                            <0 185 4>,
->> +                            <0 186 4>,
->> +                            <0 187 4>,
->> +                            <0 188 4>,
->> +                            <0 189 4>,
->> +                            <0 190 4>,
->> +                            <0 191 4>,
->> +                            <0 192 4>,
->> +                            <0 193 4>,
->> +                            <0 194 4>,
->> +                            <0 195 4>,
->> +                            <0 196 4>,
->> +                            <0 197 4>,
->> +                            <0 198 4>,
->> +                            <0 199 4>,
->> +                            <0 200 4>,
->> +                            <0 201 4>,
->> +                            <0 202 4>,
->> +                            <0 203 4>,
->> +                            <0 204 4>,
->> +                            <0 205 4>,
->> +                            <0 206 4>,
->> +                            <0 207 4>,
->> +                            <0 208 4>,
->> +                            <0 209 4>;
+>                 voltage-regulators {
+> -                       ldo1_reg: ldo1 {
+> -                               regulator-compatible = "LDO1";
+> +                       ldo1_reg: LDO1 {
+>                                 regulator-name = "VALIVE_1.0V_AP";
+>                                 regulator-min-microvolt = <1000000>;
+>                                 regulator-max-microvolt = <1000000>;
+>                                 regulator-always-on;
+>                         };
 >
-> Perhaps more than 1 per line.
+> -                       ldo2_reg: ldo2 {
+> -                               regulator-compatible = "LDO2";
+> +                       ldo2_reg: LDO2 {
+>                                 regulator-name = "VM1M2_1.2V_AP";
+>                                 regulator-min-microvolt = <1200000>;
+>                                 regulator-max-microvolt = <1200000>;
+> @@ -583,32 +581,28 @@
+>                                 };
+>                         };
+>
+> -                       ldo3_reg: ldo3 {
+> -                               regulator-compatible = "LDO3";
+> +                       ldo3_reg: LDO3 {
+>                                 regulator-name = "VCC_1.8V_AP";
+>                                 regulator-min-microvolt = <1800000>;
+>                                 regulator-max-microvolt = <1800000>;
+>                                 regulator-always-on;
+>                         };
+>
+> -                       ldo4_reg: ldo4 {
+> -                               regulator-compatible = "LDO4";
+> +                       ldo4_reg: LDO4 {
+>                                 regulator-name = "VCC_2.8V_AP";
+>                                 regulator-min-microvolt = <2800000>;
+>                                 regulator-max-microvolt = <2800000>;
+>                                 regulator-always-on;
+>                         };
+>
+> -                       ldo5_reg: ldo5 {
+> -                               regulator-compatible = "LDO5";
+> +                       ldo5_reg: LDO5 {
+>                                 regulator-name = "VCC_1.8V_IO";
+>                                 regulator-min-microvolt = <1800000>;
+>                                 regulator-max-microvolt = <1800000>;
+>                                 regulator-always-on;
+>                         };
+>
+> -                       ldo6_reg: ldo6 {
+> -                               regulator-compatible = "LDO6";
+> +                       ldo6_reg: LDO6 {
+>                                 regulator-name = "VMPLL_1.0V_AP";
+>                                 regulator-min-microvolt = <1000000>;
+>                                 regulator-max-microvolt = <1000000>;
+> @@ -618,8 +612,7 @@
+>                                 };
+>                         };
+>
+> -                       ldo7_reg: ldo7 {
+> -                               regulator-compatible = "LDO7";
+> +                       ldo7_reg: LDO7 {
+>                                 regulator-name = "VPLL_1.0V_AP";
+>                                 regulator-min-microvolt = <1000000>;
+>                                 regulator-max-microvolt = <1000000>;
+> @@ -629,8 +622,7 @@
+>                                 };
+>                         };
+>
+> -                       ldo8_reg: ldo8 {
+> -                               regulator-compatible = "LDO8";
+> +                       ldo8_reg: LDO8 {
+>                                 regulator-name = "VMIPI_1.0V";
+>                                 regulator-min-microvolt = <1000000>;
+>                                 regulator-max-microvolt = <1000000>;
+> @@ -639,15 +631,13 @@
+>                                 };
+>                         };
+>
+> -                       ldo9_reg: ldo9 {
+> -                               regulator-compatible = "LDO9";
+> +                       ldo9_reg: LDO9 {
+>                                 regulator-name = "CAM_ISP_MIPI_1.2V";
+>                                 regulator-min-microvolt = <1200000>;
+>                                 regulator-max-microvolt = <1200000>;
+>                         };
+>
+> -                       ldo10_reg: ldo10 {
+> -                               regulator-compatible = "LDO10";
+Missing the node name 'LDO10'
+> +                       ldo10_reg: DO10 {
+>                                 regulator-name = "VMIPI_1.8V";
+>                                 regulator-min-microvolt = <1800000>;
+>                                 regulator-max-microvolt = <1800000>;
+> @@ -656,8 +646,7 @@
+>                                 };
+>                         };
+>
+> -                       ldo11_reg: ldo11 {
+> -                               regulator-compatible = "LDO11";
+> +                       ldo11_reg: LDO11 {
+>                                 regulator-name = "VABB1_1.95V";
+>                                 regulator-min-microvolt = <1950000>;
+>                                 regulator-max-microvolt = <1950000>;
+> @@ -667,8 +656,7 @@
+>                                 };
+>                         };
+>
+> -                       ldo12_reg: ldo12 {
+> -                               regulator-compatible = "LDO12";
+> +                       ldo12_reg: LDO12 {
+>                                 regulator-name = "VUOTG_3.0V";
+>                                 regulator-min-microvolt = <3000000>;
+>                                 regulator-max-microvolt = <3000000>;
+> @@ -677,15 +665,13 @@
+>                                 };
+>                         };
+>
+> -                       ldo13_reg: ldo13 {
+> -                               regulator-compatible = "LDO13";
+> +                       ldo13_reg: LDO13 {
+>                                 regulator-name = "NFC_AVDD_1.8V";
+>                                 regulator-min-microvolt = <1800000>;
+>                                 regulator-max-microvolt = <1800000>;
+>                         };
+>
+> -                       ldo14_reg: ldo14 {
+> -                               regulator-compatible = "LDO14";
+> +                       ldo14_reg: LDO14 {
+>                                 regulator-name = "VABB2_1.95V";
+>                                 regulator-min-microvolt = <1950000>;
+>                                 regulator-max-microvolt = <1950000>;
+> @@ -695,8 +681,7 @@
+>                                 };
+>                         };
+>
+> -                       ldo15_reg: ldo15 {
+> -                               regulator-compatible = "LDO15";
+> +                       ldo15_reg: LDO15 {
+>                                 regulator-name = "VHSIC_1.0V";
+>                                 regulator-min-microvolt = <1000000>;
+>                                 regulator-max-microvolt = <1000000>;
+> @@ -705,8 +690,7 @@
+>                                 };
+>                         };
+>
+> -                       ldo16_reg: ldo16 {
+> -                               regulator-compatible = "LDO16";
+> +                       ldo16_reg: LDO16 {
+>                                 regulator-name = "VHSIC_1.8V";
+>                                 regulator-min-microvolt = <1800000>;
+>                                 regulator-max-microvolt = <1800000>;
+> @@ -715,80 +699,69 @@
+>                                 };
+>                         };
+>
+> -                       ldo17_reg: ldo17 {
+> -                               regulator-compatible = "LDO17";
+> +                       ldo17_reg: LDO17 {
+>                                 regulator-name = "CAM_SENSOR_CORE_1.2V";
+>                                 regulator-min-microvolt = <1200000>;
+>                                 regulator-max-microvolt = <1200000>;
+>                         };
+>
+> -                       ldo18_reg: ldo18 {
+> -                               regulator-compatible = "LDO18";
+> +                       ldo18_reg: LDO18 {
+>                                 regulator-name = "CAM_ISP_SEN_IO_1.8V";
+>                                 regulator-min-microvolt = <1800000>;
+>                                 regulator-max-microvolt = <1800000>;
+>                         };
+>
+> -                       ldo19_reg: ldo19 {
+> -                               regulator-compatible = "LDO19";
+> +                       ldo19_reg: LDO19 {
+>                                 regulator-name = "VT_CAM_1.8V";
+>                                 regulator-min-microvolt = <1800000>;
+>                                 regulator-max-microvolt = <1800000>;
+>                         };
+>
+> -                       ldo20_reg: ldo20 {
+> -                               regulator-compatible = "LDO20";
+> +                       ldo20_reg: LDO20 {
+>                                 regulator-name = "VDDQ_PRE_1.8V";
+>                                 regulator-min-microvolt = <1800000>;
+>                                 regulator-max-microvolt = <1800000>;
+>                         };
+>
+> -                       ldo21_reg: ldo21 {
+> -                               regulator-compatible = "LDO21";
+> +                       ldo21_reg: LDO21 {
+>                                 regulator-name = "VTF_2.8V";
+>                                 regulator-min-microvolt = <2800000>;
+>                                 regulator-max-microvolt = <2800000>;
+>                                 maxim,ena-gpios = <&gpy2 0 GPIO_ACTIVE_HIGH>;
+>                         };
+>
+> -                       ldo22_reg: ldo22 {
+> -                               regulator-compatible = "LDO22";
+> +                       ldo22_reg: LDO22 {
+>                                 regulator-name = "VMEM_VDD_2.8V";
+>                                 regulator-min-microvolt = <2800000>;
+>                                 regulator-max-microvolt = <2800000>;
+>                                 maxim,ena-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
+>                         };
+>
+> -                       ldo23_reg: ldo23 {
+> -                               regulator-compatible = "LDO23";
+> +                       ldo23_reg: LDO23 {
+>                                 regulator-name = "TSP_AVDD_3.3V";
+>                                 regulator-min-microvolt = <3300000>;
+>                                 regulator-max-microvolt = <3300000>;
+>                         };
+>
+> -                       ldo24_reg: ldo24 {
+> -                               regulator-compatible = "LDO24";
+> +                       ldo24_reg: LDO24 {
+>                                 regulator-name = "TSP_VDD_1.8V";
+>                                 regulator-min-microvolt = <1800000>;
+>                                 regulator-max-microvolt = <1800000>;
+>                         };
+>
+> -                       ldo25_reg: ldo25 {
+> -                               regulator-compatible = "LDO25";
+> +                       ldo25_reg: LDO25 {
+>                                 regulator-name = "LCD_VCC_3.3V";
+>                                 regulator-min-microvolt = <2800000>;
+>                                 regulator-max-microvolt = <2800000>;
+>                         };
+>
+> -                       ldo26_reg: ldo26 {
+> -                               regulator-compatible = "LDO26";
+> +                       ldo26_reg: LDO26 {
+>                                 regulator-name = "MOTOR_VCC_3.0V";
+>                                 regulator-min-microvolt = <3000000>;
+>                                 regulator-max-microvolt = <3000000>;
+>                         };
+>
+> -                       buck1_reg: buck1 {
+> -                               regulator-compatible = "BUCK1";
+> +                       buck1_reg: BUCK1 {
+>                                 regulator-name = "vdd_mif";
+>                                 regulator-min-microvolt = <850000>;
+>                                 regulator-max-microvolt = <1100000>;
+> @@ -799,8 +772,7 @@
+>                                 };
+>                         };
+>
+> -                       buck2_reg: buck2 {
+> -                               regulator-compatible = "BUCK2";
+> +                       buck2_reg: BUCK2 {
+>                                 regulator-name = "vdd_arm";
+>                                 regulator-min-microvolt = <850000>;
+>                                 regulator-max-microvolt = <1500000>;
+> @@ -811,8 +783,7 @@
+>                                 };
+>                         };
+>
+> -                       buck3_reg: buck3 {
+> -                               regulator-compatible = "BUCK3";
+> +                       buck3_reg: BUCK3 {
+>                                 regulator-name = "vdd_int";
+>                                 regulator-min-microvolt = <850000>;
+>                                 regulator-max-microvolt = <1150000>;
+> @@ -823,8 +794,7 @@
+>                                 };
+>                         };
+>
+> -                       buck4_reg: buck4 {
+> -                               regulator-compatible = "BUCK4";
+> +                       buck4_reg: BUCK4 {
+>                                 regulator-name = "vdd_g3d";
+>                                 regulator-min-microvolt = <850000>;
+>                                 regulator-max-microvolt = <1150000>;
+> @@ -834,40 +804,35 @@
+>                                 };
+>                         };
+>
+> -                       buck5_reg: buck5 {
+> -                               regulator-compatible = "BUCK5";
+> +                       buck5_reg: BUCK5 {
+>                                 regulator-name = "VMEM_1.2V_AP";
+>                                 regulator-min-microvolt = <1200000>;
+>                                 regulator-max-microvolt = <1200000>;
+>                                 regulator-always-on;
+>                         };
+>
+> -                       buck6_reg: buck6 {
+> -                               regulator-compatible = "BUCK6";
+> +                       buck6_reg: BUCK6 {
+>                                 regulator-name = "VCC_SUB_1.35V";
+>                                 regulator-min-microvolt = <1350000>;
+>                                 regulator-max-microvolt = <1350000>;
+>                                 regulator-always-on;
+>                         };
+>
+> -                       buck7_reg: buck7 {
+> -                               regulator-compatible = "BUCK7";
+> +                       buck7_reg: BUCK7 {
+>                                 regulator-name = "VCC_SUB_2.0V";
+>                                 regulator-min-microvolt = <2000000>;
+>                                 regulator-max-microvolt = <2000000>;
+>                                 regulator-always-on;
+>                         };
+>
+> -                       buck8_reg: buck8 {
+> -                               regulator-compatible = "BUCK8";
+> +                       buck8_reg: BUCK8 {
+>                                 regulator-name = "VMEM_VDDF_3.0V";
+>                                 regulator-min-microvolt = <2850000>;
+>                                 regulator-max-microvolt = <2850000>;
+>                                 maxim,ena-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
+>                         };
+>
+> -                       buck9_reg: buck9 {
+> -                               regulator-compatible = "BUCK9";
+> +                       buck9_reg: BUCK9 {
+>                                 regulator-name = "CAM_ISP_CORE_1.2V";
+>                                 regulator-min-microvolt = <1000000>;
+>                                 regulator-max-microvolt = <1200000>;
+> --
+> 2.4.3
+>
 
-Ok.
+-Anand Moon
 
->> +               mmu-masters = <&fsl_mc 0x300 0>;
->> +       };
->> +
->> +       dspi: dspi at 2100000 {
->> +               compatible = "fsl,vf610-dspi";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               reg = <0x0 0x2100000 0x0 0x10000>;
->> +               interrupts = <0 26 0x4>; /* Level high type */
->> +               tcfq-mode;
->> +               clocks = <&clockgen 4 3>;
->> +               clock-names = "dspi";
->> +               spi-num-chipselects = <5>;
->> +               bus-num = <0>;
->> +               spi-cpol;
->> +               spi-cpha;
->> +       };
->> +
->> +       esdhc: esdhc at 2140000 {
->> +               compatible = "fsl,ls2080a-esdhc", "fsl,esdhc";
->> +               reg = <0x0 0x2140000 0x0 0x10000>;
->> +               interrupts = <0 28 0x4>; /* Level high type */
->> +               clock-frequency = <0>;  /* Updated by bootloader */
->> +               voltage-ranges = <1800 1800 3300 3300>;
->> +               sdhci,auto-cmd12;
->> +               little-endian;
->> +               bus-width = <4>;
->> +       };
->> +
->> +       gpio0: gpio at 2300000 {
->> +               compatible = "fsl,ls2080a-gpio";
->> +               reg = <0x0 0x2300000 0x0 0x10000>;
->> +               interrupts = <0 36 0x4>; /* Level high type */
->> +               gpio-controller;
->> +               #gpio-cells = <2>;
->> +               interrupt-controller;
->> +               #interrupt-cells = <2>;
->> +       };
->> +
->> +       gpio1: gpio at 2310000 {
->> +               compatible = "fsl,ls2080a-gpio";
->> +               reg = <0x0 0x2310000 0x0 0x10000>;
->> +               interrupts = <0 36 0x4>; /* Level high type */
->> +               gpio-controller;
->> +               #gpio-cells = <2>;
->> +               interrupt-controller;
->> +               #interrupt-cells = <2>;
->> +       };
->> +
->> +       gpio2: gpio at 2320000 {
->> +               compatible = "fsl,ls2080a-gpio";
->> +               reg = <0x0 0x2320000 0x0 0x10000>;
->> +               interrupts = <0 37 0x4>; /* Level high type */
->> +               gpio-controller;
->> +               #gpio-cells = <2>;
->> +               interrupt-controller;
->> +               #interrupt-cells = <2>;
->> +       };
->> +
->> +       gpio3: gpio at 2330000 {
->> +               compatible = "fsl,ls2080a-gpio";
->> +               reg = <0x0 0x2330000 0x0 0x10000>;
->> +               interrupts = <0 37 0x4>; /* Level high type */
->> +               gpio-controller;
->> +               #gpio-cells = <2>;
->> +               interrupt-controller;
->> +               #interrupt-cells = <2>;
->> +       };
->> +
->> +       i2c0: i2c at 2000000 {
->> +               compatible = "fsl,vf610-i2c";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               reg = <0x0 0x2000000 0x0 0x10000>;
->> +               interrupts = <0 34 0x4>; /* Level high type */
->> +               clock-names = "i2c";
->> +               clocks = <&clockgen 4 3>;
->> +       };
->> +
->> +       i2c1: i2c at 2010000 {
->> +               compatible = "fsl,vf610-i2c";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               reg = <0x0 0x2010000 0x0 0x10000>;
->> +               interrupts = <0 34 0x4>; /* Level high type */
->> +               clock-names = "i2c";
->> +               clocks = <&clockgen 4 3>;
->> +       };
->> +
->> +       i2c2: i2c at 2020000 {
->> +               compatible = "fsl,vf610-i2c";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               reg = <0x0 0x2020000 0x0 0x10000>;
->> +               interrupts = <0 35 0x4>; /* Level high type */
->> +               clock-names = "i2c";
->> +               clocks = <&clockgen 4 3>;
->> +       };
->> +
->> +       i2c3: i2c at 2030000 {
->> +               compatible = "fsl,vf610-i2c";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               reg = <0x0 0x2030000 0x0 0x10000>;
->> +               interrupts = <0 35 0x4>; /* Level high type */
->> +               clock-names = "i2c";
->> +               clocks = <&clockgen 4 3>;
->> +       };
->> +
->> +       ifc: ifc at 2240000 {
->> +               compatible = "fsl,ifc", "simple-bus";
->> +               reg = <0x0 0x2240000 0x0 0x20000>;
->> +               interrupts = <0 21 0x4>; /* Level high type */
->> +               little-endian;
->> +               #address-cells = <2>;
->> +               #size-cells = <1>;
->> +
->> +               ranges = <0 0 0x5 0x80000000 0x08000000
->> +                         2 0 0x5 0x30000000 0x00010000
->> +                         3 0 0x5 0x20000000 0x00010000>;
->> +       };
->> +
->> +       qspi: quadspi at 20c0000 {
->> +               compatible = "fsl,vf610-qspi";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               reg = <0x0 0x20c0000 0x0 0x10000>,
->> +                     <0x0 0x20000000 0x0 0x10000000>;
->> +               reg-names = "QuadSPI", "QuadSPI-memory";
->> +               interrupts = <0 25 0x4>; /* Level high type */
->> +               clocks = <&clockgen 4 3>, <&clockgen 4 3>;
->> +               clock-names = "qspi_en", "qspi";
->> +       };
->> +
->> +       pcie at 3400000 {
->> +               compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
->> +               reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
->> +                      0x10 0x00000000 0x0 0x00001000>; /* configuration space */
->> +               reg-names = "regs", "config";
->> +               interrupts = <0 108 0x4>; /* Level high type */
->> +               interrupt-names = "intr";
->> +               #address-cells = <3>;
->> +               #size-cells = <2>;
->> +               device_type = "pci";
->> +               num-lanes = <4>;
->> +               bus-range = <0x0 0xff>;
->> +               ranges = <0x81000000 0x0 0x00000000 0x10 0x00010000 0x0 0x00010000   /* downstream I/O */
->> +                         0x82000000 0x0 0x40000000 0x10 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
->> +               msi-parent = <&its>;
->> +               #interrupt-cells = <1>;
->> +               interrupt-map-mask = <0 0 0 7>;
->> +               interrupt-map = <0000 0 0 1 &gic 0 0 0 109 4>,
->> +                               <0000 0 0 2 &gic 0 0 0 110 4>,
->> +                               <0000 0 0 3 &gic 0 0 0 111 4>,
->> +                               <0000 0 0 4 &gic 0 0 0 112 4>;
->> +       };
->> +
->> +       pcie at 3500000 {
->> +               compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
->> +               reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
->> +                      0x12 0x00000000 0x0 0x00001000>; /* configuration space */
->> +               reg-names = "regs", "config";
->> +               interrupts = <0 113 0x4>; /* Level high type */
->> +               interrupt-names = "intr";
->> +               #address-cells = <3>;
->> +               #size-cells = <2>;
->> +               device_type = "pci";
->> +               num-lanes = <4>;
->> +               bus-range = <0x0 0xff>;
->> +               ranges = <0x81000000 0x0 0x00000000 0x12 0x00010000 0x0 0x00010000   /* downstream I/O */
->> +                         0x82000000 0x0 0x40000000 0x12 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
->> +               msi-parent = <&its>;
->> +               #interrupt-cells = <1>;
->> +               interrupt-map-mask = <0 0 0 7>;
->> +               interrupt-map = <0000 0 0 1 &gic 0 0 0 114 4>,
->> +                               <0000 0 0 2 &gic 0 0 0 115 4>,
->> +                               <0000 0 0 3 &gic 0 0 0 116 4>,
->> +                               <0000 0 0 4 &gic 0 0 0 117 4>;
->> +       };
->> +
->> +       pcie at 3600000 {
->> +               compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
->> +               reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
->> +                      0x14 0x00000000 0x0 0x00001000>; /* configuration space */
->> +               reg-names = "regs", "config";
->> +               interrupts = <0 118 0x4>; /* Level high type */
->> +               interrupt-names = "intr";
->> +               #address-cells = <3>;
->> +               #size-cells = <2>;
->> +               device_type = "pci";
->> +               num-lanes = <8>;
->> +               bus-range = <0x0 0xff>;
->> +               ranges = <0x81000000 0x0 0x00000000 0x14 0x00010000 0x0 0x00010000   /* downstream I/O */
->> +                         0x82000000 0x0 0x40000000 0x14 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
->> +               msi-parent = <&its>;
->> +               #interrupt-cells = <1>;
->> +               interrupt-map-mask = <0 0 0 7>;
->> +               interrupt-map = <0000 0 0 1 &gic 0 0 0 119 4>,
->> +                               <0000 0 0 2 &gic 0 0 0 120 4>,
->> +                               <0000 0 0 3 &gic 0 0 0 121 4>,
->> +                               <0000 0 0 4 &gic 0 0 0 122 4>;
->> +       };
->> +
->> +       pcie at 3700000 {
->> +               compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
->> +               reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
->> +                      0x16 0x00000000 0x0 0x00001000>; /* configuration space */
->> +               reg-names = "regs", "config";
->> +               interrupts = <0 123 0x4>; /* Level high type */
->> +               interrupt-names = "intr";
->> +               #address-cells = <3>;
->> +               #size-cells = <2>;
->> +               device_type = "pci";
->> +               num-lanes = <4>;
->> +               bus-range = <0x0 0xff>;
->> +               ranges = <0x81000000 0x0 0x00000000 0x16 0x00010000 0x0 0x00010000   /* downstream I/O */
->> +                         0x82000000 0x0 0x40000000 0x16 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
->> +               msi-parent = <&its>;
->> +               #interrupt-cells = <1>;
->> +               interrupt-map-mask = <0 0 0 7>;
->> +               interrupt-map = <0000 0 0 1 &gic 0 0 0 124 4>,
->> +                               <0000 0 0 2 &gic 0 0 0 125 4>,
->> +                               <0000 0 0 3 &gic 0 0 0 126 4>,
->> +                               <0000 0 0 4 &gic 0 0 0 127 4>;
->> +       };
->> +
->> +       sata0: sata at 3200000 {
->> +               compatible = "fsl,ls2080a-ahci", "fsl,ls1021a-ahci";
->> +               reg = <0x0 0x3200000 0x0 0x10000>;
->> +               interrupts = <0 133 0x4>; /* Level high type */
->> +               clocks = <&clockgen 4 3>;
->> +       };
->> +
->> +       sata1: sata at 3210000 {
->> +               compatible = "fsl,ls2080a-ahci", "fsl,ls1021a-ahci";
->> +               reg = <0x0 0x3210000 0x0 0x10000>;
->> +               interrupts = <0 136 0x4>; /* Level high type */
->> +               clocks = <&clockgen 4 3>;
->> +       };
->> +
->> +       usb0: usb3 at 3100000 {
->> +               compatible = "snps,dwc3";
->> +               reg = <0x0 0x3100000 0x0 0x10000>;
->> +               interrupts = <0 80 0x4>; /* Level high type */
->> +               dr_mode = "host";
->> +       };
->> +
->> +       usb1: usb3 at 3110000 {
->> +               compatible = "snps,dwc3";
->> +               reg = <0x0 0x3110000 0x0 0x10000>;
->> +               interrupts = <0 81 0x4>; /* Level high type */
->> +               dr_mode = "host";
->> +       };
->> +
->> +       ccn at 4000000 {
->> +               compatible = "arm,ccn-504";
->> +               reg = <0x0 0x04000000 0x0 0x01000000>;
->> +               interrupts = <0 12 4>;
->>         };
->>  };
->> --
->> 1.7.9.5
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
