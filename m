@@ -1,53 +1,59 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 28 Sep 2015 16:50:08 +0800
-Subject: [PATCH 1/1] ASoC: dwc: fix dma stop transferring issue
-In-Reply-To: <035401d0f9b7$faa800b0$eff80210$@tangramtek.com>
-Message-ID: <201509281643.vPLojmpB%fengguang.wu@intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 28 Sep 2015 17:52:13 +0900
+Subject: [PATCH 4/4] ARM64: dts: exynos5433: add jpeg node
+In-Reply-To: <55FFD4FF.6090306@samsung.com>
+References: <1442586060-23657-1-git-send-email-andrzej.p@samsung.com>
+ <1442586060-23657-5-git-send-email-andrzej.p@samsung.com>
+ <55FFD2D2.1010508@xs4all.nl> <55FFD4FF.6090306@samsung.com>
+Message-ID: <5608FFBD.1030306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi yitian,
+W dniu 21.09.2015 o 18:59, Andrzej Pietrasiewicz pisze:
+> Hi Hans,
+> 
+> W dniu 21.09.2015 o 11:50, Hans Verkuil pisze:
+>> On 18-09-15 16:21, Andrzej Pietrasiewicz wrote:
+>>> From: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>
+>>> Add Exynos 5433 jpeg h/w codec node.
+>>>
+>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+>>> ---
+>>>   arch/arm64/boot/dts/exynos/exynos5433.dtsi | 21 +++++++++++++++++++++
+>>>   1 file changed, 21 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+>>> b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+>>
+>> This dtsi file doesn't exist in the media-git tree. What is the story
+>> here?
+>>
+>> Should this go through a different subsystem?
+>>
+>> I think the media subsystem can take patches 1-3 and whoever does DT
+>> patches can
+>> take this patch, right?
+>>
+> 
+> The cover letter explains that the series is rebased onto Mauro's
+> master with Kukjin's branch merged. The latter does contain
+> the exynos5433.dtsi. That said, yes, taking patches 1-3 in
+> media subsystem and leaving DT patch to someone else is the
+> way to go.
 
-[auto build test results on v4.3-rc3 -- if it's inappropriate base, please ignore]
+Although Kukjin picked Exynos 5433 ARM64 patches but they were not
+accepted upstream by arm-soc. He rolled it for few releases but:
+1. Reason for not accepting by arm-soc was not resolved - there is no DTS.
+2. Kukjin did not rebase the branch for 4.4... which maybe means that he
+wants to drop it?
+3. Anyone (but me...) can send Galaxy Note4 (Exynos5433) DTS file based
+on sources on opensource.samsung.com. The DTS there is for 32-bit but it
+can be probably easily adjusted for ARM64.
 
-config: i386-randconfig-r0-201539 (attached as .config)
-reproduce:
-  git checkout 3488a5ee9b79e2ced9fa43b78c9c5d0aa7e052f9
-  # save the attached .config to linux build tree
-  make ARCH=i386 
+All of this means that Device Tree support for this driver can't be
+merged now and effort for mainlining 5433 may be unfortunately wasted...
 
-All error/warnings (new ones prefixed by >>):
-
-   sound/soc/dwc/designware_i2s.c: In function 'i2s_start':
->> sound/soc/dwc/designware_i2s.c:148:8: error: 'i' undeclared (first use in this function)
-      for (i = 0; i < 4; i++) {
-           ^
-   sound/soc/dwc/designware_i2s.c:148:8: note: each undeclared identifier is reported only once for each function it appears in
->> sound/soc/dwc/designware_i2s.c:149:4: error: 'irq' undeclared (first use in this function)
-       irq = i2s_read_reg(dev->i2s_base, IMR(i));
-       ^
-
-vim +/i +148 sound/soc/dwc/designware_i2s.c
-
-   142			      struct snd_pcm_substream *substream)
-   143	{
-   144	
-   145		i2s_write_reg(dev->i2s_base, IER, 1);
-   146	
-   147		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
- > 148			for (i = 0; i < 4; i++) {
- > 149				irq = i2s_read_reg(dev->i2s_base, IMR(i));
-   150				i2s_write_reg(dev->i2s_base, IMR(i), irq & ~0x30);
-   151			}
-   152			i2s_write_reg(dev->i2s_base, ITER, 1);
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 24380 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150928/887c1234/attachment-0001.obj>
+Best regards,
+Krzysztof
