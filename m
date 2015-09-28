@@ -1,69 +1,48 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 28 Sep 2015 14:19:43 -0700
-Subject: [PATCH v2 3/4] clk: bcm2835: Add support for programming the
- audio domain clocks.
-In-Reply-To: <5600B663.8000501@wwwdotorg.org>
-References: <1441922305-2298-1-git-send-email-eric@anholt.net>
- <1441922305-2298-3-git-send-email-eric@anholt.net>
- <5600B663.8000501@wwwdotorg.org>
-Message-ID: <87si5yutqo.fsf@eliezer.anholt.net>
+Date: Mon, 28 Sep 2015 14:22:02 -0700
+Subject: [PATCH v3 1/4] clk: bcm2835: Move under bcm/ with other Broadcom SoC
+ clk drivers.
+Message-ID: <1443475325-22270-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+clk-bcm2835.c predates the drivers under bcm/, but all the new BCM
+drivers are going in there so let's follow them.
 
-> On 09/10/2015 02:58 PM, Eric Anholt wrote:
->> This adds support for enabling, disabling, and setting the rate of the
->> audio domain clocks.  It will be necessary for setting the pixel clock
->> for HDMI in the VC4 driver and let us write a cpufreq driver.  It will
->> also improve compatibility with user changes to the firmware's
->> config.txt, since our previous fixed clocks are unaware of it.
->> 
->> The firmware also has support for configuring the clocks through the
->> mailbox channel, but the pixel clock setup by the firmware doesn't
->> work, and it's Raspberry Pi specific anyway.  The only conflicts we
->> should have with the firmware would be if we made firmware calls that
->> result in clock management (like opening firmware V3D or ISP access,
->> which we don't support in upstream), or on hardware over-thermal or
->> under-voltage (when the firmware would rewrite PLLB to take the ARM
->> out of overclock).  If that happens, our cached .recalc_rate() results
->> would be incorrect, but that's no worse than our current state where
->> we used fixed clocks.
->> 
->> The existing fixed clocks in the code are left in place to provide
->> backwards compatibility with old device tree files.
->
->> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+Signed-off-by: Eric Anholt <eric@anholt.net>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+ drivers/clk/Makefile                | 1 -
+ drivers/clk/bcm/Makefile            | 1 +
+ drivers/clk/{ => bcm}/clk-bcm2835.c | 0
+ 3 files changed, 1 insertion(+), 1 deletion(-)
+ rename drivers/clk/{ => bcm}/clk-bcm2835.c (100%)
 
->> +static const struct bcm2835_pll_ana_bits bcm2835_ana_default = {
->> +	0,
->> +	0,
->> +	~((7 << 19) | (15 << 15)),
->> +	(2 << 19) | (8 << 15),
->> +	~(7 << 7),
->> +	(6 << 1),
->> +
->> +	14
->
-> Nit: Elide the blank line? In some other structs too.
->
-> Are there #defines or names you can use for those initializers?
-
-I've just used named initializers instad.  (These *are* the defines, so
-another indirection wouldn't help anyone reading the driver).
-
->> +	clks[BCM2835_PLLA] = bcm2835_register_pll(cprman, &bcm2835_plla_data);
->> +	clks[BCM2835_PLLB] = bcm2835_register_pll(cprman, &bcm2835_pllb_data);
->
-> These can fail; shouldn't there be error-checking? Or, does
-> of_clk_add_provider() check for this?
-
-When you get the clk from the of provider, the error gets passed
-through, like it should.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150928/8775cabd/attachment.sig>
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index d08b3e5..9f71558 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -19,7 +19,6 @@ endif
+ obj-$(CONFIG_MACH_ASM9260)		+= clk-asm9260.o
+ obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN)	+= clk-axi-clkgen.o
+ obj-$(CONFIG_ARCH_AXXIA)		+= clk-axm5516.o
+-obj-$(CONFIG_ARCH_BCM2835)		+= clk-bcm2835.o
+ obj-$(CONFIG_COMMON_CLK_CDCE706)	+= clk-cdce706.o
+ obj-$(CONFIG_ARCH_CLPS711X)		+= clk-clps711x.o
+ obj-$(CONFIG_ARCH_EFM32)		+= clk-efm32gg.o
+diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
+index 8a7a477..ee2349b 100644
+--- a/drivers/clk/bcm/Makefile
++++ b/drivers/clk/bcm/Makefile
+@@ -3,4 +3,5 @@ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-kona-setup.o
+ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm281xx.o
+ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm21664.o
+ obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
++obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
+ obj-$(CONFIG_ARCH_BCM_CYGNUS)	+= clk-cygnus.o
+diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+similarity index 100%
+rename from drivers/clk/clk-bcm2835.c
+rename to drivers/clk/bcm/clk-bcm2835.c
+-- 
+2.1.4
