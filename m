@@ -1,97 +1,112 @@
 From: petr.cvek@tul.cz (Petr Cvek)
-Date: Mon, 28 Sep 2015 23:32:40 +0200
-Subject: [PATCH v4 12/26] ARM: pxa: magician: Rename charger cable detection
- EGPIOs
+Date: Mon, 28 Sep 2015 23:33:02 +0200
+Subject: [PATCH v4 13/26] ARM: pxa: magician: Fix and add charging detection
+ functions
 In-Reply-To: <cover.1443472089.git.petr.cvek@tul.cz>
 References: <cover.1443472089.git.petr.cvek@tul.cz>
-Message-ID: <5609B1F8.8070104@tul.cz>
+Message-ID: <5609B20E.1040606@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch renames EGPIOs, which are used for the charging cable presence
-and type detection. Old names did not correspond with an observed
-functionality (on board_id 0x3a). The behavior is not:
-
-- AC charger
-- USB charger
-- Cable detection
-
-, but:
-
-- AC/USB type
-- Cable detection1
-- Cable detection2
-
-This patch fixes a possible typo in the bit offset for the cable detection
-EGPIO declaration, too.
+This patch fixes the charging detection functions for pda_power driver
+(according to newly discovered EGPIOs) and add NiCd backup accumulator
+charging support.
 
 Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 ---
- arch/arm/mach-pxa/include/mach/magician.h | 11 ++++++++---
- arch/arm/mach-pxa/magician.c              |  8 ++++----
- 2 files changed, 12 insertions(+), 7 deletions(-)
+ arch/arm/mach-pxa/magician.c | 57 ++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 50 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/include/mach/magician.h b/arch/arm/mach-pxa/include/mach/magician.h
-index af4cdc2..5f6b850 100644
---- a/arch/arm/mach-pxa/include/mach/magician.h
-+++ b/arch/arm/mach-pxa/include/mach/magician.h
-@@ -107,8 +107,13 @@
- 
- /* input */
- 
--#define EGPIO_MAGICIAN_CABLE_STATE_AC	MAGICIAN_EGPIO(4, 0)
--#define EGPIO_MAGICIAN_CABLE_STATE_USB	MAGICIAN_EGPIO(4, 1)
-+/* USB or AC charger type */
-+#define EGPIO_MAGICIAN_CABLE_TYPE	MAGICIAN_EGPIO(4, 0)
-+/*
-+ * Vbus is detected
-+ * FIXME behaves like (6,3), may differ for host/device
-+ */
-+#define EGPIO_MAGICIAN_CABLE_VBUS	MAGICIAN_EGPIO(4, 1)
- 
- #define EGPIO_MAGICIAN_BOARD_ID0	MAGICIAN_EGPIO(5, 0)
- #define EGPIO_MAGICIAN_BOARD_ID1	MAGICIAN_EGPIO(5, 1)
-@@ -118,6 +123,6 @@
- 
- #define EGPIO_MAGICIAN_EP_INSERT	MAGICIAN_EGPIO(6, 1)
- /* FIXME behaves like (4,1), may differ for host/device */
--#define EGPIO_MAGICIAN_CABLE_INSERTED	MAGICIAN_EGPIO(6, 4)
-+#define EGPIO_MAGICIAN_CABLE_INSERTED	MAGICIAN_EGPIO(6, 3)
- 
- #endif /* _MAGICIAN_H_ */
 diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index bf0760e..b645288 100644
+index b645288..906df6d 100644
 --- a/arch/arm/mach-pxa/magician.c
 +++ b/arch/arm/mach-pxa/magician.c
-@@ -579,7 +579,7 @@ static struct resource gpio_vbus_resource = {
+@@ -596,18 +596,59 @@ static struct platform_device gpio_vbus = {
+  * External power
+  */
  
- static struct gpio_vbus_mach_info gpio_vbus_info = {
- 	.gpio_pullup	= GPIO27_MAGICIAN_USBC_PUEN,
--	.gpio_vbus	= EGPIO_MAGICIAN_CABLE_STATE_USB,
-+	.gpio_vbus	= EGPIO_MAGICIAN_CABLE_VBUS,
- };
- 
- static struct platform_device gpio_vbus = {
-@@ -598,17 +598,17 @@ static struct platform_device gpio_vbus = {
- 
- static int power_supply_init(struct device *dev)
+-static int power_supply_init(struct device *dev)
++static int magician_supply_init(struct device *dev)
  {
--	return gpio_request(EGPIO_MAGICIAN_CABLE_STATE_AC, "CABLE_STATE_AC");
-+	return gpio_request(EGPIO_MAGICIAN_CABLE_TYPE, "Cable USB/AC type");
+-	return gpio_request(EGPIO_MAGICIAN_CABLE_TYPE, "Cable USB/AC type");
++	int ret = -1;
++
++	ret = gpio_request(EGPIO_MAGICIAN_CABLE_TYPE, "Cable is AC charger");
++	if (ret) {
++		pr_err("Cannot request AC/USB charger GPIO (%i)\n", ret);
++		goto err_ac;
++	}
++
++	ret = gpio_request(EGPIO_MAGICIAN_CABLE_INSERTED, "Cable inserted");
++	if (ret) {
++		pr_err("Cannot request cable detection GPIO (%i)\n", ret);
++		goto err_usb;
++	}
++
++	return 0;
++
++err_usb:
++	gpio_free(EGPIO_MAGICIAN_CABLE_TYPE);
++err_ac:
++	return ret;
++}
++
++static void magician_set_charge(int flags)
++{
++	if (flags & PDA_POWER_CHARGE_AC) {
++		pr_debug("Charging from AC\n");
++		gpio_set_value(EGPIO_MAGICIAN_NICD_CHARGE, 1);
++	} else if (flags & PDA_POWER_CHARGE_USB) {
++		pr_debug("Charging from USB\n");
++		gpio_set_value(EGPIO_MAGICIAN_NICD_CHARGE, 1);
++	} else {
++		pr_debug("Charging disabled\n");
++		gpio_set_value(EGPIO_MAGICIAN_NICD_CHARGE, 0);
++	}
  }
  
  static int magician_is_ac_online(void)
  {
--	return gpio_get_value(EGPIO_MAGICIAN_CABLE_STATE_AC);
-+	return gpio_get_value(EGPIO_MAGICIAN_CABLE_TYPE);
+-	return gpio_get_value(EGPIO_MAGICIAN_CABLE_TYPE);
++	return gpio_get_value(EGPIO_MAGICIAN_CABLE_INSERTED) &&
++		gpio_get_value(EGPIO_MAGICIAN_CABLE_TYPE); /* AC=1 */
++}
++
++static int magician_is_usb_online(void)
++{
++	return gpio_get_value(EGPIO_MAGICIAN_CABLE_INSERTED) &&
++		(!gpio_get_value(EGPIO_MAGICIAN_CABLE_TYPE)); /* USB=0 */
  }
  
- static void power_supply_exit(struct device *dev)
+-static void power_supply_exit(struct device *dev)
++static void magician_supply_exit(struct device *dev)
  {
--	gpio_free(EGPIO_MAGICIAN_CABLE_STATE_AC);
-+	gpio_free(EGPIO_MAGICIAN_CABLE_TYPE);
++	gpio_free(EGPIO_MAGICIAN_CABLE_INSERTED);
+ 	gpio_free(EGPIO_MAGICIAN_CABLE_TYPE);
  }
  
- static char *magician_supplicants[] = {
+@@ -616,9 +657,11 @@ static char *magician_supplicants[] = {
+ };
+ 
+ static struct pda_power_pdata power_supply_info = {
+-	.init			= power_supply_init,
++	.init			= magician_supply_init,
++	.exit			= magician_supply_exit,
+ 	.is_ac_online		= magician_is_ac_online,
+-	.exit			= power_supply_exit,
++	.is_usb_online		= magician_is_usb_online,
++	.set_charge		= magician_set_charge,
+ 	.supplied_to		= magician_supplicants,
+ 	.num_supplicants	= ARRAY_SIZE(magician_supplicants),
+ };
+@@ -683,7 +726,7 @@ static struct gpio_regulator_config bq24022_info = {
+ 
+ 	.enable_gpio		= GPIO30_MAGICIAN_BQ24022_nCHARGE_EN,
+ 	.enable_high		= 0,
+-	.enabled_at_boot	= 0,
++	.enabled_at_boot	= 1,
+ 
+ 	.gpios			= bq24022_gpios,
+ 	.nr_gpios		= ARRAY_SIZE(bq24022_gpios),
 -- 
 1.7.12.1
