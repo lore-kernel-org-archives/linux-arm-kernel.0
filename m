@@ -1,82 +1,37 @@
-From: songjun.wu@atmel.com (Songjun Wu)
-Date: Mon, 28 Sep 2015 13:14:37 +0800
-Subject: [RESEND PATCH v2 2/2] SoC: atmel-classd: DT binding for Class D audio
- amplifier driver
-In-Reply-To: <1443417278-19657-1-git-send-email-songjun.wu@atmel.com>
-References: <1443417278-19657-1-git-send-email-songjun.wu@atmel.com>
-Message-ID: <1443417278-19657-3-git-send-email-songjun.wu@atmel.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 28 Sep 2015 13:24:41 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 4.3
+Message-ID: <20150928052440.GA4843@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT binding documentation for this new ASoC driver.
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
-Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
----
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 
-Changes in v2:
-- Delete the device node "Sound" in dts.
+are available in the git repository at:
 
- .../devicetree/bindings/sound/atmel-classd.txt     |   52 ++++++++++++++++++++
- 1 file changed, 52 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/atmel-classd.txt
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.3
 
-diff --git a/Documentation/devicetree/bindings/sound/atmel-classd.txt b/Documentation/devicetree/bindings/sound/atmel-classd.txt
-new file mode 100644
-index 0000000..0018451
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/atmel-classd.txt
-@@ -0,0 +1,52 @@
-+* Atmel ClassD driver under ALSA SoC architecture
-+
-+Required properties:
-+- compatible
-+	Should be "atmel,sama5d2-classd".
-+- reg
-+	Should contain ClassD registers location and length.
-+- interrupts
-+	Should contain the IRQ line for the ClassD.
-+- dmas
-+	One DMA specifiers as described in atmel-dma.txt and dma.txt files.
-+- dma-names
-+	Must be "tx".
-+- clock-names
-+	Tuple listing input clock names.
-+	Required elements: "pclk", "gclk" and "aclk".
-+- clocks
-+	Please refer to clock-bindings.txt.
-+
-+Optional properties:
-+- pinctrl-names, pinctrl-0
-+	Please refer to pinctrl-bindings.txt.
-+- atmel,model
-+	The user-visible name of this sound complex.
-+	The default value is "CLASSD".
-+- atmel,pwm-type
-+	PWM modulation type, "single" or "diff".
-+	The default value is "single".
-+- atmel,non-overlap-time
-+	Set non-overlapping time, the unit is nanosecond(ns).
-+	There are four values,
-+	<5>, <10>, <15>, <20>, the default value is <10>.
-+	Non-overlapping will be disabled if not specified.
-+
-+Example:
-+classd: classd at fc048000 {
-+		compatible = "atmel,sama5d2-classd";
-+		reg = <0xfc048000 0x100>;
-+		interrupts = <59 IRQ_TYPE_LEVEL_HIGH 7>;
-+		dmas = <&dma0
-+			(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+			| AT91_XDMAC_DT_PERID(47))>;
-+		dma-names = "tx";
-+		clocks = <&classd_clk>, <&classd_gclk>, <&audio_pll_pmc>;
-+		clock-names = "pclk", "gclk", "aclk";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_classd_default>;
-+		atmel,model = "classd @ SAMA5D2-Xplained";
-+		atmel,pwm-type = "diff";
-+		atmel,non-overlap-time = <10>;
-+};
--- 
-1.7.9.5
+for you to fetch changes up to 0af822110871400908d5b6f83a8908c45f881d8f:
+
+  ARM: dts: fix usb pin control for imx-rex dts (2015-09-24 05:13:40 -0700)
+
+----------------------------------------------------------------
+The i.MX fixes for 4.3:
+ - One fix for i.MX6 Rex Pro board to remove a duplicated pinctrl entry
+   which causes error for USB pinctrl setup.
+ - Fix MC34708 PMIC interrupt level for imx53-qsrb board.
+
+----------------------------------------------------------------
+Felipe F. Tonello (1):
+      ARM: dts: fix usb pin control for imx-rex dts
+
+Lucas Stach (2):
+      ARM: imx53: include IRQ dt-bindings header
+      ARM: imx53: qsrb: fix PMIC interrupt level
+
+ arch/arm/boot/dts/imx53-qsrb.dts   | 2 +-
+ arch/arm/boot/dts/imx53.dtsi       | 1 +
+ arch/arm/boot/dts/imx6qdl-rex.dtsi | 2 --
+ 3 files changed, 2 insertions(+), 3 deletions(-)
