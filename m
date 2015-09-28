@@ -1,50 +1,94 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Mon, 28 Sep 2015 07:26:46 -0700
-Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
- 'global_lock'
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CBA3BF7@AcuExch.aculab.com>
-References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- <2524822.pQu4UKMrlb@vostro.rjw.lan>
- <1443297128.2181.11.camel@HansenPartnership.com>
- <3461169.v5xKdGLGjP@vostro.rjw.lan>
- <063D6719AE5E284EB5DD2968C1650D6D1CBA3BF7@AcuExch.aculab.com>
-Message-ID: <1443450406.2168.3.camel@HansenPartnership.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Mon, 28 Sep 2015 15:43:51 +0100
+Subject: Steps to submit a new arch/arm port
+In-Reply-To: <56094543.2040101@free.fr> (Mason's message of "Mon, 28 Sep 2015
+ 15:48:51 +0200")
+References: <56001B78.2090001@free.fr> <2206647.QPrIpE2UC0@wuerfel>
+ <56016780.5080104@free.fr> <144297172.JfjI0hNJ9J@wuerfel>
+ <56094543.2040101@free.fr>
+Message-ID: <yw1xa8s6r4d4.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-09-28 at 08:58 +0000, David Laight wrote:
-> From: Rafael J. Wysocki
-> > Sent: 27 September 2015 15:09
-> ...
-> > > > Say you have three adjacent fields in a structure, x, y, z, each one byte long.
-> > > > Initially, all of them are equal to 0.
-> > > >
-> > > > CPU A writes 1 to x and CPU B writes 2 to y at the same time.
-> > > >
-> > > > What's the result?
-> > >
-> > > I think every CPU's  cache architecure guarantees adjacent store
-> > > integrity, even in the face of SMP, so it's x==1 and y==2.  If you're
-> > > thinking of old alpha SMP system where the lowest store width is 32 bits
-> > > and thus you have to do RMW to update a byte, this was usually fixed by
-> > > padding (assuming the structure is not packed).  However, it was such a
-> > > problem that even the later alpha chips had byte extensions.
-> 
-> Does linux still support those old Alphas?
-> 
-> The x86 cpus will also do 32bit wide rmw cycles for the 'bit' operations.
+Mason <slash.tmp@free.fr> writes:
 
-That's different: it's an atomic RMW operation.  The problem with the
-alpha was that the operation wasn't atomic (meaning that it can't be
-interrupted and no intermediate output states are visible).
+> On 22/09/2015 16:51, Arnd Bergmann wrote:
+>
+>> On Tuesday 22 September 2015 16:36:48 Mason wrote:
+>> 
+>>> +void __init tangox_timer_init(void)
+>>> +{
+>>> +	int err;
+>>> +
+>>> +	clkgen_base = ioremap(CLKGEN_BASE, 0x100);
+>> 
+>> Remove all hardcoded physical memory addresses.
+>> 
+>>> +	if (clkgen_base == NULL) return;
+>>> +
+>>> +	register_current_timer_delay(&delay_timer);
+>>> +	sched_clock_register(read_sched_clock, 32, XTAL_FREQ);
+>>> +
+>>> +	err = clocksource_register_hz(&tangox_xtal, XTAL_FREQ);
+>>> +	if (err) pi_alert("Failed to register tangox_xtal clocksource!\n");
+>>> +
+>>> +	tangox_clock_tree_register();
+>>> +
+>>> +	of_clk_init(NULL);
+>>> +	clocksource_of_init();
+>>> +}
+>> 
+>> CLK_OF_DECLARE() for the clk
+>> 
+>> CLOCKSOURCE_OF_DECLARE() for the clocksource/clockevent
+>> 
+>> Make these two drivers.
+>
+> Hmmm, about that (splitting clock-tango.c in two drivers)
+>
+> The "legacy" order of calls was:
+>
+>   register_current_timer_delay
+>   sched_clock_register
+>   clocksource_register_hz
+>   /* Should the above 3 be called in a different order? */
+>
+> then
+>
+>   tangox_clock_tree_register
+>
+> then
+>
+>   of_clk_init
+>   clocksource_of_init
+>   /* To invoke the smp_twd OF init, after the clock tree is registered */
+>
+> I moved the first three to a separate clocksource driver:
+>
+> static void __init tango_timer_init(struct device_node *np)
+> {
+> 	clkgen_base = of_iomap(np, 0);
+> 	register_current_timer_delay(&delay_timer);
+> 	sched_clock_register(read_sched_clock, 32, XTAL_FREQ);
+> 	clocksource_register_hz(&tango_xtal, XTAL_FREQ);
+> }
+> CLOCKSOURCE_OF_DECLARE(tango, "sigma,tango-xtal", tango_timer_init);
+>
+> But tango_timer_init() is not being called...
+>
+> I updated my device tree with
+>
+> 	tango-xtal at 10000 {
+> 		compatible = "sigma,tango-xtal";
+> 		reg = <0x10000 0x100>;
+> 	};
+>
+> Shouldn't the kernel call tango_timer_init?
 
-> > OK, thanks!
-> 
-> You still have to ensure the compiler doesn't do wider rmw cycles.
-> I believe the recent versions of gcc won't do wider accesses for volatile data.
+Why don't you use the drivers from my tree?  It has drivers for
+everything clock related in tango3 and shouldn't need much tweaking to
+work with tango4 as well.
 
-I don't understand this comment.  You seem to be implying gcc would do a
-64 bit RMW for a 32 bit store ... that would be daft when a single
-instruction exists to perform the operation on all architectures.
-
-James
+-- 
+M?ns Rullg?rd
+mans at mansr.com
