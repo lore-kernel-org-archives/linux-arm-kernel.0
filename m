@@ -1,78 +1,85 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 28 Sep 2015 17:42:54 +0100
-Subject: [PATCH v4 1/9] drivers/of: Introduce of_node_alloc
+Date: Mon, 28 Sep 2015 17:42:55 +0100
+Subject: [PATCH v4 2/9] genirq/irqdomain: Add irq_create_acpi_mapping
 In-Reply-To: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
 References: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1443458582-7497-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1443458582-7497-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to be able to generate "fake" device nodes that can be
-used as an identifier for irq domains. For that, we reuse the
-dynamic DT layer in order to generate DT nodes in a detached state
-(so that it doesn't interfere with the rest of the tree).
+In order to help ACPI on arm64 to make use of most of the irqdomain
+goodies, add a new entry point (irq_create_acpi_mapping) which
+mimics irq_create_of_mapping, except that it takes a new
+struct acpi_gsi_descriptor, which is the pendent of of_phandle_args
+in the OF world.
+
+We assume that the way the acpi_gsi_descriptor is populated matches
+that of of_phandle_args, as the latter is still the building block
+for interrupt descriptor in the whole kernel.
+
+Eventually, these two representations should be merged in a single
+structure, but that's probably for another day.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/of/dynamic.c | 22 ++++++++++++++++++++++
- include/linux/of.h   |  5 +++++
+ include/linux/acpi.h   |  9 +++++++++
+ kernel/irq/irqdomain.c | 18 ++++++++++++++++++
  2 files changed, 27 insertions(+)
 
-diff --git a/drivers/of/dynamic.c b/drivers/of/dynamic.c
-index 53826b8..709d363 100644
---- a/drivers/of/dynamic.c
-+++ b/drivers/of/dynamic.c
-@@ -445,6 +445,28 @@ struct device_node *__of_node_dup(const struct device_node *np, const char *fmt,
- 	return NULL;
- }
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 7235c48..4db2f01 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -201,6 +201,15 @@ int acpi_register_gsi (struct device *dev, u32 gsi, int triggering, int polarity
+ int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
+ int acpi_isa_irq_to_gsi (unsigned isa_irq, u32 *gsi);
  
-+/**
-+ * of_node_alloc() - Allocate an empty device node dynamically.
-+ * @fmt: Format string (plus vargs) for new full name of the device node
-+ *
-+ * Create an device tree node, either by by allocating an empty one
-+ * suitable for further modification.  The node data are dynamically
-+ * allocated and all the node flags have the OF_DYNAMIC & OF_DETACHED
-+ * bits set. Returns the newly allocated node or NULL on out of memory
-+ * error.
-+ */
-+struct device_node *of_node_alloc(const char *fmt, ...)
-+{
-+	struct device_node *np;
-+	va_list vargs;
++#define MAX_GSI_DESC_PARAMS 16
++struct acpi_gsi_descriptor {
++	int param_count;
++	u32 param[MAX_GSI_DESC_PARAMS];
++};
 +
-+	va_start(vargs, fmt);
-+	np = __of_node_dup(NULL, fmt, vargs);
-+	va_end(vargs);
++unsigned int irq_create_acpi_mapping(struct irq_domain *d,
++				     struct acpi_gsi_descriptor *irq_data);
 +
-+	return np;
-+}
-+
- static void __of_changeset_entry_destroy(struct of_changeset_entry *ce)
- {
- 	of_node_put(ce->np);
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 2194b8c..f7f11f7 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -104,6 +104,7 @@ static inline int of_node_is_attached(struct device_node *node)
- #ifdef CONFIG_OF_DYNAMIC
- extern struct device_node *of_node_get(struct device_node *node);
- extern void of_node_put(struct device_node *node);
-+extern struct device_node *of_node_alloc(const char *fmt, ...);
- #else /* CONFIG_OF_DYNAMIC */
- /* Dummy ref counting routines - to be implemented later */
- static inline struct device_node *of_node_get(struct device_node *node)
-@@ -111,6 +112,10 @@ static inline struct device_node *of_node_get(struct device_node *node)
- 	return node;
- }
- static inline void of_node_put(struct device_node *node) { }
-+static inline struct device_node *of_node_alloc(const char *fmt, ...)
-+{
-+	return NULL;
-+}
- #endif /* !CONFIG_OF_DYNAMIC */
+ #ifdef CONFIG_X86_IO_APIC
+ extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
+ #else
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index dc9d27c..e5c1e4c 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -1,5 +1,6 @@
+ #define pr_fmt(fmt)  "irq: " fmt
  
- /* Pointer for first entry in chain of all nodes. */
++#include <linux/acpi.h>
+ #include <linux/debugfs.h>
+ #include <linux/hardirq.h>
+ #include <linux/interrupt.h>
+@@ -522,6 +523,23 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+ }
+ EXPORT_SYMBOL_GPL(irq_create_of_mapping);
+ 
++#ifdef CONFIG_ACPI
++unsigned int irq_create_acpi_mapping(struct irq_domain *d,
++				     struct acpi_gsi_descriptor *irq_data)
++{
++	struct of_phandle_args args;
++	int i;
++
++	for (i = 0; i < min(irq_data->param_count, MAX_PHANDLE_ARGS); i++)
++		args.args[i] = irq_data->param[i];
++
++	args.np = d->of_node;
++	args.args_count = i;
++
++	return irq_create_of_mapping(&args);
++}
++#endif
++
+ /**
+  * irq_dispose_mapping() - Unmap an interrupt
+  * @virq: linux irq number of the interrupt to unmap
 -- 
 2.1.4
