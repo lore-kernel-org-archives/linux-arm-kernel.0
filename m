@@ -1,160 +1,592 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Mon, 28 Sep 2015 17:56:40 +0800
-Subject: set rockchip-specific uboot bootmode flags on reboot
-In-Reply-To: <8498512.JKlZEAjChn@diego>
-References: <1441716187-29446-1-git-send-email-andy.yan@rock-chips.com>
- <CAPnjgZ0n7aNY7FRnoDYUBEnQAtUO1BWKs6DDzaMQyHsg1kQ1Jg@mail.gmail.com>
- <55FA9EDA.8010308@rock-chips.com> <8498512.JKlZEAjChn@diego>
-Message-ID: <56090ED8.9020807@rock-chips.com>
+From: bhupesh.linux@gmail.com (Bhupesh SHARMA)
+Date: Mon, 28 Sep 2015 15:33:21 +0530
+Subject: [PATCH v2 07/10] dts/ls2085a: Update DTSI to add support of
+ various peripherals
+In-Reply-To: <CAL_Jsq+9izV8vkrF1tK96M-VRGTMJ+GN5o=RsnCBDcnh-at5kA@mail.gmail.com>
+References: <1441350322-4671-1-git-send-email-bhupesh.sharma@freescale.com>
+ <CAL_Jsq+9izV8vkrF1tK96M-VRGTMJ+GN5o=RsnCBDcnh-at5kA@mail.gmail.com>
+Message-ID: <CAFTCetQ1EE332AnihKFw_Emf7_E4=OcVg2sRDoq3R-siyDZgKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko:
+Hi Rob,
 
-On 2015?09?23? 07:16, Heiko St?bner wrote:
-> Hi Andy,
->
->
-> Am Donnerstag, 17. September 2015, 19:07:06 schrieb Andy Yan:
->> On 2015?09?10? 02:05, Simon Glass wrote:
->>> Hi,
->>>
->>> On 8 September 2015 at 16:46, Heiko St?bner <heiko@sntech.de> wrote:
->>>> Hi Andy,
->>>>
->>>> Am Dienstag, 8. September 2015, 20:43:07 schrieb Andy Yan:
->>>>> rockchip platform have a protocol to pass the the kernel
->>>>> reboot mode to bootloader by some special registers when
->>>>> system reboot.By this way the bootloader can take different
->>>>> action according to the different kernel reboot mode, for
->>>>> example, command "reboot loader" will reboot the board to
->>>>> rockusb mode, this is a very convenient way to get the board
->>>>> to download mode.
->>>>>
->>>>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
->>>> [...]
->>>>
->>>>> @@ -0,0 +1,22 @@
->>>>> +#ifndef __MACH_ROCKCHIP_LOADER_H
->>>>> +#define __MACH_ROCKCHIP_LOADER_H
->>>>> +
->>>>> +/*high 24 bits is tag, low 8 bits is type*/
->>>>> +#define SYS_LOADER_REBOOT_FLAG   0x5242C300
->>>>> +
->>>>> +enum {
->>>>> +     BOOT_NORMAL = 0, /* normal boot */
->>>>> +     BOOT_LOADER,     /* enter loader rockusb mode */
->>>>> +     BOOT_MASKROM,    /* enter maskrom rockusb mode (not support now)
->>>>> */
->>>>> +     BOOT_RECOVER,    /* enter recover */
->>>>> +     BOOT_NORECOVER,  /* do not enter recover */
->>>>> +     BOOT_SECONDOS,   /* boot second OS (not support now)*/
->>>>> +     BOOT_WIPEDATA,   /* enter recover and wipe data. */
->>>>> +     BOOT_WIPEALL,    /* enter recover and wipe all data. */
->>>>> +     BOOT_CHECKIMG,   /* check firmware img with backup part*/
->>>>> +     BOOT_FASTBOOT,   /* enter fast boot mode */
->>>>> +     BOOT_SECUREBOOT_DISABLE,
->>>>> +     BOOT_CHARGING,   /* enter charge mode */
->>>>> +     BOOT_MAX         /* MAX VALID BOOT TYPE.*/
->>>>> +};
->>>>> +#endif
->>>> These flags rely on code in the bootloader to actually handle the target
->>>> action. Nowadays this is uboot, but still a rockchip-specific fork. And
->>>> we're actively moving away from that, with the recent rk3288 addition to
->>>> mainline uboot.
->>>>
->>>> So unless you convince uboot people that the _underlying special
->>>> functionality_ behind these flags should be part of uboot, I don't think
->>>> this is going to fly.
->>>>
->>>>
->>>> In a way this is similar to gpu kernel code talking to proprietary
->>>> userspace libs - these are also not eligible for the kernel. (meaning
->>>> stuff like the mali kernel driver not being allowed).
->>> I don't want to comment on what Linux does or does not want. But I can
->>> see this sort of feature being useful for devs at least. So long as it
->>> is defined in a way that is not Rockchip-specific (and the above enum
->>> looks pretty reasonable on that front, I think it makes sense.
->>>
->>> Of course it's a bit odd to target a downstream U-Boot with a Linux
->>> feature. But hopefully Rockchip's U-Boot support and development will
->>> move to mainline with time.
->>      Is there any chance for this patch to be landed?
->>      As Simon says, it is useful for development. And
->>      he is upstreaming Rockchip U-boot.
-> Sorry that I'm still dragging my feet with this, but I'm still struggling with
-> what to do.
->
-> I did talk to the arm-soc maintainers and doing this in general seems to be
-> fine. Olof was very in favour, others pointed out that just passing through
-> the command into the register might be the best solution - without having to
-> translate stuff in the kernel.
->   
-    Some commands are very long(recovery,bootloader, fastboot etc),
-    they can't be stored into a register directly. And this also bring 
-compatible
-    problems to the old boot loader.
->
-> So I guess the translation table (string to number) is the thing to talk
-> about. I guess my worries are three-fold:
->
-> - will this actually be stable or do we get a future where this translation
-> gets to be soc-specific, like "if rk3288 table_a; if rk3368 table_b ..." ?
-      All Rockchip base socs use this mechanism, but this commands may
-      stored in different registers in different soc.
->
-> - can we trim that down to actually supported modes?
-      I have take a look at exynos and msm  android base platforms, they
-      use the same mechanism[1][2], so I think many platforms need this
-      function.
-      [1] 
-https://github.com/droidroidz/Manta_kernel/blob/master/arch/arm/mach-exynos/board-manta-power.c
-      [2] 
-https://github.com/msm7x30/android_kernel_qcom_msm7x30/blob/android-3.10/arch/arm/mach-msm/restart_7k.c
+On Sat, Sep 5, 2015 at 2:45 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On Fri, Sep 4, 2015 at 2:05 AM, Bhupesh Sharma
+> <bhupesh.sharma@freescale.com> wrote:
+>> This patch updates the LS2085a DTSI (DTS Include) file to add
+>> support for various peripherals supported by FSL LS2085a SoC, for e.g.:
+>>         - USB 3.0 Host
+>>         - PMU
+>>         - CCN-504
+>>         - Watchdog
+>>         - SATA
+>>         - SPI
+>>         - PCIe
+>>         - etc.
+>>
+>> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+>> Signed-off-by: Jaiprakash Singh <b44839@freescale.com>
+>> Signed-off-by: Alison Wang <alison.wang@freescale.com>
+>> Signed-off-by: Liu Gang <Gang.Liu@freescale.com>
+>> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+>> Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
+>> Signed-off-by: Nikhil Badola <nikhil.badola@freescale.com>
+>> Signed-off-by: Yangbo Lu <yangbo.lu@freescale.com>
+>> Signed-off-by: Scott Wood <scottwood@freescale.com>
+>> ---
+>>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |  469 +++++++++++++++++++++++-
+>>  1 file changed, 459 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+>> index 333d942..5fee0a7 100644
+>> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+>> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
 
->
-> - I forgot that we already have other mass-production bootloaders, so what
-> does coreboot on veyron devices do with these register-values?
->
-       coreboot use different download mechanism, it doesn't touch this
-       register.
-> As it is probably also valid for rk3368 and following, I guess it should live
-> somehow in drivers/soc/rockchip too.
-     Yes, rk3368 also need this function, so maybe we should put it in
-     drivers/soc/rockchip.
+[snip..]
 
-     Thanks.
+>> +
+>>         gic: interrupt-controller at 6000000 {
 >
+> This should be under a bus node.
+
+Ok.
+
+>>                 compatible = "arm,gic-v3";
+>>                 reg = <0x0 0x06000000 0 0x10000>, /* GIC Dist */
+>> -                     <0x0 0x06100000 0 0x100000>; /* GICR (RD_base + SGI_base) */
+>> +                     <0x0 0x06100000 0 0x100000>, /* GICR (RD_base + SGI_base) */
+>> +                     <0x0 0x0c0c0000 0 0x2000>, /* GICC */
+>> +                     <0x0 0x0c0d0000 0 0x1000>, /* GICH */
+>> +                     <0x0 0x0c0e0000 0 0x20000>; /* GICV */
+>>                 #interrupt-cells = <3>;
+>> +               #address-cells = <2>;
+>> +               #size-cells = <2>;
+>> +               ranges;
+>>                 interrupt-controller;
+>>                 interrupts = <1 9 0x4>;
+>> +
+>> +               its: gic-its at 6020000 {
+>> +                       compatible = "arm,gic-v3-its";
+>> +                       msi-controller;
+>> +                       reg = <0x0 0x6020000 0 0x20000>;
+>> +               };
+>> +       };
+>> +
+>> +       clockgen: clocking at 1300000 {
 >
-> Heiko
+> This should be under a bus node.
+
+Ok.
+
+>> +               compatible = "fsl,ls2080a-clockgen";
+>> +               reg = <0 0x1300000 0 0xa0000>;
+>> +               #clock-cells = <2>;
+>> +               clocks = <&sysclk>;
+>> +
+>> +               sysclk: sysclk {
+>> +                       compatible = "fixed-clock";
+>> +                       #clock-cells = <0>;
+>> +                       clock-frequency = <100000000>;
+>> +                       clock-output-names = "sysclk";
+>> +               };
+>>         };
+>>
+>>         timer {
+>> @@ -139,25 +173,440 @@
+>>                              <1 10 0x8>; /* Hypervisor PPI, active-low */
+>>         };
+>>
+>> +       amba {
+>> +               compatible = "arm,amba-bus";
 >
->>>> [...]
->>>>
->>>>> +static int rockchip_reboot_notify(struct notifier_block *this,
->>>>> +                               unsigned long mode, void *cmd)
->>>>> +{
->>>>> +     u32 flag;
->>>>> +
->>>>> +     rockchip_get_reboot_flag(cmd, &flag);
->>>>> +     regmap_write(regmap, flag_reg, flag);
->>>>> +
->>>>> +     return NOTIFY_DONE;
->>>>> +}
->>>>> +
->>>>> +static struct notifier_block rockchip_reboot_handler = {
->>>>> +     .notifier_call = rockchip_reboot_notify,
->>>>> +     .priority = 150,
->>>>> +};
->>>> the restart handlers are meant to really only restart the system, not to
->>>> execute some actions before the restart happens.
->>>>
->>>> See https://lkml.org/lkml/2015/6/3/707 for a similar case.
->>>>
->>>>
->>>> Heiko
->>> Regards,
->>> Simon
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+> Use simple-bus. "arm,amba-bus" is meaningless.
+
+Not sure I understand your comment here. Without this
+compatible in place I cannot see the 'drivers/amba/bus.c'
+amba_match() function getting called which in turn will call the
+amba_lookup() function,
+thus invoking the probe function of the sp805_wdt driver.
+
+Here is the comment on top of struct amba_bustype:
+
+188 /*
+189  * Primecells are part of the Advanced Microcontroller Bus Architecture,
+190  * so we call the bus "amba".
+191  */
+
+Reference: http://lxr.free-electrons.com/source/drivers/amba/bus.c#L188
+
+So, this should be  "arm,amba-bus", as used in other DTS as well like
+ARM versatile
+DTS:
+
+  90         amba {
+ 91                 compatible = "arm,amba-bus";
+ 92                 #address-cells = <1>;
+ 93                 #size-cells = <1>;
+ 94                 ranges;
+
+Reference: http://lxr.free-electrons.com/source/arch/arm/boot/dts/versatile-ab.dts#L90
+
+>> +               #address-cells = <2>;
+>> +               #size-cells = <2>;
+>> +               ranges;
+>> +
+>> +               cluster1_core0_watchdog: wdt at c000000 {
+>> +                       compatible = "arm,primecell";
+>> +                       reg = <0x0 0xc000000 0x0 0x1000>;
+>> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
+>> +                       clocks = <&clockgen 4 3>;
+>> +                       clock-names = "apb_pclk";
+>> +               };
+>> +
+>> +               cluster1_core1_watchdog: wdt at c010000 {
+>> +                       compatible = "arm,primecell";
+>> +                       reg = <0x0 0xc010000 0x0 0x1000>;
+>> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
+>> +                       clocks = <&clockgen 4 3>;
+>> +                       clock-names = "apb_pclk";
+>> +               };
+>> +
+>> +               cluster2_core0_watchdog: wdt at c100000 {
+>> +                       compatible = "arm,primecell";
+>> +                       reg = <0x0 0xc100000 0x0 0x1000>;
+>> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
+>> +                       clocks = <&clockgen 4 3>;
+>> +                       clock-names = "apb_pclk";
+>> +               };
+>> +
+>> +               cluster2_core1_watchdog: wdt at c110000 {
+>> +                       compatible = "arm,primecell";
+>> +                       reg = <0x0 0xc110000 0x0 0x1000>;
+>> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
+>> +                       clocks = <&clockgen 4 3>;
+>> +                       clock-names = "apb_pclk";
+>> +               };
+>> +
+>> +               cluster3_core0_watchdog: wdt at c200000 {
+>> +                       compatible = "arm,primecell";
+>> +                       reg = <0x0 0xc200000 0x0 0x1000>;
+>> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
+>> +                       clocks = <&clockgen 4 3>;
+>> +                       clock-names = "apb_pclk";
+>> +               };
+>> +
+>> +               cluster3_core1_watchdog: wdt at c210000 {
+>> +                       compatible = "arm,primecell";
+>> +                       reg = <0x0 0xc210000 0x0 0x1000>;
+>> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
+>> +                       clocks = <&clockgen 4 3>;
+>> +                       clock-names = "apb_pclk";
+>> +               };
+>> +
+>> +               cluster4_core0_watchdog: wdt at c300000 {
+>> +                       compatible = "arm,primecell";
+>> +                       reg = <0x0 0xc300000 0x0 0x1000>;
+>> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
+>> +                       clocks = <&clockgen 4 3>;
+>> +                       clock-names = "apb_pclk";
+>> +               };
+>> +
+>> +               cluster4_core1_watchdog: wdt at c310000 {
+>> +                       compatible = "arm,primecell";
+>> +                       reg = <0x0 0xc310000 0x0 0x1000>;
+>> +                       interrupts = <1 12 0x8>; /* PPI, Level low type */
+>> +                       clocks = <&clockgen 4 3>;
+>> +                       clock-names = "apb_pclk";
+>> +               };
+>> +       };
+>> +
+>>         serial0: serial at 21c0500 {
+>
+> This too should be moved under a bus node.
+>
+>>                 device_type = "serial";
+>
+> You should drop this.
+
+Ok.
+
+>>                 compatible = "fsl,ns16550", "ns16550a";
+>>                 reg = <0x0 0x21c0500 0x0 0x100>;
+>> -               clock-frequency = <0>;  /* Updated by bootloader */
+>> -               interrupts = <0 32 0x1>; /* edge triggered */
+>> +               clocks = <&clockgen 4 3>;
+>> +               interrupts = <0 32 0x4>; /* Level high type */
+>>         };
+>>
+>>         serial1: serial at 21c0600 {
+>>                 device_type = "serial";
+>>                 compatible = "fsl,ns16550", "ns16550a";
+>>                 reg = <0x0 0x21c0600 0x0 0x100>;
+>> -               clock-frequency = <0>;  /* Updated by bootloader */
+>> -               interrupts = <0 32 0x1>; /* edge triggered */
+>> +               clocks = <&clockgen 4 3>;
+>> +               interrupts = <0 32 0x4>; /* Level high type */
+>>         };
+>>
+>>         fsl_mc: fsl-mc at 80c000000 {
+>>                 compatible = "fsl,qoriq-mc";
+>> +               #stream-id-cells = <2>;
+>>                 reg = <0x00000008 0x0c000000 0 0x40>,    /* MC portal base */
+>>                       <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
+>> +               lpi-parent = <&its>;
+>> +       };
+>> +
+>> +       smmu: iommu at 5000000 {
+>> +               compatible = "arm,mmu-500";
+>> +               reg = <0 0x5000000 0 0x800000>;
+>> +               #global-interrupts = <12>;
+>> +               interrupts = <0 13 4>, /* global secure fault */
+>> +                            <0 14 4>, /* combined secure interrupt */
+>> +                            <0 15 4>, /* global non-secure fault */
+>> +                            <0 16 4>, /* combined non-secure interrupt */
+>> +                       /* performance counter interrupts 0-7 */
+>> +                            <0 211 4>,
+>> +                            <0 212 4>,
+>> +                            <0 213 4>,
+>> +                            <0 214 4>,
+>> +                            <0 215 4>,
+>> +                            <0 216 4>,
+>> +                            <0 217 4>,
+>> +                            <0 218 4>,
+>> +                       /* per context interrupt, 64 interrupts */
+>> +                            <0 146 4>,
+>> +                            <0 147 4>,
+>> +                            <0 148 4>,
+>> +                            <0 149 4>,
+>> +                            <0 150 4>,
+>> +                            <0 151 4>,
+>> +                            <0 152 4>,
+>> +                            <0 153 4>,
+>> +                            <0 154 4>,
+>> +                            <0 155 4>,
+>> +                            <0 156 4>,
+>> +                            <0 157 4>,
+>> +                            <0 158 4>,
+>> +                            <0 159 4>,
+>> +                            <0 160 4>,
+>> +                            <0 161 4>,
+>> +                            <0 162 4>,
+>> +                            <0 163 4>,
+>> +                            <0 164 4>,
+>> +                            <0 165 4>,
+>> +                            <0 166 4>,
+>> +                            <0 167 4>,
+>> +                            <0 168 4>,
+>> +                            <0 169 4>,
+>> +                            <0 170 4>,
+>> +                            <0 171 4>,
+>> +                            <0 172 4>,
+>> +                            <0 173 4>,
+>> +                            <0 174 4>,
+>> +                            <0 175 4>,
+>> +                            <0 176 4>,
+>> +                            <0 177 4>,
+>> +                            <0 178 4>,
+>> +                            <0 179 4>,
+>> +                            <0 180 4>,
+>> +                            <0 181 4>,
+>> +                            <0 182 4>,
+>> +                            <0 183 4>,
+>> +                            <0 184 4>,
+>> +                            <0 185 4>,
+>> +                            <0 186 4>,
+>> +                            <0 187 4>,
+>> +                            <0 188 4>,
+>> +                            <0 189 4>,
+>> +                            <0 190 4>,
+>> +                            <0 191 4>,
+>> +                            <0 192 4>,
+>> +                            <0 193 4>,
+>> +                            <0 194 4>,
+>> +                            <0 195 4>,
+>> +                            <0 196 4>,
+>> +                            <0 197 4>,
+>> +                            <0 198 4>,
+>> +                            <0 199 4>,
+>> +                            <0 200 4>,
+>> +                            <0 201 4>,
+>> +                            <0 202 4>,
+>> +                            <0 203 4>,
+>> +                            <0 204 4>,
+>> +                            <0 205 4>,
+>> +                            <0 206 4>,
+>> +                            <0 207 4>,
+>> +                            <0 208 4>,
+>> +                            <0 209 4>;
+>
+> Perhaps more than 1 per line.
+
+Ok.
+
+>> +               mmu-masters = <&fsl_mc 0x300 0>;
+>> +       };
+>> +
+>> +       dspi: dspi at 2100000 {
+>> +               compatible = "fsl,vf610-dspi";
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +               reg = <0x0 0x2100000 0x0 0x10000>;
+>> +               interrupts = <0 26 0x4>; /* Level high type */
+>> +               tcfq-mode;
+>> +               clocks = <&clockgen 4 3>;
+>> +               clock-names = "dspi";
+>> +               spi-num-chipselects = <5>;
+>> +               bus-num = <0>;
+>> +               spi-cpol;
+>> +               spi-cpha;
+>> +       };
+>> +
+>> +       esdhc: esdhc at 2140000 {
+>> +               compatible = "fsl,ls2080a-esdhc", "fsl,esdhc";
+>> +               reg = <0x0 0x2140000 0x0 0x10000>;
+>> +               interrupts = <0 28 0x4>; /* Level high type */
+>> +               clock-frequency = <0>;  /* Updated by bootloader */
+>> +               voltage-ranges = <1800 1800 3300 3300>;
+>> +               sdhci,auto-cmd12;
+>> +               little-endian;
+>> +               bus-width = <4>;
+>> +       };
+>> +
+>> +       gpio0: gpio at 2300000 {
+>> +               compatible = "fsl,ls2080a-gpio";
+>> +               reg = <0x0 0x2300000 0x0 0x10000>;
+>> +               interrupts = <0 36 0x4>; /* Level high type */
+>> +               gpio-controller;
+>> +               #gpio-cells = <2>;
+>> +               interrupt-controller;
+>> +               #interrupt-cells = <2>;
+>> +       };
+>> +
+>> +       gpio1: gpio at 2310000 {
+>> +               compatible = "fsl,ls2080a-gpio";
+>> +               reg = <0x0 0x2310000 0x0 0x10000>;
+>> +               interrupts = <0 36 0x4>; /* Level high type */
+>> +               gpio-controller;
+>> +               #gpio-cells = <2>;
+>> +               interrupt-controller;
+>> +               #interrupt-cells = <2>;
+>> +       };
+>> +
+>> +       gpio2: gpio at 2320000 {
+>> +               compatible = "fsl,ls2080a-gpio";
+>> +               reg = <0x0 0x2320000 0x0 0x10000>;
+>> +               interrupts = <0 37 0x4>; /* Level high type */
+>> +               gpio-controller;
+>> +               #gpio-cells = <2>;
+>> +               interrupt-controller;
+>> +               #interrupt-cells = <2>;
+>> +       };
+>> +
+>> +       gpio3: gpio at 2330000 {
+>> +               compatible = "fsl,ls2080a-gpio";
+>> +               reg = <0x0 0x2330000 0x0 0x10000>;
+>> +               interrupts = <0 37 0x4>; /* Level high type */
+>> +               gpio-controller;
+>> +               #gpio-cells = <2>;
+>> +               interrupt-controller;
+>> +               #interrupt-cells = <2>;
+>> +       };
+>> +
+>> +       i2c0: i2c at 2000000 {
+>> +               compatible = "fsl,vf610-i2c";
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +               reg = <0x0 0x2000000 0x0 0x10000>;
+>> +               interrupts = <0 34 0x4>; /* Level high type */
+>> +               clock-names = "i2c";
+>> +               clocks = <&clockgen 4 3>;
+>> +       };
+>> +
+>> +       i2c1: i2c at 2010000 {
+>> +               compatible = "fsl,vf610-i2c";
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +               reg = <0x0 0x2010000 0x0 0x10000>;
+>> +               interrupts = <0 34 0x4>; /* Level high type */
+>> +               clock-names = "i2c";
+>> +               clocks = <&clockgen 4 3>;
+>> +       };
+>> +
+>> +       i2c2: i2c at 2020000 {
+>> +               compatible = "fsl,vf610-i2c";
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +               reg = <0x0 0x2020000 0x0 0x10000>;
+>> +               interrupts = <0 35 0x4>; /* Level high type */
+>> +               clock-names = "i2c";
+>> +               clocks = <&clockgen 4 3>;
+>> +       };
+>> +
+>> +       i2c3: i2c at 2030000 {
+>> +               compatible = "fsl,vf610-i2c";
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +               reg = <0x0 0x2030000 0x0 0x10000>;
+>> +               interrupts = <0 35 0x4>; /* Level high type */
+>> +               clock-names = "i2c";
+>> +               clocks = <&clockgen 4 3>;
+>> +       };
+>> +
+>> +       ifc: ifc at 2240000 {
+>> +               compatible = "fsl,ifc", "simple-bus";
+>> +               reg = <0x0 0x2240000 0x0 0x20000>;
+>> +               interrupts = <0 21 0x4>; /* Level high type */
+>> +               little-endian;
+>> +               #address-cells = <2>;
+>> +               #size-cells = <1>;
+>> +
+>> +               ranges = <0 0 0x5 0x80000000 0x08000000
+>> +                         2 0 0x5 0x30000000 0x00010000
+>> +                         3 0 0x5 0x20000000 0x00010000>;
+>> +       };
+>> +
+>> +       qspi: quadspi at 20c0000 {
+>> +               compatible = "fsl,vf610-qspi";
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +               reg = <0x0 0x20c0000 0x0 0x10000>,
+>> +                     <0x0 0x20000000 0x0 0x10000000>;
+>> +               reg-names = "QuadSPI", "QuadSPI-memory";
+>> +               interrupts = <0 25 0x4>; /* Level high type */
+>> +               clocks = <&clockgen 4 3>, <&clockgen 4 3>;
+>> +               clock-names = "qspi_en", "qspi";
+>> +       };
+>> +
+>> +       pcie at 3400000 {
+>> +               compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
+>> +               reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
+>> +                      0x10 0x00000000 0x0 0x00001000>; /* configuration space */
+>> +               reg-names = "regs", "config";
+>> +               interrupts = <0 108 0x4>; /* Level high type */
+>> +               interrupt-names = "intr";
+>> +               #address-cells = <3>;
+>> +               #size-cells = <2>;
+>> +               device_type = "pci";
+>> +               num-lanes = <4>;
+>> +               bus-range = <0x0 0xff>;
+>> +               ranges = <0x81000000 0x0 0x00000000 0x10 0x00010000 0x0 0x00010000   /* downstream I/O */
+>> +                         0x82000000 0x0 0x40000000 0x10 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+>> +               msi-parent = <&its>;
+>> +               #interrupt-cells = <1>;
+>> +               interrupt-map-mask = <0 0 0 7>;
+>> +               interrupt-map = <0000 0 0 1 &gic 0 0 0 109 4>,
+>> +                               <0000 0 0 2 &gic 0 0 0 110 4>,
+>> +                               <0000 0 0 3 &gic 0 0 0 111 4>,
+>> +                               <0000 0 0 4 &gic 0 0 0 112 4>;
+>> +       };
+>> +
+>> +       pcie at 3500000 {
+>> +               compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
+>> +               reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
+>> +                      0x12 0x00000000 0x0 0x00001000>; /* configuration space */
+>> +               reg-names = "regs", "config";
+>> +               interrupts = <0 113 0x4>; /* Level high type */
+>> +               interrupt-names = "intr";
+>> +               #address-cells = <3>;
+>> +               #size-cells = <2>;
+>> +               device_type = "pci";
+>> +               num-lanes = <4>;
+>> +               bus-range = <0x0 0xff>;
+>> +               ranges = <0x81000000 0x0 0x00000000 0x12 0x00010000 0x0 0x00010000   /* downstream I/O */
+>> +                         0x82000000 0x0 0x40000000 0x12 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+>> +               msi-parent = <&its>;
+>> +               #interrupt-cells = <1>;
+>> +               interrupt-map-mask = <0 0 0 7>;
+>> +               interrupt-map = <0000 0 0 1 &gic 0 0 0 114 4>,
+>> +                               <0000 0 0 2 &gic 0 0 0 115 4>,
+>> +                               <0000 0 0 3 &gic 0 0 0 116 4>,
+>> +                               <0000 0 0 4 &gic 0 0 0 117 4>;
+>> +       };
+>> +
+>> +       pcie at 3600000 {
+>> +               compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
+>> +               reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
+>> +                      0x14 0x00000000 0x0 0x00001000>; /* configuration space */
+>> +               reg-names = "regs", "config";
+>> +               interrupts = <0 118 0x4>; /* Level high type */
+>> +               interrupt-names = "intr";
+>> +               #address-cells = <3>;
+>> +               #size-cells = <2>;
+>> +               device_type = "pci";
+>> +               num-lanes = <8>;
+>> +               bus-range = <0x0 0xff>;
+>> +               ranges = <0x81000000 0x0 0x00000000 0x14 0x00010000 0x0 0x00010000   /* downstream I/O */
+>> +                         0x82000000 0x0 0x40000000 0x14 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+>> +               msi-parent = <&its>;
+>> +               #interrupt-cells = <1>;
+>> +               interrupt-map-mask = <0 0 0 7>;
+>> +               interrupt-map = <0000 0 0 1 &gic 0 0 0 119 4>,
+>> +                               <0000 0 0 2 &gic 0 0 0 120 4>,
+>> +                               <0000 0 0 3 &gic 0 0 0 121 4>,
+>> +                               <0000 0 0 4 &gic 0 0 0 122 4>;
+>> +       };
+>> +
+>> +       pcie at 3700000 {
+>> +               compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
+>> +               reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
+>> +                      0x16 0x00000000 0x0 0x00001000>; /* configuration space */
+>> +               reg-names = "regs", "config";
+>> +               interrupts = <0 123 0x4>; /* Level high type */
+>> +               interrupt-names = "intr";
+>> +               #address-cells = <3>;
+>> +               #size-cells = <2>;
+>> +               device_type = "pci";
+>> +               num-lanes = <4>;
+>> +               bus-range = <0x0 0xff>;
+>> +               ranges = <0x81000000 0x0 0x00000000 0x16 0x00010000 0x0 0x00010000   /* downstream I/O */
+>> +                         0x82000000 0x0 0x40000000 0x16 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+>> +               msi-parent = <&its>;
+>> +               #interrupt-cells = <1>;
+>> +               interrupt-map-mask = <0 0 0 7>;
+>> +               interrupt-map = <0000 0 0 1 &gic 0 0 0 124 4>,
+>> +                               <0000 0 0 2 &gic 0 0 0 125 4>,
+>> +                               <0000 0 0 3 &gic 0 0 0 126 4>,
+>> +                               <0000 0 0 4 &gic 0 0 0 127 4>;
+>> +       };
+>> +
+>> +       sata0: sata at 3200000 {
+>> +               compatible = "fsl,ls2080a-ahci", "fsl,ls1021a-ahci";
+>> +               reg = <0x0 0x3200000 0x0 0x10000>;
+>> +               interrupts = <0 133 0x4>; /* Level high type */
+>> +               clocks = <&clockgen 4 3>;
+>> +       };
+>> +
+>> +       sata1: sata at 3210000 {
+>> +               compatible = "fsl,ls2080a-ahci", "fsl,ls1021a-ahci";
+>> +               reg = <0x0 0x3210000 0x0 0x10000>;
+>> +               interrupts = <0 136 0x4>; /* Level high type */
+>> +               clocks = <&clockgen 4 3>;
+>> +       };
+>> +
+>> +       usb0: usb3 at 3100000 {
+>> +               compatible = "snps,dwc3";
+>> +               reg = <0x0 0x3100000 0x0 0x10000>;
+>> +               interrupts = <0 80 0x4>; /* Level high type */
+>> +               dr_mode = "host";
+>> +       };
+>> +
+>> +       usb1: usb3 at 3110000 {
+>> +               compatible = "snps,dwc3";
+>> +               reg = <0x0 0x3110000 0x0 0x10000>;
+>> +               interrupts = <0 81 0x4>; /* Level high type */
+>> +               dr_mode = "host";
+>> +       };
+>> +
+>> +       ccn at 4000000 {
+>> +               compatible = "arm,ccn-504";
+>> +               reg = <0x0 0x04000000 0x0 0x01000000>;
+>> +               interrupts = <0 12 4>;
+>>         };
+>>  };
+>> --
+>> 1.7.9.5
+>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
