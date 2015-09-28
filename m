@@ -1,174 +1,40 @@
-From: cmetcalf@ezchip.com (Chris Metcalf)
-Date: Mon, 28 Sep 2015 11:17:24 -0400
-Subject: [PATCH v7 09/11] arch/arm64: enable task isolation functionality
-In-Reply-To: <1443453446-7827-1-git-send-email-cmetcalf@ezchip.com>
-References: <1443453446-7827-1-git-send-email-cmetcalf@ezchip.com>
-Message-ID: <1443453446-7827-10-git-send-email-cmetcalf@ezchip.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Sep 2015 16:24:30 +0100
+Subject: xf86-video-armada + etnaviv (Was: Re: I.MX6 HDMI support in v4.2)
+In-Reply-To: <1443451688.3178.61.camel@pengutronix.de>
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m337yp5gvv.fsf@t19.piap.pl>
+ <1441709778.13536.8.camel@pengutronix.de>
+ <m3bnd52y4s.fsf@t19.piap.pl>
+ <1442332425.2637.16.camel@pengutronix.de>
+ <20150915163642.GW21084@n2100.arm.linux.org.uk>
+ <1442336034.2637.20.camel@pengutronix.de>
+ <20150915170444.GX21084@n2100.arm.linux.org.uk>
+ <1443451688.3178.61.camel@pengutronix.de>
+Message-ID: <20150928152429.GW21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to call task_isolation_enter() from prepare_exit_to_usermode(),
-so that we can both ensure we do it last before returning to
-userspace, and we also are able to re-run signal handling, etc.,
-if something occurs while task_isolation_enter() has interrupts
-enabled.  To do this we add _TIF_NOHZ to the _TIF_WORK_MASK if
-we have CONFIG_TASK_ISOLATION enabled, which brings us into
-prepare_exit_to_usermode() on all return to userspace.  But we
-don't put _TIF_NOHZ in the flags that we use to loop back and
-recheck, since we don't need to loop back only because the flag
-is set.  Instead we unconditionally call task_isolation_enter()
-at the end of the loop if any other work is done.
+On Mon, Sep 28, 2015 at 04:48:08PM +0200, Lucas Stach wrote:
+> I've looked at that again and the issue here seems to be that GStreamer
+> is handing us a pointer to a buffer that isn't aligned to a page. The
+> buffers size is properly rounded up to a pagesize, as requested by
+> QueryImageAttributes, but if the buffer start pointer isn't aligned to a
+> page boundary we end up with an non-mappable buffer anyway.
+> 
+> Unfortunately there is no obvious way for a driver to request a minimum
+> alignment for the buffer. The only possible fix is for the client to
+> always align the buffer to a page boundary in hopes that this is enough
+> for the hardware to map it directly and allow to skip any unwanted
+> copying.
 
-To make the assembly code continue to be as optimized as before,
-we renumber the _TIF flags so that both _TIF_WORK_MASK and
-_TIF_SYSCALL_WORK still have contiguous runs of bits in the
-immediate operand for the "and" instruction, as required by the
-ARM64 ISA.  Since TIF_NOHZ is in both masks, it must be the
-middle bit in the contiguous run that starts with the
-_TIF_WORK_MASK bits and ends with the _TIF_SYSCALL_WORK bits.
+We can't just "round up" the size.  We've no idea whether the buffer
+came from shmem (for XvShmPutImage), or whether it's part of an internal
+X buffer (for XvPutImage).  In the latter case, we've no idea whether
+data in the remainder of the page will be read or written by the CPU
+when, eg, a signal occurs - and X does use signals.
 
-We tweak syscall_trace_enter() slightly to carry the "flags"
-value from current_thread_info()->flags for each of the tests,
-rather than doing a volatile read from memory for each one.  This
-avoids a small overhead for each test, and in particular avoids
-that overhead for TIF_NOHZ when TASK_ISOLATION is not enabled.
-
-Also, we have to add an explicit check for STRICT mode in
-do_mem_abort() to handle the case of page faults, since arm64
-does not use the exception_enter() mechanism.
-
-Signed-off-by: Chris Metcalf <cmetcalf@ezchip.com>
----
- arch/arm64/include/asm/thread_info.h | 18 ++++++++++++------
- arch/arm64/kernel/ptrace.c           | 10 ++++++++--
- arch/arm64/kernel/signal.c           |  6 +++++-
- arch/arm64/mm/fault.c                |  8 ++++++++
- 4 files changed, 33 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index dcd06d18a42a..4c36c4ee3528 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -101,11 +101,11 @@ static inline struct thread_info *current_thread_info(void)
- #define TIF_NEED_RESCHED	1
- #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
- #define TIF_FOREIGN_FPSTATE	3	/* CPU's FP state is not current's */
--#define TIF_NOHZ		7
--#define TIF_SYSCALL_TRACE	8
--#define TIF_SYSCALL_AUDIT	9
--#define TIF_SYSCALL_TRACEPOINT	10
--#define TIF_SECCOMP		11
-+#define TIF_NOHZ		4
-+#define TIF_SYSCALL_TRACE	5
-+#define TIF_SYSCALL_AUDIT	6
-+#define TIF_SYSCALL_TRACEPOINT	7
-+#define TIF_SECCOMP		8
- #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
- #define TIF_FREEZE		19
- #define TIF_RESTORE_SIGMASK	20
-@@ -124,9 +124,15 @@ static inline struct thread_info *current_thread_info(void)
- #define _TIF_SECCOMP		(1 << TIF_SECCOMP)
- #define _TIF_32BIT		(1 << TIF_32BIT)
- 
--#define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
-+#define _TIF_WORK_LOOP_MASK	(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
- 				 _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE)
- 
-+#ifdef CONFIG_TASK_ISOLATION
-+# define _TIF_WORK_MASK		(_TIF_WORK_LOOP_MASK | _TIF_NOHZ)
-+#else
-+# define _TIF_WORK_MASK		_TIF_WORK_LOOP_MASK
-+#endif
-+
- #define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
- 				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
- 				 _TIF_NOHZ)
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 1971f491bb90..9113789e9486 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -37,6 +37,7 @@
- #include <linux/regset.h>
- #include <linux/tracehook.h>
- #include <linux/elf.h>
-+#include <linux/isolation.h>
- 
- #include <asm/compat.h>
- #include <asm/debug-monitors.h>
-@@ -1240,14 +1241,19 @@ static void tracehook_report_syscall(struct pt_regs *regs,
- 
- asmlinkage int syscall_trace_enter(struct pt_regs *regs)
- {
-+	unsigned long work = ACCESS_ONCE(current_thread_info()->flags);
-+
- 	/* Do the secure computing check first; failures should be fast. */
- 	if (secure_computing() == -1)
- 		return -1;
- 
--	if (test_thread_flag(TIF_SYSCALL_TRACE))
-+	if ((work & _TIF_NOHZ) && task_isolation_strict())
-+		task_isolation_syscall(regs->syscallno);
-+
-+	if (work & _TIF_SYSCALL_TRACE)
- 		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
- 
--	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
-+	if (work & _TIF_SYSCALL_TRACEPOINT)
- 		trace_sys_enter(regs, regs->syscallno);
- 
- 	audit_syscall_entry(regs->syscallno, regs->orig_x0, regs->regs[1],
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index fde59c1139a9..def9166eac9e 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -25,6 +25,7 @@
- #include <linux/uaccess.h>
- #include <linux/tracehook.h>
- #include <linux/ratelimit.h>
-+#include <linux/isolation.h>
- 
- #include <asm/debug-monitors.h>
- #include <asm/elf.h>
-@@ -419,10 +420,13 @@ asmlinkage void prepare_exit_to_usermode(struct pt_regs *regs,
- 		if (thread_flags & _TIF_FOREIGN_FPSTATE)
- 			fpsimd_restore_current_state();
- 
-+		if (task_isolation_enabled())
-+			task_isolation_enter();
-+
- 		local_irq_disable();
- 
- 		thread_flags = READ_ONCE(current_thread_info()->flags) &
--			_TIF_WORK_MASK;
-+			_TIF_WORK_LOOP_MASK;
- 
- 	} while (thread_flags);
- }
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index aba9ead1384c..01c9ae336887 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -29,6 +29,7 @@
- #include <linux/sched.h>
- #include <linux/highmem.h>
- #include <linux/perf_event.h>
-+#include <linux/isolation.h>
- 
- #include <asm/cpufeature.h>
- #include <asm/exception.h>
-@@ -465,6 +466,13 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
- 	const struct fault_info *inf = fault_info + (esr & 63);
- 	struct siginfo info;
- 
-+	/* We don't use exception_enter(), so we check strict isolation here. */
-+	if (IS_ENABLED(CONFIG_TASK_ISOLATION) &&
-+	    test_thread_flag(TIF_NOHZ) &&
-+	    task_isolation_strict() &&
-+	    user_mode(regs))
-+		task_isolation_exception();
-+
- 	if (!inf->fn(addr, esr, regs))
- 		return;
- 
 -- 
-2.1.2
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
