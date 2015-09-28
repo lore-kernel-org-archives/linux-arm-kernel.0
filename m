@@ -1,75 +1,94 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Mon, 28 Sep 2015 08:11:51 -0700
-Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
- 'global_lock'
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CBA4232@AcuExch.aculab.com>
-References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- <2524822.pQu4UKMrlb@vostro.rjw.lan>
- <1443297128.2181.11.camel@HansenPartnership.com>
- <3461169.v5xKdGLGjP@vostro.rjw.lan>
- <063D6719AE5E284EB5DD2968C1650D6D1CBA3BF7@AcuExch.aculab.com>
- <1443450406.2168.3.camel@HansenPartnership.com>
- <063D6719AE5E284EB5DD2968C1650D6D1CBA4232@AcuExch.aculab.com>
-Message-ID: <1443453111.2168.9.camel@HansenPartnership.com>
+From: cmetcalf@ezchip.com (Chris Metcalf)
+Date: Mon, 28 Sep 2015 11:17:23 -0400
+Subject: [PATCH v7 08/11] arch/arm64: adopt prepare_exit_to_usermode() model
+ from x86
+In-Reply-To: <1443453446-7827-1-git-send-email-cmetcalf@ezchip.com>
+References: <1443453446-7827-1-git-send-email-cmetcalf@ezchip.com>
+Message-ID: <1443453446-7827-9-git-send-email-cmetcalf@ezchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-09-28 at 14:50 +0000, David Laight wrote:
-> From: James Bottomley [mailto:James.Bottomley at HansenPartnership.com]
-> > Sent: 28 September 2015 15:27
-> > On Mon, 2015-09-28 at 08:58 +0000, David Laight wrote:
-> > > From: Rafael J. Wysocki
-> > > > Sent: 27 September 2015 15:09
-> > > ...
-> > > > > > Say you have three adjacent fields in a structure, x, y, z, each one byte long.
-> > > > > > Initially, all of them are equal to 0.
-> > > > > >
-> > > > > > CPU A writes 1 to x and CPU B writes 2 to y at the same time.
-> > > > > >
-> > > > > > What's the result?
-> > > > >
-> > > > > I think every CPU's  cache architecure guarantees adjacent store
-> > > > > integrity, even in the face of SMP, so it's x==1 and y==2.  If you're
-> > > > > thinking of old alpha SMP system where the lowest store width is 32 bits
-> > > > > and thus you have to do RMW to update a byte, this was usually fixed by
-> > > > > padding (assuming the structure is not packed).  However, it was such a
-> > > > > problem that even the later alpha chips had byte extensions.
-> > >
-> > > Does linux still support those old Alphas?
-> > >
-> > > The x86 cpus will also do 32bit wide rmw cycles for the 'bit' operations.
-> > 
-> > That's different: it's an atomic RMW operation.  The problem with the
-> > alpha was that the operation wasn't atomic (meaning that it can't be
-> > interrupted and no intermediate output states are visible).
-> 
-> It is only atomic if prefixed by the 'lock' prefix.
-> Normally the read and write are separate bus cycles.
+This change is a prerequisite change for TASK_ISOLATION but also
+stands on its own for readability and maintainability.  The existing
+arm64 do_notify_resume() is called in a loop from assembly on
+the slow path; this change moves the loop into C code as well.
+For the x86 version see commit c5c46f59e4e7 ("x86/entry: Add new,
+comprehensible entry and exit handlers written in C").
 
-The essential point is that x86 has atomic bit ops and byte writes.
-Early alpha did not.
+Signed-off-by: Chris Metcalf <cmetcalf@ezchip.com>
+---
+ arch/arm64/kernel/entry.S  |  6 +++---
+ arch/arm64/kernel/signal.c | 32 ++++++++++++++++++++++----------
+ 2 files changed, 25 insertions(+), 13 deletions(-)
 
-> > > You still have to ensure the compiler doesn't do wider rmw cycles.
-> > > I believe the recent versions of gcc won't do wider accesses for volatile data.
-> > 
-> > I don't understand this comment.  You seem to be implying gcc would do a
-> > 64 bit RMW for a 32 bit store ... that would be daft when a single
-> > instruction exists to perform the operation on all architectures.
-> 
-> Read the object code and weep...
-> It is most likely to happen for operations that are rmw (eg bit set).
-> For instance the arm cpu has limited offsets for 16bit accesses, for
-> normal structures the compiler is likely to use a 32bit rmw sequence
-> for a 16bit field that has a large offset.
-> The C language allows the compiler to do it for any access (IIRC including
-> volatiles).
-
-I think you might be confusing different things.  Most RISC CPUs can't
-do 32 bit store immediates because there aren't enough bits in their
-arsenal, so they tend to split 32 bit loads into a left and right part
-(first the top then the offset).  This (and other things) are mostly
-what you see in code.  However, 32 bit register stores are still atomic,
-which is all we require.  It's not really the compiler's fault, it's
-mostly an architectural limitation.
-
-James
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 4306c937b1ff..6fcbf8ea307b 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -628,9 +628,8 @@ work_pending:
+ 	mov	x0, sp				// 'regs'
+ 	tst	x2, #PSR_MODE_MASK		// user mode regs?
+ 	b.ne	no_work_pending			// returning to kernel
+-	enable_irq				// enable interrupts for do_notify_resume()
+-	bl	do_notify_resume
+-	b	ret_to_user
++	bl	prepare_exit_to_usermode
++	b	no_user_work_pending
+ work_resched:
+ 	bl	schedule
+ 
+@@ -642,6 +641,7 @@ ret_to_user:
+ 	ldr	x1, [tsk, #TI_FLAGS]
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
++no_user_work_pending:
+ 	enable_step_tsk x1, x2
+ no_work_pending:
+ 	kernel_exit 0
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index e18c48cb6db1..fde59c1139a9 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -399,18 +399,30 @@ static void do_signal(struct pt_regs *regs)
+ 	restore_saved_sigmask();
+ }
+ 
+-asmlinkage void do_notify_resume(struct pt_regs *regs,
+-				 unsigned int thread_flags)
++asmlinkage void prepare_exit_to_usermode(struct pt_regs *regs,
++					 unsigned int thread_flags)
+ {
+-	if (thread_flags & _TIF_SIGPENDING)
+-		do_signal(regs);
++	do {
++		local_irq_enable();
+ 
+-	if (thread_flags & _TIF_NOTIFY_RESUME) {
+-		clear_thread_flag(TIF_NOTIFY_RESUME);
+-		tracehook_notify_resume(regs);
+-	}
++		if (thread_flags & _TIF_NEED_RESCHED)
++			schedule();
++
++		if (thread_flags & _TIF_SIGPENDING)
++			do_signal(regs);
++
++		if (thread_flags & _TIF_NOTIFY_RESUME) {
++			clear_thread_flag(TIF_NOTIFY_RESUME);
++			tracehook_notify_resume(regs);
++		}
++
++		if (thread_flags & _TIF_FOREIGN_FPSTATE)
++			fpsimd_restore_current_state();
++
++		local_irq_disable();
+ 
+-	if (thread_flags & _TIF_FOREIGN_FPSTATE)
+-		fpsimd_restore_current_state();
++		thread_flags = READ_ONCE(current_thread_info()->flags) &
++			_TIF_WORK_MASK;
+ 
++	} while (thread_flags);
+ }
+-- 
+2.1.2
