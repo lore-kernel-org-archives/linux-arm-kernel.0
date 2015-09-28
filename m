@@ -1,37 +1,37 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 28 Sep 2015 13:24:41 +0800
-Subject: [GIT PULL] ARM: imx: fixes for 4.3
-Message-ID: <20150928052440.GA4843@tiger>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Mon, 28 Sep 2015 13:34:38 +0800
+Subject: [PATCH 2/2] arm64: to allow EFI_RTC can be selected on ARM64
+In-Reply-To: <1443418478-8240-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1443418478-8240-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1443418478-8240-3-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+Now, ARM64 is also support EFI startup. We hope use EFI runtime services
+to get/set current time and date.
 
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+RTC_LIB only controls some configs in drivers/char/Kconfig(included
+EFI_RTC), and will be automatically selected when RTC_CLASS opened. So
+this patch have no functional change but give an opportunity to select
+EFI_RTC when RTC_CLASS closed.
 
-are available in the git repository at:
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ arch/arm64/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.3
-
-for you to fetch changes up to 0af822110871400908d5b6f83a8908c45f881d8f:
-
-  ARM: dts: fix usb pin control for imx-rex dts (2015-09-24 05:13:40 -0700)
-
-----------------------------------------------------------------
-The i.MX fixes for 4.3:
- - One fix for i.MX6 Rex Pro board to remove a duplicated pinctrl entry
-   which causes error for USB pinctrl setup.
- - Fix MC34708 PMIC interrupt level for imx53-qsrb board.
-
-----------------------------------------------------------------
-Felipe F. Tonello (1):
-      ARM: dts: fix usb pin control for imx-rex dts
-
-Lucas Stach (2):
-      ARM: imx53: include IRQ dt-bindings header
-      ARM: imx53: qsrb: fix PMIC interrupt level
-
- arch/arm/boot/dts/imx53-qsrb.dts   | 2 +-
- arch/arm/boot/dts/imx53.dtsi       | 1 +
- arch/arm/boot/dts/imx6qdl-rex.dtsi | 2 --
- 3 files changed, 2 insertions(+), 3 deletions(-)
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 07d1811..25cec57 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -85,7 +85,7 @@ config ARM64
+ 	select PERF_USE_VMALLOC
+ 	select POWER_RESET
+ 	select POWER_SUPPLY
+-	select RTC_LIB
++	select RTC_LIB if !EFI
+ 	select SPARSE_IRQ
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select HAVE_CONTEXT_TRACKING
+--
+2.5.0
