@@ -1,100 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 28 Sep 2015 16:46:49 +0100
-Subject: [PATCH v4 1/2] Add the driver of mbigen interrupt controller
-In-Reply-To: <5605365A.80605@huawei.com>
-References: <1439952920-2296-1-git-send-email-majun258@huawei.com>
- <1439952920-2296-2-git-send-email-majun258@huawei.com>
- <20150921225324.5568f673@arm.com> <560253C2.60609@huawei.com>
- <20150924203006.4bb162aa@arm.com> <5605365A.80605@huawei.com>
-Message-ID: <560960E9.6010302@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 28 Sep 2015 16:47:01 +0100
+Subject: [PATCH v2 00/11] Hi Maxime / Patrice / Srini,
+In-Reply-To: <20150928153938.GS27197@x1>
+References: <1443443867-4099-1-git-send-email-peter.griffin@linaro.org>
+ <20150928153938.GS27197@x1>
+Message-ID: <20150928154701.GT27197@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/09/15 12:56, majun (F) wrote:
-> 
-> 
-> ? 2015/9/25 3:30, Marc Zyngier ??:
->> On Wed, 23 Sep 2015 15:24:50 +0800
->> "majun (F)" <majun258@huawei.com> wrote:
->>
->> [...]
->>
->>>>> +static int mbigen_device_init(struct mbigen_chip *chip,
->>>>> +                       struct device_node *node)
-> [...]
->>>>> +
->>>>> +core_initcall(mbigen_init);
->>>>
->>>> That's the wrong thing to do. The interrupt controller should be
->>>> probed with IRQCHIP_DECLARE(). Yes, this creates a dependency
->>>> problem between the MSI layer and the irqchip layer, but that
->>>> should be easy (-ish) to solve.
->>>
->>> Based on our discusstion about DTS,I will change the code likes below:
->>> IRQCHIP_DECLARE(hisi_mbigen, "hisilicon,mbigen-v2", mbigen_of_init);
->>>
->>> Mbigen device is initialized as a interrupt controller.
->>>
->>> But I still can't call platform_msi_domain_alloc_irqs()
->>> to apply the msi irqs.
->>>
->>> It think this is what you said "dependency problem between
->>>  the MSI layer and the irqchip layer" , am i right ?
->>>
->>> Do you have any idea about this problem?
->>
->> You need to have multiple phases for initializing this beast:
->> - IRQCHIP_DECLARE() to create the irqchips, allocate the domains and
->>   the main data structures,
->> - platform device probing of the top-level device to do some HW probing
->>   and to kick of_platform_populate on the subnodes,
->> - Handle the the subnode probing, allocate the MSIs, and finish the
->>   initialization of the irqchip how that you have all the information.
-> 
-> Ok, I got it. But I still have a question.
-> According to your suggestions, the initial flow is:
-> 
-> Step1: IRQCHIP_DECLARE() to create the irqchips, allocate the domains and
-> 	the main data structures,
-> Step2: Parse the device node and apply the irq(named as *device-virq*) within mbigen-device	
-> 	domain (handled by irq core code).
-> Step3: platform device probing of the top-level device to do some HW probing
-> 	and to kick of_platform_populate on the subnodes,
-> Step4: Handle the the subnode probing, allocate the MSIs(named as *msi-virq*), and finish the
-> 	initialization of the irqchip how that you have all the information.
-> 
-> My questions is:
-> 	How to connect msi-virq and device-virq ?
-> 
-> In my v4 version, I used the
-> 
-> irq_set_chained_handler(msi-virq, mbigen_handle_cascade_irq);
-> 
-> as msi-virq primary handler function .
-> 
-> Then find  device-virq in mbigen_handle_cascade_irq()
-> and call device-virq corresponding handler fucntion.
-> 
-> But it seems not a right solution.
-> 
-> So I want try another solution for this problem.
-> 
-> [1] In step2, when the interrupt controller map function is called, using
-> 	irq_set_chip_and_handler(device-irq, &mbigen_irq_chip, handle_fasteoi_irq);
-> [2] In step4, using
-> 	for_each_msi_entry(desc, &mgn_dev->dev) {
-> 		request_irq( msi-virq, msi_irq_handler, **);
-> 	}
-> 
-> But I am not sure about this solution, please review this and offer me some suggestions.
+On Mon, 28 Sep 2015, Lee Jones wrote:
 
-I don't see what is wrong with keeping it as a chained irq handler.
-Actually, you really need it to be a chained handler (because this is
-what it is). So using irq_set_chained_handler_and_data() is probably the
-right thing to do.
+> On Mon, 28 Sep 2015, Peter Griffin wrote:
+> 
+> > This series makes a series of updates to the stih407 pinctrl groups
+> > and makes the upstream kernel more closely aligned in terms of pin
+> > configuration to the vendor kernel.
+> > 
+> > A number of new periphs are added such as spi fsm, nand, cec0, and
+> > for others such as SPI the various alternate function pin muxings have
+> > been added. Finally for SPI the controller nodes have been updated
+> > to have the default pin assignment in the controller node.
+> > 
+> > Changes since v1:
+> >  - Rebase on v4.3-rc3
+> >  - Remove some SoBs (Lee)
+> >  - Collect up Acks
+> > 
+> > kind regards,
+> > 
+> > Peter.
+> > 
+> > Peter Griffin (11):
+> >   ARM: STi: DT: STiH407: Add a cec0 pin definition
+> >   ARM: STi: DT: STiH407: Add i2c3 alternate pin configs
+> >   ARM: DT: STiH407: Add SPI 3 wire and 4 wire pinctrl configs
+> >   ARM: DT: STiH407: Add serial3 pinctrl configuration
+> >   ARM: DT: STiH407: Add SPI FSM (NOR Flash) Controller pin config
+> >   ARM: DT: STiH407: Add NAND flash controller pin configuration
+> >   ARM: DT: STiH407: Add systrace pin configuration
+> >   ARM: DT: STiH407: Add SD pinctrl config for mmc0 controller
+> >   ARM: DT: STiH407: Add pinconfig for IRB UHF and IRB TX
+> >   ARM: DT: STiH407: Add RMII pinctrl support
+> >   ARM: STi: STiH407: Add spi default pinctrl groups.
+> > 
+> >  arch/arm/boot/dts/stih407-family.dtsi  |  14 ++
+> >  arch/arm/boot/dts/stih407-pinctrl.dtsi | 378 ++++++++++++++++++++++++++++++++-
+> >  2 files changed, 387 insertions(+), 5 deletions(-)
+> 
+> I'll do this privately, so as not to unnecessarily delay the
+> acceptance of the set.
 
-Thanks,
+Whoops!  Fingers faster than brain.  Sorry folks.
 
-	M.
+Maxime,
+  Please do not slow up the acceptance of this set due to my comments.
+
+> I'm a big fan of keeping the *-by's in chronological order.  It does
+> help to provide an insight to the history of the patch.
+
+
 -- 
-Jazz is not dead. It just smells funny...
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
