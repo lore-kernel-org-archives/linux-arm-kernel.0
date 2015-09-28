@@ -1,152 +1,123 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 28 Sep 2015 11:44:28 +0200
-Subject: [PATCH v2] power: reset: at91-shdwc: add new shutdown controller
- driver
-In-Reply-To: <20150924110652.GW4287@piout.net>
-References: <20150922135925.GI23334@earth>
- <1442937472-5481-1-git-send-email-nicolas.ferre@atmel.com>
- <20150924110652.GW4287@piout.net>
-Message-ID: <56090BFC.10006@atmel.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Mon, 28 Sep 2015 17:44:40 +0800
+Subject: [PATCH 2/2] arm64: to allow EFI_RTC can be selected on ARM64
+In-Reply-To: <2245172.1ESUGv0DKo@wuerfel>
+References: <1443418478-8240-1-git-send-email-thunder.leizhen@huawei.com>
+ <1783631.jH4WY2RqXu@wuerfel> <5608FA85.8070009@huawei.com>
+ <2245172.1ESUGv0DKo@wuerfel>
+Message-ID: <56090C08.8070003@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 24/09/2015 13:06, Alexandre Belloni a ?crit :
-> On 22/09/2015 at 17:57:52 +0200, Nicolas Ferre wrote :
->> +config POWER_RESET_AT91_SHDWC
-> 
-> Maybe we should start numbering, at91-poweroff is already a driver for
-> an shdwc.
-> 
->> +#define SLOW_CLOCK_FREQ	32768
->> +
-> 
-> The slow clock is an input to the shdwc, then you have to get it,
-> prepare and enable it. The you could use clk_get_rate.
 
-Okay, sure: I modify the driver to take your enhancements into account.
 
-> By duplicating the driver, you are repeating mistakes from the past ;)
+On 2015/9/28 16:42, Arnd Bergmann wrote:
+> On Monday 28 September 2015 16:29:57 Leizhen wrote:
+>>
+>> On 2015/9/28 15:35, Arnd Bergmann wrote:
+>>> On Monday 28 September 2015 13:34:38 Zhen Lei wrote:
+>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>>> index 07d1811..25cec57 100644
+>>>> --- a/arch/arm64/Kconfig
+>>>> +++ b/arch/arm64/Kconfig
+>>>> @@ -85,7 +85,7 @@ config ARM64
+>>>>         select PERF_USE_VMALLOC
+>>>>         select POWER_RESET
+>>>>         select POWER_SUPPLY
+>>>> -       select RTC_LIB
+>>>> +       select RTC_LIB if !EFI
+>>>>         select SPARSE_IRQ
+>>>>         select SYSCTL_EXCEPTION_TRACE
+>>>>         select HAVE_CONTEXT_TRACKING
+>>>
+>>> Sorry, we can't do that: enabling EFI has to be done in a way that it only
+>>> adds features but not disables them.
+>>
+>> I run "make ARCH=arm64 menuconfig" and found that RTC_CLASS is selected by default. Actually, RTC_LIB only
+>> controls whether to display some configs when run "make menuconfig". I list all informations below:
+>>
+>> ---------make ARCH=arm64 menuconfig-----
+>>   [*] Real Time Clock  --->
+>>
+>> ---------drivers/rtc/Kconfig-------
+>> menuconfig RTC_CLASS
+>>         bool "Real Time Clock"
+>>         default n
+>>         depends on !S390 && !UML
+>>         select RTC_LIB
+> 
+> Ok, I see. So your patch here has no effect at all and can be dropped, or
+> we can remove the 'select RTC_LIB' without the EFI dependency.
 
-Hey! look at the common parts that these drivers would share if it was
-merged and you would realize that it was not worth the effort: I tried
-and judged it was completely pointless.
+Oh, I described the reason in the reply to Ard Biesheuvel.
 
->> +static void at91_poweroff(void)
->> +{
->> +	BUG_ON(!at91_shdwc);
-> 
-> Is that condition even possible?
-
-No it's not. I remove it.
+https://lkml.org/lkml/2015/9/28/124
 
 > 
->> +
->> +	writel(AT91_SHDW_KEY | AT91_SHDW_SHDW,
->> +			at91_shdwc->at91_shdwc_base + AT91_SHDW_CR);
+>> -----------------------------------
+>> find . -name "*Kconfig*" | xargs grep RTC_LIB
+>> ./drivers/rtc/Kconfig:config RTC_LIB
+>> ./drivers/rtc/Kconfig:	select RTC_LIB
+>> ./drivers/char/Kconfig:if RTC_LIB=n
+>> ./drivers/char/Kconfig:endif # RTC_LIB
+>> ./arch/x86/Kconfig:	select RTC_LIB
+>> ./arch/arm/Kconfig:	select RTC_LIB
+>> ./arch/arm64/Kconfig:	select RTC_LIB if !EFI
+>> ./arch/sh/Kconfig:	select RTC_LIB
+>> ./arch/mips/Kconfig:	select RTC_LIB if !MACH_LOONGSON64
+>>
+>> --------------drivers/char/Kconfig--------------
+>> if RTC_LIB=n
+>>
+>> config RTC
+>>         tristate "Enhanced Real Time Clock Support (legacy PC RTC driver)"
+>>
+>> .......
+>>
+>> endif # RTC_LIB
+>>
+>>
+>>>
+>>> Your patch breaks RTC on all non-EFI platforms as soon as CONFIG_EFI
+>>> is selected by the user.
+>>
+>> No, on non-EFI platforms, they can still use RTC as before. As I mentioned above,
+>> RTC_LIB only controls whether to display some configs when run "make menuconfig".
+>> On ARM64, (in this patch) I only allowed EFI_RTC can be showed when RTC_LIB was
+>> not selected.
+>>
 > 
-> This is not properly aligned.
+> but that is the wrong driver that uses the legacy API, we cannot have that
+> on ARM because it conflicts with the normal RTC_CLASS drivers.
 
-Why? I prefer it like this and the second line doesn't cross the 80
-column so I presume that it's valid.
+Yes, RTC_CLASS will automatically select RTC_LIB, and will not display EFI_RTC, because
+RTC_LIB=y now.
+
+We can select EFI_RTC only when RTC_CLASS is not selected(meanwhile RTC_LIB=n)
 
 > 
->> +}
->> +
->> +static u32 at91_shdwc_debouncer_value(struct platform_device *pdev,
->> +				      u32 in_period_us)
->> +{
->> +	int i;
->> +	int max_idx = ARRAY_SIZE(sdwc_dbc_period) - 1;
->> +	unsigned long long period_us;
->> +	unsigned long long max_period_us = DBC_PERIOD_US(sdwc_dbc_period[max_idx]);
->> +
->> +	if (in_period_us > max_period_us) {
->> +		dev_warn(&pdev->dev,
->> +			 "debouncer period %u too big, reduced to %llu us\n",
->> +			 in_period_us, max_period_us);
->> +		return max_idx;
->> +	}
->> +
->> +	for (i = max_idx - 1; i > 0; i--) {
->> +		period_us = DBC_PERIOD_US(sdwc_dbc_period[i]);
->> +		dev_dbg(&pdev->dev, "%s: ref[%d] = %llu\n",
->> +						__func__, i, period_us);
-> ditto
+>> --------------drivers/char/Kconfig--------------
+>> if RTC_LIB=n
+>>
+>> config RTC
+>> tristate "Enhanced Real Time Clock Support (legacy PC RTC driver)"
+>>
+>> .......
+>>
+>> config EFI_RTC
+>>         bool "EFI Real Time Clock Services"
+>>         depends on IA64 || ARM64
+>>
+>> .......
+>>
+>> endif # RTC_LIB
 > 
-> 
->> +		if (in_period_us > period_us)
->> +			break;
->> +	}
->> +
->> +	return i + 1;
->> +}
->> +
->> +static u32 at91_shdwc_get_wakeup_input(struct platform_device *pdev,
->> +				       struct device_node *np)
->> +{
->> +	struct device_node *cnp;
->> +	const char *pm;
->> +	u32 wk_input_mask;
->> +	u32 wuir = 0;
->> +	u32 wk_input;
->> +
->> +	for_each_child_of_node(np, cnp) {
->> +		if (of_property_read_u32(cnp, "reg", &wk_input)) {
->> +			dev_warn(&pdev->dev, "reg property is missing for %s\n",
->> +				 cnp->full_name);
->> +			continue;
->> +		}
->> +
->> +		wk_input_mask = 1 << wk_input;
->> +		if (!(wk_input_mask & AT91_SHDW_WKUPEN_MASK)) {
->> +			dev_warn(&pdev->dev,
->> +				 "wake-up input %d out of bounds ignore\n",
->> +				 wk_input);
->> +			continue;
->> +		}
->> +		wuir |= wk_input_mask;
->> +
->> +		if (!of_property_read_string(cnp, "atmel,wakeup-type", &pm)) {
->> +			if (!strcasecmp(pm, "high"))
->> +				/*
->> +				 * only add a type if "high" is specified. Low
->> +				 * is the default.
->> +				 */
->> +				wuir |= AT91_SHDW_WKUPT(wk_input);
->> +		}
->> +		dev_dbg(&pdev->dev, "%s: (child %d) wuir = %#x\n",
->> +						__func__, wk_input, wuir);
-> 
-> ditto
-> 
->> +static int at91_shdwc_probe(struct platform_device *pdev)
->> +{
->> +	struct resource *res;
->> +	const struct of_device_id *match;
->> +
->> +	if (!pdev->dev.of_node)
->> +		return -ENODEV;
->> +
->> +	at91_shdwc = devm_kzalloc(&pdev->dev, sizeof(*at91_shdwc), GFP_KERNEL);
->> +	if (!at91_shdwc)
->> +		return -ENOMEM;
->> +
->> +	platform_set_drvdata(pdev, at91_shdwc);
->> +
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	at91_shdwc->at91_shdwc_base = devm_ioremap_resource(&pdev->dev, res);
->> +	if (IS_ERR(at91_shdwc->at91_shdwc_base)) {
->> +		dev_err(&pdev->dev, "Could not map reset controller address\n");
->> +		return PTR_ERR(at91_shdwc->at91_shdwc_base);
->> +	}
->> +
->> +	match = of_match_node(at91_shdwc_of_match, pdev->dev.of_node);
->> +	if (match != NULL)
-> 
-> match will never be NULL, else you wouldn't be probed. You can remove that test.
+> The driver you want is RTC_DRV_EFI, not EFI_RTC.
 
-I'll remove this and repost the driver as v3.
+OK, I will try it tommorrow.
 
-Thanks, bye,
--- 
-Nicolas Ferre
+> 
+> 	Arnd
+> 
+> .
+> 
