@@ -1,68 +1,149 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 28 Sep 2015 15:07:23 +0200
-Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
- 'global_lock'
-In-Reply-To: <2003030.YkVHTCZahK@wuerfel>
-References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- <1578470.DLzaBp4j3T@vostro.rjw.lan> <2003030.YkVHTCZahK@wuerfel>
-Message-ID: <14747297.j7J33tmxDW@vostro.rjw.lan>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 28 Sep 2015 14:44:21 +0200
+Subject: [PATCH v2 7/9] rockchip: make sure timer5 is enabled on rk3036
+ platforms
+In-Reply-To: <560931A3.2020403@rock-chips.com>
+References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
+ <11125723.j2J5LpAGi4@diego> <560931A3.2020403@rock-chips.com>
+Message-ID: <1726823.4nE2gJuWPe@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 28, 2015 10:24:58 AM Arnd Bergmann wrote:
-> On Sunday 27 September 2015 16:10:48 Rafael J. Wysocki wrote:
-> > On Saturday, September 26, 2015 09:33:56 PM Arnd Bergmann wrote:
-> > > On Saturday 26 September 2015 11:40:00 Viresh Kumar wrote:
-> > > > On 25 September 2015 at 15:19, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> > > > > So if you allow something like debugfs to update your structure, how
-> > > > > do you make sure there is the proper locking?
-> > > > 
-> > > > Not really sure at all.. Isn't there some debugfs locking that will
-> > > > jump in, to avoid updation of fields to the same device?
-> > > 
-> > > No, if you need any locking to access variable, you cannot use the
-> > > simple debugfs helpers but have to provide your own functions.
-> > > 
-> > > > >> Anyway, that problem isn't here for sure as its between two
-> > > > >> unsigned-longs. So, should I just move it to bool and resend ?
-> > > > >
-> > > > > I guess it might be more convenient to fold this into the other patch,
-> > > > > because we seem to be splitting hairs here.
-> > > > 
-> > > > I can and that's what I did. But then Arnd asked me to separate it
-> > > > out. I can fold it back if that's what you want.
-> > > 
-> > > It still makes sense to keep it separate I think, the patch is clearly
-> > > different from the other parts.
+Hi,
+
+Am Montag, 28. September 2015, 20:25:07 schrieb Xing Zheng:
+> On 2015?09?17? 23:05, Heiko St?bner wrote:
+> > Am Donnerstag, 17. September 2015, 18:37:24 schrieb Xing Zheng:
+> >> The timer5 supplies the architected timer and thus as has to run when
+> >> the system clocksource and clockevents drivers are registered.
 > > 
-> > I just don't see much point in going from unsigned long to u32 and then
-> > from 32 to bool if we can go directly to bool in one go.
+> > please kindly ask the people doing uboot development to do this in uboot
+> > itself in future socs :-) - for example Simon's rk3288 mainline uboot does
+> > this correctly.
 > 
-> It's only important to keep the 34-file multi-subsystem trivial cleanup
-> that doesn't change any functionality separate from the bugfix.
+> OK, I will ask the engineer who is doing uboot whether needs to add
+> this patch. So I will remove it from the patchset v3 of "Build and support
+> rk3036 SoC platform".
 
-Which isn't a bugfix really, because the EC code is not run on any big-endian
-systems to my knowledge.  And it won't matter after the [2/2] anyway.
+No, I really only meant try to make people get this right in the future :-).
 
-And the changelog of it doesn't really makes sense, because it talks about
-future systems, but after the [2/2] no future systems will run that code in
-the first place.
+For the rk3036 there are probably already devices on the market with uboots 
+sporting that issue. So it's ok to have this in here now, it's just to make 
+sure it gets really fixed in future socs.
 
-> If you like to avoid patching one of the files twice, the alternative would
-> be to first change the API for all other instances from u32 to bool
-> and leave ACPI alone, and then do the second patch that changes ACPI
-> from long to bool.
 
-My point is that this patch doesn't matter.  It doesn't really fix anything
-and the result of it goes away after the second patch.
+Heiko
 
-The only marginal value of having it as a separate commit is in case if
-(a) we need to revert the [2/2] for some reason and (b) ACPI-based ARM systems
-(the big-endian ones) become full-hardware at one point.  You know what the
-chances of that are, though. :-)
 
-That said I've ACKed the patch, because I don't care that much.  I'm not exactly
-sure why you care either.
 
-Thanks,
-Rafael
+> 
+> Thanks.
+> 
+> >> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
+> >> ---
+> >> 
+> >> Changes in v2: None
+> >> 
+> >>   arch/arm/mach-rockchip/rockchip.c |   22 ++++++++++++++++++++++
+> >>   1 file changed, 22 insertions(+)
+> >> 
+> >> diff --git a/arch/arm/mach-rockchip/rockchip.c
+> >> b/arch/arm/mach-rockchip/rockchip.c index b6cf3b4..937047f 100644
+> >> --- a/arch/arm/mach-rockchip/rockchip.c
+> >> +++ b/arch/arm/mach-rockchip/rockchip.c
+> >> @@ -32,6 +32,8 @@
+> >> 
+> >>   #define RK3288_GRF_SOC_CON0 0x244
+> >>   #define RK3288_TIMER6_7_PHYS 0xff810000
+> >> 
+> >> +#define RK3036_TIMER5_PHYS 0x200440a0
+> >> +
+> > 
+> > #define RK3036_TIMER_PHYS 0x20044000
+> > -->  the actual base address of the timer block
+> > 
+> > As it looks like that we'll need to duplicate that timer init at least for
+> > the rk3036 and the timer ip in question is actually the same on both,
+> > please split out the actual work into a separate function like
+> > 
+> > static void rockchip_init_arch_timer_supply(resource_size_t phys, int
+> > offs)
+> > {
+> > 
+> > 		reg_base = ioremap(phys, SZ_16K);
+> > 		if (reg_base) {
+> > 		
+> > 			writel(0, reg_base + offs + 0x10);
+> > 			writel(0xffffffff, reg_base + offs);
+> > 			writel(0xffffffff, reg_base + offs + 0x04);
+> > 			writel(1, reg_base + offs + 0x10);
+> > 			dsb();
+> > 			iounmap(reg_base);
+> > 		
+> > 		} else {
+> > 		
+> > 			pr_err("rockchip: could not map timer registers\n");
+> > 		
+> > 		}
+> > 
+> > }
+> 
+> Done.
+> 
+> >>   static void __init rockchip_timer_init(void)
+> >>   {
+> >>   
+> >>   	if (of_machine_is_compatible("rockchip,rk3288")) {
+> >> 
+> >> @@ -64,6 +66,25 @@ static void __init rockchip_timer_init(void)
+> > 
+> > for the rk3288 exchange the timer init against
+> > rockchip_init_arch_timer_supply(RK3288_TIMER6_7_PHYS, 0x20);
+> 
+> Done.
+> 
+> >>   			regmap_write(grf, RK3288_GRF_SOC_CON0, 0x10000000);
+> >>   		
+> >>   		else
+> >>   		
+> >>   			pr_err("rockchip: could not get grf syscon\n");
+> >> 
+> >> +	} else if (of_machine_is_compatible("rockchip,rk3036")) {
+> >> +		void __iomem *reg_base;
+> >> +
+> >> +		/*
+> >> +		 * Most/all uboot versions for rk3036 don't enable timer5
+> >> +		 * which is needed for the architected timer to work.
+> >> +		 * So make sure it is running during early boot.
+> >> +		 */
+> >> +		reg_base = ioremap(RK3036_TIMER5_PHYS, SZ_16K);
+> >> +		if (reg_base) {
+> >> +			writel(0, reg_base + 0x10);
+> >> +			writel(0xffffffff, reg_base);
+> >> +			writel(0xffffffff, reg_base + 0x04);
+> >> +			writel(1, reg_base + 0x10);
+> >> +			dsb();
+> >> +			iounmap(reg_base);
+> >> +		} else {
+> >> +			pr_err("rockchip: could not map timer5 registers\n");
+> >> +		}
+> > 
+> > rockchip_init_arch_timer_supply(RK3036_TIMER_PHYS, 0xa0);
+> 
+> Done.
+> 
+> >>   	}
+> >>   	
+> >>   	of_clk_init(NULL);
+> >> 
+> >> @@ -79,6 +100,7 @@ static void __init rockchip_dt_init(void)
+> >> 
+> >>   static const char * const rockchip_board_dt_compat[] = {
+> >>   
+> >>   	"rockchip,rk2928",
+> >> 
+> >> +	"rockchip,rk3036",
+> >> 
+> >>   	"rockchip,rk3066a",
+> >>   	"rockchip,rk3066b",
+> >>   	"rockchip,rk3188",
