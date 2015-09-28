@@ -1,42 +1,75 @@
-From: kwizart@gmail.com (Nicolas Chauvet)
-Date: Mon, 28 Sep 2015 17:08:13 +0200
-Subject: [PATCH v2] nouveau: arm: Add MODULE_FIRMWARE for gk20a
-Message-ID: <1443452893-18246-1-git-send-email-kwizart@gmail.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Mon, 28 Sep 2015 08:11:51 -0700
+Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
+ 'global_lock'
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CBA4232@AcuExch.aculab.com>
+References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
+ <2524822.pQu4UKMrlb@vostro.rjw.lan>
+ <1443297128.2181.11.camel@HansenPartnership.com>
+ <3461169.v5xKdGLGjP@vostro.rjw.lan>
+ <063D6719AE5E284EB5DD2968C1650D6D1CBA3BF7@AcuExch.aculab.com>
+ <1443450406.2168.3.camel@HansenPartnership.com>
+ <063D6719AE5E284EB5DD2968C1650D6D1CBA4232@AcuExch.aculab.com>
+Message-ID: <1443453111.2168.9.camel@HansenPartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is needed by initramfs tools to detect
-the required firmware files for the module.
+On Mon, 2015-09-28 at 14:50 +0000, David Laight wrote:
+> From: James Bottomley [mailto:James.Bottomley at HansenPartnership.com]
+> > Sent: 28 September 2015 15:27
+> > On Mon, 2015-09-28 at 08:58 +0000, David Laight wrote:
+> > > From: Rafael J. Wysocki
+> > > > Sent: 27 September 2015 15:09
+> > > ...
+> > > > > > Say you have three adjacent fields in a structure, x, y, z, each one byte long.
+> > > > > > Initially, all of them are equal to 0.
+> > > > > >
+> > > > > > CPU A writes 1 to x and CPU B writes 2 to y at the same time.
+> > > > > >
+> > > > > > What's the result?
+> > > > >
+> > > > > I think every CPU's  cache architecure guarantees adjacent store
+> > > > > integrity, even in the face of SMP, so it's x==1 and y==2.  If you're
+> > > > > thinking of old alpha SMP system where the lowest store width is 32 bits
+> > > > > and thus you have to do RMW to update a byte, this was usually fixed by
+> > > > > padding (assuming the structure is not packed).  However, it was such a
+> > > > > problem that even the later alpha chips had byte extensions.
+> > >
+> > > Does linux still support those old Alphas?
+> > >
+> > > The x86 cpus will also do 32bit wide rmw cycles for the 'bit' operations.
+> > 
+> > That's different: it's an atomic RMW operation.  The problem with the
+> > alpha was that the operation wasn't atomic (meaning that it can't be
+> > interrupted and no intermediate output states are visible).
+> 
+> It is only atomic if prefixed by the 'lock' prefix.
+> Normally the read and write are separate bus cycles.
 
-This patch tests for either TEGRA_124_SOC or TEGRA_132_SOC
-for the firmwares related to the Tegra K1 generation.
+The essential point is that x86 has atomic bit ops and byte writes.
+Early alpha did not.
 
-v2: move the MODULE_FIRMWARE to the nvidia_platform.c file.
- This will avoid to test for NOUVEAU_PLATFORM_DRIVER
+> > > You still have to ensure the compiler doesn't do wider rmw cycles.
+> > > I believe the recent versions of gcc won't do wider accesses for volatile data.
+> > 
+> > I don't understand this comment.  You seem to be implying gcc would do a
+> > 64 bit RMW for a 32 bit store ... that would be daft when a single
+> > instruction exists to perform the operation on all architectures.
+> 
+> Read the object code and weep...
+> It is most likely to happen for operations that are rmw (eg bit set).
+> For instance the arm cpu has limited offsets for 16bit accesses, for
+> normal structures the compiler is likely to use a 32bit rmw sequence
+> for a 16bit field that has a large offset.
+> The C language allows the compiler to do it for any access (IIRC including
+> volatiles).
 
-Signed-off-by: Nicolas Chauvet <kwizart@gmail.com>
----
- drivers/gpu/drm/nouveau/nouveau_platform.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+I think you might be confusing different things.  Most RISC CPUs can't
+do 32 bit store immediates because there aren't enough bits in their
+arsenal, so they tend to split 32 bit loads into a left and right part
+(first the top then the offset).  This (and other things) are mostly
+what you see in code.  However, 32 bit register stores are still atomic,
+which is all we require.  It's not really the compiler's fault, it's
+mostly an architectural limitation.
 
-diff --git a/drivers/gpu/drm/nouveau/nouveau_platform.c b/drivers/gpu/drm/nouveau/nouveau_platform.c
-index 3eb6654..9013141 100644
---- a/drivers/gpu/drm/nouveau/nouveau_platform.c
-+++ b/drivers/gpu/drm/nouveau/nouveau_platform.c
-@@ -65,3 +65,14 @@ struct platform_driver nouveau_platform_driver = {
- 	.probe = nouveau_platform_probe,
- 	.remove = nouveau_platform_remove,
- };
-+
-+#if IS_ENABLED(CONFIG_ARCH_TEGRA_124_SOC) || IS_ENABLED(CONFIG_ARCH_TEGRA_132_SOC)
-+MODULE_FIRMWARE("nvidia/gk20a/fecs_data.bin");
-+MODULE_FIRMWARE("nvidia/gk20a/fecs_inst.bin");
-+MODULE_FIRMWARE("nvidia/gk20a/gpccs_data.bin");
-+MODULE_FIRMWARE("nvidia/gk20a/gpccs_inst.bin");
-+MODULE_FIRMWARE("nvidia/gk20a/sw_bundle_init.bin");
-+MODULE_FIRMWARE("nvidia/gk20a/sw_ctx.bin");
-+MODULE_FIRMWARE("nvidia/gk20a/sw_method_init.bin");
-+MODULE_FIRMWARE("nvidia/gk20a/sw_nonctx.bin");
-+#endif
--- 
-2.4.3
+James
