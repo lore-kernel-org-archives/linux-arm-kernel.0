@@ -1,76 +1,37 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Sep 2015 16:12:58 -0500
-Subject: [PATCH] arm: omap2: timer: always define omap4_local_timer_init
-In-Reply-To: <5609ACD0.1010907@ti.com>
-References: <1443464744-16561-1-git-send-email-balbi@ti.com>
- <5609ACD0.1010907@ti.com>
-Message-ID: <20150928211258.GB16627@saruman.tx.rr.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 28 Sep 2015 23:13:01 +0200
+Subject: [PATCH v4 0/5] Provide better MADT subtable sanity checks
+In-Reply-To: <5609A06A.5020802@redhat.com>
+References: <1442446005-19799-1-git-send-email-al.stone@linaro.org>
+ <1883446.cx2ktyZcIz@vostro.rjw.lan> <5609A06A.5020802@redhat.com>
+Message-ID: <CAJZ5v0hHfwpw2h26KJePVCcgd68QFK2mtiffwjpootVn4WtvsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2015 at 04:10:40PM -0500, Nishanth Menon wrote:
-> On 09/28/2015 01:25 PM, Felipe Balbi wrote:
-> > omap4_local_timer_init() can be used by other
-> > platforms as is. At least AM437x wants to use
-> > it. Instead of making omap4-only and providing
-> > a stub for builds without OMAP4, we can just
-> > always define that function.
-> > 
-> > Reported-by: Nishanth Menon <nm@ti.com>
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/timer.c | 9 ---------
-> >  1 file changed, 9 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> > index a55655127ef2..f9028582e962 100644
-> > --- a/arch/arm/mach-omap2/timer.c
-> > +++ b/arch/arm/mach-omap2/timer.c
-> > @@ -642,20 +642,11 @@ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
-> >  			       2, "sys_clkin_ck", NULL);
-> >  #endif
-> >  
-> > -#ifdef CONFIG_ARCH_OMAP4
-> > -#ifdef CONFIG_HAVE_ARM_TWD
-> >  void __init omap4_local_timer_init(void)
-> >  {
-> >  	omap4_sync32k_timer_init();
-> >  	clocksource_of_init();
-> >  }
-> > -#else
-> > -void __init omap4_local_timer_init(void)
-> > -{
-> > -	omap4_sync32k_timer_init();
-> > -}
-> > -#endif /* CONFIG_HAVE_ARM_TWD */
-> > -#endif /* CONFIG_ARCH_OMAP4 */
-> >  
-> >  #if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
-> >  void __init omap5_realtime_timer_init(void)
-> > 
-> I am a little confused if this will build in a am437xx only build.
-> 
-> #define OMAP_SYS_32K_TIMER_INIT(name, clkev_nr, clkev_src, clkev_prop, \
-> clksrc_nr, clksrc_src, clksrc_prop) \
-> void __init omap##name##_sync32k_timer_init(void) \
-> 
-> Would you like to consider this for OMAP4 only build as well?
-> 
-> #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
-> 
->         defined(CONFIG_SOC_DRA7XX)
-> static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
->                                2, "sys_clkin_ck", NULL);
-> #endif
+On Mon, Sep 28, 2015 at 10:17 PM, Al Stone <ahs3@redhat.com> wrote:
+> On 09/25/2015 05:29 PM, Rafael J. Wysocki wrote:
+>> On Wednesday, September 16, 2015 05:26:40 PM Al Stone wrote:
 
-heh, more of the ifdeferry to drop. Okay, I'll respin this
+[cut]
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150928/40131357/attachment.sig>
+>> In particular, I'm not sure if we really need to return
+>> -EINVAL from acpi_parse_entries_array() when we find a bad MADT entry or it
+>> will be sufficient to simply go to the next entry in that case?
+>>
+>> Thanks,
+>> Rafael
+>
+> I see there being two options: (1) return -EINVAL and indicate that the tables
+> are incorrect, or (2) print a warning (or something more aggressive?), go to
+> the next entry, and hope for the best with the remainder of the MADT subtables.
+> The former is consistent with past behavior, I think, and the latter seems to
+> me a bit of a gamble.  So, my vote is for (1), the current method; what are you
+> thinking these days?
+
+I would be for preserving the past behavior.
+
+I'm a bit concerned that the new checks may trigger on systems where
+the old ones didn't, but that is a separete problem.
+
+Thanks,
+Rafael
