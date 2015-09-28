@@ -1,66 +1,24 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 28 Sep 2015 16:47:01 +0100
-Subject: [PATCH v2 00/11] Hi Maxime / Patrice / Srini,
-In-Reply-To: <20150928153938.GS27197@x1>
-References: <1443443867-4099-1-git-send-email-peter.griffin@linaro.org>
- <20150928153938.GS27197@x1>
-Message-ID: <20150928154701.GT27197@x1>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 28 Sep 2015 09:29:34 -0700
+Subject: [PATCH v4] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter
+ support
+In-Reply-To: <1442848061-4168-1-git-send-email-vladimir_zapolskiy@mentor.com>
+References: <1442848061-4168-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <CAD=FV=W6h6Nd=HQPYDcarCVNBmDQ6k4P2=Y_9rn6WM9Zc5ammw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Sep 2015, Lee Jones wrote:
+Vladimir,
 
-> On Mon, 28 Sep 2015, Peter Griffin wrote:
-> 
-> > This series makes a series of updates to the stih407 pinctrl groups
-> > and makes the upstream kernel more closely aligned in terms of pin
-> > configuration to the vendor kernel.
-> > 
-> > A number of new periphs are added such as spi fsm, nand, cec0, and
-> > for others such as SPI the various alternate function pin muxings have
-> > been added. Finally for SPI the controller nodes have been updated
-> > to have the default pin assignment in the controller node.
-> > 
-> > Changes since v1:
-> >  - Rebase on v4.3-rc3
-> >  - Remove some SoBs (Lee)
-> >  - Collect up Acks
-> > 
-> > kind regards,
-> > 
-> > Peter.
-> > 
-> > Peter Griffin (11):
-> >   ARM: STi: DT: STiH407: Add a cec0 pin definition
-> >   ARM: STi: DT: STiH407: Add i2c3 alternate pin configs
-> >   ARM: DT: STiH407: Add SPI 3 wire and 4 wire pinctrl configs
-> >   ARM: DT: STiH407: Add serial3 pinctrl configuration
-> >   ARM: DT: STiH407: Add SPI FSM (NOR Flash) Controller pin config
-> >   ARM: DT: STiH407: Add NAND flash controller pin configuration
-> >   ARM: DT: STiH407: Add systrace pin configuration
-> >   ARM: DT: STiH407: Add SD pinctrl config for mmc0 controller
-> >   ARM: DT: STiH407: Add pinconfig for IRB UHF and IRB TX
-> >   ARM: DT: STiH407: Add RMII pinctrl support
-> >   ARM: STi: STiH407: Add spi default pinctrl groups.
-> > 
-> >  arch/arm/boot/dts/stih407-family.dtsi  |  14 ++
-> >  arch/arm/boot/dts/stih407-pinctrl.dtsi | 378 ++++++++++++++++++++++++++++++++-
-> >  2 files changed, 387 insertions(+), 5 deletions(-)
-> 
-> I'll do this privately, so as not to unnecessarily delay the
-> acceptance of the set.
+On Mon, Sep 21, 2015 at 8:07 AM, Vladimir Zapolskiy
+<vladimir_zapolskiy@mentor.com> wrote:
+> - do I2C bus controller reinitialization on every data transfer,
+>   this change hopefully solves some observed problems on RK3288 platform
 
-Whoops!  Fingers faster than brain.  Sorry folks.
+My apologies, but this appears to be a bad idea...
 
-Maxime,
-  Please do not slow up the acceptance of this set due to my comments.
+We just discovered that this was the root cause of a bug.  If an HDCP
+transfer is happening then the soft reset messes things up.  In our
+tree we've moving things back to the way they were.  :(
 
-> I'm a big fan of keeping the *-by's in chronological order.  It does
-> help to provide an insight to the history of the patch.
-
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+-Doug
