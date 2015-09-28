@@ -1,118 +1,104 @@
-From: aalonso@freescale.com (Adrian Alonso)
-Date: Mon, 28 Sep 2015 16:56:41 -0500
-Subject: [PATCH v7 7/7] pinctrl: freescale: imx: imx7d iomuxc-lpsr devicetree
- bindings
-In-Reply-To: <1443477401-17238-1-git-send-email-aalonso@freescale.com>
-References: <1443477401-17238-1-git-send-email-aalonso@freescale.com>
-Message-ID: <1443477401-17238-7-git-send-email-aalonso@freescale.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 29 Sep 2015 00:46:04 +0200
+Subject: [PATCH v3 0/7] Early ACPI probing infrastructure
+In-Reply-To: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
+References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <3881043.sWK6Pcr0HP@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add iomuxc-lpsr devicetree bindings documentation
-Provide documentation context as well an example on
-pheriperals that could use pad from either iomuxc controller
-supported by iMX7D SoC
+On Monday, September 28, 2015 03:49:11 PM Marc Zyngier wrote:
+> IRQ controllers and timers are the two types of device the kernel
+> requires before being able to use the device driver model.
+> 
+> The Device Tree infrastructure makes it very easy to make these
+> discoverable by the rest of the kernel. For example, each interrupt
+> controller driver has at least one entry like this:
+> 
+> IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
+> 
+> which says: if you find a node having "arm,gic-400" as a compatible
+> string in the device tree, then call gic_of_init with this node as a
+> parameter. The probing itself is done by the OF layer when the
+> architecture code calls of_irq_init() (usually via irqchip_init).
+> 
+> This has a number of benefits:
+> 
+> - The irqchip code is self-contained. No architecture specific entry
+> point, no exposed symbols. Just a standard interface.
+> 
+> - The low-level architecture code doesn't have to know about which
+> interrupt controller is present. It just calls into the firmware
+> interface (of_irq_init) which is going to sort things out.
+> 
+> Similar infrastructure is provided for the timers/clock sources. Note
+> that this is not a replacement for the device model, but acts as a
+> probing infrastructure for things that are required too early for the
+> device infrastructure to be available.
+> 
+> What I'm aiming for is to introduce the same level of abstraction for
+> ACPI, or at least for the few bits that are required before a full blown
+> ACPI/device model can be used. For this, I introduce something vaguely
+> similar:
+> 
+> IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
+> 		     gic_validate_dist, ACPI_MADT_GIC_VERSION_V2,
+> 		     gic_v2_acpi_init);
+> 
+> which says: if you find a ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR entry in
+> MADT (implied by the macro), and that entry is of type
+> ACPI_MADT_GIC_VERSION_V2 (as checked by gic_validate_dist), then call
+> gic_v2_acpi_init with the entry as a parameter. A bit more convoluted,
+> but still without any special entry point.
+> 
+> The various interrupt controller drivers can then implement the above,
+> and the arch code can use a firmware-specific call to get the probing
+> done, still oblivious to what interrupt controller is being used. It
+> also makes the adaptation of a DT driver to ACPI easier.
+> 
+> It turns out that providing such a probing infrastructure is rather
+> easy, and provides a much deserved cleanup in both the arch code, the
+> GIC driver, and the architected timer driver. An additional (and very
+> much optional) patch renames files and symbols to make it obvious that
+> the infrastructure is not just for DT anymore.
+> 
+> I'm sure there is some more code to be deleted, and one can only
+> wonder why this wasn't done before the arm64 code was initially merged
+> (the diffstat says it all...).
+> 
+> Patches are against Rafael's bleeding-edge branch, and a branch is
+> available at
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git acpi/device-probing-v3
+> 
+> * From v2:
+>   - Addressed Rafael's comments (title for patch #1, macro/field names)
+>   - New config symbols for clocksources
+>   - Additional and optional last patch to get rid of the apparent
+>     dependency between the probing infrastructure and DT.
+> 
+> * From the initial version:
+>   - Make the infrastructure more DT like by providing an
+>     acpi_probe_entry array per "device type" (one for irqchips, one
+>     for clocksources). This means that entries can depend on any ACPI
+>     static table.
+>   - Use some cpp magic to reduce the amount of code added to an
+>     absolute minimum.
+>   - Rebased on v4.3-rc1
+> 
+> Marc Zyngier (7):
+>   acpi: Add early device probing infrastructure
+>   irqchip/acpi: Add probing infrastructure for ACPI-based irqchips
+>   irqchip/gic: Convert the GIC driver to ACPI probing
+>   clocksource/acpi: Add probing infrastructure for ACPI-based
+>     clocksources
+>   clocksource: Add new CLKSRC_{PROBE,ACPI} config symbols
+>   clocksource/arm_arch_timer: Convert to ACPI probing
+>   clocksource: cosmetic: Drop OF 'dependency' from symbols
 
-Signed-off-by: Adrian Alonso <aalonso@freescale.com>
----
-Changes for V2: New patch on imx7d iomuxc-lpsr patch series
-Changes for V3: Add shared input select register notes
-Changes for V4: Resend
-Changes for V5:
-- Fix spell error
-- Remove references of SHARE_INPUT_SELECT_REG flag
-Changes for V6: Resend
-Changes for v7: Resend
+If you want me to apply this series, ACKs are needed for patches [3-7/7].
 
- .../bindings/pinctrl/fsl,imx7d-pinctrl.txt         | 63 +++++++++++++++++++++-
- 1 file changed, 62 insertions(+), 1 deletion(-)
+They are fine by me, but I'd also like to hear from the other maintainers.
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
-index 8bbf25d..aae069f 100644
---- a/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
-@@ -1,16 +1,42 @@
- * Freescale i.MX7 Dual IOMUX Controller
- 
-+iMX7D supports two iomuxc controllers, fsl,imx7d-iomuxc controller is similar
-+as previous iMX SoC generation and fsl,imx7d-iomuxc-lpsr which provides low
-+power state retention capabilities on gpios that are part of iomuxc-lpsr
-+(GPIO1_IO7..GPIO1_IO0). While iomuxc-lpsr provides its own set of registers for
-+mux and pad control settings, it shares the input select register from main
-+iomuxc controller for daisy chain settings, the fsl,input-sel property extends
-+fsl,imx-pinctrl driver to support iomuxc-lpsr controller.
-+
-+iomuxc_lpsr: iomuxc-lpsr at 302c0000 {
-+	compatible = "fsl,imx7d-iomuxc-lpsr";
-+	reg = <0x302c0000 0x10000>;
-+	fsl,input-sel = <&iomuxc>;
-+};
-+
-+iomuxc: iomuxc at 30330000 {
-+	compatible = "fsl,imx7d-iomuxc";
-+	reg = <0x30330000 0x10000>;
-+};
-+
-+Pheriparials using pads from iomuxc-lpsr support low state retention power
-+state, under LPSR mode GPIO's state of pads are retain.
-+
- Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
- and usage.
- 
- Required properties:
--- compatible: "fsl,imx7d-iomuxc"
-+- compatible: "fsl,imx7d-iomuxc" for main IOMUXC controller, or
-+  "fsl,imx7d-iomuxc-lpsr" for Low Power State Retention IOMUXC controller.
- - fsl,pins: each entry consists of 6 integers and represents the mux and config
-   setting for one pin.  The first 5 integers <mux_reg conf_reg input_reg mux_val
-   input_val> are specified using a PIN_FUNC_ID macro, which can be found in
-   imx7d-pinfunc.h under device tree source folder.  The last integer CONFIG is
-   the pad setting value like pull-up on this pin.  Please refer to i.MX7 Dual
-   Reference Manual for detailed CONFIG settings.
-+- fsl,input-sel: required property for iomuxc-lpsr controller, this property is
-+  a phandle for main iomuxc controller which shares the input select register for
-+  daisy chain settings.
- 
- CONFIG bits definition:
- PAD_CTL_PUS_100K_DOWN           (0 << 5)
-@@ -25,3 +51,38 @@ PAD_CTL_DSE_X1                  (0 << 0)
- PAD_CTL_DSE_X2                  (1 << 0)
- PAD_CTL_DSE_X3                  (2 << 0)
- PAD_CTL_DSE_X4                  (3 << 0)
-+
-+Examples:
-+While iomuxc-lpsr is intended to be used by dedicated peripherals to take
-+advantages of LPSR power mode, is also possible that an IP to use pads from
-+any of the iomux controllers. For example the I2C1 IP can use SCL pad from
-+iomuxc-lpsr controller and SDA pad from iomuxc controller as:
-+
-+i2c1: i2c@30a20000 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1_1 &pinctrl_i2c1_2>;
-+	status = "okay";
-+};
-+
-+iomuxc-lpsr at 302c0000 {
-+	compatible = "fsl,imx7d-iomuxc-lpsr";
-+	reg = <0x302c0000 0x10000>;
-+	fsl,input-sel = <&iomuxc>;
-+
-+	pinctrl_i2c1_1: i2c1grp-1 {
-+		fsl,pins = <
-+			MX7D_PAD_GPIO1_IO04__I2C1_SCL 0x4000007f
-+		>;
-+	};
-+};
-+
-+iomuxc at 30330000 {
-+	compatible = "fsl,imx7d-iomuxc";
-+	reg = <0x30330000 0x10000>;
-+
-+	pinctrl_i2c1_2: i2c1grp-2 {
-+		fsl,pins = <
-+			MX7D_PAD_I2C1_SCL__I2C1_SCL 0x4000007f
-+		>;
-+	};
-+};
--- 
-2.1.4
+Thanks,
+Rafael
