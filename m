@@ -1,123 +1,50 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Mon, 28 Sep 2015 17:44:40 +0800
-Subject: [PATCH 2/2] arm64: to allow EFI_RTC can be selected on ARM64
-In-Reply-To: <2245172.1ESUGv0DKo@wuerfel>
-References: <1443418478-8240-1-git-send-email-thunder.leizhen@huawei.com>
- <1783631.jH4WY2RqXu@wuerfel> <5608FA85.8070009@huawei.com>
- <2245172.1ESUGv0DKo@wuerfel>
-Message-ID: <56090C08.8070003@huawei.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Sep 2015 10:48:36 +0100
+Subject: Build regressions/improvements in v4.3-rc3
+In-Reply-To: <20150928093006.GT21513@n2100.arm.linux.org.uk>
+References: <1443382476-12171-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdWrBYnQ0CRYmBgO3xNZMqCY42OtNwhryqzi+Tv+KGj6Lg@mail.gmail.com>
+ <20150928093006.GT21513@n2100.arm.linux.org.uk>
+Message-ID: <20150928094836.GU21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2015/9/28 16:42, Arnd Bergmann wrote:
-> On Monday 28 September 2015 16:29:57 Leizhen wrote:
->>
->> On 2015/9/28 15:35, Arnd Bergmann wrote:
->>> On Monday 28 September 2015 13:34:38 Zhen Lei wrote:
->>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>>> index 07d1811..25cec57 100644
->>>> --- a/arch/arm64/Kconfig
->>>> +++ b/arch/arm64/Kconfig
->>>> @@ -85,7 +85,7 @@ config ARM64
->>>>         select PERF_USE_VMALLOC
->>>>         select POWER_RESET
->>>>         select POWER_SUPPLY
->>>> -       select RTC_LIB
->>>> +       select RTC_LIB if !EFI
->>>>         select SPARSE_IRQ
->>>>         select SYSCTL_EXCEPTION_TRACE
->>>>         select HAVE_CONTEXT_TRACKING
->>>
->>> Sorry, we can't do that: enabling EFI has to be done in a way that it only
->>> adds features but not disables them.
->>
->> I run "make ARCH=arm64 menuconfig" and found that RTC_CLASS is selected by default. Actually, RTC_LIB only
->> controls whether to display some configs when run "make menuconfig". I list all informations below:
->>
->> ---------make ARCH=arm64 menuconfig-----
->>   [*] Real Time Clock  --->
->>
->> ---------drivers/rtc/Kconfig-------
->> menuconfig RTC_CLASS
->>         bool "Real Time Clock"
->>         default n
->>         depends on !S390 && !UML
->>         select RTC_LIB
+On Mon, Sep 28, 2015 at 10:30:06AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Sep 28, 2015 at 08:57:44AM +0200, Geert Uytterhoeven wrote:
+> > On Sun, Sep 27, 2015 at 9:34 PM, Geert Uytterhoeven
+> > <geert@linux-m68k.org> wrote:
+> > > JFYI, when comparing v4.3-rc3[1] to v4.3-rc2[3], the summaries are:
+> > >   - build errors: +8/-12
+> > 
+> >   + error: No rule to make target include/config/auto.conf:  => N/A
+> > 
+> > arm-randconfig
 > 
-> Ok, I see. So your patch here has no effect at all and can be dropped, or
-> we can remove the 'select RTC_LIB' without the EFI dependency.
-
-Oh, I described the reason in the reply to Ard Biesheuvel.
-
-https://lkml.org/lkml/2015/9/28/124
-
+> Not every randconfig failure is a kernel problem.  Here's an example:
 > 
->> -----------------------------------
->> find . -name "*Kconfig*" | xargs grep RTC_LIB
->> ./drivers/rtc/Kconfig:config RTC_LIB
->> ./drivers/rtc/Kconfig:	select RTC_LIB
->> ./drivers/char/Kconfig:if RTC_LIB=n
->> ./drivers/char/Kconfig:endif # RTC_LIB
->> ./arch/x86/Kconfig:	select RTC_LIB
->> ./arch/arm/Kconfig:	select RTC_LIB
->> ./arch/arm64/Kconfig:	select RTC_LIB if !EFI
->> ./arch/sh/Kconfig:	select RTC_LIB
->> ./arch/mips/Kconfig:	select RTC_LIB if !MACH_LOONGSON64
->>
->> --------------drivers/char/Kconfig--------------
->> if RTC_LIB=n
->>
->> config RTC
->>         tristate "Enhanced Real Time Clock Support (legacy PC RTC driver)"
->>
->> .......
->>
->> endif # RTC_LIB
->>
->>
->>>
->>> Your patch breaks RTC on all non-EFI platforms as soon as CONFIG_EFI
->>> is selected by the user.
->>
->> No, on non-EFI platforms, they can still use RTC as before. As I mentioned above,
->> RTC_LIB only controls whether to display some configs when run "make menuconfig".
->> On ARM64, (in this patch) I only allowed EFI_RTC can be showed when RTC_LIB was
->> not selected.
->>
+> Physical address of main memory (PHYS_OFFSET) [] (NEW) aborted!
 > 
-> but that is the wrong driver that uses the legacy API, we cannot have that
-> on ARM because it conflicts with the normal RTC_CLASS drivers.
+> Console input/output is redirected. Run 'make oldconfig' to update configuration.
+> 
+> This needs someone to provide a value, which means these failures are
+> not in fact failures of the kernel, but a failure of the build system
+> to anticipate that there may be Kconfig questions that need input.
+> 
+> So, these ones should be ignored.
 
-Yes, RTC_CLASS will automatically select RTC_LIB, and will not display EFI_RTC, because
-RTC_LIB=y now.
+Also, a great many of the failures are due to the build toolchain not
+supporting -fstack-protector-strong.  I think it's absolutely right
+for the build to error out if you enable a kernel feature which requires
+toolchain support, but the toolchain does not support that feature.
 
-We can select EFI_RTC only when RTC_CLASS is not selected(meanwhile RTC_LIB=n)
+What this means is that the build results from kissb are less than
+useful - without spending ages looking at every single build, it's
+hard to find the real failures we care about.
 
-> 
->> --------------drivers/char/Kconfig--------------
->> if RTC_LIB=n
->>
->> config RTC
->> tristate "Enhanced Real Time Clock Support (legacy PC RTC driver)"
->>
->> .......
->>
->> config EFI_RTC
->>         bool "EFI Real Time Clock Services"
->>         depends on IA64 || ARM64
->>
->> .......
->>
->> endif # RTC_LIB
-> 
-> The driver you want is RTC_DRV_EFI, not EFI_RTC.
+I'd suggest that either the randconfig is seeded to ensure that
+CONFIG_CC_STACKPROTECTOR_STRONG is always disabled in ARM randconfigs,
+or that the ARM toolchain is updated to support this feature.
 
-OK, I will try it tommorrow.
-
-> 
-> 	Arnd
-> 
-> .
-> 
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
