@@ -1,31 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 28 Sep 2015 08:57:44 +0200
-Subject: Build regressions/improvements in v4.3-rc3
-In-Reply-To: <1443382476-12171-1-git-send-email-geert@linux-m68k.org>
-References: <1443382476-12171-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CAMuHMdWrBYnQ0CRYmBgO3xNZMqCY42OtNwhryqzi+Tv+KGj6Lg@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 28 Sep 2015 10:00:08 +0300
+Subject: [PATCH 1/1] dmaengine: dw: fix nollp issue
+In-Reply-To: <032901d0f999$363fae80$a2bf0b80$@tangramtek.com>
+References: <032901d0f999$363fae80$a2bf0b80$@tangramtek.com>
+Message-ID: <CAHp75Vd-AUrNdT6_yxwHbx49JHTVO+-ZkQTJ5xijebW1gFdp0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 27, 2015 at 9:34 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> JFYI, when comparing v4.3-rc3[1] to v4.3-rc2[3], the summaries are:
->   - build errors: +8/-12
+On Mon, Sep 28, 2015 at 5:55 AM, yitian <yitian.bu@tangramtek.com> wrote:
+> when channel number is less than maximum number, the register
+> address of all channels is wrong, which causes the "nollp" flag
+> is set for all channels even if HW supports llp.
+>
 
-  + error: No rule to make target include/config/auto.conf:  => N/A
+Thanks for the fix, though proper one is already under review here:
+http://www.spinics.net/lists/dmaengine/msg06143.html
 
-arm-randconfig
+You might break a channel prioritization.
 
-> [1] http://kisskb.ellerman.id.au/kisskb/head/9404/ (255 out of 254 configs)
-> [3] http://kisskb.ellerman.id.au/kisskb/head/9376/ (all 254 configs)
+> Signed-off-by: Yitian Bu <yitian.bu@tangramtek.com>
+> ---
+>  drivers/dma/dw/core.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/dma/dw/core.c b/drivers/dma/dw/core.c
+> index cf1c87f..c2e9ac8 100644
+> --- a/drivers/dma/dw/core.c
+> +++ b/drivers/dma/dw/core.c
+> @@ -1591,7 +1591,7 @@ int dw_dma_probe(struct dw_dma_chip *chip, struct
+> dw_dma_platform_data *pdata)
+>         INIT_LIST_HEAD(&dw->dma.channels);
+>         for (i = 0; i < nr_channels; i++) {
+>                 struct dw_dma_chan      *dwc = &dw->chan[i];
+> -               int                     r = nr_channels - i - 1;
+> +               int                     r = DW_DMA_MAX_NR_CHANNELS - i - 1;
+>
+>                 dwc->chan.device = &dw->dma;
+>                 dma_cookie_init(&dwc->chan);
+> --
+> 1.7.12.4
+>
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-Gr{oetje,eeting}s,
 
-                        Geert
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+With Best Regards,
+Andy Shevchenko
