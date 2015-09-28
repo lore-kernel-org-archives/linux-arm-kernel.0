@@ -1,56 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 28 Sep 2015 16:39:38 +0100
-Subject: [PATCH v2 00/11] Hi Maxime / Patrice / Srini,
-In-Reply-To: <1443443867-4099-1-git-send-email-peter.griffin@linaro.org>
-References: <1443443867-4099-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20150928153938.GS27197@x1>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 28 Sep 2015 17:40:13 +0200
+Subject: xf86-video-armada + etnaviv (Was: Re: I.MX6 HDMI support in v4.2)
+In-Reply-To: <20150928152429.GW21513@n2100.arm.linux.org.uk>
+References: <m3bnde5whx.fsf@t19.piap.pl>
+ <20150907112555.GS21084@n2100.arm.linux.org.uk>
+ <m337yp5gvv.fsf@t19.piap.pl> <1441709778.13536.8.camel@pengutronix.de>
+ <m3bnd52y4s.fsf@t19.piap.pl> <1442332425.2637.16.camel@pengutronix.de>
+ <20150915163642.GW21084@n2100.arm.linux.org.uk>
+ <1442336034.2637.20.camel@pengutronix.de>
+ <20150915170444.GX21084@n2100.arm.linux.org.uk>
+ <1443451688.3178.61.camel@pengutronix.de>
+ <20150928152429.GW21513@n2100.arm.linux.org.uk>
+Message-ID: <1443454813.3178.66.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Sep 2015, Peter Griffin wrote:
+Am Montag, den 28.09.2015, 16:24 +0100 schrieb Russell King - ARM Linux:
+> On Mon, Sep 28, 2015 at 04:48:08PM +0200, Lucas Stach wrote:
+> > I've looked at that again and the issue here seems to be that GStreamer
+> > is handing us a pointer to a buffer that isn't aligned to a page. The
+> > buffers size is properly rounded up to a pagesize, as requested by
+> > QueryImageAttributes, but if the buffer start pointer isn't aligned to a
+> > page boundary we end up with an non-mappable buffer anyway.
+> > 
+> > Unfortunately there is no obvious way for a driver to request a minimum
+> > alignment for the buffer. The only possible fix is for the client to
+> > always align the buffer to a page boundary in hopes that this is enough
+> > for the hardware to map it directly and allow to skip any unwanted
+> > copying.
+> 
+> We can't just "round up" the size.  We've no idea whether the buffer
+> came from shmem (for XvShmPutImage), or whether it's part of an internal
+> X buffer (for XvPutImage).  In the latter case, we've no idea whether
+> data in the remainder of the page will be read or written by the CPU
+> when, eg, a signal occurs - and X does use signals.
+> 
+I'm not talking about the driver rounding up the size. That is obviously
+(contrary to what my patch did) the wrong thing to do.
 
-> This series makes a series of updates to the stih407 pinctrl groups
-> and makes the upstream kernel more closely aligned in terms of pin
-> configuration to the vendor kernel.
-> 
-> A number of new periphs are added such as spi fsm, nand, cec0, and
-> for others such as SPI the various alternate function pin muxings have
-> been added. Finally for SPI the controller nodes have been updated
-> to have the default pin assignment in the controller node.
-> 
-> Changes since v1:
->  - Rebase on v4.3-rc3
->  - Remove some SoBs (Lee)
->  - Collect up Acks
-> 
-> kind regards,
-> 
-> Peter.
-> 
-> Peter Griffin (11):
->   ARM: STi: DT: STiH407: Add a cec0 pin definition
->   ARM: STi: DT: STiH407: Add i2c3 alternate pin configs
->   ARM: DT: STiH407: Add SPI 3 wire and 4 wire pinctrl configs
->   ARM: DT: STiH407: Add serial3 pinctrl configuration
->   ARM: DT: STiH407: Add SPI FSM (NOR Flash) Controller pin config
->   ARM: DT: STiH407: Add NAND flash controller pin configuration
->   ARM: DT: STiH407: Add systrace pin configuration
->   ARM: DT: STiH407: Add SD pinctrl config for mmc0 controller
->   ARM: DT: STiH407: Add pinconfig for IRB UHF and IRB TX
->   ARM: DT: STiH407: Add RMII pinctrl support
->   ARM: STi: STiH407: Add spi default pinctrl groups.
-> 
->  arch/arm/boot/dts/stih407-family.dtsi  |  14 ++
->  arch/arm/boot/dts/stih407-pinctrl.dtsi | 378 ++++++++++++++++++++++++++++++++-
->  2 files changed, 387 insertions(+), 5 deletions(-)
+I was talking of the client (as in VLC, GStreamer, whatever) aligning
+the buffer to a page boundary. As there is no way for the client to
+query the alignment restrictions, we may still need a fallback path in
+the driver, so that if an unaligned buffer comes in we don't do a
+buffer_from_userptr but actually copy client memory to a new buffer.
 
-I'll do this privately, so as not to unnecessarily delay the
-acceptance of the set.  I'm a big fan of keeping the *-by's in
-chronological order.  It does help to provide an insight to the
-history of the patch.
-
+Regards,
+Lucas
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
