@@ -1,94 +1,88 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Mon, 28 Sep 2015 23:34:39 +0200
-Subject: [PATCH v4 16/26] ARM: pxa: magician: Fix support for Intel Strata NOR
- Flash
-In-Reply-To: <cover.1443472089.git.petr.cvek@tul.cz>
-References: <cover.1443472089.git.petr.cvek@tul.cz>
-Message-ID: <5609B26F.9010809@tul.cz>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 28 Sep 2015 16:37:31 -0500
+Subject: [PATCHv2] arm: omap2: timer: always define omap4_local_timer_init
+In-Reply-To: <1443475405-15977-1-git-send-email-balbi@ti.com>
+References: <1443475405-15977-1-git-send-email-balbi@ti.com>
+Message-ID: <5609B31B.9030108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Old definition for the physmap-flash driver is incomplete:
-- Use of an EGPIO without previous request
-- Missing the MTD partitions
 
-This patch fixes it. Read functionality was tested on the machine with
-board_id 0x3a. Writing was not tested.
+bit of nitpick on capitalization of $subject.. aside..
 
-Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
----
- arch/arm/mach-pxa/magician.c | 45 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+On 09/28/2015 04:23 PM, Felipe Balbi wrote:
+> omap4_local_timer_init() can be used by other
+> platforms as is. At least AM437x wants to use
+> it. Instead of making omap4-only and providing
+> a stub for builds without OMAP4, we can just
+> always define that function.
+> 
+> Reported-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+> 
+> changes since v1:
+>  - make sure result builds on AM43xx-only builds
+> 
+>  arch/arm/mach-omap2/timer.c | 14 ++------------
+>  1 file changed, 2 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index e4d8701f99f9..3cdd22251a0d 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -634,32 +634,22 @@ OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
+>  			2, "timer_sys_ck", NULL);
+>  #endif /* CONFIG_ARCH_OMAP3 */
+>  
+> -#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX) || \
+> -	defined(CONFIG_SOC_AM43XX)
+> +#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+>  OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
+>  		       1, "timer_sys_ck", "ti,timer-alwon");
+>  #endif
+>  
+>  #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+> -	defined(CONFIG_SOC_DRA7XX)
+> +	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
+>  static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+>  			       2, "sys_clkin_ck", NULL);
+>  #endif
+>  
+> -#ifdef CONFIG_ARCH_OMAP4
+> -#ifdef CONFIG_HAVE_ARM_TWD
 
-diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index 91b5ed0..8e8b122 100644
---- a/arch/arm/mach-pxa/magician.c
-+++ b/arch/arm/mach-pxa/magician.c
-@@ -788,20 +788,65 @@ static struct pxaohci_platform_data magician_ohci_info = {
-  * StrataFlash
-  */
- 
-+static int magician_flash_init(struct platform_device *pdev)
-+{
-+	int ret = gpio_request(EGPIO_MAGICIAN_FLASH_VPP, "flash Vpp enable");
-+
-+	if (ret) {
-+		pr_err("Cannot request flash enable GPIO (%i)\n", ret);
-+		return ret;
-+	}
-+
-+	ret = gpio_direction_output(EGPIO_MAGICIAN_FLASH_VPP, 1);
-+	if (ret) {
-+		pr_err("Cannot set direction for flash enable (%i)\n", ret);
-+		gpio_free(EGPIO_MAGICIAN_FLASH_VPP);
-+	}
-+
-+	return ret;
-+}
-+
- static void magician_set_vpp(struct platform_device *pdev, int vpp)
- {
- 	gpio_set_value(EGPIO_MAGICIAN_FLASH_VPP, vpp);
- }
- 
-+static void magician_flash_exit(struct platform_device *pdev)
-+{
-+	gpio_free(EGPIO_MAGICIAN_FLASH_VPP);
-+}
-+
- static struct resource strataflash_resource = {
- 	.start	= PXA_CS0_PHYS,
- 	.end	= PXA_CS0_PHYS + SZ_64M - 1,
- 	.flags	= IORESOURCE_MEM,
- };
- 
-+static struct mtd_partition magician_flash_parts[] = {
-+	{
-+		.name		= "Bootloader",
-+		.offset		= 0x0,
-+		.size		= 0x40000,
-+		.mask_flags	= MTD_WRITEABLE, /* EXPERIMENTAL */
-+	},
-+	{
-+		.name		= "Linux Kernel",
-+		.offset		= 0x40000,
-+		.size		= MTDPART_SIZ_FULL,
-+	},
-+};
-+
-+/*
-+ * physmap-flash driver
-+ */
-+
- static struct physmap_flash_data strataflash_data = {
- 	.width		= 4,
-+	.init		= magician_flash_init,
- 	.set_vpp	= magician_set_vpp,
-+	.exit		= magician_flash_exit,
-+	.parts		= magician_flash_parts,
-+	.nr_parts	= ARRAY_SIZE(magician_flash_parts),
- };
- 
- static struct platform_device strataflash = {
+OK -> so we removed both of these..
+
+>  void __init omap4_local_timer_init(void)
+>  {
+>  	omap4_sync32k_timer_init();
+
+but this only gets defined *if*
+>  #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+> -	defined(CONFIG_SOC_DRA7XX)
+> +	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
+
+we should fail build on omap3 only, correct??
+
+or am i missing something else?
+
+>  	clocksource_of_init();
+>  }
+> -#else
+> -void __init omap4_local_timer_init(void)
+> -{
+> -	omap4_sync32k_timer_init();
+> -}
+> -#endif /* CONFIG_HAVE_ARM_TWD */
+> -#endif /* CONFIG_ARCH_OMAP4 */
+>  
+>  #if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
+>  void __init omap5_realtime_timer_init(void)
+> 
+
+
+
 -- 
-1.7.12.1
+Regards,
+Nishanth Menon
