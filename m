@@ -1,82 +1,79 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 28 Sep 2015 17:42:57 +0100
-Subject: [PATCH v4 4/9] acpi/gsi: Always perform an irq domain lookup
+Date: Mon, 28 Sep 2015 17:42:56 +0100
+Subject: [PATCH v4 3/9] genirq/irqdomain: Add a fwnode_handle allocator
 In-Reply-To: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
 References: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1443458582-7497-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1443458582-7497-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of directly passing NULL to the various irq_domain functions,
-start by looking up the domain with a domain identifier..
+In order to be able to reference an irqdomain from ACPI, we need
+to be able to create an identifier, which is a struct device_node.
 
-As this identifier is permanently set to NULL, the lookup function will
-return the same value (no domain found) and the default will be used,
-preserving the current behaviour.
+This device node does't really fit the ACPI infrastructure, so
+we cunningly hide it by returning the contained fwnode_handle.
+This will help a (still hypothetical) further migration of
+irqdomain from device_node to fwnode_handle.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/acpi/gsi.c | 23 ++++++++++-------------
- 1 file changed, 10 insertions(+), 13 deletions(-)
+ include/linux/irqdomain.h |  2 ++
+ kernel/irq/irqdomain.c    | 30 ++++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
-diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-index 38208f2..6232d55 100644
---- a/drivers/acpi/gsi.c
-+++ b/drivers/acpi/gsi.c
-@@ -11,9 +11,12 @@
- #include <linux/acpi.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
-+#include <linux/of.h>
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index d3ca792..3193c61 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -162,6 +162,8 @@ enum {
+ };
  
- enum acpi_irq_model_id acpi_irq_model;
+ #ifdef CONFIG_IRQ_DOMAIN
++struct fwnode_handle *irq_domain_alloc_fwnode(void *data);
++void irq_domain_free_fwnode(struct fwnode_handle *fwnode);
+ struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
+ 				    irq_hw_number_t hwirq_max, int direct_max,
+ 				    const struct irq_domain_ops *ops,
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index e5c1e4c..5e7214a 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -29,6 +29,36 @@ static int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+ static void irq_domain_check_hierarchy(struct irq_domain *domain);
  
-+static struct device_node *acpi_gsi_domain_id;
+ /**
++ * irq_domain_alloc_fwnode - Allocate a OF-backed fwnode_handle suitable for
++ *                           identifying an irq domain
++ * @data: optional user-provided data
++ *
++ * Allocate a struct device_node, and return a poiner to the embedded
++ * fwnode_handle (or NULL on failure).
++ */
++struct fwnode_handle *irq_domain_alloc_fwnode(void *data)
++{
++	struct device_node *of_node;
 +
- static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
- {
- 	switch (polarity) {
-@@ -45,12 +48,9 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
-  */
- int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
- {
--	/*
--	 * Only default domain is supported at present, always find
--	 * the mapping corresponding to default domain by passing NULL
--	 * as irq_domain parameter
--	 */
--	*irq = irq_find_mapping(NULL, gsi);
-+	struct irq_domain *d = irq_find_host(acpi_gsi_domain_id);
++	of_node = of_node_alloc("irqdomain@%p", data);
++	if (!of_node)
++		return NULL;
 +
-+	*irq = irq_find_mapping(d, gsi);
- 	/*
- 	 * *irq == 0 means no mapping, that should
- 	 * be reported as a failure
-@@ -74,13 +74,9 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
- {
- 	unsigned int irq;
- 	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
-+	struct irq_domain *d = irq_find_host(acpi_gsi_domain_id);
- 
--	/*
--	 * There is no way at present to look-up the IRQ domain on ACPI,
--	 * hence always create mapping referring to the default domain
--	 * by passing NULL as irq_domain parameter
--	 */
--	irq = irq_create_mapping(NULL, gsi);
-+	irq = irq_create_mapping(d, gsi);
- 	if (!irq)
- 		return -EINVAL;
- 
-@@ -98,7 +94,8 @@ EXPORT_SYMBOL_GPL(acpi_register_gsi);
-  */
- void acpi_unregister_gsi(u32 gsi)
- {
--	int irq = irq_find_mapping(NULL, gsi);
-+	struct irq_domain *d = irq_find_host(acpi_gsi_domain_id);
-+	int irq = irq_find_mapping(d, gsi);
- 
- 	irq_dispose_mapping(irq);
- }
++	of_node->data = data;
++	return &of_node->fwnode;
++}
++
++/**
++ * irq_domain_free_fwnode - Free a OF-backed fwnode_handle
++ *
++ * Free a fwnode_handle allocated with irq_domain_alloc_fwnode.
++ */
++void irq_domain_free_fwnode(struct fwnode_handle *fwnode)
++{
++	of_node_put(to_of_node(fwnode));
++}
++
++/**
+  * __irq_domain_add() - Allocate a new irq_domain data structure
+  * @of_node: optional device-tree node of the interrupt controller
+  * @size: Size of linear map; 0 for radix mapping only
 -- 
 2.1.4
