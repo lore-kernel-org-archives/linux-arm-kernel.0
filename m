@@ -1,55 +1,133 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Mon, 28 Sep 2015 13:34:37 +0800
-Subject: [PATCH 1/2] char/rtc: to allow EFI_RTC can be selected on ARM64
-In-Reply-To: <1443418478-8240-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1443418478-8240-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1443418478-8240-2-git-send-email-thunder.leizhen@huawei.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Mon, 28 Sep 2015 13:38:39 +0800
+Subject: [PATCH v7 5/6] Documentation: dt-bindings: pci: altera pcie
+ device tree binding
+In-Reply-To: <5606171A.5000609@kernel.org>
+References: <1442801587-3812-1-git-send-email-lftan@altera.com>
+ <1442801587-3812-6-git-send-email-lftan@altera.com>
+ <5606171A.5000609@kernel.org>
+Message-ID: <CAFiDJ59PuhRj3F288A_451pLiKnqPUKin9C2t5uuH2iNPnJfAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, ARM64 is also support EFI startup. We hope use EFI runtime services
-to get/set current time and date.
+On Sat, Sep 26, 2015 at 11:55 AM, Rob Herring <robh@kernel.org> wrote:
+>
+> On 09/20/2015 09:13 PM, Ley Foon Tan wrote:
+> > This patch adds the bindings for Altera PCIe host controller driver and
+> > Altera PCIe MSI driver.
+> >
+> > Signed-off-by: Ley Foon Tan <lftan@altera.com>
+> > ---
+> >  .../devicetree/bindings/pci/altera-pcie-msi.txt    | 28 +++++++++++++
+> >  .../devicetree/bindings/pci/altera-pcie.txt        | 49 ++++++++++++++++++++++
+> >  2 files changed, 77 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
+> >  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
+> > new file mode 100644
+> > index 0000000..53ad2388
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
+> > @@ -0,0 +1,28 @@
+> > +* Altera PCIe MSI controller
+> > +
+> > +Required properties:
+> > +- compatible:        should contain "altr,msi-1.0"
+> > +- reg:               specifies the physical base address of the controller and
+> > +             the length of the memory mapped region.
+> > +- reg-names: must include the following entries:
+> > +             "csr": CSR registers
+> > +             "vector_slave": vectors slave port region
+> > +- interrupt-parent:  interrupt source phandle.
+> > +- interrupts:        specifies the interrupt source of the parent interrupt
+> > +             controller. The format of the interrupt specifier depends on the
+> > +             parent interrupt controller.
+> > +- num-vectors:       number of vectors, range 1 to 32.
+> > +- msi-controller:    indicates that this is MSI controller node
+> > +
+> > +
+> > +Example
+> > +msi0: msi at 0xFF200000 {
+> > +     compatible = "altr,msi-1.0";
+> > +     reg = <0xFF200000 0x00000010
+> > +             0xFF200010 0x00000080>;
+> > +     reg-names = "csr", "vector_slave";
+> > +     interrupt-parent = <&hps_0_arm_gic_0>;
+> > +     interrupts = <0 42 4>;
+> > +     msi-controller = <1>;
+>
+> This should not have a value.
+Okay.
 
-Slightly adjust to keep a line not exceed 80 characters.
+>
+> > +     num-vectors = <32>;
+> > +};
+> > diff --git a/Documentation/devicetree/bindings/pci/altera-pcie.txt b/Documentation/devicetree/bindings/pci/altera-pcie.txt
+> > new file mode 100644
+> > index 0000000..4440db1
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pci/altera-pcie.txt
+> > @@ -0,0 +1,49 @@
+> > +* Altera PCIe controller
+> > +
+> > +Required properties:
+> > +- compatible :       should contain "altr,pcie-root-port-1.0"
+> > +- reg:               a list of physical base address and length for TXS and CRA.
+> > +- reg-names: must include the following entries:
+> > +             "Txs" or "txs": TX slave port region
+> > +             "Cra" or "cra": Control register access region
+>
+> Why both cases? Can we please just have one (or none is better IMO).
+The PCIe IP on different device families use different register names.
+And our device tree generator will auto generate the register names
+based on the hardware description name. Too bad we can't change the
+hardware description names now.
+>
+> txs contains the config space?
+It is not the config space, but a memory slave port.
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/char/Kconfig | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/char/Kconfig b/drivers/char/Kconfig
-index a043107..7ad3fd1 100644
---- a/drivers/char/Kconfig
-+++ b/drivers/char/Kconfig
-@@ -280,7 +280,8 @@ if RTC_LIB=n
- config RTC
- 	tristate "Enhanced Real Time Clock Support (legacy PC RTC driver)"
- 	depends on !PPC && !PARISC && !IA64 && !M68K && !SPARC && !FRV \
--			&& !ARM && !SUPERH && !S390 && !AVR32 && !BLACKFIN && !UML
-+			&& !ARM && !ARM64 && !SUPERH && !S390 && !AVR32 \
-+			&& !BLACKFIN && !UML
- 	---help---
- 	  If you say Y here and create a character special file /dev/rtc with
- 	  major number 10 and minor number 135 using mknod ("man mknod"), you
-@@ -328,7 +329,9 @@ config JS_RTC
-
- config GEN_RTC
- 	tristate "Generic /dev/rtc emulation"
--	depends on RTC!=y && !IA64 && !ARM && !M32R && !MIPS && !SPARC && !FRV && !S390 && !SUPERH && !AVR32 && !BLACKFIN && !UML
-+	depends on RTC!=y && !IA64 && !ARM && !ARM64 && !M32R && !MIPS \
-+			&& !SPARC && !FRV && !S390 && !SUPERH && !AVR32 \
-+			&& !BLACKFIN && !UML
- 	---help---
- 	  If you say Y here and create a character special file /dev/rtc with
- 	  major number 10 and minor number 135 using mknod ("man mknod"), you
-@@ -353,7 +356,7 @@ config GEN_RTC_X
-
- config EFI_RTC
- 	bool "EFI Real Time Clock Services"
--	depends on IA64
-+	depends on IA64 || ARM64
-
- config DS1302
- 	tristate "DS1302 RTC support"
---
-2.5.0
+>
+> > +- interrupt-parent:  interrupt source phandle.
+> > +- interrupts:        specifies the interrupt source of the parent interrupt controller.
+> > +             The format of the interrupt specifier depends on the parent interrupt
+> > +             controller.
+> > +- device_type:       must be "pci"
+> > +- #address-cells:    set to <3>
+> > +- #size-cells:       set to <2>
+> > +- #interrupt-cells:  set to <1>
+> > +- ranges:            describes the translation of addresses for root ports and standard
+> > +             PCI regions.
+> > +- interrupt-map-mask and interrupt-map: standard PCI properties to define the
+> > +             mapping of the PCIe interface to interrupt numbers.
+> > +
+> > +Optional properties:
+> > +- msi-parent:        Link to the hardware entity that serves as the MSI controller for this PCIe
+> > +             controller.
+> > +- bus-range: PCI bus numbers covered
+> > +
+> > +Example
+> > +     pcie_0: pcie at 0xc00000000 {
+> > +             compatible = "altr,pcie-root-port-1.0";
+> > +             reg = <0xc0000000 0x20000000>,
+> > +                     <0xff220000 0x00004000>;
+> > +             reg-names = "Txs", "Cra";
+> > +             interrupt-parent = <&hps_0_arm_gic_0>;
+> > +             interrupts = <0 40 4>;
+> > +             interrupt-controller;
+> > +             #interrupt-cells = <1>;
+> > +             bus-range = <0x0 0xFF>;
+> > +             device_type = "pci";
+> > +             msi-parent = <&msi_to_gic_gen_0>;
+> > +             #address-cells = <3>;
+> > +             #size-cells = <2>;
+> > +             interrupt-map-mask = <0 0 0 7>;
+> > +             interrupt-map = <0 0 0 1 &pcie_0 1>,
+> > +                                 <0 0 0 2 &pcie_0 2>,
+> > +                                 <0 0 0 3 &pcie_0 3>,
+> > +                                 <0 0 0 4 &pcie_0 4>;
+> > +             ranges = <0x82000000 0x00000000 0x00000000 0xc0000000 0x00000000 0x10000000
+> > +                         0x82000000 0x00000000 0x10000000 0xd0000000 0x00000000 0x10000000>;
+> > +     };
+> >
+>
