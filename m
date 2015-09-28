@@ -1,33 +1,76 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Mon, 28 Sep 2015 23:11:34 +0200
-Subject: [PATCH v4 05/26] ARM: pxa: magician: Change description of LCD power
- GPIO
-In-Reply-To: <cover.1443472089.git.petr.cvek@tul.cz>
-References: <cover.1443472089.git.petr.cvek@tul.cz>
-Message-ID: <5609AD06.1090706@tul.cz>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 28 Sep 2015 16:12:58 -0500
+Subject: [PATCH] arm: omap2: timer: always define omap4_local_timer_init
+In-Reply-To: <5609ACD0.1010907@ti.com>
+References: <1443464744-16561-1-git-send-email-balbi@ti.com>
+ <5609ACD0.1010907@ti.com>
+Message-ID: <20150928211258.GB16627@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the description of the LCD power GPIO to be more
-specific.
+On Mon, Sep 28, 2015 at 04:10:40PM -0500, Nishanth Menon wrote:
+> On 09/28/2015 01:25 PM, Felipe Balbi wrote:
+> > omap4_local_timer_init() can be used by other
+> > platforms as is. At least AM437x wants to use
+> > it. Instead of making omap4-only and providing
+> > a stub for builds without OMAP4, we can just
+> > always define that function.
+> > 
+> > Reported-by: Nishanth Menon <nm@ti.com>
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/timer.c | 9 ---------
+> >  1 file changed, 9 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> > index a55655127ef2..f9028582e962 100644
+> > --- a/arch/arm/mach-omap2/timer.c
+> > +++ b/arch/arm/mach-omap2/timer.c
+> > @@ -642,20 +642,11 @@ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+> >  			       2, "sys_clkin_ck", NULL);
+> >  #endif
+> >  
+> > -#ifdef CONFIG_ARCH_OMAP4
+> > -#ifdef CONFIG_HAVE_ARM_TWD
+> >  void __init omap4_local_timer_init(void)
+> >  {
+> >  	omap4_sync32k_timer_init();
+> >  	clocksource_of_init();
+> >  }
+> > -#else
+> > -void __init omap4_local_timer_init(void)
+> > -{
+> > -	omap4_sync32k_timer_init();
+> > -}
+> > -#endif /* CONFIG_HAVE_ARM_TWD */
+> > -#endif /* CONFIG_ARCH_OMAP4 */
+> >  
+> >  #if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
+> >  void __init omap5_realtime_timer_init(void)
+> > 
+> I am a little confused if this will build in a am437xx only build.
+> 
+> #define OMAP_SYS_32K_TIMER_INIT(name, clkev_nr, clkev_src, clkev_prop, \
+> clksrc_nr, clksrc_src, clksrc_prop) \
+> void __init omap##name##_sync32k_timer_init(void) \
+> 
+> Would you like to consider this for OMAP4 only build as well?
+> 
+> #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+> 
+>         defined(CONFIG_SOC_DRA7XX)
+> static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+>                                2, "sys_clkin_ck", NULL);
+> #endif
 
-Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
----
- arch/arm/mach-pxa/magician.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+heh, more of the ifdeferry to drop. Okay, I'll respin this
 
-diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index 1bac785..a93ed14 100644
---- a/arch/arm/mach-pxa/magician.c
-+++ b/arch/arm/mach-pxa/magician.c
-@@ -773,7 +773,7 @@ static void __init magician_init(void)
- 		pr_info("LCD type: %s\n", lcd_select ? "Samsung" : "Toppoly");
- 		if (lcd_select && (system_rev < 3))
- 			gpio_request_one(GPIO75_MAGICIAN_SAMSUNG_POWER,
--				GPIOF_OUT_INIT_LOW, "SAMSUNG_POWER");
-+				GPIOF_OUT_INIT_LOW, "Samsung LCD Power");
- 		pxa_set_fb_info(NULL,
- 			lcd_select ? &samsung_info : &toppoly_info);
- 	} else
 -- 
-1.7.12.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150928/40131357/attachment.sig>
