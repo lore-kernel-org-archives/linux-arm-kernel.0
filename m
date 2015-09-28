@@ -1,126 +1,1060 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 28 Sep 2015 11:19:56 +0200
-Subject: [PATCH v6 5/5] leds: netxbig: set led_classdev max_brightness
-In-Reply-To: <5608F41B.4020307@samsung.com>
-References: <1443301358-2131-1-git-send-email-simon.guinot@sequanux.org>
- <1443301358-2131-6-git-send-email-simon.guinot@sequanux.org>
- <5608F41B.4020307@samsung.com>
-Message-ID: <20150928091956.GY7306@kw.sim.vm.gnt>
+From: codekipper@gmail.com (Code Kipper)
+Date: Mon, 28 Sep 2015 11:25:02 +0200
+Subject: [linux-sunxi][alsa-devel][PATCH 3/3] ASOC: sunxi: Add support for
+ the spdif block
+In-Reply-To: <20150928082533.GJ7104@lukather>
+References: <1443105005-4083-1-git-send-email-codekipper@gmail.com>
+ <20150928082533.GJ7104@lukather>
+Message-ID: <CAEKpxBkqJchQyiFx7YSu-ZTuNpYfWXxwi2=n0miPx=p6mbZ28A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2015 at 10:02:35AM +0200, Jacek Anaszewski wrote:
-> Hi Simon,
+On 28 September 2015 at 10:25, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Sep 24, 2015 at 04:30:05PM +0200, codekipper at gmail.com wrote:
+>> From: Marcus Cooper <codekipper@gmail.com>
+>>
+>> The sun4i, sun6i and sun7i SoC families have an SPDIF
+>> block which is capable of playback and capture.
+>>
+>> This patch enables the playback of this block for
+>> the sun4i and sun7i families.
+>>
+>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+>> ---
+>>  sound/soc/sunxi/Kconfig               |  10 +
+>>  sound/soc/sunxi/Makefile              |   4 +
+>>  sound/soc/sunxi/sunxi-machine-spdif.c | 110 +++++
+>>  sound/soc/sunxi/sunxi-spdif.c         | 801 ++++++++++++++++++++++++++++++++++
+>>  4 files changed, 925 insertions(+)
+>>  create mode 100644 sound/soc/sunxi/sunxi-machine-spdif.c
+>>  create mode 100644 sound/soc/sunxi/sunxi-spdif.c
+>>
+>> diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
+>> index 84c72ec..053db02 100644
+>> --- a/sound/soc/sunxi/Kconfig
+>> +++ b/sound/soc/sunxi/Kconfig
+>> @@ -8,4 +8,14 @@ config SND_SUN4I_CODEC
+>>         Select Y or M to add support for the Codec embedded in the Allwinner
+>>         A10 and affiliated SoCs.
+>>
+>> +config SND_SOC_SUNXI_DAI_SPDIF
+>> +        tristate
+>> +        select SND_SOC_GENERIC_DMAENGINE_PCM
+>> +        select REGMAP_MMIO
+>> +
+>> +config SND_SOC_SUNXI_MACHINE_SPDIF
+>> +        tristate "APB on-chip sun4i/sun5i/sun7i SPDIF"
+>> +        select SND_SOC_SUNXI_DAI_SPDIF
+>> +        help
+>> +          Say Y if you want to add support for SoC S/PDIF audio as simple audio card.
+>>  endmenu
+>> diff --git a/sound/soc/sunxi/Makefile b/sound/soc/sunxi/Makefile
+>> index ea8a08c..7849a75 100644
+>> --- a/sound/soc/sunxi/Makefile
+>> +++ b/sound/soc/sunxi/Makefile
+>> @@ -1,2 +1,6 @@
+>>  obj-$(CONFIG_SND_SUN4I_CODEC) += sun4i-codec.o
+>>
+>> +snd-soc-sunxi-dai-spdif-objs := sunxi-spdif.o
+>> +obj-$(CONFIG_SND_SOC_SUNXI_DAI_SPDIF) += snd-soc-sunxi-dai-spdif.o
+>> +snd-soc-sunxi-machine-spdif-objs := sunxi-machine-spdif.o
+>> +obj-$(CONFIG_SND_SOC_SUNXI_MACHINE_SPDIF) += snd-soc-sunxi-machine-spdif.o
+>> diff --git a/sound/soc/sunxi/sunxi-machine-spdif.c b/sound/soc/sunxi/sunxi-machine-spdif.c
+>> new file mode 100644
+>> index 0000000..f8f6bd8
+>> --- /dev/null
+>> +++ b/sound/soc/sunxi/sunxi-machine-spdif.c
+>> @@ -0,0 +1,110 @@
+>> +/*
+>> + * Copyright (C) 2015 Andrea Venturi <be17068@iperbole.bo.it>
+>> + * From code by (C) 2013 Freescale Semiconductor, Inc.
+>> + * (sound/soc/fsl/imx-spdif.c)
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/module.h>
+>> +#include <linux/of_platform.h>
+>> +#include <sound/soc.h>
+>> +
+>> +struct sunxi_machine_spdif_data {
+>> +     struct snd_soc_dai_link dai;
+>> +     struct snd_soc_card card;
+>> +};
+>> +
+>> +static int sunxi_machine_spdif_audio_probe(struct platform_device *pdev)
+>> +{
+>> +     struct device_node *spdif_np, *np = pdev->dev.of_node;
+>> +     struct sunxi_machine_spdif_data *data;
+>> +     int ret = 0;
+>> +
+>> +     dev_dbg(&pdev->dev, "%s: Looking for spdif-controller\n", __func__);
+>> +     spdif_np = of_parse_phandle(np, "spdif-controller", 0);
+>> +     if (!spdif_np) {
+>> +             dev_err(&pdev->dev, "failed to find spdif-controller\n");
+>> +             ret = -EINVAL;
+>> +             goto end;
+>> +     }
+>> +
+>> +     data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+>> +     if (!data) {
+>> +             ret = -ENOMEM;
+>> +             goto end;
+>> +     }
+>> +
+>> +     data->dai.name = "S/PDIF PCM";
+>> +     data->dai.stream_name = "S/PDIF PCM";
+>> +     data->dai.codec_dai_name = "snd-soc-dummy-dai";
+>> +     data->dai.codec_name = "snd-soc-dummy";
+>> +     data->dai.cpu_of_node = spdif_np;
+>> +     data->dai.platform_of_node = spdif_np;
+>> +     data->dai.playback_only = true;
+>> +     data->dai.capture_only = true;
+>> +
+>> +     if (of_property_read_bool(np, "spdif-out"))
+>> +             data->dai.capture_only = false;
+>> +
+>> +     if (of_property_read_bool(np, "spdif-in"))
+>> +             data->dai.playback_only = false;
+>> +
+>> +     if (data->dai.playback_only && data->dai.capture_only) {
+>> +             dev_err(&pdev->dev, "no enabled S/PDIF DAI link\n");
+>> +             goto end;
+>> +     }
+>> +
+>> +     data->card.dev = &pdev->dev;
+>> +     data->card.dai_link = &data->dai;
+>> +     data->card.num_links = 1;
+>> +     data->card.owner = THIS_MODULE;
+>> +
+>> +     ret = snd_soc_of_parse_card_name(&data->card, "model");
+>> +     if (ret)
+>> +             goto end;
+>> +
+>> +     ret = devm_snd_soc_register_card(&pdev->dev, &data->card);
+>> +     if (ret) {
+>> +             dev_err(&pdev->dev, "snd_soc_register_card failed: %d\n", ret);
+>> +             goto end;
+>> +     }
+>> +
+>> +     platform_set_drvdata(pdev, data);
+>> +
+>> +end:
+>> +     of_node_put(spdif_np);
+>> +
+>> +     return ret;
+>> +}
+>> +
+>> +#ifdef CONFIG_OF
+>> +static const struct of_device_id sunxi_machine_spdif_dt_ids[] = {
+>> +     { .compatible = "allwinner,sunxi-audio-spdif", },
+>> +     { /* sentinel */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, sunxi_machine_spdif_dt_ids);
+>> +#endif
+>> +
+>> +static struct platform_driver sunxi_machine_spdif_driver = {
+>> +     .driver = {
+>> +             .name = "sunxi-machine-spdif",
+>> +             .of_match_table = sunxi_machine_spdif_dt_ids,
+>> +     },
+>> +     .probe = sunxi_machine_spdif_audio_probe,
+>> +};
+>> +
+>> +module_platform_driver(sunxi_machine_spdif_driver);
+>> +
+>> +MODULE_AUTHOR("Marcus Cooper <codekipper@gmail.com>");
+>> +MODULE_AUTHOR("Andrea Venturi, <be17068@iperbole.bo.it>");
+>> +MODULE_DESCRIPTION("Allwinner sunxi S/PDIF machine driver");
+>> +MODULE_LICENSE("GPL v2");
+>> diff --git a/sound/soc/sunxi/sunxi-spdif.c b/sound/soc/sunxi/sunxi-spdif.c
+>> new file mode 100644
+>> index 0000000..cae9261
+>> --- /dev/null
+>> +++ b/sound/soc/sunxi/sunxi-spdif.c
+>> @@ -0,0 +1,801 @@
+>> +/*
+>> + * ALSA SoC SPDIF Audio Layer
+>> + *
+>> + * Copyright 2015 Andrea Venturi <be17068@iperbole.bo.it>
+>> + * Copyright 2015 Marcus Cooper <codekipper@gmail.com>
+>> + *
+>> + * Based on the Allwinner SDK driver, released under the GPL.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +/*
+>> + * this is SPDIF sunxi simple audio card DAI driver that uses the codec
+>> + * "dummy driver" as per sound/soc/fsl/imx-spdif.c
+>> + */
+>> +#include <linux/clk.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/device.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/init.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/ioport.h>
+>> +#include <linux/module.h>
+>> +#include <linux/platform_device.h>
+>> +#include <sound/dmaengine_pcm.h>
+>> +#include <sound/pcm_params.h>
+>> +#include <sound/soc.h>
+>> +
+>> +#define      SUNXI_SPDIF_CTL         (0x00)
+>> +     #define SUNXI_SPDIF_CTL_MCLKDIV(v)              ((v) << 4) /* v even */
+>> +     #define SUNXI_SPDIF_CTL_MCLKOUTEN               BIT(2)
+>> +     #define SUNXI_SPDIF_CTL_GEN                     BIT(1)
+>> +     #define SUNXI_SPDIF_CTL_RESET                   BIT(0)
+>> +
+>> +#define SUNXI_SPDIF_TXCFG    (0x04)
+>> +     #define SUNXI_SPDIF_TXCFG_SINGLEMOD             BIT(31)
+>> +     #define SUNXI_SPDIF_TXCFG_ASS                   BIT(17)
+>> +     #define SUNXI_SPDIF_TXCFG_NONAUDIO              BIT(16)
+>> +     #define SUNXI_SPDIF_TXCFG_TXRATIO(v)            ((v) << 4)
+>> +     #define SUNXI_SPDIF_TXCFG_TXRATIO_MASK          GENMASK(8, 4)
+>> +     #define SUNXI_SPDIF_TXCFG_FMTRVD                GENMASK(3, 2)
+>> +     #define SUNXI_SPDIF_TXCFG_FMT16BIT              (0 << 2)
+>> +     #define SUNXI_SPDIF_TXCFG_FMT20BIT              (1 << 2)
+>> +     #define SUNXI_SPDIF_TXCFG_FMT24BIT              (2 << 2)
+>> +     #define SUNXI_SPDIF_TXCFG_CHSTMODE              BIT(1)
+>> +     #define SUNXI_SPDIF_TXCFG_TXEN                  BIT(0)
+>> +
+>> +#define SUNXI_SPDIF_RXCFG    (0x08)
+>> +     #define SUNXI_SPDIF_RXCFG_LOCKFLAG              BIT(4)
+>> +     #define SUNXI_SPDIF_RXCFG_CHSTSRC               BIT(3)
+>> +     #define SUNXI_SPDIF_RXCFG_CHSTCP                BIT(1)
+>> +     #define SUNXI_SPDIF_RXCFG_RXEN                  BIT(0)
+>> +
+>> +#define SUNXI_SPDIF_TXFIFO   (0x0C)
+>> +
+>> +#define SUNXI_SPDIF_RXFIFO   (0x10)
+>> +
+>> +#define SUNXI_SPDIF_FCTL     (0x14)
+>> +     #define SUNXI_SPDIF_FCTL_FIFOSRC                BIT(31)
+>> +     #define SUNXI_SPDIF_FCTL_FTX                    BIT(17)
+>> +     #define SUNXI_SPDIF_FCTL_FRX                    BIT(16)
+>> +     #define SUNXI_SPDIF_FCTL_TXTL(v)                ((v) << 8)
+>> +     #define SUNXI_SPDIF_FCTL_TXTL_MASK              GENMASK(12, 8)
+>> +     #define SUNXI_SPDIF_FCTL_RXTL(v)                ((v) << 3)
+>> +     #define SUNXI_SPDIF_FCTL_RXTL_MASK              GENMASK(7, 3)
+>> +     #define SUNXI_SPDIF_FCTL_TXIM                   BIT(2)
+>> +     #define SUNXI_SPDIF_FCTL_RXOM(v)                ((v) << 0)
+>> +     #define SUNXI_SPDIF_FCTL_RXOM_MASK              GENMASK(1, 0)
+>> +
+>> +#define SUNXI_SPDIF_FSTA     (0x18)
+>> +     #define SUNXI_SPDIF_FSTA_TXE                    BIT(14)
+>> +     #define SUNXI_SPDIF_FSTA_TXECNTSHT              (8)
+>> +     #define SUNXI_SPDIF_FSTA_RXA                    BIT(6)
+>> +     #define SUNXI_SPDIF_FSTA_RXACNTSHT              (0)
+>> +
+>> +#define SUNXI_SPDIF_INT              (0x1C)
+>> +     #define SUNXI_SPDIF_INT_RXLOCKEN                BIT(18)
+>> +     #define SUNXI_SPDIF_INT_RXUNLOCKEN              BIT(17)
+>> +     #define SUNXI_SPDIF_INT_RXPARERREN              BIT(16)
+>> +     #define SUNXI_SPDIF_INT_TXDRQEN                 BIT(7)
+>> +     #define SUNXI_SPDIF_INT_TXUIEN                  BIT(6)
+>> +     #define SUNXI_SPDIF_INT_TXOIEN                  BIT(5)
+>> +     #define SUNXI_SPDIF_INT_TXEIEN                  BIT(4)
+>> +     #define SUNXI_SPDIF_INT_RXDRQEN                 BIT(2)
+>> +     #define SUNXI_SPDIF_INT_RXOIEN                  BIT(1)
+>> +     #define SUNXI_SPDIF_INT_RXAIEN                  BIT(0)
+>> +
+>> +#define SUNXI_SPDIF_ISTA     (0x20)
+>> +     #define SUNXI_SPDIF_ISTA_RXLOCKSTA              BIT(18)
+>> +     #define SUNXI_SPDIF_ISTA_RXUNLOCKSTA            BIT(17)
+>> +     #define SUNXI_SPDIF_ISTA_RXPARERRSTA            BIT(16)
+>> +     #define SUNXI_SPDIF_ISTA_TXUSTA                 BIT(6)
+>> +     #define SUNXI_SPDIF_ISTA_TXOSTA                 BIT(5)
+>> +     #define SUNXI_SPDIF_ISTA_TXESTA                 BIT(4)
+>> +     #define SUNXI_SPDIF_ISTA_RXOSTA                 BIT(1)
+>> +     #define SUNXI_SPDIF_ISTA_RXASTA                 BIT(0)
+>> +
+>> +#define SUNXI_SPDIF_TXCNT    (0x24)
+>> +
+>> +#define SUNXI_SPDIF_RXCNT    (0x28)
+>> +
+>> +#define SUNXI_SPDIF_TXCHSTA0 (0x2C)
+>> +     #define SUNXI_SPDIF_TXCHSTA0_CLK(v)             ((v) << 28)
+>> +     #define SUNXI_SPDIF_TXCHSTA0_SAMFREQ(v)         ((v) << 24)
+>> +     #define SUNXI_SPDIF_TXCHSTA0_SAMFREQ_MASK       GENMASK(27, 24)
+>> +     #define SUNXI_SPDIF_TXCHSTA0_CHNUM(v)           ((v) << 20)
+>> +     #define SUNXI_SPDIF_TXCHSTA0_CHNUM_MASK         GENMASK(23, 20)
+>> +     #define SUNXI_SPDIF_TXCHSTA0_SRCNUM(v)          ((v) << 16)
+>> +     #define SUNXI_SPDIF_TXCHSTA0_CATACOD(v)         ((v) << 8)
+>> +     #define SUNXI_SPDIF_TXCHSTA0_MODE(v)            ((v) << 6)
+>> +     #define SUNXI_SPDIF_TXCHSTA0_EMPHASIS(v)        ((v) << 3)
+>> +     #define SUNXI_SPDIF_TXCHSTA0_CP                 BIT(2)
+>> +     #define SUNXI_SPDIF_TXCHSTA0_AUDIO              BIT(1)
+>> +     #define SUNXI_SPDIF_TXCHSTA0_PRO                BIT(0)
+>> +
+>> +#define SUNXI_SPDIF_TXCHSTA1 (0x30)
+>> +     #define SUNXI_SPDIF_TXCHSTA1_CGMSA(v)           ((v) << 8)
+>> +     #define SUNXI_SPDIF_TXCHSTA1_ORISAMFREQ(v)      ((v) << 4)
+>> +     #define SUNXI_SPDIF_TXCHSTA1_ORISAMFREQ_MASK    GENMASK(7, 4)
+>> +     #define SUNXI_SPDIF_TXCHSTA1_SAMWORDLEN(v)      ((v) << 1)
+>> +     #define SUNXI_SPDIF_TXCHSTA1_MAXWORDLEN         BIT(0)
+>> +
+>> +#define SUNXI_SPDIF_RXCHSTA0 (0x34)
+>> +     #define SUNXI_SPDIF_RXCHSTA0_CLK(v)             ((v) << 28)
+>> +     #define SUNXI_SPDIF_RXCHSTA0_SAMFREQ(v)         ((v) << 24)
+>> +     #define SUNXI_SPDIF_RXCHSTA0_CHNUM(v)           ((v) << 20)
+>> +     #define SUNXI_SPDIF_RXCHSTA0_SRCNUM(v)          ((v) << 16)
+>> +     #define SUNXI_SPDIF_RXCHSTA0_CATACOD(v)         ((v) << 8)
+>> +     #define SUNXI_SPDIF_RXCHSTA0_MODE(v)            ((v) << 6)
+>> +     #define SUNXI_SPDIF_RXCHSTA0_EMPHASIS(v)        ((v) << 3)
+>> +     #define SUNXI_SPDIF_RXCHSTA0_CP                 BIT(2)
+>> +     #define SUNXI_SPDIF_RXCHSTA0_AUDIO              BIT(1)
+>> +     #define SUNXI_SPDIF_RXCHSTA0_PRO                BIT(0)
+>> +
+>> +#define SUNXI_SPDIF_RXCHSTA1 (0x38)
+>> +     #define SUNXI_SPDIF_RXCHSTA1_CGMSA(v)           ((v) << 8)
+>> +     #define SUNXI_SPDIF_RXCHSTA1_ORISAMFREQ(v)      ((v) << 4)
+>> +     #define SUNXI_SPDIF_RXCHSTA1_SAMWORDLEN(v)      ((v) << 1)
+>> +     #define SUNXI_SPDIF_RXCHSTA1_MAXWORDLEN         BIT(0)
+>> +
+>> +/* Defines for Sampling Frequency */
+>> +enum sunxi_spdif_sampling_freq {
+>> +     SUNXI_SPDIF_SAMFREQ_44_1KHZ             = 0x0,
+>> +     SUNXI_SPDIF_SAMFREQ_NOT_INDICATED       = 0x1,
+>> +     SUNXI_SPDIF_SAMFREQ_48KHZ               = 0x2,
+>> +     SUNXI_SPDIF_SAMFREQ_32KHZ               = 0x3,
+>> +     SUNXI_SPDIF_SAMFREQ_22_05KHZ            = 0x4,
+>> +     SUNXI_SPDIF_SAMFREQ_24KHZ               = 0x6,
+>> +     SUNXI_SPDIF_SAMFREQ_88_2KHZ             = 0x8,
+>> +     SUNXI_SPDIF_SAMFREQ_768KHZ              = 0x9,
+>> +     SUNXI_SPDIF_SAMFREQ_96KHZ               = 0xa,
+>> +     SUNXI_SPDIF_SAMFREQ_176_4KHZ            = 0xc,
+>> +     SUNXI_SPDIF_SAMFREQ_192KHZ              = 0xe,
+>> +};
+>> +
+>> +/*
+>> + * Original sampling frequency can be represented by inverting the value of the
+>> + * sampling frequency.
+>> + */
+>> +#define ORIGINAL(v) ((~v) & 0xf)
+>> +
+>> +struct sunxi_spdif_dev {
+>> +     struct platform_device *pdev;
+>> +     struct clk *clk;
+>> +     struct clk *apb_clk;
+>> +     struct clk *audio_clk;
+>> +     struct snd_soc_dai_driver cpu_dai_drv;
+>> +     bool running;
+>> +     struct regmap *regmap;
+>> +     struct snd_dmaengine_dai_dma_data dma_params_tx;
+>> +     struct snd_dmaengine_dai_dma_data dma_params_rx;
+>> +     bool playback_supported;
+>> +     bool capture_supported;
+>> +};
+>> +
+>> +static void sunxi_spdif_configure(struct sunxi_spdif_dev *host)
+>> +{
+>> +     u32 reg_val;
+>> +
+>> +     /* soft reset SPDIF */
+>> +     regmap_write(host->regmap, SUNXI_SPDIF_CTL, SUNXI_SPDIF_CTL_RESET);
+>> +
+>> +     /* MCLK OUTPUT enable */
+>> +     regmap_update_bits(host->regmap, SUNXI_SPDIF_CTL,
+>> +                     SUNXI_SPDIF_CTL_MCLKOUTEN, SUNXI_SPDIF_CTL_MCLKOUTEN);
+>> +
+>> +     /* flush TX FIFO */
+>> +     regmap_update_bits(host->regmap, SUNXI_SPDIF_FCTL, SUNXI_SPDIF_FCTL_FTX,
+>> +                                                     SUNXI_SPDIF_FCTL_FTX);
+>
+> The new line should be aligned on an open parenthesis.
+DONE
+>
+>> +
+>> +     /* clear interrupt status */
+>> +     regmap_read(host->regmap, SUNXI_SPDIF_ISTA, &reg_val);
+>> +     regmap_write(host->regmap, SUNXI_SPDIF_ISTA, reg_val);
+>> +
+>> +     /* clear TX counter */
+>> +     regmap_write(host->regmap, SUNXI_SPDIF_TXCNT, 0);
+>> +
+>> +}
+>> +
+>> +void sunxi_snd_txctrl(struct snd_pcm_substream *substream,
+>> +                                     struct sunxi_spdif_dev *host, int on)
+>> +{
+>> +     u32 tmp;
+>> +
+>> +     regmap_read(host->regmap, SUNXI_SPDIF_TXCNT, &tmp);
+>> +     if (substream->runtime->channels == 1)
+>> +             regmap_update_bits(host->regmap, SUNXI_SPDIF_TXCFG,
+>> +                                             SUNXI_SPDIF_TXCFG_SINGLEMOD,
+>> +                                             SUNXI_SPDIF_TXCFG_SINGLEMOD);
+>> +
+>> +     if (on) {
+>> +             /* SPDIF TX ENABLE */
+>> +             regmap_update_bits(host->regmap, SUNXI_SPDIF_TXCFG,
+>> +                                             SUNXI_SPDIF_TXCFG_TXEN,
+>> +                                             SUNXI_SPDIF_TXCFG_TXEN);
+>> +
+>> +             /* DRQ ENABLE */
+>> +             regmap_update_bits(host->regmap, SUNXI_SPDIF_INT,
+>> +                                             SUNXI_SPDIF_INT_TXDRQEN,
+>> +                                             SUNXI_SPDIF_INT_TXDRQEN);
+>> +
+>> +             /* Global enable */
+>> +             regmap_update_bits(host->regmap, SUNXI_SPDIF_CTL,
+>> +                                             SUNXI_SPDIF_CTL_GEN,
+>> +                                             SUNXI_SPDIF_CTL_GEN);
+>> +     } else {
+>> +             /* SPDIF TX DISABLE */
+>> +             regmap_update_bits(host->regmap, SUNXI_SPDIF_TXCFG,
+>> +                                             SUNXI_SPDIF_TXCFG_TXEN, 0);
+>> +
+>> +             /* DRQ DISABLE */
+>> +             regmap_update_bits(host->regmap, SUNXI_SPDIF_INT,
+>> +                                             SUNXI_SPDIF_INT_TXDRQEN, 0);
+>> +
+>> +             /* Global disable */
+>> +             regmap_update_bits(host->regmap, SUNXI_SPDIF_CTL,
+>> +                                             SUNXI_SPDIF_CTL_GEN, 0);
+>> +     }
+>> +}
+>> +
+>> +static int sunxi_spdif_startup(struct snd_pcm_substream *substream,
+>> +             struct snd_soc_dai *cpu_dai)
+>> +{
+>> +     struct snd_soc_pcm_runtime *rtd = substream->private_data;
+>> +     struct sunxi_spdif_dev *host = snd_soc_dai_get_drvdata(rtd->cpu_dai);
+>> +     int ret;
+>> +
+>> +     if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
+>> +             return -EINVAL;
+>> +
+>> +     /* Reset module and interrupts only for first initialization */
+>> +     if (!cpu_dai->active) {
+>> +             ret = clk_prepare_enable(host->clk);
+>
+> Can't you just use runtime_pm to deal with that?
+LOOKING INTO THIS.
+>
+>> +             if (ret)
+>> +                     return ret;
+>> +     }
+>> +
+>> +     host->running = true;
+>> +     sunxi_spdif_configure(host);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static void sunxi_spdif_shutdown(struct snd_pcm_substream *substream,
+>> +             struct snd_soc_dai *dai)
+>> +{
+>> +     struct snd_soc_pcm_runtime *rtd = substream->private_data;
+>> +     struct sunxi_spdif_dev *host = snd_soc_dai_get_drvdata(rtd->cpu_dai);
+>> +
+>> +     if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
+>> +             return;
+>> +
+>> +     clk_disable_unprepare(host->clk);
+>> +     host->running = false;
+>> +}
+>> +
+>> +static int sunxi_spdif_set_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
+>> +{
+>> +     u32 reg_val;
+>> +     struct sunxi_spdif_dev *host = snd_soc_dai_get_drvdata(cpu_dai);
+>> +
+>> +     reg_val = 0;
+>> +     reg_val &= ~SUNXI_SPDIF_TXCFG_SINGLEMOD;
+>> +     reg_val |= SUNXI_SPDIF_TXCFG_ASS;
+>> +     reg_val |= fmt; /* set non audio and bit depth */
+>> +     reg_val |= SUNXI_SPDIF_TXCFG_CHSTMODE;
+>> +     regmap_write(host->regmap, SUNXI_SPDIF_TXCFG, reg_val);
+>
+> You can probably used regmap_update_bits for that.
+I've moved all this to the hw_params now so there is just the one reg write.
+>
+>> +     reg_val = 0;
+>> +     reg_val &= ~SUNXI_SPDIF_FCTL_FIFOSRC;
+>> +     reg_val |= SUNXI_SPDIF_FCTL_TXTL_MASK;
+>> +     reg_val |= SUNXI_SPDIF_FCTL_RXTL_MASK;
+>> +     reg_val |= SUNXI_SPDIF_FCTL_TXIM;
+>> +     reg_val |= SUNXI_SPDIF_FCTL_RXOM_MASK;
+>> +     regmap_write(host->regmap, SUNXI_SPDIF_FCTL, reg_val);
+>> +     reg_val = 0;
+>> +     reg_val |= (SUNXI_SPDIF_TXCHSTA0_CHNUM(2));
+>> +     regmap_write(host->regmap, SUNXI_SPDIF_TXCHSTA0, reg_val);
+>> +
+>> +     reg_val = 0;
+>> +     reg_val |= (SUNXI_SPDIF_TXCHSTA1_SAMWORDLEN(1));
+>> +     if ((fmt & SUNXI_SPDIF_TXCFG_FMT24BIT) == SUNXI_SPDIF_TXCFG_FMT24BIT)
+>> +             reg_val |= SUNXI_SPDIF_TXCHSTA1_MAXWORDLEN;
+>> +     regmap_write(host->regmap, SUNXI_SPDIF_TXCHSTA1, reg_val);
+>> +     return 0;
+>> +}
+>> +
+>> +static int sunxi_spdif_set_sysclk(struct snd_soc_dai *cpu_dai, unsigned int freq)
+>> +{
+>> +     struct sunxi_spdif_dev *host = snd_soc_dai_get_drvdata(cpu_dai);
+>> +     struct platform_device *pdev = host->pdev;
+>> +
+>> +     if (clk_set_rate(host->audio_clk, freq))
+>> +             dev_err(&pdev->dev,
+>> +                     "Setting pll2 clock rate for %d Hz failed!\n", freq);
+>> +     if (clk_set_rate(host->clk, freq))
+>> +             dev_err(&pdev->dev,
+>> +                     "Setting SPDIF clock rate for %d Hz failed!\n", freq);
+>> +     return 0;
+>> +}
+>> +
+>> +static int sunxi_spdif_set_clkdiv(struct snd_soc_dai *cpu_dai,
+>> +                                             unsigned int rate, int div)
+>> +{
+>> +     struct sunxi_spdif_dev *host = snd_soc_dai_get_drvdata(cpu_dai);
+>> +     int sample_freq, original_sample_freq;
+>> +
+>> +     regmap_update_bits(host->regmap, SUNXI_SPDIF_TXCHSTA0,
+>> +                             SUNXI_SPDIF_TXCHSTA0_SAMFREQ_MASK, 0);
+>> +
+>> +     regmap_update_bits(host->regmap, SUNXI_SPDIF_TXCHSTA1,
+>> +                             SUNXI_SPDIF_TXCHSTA1_ORISAMFREQ_MASK, 0);
+>
+> Why do you need to clear the registers before writing them again?
+This is copied from the code from the SDK and as the data sheet lacks
+a lot of detail then I took the code as face value. Mark's comments
+prompted me to look into this and low and behold removal of all this
+sampling frequency code doesn't break playback....so it's all gone
+now.
+>
+>> +     regmap_update_bits(host->regmap, SUNXI_SPDIF_TXCFG,
+>> +                             SUNXI_SPDIF_TXCFG_TXRATIO_MASK,
+>> +                             SUNXI_SPDIF_TXCFG_TXRATIO(div - 1));
+>> +
+>> +     if (rate == 24576000) {
+>> +             switch (div) {
+>> +             /* 24KHZ */
+>> +             case 8:
+>> +                     sample_freq = SUNXI_SPDIF_SAMFREQ_24KHZ;
+>> +                     original_sample_freq
+>> +                             = ORIGINAL(SUNXI_SPDIF_SAMFREQ_24KHZ);
+>
+> What is this original sample frequency?
+>
+>> +                     break;
+>> +
+>> +             /* 32KHZ */
+>> +             case 6:
+>> +                     sample_freq = SUNXI_SPDIF_SAMFREQ_32KHZ;
+>> +                     original_sample_freq
+>> +                             = ORIGINAL(SUNXI_SPDIF_SAMFREQ_32KHZ);
+>> +                     break;
+>> +
+>> +             /* 48KHZ */
+>> +             case 4:
+>> +                     sample_freq = SUNXI_SPDIF_SAMFREQ_48KHZ;
+>> +                     original_sample_freq
+>> +                             = ORIGINAL(SUNXI_SPDIF_SAMFREQ_48KHZ);
+>> +                     break;
+>> +
+>> +             /* 96KHZ */
+>> +             case 2:
+>> +                     sample_freq = SUNXI_SPDIF_SAMFREQ_96KHZ;
+>> +                     original_sample_freq
+>> +                             = ORIGINAL(SUNXI_SPDIF_SAMFREQ_96KHZ);
+>> +                     break;
+>> +
+>> +             /* 192KHZ */
+>> +             case 1:
+>> +                     sample_freq = SUNXI_SPDIF_SAMFREQ_192KHZ;
+>> +                     original_sample_freq
+>> +                             = ORIGINAL(SUNXI_SPDIF_SAMFREQ_192KHZ);
+>> +                     break;
+>> +
+>> +             default:
+>> +                     sample_freq = SUNXI_SPDIF_SAMFREQ_NOT_INDICATED;
+>> +                     original_sample_freq = 0;
+>> +                     break;
+>> +             }
+>> +     } else {
+>> +             /* 22.5792MHz */
+>> +             switch (div) {
+>> +             /* 22.05KHZ */
+>> +             case 8:
+>> +                     sample_freq = SUNXI_SPDIF_SAMFREQ_22_05KHZ;
+>> +                     original_sample_freq
+>> +                             = ORIGINAL(SUNXI_SPDIF_SAMFREQ_22_05KHZ);
+>> +                     break;
+>> +
+>> +             /* 44.1KHZ */
+>> +             case 4:
+>> +                     sample_freq = SUNXI_SPDIF_SAMFREQ_44_1KHZ;
+>> +                     original_sample_freq
+>> +                             = ORIGINAL(SUNXI_SPDIF_SAMFREQ_44_1KHZ);
+>> +                     break;
+>> +
+>> +             /* 88.2KHZ */
+>> +             case 2:
+>> +                     sample_freq = SUNXI_SPDIF_SAMFREQ_88_2KHZ;
+>> +                     original_sample_freq
+>> +                             = ORIGINAL(SUNXI_SPDIF_SAMFREQ_88_2KHZ);
+>> +                     break;
+>> +
+>> +             /* 176.4KHZ */
+>> +             case 1:
+>> +                     sample_freq = SUNXI_SPDIF_SAMFREQ_176_4KHZ;
+>> +                     original_sample_freq
+>> +                             = ORIGINAL(SUNXI_SPDIF_SAMFREQ_176_4KHZ);
+>> +                     break;
+>> +
+>
+> You can probably turn this into a funcion that computes it, instead of
+> having to duplicated and almost identical switch statements.
+>
+>> +             default:
+>> +                     sample_freq = SUNXI_SPDIF_SAMFREQ_NOT_INDICATED;
+>> +                     original_sample_freq = 0;
+>> +                     break;
+>> +             }
+>> +     }
+>
+> Shouldn't you return an error in such a case?
+>
+>> +
+>> +     regmap_update_bits(host->regmap, SUNXI_SPDIF_TXCHSTA0,
+>> +                     SUNXI_SPDIF_TXCHSTA0_SAMFREQ_MASK,
+>> +                     SUNXI_SPDIF_TXCHSTA0_SAMFREQ(sample_freq));
+>> +
+>> +     regmap_update_bits(host->regmap, SUNXI_SPDIF_TXCHSTA1,
+>> +                     SUNXI_SPDIF_TXCHSTA1_ORISAMFREQ_MASK,
+>> +                     SUNXI_SPDIF_TXCHSTA1_ORISAMFREQ(original_sample_freq));
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int sunxi_spdif_hw_params(struct snd_pcm_substream *substream,
+>> +                                     struct snd_pcm_hw_params *params,
+>> +                                     struct snd_soc_dai *cpu_dai)
+>> +{
+>> +     int ret = 0;
+>> +     int fmt;
+>> +     unsigned long rate = params_rate(params);
+>> +     u32 mclk_div = 0;
+>> +     unsigned int mclk = 0;
+>> +
+>> +     /* Add the PCM and raw data select interface */
+>> +     switch (params_channels(params)) {
+>> +     case 1: /* PCM mode */
+>> +     case 2:
+>> +             fmt = 0;
+>> +             break;
+>> +     case 4: /* raw data mode */
+>> +             fmt = SUNXI_SPDIF_TXCFG_NONAUDIO;
+>> +             break;
+>> +     default:
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     switch (params_format(params)) {
+>> +     case SNDRV_PCM_FORMAT_S16_LE:
+>> +             fmt |= SUNXI_SPDIF_TXCFG_FMT16BIT;
+>> +             break;
+>> +     case SNDRV_PCM_FORMAT_S20_3LE:
+>> +             fmt |= SUNXI_SPDIF_TXCFG_FMT20BIT;
+>> +             break;
+>> +     case SNDRV_PCM_FORMAT_S24_LE:
+>> +             fmt |= SUNXI_SPDIF_TXCFG_FMT24BIT;
+>> +             break;
+>> +     default:
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     ret = snd_soc_dai_set_fmt(cpu_dai, fmt);
+>> +     if (ret < 0)
+>> +             return ret;
+>> +
+>> +     switch (rate) {
+>> +     case 22050:
+>> +     case 44100:
+>> +     case 88200:
+>> +     case 176400:
+>> +             mclk = 22579200;
+>> +             break;
+>> +     case 24000:
+>> +     case 32000:
+>> +     case 48000:
+>> +     case 96000:
+>> +     case 192000:
+>> +             mclk = 24576000;
+>> +             break;
+>> +     default:
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     ret = sunxi_spdif_set_sysclk(cpu_dai, mclk);
+>> +     if (ret < 0)
+>> +             return ret;
+>> +
+>> +     switch (rate) {
+>> +     case 22050:
+>> +     case 24000:
+>> +             mclk_div = 8;
+>> +             break;
+>> +     case 32000:
+>> +             mclk_div = 6;
+>> +             break;
+>> +     case 44100:
+>> +     case 48000:
+>> +             mclk_div = 4;
+>> +             break;
+>> +     case 88200:
+>> +     case 96000:
+>> +             mclk_div = 2;
+>> +             break;
+>> +     case 176400:
+>> +     case 192000:
+>> +             mclk_div = 1;
+>> +             break;
+>> +     default:
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     ret = sunxi_spdif_set_clkdiv(cpu_dai, mclk, mclk_div);
+>> +     if (ret < 0)
+>> +             return ret;
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int sunxi_spdif_trigger(struct snd_pcm_substream *substream, int cmd,
+>> +             struct snd_soc_dai *dai)
+>> +{
+>> +     int ret = 0;
+>> +     struct sunxi_spdif_dev *host = snd_soc_dai_get_drvdata(dai);
+>> +
+>> +     if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
+>> +             return -EINVAL;
+>> +
+>> +     switch (cmd) {
+>> +     case SNDRV_PCM_TRIGGER_START:
+>> +     case SNDRV_PCM_TRIGGER_RESUME:
+>> +     case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+>> +             sunxi_snd_txctrl(substream, host, 1);
+>> +             break;
+>> +
+>> +     case SNDRV_PCM_TRIGGER_STOP:
+>> +     case SNDRV_PCM_TRIGGER_SUSPEND:
+>> +     case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+>> +             sunxi_snd_txctrl(substream, host, 0);
+>> +             break;
+>> +
+>> +     default:
+>> +             ret = -EINVAL;
+>> +             break;
+>> +     }
+>> +     return ret;
+>> +}
+>> +
+>> +static int sunxi_spdif_soc_dai_probe(struct snd_soc_dai *dai)
+>> +{
+>> +     struct sunxi_spdif_dev *host = snd_soc_dai_get_drvdata(dai);
+>> +
+>> +     snd_soc_dai_init_dma_data(dai, &host->dma_params_tx,
+>> +                                             &host->dma_params_rx);
+>> +     return 0;
+>> +}
+>> +
+>> +static const struct snd_soc_dai_ops sunxi_spdif_dai_ops = {
+>> +     .startup        = sunxi_spdif_startup,
+>> +     .shutdown       = sunxi_spdif_shutdown,
+>> +     .trigger        = sunxi_spdif_trigger,
+>> +     .hw_params      = sunxi_spdif_hw_params,
+>> +     .set_fmt        = sunxi_spdif_set_fmt,
+>> +};
+>> +
+>> +static const struct regmap_config sunxi_spdif_regmap_config = {
+>> +     .reg_bits = 32,
+>> +     .reg_stride = 4,
+>> +     .val_bits = 32,
+>> +     .max_register = SUNXI_SPDIF_RXCHSTA1,
+>> +};
+>> +
+>> +#define SUNXI_RATES  (SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 | \
+>> +                             SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000 | \
+>> +                             SNDRV_PCM_RATE_192000)
+>> +#define SUNXI_FORMATS        (SNDRV_PCM_FORMAT_S16_LE | SNDRV_PCM_FORMAT_S20_3LE | \
+>> +                             SNDRV_PCM_FORMAT_S24_LE)
+>> +
+>> +static struct snd_soc_dai_driver sunxi_spdif_dai = {
+>> +     .playback = {
+>> +             .channels_min = 2,
+>> +             .channels_max = 2,
+>> +             .rates = SUNXI_RATES,
+>> +             .formats = SUNXI_FORMATS,
+>> +     },
+>> +     .probe = sunxi_spdif_soc_dai_probe,
+>> +     .ops = &sunxi_spdif_dai_ops,
+>> +     .name = "spdif",
+>> +};
+>> +
+>> +static const struct snd_soc_dapm_widget dit_widgets[] = {
+>> +     SND_SOC_DAPM_OUTPUT("spdif-out"),
+>> +};
+>> +
+>> +static const struct snd_soc_dapm_route dit_routes[] = {
+>> +     { "spdif-out", NULL, "Playback" },
+>> +};
+>> +
+>> +#ifdef CONFIG_OF
+>
+> You don't support !dt probing. You should probably only depend on
+> CONFIG_OF in Kconfig.
+>
+>> +static const struct of_device_id sunxi_spdif_of_match[] = {
+>> +     { .compatible = "allwinner,sun4i-a10-spdif", },
+>
+> I'd prefer to have the driver named sun4i-spdif (in the driver name,
+> prefixes, Kconfig options, etc.) so that if there's a new spdif IP
+> introduced, you don't end up with something weird.
+Yeah...I was expecting this.....once I've confirmed operation after
+today's refactoring I will start search and replace!.
+>
+>> +     { /* sentinel */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, sunxi_spdif_of_match);
+>> +#endif
+>> +
+>> +static const struct snd_soc_component_driver sunxi_spdif_component = {
+>> +     .name           = "sunxi-spdif",
+>> +};
+>> +
+>> +static int sunxi_spdif_probe(struct platform_device *pdev)
+>> +{
+>> +     struct device_node *np = pdev->dev.of_node;
+>> +     struct sunxi_spdif_dev *host;
+>> +     struct resource *res;
+>> +     int ret;
+>> +     const struct of_device_id *of_id;
+>> +     void __iomem *base;
+>> +
+>> +     dev_dbg(&pdev->dev, "Entered %s\n", __func__);
+>> +
+>> +     if (!np)
+>> +             return -ENODEV;
+>> +
+>> +     of_id = of_match_device(sunxi_spdif_of_match, &pdev->dev);
+>> +     if (!of_id) {
+>> +             dev_err(&pdev->dev, "No matched devices found.\n");
+>> +             return -EINVAL;
+>> +     }
+>
+> Are you using that of_id anywhere?
+>
+Nope...it can go.
+>> +
+>> +     host = devm_kzalloc(&pdev->dev, sizeof(*host), GFP_KERNEL);
+>> +     if (!host)
+>> +             return -ENOMEM;
+>> +
+>> +     host->pdev = pdev;
+>> +
+>> +     /* Initialize this copy of the CPU DAI driver structure */
+>> +     memcpy(&host->cpu_dai_drv, &sunxi_spdif_dai, sizeof(sunxi_spdif_dai));
+>> +     host->cpu_dai_drv.name = dev_name(&pdev->dev);
+>> +
+>> +     /* Get the addresses */
+>> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +     base = devm_ioremap_resource(&pdev->dev, res);
+>> +     if (IS_ERR(base))
+>> +             return PTR_ERR(base);
+>> +
+>> +     host->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+>> +                                             &sunxi_spdif_regmap_config);
+>> +
+>> +     /* Clocks */
+>> +     host->apb_clk = devm_clk_get(&pdev->dev, "apb");
+>> +     if (IS_ERR(host->apb_clk)) {
+>> +             dev_err(&pdev->dev, "failed to get a apb clock.\n");
+>> +             return PTR_ERR(host->apb_clk);
+>> +     }
+>> +
+>> +     if (clk_prepare_enable(host->apb_clk)) {
+>> +             dev_err(&pdev->dev, "try to enable apb_spdif_clk failed\n");
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     host->audio_clk = devm_clk_get(&pdev->dev, "audio");
+>> +     if (IS_ERR(host->audio_clk)) {
+>> +             dev_err(&pdev->dev, "failed to get an audio clock.\n");
+>> +             return PTR_ERR(host->audio_clk);
+>> +     }
+>> +
+>> +     host->clk = devm_clk_get(&pdev->dev, "spdif");
+>> +     if (IS_ERR(host->clk)) {
+>> +             dev_err(&pdev->dev, "failed to get a spdif clock.\n");
+>> +             return PTR_ERR(host->clk);
+>> +     }
+>> +
+>> +     ret = clk_set_rate(host->audio_clk, 24576000);
+>> +     if (ret) {
+>> +             dev_err(&pdev->dev, "set spdif base clock failed!\n");
+>> +             return ret;
+>> +     }
+>
+> Why do you need to have to poke at PLL2 directly? the spdif clock is
+> its direct child. If you have to set a rate, do it directly on this
+> clock. And you don't have to assign a rate at probe time either since
+> you will like change it when the playback will start
+>
+OK...let me check this.
 
-Hi Jacek,
+>> +     if (clk_prepare_enable(host->audio_clk)) {
+>> +             dev_err(&pdev->dev, "try to enable audio clk failed\n");
+>> +             ret = -EINVAL;
+>> +             goto exit_clkdisable_apb_clk;
+>> +     }
+>> +
+>> +     host->playback_supported = false;
+>> +     host->capture_supported = false;
+>> +
+>> +     if (of_property_read_bool(np, "spdif-out"))
+>> +             host->playback_supported = true;
+>> +
+>> +     if (!host->playback_supported) {
+>> +             dev_err(&pdev->dev, "no enabled S/PDIF DAI link\n");
+>> +             goto exit_clkdisable_clk;
+>> +     }
+>> +
+>> +     host->dma_params_tx.addr = res->start + SUNXI_SPDIF_TXFIFO;
+>> +     host->dma_params_tx.maxburst = 4;
+>> +     host->dma_params_tx.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+>> +     host->dma_params_rx.addr = res->start + SUNXI_SPDIF_RXFIFO;
+>> +     host->dma_params_rx.maxburst = 4;
+>> +     host->dma_params_rx.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+>> +
+>> +     /* Register with ASoC */
+>> +     dev_set_drvdata(&pdev->dev, host);
+>
+> That's not what it does. And you can use platform_set_drvdata here
+OK...I will also check this.
+>
+>> +
+>> +     ret = devm_snd_soc_register_component(&pdev->dev,
+>> +                             &sunxi_spdif_component, &sunxi_spdif_dai, 1);
+>> +     if (ret)
+>> +             goto exit_clkdisable_clk;
+>> +
+>> +     ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
+>> +     if (ret)
+>> +             goto exit_clkdisable_clk;
+>> +     return 0;
+>> +
+>> +exit_clkdisable_clk:
+>> +     clk_disable_unprepare(host->clk);
+>> +exit_clkdisable_apb_clk:
+>> +     clk_disable_unprepare(host->apb_clk);
+>> +     return ret;
+>> +}
+>> +
+>> +static int sunxi_spdif_remove(struct platform_device *pdev)
+>> +{
+>> +     struct sunxi_spdif_dev *host = dev_get_drvdata(&pdev->dev);
+>> +
+>> +     snd_soc_unregister_platform(&pdev->dev);
+>> +     snd_soc_unregister_component(&pdev->dev);
+>> +
+>> +     if (!IS_ERR(host->clk)) {
+>> +             clk_disable_unprepare(host->clk);
+>> +             clk_disable_unprepare(host->apb_clk);
+>> +     }
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +#ifdef CONFIG_PM
+>> +static int sunxi_spdif_suspend(struct device *dev)
+>> +{
+>> +     struct platform_device *pdev = to_platform_device(dev);
+>> +     struct sunxi_spdif_dev *host = dev_get_drvdata(&pdev->dev);
+>> +
+>> +     if (host->running)
+>> +             clk_disable(host->clk);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int sunxi_spdif_resume(struct device *dev)
+>> +{
+>> +     struct platform_device *pdev = to_platform_device(dev);
+>> +     struct sunxi_spdif_dev *host = dev_get_drvdata(&pdev->dev);
+>> +
+>> +     if (host->running) {
+>> +             clk_enable(host->clk);
+>> +             sunxi_spdif_configure(host);
+>> +     }
+>> +     return 0;
+>> +}
+>> +
+>> +static SIMPLE_DEV_PM_OPS(spdif_dev_pm_ops, sunxi_spdif_suspend,
+>> +                                             sunxi_spdif_resume);
+>> +
+>> +#define SPDIF_DEV_PM_OPS (&spdif_dev_pm_ops)
+>
+> How did you test this?
+Errrrrr......uummmmmm.......let me think about this one.
+>
+>> +#else
+>> +#define SPDIF_DEV_PM_OPS NULL
+>> +
+>> +#endif
+>> +
+>> +static struct platform_driver sunxi_spdif_driver = {
+>> +     .driver         = {
+>> +             .name   = "sunxi-spdif",
+>> +             .owner  = THIS_MODULE,
+>
+> That's not needed anymore.
+>
+>> +             .pm     = SPDIF_DEV_PM_OPS,
+>> +             .of_match_table = of_match_ptr(sunxi_spdif_of_match),
+>> +     },
+>> +     .probe          = sunxi_spdif_probe,
+>> +     .remove         = sunxi_spdif_remove,
+>> +};
+>> +
+>> +module_platform_driver(sunxi_spdif_driver);
+>> +
+>> +MODULE_AUTHOR("Marcus Cooper <codekipper@gmail.com>");
+>> +MODULE_AUTHOR("Andrea Venturi <be17068@iperbole.bo.it>");
+>> +MODULE_DESCRIPTION("Allwinner Sunxi SPDIF SoC Interface");
+>> +MODULE_LICENSE("GPL");
+>> +MODULE_ALIAS("platform:sunxi-spdif");
+>> --
+>> 1.9.1
+>
+> Thanks!
+> Maxime
 
-> 
-> Does your device support reading the brightness currently set?
-
-No it don't.
-
-> If so, it would be good to implement brightness_get op, because
-> AFAIR you mentioned that the firmware you are working with sets
-> always maximum brightness value. Having the op implemented would
-> allow to find this out.
-
-I don't understand how this can help. I mean, the only issue is that at
-startup the initial LED state is unknown. And the software brightness
-value could be false. But once the LED is configured, the brightness
-values for software and hardware are synchronized. The brightness value
-is stored/cached in led_classdev and it can be retrieved by the user via
-sysfs...
-
-For my own knowledge, is there some interest in having brightness_get(),
-aside of guessing the LED initial state ?
-
-What does the embedded firmware is writing 255 or 0 into the brightness
-sysfs attribute. The max_brightness value is ignored. After this patch,
-writing 255 and 0 still allows to configure the LED in the same way:
-maximum brightness or off. Thus, I believe there is no compatibility
-issue.
-
-But of course, I will update the firmware as well :)
-
-Thanks,
-
-Simon
-
-> 
-> On 09/26/2015 11:02 PM, Simon Guinot wrote:
-> >This patch sets the led_classdev max_brightness to the maximum level
-> >value supported by hardware. This allows to get rid of the brightness
-> >conversion operation (from software [0:LED_FULL] to hardware ranges) in
-> >brightness_set().
-> >
-> >Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> >---
-> >  drivers/leds/leds-netxbig.c | 12 ++++--------
-> >  1 file changed, 4 insertions(+), 8 deletions(-)
-> >
-> >diff --git a/drivers/leds/leds-netxbig.c b/drivers/leds/leds-netxbig.c
-> >index b166fd9f4186..4b88b93244be 100644
-> >--- a/drivers/leds/leds-netxbig.c
-> >+++ b/drivers/leds/leds-netxbig.c
-> >@@ -116,7 +116,6 @@ struct netxbig_led_data {
-> >  	int			mode_addr;
-> >  	int			*mode_val;
-> >  	int			bright_addr;
-> >-	int			bright_max;
-> >  	struct			netxbig_led_timer *timer;
-> >  	int			num_timer;
-> >  	enum netxbig_led_mode	mode;
-> >@@ -178,7 +177,7 @@ static void netxbig_led_set(struct led_classdev *led_cdev,
-> >  	struct netxbig_led_data *led_dat =
-> >  		container_of(led_cdev, struct netxbig_led_data, cdev);
-> >  	enum netxbig_led_mode mode;
-> >-	int mode_val, bright_val;
-> >+	int mode_val;
-> >  	int set_brightness = 1;
-> >  	unsigned long flags;
-> >
-> >@@ -204,12 +203,9 @@ static void netxbig_led_set(struct led_classdev *led_cdev,
-> >  	 * SATA LEDs. So, change the brightness setting for a single
-> >  	 * SATA LED will affect all the others.
-> >  	 */
-> >-	if (set_brightness) {
-> >-		bright_val = DIV_ROUND_UP(value * led_dat->bright_max,
-> >-					  LED_FULL);
-> >+	if (set_brightness)
-> >  		gpio_ext_set_value(led_dat->gpio_ext,
-> >-				   led_dat->bright_addr, bright_val);
-> >-	}
-> >+				   led_dat->bright_addr, value);
-> >
-> >  	spin_unlock_irqrestore(&led_dat->lock, flags);
-> >  }
-> >@@ -306,11 +302,11 @@ static int create_netxbig_led(struct platform_device *pdev,
-> >  	 */
-> >  	led_dat->sata = 0;
-> >  	led_dat->cdev.brightness = LED_OFF;
-> >+	led_dat->cdev.max_brightness = template->bright_max;
-> >  	led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
-> >  	led_dat->mode_addr = template->mode_addr;
-> >  	led_dat->mode_val = template->mode_val;
-> >  	led_dat->bright_addr = template->bright_addr;
-> >-	led_dat->bright_max = template->bright_max;
-> >  	led_dat->timer = pdata->timer;
-> >  	led_dat->num_timer = pdata->num_timer;
-> >  	/*
-> >
-> 
-> 
-> -- 
-> Best Regards,
-> Jacek Anaszewski
+Thanks...they'll be nothing left of this driver soon,
+CK
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-leds" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150928/58676f37/attachment-0001.sig>
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
