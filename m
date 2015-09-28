@@ -1,21 +1,25 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Sun, 27 Sep 2015 17:21:15 -0700
-Subject: [PATCH] mxc_nand: fix copy_spare
-In-Reply-To: <1443020848-28813-1-git-send-email-eric@eukrea.com>
-References: <1443020848-28813-1-git-send-email-eric@eukrea.com>
-Message-ID: <20150928002115.GC34421@google.com>
+From: songjun.wu@atmel.com (Wu, Songjun)
+Date: Mon, 28 Sep 2015 09:36:37 +0800
+Subject: [PATCH v2 0/2] ASoC: atmel-classd: add driver for Atmel CLASSD
+In-Reply-To: <20150925180728.GP30445@sirena.org.uk>
+References: <1443073287-17849-1-git-send-email-songjun.wu@atmel.com>
+ <20150925180728.GP30445@sirena.org.uk>
+Message-ID: <560899A5.4050602@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 05:07:28PM +0200, Eric B?nard wrote:
-> it was broken by 35d5d20efad8a04c8c002c7f31241dff973977a6
-> "mtd: mxc_nand: cleanup copy_spare function"
-> 
-[...]
-> 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Added Fixes and -stable tags and pushed to linux-mtd.git. Thanks!
 
-Brian
+On 9/26/2015 02:07, Mark Brown wrote:
+> On Thu, Sep 24, 2015 at 01:41:25PM +0800, Songjun Wu wrote:
+>
+>> Songjun Wu (2):
+>>    ASoC: atmel-classd: add the Audio Class D Amplifier
+>>    ASoC: atmel-classd: DT binding for Class D audio amplifier driver
+>
+> I don't seem to have the second patch with the binding documentation.
+>
+Sorry, I use the patman to send the patch this time.
+And the patman will sent the patch automatically.
+I didn't check, and it missed you.
+I will forward to you at once.
