@@ -1,58 +1,35 @@
-From: yitian.bu@tangramtek.com (yitian)
-Date: Mon, 28 Sep 2015 17:48:14 +0800
-Subject: [PATCH v2 1/1] ASoC: dwc: fix dma stop transferring issue
-Message-ID: <037a01d0f9d2$cec8aa10$6c59fe30$@tangramtek.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Sep 2015 11:56:43 +0200
+Subject: [PATCH 2/2] arm64: to allow EFI_RTC can be selected on ARM64
+In-Reply-To: <56090C08.8070003@huawei.com>
+References: <1443418478-8240-1-git-send-email-thunder.leizhen@huawei.com>
+ <2245172.1ESUGv0DKo@wuerfel> <56090C08.8070003@huawei.com>
+Message-ID: <1493434.sLUZ1A9ljb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Designware I2S uses tx empty and rx available signals as the DMA
-handshaking signals. during music playing, if XRUN occurs,
-i2s_stop() function will be executed and both tx and rx irq are
-masked, when music contintes to be played, i2s_start() is executed
-but both tx and rx irq are not unmasked which cause I2S stop
-sending DMA handshaking signal to DMA controller, and it finally
-cause music playing will be stopped once XRUN occurs for the first
-time.
+On Monday 28 September 2015 17:44:40 Leizhen wrote:
+> >> No, on non-EFI platforms, they can still use RTC as before. As I mentioned above,
+> >> RTC_LIB only controls whether to display some configs when run "make menuconfig".
+> >> On ARM64, (in this patch) I only allowed EFI_RTC can be showed when RTC_LIB was
+> >> not selected.
+> >>
+> > 
+> > but that is the wrong driver that uses the legacy API, we cannot have that
+> > on ARM because it conflicts with the normal RTC_CLASS drivers.
+> 
+> Yes, RTC_CLASS will automatically select RTC_LIB, and will not display EFI_RTC, because
+> RTC_LIB=y now.
+> 
+> We can select EFI_RTC only when RTC_CLASS is not selected(meanwhile RTC_LIB=n)
 
-Signed-off-by: Yitian Bu <yitian.bu@tangramtek.com>
----
-changes in V2:
- - add definition for i and irq
----
- sound/soc/dwc/designware_i2s.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+I understood that, and my initial point was that we cannot allow
+such a situation, all drivers that we might use must be able to coexist
+in one kernel.
 
-diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
-index a3e97b4..76b2e19 100644
---- a/sound/soc/dwc/designware_i2s.c
-+++ b/sound/soc/dwc/designware_i2s.c
-@@ -141,13 +141,22 @@ static inline void i2s_clear_irqs(struct dw_i2s_dev
-*dev, u32 stream)
- static void i2s_start(struct dw_i2s_dev *dev,
- 		      struct snd_pcm_substream *substream)
- {
--
-+	u32 i, irq;
- 	i2s_write_reg(dev->i2s_base, IER, 1);
- 
--	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-+		for (i = 0; i < 4; i++) {
-+			irq = i2s_read_reg(dev->i2s_base, IMR(i));
-+			i2s_write_reg(dev->i2s_base, IMR(i), irq & ~0x30);
-+		}
- 		i2s_write_reg(dev->i2s_base, ITER, 1);
--	else
-+	} else {
-+		for (i = 0; i < 4; i++) {
-+			irq = i2s_read_reg(dev->i2s_base, IMR(i));
-+			i2s_write_reg(dev->i2s_base, IMR(i), irq & ~0x03);
-+		}
- 		i2s_write_reg(dev->i2s_base, IRER, 1);
-+	}
- 
- 	i2s_write_reg(dev->i2s_base, CER, 1);
- }
--- 
+If you have any applications that are ported from Itanium and that rely on
+specific behavior of the ia64 rtc driver, we should either enable those in the
+normal rtc-efi driver, or you need to change your application to use the
+portable RTC interfaces.
 
-1.7.12.4
+	Arnd
