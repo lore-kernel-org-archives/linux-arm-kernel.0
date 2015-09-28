@@ -1,46 +1,49 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Sep 2015 13:25:44 -0500
-Subject: [PATCH] arm: omap2: timer: always define omap4_local_timer_init
-Message-ID: <1443464744-16561-1-git-send-email-balbi@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 28 Sep 2015 11:48:36 -0700
+Subject: [PATCH v2 0/5] Support CPR on MSM8916
+In-Reply-To: <7646588.WPLWGVmoNH@vostro.rjw.lan>
+References: <1442623929-4507-1-git-send-email-sboyd@codeaurora.org>
+ <7646588.WPLWGVmoNH@vostro.rjw.lan>
+Message-ID: <20150928184836.GN23081@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap4_local_timer_init() can be used by other
-platforms as is. At least AM437x wants to use
-it. Instead of making omap4-only and providing
-a stub for builds without OMAP4, we can just
-always define that function.
+On 09/26, Rafael J. Wysocki wrote:
+> On Friday, September 18, 2015 05:52:04 PM Stephen Boyd wrote:
+> > This patch series adds support for CPR on MSM8916. The first
+> > patch exposes a corner voting API to the CPR driver so that we can
+> > change the corner for the MX regulator. If possible I would
+> > like to make this patch prettier, but I don't have any great
+> > ideas right now. The next patch adds support to adjust voltages in the OPP
+> > layer, and then hooks that up to cpufreq-dt so that we can adjust
+> > the voltage in response to what CPR tells us to do. I've also thrown
+> > in a patch to make RCU lockdep warnings go away, but I'm not sure if it's
+> > right. There's still work to do.
+> > 
+> > The final patch adds the CPR driver. This still has some rough edges. With
+> > the OPPv2 bindings I'm thinking of moving the frequency tables into DT
+> > and adding a custom vendor property to describe which fuse corner to use for
+> > each frequency.
+> > 
+> > Once you have these patches in place along with a CPU clock driver you
+> > can eanble enable cpufreq-dt and add the cpufreq-dt device (maybe the
+> > CPR driver should add the cpufreq-dt device?) and you'll see interrupts
+> > for CPR and OPP voltage adjustments triggering CPUfreq to modify voltages.
+> > 
+> > Andy Gross (1):
+> >   regulator: smd: Add floor and corner operations
+> > 
+> > Stephen Boyd (4):
+> >   PM / OPP: Support adjusting OPP voltages at runtime
+> >   OPP: Allow notifiers to call dev_pm_opp_get_{voltage,freq} RCU-free
+> >   cpufreq-dt: Handle OPP voltage adjust events
+> >   power: avs: Add support for CPR (Core Power Reduction)
+> 
+> From the responses so far I gather there will be a v3?
+> 
 
-Reported-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/mach-omap2/timer.c | 9 ---------
- 1 file changed, 9 deletions(-)
+Yes. Definitely.
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index a55655127ef2..f9028582e962 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -642,20 +642,11 @@ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
- 			       2, "sys_clkin_ck", NULL);
- #endif
- 
--#ifdef CONFIG_ARCH_OMAP4
--#ifdef CONFIG_HAVE_ARM_TWD
- void __init omap4_local_timer_init(void)
- {
- 	omap4_sync32k_timer_init();
- 	clocksource_of_init();
- }
--#else
--void __init omap4_local_timer_init(void)
--{
--	omap4_sync32k_timer_init();
--}
--#endif /* CONFIG_HAVE_ARM_TWD */
--#endif /* CONFIG_ARCH_OMAP4 */
- 
- #if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
- void __init omap5_realtime_timer_init(void)
 -- 
-2.5.0.GIT
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
