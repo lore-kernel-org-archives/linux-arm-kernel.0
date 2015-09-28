@@ -1,45 +1,72 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 28 Sep 2015 15:53:52 +0200
-Subject: [PATCH v2 0/5] ACPI probing infrastructure
-In-Reply-To: <560939A7.3030603@arm.com>
-References: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
- <1698028.ftHN1K8oZa@vostro.rjw.lan> <560939A7.3030603@arm.com>
-Message-ID: <39030379.kalO2V72FV@vostro.rjw.lan>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 28 Sep 2015 14:30:44 +0100
+Subject: [PATCH] xen/pci: Don't build Xen pci code for ARM and ARM64
+Message-ID: <1443447044-24985-1-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 28, 2015 01:59:19 PM Marc Zyngier wrote:
-> Hi Rafael,
-> 
-> On 26/09/15 00:45, Rafael J. Wysocki wrote:
-> 
-> >> Marc Zyngier (5):
-> >>   acpi: Add basic device probing infrastructure
-> >>   irqchip/acpi: Add probing infrastructure for ACPI-based irqchips
-> >>   irqchip/gic: Convert the GIC driver to ACPI probing
-> >>   clocksource/acpi: Add probing infrastructure for ACPI-based
-> >>     clocksources
-> >>   clocksource/arm_arch_timer: Convert to ACPI probing
-> > 
-> > I'm generally fine with this (modulo a couple of super-minor nits in the
-> > first patch), but it needs ACKs from Thomas for the irqchip-related and
-> > clocksource-related patches.
-> 
-> Sure. I've now addressed your comments, and I'll post the updated series
-> later today.
-> 
-> > Plus [3/5] needs to be rebased on top of the Al's patches removing BAD_MADT_ENTRY
-> > (currently in my bleeding-edge branch).
-> 
-> Al's patches were there on Friday, but vanished over the weekend. Do you
-> have another (stable?) branch with these patches in (assuming they are
-> still aimed at 4.4)?
+The PCI support for Xen doesn't compile on ARM/ARM64 when
+CONFIG_PCI_MMCONFIG=y:
 
-The Al's patches are gone for now, because they introduced a 0-day testing
-regression.
+drivers/xen/pci.c:31:25: fatal error: asm/pci_x86.h: No such file or
+directory
+ #include <asm/pci_x86.h>
 
-I guess this means I can apply your patches first and ask Al to rebase his
-next version on them.
+Although, Xen is not currently involved in PCI management for ARM/ARM64.
+There is plan to support it, but it would require some changes in Linux
+side.
 
-Thanks,
-Rafael
+For now, introduce a new config options XEN_PCI which will be turned off
+for ARM platform.
+
+Reported-by: Robert Richter <robert.richter@caviumnetworks.com>
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
+
+---
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
+---
+ drivers/xen/Kconfig  | 6 +++++-
+ drivers/xen/Makefile | 2 +-
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+index 73708ac..6bcc8b0 100644
+--- a/drivers/xen/Kconfig
++++ b/drivers/xen/Kconfig
+@@ -168,7 +168,7 @@ config XEN_TMEM
+ 
+ config XEN_PCIDEV_BACKEND
+ 	tristate "Xen PCI-device backend driver"
+-	depends on PCI && X86 && XEN
++	depends on XEN_PCI
+ 	depends on XEN_BACKEND
+ 	default m
+ 	help
+@@ -189,6 +189,10 @@ config XEN_PCIDEV_BACKEND
+ 
+ 	  If in doubt, say m.
+ 
++config XEN_PCI
++	def_bool y
++	depends on PCI && !ARM && !ARM64
++
+ config XEN_SCSI_BACKEND
+ 	tristate "XEN SCSI backend driver"
+ 	depends on XEN && XEN_BACKEND && TARGET_CORE
+diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+index e293bc5..c9f23b7 100644
+--- a/drivers/xen/Makefile
++++ b/drivers/xen/Makefile
+@@ -11,7 +11,7 @@ CFLAGS_features.o			:= $(nostackp)
+ 
+ CFLAGS_efi.o				+= -fshort-wchar
+ 
+-dom0-$(CONFIG_PCI) += pci.o
++dom0-$(CONFIG_XEN_PCI) += pci.o
+ dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
+ dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
+ xen-pad-$(CONFIG_X86) += xen-acpi-pad.o
+-- 
+2.1.4
