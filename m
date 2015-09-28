@@ -1,192 +1,72 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Mon, 28 Sep 2015 19:50:00 +0800
-Subject: [PATCH v2 8/9] ARM: rockchip: add support smp for rk3036
-In-Reply-To: <22222181.r5MSqEbWpB@diego>
-References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
- <1442486286-1873-1-git-send-email-zhengxing@rock-chips.com>
- <22222181.r5MSqEbWpB@diego>
-Message-ID: <56092968.1040001@rock-chips.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 28 Sep 2015 13:54:37 +0200
+Subject: [PATCH 4/4] ARM64: dts: exynos5433: add jpeg node
+In-Reply-To: <5608FFBD.1030306@samsung.com>
+References: <1442586060-23657-1-git-send-email-andrzej.p@samsung.com>
+ <55FFD4FF.6090306@samsung.com> <5608FFBD.1030306@samsung.com>
+Message-ID: <2466182.YdnXZtSWXI@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?09?18? 04:15, Heiko St?bner wrote:
-> Am Donnerstag, 17. September 2015, 18:38:06 schrieb Xing Zheng:
->> The rk3036 is dual-core soc, we can use this patch to enable cpu1
->> enter boot secondary, and hotplug(online/offline).
->>
->> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
->> ---
->>
->> Changes in v2: None
->>
->>   arch/arm/mach-rockchip/platsmp.c |  121
->> ++++++++++++++++++++++++++++++++++++++ 1 file changed, 121 insertions(+)
->>
->> diff --git a/arch/arm/mach-rockchip/platsmp.c
->> b/arch/arm/mach-rockchip/platsmp.c index 3e7a4b7..14218eb 100644
->> --- a/arch/arm/mach-rockchip/platsmp.c
->> +++ b/arch/arm/mach-rockchip/platsmp.c
->> @@ -34,6 +34,8 @@
->>
->>   static void __iomem *scu_base_addr;
->>   static void __iomem *sram_base_addr;
->> +static void __iomem *cru_base_addr;
->> +
->>   static int ncores;
->>
->>   #define PMU_PWRDN_CON		0x08
->> @@ -41,6 +43,8 @@ static int ncores;
->>
->>   #define PMU_PWRDN_SCU		4
->>
->> +#define RK3036_SOFTRST_CON(x)	((x) * 0x4 + 0x110)
->> +
->>   static struct regmap *pmu;
->>
->>   static int pmu_power_domain_is_on(int pd)
->> @@ -184,6 +188,7 @@ static int __init rockchip_smp_prepare_sram(struct
->> device_node *node) }
->>
->>   	rsize = resource_size(&res);
->> +
->>   	if (rsize<  trampoline_sz) {
->>   		pr_err("%s: reserved block with size 0x%x is to small for trampoline
-> size
->> 0x%x\n", __func__, rsize, trampoline_sz);
->> @@ -350,3 +355,119 @@ static struct smp_operations rockchip_smp_ops
->> __initdata = { };
->>
->>   CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp",
->> &rockchip_smp_ops); +
->> +/* for rk3036 */
->> +
->> +static int rk3036_set_power_domain(int pd, bool on)
->> +{
->> +	/* there are 2cpus on rk3036 soc, we just need to be care cpu1 */
->> +	if (pd != 1)
->> +		return 0;
->> +
->> +	if (on)
->> +		writel_relaxed(0x20000, cru_base_addr + RK3036_SOFTRST_CON(0));
->> +	else
->> +		writel_relaxed(0x20002, cru_base_addr + RK3036_SOFTRST_CON(0));
-> this is definitly the wrong way. The reset handling is the same as on the
-> rk3288 - so you can use the regular reset mechanism like the other socs and
-> should definitly _never_ write to the cru directly.
->
-> The only visible difference is that you cannot control the power-domains of
-> the cpu cores. Its sibling the rk3128 seems to have controllable power domains
-> again.
->
-> I'm still pondering how to make this future proof...
->
->
-> Heiko
-OK, I tried add the regular reset mechanism like the rk3288.
-Yes, then, there are something need to continue to improve.
 
-Thanks.
->
->> +
->> +	dsb();
->> +
->> +	return 0;
->> +}
->> +
->> +static void __init rk3036_smp_prepare_cpus(unsigned int max_cpus)
->> +{
->> +	struct device_node *node;
->> +	unsigned int l2ctlr;
->> +	unsigned int i, cpu;
->> +
->> +	/* get cru_base_addr */
->> +	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3036-cru");
->> +	if (!node) {
->> +		pr_err("%s: could not find cru dt node\n", __func__);
->> +		return;
->> +	}
->> +
->> +	cru_base_addr = of_iomap(node, 0);
->> +	if (!cru_base_addr) {
->> +		pr_err("%s: could not map cru registers\n", __func__);
->> +		return;
->> +	}
->> +
->> +	/* get sram_base_addr */
->> +	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3036-smp-sram");
->> +	if (!node) {
->> +		pr_err("%s: could not find sram dt node\n", __func__);
->> +		return;
->> +	}
->> +
->> +	sram_base_addr = of_iomap(node, 0);
->> +	if (!sram_base_addr) {
->> +		pr_err("%s: could not map sram registers\n", __func__);
->> +		return;
->> +	}
->> +
->> +	/* get ncores */
->> +	asm ("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
->> +	ncores = ((l2ctlr>>  24)&  0x3) + 1;
->> +	cpu = MPIDR_AFFINITY_LEVEL(read_cpuid_mpidr(), 0);
->> +
->> +	/* Make sure that all cores except the first are really off */
->> +	for (i = 1; i<  ncores; i++)
->> +		rk3036_set_power_domain(0 + i, false);
->> +}
->> +
->> +static int rk3036_boot_secondary(unsigned int cpu, struct task_struct
->> *idle) +{
->> +	if (cpu>= ncores) {
->> +		pr_err("%s: cpu %d outside maximum number of cpus %d\n",
->> +			__func__, cpu, ncores);
->> +		return -ENXIO;
->> +	}
->> +
->> +	/* start the core */
->> +	rk3036_set_power_domain(0 + cpu, true);
->> +
->> +	/*
->> +	 * We need to wait a moment after soft reset CPUx on rk3036,
->> +	 * otherwise, CPUx will startup failed.
->> +	 */
->> +	udelay(10);
->> +	writel(virt_to_phys(secondary_startup), sram_base_addr + 8);
->> +	writel(0xDEADBEAF, sram_base_addr + 4);
->> +	dsb_sev();
->> +
->> +	return 0;
->> +}
->> +
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +static int rk3066_cpu_kill(unsigned int cpu)
->> +{
->> +	/*
->> +	 * We need a delay here to ensure that the dying CPU can finish
->> +	 * executing v7_coherency_exit() and reach the WFI/WFE state
->> +	 * prior to having the power domain disabled.
->> +	 */
->> +	mdelay(1);
->> +
->> +	rk3036_set_power_domain(0 + cpu, false);
->> +
->> +	return 1;
->> +}
->> +
->> +static void rk3066_cpu_die(unsigned int cpu)
->> +{
->> +	v7_exit_coherency_flush(louis);
->> +	while (1)
->> +		cpu_do_idle();
->> +}
->> +#endif
->> +
->> +static struct smp_operations rk3036_smp_ops __initdata = {
->> +	.smp_prepare_cpus	= rk3036_smp_prepare_cpus,
->> +	.smp_boot_secondary	= rk3036_boot_secondary,
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +	.cpu_kill		= rk3066_cpu_kill,
->> +	.cpu_die		= rk3066_cpu_die,
->> +#endif
->> +};
->> +CPU_METHOD_OF_DECLARE(rk3036_smp, "rockchip,rk3036-smp",&rk3036_smp_ops);
+Hi,
+
+On Monday, September 28, 2015 05:52:13 PM Krzysztof Kozlowski wrote:
+> W dniu 21.09.2015 o 18:59, Andrzej Pietrasiewicz pisze:
+> > Hi Hans,
+> > 
+> > W dniu 21.09.2015 o 11:50, Hans Verkuil pisze:
+> >> On 18-09-15 16:21, Andrzej Pietrasiewicz wrote:
+> >>> From: Marek Szyprowski <m.szyprowski@samsung.com>
+> >>>
+> >>> Add Exynos 5433 jpeg h/w codec node.
+> >>>
+> >>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >>> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+> >>> ---
+> >>>   arch/arm64/boot/dts/exynos/exynos5433.dtsi | 21 +++++++++++++++++++++
+> >>>   1 file changed, 21 insertions(+)
+> >>>
+> >>> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+> >>> b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+> >>
+> >> This dtsi file doesn't exist in the media-git tree. What is the story
+> >> here?
+> >>
+> >> Should this go through a different subsystem?
+> >>
+> >> I think the media subsystem can take patches 1-3 and whoever does DT
+> >> patches can
+> >> take this patch, right?
+> >>
+> > 
+> > The cover letter explains that the series is rebased onto Mauro's
+> > master with Kukjin's branch merged. The latter does contain
+> > the exynos5433.dtsi. That said, yes, taking patches 1-3 in
+> > media subsystem and leaving DT patch to someone else is the
+> > way to go.
+> 
+> Although Kukjin picked Exynos 5433 ARM64 patches but they were not
+> accepted upstream by arm-soc. He rolled it for few releases but:
+> 1. Reason for not accepting by arm-soc was not resolved - there is no DTS.
+> 2. Kukjin did not rebase the branch for 4.4... which maybe means that he
+> wants to drop it?
+> 3. Anyone (but me...) can send Galaxy Note4 (Exynos5433) DTS file based
+> on sources on opensource.samsung.com. The DTS there is for 32-bit but it
+> can be probably easily adjusted for ARM64.
+> 
+> All of this means that Device Tree support for this driver can't be
+> merged now and effort for mainlining 5433 may be unfortunately wasted...
+
+Exynos5433 support is being incrementally merged (clocks, drm, phy,
+pinctrl, thermal and tty support is already in upstream or -next).
+
+I don't know why DTS changes got stuck in Kukjin's tree (Kukjin,
+could you please explain?) but I think that this shouldn't not stop
+us from continuing Exynos5433 upstreaming effort.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
