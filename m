@@ -1,39 +1,41 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Mon, 28 Sep 2015 20:53:03 +0800
-Subject: [PATCH v2 7/9] rockchip: make sure timer5 is enabled on rk3036
- platforms
-In-Reply-To: <1726823.4nE2gJuWPe@diego>
-References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
- <11125723.j2J5LpAGi4@diego> <560931A3.2020403@rock-chips.com>
- <1726823.4nE2gJuWPe@diego>
-Message-ID: <5609382F.2000203@rock-chips.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 28 Sep 2015 13:59:19 +0100
+Subject: [PATCH v2 0/5] ACPI probing infrastructure
+In-Reply-To: <1698028.ftHN1K8oZa@vostro.rjw.lan>
+References: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
+ <1698028.ftHN1K8oZa@vostro.rjw.lan>
+Message-ID: <560939A7.3030603@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?09?28? 20:44, Heiko St?bner wrote:
-> Hi,
->
-> Am Montag, 28. September 2015, 20:25:07 schrieb Xing Zheng:
->> On 2015?09?17? 23:05, Heiko St?bner wrote:
->>> Am Donnerstag, 17. September 2015, 18:37:24 schrieb Xing Zheng:
->>>> The timer5 supplies the architected timer and thus as has to run when
->>>> the system clocksource and clockevents drivers are registered.
->>> please kindly ask the people doing uboot development to do this in uboot
->>> itself in future socs :-) - for example Simon's rk3288 mainline uboot does
->>> this correctly.
->> OK, I will ask the engineer who is doing uboot whether needs to add
->> this patch. So I will remove it from the patchset v3 of "Build and support
->> rk3036 SoC platform".
-> No, I really only meant try to make people get this right in the future :-).
->
-> For the rk3036 there are probably already devices on the market with uboots
-> sporting that issue. So it's ok to have this in here now, it's just to make
-> sure it gets really fixed in future socs.
->
->
-> Heiko
->
->
-OK, I got it.
+Hi Rafael,
 
-Thank you. :)
+On 26/09/15 00:45, Rafael J. Wysocki wrote:
+
+>> Marc Zyngier (5):
+>>   acpi: Add basic device probing infrastructure
+>>   irqchip/acpi: Add probing infrastructure for ACPI-based irqchips
+>>   irqchip/gic: Convert the GIC driver to ACPI probing
+>>   clocksource/acpi: Add probing infrastructure for ACPI-based
+>>     clocksources
+>>   clocksource/arm_arch_timer: Convert to ACPI probing
+> 
+> I'm generally fine with this (modulo a couple of super-minor nits in the
+> first patch), but it needs ACKs from Thomas for the irqchip-related and
+> clocksource-related patches.
+
+Sure. I've now addressed your comments, and I'll post the updated series
+later today.
+
+> Plus [3/5] needs to be rebased on top of the Al's patches removing BAD_MADT_ENTRY
+> (currently in my bleeding-edge branch).
+
+Al's patches were there on Friday, but vanished over the weekend. Do you
+have another (stable?) branch with these patches in (assuming they are
+still aimed at 4.4)?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
