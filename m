@@ -1,130 +1,159 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 28 Sep 2015 14:22:03 -0700
-Subject: [PATCH v3 2/4] clk: bcm2835: Add binding docs for the new platform
- clock driver.
+Date: Mon, 28 Sep 2015 14:22:05 -0700
+Subject: [PATCH v3 4/4] ARM: bcm2835: Switch to using the new clock driver
+ support.
 In-Reply-To: <1443475325-22270-1-git-send-email-eric@anholt.net>
 References: <1443475325-22270-1-git-send-email-eric@anholt.net>
-Message-ID: <1443475325-22270-2-git-send-email-eric@anholt.net>
+Message-ID: <1443475325-22270-4-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously we've only supported a few fixed clocks based on
-assumptions about how the firmware sets up the clocks, but this
-binding will let us control the actual (audio power domain) clock
-manager.
+This will give us the ability to set the pixel and HDMI state machine
+clocks for the VC4 KMS driver, change the CPU frequency, and
+potentially gate clocks in the future (once we also write a power
+domain driver).  It also gives the uart an explicit clock reference,
+so that we don't need to change the physical addresses of the old
+fixed clk_bcm2835.c clocks for Raspberry Pi 2 port.
+
+Two clocks get their frequencies updated as a result of this.  One is
+uart's apb_pclk, which was previously accidentally grabbing the fixed
+uart0_pclk due to the apb_pclk not having clk_register_clkdev()
+called.  The uart doesn't seem to do anything with apb_pclk other than
+make sure it's on, so that appears safe (also, as far as I can see,
+the apb clock is actually the same as the VPU clock).  The other is
+EMMC, which according to the docs was supposed to be in the 50-100Mhz
+range, but it turns out the firmware needed to change to running it at
+the 250Mhz core clock speed to avoid a bug in clock domain crossing.
+
+Additionally, anything using BCM2835_CLOCK_VPU will now have a correct
+clock rate if the user configures the boot-time core clock speed using
+config.txt.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- .../bindings/clock/brcm,bcm2835-cprman.txt         | 45 +++++++++++++++++++++
- include/dt-bindings/clock/bcm2835.h                | 47 ++++++++++++++++++++++
- 2 files changed, 92 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt
- create mode 100644 include/dt-bindings/clock/bcm2835.h
+ arch/arm/boot/dts/bcm2835.dtsi | 52 +++++++++++++++++++++++-------------------
+ 1 file changed, 28 insertions(+), 24 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt b/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt
-new file mode 100644
-index 0000000..e56a1df
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt
-@@ -0,0 +1,45 @@
-+Broadcom BCM2835 CPRMAN clocks
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index 301c73f..a6a55b7 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -1,4 +1,5 @@
+ #include <dt-bindings/pinctrl/bcm2835.h>
++#include <dt-bindings/clock/bcm2835.h>
+ #include "skeleton.dtsi"
+ 
+ / {
+@@ -21,6 +22,10 @@
+ 			compatible = "brcm,bcm2835-system-timer";
+ 			reg = <0x7e003000 0x1000>;
+ 			interrupts = <1 0>, <1 1>, <1 2>, <1 3>;
++			/* This could be a reference to BCM2835_CLOCK_TIMER,
++			 * but we don't have the driver using the common clock
++			 * support yet.
++			 */
+ 			clock-frequency = <1000000>;
+ 		};
+ 
+@@ -57,6 +62,17 @@
+ 			reg = <0x7e100000 0x28>;
+ 		};
+ 
++		clocks: cprman at 7e101000 {
++			compatible = "brcm,bcm2835-cprman";
++			#clock-cells = <1>;
++			reg = <0x7e101000 0x2000>;
 +
-+This binding uses the common clock binding:
-+    Documentation/devicetree/bindings/clock/clock-bindings.txt
++			/* CPRMAN derives everything from the platform's
++			 * oscillator.
++			 */
++			clocks = <&clk_osc>;
++		};
 +
-+The CPRMAN clock controller generates clocks in the audio power domain
-+of the BCM2835.  There is a level of PLLs deriving from an external
-+oscillator, a level of PLL dividers that produce channels off of the
-+few PLLs, and a level of mostly-generic clock generators sourcing from
-+the PLL channels.  Most other hardware components source from the
-+clock generators, but a few (like the ARM or HDMI) will source from
-+the PLL dividers directly.
-+
-+Required properties:
-+- compatible:	Should be "brcm,bcm2835-cprman"
-+- #clock-cells:	Should be <1>. The permitted clock-specifier values can be
-+		  found in include/dt-bindings/clock/bcm2835.h
-+- reg:		Specifies base physical address and size of the registers
-+- clocks:	The external oscillator clock phandle
-+
-+Example:
-+
-+	clk_osc: clock at 3 {
-+		compatible = "fixed-clock";
-+		reg = <3>;
-+		#clock-cells = <0>;
-+		clock-output-names = "osc";
-+		clock-frequency = <19200000>;
-+	};
-+
-+	clocks: cprman at 7e101000 {
-+		compatible = "brcm,bcm2835-cprman";
-+		#clock-cells = <1>;
-+		reg = <0x7e101000 0x2000>;
-+		clocks = <&clk_osc>;
-+	};
-+
-+	i2c0: i2c at 7e205000 {
-+		compatible = "brcm,bcm2835-i2c";
-+		reg = <0x7e205000 0x1000>;
-+		interrupts = <2 21>;
-+		clocks = <&clocks BCM2835_CLOCK_VPU>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-diff --git a/include/dt-bindings/clock/bcm2835.h b/include/dt-bindings/clock/bcm2835.h
-new file mode 100644
-index 0000000..d323efa
---- /dev/null
-+++ b/include/dt-bindings/clock/bcm2835.h
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright (C) 2015 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#define BCM2835_PLLA			0
-+#define BCM2835_PLLB			1
-+#define BCM2835_PLLC			2
-+#define BCM2835_PLLD			3
-+#define BCM2835_PLLH			4
-+
-+#define BCM2835_PLLA_CORE		5
-+#define BCM2835_PLLA_PER		6
-+#define BCM2835_PLLB_ARM		7
-+#define BCM2835_PLLC_CORE0		8
-+#define BCM2835_PLLC_CORE1		9
-+#define BCM2835_PLLC_CORE2		10
-+#define BCM2835_PLLC_PER		11
-+#define BCM2835_PLLD_CORE		12
-+#define BCM2835_PLLD_PER		13
-+#define BCM2835_PLLH_RCAL		14
-+#define BCM2835_PLLH_AUX		15
-+#define BCM2835_PLLH_PIX		16
-+
-+#define BCM2835_CLOCK_TIMER		17
-+#define BCM2835_CLOCK_OTP		18
-+#define BCM2835_CLOCK_UART		19
-+#define BCM2835_CLOCK_VPU		20
-+#define BCM2835_CLOCK_V3D		21
-+#define BCM2835_CLOCK_ISP		22
-+#define BCM2835_CLOCK_H264		23
-+#define BCM2835_CLOCK_VEC		24
-+#define BCM2835_CLOCK_HSM		25
-+#define BCM2835_CLOCK_SDRAM		26
-+#define BCM2835_CLOCK_TSENS		27
-+#define BCM2835_CLOCK_EMMC		28
-+#define BCM2835_CLOCK_PERI_IMAGE	29
-+
-+#define BCM2835_CLOCK_COUNT		30
+ 		rng at 7e104000 {
+ 			compatible = "brcm,bcm2835-rng";
+ 			reg = <0x7e104000 0x10>;
+@@ -96,7 +112,9 @@
+ 			compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
+ 			reg = <0x7e201000 0x1000>;
+ 			interrupts = <2 25>;
+-			clock-frequency = <3000000>;
++			clocks = <&clocks BCM2835_CLOCK_UART>,
++				 <&clocks BCM2835_CLOCK_VPU>;
++			clock-names = "uartclk", "apb_pclk";
+ 			arm,primecell-periphid = <0x00241011>;
+ 		};
+ 
+@@ -115,7 +133,7 @@
+ 			compatible = "brcm,bcm2835-spi";
+ 			reg = <0x7e204000 0x1000>;
+ 			interrupts = <2 22>;
+-			clocks = <&clk_spi>;
++			clocks = <&clocks BCM2835_CLOCK_VPU>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -125,7 +143,7 @@
+ 			compatible = "brcm,bcm2835-i2c";
+ 			reg = <0x7e205000 0x1000>;
+ 			interrupts = <2 21>;
+-			clocks = <&clk_i2c>;
++			clocks = <&clocks BCM2835_CLOCK_VPU>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -135,7 +153,7 @@
+ 			compatible = "brcm,bcm2835-sdhci";
+ 			reg = <0x7e300000 0x100>;
+ 			interrupts = <2 30>;
+-			clocks = <&clk_mmc>;
++			clocks = <&clocks BCM2835_CLOCK_EMMC>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -143,7 +161,7 @@
+ 			compatible = "brcm,bcm2835-i2c";
+ 			reg = <0x7e804000 0x1000>;
+ 			interrupts = <2 21>;
+-			clocks = <&clk_i2c>;
++			clocks = <&clocks BCM2835_CLOCK_VPU>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+@@ -165,28 +183,14 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		clk_mmc: clock at 0 {
+-			compatible = "fixed-clock";
+-			reg = <0>;
+-			#clock-cells = <0>;
+-			clock-output-names = "mmc";
+-			clock-frequency = <100000000>;
+-		};
+-
+-		clk_i2c: clock at 1 {
++		/* The oscillator is the root of the clock tree. */
++		clk_osc: clock at 3 {
+ 			compatible = "fixed-clock";
+-			reg = <1>;
++			reg = <3>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "i2c";
+-			clock-frequency = <250000000>;
++			clock-output-names = "osc";
++			clock-frequency = <19200000>;
+ 		};
+ 
+-		clk_spi: clock at 2 {
+-			compatible = "fixed-clock";
+-			reg = <2>;
+-			#clock-cells = <0>;
+-			clock-output-names = "spi";
+-			clock-frequency = <250000000>;
+-		};
+ 	};
+ };
 -- 
 2.1.4
