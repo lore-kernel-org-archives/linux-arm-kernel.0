@@ -1,74 +1,102 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Mon, 28 Sep 2015 16:41:19 +0800
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Sep 2015 10:42:42 +0200
 Subject: [PATCH 2/2] arm64: to allow EFI_RTC can be selected on ARM64
-In-Reply-To: <CAKv+Gu_uFi03XVf5mX9Qy7eH=m1Q1ufpBNN2ucvSREBD+H-Q4g@mail.gmail.com>
+In-Reply-To: <5608FA85.8070009@huawei.com>
 References: <1443418478-8240-1-git-send-email-thunder.leizhen@huawei.com>
- <1443418478-8240-3-git-send-email-thunder.leizhen@huawei.com>
- <CAKv+Gu_uFi03XVf5mX9Qy7eH=m1Q1ufpBNN2ucvSREBD+H-Q4g@mail.gmail.com>
-Message-ID: <5608FD2F.1000105@huawei.com>
+ <1783631.jH4WY2RqXu@wuerfel> <5608FA85.8070009@huawei.com>
+Message-ID: <2245172.1ESUGv0DKo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2015/9/28 15:40, Ard Biesheuvel wrote:
-> On 28 September 2015 at 06:34, Zhen Lei <thunder.leizhen@huawei.com> wrote:
->> Now, ARM64 is also support EFI startup. We hope use EFI runtime services
->> to get/set current time and date.
->>
->> RTC_LIB only controls some configs in drivers/char/Kconfig(included
->> EFI_RTC), and will be automatically selected when RTC_CLASS opened. So
->> this patch have no functional change but give an opportunity to select
->> EFI_RTC when RTC_CLASS closed.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>  arch/arm64/Kconfig | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 07d1811..25cec57 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -85,7 +85,7 @@ config ARM64
->>         select PERF_USE_VMALLOC
->>         select POWER_RESET
->>         select POWER_SUPPLY
->> -       select RTC_LIB
->> +       select RTC_LIB if !EFI
->>         select SPARSE_IRQ
->>         select SYSCTL_EXCEPTION_TRACE
->>         select HAVE_CONTEXT_TRACKING
+On Monday 28 September 2015 16:29:57 Leizhen wrote:
 > 
-> You can currently enable EFI_RTC just fine on arm64 when EFI is enabled.
-> Why exactly do you need this patch on top?
-
-Because when we run "make ARCH=arm64 menuconfig", RTC_LIB is always selected. And we have no opportunity
-to deselect it. And EFI_RTC can be displayed only when RTC_LIB=n.
-
---------drivers/rtc/Kconfig-------
-config RTC_LIB
-        bool
-
-menuconfig RTC_CLASS
-        bool "Real Time Clock"
-        default n
-        depends on !S390 && !UML
-        select RTC_LIB
-
---------------drivers/char/Kconfig--------------
-if RTC_LIB=n
-
-......
-
-config EFI_RTC
-        bool "EFI Real Time Clock Services"
-        depends on IA64 || ARM64
-
-.......
-
-endif # RTC_LIB
-
+> On 2015/9/28 15:35, Arnd Bergmann wrote:
+> > On Monday 28 September 2015 13:34:38 Zhen Lei wrote:
+> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >> index 07d1811..25cec57 100644
+> >> --- a/arch/arm64/Kconfig
+> >> +++ b/arch/arm64/Kconfig
+> >> @@ -85,7 +85,7 @@ config ARM64
+> >>         select PERF_USE_VMALLOC
+> >>         select POWER_RESET
+> >>         select POWER_SUPPLY
+> >> -       select RTC_LIB
+> >> +       select RTC_LIB if !EFI
+> >>         select SPARSE_IRQ
+> >>         select SYSCTL_EXCEPTION_TRACE
+> >>         select HAVE_CONTEXT_TRACKING
+> > 
+> > Sorry, we can't do that: enabling EFI has to be done in a way that it only
+> > adds features but not disables them.
 > 
-> .
+> I run "make ARCH=arm64 menuconfig" and found that RTC_CLASS is selected by default. Actually, RTC_LIB only
+> controls whether to display some configs when run "make menuconfig". I list all informations below:
 > 
+> ---------make ARCH=arm64 menuconfig-----
+>   [*] Real Time Clock  --->
+> 
+> ---------drivers/rtc/Kconfig-------
+> menuconfig RTC_CLASS
+>         bool "Real Time Clock"
+>         default n
+>         depends on !S390 && !UML
+>         select RTC_LIB
+
+Ok, I see. So your patch here has no effect at all and can be dropped, or
+we can remove the 'select RTC_LIB' without the EFI dependency.
+
+> -----------------------------------
+> find . -name "*Kconfig*" | xargs grep RTC_LIB
+> ./drivers/rtc/Kconfig:config RTC_LIB
+> ./drivers/rtc/Kconfig:	select RTC_LIB
+> ./drivers/char/Kconfig:if RTC_LIB=n
+> ./drivers/char/Kconfig:endif # RTC_LIB
+> ./arch/x86/Kconfig:	select RTC_LIB
+> ./arch/arm/Kconfig:	select RTC_LIB
+> ./arch/arm64/Kconfig:	select RTC_LIB if !EFI
+> ./arch/sh/Kconfig:	select RTC_LIB
+> ./arch/mips/Kconfig:	select RTC_LIB if !MACH_LOONGSON64
+> 
+> --------------drivers/char/Kconfig--------------
+> if RTC_LIB=n
+> 
+> config RTC
+>         tristate "Enhanced Real Time Clock Support (legacy PC RTC driver)"
+> 
+> .......
+> 
+> endif # RTC_LIB
+> 
+> 
+> > 
+> > Your patch breaks RTC on all non-EFI platforms as soon as CONFIG_EFI
+> > is selected by the user.
+> 
+> No, on non-EFI platforms, they can still use RTC as before. As I mentioned above,
+> RTC_LIB only controls whether to display some configs when run "make menuconfig".
+> On ARM64, (in this patch) I only allowed EFI_RTC can be showed when RTC_LIB was
+> not selected.
+>
+
+but that is the wrong driver that uses the legacy API, we cannot have that
+on ARM because it conflicts with the normal RTC_CLASS drivers.
+
+> --------------drivers/char/Kconfig--------------
+> if RTC_LIB=n
+> 
+> config RTC
+> tristate "Enhanced Real Time Clock Support (legacy PC RTC driver)"
+> 
+> .......
+> 
+> config EFI_RTC
+>         bool "EFI Real Time Clock Services"
+>         depends on IA64 || ARM64
+> 
+> .......
+> 
+> endif # RTC_LIB
+
+The driver you want is RTC_DRV_EFI, not EFI_RTC.
+
+	Arnd
