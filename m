@@ -1,7 +1,9 @@
 From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Mon, 28 Sep 2015 23:06:01 +0300
-Subject: [PATCH] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter support
-Message-ID: <1443470762-17937-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Date: Mon, 28 Sep 2015 23:06:02 +0300
+Subject: [PATCH v5] drm: bridge/dw_hdmi: add dw hdmi i2c bus adapter support
+In-Reply-To: <1443470762-17937-1-git-send-email-vladimir_zapolskiy@mentor.com>
+References: <1443470762-17937-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <1443470762-17937-2-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,6 +22,45 @@ monitors have at maximum one extension block.
 
 Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
 ---
+The change is based on v4.3.0-rc3 and it is applicable to rmk/drm-dwhdmi-devel,
+please let me know, if it should be rebased.
+
+Changes from v4 to v5:
+- do I2C bus controller initialization only once in bind() as it was done
+  in v1-v3 of the change.
+
+Changes from v3 to v4, thanks to Doug and Philipp for review:
+- set speed mode after software reset in dw_hdmi_i2c_init()
+- by default set standard speed mode instead of fast speed mode, on iMX6Q
+  this configures SCL to 100 KHz, which is compliant with HDMI 1.3a spec
+- do I2C bus controller reinitialization on every data transfer,
+  this change hopefully solves some observed problems on RK3288 platform
+- added short functional change description to dw_hdmi.txt
+
+v3 of the change was
+
+  Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+Changes from v2 to v3, thanks to Russell:
+- moved register field value definitions to dw_hdmi.h
+- made completions uninterruptible to avoid transfer retries if interrupted
+- use one completion for both read and write transfers as in v1, operation_reg is removed
+- redundant i2c->stat = 0 is removed from dw_hdmi_i2c_read/write()
+- struct i2c_algorithm dw_hdmi_algorithm is qualified as const
+- dw_hdmi_i2c_adapter() does not modify struct dw_hdmi on error path
+- dw_hdmi_i2c_irq() does not modify hdmi->i2c->stat, if interrupt is not for I2CM
+- spin lock is removed from dw_hdmi_i2c_irq()
+- removed spin lock from dw_hdmi_i2c_xfer() around write to HDMI_IH_MUTE_I2CM_STAT0 register
+- split loop over message array in dw_hdmi_i2c_xfer() to validation and transfer parts
+- added a mutex to serialize I2C transfer requests, i2c->lock is completely removed
+- removed if(len) check from dw_hdmi_i2c_write(), hardware supports only len>0 transfers
+- described extension blocks <= 1 limitation in the commit message
+- a number of minor clean ups
+
+Changes from v1 to v2:
+- fixed a devm_kfree() signature
+- split completions for read and write operations
+
  .../devicetree/bindings/drm/bridge/dw_hdmi.txt     |   4 +-
  drivers/gpu/drm/bridge/dw_hdmi.c                   | 263 ++++++++++++++++++++-
  drivers/gpu/drm/bridge/dw_hdmi.h                   |  19 ++
