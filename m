@@ -1,71 +1,59 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 28 Sep 2015 15:01:47 +0100
-Subject: [PATCH] xen/pci: Don't build Xen pci code for ARM and ARM64
-In-Reply-To: <alpine.DEB.2.02.1509281447010.2672@kaball.uk.xensource.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Mon, 28 Sep 2015 15:22:40 +0100
+Subject: [Xen-devel] [PATCH] xen/pci: Don't build Xen pci code for ARM
+ and ARM64
+In-Reply-To: <56094891.2000409@oracle.com>
 References: <1443447044-24985-1-git-send-email-julien.grall@citrix.com>
- <alpine.DEB.2.02.1509281447010.2672@kaball.uk.xensource.com>
-Message-ID: <5609484B.8090605@citrix.com>
+ <56094600.7050508@citrix.com> <560947B6.1030101@citrix.com>
+ <56094891.2000409@oracle.com>
+Message-ID: <56094D30.7080305@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/09/15 14:48, Stefano Stabellini wrote:
-> On Mon, 28 Sep 2015, Julien Grall wrote:
->> The PCI support for Xen doesn't compile on ARM/ARM64 when
->> CONFIG_PCI_MMCONFIG=y:
+On 28/09/15 15:02, Boris Ostrovsky wrote:
+> On 09/28/2015 09:59 AM, Julien Grall wrote:
+>> Hi David,
 >>
->> drivers/xen/pci.c:31:25: fatal error: asm/pci_x86.h: No such file or
->> directory
->>  #include <asm/pci_x86.h>
+>> On 28/09/15 14:52, David Vrabel wrote:
+>>> On 28/09/15 14:30, Julien Grall wrote:
+>>>> The PCI support for Xen doesn't compile on ARM/ARM64 when
+>>>> CONFIG_PCI_MMCONFIG=y:
+>>>>
+>>>> drivers/xen/pci.c:31:25: fatal error: asm/pci_x86.h: No such file or
+>>>> directory
+>>>>   #include <asm/pci_x86.h>
+>>>>
+>>>> Although, Xen is not currently involved in PCI management for
+>>>> ARM/ARM64.
+>>>> There is plan to support it, but it would require some changes in Linux
+>>>> side.
+>>>>
+>>>> For now, introduce a new config options XEN_PCI which will be turned
+>>>> off
+>>>> for ARM platform.
+>>> Since PCI_MMCONFIG isn't x86 specific and its use in drivers/xen/pci.c
+>>> is, can you fix this by changing to #ifdef CONFIG_X86?
+
+This.
+
+>> Well, it may be possible that we need this code for ARM/ARM64.
 >>
->> Although, Xen is not currently involved in PCI management for ARM/ARM64.
->> There is plan to support it, but it would require some changes in Linux
->> side.
+>>  From the origin thread [1], it wasn't clear what is the correct
+>> solution. So I think that disabling the Xen PCI code for now is the
+>> right solution.
 >>
->> For now, introduce a new config options XEN_PCI which will be turned off
->> for ARM platform.
+>> Note, that it's still possible to use PCI in DOM0 on ARM64 platform
+>> without this code.
 >>
->> Reported-by: Robert Richter <robert.richter@caviumnetworks.com>
->> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+>> Regards,
 >>
->> ---
->> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->> Cc: David Vrabel <david.vrabel@citrix.com>
->> ---
->>  drivers/xen/Kconfig  | 6 +++++-
->>  drivers/xen/Makefile | 2 +-
->>  2 files changed, 6 insertions(+), 2 deletions(-)
+>> [1] https://lkml.org/lkml/2015/8/6/510
 >>
->> diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
->> index 73708ac..6bcc8b0 100644
->> --- a/drivers/xen/Kconfig
->> +++ b/drivers/xen/Kconfig
->> @@ -168,7 +168,7 @@ config XEN_TMEM
->>  
->>  config XEN_PCIDEV_BACKEND
->>  	tristate "Xen PCI-device backend driver"
->> -	depends on PCI && X86 && XEN
->> +	depends on XEN_PCI
->>  	depends on XEN_BACKEND
->>  	default m
->>  	help
->> @@ -189,6 +189,10 @@ config XEN_PCIDEV_BACKEND
->>  
->>  	  If in doubt, say m.
->>  
->> +config XEN_PCI
->> +	def_bool y
->> +	depends on PCI && !ARM && !ARM64
 > 
-> This is confusing because x86 already has PCI_XEN, see arch/x86/Kconfig.
-> Just move PCI_XEN from arch/x86/Kconfig to here and disable it for ARM?
+> Can we then implement Robert's proposals from that thread and have an
+> arch function for pci_probe? It will be a nop on ARM. (I think that was
+> the only problem here).
 
-PCI_XEN enables SWIOTLB. Do we really want the same dependencies for any
-architecture?
+Or preferably this.
 
-Regards,
-
-
-
--- 
-Julien Grall
+David
