@@ -1,59 +1,136 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 28 Sep 2015 17:52:13 +0900
-Subject: [PATCH 4/4] ARM64: dts: exynos5433: add jpeg node
-In-Reply-To: <55FFD4FF.6090306@samsung.com>
-References: <1442586060-23657-1-git-send-email-andrzej.p@samsung.com>
- <1442586060-23657-5-git-send-email-andrzej.p@samsung.com>
- <55FFD2D2.1010508@xs4all.nl> <55FFD4FF.6090306@samsung.com>
-Message-ID: <5608FFBD.1030306@samsung.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Mon, 28 Sep 2015 10:56:49 +0200
+Subject: [PATCH RESEND] ARM: dts: Move display-timings node from fimd to dp
+In-Reply-To: <1442494120-463-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1442494120-463-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CAAObsKDqpBnggX7sHCgQ5d7ZxYumh_ga8kbLQc4bQ=N+M6BoCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 21.09.2015 o 18:59, Andrzej Pietrasiewicz pisze:
-> Hi Hans,
-> 
-> W dniu 21.09.2015 o 11:50, Hans Verkuil pisze:
->> On 18-09-15 16:21, Andrzej Pietrasiewicz wrote:
->>> From: Marek Szyprowski <m.szyprowski@samsung.com>
->>>
->>> Add Exynos 5433 jpeg h/w codec node.
->>>
->>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
->>> ---
->>>   arch/arm64/boot/dts/exynos/exynos5433.dtsi | 21 +++++++++++++++++++++
->>>   1 file changed, 21 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->>> b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->>
->> This dtsi file doesn't exist in the media-git tree. What is the story
->> here?
->>
->> Should this go through a different subsystem?
->>
->> I think the media subsystem can take patches 1-3 and whoever does DT
->> patches can
->> take this patch, right?
->>
-> 
-> The cover letter explains that the series is rebased onto Mauro's
-> master with Kukjin's branch merged. The latter does contain
-> the exynos5433.dtsi. That said, yes, taking patches 1-3 in
-> media subsystem and leaving DT patch to someone else is the
-> way to go.
+Hi Kukjin and Krzysztof,
 
-Although Kukjin picked Exynos 5433 ARM64 patches but they were not
-accepted upstream by arm-soc. He rolled it for few releases but:
-1. Reason for not accepting by arm-soc was not resolved - there is no DTS.
-2. Kukjin did not rebase the branch for 4.4... which maybe means that he
-wants to drop it?
-3. Anyone (but me...) can send Galaxy Note4 (Exynos5433) DTS file based
-on sources on opensource.samsung.com. The DTS there is for 32-bit but it
-can be probably easily adjusted for ARM64.
+could you take a look at this?
 
-All of this means that Device Tree support for this driver can't be
-merged now and effort for mainlining 5433 may be unfortunately wasted...
+Thanks,
 
-Best regards,
-Krzysztof
+Tomeu
+
+On 17 September 2015 at 14:48, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+> From: Sean Paul <seanpaul@chromium.org>
+>
+> This patch moves the display-timings node from fimd to dp to reflect the
+> device tree bindings change.
+>
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> [tomeu.vizoso at collabora.com: Rebased]
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>
+> ---
+>
+> Hi,
+>
+> looks like a long time ago the bindings were changed and the DTs for
+> these boards weren't updated.
+>
+> I have retaken Sean's forgotten patch and rebased it, but I have only
+> tested on an Arndale that exynos-drm doesn't complain about missing
+> timings.
+>
+> Regards,
+>
+> Tomeu
+> ---
+>  arch/arm/boot/dts/exynos5250-arndale.dts  |  8 ++++----
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts | 16 ++++++++--------
+>  arch/arm/boot/dts/exynos5420-smdk5420.dts |  7 ++++---
+>  3 files changed, 16 insertions(+), 15 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+> index db3f65f3eb45..c000532c1444 100644
+> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
+> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+> @@ -129,10 +129,6 @@
+>         samsung,color-depth = <1>;
+>         samsung,link-rate = <0x0a>;
+>         samsung,lane-count = <4>;
+> -};
+> -
+> -&fimd {
+> -       status = "okay";
+>
+>         display-timings {
+>                 native-mode = <&timing0>;
+> @@ -152,6 +148,10 @@
+>         };
+>  };
+>
+> +&fimd {
+> +       status = "okay";
+> +};
+> +
+>  &hdmi {
+>         hpd-gpio = <&gpx3 7 GPIO_ACTIVE_LOW>;
+>         vdd_osc-supply = <&ldo10_reg>;
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> index c625e71217aa..0f5dcd418af8 100644
+> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> @@ -89,14 +89,6 @@
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&dp_hpd>;
+>         status = "okay";
+> -};
+> -
+> -&ehci {
+> -       samsung,vbus-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
+> -};
+> -
+> -&fimd {
+> -       status = "okay";
+>
+>         display-timings {
+>                 native-mode = <&timing0>;
+> @@ -116,6 +108,14 @@
+>         };
+>  };
+>
+> +&ehci {
+> +       samsung,vbus-gpio = <&gpx2 6 GPIO_ACTIVE_HIGH>;
+> +};
+> +
+> +&fimd {
+> +       status = "okay";
+> +};
+> +
+>  &hdmi {
+>         hpd-gpio = <&gpx3 7 GPIO_ACTIVE_HIGH>;
+>  };
+> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> index 98871f972c8a..7520d52f4e22 100644
+> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> @@ -98,10 +98,7 @@
+>         samsung,link-rate = <0x0a>;
+>         samsung,lane-count = <4>;
+>         status = "okay";
+> -};
+>
+> -&fimd {
+> -       status = "okay";
+>         display-timings {
+>                 native-mode = <&timing0>;
+>                 timing0: timing at 0 {
+> @@ -118,6 +115,10 @@
+>         };
+>  };
+>
+> +&fimd {
+> +       status = "okay";
+> +};
+> +
+>  &hdmi {
+>         status = "okay";
+>         hpd-gpio = <&gpx3 7 0>;
+> --
+> 2.4.3
+>
