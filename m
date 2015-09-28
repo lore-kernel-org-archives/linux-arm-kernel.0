@@ -1,34 +1,48 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 28 Sep 2015 11:48:08 +0800
-Subject: [PATCH v2 1/8] spi: imx: Fix DMA transfer
-In-Reply-To: <d61ed8cc9e13b0890e6243135c613edea1234698.1442923630.git.anton_bondarenko@mentor.com>
-Message-ID: <201509281125.KBKxMzor%fengguang.wu@intel.com>
+From: songjun.wu@atmel.com (Songjun Wu)
+Date: Mon, 28 Sep 2015 13:14:35 +0800
+Subject: [RESEND PATCH v2 0/2] ASoC: atmel-classd: add driver for Atmel CLASSD
+Message-ID: <1443417278-19657-1-git-send-email-songjun.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anton,
+The Audio Class D Amplifier driver includes two parts.
+1) Driver code to implement the Audio Class D Amplifier function.
+2) Device tree binding document, it describes how to add the Audio
+   Class D Amplifier in device tree.
 
-[auto build test results on v4.3-rc2 -- if it's inappropriate base, please ignore]
+Changes in v2:
+- Change the "Mono", "Swap" and "Deemphasis" controls to
+  "Mono Switch", "Swap Switch" and "Deemphasis Switch".
+- Merge "EQ Bass", "EQ Medium" and "EQ Treble" controls
+  into one "EQ" control.
+- Change the "single-ended" and "differential" to
+  "Single ended", "Differential".
+- Merge separate left and right controls into one single
+  stereo control.
+- Add a warning if the user trys to specify an invalid
+  value in function "atmel_classd_codec_probe".
+- Use the "dev_get_regmap()" in function
+  "atmel_classd_codec_get_remap".
+- Check for errors when invoking the "clk_prepare_enable".
+- Remove the "dev_info" in function "atmel_classd_probe".
+- Add some code to create a sound card in function
+  "atmel_classd_probe".
+- Remove the DT node "Sound" and the related code.
+- Delete the device node "Sound" in dts.
 
-config: arm-arm5 (attached as .config)
-reproduce:
-  wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-  chmod +x ~/bin/make.cross
-  git checkout 82f1264caef01600e640af28b9f92d5a86efd25b
-  # save the attached .config to linux build tree
-  make.cross ARCH=arm 
+Songjun Wu (2):
+  ASoC: atmel-classd: add the Audio Class D Amplifier
+  SoC: atmel-classd: DT binding for Class D audio amplifier driver
 
-All error/warnings (new ones prefixed by >>):
+ .../devicetree/bindings/sound/atmel-classd.txt     |   52 ++
+ sound/soc/atmel/Kconfig                            |    9 +
+ sound/soc/atmel/Makefile                           |    2 +
+ sound/soc/atmel/atmel-classd.c                     |  680 ++++++++++++++++++++
+ sound/soc/atmel/atmel-classd.h                     |  120 ++++
+ 5 files changed, 863 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/atmel-classd.txt
+ create mode 100644 sound/soc/atmel/atmel-classd.c
+ create mode 100644 sound/soc/atmel/atmel-classd.h
 
->> ERROR: "arm926_dma_flush_range" [drivers/spi/spi-imx.ko] undefined!
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 25917 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150928/071e0613/attachment-0001.obj>
+-- 
+1.7.9.5
