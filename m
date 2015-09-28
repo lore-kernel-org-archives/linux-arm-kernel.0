@@ -1,116 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 28 Sep 2015 16:38:14 +0100
-Subject: [PATCH] arm-cci500: Workaround pmu_event_set_period
-In-Reply-To: <1443196253-22765-1-git-send-email-suzuki.poulose@arm.com>
-References: <1443196253-22765-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20150928153813.GA27704@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 28 Sep 2015 16:39:38 +0100
+Subject: [PATCH v2 00/11] Hi Maxime / Patrice / Srini,
+In-Reply-To: <1443443867-4099-1-git-send-email-peter.griffin@linaro.org>
+References: <1443443867-4099-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20150928153938.GS27197@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 25, 2015 at 04:50:53PM +0100, Suzuki K. Poulose wrote:
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+On Mon, 28 Sep 2015, Peter Griffin wrote:
+
+> This series makes a series of updates to the stih407 pinctrl groups
+> and makes the upstream kernel more closely aligned in terms of pin
+> configuration to the vendor kernel.
 > 
-> The CCI PMU driver sets the event counter to the half of the maximum
-> value(2^31) it can count before we start the counters via
-> pmu_event_set_period(). This is done to give us the best chance to
-> handle the overflow interrupt, taking care of extreme interrupt latencies.
+> A number of new periphs are added such as spi fsm, nand, cec0, and
+> for others such as SPI the various alternate function pin muxings have
+> been added. Finally for SPI the controller nodes have been updated
+> to have the default pin assignment in the controller node.
 > 
-> However, CCI-500 comes with advanced power saving schemes, which disables
-> the clock to the event counters unless the counters are enabled to count
-> (PMCR.CEN). This prevents the driver from writing the period to the
-> counters before starting them.  Also, there is no way we can reset the
-> individual event counter to 0 (PMCR.RST resets all the counters, losing
-> their current readings). However the value of the counter is preserved and
-> could be read back, when the counters are not enabled.
-
-Does reset work while the counters are clock gated?
-
-I take it that we can configure the counters while they are disabled,
-even if we can't alter the counter value?
-
-> So we cannot reliably use the counters and compute the number of events
-> generated during the sampling period since we don't have the value of the
-> counter at start.
+> Changes since v1:
+>  - Rebase on v4.3-rc3
+>  - Remove some SoBs (Lee)
+>  - Collect up Acks
 > 
-> Here are the possible solutions:
+> kind regards,
 > 
->  1) Disable clock gating on CCI-500 by setting Control_Override_Reg[bit3].
->     - The Control_Override_Reg is secure (and hence not programmable from
->       Linux), and also has an impact on power consumption.
+> Peter.
 > 
->  2) Change the order of operations
-> 	i.e,
-> 	a) Program and enable individual counters
-> 	b) Enable counting on all the counters by setting PMCR.CEN
-> 	c) Write the period to the individual counters
-> 	d) Disable the counters
->     - This could cause in unnecessary noise in the other counters and is
->       costly (we should repeat this for all enabled counters).
+> Peter Griffin (11):
+>   ARM: STi: DT: STiH407: Add a cec0 pin definition
+>   ARM: STi: DT: STiH407: Add i2c3 alternate pin configs
+>   ARM: DT: STiH407: Add SPI 3 wire and 4 wire pinctrl configs
+>   ARM: DT: STiH407: Add serial3 pinctrl configuration
+>   ARM: DT: STiH407: Add SPI FSM (NOR Flash) Controller pin config
+>   ARM: DT: STiH407: Add NAND flash controller pin configuration
+>   ARM: DT: STiH407: Add systrace pin configuration
+>   ARM: DT: STiH407: Add SD pinctrl config for mmc0 controller
+>   ARM: DT: STiH407: Add pinconfig for IRB UHF and IRB TX
+>   ARM: DT: STiH407: Add RMII pinctrl support
+>   ARM: STi: STiH407: Add spi default pinctrl groups.
 > 
->  3) Don't set the counter value, instead use the current count as the
->     starting count and compute the delta at the end of sampling.
+>  arch/arm/boot/dts/stih407-family.dtsi  |  14 ++
+>  arch/arm/boot/dts/stih407-pinctrl.dtsi | 378 ++++++++++++++++++++++++++++++++-
+>  2 files changed, 387 insertions(+), 5 deletions(-)
 
-This leaves us less broken than we currently are, but as far as I can
-tell, this leaves us back where we started, with the overflow issues
-seen elsewhere, cf:
+I'll do this privately, so as not to unnecessarily delay the
+acceptance of the set.  I'm a big fan of keeping the *-by's in
+chronological order.  It does help to provide an insight to the
+history of the patch.
 
-a737823d37666255 ("ARM: 6835/1: perf: ensure overflows aren't missed due to IRQ latency")
-5727347180ebc6b4 ("ARM: 7354/1: perf: limit sample_period to half max_period in non-sampling mode")
-
-> @@ -792,15 +803,33 @@ static void pmu_read(struct perf_event *event)
->  void pmu_event_set_period(struct perf_event *event)
->  {
->  	struct hw_perf_event *hwc = &event->hw;
-> +	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
-> +	u64 val = 0;
-> +
->  	/*
-> -	 * The CCI PMU counters have a period of 2^32. To account for the
-> -	 * possiblity of extreme interrupt latency we program for a period of
-> -	 * half that. Hopefully we can handle the interrupt before another 2^31
-> -	 * events occur and the counter overtakes its previous value.
-> +	 * If the PMU gates the clock to PMU event counters when the counters
-> +	 * are not enabled, any write to it is ineffective. Hence we cannot
-> +	 * set a value reliably. Also, we cannot reset an individual event
-> +	 * counter; PMCR.RST resets all the counters. However the existing
-> +	 * counter values can be read back. Hence, we use the existing counter
-> +	 * value as the period and set the prev_count accordingly. This is
-> +	 * safe, since we don't support sampling of events anyway.
->  	 */
-> -	u64 val = 1ULL << 31;
-> +	if (pmu_ignores_cntr_write(cci_pmu)) {
-> +		val = pmu_read_counter(event);
-> +	} else {
-> +		/*
-> +		 * The CCI PMU counters have a period of 2^32. To account for
-> +		 * the possiblity of extreme interrupt latency we program for
-> +		 * a period of half that. Hopefully we can handle the interrupt
-> +		 * before another 2^31 events occur and the counter overtakes
-> +		 * its previous value.
-> +		 */
-> +		val = 1ULL << 31;
-> +		pmu_write_counter(event, val);
-> +	}
-> +
->  	local64_set(&hwc->prev_count, val);
-> -	pmu_write_counter(event, val);
->  }
-
-We could get rid of the flag and always do:
-
-	pmu_write_counter(event, 1UL << 31);
-	val = pmu_read_counter(event);
-
-That should work for CCI-400 and CCI-500, and if the CCI-500 counters
-aren't clock-gated (e.g. because of FW configuration) then we get the
-period that we actually wanted.
-
-However, can't we use an event which won't count to solve the race with
-option 2?
-
-Per the TRM, events for unimplemented interfaces don't count, though I'm
-not sure if there's an event that's guaranteed to not count in all
-configurations. Perhaps we might be able to dig one up.
-
-Thanks,
-Mark.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
