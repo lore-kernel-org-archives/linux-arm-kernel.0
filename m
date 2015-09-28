@@ -1,69 +1,80 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 28 Sep 2015 15:50:16 +0200
-Subject: Build regressions/improvements in v4.3-rc3
-In-Reply-To: <20150928094836.GU21513@n2100.arm.linux.org.uk>
-References: <1443382476-12171-1-git-send-email-geert@linux-m68k.org>
- <CAMuHMdWrBYnQ0CRYmBgO3xNZMqCY42OtNwhryqzi+Tv+KGj6Lg@mail.gmail.com>
- <20150928093006.GT21513@n2100.arm.linux.org.uk>
- <20150928094836.GU21513@n2100.arm.linux.org.uk>
-Message-ID: <CAMuHMdU5UGfDSzfNWsZvsgLvJJYK-5VWEZ841Zc4GYfey6RdtA@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 28 Sep 2015 14:48:08 +0100
+Subject: [PATCH] xen/pci: Don't build Xen pci code for ARM and ARM64
+In-Reply-To: <1443447044-24985-1-git-send-email-julien.grall@citrix.com>
+References: <1443447044-24985-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <alpine.DEB.2.02.1509281447010.2672@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Mon, 28 Sep 2015, Julien Grall wrote:
+> The PCI support for Xen doesn't compile on ARM/ARM64 when
+> CONFIG_PCI_MMCONFIG=y:
+> 
+> drivers/xen/pci.c:31:25: fatal error: asm/pci_x86.h: No such file or
+> directory
+>  #include <asm/pci_x86.h>
+> 
+> Although, Xen is not currently involved in PCI management for ARM/ARM64.
+> There is plan to support it, but it would require some changes in Linux
+> side.
+> 
+> For now, introduce a new config options XEN_PCI which will be turned off
+> for ARM platform.
+> 
+> Reported-by: Robert Richter <robert.richter@caviumnetworks.com>
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> 
+> ---
+> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: David Vrabel <david.vrabel@citrix.com>
+> ---
+>  drivers/xen/Kconfig  | 6 +++++-
+>  drivers/xen/Makefile | 2 +-
+>  2 files changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+> index 73708ac..6bcc8b0 100644
+> --- a/drivers/xen/Kconfig
+> +++ b/drivers/xen/Kconfig
+> @@ -168,7 +168,7 @@ config XEN_TMEM
+>  
+>  config XEN_PCIDEV_BACKEND
+>  	tristate "Xen PCI-device backend driver"
+> -	depends on PCI && X86 && XEN
+> +	depends on XEN_PCI
+>  	depends on XEN_BACKEND
+>  	default m
+>  	help
+> @@ -189,6 +189,10 @@ config XEN_PCIDEV_BACKEND
+>  
+>  	  If in doubt, say m.
+>  
+> +config XEN_PCI
+> +	def_bool y
+> +	depends on PCI && !ARM && !ARM64
 
-On Mon, Sep 28, 2015 at 11:48 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Sep 28, 2015 at 10:30:06AM +0100, Russell King - ARM Linux wrote:
->> On Mon, Sep 28, 2015 at 08:57:44AM +0200, Geert Uytterhoeven wrote:
->> > On Sun, Sep 27, 2015 at 9:34 PM, Geert Uytterhoeven
->> > <geert@linux-m68k.org> wrote:
->> > > JFYI, when comparing v4.3-rc3[1] to v4.3-rc2[3], the summaries are:
->> > >   - build errors: +8/-12
->> >
->> >   + error: No rule to make target include/config/auto.conf:  => N/A
->> >
->> > arm-randconfig
->>
->> Not every randconfig failure is a kernel problem.  Here's an example:
->>
->> Physical address of main memory (PHYS_OFFSET) [] (NEW) aborted!
->>
->> Console input/output is redirected. Run 'make oldconfig' to update configuration.
->>
->> This needs someone to provide a value, which means these failures are
->> not in fact failures of the kernel, but a failure of the build system
->> to anticipate that there may be Kconfig questions that need input.
->>
->> So, these ones should be ignored.
+This is confusing because x86 already has PCI_XEN, see arch/x86/Kconfig.
+Just move PCI_XEN from arch/x86/Kconfig to here and disable it for ARM?
 
-Usually I ignore them. But as this was the only failure to report (I ignore
-R_PPC64_REL24 failures, too), I thought to kick the kbuild people (and the
-ARM list, as it was the ARM randconfig that failed) for once.
 
-> Also, a great many of the failures are due to the build toolchain not
-> supporting -fstack-protector-strong.  I think it's absolutely right
-> for the build to error out if you enable a kernel feature which requires
-> toolchain support, but the toolchain does not support that feature.
->
-> What this means is that the build results from kissb are less than
-> useful - without spending ages looking at every single build, it's
-> hard to find the real failures we care about.
->
-> I'd suggest that either the randconfig is seeded to ensure that
-> CONFIG_CC_STACKPROTECTOR_STRONG is always disabled in ARM randconfigs,
-> or that the ARM toolchain is updated to support this feature.
-
-Or that it's impossible to enable this feature if your toolchain doesn't
-support it?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>  config XEN_SCSI_BACKEND
+>  	tristate "XEN SCSI backend driver"
+>  	depends on XEN && XEN_BACKEND && TARGET_CORE
+> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+> index e293bc5..c9f23b7 100644
+> --- a/drivers/xen/Makefile
+> +++ b/drivers/xen/Makefile
+> @@ -11,7 +11,7 @@ CFLAGS_features.o			:= $(nostackp)
+>  
+>  CFLAGS_efi.o				+= -fshort-wchar
+>  
+> -dom0-$(CONFIG_PCI) += pci.o
+> +dom0-$(CONFIG_XEN_PCI) += pci.o
+>  dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
+>  dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
+>  xen-pad-$(CONFIG_X86) += xen-acpi-pad.o
+> -- 
+> 2.1.4
+> 
