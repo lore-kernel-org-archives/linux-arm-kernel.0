@@ -1,102 +1,64 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 28 Sep 2015 15:22:51 -0600
-Subject: [RFC PATCH 14/20] coresight: etm-perf: implementing
- 'event_init()' API
-In-Reply-To: <87eghq4jf7.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
- <1442593594-10665-15-git-send-email-mathieu.poirier@linaro.org>
- <87eghq4jf7.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYkxZ83554k+7sgS6dPp4iyaN1qEUzFNLUg6m=uo+S0ArZA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 28 Sep 2015 16:23:25 -0500
+Subject: [PATCHv2] arm: omap2: timer: always define omap4_local_timer_init
+Message-ID: <1443475405-15977-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 September 2015 at 08:29, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
->
->> +static void etm_event_destroy(struct perf_event *event)
->> +{
->> +     /* switching off the source will also tear down the path */
->> +     etm_event_power_sources(event->cpu, false);
->> +}
->> +
->> +static int etm_event_init(struct perf_event *event)
->> +{
->> +     int ret;
->> +
->> +     if (event->attr.type != etm_pmu.type)
->> +             return -ENOENT;
->> +
->> +     if (event->cpu >= nr_cpu_ids)
->> +             return -EINVAL;
->> +
->> +     /* only one session at a time */
->> +     if (etm_event_source_enabled(event->cpu))
->> +             return -EBUSY;
->
-> Why is this the case? If you were to configure the event in pmu::add()
-> and deconfigure it in pmu::del(), like you already do with the buffer
-> part, you could handle as many sessions as you want.
+omap4_local_timer_init() can be used by other
+platforms as is. At least AM437x wants to use
+it. Instead of making omap4-only and providing
+a stub for builds without OMAP4, we can just
+always define that function.
 
-Apologies for the late reply, I was travelling.
+Reported-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
 
-We certainly don't want to have more than once trace session going on
-at any given time, especially if the sessions have different
-configuration parameters.  Moreover doing the tracer configuration as
-part of pmu::add() is highly redundant.
+changes since v1:
+ - make sure result builds on AM43xx-only builds
 
->
->> +
->> +     /*
->> +      * Make sure CPUs don't disappear between the
->> +      * power up sequence and configuration.
->> +      */
->> +     get_online_cpus();
->> +     ret = etm_event_power_sources(event->cpu, true);
->> +     if (ret)
->> +             goto out;
->> +
->> +     ret = etm_event_config_sources(event->cpu);
->
-> This can be done in pmu::add(), if you can call directly into
-> etm_configure_cpu() or etm_config_enable() so that there's no cross-cpu
-> calling in between.
+ arch/arm/mach-omap2/timer.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
 
-As per my comment above, reconfiguring the tracers every time it is
-about to run is redundant and extensive (etm_configure_cpu() isn't
-exactly short),  incurring a cost that is likely to be higher than
-calling get_online_cpus().
-
->
->> +
->> +     event->destroy = etm_event_destroy;
->> +out:
->> +     put_online_cpus();
->> +     return ret;
->> +}
->> +
->>  static int __init etm_perf_init(void)
->>  {
->>       etm_pmu.capabilities    = PERF_PMU_CAP_EXCLUSIVE;
->> @@ -59,6 +234,7 @@ static int __init etm_perf_init(void)
->>       etm_pmu.attr_groups     = etm_pmu_attr_groups;
->>       etm_pmu.task_ctx_nr     = perf_sw_context;
->>       etm_pmu.read            = etm_event_read;
->> +     etm_pmu.event_init      = etm_event_init;
->>
->>       return perf_pmu_register(&etm_pmu, CORESIGHT_ETM_PMU_NAME, -1);
->>  }
->
-> One general comment -- it would be slightly easier at least for me if
-> all the pmu related bits were in one patch.
-
-Ah!  I went to great length to split them up to make the patches
-smaller  - I will refactor...
-
-Thanks for the review,
-Mathieu
-
->
-> Thanks,
-> --
-> Alex
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index e4d8701f99f9..3cdd22251a0d 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -634,32 +634,22 @@ OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
+ 			2, "timer_sys_ck", NULL);
+ #endif /* CONFIG_ARCH_OMAP3 */
+ 
+-#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX) || \
+-	defined(CONFIG_SOC_AM43XX)
++#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+ OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
+ 		       1, "timer_sys_ck", "ti,timer-alwon");
+ #endif
+ 
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+-	defined(CONFIG_SOC_DRA7XX)
++	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
+ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+ 			       2, "sys_clkin_ck", NULL);
+ #endif
+ 
+-#ifdef CONFIG_ARCH_OMAP4
+-#ifdef CONFIG_HAVE_ARM_TWD
+ void __init omap4_local_timer_init(void)
+ {
+ 	omap4_sync32k_timer_init();
+ 	clocksource_of_init();
+ }
+-#else
+-void __init omap4_local_timer_init(void)
+-{
+-	omap4_sync32k_timer_init();
+-}
+-#endif /* CONFIG_HAVE_ARM_TWD */
+-#endif /* CONFIG_ARCH_OMAP4 */
+ 
+ #if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
+ void __init omap5_realtime_timer_init(void)
+-- 
+2.5.3
