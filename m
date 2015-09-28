@@ -1,75 +1,116 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Mon, 28 Sep 2015 15:31:17 +0000
-Subject: [PATCH V4 1/2] ACPI / EC: Fix broken 64bit big-endian users of
- 'global_lock'
-In-Reply-To: <1443453111.2168.9.camel@HansenPartnership.com>
-References: <e28c4b4deaf766910c366ab87b64325da59c8ad6.1443198783.git.viresh.kumar@linaro.org>
- <2524822.pQu4UKMrlb@vostro.rjw.lan>
- <1443297128.2181.11.camel@HansenPartnership.com>
- <3461169.v5xKdGLGjP@vostro.rjw.lan>
- <063D6719AE5E284EB5DD2968C1650D6D1CBA3BF7@AcuExch.aculab.com>
- <1443450406.2168.3.camel@HansenPartnership.com>
- <063D6719AE5E284EB5DD2968C1650D6D1CBA4232@AcuExch.aculab.com>
- <1443453111.2168.9.camel@HansenPartnership.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1CBA42F5@AcuExch.aculab.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 28 Sep 2015 16:38:14 +0100
+Subject: [PATCH] arm-cci500: Workaround pmu_event_set_period
+In-Reply-To: <1443196253-22765-1-git-send-email-suzuki.poulose@arm.com>
+References: <1443196253-22765-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20150928153813.GA27704@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Bottomley 
-> Sent: 28 September 2015 16:12
-> > > > The x86 cpus will also do 32bit wide rmw cycles for the 'bit' operations.
-> > >
-> > > That's different: it's an atomic RMW operation.  The problem with the
-> > > alpha was that the operation wasn't atomic (meaning that it can't be
-> > > interrupted and no intermediate output states are visible).
-> >
-> > It is only atomic if prefixed by the 'lock' prefix.
-> > Normally the read and write are separate bus cycles.
+On Fri, Sep 25, 2015 at 04:50:53PM +0100, Suzuki K. Poulose wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 > 
-> The essential point is that x86 has atomic bit ops and byte writes.
-> Early alpha did not.
-
-Early alpha didn't have any byte accesses.
-
-On x86 if you have the following:
-	struct {
-		char  a;
-		volatile char b;
-	} *foo;
-	foo->a |= 4;
-
-The compiler is likely to generate a 'bis #4, 0(rbx)' (or similar)
-and the cpu will do two 32bit memory cycles that read and write
-the 'volatile' field 'b'.
-(gcc definitely used to do this...)
-
-A lot of fields were made 32bit (and probably not bitfields) in the linux
-kernel tree a year or two ago to avoid this very problem.
-
-> > > > You still have to ensure the compiler doesn't do wider rmw cycles.
-> > > > I believe the recent versions of gcc won't do wider accesses for volatile data.
-> > >
-> > > I don't understand this comment.  You seem to be implying gcc would do a
-> > > 64 bit RMW for a 32 bit store ... that would be daft when a single
-> > > instruction exists to perform the operation on all architectures.
-> >
-> > Read the object code and weep...
-> > It is most likely to happen for operations that are rmw (eg bit set).
-> > For instance the arm cpu has limited offsets for 16bit accesses, for
-> > normal structures the compiler is likely to use a 32bit rmw sequence
-> > for a 16bit field that has a large offset.
-> > The C language allows the compiler to do it for any access (IIRC including
-> > volatiles).
+> The CCI PMU driver sets the event counter to the half of the maximum
+> value(2^31) it can count before we start the counters via
+> pmu_event_set_period(). This is done to give us the best chance to
+> handle the overflow interrupt, taking care of extreme interrupt latencies.
 > 
-> I think you might be confusing different things.  Most RISC CPUs can't
-> do 32 bit store immediates because there aren't enough bits in their
-> arsenal, so they tend to split 32 bit loads into a left and right part
-> (first the top then the offset).  This (and other things) are mostly
-> what you see in code.  However, 32 bit register stores are still atomic,
-> which is all we require.  It's not really the compiler's fault, it's
-> mostly an architectural limitation.
+> However, CCI-500 comes with advanced power saving schemes, which disables
+> the clock to the event counters unless the counters are enabled to count
+> (PMCR.CEN). This prevents the driver from writing the period to the
+> counters before starting them.  Also, there is no way we can reset the
+> individual event counter to 0 (PMCR.RST resets all the counters, losing
+> their current readings). However the value of the counter is preserved and
+> could be read back, when the counters are not enabled.
 
-No, I'm not talking about how 32bit constants are generated.
-I'm talking about structure offsets.
+Does reset work while the counters are clock gated?
 
-	David
+I take it that we can configure the counters while they are disabled,
+even if we can't alter the counter value?
+
+> So we cannot reliably use the counters and compute the number of events
+> generated during the sampling period since we don't have the value of the
+> counter at start.
+> 
+> Here are the possible solutions:
+> 
+>  1) Disable clock gating on CCI-500 by setting Control_Override_Reg[bit3].
+>     - The Control_Override_Reg is secure (and hence not programmable from
+>       Linux), and also has an impact on power consumption.
+> 
+>  2) Change the order of operations
+> 	i.e,
+> 	a) Program and enable individual counters
+> 	b) Enable counting on all the counters by setting PMCR.CEN
+> 	c) Write the period to the individual counters
+> 	d) Disable the counters
+>     - This could cause in unnecessary noise in the other counters and is
+>       costly (we should repeat this for all enabled counters).
+> 
+>  3) Don't set the counter value, instead use the current count as the
+>     starting count and compute the delta at the end of sampling.
+
+This leaves us less broken than we currently are, but as far as I can
+tell, this leaves us back where we started, with the overflow issues
+seen elsewhere, cf:
+
+a737823d37666255 ("ARM: 6835/1: perf: ensure overflows aren't missed due to IRQ latency")
+5727347180ebc6b4 ("ARM: 7354/1: perf: limit sample_period to half max_period in non-sampling mode")
+
+> @@ -792,15 +803,33 @@ static void pmu_read(struct perf_event *event)
+>  void pmu_event_set_period(struct perf_event *event)
+>  {
+>  	struct hw_perf_event *hwc = &event->hw;
+> +	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
+> +	u64 val = 0;
+> +
+>  	/*
+> -	 * The CCI PMU counters have a period of 2^32. To account for the
+> -	 * possiblity of extreme interrupt latency we program for a period of
+> -	 * half that. Hopefully we can handle the interrupt before another 2^31
+> -	 * events occur and the counter overtakes its previous value.
+> +	 * If the PMU gates the clock to PMU event counters when the counters
+> +	 * are not enabled, any write to it is ineffective. Hence we cannot
+> +	 * set a value reliably. Also, we cannot reset an individual event
+> +	 * counter; PMCR.RST resets all the counters. However the existing
+> +	 * counter values can be read back. Hence, we use the existing counter
+> +	 * value as the period and set the prev_count accordingly. This is
+> +	 * safe, since we don't support sampling of events anyway.
+>  	 */
+> -	u64 val = 1ULL << 31;
+> +	if (pmu_ignores_cntr_write(cci_pmu)) {
+> +		val = pmu_read_counter(event);
+> +	} else {
+> +		/*
+> +		 * The CCI PMU counters have a period of 2^32. To account for
+> +		 * the possiblity of extreme interrupt latency we program for
+> +		 * a period of half that. Hopefully we can handle the interrupt
+> +		 * before another 2^31 events occur and the counter overtakes
+> +		 * its previous value.
+> +		 */
+> +		val = 1ULL << 31;
+> +		pmu_write_counter(event, val);
+> +	}
+> +
+>  	local64_set(&hwc->prev_count, val);
+> -	pmu_write_counter(event, val);
+>  }
+
+We could get rid of the flag and always do:
+
+	pmu_write_counter(event, 1UL << 31);
+	val = pmu_read_counter(event);
+
+That should work for CCI-400 and CCI-500, and if the CCI-500 counters
+aren't clock-gated (e.g. because of FW configuration) then we get the
+period that we actually wanted.
+
+However, can't we use an event which won't count to solve the race with
+option 2?
+
+Per the TRM, events for unimplemented interfaces don't count, though I'm
+not sure if there's an event that's guaranteed to not count in all
+configurations. Perhaps we might be able to dig one up.
+
+Thanks,
+Mark.
