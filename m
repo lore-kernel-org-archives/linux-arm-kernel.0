@@ -1,64 +1,35 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 28 Sep 2015 16:23:25 -0500
-Subject: [PATCHv2] arm: omap2: timer: always define omap4_local_timer_init
-Message-ID: <1443475405-15977-1-git-send-email-balbi@ti.com>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Mon, 28 Sep 2015 23:32:12 +0200
+Subject: [PATCH v4 10/26] ARM: pxa: magician: Optimize Samsung LCD refresh to
+ 50Hz
+In-Reply-To: <cover.1443472089.git.petr.cvek@tul.cz>
+References: <cover.1443472089.git.petr.cvek@tul.cz>
+Message-ID: <5609B1DC.2040703@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap4_local_timer_init() can be used by other
-platforms as is. At least AM437x wants to use
-it. Instead of making omap4-only and providing
-a stub for builds without OMAP4, we can just
-always define that function.
+Change the default Samsung LCD refresh from an unrealistic 117Hz to 50Hz
+as no video applications on the HTC Magician can work that fast.
 
-Reported-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
+The optimalization lowers the RAM latency at least by 3%.
+
+Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 ---
+ arch/arm/mach-pxa/magician.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-changes since v1:
- - make sure result builds on AM43xx-only builds
-
- arch/arm/mach-omap2/timer.c | 14 ++------------
- 1 file changed, 2 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index e4d8701f99f9..3cdd22251a0d 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -634,32 +634,22 @@ OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
- 			2, "timer_sys_ck", NULL);
- #endif /* CONFIG_ARCH_OMAP3 */
+diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
+index 14d1f55..2c487ae 100644
+--- a/arch/arm/mach-pxa/magician.c
++++ b/arch/arm/mach-pxa/magician.c
+@@ -317,7 +317,7 @@ static struct pxafb_mode_info toppoly_modes[] = {
  
--#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX) || \
--	defined(CONFIG_SOC_AM43XX)
-+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
- OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
- 		       1, "timer_sys_ck", "ti,timer-alwon");
- #endif
- 
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
--	defined(CONFIG_SOC_DRA7XX)
-+	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
- static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
- 			       2, "sys_clkin_ck", NULL);
- #endif
- 
--#ifdef CONFIG_ARCH_OMAP4
--#ifdef CONFIG_HAVE_ARM_TWD
- void __init omap4_local_timer_init(void)
- {
- 	omap4_sync32k_timer_init();
- 	clocksource_of_init();
- }
--#else
--void __init omap4_local_timer_init(void)
--{
--	omap4_sync32k_timer_init();
--}
--#endif /* CONFIG_HAVE_ARM_TWD */
--#endif /* CONFIG_ARCH_OMAP4 */
- 
- #if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
- void __init omap5_realtime_timer_init(void)
+ static struct pxafb_mode_info samsung_modes[] = {
+ 	{
+-		.pixclock	= 96153,
++		.pixclock	= 226469,
+ 		.bpp		= 16,
+ 		.xres		= 240,
+ 		.yres		= 320,
 -- 
-2.5.3
+1.7.12.1
