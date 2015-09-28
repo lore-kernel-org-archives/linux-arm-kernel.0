@@ -1,34 +1,24 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 28 Sep 2015 15:57:24 +0100
-Subject: [PATCH] arm-cci500: Don't enable PMU driver by default
-Message-ID: <1443452244-14062-1-git-send-email-suzuki.poulose@arm.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Mon, 28 Sep 2015 17:05:48 +0200
+Subject: [PATCH 0/2] ASoc: add driver for Atmel I2S controller
+Message-ID: <cover.1443452274.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+This series of patches add support to the new Atmel I2S controller embedded
+on sama5d2 SoCs.
 
-Disable building CCI-500 PMU driver by default.
+Cyrille Pitchen (2):
+  ASoC: atmel-i2s: add DT bindings for I2S controller
+  ASoC: atmel-i2s: add driver for the new Atmel I2S controller
 
-Reported-by: Russell King <linux@arm.linux.org.uk>
-Cc: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: arm at kernel.org
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- drivers/bus/Kconfig |    1 -
- 1 file changed, 1 deletion(-)
+ .../devicetree/bindings/sound/atmel-i2s.txt        |  43 ++
+ sound/soc/atmel/Kconfig                            |  10 +
+ sound/soc/atmel/Makefile                           |   2 +
+ sound/soc/atmel/atmel-i2s.c                        | 760 +++++++++++++++++++++
+ 4 files changed, 815 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/atmel-i2s.txt
+ create mode 100644 sound/soc/atmel/atmel-i2s.c
 
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 1a82f3a..0ebca8b 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -36,7 +36,6 @@ config ARM_CCI400_PORT_CTRL
- 
- config ARM_CCI500_PMU
- 	bool "ARM CCI500 PMU support"
--	default y
- 	depends on (ARM && CPU_V7) || ARM64
- 	depends on PERF_EVENTS
- 	select ARM_CCI_PMU
 -- 
-1.7.9.5
+1.8.2.2
