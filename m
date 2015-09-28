@@ -1,48 +1,130 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 28 Sep 2015 14:22:02 -0700
-Subject: [PATCH v3 1/4] clk: bcm2835: Move under bcm/ with other Broadcom SoC
- clk drivers.
-Message-ID: <1443475325-22270-1-git-send-email-eric@anholt.net>
+Date: Mon, 28 Sep 2015 14:22:03 -0700
+Subject: [PATCH v3 2/4] clk: bcm2835: Add binding docs for the new platform
+ clock driver.
+In-Reply-To: <1443475325-22270-1-git-send-email-eric@anholt.net>
+References: <1443475325-22270-1-git-send-email-eric@anholt.net>
+Message-ID: <1443475325-22270-2-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk-bcm2835.c predates the drivers under bcm/, but all the new BCM
-drivers are going in there so let's follow them.
+Previously we've only supported a few fixed clocks based on
+assumptions about how the firmware sets up the clocks, but this
+binding will let us control the actual (audio power domain) clock
+manager.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- drivers/clk/Makefile                | 1 -
- drivers/clk/bcm/Makefile            | 1 +
- drivers/clk/{ => bcm}/clk-bcm2835.c | 0
- 3 files changed, 1 insertion(+), 1 deletion(-)
- rename drivers/clk/{ => bcm}/clk-bcm2835.c (100%)
+ .../bindings/clock/brcm,bcm2835-cprman.txt         | 45 +++++++++++++++++++++
+ include/dt-bindings/clock/bcm2835.h                | 47 ++++++++++++++++++++++
+ 2 files changed, 92 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt
+ create mode 100644 include/dt-bindings/clock/bcm2835.h
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index d08b3e5..9f71558 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -19,7 +19,6 @@ endif
- obj-$(CONFIG_MACH_ASM9260)		+= clk-asm9260.o
- obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN)	+= clk-axi-clkgen.o
- obj-$(CONFIG_ARCH_AXXIA)		+= clk-axm5516.o
--obj-$(CONFIG_ARCH_BCM2835)		+= clk-bcm2835.o
- obj-$(CONFIG_COMMON_CLK_CDCE706)	+= clk-cdce706.o
- obj-$(CONFIG_ARCH_CLPS711X)		+= clk-clps711x.o
- obj-$(CONFIG_ARCH_EFM32)		+= clk-efm32gg.o
-diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
-index 8a7a477..ee2349b 100644
---- a/drivers/clk/bcm/Makefile
-+++ b/drivers/clk/bcm/Makefile
-@@ -3,4 +3,5 @@ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-kona-setup.o
- obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm281xx.o
- obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm21664.o
- obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
-+obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
- obj-$(CONFIG_ARCH_BCM_CYGNUS)	+= clk-cygnus.o
-diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-similarity index 100%
-rename from drivers/clk/clk-bcm2835.c
-rename to drivers/clk/bcm/clk-bcm2835.c
+diff --git a/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt b/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt
+new file mode 100644
+index 0000000..e56a1df
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/brcm,bcm2835-cprman.txt
+@@ -0,0 +1,45 @@
++Broadcom BCM2835 CPRMAN clocks
++
++This binding uses the common clock binding:
++    Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++The CPRMAN clock controller generates clocks in the audio power domain
++of the BCM2835.  There is a level of PLLs deriving from an external
++oscillator, a level of PLL dividers that produce channels off of the
++few PLLs, and a level of mostly-generic clock generators sourcing from
++the PLL channels.  Most other hardware components source from the
++clock generators, but a few (like the ARM or HDMI) will source from
++the PLL dividers directly.
++
++Required properties:
++- compatible:	Should be "brcm,bcm2835-cprman"
++- #clock-cells:	Should be <1>. The permitted clock-specifier values can be
++		  found in include/dt-bindings/clock/bcm2835.h
++- reg:		Specifies base physical address and size of the registers
++- clocks:	The external oscillator clock phandle
++
++Example:
++
++	clk_osc: clock at 3 {
++		compatible = "fixed-clock";
++		reg = <3>;
++		#clock-cells = <0>;
++		clock-output-names = "osc";
++		clock-frequency = <19200000>;
++	};
++
++	clocks: cprman at 7e101000 {
++		compatible = "brcm,bcm2835-cprman";
++		#clock-cells = <1>;
++		reg = <0x7e101000 0x2000>;
++		clocks = <&clk_osc>;
++	};
++
++	i2c0: i2c at 7e205000 {
++		compatible = "brcm,bcm2835-i2c";
++		reg = <0x7e205000 0x1000>;
++		interrupts = <2 21>;
++		clocks = <&clocks BCM2835_CLOCK_VPU>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
+diff --git a/include/dt-bindings/clock/bcm2835.h b/include/dt-bindings/clock/bcm2835.h
+new file mode 100644
+index 0000000..d323efa
+--- /dev/null
++++ b/include/dt-bindings/clock/bcm2835.h
+@@ -0,0 +1,47 @@
++/*
++ * Copyright (C) 2015 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#define BCM2835_PLLA			0
++#define BCM2835_PLLB			1
++#define BCM2835_PLLC			2
++#define BCM2835_PLLD			3
++#define BCM2835_PLLH			4
++
++#define BCM2835_PLLA_CORE		5
++#define BCM2835_PLLA_PER		6
++#define BCM2835_PLLB_ARM		7
++#define BCM2835_PLLC_CORE0		8
++#define BCM2835_PLLC_CORE1		9
++#define BCM2835_PLLC_CORE2		10
++#define BCM2835_PLLC_PER		11
++#define BCM2835_PLLD_CORE		12
++#define BCM2835_PLLD_PER		13
++#define BCM2835_PLLH_RCAL		14
++#define BCM2835_PLLH_AUX		15
++#define BCM2835_PLLH_PIX		16
++
++#define BCM2835_CLOCK_TIMER		17
++#define BCM2835_CLOCK_OTP		18
++#define BCM2835_CLOCK_UART		19
++#define BCM2835_CLOCK_VPU		20
++#define BCM2835_CLOCK_V3D		21
++#define BCM2835_CLOCK_ISP		22
++#define BCM2835_CLOCK_H264		23
++#define BCM2835_CLOCK_VEC		24
++#define BCM2835_CLOCK_HSM		25
++#define BCM2835_CLOCK_SDRAM		26
++#define BCM2835_CLOCK_TSENS		27
++#define BCM2835_CLOCK_EMMC		28
++#define BCM2835_CLOCK_PERI_IMAGE	29
++
++#define BCM2835_CLOCK_COUNT		30
 -- 
 2.1.4
