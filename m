@@ -1,37 +1,44 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Mon, 28 Sep 2015 23:13:01 +0200
-Subject: [PATCH v4 0/5] Provide better MADT subtable sanity checks
-In-Reply-To: <5609A06A.5020802@redhat.com>
-References: <1442446005-19799-1-git-send-email-al.stone@linaro.org>
- <1883446.cx2ktyZcIz@vostro.rjw.lan> <5609A06A.5020802@redhat.com>
-Message-ID: <CAJZ5v0hHfwpw2h26KJePVCcgd68QFK2mtiffwjpootVn4WtvsQ@mail.gmail.com>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Mon, 28 Sep 2015 23:15:19 +0200
+Subject: [PATCH v4 06/26] ARM: pxa: magician: Add new discovered EGPIO pins
+In-Reply-To: <cover.1443472089.git.petr.cvek@tul.cz>
+References: <cover.1443472089.git.petr.cvek@tul.cz>
+Message-ID: <5609ADE7.3080504@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2015 at 10:17 PM, Al Stone <ahs3@redhat.com> wrote:
-> On 09/25/2015 05:29 PM, Rafael J. Wysocki wrote:
->> On Wednesday, September 16, 2015 05:26:40 PM Al Stone wrote:
+This patch adds EGPIO pins: Infra transceiver power, NiCD charging and
+inserted charger cable.
 
-[cut]
+Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+---
+ arch/arm/mach-pxa/include/mach/magician.h | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
->> In particular, I'm not sure if we really need to return
->> -EINVAL from acpi_parse_entries_array() when we find a bad MADT entry or it
->> will be sufficient to simply go to the next entry in that case?
->>
->> Thanks,
->> Rafael
->
-> I see there being two options: (1) return -EINVAL and indicate that the tables
-> are incorrect, or (2) print a warning (or something more aggressive?), go to
-> the next entry, and hope for the best with the remainder of the MADT subtables.
-> The former is consistent with past behavior, I think, and the latter seems to
-> me a bit of a gamble.  So, my vote is for (1), the current method; what are you
-> thinking these days?
-
-I would be for preserving the past behavior.
-
-I'm a bit concerned that the new checks may trigger on systems where
-the old ones didn't, but that is a separete problem.
-
-Thanks,
-Rafael
+diff --git a/arch/arm/mach-pxa/include/mach/magician.h b/arch/arm/mach-pxa/include/mach/magician.h
+index b08c85a..3f8922a 100644
+--- a/arch/arm/mach-pxa/include/mach/magician.h
++++ b/arch/arm/mach-pxa/include/mach/magician.h
+@@ -98,10 +98,11 @@
+ #define EGPIO_MAGICIAN_BL_POWER		MAGICIAN_EGPIO(1, 7)
+ #define EGPIO_MAGICIAN_SD_POWER		MAGICIAN_EGPIO(2, 0)
+ #define EGPIO_MAGICIAN_CARKIT_MIC	MAGICIAN_EGPIO(2, 1)
+-#define EGPIO_MAGICIAN_UNKNOWN_WAVEDEV_DLL	MAGICIAN_EGPIO(2, 2)
++#define EGPIO_MAGICIAN_IR_RX_SHUTDOWN	MAGICIAN_EGPIO(2, 2)
+ #define EGPIO_MAGICIAN_FLASH_VPP	MAGICIAN_EGPIO(2, 3)
+ #define EGPIO_MAGICIAN_BL_POWER2	MAGICIAN_EGPIO(2, 4)
+ #define EGPIO_MAGICIAN_BQ24022_ISET2	MAGICIAN_EGPIO(2, 5)
++#define EGPIO_MAGICIAN_NICD_CHARGE	MAGICIAN_EGPIO(2, 6)
+ #define EGPIO_MAGICIAN_GSM_POWER	MAGICIAN_EGPIO(2, 7)
+ 
+ /* input */
+@@ -116,5 +117,7 @@
+ #define EGPIO_MAGICIAN_nSD_READONLY	MAGICIAN_EGPIO(5, 4)
+ 
+ #define EGPIO_MAGICIAN_EP_INSERT	MAGICIAN_EGPIO(6, 1)
++/* FIXME behaves like (4,1), may differ for host/device */
++#define EGPIO_MAGICIAN_CABLE_INSERTED	MAGICIAN_EGPIO(6, 4)
+ 
+ #endif /* _MAGICIAN_H_ */
+-- 
+1.7.12.1
