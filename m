@@ -1,71 +1,68 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 28 Sep 2015 15:49:15 +0100
-Subject: [PATCH v3 4/7] clocksource/acpi: Add probing infrastructure for
- ACPI-based clocksources
+Date: Mon, 28 Sep 2015 15:49:16 +0100
+Subject: [PATCH v3 5/7] clocksource: Add new CLKSRC_{PROBE,
+ ACPI} config symbols
 In-Reply-To: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
 References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1443451758-22717-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1443451758-22717-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT enjoys a rather nice probing infrastructure for clocksources,
-while ACPI is so far stuck into a very distant past.
-
-This patch introduces a declarative API, allowing clocksources
-to be self-contained and be called when parsing the GTDT table.
+The clocksource probing infrastructure currently depends on
+CONFIG_CLKSRC_OF, which depends on CONFIG_OF. In order to make
+this infrastructure selectable even if CONFIG_OF is not selected,
+introduce a new CONFIG_CLKSRC_PROBE (which allow the infrastructure
+to be compiled in), and CONFIG_CLKSRC_ACPI (which is the pendent
+of CONFIG_CLKSRC_OF for ACPI).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/clksrc-of.c   | 4 ++++
- include/asm-generic/vmlinux.lds.h | 1 +
- include/linux/clocksource.h       | 3 +++
- 3 files changed, 8 insertions(+)
+ drivers/clocksource/Kconfig  | 8 ++++++++
+ drivers/clocksource/Makefile | 2 +-
+ include/linux/clocksource.h  | 2 +-
+ 3 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clocksource/clksrc-of.c b/drivers/clocksource/clksrc-of.c
-index 0093a8e..a2105bd 100644
---- a/drivers/clocksource/clksrc-of.c
-+++ b/drivers/clocksource/clksrc-of.c
-@@ -14,6 +14,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index a7726db..fefedf1 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -2,6 +2,14 @@ menu "Clock Source drivers"
  
-+#include <linux/acpi.h>
- #include <linux/init.h>
- #include <linux/of.h>
- #include <linux/clocksource.h>
-@@ -38,6 +39,9 @@ void __init clocksource_of_init(void)
- 		init_func(np);
- 		clocksources++;
- 	}
+ config CLKSRC_OF
+ 	bool
++	select CLKSRC_PROBE
 +
-+	clocksources += acpi_probe_device_table(clksrc);
++config CLKSRC_ACPI
++	bool
++	select CLKSRC_PROBE
 +
- 	if (!clocksources)
- 		pr_crit("%s: no matching clocksources found\n", __func__);
- }
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index cd836cd..c4bd0e2 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -525,6 +525,7 @@
- 	KERNEL_DTB()							\
- 	IRQCHIP_OF_MATCH_TABLE()					\
- 	ACPI_PROBE_TABLE(irqchip)					\
-+	ACPI_PROBE_TABLE(clksrc)					\
- 	EARLYCON_TABLE()						\
- 	EARLYCON_OF_TABLES()
++config CLKSRC_PROBE
++	bool
  
+ config CLKSRC_I8253
+ 	bool
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 5c00863..b47be92 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -1,4 +1,4 @@
+-obj-$(CONFIG_CLKSRC_OF)	+= clksrc-of.o
++obj-$(CONFIG_CLKSRC_PROBE)	+= clksrc-of.o
+ obj-$(CONFIG_ATMEL_PIT)		+= timer-atmel-pit.o
+ obj-$(CONFIG_ATMEL_ST)		+= timer-atmel-st.o
+ obj-$(CONFIG_ATMEL_TCB_CLKSRC)	+= tcb_clksrc.o
 diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
-index 278dd27..8cde048 100644
+index 8cde048..6eab6ab 100644
 --- a/include/linux/clocksource.h
 +++ b/include/linux/clocksource.h
-@@ -258,4 +258,7 @@ void acpi_generic_timer_init(void);
- static inline void acpi_generic_timer_init(void) { }
- #endif
+@@ -246,7 +246,7 @@ extern int clocksource_i8253_init(void);
+ #define CLOCKSOURCE_OF_DECLARE(name, compat, fn) \
+ 	OF_DECLARE_1(clksrc, name, compat, fn)
  
-+#define CLOCKSOURCE_ACPI_DECLARE(name, table_id, fn)		\
-+	ACPI_DECLARE_PROBE_ENTRY(clksrc, name, table_id, 0, NULL, 0, fn)
-+
- #endif /* _LINUX_CLOCKSOURCE_H */
+-#ifdef CONFIG_CLKSRC_OF
++#ifdef CONFIG_CLKSRC_PROBE
+ extern void clocksource_of_init(void);
+ #else
+ static inline void clocksource_of_init(void) {}
 -- 
 2.1.4
