@@ -1,58 +1,72 @@
-From: leoli@freescale.com (Li Yang)
-Date: Mon, 28 Sep 2015 15:19:05 -0500
-Subject: License for ARM device tree file
-In-Reply-To: <20150928192931.GE21513@n2100.arm.linux.org.uk>
-References: <DM2PR0301MB07343BCB0B5059C96CA31438BA4F0@DM2PR0301MB0734.namprd03.prod.outlook.com>
- <20150928192931.GE21513@n2100.arm.linux.org.uk>
-Message-ID: <CADRPPNQniPRmLq4WmSPU818=PafUV99djC9JveajMVdxARz0KA@mail.gmail.com>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Mon, 28 Sep 2015 23:20:55 +0300
+Subject: [PATCH 1/1] arm: mm: Fix comments in sg_sync functions
+Message-ID: <1443471655-28302-1-git-send-email-sakari.ailus@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2015 at 2:29 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Sep 28, 2015 at 07:14:30PM +0000, Li Leo wrote:
->> I saw some discussion going on last year about the permissive license
->> to be used in ARM device tree files.  I know a lot of files have been
->> changed to use GPLv2/X11 license.  But may I know if GPLv2/BSD 3-clause
->> dual license is still a valid license to use in ARM device tree files.
->> It has been our standard permissive license used for a long time in
->> many components like device trees in Power architecture.
->
-> It would have been nice to have had some input at the time that what
-> little discussion there was happened.
->
-> I'm sorry, but at this point I'm of the opinion that the window for
-> discussing what license we switch to has been had, and the matter is
-> settled; those who didn't take part in the discussion have themselves
-> to blame if they don't like the outcome.
->
-> What I'm saying is that I doubt anyone has the stomach to go through
-> another set of license changes on the existing files to suit some
-> late-commer to the party.
->
+The comment on the usage of arm_dma_sync_sg_for_cpu(),
+arm_dma_sync_sg_for_device(), arm_iommu_sync_sg_for_cpu() and
+arm_iommu_sync_sg_for_device() functions wrongly noted that the "nelems"
+parameter is the number of sglist entries returned by dma_map_sg(), while
+this must be the number of entiries passed to dma_map_sg() instead.
 
-Right.  I'm not proposing to change all the device trees into another
-license.  GPL/X11 is actually a good license to use.
+Suggested-by: Daniel Kurtz <djkurtz@chromium.org>
+Signed-off-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+---
+Hi folks,
 
-> However, we can't dictate to people what license they wish to submit
-> their work under; though, we can make the decision whether to accept
-> it under the license terms or not.
+This related patch was applied to Jonathan Corbet's tree:
 
-But I'm wondering if we submit a device tree patch using other GPL
-compatible permissive license(like GPL/3-clause-BSD dual license)
-which doesn't include any other device tree files, will it still be
-acceptable or not?
+<URL:http://www.spinics.net/lists/linux-doc/msg31801.html>
 
->
-> I think the problem will come if we try to mix a file that's licensed
-> one way, which includes files licensed under a different set of
-> licenses... if you want to use a file licensed under BSD 3-clause but
-> don't want to agree to the GPL license (so you're only bound by the
-> BSD 3-clause license) and that file includes some GPL/X11 licensed
-> files, then what?
+The comments were indeed wrong. This may have contributed to a related
+videobuf2 bug:
 
-Permissive licenses like X11 and BSD 3-clause should be compatible
-with each other right?
+<URL:http://www.spinics.net/lists/linux-media/msg93765.html>
 
-Regards,
-Leo
+ arch/arm/mm/dma-mapping.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index e626043..1c0154a 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -958,7 +958,7 @@ void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+  * arm_dma_sync_sg_for_cpu
+  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+  * @sg: list of buffers
+- * @nents: number of buffers to map (returned from dma_map_sg)
++ * @nents: number of buffers to sync (same as was passed to dma_map_sg)
+  * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+  */
+ void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+@@ -977,7 +977,7 @@ void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+  * arm_dma_sync_sg_for_device
+  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+  * @sg: list of buffers
+- * @nents: number of buffers to map (returned from dma_map_sg)
++ * @nents: number of buffers to sync (same as was passed to dma_map_sg)
+  * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+  */
+ void arm_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+@@ -1672,7 +1672,7 @@ void arm_iommu_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+  * arm_iommu_sync_sg_for_cpu
+  * @dev: valid struct device pointer
+  * @sg: list of buffers
+- * @nents: number of buffers to map (returned from dma_map_sg)
++ * @nents: number of buffers to sync (same as was passed to dma_map_sg)
+  * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+  */
+ void arm_iommu_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+@@ -1690,7 +1690,7 @@ void arm_iommu_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+  * arm_iommu_sync_sg_for_device
+  * @dev: valid struct device pointer
+  * @sg: list of buffers
+- * @nents: number of buffers to map (returned from dma_map_sg)
++ * @nents: number of buffers to sync (same as was passed to dma_map_sg)
+  * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+  */
+ void arm_iommu_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+-- 
+2.1.0.231.g7484e3b
