@@ -1,87 +1,52 @@
 From: aalonso@freescale.com (Adrian Alonso)
-Date: Mon, 28 Sep 2015 16:56:40 -0500
-Subject: [PATCH v7 6/7] pinctrl: freescale: imx7d: support iomux lpsr
- controller
+Date: Mon, 28 Sep 2015 16:56:37 -0500
+Subject: [PATCH v7 3/7] ARM: dts: imx: imx7d-sbd add usb_otg2_vbus pinctrl
+ settings
 In-Reply-To: <1443477401-17238-1-git-send-email-aalonso@freescale.com>
 References: <1443477401-17238-1-git-send-email-aalonso@freescale.com>
-Message-ID: <1443477401-17238-6-git-send-email-aalonso@freescale.com>
+Message-ID: <1443477401-17238-3-git-send-email-aalonso@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iMX7D has two iomuxc controllers, iomuxc controller similar as
-previous iMX SoC generation and iomuxc-lpsr which provides low
-power state rentetion capabilities on gpios that are part of
-iomuxc-lpsr
-
-Add iomuxc-lpsr gpio group id's
+Add usb_otg2_vbus pinctrl settings
 
 Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 ---
-Changes for V2: Add imx7d_lpsr_pads enums
-Changes for V3: Resend
-Changes for V4: Resend
-Changes for V5: Remove flags SHARE_INPUT_SELECT_REG and
- ZERO_OFFSET_VALID.
-Changes for V6: Restore ZERO_OFFSET_VALID flag.
-Changes for V7: Resend
+Changes for V7: New patch in series
 
- drivers/pinctrl/freescale/pinctrl-imx7d.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/imx7d-sdb.dts | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx7d.c b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-index 1fa7530..16dc925 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx7d.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-@@ -174,6 +174,17 @@ enum imx7d_pads {
- 	MX7D_PAD_ENET1_COL = 154,
- };
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index a5c7a44..96c1e1a 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -77,6 +77,8 @@
+ 			regulator-min-microvolt = <5000000>;
+ 			regulator-max-microvolt = <5000000>;
+ 			gpio = <&gpio4 7 GPIO_ACTIVE_HIGH>;
++			pinctrl-names = "default";
++			pinctrl-0 =  <&pinctrl_usb_otg2_vbus>;
+ 			enable-active-high;
+ 		};
  
-+enum imx7d_lpsr_pads {
-+	MX7D_PAD_GPIO1_IO00 = 0,
-+	MX7D_PAD_GPIO1_IO01 = 1,
-+	MX7D_PAD_GPIO1_IO02 = 2,
-+	MX7D_PAD_GPIO1_IO03 = 3,
-+	MX7D_PAD_GPIO1_IO04 = 4,
-+	MX7D_PAD_GPIO1_IO05 = 5,
-+	MX7D_PAD_GPIO1_IO06 = 6,
-+	MX7D_PAD_GPIO1_IO07 = 7,
-+};
+@@ -254,11 +256,16 @@
+ 	imx7d-sdb {
+ 		pinctrl_hog: hoggrp {
+ 			fsl,pins = <
+-				MX7D_PAD_UART3_CTS_B__GPIO4_IO7		0x14
+ 				MX7D_PAD_ECSPI2_SS0__GPIO4_IO23		0x34  /* bt reg on */
+ 			>;
+ 		};
+ 
++		pinctrl_usb_otg2_vbus: usbotg2vbusgrp {
++			fsl,pins = <
++				MX7D_PAD_UART3_CTS_B__GPIO4_IO7		0x14 /* usb_otg2_pwr */
++			>;
++		};
 +
- /* Pad names for the pinmux subsystem */
- static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
- 	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE0),
-@@ -333,13 +344,32 @@ static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
- 	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_COL),
- };
- 
-+/* Pad names for the pinmux subsystem */
-+static const struct pinctrl_pin_desc imx7d_lpsr_pinctrl_pads[] = {
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO00),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO01),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO02),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO03),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO04),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO05),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO06),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO07),
-+};
-+
- static struct imx_pinctrl_soc_info imx7d_pinctrl_info = {
- 	.pins = imx7d_pinctrl_pads,
- 	.npins = ARRAY_SIZE(imx7d_pinctrl_pads),
- };
- 
-+static struct imx_pinctrl_soc_info imx7d_lpsr_pinctrl_info = {
-+	.pins = imx7d_lpsr_pinctrl_pads,
-+	.npins = ARRAY_SIZE(imx7d_lpsr_pinctrl_pads),
-+	.flags = ZERO_OFFSET_VALID,
-+};
-+
- static struct of_device_id imx7d_pinctrl_of_match[] = {
- 	{ .compatible = "fsl,imx7d-iomuxc", .data = &imx7d_pinctrl_info, },
-+	{ .compatible = "fsl,imx7d-iomuxc-lpsr", .data = &imx7d_lpsr_pinctrl_info },
- 	{ /* sentinel */ }
- };
- 
+ 		pinctrl_i2c1: i2c1grp {
+ 			fsl,pins = <
+ 				MX7D_PAD_I2C1_SDA__I2C1_SDA		0x4000007f
 -- 
 2.1.4
