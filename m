@@ -1,37 +1,78 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 28 Sep 2015 16:35:51 +0000 (UTC)
-Subject: [PATCH v3 0/3] ARM: OMAP2+: hwmod: RTC: Add lock and unlock hooks
-In-Reply-To: <56037FEA.5070807@ti.com>
-References: <1437657946-10733-1-git-send-email-lokeshvutla@ti.com>
- <55DE9055.4090701@ti.com> <56037FEA.5070807@ti.com>
-Message-ID: <alpine.DEB.2.02.1509280822250.7947@utopia.booyaka.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 28 Sep 2015 17:42:54 +0100
+Subject: [PATCH v4 1/9] drivers/of: Introduce of_node_alloc
+In-Reply-To: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
+References: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1443458582-7497-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Sep 2015, Lokesh Vutla wrote:
+We want to be able to generate "fake" device nodes that can be
+used as an identifier for irq domains. For that, we reuse the
+dynamic DT layer in order to generate DT nodes in a detached state
+(so that it doesn't interfere with the rest of the tree).
 
-> On Thursday 27 August 2015 09:51 AM, Lokesh Vutla wrote:
-> > On Thursday 23 July 2015 06:55 PM, Lokesh Vutla wrote:
-> >> This series implements lock and unlock functions for RTC and hooks
-> >> the same to DRA7 and AMx3xx hwmod.
-> >> This is dependent on the patch https://patchwork.kernel.org/patch/6578281/,
-> >> which is queued recently by Paul.
-> > Gentle ping on this series.
-> Do you have any comments on this series?
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/of/dynamic.c | 22 ++++++++++++++++++++++
+ include/linux/of.h   |  5 +++++
+ 2 files changed, 27 insertions(+)
 
-Looks pretty good.  I'm slightly concerned about the latency jitter impact 
-on -rt kernels for that local_irq_disable() section.  Looks like it could 
-hold off interrupts for ~(50 udelay ?s) + 50*((RTC register read time) + 
-1).  But I'm not sure if preempt_enable/disable() is a good alternative 
-since a bunch of interrupt top halves could conceivably run after the RTC 
-goes non-busy and result in the RTC not being locked/unlocked.  
-
-Is there an RTC IP block register that the code can read, or a safe 
-sequence that the code can execute, after the RTC lock/unlock operation to 
-verify that the RTC has successfully been locked or unlocked?  If so then 
-it's probably worth converting the local_irq_disable/enable() to 
-preempt_disable/enable() and testing that, then retrying the lock/unlock 
-if it fails.
-
-
-- Paul
+diff --git a/drivers/of/dynamic.c b/drivers/of/dynamic.c
+index 53826b8..709d363 100644
+--- a/drivers/of/dynamic.c
++++ b/drivers/of/dynamic.c
+@@ -445,6 +445,28 @@ struct device_node *__of_node_dup(const struct device_node *np, const char *fmt,
+ 	return NULL;
+ }
+ 
++/**
++ * of_node_alloc() - Allocate an empty device node dynamically.
++ * @fmt: Format string (plus vargs) for new full name of the device node
++ *
++ * Create an device tree node, either by by allocating an empty one
++ * suitable for further modification.  The node data are dynamically
++ * allocated and all the node flags have the OF_DYNAMIC & OF_DETACHED
++ * bits set. Returns the newly allocated node or NULL on out of memory
++ * error.
++ */
++struct device_node *of_node_alloc(const char *fmt, ...)
++{
++	struct device_node *np;
++	va_list vargs;
++
++	va_start(vargs, fmt);
++	np = __of_node_dup(NULL, fmt, vargs);
++	va_end(vargs);
++
++	return np;
++}
++
+ static void __of_changeset_entry_destroy(struct of_changeset_entry *ce)
+ {
+ 	of_node_put(ce->np);
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 2194b8c..f7f11f7 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -104,6 +104,7 @@ static inline int of_node_is_attached(struct device_node *node)
+ #ifdef CONFIG_OF_DYNAMIC
+ extern struct device_node *of_node_get(struct device_node *node);
+ extern void of_node_put(struct device_node *node);
++extern struct device_node *of_node_alloc(const char *fmt, ...);
+ #else /* CONFIG_OF_DYNAMIC */
+ /* Dummy ref counting routines - to be implemented later */
+ static inline struct device_node *of_node_get(struct device_node *node)
+@@ -111,6 +112,10 @@ static inline struct device_node *of_node_get(struct device_node *node)
+ 	return node;
+ }
+ static inline void of_node_put(struct device_node *node) { }
++static inline struct device_node *of_node_alloc(const char *fmt, ...)
++{
++	return NULL;
++}
+ #endif /* !CONFIG_OF_DYNAMIC */
+ 
+ /* Pointer for first entry in chain of all nodes. */
+-- 
+2.1.4
