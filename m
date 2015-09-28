@@ -1,29 +1,46 @@
-From: leoli@freescale.com (Li Yang)
-Date: Mon, 28 Sep 2015 17:19:17 -0500
-Subject: [PATCH 2/2] irqchip/Layerscape: Add Layerscape MSI controller
- support
-In-Reply-To: <DM2PR0301MB0640A0D236485867ED1B6690E24F0@DM2PR0301MB0640.namprd03.prod.outlook.com>
-References: <1442482127-32674-1-git-send-email-Minghuan.Lian@freescale.com>
- <1442482127-32674-2-git-send-email-Minghuan.Lian@freescale.com>
- <CADRPPNRx2QwZya83hYhOPKPhZj5moYr0VFR=+0VoK3PjmVVFjA@mail.gmail.com>
- <DM2PR0301MB0640A0D236485867ED1B6690E24F0@DM2PR0301MB0640.namprd03.prod.outlook.com>
-Message-ID: <CADRPPNTqADaBDyW9z+BEBJBjaaL9hfW_6Lt3dRXR48+pNZjFUw@mail.gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Mon, 28 Sep 2015 15:50:38 -0700
+Subject: [PATCH v4 1/9] drivers/of: Introduce of_node_alloc
+In-Reply-To: <1443458582-7497-2-git-send-email-marc.zyngier@arm.com>
+References: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
+ <1443458582-7497-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <5609C43E.1040106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 27, 2015 at 9:48 PM, Lian M.H. <Minghuan.Lian@freescale.com> wrote:
-> Hi Leo,
->
-> Could you tell me how to get the detailed Layerscape route map.
-> I am not sure that only Layerscape 1 series use the similar GIC and SCFG to implement MSI.
-> I am even not sure if ls1043 belongs Layerscape 1 series.
->
-> Could anyone tell me how to get the MSI route map?
+On 9/28/2015 9:42 AM, Marc Zyngier wrote:
+> We want to be able to generate "fake" device nodes that can be
+> used as an identifier for irq domains. For that, we reuse the
+> dynamic DT layer in order to generate DT nodes in a detached state
+> (so that it doesn't interfere with the rest of the tree).
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/of/dynamic.c | 22 ++++++++++++++++++++++
+>  include/linux/of.h   |  5 +++++
+>  2 files changed, 27 insertions(+)
+> 
+> diff --git a/drivers/of/dynamic.c b/drivers/of/dynamic.c
+> index 53826b8..709d363 100644
+> --- a/drivers/of/dynamic.c
+> +++ b/drivers/of/dynamic.c
+> @@ -445,6 +445,28 @@ struct device_node *__of_node_dup(const struct device_node *np, const char *fmt,
+>  	return NULL;
+>  }
+>  
+> +/**
+> + * of_node_alloc() - Allocate an empty device node dynamically.
+> + * @fmt: Format string (plus vargs) for new full name of the device node
+> + *
+> + * Create an device tree node, either by by allocating an empty one
 
-MSI shouldn't be the key feature to determine the naming of an SoC.
-So I don't think anyone can tell if all 1 series in the future will
-use this approach.  Probably it will be more generic to name it
-"fsl,scfg-msi"
+      Create a device tree node by allocating an empty one
 
-Regards,
-Leo
+> + * suitable for further modification.  The node data are dynamically
+> + * allocated and all the node flags have the OF_DYNAMIC & OF_DETACHED
+> + * bits set. Returns the newly allocated node or NULL on out of memory
+> + * error.
+> + */
+> +struct device_node *of_node_alloc(const char *fmt, ...)
+
+< snip >
