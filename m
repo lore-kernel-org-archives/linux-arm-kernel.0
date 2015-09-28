@@ -1,69 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Sep 2015 18:29:24 +0100
-Subject: Steps to submit a new arch/arm port
-In-Reply-To: <56096B85.6040002@free.fr>
-References: <56001B78.2090001@free.fr> <2206647.QPrIpE2UC0@wuerfel>
- <56016780.5080104@free.fr> <144297172.JfjI0hNJ9J@wuerfel>
- <56094543.2040101@free.fr> <56096B85.6040002@free.fr>
-Message-ID: <20150928172924.GA21513@n2100.arm.linux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 28 Sep 2015 12:31:36 -0500
+Subject: [PATCH v7 5/6] Documentation: dt-bindings: pci: altera pcie
+ device tree binding
+In-Reply-To: <CAFiDJ59PuhRj3F288A_451pLiKnqPUKin9C2t5uuH2iNPnJfAg@mail.gmail.com>
+References: <1442801587-3812-1-git-send-email-lftan@altera.com>
+ <1442801587-3812-6-git-send-email-lftan@altera.com>
+ <5606171A.5000609@kernel.org>
+ <CAFiDJ59PuhRj3F288A_451pLiKnqPUKin9C2t5uuH2iNPnJfAg@mail.gmail.com>
+Message-ID: <CAL_JsqL9eoTRa2-eeNJgVoO=0LyuaaJ87E4_BS0KocRKBXGdGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2015 at 06:32:05PM +0200, Mason wrote:
-> On 28/09/2015 15:48, Mason wrote:
-> 
-> > But tango_timer_init() is not being called...
-> 
-> Doh! I was using the wrong DTB...
-> 
-> By the way, the command I use to generate uImage feels wrong.
-> Is there a better way?
-> 
-> $ make dtbs ; make -j2 zImage ; cat arch/arm/boot/zImage arch/arm/boot/dts/tango4.dtb >XXX && mv XXX arch/arm/boot/zImage ; make uImage LOADADDR=0x80008000
+On Mon, Sep 28, 2015 at 12:38 AM, Ley Foon Tan <lftan@altera.com> wrote:
+> On Sat, Sep 26, 2015 at 11:55 AM, Rob Herring <robh@kernel.org> wrote:
+>>
+>> On 09/20/2015 09:13 PM, Ley Foon Tan wrote:
+>> > This patch adds the bindings for Altera PCIe host controller driver and
+>> > Altera PCIe MSI driver.
 
-bash$ cat > build.sh
-#!/bin/sh
-function emake
-{
-  LANG=C make -j2 CROSS_COMPILE=arm-linux- ARCH=arm "$@"
-}
+[...]
 
-load=0x80008000
+>> > +     num-vectors = <32>;
+>> > +};
+>> > diff --git a/Documentation/devicetree/bindings/pci/altera-pcie.txt b/Documentation/devicetree/bindings/pci/altera-pcie.txt
+>> > new file mode 100644
+>> > index 0000000..4440db1
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/pci/altera-pcie.txt
+>> > @@ -0,0 +1,49 @@
+>> > +* Altera PCIe controller
+>> > +
+>> > +Required properties:
+>> > +- compatible :       should contain "altr,pcie-root-port-1.0"
+>> > +- reg:               a list of physical base address and length for TXS and CRA.
+>> > +- reg-names: must include the following entries:
+>> > +             "Txs" or "txs": TX slave port region
+>> > +             "Cra" or "cra": Control register access region
+>>
+>> Why both cases? Can we please just have one (or none is better IMO).
+> The PCIe IP on different device families use different register names.
+> And our device tree generator will auto generate the register names
+> based on the hardware description name. Too bad we can't change the
+> hardware description names now.
 
-emake zImage dtbs
-v=$(emake -s kernelrelease)
-cat arch/arm/boot/zImage arch/arm/boot/dts/tango4.dtb zImage.tmp
-mkimage -A arm -O linux -C none -T kernel \
-	-a $load -e $load -n "Linux $v (dt)" -d zImage.tmp uImage
-^d
-bash$ chmod 755 build.sh
-bash$ ./build.sh #<--- build kernel to uImage like this
+Okay, your problem to maintain. Hopefully the driver just goes by index then.
 
-Even better (and this is what I do) is you can append to that script
-a command to copy it to your TFTP server, install modules, tar them
-up, copy the modules to the target, and have the target automatically
-reboot after the kernel build has finished (provided certain options
-are given to the script.)
+Strictly speaking, if you have undocumented bindings downstream that
+is your problem and we don't have to accept them as-is upstream. I'm
+not going to worry about that here.
 
-For a fair number of my active development boards, my kernel build and
-boot process is just:
+>> txs contains the config space?
+> It is not the config space, but a memory slave port.
 
-$ kbuild -r -m imx6 cbi4 ssh:hbi2ex hbi1
+Then where is the config space? It should not be part of "ranges" is
+all I care about.
 
-to build and boot an imx6 kernel on three imx6 machines, or just:
-
-$ kbuild armada38x
-
-to build and copy the armada38x kernel to the tftp server.
-
-This is why people who think that copying kernels to SD cards is somehow
-easier than TFTP boot - TFTP based booting is fully automated, no need
-to constantly plug and unplug SD cards, wearing out their sockets.  You
-can't get any simpler than running a script, walking away to make a
-coffee, coming back and having your newly built kernel running on a
-whole suite of platforms without any user intervention - complete with
-updated modules on the target systems. ;)
-
--- 
-FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
-according to speedtest.net.
+Rob
