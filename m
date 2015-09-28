@@ -1,85 +1,52 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 28 Sep 2015 15:48:51 +0200
-Subject: Steps to submit a new arch/arm port
-In-Reply-To: <144297172.JfjI0hNJ9J@wuerfel>
-References: <56001B78.2090001@free.fr> <2206647.QPrIpE2UC0@wuerfel>
- <56016780.5080104@free.fr> <144297172.JfjI0hNJ9J@wuerfel>
-Message-ID: <56094543.2040101@free.fr>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 28 Sep 2015 14:50:01 +0100
+Subject: [PATCH v2 0/5] ACPI probing infrastructure
+In-Reply-To: <39030379.kalO2V72FV@vostro.rjw.lan>
+References: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
+ <1698028.ftHN1K8oZa@vostro.rjw.lan> <560939A7.3030603@arm.com>
+ <39030379.kalO2V72FV@vostro.rjw.lan>
+Message-ID: <56094589.504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/09/2015 16:51, Arnd Bergmann wrote:
-
-> On Tuesday 22 September 2015 16:36:48 Mason wrote:
+On 28/09/15 14:53, Rafael J. Wysocki wrote:
+> On Monday, September 28, 2015 01:59:19 PM Marc Zyngier wrote:
+>> Hi Rafael,
+>>
+>> On 26/09/15 00:45, Rafael J. Wysocki wrote:
+>>
+>>>> Marc Zyngier (5):
+>>>>   acpi: Add basic device probing infrastructure
+>>>>   irqchip/acpi: Add probing infrastructure for ACPI-based irqchips
+>>>>   irqchip/gic: Convert the GIC driver to ACPI probing
+>>>>   clocksource/acpi: Add probing infrastructure for ACPI-based
+>>>>     clocksources
+>>>>   clocksource/arm_arch_timer: Convert to ACPI probing
+>>>
+>>> I'm generally fine with this (modulo a couple of super-minor nits in the
+>>> first patch), but it needs ACKs from Thomas for the irqchip-related and
+>>> clocksource-related patches.
+>>
+>> Sure. I've now addressed your comments, and I'll post the updated series
+>> later today.
+>>
+>>> Plus [3/5] needs to be rebased on top of the Al's patches removing BAD_MADT_ENTRY
+>>> (currently in my bleeding-edge branch).
+>>
+>> Al's patches were there on Friday, but vanished over the weekend. Do you
+>> have another (stable?) branch with these patches in (assuming they are
+>> still aimed at 4.4)?
 > 
->> +void __init tangox_timer_init(void)
->> +{
->> +	int err;
->> +
->> +	clkgen_base = ioremap(CLKGEN_BASE, 0x100);
+> The Al's patches are gone for now, because they introduced a 0-day testing
+> regression.
 > 
-> Remove all hardcoded physical memory addresses.
-> 
->> +	if (clkgen_base == NULL) return;
->> +
->> +	register_current_timer_delay(&delay_timer);
->> +	sched_clock_register(read_sched_clock, 32, XTAL_FREQ);
->> +
->> +	err = clocksource_register_hz(&tangox_xtal, XTAL_FREQ);
->> +	if (err) pi_alert("Failed to register tangox_xtal clocksource!\n");
->> +
->> +	tangox_clock_tree_register();
->> +
->> +	of_clk_init(NULL);
->> +	clocksource_of_init();
->> +}
-> 
-> CLK_OF_DECLARE() for the clk
-> 
-> CLOCKSOURCE_OF_DECLARE() for the clocksource/clockevent
-> 
-> Make these two drivers.
+> I guess this means I can apply your patches first and ask Al to rebase his
+> next version on them.
 
-Hmmm, about that (splitting clock-tango.c in two drivers)
+OK. I'll rebase them on the current bleeding-edge, and post that.
 
-The "legacy" order of calls was:
+Thanks,
 
-  register_current_timer_delay
-  sched_clock_register
-  clocksource_register_hz
-  /* Should the above 3 be called in a different order? */
-
-then
-
-  tangox_clock_tree_register
-
-then
-
-  of_clk_init
-  clocksource_of_init
-  /* To invoke the smp_twd OF init, after the clock tree is registered */
-
-
-I moved the first three to a separate clocksource driver:
-
-static void __init tango_timer_init(struct device_node *np)
-{
-	clkgen_base = of_iomap(np, 0);
-	register_current_timer_delay(&delay_timer);
-	sched_clock_register(read_sched_clock, 32, XTAL_FREQ);
-	clocksource_register_hz(&tango_xtal, XTAL_FREQ);
-}
-CLOCKSOURCE_OF_DECLARE(tango, "sigma,tango-xtal", tango_timer_init);
-
-But tango_timer_init() is not being called...
-
-I updated my device tree with
-
-	tango-xtal at 10000 {
-		compatible = "sigma,tango-xtal";
-		reg = <0x10000 0x100>;
-	};
-
-Shouldn't the kernel call tango_timer_init?
-
-Regards.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
