@@ -1,67 +1,32 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 28 Sep 2015 16:10:40 -0500
-Subject: [PATCH] arm: omap2: timer: always define omap4_local_timer_init
-In-Reply-To: <1443464744-16561-1-git-send-email-balbi@ti.com>
-References: <1443464744-16561-1-git-send-email-balbi@ti.com>
-Message-ID: <5609ACD0.1010907@ti.com>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Mon, 28 Sep 2015 23:10:43 +0200
+Subject: [PATCH v4 03/26] ARM: pxa: magician: Print more specific error
+ message for global GPIOs
+In-Reply-To: <cover.1443472089.git.petr.cvek@tul.cz>
+References: <cover.1443472089.git.petr.cvek@tul.cz>
+Message-ID: <5609ACD3.6030600@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2015 01:25 PM, Felipe Balbi wrote:
-> omap4_local_timer_init() can be used by other
-> platforms as is. At least AM437x wants to use
-> it. Instead of making omap4-only and providing
-> a stub for builds without OMAP4, we can just
-> always define that function.
-> 
-> Reported-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  arch/arm/mach-omap2/timer.c | 9 ---------
->  1 file changed, 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index a55655127ef2..f9028582e962 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -642,20 +642,11 @@ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
->  			       2, "sys_clkin_ck", NULL);
->  #endif
->  
-> -#ifdef CONFIG_ARCH_OMAP4
-> -#ifdef CONFIG_HAVE_ARM_TWD
->  void __init omap4_local_timer_init(void)
->  {
->  	omap4_sync32k_timer_init();
->  	clocksource_of_init();
->  }
-> -#else
-> -void __init omap4_local_timer_init(void)
-> -{
-> -	omap4_sync32k_timer_init();
-> -}
-> -#endif /* CONFIG_HAVE_ARM_TWD */
-> -#endif /* CONFIG_ARCH_OMAP4 */
->  
->  #if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
->  void __init omap5_realtime_timer_init(void)
-> 
-I am a little confused if this will build in a am437xx only build.
+Print more specific error message for global GPIOs.
 
-#define OMAP_SYS_32K_TIMER_INIT(name, clkev_nr, clkev_src, clkev_prop, \
-clksrc_nr, clksrc_src, clksrc_prop) \
-void __init omap##name##_sync32k_timer_init(void) \
+Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+---
+ arch/arm/mach-pxa/magician.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Would you like to consider this for OMAP4 only build as well?
-
-#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
-
-        defined(CONFIG_SOC_DRA7XX)
-static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
-                               2, "sys_clkin_ck", NULL);
-#endif
-
-
+diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
+index c8fa379..29d8146 100644
+--- a/arch/arm/mach-pxa/magician.c
++++ b/arch/arm/mach-pxa/magician.c
+@@ -752,7 +752,7 @@ static void __init magician_init(void)
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(magician_pin_config));
+ 	err = gpio_request_array(ARRAY_AND_SIZE(magician_global_gpios));
+ 	if (err)
+-		pr_err("magician: Failed to request GPIOs: %d\n", err);
++		pr_err("magician: Failed to request global GPIOs: %d\n", err);
+ 
+ 	pxa_set_ffuart_info(NULL);
+ 	pxa_set_btuart_info(NULL);
 -- 
-Regards,
-Nishanth Menon
+1.7.12.1
