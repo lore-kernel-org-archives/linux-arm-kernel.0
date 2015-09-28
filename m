@@ -1,104 +1,29 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 29 Sep 2015 00:46:04 +0200
-Subject: [PATCH v3 0/7] Early ACPI probing infrastructure
-In-Reply-To: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
-References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <3881043.sWK6Pcr0HP@vostro.rjw.lan>
+From: leoli@freescale.com (Li Yang)
+Date: Mon, 28 Sep 2015 17:19:17 -0500
+Subject: [PATCH 2/2] irqchip/Layerscape: Add Layerscape MSI controller
+ support
+In-Reply-To: <DM2PR0301MB0640A0D236485867ED1B6690E24F0@DM2PR0301MB0640.namprd03.prod.outlook.com>
+References: <1442482127-32674-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1442482127-32674-2-git-send-email-Minghuan.Lian@freescale.com>
+ <CADRPPNRx2QwZya83hYhOPKPhZj5moYr0VFR=+0VoK3PjmVVFjA@mail.gmail.com>
+ <DM2PR0301MB0640A0D236485867ED1B6690E24F0@DM2PR0301MB0640.namprd03.prod.outlook.com>
+Message-ID: <CADRPPNTqADaBDyW9z+BEBJBjaaL9hfW_6Lt3dRXR48+pNZjFUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 28, 2015 03:49:11 PM Marc Zyngier wrote:
-> IRQ controllers and timers are the two types of device the kernel
-> requires before being able to use the device driver model.
-> 
-> The Device Tree infrastructure makes it very easy to make these
-> discoverable by the rest of the kernel. For example, each interrupt
-> controller driver has at least one entry like this:
-> 
-> IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
-> 
-> which says: if you find a node having "arm,gic-400" as a compatible
-> string in the device tree, then call gic_of_init with this node as a
-> parameter. The probing itself is done by the OF layer when the
-> architecture code calls of_irq_init() (usually via irqchip_init).
-> 
-> This has a number of benefits:
-> 
-> - The irqchip code is self-contained. No architecture specific entry
-> point, no exposed symbols. Just a standard interface.
-> 
-> - The low-level architecture code doesn't have to know about which
-> interrupt controller is present. It just calls into the firmware
-> interface (of_irq_init) which is going to sort things out.
-> 
-> Similar infrastructure is provided for the timers/clock sources. Note
-> that this is not a replacement for the device model, but acts as a
-> probing infrastructure for things that are required too early for the
-> device infrastructure to be available.
-> 
-> What I'm aiming for is to introduce the same level of abstraction for
-> ACPI, or at least for the few bits that are required before a full blown
-> ACPI/device model can be used. For this, I introduce something vaguely
-> similar:
-> 
-> IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
-> 		     gic_validate_dist, ACPI_MADT_GIC_VERSION_V2,
-> 		     gic_v2_acpi_init);
-> 
-> which says: if you find a ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR entry in
-> MADT (implied by the macro), and that entry is of type
-> ACPI_MADT_GIC_VERSION_V2 (as checked by gic_validate_dist), then call
-> gic_v2_acpi_init with the entry as a parameter. A bit more convoluted,
-> but still without any special entry point.
-> 
-> The various interrupt controller drivers can then implement the above,
-> and the arch code can use a firmware-specific call to get the probing
-> done, still oblivious to what interrupt controller is being used. It
-> also makes the adaptation of a DT driver to ACPI easier.
-> 
-> It turns out that providing such a probing infrastructure is rather
-> easy, and provides a much deserved cleanup in both the arch code, the
-> GIC driver, and the architected timer driver. An additional (and very
-> much optional) patch renames files and symbols to make it obvious that
-> the infrastructure is not just for DT anymore.
-> 
-> I'm sure there is some more code to be deleted, and one can only
-> wonder why this wasn't done before the arm64 code was initially merged
-> (the diffstat says it all...).
-> 
-> Patches are against Rafael's bleeding-edge branch, and a branch is
-> available at
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git acpi/device-probing-v3
-> 
-> * From v2:
->   - Addressed Rafael's comments (title for patch #1, macro/field names)
->   - New config symbols for clocksources
->   - Additional and optional last patch to get rid of the apparent
->     dependency between the probing infrastructure and DT.
-> 
-> * From the initial version:
->   - Make the infrastructure more DT like by providing an
->     acpi_probe_entry array per "device type" (one for irqchips, one
->     for clocksources). This means that entries can depend on any ACPI
->     static table.
->   - Use some cpp magic to reduce the amount of code added to an
->     absolute minimum.
->   - Rebased on v4.3-rc1
-> 
-> Marc Zyngier (7):
->   acpi: Add early device probing infrastructure
->   irqchip/acpi: Add probing infrastructure for ACPI-based irqchips
->   irqchip/gic: Convert the GIC driver to ACPI probing
->   clocksource/acpi: Add probing infrastructure for ACPI-based
->     clocksources
->   clocksource: Add new CLKSRC_{PROBE,ACPI} config symbols
->   clocksource/arm_arch_timer: Convert to ACPI probing
->   clocksource: cosmetic: Drop OF 'dependency' from symbols
+On Sun, Sep 27, 2015 at 9:48 PM, Lian M.H. <Minghuan.Lian@freescale.com> wrote:
+> Hi Leo,
+>
+> Could you tell me how to get the detailed Layerscape route map.
+> I am not sure that only Layerscape 1 series use the similar GIC and SCFG to implement MSI.
+> I am even not sure if ls1043 belongs Layerscape 1 series.
+>
+> Could anyone tell me how to get the MSI route map?
 
-If you want me to apply this series, ACKs are needed for patches [3-7/7].
+MSI shouldn't be the key feature to determine the naming of an SoC.
+So I don't think anyone can tell if all 1 series in the future will
+use this approach.  Probably it will be more generic to name it
+"fsl,scfg-msi"
 
-They are fine by me, but I'd also like to hear from the other maintainers.
-
-Thanks,
-Rafael
+Regards,
+Leo
