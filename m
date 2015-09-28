@@ -1,79 +1,72 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 28 Sep 2015 17:42:56 +0100
-Subject: [PATCH v4 3/9] genirq/irqdomain: Add a fwnode_handle allocator
+Date: Mon, 28 Sep 2015 17:43:00 +0100
+Subject: [PATCH v4 7/9] irqchip/GIC: Get rid of gic_init_bases()
 In-Reply-To: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
 References: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1443458582-7497-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1443458582-7497-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to reference an irqdomain from ACPI, we need
-to be able to create an identifier, which is a struct device_node.
+Since nobody is using gic_init_bases anymore outside of the GIC
+driver itself, let's do a bit of housekeeping and remove the now
+useless entry point.
 
-This device node does't really fit the ACPI infrastructure, so
-we cunningly hide it by returning the contained fwnode_handle.
-This will help a (still hypothetical) further migration of
-irqdomain from device_node to fwnode_handle.
+Only gic_init() is now exposed to the rest of the kernel for the
+benefit of non DT/ACPI system.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/irqdomain.h |  2 ++
- kernel/irq/irqdomain.c    | 30 ++++++++++++++++++++++++++++++
- 2 files changed, 32 insertions(+)
+ drivers/irqchip/irq-gic.c       | 8 +++-----
+ include/linux/irqchip/arm-gic.h | 9 ++-------
+ 2 files changed, 5 insertions(+), 12 deletions(-)
 
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index d3ca792..3193c61 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -162,6 +162,8 @@ enum {
- };
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 982c09c..0e4142d 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -1087,17 +1087,15 @@ static void __init __gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	gic_pm_init(gic);
+ }
  
- #ifdef CONFIG_IRQ_DOMAIN
-+struct fwnode_handle *irq_domain_alloc_fwnode(void *data);
-+void irq_domain_free_fwnode(struct fwnode_handle *fwnode);
- struct irq_domain *__irq_domain_add(struct device_node *of_node, int size,
- 				    irq_hw_number_t hwirq_max, int direct_max,
- 				    const struct irq_domain_ops *ops,
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index e5c1e4c..5e7214a 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -29,6 +29,36 @@ static int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
- static void irq_domain_check_hierarchy(struct irq_domain *domain);
+-void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+-			   void __iomem *dist_base, void __iomem *cpu_base,
+-			   u32 percpu_offset, struct device_node *node)
++void __init gic_init(unsigned int gic_nr, int irq_start,
++		     void __iomem *dist_base, void __iomem *cpu_base)
+ {
+ 	/*
+ 	 * Non-DT/ACPI systems won't run a hypervisor, so let's not
+ 	 * bother with these...
+ 	 */
+ 	static_key_slow_dec(&supports_deactivate);
+-	__gic_init_bases(gic_nr, irq_start, dist_base, cpu_base,
+-			 percpu_offset, node);
++	__gic_init_bases(gic_nr, irq_start, dist_base, cpu_base, 0, NULL);
+ }
  
- /**
-+ * irq_domain_alloc_fwnode - Allocate a OF-backed fwnode_handle suitable for
-+ *                           identifying an irq domain
-+ * @data: optional user-provided data
-+ *
-+ * Allocate a struct device_node, and return a poiner to the embedded
-+ * fwnode_handle (or NULL on failure).
-+ */
-+struct fwnode_handle *irq_domain_alloc_fwnode(void *data)
-+{
-+	struct device_node *of_node;
-+
-+	of_node = of_node_alloc("irqdomain@%p", data);
-+	if (!of_node)
-+		return NULL;
-+
-+	of_node->data = data;
-+	return &of_node->fwnode;
-+}
-+
-+/**
-+ * irq_domain_free_fwnode - Free a OF-backed fwnode_handle
-+ *
-+ * Free a fwnode_handle allocated with irq_domain_alloc_fwnode.
-+ */
-+void irq_domain_free_fwnode(struct fwnode_handle *fwnode)
-+{
-+	of_node_put(to_of_node(fwnode));
-+}
-+
-+/**
-  * __irq_domain_add() - Allocate a new irq_domain data structure
-  * @of_node: optional device-tree node of the interrupt controller
-  * @size: Size of linear map; 0 for radix mapping only
+ #ifdef CONFIG_OF
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index b8901df..bae69e5 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -100,16 +100,11 @@
+ 
+ struct device_node;
+ 
+-void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+-		    u32 offset, struct device_node *);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+ int gic_cpu_if_down(unsigned int gic_nr);
+ 
+-static inline void gic_init(unsigned int nr, int start,
+-			    void __iomem *dist , void __iomem *cpu)
+-{
+-	gic_init_bases(nr, start, dist, cpu, 0, NULL);
+-}
++void gic_init(unsigned int nr, int start,
++	      void __iomem *dist , void __iomem *cpu);
+ 
+ int gicv2m_of_init(struct device_node *node, struct irq_domain *parent);
+ 
 -- 
 2.1.4
