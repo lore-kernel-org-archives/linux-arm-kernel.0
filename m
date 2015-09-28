@@ -1,52 +1,69 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 28 Sep 2015 14:50:01 +0100
-Subject: [PATCH v2 0/5] ACPI probing infrastructure
-In-Reply-To: <39030379.kalO2V72FV@vostro.rjw.lan>
-References: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
- <1698028.ftHN1K8oZa@vostro.rjw.lan> <560939A7.3030603@arm.com>
- <39030379.kalO2V72FV@vostro.rjw.lan>
-Message-ID: <56094589.504@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 28 Sep 2015 15:50:16 +0200
+Subject: Build regressions/improvements in v4.3-rc3
+In-Reply-To: <20150928094836.GU21513@n2100.arm.linux.org.uk>
+References: <1443382476-12171-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdWrBYnQ0CRYmBgO3xNZMqCY42OtNwhryqzi+Tv+KGj6Lg@mail.gmail.com>
+ <20150928093006.GT21513@n2100.arm.linux.org.uk>
+ <20150928094836.GU21513@n2100.arm.linux.org.uk>
+Message-ID: <CAMuHMdU5UGfDSzfNWsZvsgLvJJYK-5VWEZ841Zc4GYfey6RdtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/09/15 14:53, Rafael J. Wysocki wrote:
-> On Monday, September 28, 2015 01:59:19 PM Marc Zyngier wrote:
->> Hi Rafael,
->>
->> On 26/09/15 00:45, Rafael J. Wysocki wrote:
->>
->>>> Marc Zyngier (5):
->>>>   acpi: Add basic device probing infrastructure
->>>>   irqchip/acpi: Add probing infrastructure for ACPI-based irqchips
->>>>   irqchip/gic: Convert the GIC driver to ACPI probing
->>>>   clocksource/acpi: Add probing infrastructure for ACPI-based
->>>>     clocksources
->>>>   clocksource/arm_arch_timer: Convert to ACPI probing
->>>
->>> I'm generally fine with this (modulo a couple of super-minor nits in the
->>> first patch), but it needs ACKs from Thomas for the irqchip-related and
->>> clocksource-related patches.
->>
->> Sure. I've now addressed your comments, and I'll post the updated series
->> later today.
->>
->>> Plus [3/5] needs to be rebased on top of the Al's patches removing BAD_MADT_ENTRY
->>> (currently in my bleeding-edge branch).
->>
->> Al's patches were there on Friday, but vanished over the weekend. Do you
->> have another (stable?) branch with these patches in (assuming they are
->> still aimed at 4.4)?
-> 
-> The Al's patches are gone for now, because they introduced a 0-day testing
-> regression.
-> 
-> I guess this means I can apply your patches first and ask Al to rebase his
-> next version on them.
+Hi Russell,
 
-OK. I'll rebase them on the current bleeding-edge, and post that.
+On Mon, Sep 28, 2015 at 11:48 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Sep 28, 2015 at 10:30:06AM +0100, Russell King - ARM Linux wrote:
+>> On Mon, Sep 28, 2015 at 08:57:44AM +0200, Geert Uytterhoeven wrote:
+>> > On Sun, Sep 27, 2015 at 9:34 PM, Geert Uytterhoeven
+>> > <geert@linux-m68k.org> wrote:
+>> > > JFYI, when comparing v4.3-rc3[1] to v4.3-rc2[3], the summaries are:
+>> > >   - build errors: +8/-12
+>> >
+>> >   + error: No rule to make target include/config/auto.conf:  => N/A
+>> >
+>> > arm-randconfig
+>>
+>> Not every randconfig failure is a kernel problem.  Here's an example:
+>>
+>> Physical address of main memory (PHYS_OFFSET) [] (NEW) aborted!
+>>
+>> Console input/output is redirected. Run 'make oldconfig' to update configuration.
+>>
+>> This needs someone to provide a value, which means these failures are
+>> not in fact failures of the kernel, but a failure of the build system
+>> to anticipate that there may be Kconfig questions that need input.
+>>
+>> So, these ones should be ignored.
 
-Thanks,
+Usually I ignore them. But as this was the only failure to report (I ignore
+R_PPC64_REL24 failures, too), I thought to kick the kbuild people (and the
+ARM list, as it was the ARM randconfig that failed) for once.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Also, a great many of the failures are due to the build toolchain not
+> supporting -fstack-protector-strong.  I think it's absolutely right
+> for the build to error out if you enable a kernel feature which requires
+> toolchain support, but the toolchain does not support that feature.
+>
+> What this means is that the build results from kissb are less than
+> useful - without spending ages looking at every single build, it's
+> hard to find the real failures we care about.
+>
+> I'd suggest that either the randconfig is seeded to ensure that
+> CONFIG_CC_STACKPROTECTOR_STRONG is always disabled in ARM randconfigs,
+> or that the ARM toolchain is updated to support this feature.
+
+Or that it's impossible to enable this feature if your toolchain doesn't
+support it?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
