@@ -1,27 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 28 Sep 2015 16:31:38 -0700
-Subject: [PATCH] arm-cci500: Don't enable PMU driver by default
-In-Reply-To: <1443452244-14062-1-git-send-email-suzuki.poulose@arm.com>
-References: <1443452244-14062-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20150928233138.GB30986@localhost>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 28 Sep 2015 20:37:16 -0300
+Subject: [PATCH] ARM: dts: imx7d: Fix UART2 base address
+In-Reply-To: <20150926050154.GF3529@tiger>
+References: <1443122292-29385-1-git-send-email-festevam@gmail.com>
+ <20150926050154.GF3529@tiger>
+Message-ID: <CAOMZO5BoTRj-wsN37=Tk5CQO8DkuZaUuRCLVe6Y=+waZGDJxgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2015 at 03:57:24PM +0100, Suzuki K. Poulose wrote:
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
-> 
-> Disable building CCI-500 PMU driver by default.
-> 
-> Reported-by: Russell King <linux@arm.linux.org.uk>
-> Cc: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: arm at kernel.org
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/bus/Kconfig |    1 -
->  1 file changed, 1 deletion(-)
+Hi Shawn,
 
-Applied as fix for 4.3.
+On Sat, Sep 26, 2015 at 2:01 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Thu, Sep 24, 2015 at 04:18:12PM -0300, Fabio Estevam wrote:
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>> The UART2 memory space starts at address 0x30890000 (UART2_URXD).
+>>
+>> Fix it so that UART2 can be used.
+>>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>
+> Frank, can you confirm it?
 
+This patch uses the UART2 base address as stated in the MX7D Reference Manual.
 
--Olof
+It has also been tested on a custom board.
