@@ -1,77 +1,88 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 28 Sep 2015 21:02:28 +0900
-Subject: [PATCH 4/4] ARM64: dts: exynos5433: add jpeg node
-In-Reply-To: <2466182.YdnXZtSWXI@amdc1976>
-References: <1442586060-23657-1-git-send-email-andrzej.p@samsung.com>
- <55FFD4FF.6090306@samsung.com> <5608FFBD.1030306@samsung.com>
- <2466182.YdnXZtSWXI@amdc1976>
-Message-ID: <56092C54.1070507@samsung.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Mon, 28 Sep 2015 14:24:40 +0200
+Subject: [PATCH v6 5/5] leds: netxbig: set led_classdev max_brightness
+In-Reply-To: <20150928115033.GZ7306@kw.sim.vm.gnt>
+References: <1443301358-2131-1-git-send-email-simon.guinot@sequanux.org>
+ <1443301358-2131-6-git-send-email-simon.guinot@sequanux.org>
+ <5608F41B.4020307@samsung.com> <20150928091956.GY7306@kw.sim.vm.gnt>
+ <5609133A.3050802@samsung.com> <20150928115033.GZ7306@kw.sim.vm.gnt>
+Message-ID: <56093188.4050405@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 28.09.2015 o 20:54, Bartlomiej Zolnierkiewicz pisze:
-> 
-> Hi,
-> 
-> On Monday, September 28, 2015 05:52:13 PM Krzysztof Kozlowski wrote:
->> W dniu 21.09.2015 o 18:59, Andrzej Pietrasiewicz pisze:
->>> Hi Hans,
+On 09/28/2015 01:50 PM, Simon Guinot wrote:
+> On Mon, Sep 28, 2015 at 12:15:22PM +0200, Jacek Anaszewski wrote:
+>> On 09/28/2015 11:19 AM, Simon Guinot wrote:
+>>> On Mon, Sep 28, 2015 at 10:02:35AM +0200, Jacek Anaszewski wrote:
+>>>> Hi Simon,
 >>>
->>> W dniu 21.09.2015 o 11:50, Hans Verkuil pisze:
->>>> On 18-09-15 16:21, Andrzej Pietrasiewicz wrote:
->>>>> From: Marek Szyprowski <m.szyprowski@samsung.com>
->>>>>
->>>>> Add Exynos 5433 jpeg h/w codec node.
->>>>>
->>>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>>>> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
->>>>> ---
->>>>>   arch/arm64/boot/dts/exynos/exynos5433.dtsi | 21 +++++++++++++++++++++
->>>>>   1 file changed, 21 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->>>>> b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->>>>
->>>> This dtsi file doesn't exist in the media-git tree. What is the story
->>>> here?
->>>>
->>>> Should this go through a different subsystem?
->>>>
->>>> I think the media subsystem can take patches 1-3 and whoever does DT
->>>> patches can
->>>> take this patch, right?
->>>>
+>>> Hi Jacek,
 >>>
->>> The cover letter explains that the series is rebased onto Mauro's
->>> master with Kukjin's branch merged. The latter does contain
->>> the exynos5433.dtsi. That said, yes, taking patches 1-3 in
->>> media subsystem and leaving DT patch to someone else is the
->>> way to go.
+>>>>
+>>>> Does your device support reading the brightness currently set?
+>>>
+>>> No it don't.
+>>>
+>>>> If so, it would be good to implement brightness_get op, because
+>>>> AFAIR you mentioned that the firmware you are working with sets
+>>>> always maximum brightness value. Having the op implemented would
+>>>> allow to find this out.
+>>>
+>>> I don't understand how this can help. I mean, the only issue is that at
+>>> startup the initial LED state is unknown. And the software brightness
+>>> value could be false. But once the LED is configured, the brightness
+>>> values for software and hardware are synchronized. The brightness value
+>>> is stored/cached in led_classdev and it can be retrieved by the user via
+>>> sysfs...
+>>>
+>>> For my own knowledge, is there some interest in having brightness_get(),
+>>> aside of guessing the LED initial state ?
 >>
->> Although Kukjin picked Exynos 5433 ARM64 patches but they were not
->> accepted upstream by arm-soc. He rolled it for few releases but:
->> 1. Reason for not accepting by arm-soc was not resolved - there is no DTS.
->> 2. Kukjin did not rebase the branch for 4.4... which maybe means that he
->> wants to drop it?
->> 3. Anyone (but me...) can send Galaxy Note4 (Exynos5433) DTS file based
->> on sources on opensource.samsung.com. The DTS there is for 32-bit but it
->> can be probably easily adjusted for ARM64.
+>> Some LED controllers can adjust brightness in case battery voltage level
+>> falls below some threshold.
+>
+> OK, thanks for the explanation.
+>
 >>
->> All of this means that Device Tree support for this driver can't be
->> merged now and effort for mainlining 5433 may be unfortunately wasted...
-> 
-> Exynos5433 support is being incrementally merged (clocks, drm, phy,
-> pinctrl, thermal and tty support is already in upstream or -next).
-> 
-> I don't know why DTS changes got stuck in Kukjin's tree (Kukjin,
-> could you please explain?) but I think that this shouldn't not stop
-> us from continuing Exynos5433 upstreaming effort.
+>>> What does the embedded firmware is writing 255 or 0 into the brightness
+>>> sysfs attribute. The max_brightness value is ignored. After this patch,
+>>> writing 255 and 0 still allows to configure the LED in the same way:
+>>> maximum brightness or off. Thus, I believe there is no compatibility
+>>> issue.
+>>
+>> LED core always assures that brightness value passed to brightness_set
+>> op does not exceed max_brightness value. So, now after executing
+>> "echo 255 > brightness", LED core will adjust it to max_brightness
+>> (e.g. 7) before passing to brightness_set.
+>>
+>> In the message [1], you mentioned that "LEDs are only enabled at their
+>> maximum level", so IIUC following is possible:
+>>
+>> #echo 3 > "brightness"
+>>
+>> firmware sets brightness to max_brightness from DT (e.g. 7), but
+>>
+>> #cat brightness
+>> #3
+>>
+>> Is it true?
+>
+> Oh no sorry, it is a misunderstanding. By "LEDs are only enabled at
+> their maximum level", I was meaning "LEDs are only enabled at their
+> maximum level by the LaCie stock firmware". The firmware don't make
+> use of the different hardware brightness levels available. But the
+> feature works perfectly. If you write 3 into sysfs "brightness", then
+> you get the third brightness level.
 
-I already explained. There is no DTS, so the pull request was rejected
-(pull request for v4.0 I believe).
+I thought that driver talks to firmware, which controls the LEDs.
+ From your explanation I infer that this driver replaces LaCie stock
+firmware, am I right? There must be however some circuit that controls
+LED brightness then.
 
-It was not about adding drivers for 5433's clocks/phy/pinctrl etc. It
-was about DTS.
+> OK, I understand you remark now. Sorry for not being very clear in a
+> first place.
 
-Best regards,
-Krzysztof
+
+-- 
+Best Regards,
+Jacek Anaszewski
