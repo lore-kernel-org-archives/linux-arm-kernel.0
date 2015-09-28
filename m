@@ -1,108 +1,58 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Mon, 28 Sep 2015 14:17:46 -0600
-Subject: [PATCH v4 0/5] Provide better MADT subtable sanity checks
-In-Reply-To: <1883446.cx2ktyZcIz@vostro.rjw.lan>
-References: <1442446005-19799-1-git-send-email-al.stone@linaro.org>
- <1883446.cx2ktyZcIz@vostro.rjw.lan>
-Message-ID: <5609A06A.5020802@redhat.com>
+From: leoli@freescale.com (Li Yang)
+Date: Mon, 28 Sep 2015 15:19:05 -0500
+Subject: License for ARM device tree file
+In-Reply-To: <20150928192931.GE21513@n2100.arm.linux.org.uk>
+References: <DM2PR0301MB07343BCB0B5059C96CA31438BA4F0@DM2PR0301MB0734.namprd03.prod.outlook.com>
+ <20150928192931.GE21513@n2100.arm.linux.org.uk>
+Message-ID: <CADRPPNQniPRmLq4WmSPU818=PafUV99djC9JveajMVdxARz0KA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2015 05:29 PM, Rafael J. Wysocki wrote:
-> On Wednesday, September 16, 2015 05:26:40 PM Al Stone wrote:
->> Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
->> check on the various subtables that are defined for the MADT.  The check
->> compares the size of the subtable data structure as defined by ACPICA to
->> the length entry in the subtable.  If they are not the same, the assumption
->> is that the subtable is incorrect.
->>
->> Over time, the ACPI spec has allowed for MADT subtables where this can
->> never be true (the local SAPIC subtable, for example).  Or, more recently,
->> the spec has accumulated some minor flaws where there are three possible 
->> sizes for a subtable, all of which are valid, but only for specific versions
->> of the spec (the GICC subtable).  In both cases, BAD_MADT_ENTRY reports these
->> subtables as bad when they are not.  In order to retain some sanity check
->> on the MADT subtables, we now have to special case these subtables.  Of
->> necessity, these special cases have ended up in arch-dependent code (arm64)
->> or an arch has simply decided to forgo the check (ia64).
->>
->> This patch set replaces the BAD_MADT_ENTRY macro with a function called
->> bad_madt_entry().  This function uses a data set of details about the
->> subtables to provide more sanity checking than before:
->>
->> 	-- is the subtable legal for the version given in the FADT?
->>
->> 	-- is the subtable legal for the revision of the MADT in use?
->>
->> 	-- is the subtable of the proper length (including checking
->> 	   on the one variable length subtable that is currently ignored),
->> 	   given the FADT version and the MADT revision?
->>
->> Further, this patch set adds in the call to bad_madt_entry() from the 
->> acpi_table_parse_madt() function, allowing it to be used consistently
->> by all architectures, for all subtables, and removing the need for each
->> of the subtable traversal callback functions to use BAD_MADT_ENTRY.
->>
->> In theory, as the ACPI specification changes, we would only have to add
->> additional information to the data set describing the MADT subtables in
->> order to continue providing sanity checks, even when new subtables are
->> added.
->>
->> These patches have been tested on an APM Mustang (arm64) and are known to
->> work there.  They have also been cross-compiled for x86 and ia64 with no
->> known failures.
->>
->> Changes for v4:
->>    -- Remove extraneous white space change (Graeme Gregory)
->>    -- acpi_parse_entries() changes also needed a check to make sure that
->>       only MADT entries used bad_madt_entry() (Sudeep Holla)
->>    -- inadvertent use of 01day build noted that bad_madt_entry() can be
->>       static, so added it (Sudeep Holla, Fengguang Wu)
->>
->> Changes for v3:
->>    -- Reviewed-and-tested-by from Sudeep Holla for arm64 parts
->>    -- Clearer language in error messages (Graeme Gregory, Timur Tabi)
->>    -- Double checked that inserting call to bad_madt_entry() into the
->>       function acpi_parse_entries() does not impact current behavior
->>       (Sudeep Holla)
->>    
->> Changes for v2:
->>    -- Acked-by on 2/5 from Marc Zyngier and Catalin Marinas for ARM
->>    -- Correct faulty end of loop test found by Timur Tabi
->>
->>
->> Al Stone (5):
->>   ACPI: add in a bad_madt_entry() function to eventually replace the
->>     macro
->>   ACPI / ARM64: remove usage of BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
->>   ACPI / IA64: remove usage of BAD_MADT_ENTRY
->>   ACPI / X86: remove usage of BAD_MADT_ENTRY
->>   ACPI: remove definition of BAD_MADT_ENTRY macro
-> 
-> I've queued this up for v4.4, but I had to rebase it on top of some previous
-> changes in my linux-next branch.
-> 
-> Can you please look at my bleeding-edge branch and see if the result of the
-> rebase is as intended?  In particular, I'm not sure if we really need to return
-> -EINVAL from acpi_parse_entries_array() when we find a bad MADT entry or it
-> will be sufficient to simply go to the next entry in that case?
-> 
-> Thanks,
-> Rafael
+On Mon, Sep 28, 2015 at 2:29 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Sep 28, 2015 at 07:14:30PM +0000, Li Leo wrote:
+>> I saw some discussion going on last year about the permissive license
+>> to be used in ARM device tree files.  I know a lot of files have been
+>> changed to use GPLv2/X11 license.  But may I know if GPLv2/BSD 3-clause
+>> dual license is still a valid license to use in ARM device tree files.
+>> It has been our standard permissive license used for a long time in
+>> many components like device trees in Power architecture.
+>
+> It would have been nice to have had some input at the time that what
+> little discussion there was happened.
+>
+> I'm sorry, but at this point I'm of the opinion that the window for
+> discussing what license we switch to has been had, and the matter is
+> settled; those who didn't take part in the discussion have themselves
+> to blame if they don't like the outcome.
+>
+> What I'm saying is that I doubt anyone has the stomach to go through
+> another set of license changes on the existing files to suit some
+> late-commer to the party.
+>
 
-I see there being two options: (1) return -EINVAL and indicate that the tables
-are incorrect, or (2) print a warning (or something more aggressive?), go to
-the next entry, and hope for the best with the remainder of the MADT subtables.
-The former is consistent with past behavior, I think, and the latter seems to
-me a bit of a gamble.  So, my vote is for (1), the current method; what are you
-thinking these days?
+Right.  I'm not proposing to change all the device trees into another
+license.  GPL/X11 is actually a good license to use.
 
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+> However, we can't dictate to people what license they wish to submit
+> their work under; though, we can make the decision whether to accept
+> it under the license terms or not.
+
+But I'm wondering if we submit a device tree patch using other GPL
+compatible permissive license(like GPL/3-clause-BSD dual license)
+which doesn't include any other device tree files, will it still be
+acceptable or not?
+
+>
+> I think the problem will come if we try to mix a file that's licensed
+> one way, which includes files licensed under a different set of
+> licenses... if you want to use a file licensed under BSD 3-clause but
+> don't want to agree to the GPL license (so you're only bound by the
+> BSD 3-clause license) and that file includes some GPL/X11 licensed
+> files, then what?
+
+Permissive licenses like X11 and BSD 3-clause should be compatible
+with each other right?
+
+Regards,
+Leo
