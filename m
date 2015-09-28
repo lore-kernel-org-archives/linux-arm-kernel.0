@@ -1,64 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 28 Sep 2015 17:43:02 +0100
-Subject: [PATCH v4 9/9] acpi/gsi: Cleanup acpi_register_gsi
-In-Reply-To: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
-References: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1443458582-7497-10-git-send-email-marc.zyngier@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Sep 2015 17:50:21 +0100
+Subject: xf86-video-armada + etnaviv (Was: Re: I.MX6 HDMI support in v4.2)
+In-Reply-To: <1443454813.3178.66.camel@pengutronix.de>
+References: <m337yp5gvv.fsf@t19.piap.pl>
+ <1441709778.13536.8.camel@pengutronix.de>
+ <m3bnd52y4s.fsf@t19.piap.pl>
+ <1442332425.2637.16.camel@pengutronix.de>
+ <20150915163642.GW21084@n2100.arm.linux.org.uk>
+ <1442336034.2637.20.camel@pengutronix.de>
+ <20150915170444.GX21084@n2100.arm.linux.org.uk>
+ <1443451688.3178.61.camel@pengutronix.de>
+ <20150928152429.GW21513@n2100.arm.linux.org.uk>
+ <1443454813.3178.66.camel@pengutronix.de>
+Message-ID: <20150928165021.GY21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the only user of drivers/acpi/gsi.c is now using acpi_set_irq_model
-to set acpi_gsi_descriptor_populate to something meaningful, we can
-always rely on that information to be present (its absence is an error),
-and guarantee that new interrupt controllers will use this API.
+On Mon, Sep 28, 2015 at 05:40:13PM +0200, Lucas Stach wrote:
+> Am Montag, den 28.09.2015, 16:24 +0100 schrieb Russell King - ARM Linux:
+> > On Mon, Sep 28, 2015 at 04:48:08PM +0200, Lucas Stach wrote:
+> > > I've looked at that again and the issue here seems to be that GStreamer
+> > > is handing us a pointer to a buffer that isn't aligned to a page. The
+> > > buffers size is properly rounded up to a pagesize, as requested by
+> > > QueryImageAttributes, but if the buffer start pointer isn't aligned to a
+> > > page boundary we end up with an non-mappable buffer anyway.
+> > > 
+> > > Unfortunately there is no obvious way for a driver to request a minimum
+> > > alignment for the buffer. The only possible fix is for the client to
+> > > always align the buffer to a page boundary in hopes that this is enough
+> > > for the hardware to map it directly and allow to skip any unwanted
+> > > copying.
+> > 
+> > We can't just "round up" the size.  We've no idea whether the buffer
+> > came from shmem (for XvShmPutImage), or whether it's part of an internal
+> > X buffer (for XvPutImage).  In the latter case, we've no idea whether
+> > data in the remainder of the page will be read or written by the CPU
+> > when, eg, a signal occurs - and X does use signals.
+> > 
+> I'm not talking about the driver rounding up the size. That is obviously
+> (contrary to what my patch did) the wrong thing to do.
+> 
+> I was talking of the client (as in VLC, GStreamer, whatever) aligning
+> the buffer to a page boundary. As there is no way for the client to
+> query the alignment restrictions, we may still need a fallback path in
+> the driver, so that if an unaligned buffer comes in we don't do a
+> buffer_from_userptr but actually copy client memory to a new buffer.
 
-Take this opportunity to cleanup acpi_register_gsi.
+You really do _not_ want to do be copying image data.  With large images
+(1080p) that will consume lots of CPU, and tie up the X server doing not
+much other than copying data.  You might as well manually convert and
+copy the data to the screen at that point.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/acpi/gsi.c | 24 ++++++++----------------
- 1 file changed, 8 insertions(+), 16 deletions(-)
-
-diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-index 7905840..29e994d 100644
---- a/drivers/acpi/gsi.c
-+++ b/drivers/acpi/gsi.c
-@@ -76,28 +76,20 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
- 		      int polarity)
- {
- 	int err;
--	unsigned int irq;
-+	struct acpi_gsi_descriptor data;
- 	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
- 	struct irq_domain *d = irq_find_host(acpi_gsi_domain_id);
- 
--	if (acpi_gsi_descriptor_populate) {
--		struct acpi_gsi_descriptor data;
--		err = acpi_gsi_descriptor_populate(&data, gsi, irq_type);
--		if (err)
--			return err;
--
--		return irq_create_acpi_mapping(d, &data);
-+	if (WARN_ON(!acpi_gsi_descriptor_populate)) {
-+		pr_warn("GSI: No registered irqchip, giving up\n");
-+		return -EINVAL;
- 	}
- 
--	irq = irq_create_mapping(d, gsi);
--	if (!irq)
--		return -EINVAL;
-+	err = acpi_gsi_descriptor_populate(&data, gsi, irq_type);
-+	if (err)
-+		return err;
- 
--	/* Set irq type if specified and different than the current one */
--	if (irq_type != IRQ_TYPE_NONE &&
--		irq_type != irq_get_trigger_type(irq))
--		irq_set_irq_type(irq, irq_type);
--	return irq;
-+	return irq_create_acpi_mapping(d, &data);
- }
- EXPORT_SYMBOL_GPL(acpi_register_gsi);
- 
 -- 
-2.1.4
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
