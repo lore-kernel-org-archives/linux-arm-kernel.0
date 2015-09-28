@@ -1,46 +1,40 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Mon, 28 Sep 2015 15:37:43 +0800
-Subject: [RFC PATCH v3 1/3] mmc: sprd: Add MMC host driver for Spreadtrum
- SoC
-In-Reply-To: <CAG_R4_VTXCV4NVMOwv-9F56-_pVsK0hU4go79ZhV3OFxwcF0mA@mail.gmail.com>
-References: <1439571353-30165-1-git-send-email-wuht06@gmail.com>
- <1439571353-30165-2-git-send-email-wuht06@gmail.com>
- <CAPDyKFp=XH+Vo_diRyhrMuB+v1rmTmxo3Lid3Wc-u1ohqNisKw@mail.gmail.com>
- <CAG_R4_VTXCV4NVMOwv-9F56-_pVsK0hU4go79ZhV3OFxwcF0mA@mail.gmail.com>
-Message-ID: <5608EE47.1020402@rock-chips.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 28 Sep 2015 08:40:25 +0100
+Subject: [PATCH 2/2] arm64: to allow EFI_RTC can be selected on ARM64
+In-Reply-To: <1443418478-8240-3-git-send-email-thunder.leizhen@huawei.com>
+References: <1443418478-8240-1-git-send-email-thunder.leizhen@huawei.com>
+ <1443418478-8240-3-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <CAKv+Gu_uFi03XVf5mX9Qy7eH=m1Q1ufpBNN2ucvSREBD+H-Q4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/9/28 15:18, Hongtao Wu wrote:
->  >>
+On 28 September 2015 at 06:34, Zhen Lei <thunder.leizhen@huawei.com> wrote:
+> Now, ARM64 is also support EFI startup. We hope use EFI runtime services
+> to get/set current time and date.
 >
-> On Thu, Sep 10, 2015 at 9:28 PM, Ulf Hansson <ulf.hansson@linaro.org
-> <mailto:ulf.hansson@linaro.org>> wrote:
->  >
->  > On 14 August 2015 at 18:55, Hongtao Wu <wuht06@gmail.com
-> <mailto:wuht06@gmail.com>> wrote:
-
-[...]
-
+> RTC_LIB only controls some configs in drivers/char/Kconfig(included
+> EFI_RTC), and will be automatically selected when RTC_CLASS opened. So
+> this patch have no functional change but give an opportunity to select
+> EFI_RTC when RTC_CLASS closed.
 >
-> Yes, most of this data can be removed, such as caps, caps2, base_clk.
-> However ocr_avail and signal_default_voltage are useful for us.
-> We can't fetch ocr_avail from external regulator via
-> mmc_regulator_get_supply,
-> because our regulator driver can't supply mmc_regulator_get_ocrmask()
-> interface for MMC driver.
-
-Sorry for the noise but... IMO, your need to quirk your regulator driver 
-stuffs rather than mmc.
-
-> And sometimes our external regulator can not supply 3.0v or 1.8v default
-> signal voltage that we expect. So this 3.0v or 1.8v default signal
-> voltage are
-> mandatory.
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  arch/arm64/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 07d1811..25cec57 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -85,7 +85,7 @@ config ARM64
+>         select PERF_USE_VMALLOC
+>         select POWER_RESET
+>         select POWER_SUPPLY
+> -       select RTC_LIB
+> +       select RTC_LIB if !EFI
+>         select SPARSE_IRQ
+>         select SYSCTL_EXCEPTION_TRACE
+>         select HAVE_CONTEXT_TRACKING
 
-
-
--- 
-Best Regards
-Shawn Lin
+You can currently enable EFI_RTC just fine on arm64 when EFI is enabled.
+Why exactly do you need this patch on top?
