@@ -1,72 +1,110 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 28 Sep 2015 17:43:00 +0100
-Subject: [PATCH v4 7/9] irqchip/GIC: Get rid of gic_init_bases()
+Date: Mon, 28 Sep 2015 17:42:58 +0100
+Subject: [PATCH v4 5/9] acpi/gsi: Add acpi_set_irq_model to initialize the GSI
+ layer
 In-Reply-To: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
 References: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1443458582-7497-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1443458582-7497-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since nobody is using gic_init_bases anymore outside of the GIC
-driver itself, let's do a bit of housekeeping and remove the now
-useless entry point.
+In order to start embrassing irqdomains at the GSI level, introduce
+a new initializer:
 
-Only gic_init() is now exposed to the rest of the kernel for the
-benefit of non DT/ACPI system.
+void acpi_set_irq_model(enum acpi_irq_model_id model,
+			struct fwnode_handle *fwnode,
+			int (*populate)(struct acpi_gsi_descriptor *,
+					u32, unsigned int));
+
+where:
+- model is the value assigned to acpi_irq_model
+- fwnode is the identifier for the irqdomain mapping
+  GSI interrupts
+- populate is a function provided by the interrupt controller,
+  populating a struct acpi_gsi_descriptor based on a GSI and
+  the interrupt trigger information
+
+As nobody calls this code yet, the current code is left in place.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic.c       | 8 +++-----
- include/linux/irqchip/arm-gic.h | 9 ++-------
- 2 files changed, 5 insertions(+), 12 deletions(-)
+ drivers/acpi/gsi.c   | 32 ++++++++++++++++++++++++++++++++
+ include/linux/acpi.h |  5 +++++
+ 2 files changed, 37 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 982c09c..0e4142d 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1087,17 +1087,15 @@ static void __init __gic_init_bases(unsigned int gic_nr, int irq_start,
- 	gic_pm_init(gic);
- }
+diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
+index 6232d55..7905840 100644
+--- a/drivers/acpi/gsi.c
++++ b/drivers/acpi/gsi.c
+@@ -17,6 +17,9 @@ enum acpi_irq_model_id acpi_irq_model;
  
--void __init gic_init_bases(unsigned int gic_nr, int irq_start,
--			   void __iomem *dist_base, void __iomem *cpu_base,
--			   u32 percpu_offset, struct device_node *node)
-+void __init gic_init(unsigned int gic_nr, int irq_start,
-+		     void __iomem *dist_base, void __iomem *cpu_base)
+ static struct device_node *acpi_gsi_domain_id;
+ 
++static int (*acpi_gsi_descriptor_populate)(struct acpi_gsi_descriptor *data,
++					   u32 gsi, unsigned int irq_type);
++
+ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
  {
- 	/*
- 	 * Non-DT/ACPI systems won't run a hypervisor, so let's not
- 	 * bother with these...
- 	 */
- 	static_key_slow_dec(&supports_deactivate);
--	__gic_init_bases(gic_nr, irq_start, dist_base, cpu_base,
--			 percpu_offset, node);
-+	__gic_init_bases(gic_nr, irq_start, dist_base, cpu_base, 0, NULL);
+ 	switch (polarity) {
+@@ -72,10 +75,20 @@ EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
+ 		      int polarity)
+ {
++	int err;
+ 	unsigned int irq;
+ 	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
+ 	struct irq_domain *d = irq_find_host(acpi_gsi_domain_id);
+ 
++	if (acpi_gsi_descriptor_populate) {
++		struct acpi_gsi_descriptor data;
++		err = acpi_gsi_descriptor_populate(&data, gsi, irq_type);
++		if (err)
++			return err;
++
++		return irq_create_acpi_mapping(d, &data);
++	}
++
+ 	irq = irq_create_mapping(d, gsi);
+ 	if (!irq)
+ 		return -EINVAL;
+@@ -100,3 +113,22 @@ void acpi_unregister_gsi(u32 gsi)
+ 	irq_dispose_mapping(irq);
  }
+ EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
++
++/**
++ * acpi_set_irq_model - Setup the GSI irqdomain information
++ * @model: the value assigned to acpi_irq_model
++ * @fwnode: the irq_domain identifier for mapping and looking up
++ *          GSI interrupts
++ * @populate: provided by the interrupt controller, populating a
++ *            struct acpi_gsi_descriptor based on a GSI and
++ *            the interrupt trigger information
++ */
++void __init acpi_set_irq_model(enum acpi_irq_model_id model,
++			       struct fwnode_handle *fwnode,
++			       int (*populate)(struct acpi_gsi_descriptor *,
++					       u32, unsigned int))
++{
++	acpi_irq_model = model;
++	acpi_gsi_domain_id = to_of_node(fwnode);
++	acpi_gsi_descriptor_populate = populate;
++}
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 4db2f01..1423b21 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -210,6 +210,11 @@ struct acpi_gsi_descriptor {
+ unsigned int irq_create_acpi_mapping(struct irq_domain *d,
+ 				     struct acpi_gsi_descriptor *irq_data);
  
- #ifdef CONFIG_OF
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index b8901df..bae69e5 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -100,16 +100,11 @@
- 
- struct device_node;
- 
--void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
--		    u32 offset, struct device_node *);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
- int gic_cpu_if_down(unsigned int gic_nr);
- 
--static inline void gic_init(unsigned int nr, int start,
--			    void __iomem *dist , void __iomem *cpu)
--{
--	gic_init_bases(nr, start, dist, cpu, 0, NULL);
--}
-+void gic_init(unsigned int nr, int start,
-+	      void __iomem *dist , void __iomem *cpu);
- 
- int gicv2m_of_init(struct device_node *node, struct irq_domain *parent);
- 
++void acpi_set_irq_model(enum acpi_irq_model_id model,
++			struct fwnode_handle *fwnode,
++			int (*populate)(struct acpi_gsi_descriptor *,
++					u32, unsigned int));
++
+ #ifdef CONFIG_X86_IO_APIC
+ extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
+ #else
 -- 
 2.1.4
