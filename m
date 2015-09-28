@@ -1,88 +1,108 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Mon, 28 Sep 2015 14:24:40 +0200
-Subject: [PATCH v6 5/5] leds: netxbig: set led_classdev max_brightness
-In-Reply-To: <20150928115033.GZ7306@kw.sim.vm.gnt>
-References: <1443301358-2131-1-git-send-email-simon.guinot@sequanux.org>
- <1443301358-2131-6-git-send-email-simon.guinot@sequanux.org>
- <5608F41B.4020307@samsung.com> <20150928091956.GY7306@kw.sim.vm.gnt>
- <5609133A.3050802@samsung.com> <20150928115033.GZ7306@kw.sim.vm.gnt>
-Message-ID: <56093188.4050405@samsung.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Mon, 28 Sep 2015 20:25:07 +0800
+Subject: [PATCH v2 7/9] rockchip: make sure timer5 is enabled on rk3036
+ platforms
+In-Reply-To: <11125723.j2J5LpAGi4@diego>
+References: <1442478540-15068-1-git-send-email-zhengxing@rock-chips.com>
+ <1442486244-1833-1-git-send-email-zhengxing@rock-chips.com>
+ <11125723.j2J5LpAGi4@diego>
+Message-ID: <560931A3.2020403@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2015 01:50 PM, Simon Guinot wrote:
-> On Mon, Sep 28, 2015 at 12:15:22PM +0200, Jacek Anaszewski wrote:
->> On 09/28/2015 11:19 AM, Simon Guinot wrote:
->>> On Mon, Sep 28, 2015 at 10:02:35AM +0200, Jacek Anaszewski wrote:
->>>> Hi Simon,
->>>
->>> Hi Jacek,
->>>
->>>>
->>>> Does your device support reading the brightness currently set?
->>>
->>> No it don't.
->>>
->>>> If so, it would be good to implement brightness_get op, because
->>>> AFAIR you mentioned that the firmware you are working with sets
->>>> always maximum brightness value. Having the op implemented would
->>>> allow to find this out.
->>>
->>> I don't understand how this can help. I mean, the only issue is that at
->>> startup the initial LED state is unknown. And the software brightness
->>> value could be false. But once the LED is configured, the brightness
->>> values for software and hardware are synchronized. The brightness value
->>> is stored/cached in led_classdev and it can be retrieved by the user via
->>> sysfs...
->>>
->>> For my own knowledge, is there some interest in having brightness_get(),
->>> aside of guessing the LED initial state ?
+On 2015?09?17? 23:05, Heiko St?bner wrote:
+> Am Donnerstag, 17. September 2015, 18:37:24 schrieb Xing Zheng:
+>> The timer5 supplies the architected timer and thus as has to run when
+>> the system clocksource and clockevents drivers are registered.
+> please kindly ask the people doing uboot development to do this in uboot
+> itself in future socs :-) - for example Simon's rk3288 mainline uboot does
+> this correctly.
+OK, I will ask the engineer who is doing uboot whether needs to add
+this patch. So I will remove it from the patchset v3 of "Build and support
+rk3036 SoC platform".
+
+Thanks.
+>> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
+>> ---
 >>
->> Some LED controllers can adjust brightness in case battery voltage level
->> falls below some threshold.
+>> Changes in v2: None
+>>
+>>   arch/arm/mach-rockchip/rockchip.c |   22 ++++++++++++++++++++++
+>>   1 file changed, 22 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-rockchip/rockchip.c
+>> b/arch/arm/mach-rockchip/rockchip.c index b6cf3b4..937047f 100644
+>> --- a/arch/arm/mach-rockchip/rockchip.c
+>> +++ b/arch/arm/mach-rockchip/rockchip.c
+>> @@ -32,6 +32,8 @@
+>>   #define RK3288_GRF_SOC_CON0 0x244
+>>   #define RK3288_TIMER6_7_PHYS 0xff810000
+>>
+>> +#define RK3036_TIMER5_PHYS 0x200440a0
+>> +
+> #define RK3036_TIMER_PHYS 0x20044000
+> -->  the actual base address of the timer block
 >
-> OK, thanks for the explanation.
+> As it looks like that we'll need to duplicate that timer init at least for the
+> rk3036 and the timer ip in question is actually the same on both, please split
+> out the actual work into a separate function like
 >
->>
->>> What does the embedded firmware is writing 255 or 0 into the brightness
->>> sysfs attribute. The max_brightness value is ignored. After this patch,
->>> writing 255 and 0 still allows to configure the LED in the same way:
->>> maximum brightness or off. Thus, I believe there is no compatibility
->>> issue.
->>
->> LED core always assures that brightness value passed to brightness_set
->> op does not exceed max_brightness value. So, now after executing
->> "echo 255 > brightness", LED core will adjust it to max_brightness
->> (e.g. 7) before passing to brightness_set.
->>
->> In the message [1], you mentioned that "LEDs are only enabled at their
->> maximum level", so IIUC following is possible:
->>
->> #echo 3 > "brightness"
->>
->> firmware sets brightness to max_brightness from DT (e.g. 7), but
->>
->> #cat brightness
->> #3
->>
->> Is it true?
+> static void rockchip_init_arch_timer_supply(resource_size_t phys, int offs)
+> {
+> 		reg_base = ioremap(phys, SZ_16K);
+> 		if (reg_base) {
+> 			writel(0, reg_base + offs + 0x10);
+> 			writel(0xffffffff, reg_base + offs);
+> 			writel(0xffffffff, reg_base + offs + 0x04);
+> 			writel(1, reg_base + offs + 0x10);
+> 			dsb();
+> 			iounmap(reg_base);
+> 		} else {
+> 			pr_err("rockchip: could not map timer registers\n");
+> 		}
+> }
+Done.
 >
-> Oh no sorry, it is a misunderstanding. By "LEDs are only enabled at
-> their maximum level", I was meaning "LEDs are only enabled at their
-> maximum level by the LaCie stock firmware". The firmware don't make
-> use of the different hardware brightness levels available. But the
-> feature works perfectly. If you write 3 into sysfs "brightness", then
-> you get the third brightness level.
-
-I thought that driver talks to firmware, which controls the LEDs.
- From your explanation I infer that this driver replaces LaCie stock
-firmware, am I right? There must be however some circuit that controls
-LED brightness then.
-
-> OK, I understand you remark now. Sorry for not being very clear in a
-> first place.
-
-
--- 
-Best Regards,
-Jacek Anaszewski
+>>   static void __init rockchip_timer_init(void)
+>>   {
+>>   	if (of_machine_is_compatible("rockchip,rk3288")) {
+>> @@ -64,6 +66,25 @@ static void __init rockchip_timer_init(void)
+> for the rk3288 exchange the timer init against
+> rockchip_init_arch_timer_supply(RK3288_TIMER6_7_PHYS, 0x20);
+Done.
+>>   			regmap_write(grf, RK3288_GRF_SOC_CON0, 0x10000000);
+>>   		else
+>>   			pr_err("rockchip: could not get grf syscon\n");
+>> +	} else if (of_machine_is_compatible("rockchip,rk3036")) {
+>> +		void __iomem *reg_base;
+>> +
+>> +		/*
+>> +		 * Most/all uboot versions for rk3036 don't enable timer5
+>> +		 * which is needed for the architected timer to work.
+>> +		 * So make sure it is running during early boot.
+>> +		 */
+>> +		reg_base = ioremap(RK3036_TIMER5_PHYS, SZ_16K);
+>> +		if (reg_base) {
+>> +			writel(0, reg_base + 0x10);
+>> +			writel(0xffffffff, reg_base);
+>> +			writel(0xffffffff, reg_base + 0x04);
+>> +			writel(1, reg_base + 0x10);
+>> +			dsb();
+>> +			iounmap(reg_base);
+>> +		} else {
+>> +			pr_err("rockchip: could not map timer5 registers\n");
+>> +		}
+> rockchip_init_arch_timer_supply(RK3036_TIMER_PHYS, 0xa0);
+Done.
+>>   	}
+>>
+>>   	of_clk_init(NULL);
+>> @@ -79,6 +100,7 @@ static void __init rockchip_dt_init(void)
+>>
+>>   static const char * const rockchip_board_dt_compat[] = {
+>>   	"rockchip,rk2928",
+>> +	"rockchip,rk3036",
+>>   	"rockchip,rk3066a",
+>>   	"rockchip,rk3066b",
+>>   	"rockchip,rk3188",
+>
