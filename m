@@ -1,65 +1,85 @@
 From: petr.cvek@tul.cz (Petr Cvek)
-Date: Mon, 28 Sep 2015 23:39:33 +0200
-Subject: [PATCH v4 21/26] ARM: pxa: magician: Add support for PXA27x UDC
+Date: Mon, 28 Sep 2015 23:39:51 +0200
+Subject: [PATCH v4 22/26] ARM: pxa: magician: Remove pdata for pasic3-leds
 In-Reply-To: <cover.1443472089.git.petr.cvek@tul.cz>
 References: <cover.1443472089.git.petr.cvek@tul.cz>
-Message-ID: <5609B395.8040800@tul.cz>
+Message-ID: <5609B3A7.3090701@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A PXA27x SoC supports USB device mode, this patch adds support for that.
+The pasic3-leds driver was never in vanilla kernel. Actual configuration
+data for a hypothetical driver does not describe hardware completely, so
+remove them.
+
+This patch prepare HTC Magician machine code to pasic3-leds driver
+addition.
 
 Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 ---
- arch/arm/mach-pxa/magician.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/mach-pxa/magician.c | 44 ++------------------------------------------
+ 1 file changed, 2 insertions(+), 42 deletions(-)
 
 diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index 490d79f..331dfd1 100644
+index 331dfd1..8a90b90 100644
 --- a/arch/arm/mach-pxa/magician.c
 +++ b/arch/arm/mach-pxa/magician.c
-@@ -54,6 +54,10 @@
+@@ -510,46 +510,6 @@ static struct platform_device leds_gpio = {
+ };
  
- #include <linux/regulator/max1586.h>
- 
-+#include <linux/platform_data/pxa2xx_udc.h>
-+#include <mach/udc.h>
-+#include <mach/pxa27x-udc.h>
-+
- #include "devices.h"
- #include "generic.h"
- 
-@@ -582,6 +586,23 @@ static struct platform_device pasic3 = {
-  * PXA UDC
+ /*
+- * PASIC3 LEDs
+- */
+-
+-static struct pasic3_led pasic3_leds[] = {
+-	{
+-		.led = {
+-			.name = "magician:red",
+-			.default_trigger = "ds2760-battery.0-charging",
+-		},
+-		.hw_num	= 0,
+-		.bit2	= PASIC3_BIT2_LED0,
+-		.mask	= PASIC3_MASK_LED0,
+-	},
+-	{
+-		.led = {
+-			.name = "magician:green",
+-			.default_trigger = "ds2760-battery.0-charging-or-full",
+-		},
+-		.hw_num	= 1,
+-		.bit2	= PASIC3_BIT2_LED1,
+-		.mask	= PASIC3_MASK_LED1,
+-	},
+-	{
+-		.led = {
+-			.name = "magician:blue",
+-			.default_trigger = "bluetooth",
+-		},
+-		.hw_num	= 2,
+-		.bit2	= PASIC3_BIT2_LED2,
+-		.mask	= PASIC3_MASK_LED2,
+-	},
+-};
+-
+-static struct pasic3_leds_machinfo pasic3_leds_info = {
+-	.num_leds	= ARRAY_SIZE(pasic3_leds),
+-	.power_gpio	= EGPIO_MAGICIAN_LED_POWER,
+-	.leds		= pasic3_leds,
+-};
+-
+-/*
+  * PASIC3 DS1WM
   */
  
-+static void magician_udc_command(int cmd)
-+{
-+	if (cmd == PXA2XX_UDC_CMD_CONNECT)
-+		UP2OCR |= UP2OCR_DPPUE | UP2OCR_DPPUBE;
-+	else if (cmd == PXA2XX_UDC_CMD_DISCONNECT)
-+		UP2OCR &= ~(UP2OCR_DPPUE | UP2OCR_DPPUBE);
-+}
-+
-+static struct pxa2xx_udc_mach_info magician_udc_info __initdata = {
-+	.udc_command	= magician_udc_command,
-+	.gpio_pullup	= GPIO27_MAGICIAN_USBC_PUEN,
-+};
-+
-+/*
-+ * USB device VUSB detection
-+ */
-+
- static struct resource gpio_vbus_resource = {
- 	.flags	= IORESOURCE_IRQ,
- 	.start	= IRQ_MAGICIAN_VBUS,
-@@ -1120,6 +1141,7 @@ static void __init magician_init(void)
+@@ -568,8 +528,8 @@ static struct resource pasic3_resources[] = {
+ };
  
- 	pxa_set_mci_info(&magician_mci_info);
- 	pxa_set_ohci_info(&magician_ohci_info);
-+	pxa_set_udc_info(&magician_udc_info);
+ static struct pasic3_platform_data pasic3_platform_data = {
+-	.led_pdata	= &pasic3_leds_info,
+-	.clock_rate	= 4000000,
++/*	.led_pdata  = &pasic3_leds_info,*/
++	.clock_rate = 4000000,
+ };
  
- 	/* Check LCD type we have */
- 	cpld = ioremap_nocache(PXA_CS3_PHYS, 0x1000);
+ static struct platform_device pasic3 = {
 -- 
 1.7.12.1
