@@ -1,46 +1,32 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Mon, 28 Sep 2015 15:50:38 -0700
-Subject: [PATCH v4 1/9] drivers/of: Introduce of_node_alloc
-In-Reply-To: <1443458582-7497-2-git-send-email-marc.zyngier@arm.com>
-References: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
- <1443458582-7497-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <5609C43E.1040106@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 28 Sep 2015 16:31:05 -0700
+Subject: [GIT PULL] ARM: imx: fixes for 4.3
+In-Reply-To: <20150928052440.GA4843@tiger>
+References: <20150928052440.GA4843@tiger>
+Message-ID: <20150928233105.GA30986@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/28/2015 9:42 AM, Marc Zyngier wrote:
-> We want to be able to generate "fake" device nodes that can be
-> used as an identifier for irq domains. For that, we reuse the
-> dynamic DT layer in order to generate DT nodes in a detached state
-> (so that it doesn't interfere with the rest of the tree).
+On Mon, Sep 28, 2015 at 01:24:41PM +0800, Shawn Guo wrote:
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/of/dynamic.c | 22 ++++++++++++++++++++++
->  include/linux/of.h   |  5 +++++
->  2 files changed, 27 insertions(+)
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 > 
-> diff --git a/drivers/of/dynamic.c b/drivers/of/dynamic.c
-> index 53826b8..709d363 100644
-> --- a/drivers/of/dynamic.c
-> +++ b/drivers/of/dynamic.c
-> @@ -445,6 +445,28 @@ struct device_node *__of_node_dup(const struct device_node *np, const char *fmt,
->  	return NULL;
->  }
->  
-> +/**
-> + * of_node_alloc() - Allocate an empty device node dynamically.
-> + * @fmt: Format string (plus vargs) for new full name of the device node
-> + *
-> + * Create an device tree node, either by by allocating an empty one
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.3
+> 
+> for you to fetch changes up to 0af822110871400908d5b6f83a8908c45f881d8f:
+> 
+>   ARM: dts: fix usb pin control for imx-rex dts (2015-09-24 05:13:40 -0700)
+> 
+> ----------------------------------------------------------------
+> The i.MX fixes for 4.3:
+>  - One fix for i.MX6 Rex Pro board to remove a duplicated pinctrl entry
+>    which causes error for USB pinctrl setup.
+>  - Fix MC34708 PMIC interrupt level for imx53-qsrb board.
 
-      Create a device tree node by allocating an empty one
+Merged, thanks.
 
-> + * suitable for further modification.  The node data are dynamically
-> + * allocated and all the node flags have the OF_DYNAMIC & OF_DETACHED
-> + * bits set. Returns the newly allocated node or NULL on out of memory
-> + * error.
-> + */
-> +struct device_node *of_node_alloc(const char *fmt, ...)
 
-< snip >
+-Olof
