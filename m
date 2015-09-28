@@ -1,68 +1,41 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Mon, 28 Sep 2015 13:43:09 -0600
-Subject: [Linaro-acpi] [PATCH v2 0/5] ACPI probing infrastructure
-In-Reply-To: <56094589.504@arm.com>
-References: <1442152943-24493-1-git-send-email-marc.zyngier@arm.com>
- <1698028.ftHN1K8oZa@vostro.rjw.lan> <560939A7.3030603@arm.com>
- <39030379.kalO2V72FV@vostro.rjw.lan> <56094589.504@arm.com>
-Message-ID: <5609984D.70702@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 28 Sep 2015 13:49:10 -0600
+Subject: [PATCH 3/3] ARM: bcm2835: Add the auxiliary clocks to the device
+ tree.
+In-Reply-To: <87si5ymjki.fsf@eliezer.anholt.net>
+References: <1441923750-19404-1-git-send-email-eric@anholt.net>
+ <1441923750-19404-4-git-send-email-eric@anholt.net>
+ <5600BAC3.70506@wwwdotorg.org> <87si5ymjki.fsf@eliezer.anholt.net>
+Message-ID: <560999B6.7080400@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2015 07:50 AM, Marc Zyngier wrote:
-> On 28/09/15 14:53, Rafael J. Wysocki wrote:
->> On Monday, September 28, 2015 01:59:19 PM Marc Zyngier wrote:
->>> Hi Rafael,
->>>
->>> On 26/09/15 00:45, Rafael J. Wysocki wrote:
->>>
->>>>> Marc Zyngier (5):
->>>>>   acpi: Add basic device probing infrastructure
->>>>>   irqchip/acpi: Add probing infrastructure for ACPI-based irqchips
->>>>>   irqchip/gic: Convert the GIC driver to ACPI probing
->>>>>   clocksource/acpi: Add probing infrastructure for ACPI-based
->>>>>     clocksources
->>>>>   clocksource/arm_arch_timer: Convert to ACPI probing
->>>>
->>>> I'm generally fine with this (modulo a couple of super-minor nits in the
->>>> first patch), but it needs ACKs from Thomas for the irqchip-related and
->>>> clocksource-related patches.
->>>
->>> Sure. I've now addressed your comments, and I'll post the updated series
->>> later today.
->>>
->>>> Plus [3/5] needs to be rebased on top of the Al's patches removing BAD_MADT_ENTRY
->>>> (currently in my bleeding-edge branch).
->>>
->>> Al's patches were there on Friday, but vanished over the weekend. Do you
->>> have another (stable?) branch with these patches in (assuming they are
->>> still aimed at 4.4)?
+On 09/28/2015 01:26 PM, Eric Anholt wrote:
+> Stephen Warren <swarren@wwwdotorg.org> writes:
+>
+>> On 09/10/2015 03:22 PM, Eric Anholt wrote:
+>>> These will be used for enabling UART1, SPI1, and SPI2.
 >>
->> The Al's patches are gone for now, because they introduced a 0-day testing
->> regression.
+>>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
 >>
->> I guess this means I can apply your patches first and ask Al to rebase his
->> next version on them.
-> 
-> OK. I'll rebase them on the current bleeding-edge, and post that.
-> 
-> Thanks,
-> 
-> 	M.
-> 
+>>> +		aux_clocks: aux-clocks at 0x7e215004 {
+>>> +			compatible = "brcm,bcm2835-aux-clock";
+>>> +			#clock-cells = <1>;
+>>> +			reg = <0x7e215004 0x4>;
+>>
+>> Actually, I take back the ack on this patch. This HW module has two
+>> registers. The reg property should include both of those registers so
+>> that if SW needs to start using the other register at some time in the
+>> future, the entire set of registers is already represented in DT.
+>
+> If I changed it to "reg = <0x7e215000 0x8>" and use a #define for the
+> clock register offset in patch 2/3, would I then have your ack?
 
-Yeah, sorry about that; I had some bad info from the 1.0 version of the ACPI
-spec.  And I was busy with family stuff all weekend.
+I suspect the compatible should then be "brcm,bcm2835-aux" (or similar) 
+since the node would represent the entire aux module, not just the clock 
+gate feature of the module (assuming there are other features in the aux 
+module besides just the clock gate).
 
-Rafael, I'll look for Marc's patches to show up in bleeding-edge and rebase on
-top of that.
-
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+With the reg change and the compatible change if appropriate, you can 
+have my ack,
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
