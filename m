@@ -1,120 +1,52 @@
 From: petr.cvek@tul.cz (Petr Cvek)
-Date: Mon, 28 Sep 2015 23:15:57 +0200
-Subject: [PATCH v4 08/26] ARM: pxa: magician: Rename abstract LCD GPIOs
+Date: Mon, 28 Sep 2015 23:16:14 +0200
+Subject: [PATCH v4 09/26] ARM: pxa: magician: Optimize powerup delays for
+ Samsung LCD
 In-Reply-To: <cover.1443472089.git.petr.cvek@tul.cz>
 References: <cover.1443472089.git.petr.cvek@tul.cz>
-Message-ID: <5609AE0D.6070701@tul.cz>
+Message-ID: <5609AE1E.1090805@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch renames GPIOs, which are used to control the power lines to
-the LCD screen. New names correspond to a real functionality, which was
-measured on the HTC Magician board_id 0x3a.
+Delays for the Samsung LCD are greater than needed. These values were
+extracted from a datasheet.
 
 Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 ---
- arch/arm/mach-pxa/include/mach/magician.h |  6 +++---
- arch/arm/mach-pxa/magician.c              | 33 +++++++++++++++++--------------
- 2 files changed, 21 insertions(+), 18 deletions(-)
+ arch/arm/mach-pxa/magician.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/include/mach/magician.h b/arch/arm/mach-pxa/include/mach/magician.h
-index 3f8922a..af4cdc2 100644
---- a/arch/arm/mach-pxa/include/mach/magician.h
-+++ b/arch/arm/mach-pxa/include/mach/magician.h
-@@ -52,9 +52,9 @@
- #define GPIO101_MAGICIAN_KEY_VOL_DOWN 		101
- #define GPIO102_MAGICIAN_KEY_PHONE		102
- #define GPIO103_MAGICIAN_LED_KP			103
--#define GPIO104_MAGICIAN_LCD_POWER_1 		104
--#define GPIO105_MAGICIAN_LCD_POWER_2		105
--#define GPIO106_MAGICIAN_LCD_POWER_3		106
-+#define GPIO104_MAGICIAN_LCD_VOFF_EN		104
-+#define GPIO105_MAGICIAN_LCD_VON_EN		105
-+#define GPIO106_MAGICIAN_LCD_DCDC_NRESET	106
- #define GPIO107_MAGICIAN_DS1WM_IRQ		107
- #define GPIO108_MAGICIAN_GSM_READY		108
- #define GPIO114_MAGICIAN_UNKNOWN		114
 diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index 91d302b..d78fc3a 100644
+index d78fc3a..14d1f55 100644
 --- a/arch/arm/mach-pxa/magician.c
 +++ b/arch/arm/mach-pxa/magician.c
-@@ -337,22 +337,22 @@ static void toppoly_lcd_power(int on, struct fb_var_screeninfo *si)
- 
- 	if (on) {
- 		gpio_set_value(EGPIO_MAGICIAN_TOPPOLY_POWER, 1);
--		gpio_set_value(GPIO106_MAGICIAN_LCD_POWER_3, 1);
-+		gpio_set_value(GPIO106_MAGICIAN_LCD_DCDC_NRESET, 1);
- 		udelay(2000);
- 		gpio_set_value(EGPIO_MAGICIAN_LCD_POWER, 1);
- 		udelay(2000);
- 		/* FIXME: enable LCDC here */
- 		udelay(2000);
--		gpio_set_value(GPIO104_MAGICIAN_LCD_POWER_1, 1);
-+		gpio_set_value(GPIO104_MAGICIAN_LCD_VOFF_EN, 1);
- 		udelay(2000);
--		gpio_set_value(GPIO105_MAGICIAN_LCD_POWER_2, 1);
-+		gpio_set_value(GPIO105_MAGICIAN_LCD_VON_EN, 1);
- 	} else {
- 		msleep(15);
--		gpio_set_value(GPIO105_MAGICIAN_LCD_POWER_2, 0);
-+		gpio_set_value(GPIO105_MAGICIAN_LCD_VON_EN, 0);
- 		udelay(500);
--		gpio_set_value(GPIO104_MAGICIAN_LCD_POWER_1, 0);
-+		gpio_set_value(GPIO104_MAGICIAN_LCD_VOFF_EN, 0);
- 		udelay(1000);
--		gpio_set_value(GPIO106_MAGICIAN_LCD_POWER_3, 0);
-+		gpio_set_value(GPIO106_MAGICIAN_LCD_DCDC_NRESET, 0);
- 		gpio_set_value(EGPIO_MAGICIAN_LCD_POWER, 0);
- 	}
- }
-@@ -367,19 +367,19 @@ static void samsung_lcd_power(int on, struct fb_var_screeninfo *si)
+@@ -366,21 +366,19 @@ static void samsung_lcd_power(int on, struct fb_var_screeninfo *si)
+ 			gpio_set_value(GPIO75_MAGICIAN_SAMSUNG_POWER, 1);
  		else
  			gpio_set_value(EGPIO_MAGICIAN_LCD_POWER, 1);
- 		mdelay(10);
--		gpio_set_value(GPIO106_MAGICIAN_LCD_POWER_3, 1);
-+		gpio_set_value(GPIO106_MAGICIAN_LCD_DCDC_NRESET, 1);
- 		mdelay(10);
--		gpio_set_value(GPIO104_MAGICIAN_LCD_POWER_1, 1);
-+		gpio_set_value(GPIO104_MAGICIAN_LCD_VOFF_EN, 1);
- 		mdelay(30);
--		gpio_set_value(GPIO105_MAGICIAN_LCD_POWER_2, 1);
-+		gpio_set_value(GPIO105_MAGICIAN_LCD_VON_EN, 1);
- 		mdelay(10);
+-		mdelay(10);
++		mdelay(6);
+ 		gpio_set_value(GPIO106_MAGICIAN_LCD_DCDC_NRESET, 1);
+-		mdelay(10);
++		mdelay(6);	/* Avdd -> Voff >5ms */
+ 		gpio_set_value(GPIO104_MAGICIAN_LCD_VOFF_EN, 1);
+-		mdelay(30);
++		mdelay(16);	/* Voff -> Von >(5+10)ms */
+ 		gpio_set_value(GPIO105_MAGICIAN_LCD_VON_EN, 1);
+-		mdelay(10);
  	} else {
- 		mdelay(10);
--		gpio_set_value(GPIO105_MAGICIAN_LCD_POWER_2, 0);
-+		gpio_set_value(GPIO105_MAGICIAN_LCD_VON_EN, 0);
- 		mdelay(30);
--		gpio_set_value(GPIO104_MAGICIAN_LCD_POWER_1, 0);
-+		gpio_set_value(GPIO104_MAGICIAN_LCD_VOFF_EN, 0);
- 		mdelay(10);
--		gpio_set_value(GPIO106_MAGICIAN_LCD_POWER_3, 0);
-+		gpio_set_value(GPIO106_MAGICIAN_LCD_DCDC_NRESET, 0);
- 		mdelay(10);
+-		mdelay(10);
+ 		gpio_set_value(GPIO105_MAGICIAN_LCD_VON_EN, 0);
+-		mdelay(30);
++		mdelay(16);
+ 		gpio_set_value(GPIO104_MAGICIAN_LCD_VOFF_EN, 0);
+-		mdelay(10);
++		mdelay(6);
+ 		gpio_set_value(GPIO106_MAGICIAN_LCD_DCDC_NRESET, 0);
+-		mdelay(10);
++		mdelay(6);
  		if (system_rev < 3)
  			gpio_set_value(GPIO75_MAGICIAN_SAMSUNG_POWER, 0);
-@@ -796,9 +796,11 @@ static struct platform_device *devices[] __initdata = {
- static struct gpio magician_global_gpios[] = {
- 	{ GPIO13_MAGICIAN_CPLD_IRQ, GPIOF_IN, "CPLD_IRQ" },
- 	{ GPIO107_MAGICIAN_DS1WM_IRQ, GPIOF_IN, "DS1WM_IRQ" },
--	{ GPIO104_MAGICIAN_LCD_POWER_1, GPIOF_OUT_INIT_LOW, "LCD power 1" },
--	{ GPIO105_MAGICIAN_LCD_POWER_2, GPIOF_OUT_INIT_LOW, "LCD power 2" },
--	{ GPIO106_MAGICIAN_LCD_POWER_3, GPIOF_OUT_INIT_LOW, "LCD power 3" },
-+
-+	/* NOTICE valid LCD init sequence */
-+	{ GPIO106_MAGICIAN_LCD_DCDC_NRESET, GPIOF_OUT_INIT_LOW, "LCD DCDC nreset" },
-+	{ GPIO104_MAGICIAN_LCD_VOFF_EN, GPIOF_OUT_INIT_LOW, "LCD VOFF enable" },
-+	{ GPIO105_MAGICIAN_LCD_VON_EN, GPIOF_OUT_INIT_LOW, "LCD VON enable" },
- 	{ GPIO83_MAGICIAN_nIR_EN, GPIOF_OUT_INIT_HIGH, "nIR_EN" },
- };
- 
-@@ -835,6 +837,7 @@ static void __init magician_init(void)
- 		lcd_select = board_id & 0x8;
- 		pr_info("LCD type: %s\n", lcd_select ? "Samsung" : "Toppoly");
- 		if (lcd_select && (system_rev < 3))
-+			/* NOTICE valid LCD init sequence */
- 			gpio_request_one(GPIO75_MAGICIAN_SAMSUNG_POWER,
- 				GPIOF_OUT_INIT_LOW, "Samsung LCD Power");
- 		pxa_set_fb_info(NULL,
+ 		else
 -- 
 1.7.12.1
