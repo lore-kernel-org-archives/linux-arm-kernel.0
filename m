@@ -1,45 +1,49 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 28 Sep 2015 08:19:14 +0200
-Subject: [PATCH v3 00/26] ARM: pxa: magician: Rework HTC Magician support
-In-Reply-To: <5608D3DB.2000106@tul.cz> (Petr Cvek's message of "Mon, 28 Sep
- 2015 07:44:59 +0200")
-References: <55FA4756.9080309@tul.cz> <87zj09fbyq.fsf@belgarion.home>
- <5608D3DB.2000106@tul.cz>
-Message-ID: <8737xzf4m5.fsf@belgarion.home>
+From: yitian.bu@tangramtek.com (yitian)
+Date: Mon, 28 Sep 2015 14:36:16 +0800
+Subject: [PATCH 1/1] ASoC: dwc: fix dma stop transferring issue
+Message-ID: <035401d0f9b7$faa800b0$eff80210$@tangramtek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
+Designware I2S uses tx empty and rx available signals as the DMA
+handshaking signals. during music playing, if XRUN occurs,
+i2s_stop() function will be executed and both tx and rx irq are
+masked, when music contintes to be played, i2s_start() is executed
+but both tx and rx irq are not unmasked which cause I2S stop
+sending DMA handshaking signal to DMA controller, and it finally
+cause music playing will be stopped once XRUN occurs for the first
+time.
 
-> Dne 26.9.2015 v 17:15 Robert Jarzmik napsal(a):
->> Petr Cvek <petr.cvek@tul.cz> writes:
->> 
->>> This patchset will clean, fix, optimize and add multiple devices,
->>> which can be found on the HTC Magician machine.
->> ... zip ...
->>>  arch/arm/mach-pxa/include/mach/magician.h |  78 +--
->>>  arch/arm/mach-pxa/magician.c              | 907 +++++++++++++++++++++---------
->>>  2 files changed, 682 insertions(+), 303 deletions(-)
->> 
->> Ok Petr, that's way better.
->> This is how I see the next step :
->>  1) You fix the patch 1/26 and resend only that one, it's trivial whitespacing,
->>     no need to send another complete patchset
->
-> OMG my version of Kate editor differently renders the tabs depending on the font size.
->
->> 
->> Meanwhile, I'll have time to answer to patches 19 and 22. Next Sunday, I'll
->> reply once more that I have queued your patches (provided that you update patch
->> 1/26), and you will be able to rebase on this tree, leaving at most 2 patches to
->> deal with.
->
-> It does not clearly rebase (by "fixup" during git rebase) as an another patch
-> (#8) renames LCD GPIOs. And I have found another unnecessary tabs in patch
-> #21. So I will send another patchset version, OK?
-Yes, with the very same audience as this mail.
+Signed-off-by: Yitian Bu <yitian.bu@tangramtek.com>
+---
+ sound/soc/dwc/designware_i2s.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-Cheers.
-
+diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
+index a3e97b4..4d3e1d3 100644
+--- a/sound/soc/dwc/designware_i2s.c
++++ b/sound/soc/dwc/designware_i2s.c
+@@ -144,10 +144,19 @@ static void i2s_start(struct dw_i2s_dev *dev,
+ 
+ 	i2s_write_reg(dev->i2s_base, IER, 1);
+ 
+-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
++		for (i = 0; i < 4; i++) {
++			irq = i2s_read_reg(dev->i2s_base, IMR(i));
++			i2s_write_reg(dev->i2s_base, IMR(i), irq & ~0x30);
++		}
+ 		i2s_write_reg(dev->i2s_base, ITER, 1);
+-	else
++	} else {
++		for (i = 0; i < 4; i++) {
++			irq = i2s_read_reg(dev->i2s_base, IMR(i));
++			i2s_write_reg(dev->i2s_base, IMR(i), irq & ~0x03);
++		}
+ 		i2s_write_reg(dev->i2s_base, IRER, 1);
++	}
+ 
+ 	i2s_write_reg(dev->i2s_base, CER, 1);
+ }
 -- 
-Robert
+1.7.12.4
