@@ -1,12 +1,12 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Mon, 28 Sep 2015 15:22:40 +0100
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 28 Sep 2015 15:23:28 +0100
 Subject: [Xen-devel] [PATCH] xen/pci: Don't build Xen pci code for ARM
  and ARM64
 In-Reply-To: <56094891.2000409@oracle.com>
 References: <1443447044-24985-1-git-send-email-julien.grall@citrix.com>
  <56094600.7050508@citrix.com> <560947B6.1030101@citrix.com>
  <56094891.2000409@oracle.com>
-Message-ID: <56094D30.7080305@citrix.com>
+Message-ID: <56094D60.1010003@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -33,9 +33,6 @@ On 28/09/15 15:02, Boris Ostrovsky wrote:
 >>>> for ARM platform.
 >>> Since PCI_MMCONFIG isn't x86 specific and its use in drivers/xen/pci.c
 >>> is, can you fix this by changing to #ifdef CONFIG_X86?
-
-This.
-
 >> Well, it may be possible that we need this code for ARM/ARM64.
 >>
 >>  From the origin thread [1], it wasn't clear what is the correct
@@ -54,6 +51,15 @@ This.
 > arch function for pci_probe? It will be a nop on ARM. (I think that was
 > the only problem here).
 
-Or preferably this.
+Hmmmm. It looks like that the mmconfig is not yet supported upstream for
+ARM64. So even with arch function for pci_probe so it won't work.
 
-David
+I hit the compilation issue on a 4.2 with patched applied for some
+hardware enablement. Some of them if for mmconfig.
+
+I should have check it before sending it. Sorry for the noise.
+
+Regards,
+
+-- 
+Julien Grall
