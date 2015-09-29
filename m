@@ -1,43 +1,46 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 29 Sep 2015 14:42:26 +0200
-Subject: [PATCH] ARM: exynos_defconfig: Enable WiFi-Ex as a module instead
- built-in
-Message-ID: <1443530546-3066-1-git-send-email-javier@osg.samsung.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 29 Sep 2015 13:46:20 +0100
+Subject: [PATCH 16/22] arm64/debug: Make use of the system wide safe value
+In-Reply-To: <560A8159.8000300@arm.com>
+References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
+ <1442413280-31885-17-git-send-email-suzuki.poulose@arm.com>
+ <560A8159.8000300@arm.com>
+Message-ID: <560A881C.2020908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell WiFi-Ex driver tries to load a firmware on probe. So if the
-driver is built-in and probed before a firmware is available, this is
-not loaded and the chip does not work.
+On 29/09/15 13:17, Vladimir Murzin wrote:
+> On 16/09/15 15:21, Suzuki K. Poulose wrote:
+>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>>
+>> Use the system wide value of ID_AA64DFR0 to make safer decisions
+>>
+>> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   arch/arm64/include/asm/hw_breakpoint.h |   14 ++------------
+>>   arch/arm64/kernel/debug-monitors.c     |    6 ++++--
+>>   arch/arm64/kernel/hw_breakpoint.c      |   19 ++++++++++++++++++-
+>>   3 files changed, 24 insertions(+), 15 deletions(-)
+>>
+>
+> Looks like this patch introduces build-time regression if
+> CONFIG_PERF_EVENTS is not set:
+>
+>> arch/arm64/kvm/built-in.o: In function `kvm_arm_setup_debug':
+>> /work/tools/linux/arch/arm64/kvm/debug.c:173: undefined reference to `get_num_brps'
+>> /work/tools/linux/arch/arm64/kvm/debug.c:177: undefined reference to `get_num_wrps'
+>> arch/arm64/kvm/built-in.o: In function `kvm_arm_clear_debug':
+>> /work/tools/linux/arch/arm64/kvm/debug.c:208: undefined reference to `get_num_brps'
+>> /work/tools/linux/arch/arm64/kvm/debug.c:212: undefined reference to `get_num_wrps'
+>> arch/arm64/kvm/built-in.o: In function `kvm_arch_dev_ioctl_check_extension':
+>> /work/tools/linux/arch/arm64/kvm/reset.c:78: undefined reference to `get_num_wrps'
+>> /work/tools/linux/arch/arm64/kvm/reset.c:75: undefined reference to `get_num_brps'
+>> make: *** [vmlinux] Error 1
+>
+> Vladimir
+>
 
-This happens for example if an initramfs isn't used since the driver is
-probed before the root filesystem is mounted.
+Thanks for pointing this out. I will fix it by moving the get_num_xrps() definition
+back to hw_breakpoint.h.
 
-Change the default config since the driver isn't needed for machines to
-boot and is more convenient to have it enabled as a module to avoid
-requiring an initramfs or to have the firmware built into the kernel.
-
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
----
-
- arch/arm/configs/exynos_defconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index d4f6063d8a72..5aad617f02c7 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -64,8 +64,8 @@ CONFIG_SMSC911X=y
- CONFIG_USB_USBNET=y
- CONFIG_USB_NET_SMSC75XX=y
- CONFIG_USB_NET_SMSC95XX=y
--CONFIG_MWIFIEX=y
--CONFIG_MWIFIEX_SDIO=y
-+CONFIG_MWIFIEX=m
-+CONFIG_MWIFIEX_SDIO=m
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_CROS_EC=y
--- 
-2.4.3
+Suzuki
