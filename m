@@ -1,81 +1,50 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 29 Sep 2015 14:27:27 -0700
-Subject: [PATCH 4/4] dma-debug: Allow poisoning nonzero allocations
-In-Reply-To: <560585EB.3060908@arm.com>
-References: <cover.1443178314.git.robin.murphy@arm.com>
- <0405c6131def5aa179ff4ba5d4201ebde89cede3.1443178314.git.robin.murphy@arm.com>
- <20150925124447.GO21513@n2100.arm.linux.org.uk>
- <560585EB.3060908@arm.com>
-Message-ID: <20150929142727.e95a2d2ebff65dda86315248@linux-foundation.org>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Wed, 30 Sep 2015 00:28:45 +0300
+Subject: [PATCH 0/4] memory: pl17x: add support of PL175 and PL176
+ controllers
+In-Reply-To: <CAGhQ9VzUwkkXqRQ-WZ_cjRKCrE=co1LNwFaQfGmBbuEOsVZ6_A@mail.gmail.com>
+References: <1443459043-24144-1-git-send-email-vz@mleia.com>
+ <CAGhQ9VzUwkkXqRQ-WZ_cjRKCrE=co1LNwFaQfGmBbuEOsVZ6_A@mail.gmail.com>
+Message-ID: <560B028D.1040402@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Sep 2015 18:35:39 +0100 Robin Murphy <robin.murphy@arm.com> wrote:
+Hi Joachim,
 
-> Hi Russell,
+On 29.09.2015 23:39, Joachim Eastwood wrote:
+> Hi Vladimir,
 > 
-> On 25/09/15 13:44, Russell King - ARM Linux wrote:
-> > On Fri, Sep 25, 2015 at 01:15:46PM +0100, Robin Murphy wrote:
-> >> Since some dma_alloc_coherent implementations return a zeroed buffer
-> >> regardless of whether __GFP_ZERO is passed, there exist drivers which
-> >> are implicitly dependent on this and pass otherwise uninitialised
-> >> buffers to hardware. This can lead to subtle and awkward-to-debug issues
-> >> using those drivers on different platforms, where nonzero uninitialised
-> >> junk may for instance occasionally look like a valid command which
-> >> causes the hardware to start misbehaving. To help with debugging such
-> >> issues, add the option to make uninitialised buffers much more obvious.
-> >
-> > The reason people started to do this is to stop a security leak in the
-> > ALSA code: ALSA allocates the ring buffer with dma_alloc_coherent()
-> > which used to grab pages and return them uninitialised.  These pages
-> > could contain anything - including the contents of /etc/shadow, or
-> > your bank details.
-> >
-> > ALSA then lets userspace mmap() that memory, which means any user process
-> > which has access to the sound devices can read data leaked from kernel
-> > memory.
-> >
-> > I think I did bring it up at the time I found it, and decided that the
-> > safest thing to do was to always return an initialised buffer - short of
-> > constantly auditing every dma_alloc_coherent() user which also mmap()s
-> > the buffer into userspace, I couldn't convince myself that it was safe
-> > to avoid initialising the buffer.
-> >
-> > I don't know whether the original problem still exists in ALSA or not,
-> > but I do know that there are dma_alloc_coherent() implementations out
-> > there which do not initialise prior to returning memory.
+> On 28 September 2015 at 18:50, Vladimir Zapolskiy <vz@mleia.com> wrote:
+>> The change adds support of ARM PrimeCell PL175 MPMC and PL176 MPMC,
+>> the static memory controllers on devices are similar to one found on
+>> ARM PrimeCell PL172, add support to the existing driver.
+>>
+>> Vladimir Zapolskiy (4):
+>>   memory: pl172: correct MPMC peripheral ID register bits
+>>   memory: pl172: add ARM PrimeCell PL175 MPMC support
+>>   memory: pl172: add ARM PrimeCell PL176 MPMC support
+>>   doc: dt: arm,pl172: add description of PL175 and PL176 controllers
 > 
-> Indeed, I think we've discussed this before, and I don't imagine we'll 
-> be changing the actual behaviour of the existing allocators any time soon.
-
-If I'm understanding things correctly, some allocators zero the memory
-by default and others do not.  And we have an unknown number of drivers
-which are assuming that the memory is zeroed.
-
-Correct?
-
-If so, our options are
-
-a) audit all callers, find the ones which expect zeroed memory but
-   aren't passing __GFP_ZERO and fix them.
-
-b) convert all allocators to zero the memory by default.
-
-Obviously, a) is better.  How big a job is it?
-
-This patch will help the process, if people use it.
-
-> >> +	if (IS_ENABLED(CONFIG_DMA_API_DEBUG_POISON) && !(flags & __GFP_ZERO))
-> >> +		memset(virt, DMA_ALLOC_POISON, size);
-> >> +
-> >
-> > This is likely to be slow in the case of non-cached memory and large
-> > allocations.  The config option should come with a warning.
+> Changes look good to me.
 > 
-> It depends on DMA_API_DEBUG, which already has a stern performance 
-> warning, is additionally hidden behind EXPERT, and carries a slightly 
-> flippant yet largely truthful warning that actually using it could break 
-> pretty much every driver in your system; is that not enough?
+> What LPC32xx board did you test this on, btw?
 
-It might be helpful to provide a runtime knob as well - having to
-rebuild&reinstall just to enable/disable this feature is a bit painful.
+I tested PL175 on Timll Devkit3250 board with 4Mb NOR.
+
+> Also if you have added the controller to lpc32xx.dtsi it would be
+> great if you could also submit those changes to the lpc32xx
+> maintainer.
+> 
+
+Right, this is in my plans. To avoid any mess in the controller driver,
+mach-lpc32xx must be converted to common clock framework firstly, that's
+what I'm doing at the moment, then I'll send the corresponding EMC
+updates in lpc32xx.dtsi.
+
+By the way I've tested your clocksource driver on LPC32xx and it works
+fine, but again clean switching to it is not possible until LPC32xx
+clocks are out of the common clock framework.
+
+--
+With best wishes,
+Vladimir
