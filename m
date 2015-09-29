@@ -1,128 +1,278 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 29 Sep 2015 09:39:13 +0200
-Subject: [PATCH v3 5/5] clk: sunxi: mod1 clock support
+Date: Tue, 29 Sep 2015 09:39:09 +0200
+Subject: [PATCH v3 1/5] clk: Add a basic multiplier clock
 In-Reply-To: <1443512353-28073-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1443512353-28073-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1443512353-28073-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1443512353-28073-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emilio L?pez <emilio@elopez.com.ar>
+Some clocks are using a multiplier component, however, unlike their mux,
+gate or divider counterpart, these factors don't have a basic clock
+implementation.
 
-The module 1 type of clocks consist of a gate and a mux and are used on
-the audio blocks to mux and gate the PLL2 outputs for AC97, IIS or
-SPDIF. This commit adds support for them on the sunxi clock driver.
+This leads to code duplication across platforms that want to use that kind
+of clocks, and the impossibility to use the composite clocks with such a
+clock without defining your own rate operations.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Create such a driver in order to remove these issues, and hopefully factor
+the implementations, reducing code size across platforms and consolidating
+the various implementations.
+
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi/Makefile       |  1 +
- drivers/clk/sunxi/clk-a10-mod1.c | 84 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 85 insertions(+)
- create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
+ drivers/clk/Makefile         |   1 +
+ drivers/clk/clk-multiplier.c | 176 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk-provider.h |  42 +++++++++++
+ 3 files changed, 219 insertions(+)
+ create mode 100644 drivers/clk/clk-multiplier.c
 
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index 70a449a419e6..cb4c299214ce 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -5,6 +5,7 @@
- obj-y += clk-sunxi.o clk-factors.o
- obj-y += clk-a10-codec.o
- obj-y += clk-a10-hosc.o
-+obj-y += clk-a10-mod1.o
- obj-y += clk-a10-pll2.o
- obj-y += clk-a20-gmac.o
- obj-y += clk-mod0.o
-diff --git a/drivers/clk/sunxi/clk-a10-mod1.c b/drivers/clk/sunxi/clk-a10-mod1.c
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index d08b3e5985be..0b2101039508 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -6,6 +6,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-divider.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-factor.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
++obj-$(CONFIG_COMMON_CLK)	+= clk-multiplier.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-fractional-divider.o
+diff --git a/drivers/clk/clk-multiplier.c b/drivers/clk/clk-multiplier.c
 new file mode 100644
-index 000000000000..490f72432a1e
+index 000000000000..61097e365d55
 --- /dev/null
-+++ b/drivers/clk/sunxi/clk-a10-mod1.c
-@@ -0,0 +1,84 @@
++++ b/drivers/clk/clk-multiplier.c
+@@ -0,0 +1,176 @@
 +/*
-+ * Copyright 2013 Emilio L?pez
-+ *
-+ * Emilio L?pez <emilio@elopez.com.ar>
++ * Copyright (C) 2015 Maxime Ripard <maxime.ripard@free-electrons.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+
++#include <linux/module.h>
 +#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
++#include <linux/slab.h>
++#include <linux/err.h>
 +#include <linux/of.h>
-+#include <linux/of_address.h>
 +
-+static DEFINE_SPINLOCK(mod1_lock);
++#define to_clk_multiplier(_hw) container_of(_hw, struct clk_multiplier, hw)
 +
-+#define SUN4I_MOD1_ENABLE	31
-+#define SUN4I_MOD1_MUX		16
-+#define SUN4I_MOD1_MUX_WIDTH	2
-+#define SUN4I_MOD1_MAX_PARENTS	4
-+
-+static void __init sun4i_mod1_clk_setup(struct device_node *node)
++static unsigned long __get_mult(struct clk_multiplier *mult,
++				unsigned long rate,
++				unsigned long parent_rate)
 +{
-+	struct clk *clk;
-+	struct clk_mux *mux;
-+	struct clk_gate *gate;
-+	const char *parents[4];
-+	const char *clk_name = node->name;
-+	void __iomem *reg;
-+	int i = 0;
++	if (mult->flags & CLK_MULTIPLIER_ROUND_CLOSEST)
++		return DIV_ROUND_CLOSEST(rate, parent_rate);
 +
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (IS_ERR(reg))
++	return rate / parent_rate;
++}
++
++static unsigned long clk_multiplier_recalc_rate(struct clk_hw *hw,
++						unsigned long parent_rate)
++{
++	struct clk_multiplier *mult = to_clk_multiplier(hw);
++	unsigned long val;
++	
++	val = clk_readl(mult->reg) >> mult->shift;
++	val &= GENMASK(mult->width, 0);
++
++	if (!val && mult->flags & CLK_MULTIPLIER_ZERO_BYPASS)
++		val = 1;
++	
++	return parent_rate * val;
++}
++
++static bool __is_best_rate(unsigned long rate, unsigned long new,
++			   unsigned long best, unsigned long flags)
++{
++	if (flags & CLK_MULTIPLIER_ROUND_CLOSEST)
++		return abs(rate - new) < abs(rate - best);
++
++	return new >= rate && new < best;
++}
++
++static unsigned long __bestmult(struct clk_hw *hw, unsigned long rate,
++				unsigned long *best_parent_rate,
++				u8 width, unsigned long flags)
++{
++	unsigned long orig_parent_rate = *best_parent_rate;
++	unsigned long parent_rate, current_rate, best_rate = ~0;
++	unsigned int i, bestmult = 0;
++
++	if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT))
++		return rate / *best_parent_rate;
++
++	for (i = 1; i < ((1 << width) - 1); i++) {
++		if (rate * i == orig_parent_rate) {
++			/*
++			 * This is the best case for us if we have a
++			 * perfect match without changing the parent
++			 * rate.
++			 */
++			*best_parent_rate = orig_parent_rate;
++			return i;
++		}
++
++		parent_rate = clk_hw_round_rate(clk_hw_get_parent(hw),
++						rate / i);
++		current_rate = parent_rate * i;
++
++		if (__is_best_rate(rate, current_rate, best_rate, flags)) {
++			bestmult = i;
++			best_rate = current_rate;
++			*best_parent_rate = parent_rate;
++		}
++	}
++
++	return bestmult;
++}
++
++static long clk_multiplier_round_rate(struct clk_hw *hw, unsigned long rate,
++				  unsigned long *parent_rate)
++{
++	struct clk_multiplier *mult = to_clk_multiplier(hw);
++	unsigned long factor = __bestmult(hw, rate, parent_rate,
++					  mult->width, mult->flags);
++
++	return *parent_rate * factor;
++}
++
++static int clk_multiplier_set_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long parent_rate)
++{
++	struct clk_multiplier *mult = to_clk_multiplier(hw);
++	unsigned long factor = __get_mult(mult, rate, parent_rate);
++	unsigned long uninitialized_var(flags);
++	unsigned long val;
++
++	if (mult->lock)
++		spin_lock_irqsave(mult->lock, flags);
++
++	val = clk_readl(mult->reg);
++	val &= ~GENMASK(mult->width + mult->shift, mult->shift);
++	val |= factor << mult->shift;
++	clk_writel(val, mult->reg);
++
++	if (mult->lock)
++		spin_unlock_irqrestore(mult->lock, flags);
++
++	return 0;
++}
++
++const struct clk_ops clk_multiplier_ops = {
++	.recalc_rate	= clk_multiplier_recalc_rate,
++	.round_rate	= clk_multiplier_round_rate,
++	.set_rate	= clk_multiplier_set_rate,
++};
++EXPORT_SYMBOL_GPL(clk_multiplier_ops);
++
++struct clk *clk_register_multiplier(struct device *dev, const char *name,
++				    const char *parent_name,
++				    unsigned long flags,
++				    void __iomem *reg, u8 shift, u8 width,
++				    u8 clk_mult_flags, spinlock_t *lock)
++{
++	struct clk_init_data init;
++	struct clk_multiplier *mult;
++	struct clk *clk;
++
++	mult = kmalloc(sizeof(*mult), GFP_KERNEL);
++	if (!mult) {
++		pr_err("%s: could not allocate multiplier clk\n", __func__);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	init.name = name;
++	init.ops = &clk_multiplier_ops;
++	init.flags = flags | CLK_IS_BASIC;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	mult->reg = reg;
++	mult->shift = shift;
++	mult->width = width;
++	mult->flags = clk_mult_flags;
++	mult->lock = lock;
++	mult->hw.init = &init;
++	
++	clk = clk_register(dev, &mult->hw);
++	if (IS_ERR(clk))
++		kfree(mult);
++
++	return clk;
++}
++EXPORT_SYMBOL_GPL(clk_register_multiplier);
++
++void clk_unregister_multiplier(struct clk *clk)
++{
++	struct clk_multiplier *mult;
++	struct clk_hw *hw;
++
++	hw = __clk_get_hw(clk);
++	if (!hw)
 +		return;
 +
-+	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-+	if (!mux)
-+		goto err_unmap;
++	mult = to_clk_multiplier(hw);
 +
-+	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-+	if (!gate)
-+		goto err_free_mux;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
-+	while (i < SUN4I_MOD1_MAX_PARENTS &&
-+	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
-+		i++;
-+
-+	gate->reg = reg;
-+	gate->bit_idx = SUN4I_MOD1_ENABLE;
-+	gate->lock = &mod1_lock;
-+	mux->reg = reg;
-+	mux->shift = SUN4I_MOD1_MUX;
-+	mux->mask = BIT(SUN4I_MOD1_MUX_WIDTH) - 1;
-+	mux->lock = &mod1_lock;
-+
-+	clk = clk_register_composite(NULL, clk_name, parents, i,
-+				     &mux->hw, &clk_mux_ops,
-+				     NULL, NULL,
-+				     &gate->hw, &clk_gate_ops, 0);
-+	if (IS_ERR(clk))
-+		goto err_free_gate;
-+
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+
-+	return;
-+
-+err_free_gate:
-+	kfree(gate);
-+err_free_mux:
-+	kfree(mux);
-+err_unmap:
-+	iounmap(reg);
++	clk_unregister(clk);
++	kfree(mult);
 +}
-+CLK_OF_DECLARE(sun4i_mod1, "allwinner,sun4i-a10-mod1-clk",
-+	       sun4i_mod1_clk_setup);
++EXPORT_SYMBOL_GPL(clk_unregister_multiplier);
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 3ecc07d0da77..6a7dfe33a317 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -518,6 +518,48 @@ struct clk *clk_register_fractional_divider(struct device *dev,
+ 		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
+ 		u8 clk_divider_flags, spinlock_t *lock);
+ 
++/**
++ * struct clk_multiplier - adjustable multiplier clock
++ *
++ * @hw:		handle between common and hardware-specific interfaces
++ * @reg:	register containing the multiplier
++ * @shift:	shift to the multiplier bit field
++ * @width:	width of the multiplier bit field
++ * @lock:	register lock
++ *
++ * Clock with an adjustable multiplier affecting its output frequency.
++ * Implements .recalc_rate, .set_rate and .round_rate
++ *
++ * Flags:
++ * CLK_MULTIPLIER_ZERO_BYPASS - By default, the multiplier is the value read
++ *	from the register, with 0 being a valid value effectively
++ *	zeroing the output clock rate. If CLK_MULTIPLIER_ZERO_BYPASS is
++ *	set, then a null multiplier will be considered as a bypass,
++ *	leaving the parent rate unmodified.
++ * CLK_MULTIPLIER_ROUND_CLOSEST - Makes the best calculated divider to be
++ *	rounded to the closest integer instead of the down one.
++ */
++struct clk_multiplier {
++	struct clk_hw	hw;
++	void __iomem	*reg;
++	u8		shift;
++	u8		width;
++	u8		flags;
++	spinlock_t	*lock;
++};
++
++#define CLK_MULTIPLIER_ZERO_BYPASS		BIT(0)
++#define CLK_MULTIPLIER_ROUND_CLOSEST	BIT(1)
++
++extern const struct clk_ops clk_multiplier_ops;
++
++struct clk *clk_register_multiplier(struct device *dev, const char *name,
++				    const char *parent_name,
++				    unsigned long flags,
++				    void __iomem *reg, u8 shift, u8 width,
++				    u8 clk_mult_flags, spinlock_t *lock);
++void clk_unregister_multiplier(struct clk *clk);
++
+ /***
+  * struct clk_composite - aggregate clock of mux, divider and gate clocks
+  *
 -- 
 2.5.3
