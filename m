@@ -1,53 +1,115 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 29 Sep 2015 09:38:14 +0200
-Subject: [PATCH v4 15/15] KVM: arm: enable trapping of all debug registers
-In-Reply-To: <560A2499.3030409@linaro.org>
-References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
- <1439213167-8988-16-git-send-email-zhichao.huang@linaro.org>
- <20150902160814.GS10991@cbox> <560A2499.3030409@linaro.org>
-Message-ID: <20150929073814.GE9002@cbox>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 29 Sep 2015 09:38:57 +0200
+Subject: [PATCH v3 0/6] arm64 UEFI early FDT handling
+In-Reply-To: <1442881288-13962-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1442881288-13962-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu8m2M9920yPRcrjmPeJPXKj=xd7ypH+ZFcYEm+_t5a5ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 29, 2015 at 01:41:45PM +0800, Zhichao Huang wrote:
-> 
-> 
-> On 2015/9/3 0:08, Christoffer Dall wrote:
-> > On Mon, Aug 10, 2015 at 09:26:07PM +0800, Zhichao Huang wrote:
-> >> Enable trapping of the debug registers unconditionally, allowing guests to
-> >> use the debug infrastructure.
-> >>
-> >> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
-> >> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >> ---
-> >>  arch/arm/kvm/interrupts_head.S | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-> >> index 7ad0adf..494991d 100644
-> >> --- a/arch/arm/kvm/interrupts_head.S
-> >> +++ b/arch/arm/kvm/interrupts_head.S
-> >> @@ -792,7 +792,7 @@ ARM_BE8(rev	r6, r6  )
-> >>   * (hardware reset value is 0) */
-> >>  .macro set_hdcr operation
-> >>  	mrc	p15, 4, r2, c1, c1, 1
-> >> -	ldr	r3, =(HDCR_TPM|HDCR_TPMCR)
-> >> +	ldr	r3, =(HDCR_TPM|HDCR_TPMCR|HDCR_TDRA|HDCR_TDOSA|HDCR_TDA)
-> > 
-> > eh, but I thought we didn't have to trap accesses to the debug registers
-> > if we switch them, because the guest is likely to be using them?
-> > 
-> > Maybe I am getting confused, can you repeat for me exactly when we
-> > context-switch the registers and when we trap accesses to them?
-> > 
-> 
-> Since we don't want to world switch the dangerous register(DBGDSCR), we have
-> to trap accesses all the time, to prevent the guest to write to the real register.
-> 
-ok, so this is in line with my comment to your previous patch, but you
-did have world-switching code of DBGDSCR in this series, hence my
-confusion.  So you would need to get rid of this for the new version of
-the series.
+(+ Grant)
 
-Thanks,
--Christoffer
+On 22 September 2015 at 02:21, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> This is a followup to the "arm64: update/clarify/relax Image and FDT placement
+> rules" series I sent a while ago:
+> (http://article.gmane.org/gmane.linux.ports.arm.kernel/407148)
+>
+> This has now been split in two series: this first series deals with the
+> early FDT handling, primarily in the context of UEFI, but not exclusively.
+>
+> A number of minor issues exist in the early UEFI/FDT handling path, such as:
+> - when booting via UEFI, memreserve entries are removed from the device tree but
+>   the /reserved-memory node is not
+
+After reading Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+again, I think simply ignoring the reserved-memory node is not the way
+to go. The reason is that it may contain dynamic allocations that are
+referenced by other nodes in the DT, and there is no good technical
+reason IMO to disallow those. OTOH, static allocations may conflict
+with the UEFI memory map, so those need to be dropped or at least
+checked against the memory map. The problem here is that static nodes
+may also be referenced by phandle, so we need to handle the referring
+node in some way as well.
+
+So I think we have a number of options:
+- ignore /memreserve/s and reject static allocations in
+/reserved-memory (*) but honor dynamic ones
+- ignore /memreserve/s and honor all of /reserved-memory after
+checking that static allocations don't conflict
+- honor all /memreserve/s and /reserved-memory nodes and check all for conflicts
+- ...
+
+(*) static allocations for regions that the UEFI memory map does not
+describe should be OK, though
+
+I personally prefer the first one, since a dynamic allocation
+implicitly conveys that the region does not contain anything special
+when coming out of boot, and there is very little we need to do other
+than perform the actual reservation. Static allocations are ambiguous
+in the sense that there is no annotation that explains the choice of
+address.
+
+Thoughts, please?
+
+-- 
+Ard.
+
+
+> - memory nodes are removed from the device tree in a way that is not officially
+>   supported by the libfdt API (i.e., you cannot delete nodes while traversing
+>   the tree)
+> - removal of memory nodes may discard annotations (such as NUMA topology) that
+>   should ideally be retained, or may corrupt the tree by discarding nodes
+>   referenced by phandles.
+>
+> Patches #1 and #2 introduce an arm64 specific version of
+> early_init_dt_add_memory_arch() so that we can modify it later to ignore DT
+> memory nodes if booting via UEFI.
+>
+> Patch #3 moves some UEFI+FDT init code around before making changes to it.
+>
+> Patch #4 moves the UEFI initialization to before the early FDT scanning so we
+> know at that point whether we are booting via UEFI or not.
+>
+> Patch #5 changes the UEFI init code so that memory nodes are simply ignored, so
+> that they don't have to be removed by the stub anymore.
+>
+> Patch #6 does the same as #5, but for memreserves and the /reserved-memory
+> node.
+>
+> Changes since v2:
+> - instead of copying the generic implementation, turn
+>   early_init_dt_add_memory_arch() into a weak alias so that it is still
+>   accessible to overrides
+>
+> Changes since v1:
+> - dropped first two patches, they have been merged into v4.2-rc1
+> - dropped last patch regarding FDT placement by the stub, this is not entirely
+>   relevant to the primary issue targeted by this series
+> - rebased onto for-next/core (arm64) as of today
+>
+> Ard Biesheuvel (6):
+>   of/fdt: make generic early_init_dt_add_memory_arch() a weak alias
+>   arm64: override generic version of early_init_dt_add_memory_arch()
+>   efi: move FDT handling to separate object file
+>   arm64/efi: move EFI /chosen node parsing before early FDT processing
+>   arm64/efi: ignore DT memory nodes instead of removing them
+>   arm64/efi: ignore DT memreserve entries instead of removing them
+>
+>  arch/arm64/include/asm/efi.h       |  2 +
+>  arch/arm64/kernel/efi.c            | 26 ++++--
+>  arch/arm64/kernel/setup.c          |  3 +
+>  arch/arm64/mm/init.c               | 12 ++-
+>  drivers/firmware/efi/Makefile      |  1 +
+>  drivers/firmware/efi/efi-fdt.c     | 73 +++++++++++++++++
+>  drivers/firmware/efi/efi.c         | 84 --------------------
+>  drivers/firmware/efi/libstub/fdt.c | 33 +-------
+>  drivers/of/fdt.c                   |  7 +-
+>  include/linux/efi.h                |  2 +-
+>  include/linux/of_fdt.h             |  1 +
+>  11 files changed, 116 insertions(+), 128 deletions(-)
+>  create mode 100644 drivers/firmware/efi/efi-fdt.c
+>
+> --
+> 1.9.1
+>
