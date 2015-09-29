@@ -1,50 +1,35 @@
-From: a0131933@ti.com (Lokesh Vutla)
-Date: Tue, 29 Sep 2015 09:23:48 +0530
-Subject: [PATCH v3 0/3] ARM: OMAP2+: hwmod: RTC: Add lock and unlock hooks
-In-Reply-To: <alpine.DEB.2.02.1509280822250.7947@utopia.booyaka.com>
-References: <1437657946-10733-1-git-send-email-lokeshvutla@ti.com>
- <55DE9055.4090701@ti.com> <56037FEA.5070807@ti.com>
- <alpine.DEB.2.02.1509280822250.7947@utopia.booyaka.com>
-Message-ID: <560A0B4C.90206@ti.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 29 Sep 2015 06:18:03 +0200
+Subject: [PATCH v2 1/4] clocksource: rockchip: Make the driver more
+ compatible
+In-Reply-To: <1443147298-12603-2-git-send-email-wxt@rock-chips.com>
+References: <1443147298-12603-1-git-send-email-wxt@rock-chips.com>
+ <1443147298-12603-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <560A10FB.7040408@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On 09/25/2015 04:14 AM, Caesar Wang wrote:
+> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
+> There are some failure with build up on timer driver for rockchip.
+>
+> Says:
+> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand 1 --
+> `dsb`
+> ...
+>
+> The problem was different semantics of dsb on btw arm32 and arm64,
+> Here we can convert the dsb with insteading of dsb(sy).The "sy" param
+> is the default which you are allow to omit, so on arm32 dsb()and dsb(sy)
+> are the same.
+>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-On Monday 28 September 2015 10:05 PM, Paul Walmsley wrote:
-> On Thu, 24 Sep 2015, Lokesh Vutla wrote:
-> 
->> On Thursday 27 August 2015 09:51 AM, Lokesh Vutla wrote:
->>> On Thursday 23 July 2015 06:55 PM, Lokesh Vutla wrote:
->>>> This series implements lock and unlock functions for RTC and hooks
->>>> the same to DRA7 and AMx3xx hwmod.
->>>> This is dependent on the patch https://patchwork.kernel.org/patch/6578281/,
->>>> which is queued recently by Paul.
->>> Gentle ping on this series.
->> Do you have any comments on this series?
-> 
-> Looks pretty good.  I'm slightly concerned about the latency jitter impact 
-> on -rt kernels for that local_irq_disable() section.  Looks like it could 
-> hold off interrupts for ~(50 udelay ?s) + 50*((RTC register read time) + 
-> 1).  But I'm not sure if preempt_enable/disable() is a good alternative 
-> since a bunch of interrupt top halves could conceivably run after the RTC 
-> goes non-busy and result in the RTC not being locked/unlocked. 
-Agree.
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-> 
-> Is there an RTC IP block register that the code can read, or a safe 
-> sequence that the code can execute, after the RTC lock/unlock operation to 
-> verify that the RTC has successfully been locked or unlocked?  If so then 
-> it's probably worth converting the local_irq_disable/enable() to 
-> preempt_disable/enable() and testing that, then retrying the lock/unlock 
-> if it fails.
-I am afraid there is no such register to verify lock or unlock. Also
-these KICK registers are Write only registers so can't read back the
-value. Even the driver implement the same api's for writing into registers.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-One thing I can think of is that to write a known pattern to scratch pad
-register and read back the value to confirm if it is locked/unlocked.
-But don't think this is a good approach.
-
-Thanks and regards,
-Lokesh
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
