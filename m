@@ -1,50 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 Sep 2015 18:17:57 +0100
-Subject: [PATCH v4 0/9] Making the generic ACPI GSI layer irqdomain aware
-In-Reply-To: <CAL_Jsq+b10aEREipSsrg69=S4gpv-xZWRYS+TVTvhbqdHGATsA@mail.gmail.com>
-References: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
- <CAL_Jsq+b10aEREipSsrg69=S4gpv-xZWRYS+TVTvhbqdHGATsA@mail.gmail.com>
-Message-ID: <560AC7C5.1090201@arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 29 Sep 2015 10:28:15 -0700
+Subject: [PATCH] ARM: dts: Add Exynos5250 Snow Rev5+ support
+In-Reply-To: <1443527855-434-1-git-send-email-javier@osg.samsung.com>
+References: <1443527855-434-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <CAD=FV=Vmdv6sTmbVyxE=04ycNCOzEWJpfMpzGnihOwaW0ZFzmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/09/15 18:11, Rob Herring wrote:
-> On Mon, Sep 28, 2015 at 11:42 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> The irqdomain code is not entierely ACPI friendly, as it has some
->> built-in knowledge of the device-tree. Nothing too harmful, but enough
->> to scare the ARM ACPI developpers which end up with their own version
->> of the square wheel.
->>
->> This small patch series adapts the irqdomain code to remove the
->> hurdles that prevent the full blown irqdomain subsystem to be used on
->> ACPI, creates an interface between the GSI layer and the irqdomain,
->> and as an example, convert the ARM GIC ACPI support to use irqdomains
->> as originally intended.
->>
->> Overall, this gives us a way to use irqdomains on both DT and ACPI
->> enabled platforms, having very little changes made to the actual
->> drivers (other than the probing infrastructure). Because we keep the
->> flow of information between the various layers identical between ACPI
->> and DT, we immediately benefit from the existing infrastructure. The
->> "convert the GSI information to be DT friendly" is admitedly not very
->> pretty, but I see it as a stepping stone towards unifying the two
->> structures.
-> 
-> Did I miss v1-v3 or did the DT change just show up? I probably tuned
-> out with ACPI in the subject.
+Javier,
 
-No, that's new. It was far worse before.
+On Tue, Sep 29, 2015 at 4:57 AM, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> There are 2 revisions of the Exynos5250 Snow Chromebook that were shipped:
+> Rev4 and Rev5. The only difference between these 2 revisions is the codec,
+> Rev4 has a max98095 codec while Rev5 has a max98090.
+>
+> Mainline only supports Rev4 so this patch moves the common device nodes to
+> a DTSI file and adds a DTS for the Exynos5250 Snow Rev5.
+>
+> The Snow Rev5 DTS is based on the DTS found in the ChromiumOS 3.8 tree.
+>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>
+> ---
+>
+> The DTS in the vendor ChromeOS tree are called exynos5250-snow-rev{4,5}.dtb
+> but I decided to leave Rev4 as exynos5250-snow.dtb to avoid breaking u-boot
+> that has CONFIG_DEFAULT_DEVICE_TREE="exynos5250-snow" in snow_defconfig.
+>
+> Also, ChromiumOS Rev4 DTS has "google,snow-rev4" in its compatible string
+> but was not added in mainline since Rev4 firmware fallbacks to "google,snow"
+> and Rev5 searches for "google,snow-rev5". That way the compatible string
+> could be consistent with the DTS naming and still be able to pack both Rev4
+> and Rev5 FDT in the same FIT image and let the firmware pick the correct FDT.
 
-> Needing fake DT nodes for ACPI is just wrong. There's got to be
-> another, better way.
+Looking at all the notes in the DTS in the ChromeOS tree, this sounds
+like it should be fine.
 
-Well, the alternative is to rewrite the whole of irqdomain and
-everything that gets called from there in terms of fwnode_handle. Which
-will trickle in the whole of OF as well.
 
-Note that the fake DT node doesn't represent an ACPI object at all. It
-is an identifier for an irqdomain, and that's where it stops.
+>  arch/arm/boot/dts/Makefile                    |   1 +
+>  arch/arm/boot/dts/exynos5250-snow-common.dtsi | 684 ++++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5250-snow-rev5.dts    |  47 ++
+>  arch/arm/boot/dts/exynos5250-snow.dts         | 666 +------------------------
+>  4 files changed, 733 insertions(+), 665 deletions(-)
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks!  Note:
+
+$ pwclient git-am 7285451
+Applying patch #7285451 using 'git am'
+Description: ARM: dts: Add Exynos5250 Snow Rev5+ support
+Applying: ARM: dts: Add Exynos5250 Snow Rev5+ support
+.git/rebase-apply/patch:774: new blank line at EOF.
++
+warning: 1 line adds whitespace errors.
+
+
+One other nit is that the exynos5250-snow.dts" ends up with the
+"max98095" pinctrl properties sorted differently than the
+"exynos5250-snow-rev5.dts".  Is it worth reordering the
+"exynos5250-snow.dts" in the same patch?
+
+Otherwise this looks fine to me.
+
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
