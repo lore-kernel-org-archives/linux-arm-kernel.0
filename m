@@ -1,13 +1,13 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 29 Sep 2015 11:10:49 +0200
-Subject: [PATCH v7 11/20] pwm: Probe PWM chip devices on demand
+Date: Tue, 29 Sep 2015 11:10:51 +0200
+Subject: [PATCH v7 13/20] usb: phy: Probe phy devices on demand
 In-Reply-To: <1443517859-30376-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1443517859-30376-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1443517859-30376-12-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1443517859-30376-14-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When looking up a PWM chip through its OF node, probe it if it hasn't
+When looking up a phy through its OF node, probe it if it hasn't
 already.
 
 The goal is to reduce deferred probes to a minimum, as it makes it very
@@ -18,29 +18,29 @@ Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
 
 
- drivers/pwm/core.c | 3 +++
+ drivers/usb/phy/phy.c | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 3f9df3ea3350..794a923df0d8 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -29,6 +29,7 @@
- #include <linux/device.h>
- #include <linux/debugfs.h>
- #include <linux/seq_file.h>
+diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
+index 98f75d2842b7..fb0b650bb494 100644
+--- a/drivers/usb/phy/phy.c
++++ b/drivers/usb/phy/phy.c
+@@ -15,6 +15,7 @@
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ #include <linux/of.h>
 +#include <linux/of_device.h>
  
- #include <dt-bindings/pwm/pwm.h>
+ #include <linux/usb/phy.h>
  
-@@ -516,6 +517,8 @@ static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
- {
- 	struct pwm_chip *chip;
+@@ -196,6 +197,8 @@ struct  usb_phy *devm_usb_get_phy_by_node(struct device *dev,
+ 		goto err0;
+ 	}
  
-+	of_device_probe(np);
++	of_device_probe(node);
 +
- 	mutex_lock(&pwm_lock);
+ 	spin_lock_irqsave(&phy_lock, flags);
  
- 	list_for_each_entry(chip, &pwm_chips, list)
+ 	phy = __of_usb_find_phy(node);
 -- 
 2.4.3
