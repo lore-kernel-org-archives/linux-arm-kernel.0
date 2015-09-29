@@ -1,187 +1,101 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 29 Sep 2015 11:10:40 +0200
-Subject: [PATCH v7 02/20] ARM: amba: Move reading of periphid to amba_match()
+Date: Tue, 29 Sep 2015 11:10:41 +0200
+Subject: [PATCH v7 03/20] of/platform: Point to struct device from device node
 In-Reply-To: <1443517859-30376-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1443517859-30376-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1443517859-30376-3-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1443517859-30376-4-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reading the periphid when the Primecell device is registered means that
-the apb pclk must be available by then or the device won't be registered
-at all.
+When adding platform and AMBA devices, set the device node's device
+member to point to it.
 
-By reading the periphid in amba_match() we can return -EPROBE_DEFER if
-the apb pclk isn't there yet and the device will be retried later.
+This speeds lookups considerably and is safe because we only create one
+of these devices for any given device node.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
 
-Changes in v6:
-- Drop bus_type.pre_probe and read the periphid in match() instead as
-  suggested by Alan Stern.
+Changes in v5:
+- Set the pointer to struct device also for AMBA devices
+- Unset the pointer to struct device when the platform device is about
+  to be unregistered
+- Increase the reference count of the device before returning from
+  of_find_device_by_node()
 
-Changes in v4:
-- Added bus.pre_probe callback so the probes of Primecell devices can be
-  deferred if their device IDs cannot be yet read because of the clock
-  driver not having probed when they are registered. Maybe this goes
-  overboard and the matching information should be in the DT if there is
-  one.
+ drivers/of/platform.c | 19 ++++++++++---------
+ include/linux/of.h    |  1 +
+ 2 files changed, 11 insertions(+), 9 deletions(-)
 
- drivers/amba/bus.c | 88 ++++++++++++++++++++++++++++--------------------------
- 1 file changed, 46 insertions(+), 42 deletions(-)
-
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index f0099360039e..72ebf9b1c715 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -24,6 +24,8 @@
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 1001efaedcb8..408d89f1d124 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -32,11 +32,6 @@ const struct of_device_id of_default_bus_match_table[] = {
+ 	{} /* Empty terminated list */
+ };
  
- #define to_amba_driver(d)	container_of(d, struct amba_driver, drv)
- 
-+static int read_periphid(struct amba_device *d, unsigned int *periphid);
-+
- static const struct amba_id *
- amba_lookup(const struct amba_id *table, struct amba_device *dev)
+-static int of_dev_node_match(struct device *dev, void *data)
+-{
+-	return dev->of_node == data;
+-}
+-
+ /**
+  * of_find_device_by_node - Find the platform_device associated with a node
+  * @np: Pointer to device tree node
+@@ -45,10 +40,10 @@ static int of_dev_node_match(struct device *dev, void *data)
+  */
+ struct platform_device *of_find_device_by_node(struct device_node *np)
  {
-@@ -43,11 +45,22 @@ static int amba_match(struct device *dev, struct device_driver *drv)
- {
- 	struct amba_device *pcdev = to_amba_device(dev);
- 	struct amba_driver *pcdrv = to_amba_driver(drv);
-+	int ret;
- 
- 	/* When driver_override is set, only bind to the matching driver */
- 	if (pcdev->driver_override)
- 		return !strcmp(pcdev->driver_override, drv->name);
- 
-+	if (!pcdev->periphid) {
-+		ret = read_periphid(pcdev, &pcdev->periphid);
-+		if (ret) {
-+			if (ret != -EPROBE_DEFER)
-+				dev_err(dev, "Failed to read periphid: %d",
-+					ret);
-+			return ret;
-+		}
-+	}
-+
- 	return amba_lookup(pcdrv->id_table, pcdev) != NULL;
+-	struct device *dev;
+-
+-	dev = bus_find_device(&platform_bus_type, NULL, np, of_dev_node_match);
+-	return dev ? to_platform_device(dev) : NULL;
++	if (np->device && np->device->bus == &platform_bus_type &&
++	    get_device(np->device))
++		return to_platform_device(np->device);
++	return NULL;
  }
+ EXPORT_SYMBOL(of_find_device_by_node);
  
-@@ -336,44 +349,22 @@ static void amba_device_release(struct device *dev)
- 	kfree(d);
- }
- 
--/**
-- *	amba_device_add - add a previously allocated AMBA device structure
-- *	@dev: AMBA device allocated by amba_device_alloc
-- *	@parent: resource parent for this devices resources
-- *
-- *	Claim the resource, and read the device cell ID if not already
-- *	initialized.  Register the AMBA device with the Linux device
-- *	manager.
-- */
--int amba_device_add(struct amba_device *dev, struct resource *parent)
-+static int read_periphid(struct amba_device *d, unsigned int *periphid)
- {
- 	u32 size;
- 	void __iomem *tmp;
--	int i, ret;
--
--	WARN_ON(dev->irq[0] == (unsigned int)-1);
--	WARN_ON(dev->irq[1] == (unsigned int)-1);
--
--	ret = request_resource(parent, &dev->res);
--	if (ret)
--		goto err_out;
--
--	/* Hard-coded primecell ID instead of plug-n-play */
--	if (dev->periphid != 0)
--		goto skip_probe;
-+	int i, ret = 0;
- 
- 	/*
- 	 * Dynamically calculate the size of the resource
- 	 * and use this for iomap
- 	 */
--	size = resource_size(&dev->res);
--	tmp = ioremap(dev->res.start, size);
--	if (!tmp) {
--		ret = -ENOMEM;
--		goto err_release;
--	}
-+	size = resource_size(&d->res);
-+	tmp = ioremap(d->res.start, size);
-+	if (!tmp)
-+		return -ENOMEM;
- 
--	ret = amba_get_enable_pclk(dev);
-+	ret = amba_get_enable_pclk(d);
- 	if (ret == 0) {
- 		u32 pid, cid;
- 
-@@ -388,37 +379,50 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
- 			cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
- 				(i * 8);
- 
--		amba_put_disable_pclk(dev);
-+		amba_put_disable_pclk(d);
- 
- 		if (cid == AMBA_CID || cid == CORESIGHT_CID)
--			dev->periphid = pid;
-+			*periphid = pid;
- 
--		if (!dev->periphid)
-+		if (!*periphid)
- 			ret = -ENODEV;
+@@ -192,6 +187,8 @@ static struct platform_device *of_platform_device_create_pdata(
+ 		goto err_clear_flag;
  	}
  
- 	iounmap(tmp);
- 
-+	return ret;
-+}
++	np->device = &dev->dev;
 +
-+/**
-+ *	amba_device_add - add a previously allocated AMBA device structure
-+ *	@dev: AMBA device allocated by amba_device_alloc
-+ *	@parent: resource parent for this devices resources
-+ *
-+ *	Claim the resource, and register the AMBA device with the Linux device
-+ *	manager.
-+ */
-+int amba_device_add(struct amba_device *dev, struct resource *parent)
-+{
-+	int ret;
+ 	return dev;
+ 
+ err_clear_flag:
+@@ -272,6 +269,8 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+ 		goto err_free;
+ 	}
+ 
++	node->device = &dev->dev;
 +
-+	WARN_ON(dev->irq[0] == (unsigned int)-1);
-+	WARN_ON(dev->irq[1] == (unsigned int)-1);
+ 	return dev;
+ 
+ err_free:
+@@ -476,6 +475,8 @@ static int of_platform_device_destroy(struct device *dev, void *data)
+ 	if (of_node_check_flag(dev->of_node, OF_POPULATED_BUS))
+ 		device_for_each_child(dev, NULL, of_platform_device_destroy);
+ 
++	dev->of_node->device = NULL;
 +
-+	ret = request_resource(parent, &dev->res);
- 	if (ret)
--		goto err_release;
-+		return ret;
+ 	if (dev->bus == &platform_bus_type)
+ 		platform_device_unregister(to_platform_device(dev));
+ #ifdef CONFIG_ARM_AMBA
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 2194b8ca41f9..eb091be0f8ee 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -52,6 +52,7 @@ struct device_node {
+ 	phandle phandle;
+ 	const char *full_name;
+ 	struct fwnode_handle fwnode;
++	struct device *device;
  
-- skip_probe:
- 	ret = device_add(&dev->dev);
- 	if (ret)
--		goto err_release;
-+		return ret;
- 
- 	if (dev->irq[0])
- 		ret = device_create_file(&dev->dev, &dev_attr_irq0);
- 	if (ret == 0 && dev->irq[1])
- 		ret = device_create_file(&dev->dev, &dev_attr_irq1);
--	if (ret == 0)
--		return ret;
--
--	device_unregister(&dev->dev);
-+	if (ret)
-+		device_unregister(&dev->dev);
- 
-- err_release:
--	release_resource(&dev->res);
-- err_out:
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(amba_device_add);
+ 	struct	property *properties;
+ 	struct	property *deadprops;	/* removed properties */
 -- 
 2.4.3
