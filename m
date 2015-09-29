@@ -1,98 +1,86 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 29 Sep 2015 11:10:57 +0200
-Subject: [PATCH v7 19/20] driver core: Allow deferring probes until late init
+Date: Tue, 29 Sep 2015 11:10:58 +0200
+Subject: [PATCH v7 20/20] of/platform: Defer probes of registered devices
 In-Reply-To: <1443517859-30376-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1443517859-30376-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1443517859-30376-20-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1443517859-30376-21-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a field to struct device that instructs the device-driver core to
-defer the probe of this device until the late_initcall level.
+Instead of trying to match and probe platform and AMBA devices right
+after each is registered, delay their probes until device_initcall_sync.
 
-By letting all built-in drivers to register before starting to probe, we
-can avoid any deferred probes by probing dependencies on demand.
+This means that devices will start probing once all built-in drivers
+have registered, and after all platform and AMBA devices from the DT
+have been registered already.
+
+This allows us to prevent deferred probes by probing dependencies on
+demand.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-
 ---
 
 Changes in v7:
-- Move IS_ENABLED(CONFIG_DELAY_DEVICE_PROBES) into if condition
-- Hide CONFIG_DELAY_DEVICE_PROBES behind EXPERT
+- Removed patch that moved deferred probe processing to
+  device_initcall_sync, as it's not currently needed and can be applied
+  later if we find any boards that fail to boot without this change.
 
 Changes in v4:
-- Add Kconfig DELAY_DEVICE_PROBES to allow disabling delayed probing in
-  machines with initcalls that depend on devices probing at a given time.
+- Also defer probes of AMBA devices registered from the DT as they can
+  also request resources.
 
- drivers/base/Kconfig   | 18 ++++++++++++++++++
- drivers/base/dd.c      |  6 ++++++
- include/linux/device.h |  2 ++
- 3 files changed, 26 insertions(+)
+ drivers/of/platform.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
-index 98504ec99c7d..8bb7b556da1b 100644
---- a/drivers/base/Kconfig
-+++ b/drivers/base/Kconfig
-@@ -324,4 +324,22 @@ config CMA_ALIGNMENT
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 408d89f1d124..7b33e0369374 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -164,7 +164,8 @@ static struct platform_device *of_platform_device_create_pdata(
+ 					struct device_node *np,
+ 					const char *bus_id,
+ 					void *platform_data,
+-					struct device *parent)
++					struct device *parent,
++					bool probe_late)
+ {
+ 	struct platform_device *dev;
  
- endif
+@@ -178,6 +179,7 @@ static struct platform_device *of_platform_device_create_pdata(
  
-+config DELAY_DEVICE_PROBES
-+	bool "Allow delaying the probe of some devices" if EXPERT
-+	default y
-+	help
-+	  Devices can be matched to a driver and probed from the moment they
-+	  are registered, but early during boot their probes are likely to be
-+	  deferred because some dependency isn't available yet because most
-+	  drivers haven't been registered yet.
-+
-+	  Enabling this option allows the device registration code to delay the
-+	  probing of a specific device until device_initcall_sync, when all
-+	  built-in drivers have been registered already.
-+
-+	  In some platforms there may be implicit assumptions about when some
-+	  devices are probed, so enabling this option could cause problems there.
-+
-+	  If unsure, say Y here.
-+
- endmenu
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 7dc04ee81c8b..c4a3f298e726 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -417,6 +417,12 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
- 	if (!device_is_registered(dev))
- 		return -ENODEV;
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
++	dev->dev.probe_late = probe_late;
+ 	of_dma_configure(&dev->dev, dev->dev.of_node);
+ 	of_msi_configure(&dev->dev, dev->dev.of_node);
  
-+	if (IS_ENABLED(CONFIG_DELAY_DEVICE_PROBES) &&
-+	    !driver_deferred_probe_enable && dev->probe_late) {
-+		driver_deferred_probe_add(dev);
-+		return 0;
-+	}
-+
- 	pr_debug("bus: '%s': %s: matched device %s with driver %s\n",
- 		 drv->bus->name, __func__, dev_name(dev), drv->name);
+@@ -209,7 +211,8 @@ struct platform_device *of_platform_device_create(struct device_node *np,
+ 					    const char *bus_id,
+ 					    struct device *parent)
+ {
+-	return of_platform_device_create_pdata(np, bus_id, NULL, parent);
++	return of_platform_device_create_pdata(np, bus_id, NULL, parent,
++					       false);
+ }
+ EXPORT_SYMBOL(of_platform_device_create);
  
-diff --git a/include/linux/device.h b/include/linux/device.h
-index 8e7b806f0744..e64f4c7e243d 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -744,6 +744,7 @@ struct device_dma_parameters {
-  *
-  * @offline_disabled: If set, the device is permanently online.
-  * @offline:	Set after successful invocation of bus type's .offline().
-+ * @probe_late:	If set, device will be probed in the late initcall level.
-  *
-  * At the lowest level, every device in a Linux system is represented by an
-  * instance of struct device. The device structure contains the information
-@@ -828,6 +829,7 @@ struct device {
+@@ -240,6 +243,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+ 	dev->dev.of_node = of_node_get(node);
+ 	dev->dev.parent = parent ? : &platform_bus;
+ 	dev->dev.platform_data = platform_data;
++	dev->dev.probe_late = true;
+ 	if (bus_id)
+ 		dev_set_name(&dev->dev, "%s", bus_id);
+ 	else
+@@ -358,7 +362,8 @@ static int of_platform_bus_create(struct device_node *bus,
+ 		return 0;
+ 	}
  
- 	bool			offline_disabled:1;
- 	bool			offline:1;
-+	bool			probe_late:1;
- };
+-	dev = of_platform_device_create_pdata(bus, bus_id, platform_data, parent);
++	dev = of_platform_device_create_pdata(bus, bus_id, platform_data,
++					      parent, true);
+ 	if (!dev || !of_match_node(matches, bus))
+ 		return 0;
  
- static inline struct device *kobj_to_dev(struct kobject *kobj)
 -- 
 2.4.3
