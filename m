@@ -1,102 +1,52 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 29 Sep 2015 15:44:45 +0200
-Subject: [PATCH v4 07/11] KVM: arm/arm64: vgic: Allow HW interrupts to be
- queued to a guest
-In-Reply-To: <5602E778.3080004@arm.com>
-References: <1438962347-17541-1-git-send-email-marc.zyngier@arm.com>
- <1438962347-17541-8-git-send-email-marc.zyngier@arm.com>
- <5602E778.3080004@arm.com>
-Message-ID: <20150929134445.GF9002@cbox>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 29 Sep 2015 15:57:52 +0200
+Subject: [PATCH] ARM: exynos_defconfig: Enable WiFi-Ex as a module instead
+ built-in
+In-Reply-To: <560A9012.2090802@suse.de>
+References: <1443530546-3066-1-git-send-email-javier@osg.samsung.com>
+ <560A9012.2090802@suse.de>
+Message-ID: <560A98E0.9010606@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 23, 2015 at 06:55:04PM +0100, Andre Przywara wrote:
-> Salut Marc,
-> 
-> I know that this patch is already merged, but ....
-> 
-> On 07/08/15 16:45, Marc Zyngier wrote:
-> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> > index 51c9900..9d009d2 100644
-> ...
-> > @@ -1364,6 +1397,39 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
-> >  	return level_pending;
-> >  }
-> >  
-> > +/*
-> > + * Save the physical active state, and reset it to inactive.
-> > + *
-> > + * Return 1 if HW interrupt went from active to inactive, and 0 otherwise.
-> > + */
-> > +static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
-> > +{
-> > +	struct irq_phys_map *map;
-> > +	int ret;
-> > +
-> > +	if (!(vlr.state & LR_HW))
-> > +		return 0;
-> > +
-> > +	map = vgic_irq_map_search(vcpu, vlr.irq);
-> > +	BUG_ON(!map || !map->active);
-> > +
-> > +	ret = irq_get_irqchip_state(map->irq,
-> > +				    IRQCHIP_STATE_ACTIVE,
-> > +				    &map->active);
-> > +
-> > +	WARN_ON(ret);
-> > +
-> > +	if (map->active) {
-> > +		ret = irq_set_irqchip_state(map->irq,
-> > +					    IRQCHIP_STATE_ACTIVE,
-> > +					    false);
-> > +		WARN_ON(ret);
-> > +		return 0;
-> > +	}
-> > +
-> > +	return 1;
-> > +}
-> > +
-> >  /* Sync back the VGIC state after a guest run */
-> >  static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
-> >  {
-> > @@ -1378,14 +1444,31 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
-> >  	elrsr = vgic_get_elrsr(vcpu);
-> >  	elrsr_ptr = u64_to_bitmask(&elrsr);
-> >  
-> > -	/* Clear mappings for empty LRs */
-> > -	for_each_set_bit(lr, elrsr_ptr, vgic->nr_lr) {
-> > +	/* Deal with HW interrupts, and clear mappings for empty LRs */
-> > +	for (lr = 0; lr < vgic->nr_lr; lr++) {
-> >  		struct vgic_lr vlr;
-> >  
-> > -		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
-> > +		if (!test_bit(lr, vgic_cpu->lr_used))
-> >  			continue;
-> >  
-> >  		vlr = vgic_get_lr(vcpu, lr);
-> > +		if (vgic_sync_hwirq(vcpu, vlr)) {
-> > +			/*
-> > +			 * So this is a HW interrupt that the guest
-> > +			 * EOI-ed. Clean the LR state and allow the
-> > +			 * interrupt to be sampled again.
-> > +			 */
-> > +			vlr.state = 0;
-> > +			vlr.hwirq = 0;
-> > +			vgic_set_lr(vcpu, lr, vlr);
-> > +			vgic_irq_clear_queued(vcpu, vlr.irq);
-> 
-> Isn't this line altering common VGIC state without holding the lock?
-> Eric removed the coarse dist->lock around the whole
-> __kvm_vgic_sync_hwstate() function, we take it now in
-> vgic_process_maintenance(), but don't hold it here AFAICT.
-> As long as we are only dealing with private timer IRQs this is probably
-> not a problem, but the IRQ number could be a SPI as well, right?
-> 
-I don't see a problematic race with this though, as all we're doing is
-to clear a bit in a bitmap, which is always checked atomically, so
-adding a lock around this really doesn't change anything as far as I can
-tell.
+Hello Andreas,
 
-Nevertheless, my rework series also addresses this.
+On 09/29/2015 03:20 PM, Andreas F?rber wrote:
+> Am 29.09.2015 um 14:42 schrieb Javier Martinez Canillas:
+>> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+>> index d4f6063d8a72..5aad617f02c7 100644
+>> --- a/arch/arm/configs/exynos_defconfig
+>> +++ b/arch/arm/configs/exynos_defconfig
+>> @@ -64,8 +64,8 @@ CONFIG_SMSC911X=y
+>>  CONFIG_USB_USBNET=y
+>>  CONFIG_USB_NET_SMSC75XX=y
+>>  CONFIG_USB_NET_SMSC95XX=y
+>> -CONFIG_MWIFIEX=y
+>> -CONFIG_MWIFIEX_SDIO=y
+>> +CONFIG_MWIFIEX=m
+>> +CONFIG_MWIFIEX_SDIO=m
+>>  CONFIG_INPUT_EVDEV=y
+>>  CONFIG_KEYBOARD_GPIO=y
+>>  CONFIG_KEYBOARD_CROS_EC=y
+> 
+> Makes sense,
+> 
+> Reviewed-by: Andreas F?rber <afaerber@suse.de>
+> 
 
--Christoffer
+Thanks.
+
+> What about multi_v7?
+>
+
+Already enables these options as a module.
+ 
+> Cheers,
+> Andreas
+> 
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
