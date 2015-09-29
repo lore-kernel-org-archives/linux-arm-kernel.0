@@ -1,95 +1,76 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 30 Sep 2015 02:26:08 +0300
-Subject: [PATCH] ARM: shmobile: porter: initial device tree
-In-Reply-To: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
-References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
-Message-ID: <2022535.FYlSB7sRz4@wasted.cogentembedded.com>
+From: al.stone@linaro.org (Al Stone)
+Date: Tue, 29 Sep 2015 17:45:43 -0600
+Subject: [PATCH v5 2/5] ACPI / ARM64: remove usage of
+ BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
+In-Reply-To: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
+References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
+Message-ID: <1443570346-15378-3-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initial device tree for the R8A7791 SoC based Porter low cost board
-(which  is a  slightly modified version  of the Henninger board).
+Now that we have introduced the bad_madt_entry() function, and that
+function is being invoked in acpi_table_parse_madt() for us, there
+is no longer any need to use the BAD_MADT_ENTRY macro, or in the case
+of arm64, the BAD_MADT_GICC_ENTRY, too.
 
-SCIF0 serial port support is included, so that the serial console can work. 
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
+Signed-off-by: Al Stone <al.stone@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-and-tested-by: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
 ---
-This patch is against the 'renesas-devel-20150928-v4.3-rc3' tag of Simon
-Horman's 'renesas.git' repo.
+ arch/arm64/include/asm/acpi.h | 8 --------
+ arch/arm64/kernel/smp.c       | 2 --
+ drivers/irqchip/irq-gic.c     | 3 ---
+ 3 files changed, 13 deletions(-)
 
- arch/arm/boot/dts/Makefile           |    1 
- arch/arm/boot/dts/r8a7791-porter.dts |   54 +++++++++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/Makefile
-===================================================================
---- renesas.orig/arch/arm/boot/dts/Makefile
-+++ renesas/arch/arm/boot/dts/Makefile
-@@ -532,6 +532,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
- 	r8a7790-lager.dtb \
- 	r8a7791-henninger.dtb \
- 	r8a7791-koelsch.dtb \
-+	r8a7791-porter.dtb \
- 	r8a7793-gose.dtb \
- 	r8a7794-alt.dtb \
- 	r8a7794-silk.dtb \
-Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
-===================================================================
---- /dev/null
-+++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -0,0 +1,54 @@
-+/*
-+ * Device Tree Source for the Porter board
-+ *
-+ * Copyright (C) 2015 Cogent Embedded, Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "r8a7791.dtsi"
-+
-+/ {
-+	model = "Porter";
-+	compatible = "renesas,porter", "renesas,r8a7791";
-+
-+	aliases {
-+		serial0 = &scif0;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttySC0,115200 ignore_loglevel";
-+		stdout-path = &scif0;
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x40000000>;
-+	};
-+
-+	memory at 200000000 {
-+		device_type = "memory";
-+		reg = <2 0x00000000 0 0x40000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <20000000>;
-+};
-+
-+&pfc {
-+	scif0_pins: serial0 {
-+		renesas,groups = "scif0_data_d";
-+		renesas,function = "scif0";
-+	};
-+};
-+
-+&scif0 {
-+	pinctrl-0 = <&scif0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 6894205..05656fc 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -18,14 +18,6 @@
+ #include <asm/cputype.h>
+ #include <asm/smp_plat.h>
+ 
+-/* Macros for consistency checks of the GICC subtable of MADT */
+-#define ACPI_MADT_GICC_LENGTH	\
+-	(acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
+-
+-#define BAD_MADT_GICC_ENTRY(entry, end)						\
+-	(!(entry) || (unsigned long)(entry) + sizeof(*(entry)) > (end) ||	\
+-	 (entry)->header.length != ACPI_MADT_GICC_LENGTH)
+-
+ /* Basic configuration for ACPI */
+ #ifdef	CONFIG_ACPI
+ /* ACPI table mapping after acpi_gbl_permanent_mmap is set */
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index dbdaacd..66cc8c4 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -451,8 +451,6 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+ 	struct acpi_madt_generic_interrupt *processor;
+ 
+ 	processor = (struct acpi_madt_generic_interrupt *)header;
+-	if (BAD_MADT_GICC_ENTRY(processor, end))
+-		return -EINVAL;
+ 
+ 	acpi_table_print_madt_entry(header);
+ 
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index d4add30..67b7b48 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -1206,9 +1206,6 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+ 
+ 	processor = (struct acpi_madt_generic_interrupt *)header;
+ 
+-	if (BAD_MADT_GICC_ENTRY(processor, end))
+-		return -EINVAL;
+-
+ 	/*
+ 	 * There is no support for non-banked GICv1/2 register in ACPI spec.
+ 	 * All CPU interface addresses have to be the same.
+-- 
+2.4.3
