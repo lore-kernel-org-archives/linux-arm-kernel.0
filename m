@@ -1,49 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 29 Sep 2015 22:35:54 +0200
-Subject: [PATCH 1/1] Disable CONFIG_UACCESS_WITH_MEMCPY in Atmel config.
-In-Reply-To: <1443556987-2788-1-git-send-email-jc@eclis.ch>
-References: <1443556987-2788-1-git-send-email-jc@eclis.ch>
-Message-ID: <20150929203554.GH3982@pengutronix.de>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 29 Sep 2015 22:39:05 +0200
+Subject: [PATCH 0/4] memory: pl17x: add support of PL175 and PL176
+ controllers
+In-Reply-To: <1443459043-24144-1-git-send-email-vz@mleia.com>
+References: <1443459043-24144-1-git-send-email-vz@mleia.com>
+Message-ID: <CAGhQ9VzUwkkXqRQ-WZ_cjRKCrE=co1LNwFaQfGmBbuEOsVZ6_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Vladimir,
 
-On Tue, Sep 29, 2015 at 10:03:07PM +0200, jc at eclis.ch wrote:
-> From: Jean-Christian de Rivaz <jc@eclis.ch>
-> 
-> According to Russell King:
-> In any case, unless you have a Marvell platform, you should have this
-> disabled - it provides a performance boost for Marvell platforms, but
-> degrades performance everywhere else.  Please ensure that you disable
-> CONFIG_UACCESS_WITH_MEMCPY.
-> 
-> Signed-off-by: Jean-Christian de Rivaz <jc@eclis.ch>
-> ---
->  arch/arm/configs/at91_dt_defconfig |    2 +-
->  arch/arm/configs/sama5_defconfig   |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-> index 090c5b2..1807d7f 100644
-> --- a/arch/arm/configs/at91_dt_defconfig
-> +++ b/arch/arm/configs/at91_dt_defconfig
-> @@ -21,7 +21,7 @@ CONFIG_SOC_SAM_V4_V5=y
->  CONFIG_SOC_AT91RM9200=y
->  CONFIG_SOC_AT91SAM9=y
->  CONFIG_AEABI=y
-> -CONFIG_UACCESS_WITH_MEMCPY=y
-> +# CONFIG_UACCESS_WITH_MEMCPY is not set
->  CONFIG_ZBOOT_ROM_TEXT=0x0
->  CONFIG_ZBOOT_ROM_BSS=0x0
->  CONFIG_ARM_APPENDED_DTB=y
-What is the reason to add the "# ... is not set" line? Given the default
-line of UACCESS_WITH_MEMCPY I suggest to just drop the line without
-replacement in the defconfigs.
+On 28 September 2015 at 18:50, Vladimir Zapolskiy <vz@mleia.com> wrote:
+> The change adds support of ARM PrimeCell PL175 MPMC and PL176 MPMC,
+> the static memory controllers on devices are similar to one found on
+> ARM PrimeCell PL172, add support to the existing driver.
+>
+> Vladimir Zapolskiy (4):
+>   memory: pl172: correct MPMC peripheral ID register bits
+>   memory: pl172: add ARM PrimeCell PL175 MPMC support
+>   memory: pl172: add ARM PrimeCell PL176 MPMC support
+>   doc: dt: arm,pl172: add description of PL175 and PL176 controllers
 
-Best regards
-Uwe
+Changes look good to me.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+What LPC32xx board did you test this on, btw?
+
+Also if you have added the controller to lpc32xx.dtsi it would be
+great if you could also submit those changes to the lpc32xx
+maintainer.
+
+
+regards,
+Joachim Eastwood
