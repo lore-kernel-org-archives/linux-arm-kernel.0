@@ -1,14 +1,13 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Tue, 29 Sep 2015 10:13:51 +0800
-Subject: [PATCH v3 6/8] ARM: rockchip: add support smp for rk3036
+Date: Tue, 29 Sep 2015 10:13:46 +0800
+Subject: [PATCH v3 1/8] ARM: dts: rockchip: add core rk3036 dts
 In-Reply-To: <1443492833-15630-1-git-send-email-zhengxing@rock-chips.com>
 References: <1443492833-15630-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1443492833-15630-7-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1443492833-15630-2-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rk3036 is dual-core soc, we can use this patch to enable cpu1
-enter boot secondary, and hotplug(online/offline).
+Initial release for rk3036, node definitions rk3036 sdk board.
 
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 Reviewed-by: Heiko Stuebner <heiko@sntech.de>
@@ -16,172 +15,482 @@ Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
 Changes in v3: None
 
- arch/arm/mach-rockchip/platsmp.c |  142 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 142 insertions(+)
+ arch/arm/boot/dts/Makefile       |    1 +
+ arch/arm/boot/dts/rk3036-evb.dts |   64 +++++++
+ arch/arm/boot/dts/rk3036.dtsi    |  382 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 447 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3036-evb.dts
+ create mode 100644 arch/arm/boot/dts/rk3036.dtsi
 
-diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-index 3e7a4b7..7864bf3 100644
---- a/arch/arm/mach-rockchip/platsmp.c
-+++ b/arch/arm/mach-rockchip/platsmp.c
-@@ -34,6 +34,8 @@
- 
- static void __iomem *scu_base_addr;
- static void __iomem *sram_base_addr;
-+static void __iomem *cru_base_addr;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 1c5f225..82e4caf 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -499,6 +499,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+ dtb-$(CONFIG_ARCH_REALVIEW) += \
+ 	arm-realview-pb1176.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
++	rk3036-evb.dtb \
+ 	rk3066a-bqcurie2.dtb \
+ 	rk3066a-marsboard.dtb \
+ 	rk3066a-rayeager.dtb \
+diff --git a/arch/arm/boot/dts/rk3036-evb.dts b/arch/arm/boot/dts/rk3036-evb.dts
+new file mode 100644
+index 0000000..645d144
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3036-evb.dts
+@@ -0,0 +1,64 @@
++/*
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *  Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
- static int ncores;
- 
- #define PMU_PWRDN_CON		0x08
-@@ -41,6 +43,8 @@ static int ncores;
- 
- #define PMU_PWRDN_SCU		4
- 
-+#define RK3036_SOFTRST_CON(x)	((x) * 0x4 + 0x110)
++/dts-v1/;
 +
- static struct regmap *pmu;
- 
- static int pmu_power_domain_is_on(int pd)
-@@ -350,3 +354,141 @@ static struct smp_operations rockchip_smp_ops __initdata = {
- };
- 
- CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip_smp_ops);
++#include "rk3036.dtsi"
 +
-+/* for RK3036 */
-+
-+static int rk3036_set_power_domain(int pd, bool on)
-+{
-+	struct reset_control *rstc = rockchip_get_core_reset(pd);
-+	u32 val;
-+
-+	/* there are 2cpus on rk3036 soc, we just need to be care cpu1 */
-+	if (pd != 1)
-+		return 0;
-+
-+	if (IS_ERR(rstc) && read_cpuid_part() != ARM_CPU_PART_CORTEX_A9) {
-+		pr_err("%s: could not get reset control for core %d\n",
-+		       __func__, pd);
-+		return PTR_ERR(rstc);
-+	}
-+
-+	/*
-+	 * We need to soft reset the cpu when we turn off the cpu power domain,
-+	 * or else the active processors might be stalled when the individual
-+	 * processor is powered down.
-+	 */
-+	if (!IS_ERR(rstc) && !on)
-+		reset_control_assert(rstc);
-+
-+	val = (on) ? 0 : 1;
-+	val = (val << pd) | BIT(pd + 16);
-+	writel_relaxed(val, cru_base_addr + RK3036_SOFTRST_CON(0));
-+
-+	dsb();
-+
-+	if (!IS_ERR(rstc)) {
-+		if (on)
-+			reset_control_deassert(rstc);
-+		reset_control_put(rstc);
-+	}
-+
-+	return 0;
-+}
-+
-+static void __init rk3036_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *node;
-+	unsigned int l2ctlr;
-+	unsigned int i, cpu;
-+
-+	/* get cru_base_addr */
-+	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3036-cru");
-+	if (!node) {
-+		pr_err("%s: could not find cru dt node\n", __func__);
-+		return;
-+	}
-+
-+	cru_base_addr = of_iomap(node, 0);
-+	if (!cru_base_addr) {
-+		pr_err("%s: could not map cru registers\n", __func__);
-+		return;
-+	}
-+
-+	/* get sram_base_addr */
-+	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3036-smp-sram");
-+	if (!node) {
-+		pr_err("%s: could not find sram dt node\n", __func__);
-+		return;
-+	}
-+
-+	sram_base_addr = of_iomap(node, 0);
-+	if (!sram_base_addr) {
-+		pr_err("%s: could not map sram registers\n", __func__);
-+		return;
-+	}
-+
-+	/* get ncores */
-+	asm ("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
-+	ncores = ((l2ctlr >> 24) & 0x3) + 1;
-+	cpu = MPIDR_AFFINITY_LEVEL(read_cpuid_mpidr(), 0);
-+
-+	/* Make sure that all cores except the first are really off */
-+	for (i = 1; i < ncores; i++)
-+		rk3036_set_power_domain(0 + i, false);
-+}
-+
-+static int rk3036_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	if (cpu >= ncores) {
-+		pr_err("%s: cpu %d outside maximum number of cpus %d\n",
-+			__func__, cpu, ncores);
-+		return -ENXIO;
-+	}
-+
-+	/* start the core */
-+	rk3036_set_power_domain(0 + cpu, true);
-+
-+	/*
-+	 * We need to wait a moment after soft reset CPUx on rk3036,
-+	 * otherwise, CPUx will startup failed.
-+	 */
-+	udelay(10);
-+	writel(virt_to_phys(secondary_startup), sram_base_addr + 8);
-+	writel(0xDEADBEAF, sram_base_addr + 4);
-+	dsb_sev();
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int rk3066_cpu_kill(unsigned int cpu)
-+{
-+	/*
-+	 * We need a delay here to ensure that the dying CPU can finish
-+	 * executing v7_coherency_exit() and reach the WFI/WFE state
-+	 * prior to having the power domain disabled.
-+	 */
-+	mdelay(1);
-+
-+	rk3036_set_power_domain(0 + cpu, false);
-+
-+	return 1;
-+}
-+
-+static void rk3066_cpu_die(unsigned int cpu)
-+{
-+	v7_exit_coherency_flush(louis);
-+	while (1)
-+		cpu_do_idle();
-+}
-+#endif
-+
-+static struct smp_operations rk3036_smp_ops __initdata = {
-+	.smp_prepare_cpus	= rk3036_smp_prepare_cpus,
-+	.smp_boot_secondary	= rk3036_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_kill		= rk3066_cpu_kill,
-+	.cpu_die		= rk3066_cpu_die,
-+#endif
++/ {
++	model = "Rockchip RK3036 Evaluation board";
++	compatible = "rockchip,rk3036-evb", "rockchip,rk3036";
 +};
-+CPU_METHOD_OF_DECLARE(rk3036_smp, "rockchip,rk3036-smp", &rk3036_smp_ops);
++
++&i2c1 {
++	status = "okay";
++
++        hym8563: hym8563 at 51 {
++		compatible = "haoyu,hym8563";
++		reg = <0x51>;
++		#clock-cells = <0>;
++		clock-frequency = <32768>;
++		clock-output-names = "xin32k";
++	};
++};
++
++&uart2 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+new file mode 100644
+index 0000000..fea51de
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3036.dtsi
+@@ -0,0 +1,382 @@
++/*
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/pinctrl/rockchip.h>
++#include <dt-bindings/clock/rk3036-cru.h>
++#include "skeleton.dtsi"
++
++/ {
++	compatible = "rockchip,rk3036";
++
++	interrupt-parent = <&gic>;
++
++	aliases {
++		i2c1 = &i2c1;
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x60000000 0x40000000>;
++	};
++
++	arm-pmu {
++		compatible = "arm,cortex-a7-pmu";
++		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
++		             <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&cpu0>, <&cpu1>;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at f00 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf00>;
++			operating-points = <
++				/* KHz    uV */
++				 816000 1000000
++			>;
++			clock-latency = <40000>;
++			clocks = <&cru ARMCLK>;
++			resets = <&cru SRST_CORE0>;
++		};
++		cpu1: cpu at f01 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf01>;
++			resets = <&cru SRST_CORE1>;
++		};
++	};
++
++	amba {
++		compatible = "arm,amba-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		pdma: pdma at 20078000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x20078000 0x4000>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
++			#dma-cells = <1>;
++			clocks = <&cru ACLK_DMAC2>;
++			clock-names = "apb_pclk";
++		};
++	};
++
++	xin24m: oscillator {
++		compatible = "fixed-clock";
++		clock-frequency = <24000000>;
++		clock-output-names = "xin24m";
++		#clock-cells = <0>;
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		arm,cpu-registers-not-fw-configured;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++		clock-frequency = <24000000>;
++	};
++
++	gic: interrupt-controller at 10139000 {
++		compatible = "arm,gic-400";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++
++		reg = <0x10139000 0x1000>,
++		      <0x1013a000 0x1000>,
++		      <0x1013c000 0x2000>,
++		      <0x1013e000 0x2000>;
++		interrupts = <GIC_PPI 9 0xf04>;
++	};
++
++	sram: sram at 10080000 {
++		compatible = "rockchip,rk3036-smp-sram", "mmio-sram";
++		reg = <0x10080000 0x2000>;
++	};
++
++	cru: clock-controller at 20000000 {
++		compatible = "rockchip,rk3036-cru";
++		reg = <0x20000000 0x1000>;
++		rockchip,grf = <&grf>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++		assigned-clocks = <&cru PLL_GPLL>;
++		assigned-clock-rates = <594000000>;
++	};
++
++	grf: syscon at 20008000 {
++		compatible = "rockchip,rk3036-grf", "syscon";
++		reg = <0x20008000 0x1000>;
++	};
++
++	pwm0: pwm at 20050000 {
++		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
++		reg = <0x20050000 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm0_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
++
++	pwm1: pwm at 20050010 {
++		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
++		reg = <0x20050010 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm1_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
++
++	pwm2: pwm at 20050020 {
++		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
++		reg = <0x20050020 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm2_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
++
++	pwm3: pwm at 20050030 {
++		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
++		reg = <0x20050030 0x10>;
++		#pwm-cells = <2>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm3_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
++
++	i2c1: i2c at 20056000 {
++		compatible = "rockchip,rk3288-i2c";
++		reg = <0x20056000 0x1000>;
++		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2c";
++		clocks = <&cru PCLK_I2C1>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c1_xfer>;
++		status = "disabled";
++	};
++
++	uart0: serial at 20060000 {
++		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
++		reg = <0x20060000 0x100>;
++		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clock-frequency = <24000000>;
++		clocks = <&cru SCLK_UART0>, <&cru PCLK_UART0>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
++		status = "disabled";
++	};
++
++	uart1: serial at 20064000 {
++		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
++		reg = <0x20064000 0x100>;
++		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clock-frequency = <24000000>;
++		clocks = <&cru SCLK_UART1>, <&cru PCLK_UART1>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart1_xfer>;
++		status = "disabled";
++	};
++
++	uart2: serial at 20068000 {
++		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
++		reg = <0x20068000 0x100>;
++		interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clock-frequency = <24000000>;
++		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart2_xfer>;
++		status = "disabled";
++	};
++
++	pinctrl: pinctrl {
++		compatible = "rockchip,rk3036-pinctrl";
++		rockchip,grf = <&grf>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		gpio0: gpio0 at 2007c000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x2007c000 0x100>;
++			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO0>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio1: gpio1 at 20080000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x20080000 0x100>;
++			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO1>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio2: gpio2 at 20084000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x20084000 0x100>;
++			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO2>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		pcfg_pull_up: pcfg-pull-up {
++			bias-pull-up;
++		};
++
++		pcfg_pull_down: pcfg-pull-down {
++			bias-pull-down;
++		};
++
++		pcfg_pull_none: pcfg-pull-none {
++			bias-disable;
++		};
++
++		pwm0 {
++			pwm0_pin: pwm0-pin {
++				rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm1 {
++			pwm1_pin: pwm1-pin {
++				rockchip,pins = <0 1 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm2 {
++			pwm2_pin: pwm2-pin {
++				rockchip,pins = <0 1 2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm3 {
++			pwm3_pin: pwm3-pin {
++				rockchip,pins = <0 27 1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c1 {
++			i2c1_xfer: i2c1-xfer {
++				rockchip,pins = <0 2 RK_FUNC_1 &pcfg_pull_none>,
++						<0 3 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart0 {
++			uart0_xfer: uart0-xfer {
++				rockchip,pins = <0 16 RK_FUNC_1 &pcfg_pull_up>,
++						<0 17 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart0_cts: uart0-cts {
++				rockchip,pins = <0 18 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			uart0_rts: uart0-rts {
++				rockchip,pins = <0 19 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart1 {
++			uart1_xfer: uart1-xfer {
++				rockchip,pins = <2 22 RK_FUNC_1 &pcfg_pull_none>,
++						<2 23 RK_FUNC_1 &pcfg_pull_none>;
++			};
++			/* no rts / cts for uart1 */
++		};
++
++		uart2 {
++			uart2_xfer: uart2-xfer {
++				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_none>,
++						<1 19 RK_FUNC_2 &pcfg_pull_none>;
++			};
++			/* no rts / cts for uart2 */
++		};
++	};
++};
 -- 
 1.7.9.5
