@@ -1,86 +1,41 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 30 Sep 2015 01:14:15 +0300
-Subject: [PATCH v5 18/23] ptrace: Allow compat to use the native siginfo
-In-Reply-To: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1443564860-31208-19-git-send-email-ynorov@caviumnetworks.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Sep 2015 23:18:01 +0100
+Subject: [PATCH 1/1] Disable CONFIG_UACCESS_WITH_MEMCPY in Atmel config.
+In-Reply-To: <20150929220140.GA3639@piout.net>
+References: <1443556987-2788-1-git-send-email-jc@eclis.ch>
+ <20150929203554.GH3982@pengutronix.de> <560AFBC2.5050000@eclis.ch>
+ <20150929220140.GA3639@piout.net>
+Message-ID: <20150929221800.GR21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+On Wed, Sep 30, 2015 at 12:01:40AM +0200, Alexandre Belloni wrote:
+> Hi,
+> 
+> On 29/09/2015 at 22:59:46 +0200, Jean-Christian de Rivaz wrote :
+> > Without the explicit disabling, the user will be asked and could possibly
+> > give the wrong answer as the help look as a cool feature and the condition
+> > is very hard to understand.
+> > 
+> 
+> That is not true, if you remove it from the defconfig, it will simply be
+> disabled in the final config.
+> 
+> Moreover, I would prefer a better commit message than "Russell said so"
 
-Set COMPAT_USE_NATIVE_SIGINFO to be true for non AARCH32 tasks.
+Well, if people are going to take that kind of attitude, then I'm not
+going to bother fixing it at all.  I've got better things to do than
+chase after bugs in almost unused code and code which people shouldn't
+be enabling on their platforms.
 
-With ARM64 ILP32 ABI, we want to use the non-compat
-siginfo as we want to simplify signal handling for this new ABI.
-This patch just adds a new define COMPAT_USE_NATIVE_SIGINFO and
-if it is true then read/write in the compat case as it was the
-non-compat case.
+It's not "Russell said so" but "Nicolas, the author of the code, said so."
+I'm merely passing the information along.  Search the archives if you don't
+believe me, it's been discussed in the last couple of months, including
+potentially removing this code.
 
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+I regard this code as a maintanence burden, one that I personally can do
+without.
 
-diff --git a/include/linux/compat.h b/include/linux/compat.h
-index a76c917..0a25d90 100644
---- a/include/linux/compat.h
-+++ b/include/linux/compat.h
-@@ -24,6 +24,10 @@
- #define COMPAT_USE_64BIT_TIME 0
- #endif
- 
-+#ifndef COMPAT_USE_NATIVE_SIGINFO
-+#define COMPAT_USE_NATIVE_SIGINFO 0
-+#endif
-+
- #ifndef __SC_DELOUSE
- #define __SC_DELOUSE(t,v) ((t)(unsigned long)(v))
- #endif
-diff --git a/kernel/ptrace.c b/kernel/ptrace.c
-index 787320d..04799aa 100644
---- a/kernel/ptrace.c
-+++ b/kernel/ptrace.c
-@@ -652,7 +652,7 @@ static int ptrace_peek_siginfo(struct task_struct *child,
- 			break;
- 
- #ifdef CONFIG_COMPAT
--		if (unlikely(is_compat_task())) {
-+		if (unlikely(is_compat_task() && !COMPAT_USE_NATIVE_SIGINFO)) {
- 			compat_siginfo_t __user *uinfo = compat_ptr(data);
- 
- 			if (copy_siginfo_to_user32(uinfo, &info) ||
-@@ -1140,16 +1140,26 @@ int compat_ptrace_request(struct task_struct *child, compat_long_t request,
- 
- 	case PTRACE_GETSIGINFO:
- 		ret = ptrace_getsiginfo(child, &siginfo);
--		if (!ret)
--			ret = copy_siginfo_to_user32(
--				(struct compat_siginfo __user *) datap,
--				&siginfo);
-+		if (!ret) {
-+			if (COMPAT_USE_NATIVE_SIGINFO)
-+				ret = copy_siginfo_to_user(
-+					(struct siginfo __user *) datap,
-+					&siginfo);
-+			else
-+				ret = copy_siginfo_to_user32(
-+					(struct compat_siginfo __user *) datap,
-+					&siginfo);
-+		}
- 		break;
- 
- 	case PTRACE_SETSIGINFO:
- 		memset(&siginfo, 0, sizeof siginfo);
--		if (copy_siginfo_from_user32(
--			    &siginfo, (struct compat_siginfo __user *) datap))
-+		if (COMPAT_USE_NATIVE_SIGINFO)
-+			ret = copy_from_user(&siginfo, datap, sizeof(siginfo));
-+		else
-+			ret = copy_siginfo_from_user32(
-+				 &siginfo, (struct compat_siginfo __user *) datap);
-+		if (ret)
- 			ret = -EFAULT;
- 		else
- 			ret = ptrace_setsiginfo(child, &siginfo);
 -- 
-2.1.4
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
