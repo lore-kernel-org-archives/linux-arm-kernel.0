@@ -1,43 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Sep 2015 18:48:35 +0100
-Subject: [PATCH v4 1/2] ARM: dma-mapping: Don't use outer_flush_range
- when the L2C is coherent
-In-Reply-To: <20150929193031.72bbebe8@free-electrons.com>
-References: <1443545458-14807-1-git-send-email-gregory.clement@free-electrons.com>
- <1443545458-14807-2-git-send-email-gregory.clement@free-electrons.com>
- <20150929171054.GN21513@n2100.arm.linux.org.uk>
- <20150929193031.72bbebe8@free-electrons.com>
-Message-ID: <20150929174835.GO21513@n2100.arm.linux.org.uk>
+From: jc@eclis.ch (Jean-Christian de Rivaz)
+Date: Tue, 29 Sep 2015 19:50:08 +0200
+Subject: Unhandled fault or spinlock lockup suspected ?
+In-Reply-To: <20150929162246.GK21513@n2100.arm.linux.org.uk>
+References: <560AB619.2040502@eclis.ch>
+ <20150929162246.GK21513@n2100.arm.linux.org.uk>
+Message-ID: <560ACF50.8030205@eclis.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 29, 2015 at 07:30:31PM +0200, Thomas Petazzoni wrote:
-> Hello Russell,
-> 
-> On Tue, 29 Sep 2015 18:10:54 +0100, Russell King - ARM Linux wrote:
-> 
-> > > In the current kernel implementation, the outer cache flush range
-> > > operation is triggered by the dma_alloc function.
-> > > This operation can be take place during runtime and in some
-> > > circumstances may lead to the PCIe/PL310 deadlock on Armada 375/38x
-> > > SoCs.
-> > 
-> > I wonder if that's what's causing the sporadic lockups I'm seeing on
-> > 38x with a SATA PCIe card - it happens at a very specific point during
-> > boot while initialising the SATA card, right down to the kernel message
-> > character that it stops at.
-> 
-> It might very well be the case. If there's enough PCIe traffic and a
-> PL310 cache maintenance operation happening at the same time, the
-> system will lockup. I'm a bit surprised that just the initialization of
-> the PCIe card generates enough traffic to trigger the deadlock, but
-> maybe I'm underestimating the problem.
+Le 29. 09. 15 18:22, Russell King - ARM Linux a ?crit :
+> On Tue, Sep 29, 2015 at 06:02:33PM +0200, Jean-Christian de Rivaz wrote:
+>> I tried the last git linux master on a embedded system that worked with a
+>> 3.19.0 kernel before. I solved most of the problems caused by the kernel
+>> upgrade, but every 15 to 20 minutes I get this type of kernel report:
+> Yes, it's because of the user access changes.  The uaccess_with_memcpy()
+> code got broken, and despite trying to fix it, it seems that it's still
+> broken.  I'll try again to fix it in the next few days.
+>
+> In any case, unless you have a Marvell platform, you should have this
+> disabled - it provides a performance boost for Marvell platforms, but
+> degrades performance everywhere else.  Please ensure that you disable
+> CONFIG_UACCESS_WITH_MEMCPY.
+>
 
-It isn't every boot - the board has booted around 240 kernels so far and
-maybe 5% of them have needed the reset button pressed because of this.
-It only happens when I have the SATA card connected.  I don't have any
-drives on the SATA card at the moment though.
+Hi Russell, many thanks for your fast help. Work well when 
+CONFIG_UACCESS_WITH_MEMCPY is disabled.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jean-Christian
