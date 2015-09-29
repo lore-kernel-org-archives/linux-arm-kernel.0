@@ -1,104 +1,78 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 Sep 2015 08:29:06 +0100
-Subject: [PATCH v3 1/7] acpi: Add early device probing infrastructure
-In-Reply-To: <560A13FC.4080204@linaro.org>
-References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
- <1443451758-22717-2-git-send-email-marc.zyngier@arm.com>
- <560A13FC.4080204@linaro.org>
-Message-ID: <20150929082906.2cabe51a@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 29 Sep 2015 09:34:54 +0200
+Subject: [PATCH v4 10/15] KVM: arm: implement world switch for debug
+ registers
+In-Reply-To: <560A2273.6050207@linaro.org>
+References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
+ <1439213167-8988-11-git-send-email-zhichao.huang@linaro.org>
+ <20150902145327.GL10991@cbox> <560A2273.6050207@linaro.org>
+Message-ID: <20150929073454.GD9002@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Sep 2015 06:30:52 +0200
-Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-
+On Tue, Sep 29, 2015 at 01:32:35PM +0800, Zhichao Huang wrote:
 > 
-> Hi Marc,
 > 
-> On 09/28/2015 04:49 PM, Marc Zyngier wrote:
-> > IRQ controllers and timers are the two types of device the kernel
-> > requires before being able to use the device driver model.
-> >
-> > ACPI so far lacks a proper probing infrastructure similar to the one
-> > we have with DT, where we're able to declare IRQ chips and
-> > clocksources inside the driver code, and let the core code pick it up
-> > and call us back on a match. This leads to all kind of really ugly
-> > hacks all over the arm64 code and even in the ACPI layer.
-> >
-> > In order to allow some basic probing based on the ACPI tables,
-> > introduce "struct acpi_probe_entry" which contains just enough
-> > data and callbacks to match a table, an optional subtable, and
-> > call a probe function. A driver can, at build time, register itself
-> > and expect being called if the right entry exists in the ACPI
-> > table.
-> >
-> > A acpi_probe_device_table() is provided, taking an identifier for
-> > a set of acpi_prove_entries, and iterating over the registered
-> > entries.
-> >
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >   drivers/acpi/scan.c               | 39 +++++++++++++++++++++++
-> >   include/asm-generic/vmlinux.lds.h | 10 ++++++
-> >   include/linux/acpi.h              | 66 +++++++++++++++++++++++++++++++++++++++
-> >   3 files changed, 115 insertions(+)
-> >
-> > diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-> > index f834b8c..daf9fc8 100644
-> > --- a/drivers/acpi/scan.c
-> > +++ b/drivers/acpi/scan.c
-> > @@ -1913,3 +1913,42 @@ int __init acpi_scan_init(void)
-> >   	mutex_unlock(&acpi_scan_lock);
-> >   	return result;
-> >   }
-> > +
-> > +static struct acpi_probe_entry *ape;
-> > +static int acpi_probe_count;
-> > +static DEFINE_SPINLOCK(acpi_probe_lock);
-> > +
-> > +static int __init acpi_match_madt(struct acpi_subtable_header *header,
-> > +				  const unsigned long end)
-> > +{
-> > +	if (!ape->subtable_valid || ape->subtable_valid(header, ape))
-> > +		if (!ape->probe_subtbl(header, end))
-> > +			acpi_probe_count++;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +int __init __acpi_probe_device_table(struct acpi_probe_entry *ap_head, int nr)
-> > +{
-> > +	int count = 0;
-> > +
-> > +	if (acpi_disabled)
-> > +		return 0;
-> > +
-> > +	spin_lock(&acpi_probe_lock);
-> > +	for (ape = ap_head; nr; ape++, nr--) {
-> > +		if (ACPI_COMPARE_NAME(ACPI_SIG_MADT, ape->id)) {
-> > +			acpi_probe_count = 0;
-> > +			acpi_table_parse_madt(ape->type, acpi_match_madt, 0);
+> On 2015/9/2 22:53, Christoffer Dall wrote:
+> >> +/* Reads cp14 registers from hardware.
+> >> + * Writes cp14 registers in-order to the CP14 struct pointed to by r10
+> >> + *
+> >> + * Assumes vcpu pointer in vcpu reg
+> >> + *
+> >> + * Clobbers r2-r12
+> >> + */
+> >> +.macro save_debug_state
+> >> +	read_hw_dbg_num
+> >> +	cp14_read_and_str r10, 4, cp14_DBGBVR0, r11
+> >> +	cp14_read_and_str r10, 5, cp14_DBGBCR0, r11
+> >> +	cp14_read_and_str r10, 6, cp14_DBGWVR0, r12
+> >> +	cp14_read_and_str r10, 7, cp14_DBGWCR0, r12
+> >> +
+> >> +	/* DBGDSCR reg */
+> >> +	mrc	p14, 0, r2, c0, c1, 0
+> >> +	str	r2, [r10, #CP14_OFFSET(cp14_DBGDSCRext)]
+> > 
+> > so again we're touching the scary register on every world-switch.  Since
+> > it sounds like we have experience telling us that this can cause
+> > troubles, I'm wondering if we can get around it by:
+> > 
+> > Only ever allow the guest to use debugging registers if we managed to
+> > enter_monitor_mode on the host, and in that case only allow guest
+> > debugging with the configuration of DBGDSCR that the host has.
+> > 
+> > If the host never managed to enable debugging, the guest probably won't
+> > succeed either, and we should just trap all guest accesses to the debug
+> > registers.
+> > 
+> > Does this work?
+> > 
 > 
-> Isn't supposed 'acpi_table_parse_madt' to return the count ? and 
-> shouldn't the return code be checked ?
+> I think it works. Since the register is dangerous, we will try not to
+> world switch it. It means that the guest will not be able to write the register,
+> and will always see what the host set. So the guest will not be able to use
+> hardware debug feature if the host disable it.
+> 
+I talked to Will about this the last day of Linaro Connect and we
+arrived at the conclusion that since you cannot trap on only a subset of
+the debug registers (namely the DBGDSCR and the registers related to the
+OS lock etc.), there is simply no safe and robus way to do this on
+ARMv7.
 
-acpi_table_madt_parse() returns the count of the entries it has parsed.
-We're interested in the count of entries that have been successfully
-probed. Not quite the same thing.
+Therfore, this patch series probably needs to be reworked so that we
+*always* set TDA for the guest, and when the guest programs a break- or
+watchpoint, then we program the hardware registers directly in KVM
+without telling perf or hw_breakpoints about this, and we only do any of
+this if monitor_mode_enabled() is true.  If not, then debugging inside
+the guest simply won't work.
 
-As for the return code, checking it is highly symbolic, because there
-is no way we can recover from  an error in the ACPI parsing - we're
-dead anyway, as we end up without interrupt controller. I can add a
-WARN_ON(), but I'm not sure more noise will help understanding the
-problem.
+I also don't think that checking the host's breakpoint and wathcpoint
+registers are necessary after all, since they are context switched per
+process on the host, so this will only be a problem for guests when the
+user uses GDB on the VCPU thread (in which case he's asking for trouble
+anyway) or with using the weird perf CPU-wide breakpoints, which is very
+far from a the common case, so I wouldn't worry about this for now.
 
-There is also the perfectly valid case where ACPI has been forcefully
-disabled (or on arm64, not forcefully enabled). In which case, the
-parsing code will abort early, and there is no reason to scream about
-it.
+Hopefully this makes sense.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+-Christoffer
