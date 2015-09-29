@@ -1,94 +1,215 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 30 Sep 2015 01:13:58 +0300
-Subject: [PATCH v5 01/23] arm64:ilp32: add documentation on the ILP32 ABI for
- ARM64
+Date: Wed, 30 Sep 2015 01:14:04 +0300
+Subject: [PATCH v5 07/23] arm64:ilp32: share signal structures between ILP32
+ and LP64 ABIs
 In-Reply-To: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1443564860-31208-2-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1443564860-31208-8-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+From: Andrew Pinski <apinski@cavium.com>
 
-Based on Andrew Pinski's original patch-series and adapted with changes
-to reduce the duplication of code-paths and resolve issue found during
-LTP testing.
+Defines the macros which allow the signal structures to be the same between
+ILP32 and LP64.
 
 Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
 Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 
- create mode 100644 Documentation/arm64/ilp32.txt
-
-diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
-new file mode 100644
-index 0000000..1049510
---- /dev/null
-+++ b/Documentation/arm64/ilp32.txt
-@@ -0,0 +1,64 @@
-+ILP32 AARCH64 SYSCALL ABI
-+=========================
-+Written by Andrew Pinski <apinski@cavium.com>
-+Updated by Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+diff --git a/arch/arm64/include/uapi/asm/siginfo.h b/arch/arm64/include/uapi/asm/siginfo.h
+index 5a74a08..1a6aa32 100644
+--- a/arch/arm64/include/uapi/asm/siginfo.h
++++ b/arch/arm64/include/uapi/asm/siginfo.h
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) 2012 ARM Ltd.
++ * Copyright (C) 2014 Cavium Inc.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -18,6 +19,26 @@
+ 
+ #define __ARCH_SI_PREAMBLE_SIZE	(4 * sizeof(int))
+ 
++#ifdef __ILP32__
++# ifdef __AARCH64EB__
++#  define __SIGINFO_INNER(type, field)		\
++		int __pad#field;		\
++		type field
++# else
++#  define __SIGINFO_INNER(type, field)		\
++		type field;			\
++		int __pad#field
++# endif
++
++# undef __SIGINFO_VOIDPOINTER
++# define __SIGINFO_VOIDPOINTER(field)		\
++		__SIGINFO_INNER(void __user*, field)
++# undef __SIGINFO_BAND
++
++# define __SIGINFO_BAND(field)			\
++	__SIGINFO_INNER(long, field)
++#endif
++
+ #include <asm-generic/siginfo.h>
+ 
+ #endif
+diff --git a/arch/arm64/include/uapi/asm/signal.h b/arch/arm64/include/uapi/asm/signal.h
+index 8d1e723..d90d53b 100644
+--- a/arch/arm64/include/uapi/asm/signal.h
++++ b/arch/arm64/include/uapi/asm/signal.h
+@@ -19,6 +19,38 @@
+ /* Required for AArch32 compatibility. */
+ #define SA_RESTORER	0x04000000
+ 
++/* For ILP32, sigset should be the same size fields as LP64 so use
++   unsigned long long. */
++#ifdef __ILP32__
++#define __SIGSET_INNER_TYPE __extension__ unsigned long long
++#define _NSIG_BPW 64
++
++# ifdef __AARCH64EB__
++#  define __SIGNAL_INNER(type, field)		\
++	__extension__ struct {			\
++		int __pad_##field;		\
++		type field;			\
++	} __attribute__((aligned(8)))
++# else
++#  define __SIGNAL_INNER(type, field)		\
++	__extension__ struct {			\
++		type field;			\
++		int __pad_##field;		\
++	} __attribute__((aligned(8)))
++# endif
++
++# define __SIGACTION_HANDLER(field)		\
++	__SIGNAL_INNER(__sighandler_t, field)
 +
 +
-+This document describes the ILP32 syscall ABI and where it differs
-+from the generic linux syscall interface.
++#define __SIGACTION_FLAGS(field)		\
++	__extension__ unsigned long long field
 +
-+ILP32 sets __kernel_long_t and __kernel_ulong_t both to 64bit.  This
-+affects the following type definitions for ILP32 client programs:
-+ * time_t          unsigned long long
-+ * clock_t         unsigned long long
-+ * fsword_t        long long
-+ * suseconds_t     long long
-+ * swblk_t         long long
-+ * fd_mask_t       long long
++#define __SIGACTION_RESTORER(field)		\
++	__SIGNAL_INNER(__sigrestore_t, field)
 +
-+Some structures are changed to reduce the difference in the code path
-+for both ILP32 and LP64 ABIs for signal handling.
++#endif
 +
-+The following structures have been changed so the layout of the
-+structures are the same between ILP32 and LP64 ABIs, including:
-+ * timespec        uses time_t and suseconds_t
-+ * timeval         uses time_t and suseconds_t
-+ * stat            uses timespec/time_t
-+ * semid64_ds      uses time_t.
-+ * msqid64_ds      uses time_t.
-+ * shmid64_ds      uses time_t.
-+ * rt_sigframe     uses siginfo and ucontext.
-+ * siginfo_t       uses clock_t and sigval_t
-+ * ucontext        uses stack_t and sigset_t
-+ * sigval_t        contains pointers
-+ * sigevent        Uses sigval_t which causes it to be the same.  Special
-+                   handing is needed for reading; in the mq_notify syscall
-+ * sigaction       Conversion is handled in the userland (glibc), as the
-+		    userland data structures are defined in glibc anyway.
-+ * fd_set          This is done to avoid endian issues between ILP32 and
-+		   LP64. Syscalls consuming fd_set use timespec.
+ #include <asm-generic/signal.h>
+ 
+ #endif
+diff --git a/include/uapi/asm-generic/siginfo.h b/include/uapi/asm-generic/siginfo.h
+index 1e35520..be640a9 100644
+--- a/include/uapi/asm-generic/siginfo.h
++++ b/include/uapi/asm-generic/siginfo.h
+@@ -4,9 +4,17 @@
+ #include <linux/compiler.h>
+ #include <linux/types.h>
+ 
++#ifndef __SIGINFO_VOIDPOINTER
++#define __SIGINFO_VOIDPOINTER(field) void __user *field
++#endif
 +
-+A number of structures differ between ILP32 and LP64, including:
-+ * struct msgbuf   The specification of 'struct msgbuf' defines the 'mtype'
-+                   field as a 'long' (i.e. 32bit for ILP32, but 64bit for
-+		   LP64).  Functions that operate on 'struct msgbuf' need
-+		   to be passed through the compat-syscalls to resolve
-+		   this.
-+ * stack_t         contains pointers (handled in the compatibility layer)
++#ifndef __SIGINFO_BAND
++#define __SIGINFO_BAND(field) __ARCH_SI_BAND_T field
++#endif
 +
-+Also the syscalls which normally would pass 64bit values as two arguments;
-+now pass the 64bit value as one argument.  Also they have been renamed
-+(removing the 64 from the name) to avoid confusion.
-+The list of these LP64 syscalls reused by ILP32 clients is:
-+ * fcntl
-+ * statfs
-+ * fstatfs
-+ * truncate
-+ * ftruncate
-+ * lseek
-+ * sendfile
-+ * newfstatat
-+ * fstat
-+ * mmap
-+ * fadvise64
+ typedef union sigval {
+ 	int sival_int;
+-	void __user *sival_ptr;
++	__SIGINFO_VOIDPOINTER(sival_ptr);
+ } sigval_t;
+ 
+ /*
+@@ -86,7 +94,7 @@ typedef struct siginfo {
+ 
+ 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
+ 		struct {
+-			void __user *_addr; /* faulting insn/memory ref. */
++			__SIGINFO_VOIDPOINTER(_addr); /* faulting insn/memory ref. */
+ #ifdef __ARCH_SI_TRAPNO
+ 			int _trapno;	/* TRAP # which caused the signal */
+ #endif
+@@ -99,13 +107,13 @@ typedef struct siginfo {
+ 
+ 		/* SIGPOLL */
+ 		struct {
+-			__ARCH_SI_BAND_T _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
++			__SIGINFO_BAND(_band);	/* POLL_IN, POLL_OUT, POLL_MSG */
+ 			int _fd;
+ 		} _sigpoll;
+ 
+ 		/* SIGSYS */
+ 		struct {
+-			void __user *_call_addr; /* calling user insn */
++			__SIGINFO_VOIDPOINTER(_call_addr); /* calling user insn */
+ 			int _syscall;	/* triggering system call number */
+ 			unsigned int _arch;	/* AUDIT_ARCH_* of syscall */
+ 		} _sigsys;
+@@ -290,6 +298,7 @@ typedef struct sigevent {
+ 		int _pad[SIGEV_PAD_SIZE];
+ 		 int _tid;
+ 
++		/* Note these two are handled only in userspace */
+ 		struct {
+ 			void (*_function)(sigval_t);
+ 			void *_attribute;	/* really pthread_attr_t */
+diff --git a/include/uapi/asm-generic/signal.h b/include/uapi/asm-generic/signal.h
+index 9df61f1..c4ce238 100644
+--- a/include/uapi/asm-generic/signal.h
++++ b/include/uapi/asm-generic/signal.h
+@@ -4,7 +4,9 @@
+ #include <linux/types.h>
+ 
+ #define _NSIG		64
++#ifndef _NSIG_BPW
+ #define _NSIG_BPW	__BITS_PER_LONG
++#endif
+ #define _NSIG_WORDS	(_NSIG / _NSIG_BPW)
+ 
+ #define SIGHUP		 1
+@@ -83,9 +85,13 @@
+ #define MINSIGSTKSZ	2048
+ #define SIGSTKSZ	8192
+ 
++#ifndef __SIGSET_INNER_TYPE
++#define __SIGSET_INNER_TYPE unsigned long
++#endif
 +
+ #ifndef __ASSEMBLY__
+ typedef struct {
+-	unsigned long sig[_NSIG_WORDS];
++	__SIGSET_INNER_TYPE sig[_NSIG_WORDS];
+ } sigset_t;
+ 
+ /* not actually used, but required for linux/syscalls.h */
+@@ -98,11 +104,24 @@ typedef unsigned long old_sigset_t;
+ #endif
+ 
+ #ifndef __KERNEL__
++
++#ifndef __SIGACTION_HANDLER
++#define __SIGACTION_HANDLER(field)	__sighandler_t field
++#endif
++
++#ifndef __SIGACTION_FLAGS
++#define __SIGACTION_FLAGS(field)	unsigned long field
++#endif
++
++#ifndef __SIGACTION_RESTORER
++#define __SIGACTION_RESTORER(field)	__sigrestore_t field
++#endif
++
+ struct sigaction {
+-	__sighandler_t sa_handler;
+-	unsigned long sa_flags;
++	__SIGACTION_HANDLER(sa_handler);
++	__SIGACTION_FLAGS(sa_flags);
+ #ifdef SA_RESTORER
+-	__sigrestore_t sa_restorer;
++	__SIGACTION_RESTORER(sa_restorer);
+ #endif
+ 	sigset_t sa_mask;		/* mask last for extensibility */
+ };
 -- 
 2.1.4
