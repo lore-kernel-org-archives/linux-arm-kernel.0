@@ -1,42 +1,49 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 30 Sep 2015 01:14:03 +0300
-Subject: [PATCH v5 06/23] arm64:uapi: set __BITS_PER_LONG correctly for ILP32
- and LP64
+Date: Wed, 30 Sep 2015 01:14:02 +0300
+Subject: [PATCH v5 05/23] arm64:ilp32: expose 'kernel_long' as 'long long' for
+ ILP32
 In-Reply-To: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1443564860-31208-7-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1443564860-31208-6-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrew Pinski <apinski@cavium.com>
 
-Define __BITS_PER_LONG depending on the ABI used (i.e. check whether
-__ILP32__ or __LP64__ is defined).  This is necessary for glibc to
-determine the appropriate type definitions for the system call interface.
+Since we want time_t and some other userland types to be the same
+between ILP32 and LP64, we define __kernel_long_t to be long long.
+
+To reuse the bulk of LP64 system calls (and data structures), the LP64
+kernel data types ('kernel_long', 'kernel_ulong') are exposed as their
+ILP32 'long long' and 'unsigned long long' equivalents to allow glibc
+to correctly interpret most data-structures used in the kernel ABI
+(i.el with the exception of those, that include pointers).
 
 Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
 Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 
-diff --git a/arch/arm64/include/uapi/asm/bitsperlong.h b/arch/arm64/include/uapi/asm/bitsperlong.h
-index fce9c29..4265243 100644
---- a/arch/arm64/include/uapi/asm/bitsperlong.h
-+++ b/arch/arm64/include/uapi/asm/bitsperlong.h
-@@ -16,7 +16,14 @@
- #ifndef __ASM_BITSPERLONG_H
- #define __ASM_BITSPERLONG_H
+diff --git a/arch/arm64/include/uapi/asm/posix_types.h b/arch/arm64/include/uapi/asm/posix_types.h
+index 7985ff6..d6a7cb5 100644
+--- a/arch/arm64/include/uapi/asm/posix_types.h
++++ b/arch/arm64/include/uapi/asm/posix_types.h
+@@ -5,6 +5,16 @@ typedef unsigned short __kernel_old_uid_t;
+ typedef unsigned short __kernel_old_gid_t;
+ #define __kernel_old_uid_t __kernel_old_uid_t
  
--#define __BITS_PER_LONG 64
-+#if defined(__LP64__)
-+/* Assuming __LP64__ will be defined for native ELF64's and not for ILP32. */
-+#  define __BITS_PER_LONG 64
-+#elif defined(__ILP32__)
-+#  define __BITS_PER_LONG 32
-+#else
-+#  error "Neither LP64 nor ILP32: unsupported ABI in asm/bitsperlong.h"
-+#endif
++#if defined(__ILP32__)
++/* The ILP32 kernel ABI reuses LP64 system calls where possible; to
++   this end, the equivalent ILP32 type definitions are used (a 64bit
++   'long'-type in LP64 corresponds to a 'long long' in LP64).  */
++
++typedef long long           __kernel_long_t;
++typedef unsigned long long  __kernel_ulong_t;
++#define __kernel_long_t     __kernel_long_t
++#endif /* defined(__ILP32__) */
++
+ #include <asm-generic/posix_types.h>
  
- #include <asm-generic/bitsperlong.h>
- 
+-#endif /*  __ASM_POSIX_TYPES_H */
++#endif /* __ASM_POSIX_TYPES_H */
 -- 
 2.1.4
