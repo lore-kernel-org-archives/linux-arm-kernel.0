@@ -1,39 +1,100 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 29 Sep 2015 20:10:01 +0200
-Subject: [PULL] ARM: efm32: cleanups
-Message-ID: <20150929181001.GF3982@pengutronix.de>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 29 Sep 2015 13:20:55 -0500
+Subject: [PATCH v4 1/5] Documentation: add DT bindings for ARM SCPI sensors
+In-Reply-To: <1442335861-7282-2-git-send-email-punit.agrawal@arm.com>
+References: <1442335861-7282-1-git-send-email-punit.agrawal@arm.com>
+ <1442335861-7282-2-git-send-email-punit.agrawal@arm.com>
+Message-ID: <CAL_Jsq+_Rrv5XqNsL-gwQZv3HK20dQC3jY7qCoxQ8KWhhs4Fdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 64291f7db5bd8150a74ad2036f1037e6a0428df2:
+On Tue, Sep 15, 2015 at 11:50 AM, Punit Agrawal <punit.agrawal@arm.com> wrote:
+> The System Control Processor (SCP) provides access to SoC sensors via
+> the System Control and Power Interface (SCPI) Message Protocol. Add
+> bindings to allow probing of these sensors. Also support referencing
+> of the sensors for setting up thermal zones via the thermal DT
+> bindings.
+>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
 
-  Linux 4.2 (2015-08-30 11:34:09 -0700)
+Acked-by: Rob Herring <robh@kernel.org>
 
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/ukl/linux.git tags/efm32-for-4.4-rc1
-
-for you to fetch changes up to f719a0d6a8541b383c506aaa4b4fa6b4109669f4:
-
-  ARM: efm32: switch to vendor,device compatible strings (2015-09-10 10:02:38 +0200)
-
-They are targeted for the next merge window and should not result in any
-conflict.
-
-----------------------------------------------------------------
-efm32 cleanups for 4.4-rc1
-
-These are just two followup cleanups for commits that are in v3.17-rc1 and
-waited in my private tree for application since that time.
-
-----------------------------------------------------------------
-Uwe Kleine-K?nig (2):
-      ARM: efm32: switch to properly namespaced location property
-      ARM: efm32: switch to vendor,device compatible strings
-
- arch/arm/boot/dts/efm32gg-dk3750.dts |  8 ++++----
- arch/arm/boot/dts/efm32gg.dtsi       | 32 ++++++++++++++++----------------
- 2 files changed, 20 insertions(+), 20 deletions(-)
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+> index f002460..86302de 100644
+> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
+> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+> @@ -72,8 +72,25 @@ Required sub-node properties:
+>  - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
+>                shared memory on Juno platforms
+>
+> +Sensor bindings for the sensors based on SCPI Message Protocol
+> +--------------------------------------------------------------
+> +SCPI provides an API to access the various sensors on the SoC.
+> +
+> +Required properties:
+> +- compatible : should be "arm,scpi-sensors".
+> +- #thermal-sensor-cells: should be set to 1. This property follows the
+> +                        thermal device tree bindings[2].
+> +
+> +                        Valid cell values are raw identifiers (Sensor
+> +                        ID) as used by the firmware. Refer to
+> +                        platform documentation for your
+> +                        implementation for the IDs to use. For Juno
+> +                        R0 and Juno R1 refer to [3].
+> +
+>  [0] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
+>  [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +[2] Documentation/devicetree/bindings/thermal/thermal.txt
+> +[3] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/apas03s22.html
+>
+>  Example:
+>
+> @@ -122,6 +139,11 @@ scpi_protocol: scpi at 2e000000 {
+>                         clock-output-names = "pxlclk0", "pxlclk1";
+>                 };
+>         };
+> +
+> +       scpi_sensors0: sensors {
+> +               compatible = "arm,scpi-sensors";
+> +               #thermal-sensor-cells = <1>;
+> +       };
+>  };
+>
+>  cpu at 0 {
+> @@ -136,6 +158,17 @@ hdlcd at 7ff60000 {
+>         clocks = <&scpi_clk 4>;
+>  };
+>
+> +thermal-zones {
+> +       soc_thermal {
+> +               polling-delay-passive = <100>;
+> +               polling-delay = <1000>;
+> +
+> +                               /* sensor         ID */
+> +               thermal-sensors = <&scpi_sensors0 3>;
+> +               ...
+> +       };
+> +};
+> +
+>  In the above example, the #clock-cells is set to 1 as required.
+>  scpi_dvfs has 3 output clocks namely: atlclk, aplclk, and gpuclk with 0,
+>  1 and 2 as clock-indices. scpi_clk has 2 output clocks namely: pxlclk0
+> @@ -148,3 +181,8 @@ scpi_dvfs i.e. "atlclk".
+>  Similarly the second example is hdlcd at 7ff60000 and it has pxlclk1 as input
+>  clock. '4' in the clock specifier here points to the second entry
+>  in the output clocks of scpi_clocks  i.e. "pxlclk1"
+> +
+> +The thermal-sensors property in the soc_thermal node uses the
+> +temperature sensor provided by SCP firmware to setup a thermal
+> +zone. The ID "3" is the sensor identifier for the temperature sensor
+> +as used by the firmware.
+> --
+> 2.5.1
+>
