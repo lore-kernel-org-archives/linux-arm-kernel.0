@@ -1,105 +1,136 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 29 Sep 2015 11:23:20 +0100
-Subject: [PATCH v2 4/9] dmaengine: st_fdma: Add STMicroelectronics FDMA
- engine driver support
-In-Reply-To: <2502961.3gtPceE427@wuerfel>
-References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
- <1441980871-24475-5-git-send-email-peter.griffin@linaro.org>
- <2502961.3gtPceE427@wuerfel>
-Message-ID: <20150929102320.GD16955@griffinp-ThinkPad-X1-Carbon-2nd>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 29 Sep 2015 18:25:44 +0800
+Subject: [PATCH] soc: mediatek: Fix random hang up issue while kernel init
+In-Reply-To: <5607D224.4050801@gmail.com>
+References: <1443162717-64831-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1443169573.3135.9.camel@pengutronix.de> <5607D224.4050801@gmail.com>
+Message-ID: <CAGS+omCXMRf4bxWancSJSq2a1pc38TYYY46Os9ASWWCRp95_ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Matthias & Lucas,
 
-Thanks for reviewing.
+On Sun, Sep 27, 2015 at 7:25 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+>
+>
+>
+> On 25/09/15 10:26, Lucas Stach wrote:
+>>
+>> Am Freitag, den 25.09.2015, 14:31 +0800 schrieb James Liao:
+>>>
+>>> In kernel late init, it turns off all unused clocks, which
+>>> needs to access subsystem registers such as VENC and VENC_LT.
+>>>
+>>> Accessing MT8173 VENC registers needs two top clocks, mm_sel and
+>>> venc_sel. Accessing VENC_LT registers needs mm_sel and venclt_sel.
+>>> So we need to keep these clocks on before accessing their registers.
+>>>
+>>> This patch keeps venc_sel / venclt_sel clock on when
+>>> VENC / VENC_LT's power is on, to prevent system hang up while
+>>> accessing its registeres.
+>>>
+>> This changes the binding of an existing driver, so it needs some more
+>> consideration. Are VENC_SEL and VENC_LT_SEL really direct clock inputs
+>> to the VENC module, or are they some kind of parent clock for one of the
+>> existing clocks used by the old VENC binding?
+>>
+>> If they are direct clock inputs to the VENC module, changing the binding
+>> might be still ok at that point, as there shouldn't be many users of
+>> that yet.
 
-On Fri, 11 Sep 2015, Arnd Bergmann wrote:
+The MT8173 VENC subsystem clock registers are modeled by the vencsys
+clock-controller node:
 
-> On Friday 11 September 2015 15:14:26 Peter Griffin wrote:
-> > +
-> > +#include "st_fdma.h"
-> 
-> Just move the contents of that file here, no other driver should
-> be including it.
+vencsys: clock-controller at 18000000 {
+  compatible = "mediatek,mt8173-vencsys", "syscon";
+  reg = <0 0x18000000 0 0x1000>;
+  #clock-cells = <1>;
+};
 
-There is another file st_fdma_xbar.c which will be upstreamed shortly
-which uses some parts of this header. It was originally part of the
-v1 series here: -
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355069.html
+These registers, however, are only accessible if:
+  (a) the VENC power domain is enabled, and
+  (b) the "venc_sel" clock is enabled.
 
-But I removed it from subsequent submissions as it needs to be re-worked
-to use some of the new xbar functionality recently added by TI.
+According to James, venc_sel is a direct clock input the VENC module,
+and it is an ancestor to some, but not all, of the subsystem clocks, in
+particular it is not an ancestor to "venc_cke0":
 
-However large parts probably aren't required by xbar, and could be
-moved into the c file, so I will move those parts in the next submission.
+ static const struct mtk_gate venc_clks[] __initconst = {
+         GATE_VENC(CLK_VENC_CKE0, "venc_cke0", "mm_sel", 0),
+         GATE_VENC(CLK_VENC_CKE1, "venc_cke1", "venc_sel", 4),
+         GATE_VENC(CLK_VENC_CKE2, "venc_cke2", "venc_sel", 8),
+         GATE_VENC(CLK_VENC_CKE3, "venc_cke3", "venc_sel", 12),
+ };
 
-> 
-> > +static struct dma_chan *st_fdma_of_xlate(struct of_phandle_args *dma_spec,
-> > +					 struct of_dma *ofdma)
-> > +{
-> > +	struct st_fdma_dev *fdev = ofdma->of_dma_data;
-> > +	struct st_fdma_cfg cfg;
-> > +
-> > +	if (dma_spec->args_count < 1)
-> > +		return NULL;
-> > +
-> > +	cfg.of_node = dma_spec->np;
-> > +	cfg.req_line = dma_spec->args[0];
-> > +	cfg.req_ctrl = 0;
-> > +	cfg.type = ST_FDMA_TYPE_FREE_RUN;
-> > +
-> > +	if (dma_spec->args_count > 1)
-> > +		cfg.req_ctrl = dma_spec->args[1] & REQ_CTRL_CFG_MASK;
-> > +
-> > +	if (dma_spec->args_count > 2)
-> > +		cfg.type = dma_spec->args[2];
-> 
-> The binding mandates #dma-cells=<3>, so you can just return an error
-> otherwise.
+If the VENC power domain is disabled, then accesses to the vencsys
+registers just silently fail (i.e., reads probably
+return all 0s).  However, if the power domain is ON but venc_sel is
+disabled, then accessing the clock-controller registers results in a
+system hang (until the power domain is disabled).
 
-Ok will fix in next submission
-> 
-> > +	dev_dbg(fdev->dev, "xlate req_line:%d type:%d req_ctrl:%#x\n",
-> > +		cfg.req_line, cfg.type, cfg.req_ctrl);
-> > +
-> > +	return dma_request_channel(fdev->dma_device.cap_mask,
-> > +			st_fdma_filter_fn, &cfg);
-> > +}
-> 
-> Why this indirection? You should be able to just use
-> dma_get_any_slave_channel() to get the first available channel and
-> then configure it the same way that the filter function does.
+At boot the VENC power domain is forced on by scpsys (like all other
+power domains).  Later both unused clocks and power domains get
+disabled. If clocks are disabled first, and venc_sel is disabled
+before venc_cke0, then when unused_clock tries to disable venc_cke0,
+the system will hang when it reads the vencsys "is clock enabled" bit
+since:
+  (a) VENC power domain is still enabled, and
+  (b) venc_sel is already disabled
 
-Ok I will look at using this API instead of dma_request_channel
-in the next submission.
+In theory, we could add "clocks=<&topckgen CLK_TOP_VENC_SEL>;" to the
+vencsys clock-controller node.  On initialization, mtk_vencsys_init()
+could then pass venc_sel to the generic MT8173 gate clock driver, and
+it would then clk_enable(venc_sel)/_disable(venc_sel) around any
+access to the clock-controller registers.  James, however, thinks
+this is a lot of extra overhead, and instead has proposed the fix in this patch,
+where venc_sel is forced on whenever the VENC power domain is enabled.
 
-> 
-> > +bool st_fdma_filter_fn(struct dma_chan *chan, void *param)
-> > +{
-> > +	struct st_fdma_cfg *config = param;
-> > +	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
-> > +
-> > +	if (!param)
-> > +		return false;
-> > +
-> > +	if (fchan->fdev->dma_device.dev->of_node != config->of_node)
-> > +		return false;
-> > +
-> > +	fchan->cfg = *config;
-> > +
-> > +	return true;
-> > +}
-> 
-> Please drop this until there is a board file that references the
-> function. Otherwise it's just dead code. I assume there are some
-> users in arch/sh/ in a private tree?
+So, this patch is a bit of a hack, but the mtk scpsys driver already
+does something similar for the MM & MFG clocks - these clocks are
+always enabled whenever certain power domains are enabled, and they
+are only disabled when all such power domains are disabled.  I'm not
+100% why these clocks must always be kept on whenever these power
+domains are enabled, but probably to solve a similar problem where
+these clocks are needed to access some registers at a time when these
+clocks would not otherwise be explicitly enabled.
 
-I'll drop this in the next submission. There aren't any users I can
-see in the private tree. This function is currently only used by
-dma_reuest_channel above, so won't be required if we move over to
-using dma_get_any_slave_channel().
+Is the above clear?
 
-regards,
+>> But then we at least need a corresponding change to the binding documentation.
 
-Peter.
+Agreed.
+
+> Yes, we will need a really good reason to change the bindings.
+
+There is a race where the system can sometimes hang at boot with the
+existing implementation & bindings.
+This seems like a really good reason to change the bindings, if the
+proposed solution is acceptable (it may be possible to fix the hang
+without changing the bindings).
+
+> Apart from that we would need to find a solution which works with the old (and wrong bindings) as well.
+
+Why do we need to support the old bindings?
+This patch fixes a problem in MT8173, for which the mainline kernel is
+still under active bringup.
+If the existing bindings are not used anywhere yet (*), it seems like
+unnecessary overhead to enforce backwards compatibility at this stage.
+
+(*) I don't actually know if this is true, perhaps only Mediatek can
+answer this.
+
+> Apart from that, please send the dtsi part as a seperate patch.
+
+Agreed.
+
+Thanks,
+-Dan
+
+>
+> Thanks,
+> Matthias
+>
+>
+>> Regards,
+>> Lucas
