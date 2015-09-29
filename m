@@ -1,56 +1,30 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 29 Sep 2015 10:29:58 +0100
-Subject: [PATCH 06/10] arm64: tlbflush: avoid flushing when fullmm == 1
-In-Reply-To: <1442494219-6133-7-git-send-email-will.deacon@arm.com>
+Date: Tue, 29 Sep 2015 10:55:55 +0100
+Subject: [PATCH 00/10] arm64 switch_mm improvements
+In-Reply-To: <1442494219-6133-1-git-send-email-will.deacon@arm.com>
 References: <1442494219-6133-1-git-send-email-will.deacon@arm.com>
- <1442494219-6133-7-git-send-email-will.deacon@arm.com>
-Message-ID: <20150929092957.GA30504@e104818-lin.cambridge.arm.com>
+Message-ID: <20150929095555.GB30504@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 17, 2015 at 01:50:15PM +0100, Will Deacon wrote:
-> The TLB gather code sets fullmm=1 when tearing down the entire address
-> space for an mm_struct on exit or execve. Given that the ASID allocator
-> will never re-allocate a dirty ASID, this flushing is not needed and can
-> simply be avoided in the flushing code.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/tlb.h | 26 +++++++++++++++-----------
->  1 file changed, 15 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
-> index d6e6b6660380..ffdaea7954bb 100644
-> --- a/arch/arm64/include/asm/tlb.h
-> +++ b/arch/arm64/include/asm/tlb.h
-> @@ -37,17 +37,21 @@ static inline void __tlb_remove_table(void *_table)
->  
->  static inline void tlb_flush(struct mmu_gather *tlb)
->  {
-> -	if (tlb->fullmm) {
-> -		flush_tlb_mm(tlb->mm);
-> -	} else {
-> -		struct vm_area_struct vma = { .vm_mm = tlb->mm, };
-> -		/*
-> -		 * The intermediate page table levels are already handled by
-> -		 * the __(pte|pmd|pud)_free_tlb() functions, so last level
-> -		 * TLBI is sufficient here.
-> -		 */
-> -		__flush_tlb_range(&vma, tlb->start, tlb->end, true);
-> -	}
-> +	struct vm_area_struct vma = { .vm_mm = tlb->mm, };
-> +
-> +	/*
-> +	 * The ASID allocator will either invalidate the ASID or mark
-> +	 * it as used.
-> +	 */
-> +	if (tlb->fullmm)
-> +		return;
+On Thu, Sep 17, 2015 at 01:50:09PM +0100, Will Deacon wrote:
+> Will Deacon (10):
+>   arm64: mm: remove unused cpu_set_idmap_tcr_t0sz function
+>   arm64: proc: de-scope TLBI operation during cold boot
+>   arm64: flush: use local TLB and I-cache invalidation
+>   arm64: mm: rewrite ASID allocator and MM context-switching code
+>   arm64: tlbflush: remove redundant ASID casts to (unsigned long)
+>   arm64: tlbflush: avoid flushing when fullmm == 1
+>   arm64: switch_mm: simplify mm and CPU checks
+>   arm64: mm: kill mm_cpumask usage
+>   arm64: tlb: remove redundant barrier from __flush_tlb_pgtable
+>   arm64: mm: remove dsb from update_mmu_cache
 
-BTW, do we actually need this flush_tlb_mm() with the current ASID
-allocator? It doesn't reuse old ASIDs either before a full TLBI (just
-trying to remember if we had any logic; or maybe it was needed before
-non-lazy __pte_free_tlb).
+Apart from some minor comments on patch 4, the series looks fine to me.
+
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+
+I'll do some more tests in the meantime.
 
 -- 
 Catalin
