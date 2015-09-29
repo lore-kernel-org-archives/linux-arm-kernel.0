@@ -1,41 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 29 Sep 2015 11:27:46 +0100
-Subject: [PATCH v3 7/7] clocksource: cosmetic: Drop OF 'dependency' from
- symbols
-In-Reply-To: <1443451758-22717-8-git-send-email-marc.zyngier@arm.com>
-References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
- <1443451758-22717-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150929102746.GF30504@e104818-lin.cambridge.arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 29 Sep 2015 12:29:49 +0200
+Subject: [PATCH v2 resend 2/4] ARM: dts: sun5i: Add PWM channel 0 pinmux
+ setting for A13/A10s
+In-Reply-To: <1443522591-6590-1-git-send-email-hdegoede@redhat.com>
+References: <1443522591-6590-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1443522591-6590-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2015 at 03:49:18PM +0100, Marc Zyngier wrote:
-> Seeing the 'of' characters in a symbol that is being called from
-> ACPI seems to freak out people. So let's do a bit of pointless
-> renaming so that these folks do feel at home.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kernel/time.c                              | 2 +-
->  arch/arm/mach-omap2/timer.c                         | 4 ++--
->  arch/arm/mach-rockchip/rockchip.c                   | 2 +-
->  arch/arm/mach-shmobile/setup-r8a7779.c              | 2 +-
->  arch/arm/mach-shmobile/setup-rcar-gen2.c            | 2 +-
->  arch/arm/mach-spear/spear13xx.c                     | 2 +-
->  arch/arm/mach-sunxi/sunxi.c                         | 2 +-
->  arch/arm/mach-u300/core.c                           | 2 +-
->  arch/arm/mach-ux500/timer.c                         | 2 +-
->  arch/arm/mach-zynq/common.c                         | 2 +-
->  arch/arm64/kernel/time.c                            | 2 +-
->  arch/microblaze/kernel/setup.c                      | 2 +-
->  arch/mips/pistachio/time.c                          | 2 +-
->  arch/mips/ralink/clk.c                              | 2 +-
->  arch/nios2/kernel/time.c                            | 2 +-
->  arch/xtensa/kernel/time.c                           | 2 +-
->  drivers/clocksource/Makefile                        | 2 +-
->  drivers/clocksource/{clksrc-of.c => clksrc-probe.c} | 2 +-
->  include/linux/clocksource.h                         | 4 ++--
->  19 files changed, 21 insertions(+), 21 deletions(-)
->  rename drivers/clocksource/{clksrc-of.c => clksrc-probe.c} (97%)
+Add a pinmux setting for the first pwm channel. This is often used for
+backlight dimming on tablets.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun5i.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 5e036a4..f0714d3 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -529,6 +529,13 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ 			};
++
++			pwm0_pins: pwm0 {
++				allwinner,pins = "PB2";
++				allwinner,function = "pwm";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
+ 		};
+ 
+ 		timer at 01c20c00 {
+-- 
+2.5.0
