@@ -1,46 +1,21 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 30 Sep 2015 01:14:20 +0300
-Subject: [PATCH v5 23/23] arm64:ilp32: add ARM64_ILP32 to Kconfig
-In-Reply-To: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1443564860-31208-24-git-send-email-ynorov@caviumnetworks.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 29 Sep 2015 15:21:44 -0700
+Subject: [PATCH 0/2] mtd: nand: sunxi: cleanup
+In-Reply-To: <1442389597-30698-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1442389597-30698-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150929222144.GA143959@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+On Wed, Sep 16, 2015 at 09:46:35AM +0200, Boris Brezillon wrote:
+> Hello,
+> 
+> Those two patches aim at cleaning up the sunxi_nand driver by first adding
+> some consistency in the macro definitions, and then factorizing the code
+> duplicated code found in hw_ecc and hw_syndrome_ecc implementations.
+> 
+> Best Regards,
+> 
+> Boris
 
-This patch adds the config option for ILP32.
-
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index d1dc605..afbde9c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -680,7 +680,7 @@ source "fs/Kconfig.binfmt"
- 
- config COMPAT
- 	def_bool y
--	depends on AARCH32_EL0
-+	depends on AARCH32_EL0 || ARM64_ILP32
- 	select COMPAT_BINFMT_ELF
- 
- config AARCH32_EL0
-@@ -702,6 +702,13 @@ config AARCH32_EL0
- 
- 	  If you want to execute 32-bit userspace applications, say Y.
- 
-+config ARM64_ILP32
-+	bool "Kernel support for ILP32"
-+	help
-+	  This option enables support for AArch64 ILP32 user space.  ILP32
-+	  is an ABI where long and pointers are 32bits but it uses the AARCH64
-+	  instruction set.
-+
- config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on AARCH32_EL0 && SYSVIPC
--- 
-2.1.4
+I believe this series no longer applies cleanly
