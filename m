@@ -1,40 +1,35 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Sep 2015 19:55:14 +0200
-Subject: [PATCH v4 1/2] ARM: dma-mapping: Don't use outer_flush_range
- when the L2C is coherent
-In-Reply-To: <20150929174835.GO21513@n2100.arm.linux.org.uk>
-References: <1443545458-14807-1-git-send-email-gregory.clement@free-electrons.com>
- <1443545458-14807-2-git-send-email-gregory.clement@free-electrons.com>
- <20150929171054.GN21513@n2100.arm.linux.org.uk>
- <20150929193031.72bbebe8@free-electrons.com>
- <20150929174835.GO21513@n2100.arm.linux.org.uk>
-Message-ID: <20150929195514.277efd80@free-electrons.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 29 Sep 2015 15:01:18 -0300
+Subject: Unhandled fault or spinlock lockup suspected ?
+In-Reply-To: <560ACF50.8030205@eclis.ch>
+References: <560AB619.2040502@eclis.ch>
+ <20150929162246.GK21513@n2100.arm.linux.org.uk>
+ <560ACF50.8030205@eclis.ch>
+Message-ID: <CAOMZO5DVmezRboZdYnvDSoBydSE_VA9GafwTY-VtHR1CO=2GaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Sep 29, 2015 at 2:50 PM, Jean-Christian de Rivaz <jc@eclis.ch> wrote:
+> Le 29. 09. 15 18:22, Russell King - ARM Linux a ?crit :
+>>
+>> On Tue, Sep 29, 2015 at 06:02:33PM +0200, Jean-Christian de Rivaz wrote:
+>>>
+>>> I tried the last git linux master on a embedded system that worked with a
+>>> 3.19.0 kernel before. I solved most of the problems caused by the kernel
+>>> upgrade, but every 15 to 20 minutes I get this type of kernel report:
+>>
+>> Yes, it's because of the user access changes.  The uaccess_with_memcpy()
+>> code got broken, and despite trying to fix it, it seems that it's still
+>> broken.  I'll try again to fix it in the next few days.
+>>
+>> In any case, unless you have a Marvell platform, you should have this
+>> disabled - it provides a performance boost for Marvell platforms, but
+>> degrades performance everywhere else.  Please ensure that you disable
+>> CONFIG_UACCESS_WITH_MEMCPY.
+>>
+>
+> Hi Russell, many thanks for your fast help. Work well when
+> CONFIG_UACCESS_WITH_MEMCPY is disabled.
 
-On Tue, 29 Sep 2015 18:48:35 +0100, Russell King - ARM Linux wrote:
-
-> > It might very well be the case. If there's enough PCIe traffic and a
-> > PL310 cache maintenance operation happening at the same time, the
-> > system will lockup. I'm a bit surprised that just the initialization of
-> > the PCIe card generates enough traffic to trigger the deadlock, but
-> > maybe I'm underestimating the problem.
-> 
-> It isn't every boot - the board has booted around 240 kernels so far and
-> maybe 5% of them have needed the reset button pressed because of this.
-> It only happens when I have the SATA card connected.  I don't have any
-> drives on the SATA card at the moment though.
-
-Hum, ok. Then I'm not sure it's the same problem. I believe it's
-unlikely that the few PCIe accesses used just to enumerate the PCIe
-device and initialize it are enough to cause the deadlock. But I don't
-have (and anyway wouldn't fully understand) all the details about this
-issue, so I can't say for sure.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Cool, maybe you could send a patch removing CONFIG_UACCESS_WITH_MEMCPY from
+arch/arm/configs/at91_dt_defconfig and sama5_defconfig ?
