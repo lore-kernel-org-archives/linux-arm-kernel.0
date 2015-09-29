@@ -1,92 +1,58 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 29 Sep 2015 17:43:10 +0300
-Subject: [PATCH v9 1/5] dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
-In-Reply-To: <1443495698-32233-2-git-send-email-chunfeng.yun@mediatek.com>
-References: <1443495698-32233-1-git-send-email-chunfeng.yun@mediatek.com>
- <1443495698-32233-2-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <560AA37E.2090106@cogentembedded.com>
+From: yitian.bu@tangramtek.com (yitian)
+Date: Tue, 29 Sep 2015 22:43:17 +0800
+Subject: [RESEND PATCH v2 1/1] ASoC: dwc: fix dma stop transferring issue
+Message-ID: <006401d0fac5$2e4bb840$8ae328c0$@tangramtek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Designware I2S uses tx empty and rx available signals as the DMA
+handshaking signals. during music playing, if XRUN occurs,
+i2s_stop() function will be executed and both tx and rx irq are
+masked, when music continues to be played, i2s_start() is executed
+but both tx and rx irq are not unmasked which cause I2S stop
+sending DMA handshaking signal to DMA controller, and it finally
+causes music playing will be stopped once XRUN occurs for the first
+time.
 
-On 09/29/2015 06:01 AM, Chunfeng Yun wrote:
+Signed-off-by: Yitian Bu <yitian.bu@tangramtek.com>
+---
+changes in V2:
+ - add definition for i and irq
+---
+ sound/soc/dwc/designware_i2s.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
-> add a DT binding documentation of usb3.0 phy for MT65xx
-> SoCs from Mediatek.
->
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->   .../devicetree/bindings/phy/phy-mt65xx-usb.txt     | 68 ++++++++++++++++++++++
->   1 file changed, 68 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
->
-> diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
-> new file mode 100644
-> index 0000000..00100cf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
-> @@ -0,0 +1,68 @@
-> +mt65xx USB3.0 PHY binding
-> +--------------------------
-> +
-> +This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
-> +
-> +Required properties (controller (parent) node):
-> + - compatible	: should be "mediatek,mt8173-u3phy"
-> + - reg		: offset and length of register for phy, exclude port's
-> +		  register.
-> + - clocks	: a list of phandle + clock-specifier pairs, one for each
-> +		  entry in clock-names
-> + - clock-names	: must contain
-> +		  "u3phya_ref": for reference clock of usb3.0 analog phy.
-> +
-> +Required nodes	: a sub-node is required for each port the controller
-> +		  provides. Address range information including the usual
-> +		  'reg' property is used inside these nodes to describe
-> +		  the controller's topology.
-> +
-> +Required properties (port (child) node):
-> +- reg		: address and length of the register set for the port.
-> +- #phy-cells	: should be 1 (See second example)
-> +		  cell after port phandle is phy type from:
-> +			- PHY_TYPE_USB2
-> +			- PHY_TYPE_USB3
-> +
-> +Example:
-> +
-> +u3phy: usb-phy at 11290000 {
-> +	compatible = "mediatek,mt8173-u3phy";
-> +	reg = <0 0x11290000 0 0x800>;
-> +	clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
-> +	clock-names = "u3phya_ref";
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +	ranges;
+diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
+index a3e97b4..76b2e19 100644
+--- a/sound/soc/dwc/designware_i2s.c
++++ b/sound/soc/dwc/designware_i2s.c
+@@ -141,13 +141,22 @@ static inline void i2s_clear_irqs(struct dw_i2s_dev
+*dev, u32 stream)
+ static void i2s_start(struct dw_i2s_dev *dev,
+ 		      struct snd_pcm_substream *substream)
+ {
+-
++	u32 i, irq;
+ 	i2s_write_reg(dev->i2s_base, IER, 1);
+ 
+-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
++		for (i = 0; i < 4; i++) {
++			irq = i2s_read_reg(dev->i2s_base, IMR(i));
++			i2s_write_reg(dev->i2s_base, IMR(i), irq & ~0x30);
++		}
+ 		i2s_write_reg(dev->i2s_base, ITER, 1);
+-	else
++	} else {
++		for (i = 0; i < 4; i++) {
++			irq = i2s_read_reg(dev->i2s_base, IMR(i));
++			i2s_write_reg(dev->i2s_base, IMR(i), irq & ~0x03);
++		}
+ 		i2s_write_reg(dev->i2s_base, IRER, 1);
++	}
+ 
+ 	i2s_write_reg(dev->i2s_base, CER, 1);
+ }
+-- 
 
-    You don't describe the above 3 props neither as mandatory nor optional.
-
-[...]
-> +Specifying phy control of devices
-> +---------------------------------
-> +
-> +Device nodes should specify the configuration required in their "phys"
-> +property, containing a phandle to the phy port node and a device type;
-> +phy-names for each port are optional.
-> +
-> +Example:
-> +
-> +#include <dt-bindings/phy/phy.h>
-> +
-> +usb30: usb at 11270000 {
-> +	...
-> +	phys = <&phy_port0 PHY_TYPE_USB3>;
-> +	phy-names = "usb3-0";
-> +	...
-> +};
-
-    Isn't the above already described in 
-Documentation/devicetree/bindings/phy/phy-bindings.txt?
-
-MBR, Sergei
+1.7.12.4
