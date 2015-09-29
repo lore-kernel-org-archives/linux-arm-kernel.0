@@ -1,38 +1,36 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 29 Sep 2015 12:05:27 +0100
-Subject: [PATCH v3 1/7] acpi: Add early device probing infrastructure
-In-Reply-To: <1443451758-22717-2-git-send-email-marc.zyngier@arm.com>
-References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
- <1443451758-22717-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150929110527.GB17577@red-moon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Sep 2015 13:10:32 +0200
+Subject: [PATCH v2 2/9] dmaengine: st_fdma: Add st fdma platform specific
+ header
+In-Reply-To: <20150929092442.GB16955@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
+ <2654563.3IzPKrUkAU@wuerfel>
+ <20150929092442.GB16955@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <1595360.mhtcFfAByg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2015 at 03:49:12PM +0100, Marc Zyngier wrote:
-> IRQ controllers and timers are the two types of device the kernel
-> requires before being able to use the device driver model.
+On Tuesday 29 September 2015 10:24:42 Peter Griffin wrote:
+> On Fri, 11 Sep 2015, Arnd Bergmann wrote:
 > 
-> ACPI so far lacks a proper probing infrastructure similar to the one
-> we have with DT, where we're able to declare IRQ chips and
-> clocksources inside the driver code, and let the core code pick it up
-> and call us back on a match. This leads to all kind of really ugly
-> hacks all over the arm64 code and even in the ACPI layer.
+> > On Friday 11 September 2015 15:14:24 Peter Griffin wrote:
+> > > Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> > > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > > ---
+> > >  include/linux/platform_data/dma-st_fdma.h | 72 +++++++++++++++++++++++++++++++
+> > >  1 file changed, 72 insertions(+)
+> > >  create mode 100644 include/linux/platform_data/dma-st_fdma.h
+> > > 
+> > 
+> > This clearly needs an explanation of which platforms require the header.
+> > 
+> > On ARM, all new platforms use DT, so it's obviously not one of them.
 > 
-> In order to allow some basic probing based on the ACPI tables,
-> introduce "struct acpi_probe_entry" which contains just enough
-> data and callbacks to match a table, an optional subtable, and
-> call a probe function. A driver can, at build time, register itself
-> and expect being called if the right entry exists in the ACPI
-> table.
-> 
-> A acpi_probe_device_table() is provided, taking an identifier for
-> a set of acpi_prove_entries, and iterating over the registered
-> entries.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/acpi/scan.c               | 39 +++++++++++++++++++++++
->  include/asm-generic/vmlinux.lds.h | 10 ++++++
->  include/linux/acpi.h              | 66 +++++++++++++++++++++++++++++++++++++++
+> I will move the relevant parts into the st_fdma.h header file, as no other platforms
+> will be upstreamed that are not DT based.
 
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Ok, it's possible that you can simplify the code a bit after you do that,
+e.g. if you can fold the st_fdma_platform_data structure into the main
+per-device structure, and if you remove the filter function.
+
+	Arnd
