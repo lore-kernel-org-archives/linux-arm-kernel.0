@@ -1,111 +1,56 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Tue, 29 Sep 2015 11:28:13 +0200
-Subject: [PATCH] drm/rockchip: vop: Correct enabled clocks during setup
-Message-ID: <1443518893-28142-1-git-send-email-sjoerd.simons@collabora.co.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 29 Sep 2015 10:29:58 +0100
+Subject: [PATCH 06/10] arm64: tlbflush: avoid flushing when fullmm == 1
+In-Reply-To: <1442494219-6133-7-git-send-email-will.deacon@arm.com>
+References: <1442494219-6133-1-git-send-email-will.deacon@arm.com>
+ <1442494219-6133-7-git-send-email-will.deacon@arm.com>
+Message-ID: <20150929092957.GA30504@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When doing the initial setup both the hclk and the aclk need to be
-enabled otherwise the board will simply hang. This only occurs when
-building the vop driver as a module, when its built-in the initial setup
-happens to run before the clock framework shuts of unused clocks
-(including the aclk).
+On Thu, Sep 17, 2015 at 01:50:15PM +0100, Will Deacon wrote:
+> The TLB gather code sets fullmm=1 when tearing down the entire address
+> space for an mm_struct on exit or execve. Given that the ASID allocator
+> will never re-allocate a dirty ASID, this flushing is not needed and can
+> simply be avoided in the flushing code.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/tlb.h | 26 +++++++++++++++-----------
+>  1 file changed, 15 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+> index d6e6b6660380..ffdaea7954bb 100644
+> --- a/arch/arm64/include/asm/tlb.h
+> +++ b/arch/arm64/include/asm/tlb.h
+> @@ -37,17 +37,21 @@ static inline void __tlb_remove_table(void *_table)
+>  
+>  static inline void tlb_flush(struct mmu_gather *tlb)
+>  {
+> -	if (tlb->fullmm) {
+> -		flush_tlb_mm(tlb->mm);
+> -	} else {
+> -		struct vm_area_struct vma = { .vm_mm = tlb->mm, };
+> -		/*
+> -		 * The intermediate page table levels are already handled by
+> -		 * the __(pte|pmd|pud)_free_tlb() functions, so last level
+> -		 * TLBI is sufficient here.
+> -		 */
+> -		__flush_tlb_range(&vma, tlb->start, tlb->end, true);
+> -	}
+> +	struct vm_area_struct vma = { .vm_mm = tlb->mm, };
+> +
+> +	/*
+> +	 * The ASID allocator will either invalidate the ASID or mark
+> +	 * it as used.
+> +	 */
+> +	if (tlb->fullmm)
+> +		return;
 
-While there also switch to doing prepare and enable in one step rather
-then separate steps to reduce the amount of code required.
+BTW, do we actually need this flush_tlb_mm() with the current ASID
+allocator? It doesn't reuse old ASIDs either before a full TLBI (just
+trying to remember if we had any logic; or maybe it was needed before
+non-lazy __pte_free_tlb).
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-
----
-
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 36 +++++++++++------------------
- 1 file changed, 14 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 5d8ae5e..48719df 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -1575,32 +1575,25 @@ static int vop_initial(struct vop *vop)
- 		return PTR_ERR(vop->dclk);
- 	}
- 
--	ret = clk_prepare(vop->hclk);
--	if (ret < 0) {
--		dev_err(vop->dev, "failed to prepare hclk\n");
--		return ret;
--	}
--
- 	ret = clk_prepare(vop->dclk);
- 	if (ret < 0) {
- 		dev_err(vop->dev, "failed to prepare dclk\n");
--		goto err_unprepare_hclk;
-+		return ret;
- 	}
- 
--	ret = clk_prepare(vop->aclk);
-+	/* Enable both the hclk and aclk to setup the vop */
-+	ret = clk_prepare_enable(vop->hclk);
- 	if (ret < 0) {
--		dev_err(vop->dev, "failed to prepare aclk\n");
-+		dev_err(vop->dev, "failed to prepare/enable hclk\n");
- 		goto err_unprepare_dclk;
- 	}
- 
--	/*
--	 * enable hclk, so that we can config vop register.
--	 */
--	ret = clk_enable(vop->hclk);
-+	ret = clk_prepare_enable(vop->aclk);
- 	if (ret < 0) {
--		dev_err(vop->dev, "failed to prepare aclk\n");
--		goto err_unprepare_aclk;
-+		dev_err(vop->dev, "failed to prepare/enable aclk\n");
-+		goto err_disable_hclk;
- 	}
-+
- 	/*
- 	 * do hclk_reset, reset all vop registers.
- 	 */
-@@ -1608,7 +1601,7 @@ static int vop_initial(struct vop *vop)
- 	if (IS_ERR(ahb_rst)) {
- 		dev_err(vop->dev, "failed to get ahb reset\n");
- 		ret = PTR_ERR(ahb_rst);
--		goto err_disable_hclk;
-+		goto err_disable_aclk;
- 	}
- 	reset_control_assert(ahb_rst);
- 	usleep_range(10, 20);
-@@ -1634,26 +1627,25 @@ static int vop_initial(struct vop *vop)
- 	if (IS_ERR(vop->dclk_rst)) {
- 		dev_err(vop->dev, "failed to get dclk reset\n");
- 		ret = PTR_ERR(vop->dclk_rst);
--		goto err_unprepare_aclk;
-+		goto err_disable_aclk;
- 	}
- 	reset_control_assert(vop->dclk_rst);
- 	usleep_range(10, 20);
- 	reset_control_deassert(vop->dclk_rst);
- 
- 	clk_disable(vop->hclk);
-+	clk_disable(vop->aclk);
- 
- 	vop->is_enabled = false;
- 
- 	return 0;
- 
-+err_disable_aclk:
-+	clk_disable_unprepare(vop->aclk);
- err_disable_hclk:
--	clk_disable(vop->hclk);
--err_unprepare_aclk:
--	clk_unprepare(vop->aclk);
-+	clk_disable_unprepare(vop->hclk);
- err_unprepare_dclk:
- 	clk_unprepare(vop->dclk);
--err_unprepare_hclk:
--	clk_unprepare(vop->hclk);
- 	return ret;
- }
- 
 -- 
-2.5.3
+Catalin
