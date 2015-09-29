@@ -1,33 +1,35 @@
-From: jwboyer@fedoraproject.org (Josh Boyer)
-Date: Tue, 29 Sep 2015 10:32:59 -0400
-Subject: [PATCH RESEND] ARM: dts: Fix Makefile target for
- sun4i-a10-itead-iteaduino-plus
-In-Reply-To: <20150906112046.GK31584@lukather>
-References: <20150904124934.GD464@hansolo.redhat.com>
- <20150906112046.GK31584@lukather>
-Message-ID: <CA+5PVA5ceg94PrUdUpb5X7ZsbEuK4_u1V-ZDesR7h_MZ8rGUtg@mail.gmail.com>
+From: yitian.bu@tangramtek.com (yitian)
+Date: Tue, 29 Sep 2015 22:39:00 +0800
+Subject: [RESEND PATCH 1/1] ASoC: dwc: correct irq clear method
+Message-ID: <006301d0fac4$94eb5890$bec209b0$@tangramtek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 6, 2015 at 7:20 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, Sep 04, 2015 at 08:49:34AM -0400, Josh Boyer wrote:
->> Commit 79ae3e66f8d (ARM: dts: sun4i: Add Iteaduino Plus A10) added a new
->> make target for the sun4i-a10-itead-iteaduino-plus dts file, but mistakenly
->> used .dts instead of the correct .dtb suffix.  This resulted in a build error
->> like:
->>
->>         scripts/Makefile.dtbinst:42: target 'sun4i-a10-itead-iteaduino-plus.dts' doesn't match the target pattern
->>
->> when doing a make dtbs_install.
->>
->> Fix it to use the proper file name.
->>
->> Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
->
-> Queued, thanks!
+from Designware I2S datasheet, irq is cleared by reading from
+TOR/ROR registers, rather than by writing into them.
 
-Are you going to push this to Olof or Linus for the 4.3 release?  I
-don't see it in Linus' tree and this is still broken there.
+Signed-off-by: Yitian Bu <yitian.bu@tangramtek.com>
+---
+ sound/soc/dwc/designware_i2s.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-josh
+diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
+index a3e97b4..0d28e3b 100644
+--- a/sound/soc/dwc/designware_i2s.c
++++ b/sound/soc/dwc/designware_i2s.c
+@@ -131,10 +131,10 @@ static inline void i2s_clear_irqs(struct dw_i2s_dev
+*dev, u32 stream)
+ 
+ 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+ 		for (i = 0; i < 4; i++)
+-			i2s_write_reg(dev->i2s_base, TOR(i), 0);
++			i2s_read_reg(dev->i2s_base, TOR(i));
+ 	} else {
+ 		for (i = 0; i < 4; i++)
+-			i2s_write_reg(dev->i2s_base, ROR(i), 0);
++			i2s_read_reg(dev->i2s_base, ROR(i));
+ 	}
+ }
+ 
+-- 
+1.7.12.4
