@@ -1,83 +1,69 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 29 Sep 2015 17:34:59 +0200
-Subject: [PATCH 00/10] ARM: marvell/dt: add crypto nodes in existing DTs
-In-Reply-To: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
- (Boris Brezillon's message of "Tue, 18 Aug 2015 10:08:51 +0200")
-References: <1439885341-14644-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <871tdhs0gs.fsf@free-electrons.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 29 Sep 2015 10:53:20 -0500
+Subject: [PATCHv3] arm: omap2: timer: always define omap4_local_timer_init
+Message-ID: <1443542000-24958-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+omap4_local_timer_init() can be used by other
+platforms as is. At least AM437x wants to use
+it. Instead of making omap4-only and providing
+a stub for builds without OMAP4, we can just
+always define that function.
+
+Reported-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+
+changes since v2:
+  - move ifdefs around
+
+changes since v1:
+  - make sure result builds on AM43xx-only builds
+
+
+ arch/arm/mach-omap2/timer.c | 16 +++-------------
+ 1 file changed, 3 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index e4d8701f99f9..3ebe16cd645e 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -634,32 +634,22 @@ OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
+ 			2, "timer_sys_ck", NULL);
+ #endif /* CONFIG_ARCH_OMAP3 */
  
- On mar., ao?t 18 2015, Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-
-> Hello,
->
-> This series declares and enables the crypto engine on the armada, orion,
-> kirkwood and dove SoCs.
->
-> Best Regards,
->
-> Boris
->
-
-All the patches have been applied on mvebu/dt. I only reworded the commit
-title to call them "ARM: mvebu" instead of "ARM: marvell" or "ARM:
-marvell/dt". Also for the patch 3 I took your v2.
-
-Thanks,
-
-Gregory
-
->
-> Arnaud Ebalard (1):
->   ARM: marvell/dt: add crypto related nodes to armada 370 dtsi
->
-> Boris Brezillon (9):
->   ARM: marvell/dt: add crypto related nodes to armada-xp.dtsi
->   ARM: marvell/dt: define crypto SRAM ranges for all armada-xp boards
->   ARM: marvell/dt: define crypto SRAM ranges for all armada-370 boards
->   ARM: marvell/dt: add crypto related nodes to armada 375 dtsi
->   ARM: marvell/dt: define crypto SRAM ranges in armada-375-db.dts
->   ARM: marvell/dt: add crypto related nodes to armada 38x dtsi
->   ARM: marvell/dt: define crypto SRAM ranges for all armada-38x boards
->   ARM: marvell: use new bindings for existing crypto devices
->   ARM: marvell: modify Orion and Kirkwoord crypto compatible strings
->
->  arch/arm/boot/dts/armada-370-db.dts              |  3 ++-
->  arch/arm/boot/dts/armada-370-dlink-dns327l.dts   |  3 ++-
->  arch/arm/boot/dts/armada-370-mirabox.dts         |  7 ++++-
->  arch/arm/boot/dts/armada-370-netgear-rn102.dts   |  3 ++-
->  arch/arm/boot/dts/armada-370-netgear-rn104.dts   |  3 ++-
->  arch/arm/boot/dts/armada-370-rd.dts              |  3 ++-
->  arch/arm/boot/dts/armada-370-synology-ds213j.dts |  3 ++-
->  arch/arm/boot/dts/armada-370.dtsi                | 25 ++++++++++++++++++
->  arch/arm/boot/dts/armada-375-db.dts              |  4 ++-
->  arch/arm/boot/dts/armada-375.dtsi                | 33 ++++++++++++++++++++++++
->  arch/arm/boot/dts/armada-385-db-ap.dts           |  4 ++-
->  arch/arm/boot/dts/armada-385-linksys.dtsi        |  4 ++-
->  arch/arm/boot/dts/armada-388-db.dts              |  4 ++-
->  arch/arm/boot/dts/armada-388-gp.dts              |  4 ++-
->  arch/arm/boot/dts/armada-388-rd.dts              |  4 ++-
->  arch/arm/boot/dts/armada-38x.dtsi                | 33 ++++++++++++++++++++++++
->  arch/arm/boot/dts/armada-xp-axpwifiap.dts        |  4 ++-
->  arch/arm/boot/dts/armada-xp-db.dts               |  4 ++-
->  arch/arm/boot/dts/armada-xp-gp.dts               |  4 ++-
->  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  |  4 ++-
->  arch/arm/boot/dts/armada-xp-linksys-mamba.dts    |  4 ++-
->  arch/arm/boot/dts/armada-xp-matrix.dts           |  4 ++-
->  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   |  4 ++-
->  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  4 ++-
->  arch/arm/boot/dts/armada-xp-synology-ds414.dts   |  4 ++-
->  arch/arm/boot/dts/armada-xp.dtsi                 | 30 +++++++++++++++++++++
->  arch/arm/boot/dts/dove.dtsi                      | 17 +++++++++---
->  arch/arm/boot/dts/kirkwood.dtsi                  | 29 ++++++++++++++-------
->  arch/arm/boot/dts/orion5x.dtsi                   | 22 +++++++++++-----
->  29 files changed, 231 insertions(+), 43 deletions(-)
-
+-#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX) || \
+-	defined(CONFIG_SOC_AM43XX)
++#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+ OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
+ 		       1, "timer_sys_ck", "ti,timer-alwon");
+ #endif
+ 
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+-	defined(CONFIG_SOC_DRA7XX)
++	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
+ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+ 			       2, "sys_clkin_ck", NULL);
+-#endif
+ 
+-#ifdef CONFIG_ARCH_OMAP4
+-#ifdef CONFIG_HAVE_ARM_TWD
+ void __init omap4_local_timer_init(void)
+ {
+ 	omap4_sync32k_timer_init();
+ 	clocksource_of_init();
+ }
+-#else
+-void __init omap4_local_timer_init(void)
+-{
+-	omap4_sync32k_timer_init();
+-}
+-#endif /* CONFIG_HAVE_ARM_TWD */
+-#endif /* CONFIG_ARCH_OMAP4 */
++#endif
+ 
+ #if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
+ void __init omap5_realtime_timer_init(void)
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.5.3
