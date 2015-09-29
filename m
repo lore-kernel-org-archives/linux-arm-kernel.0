@@ -1,77 +1,166 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 29 Sep 2015 11:01:51 +0200
-Subject: xf86-video-armada + etnaviv (Was: Re: I.MX6 HDMI support in v4.2)
-In-Reply-To: <20150929084141.GH21513@n2100.arm.linux.org.uk>
-References: <m3bnd52y4s.fsf@t19.piap.pl>
- <1442332425.2637.16.camel@pengutronix.de>
- <20150915163642.GW21084@n2100.arm.linux.org.uk>
- <1442336034.2637.20.camel@pengutronix.de>
- <20150915170444.GX21084@n2100.arm.linux.org.uk>
- <1443451688.3178.61.camel@pengutronix.de>
- <20150928152429.GW21513@n2100.arm.linux.org.uk>
- <1443454813.3178.66.camel@pengutronix.de>
- <20150928165021.GY21513@n2100.arm.linux.org.uk>
- <1443515299.3141.4.camel@pengutronix.de>
- <20150929084141.GH21513@n2100.arm.linux.org.uk>
-Message-ID: <1443517311.3141.13.camel@pengutronix.de>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 29 Sep 2015 11:10:38 +0200
+Subject: [PATCH v7 0/20] On-demand device probing
+Message-ID: <1443517859-30376-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 29.09.2015, 09:41 +0100 schrieb Russell King - ARM
-Linux:
-> On Tue, Sep 29, 2015 at 10:28:19AM +0200, Lucas Stach wrote:
-> > Am Montag, den 28.09.2015, 17:50 +0100 schrieb Russell King - ARM Linux:
-> > > You really do _not_ want to do be copying image data.  With large images
-> > > (1080p) that will consume lots of CPU, and tie up the X server doing not
-> > > much other than copying data.  You might as well manually convert and
-> > > copy the data to the screen at that point.
-> > > 
-> > So what other possibilities do we have if the client hands us a non page
-> > aligned buffer, other than failing the PutImage? Converting the image
-> > manually and possibly doubling the amount of bytes to write out
-> > (YUV->RGB) will tie up the X server even longer.
-> 
-> Are you sure about that?
-> 
-> If you memcpy() the buffer, you have to read about 6MB of data, write
-> 6MB of data, flush the caches of that, then ask the GPU to perform two
-> blits (which on my measurements just about fit in one field scan), wait
-> for the blit to finish before then returning to the client.
-> 
-The cache flush can easily be avoided if you copy into a WC buffer.
+Hello,
 
-And I don't see why we would need to wait for the blit to finish before
-returning to the client. If we copy the userdata there is no need to
-block the client until the GPU is done with the data.
+I have a problem with the panel on my Tegra Chromebook taking longer
+than expected to be ready during boot (St?phane Marchesin reported what
+is basically the same issue in [0]), and have looked into ordered
+probing as a better way of solving this than moving nodes around in the
+DT or playing with initcall levels and linking order.
 
-Or is there something in the spec I'm not aware of which would mandate
-such blocking?
+While reading the thread [1] that Alexander Holler started with his
+series to make probing order deterministic, it occurred to me that it
+should be possible to achieve the same by probing devices as they are
+referenced by other devices.
 
-> I can tell you that VLC uses memcpy() on images internally, and you can't
-> get away with it for 1080p video.
-> 
-I'm not disputing that it's a really bad idea if you care about
-performance.
+This basically reuses the information that is already implicit in the
+probe() implementations, saving us from refactoring existing drivers or
+adding information to DTBs.
 
-> > This all doesn't seem to be a problem as long as the client allocates
-> > from XShm, as this seems to hand out page aligned memory. Only if the
-> > client mallocs the image buffer we might end up with unaligned buffers.
-> 
-> I don't see that.  How does a malloc()'d buffer get to the X server,
-> other than throuh XvPutImage?  If you're using XvPutImage(), you'll
-> be incurring an even _larger_ overhead because the kernel will have
-> to copy the image data as well.  AFAIK, you can't pass arbitary malloc()d
-> buffers to sysvipc and therefore via XShm.
-> 
-Right I'm talking about XvPutImage. I'm not saying it is a good way to
-hand off your image data to the X server, all I'm saying is that this is
-a path that applications _might_ use.
+During review of v1 of this series Linus Walleij suggested that it
+should be the device driver core to make sure that dependencies are
+ready before probing a device. I gave this idea a try [2] but Mark Brown
+pointed out to the logic duplication between the resource acquisition
+and dependency discovery code paths (though I think it's fairly minor).
 
-We can just choose to ignore this for the time being, as it's a
-non-issue if the client is using XShm.
+To address that code duplication I experimented with Arnd's devm_probe
+[3] concept of having drivers declare their dependencies instead of
+acquiring them during probe, and while it worked [4], I don't think we
+end up winning anything when compared to just probing devices on-demand
+from resource getters.
+
+One remaining objection is to the "sprinkling" of calls to
+of_device_probe() in the resource getters of each subsystem, but I think
+it's the right thing to do given that the storage of resources is
+currently subsystem-specific.
+
+We could avoid the above by moving resource storage into the core, but I
+don't think there's a compelling case for that.
+
+I have tested this on boards with Tegra, iMX.6, Exynos, Rockchip and
+OMAP SoCs, and these patches were enough to eliminate all the deferred
+probes (except one in PandaBoard because omap_dma_system doesn't have a
+firmware node as of yet).
+
+Have submitted a branch [5][6][7] with these patches on top of friday's
+linux-next (20150925) to kernelci.org and I don't see any issues that
+could be caused by them.
+
+With this series I get the kernel to output to the panel in 0.5s,
+instead of 2.8s.
 
 Regards,
-Lucas
+
+Tomeu
+
+[0] http://lists.freedesktop.org/archives/dri-devel/2014-August/066527.html
+
+[1] https://lkml.org/lkml/2014/5/12/452
+
+[2] https://lkml.org/lkml/2015/6/17/305
+
+[3] http://article.gmane.org/gmane.linux.ports.arm.kernel/277689
+
+[4] https://lkml.org/lkml/2015/7/21/441a
+
+[5] https://git.collabora.com/cgit/user/tomeu/linux.git/log/?h=on-demand-probes-v9
+
+[6] http://kernelci.org/boot/all/job/collabora/kernel/v4.3-rc2-3497-g96d8df1bbcc1/
+
+[7] http://kernelci.org/boot/all/job/next/kernel/next-20150925
+
+Changes in v7:
+- Move IS_ENABLED(CONFIG_DELAY_DEVICE_PROBES) into if condition
+- Hide CONFIG_DELAY_DEVICE_PROBES behind EXPERT
+- Removed patch that moved deferred probe processing to
+  device_initcall_sync, as it's not currently needed and can be applied
+  later if we find any boards that fail to boot without this change.
+
+Changes in v6:
+- Drop bus_type.pre_probe and read the periphid in match() instead as
+  suggested by Alan Stern.
+
+Changes in v5:
+- Set the pointer to struct device also for AMBA devices
+- Unset the pointer to struct device when the platform device is about
+  to be unregistered
+- Increase the reference count of the device before returning from
+  of_find_device_by_node()
+- Move the assignment to device_node->device for AMBA devices to another
+  commit.
+- Hold a reference to the struct device while it's in use in
+  of_device_probe().
+
+Changes in v4:
+- Added bus.pre_probe callback so the probes of Primecell devices can be
+  deferred if their device IDs cannot be yet read because of the clock
+  driver not having probed when they are registered. Maybe this goes
+  overboard and the matching information should be in the DT if there is
+  one.
+- Rename of_platform_probe to of_device_probe
+- Use device_node.device instead of device_node.platform_dev
+- Add Kconfig DELAY_DEVICE_PROBES to allow disabling delayed probing in
+  machines with initcalls that depend on devices probing at a given time.
+- Also defer probes of AMBA devices registered from the DT as they can
+  also request resources.
+
+Changes in v3:
+- Set and use device_node.platform_dev instead of reversing the logic to
+  find the platform device that encloses a device node.
+- Drop the fwnode API to probe firmware nodes and add OF-only API for
+  now. I think this same scheme could be used for machines with ACPI,
+  but I haven't been able to find one that had to defer its probes because
+  of the device probe order.
+
+Tomeu Vizoso (20):
+  driver core: handle -EPROBE_DEFER from bus_type.match()
+  ARM: amba: Move reading of periphid to amba_match()
+  of/platform: Point to struct device from device node
+  of: add function to allow probing a device from a OF node
+  gpio: Probe GPIO drivers on demand
+  pinctrl: Probe pinctrl devices on demand
+  regulator: core: Probe regulators on demand
+  drm: Probe panels on demand
+  drm/tegra: Probe dpaux devices on demand
+  i2c: core: Probe i2c adapters and devices on demand
+  pwm: Probe PWM chip devices on demand
+  backlight: Probe backlight devices on demand
+  usb: phy: Probe phy devices on demand
+  clk: Probe clk providers on demand
+  pinctrl: Probe pinctrl devices on demand
+  phy: core: Probe phy providers on demand
+  dma: of: Probe DMA controllers on demand
+  power-supply: Probe power supplies on demand
+  driver core: Allow deferring probes until late init
+  of/platform: Defer probes of registered devices
+
+ drivers/amba/bus.c                  | 88 +++++++++++++++++++------------------
+ drivers/base/Kconfig                | 18 ++++++++
+ drivers/base/dd.c                   | 30 ++++++++++++-
+ drivers/clk/clk.c                   |  3 ++
+ drivers/dma/of-dma.c                |  3 ++
+ drivers/gpio/gpiolib-of.c           |  5 +++
+ drivers/gpu/drm/drm_panel.c         |  3 ++
+ drivers/gpu/drm/tegra/dpaux.c       |  3 ++
+ drivers/i2c/i2c-core.c              |  4 ++
+ drivers/of/device.c                 | 61 +++++++++++++++++++++++++
+ drivers/of/platform.c               | 30 ++++++++-----
+ drivers/phy/phy-core.c              |  3 ++
+ drivers/pinctrl/devicetree.c        |  3 ++
+ drivers/power/power_supply_core.c   |  3 ++
+ drivers/pwm/core.c                  |  3 ++
+ drivers/regulator/core.c            |  2 +
+ drivers/usb/phy/phy.c               |  3 ++
+ drivers/video/backlight/backlight.c |  3 ++
+ include/linux/device.h              |  4 +-
+ include/linux/of.h                  |  1 +
+ include/linux/of_device.h           |  3 ++
+ 21 files changed, 219 insertions(+), 57 deletions(-)
+
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+2.4.3
