@@ -1,98 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Sep 2015 16:15:25 +0200
-Subject: [PATCH v2 1/9] dmaengine: st_fdma: Add STMicroelectronics FDMA DT
- binding documentation
-In-Reply-To: <20150929134215.GA21591@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
- <1842713.tkjrhSVazj@wuerfel>
- <20150929134215.GA21591@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <2737791.qJkUc2COQb@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 29 Sep 2015 15:29:32 +0100
+Subject: [PATCH v2 0/7] hwrng: Add support for STMicroelectronics' RNG IP
+In-Reply-To: <20150918155112.GE3218@x1>
+References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
+ <20150918140756.GK9249@gondor.apana.org.au>
+ <CAF2Aj3h7Jy=tpYdZTdbxAJwa=147_hAu3reOFrbEh=JdrMFWLQ@mail.gmail.com>
+ <20150918151137.GA10763@gondor.apana.org.au>
+ <20150918155112.GE3218@x1>
+Message-ID: <20150929142932.GY27197@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 September 2015 14:42:15 Peter Griffin wrote:
-> On Tue, 29 Sep 2015, Arnd Bergmann wrote:
-> > On Tuesday 29 September 2015 13:11:55 Peter Griffin wrote:
-> > > Does it? I didn't think it did.
+On Fri, 18 Sep 2015, Lee Jones wrote:
+> On Fri, 18 Sep 2015, Herbert Xu wrote:
+> > On Fri, Sep 18, 2015 at 03:53:50PM +0100, Lee Jones wrote:
+> > > On 18 September 2015 at 15:07, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> > > > On Thu, Sep 17, 2015 at 02:45:50PM +0100, Lee Jones wrote:
+> > > >> v1 => v2:
+> > > >>  - New patch: Also fixing /dev/hw_random => /dev/hwrng in Kconfig
+> > > >>  - Fix 2099 => 2009 typo in commit log
+> > > >>  - Fix 'number of random numbers sourced' return value
+> > > >>  - Treat devm_clk_get()'s return value correctly
+> > > >>  - Check return value of clk_prepare_enable()
+> > > >>  - Use sysfs_streq() instead of manually stripping '\n' from sysfs
+> > > >
+> > > > All applied.  Thanks.
 > > > 
-> > > Using the instance number as a DT property defers the decision over what firmware to
-> > > load to the driver, which can choose whatever firmware name it wishes.
-> > > 
-> > > e.g. in v4.3 it could load xyz.elf, in v4.4 it could choose abc.elf. The DT will remain
-> > > unchanged, but the use of that fdma instance has changed.
-> > > 
-> > > We currently only have one firmware for each instance with the "use" compiled into it.
-> > > If in the future we had two firmwares with different "uses" for the same instance some extra
-> > > logic would be required in the driver to make a decision on which firmware to load.
+> > > Just to be clear.  Which patches have you applied?
 > > 
-> > Ok, I probably need some more background about what the firmware on this
-> > device does, and what it could do with a different firmware. Could you
-> > elaborate?
+> > All of your patches.
 > 
-> So the fdma hw is a dma engine based around a xp70 slim core. It supports: -
-> * block memory move between 2 system locations
-> * paced transfer from system memory to paced peripheral
-> * paced transfer from a paced peripheral to system memory
+> I think it's okay for you to take all but patch 6.
 > 
-> I believe each firmware for each instance supports those 3 things.
+> Patch 6 is an ARM patch and needs to go into ARM SoC via
+> STMicroelectronics STi tree.
 
-Ok
+Hi Herbert,
 
-> However the xp70 also has some ancilary HW to facilitate Start Code Detection.
-> It is this feature which I believe would require a different firmware if we wanted to make
-> use of it. Looking at the functional spec each xp70 also
-> has 16 gp output signals which we could also control from the firmware. Whether
-> these are actually connected to anything useful inside the SoC I don't know.
+I see that your tree is 8 days old, so this may have been resolved
+already, but would you be kind enough to ensure you remove the 6th
+(ARM) patch from your repo please?  I wouldn't want it to cause
+conflicts and for Maxime and yourself to get shouted at by Linus.
 
-I still don't understand what Start Code Detection is here.
+Much appreciated.
 
-> > > > and you correctly describe the problem with
-> > > > using the compatible string for the firmware name if the driver for the FDMA
-> > > > does not actually care what firmware is being used here.
-> > > > 
-> > > > Whatever code makes the decision as to how the FDMA is used should also
-> > > > decide on the name of the firmware file.
-> > > 
-> > > The code which makes this decision currently is the st_fdma.c driver. However it does
-> > > need to know which fdma controller it is operating on to make this decision correctly.
-> > > 
-> > > Apart from passing the fdma instance number in DT, how else can we determine which
-> > > controller we are?
-> > > 
-> > > I guess we could infer it by having a table in the driver containing the base addresses
-> > > of the controllers for a given SoC, and match that against what DT passes us in the
-> > > reg property. But that seems ugly, and is encoding the same information in two
-> > > different places.
-> > > 
-> > > I'm open to suggestions if there is a better way to do this.
-> > 
-> > Using the address would be the same thing, that doesn't change the
-> > fundamental logic. Can you explain why it matters which instance
-> > a firmware is used on for this driver?
-> 
-> The reason we care, is that each instance has its own firmware file.
-> 
-> I just did a hexdump on the 3 different firmwares and compared them. Although the majority
-> of the binary is the same, there are various bytes which change at several different offsets
-> in the firmware file depending on the instance.
-> 
-> I don't have a xp70 toolchain or know enough about the cpu architecture to analyze what exactly
-> the firmware is doing at these locations.
-
-This sounds like we should indeed treat them as different things: We don't
-know what the difference is, but we know that each of them needs a different
-firmware, and presumably if you get a new SoC variant, it will in turn
-need three new ones.
-
-In this case, I'd say using the compatible string to identify them is best,
-using whatever the SoC documentation uses to describe them. You can use the
-of_device_id data fields to look up the firmware name then.
-
-If the output signals end up being connected to something we want to
-control through the firmware, that also makes sense for a new compatible
-string, as the driver needs to know about the feature in order to
-communicate with the firmware, and the DT needs to be able to describe
-the pins (e.g. by making the node act as a GPIO controller) in a way that
-requires a different string, too.
-
-	Arnd
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
