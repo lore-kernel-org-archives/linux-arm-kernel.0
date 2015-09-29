@@ -1,38 +1,53 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Tue, 29 Sep 2015 17:45:46 -0600
-Subject: [PATCH v5 5/5] ACPI: remove definition of BAD_MADT_ENTRY macro
-In-Reply-To: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
-References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1443570346-15378-6-git-send-email-al.stone@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 30 Sep 2015 08:59:14 +0900
+Subject: [GIT PULL] Samsung fixes for v4.3
+Message-ID: <1443571154-28722-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have introduced to bad_madt_entry(), and we have removed
-all the usages of the BAD_MADT_ENTRY macro from all of the various
-architectures that use it (arm64, ia64, x86), we can remove the macro
-definition since it is no longer used.
 
-Signed-off-by: Al Stone <al.stone@linaro.org>
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-Cc: Len Brown <lenb@kernel.org>
----
- include/linux/acpi.h | 4 ----
- 1 file changed, 4 deletions(-)
+Dear Kukjin,
 
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 51a96a8..dd5bd228 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -127,10 +127,6 @@ static inline void acpi_initrd_override(void *data, size_t size)
- }
- #endif
- 
--#define BAD_MADT_ENTRY(entry, end) (					    \
--		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
--		((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
--
- struct acpi_subtable_proc {
- 	int id;
- 	acpi_tbl_entry_handler handler;
--- 
-2.4.3
+Below you will find fixes for current release cycle which are not
+present yet in your tree.
+
+Best regards,
+Krzysztof
+
+
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  https://github.com/krzk/linux.git tags/samsung-fixes-4.3
+
+for you to fetch changes up to c7d2ecd9f64c351cb4d551f1f472d0fc09c3cae8:
+
+  ARM: dts: Fix wrong clock binding for sysmmu_fimd1_1 on exynos5420 (2015-09-29 15:39:58 +0900)
+
+----------------------------------------------------------------
+Fixes for Exynos (DT and mach code):
+1. Finally fix booting of all 8 cores on Exynos Octa (Exynos542x): all
+   8 cores are booting and can be used. The fix, based on vendor
+   code and bootloader behavior, is as for time being only
+   for MCPM enabled path.
+2. Fix thermal boot issue on SMDK5250.
+3. Fix invalid clock used for FIMD IOMMU.
+
+----------------------------------------------------------------
+Chanho Park (1):
+      ARM: EXYNOS: reset Little cores when cpu is up
+
+Joonyoung Shim (1):
+      ARM: dts: Fix wrong clock binding for sysmmu_fimd1_1 on exynos5420
+
+Yadwinder Singh Brar (1):
+      ARM: dts: Fix bootup thermal issue on smdk5250
+
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |  1 +
+ arch/arm/boot/dts/exynos5420.dtsi         |  2 +-
+ arch/arm/mach-exynos/mcpm-exynos.c        | 27 ++++++++++++++++++++++++++-
+ arch/arm/mach-exynos/regs-pmu.h           |  6 ++++++
+ 4 files changed, 34 insertions(+), 2 deletions(-)
