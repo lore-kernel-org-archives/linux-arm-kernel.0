@@ -1,43 +1,104 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 29 Sep 2015 16:21:07 +0900
-Subject: [PATCH RESEND] ARM: dts: Move display-timings node from fimd to dp
-In-Reply-To: <1442494120-463-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1442494120-463-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <560A3BE3.3090504@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 29 Sep 2015 08:29:06 +0100
+Subject: [PATCH v3 1/7] acpi: Add early device probing infrastructure
+In-Reply-To: <560A13FC.4080204@linaro.org>
+References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
+ <1443451758-22717-2-git-send-email-marc.zyngier@arm.com>
+ <560A13FC.4080204@linaro.org>
+Message-ID: <20150929082906.2cabe51a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 17.09.2015 o 21:48, Tomeu Vizoso pisze:
-> From: Sean Paul <seanpaul@chromium.org>
-> 
-> This patch moves the display-timings node from fimd to dp to reflect the
-> device tree bindings change.
-> 
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> [tomeu.vizoso at collabora.com: Rebased]
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> 
-> ---
-> 
-> Hi,
-> 
-> looks like a long time ago the bindings were changed and the DTs for
-> these boards weren't updated.
-> 
-> I have retaken Sean's forgotten patch and rebased it, but I have only
-> tested on an Arndale that exynos-drm doesn't complain about missing
-> timings.
-> 
-> Regards,
-> 
-> Tomeu
-> ---
->  arch/arm/boot/dts/exynos5250-arndale.dts  |  8 ++++----
->  arch/arm/boot/dts/exynos5250-smdk5250.dts | 16 ++++++++--------
->  arch/arm/boot/dts/exynos5420-smdk5420.dts |  7 ++++---
->  3 files changed, 16 insertions(+), 15 deletions(-)
+On Tue, 29 Sep 2015 06:30:52 +0200
+Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> Hi Marc,
+> 
+> On 09/28/2015 04:49 PM, Marc Zyngier wrote:
+> > IRQ controllers and timers are the two types of device the kernel
+> > requires before being able to use the device driver model.
+> >
+> > ACPI so far lacks a proper probing infrastructure similar to the one
+> > we have with DT, where we're able to declare IRQ chips and
+> > clocksources inside the driver code, and let the core code pick it up
+> > and call us back on a match. This leads to all kind of really ugly
+> > hacks all over the arm64 code and even in the ACPI layer.
+> >
+> > In order to allow some basic probing based on the ACPI tables,
+> > introduce "struct acpi_probe_entry" which contains just enough
+> > data and callbacks to match a table, an optional subtable, and
+> > call a probe function. A driver can, at build time, register itself
+> > and expect being called if the right entry exists in the ACPI
+> > table.
+> >
+> > A acpi_probe_device_table() is provided, taking an identifier for
+> > a set of acpi_prove_entries, and iterating over the registered
+> > entries.
+> >
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >   drivers/acpi/scan.c               | 39 +++++++++++++++++++++++
+> >   include/asm-generic/vmlinux.lds.h | 10 ++++++
+> >   include/linux/acpi.h              | 66 +++++++++++++++++++++++++++++++++++++++
+> >   3 files changed, 115 insertions(+)
+> >
+> > diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> > index f834b8c..daf9fc8 100644
+> > --- a/drivers/acpi/scan.c
+> > +++ b/drivers/acpi/scan.c
+> > @@ -1913,3 +1913,42 @@ int __init acpi_scan_init(void)
+> >   	mutex_unlock(&acpi_scan_lock);
+> >   	return result;
+> >   }
+> > +
+> > +static struct acpi_probe_entry *ape;
+> > +static int acpi_probe_count;
+> > +static DEFINE_SPINLOCK(acpi_probe_lock);
+> > +
+> > +static int __init acpi_match_madt(struct acpi_subtable_header *header,
+> > +				  const unsigned long end)
+> > +{
+> > +	if (!ape->subtable_valid || ape->subtable_valid(header, ape))
+> > +		if (!ape->probe_subtbl(header, end))
+> > +			acpi_probe_count++;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +int __init __acpi_probe_device_table(struct acpi_probe_entry *ap_head, int nr)
+> > +{
+> > +	int count = 0;
+> > +
+> > +	if (acpi_disabled)
+> > +		return 0;
+> > +
+> > +	spin_lock(&acpi_probe_lock);
+> > +	for (ape = ap_head; nr; ape++, nr--) {
+> > +		if (ACPI_COMPARE_NAME(ACPI_SIG_MADT, ape->id)) {
+> > +			acpi_probe_count = 0;
+> > +			acpi_table_parse_madt(ape->type, acpi_match_madt, 0);
+> 
+> Isn't supposed 'acpi_table_parse_madt' to return the count ? and 
+> shouldn't the return code be checked ?
 
-Best regards,
-Krzysztof
+acpi_table_madt_parse() returns the count of the entries it has parsed.
+We're interested in the count of entries that have been successfully
+probed. Not quite the same thing.
+
+As for the return code, checking it is highly symbolic, because there
+is no way we can recover from  an error in the ACPI parsing - we're
+dead anyway, as we end up without interrupt controller. I can add a
+WARN_ON(), but I'm not sure more noise will help understanding the
+problem.
+
+There is also the perfectly valid case where ACPI has been forcefully
+disabled (or on arm64, not forcefully enabled). In which case, the
+parsing code will abort early, and there is no reason to scream about
+it.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
