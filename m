@@ -1,35 +1,111 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 29 Sep 2015 10:24:42 +0100
-Subject: [PATCH v2 2/9] dmaengine: st_fdma: Add st fdma platform specific
- header
-In-Reply-To: <2654563.3IzPKrUkAU@wuerfel>
-References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
- <1441980871-24475-3-git-send-email-peter.griffin@linaro.org>
- <2654563.3IzPKrUkAU@wuerfel>
-Message-ID: <20150929092442.GB16955@griffinp-ThinkPad-X1-Carbon-2nd>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Tue, 29 Sep 2015 11:28:13 +0200
+Subject: [PATCH] drm/rockchip: vop: Correct enabled clocks during setup
+Message-ID: <1443518893-28142-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+When doing the initial setup both the hclk and the aclk need to be
+enabled otherwise the board will simply hang. This only occurs when
+building the vop driver as a module, when its built-in the initial setup
+happens to run before the clock framework shuts of unused clocks
+(including the aclk).
 
-On Fri, 11 Sep 2015, Arnd Bergmann wrote:
+While there also switch to doing prepare and enable in one step rather
+then separate steps to reduce the amount of code required.
 
-> On Friday 11 September 2015 15:14:24 Peter Griffin wrote:
-> > Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > ---
-> >  include/linux/platform_data/dma-st_fdma.h | 72 +++++++++++++++++++++++++++++++
-> >  1 file changed, 72 insertions(+)
-> >  create mode 100644 include/linux/platform_data/dma-st_fdma.h
-> > 
-> 
-> This clearly needs an explanation of which platforms require the header.
-> 
-> On ARM, all new platforms use DT, so it's obviously not one of them.
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-I will move the relevant parts into the st_fdma.h header file, as no other platforms
-will be upstreamed that are not DT based.
+---
 
-regards,
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 36 +++++++++++------------------
+ 1 file changed, 14 insertions(+), 22 deletions(-)
 
-Peter.
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 5d8ae5e..48719df 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -1575,32 +1575,25 @@ static int vop_initial(struct vop *vop)
+ 		return PTR_ERR(vop->dclk);
+ 	}
+ 
+-	ret = clk_prepare(vop->hclk);
+-	if (ret < 0) {
+-		dev_err(vop->dev, "failed to prepare hclk\n");
+-		return ret;
+-	}
+-
+ 	ret = clk_prepare(vop->dclk);
+ 	if (ret < 0) {
+ 		dev_err(vop->dev, "failed to prepare dclk\n");
+-		goto err_unprepare_hclk;
++		return ret;
+ 	}
+ 
+-	ret = clk_prepare(vop->aclk);
++	/* Enable both the hclk and aclk to setup the vop */
++	ret = clk_prepare_enable(vop->hclk);
+ 	if (ret < 0) {
+-		dev_err(vop->dev, "failed to prepare aclk\n");
++		dev_err(vop->dev, "failed to prepare/enable hclk\n");
+ 		goto err_unprepare_dclk;
+ 	}
+ 
+-	/*
+-	 * enable hclk, so that we can config vop register.
+-	 */
+-	ret = clk_enable(vop->hclk);
++	ret = clk_prepare_enable(vop->aclk);
+ 	if (ret < 0) {
+-		dev_err(vop->dev, "failed to prepare aclk\n");
+-		goto err_unprepare_aclk;
++		dev_err(vop->dev, "failed to prepare/enable aclk\n");
++		goto err_disable_hclk;
+ 	}
++
+ 	/*
+ 	 * do hclk_reset, reset all vop registers.
+ 	 */
+@@ -1608,7 +1601,7 @@ static int vop_initial(struct vop *vop)
+ 	if (IS_ERR(ahb_rst)) {
+ 		dev_err(vop->dev, "failed to get ahb reset\n");
+ 		ret = PTR_ERR(ahb_rst);
+-		goto err_disable_hclk;
++		goto err_disable_aclk;
+ 	}
+ 	reset_control_assert(ahb_rst);
+ 	usleep_range(10, 20);
+@@ -1634,26 +1627,25 @@ static int vop_initial(struct vop *vop)
+ 	if (IS_ERR(vop->dclk_rst)) {
+ 		dev_err(vop->dev, "failed to get dclk reset\n");
+ 		ret = PTR_ERR(vop->dclk_rst);
+-		goto err_unprepare_aclk;
++		goto err_disable_aclk;
+ 	}
+ 	reset_control_assert(vop->dclk_rst);
+ 	usleep_range(10, 20);
+ 	reset_control_deassert(vop->dclk_rst);
+ 
+ 	clk_disable(vop->hclk);
++	clk_disable(vop->aclk);
+ 
+ 	vop->is_enabled = false;
+ 
+ 	return 0;
+ 
++err_disable_aclk:
++	clk_disable_unprepare(vop->aclk);
+ err_disable_hclk:
+-	clk_disable(vop->hclk);
+-err_unprepare_aclk:
+-	clk_unprepare(vop->aclk);
++	clk_disable_unprepare(vop->hclk);
+ err_unprepare_dclk:
+ 	clk_unprepare(vop->dclk);
+-err_unprepare_hclk:
+-	clk_unprepare(vop->hclk);
+ 	return ret;
+ }
+ 
+-- 
+2.5.3
