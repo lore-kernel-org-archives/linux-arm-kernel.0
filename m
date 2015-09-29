@@ -1,15 +1,14 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Tue, 29 Sep 2015 10:13:49 +0800
-Subject: [PATCH v3 4/8] dt-bindings: add documentation of rk3036 clock
- controller
+Date: Tue, 29 Sep 2015 10:13:51 +0800
+Subject: [PATCH v3 6/8] ARM: rockchip: add support smp for rk3036
 In-Reply-To: <1443492833-15630-1-git-send-email-zhengxing@rock-chips.com>
 References: <1443492833-15630-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1443492833-15630-5-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1443492833-15630-7-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the devicetree binding for the cru on the rk3036 which quite similar
-structured as previous clock controllers.
+The rk3036 is dual-core soc, we can use this patch to enable cpu1
+enter boot secondary, and hotplug(online/offline).
 
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 Reviewed-by: Heiko Stuebner <heiko@sntech.de>
@@ -17,71 +16,172 @@ Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
 Changes in v3: None
 
- .../bindings/clock/rockchip,rk3036-cru.txt         |   56 ++++++++++++++++++++
- 1 file changed, 56 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
+ arch/arm/mach-rockchip/platsmp.c |  142 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 142 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
-new file mode 100644
-index 0000000..ace0599
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
-@@ -0,0 +1,56 @@
-+* Rockchip RK3036 Clock and Reset Unit
+diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
+index 3e7a4b7..7864bf3 100644
+--- a/arch/arm/mach-rockchip/platsmp.c
++++ b/arch/arm/mach-rockchip/platsmp.c
+@@ -34,6 +34,8 @@
+ 
+ static void __iomem *scu_base_addr;
+ static void __iomem *sram_base_addr;
++static void __iomem *cru_base_addr;
 +
-+The RK3036 clock controller generates and supplies clock to various
-+controllers within the SoC and also implements a reset controller for SoC
-+peripherals.
+ static int ncores;
+ 
+ #define PMU_PWRDN_CON		0x08
+@@ -41,6 +43,8 @@ static int ncores;
+ 
+ #define PMU_PWRDN_SCU		4
+ 
++#define RK3036_SOFTRST_CON(x)	((x) * 0x4 + 0x110)
 +
-+Required Properties:
+ static struct regmap *pmu;
+ 
+ static int pmu_power_domain_is_on(int pd)
+@@ -350,3 +354,141 @@ static struct smp_operations rockchip_smp_ops __initdata = {
+ };
+ 
+ CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip_smp_ops);
 +
-+- compatible: should be "rockchip,rk3036-cru"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- #clock-cells: should be 1.
-+- #reset-cells: should be 1.
++/* for RK3036 */
 +
-+Optional Properties:
++static int rk3036_set_power_domain(int pd, bool on)
++{
++	struct reset_control *rstc = rockchip_get_core_reset(pd);
++	u32 val;
 +
-+- rockchip,grf: phandle to the syscon managing the "general register files"
-+  If missing pll rates are not changeable, due to the missing pll lock status.
++	/* there are 2cpus on rk3036 soc, we just need to be care cpu1 */
++	if (pd != 1)
++		return 0;
 +
-+Each clock is assigned an identifier and client nodes can use this identifier
-+to specify the clock which they consume. All available clocks are defined as
-+preprocessor macros in the dt-bindings/clock/rk3036-cru.h headers and can be
-+used in device tree sources. Similar macros exist for the reset sources in
-+these files.
++	if (IS_ERR(rstc) && read_cpuid_part() != ARM_CPU_PART_CORTEX_A9) {
++		pr_err("%s: could not get reset control for core %d\n",
++		       __func__, pd);
++		return PTR_ERR(rstc);
++	}
 +
-+External clocks:
++	/*
++	 * We need to soft reset the cpu when we turn off the cpu power domain,
++	 * or else the active processors might be stalled when the individual
++	 * processor is powered down.
++	 */
++	if (!IS_ERR(rstc) && !on)
++		reset_control_assert(rstc);
 +
-+There are several clocks that are generated outside the SoC. It is expected
-+that they are defined using standard clock bindings with following
-+clock-output-names:
-+ - "xin24m" - crystal input - required,
-+ - "ext_i2s" - external I2S clock - optional,
-+ - "ext_gmac" - external GMAC clock - optional
++	val = (on) ? 0 : 1;
++	val = (val << pd) | BIT(pd + 16);
++	writel_relaxed(val, cru_base_addr + RK3036_SOFTRST_CON(0));
 +
-+Example: Clock controller node:
++	dsb();
 +
-+	cru: cru at 20000000 {
-+		compatible = "rockchip,rk3036-cru";
-+		reg = <0x20000000 0x1000>;
-+		rockchip,grf = <&grf>;
++	if (!IS_ERR(rstc)) {
++		if (on)
++			reset_control_deassert(rstc);
++		reset_control_put(rstc);
++	}
 +
-+		#clock-cells = <1>;
-+		#reset-cells = <1>;
-+	};
++	return 0;
++}
 +
-+Example: UART controller node that consumes the clock generated by the clock
-+  controller:
++static void __init rk3036_smp_prepare_cpus(unsigned int max_cpus)
++{
++	struct device_node *node;
++	unsigned int l2ctlr;
++	unsigned int i, cpu;
 +
-+	uart0: serial at 20060000 {
-+		compatible = "snps,dw-apb-uart";
-+		reg = <0x20060000 0x100>;
-+		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+		reg-shift = <2>;
-+		reg-io-width = <4>;
-+		clocks = <&cru SCLK_UART0>;
-+	};
++	/* get cru_base_addr */
++	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3036-cru");
++	if (!node) {
++		pr_err("%s: could not find cru dt node\n", __func__);
++		return;
++	}
++
++	cru_base_addr = of_iomap(node, 0);
++	if (!cru_base_addr) {
++		pr_err("%s: could not map cru registers\n", __func__);
++		return;
++	}
++
++	/* get sram_base_addr */
++	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3036-smp-sram");
++	if (!node) {
++		pr_err("%s: could not find sram dt node\n", __func__);
++		return;
++	}
++
++	sram_base_addr = of_iomap(node, 0);
++	if (!sram_base_addr) {
++		pr_err("%s: could not map sram registers\n", __func__);
++		return;
++	}
++
++	/* get ncores */
++	asm ("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
++	ncores = ((l2ctlr >> 24) & 0x3) + 1;
++	cpu = MPIDR_AFFINITY_LEVEL(read_cpuid_mpidr(), 0);
++
++	/* Make sure that all cores except the first are really off */
++	for (i = 1; i < ncores; i++)
++		rk3036_set_power_domain(0 + i, false);
++}
++
++static int rk3036_boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	if (cpu >= ncores) {
++		pr_err("%s: cpu %d outside maximum number of cpus %d\n",
++			__func__, cpu, ncores);
++		return -ENXIO;
++	}
++
++	/* start the core */
++	rk3036_set_power_domain(0 + cpu, true);
++
++	/*
++	 * We need to wait a moment after soft reset CPUx on rk3036,
++	 * otherwise, CPUx will startup failed.
++	 */
++	udelay(10);
++	writel(virt_to_phys(secondary_startup), sram_base_addr + 8);
++	writel(0xDEADBEAF, sram_base_addr + 4);
++	dsb_sev();
++
++	return 0;
++}
++
++#ifdef CONFIG_HOTPLUG_CPU
++static int rk3066_cpu_kill(unsigned int cpu)
++{
++	/*
++	 * We need a delay here to ensure that the dying CPU can finish
++	 * executing v7_coherency_exit() and reach the WFI/WFE state
++	 * prior to having the power domain disabled.
++	 */
++	mdelay(1);
++
++	rk3036_set_power_domain(0 + cpu, false);
++
++	return 1;
++}
++
++static void rk3066_cpu_die(unsigned int cpu)
++{
++	v7_exit_coherency_flush(louis);
++	while (1)
++		cpu_do_idle();
++}
++#endif
++
++static struct smp_operations rk3036_smp_ops __initdata = {
++	.smp_prepare_cpus	= rk3036_smp_prepare_cpus,
++	.smp_boot_secondary	= rk3036_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_kill		= rk3066_cpu_kill,
++	.cpu_die		= rk3066_cpu_die,
++#endif
++};
++CPU_METHOD_OF_DECLARE(rk3036_smp, "rockchip,rk3036-smp", &rk3036_smp_ops);
 -- 
 1.7.9.5
