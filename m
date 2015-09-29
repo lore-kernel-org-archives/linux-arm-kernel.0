@@ -1,39 +1,54 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 29 Sep 2015 15:20:18 +0200
-Subject: [PATCH] ARM: exynos_defconfig: Enable WiFi-Ex as a module instead
- built-in
-In-Reply-To: <1443530546-3066-1-git-send-email-javier@osg.samsung.com>
-References: <1443530546-3066-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <560A9012.2090802@suse.de>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Tue, 29 Sep 2015 15:26:14 +0200
+Subject: [PATCH 2/2] ASoC: atmel-i2s: add driver for the new Atmel I2S
+ controller
+In-Reply-To: <9b9890682c47fd2669aeed529225ebf44eca5cf6.1443452274.git.cyrille.pitchen@atmel.com>
+References: <cover.1443452274.git.cyrille.pitchen@atmel.com>
+ <9b9890682c47fd2669aeed529225ebf44eca5cf6.1443452274.git.cyrille.pitchen@atmel.com>
+Message-ID: <560A9176.9070007@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 29.09.2015 um 14:42 schrieb Javier Martinez Canillas:
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index d4f6063d8a72..5aad617f02c7 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -64,8 +64,8 @@ CONFIG_SMSC911X=y
->  CONFIG_USB_USBNET=y
->  CONFIG_USB_NET_SMSC75XX=y
->  CONFIG_USB_NET_SMSC95XX=y
-> -CONFIG_MWIFIEX=y
-> -CONFIG_MWIFIEX_SDIO=y
-> +CONFIG_MWIFIEX=m
-> +CONFIG_MWIFIEX_SDIO=m
->  CONFIG_INPUT_EVDEV=y
->  CONFIG_KEYBOARD_GPIO=y
->  CONFIG_KEYBOARD_CROS_EC=y
+Le 28/09/2015 17:05, Cyrille Pitchen a ?crit :
+[...]
+> +	/* Get audio clocks to generate the I2S Master Clock (I2S_MCK) */
+> +	dev->aclk = devm_clk_get(&pdev->dev, "aclk");
+> +	dev->gclk = devm_clk_get(&pdev->dev, "gclk");
+> +	if (IS_ERR(dev->aclk) && IS_ERR(dev->gclk)) {
+> +		/* Master Mode not supported */
+> +		dev->aclk = NULL;
+> +		dev->gclk = NULL;
+> +	} else if (IS_ERR(dev->gclk)) {
+> +		err = PTR_ERR(dev->gclk);
+> +		dev_err(&pdev->dev,
+> +			"failed to get the PMC generated clock: %d\n", err);
+> +		return err;
+> +	} else if (IS_ERR(dev->aclk)) {
+> +		err = PTR_ERR(dev->aclk);
+> +		dev_err(&pdev->dev,
+> +			"failed to get the PLL audio clock: %d\n", err);
+> +		return err;
+> +	}
+> +
+> +	/* Do hardware specific settings to initialize I2S_MCK generator */
+> +	if (dev->caps && dev->caps->mck_init) {
+> +		err = dev->caps->mck_init(dev, np);
+> +		if (err)
+> +			return err;
+> +	}
+> +
+> +	/* Enable the peripheral clock. */
+> +	err = clk_prepare_enable(dev->pclk);
+> +	if (err)
+> +		return err;
+> +
+> +	dev->dev = &pdev->dev;
+> +	dev->regmap = regmap;
+> +	platform_set_drvdata(pdev, dev);
 
-Makes sense,
+those last 3 lines should be moved before calling dev->caps->mck_init(),
+otherwise dev->dev would not be initialized yet if dev_err() is called by
+atmel_i2s_sama5d2_mck_init().
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
-
-What about multi_v7?
-
-Cheers,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+Will be fixed in the next series.
+[...]
