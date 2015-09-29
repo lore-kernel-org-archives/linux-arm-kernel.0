@@ -1,64 +1,40 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 29 Sep 2015 16:48:57 +0200
-Subject: [PATCH v3 0/8] Rework architected timer and forwarded IRQs handling
-Message-ID: <1443538145-11990-1-git-send-email-christoffer.dall@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 29 Sep 2015 17:49:04 +0300
+Subject: [PATCH v9 2/5] dt-bindings: Add a binding for Mediatek xHCI host
+ controller
+In-Reply-To: <1443495698-32233-3-git-send-email-chunfeng.yun@mediatek.com>
+References: <1443495698-32233-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1443495698-32233-3-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <560AA4E0.3030705@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The architected timer integration with the VGIC had some shortcomings in
-that certain guest operations weren't fully supported.
+On 09/29/2015 06:01 AM, Chunfeng Yun wrote:
 
-This series tries to address these problems in providing level-triggered
-semantics for the arch timer and VGIC integration and seeks to clarify
-the behavior when setting/clearing the active state on the physical
-distributor.
+> add a DT binding documentation of xHCI host controller for the
+> MT8173 SoC from Mediatek.
+>
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>   .../devicetree/bindings/usb/mt8173-xhci.txt        | 52 ++++++++++++++++++++++
+>   1 file changed, 52 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+>
+> diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> new file mode 100644
+> index 0000000..0c96273
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> @@ -0,0 +1,52 @@
+[...]
+> +
+> +Example:
+> +usb30: usb at 11270000 {
+[...]
+> +	status = "okay";
 
-It also fixes a few other bugs in the VGIC code and finally adds support
-for edge-triggered forwarded interrupts.
+    This line is not needed.
 
-The edge-triggered forwarded interrupts code is untested but probably
-better to clearly do something wrong and raise a warning.
+[...]
 
-Changes since v2:
- - Various spelling and comment fixes
- - Clarified timer example in Documentation and fixed EOIMode=1 explanation
- - Added spin lock around process_queued_irq as pointed out by Andre.
-
-Changes since v1:
- - Sent out bug fixes for active state and UEFI reset as separate
-   patches.
- - Fixed various spelling nits
- - Rewrote proposed documentation file trying to address Eric's and
-   Marc's comments
- - Rewrote kvm_timer_update_irq and kvm_timer_update_state according to
-   Marc's suggestion (thanks!)
- - Added additional patch to support edge-triggered forwarded
-   interrupts.
-
-Christoffer Dall (8):
-  KVM: Add kvm_arch_vcpu_{un}blocking callbacks
-  arm/arm64: KVM: arch_timer: Only schedule soft timer on vcpu_block
-  arm/arm64: KVM: vgic: Factor out level irq processing on guest exit
-  arm/arm64: KVM: Implement GICD_ICFGR as RO for PPIs
-  arm/arm64: KVM: Use appropriate define in VGIC reset code
-  arm/arm64: KVM: Add forwarded physical interrupts documentation
-  arm/arm64: KVM: Rework the arch timer to use level-triggered semantics
-  arm/arm64: KVM: Support edge-triggered forwarded interrupts
-
- Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt | 186 +++++++++++++++++++++
- arch/arm/kvm/arm.c                                 |  21 ++-
- arch/mips/include/asm/kvm_host.h                   |   2 +
- arch/powerpc/include/asm/kvm_host.h                |   2 +
- arch/s390/include/asm/kvm_host.h                   |   2 +
- arch/x86/include/asm/kvm_host.h                    |   3 +
- include/kvm/arm_arch_timer.h                       |   4 +-
- include/kvm/arm_vgic.h                             |   3 -
- include/linux/kvm_host.h                           |   2 +
- virt/kvm/arm/arch_timer.c                          | 149 +++++++++++------
- virt/kvm/arm/vgic.c                                | 172 +++++++++----------
- virt/kvm/kvm_main.c                                |   3 +
- 12 files changed, 408 insertions(+), 141 deletions(-)
- create mode 100644 Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
-
--- 
-2.1.2.330.g565301e.dirty
+MBR, Sergei
