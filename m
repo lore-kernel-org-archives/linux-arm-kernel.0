@@ -1,95 +1,54 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 29 Sep 2015 13:59:23 -0700
-Subject: [PATCH v12 3/5] mtd: nand: vf610_nfc: add device tree bindings
-In-Reply-To: <1441242397-870-4-git-send-email-stefan@agner.ch>
-References: <1441242397-870-1-git-send-email-stefan@agner.ch>
- <1441242397-870-4-git-send-email-stefan@agner.ch>
-Message-ID: <20150929205923.GQ31505@google.com>
+From: jc@eclis.ch (Jean-Christian de Rivaz)
+Date: Tue, 29 Sep 2015 22:59:46 +0200
+Subject: [PATCH 1/1] Disable CONFIG_UACCESS_WITH_MEMCPY in Atmel config.
+In-Reply-To: <20150929203554.GH3982@pengutronix.de>
+References: <1443556987-2788-1-git-send-email-jc@eclis.ch>
+ <20150929203554.GH3982@pengutronix.de>
+Message-ID: <560AFBC2.5050000@eclis.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 02, 2015 at 06:06:35PM -0700, Stefan Agner wrote:
-> Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  .../devicetree/bindings/mtd/vf610-nfc.txt          | 59 ++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/vf610-nfc.txt b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> new file mode 100644
-> index 0000000..6be4871
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> @@ -0,0 +1,59 @@
-> +Freescale's NAND flash controller (NFC)
-> +
-> +This variant of the Freescale NAND flash controller (NFC) can be found on
-> +Vybrid (vf610), MPC5125, MCF54418 and Kinetis K70.
-> +
-> +Required properties:
-> +- compatible: Should be set to "fsl,vf610-nfc".
-> +- reg: address range of the NFC.
-> +- interrupts: interrupt of the NFC.
-> +- #address-cells: shall be set to 1. Encode the nand CS.
-> +- #size-cells : shall be set to 0.
-> +- assigned-clocks: main clock from the SoC, for Vybrid <&clks VF610_CLK_NFC>;
-> +- assigned-clock-rates: The NAND bus timing is derived from this clock
-> +    rate and should not exceed maximum timing for any NAND memory chip
-> +    in a board stuffing. Typical NAND memory timings derived from this
-> +    clock are found in the SoC hardware reference manual. Furthermore,
-> +    there might be restrictions on maximum rates when using hardware ECC.
-> +
-> +- #address-cells, #size-cells : Must be present if the device has sub-nodes
-> +  representing partitions.
-> +
-> +Required children nodes:
-> +Children nodes represent the available nand chips. Currently the driver can
-> +only handle one NAND chip.
-> +
-> +Required properties:
-> +- compatible: Should be set to "fsl,vf610-nfc-cs".
-> +- nand-bus-width: see nand.txt
-> +- nand-ecc-mode: see nand.txt
-> +
-> +Required properties for hardware ECC:
-> +- nand-ecc-strength: supported strengths are 24 and 32 bit (see nand.txt)
-> +- nand-ecc-step-size: step size equals page size, currently only 2k pages are
-> +    supported
-> +- nand-on-flash-bbt: see nand.txt
-> +
-> +Example:
-> +
-> +	nfc: nand at 400e0000 {
-> +		compatible = "fsl,vf610-nfc";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
+Le 29. 09. 15 22:35, Uwe Kleine-K?nig a ?crit :
+> Hello,
+>
+> On Tue, Sep 29, 2015 at 10:03:07PM +0200, jc at eclis.ch wrote:
+>> From: Jean-Christian de Rivaz <jc@eclis.ch>
+>>
+>> According to Russell King:
+>> In any case, unless you have a Marvell platform, you should have this
+>> disabled - it provides a performance boost for Marvell platforms, but
+>> degrades performance everywhere else.  Please ensure that you disable
+>> CONFIG_UACCESS_WITH_MEMCPY.
+>>
+>> Signed-off-by: Jean-Christian de Rivaz <jc@eclis.ch>
+>> ---
+>>   arch/arm/configs/at91_dt_defconfig |    2 +-
+>>   arch/arm/configs/sama5_defconfig   |    2 +-
+>>   2 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+>> index 090c5b2..1807d7f 100644
+>> --- a/arch/arm/configs/at91_dt_defconfig
+>> +++ b/arch/arm/configs/at91_dt_defconfig
+>> @@ -21,7 +21,7 @@ CONFIG_SOC_SAM_V4_V5=y
+>>   CONFIG_SOC_AT91RM9200=y
+>>   CONFIG_SOC_AT91SAM9=y
+>>   CONFIG_AEABI=y
+>> -CONFIG_UACCESS_WITH_MEMCPY=y
+>> +# CONFIG_UACCESS_WITH_MEMCPY is not set
+>>   CONFIG_ZBOOT_ROM_TEXT=0x0
+>>   CONFIG_ZBOOT_ROM_BSS=0x0
+>>   CONFIG_ARM_APPENDED_DTB=y
+> What is the reason to add the "# ... is not set" line? Given the default
+> line of UACCESS_WITH_MEMCPY I suggest to just drop the line without
+> replacement in the defconfigs.
+>
 
-Fixed this to <0> ^^^
+Hi Uwe,
 
-and pushed to l2-mtd.git. I'll assume the DTS updates can be rebased and
-taken through arm-soc
+Without the explicit disabling, the user will be asked and could 
+possibly give the wrong answer as the help look as a cool feature and 
+the condition is very hard to understand.
 
-> +		reg = <0x400e0000 0x4000>;
-> +		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&clks VF610_CLK_NFC>;
-> +		clock-names = "nfc";
-> +		assigned-clocks = <&clks VF610_CLK_NFC>;
-> +		assigned-clock-rates = <33000000>;
-> +
-> +		nand at 0 {
-> +			compatible = "fsl,vf610-nfc-nandcs";
-> +			reg = <0>;
-> +			nand-bus-width = <8>;
-> +			nand-ecc-mode = "hw";
-> +			nand-ecc-strength = <32>;
-> +			nand-ecc-step-size = <2048>;
-> +			nand-on-flash-bbt;
-> +		};
-> +	};
-> -- 
-> 2.5.1
-> 
-
-Brian
+Regards,
+Jean-Christian
