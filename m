@@ -1,34 +1,115 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 29 Sep 2015 23:01:31 +0800
-Subject: [PATCH v3 3/7] irqchip/gic: Convert the GIC driver to ACPI probing
-In-Reply-To: <1443451758-22717-4-git-send-email-marc.zyngier@arm.com>
-References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
- <1443451758-22717-4-git-send-email-marc.zyngier@arm.com>
-Message-ID: <560AA7CB.7020600@linaro.org>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 29 Sep 2015 16:11:10 +0100
+Subject: [PATCH v4 1/5] Documentation: add DT bindings for ARM SCPI sensors
+In-Reply-To: <9hhoagubk4m.fsf@e105922-lin.cambridge.arm.com> (Punit Agrawal's
+ message of "Tue, 22 Sep 2015 15:31:53 +0100")
+References: <1442335861-7282-1-git-send-email-punit.agrawal@arm.com>
+ <1442335861-7282-2-git-send-email-punit.agrawal@arm.com>
+ <9hhoagubk4m.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <9hhd1x16z1t.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2015 10:49 PM, Marc Zyngier wrote:
-> Now that we have a basic infrastructure to register irqchips and
-> call them on discovery of a matching entry in MADT, convert the
-> GIC driver to this new probing method.
+Punit Agrawal <punit.agrawal@arm.com> writes:
+
+> Punit Agrawal <punit.agrawal@arm.com> writes:
 >
-> It ends up being a code deletion party, which is a rather good thing.
+>> The System Control Processor (SCP) provides access to SoC sensors via
+>> the System Control and Power Interface (SCPI) Message Protocol. Add
+>> bindings to allow probing of these sensors. Also support referencing
+>> of the sensors for setting up thermal zones via the thermal DT
+>> bindings.
+>>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
 >
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   arch/arm64/include/asm/acpi.h        |  1 -
->   arch/arm64/include/asm/irq.h         |  2 --
->   arch/arm64/kernel/acpi.c             | 25 -------------
->   drivers/irqchip/irq-gic.c            | 69 ++++++++++++++++++------------------
->   drivers/irqchip/irqchip.c            |  3 --
->   include/linux/irqchip/arm-gic-acpi.h | 31 ----------------
->   6 files changed, 35 insertions(+), 96 deletions(-)
->   delete mode 100644 include/linux/irqchip/arm-gic-acpi.h
+> Gentle reminder for review of the below bindings. They've been updated
+> based on feedback on the earlier version [a].
+>
+> If there are no further comments, I'd like to request an ack from the DT
+> reviewers.
 
-I love the code deletion party too :)
+Ping!
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-Thanks
-Hanjun
+>
+> [a] http://thread.gmane.org/gmane.linux.power-management.general/65475/focus=134976
+>
+>> ---
+>>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 38 ++++++++++++++++++++++
+>>  1 file changed, 38 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> index f002460..86302de 100644
+>> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> @@ -72,8 +72,25 @@ Required sub-node properties:
+>>  - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
+>>  	       shared memory on Juno platforms
+>>  
+>> +Sensor bindings for the sensors based on SCPI Message Protocol
+>> +--------------------------------------------------------------
+>> +SCPI provides an API to access the various sensors on the SoC.
+>> +
+>> +Required properties:
+>> +- compatible : should be "arm,scpi-sensors".
+>> +- #thermal-sensor-cells: should be set to 1. This property follows the
+>> +			 thermal device tree bindings[2].
+>> +
+>> +			 Valid cell values are raw identifiers (Sensor
+>> +			 ID) as used by the firmware. Refer to
+>> +			 platform documentation for your
+>> +			 implementation for the IDs to use. For Juno
+>> +			 R0 and Juno R1 refer to [3].
+>> +
+>>  [0] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
+>>  [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +[2] Documentation/devicetree/bindings/thermal/thermal.txt
+>> +[3] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/apas03s22.html
+>>  
+>>  Example:
+>>  
+>> @@ -122,6 +139,11 @@ scpi_protocol: scpi at 2e000000 {
+>>  			clock-output-names = "pxlclk0", "pxlclk1";
+>>  		};
+>>  	};
+>> +
+>> +	scpi_sensors0: sensors {
+>> +		compatible = "arm,scpi-sensors";
+>> +		#thermal-sensor-cells = <1>;
+>> +	};
+>>  };
+>>  
+>>  cpu at 0 {
+>> @@ -136,6 +158,17 @@ hdlcd at 7ff60000 {
+>>  	clocks = <&scpi_clk 4>;
+>>  };
+>>  
+>> +thermal-zones {
+>> +	soc_thermal {
+>> +		polling-delay-passive = <100>;
+>> +		polling-delay = <1000>;
+>> +
+>> +				/* sensor         ID */
+>> +		thermal-sensors = <&scpi_sensors0 3>;
+>> +		...
+>> +	};
+>> +};
+>> +
+>>  In the above example, the #clock-cells is set to 1 as required.
+>>  scpi_dvfs has 3 output clocks namely: atlclk, aplclk, and gpuclk with 0,
+>>  1 and 2 as clock-indices. scpi_clk has 2 output clocks namely: pxlclk0
+>> @@ -148,3 +181,8 @@ scpi_dvfs i.e. "atlclk".
+>>  Similarly the second example is hdlcd at 7ff60000 and it has pxlclk1 as input
+>>  clock. '4' in the clock specifier here points to the second entry
+>>  in the output clocks of scpi_clocks  i.e. "pxlclk1"
+>> +
+>> +The thermal-sensors property in the soc_thermal node uses the
+>> +temperature sensor provided by SCP firmware to setup a thermal
+>> +zone. The ID "3" is the sensor identifier for the temperature sensor
+>> +as used by the firmware.
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
