@@ -1,25 +1,92 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 29 Sep 2015 22:42:27 +0800
-Subject: [PATCH v3 2/7] irqchip/acpi: Add probing infrastructure for
- ACPI-based irqchips
-In-Reply-To: <1443451758-22717-3-git-send-email-marc.zyngier@arm.com>
-References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
- <1443451758-22717-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <560AA353.6040206@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 29 Sep 2015 17:43:10 +0300
+Subject: [PATCH v9 1/5] dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
+In-Reply-To: <1443495698-32233-2-git-send-email-chunfeng.yun@mediatek.com>
+References: <1443495698-32233-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1443495698-32233-2-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <560AA37E.2090106@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2015 10:49 PM, Marc Zyngier wrote:
-> DT enjoys a rather nice probing infrastructure for irqchips, while
-> ACPI is so far stuck into a very distant past.
->
-> This patch introduces a declarative API, allowing irqchips to be
-> self-contained and be called when a particular entry is matched
-> in the MADT table.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Hello.
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+On 09/29/2015 06:01 AM, Chunfeng Yun wrote:
 
-Thanks
-Hanjun
+> add a DT binding documentation of usb3.0 phy for MT65xx
+> SoCs from Mediatek.
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>   .../devicetree/bindings/phy/phy-mt65xx-usb.txt     | 68 ++++++++++++++++++++++
+>   1 file changed, 68 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+>
+> diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> new file mode 100644
+> index 0000000..00100cf
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> @@ -0,0 +1,68 @@
+> +mt65xx USB3.0 PHY binding
+> +--------------------------
+> +
+> +This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
+> +
+> +Required properties (controller (parent) node):
+> + - compatible	: should be "mediatek,mt8173-u3phy"
+> + - reg		: offset and length of register for phy, exclude port's
+> +		  register.
+> + - clocks	: a list of phandle + clock-specifier pairs, one for each
+> +		  entry in clock-names
+> + - clock-names	: must contain
+> +		  "u3phya_ref": for reference clock of usb3.0 analog phy.
+> +
+> +Required nodes	: a sub-node is required for each port the controller
+> +		  provides. Address range information including the usual
+> +		  'reg' property is used inside these nodes to describe
+> +		  the controller's topology.
+> +
+> +Required properties (port (child) node):
+> +- reg		: address and length of the register set for the port.
+> +- #phy-cells	: should be 1 (See second example)
+> +		  cell after port phandle is phy type from:
+> +			- PHY_TYPE_USB2
+> +			- PHY_TYPE_USB3
+> +
+> +Example:
+> +
+> +u3phy: usb-phy at 11290000 {
+> +	compatible = "mediatek,mt8173-u3phy";
+> +	reg = <0 0x11290000 0 0x800>;
+> +	clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+> +	clock-names = "u3phya_ref";
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +	ranges;
+
+    You don't describe the above 3 props neither as mandatory nor optional.
+
+[...]
+> +Specifying phy control of devices
+> +---------------------------------
+> +
+> +Device nodes should specify the configuration required in their "phys"
+> +property, containing a phandle to the phy port node and a device type;
+> +phy-names for each port are optional.
+> +
+> +Example:
+> +
+> +#include <dt-bindings/phy/phy.h>
+> +
+> +usb30: usb at 11270000 {
+> +	...
+> +	phys = <&phy_port0 PHY_TYPE_USB3>;
+> +	phy-names = "usb3-0";
+> +	...
+> +};
+
+    Isn't the above already described in 
+Documentation/devicetree/bindings/phy/phy-bindings.txt?
+
+MBR, Sergei
