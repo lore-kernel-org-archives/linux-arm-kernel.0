@@ -1,89 +1,81 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 29 Sep 2015 23:13:56 +0200
-Subject: [linux-sunxi] [PATCH 0/2] ASoC: Add support for the Allwinner A10
- codec
-In-Reply-To: <20150928074248.GI7104@lukather>
-References: <1442064384-23379-1-git-send-email-maxime.ripard@free-electrons.com>
- <1442928417.6509.12.camel@plaes.org> <20150928074248.GI7104@lukather>
-Message-ID: <560AFF14.80400@redhat.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 29 Sep 2015 14:27:27 -0700
+Subject: [PATCH 4/4] dma-debug: Allow poisoning nonzero allocations
+In-Reply-To: <560585EB.3060908@arm.com>
+References: <cover.1443178314.git.robin.murphy@arm.com>
+ <0405c6131def5aa179ff4ba5d4201ebde89cede3.1443178314.git.robin.murphy@arm.com>
+ <20150925124447.GO21513@n2100.arm.linux.org.uk>
+ <560585EB.3060908@arm.com>
+Message-ID: <20150929142727.e95a2d2ebff65dda86315248@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 25 Sep 2015 18:35:39 +0100 Robin Murphy <robin.murphy@arm.com> wrote:
 
-On 09/28/2015 09:42 AM, Maxime Ripard wrote:
-> Hi Priit,
->
-> On Tue, Sep 22, 2015 at 04:26:57PM +0300, Priit Laes wrote:
->> On Sat, 2015-09-12 at 15:26 +0200, Maxime Ripard wrote:
->>> Hi everyone,
->>>
->>> This patch set adds the support for what Allwinner calls the codec on
->>> their SoCs.
->>>
->>> This codec is actually a combination of a codec and DAI, tied
->>> together
->>> in a single memory-mapped IP. It is completely standalone, and
->>> outputs
->>> directly the analog signal.
->>>
->>> While it supports both playback and capture, the capture is not
->>> implemented in this patch, and will be posted eventually as a
->>> separate
->>> one.
->>>
->>> This set, in order to be functional, has a dependency on the audio
->>> clocks patch set posted separately. However, it doesn't needs this to
->>> compile properly, so I guess it can be merged without really caring
->>> for the merging status of the clock patches.
->>
->> It works on Gemei G9 tablet which has also extra chip that
->> automatically switches output over from internal speakers to headphones
->> when connector is inserted.
->>
->> Now I noticed some weird things:
->>
->> When I have all the switches as ON in alsamixer, and I start disabling
->> them, I get following weird results.
->>
->> Left Mixer Left - LML
->> Right Mixer Left - LMR
->> Right Mixer Right - RMR
->>
->> Very faint output:
->> LML - ON
->> RML - Mute
->> RMR - ON
->>
->> Output works fully:
->> LML - Mute
->> RML - Mute
->> RMR - Mute
->>
->> When I Mute Pre-Amplifier and fiddle any of LML, RML or RMR, the output
->> stays mute even after setting Pre-Amplifier Mute back on:
->>
->> 1. All switches on
->> 2. Mute pre-amplifier
->> 3. Mute RMR
->> 4. Pre-Amilifier Mute Off
->> .. Music stays off
->> 5. Toggle Pre-Amplifier twice - output turns on
->
-> Unfortunately, I don't have access to that SoC or that setup.
+> Hi Russell,
+> 
+> On 25/09/15 13:44, Russell King - ARM Linux wrote:
+> > On Fri, Sep 25, 2015 at 01:15:46PM +0100, Robin Murphy wrote:
+> >> Since some dma_alloc_coherent implementations return a zeroed buffer
+> >> regardless of whether __GFP_ZERO is passed, there exist drivers which
+> >> are implicitly dependent on this and pass otherwise uninitialised
+> >> buffers to hardware. This can lead to subtle and awkward-to-debug issues
+> >> using those drivers on different platforms, where nonzero uninitialised
+> >> junk may for instance occasionally look like a valid command which
+> >> causes the hardware to start misbehaving. To help with debugging such
+> >> issues, add the option to make uninitialised buffers much more obvious.
+> >
+> > The reason people started to do this is to stop a security leak in the
+> > ALSA code: ALSA allocates the ring buffer with dma_alloc_coherent()
+> > which used to grab pages and return them uninitialised.  These pages
+> > could contain anything - including the contents of /etc/shadow, or
+> > your bank details.
+> >
+> > ALSA then lets userspace mmap() that memory, which means any user process
+> > which has access to the sound devices can read data leaked from kernel
+> > memory.
+> >
+> > I think I did bring it up at the time I found it, and decided that the
+> > safest thing to do was to always return an initialised buffer - short of
+> > constantly auditing every dma_alloc_coherent() user which also mmap()s
+> > the buffer into userspace, I couldn't convince myself that it was safe
+> > to avoid initialising the buffer.
+> >
+> > I don't know whether the original problem still exists in ALSA or not,
+> > but I do know that there are dma_alloc_coherent() implementations out
+> > there which do not initialise prior to returning memory.
+> 
+> Indeed, I think we've discussed this before, and I don't imagine we'll 
+> be changing the actual behaviour of the existing allocators any time soon.
 
-I'm seeing similar stuff on a cubieboard, both A10 and A20
-based cubieboards, I have to fiddle a bit with the switches
-to get things to work. At boot all switches are disabled.
+If I'm understanding things correctly, some allocators zero the memory
+by default and others do not.  And we have an unknown number of drivers
+which are assuming that the memory is zeroed.
 
-On both A10 and A20 I need to enable to following for things to work:
+Correct?
 
-unmute Pre-Amplifier DAC
-unmute Pre-Amplifier Mute
+If so, our options are
 
-I guess this is just a question if adding some mixer defaults to
-the alsa userspace somewhere ?
+a) audit all callers, find the ones which expect zeroed memory but
+   aren't passing __GFP_ZERO and fix them.
 
-Regards,
+b) convert all allocators to zero the memory by default.
 
-Hans
+Obviously, a) is better.  How big a job is it?
+
+This patch will help the process, if people use it.
+
+> >> +	if (IS_ENABLED(CONFIG_DMA_API_DEBUG_POISON) && !(flags & __GFP_ZERO))
+> >> +		memset(virt, DMA_ALLOC_POISON, size);
+> >> +
+> >
+> > This is likely to be slow in the case of non-cached memory and large
+> > allocations.  The config option should come with a warning.
+> 
+> It depends on DMA_API_DEBUG, which already has a stern performance 
+> warning, is additionally hidden behind EXPERT, and carries a slightly 
+> flippant yet largely truthful warning that actually using it could break 
+> pretty much every driver in your system; is that not enough?
+
+It might be helpful to provide a runtime knob as well - having to
+rebuild&reinstall just to enable/disable this feature is a bit painful.
