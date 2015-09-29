@@ -1,54 +1,36 @@
-From: zhichao.huang@linaro.org (Zhichao Huang)
-Date: Tue, 29 Sep 2015 13:41:45 +0800
-Subject: [PATCH v4 15/15] KVM: arm: enable trapping of all debug registers
-In-Reply-To: <20150902160814.GS10991@cbox>
-References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
- <1439213167-8988-16-git-send-email-zhichao.huang@linaro.org>
- <20150902160814.GS10991@cbox>
-Message-ID: <560A2499.3030409@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 29 Sep 2015 15:38:23 +0900
+Subject: [PATCH v2] ARM: dts: exynos5420: fix wrong clock binding for
+ sysmmu_fimd1_1
+In-Reply-To: <1442994115-20167-1-git-send-email-jy0922.shim@samsung.com>
+References: <1442994115-20167-1-git-send-email-jy0922.shim@samsung.com>
+Message-ID: <CAJKOXPfNfdkv4hEN=Mm8D2o+z+z9LbAvne5iekLGSeZ8x+NJAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2015-09-23 16:41 GMT+09:00 Joonyoung Shim <jy0922.shim@samsung.com>:
+>
+> The sysmmu_fimd1_1 should bind the clock CLK_SMMU_FIMD1M1, not the clock
+> CLK_SMMU_FIMD1M0. CLK_SMMU_FIMD1M0 is a clock for the sysmmu_fimd1_0.
+>
+> This wrong clock binding causes the problem that is blocked in iommu_map
+> function when IOMMU is enabled and exynos-drm driver tries to allocate
+> buffer via DMA mapping API on Odroid-XU3 board.
+>
+> Fixes: b70045167815 ("ARM: dts: add sysmmu nodes for exynos5420")
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> Cc: <stable@vger.kernel.org> # v4.2
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
+> Changes for v2:
+> - Update the commit message
+> - Add Fixes: and Reviewed-by: tags
+>
+>  arch/arm/boot/dts/exynos5420.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
 
-On 2015/9/3 0:08, Christoffer Dall wrote:
-> On Mon, Aug 10, 2015 at 09:26:07PM +0800, Zhichao Huang wrote:
->> Enable trapping of the debug registers unconditionally, allowing guests to
->> use the debug infrastructure.
->>
->> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
->> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->> ---
->>  arch/arm/kvm/interrupts_head.S | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
->> index 7ad0adf..494991d 100644
->> --- a/arch/arm/kvm/interrupts_head.S
->> +++ b/arch/arm/kvm/interrupts_head.S
->> @@ -792,7 +792,7 @@ ARM_BE8(rev	r6, r6  )
->>   * (hardware reset value is 0) */
->>  .macro set_hdcr operation
->>  	mrc	p15, 4, r2, c1, c1, 1
->> -	ldr	r3, =(HDCR_TPM|HDCR_TPMCR)
->> +	ldr	r3, =(HDCR_TPM|HDCR_TPMCR|HDCR_TDRA|HDCR_TDOSA|HDCR_TDA)
-> 
-> eh, but I thought we didn't have to trap accesses to the debug registers
-> if we switch them, because the guest is likely to be using them?
-> 
-> Maybe I am getting confused, can you repeat for me exactly when we
-> context-switch the registers and when we trap accesses to them?
-> 
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Since we don't want to world switch the dangerous register(DBGDSCR), we have
-to trap accesses all the time, to prevent the guest to write to the real register.
-
-> Thanks,
-> -Christoffer
-> 
->>  	.if \operation == vmentry
->>  	orr	r2, r2, r3		@ Trap some perfmon accesses
->>  	.else
->> -- 
->> 1.7.12.4
->>
+Best regards,
+Krzysztof
