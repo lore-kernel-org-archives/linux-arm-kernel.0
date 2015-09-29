@@ -1,152 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 29 Sep 2015 12:28:11 -0500
-Subject: [PATCH 1/4] of: Add of_parse_phandle_with_opt_args() helper
- function
-In-Reply-To: <1442944336-11754-2-git-send-email-marc.zyngier@arm.com>
-References: <1442944336-11754-1-git-send-email-marc.zyngier@arm.com>
- <1442944336-11754-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAL_JsqLWPfi9ynLbkzHkpcSHHg3ciwCcAN1uGcjXhnBAXZ74zw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 29 Sep 2015 19:30:31 +0200
+Subject: [PATCH v4 1/2] ARM: dma-mapping: Don't use outer_flush_range
+ when the L2C is coherent
+In-Reply-To: <20150929171054.GN21513@n2100.arm.linux.org.uk>
+References: <1443545458-14807-1-git-send-email-gregory.clement@free-electrons.com>
+ <1443545458-14807-2-git-send-email-gregory.clement@free-electrons.com>
+ <20150929171054.GN21513@n2100.arm.linux.org.uk>
+Message-ID: <20150929193031.72bbebe8@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 12:52 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> of_parse_phandle_with_args() is slightly inflexible as it doesn't
-> allow the (unusual) case where the #*-cells property is not defined.
-> In order to support this, introduce of_parse_phandle_with_opt_args()
-> which assumes that #*-cells is zero when it is not defined,
+Hello Russell,
 
-zero or cell_count - 1?
+On Tue, 29 Sep 2015 18:10:54 +0100, Russell King - ARM Linux wrote:
 
-I would be okay with always assuming zero rather than being an error
-if that simplifies things. It is not really the kernel's job to be a
-dtb validator.
+> > In the current kernel implementation, the outer cache flush range
+> > operation is triggered by the dma_alloc function.
+> > This operation can be take place during runtime and in some
+> > circumstances may lead to the PCIe/PL310 deadlock on Armada 375/38x
+> > SoCs.
+> 
+> I wonder if that's what's causing the sporadic lockups I'm seeing on
+> 38x with a SATA PCIe card - it happens at a very specific point during
+> boot while initialising the SATA card, right down to the kernel message
+> character that it stops at.
 
-Also, I assume this was done for some compatibility? In general, we
-should be explicit, so "#msi-cells = <0>" should be recommended and we
-should update dts files if they are not.
+It might very well be the case. If there's enough PCIe traffic and a
+PL310 cache maintenance operation happening at the same time, the
+system will lockup. I'm a bit surprised that just the initialization of
+the PCIe card generates enough traffic to trigger the deadlock, but
+maybe I'm underestimating the problem.
 
-Rob
+Best regards,
 
-> as required by the msi-parent binding
->
-> This is done by turning __of_parse_phandle_with_args into an even
-> bigger monster, which is a bit frightening.
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/of/base.c  | 64 ++++++++++++++++++++++++++++++++++++++++++++++++++++--
->  include/linux/of.h |  3 +++
->  2 files changed, 65 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 8b5a187..1612342e 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -1479,6 +1479,10 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
->                          * (i.e. cells_name not set, but cell_count is set),
->                          * except when we're going to return the found node
->                          * below.
-> +                        *
-> +                        * If #*-cells is not found, but cell_count is set
-> +                        * to a non-zero value, use (cell_count-1) as a
-> +                        * fallback value.
->                          */
->                         if (cells_name || cur_index == index) {
->                                 node = of_find_node_by_phandle(phandle);
-> @@ -1490,13 +1494,21 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
->                         }
->
->                         if (cells_name) {
-> -                               if (of_property_read_u32(node, cells_name,
-> -                                                        &count)) {
-> +                               int ret;
-> +                               ret = of_property_read_u32(node, cells_name,
-> +                                                          &count);
-> +                               if (ret && !cell_count) {
->                                         pr_err("%s: could not get %s for %s\n",
->                                                 np->full_name, cells_name,
->                                                 node->full_name);
->                                         goto err;
->                                 }
-> +                               if (ret) {
-> +                                       count = cell_count - 1;
-> +                                       pr_debug("%s: could not get %s for %s, assuming %d\n",
-> +                                                np->full_name, cells_name,
-> +                                                node->full_name, count);
-> +                               }
->                         } else {
->                                 count = cell_count;
->                         }
-> @@ -1628,6 +1640,54 @@ int of_parse_phandle_with_args(const struct device_node *np, const char *list_na
->  EXPORT_SYMBOL(of_parse_phandle_with_args);
->
->  /**
-> + * of_parse_phandle_with_opt_args() - Find a node pointed by phandle in a list
-> + * @np:                pointer to a device tree node containing a list
-> + * @list_name: property name that contains a list
-> + * @cells_name:        property name that specifies phandles' arguments count
-> + * @index:     index of a phandle to parse out
-> + * @out_args:  optional pointer to output arguments structure (will be filled)
-> + *
-> + * This function is useful to parse lists of phandles and their arguments.
-> + * If cells_name is not found, then it is assumed to be zero.
-> + * Returns 0 on success and fills out_args, on error returns appropriate
-> + * errno value.
-> + *
-> + * Caller is responsible to call of_node_put() on the returned out_args->np
-> + * pointer.
-> + *
-> + * Example:
-> + *
-> + * phandle1: node1 {
-> + *     #list-cells = <2>;
-> + * }
-> + *
-> + * phandle2: node2 {
-> + * }
-> + *
-> + * phandle3: node3 {
-> + *     #list-cells = <1>;
-> + * }
-> + *
-> + * node3 {
-> + *     list = <&phandle1 1 2 &phandle2 &phandle 3>;
-> + * }
-> + *
-> + * To get a device_node of the `node2' node you may call this:
-> + * of_parse_phandle_with_args(node3, "list", "#list-cells", 1, &args);
-> + */
-> +int of_parse_phandle_with_opt_args(const struct device_node *np,
-> +                                  const char *list_name,
-> +                                  const char *cells_name, int index,
-> +                                  struct of_phandle_args *out_args)
-> +{
-> +       if (index < 0)
-> +               return -EINVAL;
-> +       return __of_parse_phandle_with_args(np, list_name, cells_name, 1,
-> +                                           index, out_args);
-> +}
-> +EXPORT_SYMBOL(of_parse_phandle_with_opt_args);
-> +
-> +/**
->   * of_parse_phandle_with_fixed_args() - Find a node pointed by phandle in a list
->   * @np:                pointer to a device tree node containing a list
->   * @list_name: property name that contains a list
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index 2194b8c..ae6cd03 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -328,6 +328,9 @@ extern struct device_node *of_parse_phandle(const struct device_node *np,
->  extern int of_parse_phandle_with_args(const struct device_node *np,
->         const char *list_name, const char *cells_name, int index,
->         struct of_phandle_args *out_args);
-> +extern int of_parse_phandle_with_opt_args(const struct device_node *np,
-> +       const char *list_name, const char *cells_name, int index,
-> +       struct of_phandle_args *out_args);
->  extern int of_parse_phandle_with_fixed_args(const struct device_node *np,
->         const char *list_name, int cells_count, int index,
->         struct of_phandle_args *out_args);
-> --
-> 2.1.4
->
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
