@@ -1,79 +1,50 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 29 Sep 2015 11:01:35 +0800
-Subject: [PATCH v9 2/5] dt-bindings: Add a binding for Mediatek xHCI host
- controller
-In-Reply-To: <1443495698-32233-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1443495698-32233-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1443495698-32233-3-git-send-email-chunfeng.yun@mediatek.com>
+From: a0131933@ti.com (Lokesh Vutla)
+Date: Tue, 29 Sep 2015 09:23:48 +0530
+Subject: [PATCH v3 0/3] ARM: OMAP2+: hwmod: RTC: Add lock and unlock hooks
+In-Reply-To: <alpine.DEB.2.02.1509280822250.7947@utopia.booyaka.com>
+References: <1437657946-10733-1-git-send-email-lokeshvutla@ti.com>
+ <55DE9055.4090701@ti.com> <56037FEA.5070807@ti.com>
+ <alpine.DEB.2.02.1509280822250.7947@utopia.booyaka.com>
+Message-ID: <560A0B4C.90206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add a DT binding documentation of xHCI host controller for the
-MT8173 SoC from Mediatek.
+Hi Paul,
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- .../devicetree/bindings/usb/mt8173-xhci.txt        | 52 ++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+On Monday 28 September 2015 10:05 PM, Paul Walmsley wrote:
+> On Thu, 24 Sep 2015, Lokesh Vutla wrote:
+> 
+>> On Thursday 27 August 2015 09:51 AM, Lokesh Vutla wrote:
+>>> On Thursday 23 July 2015 06:55 PM, Lokesh Vutla wrote:
+>>>> This series implements lock and unlock functions for RTC and hooks
+>>>> the same to DRA7 and AMx3xx hwmod.
+>>>> This is dependent on the patch https://patchwork.kernel.org/patch/6578281/,
+>>>> which is queued recently by Paul.
+>>> Gentle ping on this series.
+>> Do you have any comments on this series?
+> 
+> Looks pretty good.  I'm slightly concerned about the latency jitter impact 
+> on -rt kernels for that local_irq_disable() section.  Looks like it could 
+> hold off interrupts for ~(50 udelay ?s) + 50*((RTC register read time) + 
+> 1).  But I'm not sure if preempt_enable/disable() is a good alternative 
+> since a bunch of interrupt top halves could conceivably run after the RTC 
+> goes non-busy and result in the RTC not being locked/unlocked. 
+Agree.
 
-diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-new file mode 100644
-index 0000000..0c96273
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-@@ -0,0 +1,52 @@
-+MT8173 xHCI
-+
-+The device node for Mediatek SOC USB3.0 host controller
-+
-+Required properties:
-+ - compatible : should contain "mediatek,mt8173-xhci"
-+ - reg : specifies physical base address and size of the registers,
-+	the first one for MAC, the second for IPPC
-+ - interrupts : interrupt used by the controller
-+ - power-domains : a phandle to USB power domain node to control USB's
-+	mtcmos
-+ - vusb33-supply : regulator of USB avdd3.3v
-+
-+ - clocks : a list of phandle + clock-specifier pairs, one for each
-+	entry in clock-names
-+ - clock-names : must contain
-+	"sys_ck": for clock of xHCI MAC
-+	"wakeup_deb_p0": for USB wakeup debounce clock of port0
-+	"wakeup_deb_p0": for USB wakeup debounce clock of port1
-+
-+ - phys : a list of phandle + phy specifier pairs
-+ - usb3-lpm-capable : supports USB3.0 LPM
-+
-+Optional properties:
-+ - mediatek,wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup
-+	mode;
-+ - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
-+	control register, it depends on "mediatek,wakeup-src".
-+ - vbus-supply : reference to the VBUS regulator;
-+
-+Example:
-+usb30: usb at 11270000 {
-+	compatible = "mediatek,mt8173-xhci";
-+	reg = <0 0x11270000 0 0x1000>,
-+	      <0 0x11280700 0 0x0100>;
-+	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+	clocks = <&topckgen CLK_TOP_USB30_SEL>,
-+		 <&pericfg CLK_PERI_USB0>,
-+		 <&pericfg CLK_PERI_USB1>;
-+	clock-names = "sys_ck",
-+		      "wakeup_deb_p0",
-+		      "wakeup_deb_p1";
-+	phys = <&phy_port0 PHY_TYPE_USB3>,
-+	       <&phy_port1 PHY_TYPE_USB2>;
-+	vusb33-supply = <&mt6397_vusb_reg>;
-+	vbus-supply = <&usb_p1_vbus>;
-+	usb3-lpm-capable;
-+	mediatek,syscon-wakeup = <&pericfg>;
-+	mediatek,wakeup-src = <1>;
-+	status = "okay";
-+};
--- 
-1.8.1.1.dirty
+> 
+> Is there an RTC IP block register that the code can read, or a safe 
+> sequence that the code can execute, after the RTC lock/unlock operation to 
+> verify that the RTC has successfully been locked or unlocked?  If so then 
+> it's probably worth converting the local_irq_disable/enable() to 
+> preempt_disable/enable() and testing that, then retrying the lock/unlock 
+> if it fails.
+I am afraid there is no such register to verify lock or unlock. Also
+these KICK registers are Write only registers so can't read back the
+value. Even the driver implement the same api's for writing into registers.
+
+One thing I can think of is that to write a known pattern to scratch pad
+register and read back the value to confirm if it is locked/unlocked.
+But don't think this is a good approach.
+
+Thanks and regards,
+Lokesh
