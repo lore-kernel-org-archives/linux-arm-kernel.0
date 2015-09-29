@@ -1,49 +1,94 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 30 Sep 2015 01:14:02 +0300
-Subject: [PATCH v5 05/23] arm64:ilp32: expose 'kernel_long' as 'long long' for
- ILP32
+Date: Wed, 30 Sep 2015 01:13:58 +0300
+Subject: [PATCH v5 01/23] arm64:ilp32: add documentation on the ILP32 ABI for
+ ARM64
 In-Reply-To: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1443564860-31208-6-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1443564860-31208-2-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
 
-Since we want time_t and some other userland types to be the same
-between ILP32 and LP64, we define __kernel_long_t to be long long.
-
-To reuse the bulk of LP64 system calls (and data structures), the LP64
-kernel data types ('kernel_long', 'kernel_ulong') are exposed as their
-ILP32 'long long' and 'unsigned long long' equivalents to allow glibc
-to correctly interpret most data-structures used in the kernel ABI
-(i.el with the exception of those, that include pointers).
+Based on Andrew Pinski's original patch-series and adapted with changes
+to reduce the duplication of code-paths and resolve issue found during
+LTP testing.
 
 Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
 Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 
-diff --git a/arch/arm64/include/uapi/asm/posix_types.h b/arch/arm64/include/uapi/asm/posix_types.h
-index 7985ff6..d6a7cb5 100644
---- a/arch/arm64/include/uapi/asm/posix_types.h
-+++ b/arch/arm64/include/uapi/asm/posix_types.h
-@@ -5,6 +5,16 @@ typedef unsigned short __kernel_old_uid_t;
- typedef unsigned short __kernel_old_gid_t;
- #define __kernel_old_uid_t __kernel_old_uid_t
- 
-+#if defined(__ILP32__)
-+/* The ILP32 kernel ABI reuses LP64 system calls where possible; to
-+   this end, the equivalent ILP32 type definitions are used (a 64bit
-+   'long'-type in LP64 corresponds to a 'long long' in LP64).  */
+ create mode 100644 Documentation/arm64/ilp32.txt
+
+diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
+new file mode 100644
+index 0000000..1049510
+--- /dev/null
++++ b/Documentation/arm64/ilp32.txt
+@@ -0,0 +1,64 @@
++ILP32 AARCH64 SYSCALL ABI
++=========================
++Written by Andrew Pinski <apinski@cavium.com>
++Updated by Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
 +
-+typedef long long           __kernel_long_t;
-+typedef unsigned long long  __kernel_ulong_t;
-+#define __kernel_long_t     __kernel_long_t
-+#endif /* defined(__ILP32__) */
 +
- #include <asm-generic/posix_types.h>
- 
--#endif /*  __ASM_POSIX_TYPES_H */
-+#endif /* __ASM_POSIX_TYPES_H */
++This document describes the ILP32 syscall ABI and where it differs
++from the generic linux syscall interface.
++
++ILP32 sets __kernel_long_t and __kernel_ulong_t both to 64bit.  This
++affects the following type definitions for ILP32 client programs:
++ * time_t          unsigned long long
++ * clock_t         unsigned long long
++ * fsword_t        long long
++ * suseconds_t     long long
++ * swblk_t         long long
++ * fd_mask_t       long long
++
++Some structures are changed to reduce the difference in the code path
++for both ILP32 and LP64 ABIs for signal handling.
++
++The following structures have been changed so the layout of the
++structures are the same between ILP32 and LP64 ABIs, including:
++ * timespec        uses time_t and suseconds_t
++ * timeval         uses time_t and suseconds_t
++ * stat            uses timespec/time_t
++ * semid64_ds      uses time_t.
++ * msqid64_ds      uses time_t.
++ * shmid64_ds      uses time_t.
++ * rt_sigframe     uses siginfo and ucontext.
++ * siginfo_t       uses clock_t and sigval_t
++ * ucontext        uses stack_t and sigset_t
++ * sigval_t        contains pointers
++ * sigevent        Uses sigval_t which causes it to be the same.  Special
++                   handing is needed for reading; in the mq_notify syscall
++ * sigaction       Conversion is handled in the userland (glibc), as the
++		    userland data structures are defined in glibc anyway.
++ * fd_set          This is done to avoid endian issues between ILP32 and
++		   LP64. Syscalls consuming fd_set use timespec.
++
++A number of structures differ between ILP32 and LP64, including:
++ * struct msgbuf   The specification of 'struct msgbuf' defines the 'mtype'
++                   field as a 'long' (i.e. 32bit for ILP32, but 64bit for
++		   LP64).  Functions that operate on 'struct msgbuf' need
++		   to be passed through the compat-syscalls to resolve
++		   this.
++ * stack_t         contains pointers (handled in the compatibility layer)
++
++Also the syscalls which normally would pass 64bit values as two arguments;
++now pass the 64bit value as one argument.  Also they have been renamed
++(removing the 64 from the name) to avoid confusion.
++The list of these LP64 syscalls reused by ILP32 clients is:
++ * fcntl
++ * statfs
++ * fstatfs
++ * truncate
++ * ftruncate
++ * lseek
++ * sendfile
++ * newfstatat
++ * fstat
++ * mmap
++ * fadvise64
++
 -- 
 2.1.4
