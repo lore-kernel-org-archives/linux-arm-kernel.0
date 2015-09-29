@@ -1,54 +1,89 @@
-From: jc@eclis.ch (Jean-Christian de Rivaz)
-Date: Tue, 29 Sep 2015 22:59:46 +0200
-Subject: [PATCH 1/1] Disable CONFIG_UACCESS_WITH_MEMCPY in Atmel config.
-In-Reply-To: <20150929203554.GH3982@pengutronix.de>
-References: <1443556987-2788-1-git-send-email-jc@eclis.ch>
- <20150929203554.GH3982@pengutronix.de>
-Message-ID: <560AFBC2.5050000@eclis.ch>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 29 Sep 2015 23:13:56 +0200
+Subject: [linux-sunxi] [PATCH 0/2] ASoC: Add support for the Allwinner A10
+ codec
+In-Reply-To: <20150928074248.GI7104@lukather>
+References: <1442064384-23379-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1442928417.6509.12.camel@plaes.org> <20150928074248.GI7104@lukather>
+Message-ID: <560AFF14.80400@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 29. 09. 15 22:35, Uwe Kleine-K?nig a ?crit :
-> Hello,
->
-> On Tue, Sep 29, 2015 at 10:03:07PM +0200, jc at eclis.ch wrote:
->> From: Jean-Christian de Rivaz <jc@eclis.ch>
->>
->> According to Russell King:
->> In any case, unless you have a Marvell platform, you should have this
->> disabled - it provides a performance boost for Marvell platforms, but
->> degrades performance everywhere else.  Please ensure that you disable
->> CONFIG_UACCESS_WITH_MEMCPY.
->>
->> Signed-off-by: Jean-Christian de Rivaz <jc@eclis.ch>
->> ---
->>   arch/arm/configs/at91_dt_defconfig |    2 +-
->>   arch/arm/configs/sama5_defconfig   |    2 +-
->>   2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
->> index 090c5b2..1807d7f 100644
->> --- a/arch/arm/configs/at91_dt_defconfig
->> +++ b/arch/arm/configs/at91_dt_defconfig
->> @@ -21,7 +21,7 @@ CONFIG_SOC_SAM_V4_V5=y
->>   CONFIG_SOC_AT91RM9200=y
->>   CONFIG_SOC_AT91SAM9=y
->>   CONFIG_AEABI=y
->> -CONFIG_UACCESS_WITH_MEMCPY=y
->> +# CONFIG_UACCESS_WITH_MEMCPY is not set
->>   CONFIG_ZBOOT_ROM_TEXT=0x0
->>   CONFIG_ZBOOT_ROM_BSS=0x0
->>   CONFIG_ARM_APPENDED_DTB=y
-> What is the reason to add the "# ... is not set" line? Given the default
-> line of UACCESS_WITH_MEMCPY I suggest to just drop the line without
-> replacement in the defconfigs.
->
+Hi,
 
-Hi Uwe,
+On 09/28/2015 09:42 AM, Maxime Ripard wrote:
+> Hi Priit,
+>
+> On Tue, Sep 22, 2015 at 04:26:57PM +0300, Priit Laes wrote:
+>> On Sat, 2015-09-12 at 15:26 +0200, Maxime Ripard wrote:
+>>> Hi everyone,
+>>>
+>>> This patch set adds the support for what Allwinner calls the codec on
+>>> their SoCs.
+>>>
+>>> This codec is actually a combination of a codec and DAI, tied
+>>> together
+>>> in a single memory-mapped IP. It is completely standalone, and
+>>> outputs
+>>> directly the analog signal.
+>>>
+>>> While it supports both playback and capture, the capture is not
+>>> implemented in this patch, and will be posted eventually as a
+>>> separate
+>>> one.
+>>>
+>>> This set, in order to be functional, has a dependency on the audio
+>>> clocks patch set posted separately. However, it doesn't needs this to
+>>> compile properly, so I guess it can be merged without really caring
+>>> for the merging status of the clock patches.
+>>
+>> It works on Gemei G9 tablet which has also extra chip that
+>> automatically switches output over from internal speakers to headphones
+>> when connector is inserted.
+>>
+>> Now I noticed some weird things:
+>>
+>> When I have all the switches as ON in alsamixer, and I start disabling
+>> them, I get following weird results.
+>>
+>> Left Mixer Left - LML
+>> Right Mixer Left - LMR
+>> Right Mixer Right - RMR
+>>
+>> Very faint output:
+>> LML - ON
+>> RML - Mute
+>> RMR - ON
+>>
+>> Output works fully:
+>> LML - Mute
+>> RML - Mute
+>> RMR - Mute
+>>
+>> When I Mute Pre-Amplifier and fiddle any of LML, RML or RMR, the output
+>> stays mute even after setting Pre-Amplifier Mute back on:
+>>
+>> 1. All switches on
+>> 2. Mute pre-amplifier
+>> 3. Mute RMR
+>> 4. Pre-Amilifier Mute Off
+>> .. Music stays off
+>> 5. Toggle Pre-Amplifier twice - output turns on
+>
+> Unfortunately, I don't have access to that SoC or that setup.
 
-Without the explicit disabling, the user will be asked and could 
-possibly give the wrong answer as the help look as a cool feature and 
-the condition is very hard to understand.
+I'm seeing similar stuff on a cubieboard, both A10 and A20
+based cubieboards, I have to fiddle a bit with the switches
+to get things to work. At boot all switches are disabled.
+
+On both A10 and A20 I need to enable to following for things to work:
+
+unmute Pre-Amplifier DAC
+unmute Pre-Amplifier Mute
+
+I guess this is just a question if adding some mixer defaults to
+the alsa userspace somewhere ?
 
 Regards,
-Jean-Christian
+
+Hans
