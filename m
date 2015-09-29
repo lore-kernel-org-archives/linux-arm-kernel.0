@@ -1,19 +1,49 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 29 Sep 2015 11:51:57 -0700 (PDT)
-Subject: [PATCH v2 0/7] net: mvneta: Switch to per-CPU irq and make
- rxq_def useful
-In-Reply-To: <1443197378-30717-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1443197378-30717-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150929.115157.1923947727727463035.davem@davemloft.net>
+From: jc@eclis.ch (jc at eclis.ch)
+Date: Tue, 29 Sep 2015 22:03:07 +0200
+Subject: [PATCH 1/1] Disable CONFIG_UACCESS_WITH_MEMCPY in Atmel config.
+Message-ID: <1443556987-2788-1-git-send-email-jc@eclis.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Date: Fri, 25 Sep 2015 18:09:31 +0200
+From: Jean-Christian de Rivaz <jc@eclis.ch>
 
-> As stated in the first version: "this patchset reworks the Marvell
-> neta driver in order to really support its per-CPU interrupts, instead
-> of faking them as SPI, and allow the use of any RX queue instead of
-> the hardcoded RX queue 0 that we have currently."
+According to Russell King:
+In any case, unless you have a Marvell platform, you should have this
+disabled - it provides a performance boost for Marvell platforms, but
+degrades performance everywhere else.  Please ensure that you disable
+CONFIG_UACCESS_WITH_MEMCPY.
 
-Series applied, thanks.
+Signed-off-by: Jean-Christian de Rivaz <jc@eclis.ch>
+---
+ arch/arm/configs/at91_dt_defconfig |    2 +-
+ arch/arm/configs/sama5_defconfig   |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+index 090c5b2..1807d7f 100644
+--- a/arch/arm/configs/at91_dt_defconfig
++++ b/arch/arm/configs/at91_dt_defconfig
+@@ -21,7 +21,7 @@ CONFIG_SOC_SAM_V4_V5=y
+ CONFIG_SOC_AT91RM9200=y
+ CONFIG_SOC_AT91SAM9=y
+ CONFIG_AEABI=y
+-CONFIG_UACCESS_WITH_MEMCPY=y
++# CONFIG_UACCESS_WITH_MEMCPY is not set
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+index 31eb951..471e214 100644
+--- a/arch/arm/configs/sama5_defconfig
++++ b/arch/arm/configs/sama5_defconfig
+@@ -19,7 +19,7 @@ CONFIG_SOC_SAM_V7=y
+ CONFIG_SOC_SAMA5D3=y
+ CONFIG_SOC_SAMA5D4=y
+ CONFIG_AEABI=y
+-CONFIG_UACCESS_WITH_MEMCPY=y
++# CONFIG_UACCESS_WITH_MEMCPY is not set
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+-- 
+1.7.10.4
