@@ -1,59 +1,106 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 29 Sep 2015 16:13:46 -0400 (EDT)
-Subject: [PATCH 1/1] Disable CONFIG_UACCESS_WITH_MEMCPY in Atmel config.
-In-Reply-To: <1443556987-2788-1-git-send-email-jc@eclis.ch>
-References: <1443556987-2788-1-git-send-email-jc@eclis.ch>
-Message-ID: <alpine.LFD.2.20.1509291613080.11346@knanqh.ubzr>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Tue, 29 Sep 2015 13:29:12 -0700
+Subject: [PATCH] arm64: dts: add all hi6220 uart nodes
+Message-ID: <1443558552-5734-1-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Sep 2015, jc at eclis.ch wrote:
+This patch adds all UART nodes for the Hi6220 SoC. Recently a board[1] has
+been developed to standardize UART access across all the 96boards consumer
+edition boards. To use this hardware on HiKey we must configure and enable
+UART3. However, to ensure backward compatibility we must keep UART0 enabled
+as well.
 
-> From: Jean-Christian de Rivaz <jc@eclis.ch>
-> 
-> According to Russell King:
-> In any case, unless you have a Marvell platform, you should have this
-> disabled - it provides a performance boost for Marvell platforms, but
-> degrades performance everywhere else.  Please ensure that you disable
-> CONFIG_UACCESS_WITH_MEMCPY.
-> 
-> Signed-off-by: Jean-Christian de Rivaz <jc@eclis.ch>
+I have removed the hard coded clock index values in favor of using the ones
+already defined in include/dt-bindings/clock/hi6220-clock.h.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+This patch was boot tested on top of next-20150929, with both UART
+configurations.
 
+[1] http://www.seeedstudio.com/depot/96Boards-UART-p-2525.html?ref=newInBazaar
 
-> ---
->  arch/arm/configs/at91_dt_defconfig |    2 +-
->  arch/arm/configs/sama5_defconfig   |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-> index 090c5b2..1807d7f 100644
-> --- a/arch/arm/configs/at91_dt_defconfig
-> +++ b/arch/arm/configs/at91_dt_defconfig
-> @@ -21,7 +21,7 @@ CONFIG_SOC_SAM_V4_V5=y
->  CONFIG_SOC_AT91RM9200=y
->  CONFIG_SOC_AT91SAM9=y
->  CONFIG_AEABI=y
-> -CONFIG_UACCESS_WITH_MEMCPY=y
-> +# CONFIG_UACCESS_WITH_MEMCPY is not set
->  CONFIG_ZBOOT_ROM_TEXT=0x0
->  CONFIG_ZBOOT_ROM_BSS=0x0
->  CONFIG_ARM_APPENDED_DTB=y
-> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-> index 31eb951..471e214 100644
-> --- a/arch/arm/configs/sama5_defconfig
-> +++ b/arch/arm/configs/sama5_defconfig
-> @@ -19,7 +19,7 @@ CONFIG_SOC_SAM_V7=y
->  CONFIG_SOC_SAMA5D3=y
->  CONFIG_SOC_SAMA5D4=y
->  CONFIG_AEABI=y
-> -CONFIG_UACCESS_WITH_MEMCPY=y
-> +# CONFIG_UACCESS_WITH_MEMCPY is not set
->  CONFIG_ZBOOT_ROM_TEXT=0x0
->  CONFIG_ZBOOT_ROM_BSS=0x0
->  CONFIG_ARM_APPENDED_DTB=y
-> -- 
-> 1.7.10.4
-> 
-> 
+Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts |  4 +++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 43 +++++++++++++++++++++++++-
+ 2 files changed, 46 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index e36a539..34486bc 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -18,6 +18,10 @@
+ 
+ 	aliases {
+ 		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
++		serial4 = &uart4;
+ 	};
+ 
+ 	chosen {
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 3f03380..82d2488 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -5,6 +5,7 @@
+  */
+ 
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/hi6220-clock.h>
+ 
+ / {
+ 	compatible = "hisilicon,hi6220";
+@@ -164,8 +165,48 @@
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0x0 0xf8015000 0x0 0x1000>;
+ 			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&ao_ctrl 36>, <&ao_ctrl 36>;
++			clocks = <&ao_ctrl HI6220_UART0_PCLK>,
++				 <&ao_ctrl HI6220_UART0_PCLK>;
+ 			clock-names = "uartclk", "apb_pclk";
+ 		};
++
++		uart1: uart at f7111000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x0 0xf7111000 0x0 0x1000>;
++			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sys_ctrl HI6220_UART1_PCLK>,
++				 <&sys_ctrl HI6220_UART1_PCLK>;
++			clock-names = "uartclk", "apb_pclk";
++			status = "disabled";
++		};
++
++		uart2: uart at f7112000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x0 0xf7112000 0x0 0x1000>;
++			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sys_ctrl HI6220_UART2_PCLK>,
++				 <&sys_ctrl HI6220_UART2_PCLK>;
++			clock-names = "uartclk", "apb_pclk";
++			status = "disabled";
++		};
++
++		uart3: uart at f7113000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x0 0xf7113000 0x0 0x1000>;
++			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sys_ctrl HI6220_UART3_PCLK>,
++				 <&sys_ctrl HI6220_UART3_PCLK>;
++			clock-names = "uartclk", "apb_pclk";
++		};
++
++		uart4: uart at f7114000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x0 0xf7114000 0x0 0x1000>;
++			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&sys_ctrl HI6220_UART4_PCLK>,
++				 <&sys_ctrl HI6220_UART4_PCLK>;
++			clock-names = "uartclk", "apb_pclk";
++			status = "disabled";
++		};
+ 	};
+ };
+-- 
+2.1.4
