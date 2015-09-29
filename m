@@ -1,85 +1,26 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 29 Sep 2015 11:17:17 -0500
-Subject: [PATCHv4] arm: omap2: timer: always define omap4_local_timer_init
-In-Reply-To: <1443543337-2904-1-git-send-email-balbi@ti.com>
-References: <1443543337-2904-1-git-send-email-balbi@ti.com>
-Message-ID: <560AB98D.7040602@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Sep 2015 17:22:46 +0100
+Subject: Unhandled fault or spinlock lockup suspected ?
+In-Reply-To: <560AB619.2040502@eclis.ch>
+References: <560AB619.2040502@eclis.ch>
+Message-ID: <20150929162246.GK21513@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2015 11:15 AM, Felipe Balbi wrote:
-> omap4_local_timer_init() can be used by other
-> platforms as is. At least AM437x wants to use
-> it. Instead of making omap4-only and providing
-> a stub for builds without OMAP4, we can just
-> make sure that function is always available
-> for all SoCs that need it.
+On Tue, Sep 29, 2015 at 06:02:33PM +0200, Jean-Christian de Rivaz wrote:
+> I tried the last git linux master on a embedded system that worked with a
+> 3.19.0 kernel before. I solved most of the problems caused by the kernel
+> upgrade, but every 15 to 20 minutes I get this type of kernel report:
 
-Sounds right now. $subject needs fixing. if Tony is ok picking and
-fixing it up himself...
+Yes, it's because of the user access changes.  The uaccess_with_memcpy()
+code got broken, and despite trying to fix it, it seems that it's still
+broken.  I'll try again to fix it in the next few days.
 
-Reviewed-by: Nishanth Menon <nm@ti.com>
-
-> 
-> Reported-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
-> 
-> changes since v3:
->   - modify commit log slightly
-> 
-> changes since v2:
->   - move ifdefs around
-> 
-> changes since v1:
->   - make sure result builds on AM43xx-only builds
-> 
->  arch/arm/mach-omap2/timer.c | 16 +++-------------
->  1 file changed, 3 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index e4d8701f99f9..3ebe16cd645e 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -634,32 +634,22 @@ OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
->  			2, "timer_sys_ck", NULL);
->  #endif /* CONFIG_ARCH_OMAP3 */
->  
-> -#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX) || \
-> -	defined(CONFIG_SOC_AM43XX)
-> +#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
->  OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
->  		       1, "timer_sys_ck", "ti,timer-alwon");
->  #endif
->  
->  #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
-> -	defined(CONFIG_SOC_DRA7XX)
-> +	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
->  static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
->  			       2, "sys_clkin_ck", NULL);
-> -#endif
->  
-> -#ifdef CONFIG_ARCH_OMAP4
-> -#ifdef CONFIG_HAVE_ARM_TWD
->  void __init omap4_local_timer_init(void)
->  {
->  	omap4_sync32k_timer_init();
->  	clocksource_of_init();
->  }
-> -#else
-> -void __init omap4_local_timer_init(void)
-> -{
-> -	omap4_sync32k_timer_init();
-> -}
-> -#endif /* CONFIG_HAVE_ARM_TWD */
-> -#endif /* CONFIG_ARCH_OMAP4 */
-> +#endif
->  
->  #if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
->  void __init omap5_realtime_timer_init(void)
-> 
-
+In any case, unless you have a Marvell platform, you should have this
+disabled - it provides a performance boost for Marvell platforms, but
+degrades performance everywhere else.  Please ensure that you disable
+CONFIG_UACCESS_WITH_MEMCPY.
 
 -- 
-Regards,
-Nishanth Menon
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
