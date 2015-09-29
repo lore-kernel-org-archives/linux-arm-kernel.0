@@ -1,26 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Sep 2015 17:22:46 +0100
-Subject: Unhandled fault or spinlock lockup suspected ?
-In-Reply-To: <560AB619.2040502@eclis.ch>
-References: <560AB619.2040502@eclis.ch>
-Message-ID: <20150929162246.GK21513@n2100.arm.linux.org.uk>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Tue, 29 Sep 2015 17:27:38 +0100
+Subject: [Xen-devel] [PATCH v4 00/20] xen/arm64: Add support for 64KB
+ page in Linux
+In-Reply-To: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+References: <1441640038-23615-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <560ABBFA.6070902@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 29, 2015 at 06:02:33PM +0200, Jean-Christian de Rivaz wrote:
-> I tried the last git linux master on a embedded system that worked with a
-> 3.19.0 kernel before. I solved most of the problems caused by the kernel
-> upgrade, but every 15 to 20 minutes I get this type of kernel report:
+On 07/09/15 16:33, Julien Grall wrote:
+> 
+> A branch based on the latest xentip/for-linus-4.3 can be found here:
+> 
+> git://xenbits.xen.org/people/julieng/linux-arm.git branch xen-64k-v4
 
-Yes, it's because of the user access changes.  The uaccess_with_memcpy()
-code got broken, and despite trying to fix it, it seems that it's still
-broken.  I'll try again to fix it in the next few days.
+This has too many conflicts with the
+git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip.git for-linus-4.4
+branch.
 
-In any case, unless you have a Marvell platform, you should have this
-disabled - it provides a performance boost for Marvell platforms, but
-degrades performance everywhere else.  Please ensure that you disable
-CONFIG_UACCESS_WITH_MEMCPY.
+Please rebase.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+David
