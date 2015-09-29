@@ -1,24 +1,81 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 28 Sep 2015 22:34:50 -0700 (PDT)
-Subject: [PATCH net-next v4] net: Fix Hisilicon Network Subsystem
- Support Compilation
-In-Reply-To: <1443338564-185286-1-git-send-email-huangdaode@hisilicon.com>
-References: <1443338564-185286-1-git-send-email-huangdaode@hisilicon.com>
-Message-ID: <20150928.223450.2253763281253460708.davem@davemloft.net>
+From: zhichao.huang@linaro.org (Zhichao Huang)
+Date: Tue, 29 Sep 2015 13:36:15 +0800
+Subject: [PATCH v4 13/15] KVM: arm: keep track of guest use of the debug
+ registers
+In-Reply-To: <20150902160103.GP10991@cbox>
+References: <1439213167-8988-1-git-send-email-zhichao.huang@linaro.org>
+ <1439213167-8988-14-git-send-email-zhichao.huang@linaro.org>
+ <20150902160103.GP10991@cbox>
+Message-ID: <560A234F.9050702@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: huangdaode <huangdaode@hisilicon.com>
-Date: Sun, 27 Sep 2015 15:22:44 +0800
 
-> This patch fixes the compilation error with arm allmodconfig, this error
-> generated due to unavailability of readq() on 32-bit platform which was
-> found during net-next daily compilation. In the same time, fix all the
-> hns drivers compilation warnings.
+
+On 2015/9/3 0:01, Christoffer Dall wrote:
+> On Mon, Aug 10, 2015 at 09:26:05PM +0800, Zhichao Huang wrote:
+>>  
+>> -static bool trap_debug32(struct kvm_vcpu *vcpu,
+>> +/* Indicate whether the guest has enabled any break/watch points or not. */
+>> +static bool guest_debug_in_use(struct kvm_vcpu *vcpu)
+>> +{
+>> +	unsigned int i;
+>> +
+>> +	for (i = 0; i < ARM_MAX_BRP; i++)
+>> +		if (vcpu->arch.cp14[cp14_DBGBCR0 + i] & 0x1)
+>> +			return true;
+>> +	for (i = 0; i < ARM_MAX_WRP; i++)
+>> +		if (vcpu->arch.cp14[cp14_DBGWCR0 + i] & 0x1)
+>> +			return true;
+>> +
+>> +	return false;
+>> +}
+>> +
+>> +static bool __trap_debug32(struct kvm_vcpu *vcpu,
+>>  			const struct coproc_params *p,
+>>  			const struct coproc_reg *r)
+>>  {
+>> @@ -232,6 +247,56 @@ static bool trap_debug32(struct kvm_vcpu *vcpu,
+>>  	return true;
+>>  }
+>>  
+
+>> +static bool trap_debug32(struct kvm_vcpu *vcpu,
+>> +			const struct coproc_params *p,
+>> +			const struct coproc_reg *r)
+>> +{
+>> +	__trap_debug32(vcpu, p, r);
+>> +
+>> +	if (p->is_write) {
+>> +		if ((vcpu->arch.cp14[r->reg] & 0x1) ||
+>> +		    guest_debug_in_use(vcpu))
+>> +			vcpu->arch.debug_flags |= KVM_ARM_DEBUG_GUEST_INUSE;
+>> +		else
+>> +			vcpu->arch.debug_flags &= ~KVM_ARM_DEBUG_GUEST_INUSE;
 > 
-> Signed-off-by: huangdaode <huangdaode@hisilicon.com>
-> Signed-off-by: zhaungyuzeng <Yisen.zhuang@huawei.com>
-> Signed-off-by: kenneth Lee <liguozhu@hisilicon.com>
-> Signed-off-by: yankejian <yankejian@huawei.com>
+> I don't understand this logic, if we are enabling one of the w/b points
+> or if there was already an enabled w/b point, then we set the flag, but
+> if you disable a single one then you clear the flag?
+> 
+> It looks to me like you're mixing two approaches here;  either read
+> through all the registers whenever you need to know to set the flag or
+> not, or you keep track of this on every read/write of the registers.
+> 
 
-Applied, thanks.
+I did it in the function guest_debug_in_use(), which will read through all the
+registers.
+
+
+> 
+> So __trap_debug32 is for the non-control registers and trap-debug32 is
+> for the control registers?
+> 
+> I think specifically naming the control register function
+> trap_debug_cr would be cleaner in that case.
+> 
+
+OK.
+
+> Thanks,
+> -Christoffer
+> 
