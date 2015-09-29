@@ -1,50 +1,27 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 30 Sep 2015 00:28:45 +0300
-Subject: [PATCH 0/4] memory: pl17x: add support of PL175 and PL176
- controllers
-In-Reply-To: <CAGhQ9VzUwkkXqRQ-WZ_cjRKCrE=co1LNwFaQfGmBbuEOsVZ6_A@mail.gmail.com>
-References: <1443459043-24144-1-git-send-email-vz@mleia.com>
- <CAGhQ9VzUwkkXqRQ-WZ_cjRKCrE=co1LNwFaQfGmBbuEOsVZ6_A@mail.gmail.com>
-Message-ID: <560B028D.1040402@mleia.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 30 Sep 2015 00:01:40 +0200
+Subject: [PATCH 1/1] Disable CONFIG_UACCESS_WITH_MEMCPY in Atmel config.
+In-Reply-To: <560AFBC2.5050000@eclis.ch>
+References: <1443556987-2788-1-git-send-email-jc@eclis.ch>
+ <20150929203554.GH3982@pengutronix.de> <560AFBC2.5050000@eclis.ch>
+Message-ID: <20150929220140.GA3639@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim,
+Hi,
 
-On 29.09.2015 23:39, Joachim Eastwood wrote:
-> Hi Vladimir,
-> 
-> On 28 September 2015 at 18:50, Vladimir Zapolskiy <vz@mleia.com> wrote:
->> The change adds support of ARM PrimeCell PL175 MPMC and PL176 MPMC,
->> the static memory controllers on devices are similar to one found on
->> ARM PrimeCell PL172, add support to the existing driver.
->>
->> Vladimir Zapolskiy (4):
->>   memory: pl172: correct MPMC peripheral ID register bits
->>   memory: pl172: add ARM PrimeCell PL175 MPMC support
->>   memory: pl172: add ARM PrimeCell PL176 MPMC support
->>   doc: dt: arm,pl172: add description of PL175 and PL176 controllers
-> 
-> Changes look good to me.
-> 
-> What LPC32xx board did you test this on, btw?
-
-I tested PL175 on Timll Devkit3250 board with 4Mb NOR.
-
-> Also if you have added the controller to lpc32xx.dtsi it would be
-> great if you could also submit those changes to the lpc32xx
-> maintainer.
+On 29/09/2015 at 22:59:46 +0200, Jean-Christian de Rivaz wrote :
+> Without the explicit disabling, the user will be asked and could possibly
+> give the wrong answer as the help look as a cool feature and the condition
+> is very hard to understand.
 > 
 
-Right, this is in my plans. To avoid any mess in the controller driver,
-mach-lpc32xx must be converted to common clock framework firstly, that's
-what I'm doing at the moment, then I'll send the corresponding EMC
-updates in lpc32xx.dtsi.
+That is not true, if you remove it from the defconfig, it will simply be
+disabled in the final config.
 
-By the way I've tested your clocksource driver on LPC32xx and it works
-fine, but again clean switching to it is not possible until LPC32xx
-clocks are out of the common clock framework.
+Moreover, I would prefer a better commit message than "Russell said so"
 
---
-With best wishes,
-Vladimir
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
