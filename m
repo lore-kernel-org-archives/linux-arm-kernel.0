@@ -1,37 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Sep 2015 09:42:48 +0200
-Subject: [RFC PATCH] PCI/pci-host-generic: Add support for Cavium Thunder
- fixed BARs.
-In-Reply-To: <1443488184-12633-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1443488184-12633-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1981236.3bSkWiA8PH@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 29 Sep 2015 09:01:28 +0100
+Subject: [PATCH v4 1/9] drivers/of: Introduce of_node_alloc
+In-Reply-To: <5609C43E.1040106@gmail.com>
+References: <1443458582-7497-1-git-send-email-marc.zyngier@arm.com>
+ <1443458582-7497-2-git-send-email-marc.zyngier@arm.com>
+ <5609C43E.1040106@gmail.com>
+Message-ID: <20150929090128.4647f27a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 September 2015 17:56:24 David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> Early versions of the Cavium Thunder CN88XX processor are missing
-> Enhanced Allocation (EA) capabilities for the fixed BAR addresses used
-> by the on-SoC hardware blocks.
-> 
-> Add config access functions that synthesize the missing EA
-> capabilities for versions that are missing that information.  Since
-> this is a little hacky, gate the inclusion of the code with a new
-> Kconfig variable.
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
-> 
-> As suggested by Bjorn Helgaas...  It is RFC at this point, but this is
-> working well for me.
+On Mon, 28 Sep 2015 15:50:38 -0700
+Frank Rowand <frowand.list@gmail.com> wrote:
 
-I don't have an opinion on the way you implement the config space
-accessors, but it seems that the overall amount of code is comparable
-to the normal pci-host-generic driver without this, and it is not
-really generic at all.
+> On 9/28/2015 9:42 AM, Marc Zyngier wrote:
+> > We want to be able to generate "fake" device nodes that can be
+> > used as an identifier for irq domains. For that, we reuse the
+> > dynamic DT layer in order to generate DT nodes in a detached state
+> > (so that it doesn't interfere with the rest of the tree).
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  drivers/of/dynamic.c | 22 ++++++++++++++++++++++
+> >  include/linux/of.h   |  5 +++++
+> >  2 files changed, 27 insertions(+)
+> > 
+> > diff --git a/drivers/of/dynamic.c b/drivers/of/dynamic.c
+> > index 53826b8..709d363 100644
+> > --- a/drivers/of/dynamic.c
+> > +++ b/drivers/of/dynamic.c
+> > @@ -445,6 +445,28 @@ struct device_node *__of_node_dup(const struct device_node *np, const char *fmt,
+> >  	return NULL;
+> >  }
+> >  
+> > +/**
+> > + * of_node_alloc() - Allocate an empty device node dynamically.
+> > + * @fmt: Format string (plus vargs) for new full name of the device node
+> > + *
+> > + * Create an device tree node, either by by allocating an empty one
+> 
+>       Create a device tree node by allocating an empty one
 
-I think because of this, it makes more sense to have a separate top-level
-driver for this and not reuse the pci-host-generic implementation here.
+Ah! Thanks!
 
-	Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny.
