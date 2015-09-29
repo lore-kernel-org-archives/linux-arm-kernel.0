@@ -1,58 +1,64 @@
-From: yitian.bu@tangramtek.com (yitian)
-Date: Tue, 29 Sep 2015 22:43:17 +0800
-Subject: [RESEND PATCH v2 1/1] ASoC: dwc: fix dma stop transferring issue
-Message-ID: <006401d0fac5$2e4bb840$8ae328c0$@tangramtek.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 29 Sep 2015 16:48:57 +0200
+Subject: [PATCH v3 0/8] Rework architected timer and forwarded IRQs handling
+Message-ID: <1443538145-11990-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Designware I2S uses tx empty and rx available signals as the DMA
-handshaking signals. during music playing, if XRUN occurs,
-i2s_stop() function will be executed and both tx and rx irq are
-masked, when music continues to be played, i2s_start() is executed
-but both tx and rx irq are not unmasked which cause I2S stop
-sending DMA handshaking signal to DMA controller, and it finally
-causes music playing will be stopped once XRUN occurs for the first
-time.
+The architected timer integration with the VGIC had some shortcomings in
+that certain guest operations weren't fully supported.
 
-Signed-off-by: Yitian Bu <yitian.bu@tangramtek.com>
----
-changes in V2:
- - add definition for i and irq
----
- sound/soc/dwc/designware_i2s.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+This series tries to address these problems in providing level-triggered
+semantics for the arch timer and VGIC integration and seeks to clarify
+the behavior when setting/clearing the active state on the physical
+distributor.
 
-diff --git a/sound/soc/dwc/designware_i2s.c b/sound/soc/dwc/designware_i2s.c
-index a3e97b4..76b2e19 100644
---- a/sound/soc/dwc/designware_i2s.c
-+++ b/sound/soc/dwc/designware_i2s.c
-@@ -141,13 +141,22 @@ static inline void i2s_clear_irqs(struct dw_i2s_dev
-*dev, u32 stream)
- static void i2s_start(struct dw_i2s_dev *dev,
- 		      struct snd_pcm_substream *substream)
- {
--
-+	u32 i, irq;
- 	i2s_write_reg(dev->i2s_base, IER, 1);
- 
--	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-+		for (i = 0; i < 4; i++) {
-+			irq = i2s_read_reg(dev->i2s_base, IMR(i));
-+			i2s_write_reg(dev->i2s_base, IMR(i), irq & ~0x30);
-+		}
- 		i2s_write_reg(dev->i2s_base, ITER, 1);
--	else
-+	} else {
-+		for (i = 0; i < 4; i++) {
-+			irq = i2s_read_reg(dev->i2s_base, IMR(i));
-+			i2s_write_reg(dev->i2s_base, IMR(i), irq & ~0x03);
-+		}
- 		i2s_write_reg(dev->i2s_base, IRER, 1);
-+	}
- 
- 	i2s_write_reg(dev->i2s_base, CER, 1);
- }
+It also fixes a few other bugs in the VGIC code and finally adds support
+for edge-triggered forwarded interrupts.
+
+The edge-triggered forwarded interrupts code is untested but probably
+better to clearly do something wrong and raise a warning.
+
+Changes since v2:
+ - Various spelling and comment fixes
+ - Clarified timer example in Documentation and fixed EOIMode=1 explanation
+ - Added spin lock around process_queued_irq as pointed out by Andre.
+
+Changes since v1:
+ - Sent out bug fixes for active state and UEFI reset as separate
+   patches.
+ - Fixed various spelling nits
+ - Rewrote proposed documentation file trying to address Eric's and
+   Marc's comments
+ - Rewrote kvm_timer_update_irq and kvm_timer_update_state according to
+   Marc's suggestion (thanks!)
+ - Added additional patch to support edge-triggered forwarded
+   interrupts.
+
+Christoffer Dall (8):
+  KVM: Add kvm_arch_vcpu_{un}blocking callbacks
+  arm/arm64: KVM: arch_timer: Only schedule soft timer on vcpu_block
+  arm/arm64: KVM: vgic: Factor out level irq processing on guest exit
+  arm/arm64: KVM: Implement GICD_ICFGR as RO for PPIs
+  arm/arm64: KVM: Use appropriate define in VGIC reset code
+  arm/arm64: KVM: Add forwarded physical interrupts documentation
+  arm/arm64: KVM: Rework the arch timer to use level-triggered semantics
+  arm/arm64: KVM: Support edge-triggered forwarded interrupts
+
+ Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt | 186 +++++++++++++++++++++
+ arch/arm/kvm/arm.c                                 |  21 ++-
+ arch/mips/include/asm/kvm_host.h                   |   2 +
+ arch/powerpc/include/asm/kvm_host.h                |   2 +
+ arch/s390/include/asm/kvm_host.h                   |   2 +
+ arch/x86/include/asm/kvm_host.h                    |   3 +
+ include/kvm/arm_arch_timer.h                       |   4 +-
+ include/kvm/arm_vgic.h                             |   3 -
+ include/linux/kvm_host.h                           |   2 +
+ virt/kvm/arm/arch_timer.c                          | 149 +++++++++++------
+ virt/kvm/arm/vgic.c                                | 172 +++++++++----------
+ virt/kvm/kvm_main.c                                |   3 +
+ 12 files changed, 408 insertions(+), 141 deletions(-)
+ create mode 100644 Documentation/virtual/kvm/arm/vgic-mapped-irqs.txt
+
 -- 
-
-1.7.12.4
+2.1.2.330.g565301e.dirty
