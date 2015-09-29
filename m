@@ -1,89 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 29 Sep 2015 09:39:12 +0200
-Subject: [PATCH v3 4/5] clk: sunxi: codec clock support
-In-Reply-To: <1443512353-28073-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1443512353-28073-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1443512353-28073-5-git-send-email-maxime.ripard@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Sep 2015 09:42:48 +0200
+Subject: [RFC PATCH] PCI/pci-host-generic: Add support for Cavium Thunder
+ fixed BARs.
+In-Reply-To: <1443488184-12633-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1443488184-12633-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1981236.3bSkWiA8PH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emilio L?pez <emilio@elopez.com.ar>
+On Monday 28 September 2015 17:56:24 David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> Early versions of the Cavium Thunder CN88XX processor are missing
+> Enhanced Allocation (EA) capabilities for the fixed BAR addresses used
+> by the on-SoC hardware blocks.
+> 
+> Add config access functions that synthesize the missing EA
+> capabilities for versions that are missing that information.  Since
+> this is a little hacky, gate the inclusion of the code with a new
+> Kconfig variable.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+> 
+> As suggested by Bjorn Helgaas...  It is RFC at this point, but this is
+> working well for me.
 
-The codec clock on sun4i, sun5i and sun7i is a simple gate with PLL2 as
-parent. Add a driver for such a clock.
+I don't have an opinion on the way you implement the config space
+accessors, but it seems that the overall amount of code is comparable
+to the normal pci-host-generic driver without this, and it is not
+really generic at all.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/clk/sunxi/Makefile        |  1 +
- drivers/clk/sunxi/clk-a10-codec.c | 45 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+)
- create mode 100644 drivers/clk/sunxi/clk-a10-codec.c
+I think because of this, it makes more sense to have a separate top-level
+driver for this and not reuse the pci-host-generic implementation here.
 
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index c658a18ba7cb..70a449a419e6 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -3,6 +3,7 @@
- #
- 
- obj-y += clk-sunxi.o clk-factors.o
-+obj-y += clk-a10-codec.o
- obj-y += clk-a10-hosc.o
- obj-y += clk-a10-pll2.o
- obj-y += clk-a20-gmac.o
-diff --git a/drivers/clk/sunxi/clk-a10-codec.c b/drivers/clk/sunxi/clk-a10-codec.c
-new file mode 100644
-index 000000000000..aaeccf8cde39
---- /dev/null
-+++ b/drivers/clk/sunxi/clk-a10-codec.c
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright 2013 Emilio L?pez
-+ *
-+ * Emilio L?pez <emilio@elopez.com.ar>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+#define SUN4I_CODEC_GATE	31
-+
-+static void __init sun4i_codec_clk_setup(struct device_node *node)
-+{
-+	struct clk *clk;
-+	const char *clk_name = node->name, *parent_name;
-+	void __iomem *reg;
-+
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (IS_ERR(reg))
-+		return;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+	parent_name = of_clk_get_parent_name(node, 0);
-+
-+	clk = clk_register_gate(NULL, clk_name, parent_name,
-+				CLK_SET_RATE_PARENT, reg,
-+				SUN4I_CODEC_GATE, 0, NULL);
-+
-+	if (!IS_ERR(clk))
-+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+}
-+CLK_OF_DECLARE(sun4i_codec, "allwinner,sun4i-a10-codec-clk",
-+	       sun4i_codec_clk_setup);
--- 
-2.5.3
+	Arnd
