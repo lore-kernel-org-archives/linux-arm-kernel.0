@@ -1,51 +1,81 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 29 Sep 2015 15:29:32 +0100
-Subject: [PATCH v2 0/7] hwrng: Add support for STMicroelectronics' RNG IP
-In-Reply-To: <20150918155112.GE3218@x1>
-References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
- <20150918140756.GK9249@gondor.apana.org.au>
- <CAF2Aj3h7Jy=tpYdZTdbxAJwa=147_hAu3reOFrbEh=JdrMFWLQ@mail.gmail.com>
- <20150918151137.GA10763@gondor.apana.org.au>
- <20150918155112.GE3218@x1>
-Message-ID: <20150929142932.GY27197@x1>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 29 Sep 2015 16:30:46 +0200
+Subject: [PATCH v2 7/8] arm/arm64: KVM: Rework the arch timer to use
+ level-triggered semantics
+In-Reply-To: <5602E4F5.9080109@arm.com>
+References: <1441395650-19663-1-git-send-email-christoffer.dall@linaro.org>
+ <1441395650-19663-8-git-send-email-christoffer.dall@linaro.org>
+ <5602E4F5.9080109@arm.com>
+Message-ID: <20150929143046.GG9002@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Sep 2015, Lee Jones wrote:
-> On Fri, 18 Sep 2015, Herbert Xu wrote:
-> > On Fri, Sep 18, 2015 at 03:53:50PM +0100, Lee Jones wrote:
-> > > On 18 September 2015 at 15:07, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> > > > On Thu, Sep 17, 2015 at 02:45:50PM +0100, Lee Jones wrote:
-> > > >> v1 => v2:
-> > > >>  - New patch: Also fixing /dev/hw_random => /dev/hwrng in Kconfig
-> > > >>  - Fix 2099 => 2009 typo in commit log
-> > > >>  - Fix 'number of random numbers sourced' return value
-> > > >>  - Treat devm_clk_get()'s return value correctly
-> > > >>  - Check return value of clk_prepare_enable()
-> > > >>  - Use sysfs_streq() instead of manually stripping '\n' from sysfs
-> > > >
-> > > > All applied.  Thanks.
-> > > 
-> > > Just to be clear.  Which patches have you applied?
-> > 
-> > All of your patches.
+On Wed, Sep 23, 2015 at 06:44:21PM +0100, Andre Przywara wrote:
+> Hi Christoffer,
 > 
-> I think it's okay for you to take all but patch 6.
+> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> > index 9ed8d53..f4ea950 100644
+> > --- a/virt/kvm/arm/vgic.c
+> > +++ b/virt/kvm/arm/vgic.c
+> > @@ -1422,34 +1422,43 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+> >  /*
+> >   * Save the physical active state, and reset it to inactive.
+> >   *
+> > - * Return 1 if HW interrupt went from active to inactive, and 0 otherwise.
+> > + * Return true if there's a pending level triggered interrupt line to queue.
+> >   */
+> > -static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
+> > +static bool vgic_sync_hwirq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
+> >  {
+> >  	struct irq_phys_map *map;
+> > +	bool phys_active;
+> >  	int ret;
+> >  
+> >  	if (!(vlr.state & LR_HW))
+> >  		return 0;
+> >  
+> >  	map = vgic_irq_map_search(vcpu, vlr.irq);
+> > -	BUG_ON(!map || !map->active);
+> > +	BUG_ON(!map);
+> >  
+> >  	ret = irq_get_irqchip_state(map->irq,
+> >  				    IRQCHIP_STATE_ACTIVE,
+> > -				    &map->active);
+> > +				    &phys_active);
+> >  
+> >  	WARN_ON(ret);
+> >  
+> > -	if (map->active) {
+> > +	if (phys_active) {
+> > +		/*
+> > +		 * Interrupt still marked as active on the physical
+> > +		 * distributor, so guest did not EOI it yet.  Reset to
+> > +		 * non-active so that other VMs can see interrupts from this
+> > +		 * device.
+> > +		 */
+> >  		ret = irq_set_irqchip_state(map->irq,
+> >  					    IRQCHIP_STATE_ACTIVE,
+> >  					    false);
+> >  		WARN_ON(ret);
+> > -		return 0;
+> > +		return false;
+> >  	}
+> >  
+> > -	return 1;
+> > +	/* Mapped edge-triggered interrupts not yet supported. */
+> > +	WARN_ON(vgic_irq_is_edge(vcpu, vlr.irq));
+> > +	return process_level_irq(vcpu, lr, vlr);
 > 
-> Patch 6 is an ARM patch and needs to go into ARM SoC via
-> STMicroelectronics STi tree.
+> Don't you miss the dist->lock here? The other call to
+> process_level_irq() certainly does it, and Eric recently removed the
+> coarse grained lock around the whole __kvm_vgic_sync_hwstate() function.
+> So we don't hold the lock here, but we change quite some common VGIC
+> state in there.
+> 
 
-Hi Herbert,
+Indeed I think we should.
 
-I see that your tree is 8 days old, so this may have been resolved
-already, but would you be kind enough to ensure you remove the 6th
-(ARM) patch from your repo please?  I wouldn't want it to cause
-conflicts and for Maxime and yourself to get shouted at by Linus.
+I'll fix that for the next revision.
 
-Much appreciated.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+-Christoffer
