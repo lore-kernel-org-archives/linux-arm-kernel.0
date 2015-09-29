@@ -1,50 +1,104 @@
-From: Minghuan.Lian@freescale.com (Lian M.H.)
-Date: Tue, 29 Sep 2015 02:57:55 +0000
-Subject: [PATCH 2/2] irqchip/Layerscape: Add Layerscape MSI controller
- support
-In-Reply-To: <CADRPPNTqADaBDyW9z+BEBJBjaaL9hfW_6Lt3dRXR48+pNZjFUw@mail.gmail.com>
-References: <1442482127-32674-1-git-send-email-Minghuan.Lian@freescale.com>
- <1442482127-32674-2-git-send-email-Minghuan.Lian@freescale.com>
- <CADRPPNRx2QwZya83hYhOPKPhZj5moYr0VFR=+0VoK3PjmVVFjA@mail.gmail.com>
- <DM2PR0301MB0640A0D236485867ED1B6690E24F0@DM2PR0301MB0640.namprd03.prod.outlook.com>
- <CADRPPNTqADaBDyW9z+BEBJBjaaL9hfW_6Lt3dRXR48+pNZjFUw@mail.gmail.com>
-Message-ID: <DM2PR0301MB06409BD76B841E3AA89E74DCE24E0@DM2PR0301MB0640.namprd03.prod.outlook.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 29 Sep 2015 11:01:33 +0800
+Subject: [PATCH v9 0/5] Mediatek xHCI support
+Message-ID: <1443495698-32233-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+The patch supports MediaTek's xHCI controller.
 
-Thanks for your advice.
-"fsl,scfg-msi" is better, I use it in next version.
+There are some differences from xHCI spec:
+1. The interval is specified in 250 * 8ns increments for Interrupt Moderation
+Interval(IMODI) of the Interrupter Moderation(IMOD) register, it is 8 times as
+much as that defined in xHCI spec.
 
-Thanks,
-Minghuan
+2. For the value of TD Size in Normal TRB, MTK's xHCI controller defines a
+number of packets that remain to be transferred for a TD after processing all
+Max packets in all previous TRBs,that means don't include the current TRB's,
+but in xHCI spec it includes the current ones.
 
-> -----Original Message-----
-> From: pku.leo at gmail.com [mailto:pku.leo at gmail.com] On Behalf Of Li Yang
-> Sent: Tuesday, September 29, 2015 6:19 AM
-> To: Lian Minghuan-B31939 <Minghuan.Lian@freescale.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>; Yoder Stuart-B08248
-> <stuart.yoder@freescale.com>; Thomas Gleixner <tglx@linutronix.de>; Zang
-> Roy-R61911 <tie-fei.zang@freescale.com>; Hu Mingkai-B21284
-> <Mingkai.Hu@freescale.com>; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 2/2] irqchip/Layerscape: Add Layerscape MSI controller
-> support
-> 
-> On Sun, Sep 27, 2015 at 9:48 PM, Lian M.H. <Minghuan.Lian@freescale.com>
-> wrote:
-> > Hi Leo,
-> >
-> > Could you tell me how to get the detailed Layerscape route map.
-> > I am not sure that only Layerscape 1 series use the similar GIC and SCFG to
-> implement MSI.
-> > I am even not sure if ls1043 belongs Layerscape 1 series.
-> >
-> > Could anyone tell me how to get the MSI route map?
-> 
-> MSI shouldn't be the key feature to determine the naming of an SoC.
-> So I don't think anyone can tell if all 1 series in the future will use this approach.
-> Probably it will be more generic to name it "fsl,scfg-msi"
-> 
-> Regards,
-> Leo
+3. To minimize the scheduling effort for synchronous endpoints in xHC, the MTK
+architecture defines some extra SW scheduling parameters for HW. According to
+these parameters provided by SW, the xHC can easily decide whether a
+synchronous endpoint should be scheduled in a specific uFrame. The extra SW
+scheduling parameters are put into reserved DWs in Slot and Endpoint Context.
+And a bandwidth scheduler algorithm is added to support such feature.
+
+A usb3.0 phy driver is also added which used by mt65xx SoCs platform, it
+supports two usb2.0 ports and one usb3.0 port.
+
+depend on the patch for TDS calculation:
+https://patchwork.kernel.org/patch/7140041/
+
+Change in v9:
+1. fix up issue of FS out-iso when use single-TT hub
+2. improve RX sensitivity
+3. remove udelay(800) called by phy_instance_power_on/off
+
+Change in v8:
+1. use struct overlay for ippc register
+2. change usb wakeup as optional feature
+3. add TDS quirk into unified TDS calculation function
+
+Change in v7:
+1. remove xHCI timing setting which only for FPGA
+2. revise xHCI scheduler algorithms
+3. replace "usb" by "USB" in xHCI binding file
+
+Change in v6:
+1. get register base address of port in probe instead of of_xlate
+2. enable clock in phy_init instead of probe
+
+Change in v5:
+1. descripte more exactly for each specifiers in xHCI binding
+2. make use of new multi-phy feature for phy driver
+
+Change in v4:
+1. descripte more exactly for each specifiers in binding file
+2. use BIT() to define a bit mask macro
+
+Change in v3:
+1. implement generic phy
+2. move opperations of IPPC and wakeup from phy driver to xHCI driver
+3. seperate quirk functions into a single C file to fix up dependence issue
+
+Change in v2:
+1. Rebase to 4.2-rc1
+2. Remove probe phy before add usb_hcd patch from this series due to 4.2-rc1
+   already fix this issue
+3. add xhci mac clocks
+4. add suspend/resume
+5. support remote wakeup
+
+Chunfeng Yun (5):
+  dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
+  dt-bindings: Add a binding for Mediatek xHCI host controller
+  phy: add usb3.0 phy driver for mt65xx SoCs
+  xhci: mediatek: support MTK xHCI host controller
+  arm64: dts: mediatek: add xHCI & usb phy for mt8173
+
+ .../devicetree/bindings/phy/phy-mt65xx-usb.txt     |  68 ++
+ .../devicetree/bindings/usb/mt8173-xhci.txt        |  52 ++
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  16 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  43 ++
+ drivers/phy/Kconfig                                |   9 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-mt65xx-usb3.c                      | 506 ++++++++++++++
+ drivers/usb/host/Kconfig                           |   9 +
+ drivers/usb/host/Makefile                          |   4 +
+ drivers/usb/host/xhci-mtk-sch.c                    | 424 +++++++++++
+ drivers/usb/host/xhci-mtk.c                        | 776 +++++++++++++++++++++
+ drivers/usb/host/xhci-mtk.h                        | 156 +++++
+ drivers/usb/host/xhci-ring.c                       |  22 +-
+ drivers/usb/host/xhci.c                            |  19 +-
+ drivers/usb/host/xhci.h                            |   1 +
+ 15 files changed, 2099 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+ create mode 100644 drivers/phy/phy-mt65xx-usb3.c
+ create mode 100644 drivers/usb/host/xhci-mtk-sch.c
+ create mode 100644 drivers/usb/host/xhci-mtk.c
+ create mode 100644 drivers/usb/host/xhci-mtk.h
+
+--
+1.8.1.1.dirty
