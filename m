@@ -1,115 +1,176 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 29 Sep 2015 14:42:15 +0100
-Subject: [PATCH v2 1/9] dmaengine: st_fdma: Add STMicroelectronics FDMA
- DT binding documentation
-In-Reply-To: <1842713.tkjrhSVazj@wuerfel>
-References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
- <35211759.Jca4RWVLIS@wuerfel>
- <20150929121155.GA17986@griffinp-ThinkPad-X1-Carbon-2nd>
- <1842713.tkjrhSVazj@wuerfel>
-Message-ID: <20150929134215.GA21591@griffinp-ThinkPad-X1-Carbon-2nd>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 29 Sep 2015 15:42:52 +0200
+Subject: [PATCH 1/2] ARM: mvebu: add support to clear shared L2 bit on
+ Armada XP
+In-Reply-To: <1436364561-20958-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Wed, 8 Jul 2015 16:09:20 +0200")
+References: <1436364561-20958-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1436364561-20958-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <877fn9s5nn.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Thomas,
+ 
+ On mer., juil. 08 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-On Tue, 29 Sep 2015, Arnd Bergmann wrote:
+> For optimal performance, in a HW I/O coherency context such as the one
+> used on Armada XP, the shared L2 bit of the CPU configuration register
+> should be cleared.
+>
+> This commit adjusts the coherency fabric code used by Marvell EBU
+> processors to clear this bit on Armada XP. Since it's a per-CPU
+> register, it's cleared in set_cpu_coherent() for the boot CPU, and
+> through a CPU notifier for the non-boot CPUs.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-> On Tuesday 29 September 2015 13:11:55 Peter Griffin wrote:
-> > Hi Arnd,
-> > 
-> > On Tue, 29 Sep 2015, Arnd Bergmann wrote:
-> > 
-> > > On Tuesday 29 September 2015 11:04:40 Peter Griffin wrote:
-> > > > 
-> > > > "The hardware is identical, and different firmware is used to apply
-> > > >    it in different ways."
-> > > > 
-> > > > Which is the case with fdma. By encoding the "way you wish to apply it" into the
-> > > > compatible string, it causes problems if you want to change for example fdma0
-> > > > to do some other function other than audio.
-> > > > 
-> > > > You then require a DT update, (when the hardware hasn't changed, just the
-> > > > firmware) which is the same problem as using the filename directly in DT.
-> > > > 
-> > > > Therefore I believe it is important that the DT binding does *not* encode the
-> > > > way the hardware is to be applied into the binding in *any* way, and defers this
-> > > >  decision to the driver.
-> > > > That is the rationale / reasoning behind choosing the fdma instance number.
-> > > > 
-> > > > Assuming you agree with my arguments above, then the choice becomes between 
-> > > > having a fdma instance DT property, or having lots of compatibles where the only
-> > > > difference is the appending of the instance number. I think out of the two I prefer
-> > > > my original approach.
-> > > > 
-> > > > Any thoughts from the DT folks?
-> > > 
-> > > To me both approaches sound wrong: basing the firmware name on the instance
-> > > number requires that each instance is always used in the same way, which
-> > > is not guaranteed to be the case,
-> > 
-> > Does it? I didn't think it did.
-> > 
-> > Using the instance number as a DT property defers the decision over what firmware to
-> > load to the driver, which can choose whatever firmware name it wishes.
-> > 
-> > e.g. in v4.3 it could load xyz.elf, in v4.4 it could choose abc.elf. The DT will remain
-> > unchanged, but the use of that fdma instance has changed.
-> > 
-> > We currently only have one firmware for each instance with the "use" compiled into it.
-> > If in the future we had two firmwares with different "uses" for the same instance some extra
-> > logic would be required in the driver to make a decision on which firmware to load.
-> 
-> Ok, I probably need some more background about what the firmware on this
-> device does, and what it could do with a different firmware. Could you
-> elaborate?
+Applied on mvebu/soc with a conflict resolution due to the rebase on 4.3-rc1
 
-So the fdma hw is a dma engine based around a xp70 slim core. It supports: -
-* block memory move between 2 system locations
-* paced transfer from system memory to paced peripheral
-* paced transfer from a paced peripheral to system memory
+Thanks,
 
-I believe each firmware for each instance supports those 3 things.
+Gregory
+> ---
+>  .../devicetree/bindings/arm/mvebu-cpu-config.txt   | 20 +++++++
+>  arch/arm/mach-mvebu/coherency.c                    | 61 ++++++++++++++++++++++
+>  2 files changed, 81 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt b/Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt
+> new file mode 100644
+> index 0000000..2cdcd71
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt
+> @@ -0,0 +1,20 @@
+> +MVEBU CPU Config registers
+> +--------------------------
+> +
+> +MVEBU (Marvell SOCs: Armada 370/XP)
+> +
+> +Required properties:
+> +
+> +- compatible: one of:
+> +	- "marvell,armada-370-cpu-config"
+> +	- "marvell,armada-xp-cpu-config"
+> +
+> +- reg: Should contain CPU config registers location and length, in
+> +  their per-CPU variant
+> +
+> +Example:
+> +
+> +	cpu-config at 21000 {
+> +		compatible = "marvell,armada-xp-cpu-config";
+> +		reg = <0x21000 0x8>;
+> +	};
+> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+> index e46e9ea..48655f8 100644
+> --- a/arch/arm/mach-mvebu/coherency.c
+> +++ b/arch/arm/mach-mvebu/coherency.c
+> @@ -40,6 +40,7 @@
+>  unsigned long coherency_phys_base;
+>  void __iomem *coherency_base;
+>  static void __iomem *coherency_cpu_base;
+> +static void __iomem *cpu_config_base;
+>  
+>  /* Coherency fabric registers */
+>  #define IO_SYNC_BARRIER_CTL_OFFSET		   0x0
+> @@ -65,6 +66,31 @@ static const struct of_device_id of_coherency_table[] = {
+>  int ll_enable_coherency(void);
+>  void ll_add_cpu_to_smp_group(void);
+>  
+> +#define CPU_CONFIG_SHARED_L2 BIT(16)
+> +
+> +/*
+> + * Disable the "Shared L2 Present" bit in CPU Configuration register
+> + * on Armada XP.
+> + *
+> + * The "Shared L2 Present" bit affects the "level of coherence" value
+> + * in the clidr CP15 register.  Cache operation functions such as
+> + * "flush all" and "invalidate all" operate on all the cache levels
+> + * that included in the defined level of coherence. When HW I/O
+> + * coherency is used, this bit causes unnecessary flushes of the L2
+> + * cache.
+> + */
+> +static void armada_xp_clear_shared_l2(void)
+> +{
+> +	u32 reg;
+> +
+> +	if (!cpu_config_base)
+> +		return;
+> +
+> +	reg = readl(cpu_config_base);
+> +	reg &= ~CPU_CONFIG_SHARED_L2;
+> +	writel(reg, cpu_config_base);
+> +}
+> +
+>  int set_cpu_coherent(void)
+>  {
+>  	if (!coherency_base) {
+> @@ -73,10 +99,13 @@ int set_cpu_coherent(void)
+>  		return 1;
+>  	}
+>  
+> +	armada_xp_clear_shared_l2();
+>  	ll_add_cpu_to_smp_group();
+>  	return ll_enable_coherency();
+>  }
+>  
+> +
+> +
+>  static int mvebu_hwcc_notifier(struct notifier_block *nb,
+>  			       unsigned long event, void *__dev)
+>  {
+> @@ -97,9 +126,24 @@ static struct notifier_block mvebu_hwcc_pci_nb = {
+>  	.notifier_call = mvebu_hwcc_notifier,
+>  };
+>  
+> +static int armada_xp_clear_shared_l2_notifier_func(struct notifier_block *nfb,
+> +						   unsigned long action, void *hcpu)
+> +{
+> +	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
+> +		armada_xp_clear_shared_l2();
+> +
+> +	return NOTIFY_OK;
+> +}
+> +
+> +static struct notifier_block armada_xp_clear_shared_l2_notifier = {
+> +	.notifier_call = armada_xp_clear_shared_l2_notifier_func,
+> +	.priority = 100,
+> +};
+> +
+>  static void __init armada_370_coherency_init(struct device_node *np)
+>  {
+>  	struct resource res;
+> +	struct device_node *cpu_config_np;
+>  
+>  	of_address_to_resource(np, 0, &res);
+>  	coherency_phys_base = res.start;
+> @@ -112,6 +156,23 @@ static void __init armada_370_coherency_init(struct device_node *np)
+>  	sync_cache_w(&coherency_phys_base);
+>  	coherency_base = of_iomap(np, 0);
+>  	coherency_cpu_base = of_iomap(np, 1);
+> +
+> +	cpu_config_np = of_find_compatible_node(NULL, NULL,
+> +						"marvell,armada-xp-cpu-config");
+> +	if (!cpu_config_np)
+> +		goto exit;
+> +
+> +	cpu_config_base = of_iomap(cpu_config_np, 0);
+> +	if (!cpu_config_base) {
+> +		of_node_put(cpu_config_np);
+> +		goto exit;
+> +	}
+> +
+> +	of_node_put(cpu_config_np);
+> +
+> +	register_cpu_notifier(&armada_xp_clear_shared_l2_notifier);
+> +
+> +exit:
+>  	set_cpu_coherent();
+>  }
 
-However the xp70 also has some ancilary HW to facilitate Start Code Detection.
-It is this feature which I believe would require a different firmware if we wanted to make
-use of it. Looking at the functional spec each xp70 also
-has 16 gp output signals which we could also control from the firmware. Whether
-these are actually connected to anything useful inside the SoC I don't know.
-
-> > > and you correctly describe the problem with
-> > > using the compatible string for the firmware name if the driver for the FDMA
-> > > does not actually care what firmware is being used here.
-> > > 
-> > > Whatever code makes the decision as to how the FDMA is used should also
-> > > decide on the name of the firmware file.
-> > 
-> > The code which makes this decision currently is the st_fdma.c driver. However it does
-> > need to know which fdma controller it is operating on to make this decision correctly.
-> > 
-> > Apart from passing the fdma instance number in DT, how else can we determine which
-> > controller we are?
-> > 
-> > I guess we could infer it by having a table in the driver containing the base addresses
-> > of the controllers for a given SoC, and match that against what DT passes us in the
-> > reg property. But that seems ugly, and is encoding the same information in two
-> > different places.
-> > 
-> > I'm open to suggestions if there is a better way to do this.
-> 
-> Using the address would be the same thing, that doesn't change the
-> fundamental logic. Can you explain why it matters which instance
-> a firmware is used on for this driver?
-
-The reason we care, is that each instance has its own firmware file.
-
-I just did a hexdump on the 3 different firmwares and compared them. Although the majority
-of the binary is the same, there are various bytes which change at several different offsets
-in the firmware file depending on the instance.
-
-I don't have a xp70 toolchain or know enough about the cpu architecture to analyze what exactly
-the firmware is doing at these locations.
-
-regards,
-
-Peter.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
