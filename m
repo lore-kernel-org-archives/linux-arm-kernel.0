@@ -1,95 +1,30 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 29 Sep 2015 16:37:48 +0800
-Subject: [linux-sunxi] [PATCH 0/2] ASoC: Add support for the Allwinner A10
- codec
-In-Reply-To: <20150928074248.GI7104@lukather>
-References: <1442064384-23379-1-git-send-email-maxime.ripard@free-electrons.com>
- <1442928417.6509.12.camel@plaes.org> <20150928074248.GI7104@lukather>
-Message-ID: <CAGb2v66MBLu7Xzk7zNwz6o7rB6+2EdgoN=jNVqpMcvfDq9EM2g@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 29 Sep 2015 09:40:56 +0100
+Subject: [PATCH] arm-cci500: Don't enable PMU driver by default
+In-Reply-To: <20150928233138.GB30986@localhost>
+References: <1443452244-14062-1-git-send-email-suzuki.poulose@arm.com>
+ <20150928233138.GB30986@localhost>
+Message-ID: <560A4E98.8050208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 28, 2015 at 3:42 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Priit,
+On 29/09/15 00:31, Olof Johansson wrote:
+> On Mon, Sep 28, 2015 at 03:57:24PM +0100, Suzuki K. Poulose wrote:
+>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>>
+>> Disable building CCI-500 PMU driver by default.
+>>
+>> Reported-by: Russell King <linux@arm.linux.org.uk>
+>> Cc: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: arm at kernel.org
+>> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   drivers/bus/Kconfig |    1 -
+>>   1 file changed, 1 deletion(-)
 >
-> On Tue, Sep 22, 2015 at 04:26:57PM +0300, Priit Laes wrote:
->> On Sat, 2015-09-12 at 15:26 +0200, Maxime Ripard wrote:
->> > Hi everyone,
->> >
->> > This patch set adds the support for what Allwinner calls the codec on
->> > their SoCs.
->> >
->> > This codec is actually a combination of a codec and DAI, tied
->> > together
->> > in a single memory-mapped IP. It is completely standalone, and
->> > outputs
->> > directly the analog signal.
->> >
->> > While it supports both playback and capture, the capture is not
->> > implemented in this patch, and will be posted eventually as a
->> > separate
->> > one.
->> >
->> > This set, in order to be functional, has a dependency on the audio
->> > clocks patch set posted separately. However, it doesn't needs this to
->> > compile properly, so I guess it can be merged without really caring
->> > for the merging status of the clock patches.
->>
->> It works on Gemei G9 tablet which has also extra chip that
->> automatically switches output over from internal speakers to headphones
->> when connector is inserted.
->>
->> Now I noticed some weird things:
->>
->> When I have all the switches as ON in alsamixer, and I start disabling
->> them, I get following weird results.
->>
->> Left Mixer Left - LML
->> Right Mixer Left - LMR
->> Right Mixer Right - RMR
->>
->> Very faint output:
->> LML - ON
->> RML - Mute
->> RMR - ON
->>
->> Output works fully:
->> LML - Mute
->> RML - Mute
->> RMR - Mute
->>
->> When I Mute Pre-Amplifier and fiddle any of LML, RML or RMR, the output
->> stays mute even after setting Pre-Amplifier Mute back on:
->>
->> 1. All switches on
->> 2. Mute pre-amplifier
->> 3. Mute RMR
->> 4. Pre-Amilifier Mute Off
->> .. Music stays off
->> 5. Toggle Pre-Amplifier twice - output turns on
->
-> Unfortunately, I don't have access to that SoC or that setup.
->
-> Do you have another A10 board with a simpler audio setup, like a
-> cubieboard?
->
->> And also following in dmesg:
->> sun4i-codec 1c22c00.codec: Codec <-> 1c22c00.codec mapping ok
->> sun4i-codec 1c22c00.codec: ASoC: no sink widget found for Headphone Jack
->> sun4i-codec 1c22c00.codec: ASoC: Failed to add route HP Left -> direct -> Headphone Jack
->> sun4i-codec 1c22c00.codec: ASoC: no sink widget found for Headphone Jack
->> sun4i-codec 1c22c00.codec: ASoC: Failed to add route HP Right -> direct -> Headphone Jack
->
-> That one is weird, I'll look into this.
+> Applied as fix for 4.3.
 
-This also appears on my Cubietruck, when using the dts patch from
-Hans' sunxi-wip
-branch, which is the same patch, albeit for a different dts file, as Priit.
+Thanks Olof !
 
-The immediate culprit seems to be the routing property, though I'm not sure what
-it should be set to, or what extra drivers might be needed.
-
-
-Regards
-ChenYu
+Suzuki
