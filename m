@@ -1,22 +1,43 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Wed, 30 Sep 2015 13:57:10 +0900
-Subject: [PATCH v2] nouveau: arm: Add MODULE_FIRMWARE for gk20a
-In-Reply-To: <1443452893-18246-1-git-send-email-kwizart@gmail.com>
-References: <1443452893-18246-1-git-send-email-kwizart@gmail.com>
-Message-ID: <CAAVeFuJLJO4LvLqq2w9gMe6V6L3VDi+Gz59GvwKF2v8OWTWgBQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 29 Sep 2015 21:43:17 +0200
+Subject: [PATCH 1/2] ASoC: sun4i-codec: pass through clk_set_rate error
+Message-ID: <1443555798-16001-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 29, 2015 at 12:08 AM, Nicolas Chauvet <kwizart@gmail.com> wrote:
-> This patch is needed by initramfs tools to detect
-> the required firmware files for the module.
->
-> This patch tests for either TEGRA_124_SOC or TEGRA_132_SOC
-> for the firmwares related to the Tegra K1 generation.
->
-> v2: move the MODULE_FIRMWARE to the nvidia_platform.c file.
->  This will avoid to test for NOUVEAU_PLATFORM_DRIVER
+The current code, disregarding the clk_set_rate error code, was always
+returning -EINVAL. Fix that and return the code in order to have more clue
+about what's going on.
 
-Nice, thanks for doing this change!
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ sound/soc/sunxi/sun4i-codec.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-Reviewed-by: Alexandre Courbot <acourbot@nvidia.com>
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index 6e83e62ef039..28834129bea3 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -283,7 +283,7 @@ static int sun4i_codec_hw_params(struct snd_pcm_substream *substream,
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	struct sun4i_codec *scodec = snd_soc_card_get_drvdata(rtd->card);
+ 	unsigned long clk_freq;
+-	int hwrate;
++	int ret, hwrate;
+ 	u32 val;
+ 
+ 	if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
+@@ -293,8 +293,9 @@ static int sun4i_codec_hw_params(struct snd_pcm_substream *substream,
+ 	if (!clk_freq)
+ 		return -EINVAL;
+ 
+-	if (clk_set_rate(scodec->clk_module, clk_freq))
+-		return -EINVAL;
++	ret = clk_set_rate(scodec->clk_module, clk_freq);
++	if (ret)
++		return ret;
+ 
+ 	hwrate = sun4i_codec_get_hw_rate(params);
+ 	if (hwrate < 0)
+-- 
+2.5.3
