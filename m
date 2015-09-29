@@ -1,47 +1,27 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 29 Sep 2015 23:14:54 +0800
-Subject: [PATCH v3 7/7] clocksource: cosmetic: Drop OF 'dependency' from
- symbols
-In-Reply-To: <1443451758-22717-8-git-send-email-marc.zyngier@arm.com>
-References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
- <1443451758-22717-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <560AAAEE.3060406@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 29 Sep 2015 16:24:35 +0100
+Subject: [linux-sunxi][alsa-devel][PATCH 3/3] ASOC: sunxi: Add support
+ for the spdif block
+In-Reply-To: <20150928082533.GJ7104@lukather>
+References: <1443105005-4083-1-git-send-email-codekipper@gmail.com>
+ <20150928082533.GJ7104@lukather>
+Message-ID: <20150929152435.GU30445@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2015 10:49 PM, Marc Zyngier wrote:
-> Seeing the 'of' characters in a symbol that is being called from
-> ACPI seems to freak out people. So let's do a bit of pointless
-> renaming so that these folks do feel at home.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   arch/arm/kernel/time.c                              | 2 +-
->   arch/arm/mach-omap2/timer.c                         | 4 ++--
->   arch/arm/mach-rockchip/rockchip.c                   | 2 +-
->   arch/arm/mach-shmobile/setup-r8a7779.c              | 2 +-
->   arch/arm/mach-shmobile/setup-rcar-gen2.c            | 2 +-
->   arch/arm/mach-spear/spear13xx.c                     | 2 +-
->   arch/arm/mach-sunxi/sunxi.c                         | 2 +-
->   arch/arm/mach-u300/core.c                           | 2 +-
->   arch/arm/mach-ux500/timer.c                         | 2 +-
->   arch/arm/mach-zynq/common.c                         | 2 +-
->   arch/arm64/kernel/time.c                            | 2 +-
->   arch/microblaze/kernel/setup.c                      | 2 +-
->   arch/mips/pistachio/time.c                          | 2 +-
->   arch/mips/ralink/clk.c                              | 2 +-
->   arch/nios2/kernel/time.c                            | 2 +-
->   arch/xtensa/kernel/time.c                           | 2 +-
->   drivers/clocksource/Makefile                        | 2 +-
->   drivers/clocksource/{clksrc-of.c => clksrc-probe.c} | 2 +-
->   include/linux/clocksource.h                         | 4 ++--
->   19 files changed, 21 insertions(+), 21 deletions(-)
->   rename drivers/clocksource/{clksrc-of.c => clksrc-probe.c} (97%)
+On Mon, Sep 28, 2015 at 10:25:33AM +0200, Maxime Ripard wrote:
+> On Thu, Sep 24, 2015 at 04:30:05PM +0200, codekipper at gmail.com wrote:
+> > From: Marcus Cooper <codekipper@gmail.com>
+> > 
+> > The sun4i, sun6i and sun7i SoC families have an SPDIF
+> > block which is capable of playback and capture.
 
-Thanks for fixing my worrying of making ACPI depends on OF
-in previous version, for patch 4/7 to patch 7/7,
-
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-Thanks
-Hanjun
+Please delete unneeded context from replies, it makes it much easier to
+find new content.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150929/a2abb019/attachment.sig>
