@@ -1,281 +1,74 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 29 Sep 2015 15:44:06 -0500
-Subject: [RFC/PATCH 11/11] arm: boot: dts: omap: add missing default status
- for 32k counter
-In-Reply-To: <1443559446-26969-1-git-send-email-balbi@ti.com>
-References: <1443559446-26969-1-git-send-email-balbi@ti.com>
-Message-ID: <1443559446-26969-12-git-send-email-balbi@ti.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 29 Sep 2015 13:55:48 -0700
+Subject: [PATCH v12 1/5] mtd: nand: vf610_nfc: Freescale NFC for VF610,
+ MPC5125 and others
+In-Reply-To: <CALW4P+LDwFnCjOorh7iCr8TrUnync7a_zkdZ4Hp_91=60AtUQw@mail.gmail.com>
+References: <1441242397-870-1-git-send-email-stefan@agner.ch>
+ <1441242397-870-2-git-send-email-stefan@agner.ch>
+ <CALW4P+LDwFnCjOorh7iCr8TrUnync7a_zkdZ4Hp_91=60AtUQw@mail.gmail.com>
+Message-ID: <20150929205548.GO31505@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All devices should have a default status. Ignoring
-the arguments if it should be 'okay' or 'disabled'
-by default, let's set them all the 'disabled' and
-have boards enable 32k counter.
+On Fri, Sep 04, 2015 at 07:10:10AM +0300, Alexey Klimov wrote:
+> On Thu, Sep 3, 2015 at 4:06 AM, Stefan Agner <stefan@agner.ch> wrote:
+> > --- /dev/null
+> > +++ b/drivers/mtd/nand/vf610_nfc.c
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/boot/dts/am4372.dtsi         | 1 +
- arch/arm/boot/dts/am437x-gp-evm.dts   | 4 ++++
- arch/arm/boot/dts/am437x-idk-evm.dts  | 4 ++++
- arch/arm/boot/dts/am437x-sk-evm.dts   | 4 ++++
- arch/arm/boot/dts/am43x-epos-evm.dts  | 4 ++++
- arch/arm/boot/dts/dra7.dtsi           | 1 +
- arch/arm/boot/dts/omap2420-h4.dts     | 4 ++++
- arch/arm/boot/dts/omap2420.dtsi       | 1 +
- arch/arm/boot/dts/omap2430.dtsi       | 1 +
- arch/arm/boot/dts/omap3-beagle-xm.dts | 4 ++++
- arch/arm/boot/dts/omap3-beagle.dts    | 4 ++++
- arch/arm/boot/dts/omap3-ldp.dts       | 4 ++++
- arch/arm/boot/dts/omap3-n900.dts      | 4 ++++
- arch/arm/boot/dts/omap3.dtsi          | 1 +
- arch/arm/boot/dts/omap3430-sdp.dts    | 4 ++++
- arch/arm/boot/dts/omap4-sdp.dts       | 4 ++++
- arch/arm/boot/dts/omap4.dtsi          | 1 +
- arch/arm/boot/dts/omap5-cm-t54.dts    | 4 ++++
- arch/arm/boot/dts/omap5-uevm.dts      | 4 ++++
- arch/arm/boot/dts/omap5.dtsi          | 1 +
- 20 files changed, 59 insertions(+)
+> > +static int vf610_nfc_probe(struct platform_device *pdev)
+> > +{
+> > +       struct vf610_nfc *nfc;
+> > +       struct resource *res;
+> > +       struct mtd_info *mtd;
+> > +       struct nand_chip *chip;
+> > +       struct device_node *child;
+> > +       const struct of_device_id *of_id;
+> > +       int err = 0;
+> 
+> According to usage you don't need to initialize err to zero here.
 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 0447c04a40cc..0a3e0a82ea96 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -349,6 +349,7 @@
- 			compatible = "ti,am4372-counter32k","ti,omap-counter32k";
- 			reg = <0x44e86000 0x40>;
- 			ti,hwmods = "counter_32k";
-+			status = "disabled";
- 		};
- 
- 		rtc: rtc at 44e3e000 {
-diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-index 22038f21f228..f4b6cb6efde3 100644
---- a/arch/arm/boot/dts/am437x-gp-evm.dts
-+++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-@@ -954,3 +954,7 @@
- 	clock-names = "ext-clk", "int-clk";
- 	status = "okay";
- };
-+
-+&counter32k {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am437x-idk-evm.dts b/arch/arm/boot/dts/am437x-idk-evm.dts
-index af25801418b4..17c429d4e136 100644
---- a/arch/arm/boot/dts/am437x-idk-evm.dts
-+++ b/arch/arm/boot/dts/am437x-idk-evm.dts
-@@ -413,3 +413,7 @@
- &cpu {
- 	cpu0-supply = <&tps>;
- };
-+
-+&counter32k {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-index 7da7c2da4af1..f0d9d26e644e 100644
---- a/arch/arm/boot/dts/am437x-sk-evm.dts
-+++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-@@ -734,3 +734,7 @@
- 		};
- 	};
- };
-+
-+&counter32k {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
-index 86c2dfbe8875..9a0cd866e3ab 100644
---- a/arch/arm/boot/dts/am43x-epos-evm.dts
-+++ b/arch/arm/boot/dts/am43x-epos-evm.dts
-@@ -792,3 +792,7 @@
- 	tx-num-evt = <32>;
- 	rx-num-evt = <32>;
- };
-+
-+&counter32k {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 5d65db9ebc2b..a6f2072b6c46 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -193,6 +193,7 @@
- 				compatible = "ti,omap-counter32k";
- 				reg = <0x4000 0x40>;
- 				ti,hwmods = "counter_32k";
-+				status = "disabled";
- 			};
- 
- 			prm: prm at 6000 {
-diff --git a/arch/arm/boot/dts/omap2420-h4.dts b/arch/arm/boot/dts/omap2420-h4.dts
-index 34cdecb4fdda..f41d95836dcf 100644
---- a/arch/arm/boot/dts/omap2420-h4.dts
-+++ b/arch/arm/boot/dts/omap2420-h4.dts
-@@ -64,3 +64,7 @@
- 		};
- 	};
- };
-+
-+&counter32k {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-index 5b9a376cc31e..abef0670e7e6 100644
---- a/arch/arm/boot/dts/omap2420.dtsi
-+++ b/arch/arm/boot/dts/omap2420.dtsi
-@@ -70,6 +70,7 @@
- 				compatible = "ti,omap-counter32k";
- 				reg = <0x4000 0x20>;
- 				ti,hwmods = "counter_32k";
-+				status = "disabled";
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-index 2390f387c271..f501b6f355a4 100644
---- a/arch/arm/boot/dts/omap2430.dtsi
-+++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -82,6 +82,7 @@
- 				compatible = "ti,omap-counter32k";
- 				reg = <0x20000 0x20>;
- 				ti,hwmods = "counter_32k";
-+				status = "disabled";
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index 7c4dca122a91..47a354f22363 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -390,3 +390,7 @@
- 		};
- 	};
- };
-+
-+&counter32k {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index a5474113cd50..3a50baa56399 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -429,3 +429,7 @@
- 		};
- 	};
- };
-+
-+&counter32k {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
-index bd6e6769c7ce..58ef3e86c31f 100644
---- a/arch/arm/boot/dts/omap3-ldp.dts
-+++ b/arch/arm/boot/dts/omap3-ldp.dts
-@@ -302,3 +302,7 @@
- 	/* Needed for ads7846 */
-         regulator-name = "vcc";
- };
-+
-+&counter32k {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index 5f5e0f3d5b64..0f9405ef4dc7 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -988,3 +988,7 @@
- &ssi_port2 {
- 	status = "disabled";
- };
-+
-+&counter32k {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 69a40cfc1f29..1bc8fb05d4bd 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -181,6 +181,7 @@
- 			compatible = "ti,omap-counter32k";
- 			reg = <0x48320000 0x20>;
- 			ti,hwmods = "counter_32k";
-+			status = "disabled";
- 		};
- 
- 		intc: interrupt-controller at 48200000 {
-diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
-index 16b0cdfbee9c..8344e1d01ac6 100644
---- a/arch/arm/boot/dts/omap3430-sdp.dts
-+++ b/arch/arm/boot/dts/omap3430-sdp.dts
-@@ -191,3 +191,7 @@
- 		};
- 	};
- };
-+
-+&counter32k {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index dac86ed7481f..d54ee6605af0 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -697,3 +697,7 @@
- 		};
- 	};
- };
-+
-+&counter32k {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index abc4473e6f8a..76371eb9fa02 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -220,6 +220,7 @@
- 					compatible = "ti,omap-counter32k";
- 					reg = <0x4000 0x20>;
- 					ti,hwmods = "counter_32k";
-+					status = "disabled";
- 				};
- 
- 				prm: prm at 6000 {
-diff --git a/arch/arm/boot/dts/omap5-cm-t54.dts b/arch/arm/boot/dts/omap5-cm-t54.dts
-index 61ad2ea34720..d88f9bf1ce28 100644
---- a/arch/arm/boot/dts/omap5-cm-t54.dts
-+++ b/arch/arm/boot/dts/omap5-cm-t54.dts
-@@ -677,3 +677,7 @@
- 		};
- 	};
- };
-+
-+&counter32k {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-index 3cc8f357d5b8..ecf8db4ea64b 100644
---- a/arch/arm/boot/dts/omap5-uevm.dts
-+++ b/arch/arm/boot/dts/omap5-uevm.dts
-@@ -641,3 +641,7 @@
- 		};
- 	};
- };
-+
-+&counter32k {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 4205a8ac9ddb..aa8216a5bf4f 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -236,6 +236,7 @@
- 				compatible = "ti,omap-counter32k";
- 				reg = <0x4000 0x40>;
- 				ti,hwmods = "counter_32k";
-+				status = "disabled";
- 			};
- 
- 			prm: prm at 6000 {
--- 
-2.5.3
+Fixed this one.
+
+> > +       int irq;
+> > +
+> > +       nfc = devm_kzalloc(&pdev->dev, sizeof(*nfc), GFP_KERNEL);
+> > +       if (!nfc)
+> > +               return -ENOMEM;
+> > +
+> > +       nfc->dev = &pdev->dev;
+> > +       mtd = &nfc->mtd;
+> > +       chip = &nfc->chip;
+> > +
+> > +       mtd->priv = chip;
+> > +       mtd->owner = THIS_MODULE;
+> > +       mtd->dev.parent = nfc->dev;
+> > +       mtd->name = DRV_NAME;
+> > +
+> > +       irq = platform_get_irq(pdev, 0);
+> > +       if (irq <= 0)
+> > +               return -EINVAL;
+> > +
+> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +       nfc->regs = devm_ioremap_resource(nfc->dev, res);
+> > +       if (IS_ERR(nfc->regs))
+> > +               return PTR_ERR(nfc->regs);
+> > +
+> > +       nfc->clk = devm_clk_get(&pdev->dev, NULL);
+> > +       if (IS_ERR(nfc->clk))
+> > +               return PTR_ERR(nfc->clk);
+> > +
+> > +       err = clk_prepare_enable(nfc->clk);
+> > +       if (err) {
+> > +               dev_err(nfc->dev, "Unable to enable clock!\n");
+> > +               return err;
+> > +       }
+> 
+> After fixing that feel free to use:
+> 
+> Reviewed-by: Alexey Klimov <klimov.linux@gmail.com>
+
+Also, fixed up the nand_chip field name change (from 'dn' to
+'flash_node'), and pushed to l2-mtd.git
+
+Thanks,
+Brian
