@@ -1,65 +1,152 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 29 Sep 2015 10:28:15 -0700
-Subject: [PATCH] ARM: dts: Add Exynos5250 Snow Rev5+ support
-In-Reply-To: <1443527855-434-1-git-send-email-javier@osg.samsung.com>
-References: <1443527855-434-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <CAD=FV=Vmdv6sTmbVyxE=04ycNCOzEWJpfMpzGnihOwaW0ZFzmQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 29 Sep 2015 12:28:11 -0500
+Subject: [PATCH 1/4] of: Add of_parse_phandle_with_opt_args() helper
+ function
+In-Reply-To: <1442944336-11754-2-git-send-email-marc.zyngier@arm.com>
+References: <1442944336-11754-1-git-send-email-marc.zyngier@arm.com>
+ <1442944336-11754-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAL_JsqLWPfi9ynLbkzHkpcSHHg3ciwCcAN1uGcjXhnBAXZ74zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
+On Tue, Sep 22, 2015 at 12:52 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> of_parse_phandle_with_args() is slightly inflexible as it doesn't
+> allow the (unusual) case where the #*-cells property is not defined.
+> In order to support this, introduce of_parse_phandle_with_opt_args()
+> which assumes that #*-cells is zero when it is not defined,
 
-On Tue, Sep 29, 2015 at 4:57 AM, Javier Martinez Canillas
-<javier@osg.samsung.com> wrote:
-> There are 2 revisions of the Exynos5250 Snow Chromebook that were shipped:
-> Rev4 and Rev5. The only difference between these 2 revisions is the codec,
-> Rev4 has a max98095 codec while Rev5 has a max98090.
+zero or cell_count - 1?
+
+I would be okay with always assuming zero rather than being an error
+if that simplifies things. It is not really the kernel's job to be a
+dtb validator.
+
+Also, I assume this was done for some compatibility? In general, we
+should be explicit, so "#msi-cells = <0>" should be recommended and we
+should update dts files if they are not.
+
+Rob
+
+> as required by the msi-parent binding
 >
-> Mainline only supports Rev4 so this patch moves the common device nodes to
-> a DTSI file and adds a DTS for the Exynos5250 Snow Rev5.
+> This is done by turning __of_parse_phandle_with_args into an even
+> bigger monster, which is a bit frightening.
 >
-> The Snow Rev5 DTS is based on the DTS found in the ChromiumOS 3.8 tree.
->
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
+>  drivers/of/base.c  | 64 ++++++++++++++++++++++++++++++++++++++++++++++++++++--
+>  include/linux/of.h |  3 +++
+>  2 files changed, 65 insertions(+), 2 deletions(-)
 >
-> The DTS in the vendor ChromeOS tree are called exynos5250-snow-rev{4,5}.dtb
-> but I decided to leave Rev4 as exynos5250-snow.dtb to avoid breaking u-boot
-> that has CONFIG_DEFAULT_DEVICE_TREE="exynos5250-snow" in snow_defconfig.
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 8b5a187..1612342e 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -1479,6 +1479,10 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
+>                          * (i.e. cells_name not set, but cell_count is set),
+>                          * except when we're going to return the found node
+>                          * below.
+> +                        *
+> +                        * If #*-cells is not found, but cell_count is set
+> +                        * to a non-zero value, use (cell_count-1) as a
+> +                        * fallback value.
+>                          */
+>                         if (cells_name || cur_index == index) {
+>                                 node = of_find_node_by_phandle(phandle);
+> @@ -1490,13 +1494,21 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
+>                         }
 >
-> Also, ChromiumOS Rev4 DTS has "google,snow-rev4" in its compatible string
-> but was not added in mainline since Rev4 firmware fallbacks to "google,snow"
-> and Rev5 searches for "google,snow-rev5". That way the compatible string
-> could be consistent with the DTS naming and still be able to pack both Rev4
-> and Rev5 FDT in the same FIT image and let the firmware pick the correct FDT.
-
-Looking at all the notes in the DTS in the ChromeOS tree, this sounds
-like it should be fine.
-
-
->  arch/arm/boot/dts/Makefile                    |   1 +
->  arch/arm/boot/dts/exynos5250-snow-common.dtsi | 684 ++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos5250-snow-rev5.dts    |  47 ++
->  arch/arm/boot/dts/exynos5250-snow.dts         | 666 +------------------------
->  4 files changed, 733 insertions(+), 665 deletions(-)
-
-Thanks!  Note:
-
-$ pwclient git-am 7285451
-Applying patch #7285451 using 'git am'
-Description: ARM: dts: Add Exynos5250 Snow Rev5+ support
-Applying: ARM: dts: Add Exynos5250 Snow Rev5+ support
-.git/rebase-apply/patch:774: new blank line at EOF.
-+
-warning: 1 line adds whitespace errors.
-
-
-One other nit is that the exynos5250-snow.dts" ends up with the
-"max98095" pinctrl properties sorted differently than the
-"exynos5250-snow-rev5.dts".  Is it worth reordering the
-"exynos5250-snow.dts" in the same patch?
-
-Otherwise this looks fine to me.
-
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+>                         if (cells_name) {
+> -                               if (of_property_read_u32(node, cells_name,
+> -                                                        &count)) {
+> +                               int ret;
+> +                               ret = of_property_read_u32(node, cells_name,
+> +                                                          &count);
+> +                               if (ret && !cell_count) {
+>                                         pr_err("%s: could not get %s for %s\n",
+>                                                 np->full_name, cells_name,
+>                                                 node->full_name);
+>                                         goto err;
+>                                 }
+> +                               if (ret) {
+> +                                       count = cell_count - 1;
+> +                                       pr_debug("%s: could not get %s for %s, assuming %d\n",
+> +                                                np->full_name, cells_name,
+> +                                                node->full_name, count);
+> +                               }
+>                         } else {
+>                                 count = cell_count;
+>                         }
+> @@ -1628,6 +1640,54 @@ int of_parse_phandle_with_args(const struct device_node *np, const char *list_na
+>  EXPORT_SYMBOL(of_parse_phandle_with_args);
+>
+>  /**
+> + * of_parse_phandle_with_opt_args() - Find a node pointed by phandle in a list
+> + * @np:                pointer to a device tree node containing a list
+> + * @list_name: property name that contains a list
+> + * @cells_name:        property name that specifies phandles' arguments count
+> + * @index:     index of a phandle to parse out
+> + * @out_args:  optional pointer to output arguments structure (will be filled)
+> + *
+> + * This function is useful to parse lists of phandles and their arguments.
+> + * If cells_name is not found, then it is assumed to be zero.
+> + * Returns 0 on success and fills out_args, on error returns appropriate
+> + * errno value.
+> + *
+> + * Caller is responsible to call of_node_put() on the returned out_args->np
+> + * pointer.
+> + *
+> + * Example:
+> + *
+> + * phandle1: node1 {
+> + *     #list-cells = <2>;
+> + * }
+> + *
+> + * phandle2: node2 {
+> + * }
+> + *
+> + * phandle3: node3 {
+> + *     #list-cells = <1>;
+> + * }
+> + *
+> + * node3 {
+> + *     list = <&phandle1 1 2 &phandle2 &phandle 3>;
+> + * }
+> + *
+> + * To get a device_node of the `node2' node you may call this:
+> + * of_parse_phandle_with_args(node3, "list", "#list-cells", 1, &args);
+> + */
+> +int of_parse_phandle_with_opt_args(const struct device_node *np,
+> +                                  const char *list_name,
+> +                                  const char *cells_name, int index,
+> +                                  struct of_phandle_args *out_args)
+> +{
+> +       if (index < 0)
+> +               return -EINVAL;
+> +       return __of_parse_phandle_with_args(np, list_name, cells_name, 1,
+> +                                           index, out_args);
+> +}
+> +EXPORT_SYMBOL(of_parse_phandle_with_opt_args);
+> +
+> +/**
+>   * of_parse_phandle_with_fixed_args() - Find a node pointed by phandle in a list
+>   * @np:                pointer to a device tree node containing a list
+>   * @list_name: property name that contains a list
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index 2194b8c..ae6cd03 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -328,6 +328,9 @@ extern struct device_node *of_parse_phandle(const struct device_node *np,
+>  extern int of_parse_phandle_with_args(const struct device_node *np,
+>         const char *list_name, const char *cells_name, int index,
+>         struct of_phandle_args *out_args);
+> +extern int of_parse_phandle_with_opt_args(const struct device_node *np,
+> +       const char *list_name, const char *cells_name, int index,
+> +       struct of_phandle_args *out_args);
+>  extern int of_parse_phandle_with_fixed_args(const struct device_node *np,
+>         const char *list_name, int cells_count, int index,
+>         struct of_phandle_args *out_args);
+> --
+> 2.1.4
+>
