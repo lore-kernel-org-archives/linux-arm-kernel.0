@@ -1,49 +1,49 @@
-From: jc@eclis.ch (jc at eclis.ch)
-Date: Tue, 29 Sep 2015 22:03:07 +0200
-Subject: [PATCH 1/1] Disable CONFIG_UACCESS_WITH_MEMCPY in Atmel config.
-Message-ID: <1443556987-2788-1-git-send-email-jc@eclis.ch>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 29 Sep 2015 22:10:20 +0200
+Subject: [PATCH 2/3] ARM: dts: sun6i: Turn on gmac on Colombus
+In-Reply-To: <20150820221259.GM30520@lukather>
+References: <1438960955-6551-1-git-send-email-hdegoede@redhat.com>
+ <1438960955-6551-2-git-send-email-hdegoede@redhat.com>
+ <20150819151754.GH30520@lukather> <55D5725F.6000106@redhat.com>
+ <20150820221259.GM30520@lukather>
+Message-ID: <560AF02C.2010308@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Christian de Rivaz <jc@eclis.ch>
+Hi,
 
-According to Russell King:
-In any case, unless you have a Marvell platform, you should have this
-disabled - it provides a performance boost for Marvell platforms, but
-degrades performance everywhere else.  Please ensure that you disable
-CONFIG_UACCESS_WITH_MEMCPY.
+On 08/21/2015 12:12 AM, Maxime Ripard wrote:
+> On Thu, Aug 20, 2015 at 08:23:27AM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 08/19/2015 05:17 PM, Maxime Ripard wrote:
+>>> On Fri, Aug 07, 2015 at 05:22:34PM +0200, Hans de Goede wrote:
+>>>> We've everything we need to support the gmac on Colombus, turn it on.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>
+>>> I recall that the phy was powered by one of the AXP221 regulators,
+>>> does it require some additional stuff (like a recent u-boot), or does
+>>> it just work and my memory is bad :) ?
+>>
+>> I think it just works, it MAY be connected to aldo1 but according to
+>> the git history for the u-boot defconfig that one is used for wifi not
+>> for the gmac, and we do not enable any other "spare" regulators in the
+>> u-boot config.
+>>
+>> I do not have any schematics, so no way to say for sure.
+>>
+>> I can confirm that the GMAC work fine with the latest u-boot
+>> master. Looking in the history we've always enabled ALDO1
+>> on the Colombus in upstream u-boot, so this should all just work.
+>
+> Except that if it is the case, the DT was working fine with the stock
+> bootloader, and it doesn't anymore, while we have no way to upgrade
+> it.
 
-Signed-off-by: Jean-Christian de Rivaz <jc@eclis.ch>
----
- arch/arm/configs/at91_dt_defconfig |    2 +-
- arch/arm/configs/sama5_defconfig   |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Ok, I've finally made some time to test this, the gmac works fine
+with aldo1 disabled, so I believe this patch can be merged as is.
 
-diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-index 090c5b2..1807d7f 100644
---- a/arch/arm/configs/at91_dt_defconfig
-+++ b/arch/arm/configs/at91_dt_defconfig
-@@ -21,7 +21,7 @@ CONFIG_SOC_SAM_V4_V5=y
- CONFIG_SOC_AT91RM9200=y
- CONFIG_SOC_AT91SAM9=y
- CONFIG_AEABI=y
--CONFIG_UACCESS_WITH_MEMCPY=y
-+# CONFIG_UACCESS_WITH_MEMCPY is not set
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index 31eb951..471e214 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -19,7 +19,7 @@ CONFIG_SOC_SAM_V7=y
- CONFIG_SOC_SAMA5D3=y
- CONFIG_SOC_SAMA5D4=y
- CONFIG_AEABI=y
--CONFIG_UACCESS_WITH_MEMCPY=y
-+# CONFIG_UACCESS_WITH_MEMCPY is not set
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
--- 
-1.7.10.4
+Regards,
+
+Hans
