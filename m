@@ -1,52 +1,30 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 29 Sep 2015 15:57:52 +0200
-Subject: [PATCH] ARM: exynos_defconfig: Enable WiFi-Ex as a module instead
- built-in
-In-Reply-To: <560A9012.2090802@suse.de>
-References: <1443530546-3066-1-git-send-email-javier@osg.samsung.com>
- <560A9012.2090802@suse.de>
-Message-ID: <560A98E0.9010606@osg.samsung.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Tue, 29 Sep 2015 16:09:18 +0200
+Subject: [PATCH v2 0/2] ASoC: add driver for Atmel I2S controller
+Message-ID: <cover.1443535188.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andreas,
+This series of patches adds support to the new Atmel I2S controller embedded
+on sama5d2 SoCs.
 
-On 09/29/2015 03:20 PM, Andreas F?rber wrote:
-> Am 29.09.2015 um 14:42 schrieb Javier Martinez Canillas:
->> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
->> index d4f6063d8a72..5aad617f02c7 100644
->> --- a/arch/arm/configs/exynos_defconfig
->> +++ b/arch/arm/configs/exynos_defconfig
->> @@ -64,8 +64,8 @@ CONFIG_SMSC911X=y
->>  CONFIG_USB_USBNET=y
->>  CONFIG_USB_NET_SMSC75XX=y
->>  CONFIG_USB_NET_SMSC95XX=y
->> -CONFIG_MWIFIEX=y
->> -CONFIG_MWIFIEX_SDIO=y
->> +CONFIG_MWIFIEX=m
->> +CONFIG_MWIFIEX_SDIO=m
->>  CONFIG_INPUT_EVDEV=y
->>  CONFIG_KEYBOARD_GPIO=y
->>  CONFIG_KEYBOARD_CROS_EC=y
-> 
-> Makes sense,
-> 
-> Reviewed-by: Andreas F?rber <afaerber@suse.de>
-> 
 
-Thanks.
+ChangeLog
 
-> What about multi_v7?
->
+v2:
+- initialize dev->dev before calling dev->caps->mck_init().
 
-Already enables these options as a module.
- 
-> Cheers,
-> Andreas
-> 
+Cyrille Pitchen (2):
+  ASoC: atmel-i2s: add DT bindings for I2S controller
+  ASoC: atmel-i2s: add driver for the new Atmel I2S controller
 
-Best regards,
+ .../devicetree/bindings/sound/atmel-i2s.txt        |  43 ++
+ sound/soc/atmel/Kconfig                            |  10 +
+ sound/soc/atmel/Makefile                           |   2 +
+ sound/soc/atmel/atmel-i2s.c                        | 760 +++++++++++++++++++++
+ 4 files changed, 815 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/atmel-i2s.txt
+ create mode 100644 sound/soc/atmel/atmel-i2s.c
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+1.8.2.2
