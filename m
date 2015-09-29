@@ -1,43 +1,34 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 29 Sep 2015 21:43:17 +0200
-Subject: [PATCH 1/2] ASoC: sun4i-codec: pass through clk_set_rate error
-Message-ID: <1443555798-16001-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue, 29 Sep 2015 21:43:18 +0200
+Subject: [PATCH 2/2] ASoC: sun4i-codec: Remove redundant SND_PCM_RATE_KNOT
+In-Reply-To: <1443555798-16001-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1443555798-16001-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1443555798-16001-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code, disregarding the clk_set_rate error code, was always
-returning -EINVAL. Fix that and return the code in order to have more clue
-about what's going on.
+The SND_PCM_RATE_KNOT covers all the rate settings, even though some that
+we don't support, while we also list all the rate we support. Simply remove
+it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- sound/soc/sunxi/sun4i-codec.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ sound/soc/sunxi/sun4i-codec.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 6e83e62ef039..28834129bea3 100644
+index 28834129bea3..e5d195fe491e 100644
 --- a/sound/soc/sunxi/sun4i-codec.c
 +++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -283,7 +283,7 @@ static int sun4i_codec_hw_params(struct snd_pcm_substream *substream,
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct sun4i_codec *scodec = snd_soc_card_get_drvdata(rtd->card);
- 	unsigned long clk_freq;
--	int hwrate;
-+	int ret, hwrate;
- 	u32 val;
- 
- 	if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
-@@ -293,8 +293,9 @@ static int sun4i_codec_hw_params(struct snd_pcm_substream *substream,
- 	if (!clk_freq)
- 		return -EINVAL;
- 
--	if (clk_set_rate(scodec->clk_module, clk_freq))
--		return -EINVAL;
-+	ret = clk_set_rate(scodec->clk_module, clk_freq);
-+	if (ret)
-+		return ret;
- 
- 	hwrate = sun4i_codec_get_hw_rate(params);
- 	if (hwrate < 0)
+@@ -389,8 +389,7 @@ static struct snd_soc_dai_driver sun4i_codec_dai = {
+ 		.rate_max	= 192000,
+ 		.rates		= SNDRV_PCM_RATE_8000_48000 |
+ 				  SNDRV_PCM_RATE_96000 |
+-				  SNDRV_PCM_RATE_192000 |
+-				  SNDRV_PCM_RATE_KNOT,
++				  SNDRV_PCM_RATE_192000,
+ 		.formats	= SNDRV_PCM_FMTBIT_S16_LE |
+ 				  SNDRV_PCM_FMTBIT_S32_LE,
+ 		.sig_bits	= 24,
 -- 
 2.5.3
