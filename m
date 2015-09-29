@@ -1,48 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Sep 2015 13:17:20 +0200
-Subject: [PATCH v2 1/9] dmaengine: st_fdma: Add STMicroelectronics FDMA DT
- binding documentation
-In-Reply-To: <20150929100440.GC16955@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1441980871-24475-1-git-send-email-peter.griffin@linaro.org>
- <20150914081937.GF27591@x1>
- <20150929100440.GC16955@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <35211759.Jca4RWVLIS@wuerfel>
+From: martink@posteo.de (Martin Kepplinger)
+Date: Tue, 29 Sep 2015 13:32:27 +0200
+Subject: [PATCH] clk: imx: use sign_extend32() and abs()
+Message-ID: <1443526347-15501-1-git-send-email-martink@posteo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 September 2015 11:04:40 Peter Griffin wrote:
-> 
-> "The hardware is identical, and different firmware is used to apply
->    it in different ways."
-> 
-> Which is the case with fdma. By encoding the "way you wish to apply it" into the
-> compatible string, it causes problems if you want to change for example fdma0
-> to do some other function other than audio.
-> 
-> You then require a DT update, (when the hardware hasn't changed, just the
-> firmware) which is the same problem as using the filename directly in DT.
-> 
-> Therefore I believe it is important that the DT binding does *not* encode the
-> way the hardware is to be applied into the binding in *any* way, and defers this
->  decision to the driver.
-> That is the rationale / reasoning behind choosing the fdma instance number.
-> 
-> Assuming you agree with my arguments above, then the choice becomes between 
-> having a fdma instance DT property, or having lots of compatibles where the only
-> difference is the appending of the instance number. I think out of the two I prefer
-> my original approach.
-> 
-> Any thoughts from the DT folks?
+This simplifies the given function by getting rid of the manual
+sign extension as well as saving an absolute value in an extra
+variable.
 
-To me both approaches sound wrong: basing the firmware name on the instance
-number requires that each instance is always used in the same way, which
-is not guaranteed to be the case, and you correctly describe the problem with
-using the compatible string for the firmware name if the driver for the FDMA
-does not actually care what firmware is being used here.
+Signed-off-by: Martin Kepplinger <martink@posteo.de>
+---
+built and run, but please review.
 
-Whatever code makes the decision as to how the FDMA is used should also
-decide on the name of the firmware file. You can have a mapping in the
-driver that contains the file names that are used by ST's distro, possibly
-with a fallback mechanism that tries more meaningful names first.
+                     martin
 
-	Arnd
+
+ drivers/clk/imx/clk-pllv2.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/clk/imx/clk-pllv2.c b/drivers/clk/imx/clk-pllv2.c
+index 20889d5..b18f875 100644
+--- a/drivers/clk/imx/clk-pllv2.c
++++ b/drivers/clk/imx/clk-pllv2.c
+@@ -77,7 +77,7 @@ struct clk_pllv2 {
+ static unsigned long __clk_pllv2_recalc_rate(unsigned long parent_rate,
+ 		u32 dp_ctl, u32 dp_op, u32 dp_mfd, u32 dp_mfn)
+ {
+-	long mfi, mfn, mfd, pdf, ref_clk, mfn_abs;
++	long mfi, mfn, mfd, pdf, ref_clk;
+ 	unsigned long dbl;
+ 	s64 temp;
+ 
+@@ -87,19 +87,15 @@ static unsigned long __clk_pllv2_recalc_rate(unsigned long parent_rate,
+ 	mfi = (dp_op & MXC_PLL_DP_OP_MFI_MASK) >> MXC_PLL_DP_OP_MFI_OFFSET;
+ 	mfi = (mfi <= 5) ? 5 : mfi;
+ 	mfd = dp_mfd & MXC_PLL_DP_MFD_MASK;
+-	mfn = mfn_abs = dp_mfn & MXC_PLL_DP_MFN_MASK;
+-	/* Sign extend to 32-bits */
+-	if (mfn >= 0x04000000) {
+-		mfn |= 0xFC000000;
+-		mfn_abs = -mfn;
+-	}
++	mfn = dp_mfn & MXC_PLL_DP_MFN_MASK;
++	mfn = sign_extend32(mfn, 26);
+ 
+ 	ref_clk = 2 * parent_rate;
+ 	if (dbl != 0)
+ 		ref_clk *= 2;
+ 
+ 	ref_clk /= (pdf + 1);
+-	temp = (u64) ref_clk * mfn_abs;
++	temp = (u64) ref_clk * abs(mfn);
+ 	do_div(temp, mfd + 1);
+ 	if (mfn < 0)
+ 		temp = -temp;
+-- 
+2.1.4
