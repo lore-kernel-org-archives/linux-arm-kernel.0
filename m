@@ -1,35 +1,131 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 29 Sep 2015 10:04:53 +0200
-Subject: [PATCH 2/6] ARM: dts: sun7i: Enable USB DRC on Bananapi
-In-Reply-To: <1442928966-6418-2-git-send-email-hdegoede@redhat.com>
-References: <1442928966-6418-1-git-send-email-hdegoede@redhat.com>
- <1442928966-6418-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150929080453.GN7104@lukather>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 29 Sep 2015 10:05:38 +0200
+Subject: [PATCH v6 20/22] driver core: Allow deferring probes until late
+ init
+In-Reply-To: <5606E0DA.2040900@kernel.org>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1442844182-27787-21-git-send-email-tomeu.vizoso@collabora.com>
+ <5606E0DA.2040900@kernel.org>
+Message-ID: <CAAObsKBoBgP_y161qWC_U+yVtbWxudFgBNM7map0jz2WcJws_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 03:36:01PM +0200, Hans de Goede wrote:
-> Enable the otg/drc usb controller on the Bananapi.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On 26 September 2015 at 20:15, Rob Herring <robh@kernel.org> wrote:
+> On 09/21/2015 09:03 AM, Tomeu Vizoso wrote:
+>> Add a field to struct device that instructs the device-driver core to
+>> defer the probe of this device until the late_initcall level.
+>
+> This is true until the next patch with moves deferred probe processing
+> to device_initcall_sync. So disabling this option alone won't totally
+> revert to current behaviour. I guess patch 21 could be reverted if
+> necessary.
 
-Applied all the other patches but this one.
+Actually, the goal with that commit was to prevent potential problems
+due to the increased pressure on late_initcall, as suggested by
+Grygorii Strashko, but I haven't found yet any evidence of it being
+needed, and in my testing the series boot all boards in kernelci with
+or without this commit. So I would just not commit it for now and only
+consider applying it later if someone reports a problem.
 
-Since we dropped the patch adding the regulators support on the
-Bananapi until we figure out why the board crash, it doesn't compile
-anymore.
+>> By letting all built-in drivers to register before starting to probe, we
+>> can avoid any deferred probes by probing dependencies on demand.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>
+>> ---
+>>
+>> Changes in v4:
+>> - Add Kconfig DELAY_DEVICE_PROBES to allow disabling delayed probing in
+>>   machines with initcalls that depend on devices probing at a given time.
+>>
+>>  drivers/base/Kconfig   | 18 ++++++++++++++++++
+>>  drivers/base/dd.c      |  7 +++++++
+>>  include/linux/device.h |  2 ++
+>>  3 files changed, 27 insertions(+)
+>>
+>> diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+>> index 98504ec99c7d..44b5d33b1f49 100644
+>> --- a/drivers/base/Kconfig
+>> +++ b/drivers/base/Kconfig
+>> @@ -324,4 +324,22 @@ config CMA_ALIGNMENT
+>>
+>>  endif
+>>
+>> +config DELAY_DEVICE_PROBES
+>> +     bool "Allow delaying the probe of some devices"
+>
+> I'd like to hide visibility of this behind EXPERT.
 
-Thanks!
-Maxime
+Done.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150929/a64e5db6/attachment.sig>
+>> +     default y
+>> +     help
+>> +       Devices can be matched to a driver and probed from the moment they
+>> +       are registered, but early during boot their probes are likely to be
+>> +       deferred because some dependency isn't available yet because most
+>> +       drivers haven't been registered yet.
+>> +
+>> +       Enabling this option allows the device registration code to delay the
+>> +       probing of a specific device until device_initcall_sync, when all
+>> +       built-in drivers have been registered already.
+>> +
+>> +       In some platforms there may be implicit assumptions about when some
+>> +       devices are probed, so enabling this option could cause problems there.
+>> +
+>> +       If unsure, say Y here.
+>> +
+>>  endmenu
+>> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+>> index 7dc04ee81c8b..269ea76c1a4f 100644
+>> --- a/drivers/base/dd.c
+>> +++ b/drivers/base/dd.c
+>> @@ -417,6 +417,13 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
+>>       if (!device_is_registered(dev))
+>>               return -ENODEV;
+>>
+>> +#if IS_ENABLED(CONFIG_DELAY_DEVICE_PROBES)
+>
+> This can be moved to the if.
+
+Done.
+
+Thanks,
+
+Tomeu
+
+>> +     if (!driver_deferred_probe_enable && dev->probe_late) {
+>> +             driver_deferred_probe_add(dev);
+>> +             return 0;
+>> +     }
+>> +#endif
+>> +
+>>       pr_debug("bus: '%s': %s: matched device %s with driver %s\n",
+>>                drv->bus->name, __func__, dev_name(dev), drv->name);
+>>
+>> diff --git a/include/linux/device.h b/include/linux/device.h
+>> index 8e7b806f0744..e64f4c7e243d 100644
+>> --- a/include/linux/device.h
+>> +++ b/include/linux/device.h
+>> @@ -744,6 +744,7 @@ struct device_dma_parameters {
+>>   *
+>>   * @offline_disabled: If set, the device is permanently online.
+>>   * @offline: Set after successful invocation of bus type's .offline().
+>> + * @probe_late:      If set, device will be probed in the late initcall level.
+>>   *
+>>   * At the lowest level, every device in a Linux system is represented by an
+>>   * instance of struct device. The device structure contains the information
+>> @@ -828,6 +829,7 @@ struct device {
+>>
+>>       bool                    offline_disabled:1;
+>>       bool                    offline:1;
+>> +     bool                    probe_late:1;
+>>  };
+>>
+>>  static inline struct device *kobj_to_dev(struct kobject *kobj)
+>>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
