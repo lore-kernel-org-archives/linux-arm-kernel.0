@@ -1,39 +1,50 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 29 Sep 2015 12:29:48 +0200
-Subject: [PATCH v2 resend 1/4] ARM: dts: sun5i: Add PWM controller node for
- A13/A10s
+Date: Tue, 29 Sep 2015 12:29:51 +0200
+Subject: [PATCH v2 resend 4/4] ARM: dts: sun5i: Add backlight node to
+ sun5i-q8-common.dtsi
 In-Reply-To: <1443522591-6590-1-git-send-email-hdegoede@redhat.com>
 References: <1443522591-6590-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1443522591-6590-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1443522591-6590-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sun5i die has a PWM controller that is compatible to the one on the A20.
-Add a device node for it.
+All A13 based q8 formfactor tablets use the same backlight setup, add
+a backlight devicetree node for controlling the backlight on these devices.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun5i.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Changes in v2:
+-Drop the comment about DCDC1SW, the axp209 used on A13 boards does not
+ have a DCDC1SW
+---
+ arch/arm/boot/dts/sun5i-q8-common.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index 78b993a..5e036a4 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -543,6 +543,14 @@
- 			reg = <0x01c20c90 0x10>;
- 		};
+diff --git a/arch/arm/boot/dts/sun5i-q8-common.dtsi b/arch/arm/boot/dts/sun5i-q8-common.dtsi
+index 0641d68..a78e189 100644
+--- a/arch/arm/boot/dts/sun5i-q8-common.dtsi
++++ b/arch/arm/boot/dts/sun5i-q8-common.dtsi
+@@ -41,11 +41,21 @@
+  */
+ #include "sunxi-q8-common.dtsi"
  
-+		pwm: pwm at 01c20e00 {
-+			compatible = "allwinner,sun7i-a20-pwm";
-+			reg = <0x01c20e00 0xc>;
-+			clocks = <&osc24M>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
-+		};
++#include <dt-bindings/pwm/pwm.h>
 +
- 		lradc: lradc at 01c22800 {
- 			compatible = "allwinner,sun4i-a10-lradc-keys";
- 			reg = <0x01c22800 0x100>;
+ / {
+ 	aliases {
+ 		serial0 = &uart1;
+ 	};
+ 
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
++		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
++		default-brightness-level = <8>;
++		/* TODO: backlight uses axp gpio1 as enable pin */
++	};
++
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
 -- 
 2.5.0
