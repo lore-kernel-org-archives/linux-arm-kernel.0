@@ -1,40 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Sep 2015 19:30:31 +0200
-Subject: [PATCH v4 1/2] ARM: dma-mapping: Don't use outer_flush_range
- when the L2C is coherent
-In-Reply-To: <20150929171054.GN21513@n2100.arm.linux.org.uk>
-References: <1443545458-14807-1-git-send-email-gregory.clement@free-electrons.com>
- <1443545458-14807-2-git-send-email-gregory.clement@free-electrons.com>
- <20150929171054.GN21513@n2100.arm.linux.org.uk>
-Message-ID: <20150929193031.72bbebe8@free-electrons.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 29 Sep 2015 10:38:33 -0700
+Subject: [PATCH 0/3] mmc: Wait for card_busy before starting sdio requests
+In-Reply-To: <560A8AE6.9010603@redhat.com>
+References: <1442935826-16758-1-git-send-email-hdegoede@redhat.com>
+ <CAPDyKFqvnVTL0pDLc8S1Ssqmy5WXR9+=uCWq8ONmgrYU=Zzoow@mail.gmail.com>
+ <5603C020.80603@redhat.com>
+ <CAD=FV=UacwyVcX+ZwCJ+iuhTGyr8ktOw7EiMxng8G1EmwXomJQ@mail.gmail.com>
+ <5604FD94.4020808@redhat.com>
+ <CAD=FV=VVu5V77K073JAy884GZUAgeNUFmsJU4d-k4GGoW_6Tkg@mail.gmail.com>
+ <560A8AE6.9010603@redhat.com>
+Message-ID: <CAD=FV=Vq_mgY8atFjtRJSKobfS=Ez6M_8Uio7T4-G4OD+bjR_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Hans,
 
-On Tue, 29 Sep 2015 18:10:54 +0100, Russell King - ARM Linux wrote:
+On Tue, Sep 29, 2015 at 5:58 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> So perhaps it would be good to update your patch to check for all data
+>> commands?
+>
+>
+> Agreed, since you seem to know this stuff much better then I do can you do
+> a follow-up patch expanding my patch to do the busy check / wait for
+> all data commands?
 
-> > In the current kernel implementation, the outer cache flush range
-> > operation is triggered by the dma_alloc function.
-> > This operation can be take place during runtime and in some
-> > circumstances may lead to the PCIe/PL310 deadlock on Armada 375/38x
-> > SoCs.
-> 
-> I wonder if that's what's causing the sporadic lockups I'm seeing on
-> 38x with a SATA PCIe card - it happens at a very specific point during
-> boot while initialising the SATA card, right down to the kernel message
-> character that it stops at.
+Hmmm, what a strange thing to say about me.  ;)  I always kinda feel
+like I'm bumbling around with most of this stuff.  If I've happened to
+look at a particular issue in detail I know about it, but usually I
+only know about the little bits that I've had to debug...  Really my
+knowledge of SD/MMC/SDIO is limited to having to deal with dw_mmc
+since all the SoCs I've worked with have had that controller.
 
-It might very well be the case. If there's enough PCIe traffic and a
-PL310 cache maintenance operation happening at the same time, the
-system will lockup. I'm a bit surprised that just the initialization of
-the PCIe card generates enough traffic to trigger the deadlock, but
-maybe I'm underestimating the problem.
+I'll put it on my list to try to come up with a patch, but it might be
+a while before I get to it since I've already god a whole lot of
+"upstream wishlist" things that I haven't had time for.  My main work
+keep promising to lighten up a little bit to pick some of these tasks
+off.  If someone else is reading this and wants to take a crack at the
+patch themselves, please don't wait for me.
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-Doug
