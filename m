@@ -1,31 +1,32 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 30 Sep 2015 08:40:39 -0700 (PDT)
-Subject: [PATCH v2 0/7] net: mvneta: Switch to per-CPU irq and make
- rxq_def useful
-In-Reply-To: <alpine.DEB.2.11.1509301655140.4500@nanos>
-References: <1443197378-30717-1-git-send-email-gregory.clement@free-electrons.com>
- <20150929.115157.1923947727727463035.davem@davemloft.net>
- <alpine.DEB.2.11.1509301655140.4500@nanos>
-Message-ID: <20150930.084039.1788742148434227487.davem@davemloft.net>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 30 Sep 2015 17:50:18 +0200
+Subject: [PATCH 1/3] ARM: shmobile: smp: Make shmobile_smp_apmu_cpu_shutdown()
+ static
+In-Reply-To: <1443628220-1352-1-git-send-email-geert+renesas@glider.be>
+References: <1443628220-1352-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1443628220-1352-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Gleixner <tglx@linutronix.de>
-Date: Wed, 30 Sep 2015 16:56:06 +0200 (CEST)
+shmobile_smp_apmu_cpu_shutdown() is used inside platsmp-apmu.c only.
 
-> On Tue, 29 Sep 2015, David Miller wrote:
->> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> Date: Fri, 25 Sep 2015 18:09:31 +0200
->> 
->> > As stated in the first version: "this patchset reworks the Marvell
->> > neta driver in order to really support its per-CPU interrupts, instead
->> > of faking them as SPI, and allow the use of any RX queue instead of
->> > the hardcoded RX queue 0 that we have currently."
->> 
->> Series applied, thanks.
-> 
-> You could have had the courtesy to wait for an ack for the core irq
-> parts at least....
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/mach-shmobile/platsmp-apmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Sorry, my impression was that those parts were already discussed and
-agreed upon.
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+index 4e54512bee308312..bcf4cc51b926c479 100644
+--- a/arch/arm/mach-shmobile/platsmp-apmu.c
++++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+@@ -170,7 +170,7 @@ static inline void cpu_enter_lowpower_a15(void)
+ 	dsb();
+ }
+ 
+-void shmobile_smp_apmu_cpu_shutdown(unsigned int cpu)
++static void shmobile_smp_apmu_cpu_shutdown(unsigned int cpu)
+ {
+ 
+ 	/* Select next sleep mode using the APMU */
+-- 
+1.9.1
