@@ -1,44 +1,59 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 30 Sep 2015 16:08:58 +0900
-Subject: [PATCH] ARM: dts: Add Exynos5250 Snow Rev5+ support
-In-Reply-To: <560B8A0F.8090709@osg.samsung.com>
-References: <1443527855-434-1-git-send-email-javier@osg.samsung.com>
- <560B2D29.5060707@samsung.com> <560B8818.8020002@kernel.org>
- <560B890C.3060200@samsung.com> <560B8A0F.8090709@osg.samsung.com>
-Message-ID: <560B8A8A.5050506@samsung.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 30 Sep 2015 15:20:16 +0800
+Subject: [PATCH v5 07/17] ARM: dts: exynos/dp: remove some properties
+ that deprecated by analogix_dp driver
+In-Reply-To: <560B7584.8070703@samsung.com>
+References: <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
+ <1442907799-6266-1-git-send-email-ykk@rock-chips.com>
+ <560B7584.8070703@samsung.com>
+Message-ID: <560B8D30.2010309@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.09.2015 16:06, Javier Martinez Canillas wrote:
-> Hello,
-> 
-> On 09/30/2015 09:02 AM, Krzysztof Kozlowski wrote:
->> On 30.09.2015 15:58, Kukjin Kim wrote:
-> 
-> [snip]
-> 
->>>>
->>>> Could you add the new compatible and fix patch issues pointed by Doug?
->>>>
->>> Documenting for the compatibles would be required even I already applied
->>> its updated patch...
->>
-> 
-> Kukjin, I agree that they should be documented but I thought it would
-> be a separate patch since currently we don't document any board.
->  
->> What do you mean by "documenting compatibles"? These are board
->> compatibles, they are not documented...
->>
-> 
-> Krzysztof, I've on my TODO list to add a file describing all Exynos
-> platforms and DT bindings, something like what other SoC do, i.e:
-> 
-> Documentation/devicetree/bindings/arm/omap/omap.txt
-> Documentation/devicetree/bindings/arm/rockchip.txt
+Hi Krzysztof,
 
-Right, that's a good idea. However lack of it does not affect current
-work because compatibles for Exynos board are not documented at all.
+On 09/30/2015 01:39 PM, Krzysztof Kozlowski wrote:
+> On 22.09.2015 16:43, Yakir Yang wrote:
+>> After exynos_dp have been split the common IP code into analogix_dp driver,
+>> the analogix_dp driver have deprecated some Samsung platform properties which
+>> could be dynamically parsed from EDID/MODE/DPCD message, so this is an update
+>> for Exynos DTS file for dp-controller.
+>>
+>> Beside the backward compatibility is fully preserved, so there are no
+>> bisectability break that make this change in a separate patch.
+>>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>> ---
+>> Changes in v5:
+>> - Correct the misspell in commit message. (Krzysztof)
+>>
+>> Changes in v4:
+>> - Separate all DTS changes to a separate patch. (Krzysztof)
+>>
+>> Changes in v3: None
+>> Changes in v2: None
+>>
+>>   arch/arm/boot/dts/exynos5250-arndale.dts   | 2 --
+>>   arch/arm/boot/dts/exynos5250-smdk5250.dts  | 2 --
+>>   arch/arm/boot/dts/exynos5250-snow.dts      | 4 +---
+>>   arch/arm/boot/dts/exynos5250-spring.dts    | 4 +---
+>>   arch/arm/boot/dts/exynos5420-peach-pit.dts | 4 +---
+>>   arch/arm/boot/dts/exynos5420-smdk5420.dts  | 2 --
+>>   arch/arm/boot/dts/exynos5800-peach-pi.dts  | 4 +---
+>>   7 files changed, 4 insertions(+), 18 deletions(-)
+>>
+> Assuming this will be merged as part of this set (dependency on previous
+> patches):
+>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Best regards,
-Krzysztof
+Thanks a lot ;)
+
+- Yakir
+
+> Best regards,
+> Krzysztof
+>
+>
+>
+>
