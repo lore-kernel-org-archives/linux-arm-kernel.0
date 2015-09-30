@@ -1,66 +1,53 @@
 From: aalonso@freescale.com (Adrian Alonso)
-Date: Wed, 30 Sep 2015 11:11:04 -0500
-Subject: [PATCH v8 2/7] ARM: dts: imx: imx7d-sbd add iomuxc-lpsr hoggrp-2 pads
+Date: Wed, 30 Sep 2015 11:11:05 -0500
+Subject: [PATCH v8 3/7] ARM: dts: imx: imx7d-sbd add usb_otg2_vbus pinctrl
+ settings
 In-Reply-To: <1443629469-12294-1-git-send-email-aalonso@freescale.com>
 References: <1443629469-12294-1-git-send-email-aalonso@freescale.com>
-Message-ID: <1443629469-12294-2-git-send-email-aalonso@freescale.com>
+Message-ID: <1443629469-12294-3-git-send-email-aalonso@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx7d-sdb iomuxc-lpsr hoggrp-2 default pads settings
-Add iomuxc-lpsr usb_otg1_vbus pinctrl settings
+Add usb_otg2_vbus pinctrl settings
 
 Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 ---
-Changes for V2: Resend
-Changes for V3: Resend
-Changes for V4: Resend
-Changes for V5: Resend
-Changes for V6:
-- Add wdog pinctrl group, add comments for hog2 group gpios
-Changes for V7:
-- Remove wdog pinctrl settings as they are not currently used
-- Add pinctrl_usb_otg1_vbus settings
-Changes for V8: Resend
+Changes for V7: New patch in series
+Changes for V8: Rework for latest master
 
- arch/arm/boot/dts/imx7d-sdb.dts | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/boot/dts/imx7d-sdb.dts | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index 88308f3..ca68a67 100644
+index ca68a67..1962cb9 100644
 --- a/arch/arm/boot/dts/imx7d-sdb.dts
 +++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -65,6 +65,8 @@
+@@ -77,6 +77,8 @@
  			regulator-min-microvolt = <5000000>;
  			regulator-max-microvolt = <5000000>;
- 			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
+ 			gpio = <&gpio4 7 GPIO_ACTIVE_HIGH>;
 +			pinctrl-names = "default";
-+			pinctrl-0 =  <&pinctrl_usb_otg1_vbus>;
++			pinctrl-0 =  <&pinctrl_usb_otg2_vbus>;
  			enable-active-high;
  		};
  
-@@ -495,3 +497,22 @@
+@@ -340,11 +342,16 @@
  
- 	};
- };
-+
-+&iomuxc_lpsr {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog_2>;
-+
-+	imx7d-sdb {
-+		pinctrl_hog_2: hog2grp {
+ 		pinctrl_hog: hoggrp {
+ 			fsl,pins = <
+-				MX7D_PAD_UART3_CTS_B__GPIO4_IO7		0x14
+ 				MX7D_PAD_ECSPI2_SS0__GPIO4_IO23		0x34  /* bt reg on */
+ 			>;
+ 		};
+ 
++		pinctrl_usb_otg2_vbus: usbotg2vbusgrp {
 +			fsl,pins = <
-+				MX7D_PAD_GPIO1_IO07__GPIO1_IO7    0x59  /* sensor_int_b */
++				MX7D_PAD_UART3_CTS_B__GPIO4_IO7		0x14 /* usb_otg2_pwr */
 +			>;
 +		};
 +
-+		pinctrl_usb_otg1_vbus: usbotg1vbusgrp {
-+			fsl,pins = <
-+				MX7D_PAD_GPIO1_IO05__GPIO1_IO5    0x14 	/* usb_otg1_pwr */
-+			>;
-+		};
-+	};
-+};
+ 		pinctrl_i2c1: i2c1grp {
+ 			fsl,pins = <
+ 				MX7D_PAD_I2C1_SDA__I2C1_SDA		0x4000007f
 -- 
 2.1.4
