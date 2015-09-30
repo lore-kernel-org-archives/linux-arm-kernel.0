@@ -1,33 +1,56 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Wed, 30 Sep 2015 14:15:22 +0100
-Subject: [PATCH] drm/exynos: Avoid NULL pointer dereference in resume
- if bind failed
-In-Reply-To: <560BC6ED.3090205@samsung.com>
-References: <1443370306-15429-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
- <560BC6ED.3090205@samsung.com>
-Message-ID: <20150930131522.GK5432@ck-lbox>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Wed, 30 Sep 2015 15:46:38 +0200
+Subject: [RESEND][PATCH v3 1/9] ARM: dts: imx6dql-nitrogen6x: add touchscreen
+ support
+In-Reply-To: <1443620806-14792-1-git-send-email-gary.bisson@boundarydevices.com>
+References: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1443620806-14792-1-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1443620806-14792-2-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 08:26:37PM +0900, Inki Dae wrote:
-> Hi,
-> 
-> On 2015? 09? 28? 01:11, Charles Keepax wrote:
-> > If binding failed calling exynos_dp_enable in exynos_dp_resume will
-> > result in several NULL pointer dereferences. It is much better to
-> > simply skip suspend/resume handling if bind has failed, do so by
-> > checking if a drm_dev exists.
-> 
-> Thanks for your patch. However, the pm interfaces of KMS drivers aren't
-> required because these are controlled by top of Exynos drm driver and
-> connector dpms. So I posted a patch that it removes pm interfaces of dp
-> driver.
+This patch adds the different touchscreens that can be connected using
+the displays available for this board.
+http://boundarydevices.com/product-category/displays/
 
-No problems at all, as long as my Arndale starts resuming without
-a NULL pointer I am happy :-)
+Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+---
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Had a quick test of your patch it appears to fix my issue as well
-so totally fine with that.
-
-Thanks,
-Charles
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 04278ba..dadc01a 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -247,6 +247,21 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c3>;
+ 	status = "okay";
++
++	touchscreen at 04 {
++		compatible = "eeti,egalax_ts";
++		reg = <0x04>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
++		wakeup-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
++	};
++
++	touchscreen at 38 {
++		compatible = "edt,edt-ft5x06";
++		reg = <0x38>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
++	};
+ };
+ 
+ &iomuxc {
+@@ -258,6 +273,7 @@
+ 			fsl,pins = <
+ 				/* SGTL5000 sys_mclk */
+ 				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x030b0
++				MX6QDL_PAD_GPIO_9__GPIO1_IO09	0x1b0b0
+ 			>;
+ 		};
+ 
+-- 
+2.5.3
