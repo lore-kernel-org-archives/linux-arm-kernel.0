@@ -1,11 +1,11 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 30 Sep 2015 09:57:30 -0500
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 30 Sep 2015 17:03:40 +0200
 Subject: [RFC/PATCH 00/11] arm: omap: counter32k rework
 In-Reply-To: <6944324.e1oo8C9xbx@wuerfel>
 References: <1443559446-26969-1-git-send-email-balbi@ti.com>
  <20150930141338.GC31865@saruman.tx.rr.com>
  <3705422.OMk7ysE7Jn@wuerfel> <6944324.e1oo8C9xbx@wuerfel>
-Message-ID: <20150930145730.GA32625@saruman.tx.rr.com>
+Message-ID: <20150930150340.GA19079@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -31,14 +31,21 @@ On Wed, Sep 30, 2015 at 04:49:53PM +0200, Arnd Bergmann wrote:
 > If we decide to also delete the tegra_read_persistent_clock()
 > function, we can remove the registration too.
 
-cool, I'll try to have a look at that after this series gets accepted.
+This was discussed a very long time ago, but I can't remember most of
+the context. I found this in my inbox:
 
--- 
-balbi
+	https://lkml.org/lkml/2014/11/7/605
+
+But I don't remember if there was an outcome or if anything came of
+that. I'm currently busy with some other work, but thought I'd drop
+this reference here in case somebody wants to dig into it before I
+get around to it.
+
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/20855b9b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/e12518b4/attachment.sig>
