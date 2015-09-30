@@ -1,96 +1,120 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 30 Sep 2015 17:00:57 +0800
-Subject: [PATCH v5 0/5] Provide better MADT subtable sanity checks
-In-Reply-To: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
-References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
-Message-ID: <560BA4C9.7090607@huawei.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Wed, 30 Sep 2015 17:03:01 +0800
+Subject: [PATCH] mmc: core: Fix init_card in 52Mhz
+In-Reply-To: <560B9C24.3090209@intel.com>
+References: <1443583688-1952-1-git-send-email-chaotian.jing@mediatek.com>
+ <560B9C24.3090209@intel.com>
+Message-ID: <1443603781.5148.0.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/9/30 7:45, Al Stone wrote:
-> NB: this patch set is for use against the linux-pm bleeding edge branch.
->
-> Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
-> check on the various subtables that are defined for the MADT.  The check
-> compares the size of the subtable data structure as defined by ACPICA to
-> the length entry in the subtable.  If they are not the same, the assumption
-> is that the subtable is incorrect.
->
-> Over time, the ACPI spec has allowed for MADT subtables where this can
-> never be true (the local SAPIC subtable, for example).  Or, more recently,
-> the spec has accumulated some minor flaws where there are three possible 
-> sizes for a subtable, all of which are valid, but only for specific versions
-> of the spec (the GICC subtable).  In both cases, BAD_MADT_ENTRY reports these
-> subtables as bad when they are not.  In order to retain some sanity check
-> on the MADT subtables, we now have to special case these subtables.  Of
-> necessity, these special cases have ended up in arch-dependent code (arm64)
-> or an arch has simply decided to forgo the check (ia64).
->
-> This patch set replaces the BAD_MADT_ENTRY macro with a function called
-> bad_madt_entry().  This function uses a data set of details about the
-> subtables to provide more sanity checking than before:
->
-> 	-- is the subtable legal for the version given in the FADT?
->
-> 	-- is the subtable legal for the revision of the MADT in use?
->
-> 	-- is the subtable of the proper length (including checking
-> 	   on the one variable length subtable that is currently ignored),
-> 	   given the FADT version and the MADT revision?
->
-> Further, this patch set adds in the call to bad_madt_entry() from the 
-> acpi_table_parse_madt() function, allowing it to be used consistently
-> by all architectures, for all subtables, and removing the need for each
-> of the subtable traversal callback functions to use BAD_MADT_ENTRY.
->
-> In theory, as the ACPI specification changes, we would only have to add
-> additional information to the data set describing the MADT subtables in
-> order to continue providing sanity checks, even when new subtables are
-> added.
->
-> These patches have been tested on an APM Mustang (arm64) and are known to
-> work there.  They have also been cross-compiled for x86 and ia64 with no
-> known failures.
->
-> Changes for v5:
->    -- 0-day found incorrect data in the table describing allowed MADT
->       subtables; this only affected ACPI 1.0 firmware.  Corrected the
->       data to meet the 1.0b spec.
->    -- Rebase to bleeding-edge branch for Rafael Wysocki; this patch set
->       now requires that a patch set from Marc Zyngier be applied first:
->       https://lkml.org/lkml/2015/9/28/421
->    -- Tested on AMD Seattle (linux-pm tree) also
->
-> Changes for v4:
->    -- Remove extraneous white space change (Graeme Gregory)
->    -- acpi_parse_entries() changes also needed a check to make sure that
->       only MADT entries used bad_madt_entry() (Sudeep Holla)
->    -- inadvertent use of 01day build noted that bad_madt_entry() can be
->       static, so added it (Sudeep Holla, Fengguang Wu)
->
-> Changes for v3:
->    -- Reviewed-and-tested-by from Sudeep Holla for arm64 parts
->    -- Clearer language in error messages (Graeme Gregory, Timur Tabi)
->    -- Double checked that inserting call to bad_madt_entry() into the
->       function acpi_parse_entries() does not impact current behavior
->       (Sudeep Holla)
->    
-> Changes for v2:
->    -- Acked-by on 2/5 from Marc Zyngier and Catalin Marinas for ARM
->    -- Correct faulty end of loop test found by Timur Tabi
->
->
-> Al Stone (5):
->   ACPI: add in a bad_madt_entry() function to eventually replace the
->     macro
->   ACPI / ARM64: remove usage of BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
->   ACPI / IA64: remove usage of BAD_MADT_ENTRY
->   ACPI / X86: remove usage of BAD_MADT_ENTRY
->   ACPI: remove definition of BAD_MADT_ENTRY macro
+On Wed, 2015-09-30 at 11:24 +0300, Adrian Hunter wrote:
+> On 30/09/15 06:28, Chaotian Jing wrote:
+> > Suppose that we got a data crc error, and it triggers the mmc_reset.
+> > mmc_reset will call mmc_send_status to see if HW reset was supported.
+> > before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
+> > it will reduce frequency to 52Mhz firstly, that results in card init
+> > was doing at 52Mhz, So need ensure frequency is lower than 400Khz when
+> > re-init card.
+> 
+> The call to mmc_send_status() was originally only done for mmc_test and
+> doesn't belong in a real reset.  However the test parameter was removed
+> to simplify the code by:
+> 
+> commit 83533ab28380f6957af39a7b322e639e42dbdaf1
+> Author: Johan Rudholm <johan.rudholm@axis.com>
+> Date:   Mon Jan 12 15:38:04 2015 +0100
+> 
+>     mmc: core: always check status after reset
+>     
+>     Always check if the card is alive after a successful reset. This allows
+>     us to remove mmc_hw_reset_check(), leaving mmc_hw_reset() as the only
+>     card reset interface.
+>     
+>     Signed-off-by: Johan Rudholm <johanru@axis.com>
+>     Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> 
+> IMHO having a test to check whether hw reset actually did reset the card
+> is useful, so I would suggest putting back mmc_hw_reset_check() and
+> removing the check from the non-test path.
+> 
+> An alternative is to recognize that we don't want retuning here, and it is
+> unlikely to be needed in the mmc_test case.  So if retuning is needed, just
+> skip the call to mmc_send_status() i.e.
+> 
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index f2d0c2ae85b1..c3749ba42739 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
+>  	host->ops->hw_reset(host);
+>  
+>  	/* If the reset has happened, then a status command will fail */
+> -	if (!mmc_send_status(card, &status)) {
+> +	if (!host->need_retune && !mmc_send_status(card, &status)) {
+>  		mmc_host_clk_release(host);
+>  		return -ENOSYS;
+>  	}
+> 
+> Could then make mmc_test aware of that:
+>  
 
-For this patch set,
-
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-Thanks
-Hanjun
+> This solution is better, please help to upstream it. Thx!
+> diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
+> index b78cf5d403a3..7b105b97be78 100644
+> --- a/drivers/mmc/card/mmc_test.c
+> +++ b/drivers/mmc/card/mmc_test.c
+> @@ -2272,6 +2272,16 @@ static int mmc_test_hw_reset(struct mmc_test_card *test)
+>  	if (!mmc_card_mmc(card) || !mmc_can_reset(card))
+>  		return RESULT_UNSUP_CARD;
+>  
+> +	err = mmc_send_status(card, NULL);
+> +	if (err)
+> +		return err;
+> +
+> +	if (host->need_retune) {
+> +		pr_info("%s: cannot test hw reset because retune needed\n",
+> +			mmc_hostname(test->card->host));
+> +		return RESULT_FAIL;
+> +	}
+> +
+>  	err = mmc_hw_reset(host);
+>  	if (!err)
+>  		return RESULT_OK;
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index f2d0c2ae85b1..c3749ba42739 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
+>  	host->ops->hw_reset(host);
+>  
+>  	/* If the reset has happened, then a status command will fail */
+> -	if (!mmc_send_status(card, &status)) {
+> +	if (!host->need_retune && !mmc_send_status(card, &status)) {
+>  		mmc_host_clk_release(host);
+>  		return -ENOSYS;
+>  	}
+> 
+> 
+> 
+> 
+> > 
+> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > ---
+> >  drivers/mmc/core/mmc.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> > index e726903..f2d0c2a 100644
+> > --- a/drivers/mmc/core/mmc.c
+> > +++ b/drivers/mmc/core/mmc.c
+> > @@ -1945,6 +1945,7 @@ static int mmc_reset(struct mmc_host *host)
+> >  
+> >  	/* Set initial state and call mmc_set_ios */
+> >  	mmc_set_initial_state(host);
+> > +	mmc_set_clock(host, host->f_init);
+> >  	mmc_host_clk_release(host);
+> >  
+> >  	return mmc_init_card(host, card->ocr, card);
+> > 
+> 
