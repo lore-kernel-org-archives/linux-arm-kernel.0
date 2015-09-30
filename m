@@ -1,183 +1,184 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Sep 2015 23:45:26 +0200
-Subject: [PATCH v2 4/7] mtd: nand: sunxi: factorize extra OOB bytes handling
+Date: Wed, 30 Sep 2015 23:45:23 +0200
+Subject: [PATCH v2 1/7] mtd: nand: sunxi: create
+ sunxi_nfc_hw_ecc_enable()/disable() functions
 In-Reply-To: <1443649529-9852-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1443649529-9852-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1443649529-9852-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1443649529-9852-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add helper functions to factorize the code dealing extra OOB bytes in the
-normal and syndrome ECC implementations.
+The code used to enable/disable the hardware ECC engine is repeated in a
+lot of places. Create two functions to avoid code duplication.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/sunxi_nand.c | 90 +++++++++++++++++++++++--------------------
- 1 file changed, 48 insertions(+), 42 deletions(-)
+ drivers/mtd/nand/sunxi_nand.c | 70 ++++++++++++++++++++-----------------------
+ 1 file changed, 32 insertions(+), 38 deletions(-)
 
 diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index 176d0f0..45b74fc 100644
+index dc44435..471fc2b 100644
 --- a/drivers/mtd/nand/sunxi_nand.c
 +++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -621,6 +621,26 @@ static int sunxi_nfc_hw_ecc_read_chunk(struct mtd_info *mtd,
- 	return 0;
+@@ -543,6 +543,30 @@ static void sunxi_nfc_cmd_ctrl(struct mtd_info *mtd, int dat,
+ 	sunxi_nfc_wait_int(nfc, NFC_CMD_INT_FLAG, 0);
  }
  
-+static void sunxi_nfc_hw_ecc_read_extra_oob(struct mtd_info *mtd,
-+					    u8 *oob, int *cur_off)
++static void sunxi_nfc_hw_ecc_enable(struct mtd_info *mtd)
 +{
 +	struct nand_chip *nand = mtd->priv;
-+	struct nand_ecc_ctrl *ecc = &nand->ecc;
-+	int offset = ((ecc->bytes + 4) * ecc->steps);
-+	int len = mtd->oobsize - offset;
++	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
++	struct sunxi_nand_hw_ecc *data = nand->ecc.priv;
++	u32 ecc_ctl;
 +
-+	if (len <= 0)
-+		return;
++	ecc_ctl = readl(nfc->regs + NFC_REG_ECC_CTL);
++	ecc_ctl &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE |
++		     NFC_ECC_BLOCK_SIZE_MSK);
++	ecc_ctl |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
 +
-+	if (*cur_off != offset)
-+		nand->cmdfunc(mtd, NAND_CMD_RNDOUT,
-+			      offset + mtd->writesize, -1);
-+
-+	sunxi_nfc_read_buf(mtd, oob + offset, len);
-+
-+	*cur_off = mtd->oobsize + mtd->writesize;
++	writel(ecc_ctl, nfc->regs + NFC_REG_ECC_CTL);
 +}
 +
- static int sunxi_nfc_hw_ecc_write_chunk(struct mtd_info *mtd,
- 					const u8 *data, int data_off,
- 					const u8 *oob, int oob_off,
-@@ -659,6 +679,26 @@ static int sunxi_nfc_hw_ecc_write_chunk(struct mtd_info *mtd,
- 	return 0;
- }
- 
-+static void sunxi_nfc_hw_ecc_write_extra_oob(struct mtd_info *mtd,
-+					     u8 *oob, int *cur_off)
++static void sunxi_nfc_hw_ecc_disable(struct mtd_info *mtd)
 +{
 +	struct nand_chip *nand = mtd->priv;
-+	struct nand_ecc_ctrl *ecc = &nand->ecc;
-+	int offset = ((ecc->bytes + 4) * ecc->steps);
-+	int len = mtd->oobsize - offset;
++	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
 +
-+	if (len <= 0)
-+		return;
-+
-+	if (*cur_off != offset)
-+		nand->cmdfunc(mtd, NAND_CMD_RNDIN,
-+			      offset + mtd->writesize, -1);
-+
-+	sunxi_nfc_write_buf(mtd, oob + offset, len);
-+
-+	*cur_off = mtd->oobsize + mtd->writesize;
++	writel(readl(nfc->regs + NFC_REG_ECC_CTL) & ~NFC_ECC_EN,
++	       nfc->regs + NFC_REG_ECC_CTL);
 +}
 +
  static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
  				      struct nand_chip *chip, uint8_t *buf,
  				      int oob_required, int page)
-@@ -666,8 +706,6 @@ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
+@@ -550,7 +574,6 @@ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
+ 	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
  	struct nand_ecc_ctrl *ecc = &chip->ecc;
+ 	struct nand_ecclayout *layout = ecc->layout;
+-	struct sunxi_nand_hw_ecc *data = ecc->priv;
  	unsigned int max_bitflips = 0;
- 	int ret, i, cur_off = 0;
--	int offset;
--	int cnt;
+ 	int offset;
+ 	int ret;
+@@ -558,11 +581,7 @@ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
+ 	int i;
+ 	int cnt;
  
- 	sunxi_nfc_hw_ecc_enable(mtd);
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
+-	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
+-
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_hw_ecc_enable(mtd);
  
-@@ -684,16 +722,8 @@ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
- 			return ret;
+ 	for (i = 0; i < ecc->steps; i++) {
+ 		if (i)
+@@ -620,10 +639,7 @@ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
+ 		}
  	}
  
--	if (oob_required) {
--		cnt = ecc->layout->oobfree[ecc->steps].length;
--		if (cnt > 0) {
--			offset = mtd->writesize +
--				 ecc->layout->oobfree[ecc->steps].offset;
--			chip->cmdfunc(mtd, NAND_CMD_RNDOUT, offset, -1);
--			offset -= mtd->writesize;
--			chip->read_buf(mtd, chip->oob_poi + offset, cnt);
--		}
--	}
-+	if (oob_required)
-+		sunxi_nfc_hw_ecc_read_extra_oob(mtd, chip->oob_poi, &cur_off);
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~NFC_ECC_EN;
+-
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_hw_ecc_disable(mtd);
  
- 	sunxi_nfc_hw_ecc_disable(mtd);
+ 	return max_bitflips;
+ }
+@@ -635,18 +651,13 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
+ 	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
+ 	struct nand_ecc_ctrl *ecc = &chip->ecc;
+ 	struct nand_ecclayout *layout = ecc->layout;
+-	struct sunxi_nand_hw_ecc *data = ecc->priv;
+ 	int offset;
+ 	int ret;
+ 	u32 tmp;
+ 	int i;
+ 	int cnt;
  
-@@ -706,8 +736,6 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
+-	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
+-
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_hw_ecc_enable(mtd);
+ 
+ 	for (i = 0; i < ecc->steps; i++) {
+ 		if (i)
+@@ -686,10 +697,7 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
+ 		}
+ 	}
+ 
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~NFC_ECC_EN;
+-
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_hw_ecc_disable(mtd);
+ 
+ 	return 0;
+ }
+@@ -701,7 +709,6 @@ static int sunxi_nfc_hw_syndrome_ecc_read_page(struct mtd_info *mtd,
  {
+ 	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
  	struct nand_ecc_ctrl *ecc = &chip->ecc;
- 	int ret, i, cur_off = 0;
--	int offset;
--	int cnt;
- 
- 	sunxi_nfc_hw_ecc_enable(mtd);
- 
-@@ -724,16 +752,8 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
- 			return ret;
- 	}
- 
--	if (oob_required) {
--		cnt = ecc->layout->oobfree[i].length;
--		if (cnt > 0) {
--			offset = mtd->writesize +
--				 ecc->layout->oobfree[i].offset;
--			chip->cmdfunc(mtd, NAND_CMD_RNDIN, offset, -1);
--			offset -= mtd->writesize;
--			chip->write_buf(mtd, chip->oob_poi + offset, cnt);
--		}
--	}
-+	if (oob_required)
-+		sunxi_nfc_hw_ecc_write_extra_oob(mtd, chip->oob_poi, &cur_off);
- 
- 	sunxi_nfc_hw_ecc_disable(mtd);
- 
-@@ -748,7 +768,6 @@ static int sunxi_nfc_hw_syndrome_ecc_read_page(struct mtd_info *mtd,
- 	struct nand_ecc_ctrl *ecc = &chip->ecc;
+-	struct sunxi_nand_hw_ecc *data = ecc->priv;
  	unsigned int max_bitflips = 0;
- 	int ret, i, cur_off = 0;
--	int cnt;
+ 	uint8_t *oob = chip->oob_poi;
+ 	int offset = 0;
+@@ -710,11 +717,7 @@ static int sunxi_nfc_hw_syndrome_ecc_read_page(struct mtd_info *mtd,
+ 	u32 tmp;
+ 	int i;
  
- 	sunxi_nfc_hw_ecc_enable(mtd);
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
+-	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
+-
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_hw_ecc_enable(mtd);
  
-@@ -765,14 +784,8 @@ static int sunxi_nfc_hw_syndrome_ecc_read_page(struct mtd_info *mtd,
- 			return ret;
+ 	for (i = 0; i < ecc->steps; i++) {
+ 		chip->read_buf(mtd, NULL, ecc->size);
+@@ -755,8 +758,7 @@ static int sunxi_nfc_hw_syndrome_ecc_read_page(struct mtd_info *mtd,
+ 		}
  	}
  
--	if (oob_required) {
--		cnt = mtd->writesize + mtd->oobsize - cur_off;
--		if (cnt > 0) {
--			u8 *oob = chip->oob_poi + mtd->oobsize - cnt;
--
--			chip->read_buf(mtd, oob, cnt);
--		}
--	}
-+	if (oob_required)
-+		sunxi_nfc_hw_ecc_read_extra_oob(mtd, chip->oob_poi, &cur_off);
+-	writel(readl(nfc->regs + NFC_REG_ECC_CTL) & ~NFC_ECC_EN,
+-	       nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_hw_ecc_disable(mtd);
  
- 	sunxi_nfc_hw_ecc_disable(mtd);
- 
-@@ -786,7 +799,6 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
+ 	return max_bitflips;
+ }
+@@ -768,7 +770,6 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
  {
+ 	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
  	struct nand_ecc_ctrl *ecc = &chip->ecc;
- 	int ret, i, cur_off = 0;
--	int cnt;
+-	struct sunxi_nand_hw_ecc *data = ecc->priv;
+ 	uint8_t *oob = chip->oob_poi;
+ 	int offset = 0;
+ 	int ret;
+@@ -776,11 +777,7 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
+ 	u32 tmp;
+ 	int i;
  
- 	sunxi_nfc_hw_ecc_enable(mtd);
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~(NFC_ECC_MODE_MSK | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE_MSK);
+-	tmp |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION;
+-
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_hw_ecc_enable(mtd);
  
-@@ -802,14 +814,8 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
- 			return ret;
+ 	for (i = 0; i < ecc->steps; i++) {
+ 		chip->write_buf(mtd, buf + (i * ecc->size), ecc->size);
+@@ -810,10 +807,7 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
+ 		}
  	}
  
--	if (oob_required) {
--		cnt = mtd->writesize + mtd->oobsize - cur_off;
--		if (cnt > 0) {
--			u8 *oob = chip->oob_poi + mtd->oobsize - cnt;
+-	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
+-	tmp &= ~NFC_ECC_EN;
 -
--			chip->write_buf(mtd, oob, cnt);
--		}
--	}
-+	if (oob_required)
-+		sunxi_nfc_hw_ecc_write_extra_oob(mtd, chip->oob_poi, &cur_off);
+-	writel(tmp, nfc->regs + NFC_REG_ECC_CTL);
++	sunxi_nfc_hw_ecc_disable(mtd);
  
- 	sunxi_nfc_hw_ecc_disable(mtd);
- 
+ 	return 0;
+ }
 -- 
 2.1.4
