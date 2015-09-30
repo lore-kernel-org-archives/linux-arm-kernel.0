@@ -1,190 +1,172 @@
-From: Bharat.Bhushan@freescale.com (Bhushan Bharat)
-Date: Wed, 30 Sep 2015 09:37:21 +0000
-Subject: [RFC 0/2] VFIO: Add virtual MSI doorbell support.
-In-Reply-To: <20150925171206.GA2151@lvm>
-References: <1437728590-23126-1-git-send-email-pranavkumar@linaro.org>
- <1438100507.5211.170.camel@redhat.com>
- <CY1PR0301MB127660D71378F009918DDDD5908D0@CY1PR0301MB1276.namprd03.prod.outlook.com>
- <1438106335.5211.219.camel@redhat.com>
- <CAAHg+HgosCe=1T5ER-4AS1g779RxCDjcrazKV4CQC-43zDK-+Q@mail.gmail.com>
- <CY1PR0301MB12761E7FA759BD1D6F218B8B90760@CY1PR0301MB1276.namprd03.prod.outlook.com>
- <20150922230914.79972137@arm.com> <20150925171206.GA2151@lvm>
-Message-ID: <CY1PR0301MB127606669546CBE5AE26AEF4904D0@CY1PR0301MB1276.namprd03.prod.outlook.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 30 Sep 2015 17:39:23 +0800
+Subject: [PATCH v5 05/17] drm: bridge: analogix/dp: dynamic parse sync_pol
+ & interlace & dynamic_range
+In-Reply-To: <560B9CAA.9080109@samsung.com>
+References: <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
+ <1442907477-3283-1-git-send-email-ykk@rock-chips.com>
+ <560B73D4.30109@samsung.com> <560B8CF1.7050102@rock-chips.com>
+ <560B9075.1000304@samsung.com> <560B9B33.2060409@rock-chips.com>
+ <560B9CAA.9080109@samsung.com>
+Message-ID: <560BADCB.9020502@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Krzysztof,
 
+On 09/30/2015 04:26 PM, Krzysztof Kozlowski wrote:
+> On 30.09.2015 17:20, Yakir Yang wrote:
+>> Hi Krzysztof,
+>>
+>> On 09/30/2015 03:34 PM, Krzysztof Kozlowski wrote:
+>>> On 30.09.2015 16:19, Yakir Yang wrote:
+>>>> Hi Krzysztof,
+>>>>
+>>>> On 09/30/2015 01:32 PM, Krzysztof Kozlowski wrote:
+>>>>> On 22.09.2015 16:37, Yakir Yang wrote:
+>>>>>> Both hsync/vsync polarity and interlace mode can be parsed from
+>>>>>> drm display mode, and dynamic_range and ycbcr_coeff can be judge
+>>>>>> by the video code.
+>>>>>>
+>>>>>> But presumably Exynos still relies on the DT properties, so take
+>>>>>> good use of mode_fixup() in to achieve the compatibility hacks.
+>>>>>>
+>>>>>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>>>>>> ---
+>>>>>> Changes in v5:
+>>>>>> - Switch video timing type to "u32", so driver could use "of_property_read_u32"
+>>>>>>    to get the backword timing values.
+>>>>> Okay
+>>>>>
+>>>>>> Krzysztof suggest me that driver could use
+>>>>>>    the "of_property_read_bool" to get backword timing values, but that interfacs
+>>>>>>    would modify the original drm_display_mode timing directly (whether those
+>>>>>>    properties exists or not).
+>>>>> Hmm, I don't understand. You have a:
+>>>>> 	struct video_info {
+>>>>> 		bool h_sync_polarity;
+>>>>> 		bool v_sync_polarity;
+>>>>> 		bool interlaced;
+>>>>> 	};
+>>>>>
+>>>>> so what is wrong with:
+>>>>> 	dp_video_config->h_sync_polarity =
+>>>>> 		of_property_read_bool(dp_node, "hsync-active-high");
+>>>>>
+>>>>> Is it exactly the same binding as previously?
+>>>> Yes, it is the same binding as previously. But just a note that we already
+>>>> mark those DT binding as deprecated.
+>>>>
+>>>> +-interlaced:            deprecated prop that can parsed frm drm_display_mode.
+>>>> +-vsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
+>>>> +-hsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
+>>>>
+>>>>
+>>>> For now those values should come from "struct drm_display_mode",
+>>>> and we already parsed them out from "drm_display_mode" before
+>>>> driver provide the backward compatibility.
+>>>>
+>>>> Let's used the "hsync-active-high" example:
+>>>>      As for now the code would like:
+>>>>      static void analogix_dp_bridge_mode_set(...)
+>>>>      {
+>>>>          // Parsed timing value from "drm_display_mode"
+>>>>          video->h_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NHSYNC);
+>>>>
+>>>>          // Try to detect the deprecated property, providing
+>>>>          // the backward compatibility
+>>>>          of_property_read_u32(dp_node, "hsync-active-high",
+>>>>                                   &video->h_sync_polarity);
+>>>>
+>>>>          /*
+>>>>           * In this case, if "hsync-active-high" property haven't been
+>>>>           * found, then the video timing "h_sync_polarity" would  keep
+>>>>           * no change, keeping the parsed value from "drm_display_mode"
+>>>>           */
+>>>>      }
+>>>>
+>>>>      But if keep the "of_property_read_bool", then code would like:
+>>>>      static void analogix_dp_bridge_mode_set(...)
+>>>>      {
+>>>>          // Parsed timing value from "drm_display_mode"
+>>>>          video->h_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NHSYNC);
+>>>>
+>>>>          // Try to detect the deprecated property, providing
+>>>>          // the backward compatibility
+>>>>          video->h_sync_polarity =
+>>>>                      of_property_read_bool(dp_node, "hsync-active-high");
+>>>>     
+>>>>
+>>>>          /*
+>>>>           * In this case, if "hsync-active-high" property haven't been
+>>>>           * found, then the video timing "h_sync_polarity" would just
+>>>>           * modify to "false". That is the place we don't want, cause
+>>>>           * it would always modify the timing value parsed from
+>>>>           * "drm_display_mode"
+>>>>           */
+>>>>      }
+>>>>
+>>> OK, I see the point of overwriting values from drm_display_mode. However
+>>> I think you changed the binding. I believe the of_property_read_u32()
+>>> will behave differently for such DTS:
+>>>
+>>> exynos_dp {
+>>> 	...
+>>> 	hsync-active-high;
+>>> }
+>>>
+>>> It will return -EOVERFLOW which means it would be broken now...
+>> Whoops, thanks for your remind, after try that, I do see over flow error.
+>> static void *of_find_property_value_of_size(const struct device_node *np,
+>>                          const char *propname, u32 len)
+>> {
+>>          ....
+>>          if (len > prop->length)
+>>                  return ERR_PTR(-EOVERFLOW);
+>>          ...
+>> }
+>>
+>> So I though code should be:
+>>      if (of_property_read_bool(dp_node, "hsync-active-high"))
+>>          video->h_sync_polarity = true;
+> Looks good.
+>
+>> And we can't provide full backward compatibility for this property, cause
+>> the previous exynos_dp driver would set this timing value to "false" when
+>> property not defined, but analogix_dp driver keep this timing value
+>> corresponding to "drm_display_mode" when property not found.
+> Indeed, the behaviour changes. I don't know if this is important issue...
 
-> -----Original Message-----
-> From: Christoffer Dall [mailto:christoffer.dall at linaro.org]
-> Sent: Friday, September 25, 2015 10:42 PM
-> To: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Bhushan Bharat-R65777 <Bharat.Bhushan@freescale.com>; Pranavkumar
-> Sawargaonkar <pranavkumar@linaro.org>; kvm at vger.kernel.org; Alex
-> Williamson <alex.williamson@redhat.com>; kvmarm at lists.cs.columbia.edu;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Will
-> Deacon <Will.Deacon@arm.com>; bhelgaas at google.com; arnd at arndb.de;
-> rob.herring at linaro.org; eric.auger at linaro.org; patches at apm.com; Yoder
-> Stuart-B08248 <stuart.yoder@freescale.com>
-> Subject: Re: [RFC 0/2] VFIO: Add virtual MSI doorbell support.
-> 
-> On Tue, Sep 22, 2015 at 11:09:14PM +0100, Marc Zyngier wrote:
-> > On Tue, 4 Aug 2015 06:52:01 +0100
-> > Bhushan Bharat <Bharat.Bhushan@freescale.com> wrote:
-> >
-> > >
-> > >
-> > > > -----Original Message-----
-> > > > From: Pranavkumar Sawargaonkar [mailto:pranavkumar at linaro.org]
-> > > > Sent: Tuesday, August 04, 2015 11:18 AM
-> > > > To: Bhushan Bharat-R65777
-> > > > Cc: kvm at vger.kernel.org; Alex Williamson;
-> > > > kvmarm at lists.cs.columbia.edu;
-> > > > linux-arm-kernel at lists.infradead.org;
-> > > > linux-kernel at vger.kernel.org; christoffer.dall at linaro.org;
-> > > > marc.zyngier at arm.com; will.deacon at arm.com; bhelgaas at google.com;
-> > > > arnd at arndb.de; rob.herring at linaro.org; eric.auger at linaro.org;
-> > > > patches at apm.com; Yoder Stuart-B08248
-> > > > Subject: Re: [RFC 0/2] VFIO: Add virtual MSI doorbell support.
-> > > >
-> > > > Hi Bharat,
-> > > >
-> > > > On 28 July 2015 at 23:28, Alex Williamson
-> > > > <alex.williamson@redhat.com>
-> > > > wrote:
-> > > > > On Tue, 2015-07-28 at 17:23 +0000, Bhushan Bharat wrote:
-> > > > >> Hi Alex,
-> > > > >>
-> > > > >> > -----Original Message-----
-> > > > >> > From: Alex Williamson [mailto:alex.williamson at redhat.com]
-> > > > >> > Sent: Tuesday, July 28, 2015 9:52 PM
-> > > > >> > To: Pranavkumar Sawargaonkar
-> > > > >> > Cc: kvm at vger.kernel.org; kvmarm at lists.cs.columbia.edu;
-> > > > >> > linux-arm- kernel at lists.infradead.org;
-> > > > >> > linux-kernel at vger.kernel.org; christoffer.dall at linaro.org;
-> > > > >> > marc.zyngier at arm.com; will.deacon at arm.com;
-> > > > >> > bhelgaas at google.com; arnd at arndb.de; rob.herring at linaro.org;
-> > > > >> > eric.auger at linaro.org; patches at apm.com; Bhushan
-> > > > >> > Bharat-R65777; Yoder
-> > > > >> > Stuart-B08248
-> > > > >> > Subject: Re: [RFC 0/2] VFIO: Add virtual MSI doorbell support.
-> > > > >> >
-> > > > >> > On Fri, 2015-07-24 at 14:33 +0530, Pranavkumar Sawargaonkar
-> wrote:
-> > > > >> > > In current VFIO MSI/MSI-X implementation, linux host kernel
-> > > > >> > > allocates MSI/MSI-X vectors when userspace requests through
-> > > > >> > > vfio
-> > > > ioctls.
-> > > > >> > > Vfio creates irqfd mappings to notify MSI/MSI-X interrupts
-> > > > >> > > to the userspace when raised.
-> > > > >> > > Guest OS will see emulated MSI/MSI-X controller and
-> > > > >> > > receives an interrupt when kernel notifies the same via irqfd.
-> > > > >> > >
-> > > > >> > > Host kernel allocates MSI/MSI-X using standard linux
-> > > > >> > > routines like
-> > > > >> > > pci_enable_msix_range() and pci_enable_msi_range().
-> > > > >> > > These routines along with requset_irq() in host kernel sets
-> > > > >> > > up MSI/MSI-X vectors with Physical MSI/MSI-X addresses
-> > > > >> > > provided by interrupt controller driver in host kernel.
-> > > > >> > >
-> > > > >> > > This means when a device is assigned with the guest OS,
-> > > > >> > > MSI/MSI-X addresses present in PCIe EP are the PAs
-> > > > >> > > programmed by the host linux
-> > > > >> > kernel.
-> > > > >> > >
-> > > > >> > > In x86 MSI/MSI-X physical address range is reserved and
-> > > > >> > > iommu is aware about these addreses and transalation is
-> > > > >> > > bypassed for these
-> > > > address range.
-> > > > >> > >
-> > > > >> > > Unlike x86, ARM/ARM64 does not reserve MSI/MSI-X Physical
-> > > > >> > > address range and all the transactions including MSI go
-> > > > >> > > through iommu/smmu
-> > > > >> > without bypass.
-> > > > >> > > This requires extending current vfio MSI layer with
-> > > > >> > > additional functionality for ARM/ARM64 by 1. Programing
-> > > > >> > > IOVA (referred as a MSI virtual doorbell address)
-> > > > >> > >    in device's MSI vector as a MSI address.
-> > > > >> > >    This IOVA will be provided by the userspace based on the
-> > > > >> > >    MSI/MSI-X addresses reserved for the guest.
-> > > > >> > > 2. Create an IOMMU mapping between this IOVA and
-> > > > >> > >    Physical address (PA) assigned to the MSI vector.
-> > > > >> > >
-> > > > >> > > This RFC is proposing a solution for MSI/MSI-X passthrough
-> > > > >> > > for
-> > > > >> > ARM/ARM64.
-> > > > >> >
-> > > > >> >
-> > > > >> > Hi Pranavkumar,
-> > > > >> >
-> > > > >> > Freescale has the same, or very similar, need, so any
-> > > > >> > solution in this space will need to work for both ARM and
-> > > > >> > powerpc.  I'm not a big fan of this approach as it seems to
-> > > > >> > require the user to configure MSI/X via ioctl and then call a
-> > > > >> > separate ioctl mapping the doorbells.  That's more code for
-> > > > >> > the user, more code to get wrong and potentially a gap
-> > > > >> > between configuring MSI/X and enabling
-> > > > mappings where we could see IOMMU faults.
-> > > > >> >
-> > > > >> > If we know that doorbell mappings are required, why can't we
-> > > > >> > set aside a bank of IOVA space and have them mapped
-> > > > >> > automatically as MSI/X is being configured?  Then the user's
-> > > > >> > need for special knowledge and handling of this case is
-> > > > >> > limited to setup.  The IOVA space will be mapped and used as
-> > > > >> > needed, we only need the user to specify the IOVA space
-> > > > >> > reserved for this.  Thanks,
-> > > > >>
-> > > > >> We probably need a mix of both to support Freescale PowerPC and
-> > > > >> ARM based machines.
-> > > > >> In this mix mode kernel vfio driver will reserve some IOVA for
-> > > > >> mapping MSI page/s.
-> > > > >
-> > > > > If vfio is reserving pages independently from the user, this
-> > > > > becomes what Marc called "shaping" the VM and what x86
-> > > > > effectively does.  An interface extension should expose these
-> > > > > implicit regions so the user can avoid them for DMA memory
-> mapping.
-> > > > >
-> > > > >>  If any other iova mapping will overlap with this then it will
-> > > > >> return error and user-space. Ideally this should be choosen in
-> > > > >> such a way that it never overlap, which is easy on some systems
-> > > > >> but can be tricky on some other system like Freescale PowerPC.
-> > > > >> This is not sufficient for at-least Freescale PowerPC based
-> > > > >> SOC. This is because of hardware limitation, where we need to
-> > > > >> fit this reserved iova address within aperture decided by
-> > > > >> user-space. So if we allow user-space to change this reserved
-> > > > >> iova address to a value decided by user-spece itself then we
-> > > > >> can support both ARM/PowerPC based
-> > > > solutions.
-> > > > >
-> > > > > Yes, that's my intention, to allow userspace to specify the
-> > > > > reserved region.  I believe you have some additional
-> > > > > restrictions on the number of MSI banks available and whether
-> > > > > MSI banks can be shared, but I would hope that doesn't preclude a
-> shared interface with ARM.
-> > > > >
-> > > > >> I have some implementation ready/tested with this approach and
-> > > > >> if this approach looks good then I can submit a RFC patch.
-> > > > >
-> > > > > Yes, please post.  Thanks,
-> > > >
-> > > > Could you please share a tentative timeline by which you will be
-> > > > posting your patches ?
-> > >
-> > > I have not touched that code for a while, I am planning to send the
-> > > patch in couple of weeks.
-> >
-> > Have we made any progress on this subject? It looks like a lot of time
-> > has passed, but I haven't seen anything. Did I miss it?
-> >
-> Pranav is going to respin his series, because we are clarly not making progress
-> on this front.
+Hmm... as I know the timing polarity would influence something like:
+     - CTS test
+     - HDCP function
 
-Sorry for long long delay, some unplanned leaves delays this work.
-Finally I sent of the RFC patches, those patches are not tested with PCI devices but tested with some freescale specific platform/devices.
+But I though it's more likely that driver would made those functions 
+failed if
+hard code the timing polarity.
 
-Thanks
--Bharat
-> 
-> Thanks,
-> -Christoffer
+And I think it would be better to get timing polarity from 
+"drm_display_mode".
+Caused the analogix_dp driver have called the drm_add_edid_modes() that
+function would parse the EDID "detailed timing" block which contained the
+correct timing message that panel request.
+
+Besides I see the exynos_fmid driver already setup the timing polarity from
+"drm_display_mode", and there is no doubt that exynos dp should set the
+same polarity with fmid driver (I guess, just notice that fmid is a kind 
+of CTRC
+driver).
+
+That's to say parsing timing polarity dynamically would give more chances to
+make those functions works.
+
+Thanks,
+- Yakir
+
+> Best regards,
+> Krzysztof
+>
+>
+>
+>
+"
