@@ -1,153 +1,46 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 30 Sep 2015 11:07:02 +0200
-Subject: [PATCH] soc: mediatek: Fix random hang up issue while kernel init
-In-Reply-To: <CAGS+omCXMRf4bxWancSJSq2a1pc38TYYY46Os9ASWWCRp95_ig@mail.gmail.com>
-References: <1443162717-64831-1-git-send-email-jamesjj.liao@mediatek.com>
- <1443169573.3135.9.camel@pengutronix.de> <5607D224.4050801@gmail.com>
- <CAGS+omCXMRf4bxWancSJSq2a1pc38TYYY46Os9ASWWCRp95_ig@mail.gmail.com>
-Message-ID: <1443604022.3185.17.camel@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 30 Sep 2015 10:08:59 +0100
+Subject: [PATCH 1/4] of: Add of_parse_phandle_with_opt_args() helper
+ function
+In-Reply-To: <CAL_JsqLWPfi9ynLbkzHkpcSHHg3ciwCcAN1uGcjXhnBAXZ74zw@mail.gmail.com>
+References: <1442944336-11754-1-git-send-email-marc.zyngier@arm.com>
+ <1442944336-11754-2-git-send-email-marc.zyngier@arm.com>
+ <CAL_JsqLWPfi9ynLbkzHkpcSHHg3ciwCcAN1uGcjXhnBAXZ74zw@mail.gmail.com>
+Message-ID: <560BA6AB.3060500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On 29/09/15 18:28, Rob Herring wrote:
+> On Tue, Sep 22, 2015 at 12:52 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> of_parse_phandle_with_args() is slightly inflexible as it doesn't
+>> allow the (unusual) case where the #*-cells property is not defined.
+>> In order to support this, introduce of_parse_phandle_with_opt_args()
+>> which assumes that #*-cells is zero when it is not defined,
+> 
+> zero or cell_count - 1?
 
-Am Dienstag, den 29.09.2015, 18:25 +0800 schrieb Daniel Kurtz:
-> Hi Matthias & Lucas,
-> 
-> On Sun, Sep 27, 2015 at 7:25 PM, Matthias Brugger
-> <matthias.bgg@gmail.com> wrote:
-> >
-> >
-> >
-> > On 25/09/15 10:26, Lucas Stach wrote:
-> >>
-> >> Am Freitag, den 25.09.2015, 14:31 +0800 schrieb James Liao:
-> >>>
-> >>> In kernel late init, it turns off all unused clocks, which
-> >>> needs to access subsystem registers such as VENC and VENC_LT.
-> >>>
-> >>> Accessing MT8173 VENC registers needs two top clocks, mm_sel and
-> >>> venc_sel. Accessing VENC_LT registers needs mm_sel and venclt_sel.
-> >>> So we need to keep these clocks on before accessing their registers.
-> >>>
-> >>> This patch keeps venc_sel / venclt_sel clock on when
-> >>> VENC / VENC_LT's power is on, to prevent system hang up while
-> >>> accessing its registeres.
-> >>>
-> >> This changes the binding of an existing driver, so it needs some more
-> >> consideration. Are VENC_SEL and VENC_LT_SEL really direct clock inputs
-> >> to the VENC module, or are they some kind of parent clock for one of the
-> >> existing clocks used by the old VENC binding?
-> >>
-> >> If they are direct clock inputs to the VENC module, changing the binding
-> >> might be still ok at that point, as there shouldn't be many users of
-> >> that yet.
-> 
-> The MT8173 VENC subsystem clock registers are modeled by the vencsys
-> clock-controller node:
-> 
-> vencsys: clock-controller at 18000000 {
->   compatible = "mediatek,mt8173-vencsys", "syscon";
->   reg = <0 0x18000000 0 0x1000>;
->   #clock-cells = <1>;
-> };
-> 
-> These registers, however, are only accessible if:
->   (a) the VENC power domain is enabled, and
->   (b) the "venc_sel" clock is enabled.
-> 
-> According to James, venc_sel is a direct clock input the VENC module,
-> and it is an ancestor to some, but not all, of the subsystem clocks, in
-> particular it is not an ancestor to "venc_cke0":
-> 
->  static const struct mtk_gate venc_clks[] __initconst = {
->          GATE_VENC(CLK_VENC_CKE0, "venc_cke0", "mm_sel", 0),
->          GATE_VENC(CLK_VENC_CKE1, "venc_cke1", "venc_sel", 4),
->          GATE_VENC(CLK_VENC_CKE2, "venc_cke2", "venc_sel", 8),
->          GATE_VENC(CLK_VENC_CKE3, "venc_cke3", "venc_sel", 12),
->  };
-> 
-> If the VENC power domain is disabled, then accesses to the vencsys
-> registers just silently fail (i.e., reads probably
-> return all 0s). 
+Zero is how the lack of #msi-cells property is interpreted. (cell_count
+- 1) is how this is implemented.
 
-If this ever happens it is really unfortunate and needs fixing, too. If
-you need the power domain to be powered ON to properly read or even
-change the clock registers, the clock driver needs to be a consumer of
-the power domain, so any clock operations powers the domain up.
+> I would be okay with always assuming zero rather than being an error
+> if that simplifies things. It is not really the kernel's job to be a
+> dtb validator.
 
-> However, if the power domain is ON but venc_sel is
-> disabled, then accessing the clock-controller registers results in a
-> system hang (until the power domain is disabled).
-> 
-> At boot the VENC power domain is forced on by scpsys (like all other
-> power domains).  Later both unused clocks and power domains get
-> disabled. If clocks are disabled first, and venc_sel is disabled
-> before venc_cke0, then when unused_clock tries to disable venc_cke0,
-> the system will hang when it reads the vencsys "is clock enabled" bit
-> since:
->   (a) VENC power domain is still enabled, and
->   (b) venc_sel is already disabled
-> 
-> In theory, we could add "clocks=<&topckgen CLK_TOP_VENC_SEL>;" to the
-> vencsys clock-controller node.  On initialization, mtk_vencsys_init()
-> could then pass venc_sel to the generic MT8173 gate clock driver, and
-> it would then clk_enable(venc_sel)/_disable(venc_sel) around any
-> access to the clock-controller registers.  James, however, thinks
-> this is a lot of extra overhead, and instead has proposed the fix in this patch,
-> where venc_sel is forced on whenever the VENC power domain is enabled.
-> 
-I would still say this is the correct solution. If the vencsys clock
-registers are itself clocked by VENC_SEL this driver needs to make sure
-this clock is running at the appropriate times. I understand that this
-may be a bit of an overhead, but clock enable/disable paths are not
-really performance critical.
+I'd be fine with that too. I'd just like it to be a defined behaviour,
+not an unexpected side effect.
 
-> So, this patch is a bit of a hack, but the mtk scpsys driver already
-> does something similar for the MM & MFG clocks - these clocks are
-> always enabled whenever certain power domains are enabled, and they
-> are only disabled when all such power domains are disabled.  I'm not
-> 100% why these clocks must always be kept on whenever these power
-> domains are enabled, but probably to solve a similar problem where
-> these clocks are needed to access some registers at a time when these
-> clocks would not otherwise be explicitly enabled.
-> 
-I can't really argue with this being the wrong solution if we already
-have precedent of the same solution being used for other domains. But I
-would still ask you to re-evaluate with the above in mind.
+> Also, I assume this was done for some compatibility? In general, we
+> should be explicit, so "#msi-cells = <0>" should be recommended and we
+> should update dts files if they are not.
 
-> Is the above clear?
-> 
-> >> But then we at least need a corresponding change to the binding documentation.
-> 
-> Agreed.
-> 
-> > Yes, we will need a really good reason to change the bindings.
-> 
-> There is a race where the system can sometimes hang at boot with the
-> existing implementation & bindings.
-> This seems like a really good reason to change the bindings, if the
-> proposed solution is acceptable (it may be possible to fix the hang
-> without changing the bindings).
-> 
-> > Apart from that we would need to find a solution which works with the old (and wrong bindings) as well.
-> 
-> Why do we need to support the old bindings?
-> This patch fixes a problem in MT8173, for which the mainline kernel is
-> still under active bringup.
-> If the existing bindings are not used anywhere yet (*), it seems like
-> unnecessary overhead to enforce backwards compatibility at this stage.
-> 
-I tend to agree. DT backwards compatibility isn't easily done (and is a
-constant burden, as it gets harder to test over time) and if the SoC is
-in early bringup one might just admit that the first iteration of the
-bindings were wrong and need an incompatible change.
+I agree that over time, we should update the existing DTS. But I hear
+Mark chanting "Stable DT" behind me, so I'm inclined to provide an
+transition path... ;-)
 
-But that's not up to me to decide, but something Matthias needs to make
-a decision on.
+I'll respin the series later today.
 
-Regards,
-Lucas
+Thanks,
+
+	M.
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Jazz is not dead. It just smells funny...
