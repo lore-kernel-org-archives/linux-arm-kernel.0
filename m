@@ -1,254 +1,146 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 30 Sep 2015 13:56:44 +0100
-Subject: [PATCH 8/8] nvmem: Adding bindings for rockchip-efuse
-In-Reply-To: <1443617615-26261-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1443617615-26261-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1443617804-26656-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 30 Sep 2015 16:00:40 +0300
+Subject: [PATCH 01/11 RESEND] ARM: OMAP: DRA7: hwmod: Add data for McASP3
+In-Reply-To: <560BB434.6080308@ti.com>
+References: <1442326206-30192-1-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.02.1509270631440.7947@utopia.booyaka.com>
+ <560BB434.6080308@ti.com>
+Message-ID: <560BDCF8.20909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ZhengShunQian <zhengsq@rock-chips.com>
+On 09/30/2015 01:06 PM, Peter Ujfalusi wrote:
+> Paul,
+>
+> On 09/27/2015 10:02 AM, Paul Walmsley wrote:
+>>>   /*
+>>> + * 'mcasp' class
+>>> + *
+>>> + */
+>>> +static struct omap_hwmod_class_sysconfig dra7xx_mcasp_sysc = {
+>>> +	.sysc_offs	= 0x0004,
+>>> +	.sysc_flags	= SYSC_HAS_SIDLEMODE,
+>>> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+>>> +	.sysc_fields	= &omap_hwmod_sysc_type3,
+>>> +};
+>>> +
+>>> +static struct omap_hwmod_class dra7xx_mcasp_hwmod_class = {
+>>> +	.name	= "mcasp",
+>>> +	.sysc	= &dra7xx_mcasp_sysc,
+>>> +};
+>>> +
+>>> +/* mcasp3 */
+>>> +static struct omap_hwmod dra7xx_mcasp3_hwmod = {
+>>> +	.name		= "mcasp3",
+>>> +	.class		= &dra7xx_mcasp_hwmod_class,
+>>> +	.clkdm_name	= "l4per2_clkdm",
+>>> +	.main_clk	= "mcasp3_ahclkx_mux",
+>>
+>> I'd expect this clock to be something derived from mcasp3_aux_gfclk,
+>> according to Table 24-408 "Clocks and Resets" of SPRUHZ6.  Could you
+>> please doublecheck this?
+>
+> I can not explain this. If I change the main_clk to "mcasp3_aux_gfclk_mux"
+> then I can not access to McASP3 register at all.
+> I don't see anything popping out in the clock data, nor in other places.
+>
+>>> +	.flags		= HWMOD_SWSUP_SIDLE,
+>
+> Not sure why this has been added, I can not find any pointers regarding to
+> this and everything is working w/o this flag. Will remove it in v2.
+>
+>
+>> Is this needed?  If it is, please add a brief comment describing the issue
+>> or bug that it's working around.
+>>
+>>> +	.prcm = {
+>>> +		.omap4 = {
+>>> +			.clkctrl_offs = DRA7XX_CM_L4PER2_MCASP3_CLKCTRL_OFFSET,
+>>> +			.context_offs = DRA7XX_RM_L4PER2_MCASP3_CONTEXT_OFFSET,
+>>> +			.modulemode   = MODULEMODE_SWCTRL,
+>>> +		},
+>>> +	},
+>>> +};
+>>> +
+>>> +/*
+>>>    * 'mmc' class
+>>>    *
+>>>    */
+>>> @@ -2566,6 +2598,14 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__hdmi = {
+>>>   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>>>   };
+>>>
+>>> +/* l4_per2 -> mcasp3 */
+>>> +static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp3 = {
+>>> +	.master		= &dra7xx_l4_per2_hwmod,
+>>> +	.slave		= &dra7xx_mcasp3_hwmod,
+>>
+>> So this is the low-speed control/register access port, where the MPU
+>> writes to the McASP3 config registers...
+>>
+>>> +	.clk		= "l3_iclk_div",
+>>
+>> ... and thus this interface clock doesn't look right for this port, since
+>> it's most likely generated from the L4PER2, where this port is connected.
+>> So it should probably be "l4_iclk_div".
+>
+> There is no "l4_iclk_div" for dra7xx. Looking around the file all other script
+> generated data uses "l3_iclk_div" for IPs under dra7xx_l4_per2_hwmod.
+>
+> Tero: do you know the reason for this?
 
-There are some SoC specified values store in eFuse,
-such as the cpu_leakage and cpu_version,
-this driver can expose these values to /sys base on nvmem.
+This comes from the autogen generated data. Looking at the hwdb data for 
+dra7, it seems l3 clock is defined as the OCP input clock for most of 
+the modules.
 
-Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-Signed-off-by: ZhengShunQian <zhengsq@rock-chips.com>
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/nvmem/Kconfig          |  10 +++
- drivers/nvmem/Makefile         |   2 +
- drivers/nvmem/rockchip-efuse.c | 186 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 198 insertions(+)
- create mode 100644 drivers/nvmem/rockchip-efuse.c
+Looking at TRM, we also have L3 ICK defined as the interface clock for 
+GPIO modules for example, and also mcasp modules.
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index a6d8053..bc4ea58 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -47,6 +47,16 @@ config QCOM_QFPROM
- 	  This driver can also be built as a module. If so, the module
- 	  will be called nvmem_qfprom.
- 
-+config ROCKCHIP_EFUSE
-+	tristate "Rockchip eFuse Support"
-+	depends on ARCH_ROCKCHIP || COMPILE_TEST
-+	help
-+	  This is a simple drive to dump specified values of Rockchip SoC
-+	  from eFuse, such as cpu-leakage.
-+
-+	  This driver can also be built as a module. If so, the module
-+	  will be called nvmem_rockchip_efuse.
-+
- config NVMEM_SUNXI_SID
- 	tristate "Allwinner SoCs SID support"
- 	depends on ARCH_SUNXI
-diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-index 9322116..95dde3f 100644
---- a/drivers/nvmem/Makefile
-+++ b/drivers/nvmem/Makefile
-@@ -12,6 +12,8 @@ obj-$(CONFIG_NVMEM_MXS_OCOTP)	+= nvmem-mxs-ocotp.o
- nvmem-mxs-ocotp-y		:= mxs-ocotp.o
- obj-$(CONFIG_QCOM_QFPROM)	+= nvmem_qfprom.o
- nvmem_qfprom-y			:= qfprom.o
-+obj-$(CONFIG_ROCKCHIP_EFUSE)	+= nvmem_rockchip_efuse.o
-+nvmem_rockchip_efuse-y		:= rockchip-efuse.o
- obj-$(CONFIG_NVMEM_SUNXI_SID)	+= nvmem_sunxi_sid.o
- nvmem_sunxi_sid-y		:= sunxi_sid.o
- obj-$(CONFIG_NVMEM_VF610_OCOTP)	+= nvmem-vf610-ocotp.o
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-new file mode 100644
-index 0000000..7887070
---- /dev/null
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -0,0 +1,186 @@
-+/*
-+ * Rockchip eFuse Driver
-+ *
-+ * Copyright (c) 2015 Rockchip Electronics Co. Ltd.
-+ * Author: Caesar Wang <wxt@rock-chips.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of version 2 of the GNU General Public License as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-+ * more details.
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/nvmem-provider.h>
-+#include <linux/slab.h>
-+#include <linux/regmap.h>
-+#include <linux/device.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/delay.h>
-+#include <linux/of.h>
-+#include <linux/clk.h>
-+
-+#define EFUSE_A_SHIFT			6
-+#define EFUSE_A_MASK			0x3ff
-+#define EFUSE_PGENB			BIT(3)
-+#define EFUSE_LOAD			BIT(2)
-+#define EFUSE_STROBE			BIT(1)
-+#define EFUSE_CSB			BIT(0)
-+
-+#define REG_EFUSE_CTRL			0x0000
-+#define REG_EFUSE_DOUT			0x0004
-+
-+struct rockchip_efuse_context {
-+	struct device *dev;
-+	void __iomem *base;
-+	struct clk *efuse_clk;
-+};
-+
-+static int rockchip_efuse_write(void *context, const void *data, size_t count)
-+{
-+	/* Nothing TBD, Read-Only */
-+	return 0;
-+}
-+
-+static int rockchip_efuse_read(void *context,
-+			       const void *reg, size_t reg_size,
-+			       void *val, size_t val_size)
-+{
-+	unsigned int offset = *(u32 *)reg;
-+	struct rockchip_efuse_context *_context = context;
-+	void __iomem *base = _context->base;
-+	struct clk *clk = _context->efuse_clk;
-+	u8 *buf = val;
-+	int ret;
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret < 0) {
-+		dev_err(_context->dev, "failed to prepare/enable efuse clk\n");
-+		return ret;
-+	}
-+
-+	writel(EFUSE_LOAD | EFUSE_PGENB, base + REG_EFUSE_CTRL);
-+	udelay(1);
-+	while (val_size) {
-+		writel(readl(base + REG_EFUSE_CTRL) &
-+			     (~(EFUSE_A_MASK << EFUSE_A_SHIFT)),
-+			     base + REG_EFUSE_CTRL);
-+		writel(readl(base + REG_EFUSE_CTRL) |
-+			     ((offset & EFUSE_A_MASK) << EFUSE_A_SHIFT),
-+			     base + REG_EFUSE_CTRL);
-+		udelay(1);
-+		writel(readl(base + REG_EFUSE_CTRL) |
-+			     EFUSE_STROBE, base + REG_EFUSE_CTRL);
-+		udelay(1);
-+		*buf++ = readb(base + REG_EFUSE_DOUT);
-+		writel(readl(base + REG_EFUSE_CTRL) &
-+		     (~EFUSE_STROBE), base + REG_EFUSE_CTRL);
-+		udelay(1);
-+
-+		val_size -= 1;
-+		offset += 1;
-+	}
-+
-+	/* Switch to standby mode */
-+	writel(EFUSE_PGENB | EFUSE_CSB, base + REG_EFUSE_CTRL);
-+
-+	clk_disable_unprepare(clk);
-+
-+	return 0;
-+}
-+
-+static struct regmap_bus rockchip_efuse_bus = {
-+	.read = rockchip_efuse_read,
-+	.write = rockchip_efuse_write,
-+	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
-+	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
-+};
-+
-+struct regmap_config rockchip_efuse_regmap_config = {
-+	.reg_bits = 32,
-+	.reg_stride = 1,
-+	.val_bits = 8,
-+};
-+
-+static struct nvmem_config econfig = {
-+	.name = "rockchip-efuse",
-+	.owner = THIS_MODULE,
-+	.read_only = true,
-+};
-+
-+static const struct of_device_id rockchip_efuse_match[] = {
-+	{ .compatible = "rockchip,rockchip-efuse",},
-+	{ /* sentinel */},
-+};
-+MODULE_DEVICE_TABLE(of, rockchip_efuse_match);
-+
-+int rockchip_efuse_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	struct nvmem_device *nvmem;
-+	struct regmap *regmap;
-+	void __iomem *base;
-+	struct clk *clk;
-+	struct rockchip_efuse_context *context;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	context = devm_kzalloc(dev, sizeof(struct rockchip_efuse_context),
-+			       GFP_KERNEL);
-+	if (IS_ERR(context))
-+		return PTR_ERR(context);
-+
-+	clk = devm_clk_get(dev, "pclk_efuse");
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	context->dev = dev;
-+	context->base = base;
-+	context->efuse_clk = clk;
-+
-+	rockchip_efuse_regmap_config.max_register = resource_size(res) - 1;
-+
-+	regmap = devm_regmap_init(dev, &rockchip_efuse_bus,
-+				  context, &rockchip_efuse_regmap_config);
-+	if (IS_ERR(regmap)) {
-+		dev_err(dev, "regmap init failed\n");
-+		return PTR_ERR(regmap);
-+	}
-+	econfig.dev = dev;
-+	nvmem = nvmem_register(&econfig);
-+	if (IS_ERR(nvmem))
-+		return PTR_ERR(nvmem);
-+
-+	platform_set_drvdata(pdev, nvmem);
-+
-+	return 0;
-+}
-+
-+int rockchip_efuse_remove(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-+
-+	return nvmem_unregister(nvmem);
-+}
-+
-+static struct platform_driver rockchip_efuse_driver = {
-+	.probe = rockchip_efuse_probe,
-+	.remove = rockchip_efuse_remove,
-+	.driver = {
-+		.name = "rockchip-efuse",
-+		.of_match_table = rockchip_efuse_match,
-+	},
-+};
-+
-+module_platform_driver(rockchip_efuse_driver);
-+MODULE_DESCRIPTION("rockchip_efuse driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+I think this is just a documentation issue and we are missing a divide 
+by 2 from all interface clocks, the interface clocks are coming from l4 
+interconnects and the interconnect chapter still clearly states that the 
+l4 clock is l3 clock / 2.
+
+-Tero
+
+>
+>>
+>>> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>>> +};
+>>
+>> There's another struct omap_hwmod_ocp_if record missing: the high-speed
+>> bus-master port that the McASP3 uses to DMA audio data.  This port should
+>> most likely be clocked with "l3_iclk_div" per Table 24-408 "Clocks and
+>> Resets".  This port is also where the registers described in Table 24-555
+>> "MCASP_DAT Register Summary 3" L3_MAIN column are exposed.  You've got
+>> that address map range blocked out in your DT data reg property, and
+>> associated with this device, right? 0x46000000?
+>
+> Yes, the McASP3-dat port is not used ATM. This is over the L3 interconnect and
+> due to a feature we can not use it with sDMA (constant addressing is not
+> supported through L3 interconnect for DMAs).
+> We could use eDMA, but there are complications regarding to that.
+> At the moment we are using the sDMA through the L4 interconnect address space.
+>
+>>
+>>> +
+>>>   static struct omap_hwmod_addr_space dra7xx_elm_addrs[] = {
+>>>   	{
+>>>   		.pa_start	= 0x48078000,
+>>> @@ -3338,6 +3378,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>>>   	&dra7xx_l4_wkup__dcan1,
+>>>   	&dra7xx_l4_per2__dcan2,
+>>>   	&dra7xx_l4_per2__cpgmac0,
+>>> +	&dra7xx_l4_per2__mcasp3,
+>>>   	&dra7xx_gmac__mdio,
+>>>   	&dra7xx_l4_cfg__dma_system,
+>>>   	&dra7xx_l3_main_1__dss,
+>>> --
+>>> 2.5.0
+>>>
+>>
+>>
+>> - Paul
+>>
+>
+>
