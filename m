@@ -1,115 +1,151 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Wed, 30 Sep 2015 11:24:04 +0300
-Subject: [PATCH] mmc: core: Fix init_card in 52Mhz
-In-Reply-To: <1443583688-1952-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1443583688-1952-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <560B9C24.3090209@intel.com>
+From: b38343@freescale.com (Robin Gong)
+Date: Wed, 30 Sep 2015 16:31:36 +0800
+Subject: [PATCH v2 2/8] spi: imx: replace fixed timeout with calculated one
+In-Reply-To: <43a7e93d4d29253215a5590b09baeb11a7e6f6d8.1442923630.git.anton_bondarenko@mentor.com>
+References: <cover.1442923630.git.anton_bondarenko@mentor.com>
+ <43a7e93d4d29253215a5590b09baeb11a7e6f6d8.1442923630.git.anton_bondarenko@mentor.com>
+Message-ID: <20150930083135.GC2709@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/15 06:28, Chaotian Jing wrote:
-> Suppose that we got a data crc error, and it triggers the mmc_reset.
-> mmc_reset will call mmc_send_status to see if HW reset was supported.
-> before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
-> it will reduce frequency to 52Mhz firstly, that results in card init
-> was doing at 52Mhz, So need ensure frequency is lower than 400Khz when
-> re-init card.
-
-The call to mmc_send_status() was originally only done for mmc_test and
-doesn't belong in a real reset.  However the test parameter was removed
-to simplify the code by:
-
-commit 83533ab28380f6957af39a7b322e639e42dbdaf1
-Author: Johan Rudholm <johan.rudholm@axis.com>
-Date:   Mon Jan 12 15:38:04 2015 +0100
-
-    mmc: core: always check status after reset
-    
-    Always check if the card is alive after a successful reset. This allows
-    us to remove mmc_hw_reset_check(), leaving mmc_hw_reset() as the only
-    card reset interface.
-    
-    Signed-off-by: Johan Rudholm <johanru@axis.com>
-    Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-
-IMHO having a test to check whether hw reset actually did reset the card
-is useful, so I would suggest putting back mmc_hw_reset_check() and
-removing the check from the non-test path.
-
-An alternative is to recognize that we don't want retuning here, and it is
-unlikely to be needed in the mmc_test case.  So if retuning is needed, just
-skip the call to mmc_send_status() i.e.
-
-diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-index f2d0c2ae85b1..c3749ba42739 100644
---- a/drivers/mmc/core/mmc.c
-+++ b/drivers/mmc/core/mmc.c
-@@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
- 	host->ops->hw_reset(host);
- 
- 	/* If the reset has happened, then a status command will fail */
--	if (!mmc_send_status(card, &status)) {
-+	if (!host->need_retune && !mmc_send_status(card, &status)) {
- 		mmc_host_clk_release(host);
- 		return -ENOSYS;
- 	}
-
-Could then make mmc_test aware of that:
-
-diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
-index b78cf5d403a3..7b105b97be78 100644
---- a/drivers/mmc/card/mmc_test.c
-+++ b/drivers/mmc/card/mmc_test.c
-@@ -2272,6 +2272,16 @@ static int mmc_test_hw_reset(struct mmc_test_card *test)
- 	if (!mmc_card_mmc(card) || !mmc_can_reset(card))
- 		return RESULT_UNSUP_CARD;
- 
-+	err = mmc_send_status(card, NULL);
-+	if (err)
-+		return err;
-+
-+	if (host->need_retune) {
-+		pr_info("%s: cannot test hw reset because retune needed\n",
-+			mmc_hostname(test->card->host));
-+		return RESULT_FAIL;
-+	}
-+
- 	err = mmc_hw_reset(host);
- 	if (!err)
- 		return RESULT_OK;
-diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-index f2d0c2ae85b1..c3749ba42739 100644
---- a/drivers/mmc/core/mmc.c
-+++ b/drivers/mmc/core/mmc.c
-@@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
- 	host->ops->hw_reset(host);
- 
- 	/* If the reset has happened, then a status command will fail */
--	if (!mmc_send_status(card, &status)) {
-+	if (!host->need_retune && !mmc_send_status(card, &status)) {
- 		mmc_host_clk_release(host);
- 		return -ENOSYS;
- 	}
-
-
-
-
+On Fri, Sep 25, 2015 at 07:57:09PM +0200, Anton Bondarenko wrote:
+> Fixed timeout value can fire while transaction is ongoing. This may happen
+> because there are no strict requirements on SPI transaction duration.
+> Dynamic timeout value is generated based on SCLK and transaction size.
 > 
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> There is also 4 * SCLK delay between TX bursts related to CS change.
+> 
+> Signed-off-by: Anton Bondarenko <anton_bondarenko@mentor.com>
 > ---
->  drivers/mmc/core/mmc.c | 1 +
->  1 file changed, 1 insertion(+)
+>  drivers/spi/spi-imx.c | 49 +++++++++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 41 insertions(+), 8 deletions(-)
 > 
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index e726903..f2d0c2a 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -1945,6 +1945,7 @@ static int mmc_reset(struct mmc_host *host)
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index 165bc2c..6c98eda 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -59,7 +59,6 @@
 >  
->  	/* Set initial state and call mmc_set_ios */
->  	mmc_set_initial_state(host);
-> +	mmc_set_clock(host, host->f_init);
->  	mmc_host_clk_release(host);
+>  /* The maximum  bytes that a sdma BD can transfer.*/
+>  #define MAX_SDMA_BD_BYTES  (1 << 15)
+> -#define IMX_DMA_TIMEOUT (msecs_to_jiffies(3000))
+>  struct spi_imx_config {
+>  	unsigned int speed_hz;
+>  	unsigned int bpw;
+> @@ -95,6 +94,7 @@ struct spi_imx_data {
+>  	struct clk *clk_per;
+>  	struct clk *clk_ipg;
+>  	unsigned long spi_clk;
+> +	unsigned int spi_bus_clk;
 >  
->  	return mmc_init_card(host, card->ocr, card);
+>  	unsigned int count;
+>  	void (*tx)(struct spi_imx_data *);
+> @@ -317,8 +317,7 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+>  {
+>  	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, dma = 0;
+>  	u32 cfg = readl(spi_imx->base + MX51_ECSPI_CONFIG);
+> -
+> -	u32 clk = config->speed_hz, delay;
+> +	u32 delay;
+>  
+>  	/*
+>  	 * The hardware seems to have a race condition when changing modes. The
+> @@ -330,7 +329,9 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+>  	ctrl |= MX51_ECSPI_CTRL_MODE_MASK;
+>  
+>  	/* set clock speed */
+> -	ctrl |= mx51_ecspi_clkdiv(spi_imx->spi_clk, config->speed_hz, &clk);
+> +	spi_imx->spi_bus_clk = config->speed_hz;
+> +	ctrl |= mx51_ecspi_clkdiv(spi_imx->spi_clk, config->speed_hz,
+> +				  &spi_imx->spi_bus_clk);
+>  
+>  	/* set chip select to use */
+>  	ctrl |= MX51_ECSPI_CTRL_CS(config->cs);
+> @@ -363,7 +364,7 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+>  	 * the SPI communication as the device on the other end would consider
+>  	 * the change of SCLK polarity as a clock tick already.
+>  	 */
+> -	delay = (2 * 1000000) / clk;
+> +	delay = (2 * USEC_PER_SEC) / spi_imx->spi_bus_clk;
+>  	if (likely(delay < 10))	/* SCLK is faster than 100 kHz */
+>  		udelay(delay);
+>  	else			/* SCLK is _very_ slow */
+> @@ -889,12 +890,40 @@ static void spi_imx_dma_tx_callback(void *cookie)
+>  	complete(&spi_imx->dma_tx_completion);
+>  }
+>  
+> +static int spi_imx_calculate_timeout(struct spi_imx_data *spi_imx, int size)
+> +{
+> +	unsigned long coef1 = 1;
+> +	unsigned long coef2 = MSEC_PER_SEC;
+> +	unsigned long timeout = 0;
+> +
+> +	/* Swap coeficients to avoid div by 0 */
+> +	if (spi_imx->spi_bus_clk < MSEC_PER_SEC) {
+> +		coef1 = MSEC_PER_SEC;
+> +		coef2 = 1;
+> +	}
+> +
+> +	/* Time with actual data transfer */
+> +	timeout += DIV_ROUND_UP(8 * size * coef1,
+> +				spi_imx->spi_bus_clk / coef2);
+> +
+> +	/* Take CS change delay related to HW */
+> +	timeout += DIV_ROUND_UP((size - 1) * 4 * coef1,
+> +				spi_imx->spi_bus_clk / coef2);
+> +
+> +	/* Add extra second for scheduler related activities */
+> +	timeout += MSEC_PER_SEC;
+> +
+> +	/* Double calculated timeout */
+> +	return msecs_to_jiffies(2 * timeout);
+> +}
+> +
+>  static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+>  				struct spi_transfer *transfer)
+>  {
+>  	struct dma_async_tx_descriptor *desc_tx = NULL, *desc_rx = NULL;
+>  	int ret;
+>  	unsigned long timeout;
+> +	unsigned long transfer_timeout;
+>  	const int left = transfer->len % spi_imx->wml;
+>  	struct spi_master *master = spi_imx->bitbang.master;
+>  	struct sg_table *tx = &transfer->tx_sg, *rx = &transfer->rx_sg;
+> @@ -947,9 +976,11 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+>  	dma_async_issue_pending(master->dma_tx);
+>  	spi_imx->devtype_data->trigger(spi_imx);
+>  
+> +	transfer_timeout = spi_imx_calculate_timeout(spi_imx, transfer->len);
+> +
+>  	/* Wait SDMA to finish the data transfer.*/
+>  	timeout = wait_for_completion_timeout(&spi_imx->dma_tx_completion,
+> -						IMX_DMA_TIMEOUT);
+> +						transfer_timeout);
+>  	if (!timeout) {
+>  		pr_warn("%s %s: I/O Error in DMA TX\n",
+>  			dev_driver_string(&master->dev),
+> @@ -957,8 +988,10 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+>  		dmaengine_terminate_all(master->dma_tx);
+>  		dmaengine_terminate_all(master->dma_rx);
+>  	} else {
+> +		transfer_timeout = spi_imx_calculate_timeout(spi_imx,
+> +							     spi_imx->wml * 2);
+*2 again here? Although spi_imx_calculate_timeout has double it.
+>  		timeout = wait_for_completion_timeout(
+> -				&spi_imx->dma_rx_completion, IMX_DMA_TIMEOUT);
+> +				&spi_imx->dma_rx_completion, transfer_timeout);
+>  		if (!timeout) {
+>  			pr_warn("%s %s: I/O Error in DMA RX\n",
+>  				dev_driver_string(&master->dev),
+> @@ -980,7 +1013,7 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+>  			spi_imx->devtype_data->intctrl(spi_imx, MXC_INT_TCEN);
+>  
+>  			timeout = wait_for_completion_timeout(
+> -					&spi_imx->xfer_done, IMX_DMA_TIMEOUT);
+> +					&spi_imx->xfer_done, transfer_timeout);
+>  			if (!timeout) {
+>  				pr_warn("%s %s: I/O Error in RX tail\n",
+>  					dev_driver_string(&master->dev),
+> -- 
+> 2.5.2
 > 
