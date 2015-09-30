@@ -1,22 +1,18 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 30 Sep 2015 11:22:45 +0900
-Subject: [GIT PULL] ARM: dts: Exynos improvements for 4.4
+Date: Wed, 30 Sep 2015 11:22:46 +0900
+Subject: [GIT PULL] arm64: dts: Exynos ARMv8 improvements for 4.4
 In-Reply-To: <1443579766-15793-1-git-send-email-k.kozlowski@samsung.com>
 References: <1443579766-15793-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1443579766-15793-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1443579766-15793-3-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Kukjin,
 
-DTS related changes for 4.4.
-
-Description along with a tag.
-You can find them also on the lists with my reviewed-by.
+One ARMv8 DTS change for 4.4.
 
 Best regards,
 Krzysztof
-
 
 The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
@@ -24,42 +20,20 @@ The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
 are available in the git repository at:
 
-  https://github.com/krzk/linux.git tags/samsung-dt-4.4
+  https://github.com/krzk/linux.git tags/samsung-dt64-4.4
 
-for you to fetch changes up to 01dd011b7a0230a426a79475ae452298421a16e4:
+for you to fetch changes up to 235c8e96f54a76bee201a7c86620c351a30b1ac6:
 
-  ARM: dts: exynos4412-trats2: remove regulator-compatible usage (2015-09-30 09:03:03 +0900)
-
-----------------------------------------------------------------
-Device Tree improvements for Exynos based boards:
-1. Enable DMA on Exynos4 serial ports. This old patch uncovered
-   a number of other issues in dmaengine and samsung serial driver.
-   All of known issues are resolved so finally enable the DMA for UART.
-2. Fix incorrect location of display-timings node (FIMD->DP node).
-3. Minor cleanups.
+  arm64: dts: Add BUS1 instance pinctrl support for exynos7 (2015-09-16 09:03:09 +0900)
 
 ----------------------------------------------------------------
-Javier Martinez Canillas (1):
-      ARM: dts: exynos4412-trats2: remove regulator-compatible usage
+Device Tree improvements for Exynos ARMv8 based boards:
+1. Add a BUS1 instance pinctrl for Exynos7 SoC.
 
-Robert Baldyga (1):
-      ARM: dts: Add DMA support for serial ports in exynos4
+----------------------------------------------------------------
+Alim Akhtar (1):
+      arm64: dts: Add BUS1 instance pinctrl support for exynos7
 
-Sean Paul (1):
-      ARM: dts: Move display-timings node from fimd to dp on Exynos
-
-Tobias Jakobi (2):
-      ARM: dts: Remove redundant pinctrl settings in exynos4412-odroid
-      ARM: dts: Unify voltage regulator style in exynos4412-odroid
-
-Vladimir Zapolskiy (1):
-      ARM: dts: Fix cpu compatible value for s3c2416
-
- arch/arm/boot/dts/exynos4.dtsi                  |   8 ++
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  12 +--
- arch/arm/boot/dts/exynos4412-trats2.dts         | 105 ++++++++----------------
- arch/arm/boot/dts/exynos5250-arndale.dts        |   8 +-
- arch/arm/boot/dts/exynos5250-smdk5250.dts       |  16 ++--
- arch/arm/boot/dts/exynos5420-smdk5420.dts       |   7 +-
- arch/arm/boot/dts/s3c2416.dtsi                  |   2 +-
- 7 files changed, 62 insertions(+), 96 deletions(-)
+ arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi | 103 ++++++++++++++++++++++++
+ arch/arm64/boot/dts/exynos/exynos7.dtsi         |   7 ++
+ 2 files changed, 110 insertions(+)
