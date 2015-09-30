@@ -1,29 +1,56 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 30 Sep 2015 19:35:21 +0200
-Subject: [PATCH 1/2] dma: pxa_dma: fix the no-requestor case
-In-Reply-To: <20150930062422.GC21690@vkoul-mobl.iind.intel.com> (Vinod Koul's
- message of "Wed, 30 Sep 2015 11:54:22 +0530")
-References: <1441905466-17459-1-git-send-email-robert.jarzmik@free.fr>
- <20150930062422.GC21690@vkoul-mobl.iind.intel.com>
-Message-ID: <87fv1verom.fsf@belgarion.home>
+Date: Wed, 30 Sep 2015 19:42:15 +0200
+Subject: [PATCH v2 2/2] dma: pxa_dma: fix residue corner case
+In-Reply-To: <1443634935-28989-1-git-send-email-robert.jarzmik@free.fr>
+References: <1443634935-28989-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1443634935-28989-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul <vinod.koul@intel.com> writes:
+A very tiny temporal window exists in the residue calculation where :
+ - upon entering residue calculation, the transfer is ongoing
+ - when reading the current transfer pointer, it just changed to
+   the "finisher/linker" descriptor
 
-> On Thu, Sep 10, 2015 at 07:17:45PM +0200, Robert Jarzmik wrote:
->> A very small number of devices don't use the flow control offered by
->> requestor lines. In these specific cases, the pxa dma driver should be
->> aware of that and not try to use a requestor line.
->
-> And these fail for me, what were these sent against?
-v4.2. My fault, in v4.2-rc1 the patch 0e95fb9ceb82 ("dmaengine: pxa_dma: don't
-use config direction parameter") impact this one.
+In this case, the residue returned is the whole transfer length instead
+of 0. Fix it.
 
-> Please rebase and resend
-Of course, I'm on it.
+This appears almost in one extreme case, where the driver is used
+by older clients which inquire for residue in interrupt context, such
+as the smsc91x ethernet driver, in a tight loop :
+  interrupt_handler()
+    dmaengine_submit()
+    do {
+      dmaengine_tx_status()
+    } while (residue > 0 || status != DMA_ERROR)
 
-Cheers.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+Since v1: reworded the commit message for typos
+---
+ drivers/dma/pxa_dma.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index 7d3ff56caa0a..51f294e4227c 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -1185,6 +1185,16 @@ static unsigned int pxad_residue(struct pxad_chan *chan,
+ 	else
+ 		curr = phy_readl_relaxed(chan->phy, DTADR);
+ 
++	/*
++	 * curr has to be actually read before checking descriptor
++	 * completion, so that a curr inside a status updater
++	 * descriptor implies the following test returns true, and
++	 * preventing reordering of curr load and the test.
++	 */
++	rmb();
++	if (is_desc_completed(vd))
++		goto out;
++
+ 	for (i = 0; i < sw_desc->nb_desc - 1; i++) {
+ 		hw_desc = sw_desc->hw_desc[i];
+ 		if (sw_desc->hw_desc[0]->dcmd & PXA_DCMD_INCSRCADDR)
 -- 
-Robert
+2.1.4
