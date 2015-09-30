@@ -1,47 +1,45 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 30 Sep 2015 16:05:41 +0200
-Subject: [PATCH 1/6] Revert "regulator: core: Handle full constraints systems
- when resolving supplies"
+Date: Wed, 30 Sep 2015 16:05:46 +0200
+Subject: [PATCH 6/6] ARM: i.MX6 Phytec PFLA02: Add supplies for the SoC
+ internal regulators
 In-Reply-To: <1443621946-8712-1-git-send-email-s.hauer@pengutronix.de>
 References: <1443621946-8712-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1443621946-8712-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1443621946-8712-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 9f7e25edb1575a6d2363dc003f9cc09d840657e2.
-
-When a regulator A is registered and is supplied by regulator B which is
-not yet registered then a regulator_get on regulator A will set the As
-supply to the dummy regulator. This is not correct, we should return
--EPROBE_DEFER instead as done without this patch.
-Of course reverting this patch brings back the issue it fixed, so this
-is not a solution, but what is the correct solution?
+The SoC internal regulators for the CPU and the SoC come from the
+DA9063 vdd_core and vdd_soc. Add this relationship to the device tree
+so that the voltage drop on the SoC internal LDO regulators can be
+minimized.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/regulator/core.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 7849187..bd9db70 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -1403,13 +1403,9 @@ static int regulator_resolve_supply(struct regulator_dev *rdev)
- 			return 0;
- 		}
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+index 9e6ecd9..f19c680 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+@@ -379,6 +379,18 @@
+ 	status = "disabled";
+ };
  
--		if (have_full_constraints()) {
--			r = dummy_regulator_rdev;
--		} else {
--			dev_err(dev, "Failed to resolve %s-supply for %s\n",
--				rdev->supply_name, rdev->desc->name);
--			return -EPROBE_DEFER;
--		}
-+		dev_err(dev, "Failed to resolve %s-supply for %s\n",
-+			rdev->supply_name, rdev->desc->name);
-+		return -EPROBE_DEFER;
- 	}
- 
- 	/* Recursively resolve the supply of the supply */
++&reg_arm {
++	vin-supply = <&vddcore_reg>;
++};
++
++&reg_pu {
++	vin-supply = <&vddsoc_reg>;
++};
++
++&reg_soc {
++	vin-supply = <&vddsoc_reg>;
++};
++
+ &uart3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart3>;
 -- 
 2.5.3
