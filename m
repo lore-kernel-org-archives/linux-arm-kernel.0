@@ -1,38 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Sep 2015 10:15:25 +0200
-Subject: [RFC/PATCH 11/11] arm: boot: dts: omap: add missing default
- status for 32k counter
-In-Reply-To: <1443559446-26969-12-git-send-email-balbi@ti.com>
-References: <1443559446-26969-1-git-send-email-balbi@ti.com>
- <1443559446-26969-12-git-send-email-balbi@ti.com>
-Message-ID: <4815825.NCBBBMgLGf@wuerfel>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 30 Sep 2015 16:15:37 +0800
+Subject: [PATCH] ARM: dts: sun6i: hummingbird: Add aliases for rtc devices
+Message-ID: <1443600937-11071-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 September 2015 15:44:06 Felipe Balbi wrote:
-> All devices should have a default status. Ignoring
-> the arguments if it should be 'okay' or 'disabled'
-> by default, let's set them all the 'disabled' and
-> have boards enable 32k counter.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> 
+The hummingbird A31 has 2 rtc devices available: one in the SoC, and
+a pcf8563 external rtc on i2c2.
 
-The patch looks good, but the description is slightly incorrect:
-There is no reason to list "status='okay'" other than overriding
-the 'disabled' status.
+For some unknown reason, the onboard backup battery to power the
+internal rtc when power is removed, and its time would reset. Hence
+we want to use the external one by default.
 
-I'd phrase it something like:
+Add aliases for the rtc devices with the external one as rtc0.
 
-"We want the use of the 32k counter to be a per-board setting,
-so let's disable it by default in each dtsi file and override the
-setting in the boards. Any board that does not wire up the counter
-should leave it disabled".
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-However, if you really want all boards to provide the counter all
-the time, I'd argue that we're better off dropping this patch. We
-use the status="disabled" trick for anything that may or may not
-be working based on the board design, but things that are present
-everywhere don't need this.
+Can someone else with the Hummingbird A31 also test the internal RTC
+and see if it doesn't survive power removal?
 
-	Arnd
+Thanks
+ChenYu
+
+---
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+index 06d9391ca30e..358781113582 100644
+--- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
++++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+@@ -55,6 +55,8 @@
+ 
+ 	aliases {
+ 		serial0 = &uart0;
++		rtc0 = &pcf8563;
++		rtc1 = &rtc;
+ 	};
+ 
+ 	chosen {
+-- 
+2.5.3
