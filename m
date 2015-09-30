@@ -1,110 +1,85 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 30 Sep 2015 18:10:59 +0200
-Subject: [PATCH 06/16] clk: at91: clk-main: factorize irq handling
+Date: Wed, 30 Sep 2015 18:11:08 +0200
+Subject: [PATCH 15/16] usb: gadget: atmel: access the PMC using regmap
 In-Reply-To: <1443629469-15086-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1443629469-15086-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1443629469-15086-7-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1443629469-15086-16-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The three different irq handlers are doing the same thing, factorize their
-code in a generic irq handler.
+Use regmap to access the PMC to avoid using at91_pmc_read and
+at91_pmc_write.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/clk/at91/clk-main.c | 43 ++++++++++++++++---------------------------
- 1 file changed, 16 insertions(+), 27 deletions(-)
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: linux-usb at vger.kernel.org
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 20 ++++++++++----------
+ drivers/usb/gadget/udc/atmel_usba_udc.h |  2 ++
+ 2 files changed, 12 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
-index c1f119748bdc..79a380cd1f4e 100644
---- a/drivers/clk/at91/clk-main.c
-+++ b/drivers/clk/at91/clk-main.c
-@@ -71,12 +71,21 @@ struct clk_sam9x5_main {
- 
- #define to_clk_sam9x5_main(hw) container_of(hw, struct clk_sam9x5_main, hw)
- 
--static irqreturn_t clk_main_osc_irq_handler(int irq, void *dev_id)
-+/* Generic structure */
-+struct clk_main {
-+	struct clk_hw hw;
-+	struct at91_pmc *pmc;
-+	unsigned int irq;
-+	wait_queue_head_t wait;
-+};
-+#define to_clk_main(hw) container_of(hw, struct clk_main, hw)
-+
-+static irqreturn_t clk_main_irq_handler(int irq, void *dev_id)
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 3dfada8d6061..40977cd832af 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -17,7 +17,9 @@
+ #include <linux/device.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/list.h>
++#include <linux/mfd/syscon.h>
+ #include <linux/platform_device.h>
++#include <linux/regmap.h>
+ #include <linux/usb/ch9.h>
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/atmel_usba_udc.h>
+@@ -1888,20 +1890,15 @@ static int atmel_usba_stop(struct usb_gadget *gadget)
+ #ifdef CONFIG_OF
+ static void at91sam9rl_toggle_bias(struct usba_udc *udc, int is_on)
  {
--	struct clk_main_osc *osc = dev_id;
-+	struct clk_main *clkmain = dev_id;
- 
--	wake_up(&osc->wait);
--	disable_irq_nosync(osc->irq);
-+	wake_up(&clkmain->wait);
-+	disable_irq_nosync(clkmain->irq);
- 
- 	return IRQ_HANDLED;
+-	unsigned int uckr = at91_pmc_read(AT91_CKGR_UCKR);
+-
+-	if (is_on)
+-		at91_pmc_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
+-	else
+-		at91_pmc_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
++	regmap_update_bits(udc->pmc, AT91_CKGR_UCKR, AT91_PMC_BIASEN,
++			   is_on ? AT91_PMC_BIASEN : 0);
  }
-@@ -185,7 +194,7 @@ at91_clk_register_main_osc(struct regmap *regmap,
  
- 	init_waitqueue_head(&osc->wait);
- 	irq_set_status_flags(osc->irq, IRQ_NOAUTOEN);
--	ret = request_irq(osc->irq, clk_main_osc_irq_handler,
-+	ret = request_irq(osc->irq, clk_main_irq_handler,
- 			  IRQF_TRIGGER_HIGH, name, osc);
- 	if (ret) {
- 		kfree(osc);
-@@ -237,16 +246,6 @@ static void __init of_at91rm9200_clk_main_osc_setup(struct device_node *np)
- CLK_OF_DECLARE(at91rm9200_clk_main_osc, "atmel,at91rm9200-clk-main-osc",
- 	       of_at91rm9200_clk_main_osc_setup);
- 
--static irqreturn_t clk_main_rc_osc_irq_handler(int irq, void *dev_id)
--{
--	struct clk_main_rc_osc *osc = dev_id;
--
--	wake_up(&osc->wait);
--	disable_irq_nosync(osc->irq);
--
--	return IRQ_HANDLED;
--}
--
- static bool clk_main_rc_osc_ready(struct regmap *regmap)
+ static void at91sam9g45_pulse_bias(struct usba_udc *udc)
  {
- 	unsigned int status;
-@@ -361,7 +360,7 @@ at91_clk_register_main_rc_osc(struct regmap *regmap,
+-	unsigned int uckr = at91_pmc_read(AT91_CKGR_UCKR);
+-
+-	at91_pmc_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
+-	at91_pmc_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
++	regmap_update_bits(udc->pmc, AT91_CKGR_UCKR, AT91_PMC_BIASEN, 0);
++	regmap_update_bits(udc->pmc, AT91_CKGR_UCKR, AT91_PMC_BIASEN,
++			   AT91_PMC_BIASEN);
+ }
  
- 	init_waitqueue_head(&osc->wait);
- 	irq_set_status_flags(osc->irq, IRQ_NOAUTOEN);
--	ret = request_irq(osc->irq, clk_main_rc_osc_irq_handler,
-+	ret = request_irq(osc->irq, clk_main_irq_handler,
- 			  IRQF_TRIGGER_HIGH, name, osc);
- 	if (ret)
- 		return ERR_PTR(ret);
-@@ -529,16 +528,6 @@ static void __init of_at91rm9200_clk_main_setup(struct device_node *np)
- CLK_OF_DECLARE(at91rm9200_clk_main, "atmel,at91rm9200-clk-main",
- 	       of_at91rm9200_clk_main_setup);
+ static const struct usba_udc_errata at91sam9rl_errata = {
+@@ -1938,6 +1935,9 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+ 		return ERR_PTR(-EINVAL);
  
--static irqreturn_t clk_sam9x5_main_irq_handler(int irq, void *dev_id)
--{
--	struct clk_sam9x5_main *clkmain = dev_id;
--
--	wake_up(&clkmain->wait);
--	disable_irq_nosync(clkmain->irq);
--
--	return IRQ_HANDLED;
--}
--
- static inline bool clk_sam9x5_main_ready(struct regmap *regmap)
- {
- 	unsigned int status;
-@@ -657,7 +646,7 @@ at91_clk_register_sam9x5_main(struct regmap *regmap,
- 	clkmain->parent = status & AT91_PMC_MOSCEN ? 1 : 0;
- 	init_waitqueue_head(&clkmain->wait);
- 	irq_set_status_flags(clkmain->irq, IRQ_NOAUTOEN);
--	ret = request_irq(clkmain->irq, clk_sam9x5_main_irq_handler,
-+	ret = request_irq(clkmain->irq, clk_main_irq_handler,
- 			  IRQF_TRIGGER_HIGH, name, clkmain);
- 	if (ret)
- 		return ERR_PTR(ret);
+ 	udc->errata = match->data;
++	udc->pmc = syscon_regmap_lookup_by_compatible("atmel,at91sam9g45-pmc");
++	if (udc->errata && IS_ERR(udc->pmc))
++		return ERR_CAST(udc->pmc);
+ 
+ 	udc->num_ep = 0;
+ 
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
+index ea448a344767..3e1c9d589dfa 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.h
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
+@@ -354,6 +354,8 @@ struct usba_udc {
+ 	struct dentry *debugfs_root;
+ 	struct dentry *debugfs_regs;
+ #endif
++
++	struct regmap *pmc;
+ };
+ 
+ static inline struct usba_ep *to_usba_ep(struct usb_ep *ep)
 -- 
 2.1.4
