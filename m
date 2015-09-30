@@ -1,30 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Sep 2015 19:03:03 +0100
-Subject: [PATCH 1/6] Revert "regulator: core: Handle full constraints
- systems when resolving supplies"
-In-Reply-To: <1443621946-8712-2-git-send-email-s.hauer@pengutronix.de>
-References: <1443621946-8712-1-git-send-email-s.hauer@pengutronix.de>
- <1443621946-8712-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150930180303.GM15635@sirena.org.uk>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 30 Sep 2015 11:11:35 -0700
+Subject: [PATCH 0/2] mtd: nand: sunxi: cleanup
+In-Reply-To: <20150930083634.68351ade@bbrezillon>
+References: <1442389597-30698-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150929222144.GA143959@google.com>
+ <20150930083634.68351ade@bbrezillon>
+Message-ID: <20150930181135.GF143959@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 04:05:41PM +0200, Sascha Hauer wrote:
-> This reverts commit 9f7e25edb1575a6d2363dc003f9cc09d840657e2.
+On Wed, Sep 30, 2015 at 08:36:34AM +0200, Boris Brezillon wrote:
+> On Tue, 29 Sep 2015 15:21:44 -0700
+> Brian Norris <computersforpeace@gmail.com> wrote:
 > 
-> When a regulator A is registered and is supplied by regulator B which is
-> not yet registered then a regulator_get on regulator A will set the As
-> supply to the dummy regulator. This is not correct, we should return
-> -EPROBE_DEFER instead as done without this patch.
+> > On Wed, Sep 16, 2015 at 09:46:35AM +0200, Boris Brezillon wrote:
+> > > Hello,
+> > > 
+> > > Those two patches aim at cleaning up the sunxi_nand driver by first adding
+> > > some consistency in the macro definitions, and then factorizing the code
+> > > duplicated code found in hw_ecc and hw_syndrome_ecc implementations.
+> > > 
+> > > Best Regards,
+> > > 
+> > > Boris
+> > 
+> > I believe this series no longer applies cleanly
+> 
+> Hm, actually it depends on fixes you have in your linux-mtd tree and
+> features in your l2-mtd tree.
+> 
+> I don't know how you usually deal with those problems (merging the
+> linux-mtd/master branch into the l2-mtd/master one, or merging
+> last linus' -rc into l2-mtd/master should work), but I'd really
+> like to have this in 4.4 :-).
 
-What makes you say this is not correct?  In a system with fully
-specified supplies if we fail to resolve the supply we know that no
-supply will ever appear and so substitute in the dummy on the assumption
-that there is a supply with no software control.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/823ee91b/attachment.sig>
+linux-mtd.git is prepped for a pull request. I'll do that before the
+week ends. And I'll either merge that back into l2-mtd.git at that time,
+or just pull in v4.3-rc4.
+
+> I still have the patch using the nand_check_erased_ecc_chunk() function
+> which depends on those 2 patches, and I'd like to have it in 4.4 too.
+> 
+> I know I'm asking a lot, but as explained earlier, I still have a
+> bunch of patches on top of those already posted (mainly to support
+> the hardware randomizer), and I'd like the trivial ones to be merged
+> quickly.
+
+I'll see what I can apply after pulling together all the latest, but if
+I'm still missing things then, feel free to resend.
+
+BTW, I thought there were some things to address on the erased ECC stuff
+still. I'll re-check that series too.
+
+Brian
