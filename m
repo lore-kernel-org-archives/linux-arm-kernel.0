@@ -1,45 +1,91 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 30 Sep 2015 16:05:46 +0200
-Subject: [PATCH 6/6] ARM: i.MX6 Phytec PFLA02: Add supplies for the SoC
- internal regulators
+Date: Wed, 30 Sep 2015 16:05:42 +0200
+Subject: [PATCH 2/6] regulator: core: introduce function to lock regulators
+ and its supplies
 In-Reply-To: <1443621946-8712-1-git-send-email-s.hauer@pengutronix.de>
 References: <1443621946-8712-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1443621946-8712-7-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1443621946-8712-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoC internal regulators for the CPU and the SoC come from the
-DA9063 vdd_core and vdd_soc. Add this relationship to the device tree
-so that the voltage drop on the SoC internal LDO regulators can be
-minimized.
+Each regulator_dev is locked with its own mutex. This is fine as long
+as only one regulator_dev is locked, but makes lockdep unhappy when we
+have to walk up the supply chain like it can happen in
+regulator_get_voltage:
+
+regulator_get_voltage ->
+ mutex_lock(&regulator->rdev->mutex) ->
+_regulator_get_voltage(regulator->rdev) ->
+regulator_get_voltage(rdev->supply) ->
+mutex_lock(&regulator->rdev->mutex);
+
+This causes lockdep to issue a possible deadlock warning.
+
+There are at least two ways to work around this:
+
+- We can always lock the whole supply chain using the functions
+  introduced with this patch.
+- We could store the current voltage in struct regulator_rdev so
+  that we do not have to walk up the supply chain for the
+  _regulator_get_voltage case.
+
+Anyway, regulator_lock_supply/regulator_unlock_supply will be needed
+once we allow regulator_set_voltage to optimize the supply voltages.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/regulator/core.c | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-index 9e6ecd9..f19c680 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-@@ -379,6 +379,18 @@
- 	status = "disabled";
- };
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index bd9db70..e5de3d9 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -132,6 +132,45 @@ static bool have_full_constraints(void)
+ }
  
-+&reg_arm {
-+	vin-supply = <&vddcore_reg>;
-+};
+ /**
++ * regulator_lock_supply - lock a regulator and its supplies
++ * @rdev:         regulator source
++ */
++static void regulator_lock_supply(struct regulator_dev *rdev)
++{
++	struct regulator *supply;
++	int i = 0;
 +
-+&reg_pu {
-+	vin-supply = <&vddsoc_reg>;
-+};
++	while (1) {
++		mutex_lock_nested(&rdev->mutex, i++);
++		supply = rdev->supply;
 +
-+&reg_soc {
-+	vin-supply = <&vddsoc_reg>;
-+};
++		if (!rdev->supply)
++			return;
 +
- &uart3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart3>;
++		rdev = supply->rdev;
++	}
++}
++
++/**
++ * regulator_unlock_supply - unlock a regulator and its supplies
++ * @rdev:         regulator source
++ */
++static void regulator_unlock_supply(struct regulator_dev *rdev)
++{
++	struct regulator *supply;
++
++	while (1) {
++		mutex_unlock(&rdev->mutex);
++		supply = rdev->supply;
++
++		if (!rdev->supply)
++			return;
++
++		rdev = supply->rdev;
++	}
++}
++
++/**
+  * of_get_regulator - get a regulator device node based on supply name
+  * @dev: Device pointer for the consumer (of regulator) device
+  * @supply: regulator supply name
 -- 
 2.5.3
