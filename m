@@ -1,43 +1,48 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 30 Sep 2015 22:28:13 +0800
-Subject: [PATCH v2 0/7] hwrng: Add support for STMicroelectronics' RNG IP
-In-Reply-To: <20150930141539.GD27197@x1>
-References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
- <20150918140756.GK9249@gondor.apana.org.au>
- <CAF2Aj3h7Jy=tpYdZTdbxAJwa=147_hAu3reOFrbEh=JdrMFWLQ@mail.gmail.com>
- <20150918151137.GA10763@gondor.apana.org.au>
- <20150918155112.GE3218@x1> <20150929142932.GY27197@x1>
- <20150930134757.GA18408@gondor.apana.org.au>
- <20150930141539.GD27197@x1>
-Message-ID: <20150930142812.GA19039@gondor.apana.org.au>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 30 Sep 2015 10:31:48 -0400
+Subject: [PATCH 1/3] Documentation: dt: keystone: provide SoC specific
+ compatible flags
+In-Reply-To: <56056FD9.5060000@ti.com>
+References: <1442938118-4718-1-git-send-email-nm@ti.com>
+ <1442938118-4718-2-git-send-email-nm@ti.com> <5602ED34.9010108@oracle.com>
+ <56040323.1080409@ti.com> <560406C2.6090200@ti.com> <56041CA4.40208@ti.com>
+ <56055F1F.4060401@ti.com> <560565AF.2010701@oracle.com>
+ <56056FD9.5060000@ti.com>
+Message-ID: <560BF254.2040509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 03:15:39PM +0100, Lee Jones wrote:
+On 09/25/2015 12:01 PM, Nishanth Menon wrote:
+> On 09/25/2015 10:18 AM, santosh shilimkar wrote:
+>> On 9/25/2015 7:50 AM, Nishanth Menon wrote:
+> [...]
+>>> But, how about userspace
+>>> needing to know which SoC they are on, without needing to depend on
+>>> board->soc mapping? How do we help resolve that?
+Believe it or not, user space tools that are custom to a specific SoC 
+would require such knowledge. So I agree on this front that a SoC 
+specific compatibility is cool to have. I think that should have been 
+clear in the commit description.
+
+My Acked-By: Murali Karicheri <m-karicheri2@ti.com>
+
+>>>
+>> Why the user space should care about exact SOC ?
 >
-> > I prefer not to merge patches that cannot be tested.  Without
-> > the DT bits in patch 6 the other five patches are useless.  So
-> > I think patch 6 should be applied together with the other five
-> > which add the driver.
-> 
-> That's crazy talk.  If all subsystem maintainers abide by this rule
-> there would be chaos.  We'd either need to send pull-requests to each
-> other for every set which crossed a subsystems boundary, or 1000's of
-> merge conflicts would ensue at merge time.
-> 
-> The (sensible) rule we normally stick to is; as long as there isn't
-> a _build_ dependency, then the patches should filter though their
-> respective trees; _functional_ dependencies have nothing to do with
-> us as maintainers.  Another chaos preventing rule we abide by is; thou
-> shalt not apply patches belonging to other maintainer's subsystems
-> without the appropriate Ack-by and a subsequent "you may take this
-> though your tree" and/or "please send me an immutable pull-request".
+> examples vary - trivial one is: debug tools like omapconf[1] or testing
+> tools like opentest[2] need some standard way to ensure Linux kernel is
+> functional - trusting the least set of parameters is usually what we
+> would prefer. while building a generic distro such as debian or yocto,
+> one prefers NOT to need to do a package build per SoC/perboard - that
+> never scales. instead, you'd like the same application run on different
+> systems dynamically.
+>
+>
+> [1] https://github.com/omapconf/omapconf
+> [2] http://arago-project.org/wiki/index.php/Opentest
+>
 
-So you want the series to be merged in two parts via two different
-trees where neither can be tested? That sounds crazy to me.
 
-Cheers,
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Murali Karicheri
+Linux Kernel, Keystone
