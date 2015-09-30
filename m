@@ -1,86 +1,49 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Wed, 30 Sep 2015 18:13:23 +0200
-Subject: [PATCH] ARM: fix vdsomunge depends on glibc specific byteswap.h
-In-Reply-To: <CAKv+Gu_098GVMeJPjDWaQ-uXek_cGUe4UMVy+fMdKw=_C+P7Tg@mail.gmail.com>
-References: <cover.1443628457.git.hns@goldelico.com>
- <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
- <CAKv+Gu_098GVMeJPjDWaQ-uXek_cGUe4UMVy+fMdKw=_C+P7Tg@mail.gmail.com>
-Message-ID: <B6E60776-A054-4749-BCAF-1433BFFC6AF7@goldelico.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Wed, 30 Sep 2015 17:13:55 +0100
+Subject: [PATCH 16/22] arm64/debug: Make use of the system wide safe value
+In-Reply-To: <560A8159.8000300@arm.com>
+References: <1442413280-31885-1-git-send-email-suzuki.poulose@arm.com>
+ <1442413280-31885-17-git-send-email-suzuki.poulose@arm.com>
+ <560A8159.8000300@arm.com>
+Message-ID: <560C0A43.1040209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Am 30.09.2015 um 18:02 schrieb Ard Biesheuvel <ard.biesheuvel@linaro.org>:
-
-> On 30 September 2015 at 17:56, H. Nikolaus Schaller <hns@goldelico.com> wrote:
->> If the host toolchain is not glibc based then the arm kernel build
->> fails with
->> 
->> HOSTCC  arch/arm/vdso/vdsomunge
->> arch/arm/vdso/vdsomunge.c:48:22: fatal error: byteswap.h: No such file or directory
->> 
->> Observed with omap2plus_defconfig and compile on Mac OS X with arm ELF
->> cross-compiler.
->> 
->> Reason: byteswap.h is a glibc only header.
->> 
->> Changed to detect the host and include the right file as described at:
->> 
->> https://bugs.freedesktop.org/show_bug.cgi?id=8882
->> 
->> Tested to compile on Mac OS X 10.9.5 host.
->> 
->> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+On 29/09/15 13:17, Vladimir Murzin wrote:
+> On 16/09/15 15:21, Suzuki K. Poulose wrote:
+>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>>
+>> Use the system wide value of ID_AA64DFR0 to make safer decisions
+>>
+>> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 >> ---
->> arch/arm/vdso/vdsomunge.c | 18 ++++++++++++++++++
->> 1 file changed, 18 insertions(+)
->> 
->> diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
->> index aedec81..5364cea 100644
->> --- a/arch/arm/vdso/vdsomunge.c
->> +++ b/arch/arm/vdso/vdsomunge.c
->> @@ -45,7 +45,25 @@
->> * it does.
->> */
->> 
->> +#if defined(__linux__)
->> #include <byteswap.h>
->> +#elif defined(__OpenBSD__)
->> +#include <sys/endian.h>
->> +#define bswap_16 __swap16
->> +#define bswap_32 __swap32
->> +#define bswap_64 __swap64
->> +#elif defined(__APPLE__)
->> +#include <libkern/OSByteOrder.h>
->> +#define bswap_16 OSSwapInt16
->> +#define bswap_32 OSSwapInt32
->> +#define bswap_64 OSSwapInt64
->> +#else
->> +#include <sys/endian.h>
->> +#define bswap_16 bswap16
->> +#define bswap_32 bswap32
->> +#define bswap_64 bswap64
->> +#endif
->> +
-> 
-> Have you tried this?
-> 
-> #define bswap_16 __builtin_bswap16
-> #define bswap_32 __builtin_bswap32
-> #define bswap_64 __builtin_bswap64
-> 
-> https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html
+>>   arch/arm64/include/asm/hw_breakpoint.h |   14 ++------------
+>>   arch/arm64/kernel/debug-monitors.c     |    6 ++++--
+>>   arch/arm64/kernel/hw_breakpoint.c      |   19 ++++++++++++++++++-
+>>   3 files changed, 24 insertions(+), 15 deletions(-)
+>>
+>
+> Looks like this patch introduces build-time regression if
+> CONFIG_PERF_EVENTS is not set:
+>
+>> arch/arm64/kvm/built-in.o: In function `kvm_arm_setup_debug':
+>> /work/tools/linux/arch/arm64/kvm/debug.c:173: undefined reference to `get_num_brps'
+>> /work/tools/linux/arch/arm64/kvm/debug.c:177: undefined reference to `get_num_wrps'
+>> arch/arm64/kvm/built-in.o: In function `kvm_arm_clear_debug':
+>> /work/tools/linux/arch/arm64/kvm/debug.c:208: undefined reference to `get_num_brps'
+>> /work/tools/linux/arch/arm64/kvm/debug.c:212: undefined reference to `get_num_wrps'
+>> arch/arm64/kvm/built-in.o: In function `kvm_arch_dev_ioctl_check_extension':
+>> /work/tools/linux/arch/arm64/kvm/reset.c:78: undefined reference to `get_num_wrps'
+>> /work/tools/linux/arch/arm64/kvm/reset.c:75: undefined reference to `get_num_brps'
+>> make: *** [vmlinux] Error 1
 
-OS X host uses llvm and I am not sure if these builtins are
-always available.
+The fixed series is available here :
 
-So it replaces an include file dependency by a compiler
-built-in dependency. IMHO my approach is more general
-and should cover a broader range of compile hosts.
+git://linux-arm.org/linux-skp.git cpu-ftr/v1.1-4.3-rc3
 
-This is a tool compiled by HOSTCC to be run on the build
-host - so I think we can't assume to have a gcc host compiler
-(while for the CC cross-compiler we can).
 
-Thanks,
-Nikolaus Schaller
+I will wait for some more comments/review before I sent the updated
+version to the list.
+
+Thanks
+Suzuki
