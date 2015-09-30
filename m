@@ -1,151 +1,44 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Wed, 30 Sep 2015 16:31:36 +0800
-Subject: [PATCH v2 2/8] spi: imx: replace fixed timeout with calculated one
-In-Reply-To: <43a7e93d4d29253215a5590b09baeb11a7e6f6d8.1442923630.git.anton_bondarenko@mentor.com>
-References: <cover.1442923630.git.anton_bondarenko@mentor.com>
- <43a7e93d4d29253215a5590b09baeb11a7e6f6d8.1442923630.git.anton_bondarenko@mentor.com>
-Message-ID: <20150930083135.GC2709@shlinux2>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 30 Sep 2015 17:33:25 +0900
+Subject: [PATCH 1/2] ARM: shmobile: r8a7794: add USB PHY DT support
+In-Reply-To: <55F9F82E.4000809@cogentembedded.com>
+References: <1442100737.hcefR9HyDq@wasted.cogentembedded.com>
+ <1590842.9hQm6l1zli@wasted.cogentembedded.com>
+ <55F9F82E.4000809@cogentembedded.com>
+Message-ID: <20150930083324.GA3426@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 25, 2015 at 07:57:09PM +0200, Anton Bondarenko wrote:
-> Fixed timeout value can fire while transaction is ongoing. This may happen
-> because there are no strict requirements on SPI transaction duration.
-> Dynamic timeout value is generated based on SCLK and transaction size.
+On Thu, Sep 17, 2015 at 02:15:58AM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> There is also 4 * SCLK delay between TX bursts related to CS change.
+> On 09/13/2015 01:50 AM, Sergei Shtylyov wrote:
 > 
-> Signed-off-by: Anton Bondarenko <anton_bondarenko@mentor.com>
-> ---
->  drivers/spi/spi-imx.c | 49 +++++++++++++++++++++++++++++++++++++++++--------
->  1 file changed, 41 insertions(+), 8 deletions(-)
+> >Define the R8A7794 generic part of the USB PHY device node. It is up to the
+> >board file to enable the device.
+> >
+> >Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >
+> >---
+> >  arch/arm/boot/dts/r8a7794.dtsi |   19 +++++++++++++++++++
+> >  1 file changed, 19 insertions(+)
+> >
+> >Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+> >===================================================================
+> >--- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
+> >+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
+> >@@ -690,6 +690,25 @@
+> >  				 0x1000 0 0 2 &gic 0 113 IRQ_TYPE_LEVEL_HIGH>;
+> >  	};
+> >
+> >+	usbphy: usb-phy at e6590100 {
+> >+		compatible = "renesas,usb-phy-r8a7794";
+> >+		reg = <0 0xe6590100 0 0x100>;
+> >+		#address-cells = <1>;
+> >+		#size-cells = <0>;
+> >+		clocks = <&mstp7_clks R8A7794_CLK_HSUSB>;
+> >+		clock-names = "usbhs";
 > 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 165bc2c..6c98eda 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -59,7 +59,6 @@
->  
->  /* The maximum  bytes that a sdma BD can transfer.*/
->  #define MAX_SDMA_BD_BYTES  (1 << 15)
-> -#define IMX_DMA_TIMEOUT (msecs_to_jiffies(3000))
->  struct spi_imx_config {
->  	unsigned int speed_hz;
->  	unsigned int bpw;
-> @@ -95,6 +94,7 @@ struct spi_imx_data {
->  	struct clk *clk_per;
->  	struct clk *clk_ipg;
->  	unsigned long spi_clk;
-> +	unsigned int spi_bus_clk;
->  
->  	unsigned int count;
->  	void (*tx)(struct spi_imx_data *);
-> @@ -317,8 +317,7 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
->  {
->  	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, dma = 0;
->  	u32 cfg = readl(spi_imx->base + MX51_ECSPI_CONFIG);
-> -
-> -	u32 clk = config->speed_hz, delay;
-> +	u32 delay;
->  
->  	/*
->  	 * The hardware seems to have a race condition when changing modes. The
-> @@ -330,7 +329,9 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
->  	ctrl |= MX51_ECSPI_CTRL_MODE_MASK;
->  
->  	/* set clock speed */
-> -	ctrl |= mx51_ecspi_clkdiv(spi_imx->spi_clk, config->speed_hz, &clk);
-> +	spi_imx->spi_bus_clk = config->speed_hz;
-> +	ctrl |= mx51_ecspi_clkdiv(spi_imx->spi_clk, config->speed_hz,
-> +				  &spi_imx->spi_bus_clk);
->  
->  	/* set chip select to use */
->  	ctrl |= MX51_ECSPI_CTRL_CS(config->cs);
-> @@ -363,7 +364,7 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
->  	 * the SPI communication as the device on the other end would consider
->  	 * the change of SCLK polarity as a clock tick already.
->  	 */
-> -	delay = (2 * 1000000) / clk;
-> +	delay = (2 * USEC_PER_SEC) / spi_imx->spi_bus_clk;
->  	if (likely(delay < 10))	/* SCLK is faster than 100 kHz */
->  		udelay(delay);
->  	else			/* SCLK is _very_ slow */
-> @@ -889,12 +890,40 @@ static void spi_imx_dma_tx_callback(void *cookie)
->  	complete(&spi_imx->dma_tx_completion);
->  }
->  
-> +static int spi_imx_calculate_timeout(struct spi_imx_data *spi_imx, int size)
-> +{
-> +	unsigned long coef1 = 1;
-> +	unsigned long coef2 = MSEC_PER_SEC;
-> +	unsigned long timeout = 0;
-> +
-> +	/* Swap coeficients to avoid div by 0 */
-> +	if (spi_imx->spi_bus_clk < MSEC_PER_SEC) {
-> +		coef1 = MSEC_PER_SEC;
-> +		coef2 = 1;
-> +	}
-> +
-> +	/* Time with actual data transfer */
-> +	timeout += DIV_ROUND_UP(8 * size * coef1,
-> +				spi_imx->spi_bus_clk / coef2);
-> +
-> +	/* Take CS change delay related to HW */
-> +	timeout += DIV_ROUND_UP((size - 1) * 4 * coef1,
-> +				spi_imx->spi_bus_clk / coef2);
-> +
-> +	/* Add extra second for scheduler related activities */
-> +	timeout += MSEC_PER_SEC;
-> +
-> +	/* Double calculated timeout */
-> +	return msecs_to_jiffies(2 * timeout);
-> +}
-> +
->  static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
->  				struct spi_transfer *transfer)
->  {
->  	struct dma_async_tx_descriptor *desc_tx = NULL, *desc_rx = NULL;
->  	int ret;
->  	unsigned long timeout;
-> +	unsigned long transfer_timeout;
->  	const int left = transfer->len % spi_imx->wml;
->  	struct spi_master *master = spi_imx->bitbang.master;
->  	struct sg_table *tx = &transfer->tx_sg, *rx = &transfer->rx_sg;
-> @@ -947,9 +976,11 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
->  	dma_async_issue_pending(master->dma_tx);
->  	spi_imx->devtype_data->trigger(spi_imx);
->  
-> +	transfer_timeout = spi_imx_calculate_timeout(spi_imx, transfer->len);
-> +
->  	/* Wait SDMA to finish the data transfer.*/
->  	timeout = wait_for_completion_timeout(&spi_imx->dma_tx_completion,
-> -						IMX_DMA_TIMEOUT);
-> +						transfer_timeout);
->  	if (!timeout) {
->  		pr_warn("%s %s: I/O Error in DMA TX\n",
->  			dev_driver_string(&master->dev),
-> @@ -957,8 +988,10 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
->  		dmaengine_terminate_all(master->dma_tx);
->  		dmaengine_terminate_all(master->dma_rx);
->  	} else {
-> +		transfer_timeout = spi_imx_calculate_timeout(spi_imx,
-> +							     spi_imx->wml * 2);
-*2 again here? Although spi_imx_calculate_timeout has double it.
->  		timeout = wait_for_completion_timeout(
-> -				&spi_imx->dma_rx_completion, IMX_DMA_TIMEOUT);
-> +				&spi_imx->dma_rx_completion, transfer_timeout);
->  		if (!timeout) {
->  			pr_warn("%s %s: I/O Error in DMA RX\n",
->  				dev_driver_string(&master->dev),
-> @@ -980,7 +1013,7 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
->  			spi_imx->devtype_data->intctrl(spi_imx, MXC_INT_TCEN);
->  
->  			timeout = wait_for_completion_timeout(
-> -					&spi_imx->xfer_done, IMX_DMA_TIMEOUT);
-> +					&spi_imx->xfer_done, transfer_timeout);
->  			if (!timeout) {
->  				pr_warn("%s %s: I/O Error in RX tail\n",
->  					dev_driver_string(&master->dev),
-> -- 
-> 2.5.2
-> 
+>    Forgot to add "power-domains" prop here. :-(
+
+Are you planning to repost this?
