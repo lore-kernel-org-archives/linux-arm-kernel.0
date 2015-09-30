@@ -1,37 +1,40 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 30 Sep 2015 15:45:20 +0300
-Subject: [RFC PATCH 18/20] coresight: etm3x: pushing down perf
- configuration to tracer
-In-Reply-To: <1442593594-10665-19-git-send-email-mathieu.poirier@linaro.org>
-References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
- <1442593594-10665-19-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <878u7ojctb.fsf@ashishki-desk.ger.corp.intel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 30 Sep 2015 14:47:39 +0200
+Subject: [PATCH] mmc: core: fix dead loop of mmc_retune
+In-Reply-To: <560BCF1B.7050302@intel.com>
+References: <1443605838-5948-1-git-send-email-chaotian.jing@mediatek.com>
+ <560BCF1B.7050302@intel.com>
+Message-ID: <CAPDyKFrVWGP2nXZR63v0r7eRKmHuKdX1=FMjGRhOaNtDaKTg8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+On 30 September 2015 at 14:01, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> On 30/09/15 12:37, Chaotian Jing wrote:
+>> When get a CRC error, start the mmc_retune, it will issue CMD19/CMD21
+>> to do tune, assume there were 10 clock phase need to try, phase 0 to
+>> phase 6 is ok, phase 7 to phase 9 is NG, we try it from 0 to 9, so
+>> the last CMD19/CMD21 will get CRC error, host->need_retune was set and
+>> cause mmc_retune was called, then dead loop of mmc_retune
+>>
+>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+>
+> Wasn't my idea to have this CRC checking in the core ;-) and sdhci
+> doesn't put it's tuning commands through a mmc request so it doesn't
+> see this issue.
 
-> +#define ETM3X_SUPPORTED_OPTIONS (ETMCR_CYC_ACC | ETMCR_TIMESTAMP_EN)
-> +
-> +static int etm_parse_event_config(struct etm_drvdata *drvdata,
-> +				  struct perf_event *event)
-> +{
-> +	u64 config = event->attr.config;
-> +
-> +	/*
-> +	 * At this time only cycle accurate and timestamp options are
-> +	 * available.  As such clear everything else that may have been
-> +	 * configured and set the ETM control register based on what was
-> +	 * requested.
-> +	 */
-> +	config &= ETM3X_SUPPORTED_OPTIONS;
+That's not true for all sdhci variants. For those that uses sdhci's
+->platform_execute_tuning() callback, all uses mmc_send_tuning().
 
-You want to make sure no bits outside of this mask are set in config,
-though, and return -EINVAL. Below you're even checking for it:
+I think for sdhci's default tuning path, we should change to use
+mmc_send_tuning() and thus we would potentially hit this problem as
+well.
 
-> +	if (etm_parse_event_config(drvdata, event))
-> +		return -EINVAL;
+>
+> But definitely the CRC logic is not meant for the tuning commands, so
+>
+> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-Regards,
---
-Alex
+Thanks for reviewing Adrian and for keeping an eye on "tuning" related patches.
+
+Kind regards
+Uffe
