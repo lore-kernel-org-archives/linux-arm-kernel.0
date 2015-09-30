@@ -1,34 +1,37 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 1 Oct 2015 04:32:46 +0800
-Subject: [arm-platforms:irq/msi-parent-v2 3/4] undefined reference to
- `of_msi_get_domain'
-Message-ID: <201510010445.XJOyJCg9%fengguang.wu@intel.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 1 Oct 2015 01:56:47 +0300
+Subject: [PATCH 01/19] ARM: shmobile: Add silk device tree bindings
+ documentation
+In-Reply-To: <e5923ad92d0177202b85fc4c2f1ae1a3a01f5a76.1442536920.git.horms+renesas@verge.net.au>
+References: <cover.1442536920.git.horms+renesas@verge.net.au>
+ <e5923ad92d0177202b85fc4c2f1ae1a3a01f5a76.1442536920.git.horms+renesas@verge.net.au>
+Message-ID: <560C68AF.4050505@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/msi-parent-v2
-head:   0d537e9ee95ada0563c90e6fb310e256eaa34db3
-commit: 868623d0a5560dc77c594018b84720a7e235c025 [3/4] PCI/MSI: Use of_msi_get_domain instead of open-coded "msi-parent" parsing
-config: sparc-allmodconfig (attached as .config)
-reproduce:
-  wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-  chmod +x ~/bin/make.cross
-  git checkout 868623d0a5560dc77c594018b84720a7e235c025
-  # save the attached .config to linux build tree
-  make.cross ARCH=sparc 
+On 09/18/2015 03:47 AM, Simon Horman wrote:
 
-All error/warnings (new ones prefixed by >>):
+> Add Silk Device tree bindings Documentation, listing it as a supported board.
+>
+> This allows to use checkpatch to validate DTSes referring to the Silk board.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>   Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+> index 2b9cb62838f2..1d70e78e7c80 100644
+> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+> @@ -55,3 +55,5 @@ Boards:
+>       compatible = "renesas,lager", "renesas,r8a7790"
+>     - Marzen
+>       compatible = "renesas,marzen", "renesas,r8a7779"
+> +  - Silk
 
-   drivers/built-in.o: In function `pci_host_bridge_of_msi_domain':
->> (.text+0x24224): undefined reference to `of_msi_get_domain'
+    I'll have to fix this up to SILK (RTP0RC7794LCB00011S). Sorry, noticed too 
+late. :-(
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 43409 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151001/0a84a9d1/attachment-0001.obj>
+MBR, Sergei
