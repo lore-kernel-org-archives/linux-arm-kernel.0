@@ -1,18 +1,38 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 30 Sep 2015 13:35:24 +0530
-Subject: [PATCH] dmaengine: xgene-dma: Fix overwritting DMA tx ring
-In-Reply-To: <1442390603-21129-1-git-send-email-rsahu@apm.com>
-References: <1442390603-21129-1-git-send-email-rsahu@apm.com>
-Message-ID: <20150930080524.GG21690@vkoul-mobl.iind.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Sep 2015 10:15:25 +0200
+Subject: [RFC/PATCH 11/11] arm: boot: dts: omap: add missing default
+ status for 32k counter
+In-Reply-To: <1443559446-26969-12-git-send-email-balbi@ti.com>
+References: <1443559446-26969-1-git-send-email-balbi@ti.com>
+ <1443559446-26969-12-git-send-email-balbi@ti.com>
+Message-ID: <4815825.NCBBBMgLGf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 16, 2015 at 01:33:23PM +0530, Rameshwar Prasad Sahu wrote:
-> This patch fixes an over flow issue with the TX ring descriptor. Each
-> descriptor is 32B in size and an operation requires 2 of these
-> descriptors.
+On Tuesday 29 September 2015 15:44:06 Felipe Balbi wrote:
+> All devices should have a default status. Ignoring
+> the arguments if it should be 'okay' or 'disabled'
+> by default, let's set them all the 'disabled' and
+> have boards enable 32k counter.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> 
 
-Applied, thanks
+The patch looks good, but the description is slightly incorrect:
+There is no reason to list "status='okay'" other than overriding
+the 'disabled' status.
 
--- 
-~Vinod
+I'd phrase it something like:
+
+"We want the use of the 32k counter to be a per-board setting,
+so let's disable it by default in each dtsi file and override the
+setting in the boards. Any board that does not wire up the counter
+should leave it disabled".
+
+However, if you really want all boards to provide the counter all
+the time, I'd argue that we're better off dropping this patch. We
+use the status="disabled" trick for anything that may or may not
+be working based on the board design, but things that are present
+everywhere don't need this.
+
+	Arnd
