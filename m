@@ -1,46 +1,31 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 30 Sep 2015 21:46:06 +0800
-Subject: [RFC PATCH] nvmem: rockchip_efuse_regmap_config can be static
-In-Reply-To: <1443617804-26656-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <201509302107.qXqgxYhn%fengguang.wu@intel.com>
-Message-ID: <20150930134606.GA19541@lkp-nex05>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Wed, 30 Sep 2015 15:46:44 +0200
+Subject: [RESEND][PATCH v3 7/9] ARM: dts: imx6dl-nitrogen6x: change
+ manufacturer to Boundary Devices
+In-Reply-To: <1443620806-14792-1-git-send-email-gary.bisson@boundarydevices.com>
+References: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1443620806-14792-1-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1443620806-14792-8-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
 ---
- rockchip-efuse.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx6dl-nitrogen6x.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
-index 7887070..f552134 100644
---- a/drivers/nvmem/rockchip-efuse.c
-+++ b/drivers/nvmem/rockchip-efuse.c
-@@ -101,7 +101,7 @@ static struct regmap_bus rockchip_efuse_bus = {
- 	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
+diff --git a/arch/arm/boot/dts/imx6dl-nitrogen6x.dts b/arch/arm/boot/dts/imx6dl-nitrogen6x.dts
+index 54bc4cd..8398f97 100644
+--- a/arch/arm/boot/dts/imx6dl-nitrogen6x.dts
++++ b/arch/arm/boot/dts/imx6dl-nitrogen6x.dts
+@@ -46,6 +46,6 @@
+ #include "imx6qdl-nitrogen6x.dtsi"
+ 
+ / {
+-	model = "Freescale i.MX6 DualLite Nitrogen6x Board";
+-	compatible = "fsl,imx6dl-nitrogen6x", "fsl,imx6dl";
++	model = "Boundary Devices i.MX6 DualLite Nitrogen6x Board";
++	compatible = "boundary,imx6dl-nitrogen6x", "fsl,imx6dl";
  };
- 
--struct regmap_config rockchip_efuse_regmap_config = {
-+static struct regmap_config rockchip_efuse_regmap_config = {
- 	.reg_bits = 32,
- 	.reg_stride = 1,
- 	.val_bits = 8,
-@@ -119,7 +119,7 @@ static const struct of_device_id rockchip_efuse_match[] = {
- };
- MODULE_DEVICE_TABLE(of, rockchip_efuse_match);
- 
--int rockchip_efuse_probe(struct platform_device *pdev)
-+static int rockchip_efuse_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct resource *res;
-@@ -165,7 +165,7 @@ int rockchip_efuse_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--int rockchip_efuse_remove(struct platform_device *pdev)
-+static int rockchip_efuse_remove(struct platform_device *pdev)
- {
- 	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
- 
+-- 
+2.5.3
