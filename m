@@ -1,87 +1,45 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 30 Sep 2015 15:25:49 +0800
-Subject: [PATCH v2 1/2] regulator: act8865: support output voltage by VSET2[]
- bits
+Date: Wed, 30 Sep 2015 15:25:50 +0800
+Subject: [PATCH v2 2/2] regulator: act8865: add DT binding for property
+ "active-semi, vsel-high"
 In-Reply-To: <1443597950-27849-1-git-send-email-wenyou.yang@atmel.com>
 References: <1443597950-27849-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1443597950-27849-2-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1443597950-27849-3-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the step-down DC/DC regulators, the output voltage is
-selectable by setting VSEL pin that when VSEL is low, output
-voltage is programmed by VSET1[] bits, and when VSEL is high,
-output voltage is programmed by VSET2[] bits.
-
-The DT property "active-semi,vsel-high" is used to specify
-the VSEL pin at high on the board.
+Add a DT property "active-semi,vsel-high" to indicate the VSEL pin
+is high. If this property is missing, then assume the VSEL pin is
+low(0).
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
 
-Changes in v2:
- - fix missed argument of macro "ACT88xx_REG" for act8865_alt_regulators
-   structure variable.
- - set variable "voltage_select" initial value to avoid compile warning.
+Changes in v2: None
 
- drivers/regulator/act8865-regulator.c |   24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
+ .../bindings/regulator/act8865-regulator.txt       |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
-index 896db16..f8d4cd3 100644
---- a/drivers/regulator/act8865-regulator.c
-+++ b/drivers/regulator/act8865-regulator.c
-@@ -261,6 +261,16 @@ static const struct regulator_desc act8865_regulators[] = {
- 	ACT88xx_REG("LDO_REG4", ACT8865, LDO4, VSET, "inl67"),
- };
+diff --git a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
+index e91485d..6067d98 100644
+--- a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
+@@ -8,6 +8,8 @@ Required properties:
+ Optional properties:
+ - system-power-controller: Telling whether or not this pmic is controlling
+   the system power. See Documentation/devicetree/bindings/power/power-controller.txt .
++- active-semi,vsel-high: Indicates the VSEL pin is high.
++  If this property is missing, assume the VSEL pin is low(0).
  
-+static const struct regulator_desc act8865_alt_regulators[] = {
-+	ACT88xx_REG("DCDC_REG1", ACT8865, DCDC1, VSET2, "vp1"),
-+	ACT88xx_REG("DCDC_REG2", ACT8865, DCDC2, VSET2, "vp2"),
-+	ACT88xx_REG("DCDC_REG3", ACT8865, DCDC3, VSET2, "vp3"),
-+	ACT88xx_REG("LDO_REG1", ACT8865, LDO1, VSET, "inl45"),
-+	ACT88xx_REG("LDO_REG2", ACT8865, LDO2, VSET, "inl45"),
-+	ACT88xx_REG("LDO_REG3", ACT8865, LDO3, VSET, "inl67"),
-+	ACT88xx_REG("LDO_REG4", ACT8865, LDO4, VSET, "inl67"),
-+};
-+
- #ifdef CONFIG_OF
- static const struct of_device_id act8865_dt_ids[] = {
- 	{ .compatible = "active-semi,act8600", .data = (void *)ACT8600 },
-@@ -413,6 +423,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
- 	struct act8865 *act8865;
- 	unsigned long type;
- 	int off_reg, off_mask;
-+	int voltage_select = 0;
+ Optional input supply properties:
+ - for act8600:
+@@ -49,6 +51,7 @@ Example:
+ 			pmic: act8865 at 5b {
+ 				compatible = "active-semi,act8865";
+ 				reg = <0x5b>;
++				active-semi,vsel-high;
+ 				status = "disabled";
  
- 	pdata = dev_get_platdata(dev);
- 
-@@ -424,6 +435,10 @@ static int act8865_pmic_probe(struct i2c_client *client,
- 			return -ENODEV;
- 
- 		type = (unsigned long) id->data;
-+
-+		voltage_select = !!of_get_property(dev->of_node,
-+						   "active-semi,vsel-high",
-+						   NULL);
- 	} else {
- 		type = i2c_id->driver_data;
- 	}
-@@ -442,8 +457,13 @@ static int act8865_pmic_probe(struct i2c_client *client,
- 		off_mask = ACT8846_OFF_SYSMASK;
- 		break;
- 	case ACT8865:
--		regulators = act8865_regulators;
--		num_regulators = ARRAY_SIZE(act8865_regulators);
-+		if (voltage_select) {
-+			regulators = act8865_alt_regulators;
-+			num_regulators = ARRAY_SIZE(act8865_alt_regulators);
-+		} else {
-+			regulators = act8865_regulators;
-+			num_regulators = ARRAY_SIZE(act8865_regulators);
-+		}
- 		off_reg = ACT8865_SYS_CTRL;
- 		off_mask = ACT8865_MSTROFF;
- 		break;
+ 				regulators {
 -- 
 1.7.9.5
