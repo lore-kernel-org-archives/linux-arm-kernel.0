@@ -1,52 +1,130 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 30 Sep 2015 15:03:05 +0200
-Subject: [PATCH] mmc: core: fix dead loop of mmc_retune
-In-Reply-To: <1443605838-5948-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1443605838-5948-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFrOtC80QKT6Bczq7dEZ3s3_3LXYcz-5L1sAKVxVMaNNBA@mail.gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Wed, 30 Sep 2015 16:01:11 +0300
+Subject: [PATCH] mmc: core: Fix init_card in 52Mhz
+In-Reply-To: <1443603781.5148.0.camel@mhfsdcap03>
+References: <1443583688-1952-1-git-send-email-chaotian.jing@mediatek.com>
+ <560B9C24.3090209@intel.com> <1443603781.5148.0.camel@mhfsdcap03>
+Message-ID: <560BDD17.4060102@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 September 2015 at 11:37, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> When get a CRC error, start the mmc_retune, it will issue CMD19/CMD21
-> to do tune, assume there were 10 clock phase need to try, phase 0 to
-> phase 6 is ok, phase 7 to phase 9 is NG, we try it from 0 to 9, so
-> the last CMD19/CMD21 will get CRC error, host->need_retune was set and
-> cause mmc_retune was called, then dead loop of mmc_retune
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+On 30/09/15 12:03, Chaotian Jing wrote:
+> On Wed, 2015-09-30 at 11:24 +0300, Adrian Hunter wrote:
+>> On 30/09/15 06:28, Chaotian Jing wrote:
+>>> Suppose that we got a data crc error, and it triggers the mmc_reset.
+>>> mmc_reset will call mmc_send_status to see if HW reset was supported.
+>>> before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
+>>> it will reduce frequency to 52Mhz firstly, that results in card init
+>>> was doing at 52Mhz, So need ensure frequency is lower than 400Khz when
+>>> re-init card.
+>>
+>> The call to mmc_send_status() was originally only done for mmc_test and
+>> doesn't belong in a real reset.  However the test parameter was removed
+>> to simplify the code by:
+>>
+>> commit 83533ab28380f6957af39a7b322e639e42dbdaf1
+>> Author: Johan Rudholm <johan.rudholm@axis.com>
+>> Date:   Mon Jan 12 15:38:04 2015 +0100
+>>
+>>     mmc: core: always check status after reset
+>>     
+>>     Always check if the card is alive after a successful reset. This allows
+>>     us to remove mmc_hw_reset_check(), leaving mmc_hw_reset() as the only
+>>     card reset interface.
+>>     
+>>     Signed-off-by: Johan Rudholm <johanru@axis.com>
+>>     Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> IMHO having a test to check whether hw reset actually did reset the card
+>> is useful, so I would suggest putting back mmc_hw_reset_check() and
+>> removing the check from the non-test path.
+>>
+>> An alternative is to recognize that we don't want retuning here, and it is
+>> unlikely to be needed in the mmc_test case.  So if retuning is needed, just
+>> skip the call to mmc_send_status() i.e.
+>>
+>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>> index f2d0c2ae85b1..c3749ba42739 100644
+>> --- a/drivers/mmc/core/mmc.c
+>> +++ b/drivers/mmc/core/mmc.c
+>> @@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
+>>  	host->ops->hw_reset(host);
+>>  
+>>  	/* If the reset has happened, then a status command will fail */
+>> -	if (!mmc_send_status(card, &status)) {
+>> +	if (!host->need_retune && !mmc_send_status(card, &status)) {
+>>  		mmc_host_clk_release(host);
+>>  		return -ENOSYS;
+>>  	}
+>>
+>> Could then make mmc_test aware of that:
+>>  
+> 
+>> This solution is better, please help to upstream it. Thx!
 
-Thanks Chaotian!
+Then please, make it a patch, and test it and submit it.  You can add:
 
-I have applied this for fixes and added the following tag:
+Suggested-by: Adrian Hunter <adrian.hunter@intel.com>
 
-Fixes: bd11e8bd03ca ("mmc: core: Flag re-tuning is needed on CRC errors")
 
-Kind regards
-Uffe
-
-> ---
->  drivers/mmc/core/core.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-> index 0520064..a3eb20b 100644
-> --- a/drivers/mmc/core/core.c
-> +++ b/drivers/mmc/core/core.c
-> @@ -134,9 +134,11 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
->         int err = cmd->error;
->
->         /* Flag re-tuning needed on CRC errors */
-> -       if (err == -EILSEQ || (mrq->sbc && mrq->sbc->error == -EILSEQ) ||
-> +       if ((cmd->opcode != MMC_SEND_TUNING_BLOCK &&
-> +           cmd->opcode != MMC_SEND_TUNING_BLOCK_HS200) &&
-> +           (err == -EILSEQ || (mrq->sbc && mrq->sbc->error == -EILSEQ) ||
->             (mrq->data && mrq->data->error == -EILSEQ) ||
-> -           (mrq->stop && mrq->stop->error == -EILSEQ))
-> +           (mrq->stop && mrq->stop->error == -EILSEQ)))
->                 mmc_retune_needed(host);
->
->         if (err && cmd->retries && mmc_host_is_spi(host)) {
-> --
-> 1.8.1.1.dirty
->
+>> diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
+>> index b78cf5d403a3..7b105b97be78 100644
+>> --- a/drivers/mmc/card/mmc_test.c
+>> +++ b/drivers/mmc/card/mmc_test.c
+>> @@ -2272,6 +2272,16 @@ static int mmc_test_hw_reset(struct mmc_test_card *test)
+>>  	if (!mmc_card_mmc(card) || !mmc_can_reset(card))
+>>  		return RESULT_UNSUP_CARD;
+>>  
+>> +	err = mmc_send_status(card, NULL);
+>> +	if (err)
+>> +		return err;
+>> +
+>> +	if (host->need_retune) {
+>> +		pr_info("%s: cannot test hw reset because retune needed\n",
+>> +			mmc_hostname(test->card->host));
+>> +		return RESULT_FAIL;
+>> +	}
+>> +
+>>  	err = mmc_hw_reset(host);
+>>  	if (!err)
+>>  		return RESULT_OK;
+>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>> index f2d0c2ae85b1..c3749ba42739 100644
+>> --- a/drivers/mmc/core/mmc.c
+>> +++ b/drivers/mmc/core/mmc.c
+>> @@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
+>>  	host->ops->hw_reset(host);
+>>  
+>>  	/* If the reset has happened, then a status command will fail */
+>> -	if (!mmc_send_status(card, &status)) {
+>> +	if (!host->need_retune && !mmc_send_status(card, &status)) {
+>>  		mmc_host_clk_release(host);
+>>  		return -ENOSYS;
+>>  	}
+>>
+>>
+>>
+>>
+>>>
+>>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+>>> ---
+>>>  drivers/mmc/core/mmc.c | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>>> index e726903..f2d0c2a 100644
+>>> --- a/drivers/mmc/core/mmc.c
+>>> +++ b/drivers/mmc/core/mmc.c
+>>> @@ -1945,6 +1945,7 @@ static int mmc_reset(struct mmc_host *host)
+>>>  
+>>>  	/* Set initial state and call mmc_set_ios */
+>>>  	mmc_set_initial_state(host);
+>>> +	mmc_set_clock(host, host->f_init);
+>>>  	mmc_host_clk_release(host);
+>>>  
+>>>  	return mmc_init_card(host, card->ocr, card);
+>>>
+>>
+> 
+> 
+> 
