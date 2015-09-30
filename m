@@ -1,104 +1,151 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 30 Sep 2015 11:45:35 +0100
-Subject: [PATCH v5 20/22] arm/xen: Add support for 64KB page granularity
+Date: Wed, 30 Sep 2015 11:45:31 +0100
+Subject: [PATCH v5 16/22] block/xen-blkback: Make it running on 64KB page
+ granularity
 In-Reply-To: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
 References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1443609937-25278-21-git-send-email-julien.grall@citrix.com>
+Message-ID: <1443609937-25278-17-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hypercall interface is always using 4KB page granularity. This is
-requiring to use xen page definition macro when we deal with hypercall.
+The PV block protocol is using 4KB page granularity. The goal of this
+patch is to allow a Linux using 64KB page granularity behaving as a
+block backend on a non-modified Xen.
 
-Note that pfn_to_gfn is working with a Xen pfn (i.e 4KB). We may want to
-rename pfn_gfn to make this explicit.
+It's only necessary to adapt the ring size and the number of request per
+indirect frames. The rest of the code is relying on the grant table
+code.
 
-We also allocate a 64KB page for the shared page even though only the
-first 4KB is used. I don't think this is really important for now as it
-helps to have the pointer 4KB aligned (XENMEM_add_to_physmap is taking a
-Xen PFN).
+Note that the grant table code is allocating a Linux page per grant
+which will result to waste 6OKB for every grant when Linux is using 64KB
+page granularity. This could be improved by sharing the page between
+multiple grants.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
+Acked-by: "Roger Pau Monn?" <roger.pau@citrix.com>
 ---
-Cc: Russell King <linux@arm.linux.org.uk>
 
-Stefano, I've dropped your reviewed-by given I've updated the doc and do
-changes to avoid usage of XEN_PAGE_SHIFT
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
+
+Improvement such as support of 64KB grant is not taken into
+consideration in this patch because we have the requirement to run a
+Linux using 64KB pages on a non-modified Xen.
+
+This has been tested only with a loop device. I plan to test passing
+hard drive partition but I didn't yet convert the swiotlb code.
 
     Changes in v4:
-        - Add Stefano's Reviewed-by
+        - Add Roger's acked-by
 
     Changes in v3:
-        - s/MFN/GFN/ base on the new naming
-        - Use virt_to_gfn to avoid use XEN_PAGE_SHIFT
-        - Drop Stefano's reviewed-by
-        - Add some docs in arch/arm/asm/xen/page.h
-
-    Changes in v2
-        - Add Stefano's reviewed-by
+        - Use DIV_ROUND_UP in INDIRECT_PAGES to avoid a line over 80
+        characters
 ---
- arch/arm/include/asm/xen/page.h | 15 +++++++++++++--
- arch/arm/xen/enlighten.c        |  6 +++---
- 2 files changed, 16 insertions(+), 5 deletions(-)
+ drivers/block/xen-blkback/blkback.c |  5 +++--
+ drivers/block/xen-blkback/common.h  | 17 +++++++++++++----
+ drivers/block/xen-blkback/xenbus.c  |  9 ++++++---
+ 3 files changed, 22 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-index 98c9fc3..e3d94cf 100644
---- a/arch/arm/include/asm/xen/page.h
-+++ b/arch/arm/include/asm/xen/page.h
-@@ -28,6 +28,17 @@ typedef struct xpaddr {
+diff --git a/drivers/block/xen-blkback/blkback.c b/drivers/block/xen-blkback/blkback.c
+index 6a685ae..809634c 100644
+--- a/drivers/block/xen-blkback/blkback.c
++++ b/drivers/block/xen-blkback/blkback.c
+@@ -961,7 +961,7 @@ static int xen_blkbk_parse_indirect(struct blkif_request *req,
+ 		seg[n].nsec = segments[i].last_sect -
+ 			segments[i].first_sect + 1;
+ 		seg[n].offset = (segments[i].first_sect << 9);
+-		if ((segments[i].last_sect >= (PAGE_SIZE >> 9)) ||
++		if ((segments[i].last_sect >= (XEN_PAGE_SIZE >> 9)) ||
+ 		    (segments[i].last_sect < segments[i].first_sect)) {
+ 			rc = -EINVAL;
+ 			goto unmap;
+@@ -1210,6 +1210,7 @@ static int dispatch_rw_block_io(struct xen_blkif *blkif,
  
- #define INVALID_P2M_ENTRY      (~0UL)
- 
-+/*
-+ * The pseudo-physical frame (pfn) used in all the helpers is always based
-+ * on Xen page granularity (i.e 4KB).
-+ *
-+ * A Linux page may be split across multiple non-contiguous Xen page so we
-+ * have to keep track with frame based on 4KB page granularity.
-+ *
-+ * PV drivers should never make a direct usage of those helpers (particularly
-+ * pfn_to_gfn and gfn_to_pfn).
-+ */
+ 	req_operation = req->operation == BLKIF_OP_INDIRECT ?
+ 			req->u.indirect.indirect_op : req->operation;
 +
- unsigned long __pfn_to_mfn(unsigned long pfn);
- extern struct rb_root phys_to_mach;
+ 	if ((req->operation == BLKIF_OP_INDIRECT) &&
+ 	    (req_operation != BLKIF_OP_READ) &&
+ 	    (req_operation != BLKIF_OP_WRITE)) {
+@@ -1268,7 +1269,7 @@ static int dispatch_rw_block_io(struct xen_blkif *blkif,
+ 			seg[i].nsec = req->u.rw.seg[i].last_sect -
+ 				req->u.rw.seg[i].first_sect + 1;
+ 			seg[i].offset = (req->u.rw.seg[i].first_sect << 9);
+-			if ((req->u.rw.seg[i].last_sect >= (PAGE_SIZE >> 9)) ||
++			if ((req->u.rw.seg[i].last_sect >= (XEN_PAGE_SIZE >> 9)) ||
+ 			    (req->u.rw.seg[i].last_sect <
+ 			     req->u.rw.seg[i].first_sect))
+ 				goto fail_response;
+diff --git a/drivers/block/xen-blkback/common.h b/drivers/block/xen-blkback/common.h
+index 45a044a..68e87a0 100644
+--- a/drivers/block/xen-blkback/common.h
++++ b/drivers/block/xen-blkback/common.h
+@@ -39,6 +39,7 @@
+ #include <asm/pgalloc.h>
+ #include <asm/hypervisor.h>
+ #include <xen/grant_table.h>
++#include <xen/page.h>
+ #include <xen/xenbus.h>
+ #include <xen/interface/io/ring.h>
+ #include <xen/interface/io/blkif.h>
+@@ -51,12 +52,20 @@ extern unsigned int xen_blkif_max_ring_order;
+  */
+ #define MAX_INDIRECT_SEGMENTS 256
  
-@@ -64,8 +75,8 @@ static inline unsigned long bfn_to_pfn(unsigned long bfn)
- #define bfn_to_local_pfn(bfn)	bfn_to_pfn(bfn)
+-#define SEGS_PER_INDIRECT_FRAME \
+-	(PAGE_SIZE/sizeof(struct blkif_request_segment))
++/*
++ * Xen use 4K pages. The guest may use different page size (4K or 64K)
++ * Number of Xen pages per segment
++ */
++#define XEN_PAGES_PER_SEGMENT   (PAGE_SIZE / XEN_PAGE_SIZE)
++
++#define XEN_PAGES_PER_INDIRECT_FRAME \
++	(XEN_PAGE_SIZE/sizeof(struct blkif_request_segment))
++#define SEGS_PER_INDIRECT_FRAME	\
++	(XEN_PAGES_PER_INDIRECT_FRAME / XEN_PAGES_PER_SEGMENT)
++
+ #define MAX_INDIRECT_PAGES \
+ 	((MAX_INDIRECT_SEGMENTS + SEGS_PER_INDIRECT_FRAME - 1)/SEGS_PER_INDIRECT_FRAME)
+-#define INDIRECT_PAGES(_segs) \
+-	((_segs + SEGS_PER_INDIRECT_FRAME - 1)/SEGS_PER_INDIRECT_FRAME)
++#define INDIRECT_PAGES(_segs) DIV_ROUND_UP(_segs, XEN_PAGES_PER_INDIRECT_FRAME)
  
- /* VIRT <-> GUEST conversion */
--#define virt_to_gfn(v)		(pfn_to_gfn(virt_to_pfn(v)))
--#define gfn_to_virt(m)		(__va(gfn_to_pfn(m) << PAGE_SHIFT))
-+#define virt_to_gfn(v)		(pfn_to_gfn(virt_to_phys(v) >> XEN_PAGE_SHIFT))
-+#define gfn_to_virt(m)		(__va(gfn_to_pfn(m) << XEN_PAGE_SHIFT))
- 
- /* Only used in PV code. But ARM guests are always HVM. */
- static inline xmaddr_t arbitrary_virt_to_machine(void *vaddr)
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index eeeab07..50b4769 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -89,8 +89,8 @@ static void xen_percpu_init(void)
- 	pr_info("Xen: initializing cpu%d\n", cpu);
- 	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
- 
--	info.mfn = __pa(vcpup) >> PAGE_SHIFT;
--	info.offset = offset_in_page(vcpup);
-+	info.mfn = virt_to_gfn(vcpup);
-+	info.offset = xen_offset_in_page(vcpup);
- 
- 	err = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_info, cpu, &info);
- 	BUG_ON(err);
-@@ -213,7 +213,7 @@ static int __init xen_guest_init(void)
- 	xatp.domid = DOMID_SELF;
- 	xatp.idx = 0;
- 	xatp.space = XENMAPSPACE_shared_info;
--	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
-+	xatp.gpfn = virt_to_gfn(shared_info_page);
- 	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
- 		BUG();
- 
+ /* Not a real protocol.  Used to generate ring structs which contain
+  * the elements common to all protocols only.  This way we get a
+diff --git a/drivers/block/xen-blkback/xenbus.c b/drivers/block/xen-blkback/xenbus.c
+index deb3f00..edd27e4 100644
+--- a/drivers/block/xen-blkback/xenbus.c
++++ b/drivers/block/xen-blkback/xenbus.c
+@@ -176,21 +176,24 @@ static int xen_blkif_map(struct xen_blkif *blkif, grant_ref_t *gref,
+ 	{
+ 		struct blkif_sring *sring;
+ 		sring = (struct blkif_sring *)blkif->blk_ring;
+-		BACK_RING_INIT(&blkif->blk_rings.native, sring, PAGE_SIZE * nr_grefs);
++		BACK_RING_INIT(&blkif->blk_rings.native, sring,
++			       XEN_PAGE_SIZE * nr_grefs);
+ 		break;
+ 	}
+ 	case BLKIF_PROTOCOL_X86_32:
+ 	{
+ 		struct blkif_x86_32_sring *sring_x86_32;
+ 		sring_x86_32 = (struct blkif_x86_32_sring *)blkif->blk_ring;
+-		BACK_RING_INIT(&blkif->blk_rings.x86_32, sring_x86_32, PAGE_SIZE * nr_grefs);
++		BACK_RING_INIT(&blkif->blk_rings.x86_32, sring_x86_32,
++			       XEN_PAGE_SIZE * nr_grefs);
+ 		break;
+ 	}
+ 	case BLKIF_PROTOCOL_X86_64:
+ 	{
+ 		struct blkif_x86_64_sring *sring_x86_64;
+ 		sring_x86_64 = (struct blkif_x86_64_sring *)blkif->blk_ring;
+-		BACK_RING_INIT(&blkif->blk_rings.x86_64, sring_x86_64, PAGE_SIZE * nr_grefs);
++		BACK_RING_INIT(&blkif->blk_rings.x86_64, sring_x86_64,
++			       XEN_PAGE_SIZE * nr_grefs);
+ 		break;
+ 	}
+ 	default:
 -- 
 2.1.4
