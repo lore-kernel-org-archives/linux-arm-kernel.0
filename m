@@ -1,37 +1,49 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 30 Sep 2015 13:35:15 +0100
-Subject: [PATCH 2/4] nvmem: core: Handle shift bits in-place if cell->nbits is
- non-zero
-In-Reply-To: <1443616298-17389-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1443616298-17389-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1443616515-17763-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 30 Sep 2015 14:36:07 +0200
+Subject: [PATCH v2 6/7] ARM64: smp: Add runtime PM support for CPU hotplug
+In-Reply-To: <1441310314-8857-7-git-send-email-lina.iyer@linaro.org>
+References: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
+ <1441310314-8857-7-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAMuHMdWVCHRxhMHTzussPFXEu_CAed+nyfOSGF9vmA-z9X9OaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Axel Lin <axel.lin@ingics.com>
+Hi Lina,
 
-It's pointless to test (cell->bit_offset || cell->bit_offset).
-nvmem_shift_read_buffer_in_place() should be called when
-(cell->bit_offset || cell->nbits).
+On Thu, Sep 3, 2015 at 9:58 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index dbdaacd..4076962 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -135,6 +135,7 @@ asmlinkage void secondary_start_kernel(void)
+>  {
+>         struct mm_struct *mm = &init_mm;
+>         unsigned int cpu = smp_processor_id();
+> +       struct device *cpu_dev;
+>
+>         /*
+>          * All kernel threads share the same mm context; grab a
+> @@ -185,6 +186,11 @@ asmlinkage void secondary_start_kernel(void)
+>         local_irq_enable();
+>         local_async_enable();
+>
+> +       /* We are running, enable runtime PM for the CPU. */
+> +       cpu_dev = get_cpu_device(cpu);
+> +       if (cpu_dev)
+> +               pm_runtime_get_sync(cpu_dev);
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/nvmem/core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+arch/arm64/kernel/smp.c:192:3: error: implicit declaration of function
+'pm_runtime_get_sync' [-Werror=implicit-function-declaration]
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index f4af8e5..676607c 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -825,7 +825,7 @@ static int __nvmem_cell_read(struct nvmem_device *nvmem,
- 		return rc;
- 
- 	/* shift bits in-place */
--	if (cell->bit_offset || cell->bit_offset)
-+	if (cell->bit_offset || cell->nbits)
- 		nvmem_shift_read_buffer_in_place(cell, buf);
- 
- 	*len = cell->bytes;
--- 
-1.9.1
+Adding #include <linux/pm_runtime.h> fixes compilation.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
