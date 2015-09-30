@@ -1,26 +1,49 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 30 Sep 2015 15:38:29 -0700
-Subject: [PATCH 1/5] ARM: sunxi: Add R8 support
-In-Reply-To: <1442566130-3497-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
- <1442566130-3497-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150930223829.GG18556@codeaurora.org>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Wed, 30 Sep 2015 15:46:58 -0700
+Subject: [PATCH v3 0/4] MSI, of,
+ irqchip/gicv3-its: Handle "msi-map" properties.
+Message-ID: <1443653222-24924-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18, Maxime Ripard wrote:
-> The R8 is a new Allwinner SoC based on the A13. While both are very
-> similar, there's still a few differences. Introduce a new compatible to
-> deal with them.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
+From: David Daney <david.daney@cavium.com>
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+The first patch from Mark Rutland adds the OF device tree binding
+description, which explains what we are attempting to do here.  For
+MSI messages on GICv3 systems there is some side-band data that
+accompanies the message, this data is specified in the OF device tree
+"msi-map" property of the PCI host driver.
 
-BTW, why is the entire series sent To: Mike and I? Are these
-patches intended to go through clk tree?
+The second patch adds a parser to get the required information out of
+the device tree.
+
+The third patch creates the pci_msi_domain_get_msi_rid() function to
+make it more convenient to generate the proper PCI/MSI requester id.
+
+The final patch converts gicv3-its to use the new infrastructure.
+
+Changes from v1: Factor out the device tree access code to a separate
+function in drivers/of/irq.c
+
+Changes from v2: Added the pci_msi_domain_get_msi_rid() patch to
+generalize the support a bit more.
+
+David Daney (3):
+  of/irq: Add new function of_msi_map_rid()
+  PCI/MSI:  Add helper function pci_msi_domain_get_msi_rid().
+  irqchip/gic-v3-its:  Add handling of PCI requester id.
+
+Mark Rutland (1):
+  Docs: dt: Add PCI MSI map bindings
+
+ Documentation/devicetree/bindings/pci/pci-msi.txt | 220 ++++++++++++++++++++++
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c          |   4 +-
+ drivers/of/irq.c                                  |  84 +++++++++
+ drivers/pci/msi.c                                 |  31 +++
+ include/linux/msi.h                               |   1 +
+ include/linux/of_irq.h                            |   7 +
+ 6 files changed, 344 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-msi.txt
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
