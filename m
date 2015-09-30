@@ -1,130 +1,30 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Wed, 30 Sep 2015 16:01:11 +0300
-Subject: [PATCH] mmc: core: Fix init_card in 52Mhz
-In-Reply-To: <1443603781.5148.0.camel@mhfsdcap03>
-References: <1443583688-1952-1-git-send-email-chaotian.jing@mediatek.com>
- <560B9C24.3090209@intel.com> <1443603781.5148.0.camel@mhfsdcap03>
-Message-ID: <560BDD17.4060102@intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 30 Sep 2015 14:04:30 +0100
+Subject: [PATCH v5 00/22] xen/arm64: Add support for 64KB page in Linux
+In-Reply-To: <560BCB67.1060100@citrix.com>
+References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
+ <20150930113214.GA10997@leverpostej> <560BCB67.1060100@citrix.com>
+Message-ID: <20150930130429.GG10997@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/15 12:03, Chaotian Jing wrote:
-> On Wed, 2015-09-30 at 11:24 +0300, Adrian Hunter wrote:
->> On 30/09/15 06:28, Chaotian Jing wrote:
->>> Suppose that we got a data crc error, and it triggers the mmc_reset.
->>> mmc_reset will call mmc_send_status to see if HW reset was supported.
->>> before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
->>> it will reduce frequency to 52Mhz firstly, that results in card init
->>> was doing at 52Mhz, So need ensure frequency is lower than 400Khz when
->>> re-init card.
->>
->> The call to mmc_send_status() was originally only done for mmc_test and
->> doesn't belong in a real reset.  However the test parameter was removed
->> to simplify the code by:
->>
->> commit 83533ab28380f6957af39a7b322e639e42dbdaf1
->> Author: Johan Rudholm <johan.rudholm@axis.com>
->> Date:   Mon Jan 12 15:38:04 2015 +0100
->>
->>     mmc: core: always check status after reset
->>     
->>     Always check if the card is alive after a successful reset. This allows
->>     us to remove mmc_hw_reset_check(), leaving mmc_hw_reset() as the only
->>     card reset interface.
->>     
->>     Signed-off-by: Johan Rudholm <johanru@axis.com>
->>     Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>
->> IMHO having a test to check whether hw reset actually did reset the card
->> is useful, so I would suggest putting back mmc_hw_reset_check() and
->> removing the check from the non-test path.
->>
->> An alternative is to recognize that we don't want retuning here, and it is
->> unlikely to be needed in the mmc_test case.  So if retuning is needed, just
->> skip the call to mmc_send_status() i.e.
->>
->> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->> index f2d0c2ae85b1..c3749ba42739 100644
->> --- a/drivers/mmc/core/mmc.c
->> +++ b/drivers/mmc/core/mmc.c
->> @@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
->>  	host->ops->hw_reset(host);
->>  
->>  	/* If the reset has happened, then a status command will fail */
->> -	if (!mmc_send_status(card, &status)) {
->> +	if (!host->need_retune && !mmc_send_status(card, &status)) {
->>  		mmc_host_clk_release(host);
->>  		return -ENOSYS;
->>  	}
->>
->> Could then make mmc_test aware of that:
->>  
+> > Just to check, would this be expected to work with a 16K DomU (e.g.
+> > [2])?
+> > 
+> > From a quick scan it looks like the relaxations provided by this series
+> > should work so long as PAGE_SIZE % XEN_PAGE_SIZE == 0, assuming I
+> > haven't missed something.
 > 
->> This solution is better, please help to upstream it. Thx!
+> Correct, this series is able to cope with any PAGE_SIZE as long as it's
+> a multiple of the granularity used by Xen (i.e 4KB on ARM).
 
-Then please, make it a patch, and test it and submit it.  You can add:
+[...]
 
-Suggested-by: Adrian Hunter <adrian.hunter@intel.com>
-
-
->> diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
->> index b78cf5d403a3..7b105b97be78 100644
->> --- a/drivers/mmc/card/mmc_test.c
->> +++ b/drivers/mmc/card/mmc_test.c
->> @@ -2272,6 +2272,16 @@ static int mmc_test_hw_reset(struct mmc_test_card *test)
->>  	if (!mmc_card_mmc(card) || !mmc_can_reset(card))
->>  		return RESULT_UNSUP_CARD;
->>  
->> +	err = mmc_send_status(card, NULL);
->> +	if (err)
->> +		return err;
->> +
->> +	if (host->need_retune) {
->> +		pr_info("%s: cannot test hw reset because retune needed\n",
->> +			mmc_hostname(test->card->host));
->> +		return RESULT_FAIL;
->> +	}
->> +
->>  	err = mmc_hw_reset(host);
->>  	if (!err)
->>  		return RESULT_OK;
->> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->> index f2d0c2ae85b1..c3749ba42739 100644
->> --- a/drivers/mmc/core/mmc.c
->> +++ b/drivers/mmc/core/mmc.c
->> @@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
->>  	host->ops->hw_reset(host);
->>  
->>  	/* If the reset has happened, then a status command will fail */
->> -	if (!mmc_send_status(card, &status)) {
->> +	if (!host->need_retune && !mmc_send_status(card, &status)) {
->>  		mmc_host_clk_release(host);
->>  		return -ENOSYS;
->>  	}
->>
->>
->>
->>
->>>
->>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
->>> ---
->>>  drivers/mmc/core/mmc.c | 1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->>> index e726903..f2d0c2a 100644
->>> --- a/drivers/mmc/core/mmc.c
->>> +++ b/drivers/mmc/core/mmc.c
->>> @@ -1945,6 +1945,7 @@ static int mmc_reset(struct mmc_host *host)
->>>  
->>>  	/* Set initial state and call mmc_set_ios */
->>>  	mmc_set_initial_state(host);
->>> +	mmc_set_clock(host, host->f_init);
->>>  	mmc_host_clk_release(host);
->>>  
->>>  	return mmc_init_card(host, card->ocr, card);
->>>
->>
+> > Would any of these require more work to also handle 16K?
 > 
-> 
-> 
+> No. It should just boot on Xen as long as the CPU is support 16K
+> granularity.
+
+Great to hear, thanks!
+
+Mark.
