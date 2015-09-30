@@ -1,89 +1,164 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 30 Sep 2015 12:43:00 +0300
-Subject: [RFC PATCH 14/20] coresight: etm-perf: implementing
- 'event_init()' API
-In-Reply-To: <CANLsYkxZ83554k+7sgS6dPp4iyaN1qEUzFNLUg6m=uo+S0ArZA@mail.gmail.com>
-References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
- <1442593594-10665-15-git-send-email-mathieu.poirier@linaro.org>
- <87eghq4jf7.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYkxZ83554k+7sgS6dPp4iyaN1qEUzFNLUg6m=uo+S0ArZA@mail.gmail.com>
-Message-ID: <87twqcjl97.fsf@ashishki-desk.ger.corp.intel.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Wed, 30 Sep 2015 11:51:30 +0200
+Subject: [PATCH] drm/rockchip: vop: Correct enabled clocks during setup
+In-Reply-To: <1443527884.31869.48.camel@collabora.co.uk>
+References: <1443518893-28142-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <560A600C.8060203@rock-chips.com> <560A6EBF.4080902@rock-chips.com>
+ <1443527884.31869.48.camel@collabora.co.uk>
+Message-ID: <CABgxDo+NV7tnQpap-NA=yzJy0vEePFw0JSk2F2yGfhuTcEmtAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+Hi all,
 
-> On 22 September 2015 at 08:29, Alexander Shishkin
-> <alexander.shishkin@linux.intel.com> wrote:
->> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+I had an issue with the drm driver, when I start the kernel via kexec,
+the drm driver freezes the platform. it is caused by the function
+vop_initial (when copying registers via ahb). This issue happens with
+the chromeos kernel or with the mainline kernel. When I investigated a
+bit, I found that it had something to do with the hclk clock.
+
+This patch fixes the issue. Everything works like a charm now.
+
+Tested-by: Romain Perier <romain.perier@gmail.com>
+
+2015-09-29 13:58 GMT+02:00 Sjoerd Simons <sjoerd.simons@collabora.co.uk>:
+> On Tue, 2015-09-29 at 18:58 +0800, Yakir Yang wrote:
 >>
->>> +static void etm_event_destroy(struct perf_event *event)
->>> +{
->>> +     /* switching off the source will also tear down the path */
->>> +     etm_event_power_sources(event->cpu, false);
->>> +}
->>> +
->>> +static int etm_event_init(struct perf_event *event)
->>> +{
->>> +     int ret;
->>> +
->>> +     if (event->attr.type != etm_pmu.type)
->>> +             return -ENOENT;
->>> +
->>> +     if (event->cpu >= nr_cpu_ids)
->>> +             return -EINVAL;
->>> +
->>> +     /* only one session at a time */
->>> +     if (etm_event_source_enabled(event->cpu))
->>> +             return -EBUSY;
+>> On 09/29/2015 05:55 PM, Yakir Yang wrote:
+>> >
+>> >
+>> > On 09/29/2015 05:28 PM, Sjoerd Simons wrote:
+>> > > When doing the initial setup both the hclk and the aclk need to
+>> > > be
+>> > > enabled otherwise the board will simply hang. This only occurs
+>> > > when
+>> > > building the vop driver as a module, when its built-in the
+>> > > initial setup
 >>
->> Why is this the case? If you were to configure the event in pmu::add()
->> and deconfigure it in pmu::del(), like you already do with the buffer
->> part, you could handle as many sessions as you want.
+>> Hmm... My previous test was built-in the vop driver, and just notice
+>> that
+>> you say problem only occurred when building the vop driver as module.
+>> That's to say my test was wrong, so I try to do the right things.
+>>
+>> But I found that vop driver module and rockchipdrm driver module in
+>> dependency cycles, here are the build message:
+>>      depmod: ERROR: Found 2 modules in dependency cycles!
 >
-> Apologies for the late reply, I was travelling.
 >
-> We certainly don't want to have more than once trace session going on
-> at any given time, especially if the sessions have different
-> configuration parameters.  Moreover doing the tracer configuration as
-> part of pmu::add() is highly redundant.
-
-But why?
-
-The whole point of using perf for this is that it does all the tricky
-context switching for us, all the cross-cpu calling to enable/disable
-the events etc so that we can run multiple sessions in parallel without
-having to worry (much) about scheduling. (Aside, of course, from other
-useful things like sideband events, but that's another topic).
-
->> This can be done in pmu::add(), if you can call directly into
->> etm_configure_cpu() or etm_config_enable() so that there's no cross-cpu
->> calling in between.
+> I've only tested with mainline which doesn't seem to have that issue?
+> So can't easily help you there unfortunately.
 >
-> As per my comment above, reconfiguring the tracers every time it is
-> about to run is redundant and extensive (etm_configure_cpu() isn't
-> exactly short),  incurring a cost that is likely to be higher than
-> calling get_online_cpus().
-
-I was actually referring to synchronous smp_function_call*()s that
-obviously won't work here. But the good news is that they are also
-redundant.
-
-But I don't see anything expensive in configuring etm and etb in
-pmu::add(), as far as I can tell, it's just a bunch of register
-writes. If you want to optimize those, you could compare the new context
-against the previous one and only update registers that need to be
-updated. The spinlock you also could get rid of, because there won't be
-any local racing (again, afaict neither ETM nor ETB generate
-interrupts).
-
-That said, one expensive thing is reading out the ETB buffer on every
-sched out, and that is the real problem, because it slows down the fast
-path by a loop of arbitrary length reading out hw registers. Iirc, ETBs
-could be up to 64K?
-
-But a TMC-enabled coresight should do much better in this regard.
-
-Thanks,
---
-Alex
+>
+>> Thanks,
+>> - Yakir
+>>
+>> > > happens to run before the clock framework shuts of unused clocks
+>> > > (including the aclk).
+>> > >
+>> > > While there also switch to doing prepare and enable in one step
+>> > > rather
+>> > > then separate steps to reduce the amount of code required.
+>> > >
+>> > > Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+>> >
+>> > Looks good and test on chromeos-3.14 tree, no problem, so
+>> >
+>> > Tested-by: Yakir Yang <ykk@rock-chips.com>
+>> >
+>> > > ---
+>> > >
+>> > >   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 36
+>> > > +++++++++++------------------
+>> > >   1 file changed, 14 insertions(+), 22 deletions(-)
+>> > >
+>> > > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> > > b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> > > index 5d8ae5e..48719df 100644
+>> > > --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> > > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> > > @@ -1575,32 +1575,25 @@ static int vop_initial(struct vop *vop)
+>> > >           return PTR_ERR(vop->dclk);
+>> > >       }
+>> > >   -    ret = clk_prepare(vop->hclk);
+>> > > -    if (ret < 0) {
+>> > > -        dev_err(vop->dev, "failed to prepare hclk\n");
+>> > > -        return ret;
+>> > > -    }
+>> > > -
+>> > >       ret = clk_prepare(vop->dclk);
+>> > >       if (ret < 0) {
+>> > >           dev_err(vop->dev, "failed to prepare dclk\n");
+>> > > -        goto err_unprepare_hclk;
+>> > > +        return ret;
+>> > >       }
+>> > >   -    ret = clk_prepare(vop->aclk);
+>> > > +    /* Enable both the hclk and aclk to setup the vop */
+>> > > +    ret = clk_prepare_enable(vop->hclk);
+>> > >       if (ret < 0) {
+>> > > -        dev_err(vop->dev, "failed to prepare aclk\n");
+>> > > +        dev_err(vop->dev, "failed to prepare/enable hclk\n");
+>> > >           goto err_unprepare_dclk;
+>> > >       }
+>> > >   -    /*
+>> > > -     * enable hclk, so that we can config vop register.
+>> > > -     */
+>> > > -    ret = clk_enable(vop->hclk);
+>> > > +    ret = clk_prepare_enable(vop->aclk);
+>> > >       if (ret < 0) {
+>> > > -        dev_err(vop->dev, "failed to prepare aclk\n");
+>> > > -        goto err_unprepare_aclk;
+>> > > +        dev_err(vop->dev, "failed to prepare/enable aclk\n");
+>> > > +        goto err_disable_hclk;
+>> > >       }
+>> > > +
+>> > >       /*
+>> > >        * do hclk_reset, reset all vop registers.
+>> > >        */
+>> > > @@ -1608,7 +1601,7 @@ static int vop_initial(struct vop *vop)
+>> > >       if (IS_ERR(ahb_rst)) {
+>> > >           dev_err(vop->dev, "failed to get ahb reset\n");
+>> > >           ret = PTR_ERR(ahb_rst);
+>> > > -        goto err_disable_hclk;
+>> > > +        goto err_disable_aclk;
+>> > >       }
+>> > >       reset_control_assert(ahb_rst);
+>> > >       usleep_range(10, 20);
+>> > > @@ -1634,26 +1627,25 @@ static int vop_initial(struct vop *vop)
+>> > >       if (IS_ERR(vop->dclk_rst)) {
+>> > >           dev_err(vop->dev, "failed to get dclk reset\n");
+>> > >           ret = PTR_ERR(vop->dclk_rst);
+>> > > -        goto err_unprepare_aclk;
+>> > > +        goto err_disable_aclk;
+>> > >       }
+>> > >       reset_control_assert(vop->dclk_rst);
+>> > >       usleep_range(10, 20);
+>> > >       reset_control_deassert(vop->dclk_rst);
+>> > >         clk_disable(vop->hclk);
+>> > > +    clk_disable(vop->aclk);
+>> > >         vop->is_enabled = false;
+>> > >         return 0;
+>> > >   +err_disable_aclk:
+>> > > +    clk_disable_unprepare(vop->aclk);
+>> > >   err_disable_hclk:
+>> > > -    clk_disable(vop->hclk);
+>> > > -err_unprepare_aclk:
+>> > > -    clk_unprepare(vop->aclk);
+>> > > +    clk_disable_unprepare(vop->hclk);
+>> > >   err_unprepare_dclk:
+>> > >       clk_unprepare(vop->dclk);
+>> > > -err_unprepare_hclk:
+>> > > -    clk_unprepare(vop->hclk);
+>> > >       return ret;
+>> > >   }
+>> >
+>>
+>>
+>
+> --
+> Sjoerd Simons
+> Collabora Ltd.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
