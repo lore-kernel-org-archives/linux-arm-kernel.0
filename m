@@ -1,39 +1,49 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 30 Sep 2015 11:22:46 +0900
-Subject: [GIT PULL] arm64: dts: Exynos ARMv8 improvements for 4.4
-In-Reply-To: <1443579766-15793-1-git-send-email-k.kozlowski@samsung.com>
-References: <1443579766-15793-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1443579766-15793-3-git-send-email-k.kozlowski@samsung.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 30 Sep 2015 10:25:21 +0800
+Subject: [RESEND PATCH v3 1/5] doc: dt-binding: ci-hdrc-usb2: split vendor
+ specific properties
+In-Reply-To: <1443579925-1330-1-git-send-email-peter.chen@freescale.com>
+References: <1443579925-1330-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <1443579925-1330-2-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+Each vendor may have its specific properties, they are not belonged
+to common optional properties, split them from common's.
 
-One ARMv8 DTS change for 4.4.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-Best regards,
-Krzysztof
-
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-
-are available in the git repository at:
-
-  https://github.com/krzk/linux.git tags/samsung-dt64-4.4
-
-for you to fetch changes up to 235c8e96f54a76bee201a7c86620c351a30b1ac6:
-
-  arm64: dts: Add BUS1 instance pinctrl support for exynos7 (2015-09-16 09:03:09 +0900)
-
-----------------------------------------------------------------
-Device Tree improvements for Exynos ARMv8 based boards:
-1. Add a BUS1 instance pinctrl for Exynos7 SoC.
-
-----------------------------------------------------------------
-Alim Akhtar (1):
-      arm64: dts: Add BUS1 instance pinctrl support for exynos7
-
- arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi | 103 ++++++++++++++++++++++++
- arch/arm64/boot/dts/exynos/exynos7.dtsi         |   7 ++
- 2 files changed, 110 insertions(+)
+diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+index 77946f5..27dc705 100644
+--- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
++++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+@@ -27,10 +27,6 @@ Optional properties:
+ - vbus-supply: reference to the VBUS regulator
+ - maximum-speed: limit the maximum connection speed to "full-speed".
+ - tpl-support: TPL (Targeted Peripheral List) feature for targeted hosts
+-- fsl,usbmisc: (FSL only) phandler of non-core register device, with one
+-  argument that indicate usb controller index
+-- disable-over-current: (FSL only) disable over current detect
+-- external-vbus-divider: (FSL only) enables off-chip resistor divider for Vbus
+ - itc-setting: interrupt threshold control register control, the setting
+   should be aligned with ITC bits at register USBCMD.
+ - ahb-burst-config: it is vendor dependent, the required value should be
+@@ -54,6 +50,12 @@ Optional properties:
+ - phy-clkgate-delay-us: the delay time (us) between putting the PHY into
+   low power mode and gating the PHY clock.
+ 
++i.mx specific properties
++- fsl,usbmisc: phandler of non-core register device, with one
++  argument that indicate usb controller index
++- disable-over-current: disable over current detect
++- external-vbus-divider: enables off-chip resistor divider for Vbus
++
+ Example:
+ 
+ 	usb at f7ed0000 {
+-- 
+1.9.1
