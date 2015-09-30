@@ -1,51 +1,88 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 30 Sep 2015 10:37:19 +0200
-Subject: [PATCH v2 00/11] Hi Maxime / Patrice / Srini,
-In-Reply-To: <1443443867-4099-1-git-send-email-peter.griffin@linaro.org>
-References: <1443443867-4099-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <560B9F3F.1080701@st.com>
+From: b38343@freescale.com (Robin Gong)
+Date: Wed, 30 Sep 2015 16:42:20 +0800
+Subject: [PATCH v2 5/8] spi: imx: Add support for loopback for ECSPI
+ controllers
+In-Reply-To: <ca96561d8010acf587a93d0f357774bf77efbe16.1442923630.git.anton_bondarenko@mentor.com>
+References: <cover.1442923630.git.anton_bondarenko@mentor.com>
+ <ca96561d8010acf587a93d0f357774bf77efbe16.1442923630.git.anton_bondarenko@mentor.com>
+Message-ID: <20150930084219.GE2709@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On 09/28/2015 02:37 PM, Peter Griffin wrote:
-> This series makes a series of updates to the stih407 pinctrl groups
-> and makes the upstream kernel more closely aligned in terms of pin
-> configuration to the vendor kernel.
->
-> A number of new periphs are added such as spi fsm, nand, cec0, and
-> for others such as SPI the various alternate function pin muxings have
-> been added. Finally for SPI the controller nodes have been updated
-> to have the default pin assignment in the controller node.
->
-> Changes since v1:
->   - Rebase on v4.3-rc3
->   - Remove some SoBs (Lee)
->   - Collect up Acks
->
-> kind regards,
->
-> Peter.
->
-> Peter Griffin (11):
->    ARM: STi: DT: STiH407: Add a cec0 pin definition
->    ARM: STi: DT: STiH407: Add i2c3 alternate pin configs
->    ARM: DT: STiH407: Add SPI 3 wire and 4 wire pinctrl configs
->    ARM: DT: STiH407: Add serial3 pinctrl configuration
->    ARM: DT: STiH407: Add SPI FSM (NOR Flash) Controller pin config
->    ARM: DT: STiH407: Add NAND flash controller pin configuration
->    ARM: DT: STiH407: Add systrace pin configuration
->    ARM: DT: STiH407: Add SD pinctrl config for mmc0 controller
->    ARM: DT: STiH407: Add pinconfig for IRB UHF and IRB TX
->    ARM: DT: STiH407: Add RMII pinctrl support
->    ARM: STi: STiH407: Add spi default pinctrl groups.
->
->   arch/arm/boot/dts/stih407-family.dtsi  |  14 ++
->   arch/arm/boot/dts/stih407-pinctrl.dtsi | 378 ++++++++++++++++++++++++++++++++-
->   2 files changed, 387 insertions(+), 5 deletions(-)
->
-
-Series applied to sti-dt-for-v4.4.
-Thanks!
-Maxime
+On Fri, Sep 25, 2015 at 07:57:12PM +0200, Anton Bondarenko wrote:
+> Support for ECSPI loopback for IMX51,IMX53 and IMX6Q using TEST register.
+> 
+> Signed-off-by: Mohsin Kazmi <mohsin_kazmi@mentor.com>
+> Signed-off-by: Anton Bondarenko <anton_bondarenko@mentor.com>
+> ---
+>  drivers/spi/spi-imx.c | 20 ++++++++++++++++----
+>  1 file changed, 16 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index 41c9cef..4b3c16e 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -265,6 +265,9 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+>  #define MX51_ECSPI_STAT		0x18
+>  #define MX51_ECSPI_STAT_RR		(1 <<  3)
+>  
+> +#define MX51_ECSPI_TEST			0x20
+> +#define MX51_ECSPI_LOOP			BIT(31)
+> +
+>  /* MX51 eCSPI */
+>  static unsigned int mx51_ecspi_clkdiv(unsigned int fin, unsigned int fspi,
+>  				      unsigned int *fres)
+> @@ -338,6 +341,7 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+>  	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, dma = 0;
+>  	u32 cfg = readl(spi_imx->base + MX51_ECSPI_CONFIG);
+>  	u32 delay;
+> +	u32 lpb = 0;
+>  
+>  	/*
+>  	 * The hardware seems to have a race condition when changing modes. The
+> @@ -370,8 +374,12 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+>  	if (config->mode & SPI_CS_HIGH)
+>  		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
+>  
+> +	if (config->mode & SPI_LOOP)
+> +		lpb |= MX51_ECSPI_LOOP;
+> +
+>  	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
+>  	writel(cfg, spi_imx->base + MX51_ECSPI_CONFIG);
+> +	writel(lpb, spi_imx->base + MX51_ECSPI_TEST);
+It's better write this MX51_ECSPI_TEST only in LOOP mode.
+>  
+>  	/*
+>  	 * Wait until the changes in the configuration register CONFIGREG
+> @@ -1252,6 +1260,9 @@ static int spi_imx_probe(struct platform_device *pdev)
+>  	spi_imx = spi_master_get_devdata(master);
+>  	spi_imx->bitbang.master = master;
+>  
+> +	spi_imx->devtype_data = of_id ? of_id->data :
+> +		(struct spi_imx_devtype_data *)pdev->id_entry->driver_data;
+> +
+>  	for (i = 0; i < master->num_chipselect; i++) {
+>  		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
+>  		if (!gpio_is_valid(cs_gpio) && mxc_platform_info)
+> @@ -1276,12 +1287,13 @@ static int spi_imx_probe(struct platform_device *pdev)
+>  	spi_imx->bitbang.master->cleanup = spi_imx_cleanup;
+>  	spi_imx->bitbang.master->prepare_message = spi_imx_prepare_message;
+>  	spi_imx->bitbang.master->unprepare_message = spi_imx_unprepare_message;
+> -	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
+> +	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA |
+> +				SPI_CS_HIGH;
+Any change?
+>  
+> -	init_completion(&spi_imx->xfer_done);
+> +	if (is_imx5x_ecspi(spi_imx))
+> +		spi_imx->bitbang.master->mode_bits |= SPI_LOOP;
+>  
+> -	spi_imx->devtype_data = of_id ? of_id->data :
+> -		(struct spi_imx_devtype_data *) pdev->id_entry->driver_data;
+> +	init_completion(&spi_imx->xfer_done);
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	spi_imx->base = devm_ioremap_resource(&pdev->dev, res);
+> -- 
+> 2.5.2
+> 
