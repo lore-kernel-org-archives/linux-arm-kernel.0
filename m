@@ -1,49 +1,116 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Wed, 30 Sep 2015 16:54:59 +0800
-Subject: [PATCH v2 7/8] spi: imx: defer spi initialization, if DMA engine
- is pending
-In-Reply-To: <42b82309e539e8a5523dca5364846c472ab9dcee.1442923630.git.anton_bondarenko@mentor.com>
-References: <cover.1442923630.git.anton_bondarenko@mentor.com>
- <42b82309e539e8a5523dca5364846c472ab9dcee.1442923630.git.anton_bondarenko@mentor.com>
-Message-ID: <20150930085458.GG2709@shlinux2>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 30 Sep 2015 09:57:37 +0100
+Subject: [PATCH v4 1/5] Documentation: add DT bindings for ARM SCPI sensors
+In-Reply-To: <CAL_Jsq+_Rrv5XqNsL-gwQZv3HK20dQC3jY7qCoxQ8KWhhs4Fdw@mail.gmail.com>
+ (Rob Herring's message of "Tue, 29 Sep 2015 13:20:55 -0500")
+References: <1442335861-7282-1-git-send-email-punit.agrawal@arm.com>
+ <1442335861-7282-2-git-send-email-punit.agrawal@arm.com>
+ <CAL_Jsq+_Rrv5XqNsL-gwQZv3HK20dQC3jY7qCoxQ8KWhhs4Fdw@mail.gmail.com>
+Message-ID: <9hh612s708u.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 25, 2015 at 07:57:14PM +0200, Anton Bondarenko wrote:
-> If SPI device supports DMA mode, but DMA controller is not yet
-> available due to e.g. a delay in the corresponding kernel module
-> initialization, retry to initialize SPI driver later on instead of
-> falling back into PIO only mode.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> Signed-off-by: Anton Bondarenko <anton_bondarenko@mentor.com>
-> ---
->  drivers/spi/spi-imx.c | 12 +++++++++---
->  1 file changed, 9 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 44d3cf0..1bf0739a 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -1343,9 +1343,15 @@ static int spi_imx_probe(struct platform_device *pdev)
->  	 * Only validated on i.mx6 now, can remove the constrain if validated on
->  	 * other chips.
->  	 */
-> -	if (is_imx5x_ecspi(spi_imx) &&
-> -	    spi_imx_sdma_init(&pdev->dev, spi_imx, master))
-> -		dev_err(&pdev->dev, "dma setup error,use pio instead\n");
-> +	if (is_imx5x_ecspi(spi_imx)) {
-> +		ret = spi_imx_sdma_init(&pdev->dev, spi_imx, master);
-> +		if (ret == -EPROBE_DEFER)
-> +			goto out_clk_put;
-> +
-> +		if (ret < 0)
-> +			dev_err(&pdev->dev, "dma setup error %d, use pio\n",
-> +				ret);
-> +	}
->  
->  	spi_imx->devtype_data->reset(spi_imx);
->  
-> -- 
-> 2.5.2
-> 
+Rob Herring <robh@kernel.org> writes:
+
+> On Tue, Sep 15, 2015 at 11:50 AM, Punit Agrawal <punit.agrawal@arm.com> wrote:
+>> The System Control Processor (SCP) provides access to SoC sensors via
+>> the System Control and Power Interface (SCPI) Message Protocol. Add
+>> bindings to allow probing of these sensors. Also support referencing
+>> of the sensors for setting up thermal zones via the thermal DT
+>> bindings.
+>>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+
+Thanks, Rob!
+
+Sudeep, now that we have acks for all the patches, are you OK to take
+this patchset along with your series adding support for SCPI?
+
+Punit
+
+>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 38 ++++++++++++++++++++++
+>>  1 file changed, 38 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> index f002460..86302de 100644
+>> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> @@ -72,8 +72,25 @@ Required sub-node properties:
+>>  - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
+>>                shared memory on Juno platforms
+>>
+>> +Sensor bindings for the sensors based on SCPI Message Protocol
+>> +--------------------------------------------------------------
+>> +SCPI provides an API to access the various sensors on the SoC.
+>> +
+>> +Required properties:
+>> +- compatible : should be "arm,scpi-sensors".
+>> +- #thermal-sensor-cells: should be set to 1. This property follows the
+>> +                        thermal device tree bindings[2].
+>> +
+>> +                        Valid cell values are raw identifiers (Sensor
+>> +                        ID) as used by the firmware. Refer to
+>> +                        platform documentation for your
+>> +                        implementation for the IDs to use. For Juno
+>> +                        R0 and Juno R1 refer to [3].
+>> +
+>>  [0] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
+>>  [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +[2] Documentation/devicetree/bindings/thermal/thermal.txt
+>> +[3] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/apas03s22.html
+>>
+>>  Example:
+>>
+>> @@ -122,6 +139,11 @@ scpi_protocol: scpi at 2e000000 {
+>>                         clock-output-names = "pxlclk0", "pxlclk1";
+>>                 };
+>>         };
+>> +
+>> +       scpi_sensors0: sensors {
+>> +               compatible = "arm,scpi-sensors";
+>> +               #thermal-sensor-cells = <1>;
+>> +       };
+>>  };
+>>
+>>  cpu at 0 {
+>> @@ -136,6 +158,17 @@ hdlcd at 7ff60000 {
+>>         clocks = <&scpi_clk 4>;
+>>  };
+>>
+>> +thermal-zones {
+>> +       soc_thermal {
+>> +               polling-delay-passive = <100>;
+>> +               polling-delay = <1000>;
+>> +
+>> +                               /* sensor         ID */
+>> +               thermal-sensors = <&scpi_sensors0 3>;
+>> +               ...
+>> +       };
+>> +};
+>> +
+>>  In the above example, the #clock-cells is set to 1 as required.
+>>  scpi_dvfs has 3 output clocks namely: atlclk, aplclk, and gpuclk with 0,
+>>  1 and 2 as clock-indices. scpi_clk has 2 output clocks namely: pxlclk0
+>> @@ -148,3 +181,8 @@ scpi_dvfs i.e. "atlclk".
+>>  Similarly the second example is hdlcd at 7ff60000 and it has pxlclk1 as input
+>>  clock. '4' in the clock specifier here points to the second entry
+>>  in the output clocks of scpi_clocks  i.e. "pxlclk1"
+>> +
+>> +The thermal-sensors property in the soc_thermal node uses the
+>> +temperature sensor provided by SCP firmware to setup a thermal
+>> +zone. The ID "3" is the sensor identifier for the temperature sensor
+>> +as used by the firmware.
+>> --
+>> 2.5.1
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
