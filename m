@@ -1,27 +1,33 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 30 Sep 2015 21:37:12 +0800
-Subject: [RESEND PATCH v2 2/2] ARM: imx6: change default burst size for USB
-In-Reply-To: <1443603159.3185.5.camel@pengutronix.de>
-References: <1443579437-845-1-git-send-email-peter.chen@freescale.com>
- <1443579437-845-2-git-send-email-peter.chen@freescale.com>
- <1443603159.3185.5.camel@pengutronix.de>
-Message-ID: <20150930133712.GG16362@tiger>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Wed, 30 Sep 2015 14:15:22 +0100
+Subject: [PATCH] drm/exynos: Avoid NULL pointer dereference in resume
+ if bind failed
+In-Reply-To: <560BC6ED.3090205@samsung.com>
+References: <1443370306-15429-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
+ <560BC6ED.3090205@samsung.com>
+Message-ID: <20150930131522.GK5432@ck-lbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 10:52:39AM +0200, Lucas Stach wrote:
-> Am Mittwoch, den 30.09.2015, 10:17 +0800 schrieb Peter Chen:
-> > It can improve the USB performance when choosing larger
-> > burst size at some systems (bus size is larger), there is
-> > no side effect if this burst size is larger than bus size.
-> > 
-> Just for the record, as it seems too late to stop the train now:
+On Wed, Sep 30, 2015 at 08:26:37PM +0900, Inki Dae wrote:
+> Hi,
 > 
-> I am _NOT_ happy that the extended binding has been accepted into the
-> USB tree despite outstanding review comments from me not being addressed
-> or even answered.
+> On 2015? 09? 28? 01:11, Charles Keepax wrote:
+> > If binding failed calling exynos_dp_enable in exynos_dp_resume will
+> > result in several NULL pointer dereferences. It is much better to
+> > simply skip suspend/resume handling if bind has failed, do so by
+> > checking if a drm_dev exists.
+> 
+> Thanks for your patch. However, the pm interfaces of KMS drivers aren't
+> required because these are controlled by top of Exynos drm driver and
+> connector dpms. So I posted a patch that it removes pm interfaces of dp
+> driver.
 
-Okay.  I'm not aware of this.  I'm dropping the patches until everyone
-agrees with it.
+No problems at all, as long as my Arndale starts resuming without
+a NULL pointer I am happy :-)
 
-Shawn
+Had a quick test of your patch it appears to fix my issue as well
+so totally fine with that.
+
+Thanks,
+Charles
