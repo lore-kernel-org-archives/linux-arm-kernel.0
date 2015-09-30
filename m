@@ -1,54 +1,43 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 30 Sep 2015 09:12:09 -0500
-Subject: [RFC/PATCH 11/11] arm: boot: dts: omap: add missing default
- status for 32k counter
-In-Reply-To: <4815825.NCBBBMgLGf@wuerfel>
+Date: Wed, 30 Sep 2015 09:13:38 -0500
+Subject: [RFC/PATCH 00/11] arm: omap: counter32k rework
+In-Reply-To: <1986790.syN3WBv9AR@wuerfel>
 References: <1443559446-26969-1-git-send-email-balbi@ti.com>
- <1443559446-26969-12-git-send-email-balbi@ti.com>
- <4815825.NCBBBMgLGf@wuerfel>
-Message-ID: <20150930141209.GB31865@saruman.tx.rr.com>
+ <1986790.syN3WBv9AR@wuerfel>
+Message-ID: <20150930141338.GC31865@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 10:15:25AM +0200, Arnd Bergmann wrote:
-> On Tuesday 29 September 2015 15:44:06 Felipe Balbi wrote:
-> > All devices should have a default status. Ignoring
-> > the arguments if it should be 'okay' or 'disabled'
-> > by default, let's set them all the 'disabled' and
-> > have boards enable 32k counter.
+On Wed, Sep 30, 2015 at 10:22:46AM +0200, Arnd Bergmann wrote:
+> On Tuesday 29 September 2015 15:43:55 Felipe Balbi wrote:
 > > 
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > the following patches de-obfuscate arch/arm/mach-omap2/timer.c
+> > and start moving code to drivers/clocksource. So far only counter32k
+> > has been moved over.
 > > 
+> > Note that we can't get rid of all the code (yet) because there are
+> > still platforms relying to legacy boot and because of the strong
+> > coupling with OMAP's hwmod layer.
+> > 
+> > This is, for now, an RFC and has be written on top of [1]. Boot tested
+> > with AM335x and AM437x.
+> > 
+> > [1] http://marc.info/?l=linux-omap&m=144354336924308&w=2
 > 
-> The patch looks good, but the description is slightly incorrect:
-> There is no reason to list "status='okay'" other than overriding
-> the 'disabled' status.
+> Looks very nice!
 > 
-> I'd phrase it something like:
+> > ps: if anybody has a good idea on how to get rid of
+> > register_persistent_clock(), please let me know
 > 
-> "We want the use of the 32k counter to be a per-board setting,
-> so let's disable it by default in each dtsi file and override the
-> setting in the boards. Any board that does not wire up the counter
-> should leave it disabled".
-> 
-> However, if you really want all boards to provide the counter all
-> the time, I'd argue that we're better off dropping this patch. We
-> use the status="disabled" trick for anything that may or may not
-> be working based on the board design, but things that are present
-> everywhere don't need this.
+> I don't think we want to get rid of that, because it is the more
+> accurate interface. IIRC systems that have an RTC will use
+> timekeeping_inject_sleeptime64() in rtc_resume(). I don't know however
+> how the two methods are coordinated, i.e. how the kernel ensures that
+> exactly one of the two is used, but never both.
 
-okay, so here's the thing. While fiddling with the 32k counter, I noticed
-that even though there was no status listed, the thing still initializes
-fine. However, when moving 32k to drivers/clocksource and using
-CLOCKSOURCE_OF_DECLARE(), 32k would *NOT* probe unless I had an explicit
-status = "okay" in DT.
-
-This is where this patch came from. I've used disabled by default
-because we just might have a board somewhere which doesn't want to use 32k
-counter and having it enabled per-board would help with that. Although,
-we could just set status = "disabled" for that one board.
-
-Whatever Tony prefers, I can change the patch accordingly.
+however register_persistent_clock() is an ARM-only thing, the question
+was more towards that. Do we want to continue using the ARM-only
+register_persistent_clock() or is there a more generic version of it ?
 
 -- 
 balbi
@@ -58,4 +47,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/2d2d868d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/5681058b/attachment.sig>
