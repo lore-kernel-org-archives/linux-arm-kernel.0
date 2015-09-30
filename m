@@ -1,27 +1,84 @@
 From: w.f@huawei.com (Fei Wang)
-Date: Wed, 30 Sep 2015 19:05:08 +0800
-Subject: [PATCH 5/8] arm64: dts: Add Hi655x regulator config node
+Date: Wed, 30 Sep 2015 19:05:04 +0800
+Subject: [PATCH 1/8] dt-bindings: pmic: Document Hi655x pmic driver
 In-Reply-To: <1443611111-3196-1-git-send-email-w.f@huawei.com>
 References: <1443611111-3196-1-git-send-email-w.f@huawei.com>
-Message-ID: <1443611111-3196-6-git-send-email-w.f@huawei.com>
+Message-ID: <1443611111-3196-2-git-send-email-w.f@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add hi655x regulator dts file for Hi6220 SoC.
+Document the new compatible for Hisilicon Hi655x pmic driver.
 
 Signed-off-by: Fei Wang <w.f@huawei.com>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi |  245 +++++++++++++++++++++++++++++
- 1 file changed, 245 insertions(+)
+ .../devicetree/bindings/mfd/hisilicon,hi655x.txt   |   80 ++++++++++++++++++++
+ 1 file changed, 80 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 4e4830b..40f895b 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -176,5 +176,250 @@
-                 interrupt-controller;
-                 pmu_irq_gpio = <&gpio_pmu_irq_n>;
-                 status = "ok";
+diff --git a/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt b/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
+new file mode 100644
+index 0000000..17bd8ca
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
+@@ -0,0 +1,80 @@
++Hisilicon hi655x Power Management Integrated Circuit (PMIC)
++
++hi655x consists of a large and varied group of sub-devices:
++
++Device			 Supply Names	 Description
++------			 ------------	 -----------
++hi655x-powerkey		:		: Powerkey
++hi655x-regulator-pmic	:		: Regulators
++hi655x-usbvbus		:		: USB plug detection
++hi655x-pmu-rtc		:		: RTC
++hi655x-coul		:		: Coulomb
++
++Required properties:
++- compatible : Should be "hisilicon,hi655x-pmic-driver"
++- reg: Base address of PMIC on hi6220 soc
++- #interrupt-cells: Should be 2, is the local IRQ number for hi655x.
++- interrupt-controller: hi655x has internal IRQs (has own IRQ domain).
++- pmu_irq_gpio: should be &gpio_pmu_irq_n, is the IRQ gpio of hi655x.
++
++Example:
++	pmic: pmic at F8000000 {
++                compatible = "hisilicon,hi655x-pmic-driver";
++                reg = <0x0 0xF8000000 0x0 0x1000>;
++                #interrupt-cells = <2>;
++                interrupt-controller;
++                pmu_irq_gpio = <&gpio_pmu_irq_n>;
++                status = "ok";
++
++                ponkey:ponkey at b1{
++                        compatible = "hisilicon,hi655x-powerkey";
++                        interrupt-parent = <&pmic>;
++                        interrupts = <6 0>, <5 0>, <4 0>;
++                        interrupt-names = "down", "up", "hold 1s";
++                };
++
++                coul: coul at 1 {
++                        compatible = "hisilicon,hi655x-coul";
++                        interrupt-parent = <&pmic>;
++                        interrupts = <24 0>, <25 0>, <26 0>, <27 0>;
++                        interrupt-names = "cl_int_i", "cl_out_i", "cl_in_i", "vbat_int_i";
++                        battery_product_index = <0>;
++                        status = "ok";
++                };
++
++                rtc: rtc at 1 {
++                        compatible = "hisilicon,hi655x-pmu-rtc";
++                        interrupt-parent = <&pmic>;
++                        interrupts = <20 0>;
++                        interrupt-names = "hi655x_pmu_rtc";
++                        board_id = <1>;
++                };
++
++                usbvbus:usbvbus at b2{
++                        compatible = "hisilicon,hi655x-usbvbus";
++                        interrupt-parent = <&pmic>;
++                        interrupts = <9 0>, <8 0>;
++                        interrupt-names = "connect", "disconnect";
++                };
 +
 +		ldo2: regulator at a21 {
 +                        compatible = "hisilicon,hi655x-regulator-pmic";
@@ -39,235 +96,10 @@ index 4e4830b..40f895b 100644
 +                        hisilicon,vset-regs = <0x072>;
 +                        hisilicon,vset-data = <0 0x3>;
 +                        hisilicon,regulator-n-vol = <8>;
-+                        hisilicon,vset-table  = <2500000>,<2600000>,
-+						<2700000>,<2800000>,
-+						<2900000>,<3000000>,
-+						<3100000>,<3200000>;
++                        hisilicon,vset-table = <2500000>,<2600000>,<2700000>,<2800000>,<2900000>,<3000000>,<3100000>,<3200000>;
 +                        hisilicon,num_consumer_supplies = <1>;
 +                        hisilicon,consumer-supplies = "sensor_analog";
 +                };
-+
-+		ldo7: regulator at a26 {
-+                        compatible = "hisilicon,hi655x-regulator-pmic";
-+                        regulator-name = "ldo7";
-+                        regulator-min-microvolt = <1800000>;
-+                        regulator-max-microvolt = <3300000>;
-+                        hisilicon,valid-modes-mask = <0x0a>;
-+                        hisilicon,valid-ops-mask = <0x01d>;
-+                        hisilicon,initial-mode = <0x02>;
-+                        hisilicon,regulator-type = <0x01>;
-+
-+                        hisilicon,off-on-delay = <120>;
-+                        hisilicon,ctrl-regs = <0x029 0x02a 0x02b>;
-+                        hisilicon,ctrl-data = <0x6 0x1>;
-+                        hisilicon,vset-regs = <0x078>;
-+                        hisilicon,vset-data = <0 0x3>;
-+                        hisilicon,regulator-n-vol = <8>;
-+                        hisilicon,vset-table  = <1800000>,<1850000>,
-+						<2850000>,<2900000>,
-+						<3000000>,<3100000>,
-+						<3200000>,<3300000>;
-+                        hisilicon,num_consumer_supplies = <1>;
-+                        hisilicon,consumer-supplies = "sd_card_io";
-+		};
-+
-+		ldo10: regulator at a29 {
-+                        compatible = "hisilicon,hi655x-regulator-pmic";
-+                        regulator-name = "ldo10";
-+                        regulator-min-microvolt = <1800000>;
-+                        regulator-max-microvolt = <3000000>;
-+                        hisilicon,valid-modes-mask = <0x0a>;
-+                        hisilicon,valid-ops-mask = <0x01d>;
-+                        hisilicon,initial-mode = <0x02>;
-+                        hisilicon,regulator-type = <0x01>;
-+
-+                        hisilicon,off-on-delay = <360>;
-+                        hisilicon,ctrl-regs = <0x02c 0x02d 0x02e>;
-+                        hisilicon,ctrl-data = <0x1 0x1>;
-+                        hisilicon,vset-regs = <0x07b>;
-+                        hisilicon,vset-data = <0 0x3>;
-+                        hisilicon,regulator-n-vol = <8>;
-+                        hisilicon,vset-table  = <1800000>,<1850000>,
-+						<1900000>,<2750000>,
-+						<2800000>,<2850000>,
-+						<2900000>,<3000000>;
-+                        hisilicon,num_consumer_supplies = <1>;
-+                        hisilicon,consumer-supplies = "sd_card";
-+                };
-+
-+		ldo13: regulator at a32 {
-+                        compatible = "hisilicon,hi655x-regulator-pmic";
-+                        regulator-name = "ldo13";
-+                        regulator-min-microvolt = <1600000>;
-+                        regulator-max-microvolt = <1950000>;
-+                        hisilicon,valid-modes-mask = <0x0a>;
-+                        hisilicon,valid-ops-mask = <0x01d>;
-+                        hisilicon,initial-mode = <0x02>;
-+                        hisilicon,regulator-type = <0x01>;
-+
-+                        hisilicon,off-on-delay = <120>;
-+                        hisilicon,ctrl-regs = <0x02c 0x02d 0x02e>;
-+                        hisilicon,ctrl-data = <0x4 0x1>;
-+                        hisilicon,vset-regs = <0x07e>;
-+                        hisilicon,vset-data = <0 0x3>;
-+                        hisilicon,regulator-n-vol = <8>;
-+                        hisilicon,vset-table  = <1600000>,<1650000>,
-+						<1700000>,<1750000>,
-+						<1800000>,<1850000>,
-+						<1900000>,<1950000>;
-+                        hisilicon,num_consumer_supplies = <3>;
-+                        hisilicon,consumer-supplies = "scamera_core",
-+							"mcamera_io",
-+							"scamera_io";
-+                };
-+
-+		ldo14: regulator at a33 {
-+                        compatible = "hisilicon,hi655x-regulator-pmic";
-+                        regulator-name = "ldo14";
-+                        regulator-min-microvolt = <2500000>;
-+                        regulator-max-microvolt = <3200000>;
-+                        hisilicon,valid-modes-mask = <0x02>;
-+                        hisilicon,valid-ops-mask = <0x01d>;
-+                        hisilicon,initial-mode = <0x02>;
-+                        hisilicon,regulator-type = <0x01>;
-+
-+                        hisilicon,off-on-delay = <120>;
-+                        hisilicon,ctrl-regs = <0x02c 0x02d 0x02e>;
-+                        hisilicon,ctrl-data = <0x5 0x1>;
-+                        hisilicon,vset-regs = <0x07f>;
-+                        hisilicon,vset-data = <0 0x3>;
-+                        hisilicon,regulator-n-vol = <8>;
-+                        hisilicon,vset-table  = <2500000>,<2600000>,
-+						<2700000>,<2800000>,
-+						<2900000>,<3000000>,
-+						<3100000>,<3200000>;
-+                        hisilicon,num_consumer_supplies = <3>;
-+                        hisilicon,consumer-supplies  = "scamera_avdd",
-+							"mcamera_avdd",
-+							"mcamera_vcm";
-+                };
-+
-+		ldo15: regulator at a34 {
-+                        compatible = "hisilicon,hi655x-regulator-pmic";
-+                        regulator-name = "ldo15";
-+                        regulator-min-microvolt = <1600000>;
-+                        regulator-max-microvolt = <1950000>;
-+                        regulator-boot-on;
-+                        regulator-always-on;
-+                        hisilicon,valid-modes-mask = <0x0a>;
-+                        hisilicon,valid-ops-mask = <0x01d>;
-+                        hisilicon,initial-mode = <0x02>;
-+                        hisilicon,regulator-type = <0x01>;
-+
-+                        hisilicon,off-on-delay = <120>;
-+                        hisilicon,ctrl-regs = <0x02c 0x02d 0x02e>;
-+                        hisilicon,ctrl-data = <0x6 0x1>;
-+                        hisilicon,vset-regs = <0x080>;
-+                        hisilicon,vset-data = <0 0x3>;
-+                        hisilicon,regulator-n-vol = <8>;
-+                        hisilicon,vset-table  = <1600000>,<1650000>,
-+						<1700000>,<1750000>,
-+						<1800000>,<1850000>,
-+						<1900000>,<1950000>;
-+                        hisilicon,num_consumer_supplies = <1>;
-+                        hisilicon,consumer-supplies = "codec_analog";
-+                };
-+
-+		ldo17: regulator at a36 {
-+                        compatible = "hisilicon,hi655x-regulator-pmic";
-+                        regulator-name = "ldo17";
-+                        regulator-min-microvolt = <2500000>;
-+                        regulator-max-microvolt = <3200000>;
-+                        hisilicon,valid-modes-mask = <0x02>;
-+                        hisilicon,valid-ops-mask = <0x01d>;
-+                        hisilicon,initial-mode = <0x02>;
-+                        hisilicon,regulator-type = <0x01>;
-+
-+                        hisilicon,off-on-delay = <120>;
-+                        hisilicon,ctrl-regs = <0x02f 0x030 0x031>;
-+                        hisilicon,ctrl-data = <0x0 0x1>;
-+                        hisilicon,vset-regs = <0x082>;
-+                        hisilicon,vset-data = <0 0x3>;
-+                        hisilicon,regulator-n-vol = <8>;
-+                        hisilicon,vset-table  = <2500000>,<2600000>,
-+						<2700000>,<2800000>,
-+						<2900000>,<3000000>,
-+						<3100000>,<3200000>;
-+                        hisilicon,num_consumer_supplies = <1>;
-+                        hisilicon,consumer-supplies = "vibrator";
-+                };
-+
-+		ldo19: regulator at a38 {
-+                        compatible = "hisilicon,hi655x-regulator-pmic";
-+                        regulator-name = "ldo19";
-+                        regulator-min-microvolt = <1800000>;
-+                        regulator-max-microvolt = <3000000>;
-+                        hisilicon,valid-modes-mask = <0x0a>;
-+                        hisilicon,valid-ops-mask = <0x01d>;
-+                        hisilicon,initial-mode = <0x02>;
-+                        hisilicon,regulator-type = <0x01>;
-+
-+                        hisilicon,off-on-delay = <360>;
-+                        hisilicon,ctrl-regs = <0x02f 0x030 0x031>;
-+                        hisilicon,ctrl-data = <0x2 0x1>;
-+                        hisilicon,vset-regs = <0x084>;
-+                        hisilicon,vset-data = <0 0x3>;
-+                        hisilicon,regulator-n-vol = <8>;
-+                        hisilicon,vset-table  = <1800000>,<1850000>,
-+						<1900000>,<2750000>,
-+						<2800000>,<2850000>,
-+						<2900000>,<3000000>;
-+                        hisilicon,num_consumer_supplies = <1>;
-+                        hisilicon,consumer-supplies = "emmc_vddm";
-+                };
-+
-+		ldo21: regulator at a40 {
-+                        compatible = "hisilicon,hi655x-regulator-pmic";
-+                        regulator-name = "ldo21";                                                                                                       regulator-min-microvolt = <1650000>;
-+                        regulator-max-microvolt = <2000000>;
-+                        regulator-always-on;
-+                        hisilicon,valid-modes-mask = <0x02>;                                                                                            hisilicon,valid-ops-mask = <0x01d>;
-+                        hisilicon,initial-mode = <0x02>;
-+                        hisilicon,regulator-type = <0x01>;
-+
-+                        hisilicon,off-on-delay = <120>;
-+                        hisilicon,ctrl-regs = <0x02f 0x030 0x031>;
-+                        hisilicon,ctrl-data = <0x4 0x1>;
-+                        hisilicon,vset-regs = <0x086>;
-+                        hisilicon,vset-data = <0 0x3>;
-+                        hisilicon,regulator-n-vol = <8>;
-+                        hisilicon,vset-table  = <1650000>,<1700000>,
-+						<1750000>,<1800000>,
-+						<1850000>,<1900000>,
-+						<1950000>,<2000000>;
-+                };
-+
-+		ldo22: regulator at a41 {
-+                        compatible = "hisilicon,hi655x-regulator-pmic";
-+                        regulator-name = "ldo22";
-+                        regulator-min-microvolt = <900000>;
-+                        regulator-max-microvolt = <1200000>;
-+                        regulator-boot-on;
-+                        regulator-always-on;
-+                        hisilicon,valid-modes-mask = <0x02>;
-+                        hisilicon,valid-ops-mask = <0x01d>;
-+                        hisilicon,initial-mode = <0x02>;
-+                        hisilicon,regulator-type = <0x01>;
-+
-+                        hisilicon,off-on-delay = <120>;
-+                        hisilicon,ctrl-regs = <0x02f 0x030 0x031>;
-+                        hisilicon,ctrl-data = <0x5 0x1>;
-+                        hisilicon,vset-regs = <0x087>;
-+                        hisilicon,vset-data = <0 0x3>;
-+                        hisilicon,regulator-n-vol = <8>;
-+                        hisilicon,vset-table  = <900000>,<1000000>,
-+						<1050000>,<1100000>,
-+						<1150000>,<1175000>,
-+						<1185000>,<1200000>;
-+                        hisilicon,num_consumer_supplies = <1>;
-+                        hisilicon,consumer-supplies = "mcamera_core";
-+                };
- 	};
- };
++	};
 -- 
 1.7.9.5
