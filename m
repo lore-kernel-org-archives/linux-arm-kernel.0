@@ -1,115 +1,36 @@
-From: majun258@huawei.com (MaJun)
-Date: Wed, 30 Sep 2015 17:39:09 +0800
-Subject: [PATCH v5 3/3] dt-binding:Documents of the mbigen bindings
-In-Reply-To: <1443605949-15396-1-git-send-email-majun258@huawei.com>
-References: <1443605949-15396-1-git-send-email-majun258@huawei.com>
-Message-ID: <1443605949-15396-4-git-send-email-majun258@huawei.com>
+From: a0131933@ti.com (Lokesh Vutla)
+Date: Wed, 30 Sep 2015 15:11:54 +0530
+Subject: [PATCHv4] arm: omap2: timer: always define omap4_local_timer_init
+In-Reply-To: <560B9210.1080700@ti.com>
+References: <1443543337-2904-1-git-send-email-balbi@ti.com>
+ <560B9210.1080700@ti.com>
+Message-ID: <560BAE62.9000503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ma Jun <majun258@huawei.com>
 
-Add the mbigen msi interrupt controller bindings document.
 
-This patch based on Mark Rutland's patch 
-https://lkml.org/lkml/2015/7/23/558 
+On Wednesday 30 September 2015 01:11 PM, Lokesh Vutla wrote:
+> Hi Felipe,
+> 
+> On Tuesday 29 September 2015 09:45 PM, Felipe Balbi wrote:
+>> omap4_local_timer_init() can be used by other
+>> platforms as is. At least AM437x wants to use
+>> it. Instead of making omap4-only and providing
+>> a stub for builds without OMAP4, we can just
+>> make sure that function is always available
+>> for all SoCs that need it.
+> You might also want to update init_time function pointer for AM43xx in
+> board_generic.c or is there any dependency for this patch? With this
+> patch alone AM43xx only build is broken.
+> 
+> arch/arm/mach-omap2/built-in.o:(.arch.info.init+0x54): undefined
+> reference to `omap3_gptimer_timer_init'
+> Makefile:944: recipe for target 'vmlinux' failed
+> make: *** [vmlinux] Error 1
+I think the following series needs to be applied.
+http://www.mail-archive.com/linux-omap%40vger.kernel.org/msg119840.html
+Sorry for the noise.
 
-Signed-off-by: Ma Jun <majun258@huawei.com>
----
- Documentation/devicetree/bindings/arm/mbigen.txt |   85 ++++++++++++++++++++++
- 1 files changed, 85 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
-new file mode 100644
-index 0000000..f5345ab
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mbigen.txt
-@@ -0,0 +1,85 @@
-+Hisilicon mbigen device tree bindings.
-+=======================================
-+
-+Mbigen means: message based interrupt generator.
-+
-+MBI is kind of msi interrupt only used on Non-PCI devices.
-+
-+To reduce the wired interrupt number connected to GIC,
-+Hisilicon designed mbigen to collect and generate interrupt.
-+
-+
-+Non-pci devices can connect to mbigen and generate the
-+interrupt by writing ITS register.
-+
-+The mbigen chip and devices connect to mbigen have the following properties:
-+
-+Mbigen main node required properties:
-+-------------------------------------------
-+- compatible: Should be "hisilicon,mbigen-v2"
-+- reg: Specifies the base physical address and size of the Mbigen
-+  registers.
-+
-+Sub-nodes:
-+---------------------------------------------
-+Mbigen has one or more mbigen device nodes which represents the devices
-+connected to this mbigen chip.
-+
-+These nodes must have the following properties:
-+- compatible: Should be "hisilicon,mbigen-intc-v2"
-+- interrupt controller: Identifies the node as an interrupt controller
-+- msi-parent: This property has two cells.
-+	The 1st cell specifies the ITS this device connected.
-+	The 2nd cell specifies the device id.
-+- nr-interrupts:Specifies the total number of interrupt this device has.
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value is 2 now.
-+
-+  The 1st cell is global hardware pin number of the interrupt.
-+		This value depends on the Soc design.
-+  The 2nd the private index of the device. For a device with n interrupts,
-+		this value is from 0 ~ n-1.
-+
-+Examples:
-+
-+		mbigen_dsa: interrupt-controller at c0080000 {
-+			compatible = "hisilicon,mbigen-v2";
-+			reg = <0xc0080000 0x10000>;
-+
-+			mbigen_device_gmac0 {
-+				compatible = "hisilicon,mbigen-intc-v2";
-+				interrupt-controller;
-+				msi-parent = <&its 0x40b1c>;
-+				nr-interrupts = <9>;
-+				#interrupt-cells = <2>;
-+			}
-+
-+			mbigen_device_02 {
-+				compatible = "hisilicon,mbigen-intc-v2";
-+				interrupt-controller;
-+				msi-parent = <&its 0x40b1d>;
-+				nr-interrupts = <3>;
-+				#interrupt-cells = <2>;
-+			}
-+		};
-+
-+Device connect to mbigen required properties:
-+----------------------------------------------------
-+-interrupt-parent: Specifies the mbigen device node which device connected.
-+-interrupts:specifies the interrupt source.
-+  The 1st cell is global hardware pin number of the interrupt.
-+		This value depends on the Soc design.
-+  The 2nd the private index of the device. For a device with n interrupts,
-+		this value is from 0 ~ n-1.
-+
-+Examples:
-+	gmac0: ethernet at c2080000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0 0xc2080000 0 0x20000>,
-+		      <0 0xc0000000 0 0x1000>;
-+		interrupt-parent  = <&mbigen_device_gmac0>;
-+		interrupts = <656 0>,
-+			<657 1>;
-+	};
-+
--- 
-1.7.1
+Thanks and regards,
+Lokesh
