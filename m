@@ -1,49 +1,94 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 30 Sep 2015 10:25:21 +0800
-Subject: [RESEND PATCH v3 1/5] doc: dt-binding: ci-hdrc-usb2: split vendor
- specific properties
+Date: Wed, 30 Sep 2015 10:25:22 +0800
+Subject: [RESEND PATCH v3 2/5] ARM: dts: imx27.dtsi: change the clock
+ information for usb
 In-Reply-To: <1443579925-1330-1-git-send-email-peter.chen@freescale.com>
 References: <1443579925-1330-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1443579925-1330-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <1443579925-1330-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each vendor may have its specific properties, they are not belonged
-to common optional properties, split them from common's.
+For imx27, it needs three clocks to let the controller work,
+the old code is wrong, and usbmisc has not included clock handling
+code any more. Without this patch, it will cause below data
+abort when accessing usbmisc registers.
+
+usbcore: registered new interface driver usb-storage
+Unhandled fault: external abort on non-linefetch (0x008) at 0xf4424600
+pgd = c0004000
+[f4424600] *pgd=10000452(bad)
+Internal error: : 8 [#1] PREEMPT ARM
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper Not tainted 4.1.0-next-20150701-dirty #3089
+Hardware name: Freescale i.MX27 (Device Tree Support)
+task: c7832b60 ti: c783e000 task.ti: c783e000
+PC is at usbmisc_imx27_init+0x4c/0xbc
+LR is at usbmisc_imx27_init+0x40/0xbc
+pc : [<c03cb5c0>]    lr : [<c03cb5b4>]    psr: 60000093
+sp : c783fe08  ip : 00000000  fp : 00000000
+r10: c0576434  r9 : 0000009c  r8 : c7a773a0
+r7 : 01000000  r6 : 60000013  r5 : c7a776f0  r4 : c7a773f0
+r3 : f4424600  r2 : 00000000  r1 : 00000001  r0 : 00000001
+Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+Control: 0005317f  Table: a0004000  DAC: 00000017
+Process swapper (pid: 1, stack limit = 0xc783e190)
+Stack: (0xc783fe08 to 0xc7840000)
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
+Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: <stable@vger.kernel.org> #v4.1+
 ---
- Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/imx27.dtsi | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-index 77946f5..27dc705 100644
---- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-+++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-@@ -27,10 +27,6 @@ Optional properties:
- - vbus-supply: reference to the VBUS regulator
- - maximum-speed: limit the maximum connection speed to "full-speed".
- - tpl-support: TPL (Targeted Peripheral List) feature for targeted hosts
--- fsl,usbmisc: (FSL only) phandler of non-core register device, with one
--  argument that indicate usb controller index
--- disable-over-current: (FSL only) disable over current detect
--- external-vbus-divider: (FSL only) enables off-chip resistor divider for Vbus
- - itc-setting: interrupt threshold control register control, the setting
-   should be aligned with ITC bits at register USBCMD.
- - ahb-burst-config: it is vendor dependent, the required value should be
-@@ -54,6 +50,12 @@ Optional properties:
- - phy-clkgate-delay-us: the delay time (us) between putting the PHY into
-   low power mode and gating the PHY clock.
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index feb9d34..f818ea4 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -486,7 +486,10 @@
+ 				compatible = "fsl,imx27-usb";
+ 				reg = <0x10024000 0x200>;
+ 				interrupts = <56>;
+-				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
++				clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
++					<&clks IMX27_CLK_USB_AHB_GATE>,
++					<&clks IMX27_CLK_USB_DIV>;
++				clock-names = "ipg", "ahb", "per";
+ 				fsl,usbmisc = <&usbmisc 0>;
+ 				status = "disabled";
+ 			};
+@@ -495,7 +498,10 @@
+ 				compatible = "fsl,imx27-usb";
+ 				reg = <0x10024200 0x200>;
+ 				interrupts = <54>;
+-				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
++				clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
++					<&clks IMX27_CLK_USB_AHB_GATE>,
++					<&clks IMX27_CLK_USB_DIV>;
++				clock-names = "ipg", "ahb", "per";
+ 				fsl,usbmisc = <&usbmisc 1>;
+ 				dr_mode = "host";
+ 				status = "disabled";
+@@ -505,7 +511,10 @@
+ 				compatible = "fsl,imx27-usb";
+ 				reg = <0x10024400 0x200>;
+ 				interrupts = <55>;
+-				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
++				clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
++					<&clks IMX27_CLK_USB_AHB_GATE>,
++					<&clks IMX27_CLK_USB_DIV>;
++				clock-names = "ipg", "ahb", "per";
+ 				fsl,usbmisc = <&usbmisc 2>;
+ 				dr_mode = "host";
+ 				status = "disabled";
+@@ -515,7 +524,6 @@
+ 				#index-cells = <1>;
+ 				compatible = "fsl,imx27-usbmisc";
+ 				reg = <0x10024600 0x200>;
+-				clocks = <&clks IMX27_CLK_USB_AHB_GATE>;
+ 			};
  
-+i.mx specific properties
-+- fsl,usbmisc: phandler of non-core register device, with one
-+  argument that indicate usb controller index
-+- disable-over-current: disable over current detect
-+- external-vbus-divider: enables off-chip resistor divider for Vbus
-+
- Example:
- 
- 	usb at f7ed0000 {
+ 			sahara2: sahara at 10025000 {
 -- 
 1.9.1
