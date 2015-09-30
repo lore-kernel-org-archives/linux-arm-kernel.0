@@ -1,71 +1,61 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 30 Sep 2015 16:07:44 +0200
-Subject: [PATCH v2 8/8] ARM: dts: rockchip: add tuning related settings to
- veyron devices
-In-Reply-To: <1443622064-14362-1-git-send-email-heiko@sntech.de>
-References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
-Message-ID: <1443622064-14362-9-git-send-email-heiko@sntech.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 30 Sep 2015 09:12:09 -0500
+Subject: [RFC/PATCH 11/11] arm: boot: dts: omap: add missing default
+ status for 32k counter
+In-Reply-To: <4815825.NCBBBMgLGf@wuerfel>
+References: <1443559446-26969-1-git-send-email-balbi@ti.com>
+ <1443559446-26969-12-git-send-email-balbi@ti.com>
+ <4815825.NCBBBMgLGf@wuerfel>
+Message-ID: <20150930141209.GB31865@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows the tuning code to run and use higher speeds on capable cards.
+On Wed, Sep 30, 2015 at 10:15:25AM +0200, Arnd Bergmann wrote:
+> On Tuesday 29 September 2015 15:44:06 Felipe Balbi wrote:
+> > All devices should have a default status. Ignoring
+> > the arguments if it should be 'okay' or 'disabled'
+> > by default, let's set them all the 'disabled' and
+> > have boards enable 32k counter.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > 
+> 
+> The patch looks good, but the description is slightly incorrect:
+> There is no reason to list "status='okay'" other than overriding
+> the 'disabled' status.
+> 
+> I'd phrase it something like:
+> 
+> "We want the use of the 32k counter to be a per-board setting,
+> so let's disable it by default in each dtsi file and override the
+> setting in the boards. Any board that does not wire up the counter
+> should leave it disabled".
+> 
+> However, if you really want all boards to provide the counter all
+> the time, I'd argue that we're better off dropping this patch. We
+> use the status="disabled" trick for anything that may or may not
+> be working based on the board design, but things that are present
+> everywhere don't need this.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi | 7 ++++++-
- arch/arm/boot/dts/rk3288-veyron.dtsi       | 6 ++++++
- 2 files changed, 12 insertions(+), 1 deletion(-)
+okay, so here's the thing. While fiddling with the 32k counter, I noticed
+that even though there was no status listed, the thing still initializes
+fine. However, when moving 32k to drivers/clocksource and using
+CLOCKSOURCE_OF_DECLARE(), 32k would *NOT* probe unless I had an explicit
+status = "okay" in DT.
 
-diff --git a/arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi b/arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi
-index b5334ec..24a7a11 100644
---- a/arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi
-@@ -90,7 +90,7 @@
- 	regulators {
- 		vccio_sd: LDO_REG4 {
- 			regulator-name = "vccio_sd";
--			regulator-min-microvolt = <3300000>;
-+			regulator-min-microvolt = <1800000>;
- 			regulator-max-microvolt = <3300000>;
- 			regulator-state-mem {
- 				regulator-off-in-suspend;
-@@ -116,7 +116,12 @@
- 	cap-sd-highspeed;
- 	card-detect-delay = <200>;
- 	cd-gpios = <&gpio7 5 GPIO_ACTIVE_LOW>;
-+	rockchip,default-sample-phase = <90>;
- 	num-slots = <1>;
-+	sd-uhs-sdr12;
-+	sd-uhs-sdr25;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
- 	vmmc-supply = <&vcc33_sd>;
- 	vqmmc-supply = <&vccio_sd>;
- };
-diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
-index 6820977..aabd394 100644
---- a/arch/arm/boot/dts/rk3288-veyron.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
-@@ -196,7 +196,9 @@
- 	broken-cd;
- 	bus-width = <8>;
- 	cap-mmc-highspeed;
-+	rockchip,default-sample-phase = <158>;
- 	disable-wp;
-+	mmc-hs200-1_8v;
- 	mmc-pwrseq = <&emmc_pwrseq>;
- 	non-removable;
- 	num-slots = <1>;
-@@ -413,6 +415,10 @@
- 	num-slots = <1>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sdio0_clk &sdio0_cmd &sdio0_bus4>;
-+	sd-uhs-sdr12;
-+	sd-uhs-sdr25;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
- 	vmmc-supply = <&vcc33_sys>;
- 	vqmmc-supply = <&vcc18_wl>;
- };
+This is where this patch came from. I've used disabled by default
+because we just might have a board somewhere which doesn't want to use 32k
+counter and having it enabled per-board would help with that. Although,
+we could just set status = "disabled" for that one board.
+
+Whatever Tony prefers, I can change the patch accordingly.
+
 -- 
-2.5.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/2d2d868d/attachment.sig>
