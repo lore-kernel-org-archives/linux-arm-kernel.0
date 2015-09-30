@@ -1,126 +1,43 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Wed, 30 Sep 2015 19:25:30 +0200
-Subject: [PATCH] ARM: fix vdsomunge depends on glibc specific byteswap.h
-In-Reply-To: <CAKv+Gu_6DibhUUPGrACCZE3S_k50rcO8A5ZcHh5c4UiDQUNApA@mail.gmail.com>
-References: <cover.1443628457.git.hns@goldelico.com>
- <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
- <CAKv+Gu_098GVMeJPjDWaQ-uXek_cGUe4UMVy+fMdKw=_C+P7Tg@mail.gmail.com>
- <B6E60776-A054-4749-BCAF-1433BFFC6AF7@goldelico.com>
- <CAKv+Gu_6DibhUUPGrACCZE3S_k50rcO8A5ZcHh5c4UiDQUNApA@mail.gmail.com>
-Message-ID: <771A393B-5BCF-4DEB-9C93-53EFEA91B41A@goldelico.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 Sep 2015 18:31:45 +0100
+Subject: [PATCH] arm64: dts: add all hi6220 uart nodes
+In-Reply-To: <1459065.BtzC7pyUYF@wuerfel>
+References: <1443558552-5734-1-git-send-email-tyler.baker@linaro.org>
+ <1459065.BtzC7pyUYF@wuerfel>
+Message-ID: <20150930173145.GG15635@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Sep 30, 2015 at 10:24:56AM +0200, Arnd Bergmann wrote:
+> On Tuesday 29 September 2015 13:29:12 Tyler Baker wrote:
 
-Am 30.09.2015 um 18:17 schrieb Ard Biesheuvel <ard.biesheuvel@linaro.org>:
+> >         aliases {
+> >                 serial0 = &uart0;
+> > +               serial1 = &uart1;
+> > +               serial2 = &uart2;
+> > +               serial3 = &uart3;
+> > +               serial4 = &uart4;
+> >         };
 
-> On 30 September 2015 at 18:13, H. Nikolaus Schaller <hns@goldelico.com> wrote:
->> 
->> Am 30.09.2015 um 18:02 schrieb Ard Biesheuvel <ard.biesheuvel@linaro.org>:
->> 
->>> On 30 September 2015 at 17:56, H. Nikolaus Schaller <hns@goldelico.com> wrote:
->>>> If the host toolchain is not glibc based then the arm kernel build
->>>> fails with
->>>> 
->>>> HOSTCC  arch/arm/vdso/vdsomunge
->>>> arch/arm/vdso/vdsomunge.c:48:22: fatal error: byteswap.h: No such file or directory
->>>> 
->>>> Observed with omap2plus_defconfig and compile on Mac OS X with arm ELF
->>>> cross-compiler.
->>>> 
->>>> Reason: byteswap.h is a glibc only header.
->>>> 
->>>> Changed to detect the host and include the right file as described at:
->>>> 
->>>> https://bugs.freedesktop.org/show_bug.cgi?id=8882
->>>> 
->>>> Tested to compile on Mac OS X 10.9.5 host.
->>>> 
->>>> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
->>>> ---
->>>> arch/arm/vdso/vdsomunge.c | 18 ++++++++++++++++++
->>>> 1 file changed, 18 insertions(+)
->>>> 
->>>> diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
->>>> index aedec81..5364cea 100644
->>>> --- a/arch/arm/vdso/vdsomunge.c
->>>> +++ b/arch/arm/vdso/vdsomunge.c
->>>> @@ -45,7 +45,25 @@
->>>> * it does.
->>>> */
->>>> 
->>>> +#if defined(__linux__)
->>>> #include <byteswap.h>
->>>> +#elif defined(__OpenBSD__)
->>>> +#include <sys/endian.h>
->>>> +#define bswap_16 __swap16
->>>> +#define bswap_32 __swap32
->>>> +#define bswap_64 __swap64
->>>> +#elif defined(__APPLE__)
->>>> +#include <libkern/OSByteOrder.h>
->>>> +#define bswap_16 OSSwapInt16
->>>> +#define bswap_32 OSSwapInt32
->>>> +#define bswap_64 OSSwapInt64
->>>> +#else
->>>> +#include <sys/endian.h>
->>>> +#define bswap_16 bswap16
->>>> +#define bswap_32 bswap32
->>>> +#define bswap_64 bswap64
->>>> +#endif
->>>> +
->>> 
->>> Have you tried this?
->>> 
->>> #define bswap_16 __builtin_bswap16
->>> #define bswap_32 __builtin_bswap32
->>> #define bswap_64 __builtin_bswap64
->>> 
->>> https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html
->> 
->> OS X host uses llvm and I am not sure if these builtins are
->> always available.
->> 
-> 
-> I am pretty sure recent clang supports these as well. Could you please try it?
+> In the changelog you mention "both uarts", but here you have five of them.
+> Are they all accessible on the connector? If not, only provide aliases
+> for the ones that are, using numbering that makes most sense for given
+> how one would use the board.
 
-What release date (= feature set) of a compiler would you no longer consider as "recent"?
+Unless I'm missing something there's only two UARTs brought out on the
+low speed expansion connector (in addition to the one on the solder pads
+which is currently supported).  We should also adjust the console
+default to match whatever one of the low speed expansion connector UARTs
+is being used by the bootloader.
 
-> 
->> So it replaces an include file dependency by a compiler
->> built-in dependency. IMHO my approach is more general
->> and should cover a broader range of compile hosts.
->> 
->> This is a tool compiled by HOSTCC to be run on the build
->> host - so I think we can't assume to have a gcc host compiler
->> (while for the CC cross-compiler we can).
->> 
-> 
-> If my suggestion works, we'll support host side GCC and clang without
-> decorating the source code with lots of #ifdefs for OSes few people
-> care about. That would be an improvement imo
-
-Indeed it would be the best solution.
-
-But at least my Apple LLVM version 6.0 (clang-600.0.57) (based on LLVM 3.5svn)
-it does *not* work (see also for example http://sourceforge.net/p/flac/bugs/416/ ).
-
-Clang 3.5 appears to provide all features of GCC 4.7.
-
-I have checked and it appears that __builtin_bswap16 only became available in
-GCC 4.8 (released 2013-03-22). And maybe in Clang 3.7.
-
-Unfortunately I could not find a reference what the minimum required gcc for
-the Linux HOSTCC currently is.
-
-So if we require gcc >= 4.8 just by this small tool, this should be made well
-known and well decided.
-
-Therefore I would propose to use the #ifdef approach now and revise 5 years
-after gcc 4.8 release (2013 ==> 2018) if __builtin_bswap16 (or something else)
-has become a widely available standard.
-
-I can add this to the patch commit V2 for reference.
-
-BR and thanks,
-Nikolaus Schaller
+While we're at it there was a recent talk which mentioned a fairly large
+amount of functionality that's apparently already "upstream" for this
+device but not included in the DT, assuming that means that driver
+support is there it would be good to add the corresponding DT.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/b171b48d/attachment.sig>
