@@ -1,26 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Sep 2015 23:36:03 +0100
-Subject: [PATCH 3/6] regulator: core: create unlocked version of
- regulator_list_voltage
-In-Reply-To: <1443621946-8712-4-git-send-email-s.hauer@pengutronix.de>
-References: <1443621946-8712-1-git-send-email-s.hauer@pengutronix.de>
- <1443621946-8712-4-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150930223603.GF15635@sirena.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 30 Sep 2015 15:38:29 -0700
+Subject: [PATCH 1/5] ARM: sunxi: Add R8 support
+In-Reply-To: <1442566130-3497-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1442566130-3497-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150930223829.GG18556@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 04:05:43PM +0200, Sascha Hauer wrote:
-> The unlocked version will be needed when we start propagating voltage
-> changes to the supply regulators.
+On 09/18, Maxime Ripard wrote:
+> The R8 is a new Allwinner SoC based on the A13. While both are very
+> similar, there's still a few differences. Introduce a new compatible to
+> deal with them.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
 
-I'm now wondering why we have a locked _list_voltage() in the first
-place...  it *should* be a pure function that doesn't need any locking.
-I'll check tomorrow if there are any users who care but if there aren't
-the change here is probably to remove the locking entirely.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/5e2cca5b/attachment.sig>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+
+BTW, why is the entire series sent To: Mike and I? Are these
+patches intended to go through clk tree?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
