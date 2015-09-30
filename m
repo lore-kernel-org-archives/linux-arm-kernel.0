@@ -1,91 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 30 Sep 2015 17:38:46 +0200
-Subject: [PATCH RFC RFT 2/3] clk: clk_put WARNs if user has not disabled
- clk
-In-Reply-To: <1438974570-20812-3-git-send-email-mturquette@baylibre.com>
-References: <1438974570-20812-1-git-send-email-mturquette@baylibre.com>
- <1438974570-20812-3-git-send-email-mturquette@baylibre.com>
-Message-ID: <CAMuHMdX8Fq3AfxuZMLe4-CYFzrDiQcwnREQhX5fSGXzYNSkKsA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 30 Sep 2015 16:39:30 +0100
+Subject: [PATCH 1/4] of: Add of_parse_phandle_with_opt_args() helper
+ function
+In-Reply-To: <1442944336-11754-2-git-send-email-marc.zyngier@arm.com>
+References: <1442944336-11754-1-git-send-email-marc.zyngier@arm.com>
+ <1442944336-11754-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <560C0232.2010100@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Marc,
 
-On Fri, Aug 7, 2015 at 9:09 PM, Michael Turquette
-<mturquette@baylibre.com> wrote:
-> From the clk_put kerneldoc in include/linux/clk.h:
+On 22/09/15 18:52, Marc Zyngier wrote:
+> of_parse_phandle_with_args() is slightly inflexible as it doesn't
+> allow the (unusual) case where the #*-cells property is not defined.
+> In order to support this, introduce of_parse_phandle_with_opt_args()
+> which assumes that #*-cells is zero when it is not defined,
+> as required by the msi-parent binding
 >
-> """
-> Note: drivers must ensure that all clk_enable calls made on this clock
-> source are balanced by clk_disable calls prior to calling this function.
-> """
->
-> The common clock framework implementation of the clk.h api has per-user
-> reference counts for calls to clk_prepare and clk_disable. As such it
-> can enforce the requirement to properly call clk_disable and
-> clk_unprepare before calling clk_put.
->
-> Because this requirement is probably violated in many places, this patch
-> starts with a simple warning. Once offending code has been fixed this
-> check could additionally release the reference counts automatically.
->
-> Signed-off-by: Michael Turquette <mturquette@baylibre.com>
-> ---
->  drivers/clk/clk.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 72feee9..6ec0f77 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -2764,6 +2764,14 @@ void __clk_put(struct clk *clk)
->             clk->max_rate < clk->core->req_rate)
->                 clk_core_set_rate_nolock(clk->core, clk->core->req_rate);
->
-> +       /*
-> +        * before calling clk_put, all calls to clk_prepare and clk_enable from
-> +        * a given user must be balanced with calls to clk_disable and
-> +        * clk_unprepare by that same user
-> +        */
-> +       WARN_ON(clk->prepare_count);
-> +       WARN_ON(clk->enable_count);
+> This is done by turning __of_parse_phandle_with_args into an even
+> bigger monster, which is a bit frightening.
 
-These two WARN_ON()s are triggered a lot when using a legacy clock domain,
-and CONFIG_PM=n. Indeed, without Runtime PM, the idea is that the module clocks
-get enabled unconditionally, which violates the assumptions above.
+A monster indeed; I can't quite figure out the exact effect this change 
+has on of_count_phandle_with_args(), but I have a lingering doubt it may 
+be something undesirable, since AFAICS that's now going to proceed from 
+where it would have errored out before, with a count of -2.
 
-Cfr. the CONFIG_PM=n version of pm_clk_notify() in
-drivers/base/power/clock_ops.c, which calls enable_clock():
+I think it might be nicer to implement this by passing an extra "assume 
+zero if #cells not found" boolean to __of_parse_phandle_with_args().
 
-    /**
-     * enable_clock - Enable a device clock.
-     * @dev: Device whose clock is to be enabled.
-     * @con_id: Connection ID of the clock.
-     */
-    static void enable_clock(struct device *dev, const char *con_id)
-    {
-            struct clk *clk;
+Alternatively, what's the actual likelihood of legacy bindings being 
+mixed in with new ones? Could we not simply mandate that anyone adding 
+an MSI controller with #msi-cells to a DT must ensure any existing nodes 
+are also updated with #msi-cells = 0, and keep the legacy workaround 
+self-contained in the MSI layer? e.g. paraphrasing from patch 2/2:
 
-            clk = clk_get(dev, con_id);
-            if (!IS_ERR(clk)) {
-                    clk_prepare_enable(clk);
-                    clk_put(clk);
-                    dev_info(dev, "Runtime PM disabled, clock forced on.\n");
-            }
-    }
+msi_np = of_parse_phandle(np, "msi-parent", 0);
+if (!of_property_read_bool(msi_np, "#msi-cells"))
+	return parse_this_thing(...);
+else
+	while (!of_parse_phandle_with_opt_args(np, "msi-parent"...
+		if (parse_this_thing(...))
+			return;
 
-I think this affects shmobile, keystone, davinci, omap1, and legacy sh.
-
-Sorry for not noticing before, we usually build with CONFIG_PM=y.
-One more reason for making CONFIG_PM=y mandatory on SoCs with clock domains?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Robin.
