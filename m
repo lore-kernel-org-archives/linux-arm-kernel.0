@@ -1,74 +1,76 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 30 Sep 2015 16:07:40 +0200
-Subject: [PATCH v2 4/8] mmc: dw_mmc: Use mmc_regulator_set_vqmmc in
- start_signal_voltage_switch
+Date: Wed, 30 Sep 2015 16:07:43 +0200
+Subject: [PATCH v2 7/8] ARM: dts: rockchip: Add drive/sample clocks for rk3288
+ dw_mmc devices
 In-Reply-To: <1443622064-14362-1-git-send-email-heiko@sntech.de>
 References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
-Message-ID: <1443622064-14362-5-git-send-email-heiko@sntech.de>
+Message-ID: <1443622064-14362-8-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Douglas Anderson <dianders@chromium.org>
+From: Alexandru M Stan <amstan@chromium.org>
 
-We've introduced a new helper in the MMC core:
-mmc_regulator_set_vqmmc().  Let's use this in dw_mmc.  Using this new
-helper has some advantages:
+The drive/sample clocks can be phase shifted.  The drive clock
+could be used in a future patch to adjust hold times.  The sample
+clock is used for tuning.
 
-1. We get the mmc_regulator_set_vqmmc() behavior of trying to match
-   VQMMC and VMMC when the signal voltage is 3.3V.  This ensures max
-   compatibility.
-
-2. We get rid of a few more warnings when probing unsupported
-   voltages.
-
-3. We get rid of some non-dw_mmc specific code in dw_mmc.
-
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Alexandru M Stan <amstan@chromium.org>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/mmc/host/dw_mmc.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/rk3288.dtsi | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index fcbf552..b1b7e7f 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1279,7 +1279,6 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
- 	const struct dw_mci_drv_data *drv_data = host->drv_data;
- 	u32 uhs;
- 	u32 v18 = SDMMC_UHS_18V << slot->id;
--	int min_uv, max_uv;
- 	int ret;
- 
- 	if (drv_data && drv_data->switch_voltage)
-@@ -1291,22 +1290,18 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
- 	 * does no harm but you need to set the regulator directly.  Try both.
- 	 */
- 	uhs = mci_readl(host, UHS_REG);
--	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
--		min_uv = 2700000;
--		max_uv = 3600000;
-+	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330)
- 		uhs &= ~v18;
--	} else {
--		min_uv = 1700000;
--		max_uv = 1950000;
-+	else
- 		uhs |= v18;
--	}
-+
- 	if (!IS_ERR(mmc->supply.vqmmc)) {
--		ret = regulator_set_voltage(mmc->supply.vqmmc, min_uv, max_uv);
-+		ret = mmc_regulator_set_vqmmc(mmc, ios);
- 
- 		if (ret) {
- 			dev_dbg(&mmc->class_dev,
--					 "Regulator set error %d: %d - %d\n",
--					 ret, min_uv, max_uv);
-+					 "Regulator set error %d - %s V\n",
-+					 ret, uhs & v18 ? "1.8" : "3.3");
- 			return ret;
- 		}
- 	}
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 27a397f6..37c5a02 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -225,8 +225,9 @@
+ 	sdmmc: dwmmc at ff0c0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		clock-freq-min-max = <400000 150000000>;
+-		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
+-		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
++			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg = <0xff0c0000 0x4000>;
+@@ -236,8 +237,9 @@
+ 	sdio0: dwmmc at ff0d0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		clock-freq-min-max = <400000 150000000>;
+-		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>;
+-		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>,
++			 <&cru SCLK_SDIO0_DRV>, <&cru SCLK_SDIO0_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg = <0xff0d0000 0x4000>;
+@@ -247,8 +249,9 @@
+ 	sdio1: dwmmc at ff0e0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		clock-freq-min-max = <400000 150000000>;
+-		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>;
+-		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>,
++			 <&cru SCLK_SDIO1_DRV>, <&cru SCLK_SDIO1_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg = <0xff0e0000 0x4000>;
+@@ -258,8 +261,9 @@
+ 	emmc: dwmmc at ff0f0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		clock-freq-min-max = <400000 150000000>;
+-		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
+-		clock-names = "biu", "ciu";
++		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
++			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
+ 		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg = <0xff0f0000 0x4000>;
 -- 
 2.5.1
