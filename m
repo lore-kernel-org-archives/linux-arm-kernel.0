@@ -1,42 +1,29 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 30 Sep 2015 19:39:26 +0200 (CEST)
-Subject: [PATCH v2 0/7] net: mvneta: Switch to per-CPU irq and make
- rxq_def useful
-In-Reply-To: <20150930.084039.1788742148434227487.davem@davemloft.net>
-References: <1443197378-30717-1-git-send-email-gregory.clement@free-electrons.com>
- <20150929.115157.1923947727727463035.davem@davemloft.net>
- <alpine.DEB.2.11.1509301655140.4500@nanos>
- <20150930.084039.1788742148434227487.davem@davemloft.net>
-Message-ID: <alpine.DEB.2.11.1509301938130.4500@nanos>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 30 Sep 2015 19:35:21 +0200
+Subject: [PATCH 1/2] dma: pxa_dma: fix the no-requestor case
+In-Reply-To: <20150930062422.GC21690@vkoul-mobl.iind.intel.com> (Vinod Koul's
+ message of "Wed, 30 Sep 2015 11:54:22 +0530")
+References: <1441905466-17459-1-git-send-email-robert.jarzmik@free.fr>
+ <20150930062422.GC21690@vkoul-mobl.iind.intel.com>
+Message-ID: <87fv1verom.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Sep 2015, David Miller wrote:
-> From: Thomas Gleixner <tglx@linutronix.de>
-> Date: Wed, 30 Sep 2015 16:56:06 +0200 (CEST)
-> 
-> > On Tue, 29 Sep 2015, David Miller wrote:
-> >> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >> Date: Fri, 25 Sep 2015 18:09:31 +0200
-> >> 
-> >> > As stated in the first version: "this patchset reworks the Marvell
-> >> > neta driver in order to really support its per-CPU interrupts, instead
-> >> > of faking them as SPI, and allow the use of any RX queue instead of
-> >> > the hardcoded RX queue 0 that we have currently."
-> >> 
-> >> Series applied, thanks.
-> > 
-> > You could have had the courtesy to wait for an ack for the core irq
-> > parts at least....
-> 
-> Sorry, my impression was that those parts were already discussed and
-> agreed upon.
+Vinod Koul <vinod.koul@intel.com> writes:
 
-No problem. I would have preferred to merge them to a separate branch
-which you could have pulled so we don't end up with conflicts on
-further changes in that area. But it's ok as it is. The patches are
-good to go.
+> On Thu, Sep 10, 2015 at 07:17:45PM +0200, Robert Jarzmik wrote:
+>> A very small number of devices don't use the flow control offered by
+>> requestor lines. In these specific cases, the pxa dma driver should be
+>> aware of that and not try to use a requestor line.
+>
+> And these fail for me, what were these sent against?
+v4.2. My fault, in v4.2-rc1 the patch 0e95fb9ceb82 ("dmaengine: pxa_dma: don't
+use config direction parameter") impact this one.
 
-Thanks,
+> Please rebase and resend
+Of course, I'm on it.
 
-	tglx
+Cheers.
+
+-- 
+Robert
