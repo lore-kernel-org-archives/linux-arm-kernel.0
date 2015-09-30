@@ -1,80 +1,98 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 30 Sep 2015 21:17:47 +0200
-Subject: [PATCH 2/5] ARM: dts: rockchip: add rk3288-popmemtal mmc supplies
+Date: Wed, 30 Sep 2015 21:17:50 +0200
+Subject: [PATCH 5/5] ARM: dts: rockchip: add rk3288-firefly iodomains
 In-Reply-To: <1443640670-21104-1-git-send-email-heiko@sntech.de>
 References: <1443640670-21104-1-git-send-email-heiko@sntech.de>
-Message-ID: <1443640670-21104-3-git-send-email-heiko@sntech.de>
+Message-ID: <1443640670-21104-6-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing regulators and supply properties to emmc and sdmmc nodes.
+Add the iodomains node and reference the correct regulator for each
+domain. This also includes adding the currently unused dvp regulators.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3288-popmetal.dts | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/rk3288-firefly.dtsi | 47 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288-popmetal.dts b/arch/arm/boot/dts/rk3288-popmetal.dts
-index f82b956..b677611 100644
---- a/arch/arm/boot/dts/rk3288-popmetal.dts
-+++ b/arch/arm/boot/dts/rk3288-popmetal.dts
-@@ -86,6 +86,26 @@
- 		pinctrl-0 = <&ir_int>;
+diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
+index a7b1972..105b175 100644
+--- a/arch/arm/boot/dts/rk3288-firefly.dtsi
++++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+@@ -48,6 +48,14 @@
+ 		reg = <0 0x80000000>;
  	};
  
-+	vcc_flash: flash-regulator {
++	dovdd_1v8: dovdd-1v8-regulator {
 +		compatible = "regulator-fixed";
-+		regulator-name = "vcc_flash";
++		regulator-name = "dovdd_1v8";
 +		regulator-min-microvolt = <1800000>;
 +		regulator-max-microvolt = <1800000>;
-+		vin-supply = <&vcc_io>;
++		vin-supply = <&vcc28_dvp>;
 +	};
 +
-+	vcc_sd: sdmmc-regulator {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio7 11 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sdmmc_pwr>;
-+		regulator-name = "vcc_sd";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		vin-supply = <&vcc_io>;
+ 	ext_gmac: external-gmac-clock {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+@@ -55,6 +63,22 @@
+ 		clock-output-names = "ext_gmac";
+ 	};
+ 
++	io_domains: io-domains {
++		compatible = "rockchip,rk3288-io-voltage-domain";
++		rockchip,grf = <&grf>;
++
++		audio-supply = <&vcca_33>;
++		bb-supply = <&vcc_io>;
++		dvp-supply = <&dovdd_1v8>;
++		flash0-supply = <&vcc_flash>;
++		flash1-supply = <&vcc_lan>;
++		gpio30-supply = <&vcc_io>;
++		gpio1830-supply = <&vcc_io>;
++		lcdc-supply = <&vcc_io>;
++		sdcard-supply = <&vccio_sd>;
++		wifi-supply = <&vccio_wl>;
 +	};
 +
- 	vcc_sys: vsys-regulator {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc_sys";
-@@ -109,6 +129,8 @@
- 	num-slots = <1>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_pwr &emmc_bus8>;
-+	vmmc-supply = <&vcc_io>;
-+	vqmmc-supply = <&vcc_flash>;
- 	status = "okay";
- };
- 
-@@ -121,6 +143,8 @@
- 	num-slots = <1>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
-+	vmmc-supply = <&vcc_sd>;
-+	vqmmc-supply = <&vccio_sd>;
- 	status = "okay";
- };
- 
-@@ -405,6 +429,12 @@
- 			rockchip,pins = <RK_GPIO0 4 RK_FUNC_GPIO &pcfg_pull_up>;
- 		};
+ 	ir: ir-receiver {
+ 		compatible = "gpio-ir-receiver";
+ 		pinctrl-names = "default";
+@@ -160,6 +184,23 @@
+ 		regulator-always-on;
+ 		vin-supply = <&vcc_5v>;
  	};
 +
-+	sdmmc {
-+		sdmmc_pwr: sdmmc-pwr {
-+			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
++	/*
++	 * A TT8142 creates both dovdd_1v8 and vcc28_dvp, controlled
++	 * by the dvp_pwr pin.
++	 */
++	vcc28_dvp: vcc28-dvp-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio0 11 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&dvp_pwr>;
++		regulator-name = "vcc28_dvp";
++		regulator-min-microvolt = <2800000>;
++		regulator-max-microvolt = <2800000>;
++		regulator-always-on;
++		vin-supply = <&vcc_io>;
 +	};
  };
  
- &tsadc {
+ &cpu0 {
+@@ -377,6 +418,12 @@
+ 		};
+ 	};
+ 
++	dvp {
++		dvp_pwr: dvp-pwr {
++			rockchip,pins = <0 11 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
+ 	gmac {
+ 		phy_int: phy-int {
+ 			rockchip,pins = <0 9 RK_FUNC_GPIO &pcfg_pull_up>;
 -- 
 2.5.3
