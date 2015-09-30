@@ -1,59 +1,66 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 30 Sep 2015 15:20:16 +0800
-Subject: [PATCH v5 07/17] ARM: dts: exynos/dp: remove some properties
- that deprecated by analogix_dp driver
-In-Reply-To: <560B7584.8070703@samsung.com>
-References: <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
- <1442907799-6266-1-git-send-email-ykk@rock-chips.com>
- <560B7584.8070703@samsung.com>
-Message-ID: <560B8D30.2010309@rock-chips.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 30 Sep 2015 09:22:11 +0200
+Subject: [PATCH] ARM: exynos_defconfig: Enable WiFi-Ex as a module instead
+ built-in
+In-Reply-To: <560B2EA4.8050406@samsung.com>
+References: <1443530546-3066-1-git-send-email-javier@osg.samsung.com>
+ <560B2EA4.8050406@samsung.com>
+Message-ID: <560B8DA3.6060507@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hello Krzysztof,
 
-On 09/30/2015 01:39 PM, Krzysztof Kozlowski wrote:
-> On 22.09.2015 16:43, Yakir Yang wrote:
->> After exynos_dp have been split the common IP code into analogix_dp driver,
->> the analogix_dp driver have deprecated some Samsung platform properties which
->> could be dynamically parsed from EDID/MODE/DPCD message, so this is an update
->> for Exynos DTS file for dp-controller.
+On 09/30/2015 02:36 AM, Krzysztof Kozlowski wrote:
+> On 29.09.2015 21:42, Javier Martinez Canillas wrote:
+>> The Marvell WiFi-Ex driver tries to load a firmware on probe. So if the
+>> driver is built-in and probed before a firmware is available, this is
+>> not loaded and the chip does not work.
 >>
->> Beside the backward compatibility is fully preserved, so there are no
->> bisectability break that make this change in a separate patch.
+>> This happens for example if an initramfs isn't used since the driver is
+>> probed before the root filesystem is mounted.
 >>
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>> Change the default config since the driver isn't needed for machines to
+>> boot and is more convenient to have it enabled as a module to avoid
+>> requiring an initramfs or to have the firmware built into the kernel.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>
 >> ---
->> Changes in v5:
->> - Correct the misspell in commit message. (Krzysztof)
 >>
->> Changes in v4:
->> - Separate all DTS changes to a separate patch. (Krzysztof)
->>
->> Changes in v3: None
->> Changes in v2: None
->>
->>   arch/arm/boot/dts/exynos5250-arndale.dts   | 2 --
->>   arch/arm/boot/dts/exynos5250-smdk5250.dts  | 2 --
->>   arch/arm/boot/dts/exynos5250-snow.dts      | 4 +---
->>   arch/arm/boot/dts/exynos5250-spring.dts    | 4 +---
->>   arch/arm/boot/dts/exynos5420-peach-pit.dts | 4 +---
->>   arch/arm/boot/dts/exynos5420-smdk5420.dts  | 2 --
->>   arch/arm/boot/dts/exynos5800-peach-pi.dts  | 4 +---
->>   7 files changed, 4 insertions(+), 18 deletions(-)
->>
-> Assuming this will be merged as part of this set (dependency on previous
-> patches):
+>>  arch/arm/configs/exynos_defconfig | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> The user-space can always initiate re-probing of device - just re-bind
+
+It is true that you can force a re-probing from user-space by doing:
+
+$ echo "mmc2:0001:1" > /sys/bus/sdio/drivers/mwifiex_sdio/unbind
+$ echo "mmc2:0001:1" > /sys/bus/sdio/drivers/mwifiex_sdio/bind
+
+but:
+
+a) This is not obvious. In fact, I didn't think that possibility
+before you mentioned and I've been using Linux for many years :)
+
+b) This is not something that isn't done automatically by init systems.
+
+So what users will see is that the driver was probed successfully but
+the firmware fails to load later (since the driver users the async
+request_firmware_nowait function to request the firmware).
+
+> it. However I assume that driver cannot work without firmware?
 >
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Thanks a lot ;)
-
-- Yakir
-
+Yes, it doesn't. I explained this in the commit message. Do you
+think it should be made more clear?
+ 
 > Best regards,
 > Krzysztof
->
->
->
->
+> 
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
