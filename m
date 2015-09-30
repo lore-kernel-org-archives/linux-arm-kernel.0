@@ -1,44 +1,38 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 30 Sep 2015 10:47:11 +0200
-Subject: [PATCH 2/2] i2c: at91: update documentation for new "atmel,
- twd-hold-cycles" property
-In-Reply-To: <1443602831-27069-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1443602831-27069-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1443602831-27069-2-git-send-email-ludovic.desroches@atmel.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Wed, 30 Sep 2015 11:52:11 +0300
+Subject: [RFC PATCH 00/20] Coresight integration with perf
+In-Reply-To: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <87zj04jnlw.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wenyou Yang <wenyou.yang@atmel.com>
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-Add a DT property "atmel,twd-hold-cycles" to specify the HOLD
-field of TWIHS_CWGR register to increase the TWD hold time.
+> This patchset aims to integrate configuration and control of
+> the Coresight tracers with the perf sub-system.
+>
+> The goal is to use PMUs to represent tracers and the auxiliary
+> buffer enhancement to collect processor traces.  As such a lot
+> of work is done to move the current Coresight sysFS oriented
+> configuration and control commands to perf's AUX API.
+>
+> For the time being the work concentrates on ETMv3 and ETB1.0
+> sink buffers.  Work on ETMv4 and other type of sink buffers
+> will follow once a foundation has been established.
+>
+> Enhancement to the perf command line tool can be found here [1].
+> It is based on v4.2 but a rebase to v4.3-rcX will be available
+> shortly.
+>
+> Best regards,
+> Mathieu
+>
+> [1]. https://git.linaro.org/people/mathieu.poirier/coresight.git/shortlog/refs/heads/perf-v4.2 
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- Documentation/devicetree/bindings/i2c/i2c-at91.txt | 3 +++
- 1 file changed, 3 insertions(+)
+I had a peek there -- didn't see an actual decoder for the ETM/PTM
+binary stream or did I miss it somehow?
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-at91.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-index 6e81dc1..f14c0b2 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-@@ -17,6 +17,8 @@ Optional properties:
- - dma-names: should contain "tx" and "rx".
- - atmel,fifo-size: maximum number of data the RX and TX FIFOs can store for FIFO
-   capable I2C controllers.
-+- atmel,twd-hold-cycles: increase the TWD hold time by
-+  (atmel,twd-hold-cycles + 3) x t_periperal_clk, maximum value is 0x1f.
- - Child nodes conforming to i2c bus binding
- 
- Examples :
-@@ -29,6 +31,7 @@ i2c0: i2c at fff84000 {
- 	#size-cells = <0>;
- 	clocks = <&twi0_clk>;
- 	clock-frequency = <400000>;
-+	atmel,twd-hold-cycles = <2>;
- 
- 	24c512 at 50 {
- 		compatible = "24c512";
--- 
-2.5.0
+Thanks,
+--
+Alex
