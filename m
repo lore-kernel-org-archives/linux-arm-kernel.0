@@ -1,84 +1,56 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 30 Sep 2015 12:23:04 +0200
-Subject: [PATCH v6 0/22] On-demand device probing
-In-Reply-To: <CAAObsKChqEfFO+qTwLcBLs8tPPT_gchGKK287652jdC=5R6+qQ@mail.gmail.com>
-References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
- <5606E120.3070305@kernel.org> <20150926192218.GA15657@kroah.com>
- <CAAObsKChqEfFO+qTwLcBLs8tPPT_gchGKK287652jdC=5R6+qQ@mail.gmail.com>
-Message-ID: <20150930102304.GA7435@kroah.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 30 Sep 2015 12:37:04 +0200
+Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
+In-Reply-To: <9hhpp105jw1.fsf@e105922-lin.cambridge.arm.com>
+References: <1443015463-23639-1-git-send-email-s.hauer@pengutronix.de>
+ <1443015463-23639-3-git-send-email-s.hauer@pengutronix.de>
+ <9hhpp105jw1.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20150930103704.GA7858@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 12:09:27PM +0200, Tomeu Vizoso wrote:
-> On 26 September 2015 at 21:22, Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org> wrote:
-> > On Sat, Sep 26, 2015 at 01:17:04PM -0500, Rob Herring wrote:
-> >> On 09/21/2015 09:02 AM, Tomeu Vizoso wrote:
-> >> > Hello,
-> >> >
-> >> > I have a problem with the panel on my Tegra Chromebook taking longer
-> >> > than expected to be ready during boot (St?phane Marchesin reported what
-> >> > is basically the same issue in [0]), and have looked into ordered
-> >> > probing as a better way of solving this than moving nodes around in the
-> >> > DT or playing with initcall levels and linking order.
-> >> >
-> >> > While reading the thread [1] that Alexander Holler started with his
-> >> > series to make probing order deterministic, it occurred to me that it
-> >> > should be possible to achieve the same by probing devices as they are
-> >> > referenced by other devices.
-> >> >
-> >> > This basically reuses the information that is already implicit in the
-> >> > probe() implementations, saving us from refactoring existing drivers or
-> >> > adding information to DTBs.
-> >> >
-> >> > During review of v1 of this series Linus Walleij suggested that it
-> >> > should be the device driver core to make sure that dependencies are
-> >> > ready before probing a device. I gave this idea a try [2] but Mark Brown
-> >> > pointed out to the logic duplication between the resource acquisition
-> >> > and dependency discovery code paths (though I think it's fairly minor).
-> >> >
-> >> > To address that code duplication I experimented with Arnd's devm_probe
-> >> > [3] concept of having drivers declare their dependencies instead of
-> >> > acquiring them during probe, and while it worked [4], I don't think we
-> >> > end up winning anything when compared to just probing devices on-demand
-> >> > from resource getters.
-> >> >
-> >> > One remaining objection is to the "sprinkling" of calls to
-> >> > of_device_probe() in the resource getters of each subsystem, but I think
-> >> > it's the right thing to do given that the storage of resources is
-> >> > currently subsystem-specific.
-> >> >
-> >> > We could avoid the above by moving resource storage into the core, but I
-> >> > don't think there's a compelling case for that.
-> >> >
-> >> > I have tested this on boards with Tegra, iMX.6, Exynos, Rockchip and
-> >> > OMAP SoCs, and these patches were enough to eliminate all the deferred
-> >> > probes (except one in PandaBoard because omap_dma_system doesn't have a
-> >> > firmware node as of yet).
-> >> >
-> >> > Have submitted a branch [5][6][7] with these patches on top of today's
-> >> > linux-next (20150921) to kernelci.org and I don't see any issues that
-> >> > could be caused by them.
-> >> >
-> >> > With this series I get the kernel to output to the panel in 0.5s,
-> >> > instead of 2.8s.
-> >>
-> >> I think we're pretty close other than some minor comments. I would like
-> >> to see ack's from Greg and some reviewed-bys from others. The subsystem
-> >> changes are minor and there has been plenty of chance to comment, so I
-> >> don't think acks from all subsystems are needed.
-> >>
-> >> Your branch is based on -next. Is there any dependence on something in
-> >> -next? I want to get this into -next soon, but need a branch not based
-> >> on -next. Please send me a pull request with the collected acks and
-> >> minor comments I have addressed.
-> >
-> > Let me review this on Monday and I'll let you know...
+Hi Punit,
+
+On Wed, Sep 30, 2015 at 10:36:14AM +0100, Punit Agrawal wrote:
+> Hi Sascha,
 > 
-> Hi Greg, hope you don't mind that I ping you regarding this, just in
-> case it fell through some crack.
+> Re-posting a comment from v7. Perhaps you missed it...
 
-It's on my todo list, sorry, am at a conference for the next few days,
-didn't get to it on Monday, hopefully soon...
+Uh, sorry. In fact I didn't miss it and I thought I have answered it.
+Appearantly I haven't.
 
-greg "my todo list is too long" k-h
+> > +	struct mtk_thermal *mt = bank->mt;
+> > +	int temp, i, max;
+> > +	u32 raw;
+> > +
+> > +	temp = max = INT_MIN;
+> > +
+> > +	for (i = 0; i < bank_data[bank->id].num_sensors; i++) {
+> > +		raw = readl(mt->thermal_base + sensing_points[i].msr);
+> > +
+> > +		temp = raw_to_mcelsius(mt, raw);
+> > +
+> > +		/*
+> > +		 * The first read of a sensor often contains very high bogus
+> > +		 * temperature value. Filter these out so that the system does
+> > +		 * not immediately shut down.
+> > +		 */
+> > +		if (temp > 200000)
+> > +			temp = 0;
+> > +
+> 
+> If the bogus value is only the first time the sensor is read, instead of
+> filtering here, you could call mtk_thermal_bank_temperature at probe
+> time when you are initialising the banks and ignore the returned value.
+
+It seems that after initialization the hardware needs some time to
+settle before correct values can be read. Doing what you suggest would
+mean we have to delay the boot by several 100ms. I'd rather not do that.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
