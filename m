@@ -1,54 +1,32 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 30 Sep 2015 09:43:19 +0100
-Subject: Tegra baseline test results for v4.3-rc3
-Message-ID: <560BA0A7.4040504@nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 30 Sep 2015 17:43:14 +0900
+Subject: [PATCH 0/2] Add R8A7794/SILK board PCI USB DT support
+In-Reply-To: <560A8196.5020102@cogentembedded.com>
+References: <3151312.grtDDBsSl8@wasted.cogentembedded.com>
+ <55F4A850.3050806@cogentembedded.com>
+ <20150929003600.GA20067@verge.net.au>
+ <560A8196.5020102@cogentembedded.com>
+Message-ID: <20150930084314.GA9706@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.3-rc3.
-Logs and other details at:
+On Tue, Sep 29, 2015 at 03:18:30PM +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 9/29/2015 3:36 AM, Simon Horman wrote:
+> 
+> >>On 09/13/2015 01:28 AM, Sergei Shtylyov wrote:
+> 
+> >>>    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
+> >>>'renesas-devel-20150911v2-v4.2' tag. Here we add PCI USB device tree support
+> >>>for the R8A7794-based SILK board.
+> 
+> >>    Oops, forgot to say that the patches need the 'pci-rcar-gen2' driver
+> >>patch posted yesterday in order to work.
+> 
+> >Am I correct in thinking that patch has been accepted and
+> >that therefore I can now pick up this series?
+> 
+>    Yes, it's been merged by Linus already.
 
-    https://nvtb.github.io//linux/test_v4.3-rc3/20150927050105/
-
-
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 1/ 1): qemu-vexpress64
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.3-rc2 (1f93e4a96c9109378204c147b3eec0d0e8100fde)):
-   text     data      bss    total  kernel
-    -38        0     -128     -166  defconfig
-  +2294     +256      -64    +2486  multi_v7_defconfig
-  +2611        0      -64    +2547  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.3-rc2 (1f93e4a96c9109378204c147b3eec0d0e8100fde))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Thanks, I have queued-up this series.
