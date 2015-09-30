@@ -1,45 +1,66 @@
 From: aalonso@freescale.com (Adrian Alonso)
-Date: Wed, 30 Sep 2015 11:11:03 -0500
-Subject: [PATCH v8 1/7] ARM: dts: imx: imx7d-sbd remove fixed can2-3v3
- regulator
-Message-ID: <1443629469-12294-1-git-send-email-aalonso@freescale.com>
+Date: Wed, 30 Sep 2015 11:11:04 -0500
+Subject: [PATCH v8 2/7] ARM: dts: imx: imx7d-sbd add iomuxc-lpsr hoggrp-2 pads
+In-Reply-To: <1443629469-12294-1-git-send-email-aalonso@freescale.com>
+References: <1443629469-12294-1-git-send-email-aalonso@freescale.com>
+Message-ID: <1443629469-12294-2-git-send-email-aalonso@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove incorrect can2-3v3 fixed regulator, imx7d-sdb doesn't
-have a dedicated can2 fixed regulator instead it shares PERI_3V3
-fixed regulator (RT8070ZS) which is enabled by default (hardwired)
-from pmic pfuze3000 NVCC_3V3 power rail.
+Add imx7d-sdb iomuxc-lpsr hoggrp-2 default pads settings
+Add iomuxc-lpsr usb_otg1_vbus pinctrl settings
 
 Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 ---
-Changes for V7: New patch in series
+Changes for V2: Resend
+Changes for V3: Resend
+Changes for V4: Resend
+Changes for V5: Resend
+Changes for V6:
+- Add wdog pinctrl group, add comments for hog2 group gpios
+Changes for V7:
+- Remove wdog pinctrl settings as they are not currently used
+- Add pinctrl_usb_otg1_vbus settings
 Changes for V8: Resend
 
- arch/arm/boot/dts/imx7d-sdb.dts | 11 +----------
- 1 file changed, 1 insertion(+), 10 deletions(-)
+ arch/arm/boot/dts/imx7d-sdb.dts | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index 432aaf5..88308f3 100644
+index 88308f3..ca68a67 100644
 --- a/arch/arm/boot/dts/imx7d-sdb.dts
 +++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -78,16 +78,7 @@
+@@ -65,6 +65,8 @@
+ 			regulator-min-microvolt = <5000000>;
+ 			regulator-max-microvolt = <5000000>;
+ 			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
++			pinctrl-names = "default";
++			pinctrl-0 =  <&pinctrl_usb_otg1_vbus>;
  			enable-active-high;
  		};
  
--		reg_can2_3v3: regulator at 2 {
--			compatible = "regulator-fixed";
--			reg = <2>;
--			regulator-name = "can2-3v3";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpio = <&gpio1 7 GPIO_ACTIVE_LOW>;
--		};
--
--		reg_vref_1v8: regulator at 3 {
-+		reg_vref_1v8: regulator at 2 {
- 			compatible = "regulator-fixed";
- 			reg = <3>;
- 			regulator-name = "vref-1v8";
+@@ -495,3 +497,22 @@
+ 
+ 	};
+ };
++
++&iomuxc_lpsr {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog_2>;
++
++	imx7d-sdb {
++		pinctrl_hog_2: hog2grp {
++			fsl,pins = <
++				MX7D_PAD_GPIO1_IO07__GPIO1_IO7    0x59  /* sensor_int_b */
++			>;
++		};
++
++		pinctrl_usb_otg1_vbus: usbotg1vbusgrp {
++			fsl,pins = <
++				MX7D_PAD_GPIO1_IO05__GPIO1_IO5    0x14 	/* usb_otg1_pwr */
++			>;
++		};
++	};
++};
 -- 
 2.1.4
