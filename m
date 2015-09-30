@@ -1,350 +1,190 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 30 Sep 2015 10:36:14 +0100
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
-In-Reply-To: <1443015463-23639-3-git-send-email-s.hauer@pengutronix.de>
- (Sascha Hauer's message of "Wed, 23 Sep 2015 15:37:42 +0200")
-References: <1443015463-23639-1-git-send-email-s.hauer@pengutronix.de>
- <1443015463-23639-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <9hhpp105jw1.fsf@e105922-lin.cambridge.arm.com>
+From: Bharat.Bhushan@freescale.com (Bhushan Bharat)
+Date: Wed, 30 Sep 2015 09:37:21 +0000
+Subject: [RFC 0/2] VFIO: Add virtual MSI doorbell support.
+In-Reply-To: <20150925171206.GA2151@lvm>
+References: <1437728590-23126-1-git-send-email-pranavkumar@linaro.org>
+ <1438100507.5211.170.camel@redhat.com>
+ <CY1PR0301MB127660D71378F009918DDDD5908D0@CY1PR0301MB1276.namprd03.prod.outlook.com>
+ <1438106335.5211.219.camel@redhat.com>
+ <CAAHg+HgosCe=1T5ER-4AS1g779RxCDjcrazKV4CQC-43zDK-+Q@mail.gmail.com>
+ <CY1PR0301MB12761E7FA759BD1D6F218B8B90760@CY1PR0301MB1276.namprd03.prod.outlook.com>
+ <20150922230914.79972137@arm.com> <20150925171206.GA2151@lvm>
+Message-ID: <CY1PR0301MB127606669546CBE5AE26AEF4904D0@CY1PR0301MB1276.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
 
-Re-posting a comment from v7. Perhaps you missed it...
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
+> -----Original Message-----
+> From: Christoffer Dall [mailto:christoffer.dall at linaro.org]
+> Sent: Friday, September 25, 2015 10:42 PM
+> To: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Bhushan Bharat-R65777 <Bharat.Bhushan@freescale.com>; Pranavkumar
+> Sawargaonkar <pranavkumar@linaro.org>; kvm at vger.kernel.org; Alex
+> Williamson <alex.williamson@redhat.com>; kvmarm at lists.cs.columbia.edu;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Will
+> Deacon <Will.Deacon@arm.com>; bhelgaas at google.com; arnd at arndb.de;
+> rob.herring at linaro.org; eric.auger at linaro.org; patches at apm.com; Yoder
+> Stuart-B08248 <stuart.yoder@freescale.com>
+> Subject: Re: [RFC 0/2] VFIO: Add virtual MSI doorbell support.
+> 
+> On Tue, Sep 22, 2015 at 11:09:14PM +0100, Marc Zyngier wrote:
+> > On Tue, 4 Aug 2015 06:52:01 +0100
+> > Bhushan Bharat <Bharat.Bhushan@freescale.com> wrote:
+> >
+> > >
+> > >
+> > > > -----Original Message-----
+> > > > From: Pranavkumar Sawargaonkar [mailto:pranavkumar at linaro.org]
+> > > > Sent: Tuesday, August 04, 2015 11:18 AM
+> > > > To: Bhushan Bharat-R65777
+> > > > Cc: kvm at vger.kernel.org; Alex Williamson;
+> > > > kvmarm at lists.cs.columbia.edu;
+> > > > linux-arm-kernel at lists.infradead.org;
+> > > > linux-kernel at vger.kernel.org; christoffer.dall at linaro.org;
+> > > > marc.zyngier at arm.com; will.deacon at arm.com; bhelgaas at google.com;
+> > > > arnd at arndb.de; rob.herring at linaro.org; eric.auger at linaro.org;
+> > > > patches at apm.com; Yoder Stuart-B08248
+> > > > Subject: Re: [RFC 0/2] VFIO: Add virtual MSI doorbell support.
+> > > >
+> > > > Hi Bharat,
+> > > >
+> > > > On 28 July 2015 at 23:28, Alex Williamson
+> > > > <alex.williamson@redhat.com>
+> > > > wrote:
+> > > > > On Tue, 2015-07-28 at 17:23 +0000, Bhushan Bharat wrote:
+> > > > >> Hi Alex,
+> > > > >>
+> > > > >> > -----Original Message-----
+> > > > >> > From: Alex Williamson [mailto:alex.williamson at redhat.com]
+> > > > >> > Sent: Tuesday, July 28, 2015 9:52 PM
+> > > > >> > To: Pranavkumar Sawargaonkar
+> > > > >> > Cc: kvm at vger.kernel.org; kvmarm at lists.cs.columbia.edu;
+> > > > >> > linux-arm- kernel at lists.infradead.org;
+> > > > >> > linux-kernel at vger.kernel.org; christoffer.dall at linaro.org;
+> > > > >> > marc.zyngier at arm.com; will.deacon at arm.com;
+> > > > >> > bhelgaas at google.com; arnd at arndb.de; rob.herring at linaro.org;
+> > > > >> > eric.auger at linaro.org; patches at apm.com; Bhushan
+> > > > >> > Bharat-R65777; Yoder
+> > > > >> > Stuart-B08248
+> > > > >> > Subject: Re: [RFC 0/2] VFIO: Add virtual MSI doorbell support.
+> > > > >> >
+> > > > >> > On Fri, 2015-07-24 at 14:33 +0530, Pranavkumar Sawargaonkar
+> wrote:
+> > > > >> > > In current VFIO MSI/MSI-X implementation, linux host kernel
+> > > > >> > > allocates MSI/MSI-X vectors when userspace requests through
+> > > > >> > > vfio
+> > > > ioctls.
+> > > > >> > > Vfio creates irqfd mappings to notify MSI/MSI-X interrupts
+> > > > >> > > to the userspace when raised.
+> > > > >> > > Guest OS will see emulated MSI/MSI-X controller and
+> > > > >> > > receives an interrupt when kernel notifies the same via irqfd.
+> > > > >> > >
+> > > > >> > > Host kernel allocates MSI/MSI-X using standard linux
+> > > > >> > > routines like
+> > > > >> > > pci_enable_msix_range() and pci_enable_msi_range().
+> > > > >> > > These routines along with requset_irq() in host kernel sets
+> > > > >> > > up MSI/MSI-X vectors with Physical MSI/MSI-X addresses
+> > > > >> > > provided by interrupt controller driver in host kernel.
+> > > > >> > >
+> > > > >> > > This means when a device is assigned with the guest OS,
+> > > > >> > > MSI/MSI-X addresses present in PCIe EP are the PAs
+> > > > >> > > programmed by the host linux
+> > > > >> > kernel.
+> > > > >> > >
+> > > > >> > > In x86 MSI/MSI-X physical address range is reserved and
+> > > > >> > > iommu is aware about these addreses and transalation is
+> > > > >> > > bypassed for these
+> > > > address range.
+> > > > >> > >
+> > > > >> > > Unlike x86, ARM/ARM64 does not reserve MSI/MSI-X Physical
+> > > > >> > > address range and all the transactions including MSI go
+> > > > >> > > through iommu/smmu
+> > > > >> > without bypass.
+> > > > >> > > This requires extending current vfio MSI layer with
+> > > > >> > > additional functionality for ARM/ARM64 by 1. Programing
+> > > > >> > > IOVA (referred as a MSI virtual doorbell address)
+> > > > >> > >    in device's MSI vector as a MSI address.
+> > > > >> > >    This IOVA will be provided by the userspace based on the
+> > > > >> > >    MSI/MSI-X addresses reserved for the guest.
+> > > > >> > > 2. Create an IOMMU mapping between this IOVA and
+> > > > >> > >    Physical address (PA) assigned to the MSI vector.
+> > > > >> > >
+> > > > >> > > This RFC is proposing a solution for MSI/MSI-X passthrough
+> > > > >> > > for
+> > > > >> > ARM/ARM64.
+> > > > >> >
+> > > > >> >
+> > > > >> > Hi Pranavkumar,
+> > > > >> >
+> > > > >> > Freescale has the same, or very similar, need, so any
+> > > > >> > solution in this space will need to work for both ARM and
+> > > > >> > powerpc.  I'm not a big fan of this approach as it seems to
+> > > > >> > require the user to configure MSI/X via ioctl and then call a
+> > > > >> > separate ioctl mapping the doorbells.  That's more code for
+> > > > >> > the user, more code to get wrong and potentially a gap
+> > > > >> > between configuring MSI/X and enabling
+> > > > mappings where we could see IOMMU faults.
+> > > > >> >
+> > > > >> > If we know that doorbell mappings are required, why can't we
+> > > > >> > set aside a bank of IOVA space and have them mapped
+> > > > >> > automatically as MSI/X is being configured?  Then the user's
+> > > > >> > need for special knowledge and handling of this case is
+> > > > >> > limited to setup.  The IOVA space will be mapped and used as
+> > > > >> > needed, we only need the user to specify the IOVA space
+> > > > >> > reserved for this.  Thanks,
+> > > > >>
+> > > > >> We probably need a mix of both to support Freescale PowerPC and
+> > > > >> ARM based machines.
+> > > > >> In this mix mode kernel vfio driver will reserve some IOVA for
+> > > > >> mapping MSI page/s.
+> > > > >
+> > > > > If vfio is reserving pages independently from the user, this
+> > > > > becomes what Marc called "shaping" the VM and what x86
+> > > > > effectively does.  An interface extension should expose these
+> > > > > implicit regions so the user can avoid them for DMA memory
+> mapping.
+> > > > >
+> > > > >>  If any other iova mapping will overlap with this then it will
+> > > > >> return error and user-space. Ideally this should be choosen in
+> > > > >> such a way that it never overlap, which is easy on some systems
+> > > > >> but can be tricky on some other system like Freescale PowerPC.
+> > > > >> This is not sufficient for at-least Freescale PowerPC based
+> > > > >> SOC. This is because of hardware limitation, where we need to
+> > > > >> fit this reserved iova address within aperture decided by
+> > > > >> user-space. So if we allow user-space to change this reserved
+> > > > >> iova address to a value decided by user-spece itself then we
+> > > > >> can support both ARM/PowerPC based
+> > > > solutions.
+> > > > >
+> > > > > Yes, that's my intention, to allow userspace to specify the
+> > > > > reserved region.  I believe you have some additional
+> > > > > restrictions on the number of MSI banks available and whether
+> > > > > MSI banks can be shared, but I would hope that doesn't preclude a
+> shared interface with ARM.
+> > > > >
+> > > > >> I have some implementation ready/tested with this approach and
+> > > > >> if this approach looks good then I can submit a RFC patch.
+> > > > >
+> > > > > Yes, please post.  Thanks,
+> > > >
+> > > > Could you please share a tentative timeline by which you will be
+> > > > posting your patches ?
+> > >
+> > > I have not touched that code for a while, I am planning to send the
+> > > patch in couple of weeks.
+> >
+> > Have we made any progress on this subject? It looks like a lot of time
+> > has passed, but I haven't seen anything. Did I miss it?
+> >
+> Pranav is going to respin his series, because we are clarly not making progress
+> on this front.
 
-> This adds support for the Mediatek thermal controller found on MT8173
-> and likely other SoCs.
-> The controller is a bit special. It does not have its own ADC, instead
-> it controls the on-SoC AUXADC via AHB bus accesses. For this reason
-> we need the physical address of the AUXADC. Also it controls a mux
-> using AHB bus accesses, so we need the APMIXEDSYS physical address aswell.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> ---
->  drivers/thermal/Kconfig       |   8 +
->  drivers/thermal/Makefile      |   1 +
->  drivers/thermal/mtk_thermal.c | 537 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 546 insertions(+)
->  create mode 100644 drivers/thermal/mtk_thermal.c
->
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index 0390044..dadd1eb 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -348,6 +348,14 @@ config INTEL_PCH_THERMAL
->  	  Thermal reporting device will provide temperature reading,
->  	  programmable trip points and other information.
->  
-> +config MTK_THERMAL
-> +	tristate "Temperature sensor driver for mediatek SoCs"
-> +	depends on ARCH_MEDIATEK || COMPILE_TEST
-> +	default y
-> +	help
-> +	  Enable this option if you want to have support for thermal management
-> +	  controller present in Mediatek SoCs
-> +
->  menu "Texas Instruments thermal drivers"
->  source "drivers/thermal/ti-soc-thermal/Kconfig"
->  endmenu
-> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> index 26f1608..5f979e7 100644
-> --- a/drivers/thermal/Makefile
-> +++ b/drivers/thermal/Makefile
-> @@ -45,3 +45,4 @@ obj-$(CONFIG_INTEL_PCH_THERMAL)	+= intel_pch_thermal.o
->  obj-$(CONFIG_ST_THERMAL)	+= st/
->  obj-$(CONFIG_TEGRA_SOCTHERM)	+= tegra_soctherm.o
->  obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
-> +obj-$(CONFIG_MTK_THERMAL)	+= mtk_thermal.o
-> diff --git a/drivers/thermal/mtk_thermal.c b/drivers/thermal/mtk_thermal.c
-> new file mode 100644
-> index 0000000..6be1a6c
-> --- /dev/null
-> +++ b/drivers/thermal/mtk_thermal.c
-> @@ -0,0 +1,537 @@
-> +/*
-> + * Copyright (c) 2015 MediaTek Inc.
-> + * Author: Hanyi Wu <hanyi.wu@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <linux/thermal.h>
-> +#include <linux/reset.h>
-> +#include <linux/time.h>
-> +#include <linux/types.h>
-> +#include <dt-bindings/thermal/mt8173.h>
-> +
-> +/* AUXADC Registers */
-> +#define AUXADC_CON0_V		0x000
-> +#define AUXADC_CON1_V		0x004
-> +#define AUXADC_CON1_SET_V	0x008
-> +#define AUXADC_CON1_CLR_V	0x00c
-> +#define AUXADC_CON2_V		0x010
-> +#define AUXADC_DATA(channel)	(0x14 + (channel) * 4)
-> +#define AUXADC_MISC_V		0x094
-> +
-> +#define AUXADC_CON1_CHANNEL(x)	BIT(x)
-> +
-> +#define APMIXED_SYS_TS_CON1	0x604
-> +
-> +/* Thermal Controller Registers */
-> +#define TEMP_MONCTL0		0x000
-> +#define TEMP_MONCTL1		0x004
-> +#define TEMP_MONCTL2		0x008
-> +#define TEMP_MONIDET0		0x014
-> +#define TEMP_MONIDET1		0x018
-> +#define TEMP_MSRCTL0		0x038
-> +#define TEMP_AHBPOLL		0x040
-> +#define TEMP_AHBTO		0x044
-> +#define TEMP_ADCPNP0		0x048
-> +#define TEMP_ADCPNP1		0x04c
-> +#define TEMP_ADCPNP2		0x050
-> +#define TEMP_ADCPNP3		0x0b4
-> +
-> +#define TEMP_ADCMUX		0x054
-> +#define TEMP_ADCEN		0x060
-> +#define TEMP_PNPMUXADDR		0x064
-> +#define TEMP_ADCMUXADDR		0x068
-> +#define TEMP_ADCENADDR		0x074
-> +#define TEMP_ADCVALIDADDR	0x078
-> +#define TEMP_ADCVOLTADDR	0x07c
-> +#define TEMP_RDCTRL		0x080
-> +#define TEMP_ADCVALIDMASK	0x084
-> +#define TEMP_ADCVOLTAGESHIFT	0x088
-> +#define TEMP_ADCWRITECTRL	0x08c
-> +#define TEMP_MSR0		0x090
-> +#define TEMP_MSR1		0x094
-> +#define TEMP_MSR2		0x098
-> +#define TEMP_MSR3		0x0B8
-> +
-> +#define TEMP_SPARE0		0x0f0
-> +
-> +#define PTPCORESEL		0x400
-> +
-> +#define TEMP_MONCTL1_PERIOD_UNIT(x)	((x) & 0x3ff)
-> +
-> +#define TEMP_MONCTL2_FILTER_INTERVAL(x)	(((x) & 0x3ff)) << 16
-> +#define TEMP_MONCTL2_SENSOR_INTERVAL(x)	((x) & 0x3ff)
-> +
-> +#define TEMP_AHBPOLL_ADC_POLL_INTERVAL(x)	(x)
-> +
-> +#define TEMP_ADCWRITECTRL_ADC_PNP_WRITE		BIT(0)
-> +#define TEMP_ADCWRITECTRL_ADC_MUX_WRITE		BIT(1)
-> +
-> +#define TEMP_ADCVALIDMASK_VALID_HIGH		BIT(5)
-> +#define TEMP_ADCVALIDMASK_VALID_POS(bit)	(bit)
-> +
-> +#define MT8173_TS1	0
-> +#define MT8173_TS2	1
-> +#define MT8173_TS3	2
-> +#define MT8173_TS4	3
-> +#define MT8173_TSABB	4
-> +
-> +/* AUXADC channel 11 is used for the temperature sensors */
-> +#define MT8173_TEMP_AUXADC_CHANNEL	11
-> +
-> +/* The total number of temperature sensors in the MT8173 */
-> +#define MT8173_NUM_SENSORS		5
-> +
-> +/* The number of banks in the MT8173 */
-> +#define MT8173_NUM_ZONES		4
-> +
-> +/* The number of sensing points per bank */
-> +#define MT8173_NUM_SENSORS_PER_ZONE	4
-> +
-> +#define THERMAL_NAME    "mtk-thermal"
-> +
-> +struct mtk_thermal;
-> +
-> +struct mtk_thermal_bank {
-> +	struct mtk_thermal *mt;
-> +	struct thermal_zone_device *tzd;
-> +	int id;
-> +};
-> +
-> +struct mtk_thermal {
-> +	struct device *dev;
-> +	void __iomem *thermal_base;
-> +
-> +	struct clk *clk_peri_therm;
-> +	struct clk *clk_auxadc;
-> +
-> +	struct mtk_thermal_bank banks[MT8173_NUM_ZONES];
-> +
-> +	struct mutex lock;
-> +
-> +	/* Calibration values */
-> +	int calib_slope;
-> +	int calib_offset;
-> +};
-> +
-> +struct mtk_thermal_bank_cfg {
-> +	unsigned int num_sensors;
-> +	unsigned int sensors[MT8173_NUM_SENSORS_PER_ZONE];
-> +};
-> +
-> +static const int sensor_mux_values[MT8173_NUM_SENSORS] = { 0, 1, 2, 3, 16 };
-> +
-> +/*
-> + * The MT8173 thermal controller has four banks. Each bank can read up to
-> + * four temperature sensors simultaneously. The MT8173 has a total of 5
-> + * temperature sensors. We use each bank to measure a certain area of the
-> + * SoC. Since TS2 is located centrally in the SoC it is influenced by multiple
-> + * areas, hence is used in different banks.
-> + */
-> +static const struct mtk_thermal_bank_cfg bank_data[] = {
-> +	[MT8173_THERMAL_ZONE_CA53] = {
-> +		.num_sensors = 2,
-> +		.sensors = { MT8173_TS2, MT8173_TS3 },
-> +	},
-> +
-> +	[MT8173_THERMAL_ZONE_CA57] = {
-> +		.num_sensors = 2,
-> +		.sensors = { MT8173_TS2, MT8173_TS4 },
-> +	},
-> +
-> +	[MT8173_THERMAL_ZONE_GPU] = {
-> +		.num_sensors = 3,
-> +		.sensors = { MT8173_TS1, MT8173_TS2, MT8173_TSABB },
-> +	},
-> +
-> +	[MT8173_THERMAL_ZONE_CORE] = {
-> +		.num_sensors = 1,
-> +		.sensors = { MT8173_TS2 },
-> +	},
-> +};
-> +
-> +struct mtk_thermal_sense_point {
-> +	int msr;
-> +	int adcpnp;
-> +};
-> +
-> +static const struct mtk_thermal_sense_point
-> +		sensing_points[MT8173_NUM_SENSORS_PER_ZONE] = {
-> +	{
-> +		.msr = TEMP_MSR0,
-> +		.adcpnp = TEMP_ADCPNP0,
-> +	}, {
-> +		.msr = TEMP_MSR1,
-> +		.adcpnp = TEMP_ADCPNP1,
-> +	}, {
-> +		.msr = TEMP_MSR2,
-> +		.adcpnp = TEMP_ADCPNP2,
-> +	}, {
-> +		.msr = TEMP_MSR3,
-> +		.adcpnp = TEMP_ADCPNP3,
-> +	},
-> +};
-> +
-> +/**
-> + * raw_to_mcelsius - convert a raw ADC value to mcelsius
-> + * @mt:		The thermal controller
-> + * @raw:	raw ADC value
-> + *
-> + * This converts the raw ADC value to mcelsius using the SoC specific
-> + * calibration constants
-> + */
-> +static int raw_to_mcelsius(struct mtk_thermal *mt, u32 raw)
-> +{
-> +	return mt->calib_offset + mt->calib_slope * (raw & 0xfff);
-> +}
-> +
-> +/**
-> + * mtk_thermal_get_bank - get bank
-> + * @bank:	The bank
-> + *
-> + * The bank registers are banked, we have to select a bank in the
-> + * PTPCORESEL register to access it.
-> + */
-> +static void mtk_thermal_get_bank(struct mtk_thermal_bank *bank)
-> +{
-> +	struct mtk_thermal *mt = bank->mt;
-> +	u32 val;
-> +
-> +	mutex_lock(&mt->lock);
-> +
-> +	val = readl(mt->thermal_base + PTPCORESEL);
-> +	val &= ~0xf;
-> +	val |= bank->id;
-> +	writel(val, mt->thermal_base + PTPCORESEL);
-> +}
-> +
-> +/**
-> + * mtk_thermal_put_bank - release bank
-> + * @bank:	The bank
-> + *
-> + * release a bank previously taken with mtk_thermal_get_bank,
-> + */
-> +static void mtk_thermal_put_bank(struct mtk_thermal_bank *bank)
-> +{
-> +	struct mtk_thermal *mt = bank->mt;
-> +
-> +	mutex_unlock(&mt->lock);
-> +}
-> +
-> +/**
-> + * mtk_thermal_bank_temperature - get the temperature of a bank
-> + * @bank:	The bank
-> + *
-> + * The temperature of a bank is considered the maximum temperature of
-> + * the sensors associated to the bank.
-> + */
-> +static int mtk_thermal_bank_temperature(struct mtk_thermal_bank *bank)
-> +{
-> +	struct mtk_thermal *mt = bank->mt;
-> +	int temp, i, max;
-> +	u32 raw;
-> +
-> +	temp = max = INT_MIN;
-> +
-> +	for (i = 0; i < bank_data[bank->id].num_sensors; i++) {
-> +		raw = readl(mt->thermal_base + sensing_points[i].msr);
-> +
-> +		temp = raw_to_mcelsius(mt, raw);
-> +
-> +		/*
-> +		 * The first read of a sensor often contains very high bogus
-> +		 * temperature value. Filter these out so that the system does
-> +		 * not immediately shut down.
-> +		 */
-> +		if (temp > 200000)
-> +			temp = 0;
-> +
+Sorry for long long delay, some unplanned leaves delays this work.
+Finally I sent of the RFC patches, those patches are not tested with PCI devices but tested with some freescale specific platform/devices.
 
-If the bogus value is only the first time the sensor is read, instead of
-filtering here, you could call mtk_thermal_bank_temperature at probe
-time when you are initialising the banks and ignore the returned value.
-
-Thanks,
-Punit
-
-> +		if (temp > max)
-> +			max = temp;
-> +	}
-> +
-> +	return max;
-> +}
-> +
-
-[...]
+Thanks
+-Bharat
+> 
+> Thanks,
+> -Christoffer
