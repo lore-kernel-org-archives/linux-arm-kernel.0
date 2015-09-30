@@ -1,53 +1,35 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 30 Sep 2015 08:59:14 +0900
-Subject: [GIT PULL] Samsung fixes for v4.3
-Message-ID: <1443571154-28722-1-git-send-email-k.kozlowski@samsung.com>
+Date: Wed, 30 Sep 2015 09:16:21 +0900
+Subject: [PATCH v2] ARM: dts: exynos4412-trats2: remove
+ regulator-compatible usage
+In-Reply-To: <1443436714-4488-1-git-send-email-javier@osg.samsung.com>
+References: <1443436714-4488-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <560B29D5.8050105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 28.09.2015 19:38, Javier Martinez Canillas wrote:
+> The regulator-compatible property from the regulator DT binding was
+> deprecated and the correct approach is to use the node's name.
+> 
+> This patch has no functional changes but by not using a deprecated
+> property, new DTS based on this one will not carry the same issue.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> 
+> Changes in v2:
+> - Fixed typo on LDO10. Pointed out by Anand Moon.
+> 
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 105 +++++++++++---------------------
+>  1 file changed, 35 insertions(+), 70 deletions(-)
+> 
 
-Dear Kukjin,
+Tested on Trats2 board:
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Below you will find fixes for current release cycle which are not
-present yet in your tree.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 Best regards,
 Krzysztof
-
-
-The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
-
-  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
-
-are available in the git repository at:
-
-  https://github.com/krzk/linux.git tags/samsung-fixes-4.3
-
-for you to fetch changes up to c7d2ecd9f64c351cb4d551f1f472d0fc09c3cae8:
-
-  ARM: dts: Fix wrong clock binding for sysmmu_fimd1_1 on exynos5420 (2015-09-29 15:39:58 +0900)
-
-----------------------------------------------------------------
-Fixes for Exynos (DT and mach code):
-1. Finally fix booting of all 8 cores on Exynos Octa (Exynos542x): all
-   8 cores are booting and can be used. The fix, based on vendor
-   code and bootloader behavior, is as for time being only
-   for MCPM enabled path.
-2. Fix thermal boot issue on SMDK5250.
-3. Fix invalid clock used for FIMD IOMMU.
-
-----------------------------------------------------------------
-Chanho Park (1):
-      ARM: EXYNOS: reset Little cores when cpu is up
-
-Joonyoung Shim (1):
-      ARM: dts: Fix wrong clock binding for sysmmu_fimd1_1 on exynos5420
-
-Yadwinder Singh Brar (1):
-      ARM: dts: Fix bootup thermal issue on smdk5250
-
- arch/arm/boot/dts/exynos5250-smdk5250.dts |  1 +
- arch/arm/boot/dts/exynos5420.dtsi         |  2 +-
- arch/arm/mach-exynos/mcpm-exynos.c        | 27 ++++++++++++++++++++++++++-
- arch/arm/mach-exynos/regs-pmu.h           |  6 ++++++
- 4 files changed, 34 insertions(+), 2 deletions(-)
