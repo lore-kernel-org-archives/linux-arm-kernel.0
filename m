@@ -1,54 +1,16 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 30 Sep 2015 14:22:34 +0900
-Subject: [PATCH v5 03/17] drm: bridge: analogix/dp: fix some obvious code
- style
-In-Reply-To: <1442907276-2997-1-git-send-email-ykk@rock-chips.com>
-References: <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
- <1442907276-2997-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <560B719A.4040309@samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 30 Sep 2015 13:24:14 +0800
+Subject: [RESEND PATCH v2 1/2] ARM: imx6: set ahb-burst-config as 0 for USB
+In-Reply-To: <1443579437-845-1-git-send-email-peter.chen@freescale.com>
+References: <1443579437-845-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20150930052414.GB18468@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.09.2015 16:34, Yakir Yang wrote:
-> Fix some obvious alignment problems, like alignment and line
-> over 80 characters problems, make this easy to be maintained
-> later.
+On Wed, Sep 30, 2015 at 10:17:16AM +0800, Peter Chen wrote:
+> After setting ahb burst configuration as 0, we can increase tx/rx
+> burst size, it will improve the USB performance
 > 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
-> Changes in v5:
-> - Resequence this patch after analogix_dp driver have been split
->   from exynos_dp code, and rephrase reasonable commit message, and
->   remove some controversial style (Krzysztof)
->     -		analogix_dp_write_byte_to_dpcd(
->     - 				dp, DP_TEST_RESPONSE,
->     +		analogix_dp_write_byte_to_dpcd(dp,
->     +				DP_TEST_RESPONSE,
-> 				DP_TEST_EDID_CHECKSUM_WRITE);
-> 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2:
-> - Improved commit message more readable, and avoid using some
->   uncommon style like bellow: (Joe Preches)
->     -  retval = exynos_dp_read_bytes_from_i2c(...
->   				  ...);
->     +  retval =
->     +  exynos_dp_read_bytes_from_i2c(......);
-> 
->  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 129 ++++++++++-----------
->  drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  72 ++++++------
->  drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  | 124 ++++++++++----------
->  3 files changed, 163 insertions(+), 162 deletions(-)
-> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 
-IMHO much better than in previous attempt. The code looks good:
-
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-BTW my opinion is not enough, you still need an ack from Exynos DP
-maintainer (or DRM guys).
-
-
-Best regards,
-Krzysztof
+Applied both, thanks.
