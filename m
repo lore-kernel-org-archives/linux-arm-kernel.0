@@ -1,55 +1,35 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 30 Sep 2015 15:21:54 +0200
-Subject: [PATCH v2 2/2] regulator: act8865: add DT binding for property
- "active-semi, vsel-high"
-In-Reply-To: <1443597950-27849-3-git-send-email-wenyou.yang@atmel.com>
-References: <1443597950-27849-1-git-send-email-wenyou.yang@atmel.com>
- <1443597950-27849-3-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150930132154.GI31199@odux.rfo.atmel.com>
+From: bharatku@xilinx.com (bharat kumar gogada)
+Date: Wed, 30 Sep 2015 13:26:15 +0000 (UTC)
+Subject: Need information on Microblaze/ARM PCIe
+Message-ID: <loom.20150930T152450-636@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 03:25:50PM +0800, Wenyou Yang wrote:
-> Add a DT property "active-semi,vsel-high" to indicate the VSEL pin
-> is high. If this property is missing, then assume the VSEL pin is
-> low(0).
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Reviewed-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+We are trying to write a generic PCIE root port driver which works both on
+zynq (ARM 32 architecture) and Microblaze architecture, since both use same
+PCIE Hardware IP. So we started exploring microblaze pci architecture. Zynq
+driver is already present at drivers/pci/host/pcie-xilinx.c
 
-> ---
-> 
-> Changes in v2: None
-> 
->  .../bindings/regulator/act8865-regulator.txt       |    3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-> index e91485d..6067d98 100644
-> --- a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-> +++ b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-> @@ -8,6 +8,8 @@ Required properties:
->  Optional properties:
->  - system-power-controller: Telling whether or not this pmic is controlling
->    the system power. See Documentation/devicetree/bindings/power/power-controller.txt .
-> +- active-semi,vsel-high: Indicates the VSEL pin is high.
-> +  If this property is missing, assume the VSEL pin is low(0).
->  
->  Optional input supply properties:
->  - for act8600:
-> @@ -49,6 +51,7 @@ Example:
->  			pmic: act8865 at 5b {
->  				compatible = "active-semi,act8865";
->  				reg = <0x5b>;
-> +				active-semi,vsel-high;
->  				status = "disabled";
->  
->  				regulators {
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Microblaze pci mainly relies on arch/microblaze/pci/pci-common.c this file.
+In this file "static int __init pcibios_init(void)" is the main function
+which does most of the work, before that we need to allocate struct
+pci_controller and fill in the required device node and resource details.
+
+Problem is if we use platform_driver for registration, the "pcibios_init" of
+microblaze will get invoked before this driver probe is called since it is
+exported as " subsys_initcall(pcibios_init) " and by that time it doesn't
+have information of struct pci_controller. (We are using some #ifdef
+according to archticture) 
+
+So, in order to avoid above problem and remove dependency on "pcibios_init",
+we tried directly invoking the following functions, without registering to
+hw_pci in probe:
+of_pci_get_host_bridge_resources, pci_create_root_bus, pci_scan_child_bus,
+pci_assign_unassigned_bus_resources, pci_bus_add_devices.
+
+But then also its not successful since pci subsystem itself is invoking some
+methods from this file(pci-common.c), and some methods take information from
+struct pci_controller. 
+
+So I need some inputs what are other possible ways I could try to make
+generic driver.
