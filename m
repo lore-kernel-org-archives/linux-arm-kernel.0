@@ -1,71 +1,62 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 30 Sep 2015 19:42:14 +0200
-Subject: [PATCH v2 1/2] dma: pxa_dma: fix the no-requestor case
-Message-ID: <1443634935-28989-1-git-send-email-robert.jarzmik@free.fr>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Wed, 30 Sep 2015 19:47:39 +0200
+Subject: [PATCH] ARM: fix vdsomunge depends on glibc specific byteswap.h
+In-Reply-To: <560C1DD0.1000907@mentor.com>
+References: <cover.1443628457.git.hns@goldelico.com>
+ <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
+ <CAKv+Gu_098GVMeJPjDWaQ-uXek_cGUe4UMVy+fMdKw=_C+P7Tg@mail.gmail.com>
+ <B6E60776-A054-4749-BCAF-1433BFFC6AF7@goldelico.com>
+ <CAKv+Gu_6DibhUUPGrACCZE3S_k50rcO8A5ZcHh5c4UiDQUNApA@mail.gmail.com>
+ <560C1DD0.1000907@mentor.com>
+Message-ID: <8B76E3E8-52BF-4803-B1F9-E5704A858870@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A very small number of devices don't use the flow control offered by
-requestor lines. In these specific cases, the pxa dma driver should be
-aware of that and not try to use a requestor line.
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-Since v1: rebase on v4.3-rc3
----
- drivers/dma/pxa_dma.c | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
+Am 30.09.2015 um 19:37 schrieb Nathan Lynch <Nathan_Lynch@mentor.com>:
 
-diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
-index 5cb61ce01036..7d3ff56caa0a 100644
---- a/drivers/dma/pxa_dma.c
-+++ b/drivers/dma/pxa_dma.c
-@@ -473,8 +473,10 @@ static void pxad_free_phy(struct pxad_chan *chan)
- 		return;
- 
- 	/* clear the channel mapping in DRCMR */
--	reg = pxad_drcmr(chan->drcmr);
--	writel_relaxed(0, chan->phy->base + reg);
-+	if (chan->drcmr <= DRCMR_CHLNUM) {
-+		reg = pxad_drcmr(chan->drcmr);
-+		writel_relaxed(0, chan->phy->base + reg);
-+	}
- 
- 	spin_lock_irqsave(&pdev->phy_lock, flags);
- 	for (i = 0; i < 32; i++)
-@@ -516,8 +518,10 @@ static void phy_enable(struct pxad_phy *phy, bool misaligned)
- 		"%s(); phy=%p(%d) misaligned=%d\n", __func__,
- 		phy, phy->idx, misaligned);
- 
--	reg = pxad_drcmr(phy->vchan->drcmr);
--	writel_relaxed(DRCMR_MAPVLD | phy->idx, phy->base + reg);
-+	if (phy->vchan->drcmr <= DRCMR_CHLNUM) {
-+		reg = pxad_drcmr(phy->vchan->drcmr);
-+		writel_relaxed(DRCMR_MAPVLD | phy->idx, phy->base + reg);
-+	}
- 
- 	dalgn = phy_readl_relaxed(phy, DALGN);
- 	if (misaligned)
-@@ -910,14 +914,18 @@ static void pxad_get_config(struct pxad_chan *chan,
- 		width = chan->cfg.src_addr_width;
- 		dev_addr = chan->cfg.src_addr;
- 		*dev_src = dev_addr;
--		*dcmd |= PXA_DCMD_INCTRGADDR | PXA_DCMD_FLOWSRC;
-+		*dcmd |= PXA_DCMD_INCTRGADDR;
-+		if (chan->drcmr <= DRCMR_CHLNUM)
-+			*dcmd |= PXA_DCMD_FLOWSRC;
- 	}
- 	if (dir == DMA_MEM_TO_DEV) {
- 		maxburst = chan->cfg.dst_maxburst;
- 		width = chan->cfg.dst_addr_width;
- 		dev_addr = chan->cfg.dst_addr;
- 		*dev_dst = dev_addr;
--		*dcmd |= PXA_DCMD_INCSRCADDR | PXA_DCMD_FLOWTRG;
-+		*dcmd |= PXA_DCMD_INCSRCADDR;
-+		if (chan->drcmr <= DRCMR_CHLNUM)
-+			*dcmd |= PXA_DCMD_FLOWTRG;
- 	}
- 	if (dir == DMA_MEM_TO_MEM)
- 		*dcmd |= PXA_DCMD_BURST32 | PXA_DCMD_INCTRGADDR |
--- 
-2.1.4
+> On 09/30/2015 11:17 AM, Ard Biesheuvel wrote:
+>> On 30 September 2015 at 18:13, H. Nikolaus Schaller <hns@goldelico.com> wrote:
+>>> 
+>>> Am 30.09.2015 um 18:02 schrieb Ard Biesheuvel <ard.biesheuvel@linaro.org>:
+>>>> 
+>>>> Have you tried this?
+>>>> 
+>>>> #define bswap_16 __builtin_bswap16
+>>>> #define bswap_32 __builtin_bswap32
+>>>> #define bswap_64 __builtin_bswap64
+>>>> 
+>>>> https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html
+>>> 
+>>> OS X host uses llvm and I am not sure if these builtins are
+>>> always available.
+>>> 
+>> 
+>> I am pretty sure recent clang supports these as well. Could you please try it?
+> 
+> Well, I think GCC did not provide __builtin_bswap16 consistently until
+> the 4.8 release:
+> 
+> https://gcc.gnu.org/bugzilla/show_bug.cgi?id=52624
+> 
+> That seems too recent to me.
+
+Same for me.
+
+> 
+> vdsomunge makes only three or four potentially byteswapped accesses to
+> the ELF header.  It's not worth a lot of effort to try to use the most
+> optimal implementation available.
+
+Especially as it does not run on the target device but the build host.
+
+>  Why not just use a generic
+> implementation like is found in mips' elf2ecoff?
+
+Do you have a reference?
+I can't find byte swapping in
+
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/mips/boot/elf2ecoff.c?id=refs/tags/v4.3-rc3
+
+BR and thanks,
+Nikolaus Schaller
