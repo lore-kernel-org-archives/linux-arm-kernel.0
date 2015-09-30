@@ -1,88 +1,54 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Wed, 30 Sep 2015 16:42:20 +0800
-Subject: [PATCH v2 5/8] spi: imx: Add support for loopback for ECSPI
- controllers
-In-Reply-To: <ca96561d8010acf587a93d0f357774bf77efbe16.1442923630.git.anton_bondarenko@mentor.com>
-References: <cover.1442923630.git.anton_bondarenko@mentor.com>
- <ca96561d8010acf587a93d0f357774bf77efbe16.1442923630.git.anton_bondarenko@mentor.com>
-Message-ID: <20150930084219.GE2709@shlinux2>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 30 Sep 2015 09:43:19 +0100
+Subject: Tegra baseline test results for v4.3-rc3
+Message-ID: <560BA0A7.4040504@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 25, 2015 at 07:57:12PM +0200, Anton Bondarenko wrote:
-> Support for ECSPI loopback for IMX51,IMX53 and IMX6Q using TEST register.
-> 
-> Signed-off-by: Mohsin Kazmi <mohsin_kazmi@mentor.com>
-> Signed-off-by: Anton Bondarenko <anton_bondarenko@mentor.com>
-> ---
->  drivers/spi/spi-imx.c | 20 ++++++++++++++++----
->  1 file changed, 16 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 41c9cef..4b3c16e 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -265,6 +265,9 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
->  #define MX51_ECSPI_STAT		0x18
->  #define MX51_ECSPI_STAT_RR		(1 <<  3)
->  
-> +#define MX51_ECSPI_TEST			0x20
-> +#define MX51_ECSPI_LOOP			BIT(31)
-> +
->  /* MX51 eCSPI */
->  static unsigned int mx51_ecspi_clkdiv(unsigned int fin, unsigned int fspi,
->  				      unsigned int *fres)
-> @@ -338,6 +341,7 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
->  	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, dma = 0;
->  	u32 cfg = readl(spi_imx->base + MX51_ECSPI_CONFIG);
->  	u32 delay;
-> +	u32 lpb = 0;
->  
->  	/*
->  	 * The hardware seems to have a race condition when changing modes. The
-> @@ -370,8 +374,12 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
->  	if (config->mode & SPI_CS_HIGH)
->  		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
->  
-> +	if (config->mode & SPI_LOOP)
-> +		lpb |= MX51_ECSPI_LOOP;
-> +
->  	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
->  	writel(cfg, spi_imx->base + MX51_ECSPI_CONFIG);
-> +	writel(lpb, spi_imx->base + MX51_ECSPI_TEST);
-It's better write this MX51_ECSPI_TEST only in LOOP mode.
->  
->  	/*
->  	 * Wait until the changes in the configuration register CONFIGREG
-> @@ -1252,6 +1260,9 @@ static int spi_imx_probe(struct platform_device *pdev)
->  	spi_imx = spi_master_get_devdata(master);
->  	spi_imx->bitbang.master = master;
->  
-> +	spi_imx->devtype_data = of_id ? of_id->data :
-> +		(struct spi_imx_devtype_data *)pdev->id_entry->driver_data;
-> +
->  	for (i = 0; i < master->num_chipselect; i++) {
->  		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
->  		if (!gpio_is_valid(cs_gpio) && mxc_platform_info)
-> @@ -1276,12 +1287,13 @@ static int spi_imx_probe(struct platform_device *pdev)
->  	spi_imx->bitbang.master->cleanup = spi_imx_cleanup;
->  	spi_imx->bitbang.master->prepare_message = spi_imx_prepare_message;
->  	spi_imx->bitbang.master->unprepare_message = spi_imx_unprepare_message;
-> -	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
-> +	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA |
-> +				SPI_CS_HIGH;
-Any change?
->  
-> -	init_completion(&spi_imx->xfer_done);
-> +	if (is_imx5x_ecspi(spi_imx))
-> +		spi_imx->bitbang.master->mode_bits |= SPI_LOOP;
->  
-> -	spi_imx->devtype_data = of_id ? of_id->data :
-> -		(struct spi_imx_devtype_data *) pdev->id_entry->driver_data;
-> +	init_completion(&spi_imx->xfer_done);
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	spi_imx->base = devm_ioremap_resource(&pdev->dev, res);
-> -- 
-> 2.5.2
-> 
+Here are some basic Tegra test results for Linux v4.3-rc3.
+Logs and other details at:
+
+    https://nvtb.github.io//linux/test_v4.3-rc3/20150927050105/
+
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.3-rc2 (1f93e4a96c9109378204c147b3eec0d0e8100fde)):
+   text     data      bss    total  kernel
+    -38        0     -128     -166  defconfig
+  +2294     +256      -64    +2486  multi_v7_defconfig
+  +2611        0      -64    +2547  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.3-rc2 (1f93e4a96c9109378204c147b3eec0d0e8100fde))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
