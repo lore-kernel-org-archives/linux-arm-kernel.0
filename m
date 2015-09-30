@@ -1,30 +1,96 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 30 Sep 2015 12:01:20 +0300
-Subject: [RFC PATCH 00/20] Coresight integration with perf
-In-Reply-To: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <87wpv8jn6n.fsf@ashishki-desk.ger.corp.intel.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 30 Sep 2015 17:00:57 +0800
+Subject: [PATCH v5 0/5] Provide better MADT subtable sanity checks
+In-Reply-To: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
+References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
+Message-ID: <560BA4C9.7090607@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
-
-> This patchset aims to integrate configuration and control of
-> the Coresight tracers with the perf sub-system.
+On 2015/9/30 7:45, Al Stone wrote:
+> NB: this patch set is for use against the linux-pm bleeding edge branch.
 >
-> The goal is to use PMUs to represent tracers and the auxiliary
-> buffer enhancement to collect processor traces.  As such a lot
-> of work is done to move the current Coresight sysFS oriented
-> configuration and control commands to perf's AUX API.
+> Currently, the BAD_MADT_ENTRY macro is used to do a very simple sanity
+> check on the various subtables that are defined for the MADT.  The check
+> compares the size of the subtable data structure as defined by ACPICA to
+> the length entry in the subtable.  If they are not the same, the assumption
+> is that the subtable is incorrect.
 >
-> For the time being the work concentrates on ETMv3 and ETB1.0
-> sink buffers.  Work on ETMv4 and other type of sink buffers
-> will follow once a foundation has been established.
+> Over time, the ACPI spec has allowed for MADT subtables where this can
+> never be true (the local SAPIC subtable, for example).  Or, more recently,
+> the spec has accumulated some minor flaws where there are three possible 
+> sizes for a subtable, all of which are valid, but only for specific versions
+> of the spec (the GICC subtable).  In both cases, BAD_MADT_ENTRY reports these
+> subtables as bad when they are not.  In order to retain some sanity check
+> on the MADT subtables, we now have to special case these subtables.  Of
+> necessity, these special cases have ended up in arch-dependent code (arm64)
+> or an arch has simply decided to forgo the check (ia64).
+>
+> This patch set replaces the BAD_MADT_ENTRY macro with a function called
+> bad_madt_entry().  This function uses a data set of details about the
+> subtables to provide more sanity checking than before:
+>
+> 	-- is the subtable legal for the version given in the FADT?
+>
+> 	-- is the subtable legal for the revision of the MADT in use?
+>
+> 	-- is the subtable of the proper length (including checking
+> 	   on the one variable length subtable that is currently ignored),
+> 	   given the FADT version and the MADT revision?
+>
+> Further, this patch set adds in the call to bad_madt_entry() from the 
+> acpi_table_parse_madt() function, allowing it to be used consistently
+> by all architectures, for all subtables, and removing the need for each
+> of the subtable traversal callback functions to use BAD_MADT_ENTRY.
+>
+> In theory, as the ACPI specification changes, we would only have to add
+> additional information to the data set describing the MADT subtables in
+> order to continue providing sanity checks, even when new subtables are
+> added.
+>
+> These patches have been tested on an APM Mustang (arm64) and are known to
+> work there.  They have also been cross-compiled for x86 and ia64 with no
+> known failures.
+>
+> Changes for v5:
+>    -- 0-day found incorrect data in the table describing allowed MADT
+>       subtables; this only affected ACPI 1.0 firmware.  Corrected the
+>       data to meet the 1.0b spec.
+>    -- Rebase to bleeding-edge branch for Rafael Wysocki; this patch set
+>       now requires that a patch set from Marc Zyngier be applied first:
+>       https://lkml.org/lkml/2015/9/28/421
+>    -- Tested on AMD Seattle (linux-pm tree) also
+>
+> Changes for v4:
+>    -- Remove extraneous white space change (Graeme Gregory)
+>    -- acpi_parse_entries() changes also needed a check to make sure that
+>       only MADT entries used bad_madt_entry() (Sudeep Holla)
+>    -- inadvertent use of 01day build noted that bad_madt_entry() can be
+>       static, so added it (Sudeep Holla, Fengguang Wu)
+>
+> Changes for v3:
+>    -- Reviewed-and-tested-by from Sudeep Holla for arm64 parts
+>    -- Clearer language in error messages (Graeme Gregory, Timur Tabi)
+>    -- Double checked that inserting call to bad_madt_entry() into the
+>       function acpi_parse_entries() does not impact current behavior
+>       (Sudeep Holla)
+>    
+> Changes for v2:
+>    -- Acked-by on 2/5 from Marc Zyngier and Catalin Marinas for ARM
+>    -- Correct faulty end of loop test found by Timur Tabi
+>
+>
+> Al Stone (5):
+>   ACPI: add in a bad_madt_entry() function to eventually replace the
+>     macro
+>   ACPI / ARM64: remove usage of BAD_MADT_ENTRY/BAD_MADT_GICC_ENTRY
+>   ACPI / IA64: remove usage of BAD_MADT_ENTRY
+>   ACPI / X86: remove usage of BAD_MADT_ENTRY
+>   ACPI: remove definition of BAD_MADT_ENTRY macro
 
-Also this patchset doesn't seem to apply to tip/perf/core, v4.3-rc3,
-v4.2. What is it based on? Do you have a git branch with these patches
-as well?
+For this patch set,
 
-Regards,
---
-Alex
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Thanks
+Hanjun
