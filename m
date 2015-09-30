@@ -1,44 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 30 Sep 2015 16:15:37 +0800
-Subject: [PATCH] ARM: dts: sun6i: hummingbird: Add aliases for rtc devices
-Message-ID: <1443600937-11071-1-git-send-email-wens@csie.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Sep 2015 10:22:46 +0200
+Subject: [RFC/PATCH 00/11] arm: omap: counter32k rework
+In-Reply-To: <1443559446-26969-1-git-send-email-balbi@ti.com>
+References: <1443559446-26969-1-git-send-email-balbi@ti.com>
+Message-ID: <1986790.syN3WBv9AR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hummingbird A31 has 2 rtc devices available: one in the SoC, and
-a pcf8563 external rtc on i2c2.
+On Tuesday 29 September 2015 15:43:55 Felipe Balbi wrote:
+> 
+> the following patches de-obfuscate arch/arm/mach-omap2/timer.c
+> and start moving code to drivers/clocksource. So far only counter32k
+> has been moved over.
+> 
+> Note that we can't get rid of all the code (yet) because there are
+> still platforms relying to legacy boot and because of the strong
+> coupling with OMAP's hwmod layer.
+> 
+> This is, for now, an RFC and has be written on top of [1]. Boot tested
+> with AM335x and AM437x.
+> 
+> [1] http://marc.info/?l=linux-omap&m=144354336924308&w=2
 
-For some unknown reason, the onboard backup battery to power the
-internal rtc when power is removed, and its time would reset. Hence
-we want to use the external one by default.
+Looks very nice!
 
-Add aliases for the rtc devices with the external one as rtc0.
+> ps: if anybody has a good idea on how to get rid of
+> register_persistent_clock(), please let me know
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
+I don't think we want to get rid of that, because it is the more
+accurate interface. IIRC systems that have an RTC will use
+timekeeping_inject_sleeptime64() in rtc_resume(). I don't know however
+how the two methods are coordinated, i.e. how the kernel ensures that
+exactly one of the two is used, but never both.
 
-Can someone else with the Hummingbird A31 also test the internal RTC
-and see if it doesn't survive power removal?
-
-Thanks
-ChenYu
-
----
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-index 06d9391ca30e..358781113582 100644
---- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-@@ -55,6 +55,8 @@
- 
- 	aliases {
- 		serial0 = &uart0;
-+		rtc0 = &pcf8563;
-+		rtc1 = &rtc;
- 	};
- 
- 	chosen {
--- 
-2.5.3
+	Arnd
