@@ -1,45 +1,114 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 30 Sep 2015 15:25:50 +0800
-Subject: [PATCH v2 2/2] regulator: act8865: add DT binding for property
- "active-semi, vsel-high"
-In-Reply-To: <1443597950-27849-1-git-send-email-wenyou.yang@atmel.com>
-References: <1443597950-27849-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1443597950-27849-3-git-send-email-wenyou.yang@atmel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 30 Sep 2015 16:34:13 +0900
+Subject: [PATCH v5 05/17] drm: bridge: analogix/dp: dynamic parse sync_pol
+ & interlace & dynamic_range
+In-Reply-To: <560B8CF1.7050102@rock-chips.com>
+References: <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
+ <1442907477-3283-1-git-send-email-ykk@rock-chips.com>
+ <560B73D4.30109@samsung.com> <560B8CF1.7050102@rock-chips.com>
+Message-ID: <560B9075.1000304@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DT property "active-semi,vsel-high" to indicate the VSEL pin
-is high. If this property is missing, then assume the VSEL pin is
-low(0).
+On 30.09.2015 16:19, Yakir Yang wrote:
+> Hi Krzysztof,
+> 
+> On 09/30/2015 01:32 PM, Krzysztof Kozlowski wrote:
+>> On 22.09.2015 16:37, Yakir Yang wrote:
+>>> Both hsync/vsync polarity and interlace mode can be parsed from
+>>> drm display mode, and dynamic_range and ycbcr_coeff can be judge
+>>> by the video code.
+>>>
+>>> But presumably Exynos still relies on the DT properties, so take
+>>> good use of mode_fixup() in to achieve the compatibility hacks.
+>>>
+>>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>>> ---
+>>> Changes in v5:
+>>> - Switch video timing type to "u32", so driver could use "of_property_read_u32"
+>>>   to get the backword timing values. 
+>> Okay
+>>
+>>> Krzysztof suggest me that driver could use
+>>>   the "of_property_read_bool" to get backword timing values, but that interfacs
+>>>   would modify the original drm_display_mode timing directly (whether those
+>>>   properties exists or not).
+>> Hmm, I don't understand. You have a:
+>> 	struct video_info {
+>> 		bool h_sync_polarity;
+>> 		bool v_sync_polarity;
+>> 		bool interlaced;
+>> 	};
+>>
+>> so what is wrong with:
+>> 	dp_video_config->h_sync_polarity =
+>> 		of_property_read_bool(dp_node, "hsync-active-high");
+>>
+>> Is it exactly the same binding as previously?
+> 
+> Yes, it is the same binding as previously. But just a note that we already
+> mark those DT binding as deprecated.
+> 
+> +-interlaced:            deprecated prop that can parsed frm drm_display_mode.
+> +-vsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
+> +-hsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
+> 
+> 
+> For now those values should come from "struct drm_display_mode",
+> and we already parsed them out from "drm_display_mode" before
+> driver provide the backward compatibility.
+> 
+> Let's used the "hsync-active-high" example:
+>     As for now the code would like:
+>     static void analogix_dp_bridge_mode_set(...)
+>     {
+>         // Parsed timing value from "drm_display_mode"
+>         video->h_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NHSYNC);
+> 
+>         // Try to detect the deprecated property, providing
+>         // the backward compatibility
+>         of_property_read_u32(dp_node, "hsync-active-high",
+>                                  &video->h_sync_polarity);    
+> 
+>         /*
+>          * In this case, if "hsync-active-high" property haven't been
+>          * found, then the video timing "h_sync_polarity" would  keep
+>          * no change, keeping the parsed value from "drm_display_mode"
+>          */     
+>     }   
+> 
+>     But if keep the "of_property_read_bool", then code would like:
+>     static void analogix_dp_bridge_mode_set(...)
+>     {
+>         // Parsed timing value from "drm_display_mode"
+>         video->h_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NHSYNC);
+> 
+>         // Try to detect the deprecated property, providing
+>         // the backward compatibility
+>         video->h_sync_polarity =
+>                     of_property_read_bool(dp_node, "hsync-active-high");
+>    
+> 
+>         /*
+>          * In this case, if "hsync-active-high" property haven't been
+>          * found, then the video timing "h_sync_polarity" would just
+>          * modify to "false". That is the place we don't want, cause
+>          * it would always modify the timing value parsed from
+>          * "drm_display_mode"
+>          */  
+>     }   
+> 
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+OK, I see the point of overwriting values from drm_display_mode. However
+I think you changed the binding. I believe the of_property_read_u32()
+will behave differently for such DTS:
 
-Changes in v2: None
+exynos_dp {
+	...
+	hsync-active-high;
+}
 
- .../bindings/regulator/act8865-regulator.txt       |    3 +++
- 1 file changed, 3 insertions(+)
+It will return -EOVERFLOW which means it would be broken now...
 
-diff --git a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-index e91485d..6067d98 100644
---- a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-@@ -8,6 +8,8 @@ Required properties:
- Optional properties:
- - system-power-controller: Telling whether or not this pmic is controlling
-   the system power. See Documentation/devicetree/bindings/power/power-controller.txt .
-+- active-semi,vsel-high: Indicates the VSEL pin is high.
-+  If this property is missing, assume the VSEL pin is low(0).
- 
- Optional input supply properties:
- - for act8600:
-@@ -49,6 +51,7 @@ Example:
- 			pmic: act8865 at 5b {
- 				compatible = "active-semi,act8865";
- 				reg = <0x5b>;
-+				active-semi,vsel-high;
- 				status = "disabled";
- 
- 				regulators {
--- 
-1.7.9.5
+Best regards,
+Krzysztof
