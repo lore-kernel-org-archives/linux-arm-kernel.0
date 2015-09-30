@@ -1,102 +1,98 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Wed, 30 Sep 2015 11:20:11 +0530
-Subject: [PATCH v5 1/3] ARM: dts: vf500-colibri: Add device tree node for
- touchscreen support
-In-Reply-To: <1f73c4bfeae6bfca605f43e6203419dec38db1c0.1441110400.git.maitysanchayan@gmail.com>
-References: <cover.1441110400.git.maitysanchayan@gmail.com>
- <1f73c4bfeae6bfca605f43e6203419dec38db1c0.1441110400.git.maitysanchayan@gmail.com>
-Message-ID: <20150930055011.GA2515@Sanchayan-Arch.toradex.int>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 30 Sep 2015 14:03:13 +0800
+Subject: [PATCH v3 0/9] ARM: dts: update Boundary Devices boards support
+In-Reply-To: <1441801853-10264-1-git-send-email-gary.bisson@boundarydevices.com>
+References: <1441645069-27263-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1441801853-10264-1-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <20150930060312.GC16362@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
-
-The driver has landed in your tree. Can you queue this DT change for the same?
-
-Thanks.
-
-- Sanchayan.
-
-On 15-09-01 18:06:53, Sanchayan Maity wrote:
-> Add device tree node for touchscreen support on Colibri VF50. The
-> touchscreen functionality on VF50 uses the ADC channels of Vybrid
-> and some GPIOs. Also add pinctrl nodes for proper pinmux.
+On Wed, Sep 09, 2015 at 02:30:44PM +0200, Gary Bisson wrote:
+> Hi all,
 > 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->  arch/arm/boot/dts/vf500-colibri-eval-v3.dts |  5 +++
->  arch/arm/boot/dts/vf500-colibri.dtsi        | 47 +++++++++++++++++++++++++++++
->  2 files changed, 52 insertions(+)
+> This series is a follow-up to the previous series that added LCD display
+> support.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/364425.html
+
+The MAINTAINERS file has been updated for a couple of release cycles
+with my new email address.  Please stop sending patches to
+shawn.guo at linaro.org, and resend any patches you want me to collect to
+shawnguo at kernel.org.
+
+Shawn
+
 > 
-> diff --git a/arch/arm/boot/dts/vf500-colibri-eval-v3.dts b/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
-> index 7fc782c..c3173fc 100644
-> --- a/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
-> +++ b/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
-> @@ -15,3 +15,8 @@
->  	model = "Toradex Colibri VF50 on Colibri Evaluation Board";
->  	compatible = "toradex,vf500-colibri_vf50-on-eval", "toradex,vf500-colibri_vf50", "fsl,vf500";
->  };
-> +
-> +&touchscreen {
-> +	vf50-ts-min-pressure = <200>;
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/vf500-colibri.dtsi b/arch/arm/boot/dts/vf500-colibri.dtsi
-> index cee34a3..84f091d 100644
-> --- a/arch/arm/boot/dts/vf500-colibri.dtsi
-> +++ b/arch/arm/boot/dts/vf500-colibri.dtsi
-> @@ -17,4 +17,51 @@
->  	memory {
->  		reg = <0x80000000 0x8000000>;
->  	};
-> +
-> +	touchscreen: vf50-touchscreen {
-> +		compatible = "toradex,vf50-touchscreen";
-> +		io-channels = <&adc1 0>,<&adc0 0>,
-> +				<&adc0 1>,<&adc1 2>;
-> +		xp-gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
-> +		xm-gpios = <&gpio2 29 GPIO_ACTIVE_HIGH>;
-> +		yp-gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
-> +		ym-gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
-> +		interrupt-parent = <&gpio0>;
-> +		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
-> +		pinctrl-names = "idle","default","gpios";
-> +		pinctrl-0 = <&pinctrl_touchctrl_idle>;
-> +		pinctrl-1 = <&pinctrl_touchctrl_default>;
-> +		pinctrl-2 = <&pinctrl_touchctrl_gpios>;
-> +		vf50-ts-min-pressure = <200>;
-> +		status = "disabled";
-> +	};
-> +};
-> +
-> +&iomuxc {
-> +	vf610-colibri {
-> +		pinctrl_touchctrl_idle: touchctrl_idle {
-> +			fsl,pins = <
-> +				VF610_PAD_PTA18__GPIO_8		0x006d
-> +				VF610_PAD_PTA19__GPIO_9		0x006c
-> +				>;
-> +		};
-> +
-> +		pinctrl_touchctrl_default: touchctrl_default {
-> +			fsl,pins = <
-> +				VF610_PAD_PTA18__ADC0_SE0	0x0040
-> +				VF610_PAD_PTA19__ADC0_SE1	0x0040
-> +				VF610_PAD_PTA16__ADC1_SE0	0x0040
-> +				VF610_PAD_PTB2__ADC1_SE2	0x0040
-> +				>;
-> +		};
-> +
-> +		pinctrl_touchctrl_gpios: touchctrl_gpios {
-> +			fsl,pins = <
-> +				VF610_PAD_PTA23__GPIO_13	0x22e9
-> +				VF610_PAD_PTB23__GPIO_93	0x22e9
-> +				VF610_PAD_PTA22__GPIO_12	0x22e9
-> +				VF610_PAD_PTA11__GPIO_4		0x22e9
-> +				>;
-> +		};
-> +	};
->  };
+> This one aims at adding touchscreen and WiFi support for Nitrogen6x as well as
+> adding two boards: Nitrogen6_Max and Nit6xlite.
+> 
+> It also takes care of updating the licenses to be GPLv2/X11.
+> 
+> The series has been tested against linux-next tag next-20150909.
+> 
+> Note that imx_v6_v7_defconfig has been used with the following additions:
+> CONFIG_TOUCHSCREEN_EDT_FT5X06=y
+> CONFIG_I2C_MUX_GPIO=y
+> CONFIG_RTC_DRV_M41T80=y
+> 
+> Modifications:
+> v2->v3:
+> - Rename nodes to general class of device as suggested by Philipp and Russell.
+> - Remove useless wakeup-gpio field for edt,ft5x06 touchscreen
+> - Add missing muxing for interrupt GPIO
+> - Rebased on next-20150909
+> v1->v2:
+> - Add Boundary Devices Inc. to vendor prefixes
+> - Relicense devices trees to GPLv2/X11 as suggested by Fabio for:
+>   - Nitrogen6x
+>   - SabreLite
+>   - Nit6xLite
+>   - Nitrogen6_MAX
+> - Change manufacturer to Boundary Devices as suggested by Fabio for:
+>   - Nitrogen6x
+>   - Nit6xLite
+>   - Nitrogen6_MAX
+> - Fixed missing macros for gpio/irq values as suggested by Philipp.
+> - Rebased on next-20150908
+> 
+> Regards,
+> Gary
+> 
+> Gary Bisson (9):
+>   ARM: dts: imx6dql-nitrogen6x: add touchscreen support
+>   ARM: dts: imx6qdl-nitrogen6x: add wifi wl1271 support
+>   ARM: dts: imx6qdl-nitrogen6x: relicense under GPLv2/X11
+>   ARM: dts: imx6qdl-sabrelite: relicense under GPLv2/X11
+>   of: Add Boundary Devices Inc. vendor prefix
+>   ARM: dts: imx6q-nitrogen6x: change manufacturer to Boundary Devices
+>   ARM: dts: imx6dl-nitrogen6x: change manufacturer to Boundary Devices
+>   ARM: dts: imx: add Boundary Devices Nitrogen6_Max board
+>   ARM: dts: imx: add Boundary Devices Nitrogen6_Lite board
+> 
+>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>  arch/arm/boot/dts/Makefile                         |   2 +
+>  arch/arm/boot/dts/imx6dl-nit6xlite.dts             |  49 ++
+>  arch/arm/boot/dts/imx6dl-nitrogen6x.dts            |  44 +-
+>  arch/arm/boot/dts/imx6dl-sabrelite.dts             |  40 +-
+>  arch/arm/boot/dts/imx6q-nitrogen6_max.dts          |  53 ++
+>  arch/arm/boot/dts/imx6q-nitrogen6x.dts             |  44 +-
+>  arch/arm/boot/dts/imx6q-sabrelite.dts              |  40 +-
+>  ...6qdl-nitrogen6x.dtsi => imx6qdl-nit6xlite.dtsi} | 396 ++++++----
+>  arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi       | 873 +++++++++++++++++++++
+>  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi          | 111 ++-
+>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi           |  40 +-
+>  12 files changed, 1523 insertions(+), 170 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/imx6dl-nit6xlite.dts
+>  create mode 100644 arch/arm/boot/dts/imx6q-nitrogen6_max.dts
+>  copy arch/arm/boot/dts/{imx6qdl-nitrogen6x.dtsi => imx6qdl-nit6xlite.dtsi} (50%)
+>  create mode 100644 arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
+> 
 > -- 
-> 2.5.0
+> 2.5.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
