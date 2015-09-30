@@ -1,16 +1,63 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 30 Sep 2015 12:44:29 +0200 (CEST)
-Subject: [PATCH v3 0/7] Early ACPI probing infrastructure
-In-Reply-To: <3881043.sWK6Pcr0HP@vostro.rjw.lan>
-References: <1443451758-22717-1-git-send-email-marc.zyngier@arm.com>
- <3881043.sWK6Pcr0HP@vostro.rjw.lan>
-Message-ID: <alpine.DEB.2.11.1509301244080.4500@nanos>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Wed, 30 Sep 2015 11:45:16 +0100
+Subject: [PATCH v5 01/22] net/xen-netback: xenvif_gop_frag_copy: move GSO
+ check out of the loop
+In-Reply-To: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
+References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <1443609937-25278-2-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Sep 2015, Rafael J. Wysocki wrote:
-> If you want me to apply this series, ACKs are needed for patches [3-7/7].
-> 
-> They are fine by me, but I'd also like to hear from the other maintainers.
+The skb doesn't change within the function. Therefore it's only
+necessary to check if we need GSO once at the beginning.
 
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
+Acked-by: Wei Liu <wei.liu2@citrix.com>
+
+---
+Cc: Ian Campbell <ian.campbell@citrix.com>
+Cc: netdev at vger.kernel.org
+
+    Changes in v4:
+        - Add Wei's acked
+
+    Changes in v2:
+        - Patch added
+---
+ drivers/net/xen-netback/netback.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
+index ec98d43..c4e6c02 100644
+--- a/drivers/net/xen-netback/netback.c
++++ b/drivers/net/xen-netback/netback.c
+@@ -288,6 +288,13 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
+ 	unsigned long bytes;
+ 	int gso_type = XEN_NETIF_GSO_TYPE_NONE;
+ 
++	if (skb_is_gso(skb)) {
++		if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV4)
++			gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
++		else if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6)
++			gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
++	}
++
+ 	/* Data must not cross a page boundary. */
+ 	BUG_ON(size + offset > PAGE_SIZE<<compound_order(page));
+ 
+@@ -347,13 +354,6 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
+ 		}
+ 
+ 		/* Leave a gap for the GSO descriptor. */
+-		if (skb_is_gso(skb)) {
+-			if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV4)
+-				gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
+-			else if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6)
+-				gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
+-		}
+-
+ 		if (*head && ((1 << gso_type) & queue->vif->gso_mask))
+ 			queue->rx.req_cons++;
+ 
+-- 
+2.1.4
