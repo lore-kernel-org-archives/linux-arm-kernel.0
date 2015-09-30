@@ -1,56 +1,50 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 30 Sep 2015 13:53:35 +0100
-Subject: [PATCH 0/8] nvmem: new drivers for v4.4
-Message-ID: <1443617615-26261-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Wed, 30 Sep 2015 13:54:44 +0100
+Subject: [PATCH 1/8] nvmem: Add DT binding documentation for Vybrid OCOTP
+ driver
+In-Reply-To: <1443617615-26261-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1443617615-26261-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1443617684-26311-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+From: Sanchayan Maity <maitysanchayan@gmail.com>
 
-Here are 4 new nvmem drivers which are in the mailing list for long time
-and are good to go for some testing and find its way to v4.4-rc*.
+Add the devicetree bindings for the Freescale Vybrid On-Chip
+OTP driver.
 
-Could you please take these patches via char-misc tree.
-
-Thanks,
-srini
-
-
-Philipp Zabel (2):
-  nvmem: Add i.MX6 OCOTP device tree binding documentation
-  nvmem: imx-ocotp: Add i.MX6 OCOTP driver
-
-Sanchayan Maity (2):
-  nvmem: Add DT binding documentation for Vybrid OCOTP driver
-  nvmem: Add Vybrid OCOTP support
-
-Stefan Wahren (2):
-  nvmem: add binding for mxs-ocotp
-  nvmem: add driver for ocotp in i.MX23 and i.MX28
-
-ZhengShunQian (2):
-  nvmem: rockchip-efuse: describe the usage of eFuse
-  nvmem: Adding bindings for rockchip-efuse
-
- .../devicetree/bindings/nvmem/imx-ocotp.txt        |  20 ++
- .../devicetree/bindings/nvmem/mxs-ocotp.txt        |  25 ++
- .../devicetree/bindings/nvmem/rockchip-efuse.txt   |  38 +++
- .../devicetree/bindings/nvmem/vf610-ocotp.txt      |  19 ++
- drivers/nvmem/Kconfig                              |  42 +++
- drivers/nvmem/Makefile                             |   8 +
- drivers/nvmem/imx-ocotp.c                          | 154 +++++++++++
- drivers/nvmem/mxs-ocotp.c                          | 257 ++++++++++++++++++
- drivers/nvmem/rockchip-efuse.c                     | 186 +++++++++++++
- drivers/nvmem/vf610-ocotp.c                        | 302 +++++++++++++++++++++
- 10 files changed, 1051 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
- create mode 100644 Documentation/devicetree/bindings/nvmem/mxs-ocotp.txt
- create mode 100644 Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ .../devicetree/bindings/nvmem/vf610-ocotp.txt         | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
- create mode 100644 drivers/nvmem/imx-ocotp.c
- create mode 100644 drivers/nvmem/mxs-ocotp.c
- create mode 100644 drivers/nvmem/rockchip-efuse.c
- create mode 100644 drivers/nvmem/vf610-ocotp.c
 
+diff --git a/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt b/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
+new file mode 100644
+index 0000000..56ed481
+--- /dev/null
++++ b/Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
+@@ -0,0 +1,19 @@
++On-Chip OTP Memory for Freescale Vybrid
++
++Required Properties:
++  compatible:
++  - "fsl,vf610-ocotp" for VF5xx/VF6xx
++  #address-cells : Should be 1
++  #size-cells : Should be 1
++  reg : Address and length of OTP controller and fuse map registers
++  clocks : ipg clock we associate with the OCOTP peripheral
++
++Example for Vybrid VF5xx/VF6xx:
++
++	ocotp: ocotp at 400a5000 {
++		compatible = "fsl,vf610-ocotp";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x400a5000 0xCF0>;
++		clocks = <&clks VF610_CLK_OCOTP>;
++	};
 -- 
 1.9.1
