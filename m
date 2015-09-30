@@ -1,57 +1,57 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 30 Sep 2015 12:07:04 +0100
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
-In-Reply-To: <20150930103704.GA7858@pengutronix.de> (Sascha Hauer's message of
- "Wed, 30 Sep 2015 12:37:04 +0200")
-References: <1443015463-23639-1-git-send-email-s.hauer@pengutronix.de>
- <1443015463-23639-3-git-send-email-s.hauer@pengutronix.de>
- <9hhpp105jw1.fsf@e105922-lin.cambridge.arm.com>
- <20150930103704.GA7858@pengutronix.de>
-Message-ID: <9hha8s45fon.fsf@e105922-lin.cambridge.arm.com>
+From: w.f@huawei.com (Fei Wang)
+Date: Wed, 30 Sep 2015 19:05:09 +0800
+Subject: [PATCH 6/8] dt-bindings: mtcmos: Document Hi6220 mtcmos driver
+In-Reply-To: <1443611111-3196-1-git-send-email-w.f@huawei.com>
+References: <1443611111-3196-1-git-send-email-w.f@huawei.com>
+Message-ID: <1443611111-3196-7-git-send-email-w.f@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
+Document the new compatible for Hisilicon Hi6220 mtcmos driver.
 
-> Hi Punit,
->
-> On Wed, Sep 30, 2015 at 10:36:14AM +0100, Punit Agrawal wrote:
->> Hi Sascha,
->> 
->> Re-posting a comment from v7. Perhaps you missed it...
->
-> Uh, sorry. In fact I didn't miss it and I thought I have answered it.
-> Appearantly I haven't.
->
->> > +	struct mtk_thermal *mt = bank->mt;
->> > +	int temp, i, max;
->> > +	u32 raw;
->> > +
->> > +	temp = max = INT_MIN;
->> > +
->> > +	for (i = 0; i < bank_data[bank->id].num_sensors; i++) {
->> > +		raw = readl(mt->thermal_base + sensing_points[i].msr);
->> > +
->> > +		temp = raw_to_mcelsius(mt, raw);
->> > +
->> > +		/*
->> > +		 * The first read of a sensor often contains very high bogus
->> > +		 * temperature value. Filter these out so that the system does
->> > +		 * not immediately shut down.
->> > +		 */
->> > +		if (temp > 200000)
->> > +			temp = 0;
->> > +
->> 
->> If the bogus value is only the first time the sensor is read, instead of
->> filtering here, you could call mtk_thermal_bank_temperature at probe
->> time when you are initialising the banks and ignore the returned value.
->
-> It seems that after initialization the hardware needs some time to
-> settle before correct values can be read. Doing what you suggest would
-> mean we have to delay the boot by several 100ms. I'd rather not do that.
+Signed-off-by: Fei Wang <w.f@huawei.com>
+---
+ .../bindings/regulator/hisilicon,hi6220-mtcmos.txt |   32 ++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/hisilicon,hi6220-mtcmos.txt
 
-Fair enough. Thanks for clarifying.
-
->
-> Sascha
+diff --git a/Documentation/devicetree/bindings/regulator/hisilicon,hi6220-mtcmos.txt b/Documentation/devicetree/bindings/regulator/hisilicon,hi6220-mtcmos.txt
+new file mode 100644
+index 0000000..748ac62
+--- /dev/null
++++ b/Documentation/devicetree/bindings/regulator/hisilicon,hi6220-mtcmos.txt
+@@ -0,0 +1,32 @@
++Hi6220 mtcmos Voltage regulators
++
++Required parent device properties:
++- compatible: Must be "hisilicon,hi6220-mtcmos-driver"
++- hisilicon,mtcmos-steady-us: The time to wait for power steady
++- hisilicon,mtcmos-sc-on-base: address of hi6220 soc control register
++
++Required child device properties:
++- regulator-name: The name of mtcmos
++- hisilicon,ctrl-regs: offset of ctrl-regs
++- hisilicon,ctrl-data: the bit to ctrl the regulator
++
++Example:
++        mtcmos {
++                compatible = "hisilicon,hi6220-mtcmos-driver";
++                hisilicon,mtcmos-steady-us = <10>;
++                hisilicon,mtcmos-sc-on-base  = <0xf7800000>;
++                hisilicon,mtcmos-acpu-on-base = <0xf65a0000>;
++
++                mtcmos1: regulator at a1{
++                        regulator-name = "G3D_PD_VDD";
++                        regulator-compatible = "mtcmos1";
++                        hisilicon,ctrl-regs = <0x830 0x834 0x83c>;
++                        hisilicon,ctrl-data = <1 0x1>;
++                };
++                mtcmos2: regulator at a2{
++                        regulator-name = "SOC_MED";
++                         regulator-compatible = "mtcmos2";
++                        hisilicon,ctrl-regs = <0x830 0x834 0x83c>;
++                        hisilicon,ctrl-data = <2 0x1>;
++                };
++        };
+-- 
+1.7.9.5
