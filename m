@@ -1,100 +1,47 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 30 Sep 2015 16:05:43 +0200
-Subject: [PATCH 3/6] regulator: core: create unlocked version of
- regulator_list_voltage
+Date: Wed, 30 Sep 2015 16:05:41 +0200
+Subject: [PATCH 1/6] Revert "regulator: core: Handle full constraints systems
+ when resolving supplies"
 In-Reply-To: <1443621946-8712-1-git-send-email-s.hauer@pengutronix.de>
 References: <1443621946-8712-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1443621946-8712-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1443621946-8712-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The unlocked version will be needed when we start propagating voltage
-changes to the supply regulators.
+This reverts commit 9f7e25edb1575a6d2363dc003f9cc09d840657e2.
+
+When a regulator A is registered and is supplied by regulator B which is
+not yet registered then a regulator_get on regulator A will set the As
+supply to the dummy regulator. This is not correct, we should return
+-EPROBE_DEFER instead as done without this patch.
+Of course reverting this patch brings back the issue it fixed, so this
+is not a solution, but what is the correct solution?
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/regulator/core.c | 62 +++++++++++++++++++++++++++---------------------
- 1 file changed, 35 insertions(+), 27 deletions(-)
+ drivers/regulator/core.c | 10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index e5de3d9..d148545 100644
+index 7849187..bd9db70 100644
 --- a/drivers/regulator/core.c
 +++ b/drivers/regulator/core.c
-@@ -2343,6 +2343,40 @@ static int _regulator_is_enabled(struct regulator_dev *rdev)
- 	return rdev->desc->ops->is_enabled(rdev);
- }
+@@ -1403,13 +1403,9 @@ static int regulator_resolve_supply(struct regulator_dev *rdev)
+ 			return 0;
+ 		}
  
-+static int _regulator_list_voltage(struct regulator *regulator,
-+				    unsigned selector, int lock)
-+{
-+	struct regulator_dev *rdev = regulator->rdev;
-+	const struct regulator_ops *ops = rdev->desc->ops;
-+	int ret;
-+
-+	if (rdev->desc->fixed_uV && rdev->desc->n_voltages == 1 && !selector)
-+		return rdev->desc->fixed_uV;
-+
-+	if (ops->list_voltage) {
-+		if (selector >= rdev->desc->n_voltages)
-+			return -EINVAL;
-+		if (lock)
-+			mutex_lock(&rdev->mutex);
-+		ret = ops->list_voltage(rdev, selector);
-+		if (lock)
-+			mutex_unlock(&rdev->mutex);
-+	} else if (rdev->supply) {
-+		ret = _regulator_list_voltage(rdev->supply, selector, lock);
-+	} else {
-+		return -EINVAL;
-+	}
-+
-+	if (ret > 0) {
-+		if (ret < rdev->constraints->min_uV)
-+			ret = 0;
-+		else if (ret > rdev->constraints->max_uV)
-+			ret = 0;
-+	}
-+
-+	return ret;
-+}
-+
- /**
-  * regulator_is_enabled - is the regulator output enabled
-  * @regulator: regulator source
-@@ -2432,33 +2466,7 @@ EXPORT_SYMBOL_GPL(regulator_count_voltages);
-  */
- int regulator_list_voltage(struct regulator *regulator, unsigned selector)
- {
--	struct regulator_dev *rdev = regulator->rdev;
--	const struct regulator_ops *ops = rdev->desc->ops;
--	int ret;
--
--	if (rdev->desc->fixed_uV && rdev->desc->n_voltages == 1 && !selector)
--		return rdev->desc->fixed_uV;
--
--	if (ops->list_voltage) {
--		if (selector >= rdev->desc->n_voltages)
--			return -EINVAL;
--		mutex_lock(&rdev->mutex);
--		ret = ops->list_voltage(rdev, selector);
--		mutex_unlock(&rdev->mutex);
--	} else if (rdev->supply) {
--		ret = regulator_list_voltage(rdev->supply, selector);
--	} else {
--		return -EINVAL;
--	}
--
--	if (ret > 0) {
--		if (ret < rdev->constraints->min_uV)
--			ret = 0;
--		else if (ret > rdev->constraints->max_uV)
--			ret = 0;
--	}
--
--	return ret;
-+	return _regulator_list_voltage(regulator, selector, 1);
- }
- EXPORT_SYMBOL_GPL(regulator_list_voltage);
+-		if (have_full_constraints()) {
+-			r = dummy_regulator_rdev;
+-		} else {
+-			dev_err(dev, "Failed to resolve %s-supply for %s\n",
+-				rdev->supply_name, rdev->desc->name);
+-			return -EPROBE_DEFER;
+-		}
++		dev_err(dev, "Failed to resolve %s-supply for %s\n",
++			rdev->supply_name, rdev->desc->name);
++		return -EPROBE_DEFER;
+ 	}
  
+ 	/* Recursively resolve the supply of the supply */
 -- 
 2.5.3
