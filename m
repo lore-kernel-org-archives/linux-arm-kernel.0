@@ -1,40 +1,131 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Wed, 30 Sep 2015 15:05:18 +0200
-Subject: [RESEND][PATCH v3 0/2] ARM: dts: add Okaya LCD display for Nitrogen
- and Sabrelite
-In-Reply-To: <1432314867-30888-1-git-send-email-gary.bisson@boundarydevices.com>
+Date: Wed, 30 Sep 2015 15:05:19 +0200
+Subject: [RESEND][PATCH v3 1/2] ARM: dts: imx6qdl-nitrogen6x: add Okaya LCD
+ panel
+In-Reply-To: <1443618320-12708-1-git-send-email-gary.bisson@boundarydevices.com>
 References: <1432314867-30888-1-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <1443618320-12708-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1443618320-12708-1-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1443618320-12708-2-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is just a resend of my v3 with Shawn's correct e-mail address. I've also
-made sure it applies (and builds) on latest linux-next 20150930.
+This patch adds support for the 7" LCD display available for Nitrogen6x:
+http://boundarydevices.com/product/7-800x480-display/
 
-This series adds the Okaya 7" LCD support as a simple panel for both Nitrogen
-and Sabrelite.
+Also add label to backlight_lcd and connect it to the panel.
 
-This v3 updates the series as the compatible name has been changed from
-"okaya,rs800480t_7x0gp" to "okaya,rs800480t-7x0gp" when the drm patch has been
-merged into linux-next branch.
-http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=ec9000c
-
-Also note that Philipp Zabel's patch that enables the parallel-display driver
-to work with a simple panel has been merged.
-http://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/commit/?id=553a59f
-
-A U-Boot script to configure the displays based on detection of the
-touch controller is available for reference here:
-https://github.com/boundarydevices/u-boot-imx6/blob/staging/board/boundary/nitrogen6x/6x_bootscript-mainline.txt
-
-
-Gary Bisson (2):
-  ARM: dts: imx6qdl-nitrogen6x: add Okaya LCD panel
-  ARM: dts: imx6qdl-sabrelite: add Okaya LCD panel
-
+Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+---
  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 76 ++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 76 ++++++++++++++++++++++++++++++-
- 2 files changed, 150 insertions(+), 2 deletions(-)
+ 1 file changed, 75 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 04278ba..7212f90 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -124,7 +124,7 @@
+ 		mux-ext-port = <3>;
+ 	};
+ 
+-	backlight_lcd {
++	backlight_lcd: backlight_lcd {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm1 0 5000000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+@@ -142,6 +142,43 @@
+ 		status = "okay";
+ 	};
+ 
++	lcd_display: display at di0 {
++		compatible = "fsl,imx-parallel-display";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interface-pix-fmt = "bgr666";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_j15>;
++		status = "okay";
++
++		port at 0 {
++			reg = <0>;
++
++			lcd_display_in: endpoint {
++				remote-endpoint = <&ipu1_di0_disp0>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++
++			lcd_display_out: endpoint {
++				remote-endpoint = <&lcd_panel_in>;
++			};
++		};
++	};
++
++	lcd_panel {
++		compatible = "okaya,rs800480t-7x0gp";
++		backlight = <&backlight_lcd>;
++
++		port {
++			lcd_panel_in: endpoint {
++				remote-endpoint = <&lcd_display_out>;
++			};
++		};
++	};
++
+ 	panel {
+ 		compatible = "hannstar,hsd100pxn1";
+ 		backlight = <&backlight_lvds>;
+@@ -354,6 +391,39 @@
+ 			>;
+ 		};
+ 
++		pinctrl_j15: j15grp {
++			fsl,pins = <
++				MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK 0x10
++				MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15       0x10
++				MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02        0x10
++				MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03        0x10
++				MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00   0x10
++				MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01   0x10
++				MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02   0x10
++				MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03   0x10
++				MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04   0x10
++				MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05   0x10
++				MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06   0x10
++				MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07   0x10
++				MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08   0x10
++				MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09   0x10
++				MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10  0x10
++				MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11  0x10
++				MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12  0x10
++				MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13  0x10
++				MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14  0x10
++				MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15  0x10
++				MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16  0x10
++				MX6QDL_PAD_DISP0_DAT17__IPU1_DISP0_DATA17  0x10
++				MX6QDL_PAD_DISP0_DAT18__IPU1_DISP0_DATA18  0x10
++				MX6QDL_PAD_DISP0_DAT19__IPU1_DISP0_DATA19  0x10
++				MX6QDL_PAD_DISP0_DAT20__IPU1_DISP0_DATA20  0x10
++				MX6QDL_PAD_DISP0_DAT21__IPU1_DISP0_DATA21  0x10
++				MX6QDL_PAD_DISP0_DAT22__IPU1_DISP0_DATA22  0x10
++				MX6QDL_PAD_DISP0_DAT23__IPU1_DISP0_DATA23  0x10
++			>;
++		};
++
+ 		pinctrl_pwm1: pwm1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD1_DAT3__PWM1_OUT 0x1b0b1
+@@ -421,6 +491,10 @@
+ 	};
+ };
+ 
++&ipu1_di0_disp0 {
++	remote-endpoint = <&lcd_display_in>;
++};
++
+ &ldb {
+ 	status = "okay";
+ 
 -- 
 2.5.3
