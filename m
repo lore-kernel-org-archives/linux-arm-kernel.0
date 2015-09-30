@@ -1,60 +1,89 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 30 Sep 2015 22:08:33 +0300
-Subject: [PATCH] ARM: shmobile: porter: initial device tree
-In-Reply-To: <2022535.FYlSB7sRz4@wasted.cogentembedded.com>
-References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
- <2022535.FYlSB7sRz4@wasted.cogentembedded.com>
-Message-ID: <560C3331.3030606@cogentembedded.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 30 Sep 2015 21:09:00 +0200
+Subject: [PATCH 2/2] mtd: sunxi: nand: refactor
+ ->read_page()/->write_page() code
+In-Reply-To: <20150930183627.GH143959@google.com>
+References: <1442389597-30698-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1442389597-30698-3-git-send-email-boris.brezillon@free-electrons.com>
+ <20150930183627.GH143959@google.com>
+Message-ID: <20150930210900.554c4be3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Brian,
 
-On 09/30/2015 02:26 AM, Sergei Shtylyov wrote:
+On Wed, 30 Sep 2015 11:36:27 -0700
+Brian Norris <computersforpeace@gmail.com> wrote:
 
-> Add the initial device tree for the R8A7791 SoC based Porter low cost board
-> (which  is a  slightly modified version  of the Henninger board).
->
-> SCIF0 serial port support is included, so that the serial console can work.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-> ---
-> This patch is against the 'renesas-devel-20150928-v4.3-rc3' tag of Simon
-> Horman's 'renesas.git' repo.
+> On Wed, Sep 16, 2015 at 09:46:37AM +0200, Boris Brezillon wrote:
+> > Most of the logic to read/write pages with the HW ECC engine enabled
+> > is common to the HW_ECC and NAND_ECC_HW_SYNDROME scheme.
+> > Refactor the code to avoid code duplication.
+> 
+> Hmm, a benign commit description to describe a somewhat complicated
+> patch. This seems to do several different types of refactoring all at
+> once, and it makes it a bit hard to review. Can you perhaps refactor
+> this into 2 or more patches?
 
-    Forgot to mention I had to disable USB-DMAC.
+Fair enough, I'll try to split it in several pieces.
 
-> Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
-> ===================================================================
-> --- /dev/null
-> +++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
-> @@ -0,0 +1,54 @@
-> +/*
-> + * Device Tree Source for the Porter board
-> + *
-> + * Copyright (C) 2015 Cogent Embedded, Inc.
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +#include "r8a7791.dtsi"
-> +
-> +/ {
-> +	model = "Porter";
-> +	compatible = "renesas,porter", "renesas,r8a7791";
-> +
-> +	aliases {
-> +		serial0 = &scif0;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttySC0,115200 ignore_loglevel";
+> e.g., I think the NFC_USER_DATA_TO_BUF()
+> stuff can be orthogonal from the introduction of
+> sunxi_nfc_hw_ecc_read_chunk() and sunxi_nfc_hw_ecc_read_extra_oob().
 
-    Oops, scratch that. I thought I removed console= but I forgot to refresh 
-the patch. :-/
+Yes, it is, even if I doubt removing this small piece of code can make
+the patch more readable ;-).
 
-MBR, Sergei
+> 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  drivers/mtd/nand/sunxi_nand.c | 404 ++++++++++++++++++++++--------------------
+> >  1 file changed, 212 insertions(+), 192 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+> > index dc44435..640b96c 100644
+> > --- a/drivers/mtd/nand/sunxi_nand.c
+> > +++ b/drivers/mtd/nand/sunxi_nand.c
+> > @@ -159,6 +159,13 @@
+> >  /* NFC_USER_DATA helper macros */
+> >  #define NFC_BUF_TO_USER_DATA(buf)	((buf)[0] | ((buf)[1] << 8) | \
+> >  					((buf)[2] << 16) | ((buf)[3] << 24))
+> > +#define NFC_USER_DATA_TO_BUF(buf, val)	\
+> > +	{				\
+> > +		(buf)[0] = val;		\
+> > +		(buf)[1] = val >> 8;	\
+> > +		(buf)[2] = val >> 16;	\
+> > +		(buf)[3] = val >> 24;	\
+> > +	}
+> 
+> Two things about this macro:
+> 
+>   1) you should probably wrap 'val' in parentheses
+
+Yep ...
+
+> 
+>   2) the use of 'val' 4 times in this macro means it will be evaluated 4
+>   times; this *can* be OK, except the 'val' parameter as used in context
+>   is actually a register read (readl()). Is this intentional? Anyway,
+>   such a construct kinda hides the actual behavior, whether or not it's
+>   intentional.
+
+... and no, it's not intentional.
+
+> 
+> To kill off all concerns, perhaps this should be a static inline
+> function instead. And we might do the same with NFC_BUF_TO_USER_DATA()
+> then, to match.
+
+I like this idea (I'll use lower cases if I convert them to inline
+functions).
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
