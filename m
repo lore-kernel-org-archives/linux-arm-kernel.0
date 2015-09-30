@@ -1,46 +1,36 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 30 Sep 2015 14:16:42 +0300
-Subject: [RFC PATCH 03/20] coresight: etm3x: implementing 'cpu_id()' API
-In-Reply-To: <1442593594-10665-4-git-send-email-mathieu.poirier@linaro.org>
-References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
- <1442593594-10665-4-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <87h9mcjgx1.fsf@ashishki-desk.ger.corp.intel.com>
+From: w.f@huawei.com (Fei Wang)
+Date: Wed, 30 Sep 2015 19:05:06 +0800
+Subject: [PATCH 3/8] arm64: dts: add Hi655x pmic node
+In-Reply-To: <1443611111-3196-1-git-send-email-w.f@huawei.com>
+References: <1443611111-3196-1-git-send-email-w.f@huawei.com>
+Message-ID: <1443611111-3196-4-git-send-email-w.f@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+This patch add Hi655x device node for pmic in dts.
 
-> Adding an interface to lookup the CPU a tracer has been affined
-> to along with a source operation allowing external customers to
-> access it.
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->  drivers/hwtracing/coresight/coresight-etm3x.c | 14 ++++++++++++++
->  include/linux/coresight.h                     |  3 +++
->  2 files changed, 17 insertions(+)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-> index a44bc3532585..4ce9cfc06e93 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-> @@ -441,6 +441,19 @@ static void etm_config_enable(void *info)
->  	spin_unlock(&drvdata->spinlock);
->  }
->  
-> +static int etm_cpu_id(struct coresight_device *csdev)
-> +{
-> +	int cpu;
-> +	unsigned long flags;
-> +	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-> +
-> +	spin_lock_irqsave(&drvdata->spinlock, flags);
-> +	cpu = drvdata->cpu;
-> +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+Signed-off-by: Fei Wang <w.f@huawei.com>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Why do you need a spinlock here? Afaict, it never changes and if it
-would, things would go really bad really fast.
-
-Regards,
---
-Alex
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 3f03380..4e4830b 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -168,4 +168,13 @@
+ 			clock-names = "uartclk", "apb_pclk";
+ 		};
+ 	};
++
++	pmic: pmic at F8000000 {
++                compatible = "hisilicon,hi655x-pmic-driver";
++                reg = <0x0 0xf8000000 0x0 0x1000>;
++                #interrupt-cells = <2>;
++                interrupt-controller;
++                pmu_irq_gpio = <&gpio_pmu_irq_n>;
++                status = "ok";
++	};
+ };
+-- 
+1.7.9.5
