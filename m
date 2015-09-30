@@ -1,47 +1,115 @@
 From: majun258@huawei.com (MaJun)
-Date: Wed, 30 Sep 2015 17:39:06 +0800
-Subject: [PATCH v5 0/3] Support Mbigen interrupt controller
-Message-ID: <1443605949-15396-1-git-send-email-majun258@huawei.com>
+Date: Wed, 30 Sep 2015 17:39:09 +0800
+Subject: [PATCH v5 3/3] dt-binding:Documents of the mbigen bindings
+In-Reply-To: <1443605949-15396-1-git-send-email-majun258@huawei.com>
+References: <1443605949-15396-1-git-send-email-majun258@huawei.com>
+Message-ID: <1443605949-15396-4-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ma Jun <majun258@huawei.com>
 
-This patch adds the driver of mbigen and binding document for Hisilicon
-Mbigen chips.
+Add the mbigen msi interrupt controller bindings document.
 
-Compared with previous version, this version changed much.
-
-Because during the time between V3 and V4 of my patch, there are two
-related patches were committed by Mr.Marc Zyngier and Mr. Mark Rutland.
-
-First, Mr. Marc Zyngier changed MSI frame and added supporting for
-platform MSI.
-
-https://lkml.org/lkml/2015/7/28/552
-
-Second, Mr.Mark Rutland changed Generic PCI MSI + IOMMU topology bindings
-
+This patch based on Mark Rutland's patch 
 https://lkml.org/lkml/2015/7/23/558 
 
-Changes in v5:
---- Split mbigen driver patch into 2 smaller patches.
---- Change mbigen chip and mbigen device initialzing sequence.
---- Initializing mbigen device instead of mbigen chip as interrupt controller
---- Remove mbigen node from driver to make this driver more easily read.
---- Change the mbigen chip node definition(dts).
---- Change the interrupt cells definition(dts).
-Changes in v4:
---- Re-based mbigen driver on kernel 4.2.0-rc2 and Marc's patch
---- Changed the binding document based on Mark's patch.
-
-Ma Jun (3):
-  initialize each mbigen device node as a interrupt controller.
-  Probe mbigen chip and initial mbigen device as platform device.
-  dt-binding:Documents of the mbigen bindings
-
- Documentation/devicetree/bindings/arm/mbigen.txt |   85 ++++
- drivers/irqchip/irq-mbigen.c                     |  549 ++++++++++++++++++++++
- 2 files changed, 634 insertions(+), 0 deletions(-)
+Signed-off-by: Ma Jun <majun258@huawei.com>
+---
+ Documentation/devicetree/bindings/arm/mbigen.txt |   85 ++++++++++++++++++++++
+ 1 files changed, 85 insertions(+), 0 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
- create mode 100644 drivers/irqchip/irq-mbigen.c
+
+diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
+new file mode 100644
+index 0000000..f5345ab
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mbigen.txt
+@@ -0,0 +1,85 @@
++Hisilicon mbigen device tree bindings.
++=======================================
++
++Mbigen means: message based interrupt generator.
++
++MBI is kind of msi interrupt only used on Non-PCI devices.
++
++To reduce the wired interrupt number connected to GIC,
++Hisilicon designed mbigen to collect and generate interrupt.
++
++
++Non-pci devices can connect to mbigen and generate the
++interrupt by writing ITS register.
++
++The mbigen chip and devices connect to mbigen have the following properties:
++
++Mbigen main node required properties:
++-------------------------------------------
++- compatible: Should be "hisilicon,mbigen-v2"
++- reg: Specifies the base physical address and size of the Mbigen
++  registers.
++
++Sub-nodes:
++---------------------------------------------
++Mbigen has one or more mbigen device nodes which represents the devices
++connected to this mbigen chip.
++
++These nodes must have the following properties:
++- compatible: Should be "hisilicon,mbigen-intc-v2"
++- interrupt controller: Identifies the node as an interrupt controller
++- msi-parent: This property has two cells.
++	The 1st cell specifies the ITS this device connected.
++	The 2nd cell specifies the device id.
++- nr-interrupts:Specifies the total number of interrupt this device has.
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value is 2 now.
++
++  The 1st cell is global hardware pin number of the interrupt.
++		This value depends on the Soc design.
++  The 2nd the private index of the device. For a device with n interrupts,
++		this value is from 0 ~ n-1.
++
++Examples:
++
++		mbigen_dsa: interrupt-controller at c0080000 {
++			compatible = "hisilicon,mbigen-v2";
++			reg = <0xc0080000 0x10000>;
++
++			mbigen_device_gmac0 {
++				compatible = "hisilicon,mbigen-intc-v2";
++				interrupt-controller;
++				msi-parent = <&its 0x40b1c>;
++				nr-interrupts = <9>;
++				#interrupt-cells = <2>;
++			}
++
++			mbigen_device_02 {
++				compatible = "hisilicon,mbigen-intc-v2";
++				interrupt-controller;
++				msi-parent = <&its 0x40b1d>;
++				nr-interrupts = <3>;
++				#interrupt-cells = <2>;
++			}
++		};
++
++Device connect to mbigen required properties:
++----------------------------------------------------
++-interrupt-parent: Specifies the mbigen device node which device connected.
++-interrupts:specifies the interrupt source.
++  The 1st cell is global hardware pin number of the interrupt.
++		This value depends on the Soc design.
++  The 2nd the private index of the device. For a device with n interrupts,
++		this value is from 0 ~ n-1.
++
++Examples:
++	gmac0: ethernet at c2080000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0 0xc2080000 0 0x20000>,
++		      <0 0xc0000000 0 0x1000>;
++		interrupt-parent  = <&mbigen_device_gmac0>;
++		interrupts = <656 0>,
++			<657 1>;
++	};
++
+-- 
+1.7.1
