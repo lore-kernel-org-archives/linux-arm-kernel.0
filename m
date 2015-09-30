@@ -1,151 +1,54 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 30 Sep 2015 10:17:17 +0800
-Subject: [RESEND PATCH v2 2/2] ARM: imx6: change default burst size for USB
-In-Reply-To: <1443579437-845-1-git-send-email-peter.chen@freescale.com>
-References: <1443579437-845-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1443579437-845-2-git-send-email-peter.chen@freescale.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 30 Sep 2015 11:22:44 +0900
+Subject: [GIT PULL] ARM: defconfig: Exynos improvements for 4.4
+Message-ID: <1443579766-15793-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It can improve the USB performance when choosing larger
-burst size at some systems (bus size is larger), there is
-no side effect if this burst size is larger than bus size.
+Dear Kukjin,
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
+Few defconfig related changes for 4.4.
 
-Changes for v2:
-- Applies changes for imx6ul
+Description along with a tag.
+You can find them also on the lists with my reviewed-by.
 
- arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++++++
- arch/arm/boot/dts/imx6sl.dtsi  | 6 ++++++
- arch/arm/boot/dts/imx6sx.dtsi  | 6 ++++++
- arch/arm/boot/dts/imx6ul.dtsi  | 4 ++++
- 4 files changed, 24 insertions(+)
+Best regards,
+Krzysztof
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 3d04a17..92c5cc0 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -907,6 +907,8 @@
- 				fsl,usbphy = <&usbphy1>;
- 				fsl,usbmisc = <&usbmisc 0>;
- 				ahb-burst-config = <0x0>;
-+				tx-burst-size-dword = <0x10>;
-+				rx-burst-size-dword = <0x10>;
- 				status = "disabled";
- 			};
- 
-@@ -919,6 +921,8 @@
- 				fsl,usbmisc = <&usbmisc 1>;
- 				dr_mode = "host";
- 				ahb-burst-config = <0x0>;
-+				tx-burst-size-dword = <0x10>;
-+				rx-burst-size-dword = <0x10>;
- 				status = "disabled";
- 			};
- 
-@@ -930,6 +934,8 @@
- 				fsl,usbmisc = <&usbmisc 2>;
- 				dr_mode = "host";
- 				ahb-burst-config = <0x0>;
-+				tx-burst-size-dword = <0x10>;
-+				rx-burst-size-dword = <0x10>;
- 				status = "disabled";
- 			};
- 
-@@ -941,6 +947,8 @@
- 				fsl,usbmisc = <&usbmisc 3>;
- 				dr_mode = "host";
- 				ahb-burst-config = <0x0>;
-+				tx-burst-size-dword = <0x10>;
-+				rx-burst-size-dword = <0x10>;
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 057b1d4..2c0faeb 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -690,6 +690,8 @@
- 				fsl,usbphy = <&usbphy1>;
- 				fsl,usbmisc = <&usbmisc 0>;
- 				ahb-burst-config = <0x0>;
-+				tx-burst-size-dword = <0x10>;
-+				rx-burst-size-dword = <0x10>;
- 				status = "disabled";
- 			};
- 
-@@ -701,6 +703,8 @@
- 				fsl,usbphy = <&usbphy2>;
- 				fsl,usbmisc = <&usbmisc 1>;
- 				ahb-burst-config = <0x0>;
-+				tx-burst-size-dword = <0x10>;
-+				rx-burst-size-dword = <0x10>;
- 				status = "disabled";
- 			};
- 
-@@ -712,6 +716,8 @@
- 				fsl,usbmisc = <&usbmisc 2>;
- 				dr_mode = "host";
- 				ahb-burst-config = <0x0>;
-+				tx-burst-size-dword = <0x10>;
-+				rx-burst-size-dword = <0x10>;
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 70a7c4f..01191c0 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -784,6 +784,8 @@
- 				fsl,usbmisc = <&usbmisc 0>;
- 				fsl,anatop = <&anatop>;
- 				ahb-burst-config = <0x0>;
-+				tx-burst-size-dword = <0x10>;
-+				rx-burst-size-dword = <0x10>;
- 				status = "disabled";
- 			};
- 
-@@ -795,6 +797,8 @@
- 				fsl,usbphy = <&usbphy2>;
- 				fsl,usbmisc = <&usbmisc 1>;
- 				ahb-burst-config = <0x0>;
-+				tx-burst-size-dword = <0x10>;
-+				rx-burst-size-dword = <0x10>;
- 				status = "disabled";
- 			};
- 
-@@ -808,6 +812,8 @@
- 				fsl,anatop = <&anatop>;
- 				dr_mode = "host";
- 				ahb-burst-config = <0x0>;
-+				tx-burst-size-dword = <0x10>;
-+				rx-burst-size-dword = <0x10>;
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 654009f..28dcd68 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -536,6 +536,8 @@
- 				fsl,usbmisc = <&usbmisc 0>;
- 				fsl,anatop = <&anatop>;
- 				ahb-burst-config = <0x0>;
-+				tx-burst-size-dword = <0x10>;
-+				rx-burst-size-dword = <0x10>;
- 				status = "disabled";
- 			};
- 
-@@ -547,6 +549,8 @@
- 				fsl,usbphy = <&usbphy2>;
- 				fsl,usbmisc = <&usbmisc 1>;
- 				ahb-burst-config = <0x0>;
-+				tx-burst-size-dword = <0x10>;
-+				rx-burst-size-dword = <0x10>;
- 				status = "disabled";
- 			};
- 
--- 
-1.9.1
+
+The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+
+  Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+
+are available in the git repository at:
+
+  https://github.com/krzk/linux.git tags/samsung-defconfig-4.4
+
+for you to fetch changes up to 7fa5ce4e6fcb4596761c17e124e7d1f8cf64fe96:
+
+  ARM: exynos_defconfig: Disable simplefb support (2015-09-13 19:25:39 +0900)
+
+----------------------------------------------------------------
+Defconfig changes around Exynos based boards:
+1. Enable DWC2 USB driver for exynos and multi_v7 defconfigs.
+   The driver is present on Exynos and Rockhip boards. Enabling also
+   ethernet gadget allows betwork communication with the device.
+2. Enable LEDS for Odroid XU3/XU4 family boards (provides simple
+   monitoring of the board).
+3. Disable the simplefb driver because in certain situations (when
+   U-boot injects simplefb bindings into DTB) it may break display.
+
+----------------------------------------------------------------
+Anand Moon (1):
+      ARM: exynos_defconfig: Enable LEDS for Odroid-XU3/XU4
+
+Javier Martinez Canillas (1):
+      ARM: exynos_defconfig: Disable simplefb support
+
+Marek Szyprowski (2):
+      ARM: exynos_defconfig: Enable DWC2 USB driver and USB ethernet gadget
+      ARM: multi_v7_defconfig: Enable DWC2 USB driver and USB ethernet gadget
+
+ arch/arm/configs/exynos_defconfig   | 9 ++++++++-
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 2 files changed, 10 insertions(+), 1 deletion(-)
