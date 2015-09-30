@@ -1,29 +1,21 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Wed, 30 Sep 2015 13:17:02 -0500
-Subject: [PATCH] ARM: fix vdsomunge depends on glibc specific byteswap.h
-In-Reply-To: <8B76E3E8-52BF-4803-B1F9-E5704A858870@goldelico.com>
-References: <cover.1443628457.git.hns@goldelico.com>
- <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
- <CAKv+Gu_098GVMeJPjDWaQ-uXek_cGUe4UMVy+fMdKw=_C+P7Tg@mail.gmail.com>
- <B6E60776-A054-4749-BCAF-1433BFFC6AF7@goldelico.com>
- <CAKv+Gu_6DibhUUPGrACCZE3S_k50rcO8A5ZcHh5c4UiDQUNApA@mail.gmail.com>
- <560C1DD0.1000907@mentor.com>
- <8B76E3E8-52BF-4803-B1F9-E5704A858870@goldelico.com>
-Message-ID: <560C271E.9060103@mentor.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 Sep 2015 19:17:51 +0100
+Subject: [RESEND PATCH 1/1] ASoC: dwc: correct irq clear method
+In-Reply-To: <006301d0fac4$94eb5890$bec209b0$@tangramtek.com>
+References: <006301d0fac4$94eb5890$bec209b0$@tangramtek.com>
+Message-ID: <20150930181751.GT15635@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/2015 12:47 PM, H. Nikolaus Schaller wrote:
-> 
-> Am 30.09.2015 um 19:37 schrieb Nathan Lynch <Nathan_Lynch@mentor.com>:
->>  Why not just use a generic
->> implementation like is found in mips' elf2ecoff?
-> 
-> Do you have a reference?
-> I can't find byte swapping in
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/mips/boot/elf2ecoff.c?id=refs/tags/v4.3-rc3
+On Tue, Sep 29, 2015 at 10:39:00PM +0800, yitian wrote:
+> from Designware I2S datasheet, irq is cleared by reading from
+> TOR/ROR registers, rather than by writing into them.
 
-See the swab16 and swab32 macros (yes, "swab" not "swap").
-
-Or the __constant_swab* macros in include/linux/uapi/swab.h.
+This doesn't apply against current code, please check and resend.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/779b74a0/attachment-0001.sig>
