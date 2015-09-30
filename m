@@ -1,131 +1,112 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Wed, 30 Sep 2015 15:05:20 +0200
-Subject: [RESEND][PATCH v3 2/2] ARM: dts: imx6qdl-sabrelite: add Okaya LCD
- panel
-In-Reply-To: <1443618320-12708-1-git-send-email-gary.bisson@boundarydevices.com>
-References: <1432314867-30888-1-git-send-email-gary.bisson@boundarydevices.com>
- <1443618320-12708-1-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <1443618320-12708-3-git-send-email-gary.bisson@boundarydevices.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 30 Sep 2015 15:21:07 +0200
+Subject: [PATCH v2 1/2] regulator: act8865: support output voltage by
+ VSET2[] bits
+In-Reply-To: <1443597950-27849-2-git-send-email-wenyou.yang@atmel.com>
+References: <1443597950-27849-1-git-send-email-wenyou.yang@atmel.com>
+ <1443597950-27849-2-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20150930132107.GH31199@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the 7" LCD display available for Sabrelite:
-http://boundarydevices.com/product/7-800x480-display/
+Hi Wenyou,
 
-Also add label to backlight_lcd and connect it to the panel.
+I see nothing wrong in it.
 
-Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
----
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 76 +++++++++++++++++++++++++++++++-
- 1 file changed, 75 insertions(+), 1 deletion(-)
+On Wed, Sep 30, 2015 at 03:25:49PM +0800, Wenyou Yang wrote:
+> For the step-down DC/DC regulators, the output voltage is
+> selectable by setting VSEL pin that when VSEL is low, output
+> voltage is programmed by VSET1[] bits, and when VSEL is high,
+> output voltage is programmed by VSET2[] bits.
+> 
+> The DT property "active-semi,vsel-high" is used to specify
+> the VSEL pin at high on the board.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index 2f85106..65cdeb3 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -123,7 +123,7 @@
- 		mux-ext-port = <4>;
- 	};
- 
--	backlight_lcd {
-+	backlight_lcd: backlight_lcd {
- 		compatible = "pwm-backlight";
- 		pwms = <&pwm1 0 5000000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -141,6 +141,43 @@
- 		status = "okay";
- 	};
- 
-+	lcd_display: display at di0 {
-+		compatible = "fsl,imx-parallel-display";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		interface-pix-fmt = "bgr666";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_j15>;
-+		status = "okay";
-+
-+		port at 0 {
-+			reg = <0>;
-+
-+			lcd_display_in: endpoint {
-+				remote-endpoint = <&ipu1_di0_disp0>;
-+			};
-+		};
-+
-+		port at 1 {
-+			reg = <1>;
-+
-+			lcd_display_out: endpoint {
-+				remote-endpoint = <&lcd_panel_in>;
-+			};
-+		};
-+	};
-+
-+	lcd_panel {
-+		compatible = "okaya,rs800480t-7x0gp";
-+		backlight = <&backlight_lcd>;
-+
-+		port {
-+			lcd_panel_in: endpoint {
-+				remote-endpoint = <&lcd_display_out>;
-+			};
-+		};
-+	};
-+
- 	panel {
- 		compatible = "hannstar,hsd100pxn1";
- 		backlight = <&backlight_lvds>;
-@@ -348,6 +385,39 @@
- 			>;
- 		};
- 
-+		pinctrl_j15: j15grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK 0x10
-+				MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15       0x10
-+				MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02        0x10
-+				MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03        0x10
-+				MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00   0x10
-+				MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01   0x10
-+				MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02   0x10
-+				MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03   0x10
-+				MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04   0x10
-+				MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05   0x10
-+				MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06   0x10
-+				MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07   0x10
-+				MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08   0x10
-+				MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09   0x10
-+				MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10  0x10
-+				MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11  0x10
-+				MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12  0x10
-+				MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13  0x10
-+				MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14  0x10
-+				MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15  0x10
-+				MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16  0x10
-+				MX6QDL_PAD_DISP0_DAT17__IPU1_DISP0_DATA17  0x10
-+				MX6QDL_PAD_DISP0_DAT18__IPU1_DISP0_DATA18  0x10
-+				MX6QDL_PAD_DISP0_DAT19__IPU1_DISP0_DATA19  0x10
-+				MX6QDL_PAD_DISP0_DAT20__IPU1_DISP0_DATA20  0x10
-+				MX6QDL_PAD_DISP0_DAT21__IPU1_DISP0_DATA21  0x10
-+				MX6QDL_PAD_DISP0_DAT22__IPU1_DISP0_DATA22  0x10
-+				MX6QDL_PAD_DISP0_DAT23__IPU1_DISP0_DATA23  0x10
-+			>;
-+		};
-+
- 		pinctrl_pwm1: pwm1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD1_DAT3__PWM1_OUT 0x1b0b1
-@@ -416,6 +486,10 @@
- 	};
- };
- 
-+&ipu1_di0_disp0 {
-+	remote-endpoint = <&lcd_display_in>;
-+};
-+
- &ldb {
- 	status = "okay";
- 
--- 
-2.5.3
+Minor comment below, it's only my point of view.
+
+Anyway, Reviewed-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+
+> ---
+> 
+> Changes in v2:
+>  - fix missed argument of macro "ACT88xx_REG" for act8865_alt_regulators
+>    structure variable.
+>  - set variable "voltage_select" initial value to avoid compile warning.
+> 
+>  drivers/regulator/act8865-regulator.c |   24 ++++++++++++++++++++++--
+>  1 file changed, 22 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
+> index 896db16..f8d4cd3 100644
+> --- a/drivers/regulator/act8865-regulator.c
+> +++ b/drivers/regulator/act8865-regulator.c
+> @@ -261,6 +261,16 @@ static const struct regulator_desc act8865_regulators[] = {
+>  	ACT88xx_REG("LDO_REG4", ACT8865, LDO4, VSET, "inl67"),
+>  };
+>  
+> +static const struct regulator_desc act8865_alt_regulators[] = {
+> +	ACT88xx_REG("DCDC_REG1", ACT8865, DCDC1, VSET2, "vp1"),
+> +	ACT88xx_REG("DCDC_REG2", ACT8865, DCDC2, VSET2, "vp2"),
+> +	ACT88xx_REG("DCDC_REG3", ACT8865, DCDC3, VSET2, "vp3"),
+> +	ACT88xx_REG("LDO_REG1", ACT8865, LDO1, VSET, "inl45"),
+> +	ACT88xx_REG("LDO_REG2", ACT8865, LDO2, VSET, "inl45"),
+> +	ACT88xx_REG("LDO_REG3", ACT8865, LDO3, VSET, "inl67"),
+> +	ACT88xx_REG("LDO_REG4", ACT8865, LDO4, VSET, "inl67"),
+> +};
+> +
+>  #ifdef CONFIG_OF
+>  static const struct of_device_id act8865_dt_ids[] = {
+>  	{ .compatible = "active-semi,act8600", .data = (void *)ACT8600 },
+> @@ -413,6 +423,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
+>  	struct act8865 *act8865;
+>  	unsigned long type;
+>  	int off_reg, off_mask;
+> +	int voltage_select = 0;
+
+I think adding this variable is useless...
+
+>  
+>  	pdata = dev_get_platdata(dev);
+>  
+> @@ -424,6 +435,10 @@ static int act8865_pmic_probe(struct i2c_client *client,
+>  			return -ENODEV;
+>  
+>  		type = (unsigned long) id->data;
+> +
+> +		voltage_select = !!of_get_property(dev->of_node,
+> +						   "active-semi,vsel-high",
+> +						   NULL);
+>  	} else {
+>  		type = i2c_id->driver_data;
+>  	}
+> @@ -442,8 +457,13 @@ static int act8865_pmic_probe(struct i2c_client *client,
+>  		off_mask = ACT8846_OFF_SYSMASK;
+>  		break;
+>  	case ACT8865:
+> -		regulators = act8865_regulators;
+> -		num_regulators = ARRAY_SIZE(act8865_regulators);
+> +		if (voltage_select) {
+
+I would directly do
+
+if (of_get_property(dev->of_node, "active-semi,vsel-high", NULL) {
+
+> +			regulators = act8865_alt_regulators;
+> +			num_regulators = ARRAY_SIZE(act8865_alt_regulators);
+> +		} else {
+> +			regulators = act8865_regulators;
+> +			num_regulators = ARRAY_SIZE(act8865_regulators);
+> +		}
+>  		off_reg = ACT8865_SYS_CTRL;
+>  		off_mask = ACT8865_MSTROFF;
+>  		break;
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
