@@ -1,46 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 Sep 2015 10:08:59 +0100
-Subject: [PATCH 1/4] of: Add of_parse_phandle_with_opt_args() helper
- function
-In-Reply-To: <CAL_JsqLWPfi9ynLbkzHkpcSHHg3ciwCcAN1uGcjXhnBAXZ74zw@mail.gmail.com>
-References: <1442944336-11754-1-git-send-email-marc.zyngier@arm.com>
- <1442944336-11754-2-git-send-email-marc.zyngier@arm.com>
- <CAL_JsqLWPfi9ynLbkzHkpcSHHg3ciwCcAN1uGcjXhnBAXZ74zw@mail.gmail.com>
-Message-ID: <560BA6AB.3060500@arm.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Wed, 30 Sep 2015 11:10:43 +0200
+Subject: [PATCH v4 2/5] ARM: mvebu: enable broken-idle on Armada 38x
+In-Reply-To: <1443604246-29844-1-git-send-email-simon.guinot@sequanux.org>
+References: <1443604246-29844-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <1443604246-29844-3-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/09/15 18:28, Rob Herring wrote:
-> On Tue, Sep 22, 2015 at 12:52 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> of_parse_phandle_with_args() is slightly inflexible as it doesn't
->> allow the (unusual) case where the #*-cells property is not defined.
->> In order to support this, introduce of_parse_phandle_with_opt_args()
->> which assumes that #*-cells is zero when it is not defined,
-> 
-> zero or cell_count - 1?
+From: Vincent Donnefort <vdonnefort@gmail.com>
 
-Zero is how the lack of #msi-cells property is interpreted. (cell_count
-- 1) is how this is implemented.
+Following the broken-idle DT property introduction, this patch enables
+this option for the Armada 38x SoCs. This allows to deactivate the idle
+state which is currently broken on this SoCs.
 
-> I would be okay with always assuming zero rather than being an error
-> if that simplifies things. It is not really the kernel's job to be a
-> dtb validator.
+Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
+---
+ arch/arm/boot/dts/armada-38x.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-I'd be fine with that too. I'd just like it to be a defined behaviour,
-not an unexpected side effect.
-
-> Also, I assume this was done for some compatibility? In general, we
-> should be explicit, so "#msi-cells = <0>" should be recommended and we
-> should update dts files if they are not.
-
-I agree that over time, we should update the existing DTS. But I hear
-Mark chanting "Stable DT" behind me, so I'm inclined to provide an
-transition path... ;-)
-
-I'll respin the series later today.
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index f9f2347d9995..6d29afe12892 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -422,6 +422,7 @@
+ 			coherency-fabric at 21010 {
+ 				compatible = "marvell,armada-380-coherency-fabric";
+ 				reg = <0x21010 0x1c>;
++				broken-idle;
+ 			};
+ 
+ 			pmsu at 22000 {
 -- 
-Jazz is not dead. It just smells funny...
+2.1.4
