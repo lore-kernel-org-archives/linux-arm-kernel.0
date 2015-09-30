@@ -1,36 +1,34 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Wed, 30 Sep 2015 10:10:16 -0600
-Subject: [PATCH v5 0/5] Provide better MADT subtable sanity checks
-In-Reply-To: <560BA4C9.7090607@huawei.com>
-References: <1443570346-15378-1-git-send-email-al.stone@linaro.org>
- <560BA4C9.7090607@huawei.com>
-Message-ID: <560C0968.6020904@redhat.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 30 Sep 2015 18:10:55 +0200
+Subject: [PATCH 02/16] clk: at91: system: don't try to free_irq when there is
+ no IRQ
+In-Reply-To: <1443629469-15086-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1443629469-15086-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1443629469-15086-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/2015 03:00 AM, Hanjun Guo wrote:
-> On 2015/9/30 7:45, Al Stone wrote:
->> NB: this patch set is for use against the linux-pm bleeding edge branch.
->>
+In the error path of at91_clk_register_system(), sys->irq is freed
+unconditionally but it may not exist or be request at all.
 
-[snip...]
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/clk/at91/clk-system.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> 
-> For this patch set,
-> 
-> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-> 
-> Thanks
-> Hanjun
-
-Thanks, Hanjun!
-
+diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
+index 58008b3e8bc1..3f5314344286 100644
+--- a/drivers/clk/at91/clk-system.c
++++ b/drivers/clk/at91/clk-system.c
+@@ -138,7 +138,8 @@ at91_clk_register_system(struct at91_pmc *pmc, const char *name,
+ 
+ 	clk = clk_register(NULL, &sys->hw);
+ 	if (IS_ERR(clk)) {
+-		free_irq(sys->irq, sys);
++		if (irq)
++			free_irq(sys->irq, sys);
+ 		kfree(sys);
+ 	}
+ 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+2.1.4
