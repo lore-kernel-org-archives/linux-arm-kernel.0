@@ -1,40 +1,56 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 30 Sep 2015 14:47:39 +0200
-Subject: [PATCH] mmc: core: fix dead loop of mmc_retune
-In-Reply-To: <560BCF1B.7050302@intel.com>
-References: <1443605838-5948-1-git-send-email-chaotian.jing@mediatek.com>
- <560BCF1B.7050302@intel.com>
-Message-ID: <CAPDyKFrVWGP2nXZR63v0r7eRKmHuKdX1=FMjGRhOaNtDaKTg8Q@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 30 Sep 2015 13:53:35 +0100
+Subject: [PATCH 0/8] nvmem: new drivers for v4.4
+Message-ID: <1443617615-26261-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 September 2015 at 14:01, Adrian Hunter <adrian.hunter@intel.com> wrote:
-> On 30/09/15 12:37, Chaotian Jing wrote:
->> When get a CRC error, start the mmc_retune, it will issue CMD19/CMD21
->> to do tune, assume there were 10 clock phase need to try, phase 0 to
->> phase 6 is ok, phase 7 to phase 9 is NG, we try it from 0 to 9, so
->> the last CMD19/CMD21 will get CRC error, host->need_retune was set and
->> cause mmc_retune was called, then dead loop of mmc_retune
->>
->> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
->
-> Wasn't my idea to have this CRC checking in the core ;-) and sdhci
-> doesn't put it's tuning commands through a mmc request so it doesn't
-> see this issue.
+Hi Greg,
 
-That's not true for all sdhci variants. For those that uses sdhci's
-->platform_execute_tuning() callback, all uses mmc_send_tuning().
+Here are 4 new nvmem drivers which are in the mailing list for long time
+and are good to go for some testing and find its way to v4.4-rc*.
 
-I think for sdhci's default tuning path, we should change to use
-mmc_send_tuning() and thus we would potentially hit this problem as
-well.
+Could you please take these patches via char-misc tree.
 
->
-> But definitely the CRC logic is not meant for the tuning commands, so
->
-> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+Thanks,
+srini
 
-Thanks for reviewing Adrian and for keeping an eye on "tuning" related patches.
 
-Kind regards
-Uffe
+Philipp Zabel (2):
+  nvmem: Add i.MX6 OCOTP device tree binding documentation
+  nvmem: imx-ocotp: Add i.MX6 OCOTP driver
+
+Sanchayan Maity (2):
+  nvmem: Add DT binding documentation for Vybrid OCOTP driver
+  nvmem: Add Vybrid OCOTP support
+
+Stefan Wahren (2):
+  nvmem: add binding for mxs-ocotp
+  nvmem: add driver for ocotp in i.MX23 and i.MX28
+
+ZhengShunQian (2):
+  nvmem: rockchip-efuse: describe the usage of eFuse
+  nvmem: Adding bindings for rockchip-efuse
+
+ .../devicetree/bindings/nvmem/imx-ocotp.txt        |  20 ++
+ .../devicetree/bindings/nvmem/mxs-ocotp.txt        |  25 ++
+ .../devicetree/bindings/nvmem/rockchip-efuse.txt   |  38 +++
+ .../devicetree/bindings/nvmem/vf610-ocotp.txt      |  19 ++
+ drivers/nvmem/Kconfig                              |  42 +++
+ drivers/nvmem/Makefile                             |   8 +
+ drivers/nvmem/imx-ocotp.c                          | 154 +++++++++++
+ drivers/nvmem/mxs-ocotp.c                          | 257 ++++++++++++++++++
+ drivers/nvmem/rockchip-efuse.c                     | 186 +++++++++++++
+ drivers/nvmem/vf610-ocotp.c                        | 302 +++++++++++++++++++++
+ 10 files changed, 1051 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
+ create mode 100644 Documentation/devicetree/bindings/nvmem/mxs-ocotp.txt
+ create mode 100644 Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt
+ create mode 100644 Documentation/devicetree/bindings/nvmem/vf610-ocotp.txt
+ create mode 100644 drivers/nvmem/imx-ocotp.c
+ create mode 100644 drivers/nvmem/mxs-ocotp.c
+ create mode 100644 drivers/nvmem/rockchip-efuse.c
+ create mode 100644 drivers/nvmem/vf610-ocotp.c
+
+-- 
+1.9.1
