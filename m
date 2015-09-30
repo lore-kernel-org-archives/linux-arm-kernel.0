@@ -1,87 +1,65 @@
 From: aalonso@freescale.com (Adrian Alonso)
-Date: Wed, 30 Sep 2015 11:11:08 -0500
-Subject: [PATCH v8 6/7] pinctrl: freescale: imx7d: support iomux lpsr
- controller
+Date: Wed, 30 Sep 2015 11:11:06 -0500
+Subject: [PATCH v8 4/7] pinctrl: freescale: imx: allow mux_reg offset zero
 In-Reply-To: <1443629469-12294-1-git-send-email-aalonso@freescale.com>
 References: <1443629469-12294-1-git-send-email-aalonso@freescale.com>
-Message-ID: <1443629469-12294-6-git-send-email-aalonso@freescale.com>
+Message-ID: <1443629469-12294-4-git-send-email-aalonso@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iMX7D has two iomuxc controllers, iomuxc controller similar as
-previous iMX SoC generation and iomuxc-lpsr which provides low
-power state rentetion capabilities on gpios that are part of
-iomuxc-lpsr
-
-Add iomuxc-lpsr gpio group id's
+Allow mux_reg offset zero to be a valid pin_id, on imx7d
+mux_conf reg offset is zero for iomuxc-lspr controller
 
 Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 ---
-Changes for V2: Add imx7d_lpsr_pads enums
+Changes for V2: Resend
 Changes for V3: Resend
-Changes for V4: Resend
-Changes for V5: Remove flags SHARE_INPUT_SELECT_REG and ZERO_OFFSET_VALID.
-Changes for V6: Restore ZERO_OFFSET_VALID flag.
+Changes for V4: Simplify pin_id assigment when ZERO_OFFSET_VALID is set
+Changes for V5:
+- Drop patch pinctrl: freescale: imx: add ZERO_OFFSET_VALID flag
+- Allow mux_reg ZERO OFFSET as pin_id
+Changes for V6: Restore ZERO_OFFSET_VALID flag
 Changes for V7: Resend
 Changes for V8: Resend
 
- drivers/pinctrl/freescale/pinctrl-imx7d.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ drivers/pinctrl/freescale/pinctrl-imx.c | 5 ++++-
+ drivers/pinctrl/freescale/pinctrl-imx.h | 1 +
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx7d.c b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-index 1fa7530..16dc925 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx7d.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-@@ -174,6 +174,17 @@ enum imx7d_pads {
- 	MX7D_PAD_ENET1_COL = 154,
- };
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+index b9c6deb..151d50d 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+@@ -542,6 +542,9 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
+ 		struct imx_pin_reg *pin_reg;
+ 		struct imx_pin *pin = &grp->pins[i];
  
-+enum imx7d_lpsr_pads {
-+	MX7D_PAD_GPIO1_IO00 = 0,
-+	MX7D_PAD_GPIO1_IO01 = 1,
-+	MX7D_PAD_GPIO1_IO02 = 2,
-+	MX7D_PAD_GPIO1_IO03 = 3,
-+	MX7D_PAD_GPIO1_IO04 = 4,
-+	MX7D_PAD_GPIO1_IO05 = 5,
-+	MX7D_PAD_GPIO1_IO06 = 6,
-+	MX7D_PAD_GPIO1_IO07 = 7,
-+};
++		if (!(info->flags & ZERO_OFFSET_VALID) && !mux_reg)
++			mux_reg = -1;
 +
- /* Pad names for the pinmux subsystem */
- static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
- 	IMX_PINCTRL_PIN(MX7D_PAD_RESERVE0),
-@@ -333,13 +344,32 @@ static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
- 	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_COL),
+ 		if (info->flags & SHARE_MUX_CONF_REG) {
+ 			conf_reg = mux_reg;
+ 		} else {
+@@ -550,7 +553,7 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
+ 				conf_reg = -1;
+ 		}
+ 
+-		pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
++		pin_id = (mux_reg != -1) ? mux_reg / 4 : conf_reg / 4;
+ 		pin_reg = &info->pin_regs[pin_id];
+ 		pin->pin = pin_id;
+ 		grp->pin_ids[i] = pin_id;
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.h b/drivers/pinctrl/freescale/pinctrl-imx.h
+index 2a5fe72..2a592f6 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.h
++++ b/drivers/pinctrl/freescale/pinctrl-imx.h
+@@ -85,6 +85,7 @@ struct imx_pinctrl_soc_info {
  };
  
-+/* Pad names for the pinmux subsystem */
-+static const struct pinctrl_pin_desc imx7d_lpsr_pinctrl_pads[] = {
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO00),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO01),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO02),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO03),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO04),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO05),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO06),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO07),
-+};
-+
- static struct imx_pinctrl_soc_info imx7d_pinctrl_info = {
- 	.pins = imx7d_pinctrl_pads,
- 	.npins = ARRAY_SIZE(imx7d_pinctrl_pads),
- };
+ #define SHARE_MUX_CONF_REG	0x1
++#define ZERO_OFFSET_VALID	0x2
  
-+static struct imx_pinctrl_soc_info imx7d_lpsr_pinctrl_info = {
-+	.pins = imx7d_lpsr_pinctrl_pads,
-+	.npins = ARRAY_SIZE(imx7d_lpsr_pinctrl_pads),
-+	.flags = ZERO_OFFSET_VALID,
-+};
-+
- static struct of_device_id imx7d_pinctrl_of_match[] = {
- 	{ .compatible = "fsl,imx7d-iomuxc", .data = &imx7d_pinctrl_info, },
-+	{ .compatible = "fsl,imx7d-iomuxc-lpsr", .data = &imx7d_lpsr_pinctrl_info },
- 	{ /* sentinel */ }
- };
- 
+ #define NO_MUX		0x0
+ #define NO_PAD		0x0
 -- 
 2.1.4
