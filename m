@@ -1,30 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 30 Sep 2015 14:04:30 +0100
-Subject: [PATCH v5 00/22] xen/arm64: Add support for 64KB page in Linux
-In-Reply-To: <560BCB67.1060100@citrix.com>
-References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
- <20150930113214.GA10997@leverpostej> <560BCB67.1060100@citrix.com>
-Message-ID: <20150930130429.GG10997@leverpostej>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Wed, 30 Sep 2015 15:05:18 +0200
+Subject: [RESEND][PATCH v3 0/2] ARM: dts: add Okaya LCD display for Nitrogen
+ and Sabrelite
+In-Reply-To: <1432314867-30888-1-git-send-email-gary.bisson@boundarydevices.com>
+References: <1432314867-30888-1-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1443618320-12708-1-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Just to check, would this be expected to work with a 16K DomU (e.g.
-> > [2])?
-> > 
-> > From a quick scan it looks like the relaxations provided by this series
-> > should work so long as PAGE_SIZE % XEN_PAGE_SIZE == 0, assuming I
-> > haven't missed something.
-> 
-> Correct, this series is able to cope with any PAGE_SIZE as long as it's
-> a multiple of the granularity used by Xen (i.e 4KB on ARM).
+This is just a resend of my v3 with Shawn's correct e-mail address. I've also
+made sure it applies (and builds) on latest linux-next 20150930.
 
-[...]
+This series adds the Okaya 7" LCD support as a simple panel for both Nitrogen
+and Sabrelite.
 
-> > Would any of these require more work to also handle 16K?
-> 
-> No. It should just boot on Xen as long as the CPU is support 16K
-> granularity.
+This v3 updates the series as the compatible name has been changed from
+"okaya,rs800480t_7x0gp" to "okaya,rs800480t-7x0gp" when the drm patch has been
+merged into linux-next branch.
+http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=ec9000c
 
-Great to hear, thanks!
+Also note that Philipp Zabel's patch that enables the parallel-display driver
+to work with a simple panel has been merged.
+http://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/commit/?id=553a59f
 
-Mark.
+A U-Boot script to configure the displays based on detection of the
+touch controller is available for reference here:
+https://github.com/boundarydevices/u-boot-imx6/blob/staging/board/boundary/nitrogen6x/6x_bootscript-mainline.txt
+
+
+Gary Bisson (2):
+  ARM: dts: imx6qdl-nitrogen6x: add Okaya LCD panel
+  ARM: dts: imx6qdl-sabrelite: add Okaya LCD panel
+
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 76 ++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 76 ++++++++++++++++++++++++++++++-
+ 2 files changed, 150 insertions(+), 2 deletions(-)
+
+-- 
+2.5.3
