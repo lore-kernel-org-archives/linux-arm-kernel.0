@@ -1,49 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 30 Sep 2015 14:36:07 +0200
-Subject: [PATCH v2 6/7] ARM64: smp: Add runtime PM support for CPU hotplug
-In-Reply-To: <1441310314-8857-7-git-send-email-lina.iyer@linaro.org>
-References: <1441310314-8857-1-git-send-email-lina.iyer@linaro.org>
- <1441310314-8857-7-git-send-email-lina.iyer@linaro.org>
-Message-ID: <CAMuHMdWVCHRxhMHTzussPFXEu_CAed+nyfOSGF9vmA-z9X9OaQ@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 30 Sep 2015 13:36:10 +0100
+Subject: [PATCH 3/4] nvmem: core: Fix memory leak in nvmem_cell_write
+In-Reply-To: <1443616298-17389-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1443616298-17389-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1443616570-17825-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lina,
+From: Axel Lin <axel.lin@ingics.com>
 
-On Thu, Sep 3, 2015 at 9:58 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index dbdaacd..4076962 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -135,6 +135,7 @@ asmlinkage void secondary_start_kernel(void)
->  {
->         struct mm_struct *mm = &init_mm;
->         unsigned int cpu = smp_processor_id();
-> +       struct device *cpu_dev;
->
->         /*
->          * All kernel threads share the same mm context; grab a
-> @@ -185,6 +186,11 @@ asmlinkage void secondary_start_kernel(void)
->         local_irq_enable();
->         local_async_enable();
->
-> +       /* We are running, enable runtime PM for the CPU. */
-> +       cpu_dev = get_cpu_device(cpu);
-> +       if (cpu_dev)
-> +               pm_runtime_get_sync(cpu_dev);
+A tmp buffer is allocated if cell->bit_offset || cell->nbits.
+So the tmp buffer needs to be freed at the same condition to avoid leak.
 
-arch/arm64/kernel/smp.c:192:3: error: implicit declaration of function
-'pm_runtime_get_sync' [-Werror=implicit-function-declaration]
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/nvmem/core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Adding #include <linux/pm_runtime.h> fixes compilation.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index 676607c..6fd4e5a 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -938,7 +938,7 @@ int nvmem_cell_write(struct nvmem_cell *cell, void *buf, size_t len)
+ 	rc = regmap_raw_write(nvmem->regmap, cell->offset, buf, cell->bytes);
+ 
+ 	/* free the tmp buffer */
+-	if (cell->bit_offset)
++	if (cell->bit_offset || cell->nbits)
+ 		kfree(buf);
+ 
+ 	if (IS_ERR_VALUE(rc))
+-- 
+1.9.1
