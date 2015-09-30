@@ -1,51 +1,38 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 30 Sep 2015 12:07:14 +0200
-Subject: [GIT PULL] clockevents: a couple of fixes 4.3
-Message-ID: <560BB452.1020000@linaro.org>
+Date: Wed, 30 Sep 2015 12:08:29 +0200
+Subject: [PATCH 1/2] clocksource/drivers/rockchip: Fix bad NO_IRQ usage
+In-Reply-To: <560BB452.1020000@linaro.org>
+References: <560BB452.1020000@linaro.org>
+Message-ID: <1443607710-10415-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The current code assumes the 'irq_of_parse_and_map' will return NO_IRQ in case
+of failure. Unfortunately, the NO_IRQ is not consistent across the different
+architectures and we must not rely on it.
 
-Hi Thomas,
+NO_IRQ is equal to '-1' on ARM and 'irq_of_parse_and_map' returns '0' in case
+of an error. Hence, the latter won't be detected and will lead to a crash.
 
-this pull request contains a couple of fixes removing the NO_IRQ usage:
+Fix this by just checking 'irq' is different from zero.
 
-  - Removed bad usage of the NO_IRQ macro which prevent to detect an 
-error when calling irq_of_parse_and_map on the rockchip and keystone 
-timers (Daniel Lezcano)
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/rockchip_timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks !
-
-   -- Daniel
-
-
-The following changes since commit eef7635a22f6b144206b5ca2f1398f637acffc4d:
-
-   clockevents: Remove unused set_mode() callback (2015-09-14 11:00:55 
-+0200)
-
-are available in the git repository at:
-
-   http://git.linaro.org/people/daniel.lezcano/clockevents.git 
-clockevents/4.3-fixes
-
-for you to fetch changes up to bdf7344e14d826d0df438a55fc51146d179e198d:
-
-   clocksource/drivers/keystone: Fix bad NO_IRQ usage (2015-09-29 
-14:33:51 +0200)
-
-----------------------------------------------------------------
-Daniel Lezcano (2):
-       clocksource/drivers/rockchip: Fix bad NO_IRQ usage
-       clocksource/drivers/keystone: Fix bad NO_IRQ usage
-
-  drivers/clocksource/rockchip_timer.c | 2 +-
-  drivers/clocksource/timer-keystone.c | 2 +-
-  2 files changed, 2 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+index bb2c2b0..d3c1742 100644
+--- a/drivers/clocksource/rockchip_timer.c
++++ b/drivers/clocksource/rockchip_timer.c
+@@ -148,7 +148,7 @@ static void __init rk_timer_init(struct device_node *np)
+ 	bc_timer.freq = clk_get_rate(timer_clk);
+ 
+ 	irq = irq_of_parse_and_map(np, 0);
+-	if (irq == NO_IRQ) {
++	if (!irq) {
+ 		pr_err("Failed to map interrupts for '%s'\n", TIMER_NAME);
+ 		return;
+ 	}
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.9.1
