@@ -1,57 +1,46 @@
-From: w.f@huawei.com (Fei Wang)
-Date: Wed, 30 Sep 2015 19:05:03 +0800
-Subject: [PATCH 0/8] Add Support for Hi6220 PMIC Hi6553 MFD Core and Regulator
-Message-ID: <1443611111-3196-1-git-send-email-w.f@huawei.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Wed, 30 Sep 2015 14:16:42 +0300
+Subject: [RFC PATCH 03/20] coresight: etm3x: implementing 'cpu_id()' API
+In-Reply-To: <1442593594-10665-4-git-send-email-mathieu.poirier@linaro.org>
+References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
+ <1442593594-10665-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <87h9mcjgx1.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch sets add support for Hi6220 PMIC Hi655x MFD core and its regulator driver.
-Current testing and support board is Hikey  which is one of Linaro 96boards.
-It is an arm64 open source board. For more information about this board,
-please access https://www.96boards.org.
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-This is hardware layout for access PMIC Hi655x from AP SoC Hi6220.
-Between PMIC Hi655x and Hi6220, the physical signal channel is SSI.We can use memory-mapped I/O to communicate.
+> Adding an interface to lookup the CPU a tracer has been affined
+> to along with a source operation allowing external customers to
+> access it.
+>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  drivers/hwtracing/coresight/coresight-etm3x.c | 14 ++++++++++++++
+>  include/linux/coresight.h                     |  3 +++
+>  2 files changed, 17 insertions(+)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+> index a44bc3532585..4ce9cfc06e93 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+> @@ -441,6 +441,19 @@ static void etm_config_enable(void *info)
+>  	spin_unlock(&drvdata->spinlock);
+>  }
+>  
+> +static int etm_cpu_id(struct coresight_device *csdev)
+> +{
+> +	int cpu;
+> +	unsigned long flags;
+> +	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+> +
+> +	spin_lock_irqsave(&drvdata->spinlock, flags);
+> +	cpu = drvdata->cpu;
+> +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
 
-+----------------+             +-------------+
-|                |             |             |
-|    Hi6220      |   SSI bus   |   Hi655x    |
-|                |-------------|             |
-|                |(REGMAP_MMIO)|             |
-+----------------+             +-------------+
+Why do you need a spinlock here? Afaict, it never changes and if it
+would, things would go really bad really fast.
 
-This patchset are based on 4.3-rc1.
-
-Fei Wang (8):
-  dt-bindings: pmic: Document Hi655x pmic driver
-  mfd: Hi655x: Add support for PMIC Hi655x MFD
-  arm64: dts: add Hi655x pmic node
-  regulator: Hi655x: Add support for Hi655x regulator
-  arm64: dts: Add Hi655x regulator config node
-  dt-bindings: mtcmos: Document Hi6220 mtcmos driver
-  mtcmos: Hi6220: Add Hi6220 mtcmos regulator driver
-  arm64: dts: Add Hi6220 mtcmos regulator node
-
- .../devicetree/bindings/mfd/hisilicon,hi655x.txt   |   80 +++
- .../bindings/regulator/hisilicon,hi6220-mtcmos.txt |   32 ++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  275 +++++++++++
- drivers/mfd/Kconfig                                |    9 +
- drivers/mfd/Makefile                               |    1 +
- drivers/mfd/hi655x-pmic.c                          |  358 ++++++++++++++
- drivers/regulator/Kconfig                          |   16 +
- drivers/regulator/Makefile                         |    2 +
- drivers/regulator/hi6220-mtcmos.c                  |  281 +++++++++++
- drivers/regulator/hi655x-regulator.c               |  517 ++++++++++++++++++++
- include/linux/mfd/hi655x-pmic.h                    |   56 +++
- include/linux/regulator/hi655x-regulator.h         |   69 +++
- 12 files changed, 1696 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
- create mode 100644 Documentation/devicetree/bindings/regulator/hisilicon,hi6220-mtcmos.txt
- create mode 100644 drivers/mfd/hi655x-pmic.c
- create mode 100644 drivers/regulator/hi6220-mtcmos.c
- create mode 100644 drivers/regulator/hi655x-regulator.c
- create mode 100644 include/linux/mfd/hi655x-pmic.h
- create mode 100644 include/linux/regulator/hi655x-regulator.h
-
--- 
-1.7.9.5
+Regards,
+--
+Alex
