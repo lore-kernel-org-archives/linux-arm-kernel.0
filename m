@@ -1,90 +1,51 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 30 Sep 2015 15:35:23 +0900
-Subject: [PATCH 4/4] ARM64: dts: exynos5433: add jpeg node
-In-Reply-To: <56092C54.1070507@samsung.com>
-References: <1442586060-23657-1-git-send-email-andrzej.p@samsung.com>
- <55FFD4FF.6090306@samsung.com> <5608FFBD.1030306@samsung.com>
- <2466182.YdnXZtSWXI@amdc1976> <56092C54.1070507@samsung.com>
-Message-ID: <560B82AB.4020907@kernel.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 30 Sep 2015 08:36:34 +0200
+Subject: [PATCH 0/2] mtd: nand: sunxi: cleanup
+In-Reply-To: <20150929222144.GA143959@google.com>
+References: <1442389597-30698-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150929222144.GA143959@google.com>
+Message-ID: <20150930083634.68351ade@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/15 21:02, Krzysztof Kozlowski wrote:
-> W dniu 28.09.2015 o 20:54, Bartlomiej Zolnierkiewicz pisze:
->>
->> Hi,
->>
->> On Monday, September 28, 2015 05:52:13 PM Krzysztof Kozlowski wrote:
->>> W dniu 21.09.2015 o 18:59, Andrzej Pietrasiewicz pisze:
->>>> Hi Hans,
->>>>
->>>> W dniu 21.09.2015 o 11:50, Hans Verkuil pisze:
->>>>> On 18-09-15 16:21, Andrzej Pietrasiewicz wrote:
->>>>>> From: Marek Szyprowski <m.szyprowski@samsung.com>
->>>>>>
->>>>>> Add Exynos 5433 jpeg h/w codec node.
->>>>>>
->>>>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>>>>> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
->>>>>> ---
->>>>>>   arch/arm64/boot/dts/exynos/exynos5433.dtsi | 21 +++++++++++++++++++++
->>>>>>   1 file changed, 21 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->>>>>> b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->>>>>
->>>>> This dtsi file doesn't exist in the media-git tree. What is the story
->>>>> here?
->>>>>
->>>>> Should this go through a different subsystem?
->>>>>
->>>>> I think the media subsystem can take patches 1-3 and whoever does DT
->>>>> patches can
->>>>> take this patch, right?
->>>>
->>>> The cover letter explains that the series is rebased onto Mauro's
->>>> master with Kukjin's branch merged. The latter does contain
->>>> the exynos5433.dtsi. That said, yes, taking patches 1-3 in
->>>> media subsystem and leaving DT patch to someone else is the
->>>> way to go.
->>>
->>> Although Kukjin picked Exynos 5433 ARM64 patches but they were not
->>> accepted upstream by arm-soc. He rolled it for few releases but:
->>> 1. Reason for not accepting by arm-soc was not resolved - there is no DTS.
->>> 2. Kukjin did not rebase the branch for 4.4... which maybe means that he
->>> wants to drop it?
->>> 3. Anyone (but me...) can send Galaxy Note4 (Exynos5433) DTS file based
->>> on sources on opensource.samsung.com. The DTS there is for 32-bit but it
->>> can be probably easily adjusted for ARM64.
->>>
->>> All of this means that Device Tree support for this driver can't be
->>> merged now and effort for mainlining 5433 may be unfortunately wasted...
->>
->> Exynos5433 support is being incrementally merged (clocks, drm, phy,
->> pinctrl, thermal and tty support is already in upstream or -next).
->>
->> I don't know why DTS changes got stuck in Kukjin's tree (Kukjin,
->> could you please explain?) but I think that this shouldn't not stop
->> us from continuing Exynos5433 upstreaming effort.
+Hi Brian,
+
+On Tue, 29 Sep 2015 15:21:44 -0700
+Brian Norris <computersforpeace@gmail.com> wrote:
+
+> On Wed, Sep 16, 2015 at 09:46:35AM +0200, Boris Brezillon wrote:
+> > Hello,
+> > 
+> > Those two patches aim at cleaning up the sunxi_nand driver by first adding
+> > some consistency in the macro definitions, and then factorizing the code
+> > duplicated code found in hw_ecc and hw_syndrome_ecc implementations.
+> > 
+> > Best Regards,
+> > 
+> > Boris
 > 
-> I already explained. There is no DTS, so the pull request was rejected
-> (pull request for v4.0 I believe).
-> 
-+ Chanwoo Choi
+> I believe this series no longer applies cleanly
 
-Yes right, as Krzysztof commented, the pull-request has been rejected by
-arm-soc even I explained it has been tested on smdk5433, because it will
-not be compiled without relevant board DT file. And I've rebased when
-new -rc1 released until 4.3...because Chanwoo said at that time that
-regarding DT file will be submitted but not yet...
+Hm, actually it depends on fixes you have in your linux-mtd tree and
+features in your l2-mtd tree.
 
-To be honest, I'm not sure I can keep the exynos5433 changes for v4.4 in
-my tree at this moment...
+I don't know how you usually deal with those problems (merging the
+linux-mtd/master branch into the l2-mtd/master one, or merging
+last linus' -rc into l2-mtd/master should work), but I'd really
+like to have this in 4.4 :-).
+I still have the patch using the nand_check_erased_ecc_chunk() function
+which depends on those 2 patches, and I'd like to have it in 4.4 too.
 
-> It was not about adding drivers for 5433's clocks/phy/pinctrl etc. It
-> was about DTS.
+I know I'm asking a lot, but as explained earlier, I still have a
+bunch of patches on top of those already posted (mainly to support
+the hardware randomizer), and I'd like the trivial ones to be merged
+quickly.
 
-Could be...hmm...
+Best Regards,
 
-Thanks,
-Kukjin
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
