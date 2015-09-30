@@ -1,73 +1,52 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 30 Sep 2015 12:58:11 +0300
-Subject: [RFC PATCH 01/20] coresight: etm3x: splitting 'etm_enable_hw()'
- operations
-In-Reply-To: <1442593594-10665-2-git-send-email-mathieu.poirier@linaro.org>
-References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
- <1442593594-10665-2-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <87r3lgjkjw.fsf@ashishki-desk.ger.corp.intel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 30 Sep 2015 11:59:01 +0200
+Subject: [PATCH v4 2/5] ARM: mvebu: enable broken-idle on Armada 38x
+In-Reply-To: <1443604246-29844-3-git-send-email-simon.guinot@sequanux.org>
+ (Simon Guinot's message of "Wed, 30 Sep 2015 11:10:43 +0200")
+References: <1443604246-29844-1-git-send-email-simon.guinot@sequanux.org>
+ <1443604246-29844-3-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <874micqlcq.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+Hi Simon and Vincent,
 
-> -static void etm_enable_hw(void *info)
-> +static void etm_power_up_cpu(void *info)
->  {
-> -	int i;
-> -	u32 etmcr;
-> -	struct etm_drvdata *drvdata = info;
-> +	struct coresight_device *csdev = info;
-> +	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-> +
-> +	WARN_ON(drvdata->cpu != smp_processor_id());
+ On mer., sept. 30 2015, Simon Guinot <simon.guinot@sequanux.org> wrote:
 
-Maybe WARN_ON_ONCE() is sufficient here (and other similar places).
+> From: Vincent Donnefort <vdonnefort@gmail.com>
+>
+> Following the broken-idle DT property introduction, this patch enables
+> this option for the Armada 38x SoCs. This allows to deactivate the idle
+> state which is currently broken on this SoCs.
 
-> +static void etm_power_down_cpu(void *info)
-> +{
-> +	struct coresight_device *csdev = info;
-> +	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-> +
-> +	WARN_ON(drvdata->cpu != smp_processor_id());
+As explained in the previous email I would like that Armada 38x don't
+use this flag.
 
-Likewise.
+Thanks,
 
-> +/**
-> + * etm_configure_cpu - configure ETM registers
-> + * @csdev - the etm that needs to be configure.
-> + *
-> + * Applies a configuration set to the ETM registers _without_ enabling the
-> + * tracer.  This function needs to be executed on the CPU who's tracer is
-> + * being configured.
-> + */
-> +static void etm_configure_cpu(void *info)
-> +{
-> +	int i;
-> +	u32 etmcr;
-> +	struct coresight_device *csdev = info;
-> +	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-> +
-> +	WARN_ON(drvdata->cpu != smp_processor_id());
+Gregory
 
-Likewise.
-
-> +
-> +	CS_UNLOCK(drvdata->base);
->  	etm_set_prog(drvdata);
+>
+> Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
+> ---
+>  arch/arm/boot/dts/armada-38x.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index f9f2347d9995..6d29afe12892 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -422,6 +422,7 @@
+>  			coherency-fabric at 21010 {
+>  				compatible = "marvell,armada-380-coherency-fabric";
+>  				reg = <0x21010 0x1c>;
+> +				broken-idle;
+>  			};
 >  
->  	etmcr = etm_readl(drvdata, ETMCR);
-> -	etmcr &= (ETMCR_PWD_DWN | ETMCR_ETM_PRG);
->  	etmcr |= drvdata->port_size;
->  	etm_writel(drvdata, drvdata->ctrl | etmcr, ETMCR);
->  	etm_writel(drvdata, drvdata->trigger_event, ETMTRIGGER);
+>  			pmsu at 22000 {
 
-Most of these things can also be bypassed, as at least initially perf
-events won't be using trigger/sequencer configurations, so we could
-simply clear all these things out when a first perf event is created
-(which would also disallow any sysfs poking around the etm/etb) and not
-worry about them in the pmu callbacks.
-
-Regards,
---
-Alex
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
