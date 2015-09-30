@@ -1,34 +1,48 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 30 Sep 2015 14:39:47 +0800
-Subject: [PATCH v2 3/3] ARM: dts: sun6i: hummingbird: Drop AXP221 DC1SW and
- DC5LDO supplies
-In-Reply-To: <1443595188-1283-1-git-send-email-wens@csie.org>
-References: <1443595188-1283-1-git-send-email-wens@csie.org>
-Message-ID: <1443595188-1283-4-git-send-email-wens@csie.org>
+Date: Wed, 30 Sep 2015 14:39:44 +0800
+Subject: [PATCH v2 0/3] regulator: axp20x: Drop AXP221 DC1SW/DC5LDO supplies
+ from bindings
+Message-ID: <1443595188-1283-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"dcdc1-supply" and "dcdc5-supply" have been dropped, as they are
-internally connected and should not be represented in the device
-tree.
+Hi everyone,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 2 --
- 1 file changed, 2 deletions(-)
+This is v2 of "regulators: axp20x: Rename AXP221 DC1SW and DC5LDO supply
+names". v2 removes the regulator supply properties for AXP221 DC1SW
+and DC5LDO, instead of renaming them. These 2 regulators are secondary
+outputs for DCDC1 and DCDC5 buck regulators, respectively, so they are
+connected to them internally. This relationship should not be represented
+in the device tree.
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-index 06d9391ca30e..f93cf4c42a7a 100644
---- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-@@ -178,8 +178,6 @@
- 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
- 		interrupt-controller;
- 		#interrupt-cells = <1>;
--		dcdc1-supply = <&vcc_3v0>;
--		dcdc5-supply = <&vcc_dram>;
- 
- 		regulators {
- 			x-powers,dcdc-freq = <3000>;
+
+Patch 1 drops the AXP22X DC1SW/DC5LDO supply properties from the axp20x
+DT bindings.
+
+Patch 2 updates the axp20x regulator driver.
+
+Patch 3 updates the only dts, the Hummingbird A31, that uses these
+bindings.
+
+If everything's ok, could we merge this for 4.4?
+
+Thanks.
+
+
+Regards,
+ChenYu
+
+
+Chen-Yu Tsai (3):
+  mfd: axp20x: Drop AXP221 DC1SW and DC5LDO regulator supplies from
+    bindings
+  regulator: axp20x: set supply names for AXP22X DC1SW/DC5LDO internally
+  ARM: dts: sun6i: hummingbird: Drop AXP221 DC1SW and DC5LDO supplies
+
+ Documentation/devicetree/bindings/mfd/axp20x.txt |  4 +-
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts      |  2 -
+ drivers/regulator/axp20x-regulator.c             | 54 ++++++++++++++++++++++--
+ 3 files changed, 52 insertions(+), 8 deletions(-)
+
 -- 
 2.5.3
