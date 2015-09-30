@@ -1,89 +1,47 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 30 Sep 2015 15:04:27 -0400
-Subject: [PATCH] arm64: convert patch_lock to raw lock
-In-Reply-To: <1443637392-6679-1-git-send-email-yang.shi@linaro.org>
-References: <1443637392-6679-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <20150930150427.2212bf80@gandalf.local.home>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Wed, 30 Sep 2015 21:08:00 +0200
+Subject: [PATCH] ARM: fix vdsomunge depends on glibc specific byteswap.h
+In-Reply-To: <560C271E.9060103@mentor.com>
+References: <cover.1443628457.git.hns@goldelico.com>
+ <2039A9BE-ADA4-4D28-84F4-C8B9D76834AD@goldelico.com>
+ <CAKv+Gu_098GVMeJPjDWaQ-uXek_cGUe4UMVy+fMdKw=_C+P7Tg@mail.gmail.com>
+ <B6E60776-A054-4749-BCAF-1433BFFC6AF7@goldelico.com>
+ <CAKv+Gu_6DibhUUPGrACCZE3S_k50rcO8A5ZcHh5c4UiDQUNApA@mail.gmail.com>
+ <560C1DD0.1000907@mentor.com>
+ <8B76E3E8-52BF-4803-B1F9-E5704A858870@goldelico.com>
+ <560C271E.9060103@mentor.com>
+Message-ID: <A323E65A-1631-4ADF-865D-04A5C38C6969@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Sep 2015 11:23:12 -0700
-Yang Shi <yang.shi@linaro.org> wrote:
 
-> When running kprobe test on arm64 rt kernel, it reports the below warning:
+Am 30.09.2015 um 20:17 schrieb Nathan Lynch <Nathan_Lynch@mentor.com>:
+
+> On 09/30/2015 12:47 PM, H. Nikolaus Schaller wrote:
+>> 
+>> Am 30.09.2015 um 19:37 schrieb Nathan Lynch <Nathan_Lynch@mentor.com>:
+>>> Why not just use a generic
+>>> implementation like is found in mips' elf2ecoff?
+>> 
+>> Do you have a reference?
+>> I can't find byte swapping in
+>> 
+>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/mips/boot/elf2ecoff.c?id=refs/tags/v4.3-rc3
 > 
-> root at qemu7:~# modprobe kprobe_example
-> BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
-> in_atomic(): 0, irqs_disabled(): 128, pid: 484, name: modprobe
-> CPU: 0 PID: 484 Comm: modprobe Not tainted 4.1.6-rt5 #2
-> Hardware name: linux,dummy-virt (DT)
-> Call trace:
-> [<ffffffc0000891b8>] dump_backtrace+0x0/0x128
-> [<ffffffc000089300>] show_stack+0x20/0x30
-> [<ffffffc00061dae8>] dump_stack+0x1c/0x28
-> [<ffffffc0000bbad0>] ___might_sleep+0x120/0x198
-> [<ffffffc0006223e8>] rt_spin_lock+0x28/0x40
-> [<ffffffc000622b30>] __aarch64_insn_write+0x28/0x78
-> [<ffffffc000622e48>] aarch64_insn_patch_text_nosync+0x18/0x48
-> [<ffffffc000622ee8>] aarch64_insn_patch_text_cb+0x70/0xa0
-
-OK, the above is called from stomp_machine().
-
-> [<ffffffc000622f40>] aarch64_insn_patch_text_sync+0x28/0x48
-> [<ffffffc0006236e0>] arch_arm_kprobe+0x38/0x48
-> [<ffffffc00010e6f4>] arm_kprobe+0x34/0x50
-> [<ffffffc000110374>] register_kprobe+0x4cc/0x5b8
-> [<ffffffbffc002038>] kprobe_init+0x38/0x7c [kprobe_example]
-> [<ffffffc000084240>] do_one_initcall+0x90/0x1b0
-> [<ffffffc00061c498>] do_init_module+0x6c/0x1cc
-> [<ffffffc0000fd0c0>] load_module+0x17f8/0x1db0
-> [<ffffffc0000fd8cc>] SyS_finit_module+0xb4/0xc8
+> See the swab16 and swab32 macros (yes, "swab" not "swap").
 > 
-> Convert patch_lock to raw loc kto avoid this issue.
-
-Yeah, I don't see anything in that lock that can sleep, or should
-take too much time (it's under stomp_machine). Looks like that should be
-raw.
-
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
-
--- Steve
-
+> Or the __constant_swab* macros in include/linux/uapi/swab.h.
 > 
-> Although the problem is found on rt kernel, the fix should be applicable to
-> mainline kernel too.
-> 
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> ---
->  arch/arm64/kernel/insn.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index f341866..c08b9ad 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -85,7 +85,7 @@ bool aarch64_insn_is_branch_imm(u32 insn)
->  		aarch64_insn_is_bcond(insn));
->  }
->  
-> -static DEFINE_SPINLOCK(patch_lock);
-> +static DEFINE_RAW_SPINLOCK(patch_lock);
->  
->  static void __kprobes *patch_map(void *addr, int fixmap)
->  {
-> @@ -131,13 +131,13 @@ static int __kprobes __aarch64_insn_write(void *addr, u32 insn)
->  	unsigned long flags = 0;
->  	int ret;
->  
-> -	spin_lock_irqsave(&patch_lock, flags);
-> +	raw_spin_lock_irqsave(&patch_lock, flags);
->  	waddr = patch_map(addr, FIX_TEXT_POKE0);
->  
->  	ret = probe_kernel_write(waddr, &insn, AARCH64_INSN_SIZE);
->  
->  	patch_unmap(FIX_TEXT_POKE0);
-> -	spin_unlock_irqrestore(&patch_lock, flags);
-> +	raw_spin_unlock_irqrestore(&patch_lock, flags);
->  
->  	return ret;
->  }
+
+Ah, I did search for swaP...
+
+And, I though that they are more conditional on the CPU endianness but that
+would be sort of htons() and ntohl() and friends.
+
+Then I see no problem adding such macros and getting rid of the #include
+completely. Which is compiler independent and OS independent.
+
+Will prepare and submit a V2 asap.
+
+Thanks and BR,
+Nikolaus
