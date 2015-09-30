@@ -1,51 +1,60 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Sep 2015 08:36:34 +0200
-Subject: [PATCH 0/2] mtd: nand: sunxi: cleanup
-In-Reply-To: <20150929222144.GA143959@google.com>
-References: <1442389597-30698-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150929222144.GA143959@google.com>
-Message-ID: <20150930083634.68351ade@bbrezillon>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 30 Sep 2015 08:38:23 +0200
+Subject: [PATCH] ARM: dts: Add Exynos5250 Snow Rev5+ support
+In-Reply-To: <CAD=FV=Vmdv6sTmbVyxE=04ycNCOzEWJpfMpzGnihOwaW0ZFzmQ@mail.gmail.com>
+References: <1443527855-434-1-git-send-email-javier@osg.samsung.com>
+ <CAD=FV=Vmdv6sTmbVyxE=04ycNCOzEWJpfMpzGnihOwaW0ZFzmQ@mail.gmail.com>
+Message-ID: <560B835F.6070708@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+Hello Doug,
 
-On Tue, 29 Sep 2015 15:21:44 -0700
-Brian Norris <computersforpeace@gmail.com> wrote:
+On 09/29/2015 07:28 PM, Doug Anderson wrote:
 
-> On Wed, Sep 16, 2015 at 09:46:35AM +0200, Boris Brezillon wrote:
-> > Hello,
-> > 
-> > Those two patches aim at cleaning up the sunxi_nand driver by first adding
-> > some consistency in the macro definitions, and then factorizing the code
-> > duplicated code found in hw_ecc and hw_syndrome_ecc implementations.
-> > 
-> > Best Regards,
-> > 
-> > Boris
+[snip]
+
 > 
-> I believe this series no longer applies cleanly
+> 
+>>  arch/arm/boot/dts/Makefile                    |   1 +
+>>  arch/arm/boot/dts/exynos5250-snow-common.dtsi | 684 ++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/exynos5250-snow-rev5.dts    |  47 ++
+>>  arch/arm/boot/dts/exynos5250-snow.dts         | 666 +------------------------
+>>  4 files changed, 733 insertions(+), 665 deletions(-)
+> 
+> Thanks!  Note:
+> 
+> $ pwclient git-am 7285451
+> Applying patch #7285451 using 'git am'
+> Description: ARM: dts: Add Exynos5250 Snow Rev5+ support
+> Applying: ARM: dts: Add Exynos5250 Snow Rev5+ support
+> .git/rebase-apply/patch:774: new blank line at EOF.
+> +
+> warning: 1 line adds whitespace errors.
+>
 
-Hm, actually it depends on fixes you have in your linux-mtd tree and
-features in your l2-mtd tree.
+sigh, sorry for missing that one.
+ 
+> 
+> One other nit is that the exynos5250-snow.dts" ends up with the
+> "max98095" pinctrl properties sorted differently than the
+> "exynos5250-snow-rev5.dts".  Is it worth reordering the
+> "exynos5250-snow.dts" in the same patch?
+>
 
-I don't know how you usually deal with those problems (merging the
-linux-mtd/master branch into the l2-mtd/master one, or merging
-last linus' -rc into l2-mtd/master should work), but I'd really
-like to have this in 4.4 :-).
-I still have the patch using the nand_check_erased_ecc_chunk() function
-which depends on those 2 patches, and I'd like to have it in 4.4 too.
+Right, I'll change exynos5250-snow.dts to have pinctrl-names
+before pinctrl-0 that will not only match max98090 properties
+order but also be consistent with the rest of the dev nodes.
+ 
+> Otherwise this looks fine to me.
+> 
+> Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> 
 
-I know I'm asking a lot, but as explained earlier, I still have a
-bunch of patches on top of those already posted (mainly to support
-the hardware randomizer), and I'd like the trivial ones to be merged
-quickly.
+Thanks a lot for your feedback and review!
 
-Best Regards,
-
-Boris
-
+Best regards,
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
