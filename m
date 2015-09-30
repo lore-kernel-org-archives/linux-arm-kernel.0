@@ -1,48 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Sep 2015 20:18:18 +0100
-Subject: [PATCH] arm64: dts: add all hi6220 uart nodes
-In-Reply-To: <CANMBJr7yY1PJChnFSRknqfOLORuWZSEONV+e=M=9heX3i-ADKA@mail.gmail.com>
-References: <1443558552-5734-1-git-send-email-tyler.baker@linaro.org>
- <1459065.BtzC7pyUYF@wuerfel> <20150930173145.GG15635@sirena.org.uk>
- <CANMBJr7yY1PJChnFSRknqfOLORuWZSEONV+e=M=9heX3i-ADKA@mail.gmail.com>
-Message-ID: <20150930191818.GZ15635@sirena.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 30 Sep 2015 23:10:47 +0300
+Subject: [PATCH 30/31] ARM: shmobile: r8a7791: add USB-DMAC device nodes
+In-Reply-To: <CAMuHMdWuAz1gGbFzgjn7mM+Q6fgqjSCG-+8VtZ+4AMJG72mbtg@mail.gmail.com>
+References: <cover.1431565427.git.horms+renesas@verge.net.au>
+ <e3e25edc1116ebf44b1813aff03b02b7737d41ca.1431565427.git.horms+renesas@verge.net.au>
+ <560B11FF.3010305@cogentembedded.com>
+ <CAMuHMdWuAz1gGbFzgjn7mM+Q6fgqjSCG-+8VtZ+4AMJG72mbtg@mail.gmail.com>
+Message-ID: <560C41C7.70200@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 11:12:58AM -0700, Tyler Baker wrote:
-> On 30 September 2015 at 10:31, Mark Brown <broonie@kernel.org> wrote:
+On 09/30/2015 09:44 AM, Geert Uytterhoeven wrote:
 
-> + Peter as he has been submitting u-boot patches recently for the HiKey.
+>>> From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+>>>
+>>> Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+>>> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>> ---
+>>>    arch/arm/boot/dts/r8a7791.dtsi | 22 ++++++++++++++++++++++
+>>>    1 file changed, 22 insertions(+)
 
-> Obviously, both UEFI and u-boot can be configured to use either UART,
-> and at the moment u-boot defaults to using the on board UART. Whereas
-> UEFI is using UART1 on the LS connector. I'm fine with switching the
-> console default to use the UART1 on the LS connector as long as there
-> is agreement to do so.
+>>     When the USB-DMAC driver is enabled, this causes kernel oops on at least
+>> the R8A7791 Henninger/Porter boards (haven't checked the others yet) with
+>> renesas-devel-20150928-v4.3-rc3 and even earlier tag. The oops can only be
+>> seen with the earlyprintk=serial kernel parameter, otherwise the kernel just
+>> hangs with a blank console.
+>
+> My current kernel on r8a7791/koelsch has CONFIG_RENESAS_USB_DMAC=y and boots
+> fine.
+>
+> renesas-devel-20150928-v4.3-rc3 with shmobile_defconfig +
+> CONFIG_RENESAS_USB_DMAC=y also boots fine.
 
-Given that UEFI is switching and the requirement for soldering to get to
-the on board UART it does seem to make sense, though it will create some
-pain for current users.
+    Indeed, I was able to boot it all the way on Henninger.
 
-> > While we're at it there was a recent talk which mentioned a fairly large
-> > amount of functionality that's apparently already "upstream" for this
-> > device but not included in the DT, assuming that means that driver
-> > support is there it would be good to add the corresponding DT.
+> Do I need to enable/disable config options to trigger this?
 
-> Indeed, I think this comment is targeted to toward the d410c though as
-> there are drivers for eMMC, and microsd drivers upstream but no DT
-> bindings. I do not believe currently this is the case for HiKey.
+    It appears so. I just don't know what -- the diff between my .config and 
+shmobile_defconfig is 150+ hunks. :-(
 
-My understanding is that it applies to both with slightly different
-driver sets, the slides aren't online yet (!) but if you look at 10:52
-or so in the video we should have SD/eMMC on HiKey in v4.1 with thermal
-and CPUfreq added in v4.2.  It also looks like there's just some DT
-additions needed to enable reset, cpuidle and CPU hotplug using generic
-code (mainly the constants for PSCI I expect).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/43e93f7a/attachment.sig>
+> Gr{oetje,eeting}s,
+>
+>                          Geert
+
+MBR, Sergei
