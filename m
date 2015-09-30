@@ -1,74 +1,46 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Wed, 30 Sep 2015 11:23:12 -0700
-Subject: [PATCH] arm64: convert patch_lock to raw lock
-Message-ID: <1443637392-6679-1-git-send-email-yang.shi@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 Sep 2015 19:46:55 +0100
+Subject: [PATCH 1/2] ASoC: rockchip: i2s: add 8 channels capture and
+ lrck-mode support
+In-Reply-To: <5608F74C.3000104@rock-chips.com>
+References: <1442979683-9441-1-git-send-email-sugar.zhang@rock-chips.com>
+ <1442979683-9441-2-git-send-email-sugar.zhang@rock-chips.com>
+ <20150923162433.GQ30445@sirena.org.uk>
+ <5608F74C.3000104@rock-chips.com>
+Message-ID: <20150930184655.GX15635@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When running kprobe test on arm64 rt kernel, it reports the below warning:
+On Mon, Sep 28, 2015 at 04:16:12PM +0800, sugar wrote:
+> ? 9/24/2015 00:24, Mark Brown ??:
 
-root at qemu7:~# modprobe kprobe_example
-BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
-in_atomic(): 0, irqs_disabled(): 128, pid: 484, name: modprobe
-CPU: 0 PID: 484 Comm: modprobe Not tainted 4.1.6-rt5 #2
-Hardware name: linux,dummy-virt (DT)
-Call trace:
-[<ffffffc0000891b8>] dump_backtrace+0x0/0x128
-[<ffffffc000089300>] show_stack+0x20/0x30
-[<ffffffc00061dae8>] dump_stack+0x1c/0x28
-[<ffffffc0000bbad0>] ___might_sleep+0x120/0x198
-[<ffffffc0006223e8>] rt_spin_lock+0x28/0x40
-[<ffffffc000622b30>] __aarch64_insn_write+0x28/0x78
-[<ffffffc000622e48>] aarch64_insn_patch_text_nosync+0x18/0x48
-[<ffffffc000622ee8>] aarch64_insn_patch_text_cb+0x70/0xa0
-[<ffffffc000622f40>] aarch64_insn_patch_text_sync+0x28/0x48
-[<ffffffc0006236e0>] arch_arm_kprobe+0x38/0x48
-[<ffffffc00010e6f4>] arm_kprobe+0x34/0x50
-[<ffffffc000110374>] register_kprobe+0x4cc/0x5b8
-[<ffffffbffc002038>] kprobe_init+0x38/0x7c [kprobe_example]
-[<ffffffc000084240>] do_one_initcall+0x90/0x1b0
-[<ffffffc00061c498>] do_init_module+0x6c/0x1cc
-[<ffffffc0000fd0c0>] load_module+0x17f8/0x1db0
-[<ffffffc0000fd8cc>] SyS_finit_module+0xb4/0xc8
+> >My initial thought here is that the machine driver should be responsible
+> >for setting this and then the DAI driver should check to see if
+> >symmetric_rates are in use and configure itself appropriately.  Is there
+> >a reason why this won't work here?
 
-Convert patch_lock to raw loc kto avoid this issue.
+> It's for i2s ip configuration, in the most situation, there is no need
+> to use this property, except one case:
 
-Although the problem is found on rt kernel, the fix should be applicable to
-mainline kernel too.
+> In order to save gpio pins for other function use, we may use single
+> lrck(tx or rx) pin. of course, it depends on product design. when in i2s
+> slave mode, we need to configure this to share lrck with tx/rx inside i2s
+> logic.
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
- arch/arm64/kernel/insn.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+> symmetric_rates flag works fine on rockchip platform, but it can't cover the
+> above case.
 
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index f341866..c08b9ad 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -85,7 +85,7 @@ bool aarch64_insn_is_branch_imm(u32 insn)
- 		aarch64_insn_is_bcond(insn));
- }
- 
--static DEFINE_SPINLOCK(patch_lock);
-+static DEFINE_RAW_SPINLOCK(patch_lock);
- 
- static void __kprobes *patch_map(void *addr, int fixmap)
- {
-@@ -131,13 +131,13 @@ static int __kprobes __aarch64_insn_write(void *addr, u32 insn)
- 	unsigned long flags = 0;
- 	int ret;
- 
--	spin_lock_irqsave(&patch_lock, flags);
-+	raw_spin_lock_irqsave(&patch_lock, flags);
- 	waddr = patch_map(addr, FIX_TEXT_POKE0);
- 
- 	ret = probe_kernel_write(waddr, &insn, AARCH64_INSN_SIZE);
- 
- 	patch_unmap(FIX_TEXT_POKE0);
--	spin_unlock_irqrestore(&patch_lock, flags);
-+	raw_spin_unlock_irqrestore(&patch_lock, flags);
- 
- 	return ret;
- }
--- 
-2.0.2
+> Do you have any suggestion about this or maybe there is no need to upstream
+> this special part?
+
+What makes you say that the symmetric_rates flag can't be used to cover
+this case?  What you describe above is hte normal reason for needing to
+enforce symmetric_rates.  The driver should be able to check if the flag
+has been set just as well as the core is.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/e8e96976/attachment.sig>
