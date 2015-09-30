@@ -1,13 +1,15 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 30 Sep 2015 11:22:44 +0900
-Subject: [GIT PULL] ARM: defconfig: Exynos improvements for 4.4
-Message-ID: <1443579766-15793-1-git-send-email-k.kozlowski@samsung.com>
+Date: Wed, 30 Sep 2015 11:22:45 +0900
+Subject: [GIT PULL] ARM: dts: Exynos improvements for 4.4
+In-Reply-To: <1443579766-15793-1-git-send-email-k.kozlowski@samsung.com>
+References: <1443579766-15793-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1443579766-15793-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Kukjin,
 
-Few defconfig related changes for 4.4.
+DTS related changes for 4.4.
 
 Description along with a tag.
 You can find them also on the lists with my reviewed-by.
@@ -22,33 +24,42 @@ The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 
 are available in the git repository at:
 
-  https://github.com/krzk/linux.git tags/samsung-defconfig-4.4
+  https://github.com/krzk/linux.git tags/samsung-dt-4.4
 
-for you to fetch changes up to 7fa5ce4e6fcb4596761c17e124e7d1f8cf64fe96:
+for you to fetch changes up to 01dd011b7a0230a426a79475ae452298421a16e4:
 
-  ARM: exynos_defconfig: Disable simplefb support (2015-09-13 19:25:39 +0900)
-
-----------------------------------------------------------------
-Defconfig changes around Exynos based boards:
-1. Enable DWC2 USB driver for exynos and multi_v7 defconfigs.
-   The driver is present on Exynos and Rockhip boards. Enabling also
-   ethernet gadget allows betwork communication with the device.
-2. Enable LEDS for Odroid XU3/XU4 family boards (provides simple
-   monitoring of the board).
-3. Disable the simplefb driver because in certain situations (when
-   U-boot injects simplefb bindings into DTB) it may break display.
+  ARM: dts: exynos4412-trats2: remove regulator-compatible usage (2015-09-30 09:03:03 +0900)
 
 ----------------------------------------------------------------
-Anand Moon (1):
-      ARM: exynos_defconfig: Enable LEDS for Odroid-XU3/XU4
+Device Tree improvements for Exynos based boards:
+1. Enable DMA on Exynos4 serial ports. This old patch uncovered
+   a number of other issues in dmaengine and samsung serial driver.
+   All of known issues are resolved so finally enable the DMA for UART.
+2. Fix incorrect location of display-timings node (FIMD->DP node).
+3. Minor cleanups.
 
+----------------------------------------------------------------
 Javier Martinez Canillas (1):
-      ARM: exynos_defconfig: Disable simplefb support
+      ARM: dts: exynos4412-trats2: remove regulator-compatible usage
 
-Marek Szyprowski (2):
-      ARM: exynos_defconfig: Enable DWC2 USB driver and USB ethernet gadget
-      ARM: multi_v7_defconfig: Enable DWC2 USB driver and USB ethernet gadget
+Robert Baldyga (1):
+      ARM: dts: Add DMA support for serial ports in exynos4
 
- arch/arm/configs/exynos_defconfig   | 9 ++++++++-
- arch/arm/configs/multi_v7_defconfig | 2 ++
- 2 files changed, 10 insertions(+), 1 deletion(-)
+Sean Paul (1):
+      ARM: dts: Move display-timings node from fimd to dp on Exynos
+
+Tobias Jakobi (2):
+      ARM: dts: Remove redundant pinctrl settings in exynos4412-odroid
+      ARM: dts: Unify voltage regulator style in exynos4412-odroid
+
+Vladimir Zapolskiy (1):
+      ARM: dts: Fix cpu compatible value for s3c2416
+
+ arch/arm/boot/dts/exynos4.dtsi                  |   8 ++
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  12 +--
+ arch/arm/boot/dts/exynos4412-trats2.dts         | 105 ++++++++----------------
+ arch/arm/boot/dts/exynos5250-arndale.dts        |   8 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts       |  16 ++--
+ arch/arm/boot/dts/exynos5420-smdk5420.dts       |   7 +-
+ arch/arm/boot/dts/s3c2416.dtsi                  |   2 +-
+ 7 files changed, 62 insertions(+), 96 deletions(-)
