@@ -1,49 +1,263 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 30 Sep 2015 15:46:58 -0700
-Subject: [PATCH v3 0/4] MSI, of,
- irqchip/gicv3-its: Handle "msi-map" properties.
-Message-ID: <1443653222-24924-1-git-send-email-ddaney.cavm@gmail.com>
+Date: Wed, 30 Sep 2015 15:46:59 -0700
+Subject: [PATCH v3 1/4] Docs: dt: Add PCI MSI map bindings
+In-Reply-To: <1443653222-24924-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1443653222-24924-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1443653222-24924-2-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+From: Mark Rutland <mark.rutland@arm.com>
 
-The first patch from Mark Rutland adds the OF device tree binding
-description, which explains what we are attempting to do here.  For
-MSI messages on GICv3 systems there is some side-band data that
-accompanies the message, this data is specified in the OF device tree
-"msi-map" property of the PCI host driver.
+Currently msi-parent is used by a few bindings to describe the
+relationship between a PCI root complex and a single MSI controller, but
+this property does not have a generic binding document.
 
-The second patch adds a parser to get the required information out of
-the device tree.
+Additionally, msi-parent is insufficient to describe more complex
+relationships between MSI controllers and devices under a root complex,
+where devices may be able to target multiple MSI controllers, or where
+MSI controllers use (non-probeable) sideband information to distinguish
+devices.
 
-The third patch creates the pci_msi_domain_get_msi_rid() function to
-make it more convenient to generate the proper PCI/MSI requester id.
+This patch adds a generic binding for mapping PCI devices to MSI
+controllers. This document covers msi-parent, and a new msi-map property
+(specific to PCI*) which may be used to map devices (identified by their
+Requester ID) to sideband data for each MSI controller that they may
+target.
 
-The final patch converts gicv3-its to use the new infrastructure.
-
-Changes from v1: Factor out the device tree access code to a separate
-function in drivers/of/irq.c
-
-Changes from v2: Added the pci_msi_domain_get_msi_rid() patch to
-generalize the support a bit more.
-
-David Daney (3):
-  of/irq: Add new function of_msi_map_rid()
-  PCI/MSI:  Add helper function pci_msi_domain_get_msi_rid().
-  irqchip/gic-v3-its:  Add handling of PCI requester id.
-
-Mark Rutland (1):
-  Docs: dt: Add PCI MSI map bindings
-
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: David Daney <david.daney@cavium.com>
+---
  Documentation/devicetree/bindings/pci/pci-msi.txt | 220 ++++++++++++++++++++++
- drivers/irqchip/irq-gic-v3-its-pci-msi.c          |   4 +-
- drivers/of/irq.c                                  |  84 +++++++++
- drivers/pci/msi.c                                 |  31 +++
- include/linux/msi.h                               |   1 +
- include/linux/of_irq.h                            |   7 +
- 6 files changed, 344 insertions(+), 3 deletions(-)
+ 1 file changed, 220 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pci/pci-msi.txt
 
+diff --git a/Documentation/devicetree/bindings/pci/pci-msi.txt b/Documentation/devicetree/bindings/pci/pci-msi.txt
+new file mode 100644
+index 0000000..9b3cc81
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/pci-msi.txt
+@@ -0,0 +1,220 @@
++This document describes the generic device tree binding for describing the
++relationship between PCI devices and MSI controllers.
++
++Each PCI device under a root complex is uniquely identified by its Requester ID
++(AKA RID). A Requester ID is a triplet of a Bus number, Device number, and
++Function number.
++
++For the purpose of this document, when treated as a numeric value, a RID is
++formatted such that:
++
++* Bits [15:8] are the Bus number.
++* Bits [7:3] are the Device number.
++* Bits [2:0] are the Function number.
++* Any other bits required for padding must be zero.
++
++MSIs may be distinguished in part through the use of sideband data accompanying
++writes. In the case of PCI devices, this sideband data may be derived from the
++Requester ID. A mechanism is required to associate a device with both the MSI
++controllers it can address, and the sideband data that will be associated with
++its writes to those controllers.
++
++For generic MSI bindings, see
++Documentation/devicetree/bindings/interrupt-controller/msi.txt.
++
++
++PCI root complex
++================
++
++Optional properties
++-------------------
++
++- msi-map: Maps a Requester ID to an MSI controller and associated
++  msi-specifier data. The property is an arbitrary number of tuples of
++  (rid-base,msi-controller,msi-base,length), where:
++
++  * rid-base is a single cell describing the first RID matched by the entry.
++
++  * msi-controller is a single phandle to an MSI controller
++
++  * msi-base is an msi-specifier describing the msi-specifier produced for the
++    first RID matched by the entry.
++
++  * length is a single cell describing how many consecutive RIDs are matched
++    following the rid-base.
++
++  Any RID r in the interval [rid-base, rid-base + length) is associated with
++  the listed msi-controller, with the msi-specifier (r - rid-base + msi-base).
++
++- msi-map-mask: A mask to be applied to each Requester ID prior to being mapped
++  to an msi-specifier per the msi-map property.
++
++- msi-parent: Describes the MSI parent of the root complex itself. Where
++  the root complex and MSI controller do not pass sideband data with MSI
++  writes, this property may be used to describe the MSI controller(s)
++  used by PCI devices under the root complex, if defined as such in the
++  binding for the root complex.
++
++
++Example (1)
++===========
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	msi: msi-controller at a {
++		reg = <0xa 0x1>;
++		compatible = "vendor,some-controller";
++		msi-controller;
++		#msi-cells = <1>;
++	};
++
++	pci: pci at f {
++		reg = <0xf 0x1>;
++		compatible = "vendor,pcie-root-complex";
++		device_type = "pci";
++
++		/*
++		 * The sideband data provided to the MSI controller is
++		 * the RID, identity-mapped.
++		 */
++		msi-map = <0x0 &msi_a 0x0 0x10000>,
++	};
++};
++
++
++Example (2)
++===========
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	msi: msi-controller at a {
++		reg = <0xa 0x1>;
++		compatible = "vendor,some-controller";
++		msi-controller;
++		#msi-cells = <1>;
++	};
++
++	pci: pci at f {
++		reg = <0xf 0x1>;
++		compatible = "vendor,pcie-root-complex";
++		device_type = "pci";
++
++		/*
++		 * The sideband data provided to the MSI controller is
++		 * the RID, masked to only the device and function bits.
++		 */
++		msi-map = <0x0 &msi_a 0x0 0x100>,
++		msi-map-mask = <0xff>
++	};
++};
++
++
++Example (3)
++===========
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	msi: msi-controller at a {
++		reg = <0xa 0x1>;
++		compatible = "vendor,some-controller";
++		msi-controller;
++		#msi-cells = <1>;
++	};
++
++	pci: pci at f {
++		reg = <0xf 0x1>;
++		compatible = "vendor,pcie-root-complex";
++		device_type = "pci";
++
++		/*
++		 * The sideband data provided to the MSI controller is
++		 * the RID, but the high bit of the bus number is
++		 * ignored.
++		 */
++		msi-map = <0x0000 &msi 0x0000 0x8000>,
++			  <0x8000 &msi 0x0000 0x8000>;
++	};
++};
++
++
++Example (4)
++===========
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	msi: msi-controller at a {
++		reg = <0xa 0x1>;
++		compatible = "vendor,some-controller";
++		msi-controller;
++		#msi-cells = <1>;
++	};
++
++	pci: pci at f {
++		reg = <0xf 0x1>;
++		compatible = "vendor,pcie-root-complex";
++		device_type = "pci";
++
++		/*
++		 * The sideband data provided to the MSI controller is
++		 * the RID, but the high bit of the bus number is
++		 * negated.
++		 */
++		msi-map = <0x0000 &msi 0x8000 0x8000>,
++			  <0x8000 &msi 0x0000 0x8000>;
++	};
++};
++
++
++Example (5)
++===========
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	msi_a: msi-controller at a {
++		reg = <0xa 0x1>;
++		compatible = "vendor,some-controller";
++		msi-controller;
++		#msi-cells = <1>;
++	};
++
++	msi_b: msi-controller at b {
++		reg = <0xb 0x1>;
++		compatible = "vendor,some-controller";
++		msi-controller;
++		#msi-cells = <1>;
++	};
++
++	msi_c: msi-controller at c {
++		reg = <0xc 0x1>;
++		compatible = "vendor,some-controller";
++		msi-controller;
++		#msi-cells = <1>;
++	};
++
++	pci: pci at c {
++		reg = <0xf 0x1>;
++		compatible = "vendor,pcie-root-complex";
++		device_type = "pci";
++
++		/*
++		 * The sideband data provided to MSI controller a is the
++		 * RID, but the high bit of the bus number is negated.
++		 * The sideband data provided to MSI controller b is the
++		 * RID, identity-mapped.
++		 * MSI controller c is not addressable.
++		 */
++		msi-map = <0x0000 &msi_a 0x8000 0x08000>,
++			  <0x8000 &msi_a 0x0000 0x08000>,
++			  <0x0000 &msi_b 0x0000 0x10000>;
++	};
++};
 -- 
 1.9.1
