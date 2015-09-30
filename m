@@ -1,68 +1,71 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Wed, 30 Sep 2015 15:59:04 -0700
-Subject: [PATCH] arm64: replace read_lock to rcu lock in call_break_hook
-Message-ID: <1443653944-21885-1-git-send-email-yang.shi@linaro.org>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Wed, 30 Sep 2015 16:51:25 -0700
+Subject: [PATCH] arm64: dts: add all hi6220 uart nodes
+In-Reply-To: <CAL_JsqLSDXGCush7TMavRkw5F=vbBbrFaexFyBdXHyrfNVGjXg@mail.gmail.com>
+References: <1443558552-5734-1-git-send-email-tyler.baker@linaro.org>
+ <1459065.BtzC7pyUYF@wuerfel> <20150930173145.GG15635@sirena.org.uk>
+ <CANMBJr7yY1PJChnFSRknqfOLORuWZSEONV+e=M=9heX3i-ADKA@mail.gmail.com>
+ <CAL_JsqLSDXGCush7TMavRkw5F=vbBbrFaexFyBdXHyrfNVGjXg@mail.gmail.com>
+Message-ID: <CANMBJr4hMBUiNQkCW0o=HAJzthu7jsWi+qjpnQ=i6cwk33SQnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:917
-in_atomic(): 0, irqs_disabled(): 128, pid: 342, name: perf
-1 lock held by perf/342:
- #0:  (break_hook_lock){+.+...}, at: [<ffffffc0000851ac>] call_break_hook+0x34/0xd0
-irq event stamp: 62224
-hardirqs last  enabled at (62223): [<ffffffc00010b7bc>] __call_rcu.constprop.59+0x104/0x270
-hardirqs last disabled at (62224): [<ffffffc0000fbe20>] vprintk_emit+0x68/0x640
-softirqs last  enabled at (0): [<ffffffc000097928>] copy_process.part.8+0x428/0x17f8
-softirqs last disabled at (0): [<          (null)>]           (null)
-CPU: 0 PID: 342 Comm: perf Not tainted 4.1.6-rt5 #4
-Hardware name: linux,dummy-virt (DT)
-Call trace:
-[<ffffffc000089968>] dump_backtrace+0x0/0x128
-[<ffffffc000089ab0>] show_stack+0x20/0x30
-[<ffffffc0007030d0>] dump_stack+0x7c/0xa0
-[<ffffffc0000c878c>] ___might_sleep+0x174/0x260
-[<ffffffc000708ac8>] __rt_spin_lock+0x28/0x40
-[<ffffffc000708db0>] rt_read_lock+0x60/0x80
-[<ffffffc0000851a8>] call_break_hook+0x30/0xd0
-[<ffffffc000085a70>] brk_handler+0x30/0x98
-[<ffffffc000082248>] do_debug_exception+0x50/0xb8
-Exception stack(0xffffffc00514fe30 to 0xffffffc00514ff50)
-fe20:                                     00000000 00000000 c1594680 0000007f
-fe40: ffffffff ffffffff 92063940 0000007f 0550dcd8 ffffffc0 00000000 00000000
-fe60: 0514fe70 ffffffc0 000be1f8 ffffffc0 0514feb0 ffffffc0 0008948c ffffffc0
-fe80: 00000004 00000000 0514fed0 ffffffc0 ffffffff ffffffff 9282a948 0000007f
-fea0: 00000000 00000000 9282b708 0000007f c1592820 0000007f 00083914 ffffffc0
-fec0: 00000000 00000000 00000010 00000000 00000064 00000000 00000001 00000000
-fee0: 005101e0 00000000 c1594680 0000007f c1594740 0000007f ffffffd8 ffffff80
-ff00: 00000000 00000000 00000000 00000000 c1594770 0000007f c1594770 0000007f
-ff20: 00665e10 00000000 7f7f7f7f 7f7f7f7f 01010101 01010101 00000000 00000000
-ff40: 928e4cc0 0000007f 91ff11e8 0000007f
+On 30 September 2015 at 12:03, Rob Herring <robherring2@gmail.com> wrote:
+> On Wed, Sep 30, 2015 at 1:12 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
+>> On 30 September 2015 at 10:31, Mark Brown <broonie@kernel.org> wrote:
+>>> On Wed, Sep 30, 2015 at 10:24:56AM +0200, Arnd Bergmann wrote:
+>>>> On Tuesday 29 September 2015 13:29:12 Tyler Baker wrote:
+>>>
+>>>> >         aliases {
+>>>> >                 serial0 = &uart0;
+>>>> > +               serial1 = &uart1;
+>>>> > +               serial2 = &uart2;
+>>>> > +               serial3 = &uart3;
+>>>> > +               serial4 = &uart4;
+>>>> >         };
+>>>
+>>>> In the changelog you mention "both uarts", but here you have five of them.
+>>>> Are they all accessible on the connector? If not, only provide aliases
+>>>> for the ones that are, using numbering that makes most sense for given
+>>>> how one would use the board.
+>>
+>> Thanks for the comment Arnd. Mark's comment below is correct, there
+>> are only two UARTs accessible on the LS connection in addition to the
+>> one on the board (solder pad).
+>>
+>> Is the following definition any clearer?
+>>
+>> serial0 = &uart0; // Onboard UART0
+>> serial1 = &uart2; // LS expansion UART0
+>> serial2 = &uart3; // LS expansion UART1
+>
+> Yes, but use C style comments.
 
-call_break_hook is called in atomic context (hard irq disabled), so replace
-the sleepable lock to rcu lock.
+Ok.
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
- arch/arm64/kernel/debug-monitors.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> What about the BT UART?
 
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index cebf786..eb520d0 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -292,11 +292,11 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
- 	struct break_hook *hook;
- 	int (*fn)(struct pt_regs *regs, unsigned int esr) = NULL;
- 
--	read_lock(&break_hook_lock);
-+	rcu_read_lock();
- 	list_for_each_entry(hook, &break_hook, node)
- 		if ((esr & hook->esr_mask) == hook->esr_val)
- 			fn = hook->fn;
--	read_unlock(&break_hook_lock);
-+	rcu_read_unlock();
- 
- 	return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
- }
--- 
-2.0.2
+According to the schematic it will use UART1, will add.
+
+>> If so, I'll respin this patch.
+>>
+>>> Unless I'm missing something there's only two UARTs brought out on the
+>>> low speed expansion connector (in addition to the one on the solder pads
+>>> which is currently supported).  We should also adjust the console
+>>> default to match whatever one of the low speed expansion connector UARTs
+>>> is being used by the bootloader.
+>>
+>> Your not missing anything, I should not have added the additional
+>> aliases, it is confusing, will remove. The UART boards by default come
+>> configured to use UART1 on the LS connector.
+>
+> Also, the console default should be set in chosen stdout-path so we
+> can move away from having to set it on the kernel command line. Then
+> the aliases don't matter so much, but there may be some work to do to
+> setup a getty correctly.
+
+Ok.
+
+Cheers,
+
+Tyler
