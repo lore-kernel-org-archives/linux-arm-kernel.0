@@ -1,58 +1,76 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 30 Sep 2015 11:45:26 +0100
-Subject: [PATCH v5 11/22] tty/hvc: xen: Use xen page definition
+Date: Wed, 30 Sep 2015 11:45:28 +0100
+Subject: [PATCH v5 13/22] xen/events: fifo: Make it running on 64KB granularity
 In-Reply-To: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
 References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1443609937-25278-12-git-send-email-julien.grall@citrix.com>
+Message-ID: <1443609937-25278-14-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The console ring is always based on the page granularity of Xen.
+Only use the first 4KB of the page to store the events channel info. It
+means that we will waste 60KB every time we allocate page for:
+     * control block: a page is allocating per CPU
+     * event array: a page is allocating everytime we need to expand it
+
+I think we can reduce the memory waste for the 2 areas by:
+
+    * control block: sharing between multiple vCPUs. Although it will
+    require some bookkeeping in order to not free the page when the CPU
+    goes offline and the other CPUs sharing the page still there
+
+    * event array: always extend the array event by 64K (i.e 16 4K
+    chunk). That would require more care when we fail to expand the
+    event channel.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@citrix.com>
 
 ---
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
-Cc: David Vrabel <david.vrabel@citrix.com>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: linuxppc-dev at lists.ozlabs.org
 
-    Changes in v4:
-        - The ring is always 4K (i.e XEN_PAGE_SIZE), so no need to
-        map with PAGE_SIZE. This was correctly done in v2 but lost with
-        the rebase to the "s/mfn/gfn/" series
+    Note I haven't updated the suggestion to reduce the memory waste
+    after David's email [1]. I can do it if necessary.
 
     Changes in v3:
-        - Some changes has been moved in the series "Use correctly the
-        Xen memory terminologies in Linux".
-        - Add Stefano's reviewed-by
----
- drivers/tty/hvc/hvc_xen.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+        - Add David and Stefano's reviewed-by
 
-diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
-index 10beb15..fa816b7 100644
---- a/drivers/tty/hvc/hvc_xen.c
-+++ b/drivers/tty/hvc/hvc_xen.c
-@@ -230,7 +230,7 @@ static int xen_hvm_console_init(void)
- 	if (r < 0 || v == 0)
- 		goto err;
- 	gfn = v;
--	info->intf = xen_remap(gfn << PAGE_SHIFT, PAGE_SIZE);
-+	info->intf = xen_remap(gfn << XEN_PAGE_SHIFT, XEN_PAGE_SIZE);
- 	if (info->intf == NULL)
- 		goto err;
- 	info->vtermno = HVC_COOKIE;
-@@ -472,7 +472,7 @@ static int xencons_resume(struct xenbus_device *dev)
- 	struct xencons_info *info = dev_get_drvdata(&dev->dev);
+    [1] http://lists.xen.org/archives/html/xen-devel/2015-07/msg04596.html
+---
+ drivers/xen/events/events_base.c | 2 +-
+ drivers/xen/events/events_fifo.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
+index 6cd5e65..849500e 100644
+--- a/drivers/xen/events/events_base.c
++++ b/drivers/xen/events/events_base.c
+@@ -40,11 +40,11 @@
+ #include <asm/idle.h>
+ #include <asm/io_apic.h>
+ #include <asm/xen/pci.h>
+-#include <xen/page.h>
+ #endif
+ #include <asm/sync_bitops.h>
+ #include <asm/xen/hypercall.h>
+ #include <asm/xen/hypervisor.h>
++#include <xen/page.h>
  
- 	xencons_disconnect_backend(info);
--	memset(info->intf, 0, PAGE_SIZE);
-+	memset(info->intf, 0, XEN_PAGE_SIZE);
- 	return xencons_connect_backend(dev, info);
- }
+ #include <xen/xen.h>
+ #include <xen/hvm.h>
+diff --git a/drivers/xen/events/events_fifo.c b/drivers/xen/events/events_fifo.c
+index 1d4baf5..e3e9e3d 100644
+--- a/drivers/xen/events/events_fifo.c
++++ b/drivers/xen/events/events_fifo.c
+@@ -54,7 +54,7 @@
  
+ #include "events_internal.h"
+ 
+-#define EVENT_WORDS_PER_PAGE (PAGE_SIZE / sizeof(event_word_t))
++#define EVENT_WORDS_PER_PAGE (XEN_PAGE_SIZE / sizeof(event_word_t))
+ #define MAX_EVENT_ARRAY_PAGES (EVTCHN_FIFO_NR_CHANNELS / EVENT_WORDS_PER_PAGE)
+ 
+ struct evtchn_fifo_queue {
 -- 
 2.1.4
