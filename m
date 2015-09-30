@@ -1,43 +1,54 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 30 Sep 2015 14:39:18 +0800
-Subject: [PATCH 2/2] regulator: act8865: add DT binding for property
- "active-semi, vsel-high"
-In-Reply-To: <1443595158-550-1-git-send-email-wenyou.yang@atmel.com>
-References: <1443595158-550-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1443595158-550-3-git-send-email-wenyou.yang@atmel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 30 Sep 2015 14:39:45 +0800
+Subject: [PATCH v2 1/3] mfd: axp20x: Drop AXP221 DC1SW and DC5LDO regulator
+ supplies from bindings
+In-Reply-To: <1443595188-1283-1-git-send-email-wens@csie.org>
+References: <1443595188-1283-1-git-send-email-wens@csie.org>
+Message-ID: <1443595188-1283-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DT property "active-semi,vsel-high" to indicate the VSEL pin
-is high. If this property is missing, then assume the VSEL pin is
-low(0).
+The DC1SW and DC5LDO regulators in the AXP221 are internally chained
+to DCDC1 and DCDC5, hence the names. The original bindings used the
+parent regulator names for the supply regulator property. This causes
+some confusion when we actually use it in the dts:
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+	axp221 {
+		/* self supplying? */
+		dcdc1-supply = <&dcdc1>;
+		dcdc5-supply = <&dcdc5>;
+
+		dcdc1: dcdc1 {
+			...
+		};
+
+		dcdc5: dcdc5 {
+			...
+		};
+	};
+
+Since they are internally connected within the PMIC, their relationships
+should not be visible in the device tree.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
- .../bindings/regulator/act8865-regulator.txt       |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-index e91485d..6067d98 100644
---- a/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/act8865-regulator.txt
-@@ -8,6 +8,8 @@ Required properties:
- Optional properties:
- - system-power-controller: Telling whether or not this pmic is controlling
-   the system power. See Documentation/devicetree/bindings/power/power-controller.txt .
-+- active-semi,vsel-high: Indicates the VSEL pin is high.
-+  If this property is missing, assume the VSEL pin is low(0).
- 
- Optional input supply properties:
- - for act8600:
-@@ -49,6 +51,7 @@ Example:
- 			pmic: act8865 at 5b {
- 				compatible = "active-semi,act8865";
- 				reg = <0x5b>;
-+				active-semi,vsel-high;
- 				status = "disabled";
- 
- 				regulators {
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index 41811223e5be..a474359dd206 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -60,8 +60,8 @@ DCDC2		: DC-DC buck	: vin2-supply
+ DCDC3		: DC-DC	buck	: vin3-supply
+ DCDC4		: DC-DC	buck	: vin4-supply
+ DCDC5		: DC-DC	buck	: vin5-supply
+-DC1SW		: On/Off Switch	: dcdc1-supply		: DCDC1 secondary output
+-DC5LDO		: LDO		: dcdc5-supply		: input from DCDC5
++DC1SW		: On/Off Switch	:			: DCDC1 secondary output
++DC5LDO		: LDO		:			: input from DCDC5
+ ALDO1		: LDO		: aldoin-supply		: shared supply
+ ALDO2		: LDO		: aldoin-supply		: shared supply
+ ALDO3		: LDO		: aldoin-supply		: shared supply
 -- 
-1.7.9.5
+2.5.3
