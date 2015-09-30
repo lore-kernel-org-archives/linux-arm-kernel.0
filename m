@@ -1,114 +1,77 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 30 Sep 2015 16:34:13 +0900
-Subject: [PATCH v5 05/17] drm: bridge: analogix/dp: dynamic parse sync_pol
- & interlace & dynamic_range
-In-Reply-To: <560B8CF1.7050102@rock-chips.com>
-References: <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
- <1442907477-3283-1-git-send-email-ykk@rock-chips.com>
- <560B73D4.30109@samsung.com> <560B8CF1.7050102@rock-chips.com>
-Message-ID: <560B9075.1000304@samsung.com>
+Date: Wed, 30 Sep 2015 16:37:41 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Enable WiFi-Ex as a module instead
+ built-in
+In-Reply-To: <560B8DA3.6060507@osg.samsung.com>
+References: <1443530546-3066-1-git-send-email-javier@osg.samsung.com>
+ <560B2EA4.8050406@samsung.com> <560B8DA3.6060507@osg.samsung.com>
+Message-ID: <560B9145.6070606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.09.2015 16:19, Yakir Yang wrote:
-> Hi Krzysztof,
+On 30.09.2015 16:22, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
 > 
-> On 09/30/2015 01:32 PM, Krzysztof Kozlowski wrote:
->> On 22.09.2015 16:37, Yakir Yang wrote:
->>> Both hsync/vsync polarity and interlace mode can be parsed from
->>> drm display mode, and dynamic_range and ycbcr_coeff can be judge
->>> by the video code.
+> On 09/30/2015 02:36 AM, Krzysztof Kozlowski wrote:
+>> On 29.09.2015 21:42, Javier Martinez Canillas wrote:
+>>> The Marvell WiFi-Ex driver tries to load a firmware on probe. So if the
+>>> driver is built-in and probed before a firmware is available, this is
+>>> not loaded and the chip does not work.
 >>>
->>> But presumably Exynos still relies on the DT properties, so take
->>> good use of mode_fixup() in to achieve the compatibility hacks.
+>>> This happens for example if an initramfs isn't used since the driver is
+>>> probed before the root filesystem is mounted.
 >>>
->>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>>> Change the default config since the driver isn't needed for machines to
+>>> boot and is more convenient to have it enabled as a module to avoid
+>>> requiring an initramfs or to have the firmware built into the kernel.
+>>>
+>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>>
 >>> ---
->>> Changes in v5:
->>> - Switch video timing type to "u32", so driver could use "of_property_read_u32"
->>>   to get the backword timing values. 
->> Okay
+>>>
+>>>  arch/arm/configs/exynos_defconfig | 4 ++--
+>>>  1 file changed, 2 insertions(+), 2 deletions(-)
 >>
->>> Krzysztof suggest me that driver could use
->>>   the "of_property_read_bool" to get backword timing values, but that interfacs
->>>   would modify the original drm_display_mode timing directly (whether those
->>>   properties exists or not).
->> Hmm, I don't understand. You have a:
->> 	struct video_info {
->> 		bool h_sync_polarity;
->> 		bool v_sync_polarity;
->> 		bool interlaced;
->> 	};
+>> The user-space can always initiate re-probing of device - just re-bind
+> 
+> It is true that you can force a re-probing from user-space by doing:
+> 
+> $ echo "mmc2:0001:1" > /sys/bus/sdio/drivers/mwifiex_sdio/unbind
+> $ echo "mmc2:0001:1" > /sys/bus/sdio/drivers/mwifiex_sdio/bind
+
+I suppose the unbind won't be needed, because device aborted the
+probe... so only one another bind.
+
+> 
+> but:
+> 
+> a) This is not obvious. In fact, I didn't think that possibility
+> before you mentioned and I've been using Linux for many years :)
+
+Eh, questionable. Obvious for me :)
+
+> 
+> b) This is not something that isn't done automatically by init systems.
+
+Right.
+
+> 
+> So what users will see is that the driver was probed successfully but
+> the firmware fails to load later (since the driver users the async
+> request_firmware_nowait function to request the firmware).
+
+Okay.
+
+> 
+>> it. However I assume that driver cannot work without firmware?
 >>
->> so what is wrong with:
->> 	dp_video_config->h_sync_polarity =
->> 		of_property_read_bool(dp_node, "hsync-active-high");
->>
->> Is it exactly the same binding as previously?
 > 
-> Yes, it is the same binding as previously. But just a note that we already
-> mark those DT binding as deprecated.
-> 
-> +-interlaced:            deprecated prop that can parsed frm drm_display_mode.
-> +-vsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
-> +-hsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
-> 
-> 
-> For now those values should come from "struct drm_display_mode",
-> and we already parsed them out from "drm_display_mode" before
-> driver provide the backward compatibility.
-> 
-> Let's used the "hsync-active-high" example:
->     As for now the code would like:
->     static void analogix_dp_bridge_mode_set(...)
->     {
->         // Parsed timing value from "drm_display_mode"
->         video->h_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NHSYNC);
-> 
->         // Try to detect the deprecated property, providing
->         // the backward compatibility
->         of_property_read_u32(dp_node, "hsync-active-high",
->                                  &video->h_sync_polarity);    
-> 
->         /*
->          * In this case, if "hsync-active-high" property haven't been
->          * found, then the video timing "h_sync_polarity" would  keep
->          * no change, keeping the parsed value from "drm_display_mode"
->          */     
->     }   
-> 
->     But if keep the "of_property_read_bool", then code would like:
->     static void analogix_dp_bridge_mode_set(...)
->     {
->         // Parsed timing value from "drm_display_mode"
->         video->h_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NHSYNC);
-> 
->         // Try to detect the deprecated property, providing
->         // the backward compatibility
->         video->h_sync_polarity =
->                     of_property_read_bool(dp_node, "hsync-active-high");
->    
-> 
->         /*
->          * In this case, if "hsync-active-high" property haven't been
->          * found, then the video timing "h_sync_polarity" would just
->          * modify to "false". That is the place we don't want, cause
->          * it would always modify the timing value parsed from
->          * "drm_display_mode"
->          */  
->     }   
-> 
+> Yes, it doesn't. I explained this in the commit message. Do you
+> think it should be made more clear?
 
-OK, I see the point of overwriting values from drm_display_mode. However
-I think you changed the binding. I believe the of_property_read_u32()
-will behave differently for such DTS:
+No, its OK, I agree.
 
-exynos_dp {
-	...
-	hsync-active-high;
-}
-
-It will return -EOVERFLOW which means it would be broken now...
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 Best regards,
 Krzysztof
