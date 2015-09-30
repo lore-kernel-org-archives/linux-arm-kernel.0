@@ -1,33 +1,55 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 30 Sep 2015 21:47:57 +0800
-Subject: [PATCH v2 0/7] hwrng: Add support for STMicroelectronics' RNG IP
-In-Reply-To: <20150929142932.GY27197@x1>
-References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
- <20150918140756.GK9249@gondor.apana.org.au>
- <CAF2Aj3h7Jy=tpYdZTdbxAJwa=147_hAu3reOFrbEh=JdrMFWLQ@mail.gmail.com>
- <20150918151137.GA10763@gondor.apana.org.au>
- <20150918155112.GE3218@x1> <20150929142932.GY27197@x1>
-Message-ID: <20150930134757.GA18408@gondor.apana.org.au>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 30 Sep 2015 14:54:12 +0100
+Subject: [RFC PATCH] nvmem: rockchip_efuse_regmap_config can be static
+In-Reply-To: <20150930134606.GA19541@lkp-nex05>
+References: <201509302107.qXqgxYhn%fengguang.wu@intel.com>
+ <20150930134606.GA19541@lkp-nex05>
+Message-ID: <560BE984.8010101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 29, 2015 at 03:29:32PM +0100, Lee Jones wrote:
-> 
-> I see that your tree is 8 days old, so this may have been resolved
-> already, but would you be kind enough to ensure you remove the 6th
-> (ARM) patch from your repo please?  I wouldn't want it to cause
-> conflicts and for Maxime and yourself to get shouted at by Linus.
+Wow.. so fast :-)
 
-I prefer not to merge patches that cannot be tested.  Without
-the DT bits in patch 6 the other five patches are useless.  So
-I think patch 6 should be applied together with the other five
-which add the driver.
+Patch looks good to me.
 
-Of course if Linus wants me to revert patch 6 in case of any
-potential conflicts with Maxime's tree I'll do that.  Linus?
+Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+On 30/09/15 14:46, kbuild test robot wrote:
+>
+> Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+> ---
+>   rockchip-efuse.c |    6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+> index 7887070..f552134 100644
+> --- a/drivers/nvmem/rockchip-efuse.c
+> +++ b/drivers/nvmem/rockchip-efuse.c
+> @@ -101,7 +101,7 @@ static struct regmap_bus rockchip_efuse_bus = {
+>   	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
+>   };
+>
+> -struct regmap_config rockchip_efuse_regmap_config = {
+> +static struct regmap_config rockchip_efuse_regmap_config = {
+>   	.reg_bits = 32,
+>   	.reg_stride = 1,
+>   	.val_bits = 8,
+> @@ -119,7 +119,7 @@ static const struct of_device_id rockchip_efuse_match[] = {
+>   };
+>   MODULE_DEVICE_TABLE(of, rockchip_efuse_match);
+>
+> -int rockchip_efuse_probe(struct platform_device *pdev)
+> +static int rockchip_efuse_probe(struct platform_device *pdev)
+>   {
+>   	struct device *dev = &pdev->dev;
+>   	struct resource *res;
+> @@ -165,7 +165,7 @@ int rockchip_efuse_probe(struct platform_device *pdev)
+>   	return 0;
+>   }
+>
+> -int rockchip_efuse_remove(struct platform_device *pdev)
+> +static int rockchip_efuse_remove(struct platform_device *pdev)
+>   {
+>   	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+>
+>
