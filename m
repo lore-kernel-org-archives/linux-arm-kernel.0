@@ -1,31 +1,45 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 30 Sep 2015 13:31:38 +0100
-Subject: [PATCH 0/4] nvmem: fixes for next rc
-Message-ID: <1443616298-17389-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Wed, 30 Sep 2015 13:33:56 +0100
+Subject: [PATCH 1/4] nvmem: core: fix the out-of-range leak in read/write()
+In-Reply-To: <1443616298-17389-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1443616298-17389-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1443616436-17565-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+From: ZhengShunQian <zhengsq@rock-chips.com>
 
-Here are couple of nvmem fixes on the mailing list which are good to go in
-next rc. Could you please take them thru the char-misc tree.
+The position to read/write must be less than max
+register size.
 
-Thanks,
-srini
+Signed-off-by: ZhengShunQian <zhengsq@rock-chips.com>
+Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/nvmem/core.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Axel Lin (2):
-  nvmem: core: Handle shift bits in-place if cell->nbits is non-zero
-  nvmem: core: Fix memory leak in nvmem_cell_write
-
-Maxime Ripard (1):
-  nvmem: sunxi: Check for memory allocation failure
-
-ZhengShunQian (1):
-  nvmem: core: fix the out-of-range leak in read/write()
-
- drivers/nvmem/core.c      |  8 ++++----
- drivers/nvmem/sunxi_sid.c | 11 ++++++++++-
- 2 files changed, 14 insertions(+), 5 deletions(-)
-
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index d3c6676..f4af8e5 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -67,7 +67,7 @@ static ssize_t bin_attr_nvmem_read(struct file *filp, struct kobject *kobj,
+ 	int rc;
+ 
+ 	/* Stop the user from reading */
+-	if (pos > nvmem->size)
++	if (pos >= nvmem->size)
+ 		return 0;
+ 
+ 	if (pos + count > nvmem->size)
+@@ -92,7 +92,7 @@ static ssize_t bin_attr_nvmem_write(struct file *filp, struct kobject *kobj,
+ 	int rc;
+ 
+ 	/* Stop the user from writing */
+-	if (pos > nvmem->size)
++	if (pos >= nvmem->size)
+ 		return 0;
+ 
+ 	if (pos + count > nvmem->size)
 -- 
 1.9.1
