@@ -1,54 +1,73 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 01 Oct 2015 08:44:44 +0900
-Subject: [PATCH] ARM: dts: Add Exynos5250 Snow Rev5+ support
-In-Reply-To: <CAD=FV=VfGeWdynFd+5YqnRGn+jsC0G_2VhTm1FKsR5o2WpcH1A@mail.gmail.com>
-References: <1443527855-434-1-git-send-email-javier@osg.samsung.com>
- <560B2D29.5060707@samsung.com>
- <CAD=FV=VfGeWdynFd+5YqnRGn+jsC0G_2VhTm1FKsR5o2WpcH1A@mail.gmail.com>
-Message-ID: <560C73EC.40608@samsung.com>
+Date: Thu, 01 Oct 2015 08:48:23 +0900
+Subject: [PATCH RESENDv2] mach:-s3c64xx:Output trace information with
+ WARN_ON if calls for setting up gpio board configuration fail in
+ s3c64xx_i2s_cfg_gpio
+In-Reply-To: <1443578870-14534-1-git-send-email-xerofoify@gmail.com>
+References: <1443578870-14534-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <560C74C7.7030409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.10.2015 01:17, Doug Anderson wrote:
-> Hi,
-> 
-> On Tue, Sep 29, 2015 at 5:30 PM, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
->> Now the exynos5250-snow.dts means in fact Rev4... but there is no
->> information in DTS about it. I think adding compatible
->> "google,snow-rev4" makes sense:
->> 1. For informational purposes (this could be also handled with a comment).
->> 2. Later one could decide to switch the default meaning of "google,snow"
->> to Rev5 and the real compatible (rev4) will be there already.
->>
->> Could you add the new compatible and fix patch issues pointed by Doug?
-> 
-> Looks like everything got applied, but just for the record:
-> 
-> Switching the default meaning of "google,snow" to Rev5 is probably not
-> something we'd ever want to do, since it could confuse "rev3" boards
-> (which should be serviced by the rev4 dts).  From comments in the
-> Chrome OS tree:
-> 
-> In the "rev4" DTS:
->          * - Any real rev 0-3 boards in the field will match "google,snow",
->          *   since older U-Boots don't look for a revision specific device tree.
->          * - Any real rev 4 boards in the field will match "google,snow-rev4"
->          *   first.  If that's not present they will pick the first
->          *   "google,snow" device tree that they find (ignoring the kernel
->          *   ordering).
-> 
-> In the "rev5" DTS:
->          * - Purposely don't add "google,snow" so old firmware (which didn't
->          *   include a -revN suffix) won't pick this one.
+On 30.09.2015 11:07, Nicholas Krause wrote:
+> This fixes the function s3c64xx_i2c_cfg_gpio to log output to the 
+> kernel log buff with WARN_ON if any of the calls to either 
+> s3c_gpio_cfgpin_range or s3c_gpio_cfgpin fail as we cannot exit 
+> from s3c64xx_i2s_cfg_gpio if any of these calls fail due to 
+> other intended function work being required to complete.
 
-These are requirements written somewhere in the downstream tree... not
-in upstream. Have in mind that someone may not be using Chrome OS on
-Chromebook but custom U-Boot and different distro.
+This is better now.
 
-You cannot expect that everyone will new some requirements of some
-downstream OS. If you need such requirements, write them in bindings
-documentation *in the upstream*.
+> Therefore
+> due to this output our failed calls by means of WARN_ON to the
+> kernel log buffer for failed configuration of gpio devices using
+> this driver file.
+
+I don't get this sentence. What do you want to say?
+
+
+> v2:Fix Patch Wording as it was clearly confusing and incorrect
+
+Changelog goes after --- separator.
+
+Last question - have you compiled it? I mean truly compiled like
+generated object file and linked objects into vmlinux?
 
 Best regards,
 Krzysztof
+
+> 
+> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+> ---
+>  arch/arm/mach-s3c64xx/dev-audio.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
+> index ff780a8..5e7538b 100644
+> --- a/arch/arm/mach-s3c64xx/dev-audio.c
+> +++ b/arch/arm/mach-s3c64xx/dev-audio.c
+> @@ -36,10 +36,10 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+>  		base = S3C64XX_GPE(0);
+>  		break;
+>  	case 2:
+> -		s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5));
+> -		s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5));
+> -		s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5));
+> -		s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));
+> +		WARN_ON(s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5)));
+> +		WARN_ON(s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5)));
+> +		WARN_ON(s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5)));
+> +		WARN_ON(s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));)
+>  		return 0;
+>  	default:
+>  		printk(KERN_DEBUG "Invalid I2S Controller number: %d\n",
+> @@ -47,7 +47,7 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> -	s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+> +	WARN_ON(s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3)));
+>  
+>  	return 0;
+>  }
+> 
