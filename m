@@ -1,176 +1,63 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 30 Sep 2015 16:42:05 +0200
-Subject: [PATCH v2 3/8] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <1443622064-14362-4-git-send-email-heiko@sntech.de>
-References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
- <1443622064-14362-4-git-send-email-heiko@sntech.de>
-Message-ID: <CAPDyKFrTNF6RUWs6UdBGoyrp+zzrLf8qAHgBL4xV6fjK_HM_yw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Sep 2015 16:42:21 +0200
+Subject: [RFC/PATCH 00/11] arm: omap: counter32k rework
+In-Reply-To: <20150930141338.GC31865@saruman.tx.rr.com>
+References: <1443559446-26969-1-git-send-email-balbi@ti.com>
+ <1986790.syN3WBv9AR@wuerfel> <20150930141338.GC31865@saruman.tx.rr.com>
+Message-ID: <3705422.OMk7ysE7Jn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 September 2015 at 16:07, Heiko Stuebner <heiko@sntech.de> wrote:
-> From: Douglas Anderson <dianders@chromium.org>
->
-> This adds logic to the MMC core to set VQMMC.  This is expected to be
-> called by MMC drivers like dw_mmc as part of (or instead of) their
-> start_signal_voltage_switch() callback.
->
-> A few notes:
->
-> * When setting the signal voltage to 3.3V we do our best to make VQMMC
->   and VMMC match.  It's been reported that this makes some old cards
->   happy since they were tested back in the day before UHS when VQMMC
->   and VMMC were provided by the same regulator.  A nice side effect of
->   this is that we don't end up on the hairy edge of VQMMC (2.7V),
->   which some EEs claim is a little too close to the minimum for
->   comfort.
->   This is done in two steps. At first we try to find a VQMMC within
->   a 0.3V tolerance of VMMC and if this is not supported by the
->   supplying regulator we try to find a suitable voltage within the
->   whole 2.7V-3.6V area of the spec.
->
-> * The two step approach is currently necessary, as the used
->   regulator_set_voltage_triplet(min, target, max) uses a simple
->   implementation that just tries two basic steps:
->         regulator_set_voltage(target, max);
->         regulator_set_voltage(min, target);
->   So with only one step with 2.7-3.6V borders, if a suitable voltage
->   is a bit below VMMC, we would directly get the lowest 2.7V
->   which some boards (like Rockchips) don't like at all.
->
-> * When setting the signal voltage to 1.8V or 1.2V we aim for that
->   specific voltage instead of picking the lowest one in the range.
->
-> * We very purposely don't print errors in mmc_regulator_set_vqmmc().
->   There are cases where the MMC core will try several different
->   voltages and we don't want to pollute the logs.
->
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+On Wednesday 30 September 2015 09:13:38 Felipe Balbi wrote:
+> On Wed, Sep 30, 2015 at 10:22:46AM +0200, Arnd Bergmann wrote:
+> > On Tuesday 29 September 2015 15:43:55 Felipe Balbi wrote:
+> > > 
+> > > the following patches de-obfuscate arch/arm/mach-omap2/timer.c
+> > > and start moving code to drivers/clocksource. So far only counter32k
+> > > has been moved over.
+> > > 
+> > > Note that we can't get rid of all the code (yet) because there are
+> > > still platforms relying to legacy boot and because of the strong
+> > > coupling with OMAP's hwmod layer.
+> > > 
+> > > This is, for now, an RFC and has be written on top of [1]. Boot tested
+> > > with AM335x and AM437x.
+> > > 
+> > > [1] http://marc.info/?l=linux-omap&m=144354336924308&w=2
+> > 
+> > Looks very nice!
+> > 
+> > > ps: if anybody has a good idea on how to get rid of
+> > > register_persistent_clock(), please let me know
+> > 
+> > I don't think we want to get rid of that, because it is the more
+> > accurate interface. IIRC systems that have an RTC will use
+> > timekeeping_inject_sleeptime64() in rtc_resume(). I don't know however
+> > how the two methods are coordinated, i.e. how the kernel ensures that
+> > exactly one of the two is used, but never both.
+> 
+> however register_persistent_clock() is an ARM-only thing, the question
+> was more towards that. Do we want to continue using the ARM-only
+> register_persistent_clock() or is there a more generic version of it ?
 
-This looks good to me!
+Ah, got it.
 
-Once all are happy with the patches, can we take the mmc patches via
-my mmc tree or does it all have to go together?
+I wouldn't worry about it at the moment, the read_persistent_clock64
+interface is very rarely used: only arm, ia64, mips/lasat and s390
+define it at all, only arm has more than one implementation (omap
+and tegra) and the tegra, ia64 and mips implementations should really
+use timekeeping_inject_sleeptime64() instead.
 
-Kind regards
-Uffe
+read_boot_clock64() is even rarer: only s390 defines it, apparently
+because it is the only architecture that uses a single register for
+wall-clock time and high-resolution time (it has a 96-bit
+quarternanosecond register that is synchronized before booting Linux).	
 
-> ---
->  drivers/mmc/core/core.c  | 74 ++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/mmc/host.h |  7 +++++
->  2 files changed, 81 insertions(+)
->
-> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-> index 0520064..363cc98 100644
-> --- a/drivers/mmc/core/core.c
-> +++ b/drivers/mmc/core/core.c
-> @@ -1437,6 +1437,80 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
->  }
->  EXPORT_SYMBOL_GPL(mmc_regulator_set_ocr);
->
-> +static int mmc_regulator_set_voltage_if_supported(struct regulator *regulator,
-> +                                                 int min_uV, int target_uV,
-> +                                                 int max_uV)
-> +{
-> +       /*
-> +        * Check if supported first to avoid errors since we may try several
-> +        * signal levels during power up and don't want to show errors.
-> +        */
-> +       if (!regulator_is_supported_voltage(regulator, min_uV, max_uV))
-> +               return -EINVAL;
-> +
-> +       return regulator_set_voltage_triplet(regulator, min_uV, target_uV,
-> +                                            max_uV);
-> +}
-> +
-> +/**
-> + * mmc_regulator_set_vqmmc - Set VQMMC as per the ios
-> + *
-> + * For 3.3V signaling, we try to match VQMMC to VMMC as closely as possible.
-> + * That will match the behavior of old boards where VQMMC and VMMC were supplied
-> + * by the same supply.  The Bus Operating conditions for 3.3V signaling in the
-> + * SD card spec also define VQMMC in terms of VMMC.
-> + * If this is not possible we'll try the full 2.7-3.6V of the spec.
-> + *
-> + * For 1.2V and 1.8V signaling we'll try to get as close as possible to the
-> + * requested voltage.  This is definitely a good idea for UHS where there's a
-> + * separate regulator on the card that's trying to make 1.8V and it's best if
-> + * we match.
-> + *
-> + * This function is expected to be used by a controller's
-> + * start_signal_voltage_switch() function.
-> + */
-> +int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios)
-> +{
-> +       int volt, min_uV, max_uV;
-> +
-> +       /* If no vqmmc supply then we can't change the voltage */
-> +       if (IS_ERR(mmc->supply.vqmmc))
-> +               return -EINVAL;
-> +
-> +       switch (ios->signal_voltage) {
-> +       case MMC_SIGNAL_VOLTAGE_120:
-> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
-> +                                               1100000, 1200000, 1300000);
-> +       case MMC_SIGNAL_VOLTAGE_180:
-> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
-> +                                               1700000, 1800000, 1950000);
-> +       case MMC_SIGNAL_VOLTAGE_330:
-> +               volt = regulator_get_voltage(mmc->supply.vmmc);
-> +               if (volt < 0)
-> +                       return volt;
-> +
-> +               min_uV = max(volt - 300000, 2700000);
-> +               max_uV = min(volt + 300000, 3600000);
-> +
-> +               /*
-> +                * Due to a limitation in the current implementation of
-> +                * regulator_set_voltage_triplet() which is taking the lowest
-> +                * voltage possible if below the target, search for a suitable
-> +                * voltage in two steps and try to stay close to vmmc
-> +                * with a 0.3V tolerance at first.
-> +                */
-> +               if (!mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
-> +                                               min_uV, volt, max_uV))
-> +                       return 0;
-> +
-> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
-> +                                               2700000, volt, 3600000);
-> +       default:
-> +               return -EINVAL;
-> +       }
-> +}
-> +EXPORT_SYMBOL_GPL(mmc_regulator_set_vqmmc);
-> +
->  #endif /* CONFIG_REGULATOR */
->
->  int mmc_regulator_get_supply(struct mmc_host *mmc)
-> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-> index 83b81fd..a2a78eb 100644
-> --- a/include/linux/mmc/host.h
-> +++ b/include/linux/mmc/host.h
-> @@ -423,6 +423,7 @@ int mmc_regulator_get_ocrmask(struct regulator *supply);
->  int mmc_regulator_set_ocr(struct mmc_host *mmc,
->                         struct regulator *supply,
->                         unsigned short vdd_bit);
-> +int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios);
->  #else
->  static inline int mmc_regulator_get_ocrmask(struct regulator *supply)
->  {
-> @@ -435,6 +436,12 @@ static inline int mmc_regulator_set_ocr(struct mmc_host *mmc,
->  {
->         return 0;
->  }
-> +
-> +static inline int mmc_regulator_set_vqmmc(struct mmc_host *mmc,
-> +                                         struct mmc_ios *ios)
-> +{
-> +       return -EINVAL;
-> +}
->  #endif
->
->  int mmc_regulator_get_supply(struct mmc_host *mmc);
-> --
-> 2.5.1
->
+TEGRA folks: the tegra_read_persistent_clock() implementation apparently
+predates the Tegra RTC driver and I wonder if they actually do the
+right thing in combination. Could it be that the wall time forwards
+twice as fast as it should during resume when the RTC driver is loaded?
+Could it be that we can simply remove  tegra_read_persistent_clock()
+and the register_persistent_clock() infrastructure?
+
+	Arnd
