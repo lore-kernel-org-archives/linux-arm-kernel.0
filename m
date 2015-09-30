@@ -1,60 +1,54 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 30 Sep 2015 09:22:11 +0200
-Subject: [PATCH] ARM: exynos_defconfig: Enable WiFi-Ex as a module instead
- built-in
-In-Reply-To: <560B2EA4.8050406@samsung.com>
-References: <1443530546-3066-1-git-send-email-javier@osg.samsung.com>
- <560B2EA4.8050406@samsung.com>
-Message-ID: <560B8DA3.6060507@osg.samsung.com>
+Date: Wed, 30 Sep 2015 09:25:27 +0200
+Subject: [PATCH] ARM: dts: Add Exynos5250 Snow Rev5+ support
+In-Reply-To: <560B8A8A.5050506@samsung.com>
+References: <1443527855-434-1-git-send-email-javier@osg.samsung.com>
+ <560B2D29.5060707@samsung.com> <560B8818.8020002@kernel.org>
+ <560B890C.3060200@samsung.com> <560B8A0F.8090709@osg.samsung.com>
+ <560B8A8A.5050506@samsung.com>
+Message-ID: <560B8E67.1080202@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Krzysztof,
 
-On 09/30/2015 02:36 AM, Krzysztof Kozlowski wrote:
-> On 29.09.2015 21:42, Javier Martinez Canillas wrote:
->> The Marvell WiFi-Ex driver tries to load a firmware on probe. So if the
->> driver is built-in and probed before a firmware is available, this is
->> not loaded and the chip does not work.
+On 09/30/2015 09:08 AM, Krzysztof Kozlowski wrote:
+> On 30.09.2015 16:06, Javier Martinez Canillas wrote:
+>> Hello,
 >>
->> This happens for example if an initramfs isn't used since the driver is
->> probed before the root filesystem is mounted.
+>> On 09/30/2015 09:02 AM, Krzysztof Kozlowski wrote:
+>>> On 30.09.2015 15:58, Kukjin Kim wrote:
 >>
->> Change the default config since the driver isn't needed for machines to
->> boot and is more convenient to have it enabled as a module to avoid
->> requiring an initramfs or to have the firmware built into the kernel.
+>> [snip]
 >>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>>>>
+>>>>> Could you add the new compatible and fix patch issues pointed by Doug?
+>>>>>
+>>>> Documenting for the compatibles would be required even I already applied
+>>>> its updated patch...
+>>>
 >>
->> ---
+>> Kukjin, I agree that they should be documented but I thought it would
+>> be a separate patch since currently we don't document any board.
+>>  
+>>> What do you mean by "documenting compatibles"? These are board
+>>> compatibles, they are not documented...
+>>>
 >>
->>  arch/arm/configs/exynos_defconfig | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
+>> Krzysztof, I've on my TODO list to add a file describing all Exynos
+>> platforms and DT bindings, something like what other SoC do, i.e:
+>>
+>> Documentation/devicetree/bindings/arm/omap/omap.txt
+>> Documentation/devicetree/bindings/arm/rockchip.txt
 > 
-> The user-space can always initiate re-probing of device - just re-bind
+> Right, that's a good idea. However lack of it does not affect current
+> work because compatibles for Exynos board are not documented at all.
+> 
 
-It is true that you can force a re-probing from user-space by doing:
+Agreed. That's why I didn't add it, even when checkpatch.pl complains:
 
-$ echo "mmc2:0001:1" > /sys/bus/sdio/drivers/mwifiex_sdio/unbind
-$ echo "mmc2:0001:1" > /sys/bus/sdio/drivers/mwifiex_sdio/bind
+WARNING: DT compatible string "google,snow-rev5" appears un-documented -- check ./Documentation/devicetree/bindings/
 
-but:
-
-a) This is not obvious. In fact, I didn't think that possibility
-before you mentioned and I've been using Linux for many years :)
-
-b) This is not something that isn't done automatically by init systems.
-
-So what users will see is that the driver was probed successfully but
-the firmware fails to load later (since the driver users the async
-request_firmware_nowait function to request the firmware).
-
-> it. However I assume that driver cannot work without firmware?
->
-
-Yes, it doesn't. I explained this in the commit message. Do you
-think it should be made more clear?
- 
 > Best regards,
 > Krzysztof
 > 
