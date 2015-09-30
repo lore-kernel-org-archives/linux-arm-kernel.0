@@ -1,481 +1,652 @@
 From: w.f@huawei.com (Fei Wang)
-Date: Wed, 30 Sep 2015 19:05:05 +0800
-Subject: [PATCH 2/8] mfd: Hi655x: Add support for PMIC Hi655x MFD
+Date: Wed, 30 Sep 2015 19:05:07 +0800
+Subject: [PATCH 4/8] regulator: Hi655x: Add support for Hi655x regulator
 In-Reply-To: <1443611111-3196-1-git-send-email-w.f@huawei.com>
 References: <1443611111-3196-1-git-send-email-w.f@huawei.com>
-Message-ID: <1443611111-3196-3-git-send-email-w.f@huawei.com>
+Message-ID: <1443611111-3196-5-git-send-email-w.f@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add core files for Hi655x MFD driver.
+Add Hi655x regulator driver.
 
 Signed-off-by: Fei Wang <w.f@huawei.com>
 ---
- drivers/mfd/Kconfig             |    9 +
- drivers/mfd/Makefile            |    1 +
- drivers/mfd/hi655x-pmic.c       |  358 +++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/hi655x-pmic.h |   56 ++++++
- 4 files changed, 424 insertions(+)
- create mode 100644 drivers/mfd/hi655x-pmic.c
- create mode 100644 include/linux/mfd/hi655x-pmic.h
+ drivers/regulator/Kconfig                  |    8 +
+ drivers/regulator/Makefile                 |    1 +
+ drivers/regulator/hi655x-regulator.c       |  517 ++++++++++++++++++++++++++++
+ include/linux/regulator/hi655x-regulator.h |   69 ++++
+ 4 files changed, 595 insertions(+)
+ create mode 100644 drivers/regulator/hi655x-regulator.c
+ create mode 100644 include/linux/regulator/hi655x-regulator.h
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 99d6367..d320def 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -273,6 +273,15 @@ config MFD_HI6421_PMIC
- 	  menus in order to enable them.
- 	  We communicate with the Hi6421 via memory-mapped I/O.
+diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+index 64bccff..d13210b 100644
+--- a/drivers/regulator/Kconfig
++++ b/drivers/regulator/Kconfig
+@@ -261,6 +261,14 @@ config REGULATOR_HI6421
+ 	  21 general purpose LDOs, 3 dedicated LDOs, and 5 BUCKs. All
+ 	  of them come with support to either ECO (idle) or sleep mode.
  
-+config MFD_HI655X_PMIC
-+	tristate "HiSilicon Hi655X series PMU/Codec IC"
-+	depends on ARCH_HISI
-+	depends on OF
-+	select MFD_CORE
-+	select REGMAP_MMIO
-+	help
-+	  Select this option to enable Hisilicon hi655x series pmic driver.
++config REGULATOR_HI655X
++        tristate "Hisilicon HI655X PMIC regulators support"
++        depends on ARCH_HISI
++	depends on MFD_HI655X_PMIC && OF
++        help
++          This driver provides support for the voltage regulators of the
++          Hisilicon Hi655x PMIC device.
 +
- config HTC_EGPIO
- 	bool "HTC EGPIO support"
- 	depends on GPIOLIB && ARM
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index a59e3fc..11ec427 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -185,6 +185,7 @@ obj-$(CONFIG_MFD_STW481X)	+= stw481x.o
- obj-$(CONFIG_MFD_IPAQ_MICRO)	+= ipaq-micro.o
- obj-$(CONFIG_MFD_MENF21BMC)	+= menf21bmc.o
- obj-$(CONFIG_MFD_HI6421_PMIC)	+= hi6421-pmic-core.o
-+obj-$(CONFIG_MFD_HI655X_PMIC)   += hi655x-pmic.o
- obj-$(CONFIG_MFD_DLN2)		+= dln2.o
- obj-$(CONFIG_MFD_RT5033)	+= rt5033.o
- obj-$(CONFIG_MFD_SKY81452)	+= sky81452.o
-diff --git a/drivers/mfd/hi655x-pmic.c b/drivers/mfd/hi655x-pmic.c
+ config REGULATOR_ISL9305
+ 	tristate "Intersil ISL9305 regulator"
+ 	depends on I2C
+diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+index 0f81749..8e4db96 100644
+--- a/drivers/regulator/Makefile
++++ b/drivers/regulator/Makefile
+@@ -34,6 +34,7 @@ obj-$(CONFIG_REGULATOR_DB8500_PRCMU) += db8500-prcmu.o
+ obj-$(CONFIG_REGULATOR_FAN53555) += fan53555.o
+ obj-$(CONFIG_REGULATOR_GPIO) += gpio-regulator.o
+ obj-$(CONFIG_REGULATOR_HI6421) += hi6421-regulator.o
++obj-$(CONFIG_REGULATOR_HI655X) += hi655x-regulator.o
+ obj-$(CONFIG_REGULATOR_ISL6271A) += isl6271a-regulator.o
+ obj-$(CONFIG_REGULATOR_ISL9305) += isl9305.o
+ obj-$(CONFIG_REGULATOR_LP3971) += lp3971.o
+diff --git a/drivers/regulator/hi655x-regulator.c b/drivers/regulator/hi655x-regulator.c
 new file mode 100644
-index 0000000..caeca4e
+index 0000000..3423a84
 --- /dev/null
-+++ b/drivers/mfd/hi655x-pmic.c
-@@ -0,0 +1,358 @@
++++ b/drivers/regulator/hi655x-regulator.c
+@@ -0,0 +1,517 @@
 +/*
-+ * Device driver for PMIC DRIVER in HI655X IC
++ * Device driver for regulators in HI655X IC
 + *
-+ * Copyright (c) 2015 Hisilicon Co. Ltd
-+ *
-+ * Fei Wang  <w.f@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/slab.h>
-+#include <linux/ioport.h>
-+#include <linux/interrupt.h>
-+#include <linux/init.h>
-+#include <linux/gpio.h>
-+#include <linux/types.h>
-+#include <linux/mutex.h>
-+#include <linux/delay.h>
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/hardirq.h>
-+#include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
-+#include <linux/of_platform.h>
-+#include <linux/irqdomain.h>
-+#include <linux/mfd/hi655x-pmic.h>
-+#include <linux/regmap.h>
-+
-+
-+static const struct of_device_id of_hi655x_pmic_child_match_tbl[] = {
-+	{ .compatible = "hisilicon,hi655x-regulator-pmic", },
-+	{ .compatible = "hisilicon,hi655x-powerkey", },
-+	{ .compatible = "hisilicon,hi655x-usbvbus", },
-+	{ .compatible = "hisilicon,hi655x-coul", },
-+	{ .compatible = "hisilicon,hi655x-pmu-rtc", },
-+	{},
-+};
-+
-+static const struct of_device_id of_hi655x_pmic_match_tbl[] = {
-+	{ .compatible = "hisilicon,hi655x-pmic-driver", },
-+	{},
-+};
-+
-+static unsigned int hi655x_pmic_get_version(struct hi655x_pmic *pmic)
-+{
-+	u32 val;
-+
-+	regmap_read(pmic->regmap,
-+		HI655X_REG_TO_BUS_ADDR(HI655X_VER_REG), &val);
-+
-+	return val;
-+}
-+
-+static irqreturn_t hi655x_pmic_irq_handler(int irq, void *data)
-+{
-+	struct hi655x_pmic *pmic = (struct hi655x_pmic *)data;
-+	u32 pending;
-+	u32 ret = IRQ_NONE;
-+	unsigned long offset;
-+	int i;
-+
-+	for (i = 0; i < HI655X_IRQ_ARRAY; i++) {
-+		regmap_read(pmic->regmap,
-+			HI655X_REG_TO_BUS_ADDR(i + HI655X_IRQ_STAT_BASE),
-+			&pending);
-+		if (pending != 0)
-+			pr_debug("pending[%d]=0x%x\n\r", i, pending);
-+
-+		/* clear pmic-sub-interrupt */
-+		regmap_write(pmic->regmap,
-+			HI655X_REG_TO_BUS_ADDR(i + HI655X_IRQ_STAT_BASE),
-+			pending);
-+
-+		if (pending) {
-+			for_each_set_bit(offset, (unsigned long *)&pending,
-+				HI655X_BITS)
-+				generic_handle_irq(pmic->irqs[offset +
-+				i * HI655X_BITS]);
-+			ret = IRQ_HANDLED;
-+		}
-+	}
-+	return ret;
-+}
-+
-+
-+static void hi655x_pmic_irq_mask(struct irq_data *d)
-+{
-+
-+	u32 data, offset;
-+	unsigned long pmic_spin_flag = 0;
-+	struct hi655x_pmic *pmic = irq_data_get_irq_chip_data(d);
-+
-+	offset = ((irqd_to_hwirq(d) >> 3) + HI655X_IRQ_MASK_BASE);
-+	spin_lock_irqsave(&pmic->ssi_hw_lock, pmic_spin_flag);
-+	regmap_read(pmic->regmap, HI655X_REG_TO_BUS_ADDR(offset), &data);
-+	data |= (1 << (irqd_to_hwirq(d) & 0x07));
-+	regmap_write(pmic->regmap, HI655X_REG_TO_BUS_ADDR(offset), data);
-+	spin_unlock_irqrestore(&pmic->ssi_hw_lock, pmic_spin_flag);
-+}
-+
-+static void hi655x_pmic_irq_unmask(struct irq_data *d)
-+{
-+	u32 data, offset;
-+	unsigned long pmic_spin_flag = 0;
-+	struct hi655x_pmic *pmic = irq_data_get_irq_chip_data(d);
-+
-+	offset = ((irqd_to_hwirq(d) >> 3) + HI655X_IRQ_MASK_BASE);
-+	spin_lock_irqsave(&pmic->ssi_hw_lock, pmic_spin_flag);
-+	regmap_read(pmic->regmap, HI655X_REG_TO_BUS_ADDR(offset), &data);
-+	data &= ~(1 << (irqd_to_hwirq(d) & 0x07));
-+	regmap_write(pmic->regmap, HI655X_REG_TO_BUS_ADDR(offset), data);
-+	spin_unlock_irqrestore(&pmic->ssi_hw_lock, pmic_spin_flag);
-+}
-+
-+
-+static struct irq_chip hi655x_pmic_irqchip = {
-+	.name		= "hisi-hi655x-pmic-irqchip",
-+	.irq_mask	= hi655x_pmic_irq_mask,
-+	.irq_unmask	= hi655x_pmic_irq_unmask,
-+};
-+
-+static int hi655x_pmic_irq_map(struct irq_domain *d, unsigned int virq,
-+			irq_hw_number_t hw)
-+{
-+	struct hi655x_pmic *pmic = d->host_data;
-+
-+	irq_set_chip_and_handler_name(virq, &hi655x_pmic_irqchip,
-+			handle_simple_irq, "hisi-hi655x-pmic-irqchip");
-+	irq_set_chip_data(virq, pmic);
-+	irq_set_irq_type(virq, IRQ_TYPE_NONE);
-+
-+	return 0;
-+}
-+
-+static struct irq_domain_ops hi655x_domain_ops = {
-+	.map	= hi655x_pmic_irq_map,
-+	.xlate	= irq_domain_xlate_twocell,
-+};
-+
-+static inline void hi655x_pmic_clear_int(struct hi655x_pmic *pmic)
-+{
-+	int addr;
-+
-+	for (addr = HI655X_IRQ_STAT_BASE; addr < (HI655X_IRQ_STAT_BASE
-+		+ HI655X_IRQ_ARRAY); addr++) {
-+		regmap_write(pmic->regmap,
-+			HI655X_REG_TO_BUS_ADDR(addr), HI655X_IRQ_CLR);
-+	}
-+}
-+
-+static inline void hi655x_pmic_mask_int(struct hi655x_pmic *pmic)
-+{
-+	int addr;
-+
-+	for (addr = HI655X_IRQ_MASK_BASE; addr < (HI655X_IRQ_MASK_BASE
-+		+ HI655X_IRQ_ARRAY); addr++) {
-+		regmap_write(pmic->regmap,
-+			HI655X_REG_TO_BUS_ADDR(addr), HI655X_IRQ_MASK);
-+	}
-+}
-+
-+
-+
-+static struct regmap_config hi655x_regmap_config = {
-+	.reg_bits = 32,
-+	.reg_stride = 4,
-+	.val_bits = 8,
-+	.max_register = HI655X_REG_TO_BUS_ADDR(0xFF),
-+};
-+
-+
-+static int   hi655x_pmic_probe(struct platform_device *pdev)
-+{
-+	int i = 0;
-+	int ret = 0;
-+	u32 virq = 0;
-+	int pmu_on = 1;
-+	enum of_gpio_flags gpio_flags;
-+
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct hi655x_pmic *pmic = NULL;
-+	struct device_node *gpio_np = NULL;
-+	void __iomem *base;
-+
-+	pmic = devm_kzalloc(dev, sizeof(*pmic), GFP_KERNEL);
-+
-+	/*
-+	* init spin lock
-+	*/
-+	spin_lock_init(&pmic->ssi_hw_lock);
-+
-+	/*
-+	* get resources
-+	*/
-+	pmic->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!pmic->res) {
-+		dev_err(dev, "platform_get_resource err\n");
-+		return -ENOENT;
-+	}
-+	if (!devm_request_mem_region(dev, pmic->res->start,
-+				resource_size(pmic->res), pdev->name)) {
-+		dev_err(dev, "cannot claim register memory\n");
-+		return -ENOMEM;
-+	}
-+	base = ioremap(pmic->res->start, resource_size(pmic->res));
-+	if (!base) {
-+		dev_err(dev, "cannot map register memory\n");
-+		return -ENOMEM;
-+	}
-+	pmic->regmap = devm_regmap_init_mmio_clk(dev, NULL, base,
-+							&hi655x_regmap_config);
-+
-+	/*
-+	* confirm pmu is exist&effective
-+	*/
-+
-+	pmic->ver = hi655x_pmic_get_version(pmic);
-+	if ((pmic->ver < PMU_VER_START) || (pmic->ver > PMU_VER_END)) {
-+		dev_warn(dev, "it is wrong pmu version\n");
-+		pmu_on = 0;
-+	}
-+
-+	regmap_write(pmic->regmap, HI655X_REG_TO_BUS_ADDR(0x1b5), 0xff);
-+
-+	gpio_np = of_parse_phandle(np, "pmu_irq_gpio", 0);
-+	if (!gpio_np) {
-+		dev_err(dev, "can't parse property\n");
-+		return -ENOENT;
-+	}
-+	pmic->gpio = of_get_gpio_flags(gpio_np, 0, &gpio_flags);
-+	if (pmic->gpio < 0) {
-+		dev_err(dev, "failed to of_get_gpio_flags %d\n", pmic->gpio);
-+		return  pmic->gpio;
-+	}
-+	if (!gpio_is_valid(pmic->gpio)) {
-+		dev_err(dev, "it is invalid gpio %d\n", pmic->gpio);
-+		return -EINVAL;
-+	}
-+	ret = gpio_request_one(pmic->gpio, GPIOF_IN, "hi655x_pmic_irq");
-+	if (ret < 0) {
-+		dev_err(dev, "failed to request gpio %d  ret = %d\n",
-+			pmic->gpio, ret);
-+		return ret;
-+	}
-+	pmic->irq = gpio_to_irq(pmic->gpio);
-+
-+	/*
-+	* clear PMIC sub-interrupt
-+	*/
-+	hi655x_pmic_clear_int(pmic);
-+
-+	/*
-+	* mask PMIC sub-interrupt
-+	*/
-+	hi655x_pmic_mask_int(pmic);
-+
-+	/*
-+	* register irq domain
-+	*/
-+	pmic->domain = irq_domain_add_simple(np,
-+			HI655X_NR_IRQ, 0, &hi655x_domain_ops, pmic);
-+	if (!pmic->domain) {
-+		dev_err(dev, "failed irq domain add simple!\n");
-+		ret = -ENODEV;
-+		goto irq_domain_add_simple;
-+	}
-+
-+	/*
-+	* here call map function
-+	*/
-+	for (i = 0; i < HI655X_NR_IRQ; i++) {
-+		virq = irq_create_mapping(pmic->domain, i);
-+		if (0 == virq) {
-+			dev_err(dev, "Failed mapping hwirq\n");
-+			ret = -ENOSPC;
-+			goto irq_create_mapping;
-+		}
-+		pmic->irqs[i] = virq;
-+	}
-+
-+	/*
-+	*  We must make sure the GPIO status which is high.
-+	*/
-+	if (pmu_on) {
-+		ret = request_threaded_irq(pmic->irq, hi655x_pmic_irq_handler,
-+			NULL, IRQF_TRIGGER_LOW | IRQF_SHARED | IRQF_NO_SUSPEND,
-+			"hi655x-pmic-irq", pmic);
-+		if (ret < 0) {
-+			dev_err(dev, "could not claim pmic %d\n", ret);
-+			ret = -ENODEV;
-+			goto request_threaded_irq;
-+		}
-+	}
-+
-+	pmic->dev = dev;
-+
-+	/*
-+	* bind pmic to device
-+	*/
-+	platform_set_drvdata(pdev, pmic);
-+
-+	/*
-+	* populate sub nodes
-+	*/
-+	of_platform_populate(np, of_hi655x_pmic_child_match_tbl, NULL, dev);
-+	return 0;
-+irq_domain_add_simple:
-+irq_create_mapping:
-+request_threaded_irq:
-+	free_irq(pmic->irq, pmic);
-+	gpio_free(pmic->gpio);
-+	return ret;
-+}
-+
-+static int hi655x_pmic_remove(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct hi655x_pmic *pmic = platform_get_drvdata(pdev);
-+
-+	free_irq(pmic->irq, pmic);
-+	gpio_free(pmic->gpio);
-+	devm_release_mem_region(dev, pmic->res->start,
-+				resource_size(pmic->res));
-+	devm_kfree(dev, pmic);
-+	platform_set_drvdata(pdev, NULL);
-+	return 0;
-+}
-+
-+static struct platform_driver hi655x_pmic_driver = {
-+	.driver	= {
-+		.name =	"hisi,hi655x-pmic",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_hi655x_pmic_match_tbl,
-+	},
-+	.probe  = hi655x_pmic_probe,
-+	.remove	= hi655x_pmic_remove,
-+};
-+module_platform_driver(hi655x_pmic_driver);
-+
-+MODULE_AUTHOR("Fei Wang <w.f@huawei.com>");
-+MODULE_DESCRIPTION("Hisi hi655x pmic driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/mfd/hi655x-pmic.h b/include/linux/mfd/hi655x-pmic.h
-new file mode 100644
-index 0000000..e66246c
---- /dev/null
-+++ b/include/linux/mfd/hi655x-pmic.h
-@@ -0,0 +1,56 @@
-+/*
-+ * Header file for device driver Hi655X PMIC
-+ *
-+ * Copyright (C) 2015 Hisilicon Co. Ltd.
++ * Copyright (c) 2015 Hisilicon.
 + *
 + * Fei Wang <w.f@huawei.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * this regulator's probe function will be called lots of times,,
++ * because of there are lots of regulator nodes in dtb.
++ * so,that's say, the driver must be inited before the regulator nodes
++ * registor to system.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * Makefile have proved my guess, please refor to the makefile.
++ * when the code is rebuild i hope we can build pmu sub_system.
++ * init order can not base on compile
++ */
++#include <linux/slab.h>
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_address.h>
++#include <linux/regmap.h>
++#include <linux/regulator/driver.h>
++#include <linux/regulator/machine.h>
++#include <linux/regulator/of_regulator.h>
++#include <linux/delay.h>
++#include <linux/time.h>
++#include <linux/regulator/hi655x-regulator.h>
++#include <linux/mfd/hi655x-pmic.h>
++#include <linux/regmap.h>
++
++#define REG_VALUE_SETBITS(reg_value, pos, bits, bits_value) \
++		(reg_value = (reg_value & \
++		~((((unsigned int)1 << bits) - 1) << pos)) | \
++		((unsigned int)(bits_value & \
++		(((unsigned int)1 << bits) - 1)) << pos))
++
++#define REG_VALUE_GETBITS(reg_value, pos, bits) \
++			((reg_value >> pos) & (((unsigned int)1 << bits) - 1))
++
++static int hi655x_regulator_pmic_is_enabled(struct regulator_dev *rdev)
++{
++	int ret = 0;
++	unsigned int value = 0;
++
++	struct hi655x_regulator *sreg = rdev_get_drvdata(rdev);
++	struct hi655x_regulator_ctrl_regs  *ctrl_regs = &(sreg->ctrl_regs);
++	struct hi655x_regulator_ctrl_data  *ctrl_data = &(sreg->ctrl_data);
++
++	/*
++	* regulator is all set,but the pmu is only subset.
++	* maybe this "buck"/"ldo"/"lvs" is not contrl by a core.
++	* and in regulator have a "status" member ("okey" or "disable").
++	*/
++	regmap_read(rdev->regmap, ctrl_regs->status_reg, &value);
++	ret = (int)REG_VALUE_GETBITS(value, ctrl_data->shift,
++					ctrl_data->mask);
++
++	return ret;
++}
++
++static int hi655x_regulator_pmic_enable(struct regulator_dev *rdev)
++{
++	int ret = 0;
++	unsigned char value_u8 = 0;
++	unsigned int value_u32 = 0;
++	struct hi655x_regulator *sreg = rdev_get_drvdata(rdev);
++	struct hi655x_regulator_ctrl_regs  *ctrl_regs = &(sreg->ctrl_regs);
++	struct hi655x_regulator_ctrl_data  *ctrl_data = &(sreg->ctrl_data);
++
++	REG_VALUE_SETBITS(value_u32, ctrl_data->shift, ctrl_data->mask, 0x1);
++	value_u8  = (unsigned char)value_u32;
++	regmap_write(rdev->regmap, ctrl_regs->enable_reg, value_u8);
++	udelay(sreg->off_on_delay);
++
++	return ret;
++}
++
++static int hi655x_regulator_pmic_disable(struct regulator_dev *rdev)
++{
++	int ret = 0;
++	int flag = 1;
++	unsigned char value_u8 = 0;
++	unsigned int value_u32 = 0;
++
++	struct hi655x_regulator *sreg = rdev_get_drvdata(rdev);
++	struct hi655x_regulator_ctrl_regs  *ctrl_regs = &(sreg->ctrl_regs);
++	struct hi655x_regulator_ctrl_data  *ctrl_data = &(sreg->ctrl_data);
++
++	/*
++	* regulator is all set,but the pmu is only subset.
++	* maybe this "buck"/"ldo"/"lvs" is not contrl by a core.
++	* and in regulator have a "status" member (okey or disable).
++	* maybe we can del some regulator which is not contrl by core.
++	*/
++	if (sreg->type == PMIC_BOOST_TYPE)
++		flag = 0;
++
++	/*
++	* for flag init value = 1;
++	*/
++
++	REG_VALUE_SETBITS(value_u32, ctrl_data->shift, ctrl_data->mask, flag);
++	value_u8  = (unsigned char)value_u32;
++	regmap_write(rdev->regmap, ctrl_regs->disable_reg, value_u8);
++	return ret;
++}
++
++static int hi655x_regulator_pmic_list_voltage_linear(struct regulator_dev *rdev,
++				  unsigned int selector)
++{
++
++	struct hi655x_regulator *sreg = rdev_get_drvdata(rdev);
++	/*
++	* regulator is all set,but the pmu is only subset.
++	* maybe this "buck"/"ldo"/"lvs" is not contrl by a core.
++	* and in regulator have a "status" member (okey or disable).
++	* maybe we can del some regulator which is not contrl by core.
++	* we will return min_uV
++	*/
++	if (sreg->type == PMIC_LVS_TYPE)
++		return 900000;
++
++	if (selector >= sreg->vol_numb) {
++		pr_err("selector err %s %d\n", __func__, __LINE__);
++		return -1;
++	}
++
++	return sreg->vset_table[selector];
++}
++
++static int hi655x_regulator_pmic_get_voltage(struct regulator_dev *rdev)
++{
++	int index = 0;
++	unsigned int value = 0;
++
++	struct hi655x_regulator *sreg = rdev_get_drvdata(rdev);
++	struct hi655x_regulator_vset_regs  *vset_regs = &(sreg->vset_regs);
++	struct hi655x_regulator_vset_data  *vset_data = &(sreg->vset_data);
++
++	if (sreg->type == PMIC_LVS_TYPE)
++		return 900000;
++
++	regmap_read(rdev->regmap, vset_regs->vset_reg, &value);
++	index = (unsigned int)REG_VALUE_GETBITS(value,
++		vset_data->shift, vset_data->mask);
++
++	return sreg->vset_table[index];
++}
++
++static int hi655x_regulator_pmic_set_voltage(struct regulator_dev *rdev,
++				int min_uV, int max_uV, unsigned *selector)
++{
++	int i = 0;
++	int ret = 0;
++	int vol = 0;
++	unsigned int value = 0;
++
++	struct hi655x_regulator *sreg = rdev_get_drvdata(rdev);
++	struct hi655x_regulator_vset_regs  *vset_regs = &(sreg->vset_regs);
++	struct hi655x_regulator_vset_data  *vset_data = &(sreg->vset_data);
++
++	if (sreg->type == PMIC_LVS_TYPE)
++		return 0;
++	/*
++	* search the matched vol and get its index
++	*/
++	for (i = 0; i < sreg->vol_numb; i++) {
++		vol = sreg->vset_table[i];
++
++		if ((vol >= min_uV) && (vol <= max_uV))
++			break;
++	}
++
++	if (i == sreg->vol_numb)
++		return -1;
++
++
++	regmap_read(rdev->regmap, vset_regs->vset_reg, &value);
++	REG_VALUE_SETBITS(value, vset_data->shift, vset_data->mask, i);
++	regmap_write(rdev->regmap, vset_regs->vset_reg, value);
++	*selector = i;
++
++	return ret;
++}
++
++static unsigned int hi655x_regulator_pmic_get_mode(
++			struct regulator_dev *rdev)
++{
++	return REGULATOR_MODE_NORMAL;
++}
++
++static int hi655x_regulator_pmic_set_mode(struct regulator_dev *rdev,
++						unsigned int mode)
++
++{
++	return 0;
++}
++
++static unsigned int hi655x_regulator_pmic_get_optimum_mode(
++	struct regulator_dev *rdev, int input_uV, int output_uV, int load_uA)
++
++{
++	return REGULATOR_MODE_NORMAL;
++}
++
++static struct regulator_ops hi655x_regulator_pmic_rops = {
++	.is_enabled = hi655x_regulator_pmic_is_enabled,
++	.enable = hi655x_regulator_pmic_enable,
++	.disable = hi655x_regulator_pmic_disable,
++	.list_voltage = hi655x_regulator_pmic_list_voltage_linear,
++	.get_voltage = hi655x_regulator_pmic_get_voltage,
++	.set_voltage = hi655x_regulator_pmic_set_voltage,
++	.get_mode = hi655x_regulator_pmic_get_mode,
++	.set_mode = hi655x_regulator_pmic_set_mode,
++	.get_optimum_mode = hi655x_regulator_pmic_get_optimum_mode,
++};
++
++static int hi655x_regualtor_pmic_dt_parse(struct hi655x_regulator *sreg,
++					struct platform_device *pdev)
++{
++	return 0;
++}
++
++static const struct hi655x_regulator hi655x_regulator_pmic = {
++	.rdesc = {
++		.ops = &hi655x_regulator_pmic_rops,
++		.type = REGULATOR_VOLTAGE,
++		.owner = THIS_MODULE,
++	},
++	.dt_parse = hi655x_regualtor_pmic_dt_parse,
++};
++
++
++static const struct of_device_id of_hi655x_regulator_match_tbl[] = {
++	{
++		.compatible = "hisilicon,hi655x-regulator-pmic",
++		.data = &hi655x_regulator_pmic,
++	},
++	{ /* end */ }
++};
++
++static struct regulator_init_data *hi655x_of_get_regulator_init_data(
++	struct device *dev, struct device_node *np)
++{
++	struct regulator_init_data *init_data = NULL;
++	const __be32 *num_consumer_supplies = NULL;
++	struct regulator_consumer_supply *consumer_supplies = NULL;
++	int consumer_id = 0;
++
++	init_data = devm_kzalloc(dev, sizeof(*init_data), GFP_KERNEL);
++	if (!init_data)
++		return NULL;
++
++	num_consumer_supplies = of_get_property(np,
++				"hisilicon,num_consumer_supplies", NULL);
++
++	if ((NULL == num_consumer_supplies) || (0 == *num_consumer_supplies)) {
++		dev_warn(dev, "%s no consumer_supplies\n", __func__);
++		return init_data;
++	}
++
++	init_data->num_consumer_supplies = be32_to_cpu(*num_consumer_supplies);
++	init_data->consumer_supplies = (struct regulator_consumer_supply *)
++		devm_kzalloc(dev, init_data->num_consumer_supplies *
++		sizeof(struct regulator_consumer_supply), GFP_KERNEL);
++
++	if (NULL == init_data->consumer_supplies) {
++		dev_err(dev, "%s devm_kzalloc consumer_supplies err\n",
++			__func__);
++		return NULL;
++	}
++
++	consumer_supplies = init_data->consumer_supplies;
++
++	for (consumer_id = 0; consumer_id < init_data->num_consumer_supplies;
++		consumer_id++, consumer_supplies++) {
++		int ret = of_property_read_string_index(np,
++			"hisilicon,consumer-supplies",
++			consumer_id, &consumer_supplies->supply);
++
++		if (ret) {
++			dev_err(dev,
++			"%s %s of_property_read_string_index consumer-supplies err\n",
++			__func__, np->name);
++		}
++	}
++
++	return init_data;
++}
++
++static int hi655x_of_get_regulator_constraint(
++	struct regulation_constraints *constraints, struct device_node *np)
++{
++	const __be32 *min_uV, *max_uV;
++	unsigned int *valid_modes_mask;
++	unsigned int *valid_ops_mask;
++	unsigned int *initial_mode;
++
++	if (!np)
++		return -1;
++
++	if (!constraints)
++		return -1;
++
++	(constraints)->name = of_get_property(np, "regulator-name", NULL);
++
++	min_uV = of_get_property(np, "regulator-min-microvolt", NULL);
++	if (min_uV)	{
++		(constraints)->min_uV = be32_to_cpu(*min_uV);
++		(constraints)->min_uA = be32_to_cpu(*min_uV);
++	}
++
++	max_uV = of_get_property(np, "regulator-max-microvolt", NULL);
++	if (max_uV)	{
++		(constraints)->max_uV = be32_to_cpu(*max_uV);
++		(constraints)->max_uA = be32_to_cpu(*max_uV);
++	}
++
++	valid_modes_mask = (unsigned int *)of_get_property(np,
++			"hisilicon,valid-modes-mask", NULL);
++
++	if (valid_modes_mask)
++		(constraints)->valid_modes_mask =
++			be32_to_cpu(*valid_modes_mask);
++
++	valid_ops_mask = (unsigned int *)of_get_property(np,
++				"hisilicon,valid-ops-mask", NULL);
++	if (valid_ops_mask)
++		(constraints)->valid_ops_mask =
++			be32_to_cpu(*valid_ops_mask);
++
++	initial_mode = (unsigned int *)of_get_property(np,
++				"hisilicon,initial-mode", NULL);
++	if (initial_mode)
++		(constraints)->initial_mode = be32_to_cpu(*initial_mode);
++
++	(constraints)->always_on = !!(of_find_property(np,
++				"regulator-always-on", NULL));
++
++	(constraints)->boot_on = !!(of_find_property(np,
++				"regulator-boot-on", NULL));
++	return 0;
++
++}
++
++static int hi655x_of_get_regulator_sreg(struct hi655x_regulator *sreg,
++		struct device *dev, struct device_node *np)
++{
++	int *vol_numb;
++	unsigned int *off_on_delay;
++	enum hi655x_regulator_type *regulator_type;
++	const char *status = NULL;
++	unsigned int *vset_table = NULL;
++	int *regulator_id;
++
++	status = of_get_property(np, "hisilicon,regulator-status", NULL);
++	if (status)
++		sreg->status = !(strcmp(status, "okey"));
++
++	regulator_type = (enum hi655x_regulator_type *)of_get_property(np,
++				"hisilicon,regulator-type", NULL);
++
++	if (regulator_type)
++		sreg->type = be32_to_cpu(*regulator_type);
++
++	off_on_delay = (unsigned int *)of_get_property(np,
++				"hisilicon,off-on-delay", NULL);
++	if (off_on_delay)
++		sreg->off_on_delay = be32_to_cpu(*off_on_delay);
++
++	(void)of_property_read_u32_array(np, "hisilicon,ctrl-regs",
++		(unsigned int *)(&sreg->ctrl_regs), 0x3);
++
++	(void)of_property_read_u32_array(np, "hisilicon,ctrl-data",
++		(unsigned int *)(&sreg->ctrl_data), 0x2);
++
++	(void)of_property_read_u32_array(np, "hisilicon,vset-regs",
++		(unsigned int *)(&sreg->vset_regs), 0x1);
++
++	(void)of_property_read_u32_array(np, "hisilicon,vset-data",
++		(unsigned int *)(&sreg->vset_data), 0x2);
++
++	vol_numb = (int *)of_get_property(np, "hisilicon,regulator-n-vol",
++				NULL);
++	if (vol_numb)
++		sreg->vol_numb = be32_to_cpu(*vol_numb);
++
++	regulator_id = (int *)of_get_property(np,
++		"hisilicon, hisi-scharger-regulator-id", NULL);
++
++	if (regulator_id)
++		sreg->regulator_id =  be32_to_cpu(*regulator_id);
++
++	vset_table = devm_kzalloc(dev, sreg->vol_numb * sizeof(int),
++					GFP_KERNEL);
++	if (!vset_table)
++		return -1;
++
++	(void)of_property_read_u32_array(np,
++		"hisilicon,vset-table", (unsigned int *)vset_table,
++			sreg->vol_numb);
++	sreg->vset_table = vset_table;
++
++	return 0;
++
++}
++
++static int hi655x_regulator_probe(struct platform_device *pdev)
++{
++
++	int ret = 0;
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct hi655x_pmic *pmic;
++	struct regulator_dev *rdev = NULL;
++	struct regulator_desc *rdesc = NULL;
++	struct hi655x_regulator *sreg = NULL;
++	struct regulator_init_data *initdata = NULL;
++	const struct of_device_id *match = NULL;
++	const struct hi655x_regulator *template = NULL;
++	struct regulator_config config = { };
++
++	pmic = dev_get_drvdata(dev->parent);
++
++	/*
++	* build hi655x_regulator device
++	*/
++
++	/* to check which type of regulator this is */
++	match = of_match_device(of_hi655x_regulator_match_tbl, &pdev->dev);
++
++	if (NULL == match) {
++		dev_err(dev, "of match hi655x regulator fail!\n\r");
++		return -EINVAL;
++	}
++	/*tempdev is regulator device*/
++	template = match->data;
++
++	/*
++	*initdata mem will release auto;
++	*this is kernel 3.10 import.
++	*/
++
++	/*just for getting "std regulator node" value-key about constraint*/
++	initdata = hi655x_of_get_regulator_init_data(dev, np);
++	if (!initdata) {
++		dev_err(dev, "get regulator init data error !\n");
++		return -EINVAL;
++	}
++
++	ret = hi655x_of_get_regulator_constraint(&initdata->constraints, np);
++	if (!!ret) {
++		dev_err(dev, "get regulator constraint error !\n");
++		return -EINVAL;
++	}
++
++	/* TODO:hi655x regulator supports two modes */
++	sreg = kmemdup(template, sizeof(*sreg), GFP_KERNEL);
++	if (!sreg)
++		return -ENOMEM;
++
++	if (0 != hi655x_of_get_regulator_sreg(sreg, dev, np)) {
++		kfree(sreg);
++		return -EINVAL;
++	}
++
++	rdesc = &sreg->rdesc;
++	rdesc->n_voltages = sreg->vol_numb;
++	rdesc->name = initdata->constraints.name;
++	rdesc->id = sreg->regulator_id;
++	rdesc->min_uV = initdata->constraints.min_uV;
++
++	/*just for skeleton for future*/
++	/* to parse device tree data for regulator specific */
++	config.dev = &pdev->dev;
++	config.init_data = initdata;
++	config.driver_data = sreg;
++	config.regmap = pmic->regmap;
++	config.of_node = pdev->dev.of_node;
++	/* register regulator */
++	rdev = regulator_register(rdesc, &config);
++	if (IS_ERR(rdev)) {
++		dev_err(dev, "regulator failed to register %s\n", rdesc->name);
++		ret = PTR_ERR(rdev);
++		return -EINVAL;
++	}
++
++	platform_set_drvdata(pdev, rdev);
++	regulator_has_full_constraints();
++
++	return ret;
++}
++
++static int hi655x_regulator_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static struct platform_driver hi655x_regulator_driver = {
++	.driver = {
++		.name	= "hi655x_regulator",
++		.owner  = THIS_MODULE,
++		.of_match_table = of_hi655x_regulator_match_tbl,
++	},
++	.probe	= hi655x_regulator_probe,
++	.remove	= hi655x_regulator_remove,
++};
++module_platform_driver(hi655x_regulator_driver);
++
++MODULE_AUTHOR("Fei Wang <w.f@huawei.com>");
++MODULE_DESCRIPTION("Hisi hi655x regulator driver");
++MODULE_LICENSE("GPL v2");
+diff --git a/include/linux/regulator/hi655x-regulator.h b/include/linux/regulator/hi655x-regulator.h
+new file mode 100644
+index 0000000..387b352
+--- /dev/null
++++ b/include/linux/regulator/hi655x-regulator.h
+@@ -0,0 +1,69 @@
++/*
++ * Device driver for regulators in HI655X IC
 + *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ * Copyright (c) 2015 Hisilicon.
++ *
++ * Fei Wang <w.f@huawei.com>
++ *
++ * this regulator's probe function will be called lots of times,,
++ * because of there are lots of regulator nodes in dtb.
++ * so,that's say, the driver must be inited before the regulator nodes
++ * registor to system.
++ *
++ * Makefile have proved my guess, please refor to the makefile.
++ * when the code is rebuild i hope we can build pmu sub_system.
++ * init order can not base on compile
 + */
 +
++#ifndef __HISI_HI655X_REGULATOR_H__
++#define __HISI_HI655X_REGULATOR_H__
 +
-+#ifndef __HI655X_PMIC_H
-+#define __HI655X_PMIC_H
-+
-+/* Hi655x registers are mapped to memory bus in 4 bytes stride */
-+#define HI655X_REG_TO_BUS_ADDR(x)	((x) << 2)
-+
-+#define HI655X_BITS			            (8)
-+
-+/*numb of sub-interrupt*/
-+#define HI655X_NR_IRQ			        (32)
-+
-+#define HI655X_IRQ_STAT_BASE	        (0x003)
-+#define HI655X_IRQ_MASK_BASE	        (0x007)
-+#define HI655X_IRQ_ARRAY			    (4)
-+#define HI655X_IRQ_MASK                 (0xFF)
-+#define HI655X_IRQ_CLR                  (0xFF)
-+#define HI655X_VER_REG                  (0x000)
-+
-+#define PMU_VER_START  0x10
-+#define PMU_VER_END    0x38
-+
-+struct hi655x_pmic {
-+	struct resource		*res;
-+	struct device		*dev;
-+	struct regmap		*regmap;
-+	spinlock_t ssi_hw_lock;
-+	struct clk          *clk;
-+	struct irq_domain	*domain;
-+	int			irq;
-+	int			gpio;
-+	unsigned int    irqs[HI655X_NR_IRQ];
-+	unsigned int       ver;
++enum hi655x_regulator_type {
++	PMIC_BUCK_TYPE = 0,
++	PMIC_LDO_TYPE  = 1,
++	PMIC_LVS_TYPE  = 2,
++	PMIC_BOOST_TYPE = 3,
++	MTCMOS_SC_ON_TYPE      = 4,
++	MTCMOS_ACPU_ON_TYPE    = 5,
++	SCHARGE_TYPE           = 6,
 +};
++
++struct hi655x_regulator_ctrl_regs {
++	unsigned int  enable_reg;
++	unsigned int  disable_reg;
++	unsigned int  status_reg;
++};
++
++struct hi655x_regulator_vset_regs {
++	unsigned int vset_reg;
++};
++
++struct hi655x_regulator_ctrl_data {
++	int          shift;
++	unsigned int mask;
++};
++
++struct hi655x_regulator_vset_data {
++	int          shift;
++	unsigned int mask;
++};
++
++struct hi655x_regulator {
++	int status;                             /*this property in child  node*/
++	unsigned int off_on_delay;              /*this property in parent node*/
++	enum hi655x_regulator_type type;        /*this property in child  node*/
++	int regulator_id;
++
++	/*this property must be unify which is in child node*/
++	struct hi655x_regulator_ctrl_regs   ctrl_regs;
++	struct hi655x_regulator_ctrl_data   ctrl_data;
++
++	struct hi655x_regulator_vset_regs   vset_regs;
++	struct hi655x_regulator_vset_data   vset_data;
++	unsigned int                        vol_numb;
++	unsigned int                        *vset_table;
++	struct regulator_desc rdesc;
++	int (*dt_parse)(struct hi655x_regulator*, struct platform_device*);
++};
++
 +#endif
 -- 
 1.7.9.5
