@@ -1,49 +1,45 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 30 Sep 2015 14:48:57 +0800
-Subject: [RESEND PATCH v3 0/5] usb: change clock information for chipidea
-In-Reply-To: <20150930062427.GA1665@shlinux2>
-References: <1443579925-1330-1-git-send-email-peter.chen@freescale.com>
- <20150930052835.GC18468@tiger> <20150930062427.GA1665@shlinux2>
-Message-ID: <20150930064857.GF16362@tiger>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 30 Sep 2015 15:50:50 +0900
+Subject: [GIT PULL] Samsung fixes for v4.3
+In-Reply-To: <1443571154-28722-1-git-send-email-k.kozlowski@samsung.com>
+References: <1443571154-28722-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <560B864A.9050400@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 02:24:28PM +0800, Peter Chen wrote:
-> On Wed, Sep 30, 2015 at 01:28:36PM +0800, Shawn Guo wrote:
-> > On Wed, Sep 30, 2015 at 10:25:20AM +0800, Peter Chen wrote:
-> > > This patch set changes usb clock information for legacy i.mx platforms.
-> > > At these platforms, they needs three clocks to let controller work.
-> > > 
-> > > Hi Shawn,
-> > > 
-> > > Fabio has tested for both imx27 and imx25 platforms.
-> > > I have queued 1/5 and 5/5, would you please help to queue others,
-> > > thanks.
-> > > 
-> > > Changes for v3:
-> > > - Delete property "needs-three-clocks", and using of_device_id->data
-> > >   to differentiate platforms
-> > > - change <stable@vger.kernel.org> #v3.19+ to <stable@vger.kernel.org> #v4.1+
-> > 
-> > So the last patch will be sent as a fix with stable on copy?
+On 09/30/15 08:59, Krzysztof Kozlowski wrote:
+> Dear Kukjin,
 > 
-> Yes
+> Below you will find fixes for current release cycle which are not
+> present yet in your tree.
 > 
-> > In that
-> > case, will USB driver just work without corresponding DTS change?  Or
-> > the driver change has a dependency on the DTS change?
-> > 
+> Best regards,
+> Krzysztof
 > 
-> At v4.1, One of USB driver changes break i.mx27's USB function.
-> The driver's change at patch 5/5 is also tagged for stable tree,
-> so it needs both DTS and driver's change to let i.mx27 USB work from
-> v4.1.
+> 
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+> 
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/krzk/linux.git tags/samsung-fixes-4.3
+> 
+> for you to fetch changes up to c7d2ecd9f64c351cb4d551f1f472d0fc09c3cae8:
+> 
+>   ARM: dts: Fix wrong clock binding for sysmmu_fimd1_1 on exynos5420 (2015-09-29 15:39:58 +0900)
+> 
+> ----------------------------------------------------------------
+> Fixes for Exynos (DT and mach code):
+> 1. Finally fix booting of all 8 cores on Exynos Octa (Exynos542x): all
+>    8 cores are booting and can be used. The fix, based on vendor
+>    code and bootloader behavior, is as for time being only
+>    for MCPM enabled path.
+> 2. Fix thermal boot issue on SMDK5250.
+> 3. Fix invalid clock used for FIMD IOMMU.
+> 
+Pulled, thanks.
 
-In that case, you need to have dts and driver changes go through the
-same tree.  For dts patches, you can have
+Note it will be sent to upstream in a day.
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
-
-As a side note, the kernel change breaks the ABI with DT anyway.
-
-Shawn
+- Kukjin
