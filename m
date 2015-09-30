@@ -1,141 +1,115 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 30 Sep 2015 17:26:18 +0900
-Subject: [PATCH v5 05/17] drm: bridge: analogix/dp: dynamic parse sync_pol
- & interlace & dynamic_range
-In-Reply-To: <560B9B33.2060409@rock-chips.com>
-References: <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
- <1442907477-3283-1-git-send-email-ykk@rock-chips.com>
- <560B73D4.30109@samsung.com> <560B8CF1.7050102@rock-chips.com>
- <560B9075.1000304@samsung.com> <560B9B33.2060409@rock-chips.com>
-Message-ID: <560B9CAA.9080109@samsung.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Wed, 30 Sep 2015 11:24:04 +0300
+Subject: [PATCH] mmc: core: Fix init_card in 52Mhz
+In-Reply-To: <1443583688-1952-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1443583688-1952-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <560B9C24.3090209@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.09.2015 17:20, Yakir Yang wrote:
-> Hi Krzysztof,
-> 
-> On 09/30/2015 03:34 PM, Krzysztof Kozlowski wrote:
->> On 30.09.2015 16:19, Yakir Yang wrote:
->>> Hi Krzysztof,
->>>
->>> On 09/30/2015 01:32 PM, Krzysztof Kozlowski wrote:
->>>> On 22.09.2015 16:37, Yakir Yang wrote:
->>>>> Both hsync/vsync polarity and interlace mode can be parsed from
->>>>> drm display mode, and dynamic_range and ycbcr_coeff can be judge
->>>>> by the video code.
->>>>>
->>>>> But presumably Exynos still relies on the DT properties, so take
->>>>> good use of mode_fixup() in to achieve the compatibility hacks.
->>>>>
->>>>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->>>>> ---
->>>>> Changes in v5:
->>>>> - Switch video timing type to "u32", so driver could use "of_property_read_u32"
->>>>>   to get the backword timing values. 
->>>> Okay
->>>>
->>>>> Krzysztof suggest me that driver could use
->>>>>   the "of_property_read_bool" to get backword timing values, but that interfacs
->>>>>   would modify the original drm_display_mode timing directly (whether those
->>>>>   properties exists or not).
->>>> Hmm, I don't understand. You have a:
->>>> 	struct video_info {
->>>> 		bool h_sync_polarity;
->>>> 		bool v_sync_polarity;
->>>> 		bool interlaced;
->>>> 	};
->>>>
->>>> so what is wrong with:
->>>> 	dp_video_config->h_sync_polarity =
->>>> 		of_property_read_bool(dp_node, "hsync-active-high");
->>>>
->>>> Is it exactly the same binding as previously?
->>> Yes, it is the same binding as previously. But just a note that we already
->>> mark those DT binding as deprecated.
->>>
->>> +-interlaced:            deprecated prop that can parsed frm drm_display_mode.
->>> +-vsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
->>> +-hsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
->>>
->>>
->>> For now those values should come from "struct drm_display_mode",
->>> and we already parsed them out from "drm_display_mode" before
->>> driver provide the backward compatibility.
->>>
->>> Let's used the "hsync-active-high" example:
->>>     As for now the code would like:
->>>     static void analogix_dp_bridge_mode_set(...)
->>>     {
->>>         // Parsed timing value from "drm_display_mode"
->>>         video->h_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NHSYNC);
->>>
->>>         // Try to detect the deprecated property, providing
->>>         // the backward compatibility
->>>         of_property_read_u32(dp_node, "hsync-active-high",
->>>                                  &video->h_sync_polarity);    
->>>
->>>         /*
->>>          * In this case, if "hsync-active-high" property haven't been
->>>          * found, then the video timing "h_sync_polarity" would  keep
->>>          * no change, keeping the parsed value from "drm_display_mode"
->>>          */     
->>>     }   
->>>
->>>     But if keep the "of_property_read_bool", then code would like:
->>>     static void analogix_dp_bridge_mode_set(...)
->>>     {
->>>         // Parsed timing value from "drm_display_mode"
->>>         video->h_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NHSYNC);
->>>
->>>         // Try to detect the deprecated property, providing
->>>         // the backward compatibility
->>>         video->h_sync_polarity =
->>>                     of_property_read_bool(dp_node, "hsync-active-high");
->>>    
->>>
->>>         /*
->>>          * In this case, if "hsync-active-high" property haven't been
->>>          * found, then the video timing "h_sync_polarity" would just
->>>          * modify to "false". That is the place we don't want, cause
->>>          * it would always modify the timing value parsed from
->>>          * "drm_display_mode"
->>>          */  
->>>     }   
->>>
->> OK, I see the point of overwriting values from drm_display_mode. However
->> I think you changed the binding. I believe the of_property_read_u32()
->> will behave differently for such DTS:
->>
->> exynos_dp {
->> 	...
->> 	hsync-active-high;
->> }
->>
->> It will return -EOVERFLOW which means it would be broken now...
-> 
-> Whoops, thanks for your remind, after try that, I do see over flow error.
-> static void *of_find_property_value_of_size(const struct device_node *np,
->                         const char *propname, u32 len)
-> {
->         ....
->         if (len > prop->length)
->                 return ERR_PTR(-EOVERFLOW);
->         ...
-> }
-> 
-> So I though code should be:
->     if (of_property_read_bool(dp_node, "hsync-active-high"))
->         video->h_sync_polarity = true;
+On 30/09/15 06:28, Chaotian Jing wrote:
+> Suppose that we got a data crc error, and it triggers the mmc_reset.
+> mmc_reset will call mmc_send_status to see if HW reset was supported.
+> before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
+> it will reduce frequency to 52Mhz firstly, that results in card init
+> was doing at 52Mhz, So need ensure frequency is lower than 400Khz when
+> re-init card.
 
-Looks good.
+The call to mmc_send_status() was originally only done for mmc_test and
+doesn't belong in a real reset.  However the test parameter was removed
+to simplify the code by:
+
+commit 83533ab28380f6957af39a7b322e639e42dbdaf1
+Author: Johan Rudholm <johan.rudholm@axis.com>
+Date:   Mon Jan 12 15:38:04 2015 +0100
+
+    mmc: core: always check status after reset
+    
+    Always check if the card is alive after a successful reset. This allows
+    us to remove mmc_hw_reset_check(), leaving mmc_hw_reset() as the only
+    card reset interface.
+    
+    Signed-off-by: Johan Rudholm <johanru@axis.com>
+    Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+IMHO having a test to check whether hw reset actually did reset the card
+is useful, so I would suggest putting back mmc_hw_reset_check() and
+removing the check from the non-test path.
+
+An alternative is to recognize that we don't want retuning here, and it is
+unlikely to be needed in the mmc_test case.  So if retuning is needed, just
+skip the call to mmc_send_status() i.e.
+
+diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+index f2d0c2ae85b1..c3749ba42739 100644
+--- a/drivers/mmc/core/mmc.c
++++ b/drivers/mmc/core/mmc.c
+@@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
+ 	host->ops->hw_reset(host);
+ 
+ 	/* If the reset has happened, then a status command will fail */
+-	if (!mmc_send_status(card, &status)) {
++	if (!host->need_retune && !mmc_send_status(card, &status)) {
+ 		mmc_host_clk_release(host);
+ 		return -ENOSYS;
+ 	}
+
+Could then make mmc_test aware of that:
+
+diff --git a/drivers/mmc/card/mmc_test.c b/drivers/mmc/card/mmc_test.c
+index b78cf5d403a3..7b105b97be78 100644
+--- a/drivers/mmc/card/mmc_test.c
++++ b/drivers/mmc/card/mmc_test.c
+@@ -2272,6 +2272,16 @@ static int mmc_test_hw_reset(struct mmc_test_card *test)
+ 	if (!mmc_card_mmc(card) || !mmc_can_reset(card))
+ 		return RESULT_UNSUP_CARD;
+ 
++	err = mmc_send_status(card, NULL);
++	if (err)
++		return err;
++
++	if (host->need_retune) {
++		pr_info("%s: cannot test hw reset because retune needed\n",
++			mmc_hostname(test->card->host));
++		return RESULT_FAIL;
++	}
++
+ 	err = mmc_hw_reset(host);
+ 	if (!err)
+ 		return RESULT_OK;
+diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+index f2d0c2ae85b1..c3749ba42739 100644
+--- a/drivers/mmc/core/mmc.c
++++ b/drivers/mmc/core/mmc.c
+@@ -1938,7 +1938,7 @@ static int mmc_reset(struct mmc_host *host)
+ 	host->ops->hw_reset(host);
+ 
+ 	/* If the reset has happened, then a status command will fail */
+-	if (!mmc_send_status(card, &status)) {
++	if (!host->need_retune && !mmc_send_status(card, &status)) {
+ 		mmc_host_clk_release(host);
+ 		return -ENOSYS;
+ 	}
+
+
+
 
 > 
-> And we can't provide full backward compatibility for this property, cause
-> the previous exynos_dp driver would set this timing value to "false" when
-> property not defined, but analogix_dp driver keep this timing value
-> corresponding to "drm_display_mode" when property not found.
-
-Indeed, the behaviour changes. I don't know if this is important issue...
-
-Best regards,
-Krzysztof
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/core/mmc.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index e726903..f2d0c2a 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1945,6 +1945,7 @@ static int mmc_reset(struct mmc_host *host)
+>  
+>  	/* Set initial state and call mmc_set_ios */
+>  	mmc_set_initial_state(host);
+> +	mmc_set_clock(host, host->f_init);
+>  	mmc_host_clk_release(host);
+>  
+>  	return mmc_init_card(host, card->ocr, card);
+> 
