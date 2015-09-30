@@ -1,67 +1,87 @@
-From: jc@eclis.ch (Jean-Christian de Rivaz)
-Date: Wed, 30 Sep 2015 12:13:33 +0200
-Subject: [PATCH 1/1] Disable CONFIG_UACCESS_WITH_MEMCPY in Atmel config.
-In-Reply-To: <20150930061002.GI3982@pengutronix.de>
-References: <1443565968-7012-1-git-send-email-jc@eclis.ch>
- <20150930061002.GI3982@pengutronix.de>
-Message-ID: <560BB5CD.1040908@eclis.ch>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Wed, 30 Sep 2015 13:16:15 +0300
+Subject: [RFC PATCH 19/20] coresight: etm3x: implementing perf's
+ user/kernel mode
+In-Reply-To: <1442593594-10665-20-git-send-email-mathieu.poirier@linaro.org>
+References: <1442593594-10665-1-git-send-email-mathieu.poirier@linaro.org>
+ <1442593594-10665-20-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <87mvw4jjps.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 30. 09. 15 08:10, Uwe Kleine-K?nig a ?crit :
-> Hello,
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+
+> Configure tracers in accordance with the specification conveyed
+> by the perf cmd line tool.  For example if only user space is
+> requested, configure the address range comparator with the kerne's
+> address range and set the 'exclude' bit, which will result in
+> tracing everything except the kernel.
 >
-> On Wed, Sep 30, 2015 at 12:32:48AM +0200, jc at eclis.ch wrote:
->> From: Jean-Christian de Rivaz <jc@eclis.ch>
->>
->> According to Russell King:
->> In any case, unless you have a Marvell platform, you should have this
->> disabled - it provides a performance boost for Marvell platforms, but
->> degrades performance everywhere else.  Please ensure that you disable
->> CONFIG_UACCESS_WITH_MEMCPY.
->>
->> Signed-off-by: Jean-Christian de Rivaz <jc@eclis.ch>
-> the change is fine now. Feel free to add my Ack also if you do another
-> round to improve the changelog.
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  drivers/hwtracing/coresight/coresight-etm3x.c | 36 +++++++++++++++++++++++++++
+>  1 file changed, 36 insertions(+)
 >
-> Best regards
-> Uwe
->
+> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+> index 077b49714259..2f818dbde099 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+> @@ -320,6 +320,41 @@ static int etm_parse_event_config(struct etm_drvdata *drvdata,
+>  {
+>  	u64 config = event->attr.config;
+>  
+> +	if (event->attr.exclude_kernel || event->attr.exclude_user) {
+> +		u32 event_encoding;
+> +		u32 flags = (1 << 0 | /* instruction execute*/
+> +			     3 << 3 | /* ARM instruction */
+> +			     0 << 5 | /* No data value comparison */
+> +			     0 << 7 | /* No exact mach */
+> +			     0 << 8 | /* Ignore context ID */
+> +			     0 << 10); /* Security ignored */
+> +
+> +		/* Bit 0 is address range comparator 1 */
+> +		drvdata->enable_ctrl1 = ETMTECR1_ADDR_COMP_1;
+> +
+> +		/* Bit 24 controls whether the address range should be
+> +		 * included or excluded.
+> +		 */
+> +		if (event->attr.exclude_kernel)
+> +			drvdata->enable_ctrl1 |= BIT(24);
 
-Thanks Uwe,
+Isn't there a privilege level based filtering (OS/USR) in ETM? Shouldn't
+ETMACTRn[10:12] have a setting for that?
 
-Nicolas and Russell, for my own curiosity I tested the difference on 
-this system:
+> +
+> +		/* No need to worry about single address comparators */
+> +		drvdata->enable_ctrl2 = 0x0;
+> +
+> +		drvdata->addr_val[0] = (u32) _stext;
+> +		drvdata->addr_val[1] = (u32) _etext;
 
-# cat /proc/cpuinfo
-processor    : 0
-model name    : ARMv7 Processor rev 1 (v7l)
-BogoMIPS    : 348.97
-Features    : half thumb fastmult vfp edsp vfpv3 vfpv3d16 tls vfpv4
-CPU implementer    : 0x41
-CPU architecture: 7
-CPU variant    : 0x0
-CPU part    : 0xc05
-CPU revision    : 1
+This doesn't cover kernel modules, afaict.
 
-Hardware    : Atmel SAMA5
-Revision    : 0000
-Serial        : 0000000000000000
-
-# dd if=/dev/zero of=/dev/null bs=4k count=1M
-
-Take about 10 seconds to complete on this system and report the 
-following speed in MB/s in 10 rounds:
-
-CONFIG_UACCESS_WITH_MEMCPY=y
-470, 419, 440, 446, 434, 437, 418, 412, 431, 437
-
-# CONFIG_UACCESS_WITH_MEMCPY disabled is not set
-387, 387, 382, 383, 385, 388, 387, 387, 384, 386
-
-So It look like this feature still give some advantage on system other 
-than Orion CPU core. I still propose my patch to disable it until it's 
-rock stable as it used to be a least with the kernel 3.19.0.
-
-Regards,
-Jean-Christian
+> +		drvdata->addr_acctype[0] = flags;
+> +		drvdata->addr_acctype[1] = flags;
+> +		drvdata->addr_type[0] = ETM_ADDR_TYPE_RANGE;
+> +		drvdata->addr_type[1] = ETM_ADDR_TYPE_RANGE;
+> +
+> +		event_encoding = 0x00 << 14 | /* Boolean function select A */
+> +				 0x01 << 4  | /* Addr range comparator 0-7 */
+> +				 0x00 << 0;   /* Addr range comparator 1 */
+> +
+> +		drvdata->enable_event = event_encoding;
+> +	}
+> +
+>  	/*
+>  	 * At this time only cycle accurate and timestamp options are
+>  	 * available.  As such clear everything else that may have been
+> @@ -362,6 +397,7 @@ static void etm_configure_cpu(void *info)
+>  	etm_writel(drvdata, drvdata->startstop_ctrl, ETMTSSCR);
+>  	etm_writel(drvdata, drvdata->enable_event, ETMTEEVR);
+>  	etm_writel(drvdata, drvdata->enable_ctrl1, ETMTECR1);
+> +	etm_writel(drvdata, drvdata->enable_ctrl2, ETMTECR2);
+>  	etm_writel(drvdata, drvdata->fifofull_level, ETMFFLR);
+>  	for (i = 0; i < drvdata->nr_addr_cmp; i++) {
+>  		etm_writel(drvdata, drvdata->addr_val[i], ETMACVRn(i));
+> -- 
+> 1.9.1
