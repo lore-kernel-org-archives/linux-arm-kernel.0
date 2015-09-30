@@ -1,69 +1,60 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 30 Sep 2015 14:52:34 +0800
-Subject: [PATCH 1/2] regulator: act8865: support output voltage by
- VSET2[] bits
-In-Reply-To: <1443595158-550-2-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <201509301442.0ZyMwfNo%fengguang.wu@intel.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 30 Sep 2015 14:48:04 +0800
+Subject: [PATCH v5 02/17] drm: bridge: analogix/dp: split exynos dp driver
+ to bridge directory
+In-Reply-To: <560B7068.2000008@samsung.com>
+References: <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
+ <1442906963-2883-1-git-send-email-ykk@rock-chips.com>
+ <560B7068.2000008@samsung.com>
+Message-ID: <560B85A4.2040907@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wenyou,
+Hi Krzysztof,
 
-[auto build test results on v4.3-rc3 -- if it's inappropriate base, please ignore]
+On 09/30/2015 01:17 PM, Krzysztof Kozlowski wrote:
+> On 22.09.2015 16:29, Yakir Yang wrote:
+>> Split the dp core driver from exynos directory to bridge directory,
+>> and rename the core driver to analogix_dp_*, rename the platform
+>> code to exynos_dp.
+>>
+>> Beside the new analogix_dp driver would export four hooks.
+>> "analogix_dp_bind()" and "analogix_dp_unbind()"
+>> "analogix_dp_detect()" and "analogix_dp_get_modes()"
+>>
+>> The bind/unbind symbols is used for analogix platform driver to connect
+>> with analogix_dp core driver. And the detect/get_modes is used for analogix
+>> platform driver to init the connector.
+>>
+>> They reason why connector need register in helper driver is rockchip drm
+>> haven't implement the atomic API, but Exynos drm have implement it, so
+>> there would need two different connector helper functions, that's why we
+>> leave the connector register in helper driver.
+>>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>> ---
+>> Changes in v5:
+>> - Correct the check condition of gpio_is_valid when driver try to get
+>>    the "hpd-gpios" DT propery. (Heiko)
+>> - Move the platform attach callback in the front of core driver bridge
+>>    attch function. Cause once platform failed at attach, core driver should
+>>    still failed, so no need to init connector before platform attached (Krzysztof)
+>> - Keep code style no changes with the previous exynos_dp_code.c in this
+>>    patch, and update commit message about the new export symbol (Krzysztof)
+>> - Gather the device type patch (v4 11/16) into this one. (Krzysztof)
+>> - leave out the connector registration to analogix platform driver. (Thierry)
+> Thanks for fixing this, looks much better.
+>
+> I don't feel comfortable enough to provide a review tag but it looks
+> good to me.
 
-config: i386-randconfig-r0-201539 (attached as .config)
-reproduce:
-  git checkout 2470179cdcc3b8eebdb6abd5aecbbe6e2804fb33
-  # save the attached .config to linux build tree
-  make ARCH=i386 
+Thanks  ;)
 
-All error/warnings (new ones prefixed by >>):
+- Yakir
 
->> drivers/regulator/act8865-regulator.c:265:48: error: macro "ACT88xx_REG" requires 5 arguments, but only 4 given
-     ACT88xx_REG("DCDC_REG1", ACT8865, DCDC1, VSET2),
-                                                   ^
->> drivers/regulator/act8865-regulator.c:265:2: error: 'ACT88xx_REG' undeclared here (not in a function)
-     ACT88xx_REG("DCDC_REG1", ACT8865, DCDC1, VSET2),
-     ^
-   drivers/regulator/act8865-regulator.c:266:48: error: macro "ACT88xx_REG" requires 5 arguments, but only 4 given
-     ACT88xx_REG("DCDC_REG2", ACT8865, DCDC2, VSET2),
-                                                   ^
-   drivers/regulator/act8865-regulator.c:267:48: error: macro "ACT88xx_REG" requires 5 arguments, but only 4 given
-     ACT88xx_REG("DCDC_REG3", ACT8865, DCDC3, VSET2),
-                                                   ^
-   drivers/regulator/act8865-regulator.c:268:45: error: macro "ACT88xx_REG" requires 5 arguments, but only 4 given
-     ACT88xx_REG("LDO_REG1", ACT8865, LDO1, VSET),
-                                                ^
-   drivers/regulator/act8865-regulator.c:269:45: error: macro "ACT88xx_REG" requires 5 arguments, but only 4 given
-     ACT88xx_REG("LDO_REG2", ACT8865, LDO2, VSET),
-                                                ^
-   drivers/regulator/act8865-regulator.c:270:45: error: macro "ACT88xx_REG" requires 5 arguments, but only 4 given
-     ACT88xx_REG("LDO_REG3", ACT8865, LDO3, VSET),
-                                                ^
-   drivers/regulator/act8865-regulator.c:271:45: error: macro "ACT88xx_REG" requires 5 arguments, but only 4 given
-     ACT88xx_REG("LDO_REG4", ACT8865, LDO4, VSET),
-                                                ^
-
-vim +/ACT88xx_REG +265 drivers/regulator/act8865-regulator.c
-
-   259		ACT88xx_REG("LDO_REG2", ACT8865, LDO2, VSET, "inl45"),
-   260		ACT88xx_REG("LDO_REG3", ACT8865, LDO3, VSET, "inl67"),
-   261		ACT88xx_REG("LDO_REG4", ACT8865, LDO4, VSET, "inl67"),
-   262	};
-   263	
-   264	static const struct regulator_desc act8865_alt_regulators[] = {
- > 265		ACT88xx_REG("DCDC_REG1", ACT8865, DCDC1, VSET2),
-   266		ACT88xx_REG("DCDC_REG2", ACT8865, DCDC2, VSET2),
-   267		ACT88xx_REG("DCDC_REG3", ACT8865, DCDC3, VSET2),
-   268		ACT88xx_REG("LDO_REG1", ACT8865, LDO1, VSET),
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 24380 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/3c6c4aed/attachment-0001.obj>
+> Best regards,
+> Krzysztof
+>
+>
+>
+>
