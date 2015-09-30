@@ -1,72 +1,79 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 30 Sep 2015 11:45:20 +0100
-Subject: [PATCH v5 05/22] xen/grant: Add helper
- gnttab_page_grant_foreign_access_ref_one
+Date: Wed, 30 Sep 2015 11:45:24 +0100
+Subject: [PATCH v5 09/22] xen/biomerge: Don't allow biovec's to be merged when
+ Linux is not using 4KB pages
 In-Reply-To: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
 References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1443609937-25278-6-git-send-email-julien.grall@citrix.com>
+Message-ID: <1443609937-25278-10-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many PV drivers contain the idiom:
+On ARM all dma-capable devices on a same platform may not be protected
+by an IOMMU. The DMA requests have to use the BFN (i.e MFN on ARM) in
+order to use correctly the device.
 
-pfn = page_to_gfn(...) /* Or similar */
-gnttab_grant_foreign_access_ref
+While the DOM0 memory is allocated in a 1:1 fashion (PFN == MFN), grant
+mapping will screw this contiguous mapping.
 
-Replace it by a new helper. Note that when Linux is using a different
-page granularity than Xen, the helper only gives access to the first 4KB
-grant.
+When Linux is using 64KB page granularitary, the page may be split
+accross multiple non-contiguous MFN (Xen is using 4KB page
+granularity). Therefore a DMA request will likely fail.
 
-This is useful where drivers are allocating a full Linux page for each
-grant.
+Checking that a 64KB page is using contiguous MFN is tedious. For
+now, always says that biovec are not mergeable.
 
-Also include xen/interface/grant_table.h rather than xen/grant_table.h in
-asm/page.h for x86 to fix a compilation issue [1]. Only the former is
-useful in order to get the structure definition.
-
-[1] Interdependency between asm/page.h and xen/grant_table.h which result
-to page_mfn not being defined when necessary.
-
-Signed-off-by: Julien Grall <julien.grall@linaro.org>
-Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
 Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
 ---
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
+
+    There is some ideas to check whether two biovec could be merged
+    (see [1]) but it's not critical and can be consider as a performance
+    improvement.
+
+    Changes in v4:
+        - Fix typoes in the subject
+        - Add Stefano's reviewed-by
 
     Changes in v3:
-        - Rename gnttab_page_grant_foreign_access_ref into
-        gnttab_page_grant_foreign_access_ref_one
-        - Fix typo in the commit message
-        - s/mfn/gfn based on the new naming
-        - Add David and Stefano's reviewed-by
+        - Update commit message
+        - s/mfn/bfn/ base on the new renaming
+        - Update TODO
 
     Changes in v2:
-        - Patch added
----
- include/xen/grant_table.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+        - Remove the workaround and check if the Linux page granularity
+        is the same as Xen or not
 
-diff --git a/include/xen/grant_table.h b/include/xen/grant_table.h
-index 05b5b08..e17a4b3 100644
---- a/include/xen/grant_table.h
-+++ b/include/xen/grant_table.h
-@@ -131,6 +131,15 @@ void gnttab_cancel_free_callback(struct gnttab_free_callback *callback);
- void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
- 				     unsigned long frame, int readonly);
+    [1] https://lkml.org/lkml/2015/7/17/418
+---
+ drivers/xen/biomerge.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/xen/biomerge.c b/drivers/xen/biomerge.c
+index 8ae2fc90..4da69db 100644
+--- a/drivers/xen/biomerge.c
++++ b/drivers/xen/biomerge.c
+@@ -6,10 +6,18 @@
+ bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+ 			       const struct bio_vec *vec2)
+ {
++#if XEN_PAGE_SIZE == PAGE_SIZE
+ 	unsigned long bfn1 = pfn_to_bfn(page_to_pfn(vec1->bv_page));
+ 	unsigned long bfn2 = pfn_to_bfn(page_to_pfn(vec2->bv_page));
  
-+/* Give access to the first 4K of the page */
-+static inline void gnttab_page_grant_foreign_access_ref_one(
-+	grant_ref_t ref, domid_t domid,
-+	struct page *page, int readonly)
-+{
-+	gnttab_grant_foreign_access_ref(ref, domid, xen_page_to_gfn(page),
-+					readonly);
-+}
-+
- void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid,
- 				       unsigned long pfn);
- 
+ 	return __BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&
+ 		((bfn1 == bfn2) || ((bfn1+1) == bfn2));
++#else
++	/*
++	 * XXX: Add support for merging bio_vec when using different page
++	 * size in Xen and Linux.
++	 */
++	return 0;
++#endif
+ }
+ EXPORT_SYMBOL(xen_biovec_phys_mergeable);
 -- 
 2.1.4
