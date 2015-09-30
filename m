@@ -1,51 +1,49 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Wed, 30 Sep 2015 16:54:51 -0700
-Subject: [PATCH] arm64: dts: add all hi6220 uart nodes
-In-Reply-To: <20150930191818.GZ15635@sirena.org.uk>
-References: <1443558552-5734-1-git-send-email-tyler.baker@linaro.org>
- <1459065.BtzC7pyUYF@wuerfel> <20150930173145.GG15635@sirena.org.uk>
- <CANMBJr7yY1PJChnFSRknqfOLORuWZSEONV+e=M=9heX3i-ADKA@mail.gmail.com>
- <20150930191818.GZ15635@sirena.org.uk>
-Message-ID: <CANMBJr6aU4wPO5HqP-Oh-ND7_DZXSH30ykNHyvDtUp3nQFG6sA@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 30 Sep 2015 16:58:43 -0700
+Subject: [PATCH] ARM: dts: Add Exynos5250 Snow Rev5+ support
+In-Reply-To: <560C73EC.40608@samsung.com>
+References: <1443527855-434-1-git-send-email-javier@osg.samsung.com>
+ <560B2D29.5060707@samsung.com>
+ <CAD=FV=VfGeWdynFd+5YqnRGn+jsC0G_2VhTm1FKsR5o2WpcH1A@mail.gmail.com>
+ <560C73EC.40608@samsung.com>
+Message-ID: <CAD=FV=WmqDSbnA8OWL00WS-qc9A4wCpkgxHhLBW3qEE=SkzupA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 September 2015 at 12:18, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Sep 30, 2015 at 11:12:58AM -0700, Tyler Baker wrote:
->> On 30 September 2015 at 10:31, Mark Brown <broonie@kernel.org> wrote:
->
->> + Peter as he has been submitting u-boot patches recently for the HiKey.
->
->> Obviously, both UEFI and u-boot can be configured to use either UART,
->> and at the moment u-boot defaults to using the on board UART. Whereas
->> UEFI is using UART1 on the LS connector. I'm fine with switching the
->> console default to use the UART1 on the LS connector as long as there
->> is agreement to do so.
->
-> Given that UEFI is switching and the requirement for soldering to get to
-> the on board UART it does seem to make sense, though it will create some
-> pain for current users.
->
->> > While we're at it there was a recent talk which mentioned a fairly large
->> > amount of functionality that's apparently already "upstream" for this
->> > device but not included in the DT, assuming that means that driver
->> > support is there it would be good to add the corresponding DT.
->
->> Indeed, I think this comment is targeted to toward the d410c though as
->> there are drivers for eMMC, and microsd drivers upstream but no DT
->> bindings. I do not believe currently this is the case for HiKey.
->
-> My understanding is that it applies to both with slightly different
-> driver sets, the slides aren't online yet (!) but if you look at 10:52
-> or so in the video we should have SD/eMMC on HiKey in v4.1 with thermal
-> and CPUfreq added in v4.2.  It also looks like there's just some DT
-> additions needed to enable reset, cpuidle and CPU hotplug using generic
-> code (mainly the constants for PSCI I expect).
+Hi,
 
-I just skimmed the video and I see your point. I'll need to
-investigate a bit but I'm up for sending some follow up patches to get
-these drivers functioning. First lets get the UART working :)
+On Wed, Sep 30, 2015 at 4:44 PM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+>> Switching the default meaning of "google,snow" to Rev5 is probably not
+>> something we'd ever want to do, since it could confuse "rev3" boards
+>> (which should be serviced by the rev4 dts).  From comments in the
+>> Chrome OS tree:
+>>
+>> In the "rev4" DTS:
+>>          * - Any real rev 0-3 boards in the field will match "google,snow",
+>>          *   since older U-Boots don't look for a revision specific device tree.
+>>          * - Any real rev 4 boards in the field will match "google,snow-rev4"
+>>          *   first.  If that's not present they will pick the first
+>>          *   "google,snow" device tree that they find (ignoring the kernel
+>>          *   ordering).
+>>
+>> In the "rev5" DTS:
+>>          * - Purposely don't add "google,snow" so old firmware (which didn't
+>>          *   include a -revN suffix) won't pick this one.
+>
+> These are requirements written somewhere in the downstream tree... not
+> in upstream. Have in mind that someone may not be using Chrome OS on
+> Chromebook but custom U-Boot and different distro.
+>
+> You cannot expect that everyone will new some requirements of some
+> downstream OS. If you need such requirements, write them in bindings
+> documentation *in the upstream*.
 
-Cheers,
+Agreed, which is why I bring it up here.  I think Javier wasn't aware
+of these when he sent up his patch.  I believe when he adds the
+bindings docs he'll put this information.
 
-Tyler
+Previously rev5 wasn't supported upstream and I believe rev5 didn't
+even exist when the upstream stuff was submitted.
+
+-Doug
