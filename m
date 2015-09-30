@@ -1,151 +1,227 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 30 Sep 2015 11:45:31 +0100
-Subject: [PATCH v5 16/22] block/xen-blkback: Make it running on 64KB page
- granularity
+Date: Wed, 30 Sep 2015 11:45:27 +0100
+Subject: [PATCH v5 12/22] xen/balloon: Don't rely on the page granularity is
+ the same for Xen and Linux
 In-Reply-To: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
 References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1443609937-25278-17-git-send-email-julien.grall@citrix.com>
+Message-ID: <1443609937-25278-13-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PV block protocol is using 4KB page granularity. The goal of this
-patch is to allow a Linux using 64KB page granularity behaving as a
-block backend on a non-modified Xen.
+For ARM64 guests, Linux is able to support either 64K or 4K page
+granularity. Although, the hypercall interface is always based on 4K
+page granularity.
 
-It's only necessary to adapt the ring size and the number of request per
-indirect frames. The rest of the code is relying on the grant table
-code.
+With 64K page granularity, a single page will be spread over multiple
+Xen frame.
 
-Note that the grant table code is allocating a Linux page per grant
-which will result to waste 6OKB for every grant when Linux is using 64KB
-page granularity. This could be improved by sharing the page between
-multiple grants.
+To avoid splitting the page into 4K frame, take advantage of the
+extent_order field to directly allocate/free chunk of the Linux page
+size.
+
+Note that PVMMU is only used for PV guest (which is x86) and the page
+granularity is always 4KB. Some BUILD_BUG_ON has been added to ensure
+that because the code has not been modified.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Acked-by: "Roger Pau Monn?" <roger.pau@citrix.com>
----
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
+---
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 Cc: David Vrabel <david.vrabel@citrix.com>
+Cc: Wei Liu <wei.liu2@citrix.com>
 
-Improvement such as support of 64KB grant is not taken into
-consideration in this patch because we have the requirement to run a
-Linux using 64KB pages on a non-modified Xen.
+Note that two BUILD_BUG_ON(XEN_PAGE_SIZE != PAGE_SIZE) in code built
+for the PV MMU code is kept in order to have at least one even if we
+ever decide to drop of code section.
 
-This has been tested only with a loop device. I plan to test passing
-hard drive partition but I didn't yet convert the swiotlb code.
+Stefano, I've kept your reviewed-by because the rebase conflict was very
+trivial. Let me know if it's not okay.
+
+    Changes in v5:
+        - Add Stefano's reviewed-by
+        - Fix comment coding style
+        - Rebase on top of xentip/for-linus-4.4. Got minor conflict
 
     Changes in v4:
-        - Add Roger's acked-by
+        - s/xen_page_to_pfn/page_to_xen_pfn/ based on the new naming
+        - Use the field lru in the page to get a list of pages when
+        decreasing the memory reservation. It avoids to use a static
+        array to store the pages (see v3).
+        - Update comment for EXTENT_ORDER.
 
     Changes in v3:
-        - Use DIV_ROUND_UP in INDIRECT_PAGES to avoid a line over 80
-        characters
----
- drivers/block/xen-blkback/blkback.c |  5 +++--
- drivers/block/xen-blkback/common.h  | 17 +++++++++++++----
- drivers/block/xen-blkback/xenbus.c  |  9 ++++++---
- 3 files changed, 22 insertions(+), 9 deletions(-)
+        - Fix errors reported by checkpatch.pl
+        - s/mfn/gfn/ based on the new naming
+        - Rather than splitting the page into 4KB chunk, use the
+        extent_order field to allocate directly a Linux page size. This
+        is avoid lots of code for no benefits.
 
-diff --git a/drivers/block/xen-blkback/blkback.c b/drivers/block/xen-blkback/blkback.c
-index 6a685ae..809634c 100644
---- a/drivers/block/xen-blkback/blkback.c
-+++ b/drivers/block/xen-blkback/blkback.c
-@@ -961,7 +961,7 @@ static int xen_blkbk_parse_indirect(struct blkif_request *req,
- 		seg[n].nsec = segments[i].last_sect -
- 			segments[i].first_sect + 1;
- 		seg[n].offset = (segments[i].first_sect << 9);
--		if ((segments[i].last_sect >= (PAGE_SIZE >> 9)) ||
-+		if ((segments[i].last_sect >= (XEN_PAGE_SIZE >> 9)) ||
- 		    (segments[i].last_sect < segments[i].first_sect)) {
- 			rc = -EINVAL;
- 			goto unmap;
-@@ -1210,6 +1210,7 @@ static int dispatch_rw_block_io(struct xen_blkif *blkif,
+    Changes in v2:
+        - Use xen_apply_to_page to split a page in 4K chunk
+        - It's not necessary to have a smaller frame list. Re-use
+        PAGE_SIZE
+        - Convert reserve_additional_memory to use XEN_... macro
+---
+ drivers/xen/balloon.c | 69 ++++++++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 54 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/xen/balloon.c b/drivers/xen/balloon.c
+index 5fd7ee1..eaab31f 100644
+--- a/drivers/xen/balloon.c
++++ b/drivers/xen/balloon.c
+@@ -113,6 +113,12 @@ static struct ctl_table xen_root[] = {
+ #endif
  
- 	req_operation = req->operation == BLKIF_OP_INDIRECT ?
- 			req->u.indirect.indirect_op : req->operation;
-+
- 	if ((req->operation == BLKIF_OP_INDIRECT) &&
- 	    (req_operation != BLKIF_OP_READ) &&
- 	    (req_operation != BLKIF_OP_WRITE)) {
-@@ -1268,7 +1269,7 @@ static int dispatch_rw_block_io(struct xen_blkif *blkif,
- 			seg[i].nsec = req->u.rw.seg[i].last_sect -
- 				req->u.rw.seg[i].first_sect + 1;
- 			seg[i].offset = (req->u.rw.seg[i].first_sect << 9);
--			if ((req->u.rw.seg[i].last_sect >= (PAGE_SIZE >> 9)) ||
-+			if ((req->u.rw.seg[i].last_sect >= (XEN_PAGE_SIZE >> 9)) ||
- 			    (req->u.rw.seg[i].last_sect <
- 			     req->u.rw.seg[i].first_sect))
- 				goto fail_response;
-diff --git a/drivers/block/xen-blkback/common.h b/drivers/block/xen-blkback/common.h
-index 45a044a..68e87a0 100644
---- a/drivers/block/xen-blkback/common.h
-+++ b/drivers/block/xen-blkback/common.h
-@@ -39,6 +39,7 @@
- #include <asm/pgalloc.h>
- #include <asm/hypervisor.h>
- #include <xen/grant_table.h>
-+#include <xen/page.h>
- #include <xen/xenbus.h>
- #include <xen/interface/io/ring.h>
- #include <xen/interface/io/blkif.h>
-@@ -51,12 +52,20 @@ extern unsigned int xen_blkif_max_ring_order;
-  */
- #define MAX_INDIRECT_SEGMENTS 256
- 
--#define SEGS_PER_INDIRECT_FRAME \
--	(PAGE_SIZE/sizeof(struct blkif_request_segment))
-+/*
-+ * Xen use 4K pages. The guest may use different page size (4K or 64K)
-+ * Number of Xen pages per segment
+ /*
++ * Use one extent per PAGE_SIZE to avoid to break down the page into
++ * multiple frame.
 + */
-+#define XEN_PAGES_PER_SEGMENT   (PAGE_SIZE / XEN_PAGE_SIZE)
++#define EXTENT_ORDER (fls(XEN_PFN_PER_PAGE) - 1)
 +
-+#define XEN_PAGES_PER_INDIRECT_FRAME \
-+	(XEN_PAGE_SIZE/sizeof(struct blkif_request_segment))
-+#define SEGS_PER_INDIRECT_FRAME	\
-+	(XEN_PAGES_PER_INDIRECT_FRAME / XEN_PAGES_PER_SEGMENT)
-+
- #define MAX_INDIRECT_PAGES \
- 	((MAX_INDIRECT_SEGMENTS + SEGS_PER_INDIRECT_FRAME - 1)/SEGS_PER_INDIRECT_FRAME)
--#define INDIRECT_PAGES(_segs) \
--	((_segs + SEGS_PER_INDIRECT_FRAME - 1)/SEGS_PER_INDIRECT_FRAME)
-+#define INDIRECT_PAGES(_segs) DIV_ROUND_UP(_segs, XEN_PAGES_PER_INDIRECT_FRAME)
++/*
+  * balloon_process() state:
+  *
+  * BP_DONE: done or nothing to do,
+@@ -304,6 +310,12 @@ static enum bp_state reserve_additional_memory(void)
+ 	nid = memory_add_physaddr_to_nid(resource->start);
  
- /* Not a real protocol.  Used to generate ring structs which contain
-  * the elements common to all protocols only.  This way we get a
-diff --git a/drivers/block/xen-blkback/xenbus.c b/drivers/block/xen-blkback/xenbus.c
-index deb3f00..edd27e4 100644
---- a/drivers/block/xen-blkback/xenbus.c
-+++ b/drivers/block/xen-blkback/xenbus.c
-@@ -176,21 +176,24 @@ static int xen_blkif_map(struct xen_blkif *blkif, grant_ref_t *gref,
- 	{
- 		struct blkif_sring *sring;
- 		sring = (struct blkif_sring *)blkif->blk_ring;
--		BACK_RING_INIT(&blkif->blk_rings.native, sring, PAGE_SIZE * nr_grefs);
-+		BACK_RING_INIT(&blkif->blk_rings.native, sring,
-+			       XEN_PAGE_SIZE * nr_grefs);
- 		break;
+ #ifdef CONFIG_XEN_HAVE_PVMMU
++	/*
++	 * We don't support PV MMU when Linux and Xen is using
++	 * different page granularity.
++	 */
++	BUILD_BUG_ON(XEN_PAGE_SIZE != PAGE_SIZE);
++
+         /*
+          * add_memory() will build page tables for the new memory so
+          * the p2m must contain invalid entries so the correct
+@@ -384,11 +396,11 @@ static bool balloon_is_inflated(void)
+ static enum bp_state increase_reservation(unsigned long nr_pages)
+ {
+ 	int rc;
+-	unsigned long  pfn, i;
++	unsigned long i;
+ 	struct page   *page;
+ 	struct xen_memory_reservation reservation = {
+ 		.address_bits = 0,
+-		.extent_order = 0,
++		.extent_order = EXTENT_ORDER,
+ 		.domid        = DOMID_SELF
+ 	};
+ 
+@@ -401,7 +413,11 @@ static enum bp_state increase_reservation(unsigned long nr_pages)
+ 			nr_pages = i;
+ 			break;
+ 		}
+-		frame_list[i] = page_to_pfn(page);
++
++		/* XENMEM_populate_physmap requires a PFN based on Xen
++		 * granularity.
++		 */
++		frame_list[i] = page_to_xen_pfn(page);
+ 		page = balloon_next_page(page);
  	}
- 	case BLKIF_PROTOCOL_X86_32:
- 	{
- 		struct blkif_x86_32_sring *sring_x86_32;
- 		sring_x86_32 = (struct blkif_x86_32_sring *)blkif->blk_ring;
--		BACK_RING_INIT(&blkif->blk_rings.x86_32, sring_x86_32, PAGE_SIZE * nr_grefs);
-+		BACK_RING_INIT(&blkif->blk_rings.x86_32, sring_x86_32,
-+			       XEN_PAGE_SIZE * nr_grefs);
- 		break;
+ 
+@@ -415,10 +431,16 @@ static enum bp_state increase_reservation(unsigned long nr_pages)
+ 		page = balloon_retrieve(false);
+ 		BUG_ON(page == NULL);
+ 
+-		pfn = page_to_pfn(page);
+-
+ #ifdef CONFIG_XEN_HAVE_PVMMU
++		/*
++		 * We don't support PV MMU when Linux and Xen is using
++		 * different page granularity.
++		 */
++		BUILD_BUG_ON(XEN_PAGE_SIZE != PAGE_SIZE);
++
+ 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
++			unsigned long pfn = page_to_pfn(page);
++
+ 			set_phys_to_machine(pfn, frame_list[i]);
+ 
+ 			/* Link back into the page tables if not highmem. */
+@@ -445,14 +467,15 @@ static enum bp_state increase_reservation(unsigned long nr_pages)
+ static enum bp_state decrease_reservation(unsigned long nr_pages, gfp_t gfp)
+ {
+ 	enum bp_state state = BP_DONE;
+-	unsigned long  pfn, i;
+-	struct page   *page;
++	unsigned long i;
++	struct page *page, *tmp;
+ 	int ret;
+ 	struct xen_memory_reservation reservation = {
+ 		.address_bits = 0,
+-		.extent_order = 0,
++		.extent_order = EXTENT_ORDER,
+ 		.domid        = DOMID_SELF
+ 	};
++	LIST_HEAD(pages);
+ 
+ 	if (nr_pages > ARRAY_SIZE(frame_list))
+ 		nr_pages = ARRAY_SIZE(frame_list);
+@@ -465,8 +488,7 @@ static enum bp_state decrease_reservation(unsigned long nr_pages, gfp_t gfp)
+ 			break;
+ 		}
+ 		scrub_page(page);
+-
+-		frame_list[i] = page_to_pfn(page);
++		list_add(&page->lru, &pages);
  	}
- 	case BLKIF_PROTOCOL_X86_64:
- 	{
- 		struct blkif_x86_64_sring *sring_x86_64;
- 		sring_x86_64 = (struct blkif_x86_64_sring *)blkif->blk_ring;
--		BACK_RING_INIT(&blkif->blk_rings.x86_64, sring_x86_64, PAGE_SIZE * nr_grefs);
-+		BACK_RING_INIT(&blkif->blk_rings.x86_64, sring_x86_64,
-+			       XEN_PAGE_SIZE * nr_grefs);
- 		break;
+ 
+ 	/*
+@@ -478,14 +500,24 @@ static enum bp_state decrease_reservation(unsigned long nr_pages, gfp_t gfp)
+ 	 */
+ 	kmap_flush_unused();
+ 
+-	/* Update direct mapping, invalidate P2M, and add to balloon. */
+-	for (i = 0; i < nr_pages; i++) {
+-		pfn = frame_list[i];
+-		frame_list[i] = pfn_to_gfn(pfn);
+-		page = pfn_to_page(pfn);
++	/*
++	 * Setup the frame, update direct mapping, invalidate P2M,
++	 * and add to balloon.
++	 */
++	list_for_each_entry_safe(page, tmp, &pages, lru) {
++		/* XENMEM_decrease_reservation requires a GFN */
++		frame_list[i] = xen_page_to_gfn(page);
+ 
+ #ifdef CONFIG_XEN_HAVE_PVMMU
++		/*
++		 * We don't support PV MMU when Linux and Xen is using
++		 * different page granularity.
++		 */
++		BUILD_BUG_ON(XEN_PAGE_SIZE != PAGE_SIZE);
++
+ 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
++			unsigned long pfn = page_to_pfn(page);
++
+ 			if (!PageHighMem(page)) {
+ 				ret = HYPERVISOR_update_va_mapping(
+ 						(unsigned long)__va(pfn << PAGE_SHIFT),
+@@ -495,6 +527,7 @@ static enum bp_state decrease_reservation(unsigned long nr_pages, gfp_t gfp)
+ 			__set_phys_to_machine(pfn, INVALID_P2M_ENTRY);
+ 		}
+ #endif
++		list_del(&page->lru);
+ 
+ 		balloon_append(page);
  	}
- 	default:
+@@ -603,6 +636,12 @@ int alloc_xenballooned_pages(int nr_pages, struct page **pages)
+ 		if (page) {
+ 			pages[pgno++] = page;
+ #ifdef CONFIG_XEN_HAVE_PVMMU
++			/*
++			 * We don't support PV MMU when Linux and Xen is using
++			 * different page granularity.
++			 */
++			BUILD_BUG_ON(XEN_PAGE_SIZE != PAGE_SIZE);
++
+ 			ret = xen_alloc_p2m_entry(page_to_pfn(page));
+ 			if (ret < 0)
+ 				goto out_undo;
 -- 
 2.1.4
