@@ -1,9 +1,10 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 30 Sep 2015 12:08:29 +0200
-Subject: [PATCH 1/2] clocksource/drivers/rockchip: Fix bad NO_IRQ usage
-In-Reply-To: <560BB452.1020000@linaro.org>
+Date: Wed, 30 Sep 2015 12:08:30 +0200
+Subject: [PATCH 2/2] clocksource/drivers/keystone: Fix bad NO_IRQ usage
+In-Reply-To: <1443607710-10415-1-git-send-email-daniel.lezcano@linaro.org>
 References: <560BB452.1020000@linaro.org>
-Message-ID: <1443607710-10415-1-git-send-email-daniel.lezcano@linaro.org>
+ <1443607710-10415-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1443607710-10415-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,20 +19,20 @@ Fix this by just checking 'irq' is different from zero.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/rockchip_timer.c | 2 +-
+ drivers/clocksource/timer-keystone.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index bb2c2b0..d3c1742 100644
---- a/drivers/clocksource/rockchip_timer.c
-+++ b/drivers/clocksource/rockchip_timer.c
-@@ -148,7 +148,7 @@ static void __init rk_timer_init(struct device_node *np)
- 	bc_timer.freq = clk_get_rate(timer_clk);
+diff --git a/drivers/clocksource/timer-keystone.c b/drivers/clocksource/timer-keystone.c
+index edacf39..1cea08c 100644
+--- a/drivers/clocksource/timer-keystone.c
++++ b/drivers/clocksource/timer-keystone.c
+@@ -152,7 +152,7 @@ static void __init keystone_timer_init(struct device_node *np)
+ 	int irq, error;
  
- 	irq = irq_of_parse_and_map(np, 0);
+ 	irq  = irq_of_parse_and_map(np, 0);
 -	if (irq == NO_IRQ) {
 +	if (!irq) {
- 		pr_err("Failed to map interrupts for '%s'\n", TIMER_NAME);
+ 		pr_err("%s: failed to map interrupts\n", __func__);
  		return;
  	}
 -- 
