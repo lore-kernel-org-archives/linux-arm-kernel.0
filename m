@@ -1,91 +1,55 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 30 Sep 2015 16:05:42 +0200
-Subject: [PATCH 2/6] regulator: core: introduce function to lock regulators
- and its supplies
-In-Reply-To: <1443621946-8712-1-git-send-email-s.hauer@pengutronix.de>
-References: <1443621946-8712-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1443621946-8712-3-git-send-email-s.hauer@pengutronix.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 30 Sep 2015 16:07:41 +0200
+Subject: [PATCH v2 5/8] mmc: dw_mmc-rockchip: dt-binding: Add tuning related
+ things
+In-Reply-To: <1443622064-14362-1-git-send-email-heiko@sntech.de>
+References: <1443622064-14362-1-git-send-email-heiko@sntech.de>
+Message-ID: <1443622064-14362-6-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each regulator_dev is locked with its own mutex. This is fine as long
-as only one regulator_dev is locked, but makes lockdep unhappy when we
-have to walk up the supply chain like it can happen in
-regulator_get_voltage:
+From: Alexandru M Stan <amstan@chromium.org>
 
-regulator_get_voltage ->
- mutex_lock(&regulator->rdev->mutex) ->
-_regulator_get_voltage(regulator->rdev) ->
-regulator_get_voltage(rdev->supply) ->
-mutex_lock(&regulator->rdev->mutex);
+Add ciu_drive, ciu_sample clocks and default-sample-phase. This will later
+be used by tuning code.
 
-This causes lockdep to issue a possible deadlock warning.
+We do not touch ciu_drive (and by extension define default-drive-phase).
+Drive phase is mostly used to define minimum hold times, while one could
+write some code to determine what phase meets the minimum hold time
+(ex 10 degrees) this will not work with the current clock phase framework
+(which floors angles, so we'll get 0 deg, and there's no way to know what
+resolution the floors happen at). We assume that the default drive angles
+set by the hardware are good enough.
 
-There are at least two ways to work around this:
-
-- We can always lock the whole supply chain using the functions
-  introduced with this patch.
-- We could store the current voltage in struct regulator_rdev so
-  that we do not have to walk up the supply chain for the
-  _regulator_get_voltage case.
-
-Anyway, regulator_lock_supply/regulator_unlock_supply will be needed
-once we allow regulator_set_voltage to optimize the supply voltages.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Alexandru M Stan <amstan@chromium.org>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/regulator/core.c | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index bd9db70..e5de3d9 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -132,6 +132,45 @@ static bool have_full_constraints(void)
- }
+diff --git a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+index c327c2d..3dc13b6 100644
+--- a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
++++ b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+@@ -14,6 +14,19 @@ Required Properties:
+ 							before RK3288
+ 	- "rockchip,rk3288-dw-mshc": for Rockchip RK3288
  
- /**
-+ * regulator_lock_supply - lock a regulator and its supplies
-+ * @rdev:         regulator source
-+ */
-+static void regulator_lock_supply(struct regulator_dev *rdev)
-+{
-+	struct regulator *supply;
-+	int i = 0;
++Optional Properties:
++* clocks: from common clock binding: if ciu_drive and ciu_sample are
++  specified in clock-names, should contain handles to these clocks.
 +
-+	while (1) {
-+		mutex_lock_nested(&rdev->mutex, i++);
-+		supply = rdev->supply;
++* clock-names: Apart from the clock-names described in synopsys-dw-mshc.txt
++  two more clocks "ciu-drive" and "ciu-sample" are supported. They are used
++  to control the clock phases, "ciu-sample" is required for tuning high-
++  speed modes.
 +
-+		if (!rdev->supply)
-+			return;
++* rockchip,default-sample-phase: The default phase to set ciu_sample at
++  probing, low speeds or in case where all phases work at tuning time.
++  If not specified 0 deg will be used.
 +
-+		rdev = supply->rdev;
-+	}
-+}
-+
-+/**
-+ * regulator_unlock_supply - unlock a regulator and its supplies
-+ * @rdev:         regulator source
-+ */
-+static void regulator_unlock_supply(struct regulator_dev *rdev)
-+{
-+	struct regulator *supply;
-+
-+	while (1) {
-+		mutex_unlock(&rdev->mutex);
-+		supply = rdev->supply;
-+
-+		if (!rdev->supply)
-+			return;
-+
-+		rdev = supply->rdev;
-+	}
-+}
-+
-+/**
-  * of_get_regulator - get a regulator device node based on supply name
-  * @dev: Device pointer for the consumer (of regulator) device
-  * @supply: regulator supply name
+ Example:
+ 
+ 	rkdwmmc0 at 12200000 {
 -- 
-2.5.3
+2.5.1
