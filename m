@@ -1,29 +1,33 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 30 Sep 2015 21:46:05 +0800
-Subject: [PATCH 8/8] nvmem: Adding bindings for rockchip-efuse
-In-Reply-To: <1443617804-26656-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <201509302107.qXqgxYhn%fengguang.wu@intel.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 30 Sep 2015 21:47:57 +0800
+Subject: [PATCH v2 0/7] hwrng: Add support for STMicroelectronics' RNG IP
+In-Reply-To: <20150929142932.GY27197@x1>
+References: <1442497557-9271-1-git-send-email-lee.jones@linaro.org>
+ <20150918140756.GK9249@gondor.apana.org.au>
+ <CAF2Aj3h7Jy=tpYdZTdbxAJwa=147_hAu3reOFrbEh=JdrMFWLQ@mail.gmail.com>
+ <20150918151137.GA10763@gondor.apana.org.au>
+ <20150918155112.GE3218@x1> <20150929142932.GY27197@x1>
+Message-ID: <20150930134757.GA18408@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ZhengShunQian,
+On Tue, Sep 29, 2015 at 03:29:32PM +0100, Lee Jones wrote:
+> 
+> I see that your tree is 8 days old, so this may have been resolved
+> already, but would you be kind enough to ensure you remove the 6th
+> (ARM) patch from your repo please?  I wouldn't want it to cause
+> conflicts and for Maxime and yourself to get shouted at by Linus.
 
-[auto build test results on v4.3-rc3 -- if it's inappropriate base, please ignore]
+I prefer not to merge patches that cannot be tested.  Without
+the DT bits in patch 6 the other five patches are useless.  So
+I think patch 6 should be applied together with the other five
+which add the driver.
 
-reproduce:
-  # apt-get install sparse
-  make ARCH=x86_64 allmodconfig
-  make C=1 CF=-D__CHECK_ENDIAN__
+Of course if Linus wants me to revert patch 6 in case of any
+potential conflicts with Maxime's tree I'll do that.  Linus?
 
-
-sparse warnings: (new ones prefixed by >>)
-
->> drivers/nvmem/rockchip-efuse.c:104:22: sparse: symbol 'rockchip_efuse_regmap_config' was not declared. Should it be static?
->> drivers/nvmem/rockchip-efuse.c:122:5: sparse: symbol 'rockchip_efuse_probe' was not declared. Should it be static?
->> drivers/nvmem/rockchip-efuse.c:168:5: sparse: symbol 'rockchip_efuse_remove' was not declared. Should it be static?
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
