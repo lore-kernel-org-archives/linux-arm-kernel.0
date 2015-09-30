@@ -1,186 +1,178 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 30 Sep 2015 11:45:22 +0100
-Subject: [PATCH v5 07/22] block/xen-blkfront: Store a page rather a pfn in the
- grant structure
+Date: Wed, 30 Sep 2015 11:45:19 +0100
+Subject: [PATCH v5 04/22] xen/grant: Introduce helpers to split a page into
+ grant
 In-Reply-To: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
 References: <1443609937-25278-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1443609937-25278-8-git-send-email-julien.grall@citrix.com>
+Message-ID: <1443609937-25278-5-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the usage of the field pfn are done using the same idiom:
+Currently, a grant is always based on the Xen page granularity (i.e
+4KB). When Linux is using a different page granularity, a single page
+will be split between multiple grants.
 
-pfn_to_page(grant->pfn)
+The new helpers will be in charge of splitting the Linux page into grants
+and call a function given by the caller on each grant.
 
-This will  return always the same page. Store directly the page in the
-grant to clean up the code.
+Also provide an helper to count the number of grants within a given
+contiguous region.
+
+Note that the x86/include/asm/xen/page.h is now including
+xen/interface/grant_table.h rather than xen/grant_table.h. It's
+necessary because xen/grant_table.h depends on asm/xen/page.h and will
+break the compilation. Furthermore, only definition in
+interface/grant_table.h is required.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
 ---
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: x86 at kernel.org
 
     Changes in v4:
-        - rebase after 7adf12b87f45a77d364464018fb8e9e1ac875152
-        "xen-blkfront: don't add indirect pages to list when
-        !feature_persistent"
+        - Typoes
+        - Rename gnttab_one_grant into gnttab_for_one_grant
+        - Add Stefano and David's reviewed-by
+        - s/xen_page_to_pfn/page_to_xen_pfn/ based on the new naming
 
     Changes in v3:
-        - Use the correct indentation in get_grant. The current
-        indentation (i.e without this patch) was wrong because it was
-        using space rather than tabulation.
-        - Add Roger's acked and Stefano's reviewed
-        - s/mfn/gfn based on the new naming
+        - Fix error reported by checkpatch.pl
+        - Typoes
+        - s/pfn/xen_pfn/ in gnttab_foreach_grant
+        - Drop the possibility to use less data. The complexity is moved
+        in netback which is the only user
+        - Rename gnttab_foreach_grant into gnttab_foreach_grant_in_range
+        - s/offset/start/ in gnttab_count_grant and update the
+        description of the parameter
+        - s/mfn/gfn base on the new terminologies
+        - Add EXPORT_SYMBOL_GPL for gnttab_foreach_grant_in_range
+        - Use xen_offset_in_page and XEN_PFN_DOWN whenever it's possible
+        - Fix compilation on x86.
 
     Changes in v2:
         - Patch added
 ---
- drivers/block/xen-blkfront.c | 39 +++++++++++++++++++--------------------
- 1 file changed, 19 insertions(+), 20 deletions(-)
+ arch/x86/include/asm/xen/page.h |  2 +-
+ drivers/xen/grant-table.c       | 26 +++++++++++++++++++++++++
+ include/xen/grant_table.h       | 42 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 69 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
-index c94ca26..dbd5bb6 100644
---- a/drivers/block/xen-blkfront.c
-+++ b/drivers/block/xen-blkfront.c
-@@ -68,7 +68,7 @@ enum blkif_state {
+diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
+index b922fa4..fe58e3a 100644
+--- a/arch/x86/include/asm/xen/page.h
++++ b/arch/x86/include/asm/xen/page.h
+@@ -12,7 +12,7 @@
+ #include <asm/pgtable.h>
  
- struct grant {
- 	grant_ref_t gref;
--	unsigned long pfn;
-+	struct page *page;
- 	struct list_head node;
- };
+ #include <xen/interface/xen.h>
+-#include <xen/grant_table.h>
++#include <xen/interface/grant_table.h>
+ #include <xen/features.h>
  
-@@ -221,7 +221,7 @@ static int fill_grant_buffer(struct blkfront_info *info, int num)
- 				kfree(gnt_list_entry);
- 				goto out_of_memory;
- 			}
--			gnt_list_entry->pfn = page_to_pfn(granted_page);
-+			gnt_list_entry->page = granted_page;
- 		}
+ /* Xen machine address */
+diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+index a4b702c9..dbeaa67 100644
+--- a/drivers/xen/grant-table.c
++++ b/drivers/xen/grant-table.c
+@@ -776,6 +776,32 @@ void gnttab_batch_copy(struct gnttab_copy *batch, unsigned count)
+ }
+ EXPORT_SYMBOL_GPL(gnttab_batch_copy);
  
- 		gnt_list_entry->gref = GRANT_INVALID_REF;
-@@ -236,7 +236,7 @@ out_of_memory:
- 	                         &info->grants, node) {
- 		list_del(&gnt_list_entry->node);
- 		if (info->feature_persistent)
--			__free_page(pfn_to_page(gnt_list_entry->pfn));
-+			__free_page(gnt_list_entry->page);
- 		kfree(gnt_list_entry);
- 		i--;
- 	}
-@@ -245,8 +245,8 @@ out_of_memory:
++void gnttab_foreach_grant_in_range(struct page *page,
++				   unsigned int offset,
++				   unsigned int len,
++				   xen_grant_fn_t fn,
++				   void *data)
++{
++	unsigned int goffset;
++	unsigned int glen;
++	unsigned long xen_pfn;
++
++	len = min_t(unsigned int, PAGE_SIZE - offset, len);
++	goffset = xen_offset_in_page(offset);
++
++	xen_pfn = page_to_xen_pfn(page) + XEN_PFN_DOWN(offset);
++
++	while (len) {
++		glen = min_t(unsigned int, XEN_PAGE_SIZE - goffset, len);
++		fn(pfn_to_gfn(xen_pfn), goffset, glen, data);
++
++		goffset = 0;
++		xen_pfn++;
++		len -= glen;
++	}
++}
++EXPORT_SYMBOL_GPL(gnttab_foreach_grant_in_range);
++
+ int gnttab_map_refs(struct gnttab_map_grant_ref *map_ops,
+ 		    struct gnttab_map_grant_ref *kmap_ops,
+ 		    struct page **pages, unsigned int count)
+diff --git a/include/xen/grant_table.h b/include/xen/grant_table.h
+index 4478f4b..05b5b08 100644
+--- a/include/xen/grant_table.h
++++ b/include/xen/grant_table.h
+@@ -45,8 +45,10 @@
+ #include <asm/xen/hypervisor.h>
+ 
+ #include <xen/features.h>
++#include <xen/page.h>
+ #include <linux/mm_types.h>
+ #include <linux/page-flags.h>
++#include <linux/kernel.h>
+ 
+ #define GNTTAB_RESERVED_XENSTORE 1
+ 
+@@ -224,4 +226,44 @@ static inline struct xen_page_foreign *xen_page_foreign(struct page *page)
+ #endif
  }
  
- static struct grant *get_grant(grant_ref_t *gref_head,
--                               unsigned long pfn,
--                               struct blkfront_info *info)
-+			       struct page *page,
-+			       struct blkfront_info *info)
- {
- 	struct grant *gnt_list_entry;
- 	unsigned long buffer_gfn;
-@@ -265,10 +265,10 @@ static struct grant *get_grant(grant_ref_t *gref_head,
- 	gnt_list_entry->gref = gnttab_claim_grant_reference(gref_head);
- 	BUG_ON(gnt_list_entry->gref == -ENOSPC);
- 	if (!info->feature_persistent) {
--		BUG_ON(!pfn);
--		gnt_list_entry->pfn = pfn;
-+		BUG_ON(!page);
-+		gnt_list_entry->page = page;
- 	}
--	buffer_gfn = pfn_to_gfn(gnt_list_entry->pfn);
-+	buffer_gfn = xen_page_to_gfn(gnt_list_entry->page);
- 	gnttab_grant_foreign_access_ref(gnt_list_entry->gref,
- 	                                info->xbdev->otherend_id,
- 	                                buffer_gfn, 0);
-@@ -524,7 +524,7 @@ static int blkif_queue_rw_req(struct request *req)
- 
- 		if ((ring_req->operation == BLKIF_OP_INDIRECT) &&
- 		    (i % SEGS_PER_INDIRECT_FRAME == 0)) {
--			unsigned long uninitialized_var(pfn);
-+			struct page *uninitialized_var(page);
- 
- 			if (segments)
- 				kunmap_atomic(segments);
-@@ -541,15 +541,15 @@ static int blkif_queue_rw_req(struct request *req)
- 				indirect_page = list_first_entry(&info->indirect_pages,
- 								 struct page, lru);
- 				list_del(&indirect_page->lru);
--				pfn = page_to_pfn(indirect_page);
-+				page = indirect_page;
- 			}
--			gnt_list_entry = get_grant(&gref_head, pfn, info);
-+			gnt_list_entry = get_grant(&gref_head, page, info);
- 			info->shadow[id].indirect_grants[n] = gnt_list_entry;
--			segments = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
-+			segments = kmap_atomic(gnt_list_entry->page);
- 			ring_req->u.indirect.indirect_grefs[n] = gnt_list_entry->gref;
- 		}
- 
--		gnt_list_entry = get_grant(&gref_head, page_to_pfn(sg_page(sg)), info);
-+		gnt_list_entry = get_grant(&gref_head, sg_page(sg), info);
- 		ref = gnt_list_entry->gref;
- 
- 		info->shadow[id].grants_used[i] = gnt_list_entry;
-@@ -560,7 +560,7 @@ static int blkif_queue_rw_req(struct request *req)
- 
- 			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
- 
--			shared_data = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
-+			shared_data = kmap_atomic(gnt_list_entry->page);
- 			bvec_data = kmap_atomic(sg_page(sg));
- 
- 			/*
-@@ -1001,7 +1001,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
- 				info->persistent_gnts_c--;
- 			}
- 			if (info->feature_persistent)
--				__free_page(pfn_to_page(persistent_gnt->pfn));
-+				__free_page(persistent_gnt->page);
- 			kfree(persistent_gnt);
- 		}
- 	}
-@@ -1036,7 +1036,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
- 			persistent_gnt = info->shadow[i].grants_used[j];
- 			gnttab_end_foreign_access(persistent_gnt->gref, 0, 0UL);
- 			if (info->feature_persistent)
--				__free_page(pfn_to_page(persistent_gnt->pfn));
-+				__free_page(persistent_gnt->page);
- 			kfree(persistent_gnt);
- 		}
- 
-@@ -1050,7 +1050,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
- 		for (j = 0; j < INDIRECT_GREFS(segs); j++) {
- 			persistent_gnt = info->shadow[i].indirect_grants[j];
- 			gnttab_end_foreign_access(persistent_gnt->gref, 0, 0UL);
--			__free_page(pfn_to_page(persistent_gnt->pfn));
-+			__free_page(persistent_gnt->page);
- 			kfree(persistent_gnt);
- 		}
- 
-@@ -1101,8 +1101,7 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
- 	if (bret->operation == BLKIF_OP_READ && info->feature_persistent) {
- 		for_each_sg(s->sg, sg, nseg, i) {
- 			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
--			shared_data = kmap_atomic(
--				pfn_to_page(s->grants_used[i]->pfn));
-+			shared_data = kmap_atomic(s->grants_used[i]->page);
- 			bvec_data = kmap_atomic(sg_page(sg));
- 			memcpy(bvec_data   + sg->offset,
- 			       shared_data + sg->offset,
-@@ -1154,7 +1153,7 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
- 				 * available pages for indirect grefs.
- 				 */
- 				if (!info->feature_persistent) {
--					indirect_page = pfn_to_page(s->indirect_grants[i]->pfn);
-+					indirect_page = s->indirect_grants[i]->page;
- 					list_add(&indirect_page->lru, &info->indirect_pages);
- 				}
- 				s->indirect_grants[i]->gref = GRANT_INVALID_REF;
++/* Split Linux page in chunk of the size of the grant and call fn
++ *
++ * Parameters of fn:
++ *	gfn: guest frame number
++ *	offset: offset in the grant
++ *	len: length of the data in the grant.
++ *	data: internal information
++ */
++typedef void (*xen_grant_fn_t)(unsigned long gfn, unsigned int offset,
++			       unsigned int len, void *data);
++
++void gnttab_foreach_grant_in_range(struct page *page,
++				   unsigned int offset,
++				   unsigned int len,
++				   xen_grant_fn_t fn,
++				   void *data);
++
++/* Helper to get to call fn only on the first "grant chunk" */
++static inline void gnttab_for_one_grant(struct page *page, unsigned int offset,
++					unsigned len, xen_grant_fn_t fn,
++					void *data)
++{
++	/* The first request is limited to the size of one grant */
++	len = min_t(unsigned int, XEN_PAGE_SIZE - (offset & ~XEN_PAGE_MASK),
++		    len);
++
++	gnttab_foreach_grant_in_range(page, offset, len, fn, data);
++}
++
++/* Get the number of grant in a specified region
++ *
++ * start: Offset from the beginning of the first page
++ * len: total length of data (can cross multiple page)
++ */
++static inline unsigned int gnttab_count_grant(unsigned int start,
++					      unsigned int len)
++{
++	return XEN_PFN_UP(xen_offset_in_page(start) + len);
++}
++
+ #endif /* __ASM_GNTTAB_H__ */
 -- 
 2.1.4
