@@ -1,35 +1,60 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 30 Sep 2015 13:36:10 +0100
-Subject: [PATCH 3/4] nvmem: core: Fix memory leak in nvmem_cell_write
+Date: Wed, 30 Sep 2015 13:36:31 +0100
+Subject: [PATCH 4/4] nvmem: sunxi: Check for memory allocation failure
 In-Reply-To: <1443616298-17389-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1443616298-17389-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1443616570-17825-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1443616591-17867-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Axel Lin <axel.lin@ingics.com>
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-A tmp buffer is allocated if cell->bit_offset || cell->nbits.
-So the tmp buffer needs to be freed at the same condition to avoid leak.
+The sunxi_sid driver doesn't check for kmalloc return status before
+derefencing the returned pointer, which could lead to a NULL pointer
+dereference if kmalloc failed. Check for its return code to make sure it
+deosn't happen.
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/nvmem/core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/nvmem/sunxi_sid.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 676607c..6fd4e5a 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -938,7 +938,7 @@ int nvmem_cell_write(struct nvmem_cell *cell, void *buf, size_t len)
- 	rc = regmap_raw_write(nvmem->regmap, cell->offset, buf, cell->bytes);
+diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
+index 14777dd..cfa3b85 100644
+--- a/drivers/nvmem/sunxi_sid.c
++++ b/drivers/nvmem/sunxi_sid.c
+@@ -103,7 +103,7 @@ static int sunxi_sid_probe(struct platform_device *pdev)
+ 	struct nvmem_device *nvmem;
+ 	struct regmap *regmap;
+ 	struct sunxi_sid *sid;
+-	int i, size;
++	int ret, i, size;
+ 	char *randomness;
  
- 	/* free the tmp buffer */
--	if (cell->bit_offset)
-+	if (cell->bit_offset || cell->nbits)
- 		kfree(buf);
+ 	sid = devm_kzalloc(dev, sizeof(*sid), GFP_KERNEL);
+@@ -131,6 +131,11 @@ static int sunxi_sid_probe(struct platform_device *pdev)
+ 		return PTR_ERR(nvmem);
  
- 	if (IS_ERR_VALUE(rc))
+ 	randomness = kzalloc(sizeof(u8) * size, GFP_KERNEL);
++	if (!randomness) {
++		ret = -EINVAL;
++		goto err_unreg_nvmem;
++	}
++
+ 	for (i = 0; i < size; i++)
+ 		randomness[i] = sunxi_sid_read_byte(sid, i);
+ 
+@@ -140,6 +145,10 @@ static int sunxi_sid_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, nvmem);
+ 
+ 	return 0;
++
++err_unreg_nvmem:
++	nvmem_unregister(nvmem);
++	return ret;
+ }
+ 
+ static int sunxi_sid_remove(struct platform_device *pdev)
 -- 
 1.9.1
