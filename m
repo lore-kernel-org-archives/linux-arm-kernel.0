@@ -1,52 +1,73 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 30 Sep 2015 09:36:52 +0900
-Subject: [PATCH] ARM: exynos_defconfig: Enable WiFi-Ex as a module instead
- built-in
-In-Reply-To: <1443530546-3066-1-git-send-email-javier@osg.samsung.com>
-References: <1443530546-3066-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <560B2EA4.8050406@samsung.com>
+Date: Wed, 30 Sep 2015 10:14:25 +0900
+Subject: [PATCH RESEND] mach:-s3c64xx:Cause kernel oops with WARN_ON if
+ calls for setting up gpio fail in s3c64xx_i2s_cfg_gpio
+In-Reply-To: <1442537674-26953-1-git-send-email-xerofoify@gmail.com>
+References: <1442537674-26953-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <560B3771.2090300@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.09.2015 21:42, Javier Martinez Canillas wrote:
-> The Marvell WiFi-Ex driver tries to load a firmware on probe. So if the
-> driver is built-in and probed before a firmware is available, this is
-> not loaded and the chip does not work.
-> 
-> This happens for example if an initramfs isn't used since the driver is
-> probed before the root filesystem is mounted.
-> 
-> Change the default config since the driver isn't needed for machines to
-> boot and is more convenient to have it enabled as a module to avoid
-> requiring an initramfs or to have the firmware built into the kernel.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> ---
-> 
->  arch/arm/configs/exynos_defconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+On 18.09.2015 09:54, Nicholas Krause wrote:
+> This fixes the function s3c64xx_i2c_cfg_gpio
 
-The user-space can always initiate re-probing of device - just re-bind
-it. However I assume that driver cannot work without firmware?
+The problem is not described and you did not provide a fix so the
+description is highly inaccurate and misleading.
+
+> to cause a kernel oopes
+
+Warn causes oops?
+
+> if the call to either s3c_gpio_cfgpin_range or s3c_gpio_cfgpin fail
+> as we cannot continue to run
+
+"cannot continue to run" means BUG_ON?
+
+> on a board using this gpio setup if
+> the configuration for the board fails when the gpio configuration
+> of the board is being reconfigured in the function in
+> s3c64xx_i2s_cfg_gpio.
+
+Please rephrase. You essentially said "Configuration fails when
+configuration is being reconfigured". Too many configurations...
+
+Fix the subject as well.
 
 Best regards,
 Krzysztof
 
 > 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index d4f6063d8a72..5aad617f02c7 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -64,8 +64,8 @@ CONFIG_SMSC911X=y
->  CONFIG_USB_USBNET=y
->  CONFIG_USB_NET_SMSC75XX=y
->  CONFIG_USB_NET_SMSC95XX=y
-> -CONFIG_MWIFIEX=y
-> -CONFIG_MWIFIEX_SDIO=y
-> +CONFIG_MWIFIEX=m
-> +CONFIG_MWIFIEX_SDIO=m
->  CONFIG_INPUT_EVDEV=y
->  CONFIG_KEYBOARD_GPIO=y
->  CONFIG_KEYBOARD_CROS_EC=y
+> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+> ---
+>  arch/arm/mach-s3c64xx/dev-audio.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
+> index ff780a8..5e7538b 100644
+> --- a/arch/arm/mach-s3c64xx/dev-audio.c
+> +++ b/arch/arm/mach-s3c64xx/dev-audio.c
+> @@ -36,10 +36,10 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+>  		base = S3C64XX_GPE(0);
+>  		break;
+>  	case 2:
+> -		s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5));
+> -		s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5));
+> -		s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5));
+> -		s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));
+> +		WARN_ON(s3c_gpio_cfgpin(S3C64XX_GPC(4), S3C_GPIO_SFN(5)));
+> +		WARN_ON(s3c_gpio_cfgpin(S3C64XX_GPC(5), S3C_GPIO_SFN(5)));
+> +		WARN_ON(s3c_gpio_cfgpin(S3C64XX_GPC(7), S3C_GPIO_SFN(5)));
+> +		WARN_ON(s3c_gpio_cfgpin_range(S3C64XX_GPH(6), 4, S3C_GPIO_SFN(5));)
+>  		return 0;
+>  	default:
+>  		printk(KERN_DEBUG "Invalid I2S Controller number: %d\n",
+> @@ -47,7 +47,7 @@ static int s3c64xx_i2s_cfg_gpio(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> -	s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3));
+> +	WARN_ON(s3c_gpio_cfgpin_range(base, 5, S3C_GPIO_SFN(3)));
+>  
+>  	return 0;
+>  }
 > 
