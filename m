@@ -1,44 +1,19 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 30 Sep 2015 14:24:28 +0800
-Subject: [RESEND PATCH v3 0/5] usb: change clock information for chipidea
-In-Reply-To: <20150930052835.GC18468@tiger>
-References: <1443579925-1330-1-git-send-email-peter.chen@freescale.com>
- <20150930052835.GC18468@tiger>
-Message-ID: <20150930062427.GA1665@shlinux2>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 30 Sep 2015 11:54:22 +0530
+Subject: [PATCH 1/2] dma: pxa_dma: fix the no-requestor case
+In-Reply-To: <1441905466-17459-1-git-send-email-robert.jarzmik@free.fr>
+References: <1441905466-17459-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20150930062422.GC21690@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 01:28:36PM +0800, Shawn Guo wrote:
-> On Wed, Sep 30, 2015 at 10:25:20AM +0800, Peter Chen wrote:
-> > This patch set changes usb clock information for legacy i.mx platforms.
-> > At these platforms, they needs three clocks to let controller work.
-> > 
-> > Hi Shawn,
-> > 
-> > Fabio has tested for both imx27 and imx25 platforms.
-> > I have queued 1/5 and 5/5, would you please help to queue others,
-> > thanks.
-> > 
-> > Changes for v3:
-> > - Delete property "needs-three-clocks", and using of_device_id->data
-> >   to differentiate platforms
-> > - change <stable@vger.kernel.org> #v3.19+ to <stable@vger.kernel.org> #v4.1+
-> 
-> So the last patch will be sent as a fix with stable on copy?
+On Thu, Sep 10, 2015 at 07:17:45PM +0200, Robert Jarzmik wrote:
+> A very small number of devices don't use the flow control offered by
+> requestor lines. In these specific cases, the pxa dma driver should be
+> aware of that and not try to use a requestor line.
 
-Yes
-
-> In that
-> case, will USB driver just work without corresponding DTS change?  Or
-> the driver change has a dependency on the DTS change?
-> 
-
-At v4.1, One of USB driver changes break i.mx27's USB function.
-The driver's change at patch 5/5 is also tagged for stable tree,
-so it needs both DTS and driver's change to let i.mx27 USB work from
-v4.1.
+And these fail for me, what were these sent against?
+Please rebase and resend
 
 -- 
-
-Best Regards,
-Peter Chen
+~Vinod
