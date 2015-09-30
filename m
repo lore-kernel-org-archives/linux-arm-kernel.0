@@ -1,90 +1,67 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 30 Sep 2015 12:09:27 +0200
-Subject: [PATCH v6 0/22] On-demand device probing
-In-Reply-To: <20150926192218.GA15657@kroah.com>
-References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
- <5606E120.3070305@kernel.org> <20150926192218.GA15657@kroah.com>
-Message-ID: <CAAObsKChqEfFO+qTwLcBLs8tPPT_gchGKK287652jdC=5R6+qQ@mail.gmail.com>
+From: jc@eclis.ch (Jean-Christian de Rivaz)
+Date: Wed, 30 Sep 2015 12:13:33 +0200
+Subject: [PATCH 1/1] Disable CONFIG_UACCESS_WITH_MEMCPY in Atmel config.
+In-Reply-To: <20150930061002.GI3982@pengutronix.de>
+References: <1443565968-7012-1-git-send-email-jc@eclis.ch>
+ <20150930061002.GI3982@pengutronix.de>
+Message-ID: <560BB5CD.1040908@eclis.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 September 2015 at 21:22, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Sat, Sep 26, 2015 at 01:17:04PM -0500, Rob Herring wrote:
->> On 09/21/2015 09:02 AM, Tomeu Vizoso wrote:
->> > Hello,
->> >
->> > I have a problem with the panel on my Tegra Chromebook taking longer
->> > than expected to be ready during boot (St?phane Marchesin reported what
->> > is basically the same issue in [0]), and have looked into ordered
->> > probing as a better way of solving this than moving nodes around in the
->> > DT or playing with initcall levels and linking order.
->> >
->> > While reading the thread [1] that Alexander Holler started with his
->> > series to make probing order deterministic, it occurred to me that it
->> > should be possible to achieve the same by probing devices as they are
->> > referenced by other devices.
->> >
->> > This basically reuses the information that is already implicit in the
->> > probe() implementations, saving us from refactoring existing drivers or
->> > adding information to DTBs.
->> >
->> > During review of v1 of this series Linus Walleij suggested that it
->> > should be the device driver core to make sure that dependencies are
->> > ready before probing a device. I gave this idea a try [2] but Mark Brown
->> > pointed out to the logic duplication between the resource acquisition
->> > and dependency discovery code paths (though I think it's fairly minor).
->> >
->> > To address that code duplication I experimented with Arnd's devm_probe
->> > [3] concept of having drivers declare their dependencies instead of
->> > acquiring them during probe, and while it worked [4], I don't think we
->> > end up winning anything when compared to just probing devices on-demand
->> > from resource getters.
->> >
->> > One remaining objection is to the "sprinkling" of calls to
->> > of_device_probe() in the resource getters of each subsystem, but I think
->> > it's the right thing to do given that the storage of resources is
->> > currently subsystem-specific.
->> >
->> > We could avoid the above by moving resource storage into the core, but I
->> > don't think there's a compelling case for that.
->> >
->> > I have tested this on boards with Tegra, iMX.6, Exynos, Rockchip and
->> > OMAP SoCs, and these patches were enough to eliminate all the deferred
->> > probes (except one in PandaBoard because omap_dma_system doesn't have a
->> > firmware node as of yet).
->> >
->> > Have submitted a branch [5][6][7] with these patches on top of today's
->> > linux-next (20150921) to kernelci.org and I don't see any issues that
->> > could be caused by them.
->> >
->> > With this series I get the kernel to output to the panel in 0.5s,
->> > instead of 2.8s.
->>
->> I think we're pretty close other than some minor comments. I would like
->> to see ack's from Greg and some reviewed-bys from others. The subsystem
->> changes are minor and there has been plenty of chance to comment, so I
->> don't think acks from all subsystems are needed.
->>
->> Your branch is based on -next. Is there any dependence on something in
->> -next? I want to get this into -next soon, but need a branch not based
->> on -next. Please send me a pull request with the collected acks and
->> minor comments I have addressed.
+Le 30. 09. 15 08:10, Uwe Kleine-K?nig a ?crit :
+> Hello,
 >
-> Let me review this on Monday and I'll let you know...
+> On Wed, Sep 30, 2015 at 12:32:48AM +0200, jc at eclis.ch wrote:
+>> From: Jean-Christian de Rivaz <jc@eclis.ch>
+>>
+>> According to Russell King:
+>> In any case, unless you have a Marvell platform, you should have this
+>> disabled - it provides a performance boost for Marvell platforms, but
+>> degrades performance everywhere else.  Please ensure that you disable
+>> CONFIG_UACCESS_WITH_MEMCPY.
+>>
+>> Signed-off-by: Jean-Christian de Rivaz <jc@eclis.ch>
+> the change is fine now. Feel free to add my Ack also if you do another
+> round to improve the changelog.
+>
+> Best regards
+> Uwe
+>
 
-Hi Greg, hope you don't mind that I ping you regarding this, just in
-case it fell through some crack.
+Thanks Uwe,
+
+Nicolas and Russell, for my own curiosity I tested the difference on 
+this system:
+
+# cat /proc/cpuinfo
+processor    : 0
+model name    : ARMv7 Processor rev 1 (v7l)
+BogoMIPS    : 348.97
+Features    : half thumb fastmult vfp edsp vfpv3 vfpv3d16 tls vfpv4
+CPU implementer    : 0x41
+CPU architecture: 7
+CPU variant    : 0x0
+CPU part    : 0xc05
+CPU revision    : 1
+
+Hardware    : Atmel SAMA5
+Revision    : 0000
+Serial        : 0000000000000000
+
+# dd if=/dev/zero of=/dev/null bs=4k count=1M
+
+Take about 10 seconds to complete on this system and report the 
+following speed in MB/s in 10 rounds:
+
+CONFIG_UACCESS_WITH_MEMCPY=y
+470, 419, 440, 446, 434, 437, 418, 412, 431, 437
+
+# CONFIG_UACCESS_WITH_MEMCPY disabled is not set
+387, 387, 382, 383, 385, 388, 387, 387, 384, 386
+
+So It look like this feature still give some advantage on system other 
+than Orion CPU core. I still propose my patch to disable it until it's 
+rock stable as it used to be a least with the kernel 3.19.0.
 
 Regards,
-
-Tomeu
-
-> thanks,
->
-> greg k-h
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Jean-Christian
