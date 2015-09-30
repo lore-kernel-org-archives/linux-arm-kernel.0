@@ -1,170 +1,40 @@
-From: ralf@ramses-pyramidenbau.de (Ralf Ramsauer)
-Date: Wed, 30 Sep 2015 23:40:52 +0200
-Subject: [PATCH] ARM,
- ARM64: Un-inlined and exported symbols of is_hyp_mode_available() and
- related functions
-Message-ID: <1443649252-10702-1-git-send-email-ralf@ramses-pyramidenbau.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 30 Sep 2015 23:45:22 +0200
+Subject: [PATCH v2 0/7] mtd: nand: sunxi: cleanup and improvements
+Message-ID: <1443649529-9852-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hypervisors may be available as modules, but need to check if
-HYP mode is enabled. Functions are provided for these means, but
-are not exported to modules; in particular since __boot_cpu_mode
-is not accessible.
+Hello,
 
-Instead of exporting symbol __boot_cpu_mode, un-inline
-is_hyp_mode_available() and related functions. This has no negative
-impact since they are never called in hot paths.
+This patch series aims at cleaning up the sunxi_nand driver by factorizing
+the duplicated code found in hw_ecc and hw_syndrome_ecc implementations.
 
-Though all modified files are licensed under GPLv2, for ARM we use
-EXPORT_SYMBOL instead of EXPORT_SYMBOL_GPL to be consistent with the
-rest of the exports in arch/arm/kernel/setup.c.
+It also adds support for OOB bytes protection (only on a limited amount of
+OOB bytes), and add code to correctly handle the 'bitflips in erased pages'
+case.
 
-Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
-Signed-off-by: Wolfgang Mauerer <wolfgang.mauerer@oth-regensburg.de>
----
- arch/arm/include/asm/virt.h   | 21 +++------------------
- arch/arm/kernel/setup.c       | 29 +++++++++++++++++++++++++++++
- arch/arm64/include/asm/virt.h | 11 ++---------
- arch/arm64/kernel/setup.c     | 14 ++++++++++++++
- 4 files changed, 48 insertions(+), 27 deletions(-)
+Best Regards,
 
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index 4371f45..37d970d 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -42,15 +42,7 @@
-  */
- extern int __boot_cpu_mode;
- 
--static inline void sync_boot_mode(void)
--{
--	/*
--	 * As secondaries write to __boot_cpu_mode with caches disabled, we
--	 * must flush the corresponding cache entries to ensure the visibility
--	 * of their writes.
--	 */
--	sync_cache_r(&__boot_cpu_mode);
--}
-+void sync_boot_mode(void);
- 
- void __hyp_set_vectors(unsigned long phys_vector_base);
- unsigned long __hyp_get_vectors(void);
-@@ -63,17 +55,10 @@ unsigned long __hyp_get_vectors(void);
- void hyp_mode_check(void);
- 
- /* Reports the availability of HYP mode */
--static inline bool is_hyp_mode_available(void)
--{
--	return ((__boot_cpu_mode & MODE_MASK) == HYP_MODE &&
--		!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH));
--}
-+bool is_hyp_mode_available(void);
- 
- /* Check if the bootloader has booted CPUs in different modes */
--static inline bool is_hyp_mode_mismatched(void)
--{
--	return !!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH);
--}
-+bool is_hyp_mode_mismatched(void);
- #endif
- 
- #endif /* __ASSEMBLY__ */
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 20edd34..c2c39f1 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -915,6 +915,35 @@ static void __init reserve_crashkernel(void)
- static inline void reserve_crashkernel(void) {}
- #endif /* CONFIG_KEXEC */
- 
-+#ifdef CONFIG_ARM_VIRT_EXT
-+void sync_boot_mode(void)
-+{
-+	/*
-+	* As secondaries write to __boot_cpu_mode with caches disabled, we
-+	* must flush the corresponding cache entries to ensure the visibility
-+	* of their writes.
-+	*/
-+	sync_cache_r(&__boot_cpu_mode);
-+}
-+#endif
-+
-+#ifndef ZIMAGE
-+/* Reports the availability of HYP mode */
-+bool is_hyp_mode_available(void)
-+{
-+	return ((__boot_cpu_mode & MODE_MASK) == HYP_MODE &&
-+		!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH));
-+}
-+EXPORT_SYMBOL(is_hyp_mode_available);
-+
-+/* Check if the bootloader has booted CPUs in different modes */
-+bool is_hyp_mode_mismatched(void)
-+{
-+	return !!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH);
-+}
-+EXPORT_SYMBOL(is_hyp_mode_mismatched);
-+#endif
-+
- void __init hyp_mode_check(void)
- {
- #ifdef CONFIG_ARM_VIRT_EXT
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 7a5df52..48c6170 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -38,17 +38,10 @@ void __hyp_set_vectors(phys_addr_t phys_vector_base);
- phys_addr_t __hyp_get_vectors(void);
- 
- /* Reports the availability of HYP mode */
--static inline bool is_hyp_mode_available(void)
--{
--	return (__boot_cpu_mode[0] == BOOT_CPU_MODE_EL2 &&
--		__boot_cpu_mode[1] == BOOT_CPU_MODE_EL2);
--}
-+bool is_hyp_mode_available(void);
- 
- /* Check if the bootloader has booted CPUs in different modes */
--static inline bool is_hyp_mode_mismatched(void)
--{
--	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
--}
-+bool is_hyp_mode_mismatched(void);
- 
- /* The section containing the hypervisor text */
- extern char __hyp_text_start[];
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 6bab21f..6442d70 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -62,6 +62,7 @@
- #include <asm/traps.h>
- #include <asm/memblock.h>
- #include <asm/efi.h>
-+#include <asm/virt.h>
- #include <asm/xen/hypervisor.h>
- 
- unsigned long elf_hwcap __read_mostly;
-@@ -195,6 +196,19 @@ static void __init smp_build_mpidr_hash(void)
- 	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
- }
- 
-+bool is_hyp_mode_available(void)
-+{
-+	return (__boot_cpu_mode[0] == BOOT_CPU_MODE_EL2 &&
-+		__boot_cpu_mode[1] == BOOT_CPU_MODE_EL2);
-+}
-+EXPORT_SYMBOL_GPL(is_hyp_mode_available);
-+
-+bool is_hyp_mode_mismatched(void)
-+{
-+	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
-+}
-+EXPORT_SYMBOL_GPL(is_hyp_mode_mismatched);
-+
- static void __init setup_processor(void)
- {
- 	u64 features;
+Boris
+
+Changes since v1:
+- drop the first patch (already applied)
+- split the second patch to ease the review
+- add the 'fix bitflips in erased pages' patch
+
+Boris Brezillon (7):
+  mtd: nand: sunxi: create sunxi_nfc_hw_ecc_enable()/disable() functions
+  mtd: nand: sunxi: introduce sunxi_nfc_hw_ecc_read/write_chunk()
+  mtd: nand: sunxi: make use of sunxi_nfc_hw_ecc_read/write_chunk()
+  mtd: nand: sunxi: factorize extra OOB bytes handling
+  mtd: nand: sunxi: retrieve corrected OOB bytes
+  mtd: nand: sunxi: replace the NFC_BUF_TO_USER_DATA() macro by an
+    inline function
+  mtd: nand: sunxi: fix bitflips in erased pages
+
+ drivers/mtd/nand/sunxi_nand.c | 416 ++++++++++++++++++++++--------------------
+ 1 file changed, 220 insertions(+), 196 deletions(-)
+
 -- 
-2.6.0
+2.1.4
