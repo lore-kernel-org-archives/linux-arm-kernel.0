@@ -1,41 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Sep 2015 17:41:03 +0100
-Subject: [PATCH v5 00/23] ILP32 for ARM64
-In-Reply-To: <20150930101918.GA9753@e104818-lin.cambridge.arm.com>
-References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
- <20150930101918.GA9753@e104818-lin.cambridge.arm.com>
-Message-ID: <20150930164103.GC15635@sirena.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 30 Sep 2015 11:43:39 -0500
+Subject: [PATCH 15/16] usb: gadget: atmel: access the PMC using regmap
+In-Reply-To: <560C1027.9060100@atmel.com>
+References: <1443629469-15086-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1443629469-15086-16-git-send-email-alexandre.belloni@free-electrons.com>
+ <20150930163102.GM32625@saruman.tx.rr.com>
+ <560C1027.9060100@atmel.com>
+Message-ID: <20150930164339.GQ32625@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 11:19:19AM +0100, Catalin Marinas wrote:
-> On Wed, Sep 30, 2015 at 01:13:57AM +0300, Yury Norov wrote:
+On Wed, Sep 30, 2015 at 06:39:03PM +0200, Nicolas Ferre wrote:
+> Le 30/09/2015 18:31, Felipe Balbi a ?crit :
+> > On Wed, Sep 30, 2015 at 06:11:08PM +0200, Alexandre Belloni wrote:
+> >> Use regmap to access the PMC to avoid using at91_pmc_read and
+> >> at91_pmc_write.
+> >>
+> >> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > 
+> > can I take this through my tree or does it have any dependences with the rest of
+> > the series ?
+> 
+> Hi Felipe,
+> 
+> Well, I have the feeling that these changes would require the regmap to
+> be in place before using it. So yes, it has a strong dependency with the
+> rest of the series (and DT modifications like the 06/16 patch actually).
+> 
+> So, I think that Alexandre would agree with me that we should take the
+> whole series with us through the arm-soc tree. An alternative would be
+> to delay the inclusion of the USB part a little bit...
+> 
+> Thanks for the heads-up Felipe, Bye,
 
-> >  - What for ILP32 on ARM64?
-> > 	See https://lkml.org/lkml/2015/4/13/814
-> > 	and http://permalink.gmane.org/gmane.comp.lib.uclibc.buildroot/121100
-> > 	Briefly,
-> > 	 - for compatibility;
-> > 	 - for performance;
-> > 	 - for memory saving.
+hey no problem. I have no objections to $subject:
 
-> Does anyone actually need this ABI? And by "need" I don't mean a
-> tick-box on product fliers but actually someone going to use it on real
-> systems in the field. Because I'm not keen on maintaining an ABI in the
-> kernel just as a PR exercise. I have yet to see conclusive benchmarks
-> that ILP32 is a real win vs LP64 but happy to be proven wrong.
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-Indeed.  On that subject there was some discussion at Linaro Connect
-last week about work (being done outside Linaro, not sure how public it
-is at this point) to pull together the current state of the art into a
-Docker container image which people can use for benchmarking and as a
-reference for how to pull things together.  That should help with the
-analysis, it'll at least make it easier for other people to reproduce
-any benchmarking results.
+-- 
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/4a1d93cd/attachment.sig>
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/4735c452/attachment.sig>
