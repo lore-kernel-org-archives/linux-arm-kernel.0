@@ -1,60 +1,43 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 30 Sep 2015 14:48:04 +0800
-Subject: [PATCH v5 02/17] drm: bridge: analogix/dp: split exynos dp driver
- to bridge directory
-In-Reply-To: <560B7068.2000008@samsung.com>
-References: <1442906428-2609-1-git-send-email-ykk@rock-chips.com>
- <1442906963-2883-1-git-send-email-ykk@rock-chips.com>
- <560B7068.2000008@samsung.com>
-Message-ID: <560B85A4.2040907@rock-chips.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 30 Sep 2015 15:55:24 +0900
+Subject: [PATCH v2] ARM: dts: Add Exynos5250 Snow Rev5+ support
+In-Reply-To: <1443595455-12754-1-git-send-email-javier@osg.samsung.com>
+References: <1443595455-12754-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <560B875C.8080705@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On 09/30/15 15:44, Javier Martinez Canillas wrote:
+> There are 2 revisions of the Exynos5250 Snow Chromebook that were shipped:
+> Rev4 and Rev5. The only difference between these 2 revisions is the codec,
+> Rev4 has a max98095 codec while Rev5 has a max98090.
+> 
+> Mainline only supports Rev4 so this patch moves the common device nodes to
+> a DTSI file and adds a DTS for the Exynos5250 Snow Rev5.
+> 
+> The Snow Rev5 DTS is based on the DTS found in the ChromiumOS 3.8 tree.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Tested-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> 
+> ---
+> 
+> Changes in v2:
+> - Add Mauro Carvalho Chehab's Tested-by tag.
+> - Add Doug Anderson's Reviewed-by tag.
+> - Remove warning about adding a whitespace error. Suggested by Doug Anderson.
+> - Make Rev{4,5} codec pinctrl properties to match. Suggested by Doug Anderson.
+> - Add "google,snow-rev4" to compatible string. Suggested by Krzysztof Kozlowski.
+> 
+>  arch/arm/boot/dts/Makefile                    |   1 +
+>  arch/arm/boot/dts/exynos5250-snow-common.dtsi | 684 ++++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5250-snow-rev5.dts    |  47 ++
+>  arch/arm/boot/dts/exynos5250-snow.dts         | 671 +------------------------
+>  4 files changed, 736 insertions(+), 667 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/exynos5250-snow-common.dtsi
+>  create mode 100644 arch/arm/boot/dts/exynos5250-snow-rev5.dts
+> 
+Applied, thanks.
 
-On 09/30/2015 01:17 PM, Krzysztof Kozlowski wrote:
-> On 22.09.2015 16:29, Yakir Yang wrote:
->> Split the dp core driver from exynos directory to bridge directory,
->> and rename the core driver to analogix_dp_*, rename the platform
->> code to exynos_dp.
->>
->> Beside the new analogix_dp driver would export four hooks.
->> "analogix_dp_bind()" and "analogix_dp_unbind()"
->> "analogix_dp_detect()" and "analogix_dp_get_modes()"
->>
->> The bind/unbind symbols is used for analogix platform driver to connect
->> with analogix_dp core driver. And the detect/get_modes is used for analogix
->> platform driver to init the connector.
->>
->> They reason why connector need register in helper driver is rockchip drm
->> haven't implement the atomic API, but Exynos drm have implement it, so
->> there would need two different connector helper functions, that's why we
->> leave the connector register in helper driver.
->>
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> ---
->> Changes in v5:
->> - Correct the check condition of gpio_is_valid when driver try to get
->>    the "hpd-gpios" DT propery. (Heiko)
->> - Move the platform attach callback in the front of core driver bridge
->>    attch function. Cause once platform failed at attach, core driver should
->>    still failed, so no need to init connector before platform attached (Krzysztof)
->> - Keep code style no changes with the previous exynos_dp_code.c in this
->>    patch, and update commit message about the new export symbol (Krzysztof)
->> - Gather the device type patch (v4 11/16) into this one. (Krzysztof)
->> - leave out the connector registration to analogix platform driver. (Thierry)
-> Thanks for fixing this, looks much better.
->
-> I don't feel comfortable enough to provide a review tag but it looks
-> good to me.
-
-Thanks  ;)
-
-- Yakir
-
-> Best regards,
-> Krzysztof
->
->
->
->
+- Kukjin
