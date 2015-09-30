@@ -1,29 +1,112 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Sep 2015 19:22:19 +0100
-Subject: [RESEND PATCH v2 1/1] ASoC: dwc: fix dma stop transferring issue
-In-Reply-To: <006401d0fac5$2e4bb840$8ae328c0$@tangramtek.com>
-References: <006401d0fac5$2e4bb840$8ae328c0$@tangramtek.com>
-Message-ID: <20150930182219.GU15635@sirena.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 30 Sep 2015 21:26:52 +0300
+Subject: [PATCH/RFC v2 net-next 3/4] ravb: Document binding for r8a7795 SoC
+In-Reply-To: <20150914004207.GA6230@verge.net.au>
+References: <1441936878-18290-1-git-send-email-horms+renesas@verge.net.au>
+ <1441936878-18290-4-git-send-email-horms+renesas@verge.net.au>
+ <55F2E44D.6010505@cogentembedded.com> <20150914004207.GA6230@verge.net.au>
+Message-ID: <560C296C.9080403@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 29, 2015 at 10:43:17PM +0800, yitian wrote:
-> Designware I2S uses tx empty and rx available signals as the DMA
-> handshaking signals. during music playing, if XRUN occurs,
-> i2s_stop() function will be executed and both tx and rx irq are
-> masked, when music continues to be played, i2s_start() is executed
-> but both tx and rx irq are not unmasked which cause I2S stop
-> sending DMA handshaking signal to DMA controller, and it finally
-> causes music playing will be stopped once XRUN occurs for the first
-> time.
+Hello.
 
-I'm a bit concerned about how this code ever worked given the above
-description - is there some race condition which allows things to work
-if we're lucky?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/d3b82426/attachment.sig>
+On 09/14/2015 03:42 AM, Simon Horman wrote:
+
+    Sorry for delayed reply, I thought I'd already replied to this. :-/
+
+>>> From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+>>>
+>>> This patch updates the ravb binding to support the r8a7795 SoC by:
+>>> - Adding a compat string for the new hardware
+>>> - Adding 25 named interrupts to binding for the new SoC;
+>>>    older SoCs continue to use a single multiplexed interrupt
+>>>
+>>> The example is also updated to reflect the r8a7795 as this is the
+>>> more complex case.
+>>>
+>>> Based on work by Kazuya Mizuguchi and others.
+>>>
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>>
+>>> ---
+>>>
+>>> v2
+>>> * First post; broken out of a driver update patch
+>>> * As discussed with Geert Uytterhoeven and Sergei Shtylyov
+>>>    - Binding: Make all interrupts mandatory as named-interrupts of
+>>>      the form ch%u
+>>> ---
+>>>   .../devicetree/bindings/net/renesas,ravb.txt       | 65 +++++++++++++++++++---
+>>>   1 file changed, 58 insertions(+), 7 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/net/renesas,ravb.txt b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+>>> index 1fd8831437bf..6c360f993d33 100644
+>>> --- a/Documentation/devicetree/bindings/net/renesas,ravb.txt
+>>> +++ b/Documentation/devicetree/bindings/net/renesas,ravb.txt
+>> [...]
+>>> @@ -27,13 +33,46 @@ Optional properties:
+>>>   Example:
+>>>
+>>>   	ethernet at e6800000 {
+>>> -		compatible = "renesas,etheravb-r8a7790";
+>>> -		reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
+>>> +		compatible = "renesas,etheravb-r8a7795";
+>>> +		reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
+>>>   		interrupt-parent = <&gic>;
+>>> -		interrupts = <0 163 IRQ_TYPE_LEVEL_HIGH>;
+>>> -		clocks = <&mstp8_clks R8A7790_CLK_ETHERAVB>;
+>>> -		phy-mode = "rmii";
+>>> +		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
+>>> +			     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+>>> +		interrupt-names = "ch0", "ch1", "ch2", "ch3",
+>>> +				  "ch4", "ch5", "ch6", "ch7",
+>>> +				  "ch8", "ch9", "ch10", "ch11",
+>>> +				  "ch12", "ch13", "ch14", "ch15",
+>>> +				  "ch16", "ch17", "ch18", "ch19",
+>>> +				  "ch20", "ch21", "ch22", "ch23",
+>>> +				  "ch24";
+>>
+>>     To me, these names don't look very helpful. You could as well omit them
+>> and use platform_get_irq() with the channel #.
+
+> These names reflect the hardware; which is the aim of DT.
+
+    Indeed (I've looked into the manuals by now). They just look poorly 
+chosen. :-)
+
+> As I believe you pointed out earlier it is preferred to use named
+> interrupts when there is more than one. Do I misunderstand the situation
+> there?
+
+    Yes.
+
+> If you have a positive contribution to make regarding better names then
+> I am all ears.
+
+    I liked your "tx<n>", "rx<n>" variant better...
+
+MBR, Sergei
