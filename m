@@ -1,94 +1,42 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 30 Sep 2015 10:25:22 +0800
-Subject: [RESEND PATCH v3 2/5] ARM: dts: imx27.dtsi: change the clock
- information for usb
-In-Reply-To: <1443579925-1330-1-git-send-email-peter.chen@freescale.com>
-References: <1443579925-1330-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1443579925-1330-3-git-send-email-peter.chen@freescale.com>
+Date: Wed, 30 Sep 2015 10:25:20 +0800
+Subject: [RESEND PATCH v3 0/5] usb: change clock information for chipidea
+Message-ID: <1443579925-1330-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For imx27, it needs three clocks to let the controller work,
-the old code is wrong, and usbmisc has not included clock handling
-code any more. Without this patch, it will cause below data
-abort when accessing usbmisc registers.
+This patch set changes usb clock information for legacy i.mx platforms.
+At these platforms, they needs three clocks to let controller work.
 
-usbcore: registered new interface driver usb-storage
-Unhandled fault: external abort on non-linefetch (0x008) at 0xf4424600
-pgd = c0004000
-[f4424600] *pgd=10000452(bad)
-Internal error: : 8 [#1] PREEMPT ARM
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper Not tainted 4.1.0-next-20150701-dirty #3089
-Hardware name: Freescale i.MX27 (Device Tree Support)
-task: c7832b60 ti: c783e000 task.ti: c783e000
-PC is at usbmisc_imx27_init+0x4c/0xbc
-LR is at usbmisc_imx27_init+0x40/0xbc
-pc : [<c03cb5c0>]    lr : [<c03cb5b4>]    psr: 60000093
-sp : c783fe08  ip : 00000000  fp : 00000000
-r10: c0576434  r9 : 0000009c  r8 : c7a773a0
-r7 : 01000000  r6 : 60000013  r5 : c7a776f0  r4 : c7a773f0
-r3 : f4424600  r2 : 00000000  r1 : 00000001  r0 : 00000001
-Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 0005317f  Table: a0004000  DAC: 00000017
-Process swapper (pid: 1, stack limit = 0xc783e190)
-Stack: (0xc783fe08 to 0xc7840000)
+Hi Shawn,
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
-Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: <stable@vger.kernel.org> #v4.1+
----
- arch/arm/boot/dts/imx27.dtsi | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+Fabio has tested for both imx27 and imx25 platforms.
+I have queued 1/5 and 5/5, would you please help to queue others,
+thanks.
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index feb9d34..f818ea4 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -486,7 +486,10 @@
- 				compatible = "fsl,imx27-usb";
- 				reg = <0x10024000 0x200>;
- 				interrupts = <56>;
--				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
-+				clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
-+					<&clks IMX27_CLK_USB_AHB_GATE>,
-+					<&clks IMX27_CLK_USB_DIV>;
-+				clock-names = "ipg", "ahb", "per";
- 				fsl,usbmisc = <&usbmisc 0>;
- 				status = "disabled";
- 			};
-@@ -495,7 +498,10 @@
- 				compatible = "fsl,imx27-usb";
- 				reg = <0x10024200 0x200>;
- 				interrupts = <54>;
--				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
-+				clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
-+					<&clks IMX27_CLK_USB_AHB_GATE>,
-+					<&clks IMX27_CLK_USB_DIV>;
-+				clock-names = "ipg", "ahb", "per";
- 				fsl,usbmisc = <&usbmisc 1>;
- 				dr_mode = "host";
- 				status = "disabled";
-@@ -505,7 +511,10 @@
- 				compatible = "fsl,imx27-usb";
- 				reg = <0x10024400 0x200>;
- 				interrupts = <55>;
--				clocks = <&clks IMX27_CLK_USB_IPG_GATE>;
-+				clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
-+					<&clks IMX27_CLK_USB_AHB_GATE>,
-+					<&clks IMX27_CLK_USB_DIV>;
-+				clock-names = "ipg", "ahb", "per";
- 				fsl,usbmisc = <&usbmisc 2>;
- 				dr_mode = "host";
- 				status = "disabled";
-@@ -515,7 +524,6 @@
- 				#index-cells = <1>;
- 				compatible = "fsl,imx27-usbmisc";
- 				reg = <0x10024600 0x200>;
--				clocks = <&clks IMX27_CLK_USB_AHB_GATE>;
- 			};
- 
- 			sahara2: sahara at 10025000 {
+Changes for v3:
+- Delete property "needs-three-clocks", and using of_device_id->data
+  to differentiate platforms
+- change <stable@vger.kernel.org> #v3.19+ to <stable@vger.kernel.org> #v4.1+
+
+Changes for v2:
+- Add imx25 & imx27 dts change
+- Add Fabio's tested-by and Cc: <stable@vger.kernel.org> #v3.19+
+- Some typo and commit description
+
+Peter Chen (5):
+  doc: dt-binding: ci-hdrc-usb2: split vendor specific properties
+  ARM: dts: imx27.dtsi: change the clock information for usb
+  ARM: dts: imx25.dtsi: change the clock information for usb
+  ARM: dts: imx35.dtsi: change the clock information for usb
+  usb: chipidea: imx: refine clock operations to adapt for all platforms
+
+ .../devicetree/bindings/usb/ci-hdrc-usb2.txt       |  10 +-
+ arch/arm/boot/dts/imx25.dtsi                       |   8 +-
+ arch/arm/boot/dts/imx27.dtsi                       |  16 ++-
+ arch/arm/boot/dts/imx35.dtsi                       |   8 +-
+ drivers/usb/chipidea/ci_hdrc_imx.c                 | 156 ++++++++++++++++++---
+ 5 files changed, 164 insertions(+), 34 deletions(-)
+
 -- 
 1.9.1
