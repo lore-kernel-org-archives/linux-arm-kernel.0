@@ -1,47 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Sep 2015 18:39:21 +0100
-Subject: [PATCH 1/8] dt-bindings: pmic: Document Hi655x pmic driver
-In-Reply-To: <1443611111-3196-2-git-send-email-w.f@huawei.com>
-References: <1443611111-3196-1-git-send-email-w.f@huawei.com>
- <1443611111-3196-2-git-send-email-w.f@huawei.com>
-Message-ID: <20150930173921.GJ15635@sirena.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 30 Sep 2015 19:39:26 +0200 (CEST)
+Subject: [PATCH v2 0/7] net: mvneta: Switch to per-CPU irq and make
+ rxq_def useful
+In-Reply-To: <20150930.084039.1788742148434227487.davem@davemloft.net>
+References: <1443197378-30717-1-git-send-email-gregory.clement@free-electrons.com>
+ <20150929.115157.1923947727727463035.davem@davemloft.net>
+ <alpine.DEB.2.11.1509301655140.4500@nanos>
+ <20150930.084039.1788742148434227487.davem@davemloft.net>
+Message-ID: <alpine.DEB.2.11.1509301938130.4500@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 07:05:04PM +0800, Fei Wang wrote:
+On Wed, 30 Sep 2015, David Miller wrote:
+> From: Thomas Gleixner <tglx@linutronix.de>
+> Date: Wed, 30 Sep 2015 16:56:06 +0200 (CEST)
+> 
+> > On Tue, 29 Sep 2015, David Miller wrote:
+> >> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >> Date: Fri, 25 Sep 2015 18:09:31 +0200
+> >> 
+> >> > As stated in the first version: "this patchset reworks the Marvell
+> >> > neta driver in order to really support its per-CPU interrupts, instead
+> >> > of faking them as SPI, and allow the use of any RX queue instead of
+> >> > the hardcoded RX queue 0 that we have currently."
+> >> 
+> >> Series applied, thanks.
+> > 
+> > You could have had the courtesy to wait for an ack for the core irq
+> > parts at least....
+> 
+> Sorry, my impression was that those parts were already discussed and
+> agreed upon.
 
-> +Hisilicon hi655x Power Management Integrated Circuit (PMIC)
-> +
-> +hi655x consists of a large and varied group of sub-devices:
-> +
-> +Device			 Supply Names	 Description
-> +------			 ------------	 -----------
-> +hi655x-powerkey		:		: Powerkey
-> +hi655x-regulator-pmic	:		: Regulators
-> +hi655x-usbvbus		:		: USB plug detection
-> +hi655x-pmu-rtc		:		: RTC
-> +hi655x-coul		:		: Coulomb
+No problem. I would have preferred to merge them to a separate branch
+which you could have pulled so we don't end up with conflicts on
+further changes in that area. But it's ok as it is. The patches are
+good to go.
 
-...counter?
+Thanks,
 
-There's no documentation of the bindings for any of the above devices or
-how things are structured, you need to provide binding documentation
-which is understandable standalone.  None of the properties are
-documented, nor is the set of regulators supported or how this is
-structured.
-
-> +                coul: coul at 1 {
-> +                        compatible = "hisilicon,hi655x-coul";
-> +                        interrupt-parent = <&pmic>;
-> +                        interrupts = <24 0>, <25 0>, <26 0>, <27 0>;
-> +                        interrupt-names = "cl_int_i", "cl_out_i", "cl_in_i", "vbat_int_i";
-> +                        battery_product_index = <0>;
-
-For example, the "battery_product_index" property here is undocumented.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150930/57546c23/attachment.sig>
+	tglx
