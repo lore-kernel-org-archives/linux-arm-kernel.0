@@ -1,111 +1,33 @@
-From: huawei.libin@huawei.com (Li Bin)
-Date: Wed, 30 Sep 2015 10:49:55 +0800
-Subject: [PATCH] arm64: ftrace: fix function_graph tracer panic
-Message-ID: <1443581395-30088-1-git-send-email-huawei.libin@huawei.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Wed, 30 Sep 2015 11:28:08 +0800
+Subject: [PATCH] mmc: core: Fix init_card in 52Mhz
+Message-ID: <1443583688-1952-1-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When function graph tracer is enabled, the following operation
-will trigger panic:
+Suppose that we got a data crc error, and it triggers the mmc_reset.
+mmc_reset will call mmc_send_status to see if HW reset was supported.
+before issue CMD13, it will do retune, and if EMMC was in HS400 mode,
+it will reduce frequency to 52Mhz firstly, that results in card init
+was doing at 52Mhz, So need ensure frequency is lower than 400Khz when
+re-init card.
 
-mount -t debugfs nodev /sys/kernel
-echo next_tgid > /sys/kernel/tracing/set_ftrace_filter
-echo function_graph > /sys/kernel/tracing/current_tracer
-ls /proc/
-
-------------[ cut here ]------------
-[  198.501417] Unable to handle kernel paging request at virtual address cb88537fdc8ba316
-[  198.506126] pgd = ffffffc008f79000
-[  198.509363] [cb88537fdc8ba316] *pgd=00000000488c6003, *pud=00000000488c6003, *pmd=0000000000000000
-[  198.517726] Internal error: Oops: 94000005 [#1] SMP
-[  198.518798] Modules linked in:
-[  198.520582] CPU: 1 PID: 1388 Comm: ls Tainted: G
-[  198.521800] Hardware name: linux,dummy-virt (DT)
-[  198.522852] task: ffffffc0fa9e8000 ti: ffffffc0f9ab0000 task.ti: ffffffc0f9ab0000
-[  198.524306] PC is at next_tgid+0x30/0x100
-[  198.525205] LR is at return_to_handler+0x0/0x20
-[  198.526090] pc : [<ffffffc0002a1070>] lr : [<ffffffc0000907c0>] pstate: 60000145
-[  198.527392] sp : ffffffc0f9ab3d40
-[  198.528084] x29: ffffffc0f9ab3d40 x28: ffffffc0f9ab0000
-[  198.529406] x27: ffffffc000d6a000 x26: ffffffc000b786e8
-[  198.530659] x25: ffffffc0002a1900 x24: ffffffc0faf16c00
-[  198.531942] x23: ffffffc0f9ab3ea0 x22: 0000000000000002
-[  198.533202] x21: ffffffc000d85050 x20: 0000000000000002
-[  198.534446] x19: 0000000000000002 x18: 0000000000000000
-[  198.535719] x17: 000000000049fa08 x16: ffffffc000242efc
-[  198.537030] x15: 0000007fa472b54c x14: ffffffffff000000
-[  198.538347] x13: ffffffc0fada84a0 x12: 0000000000000001
-[  198.539634] x11: ffffffc0f9ab3d70 x10: ffffffc0f9ab3d70
-[  198.540915] x9 : ffffffc0000907c0 x8 : ffffffc0f9ab3d40
-[  198.542215] x7 : 0000002e330f08f0 x6 : 0000000000000015
-[  198.543508] x5 : 0000000000000f08 x4 : ffffffc0f9835ec0
-[  198.544792] x3 : cb88537fdc8ba316 x2 : cb88537fdc8ba306
-[  198.546108] x1 : 0000000000000002 x0 : ffffffc000d85050
-[  198.547432]
-[  198.547920] Process ls (pid: 1388, stack limit = 0xffffffc0f9ab0020)
-[  198.549170] Stack: (0xffffffc0f9ab3d40 to 0xffffffc0f9ab4000)
-[  198.582568] Call trace:
-[  198.583313] [<ffffffc0002a1070>] next_tgid+0x30/0x100
-[  198.584359] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
-[  198.585503] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
-[  198.586574] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
-[  198.587660] [<ffffffc0000907bc>] ftrace_graph_caller+0x6c/0x70
-[  198.588896] Code: aa0003f5 2a0103f4 b4000102 91004043 (885f7c60)
-[  198.591092] ---[ end trace 6a346f8f20949ac8 ]---
-
-This is because when using function graph tracer, if the traced
-function return value is in multi regs ([0x-07]), return_to_handler
-may corrupt them. So in return_to_handler, the parameter regs should
-be protected properly.
-
-Cc: <stable@vger.kernel.org> # 3.18+
-Signed-off-by: Li Bin <huawei.libin@huawei.com>
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 ---
- arch/arm64/kernel/entry-ftrace.S |   22 ++++++++++++++++++++--
- 1 files changed, 20 insertions(+), 2 deletions(-)
+ drivers/mmc/core/mmc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
-index 08cafc5..0f03a8f 100644
---- a/arch/arm64/kernel/entry-ftrace.S
-+++ b/arch/arm64/kernel/entry-ftrace.S
-@@ -178,6 +178,24 @@ ENTRY(ftrace_stub)
- ENDPROC(ftrace_stub)
+diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+index e726903..f2d0c2a 100644
+--- a/drivers/mmc/core/mmc.c
++++ b/drivers/mmc/core/mmc.c
+@@ -1945,6 +1945,7 @@ static int mmc_reset(struct mmc_host *host)
  
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	/* save return value regs*/
-+	.macro save_return_regs
-+	sub sp, sp, #64
-+	stp x0, x1, [sp]
-+	stp x2, x3, [sp, #16]
-+	stp x4, x5, [sp, #32]
-+	stp x6, x7, [sp, #48]
-+	.endm
-+
-+	/* restore return value regs*/
-+	.macro restore_return_regs
-+	ldp x0, x1, [sp]
-+	ldp x2, x3, [sp, #16]
-+	ldp x4, x5, [sp, #32]
-+	ldp x6, x7, [sp, #48]
-+	add sp, sp, #64
-+	.endm
-+
- /*
-  * void ftrace_graph_caller(void)
-  *
-@@ -204,11 +222,11 @@ ENDPROC(ftrace_graph_caller)
-  * only when CONFIG_HAVE_FUNCTION_GRAPH_FP_TEST is enabled.
-  */
- ENTRY(return_to_handler)
--	str	x0, [sp, #-16]!
-+	save_return_regs
- 	mov	x0, x29			//     parent's fp
- 	bl	ftrace_return_to_handler// addr = ftrace_return_to_hander(fp);
- 	mov	x30, x0			// restore the original return address
--	ldr	x0, [sp], #16
-+	restore_return_regs
- 	ret
- END(return_to_handler)
- #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+ 	/* Set initial state and call mmc_set_ios */
+ 	mmc_set_initial_state(host);
++	mmc_set_clock(host, host->f_init);
+ 	mmc_host_clk_release(host);
+ 
+ 	return mmc_init_card(host, card->ocr, card);
 -- 
-1.7.1
+1.8.1.1.dirty
