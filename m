@@ -1,52 +1,131 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 30 Sep 2015 11:59:01 +0200
-Subject: [PATCH v4 2/5] ARM: mvebu: enable broken-idle on Armada 38x
-In-Reply-To: <1443604246-29844-3-git-send-email-simon.guinot@sequanux.org>
- (Simon Guinot's message of "Wed, 30 Sep 2015 11:10:43 +0200")
-References: <1443604246-29844-1-git-send-email-simon.guinot@sequanux.org>
- <1443604246-29844-3-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <874micqlcq.fsf@free-electrons.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 30 Sep 2015 13:06:44 +0300
+Subject: [PATCH 01/11 RESEND] ARM: OMAP: DRA7: hwmod: Add data for McASP3
+In-Reply-To: <alpine.DEB.2.02.1509270631440.7947@utopia.booyaka.com>
+References: <1442326206-30192-1-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.02.1509270631440.7947@utopia.booyaka.com>
+Message-ID: <560BB434.6080308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon and Vincent,
+Paul,
 
- On mer., sept. 30 2015, Simon Guinot <simon.guinot@sequanux.org> wrote:
+On 09/27/2015 10:02 AM, Paul Walmsley wrote:
+>>  /*
+>> + * 'mcasp' class
+>> + *
+>> + */
+>> +static struct omap_hwmod_class_sysconfig dra7xx_mcasp_sysc = {
+>> +	.sysc_offs	= 0x0004,
+>> +	.sysc_flags	= SYSC_HAS_SIDLEMODE,
+>> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+>> +	.sysc_fields	= &omap_hwmod_sysc_type3,
+>> +};
+>> +
+>> +static struct omap_hwmod_class dra7xx_mcasp_hwmod_class = {
+>> +	.name	= "mcasp",
+>> +	.sysc	= &dra7xx_mcasp_sysc,
+>> +};
+>> +
+>> +/* mcasp3 */
+>> +static struct omap_hwmod dra7xx_mcasp3_hwmod = {
+>> +	.name		= "mcasp3",
+>> +	.class		= &dra7xx_mcasp_hwmod_class,
+>> +	.clkdm_name	= "l4per2_clkdm",
+>> +	.main_clk	= "mcasp3_ahclkx_mux",
+> 
+> I'd expect this clock to be something derived from mcasp3_aux_gfclk, 
+> according to Table 24-408 "Clocks and Resets" of SPRUHZ6.  Could you 
+> please doublecheck this?
 
-> From: Vincent Donnefort <vdonnefort@gmail.com>
->
-> Following the broken-idle DT property introduction, this patch enables
-> this option for the Armada 38x SoCs. This allows to deactivate the idle
-> state which is currently broken on this SoCs.
+I can not explain this. If I change the main_clk to "mcasp3_aux_gfclk_mux"
+then I can not access to McASP3 register at all.
+I don't see anything popping out in the clock data, nor in other places.
 
-As explained in the previous email I would like that Armada 38x don't
-use this flag.
+>> +	.flags		= HWMOD_SWSUP_SIDLE,
 
-Thanks,
+Not sure why this has been added, I can not find any pointers regarding to
+this and everything is working w/o this flag. Will remove it in v2.
 
-Gregory
 
->
-> Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
-> ---
->  arch/arm/boot/dts/armada-38x.dtsi | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index f9f2347d9995..6d29afe12892 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -422,6 +422,7 @@
->  			coherency-fabric at 21010 {
->  				compatible = "marvell,armada-380-coherency-fabric";
->  				reg = <0x21010 0x1c>;
-> +				broken-idle;
->  			};
+> Is this needed?  If it is, please add a brief comment describing the issue 
+> or bug that it's working around.
+> 
+>> +	.prcm = {
+>> +		.omap4 = {
+>> +			.clkctrl_offs = DRA7XX_CM_L4PER2_MCASP3_CLKCTRL_OFFSET,
+>> +			.context_offs = DRA7XX_RM_L4PER2_MCASP3_CONTEXT_OFFSET,
+>> +			.modulemode   = MODULEMODE_SWCTRL,
+>> +		},
+>> +	},
+>> +};
+>> +
+>> +/*
+>>   * 'mmc' class
+>>   *
+>>   */
+>> @@ -2566,6 +2598,14 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__hdmi = {
+>>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>>  };
+>>  
+>> +/* l4_per2 -> mcasp3 */
+>> +static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp3 = {
+>> +	.master		= &dra7xx_l4_per2_hwmod,
+>> +	.slave		= &dra7xx_mcasp3_hwmod,
+> 
+> So this is the low-speed control/register access port, where the MPU 
+> writes to the McASP3 config registers...
+> 
+>> +	.clk		= "l3_iclk_div",
+> 
+> ... and thus this interface clock doesn't look right for this port, since 
+> it's most likely generated from the L4PER2, where this port is connected.  
+> So it should probably be "l4_iclk_div".
+
+There is no "l4_iclk_div" for dra7xx. Looking around the file all other script
+generated data uses "l3_iclk_div" for IPs under dra7xx_l4_per2_hwmod.
+
+Tero: do you know the reason for this?
+
 >  
->  			pmsu at 22000 {
+>> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>> +};
+> 
+> There's another struct omap_hwmod_ocp_if record missing: the high-speed 
+> bus-master port that the McASP3 uses to DMA audio data.  This port should 
+> most likely be clocked with "l3_iclk_div" per Table 24-408 "Clocks and 
+> Resets".  This port is also where the registers described in Table 24-555 
+> "MCASP_DAT Register Summary 3" L3_MAIN column are exposed.  You've got 
+> that address map range blocked out in your DT data reg property, and 
+> associated with this device, right? 0x46000000?
+
+Yes, the McASP3-dat port is not used ATM. This is over the L3 interconnect and
+due to a feature we can not use it with sDMA (constant addressing is not
+supported through L3 interconnect for DMAs).
+We could use eDMA, but there are complications regarding to that.
+At the moment we are using the sDMA through the L4 interconnect address space.
+
+> 
+>> +
+>>  static struct omap_hwmod_addr_space dra7xx_elm_addrs[] = {
+>>  	{
+>>  		.pa_start	= 0x48078000,
+>> @@ -3338,6 +3378,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>>  	&dra7xx_l4_wkup__dcan1,
+>>  	&dra7xx_l4_per2__dcan2,
+>>  	&dra7xx_l4_per2__cpgmac0,
+>> +	&dra7xx_l4_per2__mcasp3,
+>>  	&dra7xx_gmac__mdio,
+>>  	&dra7xx_l4_cfg__dma_system,
+>>  	&dra7xx_l3_main_1__dss,
+>> -- 
+>> 2.5.0
+>>
+> 
+> 
+> - Paul
+> 
+
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+P?ter
