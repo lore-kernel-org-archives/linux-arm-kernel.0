@@ -1,40 +1,38 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu,  1 Oct 2015 22:54:37 +0200
-Subject: [PATCH 00/16] LPC18xx DTS changes for 4.4
-Message-ID: <1443732893-17145-1-git-send-email-manabian@gmail.com>
+Date: Thu,  1 Oct 2015 22:54:38 +0200
+Subject: [PATCH 01/16] ARM: dts: lpc18xx: add rgu node
+In-Reply-To: <1443732893-17145-1-git-send-email-manabian@gmail.com>
+References: <1443732893-17145-1-git-send-email-manabian@gmail.com>
+Message-ID: <1443732893-17145-2-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set includes the DTS changes for lpc18xx for v4.4. Mostly
-additions of new nodes to lpc18xx.dtsi for drivers that when upstream
-during the last cycle and board updates to the Hitex and Embedded
-Artists boards.
+Add the NXP LPC1850 RGU (Reset Generation Unit) reset controller
+node to the dtsi for all lpc18xx/43xx devices.
 
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ arch/arm/boot/dts/lpc18xx.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Ariel D'Alessandro (3):
-  ARM: dts: lpc18xx: add watchdog node
-  ARM: dts: lpc18xx: add sct pwm node
-  ARM: dts: lpc4350-hitex-eval: add i2c0 and devices
-
-Joachim Eastwood (13):
-  ARM: dts: lpc18xx: add rgu node
-  ARM: dts: lpc18xx: add spifi node
-  ARM: dts: lpc18xx: add dmac node
-  ARM: dts: lpc18xx: add dmamux node
-  ARM: dts: lpc18xx: add dma to ssp0/1
-  ARM: dts: lpc18xx: add dma to uart0/1/2/3
-  ARM: dts: lpc18xx: add i2c nodes
-  ARM: dts: lpc18xx: add resets entry to device nodes
-  ARM: dts: lpc4357-ea4357: add spifi and flash device
-  ARM: dts: lpc4357-ea4357: add ssp0
-  ARM: dts: lpc4357-ea4357: add i2c0 and devices
-  ARM: dts: lpc4350-hitex-eval: add spifi and flash device
-  ARM: dts: lpc4350-hitex-eval: add joystick, buttons and leds
-
- arch/arm/boot/dts/lpc18xx.dtsi              | 134 +++++++++++++++++++++
- arch/arm/boot/dts/lpc4350-hitex-eval.dts    | 175 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/lpc4357-ea4357-devkit.dts |  95 +++++++++++++++
- 3 files changed, 404 insertions(+)
-
+diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
+index 2c569a6ddc9a..29a62b600ae5 100644
+--- a/arch/arm/boot/dts/lpc18xx.dtsi
++++ b/arch/arm/boot/dts/lpc18xx.dtsi
+@@ -178,6 +178,14 @@
+ 				      "base_ssp0_clk",  "base_sdio_clk";
+ 		};
+ 
++		rgu: reset-controller at 40053000 {
++			compatible = "nxp,lpc1850-rgu";
++			reg = <0x40053000 0x1000>;
++			clocks = <&cgu BASE_SAFE_CLK>, <&ccu1 CLK_CPU_BUS>;
++			clock-names = "delay", "reg";
++			#reset-cells = <1>;
++		};
++
+ 		uart0: serial at 40081000 {
+ 			compatible = "nxp,lpc1850-uart", "ns16550a";
+ 			reg = <0x40081000 0x1000>;
 -- 
 1.8.0
