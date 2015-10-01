@@ -1,56 +1,74 @@
-From: leoli@freescale.com (Li Yang)
-Date: Thu, 1 Oct 2015 16:42:05 -0500
-Subject: [PATCH v2 07/10] dts/ls2085a: Update DTSI to add support of
- various peripherals
-In-Reply-To: <CY1PR0301MB0748A8F37E3FBE1922AF9D3F874C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <1441350322-4671-1-git-send-email-bhupesh.sharma@freescale.com>
- <CAL_Jsq+9izV8vkrF1tK96M-VRGTMJ+GN5o=RsnCBDcnh-at5kA@mail.gmail.com>
- <CALRxmdC9ZzGiw6CVnVTqhH1xvA-P9s8cpYbk8DoVq7CodFS0VA@mail.gmail.com>
- <CY1PR0301MB0748A8F37E3FBE1922AF9D3F874C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <CADRPPNRz-yM_48HvHYv3r31u_b_tHkAjg5H5r+V2mE2=oJTGDA@mail.gmail.com>
+From: Andrew.Pinski@caviumnetworks.com (Pinski, Andrew)
+Date: Thu, 1 Oct 2015 21:49:46 +0000
+Subject: [PATCH v5 00/23] ILP32 for ARM64
+In-Reply-To: <1708349.DFbfvHcnCR@wuerfel>
+References: <1443564860-31208-1-git-send-email-ynorov@caviumnetworks.com>
+ <20150930101918.GA9753@e104818-lin.cambridge.arm.com>
+ <20151001191520.GA25295@yury-N73SV>,<1708349.DFbfvHcnCR@wuerfel>
+Message-ID: <F6B719D8-1FC0-4B26-A926-40FB6953AAE3@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 1, 2015 at 3:05 PM, Stuart Yoder <stuart.yoder@freescale.com> wrote:
-> Hi Rob,
->
-> Had a question about your comments on the patch below.
->
-> You singled out 3 nodes (gic,uart,clockgen) and said "This should be under a bus node."
->
-> What is special about those 3 nodes types?  There are a bunch of other memory
-> mapped SoC devices as well in the DTS.
->
-> I skimmed the dts files under arch/arm64 and it looks like most have a simple-bus
-> SoC node like this where SoC devices are under:
->
->         soc {
->                 #address-cells = <2>;
->                 #size-cells = <2>;
->                 compatible = "simple-bus";
->                 ranges;
->
-> Is that what you are looking for-- for all SoC devices?
 
-I think the key is to have the soc node and have all the on-chip
-devices defined underneath it.
+> On Oct 1, 2015, at 2:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+>> On Thursday 01 October 2015 22:15:20 Yury Norov wrote:
+>> 
+>> Regarding time_t, it, of course, doesn't takes much time to make it
+>> 32-bit, but I think 64 bit is better because of Y2038. X32 and mips
+>> n32 has time_t 64-bit (and ppc, not sure), and that's OK for them.
+> 
+> I'm pretty sure that n32 has 32-bit time_t, and we know that it still
+> causes real-world problems on x32: socket timestamps, v4l, alsa and
+> other subsystems all have bugs in this area that are hard to fix.
+> 
+>> That's OK for BSD as well. The objection may come from users of ABI,
+>> complaining portability problems, but I found no such complains in
+>> public discussions.
+>> 
+>> Nevertheless, as I told, I do not see any problem to rework time_t.
+>> But some arguments supporting this decision are appreciated.
+>> 
+>> The downside of 32 bit time_t is that we still face Y2038 problem,
+>> but that's the other story fixing it.
+> 
+> The main reason for 32-bit time_t is compatibility with existing
+> ioctls (also getsockopts and some others), and having a sane way
+> for fixing them. We cannot change compat_time_t to be 64-bit
+> without breaking arm32 compat mode, and we can't use the native
+> 64-bit ioctl implementation on ARM64/ILP32 because that breaks
+> all interfaces that pass 'long' or a pointer.
+> 
+> This means drivers that currently pass a time_t (or timeval, timespec
+> etc) need to not only have a compat_ioctl handler to convert it,
+> they also need to check whether which of the two compat modes they
+> are talking to. This is a mess to add (I know, because I'm working
+> on this for y2038 compliance for normal 32-bit mode), and making
+> the two behave differently makes it even harder to get right for
+> all cases.
+> 
+>> __kernel_long_t is the same. Now it's 64 bits length. Compatibility
+>> may suffer, but, again, there're no complains, and in long run it
+>> looks better.
+> 
+> __kernel_long_t isn't actually used that much, and rarely used in
+> places where it matters. The idea was to be able to reuse the
+> native syscalls rather than the compat syscall calls, but that
+> comes with the downside of defining the ABI in a way that is
+> incompatible with all other 32-bit user space.
+> 
+> Having a 64-bit __kernel_off_t is similar to the 64-bit time_t:
+> a good idea in principle, but it breaks device drivers that
+> expect user space to pass 32-bit arguments. For any interface
+> that really needs 64-bit data, we have to fix it for all
+> 32-bit architectures, and we're better off avoiding special
+> cases.
 
-I read the following from the booting-without-of.txt document:
+Ok, we will rewrite these patches using 32bit time_t and 32bit off_t and redo the toolchain support for them.  Note this is going back to the abi I had originally done when I submitted my original version when it was asked to change time_t to be 64bit. 
 
-  f) the /soc<SOCname> node
+Thanks,
+Andrew
 
-  This node is used to represent a system-on-a-chip (SoC) and must be
-  present if the processor is a SoC. The top-level soc node contains
-  information that is global to all devices on the SoC. The node name
-  should contain a unit address for the SoC, which is the base address
-  of the memory-mapped register set for the SoC. The name of an SoC
-  node should start with "soc", and the remainder of the name should
-  represent the part number for the soc.  For example, the MPC8540's
-  soc node would be called "soc8540".
 
-A lot of device trees didn't follow the soc<SOCname> naming scheme and
-just used "soc" as the node name.  I am not sure if we want to enforce
-the naming in the future or update the document to make it more relax.
-
-Regards,
-Leo
+> 
+>    Arnd
